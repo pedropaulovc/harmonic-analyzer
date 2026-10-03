@@ -4,43 +4,46 @@ The orthogonal time-base of the plotter: the platen carries the recording paper
 across the pen as the operator turns the crank, driven through the translational
 gearing, in machine coordinates (assembly origin = base origin; base top
 y = 50.8; the output side is -Z). Rebuilt against the primary references
-(memory/paper-drive-rework.md): ONE support bar, two-piece column clamps, the
-hanging platen (guides + locks), and the REAL six-gear power train:
+(memory/paper-drive-rework.md) and the paper-drive geometry contract: ONE
+support bar, two-piece column clamps, the hanging platen (guides + locks), the
+swinging transgear hanger behind the bar, and the REAL power train:
 
     crank T12 --(belt/chain feature, 12:24 teeth)--> knob T24
-      --(keyed shaft: two drive pins + LOCK)--> 12T DP38 third gear
-      --(GEAR mate 12:120)--> 120T DP38 reducer disc
-      --(LOCK: stud stack)--> 12T DP30 feed pinion
+      --(drive collar: two pressed drive pins + cross pin, LOCK)--> knob shaft
+      with its integral 12T DP38 --(GEAR mate 12:120)--> 120T DP38 reducer disc
+      --(LOCK: brass hub + feed sleeve)--> 12T DP30 feed pinion
       --(RACK-PINION mate, pi*10.16/rev)--> rack --(LOCK)--> platen
 
 Operational kinematics: the crank-end T12 sprocket spin is the ONE free
 operational DOF -- drag it and the whole feed train follows at 1.596 mm of
 paper per crank revolution (T12/T24 mounted). Every stage is a real SolidWorks
-mate on real, geometrically meshed gears (the old NET rack-pinion shortcut
-across the fictitious rest gap is gone -- the latch arm pivots ON the stud, so
-the 12T:120T mesh is permanent and the old Appendix C #8 riddle dissolves).
-The crank-spin drive spec is recorded into the DOF manifest for the transient
-verify:kinematics replay, never authored.
+mate on real, geometrically meshed gears. The hanger arm pivots on the bar and
+carries the stud, so the 12T:120T mesh is permanent. The crank-spin drive spec
+is recorded into the DOF manifest for the transient verify:kinematics replay,
+never authored.
 
 * ONE support bar (22 x 9 x 452, book p.62 "the bar that the platen rides on"),
   front face on the platen back, clamped to each column by a FRONT + BACK
   semi-arc pair closed by two long screws whose heads show on the bar front
   (ch30 p002).
 * Platen group (HANGS on the bar): platen + two full-width back guide rails
-  (above/below the bar band) + 4 lock plates bridging behind the bar + the
-  teeth-down rack at the bottom edge (crests 2 below the platen edge) + two
-  bright-brass edge clips + the paper sheet + ALL its screws -- everything
-  lock-mated to the platen so the whole group feeds together (the old
-  grounded-screw float is fixed).
-* Transgear group: bracket on the bar's back face (2 slotted screws) carrying
-  the stepped stud; on the stud the 120T disc + 12T feed pinion (locked pair,
-  O5 seat) and the latch arm's big hub; the arm carries the knob shaft MHA-078
-  with the mounted T24 removable CHAIN-WRAPPED at the z -155.7 chain plane
-  (rear face on the shaft's seat collar, driven by two pressed MHA-155 pins),
-  the 12T DP38 third gear on the shaft's O5 seat, and the thumb knob; the
-  knurled thumbnut on the shaft's front pilot retains the T24 (ch23 p.58/59).
-* Latch hook: the short curved spring-steel hook screwed to the bar's front
-  face (video 4/4), hanging beside the platen's -X edge toward the cluster.
+  (above/below the bar band) + 4 lock plates bridging behind the bar (held by
+  low button-head guide-lock screws) + the teeth-down rack at the bottom edge
+  (crests 2 below the platen edge) + two bright-brass edge clips + the paper
+  sheet + ALL its screws -- everything lock-mated to the platen so the whole
+  group feeds together.
+* Transgear hanger (behind the bar): the arm stands on the pivot spacer and
+  swings on the shoulder pivot screw in the bar's tap; the stepped stud in the
+  arm carries the feed sleeve (12T DP30), the 120T disc and its brass hub,
+  closed by the hub cap. The arm plate, screwed to the arm, bores the knob
+  shaft, whose integral 12T meshes the disc; the thrust ring and the knob cup
+  (set on a feeler, cross-pinned to the journal) set its end float. On the
+  shaft's front core the drive collar (pressed drive pins, cross pin) carries
+  the mounted T24 removable CHAIN-WRAPPED at the z -155.7 chain plane, and the
+  knurled thumbnut on the shaft's front thread, seated on the collar's pilot,
+  retains it free (ch23 p.58/59; R9-70).
+* Latch hook: the curved spring-steel strip riveted to the hook bracket's flap
+  on the bar's back face; the arm's latch pin rides in its hole.
 * The ANSI #25 roller chain loops both removables (native connected-linkage
   chain component pattern); the 2.8 sprocket plate fits BETWEEN the chain's
   inner plates, so only the roller<->tooth seating is intended contact.
@@ -76,8 +79,12 @@ from _chain import (
     PITCH_R_T12,
     PITCH_R_T24,
     PLATE_HALF_H as CHAIN_PLATE_HALF_H,
+    SLACK_R as CHAIN_SLACK_R,
+    SPAN_A as CHAIN_SPAN_A,
+    SPAN_SLACK as CHAIN_SPAN_SLACK,
     TIP_R_T12,
     TIP_R_T24,
+    WRAP_R_A as CHAIN_WRAP_R_A,
     centreline_distance,
     loop_point_tangent,
 )
@@ -93,6 +100,7 @@ from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
     angle_driver,
+    author_in_drawing_configurations,
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
@@ -124,17 +132,18 @@ from _assembly_patterns import (
 )
 from _interference_contracts import allowed_interference_pairs
 from _visibility import blank_reference_geometry, visible_reference_geometry
-from _holes import CLEARANCE_MM
 from _transforms import (  # noqa: E402
     IDENTITY,
     ROT_X_NEG90,
     ROT_X_POS90,
     ROT_Y_POS90,
+    euler_from_rows,
     rot_z_rows,
-    rows_from_euler,
 )
 from cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
 from harmonic_base_spec import STACK_HEIGHT as BASE_DECK_Y
+from _paper_drive_explode import create_paper_drive_explode
+from paper_drive_explode_spec import CLIP_SCREW_ROLE, GUIDE_SCREW_ROLE
 
 ASM_NAME = "paper-drive"
 
@@ -142,19 +151,15 @@ ROT_Y_180 = [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]
 ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
 
 # --- machine anchors ---------------------------------------------------------
-from build_latch_hook import (  # noqa: E402
-    STRIP_T as LATCH_HOOK_T,
-    X_MAX as LATCH_HOOK_X_MAX,
-    X_MIN as LATCH_HOOK_X_MIN,
-    Y_MIN as LATCH_HOOK_Y_MIN,
-)
+import latch_hook_bracket_geometry as HOOK_BRACKET  # noqa: E402
+import latch_hook_geometry as HOOK  # noqa: E402
+import support_bar_spec as BAR  # noqa: E402
+import transgear_arm_geometry as ARM  # noqa: E402
+import transgear_arm_spec as ARM_SPEC  # noqa: E402
 from build_support_bar import (  # noqa: E402
-    LATCH_HOLE_X as BAR_LATCH_HOLE_X,
     BAR_DEPTH,
     BAR_HEIGHT,
-    BRACKET_HOLE_SPEC as BAR_BRACKET_HOLE_SPEC,
-    BRACKET_HOLE_X as BAR_BRACKET_HOLE_X,  # MACHINE-handed (machine -X holes)
-    BRACKET_STUD_X,
+    BAR_LENGTH,
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
     CLAMP_HEAD_RECESS,
@@ -165,11 +170,6 @@ from column_clamp_front_geom import ARC_DEPTH as ARC_FRONT_DEPTH  # noqa: E402
 from build_column_clamp_back import (  # noqa: E402
     DEPTH as ARC_BACK_DEPTH,
     HOLE_SPEC as CLAMP_RECEIVER_SPEC,
-)
-from build_transgear_bracket import (  # noqa: E402
-    PLATE_THICK as BRACKET_THICK,
-    SCREW_HOLE_DX as BRACKET_SCREW_DX,
-    SCREW_HOLE_SPEC as BRACKET_CLEARANCE_SPEC,
 )
 
 COLUMN_X = 197.0
@@ -203,16 +203,34 @@ from build_platen_guide import (  # noqa: E402
     GUIDE_SCREW_PASSAGE,
     GUIDE_SCREW_THREAD_ENGAGEMENT,
     HOLE_X as GUIDE_LOCK_HOLE_X,
-    LOCK_SCREW_BOTTOM_CLEARANCE,
     LOCK_SCREW_PASSAGE,
     LOCK_SCREW_THREAD_ENGAGEMENT,
+    LOCK_SCREW_TIP_INSIDE_MIN,
     LOCK_STATION_X,
     SCREW_STATION_X as GUIDE_SCREW_STATION_X,
 )
 from build_guide_lock import (  # noqa: E402
     HOLE_DIA as LOCK_HOLE_DIA,
+    LOCK_HEIGHT,
     LOCK_THICK,
     LOCK_WIDTH,
+)
+
+# The printed bands the lock-station sweep judges the platen's lock stack at:
+# the same spec constants the guide and lock builds author on their model
+# dimensions, so the sheets and the sweep read one source.
+from _fit_limits import deviations  # noqa: E402
+from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
+from guide_lock_spec import (  # noqa: E402
+    DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
+    HOLE_XY as LOCK_HOLE_XY,
+    LOCK_HEIGHT_BAND,
+    RAIL_EDGE_LIP as LOCK_RAIL_LIP,
+)
+from platen_guide_spec import (  # noqa: E402
+    GUIDE_DEPTH_BAND,
+    GUIDE_DEPTH_PLACES,
+    LOCK_GAP_FIT,
 )
 from build_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
@@ -223,10 +241,6 @@ from build_platen_clip import (  # noqa: E402
     SCREW_SEAT_BOSS_H,
     SCREW_SEAT_DIA,
     SCREW_SEAT_STACK,
-)
-from build_bracket_screw import (  # noqa: E402
-    SHANK_DIA as BRACKET_SCREW_DIA,
-    SHANK_LEN as BRACKET_SCREW_LEN,
 )
 from clamp_screw_spec import (  # noqa: E402
     HEAD_DIA as CLAMP_SCREW_HEAD_DIA,
@@ -240,9 +254,22 @@ from fillister_screw_spec import (  # noqa: E402
     SHANK_DIA as FILLISTER_SHANK_DIA,
     SHANK_LEN as FILLISTER_SHANK_LEN,
 )
+
+# The guide-lock screws alone are low button heads (R9-31): a fillister head
+# on the lock back would sweep into the hanger arm as the platen feeds
+# (_assert_lock_station_sweep).
+from guide_lock_screw_spec import (  # noqa: E402
+    HEAD_DIA as LOCK_SCREW_HEAD_DIA,
+    HEAD_H as LOCK_SCREW_HEAD_H,
+    LOCK_SET_EDGE_REACH,
+    SHANK_DIA as LOCK_SCREW_SHANK_DIA,
+    SHANK_LEN as LOCK_SCREW_SHANK_LEN,
+)
 from build_platen_rack import (  # noqa: E402
     ADDENDUM as RACK_ADDENDUM,
     BAR_HEIGHT as RACK_BAR_HEIGHT,
+    BAR_LENGTH as RACK_BAR_LENGTH,
+    BAR_THICKNESS as RACK_BAR_THICKNESS,
     FIRST_GAP_X as RACK_FIRST_GAP_X,
     PITCH as RACK_PITCH,
 )
@@ -251,14 +278,15 @@ from build_platen_paper import (  # noqa: E402
     PAPER_WIDTH,
 )
 
-PLATE_X0 = -33.213
+PLATE_X0_PHOTO = -33.213
 # ch30-p002 Pose Studio refit (2026-07-23): the platen's top-left reference
 # corner was hand-aligned at (-33.213, 408.054) in the current assembly. The
 # width is 300 * 0.8988 and the user-confirmed H:W ratio is 1:2, so preserving
 # that top edge puts the resized plate bottom here. The fit's z delta remains
-# ignored: a near-front view does not constrain depth.
+# ignored: a near-front view does not constrain depth. The placed PLATE_X0 is
+# this photo x snapped to the rack's mesh phasing (below, after the stud).
 PLATE_Y0 = 273.234
-PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
+PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
 GUIDE_Y = (283.734, 317.734)  # bottom / top rail seats (machine y)
@@ -268,10 +296,12 @@ LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 # 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
 
-# Rack: teeth-down at the platen's bottom edge, crests protruding 2 below it.
-RACK_TIP_Y = PLATE_Y0 - 2.0  # 303
-RACK_PITCH_Y = RACK_TIP_Y + RACK_ADDENDUM  # 303.8467
-RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # 315 (Rz180: local y 0..12 maps down)
+# Rack: teeth-down at the platen's bottom edge, crests protruding 2.25 below it
+# (R9-62: 0.25 deeper than the first 2.00, which set the feed mesh at e 0.80).
+RACK_TIP_Y = PLATE_Y0 - 2.25  # 270.984
+RACK_PITCH_Y = RACK_TIP_Y + RACK_ADDENDUM  # 271.8307
+RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # 282.984 (Rx180: local y 0..12 maps down)
+RACK_BACK_Z = BAR_FRONT_Z + RACK_BAR_THICKNESS  # -132.9 (on the platen back)
 
 # --- transgear (the real six-gear train) -------------------------------------
 from build_rack_pinion import (  # noqa: E402
@@ -284,64 +314,191 @@ from build_transgear_feed_pinion import (  # noqa: E402
     FACE_WIDTH as FEED_FACE,
     TEETH as FEED_TEETH,
 )
-from build_transgear_latch import C2C as LATCH_C2C, THICKNESS as LATCH_THICK  # noqa: E402
-from build_transgear_pinion import (  # noqa: E402
-    DP as THIRD_DP,
-    FACE_WIDTH as THIRD_FACE,
-    TEETH as THIRD_TEETH,
-)
+import crankshaft_spec  # noqa: E402
+import rack_pinion_spec as DISC_SPEC  # noqa: E402
+import transgear_arm_plate_geometry as ARM_PLATE  # noqa: E402
+import transgear_arm_plate_spec as ARM_PLATE_SPEC  # noqa: E402
+import transgear_arm_plate_screw_spec as PLATE_SCREW  # noqa: E402
+import transgear_collar_cross_pin_spec as CROSS_PIN  # noqa: E402
+import transgear_cluster_fit as CLUSTER  # noqa: E402
+import transgear_disc_hub_geometry as DISC_HUB_GEOM  # noqa: E402
+import transgear_disc_hub_spec as DISC_HUB  # noqa: E402
+import transgear_disc_screw_spec as DISC_SCREW  # noqa: E402
+import transgear_drive_collar_spec as COLLAR  # noqa: E402
+import transgear_feed_pinion_spec as FEED  # noqa: E402
+import transgear_front_bushing_spec as FRONT_BUSHING  # noqa: E402
+import transgear_hanger_joints as HANGER  # noqa: E402
+import transgear_knob_cup_pin_spec as CUP_PIN  # noqa: E402
+import transgear_knob_cup_spec as CUP  # noqa: E402
+import transgear_knob_thrust_ring_spec as RING  # noqa: E402
+import transgear_latch_pin_spec as LATCH_PIN  # noqa: E402
+import transgear_pin_spec as PIN  # noqa: E402
+import transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
+import transgear_pivot_spacer_spec as SPACER  # noqa: E402
+import transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
+import transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
+import transgear_retaining_ring_spec as E_RING  # noqa: E402
+import latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
+import latch_hook_bracket_spec as HOOK_BRACKET_SPEC  # noqa: E402
+import latch_hook_rivet_spec as HOOK_RIVET  # noqa: E402
+import latch_hook_spec as HOOK_SPEC  # noqa: E402
 
 FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
-# Centre extension of the feed-pinion/rack mesh: the _gear recipe cuts tooth
-# gaps down to the BASE circle (rb = 4.918 for 12T DP30), which sits above the
-# rack crests' reach at nominal centres -- extend like the drive-train's
-# checker-arbitrated mesh slacks (rb - (PD/2 - addendum) = 0.685, +0.115).
-RACK_MESH_EXT = 0.8
-STUD_XY = (BRACKET_STUD_X, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)
-LATCH_ANGLE_DEG = -162.0  # knob swung low toward the crank at machine -X (ch30
-# p002); the machine reflection of the pre-mirror -18 deg (theta -> 180 - theta,
-# x -> -x), so the arm reaches west/-X and down from the stud.
-KNOB_SHAFT_XY = (
-    STUD_XY[0] + LATCH_C2C * math.cos(math.radians(LATCH_ANGLE_DEG)),
-    STUD_XY[1] + LATCH_C2C * math.sin(math.radians(LATCH_ANGLE_DEG)),
-)  # machine (-42.575, 252.367)
+# Centre extension of the feed-pinion/rack mesh (R9-62): 0.55, contact ratio
+# 1.25, the hook's +/-0.25 set reach centred on it. The sleeve's teeth are cut
+# to the 1.25/P root (root relief), so the rack crests clear the gap floors;
+# the bound is the rack's tip corners on the form-cut flank, clear from e 0.52
+# (paper_drive_assembly_steps.feed_mesh_penetration, R9-62a).
+RACK_MESH_EXT = 0.55
+# The stud S sits on machine x 0; its y is the feed pinion's mesh line under
+# the rack. The arm's printed stud station is |S - P| from the MHA-168 pivot
+# tap P in the bar.
+STUD_X = 0.0
+STUD_XY = (STUD_X, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)
+PIVOT_XY = (BAR.PIVOT_TAP_X, BAR_CY + BAR.HANGER_TAP_Y)  # (-58, 303.234)
+if (
+    abs(math.dist(STUD_XY, PIVOT_XY) - ARM.PIN_STATION)
+    > 0.5 * 10.0**-ARM_SPEC.STATION_PLACES
+):
+    raise AssertionError("the stud is off the arm's printed station from the pivot")
+# The hanger's frame: U runs from the pivot P through the stud S, N is U
+# turned +90 deg in the machine XY plane. The arm, its plate and the latch pin
+# are printed in (station along U, offset along N) from P.
+_ARM_REACH = math.dist(STUD_XY, PIVOT_XY)
+ARM_U = (
+    (STUD_XY[0] - PIVOT_XY[0]) / _ARM_REACH,
+    (STUD_XY[1] - PIVOT_XY[1]) / _ARM_REACH,
+)
+ARM_N = (-ARM_U[1], ARM_U[0])
+ARM_ANGLE_DEG = math.degrees(math.atan2(ARM_U[1], ARM_U[0]))  # -32.56
 
-# z stack on the stud (front -> back): collar | disc | feed pinion | latch arm
-# | bracket. The disc window clears the platen furniture: the guide-screw
-# heads are counterbored sub-flush (crowns -142.7), so the deepest reach near
-# the cluster is the paper plane at -143.4 -- 2.0 in front of the disc back.
-DISC_Z0 = -148.4  # disc -148.4..-145.4
-THIRD_Z0 = DISC_Z0  # third gear -148.4..-144.4 (full mesh overlap 3.0)
-FEED_Z0 = DISC_Z0 + DISC_FACE  # -145.4; face 9.5 reaches the rack band 3.0 deep
-RACK_BACK_Z = BAR_FRONT_Z + 6.0  # -132.9 (rack thickness 6 on the platen back)
-ARM_Z = (RACK_BACK_Z + BAR_BACK_Z) / 2.0  # -131.4: the arm's 2.6 band fits the
-# 3.0 slot between the rack's back face and the bar-front/bracket plane
-BRACKET_Z0 = BAR_BACK_Z  # plate -129.9..-125.9 on the bar's back face
-STUB_Z0 = BRACKET_Z0 + BRACKET_THICK  # -125.9 (Rx-90: local +Y -> -Z)
-from build_transgear_knob_shaft import (  # noqa: E402
-    COLLAR_REAR as KNOB_COLLAR_REAR,
-    DISC_AIR as KNOB_DISC_AIR,
-    DRIVE_PIN_FLOOR as KNOB_DRIVE_PIN_FLOOR,
-    SEAT_COLLAR as KNOB_SEAT_COLLAR,
-    SHAFT_DIA as KNOB_SHAFT_DIA,
+
+def _on_arm(station: float, offset: float = 0.0) -> tuple[float, float]:
+    """Machine xy of the hanger-frame point ``P + station*U + offset*N``."""
+    return (
+        PIVOT_XY[0] + station * ARM_U[0] + offset * ARM_N[0],
+        PIVOT_XY[1] + station * ARM_U[1] + offset * ARM_N[1],
+    )
+
+
+# The knob axis K: the permanent 12T:120T DP38 mesh puts it the disc's
+# CENTRE_DISTANCE from the stud, at MESH_ANGLE (a multiple of the disc's 3-deg
+# tooth pitch, knob swung low toward the crank at machine -X). The arm plate's
+# printed bore datum must land on it.
+MESH_ANGLE_DEG = -168.0
+KNOB_SHAFT_XY = (
+    STUD_XY[0] + DISC_SPEC.CENTRE_DISTANCE * math.cos(math.radians(MESH_ANGLE_DEG)),
+    STUD_XY[1] + DISC_SPEC.CENTRE_DISTANCE * math.sin(math.radians(MESH_ANGLE_DEG)),
+)  # machine (-43.788, 256.893)
+_PLATE_BORE_XY = _on_arm(ARM_PLATE.BORE_STATION, ARM_PLATE.BORE_OFFSET)
+if math.dist(KNOB_SHAFT_XY, _PLATE_BORE_XY) > 1e-3:
+    raise AssertionError(
+        f"arm plate bore {_PLATE_BORE_XY} is off the knob mesh axis {KNOB_SHAFT_XY}"
+    )
+
+# z stack of the hanger (front -Z -> back). It stands behind the bar's back
+# face on the pivot spacer, so the arm clears the sliding guide-lock stations
+# (_assert_lock_station_sweep).
+SPACER_Z0 = BAR_BACK_Z  # -129.9: spacer pressed flush on the shoulder's end
+ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
+if abs(SPACER_Z0 + SPACER.LENGTH - ARM_Z0) > 1e-9:
+    raise AssertionError("the arm's front face is off the pivot spacer's rear face")
+# Shoulder screw MHA-168 (Rx+90: shank to -Z): the shoulder bottoms on the
+# bar's back face; under its head the MHA-184 spring (identity: its O.D. rim
+# on the arm's spot-face floor, its I.D. rim under the head) holds the arm
+# on the spacer.
+PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # -117.2 under the head
+PIVOT_SPRING_Z0 = ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT  # -118.0
+# Arm plate (rows Rz(theta): local X along U): its mounting plane on
+# the arm's rear face; hub forward to the thrust ring, boss rearward.
+PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -116.4625
+PLATE_SCREW_XY = tuple(_on_arm(station) for station in ARM.PLATE_TAP_STATIONS)
+PLATE_SCREW_Z0 = PLATE_Z0 + ARM_PLATE.REAR_FACE_Z  # -111.4625: oval heads flush
+# Latch pin MHA-169 pressed to the floor of the arm tip's hole, along U
+# (rows Rz(theta - 90): the dowel's local +Y along U).
+LATCH_PIN_POS = (
+    *_on_arm(ARM.TIP_STATION - ARM.PIN_HOLE_DEPTH),
+    ARM.PIN_MACHINE_Z,
+)  # (45.543, 237.121, -120.431)
+# The pin's axis crosses the latch hook's plane inside the hook's pin hole.
+_PIN_AT_HOOK = (sum(HOOK.PLANE_X) / 2.0 - PIVOT_XY[0]) / ARM_U[0]
+_pin_hole_offset = math.hypot(
+    PIVOT_XY[1] + _PIN_AT_HOOK * ARM_U[1] - HOOK.PIN_HOLE_YZ[0],
+    ARM.PIN_MACHINE_Z - HOOK.PIN_HOLE_YZ[1],
 )
+if _pin_hole_offset + LATCH_PIN.DIA / 2.0 >= HOOK.PIN_HOLE_DIA / 2.0:
+    raise AssertionError(
+        f"latch pin axis is {_pin_hole_offset:.3f} off the hook's pin hole centre"
+    )
+
+# Disc cluster on the pin MHA-179 at S (R9-68).  The pin is pressed into the
+# arm, its head on the arm's rear face (Ry180: its stations run to machine
+# -Z).  On it, rear to front: the MHA-180 rear bushing on the arm's front
+# face, the MHA-110 feed sleeve (the disc on its round boss, its front face
+# at the D-flat's end wall where the hub's D-bore bears, screwed together),
+# the MHA-181 front bushing on the sleeve's nose and the MHA-182 ring in the
+# pin's groove.  Both bushings and the hub are
+# faced to fit (transgear_cluster_fit); the model carries them as fitted to
+# nominal parts, the cluster rearward with its float open at the ring.
+PIN_Z0 = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625: the head's underside (Ry180)
+if abs(PIN_Z0 - (ARM_Z0 + ARM.THICKNESS)) > 1e-9:
+    raise AssertionError("the pin's head is off the arm's rear face")
+REAR_BUSHING_Z0 = CLUSTER.REAR_BUSHING_REAR_Z  # -124.4 (Ry180, to -130.4)
+if abs(REAR_BUSHING_Z0 - ARM_Z0) > 1e-9:
+    raise AssertionError("the rear bushing is off the arm's front face")
+FEED_Z0 = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH  # -130.4 (Ry180, teeth to -144.0)
+DISC_Z0 = FEED_Z0 - FEED.DISC_FRONT_STATION  # -147.65: on the hub spigot's flange
+if abs(DISC_Z0 - CLUSTER.DISC_FRONT_Z) > 1e-9:
+    raise AssertionError("the disc is off the cluster fit's station")
+_DISC_SCREW_R = DISC_HUB_GEOM.BOLT_CIRCLE_DIA / 2.0
+DISC_SCREW_XY = tuple(
+    (
+        STUD_XY[0] + _DISC_SCREW_R * math.cos(math.radians(angle)),
+        STUD_XY[1] + _DISC_SCREW_R * math.sin(math.radians(angle)),
+    )
+    for angle in DISC_HUB_GEOM.SCREW_ANGLES_DEG
+)
+DISC_SCREW_Z0 = DISC_Z0 - DISC_HUB.FLANGE_THICK  # -150.05: heads on the flange
+FRONT_BUSHING_Z0 = FEED_Z0 - FEED.OVERALL_LENGTH  # -157.75 (Ry180, to -162.78)
+if abs(FRONT_BUSHING_Z0 - CLUSTER.FRONT_BUSHING_REAR_Z) > 1e-9:
+    raise AssertionError("the front bushing is off the sleeve's nose")
+# The hub's front face, faced to fit HUB_NOSE_WINDOW behind the sleeve's
+# nose, so the front bushing bears on the steel nose and traps hub and disc.
+HUB_FRONT_Z = DISC_Z0 + DISC_HUB.HUB_FRONT_Z
+if abs(HUB_FRONT_Z - CLUSTER.HUB_FRONT_Z) > 1e-9:
+    raise AssertionError("the hub's front face is off the cluster fit's station")
+if abs(DISC_Z0 + DISC_HUB_GEOM.SPIGOT_LENGTH - CLUSTER.STEP_Z) > 1e-9:
+    raise AssertionError("the hub's spigot end is off the sleeve's step face")
+if not (
+    CLUSTER.HUB_NOSE_WINDOW[0]
+    <= HUB_FRONT_Z - FRONT_BUSHING_Z0
+    <= CLUSTER.HUB_NOSE_WINDOW[1]
+):
+    raise AssertionError("the hub's front face is off the sleeve nose's window")
+if abs(CLUSTER.RING_FRONT_Z - (PIN_Z0 - PIN.GROOVE_STATION)) > 1e-9:
+    raise AssertionError("the ring is off the pin groove's load wall")
+
 import transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
-import crankshaft_spec  # noqa: E402
 import transgear_removable_spec as REMOVABLE  # noqa: E402
-import transgear_stub_spec as STUB  # noqa: E402
-from build_transgear_thumbnut import (  # noqa: E402
-    BORE_DIA as THUMBNUT_BORE_DIA,
-    DISC_DIA as THUMBNUT_DISC_DIA,
-    DISC_LEN as THUMBNUT_DISC_LEN,
-    NECK_DIA as THUMBNUT_NECK_DIA,
-    NECK_LEN as THUMBNUT_NECK_LEN,
-    TOTAL_LEN as THUMBNUT_LEN,
+import transgear_knob_shaft_spec as KNOB_SPEC  # noqa: E402
+from transgear_thumbnut_spec import (  # noqa: E402
+    FLANGE_DIA as THUMBNUT_FLANGE_DIA,
+    HEAD_DIA as THUMBNUT_HEAD_DIA,
+    OVERALL_LENGTH as THUMBNUT_LEN,
+    THREAD as THUMBNUT_THREAD,
 )
+
+# The knob shaft's integral 12T DP38 is the third gear.
+THIRD_TEETH = KNOB_SPEC.TEETH
+THIRD_DP = KNOB_SPEC.DIAMETRAL_PITCH
+THIRD_FACE = KNOB_SPEC.FACE_WIDTH
+
 
 # Both mounted removables (knob T24, crank T12) share ONE band: front face
-# BAND_FRONT_Z, rear face on the shaft's seat collar at SEAT_FACE_Z, and the
-# chain mid-plane between (transgear_removable_spec). Each is placed on its
-# FRONT face (the part's Front Plane), identity: holes on machine +/-Y.
+# BAND_FRONT_Z, rear face on the seat face SEAT_FACE_Z (the knob's drive collar,
+# the crankshaft's seat collar), and the chain mid-plane between
+# (transgear_removable_spec). Each is placed on its FRONT face (the part's
+# Front Plane), identity: holes on machine +/-Y.
 REMOVABLE_Z0 = REMOVABLE.BAND_FRONT_Z  # -157.1
 T24_MID_Z = REMOVABLE.CHAIN_MID_Z  # -155.7
 CHAIN_MID_Z = REMOVABLE.CHAIN_MID_Z  # both wheels coplanar; the crank T12 matches
@@ -356,54 +513,209 @@ CHAIN_PULLEY_DIA = {
 if REMOVABLE.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
     raise AssertionError("identity-placed removables expect pin holes on +/-Y")
 
-# Knob shaft MHA-078 (Rx+90: local +Y -> +Z, the stack runs to the knob at
-# the back): its SeatCollar station sits on the band's seat face, so its
-# origin (the pilot's front tip) is that far in front.
-KNOB_SHAFT_Z0 = REMOVABLE.SEAT_FACE_Z - KNOB_SEAT_COLLAR  # -167.9
-KNOB_COLLAR_REAR_Z = KNOB_SHAFT_Z0 + KNOB_COLLAR_REAR  # -149.7
-# The two MHA-155 dowels pressed through the collar's reamed holes (Rx-90: pin
-# +Y -> -Z), pressed end on DrivePinFloor (the press stop's station, inside
-# the collar), rounded end in the wheel's pin holes.
-KNOB_DRIVE_PIN_Z0 = KNOB_SHAFT_Z0 + KNOB_DRIVE_PIN_FLOOR  # -151.9375
-if abs(KNOB_DRIVE_PIN_Z0 - KNOB_PIN.LENGTH - REMOVABLE.DRIVE_PIN_TIP_Z) > 1e-9:
-    raise AssertionError("knob drive-pin tips are off the removable's DRIVE_PIN_TIP_Z")
+# Knob stack on K (front -> back): thumbnut | T24 | drive collar | the
+# shaft's 12T | thrust ring | arm-plate hub | plate | boss | knob cup. The
+# collar MHA-177 seats its front face on the T24's rear face (the band's seat
+# face) and is set SET_NOMINAL in front of the shaft's 12T front face F, the
+# shaft's datum (identity + spin: local +Z runs to the knob at the back).
+KNOB_COLLAR_Z0 = REMOVABLE.SEAT_FACE_Z  # -154.3
+KNOB_SHAFT_Z0 = KNOB_COLLAR_Z0 + COLLAR.SET_NOMINAL  # F = -148.1
+KNOB_COLLAR_REAR_Z = KNOB_COLLAR_Z0 + COLLAR.LENGTH  # -150.3
+# The two MHA-155 dowels pressed through the collar's holes (Rx-90: pin +Y ->
+# -Z), rounded ends DRIVE_PIN_PROUD in front of it, in the wheel's pin holes.
+KNOB_DRIVE_PIN_Z0 = REMOVABLE.DRIVE_PIN_TIP_Z + KNOB_PIN.LENGTH  # -151.9375
+KNOB_DRIVE_PIN_XY = tuple(
+    (KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1] + side * COLLAR.PIN_CIRCLE_RADIUS)
+    for side in (1.0, -1.0)
+)  # +Y first: DrivePinAxis1
+if abs(KNOB_COLLAR_Z0 - REMOVABLE.DRIVE_PIN_TIP_Z - COLLAR.DRIVE_PIN_PROUD) > 1e-9:
+    raise AssertionError("knob drive-pin tips are off the collar's DRIVE_PIN_PROUD")
 if abs(KNOB_PIN.DIA - REMOVABLE.DRIVE_PIN_DIA) > 1e-12:
     raise AssertionError("transgear-knob-drive-pin is not the removable's drive pin")
-# The collar rear stands the knob shaft's DISC_AIR clear of the 120T disc and
-# third gear front face.
-if abs(DISC_Z0 - KNOB_COLLAR_REAR_Z - KNOB_DISC_AIR) > 1e-9 or THIRD_Z0 != DISC_Z0:
-    raise AssertionError(
-        f"knob seat collar rear {KNOB_COLLAR_REAR_Z:.2f} is not {KNOB_DISC_AIR}"
-        f" clear of the disc / third gear at {DISC_Z0}"
+if COLLAR.PIN_CIRCLE_RADIUS != REMOVABLE.PIN_CIRCLE_RADIUS:
+    raise AssertionError("the collar's pin circle is not the removable's")
+# MHA-154 spring pin across the collar's rear slot (identity: along machine X).
+CROSS_PIN_Z0 = KNOB_COLLAR_Z0 + COLLAR.CROSS_HOLE_Z  # -151.3
+# Behind the 12T: the thrust ring to the plate hub's face, the knob cup on the
+# journal's rear end END_FLOAT behind the plate's boss (all Rx+90), and the
+# MHA-183 spring pin through cup and journal (identity: along machine X,
+# R9-70 K-1).
+KNOB_RING_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.FACE_WIDTH  # -142.2
+if abs(KNOB_RING_Z0 + RING.LENGTH - (PLATE_Z0 + ARM_PLATE.HUB_FACE_Z)) > 1e-9:
+    raise AssertionError("the thrust ring does not reach the arm plate's hub face")
+KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.CUP_FACE_Z  # -107.7625
+KNOB_CUP_REAR_Z = KNOB_CUP_Z0 + CUP.LENGTH  # -99.7625
+KNOB_SHAFT_REAR_Z = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -101.2625
+KNOB_CUP_PIN_Z0 = KNOB_CUP_Z0 + CUP.PIN_HOLE_FROM_FRONT  # -104.7625
+if not KNOB_CUP_Z0 < KNOB_SHAFT_REAR_Z < KNOB_CUP_REAR_Z:
+    raise AssertionError("the knob shaft's rear end is not inside the knob cup")
+if not KNOB_CUP_PIN_Z0 + CUP_PIN.HOLE_MAX / 2.0 < KNOB_SHAFT_REAR_Z:
+    raise AssertionError("the knob cup's pin hole runs off the journal's end")
+
+# R9-68, the bushings faced to fit.  F carries the disc: with the knob shaft
+# rearward and the cluster forward, the fit-up sets the disc's front face m
+# (transgear_cluster_fit.FIT_WINDOW) behind F by facing the front bushing,
+# so the pin's and sleeve's own stations drop out of every chain from F.
+# The model sits at the window's centre on the nominal chain.
+_F_FROM_ARM_Z = (
+    ARM_Z0 + ARM.THICKNESS + ARM_PLATE.HUB_FACE_Z - RING.LENGTH - KNOB_SPEC.FACE_WIDTH
+)
+if abs(_F_FROM_ARM_Z - KNOB_SHAFT_Z0) > 1e-9 or abs(CLUSTER.F_Z - KNOB_SHAFT_Z0) > 1e-9:
+    raise AssertionError("F is off the arm, plate hub and thrust ring chain")
+if abs(DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
+    raise AssertionError("the model's disc is off the knob chain's fitted station")
+# The 120T disc's rear face (the MHA-161 tips sit inside it) to the platen's
+# front face at the printed worst case: the platen forward by its fitted
+# float, magnified by its yaw about the bar's end at the near lock; F
+# rearward by the arm (held on the longest spacer by the MHA-184 spring), the
+# arm, hub face, ring and 12T bands; the platen forward by the bar and its
+# own bands; then m's max, the cluster's rearward float, its tilt on the bore
+# clearance (pivot on the rear bushing's smallest Ø9, over the shortest
+# sleeve) at the disc rim, the hanger's tilt on the spacer (Codex P1 on
+# 6c385465d) at the rim's farthest point from P, and the disc's wobble on its
+# mount (DISC_MOUNT_WOBBLE).
+PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
+# The platen (4.0) and rack bar (6.0) carry no drawing band: .XXX assumed.
+_PLATEN_THICKNESS_BAND = printed_band_mm(3)
+_RACK_THICKNESS_BAND = printed_band_mm(3)
+DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - KNOB_SHAFT_Z0 - DISC_SPEC.FACE_WIDTH  # 2.35
+DISC_PLATEN_BAND = (
+    SPACER.LENGTH_BAND
+    + ARM.THICKNESS_BAND
+    + printed_band_mm(ARM_PLATE_SPEC.HUB_STATION_PLACES)
+    + RING.LENGTH_TOL
+    + printed_band_mm(KNOB_SPEC.FACE_WIDTH_PLACES)
+    + (DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH)
+    + BAR.BAR_DEPTH_BAND
+    + _PLATEN_THICKNESS_BAND
+)  # 0.7762
+CLUSTER_TILT_AT_DISC_RIM = (
+    (
+        DISC_SPEC.OUTSIDE_DIA
+        - (REAR_BUSHING.OD - printed_band_mm(REAR_BUSHING.OD_PLACES))
     )
-# Worst case: the collar length (seat face to rear face, one .X dimension on
-# MHA-078) at its long limit puts the rear face STATION_ROW further back.  The
-# disc rim passes 3.99 off the knob axis, inside the collar's r 8.70 minimum,
-# so the faces overlap radially.  The disc + feed pinion pair floats on the
-# stud's O5 seat (13.8 for 9.5 + 3.0), so the disc front can ride up to the
-# stud collar's rear face, 0.4 in front of DISC_Z0.
-DISC_FRONT_STOP_Z = STUB_Z0 - (STUB.BASE_LEN + STUB.SEAT_LEN)  # -148.8
-KNOB_COLLAR_REAR_Z_WORST = KNOB_COLLAR_REAR_Z + crankshaft_spec.STATION_ROW  # -148.9
-KNOB_DISC_AIR_WORST = DISC_FRONT_STOP_Z - KNOB_COLLAR_REAR_Z_WORST  # 0.1
-if DISC_FRONT_STOP_Z > DISC_Z0 or KNOB_DISC_AIR_WORST <= 0.0:
+    / 2.0
+    * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
+    / (FEED.OVERALL_LENGTH - FEED.STATION_TOL)
+)  # 0.0510
+# The hanger tilts about P by the spacer's face squareness
+# (transgear_hanger_joints.HANGER_TILT): a point r from P moves r times it.
+_P_TO_S = math.dist(PIVOT_XY, STUD_XY)  # 68.81
+HANGER_TILT_AT_DISC_RIM = HANGER.HANGER_TILT * (
+    _P_TO_S + DISC_SPEC.OUTSIDE_DIA / 2.0
+)  # 0.2588
+HANGER_TILT_AT_FEED_TIPS = HANGER.HANGER_TILT * (
+    _P_TO_S + FEED.OUTSIDE_DIA / 2.0
+)  # 0.1765
+# The disc's rear face at its rim against the sleeve's axis: the hub rocking
+# on the boss (it is trapped with float, never preloaded onto the step) over
+# its shortest round engagement, levered from its step contact; then, each
+# zone scaled from its diameter to the rim, the sleeve's step face square to
+# its bore, the hub's spigot end and flange rear face square to its bore,
+# and the disc's rear face parallel to its front (clamp) face.
+_DISC_RIM_R = DISC_SPEC.OUTSIDE_DIA / 2.0
+DISC_HUB_ROCK_AT_RIM = (
+    (_DISC_RIM_R - DISC_HUB.SEAT_CONTACT_R)
+    * DISC_HUB.BOSS_CLEARANCE
+    / DISC_HUB.ROUND_ENGAGEMENT_MIN
+)  # 0.0624
+DISC_MOUNT_WOBBLE = (
+    DISC_HUB_ROCK_AT_RIM
+    + _DISC_RIM_R
+    * FEED.STEP_FACE_PERPENDICULARITY
+    / FEED.STEP_FACE_PERPENDICULARITY_ZONE_DIA
+    + _DISC_RIM_R
+    * DISC_HUB.SPIGOT_END_PERPENDICULARITY
+    / DISC_HUB.SPIGOT_END_PERPENDICULARITY_ZONE_DIA
+    + _DISC_RIM_R
+    * DISC_HUB.FLANGE_FACE_PERPENDICULARITY
+    / DISC_HUB.FLANGE_FACE_PERPENDICULARITY_ZONE_DIA
+    + float(DISC_SPEC.GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"])
+)  # 0.1956
+# The least air the disc's rear face keeps to the platen's front (R9-68).
+DISC_PLATEN_AIR_MIN = 0.03
+DISC_PLATEN_AIR_WORST = (
+    DISC_PLATEN_NOMINAL
+    - DISC_PLATEN_BAND
+    - LOCK_GAP_FIT[1] * PLATEN_YAW_LEVER
+    - CLUSTER.FIT_WINDOW[1]
+    - CLUSTER.FLOAT_WINDOW[1]
+    - CLUSTER_TILT_AT_DISC_RIM
+    - HANGER_TILT_AT_DISC_RIM
+    - DISC_MOUNT_WOBBLE
+)
+if DISC_PLATEN_AIR_WORST < DISC_PLATEN_AIR_MIN:
     raise AssertionError(
-        f"knob seat collar at its long .X limit reaches the 120T disc's front"
-        f" stop {DISC_FRONT_STOP_Z:.2f}: air {KNOB_DISC_AIR_WORST:.2f}"
+        "MHA-070 disc rear face comes within the platen front face's "
+        f"{DISC_PLATEN_AIR_MIN} at the printed worst case: air "
+        f"{DISC_PLATEN_AIR_WORST:.4f} (R9-47, R9-68)"
+    )
+# R9-67/R9-68: the feed sleeve's 12T cuts full depth from its rear face over
+# the rack's whole width.  The rack's front face is the platen's back face, so
+# the stack above sets how far forward of the sleeve's rear face it reaches,
+# less the terms that do not lie between the sleeve and the platen's back
+# (the platen's own band, the disc's mount wobble, the rim's tilts, which
+# come back as the tilts at the 12T tips).  The disc's front face is the hub
+# flange's rear face, a spigot length ahead of the sleeve's step; the stack's
+# thickest disc reaches rearward from it.
+CLUSTER_TILT_AT_FEED_TIPS = (
+    (FEED.OUTSIDE_DIA - (REAR_BUSHING.OD - printed_band_mm(REAR_BUSHING.OD_PLACES)))
+    / 2.0
+    * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
+    / (FEED.OVERALL_LENGTH - FEED.STATION_TOL)
+)  # 0.0034
+RACK_FRONT_FROM_SLEEVE_REAR_WORST = (
+    FEED.DISC_FRONT_STATION
+    - DISC_SPEC.FACE_WIDTH_MAX
+    + FEED.DISC_FRONT_STATION_BAND
+    - DISC_PLATEN_AIR_WORST
+    - _PLATEN_THICKNESS_BAND
+    - DISC_MOUNT_WOBBLE
+    - CLUSTER_TILT_AT_DISC_RIM
+    + CLUSTER_TILT_AT_FEED_TIPS
+    - HANGER_TILT_AT_DISC_RIM
+    + HANGER_TILT_AT_FEED_TIPS
+    - PLATE_THICKNESS
+)
+if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
+    raise AssertionError(
+        f"MHA-110 12T full depth may stop {FEED.FULL_DEPTH_MIN:.3f} from the rear "
+        f"face, inside the rack's worst reach {RACK_FRONT_FROM_SLEEVE_REAR_WORST:.3f}"
+    )
+# The MHA-180 rear bushing's front face to the MHA-069 rack's back face (its
+# Ø9 .X can reach the rack's crests radially): the arm forward on the
+# shortest spacer, the bar thinnest, the rack thickest, the bushing
+# following the sleeve forward to its fitted max, and the hanger's tilt at
+# the bushing's far rim.
+BUSHING_RACK_AIR_NOMINAL = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH - RACK_BACK_Z  # 2.5
+BUSHING_RACK_AIR_WORST = (
+    BUSHING_RACK_AIR_NOMINAL
+    - SPACER.LENGTH_BAND
+    - BAR.BAR_DEPTH_BAND
+    - _RACK_THICKNESS_BAND
+    - (CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1] - REAR_BUSHING.LENGTH)
+    - HANGER.HANGER_TILT
+    * (_P_TO_S + (REAR_BUSHING.OD + printed_band_mm(REAR_BUSHING.OD_PLACES)) / 2.0)
+)  # 1.07
+if BUSHING_RACK_AIR_WORST < 0.0:
+    raise AssertionError(
+        "MHA-180 rear bushing enters the MHA-069 rack at the printed worst case: "
+        f"air {BUSHING_RACK_AIR_WORST:.4f} (R9-68)"
     )
 
 # Stack D: a bought #25 chain floated REARMOST on the thinnest T24 plate
 # reaches chain_reach_rear() behind the seat face; it must keep air to the
-# 120T disc / third gear front face (the seat face is the shaft's own datum).
+# 120T disc's front face.
 CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST  # 3.587
 CHAIN_DISC_AXIAL_AIR_WORST = DISC_Z0 - (
     REMOVABLE.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
-)  # 2.3135 = 5.9 - 3.5865
+)  # 3.0635 = 6.65 - 3.5865
 if CHAIN_DISC_AXIAL_AIR_WORST <= 0.0:
     raise AssertionError(
         f"bought #25 chain reaches the 120T disc: air {CHAIN_DISC_AXIAL_AIR_WORST:.4f}"
     )
-# Radially, the only knob-shaft feature between the seat face and the disc is
-# the O17.5 seat collar (the pins sit inside it); at its print-worst (largest)
+# Radially, the only knob-stack feature between the seat face and the disc is
+# the drive collar (the pins sit inside it); at its print-worst (largest)
 # radius it must stand inside the T24 plates' inner edge, CAD link and ANSI,
 # with the wheel floated off-centre on its pins (the crank's same pins, holes
 # and bands: crankshaft_spec.WHEEL_SEAT_FLOAT).
@@ -411,134 +723,122 @@ T24_CHAIN_INNER_R = min(
     REMOVABLE.chain_plate_inner_radius(24, h)
     for h in (2.0 * CHAIN_PLATE_HALF_H, REMOVABLE.ANSI_PLATE_HEIGHT)
 )  # ~21.2 (ANSI)
-KNOB_COLLAR_R_WORST = (
-    REMOVABLE.SEAT_SPIGOT_DIA + max(crankshaft_spec.SPIGOT_DIA_BAND)
-) / 2.0  # 8.75
+KNOB_COLLAR_R_WORST = (COLLAR.OD + max(COLLAR.OD_BAND)) / 2.0  # 8.75
 if KNOB_COLLAR_R_WORST + crankshaft_spec.WHEEL_SEAT_FLOAT >= T24_CHAIN_INNER_R:
-    raise AssertionError("knob seat collar reaches the T24 chain plates' inner edge")
+    raise AssertionError("knob drive collar reaches the T24 chain plates' inner edge")
 
-# Thumbnut (2026-09-02, ch23 p.58/59 + video 4/4 "unscrew the nut that holds
-# the other gear in place"): the knurled brass nut OUTERMOST on the knob
-# shaft, its neck 0.25 in front of the mounted T24's front face, retaining
-# it; the shaft's pilot runs on into the nut. Rx(-90): local +Y -> -Z,
-# so the nut spans THUMBNUT_Z0 .. THUMBNUT_Z0 - 11 (disc at the front).
-THUMBNUT_AIR = 0.25
-THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -157.35 (neck's gear-side face)
-THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -168.35
-_THUMBNUT_DISC_MID_Z = (
-    THUMBNUT_Z0 - THUMBNUT_NECK_LEN - THUMBNUT_DISC_LEN / 2.0
-)  # -164.85
-KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0  # -167.9, the pilot's front tip
-_nut_bore_gap = (THUMBNUT_BORE_DIA - KNOB_SHAFT_DIA) / 2.0  # 0.0375 radial
-if not (0.0 < _nut_bore_gap < 0.1):
+# Thumbnut MHA-126 (ch23 p.58/59 + video 4/4 "unscrew the nut that holds the
+# other gear in place"): the knurled brass nut OUTERMOST on the knob shaft,
+# tapped for the shaft's front thread, its flange's seat face ON the drive
+# collar's pilot, faced to stand THUMBNUT_AIR proud of the mounted T24's front
+# face, so the T24 floats free under the flange (R9-70, N-A). Rx(-90): local
+# +Y -> -Z, so the nut spans THUMBNUT_Z0 .. THUMBNUT_Z0 - THUMBNUT_LEN (the
+# knurled head at the front).
+THUMBNUT_AIR = COLLAR.PILOT_PROUD  # 0.10, nominal
+THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -157.2 (the flange's seat face)
+THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -173.3 (the rim)
+KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0 - KNOB_SPEC.TIP_STATION  # -172.0, the stud tip
+THUMBNUT_ENGAGEMENT = THUMBNUT_Z0 - KNOB_SHAFT_FRONT_Z  # 14.8
+if THUMBNUT_THREAD != KNOB_SPEC.THREAD:
     raise AssertionError(
-        f"thumbnut bore/shaft radial gap {_nut_bore_gap:.4f} not in (0, 0.1)"
+        f"thumbnut tap {THUMBNUT_THREAD} is not the knob shaft's {KNOB_SPEC.THREAD}"
     )
-if abs((REMOVABLE_Z0 - THUMBNUT_Z0) - THUMBNUT_AIR) > 1e-9:
-    raise AssertionError("thumbnut neck must sit THUMBNUT_AIR in front of the T24 face")
-if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z <= _THUMBNUT_DISC_MID_Z):
+if abs(THUMBNUT_Z0 - (KNOB_COLLAR_Z0 - COLLAR.PILOT_LENGTH)) > 1e-9:
+    raise AssertionError("thumbnut seat is not on the drive collar's pilot face")
+if not THUMBNUT_AIR > 0.0:
+    raise AssertionError("the thumbnut clamps the T24: the pilot is not proud of it")
+if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z < THUMBNUT_Z0):
     raise AssertionError(
-        f"knob shaft front {KNOB_SHAFT_FRONT_Z} must end inside the thumbnut disc"
-        f" ({THUMBNUT_FRONT_Z} .. {_THUMBNUT_DISC_MID_Z})"
+        f"knob shaft front {KNOB_SHAFT_FRONT_Z} must end inside the thumbnut"
+        f" ({THUMBNUT_FRONT_Z} .. {THUMBNUT_Z0})"
     )
-# The neck must actually RETAIN the wheel: cover its bore with a shoulder.
-# It bears across the pin circle, so the drive pins must end inside the
-# wheel's plate, short of the neck by at least the same air (at the press
-# stop's worst and the thinnest wheel, KNOB_PIN.TIP_INSET_WORST holds it).
-if THUMBNUT_NECK_DIA < REMOVABLE.BORE_DIA + 1.0:
+# The flange must still RETAIN the wheel: cover its bore with a shoulder.
+# The drive-pin tips end inside the wheel's plate, behind the flange's seat.
+if THUMBNUT_FLANGE_DIA < REMOVABLE.BORE_DIA + 1.0:
     raise AssertionError(
-        "thumbnut neck slips into the removable's bore -- retains nothing"
+        "thumbnut flange slips into the removable's bore -- retains nothing"
     )
-if REMOVABLE.DRIVE_PIN_TIP_Z - THUMBNUT_Z0 < THUMBNUT_AIR:
-    raise AssertionError("knob drive-pin tips reach the thumbnut neck")
+if REMOVABLE.DRIVE_PIN_TIP_Z - THUMBNUT_Z0 <= 0.0:
+    raise AssertionError("knob drive-pin tips reach the thumbnut flange")
 # Front furniture: nothing in this sub sits in front of the T24 but the
 # chain, whose plates straddle the wheel (z CHAIN_MID_Z +- pin reach) and
-# wrap it at the pitch radius -- the nut's disc must clear that wrap radially.
+# wrap it at the pitch radius -- the nut's head must clear that wrap radially.
 _chain_inner_wrap_r = PITCH_R_T24 - CHAIN_PLATE_HALF_H  # 21.92
-if THUMBNUT_DISC_DIA / 2.0 + THUMBNUT_AIR > _chain_inner_wrap_r:
-    raise AssertionError("thumbnut disc reaches the chain's inner plate wrap")
+if THUMBNUT_HEAD_DIA / 2.0 > _chain_inner_wrap_r:
+    raise AssertionError("thumbnut head reaches the chain's inner plate wrap")
 # The bought chain floated FRONTMOST reaches CHAIN_REACH_FRONT ahead of the
-# seat face (-160.59): inside the nut's neck span, still behind its disc
-# (-161.35). The whole nut (and the shaft) lies radially inside the ANSI
-# plates' inner edge, so no axial stack exists there; assert the radial one.
+# seat face (-160.59). The whole nut (and the shaft) lies radially inside the
+# ANSI plates' inner edge, so no axial stack exists there; assert the radial
+# one.
 CHAIN_FRONT_Z_WORST = REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT  # -160.5865
-if max(THUMBNUT_DISC_DIA, THUMBNUT_NECK_DIA) / 2.0 + THUMBNUT_AIR > T24_CHAIN_INNER_R:
+if max(THUMBNUT_HEAD_DIA, THUMBNUT_FLANGE_DIA) / 2.0 > T24_CHAIN_INNER_R:
     raise AssertionError("thumbnut reaches the bought chain's inner plate edge")
 
-# Latch hook (2026-09-02, ch23 p.58 / video 4/4 keyframes v4_transgear_001 +
-# _011): the short curved spring-steel hook screwed to the bar's FRONT face,
-# hanging down and curving toward the transgear cluster. The video shows it
-# between the rocker pivot ball and the disc (machine x ~ +52), hanging from
-# a bar front that is EXPOSED ~12 mm below the platen's bottom edge (the
-# rack). DISCREPANCY with this model: here the bar (y 295.7..317.7) sits
-# 22.5 ABOVE the platen bottom (PLATE_Y0 273.2), entirely hidden behind the
-# platen (x -33.2..236.4, its back face ON the bar front), and the space
-# behind the bar is taken by the platen guide rail + guide-lock station -- so
-# the +52 pose has no home until the bar/platen vertical relation is
-# re-derived. Until then the hook hangs where the bar front IS exposed at
-# rest: just west of the platen's -X edge, mirrored (Ry180) so it still
-# bends toward the disc (+X). Restoring the photo pose is three edits here
-# (LATCH_HOOK_X = 52.0; ROWS/EULER -> IDENTITY / [0, 0, 0]; the z pair
-# becomes back = BAR_FRONT_Z - AIR, front = back - T with the thickness then
-# running +Z, i.e. place at the FRONT z) plus LATCH_HOLE_X in
-# build_support_bar.py.
-LATCH_HOOK_X = -50.0
-LATCH_HOOK_AIR = 0.25
-LATCH_HOOK_ROWS = ROT_Y_180  # local -X -> machine +X (toward the disc), +Z -> -Z
-LATCH_HOOK_EULER = [0.0, 180.0, 0.0]
-LATCH_HOOK_Z_BACK = BAR_FRONT_Z - LATCH_HOOK_AIR  # -139.15: the hook's back face
-LATCH_HOOK_Z_FRONT = (
-    LATCH_HOOK_Z_BACK - LATCH_HOOK_T
-)  # -139.95 (the Ry180 runs +Z to -Z)
-# Machine extents of the hook (the Ry180 mirrors x about LATCH_HOOK_X).
-LATCH_HOOK_X_SPAN = (LATCH_HOOK_X - LATCH_HOOK_X_MAX, LATCH_HOOK_X - LATCH_HOOK_X_MIN)
-LATCH_HOOK_Y_LOW = BAR_CY + LATCH_HOOK_Y_MIN  # ~279.1
-if abs(BAR_LATCH_HOLE_X - LATCH_HOOK_X) > 0.01:
+# Latch hook MHA-127 (contract §4.4): the 10 x 0.6 strip curved edgewise in
+# the machine YZ plane, riveted to the inside (-X) face of the MHA-170
+# bracket's flap, which stands rearward from the bar's back face. The part
+# frame's local X/Y/Z run along machine Y/Z/X (latch_hook_geometry's
+# LOCAL_TO_MACHINE, whose transpose is the Transform2 rows).
+LATCH_HOOK_POS = list(HOOK.PART_ORIGIN_MACHINE)
+LATCH_HOOK_ROWS = [list(axis) for axis in zip(*HOOK.LOCAL_TO_MACHINE, strict=True)]
+LATCH_HOOK_EULER = euler_from_rows(LATCH_HOOK_ROWS)
+_FLAP_INSIDE_X = HOOK_BRACKET.MACHINE_ORIGIN[0] - HOOK_BRACKET.SHEET_T
+if abs(HOOK.PLANE_X[1] - _FLAP_INSIDE_X) > 1e-9:
+    raise AssertionError("the latch hook's face is off the bracket flap's inside face")
+# Machine z band of the strip (local y runs along machine z).
+LATCH_HOOK_Z_SPAN = (HOOK.TOP_Z + HOOK.LOCAL_Y_MIN, HOOK.TOP_Z + HOOK.LOCAL_Y_MAX)
+if LATCH_HOOK_Z_SPAN[0] <= BAR_BACK_Z:
     raise AssertionError(
-        f"support-bar latch hole x {BAR_LATCH_HOLE_X} != latch hook {LATCH_HOOK_X}"
+        f"latch hook reaches z {LATCH_HOOK_Z_SPAN[0]:.2f}, bar back face {BAR_BACK_Z}"
     )
-# The hook lives in the platen's z slab, so it must be x-clear of the platen
-# (and of the rack on the platen back, which starts at the platen edge).
-if LATCH_HOOK_X_SPAN[1] > PLATE_X0 - LATCH_HOOK_AIR:
-    raise AssertionError(
-        f"latch hook reaches x {LATCH_HOOK_X_SPAN[1]:.2f}, platen edge {PLATE_X0}"
-    )
-# The latch arm (z ARM_Z +- LATCH_THICK/2) overlaps the hook in XY; it must
-# stay z-separated.
-if LATCH_HOOK_Z_BACK + LATCH_HOOK_AIR > ARM_Z - LATCH_THICK / 2.0:
-    raise AssertionError("latch hook reaches the latch arm's z band")
-# The knob cluster below: the hook's lowest point must clear the shaft top.
-if LATCH_HOOK_Y_LOW < KNOB_SHAFT_XY[1] + KNOB_SHAFT_DIA / 2.0 + 0.5:
-    raise AssertionError("latch hook hangs into the knob shaft")
-# Its bracket-screw (IDENTITY: shank +Z from the hook's front face into the
-# bar) is longer than hook + air + bar, so its tip exits the bar's back face
-# (logged in build(); nothing sits behind the bar at that x -- the bracket
-# plate spans stud +-15, the guide locks ride the platen).
-LATCH_SCREW_TIP_Z = LATCH_HOOK_Z_FRONT + BRACKET_SCREW_LEN
-if LATCH_SCREW_TIP_Z < BAR_BACK_Z - 2.0:
-    raise AssertionError("latch-hook screw does not engage the bar's tapped hole depth")
-if abs(LATCH_HOOK_X - STUD_XY[0]) < 15.0 + 4.0 + LATCH_HOOK_AIR:
-    raise AssertionError("latch-hook screw tip would meet the transgear bracket plate")
 
-# Mesh phasing. build_fixed_gear seeds every gear with a TOOTH centred on
-# local +X (the seed gap spans +pi/(2N)..gamma-pi/(2N)), and teeth repeat
-# every gamma = 360/N. The disc keeps identity spin (LATCH_ANGLE is a
-# multiple of its 3-deg pitch, so a disc TOOTH points along the c2c line);
-# the third gear is spun so a GAP faces back along that line.
+# MHA-170 bracket by translation on the bar's back face; its two MHA-171
+# #4-40 screws (Rx+90: shanks to -Z) bear on the base's top face and run into
+# the bar's through taps; the hook's two rivets (rows Rz(90): heads on
+# the hook's -X face, shanks +X through the strip and the flap).
+HOOK_BRACKET_SCREW_POS = tuple(
+    (x, BAR_CY + HOOK_BRACKET.HANGER_TAP_Y, BAR_BACK_Z + HOOK_BRACKET.SHEET_T)
+    for x in HOOK_BRACKET.BRACKET_TAP_X
+)  # (47.5 / 54.5, 303.234, -128.4)
+for _screw, _hole_x in zip(
+    HOOK_BRACKET_SCREW_POS, HOOK_BRACKET.SCREW_HOLE_X, strict=True
+):
+    if (
+        abs(HOOK_BRACKET.MACHINE_ORIGIN[0] + _hole_x - _screw[0]) > 1e-9
+        or abs(HOOK_BRACKET.MACHINE_ORIGIN[1] + HOOK_BRACKET.SCREW_HOLE_Y - _screw[1])
+        > 1e-9
+    ):
+        raise AssertionError("a hook-bracket hole is off its tap in the bar")
+HOOK_RIVET_POS = tuple((HOOK.PLANE_X[0], y, z) for y, z in HOOK.RIVET_YZ)
+
+# Mesh phasing. build_fixed_gear seeds the disc with a TOOTH centred on local
+# +X, and its teeth repeat every 3 deg: MESH_ANGLE is a multiple of that, so
+# the disc keeps identity spin with a tooth along the S -> K line. The knob
+# shaft's integral 12T has a GAP at GAP_AZIMUTH_DEG (a tooth on local +X); it
+# is spun so a gap faces back along that line.
 THIRD_GAMMA = 360.0 / THIRD_TEETH  # 30
-_MESH_AZ = 180.0 + LATCH_ANGLE_DEG  # 18: from the knob axis toward the stud
-THIRD_PHASE_DEG = (_MESH_AZ - THIRD_GAMMA / 2.0) % THIRD_GAMMA  # 27
+_MESH_AZ = 180.0 + MESH_ANGLE_DEG  # 12: from the knob axis toward the stud
+THIRD_PHASE_DEG = (_MESH_AZ - KNOB_SPEC.GAP_AZIMUTH_DEG) % THIRD_GAMMA  # 27
 if THIRD_PHASE_DEG > THIRD_GAMMA / 2.0:
     THIRD_PHASE_DEG -= THIRD_GAMMA  # -3: nearest representative
-# The feed pinion keeps identity spin: its mesh line points straight up
-# (+90 deg is a tooth azimuth for 12T -- 90 = 3 * 30), and the rack is
-# phased so a GAP centre sits exactly on the stud's x (see RACK_X0).
-# Machine-handed: the rack is teeth-down (Rx180), its tooth pattern marching +X
-# from RACK_X0, so a GAP sits over the machine stud (-X) near the platen's left
-# (-X) edge -- the reflection of the pre-mirror right-edge phasing.
-_k = math.floor((STUD_XY[0] - RACK_FIRST_GAP_X - PLATE_X0) / RACK_PITCH)
-RACK_X0 = STUD_XY[0] - RACK_FIRST_GAP_X - _k * RACK_PITCH
-# The resized rack keeps a gap centred on the relocated stud.
+# The feed sleeve (Ry180) keeps a tooth on machine +90 deg (90 = 3 * 30), so a
+# rack GAP centre must sit exactly on the stud's x. The rack is soldered with
+# its ends flush with the platen's (MHA-A06 "rack-soldered"), so its gaps
+# march +X from FIRST_GAP_X in from the platen's -X end: the photo pose moves
+# by the smallest shift that lands a gap on the stud (no more than half a
+# pitch, far inside the photo fit). Machine-handed: the rack is teeth-down
+# (Rx180), its tooth pattern marching +X from RACK_X0.
+PLATE_X0_PHASING = math.remainder(
+    STUD_XY[0] - RACK_FIRST_GAP_X - PLATE_X0_PHOTO, RACK_PITCH
+)  # -0.0355
+if abs(PLATE_X0_PHASING) > RACK_PITCH / 2.0:
+    raise AssertionError(
+        f"platen phasing {PLATE_X0_PHASING:.4f} exceeds half the rack pitch"
+    )
+PLATE_X0 = PLATE_X0_PHOTO + PLATE_X0_PHASING  # -33.2485
+RACK_X0 = PLATE_X0  # ends flush
+if abs(RACK_BAR_LENGTH - PLATE_WIDTH) > 1e-9:
+    raise AssertionError("the rack's ends cannot both be flush with the platen's")
 
 # Net platen feed per CRANK revolution through the real train (T12/T24
 # mounted): 0.5 chain * (12/120) gear * pi*PD rack = 1.596 mm. Every stage is
@@ -627,6 +927,109 @@ LOCK_SCREW_XY = tuple(
     (PLATE_X0 + x, gy + GUIDE_HEIGHT / 2.0) for gy in GUIDE_Y for x in GUIDE_LOCK_HOLE_X
 )
 
+# Placed parts that can reach the chain plane (the band the bought chain
+# sweeps, z CHAIN_FRONT_Z_WORST .. seat + CHAIN_REACH_REAR_WORST), as coaxial
+# cylinder envelopes (label, axis xy, radius, z front, z back). The chain's
+# own wheels are its intended contact. An axis of None stands for platen-
+# group furniture that rides the feed: only axial air can clear it.
+CHAIN_PLANE_ENVELOPES = (
+    (
+        "retaining ring",
+        STUD_XY,
+        E_RING.OD / 2.0,
+        CLUSTER.RING_FRONT_Z,
+        CLUSTER.RING_REAR_Z,
+    ),
+    ("pin", STUD_XY, PIN.DIA / 2.0, PIN.TIP_MACHINE_Z, PIN_Z0),
+    (
+        "front bushing",
+        STUD_XY,
+        FRONT_BUSHING.OD / 2.0,
+        FRONT_BUSHING_Z0 - FRONT_BUSHING.LENGTH,
+        FRONT_BUSHING_Z0,
+    ),
+    ("rear bushing", STUD_XY, REAR_BUSHING.OD / 2.0, FEED_Z0, REAR_BUSHING_Z0),
+    (
+        "disc hub",
+        STUD_XY,
+        DISC_HUB.HUB_DIA / 2.0,
+        DISC_Z0 + DISC_HUB.HUB_FRONT_Z,
+        DISC_Z0 - DISC_HUB.FLANGE_THICK,
+    ),
+    (
+        "disc hub flange",
+        STUD_XY,
+        DISC_HUB.FLANGE_DIA / 2.0,
+        DISC_Z0 - DISC_HUB.FLANGE_THICK,
+        DISC_Z0,
+    ),
+    *(
+        (
+            "disc screw head",
+            xy,
+            DISC_SCREW.HEAD_DIA / 2.0,
+            DISC_SCREW_Z0 - DISC_SCREW.HEAD_H,
+            DISC_SCREW_Z0,
+        )
+        for xy in DISC_SCREW_XY
+    ),
+    ("120T disc", STUD_XY, DISC_SPEC.OUTSIDE_DIA / 2.0, DISC_Z0, DISC_Z0 + DISC_FACE),
+    ("feed sleeve", STUD_XY, FEED.OUTSIDE_DIA / 2.0, FEED_Z0 - FEED_FACE, FEED_Z0),
+    (
+        "drive collar",
+        KNOB_SHAFT_XY,
+        COLLAR.OD / 2.0,
+        KNOB_COLLAR_Z0 - COLLAR.PILOT_LENGTH,
+        KNOB_COLLAR_REAR_Z,
+    ),
+    *(
+        (
+            "knob drive pin",
+            xy,
+            KNOB_PIN.DIA / 2.0,
+            REMOVABLE.DRIVE_PIN_TIP_Z,
+            KNOB_DRIVE_PIN_Z0,
+        )
+        for xy in KNOB_DRIVE_PIN_XY
+    ),
+    (
+        "collar cross pin",
+        KNOB_SHAFT_XY,
+        CROSS_PIN.PIN_LEN / 2.0,
+        CROSS_PIN_Z0 - CROSS_PIN.PIN_DIA / 2.0,
+        CROSS_PIN_Z0 + CROSS_PIN.PIN_DIA / 2.0,
+    ),
+    (
+        "knob shaft",
+        KNOB_SHAFT_XY,
+        KNOB_SPEC.OUTSIDE_DIA / 2.0,
+        KNOB_SHAFT_FRONT_Z,
+        KNOB_SHAFT_REAR_Z,
+    ),
+    ("thumbnut", KNOB_SHAFT_XY, THUMBNUT_HEAD_DIA / 2.0, THUMBNUT_FRONT_Z, THUMBNUT_Z0),
+    (
+        "platen-clip screw heads (the platen group's frontmost)",
+        None,
+        0.0,
+        PLATE_FRONT_Z - SCREW_SEAT_STACK - FILLISTER_HEAD_H,
+        PLATE_FRONT_Z,
+    ),
+)
+
+# The guide-lock stations ride the platen: each lock plate bridges the bar
+# behind one guide rail (bottom plate up from the lower rail's seat, top plate
+# down from the upper rail's top edge), lapping LOCK_RAIL_LIP past the rail's
+# outer edge (R9-59), its two screws on the rail's mid-line.
+if any(abs(y - LOCK_RAIL_LIP - GUIDE_HEIGHT / 2.0) > 1e-9 for _, y in LOCK_HOLE_XY):
+    raise AssertionError("guide-lock screw holes are off the guide rail's mid-line")
+LOCK_PLATE_Y = (
+    (GUIDE_Y[0] - LOCK_RAIL_LIP, GUIDE_Y[0] - LOCK_RAIL_LIP + LOCK_HEIGHT),
+    (
+        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_RAIL_LIP - LOCK_HEIGHT,
+        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_RAIL_LIP,
+    ),
+)
+
 
 def _assert_fastener_stacks() -> None:
     """Prove every selected stock screw has clearance and useful engagement."""
@@ -667,29 +1070,8 @@ def _assert_fastener_stacks() -> None:
     if abs(CLAMP_CBORE_DEPTH - CLAMP_SCREW_HEAD_H - CLAMP_HEAD_RECESS) > 1e-9:
         raise AssertionError("clamp head is not recessed by the specified 0.2 mm")
 
-    # 90280A194 bracket screws pass the 4-mm bracket and stop 0.3 mm before the
-    # front exit of the support bar's through #8-32 taps.
-    if (
-        BAR_BRACKET_HOLE_SPEC.kind,
-        BAR_BRACKET_HOLE_SPEC.size,
-        BAR_BRACKET_HOLE_SPEC.end,
-    ) != ("tapped", "#8-32", "through_all"):
-        raise AssertionError("bracket receiver is not a through #8-32 tap")
-    if (BRACKET_CLEARANCE_SPEC.kind, BRACKET_CLEARANCE_SPEC.size) != (
-        "clearance",
-        "#8",
-    ):
-        raise AssertionError("bracket passage is not #8 clearance")
-    nonnegative(
-        "bracket shank radial clearance",
-        (CLEARANCE_MM[("#8", "normal")] - BRACKET_SCREW_DIA) / 2.0,
-    )
-    bracket_engagement = BRACKET_SCREW_LEN - BRACKET_THICK
-    valid_engagement("bracket #8-32 engagement", bracket_engagement, BRACKET_SCREW_DIA)
-    nonnegative("bracket screw front-face clearance", BAR_DEPTH - bracket_engagement)
-
     # 90114A511 guide screws: exact head recess, positive shank clearance,
-    # 5.2678-mm engagement, and positive blind-bottom clearance.
+    # 5.4178-mm engagement, and positive blind-bottom clearance.
     nonnegative("guide head recess", PLATEN_CBORE_DEPTH - FILLISTER_HEAD_H)
     nonnegative(
         "guide head radial clearance", (PLATEN_CBORE_DIA - FILLISTER_HEAD_DIA) / 2.0
@@ -710,27 +1092,29 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative("guide screw blind-bottom clearance", GUIDE_SCREW_BOTTOM_CLEARANCE)
 
-    # Lock screws are newly rederived from the real 2-mm plate and 6.35-mm
-    # under-head length; the guide now receives the remaining 4.35 mm.
+    # The low button-head guide-lock screws (R9-31, R9-48) take the real 2-mm
+    # plate and 9.525-mm under-head length; the guide's through tap receives
+    # the remaining 7.525 mm and the tip stops inside the rail.
     nonnegative(
-        "lock shank radial clearance", (LOCK_HOLE_DIA - FILLISTER_SHANK_DIA) / 2.0
+        "lock shank radial clearance", (LOCK_HOLE_DIA - LOCK_SCREW_SHANK_DIA) / 2.0
     )
     if abs(LOCK_SCREW_PASSAGE - LOCK_THICK) > 1e-9:
         raise AssertionError(
             "lock screw passage does not equal the real plate thickness"
         )
     if (
-        abs(LOCK_SCREW_PASSAGE + LOCK_SCREW_THREAD_ENGAGEMENT - FILLISTER_SHANK_LEN)
+        abs(LOCK_SCREW_PASSAGE + LOCK_SCREW_THREAD_ENGAGEMENT - LOCK_SCREW_SHANK_LEN)
         > 1e-9
     ):
         raise AssertionError("lock screw stack does not consume the stock shank")
     valid_engagement(
-        "lock #4-40 engagement", LOCK_SCREW_THREAD_ENGAGEMENT, FILLISTER_SHANK_DIA
+        "lock #4-40 engagement", LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_SHANK_DIA
     )
-    nonnegative("lock screw blind-bottom clearance", LOCK_SCREW_BOTTOM_CLEARANCE)
+    nonnegative("lock screw tip inside the guide", LOCK_SCREW_TIP_INSIDE_MIN)
 
     # Clip bosses use exactly the non-threaded remainder of the shank; the
-    # platen is through-tapped, gives 4.0 mm engagement, and the tip is flush.
+    # platen and its rear socket bosses are through-tapped for 4.5 mm
+    # engagement, and the tip is flush with the boss.
     if (PLATEN_SOCKET_SPEC.kind, PLATEN_SOCKET_SPEC.size, PLATEN_SOCKET_SPEC.end) != (
         "tapped",
         "#4-40",
@@ -755,7 +1139,7 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative("clip screw rear protrusion clearance", clip_tip_clearance)
     if abs(clip_tip_clearance) > 1e-9:
-        raise AssertionError("clip screw tip is not flush with the platen back")
+        raise AssertionError("clip screw tip is not flush with the socket boss")
 
     # The raised heads remain wholly outside the recording-paper side margins.
     paper_side_margin = (PLATE_WIDTH - PAPER_WIDTH) / 2.0
@@ -766,6 +1150,446 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative(
         "right clip head-to-paper clearance", paper_side_margin - right_head_extent
+    )
+
+    # Hanger joints: transgear_hanger_joints owns the stacks; re-prove them
+    # against the placed stations.
+    spring_room = PIVOT_SCREW_Z0 - (ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT)
+    if abs(spring_room - HANGER.SPRING_ROOM_NOMINAL) > 1e-9:
+        raise AssertionError(
+            f"pivot spring room {spring_room:.4f} is not "
+            f"{HANGER.SPRING_ROOM_NOMINAL:.4f}"
+        )
+    if abs(spring_room - PIVOT_SPRING.MODEL_HEIGHT) > 1e-9:
+        raise AssertionError("the MHA-184 spring is not modelled in its room")
+    if HANGER.PIVOT_ENGAGEMENT_WORST_D + 1e-9 < HANGER.PIVOT_ENGAGEMENT_APPROVED_MIN_D:
+        raise AssertionError("pivot screw engagement is under its approved minimum")
+    if HANGER.PLATE_SCREW_ENGAGEMENT_WORST_D + 1e-9 < HANGER.ENGAGEMENT_TARGET_D:
+        raise AssertionError(
+            f"plate-screw engagement {HANGER.PLATE_SCREW_ENGAGEMENT_WORST_D:.3f} D"
+            f" worst is under {HANGER.ENGAGEMENT_TARGET_D} D"
+        )
+    # R9-44: the screws are cut flush with the arm's front face at assembly
+    # (MHA-139's filed-tip idiom), and the model carries the cut length.
+    plate_screw_tip = PLATE_SCREW_Z0 - PLATE_SCREW.LENGTH
+    if abs(plate_screw_tip - (ARM_Z0 + HANGER.PLATE_SCREW_TIP_INSIDE_NOMINAL)) > 1e-9:
+        raise AssertionError(
+            "MHA-166's cut tips are not flush with the arm's front face"
+        )
+    latch_pin_proud = LATCH_PIN.LENGTH - ARM.PIN_HOLE_DEPTH
+    low, high = HANGER.LATCH_PIN_PROUD_RANGE
+    if abs(latch_pin_proud - LATCH_PIN.PROUD) > 1e-9 or not (
+        low <= latch_pin_proud <= high
+    ):
+        raise AssertionError(f"latch pin stands {latch_pin_proud:.3f} proud of the arm")
+    bracket_engagement = HOOK_BRACKET_SCREW.LENGTH - HOOK_BRACKET.SHEET_T
+    valid_engagement(
+        "hook-bracket #4-40 engagement",
+        bracket_engagement,
+        HOOK_BRACKET_SCREW.MAJOR_DIA,
+    )
+    for x, y, z in HOOK_BRACKET_SCREW_POS:
+        nonnegative(
+            f"hook-bracket screw tip x{x:.1f} inside the bar front",
+            z - HOOK_BRACKET_SCREW.LENGTH - BAR_FRONT_Z,
+        )
+
+    # Disc screws: through the hub flange and the disc's through taps, cut at
+    # assembly (R9-47) to TIP_BELOW_REAR_FACE inside the disc's rear face, so
+    # no tip stands into the platen's path behind the disc; the model carries
+    # the cut.  The worst-case engagement is the spec's (import-time).
+    disc_screw_tip = DISC_SCREW_Z0 + DISC_SCREW.LENGTH
+    tip_below_rear = DISC_Z0 + DISC_FACE - disc_screw_tip
+    if abs(tip_below_rear - DISC_SCREW.TIP_BELOW_REAR_FACE_MODEL) > 1e-9 or not (
+        DISC_SCREW.TIP_BELOW_REAR_FACE[0]
+        <= tip_below_rear
+        <= DISC_SCREW.TIP_BELOW_REAR_FACE[1]
+    ):
+        raise AssertionError(
+            "MHA-161 disc-screw tip to the MHA-070 disc rear face: "
+            f"{tip_below_rear:.3f} inside, off the cut window"
+        )
+    valid_engagement(
+        "disc #0-80 engagement",
+        disc_screw_tip - DISC_Z0,
+        DISC_SCREW.SHANK_DIA,
+    )
+
+    # Knob stack: the thumbnut on the shaft's front thread, seated on the
+    # collar's pilot (R9-70); the cup is pinned, not screwed.
+    raw_thumbnut = KNOB_SPEC.TIP_STATION - COLLAR.SET_NOMINAL - COLLAR.PILOT_LENGTH
+    if abs(THUMBNUT_ENGAGEMENT - raw_thumbnut) > 1e-9:
+        raise AssertionError("thumbnut engagement is off the collar/pilot stack")
+    valid_engagement(
+        "thumbnut 1/4-20 engagement", THUMBNUT_ENGAGEMENT, KNOB_SPEC.THREAD_MAJOR
+    )
+    # The nut's seat stands on full thread, in front of the stud's relief.
+    nonnegative(
+        "thumbnut seat to the stud's full-thread end",
+        KNOB_SHAFT_Z0 - KNOB_SPEC.PLAIN_CORE - THUMBNUT_Z0,
+    )
+
+
+def _section_gap(
+    a: tuple[float, float, float, float], b: tuple[float, float, float, float]
+) -> float:
+    """Separation of two (y0, y1, z0, z1) sections; negative when they overlap."""
+    dy = max(a[0] - b[1], b[0] - a[1])
+    dz = max(a[2] - b[3], b[2] - a[3])
+    if dy > 0.0 and dz > 0.0:
+        return math.hypot(dy, dz)
+    return max(dy, dz)
+
+
+def _latch_hook_sections(step: float = 0.05) -> list[tuple[float, float, float, float]]:
+    """The latch hook's machine (y, z) section as thin vertical slices of the
+    edgewise-curved strip, plus the round tip's bounding square."""
+    end_y, end_z = HOOK.END_YZ
+    sections = [
+        (end_y - HOOK.TIP_R, end_y + HOOK.TIP_R, end_z - HOOK.TIP_R, end_z + HOOK.TIP_R)
+    ]
+    count = math.ceil((HOOK.TOP_Y - end_y) / step)
+    for i in range(count + 1):
+        y = end_y + (HOOK.TOP_Y - end_y) * i / count
+        centre, radius = (
+            (HOOK.C1, HOOK.R1) if y >= HOOK.JUNCTION[0] else (HOOK.C2, HOOK.R2)
+        )
+        cos_slope = math.sqrt(radius**2 - (y - centre[0]) ** 2) / radius
+        half = HOOK.HALF_W / cos_slope
+        z = HOOK.centreline_z(y)
+        sections.append((y, y, z - half, z + half))
+    return sections
+
+
+# The lock-station sweep judges every section at the printed worst case
+# (policy rule 12): each section is the envelope its printed bands allow,
+# grown toward its neighbours, and each pair must keep LOCK_SWEEP_FLOOR of
+# running clearance. The bar's back face is the datum the hanger stands on and
+# the platen rides its front face, so the thinnest bar carries the whole lock
+# stack rearward toward the hanger, and the deepest rail and thickest strip
+# stand the button heads further back again. The arm sits on the shortest
+# spacer, its plate's lower section on the thinnest arm stock and the deepest
+# notch. Deviations are (lower, upper) from the model, read from the specs the
+# parts author on their model dimensions, so the sheets and the sweep agree.
+# Unmodelled contributor (R9-61): the bottom rail's y on the platen, set
+# against the top rail (which hangs on the bar's top edge) by the platen's
+# guide-screw rows and the #4 screws' float in its Ø3.0 holes. The platen has
+# no sheet and so no printed bands, so the sweep holds both rails at GUIDE_Y.
+LOCK_SWEEP_FLOOR = 0.10
+_BAR_DEPTH_DEV = (-BAR.BAR_DEPTH_BAND, BAR.BAR_DEPTH_BAND)
+_GUIDE_DEPTH_DEV = printed_deviations(
+    GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND)
+)
+# The rail's sheet prints its other sizes at the same document places.
+_GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES)
+_LOCK_THICK_DEV = printed_deviations(LOCK_THICK, LOCK_PRECISION["Depth"])
+_LOCK_HEIGHT_DEV = printed_deviations(
+    LOCK_HEIGHT, LOCK_PRECISION["Height"], deviations(LOCK_HEIGHT_BAND)
+)
+_SPACER_LENGTH_DEV = (-SPACER.LENGTH_BAND, SPACER.LENGTH_BAND)
+_NOTCH_DEPTH_DEV = printed_deviations(
+    ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES
+)
+_PLATE_OUTLINE_BAND = ARM_PLATE_SPEC.BAND_BY_PLACES[ARM_PLATE_SPEC.OUTLINE_PLACES]
+_HUB_DIA_DEV = printed_deviations(ARM_PLATE.HUB_DIA, ARM_PLATE_SPEC.HUB_DIA_PLACES)
+_BRACKET_WIDTH_DEV = printed_deviations(
+    HOOK_BRACKET.WIDTH,
+    HOOK_BRACKET_SPEC.WIDTH_PLACES,
+    (-HOOK_BRACKET_SPEC.WIDTH_TOL, HOOK_BRACKET_SPEC.WIDTH_TOL),
+)
+_BRACKET_FLAP_DEV = printed_deviations(
+    HOOK_BRACKET.FLAP_HEIGHT, HOOK_BRACKET_SPEC.FLAP_HEIGHT_PLACES
+)
+
+
+def _grown(
+    section: tuple[float, float, float, float], dy: float, dz0: float, dz1: float
+) -> tuple[float, float, float, float]:
+    """A (y0, y1, z0, z1) section grown by dy each side in y, dz0 forward and
+    dz1 rearward in z."""
+    y0, y1, z0, z1 = section
+    return (y0 - dy, y1 + dy, z0 - dz0, z1 + dz1)
+
+
+def _assert_lock_station_sweep() -> None:
+    """The guide-lock stations ride the platen across its whole feed, so each
+    sweeps a band unbounded in x: its (y, z) section must clear every fixed
+    part behind the bar at every platen position, and the plates the bar's
+    back face, by LOCK_SWEEP_FLOOR at the printed worst case (contract lock
+    sweep; R9-31 fits the low guide-lock screw heads so they pass the hanger
+    arm)."""
+    # How far the lock stack's faces can stand from the model: forward (the
+    # thickest bar, the shallowest rail, the thinnest strip) and rearward.
+    front_forward = _BAR_DEPTH_DEV[1] - _GUIDE_DEPTH_DEV[0]
+    back_forward = front_forward - _LOCK_THICK_DEV[0]
+    front_rear = -_BAR_DEPTH_DEV[0] + _GUIDE_DEPTH_DEV[1]
+    back_rear = front_rear + _LOCK_THICK_DEV[1]
+    lock_back = LOCK_Z0 + LOCK_THICK
+    head_r = LOCK_SCREW_HEAD_DIA / 2.0  # the catalogue head, Ø and height
+    # R9-49: each lock is pushed away from the bar onto its screws before they
+    # are tightened (the "guide-locks-set" step). Set so, and skewed by holes
+    # bearing at opposite ends of the set window, its guide-side edge stands
+    # up to LOCK_SET_EDGE_REACH[1] beyond the model and its far edge up to
+    # LOCK_SET_EDGE_REACH[0] toward the bar, plus the height band's growth.
+    plate_outward = LOCK_SET_EDGE_REACH[1]
+    plate_inward = max(_LOCK_HEIGHT_DEV[1], 0.0) + LOCK_SET_EDGE_REACH[0]
+    moving = []
+    for index, (gy, (y0, y1)) in enumerate(zip(GUIDE_Y, LOCK_PLATE_Y, strict=True)):
+        yc = gy + GUIDE_HEIGHT / 2.0
+        # The bottom rail's lock laps the rail's underside and is pushed down;
+        # the top rail's laps its top and is pushed up.
+        grow_down, grow_up = (
+            (plate_outward, plate_inward)
+            if index == 0
+            else (plate_inward, plate_outward)
+        )
+        moving += [
+            (
+                f"lock plates y{y0:.1f}",
+                _grown(
+                    (y0 - grow_down, y1 + grow_up, LOCK_Z0, lock_back),
+                    0.0,
+                    front_forward,
+                    back_rear,
+                ),
+            ),
+            (
+                f"lock-screw heads y{yc:.1f}",
+                _grown(
+                    (
+                        yc - head_r,
+                        yc + head_r,
+                        lock_back,
+                        lock_back + LOCK_SCREW_HEAD_H,
+                    ),
+                    0.0,
+                    back_forward,
+                    back_rear,
+                ),
+            ),
+            (
+                f"guide rail rear lip y{gy:.1f}",
+                _grown(
+                    (gy, gy + GUIDE_HEIGHT, BAR_BACK_Z, LOCK_Z0),
+                    max(_GUIDE_HEIGHT_DEV[1], 0.0),
+                    0.0,
+                    front_rear,
+                ),
+            ),
+        ]
+    tip_y = _on_arm(ARM.TIP_STATION)[1]
+    plate_corner_y = max(
+        _on_arm(ARM_PLATE.BORE_STATION + u, ARM_PLATE.BORE_OFFSET + v)[1]
+        for u, v in (ARM_PLATE.TOP_LEFT, ARM_PLATE.TOP_RIGHT)
+    )
+    py = PIVOT_XY[1]
+    ky = KNOB_SHAFT_XY[1]
+    # R9-61: the hanger hangs on the pivot screw, whose #8-32 tap the bar
+    # prints at its ±HOLE_POSITION_BAND, so every hung section stands off its
+    # model by that band in y. The spacer is pressed on the shoulder, so its
+    # largest O.D. stands on the screw axis.
+    pivot_tap = BAR.HOLE_POSITION_BAND
+    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0
+    bracket_y = HOOK_BRACKET.MACHINE_ORIGIN[1]
+    bracket_screw_z = BAR_BACK_Z + HOOK_BRACKET.SHEET_T + HOOK_BRACKET.SHEET_T_PLUS
+    # The arm's front face on the shortest spacer; its plate's lower section
+    # stands proud of it by the deepest notch on the thinnest arm stock.
+    arm_forward = -_SPACER_LENGTH_DEV[0]
+    plate_forward = arm_forward + ARM.THICKNESS_BAND + _NOTCH_DEPTH_DEV[1]
+    # The hook is set at fit-up on its front rivet hole, measured from the
+    # MHA-170 datums (HOOK_SET_YZ as printed, ±HOOK_SET_RANGE), before the
+    # flap is match-drilled through it. The upper hole is a printed pitch
+    # further; the outline is off the holes by the hook's printed rivet run
+    # (y) and, across the strip (z), the pair's centring, half the stock's
+    # width band and half the pitch band.
+    hook_set_y = max(map(abs, HOOK_BRACKET_SPEC.HOOK_SET_Y_DEV))
+    hook_set_forward = -HOOK_BRACKET_SPEC.HOOK_SET_Z_DEV[0]
+    hook_set_rear = HOOK_BRACKET_SPEC.HOOK_SET_Z_DEV[1]
+    hook_pitch = max(
+        map(abs, printed_deviations(HOOK.RIVET_PITCH, HOOK_SPEC.RIVET_PLACES))
+    )
+    hook_run = max(map(abs, printed_deviations(HOOK.RIVET_RUN, HOOK_SPEC.RIVET_PLACES)))
+    hook_across = (
+        HOOK_SPEC.CENTRING_BAND + HOOK_SPEC.STOCK_WIDTH_TOL / 2.0 + hook_pitch / 2.0
+    )
+    fixed: list[tuple[str, tuple[float, float, float, float]]] = [
+        (
+            "arm",
+            _grown(
+                (tip_y - ARM.TIP_END_R, py + ARM.PIVOT_END_R, ARM_Z0, PLATE_Z0),
+                ARM.BAND_X + ARM.TIP_STATION_BAND + pivot_tap,
+                arm_forward,
+                0.0,
+            ),
+        ),
+        (
+            "arm plate",
+            _grown(
+                (
+                    ky - ARM_PLATE.END_R,
+                    plate_corner_y,
+                    PLATE_Z0 + ARM_PLATE.FRONT_FACE_Z,
+                    PLATE_Z0 + ARM_PLATE.BOSS_FACE_Z,
+                ),
+                _PLATE_OUTLINE_BAND + pivot_tap,
+                plate_forward,
+                0.0,
+            ),
+        ),
+        (
+            "arm plate hub",
+            _grown(
+                (
+                    ky - ARM_PLATE.HUB_DIA / 2.0,
+                    ky + ARM_PLATE.HUB_DIA / 2.0,
+                    PLATE_Z0 + ARM_PLATE.HUB_FACE_Z,
+                    ARM_Z0,
+                ),
+                _HUB_DIA_DEV[1] / 2.0 + pivot_tap,
+                arm_forward,
+                0.0,
+            ),
+        ),
+        *(
+            (
+                "arm plate-screw tip (worst proud)",
+                _grown(
+                    (
+                        y - PLATE_SCREW.THREAD_MAJOR / 2.0,
+                        y + PLATE_SCREW.THREAD_MAJOR / 2.0,
+                        ARM_Z0 - HANGER.PLATE_SCREW_TIP_PROUD_MAX,
+                        PLATE_SCREW_Z0,
+                    ),
+                    ARM.HOLE_POSITION_BAND + pivot_tap,
+                    arm_forward,
+                    0.0,
+                ),
+            )
+            for _, y in PLATE_SCREW_XY
+        ),
+        (
+            "pivot spacer",
+            _grown(
+                (py - spacer_r, py + spacer_r, SPACER_Z0, ARM_Z0), pivot_tap, 0.0, 0.0
+            ),
+        ),
+        (
+            "pivot screw shoulder",
+            _grown(
+                (
+                    py - PIVOT_SCREW.SHOULDER_DIA / 2.0,
+                    py + PIVOT_SCREW.SHOULDER_DIA / 2.0,
+                    SPACER_Z0,
+                    PIVOT_SCREW_Z0,
+                ),
+                pivot_tap,
+                0.0,
+                0.0,
+            ),
+        ),
+        (
+            "pivot screw head",
+            _grown(
+                (
+                    py - PIVOT_SCREW.HEAD_DIA / 2.0,
+                    py + PIVOT_SCREW.HEAD_DIA / 2.0,
+                    PIVOT_SCREW_Z0,
+                    PIVOT_SCREW_Z0 + PIVOT_SCREW.HEAD_H,
+                ),
+                pivot_tap,
+                0.0,
+                0.0,
+            ),
+        ),
+        (
+            # y = 0 is the base's datum edge: the width band grows the far one.
+            "latch-hook bracket",
+            (
+                bracket_y,
+                bracket_y + HOOK_BRACKET.WIDTH + _BRACKET_WIDTH_DEV[1],
+                BAR_BACK_Z,
+                BAR_BACK_Z + HOOK_BRACKET.FLAP_HEIGHT + _BRACKET_FLAP_DEV[1],
+            ),
+        ),
+        (
+            "latch-hook bracket screw heads",
+            (
+                HOOK_BRACKET_SCREW_POS[0][1] - HOOK_BRACKET_SCREW.HEAD_DIA / 2.0,
+                HOOK_BRACKET_SCREW_POS[0][1] + HOOK_BRACKET_SCREW.HEAD_DIA / 2.0,
+                bracket_screw_z,
+                bracket_screw_z + HOOK_BRACKET_SCREW.HEAD_H,
+            ),
+        ),
+        # Either end of the rivet: the dome, the tail past the flap, or the
+        # widest shop head.
+        *(
+            (
+                "latch-hook rivet",
+                _grown(
+                    (
+                        y - HOOK_RIVET.ENVELOPE_DIA / 2.0,
+                        y + HOOK_RIVET.ENVELOPE_DIA / 2.0,
+                        z - HOOK_RIVET.ENVELOPE_DIA / 2.0,
+                        z + HOOK_RIVET.ENVELOPE_DIA / 2.0,
+                    ),
+                    hook_set_y,
+                    hook_set_forward + hook_pitch,
+                    hook_set_rear + hook_pitch,
+                ),
+            )
+            for _, y, z in HOOK_RIVET_POS
+        ),
+        *(
+            (
+                "latch hook",
+                _grown(
+                    section,
+                    hook_set_y + hook_run,
+                    hook_set_forward + hook_across,
+                    hook_set_rear + hook_across,
+                ),
+            )
+            for section in _latch_hook_sections()
+        ),
+    ]
+    minima: dict[str, float] = {}
+    for fixed_label, fixed_section in fixed:
+        for moving_label, moving_section in moving:
+            gap = _section_gap(moving_section, fixed_section)
+            if gap < LOCK_SWEEP_FLOOR:
+                raise AssertionError(
+                    f"the platen's {moving_label} would sweep into the"
+                    f" {fixed_label} as it feeds (worst-case gap {gap:.3f}"
+                    f" < {LOCK_SWEEP_FLOOR})"
+                )
+            minima[fixed_label] = min(minima.get(fixed_label, math.inf), gap)
+    # The plates bridge behind the bar: the thickest bar and the shallowest
+    # rail bring their front faces closest to its back face.
+    bar_gap = LOCK_Z0 - front_forward - BAR_BACK_Z
+    if bar_gap < LOCK_SWEEP_FLOOR:
+        raise AssertionError(
+            f"the platen's lock plates would rub the bar's back face as it feeds"
+            f" (worst-case gap {bar_gap:.3f} < {LOCK_SWEEP_FLOOR})"
+        )
+    minima["bar back face"] = bar_gap
+    # Pushed away from the bar (R9-49), a lock plate's guide-side edge moves
+    # over the platen's own back. Behind the platen back only the rails and
+    # the rack stand; paper and clips are on its front face.
+    rack = (RACK_TIP_Y, RACK_Y0, BAR_FRONT_Z, RACK_BACK_Z)
+    rack_gap = min(
+        _section_gap(section, rack)
+        for label, section in moving
+        if label.startswith("lock plates")
+    )
+    if rack_gap < LOCK_SWEEP_FLOOR:
+        raise AssertionError(
+            "a set guide-lock plate would foul the platen rack"
+            f" (worst-case gap {rack_gap:.3f} < {LOCK_SWEEP_FLOOR})"
+        )
+    minima["platen rack"] = rack_gap
+    log(
+        "guide-lock station sweep clears the hanger at the printed worst case: "
+        + ", ".join(f"{label} {gap:.3f}" for label, gap in minima.items())
     )
 
 
@@ -782,110 +1606,155 @@ def _assert_rack_mesh() -> None:
         raise RuntimeError(f"rack gap phase {phase:.4f} != 0 over the stud")
     if FEED_TEETH % 4:
         raise RuntimeError("feed-pinion top-tooth alignment needs teeth % 4 == 0")
-    z_overlap = (FEED_Z0 + FEED_FACE) - BAR_FRONT_Z  # pinion face into the rack band
+    # The sleeve's teeth (Ry180: FEED_Z0 forward FEED_FACE) into the rack band
+    # (the rack's thickness on the platen back).
+    z_overlap = min(FEED_Z0, RACK_BACK_Z) - max(FEED_Z0 - FEED_FACE, BAR_FRONT_Z)
     if z_overlap < 2.5:
         raise RuntimeError(
             f"feed pinion reaches only {z_overlap:.2f} into the rack band"
         )
-    # Radial safety: the rack crests must clear the pinion's base-circle gap
-    # floor, and the pinion tips the rack's root line.
-    rb = FEED_PD / 2.0 * math.cos(math.radians(14.5))
-    crest_reach = FEED_PD / 2.0 + RACK_MESH_EXT - RACK_ADDENDUM
-    if crest_reach <= rb + 0.05:
+    # Radial safety (R9-62a): the rack clear of the form-cut 12T's flank (the
+    # same sweep that bounds the fit-up band), its crests clear of the 1.25/P
+    # root, and the contact ratio at or over 1.2 at the nominal mesh.
+    import paper_drive_assembly_steps as steps
+
+    if abs(RACK_ADDENDUM - FEED.MODULE_MM) > 1e-9:
+        raise RuntimeError("the mesh sweep assumes the rack's 1/P addendum")
+    penetration = steps.feed_mesh_penetration(RACK_MESH_EXT)
+    if penetration > 1e-5:
         raise RuntimeError(
-            f"rack crests reach {crest_reach:.3f} into the pinion"
-            f" gap floor at rb {rb:.3f}"
+            f"rack reaches {penetration:.4f} into the feed pinion's flank"
+            f" at extension {RACK_MESH_EXT:.3f}"
         )
+    crest_depth = RACK_ADDENDUM - RACK_MESH_EXT  # crests past the pitch circle
+    root_clearance = FEED_PD / 2.0 - crest_depth - FEED.ROOT_DIA_MIN / 2.0
+    if root_clearance < 0.25:
+        raise RuntimeError(f"rack crests {root_clearance:.3f} off the pinion root")
+    contact_ratio = steps.feed_mesh_contact_ratio(RACK_MESH_EXT)
+    if contact_ratio < 1.2:
+        raise RuntimeError(f"feed mesh contact ratio {contact_ratio:.2f} < 1.2")
     log(
         f"rack mesh: pitch line y {RACK_PITCH_Y:.2f}, extension {ext:.2f},"
-        f" rack gap centred over the stud, crest/floor margin"
-        f" {crest_reach - rb:.3f}"
+        f" rack gap centred over the stud, flank clear from extension"
+        f" {steps.MESH_EXTENSION_MIN:.3f}, root clearance {root_clearance:.3f},"
+        f" contact ratio {contact_ratio:.2f}"
     )
 
 
 def _assert_gear_mesh() -> None:
-    """Third-gear/disc mesh: same DP, c2c on the latch, phased tooth-on-gap."""
+    """Third-gear/disc mesh: same DP, the disc's centre distance, phased
+    tooth-on-gap."""
     if THIRD_DP != DISC_DP:
         raise RuntimeError(f"third gear DP {THIRD_DP} != disc DP {DISC_DP}")
+    centre_distance = DISC_SPEC.CENTRE_DISTANCE
     c2c_nominal = (THIRD_TEETH + DISC_TEETH) / (2.0 * DISC_DP) * IN  # 44.116
-    ext = LATCH_C2C - c2c_nominal
+    ext = centre_distance - c2c_nominal  # 0.650
     if not (0.5 <= ext <= 0.8):
         raise RuntimeError(
             f"gear mesh extension {ext:.3f} outside the 0.5..0.8 gap-floor window"
         )
-    # The disc's teeth repeat every 3 deg, so a tooth must point along the c2c
-    # line at the latch angle for the third gear's phased gap to receive it.
+    # The disc's teeth repeat every 3 deg, so a tooth must point along the S ->
+    # K line at the mesh angle for the 12T's phased gap to receive it.
     disc_gamma = 360.0 / DISC_TEETH
-    if abs(math.remainder(LATCH_ANGLE_DEG, disc_gamma)) > 1e-9:
+    if abs(math.remainder(MESH_ANGLE_DEG, disc_gamma)) > 1e-9:
         raise RuntimeError(
-            f"latch angle {LATCH_ANGLE_DEG} is not a multiple of the disc pitch"
+            f"mesh angle {MESH_ANGLE_DEG} is not a multiple of the disc pitch"
             f" {disc_gamma}"
         )
-    # Radial: the disc tooth tips must clear the third gear's base-circle gap
-    # floor (the same law the latch C2C extension exists for).
+    gap_az = THIRD_PHASE_DEG + KNOB_SPEC.GAP_AZIMUTH_DEG - _MESH_AZ
+    if abs(math.remainder(gap_az, THIRD_GAMMA)) > 1e-9:
+        raise RuntimeError("the knob 12T's phased gap does not face the disc")
+    # Radial: the disc tooth tips must clear the 12T's base-circle gap floor
+    # (the law the centre extension exists for).
     rb3 = THIRD_TEETH / THIRD_DP * IN / 2.0 * math.cos(math.radians(14.5))
     disc_ra = (DISC_TEETH + 2.0) / DISC_DP * IN / 2.0
-    tip_reach = LATCH_C2C - disc_ra
+    tip_reach = centre_distance - disc_ra
     if tip_reach <= rb3 + 0.05:
         raise RuntimeError(
             f"disc tips reach {tip_reach:.3f}, third-gear gap floor {rb3:.3f}"
         )
-    z_overlap = min(THIRD_Z0 + THIRD_FACE, DISC_Z0 + DISC_FACE) - max(THIRD_Z0, DISC_Z0)
+    z_overlap = min(KNOB_SHAFT_Z0 + THIRD_FACE, DISC_Z0 + DISC_FACE) - max(
+        KNOB_SHAFT_Z0, DISC_Z0
+    )
     if z_overlap < 2.5:
         raise RuntimeError(f"third gear/disc z overlap {z_overlap:.2f} < 2.5")
-    # The latch arm must fit its slot between the rack back and the bar front.
-    slot = BAR_BACK_Z - RACK_BACK_Z
-    if LATCH_THICK > slot - 0.3:
-        raise RuntimeError(f"latch arm {LATCH_THICK} too thick for the {slot:.1f} slot")
-    # The bar's MACHINE-handed bracket sockets must land under the bracket-screw
-    # line: both are the machine frame now, so stud +- dx matches directly.
-    expected = {
-        round(STUD_XY[0] + dx, 6) for dx in (-BRACKET_SCREW_DX, BRACKET_SCREW_DX)
-    }
-    if expected != {round(x, 6) for x in BAR_BRACKET_HOLE_X}:
-        raise RuntimeError(
-            f"support-bar bracket holes {BAR_BRACKET_HOLE_X} != screw"
-            f" line {sorted(expected)}"
-        )
     log(
-        f"gear mesh 12:120 DP38: c2c {LATCH_C2C} (ext {ext:.2f}), third gear"
+        f"gear mesh 12:120 DP38: c2c {centre_distance} (ext {ext:.2f}), 12T"
         f" phased {THIRD_PHASE_DEG:+.1f} deg, tip/floor margin {tip_reach - rb3:.3f}"
     )
 
 
 def _assert_knob_shaft_clearance() -> None:
-    """The knob cluster must ride the latch's exact c2c with its air gaps."""
-    arm = math.hypot(KNOB_SHAFT_XY[0] - STUD_XY[0], KNOB_SHAFT_XY[1] - STUD_XY[1])
-    if abs(arm - LATCH_C2C) > 1e-6:
-        raise RuntimeError(
-            f"knob shaft sits {arm:.4f} from the stud, latch c2c is {LATCH_C2C}"
+    """The knob cluster must ride the disc's exact centre distance with its
+    air gaps and floats."""
+    # R9-68: the collar's rearmost stop is the 12T's front face F, and the
+    # front bushing is faced until F to the disc's front face reads
+    # FIT_WINDOW with the cluster forward, so the window's minimum is the
+    # collar's worst air to the disc.  The model sits at the window's centre.
+    collar_disc_air_min = CLUSTER.FIT_WINDOW[0]
+    air = DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0
+    if air < collar_disc_air_min:
+        raise AssertionError(
+            f"knob drive collar to disc air {air:.2f} < {collar_disc_air_min}"
+            " with the cluster forward -- the collar must stand clear of the disc"
         )
-    shaft_top = KNOB_SHAFT_XY[1] + 0.375 * IN / 2.0
-    if shaft_top >= PLATE_Y0 - 0.5:
+    reach = math.dist(KNOB_SHAFT_XY, STUD_XY)
+    if abs(reach - DISC_SPEC.CENTRE_DISTANCE) > 1e-6:
         raise RuntimeError(
-            f"knob shaft top {shaft_top:.2f} too close to the platen bottom"
-            f" edge {PLATE_Y0}"
+            f"knob shaft sits {reach:.4f} from the stud, the mesh centre"
+            f" distance is {DISC_SPEC.CENTRE_DISTANCE}"
         )
-    t24_collar_gap = arm - (REMOVABLE_TIP_R["T24"] + 7.0)  # T24 tip r + collar r
-    if t24_collar_gap < 0.5:
-        raise RuntimeError(f"mounted T24 to stub-collar gap {t24_collar_gap:.2f} < 0.5")
+    # The arm plate's hub (z -137..-124.4) shares the rack's z band: it must
+    # stay under the rack crests at every platen position.
+    hub_top = KNOB_SHAFT_XY[1] + ARM_PLATE.HUB_DIA / 2.0
+    if hub_top >= RACK_TIP_Y - 0.5:
+        raise RuntimeError(
+            f"arm plate hub top {hub_top:.2f} too close to the rack crests"
+            f" {RACK_TIP_Y:.3f}"
+        )
+    # The mounted T24 shares the disc hub's z band: radial gap to the hub.
+    t24_hub_gap = reach - (REMOVABLE_TIP_R["T24"] + DISC_HUB.HUB_DIA / 2.0)
+    if t24_hub_gap < 0.5:
+        raise RuntimeError(f"mounted T24 to disc-hub gap {t24_hub_gap:.2f} < 0.5")
+    # The MHA-181 front bushing at its largest Ø against the knob stack's
+    # largest neighbours, whatever their z: the T24's tips, the thumbnut and
+    # the drive collar.
+    bushing_r = (FRONT_BUSHING.OD + printed_band_mm(FRONT_BUSHING.OD_PLACES)) / 2.0
+    bushing_air = (
+        reach
+        - bushing_r
+        - max(
+            REMOVABLE_TIP_R["T24"],
+            max(THUMBNUT_HEAD_DIA, THUMBNUT_FLANGE_DIA) / 2.0,
+            KNOB_COLLAR_R_WORST,
+        )
+    )
+    if bushing_air < 1.0:
+        raise RuntimeError(f"front bushing to knob stack air {bushing_air:.2f} < 1.0")
     # The T24 overlaps the disc rim in XY -- they must stay z-separated.
-    t24_back = REMOVABLE.SEAT_FACE_Z  # the wheel's BACK face on the seat collar
-    z_gap = DISC_Z0 - t24_back  # -148.4 - (-154.3) = 5.9
+    z_gap = DISC_Z0 - REMOVABLE.SEAT_FACE_Z  # 6.9
     if z_gap < 2.0:
         raise RuntimeError(f"T24/disc z gap {z_gap:.2f} < 2.0")
-    # The seat collar's rear face stands DISC_AIR in front of the disc's front
-    # face, where the disc rim passes inside the collar radius.
-    collar_disc_z = DISC_Z0 - KNOB_COLLAR_REAR_Z
-    if collar_disc_z < KNOB_DISC_AIR - 1e-9:
+    # End float: the knob cup's front face behind the arm plate's boss.
+    end_float = KNOB_CUP_Z0 - (PLATE_Z0 + ARM_PLATE.BOSS_FACE_Z)
+    if abs(end_float - KNOB_SPEC.END_FLOAT) > 1e-9:
         raise RuntimeError(
-            f"knob seat collar to disc air {collar_disc_z:.2f} < {KNOB_DISC_AIR}"
+            f"knob end float {end_float:.4f} is not {KNOB_SPEC.END_FLOAT}"
+        )
+    # Sleeve float: the ring's rear face in front of the front bushing (the
+    # disc's end float less the hub's recess).
+    cluster_float = (FRONT_BUSHING_Z0 - FRONT_BUSHING.LENGTH) - CLUSTER.RING_REAR_Z
+    if abs(cluster_float - CLUSTER.SLEEVE_FLOAT_WINDOW_CENTRE) > 1e-9:
+        raise RuntimeError(
+            f"sleeve float {cluster_float:.4f} is not "
+            f"{CLUSTER.SLEEVE_FLOAT_WINDOW_CENTRE}"
         )
     log(
-        f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}),"
-        f" {PLATE_Y0 - shaft_top:.2f} under the platen edge; gaps:"
-        f" T24/collar {t24_collar_gap:.1f}, T24/disc z {z_gap:.1f}, seat collar/disc"
-        f" z {collar_disc_z:.2f} ({KNOB_DISC_AIR_WORST:.2f} worst to the disc's stop)"
+        f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}); plate"
+        f" hub {RACK_TIP_Y - hub_top:.2f} under the rack crests; gaps:"
+        f" T24/hub {t24_hub_gap:.1f}, front bushing/knob stack {bushing_air:.1f},"
+        f" T24/disc z {z_gap:.1f}, collar/disc z"
+        f" {air:.2f}; floats: knob {end_float:.2f}, cluster {cluster_float:.2f}"
     )
 
 
@@ -914,6 +1783,54 @@ def _assert_chain_layout() -> None:
         f"roller chain layout: loop {CENTRELINE_LEN:.2f}, {LINK_COUNT} links at"
         f" {LINK_PITCH:.4f}, seated on pitch circles ({PITCH_R_T24}/{PITCH_R_T12}),"
         f" plane z {CHAIN_MID_Z}"
+    )
+
+
+def _slack_run_points(step: float = 0.1) -> list[tuple[float, float]]:
+    """Machine xy of the chain centreline's slack run (knob wrap's end ->
+    crank wrap's start), sampled every ``step`` mm."""
+    s0 = CHAIN_WRAP_R_A * CHAIN_SPAN_A
+    length = CHAIN_SLACK_R * CHAIN_SPAN_SLACK
+    count = math.ceil(length / step)
+    return [
+        loop_point_tangent(
+            s0 + length * i / count,
+            dx=CHAIN_KNOB_CENTRE[0],
+            dy=CHAIN_KNOB_CENTRE[1],
+            mirror_x=True,
+        )[:2]
+        for i in range(count + 1)
+    ]
+
+
+def _assert_chain_slack_clearance() -> None:
+    """R9-30: the slack run of the 68-link loop (the sag the link count
+    forces) must clear every placed part that reaches the chain plane --
+    in plane by the bought chain's plate half-height, or axially by the band
+    the chain sweeps when it floats on the thinnest wheel."""
+    z_front = CHAIN_FRONT_Z_WORST
+    z_back = REMOVABLE.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
+    half_h = max(CHAIN_PLATE_HALF_H, REMOVABLE.ANSI_PLATE_HEIGHT / 2.0)
+    run = _slack_run_points()
+    report = []
+    for label, axis, radius, front, back in CHAIN_PLANE_ENVELOPES:
+        axial = max(front - z_back, z_front - back)
+        in_plane = (
+            -math.inf
+            if axis is None
+            else min(math.dist(point, axis) for point in run) - radius - half_h
+        )
+        if max(axial, in_plane) <= 0.0:
+            raise AssertionError(
+                f"the chain's slack run reaches the {label}: {in_plane:.2f} in"
+                f" plane, {axial:.2f} axially"
+            )
+        report.append(
+            f"{label} {in_plane:.2f}" if axial <= 0.0 else f"{label} z {axial:.2f}"
+        )
+    log(
+        f"chain slack run ({LINK_COUNT} links) clears the chain-plane parts: "
+        + ", ".join(report)
     )
 
 
@@ -1192,10 +2109,12 @@ async def build(adapter) -> dict[str, str]:
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     _assert_fastener_stacks()
+    _assert_lock_station_sweep()
     _assert_rack_mesh()
     _assert_gear_mesh()
     _assert_knob_shaft_clearance()
     _assert_chain_layout()
+    _assert_chain_slack_clearance()
 
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
     # call: each freed DOF is recorded (never authored) and persisted below.
@@ -1204,8 +2123,8 @@ async def build(adapter) -> dict[str, str]:
 
     # --- support bar + two-piece clamps ---------------------------------------
     # The bar is FIRST so the auto-fixed seed is structure, not the mated platen.
-    # Symmetric about machine x=0; its bracket-screw holes flank the stud at
-    # machine x=0 (see build_support_bar.py).
+    # Its body is symmetric about machine x=0; the hanger's pivot tap and the
+    # latch-hook bracket's taps are not (see support_bar_spec.py).
     support_bar = await place_component(
         adapter,
         "support-bar",
@@ -1345,10 +2264,10 @@ async def build(adapter) -> dict[str, str]:
         await _lock_to_platen(guide, f"platen-guide y{gy:.1f}")
         guides.append(guide)
     # Lock plates on the guide backs, bridging BEHIND the bar (1.0 clear of its
-    # back face): top-rail locks hang DOWN over the bar (Rz180, 14 overlap),
-    # bottom-rail locks bridge UP across the 7 open channel onto the bar band
-    # (identity, 7 overlap -- the 19-tall plate is sized by this station); the
-    # two rows clear each other by 1.0 in y.
+    # back face) and lapping LOCK_RAIL_LIP past each rail's outer edge: top-rail
+    # locks hang DOWN over the bar (Rz180), bottom-rail locks bridge UP across
+    # the 7 open channel onto the bar band (identity, 2.65 overlap, R9-61 --
+    # the plate's height is sized by this station).
     for x_c in LOCK_STATION_X:
         # Machine: the station is measured from the platen's +X edge (the mirror
         # of the pre-mirror left-edge station PLATE_X0 + x_c).
@@ -1356,7 +2275,7 @@ async def build(adapter) -> dict[str, str]:
         top = await place_component(
             adapter,
             "guide-lock",
-            [station + LOCK_WIDTH / 2.0, GUIDE_Y[1] + GUIDE_HEIGHT, LOCK_Z0],
+            [station + LOCK_WIDTH / 2.0, LOCK_PLATE_Y[1][1], LOCK_Z0],
             [0.0, 0.0, 180.0],
             rot_z_rows(180.0),
             ground=False,
@@ -1366,7 +2285,7 @@ async def build(adapter) -> dict[str, str]:
         bot = await place_component(
             adapter,
             "guide-lock",
-            [station - LOCK_WIDTH / 2.0, GUIDE_Y[0], LOCK_Z0],
+            [station - LOCK_WIDTH / 2.0, LOCK_PLATE_Y[0][0], LOCK_Z0],
             [0.0, 0.0, 0.0],
             IDENTITY,
             ground=False,
@@ -1503,6 +2422,12 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         "platen guide-screw grid",
     )
+    # The exploded sheet moves the guide and clip screws apart: tag each
+    # fillister screw with the joint it makes.
+    fillister_roles = {
+        **{name: CLIP_SCREW_ROLE for name in (clip_seed, *clip_instances)},
+        **{name: GUIDE_SCREW_ROLE for name in (guide_seed, *guide_instances)},
+    }
 
     # Two seeds at the right-hand station reproduce at the left-hand station;
     # under-head planes sit on the real 2-mm lock back faces.
@@ -1518,12 +2443,12 @@ async def build(adapter) -> dict[str, str]:
     for target in lock_seed_targets:
         seed = await place_component(
             adapter,
-            "fillister-screw",
+            "guide-lock-screw",
             target,
             [0.0, 180.0, 0.0],
             ROT_Y_180,
             ground=False,
-            label=f"fillister-screw lock seed (x{target[0]:+.0f} y{target[1]:.0f})",
+            label=f"guide-lock-screw lock seed (x{target[0]:+.0f} y{target[1]:.0f})",
         )
         await _lock_to_platen(
             seed, f"lock screw seed x{target[0]:+.0f} y{target[1]:.0f}"
@@ -1550,73 +2475,129 @@ async def build(adapter) -> dict[str, str]:
         "platen lock-screw grid",
     )
 
-    # --- transgear group (the real train) --------------------------------------
-    # Bracket on the bar's back face, stud bore below the bar.
-    bracket = await place_component(
+    # --- transgear hanger (behind the bar) ------------------------------------
+    # The hanger is structure: every part fixed at its contract station. The
+    # arm stands on the pivot spacer and swings on the shoulder screw; at the
+    # latched pose its frame is (U, N) from the pivot P.
+    arm_rows = rot_z_rows(ARM_ANGLE_DEG)
+    await place_component(
         adapter,
-        "transgear-bracket",
-        [STUD_XY[0], STUD_XY[1], BRACKET_Z0],
+        "transgear-pivot-spacer",
+        [PIVOT_XY[0], PIVOT_XY[1], SPACER_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
     )
-    # One exact-pose seed at machine +10; PatternAxisX forward runs toward -X
-    # and creates the second screw at -10. Ry(180) points both shanks into the
-    # support bar while their under-head planes bear on the bracket back face.
-    bracket_seed_target = [STUD_XY[0] + BRACKET_SCREW_DX, BAR_CY, STUB_Z0]
-    bracket_seed = await place_component(
+    await place_component(
         adapter,
-        "bracket-screw",
-        bracket_seed_target,
+        "transgear-arm",
+        [PIVOT_XY[0], PIVOT_XY[1], ARM_Z0],
+        [0.0, 0.0, ARM_ANGLE_DEG],
+        arm_rows,
+    )
+    # Rx(+90): the shoulder runs to -Z, bottoming on the bar's back face.
+    await place_component(
+        adapter,
+        "transgear-pivot-screw",
+        [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SCREW_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
+    )
+    # MHA-184 (identity: +Z axial) in the arm's spot face, under the head.
+    await place_component(
+        adapter,
+        "transgear-pivot-spring",
+        [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SPRING_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
+    await place_component(
+        adapter,
+        "transgear-arm-plate",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], PLATE_Z0],
+        [0.0, 0.0, ARM_ANGLE_DEG],
+        arm_rows,
+    )
+    for k, (x, y) in enumerate(PLATE_SCREW_XY, start=1):
+        await place_component(
+            adapter,
+            "transgear-arm-plate-screw",
+            [x, y, PLATE_SCREW_Z0],
+            [90.0, 0.0, 0.0],
+            ROT_X_POS90,
+            label=f"transgear-arm-plate-screw #{k} (station {ARM.PLATE_TAP_STATIONS[k - 1]})",
+        )
+    await place_component(
+        adapter,
+        "transgear-latch-pin",
+        list(LATCH_PIN_POS),
+        [0.0, 0.0, ARM_ANGLE_DEG - 90.0],
+        rot_z_rows(ARM_ANGLE_DEG - 90.0),
+    )
+    # Latch hook MHA-127 on the MHA-170 bracket's flap behind the bar: the
+    # bracket by translation, its two screws into the bar, the hook's +X face
+    # on the flap's inside face, held by two rivets.
+    await place_component(
+        adapter,
+        "latch-hook-bracket",
+        list(HOOK_BRACKET.MACHINE_ORIGIN),
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
+    for x, y, z in HOOK_BRACKET_SCREW_POS:
+        await place_component(
+            adapter,
+            "latch-hook-bracket-screw",
+            [x, y, z],
+            [90.0, 0.0, 0.0],
+            ROT_X_POS90,
+            label=f"latch-hook-bracket-screw (x{x:.1f})",
+        )
+    await place_component(
+        adapter,
+        "latch-hook",
+        LATCH_HOOK_POS,
+        LATCH_HOOK_EULER,
+        LATCH_HOOK_ROWS,
+        label="latch-hook (spring latch of the swing cluster)",
+    )
+    for x, y, z in HOOK_RIVET_POS:
+        await place_component(
+            adapter,
+            "latch-hook-rivet",
+            [x, y, z],
+            [0.0, 0.0, 90.0],
+            rot_z_rows(90.0),
+            label=f"latch-hook-rivet (z{z:.2f})",
+        )
+    log(
+        f"latch hook in the plane x {HOOK.PLANE_X[0]}..{HOOK.PLANE_X[1]}, y"
+        f" {HOOK.TOP_Y + HOOK.LOCAL_X_MIN:.2f}..{HOOK.TOP_Y + HOOK.LOCAL_X_MAX:.2f},"
+        f" z {LATCH_HOOK_Z_SPAN[0]:.2f}..{LATCH_HOOK_Z_SPAN[1]:.2f}"
+        f" ({LATCH_HOOK_Z_SPAN[0] - BAR_BACK_Z:.2f} behind the bar's back face)"
+    )
+
+    # --- disc cluster on the pin S ----------------------------------------------
+    # Ry(180): the pin's stations run from its head seat on the arm's rear face
+    # to -Z, its shank pressed through the arm's reamed bore.
+    await place_component(
+        adapter,
+        "transgear-pin",
+        [STUD_XY[0], STUD_XY[1], PIN_Z0],
         [0.0, 180.0, 0.0],
         ROT_Y_180,
-        ground=False,
-        label=f"bracket-screw seed (x{bracket_seed_target[0]:+.0f})",
     )
-    await lock_mate(
+    # Ry(180): the rear bushing's arm face on the arm's front face, its sleeve
+    # face REAR_BUSHING.LENGTH forward (faced to fit, model at nominal).
+    await place_component(
         adapter,
-        named_ref(f"Right Plane@{bracket_seed}", "PLANE"),
-        named_ref(f"Right Plane@{bracket}", "PLANE"),
-        label="transgear bracket-screw seed fixed to bracket",
-    )
-    assert_component_placed(adapter, bracket_seed, bracket_seed_target, ROT_Y_180)
-    bracket_instances = await linear_component_pattern(
-        adapter,
-        [bracket_seed],
-        axis="x",
-        spacing_mm=2.0 * BRACKET_SCREW_DX,
-        instances=2,
-        label="transgear bracket-screw pattern",
-    )
-    assert_pattern_targets(
-        adapter,
-        bracket_instances,
-        [[STUD_XY[0] - BRACKET_SCREW_DX, BAR_CY, STUB_Z0]],
+        "transgear-rear-bushing",
+        [STUD_XY[0], STUD_XY[1], REAR_BUSHING_Z0],
+        [0.0, 180.0, 0.0],
         ROT_Y_180,
-        "transgear bracket-screw pattern",
     )
-    # Rx(-90): stud +Y -> -Z; base z -125.9..-135, O5 seat to -148.8, collar
-    # to -152.8.
-    await place_component(
-        adapter,
-        "transgear-stub",
-        [STUD_XY[0], STUD_XY[1], STUB_Z0],
-        [-90.0, 0.0, 0.0],
-        ROT_X_NEG90,
-    )
-    # Latch arm in the slot between the rack's back face and the bar front,
-    # swung to the knob at LATCH_ANGLE (thickness centred about ARM_Z). The 'z'-
-    # plane machine reflection flips the flat arm front-to-back, so the machine
-    # rows are Rx(180) . Rz(LATCH_ANGLE) -- euler [180, 0, LATCH_ANGLE_DEG].
-    await place_component(
-        adapter,
-        "transgear-latch",
-        [STUD_XY[0], STUD_XY[1], ARM_Z],
-        [180.0, 0.0, LATCH_ANGLE_DEG],
-        rows_from_euler([180.0, 0.0, LATCH_ANGLE_DEG]),
-    )
-    # 120T DP38 reducer disc on the stud's O5 seat, FREE (revolute below) --
-    # gear-mated to the third gear. Identity spin: a tooth points along the
-    # c2c line (LATCH_ANGLE is a multiple of its 3-deg pitch).
+    # 120T DP38 reducer disc on the feed sleeve's seat, FREE (revolute below) --
+    # gear-mated to the knob shaft's 12T. Identity spin: a tooth points along
+    # the S -> K line (MESH_ANGLE is a multiple of its 3-deg pitch).
     disc = await place_component(
         adapter,
         "rack-pinion",
@@ -1627,15 +2608,17 @@ async def build(adapter) -> dict[str, str]:
         label="rack-pinion (120T reducer disc)",
     )
     await _sprocket_revolute(adapter, disc, "reducer disc")
-    # 12T DP30 feed pinion locked coaxially behind the disc ("behind and
-    # attached to the fourth gear is the fifth gear" -- 4/4 video); its long
-    # face bridges back to the rack band and meshes the teeth-down rack.
+    # The 12T DP30 feed sleeve runs on the pin with its rear face on the rear
+    # bushing (Ry180, teeth forward to the disc seat) and meshes the teeth-down
+    # rack; the hub keyed on its D-flat and the three disc
+    # screws make one cluster with the disc, so each is LOCKED to it (net DOF
+    # unchanged).
     feed = await place_component(
         adapter,
         "transgear-feed-pinion",
         [STUD_XY[0], STUD_XY[1], FEED_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
         ground=False,
     )
     await lock_mate(
@@ -1644,61 +2627,64 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{disc}", "PLANE"),
         label="feed pinion locked to the disc",
     )
-    # Latch hook on the bar's front face (0.25 air), hanging from its screw
-    # hole at the bar mid-height and bending toward the disc (Ry180 mirrors
-    # the -X-bending part); its bracket-screw (identity: shank +Z from the
-    # hook's front face into the bar's tapped hole, head in front).
-    await place_component(
+    hub = await place_component(
         adapter,
-        "latch-hook",
-        [LATCH_HOOK_X, BAR_CY, LATCH_HOOK_Z_BACK],
-        LATCH_HOOK_EULER,
-        LATCH_HOOK_ROWS,
-        label="latch-hook (spring latch of the swing cluster)",
-    )
-    await place_component(
-        adapter,
-        "bracket-screw",
-        [LATCH_HOOK_X, BAR_CY, LATCH_HOOK_Z_FRONT],
+        "transgear-disc-hub",
+        [STUD_XY[0], STUD_XY[1], DISC_Z0],
         [0.0, 0.0, 0.0],
         IDENTITY,
-        label="latch-hook screw",
-    )
-    log(
-        f"latch hook at x {LATCH_HOOK_X} (span {LATCH_HOOK_X_SPAN[0]:.1f}.."
-        f"{LATCH_HOOK_X_SPAN[1]:.1f}), z {LATCH_HOOK_Z_FRONT:.2f}..{LATCH_HOOK_Z_BACK:.2f},"
-        f" tip y {LATCH_HOOK_Y_LOW:.1f}; platen edge gap"
-        f" {PLATE_X0 - LATCH_HOOK_X_SPAN[1]:.2f}, arm z gap"
-        f" {(ARM_Z - LATCH_THICK / 2.0) - LATCH_HOOK_Z_BACK:.2f}; screw tip z"
-        f" {LATCH_SCREW_TIP_Z:.2f} ({LATCH_SCREW_TIP_Z - BAR_BACK_Z:+.2f} past the bar back)"
-    )
-    # Knob shaft MHA-078 on the latch's small hub: Rx(+90) runs local +Y to
-    # machine +Z (pilot through the T24, seat collar, O5 third-gear seat, hub
-    # ride, knob); SeatCollar lands on the band's seat face.
-    knob_shaft = await place_component(
-        adapter,
-        "transgear-knob-shaft",
-        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_SHAFT_Z0],
-        [90.0, 0.0, 0.0],
-        ROT_X_POS90,
         ground=False,
     )
-    # 12T DP38 third gear on the O5 seat, phased so a GAP faces the disc's
-    # tooth along the c2c line.
-    third = await place_component(
+    await lock_mate(
         adapter,
-        "transgear-pinion",
-        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], THIRD_Z0],
-        [0.0, 0.0, THIRD_PHASE_DEG],
-        rot_z_rows(THIRD_PHASE_DEG),
-        ground=False,
-        label="transgear-pinion (12T third gear)",
+        named_ref(f"Front Plane@{hub}", "PLANE"),
+        named_ref(f"Front Plane@{disc}", "PLANE"),
+        label="disc hub locked to the disc",
     )
+    # Rx(-90): heads on the flange's front face, shanks to +Z through the disc.
+    for angle, (x, y) in zip(
+        DISC_HUB_GEOM.SCREW_ANGLES_DEG, DISC_SCREW_XY, strict=True
+    ):
+        disc_screw = await place_component(
+            adapter,
+            "transgear-disc-screw",
+            [x, y, DISC_SCREW_Z0],
+            [-90.0, 0.0, 0.0],
+            ROT_X_NEG90,
+            ground=False,
+            label=f"transgear-disc-screw ({angle:.0f} deg)",
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{disc_screw}", "PLANE"),
+            named_ref(f"Front Plane@{disc}", "PLANE"),
+            label=f"disc screw at {angle:.0f} deg locked to the disc",
+        )
+    # Ry(180): the front bushing's rear face on the sleeve's nose, faced to
+    # fit; the MHA-182 ring in the pin's groove SLEEVE_FLOAT_WINDOW_CENTRE in
+    # front of it, its front face on the groove's load wall.
+    await place_component(
+        adapter,
+        "transgear-front-bushing",
+        [STUD_XY[0], STUD_XY[1], FRONT_BUSHING_Z0],
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+    )
+    await place_component(
+        adapter,
+        "transgear-retaining-ring",
+        [STUD_XY[0], STUD_XY[1], CLUSTER.RING_REAR_Z],
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+    )
+
+    # --- knob stack on K ---------------------------------------------------------
     # Mounted T24 removable = the knob-end chain wheel (ch. 23: the roller
     # chain rides the removable's teeth; swapping removables changes the
     # platen ratio). FREE to spin: the belt/chain feature couples it to the
     # crank T12. Front face on the band's BAND_FRONT_Z, identity (the pin
-    # holes on machine +/-Y, over the knob shaft's drive pins).
+    # holes on machine +/-Y, over the collar's drive pins). Inserted before
+    # the T12 and the spare T18, so it is the first transgear-removable.
     t24 = await place_component(
         adapter,
         "transgear-removable",
@@ -1710,90 +2696,98 @@ async def build(adapter) -> dict[str, str]:
         label="transgear-removable (mounted T24)",
     )
     await _sprocket_revolute(adapter, t24, "T24 knob wheel")
-    # The knob shaft carries the T24 the way the machine does: coaxial, the
-    # wheel's RearFace on the SeatCollar, clocked so its pin holes ride the
-    # drive pins (the parallel closes the spin; both frames keep machine X).
-    # The cluster keeps T24's single free spin.
-    shaft_o = component_origin(adapter, knob_shaft)
+    # The drive collar carries the T24 the way the machine does: coaxial, its
+    # front face on the wheel's RearFace, clocked so its drive pins ride the
+    # wheel's pin holes (the parallel closes the spin; both frames keep
+    # machine X). The whole knob stack keeps T24's single free spin.
+    collar = await place_component(
+        adapter,
+        "transgear-drive-collar",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_COLLAR_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+    )
+    collar_o = component_origin(adapter, collar)
     await coincident_mate(
         adapter,
-        named_ref(f"Axis1@{knob_shaft}", "AXIS"),
+        named_ref(f"Axis1@{collar}", "AXIS"),
         named_ref(f"Axis1@{t24}", "AXIS"),
-        label="knob shaft coaxial with the mounted T24",
-        verify=(knob_shaft, shaft_o),
+        label="drive collar coaxial with the mounted T24",
+        verify=(collar, collar_o),
     )
     await coincident_mate(
         adapter,
-        named_ref(f"SeatCollar@{knob_shaft}", "PLANE"),
+        named_ref(f"Front Plane@{collar}", "PLANE"),
         named_ref(f"RearFace@{t24}", "PLANE"),
-        label="knob shaft SeatCollar on the T24 rear face",
-        verify=(knob_shaft, shaft_o),
+        label="drive collar front face on the T24 rear face",
+        verify=(collar, collar_o),
     )
-    # The shaft origin sits ON the spin axis, so only an off-axis witness (the
-    # DrivePinAxis1 station) separates the two parallel solutions.
+    # The collar origin sits ON the spin axis, so only an off-axis witness (a
+    # drive-pin station) separates the two parallel solutions.
     await parallel_mate(
         adapter,
-        named_ref(f"Right Plane@{knob_shaft}", "PLANE"),
+        named_ref(f"Right Plane@{collar}", "PLANE"),
         named_ref(f"Right Plane@{t24}", "PLANE"),
-        label="knob shaft drive pins clocked into the T24 pin holes",
-        verify=(knob_shaft, shaft_o),
-        witness_local=[0.0, KNOB_SEAT_COLLAR, REMOVABLE.PIN_CIRCLE_RADIUS],
+        label="drive collar pins clocked into the T24 pin holes",
+        verify=(collar, collar_o),
+        witness_local=[0.0, COLLAR.PIN_CIRCLE_RADIUS, 0.0],
     )
-    # The two MHA-155 dowels pressed through the seat collar's reamed holes:
-    # pressed end on DrivePinFloor, rounded end forward in the T24's pin holes
-    # (Rx-90: pin +Y -> machine -Z). DrivePinAxis1 lies on the shaft's local +Z
-    # (machine -Y), DrivePinAxis2 opposite -- the crankshaft's convention.
-    knob_pins = [
-        await place_component(
+
+    async def _lock_to_collar(name: str, label: str) -> None:
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{name}", "PLANE"),
+            named_ref(f"Front Plane@{collar}", "PLANE"),
+            label=f"knob stack: {label} locked to the drive collar",
+        )
+
+    # The two MHA-155 dowels pressed through the collar (Rx-90: rounded ends
+    # forward in the T24's pin holes), +Y first.
+    for k, (x, y) in enumerate(KNOB_DRIVE_PIN_XY, start=1):
+        knob_pin = await place_component(
             adapter,
             "transgear-knob-drive-pin",
-            [
-                KNOB_SHAFT_XY[0],
-                KNOB_SHAFT_XY[1] + side * REMOVABLE.PIN_CIRCLE_RADIUS,
-                KNOB_DRIVE_PIN_Z0,
-            ],
+            [x, y, KNOB_DRIVE_PIN_Z0],
             [-90.0, 0.0, 0.0],
             ROT_X_NEG90,
             ground=False,
-            label=f"MHA-155 knob drive pin in DrivePinAxis{k}",
+            label=f"MHA-155 knob drive pin #{k} (y{y:.1f})",
         )
-        for k, side in ((1, -1.0), (2, 1.0))
-    ]
-    for k, knob_pin in enumerate(knob_pins, start=1):
-        pin_o = component_origin(adapter, knob_pin)
-        await coincident_mate(
-            adapter,
-            named_ref(f"ScrewAxis@{knob_pin}", "AXIS"),
-            named_ref(f"DrivePinAxis{k}@{knob_shaft}", "AXIS"),
-            label=f"MHA-155 knob pin #{k} coaxial in DrivePinAxis{k}",
-            verify=(knob_pin, pin_o),
-        )
-        await coincident_mate(
-            adapter,
-            named_ref(f"Top Plane@{knob_pin}", "PLANE"),
-            named_ref(f"DrivePinFloor@{knob_shaft}", "PLANE"),
-            label=f"MHA-155 knob pin #{k} pressed to DrivePinFloor",
-            verify=(knob_pin, pin_o),
-        )
-        await parallel_mate(
-            adapter,
-            named_ref(f"Right Plane@{knob_pin}", "PLANE"),
-            named_ref(f"Right Plane@{knob_shaft}", "PLANE"),
-            label=f"MHA-155 knob pin #{k} rotational closure",
-            verify=(knob_pin, pin_o),
-        )
-    # The third gear rides the shaft's O5 seat: LOCK it to the knob shaft
-    # (net DOF unchanged: +6 freed, -6 by the lock).
-    await lock_mate(
+        await _lock_to_collar(knob_pin, f"drive pin #{k}")
+    # MHA-154 spring pin through the shaft core in the collar's rear slot.
+    cross_pin = await place_component(
         adapter,
-        named_ref(f"Front Plane@{third}", "PLANE"),
-        named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
-        label="knob cluster: third gear locked to the knob shaft",
+        "transgear-collar-cross-pin",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], CROSS_PIN_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
     )
-    # Knurled thumbnut OUTERMOST on the shaft's front pilot, its neck 0.25 in
-    # front of the T24, retaining it (ch23 p.58/59). Rx(-90): local +Y -> -Z,
-    # disc at the machine front. Locked to the knob shaft, so it spins with
-    # the cluster (net DOF unchanged: +6 freed, -6 by the lock).
+    await _lock_to_collar(cross_pin, "cross pin")
+    # Knob shaft MHA-078 on its datum F (the 12T's front face), spun so a gap
+    # of its 12T faces the disc's tooth on the S -> K line.
+    knob_shaft = await place_component(
+        adapter,
+        "transgear-knob-shaft",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_SHAFT_Z0],
+        [0.0, 0.0, THIRD_PHASE_DEG],
+        rot_z_rows(THIRD_PHASE_DEG),
+        ground=False,
+    )
+    await _lock_to_collar(knob_shaft, "knob shaft")
+
+    async def _lock_to_shaft(name: str, label: str) -> None:
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{name}", "PLANE"),
+            named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
+            label=f"knob stack: {label} locked to the knob shaft",
+        )
+
+    # Knurled thumbnut OUTERMOST on the shaft's front thread, its flange's
+    # seat on the collar's pilot, the T24 free under it (ch23 p.58/59; R9-70).
+    # Rx(-90): local +Y -> -Z, the knurled head at the machine front.
     thumbnut = await place_component(
         adapter,
         "transgear-thumbnut",
@@ -1801,22 +2795,52 @@ async def build(adapter) -> dict[str, str]:
         [-90.0, 0.0, 0.0],
         ROT_X_NEG90,
         ground=False,
-        label="transgear-thumbnut (retains the mounted T24)",
+        label="transgear-thumbnut (seated on the collar pilot, retains the T24)",
+    )
+    await _lock_to_shaft(thumbnut, "thumbnut")
+    log(
+        f"thumbnut z {THUMBNUT_FRONT_Z:.2f}..{THUMBNUT_Z0:.2f} (seat on the pilot,"
+        f" {THUMBNUT_AIR:.2f} proud of the T24 face {REMOVABLE_Z0});"
+        f" shaft front {KNOB_SHAFT_FRONT_Z:.2f}"
+        f" ({KNOB_SHAFT_FRONT_Z - THUMBNUT_FRONT_Z:+.2f} inside the nut rim,"
+        f" engagement {THUMBNUT_ENGAGEMENT:.2f}); tap {THUMBNUT_THREAD}; front-most"
+        f" furniture near the knob axis: chain plates to z"
+        f" {CHAIN_MID_Z - CHAIN_PIN_HALF_LEN:.2f} (radial gap to the head"
+        f" {_chain_inner_wrap_r - THUMBNUT_HEAD_DIA / 2.0:.1f})"
+    )
+    # Behind the 12T (Rx+90): the thrust ring to the plate hub, the knob cup on
+    # the journal's rear end, and the MHA-183 spring pin through both (R9-70).
+    ring = await place_component(
+        adapter,
+        "transgear-knob-thrust-ring",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_RING_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
+        ground=False,
+    )
+    await _lock_to_shaft(ring, "thrust ring")
+    cup = await place_component(
+        adapter,
+        "transgear-knob-cup",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_CUP_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
+        ground=False,
+    )
+    await _lock_to_shaft(cup, "knob cup")
+    cup_pin = await place_component(
+        adapter,
+        "transgear-knob-cup-pin",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_CUP_PIN_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
     )
     await lock_mate(
         adapter,
-        named_ref(f"Front Plane@{thumbnut}", "PLANE"),
-        named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
-        label="knob cluster: thumbnut locked to the knob shaft",
-    )
-    log(
-        f"thumbnut z {THUMBNUT_FRONT_Z:.2f}..{THUMBNUT_Z0:.2f} (neck {THUMBNUT_AIR}"
-        f" ahead of the T24 face {REMOVABLE_Z0}); shaft front {KNOB_SHAFT_FRONT_Z:.2f}"
-        f" ({KNOB_SHAFT_FRONT_Z - THUMBNUT_FRONT_Z:+.2f} inside the nut front,"
-        f" {_THUMBNUT_DISC_MID_Z - KNOB_SHAFT_FRONT_Z:+.2f} past the disc mid);"
-        f" bore/shaft radial gap {_nut_bore_gap:.4f}; front-most furniture near"
-        f" the knob axis: chain plates to z {CHAIN_MID_Z - CHAIN_PIN_HALF_LEN:.2f}"
-        f" (radial gap to the disc {_chain_inner_wrap_r - THUMBNUT_DISC_DIA / 2.0:.1f})"
+        named_ref(f"Front Plane@{cup_pin}", "PLANE"),
+        named_ref(f"Front Plane@{cup}", "PLANE"),
+        label="knob stack: cup pin locked to the knob cup",
     )
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
@@ -1883,12 +2907,14 @@ async def build(adapter) -> dict[str, str]:
     hide_generated_planes(adapter, shown, "belt/chain coupling")
     # (2) GEAR mate 12:120: the third gear (in the knob cluster) drives the
     # reducer disc -- the permanent DP38 mesh the latch arm exists to hold.
+    # (2) GEAR mate 12:120: the knob shaft's integral 12T drives the reducer
+    # disc -- the permanent DP38 mesh the hanger arm exists to hold.
     await gear_mate(
         adapter,
-        named_ref(f"Axis1@{third}", "AXIS"),
+        named_ref(f"Axis1@{knob_shaft}", "AXIS"),
         named_ref(f"Axis1@{disc}", "AXIS"),
         [THIRD_TEETH, DISC_TEETH],
-        label="third gear 12T : disc 120T (DP38)",
+        label="knob shaft 12T : disc 120T (DP38)",
     )
     # (3) RACK-PINION mate: the feed pinion (locked to the disc) feeds the
     # platen at its own pitch circumference -- pi * 10.16 per rev. The rack
@@ -1899,14 +2925,18 @@ async def build(adapter) -> dict[str, str]:
     # platen-axis-referenced default fed the paper backward vs the tooth
     # contact; the pitch-axis re-reference still solved reversed at flip=False
     # -- the live gate measured +0.133 mm for feed Z -1.50 deg). flip=True
-    # lands the physical sense; recalibrate HERE (never the probe's FEED_SIGN)
+    # landed the physical sense while the feed pinion was inserted identity.
+    # The round-10 sleeve is inserted Ry180, which reverses Axis1@feed (its
+    # Top x Right axis, local +Z), so the same flag fed the paper backward
+    # again (run 20261001T062924323Z: +0.133 mm for feed Z -1.50 deg);
+    # flip=False restores it. Recalibrate HERE (never the probe's FEED_SIGN)
     # if the gate ever fails on sign again.
     await rack_pinion_mate(
         adapter,
         named_ref(f"Axis1@{rack}", "AXIS"),
         named_ref(f"Axis1@{feed}", "AXIS"),
         rack_travel_per_revolution=math.pi * FEED_PD,
-        flip=True,
+        flip=False,
         label="platen feed (feed pinion on the rack)",
     )
     # (4) The crank spin is a FREED operational DOF: its drive spec is
@@ -1975,6 +3005,15 @@ async def build(adapter) -> dict[str, str]:
             "Quantity": "1",
             "Drawn By": DRAWN_BY,
         },
+    )
+    # Both drawing configurations own the explode: the exploded sheet's view
+    # at 1:3 references Default Simplified.
+    author_in_drawing_configurations(
+        adapter,
+        ASM_NAME,
+        lambda configuration: create_paper_drive_explode(
+            adapter, fillister_roles, configuration
+        ),
     )
     return await save_assembly_and_images(adapter, ASM_NAME)
 

@@ -1,21 +1,23 @@
 r"""Reproduction script: platen plate (book ch. 22, pp. 54-55).
 
 The heavy darkened-brass plate that carries the recording paper. The
-toothed rack bar screwed to its back bottom edge, the two paper-clip
+toothed rack bar soft-soldered to its back bottom edge, the two paper-clip
 strips, and the two back-side guide rails the platen hangs on are
 separate parts (build_platen_rack.py / build_platen_clip.py /
 build_platen_guide.py). Fastener holes:
 
 * four clip-screw #4-40 through receivers at the resized plate's extreme
   left/right edges (x 5.3928/264.2472), matching the resized clips'
-  7.1904-inset end holes at local y 29.6604/127.6296;
+  7.1904-inset end holes at local y 29.6604/127.6296, each tapped on
+  through a Ø7 x 0.65 boss on the back face for >= 1.5D engagement;
 * ten O3 guide-screw through-holes in two rows of 5 (ch22 front photo)
   at the guide rail centrelines: bottom row y 13, top row y 47 (machine
   318 / 352 with the plate at y 305).
 
 Dimensions: the ch30-p002 Pose Studio fit sets the width to 269.64 mm and
 the user-confirmed front-face proportion to height:width = 1:2, hence
-134.82 mm high. Thickness remains the p.55 edge-on-photo estimate (~4 mm).
+134.82 mm high. Thickness: the p.55 edge-on-photo estimate (~4 mm), thinned
+to 3.85 (R9-68) for disc-to-platen air.
 
 Layout: width along +X, height along +Y from the origin corner, thickness
 extruded +Z.
@@ -38,11 +40,14 @@ from _common import (
     PANEL_BLACK,
     bbox_extent_check,
     check,
+    define_circle,
     define_rectilinear_chain,
     drive_dimension,
     ensure_fully_defined,
+    extrude_at_offset,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -59,6 +64,8 @@ from platen_spec import (
     PLATE_HEIGHT,
     PLATE_THICKNESS,
     PLATE_WIDTH,
+    SOCKET_BOSS_DIA,
+    SOCKET_BOSS_H,
     SOCKET_SPEC,
     SOCKET_THREAD_ENGAGEMENT,
     SOCKET_XY,
@@ -89,6 +96,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PlateWidth", f"{PLATE_WIDTH}mm")
     await set_global(adapter, "PlateHeight", f"{PLATE_HEIGHT}mm")
     await set_global(adapter, "PlateThickness", f"{PLATE_THICKNESS}mm")
+    await set_global(adapter, "SocketBossDia", f"{SOCKET_BOSS_DIA}mm")
+    await set_global(adapter, "SocketBossH", f"{SOCKET_BOSS_H}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -128,11 +137,41 @@ async def build(adapter) -> dict[str, str]:
         adapter, "plate height (1:2 front-face ratio)", "y", PLATE_HEIGHT
     )
 
+    # Clip-screw receiver bosses: four Ø7 integral bosses on the back face
+    # (z = PlateThickness), sketched on the front plane and extruded from that
+    # offset, so the through taps below gain the boss height of thread.
+    bosses = SketchDims()
+    check("create_sketch socket bosses", await adapter.create_sketch("Front"))
+    for index, (x, y) in enumerate(SOCKET_XY, start=1):
+        await define_circle(
+            adapter,
+            x,
+            y,
+            SOCKET_BOSS_DIA / 2.0,
+            f"socket boss {index}",
+            dims=bosses,
+            names=(f"Boss{index}X", f"Boss{index}Y", f"Boss{index}Dia"),
+            drives=(None, None, '"SocketBossDia"'),
+        )
+    await ensure_fully_defined(adapter, "socket boss sketch")
+    check("exit_sketch socket bosses", await adapter.exit_sketch())
+    name_last_feature(adapter, "SocketBossProfile")
+    drive_jobs += bosses.apply(adapter, "SocketBossProfile")
+    extrude_at_offset(adapter, SOCKET_BOSS_H, PLATE_THICKNESS)
+    name_last_feature(adapter, "SocketBosses")
+    # Offset bosses expose depth first and start offset second.
+    boss_dims = name_dimensions(adapter, "SocketBosses", ["BossH", "BossOffset"])
+    drive_jobs += [(boss_dims[0], '"SocketBossH"'), (boss_dims[1], '"PlateThickness"')]
+    v_bosses = len(SOCKET_XY) * math.pi * (SOCKET_BOSS_DIA / 2.0) ** 2 * SOCKET_BOSS_H
+    await volume_check(
+        adapter, "plate with socket bosses", v_plate + v_bosses, 0.05 * v_bosses
+    )
+
     # Clip-screw receivers: ONE native Hole Wizard #4-40 through-tapped
     # feature (4 points) from the front face. The clip's integral outer bosses
-    # consume the shank length not used by this plate, so all 4.0 mm of platen
-    # thickness provide thread engagement and the stock screw tip finishes
-    # flush at the back face rather than bottoming in a blind socket.
+    # consume the shank length not used here, so the 3.85 plate plus the 0.65
+    # rear boss give thread engagement and the stock screw tip finishes flush
+    # at the boss's rear face rather than bottoming in a blind socket.
     pre = await adapter.get_mass_properties()
     wizard_holes(
         adapter, SOCKET_SPEC,
@@ -183,7 +222,7 @@ async def build(adapter) -> dict[str, str]:
     # Apply the deferred drive equations after the whole model + a rebuild
     # exists, then re-check neutrality (each equation evaluates to the as-built
     # value, so the geometry must not move).
-    v_final = v_plate - v_sockets - v_guide
+    v_final = v_plate + v_bosses - v_sockets - v_guide
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)

@@ -1,0 +1,16 @@
+transgear-latch-pin:
+  title: Transgear Latch Pin
+  number: MHA-169
+  stock_name: Alloy Steel Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98381A474]
+  material: Alloy Steel
+  material_specification: "Alloy steel dowel pin, 1/8 x 7/8, Round x Chamfer ends; McMaster-Carr 98381A474"
+  finish: plain; no coating
+  installation_notes: |-
+    INSTALLATION - TRANSGEAR ARM MHA-164 END FACE
+    PRESS IN, CHAMFER END FIRST, ALONG THE ARM
+    TO THE HOLE FLOOR: 13.7 PROUD OF THE ARM END FACE.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

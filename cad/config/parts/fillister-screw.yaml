@@ -7,7 +7,7 @@ fillister-screw:
   material: Brass
   material_specification: Brass, McMaster-Carr 90114A511
   finish: plain
-  quantity: 27
+  quantity: 19
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased

@@ -342,6 +342,11 @@ Do: place by the outline centre (`GetOutline` is the ink; `SetViewPosition`
 moves it by the delta from the `Position` it reads), then re-read the
 projection until it agrees with the outline before hanging anything on the
 view.
+The same holds for a section after `IDrSection::SetReversedCutDirection`:
+the reversal stood thumbnut A-A rim-up, yet `SetViewPosition` on its
+creation target left the seat projected one nut length (48.3 mm at 3:1)
+above where a centred rim-up section puts it (run 20261001T142942518Z).
+`draw_transgear_thumbnut._centre_section_outline` re-centres by the outline.
 
 **k. A datum or dimension picked by sheet coordinate where two lines meet.**
 Don't: hang a datum tag or a locating dimension on `SelectByID2("", "EDGE",

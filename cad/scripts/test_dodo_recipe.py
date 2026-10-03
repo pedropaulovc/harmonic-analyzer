@@ -316,7 +316,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     import _buildgraph as bg
 
     dodo = _load_dodo()
-    stems = ("platen_guide", "bracket_screw", "pen_assembly")
+    stems = ("platen_guide", "frame_side_screw", "pen_assembly")
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
     # The drawing recipe folds the config rows its closure reads (Codex #936
@@ -498,7 +498,7 @@ def test_selected_drawing_row_changes_only_its_freshness_and_cache_key(
     )
     after = snapshot()
     assert all(a != b for a, b in zip(before["platen_guide"], after["platen_guide"]))
-    for stem in ("bracket_screw", "pen_assembly"):
+    for stem in ("frame_side_screw", "pen_assembly"):
         assert after[stem] == before[stem]
 
 
@@ -515,7 +515,7 @@ def test_config_row_change_moves_only_its_readers_freshness_and_cache_key(
     row.write_text(renumbered, encoding="utf-8")
     after = snapshot()
     assert all(a != b for a, b in zip(before["platen_guide"], after["platen_guide"]))
-    for stem in ("bracket_screw", "pen_assembly"):
+    for stem in ("frame_side_screw", "pen_assembly"):
         assert after[stem] == before[stem], stem
 
 
@@ -2859,12 +2859,14 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     and the build subprocess is told exactly those rows."""
     dodo = _load_dodo()
     catalog = str(dodo._FASTENER_CATALOG)
-    part = dodo._part_file_deps(dodo.SCRIPTS_DIR / "build_bracket_screw.py", "bracket_screw")
-    drawing = dodo._drawing_file_deps("bracket_screw")
+    part = dodo._part_file_deps(
+        dodo.SCRIPTS_DIR / "build_frame_side_screw.py", "frame_side_screw"
+    )
+    drawing = dodo._drawing_file_deps("frame_side_screw")
     assembly = dodo._recipe_files("pen")
     for label, deps in (
-        ("part-bracket_screw", part),
-        ("drawing-bracket_screw", drawing),
+        ("part-frame_side_screw", part),
+        ("drawing-frame_side_screw", drawing),
         ("assembly-pen", assembly),
     ):
         assert catalog not in deps, label
@@ -2873,8 +2875,8 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
             and Path(dep).parent.name == ".fastener-catalog"
             for dep in deps
         ), label
-    assert dodo._fastener_rows_env("part:bracket_screw") == "bracket-screw"
-    assert dodo._fastener_rows_env("drawing:bracket_screw") == "bracket-screw"
+    assert dodo._fastener_rows_env("part:frame_side_screw") == "frame-side-screw"
+    assert dodo._fastener_rows_env("drawing:frame_side_screw") == "frame-side-screw"
     # pen's closure imports build_pen_set_screw for its constants; that module's
     # fastener("pen-set-screw") runs on import.
     assert dodo._fastener_rows_env("assembly:pen") == "pen-set-screw"
@@ -2891,8 +2893,8 @@ def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
 
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
     monkeypatch.setattr(dodo.subprocess, "run", fake_run)
-    assert dodo._run_subprocess(["x"], "part:bracket_screw") == 0
-    assert seen["HARMONIC_FASTENER_ROWS"] == "bracket-screw"
+    assert dodo._run_subprocess(["x"], "part:frame_side_screw") == 0
+    assert seen["HARMONIC_FASTENER_ROWS"] == "frame-side-screw"
     seen.clear()
     assert dodo._run_subprocess(["x"], "check:math") == 0
     assert "HARMONIC_FASTENER_ROWS" not in seen
@@ -2971,7 +2973,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
         "REFRESH channel",
         "hook hook_probe.py",
         "check math",
-        "release documents part:bracket_screw",
+        "release documents part:frame_side_screw",
         "part:no_such_part",
         "assembly:no_such_assembly",
         "drawing:no_such_drawing",

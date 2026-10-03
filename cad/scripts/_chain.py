@@ -36,10 +36,10 @@ from cone_line import X_CRANK, Y_CRANK
 
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (42.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
-# stud (0, 266.2007) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
-# mesh). The 2026-07-23 platen refit raises the bar-hung reducer 11.134 mm
-# with the resized platen/support geometry.
+KNOB_CENTRE = (43.7878, 256.8933)  # build_paper_drive_assembly KNOB_SHAFT_XY
+# mirrored: the knob axis K = stud S (0, 266.2007) + the permanent 12T:120T
+# DP38 mesh centre distance 44.766 at machine -168 deg (CONTRACT-paper-drive
+# axis points; the arm plate's bore datum puts it there).
 # The crank chain-wheel rides the fixed post's crank axis. Import its
 # SolidWorks-free frame geometry, never the drive-train assembly: _chain also
 # feeds leaf chain-link parts, which must not depend on _assembly.
@@ -164,11 +164,14 @@ LINK_PITCH = _removable.CHAIN_PITCH  # ANSI #25 pitch (1/4 in), EXACT: the link
 LINK_COUNT = 2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH))
 CENTRELINE_LEN = LINK_COUNT * LINK_PITCH
 
-# Quantisation moves the target length by at most LINK_PITCH / 2 (~3.2 mm), so
-# the solved sag stays within a few mm of the seed -- a tight bracket keeps the
-# solve inside the internal-tangency feasibility window (very large droops make
-# the slack arc infeasible: _slack_centre's q2 < 0).
-_LO_SAG, _HI_SAG = SAG_NOMINAL - 8.0, SAG_NOMINAL + 8.0
+# The EVEN count moves the target length by up to one LINK_PITCH (6.35 mm)
+# from the seed loop, and the slack run's length-vs-droop sensitivity falls
+# toward small droops (~0.3..0.9 mm/mm), so the solved sag can land ~10+ mm
+# from the seed (the -168 deg knob axis: 67.03 pitches at the seed -> 68 links,
+# sag 23.6). The bracket spans every droop the internal-tangency construction
+# admits here (feasible past 40; very large droops make the slack arc
+# infeasible: _slack_centre's q2 < 0) while staying above zero droop.
+_LO_SAG, _HI_SAG = 0.5, SAG_NOMINAL + 16.0
 assert _loop_length(_LO_SAG) < CENTRELINE_LEN < _loop_length(_HI_SAG)
 for _ in range(80):
     _MID = 0.5 * (_LO_SAG + _HI_SAG)
@@ -177,10 +180,8 @@ for _ in range(80):
     else:
         _HI_SAG = _MID
 SAG = 0.5 * (_LO_SAG + _HI_SAG)  # the BUILT droop (solved for LINK_COUNT).
-# The count quantisation moves the target length by at most LINK_PITCH / 2
-# (~3.2 mm); the slack run's length-vs-droop sensitivity is ~0.85 mm/mm here,
-# so the solved sag stays inside the +-8 bracket. The selected even count and
-# sag are derived above while preserving exact standard-pitch closure.
+# The selected even count and sag are derived above while preserving exact
+# standard-pitch closure.
 assert abs(_loop_length(SAG) - CENTRELINE_LEN) < 1e-6
 
 SLACK_R = _solve_slack_radius(SAG)

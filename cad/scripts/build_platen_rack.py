@@ -1,6 +1,6 @@
 r"""Reproduction script: platen rack bar (book ch. 22 pp. 54-55, teeth ch. 23).
 
-The brass rack screwed along the platen's back bottom edge, teeth-down with
+The brass rack soft-soldered along the platen's back bottom edge, teeth-down,
 the crests protruding ~2 below the platen's bottom edge (ch22 back photo),
 driven by the 12T DP 30 feed pinion (build_transgear_feed_pinion.py, the
 "fifth gear" of the 4/4 video). The tooth pitch was resolved during M4 gear

@@ -2,7 +2,8 @@
 
 The fixture is the case that exposed the gap: a #10-32 stud screwed into an
 arm until its shim seats, carrying an oiled rotating gear cluster that a front
-cap retains axially (MHA-082 in MHA-164, paper drive). SolidWorks-free.
+cap retains axially (the paper drive's MHA-082 stud in MHA-164, retired by
+R9-68 for a pressed pin). SolidWorks-free.
 """
 
 from __future__ import annotations
@@ -202,6 +203,46 @@ def test_a_ruling_waives_only_the_joint_it_names() -> None:
     }
 
 
+def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> None:
+    """Machinist review of 6c385465d: the free T24 rocks against the MHA-126
+    flange through its pin backlash, so the nut is an exposed joint; the
+    user's U-MHA-126-no-lock ruling (2026-10-03) waives it, with the backlash
+    the specs give."""
+    import math
+
+    import transgear_knob_drive_pin_spec as pin
+    import transgear_removable_spec as wheel
+    from _printed_tolerance import drilled_oversize_mm
+
+    joint_id = "paper-drive/thumbnut-on-knob-shaft"
+    (row,) = [j for j in jr.JOINTS if j.id == joint_id]
+    assert row.exposure is Exposure.OSCILLATING
+    assert row.lock is Lock.NONE
+    assert jr.RULINGS[row.exception].joint == joint_id
+
+    def unlocked(rulings) -> set[str]:
+        findings = jr.audit(
+            jr.JOINTS,
+            jr.build_inventory(),
+            threaded=jr.THREADED_PARTS,
+            unthreaded=jr.UNTHREADED_PARTS,
+            purchased=jr.purchased_parts(),
+            unthreaded_stock=jr.UNTHREADED_STOCK,
+            required=jr.REQUIRED_JOINTS,
+            rulings=rulings,
+        )
+        return {f.subject for f in findings if f.kind is Kind.UNLOCKED}
+
+    assert joint_id not in unlocked(jr.RULINGS)
+    without = {k: v for k, v in jr.RULINGS.items() if k != row.exception}
+    assert joint_id in unlocked(without)
+    # The rock the ruling states: the largest drilled hole over the pin, on
+    # the pin circle.
+    clearance = (wheel.PIN_HOLE_DIA + drilled_oversize_mm() - pin.DIA) / 2.0
+    rock = math.degrees(clearance / wheel.PIN_CIRCLE_RADIUS)
+    assert f"\u00b1{rock:.1f}\u00b0 per reversal" in jr.RULINGS[row.exception].granted
+
+
 def test_a_static_clamp_must_say_why_no_operating_torque_reaches_it() -> None:
     unreasoned = dataclasses.replace(SCREW, exposure_reason="  ")
     assert _kinds(_audit((STUD, CAP, unreasoned, NUT))) == {
@@ -361,9 +402,10 @@ def test_every_registered_joint_cites_a_live_source_occurrence() -> None:
 def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The latch-hook screw shares bracket_screw and support_bar with the
-    # bracket-screw row, so only the registry notices it is gone.
-    gone = "paper-drive/latch-hook-screw-in-bar"
+    # The guide screws' stems stay named without their row: fillister_screw
+    # as the clip screws' member, platen_guide as the lock screws' receiver.
+    # Only the registry notices the guide-screw joint is gone.
+    gone = "paper-drive/guide-screw-in-guide"
     table = tuple(j for j in jr.JOINTS if j.id != gone)
     findings = jr.audit(
         table,

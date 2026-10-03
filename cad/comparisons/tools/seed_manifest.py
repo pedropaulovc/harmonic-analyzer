@@ -61,7 +61,7 @@ PHOTO_FOCUS = {
     "magnifying wheel": ["magnifying_wheel"],
     "platen + rack": ["platen", "platen_rack"],
     "pen mechanism (modern)": ["pen_frame", "pen_marker"],
-    "translational gearing / chain": ["transgear_pinion", "chain_sprocket"],
+    "translational gearing / chain": ["transgear_knob_shaft", "chain_sprocket"],
     "pinion gear": ["pinion_drum"],
     "tube frame columns": ["tube_frame"],
     "top casting": ["top_frame"],

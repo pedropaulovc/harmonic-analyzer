@@ -1,12 +1,11 @@
 r"""MHA-155 transgear-knob-drive-pin: McMaster 98381A433 stock dowel.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  Two are pressed into the knob shaft's Ø17.5 seat collar (MHA-078)
-and stand ``transgear_removable_spec.DRIVE_PIN_PROUD`` out of its seat face,
-where the removable sprocket's two holes drop over them.  The knob takes the
-3/16 length of the crank's 3/32 dowel, and its holes are reamed THROUGH the
-5.4-long collar (first 3.6, where a blind floor would have been under the 1.5
-wall floor), the press depth set from the seat face by a stop.
+closure.  Two are pressed into the brass knob drive collar (MHA-177) and
+stand ``transgear_removable_spec.DRIVE_PIN_PROUD`` out of its front (seat)
+face, where the removable sprocket's two holes drop over them.  The knob
+takes the 3/16 length of the crank's 3/32 dowel, and its holes are reamed
+THROUGH the collar body, the press depth set from the seat face by a stop.
 
 Catalogue: 3/32 x 3/16 alloy-steel dowel, Round x Chamfer ends; the size row
 and the diameter tolerance are ``diagnostics.diag_mcmaster_dowel``'s.
@@ -33,11 +32,11 @@ if abs(DIA - DRIVE_PIN_DIA) > 1e-12:
 # from the seat face onto a stop that leaves it DRIVE_PIN_PROUD out, to
 # +/-PROUD_SET_TOL (the installation note on the MHA-155 sheet prints the
 # range).  The stop sets the tip, so the dowel's length grade moves only the
-# pressed end, inside the collar (build_transgear_knob_shaft checks it).
+# pressed end, inside the collar (transgear_drive_collar_spec checks it).
 PROUD_SET_TOL = 0.10
 PROUD_RANGE = (DRIVE_PIN_PROUD - PROUD_SET_TOL, DRIVE_PIN_PROUD + PROUD_SET_TOL)
-# The nominal pin's pressed end stands this far behind the seat face: the
-# knob shaft's DrivePinFloor station, and the press fit's engaged length.
+# The nominal pin's pressed end stands this far behind the seat face, inside
+# the MHA-177 collar's through hole: the press fit's engaged length.
 PRESS_DEPTH = LENGTH - DRIVE_PIN_PROUD  # 2.3625
 
 # The thumbnut's Ø14 neck clamps the T24 on its front face and covers the

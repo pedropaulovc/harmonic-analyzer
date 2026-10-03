@@ -5,9 +5,9 @@ This probe tests whether ORDINARY model annotations — IModelDoc2::InsertGtol
 and ::InsertDatumTag2, attached to the same spec faces, filled with the same
 frame XML — are fully COM-controllable end to end:
 
-1. PART: exercise the datum tag A (base) + two gtols (seat) already authored
-   on a COPY of the built part; SetPosition to distinct spots; save; reopen;
-   positions persisted?
+1. PART: exercise the datum tags A (flange face) + B (stud bearing axis) and
+   the two gtols already authored on a COPY of the built wheel axle;
+   SetPosition to distinct spots; save; reopen; positions persisted?
 2. SHEET: front + section drawing; InsertModelAnnotations3(datums|gtols);
    where do they land; SetPosition on sheet; save; reopen; persisted?
 3. B&W PDF render for the eye pass.
@@ -33,22 +33,27 @@ import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import create_section_view, model_point_in_view  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
-from transgear_stub_spec import GEOMETRIC_CONTROLS, PART_DATUMS  # noqa: E402
+from wheel_axle_spec import (  # noqa: E402
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
+    STUD_BEARING_FACE,
+)
 
-SOURCE = CAD_ROOT / "out" / "sldprt" / "transgear-stub.SLDPRT"
-SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "transgear-stub-plain.SLDPRT"
-SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "transgear-stub-plain.SLDDRW"
-OUT_PDF = CAD_ROOT / "out" / "pdf" / "transgear-stub-plain.pdf"
-SEAT_MID_Y = 0.016
+SOURCE = CAD_ROOT / "out" / "sldprt" / "wheel-axle.SLDPRT"
+SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "wheel-axle-plain.SLDPRT"
+SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "wheel-axle-plain.SLDDRW"
+OUT_PDF = CAD_ROOT / "out" / "pdf" / "wheel-axle-plain.pdf"
+STUD_BEARING_Y = STUD_BEARING_FACE.contains_y_mm / 1000.0
 
 # part-space targets (model metres), well separated
 PART_TARGETS = {
-    "datum:A": (0.012, 0.002, 0.010),
+    PART_DATUMS[0].key: (0.024, -0.004, 0.010),
+    PART_DATUMS[1].key: (-0.012, 0.008, 0.010),
     GEOMETRIC_CONTROLS[0].key: (-0.018, 0.016, 0.008),
     GEOMETRIC_CONTROLS[1].key: (0.018, 0.016, -0.008),
 }
 # sheet-space targets (sheet metres)
-SHEET_TARGETS = [(0.205, 0.115), (0.205, 0.185), (0.275, 0.115)]
+SHEET_TARGETS = [(0.205, 0.115), (0.205, 0.185), (0.275, 0.115), (0.275, 0.185)]
 
 _INSERT_DATUMS = 0x2
 _INSERT_GTOLS = 0x20
@@ -154,7 +159,7 @@ async def main() -> int:
             "IView",
         )
         cut_x, cut_y = model_point_in_view(
-            adapter, front, (0.0, SEAT_MID_Y, 0.0), label="seat mid"
+            adapter, front, (0.0, STUD_BEARING_Y, 0.0), label="stud bearing"
         )
         create_section_view(
             adapter,

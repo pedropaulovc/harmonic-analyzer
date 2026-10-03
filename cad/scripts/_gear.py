@@ -457,6 +457,7 @@ async def build_fixed_gear(
     root_relief: bool = False,
     depth_dp: float | None = None,
     long_addendum_mm: float = 0.0,
+    dedendum: float = 1.157,
 ) -> ToothedDisc:
     """Build a toothed disc on the active new part.
 
@@ -486,6 +487,9 @@ async def build_fixed_gear(
     cuts its own depth whichever plane the profile is read in.
     ``long_addendum_mm`` turns the blank's tip that much over the standard
     addendum and leaves the root where the cutter's depth puts it.
+    ``dedendum`` is the root-relief depth below the pitch circle in units of
+    1/depth_dp: the standard 1.157, or 1.25 for a pinion whose drawing
+    floors its root at the 1.25/P full-depth form (the feed-pinion sleeve).
     """
     depth_dp = dp if depth_dp is None else depth_dp
     addendum_extra_in = 1.0 / depth_dp - 1.0 / dp + long_addendum_mm / IN
@@ -493,7 +497,7 @@ async def build_fixed_gear(
     ra_mm = facts["Ra"] * IN
     pitch_r_in = teeth / dp / 2.0
     widen_rad = (backlash_mm / 2.0) / (pitch_r_in * IN)
-    root_r_in = (pitch_r_in - 1.157 / depth_dp) if root_relief else None
+    root_r_in = (pitch_r_in - dedendum / depth_dp) if root_relief else None
     if helix_deg and root_r_in is None:
         raise ValueError("helix_deg requires root_relief=True (additive tooth "
                          "area algebra assumes the root-arc floor)")

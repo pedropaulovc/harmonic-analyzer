@@ -2298,9 +2298,11 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "crankshaft_spec",
         "error_budget",
         "harmonic_base_fasteners",
+        "guide_lock_screw_spec",
         "post_mount_screw_spec",
         "spring_hook_spec",
         "swing_stop_screw_spec",
+        "transgear_disc_hub_spec",
         "transgear_removable_notes",
     }
 )

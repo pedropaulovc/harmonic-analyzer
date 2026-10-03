@@ -4,19 +4,16 @@ Turning the crank T12 sprocket must propagate through the WHOLE six-gear feed
 train (paper-drive rework E8 -- every stage a real mate):
 
     T12 (crank) --Belt/Chain 12:24 teeth--> T24 (knob wheel)
-      --Lock--> knob shaft + 12T third gear
+      --mated--> drive collar --Lock--> knob shaft (its integral 12T gear)
       --GEAR 12:120--> 120T reducer disc --Lock--> 12T feed pinion
       --rack-pinion (pi * 10.16 / rev)--> platen (the paper feed)
 
 and the roller chain rides both sprockets. This probe opens the saved default-`free`
 paper-drive model, DRIVES the crank by a known angle (authors a temporary angle mate
 on the T12 Right-plane dihedral, then ForceRebuild3), and asserts each downstream
-component moved by the coupled amount. Cluster rotations are compared by MAGNITUDE
-(axis-angle angle), never by projection onto a shared axis: the knob shaft is modeled
-on a spin axis PERPENDICULAR to the sprockets' (verified live -- it turns about
-global Y while T24 turns about Z), so a shared-axis projection would read a false
-zero for it. The SPROCKETS, the disc and the feed pinion, though, all spin about
-the global Z axis, so their SIGNED Z rotations are also compared -- ratio AND sense:
+component moved by the coupled amount. Every rotating part of the train -- both
+sprockets, the drive collar, the knob shaft, the disc and the feed pinion -- spins
+about the global Z axis, so their SIGNED Z rotations are compared -- ratio AND sense:
 
   * the Belt/Chain feature (EngageBelt, PulleyDiameters forced to the per-tooth
     values N * pitch / pi -- the picked tip faces would couple at the #25 OD ratio
@@ -24,9 +21,10 @@ the global Z axis, so their SIGNED Z rotations are also compared -- ratio AND se
     at the EXACT 12:24 = 0.500 reduction off the crank, asserted tightly,
   * T24 turns the SAME direction as T12 (signed Z angles) -- a chain couples both
     sprockets the same way; an external gear mate would REVERSE,
-  * knob shaft and 12T third gear turn by the SAME magnitude as T24 (Lock-mated
-    cluster -- the whole feed train follows; codex #189 :592),
-  * the GEAR mate turns the disc at 12:120 of the T24 spin, reversed (external
+  * the drive collar and the knob shaft (with its integral 12T) turn by the SAME
+    signed Z angle as T24 (the collar is mated to T24, the shaft Lock-mated to the
+    collar -- the whole feed train follows; codex #189 :592),
+  * the GEAR mate turns the disc at 12:120 of the knob shaft spin, reversed (external
     mesh; ``GEAR_SENSE`` pins the authored alignment),
   * the feed pinion turns WITH the disc (Lock, same axis -- signed compare),
   * the platen translates by ``pi * FEED_PD * (dTheta_feed / 360)``, checked
@@ -106,7 +104,7 @@ GEAR_RATIO = THIRD_TEETH / DISC_TEETH  # 12:120 = 0.1 (the reduction gear mate)
 # (0.5286, +0.0286 -- the old 0.03 band accepted it).
 READ_SLACK_DEG = 0.02  # deg per sprocket angle reading (4x the live 2-dp bound)
 CHAIN_RATIO_TOL = READ_SLACK_DEG * (1.0 + CHAIN_RATIO) / (DRIVE_DEG - CRANK_TOL)
-ANG_TOL = 1.2       # deg: locked cluster parts turn by equal magnitude (near-exact)
+ANG_TOL = 1.2  # deg: the collar and knob shaft turn with T24 (near-exact)
 LIN_TOL = 0.05      # mm: the 30-deg drive feeds only ~0.133 mm through the 1:20
 # net reduction, so the linear tolerance is tight enough that a dropped rack
 # mate (0 feed) or a wrong-stage ratio cannot hide inside it
@@ -116,7 +114,7 @@ LIN_TOL = 0.05      # mm: the 30-deg drive feeds only ~0.133 mm through the 1:20
 # is deterministic per build script; these constants pin it (precedent:
 # 29f1282). They live HERE (not in the build script) so a calibration flip
 # re-runs only verify:kinematics, not the assembly build.
-GEAR_SENSE = -1.0   # sign of (disc Z) / (T24/third Z): external 12:120 mesh
+GEAR_SENSE = -1.0  # sign of (disc Z) / (knob shaft Z): external 12:120 mesh
 # FEED_SIGN is PINNED by the physical tooth contact observed in live SW
 # (2026-07-07 drag test: the original platen-axis-referenced mate fed the
 # paper BACKWARD at this constant's old -1 value, every magnitude passing).
@@ -158,11 +156,9 @@ def _rot_angle_deg(after: list[float], before: list[float]) -> float:
     """Magnitude (deg) of the relative rotation ``after @ before^T`` -- the angle of
     its axis-angle form, via ``acos((trace - 1) / 2)`` (valid 0..180 deg).
 
-    Axis-AGNOSTIC on purpose: each cluster part is modeled on its OWN axis (the knob
-    shaft's spin axis is perpendicular to the sprockets' -- verified live, its rel.
-    rotation is about global Y while T24's is about Z), so a shared-axis projection
-    reads a FALSE zero for the shaft. Locked parts turn by equal MAGNITUDE, so that
-    is what we compare."""
+    Axis-AGNOSTIC on purpose: it reads the crank's driven spin without assuming
+    which axis the temporary driver turned it about, so an off-axis or runaway
+    solve still reads its true magnitude against DRIVE_DEG and the chain ratio."""
     bt = [before[0], before[3], before[6],
           before[1], before[4], before[7],
           before[2], before[5], before[8]]          # before^T
@@ -173,18 +169,29 @@ def _rot_angle_deg(after: list[float], before: list[float]) -> float:
 
 
 def _rel_z_angle_deg(after: list[float], before: list[float]) -> float:
-    """SIGNED rotation about +Z (deg) of ``after @ before^T``.
+    """SIGNED rotation about Z (deg) between two ``Transform2`` rotations.
 
-    For the two SPROCKETS only: both spin about global Z (verified live), so the
-    sign is meaningful -- Z-rotation by theta has ``m = [[c,-s,.],[s,c,.],...]``,
-    hence ``atan2(m[1][0] - m[0][1], m[0][0] + m[1][1]) = theta``. (The knob
-    shaft/cluster parts spin about OTHER axes; they keep the axis-agnostic
-    magnitude compare above.)"""
+    Every rotating part of the feed train (sprockets, drive collar, knob shaft,
+    disc, feed pinion) spins about global Z, so the sign is meaningful.
+    ``Transform2.ArrayData`` stores the rotation with the part's axes as its
+    ROWS (R = M^T for the column-vector matrix M), so the global spin
+    ``M_after @ M_before^T`` is ``after^T @ before``.  The old
+    ``after @ before^T`` read ``M_after^T @ M_before``, the spin in the
+    part's OWN frame: the global spin's transpose for a part inserted with
+    its Z along +Z, its reverse for one inserted Ry180 -- the Ry180 feed
+    sleeve Lock-mated to the identity disc read +1.50 against the disc's
+    -1.50 (run 20261001T051043622Z).  This returns ``before^T @ after``, the
+    global spin's transpose for EVERY insertion frame, so a part with its Z
+    along +Z reads exactly what it did before (the sign GEAR_SENSE and
+    FEED_SIGN were calibrated against).
+
+    Z-rotation by theta has ``m = [[c,-s,.],[s,c,.],...]``, hence
+    ``atan2(m[1][0] - m[0][1], m[0][0] + m[1][1]) = theta``."""
     bt = [before[0], before[3], before[6],
           before[1], before[4], before[7],
           before[2], before[5], before[8]]          # before^T
-    m = [sum(after[r * 3 + k] * bt[k * 3 + c] for k in range(3))
-         for r in range(3) for c in range(3)]        # after @ before^T
+    m = [sum(bt[r * 3 + k] * after[k * 3 + c] for k in range(3))
+         for r in range(3) for c in range(3)]        # before^T @ after
     return math.degrees(math.atan2(m[3] - m[1], m[0] + m[4]))
 
 
@@ -232,8 +239,8 @@ def _one(adapter: Any, stem: str) -> str:
 async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     roles = _removables_by_role(adapter)
     t12, t24 = roles["T12"], roles["T24"]
+    collar = _one(adapter, "transgear-drive-collar")
     knob_shaft = _one(adapter, "transgear-knob-shaft")
-    third_gear = _one(adapter, "transgear-pinion")
     feed_pinion = _one(adapter, "transgear-feed-pinion")
     disc = _one(adapter, "rack-pinion")
     # The platen BODY exactly (platen-<n>), not a "platen-rack"/"platen-clip" sibling.
@@ -241,11 +248,13 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
                    if n.rsplit("-", 1)[0] == "platen"), "")
     if not platen:
         raise RuntimeError("no platen-<n> body component found")
-    log(f"parts: crank T12={t12}, knob T24={t24}, shaft={knob_shaft}, "
-        f"third={third_gear}, disc={disc}, feed={feed_pinion}, platen={platen}")
+    log(
+        f"parts: crank T12={t12}, knob T24={t24}, collar={collar}, "
+        f"shaft={knob_shaft}, disc={disc}, feed={feed_pinion}, platen={platen}"
+    )
 
     # --- baseline -----------------------------------------------------------
-    parts = (t12, t24, knob_shaft, third_gear, disc, feed_pinion)
+    parts = (t12, t24, collar, knob_shaft, disc, feed_pinion)
     base_R = {n: _rot(adapter, n) for n in parts}
     base_platen_x = component_origin(adapter, platen)[0]
 
@@ -266,28 +275,30 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
 
     # --- read the driven state ---------------------------------------------
-    # Rotation MAGNITUDE of each part (axis-agnostic -- see _rot_angle_deg). All
-    # locked cluster parts turn by the same angle; the gear mate reduces into
-    # the disc; the platen translates in X.
+    # Rotation MAGNITUDE of the crank and T24 (axis-agnostic -- see
+    # _rot_angle_deg) for the driver gate and the chain ratio; the gear mate
+    # reduces into the disc; the platen translates in X.
     d_crank = _rot_angle_deg(_rot(adapter, t12), base_R[t12])
     d_t24 = _rot_angle_deg(_rot(adapter, t24), base_R[t24])
     # Signed Z rotations of the two sprockets (both spin about global Z): the
-    # SENSE of the coupling, invisible to the magnitude compares below.
+    # SENSE of the coupling, invisible to the magnitude compares.
     z_crank = _rel_z_angle_deg(_rot(adapter, t12), base_R[t12])
     z_t24 = _rel_z_angle_deg(_rot(adapter, t24), base_R[t24])
-    d_shaft = _rot_angle_deg(_rot(adapter, knob_shaft), base_R[knob_shaft])
-    d_third = _rot_angle_deg(_rot(adapter, third_gear), base_R[third_gear])
-    # The disc and the feed pinion also spin about global Z -> their SIGNED
-    # rotations are meaningful (the senses the gear + rack-pinion mates
-    # enforce), like the sprockets'.
+    # The collar, the knob shaft (integral 12T), the disc and the feed pinion
+    # also spin about global Z -> their SIGNED rotations are meaningful (the
+    # senses the collar, gear and rack-pinion mates enforce), like the sprockets'.
+    z_collar = _rel_z_angle_deg(_rot(adapter, collar), base_R[collar])
+    z_shaft = _rel_z_angle_deg(_rot(adapter, knob_shaft), base_R[knob_shaft])
     z_disc = _rel_z_angle_deg(_rot(adapter, disc), base_R[disc])
     z_feed = _rel_z_angle_deg(_rot(adapter, feed_pinion), base_R[feed_pinion])
     d_platen = component_origin(adapter, platen)[0] - base_platen_x
     chain_ratio = measured_chain_ratio(d_t24, d_crank)
-    log(f"crank spun {d_crank:.2f} deg (Z {z_crank:+.2f}) -> T24 {d_t24:.2f} "
+    log(
+        f"crank spun {d_crank:.2f} deg (Z {z_crank:+.2f}) -> T24 {d_t24:.2f} "
         f"(Z {z_t24:+.2f}, ratio {chain_ratio:.4f}), "
-        f"shaft {d_shaft:.2f}, third {d_third:.2f}, disc Z {z_disc:+.2f}, "
-        f"feed Z {z_feed:+.2f} deg; platen {d_platen:+.3f} mm")
+        f"collar Z {z_collar:+.2f}, shaft Z {z_shaft:+.2f}, disc Z {z_disc:+.2f}, "
+        f"feed Z {z_feed:+.2f} deg; platen {d_platen:+.3f} mm"
+    )
 
     # --- assert the coupled motion (magnitudes) ----------------------------
     # (0) The temporary driver must actually hit DRIVE_DEG -- bound it on BOTH
@@ -309,23 +320,26 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
             f"coupling sense REVERSED: crank Z {z_crank:+.2f} deg vs T24 Z "
             f"{z_t24:+.2f} deg -- a roller chain turns both sprockets the same "
             "way (gear-mate-style external mesh, or FlipSides on the belt?)")
-    # (2) CORE :592 check -- the Lock-mated knob cluster (knob shaft + 12T third
-    # gear) turns by the SAME angle as the driven T24: the cluster follows.
-    for nm, dv in (("knob shaft", d_shaft), ("third gear", d_third)):
-        if abs(dv - d_t24) > ANG_TOL:
+    # (2) CORE :592 check -- the drive collar (mated to T24) and the knob shaft
+    # (Lock-mated to the collar, integral 12T) turn by the SAME signed Z angle
+    # as the driven T24: the knob stack follows, in the same sense.
+    for nm, zv in (("drive collar", z_collar), ("knob shaft", z_shaft)):
+        if abs(zv - z_t24) > ANG_TOL:
             raise RuntimeError(
-                f"{nm} turned {dv:.2f} deg, expected {d_t24:.2f} (Lock-mated to T24) "
-                "-- the knob cluster did not follow the feed (codex #189 :592)")
+                f"{nm} turned Z {zv:+.2f} deg, expected {z_t24:+.2f} (T24) "
+                "-- the knob stack did not follow the feed (codex #189 :592)"
+            )
     # (3) The GEAR mate reduces the cluster spin 12:120 into the disc, SIGNED
     # (an external mesh reverses; GEAR_SENSE pins the authored alignment). The
     # expected disc angle is small (1.5 deg for a 30-deg crank), so the
     # tolerance is proportionally tight -- a dropped/mis-ratioed mate fails.
-    exp_disc = GEAR_SENSE * GEAR_RATIO * z_t24
+    exp_disc = GEAR_SENSE * GEAR_RATIO * z_shaft
     if abs(z_disc - exp_disc) > 0.25:
         raise RuntimeError(
             f"disc turned Z {z_disc:+.2f} deg, expected {exp_disc:+.2f} "
-            f"(GEAR_SENSE {GEAR_SENSE:+.0f} x {THIRD_TEETH}:{DISC_TEETH} x T24 Z "
-            f"{z_t24:+.2f}) -- gear mate broken, mis-ratioed or flipped")
+            f"(GEAR_SENSE {GEAR_SENSE:+.0f} x {THIRD_TEETH}:{DISC_TEETH} x knob "
+            f"shaft Z {z_shaft:+.2f}) -- gear mate broken, mis-ratioed or flipped"
+        )
     # (4) The feed pinion is Lock-mated coaxially to the disc: identical SIGNED
     # spin (both on the stud's Z axis).
     if abs(z_feed - z_disc) > 0.2:
@@ -357,7 +371,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
             f"(FEED_SIGN {FEED_SIGN:+.0f} x GEAR_SENSE {GEAR_SENSE:+.0f} x NET "
             f"{NET_RACK_TRAVEL_PER_CRANK_REV:.3f}/crank-rev x crank Z {z_crank:+.1f}/360)")
     _telemetry.success(
-        f"crank->feed coupling OK: crank {d_crank:.1f} deg -> T24/shaft/third "
+        f"crank->feed coupling OK: crank {d_crank:.1f} deg -> T24/collar/shaft "
         f"{d_t24:.1f} deg (chain ratio {chain_ratio:.3f} = 12:24, same-sense) "
         f"-> disc/feed Z {z_disc:+.2f} deg (12:120) -> platen {d_platen:+.3f} mm")
 
@@ -365,11 +379,11 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     chain_moved = await _attempt_chain_advance(adapter, d_crank)
 
     _telemetry.info(
-        "KINEMATIC PROBE -- crank drives the paper feed (rotation magnitudes):\n"
+        "KINEMATIC PROBE -- crank drives the paper feed:\n"
         f"  crank T12   {d_crank:6.2f} deg  (driver)\n"
         f"  knob  T24   {d_t24:6.2f} deg  (belt/chain, ratio {chain_ratio:.3f} = 12:24, same-sense)\n"
-        f"  knob shaft  {d_shaft:6.2f} deg  (Lock to T24)\n"
-        f"  third gear  {d_third:6.2f} deg  (Lock to T24)\n"
+        f"  collar      {z_collar:+6.2f} deg  (mated to T24, signed)\n"
+        f"  knob shaft  {z_shaft:+6.2f} deg  (Lock to collar, integral 12T, signed)\n"
         f"  120T disc   {z_disc:+6.2f} deg  (gear mate 12:120, signed)\n"
         f"  feed pinion {z_feed:+6.2f} deg  (Lock to disc, signed)\n"
         f"  platen      {d_platen:+7.3f} mm  (rack-pinion, pi*{FEED_PD:.2f}/rev;"

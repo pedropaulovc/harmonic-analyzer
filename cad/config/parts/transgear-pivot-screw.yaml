@@ -1,0 +1,17 @@
+transgear-pivot-screw:
+  title: Transgear Pivot Screw
+  number: MHA-168
+  stock_name: Slotted 18-8 Stainless Steel Precision Shoulder Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91829A205]
+  material: 18-8 stainless steel
+  material_specification: "18-8 stainless steel, passivated, slotted precision shoulder screw; McMaster-Carr 91829A205"
+  finish: passivated
+  installation_notes: |-
+    INSTALLATION - THROUGH MHA-167 AND MHA-164 INTO THE MHA-074 BLIND TAP.
+    #8-32 THREAD ENGAGEMENT 0.72D NOMINAL, 0.52D MIN.
+    USE LOW-STRENGTH THREADLOCKER.
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

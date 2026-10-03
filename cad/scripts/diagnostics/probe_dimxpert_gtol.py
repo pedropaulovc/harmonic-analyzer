@@ -116,9 +116,10 @@ from solidworks_mcp.adapters.pywin32_adapter import (  # noqa: E402
     null_callout,
 )
 
-# The audit's poster child: draw_transgear_stub.py carries a cylindricity 0.01
-# and a circular-runout 0.03 on the gear seat, both as frozen sheet strings.
-SOURCE_PART = CAD_ROOT / "out" / "sldprt" / "transgear-stub.SLDPRT"
+# Source part: MHA-179, the transgear pin (R9-68 retired the original target,
+# the MHA-082 stub).  A plain revolve: planar head seat and groove walls, the
+# Ø3.900 ground journal as the cylinder the controls land on.
+SOURCE_PART = CAD_ROOT / "out" / "sldprt" / "transgear-pin.SLDPRT"
 
 # swDimXpertFeatureSelectorOption_e (read from swdimxpert.tlb, see _gtol_type_map).
 SELECTOR_PLANE = 0
@@ -126,7 +127,8 @@ SELECTOR_PLANE = 0
 # swDimXpertAnnotationType_e.swDimXpertDatum
 ANNOTATION_DATUM = 150
 
-# The two controls draw_transgear_stub.py types as literals today.
+# Probe payloads: the frame shapes the drawings type as literals (a form
+# control and a datum-referenced runout); MHA-179's sheet carries neither.
 PROBE_CONTROLS = (
     ("cylindricity", "Cylindricity", "0.01", ()),
     ("circular_runout", "CircularRunout", "0.03", ("A",)),
@@ -256,7 +258,7 @@ async def _probe() -> int:
     if not SOURCE_PART.is_file():
         raise FileNotFoundError(
             f"build a part first -- {SOURCE_PART} is missing "
-            "(uv run python -m doit part:transgear_stub)"
+            "(uv run python -m doit part:transgear_pin)"
         )
     scratch = Path(tempfile.gettempdir()) / "probe_dimxpert_gtol.SLDPRT"
 

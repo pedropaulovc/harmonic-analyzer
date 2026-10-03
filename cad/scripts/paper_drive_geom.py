@@ -2,7 +2,7 @@
 
 Net platen feed per CRANK revolution with the T12 crank / T24 knob removable
 set mounted: chain (tooth ratio, ``transgear_removable_spec``) x
-third-pinion/disc reduction x
+knob-shaft 12T/disc reduction x
 feed-pinion pitch circumference on the DP30 rack. Every stage is a real mate in
 ``build_paper_drive_assembly``; this module only states the law, from the same
 pure-data spec modules the parts build from, so the assembly, the kinematics
@@ -15,7 +15,7 @@ import math
 
 import rack_pinion_spec
 import transgear_feed_pinion_spec
-import transgear_pinion_spec
+import transgear_knob_shaft_spec
 import transgear_removable_spec
 
 MM_PER_IN = 25.4
@@ -26,7 +26,7 @@ MM_PER_IN = 25.4
 _T12 = transgear_removable_spec.TEETH["T12"]
 _T24 = transgear_removable_spec.TEETH["T24"]
 CHAIN_RATIO = _T12 / _T24  # 0.5: knob turns per crank turn
-GEAR_RATIO = transgear_pinion_spec.TEETH / rack_pinion_spec.TEETH  # 12:120
+GEAR_RATIO = transgear_knob_shaft_spec.TEETH / rack_pinion_spec.TEETH  # 12:120
 FEED_PITCH_DIA = (
     transgear_feed_pinion_spec.TEETH
     / transgear_feed_pinion_spec.DIAMETRAL_PITCH

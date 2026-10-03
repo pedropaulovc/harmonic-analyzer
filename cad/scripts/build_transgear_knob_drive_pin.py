@@ -1,7 +1,7 @@
 r"""Purchased MHA-155 transgear knob drive pin: McMaster 98381A433.
 
 A 3/32 x 3/16 alloy-steel dowel (``transgear_knob_drive_pin_spec``).  Two are
-pressed into holes reamed through the knob shaft MHA-078's seat collar (ch23
+pressed into holes reamed through the knob drive collar MHA-177 (ch23
 p.56), set on a stop to their proud length: the removable sprocket MHA-081
 drops its two Ø2.5 holes over them.  The stock
 recipe ``diagnostics/diag_build_98381A433.py`` models the nominal cylinder,

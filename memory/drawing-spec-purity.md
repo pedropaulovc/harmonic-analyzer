@@ -59,8 +59,8 @@ deviation's SIGN (`-0.00`), which is what the released sheets print; Y14.5
 §2.3.2 prefers a bare `0`, and switching is a deliberate drawing change to make
 on its own, never a side effect of moving a constant.
 
-**STATUS 2026-07-28 — partially applied.** 4 parts migrated (transgear-stub,
-cone-gear-shaft, cone-tip-adjuster, crank-handle). Still outstanding: **33
+**STATUS 2026-07-28 — partially applied.** 4 parts migrated (the MHA-082 stub,
+since retired by R9-68; cone-gear-shaft, cone-tip-adjuster, crank-handle). Still outstanding: **33
 sheets** carry a band in `DIMENSION_CALLOUTS`, **23 specs** hardcode a band
 inside `DRAWING_NOTES`, and all **125** `tolerance="..."` FCF literals are
 untouched (the `GEOMETRIC_CONTROLS` spec-table convention and the

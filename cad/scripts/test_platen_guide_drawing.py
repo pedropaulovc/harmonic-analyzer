@@ -142,11 +142,6 @@ def test_drawing_hole_sizes_follow_unc_policy() -> None:
     assert drawing.THREAD_DESIGNATION == "#4-40 UNC-2B"
     assert drawing.THREAD_TAP_DRILL_MM == blind_cut_dia_mm(TAPPED_HOLE_SPEC)
     assert drawing.THREAD_MAJOR_DIA_MM == THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
-    assert TAPPED_HOLE_SPEC.end == "blind"
-    assert TAPPED_HOLE_SPEC.depth_mm == guide.SCREW_HOLE_DEPTH
-    assert TAPPED_HOLE_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(
-        guide.GUIDE_SCREW_THREAD_ENGAGEMENT
-    )
     assert CLEARANCE_MM[("#4", "normal")] == 3.264
 
 
@@ -165,38 +160,81 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
         tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
     )
     source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert source.count("replace(") == 1
     assert source.count("TAPPED_HOLE_SPEC,") == 1
     assert "screw_spec = TAPPED_HOLE_SPEC" in source
+    assert "lock_spec = LOCK_TAP_SPEC" in source
     assert '"tapped_bottoming", "#4-40"' not in source
 
 
-def test_drawing_splits_front_and_rear_blind_tap_tables() -> None:
+def test_drawing_splits_front_and_rear_tap_tables() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert '"*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M' in source
     assert source.count("insert_hole_table(") == 2
     assert 'starting_hole_tag="B"' in source
     assert source.count("hole_entities=") == 2
-    assert "for station in BLIND_X" in source
-    assert "for station in THROUGH_X" in source
+    assert "for station in FRONT_X" in source
+    assert "for station in REAR_X" in source
 
 
-def test_platen_guide_blind_taps_keep_drill_depth_and_engagement_distinct() -> None:
-    assert guide.LOCK_SCREW_HOLE_DEPTH == pytest.approx(
-        guide.LOCK_SCREW_THREAD_ENGAGEMENT + guide.LOCK_SCREW_BOTTOM_CLEARANCE
+# R9-64: the guide screws' front receivers are tapped THROUGH, so no thread
+# or drill depth exists to stack (a blind tap could not hold full thread to
+# the screw's reach and keep a bottoming tap's lead without its drill point
+# breaking through a faced lock seat). Recomputed from the catalogue screw
+# and the platen's counterbore, not from the build's derived constants.
+_GUIDE_SCREW_LEN_MAX = 0.25 * 25.4  # 90114A511; B18.6.3 band +0/-0.03 in
+_PLATEN_PASSAGE = 3.85 - 2.9178  # plate less the stock-head counterbore
+
+
+def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
+    spec = guide.TAPPED_HOLE_SPEC
+    assert (spec.kind, spec.size, spec.end) == ("tapped", "#4-40", "through_all")
+    assert spec.depth_mm == 0.0 and not spec.overrides_mm
+    reach = _GUIDE_SCREW_LEN_MAX - _PLATEN_PASSAGE
+    assert guide.GUIDE_SCREW_THREAD_ENGAGEMENT == pytest.approx(reach)
+    # The tip against the shallowest seat (the faced lock seats over A2/A4).
+    seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
+    assert seat_min - reach == pytest.approx(3.5022, abs=1e-9)
+    assert guide.GUIDE_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - reach)
+    # The assembly's blind-bottom check reads the same tip clearance.
+    assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE == guide.GUIDE_SCREW_TIP_INSIDE_MIN
+    # Full thread over the whole reach, even on the shortest catalogue screw.
+    shortest = reach - 0.03 * 25.4
+    assert shortest / THREAD_MAJOR_MM["#4-40"] >= 1.5
+
+
+# R9-48: the lock receivers are #4-40 taps THROUGH the rail, so no depth band
+# can starve the 3/8 lock screws. Recomputed here from the catalogue and the
+# printed bands, not from the build's derived constants.
+_IN = 25.4
+_LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91255A108; B18.6.3 band +0/-0.03 in
+_LOCK_THICK_MIN = 2.0 - 0.13  # 2.000 at 3 places: title block +/-0.13
+_GUIDE_DEPTH_MIN = 10.0 - 0.50  # 10.00 +0/-0.50 on the guide sheet
+_BAR_DEPTH_MIN = 9.0 - 0.13  # MHA-074 9.00 +/-0.13
+_LOCK_GAP_FIT_MIN = 0.05  # the faced lock seats (R9-47)
+
+
+def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
+    spec = guide.LOCK_TAP_SPEC
+    assert (spec.kind, spec.size, spec.end) == ("tapped", "#4-40", "through_all")
+    assert spec.depth_mm == 0.0 and not spec.overrides_mm
+    seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
+    tip_reach_max = _LOCK_SCREW_LEN_MAX - _LOCK_THICK_MIN
+    assert seat_min - tip_reach_max == pytest.approx(1.265, abs=1e-9)
+    assert guide.LOCK_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - tip_reach_max)
+
+
+def test_lock_through_tap_exits_clear_the_front_taps() -> None:
+    # Each through tap exits the platen-mating face 7.0 from a front tap:
+    # both majors at the 9X Ø0.20 position, both mouths broken 0.25.
+    c2c = min(
+        abs(lock - front)
+        for lock in (80.892 - 7.0, 80.892 + 7.0, 188.748 - 7.0, 188.748 + 7.0)
+        for front in (26.964, 80.892, 134.82, 188.748, 242.676)
     )
-    assert guide.SCREW_HOLE_DEPTH == pytest.approx(
-        guide.GUIDE_SCREW_THREAD_ENGAGEMENT + guide.GUIDE_SCREW_BOTTOM_CLEARANCE
-    )
-    assert guide.LOCK_SCREW_BOTTOM_CLEARANCE > 0.0
-    assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE > 0.0
-    assert guide.LOCK_TAPPED_HOLE_SPEC.end == "blind"
-    assert guide.LOCK_TAPPED_HOLE_SPEC.depth_mm == pytest.approx(
-        guide.LOCK_SCREW_HOLE_DEPTH
-    )
-    assert guide.LOCK_TAPPED_HOLE_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(
-        guide.LOCK_SCREW_THREAD_ENGAGEMENT
-    )
+    wall = c2c - 0.20 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.25
+    assert wall == pytest.approx(3.455, abs=1e-3)
+    assert wall >= 1.5
+    assert guide.LOCK_TAP_EXIT_WALL_MIN == pytest.approx(wall)
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:
@@ -225,14 +263,100 @@ def test_required_drawing_paths() -> None:
     assert drawing.PNG.as_posix().endswith("/png/platen-guide_drawing.png")
 
 
-def test_drawing_tolerances_follow_feature_function_not_display_zeros() -> None:
-    notes = guide.DRAWING_NOTES
-    assert "HOLE POSITION PER FCF" in notes
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LENGTH +/-" not in notes
-    assert "STOCK SECTION" not in notes
-    assert "X.XXX" not in notes
+def test_sheet_carries_no_notes_block_restating_the_position_frame() -> None:
+    # The 9X position frame already says it; "HOLE POSITION PER FCF." only
+    # repeated it (rule 6), and nothing else needs a note.
+    assert not hasattr(guide, "DRAWING_NOTES")
+    for module in (guide, drawing):
+        assert "Manufacturing Notes" not in Path(module.__file__).read_text(
+            encoding="utf-8"
+        )
+
+
+def test_bar_slide_face_carries_the_only_roughness_symbol() -> None:
+    import build_paper_drive_assembly as assembly
+    from _gtol_spec import PlanarFace
+    from _surface_finish import MACHINED_UM
+    from platen_guide_spec import SURFACE_FINISHES
+
+    # The top rail hangs by its local y 0 face on the bar's top edge, and the
+    # assembly keeps the part's y (Ry 180), so that face is the running one.
+    assert assembly.BAR_TOP_Y == assembly.GUIDE_Y[1]
+    assert [(c.key, c.roughness_um, c.face) for c in SURFACE_FINISHES] == [
+        ("bar_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0))
+    ]
+    build_source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in (
+        build_source
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bar_slide")' in source
+    # Its leader lands between the A1 and B1 axes, clear of both, at a point
+    # projected from the controlled face's front edge (model y 0, z 0). The
+    # 234a39c87 farm sheet drew that edge 1.1 mm under the hard-coded sheet y
+    # the leader once asked for, past the 1 mm attachment readback limit.
+    assert guide.SCREW_STATION_X[0] < drawing.BAR_SLIDE_STATION_MM < guide.HOLE_X[0]
+    assert (
+        "leader_attach_xy=model_point_in_view(\n"
+        "            adapter,\n"
+        "            front,\n"
+        "            (BAR_SLIDE_STATION_MM / 1000.0, 0.0, 0.0),"
+    ) in source
+
+
+def test_part_authors_the_printed_dimensions_and_places() -> None:
+    from platen_guide_spec import (
+        DRAWING_DIMENSIONS,
+        DRAWING_PRECISION,
+        DRAWING_PRECISION_BY_NAME,
+        GUIDE_DEPTH_PLACES,
+    )
+
+    assert DRAWING_DIMENSIONS == {
+        "GuideProfile": {"Length", "Height"},
+        "Guide": {"Depth"},
+    }
+    # The length only meets the platen's edges and the holes locate from the
+    # left end at basic stations: .X. The height prints at the places the
+    # paper-drive lock-station sweep judges it at.
+    assert DRAWING_PRECISION == {
+        "GuideProfile": {"Length": 1, "Height": GUIDE_DEPTH_PLACES},
+        "Guide": {"Depth": GUIDE_DEPTH_PLACES},
+    }
+    assert DRAWING_PRECISION_BY_NAME == {
+        "Length": 1,
+        "Height": GUIDE_DEPTH_PLACES,
+        "Depth": GUIDE_DEPTH_PLACES,
+    }
+    build_source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build_source
+    assert "in DRAWING_DIMENSIONS.items()" in build_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
+        in source
+    )
+    # Both views import only their own features' marked dimensions, never the
+    # whole model's (which the farm log warns about and then deletes again).
+    assert source.count("curate_view_dimensions(") == 2
+    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
+
+
+# The rear view's auto-placed hole-table origin, measured on the v38 sheet:
+# its "Y" glyph tops out 20.2 mm above the view centre and its "0 -> X" row
+# bottoms out 19.2 mm below. The front table's A5 row ends at ~0.191 and the
+# length's text above the front view starts at ~0.138.
+_ORIGIN_ABOVE_M = 0.0202
+_ORIGIN_BELOW_M = 0.0192
+_FRONT_TABLE_BOTTOM_M = 0.191
+_LENGTH_TEXT_TOP_M = 0.1382
+
+
+def test_rear_view_origin_clears_the_table_and_the_length() -> None:
+    air = 0.004
+    assert drawing.BACK_VIEW_Y_M + _ORIGIN_ABOVE_M + air <= _FRONT_TABLE_BOTTOM_M
+    assert drawing.BACK_VIEW_Y_M - _ORIGIN_BELOW_M - air >= _LENGTH_TEXT_TOP_M
 
 
 def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
@@ -243,14 +367,14 @@ def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
     assert 'characteristic="flatness"' in source
     assert 'characteristic="parallelism"' in source
     assert 'characteristic="position"' in source
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
     assert "def _manufacturing_notes" not in source
+    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
 def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
     hole_axis_x = {
         drawing.FRONT_LEFT_X_M + station / 1000.0
-        for station in (*drawing.THROUGH_X, *drawing.BLIND_X)
+        for station in (*drawing.REAR_X, *drawing.FRONT_X)
     }
     assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(
         drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0

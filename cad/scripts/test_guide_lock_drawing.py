@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import build_guide_lock as lock
 import draw_guide_lock as drawing
 import guide_lock_spec
@@ -26,10 +28,9 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     marked = set().union(*guide_lock_spec.DRAWING_DIMENSIONS.values())
     kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
     assert kept == marked
-    assert (drawing.LOCK_WIDTH, drawing.LOCK_HEIGHT, drawing.LOCK_THICK) == (
+    assert (drawing.LOCK_WIDTH, drawing.LOCK_HEIGHT) == (
         guide_lock_spec.LOCK_WIDTH,
         guide_lock_spec.LOCK_HEIGHT,
-        guide_lock_spec.LOCK_THICK,
     )
     assert lock.HOLE_XY is guide_lock_spec.HOLE_XY
 
@@ -38,9 +39,10 @@ def test_hole_contract_is_part_owned_and_resolved() -> None:
     spec = guide_lock_spec.HOLE_SPEC
     assert lock.HOLE_SPEC is spec
     assert drawing.HOLE_SPEC is spec
-    assert spec.kind == "clearance"
-    assert spec.size == "#4"
-    assert spec.fit == "close"
+    # R9-49: the fractional 1/8 drill carries both printed hole positions over
+    # the screw majors (guide_lock_screw_spec.LOCK_SET_OFFSET).
+    assert spec.kind == "drilled_fractional"
+    assert spec.size == "1/8"
     assert lock.HOLE_DIA == blind_cut_dia_mm(spec)
     assert drawing.HOLE_R_SHEET == (
         blind_cut_dia_mm(spec) * drawing.SHEET_SCALE[0] / 2000.0
@@ -49,56 +51,76 @@ def test_hole_contract_is_part_owned_and_resolved() -> None:
 
 def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (4.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("scale=(4, 1)") == 2  # front + right
-    assert source.count("scale=(2, 1)") == 1  # the isometric override
     assert guide_lock_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 2:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
-    notes = guide_lock_spec.DRAWING_NOTES
-    assert "#4 CLEARANCE DRILL THRU" in notes
-    assert "HOLE POSITION PER FCF" in notes
-    # General tolerances live in the title block ONLY -- a second general
-    # tolerance in the notes would conflict with it.
-    assert "LINEAR +/-" not in notes
-    assert "4 REQUIRED" in notes
-    # Pedro 2026-07-10: drawings spec the closest US-customary fastener, not
-    # the period British Association series; no display-zero tolerances.
-    assert "BA" not in notes
-    assert "X.XX" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert "_NOTES_" not in source
+# Title block: .X ±0.8; drilled holes +0.10/-0.
+_ONE_PLACE = 0.8
+_DRILLED_PLUS = 0.10
+_CHAR_WIDTH = 0.00276  # sheet m per character of 3.5-mm note text
 
 
-def test_hole_locators_are_basic_dimensions_off_the_datum_edges() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_edge_dimension(") == 3
-    assert source.count("set_basic_dimension(") == 3
-    assert "add_native_hole_callout(" in source
+def _ligaments(hole_y: float) -> dict[str, float]:
+    r_max = (0.125 * 25.4 + _DRILLED_PLUS) / 2.0
+    band = 0.035
+    xs = [x for x, _ in guide_lock_spec.HOLE_XY]
+    return {
+        "guide-side edge": hole_y - band - r_max,
+        "far edge": (15.65 - 0.50) - hole_y - band - r_max,
+        "left edge": min(xs) - band - r_max,
+        "right edge": (22.0 - _ONE_PLACE) - max(xs) - band - r_max,
+    }
 
 
-def test_native_gdt_replaces_form_orientation_notes() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 3
-    assert source.count("add_feature_control_frame(") == 2
-    assert 'characteristic="position"' in source
-    assert 'characteristic="flatness"' in source
-    assert 'quantity="2X"' in source
+def test_screw_holes_keep_the_ligament_floor_at_the_printed_worst_case() -> None:
+    """Review of 19e33c6c2 (blocker): 2.5 from the guide-side edge left 0.81
+    of ligament under the largest drilled 1/8 hole.  R9-59 laps the plate 1.0
+    past the rail, so the holes stand 3.5 from that edge."""
+    assert min(_ligaments(2.5).values()) < 1.0
+    (hole_y,) = {y for _, y in guide_lock_spec.HOLE_XY}
+    assert hole_y == pytest.approx(3.5)
+    worst = _ligaments(hole_y)
+    assert min(worst.values()) >= 1.5
+    assert guide_lock_spec.HOLE_LIGAMENTS_WORST == pytest.approx(worst)
+    assert guide_lock_spec.LOCK_HEIGHT_BAND == (0.0, -0.50)
+    assert guide_lock_spec.DRAWING_PRECISION_BY_NAME["Width"] == 1
 
 
-def test_wizard_holes_are_not_fake_marked_dimensions() -> None:
-    assert "ScrewHoles" not in lock.DRAWING_DIMENSIONS
-    marked = set().union(*lock.DRAWING_DIMENSIONS.values())
-    assert not {name for name in marked if "Hole" in name}
+def test_hole_coordinates_print_from_the_corner_without_a_frame() -> None:
+    """Rule 3: no frame on this plate; each hole coordinate prints from the
+    plate's corner at .XXX under its own band, and the shared Y once, 2X."""
+    holes = guide_lock_spec.DRAWING_DIMENSIONS["ScrewHoles"]
+    assert holes == {"Hole1X", "Hole2X", "Hole1Y"} <= set(drawing.FRONT_KEEP)
+    assert {guide_lock_spec.DRAWING_PRECISION_BY_NAME[name] for name in holes} == {3}
+    assert drawing.DIMENSION_PREFIXES == {"Hole1Y": "2X "}
+    assert len({y for _, y in guide_lock_spec.HOLE_XY}) == 1
 
 
-def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(lock.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+def test_the_drill_callout_stands_between_the_plate_and_the_right_view() -> None:
+    text = f"2X {drawing.HOLE_CALLOUT_PROCESS} Ø3.18 THRU ALL"
+    assert text.split()[1] == "DRILL"
+    half = len(text) * _CHAR_WIDTH / 2.0
+    left, right = (
+        drawing.HOLE_CALLOUT_XY[0] - half,
+        drawing.HOLE_CALLOUT_XY[0] + half,
+    )
+    right_view_left = (
+        drawing.RIGHT_CENTER[0]
+        - guide_lock_spec.LOCK_THICK * drawing.SHEET_SCALE[0] / 2000.0
+    )
+    assert drawing.RIGHT_EDGE_X < left and right < right_view_left
+
+
+def test_the_hole_y_text_stays_inside_the_border_and_under_the_plate() -> None:
+    x, y = drawing.FRONT_KEEP["Hole1Y"]
+    half = len("2X 3.500±0.035") * _CHAR_WIDTH / 2.0
+    assert x - 2.0 * half > 0.0127  # right-aligned or centred, inside
+    assert y < drawing.BOTTOM_EDGE_Y - 0.004
+    assert x + half < drawing.LEFT_EDGE_X  # clear of Hole1X's extension
+
+
+def test_part_registry_row_carries_the_title_block_facts() -> None:
+    """Stock, finish and quantity live in the title block, not in notes."""
     import _config
 
     spec = _config.parts("guide-lock")

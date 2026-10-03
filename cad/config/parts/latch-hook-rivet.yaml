@@ -1,0 +1,12 @@
+latch-hook-rivet:
+  title: Latch Hook Rivet
+  number: MHA-175
+  stock_name: Aluminum Domed Head Solid Rivet
+  supplier: McMaster-Carr
+  supplier_skus: [97482A015]
+  material: 1100-O Rod (SS)
+  material_specification: "1100 aluminum solid rivet, domed head, 1/16 x 3/16; McMaster-Carr 97482A015"
+  finish: plain; no coating
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

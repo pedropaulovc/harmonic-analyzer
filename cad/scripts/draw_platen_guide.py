@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the platen guide.
 
 The SLDPRT remains authoritative.  This recipe supplies only the platen-guide
-views, dimensions, hole groups, and manufacturing notes; shared sheet/template,
+views, dimensions, hole groups, GD&T and surface symbol; shared sheet/template,
 leader, reopen, and artifact behavior lives in ``_drawing_common``.
 
 Run with SolidWorks open::
@@ -15,7 +15,12 @@ import argparse
 import sys
 from typing import Any
 
-from platen_guide_spec import GEOMETRIC_TOLERANCES_MM
+from platen_guide_spec import (
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    GEOMETRIC_TOLERANCES_MM,
+    SURFACE_FINISHES,
+)
 
 import _telemetry
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
@@ -25,20 +30,24 @@ from _drawing_common import (
     add_datum_feature,
     add_feature_control_frame,
     add_property_linked_note,
+    add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     import_cosmetic_threads,
     insert_hole_table,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
     visible_view_entities,
 )
+from _surface_finish import surface_finish_by_key
 from _drawing_registry import DRAWINGS_BY_NAME
 from build_platen_guide import GUIDE_LENGTH
-from build_platen_guide import HOLE_X as THROUGH_X
-from build_platen_guide import SCREW_STATION_X as BLIND_X
+from build_platen_guide import HOLE_X as REAR_X
+from build_platen_guide import SCREW_STATION_X as FRONT_X
 from platen_guide_spec import TAPPED_HOLE_SPEC
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -67,11 +76,24 @@ FRONT_LEFT_X_M = FRONT_VIEW_X_M - GUIDE_LENGTH / 2000.0
 FRONT_VIEW_Y_M = 0.110
 FRONT_HOLE_Y_M = 0.1111
 FRONT_BOTTOM_Y_M = FRONT_HOLE_Y_M - 0.0025
-BACK_VIEW_Y_M = 0.180
+# The rear view's auto-placed hole-table origin stands 20.2 mm above the view
+# centre (its "Y" glyph) and its "0 -> X" row 19.2 mm below. At 0.180 the glyph
+# ran into the A5 row of the front table (bottom border ~0.191); at 0.165 it
+# tops out at ~0.185 and the "0" row clears the length's text (~0.138) by ~7.6.
+BACK_VIEW_Y_M = 0.165
 BACK_HOLE_Y_M = BACK_VIEW_Y_M + (FRONT_HOLE_Y_M - FRONT_VIEW_Y_M)
 BACK_BOTTOM_Y_M = BACK_HOLE_Y_M - 0.0025
 # Put datum B's symbol midway between the A3/A4 hole axes, clear of both.
-DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (BLIND_X[2] + BLIND_X[3]) / 2000.0
+DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (FRONT_X[2] + FRONT_X[3]) / 2000.0
+# The bar-slide finish lands on the bottom edge (model y 0, front face z 0)
+# midway between the A1 and B1 axes, clear of both centre marks. The landing
+# is projected from the model at draw time: the drawn edge sits ~1.1 mm under
+# FRONT_BOTTOM_Y_M, past add_surface_finish's 1 mm readback limit. The symbol
+# (anchored at its lower-left, boxed ~39 mm wide by the audit) sits below the
+# view, right of the hole-table origin's "0 -> X" row (ends ~0.078) and left
+# of datum B's tag.
+BAR_SLIDE_STATION_MM = (FRONT_X[0] + REAR_X[0]) / 2.0
+BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 - 0.006, 0.086)
 # The separate front and rear tables fit above their matching face views.
 # 0.020 also clears the 12.7 mm zone margin enforced by the sheet audit.
 HOLE_TABLE_X_M = 0.020
@@ -159,7 +181,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Isometric View Note",
             "Quantity",
-            "Manufacturing Notes",
         ),
         required=(
             "Number",
@@ -167,7 +188,6 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Isometric View Note",
-            "Manufacturing Notes",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -196,7 +216,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     thread_seeds, thread_instances = import_cosmetic_threads(adapter, front)
-    expected_thread_instances = len(THROUGH_X) + len(BLIND_X)
+    expected_thread_instances = len(REAR_X) + len(FRONT_X)
     if thread_instances != expected_thread_instances:
         raise RuntimeError(
             f"front view has {thread_seeds} cosmetic-thread seed(s) / "
@@ -220,19 +240,26 @@ async def build(adapter: Any) -> dict[str, str]:
     # (0.3485). y 0.110 centres the 3.5 mm text in the 5 mm gap between the
     # extension lines (y 0.1075 and 0.1125); at 0.1111 the upper one ran
     # through it (extension-through-own-text). Both dimensions live in the
-    # GuideProfile sketch (Front plane).
-    curate_view_dimensions(
-        adapter,
-        front,
-        keep={"Length": (FRONT_VIEW_X_M, 0.135), "Height": (0.338, 0.110)},
-        view_label="front",
-    )
-    curate_view_dimensions(
-        adapter,
-        right,
-        keep={"Depth": (0.370, 0.095)},
-        view_label="right",
-    )
+    # GuideProfile sketch (Front plane). Their places, and the depth's, are the
+    # part's (platen_guide_spec.DRAWING_PRECISION); the sheet proves the import
+    # kept them.
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            front,
+            keep={"Length": (FRONT_VIEW_X_M, 0.135), "Height": (0.338, 0.110)},
+            view_label="front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            right,
+            keep={"Depth": (0.370, 0.095)},
+            view_label="right",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
     if not auto_center_marks(adapter, back, holes=True, size=0.0025):
@@ -245,22 +272,22 @@ async def build(adapter: Any) -> dict[str, str]:
         if add_note(adapter, text, x, 0.265) is None:
             raise RuntimeError(f"failed to add platen-guide table label {text!r}")
 
-    front_hole_entities = _hole_rim_entities(front, BLIND_X, label="platen-guide front")
-    rear_hole_entities = _hole_rim_entities(back, THROUGH_X, label="platen-guide rear")
+    front_hole_entities = _hole_rim_entities(front, FRONT_X, label="platen-guide front")
+    rear_hole_entities = _hole_rim_entities(back, REAR_X, label="platen-guide rear")
 
     insert_hole_table(
         adapter,
         front,
         datum_xy=(FRONT_LEFT_X_M, FRONT_BOTTOM_Y_M),
         hole_points=tuple(
-            (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M) for station in BLIND_X
+            (FRONT_LEFT_X_M + station / 1000.0, FRONT_HOLE_Y_M) for station in FRONT_X
         ),
         hole_entities=front_hole_entities,
         # X LOC = the station from the left face (datum C); Y LOC = the bar's
         # hole-line height above the bottom face, a constant 2.50.
         expected_locations_mm=tuple(
             (station, (FRONT_HOLE_Y_M - FRONT_BOTTOM_Y_M) * 1000.0)
-            for station in BLIND_X
+            for station in FRONT_X
         ),
         anchor_xy=(HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         label="platen-guide front",
@@ -270,12 +297,11 @@ async def build(adapter: Any) -> dict[str, str]:
         back,
         datum_xy=(FRONT_LEFT_X_M, BACK_BOTTOM_Y_M),
         hole_points=tuple(
-            (FRONT_LEFT_X_M + station / 1000.0, BACK_HOLE_Y_M) for station in THROUGH_X
+            (FRONT_LEFT_X_M + station / 1000.0, BACK_HOLE_Y_M) for station in REAR_X
         ),
         hole_entities=rear_hole_entities,
         expected_locations_mm=tuple(
-            (station, (BACK_HOLE_Y_M - BACK_BOTTOM_Y_M) * 1000.0)
-            for station in THROUGH_X
+            (station, (BACK_HOLE_Y_M - BACK_BOTTOM_Y_M) * 1000.0) for station in REAR_X
         ),
         anchor_xy=(REAR_HOLE_TABLE_X_M, HOLE_TABLE_Y_M),
         starting_hole_tag="B",
@@ -283,7 +309,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Native datum reference frame and feature controls replace former notes 5-7.
-    # Right view shows the 10 mm depth: left edge is the blind-hole entry face A.
+    # Right view shows the 10 mm depth: left edge is the platen-mating face A.
     datum_a_edge = (0.365, 0.110)
     datum_b_entity = _bottom_surface_edge(front)
     datum_c_edge = (FRONT_LEFT_X_M, FRONT_HOLE_Y_M)
@@ -389,7 +415,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_feature_control_frame(
         adapter,
         front,
-        edge_xy=(FRONT_LEFT_X_M + BLIND_X[0] / 1000.0, FRONT_HOLE_Y_M),
+        edge_xy=(FRONT_LEFT_X_M + FRONT_X[0] / 1000.0, FRONT_HOLE_Y_M),
         # Was (0.105, 0.155), above the 269.64 dimension line, which its leader
         # to A1 crossed (leader-crosses-line). Now between the bar and that line,
         # right of the A1 tag: frame y 0.122..0.129 and "9X" down to 0.1174,
@@ -402,10 +428,23 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="9X",
         label="guide hole-pattern position",
     )
-    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
+    # The platen hangs by the top rail's bottom face (datum B) on the bar's top
+    # edge and slides along it: the one running surface takes the part-owned
+    # Ra symbol, landed on that face's edge in the front view.
+    add_surface_finish(
+        adapter,
+        front,
+        symbol_xy=BAR_SLIDE_FINISH_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bar_slide"),
+        label="bar-slide face finish",
+        entity=datum_b_entity,
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            front,
+            (BAR_SLIDE_STATION_MM / 1000.0, 0.0, 0.0),
+            label="bar-slide face finish landing",
+        ),
+    )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

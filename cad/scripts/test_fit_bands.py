@@ -112,6 +112,18 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
+    ("transgear_arm_plate_screw_spec", "STOCK_LENGTH_BAND"): (
+        "the oval-head screw's B18.6.3 length tolerance (plus, minus): indexed "
+        "for the shortest stock left proud of the arm before its cut"
+    ),
+    ("transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
+        "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
+        "for the stock's reach past the disc's rear face before its cut"
+    ),
+    ("guide_lock_screw_spec", "SHANK_LEN_BAND"): (
+        "the button-head screw's B18.6.3 length tolerance (plus, minus): "
+        "indexed for the shortest reach into the platen guide's through tap"
+    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them
@@ -150,6 +162,18 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("rocker_arm_spec", "PIVOT_HOLE_BAND"): (
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
         "sets it natively on PivotDia"
+    ),
+    ("transgear_collar_cross_pin_spec", "HOLE_BAND"): (
+        "the spring pin's drilled cross hole (functional, R9-11): indexed for "
+        "HOLE_MAX against the B18.8.2 window and the fit-up step's limits"
+    ),
+    ("transgear_knob_cup_pin_spec", "HOLE_BAND"): (
+        "MHA-154's cross-hole band reused for the hole match-drilled through "
+        "cup and journal: indexed for HOLE_MAX against the B18.8.2 window"
+    ),
+    ("transgear_latch_pin_spec", "DIA_BAND"): (
+        "the pressed dowel's catalogue diameter: read by min/max for the press "
+        "interference against the arm's blind hole"
     ),
 }
 

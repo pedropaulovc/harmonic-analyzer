@@ -2661,8 +2661,30 @@ def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
     return scale
 
 
+def _source_dirty_tracer(source_model: Any) -> Callable[[str], None]:
+    """Return ``step(name)``: log the released source's save flag after a step.
+
+    The drawing save writes a dirty source, which the fingerprint guard only
+    sees after the fact (run 20261001T035353825Z: drive-train drawing changed
+    the released source with no step named).  Each transition is logged with
+    the step that caused it, so the next leaf names the culprit.
+    """
+    state = {"dirty": bool(source_model.GetSaveFlag())}
+
+    def step(name: str) -> None:
+        dirty = bool(source_model.GetSaveFlag())
+        _telemetry.event("drive_train.source_save_flag", step=name, dirty=dirty)
+        if dirty == state["dirty"]:
+            return
+        state["dirty"] = dirty
+        report = _telemetry.warn if dirty else _telemetry.info
+        report(f"drive-train source went {'DIRTY' if dirty else 'clean'} after {name}")
+
+    return step
+
+
 def _place_package(
-    adapter: Any, facts: SourceFacts
+    adapter: Any, facts: SourceFacts, step: Callable[[str], None]
 ) -> tuple[dict[str, tuple[float, float]], list[BalloonLanding]]:
     """Place every sheet; return each sheet's scale as placed, and every
     balloon landing.
@@ -2680,29 +2702,43 @@ def _place_package(
     full-detail view stays in Default, so it switches nothing.
     """
     _create_package_sheets(adapter)
+    step("create sheets")
     findings = _place_assembled_sheet(adapter, facts)
+    step("assembled sheet")
     bom_view = _place_bom_view(adapter)
+    step("BOM view")
     findings += _place_sequence_sheet(adapter, facts)
+    step("sequence sheet")
     findings += _place_bank_sheet(adapter, facts)
+    step("bank sheet")
     findings += _place_fit_sheet(adapter, facts)
+    step("fit sheet")
     findings += _place_checks_sheet(adapter, facts)
+    step("checks sheet")
     full_detail = _place_full_detail_sheet(adapter)
-    cluster_views = {cluster: _place_cluster_view(adapter, cluster) for cluster in CLUSTER_SHEETS}
-    cluster_scales = {
-        cluster: _fit_cluster_view(adapter, cluster, view, facts)
-        for cluster, view in cluster_views.items()
-    }
+    step("full-detail sheet")
+    cluster_views = {}
+    for cluster in CLUSTER_SHEETS:
+        cluster_views[cluster] = _place_cluster_view(adapter, cluster)
+        step(f"{cluster} view")
+    cluster_scales = {}
+    for cluster, view in cluster_views.items():
+        cluster_scales[cluster] = _fit_cluster_view(adapter, cluster, view, facts)
+        step(f"{cluster} fit")
     bom_name, items = _insert_bom(adapter, bom_view, facts)
-    placed = {
-        SHEET_NAMES[CLUSTER_SHEETS[cluster] - 1]: _balloon_cluster_sheet(
+    step("BOM table")
+    placed = {}
+    for cluster, view in cluster_views.items():
+        placed[SHEET_NAMES[CLUSTER_SHEETS[cluster] - 1]] = _balloon_cluster_sheet(
             adapter, cluster, view, facts, cluster_scales[cluster], bom_name=bom_name, items=items
         )
-        for cluster, view in cluster_views.items()
-    }
+        step(f"{cluster} balloons")
     assert_full_detail_view(adapter, label="drive-train package")
     for sheet_name, (sheet_balloons, _landings) in placed.items():
         _final_balloon_uncross(adapter, sheet_name, sheet_balloons)
+    step("balloon uncross")
     _check_package_layout(adapter, findings)
+    step("layout check")
     landings = [landing for _balloons, sheet in placed.values() for landing in sheet]
     return package_sheet_scales(cluster_scales, full_detail), landings
 
@@ -2728,7 +2764,20 @@ async def build(adapter: Any) -> dict[str, str]:
     try:
         try:
             facts = _validate_source(source_model)
-            sheet_scales, landings = _place_package(adapter, facts)
+            step = _source_dirty_tracer(source_model)
+            step("validate source")
+            sheet_scales, landings = _place_package(adapter, facts, step)
+
+            def assert_source_clean(where: str) -> None:
+                # Saving the drawing would write a dirty released source.
+                step(where)
+                if bool(source_model.GetSaveFlag()):
+                    raise RuntimeError(
+                        f"drive-train drawing dirtied the released source assembly "
+                        f"by {where}; the per-step trace names the step"
+                    )
+
+            assert_source_clean("package placement")
             artifacts = await finalize_drawing(
                 adapter,
                 OUTPUTS,
@@ -2738,7 +2787,10 @@ async def build(adapter: Any) -> dict[str, str]:
                 expected_sheet_names=SHEET_NAMES,
                 sheet_layouts=SHEET_LAYOUTS,
                 sheet_scales=sheet_scales,
-                settled_checks=(lambda: assert_balloon_landings(adapter, landings),),
+                settled_checks=(
+                    lambda: assert_balloon_landings(adapter, landings),
+                    lambda: assert_source_clean("finalize rebuilds"),
+                ),
             )
         except Exception:
             _export_failure_pdf(adapter, "build")

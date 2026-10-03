@@ -122,11 +122,18 @@ _INSERTED_SOURCES = {
     "magnifying_bracket magnifying_clamp magnifying_lever magnifying_vertical_rod "
     "magnifying_wheel output_fixture thumb_screw wheel_axle wheel_axle_nut wheel_bar",
     "pen": "hanger_screw pen_frame pen_hanger pen_marker pen_rod pen_set_screw pen_v_block pen_wire",
-    "paper_drive": "bracket_screw chain_inner_link chain_outer_link clamp_screw "
-    "column_clamp_back column_clamp_front fillister_screw guide_lock latch_hook "
+    "paper_drive": "chain_inner_link chain_outer_link clamp_screw "
+    "column_clamp_back column_clamp_front fillister_screw guide_lock guide_lock_screw latch_hook "
+    "latch_hook_bracket latch_hook_bracket_screw latch_hook_rivet "
     "platen platen_clip platen_guide platen_paper platen_rack rack_pinion support_bar "
-    "transgear_bracket transgear_feed_pinion transgear_knob_drive_pin transgear_knob_shaft transgear_latch "
-    "transgear_pinion transgear_removable transgear_stub transgear_thumbnut",
+    "transgear_arm transgear_arm_plate transgear_arm_plate_screw transgear_collar_cross_pin "
+    "transgear_disc_hub transgear_disc_screw transgear_drive_collar transgear_feed_pinion "
+    "transgear_knob_cup transgear_knob_cup_pin transgear_knob_drive_pin "
+    "transgear_knob_shaft transgear_knob_thrust_ring transgear_latch_pin transgear_pivot_screw "
+    "transgear_pin transgear_pivot_spacer transgear_pivot_spring transgear_rear_bushing "
+    "transgear_front_bushing "
+    "transgear_removable transgear_retaining_ring "
+    "transgear_thumbnut",
     "harmonic_analyzer": "measuring_stick measuring_stick_stop frame drive_train "
     "channel summing magnifier pen paper_drive",
 }
@@ -1486,53 +1493,32 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_motion_study_springs.py", "build_motion_study"): (
         "dtrefactor: reads ANGLE, DISTANCE, SPRING_KCH, SPRING_KCT, STOCK_KCH, STOCK_KCT, _by_z_rank, _components, _entity_ref, _family, _find_one, _iter_mates, _lone_real, _read_member, _sub_model, _suppress_named"
     ),
-    ("build_paper_drive_assembly.py", "build_bracket_screw"): (
-        "dtrefactor: reads SHANK_DIA, SHANK_LEN"
-    ),
     ("build_paper_drive_assembly.py", "build_column_clamp_back"): (
         "dtrefactor: reads DEPTH, HOLE_SPEC"
     ),
     ("build_paper_drive_assembly.py", "build_guide_lock"): (
         "dtrefactor: reads HOLE_DIA, LOCK_THICK, LOCK_WIDTH"
     ),
-    ("build_paper_drive_assembly.py", "build_latch_hook"): (
-        "dtrefactor: reads STRIP_T, X_MAX, X_MIN, Y_MIN"
-    ),
     ("build_paper_drive_assembly.py", "build_platen_clip"): (
         "dtrefactor: reads CLIP_LENGTH, CLIP_THICKNESS, HOLE_DIA, HOLE_INSET, HOLE_Y, SCREW_SEAT_BOSS_H, SCREW_SEAT_DIA, SCREW_SEAT_STACK"
     ),
     ("build_paper_drive_assembly.py", "build_platen_guide"): (
-        "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_BOTTOM_CLEARANCE, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_STATION_X, SCREW_STATION_X"
+        "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_TIP_INSIDE_MIN, LOCK_STATION_X, SCREW_STATION_X"
     ),
     ("build_paper_drive_assembly.py", "build_platen_paper"): (
         "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
     ),
     ("build_paper_drive_assembly.py", "build_platen_rack"): (
-        "dtrefactor: reads ADDENDUM, BAR_HEIGHT, FIRST_GAP_X, PITCH"
+        "dtrefactor: reads ADDENDUM, BAR_HEIGHT, BAR_LENGTH, FIRST_GAP_X, PITCH"
     ),
     ("build_paper_drive_assembly.py", "build_rack_pinion"): (
         "dtrefactor: reads DP, FACE_WIDTH, TEETH"
     ),
     ("build_paper_drive_assembly.py", "build_support_bar"): (
-        "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, BRACKET_HOLE_SPEC, BRACKET_HOLE_X, BRACKET_STUD_X, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X, LATCH_HOLE_X"
-    ),
-    ("build_paper_drive_assembly.py", "build_transgear_bracket"): (
-        "dtrefactor: reads PLATE_THICK, SCREW_HOLE_DX, SCREW_HOLE_SPEC"
+        "dtrefactor: reads BAR_DEPTH, BAR_HEIGHT, CLAMP_CBORE_DEPTH, CLAMP_CBORE_DIA, CLAMP_HEAD_RECESS, CLAMP_HOLE_DIA, CLAMP_HOLE_X"
     ),
     ("build_paper_drive_assembly.py", "build_transgear_feed_pinion"): (
         "dtrefactor: reads DP, FACE_WIDTH, TEETH"
-    ),
-    ("build_paper_drive_assembly.py", "build_transgear_knob_shaft"): (
-        "dtrefactor: reads COLLAR_REAR, DRIVE_PIN_FLOOR, SEAT_COLLAR, SHAFT_DIA"
-    ),
-    ("build_paper_drive_assembly.py", "build_transgear_latch"): (
-        "dtrefactor: reads C2C, THICKNESS"
-    ),
-    ("build_paper_drive_assembly.py", "build_transgear_pinion"): (
-        "dtrefactor: reads DP, FACE_WIDTH, TEETH"
-    ),
-    ("build_paper_drive_assembly.py", "build_transgear_thumbnut"): (
-        "dtrefactor: reads BORE_DIA, DISC_DIA, DISC_LEN, NECK_DIA, NECK_LEN, TOTAL_LEN"
     ),
     ("build_pen_assembly.py", "build_pen_frame"): (
         "dtrefactor: reads FRAME_DEPTH, OUTER_HEIGHT, OUTER_WIDTH, RAIL_END, RAIL_SIDE"
@@ -1915,7 +1901,7 @@ def test_module_deps_follow_dotted_package_recipe_chain(tmp_path, monkeypatch):
     scripts = tmp_path / "scripts"
     diagnostics = scripts / "diagnostics"
     diagnostics.mkdir(parents=True)
-    wrapper = scripts / "build_bracket_screw.py"
+    wrapper = scripts / "build_frame_side_screw.py"
     package_init = diagnostics / "__init__.py"
     entry = diagnostics / "diag_build_90280A194.py"
     helper = diagnostics / "diag_mcmaster_fillister.py"
@@ -2507,14 +2493,17 @@ def _row_edited(source: str, row: str) -> str:
 
 
 def test_fastener_recipe_ignores_other_rows_and_tracks_its_own():
-    selected = frozenset({"bracket-screw"})
+    selected = frozenset({"frame-side-screw"})
     before = bg.dict_table_recipe(_CATALOG, "FASTENERS", selected)
     assert bg.dict_table_recipe(
         _row_edited(_CATALOG, "clamp-screw"), "FASTENERS", selected
     ) == before, "another row's edit must not move this row's recipe"
-    assert bg.dict_table_recipe(
-        _row_edited(_CATALOG, "bracket-screw"), "FASTENERS", selected
-    ) != before, "the selected row's edit must move it"
+    assert (
+        bg.dict_table_recipe(
+            _row_edited(_CATALOG, "frame-side-screw"), "FASTENERS", selected
+        )
+        != before
+    ), "the selected row's edit must move it"
     shared_edit = _CATALOG.replace(
         'supplier: str = "McMaster-Carr"', 'supplier: str = "McMaster"'
     )
@@ -2528,13 +2517,15 @@ def test_fastener_recipe_records_an_absent_selected_row():
     """A selected key that does not exist yet is part of the recipe, so adding it
     moves the key of every task that asked for it."""
     ghost = frozenset({"not-yet-catalogued"})
-    removed = _CATALOG.replace('"bracket-screw": _stock(', '"bracket-screw-x": _stock(', 1)
+    removed = _CATALOG.replace(
+        '"frame-side-screw": _stock(', '"frame-side-screw-x": _stock(', 1
+    )
     assert bg.dict_table_recipe(_CATALOG, "FASTENERS", ghost) == bg.dict_table_recipe(
         removed, "FASTENERS", ghost
     )
     assert bg.dict_table_recipe(
-        _CATALOG, "FASTENERS", frozenset({"bracket-screw"})
-    ) != bg.dict_table_recipe(removed, "FASTENERS", frozenset({"bracket-screw"}))
+        _CATALOG, "FASTENERS", frozenset({"frame-side-screw"})
+    ) != bg.dict_table_recipe(removed, "FASTENERS", frozenset({"frame-side-screw"}))
 
 
 @pytest.mark.parametrize(
@@ -2664,7 +2655,8 @@ def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
         # Reads through an imported listed module.
         ("build_boss_hook.py", True),
         ("build_spring_hook.py", True),
-        ("build_platen_guide.py", False),
+        # R9-48: judges its lock taps at the printed worst case.
+        ("build_platen_guide.py", True),
     ],
 )
 def test_reads_title_block_geometry_covers_root_and_closure(script, expected):

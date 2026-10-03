@@ -10,7 +10,6 @@ _EXPECTED = {
     # Stable production stem: (supplier SKU(s), MHA number, fleet quantity).
     "arbor-set-screw": (("91375A106",), "MHA-147", 2),
     "boss-hook": (("9490T1",), "MHA-005", 1),
-    "bracket-screw": (("90280A194",), "MHA-108", 2),
     "clamp-screw": (("90280A201",), "MHA-107", 6),
     "cone-lock-knob": (("93585A190",), "MHA-093", 1),
     "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
@@ -19,14 +18,17 @@ _EXPECTED = {
     "cone-tip-collar": (("9414T1",), "MHA-096", 1),
     "cone-tip-pinch-screw": (("91794A112",), "MHA-098", 1),
     "crank-seat-drive-pin": (("98381A434",), "MHA-173", 2),
-    "fillister-screw": (("90114A511",), "MHA-030", 27),
+    "fillister-screw": (("90114A511",), "MHA-030", 19),
     "foot-screw": (("90280A108",), "MHA-103", 1),
+    "guide-lock-screw": (("91255A108",), "MHA-176", 8),
     "frame-side-screw": (("90280A194",), "MHA-117", 2),
     "frame-cross-screw": (("90280A837",), "MHA-132", 8),
     "gooseneck-set-screw": (("91410A538",), "MHA-118", 1),
     "hanger-screw": (("93075A194",), "MHA-034", 1),
     "hex-bolt": (("92865A585",), "MHA-036", None),
     "knife-hanger-stud": (("91247A720",), "MHA-119", 2),
+    "latch-hook-bracket-screw": (("90280A108",), "MHA-171", 2),
+    "latch-hook-rivet": (("97482A015",), "MHA-175", 2),
     "lag-screw": (("92240A540",), "MHA-039", 4),
     "pedestal-hold-down-screw": (("90280A197",), "MHA-143", 6),
     "pen-set-screw": (("99607A213",), "MHA-052", 1),
@@ -35,7 +37,15 @@ _EXPECTED = {
     "slotted-screw": (("90280A201",), "MHA-101", 4),
     "swing-stop-screw": (("90280A108",), "MHA-095", 1),
     "thumb-screw": (("91882A221",), "MHA-075", 2),
+    "transgear-arm-plate-screw": (("91790A196",), "MHA-166", 2),
+    "transgear-collar-cross-pin": (("98296A026",), "MHA-154", 1),
     "transgear-knob-drive-pin": (("98381A433",), "MHA-155", 2),
+    "transgear-knob-cup-pin": (("98296A031",), "MHA-183", 1),
+    "transgear-disc-screw": (("91794A055",), "MHA-161", 3),
+    "transgear-latch-pin": (("98381A474",), "MHA-169", 1),
+    "transgear-pivot-screw": (("91829A205",), "MHA-168", 1),
+    "transgear-retaining-ring": (("97431A260",), "MHA-182", 1),
+    "transgear-pivot-spring": (("9715K43",), "MHA-184", 1),
     "knife-hanger-washer": (("90126A211",), "MHA-131", 2),
     "spring-hook": (("9489T111",), "MHA-090", 20),
     "tube-frame-cap": (("9275K141",), "MHA-133", 4),
@@ -61,6 +71,7 @@ def test_catalog_carries_only_purchased_supplier_identities() -> None:
             "AISI 304",
             "Brass",
             "Alloy Steel",
+            "1100-O Rod (SS)",
         }
 
 
@@ -88,9 +99,10 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
 
     # Rule 12 (E10): the four pinion-block screws moved from the #8-32 x 1 to
     # the clamp screws' #8-32 x 1-1/4; the swing stop then left the x 1 for
-    # the foot screw's #4-40 x 3/8 (2026-09-29), retiring 90280A199.
+    # the foot screw's #4-40 x 3/8 (2026-09-29), retiring 90280A199; the
+    # paper drive's latch-hook bracket takes two more (MHA-171, ruling 2).
     assert fleet_quantity("90280A199") == 0
-    assert fleet_quantity("90280A108") == 2
+    assert fleet_quantity("90280A108") == 4
     assert fleet_quantity("90280A201") == 10
 
 
@@ -107,13 +119,13 @@ def test_fastener_refuses_rows_outside_the_builds_cache_key(monkeypatch):
 
     from _fastener_catalog import fastener
 
-    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "bracket-screw,clamp-screw")
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "frame-side-screw,clamp-screw")
     assert fastener("clamp-screw").part_name == "clamp-screw"
     with pytest.raises(KeyError, match="outside this build's cache key"):
         fastener("lag-screw")
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "")
     with pytest.raises(KeyError, match="outside this build's cache key"):
-        fastener("bracket-screw")
+        fastener("frame-side-screw")
     monkeypatch.delenv("HARMONIC_FASTENER_ROWS")
     assert fastener("lag-screw").part_name == "lag-screw"
 

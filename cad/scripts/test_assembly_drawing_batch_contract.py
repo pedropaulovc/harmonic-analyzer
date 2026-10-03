@@ -1,4 +1,4 @@
-"""Cross-drawing contract for the five remaining simple assembly drawings."""
+"""Cross-drawing contract for the four remaining simple assembly drawings."""
 
 from __future__ import annotations
 
@@ -51,9 +51,15 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     drawing
     for drawing in ASSEMBLY_DRAWINGS
     # The channel sheet left the shared builder when it gained the rocker
-    # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK).
+    # bank's fit-up steps (#743, Codex PRRT_kwDOPHDy386mRSOK); the paper-drive
+    # sheet left it when it became three sheets with its own fit-up steps.
     if drawing
-    not in (draw_frame_assembly, draw_drive_train_assembly, draw_channel_assembly)
+    not in (
+        draw_frame_assembly,
+        draw_drive_train_assembly,
+        draw_channel_assembly,
+        draw_paper_drive_assembly,
+    )
 )
 
 
@@ -94,6 +100,25 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         elif drawing is draw_drive_train_assembly:
             scripts_dir = Path(draw_drive_train_assembly.__file__).resolve().parent
             assert str(scripts_dir / "drive_train_assembly_spec.py") in deps
+            assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
+        elif drawing is draw_paper_drive_assembly:
+            scripts_dir = Path(draw_paper_drive_assembly.__file__).resolve().parent
+            # The steps module, the drive-train steps it reuses, and every
+            # spec/geometry module whose constants the sheets print.
+            assert {
+                str(scripts_dir / name)
+                for name in (
+                    "paper_drive_assembly_steps.py",
+                    "drive_train_steps.py",
+                    "transgear_collar_cross_pin_spec.py",
+                    "transgear_drive_collar_spec.py",
+                    "transgear_disc_screw_spec.py",
+                    "transgear_pivot_screw_spec.py",
+                    "transgear_knob_shaft_spec.py",
+                    "transgear_hanger_joints.py",
+                    "latch_hook_bracket_geometry.py",
+                )
+            } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
         else:
             assert str(Path(_assembly_drawing.__file__).resolve()) in deps

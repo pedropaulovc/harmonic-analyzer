@@ -84,7 +84,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 | 27 | The summing lever and knife edge | `summing-lever`, `knife-mount`, `knife-hanger-stud`, `boss-hook`, `counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
 | 28 | The magnifier | `magnifying-lever`, `magnifying-wheel` (100 mm/20 mm coaxial, ×5), bracket, clamp, vertical rod, `lever-wire` |
 | 29 | The pen mechanism | `pen-frame`, `pen-v-block`, `pen-rod`, `pen-marker`, `pen-wire`, `output-fixture`. Note: the original was lost; this follows the 2013 reconstruction. |
-| 30 | The paper drive | `platen`, `platen-rack`, `platen-guide`, `platen-clip`, transgear train, `chain-sprocket` + roller chain, `transgear-latch` |
+| 30 | The paper drive | `platen`, `platen-rack`, `platen-guide`, `platen-clip`, transgear train, `chain-sprocket` + roller chain, `transgear-arm` hanger, `latch-hook` + `latch-hook-bracket` |
 | 31 | Springs | 20 channel springs + the counter spring: winding your own, or specifying them for a spring house |
 | 32 | Fasteners and small parts | The screw families, period-appropriate heads, and what to substitute |
 

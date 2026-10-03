@@ -71,6 +71,12 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91255A148": RecipeMetadata(
             "diagnostics.diag_build_91255A148", "build_91255A148", threaded=True
         ),
+        "91255A106": RecipeMetadata(
+            "diagnostics.diag_build_91255A106", "build_91255A106", threaded=True
+        ),
+        "91255A108": RecipeMetadata(
+            "diagnostics.diag_build_91255A108", "build_91255A108", threaded=True
+        ),
         "91882A425": RecipeMetadata(
             "diagnostics.diag_build_91882A425", "build_91882A425", threaded=True
         ),
@@ -79,6 +85,9 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         ),
         "91829A560": RecipeMetadata(
             "diagnostics.diag_build_91829A560", "build_91829A560", threaded=True
+        ),
+        "91829A205": RecipeMetadata(
+            "diagnostics.diag_build_91829A205", "build_91829A205", threaded=True
         ),
         "94025A164": RecipeMetadata(
             "diagnostics.diag_build_94025A164", "build_94025A164", threaded=True
@@ -125,8 +134,14 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "91882A221": RecipeMetadata(
             "diagnostics.diag_build_91882A221", "build_91882A221", threaded=True
         ),
+        "98296A026": RecipeMetadata(
+            "diagnostics.diag_build_98296A026", "build_98296A026", threaded=False
+        ),
         "98296A027": RecipeMetadata(
             "diagnostics.diag_build_98296A027", "build_98296A027", threaded=False
+        ),
+        "98296A031": RecipeMetadata(
+            "diagnostics.diag_build_98296A031", "build_98296A031", threaded=False
         ),
         "9489T111": RecipeMetadata(
             "diagnostics.diag_build_9489T111", "build_9489T111", threaded=True
@@ -145,6 +160,24 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         ),
         "98381A434": RecipeMetadata(
             "diagnostics.diag_build_98381A434", "build_98381A434", threaded=False
+        ),
+        "98381A474": RecipeMetadata(
+            "diagnostics.diag_build_98381A474", "build_98381A474", threaded=False
+        ),
+        "91794A055": RecipeMetadata(
+            "diagnostics.diag_build_91794A055", "build_91794A055", threaded=True
+        ),
+        "91790A196": RecipeMetadata(
+            "diagnostics.diag_build_91790A196", "build_91790A196", threaded=True
+        ),
+        "97482A015": RecipeMetadata(
+            "diagnostics.diag_build_97482A015", "build_97482A015", threaded=False
+        ),
+        "97431A260": RecipeMetadata(
+            "diagnostics.diag_build_97431A260", "build_97431A260", threaded=False
+        ),
+        "9715K43": RecipeMetadata(
+            "diagnostics.diag_build_9715K43", "build_9715K43", threaded=False
         ),
     }
 )

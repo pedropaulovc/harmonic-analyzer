@@ -1,30 +1,35 @@
-r"""Reproduction script: transgear thumbnut (book ch. 23 pp. 58-59; 1 used).
+r"""Reproduction script: transgear thumbnut (MHA-126; ch. 23 pp. 58-59; 1 used).
 
-The knurled brass thumbnut that retains the removable chain wheel on the
-knob shaft (ch23 page002_img03: the reeded brass disc in front of the
-sprocket, page002_img04: outermost on the shaft; engineerguy 4/4 "unscrew
-the nut that holds the other gear in place"). It sits OUTERMOST on the knob
-shaft, in front of the removable transgear: a short neck bears on the
-wheel's front face and the knurled disc is what the fingers turn.
+The knurled brass nut on the knob shaft's 1/4-20 stud that clamps the
+removable chain wheel (T24) against the drive collar; its seat face bears on
+the wheel's front face only (``transgear_thumbnut_spec``).
 
-Simplifications, both noted on the print:
-* the disc is a plain cylinder -- the knurl is NOT modelled (the repo's
-  reeding recipe, ``_features.add_reeded_head_and_thread``, is +X-axis-only
-  and adds a shank thread; a +Y variant is untested on the seat);
-* the bore is thread-free -- a plain O9.6 slip bore over the O9.525 shaft
-  stands in for the nut's internal thread.
+Layout (part frame, ``transgear_thumbnut_spec``): axis local +Y (``Axis1``),
+seat face on the Top Plane (y = 0), rim at y = OVERALL_LENGTH.
 
-The neck is O14, not the O10 the photo suggests: the removable sprocket has
-a O10.3 plain bore (transgear_removable_spec.BORE_DIA), so a O10 neck would
-slip INTO the wheel and retain nothing; O14 gives a 1.85 shoulder around the
-bore.  The neck's rim lies on the r 7 drive-pin circle, but the pins stop
-0.4 inside the sprocket plate (DRIVE_PIN_TIP_Z), so the neck bears on the
-plate's front face, never on a pin.
+* ``HeadProfile``: the knurled head as a plain Front-plane rectangle revolved
+  about +Y.  Its driving dimensions are the knurl diameter, the head length
+  and the overall length from the seat face.
+* ``Knurl``: one straight flute cut from a Top-plane seed, circular-patterned
+  ``KNURL_TEETH`` times about ``Axis1``.  It comes BEFORE the stem: circular
+  patterns of cuts fail on stepped revolved bodies but pattern fine on a
+  plain revolved cylinder (``_features.add_reeded_head_and_thread``).  The
+  seed puts two crests on the Front Plane, so the axial section shows the
+  knurl diameter.
+* ``StemProfile``: the waist and flange as a stepped profile revolved onto
+  the head's rear face.  Its dimensions are both diameters and the waist
+  length; the flange length is the remainder of the overall length.
+* ``ThreadBore``: one Hole Wizard 1/4-20 UNC-2B tapped hole, through all
+  from the seat face.
+* ``DishProfile``: the dished front face, a cone cut from the rim's Ø down
+  to a flat floor, dimensioned by both diameters and the depth from the
+  rim's edge to the floor's edge (both edges stand on the finished nut).
+* ``Countersinks``: both 90° entry countersinks as one revolved cut, each a
+  45° break on the tap-drill edge of a flat face: the seat face at the rear,
+  the dish floor at the front.
 
-Layout (part frame): axis +Y, origin at the neck's gear-side face; neck
-O NECK_DIA from y 0..NECK_LEN, disc O DISC_DIA from y NECK_LEN..
-NECK_LEN + DISC_LEN, O BORE_DIA through. The paper-drive assembly maps +Y to
-machine -Z (Rx-90), so the disc faces the machine front.
+``RimFace`` (y = OVERALL_LENGTH) and ``DishFloor`` (the dish's flat floor)
+are named offset planes for the stud's tip and cut-to-fit stations.
 
 Run (SolidWorks already open)::
 
@@ -39,13 +44,17 @@ import sys
 from _common import (
     SketchDims,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
+    bbox_extent_check,
     check,
-    define_circle,
-    define_rectilinear_chain,
+    define_polygon_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -54,111 +63,471 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import (
+    add_diametric_linear_dimension,
+    apply_drawing_precision,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _holes import wizard_holes
+from _visibility import blank_reference_geometry
+from transgear_thumbnut_spec import (
+    CSK_DIA,
+    DISH_DEPTH,
+    DISH_DIA,
+    DISH_FLOOR_CORNER,
+    DISH_FLOOR_DIA,
+    DISH_FLOOR_Y,
+    DISH_RIM_CORNER,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    FLANGE_DIA,
+    FLANGE_LENGTH,
+    FRONT_CSK_APEX_Y,
+    HEAD_DIA,
+    HEAD_LENGTH,
+    HEAD_REAR_Y,
+    KNURL_ROOT_DIA,
+    KNURL_TEETH,
+    OVERALL_LENGTH,
+    REAR_CSK_APEX_Y,
+    REAR_CSK_BREAK,
+    RIM_Y,
+    TAP_DRILL_DIA,
+    TAP_SPEC,
+    WAIST_DIA,
+    WAIST_LENGTH,
+)
 
 PART_NAME = "transgear-thumbnut"
-MATERIAL = "Brass"
+MATERIAL = "Brass"  # C36000 free-machining brass (the registry row names it)
 
-NECK_DIA = 14.0  # bears on the removable's front face; covers its O12 bore
-NECK_LEN = 4.0  # stands the knurled disc off the wheel
-DISC_DIA = 26.0  # knurled thumb disc (ch23 page002_img03, photo-scaled)
-DISC_LEN = 7.0
-BORE_DIA = 9.6  # slips the O9.525 knob shaft (modelled thread-free)
+HEAD_R = HEAD_DIA / 2.0
+ROOT_R = KNURL_ROOT_DIA / 2.0
+FLANGE_R = FLANGE_DIA / 2.0
+WAIST_R = WAIST_DIA / 2.0
+DRILL_R = TAP_DRILL_DIA / 2.0
+CSK_R = CSK_DIA / 2.0
+# How far each countersink cutter runs past its cone into air (radially).
+# The front one stays inside the dish floor's edge, so it cuts no cone.
+_CSK_OVERRUN = 0.5
+if CSK_R + _CSK_OVERRUN >= DISH_FLOOR_CORNER[0]:
+    raise AssertionError("front countersink cutter reaches the dish's cone")
+# How far the flute seed's flanks run past the crests, as a multiple of the
+# root-to-crest flank, so the cutter closes outside the head.
+_FLUTE_FLANK_RUN = 1.6
+_FLUTE_HALF_ANGLE = math.pi / KNURL_TEETH
 
-TOTAL_LEN = NECK_LEN + DISC_LEN  # 11
-V_NECK = math.pi * (NECK_DIA / 2.0) ** 2 * NECK_LEN
-V_DISC = math.pi * (DISC_DIA / 2.0) ** 2 * DISC_LEN
-V_BORE = math.pi * (BORE_DIA / 2.0) ** 2 * TOTAL_LEN
-V_TOTAL = V_NECK + V_DISC - V_BORE
+
+def knurl_seed_points() -> list[tuple[float, float]]:
+    """The one flute cutter (Top-plane sketch): root, then both flanks run
+    out past their crests.  The crests sit at angles 0 and 2π/N, so the
+    pattern puts a crest on every multiple of 2π/N -- including the Front
+    Plane on both sides of the axis."""
+    root = (
+        ROOT_R * math.cos(_FLUTE_HALF_ANGLE),
+        ROOT_R * math.sin(_FLUTE_HALF_ANGLE),
+    )
+    points = [root]
+    for crest_angle in (0.0, 2.0 * _FLUTE_HALF_ANGLE):
+        crest = (HEAD_R * math.cos(crest_angle), HEAD_R * math.sin(crest_angle))
+        points.append(
+            (
+                root[0] + _FLUTE_FLANK_RUN * (crest[0] - root[0]),
+                root[1] + _FLUTE_FLANK_RUN * (crest[1] - root[1]),
+            )
+        )
+    (x1, y1), (x2, y2) = points[1], points[2]
+    # The cutter's outer edge must clear the head so the flute is the plain
+    # V between two crests.
+    if math.hypot((x1 + x2) / 2.0, (y1 + y2) / 2.0) <= HEAD_R:
+        raise AssertionError("knurl seed's outer edge cuts into the head")
+    return points
+
+
+def _flute_area() -> float:
+    """Head cross-section one flute removes: the V from the root to the two
+    crests plus the circular segment between the crests."""
+    half = _FLUTE_HALF_ANGLE
+    triangle = HEAD_R * math.sin(half) * (HEAD_R * math.cos(half) - ROOT_R)
+    segment = HEAD_R**2 / 2.0 * (2.0 * half - math.sin(2.0 * half))
+    return triangle + segment
+
+
+def _dish_volume() -> float:
+    """Solid the dish removes once the tap drill is through: the frustum from
+    the rim's Ø to the floor's, less the drill inside it."""
+    r1, r2, h = DISH_RIM_CORNER[0], DISH_FLOOR_CORNER[0], DISH_DEPTH
+    return math.pi * h * ((r1**2 + r1 * r2 + r2**2) / 3.0 - DRILL_R**2)
+
+
+V_HEAD = math.pi * HEAD_R**2 * HEAD_LENGTH
+V_FLUTE = _flute_area() * HEAD_LENGTH
+V_KNURLED = V_HEAD - KNURL_TEETH * V_FLUTE
+V_STEM = math.pi * (FLANGE_R**2 * FLANGE_LENGTH + WAIST_R**2 * WAIST_LENGTH)
+V_THREAD = math.pi * DRILL_R**2 * OVERALL_LENGTH
+V_DISH = _dish_volume()
+V_REAR_CSK = math.pi * REAR_CSK_BREAK**2 * (DRILL_R + REAR_CSK_BREAK / 3.0)
+V_FRONT_CSK = V_REAR_CSK  # the same break, on the flat dish floor
+V_TOTAL = V_KNURLED + V_STEM - V_THREAD - V_DISH - V_REAR_CSK - V_FRONT_CSK
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import (
+        CircularPatternParameters,
+        CreatePlaneParameters,
+        ExtrusionParameters,
+        RevolveParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
     # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
     # is an INCH document and the equation manager reads BARE numbers in
-    # document units (an unsuffixed 26 = 26 in).
-    await set_global(adapter, "NeckDia", f"{NECK_DIA}mm")
-    await set_global(adapter, "NeckLen", f"{NECK_LEN}mm")
-    await set_global(adapter, "DiscDia", f"{DISC_DIA}mm")
-    await set_global(adapter, "DiscLen", f"{DISC_LEN}mm")
-    await set_global(adapter, "BoreDia", f"{BORE_DIA}mm")
+    # document units.
+    for name, value in (
+        ("OverallLength", OVERALL_LENGTH),
+        ("HeadDia", HEAD_DIA),
+        ("HeadLength", HEAD_LENGTH),
+        ("FlangeDia", FLANGE_DIA),
+        ("WaistDia", WAIST_DIA),
+        ("WaistLength", WAIST_LENGTH),
+        ("DishDia", DISH_DIA),
+        ("DishFloorDia", DISH_FLOOR_DIA),
+        ("DishDepth", DISH_DEPTH),
+    ):
+        await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Stepped blank: a Front-plane half-profile revolved about the Y axis (the
-    # knob-shaft idiom): the centerline merges into the (0, 0)/(0, TOTAL_LEN)
-    # profile corners at creation, so the closed chain's own constraints
-    # define it too. Emission order (anchor vertex 0 at the origin -> 0 anchor
-    # dims): L0 neck radius (H), L1 neck length (V), L2 disc step (H), L3 disc
-    # length (V); the top edge and the axis closure come from closure.
-    profile = SketchDims()
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    # --- Head: a plain cylinder, rear face to rim -------------------------
+    # The centerline merges into the two axis corners at creation, so the
+    # chain's own relations define it.
+    head = SketchDims()
+    check("create_sketch head profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    check("axis centerline", await adapter.add_centerline(0.0, 0.0, 0.0, TOTAL_LEN))
-    profile_pts = [
-        (0.0, 0.0),
-        (NECK_DIA / 2.0, 0.0),
-        (NECK_DIA / 2.0, NECK_LEN),
-        (DISC_DIA / 2.0, NECK_LEN),
-        (DISC_DIA / 2.0, TOTAL_LEN),
-        (0.0, TOTAL_LEN),
+    head_axis = check(
+        "head axis", await adapter.add_centerline(0.0, HEAD_REAR_Y, 0.0, RIM_Y)
+    )
+    head_points = [
+        (0.0, HEAD_REAR_Y),
+        (HEAD_R, HEAD_REAR_Y),
+        (HEAD_R, RIM_Y),
+        (0.0, RIM_Y),
     ]
-    profile_lines = await add_line_chain(adapter, profile_pts)
+    head_lines = await add_line_chain(adapter, head_points)
     set_sketch_direct_db(adapter, False)
-    await define_rectilinear_chain(
-        adapter, profile_lines, profile_pts, label="nut", dims=profile,
-        names=["NeckRadius", "NeckLength", "DiscStep", "DiscLength"],
-        drives=[
-            '"NeckDia" / 2',
-            '"NeckLen"',
-            '("DiscDia" - "NeckDia") / 2',
-            '"DiscLen"',
-        ],
-    )
-    await ensure_fully_defined(adapter, "nut profile")
-    check("exit_sketch profile", await adapter.exit_sketch())
-    name_last_feature(adapter, "NutProfile")
-    drive_jobs += profile.apply(adapter, "NutProfile")
-    check("revolve nut", await adapter.create_revolve(RevolveParameters(angle=360.0)))
-    name_last_feature(adapter, "Nut")
-    expected = V_NECK + V_DISC
-    await volume_check(adapter, "nut blank", expected, 0.005 * expected)
-
-    # Shaft bore along the axis: Top-plane circle on the origin (on-axis, so
-    # define_circle records only the diameter), cut both ways past the length.
-    bore = SketchDims()
-    check("create_sketch bore", await adapter.create_sketch("Top"))
-    await define_circle(
-        adapter, 0.0, 0.0, BORE_DIA / 2.0, "shaft bore",
-        dims=bore, names=("BoreCx", "BoreCz", "ShaftBoreDia"),
-        drives=(None, None, '"BoreDia"'),
-    )
-    await ensure_fully_defined(adapter, "bore sketch")
-    check("exit_sketch bore", await adapter.exit_sketch())
-    name_last_feature(adapter, "BoreProfile")
-    drive_jobs += bore.apply(adapter, "BoreProfile")
+    for index, line in enumerate(head_lines):
+        relation = "horizontal" if index % 2 == 0 else "vertical"
+        check(
+            f"head profile {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
     check(
-        "cut bore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.0 * TOTAL_LEN + 2.0, both_directions=True)
+        "head profile on the axis",
+        await adapter.add_sketch_constraint(
+            f"{head_lines[0]}.start", "origin", "vertical_points"
         ),
     )
-    name_last_feature(adapter, "ShaftBore")
-    expected -= V_BORE
-    await volume_check(adapter, "shaft bore", expected, 0.01 * V_BORE)
+    await add_diametric_linear_dimension(
+        adapter,
+        head_axis,
+        head_lines[1],
+        (HEAD_R + 4.0, RIM_Y - HEAD_LENGTH / 2.0),
+        "HeadDia",
+    )
+    head.record("HeadDia", '"HeadDia"')
+    check(
+        "head length",
+        await adapter.add_sketch_dimension(head_lines[1], None, "linear", HEAD_LENGTH),
+    )
+    head.record("HeadLength", '"HeadLength"')
+    # Overall length: the rim's outer corner from the seat face (the sketch
+    # origin), the one axial dimension the stud's cut-to-fit rides on.
+    await dimension_between(
+        adapter,
+        f"{head_lines[1]}.end",
+        "origin",
+        "vertical_distance",
+        OVERALL_LENGTH,
+        "overall length from the seat face",
+    )
+    head.record("OverallLength", '"OverallLength"')
+    await ensure_fully_defined(adapter, "head profile")
+    check("exit_sketch head profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "HeadProfile")
+    drive_jobs += head.apply(adapter, "HeadProfile")
+    check("revolve head", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Head")
+    await volume_check(adapter, "plain head", V_HEAD, 0.005 * V_HEAD)
+    await bbox_extent_check(adapter, "head length", "y", HEAD_LENGTH)
+    await bbox_extent_check(adapter, "head diameter", "x", HEAD_DIA)
 
-    # Deferred drive equations, then re-check neutrality (each evaluates to the
-    # as-built value, so the geometry must not move).
+    # The mate axis: the first reference axis, so it is Axis1; the knurl
+    # patterns about it.
+    nut_axis = await name_bore_axis(
+        adapter, "Front Plane", 0.0, "Right Plane", 0.0, "thumbnut axis"
+    )
+    if nut_axis != "Axis1":
+        raise RuntimeError(f"thumbnut axis came back {nut_axis!r}, not Axis1")
+
+    # --- Straight knurl: one flute, patterned ------------------------------
+    seed = knurl_seed_points()
+    check("create_sketch knurl flute", await adapter.create_sketch("Top"))
+    flute_lines = await add_line_chain(adapter, seed)
+    await define_polygon_chain(adapter, flute_lines, seed, label="knurl flute")
+    await ensure_fully_defined(adapter, "knurl flute seed")
+    check("exit_sketch knurl flute", await adapter.exit_sketch())
+    name_last_feature(adapter, "KnurlFluteProfile")
+    # Top-plane cuts run opposite the sketch normal by default; reversed, the
+    # seed runs up through the whole head (it starts in air below it).
+    check(
+        "cut knurl flute",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=OVERALL_LENGTH + 1.0, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "KnurlFlute")
+    await volume_check(adapter, "knurl flute", V_HEAD - V_FLUTE, 0.02 * V_FLUTE + 0.01)
+    check(
+        f"knurl pattern ×{KNURL_TEETH}",
+        await adapter.circular_pattern_feature(
+            CircularPatternParameters(
+                axis_name=nut_axis,
+                features=["KnurlFlute"],
+                count=KNURL_TEETH,
+                geometry_pattern=True,
+            )
+        ),
+    )
+    name_last_feature(adapter, "Knurl")
+    await volume_check(adapter, "knurled head", V_KNURLED, 0.02 * KNURL_TEETH * V_FLUTE)
+
+    # --- Waist and flange, onto the head's rear face ------------------------
+    stem = SketchDims()
+    check("create_sketch stem profile", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    stem_axis = check(
+        "stem axis", await adapter.add_centerline(0.0, 0.0, 0.0, HEAD_REAR_Y)
+    )
+    stem_points = [
+        (0.0, 0.0),
+        (FLANGE_R, 0.0),
+        (FLANGE_R, FLANGE_LENGTH),
+        (WAIST_R, FLANGE_LENGTH),
+        (WAIST_R, HEAD_REAR_Y),
+        (0.0, HEAD_REAR_Y),
+    ]
+    stem_lines = await add_line_chain(adapter, stem_points)
+    set_sketch_direct_db(adapter, False)
+    for index, line in enumerate(stem_lines):
+        relation = "horizontal" if index % 2 == 0 else "vertical"
+        check(
+            f"stem profile {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    await anchor_point_to_origin(
+        adapter, f"{stem_lines[0]}.start", 0.0, 0.0, "seat face on the axis"
+    )
+    await add_diametric_linear_dimension(
+        adapter, stem_axis, stem_lines[1], (FLANGE_R, -4.0), "FlangeDia"
+    )
+    stem.record("FlangeDia", '"FlangeDia"')
+    await add_diametric_linear_dimension(
+        adapter, stem_axis, stem_lines[3], (WAIST_R, -8.0), "WaistDia"
+    )
+    stem.record("WaistDia", '"WaistDia"')
+    check(
+        "waist length",
+        await adapter.add_sketch_dimension(stem_lines[3], None, "linear", WAIST_LENGTH),
+    )
+    stem.record("WaistLength", '"WaistLength"')
+    check(
+        "flange length",
+        await adapter.add_sketch_dimension(
+            stem_lines[1], None, "linear", FLANGE_LENGTH
+        ),
+    )
+    stem.record("FlangeLength", '"OverallLength" - "HeadLength" - "WaistLength"')
+    await ensure_fully_defined(adapter, "stem profile")
+    check("exit_sketch stem profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "StemProfile")
+    drive_jobs += stem.apply(adapter, "StemProfile")
+    check("revolve stem", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Stem")
+    volume = await volume_check(
+        adapter, "head and stem", V_KNURLED + V_STEM, 0.005 * (V_KNURLED + V_STEM)
+    )
+    await bbox_extent_check(adapter, "overall length", "y", OVERALL_LENGTH)
+
+    # --- 1/4-20 UNC-2B through, from the seat face -------------------------
+    # Drilled while both end faces are still planar, so the removed volume is
+    # the plain tap-drill cylinder.
+    thread = wizard_holes(
+        adapter,
+        TAP_SPEC,
+        [[0.0, 0.0, 0.0]],
+        (0.0, -1.0, 0.0),
+        f"thumbnut thread ({TAP_SPEC.size} through)",
+        name="ThreadBore",
+        expect_dia_mm=TAP_DRILL_DIA,
+        placement_dims=[((None, None), (None, None))],
+    )
+    drive_jobs += thread.placement_drive_jobs
+    volume = await volume_check(
+        adapter, "tapped through", volume - V_THREAD, 0.02 * V_THREAD
+    )
+
+    # --- Dished front face ---------------------------------------------------
+    # Base on the rim, the cone down to the floor's edge, the floor in to the
+    # axis, closed up the axis.  The depth runs between the two corners, the
+    # edges the finished nut keeps, not to the axis inside the tap drill.
+    dish = SketchDims()
+    check("create_sketch dish", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    dish_axis = check(
+        "dish axis", await adapter.add_centerline(0.0, DISH_FLOOR_Y, 0.0, RIM_Y)
+    )
+    dish_base = check("dish base", await adapter.add_line(0.0, RIM_Y, *DISH_RIM_CORNER))
+    dish_cone = check(
+        "dish cone", await adapter.add_line(*DISH_RIM_CORNER, *DISH_FLOOR_CORNER)
+    )
+    dish_floor = check(
+        "dish floor",
+        await adapter.add_line(*DISH_FLOOR_CORNER, 0.0, DISH_FLOOR_Y),
+    )
+    dish_close = check(
+        "dish closure", await adapter.add_line(0.0, DISH_FLOOR_Y, 0.0, RIM_Y)
+    )
+    set_sketch_direct_db(adapter, False)
+    for label, first, second in (
+        ("base-cone", f"{dish_base}.end", f"{dish_cone}.start"),
+        ("cone-floor", f"{dish_cone}.end", f"{dish_floor}.start"),
+        ("floor-close", f"{dish_floor}.end", f"{dish_close}.start"),
+        ("close-base", f"{dish_close}.end", f"{dish_base}.start"),
+        ("axis start", f"{dish_axis}.start", f"{dish_floor}.end"),
+        ("axis end", f"{dish_axis}.end", f"{dish_base}.start"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
+    for label, entity, relation in (
+        ("dish base", dish_base, "horizontal"),
+        ("dish floor", dish_floor, "horizontal"),
+        ("dish closure", dish_close, "vertical"),
+        ("dish axis", dish_axis, "vertical"),
+    ):
+        check(label, await adapter.add_sketch_constraint(entity, None, relation))
+    await anchor_point_to_origin(
+        adapter, f"{dish_base}.start", 0.0, RIM_Y, "dish rim on the axis"
+    )
+    dish.record("DishRim", '"OverallLength"')
+    await add_diametric_linear_dimension(
+        adapter, dish_axis, f"{dish_base}.end", (DISH_DIA / 4.0, RIM_Y + 3.0), "DishDia"
+    )
+    dish.record("DishDia", '"DishDia"')
+    await add_diametric_linear_dimension(
+        adapter,
+        dish_axis,
+        f"{dish_floor}.start",
+        (DISH_FLOOR_DIA / 4.0, RIM_Y + 1.5),
+        "DishFloorDia",
+    )
+    dish.record("DishFloorDia", '"DishFloorDia"')
+    await dimension_between(
+        adapter,
+        f"{dish_floor}.start",
+        f"{dish_base}.end",
+        "vertical_distance",
+        DISH_DEPTH,
+        "dish depth, rim edge to floor edge",
+    )
+    dish.record("DishDepth", '"DishDepth"')
+    await ensure_fully_defined(adapter, "dish profile")
+    check("exit_sketch dish", await adapter.exit_sketch())
+    name_last_feature(adapter, "DishProfile")
+    drive_jobs += dish.apply(adapter, "DishProfile")
+    check(
+        "revolve dish",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Dish")
+    volume = await volume_check(adapter, "dished face", volume - V_DISH, 0.01 * V_DISH)
+
+    # --- Both entry countersinks: one revolved cut --------------------------
+    # Rear: the region under the cone y = REAR_CSK_APEX_Y - ρ; front: the
+    # region over the cone y = FRONT_CSK_APEX_Y + ρ.  Each triangle's apex is
+    # on the axis and its far edge in air; the centerline merges into both
+    # apexes.
+    reach = CSK_R + _CSK_OVERRUN
+    rear = [
+        (0.0, REAR_CSK_APEX_Y),
+        (reach, REAR_CSK_APEX_Y - reach),
+        (0.0, REAR_CSK_APEX_Y - reach),
+    ]
+    front = [
+        (0.0, FRONT_CSK_APEX_Y),
+        (reach, FRONT_CSK_APEX_Y + reach),
+        (0.0, FRONT_CSK_APEX_Y + reach),
+    ]
+    check("create_sketch countersinks", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    check(
+        "countersink axis",
+        await adapter.add_centerline(0.0, REAR_CSK_APEX_Y, 0.0, FRONT_CSK_APEX_Y),
+    )
+    rear_lines = await add_line_chain(adapter, rear)
+    front_lines = await add_line_chain(adapter, front)
+    set_sketch_direct_db(adapter, False)
+    await define_polygon_chain(adapter, rear_lines, rear, label="rear countersink")
+    await define_polygon_chain(adapter, front_lines, front, label="front countersink")
+    await ensure_fully_defined(adapter, "countersink profiles")
+    check("exit_sketch countersinks", await adapter.exit_sketch())
+    name_last_feature(adapter, "CountersinkProfile")
+    check(
+        "revolve countersinks",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "Countersinks")
+    v_csk = V_REAR_CSK + V_FRONT_CSK
+    await volume_check(adapter, "countersinks", volume - v_csk, 0.03 * v_csk + 0.05)
+
+    # --- Named stations for the stud: the rim and the dish floor ------------
+    for plane, offset, drive in (
+        ("RimFace", RIM_Y, '"OverallLength"'),
+        ("DishFloor", DISH_FLOOR_Y, '"OverallLength" - "DishDepth"'),
+    ):
+        check(
+            f"create_plane {plane}",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane="Top Plane", offset=offset
+                )
+            ),
+        )
+        name_last_feature(adapter, plane)
+        blank_reference_geometry(adapter, ((plane, "PLANE"),))
+        plane_offset = name_dimensions(adapter, plane, [f"{plane}Offset"])
+        drive_jobs.append((plane_offset[0], drive))
+
+    # Deferred drive equations, then re-check neutrality.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven nut (equations neutral)", expected, 0.005 * expected)
+    await volume_check(
+        adapter, "driven thumbnut (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    # Every printed dimension is governed by its places (the spec's
+    # DRAWING_PRECISION): no model band.  No roughness symbol: the seat face
+    # is a clamp face (policy rule 5).
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(adapter, PART_NAME)
     return await save_part_and_images(adapter, PART_NAME)
 
 

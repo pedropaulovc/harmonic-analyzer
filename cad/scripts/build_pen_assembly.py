@@ -103,8 +103,8 @@ from magnifying_wheel_geom import RIM_AXIAL as WHEEL_RIM_AXIAL
 ASM_NAME = "pen"
 
 # --- machine anchors ---------------------------------------------------------
-PAPER_FRONT_Z = -143.4  # recording paper front face (build_paper_drive_assembly:
-# platen front -142.9, the sheet planted 0.5 proud)
+PAPER_FRONT_Z = -143.25  # recording paper front face (build_paper_drive_assembly:
+# platen front -142.75 on the 3.85 plate, the sheet planted 0.5 proud)
 CLEARANCE = 0.25  # interference-gate margin convention
 
 # --- pen rod line -------------------------------------------------------------
