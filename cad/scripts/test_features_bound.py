@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -140,6 +141,40 @@ def test_unbound_bundle_never_stages_or_repairs(
         assert f"scoped sha256 {scoped}, full sha256 {full}" in str(caught.value)
     assert not stage.exists()
     assert _tree(out) == before
+
+
+def test_swapped_manifest_face_never_passes_or_stages(tmp_path: Path) -> None:
+    out = bound_output(tmp_path)
+    stem = export_features.SUPPORTED_PARTS[-1]
+    path = out / "features" / stem / "features.toml"
+    manifest = tomllib.loads(path.read_text(encoding="utf-8"))
+    feature, other = list(manifest["features"])[:2]
+    manifest["features"][feature]["faces"] = manifest["features"][other]["faces"]
+    path.write_text(export_features._toml(manifest), encoding="utf-8")
+    before = _tree(out)
+    stage = tmp_path / "stage"
+
+    for gate in (
+        lambda: features_bound.check_bound_features(out),
+        lambda: features_bound.stage_bound_features(out, stage),
+    ):
+        with pytest.raises(features_bound.FeaturesBoundError, match=rf"{feature}.*faces"):
+            gate()
+    assert not stage.exists()
+    assert _tree(out) == before
+
+
+def test_invalid_manifest_schema_never_stages(tmp_path: Path) -> None:
+    out = bound_output(tmp_path)
+    stem = export_features.SUPPORTED_PARTS[-1]
+    path = out / "features" / stem / "features.toml"
+    manifest = tomllib.loads(path.read_text(encoding="utf-8"))
+    manifest["units"] = "inches"
+    path.write_text(export_features._toml(manifest), encoding="utf-8")
+    stage = tmp_path / "stage"
+    with pytest.raises(features_bound.FeaturesBoundError, match="invalid feature manifest.*"):
+        features_bound.stage_bound_features(out, stage)
+    assert not stage.exists()
 
 
 def test_half_labelled_rocker_pivot_bore_fails_even_when_both_exports_agree(

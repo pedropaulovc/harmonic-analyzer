@@ -64,9 +64,12 @@ one surviving half is a failure even if both producers make the same mistake.
 ## Release binding gate
 
 `check:features_bound` is SolidWorks-free and required by `release`, not `build`.
-It waits for both producers, verifies the manifest's adjacent scoped STEP digest,
-and compares each feature's set of face labels and the patch count per label
-between scoped and full STEPs. Both raw digests are reported. Headers, entity
+It waits for both producers, validates the manifest with the pinned prechips
+`Features` schema, verifies its adjacent scoped STEP digest, and requires every
+feature's recorded face set to equal the references parsed from that STEP.
+A mismatch fails with the feature name before any bundle is staged. It then
+compares each feature's face labels and patch count per label between scoped and
+full STEPs. Both raw digests are reported. Headers, entity
 numbers and file order are not semantic identity: SolidWorks timestamps headers
 and renumbers entities on re-export. This is the independent-session re-export
 regression, not a byte-equality certificate.

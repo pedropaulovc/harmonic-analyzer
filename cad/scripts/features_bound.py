@@ -5,9 +5,10 @@ time and every export renumbers its entities. The release-only gate therefore
 compares what the feature contract needs. For each supported part, the scoped
 STEP (``features/<stem>/<part>.STEP``) and the full export
 (``step/<part>.STEP``) must carry the same feature -> face-label -> patch-count
-map, read with ``step_face_sets``. ``features.toml`` must bind the exact raw
-bytes of its adjacent scoped STEP. Both raw digests are logged, and every
-failure reports them. The gate never opens CAD or repairs either producer.
+map, read with ``step_face_sets``. ``features.toml`` must satisfy the pinned
+prechips schema, bind the exact raw bytes of its adjacent scoped STEP, and
+record that STEP's exact face sets per feature. Both raw digests are logged,
+and every failure reports them. The gate never opens CAD or repairs either producer.
 """
 
 from __future__ import annotations
@@ -18,6 +19,9 @@ import tomllib
 from collections import Counter
 from pathlib import Path
 from typing import NoReturn
+
+from prechips.model import Features
+from pydantic import ValidationError
 
 import _telemetry
 import export_features
@@ -48,11 +52,14 @@ def _read(path: Path) -> bytes:
         _fail(str(path), f"cannot read required file ({exc.strerror})")
 
 
-def _face_labels(path: Path, content: bytes, features: list[str], digests: str) -> FaceLabels:
+def _face_sets(path: Path, content: bytes, features: list[str], digests: str) -> dict[str, list[str]]:
     try:
-        faces = step_face_sets(content.decode("latin-1"), features)
+        return step_face_sets(content.decode("latin-1"), features)
     except FeatureFaceError as exc:
         _fail(str(path), f"{exc} ({digests})")
+
+
+def _face_labels(faces: dict[str, list[str]]) -> FaceLabels:
     # A face reference is ``#<entity>/ADVANCED_FACE[<ordinal>]/<label>``; only
     # the label survives a re-export, so entity ids and file order are dropped.
     return {
@@ -79,13 +86,24 @@ def _validated_files(out: Path) -> tuple[tuple[Path, bytes], ...]:
             manifest = tomllib.loads(manifest_bytes.decode("utf-8"))
         except (UnicodeError, tomllib.TOMLDecodeError) as exc:
             _fail(str(manifest_path), f"invalid TOML ({exc})")
+        try:
+            validated = Features.model_validate(manifest)
+        except ValidationError as exc:
+            _fail(str(manifest_path), f"invalid feature manifest ({exc})")
         if manifest.get("step") != step_path.name:
             _fail(str(manifest_path), f"step must be adjacent basename {step_path.name!r}, recorded {manifest.get('step')!r}")
         if manifest.get("step_sha256") != scoped_digest:
             _fail(str(manifest_path), f"step_sha256 {manifest.get('step_sha256')!r} does not bind the adjacent STEP ({digests})")
         features = list(export_features.feature_selectors(stem))
-        scoped = _face_labels(step_path, step_bytes, features, digests)
-        full = _face_labels(full_path, full_bytes, features, digests)
+        scoped_faces = _face_sets(step_path, step_bytes, features, digests)
+        if set(validated.features) != set(features):
+            _fail(str(manifest_path), f"feature names differ from scoped STEP contract ({digests})")
+        for feature, refs in scoped_faces.items():
+            recorded = validated.features[feature].faces
+            if not isinstance(recorded, list) or set(recorded) != set(refs):
+                _fail(str(manifest_path), f"{feature} faces {recorded!r} differ from adjacent STEP {refs!r} ({digests})")
+        scoped = _face_labels(scoped_faces)
+        full = _face_labels(_face_sets(full_path, full_bytes, features, digests))
         if scoped != full:
             differing = {
                 feature: {"scoped": dict(scoped[feature]), "full": dict(full[feature])}
