@@ -108,8 +108,9 @@ The existing `_run_stamped` → `_exec` path injects `TRACEPARENT` and service
 `check-traveler`; `prechips.traveler` continues the task span and appends to the
 pipeline's atomic telemetry capture using separately owned provider handles.
 
-The consumer is pinned to full-M2 commit `ba449ce1`, including telemetry
-compatibility without downgrading existing OTel/pydantic-ai/logfire dependencies.
+The consumer is pinned to the prechips M2 merge commit `d43cdf9c`
+(pedropaulovc/prechips#6), including telemetry compatibility without
+downgrading existing OTel/pydantic-ai/logfire dependencies.
 It accepts cone `angularity_dia`/`angularity_datums` without recasting the FCF as
 position. The cone journal rim-break note and cited maximum remain preserved;
 there is no typed per-feature edge-break field, so its inspection identity stays

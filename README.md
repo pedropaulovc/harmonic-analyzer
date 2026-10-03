@@ -160,8 +160,8 @@ Without a seat you can still run the offline gates
 (`uv run python -m doit check:math`), and every release ships the STEP, STL and
 glTF exports plus the drawing PDFs.
 
-Drawing-bound requirement manifests for the rocker arm, pivot shaft, pivot
-bracket and cone pivot post are exported with named STEP face sets. The
+Drawing-bound requirement manifests for the rocker arm, pivot shaft and cone
+pivot post are exported with named STEP face sets. The
 `check:traveler_rocker_arm` gate prints the committed process plan through
 [prechips](https://github.com/pedropaulovc/prechips); shop blockers are advisory
 to this CAD gate, not permission to machine. See the
