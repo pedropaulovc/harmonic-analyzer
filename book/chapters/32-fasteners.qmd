@@ -25,6 +25,7 @@ The screws, and the small parts that do not belong anywhere else.
 | `clamp-screw` | TODO | TODO | TODO |
 | `transgear-arm-plate-screw` | TODO | TODO | TODO |
 | `transgear-pivot-screw` | TODO | TODO | TODO |
+| `transgear-pivot-spring` | TODO | TODO | TODO |
 | `transgear-latch-pin` | TODO | TODO | TODO |
 | `latch-hook-bracket-screw` | TODO | TODO | TODO |
 | `latch-hook-rivet` | TODO | TODO | TODO |

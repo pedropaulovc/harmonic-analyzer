@@ -252,6 +252,13 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Side-Mount External Retaining Ring",
         "97431A260",
     ),
+    # MHA-184: one curved disc spring under the MHA-168 pivot screw's head;
+    # high-carbon steel, the library's plain carbon steel.
+    "transgear-pivot-spring": _stock(
+        "transgear-pivot-spring",
+        "Curved Disc Spring",
+        "9715K43",
+    ),
     "tube-frame-cap": _stock(
         "tube-frame-cap",
         "Metal Round Cap",

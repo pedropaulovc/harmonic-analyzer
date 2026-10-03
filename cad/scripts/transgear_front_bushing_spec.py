@@ -5,9 +5,9 @@ closure.  A turned brass ring on the MHA-179 pin between the MHA-110
 sleeve's nose (steel: the hub never thrusts, R9-5) and the MHA-182 retaining
 ring.  It is faced to fit at assembly, after the MHA-159 hub's front face is
 faced to stand ``transgear_cluster_fit.HUB_NOSE_WINDOW`` behind the nose,
-until m reads ``transgear_cluster_fit.FIT_WINDOW`` with the cluster pushed
-forward (step 1 of the fit-up there).  It runs free on the pin; both faces
-bear.  Its Ø12 rear face reaches over the hub's front face, so the
+until m reads ``transgear_cluster_fit.FIT_WINDOW`` with the cluster, hub and
+disc pushed forward (step 1 of the fit-up there).  It runs free on the pin;
+both faces bear.  Its Ø12 rear face reaches over the hub's front face, so the
 bushing, held by the ring, traps hub and disc against the sleeve's step
 face (the hub's spigot seats on it).  The ring's Ø7.16 O.D. bears inside
 the front face; the front O.D. edge is chamfered.
@@ -75,7 +75,7 @@ GAP_MAX = FIT.FRONT_BUSHING_FITTED_MAX
 LENGTH = FIT.FRONT_BUSHING_MODEL
 
 FACING_ALLOWANCE = 0.10
-BLANK_LENGTH_MIN = 6.00
+BLANK_LENGTH_MIN = 6.10
 if BLANK_LENGTH_MIN < GAP_MAX + FACING_ALLOWANCE - 1e-9:
     raise AssertionError(
         f"MHA-181 blank {BLANK_LENGTH_MIN:.2f} MIN leaves no {FACING_ALLOWANCE} "

@@ -47,6 +47,7 @@ recipes:
 | 93585A190 | `cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 9715K43 | `transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
 | 97431A260 | `transgear-retaining-ring` | Side-Mount External Retaining Ring |
 | 97482A015 | `latch-hook-rivet` (catalogue-only; no vendor model) | Aluminum Domed Head Solid Rivet |
 | 98296A026 | `transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -388,6 +389,30 @@ Catalog specifications checked on September 10, 2026:
   vendor's (`cad/out/reference/97431A260-replica-report.json`).
   Evidence SHA-256: native SLDPRT
   `dc3d0f8549d8851713aa234e24f338e9f0d41dbc96550669c281c99c3d9f4cff`.
+
+- [9715K43](https://www.mcmaster.com/9715K43/) (`transgear-pivot-spring`,
+  MHA-184, one) sits on the MHA-168 pivot shoulder screw's shoulder, between
+  the underside of its head and the floor of the MHA-164 arm's spot face, and
+  preloads the arm forward onto the MHA-167 spacer. Its page was read live on
+  October 2, 2026 ("Curved Disc Springs, for 0.190" Shaft Diameter, 0.200"
+  ID, 0.423" OD, 0.0113" Thick"): for a 0.190 in shaft, ID 0.200 in, OD
+  0.423 in, thickness 0.0113 in, height 0.047 in; compressed height 0.027 in
+  and deflection 0.020 in at the 9 lb working load; high-carbon steel, disc
+  spring type "Curved"; pack of 10, $10.11. The page states no flat load and
+  no rate (the spec's rate is the working point taken as linear
+  [INFERENCE]), says the spring has "only two contact points", and that these
+  springs cannot be stacked to raise the working load. It states no finish,
+  only that moisture will rust the steel, so the part is taken as plain
+  [INFERENCE] and carries the library's `Plain Carbon Steel`. The two
+  contact points describe a bowed washer, which one revolve cannot make, so
+  `diag_build_9715K43.py` models the axisymmetric cone spanning the same ID,
+  OD and thickness [INFERENCE], shown as installed at the 0.80 mm nominal
+  room under the screw head (between the 0.027 in working height and the
+  free height): the outer edge at the OD from the OD rim's bearing face up
+  one thickness, the inner edge at the ID up to that height. A 3-D
+  SolidWorks model is offered on the page, but none was fetched or kept here,
+  so it is catalogue-only: no replica gate, and its standalone diagnostic is
+  a catalog-only run.
 
 - [3606T118](https://www.mcmaster.com/3606T118/) (`keeper-chain`, MHA-149)
   and [3606T811](https://www.mcmaster.com/3606T811/) (`keeper-chain-link`,

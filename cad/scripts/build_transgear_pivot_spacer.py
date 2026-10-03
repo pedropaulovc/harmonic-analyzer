@@ -4,7 +4,8 @@ The turned brass ring on the MHA-168 pivot screw's shoulder between the
 MHA-074 support bar's back face and the MHA-164 arm's front face
 (``transgear_pivot_spacer_spec``; contract §3.4).  Its length sets the pivot
 head play, so it carries an explicit band; it is fitted as made, never faced
-(R9-6).
+(R9-6).  Its reamed bore is a light press on the shoulder, under its own
+one-sided band.
 
 Layout: Front-plane annulus at the origin (O.D., bore) extruded +Z by the
 length, so the bar-side (front) face is the Front Plane (z = 0) and the rear
@@ -46,13 +47,16 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
 from transgear_pivot_spacer_spec import (
     BORE_DIA,
+    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -161,9 +165,13 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # The pivot head play rides the length: its explicit band.  The O.D. and
-    # the bore are governed by their places alone (the title block's row).
+    # The pivot head play rides the length: its explicit band.  The bore is
+    # a press on the shoulder: its reamed one-sided band.  The O.D. is
+    # governed by its places alone (the title block's row).
     set_dimension_symmetric_tolerance(adapter, "Ring", "RingLength", LENGTH_BAND)
+    set_dimension_bilateral_tolerance(
+        adapter, "RingProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

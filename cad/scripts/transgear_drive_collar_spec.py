@@ -479,19 +479,22 @@ if NUT_RELIEF_RADIAL_AIR <= 0.0:
 # Tsubaki's ±1 sprocket offset at every printed corner, floats included.  The
 # contract's enumeration sets the pair (T24 against T12, mid-planes) at
 # CHAIN_SET_RANGE; in service the crank shaft's end play and the knob's end
-# float move the T24 forward of it, the hanger's head play rearward.  R9-70
-# adds the T24's own float under the thumbnut, forward only (the collar body
-# is its rear stop), and K-1 sets the knob's end float on a feeler at fit-up,
-# so it no longer carries the journal, ring and hub-to-boss bands (contract:
-# 0..0.35): -0.3103 - 0.25 - 0.25 - 0.15 = -0.9603 .. +0.40.
+# float move the T24 forward of it.  R9-70 adds the T24's own float under the
+# thumbnut, forward only (the collar body is its rear stop), and K-1 sets the
+# knob's end float on a feeler at fit-up, so it no longer carries the
+# journal, ring and hub-to-boss bands (contract: 0..0.35).  R9-71: the
+# MHA-184 spring holds the arm on the MHA-167 spacer, which is pressed on the
+# MHA-168 shoulder, so the hanger has no end play and its tilt is fixed in
+# the bar's frame, where the fit-up reads it:
+# -0.3103 - 0.25 - 0.25 - 0.15 = -0.9603 .. +0.05.
 CHAIN_OFFSET_LIMIT = 1.0
 CHAIN_SET_RANGE = (-0.3103, 0.05)
 CRANK_END_PLAY_MAX = 0.25
-HANGER_HEAD_PLAY_MAX = 0.35
+HANGER_AXIAL_PLAY_MAX = 0.0
 KNOB_END_FLOAT_MAX = END_FLOAT + END_FLOAT_SET_TOL  # 0.25
 CHAIN_OFFSET_IN_SERVICE = (
     CHAIN_SET_RANGE[0] - CRANK_END_PLAY_MAX - KNOB_END_FLOAT_MAX - max(T24_FLOAT_RANGE),
-    CHAIN_SET_RANGE[1] + HANGER_HEAD_PLAY_MAX,
+    CHAIN_SET_RANGE[1] + HANGER_AXIAL_PLAY_MAX,
 )
 CHAIN_OFFSET_MARGIN = CHAIN_OFFSET_LIMIT - max(map(abs, CHAIN_OFFSET_IN_SERVICE))
 if CHAIN_OFFSET_MARGIN < 0.0:

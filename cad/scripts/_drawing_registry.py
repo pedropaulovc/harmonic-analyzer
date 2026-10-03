@@ -915,6 +915,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="transgear_pivot_spring",
+        part="transgear_pivot_spring",
+        artifact_stem="transgear-pivot-spring",
+        script_name="draw_transgear_pivot_spring.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="transgear_arm",
         part="transgear_arm",
         artifact_stem="transgear-arm",

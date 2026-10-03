@@ -216,6 +216,20 @@ RULINGS: dict[str, Ruling] = {
             "fits without changing the photographed 91829A205 head"
         ),
     ),
+    "U-MHA-126-no-lock": Ruling(
+        joint="paper-drive/thumbnut-on-knob-shaft",
+        granted=(
+            "user, 2026-10-03, joint-specific rule-9 ruling on the machinist review of "
+            "6c385465d: no lock on the MHA-126 thumbnut. The T24 floats 0.05-0.15 under the "
+            "flange and turns against it only by its drive-pin backlash, ±0.9° per reversal "
+            "((Ø2.5 +0.10 hole - Ø2.381 pin) / 2 on the R7 circle). Any drag it passes is "
+            "μ F r_m = 0.15 × 1 N × 5.68 = 0.85 N·mm [INFERENCE: chain axial pull ≤1 N], "
+            "against ~360 N·mm to back off a hand-tight nut [INFERENCE: ~400 N preload, μ "
+            "0.15 on the 1/4-20 flank and the pilot seat], over 100x. Every positive lock "
+            "tried broke a wall or the chain's envelope: a 98335A049 hairpin across the "
+            "flange sweeps r ~23 inside the chain band (plates' inner edge r 21.2)"
+        ),
+    ),
 }
 
 
@@ -679,7 +693,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "transgear_knob_cup",  # MHA-157: reamed through bore, cross-pinned to the journal at assembly; no thread
         "transgear_knob_thrust_ring",  # MHA-156 loose brass ring, drilled bore; no thread
         "transgear_latch_pin",  # MHA-169 1/8 dowel pressed into the arm's reamed end-face hole
-        "transgear_pivot_spacer",  # MHA-167 brass spacer, reamed bore on the pivot shoulder; no thread
+        "transgear_pivot_spacer",  # MHA-167 brass spacer, reamed bore pressed on the pivot shoulder (locating, R9-71); no thread
+        "transgear_pivot_spring",  # MHA-184 disc spring on the pivot shoulder; no thread
         "transgear_pin",  # MHA-179 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
         "transgear_rear_bushing",  # MHA-180 brass bushing faced to fit, reamed bore on the pin; no thread
         "transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_transgear_removable)
@@ -706,6 +721,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",
     "transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
+    "transgear_pivot_spring": "disc spring on the pivot shoulder; no thread",
     "tube_frame_cap": "push-on round cap over the column end",
 }
 
@@ -1740,19 +1756,20 @@ JOINTS: tuple[Joint, ...] = (
             "friction on the shoulder and under the head acts about the screw axis, in both senses"
         ),
         axial_capture=(
-            "shoulder bottomed on the bar's back face; the arm and pivot spacer ride the shoulder under "
-            "the head with 0.10-0.35 head play; thread in the bar's blind #8-32 tap (worst-case "
-            "engagement ~0.53 D, transgear_hanger_joints.PIVOT_ENGAGEMENT_WORST_D)"
+            "shoulder bottomed on the bar's back face with the MHA-167 spacer pressed on it flush; the "
+            "MHA-184 spring under the head holds the arm on the spacer (room 0.70-0.95, "
+            "transgear_hanger_joints.SPRING_ROOM_MIN/MAX); thread in the bar's blind #8-32 tap "
+            "(worst-case engagement ~0.53 D, transgear_hanger_joints.PIVOT_ENGAGEMENT_WORST_D)"
         ),
         lock=Lock.THREADLOCKER_ONLY,
         lock_step="hanger-pivoted",
         exception="U-MHA-168-threadlocker",
         evidence=(
-            "draw_paper_drive_assembly._step_text 'hanger-pivoted' ('SHOULDER SCREW FROM THE REAR "
-            "THROUGH ARM AND SPACER INTO THE BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER. SEAT IT; "
-            "THE ARM SWINGS FREELY'); build_paper_drive_assembly.py 'transgear-pivot-screw' placement; "
-            "support_bar_spec.PIVOT_TAP_THREAD; transgear_hanger_joints.HEAD_PLAY_MIN/MAX, "
-            "LATCH_ARM_ANGLE_PLAY and PIVOT_ENGAGEMENT_WORST_D"
+            "draw_paper_drive_assembly._step_text 'hanger-pivoted' ('SEAT IT IN THE MHA-074 BAR'S "
+            "BLIND TAP WITH LOW-STRENGTH THREADLOCKER; THE ARM FALLS FREELY'); "
+            "build_paper_drive_assembly.py 'transgear-pivot-screw' placement; "
+            "support_bar_spec.PIVOT_TAP_THREAD; transgear_hanger_joints.SPRING_ROOM_MIN/MAX, "
+            "HANGER_SWING_MARGIN, LATCH_ARM_ANGLE_PLAY and PIVOT_ENGAGEMENT_WORST_D"
         ),
     ),
     Joint(
@@ -1849,13 +1866,13 @@ JOINTS: tuple[Joint, ...] = (
         receiver="transgear_knob_shaft",
         thread="1/4-20 UNC",
         installed_at="fitup-pose-set",
-        exposure=Exposure.STATIC_CLAMP,
+        exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the nut seats on the drive collar's pilot, faced 0.05-0.15 proud of the T24's front "
             "face, so it clamps only the collar to itself and the T24 floats free under its flange "
             "(R9-70). The drive goes T24 -> the two pressed drive pins -> collar -> the MHA-154 "
-            "cross pin -> shaft; collar, nut and shaft turn as one body and the nut carries no "
-            "torque about its axis"
+            "cross pin -> shaft, but the free T24 rocks through its pin backlash at each "
+            "reversal and, pushed forward, can rub the flange (machinist review of 6c385465d)"
         ),
         axial_capture=(
             "the nut's flange seat face bears on the collar pilot's faced front; 1/4-20 UNC-2B "
@@ -1864,6 +1881,7 @@ JOINTS: tuple[Joint, ...] = (
             "the wheel on the drive pins; removed by hand for gear swaps"
         ),
         lock=Lock.NONE,
+        exception="U-MHA-126-no-lock",
         evidence=(
             "draw_paper_drive_assembly._step_text 'pilot-faced-to-fit', 'collar-pinned' ('THUMBNUT "
             "TIGHT ON THE PILOT') and 'fitup-accepted' (T24 free under the nut); "

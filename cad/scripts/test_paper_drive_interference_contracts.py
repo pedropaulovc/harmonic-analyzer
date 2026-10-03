@@ -34,6 +34,7 @@ import transgear_knob_drive_pin_spec as drive_pin
 import transgear_knob_shaft_spec as shaft
 import transgear_latch_pin_spec as latch_pin
 import transgear_pivot_screw_spec as pivot_screw
+import transgear_pivot_spacer_spec as spacer
 import transgear_removable_spec as removable
 import transgear_pin_spec as pin
 import transgear_retaining_ring_spec as ring
@@ -77,6 +78,12 @@ def test_hanger_screw_rows_follow_the_arm_plate_and_bar() -> None:
             bar.PIVOT_TAP_DRILL_DIA,
             pivot_screw.THREAD_LEN - pivot_screw.NECK_FLAT_END,
         )
+    )
+    # R9-71: the spacer's reamed bore pressed on the shoulder, whole length.
+    assert allowed[
+        _pair("transgear-pivot-spacer-1", "transgear-pivot-screw-1")
+    ] == pytest.approx(
+        _annulus(pivot_screw.SHOULDER_DIA, spacer.BORE_DIA, spacer.LENGTH)
     )
 
 

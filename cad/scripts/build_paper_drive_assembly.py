@@ -335,6 +335,7 @@ import transgear_latch_pin_spec as LATCH_PIN  # noqa: E402
 import transgear_pin_spec as PIN  # noqa: E402
 import transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
 import transgear_pivot_spacer_spec as SPACER  # noqa: E402
+import transgear_pivot_spring_spec as PIVOT_SPRING  # noqa: E402
 import transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
 import transgear_retaining_ring_spec as E_RING  # noqa: E402
 import latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
@@ -397,13 +398,16 @@ if math.dist(KNOB_SHAFT_XY, _PLATE_BORE_XY) > 1e-3:
 # z stack of the hanger (front -Z -> back). It stands behind the bar's back
 # face on the pivot spacer, so the arm clears the sliding guide-lock stations
 # (_assert_lock_station_sweep).
-SPACER_Z0 = BAR_BACK_Z  # -129.9: spacer on the bar's back face (identity)
+SPACER_Z0 = BAR_BACK_Z  # -129.9: spacer pressed flush on the shoulder's end
 ARM_Z0 = ARM.FRONT_FACE_MACHINE_Z  # -124.4: arm front face on the spacer
 if abs(SPACER_Z0 + SPACER.LENGTH - ARM_Z0) > 1e-9:
     raise AssertionError("the arm's front face is off the pivot spacer's rear face")
 # Shoulder screw MHA-168 (Rx+90: shank to -Z): the shoulder bottoms on the
-# bar's back face, the head bears over the arm's spot face with HEAD_PLAY.
+# bar's back face; under its head the MHA-184 spring (identity: its O.D. rim
+# on the arm's spot-face floor, its I.D. rim under the head) holds the arm
+# on the spacer.
 PIVOT_SCREW_Z0 = BAR_BACK_Z + PIVOT_SCREW.SHOULDER_LEN  # -117.2 under the head
+PIVOT_SPRING_Z0 = ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT  # -118.0
 # Arm plate (rows Rz(theta): local X along U): its mounting plane on
 # the arm's rear face; hub forward to the thrust ring, boss rearward.
 PLATE_Z0 = ARM_Z0 + ARM.THICKNESS  # -116.4625
@@ -562,19 +566,20 @@ if abs(DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) 
 # The 120T disc's rear face (the MHA-161 tips sit inside it) to the platen's
 # front face at the printed worst case: the platen forward by its fitted
 # float, magnified by its yaw about the bar's end at the near lock; F
-# rearward by the arm (its head play less the spacer band), the arm, hub
-# face, ring and 12T bands; the platen forward by the bar and its own bands;
-# then m's max, the cluster's rearward float, its tilt on the bore clearance
-# (pivot on the rear bushing's smallest Ø9, over the shortest sleeve) at the
-# disc rim, and the disc's wobble on its mount (DISC_MOUNT_WOBBLE).
+# rearward by the arm (held on the longest spacer by the MHA-184 spring), the
+# arm, hub face, ring and 12T bands; the platen forward by the bar and its
+# own bands; then m's max, the cluster's rearward float, its tilt on the bore
+# clearance (pivot on the rear bushing's smallest Ø9, over the shortest
+# sleeve) at the disc rim, the hanger's tilt on the spacer (Codex P1 on
+# 6c385465d) at the rim's farthest point from P, and the disc's wobble on its
+# mount (DISC_MOUNT_WOBBLE).
 PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
 # The platen (4.0) and rack bar (6.0) carry no drawing band: .XXX assumed.
 _PLATEN_THICKNESS_BAND = printed_band_mm(3)
 _RACK_THICKNESS_BAND = printed_band_mm(3)
 DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - KNOB_SHAFT_Z0 - DISC_SPEC.FACE_WIDTH  # 2.35
 DISC_PLATEN_BAND = (
-    HANGER.HEAD_PLAY_MAX
-    - SPACER.LENGTH_BAND
+    SPACER.LENGTH_BAND
     + ARM.THICKNESS_BAND
     + printed_band_mm(ARM_PLATE_SPEC.HUB_STATION_PLACES)
     + RING.LENGTH_TOL
@@ -582,7 +587,7 @@ DISC_PLATEN_BAND = (
     + (DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH)
     + BAR.BAR_DEPTH_BAND
     + _PLATEN_THICKNESS_BAND
-)  # 1.0262
+)  # 0.7762
 CLUSTER_TILT_AT_DISC_RIM = (
     (
         DISC_SPEC.OUTSIDE_DIA
@@ -591,7 +596,16 @@ CLUSTER_TILT_AT_DISC_RIM = (
     / 2.0
     * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
     / (FEED.OVERALL_LENGTH - FEED.STATION_TOL)
-)  # 0.0793
+)  # 0.0510
+# The hanger tilts about P by the spacer's face squareness
+# (transgear_hanger_joints.HANGER_TILT): a point r from P moves r times it.
+_P_TO_S = math.dist(PIVOT_XY, STUD_XY)  # 68.81
+HANGER_TILT_AT_DISC_RIM = HANGER.HANGER_TILT * (
+    _P_TO_S + DISC_SPEC.OUTSIDE_DIA / 2.0
+)  # 0.2588
+HANGER_TILT_AT_FEED_TIPS = HANGER.HANGER_TILT * (
+    _P_TO_S + FEED.OUTSIDE_DIA / 2.0
+)  # 0.1765
 # The disc's rear face at its rim against the sleeve's axis: the hub rocking
 # on the boss (it is trapped with float, never preloaded onto the step) over
 # its shortest round engagement, levered from its step contact; then, each
@@ -626,6 +640,7 @@ DISC_PLATEN_AIR_WORST = (
     - CLUSTER.FIT_WINDOW[1]
     - CLUSTER.FLOAT_WINDOW[1]
     - CLUSTER_TILT_AT_DISC_RIM
+    - HANGER_TILT_AT_DISC_RIM
     - DISC_MOUNT_WOBBLE
 )
 if DISC_PLATEN_AIR_WORST < DISC_PLATEN_AIR_MIN:
@@ -638,8 +653,8 @@ if DISC_PLATEN_AIR_WORST < DISC_PLATEN_AIR_MIN:
 # the rack's whole width.  The rack's front face is the platen's back face, so
 # the stack above sets how far forward of the sleeve's rear face it reaches,
 # less the terms that do not lie between the sleeve and the platen's back
-# (the platen's own band, the disc's mount wobble, the rim's tilt, which
-# comes back as the tilt at the 12T tips).  The disc's front face is the hub
+# (the platen's own band, the disc's mount wobble, the rim's tilts, which
+# come back as the tilts at the 12T tips).  The disc's front face is the hub
 # flange's rear face, a spigot length ahead of the sleeve's step; the stack's
 # thickest disc reaches rearward from it.
 CLUSTER_TILT_AT_FEED_TIPS = (
@@ -657,6 +672,8 @@ RACK_FRONT_FROM_SLEEVE_REAR_WORST = (
     - DISC_MOUNT_WOBBLE
     - CLUSTER_TILT_AT_DISC_RIM
     + CLUSTER_TILT_AT_FEED_TIPS
+    - HANGER_TILT_AT_DISC_RIM
+    + HANGER_TILT_AT_FEED_TIPS
     - PLATE_THICKNESS
 )
 if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
@@ -666,9 +683,9 @@ if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
     )
 # The MHA-180 rear bushing's front face to the MHA-069 rack's back face (its
 # Ø9 .X can reach the rack's crests radially): the arm forward on the
-# shortest spacer, the bar thinnest, the rack thickest, and the bushing
-# following the sleeve forward to its fitted max.
-# 2.5 - 0.05 - 0.13 - 0.13 - 0.87 = 1.32.
+# shortest spacer, the bar thinnest, the rack thickest, the bushing
+# following the sleeve forward to its fitted max, and the hanger's tilt at
+# the bushing's far rim.
 BUSHING_RACK_AIR_NOMINAL = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH - RACK_BACK_Z  # 2.5
 BUSHING_RACK_AIR_WORST = (
     BUSHING_RACK_AIR_NOMINAL
@@ -676,7 +693,9 @@ BUSHING_RACK_AIR_WORST = (
     - BAR.BAR_DEPTH_BAND
     - _RACK_THICKNESS_BAND
     - (CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1] - REAR_BUSHING.LENGTH)
-)  # 1.32
+    - HANGER.HANGER_TILT
+    * (_P_TO_S + (REAR_BUSHING.OD + printed_band_mm(REAR_BUSHING.OD_PLACES)) / 2.0)
+)  # 1.07
 if BUSHING_RACK_AIR_WORST < 0.0:
     raise AssertionError(
         "MHA-180 rear bushing enters the MHA-069 rack at the printed worst case: "
@@ -1134,13 +1153,14 @@ def _assert_fastener_stacks() -> None:
 
     # Hanger joints: transgear_hanger_joints owns the stacks; re-prove them
     # against the placed stations.
-    head_play = PIVOT_SCREW_Z0 - (ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT)
-    if abs(head_play - HANGER.HEAD_PLAY_NOMINAL) > 1e-9:
+    spring_room = PIVOT_SCREW_Z0 - (ARM_Z0 + ARM.SPOT_FACE_FLOOR_FROM_FRONT)
+    if abs(spring_room - HANGER.SPRING_ROOM_NOMINAL) > 1e-9:
         raise AssertionError(
-            f"pivot head play {head_play:.4f} is not {HANGER.HEAD_PLAY_NOMINAL:.4f}"
+            f"pivot spring room {spring_room:.4f} is not "
+            f"{HANGER.SPRING_ROOM_NOMINAL:.4f}"
         )
-    if not 0.0 < HANGER.HEAD_PLAY_MIN <= head_play <= HANGER.HEAD_PLAY_MAX:
-        raise AssertionError("the pivot head binds or rattles over its play band")
+    if abs(spring_room - PIVOT_SPRING.MODEL_HEIGHT) > 1e-9:
+        raise AssertionError("the MHA-184 spring is not modelled in its room")
     if HANGER.PIVOT_ENGAGEMENT_WORST_D + 1e-9 < HANGER.PIVOT_ENGAGEMENT_APPROVED_MIN_D:
         raise AssertionError("pivot screw engagement is under its approved minimum")
     if HANGER.PLATE_SCREW_ENGAGEMENT_WORST_D + 1e-9 < HANGER.ENGAGEMENT_TARGET_D:
@@ -1365,17 +1385,10 @@ def _assert_lock_station_sweep() -> None:
     ky = KNOB_SHAFT_XY[1]
     # R9-61: the hanger hangs on the pivot screw, whose #8-32 tap the bar
     # prints at its ±HOLE_POSITION_BAND, so every hung section stands off its
-    # model by that band in y. The spacer is loose on the shoulder (it only
-    # spaces the arm off the bar), so its largest O.D. also stands off the
-    # screw axis by the largest bore on the thinnest shoulder.
+    # model by that band in y. The spacer is pressed on the shoulder, so its
+    # largest O.D. stands on the screw axis.
     pivot_tap = BAR.HOLE_POSITION_BAND
-    spacer_float = (
-        SPACER.BORE_DIA
-        + SPACER.BORE_DIA_BAND
-        - PIVOT_SCREW.SHOULDER_DIA
-        - PIVOT_SCREW.SHOULDER_DIA_LIMITS[0]
-    ) / 2.0
-    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0 + spacer_float
+    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0
     bracket_y = HOOK_BRACKET.MACHINE_ORIGIN[1]
     bracket_screw_z = BAR_BACK_Z + HOOK_BRACKET.SHEET_T + HOOK_BRACKET.SHEET_T_PLUS
     # The arm's front face on the shortest spacer; its plate's lower section
@@ -1705,11 +1718,13 @@ def _assert_knob_shaft_clearance() -> None:
         raise RuntimeError(
             f"knob end float {end_float:.4f} is not {KNOB_SPEC.END_FLOAT}"
         )
-    # Cluster float: the ring's rear face in front of the front bushing.
+    # Sleeve float: the ring's rear face in front of the front bushing (the
+    # disc's end float less the hub's recess).
     cluster_float = (FRONT_BUSHING_Z0 - FRONT_BUSHING.LENGTH) - CLUSTER.RING_REAR_Z
-    if abs(cluster_float - CLUSTER.FLOAT_WINDOW_CENTRE) > 1e-9:
+    if abs(cluster_float - CLUSTER.SLEEVE_FLOAT_WINDOW_CENTRE) > 1e-9:
         raise RuntimeError(
-            f"disc cluster float {cluster_float:.4f} is not {CLUSTER.FLOAT_WINDOW_CENTRE}"
+            f"sleeve float {cluster_float:.4f} is not "
+            f"{CLUSTER.SLEEVE_FLOAT_WINDOW_CENTRE}"
         )
     log(
         f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}); plate"
@@ -2464,6 +2479,14 @@ async def build(adapter) -> dict[str, str]:
         [90.0, 0.0, 0.0],
         ROT_X_POS90,
     )
+    # MHA-184 (identity: +Z axial) in the arm's spot face, under the head.
+    await place_component(
+        adapter,
+        "transgear-pivot-spring",
+        [PIVOT_XY[0], PIVOT_XY[1], PIVOT_SPRING_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
     await place_component(
         adapter,
         "transgear-arm-plate",
@@ -2615,8 +2638,8 @@ async def build(adapter) -> dict[str, str]:
             label=f"disc screw at {angle:.0f} deg locked to the disc",
         )
     # Ry(180): the front bushing's rear face on the sleeve's nose, faced to
-    # fit; the MHA-182 ring in the pin's groove FLOAT_WINDOW_CENTRE in front
-    # of it, its front face on the groove's load wall.
+    # fit; the MHA-182 ring in the pin's groove SLEEVE_FLOAT_WINDOW_CENTRE in
+    # front of it, its front face on the groove's load wall.
     await place_component(
         adapter,
         "transgear-front-bushing",

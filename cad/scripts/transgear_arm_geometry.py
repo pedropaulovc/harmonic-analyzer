@@ -76,11 +76,14 @@ END_HALF_WIDTH = edge_half_width(TIP_STATION)
 # --- Pivot at P: Ø4.900 running bore + rear spot face for the head ---------
 PIVOT_BORE_DIA = 4.9  # on the Ø4.7625 (-0.0254/0) shoulder, 0.069 radial
 PIVOT_BORE_DIA_BAND = 0.13  # .XXX
-SPOT_FACE_DIA = 9.525  # 3/8 counterbore; head Ø7.9375 clears it
+# The spot face seats the MHA-184 curved disc spring's OD rim (Ø10.744) under
+# the MHA-168 head; the spring's float on the shoulder still clears its rim.
+SPOT_FACE_DIA = 11.5
 SPOT_FACE_DIA_GROWTH = 0.10  # +0.10/0 (drilled row)
-# The floor is dimensioned from the FRONT face so the pivot end play never
-# sees the arm's stock thickness.
-SPOT_FACE_FLOOR_FROM_FRONT = 7.0
+# The floor is dimensioned from the FRONT face so the spring's room never
+# sees the arm's stock thickness (transgear_hanger_joints.SPRING_ROOM_*):
+# 0.70..0.95, inside the spring's catalogue deflection at every corner.
+SPOT_FACE_FLOOR_FROM_FRONT = 6.4
 SPOT_FACE_FLOOR_BAND = 0.05
 SPOT_FACE_DEPTH = THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT
 
@@ -162,6 +165,10 @@ WALLS: dict[str, tuple[float, float]] = {
     "spot-face floor": (
         SPOT_FACE_FLOOR_FROM_FRONT,
         SPOT_FACE_FLOOR_FROM_FRONT - SPOT_FACE_FLOOR_BAND,
+    ),
+    "spot face to end round": (
+        PIVOT_END_R - SPOT_FACE_DIA / 2.0,
+        PIVOT_END_R - BAND_X - (SPOT_FACE_DIA + SPOT_FACE_DIA_GROWTH) / 2.0,
     ),
     "pin bore to edges": (
         edge_half_width(PIN_STATION) - PIN_BORE_DIA / 2.0,

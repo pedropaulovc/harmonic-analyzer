@@ -105,9 +105,10 @@ def test_every_accepted_part_set_is_faced_from_the_blank() -> None:
     assert spec.GAP_MIN <= spec.LENGTH <= spec.GAP_MAX
     assert spec.BLANK_LENGTH_MIN >= spec.GAP_MAX + spec.FACING_ALLOWANCE - 1e-9
     # R9-68: the spigot on the step moves the window to 4.18-5.88 (the
-    # step-to-nose chain), so the blank grows to 6.00.
-    assert (spec.GAP_MIN, spec.GAP_MAX) == pytest.approx((4.1767, 5.8783), abs=1e-4)
-    assert spec.BLANK_LENGTH_MIN == pytest.approx(6.00)
+    # step-to-nose chain); m read with hub and disc forward on the bushing
+    # adds the hub's recess behind the nose, 5.98, so the blank is 6.10.
+    assert (spec.GAP_MIN, spec.GAP_MAX) == pytest.approx((4.1767, 5.9783), abs=1e-4)
+    assert spec.BLANK_LENGTH_MIN == pytest.approx(6.10)
     assert f"{spec.BLANK_LENGTH_MIN:.2f} MIN" in spec.DRAWING_NOTES
     callout = drawing.DIMENSION_CALLOUTS["RingLength"]
     assert f"{spec.GAP_MIN:.2f}-{spec.GAP_MAX:.2f}" in callout

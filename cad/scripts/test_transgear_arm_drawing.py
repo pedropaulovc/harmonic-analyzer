@@ -331,7 +331,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
     """Machinist reviews of 19e33c6c2 and 8b5e1f354: the floor-depth text
     crossed the left border (rendered at x 1.5 mm), and the counterbore text
     crossed it before."""
-    lines = ["7.00 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
+    lines = ["6.40 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
     floor = _hanging_left_box(lines, drawing.SECTION_KEEP["FloorDepth"])
     section_bottom = (
         drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
@@ -347,7 +347,7 @@ def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() ->
         0.0015, abs=0.001
     )
     counterbore = _centred_box(
-        ["\u00d89.525 +0.1", *spec.SPOT_FACE_CALLOUT.splitlines()],
+        ["\u00d811.500 +0.1", *spec.SPOT_FACE_CALLOUT.splitlines()],
         drawing.SECTION_KEEP["SpotFaceDia"],
     )
     assert counterbore[0] > _BORDER + 0.003

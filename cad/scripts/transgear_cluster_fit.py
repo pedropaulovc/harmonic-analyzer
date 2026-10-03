@@ -9,19 +9,25 @@ wall.  The hub and disc are trapped axially between the sleeve's step face
 (rearward: the hub's spigot seats on it and passes the disc's bore; the
 hub's flange clamps the disc's front face, the spigot's length ahead of the
 step) and the front bushing (forward); the D-flat carries the torque.
-Three windows are set at assembly, in this order:
+The hub's front face stands up to ``HUB_NOSE_WINDOW`` behind the nose, so hub
+and disc slide forward off the step by that recess, independently of the
+sleeve, before the hub meets the front bushing: the disc's end float is the
+sleeve's float plus the recess.  Three windows are set at assembly, in this
+order:
 
 0. With the MHA-159 hub's spigot on the step and the disc on the spigot, the
    hub's front face is faced until it stands ``HUB_NOSE_WINDOW`` behind the
    sleeve's nose, so the front bushing bears on the steel nose (the hub never
    thrusts, R9-5) and traps hub and disc against the step.
 1. m, the air from F (the MHA-078 knob shaft's 12T front face) to the
-   MHA-070 disc's front face with the knob shaft rearward and the cluster
-   pushed FORWARD, is set to ``FIT_WINDOW`` by facing the FRONT bushing.
-   Pushed forward, the cluster bears through the front bushing on the ring,
-   so the rear bushing does not enter m.
-2. The cluster's axial float is then set to ``FLOAT_WINDOW`` by facing the
-   REAR bushing.
+   MHA-070 disc's front face with the knob shaft rearward and the cluster,
+   hub and disc pushed FORWARD, is set to ``FIT_WINDOW`` by facing the FRONT
+   bushing.  Pushed forward, the cluster bears through the front bushing on
+   the ring and the hub on the bushing, so neither the rear bushing nor the
+   recess enters m, and m is the disc's least air to F.
+2. The sleeve's float is then set to ``SLEEVE_FLOAT_WINDOW`` by facing the
+   REAR bushing, which holds the disc's end float (sleeve float plus recess)
+   to ``FLOAT_WINDOW`` at any recess.
 
 The reverse order of 1 and 2 cannot hold both: m read with the cluster
 rearward is m plus the float, so a front bushing faced to that reading leaves
@@ -31,9 +37,10 @@ had the bushings' roles the other way round; this order supersedes it.)
 Both chains run from the arm's REAR face, where the pin's head and the
 MHA-165 plate both seat, so the arm's thickness drops out of m:
 
-    front bushing = m + groove station - ring thickness
+    front bushing = m + recess + groove station - ring thickness
                     - (sleeve length - tooth length - spigot length) - F
-    rear bushing  = F - tooth length - spigot length - arm thickness - m - float
+    rear bushing  = F - tooth length - spigot length - arm thickness - m
+                    - disc end float
 
 with F (from the arm's rear face) = plate hub face + thrust ring + 12T face.
 Each term is taken at its owning module's printed band.
@@ -61,7 +68,8 @@ from _printed_tolerance import printed_band_mm
 # m: F to the disc's front face, cluster forward (R9-47's window, unchanged).
 FIT_WINDOW = (0.10, 0.20)
 FIT_WINDOW_TEXT = f"{FIT_WINDOW[0]:.2f}-{FIT_WINDOW[1]:.2f}"
-# The cluster's axial float (R9-5's window, unchanged).
+# The disc's end float, hub and disc between the step and the front bushing
+# with the sleeve between its bushings (R9-5's window, unchanged).
 FLOAT_WINDOW = (0.2, 0.4)
 FLOAT_WINDOW_TEXT = f"{FLOAT_WINDOW[0]:.1f}-{FLOAT_WINDOW[1]:.1f}"
 FIT_WINDOW_CENTRE = round(sum(FIT_WINDOW) / 2.0, 6)
@@ -71,6 +79,12 @@ FLOAT_WINDOW_CENTRE = round(sum(FLOAT_WINDOW) / 2.0, 6)
 HUB_NOSE_WINDOW = (0.0, 0.10)
 HUB_NOSE_WINDOW_TEXT = f"{HUB_NOSE_WINDOW[0]:.2f}-{HUB_NOSE_WINDOW[1]:.2f}"
 HUB_NOSE_WINDOW_CENTRE = round(sum(HUB_NOSE_WINDOW) / 2.0, 6)
+# The sleeve's own float, set by the rear bushing (step 2): the disc's end
+# float less the hub's recess, so the disc's stays in FLOAT_WINDOW at every
+# recess the hub's facing leaves.
+SLEEVE_FLOAT_WINDOW = (FLOAT_WINDOW[0], round(FLOAT_WINDOW[1] - HUB_NOSE_WINDOW[1], 6))
+SLEEVE_FLOAT_WINDOW_TEXT = f"{SLEEVE_FLOAT_WINDOW[0]:.1f}-{SLEEVE_FLOAT_WINDOW[1]:.1f}"
+SLEEVE_FLOAT_WINDOW_CENTRE = round(sum(SLEEVE_FLOAT_WINDOW) / 2.0, 6)
 
 # The disc's front face stands the hub spigot's length ahead of the sleeve's
 # step, so the disc's thickness enters no chain: only where its rear face
@@ -116,7 +130,8 @@ HUB_LENGTH_FITTED_MAX = round(
 HUB_LENGTH_MODEL = round(HUB_CHAIN_NOMINAL - HUB_NOSE_WINDOW_CENTRE, 6)  # 13.70
 
 # --- Front bushing: m -------------------------------------------------------------
-# (term, nominal, band, sign): K = sum(sign * nominal); front bushing = K + m.
+# (term, nominal, band, sign): K = sum(sign * nominal); front bushing = K + m
+# + the hub's recess (m is read with hub and disc forward on the bushing).
 FRONT_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
     ("MHA-179 groove station", PIN.GROOVE_STATION, PIN.GROOVE_STATION_BAND, 1),
     ("MHA-182 ring thickness", RING.THICKNESS, RING.THICKNESS_TOL, -1),
@@ -135,11 +150,11 @@ FRONT_CHAIN_NOMINAL = round(
 )  # 4.8775
 FRONT_CHAIN_BAND = round(sum(band for _, _, band, _ in FRONT_CHAIN_TERMS), 6)
 FRONT_BUSHING_FITTED_MIN = round(
-    FRONT_CHAIN_NOMINAL - FRONT_CHAIN_BAND + FIT_WINDOW[0], 6
-)
+    FRONT_CHAIN_NOMINAL - FRONT_CHAIN_BAND + FIT_WINDOW[0] + HUB_NOSE_WINDOW[0], 6
+)  # 4.1767
 FRONT_BUSHING_FITTED_MAX = round(
-    FRONT_CHAIN_NOMINAL + FRONT_CHAIN_BAND + FIT_WINDOW[1], 6
-)
+    FRONT_CHAIN_NOMINAL + FRONT_CHAIN_BAND + FIT_WINDOW[1] + HUB_NOSE_WINDOW[1], 6
+)  # 5.9783
 
 # --- Rear bushing: the float ------------------------------------------------------
 REAR_CHAIN_TERMS: tuple[tuple[str, float, float, int], ...] = (
@@ -164,15 +179,18 @@ REAR_BUSHING_FITTED_MAX = round(
     REAR_CHAIN_NOMINAL + REAR_CHAIN_BAND - FIT_WINDOW[0] - FLOAT_WINDOW[0], 6
 )  # 6.67
 
-# --- The model: both windows at their centres on the nominal chains -----------
-FRONT_BUSHING_MODEL = round(FRONT_CHAIN_NOMINAL + FIT_WINDOW_CENTRE, 6)  # 5.0275
+# --- The model: every window at its centre on the nominal chains --------------
+FRONT_BUSHING_MODEL = round(
+    FRONT_CHAIN_NOMINAL + FIT_WINDOW_CENTRE + HUB_NOSE_WINDOW_CENTRE, 6
+)  # 5.0775
 REAR_BUSHING_MODEL = round(
     REAR_CHAIN_NOMINAL - FIT_WINDOW_CENTRE - FLOAT_WINDOW_CENTRE, 6
 )  # 6.0
 
 # Machine z of the model's faces, cluster REARWARD (the sleeve on the rear
-# bushing, the float open between the front bushing and the ring, the ring
-# on the groove's load wall).  Machine -Z is forward.
+# bushing, its float open between the front bushing and the ring, the ring
+# on the groove's load wall; hub and disc on the step, the recess open).
+# Machine -Z is forward.
 ARM_REAR_Z = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625
 ARM_FRONT_Z = ARM.FRONT_FACE_MACHINE_Z  # -124.4
 REAR_BUSHING_REAR_Z = ARM_FRONT_Z
@@ -184,18 +202,22 @@ NOSE_Z = round(SLEEVE_REAR_Z - SLEEVE.OVERALL_LENGTH, 6)  # -157.75
 HUB_FRONT_Z = round(STEP_Z - HUB_LENGTH_MODEL, 6)  # -157.70
 FRONT_BUSHING_REAR_Z = NOSE_Z
 FRONT_BUSHING_FRONT_Z = round(NOSE_Z - FRONT_BUSHING_MODEL, 6)  # -162.7775
-RING_REAR_Z = round(FRONT_BUSHING_FRONT_Z - FLOAT_WINDOW_CENTRE, 6)  # -163.0775
+RING_REAR_Z = round(FRONT_BUSHING_FRONT_Z - SLEEVE_FLOAT_WINDOW_CENTRE, 6)  # -163.0775
 RING_FRONT_Z = round(RING_REAR_Z - RING.THICKNESS, 6)  # -163.7125
 F_Z = round(ARM_REAR_Z - F_FROM_ARM_REAR, 6)  # -148.1
-MODEL_M = round(DISC_FRONT_Z - FLOAT_WINDOW_CENTRE - F_Z, 6)  # 0.15
+# m with the cluster, hub and disc forward: the disc comes forward by the
+# sleeve's float and the hub's recess, together the disc's end float.
+MODEL_M = round(
+    DISC_FRONT_Z - (SLEEVE_FLOAT_WINDOW_CENTRE + HUB_NOSE_WINDOW_CENTRE) - F_Z, 6
+)  # 0.15
 
-# The sleeve's rear face, cluster forward, from the arm's front face: the
-# rear bushing's fitted gap plus the float (the rear bushing can follow the
-# sleeve forward), 6.35 .. 6.87 (the 12T over the rack, the bushing to the
-# rack's back face: build_paper_drive_assembly).
+# The sleeve's rear face, cluster, hub and disc forward, from the arm's front
+# face: the rear bushing's fitted gap plus the sleeve's float (the rear
+# bushing can follow the sleeve forward), 6.25 .. 6.87 (the 12T over the
+# rack, the bushing to the rack's back face: build_paper_drive_assembly).
 SLEEVE_REAR_FORWARD_FROM_ARM = (
-    round(REAR_CHAIN_NOMINAL - REAR_CHAIN_BAND - FIT_WINDOW[1], 6),
-    round(REAR_CHAIN_NOMINAL + REAR_CHAIN_BAND - FIT_WINDOW[0], 6),
+    round(REAR_CHAIN_NOMINAL - REAR_CHAIN_BAND - FIT_WINDOW[1] - HUB_NOSE_WINDOW[1], 6),
+    round(REAR_CHAIN_NOMINAL + REAR_CHAIN_BAND - FIT_WINDOW[0] - HUB_NOSE_WINDOW[0], 6),
 )
 
 # Running fits on the pin (sleeve and both bushings share the bore band).

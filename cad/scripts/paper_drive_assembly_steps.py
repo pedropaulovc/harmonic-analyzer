@@ -275,9 +275,11 @@ OFFSET_ACCEPT_TOL = 0.10
 # What the acceptance passes, in service: the seated front faces within the
 # accepted band, the mid-planes a half plate band either way (both chain
 # wheels are MHA-081 plates); then the crank's end play, the knob's end
-# float and the T24's own float under the nut forward, the hanger's head
-# play rearward (transgear_drive_collar_spec's in-service terms):
-# -0.15 - 0.05 - 0.25 - 0.25 - 0.15 = -0.85 .. +0.05 + 0.05 + 0.35 = +0.45.
+# float and the T24's own float under the nut forward.  Nothing moves the
+# T12 rearward: the MHA-184 spring holds the arm on a spacer pressed on the
+# MHA-168 shoulder, so its tilt is fixed in the bar and read here as made
+# (transgear_drive_collar_spec's in-service terms):
+# -0.15 - 0.05 - 0.25 - 0.25 - 0.15 = -0.85 .. +0.05 + 0.05 + 0 = +0.10.
 _HALF_PLATE_SPREAD = (max(removable.PLATE_BAND) - min(removable.PLATE_BAND)) / 2.0
 ACCEPTED_CHAIN_OFFSET_IN_SERVICE = (
     -(collar.FIT_UP_OFFSET_TARGET + OFFSET_ACCEPT_TOL)
@@ -288,7 +290,7 @@ ACCEPTED_CHAIN_OFFSET_IN_SERVICE = (
     OFFSET_ACCEPT_TOL
     - collar.FIT_UP_OFFSET_TARGET
     + _HALF_PLATE_SPREAD
-    + collar.HANGER_HEAD_PLAY_MAX,
+    + collar.HANGER_AXIAL_PLAY_MAX,
 )
 if max(map(abs, ACCEPTED_CHAIN_OFFSET_IN_SERVICE)) > collar.CHAIN_OFFSET_LIMIT:
     raise AssertionError(

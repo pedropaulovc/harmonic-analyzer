@@ -22,6 +22,7 @@ import paper_drive_assembly_steps as steps
 import paper_drive_explode_spec as explode
 import transgear_drive_collar_spec as collar
 import transgear_cluster_fit as cluster_fit
+import transgear_front_bushing_spec as front_bushing
 import transgear_knob_cup_pin_spec as cup_pin
 import transgear_knob_cup_spec as cup
 import transgear_knob_shaft_spec as knob_shaft
@@ -64,6 +65,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "transgear-arm-plate-screw": 2,
     "transgear-pivot-spacer": 1,
     "transgear-pivot-screw": 1,
+    "transgear-pivot-spring": 1,
     "transgear-latch-pin": 1,
     "latch-hook-bracket": 1,
     "latch-hook-bracket-screw": 2,
@@ -203,7 +205,9 @@ def test_the_steps_fit_their_fields() -> None:
     assert drawing.EXPLODED_CAPTION_XY[1] - NOTE_LINE_PITCH > template.title_block_top_m
 
 
-def test_the_bom_fits_left_of_the_title_block_and_on_the_sheet() -> None:
+def test_the_bom_fits_left_of_the_title_block_and_inside_the_border() -> None:
+    """Machinist review of 6c385465d: item 41 sat below the inner border; the
+    old check stopped at the sheet's edge."""
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
     left, top = drawing.BOM_ANCHOR
     width = sum(drawing.BOM_COLUMN_WIDTHS.values())
@@ -215,7 +219,9 @@ def test_the_bom_fits_left_of_the_title_block_and_on_the_sheet() -> None:
     assert wrapped <= len(drawing.GROUPED_DESCRIPTION_STEMS)
     height = (len(drawing.BOM_PART_NUMBERS) + 1 + wrapped) * drawing.BOM_ROW_HEIGHT
     assert left + width < template.title_block_left_m
-    assert top - height > 0.003
+    assert top - height >= (
+        drawing.SHEET_INNER_BORDER_BOTTOM + drawing.BOM_BORDER_CLEARANCE
+    )
     assert top < template.height_m - 0.003
 
 
@@ -566,31 +572,35 @@ def test_the_knob_stack_prints_front_to_rear() -> None:
     assert body.index("REAR BOSS") < body.index(_number("transgear-knob-cup"))
 
 
-def test_the_pivot_screw_is_threadlocked_and_the_spacer_fitted_as_made() -> None:
-    """R9-7 adds threadlocker to MHA-168; R9-6 never faces MHA-167."""
+def test_the_pivot_screw_is_threadlocked_and_the_spacer_pressed_as_made() -> None:
+    """R9-7 adds threadlocker to MHA-168; R9-6 never faces MHA-167.  R9-71:
+    the spacer is pressed on the shoulder flush with its end, and the MHA-184
+    spring under the head holds the arm on it."""
     body = _step_body("hanger-pivoted")
     assert "LOW-STRENGTH THREADLOCKER" in body
     assert _number("transgear-pivot-screw") in body
     assert _number("transgear-pivot-spacer") in body
+    assert _number("transgear-pivot-spring") in body
     assert "AS MADE" in body
+    assert "FLUSH WITH ITS END ON A FLAT" in body
     # No step shortens the spacer.
     assert not re.search(r"\bFACE (IT|THE SPACER|TO)\b", drawing.FITUP_STEPS)
 
 
 def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
     """§13.2 (8): offset 0.05 ±0.10, knob float at the cup's feeler band
-    (R9-70: 0.15..0.25), head play 0.10..0.35, collar-disc air 0.10 min, the
-    T24 free under the nut."""
+    (R9-70: 0.15..0.25), collar-disc air 0.10 min, the T24 free under the
+    nut.  R9-71: the hanger has no head play left to read."""
     assert drawing.KNOB_END_FLOAT_RANGE == pytest.approx((0.15, 0.25), abs=1e-9)
     body = _step_body("fitup-accepted")
     for text in (
         "0.05 \u00b10.10 FORWARD",
         "0.15 TO 0.25",
-        "0.10 TO 0.35",
         "0.10 MIN",
         "T24 FREE UNDER THE NUT",
     ):
         assert text in body, text
+    assert "HEAD PLAY" not in body
 
 
 def test_the_knob_stack_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
@@ -665,10 +675,42 @@ def test_the_collar_is_pinned_before_the_stud_is_cut_and_the_stack_accepted() ->
 
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     rear = _step_body("rear-bushing-faced-to-fit")
-    assert f"END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT}" in rear
+    assert f"DISC END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT}" in rear
     assert cluster_fit.FIT_WINDOW_TEXT in _step_body("front-bushing-faced-to-fit")
     assert "2.30 TO 2.50 PROUD" in _step_body("collar-pins-pressed")
     assert "12.96 TO 14.49 PROUD" in _step_body("latch-pin-pressed")
+
+
+def test_the_hub_recess_is_in_m_and_in_the_disc_end_float() -> None:
+    """Codex P2 (6c385465d): the hub stands up to HUB_NOSE_WINDOW behind the
+    nose, so hub and disc reach the front bushing that much ahead of the
+    step. m is read with them forward, so the recess cannot close it below
+    FIT_WINDOW's minimum, and the front bushing's longest fit carries it; the
+    rear bushing leaves the sleeve the float less the recess, so the disc's
+    end float stays FLOAT_WINDOW (the disc-to-platen stack's term)."""
+    recess = cluster_fit.HUB_NOSE_WINDOW
+    longest = (
+        cluster_fit.FRONT_CHAIN_NOMINAL
+        + cluster_fit.FRONT_CHAIN_BAND
+        + cluster_fit.FIT_WINDOW[1]
+        + recess[1]
+    )
+    assert cluster_fit.FRONT_BUSHING_FITTED_MAX == pytest.approx(longest)
+    assert front_bushing.BLANK_LENGTH_MIN >= longest + front_bushing.FACING_ALLOWANCE
+    sleeve = cluster_fit.SLEEVE_FLOAT_WINDOW
+    for r in recess:
+        assert cluster_fit.FLOAT_WINDOW[0] <= sleeve[0] + r
+        assert sleeve[1] + r <= cluster_fit.FLOAT_WINDOW[1] + 1e-9
+    # The model, cluster rearward with the hub on the step, reads m forward.
+    forward = (
+        cluster_fit.SLEEVE_FLOAT_WINDOW_CENTRE + cluster_fit.HUB_NOSE_WINDOW_CENTRE
+    )
+    assert cluster_fit.DISC_FRONT_Z - forward - cluster_fit.F_Z == pytest.approx(
+        cluster_fit.FIT_WINDOW_CENTRE
+    )
+    assert "CLUSTER, HUB AND DISC FORWARD, FEEL m" in _step_body(
+        "front-bushing-faced-to-fit"
+    )
 
 
 def test_the_rear_bushing_blank_is_faced_to_the_gauged_gap_before_it_goes_on() -> None:
@@ -678,16 +720,22 @@ def test_the_rear_bushing_blank_is_faced_to_the_gauged_gap_before_it_goes_on() -
     sleeve rear face from the arm's front face, with the front bushing and
     ring on, faces the blank to it less the float, and only then puts it on
     the pin."""
-    gap_nominal = cluster_fit.REAR_CHAIN_NOMINAL - cluster_fit.FIT_WINDOW_CENTRE
+    gap_nominal = (
+        cluster_fit.REAR_CHAIN_NOMINAL
+        - cluster_fit.FIT_WINDOW_CENTRE
+        - cluster_fit.HUB_NOSE_WINDOW_CENTRE
+    )
     assert rear_bushing.BLANK_LENGTH_MIN > gap_nominal
     lo, hi = cluster_fit.SLEEVE_REAR_FORWARD_FROM_ARM
     assert lo <= gap_nominal <= hi
-    # The gap less the float band is the length band the bushing's sheet sets.
-    assert lo - cluster_fit.FLOAT_WINDOW[1] == pytest.approx(rear_bushing.GAP_MIN)
-    assert hi - cluster_fit.FLOAT_WINDOW[0] == pytest.approx(rear_bushing.GAP_MAX)
+    # The gap less the sleeve's float band is the length band the bushing's
+    # sheet sets.
+    sleeve = cluster_fit.SLEEVE_FLOAT_WINDOW
+    assert lo - sleeve[1] == pytest.approx(rear_bushing.GAP_MIN)
+    assert hi - sleeve[0] == pytest.approx(rear_bushing.GAP_MAX)
     rear = _step_body("rear-bushing-faced-to-fit")
     gauged = rear.index("DEPTH-GAUGE THE SLEEVE REAR FACE FROM THE ARM")
-    faced = rear.index(f"BLANK TO THAT LESS {cluster_fit.FLOAT_WINDOW_TEXT}")
+    faced = rear.index(f"BLANK TO THAT LESS {cluster_fit.SLEEVE_FLOAT_WINDOW_TEXT}")
     fitted = rear.index("BLANK ON")
     assert gauged < faced < fitted
     # The hung cluster carries no rear bushing until then.
@@ -978,7 +1026,7 @@ def test_the_t24_is_read_held_back_on_its_seat() -> None:
     """Codex P2 on b2eb9a0e1: the T24 floats 0.05-0.15 forward of its seat
     under the nut, so d and the acceptance read it held back on the seat, the
     pose the chain-plane budget starts from; the float is then forward only.
-    Accepted at 0.05 ±0.10 seated, the pair runs -0.85..+0.45 in service."""
+    Accepted at 0.05 ±0.10 seated, the pair runs -0.85..+0.10 in service."""
     pose = _step_body("fitup-pose-set")
     assert steps.T24_HELD_BACK_TEXT in pose
     assert _step_body("collar-gap-measured").startswith(
@@ -987,7 +1035,7 @@ def test_the_t24_is_read_held_back_on_its_seat() -> None:
     accepted = _step_body("fitup-accepted")
     assert accepted.startswith(f"ACCEPT, IN STEP {steps.step_number('fitup-pose-set')}")
     low, high = steps.ACCEPTED_CHAIN_OFFSET_IN_SERVICE
-    assert (low, high) == pytest.approx((-0.85, 0.45), abs=1e-9)
+    assert (low, high) == pytest.approx((-0.85, 0.10), abs=1e-9)
     # The float is in the budget, forward: the contract's set range and the
     # acceptance both lose it at their forward ends.
     assert collar.CHAIN_OFFSET_IN_SERVICE[0] == pytest.approx(

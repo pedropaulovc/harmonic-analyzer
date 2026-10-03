@@ -78,7 +78,7 @@ for _label, _places, _band in (
 # Explicit model bands, (upper, lower) deviations where one-sided.
 # The counterbore only cuts oversize (drilled-hole row).
 SPOT_FACE_DIA_BAND = (SPOT_FACE_DIA_GROWTH, 0.0)
-# Floor from the FRONT face: the pivot head's end play (contract §13).
+# Floor from the FRONT face: the MHA-184 spring's room under the head (R9-71).
 SPOT_FACE_FLOOR_TOLERANCE = SPOT_FACE_FLOOR_BAND
 # Pin, plate-tap and latch-pin positions (contract §12 row 457).
 HOLE_POSITION_TOLERANCE = HOLE_POSITION_BAND

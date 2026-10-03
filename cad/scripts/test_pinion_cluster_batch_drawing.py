@@ -533,6 +533,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("transgear-pin-1", "transgear-arm-1")): _annulus_limit(
                 3.9, 3.874, 7.9375
             ),
+            # R9-71: MHA-167's Ø4.727 ream pressed on MHA-168's Ø4.7625
+            # shoulder over its 5.5 length.
+            frozenset(("transgear-pivot-spacer-1", "transgear-pivot-screw-1")): (
+                _annulus_limit(4.7625, 4.727, 5.5)
+            ),
             # MHA-182's three prong arcs, atan(3/4) of the turn each, at the
             # Ø2.8956 free diameter inside the MHA-179 Ø2.9464 groove floor.
             frozenset(("transgear-retaining-ring-1", "transgear-pin-1")): (

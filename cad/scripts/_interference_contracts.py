@@ -459,6 +459,11 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     frozenset(("transgear-pin-1", "transgear-arm-1")): _smooth_annulus_limit_mm3(
         3.9, 3.874, 7.9375
     ),
+    # MHA-167 (transgear_pivot_spacer_spec, Ø4.727 ream) pressed on the
+    # MHA-168 Ø4.7625 shoulder over its whole 5.5 length (R9-71): the press.
+    frozenset(("transgear-pivot-spacer-1", "transgear-pivot-screw-1")): (
+        _smooth_annulus_limit_mm3(4.7625, 4.727, 5.5)
+    ),
     # MHA-182 (transgear_retaining_ring_spec) in the MHA-179 groove: the
     # vendor replica is the ring as McMaster ships it, its prongs on the
     # Ø2.8956 free diameter, 0.0254 inside the Ø2.9464 groove floor: the grip,

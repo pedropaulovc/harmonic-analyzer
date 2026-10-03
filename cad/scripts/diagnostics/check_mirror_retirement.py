@@ -925,6 +925,9 @@ expect(
     p.ROT_X_POS90,
     "pivot screw",
 )
+expect(
+    PD, "transgear-pivot-spring-1", [*_P, p.PIVOT_SPRING_Z0], IDENTITY, "pivot spring"
+)
 _K = [p.KNOB_SHAFT_XY[0], p.KNOB_SHAFT_XY[1]]
 expect(PD, "transgear-arm-plate-1", [*_K, p.PLATE_Z0], _arm_rows, "arm plate")
 for i, (x, y) in enumerate(p.PLATE_SCREW_XY):

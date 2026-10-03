@@ -223,18 +223,16 @@ def _spacer_gap(monkeypatch, assembly) -> float:
     return float(re.search(r"pivot spacer (-?\d+\.\d+)", line).group(1))
 
 
-def test_set_locks_clear_the_floating_pivot_spacer_in_the_sweep(monkeypatch) -> None:
-    """R9-61: the spacer floats on the pivot shoulder (Ø5.030 bore on the
-    Ø4.7371 shoulder: 0.14645), the bar prints the pivot tap ±0.065, and each
-    set plate's far edge stands its skewed reach toward the bar; the 15.65
-    plate keeps the floor through all three."""
+def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
+    """R9-61: the bar prints the pivot tap ±0.065, and each set plate's far
+    edge stands its skewed reach toward the bar; the 15.65 plate keeps the
+    floor through both.  R9-71: the spacer is pressed on the shoulder, so its
+    O.D. no longer floats off the screw axis (it took 0.14645 on the old
+    Ø5.030 bore over the Ø4.7371 shoulder)."""
     import build_paper_drive_assembly as assembly
 
-    # The largest bore on the thinnest 3/16 shoulder (+0/-0.001 in).
-    bore_max = spacer.BORE_DIA + spacer.BORE_DIA_BAND
-    spacer_float = (bore_max - (0.1875 - 0.001) * IN) / 2.0
-    assert spacer_float == pytest.approx(0.14645, abs=1e-5)
-    spacer_r = (spacer.OD + spacer.OD_BAND) / 2.0 + spacer_float + 0.065
+    assert spacer.BORE_DIA_MAX < (0.1875 - 0.001) * IN
+    spacer_r = (spacer.OD + spacer.OD_BAND) / 2.0 + 0.065
     far_reach = (22.8 - _HOLE_X[1] + 0.035) * (_SET_MAX - _SET_MIN) / 13.93 - _SET_MIN
     pivot_y = assembly.PIVOT_XY[1]
     bottom_rail, top_rail = assembly.GUIDE_Y
@@ -244,10 +242,10 @@ def test_set_locks_clear_the_floating_pivot_spacer_in_the_sweep(monkeypatch) -> 
         pivot_y - spacer_r - (bottom_far + far_reach),
         (top_far - far_reach) - (pivot_y + spacer_r),
     )
-    assert gap == pytest.approx(0.142, abs=1e-3)
+    assert gap == pytest.approx(0.142 + 0.14645, abs=1e-3)
     assert gap >= assembly.LOCK_SWEEP_FLOOR
     assert _spacer_gap(monkeypatch, assembly) == pytest.approx(gap, abs=1e-3)
-    # The 16-high plate the old model passed runs into the floating spacer.
+    # The 16-high plate the old model passed still runs into the spacer.
     monkeypatch.setattr(
         assembly,
         "LOCK_PLATE_Y",
@@ -283,9 +281,12 @@ def test_sweep_refuses_a_lock_set_toward_the_spacer(monkeypatch) -> None:
     import build_paper_drive_assembly as assembly
 
     far, guide_side = assembly.LOCK_SET_EDGE_REACH
-    # A far edge 0.10 nearer the spacer than the set and skewed plate can
-    # reach runs under the sweep floor.
-    monkeypatch.setattr(assembly, "LOCK_SET_EDGE_REACH", (far + 0.10, guide_side))
+    # A far edge reaching 0.01 past the spacer gap's margin over the sweep
+    # floor runs under it.
+    margin = _spacer_gap(monkeypatch, assembly) - assembly.LOCK_SWEEP_FLOOR
+    monkeypatch.setattr(
+        assembly, "LOCK_SET_EDGE_REACH", (far + margin + 0.01, guide_side)
+    )
     monkeypatch.setattr(assembly, "log", lambda *_a: None)
     with pytest.raises(AssertionError, match="pivot spacer"):
         assembly._assert_lock_station_sweep()

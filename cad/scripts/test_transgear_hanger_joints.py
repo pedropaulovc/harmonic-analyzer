@@ -21,6 +21,7 @@ import transgear_hanger_joints as joints
 import transgear_latch_pin_spec as latch_pin
 import transgear_pivot_screw_spec as pivot
 import transgear_pivot_spacer_spec as spacer
+import transgear_pivot_spring_spec as spring
 from _hole_spec import TAP_DRILL_MM
 
 
@@ -56,13 +57,42 @@ def test_the_bar_tap_countersink_is_charged_to_the_tap_drill(monkeypatch) -> Non
         _reload_joints()
 
 
-def test_pivot_head_never_clamps_the_arm(monkeypatch) -> None:
-    assert (
-        0.0 < joints.HEAD_PLAY_MIN <= joints.HEAD_PLAY_NOMINAL <= joints.HEAD_PLAY_MAX
-    )
-    # A spacer long by the minimum play closes the gap at the worst case.
-    monkeypatch.setattr(spacer, "LENGTH", spacer.LENGTH + joints.HEAD_PLAY_MIN)
-    with pytest.raises(AssertionError, match="clamp the arm"):
+def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
+    monkeypatch,
+) -> None:
+    """R9-71: the MHA-184 spring holds the arm on the spacer at every printed
+    corner, never pressed past its catalogue working height.  The old floor
+    (7.00, the free pivot's 0.10..0.35 head play) leaves the spring loose."""
+    assert joints.SPRING_ROOM_MIN == pytest.approx(0.70, abs=1e-9)
+    assert joints.SPRING_ROOM_MAX == pytest.approx(0.9508, abs=1e-9)
+    assert spring.WORKING_HEIGHT <= joints.SPRING_ROOM_MIN
+    assert joints.SPRING_ROOM_MAX < spring.FREE_HEIGHT
+    assert joints.SPRING_PRELOAD_N == pytest.approx((19.15, 38.91), abs=0.01)
+    for floor in (7.0, 6.5):
+        monkeypatch.setattr(arm, "SPOT_FACE_FLOOR_FROM_FRONT", floor)
+        with pytest.raises(AssertionError, match="leaves the spring"):
+            _reload_joints()
+
+
+def test_the_hanger_tilt_is_the_spacers_squareness_not_the_bore_float() -> None:
+    """Codex P1 on 6c385465d: free on its shoulder the arm tilted by the bore
+    clearance, 0.0421 rad.  Preloaded on the pressed spacer it tilts by the
+    two face perpendicularities over the smallest face, 0.02 / 8.47."""
+    assert joints.HANGER_TILT == pytest.approx(0.02 / 8.47, rel=1e-9)
+    assert joints.HANGER_TILT < 0.042144 / 10.0
+
+
+def test_the_hanger_still_falls_onto_its_hook_and_stays_square(monkeypatch) -> None:
+    """The preload's friction never holds the hanger off the latch hook, and
+    its weakest end still holds the arm square against the hanger's forward
+    weight.  The rejected 9712K58 pair, ~3.5 times stiffer, held it off."""
+    assert joints.HANGER_SWING_MARGIN >= 2.0
+    assert joints.HANGER_TILT_HOLD_MARGIN >= 2.0
+    monkeypatch.setattr(spring, "RATE_N_PER_MM", spring.RATE_N_PER_MM * 3.5)
+    with pytest.raises(AssertionError, match="off the hook"):
+        _reload_joints()
+    monkeypatch.setattr(spring, "RATE_N_PER_MM", spring.RATE_N_PER_MM / 3.5 / 2.0)
+    with pytest.raises(AssertionError, match="tilt moment"):
         _reload_joints()
 
 
@@ -291,7 +321,7 @@ def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
 
 
 def test_spacer_wall_is_the_one_printed_shortfall() -> None:
-    worst = (spacer.OD - spacer.OD_BAND - spacer.BORE_DIA - spacer.BORE_DIA_BAND) / 2.0
+    worst = (spacer.OD - spacer.OD_BAND - spacer.BORE_DIA_MAX) / 2.0
     assert math.isclose(spacer.WALL_WORST, worst)
     assert spacer.WALL_WORST_PRINTED <= worst + 1e-9 < 2.0
     assert f"{spacer.WALL_WORST_PRINTED:.2f} MIN" in spacer.WALL_NOTE

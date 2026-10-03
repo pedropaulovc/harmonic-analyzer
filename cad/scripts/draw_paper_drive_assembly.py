@@ -45,6 +45,7 @@ import transgear_knob_cup_spec as knob_cup
 import transgear_knob_drive_pin_spec as drive_pin
 import transgear_knob_shaft_spec as knob_shaft
 import transgear_pivot_screw_spec as pivot_screw
+import transgear_pivot_spring_spec as spring
 import transgear_removable_spec as sprocket
 from _common import _com_invoke, _early_bound, check, run_build
 from _paper_drive_explode import exploded_view_name
@@ -135,8 +136,12 @@ ISO_RING_LIMITS = (0.235, 0.069, 0.418, 0.267)
 ASSEMBLED_CAPTION_XY = (0.018, 0.120)
 
 # --- sheet 2: BOM left, ballooned transgear isometric right ------------------
-# The drive-train BOM's column widths and row height (MHA-A03), on the same
-# template: its 118 mm description column held 41 characters on one line.
+# The drive-train BOM's column widths (MHA-A03), on the same template: its
+# 118 mm description column held 41 characters on one line, and a wrapped
+# description read 10.195 mm for two lines there (5.1 a line).  At its 6.0
+# row the 44 rows here (MHA-184 added, R9-71) ran past the inner border at
+# the sheet's foot, so the rows close to 5.5: the table ends 0.0200 up,
+# 7.3 mm clear of the 0.0127 border.
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
     "part": 0.022,
@@ -144,8 +149,12 @@ BOM_COLUMN_WIDTHS = {
     "quantity": 0.012,
 }
 BOM_DESCRIPTION_MAX_CHARS = 41
-BOM_ROW_HEIGHT = 0.006
+BOM_ROW_HEIGHT = 0.0055
 BOM_ANCHOR = (0.018, 0.262)
+# The ASME B landscape sheet's inner border, bottom edge, and the clearance
+# the BOM keeps above it.
+SHEET_INNER_BORDER_BOTTOM = 0.0127
+BOM_BORDER_CLEARANCE = 0.003
 # The transgear alone at 2:3, right of the inner view's ring and above the
 # title block. Native run 20261001T062924323Z read its outline at x 295.3 to
 # 404.8 mm centred at x 355; here it spans 286.3 to 395.8, its ring 269.3 to
@@ -252,6 +261,7 @@ BOM_PART_NUMBERS = {
     "transgear-arm-plate-screw": _config.parts("transgear-arm-plate-screw")["number"],
     "transgear-pivot-spacer": _config.parts("transgear-pivot-spacer")["number"],
     "transgear-pivot-screw": _config.parts("transgear-pivot-screw")["number"],
+    "transgear-pivot-spring": _config.parts("transgear-pivot-spring")["number"],
     "transgear-latch-pin": _config.parts("transgear-latch-pin")["number"],
     "latch-hook-bracket": _config.parts("latch-hook-bracket")["number"],
     "latch-hook-bracket-screw": _config.parts("latch-hook-bracket-screw")["number"],
@@ -283,6 +293,9 @@ _SKU = {
         "supplier_skus"
     ][0],
     "transgear-pivot-screw": _config.parts("transgear-pivot-screw")["supplier_skus"][0],
+    "transgear-pivot-spring": _config.parts("transgear-pivot-spring")["supplier_skus"][
+        0
+    ],
     "transgear-latch-pin": _config.parts("transgear-latch-pin")["supplier_skus"][0],
     "latch-hook-bracket-screw": _config.parts("latch-hook-bracket-screw")[
         "supplier_skus"
@@ -330,6 +343,9 @@ BOM_DESCRIPTIONS = {
     "transgear-pivot-spacer": "TRANSGEAR PIVOT SPACER",
     "transgear-pivot-screw": (
         f"{pivot_screw.THREAD} SHOULDER SCREW, MCMASTER {_SKU['transgear-pivot-screw']}"
+    ),
+    "transgear-pivot-spring": (
+        f"CURVED DISC SPRING, MCMASTER {_SKU['transgear-pivot-spring']}"
     ),
     "transgear-latch-pin": f"DOWEL PIN, MCMASTER {_SKU['transgear-latch-pin']}",
     "latch-hook-bracket": "LATCH HOOK BRACKET",
@@ -387,6 +403,7 @@ TRANSGEAR_QUANTITIES = {
     "transgear-arm-plate-screw": len(arm_geometry.PLATE_TAP_STATIONS),
     "transgear-pivot-spacer": 1,
     "transgear-pivot-screw": 1,
+    "transgear-pivot-spring": spring.COUNT,
     "transgear-latch-pin": 1,
     "latch-hook-bracket": 1,
     "latch-hook-bracket-screw": len(bracket_geometry.SCREW_HOLE_X),
@@ -954,12 +971,17 @@ def _step_text() -> dict[str, str]:
             f"{joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S FRONT "
             f"FACE; BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}."
         ),
+        # R9-71: the spacer is pressed on the shoulder, so its faces' tilt is
+        # fixed in the bar; the MHA-184 spring holds the arm on it, light
+        # enough that the arm still falls onto the hook on its own weight
+        # (transgear_hanger_joints.HANGER_SWING_MARGIN).
         "hanger-pivoted": (
-            f"HANG THE ARM ON THE {_N['support-bar']} BAR: THE "
-            f"{_N['transgear-pivot-spacer']} SPACER AS MADE BETWEEN BAR AND ARM, "
-            f"THE {_N['transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR "
-            "THROUGH ARM AND SPACER INTO THE BAR'S BLIND TAP WITH LOW-STRENGTH "
-            "THREADLOCKER. SEAT IT; THE ARM SWINGS FREELY."
+            f"{_N['transgear-pivot-spring']} SPRING, THEN ARM, ON THE "
+            f"{_N['transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR; PRESS "
+            f"THE {_N['transgear-pivot-spacer']} SPACER, AS MADE, ON THE SHOULDER, "
+            "FLUSH WITH ITS END ON A FLAT. SEAT IT IN THE "
+            f"{_N['support-bar']} BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER; "
+            "THE ARM FALLS FREELY."
         ),
         "disc-cluster-assembled": (
             f"FIT THE {_N['rack-pinion']} DISC ON THE {_N['transgear-disc-hub']} "
@@ -1036,23 +1058,23 @@ def _step_text() -> dict[str, str]:
             f"{_N['latch-hook-rivet']} RIVETS. UNCLAMP, LATCH, RE-RUN THE TRAVEL."
         ),
         "fitup-pose-set": (
-            "HANGER LATCHED. PULL THE CRANK SHAFT FORWARD AND THE ARM FORWARD "
-            f"AGAINST THE SPACER; PUSH THE KNOB SHAFT REARWARD ({teeth} ON THE "
+            "HANGER LATCHED. PULL THE CRANK SHAFT FORWARD; PUSH THE KNOB SHAFT "
+            f"REARWARD ({teeth} ON THE "
             f"RING, RING ON THE HUB). SLIDE THE COLLAR BACK AGAINST THE {teeth}; "
             f"T24 AND THUMBNUT ON FINGER-TIGHT, {steps.T24_HELD_BACK_TEXT}."
         ),
         "front-bushing-faced-to-fit": (
-            f"CLUSTER FORWARD, FEEL m, THE {teeth}-TO-DISC AIR. FACE THE "
+            f"CLUSTER, HUB AND DISC FORWARD, FEEL m ({teeth} TO DISC). FACE THE "
             f"{_N['transgear-front-bushing']} BUSHING'S REAR TILL m IS "
-            f"{cluster_fit.FIT_WINDOW_TEXT}; ELSE STOP AND REPORT."
+            f"{cluster_fit.FIT_WINDOW_TEXT}; ELSE REPORT."
         ),
         # The blank (MHA-180 BLANK_LENGTH_MIN) is longer than the nominal gap
         # it fills, so it is faced to the gap gauged before it goes on.
         "rear-bushing-faced-to-fit": (
             "CLUSTER FORWARD, DEPTH-GAUGE THE SLEEVE REAR FACE FROM THE ARM; "
             f"FACE THE {_N['transgear-rear-bushing']} BLANK TO THAT LESS "
-            f"{cluster_fit.FLOAT_WINDOW_TEXT}. STRIP TO THE PIN, BLANK ON, REFIT. "
-            f"END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT}, SPINNING FREELY; ELSE "
+            f"{cluster_fit.SLEEVE_FLOAT_WINDOW_TEXT}. STRIP TO THE PIN, BLANK ON, "
+            f"REFIT. DISC END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT} AND FREE; ELSE "
             "REPORT."
         ),
         "collar-gap-measured": (
@@ -1087,9 +1109,7 @@ def _step_text() -> dict[str, str]:
             "FOR PINNING AND GAUGE SPREAD: THE T24 UP TO "
             f"{steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET:.2f} BEHIND "
             f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; T24 FREE "
-            "UNDER THE NUT; PIVOT HEAD PLAY "
-            f"{joints.HEAD_PLAY_MIN:.2f} TO {joints.HEAD_PLAY_MAX:.2f}, THE "
-            "HANGER FREE; COLLAR TO DISC AIR "
+            "UNDER THE NUT; THE HANGER FREE; COLLAR TO DISC AIR "
             f"{steps.COLLAR_DISC_AIR_TEXT}. ELSE REPORT."
         ),
         "chain-closed": (

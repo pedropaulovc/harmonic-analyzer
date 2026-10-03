@@ -1,4 +1,4 @@
-r"""The hanger's screwed joints and pivot play, judged at the printed bands.
+r"""The hanger's screwed joints, pivot spring and tilt, at the printed bands.
 
 PURE DATA, no SolidWorks/COM imports.  The two purchased screws' catalog
 modules stay free of their mates (their stock builds rebuild only when the
@@ -18,8 +18,10 @@ may import it; no part build does.
   in the arm is the arm less its two tap countersinks.  Every stock screw,
   head riding its countersink on the plate-to-arm pitch mismatch, must stand
   proud of the arm far enough for the cut to take its incomplete lead.
-* The pivot head's end play in the arm's spot face: shoulder - spacer -
-  spot-face floor (from the arm's front face).
+* The MHA-167 spacer pressed on the MHA-168 shoulder, and the MHA-184
+  spring's room under the head: shoulder - spacer - spot-face floor (from
+  the arm's front face).  The spring holds the arm on the spacer, so the
+  hanger's tilt is the spacer's face squareness, fixed in the bar's frame.
 * The MHA-169 latch pin pressed to the floor of the arm's blind end-face
   hole (R9-12): the hole's reamed band keeps the press, its depth band and
   the dowel's length grade set the proud range, the shallowest hole still
@@ -42,6 +44,7 @@ import transgear_arm_plate_screw_spec as PLATE_SCREW
 import transgear_pivot_screw_spec as PIVOT
 import transgear_latch_pin_spec as LATCH_PIN
 import transgear_pivot_spacer_spec as SPACER
+import transgear_pivot_spring_spec as SPRING
 
 ENGAGEMENT_TARGET_D = 1.5
 
@@ -89,37 +92,106 @@ if PIVOT_TIP_TO_DRILL_BOTTOM <= 0.0:
 if not BAR.PIVOT_TAP_CSK_DIA < PIVOT.SHOULDER_DIA + PIVOT.SHOULDER_DIA_LIMITS[0]:
     raise AssertionError("the bar tap's countersink swallows the shoulder end")
 
-# --- Pivot head play: shoulder - spacer - spot-face floor --------------------
-HEAD_PLAY_NOMINAL = PIVOT.SHOULDER_LEN - SPACER.LENGTH - ARM.SPOT_FACE_FLOOR_FROM_FRONT
-HEAD_PLAY_MIN = (
+# --- MHA-167 spacer pressed on the MHA-168 shoulder (R9-71) -----------------
+# Pressed at the bench, its front face flush with the shoulder's end on a
+# flat, so the screw seats both on the bar as one body: the spacer turns with
+# the screw while it is tightened and is then fixed in the bar's frame, its
+# faces' squareness with it (the fit-up reads the result).  The spacer's
+# spec holds the press at both limits (SPACER.PRESS_INTERFERENCE).
+_SHOULDER_MIN = PIVOT.SHOULDER_DIA + min(PIVOT.SHOULDER_DIA_LIMITS)
+_SHOULDER_MAX = PIVOT.SHOULDER_DIA + max(PIVOT.SHOULDER_DIA_LIMITS)
+
+# --- MHA-184 spring room: shoulder - spacer - spot-face floor ----------------
+# The spring holds the arm's front face on the spacer's rear face, so the
+# hanger has no end play; the room between the spot-face floor and the head
+# must stay between the spring's catalogue working height and its free
+# height at every printed corner.
+SPRING_ROOM_NOMINAL = (
+    PIVOT.SHOULDER_LEN - SPACER.LENGTH - ARM.SPOT_FACE_FLOOR_FROM_FRONT
+)
+SPRING_ROOM_MIN = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[0]
     - (SPACER.LENGTH + SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT + ARM.SPOT_FACE_FLOOR_BAND)
-)
-HEAD_PLAY_MAX = (
+)  # 0.70
+SPRING_ROOM_MAX = (
     PIVOT.SHOULDER_LEN
     + PIVOT.SHOULDER_LEN_LIMITS[1]
     - (SPACER.LENGTH - SPACER.LENGTH_BAND)
     - (ARM.SPOT_FACE_FLOOR_FROM_FRONT - ARM.SPOT_FACE_FLOOR_BAND)
-)
-if not 0.0 < HEAD_PLAY_MIN <= HEAD_PLAY_NOMINAL <= HEAD_PLAY_MAX:
-    raise AssertionError("the pivot head can clamp the arm")
-# Head in the spot face; the shoulder in the arm and spacer bores, at the
-# smallest bore their .XXX rows accept on the largest shoulder.
+)  # 0.9508
+if not SPRING.WORKING_HEIGHT <= SPRING_ROOM_MIN < SPRING_ROOM_MAX < SPRING.FREE_HEIGHT:
+    raise AssertionError(
+        f"MHA-184 room {SPRING_ROOM_MIN:.4f}..{SPRING_ROOM_MAX:.4f} leaves the "
+        f"spring's {SPRING.WORKING_HEIGHT:.4f}..{SPRING.FREE_HEIGHT:.4f}"
+    )
+if abs(SPRING.MODEL_HEIGHT - SPRING_ROOM_NOMINAL) > 1e-9:
+    raise AssertionError("the spring is not modelled at the nominal room")
+# [INFERENCE: the catalogue's working point read as a linear rate.]
+SPRING_PRELOAD_N = (
+    SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MAX),
+    SPRING.RATE_N_PER_MM * (SPRING.FREE_HEIGHT - SPRING_ROOM_MIN),
+)  # 19.2 .. 38.9
+
+# --- Hanger tilt: fixed in the bar's frame by the spacer ---------------------
+# Preloaded on the spacer's rear face, the arm stands square to the screw
+# axis within the spacer's two face perpendicularities over the smallest
+# face it seats on; the shoulder's float in the arm bore no longer tilts it.
+# The term does not change in service: the spacer is pressed on the screw.
+HANGER_TILT = (
+    SPACER.REAR_FACE_PERPENDICULARITY + SPACER.FRONT_FACE_PERPENDICULARITY
+) / SPACER.FACE_PERPENDICULARITY_ZONE_DIA  # rad
+_FREE_PIVOT_TILT = 0.042144  # rad, the unpreloaded arm on its bore clearance
+if not 0.0 < HANGER_TILT < _FREE_PIVOT_TILT / 10.0:
+    raise AssertionError(f"the hanger tilt {HANGER_TILT:.6f} rad lost the spacer")
+
+# --- Gravity against the preload's friction and tilt hold --------------------
+# The hanger must still swing down onto the latch hook on its own weight,
+# and the preload must hold the arm square on the spacer against the
+# hanger's weight standing forward of it.  [INFERENCE: masses from the
+# parts' analytic volumes (steel 7870, brass 8500 kg/m3) and levers from
+# the assembly's stations; mu 0.3 dry steel and brass.]
+HANGER_MASS_KG = 0.530  # [INFERENCE]
+HANGER_GRAVITY_TORQUE_NMM = 187.65  # [INFERENCE] about P, at the hook
+HANGER_TILT_MOMENT_NMM = 36.4  # [INFERENCE] CG forward of the spacer face
+PIVOT_FRICTION_MU = 0.3  # [INFERENCE]
+# The arm turns on the spacer's rear face (mean radius of the annulus from
+# the arm bore to the smallest O.D.) and on the spring under the head (mean
+# of its I.D. and the head).
+_R_IN = ARM.PIVOT_BORE_DIA / 2.0
+_R_OUT = SPACER.FACE_PERPENDICULARITY_ZONE_DIA / 2.0
+_SPACER_FACE_R = 2.0 / 3.0 * (_R_OUT**3 - _R_IN**3) / (_R_OUT**2 - _R_IN**2)
+_SPRING_HEAD_R = (SPRING.ID + PIVOT.HEAD_DIA) / 4.0
+PIVOT_FRICTION_TORQUE_MAX_NMM = (
+    PIVOT_FRICTION_MU * SPRING_PRELOAD_N[1] * (_SPACER_FACE_R + _SPRING_HEAD_R)
+)  # 78
+HANGER_SWING_MARGIN = HANGER_GRAVITY_TORQUE_NMM / PIVOT_FRICTION_TORQUE_MAX_NMM
+if HANGER_SWING_MARGIN < 2.0:
+    raise AssertionError(
+        f"the pivot's friction {PIVOT_FRICTION_TORQUE_MAX_NMM:.1f} N.mm can hold "
+        f"the hanger off the hook ({HANGER_GRAVITY_TORQUE_NMM:.1f} N.mm)"
+    )
+HANGER_TILT_HOLD_NMM = SPRING_PRELOAD_N[0] * _R_OUT  # 81
+HANGER_TILT_HOLD_MARGIN = HANGER_TILT_HOLD_NMM / HANGER_TILT_MOMENT_NMM
+if HANGER_TILT_HOLD_MARGIN < 2.0:
+    raise AssertionError(
+        f"the weakest preload holds {HANGER_TILT_HOLD_NMM:.1f} N.mm against the "
+        f"hanger's {HANGER_TILT_MOMENT_NMM:.1f} N.mm tilt moment"
+    )
+
+# Head and spring in the spot face; the shoulder in the arm bore at the
+# smallest bore the .XXX row accepts on the largest shoulder; the spring's
+# I.D. on the shoulder, floating to the spot face's wall.
 HEAD_RADIAL_CLEARANCE = (ARM.SPOT_FACE_DIA - PIVOT.HEAD_DIA) / 2.0
 SHOULDER_RADIAL_CLEARANCE = (
-    min(
-        ARM.PIVOT_BORE_DIA - ARM.PIVOT_BORE_DIA_BAND,
-        SPACER.BORE_DIA - SPACER.BORE_DIA_BAND,
-    )
-    - PIVOT.SHOULDER_DIA
-    - PIVOT.SHOULDER_DIA_LIMITS[1]
+    ARM.PIVOT_BORE_DIA - ARM.PIVOT_BORE_DIA_BAND - _SHOULDER_MAX
 ) / 2.0
-if HEAD_RADIAL_CLEARANCE <= 0.0 or SHOULDER_RADIAL_CLEARANCE <= 0.0:
-    raise AssertionError("the pivot screw binds in the arm")
-if abs(SPACER.BORE_DIA - ARM.PIVOT_BORE_DIA) > 1e-9:
-    raise AssertionError("the spacer and the arm no longer share the running bore")
+SPRING_RIM_CLEARANCE = (
+    ARM.SPOT_FACE_DIA - SPRING.OD - (SPRING.ID - _SHOULDER_MIN)
+) / 2.0  # 0.21
+if min(HEAD_RADIAL_CLEARANCE, SHOULDER_RADIAL_CLEARANCE, SPRING_RIM_CLEARANCE) <= 0.0:
+    raise AssertionError("the pivot screw or its spring binds in the arm")
 
 # --- MHA-166 plate screws in the arm ------------------------------------------
 if PLATE_SCREW.THREAD != ARM.PLATE_TAP_SPEC.size:

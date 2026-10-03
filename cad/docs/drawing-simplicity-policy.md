@@ -94,6 +94,10 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      its bore (datum A). Unpreloaded on its sleeve, the clamped disc's rim
      wobble must stay inside the disc-to-platen air (R9-68; user ruling
      2026-10-02).
+   - **hanger pivot** — the MHA-167 pivot spacer's two faces square to its
+     pressed bore (datum A). The preloaded MHA-184 spring seats the hanger on
+     those faces, so their squareness is the hanger's only tilt; it must hold
+     the disc rim inside the disc-to-platen air (R9-71).
 
    Everything else — frames, bases, crank parts, handles, knobs, brackets,
    blocks, pedestals, shafts, bushings, gears, screws — carries **no frames
