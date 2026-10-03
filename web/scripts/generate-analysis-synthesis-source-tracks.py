@@ -21,6 +21,11 @@ Synthesis cone-overview retains a two-FIT chosen perspective-camera similarity.
 Cam-rod uses a root-selected upright three-original-FIT fixed-intrinsics SQPNP
 physical pose; former similarities are historical/unaccepted evidence only.
 Independent qualification remains missing; CHECKs never enter camera objectives.
+The cam-rod receipt's exact scene-source seal is intentional: stale calibration
+still refuses current regeneration after a renderer change. Historical replay
+tests supply the original sealed scene bytes, never fresh renderer acceptance.
+The pinned historical receipt records actual raw native model observations.
+Fresh GPU evidence requires new receipt/probe/code pins and a deliberate producer update.
 Synthesis wheel-macro uses only its original wheel-centre FIT and actual GPU
 centre for a chosen principal-point translation; its hanger CHECK stays held out.
 Analysis's stationary full-front shot holds its original frame428 CPU FIT camera
@@ -1061,11 +1066,18 @@ class Generator:
         snapshot, capture = receipt["snapshot"], receipt["renderedLandmarks"]
         rendered = next(view for view in snapshot["views"] if view["id"] == "main")["renderedMechanism"]
         identity = receipt["frameIdentity"]
+        provenance = snapshot["modelProvenance"]
+        # These immutable receipt bytes observed the original raw native model,
+        # not today's optimized transport. Fresh capture needs new evidence pins.
         if (identity["sourceImage"] != previous["sourceImage"] or identity["shotId"] != "cam-rod"
                 or identity["viewId"] != "main" or identity["timeSeconds"] != 100
                 or identity["decodedTimeSeconds"] != previous["decodedTimeSeconds"]
-                or snapshot["modelProvenance"]["identity"] != "matched"
-                or snapshot["modelProvenance"]["observedSha256"] != lineage["nativeModelSha256"]
+                or provenance.get("identity") != "matched"
+                or lineage["nativeModelSha256"] != self.data["model"]["sha256"]
+                or provenance.get("sourceCommit") != self.data["model"]["sourceCommit"]
+                or provenance.get("expectedSha256") != lineage["nativeModelSha256"]
+                or provenance.get("observedSha256") != lineage["nativeModelSha256"]
+                or "representationKind" in provenance
                 or rendered["input"] != lineage["completeInput"] or rendered["timeSeconds"] != 100
                 or rendered["sourceDrawRevision"] != lineage["sourceDrawRevision"]
                 or capture["status"] != "captured" or capture["timeSeconds"] != 100 or capture["viewId"] != "main"):

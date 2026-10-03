@@ -572,6 +572,7 @@ async function fetchMachine(): Promise<void> {
     viewer.fitView()
     initialCamera = cameraRecord()
     loading.hidden = true
+    modelStatus.textContent = `Lossless Meshopt model loaded (${machine.provenance.observedSha256?.slice(0, 12)}; ${machine.provenance.observedByteLength} bytes). Native CAD source ${machine.provenance.sourceSha256.slice(0, 12)} @ ${machine.provenance.sourceCommit.slice(0, 12)}; loading does not qualify source calibration.`
     notice(modelError, machine.missing.length ? `Unresolved native joints: ${machine.missing.join(', ')}. This model cannot establish complete footage fidelity.` : '')
     configureLandmarkProbe()
     manualRevision = 'clean'

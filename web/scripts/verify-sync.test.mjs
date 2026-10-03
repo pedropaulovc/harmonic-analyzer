@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose } from './verify-sync.mjs'
-import { jsonDigest } from './verify-reference.mjs'
+import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } from './verify-sync.mjs'
+import { jsonDigest, MODEL_SHA256, MODEL_COMMIT } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
@@ -694,4 +694,36 @@ test('visible source motion cannot override the complete same-shot minimum playb
   const interval = playbackInterval(record)
   assert.equal(interval.frame.shotId, 'montage')
   assert.ok(interval.availableSeconds >= 3)
+})
+
+test('render verification separates the real representation digest from pinned raw native identity', () => {
+  const descriptor = {
+    schemaVersion: 1, kind: 'lossless-web-model-representation',
+    source: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT },
+    representation: { path: 'models/harmonic-analyzer.glb', sha256: 'a'.repeat(64), byteLength: 4096, codec: 'EXT_meshopt_compression' },
+    pipeline: { version: 1, steps: ['exact-dedup', 'meshopt'], codecVersion: 'meshoptimizer@0.22.0' },
+    equivalence: { method: 'decoded-per-drawable-exact-v1', semanticSha256: 'b'.repeat(64), drawableCount: 435 },
+  }
+  const actual = {
+    videoId: 'fixture', playerVideoId: 'fixture', modelState: 'ready', missingBindings: [],
+    modelProvenance: {
+      sourceSha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT, representationKind: descriptor.kind,
+      identity: 'matched', expectedSha256: descriptor.representation.sha256, observedSha256: descriptor.representation.sha256,
+      expectedByteLength: descriptor.representation.byteLength, observedByteLength: descriptor.representation.byteLength,
+    },
+    physics: { springForcesN: Array(20).fill(1), springLengthsM: Array(20).fill(0.1), equilibriumResidualNm: 0 },
+  }
+  requireModel(actual, 'fixture', descriptor)
+  for (const change of [
+    { observedSha256: MODEL_SHA256 },
+    { expectedSha256: MODEL_SHA256 },
+    { sourceSha256: 'c'.repeat(64) },
+    { sourceCommit: 'd'.repeat(40) },
+    { observedByteLength: 4095 },
+    { expectedByteLength: 4095 },
+    { identity: 'mismatched' },
+  ]) assert.throws(() => requireModel({ ...actual, modelProvenance: { ...actual.modelProvenance, ...change } }, 'fixture', descriptor), /identity mismatch/)
+  const unapprovedSource = structuredClone(descriptor)
+  unapprovedSource.source.sha256 = 'c'.repeat(64)
+  assert.throws(() => requireModel(actual, 'fixture', unapprovedSource), /different native CAD source/)
 })

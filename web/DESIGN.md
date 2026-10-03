@@ -11,13 +11,16 @@ read CAD authority; the website does not infer dimensions from video pixels.
 reference hashes. `youtube-player.ts` owns the visible official embed.
 `timeline.ts` selects compact source camera and physical-input tracks per view.
 `main.ts` follows the original playback clock or permits paused exploration;
-`scene.ts` applies the physical pose to the full native GLB.
+`scene.ts` applies the physical pose to the lossless delivery representation of
+the full native GLB.
 
-The GLB hash and source revision must match the generated mechanical data.
-A rejected load never enters the visible scene. Bindings resolve genuine native
-component names; missing joints have a separate persistent warning and prevent
-complete synchronization acceptance. Original geometry is not decimated, resized
-or replaced with proxy parts.
+The raw GLB hash and source revision must match the generated mechanical data.
+The browser separately verifies the actual optimized bytes against the compiled
+representation record before loading them with the Meshopt decoder. A rejected
+load never enters the visible scene. Bindings resolve genuine native component
+names; missing joints have a separate persistent warning and prevent complete
+synchronization acceptance. Original geometry is not decimated, resized or
+replaced with proxy parts.
 
 The viewer generates a PMREM room environment once for image-based lighting.
 The native steel and brass materials are fully metallic, so diffuse hemisphere
@@ -26,6 +29,99 @@ light only: its room geometry is not added to the machine scene or drawable
 inventory, and native GLB geometry and materials remain unchanged. Temporary room
 and PMREM resources are released after generation; the environment render target
 is released with the viewer.
+
+## Model delivery and release provenance
+
+`fetch-model.mjs` invokes `optimize-model.mjs`: exact buffer/accessor/mesh/image
+deduplication comes first, followed by Meshopt 0.22.0 compression. Quantization,
+simplification, node pruning, index reordering and instancing are excluded.
+Image dependencies must be sealed in the GLB: embedded buffer-view and data-URI
+image bytes are preserved. External image URIs are rejected, including companion
+files, network URLs, `blob:` and `file:` references; optimization must not depend
+on ambient files or fetched image content.
+The optimizer fully decodes source and output and compares semantics bit-exactly
+per named drawable; compression and sharing must not change geometry, material,
+transform or component identity. This representation check is separate from
+geometry acceptance and measured source fidelity; neither is established by
+successful optimization.
+
+Raw exports are cached as `.vite/model-source/<rawSHA>.glb`, outside `public/`.
+Only `public/models/harmonic-analyzer.glb`, the optimized representation, is
+published. Both model files remain untracked. A fresh checkout without an asset
+must retain the supported missing-model UI.
+
+Tracked `content/model-representation.json` pins the raw native source commit
+and SHA-256 alongside the actual optimized SHA-256, byte count, semantic digest
+and codec. Its `pipeline.steps` is exactly `['exact-dedup', 'meshopt']`, in that
+order. The browser imports this record at build time, checks its raw association
+against `MECHANISM_DATA`, then hashes the fetched optimized bytes.
+A public manifest is not a trust authority. Native observations and their model
+SHA remain tied to the raw export. Runtime `observedSha256` identifies the actual
+optimized bytes; explicit `sourceSha256` identifies the native association.
+These hashes must not be aliased or substituted for one another.
+
+For the current release, the single command
+`npm --prefix web run fetch-model -- /path/to/raw.glb` validates the existing raw
+pin, optimizes and stages publication without changing native mathematical
+metadata or historical evidence. With no path, it uses the existing
+`cad/out/gltf/` export.
+
+A future actual CAD release requires both approved identifiers:
+
+```sh
+npm --prefix web run fetch-model -- /path/to/new.glb --source-commit <full40hexapprovedCADcommit> --source-sha256 <approvedraw64hexreleasehash>
+```
+
+The commit is a full 40-hex CAD revision and the hash is the approved 64-hex raw
+release digest, not the optimized digest. Neither flag alone authorizes adoption,
+and naming the current source commit cannot approve arbitrary replacement bytes.
+The command archives the exact matching CAD revision for the parameterized
+`export-mechanics.py`, verifies the new raw export's native rest/mechanical
+compatibility, then stages native metadata and optimized publication. A missing
+commit, incompatible mathematics or a refused release preserves the last working
+assets. No invented release sidecar supplies approval or automatic fidelity.
+
+Before publication, new-source adoption checks the archived CAD against the
+actual immutable exports/functions in `kinematics.ts`: channel count/order,
+physical tooth ratios, cone reduction, paper-chain/reducer/feed pitch and senses,
+and total signed feed. It also checks magnifier minimum/built/maximum ratios and
+the fixed `PEN_X`/`PEN_Y`/`PEN_Z` world datum from `magnifier.ts` with a 0.002 mm
+tolerance. Unsupported mathematical changes are refused with a named parameter
+before live assets are replaced. Geometry, rest, spring and setup data may change;
+proportional magnifier geometry is allowed when its ratios remain compatible.
+The same-current-release path skips native metadata regeneration and these
+new-source gates, leaving the four mechanics/math file hashes unchanged.
+
+Spring compatibility is checked against the actual immutable `scene.ts` deformer
+and classifier expressions, extracted from its AST rather than a copied browser
+formula. Source-derived channel and counter profiles include coil-end inset and
+correction, coil/wire radii and free/maximum-length coil ends; the counter also
+supplies its coil axis. Channel profiles additionally describe the native
+transition polar handle/tangent, hook-eye centres and transition control points.
+The channel transition recipe comes from the exact archived
+`diag_build_9432K31.py` expressions/constants, with provenance recorded.
+The gate permits dynamic stock dimensions, turns, catalogue lengths, force and
+setup when the source shape agrees with the actual consumer; counter rigid
+loop/transition geometry is not frozen. Only the existing tiny native solver
+residue in free-length transition interior points uses a 1e-6 mm positional
+tolerance; polar/handle and other comparisons retain their tight checks.
+
+The direct mechanics-export invocation uses the same authority inputs and an
+isolated uv environment, but is not a substitute for the staged release command:
+
+```sh
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/requirements-model-export.txt python web/scripts/export-mechanics.py --model /path/to/raw.glb --source-commit <full40hexapprovedCADcommit> --expected-model-sha256 <approvedraw64hexreleasehash> --output /path/to/mechanics-data.ts
+```
+
+The requirements file pins only the exporter's minimal dependencies without
+syncing the root SolidWorks project. `--model` is the raw native GLB;
+`--source-commit` selects the exact archived CAD revision rather than the working
+tree; `--expected-model-sha256` enforces its raw digest. `--output` selects the
+metadata destination; the release command uses staged metadata rather than
+publishing that output early. Existing tracks and capture-bound evidence for the
+old raw model are stale after adoption and must reject source-following.
+Compatible manual exploration is not recalibration; replacement needs new
+model-bound evidence before any source-fidelity acceptance claim.
 
 ## Physical model
 
@@ -307,8 +403,68 @@ particular diagnostic path, that path's known correctness defects still matter.
 
 ## Assets and rights
 
-The full native GLB is approximately 223 MB. The website loads one model and
-reuses geometry buffers during motion. Source observations load per video.
+The current raw native GLB is 222,903,724 bytes with approximately 5.627 million
+instance-expanded triangles. Its twenty exact-duplicate channel springs each
+contain 147,248 triangles and contribute 52.3% of that triangle count. Measured
+duplicate raw payload accounts for 102,076,512 bytes; two identical PNGs account
+for a further 10,415,064 duplicate bytes. These source measurements are not
+measured optimized savings.
+
+Two current source-v37 imports produced identical optimized bytes:
+
+| Representation | Bytes |
+|---|---:|
+| Raw native export | 222,903,724 |
+| Exact deduplication | 61,672,576 |
+| Meshopt delivery asset | 38,975,844 |
+
+The measured overall byte reduction is 82.5145%. All 429 source nodes and 433
+drawable instances are preserved. Exact sharing reduces mesh definitions from
+324 to 141 and images from two to one, without reducing drawable instances or
+instance-expanded triangles. Full decode comparison matched 222,538,856 bytes
+exactly. The four native mechanics/math file SHA-256 values remained unchanged.
+
+The raw SHA-256 is
+`2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d`;
+the actual optimized SHA-256 is
+`ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719`.
+The per-named-drawable semantic digest is
+`b60baed017b499c6d48e8b5aeab3c2c19f2ad256c26c0bd8e17cb094b3b4a093`.
+These are import/representation measurements, not a browser-runtime count,
+frame-rate result or geometry/source fidelity acceptance.
+
+A real headed Chromium smoke verified the 38,975,844-byte download against the
+optimized SHA-256 above and the compiled raw association. It observed 435 runtime
+drawables with zero missing bindings. At the same 106.5/118.5 camera, all twenty
+rocker GPU raster records (pixel counts, extents and contours) matched the raw
+baseline bit-for-bit. All twenty spring lengths changed independently; eighteen
+visible spring rasters changed, while two springs were occluded.
+
+Three continuous original-MP4 Analysis/Synthesis clips completed with 209, 205
+and 444 frames and no stall, pause or error events. The maximum
+video/completed-draw delta was 54.341 ms after explicitly excluding the initial
+0.1-second startup period. This scoped playback/render smoke is not an FPS
+improvement measurement or source-fidelity acceptance.
+
+The 49 source regressions pass using a historical source fixture, not a new
+renderer calibration. Production camrod's current-code guard still refuses the
+old `7b28` scene receipt; no old receipt was rehashed or accepted as fresh
+calibration. The optimized-loader smoke does not replace the required current
+camrod GPU recapture.
+
+All 33 model tests passed: 24 top-level tests and nine real-exporter negative
+subtests. The actual exporter accepted compatible future geometry and refused
+unsupported tooth-ratio, feed-pitch, feed-sign and six spring-profile changes
+with named parameters before writing any live files. The archived source-v37
+export checked 211 source files and 130 native rest conditions and passed the
+enriched mathematical and spring-profile gates against the unchanged runtime.
+A current raw reimport reproduced the optimized SHA-256 and 38,975,844-byte
+size above; the production build also passed.
+
+The website loads one optimized model and reuses geometry buffers during motion.
+Exact sharing reduces buffers and cache duplication, while Meshopt changes
+download encoding, not the instance-expanded triangle count. Frame-rate
+improvement has not been measured. Source observations load per video.
 Downloaded MP4s, decoded frames, screenshots and verification reports stay
 outside tracked publication assets. The site embeds the originals through
 YouTube rather than hosting their streams. The 2014 book's non-commercial

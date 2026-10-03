@@ -5,9 +5,12 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
+import { assertNativeSourceAssociation, assertModelRepresentationBytes, REPRESENTATION_KIND } from '../model-representation.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const STAGES = [50, 20, 10, 5]
+const NATIVE_MODEL_IDENTITY = { modelSha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT }
+let approvedModelRepresentation = null
 const VIDEO_SLUGS = ['intro-history', 'synthesis', 'analysis', 'operation', 'machine-spin', 'rocker-arms']
 const SOURCE_HASHES = [
   '595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d',
@@ -324,11 +327,15 @@ async function staticSourceControls(record) {
 }
 
 async function snapshot(page) { return page.evaluate(() => window.harmonicAnalyzer.snapshot()) }
-function requireModel(actual, id) {
+export function requireModel(actual, id, representation = approvedModelRepresentation) {
   assert(actual.videoId === id && actual.playerVideoId === id, 'Rendered route/player identity mismatch')
   assert(actual.modelState === 'ready' && !actual.missingBindings?.length, 'Full native model is unavailable or has unresolved bindings')
+  const approved = assertNativeSourceAssociation(representation, NATIVE_MODEL_IDENTITY)
   const provenance = actual.modelProvenance
-  assert(provenance?.identity === 'matched' && provenance.observedSha256 === MODEL_SHA256 && provenance.expectedSha256 === MODEL_SHA256 && provenance.sourceCommit === MODEL_COMMIT, 'Actual model bytes/source commit mismatch')
+  assert(provenance?.identity === 'matched' && provenance.sourceSha256 === MODEL_SHA256 && provenance.sourceCommit === MODEL_COMMIT
+    && provenance.representationKind === REPRESENTATION_KIND
+    && provenance.expectedSha256 === approved.representation.sha256 && provenance.expectedByteLength === approved.representation.byteLength, 'Actual native source/compiled representation identity mismatch')
+  assertModelRepresentationBytes(approved, NATIVE_MODEL_IDENTITY, { sha256: provenance.observedSha256, byteLength: provenance.observedByteLength })
   assert(actual.physics?.springForcesN?.length === 20 && actual.physics.springForcesN.every(value => finite(value) && value >= 0) && actual.physics.springLengthsM?.length === 20 && actual.physics.springLengthsM.every(value => finite(value) && value > 0) && finite(actual.physics.equilibriumResidualNm), 'Actual native physical solve is unavailable')
 }
 async function openRoute(page, url, record, player) {
@@ -1002,15 +1009,20 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
   if (options.help) { console.log(HELP); return 0 }
   const startedAt = new Date().toISOString(), outputDirectory = resolve(options.output ?? resolve(WEB_ROOT, '.vite/verification-output', `stage-${options.stage}-${startedAt.replace(/[:.]/g, '-')}`))
   await mkdir(outputDirectory, { recursive: true })
-  const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT, integrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Every integer second, authored/visible change and actual source view remains mandatory; missing/failed required measurements never pass. Extra interior observations are diagnostic: missing/inadmissible oracles do not add certification prerequisites, but independently admitted measured pixel counterexamples still fail the stage. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
+  const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sourceSha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT, sourceIntegrity: 'unmeasured', representation: null, representationIntegrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Every integer second, authored/visible change and actual source view remains mandatory; missing/failed required measurements never pass. Extra interior observations are diagnostic: missing/inadmissible oracles do not add certification prerequisites, but independently admitted measured pixel counterexamples still fail the stage. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
   const abort = new AbortController(), interrupt = () => abort.abort(new Error('Verification interrupted'))
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
   let server, browser, context, page
   try {
     const referenceRoot = resolve(process.env.HARMONIC_REFERENCE_ROOT ?? resolve(WEB_ROOT, '.vite/reference-root'))
     report.builtAssets = await distManifest(resolve(WEB_ROOT, 'dist'))
-    assert(report.builtAssets.find(asset => asset.path === 'models/harmonic-analyzer.glb')?.sha256 === MODEL_SHA256, 'Built model is missing or differs from the unchanged223MB native export')
-    report.model.integrity = 'passed'
+    approvedModelRepresentation = assertNativeSourceAssociation(JSON.parse(await readFile(resolve(WEB_ROOT, 'content/model-representation.json'), 'utf8')), NATIVE_MODEL_IDENTITY)
+    const builtModel = report.builtAssets.find(asset => asset.path === approvedModelRepresentation.representation.path)
+    assert(builtModel, 'Built optimized model is missing')
+    assertModelRepresentationBytes(approvedModelRepresentation, NATIVE_MODEL_IDENTITY, { sha256: builtModel.sha256, byteLength: builtModel.bytes })
+    report.model.sourceIntegrity = 'associated-to-pinned-native-release'
+    report.model.representation = approvedModelRepresentation
+    report.model.representationIntegrity = 'passed'
     server = await serveDist(resolve(WEB_ROOT, 'dist'), { referenceRoot, requests: report.serverRequests, signal: abort.signal, base: process.env.SIMULATOR_BASE })
     report.baseUrl = server.url
     const { chromium } = await import('playwright')

@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Export pure CAD mechanism data and verify it against the released GLB.
+"""Export pure CAD mechanism data and verify it against an explicitly pinned raw GLB.
 
-Run from the repository root:
-  python web/scripts/export-mechanics.py --model /path/to/harmonic-analyzer.glb
-Only web output is written. CAD sources and the model are read-only. The GLB is
-not redistributed. Analytic force seats and calibrated native render seats are
+Run from the repository root (use the approved release commit and raw digest):
+  uv run --isolated --no-project --python 3.13 \\
+    --with-requirements web/scripts/requirements-model-export.txt \\
+    python web/scripts/export-mechanics.py --model /path/to/raw-native.glb \\
+    --source-commit 1268c23d4a8fc741147c5e09d8d1e45247a71945 \\
+    --expected-model-sha256 2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d
+Only web output is written. CAD sources and the raw model are read-only. The GLB
+is not redistributed. CAD is archived from the exact supplied commit, never from
+the working tree. Analytic force seats and calibrated native render seats are
 kept separate; the latter are never interpolated into an invented force model.
 """
 
@@ -17,6 +22,7 @@ import importlib
 import io
 import json
 import math
+import re
 import struct
 import subprocess
 import sys
@@ -110,6 +116,72 @@ def glb_nodes(path: Path) -> tuple[dict[str, list[float]], str]:
     return result, digest.hexdigest()
 
 
+def recipe_literal_constants(path: Path, names: tuple[str, ...]) -> dict:
+    """Read pinned numeric recipe constants without importing COM recipes."""
+    values = {}
+    for node in ast.parse(path.read_text(), filename=str(path)).body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in names:
+                    values[target.id] = ast.literal_eval(node.value)
+    if set(values) != set(names):
+        raise ValueError(f"Missing native mathematical contract {names} in {path}")
+    return values
+
+
+def spring_deformation_contract(cad: Path, stock, counter) -> tuple[dict, dict]:
+    """Read only the archived pure transition AST, never its COM imports.
+
+    Export the actual coil length law and hook/transition geometry consumed by
+    scene.ts. Catalogue limits, forces and other rigid end-assembly geometry
+    are deliberately not fixed by this contract.
+    """
+    transition_path = cad / "scripts/diagnostics/diag_build_9432K31.py"
+    transition_values = recipe_literal_constants(
+        transition_path,
+        ("VENDOR_TRANSITION_CP_MM", "VENDOR_HANDLE_POLAR_RAD", "_FREE_EPS_MM"),
+    )
+    transition_tree = ast.parse(transition_path.read_text(), filename=str(transition_path))
+    transition_function = next(
+        node for node in transition_tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "transition_bezier_mm"
+    )
+    namespace = {**vars(stock), **transition_values, "math": math}
+    exec(compile(ast.Module(body=[transition_function], type_ignores=[]),
+                 str(transition_path), "exec"), namespace)  # noqa: S102
+
+    contracts = []
+    for module in (stock, counter):
+        is_counter = module is counter
+        lengths = (module.FREE_LENGTH_MM, module.MAX_LENGTH_MM)
+        profiles = []
+        for length in lengths:
+            ends = (
+                (module.coil_start_x_mm(length), module.coil_end_x_mm(length))
+                if is_counter else module.coil_ends_mm(length)
+            )
+            profile = {"lengthMm": length, "coilEndsMm": ends}
+            if not is_counter:
+                profile["hookEyeCentresMm"] = module.end_centers_mm(length)
+                profile["transitionControlPointsMm"] = namespace["transition_bezier_mm"](length)
+            profiles.append(profile)
+        start, end = profiles[0]["coilEndsMm"]
+        contract = {
+            "coilEndInsetMm": lengths[0] / 2.0 + start,
+            "coilEndCorrectionMm": -start - end,
+            "coilMeanRadiusMm": module.COIL_MEAN_RADIUS_MM,
+            "wireRadiusMm": module.WIRE_RADIUS_MM if is_counter else module.WIRE_DIA_MM / 2.0,
+            "profiles": profiles,
+        }
+        if is_counter:
+            contract["coilAxis"] = module.COIL_AXIS
+        else:
+            contract["transitionHandlePolarRad"] = transition_values["VENDOR_HANDLE_POLAR_RAD"]
+            contract["transitionTangentMm"] = module.TRANSITION_TANGENT_MM
+        contracts.append(contract)
+    return tuple(contracts)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -117,23 +189,68 @@ def main() -> None:
     )
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument(
+        "--source-commit",
+        required=True,
+        help="Approved CAD source commit: exactly 40 lowercase hexadecimal characters",
+    )
+    parser.add_argument(
+        "--expected-model-sha256",
+        required=True,
+        help="Approved raw GLB SHA256: exactly 64 lowercase hexadecimal characters",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path(__file__).resolve().parents[1] / "src/mechanics-data.ts",
     )
     args = parser.parse_args()
-    working_cad = args.cad_root.resolve()
-    repo = working_cad.parent
-    # Evaluate the exact model revision, not today's potentially different CAD.
+    if not re.fullmatch(r"[0-9a-f]{40}", args.source_commit):
+        parser.error("--source-commit must be exactly 40 lowercase hexadecimal characters")
+    if not re.fullmatch(r"[0-9a-f]{64}", args.expected_model_sha256):
+        parser.error("--expected-model-sha256 must be exactly 64 lowercase hexadecimal characters")
+    if args.source_commit == RELEASE_COMMIT and args.expected_model_sha256 != RELEASE_SHA256:
+        parser.error(
+            f"--source-commit {RELEASE_COMMIT} requires the existing raw model SHA256 "
+            f"{RELEASE_SHA256}; its native release pin cannot be replaced"
+        )
+    try:
+        nodes, model_hash = glb_nodes(args.model)
+    except (OSError, ValueError, struct.error) as error:
+        parser.error(f"Cannot read --model as a complete raw GLB: {error}")
+    if model_hash != args.expected_model_sha256:
+        parser.error(
+            f"Raw model SHA256 {model_hash} differs from --expected-model-sha256 "
+            f"{args.expected_model_sha256}; supply the approved original raw GLB"
+        )
+    repo = args.cad_root.resolve().parent
+    # Evaluate the exact supplied model revision, never working-tree CAD.
     # Only pure scripts/configuration enter the temporary snapshot.
+    try:
+        archive = subprocess.check_output(
+            ["git", "archive", args.source_commit, "cad/scripts", "cad/config"],
+            cwd=repo,
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.decode("utf-8", errors="replace").strip()
+        parser.error(
+            f"Cannot archive CAD source commit {args.source_commit}: {detail}. "
+            "Fetch that exact commit with cad/scripts and cad/config; working-tree CAD is never used"
+        )
+    except OSError as error:
+        parser.error(f"Cannot archive CAD source commit {args.source_commit} from {repo}: {error}")
     snapshot = tempfile.TemporaryDirectory(prefix="harmonic-mechanics-source-")
     snapshot_root = Path(snapshot.name)
-    archive = subprocess.check_output(
-        ["git", "archive", RELEASE_COMMIT, "cad/scripts", "cad/config"], cwd=repo
-    )
-    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        tar.extractall(snapshot_root, filter="data")
+    try:
+        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+            tar.extractall(snapshot_root, filter="data")
+    except (OSError, tarfile.TarError) as error:
+        snapshot.cleanup()
+        parser.error(f"Cannot read CAD source archive for {args.source_commit}: {error}")
     cad = snapshot_root / "cad"
+    if not (cad / "scripts").is_dir() or not (cad / "config").is_dir():
+        snapshot.cleanup()
+        parser.error(f"CAD source archive for {args.source_commit} lacks cad/scripts or cad/config")
     sys.path.insert(0, str(cad / "scripts"))
     # This released data table sits in a COM recipe whose unrelated imports
     # pull telemetry/Windows machinery. Evaluate its exact assignment AST only:
@@ -229,6 +346,7 @@ def main() -> None:
     rod = modules["connecting_rod_spec"]
     stock = modules["channel_spring_stock_geom"]
     counter = modules["counter_spring_stock_geom"]
+    spring_deformation, counter_deformation = spring_deformation_contract(cad, stock, counter)
     mount = modules["spring_mount_geom"]
     settled = modules["settled_spring_seats"]
     goose = modules["gooseneck_geom"]
@@ -238,9 +356,13 @@ def main() -> None:
     paper = modules["paper_drive_geom"]
     chain = modules["_chain"]
     installation = modules["cone_pivot_post_installation"]
-    nodes, model_hash = glb_nodes(args.model)
-    if model_hash != RELEASE_SHA256:
-        raise ValueError(f"Model SHA256 {model_hash} is not the pinned v37 release")
+    feed_senses = recipe_literal_constants(
+        cad / "scripts/build_kinematic_probe.py", ("GEAR_SENSE", "FEED_SIGN")
+    )
+    crank_teeth = [
+        recipe_literal_constants(cad / "scripts/build_crank_pinion.py", ("TEETH",))["TEETH"],
+        recipe_literal_constants(cad / "scripts/crank_drive_gear_spec.py", ("TEETH",))["TEETH"],
+    ]
     count = config.machine("channels", "count")
     if count != 20:
         raise ValueError("The web solver requires the complete twenty-channel machine")
@@ -547,6 +669,9 @@ def main() -> None:
             "build_paper_drive_assembly.py",
             "build_magnifier_assembly.py",
             "build_kinematic_probe.py",
+            "build_crank_pinion.py",
+            "crank_drive_gear_spec.py",
+            "diagnostics/diag_build_9432K31.py",
         )
     )
     sources = []
@@ -564,8 +689,21 @@ def main() -> None:
         )
     data = {
         "harmonicNumbers": [row["harmonic_n"] for row in config.channels()],
+        "driveTrain": {
+            "crankRatio": config.machine("gear_train", "crank_drive_ratio"),
+            "crankTeeth": crank_teeth,
+            "cylinderTeeth": cyl.TEETH,
+            "channelMeshes": [
+                {
+                    "coneTeeth": row["cone_teeth"],
+                    "cylinderTeeth": row["cylinder_teeth"],
+                    "ratio": row["ratio"],
+                }
+                for row in config.channels()
+            ],
+        },
         "provenance": {
-            "sourceCommit": RELEASE_COMMIT,
+            "sourceCommit": args.source_commit,
             "modelSha256": model_hash,
             "units": "CAD mm; exported pose uses metres/radians/newtons",
             "sourceFiles": sources,
@@ -604,6 +742,7 @@ def main() -> None:
             "stickDivisionMm": config.machine("amplitude", "stick_division_spacing_mm"),
         },
         "spring": {
+            "deformation": spring_deformation,
             "anchorMm": mount.CHANNEL_ANCHOR_XY,
             "lowerSeatOffsetMm": mount._CHANNEL_LOWER_OFFSET,
             "upperSeatDropMm": mount._CHANNEL_UPPER_DROP,
@@ -620,6 +759,7 @@ def main() -> None:
             ),
         },
         "counter": {
+            "deformation": counter_deformation,
             "anchorMm": mount.COUNTER_ANCHOR_XY,
             "upperEyeXMm": mount.COUNTER_UPPER_EYE_X,
             "lowerSeatOffsetMm": mount._COUNTER_LOWER_OFFSET,
@@ -688,6 +828,13 @@ def main() -> None:
             "hubTangentMm": lw.WIRE_END,
             "wheelCentreMm": [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
             "penWireBottomMm": pw.WIRE_BOTTOM,
+            # magnifier.ts still fixes the nib datum. Expose the actual raw
+            # marker origin so the importer can reject a moved datum before
+            # publishing, without freezing other output geometry.
+            "penRestMm": [
+                value * 1000
+                for value in nodes["harmonic-analyzer/pen/pen-marker-1"][12:15]
+            ],
             "cadCoupling": "Rest-linearized yoke; operational wire swing/spin and wrap require the separate physical output-chain solver.",
         },
         "setup": {
@@ -715,9 +862,9 @@ def main() -> None:
             "discAxis": [0.0, 0.0, 1.0],
             "feedAxis": [0.0, 0.0, 1.0],
             "chainSense": 1.0,
-            "externalMeshSense": -1.0,
-            "rackFeedSense": 1.0,
-            "netTravelSense": -1.0,
+            "externalMeshSense": feed_senses["GEAR_SENSE"],
+            "rackFeedSense": feed_senses["FEED_SIGN"],
+            "netTravelSense": feed_senses["GEAR_SENSE"] * feed_senses["FEED_SIGN"],
             "chain": {
                 "linkCount": chain.LINK_COUNT,
                 "pitchMm": chain.LINK_PITCH,
