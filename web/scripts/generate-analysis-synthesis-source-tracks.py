@@ -5,8 +5,9 @@ Run from any directory with the tracked web/content calibration evidence:
   python web/scripts/generate-analysis-synthesis-source-tracks.py
 This retains numeric evidence and applies one conditional source-FIT cumulative
 bank drive only to Analysis analysis-22/bar-bank/horizontal-mirror. Its twenty
-phases/amplitudes/setup stay fixed; its endpoint is chosen-held to the same shot's
-end, not extrapolated or re-zeroed. Analysis analysis-16/main/native separately
+phases/amplitudes/setup stay fixed; separately pinned source continuation replaces
+the former endpoint hold, with only the final native-frame-to-cut margin held.
+Analysis analysis-16/main/native separately
 uses observed visible-crank relative cycles, approximate within-cycle phase and
 an explicitly chosen native sign/home under its unchanged existing camera.
 Its fixed chosen setup and first/last inputs hold over same-shot margins.
@@ -21,11 +22,10 @@ Synthesis cone-overview retains a two-FIT chosen perspective-camera similarity.
 Cam-rod uses a root-selected upright three-original-FIT fixed-intrinsics SQPNP
 physical pose; former similarities are historical/unaccepted evidence only.
 Independent qualification remains missing; CHECKs never enter camera objectives.
-The cam-rod receipt's exact scene-source seal is intentional: stale calibration
-still refuses current regeneration after a renderer change. Historical replay
-tests supply the original sealed scene bytes, never fresh renderer acceptance.
-The pinned historical receipt records actual raw native model observations.
-Fresh GPU evidence requires new receipt/probe/code pins and a deliberate producer update.
+The cam-rod historical raw receipt and authentic scene-source archive stay sealed.
+Changed current renderer code requires a separately pinned actual same-draw receipt,
+live runtime-source/compiled-descriptor association and three-FIT world equivalence
+before reusing that historical calibration; this is not a source-fidelity pass.
 Synthesis wheel-macro uses only its original wheel-centre FIT and actual GPU
 centre for a chosen principal-point translation; its hanger CHECK stays held out.
 Analysis's stationary full-front shot holds its original frame428 CPU FIT camera
@@ -43,6 +43,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import re
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[1]
@@ -72,6 +73,68 @@ SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "68b33f73055a49bbdbfad4e86d4f59ccc45e39b93be
 SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/8KmVDxkia_w.automatic-motion-evidence.json"
 SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "7a193758b02166ad02604274cd08b89135b2941f54301312d242efcc508e8233"
 SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
+ANALYSIS_BANK_CONTINUATION = "web/content/6dW6VYXp9HM.bank-continuation.json"
+ANALYSIS_BANK_CONTINUATION_SHA256 = "8fc9d30edb54e43419b3c294b8a09410ec303382a47815552e75d3784f68b90b"
+ANALYSIS_BANK_CONTINUATION_PRODUCER = "web/scripts/6dW6VYXp9HM-fit-bank-continuation.py"
+ANALYSIS_BANK_CONTINUATION_PRODUCER_SHA256 = "5c7a217607e0bcd1f379c9653f5c7f0b2390e4b5878007c080419f1978daecd8"
+SYNTHESIS_BANK_CAMERA = "web/content/8KmVDxkia_w.bank-camera.json"
+SYNTHESIS_BANK_CAMERA_SHA256 = "32f8f81c9355687839b48b3fc47ec19f3faa9c6fecd05d9a5be3260c24a27a66"
+SYNTHESIS_BANK_CAMERA_FIT = "web/content/8KmVDxkia_w.bank-camera-fit-evidence.json"
+SYNTHESIS_BANK_CAMERA_FIT_SHA256 = "4195ba69e2e3f7dec7c85bf91a0602857442e61a7e219d79caac50af967070e3"
+SYNTHESIS_BANK_CAMERA_CHECK = "web/content/8KmVDxkia_w.bank-camera-check.json"
+SYNTHESIS_BANK_CAMERA_CHECK_SHA256 = "2c7d67451c751cee95316ed1b5d39dd8147ef32ad125b65e372dc8ea61534c0a"
+SYNTHESIS_BANK_CAMERA_CHECK_EVIDENCE = "web/content/8KmVDxkia_w.bank-camera-check-evidence.json"
+SYNTHESIS_BANK_CAMERA_CHECK_EVIDENCE_SHA256 = "435691e429316b8dd234f6af3dbbfb9a672ee2b3e8d0af2d0914b0626e87bf88"
+CAMROD_HISTORICAL_SCENE = "web/scripts/fixtures/camrod-scene-7b28468c.ts.txt"
+CAMROD_HISTORICAL_SCENE_SHA256 = "7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b"
+CAMROD_PROBE = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
+CAMROD_PROBE_SHA256 = "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321"
+CAMROD_HISTORICAL_RECEIPT = "web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json"
+CAMROD_HISTORICAL_RECEIPT_SHA256 = "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc"
+CAMROD_CURRENT_RECEIPT = "web/content/8KmVDxkia_w.camrod-current-world-receipt-2026-10-03.json"
+CAMROD_CURRENT_RECEIPT_SHA256 = "4d61ddd66a71e78e9f9c70cb48f92ecc2088d35d13c05535cfc151c7ad55150a"
+MODEL_REPRESENTATION = "web/content/model-representation.json"
+CAMROD_RUNTIME_FILES = ("web/src/scene.ts", "web/src/bindings.ts", "web/src/main.ts",
+    *AUTOMATIC_NATIVE_MATH, "web/src/source-track.ts", "web/src/timeline.ts",
+    MODEL_REPRESENTATION)
+
+
+def finite_number(value):
+    return type(value) in (int, float) and math.isfinite(value)
+
+
+def finite_vector(value, length):
+    return isinstance(value, list) and len(value) == length and all(finite_number(v) for v in value)
+
+
+def strict_input(value):
+    compact = common.compact_input(value)
+    numbers = [compact["crankTurns"],compact["magnification"]] + compact["phases"] + compact["amplitudes"]
+    numbers += [v for v in compact["setup"].values() if v is not None]
+    if value != compact or any(not finite_number(v) for v in numbers):
+        raise ValueError("Source input must be complete, finite and numerically typed.")
+    return compact
+
+
+def sha256_string(value):
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def source_image_identity(image, source, index):
+    """Normalize producer-only PTS fields, never pixel/source identity fields."""
+    if (not isinstance(image, dict) or type(index) is not int
+            or image.get("frameIndex") != index or type(image.get("frameIndex")) is not int
+            or image.get("pixelFormat") != "bgr8" or not sha256_string(image.get("sha256Bgr8"))
+            or image.get("sourceSha256") != source["sha256"]
+            or any(type(image.get(key)) is not int or image[key] != source[key] for key in ("width", "height"))):
+        raise ValueError("Source decoded BGR image identity is invalid.")
+    return {key: image[key] for key in
+            ("frameIndex", "sourceSha256", "pixelFormat", "sha256Bgr8", "width", "height")}
+
+
+def opaque_unwarped(view):
+    return (not view.get("imagePlaneWarp") and not view.get("resolvedImagePlaneWarp")
+            and view.get("composite") in (None, {}, {"mode": "opaque"}))
 
 
 def load(path):
@@ -189,9 +252,16 @@ class Generator:
                 frame.setdefault("unavailable", []).extend(copy.deepcopy(control["unavailable"]))
             self.data["compactChangeTimesSeconds"].extend(row["timeSeconds"] for row in controls.values())
         self.automatic_motion = self.analysis_automatic_motion_packet() if self.analysis else None
+        self.bank_continuation = self.analysis_bank_continuation_packet() if self.analysis else None
         if self.automatic_motion:
-            self.automatic_motion_frames = {row["frameIndex"]: row for row in self.automatic_motion["frames"]}
-            self.automatic_motion_times = [row["timeSeconds"] for row in self.automatic_motion["frames"]]
+            self.automatic_motion_rows = self.automatic_motion["frames"][:-1] + self.bank_continuation["frames"]
+            self.automatic_motion_frames = {row["frameIndex"]: row for row in self.automatic_motion_rows}
+            self.automatic_motion_times = [row["timeSeconds"] for row in self.automatic_motion_rows]
+            for frame in self.data["frames"]:
+                row = self.automatic_motion_frames.get(frame.get("decodedFrameIndex"))
+                if row is not None and frame.get("sourceImage") is None:
+                    # Only authenticated actual BGR exposures fill omissions.
+                    frame["sourceImage"] = copy.deepcopy(row["sourceImage"])
             # Preserve the authority's exact native keys, not integer labels or
             # rounded event seconds. Original decoded PTS/images stay untouched.
             self.data["compactChangeTimesSeconds"].extend(self.automatic_motion_times)
@@ -217,9 +287,11 @@ class Generator:
         self.presenter_reframing = None
         self.synthesis_coarse_framing = None
         self.synthesis_wheel_framing = None
+        self.synthesis_bank_camera = None
         permission_path = WEB / "content" / f"{video_id}.chosen-camera-continuity.json"
         permission_packet = json.loads(permission_path.read_text()) if permission_path.exists() else None
         if not self.analysis:
+            self.synthesis_bank_camera = self.synthesis_bank_camera_packet()
             self.presenter_reframing = self.presenter_reframing_keys()
             self.synthesis_coarse_framing = self.synthesis_coarse_framing_packet()
             self.synthesis_wheel_framing = self.synthesis_wheel_framing_packet()
@@ -465,6 +537,119 @@ class Generator:
                 or rows[0]["crankTurns"] != 0
                 or any(b["crankTurns"] < a["crankTurns"]-1e-12 for a,b in zip(rows,rows[1:]))):
             raise ValueError("Analysis automatic motion cumulative positive gauge is invalid.")
+
+    def analysis_bank_continuation_packet(self):
+        try:
+            packet, _ = load_pinned(ANALYSIS_BANK_CONTINUATION, ANALYSIS_BANK_CONTINUATION_SHA256,
+                                    "Analysis bank continuation")
+            self.validate_analysis_bank_continuation(packet)
+        except (OSError, KeyError, TypeError, AttributeError, IndexError) as error:
+            raise ValueError("Analysis bank continuation authority is missing or malformed.") from error
+        return packet
+
+    def validate_analysis_bank_continuation(self, packet):
+        previous, source = self.automatic_motion, self.data["source"]
+        interval, authority, rows = packet["interval"], packet["authority"], packet["frames"]
+        expected_interval = {
+            "startSeconds":119.08563333333333, "endSeconds":124.45766666666667,
+            "firstNativeFrameIndex":3569, "lastNativeFrameIndex":3730, "nativeFrameCount":162,
+            "shotId":"analysis-22", "viewId":"bar-bank", "presentation":"horizontal-mirror",
+            "cutEndSeconds":124.49103333333333}
+        if (type(packet["schemaVersion"]) is not int or packet["schemaVersion"] != 1
+                or packet["kind"] != "source-fit-coherent-bank-continuation"
+                or packet["videoId"] != "6dW6VYXp9HM" or interval != expected_interval
+                or authority["videoSha256"] != source["sha256"] or source["sha256"] != ANALYSIS_SOURCE_SHA256
+                or source["fps"] != {"numerator":30000,"denominator":1001}
+                or [source["width"],source["height"]] != [1920,1080]
+                or authority["nativeModelSha256"] != ANALYSIS_MODEL_SHA256
+                or self.data["model"]["sha256"] != ANALYSIS_MODEL_SHA256
+                or self.native["modelSha256"] != ANALYSIS_MODEL_SHA256
+                or authority["previousMotion"] != {"path":AUTOMATIC_MOTION,"sha256":AUTOMATIC_MOTION_SHA256}
+                or authority["controls"] != {"path":MOTION_CONTROLS,"sha256":MOTION_CONTROLS_SHA256}
+                or authority["producer"] != {"path":ANALYSIS_BANK_CONTINUATION_PRODUCER,
+                                            "sha256":ANALYSIS_BANK_CONTINUATION_PRODUCER_SHA256}
+                or hashlib.sha256((ROOT / ANALYSIS_BANK_CONTINUATION_PRODUCER).read_bytes()).hexdigest()
+                    != ANALYSIS_BANK_CONTINUATION_PRODUCER_SHA256
+                or authority["cameraUnchanged"] != self.candidate["nativeCameraRecord"]
+                or packet["fixedInput"] != previous["fixedInput"]
+                or strict_input(packet["fixedInput"]) != packet["fixedInput"]
+                or packet["integration"]["sourceSpatialFidelityAccepted"] is not False
+                or packet["integration"]["GPUQualification"] != "UNEXECUTED"):
+            raise ValueError("Analysis bank continuation source/model/fixed-input authority changed.")
+        hashes = previous["diagnostics"]["nativeForwardSmoke"]["nativeMathSha256"]
+        if (set(hashes) != set(AUTOMATIC_NATIVE_MATH)
+                or any(hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != hashes[path]
+                       for path in AUTOMATIC_NATIVE_MATH)):
+            raise ValueError("Analysis bank continuation native math changed.")
+        shot = self.shots["analysis-22"]
+        if (shot["startDecodedFrameIndex"] != 3366
+                or not finite_number(shot["startSeconds"])
+                or abs(shot["startSeconds"] - 3366*1001/30000) > 1e-9
+                or shot["endSeconds"] != interval["cutEndSeconds"]
+                or self.shots["analysis-23"]["startSeconds"] != interval["cutEndSeconds"]
+                or self.shots["analysis-23"]["endSeconds"] != 139.80633333333333):
+            raise ValueError("Analysis bank continuation cannot alter either adjacent shot/cut.")
+        checks = list(range(3574,3731,8))
+        fits = [index for index in range(3570,3731) if index not in checks]
+        holdout = packet["holdout"]
+        if (holdout["kind"] != "mixed-exposure-and-feature-pixel"
+                or holdout["FITFrameIndices"] != fits or holdout["CHECKFrameIndices"] != checks
+                or holdout["exposureHeldOutFrameIndices"] != [i for i in checks if i != 3710]
+                or holdout["featurePixelHeldOutFrameIndices"] != [3710]
+                or holdout["exploratoryCentroidFITOverlapFrameIndices"] != [3710]
+                or holdout["boundaryFrameIndex"] != 3569
+                or holdout["candidateFrozenBeforeCHECKCornerPixels"] is not True
+                or len(rows) != 162):
+            raise ValueError("Analysis bank continuation FIT/CHECK exposure/feature roles changed.")
+        originals = {}
+        for frame in self.data["frames"]:
+            index = frame.get("decodedFrameIndex")
+            if type(index) is int and 3569 <= index <= 3730:
+                originals.setdefault(index, []).append(frame)
+        for offset, row in enumerate(rows):
+            index, time = 3569+offset, row["timeSeconds"]
+            role = ("retained-boundary" if index == 3569 else
+                    "feature-held-out-CHECK" if index == 3710 else
+                    "exposure-held-out-CHECK" if index in checks else "FIT")
+            if (type(row["frameIndex"]) is not int or row["frameIndex"] != index
+                    or not finite_number(time) or abs(time - index*1001/30000) > 1e-9
+                    or row["role"] != role or not finite_number(row["crankTurns"])):
+                raise ValueError(f"Analysis bank continuation native time/input/role changed at {index}.")
+            image = source_image_identity(row["sourceImage"], source, index)
+            exposures = originals.get(index, [])
+            if (not exposures or not any(abs(frame["timeSeconds"] - time) < 1e-9 for frame in exposures)
+                    or any(frame["shotId"] != "analysis-22"
+                           or not finite_number(frame.get("decodedTimeSeconds"))
+                           or abs(frame["decodedTimeSeconds"] - time) > 1e-9
+                           or frame.get("sourceImage") is not None and frame["sourceImage"] != image
+                           for frame in exposures)):
+                raise ValueError(f"Analysis bank continuation retained source identity changed at {index}.")
+            for frame in exposures:
+                views = common.source_views(frame, self.data)
+                if (len(views) != 1 or views[0]["id"] != "bar-bank"
+                        or views[0]["rectSourcePixels"] != [0,0,1920,1080]
+                        or views[0].get("presentation") != "horizontal-mirror"
+                        or not opaque_unwarped(views[0])
+                        or views[0].get("camera") and common.compact_camera(views[0]["camera"])
+                            != common.compact_camera(authority["cameraUnchanged"])):
+                    raise ValueError("Analysis bank continuation original view/camera association changed.")
+        boundary = previous["frames"][-1]
+        if (rows[0]["frameIndex"] != boundary["frameIndex"]
+                or rows[0]["timeSeconds"] != boundary["timeSeconds"]
+                or rows[0]["sourceImage"] != boundary["sourceImage"]
+                or rows[0]["crankTurns"] != boundary["crankTurns"]
+                or rows[-1]["timeSeconds"] != interval["endSeconds"]):
+            raise ValueError("Analysis bank continuation must preserve the exact original boundary input.")
+        # CHECK is an input interpolation at its real exposure, not a source FIT.
+        # Frame3710's exploratory centroid overlap is explicitly not exposure-held-out.
+        for offset, row in enumerate(rows):
+            if row["frameIndex"] not in checks:
+                continue
+            left, right = rows[offset-1], rows[offset+1]
+            fraction = (row["timeSeconds"]-left["timeSeconds"])/(right["timeSeconds"]-left["timeSeconds"])
+            expected = left["crankTurns"] + fraction*(right["crankTurns"]-left["crankTurns"])
+            if not math.isclose(row["crankTurns"], expected, rel_tol=0., abs_tol=1e-12):
+                raise ValueError("Analysis continuation CHECK input must interpolate eligible FIT neighbours.")
 
     def analysis_visible_crank_packet(self):
         try:
@@ -733,6 +918,155 @@ class Generator:
             "H20 metal CHECK exposures stay outside annotation FIT; H1 cross-feature CHECK pixels remain held out "
             "at annotation FIT times. Neither control is camera/GPU qualification. All20stations use "
             "unchanged released harmonic20..1 coupling. Other complete baseline settings remain unobserved/chosen.")
+
+    def synthesis_bank_camera_packet(self):
+        try:
+            packet, _ = load_pinned(SYNTHESIS_BANK_CAMERA, SYNTHESIS_BANK_CAMERA_SHA256,
+                                    "Synthesis bank camera")
+            fit, _ = load_pinned(SYNTHESIS_BANK_CAMERA_FIT, SYNTHESIS_BANK_CAMERA_FIT_SHA256,
+                                 "Synthesis bank physical FIT")
+            check, _ = load_pinned(SYNTHESIS_BANK_CAMERA_CHECK, SYNTHESIS_BANK_CAMERA_CHECK_SHA256,
+                                   "Synthesis bank camera CHECK")
+            check_evidence, _ = load_pinned(SYNTHESIS_BANK_CAMERA_CHECK_EVIDENCE,
+                SYNTHESIS_BANK_CAMERA_CHECK_EVIDENCE_SHA256, "Synthesis bank physical CHECK")
+            images = self.validate_synthesis_bank_camera(packet, fit, check, check_evidence)
+        except (OSError, KeyError, TypeError, AttributeError, IndexError) as error:
+            raise ValueError("Synthesis bank camera authority is missing or malformed.") from error
+        return {"path":SYNTHESIS_BANK_CAMERA,"sha256":SYNTHESIS_BANK_CAMERA_SHA256,
+                "packet":packet,"sourceEvidence":fit,"checkPacket":check,"checkEvidence":check_evidence,
+                "sourceEvidenceSha256":SYNTHESIS_BANK_CAMERA_FIT_SHA256,
+                "checkPacketSha256":SYNTHESIS_BANK_CAMERA_CHECK_SHA256,
+                "checkEvidenceSha256":SYNTHESIS_BANK_CAMERA_CHECK_EVIDENCE_SHA256,
+                "images":images,"camera":common.compact_camera(packet["camera"]),
+                "family":"source-informed-framing:rocker-bank:main:terminal-bevel-fit"}
+
+    def validate_synthesis_bank_camera(self, packet, fit, check, check_evidence):
+        source, shot = self.data["source"], self.shots["rocker-bank"]
+        fields = ("videoId","sha256","width","height","fps","decodedFrameCount")
+        application = {"shotId":"rocker-bank","viewId":"main","presentation":"native",
+                       "rectSourcePixels":[0,0,1920,1080],
+                       "startSeconds":105.939166667,"endSeconds":124.457666667}
+        if (any(type(record["schemaVersion"]) is not int or record["schemaVersion"] != 1
+                or record["videoId"] != "8KmVDxkia_w"
+                for record in (packet,fit,check,check_evidence))
+                or source["videoId"] != "8KmVDxkia_w"
+                or source["fps"] != {"numerator":24000,"denominator":1001}
+                or [source["width"],source["height"]] != [1920,1080]
+                or any(record["source"].get(key) != source.get(key)
+                       for record in (packet,fit,check_evidence) for key in fields)
+                or any(record["model"] != self.data["model"] for record in (packet,fit,check_evidence))
+                or self.data["model"]["sha256"] != self.native["modelSha256"]
+                or packet["application"] != application or packet["cameraInterpolation"] != "held"
+                or packet["fitIntervalSeconds"] != [2541*1001/24000,2589*1001/24000]
+                or packet["sourceEvidence"] != {"path":SYNTHESIS_BANK_CAMERA_FIT,
+                                              "sha256":SYNTHESIS_BANK_CAMERA_FIT_SHA256}
+                or check["frozenCameraSha256"] != SYNTHESIS_BANK_CAMERA_SHA256
+                or check["checkEvidenceSha256"] != SYNTHESIS_BANK_CAMERA_CHECK_EVIDENCE_SHA256
+                or packet["acceptance"]["independentCheckEvaluated"] is not False
+                or any(record["acceptance"]["cameraGeometryOrGpuAccepted"] is not False
+                       for record in (packet,fit,check,check_evidence))
+                or not finite_number(shot["startSeconds"]) or not finite_number(shot["endSeconds"])
+                or abs(shot["startSeconds"]-2540*1001/24000) > 1e-9
+                or abs(shot["endSeconds"]-2984*1001/24000) > 1e-9):
+            raise ValueError("Synthesis bank camera source/model/cut/qualification authority changed.")
+        camera = packet["camera"]
+        if (set(camera) != {"positionMetres","quaternion","verticalFovDegrees","principalPointViewportPixels"}
+                or not finite_vector(camera["positionMetres"],3)
+                or not finite_vector(camera["quaternion"],4)
+                or abs(sum(v*v for v in camera["quaternion"])-1) > 1e-8
+                or not finite_number(camera["verticalFovDegrees"]) or not 0 < camera["verticalFovDegrees"] < 180
+                or not finite_vector(camera["principalPointViewportPixels"],2)
+                or common.compact_camera(camera) != camera
+                or fit["feature"] != check_evidence["feature"]
+                or fit["feature"]["id"] != "rocker-terminal-bevel-upper-edge-midpoint"
+                or not finite_vector(fit["feature"]["partLocalMetres"],3)):
+            raise ValueError("Synthesis bank camera needs a finite physical pinhole/feature association.")
+        originals = {}
+        for frame in self.data["frames"]:
+            if frame["shotId"] != "rocker-bank":
+                continue
+            index = frame.get("sourceFrameIndex",frame.get("decodedFrameIndex"))
+            originals.setdefault(index, []).append(frame)
+            views = common.source_views(frame,self.data)
+            if (len(views) != 1 or views[0]["id"] != "main"
+                    or views[0]["rectSourcePixels"] != [0,0,1920,1080]
+                    or views[0].get("presentation","native") != "native"
+                    or not opaque_unwarped(views[0])):
+                raise ValueError("Synthesis bank camera requires the original full native opaque main layout.")
+        images, keys_by_role = {}, {}
+        for evidence, role, indices, count in (
+                (fit,"fit",{2541,2589},30),(check_evidence,"check",{2580,2640,2820},38)):
+            keys = set()
+            if len(evidence["rows"]) != count:
+                raise ValueError("Synthesis bank camera physical control census changed.")
+            for row in evidence["rows"]:
+                image, index, station = row["sourceImage"], row["sourceImage"]["frameIndex"], row["physicalStationIndex"]
+                identity = source_image_identity(image,source,index)
+                key = (index,station)
+                if (row["role"] != role or index not in indices or key in keys
+                        or image["nativePts"] != index*1001 or type(image["nativePts"]) is not int
+                        or not finite_number(row["timeSeconds"]) or abs(row["timeSeconds"]-index*1001/24000) > 1e-9
+                        or type(station) is not int or not 0 <= station < 20
+                        or row["harmonicNumber"] != 20-station
+                        or row["partPath"] != f"harmonic-analyzer/channel/rocker-arm-{station+1}"
+                        or not finite_vector(row["pixel"],2)
+                        or not 0 <= row["pixel"][0] < 1920 or not 0 <= row["pixel"][1] < 1080
+                        or not finite_number(row["uncertaintyPx"]) or row["uncertaintyPx"] < 0
+                        or index in images and images[index] != identity):
+                    raise ValueError("Synthesis bank physical FIT/CHECK source/feature identity changed.")
+                exposures = originals.get(index,[])
+                if (not exposures or any(frame.get("sourceImage") != identity
+                        or not finite_number(frame.get("decodedTimeSeconds"))
+                        or abs(frame["decodedTimeSeconds"]-row["timeSeconds"]) > 1e-9 for frame in exposures)):
+                    raise ValueError(f"Synthesis bank physical control original source identity changed at {index}.")
+                images[index] = identity
+                keys.add(key)
+            keys_by_role[role] = keys
+        if {i for i,_ in keys_by_role["fit"]} & {i for i,_ in keys_by_role["check"]}:
+            raise ValueError("Synthesis bank camera CHECK exposures cannot enter its FIT objective.")
+        for rows, evidence, keys in ((packet["fitRows"],fit,keys_by_role["fit"]),
+                                    (check["rows"],check_evidence,keys_by_role["check"])):
+            observed = {(row["sourceImage"]["frameIndex"],row["physicalStationIndex"]):row for row in evidence["rows"]}
+            if len(rows) != len(keys) or {(r["frameIndex"],r["physicalStationIndex"]) for r in rows} != keys:
+                raise ValueError("Synthesis bank camera prediction/control association changed.")
+            for row in rows:
+                control = observed[(row["frameIndex"],row["physicalStationIndex"])]
+                if (row["observedPixel"] != control["pixel"] or not finite_vector(row["predictedPixel"],2)
+                        or not finite_number(row["errorPx"])
+                        or not math.isclose(row["errorPx"],math.dist(row["predictedPixel"],row["observedPixel"]),
+                                            rel_tol=0.,abs_tol=1e-9)):
+                    raise ValueError("Synthesis bank camera CPU diagnostics no longer bind actual source controls.")
+        return images
+
+    def synthesis_bank_camera_for_view(self, frame, view, family):
+        packet = self.synthesis_bank_camera
+        if (packet is None or self.analysis or family != "bar" or self.data["source"]["videoId"] != "8KmVDxkia_w"
+                or frame["shotId"] != "rocker-bank" or view["id"] != "main"
+                or view["rectSourcePixels"] != [0,0,1920,1080]
+                or view.get("presentation","native") != "native" or not opaque_unwarped(view)):
+            return None
+        time, shot = frame["decodedTimeSeconds"], self.shots["rocker-bank"]
+        fps = self.data["source"]["fps"]
+        rate = fps["numerator"] / fps["denominator"]
+        # The declared and rational-native intervals are both half-open. Their
+        # decimal representations can differ by roundoff, never by an exposure.
+        if (not finite_number(time) or time < max(shot["startSeconds"],2540/rate)-1e-9
+                or time >= min(shot["endSeconds"],2984/rate)):
+            return None
+        index = frame.get("sourceFrameIndex",frame.get("decodedFrameIndex", (frame.get("sourceImage") or {}).get("frameIndex")))
+        if index is not None and (type(index) is not int or not 2540 <= index < 2984
+                                  or abs(time-index/rate) > 1e-9):
+            raise ValueError("Synthesis bank camera requires consistent native frame/time identity.")
+        identity = packet["images"].get(index)
+        if identity and frame.get("sourceImage") != identity:
+            raise ValueError("Synthesis bank camera requires its actual source exposure identity.")
+        return copy.deepcopy(packet["camera"]), (
+            "Chosen source-FIT terminal-bevel bank camera held across this original continuous main shot. "
+            "Thirty physical FITs at native2541/2589 constrain one pinhole;38 independent physical CHECKs "
+            "at2580/2640/2820 remain post-fit CPU diagnostics, never camera selection. Weak-depth FOV/pose "
+            "and physical feature association are source-informed/chosen, not recovered historical intrinsics. "
+            "Existing410 coherent drive, chosen sign/phases and geometry are unchanged; no warp or GPU/stage "
+            "acceptance. See evidence.synthesisBankCamera.")
 
     def analysis_held_camera_packet(self):
         """Pin original own-shot evidence before any generated controls mutate it."""
@@ -1032,20 +1366,17 @@ class Generator:
 
     def synthesis_camrod_physical_pose(self, previous, observations):
         """Publish root's FIT-only upright choice from a pinned sparse probe."""
-        path = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
-        raw = (ROOT / path).read_bytes()
-        digest = hashlib.sha256(raw).hexdigest()
-        if digest != "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321":
-            raise ValueError("Chosen cam-rod physical probe artifact changed")
-        probe = json.loads(raw)
+        path, receipt_path = CAMROD_PROBE, CAMROD_HISTORICAL_RECEIPT
+        probe, digest = load_pinned(path, CAMROD_PROBE_SHA256, "Chosen cam-rod physical probe")
         lineage = probe["lineage"]
         receipt_record = lineage["actualWorldReceipt"]
-        receipt_path = "web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json"
-        receipt_raw = (ROOT / receipt_path).read_bytes()
-        receipt_hash = hashlib.sha256(receipt_raw).hexdigest()
-        if receipt_hash != receipt_record["sha256"] or receipt_hash != "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc":
-            raise ValueError("Chosen cam-rod actual world receipt changed")
-        receipt = json.loads(receipt_raw)
+        receipt, receipt_hash = load_pinned(receipt_path, CAMROD_HISTORICAL_RECEIPT_SHA256,
+                                           "Chosen cam-rod actual world receipt")
+        historical_scene_hash = hashlib.sha256((ROOT / CAMROD_HISTORICAL_SCENE).read_bytes()).hexdigest()
+        if (historical_scene_hash != CAMROD_HISTORICAL_SCENE_SHA256
+                or lineage["sceneCurrentSourceSha256"] != historical_scene_hash
+                or receipt_record["sha256"] != receipt_hash):
+            raise ValueError("Chosen cam-rod authentic historical scene/receipt seal differs")
         if (probe["status"] != "candidate-enumeration-only"
                 or probe["selection"] != "none; retain every returned pose; CHECK not evaluated"
                 or probe["chosenIntrinsics"]["verticalFovDegrees"] != 30
@@ -1055,10 +1386,13 @@ class Generator:
                 or lineage["nativeModelSha256"] != self.native["modelSha256"]
                 or lineage["nativeDenominator"] != 435
                 or lineage["originalLandmarks"] != previous["originalLandmarks"]
-                or lineage["sceneCurrentSourceSha256"] != hashlib.sha256((WEB / "src/scene.ts").read_bytes()).hexdigest()):
+                or lineage["sceneCurrentSourceSha256"] != CAMROD_HISTORICAL_SCENE_SHA256):
             raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs")
         frame = next(frame for frame in self.data["frames"]
                      if frame["shotId"] == "cam-rod" and frame["timeSeconds"] == 100)
+        if (frame.get("sourceImage") != previous["sourceImage"]
+                or frame["decodedTimeSeconds"] != previous["decodedTimeSeconds"]):
+            raise ValueError("Chosen cam-rod current source seed identity differs from historical FIT.")
         original = next(view for view in common.source_views(frame,self.data) if view["id"] == "main")
         value, _ = self.input(frame,"cone",original)
         if common.compact_input(value) != lineage["completeInput"]:
@@ -1096,6 +1430,7 @@ class Generator:
                 raise ValueError(f"Chosen cam-rod original FIT/actual world binding differs: {anchor}")
         if len(probe["exactInputs"]) != 3 or len(probe["candidates"]) != probe["returnedPoseCount"] or probe["returnedPoseCount"] != 2:
             raise ValueError("Chosen cam-rod sparse enumeration changed")
+        current_compatibility = self.synthesis_camrod_current_world_receipt(probe, previous)
         candidates = copy.deepcopy(probe["candidates"])
         fit_centroid = [sum(row["actualRenderedWorldMetres"][i] for row in probe["exactInputs"])/3 for i in range(3)]
         eligible = []
@@ -1146,15 +1481,148 @@ class Generator:
                         "probeOriginalPath":"web/.vite/verification-output/synthesis-camrod-sqpnp-probe-2026-10-01.json",
                         "worldReceipt":receipt_path,"worldReceiptSha256":receipt_hash,
                         "worldReceiptOriginalPath":receipt_record["path"],
+                        "historicalSceneSource":{"path":CAMROD_HISTORICAL_SCENE,
+                                                 "sha256":historical_scene_hash},
+                        "currentWorldCompatibility":current_compatibility,
                         "lineage":copy.deepcopy(lineage),"candidates":candidates,"chosenCandidateId":"sqpnp-001",
                         "chosenQualitativeMaximumAbsoluteRollDegrees":15.,
                         "chosenCADPositiveZSidePrior":{"FITCentroidWorldMetres":fit_centroid,
                             "rule":"Camera worldZ > original-three-FIT centroid worldZ and forwardWorldZ < 0, matching original back=CAD+Z/source-right=CAD+X semantics; not an arbitrary CAD-front yaw0."},
-                        "generationDependencies":"Active physical choice requires only tracked pinned SQPNP probe/world receipt, original source semantic/FIT identity, matched native hash and unchanged complete seed input. Exact original probe/receipt bytes and their old paths/hashes are retained; ignored paths within immutable lineage are historical references, never reads. Strict current scene.ts SHA byte gate remains: any byte change requires recapture/rebinding, including otherwise cosmetic edits; it is intentionally not waived. Retired similarity reports/committed packet are references only. Authoritative inputs come from *.track.json, never generated *.source-track.json.",
+                        "generationDependencies":"Immutable historical SQPNP probe/raw world receipt and authentic archived scene source remain sealed, with original source semantic/FIT identity and complete seed input. Authentic historical scene replay retains its original byte gate. Changed current scene requires a separately pinned fresh actual same-draw world receipt, exact live runtime-file/compiled-descriptor hashes, independently observed transport bytes associated with the unchanged raw native source and exactly equal original three-FIT native worlds. This compatibility evidence does not qualify camera/source fidelity; CHECK pixels never select the pose. No current local dist file or downloaded public manifest is read. Retired reports and ignored paths within immutable lineage are historical references only; authoritative inputs come from *.track.json.",
                         "reason":"Root selected only on original qualitative upright columns/no observed large roll and original back=CAD+Z semantic mapping. Both physical sparse branches fit the same three FITs; sqpnp-000's64.65deg roll conflicts with the declared chosen15deg upright/CAD-positiveZ-side prior. This prior is not measured historical roll. CHECK baseline and prior GPU errors were historically inspected, but CHECK was excluded from SQPNP enumeration objective and branch selection; candidate CHECKs were not projected/ranked before root selected001. Post-selection held-out measurements are separate evidence, not retroactive selection inputs.",
                         "depthScope":"Only three actual original FIT points; no whole-native-geometry positive-depth or GPU acceptance claim",
                         "poseConversion":"OpenCV world-to-camera R,t: position=-R^T*t; cameraToWorld=R^T*diag(1,-1,-1); quaternion xyzw. Fixed chosen FOV30, PP(960,540); native XYZ comes from the actual completed-draw Float32 marker vertex, not raster pixels or catalogue assumptions."}})
         return key
+
+    def synthesis_camrod_current_world_receipt(self, probe, previous):
+        """Require new actual-world evidence, never rewrite the historical raw seal."""
+        current_scene_hash = hashlib.sha256((WEB / "src/scene.ts").read_bytes()).hexdigest()
+        if current_scene_hash == CAMROD_HISTORICAL_SCENE_SHA256:
+            return {"kind":"authentic-historical-scene-replay","sceneSha256":current_scene_hash,
+                    "currentRendererAccepted":False,"sourceFidelityAccepted":False}
+        try:
+            receipt, digest = load_pinned(CAMROD_CURRENT_RECEIPT, CAMROD_CURRENT_RECEIPT_SHA256,
+                                          "Fresh current cam-rod world receipt")
+            self.validate_camrod_current_world_receipt(receipt, probe, previous)
+        except (OSError, KeyError, TypeError, AttributeError, IndexError) as error:
+            raise ValueError("Fresh current cam-rod world evidence is missing or malformed.") from error
+        return {"kind":"fresh-current-native-world-compatibility",
+                "path":CAMROD_CURRENT_RECEIPT,"sha256":digest,
+                "runtimeFiles":copy.deepcopy(receipt["currentRuntimeFiles"]),
+                "representation":copy.deepcopy(receipt["representation"]),
+                "compiledApplication":copy.deepcopy(receipt["compiledApplication"]),
+                "actualMedia":copy.deepcopy(receipt["actualMedia"]),
+                "sourceDrawRevision":receipt["snapshot"]["sourceDrawRevision"],
+                "FITWorldComparison":"exact equality of all nine original FIT world coordinates",
+                "qualification":receipt["qualification"],"sourceFidelityAccepted":False}
+
+    def validate_camrod_current_world_receipt(self, receipt, probe, previous):
+        lineage, source = probe["lineage"], self.data["source"]
+        if (receipt["kind"] != "fresh-current-camrod-world-receipt"
+                or receipt["historicalWorldReceipt"] != {
+                    "path":CAMROD_HISTORICAL_RECEIPT,"sha256":CAMROD_HISTORICAL_RECEIPT_SHA256}
+                or receipt["historicalProbe"] != {"path":CAMROD_PROBE,"sha256":CAMROD_PROBE_SHA256}
+                or receipt["frameIdentity"] != {
+                    "sourceImage":previous["sourceImage"],"shotId":"cam-rod","viewId":"main",
+                    "timeSeconds":100,"decodedTimeSeconds":previous["decodedTimeSeconds"]}):
+            raise ValueError("Fresh current cam-rod original source/historical association changed.")
+        hashes = receipt["currentRuntimeFiles"]
+        if (set(hashes) != set(CAMROD_RUNTIME_FILES)
+                or any(not sha256_string(hashes[path]["sha256"])
+                       or hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != hashes[path]["sha256"]
+                       for path in CAMROD_RUNTIME_FILES)):
+            raise ValueError("Fresh current cam-rod runtime-source evidence is stale.")
+        descriptor = load(MODEL_REPRESENTATION)
+        self.validate_current_model_representation(descriptor)
+        if receipt["representation"] != descriptor:
+            raise ValueError("Fresh current cam-rod compiled model representation differs.")
+        snapshot, capture = receipt["snapshot"], receipt["renderedLandmarks"]
+        provenance, representation = snapshot["modelProvenance"], descriptor["representation"]
+        if (provenance["identity"] != "matched" or provenance["representationKind"] != descriptor["kind"]
+                or provenance["sourceSha256"] != lineage["nativeModelSha256"]
+                or provenance["sourceCommit"] != self.data["model"]["sourceCommit"]
+                or any(provenance[key] != representation["sha256"]
+                       for key in ("expectedSha256","observedSha256"))
+                or any(type(provenance[key]) is not int or provenance[key] != representation["byteLength"]
+                       for key in ("expectedByteLength","observedByteLength"))):
+            raise ValueError("Fresh current cam-rod observed transport/native source identity differs.")
+        compiled, media = receipt["compiledApplication"], receipt["actualMedia"]
+        if (not isinstance(compiled["url"],str) or not compiled["url"]
+                or not sha256_string(compiled["sha256"])
+                or type(compiled["byteLength"]) is not int or compiled["byteLength"] <= 0
+                or media["originalFileSha256"] != source["sha256"]
+                or [media["width"],media["height"]] != [source["width"],source["height"]]
+                or media["paused"] is not True or type(media["readyState"]) is not int or media["readyState"] < 2
+                or not finite_number(media["timeSeconds"])
+                or abs(media["timeSeconds"]-previous["decodedTimeSeconds"]) > 1e-6
+                or snapshot["videoId"] != source["videoId"] or snapshot["playerVideoId"] != source["videoId"]
+                or snapshot["modelState"] != "ready" or snapshot["missingBindings"] != []
+                or not finite_number(snapshot["videoTime"]) or abs(snapshot["videoTime"]-media["timeSeconds"]) > 1e-9):
+            raise ValueError("Fresh current cam-rod compiled application/actual media binding differs.")
+        views = snapshot["views"]
+        if (len(views) != 1 or views[0]["id"] != "main" or views[0]["rectSourcePixels"] != [0,0,1920,1080]
+                or views[0].get("presentation","native") != "native" or not opaque_unwarped(views[0])):
+            raise ValueError("Fresh current cam-rod receipt requires one opaque unwarped native main view.")
+        view, rendered = views[0], views[0]["renderedMechanism"]
+        revision = snapshot["sourceDrawRevision"]
+        complete = strict_input(lineage["completeInput"])
+        if (complete != lineage["completeInput"] or type(revision) is not int or revision <= 0
+                or snapshot["modelTime"] != 100 or snapshot["sourceDrawTimeSeconds"] != 100
+                or strict_input(snapshot["input"]) != complete or strict_input(view["input"]) != complete
+                or rendered["status"] != "rendered" or rendered["method"] != "actual-native-mechanism-solve"
+                or strict_input(rendered["input"]) != complete or rendered["timeSeconds"] != 100
+                or rendered["viewId"] != "main" or rendered["sourceDrawRevision"] != revision
+                or not opaque_unwarped(rendered) or not opaque_unwarped(snapshot)
+                or capture["status"] != "captured" or capture["method"] != "gpu-readback"
+                or capture["timeSeconds"] != 100 or capture["viewId"] != "main"
+                or capture["presentation"] != "native" or not opaque_unwarped(capture)):
+            raise ValueError("Fresh current cam-rod same-draw complete input/time/view/revision differs.")
+        for record in (snapshot,view,rendered,capture):
+            layout = record["sourceLayout"]
+            if (len(layout) != 1 or layout[0]["viewId"] != "main"
+                    or layout[0]["rectSourcePixels"] != [0,0,1920,1080]
+                    or layout[0]["presentation"] != "native" or not opaque_unwarped(layout[0])):
+                raise ValueError("Fresh current cam-rod source layout differs between draw and capture.")
+        # Only the original three FIT worlds bind reuse; never project/rank CHECK.
+        for row in probe["exactInputs"]:
+            anchors = [anchor for anchor in self.data["anchors"] if anchor["id"] == row["anchorId"]]
+            if len(anchors) != 1 or anchors[0] != row["semanticNativeAnchor"]:
+                raise ValueError(f"Fresh current cam-rod original semantic native anchor changed: {row['anchorId']}")
+            markers = [point for point in capture["landmarks"] if point["id"] == row["anchorId"]]
+            if (len(markers) != 1 or markers[0]["state"] != "rendered" or markers[0]["worldReason"] is not None
+                    or not finite_vector(markers[0]["worldMetres"],3)
+                    or markers[0]["worldMetres"] != row["actualRenderedWorldMetres"]):
+                raise ValueError(f"Fresh current cam-rod original FIT native world changed: {row['anchorId']}")
+
+    def validate_current_model_representation(self, descriptor):
+        """Python equivalent of model-representation.mjs; tracked/compiled data only."""
+        def record(value, keys):
+            if not isinstance(value,dict) or set(value) != set(keys):
+                raise ValueError("Fresh current cam-rod model representation fields are invalid.")
+        record(descriptor, ("schemaVersion","kind","source","representation","pipeline","equivalence"))
+        record(descriptor["source"], ("sha256","sourceCommit"))
+        record(descriptor["representation"], ("path","sha256","byteLength","codec"))
+        record(descriptor["pipeline"], ("version","steps","codecVersion"))
+        record(descriptor["equivalence"], ("method","semanticSha256","drawableCount"))
+        source, representation = descriptor["source"], descriptor["representation"]
+        pipeline, equivalence = descriptor["pipeline"], descriptor["equivalence"]
+        if (type(descriptor["schemaVersion"]) is not int or descriptor["schemaVersion"] != 1
+                or descriptor["kind"] != "lossless-web-model-representation"
+                or source != {"sha256":self.data["model"]["sha256"],
+                              "sourceCommit":self.data["model"]["sourceCommit"]}
+                or source["sha256"] != self.native["modelSha256"] or not sha256_string(source["sha256"])
+                or not isinstance(source["sourceCommit"],str) or not re.fullmatch(r"[0-9a-f]{40}",source["sourceCommit"])
+                or representation["path"] != "models/harmonic-analyzer.glb"
+                or not sha256_string(representation["sha256"]) or representation["codec"] != "EXT_meshopt_compression"
+                or type(representation["byteLength"]) is not int or not 0 < representation["byteLength"] <= 2**53-1
+                or type(pipeline["version"]) is not int or pipeline["version"] != 1
+                or pipeline["steps"] != ["exact-dedup","meshopt"]
+                or not isinstance(pipeline["codecVersion"],str)
+                or not re.fullmatch(r"meshoptimizer@[0-9]+\.[0-9]+\.[0-9]+",pipeline["codecVersion"])
+                or equivalence["method"] != "decoded-per-drawable-exact-v1"
+                or not sha256_string(equivalence["semanticSha256"])
+                or type(equivalence["drawableCount"]) is not int or not 0 < equivalence["drawableCount"] <= 2**53-1):
+            raise ValueError("Fresh current cam-rod compiled/native model representation is invalid.")
 
     def synthesis_coarse_camera(self, frame, view, camera, note):
         packet = self.synthesis_coarse_framing
@@ -1291,6 +1759,9 @@ class Generator:
 
     def camera(self, frame, view, family):
         time, shot = frame["timeSeconds"], frame["shotId"]
+        bank_camera = self.synthesis_bank_camera_for_view(frame,view,family)
+        if bank_camera is not None:
+            return bank_camera
         if self.analysis_held_camera and self.is_analysis_held_view(frame,view):
             application = self.analysis_held_camera["application"]
             application["appliedExposures"].append(self.analysis_held_exposure(frame,view))
@@ -1418,10 +1889,13 @@ class Generator:
     def analysis_automatic_motion_input(self, frame, family, view):
         if (not self.automatic_motion or family != "bar"
                 or frame["shotId"] != "analysis-22" or view["id"] != "bar-bank"
-                or view.get("presentation","native") != "horizontal-mirror"):
+                or view.get("presentation","native") != "horizontal-mirror"
+                or view["rectSourcePixels"] != [0,0,1920,1080] or not opaque_unwarped(view)):
             return None
         packet, time = self.automatic_motion, frame["decodedTimeSeconds"]
-        rows = packet["frames"]
+        if not finite_number(time):
+            raise ValueError("Analysis automatic motion input requires finite source seconds.")
+        rows = self.automatic_motion_rows
         if time < rows[0]["timeSeconds"] or time >= self.shots["analysis-22"]["endSeconds"]:
             return None
         direct = view.get("camera")
@@ -1434,7 +1908,9 @@ class Generator:
                     or not math.isclose(time,native["timeSeconds"],rel_tol=0.,abs_tol=1e-9)):
                 raise ValueError("Analysis automatic motion input requires its exact native source identity.")
             value["crankTurns"] = native["crankTurns"]
-            note = "Exact native exposure conditional source-FIT cumulative bank drive."
+            role = native.get("role","FIT")
+            note = ("Exact native exposure conditional source-FIT cumulative bank drive." if role in ("FIT","retained-boundary")
+                    else "Actual CHECK exposure input interpolated from neighbouring FITs; its held-out pixels never select crank.")
         elif time > rows[-1]["timeSeconds"]:
             value["crankTurns"] = rows[-1]["crankTurns"]
             note = "CHOSEN unmeasured same-shot endpoint hold after the last source-FIT native exposure through analysis-22's actual end. This packet endpoint is NOT a cut; no cadence extrapolation or blend back to zero/inverse phases."
@@ -1447,7 +1923,7 @@ class Generator:
                 fraction = (time-left["timeSeconds"])/(right["timeSeconds"]-left["timeSeconds"])
                 value["crankTurns"] = left["crankTurns"] + fraction*(right["crankTurns"]-left["crankTurns"])
             note = "Linear cumulative conditional source-FIT bank drive in actual source seconds between the two surrounding native authority exposures; no interpolated source image or CHECK."
-        return value, note+" Twenty phases/amplitudes and complete setup are fixed, with the original mirrored FIT camera and source/native station association unchanged. Positive effective-bank gauge is chosen; physical shaft sign/home and historical settings remain unobservable. No camera, GPU or stage qualification."
+        return value, note+" Twenty phases/amplitudes and complete setup are fixed, with the original mirrored FIT camera and source/native station association unchanged. The separately pinned continuation follows observed forward and return motion, not monotonic cadence extrapolation. Positive effective-bank gauge is chosen; physical shaft sign/home and historical settings remain unobservable. No camera, GPU or stage qualification."
 
     def analysis_visible_crank_input(self, frame, family, view):
         if (not self.visible_crank_motion or family != "cone"
@@ -1650,11 +2126,12 @@ class Generator:
             domain = {**copy.deepcopy(motion["interval"]),
                       "measurementStatus":"conditional-source-fit",
                       "interpolation":"linear-cumulative-in-actual-source-seconds"}
-            hold = {"startSeconds":motion["interval"]["endSeconds"],
+            continuation = self.bank_continuation
+            hold = {"startSeconds":continuation["interval"]["endSeconds"],
                     "endSeconds":self.shots["analysis-22"]["endSeconds"],
                     "startExclusive":True,"endExclusive":True,
                     "measurementStatus":"unmeasured","kind":"chosen-endpoint-hold",
-                    "crankTurns":motion["frames"][-1]["crankTurns"],
+                    "crankTurns":continuation["frames"][-1]["crankTurns"],
                     "interpretation":"Last fitted exposure is inside the same shot, not a cut. Hold its complete new input without cadence extrapolation or return to independent inverse posing; no source-image/control authority extends past the measured domain."}
             diagnostics = {"kind":motion["kind"],
                 "authority":{"path":AUTOMATIC_MOTION,"sha256":AUTOMATIC_MOTION_SHA256,
@@ -1673,7 +2150,20 @@ class Generator:
             track["sourceMeasurements"]["analysisAutomaticMotion"] = {
                 "domain":copy.deepcopy(domain),"endpointHold":copy.deepcopy(hold),"stageAcceptance":False}
             track["evidence"]["notes"].append(hold["interpretation"])
-            track["sourceMeasurements"]["blockers"].append("Analysis cumulative bank drive is conditional source-relative FIT authority only at native3366..3569. Physical shaft sign/home, absolute hidden state and camera/native geometry/GPU/stage qualification remain unresolved. The remaining same-shot endpoint hold is chosen and unmeasured, not extended source-motion evidence.")
+            continuation_domain = {**copy.deepcopy(continuation["interval"]),
+                "measurementStatus":"conditional-source-fit-and-held-out-input-interpolation"}
+            continuation_evidence = {
+                "authority":{"path":ANALYSIS_BANK_CONTINUATION,"sha256":ANALYSIS_BANK_CONTINUATION_SHA256,
+                             **copy.deepcopy(continuation["authority"])},
+                "domain":continuation_domain,"endpointHold":copy.deepcopy(hold),
+                "holdout":copy.deepcopy(continuation["holdout"]),
+                "fixedInputUnchanged":True,"cameraQualificationChanged":False,"stageAcceptance":False}
+            track["evidence"]["analysisBankContinuation"] = continuation_evidence
+            track["cpuDiagnostics"]["analysisBankContinuation"] = copy.deepcopy(continuation_evidence)
+            track["sourceMeasurements"]["analysisBankContinuation"] = {
+                "domain":copy.deepcopy(continuation_domain),"endpointHold":copy.deepcopy(hold),
+                "exposureHeldOutCount":19,"featurePixelHeldOutCount":1,"stageAcceptance":False}
+            track["sourceMeasurements"]["blockers"].append("Analysis original204 bank-drive authority at native3366..3569 remains immutable. Separate native3569..3730 continuation has141 new FIT exposures plus the retained boundary;19 investigation-wide exposure-held-out CHECKs and frame3710's feature/pixel-held-out CHECK input interpolate eligible FIT neighbours. Existing source corner nulls are not replaced. Only124.457666667..124.491033333 is an unmeasured endpoint hold. Physical shaft sign/home, hidden state, camera/native geometry/GPU/stage qualification remain unresolved; no transfer into analysis-23 or its inset.")
             visible, gauge = self.visible_crank_motion, self.visible_crank_gauge
             visible_domain = {**copy.deepcopy(visible["interval"]),"viewId":"main","presentation":"native",
                               "measurementStatus":"observed-cycles-approximate-within-cycle-phase"}
@@ -1712,6 +2202,9 @@ class Generator:
             track["evidence"]["synthesisPresenterFraming"] = copy.deepcopy(self.presenter_reframing)
             track["evidence"]["synthesisCoarseFraming"] = copy.deepcopy(self.synthesis_coarse_framing)
             track["evidence"]["synthesisWheelFraming"] = copy.deepcopy(self.synthesis_wheel_framing)
+            track["evidence"]["synthesisBankCamera"] = {
+                key:copy.deepcopy(value) for key,value in self.synthesis_bank_camera.items() if key != "images"}
+            track["sourceMeasurements"]["blockers"].append("Synthesis bank camera is one chosen weak-depth physical-terminal-bevel pinhole constrained by30 original source FITs and held only within rocker-bank/main/native/full1920x1080. Its38 independent physical CHECKs are post-fit CPU measurements, not GPU/surface or historical-intrinsics qualification; FOV, hidden sign/phases and feature association remain qualified assumptions.")
             motion = self.synthesis_automatic_motion
             packet = motion["packet"]
             track["evidence"]["synthesisAutomaticMotion"] = {
@@ -1748,6 +2241,16 @@ class Generator:
                 evidence = view["provenance"]["evidence"]
                 camera = view["camera"]
                 component = self.family(frame,view)
+                bank_camera = self.synthesis_bank_camera_for_view(frame,view,component)
+                if bank_camera is not None:
+                    if camera != bank_camera[0]:
+                        raise ValueError("Synthesis bank continuity cannot label different camera geometry.")
+                    continuity = self.synthesis_bank_camera["family"]
+                    view["cameraProvenance"] = {"kind":"source-informed-framing","family":continuity,"evidence":evidence}
+                    view["cameraContinuityFamily"] = continuity
+                    view["cameraInterpolation"] = "held"
+                    view["cameraInterpolationEvidence"] = "One source-informed chosen camera held over this original continuous shot; no camera history or GPU/stage acceptance."
+                    continue
                 if self.analysis_held_camera and self.is_analysis_held_view(frame,view):
                     if camera != self.analysis_held_camera["camera"]:
                         raise ValueError("Analysis held-camera continuity cannot label different camera geometry.")

@@ -289,10 +289,54 @@ fixed. Separate time-bound native GPU captures at **106.5, 113.5 and 118.5
 seconds** retain all 435 drawables and show all twenty named rocker-arm meshes
 visible, with changing raster extents and contours at the same camera.
 The ordinary twenty landmark anchors are static structural points; their zero
-3D displacement is expected and does not test rocker movement. The camera and
-CAD remain unchanged: the fixed far portrait view still mismatches the filmed
-bank close-up. Neither timing nor rendered-motion proof qualifies source camera
-or geometric fidelity.
+3D displacement is expected and does not test rocker movement. Those historical
+captures used the old far-portrait camera; CAD and the 410-knot cumulative clock,
+4× cadence, chosen +1 physical sign, phases, amplitudes and setup remain unchanged.
+
+The [bank-camera packet](content/8KmVDxkia_w.bank-camera.json),
+[FIT evidence](content/8KmVDxkia_w.bank-camera-fit-evidence.json),
+[CHECK evidence](content/8KmVDxkia_w.bank-camera-check-evidence.json) and
+[CHECK packet](content/8KmVDxkia_w.bank-camera-check.json) are produced by
+[`8KmVDxkia_w-fit-bank-camera.py`](scripts/8KmVDxkia_w-fit-bank-camera.py).
+The new camera is held only for rocker-bank/main/bar/native, full 1920×1080,
+opaque, no-warp exposures **2540..2983**. The actual cut at native 2984
+(124.457666667 seconds) is excluded. FOV **6.021955 degrees** and weakly constrained
+depth/focal choice are source-informed choices, not recovered camera history.
+Thirty FIT observations at 2541/2589 use physical gray terminal-bevel upper-edge
+midpoints; the camera was frozen before viewing/measuring the 38 CHECK observations
+at 2580/2640/2820. Original actual GPU BEFORE under the old far-portrait camera
+has CHECK RMS **587.12994 px**, maximum **778.9835 px**. Actual GPU marker AFTER
+has RMS **17.5404813344 px**, maximum **35.8075760140 px**; adding 6 px source
+and 0.848528 px native localization uncertainty gives an inclusive
+**42.6561041514 px** bound. Keep the old H20 exposure-held and H1 feature-held
+controls separate; these new checks do not extend their authority to H2–H19.
+Depth-off marker projection is not a visibility certificate. Fresh part-ID
+surfaces exist for every native part, but closest sparse own-contour sampling
+does not establish direct surface correspondence. That witness remains pending;
+foreground gears/chain still mismatch in eye review. Neither whole-frame framing,
+source camera, geometry nor any stage is accepted.
+
+The [current cam-rod world receipt](content/8KmVDxkia_w.camrod-current-world-receipt-2026-10-03.json)
+(`4d61…`) is fresh actual normal-route evidence, not a rehash of the immutable
+[historical probe](content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json)
+(`5a9f…`) or [raw historical receipt](content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json)
+(`222d…`). The archived actual renderer `7b28468c…` remains historical authority.
+Current renderer `ff57f0a6…` may reuse the older FIT-only camera only when the
+new receipt matches source exposure 2398, original MP4 `a7ac177e…`, the same
+complete physical input and draw, all nine actual native-local coordinates of
+three FIT features with exactly zero delta, and all ten current runtime/descriptor
+file hashes. The actual downloaded optimized model SHA `ad5c2592…`
+(38,975,844 bytes) must match its descriptor and distinct raw-source association
+`2280bfa6…` at revision `1268c23d…`. Compiled actual-module evidence does not
+establish model byte identity. No historical receipt is rewritten or bypassed,
+and no CHECK pixels select the pose. This bridge proves only three-FIT world
+compatibility, not geometry, camera or stage acceptance.
+
+The actual RTX 3090 normal-route AFTER capture covers 29 frames, retaining all
+435 native drawables, zero missing bindings and zero page errors with that same
+delivery/source association. It is not a full source-camera/geometry/stage pass.
+Fresh continuous playback, seek/manual/orbit/resume, compact-player and audio
+smoke results are not yet reported here; approximation labels remain.
 
 Production playback does not require semantic source certificates for every one
 of the 435 native drawables at every exposure. Native model identity, complete
@@ -327,16 +371,47 @@ retaining the first chosen complete hidden setup. These phases are not rocker
 deflection angles. Both signed physical alternatives remain possible; neither
 phase nor cadence transfers across cuts.
 
+The [continuation packet](content/6dW6VYXp9HM.bank-continuation.json) from
+[`6dW6VYXp9HM-fit-bank-continuation.py`](scripts/6dW6VYXp9HM-fit-bank-continuation.py)
+replaces the old freeze at `T = 3.890576427` after 119.0856333 seconds.
+Actual raw GPU BEFORE contours of all twenty rockers were bit-identical over
+late-shot frames. Continuation covers genuine source-native **3569..3730**
+(**119.085633333333..124.4576666667 seconds**, 162 exposures), with the original
+boundary retained exactly. One cumulative `T` describes the forward and return;
+the twenty phases/amplitudes, setup and camera remain unchanged. The producer
+retains 386 measurements and **414 unresolved/null records**, not fabricated
+coordinates. The combined old/new authority has 365 native physical-input knots.
+
+Typed holdouts separate **141 new FIT exposures**, **19 exposure-held CHECK
+exposures**, and **3710 feature-held CHECK**. Exposure 3710's centroid informed an
+early prototype, but its final corner pixels never enter FIT; it is feature-held,
+not exposure-held. Actual GPU AFTER exposure CHECK (369 measurements) has RMS
+**19.9944791878 px**, maximum **31.4816573134 px**; 3 px source plus 1.697056 px
+native uncertainty gives inclusive **36.1787135883 px**. Feature CHECK (17
+measurements) has RMS **15.4018384491 px**, maximum **21.1638031103 px**, inclusive
+**25.8608593851 px**. Independent-corner BEFORE maxima are **223.12344 px**
+(exposure) and **123.009496 px** (feature), explicitly **CPU hold projections**,
+not actual GPU BEFORE pixel measurements. These limited moving-feature checks
+do not qualify full geometry, camera or a stage.
+
 Authority is confined to `analysis-16/main/native` for the crank and
-`analysis-22/bar-bank/horizontal-mirror` for the bank. Unmeasured same-shot
-margins hold the nearest new input through the real cut: the crank shot spans
-79.4460333..87.0202667 seconds and the bank shot ends at 124.4910333 seconds.
-There is no cadence extrapolation or blend back to the old drive at the measured
-endpoint. Outside those exact shot/view/presentation scopes, existing input
-paths remain intact. Packet facts are authoritative; generated metadata labels
-the drive chosen/approximate. Cameras and CAD are unchanged, and source camera
-and geometry fidelity remain unaccepted. Native motion evidence does not
-establish source spatial alignment or acceptance of all twenty rendered rockers.
+`analysis-22/bar-bank/horizontal-mirror` for the bank. Unmeasured same-shot crank
+margins hold through its 79.4460333..87.0202667-second shot. The bank no longer
+holds at the old 119.0856333-second endpoint: only the final
+**124.4576667..124.4910333-second** sliver holds to the actual cut, with no cadence
+extrapolation or blend back to the old drive. Later `analysis-23` and its inset
+through 139.806 seconds remain unchanged. Outside those exact shot/view/presentation
+scopes, existing input paths remain intact. Packet facts are authoritative;
+generated metadata and the GUI label the drive chosen/approximate. Cameras and
+CAD remain unchanged for Analysis, and source camera and geometry fidelity remain
+unaccepted. Native motion evidence does not establish source spatial alignment
+or acceptance of all twenty rendered rockers.
+
+Canonical generation succeeds for both videos: Synthesis **69 shots / 1,071
+frames / 1,535 views**; Analysis **42 shots / 952 frames / 1,136 views**.
+`coverageComplete` describes authored compact coverage, not measured fidelity:
+stages remain **UNMEASURED**. The all-six-video 5% (96 px at 1920 wide) and
+0.5-second contract, unknown source associations and native inventory remain intact.
 
 Required coverage includes every retained video's corresponding machine views:
 close-ups, moving mechanisms, insets, mirrored views, photographs and montages.

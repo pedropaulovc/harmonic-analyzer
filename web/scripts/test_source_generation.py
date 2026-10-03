@@ -54,6 +54,22 @@ def replay_scene_bytes(data):
         yield
 
 
+@contextmanager
+def override_file_bytes(target, data):
+    """Real fixture bytes or missing file; do not bypass a receipt/hash validator."""
+    read_bytes = Path.read_bytes
+
+    def read_fixture(path):
+        if path != target:
+            return read_bytes(path)
+        if data is None:
+            raise FileNotFoundError(target)
+        return data
+
+    with patch.object(Path, 'read_bytes', read_fixture):
+        yield
+
+
 def historical_synthesis_generator():
     # These behavioral tests replay retained source/input calibration. They do
     # not observe today's renderer, approve its model, or refresh GPU evidence.
@@ -449,6 +465,7 @@ class AnalysisAutomaticMotionTests(unittest.TestCase):
         cls.controls = json.loads((content / '6dW6VYXp9HM.motion-controls.json').read_text())
         cls.visible = json.loads((content / '6dW6VYXp9HM.visible-crank-motion.json').read_text())
         cls.gauge = json.loads((content / '6dW6VYXp9HM.visible-crank-gauge.json').read_text())
+        cls.continuation = json.loads((content / '6dW6VYXp9HM.bank-continuation.json').read_text())
 
     def native_frame(self, index):
         return next(frame for frame in self.generator.data['frames']
@@ -552,40 +569,110 @@ class AnalysisAutomaticMotionTests(unittest.TestCase):
                 rendered = next(row for row in self.generator.views(frame) if row['id'] == view['id'])
                 self.assertEqual(rendered['input'], expected['chosenInput'])
 
-    def test_endpoint_held_for_every_remaining_same_shot_key_without_source_image(self):
-        end = self.packet['interval']['endSeconds']
+    def test_observed_forward_return_continues_until_last_native_frame_then_holds_only_to_cut(self):
+        generated = {frame['timeSeconds']: frame for frame in self.track['frames']}
+        rows = self.continuation['frames']
+        self.assertEqual(rows[0]['crankTurns'], self.packet['frames'][-1]['crankTurns'])
+        peak = max(rows, key=lambda row: row['crankTurns'])
+        self.assertGreater(peak['crankTurns'], rows[0]['crankTurns'] + 0.1)
+        self.assertLess(rows[-1]['crankTurns'], peak['crankTurns'] - 0.5)
+        last_bank = next(view for view in self.generator.views(self.native_frame(3730)) if view['id'] == 'bar-bank')
+        self.assertEqual(last_bank['input']['crankTurns'], rows[-1]['crankTurns'])
+        for authority in rows:
+            with self.subTest(index=authority['frameIndex']):
+                frame = generated[authority['timeSeconds']]
+                bank = next(view for view in frame['views'] if view['id'] == 'bar-bank')
+                expected = copy.deepcopy(self.packet['fixedInput'])
+                expected['crankTurns'] = authority['crankTurns']
+                self.assertEqual(bank['input'], expected)
+                self.assertEqual(frame['sourceImage'], authority['sourceImage'])
+                self.assertEqual(frame['sourceImage']['frameIndex'],authority['frameIndex'])
+                self.assertAlmostEqual(frame['decodedTimeSeconds'],authority['frameIndex']*1001/30000,delta=1e-9)
+                self.assertEqual(bank['camera'], common.compact_camera(self.generator.candidate['nativeCameraRecord']))
+        last = copy.deepcopy(self.native_frame(3730))
+        last.pop('decodedFrameIndex')
+        last.pop('sourceImage')
+        cut = self.generator.shots['analysis-22']['endSeconds']
+        last['timeSeconds'] = last['decodedTimeSeconds'] = (rows[-1]['timeSeconds'] + cut) / 2
         expected = copy.deepcopy(self.packet['fixedInput'])
-        expected['crankTurns'] = self.packet['frames'][-1]['crankTurns']
-        held = [frame for frame in self.track['frames']
-                if frame['shotId'] == 'analysis-22' and frame['decodedTimeSeconds'] > end]
-        for frame in held:
-            bank = next(view for view in frame['views'] if view['id'] == 'bar-bank')
-            self.assertEqual(bank['input'], expected)
-        for index in (3580, 3730):
-            original = self.native_frame(index)
-            self.assertIsNone(original.get('sourceImage'))
-            bank = next(view for view in self.generator.views(original) if view['id'] == 'bar-bank')
-            self.assertEqual(bank['input'], expected)
-        self.assertAlmostEqual(held[-1]['decodedTimeSeconds'], 3730 / (30000 / 1001), places=9)
-        next_shot = self.native_frame(3731)
-        for view in self.generator.views(next_shot):
-            self.assertEqual(view['input'], self.generator.analysis_snapshots[-1]['chosenInput'])
-        diagnostics = self.track['cpuDiagnostics']['analysisAutomaticMotion']
-        self.assertEqual(diagnostics['domain']['measurementStatus'], 'conditional-source-fit')
-        self.assertEqual(diagnostics['domain']['endSeconds'], end)
-        self.assertEqual(diagnostics['endpointHold']['kind'], 'chosen-endpoint-hold')
-        self.assertEqual(diagnostics['endpointHold']['measurementStatus'], 'unmeasured')
-        self.assertEqual(diagnostics['endpointHold']['endSeconds'], self.generator.shots['analysis-22']['endSeconds'])
-        self.assertFalse(diagnostics['stageAcceptance'])
-        self.assertEqual(diagnostics['physicalCrankDirection'], 'unobservable')
-        self.assertEqual(diagnostics['absolutePhysicalCrankPhase'], 'unobservable')
+        expected['crankTurns'] = rows[-1]['crankTurns']
+        self.assertEqual(self.generator.views(last)[0]['input'], expected)
+        for index in (3731, 4000, 4189):
+            for view in self.generator.views(self.native_frame(index)):
+                self.assertEqual(view['input'], self.generator.analysis_snapshots[-1]['chosenInput'])
+        hold = self.track['evidence']['analysisBankContinuation']['endpointHold']
+        self.assertEqual(hold['startSeconds'], rows[-1]['timeSeconds'])
+        self.assertEqual(hold['endSeconds'], cut)
+        self.assertEqual(self.track['evidence']['analysisAutomaticMotion']['domain']['endSeconds'],
+                         self.packet['interval']['endSeconds'])
+
+    def test_continuation_check_inputs_interpolate_fit_neighbours_without_invented_pixels(self):
+        generated = {frame['timeSeconds']: frame for frame in self.track['frames']}
+        for offset, row in enumerate(self.continuation['frames']):
+            if not row['role'].endswith('-CHECK'):
+                continue
+            with self.subTest(index=row['frameIndex']):
+                left, right = self.continuation['frames'][offset-1:offset+2:2]
+                fraction = (row['timeSeconds']-left['timeSeconds'])/(right['timeSeconds']-left['timeSeconds'])
+                expected = left['crankTurns'] + fraction*(right['crankTurns']-left['crankTurns'])
+                bank = next(view for view in generated[row['timeSeconds']]['views'] if view['id'] == 'bar-bank')
+                self.assertAlmostEqual(bank['input']['crankTurns'], expected, places=12)
+                original = self.native_frame(row['frameIndex'])
+                self.assertEqual(generated[row['timeSeconds']]['landmarks'], original['landmarks'])
+                self.assertEqual(generated[row['timeSeconds']].get('unavailable'),
+                                 [{k: v for k, v in item.items() if k in ('anchorId', 'viewId', 'reason')}
+                                  for item in original.get('unavailable', [])] or None)
+        roles = self.continuation['holdout']
+        self.assertEqual(roles['featurePixelHeldOutFrameIndices'], [3710])
+        self.assertNotIn(3710, roles['exposureHeldOutFrameIndices'])
+
+    def test_continuation_rejects_boundary_input_clock_roles_layout_source_and_model_drift(self):
+        for mismatch in ('boundary', 'input', 'model', 'source', 'camera', 'clock', 'boolean-drive',
+                         'missing-frame', 'role', 'check-input', '3710-exposure', 'source-image', 'layout', 'cut'):
+            with self.subTest(mismatch=mismatch):
+                packet = copy.deepcopy(self.continuation)
+                generator = copy.copy(self.generator)
+                generator.data = copy.deepcopy(self.generator.data)
+                generator.shots = copy.deepcopy(self.generator.shots)
+                if mismatch == 'boundary':
+                    packet['frames'][0]['crankTurns'] += 0.001
+                elif mismatch == 'input':
+                    packet['fixedInput']['phases'][0] += 0.01
+                elif mismatch == 'model':
+                    packet['authority']['nativeModelSha256'] = '0' * 64
+                elif mismatch == 'source':
+                    packet['authority']['videoSha256'] = '0' * 64
+                elif mismatch == 'camera':
+                    packet['authority']['cameraUnchanged']['verticalFovDegrees'] += 1
+                elif mismatch == 'clock':
+                    packet['frames'][20]['timeSeconds'] += 0.001
+                elif mismatch == 'boolean-drive':
+                    packet['frames'][20]['crankTurns'] = True
+                elif mismatch == 'missing-frame':
+                    packet['frames'].pop(20)
+                elif mismatch == 'role':
+                    packet['frames'][5]['role'] = 'FIT'
+                elif mismatch == 'check-input':
+                    packet['frames'][5]['crankTurns'] += 0.1
+                elif mismatch == '3710-exposure':
+                    packet['holdout']['exposureHeldOutFrameIndices'].append(3710)
+                elif mismatch == 'source-image':
+                    packet['frames'][20]['sourceImage']['sha256Bgr8'] = '0' * 64
+                elif mismatch == 'layout':
+                    next(frame for frame in generator.data['frames'] if frame.get('decodedFrameIndex') == 3589)['views'][0]['presentation'] = 'native'
+                else:
+                    generator.shots['analysis-22']['endSeconds'] += 0.01
+                with self.assertRaises(ValueError):
+                    generator.validate_analysis_bank_continuation(packet)
 
     def test_changed_or_missing_pinned_artifact_rejects_instead_of_falling_back(self):
-        for target in (camera_tracks.AUTOMATIC_MOTION, camera_tracks.MOTION_CONTROLS):
+        for target in (camera_tracks.AUTOMATIC_MOTION, camera_tracks.MOTION_CONTROLS,
+                       camera_tracks.ANALYSIS_BANK_CONTINUATION):
             for missing in (False, True):
                 with self.subTest(target=target, missing=missing), tempfile.TemporaryDirectory() as directory:
                     root = Path(directory)
-                    for path in (camera_tracks.AUTOMATIC_MOTION, camera_tracks.MOTION_CONTROLS):
+                    for path in (camera_tracks.AUTOMATIC_MOTION, camera_tracks.MOTION_CONTROLS,
+                                 camera_tracks.ANALYSIS_BANK_CONTINUATION):
                         if path == target and missing:
                             continue
                         destination = root / path
@@ -593,7 +680,10 @@ class AnalysisAutomaticMotionTests(unittest.TestCase):
                         data = (camera_tracks.ROOT / path).read_bytes()
                         destination.write_bytes(data + b' ' if path == target else data)
                     with patch.object(camera_tracks, 'ROOT', root), self.assertRaises(ValueError):
-                        self.generator.analysis_automatic_motion_packet()
+                        if target == camera_tracks.ANALYSIS_BANK_CONTINUATION:
+                            self.generator.analysis_bank_continuation_packet()
+                        else:
+                            self.generator.analysis_automatic_motion_packet()
 
     def test_semantically_unsupported_native_authority_rejects(self):
         for mismatch in ('kind', 'source', 'model', 'fps', 'missing-frame', 'duplicate-frame',
@@ -1172,21 +1262,220 @@ class SynthesisAutomaticSourceDriveCurrentOnlyTests(unittest.TestCase):
                     generator.synthesis_automatic_motion_packet()
 
 
-class CamrodRendererLineageTests(unittest.TestCase):
-    def test_historical_replay_does_not_approve_current_scene(self):
-        generator = historical_synthesis_generator()
-        current_scene = (camera_tracks.WEB / 'src/scene.ts').read_bytes()
-        self.assertNotEqual(hashlib.sha256(current_scene).hexdigest(), HISTORICAL_SCENE_SHA256)
-        # No filesystem fixture here: the real live source seal must refuse
-        # the historical GPU packet even when unrelated replay tests pass.
-        with self.assertRaisesRegex(ValueError, 'source/native/code/intrinsics lineage differs'):
-            generator.synthesis_coarse_framing_packet()
+class SynthesisBankCameraTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.generator = historical_synthesis_generator()
+        cls.track = cls.generator.build()
+        content = HERE.parent / 'content'
+        cls.packet = json.loads((content / '8KmVDxkia_w.bank-camera.json').read_text())
+        cls.fit = json.loads((content / '8KmVDxkia_w.bank-camera-fit-evidence.json').read_text())
+        cls.check = json.loads((content / '8KmVDxkia_w.bank-camera-check.json').read_text())
+        cls.check_evidence = json.loads((content / '8KmVDxkia_w.bank-camera-check-evidence.json').read_text())
 
-    def test_even_cosmetic_source_change_requires_new_gpu_evidence(self):
+    def source_frame(self, index):
+        return copy.deepcopy(next(frame for frame in self.generator.data['frames']
+            if frame.get('sourceFrameIndex',frame.get('decodedFrameIndex')) == index))
+
+    def test_whole_continuous_bank_shot_uses_frozen_camera_without_changing_drive(self):
+        rows = [frame for frame in self.track['frames'] if frame['shotId'] == 'rocker-bank']
+        old_drive = self.generator.synthesis_automatic_motion['candidate']
+        for frame in rows:
+            with self.subTest(time=frame['timeSeconds']):
+                view = next(view for view in frame['views'] if view['id'] == 'main')
+                self.assertEqual(view['camera'], self.packet['camera'])
+                self.assertEqual(view['input']['phases'], old_drive['staticPhasesRad'])
+                self.assertEqual(view['cameraContinuityFamily'],
+                                 'source-informed-framing:rocker-bank:main:terminal-bevel-fit')
+                self.assertEqual(view['cameraInterpolation'], 'held')
+        # CHECK exposure gets the FIT-only camera and unchanged between-FIT drive.
+        check = self.source_frame(2580)
+        native_view = common.source_views(check,self.generator.data)[0]
+        value = self.generator.views(check)[0]
+        self.assertEqual(value['camera'], self.packet['camera'])
+        drive, _ = self.generator.synthesis_automatic_input(check,'bar',native_view)
+        self.assertEqual(value['input'], common.compact_input(drive))
+
+    def test_camera_never_transfers_to_cut_inset_mirror_warp_or_transparent_composite(self):
+        baseline = copy.copy(self.generator)
+        baseline.synthesis_bank_camera = None
+        for scope in ('before','cut','stale-index-at-cut','other-shot','other-family','inset','mirror','warp','composite'):
+            with self.subTest(scope=scope):
+                index = 2539 if scope == 'before' else 2984 if scope == 'cut' else 2700
+                frame = self.source_frame(index)
+                view = common.source_views(frame,self.generator.data)[0]
+                family = self.generator.family(frame,view)
+                if scope in ('before','cut'):
+                    self.assertNotEqual(frame['shotId'],'rocker-bank')
+                    self.assertAlmostEqual(frame['decodedTimeSeconds'],index*1001/24000,delta=1e-9)
+                elif scope == 'stale-index-at-cut':
+                    frame['decodedTimeSeconds'] = self.generator.shots['rocker-bank']['endSeconds']
+                elif scope == 'other-shot':
+                    frame['shotId'] = 'rocker-out'
+                elif scope == 'other-family':
+                    family = 'cone'
+                elif scope == 'inset':
+                    view.update(id='lower-inset',rectSourcePixels=[0,0,960,1080])
+                elif scope == 'mirror':
+                    view['presentation'] = 'horizontal-mirror'
+                elif scope == 'warp':
+                    view['imagePlaneWarp'] = {'kind':'homography','unwarpedViewportPixels':[1920,1080],
+                                             'renderToSourcePixels':[1,0,0,0,1,0,0,0,1]}
+                else:
+                    view['composite'] = {'mode':'crossfade','groupId':'bank','imageLayerId':'main','opacity':0.5}
+                self.assertEqual(self.generator.camera(frame,view,family),baseline.camera(frame,view,family))
+        opaque = common.source_views(self.source_frame(2700),self.generator.data)[0]
+        opaque['composite'] = {'mode':'opaque'}
+        self.assertEqual(self.generator.camera(self.source_frame(2700),opaque,'bar')[0],self.packet['camera'])
+        stale = self.source_frame(2700)
+        stale_view = common.source_views(stale,self.generator.data)[0]
+        stale['decodedTimeSeconds'] = self.source_frame(2701)['decodedTimeSeconds']
+        with self.assertRaisesRegex(ValueError,'consistent native frame/time identity'):
+            self.generator.camera(stale,stale_view,'bar')
+
+    def test_camera_refuses_changed_actual_source_identity_and_retuned_scope_or_nonfinite_intrinsics(self):
+        for mismatch in ('image','clock','cut','layout','model','check-role','fit-exposure','fov','quaternion','principal'):
+            with self.subTest(mismatch=mismatch):
+                packet, fit, check, check_evidence = map(copy.deepcopy,
+                    (self.packet,self.fit,self.check,self.check_evidence))
+                generator = copy.copy(self.generator)
+                generator.data = copy.deepcopy(self.generator.data)
+                generator.shots = copy.deepcopy(self.generator.shots)
+                if mismatch == 'image':
+                    fit['rows'][0]['sourceImage']['sha256Bgr8'] = '0' * 64
+                elif mismatch == 'clock':
+                    fit['rows'][0]['timeSeconds'] += 0.001
+                elif mismatch == 'cut':
+                    generator.shots['rocker-bank']['endSeconds'] += 0.001
+                elif mismatch == 'layout':
+                    next(frame for frame in generator.data['frames'] if frame.get('sourceFrameIndex') == 2541)['views'][0]['rectSourcePixels'][2] = 960
+                elif mismatch == 'model':
+                    packet['model']['sha256'] = '0' * 64
+                elif mismatch == 'check-role':
+                    check_evidence['rows'][0]['role'] = 'fit'
+                elif mismatch == 'fit-exposure':
+                    fit['rows'][0]['sourceImage'] = copy.deepcopy(check_evidence['rows'][0]['sourceImage'])
+                elif mismatch == 'fov':
+                    packet['camera']['verticalFovDegrees'] = True
+                elif mismatch == 'quaternion':
+                    packet['camera']['quaternion'][0] = 2
+                else:
+                    packet['camera']['principalPointViewportPixels'][0] = float('nan')
+                with self.assertRaises(ValueError):
+                    generator.validate_synthesis_bank_camera(packet,fit,check,check_evidence)
+        frame = self.source_frame(2580)
+        view = common.source_views(frame,self.generator.data)[0]
+        frame['sourceImage']['sha256Bgr8'] = '0' * 64
+        with self.assertRaises(ValueError):
+            self.generator.camera(frame,view,'bar')
+
+
+class CamrodRendererLineageTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # The real current constructor must take the fresh receipt branch.
+        cls.generator = camera_tracks.Generator('8KmVDxkia_w')
+        cls.receipt = json.loads((camera_tracks.ROOT / camera_tracks.CAMROD_CURRENT_RECEIPT).read_text())
+        cls.probe = json.loads((camera_tracks.ROOT / camera_tracks.CAMROD_PROBE).read_text())
+        cls.previous = cls.generator.synthesis_coarse_framing['shots']['cam-rod']
+
+    def test_fresh_current_constructor_reuses_original_pose_without_rewriting_raw_history(self):
+        frame = next(frame for frame in self.generator.data['frames']
+                     if frame['shotId'] == 'cam-rod' and frame['timeSeconds'] == 100)
+        camera = self.generator.views(frame)[0]['camera']
+        self.assertEqual(camera['positionMetres'],
+                         [-0.119936139775151,0.1739581164103444,0.5790659466866046])
+        selected = self.previous['physicalPoseSelection']
+        self.assertEqual(selected['currentWorldCompatibility']['kind'],'fresh-current-native-world-compatibility')
+        self.assertEqual(selected['worldReceiptSha256'],camera_tracks.CAMROD_HISTORICAL_RECEIPT_SHA256)
+        self.assertFalse(selected['currentWorldCompatibility']['sourceFidelityAccepted'])
+        old = json.loads((camera_tracks.ROOT / camera_tracks.CAMROD_HISTORICAL_RECEIPT).read_text())
+        self.assertNotIn('representationKind',old['snapshot']['modelProvenance'])
+        self.assertEqual(old['snapshot']['modelProvenance']['observedSha256'],
+                         self.generator.data['model']['sha256'])
+        historical = historical_synthesis_generator()
+        self.assertEqual(historical.synthesis_coarse_framing['shots']['cam-rod']['chosenCamera'],camera)
+
+    def test_current_scene_requires_present_fresh_pinned_evidence_even_when_historical_replay_passes(self):
         generator = historical_synthesis_generator()
-        with replay_scene_bytes(historical_scene_bytes() + b'\n'), \
-                self.assertRaisesRegex(ValueError, 'source/native/code/intrinsics lineage differs'):
-            generator.synthesis_coarse_framing_packet()
+        target = camera_tracks.ROOT / camera_tracks.CAMROD_CURRENT_RECEIPT
+        stale = (camera_tracks.ROOT / camera_tracks.CAMROD_HISTORICAL_RECEIPT).read_bytes()
+        for data in (None,stale):
+            with self.subTest(missing=data is None), override_file_bytes(target,data), \
+                    self.assertRaisesRegex(ValueError,'Fresh current cam-rod'):
+                generator.synthesis_coarse_framing_packet()
+
+    def test_cosmetic_current_source_change_invalidates_fresh_current_receipt(self):
+        current = (camera_tracks.WEB / 'src/scene.ts').read_bytes()
+        with replay_scene_bytes(current + b'\n'), self.assertRaisesRegex(ValueError,'runtime-source evidence is stale'):
+            self.generator.synthesis_coarse_framing_packet()
+
+    def test_live_runtime_dependency_or_historical_byte_change_refuses_pose_reuse(self):
+        for relative in (*camera_tracks.CAMROD_RUNTIME_FILES, camera_tracks.CAMROD_HISTORICAL_SCENE,
+                         camera_tracks.CAMROD_PROBE,camera_tracks.CAMROD_HISTORICAL_RECEIPT):
+            with self.subTest(path=relative):
+                target = camera_tracks.ROOT / relative
+                with override_file_bytes(target,target.read_bytes() + b'\n'), self.assertRaises(ValueError):
+                    self.generator.synthesis_coarse_framing_packet()
+
+    def test_fresh_receipt_rejects_source_transport_complete_input_same_draw_and_world_drift(self):
+        for mismatch in ('source-image','source-video','transport-hash','transport-length','raw-source','descriptor',
+                         'complete-input','boolean-input','revision','view','world','missing-world','nonfinite-world','duplicate-world',
+                         'media-time','compiled-hash','historical-link'):
+            with self.subTest(mismatch=mismatch):
+                receipt = copy.deepcopy(self.receipt)
+                snapshot, capture = receipt['snapshot'],receipt['renderedLandmarks']
+                if mismatch == 'source-image':
+                    receipt['frameIdentity']['sourceImage']['sha256Bgr8'] = '0' * 64
+                elif mismatch == 'source-video':
+                    receipt['actualMedia']['originalFileSha256'] = '0' * 64
+                elif mismatch == 'transport-hash':
+                    snapshot['modelProvenance']['observedSha256'] = '0' * 64
+                elif mismatch == 'transport-length':
+                    snapshot['modelProvenance']['observedByteLength'] += 1
+                elif mismatch == 'raw-source':
+                    snapshot['modelProvenance']['sourceSha256'] = '0' * 64
+                elif mismatch == 'descriptor':
+                    receipt['representation']['source']['sourceCommit'] = '0' * 40
+                elif mismatch == 'complete-input':
+                    snapshot['views'][0]['renderedMechanism']['input']['phases'][0] += 0.01
+                elif mismatch == 'boolean-input':
+                    snapshot['views'][0]['renderedMechanism']['input']['setup']['coneSwingRad'] = False
+                elif mismatch == 'revision':
+                    snapshot['views'][0]['renderedMechanism']['sourceDrawRevision'] += 1
+                elif mismatch == 'view':
+                    capture['viewId'] = 'inset'
+                elif mismatch in ('world','missing-world','nonfinite-world','duplicate-world'):
+                    marker = next(point for point in capture['landmarks'] if point['id'] == 'crank-axis-back')
+                    if mismatch == 'world':
+                        marker['worldMetres'][0] += 1e-10
+                    elif mismatch == 'missing-world':
+                        capture['landmarks'].remove(marker)
+                    elif mismatch == 'nonfinite-world':
+                        marker['worldMetres'][0] = float('nan')
+                    else:
+                        capture['landmarks'].append(copy.deepcopy(marker))
+                elif mismatch == 'media-time':
+                    receipt['actualMedia']['timeSeconds'] += 0.001
+                elif mismatch == 'compiled-hash':
+                    receipt['compiledApplication']['sha256'] = 'not-a-hash'
+                else:
+                    receipt['historicalProbe']['sha256'] = '0' * 64
+                with self.assertRaises(ValueError):
+                    self.generator.validate_camrod_current_world_receipt(receipt,self.probe,self.previous)
+
+    def test_changed_native_source_cannot_reuse_same_world_markers(self):
+        for mismatch in ('source','commit','semantic-anchor'):
+            with self.subTest(mismatch=mismatch):
+                generator = copy.copy(self.generator)
+                generator.data = copy.deepcopy(self.generator.data)
+                if mismatch == 'semantic-anchor':
+                    next(anchor for anchor in generator.data['anchors'] if anchor['id'] == 'crank-axis-back')['partLocalMetres'][0] += 0.0001
+                else:
+                    key, changed = ('sha256','0'*64) if mismatch == 'source' else ('sourceCommit','0'*40)
+                    generator.data['model'][key] = changed
+                with self.assertRaises(ValueError):
+                    generator.validate_camrod_current_world_receipt(self.receipt,self.probe,self.previous)
 
 
 if __name__ == '__main__':

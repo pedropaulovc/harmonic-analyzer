@@ -113,18 +113,25 @@ Omitting `--video` still validates and prepares both Analysis/Synthesis outputs
 before publishing either.
 
 Analysis has bounded cumulative source-drive authority for the visible crank
-(79.8130667..86.6866 seconds) and mirrored bank (112.3122..119.0856333 seconds).
+(79.8130667..86.6866 seconds) and mirrored bank (112.3122..124.4576667 seconds).
 The authoritative packets are
 [`6dW6VYXp9HM.visible-crank-motion.json`](content/6dW6VYXp9HM.visible-crank-motion.json),
 [`6dW6VYXp9HM.visible-crank-gauge.json`](content/6dW6VYXp9HM.visible-crank-gauge.json),
-[`6dW6VYXp9HM.automatic-motion.json`](content/6dW6VYXp9HM.automatic-motion.json)
-and [`6dW6VYXp9HM.motion-controls.json`](content/6dW6VYXp9HM.motion-controls.json).
-They separate observed relative motion from chosen native sign/home and hidden
-setup. Same-shot margins hold the nearest new input through the real cut;
-other shots, views and presentations retain their existing paths.
-[`DESIGN.md`](DESIGN.md#bounded-analysis-motion-authority) describes the gauges,
-source-specific producers and limits. These drives remain chosen approximations;
-source camera and geometry fidelity are unaccepted.
+[`6dW6VYXp9HM.automatic-motion.json`](content/6dW6VYXp9HM.automatic-motion.json),
+[`6dW6VYXp9HM.motion-controls.json`](content/6dW6VYXp9HM.motion-controls.json)
+and [`6dW6VYXp9HM.bank-continuation.json`](content/6dW6VYXp9HM.bank-continuation.json).
+The [continuation producer](scripts/6dW6VYXp9HM-fit-bank-continuation.py) replaces
+the old late-shot freeze with one cumulative forward-and-return drive over
+162 genuine source exposures (3569..3730), preserving the original boundary,
+twenty phases/amplitudes, setup and camera. Only the final
+124.4576667..124.4910333-second sliver holds through the actual cut.
+Actual GPU AFTER corner checks give exposure-held RMS/max **19.9945/31.4817 px**
+(369 measurements), and feature-held **15.4018/21.1638 px** (17 measurements).
+Their inclusive uncertainty bounds are **36.1787/25.8609 px**, respectively.
+The independent-corner BEFORE maxima **223.1234/123.0095 px** are CPU projections
+of the old hold, not GPU measurements. Other shots, views and presentations
+retain their existing paths. [`DESIGN.md`](DESIGN.md#bounded-analysis-motion-authority)
+describes typed holdouts and limits; source camera and geometry remain unaccepted.
 
 Synthesis's rocker-bank interval **105.980875..124.4159583 seconds** uses
 [automatic-motion inputs](content/8KmVDxkia_w.automatic-motion.json) and
@@ -145,12 +152,30 @@ Conditional actual-metal controls cover **18 held-out exposures at H20**
 (maximum 9.43 px). H20 CHECK exposures are disjoint from annotation FIT.
 H1 CHECK times overlap annotation FIT, but its cross-feature physical pixels
 never enter the cadence or H1 pixel-gauge fit. H2–H19 remain unmeasured.
-They do not qualify GPU motion, the full scene or the camera. Separate native
-GPU captures exercised all twenty visible rocker meshes, with changing raster
-extents and contours at a fixed camera. Uninterrupted original-video/native
-playback had a maximum 52.690 ms media-to-completed-draw skew. The fixed far
-portrait camera still mismatches the filmed bank close-up; camera and geometric
-fidelity remain unqualified.
+These old controls remain separate from the new camera checks. Historical native
+GPU captures exercised all twenty rocker meshes at a fixed camera; the earlier
+uninterrupted playback measurement was 52.690 ms maximum media-to-draw skew.
+The bank now uses a [held source-informed camera](content/8KmVDxkia_w.bank-camera.json),
+from the [camera producer](scripts/8KmVDxkia_w-fit-bank-camera.py), only for
+native full-frame rocker-bank/main/bar exposures **2540..2983**, before the real
+cut at **124.457666667 seconds**. Its narrow FOV and depth are chosen, not historical.
+After freezing the camera from 30 FIT features, 38 independent CHECK features
+at 2580/2640/2820 give actual GPU marker RMS/max **17.5405/35.8076 px**, versus
+the original far-portrait actual GPU BEFORE **587.1299/778.9835 px**; the inclusive
+uncertainty bound is **42.6561 px**. These measure physical terminal-bevel
+upper-edge midpoints, not whole-frame framing or visible-surface correspondence.
+Foreground gears/chain still mismatch, and direct native-surface proof remains
+pending. Camera, full-scene geometry and stage acceptance are not established.
+
+The [fresh current cam-rod world receipt](content/8KmVDxkia_w.camrod-current-world-receipt-2026-10-03.json)
+permits reuse of an immutable older FIT-only camera only after exact native-local
+FIT coordinate, source-frame, complete-input and current-runtime checks.
+It proves three-FIT world compatibility, not source fidelity or model byte identity:
+the downloaded lossless delivery SHA `ad5c2592…` is distinct from its raw-source
+association `2280bfa6…`. The actual normal-route AFTER capture retains all
+435 native drawables, with no missing bindings or page errors. Ambiguous source
+associations and approximation labels remain; full source-camera/geometry/stage
+acceptance and a fresh continuous playback/control/audio report remain unclaimed.
 
 `npm --prefix web run test:playback` exercises eight synthetic runtime decisions
 through Vite SSR, without a browser or GLB. `SOURCE_TRACK_MODULE` may point to
