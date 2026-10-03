@@ -6,6 +6,8 @@ with an assembly reference axis on the slide line (removes T_y/T_z/R_y/R_z), an
 angle snapshot killing the residual spin about X, and an X distance snapshot
 pinning the feed position.
 
+The rest pose follows build_paper_drive_assembly (PLATE_X0 includes rack phasing).
+
     C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\probe_platen.py
 """
 
@@ -29,14 +31,12 @@ from _assembly import (
     place_component,
     world_point,
 )
+from build_paper_drive_assembly import PLATE_FRONT_Z, PLATE_X0, PLATE_Y0
 
 # Distance drivers seed their side from paper-drive's flip seeds
 # (cad/config/assemblies/paper-drive.yaml), the assembly this probe mirrors.
 activate_assembly_contract("paper-drive")
 
-PLATE_X0 = -33.213
-PLATE_Y0 = 273.234
-PLATE_FRONT_Z = -142.9
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
 
@@ -111,7 +111,6 @@ async def build(adapter):
     RACK_X0, RACK_Y0, RACK_Z = 41.23, 296.5, -138.9
     rk = await place_component(adapter, "platen-rack", [RACK_X0, RACK_Y0, RACK_Z],
                               [0.0, 0.0, 180.0], rot_z180, ground=False)
-    rk_o = _org(adapter, rk)
     await lock_mate(adapter, named_ref(f"Front Plane@{rk}", "PLANE"),
                     named_ref(f"Front Plane@{pl}", "PLANE"), label="rack locked to platen")
     log(f"after lock rack: {_status(adapter, rk)}")

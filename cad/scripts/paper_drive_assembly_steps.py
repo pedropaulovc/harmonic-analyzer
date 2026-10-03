@@ -67,7 +67,8 @@ SEQUENCE: tuple[str, ...] = (
     "disc-cluster-assembled",
     "hub-faced-to-nose",
     "disc-taps-transferred",
-    # R9-47: tips cut inside the disc's rear face (transgear_disc_screw_spec).
+    # R9-47: tips flush to 0.20 below the disc's rear face, cut ends broken
+    # (transgear_disc_screw_spec.TIP_BELOW_REAR_FACE, CUT_END_BREAK_MAX).
     "disc-screws-cut",
     "oil-hole-drilled",
     # R9-68: on the pin between the two bushing blanks, the ring last.
