@@ -56,7 +56,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
 from build_crank_drive_gear import BORE_DIAMETRAL_CLEARANCE
-from crank_drive_gear_notes import SHAFT_MATE_NUMBER
+from crank_drive_gear_notes import GEAR_DATA, SHAFT_MATE_NUMBER
 from gear_seat_fit import FLAT_AF_CLEARANCE
 from crank_drive_gear_spec import (
     BORE_DIA,
@@ -93,6 +93,11 @@ FRONT_CENTER = (0.135, 0.145)
 SECTION_CENTER = (0.290, 0.145)
 ISO_CENTER = (0.365, 0.150)
 GEAR_DATA_POS = (0.016, 0.262)
+# The property-linked block hangs down from GEAR_DATA_POS one 2.5 mm note line
+# per row: on farm run 20261001T110844152Z the 15 rows' cap tops ran 261.7 to
+# 212.8 mm (3.50 mm pitch) and the last row's descenders reached 208.9 mm.
+GEAR_DATA_LINE_PITCH = 0.0035
+GEAR_DATA_BOTTOM = GEAR_DATA_POS[1] - len(GEAR_DATA.splitlines()) * GEAR_DATA_LINE_PITCH
 # One short tooth-edge note below the gear data; the D-bore fit is carried by
 # the two native model dimensions and their feature callout.
 MANUFACTURING_NOTES_POS = (0.016, 0.042)
@@ -111,8 +116,19 @@ FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.005
 # tip leader and above the bore and finish leaders; only AF's witness lines,
 # which start on the axis, meet it. The flat itself appears on local +X in
 # the face view.
+#
+# The tip diameter's text shares the upper-left corner with the gear-data
+# block, so it hangs a fixed air gap under the block's LAST row: a row added
+# to GEAR_DATA moves it down instead of under that row (R9-56's contact-ratio
+# row printed through "Ø65.21 ±0.1" when it sat at a fixed 16 mm above the
+# tips). Its ink stands 3.9 mm tall ("Ø65.21 ±0.1", same run).
+TIP_DIA_TEXT_HALF_HEIGHT = 0.002
+TIP_DIA_TEXT_GAP = 0.004
 FRONT_KEEP = {
-    "OutsideDia": (FRONT_CENTER[0] - 0.035, FRONT_CENTER[1] + HALF_OD + 0.016),
+    "OutsideDia": (
+        FRONT_CENTER[0] - 0.035,
+        GEAR_DATA_BOTTOM - TIP_DIA_TEXT_GAP - TIP_DIA_TEXT_HALF_HEIGHT,
+    ),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
     "BoreAF": (FRONT_CENTER[0] + 0.090, FRONT_CENTER[1] + 0.028),
 }

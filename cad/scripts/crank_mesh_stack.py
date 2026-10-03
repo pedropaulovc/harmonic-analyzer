@@ -18,6 +18,8 @@ import crank_drive_gear_notes
 import crank_drive_gear_spec as gear64
 import crank_pinion_spec as pinion
 import crankshaft_spec as shaft
+from cone_line import COS_I, SIN_I
+from cone_stack_end_play import CONE_FLOAT_NORTH
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 R64 = gear64.PITCH_DIA / 2.0
@@ -141,6 +143,70 @@ TERMS = stack_terms(spacing_printed=SPACING_PRINTED, plan_limit_deg=POST_ANGLE_D
 TIGHT_BACKLASH_MM = NOMINAL_TIGHT_BACKLASH_MM + sum(t.tight for t in TERMS)
 if TIGHT_BACKLASH_MM <= 0.0:
     raise AssertionError("fixed-centre 16T:64T mesh binds at the worst tight corner (user ruling 2026-09-28)")
+
+
+# --- Contact ratio at the open corner (user ruling 2026-09-30) -------------
+# TERMS is the closing corner. Least engagement is the other one: the bore
+# spacing at its +0.37 end and every centre term at the end that parts the
+# axes, the cone shaft floating on its largest running clearance. Only centre
+# translations enter; tooth thinning, the fitted pose losses and the linear
+# residual move no centre. The 64T stands at its model pose at the closing
+# corner (the stack's south stop) and floats north at the open one.
+def open_terms(*, spacing_printed: float, plan_limit_deg: float, crank_bearing_length: float) -> dict[str, float]:
+    """Centre-distance opening (mm) per term at the open corner."""
+    return {
+        "crank bore spacing": (spacing_printed + post.CRANK_ABOVE_CONE_BAND[0] - FRAME_DY) * DC_PER_DY,
+        "cone bore plan angle": PLAN_DX_PER_DEG * plan_limit_deg * DC_PER_DX,
+        "64T axial station": STATION_64T_DC,
+        # The stack's north float slides the 64T up the inclined cone axis,
+        # lengthening the in-plane horizontal leg by F*sin(i)*cos(i). Booked
+        # linearly on the frame reference's DC_PER_DX, as the plan-angle term
+        # is: 0.02405, 0.0013 under the 0.02538 exact at the assembly's
+        # physical centres (leg 5.881, not 5.647). Chosen, not missed:
+        # build_drive_train_assembly asserts the printed contact ratio holds
+        # with the exact opening in its place.
+        "cone stack north float": CONE_FLOAT_NORTH * SIN_I * COS_I * DC_PER_DX,
+        "crank float at rest": _float_at_rest(_RUNNING[1], crank_bearing_length, CRANK_OVERHANG) * DC_PER_DY,
+        "cone float at rest": _float_at_rest(_RUNNING[1], post.CONE_BOSS_LENGTH, CONE_OVERHANG) * DC_PER_DY,
+        "gear bore runout": (pinion.BORE_DIAMETRAL_CLEARANCE[1] + GEAR_SEAT_CLEARANCE[1]) / 2.0,
+        "tooth-to-bore cutting runout": TOOTH_RUNOUT_TIR_MM,
+        "post frame angle at the mesh": MESH_LEVER * math.tan(math.radians(plan_limit_deg)),
+    }
+
+
+OPEN_TERMS = open_terms(spacing_printed=SPACING_PRINTED, plan_limit_deg=POST_ANGLE_DEG, crank_bearing_length=CRANK_BEARING_LENGTH)
+OPEN_CENTRE_DISTANCE_MM = sum(OPEN_TERMS.values())
+if min(OPEN_TERMS.values()) < 0.0:
+    raise AssertionError("an open-corner centre term closes the mesh")
+
+# The 16T is spur, cut square by the 64T's normal-plane cutter; the 64T is a
+# helix crossed on the inclined cone axis. The ratio is screened in the 64T's
+# normal section (the 16T's transverse section to within the crossing's
+# 0.52 deg): the 64T takes its equivalent radius R/cos^2(helix), keeping its
+# addendum and the centre opening, and both share the cutter's base pitch.
+_CUTTER_PA = math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
+EQUIVALENT_RADIUS_GROWTH_64 = R64 / math.cos(math.radians(gear64.HELIX_ANGLE_DEG)) ** 2 - R64
+BASE_PITCH_MM = math.pi * gear64.NORMAL_MODULE_MM * math.cos(_CUTTER_PA)
+
+
+def contact_ratio(*, centre_distance: float, tip_dia_16: float, tip_dia_64: float) -> float:
+    """16T:64T contact ratio at ``centre_distance`` with the two tip diameters."""
+    grow = EQUIVALENT_RADIUS_GROWTH_64
+    rb16 = pinion.PITCH_DIA / 2.0 * math.cos(_CUTTER_PA)
+    rb64 = (R64 + grow) * math.cos(_CUTTER_PA)
+    q16 = math.sqrt((tip_dia_16 / 2.0) ** 2 - rb16**2)
+    q64 = math.sqrt((tip_dia_64 / 2.0 + grow) ** 2 - rb64**2)
+    line = math.sqrt((centre_distance + grow) ** 2 - (rb16 + rb64) ** 2)
+    return (min(q16, line) - max(line - q64, 0.0)) / BASE_PITCH_MM
+
+
+def printed_tip_low(outside_dia: float, places: int, tolerance: float) -> float:
+    """The smallest tip diameter the sheet accepts: printed nominal less its band."""
+    return round(outside_dia, places) - tolerance
+
+
+TIP_DIA_LOW_16 = printed_tip_low(pinion.OUTSIDE_DIA, pinion.DRAWING_PRECISION_BY_NAME["OutsideDia"], pinion.OUTSIDE_DIA_TOLERANCE_MM)
+TIP_DIA_LOW_64 = printed_tip_low(gear64.OUTSIDE_DIA, gear64.DRAWING_PRECISION_BY_NAME["OutsideDia"], gear64.OUTSIDE_DIA_TOLERANCE_MM)
 
 
 def stack_text() -> str:

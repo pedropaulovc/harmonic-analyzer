@@ -53,7 +53,7 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     # The StationReference sketch drives each printed station from the same
     # globals as the features; these are the values the equations evaluate to.
     far = spec.SHAFT_LENGTH
-    assert far - spec.SEAT_STEP == pytest.approx(24.1)
+    assert far - spec.SEAT_STEP == pytest.approx(25.9)
     # The station the spec chose prints exactly at its places.
     assert spec.PINION_SEAT_STATION == round(spec.PINION_SEAT_STATION, spec.STATION_PLACES)
     assert set(part._STATIONS) == set(part._STATION_DRIVES)

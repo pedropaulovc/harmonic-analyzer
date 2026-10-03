@@ -67,6 +67,7 @@ from crank_pinion_spec import (
     PIN_DIA,
     PIN_HOLE_PROCESS,
     PIN_STATION,
+    SHOULDER_LENGTH,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -189,12 +190,14 @@ def _position_section_caption(
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 # Longitudinal section: the tooth-tip diameter sits above its axial span; the
 # bore diameter stands off the toothed face, its text above-left of the view
-# and clear of the end view. The two lengths stay baseline-stacked below the
-# view from the toothed south face (rule 7: one origin per view, baseline not
-# chained). The boss diameter reads on a vertical dimension line beyond the
-# boss end, its text on the axis between the extension lines: at +0.020 it sat
-# on the upper extension line (machinist review of 4d4e038e3), which
-# ``_boss_dia_text_crossings`` now rejects on the sheet.
+# and clear of the end view. The turned-band diameter sits above the band,
+# its text at the bore diameter's height so it stays clear of the tip
+# diameter's. The three lengths stay baseline-stacked below the view from the
+# toothed south face, shortest innermost (rule 7: one origin per view,
+# baseline not chained). The boss diameter reads on a vertical dimension line
+# beyond the boss end, its text on the axis between the extension lines: at
+# +0.020 it sat on the upper extension line (machinist review of 4d4e038e3),
+# which ``_boss_dia_text_crossings`` now rejects on the sheet.
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 BOSS_DIA_TEXT_X = _side_x(OVERALL_LENGTH) + 0.049
 RIGHT_KEEP = {
@@ -202,12 +205,20 @@ RIGHT_KEEP = {
         (_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0,
         RIGHT_CENTER[1] + HALF_OD + 0.012,
     ),
+    "TurnedDia": (
+        (_side_x(SHOULDER_LENGTH) + _side_x(FACE_WIDTH)) / 2.0,
+        RIGHT_CENTER[1] + HALF_OD + 0.025,
+    ),
     "BossDia": (BOSS_DIA_TEXT_X, RIGHT_CENTER[1]),
     # Left of the toothed face: right of the boss its extension lines ran the
     # bore's full length and fenced the pin-hole leader (leader-crosses-line).
     "BoreDia": (_side_x(0.0) - 0.0075, RIGHT_CENTER[1] + HALF_OD + 0.025),
-    "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.014),
-    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.026),
+    "ShoulderLength": (
+        (_side_x(0.0) + _side_x(SHOULDER_LENGTH)) / 2.0,
+        _SIDE_BOTTOM - 0.014,
+    ),
+    "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.026),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.038),
 }
 DIMENSION_TEXT_LINE_GAP = 0.0005
 # The boss diameter's text is centred on its dimension line; it read 13.1 mm

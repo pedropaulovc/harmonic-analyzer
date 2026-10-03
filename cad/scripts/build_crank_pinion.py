@@ -12,11 +12,14 @@ carries the 1/8 in retention pin that keys the pinion to the crankshaft
 through a match-drilled radial cross-hole (crank_pinion_spec).
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
-Appendix C #9. The 9.5 face remains wider than the drive gear's 7.2113
+Appendix C #9. The 11.4 tooth length runs past the drive gear's 7.2113
 face; the south face stays against its restored MHA-016 boss-side datum.
+The teeth run at full OD for the shoulder length and are turned down north of
+it, so the grown end passes under the inclined T120 (crank_pinion_spec).
 
-Layout: gear axis = Z through the origin, teeth z = 0..FACE_WIDTH, boss
-z = FACE_WIDTH..OVERALL_LENGTH, pin at FACE_WIDTH + BOSS_LENGTH / 2 (W15).
+Layout: gear axis = Z through the origin, teeth z = 0..FACE_WIDTH (turned to
+TURNED_DIA from SHOULDER_LENGTH), boss z = FACE_WIDTH..OVERALL_LENGTH, pin at
+FACE_WIDTH + BOSS_LENGTH / 2 (W15).
 
 Run (SolidWorks already open)::
 
@@ -30,6 +33,7 @@ import sys
 
 import _telemetry
 from _common import (
+    IN,
     SketchDims,
     _feature_by_name,
     _early_bound,
@@ -86,8 +90,13 @@ from crank_pinion_spec import (
     PIN_HOLE_SPEC,
     PIN_STATION,
     PRESSURE_ANGLE_DEG,
+    SHOULDER_LENGTH,
+    SHOULDER_LENGTH_LIMITS,
     SURFACE_FINISHES,
+    TURNED_DIA,
+    TURNED_DIA_TOLERANCE_MM,
 )
+from involute_gear import gear_facts
 
 PART_NAME = "crank-pinion"
 MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
@@ -95,9 +104,9 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
 DP = DIAMETRAL_PITCH  # the 64T's normal-plane cutter, cut square (crank_pinion_spec)
 PA_DEG = PRESSURE_ANGLE_DEG
-# FACE_WIDTH (9.5) and BOSS_LENGTH are in crank_pinion_spec; only the
-# toothed north end and the boss/pin north of it retreat from the old 10.4.
-# build_drive_train_assembly checks the installed south face and overlap.
+# FACE_WIDTH (the whole tooth length), SHOULDER_LENGTH, TURNED_DIA and
+# BOSS_LENGTH are in crank_pinion_spec. build_drive_train_assembly checks the
+# installed south face, the T120 clearances and the 64T row overlap.
 BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (crank_pinion_spec)
 
 # The hub boss as the runtime gate reads it (#906 diag v3, d6ca08eb7): a boss
@@ -113,6 +122,25 @@ BOSS_GATE_FACE = CylinderFace(
     contains_z_mm=(FACE_WIDTH + OVERALL_LENGTH) / 2.0,
     tolerance_mm=BOSS_GATE_TOL_MM,
 )
+
+
+def turned_band_volume_mm3() -> float:
+    """Tooth material the TurnedBand cut removes: every tooth's cross-section
+    between the turned radius and the tip, over the turned length. The tooth
+    half-angle at radius r is Delta - inv(acos(Rb / r)) (the involute the gap
+    cut leaves; gear_facts, inches)."""
+    facts = gear_facts(TEETH, DP, PA_DEG)
+    rb, ra, delta = facts["Rb"], facts["Ra"], facts["Delta"]
+    rt = TURNED_DIA / 2.0 / IN
+    if not rb < rt < ra:
+        raise AssertionError("the turned diameter must cut the involute flanks")
+    samples = 2000
+    area_in2 = 0.0
+    for i in range(samples):
+        r = rt + (ra - rt) * (i + 0.5) / samples
+        phi = math.acos(rb / r)
+        area_in2 += 2.0 * (delta - (math.tan(phi) - phi)) * r * (ra - rt) / samples
+    return TEETH * area_in2 * IN**2 * (FACE_WIDTH - SHOULDER_LENGTH)
 
 
 async def assert_boss_present(adapter, label: str) -> None:
@@ -148,6 +176,8 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
     await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
     await set_global(adapter, "BossLength", f"{BOSS_LENGTH}mm")
+    await set_global(adapter, "ShoulderLength", f"{SHOULDER_LENGTH}mm")
+    await set_global(adapter, "TurnedDia", f"{TURNED_DIA}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -328,6 +358,98 @@ async def build(adapter) -> dict[str, str]:
     v_boss = math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_LENGTH
     volume = await volume_check(adapter, "hub boss", volume + v_boss, 0.01 * v_boss)
 
+    # Turned band (user ruling c'' variant B, 2026-09-30): north of the
+    # full-OD shoulder the teeth are turned down to TURNED_DIA so the grown
+    # end passes under the inclined T120 rim. A revolve cut of a rectangle on
+    # the Right plane (local x -> model -Z), like the boss: the shoulder
+    # length prints from the same faced end as the face and overall length,
+    # the turned diameter beside it on the side view (rule 7). The rectangle
+    # runs on to the part's far end and out past the tip -- above the boss,
+    # so it cuts tooth material alone -- and both of those extents are driven
+    # definition-only dimensions that follow the knobs.
+    band = SketchDims()
+    check("create_sketch turned band", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    band_top = OUTSIDE_DIA - TURNED_DIA / 2.0
+    band_pts = [
+        (-SHOULDER_LENGTH, TURNED_DIA / 2.0),
+        (-OVERALL_LENGTH, TURNED_DIA / 2.0),
+        (-OVERALL_LENGTH, band_top),
+        (-SHOULDER_LENGTH, band_top),
+    ]
+    band_lines = await add_line_chain(adapter, band_pts)
+    band_axis = check(
+        "turned band axis centerline",
+        await adapter.add_centerline(0.0, 0.0, -SHOULDER_LENGTH, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for i, line in enumerate(band_lines):
+        direction = "horizontal" if i % 2 == 0 else "vertical"
+        check(
+            f"turned band {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    check(
+        "turned band axis at the origin",
+        await adapter.add_sketch_constraint(f"{band_axis}.start", "origin", "coincident"),
+    )
+    check(
+        "turned band axis level",
+        await adapter.add_sketch_constraint(band_axis, None, "horizontal"),
+    )
+    check(
+        "turned band axis ends under the shoulder",
+        await adapter.add_sketch_constraint(
+            f"{band_axis}.end", f"{band_lines[0]}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{band_lines[0]}.start",
+        "origin",
+        "horizontal_distance",
+        SHOULDER_LENGTH,
+        "turned band ShoulderLength",
+    )
+    band.record("ShoulderLength", '"ShoulderLength"')
+    await add_diametric_linear_dimension(
+        adapter,
+        band_axis,
+        band_lines[0],
+        (-(SHOULDER_LENGTH + FACE_WIDTH) / 2.0, -(TURNED_DIA / 2.0 + 5.0)),
+        "TurnedDia",
+    )
+    band.record("TurnedDia", '"TurnedDia"')
+    await dimension_between(
+        adapter,
+        f"{band_lines[0]}.end",
+        "origin",
+        "horizontal_distance",
+        OVERALL_LENGTH,
+        "turned band far end",
+    )
+    band.record(None, '"FaceWidth" + "BossLength"')
+    await dimension_between(
+        adapter,
+        f"{band_lines[1]}.start",
+        f"{band_lines[1]}.end",
+        "vertical_distance",
+        band_top - TURNED_DIA / 2.0,
+        "turned band rise past the tip",
+    )
+    band.record(None, '"OutsideDia" - "TurnedDia"')
+    await ensure_fully_defined(adapter, "turned band sketch")
+    check("exit_sketch turned band", await adapter.exit_sketch())
+    name_last_feature(adapter, "TurnedBandProfile")
+    drive_jobs += band.apply(adapter, "TurnedBandProfile")
+    check(
+        "revolve-cut turned band",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "TurnedBand")
+    v_band = turned_band_volume_mm3()
+    volume = await volume_check(adapter, "turned band", volume - v_band, 0.01 * v_band)
+
     # On-axis bore (centre 0,0) through teeth and boss: define_circle emits
     # only the diameter dim, so only the "Dia" slot is recorded -- the X/Z
     # names are ignored.
@@ -414,10 +536,19 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "BossProfile", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM
     )
-    # The face's own +0/-0.30: the drive train proves the T120 air at its long
-    # limit and the 64T row engagement at its short one (Codex P1 on #1128).
+    # The face's own +0/-0.30: the drive train proves the 64T row engagement
+    # at its short limit and the turned band's T120 clearance at its long one
+    # (Codex P1 on #1128; user ruling 2026-09-30).
     set_dimension_bilateral_tolerance(
         adapter, "GearBlank", "FaceWidth", *FACE_WIDTH_LIMITS
+    )
+    # The shoulder's +0/-0.30 and the turned diameter's +/-0.10: the drive
+    # train proves the T120 air and radial clearance at their long/large limits.
+    set_dimension_bilateral_tolerance(
+        adapter, "TurnedBandProfile", "ShoulderLength", *SHOULDER_LENGTH_LIMITS
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "TurnedBandProfile", "TurnedDia", TURNED_DIA_TOLERANCE_MM
     )
     await volume_check(
         adapter, "driven crank pinion (equations neutral)", volume, 0.01 * v_bore

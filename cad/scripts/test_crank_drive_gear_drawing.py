@@ -69,9 +69,11 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
     assert '_verify_named_dimension(adapter, "OutsideDia@OutsideDiaReference"' in build
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
     # #906: normal-defined -- the transverse pitch circle plus the CUTTER's
-    # addendum on each side.
+    # addendum on each side, the blank turned 0.05 long over it (R9-56).
+    assert spec.LONG_ADDENDUM_MM == 0.05
     assert spec.OUTSIDE_DIA == pytest.approx(
-        part.TEETH / part.DP * spec.MM_PER_IN + 2.0 * spec.MM_PER_IN / spec.CUTTER_DIAMETRAL_PITCH
+        part.TEETH / part.DP * spec.MM_PER_IN
+        + 2.0 * (spec.MM_PER_IN / spec.CUTTER_DIAMETRAL_PITCH + spec.LONG_ADDENDUM_MM)
     )
     # ... and therefore never as text beside the generating data.
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
@@ -232,7 +234,7 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
     assert spec.FACE_WIDTH == 7.2113
     assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 4
-    assert pinion_spec.FACE_WIDTH == 9.5
+    assert pinion_spec.FACE_WIDTH == 11.6
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
@@ -384,7 +386,9 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     assert spec.CUTTER_DIAMETRAL_PITCH == pinion_spec.DIAMETRAL_PITCH
     assert spec.CUTTER_PRESSURE_ANGLE_DEG == pinion_spec.PRESSURE_ANGLE_DEG
     assert 'depth_dp=CUTTER_DIAMETRAL_PITCH' in _build_source()
-    assert spec.WHOLE_DEPTH == pytest.approx(2.157 * spec.NORMAL_MODULE_MM)
+    assert spec.WHOLE_DEPTH == pytest.approx(
+        2.157 * spec.NORMAL_MODULE_MM + spec.LONG_ADDENDUM_MM
+    )
     assert spec.ROOT_DIA == pytest.approx(spec.PITCH_DIA - 2.0 * 1.157 * spec.NORMAL_MODULE_MM)
     assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
         math.pi * spec.MODULE_MM / 2.0 - spec.BACKLASH_MM
@@ -511,6 +515,53 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert cap_x == pytest.approx(sx)
     assert cap_top < sy - half_od - 0.005
     assert cap_top - _CAPTION_HEIGHT > _TITLE_BLOCK_TOP + 0.003
+
+
+# The gear-data block at its 2.5 mm note height, measured on farm run
+# 20261001T110844152Z: rows 3.50 mm apart from a cap top 0.3 mm under the
+# anchor, the last row's descenders 0.6 mm under top - rows * pitch, and the
+# 95-character tooth-thickness row 165 mm wide (1.74 mm a character). The tip
+# diameter's "Ø65.21 ±0.1" printed 26.2 mm wide and 3.9 mm tall.
+_NOTE_LINE_PITCH = 0.0035
+_NOTE_DESCENDER = 0.0006
+_NOTE_CHAR_WIDTH = 0.00174
+_TIP_DIA_TEXT = "Ø65.21 ±0.1"
+_TIP_DIA_TEXT_HEIGHT = 0.0039
+
+
+def _gear_data_box() -> tuple[float, ...]:
+    rows = notes.GEAR_DATA.splitlines()
+    left, top = drawing.GEAR_DATA_POS
+    width = _NOTE_CHAR_WIDTH * max(len(row) for row in rows)
+    bottom = top - len(rows) * _NOTE_LINE_PITCH - _NOTE_DESCENDER
+    return (left, bottom, left + width, top)
+
+
+def _tip_dia_text_box(centre: tuple[float, float]) -> tuple[float, ...]:
+    half_w = _CHAR_WIDTH * len(_TIP_DIA_TEXT) / 2.0
+    half_h = _TIP_DIA_TEXT_HEIGHT / 2.0
+    x, y = centre
+    return (x - half_w, y - half_h, x + half_w, y + half_h)
+
+
+def test_tip_diameter_text_hangs_under_every_gear_data_row_and_over_the_teeth() -> None:
+    # R9-56's contact-ratio row grew the block down through "Ø65.21 ±0.1",
+    # which sat a fixed 16 mm over the tooth tips (machinist review, farm run
+    # 20261001T110844152Z). The text now hangs under the block's last row, so
+    # a further row moves it down -- until it would land on the teeth.
+    block = _gear_data_box()
+    assert "CONTACT RATIO WITH MHA-025" in notes.GEAR_DATA.splitlines()[-1]
+    tip = _tip_dia_text_box(drawing.FRONT_KEEP["OutsideDia"])
+    # The text sits under the block's columns, so its clearance is vertical.
+    assert block[0] < tip[0] < block[2]
+    assert block[1] - tip[3] >= 0.003
+    # ... and over the tooth-tip circle, with room for the leader's shoulder.
+    assert _box_distance(tip, drawing.FRONT_CENTER) > drawing.HALF_OD + 0.005
+    # The fixed placement, 16 mm over the tips, that the contact-ratio row
+    # printed through.
+    cx, cy = drawing.FRONT_CENTER
+    old = _tip_dia_text_box((cx - 0.035, cy + drawing.HALF_OD + 0.016))
+    assert old[3] > block[1]
 
 
 def test_part_stamps_make_critical_properties() -> None:

@@ -66,8 +66,35 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("build_drive_train_assembly", "ARBOR_PED_NORTH_Z_BAND"): (
         "plan z extent of the north pedestal foot (clearance geometry)"
     ),
-    ("build_drive_train_assembly", "_G64_BAND"): (
-        "64T gear z extent used for clearance checks"
+    # The 16T/T120 and row checks (c'' variant B): print-worst (lower, upper)
+    # deviations already derived by printed_deviations/deviations from each
+    # printed band, corners of the clearance scans rather than fits.
+    ("build_drive_train_assembly", "_PINION_FACE_BAND"): (
+        "16T face print-worst deviations (clearance/engagement corners)"
+    ),
+    ("build_drive_train_assembly", "_PINION_SHOULDER_BAND"): (
+        "16T shoulder print-worst deviations (T120 air corners)"
+    ),
+    ("build_drive_train_assembly", "_PINION_TIP_RADIUS_BAND"): (
+        "16T tip-radius print-worst deviations (T120 air corners)"
+    ),
+    ("build_drive_train_assembly", "_PINION_TURNED_DIA_BAND"): (
+        "16T turned-band diameter print-worst deviations (T120 radial and band contact corners)"
+    ),
+    ("build_drive_train_assembly", "_BOSS_NORTH_BAND"): (
+        "post crank-boss north face print-worst deviations (16T station corners)"
+    ),
+    ("build_drive_train_assembly", "_CONE_BOSS_NORTH_BAND"): (
+        "post cone-boss north face print-worst deviations (cone stack corners)"
+    ),
+    ("build_drive_train_assembly", "_COLLAR_WIDTH_BAND"): (
+        "cone-shaft collar print-worst deviations (cone stack corners)"
+    ),
+    ("build_drive_train_assembly", "_CRANK_HEIGHT_BAND"): (
+        "crank-above-cone print-worst deviations (radial clearance corners)"
+    ),
+    ("build_drive_train_assembly", "_T120_NORTH_BAND"): (
+        "T120 north-face (upper, lower) station band sampled by the T120 scan"
     ),
     ("build_drive_train_assembly", "_ARB_Z_BANDS"): (
         "(z extent, minimum gap) pairs for the swing-plate clearance sweep"

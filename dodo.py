@@ -3041,6 +3041,7 @@ def task_check():
         SCRIPTS_DIR / "test_crank_native_acceptance.py",
         # ... and the fixed-centre 16T:64T crank mesh clearance.
         SCRIPTS_DIR / "test_crank_mesh_stack.py",
+        SCRIPTS_DIR / "test_crank_mesh_studies_band.py",
         SCRIPTS_DIR / "test_crank_boss_rim.py",
         # ... and #937: the cylinder-bank layout bands and MHA-147's set screw.
         SCRIPTS_DIR / "test_arbor_set_screw.py",

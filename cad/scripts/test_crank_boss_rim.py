@@ -25,7 +25,7 @@ SEATED = rim.seated_gear_offset()
 
 def test_a_collar_thinned_past_the_margin_fails_the_boss_floor() -> None:
     # CollarWidth prints .XXX, so a single 0.001 step does NOT consume the
-    # ~0.236 mm spare. A geometrically meaningful reduction does.
+    # ~0.229 mm spare. A geometrically meaningful reduction does.
     thin = rim.THINNER_COLLAR
     new_offset = rim.seated_gear_offset(collar_thickness=thin)
     assert rim.THINNER_COLLAR_CLEARANCE < rim.FLOOR_CLEARANCE_MM
@@ -38,7 +38,7 @@ def test_the_seated_south_face_holds_the_floor_everywhere() -> None:
     assert set(worst) == FEATURES
     assert rim.worst_shortfalls(SEATED) == {}
     assert min(worst, key=worst.get) == "crank boss"
-    assert worst["crank boss"] == pytest.approx(0.486, abs=2e-3)
+    assert worst["crank boss"] == pytest.approx(0.479, abs=2e-3)
     assert gear64.FACE_WIDTH == pytest.approx(7.2113)
     assert gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"] == 4
 

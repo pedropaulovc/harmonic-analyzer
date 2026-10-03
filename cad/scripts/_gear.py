@@ -456,6 +456,7 @@ async def build_fixed_gear(
     backlash_mm: float = 0.0,
     root_relief: bool = False,
     depth_dp: float | None = None,
+    long_addendum_mm: float = 0.0,
 ) -> ToothedDisc:
     """Build a toothed disc on the active new part.
 
@@ -483,9 +484,11 @@ async def build_fixed_gear(
     gear cut by a normal-plane cutter passes its TRANSVERSE ``dp`` and
     ``pa_deg`` (they place the involute) and the cutter's DP here: the cutter
     cuts its own depth whichever plane the profile is read in.
+    ``long_addendum_mm`` turns the blank's tip that much over the standard
+    addendum and leaves the root where the cutter's depth puts it.
     """
     depth_dp = dp if depth_dp is None else depth_dp
-    addendum_extra_in = 1.0 / depth_dp - 1.0 / dp
+    addendum_extra_in = 1.0 / depth_dp - 1.0 / dp + long_addendum_mm / IN
     facts = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     ra_mm = facts["Ra"] * IN
     pitch_r_in = teeth / dp / 2.0

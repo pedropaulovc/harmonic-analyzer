@@ -105,7 +105,7 @@ def local_station(far_end_station: float) -> float:
 # seat, not at it: at SEAT_PINION it would print to 1.05 of standoff.
 PINION_SEAT_DIA = crank_pinion_spec.SEAT_DIA
 PINION_SEAT_DIA_BAND = SHAFT_DIA_BAND  # the through shaft's turned-fit band
-PINION_SEAT_STATION = 24.1  # far end to the step
+PINION_SEAT_STATION = 25.9  # far end to the step
 SEAT_STEP = local_station(PINION_SEAT_STATION)
 STEP_CORNER_RADIUS_MAX = 0.25  # the title block's R0.25 edge break
 SEAT_STEP_STANDOFF_WORST = SEAT_STEP + STATION_ROW + STEP_CORNER_RADIUS_MAX - SEAT_PINION
@@ -119,14 +119,15 @@ if SEAT_STEP_STANDOFF_WORST > SEAT_GAP_NORTH_RANGE + 1e-9:
 # Restore the two bearing lands and the relieved middle. Printed stations
 # remain baseline dimensions from the faced far end, at the routine .X band.
 WEB_TARGET_MM = 2.0
-JOURNAL_INBOARD_STATION = 27.7
+JOURNAL_INBOARD_STATION = 29.5
 JOURNAL_END = local_station(JOURNAL_INBOARD_STATION)
 JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
-STEP_WEB_WORST = SEAT_STEP - JOURNAL_END - 2.0 * STATION_ROW
+# Both ends print from the far end, so the web is their printed difference.
+STEP_WEB_WORST = JOURNAL_INBOARD_STATION - PINION_SEAT_STATION - 2.0 * STATION_ROW
 RELIEF_DIA = 10.4
 RELIEF_DIA_PLACES = 1
-RELIEF_OUTBOARD_STATION = 81.0
-RELIEF_INBOARD_STATION = 42.7
+RELIEF_OUTBOARD_STATION = 82.8
+RELIEF_INBOARD_STATION = 44.5
 RELIEF_START = local_station(RELIEF_OUTBOARD_STATION)
 RELIEF_END = local_station(RELIEF_INBOARD_STATION)
 RELIEF_LENGTH = RELIEF_END - RELIEF_START

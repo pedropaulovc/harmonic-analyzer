@@ -11,8 +11,10 @@ root-relief extensions, the 64T's teeth twisted as the TRUE helix
 retired K-slice cut stack) -- places them on the live drive-train geometry
 (constants imported from ``build_drive_train_assembly``, never mirrored) at
 the shipped axial placement (``PINION_TOOTH_Z`` -- the pinion proud of the
-pivot-post casting face, spanning the 64T row; ch12 page002_img06), and
-voxel-computes the pair's intersection volume.
+pivot-post casting face, spanning the 64T row; ch12 page002_img06), with the
+pinion's turned band (``crank_pinion_spec`` SHOULDER_LENGTH / TURNED_DIA, the
+cut ``build_crank_pinion`` revolves), and voxel-computes the pair's
+intersection volume.
 
 Findings it reproduces (run it after changing any crank-mesh input):
 
@@ -47,13 +49,17 @@ import build_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
 from involute_gear import PA_DEG, gear_facts
 from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG
+from crank_drive_gear_spec import LONG_ADDENDUM_MM as LONG_ADDENDUM64_MM
 from crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
+from crank_pinion_spec import SHOULDER_LENGTH as PINION_SHOULDER
+from crank_pinion_spec import TURNED_DIA as PINION_TURNED_DIA
 
 IN = 25.4
 DP_CRANK = dta.DP_CRANK
-# #906: one cutter for the pair -- the 16T's DP, and the 64T's normal DP.
+# #906: one cutter for the pair -- the 16T's DP, and the 64T's normal DP;
+# the 64T blank turned long (R9-56).
 DP_CRANK_CUTTER = dta.DP_CRANK_CUTTER
-ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK
+ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK + LONG_ADDENDUM64_MM / IN
 GEAR64_SEAT = dta.GEAR64_SEAT
 GEAR64_FACE = dta.GEAR64_FACE
 PINION_FACE = dta.PINION_FACE
@@ -67,6 +73,10 @@ INCLINE_DEG = dta.INCLINE_DEG
 R64, R16, ADD16 = dta.R64, dta.R16, dta.ADD16
 SLACK = math.hypot((GEAR64_SEAT[0] - dta.X_CRANK) * COS_I, dta.Y_CRANK - Y_DRIVE) - R64 - R16
 PINION_TOOTH_Z = dta.PINION_TOOTH_Z
+# The turned band build_crank_pinion revolve-cuts: north of the full-OD
+# shoulder (pinion z > PINION_SHOULDER from the toothed south face) the teeth
+# stop at PINION_TURNED_DIA.
+PINION_TURNED_R = PINION_TURNED_DIA / 2.0
 
 
 def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
@@ -150,6 +160,18 @@ class GapLookup:
         return inside & ~(self.table[ti, ri] & ~below)
 
 
+def pinion_material(
+    g16: GapLookup, theta: np.ndarray, r: np.ndarray, z: np.ndarray
+) -> np.ndarray:
+    """16T material at pinion-frame (theta, r, z), z from the toothed south face.
+
+    The shipped solid: full-OD teeth over the shoulder, turned down to
+    ``PINION_TURNED_DIA`` north of it, nothing past ``PINION_FACE``.
+    """
+    turned = (z > PINION_SHOULDER) & (r > PINION_TURNED_R)
+    return (z >= 0) & (z <= PINION_FACE) & ~turned & g16.material(theta, r)
+
+
 ROOT16 = R16 - 1.157 * ADD16
 ROOT64 = R64 - 1.157 * ADD16
 
@@ -222,7 +244,7 @@ def study(axis: tuple[float, float], skew_deg: float = 0.0, widen16: float = 0.0
     px, py = P[:, 0] - x_crank, P[:, 1] - y_crank
     pth = np.arctan2(py, px) + math.radians(seed - crank_deg)
     pz = P[:, 2] - (pinion_tooth_z - PINION_FACE / 2.0)
-    in16 = (pz >= 0) & (pz <= PINION_FACE) & g16.material(pth, np.hypot(px, py))
+    in16 = pinion_material(g16, pth, np.hypot(px, py), pz)
 
     rel = P - g
     s = rel @ u
@@ -305,8 +327,8 @@ def main() -> int:
     assert abs(live["seed"] - dta.PINION_SEED_DEG) < 1e-9, (
         f"study seed {live['seed']} != assembly PINION_SEED_DEG "
         f"{dta.PINION_SEED_DEG}")
-    assert abs(live["c2c"] - dta.CRANK_FIT_C2C) < 1e-9, (
-        f"study c2c {live['c2c']} != assembly CRANK_FIT_C2C {dta.CRANK_FIT_C2C}")
+    assert abs(live["c2c"] - dta.CRANK_ACTUAL_C2C) < 1e-9, (
+        f"study c2c {live['c2c']} != assembly CRANK_ACTUAL_C2C {dta.CRANK_ACTUAL_C2C}")
     w = worst_over_phase(BACKLASH_MM, SHIPPED_AXIS, 0, lut, seed_off=off)
     print(f"backlash {BACKLASH_MM} c2c +{shipped_slack:.3f} smooth: worst {w:.4f} mm^3")
     wm = worst_over_phase(BACKLASH_MM - 0.05, SHIPPED_AXIS, 0, lut, seed_off=off)

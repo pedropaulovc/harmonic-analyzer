@@ -289,7 +289,7 @@ def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
     # Codex (#834): the T120/16T scan kept the standard pitch radius +
     # addendum (Ø62.20) after the long-addendum blank grew the printed tip to
     # Ø62.93.  Every cone-tip clearance check reads the printed OD at its
-    # upper limit, and the 16T keeps its 0.25 axial air at that tip.
+    # upper limit, and the 16T's full-OD shoulder keeps its 0.25 axial air.
     assert assembly._TIP120 == pytest.approx(
         (spec.outside_dia_mm(120) + spec.BLANK_DIA_BAND[0]) / 2.0
     )
@@ -297,8 +297,7 @@ def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
         assert assembly._cone_tip_radius_max(teeth) == pytest.approx(
             (spec.outside_dia_mm(teeth) + spec.BLANK_DIA_BAND[0]) / 2.0
         )
-    pinion_north = assembly.PINION_TOOTH_Z + assembly.PINION_FACE / 2.0
-    assert assembly._T120_SOUTH - pinion_north >= 0.25
+    assert assembly.PINION_T120_CONCENTRIC["shoulder air"] >= 0.25
 
 
 # Face-width lower limit against the axial stacks the gear sits in.  The

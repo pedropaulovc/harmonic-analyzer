@@ -10,7 +10,10 @@ hypotheses.  This script measures them on the exact tooth solids that
 * each gear's material boundary is read from its ``GapLookup`` table (the same
   2048 x 512 (theta, r) grid the voxel study tests against, ~0.0015 mm
   circumferential), extruded along its own axis (the 64T with its helix
-  twist) in 0.1 mm slices;
+  twist) in 0.1 mm slices; the pinion's turned band (north of
+  ``crank_pinion_spec.SHOULDER_LENGTH``, cut to ``TURNED_DIA``) is honored in
+  both its boundary and its material, as ``crossed_mesh_study.pinion_material``
+  reads it;
 * with the 64T held at a crank phase, the pinion is rotated (``seed_off``)
   and the pair collides when any boundary point of either gear lies inside
   the other's material;
@@ -115,9 +118,16 @@ class GearDef:
         return lut[key]
 
 
-# #906: one cutter, the 64T normal-defined, at the frame's centre distance.
+# #906: one cutter, the 64T normal-defined, at the frame's centre distance,
+# its blank turned long (R9-56).
 SHIPPED16 = GearDef(16, dp_n=cms.DP_CRANK_CUTTER)
-SHIPPED64 = GearDef(64, cms.HELIX_DEG, dp_n=cms.DP_CRANK_CUTTER, definition="normal")
+SHIPPED64 = GearDef(
+    64,
+    cms.HELIX_DEG,
+    dp_n=cms.DP_CRANK_CUTTER,
+    definition="normal",
+    tip_mm=cms.LONG_ADDENDUM64_MM,
+)
 SHIPPED_EXTRA = cms.SLACK
 assert math.isclose(SHIPPED16.rp, cms.R16) and math.isclose(SHIPPED64.rp, cms.R64)
 assert math.isclose(SHIPPED16.root, cms.ROOT16) and math.isclose(SHIPPED64.root, cms.ROOT64)
@@ -130,24 +140,33 @@ def y_for_extra(extra: float, g16: GearDef, g64: GearDef) -> float:
     return cms.Y_DRIVE + math.sqrt(c2c * c2c - dxh * dxh)
 
 
-def boundary(g: cms.GapLookup) -> tuple[np.ndarray, np.ndarray]:
-    """(theta, r) of every material cell with a non-material neighbour."""
+def boundary(
+    g: cms.GapLookup, r_max: float | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    """(theta, r) of every material cell with a non-material neighbour.
+
+    ``r_max`` cuts the section at a turned diameter: the last grid row at or
+    under it becomes the outer circle (the pinion's turned band).
+    """
     mat = ~g.table
     # The tip-circle row lies ON each gap polygon's rim arc, where
     # contains_points is ambiguous (it reads material across the gaps); take
     # the row just inside it.
     mat[:, -1] = mat[:, -2]
+    rows = g.rmin + np.arange(g.nr) * (g.ra - g.rmin) / (g.nr - 1)
+    if r_max is not None:
+        keep = rows <= r_max
+        mat, rows = mat[:, keep], rows[keep]
     edge = np.zeros_like(mat)
     edge |= mat & ~np.roll(mat, 1, axis=0)
     edge |= mat & ~np.roll(mat, -1, axis=0)
     edge[:, :-1] |= mat[:, :-1] & ~mat[:, 1:]
     edge[:, 1:] |= mat[:, 1:] & ~mat[:, :-1]
-    edge[:, -1] |= mat[:, -1]  # the tip circle
+    edge[:, -1] |= mat[:, -1]  # the tip (or turned) circle
     edge[:, 0] = False  # solid hub below every gap floor
     ti, ri = np.nonzero(edge)
     theta = ti * g.gamma / g.nth
-    r = g.rmin + ri * (g.ra - g.rmin) / (g.nr - 1)
-    return theta, r
+    return theta, rows[ri]
 
 
 class Pose:
@@ -210,14 +229,22 @@ class Pose:
         self._gear_world()
 
     def _pinion_local(self) -> None:
-        th, r = boundary(self.g16)
+        # The shipped solid: full-OD teeth over the shoulder, turned down to
+        # cms.PINION_TURNED_R north of it.  Each section's boundary is
+        # extruded over its own z slices (the shoulder face, like the end
+        # faces, is sampled at its edges only).
+        z = np.arange(0.0, cms.PINION_FACE + 1e-9, SLICE_MM)
+        band = z > cms.PINION_SHOULDER + 1e-9  # the shoulder slice keeps full OD
         gamma = self.g16.gamma
-        # Every pinion tooth; points far from the 64T are culled per test.
-        ths = np.concatenate([th + k * gamma for k in range(16)])
-        rs = np.tile(r, 16)
-        near = rs > self.g16.ra - 3.0 * IN / self.gear16.dp_n  # the toothed annulus only
-        self.p_th, self.p_r = ths[near], rs[near]
-        self.p_z = np.arange(0.0, cms.PINION_FACE + 1e-9, SLICE_MM)
+        self.p_sections = []
+        for r_max, zs in ((None, z[~band]), (cms.PINION_TURNED_R, z[band])):
+            th, r = boundary(self.g16, r_max)
+            # Every pinion tooth; points far from the 64T are culled per test.
+            ths = np.concatenate([th + k * gamma for k in range(16)])
+            rs = np.tile(r, 16)
+            # The toothed annulus only.
+            near = rs > self.g16.ra - 3.0 * IN / self.gear16.dp_n
+            self.p_sections.append((ths[near], rs[near], zs))
 
     def _gear_world(self) -> None:
         th, r = boundary(self.g64)
@@ -270,26 +297,26 @@ class Pose:
     def collides(self, seed_off: float) -> bool:
         rot = math.radians(self.seed0 + seed_off) - self.crank
         # Pinion boundary -> world; test in the 64T.
-        phi = (self.p_th[:, None] - rot) + self._pinion_twist(self.p_z)[None, :]
-        r = np.broadcast_to(self.p_r[:, None], phi.shape)
-        lx = r * np.cos(phi)
-        ly = r * np.sin(phi)
-        lz = np.broadcast_to(self.p_z[None, :] - cms.PINION_FACE / 2.0, phi.shape)
-        # Cull to points within reach of the 64T teeth (in the pinion frame,
-        # which a sub-degree misalignment barely moves).
-        near = np.hypot(lx + self.x_crank - GEAR64_SEAT[0], ly + self.y_crank - GEAR64_SEAT[1]) <= (
-            self.g64.ra + 1.5
-        )
-        loc = np.stack([lx[near], ly[near], lz[near]], axis=1)
-        p = self.pivot16 + loc @ self.rot16.T
-        if self._in64(p).any():
-            return True
+        for p_th, p_r, p_z in self.p_sections:
+            phi = (p_th[:, None] - rot) + self._pinion_twist(p_z)[None, :]
+            r = np.broadcast_to(p_r[:, None], phi.shape)
+            lx = r * np.cos(phi)
+            ly = r * np.sin(phi)
+            lz = np.broadcast_to(p_z[None, :] - cms.PINION_FACE / 2.0, phi.shape)
+            # Cull to points within reach of the 64T teeth (in the pinion
+            # frame, which a sub-degree misalignment barely moves).
+            near = np.hypot(
+                lx + self.x_crank - GEAR64_SEAT[0], ly + self.y_crank - GEAR64_SEAT[1]
+            ) <= (self.g64.ra + 1.5)
+            loc = np.stack([lx[near], ly[near], lz[near]], axis=1)
+            p = self.pivot16 + loc @ self.rot16.T
+            if self._in64(p).any():
+                return True
         # 64T boundary -> pinion frame; test in the pinion.
         g = self._to_pinion(self.gear_pts)
         px, py, pz = g[:, 0], g[:, 1], g[:, 2]
         pth = np.arctan2(py, px) + rot - self._pinion_twist(pz)
-        in16 = (pz >= 0) & (pz <= cms.PINION_FACE) & self.g16.material(pth, np.hypot(px, py))
-        return bool(in16.any())
+        return bool(cms.pinion_material(self.g16, pth, np.hypot(px, py), pz).any())
 
 
 def edge(pose: Pose, free: float, step: float, tol: float = 0.001) -> float | None:
