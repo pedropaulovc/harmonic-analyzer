@@ -10,12 +10,12 @@
 part = "rocker-arm"
 features = "../../out/features/rocker_arm/features.toml"
 quantity = 20
-quantity_cite = "harmonic-analyzer/cad/config/parts/rocker-arm.yaml:5"
+quantity_cite = "harmonic-analyzer/cad/config/parts/rocker-arm.yaml:rocker-arm.quantity"
 
 [drawing]
 number = "MHA-071"
 revision = "unknown" # no released STEP/drawing revision is paired with this authored plan
-cite = ["harmonic-analyzer/cad/config/parts/rocker-arm.yaml:2", "harmonic-analyzer/cad/config/release.yaml:1-3"]
+cite = ["harmonic-analyzer/cad/config/parts/rocker-arm.yaml:rocker-arm.number", "harmonic-analyzer/cad/config/release.yaml:next_revision"]
 
 [paths]
 inventory = "../shop/inventory.toml"
@@ -26,7 +26,7 @@ cutting_data = "../shop/cutting-data.toml"
 material = "1018 low-carbon steel" # rev-3 author's pick inside the drawing's family; not a sourced grade
 material_verify = true
 drawing_material = "LOW-CARBON STEEL OR GRAY IRON"
-material_cite = ["harmonic-analyzer/cad/config/parts/rocker-arm.yaml:3", "harmonic-analyzer/cad/config/parts/_defaults.yaml:25-27", "rev-3 rocker-arm/plan.yaml:7"]
+material_cite = ["harmonic-analyzer/cad/config/parts/rocker-arm.yaml:rocker-arm.material_family", "harmonic-analyzer/cad/config/parts/_defaults.yaml:material_families.ferrous_noncritical.material", "harmonic-analyzer/cad/config/parts/_defaults.yaml:material_families.ferrous_noncritical.material_specification", "rev-3 rocker-arm/plan.yaml:7"]
 form = "rectangular_blank" # rev-3 prepared blank with rectangular reference edges; no stock on hand claimed
 form_verify = true
 section_mm = [45.0, 16.0] # author's choice, restored from rev-3 plan
@@ -52,7 +52,7 @@ machine = "PM-30MV"
 frame = "A"
 coolant = "cutting_oil_brush" # author's choice; brush-on cutting oil, supply/suitability to confirm
 deburr_mm = 0.25 # title block: break edges R0.25 or chamfer 0.25 max
-deburr_cite = "harmonic-analyzer/cad/config/title_block.yaml:43-45"
+deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
 stock_in = "stock"
 note = "Upper side: qualify the upper hub face (frame A Z0), finish the upper strap face, rough the hub, top edge and outer profile, spot and drill the pivot pilot. Keep the rails and ears continuous. Contour tables are nominal boundary offsets: interrupt at clamped rails/ears, preserve the 0.40 mm web, and confirm actual cutter access before using any checkpoint."
 
@@ -192,7 +192,7 @@ machine = "PM-30MV"
 frame = "B"
 coolant = "cutting_oil_brush" # author's choice
 deburr_mm = 0.25
-deburr_cite = "harmonic-analyzer/cad/config/title_block.yaml:43-45"
+deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
 stock_in = "S1"
 note = "Lower side, flipped about model X: qualify the lower hub face to the hub length, finish the lower strap face and lower hub OD, rough the lower side of the top edge and profile. Rails and ears stay on. Interrupt roughing at clamped rails/ears, retain the 0.40 mm web and verify access; nominal boundary checkpoints are not an approved full contour cut."
 
@@ -315,7 +315,7 @@ machine = "PM-30MV"
 frame = "A"
 coolant = "cutting_oil_brush" # author's choice
 deburr_mm = 0.25
-deburr_cite = "harmonic-analyzer/cad/config/title_block.yaml:43-45"
+deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
 stock_in = "S2"
 note = "Finish on a supported profile fixture: upper hub OD and ream without relocating, top edge, outer profile (frees the rails and ears), rod-pin hole, deburr, black oxide."
 
@@ -490,4 +490,4 @@ op = 80
 do = "coating"
 feature = "profile_outer"
 note = "Matte black oxide after machining, as the drawing calls for; no bath or vendor in the shop list. Protect or re-measure the bore."
-note_cite = "harmonic-analyzer/cad/config/parts/rocker-arm.yaml:4"
+note_cite = "harmonic-analyzer/cad/config/parts/rocker-arm.yaml:rocker-arm.finish"

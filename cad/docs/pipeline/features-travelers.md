@@ -28,8 +28,13 @@ never through a local SolidWorks session or finite build timer.
 
 ## Drawing authority
 
-Every sourced value carries file:line citations. Printed general-tolerance and
-note-only bands are acceptance limits, not the underlying inch grade. Exact
+Every sourced value carries `file:line` citations for Python and
+`file:dotted.key.path` citations for YAML, for example
+`cad/config/title_block.yaml:linear_2pl.display`. YAML paths resolve to scalar
+values in the named file, not a synthetic merged registry; material-family
+citations name both the part's family selection and the family's actual values.
+Printed general-tolerance and note-only bands are acceptance limits, not the
+underlying inch grade. Exact
 model nominal coordinates are separate; BASIC and REF dimensions do not acquire
 invented general-tolerance bands. Explicit native tolerance bands retain the
 exact authored nominal where native display rounding has not been proved.
@@ -42,8 +47,10 @@ face of their parent feature. Rocker datum B is the +Z broad face and C is only
 the +X radial tip land; those domains are disjoint from the remaining faces.
 `construction` reads the notes used by the actual drawing and cites their
 declaration; `built_up_permitted` requires an explicit permission note included
-there. A process plan cannot approve its own assembled substitute. A cheap source
-map tripwire checks each hand-authored citation against its symbol or number.
+there. A process plan cannot approve its own assembled substitute. The offline
+source-map tripwire anchors each hand-authored Python range against its symbol
+or number and loads YAML to resolve every emitted key path, including dynamic
+part-registry and material-family citations.
 
 ## Face identity and native hygiene
 
@@ -79,14 +86,17 @@ separately from the existing full neutral inventory. Each face reference remains
 bound only to the adjacent STEP whose digest the manifest records.
 
 Both export leaves use the existing exporter/import-closure and `_config_deps`
-cache keying. There is no raw-YAML feature-task override; conservative dependency
-fallbacks may over-rebuild, including after an edit irrelevant to a requirement.
+cache keying. YAML comment-only edits do not change those parsed dependencies;
+key-path citations remain valid without forcing a rebuild for shifted lines.
+There is no raw-YAML feature-task override; conservative dependency fallbacks
+may over-rebuild, including after an edit irrelevant to a requirement.
 
 ## Local traveler gate
 
 The committed `cad/process/rocker_arm/plan.toml` and three shop inputs are copied
-from prechips `0dd7614` with provenance headers. Only bundle paths changed;
-author-choice proposals and inventory verification flags are preserved. They do
+from prechips `0dd7614` with provenance headers. Bundle paths are adapted and
+local YAML citations use key paths; external provenance, author-choice proposals
+and inventory verification flags are preserved. They do
 not assert purchased tools, measured geometry or approved cutting data.
 
 ```text

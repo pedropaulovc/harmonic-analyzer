@@ -42,9 +42,9 @@ OUT = REPO / "cad" / "out"
 UNKNOWN = "unknown"
 
 
-# The only hand-authored file:line citations. Each comma-separated range has
-# its own symbol/number anchors; the offline tripwire checks every entry and
-# rejects unregistered literals elsewhere in this generator.
+# Hand-authored source citations live only here. Python line ranges retain
+# symbol/number anchors; YAML citations name scalar values by dotted key path.
+# The offline tripwire resolves every emitted YAML path, including registry ones.
 SOURCE_MAP = {
     "rocker_hole": (
         "harmonic-analyzer/cad/scripts/build_rocker_arm.py:510-516",
@@ -99,40 +99,52 @@ SOURCE_MAP = {
         (("_sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)", 'datum="C"'),),
     ),
     "drawing_revision": (
-        "harmonic-analyzer/cad/config/release.yaml:1-3",
-        (("next_revision:",),),
+        "harmonic-analyzer/cad/config/release.yaml:next_revision",
+        (),
     ),
     "drawing_properties": (
         "harmonic-analyzer/cad/scripts/_common.py:1751-1765",
         (("def part_properties", '"Revision": _config.release_revision()'),),
     ),
-    "material_defaults": (
-        "harmonic-analyzer/cad/config/parts/_defaults.yaml:21-27",
-        (("material_families:", "material_specification:"),),
-    ),
     "linear_1pl": (
-        "harmonic-analyzer/cad/config/title_block.yaml:25",
-        (("linear_1pl:", "value_in: 0.03"),),
+        "harmonic-analyzer/cad/config/title_block.yaml:linear_1pl.display",
+        (),
     ),
     "linear_2pl": (
-        "harmonic-analyzer/cad/config/title_block.yaml:26",
-        (("linear_2pl:", "value_in: 0.02"),),
+        "harmonic-analyzer/cad/config/title_block.yaml:linear_2pl.display",
+        (),
     ),
     "linear_3pl": (
-        "harmonic-analyzer/cad/config/title_block.yaml:27",
-        (("linear_3pl:", "value_in: 0.005"),),
+        "harmonic-analyzer/cad/config/title_block.yaml:linear_3pl.display",
+        (),
     ),
     "angular": (
-        "harmonic-analyzer/cad/config/title_block.yaml:28",
-        (("angular:", "value_deg: 1.0"),),
+        "harmonic-analyzer/cad/config/title_block.yaml:angular.value_deg",
+        (),
     ),
-    "drilled_hole": (
-        "harmonic-analyzer/cad/config/title_block.yaml:66",
-        (("drilled_hole:", "plus_mm: 0.10", "minus_mm: 0.0"),),
+    "drilled_hole_plus": (
+        "harmonic-analyzer/cad/config/title_block.yaml:drilled_hole.plus_mm",
+        (),
     ),
-    "edge_break": (
-        "harmonic-analyzer/cad/config/title_block.yaml:43-45",
-        (("edge_break:", "radius_mm: 0.25", "chamfer_max_mm: 0.25"),),
+    "drilled_hole_minus": (
+        "harmonic-analyzer/cad/config/title_block.yaml:drilled_hole.minus_mm",
+        (),
+    ),
+    "edge_break_r": (
+        "harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm",
+        (),
+    ),
+    "chamfer_max": (
+        "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm",
+        (),
+    ),
+    "edge_break_display_r": (
+        "harmonic-analyzer/cad/config/title_block.yaml:edge_break.display_r",
+        (),
+    ),
+    "edge_break_display_chamfer": (
+        "harmonic-analyzer/cad/config/title_block.yaml:edge_break.display_chamfer",
+        (),
     ),
 }
 
@@ -589,11 +601,26 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     notes_module = _notes_module(stem)
     construction, construction_cite = _construction(notes_module)
     row = _config.parts(dashed)
-    registry_path = CONFIG_DIR / "parts" / f"{dashed}.yaml"
-    registry_cite = (
-        f"harmonic-analyzer/cad/config/parts/{dashed}.yaml:"
-        f"1-{len(registry_path.read_text(encoding='utf-8').splitlines())}"
-    )
+    registry = _config._doc("parts")
+    registry_row = registry["parts"][dashed]
+    registry_reference = f"harmonic-analyzer/cad/config/parts/{dashed}.yaml:{dashed}"
+    defaults_reference = "harmonic-analyzer/cad/config/parts/_defaults.yaml"
+
+    def registry_cite(*keys: str) -> list[str]:
+        citations = []
+        for key in keys:
+            if key in {"material", "material_specification"} and "material_family" in registry_row:
+                family = registry_row["material_family"]
+                citations += [
+                    f"{registry_reference}.material_family",
+                    f"{defaults_reference}:material_families.{family}.{key}",
+                ]
+            elif key in registry_row:
+                citations.append(f"{registry_reference}.{key}")
+            elif key in registry.get("defaults", {}):
+                citations.append(f"{defaults_reference}:defaults.{key}")
+        return list(dict.fromkeys(citations))
+
     general = {
         f"linear_{places}pl": printed_band_mm(places) for places in (1, 2, 3)
     }
@@ -603,8 +630,8 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         for key, source in (
             ("linear_1pl", "linear_1pl"), ("linear_2pl", "linear_2pl"),
             ("linear_3pl", "linear_3pl"), ("angular_deg", "angular"),
-            ("drilled_hole_plus", "drilled_hole"), ("drilled_hole_minus", "drilled_hole"),
-            ("edge_break_r", "edge_break"), ("chamfer_max", "edge_break"),
+            ("drilled_hole_plus", "drilled_hole_plus"), ("drilled_hole_minus", "drilled_hole_minus"),
+            ("edge_break_r", "edge_break_r"), ("chamfer_max", "chamfer_max"),
         )
     }
     for feature in features.values():
@@ -614,7 +641,7 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
                     rocker_notes, "DRAWING_PRECISION", "DEFAULT_DRAWING_PRECISION",
                 )
             if key in feature["cite"] and isinstance(feature.get(key), list) and len(feature[key]) == 2:
-                feature["cite"][key] += _source_cite(f"linear_{feature['precision'][key]}pl", "angular", "drilled_hole")
+                feature["cite"][key] += _source_cite(f"linear_{feature['precision'][key]}pl", "angular", "drilled_hole_plus", "drilled_hole_minus")
         if "finish_ra" in feature:
             feature["cite"]["finish_ra"] += _cite(
                 _surface_finish,
@@ -650,9 +677,9 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         "part": dashed, "units": "mm", "precision": rocker_notes.DEFAULT_DRAWING_PRECISION if stem == "rocker_arm" else UNKNOWN,
         "step": f"{dashed}.STEP", "step_sha256": UNKNOWN, "construction": construction, "cite_root": "harmonic-analyzer",
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": _cite(rocker_notes, "DEFAULT_DRAWING_PRECISION") if stem == "rocker_arm" else frame_cite, "frames": frame_cite},
-        "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [registry_cite, *_source_cite("drawing_revision", "drawing_properties")]},
-        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": UNKNOWN, "cite": [registry_cite, *_source_cite("material_defaults")]},
-        "notes": {"manufacturing": notes.splitlines(), "process": row.get("process", UNKNOWN), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [registry_cite, *_source_cite("edge_break"), *_cite(notes_module, "DRAWING_NOTES")]},
+        "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), *_source_cite("drawing_revision", "drawing_properties")]},
+        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": UNKNOWN, "cite": registry_cite("material_specification", "material", "finish")},
+        "notes": {"manufacturing": notes.splitlines(), "process": row.get("process", UNKNOWN), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [*registry_cite("process"), *_source_cite("edge_break_display_r", "edge_break_display_chamfer"), *_cite(notes_module, "DRAWING_NOTES")]},
         "general_tolerances": general, "frames": frames, "datums": datums, "features": features,
     }
 

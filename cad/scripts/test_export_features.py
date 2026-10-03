@@ -10,6 +10,7 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 from prechips.model import Features
 
 import export_features as exporter
@@ -217,16 +218,19 @@ def test_construction_uses_the_actual_drawing_notes_and_explicit_permission(monk
     assert manifest["cite"]["construction"] == citation
 
 
-def test_every_hand_typed_source_citation_is_registered_used_and_still_anchored() -> None:
-    pattern = re.compile(r"harmonic-analyzer/[^\s:]+\.(?:py|yaml):\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*")
+def test_every_source_citation_is_registered_used_and_still_anchored() -> None:
+    pattern = re.compile(r"harmonic-analyzer/[^\s:]+\.(?:py|yaml):[^\s]+")
     tree = ast.parse(Path(exporter.__file__).read_text(encoding="utf-8"))
     source_map = next(node for node in tree.body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SOURCE_MAP" for target in node.targets))
     def literals(node):
-        return {
-            (child.lineno, match.group())
-            for child in ast.walk(node) if isinstance(child, ast.Constant) and isinstance(child.value, str)
-            for match in pattern.finditer(child.value)
-        }
+        if isinstance(node, ast.JoinedStr):
+            return set()  # Dynamic citations are checked from the emitted manifests.
+        found = set()
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            found.update((node.lineno, match.group()) for match in pattern.finditer(node.value))
+        for child in ast.iter_child_nodes(node):
+            found.update(literals(child))
+        return found
     all_literals = literals(tree)
     registered_literals = literals(source_map)
     assert all_literals == registered_literals
@@ -241,11 +245,30 @@ def test_every_hand_typed_source_citation_is_registered_used_and_still_anchored(
         elif isinstance(value, list):
             for child in value:
                 yield from strings(child)
-    emitted = {citation for stem in exporter.SUPPORTED_PARTS for citation in strings(exporter.requirement_manifest(stem))}
+    emitted = set()
+    for stem in exporter.SUPPORTED_PARTS:
+        citations = set(strings(exporter.requirement_manifest(stem)))
+        yaml_citations = {
+            citation for citation in citations
+            if citation.startswith("harmonic-analyzer/") and ".yaml" in citation
+        }
+        dashed = stem.replace("_", "-")
+        assert f"harmonic-analyzer/cad/config/parts/{dashed}.yaml:{dashed}.number" in yaml_citations
+        for reference in yaml_citations:
+            filename, separator, key_path = reference.removeprefix("harmonic-analyzer/").partition(":")
+            assert separator and key_path, reference
+            value = yaml.safe_load((exporter.REPO / filename).read_text(encoding="utf-8"))
+            for key in key_path.split("."):
+                assert isinstance(value, dict) and key in value, f"{reference}: missing key {key!r}"
+                value = value[key]
+            assert value is not None and not isinstance(value, (dict, list)), f"{reference}: not a scalar value"
+        emitted.update(citations)
     assert registered <= emitted
     assert exporter.SOURCE_MAP["rocker_datum_b"][0] in registered
     for name, (reference, anchors) in exporter.SOURCE_MAP.items():
         filename, ranges = reference.removeprefix("harmonic-analyzer/").split(":")
+        if filename.endswith(".yaml"):
+            continue  # All registered and dynamic YAML paths were resolved above.
         lines = (exporter.REPO / filename).read_text(encoding="utf-8").splitlines()
         ranges = ranges.split(",")
         assert len(ranges) == len(anchors), name
