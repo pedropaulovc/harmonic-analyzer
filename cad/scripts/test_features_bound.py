@@ -1,13 +1,10 @@
-"""Offline byte-integrity and independent-producer binding regressions."""
+"""Offline regressions for binding scoped feature bundles to the full export."""
 
 from __future__ import annotations
 
 import hashlib
-import json
-import shutil
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -17,179 +14,154 @@ import features_bound
 from _export_feature_faces import face_name
 
 
-def byte_record(path: Path, *, scoped: bool = False) -> dict:
-    content = path.read_bytes()
-    return {
-        "path" if scoped else "source": (
-            path.name if scoped else f"cad/out/{path.parent.name}/{path.name}"
-        ),
-        "bytes": len(content),
-        "sha256": hashlib.sha256(content).hexdigest(),
-    }
+def _labels(stem: str, *, pivot_bore_faces: int = 2) -> list[str]:
+    """One face per feature; the split rocker pivot bore labels both halves."""
+    labels = [face_name(feature, 1) for feature in export_features.feature_selectors(stem)]
+    if stem == "rocker_arm":
+        labels.extend([face_name("pivot_bore", 1)] * (pivot_bore_faces - 1))
+    return labels
 
 
-def bound_output(tmp_path: Path) -> Path:
-    """Produce real requirement manifests bound to named synthetic STEP bytes."""
+def _step(name: str, labels: list[str], *, stamp: str, first: int, stride: int) -> bytes:
+    """A STEP the way two separate SolidWorks writes differ: own header time,
+    own entity numbering, own face order. Unnamed faces carry ``'NONE'``."""
+    rows = [
+        "ISO-10303-21;",
+        "HEADER;",
+        "FILE_DESCRIPTION (( 'STEP AP214' ), '1' );",
+        f"FILE_NAME ('{name}', '{stamp}', ( '' ), ( '' ), 'SwSTEP 2.0', 'SolidWorks 2026', '' );",
+        "FILE_SCHEMA (( 'AUTOMOTIVE_DESIGN' ));",
+        "ENDSEC;",
+        "DATA;",
+    ]
+    for index, label in enumerate(["NONE", *labels, "NONE"]):
+        entity = first + stride * index
+        rows.append(f"#{entity} = ADVANCED_FACE ( '{label}', ( #{entity + 1} ), #{entity + 2}, .T. ) ;")
+    rows.extend(("ENDSEC;", "END-ISO-10303-21;"))
+    return "\n".join(rows).encode("ascii")
+
+
+def _add_full_face(out: Path, stem: str, label: str) -> Path:
+    """Add one labelled face to the full export only; its manifest is unaffected."""
+    full = out / "step" / f"{stem.replace('_', '-')}.STEP"
+    content = full.read_bytes()
+    row = f"#99999 = ADVANCED_FACE ( '{label}', ( #1 ), #2, .T. ) ;\n".encode("ascii")
+    index = content.rindex(b"ENDSEC;")
+    full.write_bytes(content[:index] + row + content[index:])
+    return full
+
+
+def bound_output(tmp_path: Path, *, pivot_bore_faces: int = 2) -> Path:
+    """Scoped and full exports with distinct raw bytes and the same face labels.
+
+    Manifests come from the real generator reading the scoped STEP it binds.
+    """
     out = tmp_path / "cad" / "out"
-    producer = hashlib.md5(b"offline exporter identity").hexdigest()
-    source_digest = export_features.feature_sources_sha256()
-    records = {}
     for stem in export_features.SUPPORTED_PARTS:
-        dashed = stem.replace("_", "-")
-        labels = [
-            face_name(feature, 1)
-            for feature in export_features.feature_selectors(stem)
-        ]
-        if stem == "rocker_arm":
-            labels.insert(0, face_name("pivot_bore", 1))
-        rows = ["ISO-10303-21;", "HEADER;", "ENDSEC;", "DATA;"]
-        rows.extend(
-            f"#{index} = ADVANCED_FACE('{label}',(#1),#2,.T.);"
-            for index, label in enumerate(labels, start=10)
-        )
-        rows.extend(("ENDSEC;", "END-ISO-10303-21;"))
-        bundle = out / "features" / stem
-        bundle.mkdir(parents=True)
-        step = bundle / f"{dashed}.STEP"
-        step.write_bytes("\n".join(rows).encode("ascii"))
-        full_step = out / "step" / step.name
-        full_step.parent.mkdir(exist_ok=True)
-        shutil.copyfile(step, full_step)
-        records[f"step/{step.name}"] = byte_record(full_step)
-        receipt = {
-            "schema": features_bound.FEATURE_NEUTRAL_SCHEMA,
-            "stem": stem,
-            "exporter": producer,
-            "feature_sources_sha256": source_digest,
-            "drawing_revision": "v38",
-            "native_sha256": hashlib.sha256(f"native fixture {stem}".encode()).hexdigest(),
-            "step": byte_record(step, scoped=True),
-        }
-        (bundle / "neutral.json").write_text(json.dumps(receipt), encoding="utf-8")
-    for manifest in export_features.write_manifests(out=out):
-        receipt_path = manifest.parent / "neutral.json"
-        receipt = json.loads(receipt_path.read_bytes())
-        receipt["features"] = byte_record(manifest, scoped=True)
-        receipt_path.write_text(json.dumps(receipt, indent=1) + "\n", encoding="utf-8")
-    certificate = out / "reports" / "release-neutral.json"
-    certificate.parent.mkdir()
-    certificate.write_text(json.dumps({
-        "schema": features_bound.RELEASE_NEUTRAL_SCHEMA,
-        "exporter": producer,
-        "sources": {},
-        "files": records,
-    }), encoding="utf-8")
+        labels = _labels(stem, pivot_bore_faces=pivot_bore_faces)
+        name = f"{stem.replace('_', '-')}.STEP"
+        step = out / "features" / stem / name
+        step.parent.mkdir(parents=True)
+        step.write_bytes(_step(name, labels, stamp="2026-10-01T22:03:24", first=10, stride=1))
+        full = out / "step" / name
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_bytes(_step(name, labels[::-1], stamp="2026-10-03T05:26:08", first=400, stride=7))
+        export_features.write_manifest(stem, step, revision="v38")
     return out
 
 
-def _rewrite(path: Path, value: dict) -> None:
-    path.write_text(json.dumps(value), encoding="utf-8")
+def _digests(out: Path, stem: str) -> tuple[str, str]:
+    name = f"{stem.replace('_', '-')}.STEP"
+    return tuple(
+        hashlib.sha256((out / relative / name).read_bytes()).hexdigest()
+        for relative in (Path("features") / stem, Path("step"))
+    )
 
 
-@pytest.mark.parametrize(("corruption", "diagnostic"), [
-    ("scoped-step-bytes", "SHA-256 differs"),
-    ("feature-bytes", "SHA-256 differs"),
-    ("full-step-bytes", "SHA-256 differs"),
-    ("scoped-step-size", "byte size differs"),
-    ("feature-size", "byte size differs"),
-    ("full-step-size", "byte size differs"),
-    ("full-step-producer", "producers diverged"),
-    ("exporter-identity", "exporter differs"),
-    ("requirement-sources", "feature sources changed"),
-    ("manifest-step", "step must be adjacent"),
-    ("manifest-digest", "step_sha256 does not bind"),
-    ("manifest-schema", "invalid prechips Features schema"),
-    ("missing-receipt", "cannot read required file"),
-    ("missing-feature", "cannot read required file"),
-    ("missing-full-record", "missing full neutral record"),
-    ("full-source-path", "source must be"),
+def _tree(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*") if path.is_file()
+    }
+
+
+def test_independent_exports_bind_and_stage_exact_scoped_bytes(tmp_path: Path) -> None:
+    out = bound_output(tmp_path)
+    for stem in export_features.SUPPORTED_PARTS:
+        scoped, full = _digests(out, stem)
+        assert scoped != full
+    stage = tmp_path / "stage"
+
+    checked = features_bound.check_bound_features(out)
+    staged = features_bound.stage_bound_features(out, stage)
+
+    expected = {
+        relative: content
+        for relative, content in _tree(out).items()
+        if relative.startswith("features/")
+    }
+    assert len(checked) == len(staged) == len(expected) == 2 * len(export_features.SUPPORTED_PARTS)
+    assert _tree(stage) == expected
+    for stem in export_features.SUPPORTED_PARTS:
+        assert {path.name for path in (stage / "features" / stem).iterdir()} == {
+            f"{stem.replace('_', '-')}.STEP", "features.toml",
+        }
+
+
+@pytest.mark.parametrize(("mismatch", "diagnostic"), [
+    ("label-set", "face labels differ"),
+    ("patch-count", "face labels differ"),
+    ("adjacent-digest", "does not bind the adjacent STEP"),
 ])
-def test_binding_failure_never_stages_any_feature_bundle(
-    tmp_path: Path, corruption: str, diagnostic: str,
+def test_unbound_bundle_never_stages_or_repairs(
+    tmp_path: Path, mismatch: str, diagnostic: str,
 ) -> None:
     out = bound_output(tmp_path)
-    stage = tmp_path / "stage"
-    shutil.copytree(out / "step", stage / "step")
-    # Corrupt the final stem so earlier valid bundles cannot leak into staging.
+    # The final stem diverges so earlier valid bundles cannot leak into staging.
     stem = export_features.SUPPORTED_PARTS[-1]
-    dashed = stem.replace("_", "-")
-    bundle = out / "features" / stem
-    step = bundle / f"{dashed}.STEP"
-    manifest = bundle / "features.toml"
-    receipt_path = bundle / "neutral.json"
-    receipt = json.loads(receipt_path.read_bytes())
-    certificate_path = out / "reports" / "release-neutral.json"
-    certificate = json.loads(certificate_path.read_bytes())
-    full_step = out / "step" / step.name
-    if corruption == "scoped-step-bytes":
-        step.write_bytes(step.read_bytes().replace(b"ADVANCED_FACE", b"ADVANCED_FACX", 1))
-    elif corruption == "feature-bytes":
-        manifest.write_bytes(manifest.read_bytes().replace(b"# Generated", b"# generated", 1))
-    elif corruption in {"full-step-bytes", "full-step-producer"}:
-        full_step.write_bytes(full_step.read_bytes().replace(b"ADVANCED_FACE", b"ADVANCED_FACX", 1))
-        if corruption == "full-step-producer":
-            certificate["files"][f"step/{step.name}"] = byte_record(full_step)
-            _rewrite(certificate_path, certificate)
-    elif corruption in {"scoped-step-size", "feature-size"}:
-        key = "step" if corruption == "scoped-step-size" else "features"
-        receipt[key]["bytes"] += 1
-        _rewrite(receipt_path, receipt)
-    elif corruption == "full-step-size":
-        certificate["files"][f"step/{step.name}"]["bytes"] += 1
-        _rewrite(certificate_path, certificate)
-    elif corruption == "exporter-identity":
-        receipt["exporter"] = hashlib.md5(b"different producer").hexdigest()
-        _rewrite(receipt_path, receipt)
-    elif corruption == "requirement-sources":
-        receipt["feature_sources_sha256"] = "0" * 64
-        _rewrite(receipt_path, receipt)
-    elif corruption in {"manifest-step", "manifest-digest", "manifest-schema"}:
-        values = tomllib.loads(manifest.read_text(encoding="utf-8"))
-        if corruption == "manifest-step":
-            values["step"] = f"../../step/{step.name}"
-        elif corruption == "manifest-digest":
-            values["step_sha256"] = "unknown"
-        else:
-            values["unrecognized_field"] = "unknown"
-        manifest.write_text(export_features._toml(values), encoding="utf-8")
-        receipt["features"] = byte_record(manifest, scoped=True)
-        _rewrite(receipt_path, receipt)
-    elif corruption == "missing-receipt":
-        receipt_path.unlink()
-    elif corruption == "missing-feature":
-        manifest.unlink()
-    elif corruption == "missing-full-record":
-        del certificate["files"][f"step/{step.name}"]
-        _rewrite(certificate_path, certificate)
+    feature = next(iter(export_features.feature_selectors(stem)))
+    if mismatch == "label-set":
+        _add_full_face(out, stem, face_name(feature, 2))
+    elif mismatch == "patch-count":
+        _add_full_face(out, stem, face_name(feature, 1))
     else:
-        certificate["files"][f"step/{step.name}"]["source"] = "cad/out/step/other.STEP"
-        _rewrite(certificate_path, certificate)
-    baseline = {path.name: path.read_bytes() for path in (stage / "step").iterdir()}
-    with pytest.raises(features_bound.FeaturesBoundError, match=diagnostic):
-        features_bound.check_bound_features(out)
-    with pytest.raises(features_bound.FeaturesBoundError, match=diagnostic):
-        features_bound.stage_bound_features(out, stage)
-    assert not (stage / "features").exists()
-    assert {path.name: path.read_bytes() for path in (stage / "step").iterdir()} == baseline
-
-
-def test_stage_rejects_a_different_already_staged_full_step(tmp_path: Path) -> None:
-    out = bound_output(tmp_path)
+        step = out / "features" / stem / f"{stem.replace('_', '-')}.STEP"
+        step.write_bytes(step.read_bytes().replace(b"2026-10-01T22:03:24", b"2026-10-01T22:03:25"))
+    before = _tree(out)
+    scoped, full = _digests(out, stem)
     stage = tmp_path / "stage"
-    shutil.copytree(out / "step", stage / "step")
-    staged_step = stage / "step" / "rocker-arm.STEP"
-    staged_step.write_bytes(staged_step.read_bytes().replace(b"ADVANCED_FACE", b"ADVANCED_FACX", 1))
-    # Both source producers agree; the baseline bundle is what has diverged.
-    with pytest.raises(features_bound.FeaturesBoundError, match="baseline staged STEP differs"):
-        features_bound.stage_bound_features(out, stage)
-    assert not (stage / "features").exists()
+
+    for gate in (
+        lambda: features_bound.check_bound_features(out),
+        lambda: features_bound.stage_bound_features(out, stage),
+    ):
+        with pytest.raises(features_bound.FeaturesBoundError, match=diagnostic) as caught:
+            gate()
+        assert f"scoped sha256 {scoped}, full sha256 {full}" in str(caught.value)
+    assert not stage.exists()
+    assert _tree(out) == before
 
 
-def test_cli_missing_certificate_is_nonzero_and_actionable(tmp_path: Path) -> None:
-    result = subprocess.run(
-        [sys.executable, str(Path(features_bound.__file__)), "--out", str(tmp_path)],
+def test_half_labelled_rocker_pivot_bore_fails_even_when_both_exports_agree(
+    tmp_path: Path,
+) -> None:
+    out = bound_output(tmp_path, pivot_bore_faces=1)
+    with pytest.raises(features_bound.FeaturesBoundError, match="pivot_bore must be exactly 2 STEP faces, found 1"):
+        features_bound.check_bound_features(out)
+
+
+def test_cli_exit_status_is_actionable(tmp_path: Path) -> None:
+    script = str(Path(features_bound.__file__))
+    missing = subprocess.run(
+        [sys.executable, script, "--out", str(tmp_path / "missing")],
         capture_output=True, text=True, check=False,
     )
-    assert result.returncode == 1
-    assert "release-neutral.json" in result.stderr
-    assert "regenerate package:features and export" in result.stderr
+    assert missing.returncode == 1
+    assert "cannot read required file" in missing.stderr
+    assert "regenerate package:features and export" in missing.stderr
+
+    bound = subprocess.run(
+        [sys.executable, script, "--out", str(bound_output(tmp_path))],
+        capture_output=True, text=True, check=False,
+    )
+    assert bound.returncode == 0, bound.stderr

@@ -312,6 +312,15 @@ def test_release_notes_report_the_native_pack_and_go_count() -> None:
     assert "99 referenced documents" not in notes
 
 
+def _byte_record(path: Path) -> dict:
+    content = path.read_bytes()
+    return {
+        "source": f"cad/out/{path.parent.name}/{path.name}",
+        "bytes": len(content),
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+
+
 @pytest.fixture
 def feature_release(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
@@ -319,15 +328,24 @@ def feature_release(
     """Real baseline/feature copies and ZIP; isolate unrelated release producers."""
     import export_features
     import export_models
-    from test_features_bound import bound_output, byte_record
+    from test_features_bound import bound_output
 
     out = bound_output(tmp_path)
     scene = out / "boxes" / "harmonic-analyzer.json"
     scene.parent.mkdir()
     scene.write_bytes(b'{"unit":"mm"}')
+    # The full export certifies its own bytes; the feature gate never reads this.
     certificate_path = out / "reports" / "release-neutral.json"
-    certificate = json.loads(certificate_path.read_bytes())
-    certificate["files"]["boxes/harmonic-analyzer.json"] = byte_record(scene)
+    certificate_path.parent.mkdir()
+    certificate = {
+        "schema": export_models.NEUTRAL_SCHEMA,
+        "exporter": hashlib.md5(b"offline exporter identity").hexdigest(),
+        "sources": {},
+        "files": {
+            f"{path.parent.name}/{path.name}": _byte_record(path)
+            for path in (*sorted((out / "step").iterdir()), scene)
+        },
+    }
     certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
     inventory = {
         destination: tmp_path / record["source"]
@@ -401,14 +419,16 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
             assert sums[relative] == hashlib.sha256(content).hexdigest()
             if relative.endswith("/features.toml"):
                 manifest = tomllib.loads(content.decode("utf-8"))
-                adjacent = str(Path(relative).parent / manifest["step"]).replace("\\", "/")
-                assert archive.read(adjacent) == archive.read(f"step/{manifest['step']}")
-                assert hashlib.sha256(archive.read(adjacent)).hexdigest() == manifest["step_sha256"]
-        rocker = tomllib.loads(archive.read("features/rocker_arm/features.toml").decode())
-        bracket = tomllib.loads(archive.read("features/pivot_bracket/features.toml").decode())
-        assert rocker["features"]["profile_outer"]["land_angle_deg"] == "unknown"
-        assert bracket["drawing"]["revision"] == "unknown"
-        assert bracket["datums"] == "unknown"
+                directory = Path(relative).parent.as_posix()
+                assert {name for name in expected if name.startswith(f"{directory}/")} == {
+                    f"{directory}/{manifest['step']}", relative,
+                }
+                adjacent = archive.read(f"{directory}/{manifest['step']}")
+                full = archive.read(f"step/{manifest['step']}")
+                # Independent exports: different raw bytes, the same face labels.
+                assert full == (out / "step" / manifest["step"]).read_bytes() != adjacent
+                assert hashlib.sha256(adjacent).hexdigest() == manifest["step_sha256"]
+                assert manifest["drawing"]["revision"] == "v38"
     assert set(facts["features"]) == set(expected)
     assert (out / "reports" / "release-neutral.json").read_bytes() == before_certificate
 
@@ -416,17 +436,17 @@ def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path)
 def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     feature_release: Path,
 ) -> None:
-    from test_features_bound import byte_record
+    from _export_feature_faces import face_name
+    from test_features_bound import _add_full_face
 
     out = feature_release
-    full_step = out / "step" / "rocker-arm.STEP"
-    full_step.write_bytes(full_step.read_bytes().replace(b"ADVANCED_FACE", b"ADVANCED_FACX", 1))
+    full_step = _add_full_face(out, "rocker_arm", face_name("pivot_bore", 2))
     certificate_path = out / "reports" / "release-neutral.json"
     certificate = json.loads(certificate_path.read_bytes())
-    certificate["files"]["step/rocker-arm.STEP"] = byte_record(full_step)
+    certificate["files"]["step/rocker-arm.STEP"] = _byte_record(full_step)
     certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="producers diverged"):
+    with pytest.raises(RuntimeError, match="face labels differ"):
         cut_release.bundle("v38")
 
     stage = out / "release" / "harmonic-analyzer-v38"

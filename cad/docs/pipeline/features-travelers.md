@@ -2,22 +2,20 @@
 
 ## Independent producers
 
-`package:features` is a scoped COM leaf for `rocker_arm`, `pivot_shaft`,
-`pivot_bracket` and `cone_pivot_post`. Its native dependency closure is those
-parts, not assemblies or drawings. It writes only self-contained bundles:
+`package:features` is a scoped COM leaf for `rocker_arm`, `pivot_shaft` and
+`cone_pivot_post`. Its native dependency closure is those parts, not assemblies
+or drawings. It writes only self-contained bundles:
 
 ```text
 cad/out/features/<underscore-stem>/
   <dashed-stem>.STEP
   features.toml
-  neutral.json
 ```
 
-The receipt certifies the raw STEP and manifest bytes, exporter identity,
-requirement/citation source digest, native source digest and drawing revision.
-The manifest's `step` is the adjacent STEP basename; its SHA-256 is checked
-against the receipt and actual bytes. `export_features.py` is SolidWorks-free.
-It rejects missing, corrupt or stale receipts before replacing a manifest.
+The manifest's `step` is the adjacent STEP basename and `step_sha256` binds its
+raw bytes, verified when the manifest is generated directly from that STEP.
+The STEP plus `features.toml` is the consumer artefact; there are no feature
+receipts or preservation certificates. `export_features.py` is SolidWorks-free.
 
 The ordinary full `export` remains independent: it owns `cad/out/step/`, the
 other existing neutral outputs and `release-neutral.json`. The scoped leaf does
@@ -38,11 +36,14 @@ exact authored nominal where native display rounding has not been proved.
 Precision alone does not justify a private rounding convention.
 
 Required geometry, tolerance, precision, datum or setup information without a
-source remains `unknown`. Pivot bracket has no registered drawing, so known
-model geometry does not silently become a known drawing requirement.
-`construction` defaults to `one_piece`; `built_up_permitted` requires an explicit
-permission note included in the part's drawing notes. A process plan cannot
-approve its own assembled substitute.
+source remains `unknown`. Pivot bracket is not supported until it has a drawing.
+Datum face sets identify exactly the drawing's attachment surfaces, not every
+face of their parent feature. Rocker datum B is the +Z broad face and C is only
+the +X radial tip land; those domains are disjoint from the remaining faces.
+`construction` reads the notes used by the actual drawing and cites their
+declaration; `built_up_permitted` requires an explicit permission note included
+there. A process plan cannot approve its own assembled substitute. A cheap source
+map tripwire checks each hand-authored citation against its symbol or number.
 
 ## Face identity and native hygiene
 
@@ -57,20 +58,26 @@ only with that exact STEP digest. The STEP is never rewritten.
 
 Names are never saved into the native part. A before/after native SHA guard runs
 after closing the export document. Offline parser tests cover split patches and
-ambiguous/lost labels; a real farm run of both independent producers provides
-the separate-session name-survival and rocker-bore patch proof.
+ambiguous/lost labels. The rocker pivot bore must carry two labelled STEP patches;
+one surviving half is a failure even if both producers make the same mistake.
 
 ## Release binding gate
 
 `check:features_bound` is SolidWorks-free and required by `release`, not `build`.
-It waits for both producers and compares each scoped STEP digest with the actual
-full STEP and its `release-neutral.json` record. It also validates the receipt,
-source freshness and manifest binding. Divergent producers fail loudly; no
-retry, preservation or silent substitution hides that regression.
+It waits for both producers, verifies the manifest's adjacent scoped STEP digest,
+and compares each feature's set of face labels and the patch count per label
+between scoped and full STEPs. Both raw digests are reported. Headers, entity
+numbers and file order are not semantic identity: SolidWorks timestamps headers
+and renumbers entities on re-export. This is the independent-session re-export
+regression, not a byte-equality certificate.
 
-Release staging copies the verified self-contained bundles under `features/`
-separately from the existing full neutral inventory. Every staged byte comes
-from the bound producer outputs.
+Release staging copies the verified scoped STEP and manifest under `features/`,
+separately from the existing full neutral inventory. Each face reference remains
+bound only to the adjacent STEP whose digest the manifest records.
+
+Both export leaves use the existing exporter/import-closure and `_config_deps`
+cache keying. There is no raw-YAML feature-task override; conservative dependency
+fallbacks may over-rebuild, including after an edit irrelevant to a requirement.
 
 ## Local traveler gate
 

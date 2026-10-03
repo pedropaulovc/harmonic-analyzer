@@ -30,8 +30,9 @@ What it does, in order:
      PNG for every document. Also copies the millimetre
      scene graph (``cad/out/boxes/harmonic-analyzer.json`` from export_models.py)
      so the comparison gallery renders from the bundle with no SolidWorks.
-     The independently produced feature bundles are then validated against
-     those full STEP bytes and copied intact under ``features/<stem>/``.
+     The independently produced feature bundles are checked for the same face
+     labels and patch counts as the full STEPs, then copied intact under
+     ``features/<stem>/`` with their own digest-bound adjacent STEP.
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
      ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
@@ -913,8 +914,8 @@ def bundle(
 
     # 2. Validate + stage the complete export cache.
     facts.update(stage_release_neutral(stage))
-    # The independently produced bundles are bound to those exact full STEP
-    # bytes, then staged separately; they are not in the full export inventory.
+    # The independent bundles share the full STEPs' face labels/patch counts,
+    # not bytes; their scoped STEP + manifest are staged outside that inventory.
     facts["features"] = [
         path.relative_to(stage).as_posix()
         for path in stage_bound_features(CAD_ROOT / "out", stage)

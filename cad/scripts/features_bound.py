@@ -1,38 +1,40 @@
 """Check and stage isolated feature bundles against the full neutral export.
 
-The release-only gate reads certificates and exact bytes; it never opens CAD,
-imports the full exporter, or repairs divergent producers. Each released bundle
-keeps its adjacent STEP, features.toml and original neutral.json receipt.
+SolidWorks never writes the same STEP bytes twice: the header stamps the write
+time and every export renumbers its entities. The release-only gate therefore
+compares what the feature contract needs. For each supported part, the scoped
+STEP (``features/<stem>/<part>.STEP``) and the full export
+(``step/<part>.STEP``) must carry the same feature -> face-label -> patch-count
+map, read with ``step_face_sets``. ``features.toml`` must bind the exact raw
+bytes of its adjacent scoped STEP. Both raw digests are logged, and every
+failure reports them. The gate never opens CAD or repairs either producer.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import json
-import re
 import tomllib
+from collections import Counter
 from pathlib import Path
-from typing import Any, NoReturn
-
-from prechips.model import Features
+from typing import NoReturn
 
 import _telemetry
 import export_features
+from _export_feature_faces import FeatureFaceError, step_face_sets
 
 OUT = export_features.OUT
-FEATURE_NEUTRAL_SCHEMA = "harmonic-analyzer/features-neutral@1"
-RELEASE_NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@3"
-_SHA256 = re.compile(r"[0-9a-f]{64}\Z")
-_RECEIPT_FIELDS = {
-    "schema", "stem", "exporter", "feature_sources_sha256", "drawing_revision",
-    "native_sha256", "step", "features",
-}
 _REBUILD = "regenerate package:features and export before releasing"
+# A split periodic face labels each STEP half with its native name. The issue
+# #1204 spike found the v38 rocker-arm pivot bore as two Ø6.5 halves, so a
+# half-labelled split (one patch) must fail here, not ship a partial datum A.
+_STEP_FACE_COUNTS = {"rocker_arm": {"pivot_bore": 2}}
+
+FaceLabels = dict[str, Counter[str]]
 
 
 class FeaturesBoundError(RuntimeError):
-    """A feature bundle is missing, stale, malformed or producer-divergent."""
+    """A feature bundle is missing, unbound, or disagrees with the full export."""
 
 
 def _fail(label: str, detail: str) -> NoReturn:
@@ -46,126 +48,60 @@ def _read(path: Path) -> bytes:
         _fail(str(path), f"cannot read required file ({exc.strerror})")
 
 
-def _json(path: Path, content: bytes) -> dict[str, Any]:
+def _face_labels(path: Path, content: bytes, features: list[str], digests: str) -> FaceLabels:
     try:
-        value = json.loads(content)
-    except (ValueError, UnicodeError) as exc:
-        _fail(str(path), f"invalid JSON ({exc})")
-    if not isinstance(value, dict):
-        _fail(str(path), "certificate must be a JSON object")
-    return value
-
-
-def _sha256(value: Any, label: str) -> str:
-    if not isinstance(value, str) or _SHA256.fullmatch(value) is None:
-        _fail(label, "requires a known lowercase SHA-256")
-    return value
-
-
-def _producer(value: Any, label: str) -> str:
-    # Full export's producer identity is an MD5 closure digest, not a SHA-256.
-    if not isinstance(value, str) or not value.strip() or value.strip() == "unknown":
-        _fail(label, "requires a known exporter identity")
-    return value
-
-
-def _certified_bytes(path: Path, record: Any, label: str) -> tuple[bytes, str]:
-    if not isinstance(record, dict):
-        _fail(label, "missing byte-integrity record")
-    expected_size = record.get("bytes")
-    if type(expected_size) is not int or expected_size <= 0:
-        _fail(label, "bytes must be a known positive integer")
-    expected_digest = _sha256(record.get("sha256"), f"{label}.sha256")
-    content = _read(path)
-    if len(content) != expected_size:
-        _fail(label, f"byte size differs: recorded {expected_size}, actual {len(content)}")
-    digest = hashlib.sha256(content).hexdigest()
-    if digest != expected_digest:
-        _fail(label, f"SHA-256 differs: recorded {expected_digest}, actual {digest}")
-    return content, digest
+        faces = step_face_sets(content.decode("latin-1"), features)
+    except FeatureFaceError as exc:
+        _fail(str(path), f"{exc} ({digests})")
+    # A face reference is ``#<entity>/ADVANCED_FACE[<ordinal>]/<label>``; only
+    # the label survives a re-export, so entity ids and file order are dropped.
+    return {
+        feature: Counter(ref.rsplit("/", 1)[1] for ref in refs)
+        for feature, refs in faces.items()
+    }
 
 
 def _validated_files(out: Path) -> tuple[tuple[Path, bytes], ...]:
-    certificate_path = out / "reports" / "release-neutral.json"
-    certificate = _json(certificate_path, _read(certificate_path))
-    if certificate.get("schema") != RELEASE_NEUTRAL_SCHEMA:
-        _fail(str(certificate_path), f"unsupported schema {certificate.get('schema')!r}")
-    producer = _producer(certificate.get("exporter"), f"{certificate_path}: exporter")
-    full_records = certificate.get("files")
-    if not isinstance(full_records, dict):
-        _fail(str(certificate_path), "missing full neutral file records")
-    sources_digest = _sha256(
-        export_features.feature_sources_sha256(), "current feature_sources_sha256",
-    )
     pending: list[tuple[Path, bytes]] = []
     for stem in export_features.SUPPORTED_PARTS:
         dashed = stem.replace("_", "-")
         directory = out / "features" / stem
-        receipt_path = directory / "neutral.json"
-        receipt_bytes = _read(receipt_path)
-        receipt = _json(receipt_path, receipt_bytes)
-        label = str(receipt_path)
-        if set(receipt) != _RECEIPT_FIELDS:
-            missing = sorted(_RECEIPT_FIELDS - receipt.keys())
-            extra = sorted(receipt.keys() - _RECEIPT_FIELDS)
-            _fail(label, f"receipt fields differ: missing {missing}, unexpected {extra}")
-        if receipt["schema"] != FEATURE_NEUTRAL_SCHEMA:
-            _fail(label, f"unsupported schema {receipt['schema']!r}")
-        if receipt["stem"] != stem:
-            _fail(label, f"stem differs: expected {stem!r}, recorded {receipt['stem']!r}")
-        receipt_producer = _producer(receipt["exporter"], f"{label}: exporter")
-        if receipt_producer != producer:
-            _fail(label, f"exporter differs from full certificate: scoped {receipt_producer!r}, full {producer!r}")
-        recorded_sources = _sha256(receipt["feature_sources_sha256"], f"{label}: feature_sources_sha256")
-        if recorded_sources != sources_digest:
-            _fail(label, "feature sources changed since the scoped export")
-        _sha256(receipt["native_sha256"], f"{label}: native_sha256")
-        revision = receipt["drawing_revision"]
-        if not isinstance(revision, str) or not revision:
-            _fail(label, "drawing_revision must preserve the exported revision or 'unknown'")
         step_path = directory / f"{dashed}.STEP"
         manifest_path = directory / "features.toml"
-        contents: dict[str, bytes] = {}
-        for key, path in (("step", step_path), ("features", manifest_path)):
-            record = receipt[key]
-            if not isinstance(record, dict) or set(record) != {"path", "bytes", "sha256"}:
-                _fail(label, f"{key} requires exactly path, bytes and sha256")
-            if record["path"] != path.name:
-                _fail(label, f"{key}.path must be adjacent basename {path.name!r}, recorded {record['path']!r}")
-            contents[key], _digest = _certified_bytes(path, record, f"{label}: {key}")
-        step_digest = receipt["step"]["sha256"]
-        try:
-            manifest = Features.model_validate(tomllib.loads(contents["features"].decode("utf-8")))
-        except (UnicodeError, ValueError) as exc:
-            _fail(str(manifest_path), f"invalid prechips Features schema ({exc})")
-        if manifest.part != dashed:
-            _fail(str(manifest_path), f"part differs: expected {dashed!r}, recorded {manifest.part!r}")
-        if manifest.step != step_path.name:
-            _fail(str(manifest_path), f"step must be adjacent basename {step_path.name!r}, recorded {manifest.step!r}")
-        if manifest.step_sha256 != step_digest:
-            _fail(str(manifest_path), "step_sha256 does not bind the certified scoped STEP bytes")
-        if not manifest.features:
-            _fail(str(manifest_path), "feature manifest has no features")
-        if stem != "pivot_bracket" and (
-            manifest.drawing == "unknown" or manifest.drawing.revision != revision
-        ):
-            _fail(str(manifest_path), "drawing revision differs from the scoped export receipt")
         full_path = out / "step" / step_path.name
-        destination = f"step/{step_path.name}"
-        full_record = full_records.get(destination)
-        if not isinstance(full_record, dict):
-            _fail(str(certificate_path), f"missing full neutral record {destination!r}")
-        expected_source = (
-            full_path.resolve().relative_to(export_features.REPO.resolve()).as_posix()
-            if full_path.resolve().is_relative_to(export_features.REPO.resolve())
-            else f"cad/out/{destination}"
+        step_bytes = _read(step_path)
+        manifest_bytes = _read(manifest_path)
+        full_bytes = _read(full_path)
+        scoped_digest = hashlib.sha256(step_bytes).hexdigest()
+        full_digest = hashlib.sha256(full_bytes).hexdigest()
+        digests = f"scoped sha256 {scoped_digest}, full sha256 {full_digest}"
+        try:
+            manifest = tomllib.loads(manifest_bytes.decode("utf-8"))
+        except (UnicodeError, tomllib.TOMLDecodeError) as exc:
+            _fail(str(manifest_path), f"invalid TOML ({exc})")
+        if manifest.get("step") != step_path.name:
+            _fail(str(manifest_path), f"step must be adjacent basename {step_path.name!r}, recorded {manifest.get('step')!r}")
+        if manifest.get("step_sha256") != scoped_digest:
+            _fail(str(manifest_path), f"step_sha256 {manifest.get('step_sha256')!r} does not bind the adjacent STEP ({digests})")
+        features = list(export_features.feature_selectors(stem))
+        scoped = _face_labels(step_path, step_bytes, features, digests)
+        full = _face_labels(full_path, full_bytes, features, digests)
+        if scoped != full:
+            differing = {
+                feature: {"scoped": dict(scoped[feature]), "full": dict(full[feature])}
+                for feature in features
+                if scoped[feature] != full[feature]
+            }
+            _fail(stem, f"scoped and full STEP face labels differ {differing} ({digests})")
+        for feature, expected in _STEP_FACE_COUNTS.get(stem, {}).items():
+            actual = sum(scoped[feature].values())
+            if actual != expected:
+                _fail(stem, f"{feature} must be exactly {expected} STEP faces, found {actual} ({digests})")
+        _telemetry.info(
+            f"features-bound: {stem} face labels agree ({digests})",
+            stem=stem, scoped_sha256=scoped_digest, full_sha256=full_digest,
         )
-        if full_record.get("source") != expected_source:
-            _fail(str(certificate_path), f"{destination} source must be {expected_source!r}, recorded {full_record.get('source')!r}")
-        full_bytes, full_digest = _certified_bytes(full_path, full_record, f"{certificate_path}: {destination}")
-        if len(full_bytes) != len(contents["step"]) or full_digest != step_digest:
-            _fail(stem, f"scoped STEP and full STEP producers diverged: scoped {step_digest}, full {full_digest}")
-        pending.extend(((step_path, contents["step"]), (manifest_path, contents["features"]), (receipt_path, receipt_bytes)))
+        pending.extend(((step_path, step_bytes), (manifest_path, manifest_bytes)))
     return tuple(pending)
 
 
@@ -177,19 +113,14 @@ def check_bound_features(out: Path | None = None) -> tuple[Path, ...]:
 
 
 def stage_bound_features(out: Path, released: Path) -> list[Path]:
-    """Validate all bundles, then stage their exact bytes after baseline neutrals.
+    """Validate all bundles, then stage the exact validated scoped bytes.
 
-    Validation includes the already-staged full STEP bytes. Snapshots of all
-    validated scoped files are copied, not unverified later reads of the cache.
+    Each bundle stages its scoped STEP and ``features.toml``; the snapshots
+    read during validation are written, never a later read of the cache.
     """
     output, stage = Path(out), Path(released)
     with _telemetry.span("release.features_stage", parts=len(export_features.SUPPORTED_PARTS)):
         pending = _validated_files(output)
-        for source, content in pending:
-            if source.suffix == ".STEP":
-                staged_step = stage / "step" / source.name
-                if _read(staged_step) != content:
-                    _fail(str(staged_step), "baseline staged STEP differs from the bound feature bundle")
         staged = []
         for source, content in pending:
             target = stage / source.relative_to(output)
