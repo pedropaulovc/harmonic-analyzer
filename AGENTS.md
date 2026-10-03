@@ -92,6 +92,14 @@ measurement, hour count, accepted quantity or scrap count into a board field.
 Summary files may present derived roll-ups only when they name the authoritative
 source.
 
+Current part and assembly identities follow
+[`cad/docs/subsystem-identities.md`](cad/docs/subsystem-identities.md).
+Per-part and per-assembly registry files own frozen `MHA-<CATEGORY>-<NNN>`
+Numbers and prefixed stems. Assembly drawings use `000`; part families start
+at `001`. Use prefixed underscore stems in task selections and prefixed dashed
+stems in filenames. Historical measurements, releases and bench records retain
+their original identifiers; use the migration table to find the current model.
+
 Historical plans stay unchanged as provenance, but their opening notice must say
 that they are not current status or schedule and must link to the project.
 
@@ -223,7 +231,7 @@ such build:
 - No finite local timer. A cold leaf has measured 61.5 min and a full closure
   runs for hours, so a Bash job or a 300 s tool deadline kills a still-valid
   build and leaves the remote workflow running.
-- Task names use underscores (`part:pen_rod`). An unknown or dashed target is
+- Task names use prefixed underscores (`part:pn_pen_rod`). An unknown or dashed target is
   refused with doit's invalid-command exit 3, naming the target, before any
   fleet query or workflow submission; a failed farm preflight exits 2. Neither
   runs an action.
@@ -273,7 +281,7 @@ such build:
 - Under `--executor farm` each leaf gets 15 min on the worker by default. A cold
   run (nothing in the remote cache, workers that must shallow-fetch the exact
   commit and synchronize the locked external environment, and a cold SolidWorks
-  start) needs more — the slowest measured leaf was `part:fulcrum_keeper` at
+  start) needs more — the slowest measured pre-migration leaf was `part:fulcrum_keeper` at
   61.5 min — so pass `--leaf-timeout <minutes>` (or set
   `HARMONIC_FARM_LEAF_TIMEOUT_S`); the farm clamps the request to 60 s–3 h.
   Leaving it at the default on a cold run costs one retry and then a
@@ -492,7 +500,7 @@ signals, three fatal, one log-only:
   `HARMONIC_COM_OP_TIMEOUT` seconds (default 900). Calibrated from ~3 weeks of
   `traces.jsonl`: the longest single healthy COM op on record is ~230 s
   (`verify.rebuild`), so 15 min is ~4× headroom — while whole COM tasks
-  legitimately run ~27 min (`assembly:summing`), which is why the timeout keys
+  legitimately run ~27 min (measured as pre-migration `assembly:summing`), which is why the timeout keys
   on per-op activity, never on process lifetime. Any task-level watchdog must
   use ≥ 40 min.
 - **Hung window — log-only, never fatal.** A SLDWORKS.exe top-level window
@@ -840,7 +848,7 @@ every-build battery: **gear-ratios** is DEMOTED to the release preflight (it was
 of a run and re-proves a property the tooth-count config already fixes, which
 `check:math` validates analytically); **channel-independence** (the retired
 `subsystems` suite's one unique gate) is FOLDED IN — soundness already opens
-`channel`, so it runs there; and **component-count is REMOVED** (every failure it
+`ch-channel`, so it runs there; and **component-count is REMOVED** (every failure it
 ever raised was a stale band or a gate bug, never a real regression — `_COMPONENT_BAND`
 stays as reference data). The **DOF gate splits by whether the assembly has
 freed operational DOF** (see "Default-free DOF" below): an assembly with freed
@@ -854,8 +862,8 @@ OUTSIDE that list reads under-constrained (the exact-set direction — an
 unintended freedom, e.g. a dropped mate on a structural part, fails soundness
 loud). Every assembly with nothing freed gets the strict 0-DOF check,
 unchanged. All NON-DOF gates always run on the as-built model. gear-ratios
-runs at release only, in `preflight_release.py`, on the reopened `drive-train`
-+ `channel` (the only assemblies carrying real gear meshes).
+runs at release only, in `preflight_release.py`, on the reopened `dt-drive-train`
++ `ch-channel` (the only assemblies carrying real gear meshes).
 (History: `subsystems` used to re-open all 8 and repeat the whole battery — ~95%
 duplicate COM work — then was trimmed to only `channel`-independence, and is now
 folded into soundness entirely; see `memory/release-perf-incremental.md` and
@@ -999,7 +1007,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
   keeping the mate `kind` as an attribute. Prefer a name that says WHICH thing over
   one that says only the operation TYPE.
 - **The build body is one `<kind>.build` phase span.** `dodo._exec` opens a span
-  NAMED for the doit task (`task part:cone_gear`, `task assembly:drive_train`) — the
+  NAMED for the doit task (`task part:dt_cone_gear`, `task assembly:dt_drive_train`) — the
   build subprocess CONTINUES it via the injected `TRACEPARENT`. Inside the
   subprocess `run_build` opens ONE inner `part.build` / `assembly.build` phase span
   around the `build()` body (a sibling of `sw.connect` / `sw.disconnect`), so the
@@ -1023,7 +1031,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
   at provider creation). Add a new stage to `_stage_name` when a new task family
   appears. The doit PARENT's `task <label>` span uses `_stage_name` too (via
   `service=` on `_telemetry.span`), so a task and the subprocess it spawns share one
-  resource — `task part:cone_gear` reads `part-build`, `task assembly:pen` reads
+  resource — `task part:dt_cone_gear` reads `part-build`, `task assembly:pn_pen` reads
   `assembly-build`, a drawing reads `drawing-export` — instead of the task reading
   the umbrella name while its own children read the stage. `harmonic-analyzer` is
   now a namespace and a fallback for an unmapped label, not a span label.
