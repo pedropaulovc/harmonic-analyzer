@@ -444,8 +444,8 @@ def thumbnut_engagement(seat_from_f: float) -> float:
 
 
 # Each term is a min or max of lines in the seat, so the engagement is concave
-# over the travel and least at one of its ends: 21.92 - 2.623 - 7.643 = 11.65
-# at the rearward stop, 23.39 - 1.27 - 10.673 = 11.447 (1.80 D) at the seat
+# over the travel and least at one of its ends: 21.92 - 2.6225 - 7.6425 = 11.655
+# at the rearward stop, 23.39 - 1.27 - 10.6725 = 11.4475 (1.80 D) at the seat
 # maximum.
 THUMBNUT_ENGAGEMENT_WORST = min(
     thumbnut_engagement(seat) for seat in (LENGTH_MIN, LENGTH_MAX, SEAT_MAX_FROM_F)
