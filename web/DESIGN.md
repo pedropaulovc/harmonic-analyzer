@@ -647,22 +647,29 @@ executed **3 cases, 3 passes, 0 skips** in **0.331 seconds** on its first post-f
 run. Missing `INTRO_RAW_NATIVE_MODEL_PATH` raises `RuntimeError`, without a skip.
 `npm --prefix web run test:source:geometry` uses isolated uv with pinned
 numpy **2.5.3**, scipy **1.18.1** and opencv-python-headless **5.0.0.93**.
-The enrolled npm gate's initial three cases passed in **0.391 seconds**.
-Its expanded seven-case gate executed **7 passes, zero failures/skips** in
-**1.198 seconds**, covering three raw support cases and four public CLI
-refusal/error-state cases without a private full435 test dependency.
-The nested-native-metadata follow-up gate executed **8 passes** in **2.166 seconds**;
-malformed code-hash metadata retains error rows rather than escaping as an exception.
+The current expanded gate executed **10 passes, zero skips** in **3.478 seconds**,
+covering raw support, public CLI refusal/error-state, malformed metadata and camera
+boundary cases without a private full435 test dependency. Malformed code-hash
+metadata retains error rows rather than escaping as an exception.
 Set `INTRO_RAW_NATIVE_MODEL_PATH` to the original raw `2280bfa6…` GLB,
 as shown in the README. Missing or mismatched raw bytes fail the prerequisite;
 the optimized public `ad5c2592…` model cannot substitute.
 The public first-surface CLI refuses unknown pose/input fields and accepts no
 per-part matrix overrides. Refusal/error rows preserve the exact request and use
 nullable, unvalidated native identity when execution cannot establish identity.
+Camera preflight requires a finite three-coordinate origin and finite 3×3 rotation.
+A mixed three-request actual CPU435 packet that previously raised `IndexError`
+and wrote no output now refuses all three before loading native geometry:
+three refused, zero errors/eligible, with exit2 and nullable native identity.
+For malformed nonfinite entries, `rawRayRequestText`, its parsed-byte SHA and
+`requestIndex` preserve lexical identity, with `request: null` / `raw-packet-entry`;
+ordinary request objects remain unchanged.
 The actual sealed CPU435 CLI packet evaluated **17 rays**, with **7 eligible**,
 zero refused and zero error rows, preserving the original complete51 input.
-Private evidence is `sealed-native-apex17-after-20261003.json`; these eligibility
-results remain native CPU diagnostics without source or GPU acceptance.
+The original 17-ray packet was rerun after the camera-boundary fix with the same
+7 eligible / zero refused/error result and exit0. Private evidence is
+`web/.vite/verification-output/intro-spin-20261003/sealed-native-apex17-camera-boundary-after-20261003.json`.
+These eligibility results remain native CPU diagnostics without source or GPU acceptance.
 A separate actual full435 CPU API-boundary control retained the real sealed-marker
 positive and rejected the front-right C-frame occluder. Three removed detached
 API calls raised `TypeError`, with native geometry unchanged. Private evidence is

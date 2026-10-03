@@ -12,6 +12,7 @@ controls do not depend on an unreconstructible private full435 checkpoint; actua
 positive first-surface proof requires a separately sealed native export.
 """
 import copy
+import hashlib
 import importlib.util
 import json
 import math
@@ -162,14 +163,17 @@ class SealedNativeRayRequestTests(unittest.TestCase):
             ],
         }
 
-    def run_cli(self, rays, export_content=None):
+    def run_cli(self, rays, export_content=None, request_content=None):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             request_path, output_path = root / "rays.json", root / "result.json"
             export_path = root / "missing-native-export.json"
             if export_content is not None:
                 export_path.write_text(export_content)
-            request_path.write_text(json.dumps({"rays": rays}))
+            request_path.write_text(
+                json.dumps({"rays": rays}) if request_content is None else request_content,
+                encoding="utf-8",
+            )
             completed = subprocess.run([
                 sys.executable, str(self.producer_path),
                 "--model", str(self.raw_path),
@@ -292,6 +296,58 @@ class SealedNativeRayRequestTests(unittest.TestCase):
                 self.assertEqual([row["request"] for row in result["rays"]], rays)
                 self.assertEqual([row["id"] for row in result["rays"]],
                                  [ray["id"] for ray in rays])
+                for row in result["rays"]:
+                    self.assertIsInstance(row["reason"], str)
+                    self.assertIsNone(row["guardValue"])
+                    self.assertIsNone(row["hit"])
+
+    def test_malformed_camera_shapes_are_refused_before_native_geometry(self):
+        detached = dict(copy.deepcopy(self.ray), id="detached-marker", matrices=None)
+        malformed_cameras = [
+            ("origin", None), ("origin", [0., 0.]), ("origin", [[0.], [0.], [1.]]),
+            ("origin", [False, 0., 1.]), ("origin", ["0", 0., 1.]),
+            ("rotation", [0., 0., 1.]), ("rotation", None),
+            ("rotation", [[1., 0., 0.], [0., 1.]]),
+        ]
+        for field, value in malformed_cameras:
+            with self.subTest(field=field, value=value):
+                malformed = dict(copy.deepcopy(self.ray), id="malformed-camera", **{field: value})
+                rays = [detached, malformed]
+                returncode, result = self.run_cli(rays)
+                self.assert_no_native_claim(returncode, result)
+                self.assertIsNone(result["nativeExportSha256"])
+                self.assertIsNone(result["unobservedInputFields"])
+                self.assertEqual([row["status"] for row in result["rays"]], ["refused", "refused"])
+                self.assertEqual([row["request"] for row in result["rays"]], rays)
+                self.assertEqual([row["id"] for row in result["rays"]], [ray["id"] for ray in rays])
+                for row in result["rays"]:
+                    self.assertIsInstance(row["reason"], str)
+                    self.assertIsNone(row["guardValue"])
+                    self.assertIsNone(row["hit"])
+
+    def test_nonfinite_camera_retains_exact_raw_packet_identity(self):
+        before = dict(copy.deepcopy(self.ray), id="detached-before", matrices={})
+        after = dict(copy.deepcopy(self.ray), id="detached-after", partOverrides=[])
+        for token in ("1e400", "NaN", "-Infinity"):
+            with self.subTest(token=token):
+                raw_text = (' \r\n{"rays":[\r\n' + json.dumps(before) +
+                            ',\r\n{"id":"nonfinite-camera","origin":[' + token +
+                            ',0,1],"rotation":' + json.dumps(self.ray["rotation"]) +
+                            '},\r\n' + json.dumps(after) + '\r\n]}\r\n')
+                returncode, result = self.run_cli(None, request_content=raw_text)
+                self.assert_no_native_claim(returncode, result)
+                self.assertEqual(result["rawRayRequestText"], raw_text)
+                self.assertEqual(result["rayRequestSha256"],
+                                 hashlib.sha256(raw_text.encode("utf-8")).hexdigest())
+                self.assertEqual([row["status"] for row in result["rays"]],
+                                 ["refused", "refused", "refused"])
+                self.assertEqual(result["rays"][0]["request"], before)
+                self.assertEqual(result["rays"][2]["request"], after)
+                row = result["rays"][1]
+                self.assertEqual(row["id"], "nonfinite-camera")
+                self.assertIsNone(row["request"])
+                self.assertEqual(row["requestRepresentation"], "raw-packet-entry")
+                self.assertEqual(row["requestIndex"], 1)
                 for row in result["rays"]:
                     self.assertIsInstance(row["reason"], str)
                     self.assertIsNone(row["guardValue"])

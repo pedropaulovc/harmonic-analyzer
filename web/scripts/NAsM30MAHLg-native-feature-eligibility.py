@@ -37,6 +37,27 @@ def sha256_string(value):
     return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
 
+def finite_ray_array(value, shape, label):
+    if not isinstance(value, (list, tuple, np.ndarray)):
+        raise ValueError(f"{label} must be finite numeric data of shape {shape}")
+    array = np.asarray(value)
+    if array.shape != shape or array.dtype.kind not in "iuf" or not np.all(np.isfinite(array)):
+        raise ValueError(f"{label} must be finite numeric data of shape {shape}")
+    if isinstance(value, (list, tuple)):
+        numbers = value if len(shape) == 1 else (number for row in value for number in row)
+        if any(isinstance(number, (bool, np.bool_)) for number in numbers):
+            raise ValueError(f"{label} must contain numbers, not booleans")
+    return array
+
+
+def request_has_nonfinite(value):
+    if isinstance(value, dict):
+        return any(request_has_nonfinite(item) for item in value.values())
+    if isinstance(value, list):
+        return any(request_has_nonfinite(item) for item in value)
+    return type(value) is float and not math.isfinite(value)
+
+
 def calibration_support(frame, points, policy):
     """Refuse repeated native support before fitting; never alter source rows."""
     groups = {role: [p for p in frame["landmarks"] if p["role"] == role]
@@ -233,7 +254,8 @@ class FrozenNativeFirstSurface:
                 raise ValueError(f"Native code differs from sealed export: {path}")
 
     def first_surface(self, origin, direction, near_t, far_t):
-        origin, direction = np.asarray(origin), np.asarray(direction)
+        origin = finite_ray_array(origin, (3,), "Ray origin")
+        direction = finite_ray_array(direction, (3,), "Ray direction")
         best = None
         nonzero = abs(direction) > 1e-15
         direction_inverse = np.divide(1., direction, out=np.zeros(3), where=nonzero)
@@ -277,6 +299,8 @@ class FrozenNativeFirstSurface:
         return best
 
     def nib_guard(self, origin, rotation):
+        origin = finite_ray_array(origin, (3,), "Ray origin")
+        rotation = finite_ray_array(rotation, (3, 3), "Ray rotation")
         self.assert_code()
         marker = self.parts[self.nib["partPath"]]
         vertex = self.nib["nativeVertexIndex"]
@@ -318,19 +342,39 @@ def main():
     profile = json.loads(args.profile.read_text())
     allowed_ray_fields = {"id", "origin", "rotation", "expectedNativeEligibility",
                           "cameraOriginInsideNativeAabbPaths"}
-    rows = []
-    for ray in json.loads(args.rays.read_text())["rays"]:
+    request_bytes = args.rays.read_bytes()
+    request_text = request_bytes.decode("utf-8")
+    rows, raw_request_text_required = [], False
+    for index, ray in enumerate(json.loads(request_text)["rays"]):
         reason = None
+        nonfinite = request_has_nonfinite(ray)
         if not isinstance(ray, dict):
             reason = "Ray controls must be an object describing a camera on one frozen native state"
         elif unsupported := set(ray) - allowed_ray_fields:
             reason = (f"Unsupported frozen-ray fields: {', '.join(sorted(unsupported))}. "
                       "Input changes require a new complete native solve and sealed complete51/all435 export, not detached part poses")
-        rows.append({"id": ray.get("id") if isinstance(ray, dict) else None,
-                     "request": ray, "status": "refused" if reason else "pending",
-                     "reason": reason, "guardValue": None, "hit": None})
+        elif nonfinite:
+            reason = "Ray requests must contain finite numeric values"
+        else:
+            try:
+                origin = finite_ray_array(ray.get("origin"), (3,), "Ray origin")
+                rotation = finite_ray_array(ray.get("rotation"), (3, 3), "Ray rotation")
+            except ValueError as error:
+                reason = str(error)
+        row = {"id": ray.get("id") if isinstance(ray, dict) else None,
+               "request": ray, "status": "refused" if reason else "pending",
+               "reason": reason, "guardValue": None, "hit": None}
+        if nonfinite:
+            raw_request_text_required = True
+            row.update(request=None, requestRepresentation="raw-packet-entry", requestIndex=index)
+            if request_has_nonfinite(row["id"]):
+                row["id"] = None
+        if reason is None:
+            row["_camera"] = (origin, rotation)
+        rows.append(row)
     native, native_error = None, None
     for row in rows:
+        camera = row.pop("_camera", None)
         if row["status"] == "refused":
             continue
         if native_error is not None:
@@ -339,8 +383,7 @@ def main():
         try:
             if native is None:
                 native = FrozenNativeFirstSurface(args.native_export, args.model, profile, args.code_root)
-            ray = row["request"]
-            value, hit = native.nib_guard(np.asarray(ray["origin"]), np.asarray(ray["rotation"]))
+            value, hit = native.nib_guard(*camera)
             row.update(status="measured", guardValue=value, hit=hit)
         except (OSError, ValueError, KeyError, TypeError) as error:
             reason = f"Native eligibility unavailable: {error}"
@@ -349,7 +392,7 @@ def main():
                 native_error = reason
     result = {"producerSha256": digest(__file__), "profileSha256": digest(args.profile),
               "requestedNativeExport": str(args.native_export), "requestedModel": str(args.model),
-              "rayRequestSha256": digest(args.rays),
+              "rayRequestSha256": hashlib.sha256(request_bytes).hexdigest(),
               "nativeExportSha256": native.export_sha256 if native is not None else None,
               "nativeChosenInput": native.export["input"] if native is not None else None,
               "unobservedInputFields": native.export["unobservedInputFields"] if native is not None else None,
@@ -361,6 +404,8 @@ def main():
               "distinctPhysicalApexCount": 1 if native is not None else None,
               "rays": rows, "GPUAcceptance": False,
               "sourceAcceptance": False, "sourceFeatureAssociation": "unavailable"}
+    if raw_request_text_required:
+        result["rawRayRequestText"] = request_text
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
     print(json.dumps({"output": str(args.output), "epoch": result["epoch"], "rays": len(rows),

@@ -340,7 +340,9 @@ INTRO_RAW_NATIVE_MODEL_PATH=/private/raw/harmonic-analyzer.glb \
   npm --prefix web run test:source:geometry
 ```
 
-The first post-fix run executed three cases with zero skips. A supplemental
+The expanded raw-geometry/CLI gate passed ten cases with zero skips. Camera
+origins must be finite three-coordinate values and rotations finite 3×3 matrices;
+malformed requests retain explicit refusal/error records. A supplemental
 current full-435 CPU first-surface packet checks the original HOLD809 chosen input
 and native apex facets; it does not measure GPU pixels, source camera, contact or
 stage acceptance. [`DESIGN.md`](DESIGN.md#intro-physical-support-and-first-surface)
