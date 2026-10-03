@@ -12,11 +12,13 @@
     "verify:sync": "node scripts/verify-sync.mjs",
     "test:source": "uv run --isolated --no-project python -m unittest discover -s scripts -p test_source_generation.py",
     "test:playback": "node --test scripts/source-track.test.mjs",
+    "test:model": "node --test scripts/optimize-model.test.mjs scripts/model-representation.test.mjs scripts/fetch-model.test.mjs scripts/model-loader.test.mjs",
     "preview:reference": "node scripts/serve-verification.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "meshoptimizer": "0.22.0",
     "three": "^0.180.0"
   },
   "devDependencies": {
