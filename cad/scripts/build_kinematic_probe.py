@@ -3,7 +3,7 @@ r"""Kinematic probe: prove the crank drives the paper feed (codex #189 kinematic
 Turning the crank T12 sprocket must propagate through the WHOLE six-gear feed
 train (paper-drive rework E8 -- every stage a real mate):
 
-    T12 (crank) --Belt/Chain 24:48--> T24 (knob wheel)
+    T12 (crank) --Belt/Chain 12:24 teeth--> T24 (knob wheel)
       --Lock--> knob shaft + 12T third gear
       --GEAR 12:120--> 120T reducer disc --Lock--> 12T feed pinion
       --rack-pinion (pi * 10.16 / rev)--> platen (the paper feed)
@@ -18,8 +18,9 @@ global Y while T24 turns about Z), so a shared-axis projection would read a fals
 zero for it. The SPROCKETS, the disc and the feed pinion, though, all spin about
 the global Z axis, so their SIGNED Z rotations are also compared -- ratio AND sense:
 
-  * the Belt/Chain feature (EngageBelt, PulleyDiameters forced to the pitch values
-    24/48 post-create -- the picked tip faces would couple 28:52 = 0.538) drives T24
+  * the Belt/Chain feature (EngageBelt, PulleyDiameters forced to the per-tooth
+    values N * pitch / pi -- the picked tip faces would couple at the #25 OD ratio
+    0.529) drives T24
     at the EXACT 12:24 = 0.500 reduction off the crank, asserted tightly,
   * T24 turns the SAME direction as T12 (signed Z angles) -- a chain couples both
     sprockets the same way; an external gear mate would REVERSE,
@@ -82,12 +83,29 @@ from build_paper_drive_assembly import (
 DRIVE_DEG = 30.0    # crank test rotation
 CRANK_TOL = 2.0     # deg: the temporary driver must hit DRIVE_DEG on BOTH sides
 # The crank T12 -> knob T24 tie is the Belt/Chain feature with PulleyDiameters
-# FORCED to the pitch values (24/48) post-create -- the picked tooth-tip faces
-# would otherwise couple at 28:52 = 0.538, a ~7.7% feed error. The probe
-# asserts the true 0.500 TIGHTLY, and the same-sense rotation a chain enforces.
-CHAIN_RATIO = 0.5   # T12:T24 = 12:24 exact (belt/chain coupling, pitch diams)
+# FORCED to the chain's per-tooth values (N * pitch / pi, the exact 12:24 tooth
+# law) -- the picked tooth-tip faces would otherwise couple at the OD ratio.
+# The probe asserts the true 0.500 TIGHTLY, and the same-sense rotation a
+# chain enforces.
+from paper_drive_geom import CHAIN_RATIO  # noqa: E402  (12:24 tooth ratio, exact)
+
 GEAR_RATIO = THIRD_TEETH / DISC_TEETH  # 12:120 = 0.1 (the reduction gear mate)
-RATIO_TOL = 0.03    # measured stage ratio vs nominal (pose/numeric slack)
+# Chain-stage ratio tolerance, derived from what the probe measures. The ratio
+# is d_t24 / d_crank, two axis-angle magnitudes (acos((trace - 1) / 2), well
+# conditioned at 15 and 30 deg) read from Transform2 doubles after ONE solve of
+# a LINEAR belt coupling -- no sampling, no iteration in the probe, so the only
+# error is the solved pose. Live it read T12 +30.00 -> T24 +15.00 deg, ratio
+# +0.5000 (memory/belt-chain-feature-com-binding.md): each angle within the
+# 2-dp readback's +/-0.005 deg. Budget 4x that per reading, READ_SLACK_DEG;
+# worst case the two readings err oppositely on the smallest crank the
+# CRANK_TOL gate admits, so |ratio - 0.5| <= READ_SLACK_DEG * (1 + CHAIN_RATIO)
+# / (DRIVE_DEG - CRANK_TOL) = 0.02 * 1.5 / 28 = 0.00107. That is ~21x the live
+# error bound (5e-5) yet under HALF the nearest wrong coupling's offset: the
+# #25 pitch-circle ratio p/sin(180/N) (0.5043, +0.0043 -- what typing the
+# pitch diameters instead of N*p/pi would give) and far under the OD/tip ratio
+# (0.5286, +0.0286 -- the old 0.03 band accepted it).
+READ_SLACK_DEG = 0.02  # deg per sprocket angle reading (4x the live 2-dp bound)
+CHAIN_RATIO_TOL = READ_SLACK_DEG * (1.0 + CHAIN_RATIO) / (DRIVE_DEG - CRANK_TOL)
 ANG_TOL = 1.2       # deg: locked cluster parts turn by equal magnitude (near-exact)
 LIN_TOL = 0.05      # mm: the 30-deg drive feeds only ~0.133 mm through the 1:20
 # net reduction, so the linear tolerance is tight enough that a dropped rack
@@ -106,6 +124,29 @@ GEAR_SENSE = -1.0   # sign of (disc Z) / (T24/third Z): external 12:120 mesh
 # the physics; flip the MATE (build_paper_drive_assembly, rack_pinion_mate
 # flip=) until this assert holds.
 FEED_SIGN = +1.0    # sign of (platen dX) / (feed-pinion signed-Z deg)
+
+
+def measured_chain_ratio(d_t24: float, d_crank: float) -> float:
+    """Crank T12 -> knob T24 ratio of two measured spins (0 for an unmoved crank)."""
+    return d_t24 / d_crank if d_crank else 0.0
+
+
+def check_chain_ratio(d_t24: float, d_crank: float) -> None:
+    """Raise unless ``d_t24 / d_crank`` is the EXACT 12:24 tooth ratio within
+    ``CHAIN_RATIO_TOL``.
+
+    A roller chain enforces one link per tooth, so any other ratio -- the OD/tip
+    coupling a face-member belt bakes in, the #25 pitch-circle ratio, or a
+    dropped mate (T24 still) -- is a broken coupling (codex #189 round-5).
+    """
+    chain_ratio = measured_chain_ratio(d_t24, d_crank)
+    if abs(chain_ratio - CHAIN_RATIO) > CHAIN_RATIO_TOL:
+        raise RuntimeError(
+            f"T24 turned {d_t24:.3f} deg for crank {d_crank:.3f} (ratio "
+            f"{chain_ratio:.4f}); expected the 12:24 chain ratio {CHAIN_RATIO:.4f} "
+            f"+/-{CHAIN_RATIO_TOL:.4f} -- belt coupling wrong (tip/OD or pitch-"
+            "circle diameters instead of N*p/pi, or a dropped belt mate?)"
+        )
 
 
 def _rot(adapter: Any, name: str) -> list[float]:
@@ -242,9 +283,9 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     z_disc = _rel_z_angle_deg(_rot(adapter, disc), base_R[disc])
     z_feed = _rel_z_angle_deg(_rot(adapter, feed_pinion), base_R[feed_pinion])
     d_platen = component_origin(adapter, platen)[0] - base_platen_x
-    chain_ratio = d_t24 / d_crank if d_crank else 0.0
+    chain_ratio = measured_chain_ratio(d_t24, d_crank)
     log(f"crank spun {d_crank:.2f} deg (Z {z_crank:+.2f}) -> T24 {d_t24:.2f} "
-        f"(Z {z_t24:+.2f}, ratio {chain_ratio:.3f}), "
+        f"(Z {z_t24:+.2f}, ratio {chain_ratio:.4f}), "
         f"shaft {d_shaft:.2f}, third {d_third:.2f}, disc Z {z_disc:+.2f}, "
         f"feed Z {z_feed:+.2f} deg; platen {d_platen:+.3f} mm")
 
@@ -256,17 +297,10 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
         raise RuntimeError(
             f"crank moved {d_crank:.2f} deg, expected {DRIVE_DEG:.0f} "
             f"(+/-{CRANK_TOL:.0f}) -- drive did not seat at the target angle")
-    # (1) Gear mate couples crank T12 -> knob T24 at the EXACT 12:24 = 0.500
-    # tooth/pitch ratio (a roller chain enforces one link per tooth). Assert it
-    # TIGHTLY -- a wrong ratio (e.g. the belt feature's 0.538 tip-cylinder
-    # coupling, or a flipped/dropped mate) now FAILS instead of passing a broad
-    # band (codex #189 round-5).
-    if abs(chain_ratio - CHAIN_RATIO) > RATIO_TOL:
-        raise RuntimeError(
-            f"T24 turned {d_t24:.2f} deg for crank {d_crank:.2f} (ratio {chain_ratio:.3f}); "
-            f"expected the 12:24 chain ratio {CHAIN_RATIO:.3f} +/-{RATIO_TOL:.2f} "
-            "-- belt coupling wrong (tip-face 0.538 = the PulleyDiameters enforce "
-            "failed, or a dropped belt mate?)")
+    # (1) The Belt/Chain feature couples crank T12 -> knob T24 at the EXACT
+    # 12:24 = 0.500 tooth ratio (a roller chain enforces one link per tooth),
+    # asserted to CHAIN_RATIO_TOL -- see check_chain_ratio.
+    check_chain_ratio(d_t24, d_crank)
     # (1b) SENSE: a chain turns both sprockets the SAME direction. An external
     # gear mate (or a flipped belt side) REVERSES -- the failure mode the
     # magnitude-only compares cannot see (codex #189 round-5 left it unasserted).
@@ -387,7 +421,9 @@ async def _attempt_chain_advance(adapter: Any, d_crank_deg: float) -> bool:
         seed = links[0]                       # the pattern's seed link
         probe = links[len(links) // 2]        # a link far around the loop
         before = component_origin(adapter, probe)
-        arc = math.radians(abs(d_crank_deg)) * PITCH_R_T12   # chain surface travel
+        # Chain surface travel on the crank T12 pitch circle (_chain reads the
+        # #25 pitch radius from transgear_removable_spec).
+        arc = math.radians(abs(d_crank_deg)) * PITCH_R_T12
         # Delta along the loop tangent at the seed's station (0 -> arc).
         x0, y0, _ = loop_point_tangent(0.0, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1],
                                        mirror_x=True)

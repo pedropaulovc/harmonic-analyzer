@@ -14,10 +14,12 @@ Simplifications, both noted on the print:
 * the bore is thread-free -- a plain O9.6 slip bore over the O9.525 shaft
   stands in for the nut's internal thread.
 
-The neck is O14, not the O10 the photo suggests: the modelled removable has
-a O12 plain bore (build_transgear_removable.BORE_DIAMETER), so a O10 neck
-would slip INTO the wheel and retain nothing; O14 gives a 1.0 shoulder
-around the bore and still clears the r 9.5 drive-pin circle by 0.5.
+The neck is O14, not the O10 the photo suggests: the removable sprocket has
+a O10.3 plain bore (transgear_removable_spec.BORE_DIA), so a O10 neck would
+slip INTO the wheel and retain nothing; O14 gives a 1.85 shoulder around the
+bore.  The neck's rim lies on the r 7 drive-pin circle, but the pins stop
+0.4 inside the sprocket plate (DRIVE_PIN_TIP_Z), so the neck bears on the
+plate's front face, never on a pin.
 
 Layout (part frame): axis +Y, origin at the neck's gear-side face; neck
 O NECK_DIA from y 0..NECK_LEN, disc O DISC_DIA from y NECK_LEN..

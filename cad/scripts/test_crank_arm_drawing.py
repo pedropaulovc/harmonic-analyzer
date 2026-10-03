@@ -12,6 +12,7 @@ import crank_arm_notes as notes
 import crank_arm_spec as spec
 import crank_hub_geometry as geometry
 import draw_crank_arm as drawing
+import transgear_removable_spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import drill_process
@@ -139,8 +140,12 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_ARM_ORIGIN_Z == -175.0
     # MHA-024 moved 1.6 inboard with the rule-12 hub station (13.6).
     assert drive.CRANK_PIN_Z == pytest.approx(-169.4)
-    assert drive.CRANK_HUB_REAR_Z == -163.0
-    assert drive.REMOVABLE_Z0 - drive.CRANK_HUB_REAR_Z == pytest.approx(5.5)
+    # The hub rear reaches the removable: 0.7 air to its front face.
+    assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
+    assert (
+        transgear_removable_spec.BAND_FRONT_Z - drive.CRANK_HUB_REAR_Z
+        == pytest.approx(0.7)
+    )
     # The restored shaft ends inside the pinion boss, rather than exposing a tip.
     shaft_end = drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH
     assert shaft_end < drive.PINION_Z0 + drive.PINION_OVERALL_LENGTH

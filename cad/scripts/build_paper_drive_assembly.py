@@ -7,8 +7,8 @@ y = 50.8; the output side is -Z). Rebuilt against the primary references
 (memory/paper-drive-rework.md): ONE support bar, two-piece column clamps, the
 hanging platen (guides + locks), and the REAL six-gear power train:
 
-    crank T12 --(belt/chain feature, pitch O 24:48)--> knob T24
-      --(LOCK: keyed shaft)--> 12T DP38 third gear
+    crank T12 --(belt/chain feature, 12:24 teeth)--> knob T24
+      --(keyed shaft: two drive pins + LOCK)--> 12T DP38 third gear
       --(GEAR mate 12:120)--> 120T DP38 reducer disc
       --(LOCK: stud stack)--> 12T DP30 feed pinion
       --(RACK-PINION mate, pi*10.16/rev)--> rack --(LOCK)--> platen
@@ -34,20 +34,21 @@ verify:kinematics replay, never authored.
   grounded-screw float is fixed).
 * Transgear group: bracket on the bar's back face (2 slotted screws) carrying
   the stepped stud; on the stud the 120T disc + 12T feed pinion (locked pair,
-  O5 seat) and the latch arm's big hub; the arm carries the knob shaft with
-  the mounted T24 removable CHAIN-WRAPPED at the z -155 chain plane, the 12T
-  DP38 third gear on the shaft's O5 seat, and the thumb knob; the knurled
-  thumbnut on the shaft's front stub retains the T24 (ch23 p.58/59).
+  O5 seat) and the latch arm's big hub; the arm carries the knob shaft MHA-078
+  with the mounted T24 removable CHAIN-WRAPPED at the z -155.7 chain plane
+  (rear face on the shaft's seat collar, driven by two pressed MHA-155 pins),
+  the 12T DP38 third gear on the shaft's O5 seat, and the thumb knob; the
+  knurled thumbnut on the shaft's front pilot retains the T24 (ch23 p.58/59).
 * Latch hook: the short curved spring-steel hook screwed to the bar's front
   face (video 4/4), hanging beside the platen's -X edge toward the cluster.
-* The roller chain loops both removables (native connected-linkage chain
-  component pattern); the sprocket face (2.4) now fits BETWEEN the chain's
+* The ANSI #25 roller chain loops both removables (native connected-linkage
+  chain component pattern); the 2.8 sprocket plate fits BETWEEN the chain's
   inner plates, so only the roller<->tooth seating is intended contact.
 * Spare transgear-removable (T18 chain wheel) stored loose on the base top.
 
 Cross-subassembly fits (checked at the top level): the column-clamp arcs ride
 the O25.4 columns (frame.SLDASM); the roller chain spans this sub's knob shaft
-and the drive-train crankshaft -- both share the z -155 chain plane.
+and the drive-train crankshaft -- both share the z -155.7 chain plane.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact final
 transform and fixed; the platen group and the gear train are left free and
@@ -98,10 +99,12 @@ from _assembly import (
     check_no_interference,
     component_names,
     component_origin,
+    coincident_mate,
     component_transform,
     distance_driver,
     lock_mate,
     named_ref,
+    parallel_mate,
     place_component,
     reledger_to_solved,
     remap_front_to_machine_front,
@@ -315,17 +318,17 @@ ARM_Z = (RACK_BACK_Z + BAR_BACK_Z) / 2.0  # -131.4: the arm's 2.6 band fits the
 # 3.0 slot between the rack's back face and the bar-front/bracket plane
 BRACKET_Z0 = BAR_BACK_Z  # plate -129.9..-125.9 on the bar's back face
 STUB_Z0 = BRACKET_Z0 + BRACKET_THICK  # -125.9 (Rx-90: local +Y -> -Z)
-KNOB_SHAFT_Z0 = -157.5  # Rx+90: local +Y -> +Z (stack runs to the knob at the back)
 from build_transgear_knob_shaft import (  # noqa: E402
-    FRONT_STUB as KNOB_FRONT_STUB,
+    COLLAR_REAR as KNOB_COLLAR_REAR,
+    DISC_AIR as KNOB_DISC_AIR,
+    DRIVE_PIN_FLOOR as KNOB_DRIVE_PIN_FLOOR,
+    SEAT_COLLAR as KNOB_SEAT_COLLAR,
     SHAFT_DIA as KNOB_SHAFT_DIA,
 )
-from build_transgear_removable import (  # noqa: E402
-    BORE_DIAMETER as REMOVABLE_BORE_DIA,
-    FACE_WIDTH as REMOVABLE_FACE,
-    PIN_CIRCLE_RADIUS as REMOVABLE_PIN_R,
-    PIN_HOLE_DIAMETER as REMOVABLE_PIN_DIA,
-)
+import transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
+import crankshaft_spec  # noqa: E402
+import transgear_removable_spec as REMOVABLE  # noqa: E402
+import transgear_stub_spec as STUB  # noqa: E402
 from build_transgear_thumbnut import (  # noqa: E402
     BORE_DIA as THUMBNUT_BORE_DIA,
     DISC_DIA as THUMBNUT_DISC_DIA,
@@ -335,23 +338,97 @@ from build_transgear_thumbnut import (  # noqa: E402
     TOTAL_LEN as THUMBNUT_LEN,
 )
 
-REMOVABLE_Z0 = -156.2  # mounted removables: face 2.4 about the -155 chain plane
-T24_MID_Z = REMOVABLE_Z0 + 1.2  # -155.0
-CHAIN_MID_Z = -155.0  # both wheels coplanar; the crank T12 matches (drive-train)
-REMOVABLE_TIP_R = {"T12": 14.0, "T18": 20.0, "T24": 26.0}  # m2: OD (T+2)*2
+# Both mounted removables (knob T24, crank T12) share ONE band: front face
+# BAND_FRONT_Z, rear face on the shaft's seat collar at SEAT_FACE_Z, and the
+# chain mid-plane between (transgear_removable_spec). Each is placed on its
+# FRONT face (the part's Front Plane), identity: holes on machine +/-Y.
+REMOVABLE_Z0 = REMOVABLE.BAND_FRONT_Z  # -157.1
+T24_MID_Z = REMOVABLE.CHAIN_MID_Z  # -155.7
+CHAIN_MID_Z = REMOVABLE.CHAIN_MID_Z  # both wheels coplanar; the crank T12 matches
+REMOVABLE_TIP_R = {
+    name: REMOVABLE.outside_dia(teeth) / 2.0 for name, teeth in REMOVABLE.CONFIGS
+}
+# Belt/chain coupling diameters: the per-tooth effective N * p / pi, so the
+# typed ratio is the EXACT tooth ratio a roller chain transmits.
+CHAIN_PULLEY_DIA = {
+    name: teeth * REMOVABLE.CHAIN_PITCH / math.pi for name, teeth in REMOVABLE.CONFIGS
+}
+if REMOVABLE.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
+    raise AssertionError("identity-placed removables expect pin holes on +/-Y")
+
+# Knob shaft MHA-078 (Rx+90: local +Y -> +Z, the stack runs to the knob at
+# the back): its SeatCollar station sits on the band's seat face, so its
+# origin (the pilot's front tip) is that far in front.
+KNOB_SHAFT_Z0 = REMOVABLE.SEAT_FACE_Z - KNOB_SEAT_COLLAR  # -167.9
+KNOB_COLLAR_REAR_Z = KNOB_SHAFT_Z0 + KNOB_COLLAR_REAR  # -149.7
+# The two MHA-155 dowels pressed through the collar's reamed holes (Rx-90: pin
+# +Y -> -Z), pressed end on DrivePinFloor (the press stop's station, inside
+# the collar), rounded end in the wheel's pin holes.
+KNOB_DRIVE_PIN_Z0 = KNOB_SHAFT_Z0 + KNOB_DRIVE_PIN_FLOOR  # -151.9375
+if abs(KNOB_DRIVE_PIN_Z0 - KNOB_PIN.LENGTH - REMOVABLE.DRIVE_PIN_TIP_Z) > 1e-9:
+    raise AssertionError("knob drive-pin tips are off the removable's DRIVE_PIN_TIP_Z")
+if abs(KNOB_PIN.DIA - REMOVABLE.DRIVE_PIN_DIA) > 1e-12:
+    raise AssertionError("transgear-knob-drive-pin is not the removable's drive pin")
+# The collar rear stands the knob shaft's DISC_AIR clear of the 120T disc and
+# third gear front face.
+if abs(DISC_Z0 - KNOB_COLLAR_REAR_Z - KNOB_DISC_AIR) > 1e-9 or THIRD_Z0 != DISC_Z0:
+    raise AssertionError(
+        f"knob seat collar rear {KNOB_COLLAR_REAR_Z:.2f} is not {KNOB_DISC_AIR}"
+        f" clear of the disc / third gear at {DISC_Z0}"
+    )
+# Worst case: the collar length (seat face to rear face, one .X dimension on
+# MHA-078) at its long limit puts the rear face STATION_ROW further back.  The
+# disc rim passes 3.99 off the knob axis, inside the collar's r 8.70 minimum,
+# so the faces overlap radially.  The disc + feed pinion pair floats on the
+# stud's O5 seat (13.8 for 9.5 + 3.0), so the disc front can ride up to the
+# stud collar's rear face, 0.4 in front of DISC_Z0.
+DISC_FRONT_STOP_Z = STUB_Z0 - (STUB.BASE_LEN + STUB.SEAT_LEN)  # -148.8
+KNOB_COLLAR_REAR_Z_WORST = KNOB_COLLAR_REAR_Z + crankshaft_spec.STATION_ROW  # -148.9
+KNOB_DISC_AIR_WORST = DISC_FRONT_STOP_Z - KNOB_COLLAR_REAR_Z_WORST  # 0.1
+if DISC_FRONT_STOP_Z > DISC_Z0 or KNOB_DISC_AIR_WORST <= 0.0:
+    raise AssertionError(
+        f"knob seat collar at its long .X limit reaches the 120T disc's front"
+        f" stop {DISC_FRONT_STOP_Z:.2f}: air {KNOB_DISC_AIR_WORST:.2f}"
+    )
+
+# Stack D: a bought #25 chain floated REARMOST on the thinnest T24 plate
+# reaches chain_reach_rear() behind the seat face; it must keep air to the
+# 120T disc / third gear front face (the seat face is the shaft's own datum).
+CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST  # 3.587
+CHAIN_DISC_AXIAL_AIR_WORST = DISC_Z0 - (
+    REMOVABLE.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
+)  # 2.3135 = 5.9 - 3.5865
+if CHAIN_DISC_AXIAL_AIR_WORST <= 0.0:
+    raise AssertionError(
+        f"bought #25 chain reaches the 120T disc: air {CHAIN_DISC_AXIAL_AIR_WORST:.4f}"
+    )
+# Radially, the only knob-shaft feature between the seat face and the disc is
+# the O17.5 seat collar (the pins sit inside it); at its print-worst (largest)
+# radius it must stand inside the T24 plates' inner edge, CAD link and ANSI,
+# with the wheel floated off-centre on its pins (the crank's same pins, holes
+# and bands: crankshaft_spec.WHEEL_SEAT_FLOAT).
+T24_CHAIN_INNER_R = min(
+    REMOVABLE.chain_plate_inner_radius(24, h)
+    for h in (2.0 * CHAIN_PLATE_HALF_H, REMOVABLE.ANSI_PLATE_HEIGHT)
+)  # ~21.2 (ANSI)
+KNOB_COLLAR_R_WORST = (
+    REMOVABLE.SEAT_SPIGOT_DIA + max(crankshaft_spec.SPIGOT_DIA_BAND)
+) / 2.0  # 8.75
+if KNOB_COLLAR_R_WORST + crankshaft_spec.WHEEL_SEAT_FLOAT >= T24_CHAIN_INNER_R:
+    raise AssertionError("knob seat collar reaches the T24 chain plates' inner edge")
 
 # Thumbnut (2026-09-02, ch23 p.58/59 + video 4/4 "unscrew the nut that holds
 # the other gear in place"): the knurled brass nut OUTERMOST on the knob
 # shaft, its neck 0.25 in front of the mounted T24's front face, retaining
-# it; the shaft's front stub runs on into the nut. Rx(-90): local +Y -> -Z,
+# it; the shaft's pilot runs on into the nut. Rx(-90): local +Y -> -Z,
 # so the nut spans THUMBNUT_Z0 .. THUMBNUT_Z0 - 11 (disc at the front).
 THUMBNUT_AIR = 0.25
-THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -156.45 (neck's gear-side face)
-THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -167.45
+THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -157.35 (neck's gear-side face)
+THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -168.35
 _THUMBNUT_DISC_MID_Z = (
     THUMBNUT_Z0 - THUMBNUT_NECK_LEN - THUMBNUT_DISC_LEN / 2.0
-)  # -163.95
-KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0 - KNOB_FRONT_STUB  # -167.0
+)  # -164.85
+KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0  # -167.9, the pilot's front tip
 _nut_bore_gap = (THUMBNUT_BORE_DIA - KNOB_SHAFT_DIA) / 2.0  # 0.0375 radial
 if not (0.0 < _nut_bore_gap < 0.1):
     raise AssertionError(
@@ -364,20 +441,29 @@ if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z <= _THUMBNUT_DISC_MID_Z):
         f"knob shaft front {KNOB_SHAFT_FRONT_Z} must end inside the thumbnut disc"
         f" ({THUMBNUT_FRONT_Z} .. {_THUMBNUT_DISC_MID_Z})"
     )
-# The neck must actually RETAIN the wheel: cover its O12 bore with a shoulder
-# and stay clear of the r 9.5 drive-pin holes.
-if THUMBNUT_NECK_DIA < REMOVABLE_BORE_DIA + 1.0:
+# The neck must actually RETAIN the wheel: cover its bore with a shoulder.
+# It bears across the pin circle, so the drive pins must end inside the
+# wheel's plate, short of the neck by at least the same air (at the press
+# stop's worst and the thinnest wheel, KNOB_PIN.TIP_INSET_WORST holds it).
+if THUMBNUT_NECK_DIA < REMOVABLE.BORE_DIA + 1.0:
     raise AssertionError(
         "thumbnut neck slips into the removable's bore -- retains nothing"
     )
-if THUMBNUT_NECK_DIA / 2.0 + THUMBNUT_AIR > REMOVABLE_PIN_R - REMOVABLE_PIN_DIA / 2.0:
-    raise AssertionError("thumbnut neck overlaps the removable's drive-pin circle")
+if REMOVABLE.DRIVE_PIN_TIP_Z - THUMBNUT_Z0 < THUMBNUT_AIR:
+    raise AssertionError("knob drive-pin tips reach the thumbnut neck")
 # Front furniture: nothing in this sub sits in front of the T24 but the
 # chain, whose plates straddle the wheel (z CHAIN_MID_Z +- pin reach) and
 # wrap it at the pitch radius -- the nut's disc must clear that wrap radially.
-_chain_inner_wrap_r = PITCH_R_T24 - CHAIN_PLATE_HALF_H  # 21.6
+_chain_inner_wrap_r = PITCH_R_T24 - CHAIN_PLATE_HALF_H  # 21.92
 if THUMBNUT_DISC_DIA / 2.0 + THUMBNUT_AIR > _chain_inner_wrap_r:
     raise AssertionError("thumbnut disc reaches the chain's inner plate wrap")
+# The bought chain floated FRONTMOST reaches CHAIN_REACH_FRONT ahead of the
+# seat face (-160.59): inside the nut's neck span, still behind its disc
+# (-161.35). The whole nut (and the shaft) lies radially inside the ANSI
+# plates' inner edge, so no axial stack exists there; assert the radial one.
+CHAIN_FRONT_Z_WORST = REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT  # -160.5865
+if max(THUMBNUT_DISC_DIA, THUMBNUT_NECK_DIA) / 2.0 + THUMBNUT_AIR > T24_CHAIN_INNER_R:
+    raise AssertionError("thumbnut reaches the bought chain's inner plate edge")
 
 # Latch hook (2026-09-02, ch23 p.58 / video 4/4 keyframes v4_transgear_001 +
 # _011): the short curved spring-steel hook screwed to the bar's FRONT face,
@@ -784,14 +870,22 @@ def _assert_knob_shaft_clearance() -> None:
     if t24_collar_gap < 0.5:
         raise RuntimeError(f"mounted T24 to stub-collar gap {t24_collar_gap:.2f} < 0.5")
     # The T24 overlaps the disc rim in XY -- they must stay z-separated.
-    t24_front = REMOVABLE_Z0 + REMOVABLE_FACE  # the wheel's BACK face, -153.8
-    z_gap = DISC_Z0 - t24_front  # -148.4 - (-153.8) = 5.4
+    t24_back = REMOVABLE.SEAT_FACE_Z  # the wheel's BACK face on the seat collar
+    z_gap = DISC_Z0 - t24_back  # -148.4 - (-154.3) = 5.9
     if z_gap < 2.0:
         raise RuntimeError(f"T24/disc z gap {z_gap:.2f} < 2.0")
+    # The seat collar's rear face stands DISC_AIR in front of the disc's front
+    # face, where the disc rim passes inside the collar radius.
+    collar_disc_z = DISC_Z0 - KNOB_COLLAR_REAR_Z
+    if collar_disc_z < KNOB_DISC_AIR - 1e-9:
+        raise RuntimeError(
+            f"knob seat collar to disc air {collar_disc_z:.2f} < {KNOB_DISC_AIR}"
+        )
     log(
         f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}),"
         f" {PLATE_Y0 - shaft_top:.2f} under the platen edge; gaps:"
-        f" T24/collar {t24_collar_gap:.1f}, T24/disc z {z_gap:.1f}"
+        f" T24/collar {t24_collar_gap:.1f}, T24/disc z {z_gap:.1f}, seat collar/disc"
+        f" z {collar_disc_z:.2f} ({KNOB_DISC_AIR_WORST:.2f} worst to the disc's stop)"
     )
 
 
@@ -1578,8 +1672,9 @@ async def build(adapter) -> dict[str, str]:
         f" {(ARM_Z - LATCH_THICK / 2.0) - LATCH_HOOK_Z_BACK:.2f}; screw tip z"
         f" {LATCH_SCREW_TIP_Z:.2f} ({LATCH_SCREW_TIP_Z - BAR_BACK_Z:+.2f} past the bar back)"
     )
-    # Knob shaft on the latch's small hub: Rx(+90) runs local +Y to machine +Z
-    # (removable seat at the chain plane, O5 third-gear seat, hub ride, knob).
+    # Knob shaft MHA-078 on the latch's small hub: Rx(+90) runs local +Y to
+    # machine +Z (pilot through the T24, seat collar, O5 third-gear seat, hub
+    # ride, knob); SeatCollar lands on the band's seat face.
     knob_shaft = await place_component(
         adapter,
         "transgear-knob-shaft",
@@ -1602,7 +1697,8 @@ async def build(adapter) -> dict[str, str]:
     # Mounted T24 removable = the knob-end chain wheel (ch. 23: the roller
     # chain rides the removable's teeth; swapping removables changes the
     # platen ratio). FREE to spin: the belt/chain feature couples it to the
-    # crank T12.
+    # crank T12. Front face on the band's BAND_FRONT_Z, identity (the pin
+    # holes on machine +/-Y, over the knob shaft's drive pins).
     t24 = await place_component(
         adapter,
         "transgear-removable",
@@ -1614,24 +1710,87 @@ async def build(adapter) -> dict[str, str]:
         label="transgear-removable (mounted T24)",
     )
     await _sprocket_revolute(adapter, t24, "T24 knob wheel")
-    # Key the knob cluster to spin as ONE rigid body: LOCK the knob shaft and
-    # the third gear to the (free-spinning) T24 wheel -- all three ride the
-    # same physical knob shaft. Net DOF unchanged: freeing shaft + third
-    # (+12 DOF) is removed by the two 6-DOF Lock mates; the cluster keeps
-    # T24's single free spin.
-    await lock_mate(
+    # The knob shaft carries the T24 the way the machine does: coaxial, the
+    # wheel's RearFace on the SeatCollar, clocked so its pin holes ride the
+    # drive pins (the parallel closes the spin; both frames keep machine X).
+    # The cluster keeps T24's single free spin.
+    shaft_o = component_origin(adapter, knob_shaft)
+    await coincident_mate(
         adapter,
-        named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
-        named_ref(f"Front Plane@{t24}", "PLANE"),
-        label="knob cluster: knob shaft locked to T24",
+        named_ref(f"Axis1@{knob_shaft}", "AXIS"),
+        named_ref(f"Axis1@{t24}", "AXIS"),
+        label="knob shaft coaxial with the mounted T24",
+        verify=(knob_shaft, shaft_o),
     )
+    await coincident_mate(
+        adapter,
+        named_ref(f"SeatCollar@{knob_shaft}", "PLANE"),
+        named_ref(f"RearFace@{t24}", "PLANE"),
+        label="knob shaft SeatCollar on the T24 rear face",
+        verify=(knob_shaft, shaft_o),
+    )
+    # The shaft origin sits ON the spin axis, so only an off-axis witness (the
+    # DrivePinAxis1 station) separates the two parallel solutions.
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{knob_shaft}", "PLANE"),
+        named_ref(f"Right Plane@{t24}", "PLANE"),
+        label="knob shaft drive pins clocked into the T24 pin holes",
+        verify=(knob_shaft, shaft_o),
+        witness_local=[0.0, KNOB_SEAT_COLLAR, REMOVABLE.PIN_CIRCLE_RADIUS],
+    )
+    # The two MHA-155 dowels pressed through the seat collar's reamed holes:
+    # pressed end on DrivePinFloor, rounded end forward in the T24's pin holes
+    # (Rx-90: pin +Y -> machine -Z). DrivePinAxis1 lies on the shaft's local +Z
+    # (machine -Y), DrivePinAxis2 opposite -- the crankshaft's convention.
+    knob_pins = [
+        await place_component(
+            adapter,
+            "transgear-knob-drive-pin",
+            [
+                KNOB_SHAFT_XY[0],
+                KNOB_SHAFT_XY[1] + side * REMOVABLE.PIN_CIRCLE_RADIUS,
+                KNOB_DRIVE_PIN_Z0,
+            ],
+            [-90.0, 0.0, 0.0],
+            ROT_X_NEG90,
+            ground=False,
+            label=f"MHA-155 knob drive pin in DrivePinAxis{k}",
+        )
+        for k, side in ((1, -1.0), (2, 1.0))
+    ]
+    for k, knob_pin in enumerate(knob_pins, start=1):
+        pin_o = component_origin(adapter, knob_pin)
+        await coincident_mate(
+            adapter,
+            named_ref(f"ScrewAxis@{knob_pin}", "AXIS"),
+            named_ref(f"DrivePinAxis{k}@{knob_shaft}", "AXIS"),
+            label=f"MHA-155 knob pin #{k} coaxial in DrivePinAxis{k}",
+            verify=(knob_pin, pin_o),
+        )
+        await coincident_mate(
+            adapter,
+            named_ref(f"Top Plane@{knob_pin}", "PLANE"),
+            named_ref(f"DrivePinFloor@{knob_shaft}", "PLANE"),
+            label=f"MHA-155 knob pin #{k} pressed to DrivePinFloor",
+            verify=(knob_pin, pin_o),
+        )
+        await parallel_mate(
+            adapter,
+            named_ref(f"Right Plane@{knob_pin}", "PLANE"),
+            named_ref(f"Right Plane@{knob_shaft}", "PLANE"),
+            label=f"MHA-155 knob pin #{k} rotational closure",
+            verify=(knob_pin, pin_o),
+        )
+    # The third gear rides the shaft's O5 seat: LOCK it to the knob shaft
+    # (net DOF unchanged: +6 freed, -6 by the lock).
     await lock_mate(
         adapter,
         named_ref(f"Front Plane@{third}", "PLANE"),
-        named_ref(f"Front Plane@{t24}", "PLANE"),
-        label="knob cluster: third gear locked to T24",
+        named_ref(f"Front Plane@{knob_shaft}", "PLANE"),
+        label="knob cluster: third gear locked to the knob shaft",
     )
-    # Knurled thumbnut OUTERMOST on the shaft's front stub, its neck 0.25 in
+    # Knurled thumbnut OUTERMOST on the shaft's front pilot, its neck 0.25 in
     # front of the T24, retaining it (ch23 p.58/59). Rx(-90): local +Y -> -Z,
     # disc at the machine front. Locked to the knob shaft, so it spins with
     # the cluster (net DOF unchanged: +6 freed, -6 by the lock).
@@ -1663,9 +1822,10 @@ async def build(adapter) -> dict[str, str]:
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the
     # MACHINE crank centre = -CHAIN_CRANK_CENTRE (the pre-mirror _chain anchor,
     # == -drive-train (X_CRANK, Y_CRANK); _assert_chain_layout pins this).
-    # Coplanar with the T24 on the -155 chain plane; a spur gear is symmetric so
-    # identity rotation. FREE to spin -- this is the crank input, the single
-    # operational DOF.
+    # On the same band as the T24 (front face BAND_FRONT_Z, identity: its pin
+    # holes on machine +/-Y over the crankshaft's drive pins, which
+    # drive-train places). FREE to spin -- this is the crank input, the
+    # single operational DOF.
     t12 = await place_component(
         adapter,
         "transgear-removable",
@@ -1687,14 +1847,16 @@ async def build(adapter) -> dict[str, str]:
     # (1) The native Belt/Chain assembly feature couples the crank T12 <-> knob
     # T24 exactly as the roller chain physically does: SAME rotation sense (both
     # sprockets turn the same way -- a gear mate models an external mesh and
-    # REVERSES) at the pitch-diameter ratio 24:48 = 12:24 teeth = 0.500 (each
-    # link engages one tooth, so rev_T12 * 12 == rev_T24 * 24). The pulley
-    # members are each sprocket's Axis1 DATUM AXIS, not a face: with a face
-    # member SW bakes the picked face's diameter -- on these sprockets the
-    # tooth-TIP cylinder (28:52 = 0.538, a ~7.7% feed error) -- into the
-    # EngageBelt coupling mate and no definition-level route rewrites it; an
-    # axis has no diameter to steal, so the typed pitch diameters drive the
-    # mate exactly (probed live 2026-07-06, ratio +0.5000; see
+    # REVERSES) at the tooth ratio 12:24 = 0.500 (each link engages one tooth,
+    # so rev_T12 * 12 == rev_T24 * 24). The typed diameters are therefore the
+    # per-tooth effective N * p / pi, not the #25 pitch diameters p / sin(pi/N)
+    # whose 0.5043 ratio would bake a 0.9% feed error into the coupling. The
+    # pulley members are each sprocket's Axis1 DATUM AXIS, not a face: with a
+    # face member SW bakes the picked face's diameter -- on these sprockets the
+    # tooth-TIP cylinder (0.529, a ~5.7% feed error) -- into the EngageBelt
+    # coupling mate and no definition-level route rewrites it; an axis has no
+    # diameter to steal, so the typed diameters drive the mate exactly (probed
+    # live 2026-07-06, ratio +0.5000; see
     # memory/belt-chain-feature-com-binding.md). The adapter reads the mate's
     # own D1/D2 back and fails loud on a mismatch. EngageBelt authors the
     # coupling mates; CreateBeltPart stays off -- the roller-chain component
@@ -1705,11 +1867,11 @@ async def build(adapter) -> dict[str, str]:
 
     shown = _shown_planes(adapter)
     check(
-        "chain coupling T12<->T24 (belt/chain feature, pitch 24:48)",
+        "chain coupling T12<->T24 (belt/chain feature, 12:24 teeth)",
         await adapter.insert_belt_chain(
             BeltChainParameters(
                 pulley_components=[t12, t24],
-                pulley_diameters=[2.0 * PITCH_R_T12, 2.0 * PITCH_R_T24],  # mm
+                pulley_diameters=[CHAIN_PULLEY_DIA["T12"], CHAIN_PULLEY_DIA["T24"]],
                 pulley_member_axes=[f"Axis1@{t12}", f"Axis1@{t24}"],
                 location_plane="Front Plane",
                 engage_belt=True,

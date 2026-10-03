@@ -54,6 +54,8 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "crank-drive-gear": BalloonAnchor(),
         "cone-gear": BalloonAnchor(),
         "crankshaft": BalloonAnchor(),
+        "crank-seat-washer": BalloonAnchor(),
+        "crank-seat-drive-pin": BalloonAnchor(),
         "crank-pinion": BalloonAnchor(),
         "crank-hub": BalloonAnchor(),
         "crank-hub-pin": BalloonAnchor(),

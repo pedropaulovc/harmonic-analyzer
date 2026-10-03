@@ -122,6 +122,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
         drawing.FIT_PLACEHOLDER,
+        drawing.CRANK_WASHER_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
     cited = set(re.findall(r"MHA-\d{3}", "\n".join(texts)))
@@ -139,6 +140,7 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
         drawing.FIT_PLACEHOLDER,
+        drawing.CRANK_WASHER_FIT_NOTES,
         drawing.CONSUMABLES_NOTES,
     ):
         for line in text.format(
@@ -189,6 +191,14 @@ def test_every_note_field_holds_its_stacked_blocks() -> None:
         if field.label == f"sheet {drawing.SEQUENCE_SHEET} left note field"
     )
     assert _spare(steps._replace(blocks=steps.blocks + notes.blocks)) < 0
+    # The MHA-172 fit-up rides the FIT sheet; step 4 on sheet 6 only cites it.
+    (fit,) = (
+        field
+        for field in fields
+        if field.label == f"sheet {drawing.FIT_SHEET} right note field"
+    )
+    assert drawing.CRANK_WASHER_FIT_NOTES in dict(fit.blocks).values()
+    assert f"PER SHEET {drawing.FIT_SHEET}" in drawing.CONE_CRANK_STEPS
 
 
 def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
@@ -571,12 +581,39 @@ def test_bom_split_keeps_the_second_column_no_taller() -> None:
     assert drawing.bom_split_row(42) == 21
     with pytest.raises(ValueError):
         drawing.bom_split_row(1)
-    # The reference isometric sits under the taller first column. The farm
-    # measured a 124.2 mm header + 19-row piece, so the header is ~10.2 mm;
-    # a 1:8 reference view's outline is ~49 mm tall.
-    first_bottom = drawing.BOM_ANCHOR[1] - (0.0102 + 20 * drawing.BOM_ROW_HEIGHT)
-    assert drawing.BOM_REFERENCE_ISO_CENTER[1] + 0.0247 < first_bottom - 0.010
-    assert drawing.BOM_REFERENCE_ISO_CENTER[0] < drawing.BOM_SECOND_COLUMN_X
+
+
+def test_bom_reference_view_and_caption_fit_right_of_the_bom() -> None:
+    # The farm measured a 124.2 mm header + 19-row piece, so the header is
+    # ~10.2 mm. Under the first column the view was placed for 20 rows; at 27
+    # the bottom row (MHA-058) ran through it (st19 dt-02).
+    data_rows = len(drawing.bom_components(drawing.instance_counts(_instances())))
+    first_rows = drawing.bom_split_row(data_rows)
+    first_height = 0.0102 + first_rows * drawing.BOM_ROW_HEIGHT
+    first_bottom = drawing.BOM_ANCHOR[1] - first_height
+    half = drawing.REFERENCE_ISO_HALF_OUTLINE
+    assert (0.068 + half) > first_bottom  # the old centre (0.110, 0.068)
+    # Now it stands right of the second column, the whole column height clear
+    # of either piece, with its caption seated over the title block.
+    cx, cy = drawing.BOM_REFERENCE_ISO_CENTER
+    outline = (cx - half, cy - half, cx + half, cy + half)
+    assert drawing.bom_reference_iso_violations(outline) == []
+    assert outline[0] > drawing.BOM_SECOND_COLUMN_X + drawing.BOM_COLUMN_WIDTH
+    # The caption is centred under the view: its widest line (~2.47 mm a
+    # character, the two-line caption on dt-02) stays in the strip.
+    widest = max(len(line) for line in drawing.BOM_REFERENCE_CAPTION.splitlines())
+    half_caption = widest * 0.00247 / 2
+    assert cx - half_caption > drawing.BOM_RIGHT_EDGE + drawing.BOM_SHEET_CLEARANCE
+    assert cx + half_caption < drawing.NOTE_FIELD_RIGHT[2]
+    # A view that grew onto the BOM, past the right field or down into the
+    # title block is refused before the BOM is inserted.
+    onto_bom = (outline[0] - 0.010, outline[1], outline[2] - 0.010, outline[3])
+    assert "second column" in drawing.bom_reference_iso_violations(onto_bom)[0]
+    past_right = (outline[0] + 0.010, outline[1], outline[2] + 0.010, outline[3])
+    assert "passes" in drawing.bom_reference_iso_violations(past_right)[0]
+    sunk = drawing.BOM_REFERENCE_ISO_SLACK + 0.002
+    too_low = (outline[0], outline[1] - sunk, outline[2], outline[3])
+    assert "title block" in drawing.bom_reference_iso_violations(too_low)[0]
 
 
 def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:

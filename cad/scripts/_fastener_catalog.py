@@ -81,6 +81,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91794A112",
         material="AISI 304",
     ),
+    "crank-seat-drive-pin": _stock(
+        "crank-seat-drive-pin",
+        "Alloy Steel Dowel Pin",
+        "98381A434",
+        material="Alloy Steel",
+    ),
     "fillister-screw": _stock(
         "fillister-screw",
         "Brass Fillister Head Slotted Screw",
@@ -184,6 +190,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "cone-tip-collar",
         "Black-Oxide Carbon Steel Set Screw Shaft Collar",
         "9414T1",
+    ),
+    "transgear-knob-drive-pin": _stock(
+        "transgear-knob-drive-pin",
+        "Alloy Steel Dowel Pin",
+        "98381A433",
+        material="Alloy Steel",
     ),
     "tube-frame-cap": _stock(
         "tube-frame-cap",

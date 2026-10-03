@@ -47,6 +47,10 @@ from arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
 from swing_stop_screw_spec import EMBED_LEN as _STOP_EMBED_LEN
 from swing_stop_screw_spec import SHANK_DIA as _STOP_SHANK_DIA
 from swing_stop_screw_spec import THREAD as _STOP_THREAD
+from transgear_removable_spec import DRIVE_PIN_DIA as _SEAT_PIN_DIA
+from transgear_removable_spec import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
+from crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
+from transgear_knob_drive_pin_spec import PRESS_DEPTH as _KNOB_SEAT_PIN_DEPTH
 
 
 def _smooth_annulus_limit_mm3(
@@ -204,6 +208,16 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
         ),
         second_number=None,
     ),
+    # The two MHA-173 dowels pressed into MHA-026's seat-collar holes
+    # (ø2.38125 pin in a ø2.38 ream over the press depth): the press fit.
+    **_numbered_pairs(
+        "crank-seat-drive-pin",
+        range(1, 3),
+        "crankshaft",
+        _smooth_annulus_limit_mm3(
+            _SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, _CRANK_SEAT_PIN_DEPTH
+        ),
+    ),
 }
 
 # Minimum socket chord across the screw's complete major-diameter envelope.
@@ -352,6 +366,17 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     # The front latch uses the third stock screw through the support bar's 9-mm tap.
     frozenset(("bracket-screw-3", "support-bar-1")): _smooth_annulus_limit_mm3(
         4.1656, 3.454, 9.0
+    ),
+    # The two MHA-155 dowels pressed into MHA-078's seat-collar holes, reamed
+    # through (ø2.38125 pin in a ø2.38 ream over the press depth, the pin's
+    # length inside the collar): the press fit.
+    **_numbered_pairs(
+        "transgear-knob-drive-pin",
+        range(1, 3),
+        "transgear-knob-shaft",
+        _smooth_annulus_limit_mm3(
+            _SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, _KNOB_SEAT_PIN_DEPTH
+        ),
     ),
 }
 

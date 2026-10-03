@@ -9,10 +9,10 @@ import pytest
 
 import _assembly
 import build_paper_drive_assembly as assembly
-import build_transgear_removable as sprocket
 import draw_paper_drive_assembly as drawing
 import harmonic_base_spec as base
 import nameplate_spec as nameplate
+import transgear_removable_spec as sprocket
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -49,24 +49,18 @@ def _spare_world_point(monkeypatch, local):
 
 
 def test_spare_sprocket_transformed_underside_contacts_base_deck(monkeypatch):
-    # The builder's blank is Z=0..FACE_WIDTH, identical in all tooth configs.
+    # The spec's plate is local Z=0..PLATE, identical in all tooth configs.
     underside = _spare_world_point(monkeypatch, [0.0, 0.0, 0.0])
-    top = _spare_world_point(monkeypatch, [0.0, 0.0, sprocket.FACE_WIDTH])
+    top = _spare_world_point(monkeypatch, [0.0, 0.0, sprocket.PLATE])
     assert underside[1] == pytest.approx(base.STACK_HEIGHT, rel=0, abs=1e-9)
-    assert top[1] == pytest.approx(
-        base.STACK_HEIGHT + sprocket.FACE_WIDTH, rel=0, abs=1e-9
-    )
+    assert top[1] == pytest.approx(base.STACK_HEIGHT + sprocket.PLATE, rel=0, abs=1e-9)
     assert (underside[0], underside[2]) == (160.0, -75.0)
     assert (top[0], top[2]) == (160.0, -75.0)
 
 
 def test_spare_t18_footprint_is_on_flat_deck_not_raised_rim(monkeypatch):
-    teeth = dict(sprocket.CONFIGS)["T18"]
-    radius = sprocket.gear_facts(teeth, sprocket.DP_GEAR, sprocket.PA_DEG)["Ra"]
-    radius *= sprocket.IN
-    for x, y, z in product(
-        (-radius, radius), (-radius, radius), (0.0, sprocket.FACE_WIDTH)
-    ):
+    radius = sprocket.outside_dia(sprocket.TEETH["T18"]) / 2.0
+    for x, y, z in product((-radius, radius), (-radius, radius), (0.0, sprocket.PLATE)):
         world = _spare_world_point(monkeypatch, [x, y, z])
         assert abs(world[0]) < base.TOP_LENGTH / 2.0 - base.LIP_W
         assert abs(world[2]) < base.TOP_WIDTH / 2.0 - base.LIP_W
@@ -75,11 +69,7 @@ def test_spare_t18_footprint_is_on_flat_deck_not_raised_rim(monkeypatch):
 def test_spare_storage_clears_nameplate_envelope_by_five_mm(monkeypatch):
     # Native top gate rejected the first deck-seating candidate: retaining
     # X=160/Z=-15 intersected the brass nameplate by 605.55 mm^3.
-    teeth = dict(sprocket.CONFIGS)["T18"]
-    radius = (
-        sprocket.gear_facts(teeth, sprocket.DP_GEAR, sprocket.PA_DEG)["Ra"]
-        * sprocket.IN
-    )
+    radius = sprocket.outside_dia(sprocket.TEETH["T18"]) / 2.0
     plate_corners = [
         nameplate.mount_point(point)
         for point in product(
@@ -91,7 +81,7 @@ def test_spare_storage_clears_nameplate_envelope_by_five_mm(monkeypatch):
     spare_max_z = max(
         _spare_world_point(monkeypatch, [x, y, z])[2]
         for x, y, z in product(
-            (-radius, radius), (-radius, radius), (0.0, sprocket.FACE_WIDTH)
+            (-radius, radius), (-radius, radius), (0.0, sprocket.PLATE)
         )
     )
     assert spare_max_z <= min(point[2] for point in plate_corners) - 5.0

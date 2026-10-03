@@ -979,7 +979,6 @@ def test_head_neighbours_are_each_proved_by_a_named_assembly_assert() -> None:
     source = Path(assembly.__file__).read_text(encoding="utf-8")
     for message in (
         "integral grip-head band reaches the crank hub",
-        "integral grip head reaches the T12 chain wheel",
         "lever throw plane reaches the integral grip head",
         'f"integral grip-head band reaches the {_what}"',
         "grip crossrod is not centred in the integral head",

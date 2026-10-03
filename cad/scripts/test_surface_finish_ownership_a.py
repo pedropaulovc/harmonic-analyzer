@@ -176,6 +176,11 @@ CASES = (
                     / 2.0,
                 ),
             ),
+            SurfaceFinishControl(
+                "collar_rear_face",
+                MACHINED_UM,
+                PlanarFace((0, 1, 0), crankshaft_spec.COLLAR_REAR),
+            ),
         ),
     ),
     (

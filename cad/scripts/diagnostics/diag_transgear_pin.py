@@ -1,13 +1,14 @@
 r"""Diagnostic: instrument the transgear-removable pin-hole dim failure in situ.
 
 Replays the full build with ``_common.dimension_between`` patched to dump
-sketch state, over-defining relations, and fallback attempts the moment the
-``horizontal_distance pin hole +X`` dim fails (minimal repro attempts on a
-bare/disc part all PASS — the failure needs the real gear context).
+sketch state, over-defining relations, and fallback attempts the moment a
+bore+pins centre dim fails (the ``vertical_distance pin hole PinPos`` /
+``PinNeg`` dims of the drive-pin holes on local +/-Y; minimal repro attempts
+on a bare/disc part all PASS — the failure needs the real toothed context).
 
 Run (SolidWorks already open)::
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diag_transgear_pin.py
+    uv run python cad\scripts\diagnostics\diag_transgear_pin.py
 """
 
 from __future__ import annotations

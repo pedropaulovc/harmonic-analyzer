@@ -600,6 +600,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="transgear_removable",
+        part="transgear_removable",
+        artifact_stem="transgear-removable",
+        script_name="draw_transgear_removable.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="cone_gear_shaft",
         part="cone_gear_shaft",
         artifact_stem="cone-gear-shaft",
@@ -646,6 +653,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="crankshaft",
         artifact_stem="crankshaft",
         script_name="draw_crankshaft.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_seat_washer",
+        part="crank_seat_washer",
+        artifact_stem="crank-seat-washer",
+        script_name="draw_crank_seat_washer.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -751,6 +765,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="pinion_strap_pin",
         artifact_stem="pinion-strap-pin",
         script_name="draw_pinion_strap_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_seat_drive_pin",
+        part="crank_seat_drive_pin",
+        artifact_stem="crank-seat-drive-pin",
+        script_name="draw_crank_seat_drive_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="transgear_knob_drive_pin",
+        part="transgear_knob_drive_pin",
+        artifact_stem="transgear-knob-drive-pin",
+        script_name="draw_transgear_knob_drive_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

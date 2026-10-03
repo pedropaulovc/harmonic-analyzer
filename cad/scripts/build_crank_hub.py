@@ -1,9 +1,10 @@
 r"""Build separate through hub MHA-137.
 
 The local +Y axis runs inboard from the arm's outboard face.  The O19.4 seat is
-flush through the 8-mm arm; the O25.4 rear barrel supplies the inboard shoulder
+flush through the 8-mm arm; the O22.25 rear barrel supplies the inboard shoulder
 and carries the removable MHA-024 hub-to-shaft cross-hole, located from that
-shoulder.  MHA-138 is an axial
+shoulder; behind it a O16.5 relief turned to the rear face lets the #25 chain
+plates wrapping the crank T12 pass.  MHA-138 is an axial
 seam groove at local +Z (six o'clock after assembly), match-reamed through arm
 and hub for only half the arm thickness.
 """
@@ -44,6 +45,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _features import lens_area
 from _fit_limits import deviations
@@ -53,6 +55,7 @@ from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from crank_hub_geometry import (
     AXIAL_PIN_DIA,
+    HUB_LENGTH_TOL,
     AXIAL_PIN_LENGTH,
     AXIAL_PIN_RADIUS_FROM_AXIS,
 )
@@ -72,6 +75,10 @@ from crank_hub_spec import (
     SERVICE_PIN_HOLE_SPEC,
     SERVICE_PIN_STATION,
     SURFACE_FINISHES,
+    RELIEF_DIA,
+    RELIEF_LENGTH,
+    RELIEF_LENGTH_TOL,
+    RELIEF_STATION,
 )
 
 
@@ -79,11 +86,13 @@ PART_NAME = "crank-hub"
 MATERIAL = "Plain Carbon Steel"
 SEAT_R = HUB_SEAT_DIA / 2.0
 BARREL_R = HUB_BARREL_DIA / 2.0
+RELIEF_R = RELIEF_DIA / 2.0
 BORE_R = HUB_BORE_DIA / 2.0
 PIN_R = AXIAL_PIN_DIA / 2.0
 V_BODY = math.pi * (
     SEAT_R**2 * HUB_SEAT_LENGTH
-    + BARREL_R**2 * (HUB_LENGTH - HUB_SEAT_LENGTH)
+    + BARREL_R**2 * HUB_BARREL_LENGTH
+    + RELIEF_R**2 * RELIEF_LENGTH
 )
 V_BORE = math.pi * BORE_R**2 * HUB_LENGTH
 V_SEAM_GROOVE = lens_area(PIN_R, SEAT_R) * AXIAL_PIN_LENGTH
@@ -103,10 +112,12 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
     for name, value in (
-        ("BarrelLength", HUB_BARREL_LENGTH),
+        ("HubLength", HUB_LENGTH),
         ("SeatLength", HUB_SEAT_LENGTH),
         ("SeatDia", HUB_SEAT_DIA),
         ("BarrelDia", HUB_BARREL_DIA),
+        ("ReliefLength", RELIEF_LENGTH),
+        ("ReliefDia", RELIEF_DIA),
         ("BoreDia", HUB_BORE_DIA),
         ("ServicePinFromShoulder", SERVICE_PIN_FROM_SHOULDER),
         ("AxialPinDia", AXIAL_PIN_DIA),
@@ -116,7 +127,7 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Stepped sleeve profile about local +Y.
+    # Stepped sleeve profile about local +Y: seat, barrel, rear relief.
     profile = SketchDims()
     check("create_sketch hub profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -128,7 +139,9 @@ async def build(adapter) -> dict[str, str]:
         (SEAT_R, 0.0),
         (SEAT_R, HUB_SEAT_LENGTH),
         (BARREL_R, HUB_SEAT_LENGTH),
-        (BARREL_R, HUB_LENGTH),
+        (BARREL_R, RELIEF_STATION),
+        (RELIEF_R, RELIEF_STATION),
+        (RELIEF_R, HUB_LENGTH),
         (0.0, HUB_LENGTH),
     ]
     lines = await add_line_chain(adapter, points)
@@ -150,19 +163,43 @@ async def build(adapter) -> dict[str, str]:
     )
     profile.record("SeatDia", '"SeatDia"')
     await add_diametric_linear_dimension(
-        adapter, axis, lines[3], (BARREL_R + 4.0, (HUB_SEAT_LENGTH + HUB_LENGTH) / 2.0), "BarrelDia"
+        adapter,
+        axis,
+        lines[3],
+        (BARREL_R + 4.0, (HUB_SEAT_LENGTH + RELIEF_STATION) / 2.0),
+        "BarrelDia",
     )
     profile.record("BarrelDia", '"BarrelDia"')
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        lines[5],
+        (RELIEF_R + 4.0, (RELIEF_STATION + HUB_LENGTH) / 2.0),
+        "ReliefDia",
+    )
+    profile.record("ReliefDia", '"ReliefDia"')
     check(
         "seat length",
         await adapter.add_sketch_dimension(lines[1], None, "linear", HUB_SEAT_LENGTH),
     )
     profile.record("SeatLength", '"SeatLength"')
-    check(
-        "barrel length",
-        await adapter.add_sketch_dimension(lines[3], None, "linear", HUB_BARREL_LENGTH),
+    # The overall, front face to rear face (outer corners, where the
+    # drawing's extension lines rise): the barrel's length is its remainder
+    # and is not printed.
+    await dimension_between(
+        adapter,
+        f"{lines[1]}.start",
+        f"{lines[6]}.start",
+        "vertical_distance",
+        HUB_LENGTH,
+        "hub overall length",
     )
-    profile.record("BarrelLength", '"BarrelLength"')
+    profile.record("HubLength", '"HubLength"')
+    check(
+        "relief length",
+        await adapter.add_sketch_dimension(lines[5], None, "linear", RELIEF_LENGTH),
+    )
+    profile.record("ReliefLength", '"ReliefLength"')
     await ensure_fully_defined(adapter, "hub profile")
     check("exit_sketch hub profile", await adapter.exit_sketch())
     name_last_feature(adapter, "HubProfile")
@@ -335,6 +372,15 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(HUB_BORE_BAND)
+    )
+    # The overall and the relief length place the relief shoulder and the
+    # rear face the #25 chain and the removable clear, so both carry their
+    # functional band (crank_hub_geometry).
+    set_dimension_symmetric_tolerance(
+        adapter, "HubProfile", "HubLength", HUB_LENGTH_TOL
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "HubProfile", "ReliefLength", RELIEF_LENGTH_TOL
     )
     await volume_check(adapter, "driven crank hub", final_volume, 0.001 * final_volume)
     # Both datum planes stay selectable by name for the drive-train mates.

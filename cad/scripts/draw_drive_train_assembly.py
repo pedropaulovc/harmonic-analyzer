@@ -72,6 +72,11 @@ from crank_pinion_spec import (
     SEAT_FEELER_MM as PINION_SEAT_FEELER,
     T120_FITUP_ASSEMBLY_CHECK,
 )
+from crank_pinion_spec import SHAFT_END_RECESS_MAX as PINION_RECESS_MAX
+from crank_pinion_spec import SHAFT_END_RECESS_MIN as PINION_RECESS_MIN
+from crank_seat_washer_spec import GAP_MAX as WASHER_GAP_MAX
+from crank_seat_washer_spec import GAP_MIN as WASHER_GAP_MIN
+from crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 from keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 from drive_train_assembly_spec import (
     CLUSTERS,
@@ -242,17 +247,20 @@ BOM_SECOND_COLUMN_X = BOM_ANCHOR[0] + BOM_COLUMN_WIDTH + 0.008
 BOM_ROW_HEIGHT = 0.006
 BOM_HEIGHT_TOLERANCE = 1e-6
 BOM_SHEET_CLEARANCE = 0.003
-# Under the first BOM column, where sheet 6 already proved the same 1:8 view
-# and caption clear the sheet number; beside the BOM its centred caption ran
-# into the second column and past the right border.
-BOM_REFERENCE_ISO_CENTER = (0.110, 0.068)
+# The second column's right edge; the strip between it and the right note
+# field's edge is empty from the column tops down to the title block.
+BOM_RIGHT_EDGE = BOM_SECOND_COLUMN_X + BOM_COLUMN_WIDTH
 # The MHA-013 station pointer lives here, not in its BOM cell: on the grouped
 # 20-configuration row SolidWorks kept a written description only up to its
-# second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005).
+# second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005). Four
+# short lines, so the centred caption fits the strip right of the BOM: its
+# widest, "BALLOONS ON SHEETS 3-5", is ~54 mm at the 2.47 mm a character the
+# two-line caption printed (st19 dt-02).
 BOM_REFERENCE_CAPTION = (
-    f"REFERENCE 1:8 - BALLOONS ON SHEETS {min(CLUSTER_SHEETS.values())}-"
-    f"{max(CLUSTER_SHEETS.values())}\n"
-    f"MHA-013 CONE GEAR STATIONS: SHEET {FIT_SHEET}"
+    "REFERENCE 1:8\n"
+    f"BALLOONS ON SHEETS {min(CLUSTER_SHEETS.values())}-{max(CLUSTER_SHEETS.values())}\n"
+    "MHA-013 CONE GEAR\n"
+    f"STATIONS: SHEET {FIT_SHEET}"
 )
 
 # --- sheets 3-5: exploded cluster views --------------------------------------
@@ -306,6 +314,28 @@ NOTE_LINE_PITCH = 0.004525
 # package_note_fields lists every field and its blocks.
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
+# A 1:8 reference view's outline is ~49 mm tall (its ink ~31 mm square inside
+# it, st19 dt-02); this half-extent budgets it both ways.
+REFERENCE_ISO_HALF_OUTLINE = 0.0247
+# The BOM sheet's reference view stands in the empty strip right of the
+# second column, its caption seated over the title block. Under the first
+# column it was placed for 20 rows; at 27 (MHA-172/MHA-173 added) the
+# column's bottom row ran through it (st19 dt-02), and that field has no
+# room left for the view and its caption under a taller column. The strip is
+# empty up to the column tops, so the view rides BOM_REFERENCE_ISO_SLACK
+# higher than the caption needs: dt-02's caption put the outline 25.2 mm under
+# its centre, past the budget, and bom_reference_iso_violations refuses a
+# caption that would reach the title block.
+BOM_REFERENCE_ISO_SLACK = 0.008
+BOM_REFERENCE_ISO_CENTER = (
+    (BOM_RIGHT_EDGE + NOTE_FIELD_RIGHT[2]) / 2.0,
+    DRAWING_TEMPLATES[SPEC.layout].title_block_top_m
+    + BOM_SHEET_CLEARANCE
+    + len(BOM_REFERENCE_CAPTION.splitlines()) * NOTE_LINE_PITCH
+    + VIEW_CAPTION_GAP
+    + BOM_REFERENCE_ISO_SLACK
+    + REFERENCE_ISO_HALF_OUTLINE,
+)
 
 # --- sheet 10: the whole drive train, full detail ----------------------------
 # The view (outline only) must fit between the one-line heading and the title
@@ -367,6 +397,8 @@ BOM_PART_NUMBERS = {
     "crank-handle-pivot-screw": "MHA-139",
     "crank-hub": "MHA-137",
     "crank-hub-pin": "MHA-138",
+    "crank-seat-washer": "MHA-172",
+    "crank-seat-drive-pin": "MHA-173",
     "alignment-pinion": "MHA-002",
     "pinion-bracket": "MHA-056",
     "pinion-pivot-block": "MHA-061",
@@ -421,6 +453,8 @@ BOM_DESCRIPTIONS = {
     "crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
     "crank-hub": "CRANK HUB",
     "crank-hub-pin": "CRANK HUB AXIAL PIN",
+    "crank-seat-washer": "CRANK SEAT THRUST WASHER",
+    "crank-seat-drive-pin": "3/32 X 1/4 DOWEL PIN, MCMASTER 98381A434",
     "alignment-pinion": "ALIGNMENT PINION",
     "pinion-bracket": "PINION BRACKET STRAP",
     "pinion-pivot-block": "PINION PIVOT BLOCK",
@@ -510,41 +544,47 @@ CONE_CRANK_STEPS = "\n".join(
         "   MHA-097 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
+        # CONTRACT-crank: MHA-173 press to the blind-hole floor (their proud
+        # length is the result).  User ruling 2026-09-30 (MHA-172 floor 0.5):
+        # MHA-172 is faced to fit at assembly; it goes on from the rear end
+        # before the journal enters the bore, and MHA-025's pin is
+        # match-drilled, so the gap is taken in a trial fit before either
+        # (CRANK_WASHER_FIT_NOTES, sheet 8).
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
         # are feeler-checked against T120 before the pin is drilled.  The
         # pair may rub on T120 until that check closes, so the seat and the
         # check come first, turning by hand, and the free-running revolution
         # after them (Codex P2 on #1154, review 3).  The check's last line is
         # short; the step carries on after it.
-        "4. FIT MHA-026 DIRECTLY IN THE MHA-016 CRANK BORE. SLIDE MHA-025",
-        "   ON, NOT YET PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP.",
+        "4. PRESS 2X MHA-173 TO THE MHA-026 COLLAR HOLE FLOORS. FIT MHA-026 IN",
+        "   THE MHA-016 CRANK BORE; SLIDE MHA-025 ON UNPINNED, TOOTH IN GAP",
+        f"   WITH MHA-021. FIT MHA-172 PER SHEET {FIT_SHEET}. WITH MHA-172 SEATED,",
         f"   SET MHA-025 {PINION_SEAT_FEELER:.2f} OFF THE MHA-016 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
         "   TURN MHA-021 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
         "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL/REAM MHA-134 AT BOSS",
         "   MID-LENGTH WITH MHA-026, FLUSH BOTH SIDES; RE-CHECK NO BINDING.",
-        "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",
+        "5. PAPER-DRIVE T12 ON MHA-026 BEFORE THE ARM, HOLES OVER 2X MHA-173.",
         # U33 (user, 2026-09-23): crank hub MHA-137 pressed into the arm and
         # seam-pinned by MHA-138 (a 4 m6 dowel, 4.0 long = half the arm); the
         # MHA-024 cross-hole runs behind the arm through the hub barrel. The
         # handle rides the MHA-139 shoulder screw. Wording from crankhub.
         "6. PRESS MHA-137 INTO MHA-020 TO THE SHOULDER, FACES FLUSH.",
-        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-138 FLUSH.",
-        "   SLIDE ONTO MHA-026, SHAFT END FLUSH, PUNCH MARKS ALIGNED.",
-        "   TAPER-REAM 1:48 THROUGH HUB AND SHAFT; LIGHT-DRIVE MHA-024,",
-        "   REMOVABLE BY TAP ON SMALL END. HANG MHA-128 FROM THE PIN HEAD;",
-        "   CLAMP MHA-130 UNDER MHA-030.",
+        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-138 FLUSH. SLIDE",
+        f"   ONTO MHA-026, SET HUB FRONT FACE FLUSH WITH THE {HUB_FRONT_FACE_DATUM},",
+        "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
+        "   SHAFT; LIGHT-DRIVE MHA-024, REMOVABLE BY TAP ON SMALL END. HANG",
         # Codex #1140: the keeper chain's length and topology belong on the
         # sheet; the bead count is the spec's solve, never a typed number.
-        f"   CUT MHA-149 TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-130",
-        "   LOOP AND MHA-128; SNAP ONE END BEAD INTO EACH DOME OF MHA-150.",
+        "   MHA-128 FROM THE PIN HEAD; CLAMP MHA-130 UNDER MHA-030. CUT MHA-149",
+        f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-130 LOOP AND MHA-128; SNAP",
+        "   ONE END BEAD INTO EACH DOME OF MHA-150.",
         # Local review of 747487c71: the cup cures centred on the screw, or
         # its offset can bind the head and shoulder.
         "7. EPOXY MHA-152 ON THE MHA-022 TENON, MHA-153 IN ITS BUTT; CURE ON",
         "   THE WAXED MHA-139 THROUGH BOTH. FIT IT; SLIDE MHA-022 ON; THREAD IT",
-        "   INTO MHA-020 WITH LOCTITE 222, SHOULDER TIGHT; END PLAY 0.25-1.0.",
-        "   FILE THE TIP FLUSH WITH THE ARM'S INBOARD FACE; BREAK EDGE.",
-        f"   CYLINDER BANK: SHEET {BANK_SHEET}.",
+        "   INTO MHA-020, LOCTITE 222, SHOULDER TIGHT; END PLAY 0.25-1.0; FILE",
+        f"   TIP FLUSH TO ARM INBOARD FACE, BREAK EDGE. CYLINDER BANK: SHEET {BANK_SHEET}.",
     )
 )
 
@@ -851,6 +891,30 @@ FIT_PLACEHOLDER = "\n".join(
     )
 )
 
+# User ruling 2026-09-30 (MHA-172 floor 0.5): MHA-172 goes on from the rear
+# before MHA-026 enters the bore and MHA-025's pin is match-drilled, so the
+# gap is measured in a trial fit without either, at the pinion's feeler and
+# the shaft end's mid-window recess; the washer is faced to it and slid on,
+# and the parts refitted.  Seated, the washer leaves the feeler as the end
+# play, and the recess lands in the window the 16T boss was sized for.
+_RECESS_MID = (PINION_RECESS_MIN + PINION_RECESS_MAX) / 2.0
+CRANK_WASHER_FIT_NOTES = "\n".join(
+    (
+        f"MHA-172 THRUST WASHER FIT (STEP {steps.step_number('crank-mesh-checked')})",
+        "A. TRIAL FIT WITHOUT MHA-172, MHA-025 UNPINNED ON THE "
+        f"{PINION_SEAT_FEELER:.2f} FEELER,",
+        f"   MHA-026 END {_RECESS_MID:.2f} BELOW MHA-025 NORTH FACE: MEASURE MHA-026 "
+        "COLLAR",
+        "   REAR FACE TO MHA-016 BOSS SOUTH FACE "
+        f"({WASHER_GAP_MIN:.2f}-{WASHER_GAP_MAX:.2f}).",
+        "B. WITHDRAW BOTH. FACE MHA-172 TO THAT GAP; SLIDE IT ONTO MHA-026",
+        "   FROM THE REAR, FLAT ON THE COLLAR. REFIT MHA-026 AND MHA-025.",
+        "C. MHA-172 SEATED ON THE BOSS AND MHA-025 ON THE FEELER: MHA-026 END",
+        f"   {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-025 NORTH FACE, "
+        f"END PLAY {PINION_SEAT_FEELER:.2f}.",
+    )
+)
+
 
 # ============================ pure helpers ======================================
 
@@ -1129,6 +1193,35 @@ def bom_extent_violations(
     return violations
 
 
+def bom_reference_iso_violations(outline: tuple[float, ...]) -> list[str]:
+    """Name every way the BOM sheet's reference view, with its caption under
+    it, leaves the strip right of the BOM's second column."""
+    left, bottom, right, _top = outline
+    clearance = BOM_SHEET_CLEARANCE
+    violations = []
+    # The outline already pads the ink (~8 mm on dt-02), so meeting the column
+    # is the limit.
+    if left < BOM_RIGHT_EDGE:
+        violations.append(
+            f"left edge {left * 1000:.3f} mm enters the BOM's second column "
+            f"({BOM_RIGHT_EDGE * 1000:.3f} mm)"
+        )
+    field_right = NOTE_FIELD_RIGHT[2]
+    if right > field_right:
+        violations.append(
+            f"right edge {right * 1000:.3f} mm passes {field_right * 1000:.3f} mm"
+        )
+    caption_lines = len(BOM_REFERENCE_CAPTION.splitlines())
+    caption_bottom = bottom - VIEW_CAPTION_GAP - caption_lines * NOTE_LINE_PITCH
+    floor = DRAWING_TEMPLATES[SPEC.layout].title_block_top_m + clearance
+    if caption_bottom < floor - BOM_HEIGHT_TOLERANCE:
+        violations.append(
+            f"caption bottom {caption_bottom * 1000:.3f} mm enters the title block "
+            f"(floor {floor * 1000:.3f} mm)"
+        )
+    return violations
+
+
 def instance_counts(instances: Sequence[Instance]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for instance in instances:
@@ -1272,6 +1365,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 ("cone station table", station_table_text(facts.cone_rows())),
                 ("fit placeholder", FIT_PLACEHOLDER),
+                ("crank washer fit", CRANK_WASHER_FIT_NOTES),
             ),
         ),
         NoteField(
@@ -2337,6 +2431,9 @@ def _place_bom_view(adapter: Any) -> Any:
     )
     set_high_quality_shaded_with_edges(adapter, view, label="BOM reference isometric")
     _configure_view(adapter, view, exploded=False, label="BOM reference isometric")
+    violations = bom_reference_iso_violations(_view_outline(view))
+    if violations:
+        raise RuntimeError("BOM reference isometric: " + "; ".join(violations))
     return view
 
 

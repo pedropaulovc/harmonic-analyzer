@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -42,9 +43,22 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     assert "draw_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    functional_fits = {"ShaftDiaDim", "JournalDiaDim", "PinionSeatDiaDim"}
+    # Running/seat fits print at three places; the seat collar's functional
+    # bands (rule 12) at the places that hold them; the rest at one.
+    functional_places = {
+        "ShaftDiaDim": 3,
+        "JournalDiaDim": 3,
+        "PinionSeatDiaDim": 3,
+        "CollarDiaDim": 2,
+        "SpigotDiaDim": 2,
+        "SpigotLength": 2,
+        "CollarSeatStation": 2,
+        "CollarRearStation": 2,
+        "DrivePinOffset1": 3,
+        "DrivePinOffset2": 3,
+    }
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
-        assert places == (3 if name in functional_fits else 1), name
+        assert places == functional_places.get(name, 1), name
     assert spec.REFERENCE_DIMENSIONS <= marked
     assert spec.SPHERICAL_DIMENSIONS <= spec.REFERENCE_DIMENSIONS
 
@@ -79,7 +93,158 @@ def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
 
     post_boss_north = cone_line.cone_station(cone_line.POST_STATION)[2] - post.CRANK_BOSS_START_Z
     assert -183.0 + spec.POST_BORE_END == pytest.approx(post_boss_north)
-    assert part.SEAT_T12 < spec.POST_BORE_END
+
+
+def test_seat_collar_lands_the_wheel_seat_and_leaves_the_washer_its_fit() -> None:
+    # The collar's front is the Ø17.5 seat spigot, whose face is the removable
+    # sprocket's seat on the shared plane, stepping up to the Ø20.6 body; its
+    # rear face stands off the post boss by the gap MHA-172 is faced to fill,
+    # and stays short of the outboard journal land.
+    import build_drive_train_assembly as bdt
+    import cone_pivot_post_spec as post
+    import crank_seat_washer_spec as washer
+    import transgear_removable_spec as removable
+
+    assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
+    assert spec.SPIGOT_DIA == removable.SEAT_SPIGOT_DIA < spec.COLLAR_DIA
+    # Ruling 2026-09-30: spigot -154.3..-148.5; MHA-172 floor 0.5: body
+    # -148.5..-144.5.
+    assert bdt.CRANKSHAFT_Z0 + spec.SPIGOT_END == pytest.approx(-148.5)
+    # The blind drive-pin holes end in the spigot, short of its step.
+    assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.SPIGOT_END
+    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(-144.5)
+    # The gap from the post's own boss face, not the washer spec's chain.
+    boss_south = spec.POST_BORE_END - post.CRANK_BOSS_LENGTH
+    assert boss_south - spec.COLLAR_REAR == pytest.approx(washer.GAP_NOMINAL)
+    assert washer.GAP_MIN >= washer.THICKNESS_FLOOR - 1e-9
+    # The body keeps length at print-worst: both stations and the spigot.
+    body_worst = (
+        spec.COLLAR_LENGTH
+        - spec.SPIGOT_LENGTH
+        - 2.0 * spec.COLLAR_STATION_TOL
+        - spec.SPIGOT_LENGTH_TOL
+    )
+    assert body_worst > 0.0
+    assert spec.COLLAR_REAR + spec.COLLAR_STATION_TOL < spec.JOURNAL_START
+    # Bottomed dowels stand proud by the drive-train's pin length budget.
+    assert (
+        bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.crank_seat_drive_pin_spec.LENGTH
+        == (pytest.approx(removable.DRIVE_PIN_TIP_Z))
+    )
+
+
+_POLICY = (
+    Path(spec.__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
+)
+
+
+def _floor_2(value: float) -> float:
+    return math.floor(value * 100.0 + 1e-9) / 100.0
+
+
+def test_spigot_rim_is_the_named_exception_the_sheet_states() -> None:
+    # The drive-pin holes' rim to the Ø17.5 seat spigot is under the policy's
+    # wall floor (a named exception, MHA-026): the worst case of the printed
+    # bands is what the sheet states under the holes' callout and what the
+    # policy row records, rounded down so neither claims more rim than exists.
+    policy = _POLICY.read_text(encoding="utf-8")
+    floor = re.search(r"hard floor of \*\*(\d+(?:\.\d+)?) mm\*\*", policy)
+    assert floor
+    section = policy.split("\n## Named exceptions", 1)[1].split("\n## ", 1)[0]
+    rows = [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in section.splitlines()
+        if line.startswith("| MHA-026 ")
+    ]
+    (shortfall,) = [cells[1] for cells in rows if "spigot" in cells[0]]
+    recorded = re.search(
+        r"spigot rim (\d+\.\d\d) nominal, (\d+\.\d\d) at the worst case",
+        shortfall,
+        re.IGNORECASE,
+    )
+    assert recorded, shortfall
+    hole_r = spec.DRIVE_PIN_HOLE_DIA / 2.0
+    nominal = spec.SPIGOT_DIA / 2.0 - (spec.DRIVE_PIN_CIRCLE_RADIUS + hole_r)
+    worst = (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1]) / 2.0 - (
+        spec.DRIVE_PIN_CIRCLE_RADIUS
+        + spec.DRIVE_PIN_OFFSET_TOL
+        + hole_r
+        + spec.DRIVE_PIN_HOLE_BAND[0] / 2.0
+    )
+    rim = spec.DRIVE_PIN_SPIGOT_RIM_WORST
+    assert rim == _floor_2(worst)
+    assert 0.0 < rim < float(floor.group(1))
+    printed = re.search(r"SPIGOT RIM (\d+\.\d\d) MIN\.", notes.DRIVE_PIN_CALLOUT)
+    assert printed
+    assert float(printed.group(1)) == rim
+    assert float(recorded.group(2)) == rim
+    assert float(recorded.group(1)) == _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
+
+
+def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
+    # Machinist review of f7c9771b3: the bare 3.95 read under the title
+    # block's .XX and left 5.75 - 4.46 = 1.29 of spigot under the holes.  The
+    # callout carries the cut's own band, the one the proud stack reads.
+    assert notes.DRIVE_PIN_DEPTH_BAND == f"<MOD-PM>{spec.DRIVE_PIN_DEPTH_TOL:.2f}"
+    floor = (spec.SPIGOT_LENGTH - spec.SPIGOT_LENGTH_TOL) - (
+        spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
+    )
+    assert floor >= 1.5
+    band = notes.DRIVE_PIN_DEPTH_BAND
+    # The farm's native split: the process and diameter modifier in the
+    # prefix, the depth in a later compartment.
+    depth = "<HOLE-DEPTH> <hw-depth>"
+
+    def parts(prefix: str = "REAM <MOD-DIAM>", suffix: str = depth) -> dict:
+        return {5: prefix, 6: suffix, 7: "", 8: ""}
+
+    assert drawing._depth_banded_definition(parts(), band) == (6, f"{depth} {band}")
+    whole = "REAM <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
+    assert drawing._depth_banded_definition(parts(prefix=whole, suffix=""), band) == (
+        5,
+        f"{whole} {band}",
+    )
+    for broken in (
+        parts(suffix="THRU ALL"),
+        parts(suffix=f"{depth} {band}"),
+        parts(suffix=f"{depth} PRESS FIT"),
+        parts(suffix=f"<HOLE-DEPTH> 1.0 {depth}"),
+        parts(prefix=f"REAM {depth}"),
+        {5: "REAM <MOD-DIAM>", 6: depth},
+    ):
+        with pytest.raises(RuntimeError):
+            drawing._depth_banded_definition(broken, band)
+
+
+class _Sheet:
+    """A drawing document reporting one linear unit (swLengthUnit_e)."""
+
+    def __init__(self, unit: object) -> None:
+        self.unit = unit
+
+    def GetUserPreferenceIntegerValue(self, pref: int) -> object:
+        assert pref == drawing._SW_PREF_UNITS_LINEAR
+        return self.unit
+
+
+def test_typed_depth_band_refuses_a_non_mm_sheet() -> None:
+    # Codex P2 on #1151: the band is mm text after a native depth, so it is
+    # only true on a mm sheet; the callout variables that would carry it
+    # natively are unreachable on this cut-extrude callout (farm run
+    # 20261003T001156794Z).  An inch sheet must stop before the band is typed.
+    drawing._require_mm_sheet(_Sheet(0), "mm")  # swMM
+    for unit in (3, 1, None):  # swINCHES, swCM, an unread preference
+        with pytest.raises(RuntimeError, match="typed depth band is mm"):
+            drawing._require_mm_sheet(_Sheet(unit), "not mm")
+
+    class _Callout:
+        def GetText(self, part: int) -> str:
+            raise AssertionError("read the callout before the unit check")
+
+    with pytest.raises(RuntimeError, match="typed depth band is mm"):
+        drawing._band_hole_depth(
+            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, _Sheet(3), "inch sheet"
+        )
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
@@ -141,8 +306,45 @@ def test_horizontal_profile_and_left_end_view_are_third_angle_aligned() -> None:
     # *Bottom (X right, Z up) is then the true left view, on the same axis.
     assert drawing.SIDE_VIEW_ANGLE == pytest.approx(-math.pi / 2.0)
     assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
-    end_radius = spec.SHAFT_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    # The collar is the end view's largest circle.
+    end_radius = spec.COLLAR_DIA * drawing.SHEET_SCALE[0] / 2000.0
     assert drawing.END_CENTER[0] + end_radius < drawing.DOME_TIP_X
+
+
+# Measured on the 19e33c6c2 stack-top render (3.5 mm text, 2:1 sheet): the
+# "7.000 ±0.025" value is 27.5 mm wide, and the uppercase callout rows run
+# 2.75 mm a character ("SPROCKET MHA-081", 44 mm).
+_PIN_VALUE_TEXT_WIDTH = 0.0275
+_CALLOUT_CHAR_WIDTH = 0.00275
+
+
+def test_lower_pin_location_text_ends_before_the_dome_extension_lines() -> None:
+    # Machinist review of 19e33c6c2: the text block runs right from the
+    # dimension line beside the end view, and the old two-row callout carried
+    # the value and its mate note across the dome tip's and dome root's
+    # extension lines.  Every row must end, with air, before the dome tip.
+    x, _y = drawing.END_PIN_KEEP["DrivePinOffset2"]
+    rows = notes.DRIVE_PIN_LOCATION_CALLOUT.splitlines()
+    assert "MHA-081" in rows and "SPROCKET" in " ".join(rows)
+    block = max(
+        _PIN_VALUE_TEXT_WIDTH,
+        max(len(row) for row in rows) * _CALLOUT_CHAR_WIDTH,
+    )
+    assert x + block + 0.001 < drawing.DOME_TIP_X
+
+
+def test_blind_pin_holes_bottom_in_the_collar_body_not_the_spigot_end() -> None:
+    # Machinist review of 19e33c6c2 read 5.75 - 4.05 = 1.70 behind the holes,
+    # taking the 5.80 spigot step for the end of material.  The holes lie
+    # wholly inside the spigot, and the Ø20.6 body continues behind it to the
+    # rear face: the floor is the collar's worst-case length less the
+    # deepest hole, over the 2.0 wall target.
+    assert spec.DRIVE_PIN_CIRCLE_RADIUS + spec.DRIVE_PIN_HOLE_DIA / 2.0 < (
+        spec.SPIGOT_DIA / 2.0
+    )
+    collar_min = spec.COLLAR_LENGTH - 2.0 * spec.COLLAR_STATION_TOL
+    deepest = spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
+    assert collar_min - deepest >= 2.0
 
 
 def test_sheet_placements_stay_inside_the_border() -> None:
@@ -156,7 +358,10 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
         *(symbol for _, symbol in drawing.JOURNAL_FINISHES.values()),
+        drawing.COLLAR_REAR_FINISH[1],
+        drawing.DRIVE_PIN_CALLOUT_XY,
         *drawing.SIDE_KEEP.values(),
+        *drawing.END_PIN_KEEP.values(),
         *drawing.DIAMETER_POSITIONS.values(),
     ]
     for x, y in points:
@@ -182,9 +387,9 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         "outboard_journal": (spec.JOURNAL_START, spec.RELIEF_START),
         "inboard_journal": (spec.RELIEF_END, spec.JOURNAL_END),
     }
-    assert set(drawing.JOURNAL_FINISHES) == {control.key for control in spec.SURFACE_FINISHES}
+    journal_controls = [c for c in spec.SURFACE_FINISHES if c.key in lands]
     assert set(drawing.JOURNAL_FINISHES) == set(lands)
-    for control in spec.SURFACE_FINISHES:
+    for control in journal_controls:
         start, end = lands[control.key]
         assert control.roughness_um == MACHINED_UM
         assert control.face.diameter_mm == spec.JOURNAL_DIA
@@ -193,6 +398,43 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         assert drawing._sheet_x(start) < pick[0] < drawing._sheet_x(end)
         assert pick[1] == pytest.approx(drawing.JOURNAL_FLANK_Y)
         assert drawing._sheet_x(start) < symbol[0] < drawing._sheet_x(end)
+    # The collar's rear face runs on the thrust washer: its own control, its
+    # leader landing on that face's edge-on rim, at the collar's silhouette
+    # where SolidWorks lands a point on an edge-on circle.
+    (washer_face,) = [c for c in spec.SURFACE_FINISHES if c.key not in lands]
+    assert washer_face.key == "collar_rear_face"
+    pick, _symbol = drawing.COLLAR_REAR_FINISH
+    assert pick[0] == pytest.approx(drawing._sheet_x(washer_face.face.offset_mm))
+    assert pick[1] - drawing.SIDE_CENTER[1] == pytest.approx(
+        spec.COLLAR_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    )
+
+
+def test_shaft_diameter_callout_counts_every_bare_core_land() -> None:
+    # Machinist review of 8b5e1f354: the 2X Ø9.525 sat with three bare core
+    # lands in the side view and did not say which two it meant.  The core
+    # runs dome root to far end; the collar, the journal (its relief stays
+    # proud of the core) and the Ø9 seat cover the rest, as the build lays
+    # them, so the callout counts every land left bare.
+    covers = sorted(
+        [
+            (spec.SEAT_COLLAR, spec.SEAT_COLLAR + spec.COLLAR_LENGTH),
+            (spec.JOURNAL_START, spec.JOURNAL_START + spec.JOURNAL_LENGTH),
+            (spec.SEAT_STEP, spec.SHAFT_LENGTH),
+        ]
+    )
+    bare: list[tuple[float, float]] = []
+    edge = 0.0
+    for start, end in covers:
+        if start > edge:
+            bare.append((edge, start))
+        edge = max(edge, end)
+    assert edge == pytest.approx(spec.SHAFT_LENGTH)
+    assert spec.RELIEF_DIA > spec.SHAFT_DIA > spec.PINION_SEAT_DIA
+    assert [v for land in spec.SHAFT_CORE_LANDS for v in land] == pytest.approx(
+        [v for land in bare for v in land]
+    )
+    assert drawing.CALLOUTS_ABOVE["ShaftDiaDim"] == f"{len(bare)}X" == "3X"
 
 
 def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:

@@ -63,6 +63,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_crank_hub_pin.py",
         "draw_crank_pinion.py",
         "draw_crank_pinion_pin.py",
+        "draw_crank_seat_washer.py",
         "draw_crankshaft.py",
         "draw_cylinder_gear.py",
         "draw_cylinder_gear_shaft.py",
@@ -81,6 +82,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_post_mount_screw.py",
         "draw_rocker_thrust_washer.py",
         "draw_top_frame.py",
+        "draw_transgear_removable.py",
         "draw_tube_frame.py",
     }
 )

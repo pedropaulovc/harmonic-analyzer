@@ -43,6 +43,8 @@ recipes:
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 98296A027 | `pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
+| 98381A433 | `transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
+| 98381A434 | `crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 99607A213 | `pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_cone_lock_knob.py`
@@ -193,6 +195,19 @@ Catalog specifications checked on September 10, 2026:
   installed, a 1/16 in tube with the catalog wall. The page gives no slot
   or chamfer size, so the recipe models neither. No vendor SLDPRT has been
   harvested for it yet.
+- [98381A434](https://www.mcmaster.com/98381A434/) (`crank-seat-drive-pin`,
+  MHA-173, crank only) was read live on September 30, 2026: alloy steel dowel pin,
+  unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 1/4 in long, end shape
+  "Round x Chamfer". The page states neither the end radius nor the chamfer,
+  so `diag_build_98381A434.py` models the plain nominal cylinder. It is
+  catalogue-only: no vendor model is downloaded or kept, so it has no replica
+  gate, and its standalone diagnostic is a catalog-only run.
+- [98381A433](https://www.mcmaster.com/98381A433/) (`transgear-knob-drive-pin`,
+  MHA-155, the knob shaft's pair) was read live on September 30, 2026: alloy
+  steel dowel pin, unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 3/16 in
+  long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
+  models the plain nominal cylinder; catalogue-only, no vendor model, no
+  replica gate.
 
 - [3606T118](https://www.mcmaster.com/3606T118/) (`keeper-chain`, MHA-149)
   and [3606T811](https://www.mcmaster.com/3606T811/) (`keeper-chain-link`,
