@@ -3058,3 +3058,86 @@ def test_every_python_action_passes_doits_argument_rules():
             except Exception as problem:  # doit raises InvalidTask
                 refused.append(f"{task.name}: {problem}")
     assert not refused, "\n".join(refused)
+
+
+
+@pytest.fixture
+def isolated_export_keys(tmp_path, monkeypatch):
+    """Use discovered export dependencies, but mutate only their isolated copies."""
+    import export_models
+
+    dodo = _load_dodo()
+    monkeypatch.setattr(dodo, "_cad_identity_deps", lambda: [])
+    deps = dodo._export_file_deps()
+    root = tmp_path / "repo"
+    copied = []
+    for source in deps:
+        original = Path(source)
+        destination = root / original.relative_to(REPO_ROOT)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(original.read_bytes())
+        copied.append(str(destination))
+    monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
+    monkeypatch.setattr(dodo, "_export_requirement_deps", lambda: copied)
+    monkeypatch.setattr(export_models, "_import_dodo", lambda: dodo)
+    monkeypatch.setattr(export_models, "__file__", str(root / "cad/scripts/export_models.py"))
+
+    def snapshot():
+        return (
+            dodo._cache_key(copied, "export"),
+            export_models._exporter_digest(),
+        )
+
+    return root, snapshot
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "export_features.py", "_export_feature_faces.py", "_part_pmi.py",
+        "rocker_arm_spec.py", "rocker_bank_layout.py", "draw_rocker_arm.py",
+    ],
+)
+def test_export_face_naming_inputs_invalidate_outer_key_and_internal_ledger(
+    isolated_export_keys, source,
+):
+    root, snapshot = isolated_export_keys
+    before = snapshot()
+    member = root / "cad/scripts" / source
+    with member.open("a", encoding="utf-8") as stream:
+        stream.write("\nFEATURE_EXPORT_INPUT_REVISION = 2\n")
+
+    after = snapshot()
+
+    assert after[0] != before[0], source
+    assert after[1] != before[1], source
+
+
+def test_feature_cache_and_status_share_the_parsed_yaml_key(tmp_path, monkeypatch):
+    dodo = _load_dodo()
+    source = tmp_path / "drawing.yaml"
+    source.write_text("diameter: 6.5\n", encoding="utf-8")
+    deps = [str(source)]
+    label = "package:features"
+    probes = []
+    messages = []
+    monkeypatch.setattr(dodo, "_cache_rows", lambda: [(label, deps)])
+    monkeypatch.setattr(dodo._cache, "probe", lambda key: (probes.append(key), False)[1])
+    monkeypatch.setattr(dodo._cache, "last_stored_key", lambda _label: None)
+    for level in ("info", "warn", "success", "debug"):
+        monkeypatch.setattr(dodo._telemetry, level, messages.append)
+
+    before = dodo._cache_key(deps, label)
+    dodo._cache_status([label])
+    source.write_text("# Authored value unchanged.\ndiameter: 6.500\n", encoding="utf-8")
+    unchanged = dodo._cache_key(deps, label)
+    dodo._cache_status([label])
+    source.write_text("diameter: 6.6\n", encoding="utf-8")
+    changed = dodo._cache_key(deps, label)
+    dodo._cache_status([label])
+
+    assert unchanged == before
+    assert changed != before
+    assert probes == [before, unchanged, changed]
+    assert f"MISS {before[:12]}  {label}" in messages
+    assert f"MISS {changed[:12]}  {label}" in messages

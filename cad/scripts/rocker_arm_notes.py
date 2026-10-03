@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from rocker_arm_spec import (
     ARM_DEPTH,
+    ARM_THICKNESS,
     BOT_ARC_LEN,
     CENTER_Y,
     PIVOT_MID_Y,
@@ -50,6 +51,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "TopEdgeReference": {"TopAbovePivot"},
 }
 
+# Decimal classes already authored by the part; shared with the offline
+# requirement exporter. The remaining dimensions/notes print at two places.
+DEFAULT_DRAWING_PRECISION = 2
+DRAWING_PRECISION = {
+    "Hub": {"HubLength": 3},
+    "TopEdgeReference": {"TopAbovePivot": DEFAULT_DRAWING_PRECISION},
+}
+
+# BUILT_UP_PERMISSION_NOTE may be supplied only as exact explicit permission
+# text in DRAWING_NOTES. None/absence means one_piece, never inferred permission.
+BUILT_UP_PERMISSION_NOTE = None
+
 DRAWING_NOTES = "\n".join(
     (
         # r743-3: the 21-line block rendered 0.76 over NOTES_CEILING; notes
@@ -57,22 +70,24 @@ DRAWING_NOTES = "\n".join(
         # full line of headroom at the measured pitch).
         "1. MIRROR-SYMMETRIC ABOUT THE PIVOT AXIS;",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",
-        "2. STRAP 2.50 THICK; ALL HOLES THRU.",
-        f"3. TOP EDGE R{R_TOP:.2f}, BOTTOM EDGE R{R_BOTTOM:.2f},",
+        f"2. STRAP {ARM_THICKNESS:.{DEFAULT_DRAWING_PRECISION}f} THICK; ALL HOLES THRU.",
+        f"3. TOP EDGE R{R_TOP:.{DEFAULT_DRAWING_PRECISION}f}, "
+        f"BOTTOM EDGE R{R_BOTTOM:.{DEFAULT_DRAWING_PRECISION}f},",
         "   CONCENTRIC; COMMON CENTRE ON THE",
-        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.2f} REF FROM THE PIVOT",
-        f"   AXIS (STRAP DEPTH {ARM_DEPTH:.2f} REF).",
-        f"4. ARC LENGTHS {TOP_ARC_LEN:.2f} TOP / {BOT_ARC_LEN:.2f} BOTTOM",
+        f"   MIRROR AXIS, {CENTER_Y - PIVOT_MID_Y:.{DEFAULT_DRAWING_PRECISION}f} REF FROM THE PIVOT",
+        f"   AXIS (STRAP DEPTH {ARM_DEPTH:.{DEFAULT_DRAWING_PRECISION}f} REF).",
+        f"4. ARC LENGTHS {TOP_ARC_LEN:.{DEFAULT_DRAWING_PRECISION}f} TOP / "
+        f"{BOT_ARC_LEN:.{DEFAULT_DRAWING_PRECISION}f} BOTTOM",
         "   DEFINE THE ARC ENDPOINTS.",
-        f"5. EACH END: {TIP_FACE:.2f} RADIAL LAND PERP TO",
+        f"5. EACH END: {TIP_FACE:.{DEFAULT_DRAWING_PRECISION}f} RADIAL LAND PERP TO",
         "   TOP EDGE; STRAIGHT TAPER TO BOTTOM ARC.",
         # REAM is the fit bore's process requirement (policy rule 6); its
         # +0.03/0 band rides the O6.50 natively and its Ra the bore's symbol.
         "6. PIVOT HOLE: REAM.",
-        f"7. INTEGRAL HUB DIA {HUB_DIA:.2f}, CENTRED ON THE",
+        f"7. INTEGRAL HUB DIA {HUB_DIA:.{DEFAULT_DRAWING_PRECISION}f}, CENTRED ON THE",
         "   STRAP: THE HUBS SET THE STATION PITCH",
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
-        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.2f} (TURN HUB AND REAM",
+        f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f} (TURN HUB AND REAM",
         "   BORE IN ONE SETUP).",
     )
 )

@@ -620,6 +620,8 @@ def _stage_name(label: str) -> str:
         return "verify-" + label.split(":", 2)[1]
     if label.startswith("verify "):
         return "verify-" + label.split(None, 2)[1]
+    if label.startswith("check:traveler_"):
+        return "check-traveler"
     if label.startswith("check "):
         return "check-" + label.split(None, 2)[1]
     if label.startswith("cut release") or label in ("release", "package:release"):
@@ -628,7 +630,7 @@ def _stage_name(label: str) -> str:
         return "preflight"
     if label == "gallery":
         return "gallery"
-    if label.startswith("export"):
+    if label.startswith(("export", "package:features")):
         return "export"
     return "harmonic-analyzer"
 
@@ -1387,13 +1389,11 @@ _CHECK_NAMES = (
     # Threaded-joint retention (drawing-simplicity-policy rule 9). Audit-only
     # while joint_retention.ENFORCEMENT is AUDIT: it reports, never fails.
     "joint_retention",
+    "traveler_rocker_arm",
 )
-# Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
-# depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
-# through a mock SolidWorks to pin span SHAPE (~20-30 s, ~20x the other offline
-# checks) and has never caught a product defect -- so it is off the every-build
-# required path. Union of both MUST match task_check's specs keys.
-_OPTIONAL_CHECK_NAMES = ("verify_telemetry",)
+# Checks outside the every-build set. verify_telemetry is opt-in;
+# features_bound is required only by release. Union must match the specs.
+_OPTIONAL_CHECK_NAMES = ("verify_telemetry", "features_bound")
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str, task: str) -> None:
@@ -2001,8 +2001,41 @@ def _preflight_file_deps() -> list[str]:
 
 
 def _export_file_deps() -> list[str]:
-    """Neutral-export inputs: the exporter plus every model's exact identity."""
-    return [str(EXPORT_PY), *_cad_identity_deps()]
+    """Exporter source/config closure plus every model's exact identity."""
+    return [*_export_requirement_deps(), *_cad_identity_deps()]
+
+
+def _export_requirement_deps() -> list[str]:
+    """Source/config closure for the exporter and its named-face requirements."""
+    from export_features import SUPPORTED_PARTS, source_paths
+
+    return sorted({
+        str(EXPORT_PY),
+        *module_deps_of(EXPORT_PY),
+        *(path for stem in SUPPORTED_PARTS
+          for path in _config_deps(SCRIPTS_DIR / "export_features.py", stem, "part")),
+        *(str(path.resolve()) for path in source_paths()),
+    })
+
+
+def _feature_export_file_deps() -> list[str]:
+    from export_features import SUPPORTED_PARTS
+
+    return [
+        *_export_requirement_deps(),
+        *(path for stem in SUPPORTED_PARTS
+          for path in (_sldprt(stem), _part_execution_token(stem))),
+    ]
+
+
+def _feature_export_outputs() -> list[Path]:
+    from export_features import SUPPORTED_PARTS
+
+    return [
+        (CAD_OUT / "features" / stem / name).resolve()
+        for stem in SUPPORTED_PARTS
+        for name in (f"{stem.replace('_', '-')}.STEP", "features.toml")
+    ]
 
 
 def _export_cache_outputs() -> list[Path]:
@@ -2920,6 +2953,9 @@ def task_check():
         SCRIPTS_DIR / "test_cut_release_version.py",
         SCRIPTS_DIR / "test_trim_renders.py",
         SCRIPTS_DIR / "test_export_models.py",
+        SCRIPTS_DIR / "test_export_features.py",
+        SCRIPTS_DIR / "test_export_feature_faces.py",
+        SCRIPTS_DIR / "test_features_bound.py",
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
@@ -3482,6 +3518,42 @@ def task_check():
                 str(REPORTS / "joint-retention.md"),
             ],
         },
+        "traveler_rocker_arm": {
+            "file_dep": [
+                str((REPO_ROOT / "cad/process/rocker_arm/plan.toml").resolve()),
+                *(str((REPO_ROOT / "cad/process/shop" / name).resolve())
+                  for name in ("inventory.toml", "shop-policy.toml", "cutting-data.toml")),
+                str((CAD_OUT / "features/rocker_arm/features.toml").resolve()),
+                str((CAD_OUT / "features/rocker_arm/rocker-arm.STEP").resolve()),
+                str((REPO_ROOT / "pyproject.toml").resolve()),
+                str((REPO_ROOT / "uv.lock").resolve()),
+                str((REPO_ROOT / "dodo.py").resolve()),
+                str((SCRIPTS_DIR / "_telemetry.py").resolve()),
+            ],
+            "cmd": [
+                sys.executable, str(SCRIPTS_DIR / "check_traveler.py"),
+                str(REPO_ROOT / "cad/process/rocker_arm/plan.toml"),
+                "--out", str(REPORTS / "traveler_rocker_arm"),
+            ],
+            "label": "check:traveler_rocker_arm",
+            "task_dep": ["package:features"],
+            "targets": [
+                str(REPORTS / "traveler_rocker_arm/report.json"),
+                str(REPORTS / "traveler_rocker_arm/traveler.html"),
+            ],
+        },
+        "features_bound": {
+            "file_dep": [
+                str((SCRIPTS_DIR / "features_bound.py").resolve()),
+                *(_export_requirement_deps()),
+                *(str(path) for path in _feature_export_outputs()),
+                *(str((CAD_OUT / "step" / path.name).resolve())
+                  for path in _feature_export_outputs() if path.suffix == ".STEP"),
+            ],
+            "task_dep": ["package:features", "export"],
+            "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
+                    "--out", str(CAD_OUT)],
+        },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
     # spec added here without the matching name (or vice versa) would silently never run
@@ -3513,10 +3585,14 @@ def task_check():
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
+            "task_dep": spec.get("task_dep", []),
             "uptodate": spec.get("uptodate", []),
             "targets": [stamp, *spec.get("targets", [])],
             "actions": [
-                (_run_stamped, [spec["cmd"], f"check {name}", stamp, f"check:{name}"])
+                (_run_stamped, [
+                    spec["cmd"], spec.get("label", f"check {name}"),
+                    stamp, f"check:{name}",
+                ])
             ],
             "clean": True,
             "verbosity": 2,
@@ -3549,10 +3625,8 @@ def task_export():
             str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve()),
             str((REPORTS / "release-neutral.json").resolve()),
         ],
-        # REAL gate edge (was implicit via the spine): export writes the neutral
-        # formats a release ships, which must NOT be generated from a model that
-        # then fails soundness/kinematics. So export waits on the SW verify gates --
-        # a genuine dependency, not a serialization hack.
+        # Neutral release formats require soundness and kinematics, independent
+        # of the separately produced requirements bundles.
         "task_dep": ["verify:soundness", "verify:kinematics"],
         "uptodate": [False],
         # --record-digests: this runs AFTER every part/assembly is (re)built (its
@@ -3659,7 +3733,12 @@ def task_preflight():
 
 
 def task_package():
-    """``package:release`` -- the COM half of a release: SolidWorks Pack-and-Go of
+    """COM packages with distinct, cache-keyed leaf payloads.
+
+    ``package:features`` exports isolated STEP/requirements bundles for three
+    native parts. It never writes the full export's paths or ledgers.
+
+    ``package:release`` is the COM half of a release: SolidWorks Pack-and-Go of
     the top assembly and of every native drawing, merged and de-duplicated into
     ``cad/out/release/native/`` with a ``native-package.json`` sidecar carrying the
     document revision and the per-drawing source lists.
@@ -3668,6 +3747,22 @@ def task_package():
     Pack-and-Go (locally, or as ONE farm leaf), and cut_release.py then only copies
     the prepared tree. OPT-IN -- only `release` depends on it.
     """
+    from export_features import SUPPORTED_PARTS
+
+    feature_deps = _feature_export_file_deps()
+    yield {
+        "name": "features",
+        "file_dep": feature_deps,
+        "targets": [str(path) for path in _feature_export_outputs()],
+        "uptodate": [False],
+        "actions": [(_cached_com_action, [
+            "package:features",
+            [sys.executable, str(EXPORT_PY), "--features", *SUPPORTED_PARTS],
+            feature_deps, _feature_export_outputs(), "package-features",
+        ])],
+        "verbosity": 2,
+    }
+
     deps = _package_file_deps()
     native = _package_cache_outputs()[0]
     yield {
@@ -3732,6 +3827,7 @@ def task_release():
             "gallery",
             "package:release",
             "preflight",
+            "check:features_bound",
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),
@@ -3808,6 +3904,7 @@ def _cache_rows() -> list[tuple[str, list[str]]]:
     rows.append(("verify:kinematics", _kinematics_file_deps()))
     rows.append(("preflight", _preflight_file_deps()))
     rows.append(("export", _export_file_deps()))
+    rows.append(("package:features", _feature_export_file_deps()))
     rows.append(("package:release", _package_file_deps()))
     return rows
 

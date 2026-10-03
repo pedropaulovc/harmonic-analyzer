@@ -854,30 +854,44 @@ def test_sanitize_glb_honours_khr_texture_transform_tex_coord(tmp_path: Path) ->
     assert clone["occlusionTexture"]["index"] == 2
 
 
-def test_exporter_digest_is_checkout_eol_independent() -> None:
-    """The export-freshness sentinel must be identical on a CRLF and an LF checkout.
+@pytest.mark.parametrize(
+    ("change", "reusable"),
+    [
+        ("line-endings", True),
+        ("yaml-comment", True),
+        ("yaml-value", False),
+        ("face-name", False),
+    ],
+)
+def test_exporter_ledger_reuses_only_equivalent_naming_inputs(
+    tmp_path: Path, monkeypatch, change: str, reusable: bool,
+) -> None:
+    dodo = export_models._import_dodo()
+    exporter = tmp_path / "export_models.py"
+    naming = tmp_path / "_export_feature_faces.py"
+    config = tmp_path / "requirements.yaml"
+    exporter.write_bytes(b"EXPORT_REVISION = 1\n")
+    naming.write_bytes(b"FACE_NAME_PREFIX = 'HAF_'\n")
+    config.write_bytes(b"bore_diameter_mm: 6.5\n")
+    deps = [str(path) for path in (exporter, naming, config)]
+    monkeypatch.setattr(export_models, "__file__", str(exporter))
+    monkeypatch.setattr(export_models, "_import_dodo", lambda: dodo)
+    monkeypatch.setattr(dodo, "_export_requirement_deps", lambda: deps)
+    monkeypatch.setattr(export_models, "SRC_DIGESTS", tmp_path / "export-src.json")
+    ledger = {"rocker-arm": "model-recipe"}
+    export_models.save_src_digests(ledger)
 
-    It is compared ACROSS machines: a farm worker runs `export` and publishes
-    `export-src.json`, the submitter restores it from the remote cache and decides
-    whether the recorded per-mesh digests are trustworthy. Hashing raw bytes made a
-    worker's LF checkout disagree with the submitter's CRLF one for byte-for-byte
-    identical code, so EVERY farm-produced ledger read as "written by a foreign
-    exporter": the submitter silently re-exported everything and the comparison
-    gallery's freshness check failed on a current tree (v36's release, 2026-09-18).
+    if change == "line-endings":
+        for path in (exporter, naming, config):
+            path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+    elif change == "yaml-comment":
+        config.write_bytes(b"# Same naming dimensions.\nbore_diameter_mm: 6.500\n")
+    elif change == "yaml-value":
+        config.write_bytes(b"bore_diameter_mm: 6.6\n")
+    else:
+        naming.write_bytes(b"FACE_NAME_PREFIX = 'HAG_'\n")
 
-    Pin the property directly: the digest equals the md5 of the LF-canonical closure
-    bytes, so it cannot regress to raw bytes without this failing.
-    """
-    import hashlib
-
-    from _buildgraph import module_deps_of
-
-    self_path = Path(export_models.__file__).resolve()
-    files = sorted({self_path, *(Path(p).resolve() for p in module_deps_of(self_path))})
-    expected = hashlib.md5()
-    for path in files:
-        expected.update(path.read_bytes().replace(b"\r\n", b"\n"))
-    assert export_models._exporter_digest() == expected.hexdigest()
+    assert export_models.load_src_digests() == (ledger if reusable else {})
 
 
 def test_canonical_file_bytes_cleans_text_but_never_binary(tmp_path: Path) -> None:

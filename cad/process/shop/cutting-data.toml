@@ -1,0 +1,54 @@
+# Copied from https://github.com/pedropaulovc/prechips/blob/0dd7614/examples/cutting-data.toml
+# Inventory verification flags and author-choice process proposals are unchanged.
+# Versioned reference table. No Handbook page was available to transcribe.
+# PLAN.md's 90 sfm / 0.05 mm example is a layout sketch, not source evidence.
+# Every dependent speed/feed and physics value therefore remains unknown.
+revision = 1
+
+[aliases]
+"1018 CRS" = "low_carbon_steel"
+"1018 low-carbon steel" = "low_carbon_steel"
+"AISI 1018 cold-finished steel bar, Ø10" = "low_carbon_steel"
+"Plain Carbon Steel" = "low_carbon_steel"
+
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+operation = "face"
+diameter_range = "unknown"
+sfm = "unknown"
+chip_load_mm_per_tooth = "unknown"
+cite = "unknown"
+
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+operation = "profile"
+diameter_range = "unknown"
+sfm = "unknown"
+chip_load_mm_per_tooth = "unknown"
+cite = "unknown"
+
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+operation = "drill"
+diameter_range = "unknown"
+sfm = "unknown"
+chip_load_mm_per_tooth = "unknown"
+cite = "unknown"
+
+[[cut]]
+material_class = "low_carbon_steel"
+tool_material = "HSS"
+operation = "ream"
+diameter_range = "unknown"
+sfm = "unknown"
+chip_load_mm_per_tooth = "unknown"
+cite = "unknown"
+
+[[material]]
+material_class = "low_carbon_steel"
+kc_n_per_mm2 = "unknown"
+e_gpa = "unknown"
+cite = "unknown"

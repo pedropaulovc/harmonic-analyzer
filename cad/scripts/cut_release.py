@@ -30,10 +30,13 @@ What it does, in order:
      PNG for every document. Also copies the millimetre
      scene graph (``cad/out/boxes/harmonic-analyzer.json`` from export_models.py)
      so the comparison gallery renders from the bundle with no SolidWorks.
+     The independently produced feature bundles are checked for the same face
+     labels and patch counts as the full STEPs, then copied intact under
+     ``features/<stem>/`` with their own digest-bound adjacent STEP.
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
      ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
-     ``pdf/`` + ``diff/``). Records the SW revision. (Build logs ship as a
+     ``pdf/`` + ``diff/`` + ``features/``). Records the SW revision. (Build logs ship as a
      SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
      release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
@@ -87,6 +90,7 @@ from _common import CAD_ROOT, OUT_SLDASM, log
 import _config
 from _drawing_registry import DRAWINGS
 from export_models import stage_release_neutral
+from features_bound import stage_bound_features
 
 import _telemetry
 import trim_renders
@@ -877,8 +881,9 @@ def bundle(
 
     One ``harmonic-analyzer-<version>.zip`` with everything a consumer needs:
     ``solidworks/`` the native Pack-and-Go files (open as-is in SolidWorks),
-    ``step/`` + ``stl/`` neutral geometry, ``png/`` multi-angle previews. Staged
-    under the gitignored release dir, then zipped whole.
+    ``step/`` + ``stl/`` neutral geometry, ``png/`` multi-angle previews, and
+    independently bound ``features/<stem>/`` bundles. Staged under the gitignored
+    release dir, then zipped whole.
 
     Opens nothing in SolidWorks: every native document came out of
     ``package_native.py``, whose prepared tree + sidecar this reads.
@@ -909,6 +914,12 @@ def bundle(
 
     # 2. Validate + stage the complete export cache.
     facts.update(stage_release_neutral(stage))
+    # The independent bundles share the full STEPs' face labels/patch counts,
+    # not bytes; their scoped STEP + manifest are staged outside that inventory.
+    facts["features"] = [
+        path.relative_to(stage).as_posix()
+        for path in stage_bound_features(CAD_ROOT / "out", stage)
+    ]
     facts["drawings"] = stage_drawings(stage)
     facts["drawings"].update(native_drawings)
     facts["solidworks_files"] = sum(1 for path in sw_dir.iterdir() if path.is_file())

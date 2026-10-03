@@ -258,12 +258,29 @@ such build:
 | `part:<stem>`, `assembly:<stem>`, `drawing:<stem>` | yes | yes | yes |
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
+| `package:features` (isolated STEP/requirements bundles) | yes | yes | yes |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
+| `check:traveler_rocker_arm` | **no** | no (parallel; needs exported manifest + STEP) | no |
+| `check:features_bound` | **no** | no (release only; compares scoped/full STEP face labels and patch counts) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
+
+`package:features` builds only `rocker_arm`, `pivot_shaft` and `cone_pivot_post`
+and writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`.
+The manifest's `step_sha256` binds the raw adjacent STEP; this self-contained
+bundle is the consumer artefact. Full `export` is independent; neither producer
+overwrites the other's paths. The release-only `check:features_bound` compares
+the two sessions' face-label sets and patch counts per label, requires two rocker
+pivot-bore patches and reports both digests. It does not require byte equality:
+SolidWorks timestamps headers and renumbers entities. Release staging copies the
+verified scoped bundles under `features/`.
+The build/release traveler check uses pinned prechips and `cad/process/`:
+exit 3 (bad input) fails; exit 2 (machining blockers) logs every `✗` as **warn**
+and passes; exit 4 (required unknown) and 0 pass. This is not machining approval.
+See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the

@@ -733,6 +733,33 @@ class _JsonlLogRecordExporter(ConsoleLogRecordExporter):
         _close_jsonl_writer(self.out, "log")
 
 
+def capture_external_telemetry(trace_provider: Any, log_provider: Any) -> None:
+    """Capture library-owned providers in the pipeline's atomic JSONL streams.
+
+    The library retains its resource, context propagation and OTLP exporters.
+    This processor owns a separate append handle, so library shutdown cannot
+    close the pipeline provider's exporters.
+    """
+    directory = _telemetry_dir()
+    if directory is not None:
+        trace_provider.add_span_processor(
+            SimpleSpanProcessor(
+                _JsonlSpanExporter(
+                    out=_jsonl_stream(directory / "traces.jsonl"),
+                    formatter=lambda span: span.to_json(indent=None) + "\n",
+                )
+            )
+        )
+        log_provider.add_log_record_processor(
+            SimpleLogRecordProcessor(
+                _JsonlLogRecordExporter(
+                    out=_jsonl_stream(directory / "logs.jsonl"),
+                    formatter=lambda record: record.to_json(indent=None) + "\n",
+                )
+            )
+        )
+
+
 class _LiveStderr:
     """A write proxy that always targets the CURRENT ``sys.stderr``.
 
