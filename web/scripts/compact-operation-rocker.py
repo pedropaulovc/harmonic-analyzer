@@ -80,8 +80,24 @@ def capture_request(frame, ident, requests):
     return matching[-1] if matching else None
 
 
+def require_catalogued_landmarks(data):
+    """Source observations must resolve before selection can discard anything.
+
+    Unavailable records are intentionally not resolved here: their unknown
+    identities remain required missing source data, not invented CAD anchors.
+    """
+    anchor_ids = {anchor["id"] for anchor in data["anchors"]}
+    for frame in data["frames"]:
+        for point in frame.get("landmarks", []):
+            if point.get("anchorId") not in anchor_ids:
+                raise ValueError(
+                    f"Unresolved physical-source anchor at {frame['timeSeconds']}s/"
+                    f"{point.get('viewId') or 'main'}: {point.get('anchorId')}")
+
+
 def operation():
     data = common.load_observations("jfH-NbsmvD4")
+    require_catalogued_landmarks(data)
     seeds, seed_input = load_seeds("jfH-NbsmvD4")
     index = seeds["sourceInputIndex"]
     states = seeds["chosenStates"]
@@ -103,12 +119,7 @@ def operation():
     data["compactChangeTimesSeconds"] = sorted(changes)
     cameras = []
     source_by_frame = defaultdict(list)
-    anchor_ids = {a["id"] for a in data["anchors"]}
     for family, fragment in seeds["fragments"].items():
-        for anchor in fragment.get("anchors", []):
-            if anchor["id"] not in anchor_ids:
-                data["anchors"].append(copy.deepcopy(anchor))
-                anchor_ids.add(anchor["id"])
         for frame in fragment.get("frames", []):
             source_by_frame[frame["sourceFrameIndex"]].append((family, frame))
             for fit in frame.get("fits", []) + frame.get("diagnosticFits", []):
@@ -200,6 +211,7 @@ def operation():
                 observed.add(key)
             frame["sourceImage"] = control["sourceImage"]
         frame["views"] = list(by_id.values())
+    require_catalogued_landmarks(data)
     unsupported = defaultdict(set)
     assumed = defaultdict(set)
     held_cameras = {}

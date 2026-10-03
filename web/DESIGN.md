@@ -352,9 +352,46 @@ The current capture uses original source frame **2398**, decimal PTS
 **100.016583**, the same complete historical chosen input, and actual global,
 physical and marker epoch **8**. All nine original FIT world coordinates are
 exactly equal. The actual model GET is `ad5c2592…` / **38,975,844 bytes**;
-compiled JavaScript is `d90d08c903d198ab021a1082d7b84b1faf5329e5bbcdfbfb2ad31e2df469f0e5`
+that receipt's compiled JavaScript is `d90d08c903d198ab021a1082d7b84b1faf5329e5bbcdfbfb2ad31e2df469f0e5`
 / **1,042,881 bytes**. Analysis/Synthesis canonical generation succeeds with
 this new receipt, without promoting a source stage.
+
+A later actual normal-route RTX 3090 capture uses compiled GET SHA-256
+`e0168324dc0c88e3e11693a81d28ba116159c54a0f8c7451dca45c53ef78a027`
+(`index-DQ4z1uzl`, **1,042,881 bytes**). Its 14 requested source exposures cover
+Operation **2826/2847/2877/2907/2937/2967/2989**, Rocker **0/24/144/23976**,
+Intro **809/2132**, and Spin **3452**. Actual native visibility retains 435 drawables;
+pixel/world receipts share the completed epoch, with zero page errors and original
+MP4 clocks within 1 microsecond rounding. All six Intro macro views and all nine
+Spin views, including mirror, inset, paper, book and guide, remain present.
+Private evidence is `web/.vite/source-fidelity-final-normal-route-20261003.json`.
+After the catalog/CLI corrections, another actual RTX 3090 normal-route run
+completed the same **14 exposures / 27 views** in **24.42 seconds**, with zero
+page errors, all 435 drawables per view, same completed epochs and original-media
+clock error within 0.5 seconds. Its HTTP200 compiled GET is
+`cbf063c3e0cebecc7c647b4734e064e7a724d1180d771c4c5c39ee409820020a`
+(`index-tJXzrUdU`, **1,042,881 bytes**). The report preserves actual canvas CSS,
+bitmap and DPR in `web/.vite/source-fidelity-review-corrected-normal-route-20261003.json`.
+The earlier `e016…` report remains immutable. Neither run is continuous-window,
+all-six collection, first-surface or source-stage acceptance.
+
+Raw projected-point diagnostics give Operation maximum **31.899736747 px**
+(RMS **14.26..14.93 px**) and Intro809 maximum **32.360778730 px** /
+RMS **11.45414636 px** across 14 points (7 FIT, 7 CHECK). They retain Operation
+source losses **17/0/8/12/15/15/20** and do not qualify source-physical association,
+camera/body correspondence or CHECK independence. Eye review still finds the
+Intro macro orientation/body/pen association mismatched; Rocker foreground
+gears/chain/frame dominate the unqualified source left shank. Spin's nine runtime
+views do not establish source image-card/camera/body correspondence. These scoped
+captures do not establish a source stage or global camera impossibility/CAD absence.
+The actual corrected-bundle `measureFrame` consumer smoke retains Operation's
+losses and Rocker's **3/5/5/40** losses (the final 40 also has one unavailable
+CHECK-coverage obligation). Point-only passed rows at Operation2847/Intro809 do
+not qualify source frames or stages. Intro2132 has no exact compact frame and
+remains unavailable without borrowing; all nine Spin views remain unavailable
+to this landmark consumer because no observed landmarks were supplied. The smoke
+does not enrich a contour census. Private evidence is
+`web/.vite/review-corrected-source-consumer-smoke-20261003.json`.
 
 `NativeEpochViewer` exposes its existing `drawEpoch` as captured `drawRevision`.
 `renderViews` returns the actual completed epoch and supplies the reserved epoch
@@ -537,6 +574,13 @@ replace actual source/render inspection. Use the depth-tested native part-ID
 capture to distinguish genuinely occluding components from dark metallic surfaces;
 lighting changes must not change those surface owners or hide native geometry.
 
+`measureFrame` and `finishVideo` retain the required source-loss ledger.
+Undeclared roles remain null; a loss cannot supply coverage or become an exclusion.
+The verifier/playback follow-up gate executed **73 passes, zero failures/skips**
+in **0.144 s**, including original-loss retention when census availability is null.
+Before-fix controls failed the two loss cases and the census case. These software
+checks do not supply source-fidelity measurements.
+
 Per-video verification is incremental and repeatable, without an acceptance-run
 quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.
 A coarse demo or a passing subset does not establish final acceptance.
@@ -560,6 +604,11 @@ The canonical packet has **1,033 samples / 1,460 views / 144 shots**, retaining
 90 source-loss declarations. Source time 135 seconds, frame 19451, remains
 unmeasured. Chain, removable gears, disassembly, mirror, simultaneous panels and
 pen remain required.
+Operation's single authoritative catalog has **221 anchors**, including **188
+genuine fragment definitions**. Orphan IDs are refused; duplicate fragment seed
+copies no longer override the catalog. The source-generation gate executed
+**63 passes, zero failures** in **33.638 s**; the before-fix catalog control
+had three failures and one error. Existing camera/input choices are unchanged.
 
 Rocker's [seed `cameraChoice`](content/4mBuyixt22U.source-seeds.json) is the clean
 producer authority; `historicalCameraChoices` retains the body candidate as
@@ -598,11 +647,28 @@ executed **3 cases, 3 passes, 0 skips** in **0.331 seconds** on its first post-f
 run. Missing `INTRO_RAW_NATIVE_MODEL_PATH` raises `RuntimeError`, without a skip.
 `npm --prefix web run test:source:geometry` uses isolated uv with pinned
 numpy **2.5.3**, scipy **1.18.1** and opencv-python-headless **5.0.0.93**.
-The enrolled npm gate also executed **3 tests, 3 passes, 0 skips** in **0.391 seconds**
-with those pins and the actual raw-native prerequisite.
+The enrolled npm gate's initial three cases passed in **0.391 seconds**.
+Its expanded seven-case gate executed **7 passes, zero failures/skips** in
+**1.198 seconds**, covering three raw support cases and four public CLI
+refusal/error-state cases without a private full435 test dependency.
+The nested-native-metadata follow-up gate executed **8 passes** in **2.166 seconds**;
+malformed code-hash metadata retains error rows rather than escaping as an exception.
 Set `INTRO_RAW_NATIVE_MODEL_PATH` to the original raw `2280bfa6…` GLB,
 as shown in the README. Missing or mismatched raw bytes fail the prerequisite;
 the optimized public `ad5c2592…` model cannot substitute.
+The public first-surface CLI refuses unknown pose/input fields and accepts no
+per-part matrix overrides. Refusal/error rows preserve the exact request and use
+nullable, unvalidated native identity when execution cannot establish identity.
+The actual sealed CPU435 CLI packet evaluated **17 rays**, with **7 eligible**,
+zero refused and zero error rows, preserving the original complete51 input.
+Private evidence is `sealed-native-apex17-after-20261003.json`; these eligibility
+results remain native CPU diagnostics without source or GPU acceptance.
+A separate actual full435 CPU API-boundary control retained the real sealed-marker
+positive and rejected the front-right C-frame occluder. Three removed detached
+API calls raised `TypeError`, with native geometry unchanged. Private evidence is
+`web/.vite/verification-output/intro-spin-20261003/sealed-ray-detachment-after-20261003.json`.
+This proves the sealed Float64 complete51 state/API boundary, without extending
+GPU or source qualification.
 
 The exact historical `f20571861` static-producer blob (`8626bdf7…`) was run
 against those same three raw-native cases: the coincident-apex and FIT/CHECK

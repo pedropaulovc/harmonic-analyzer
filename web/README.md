@@ -182,6 +182,12 @@ it does not qualify source geometry or camera history. The downloaded lossless
 delivery SHA `ad5c2592…` remains distinct from raw-source SHA `2280bfa6…`.
 The earlier receipt and the regional GPU measurements above remain pre-epoch
 evidence; they are not a fresh GPU replay under `f16d8a0c…`.
+A later actual normal-route RTX 3090 capture covers 14 requested Operation,
+Rocker, Intro and Spin source exposures, with completed-epoch pixel/world
+receipts, 435 drawables and zero page errors. Intro macro body/pen association,
+Rocker foreground geometry and Spin whole-frame correspondence remain
+unqualified. The full native CPU spring export also fails the unchanged
+1e-7 m GPU-equivalence bound; CPU first-surface diagnostics remain CPU-scoped.
 
 The historical `ff57f0a6…` normal-route playback probe of the original MP4 completed **443 source frames /
 443 draws** for Synthesis (105.96..124.45 seconds) and **160 / 160** for Analysis

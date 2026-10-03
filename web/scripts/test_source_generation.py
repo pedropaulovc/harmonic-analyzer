@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -23,7 +24,9 @@ def load_script(filename, name):
 
 common = load_script('compact-source-common.py', 'source_generation_common')
 spin = load_script('compact-spin.py', 'source_generation_spin')
-rocker = load_script('compact-operation-rocker.py', 'source_generation_rocker')
+rocker = load_script(os.environ.get('SOURCE_OPERATION_GENERATOR_PATH',
+                                   'compact-operation-rocker.py'),
+                     'source_generation_rocker')
 camera_tracks = load_script(os.environ.get('SOURCE_GENERATOR_PATH',
                                           'generate-analysis-synthesis-source-tracks.py'),
                             'source_generation_camera_tracks')
@@ -154,6 +157,91 @@ class ExactExposureLandmarkTests(unittest.TestCase):
                              if row.get('anchorId') == 'ambiguous']
                 self.assertEqual(len(ambiguity), 1)
                 self.assertEqual(result['landmarks'], [ambiguous, *data['frames'][1]['landmarks']])
+
+
+class OperationAnchorCatalogTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        path = Path(os.environ.get(
+            'SOURCE_OPERATION_OBSERVATIONS_PATH',
+            HERE.parent / 'content/jfH-NbsmvD4.observations.json'))
+        cls.observations = json.loads(path.read_text())
+
+    def direct_failures(self, data):
+        script = """
+            import {inspectReference} from './scripts/verify-reference.mjs';
+            let input = '';
+            for await (const chunk of process.stdin) input += chunk;
+            const data = JSON.parse(input);
+            const result = inspectReference(data, 'jfH-NbsmvD4');
+            console.log(JSON.stringify(result.failures.filter(
+                item => ['anchor-correspondence', 'anchor-point',
+                         'source-measurement'].includes(item.code)
+                    && item.detail.includes('op19m.'))));
+        """
+        result = subprocess.run(
+            ['node', '--input-type=module', '-e', script],
+            input=json.dumps(data), text=True, capture_output=True,
+            cwd=HERE.parent, check=True)
+        return json.loads(result.stdout)
+
+    def generate(self, data):
+        with patch.object(rocker.common, 'load_observations',
+                          return_value=copy.deepcopy(data)):
+            return rocker.operation()
+
+    def test_genuine_catalog_qualifies_original_and_generated_observations(self):
+        data = self.observations
+        original = next(anchor for anchor in data['anchors']
+                        if anchor['id'] == 'op19m.wheel.hub')
+        self.assertEqual(original['kind'], 'physical-feature')
+        self.assertEqual(self.direct_failures(data), [])
+        track = self.generate(data)
+        self.assertEqual(next(anchor for anchor in track['anchors']
+                              if anchor['id'] == original['id']),
+                         {**original, 'motion': rocker.common.anchor_motion(original)})
+        source = next(frame for frame in data['frames']
+                      if frame.get('sourceFrameIndex') == 2847)
+        rendered = next(frame for frame in track['frames']
+                        if frame.get('sourceImage', {}).get('frameIndex') == 2847)
+        for point in source['landmarks']:
+            if point['anchorId'].startswith('op19m.'):
+                self.assertIn(point, rendered['landmarks'])
+
+    def test_orphan_original_observation_refuses_both_consumers(self):
+        data = copy.deepcopy(self.observations)
+        data['anchors'] = [anchor for anchor in data['anchors']
+                           if anchor['id'] != 'op19m.wheel.hub']
+        with self.assertRaisesRegex(ValueError, 'op19m.wheel.hub'):
+            self.generate(data)
+        failures = self.direct_failures(data)
+        self.assertTrue(any(item['code'] == 'source-measurement'
+                            and 'op19m.wheel.hub' in item['detail']
+                            for item in failures))
+
+    def test_null_orphan_in_another_view_does_not_disappear(self):
+        data = copy.deepcopy(self.observations)
+        frame = next(frame for frame in data['frames']
+                     if frame.get('sourceFrameIndex') == 2847)
+        point = next(point for point in frame['landmarks']
+                     if point['anchorId'] == 'op19m.wheel.hub')
+        frame['landmarks'].append({**point, 'anchorId': 'missing-source-feature',
+                                   'viewId': 'unresolved-panel', 'pixel': None})
+        with self.assertRaisesRegex(
+                ValueError, 'unresolved-panel.*missing-source-feature'):
+            self.generate(data)
+
+    def test_orphan_imported_control_refuses_generated_packet(self):
+        seeds, seed_input = rocker.load_seeds('jfH-NbsmvD4')
+        control = next(control for exposure in seeds['sourceControls']
+                       for control in exposure['declarations']
+                       if control.get('usage') != 'provenance-only')
+        control['declaration']['anchorId'] = 'missing-imported-source-feature'
+        with patch.object(rocker, 'load_seeds',
+                          return_value=(seeds, seed_input)):
+            with self.assertRaisesRegex(
+                    ValueError, 'missing-imported-source-feature'):
+                self.generate(self.observations)
 
 
 def rocker_exposure():

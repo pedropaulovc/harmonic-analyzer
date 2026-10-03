@@ -44,6 +44,14 @@
     "geometry": "Hash-sealed posed positions f64 and actual indices u32 with census byte offsets/counts/matrixWorld/visibleByNativeGraph.",
     "springs": "All21 actual current shader deformations. A shader program/uniform/attribute payload plus414 rigid arrays is an honest intermediate, NOT a complete first-surface authority until spring vertices are measured/evaluated from that current shader."
   },
+  "rayControlContract": {
+    "geometryAuthority": "The exact complete51 chosen input and full435 arrays in one validated sealed export. Camera rays never alter individual native parts or the chosen input.",
+    "allowedRayFields": ["id", "origin", "rotation", "expectedNativeEligibility", "cameraOriginInsideNativeAabbPaths"],
+    "diagnosticAnnotations": "Optional expectedNativeEligibility and cameraOriginInsideNativeAabbPaths are retained request annotations only; neither determines geometry, exposure, eligibility or acceptance.",
+    "detachedPoseRefusal": "Any other ray field, including matrices or partOverrides even when null or empty, is refused before loading native geometry. Input changes require a new complete native solve and fresh sealed complete51/all435 export; no part-path allowlist or transform alias is supported.",
+    "errorIdentity": "Refusal/error rows retain id and the exact request with null guardValue/hit and an explicit reason. No validated nativeChosenInput or completeNativeDenominator is claimed when no genuine sealed export was loaded.",
+    "qualification": "Accepted frozen rays are mathematical CPU first-surface controls only. Stale or detached physical-body variants remain refused diagnostics, not first-surface, GPU-equivalence, source or stage acceptance."
+  },
   "requiredNativeControls": [
     "A positive actual nearest apex ray on the freshly posed full435 graph, exact same-primitive incident facet among97..127 and residual<=1e-7m. A facet other than96 proves the corrected equivalence gate is load-bearing; old vertex124 only supplied facet96.",
     "Adjacent marker body and foreground C-frame/other-body negatives stay in the all435 nearest-positive-surface search and remain rejected.",

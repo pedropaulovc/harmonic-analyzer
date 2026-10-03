@@ -9,8 +9,11 @@ from --code-root. Historical snapshots are not a current eligibility authority.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
+import math
 import mmap
+import re
 import struct
 from pathlib import Path
 
@@ -18,11 +21,20 @@ import numpy as np
 
 WEB = Path(__file__).resolve().parents[1]
 PROFILE = WEB / "content" / "NAsM30MAHLg.calibration-eligibility.json"
+common_spec = importlib.util.spec_from_file_location(
+    "native_feature_source_common", Path(__file__).with_name("compact-source-common.py"),
+)
+common = importlib.util.module_from_spec(common_spec)
+common_spec.loader.exec_module(common)
 
 
 def digest(path):
     with Path(path).open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def sha256_string(value):
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
 
 def calibration_support(frame, points, policy):
@@ -110,21 +122,70 @@ class FrozenNativeFirstSurface:
         self.export_path = Path(export_path)
         self.export_sha256 = digest(self.export_path)
         self.export = json.loads(self.export_path.read_text())
+        if not isinstance(self.export, dict):
+            raise ValueError("Complete native export must be a sealed object, not null")
         self.profile = profile
         self.nib = profile["finiteNib"]
-        source_identity = self.export.get("modelSourceSha256", self.export["modelSha256"])
-        if source_identity != profile["modelSha256"]:
+        source_identity = self.export.get("modelSourceSha256", self.export.get("modelSha256"))
+        if (not sha256_string(self.export.get("modelSha256"))
+                or source_identity != profile["modelSha256"]):
             raise ValueError("Posed export does not identify the original native source geometry")
-        if (self.export["nativeDrawableDenominator"] != self.nib["requiredNativeDrawableCount"]
-                or self.export["springDrawableCount"] != self.nib["requiredSpringDrawableCount"]
-                or len(self.export["unobservedInputFields"]) != 51
-                or not self.export.get("inputMechanismAndAll435ArraysFrozenAsOneState")
-                or self.export.get("partOverrides")):
+        fields = self.export.get("unobservedInputFields")
+        if (not isinstance(fields, list) or len(fields) != len(common.INPUT_FIELDS)
+                or not all(isinstance(field, str) for field in fields)
+                or set(fields) != set(common.INPUT_FIELDS)
+                or self.export.get("nativeDrawableDenominator") != self.nib["requiredNativeDrawableCount"]
+                or self.export.get("springDrawableCount") != self.nib["requiredSpringDrawableCount"]
+                or self.export.get("inputMechanismAndAll435ArraysFrozenAsOneState") is not True
+                or self.export.get("partOverrides") != []):
             raise ValueError("Finite nib requires one complete chosen51/all435/21-spring native state, without detached overrides")
-        hashes = self.export["codeHashes"]
-        snapshots = self.export["actuallyExecutedImmutableNativeSourceSnapshots"]
+        hashes = self.export.get("codeHashes")
+        if (not isinstance(hashes, dict) or not hashes
+                or any(not isinstance(path, str) or not path or not sha256_string(sha)
+                       for path, sha in hashes.items())):
+            raise ValueError("Native codeHashes must be a nonempty path-to-SHA256 object")
+        snapshots = self.export.get("actuallyExecutedImmutableNativeSourceSnapshots")
+        if (not isinstance(snapshots, list) or not snapshots
+                or any(not isinstance(row, dict)
+                       or not isinstance(row.get("relativePath"), str) or not row["relativePath"]
+                       or not isinstance(row.get("snapshotPath"), str) or not row["snapshotPath"]
+                       or not sha256_string(row.get("sha256")) for row in snapshots)):
+            raise ValueError("Executed native snapshots must contain path and SHA256 records")
+        chosen_input = self.export.get("input")
+        if (not isinstance(chosen_input, dict)
+                or not isinstance(chosen_input.get("setup"), dict)
+                or any(not isinstance(chosen_input.get(name), list) for name in ("amplitudes", "phases"))):
+            raise ValueError("Chosen native input must contain the complete scalar, channel and setup state")
+        compact_input = common.compact_input(chosen_input)
+        numbers = [compact_input["crankTurns"], compact_input["magnification"]]
+        numbers += compact_input["amplitudes"] + compact_input["phases"]
+        numbers += [value for value in compact_input["setup"].values() if value is not None]
+        if chosen_input != compact_input or any(type(value) not in (int, float) for value in numbers):
+            raise ValueError("Chosen native input must be exactly the complete51 numerically typed state")
+        geometry = self.export.get("geometry")
+        if (not isinstance(geometry, dict)
+                or any(not isinstance(geometry.get(name), dict)
+                       or not isinstance(geometry[name].get("path"), str) or not geometry[name]["path"]
+                       or not sha256_string(geometry[name].get("sha256"))
+                       for name in ("positions", "indices"))):
+            raise ValueError("Complete posed all435 arrays require sealed position/index path and SHA256 records")
+        census = self.export.get("census")
+        if not isinstance(census, list) or len(census) != self.nib["requiredNativeDrawableCount"]:
+            raise ValueError("Incomplete actual native census")
+        for row in census:
+            if (not isinstance(row, dict)
+                    or not isinstance(row.get("path"), str) or not row["path"]
+                    or any(type(row.get(key)) is not int or row[key] < 0 for key in
+                           ("positionByteOffset", "indexByteOffset", "vertexCount", "indexCount"))
+                    or not row["vertexCount"] or not row["indexCount"] or row["indexCount"] % 3
+                    or row["positionByteOffset"] % 8 or row["indexByteOffset"] % 4
+                    or not isinstance(row.get("matrixWorld"), list) or len(row["matrixWorld"]) != 16
+                    or any(type(value) not in (int, float) or not math.isfinite(value)
+                           for value in row["matrixWorld"])
+                    or type(row.get("visibleByNativeGraph")) is not bool):
+                raise ValueError("Native census rows require complete finite primitive pose/count/visibility metadata")
         closure_hashes = {row["relativePath"]: row["sha256"] for row in snapshots}
-        if not snapshots or len(closure_hashes) != len(snapshots) or any(
+        if len(closure_hashes) != len(snapshots) or any(
                 closure_hashes.get(path) != sha for path, sha in hashes.items()):
             raise ValueError("Executed native closure does not seal the declared native code")
         self.code_paths = [(Path(code_root) / path, sha) for path, sha in closure_hashes.items()]
@@ -141,14 +202,12 @@ class FrozenNativeFirstSurface:
         self.parts = {}
         arrays = {}
         for name, dtype in (("positions", "<f8"), ("indices", "<u4")):
-            entry = self.export["geometry"][name]
-            if not isinstance(entry, dict):
-                raise ValueError("Complete posed all435 arrays are unavailable; rigid geometry plus spring shader payload is not first-surface evidence")
+            entry = geometry[name]
             path = self.export_path.parent / entry["path"]
             if digest(path) != entry["sha256"]:
                 raise ValueError("Posed native array differs from its sealed export")
             arrays[name] = np.memmap(path, dtype=dtype, mode="r")
-        for row in self.export["census"]:
+        for row in census:
             path = row["path"]
             if path in self.parts:
                 raise ValueError("Duplicate actual native primitive path")
@@ -173,7 +232,7 @@ class FrozenNativeFirstSurface:
             if digest(path) != sha:
                 raise ValueError(f"Native code differs from sealed export: {path}")
 
-    def first_surface(self, origin, direction, matrices, near_t, far_t):
+    def first_surface(self, origin, direction, near_t, far_t):
         origin, direction = np.asarray(origin), np.asarray(direction)
         best = None
         nonzero = abs(direction) > 1e-15
@@ -182,10 +241,7 @@ class FrozenNativeFirstSurface:
             if not part["visible"]:
                 continue
             positions = part["P"]
-            if path in matrices:
-                local = np.c_[positions, np.ones(len(positions))] @ np.linalg.inv(part["M"]).T
-                positions = (local @ np.asarray(matrices[path]).T)[:, :3]
-            lo, hi = (positions.min(axis=0), positions.max(axis=0)) if path in matrices else part["bounds"]
+            lo, hi = part["bounds"]
             if np.any(~nonzero & ((origin < lo) | (origin > hi))):
                 continue
             aa, bb = (lo - origin) * direction_inverse, (hi - origin) * direction_inverse
@@ -193,11 +249,10 @@ class FrozenNativeFirstSurface:
             exit_t = min(np.where(nonzero, np.maximum(aa, bb), np.inf).min(), far_t)
             if entry > exit_t or best is not None and entry > best["segmentParameter"]:
                 continue
-            if path in matrices or "triangleData" not in part:
+            if "triangleData" not in part:
                 triangles = positions[part["F"]]
                 e1, e2 = triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]
-                if path not in matrices:
-                    part["triangleData"] = (triangles, e1, e2)
+                part["triangleData"] = (triangles, e1, e2)
             else:
                 triangles, e1, e2 = part["triangleData"]
             h = np.cross(direction, e2)
@@ -221,23 +276,16 @@ class FrozenNativeFirstSurface:
                         "worldPointMetres": (origin + t[index] * direction).tolist()}
         return best
 
-    def nib_guard(self, origin, rotation, matrices=None):
+    def nib_guard(self, origin, rotation):
         self.assert_code()
-        matrices = {} if matrices is None else matrices
-        allowed = {f"harmonic-analyzer/pen/{name}-1" for name in ("pen-v-block", "pen-frame", "pen-marker", "pen-set-screw")}
-        if set(matrices) - allowed:
-            raise ValueError("Input changes require a new complete native solve, not piecewise pose changes")
         marker = self.parts[self.nib["partPath"]]
         vertex = self.nib["nativeVertexIndex"]
         point = marker["P"][vertex]
-        if self.nib["partPath"] in matrices:
-            local = np.linalg.inv(marker["M"]) @ np.r_[point, 1]
-            point = (np.asarray(matrices[self.nib["partPath"]]) @ local)[:3]
         direction = point - origin
         depth = float(-(direction @ rotation)[2])
         if depth <= .005:
             return -1000., None
-        hit = self.first_surface(origin, direction, matrices, .005 / depth, 100 / depth)
+        hit = self.first_surface(origin, direction, .005 / depth, 100 / depth)
         if hit is None:
             return -1000., None
         residual = float(np.linalg.norm(np.asarray(hit["worldPointMetres"]) - point))
@@ -264,28 +312,63 @@ def main():
     parser.add_argument("--native-export", type=Path, required=True)
     parser.add_argument("--code-root", type=Path, default=WEB.parent)
     parser.add_argument("--profile", type=Path, default=PROFILE)
-    parser.add_argument("--rays", type=Path, required=True, help="JSON controls: origin/rotation, optional supported matrices")
+    parser.add_argument("--rays", type=Path, required=True, help="JSON frozen-state controls: origin/rotation only; no part or input transforms")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    native = FrozenNativeFirstSurface(args.native_export, args.model, json.loads(args.profile.read_text()), args.code_root)
+    profile = json.loads(args.profile.read_text())
+    allowed_ray_fields = {"id", "origin", "rotation", "expectedNativeEligibility",
+                          "cameraOriginInsideNativeAabbPaths"}
     rows = []
     for ray in json.loads(args.rays.read_text())["rays"]:
-        value, hit = native.nib_guard(np.asarray(ray["origin"]), np.asarray(ray["rotation"]), ray.get("matrices"))
-        rows.append({"id": ray["id"], "guardValue": value, "hit": hit})
+        reason = None
+        if not isinstance(ray, dict):
+            reason = "Ray controls must be an object describing a camera on one frozen native state"
+        elif unsupported := set(ray) - allowed_ray_fields:
+            reason = (f"Unsupported frozen-ray fields: {', '.join(sorted(unsupported))}. "
+                      "Input changes require a new complete native solve and sealed complete51/all435 export, not detached part poses")
+        rows.append({"id": ray.get("id") if isinstance(ray, dict) else None,
+                     "request": ray, "status": "refused" if reason else "pending",
+                     "reason": reason, "guardValue": None, "hit": None})
+    native, native_error = None, None
+    for row in rows:
+        if row["status"] == "refused":
+            continue
+        if native_error is not None:
+            row.update(status="error", reason=native_error)
+            continue
+        try:
+            if native is None:
+                native = FrozenNativeFirstSurface(args.native_export, args.model, profile, args.code_root)
+            ray = row["request"]
+            value, hit = native.nib_guard(np.asarray(ray["origin"]), np.asarray(ray["rotation"]))
+            row.update(status="measured", guardValue=value, hit=hit)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            reason = f"Native eligibility unavailable: {error}"
+            row.update(status="error", reason=reason)
+            if native is None:
+                native_error = reason
     result = {"producerSha256": digest(__file__), "profileSha256": digest(args.profile),
-              "nativeExportSha256": native.export_sha256,
-              "nativeChosenInput": native.export["input"],
-              "independentSourceExposureObligation": native.profile["sourceExposure"],
-              "epoch": "sealed-current-code-CPU",
-              "equivalentNativeVertexIndices": native.equivalent_vertices.tolist(),
-              "incidentNativeTriangleIndices": native.incident_nib_triangles.tolist(),
-              "distinctPhysicalApexCount": 1, "rays": rows, "GPUAcceptance": False,
+              "requestedNativeExport": str(args.native_export), "requestedModel": str(args.model),
+              "rayRequestSha256": digest(args.rays),
+              "nativeExportSha256": native.export_sha256 if native is not None else None,
+              "nativeChosenInput": native.export["input"] if native is not None else None,
+              "unobservedInputFields": native.export["unobservedInputFields"] if native is not None else None,
+              "completeNativeDenominator": len(native.parts) if native is not None else None,
+              "independentSourceExposureObligation": profile["sourceExposure"],
+              "epoch": "sealed-current-code-CPU" if native is not None else "unavailable",
+              "equivalentNativeVertexIndices": native.equivalent_vertices.tolist() if native is not None else None,
+              "incidentNativeTriangleIndices": native.incident_nib_triangles.tolist() if native is not None else None,
+              "distinctPhysicalApexCount": 1 if native is not None else None,
+              "rays": rows, "GPUAcceptance": False,
               "sourceAcceptance": False, "sourceFeatureAssociation": "unavailable"}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n")
     print(json.dumps({"output": str(args.output), "epoch": result["epoch"], "rays": len(rows),
-                      "eligibleNativeRays": sum(bool((row["hit"] or {}).get("actualFiniteNibIsExactNearestPositiveSurface")) for row in rows)}))
+                      "eligibleNativeRays": sum(bool((row["hit"] or {}).get("actualFiniteNibIsExactNearestPositiveSurface")) for row in rows),
+                      "refusedRays": sum(row["status"] == "refused" for row in rows),
+                      "errorRays": sum(row["status"] == "error" for row in rows)}))
+    return 2 if any(row["status"] != "measured" for row in rows) else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

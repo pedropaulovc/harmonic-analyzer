@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseOptions, sourceCensus, sourceContourSidecar, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, measureContours, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } from './verify-sync.mjs'
+const { parseOptions, sourceCensus, sourceContourSidecar, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, measureFrame, measureContours, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } = await import(process.env.HARMONIC_VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
 import { jsonDigest, sourceLayoutForViews, MODEL_SHA256, MODEL_COMMIT } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
@@ -331,6 +331,255 @@ function measuredViewFixture() {
   return { view, frame, observations, anchors, response, capture, seeds: new Map() }
 }
 const measureFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 96, fixture.anchors, fixture.seeds)
+
+function finishMeasuredFixture(fixture, result) {
+  const video = videoFixture()
+  Object.assign(video.samples[0], { timeSeconds: fixture.frame.timeSeconds, sampleTimeSeconds: fixture.frame.timeSeconds, measurements: result.measured ?? result.measurements,
+    contourChecks: result.contourChecks, contourFits: result.contourFits, unavailable: result.unavailable,
+    maxClockSkewSeconds: result.clockSkewSeconds ?? result.maxClockSkewSeconds, status: result.status ?? 'passed' })
+  const rows = [{ timeSeconds: fixture.frame.timeSeconds, required: true, reasons: ['every-second'] }]
+  finishVideo(video, { rows, selected: rows }, parseOptions(['--stage', '50']))
+  return video
+}
+
+test('source-loss obligation blocks passing surviving landmarks for CHECK, FIT and unknown roles', () => {
+  for (const role of ['check', 'fit', null]) {
+    const fixture = measuredViewFixture()
+    const loss = { anchorId: 'lost-control', viewId: 'main', role, reason: 'Actual source patch is unresolved',
+      trackingEvidence: { seedTimeSeconds: 0, seedPatchCorrelation: 0.2 } }
+    fixture.frame.unavailable = [loss]
+    const result = measureFixture(fixture), video = finishMeasuredFixture(fixture, result)
+    assert.ok(result.measured.every(item => item.status === 'passed'))
+    assert.equal(video.coverage.passedRequiredSamples, 0)
+    assert.equal(video.coverage.complete, false)
+    assert.equal(video.status, 'unavailable')
+    assert.equal(video.stageMeasurement.status, 'unmeasured')
+    const reported = video.unavailableReasons.find(item => item.anchorId === 'lost-control')
+    assert.equal(reported.role, role)
+    assert.equal(reported.originalRole, role)
+    assert.equal(reported.viewId, 'main')
+    assert.equal(reported.originalViewId, 'main')
+    assert.equal(reported.reason, loss.reason)
+    assert.deepEqual(reported.trackingEvidence, loss.trackingEvidence)
+    assert.deepEqual(reported.sourceImage, fixture.frame.sourceImage)
+    assert.equal(reported.decodedTimeSeconds, fixture.frame.decodedTimeSeconds)
+  }
+})
+
+test('source-loss obligation without a role or physical mapping remains missing data', () => {
+  const fixture = measuredViewFixture()
+  fixture.frame.unavailable = [{ anchorId: 'uncatalogued-control', reason: 'No native/source correspondence' }]
+  const result = measureFixture(fixture), video = finishMeasuredFixture(fixture, result)
+  assert.equal(video.status, 'unavailable')
+  const reported = video.unavailableReasons.find(item => item.anchorId === 'uncatalogued-control')
+  assert.equal(reported.role, null)
+  assert.equal(reported.originalRole, null)
+  assert.equal(reported.sourcePixels, null)
+  assert.equal(reported.viewId, 'main')
+  assert.equal(video.landmarks.measured, 4)
+})
+
+test('source-loss sample gate preserves loss-free positive coverage and blocks mixed or absent views', () => {
+  const fixture = measuredViewFixture()
+  fixture.frame.landmarks = fixture.observations
+  const positive = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors, fixture.seeds)
+  assert.equal(positive.status, 'passed')
+  assert.equal(finishMeasuredFixture(fixture, positive).stageMeasurement.status, 'passed')
+  for (const viewId of ['main', 'inset', 'unmapped-source-view']) {
+    const copy = structuredClone(fixture)
+    copy.frame.unavailable = [{ anchorId: 'lost-control', viewId, role: 'fit', reason: 'Source loss remains required' }]
+    const result = measureFrame(copy.frame, copy.response, 96, copy.anchors, copy.seeds)
+    const video = finishMeasuredFixture(copy, result)
+    assert.equal(result.status, 'unavailable')
+    assert.equal(video.coverage.passedRequiredSamples, 0)
+    assert.equal(video.stageMeasurement.status, 'unmeasured')
+    assert.equal(video.unavailableReasons.filter(item => item.anchorId === 'lost-control').length, 1)
+    assert.equal(video.unavailableReasons.find(item => item.anchorId === 'lost-control').viewId, viewId)
+  }
+})
+
+test('source-loss sample gate deduplicates the same missing obligation without merging roles or views', () => {
+  const fixture = measuredViewFixture(), observed = fixture.observations[3]
+  observed.pixel = null
+  fixture.frame.landmarks = fixture.observations
+  fixture.frame.unavailable = [
+    { anchorId: observed.anchorId, role: observed.role, reason: 'Original source feature was lost' },
+    { anchorId: observed.anchorId, role: 'fit', reason: 'Separate original FIT obligation' },
+    { anchorId: observed.anchorId, viewId: 'inset', role: observed.role, reason: 'Separate source perspective' },
+  ]
+  const result = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors, fixture.seeds)
+  const same = result.unavailable.filter(item => item.anchorId === observed.anchorId && item.viewId === 'main' && item.role === 'check')
+  assert.equal(same.length, 1)
+  assert.equal(same[0].reason, 'Original source feature was lost')
+  assert.ok(same[0].relatedUnavailable.some(item => item.reason === 'Independent source landmark pixel/measurement is unavailable'))
+  assert.equal(result.unavailable.filter(item => item.anchorId === observed.anchorId).length, 3)
+  assert.equal(result.status, 'unavailable')
+})
+
+test('source-loss sample gate retains required loss when native capture throws and prioritizes measured failure', () => {
+  const fixture = measuredViewFixture()
+  fixture.frame.landmarks = fixture.observations
+  fixture.frame.unavailable = [{ anchorId: 'lost-control', role: null, reason: 'Source control unresolved' }]
+  fixture.capture.landmarks[2].sourcePixels = [1200, 800]
+  fixture.capture.landmarks[2].canvasPixels = [1200, 800]
+  const failed = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors, fixture.seeds)
+  assert.equal(failed.status, 'failed')
+  assert.equal(finishMeasuredFixture(fixture, failed).stageMeasurement.status, 'failed')
+  fixture.capture.status = 'unavailable'
+  const missing = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors, fixture.seeds)
+  assert.equal(missing.status, 'unavailable')
+  assert.ok(missing.unavailable.some(item => item.anchorId === 'lost-control' && item.role === null))
+  assert.ok(missing.unavailable.some(item => /Missing\/stale actual GPU/.test(item.reason)))
+})
+
+test('source-loss sample gate keeps each actual view and original role independently required', () => {
+  const fixture = measuredViewFixture(), inset = sourceView('inset', [960, 0, 960, 1080])
+  fixture.view.rectSourcePixels = [0, 0, 960, 1080]
+  fixture.frame.views.push(inset)
+  const insetObservations = fixture.observations.map(item => ({ ...item, anchorId: `inset-${item.anchorId}`, viewId: 'inset', pixel: [item.pixel[0] + 960, item.pixel[1]] }))
+  fixture.frame.landmarks = [...fixture.observations, ...insetObservations]
+  for (const item of insetObservations) fixture.anchors.set(item.anchorId, { ...fixture.anchors.get(item.anchorId.slice(6)) })
+  const layout = sourceLayoutForViews(fixture.frame.views), main = fixture.response.captures[0]
+  main.capture.sourceLayout = layout
+  main.mechanism.sourceLayout = layout
+  fixture.response.actual.views = fixture.frame.views.map(view => ({ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }))
+  fixture.response.captures.push({ viewId: 'inset',
+    capture: { ...structuredClone(main.capture), viewId: 'inset', landmarks: insetObservations.map(item => ({
+      ...structuredClone(main.capture.landmarks[0]), id: item.anchorId, sourcePixels: item.pixel, canvasPixels: item.pixel })) },
+    mechanism: { ...structuredClone(main.mechanism), viewId: 'inset', input: inset.input } })
+  const positive = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors, fixture.seeds)
+  assert.equal(positive.status, 'passed')
+  assert.equal(finishMeasuredFixture(fixture, positive).status, 'passed')
+  fixture.frame.unavailable = [
+    { anchorId: 'same-source-control', viewId: 'main', role: 'fit', reason: 'Main-view source control lost' },
+    { anchorId: 'same-source-control', viewId: 'inset', role: 'check', reason: 'Inset-view source control lost' },
+  ]
+  const result = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors, fixture.seeds), video = finishMeasuredFixture(fixture, result)
+  assert.equal(video.coverage.passedRequiredSamples, 0)
+  assert.equal(video.status, 'unavailable')
+  assert.deepEqual(video.unavailableReasons.filter(item => item.anchorId === 'same-source-control').map(item => [item.viewId, item.originalRole]), [['main', 'fit'], ['inset', 'check']])
+})
+
+test('source-loss exact-exposure join retains authoritative role and provenance after a compact view rename', () => {
+  const fixture = measuredViewFixture()
+  fixture.frame.shotId = 'shot'
+  fixture.frame.sourceImage = sourceImage(30, '3'.repeat(64))
+  fixture.frame.landmarks = fixture.observations
+  fixture.frame.unavailable = [{ anchorId: 'lost-control', viewId: 'main', reason: 'Actual source patch lost' }]
+  const original = { ...fixture.frame, views: [sourceView('presenter-whole')], landmarks: [], unavailable: [{
+    anchorId: 'lost-control', viewId: 'presenter-whole', role: 'fit', reason: 'Actual source patch lost',
+    trackingEvidence: { sourceImage: fixture.frame.sourceImage, seedPatchCorrelation: 0.2 },
+  }] }
+  const source = { shots: observations.shots, frames: [original] }, track = { frames: [fixture.frame] }
+  const row = sourceCensus(source, track, native, parseOptions(['--times', '1'])).selected[0]
+  const result = measureFrame(row.frame, fixture.response, 96, fixture.anchors, fixture.seeds), video = finishMeasuredFixture(fixture, result)
+  const loss = video.unavailableReasons.filter(item => item.anchorId === 'lost-control')
+  assert.equal(loss.length, 1)
+  assert.equal(loss[0].viewId, 'main')
+  assert.equal(loss[0].originalViewId, 'presenter-whole')
+  assert.equal(loss[0].originalRole, 'fit')
+  assert.deepEqual(loss[0].trackingEvidence, original.unavailable[0].trackingEvidence)
+  assert.equal(video.status, 'unavailable')
+  original.sourceImage = sourceImage(30, '4'.repeat(64))
+  const otherExposure = sourceCensus(source, track, native, parseOptions(['--times', '1'])).selected[0]
+  const unresolved = measureFrame(otherExposure.frame, fixture.response, 96, fixture.anchors, fixture.seeds)
+  assert.equal(unresolved.unavailable.find(item => item.anchorId === 'lost-control').originalRole, null)
+  assert.equal(unresolved.status, 'unavailable')
+})
+
+test('source-loss ambiguous view mapping and unresolved null controls cannot turn surviving measurements into a pass', () => {
+  const fixture = measuredViewFixture()
+  fixture.frame.shotId = 'shot'
+  fixture.frame.sourceImage = sourceImage(30, '3'.repeat(64))
+  fixture.frame.landmarks = fixture.observations
+  const original = { ...fixture.frame, views: [sourceView('presenter-whole')], landmarks: [], unavailable: [{
+    anchorId: 'lost-control', viewId: 'presenter-whole', role: 'check', reason: 'Original control remains required',
+  }] }
+  const layers = [sourceView('outgoing'), sourceView('incoming')]
+  const row = sourceCensus({ shots: observations.shots, frames: [original] }, { frames: [{ ...fixture.frame, views: layers }] }, native, parseOptions(['--times', '1'])).selected[0]
+  assert.throws(() => requireSourceViews(row), /presenter-whole/)
+  assert.equal(row.frame.unavailable[0].originalViewId, 'presenter-whole')
+  assert.equal(row.frame.unavailable[0].originalRole, 'check')
+  assert.match(row.frame.unavailable[0].viewMappingUnavailableReason, /Ambiguous/)
+  const unavailable = measureFrame(row.frame, fixture.response, 96, fixture.anchors, fixture.seeds)
+  assert.equal(finishMeasuredFixture(fixture, unavailable).status, 'unavailable')
+  fixture.frame.unavailable = [null]
+  const missing = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors, fixture.seeds), video = finishMeasuredFixture(fixture, missing)
+  assert.equal(missing.status, 'unavailable')
+  assert.equal(video.status, 'unavailable')
+  assert.equal(video.stageMeasurement.status, 'unmeasured')
+  assert.equal(video.unavailableReasons[0].role, null)
+  assert.equal(video.unavailableReasons[0].sourcePixels, null)
+  assert.equal(video.unavailableReasons[0].anchorId, undefined)
+})
+
+test('source-loss census gate restores omitted losses from passing summaries and rejected source rows', () => {
+  for (const rejected of [false, true]) {
+    const video = videoFixture(), loss = { anchorId: 'lost-control', viewId: 'main', role: 'fit', reason: 'Required source loss cannot disappear at the sample boundary' }
+    const sourceFrame = { ...frame(0), sourceImage: sourceImage(0, '3'.repeat(64)), unavailable: [loss] }
+    const row = { ...censusFixture.rows[0], frame: rejected ? null : sourceFrame,
+      ...(rejected ? { sourceUnavailable: [{ ...loss, originalViewId: 'main', originalRole: 'fit', sourceImage: sourceFrame.sourceImage, decodedTimeSeconds: 0 }] } : {}) }
+    finishVideo(video, { rows: [row], selected: [row] }, parseOptions(['--stage', '50']))
+    assert.equal(video.samples[0].status, 'unavailable')
+    assert.equal(video.coverage.passedRequiredSamples, 0)
+    assert.equal(video.coverage.complete, false)
+    assert.equal(video.coverage.unavailableRequiredSamples, 1)
+    assert.equal(video.status, 'unavailable')
+    assert.equal(video.stageMeasurement.status, 'unmeasured')
+    const reported = video.unavailableReasons.find(item => item.anchorId === 'lost-control')
+    assert.equal(reported.originalRole, 'fit')
+    assert.deepEqual(reported.sourceImage, sourceFrame.sourceImage)
+    assert.equal(reported.decodedTimeSeconds, 0)
+  }
+})
+
+test('source-loss original census declarations survive actual missing compact selection without borrowing neighboring losses', () => {
+  for (const [decodedTimeSeconds, shotId] of [[1, 'shot'], [0.999, 'shot'], [1, 'unresolved-original-shot']]) {
+    const original = { ...frame(1), decodedTimeSeconds, shotId, sourceImage: sourceImage(30, '3'.repeat(64)),
+      views: [sourceView('presenter-whole')], unavailable: [
+        { anchorId: 'original-fit-loss', viewId: 'presenter-whole', role: 'fit', reason: 'Original FIT control was lost',
+          trackingEvidence: { seedTimeSeconds: 0.5, sourcePatchCorrelation: 0.2 } },
+        { anchorId: 'original-unknown-loss', viewId: 'presenter-whole', reason: 'Correspondence and original role remain unresolved' },
+        { anchorId: 'original-null-loss', viewId: null, originalViewId: null, role: null, originalRole: null,
+          sourcePixels: null, sourceImage: null, decodedTimeSeconds: null, trackingEvidence: null,
+          reason: 'Original source namespace and binding remain explicitly null' },
+      ] }
+    const neighbor = { ...original, timeSeconds: 0.9, decodedTimeSeconds: 0.9, sourceImage: sourceImage(27, '4'.repeat(64)),
+      unavailable: [{ anchorId: 'neighbor-loss', role: 'check', reason: 'Different real exposure; cannot be borrowed' }] }
+    const compact = { ...frame(0), views: [sourceView('main')], sourceImage: sourceImage(0, '5'.repeat(64)) }
+    const options = parseOptions(['--stage', '50', '--times', '1'])
+    const census = sourceCensus({ shots: observations.shots, frames: [neighbor, original] }, { frames: [compact] }, native, options)
+    const row = census.selected[0], video = videoFixture()
+    assert.equal(row.frame, null)
+    assert.match(row.unavailableReason, /Missing authored sample/)
+    Object.assign(video.samples[0], { timeSeconds: 1, sampleTimeSeconds: null })
+    finishVideo(video, census, options)
+    assert.equal(video.stageMeasurement.scopedSamples.status, 'unavailable')
+    assert.equal(video.samples[0].status, 'unavailable')
+    assert.equal(video.coverage.passedRequiredSamples, 0)
+    const fit = video.unavailableReasons.find(item => item.anchorId === 'original-fit-loss')
+    assert.equal(fit.viewId, 'presenter-whole')
+    assert.equal(fit.originalViewId, 'presenter-whole')
+    assert.equal(fit.role, 'fit')
+    assert.equal(fit.originalRole, 'fit')
+    assert.equal(fit.reason, original.unavailable[0].reason)
+    assert.deepEqual(fit.trackingEvidence, original.unavailable[0].trackingEvidence)
+    assert.deepEqual(fit.sourceImage, original.sourceImage)
+    assert.equal(fit.decodedTimeSeconds, decodedTimeSeconds)
+    assert.equal(fit.sourceShotId, shotId)
+    const unknown = video.unavailableReasons.find(item => item.anchorId === 'original-unknown-loss')
+    assert.equal(unknown.role, null)
+    assert.equal(unknown.originalRole, null)
+    assert.equal(unknown.sourcePixels, null)
+    const unresolved = video.unavailableReasons.find(item => item.anchorId === 'original-null-loss')
+    for (const field of ['viewId', 'originalViewId', 'role', 'originalRole', 'sourcePixels', 'sourceImage', 'decodedTimeSeconds', 'trackingEvidence']) {
+      assert.equal(unresolved[field], null)
+    }
+    assert.equal(unresolved.reason, original.unavailable[2].reason)
+    assert.equal(video.unavailableReasons.some(item => item.anchorId === 'neighbor-loss'), false)
+    assert.deepEqual(census.rows.find(row => row.timeSeconds === 0).sourceUnavailable, [])
+  }
+})
 
 test('schema template matching admits only independent seed and actual correlation provenance', () => {
   const fixture = measuredViewFixture(), observed = fixture.observations[3]
