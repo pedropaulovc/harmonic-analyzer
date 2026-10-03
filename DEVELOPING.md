@@ -61,20 +61,23 @@ explicit way to stop a run, `-Cancel` (see
 | `-Worktree` | yes | absolute path to the checkout whose pushed HEAD is built; the build runs from a private snapshot of that commit, never from here |
 | `-PoolHome` | yes | absolute path to the `solidworks-pool` checkout; exported as `SOLIDWORKS_POOL_HOME` |
 | `-LogDirectory` | yes | absolute path for the logs, run records, snapshots, shared environments and outputs; created if missing, and rejected if it resolves inside any Git worktree |
-| `-Targets` | yes | doit task names as ONE comma-separated string (`part:pen_rod,part:cone_gear`) |
+| `-Targets` | yes | doit task names as ONE comma-separated string (`part:pn_pen_rod,part:dt_cone_gear`) |
 | `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
 
 Targets are *selections*, not variables, and they arrive as one string. `pwsh
 -File` binds a single token per parameter, so a repeated `-Targets` or a
 space-separated list is rejected before the script runs: pass
-`"part:pen_rod,part:cone_gear"`. The launcher splits that string on commas,
+`"part:pn_pen_rod,part:dt_cone_gear"`. The launcher splits that string on commas,
 trims each component, and rejects an empty set, an empty component, a token
 starting with `-`, and a token containing `=`. That last rule matters: doit
 removes a `name=value` argument as a command-line variable, so a mistyped
 target would leave no selection at all and silently launch the full default
-build. Task names use underscores (`part:pen_rod`), never dashes — a dashed
+build. Task names use prefixed underscores (`part:pn_pen_rod`), never dashes — a dashed
 name is rejected by `build.py` before the fleet is contacted.
+Canonical stems and drawing Numbers are defined in the
+[subsystem identity guide](cad/docs/subsystem-identities.md); its migration
+table translates identifiers recorded in older runs.
 
 The launcher sets `SOLIDWORKS_POOL_HOME`, `HARMONIC_REMOTE_CACHE_MODE=rw`,
 `PYTHONUNBUFFERED=1` and `VIRTUAL_ENV=<shared environment>`, then runs, from the
@@ -194,7 +197,7 @@ would lose live monitoring, so it is not used.
     "-Worktree", "C:/src/harmonic-smoke",
     "-PoolHome", "C:/src/solidworks-pool",
     "-LogDirectory", "C:/src/dt-logs/farm-runs",
-    "-Targets", "part:pen_rod",
+    "-Targets", "part:pn_pen_rod",
     "-LeafTimeout", "90",
     "-Tag", "smoke"
   ],
@@ -324,6 +327,11 @@ no `.done`.
 
 Before the child starts, the launcher prints its readiness line and writes
 `<run-id>.run.json`:
+
+The timestamped record example below preserves its pre-migration target and
+commit. Current selections use `part:pn_pen_rod`; consult the
+[migration table](cad/docs/subsystem-identities.md#identity-migration-table)
+when reading older run records.
 
 ```
 farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\dt-logs\farm-runs\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.run.json
