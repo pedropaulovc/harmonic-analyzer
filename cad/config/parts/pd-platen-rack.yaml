@@ -1,0 +1,7 @@
+pd-platen-rack:
+  number: MHA-PD-005
+  category: pd
+  material: Brass
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "gear cutting (hob/shaper)"

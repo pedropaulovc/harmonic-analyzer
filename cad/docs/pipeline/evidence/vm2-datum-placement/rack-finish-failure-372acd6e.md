@@ -1,5 +1,7 @@
 # Rack finish cold-reopen failure at 372acd6e
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 The normal drawing build passed, but the complete rack lifecycle failed at its
 first cold open. This head is not accepted for readable prints.
 

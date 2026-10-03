@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 During the 2026-07-21/22 drawing-batch merge campaign, merging **#359** (green
 on its own head, `gh pr merge --merge`) left **origin/main RED** on
 `check:recipe`. Root cause was a **semantic merge conflict**, invisible to git:

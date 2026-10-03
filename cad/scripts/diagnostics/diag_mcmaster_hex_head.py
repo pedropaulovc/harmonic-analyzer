@@ -21,7 +21,7 @@ head height.
 Frame: the vendor's, axis +Y head up, origin mid-overall, so the underside
 sits at (L - HH)/2 and the tip at -(L + HH)/2.
 
-``test_cone_tip_block_screw_drawing.py`` proves offline that this builder at
+``test_vn_cone_tip_block_screw_drawing.py`` proves offline that this builder at
 93075A194's dimensions issues exactly the feature calls that recipe issues.
 """
 

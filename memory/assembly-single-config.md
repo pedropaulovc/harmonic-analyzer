@@ -6,6 +6,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 2026-06-19: user directive "remove all assembly non default configurations." The
 drive-train and top harmonic-analyzer assemblies each carried an engagement enum
 as assembly CONFIGURATIONS (`Default` / `cone_disengaged` / `operating`;

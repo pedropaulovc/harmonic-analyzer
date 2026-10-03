@@ -64,15 +64,15 @@ def test_changed_dep_is_flagged(tmp_path: Path) -> None:
 def test_new_dep_absent_from_last_build_is_flagged(tmp_path: Path) -> None:
     """A dep present in the CURRENT graph but never recorded (added since the last
     build, e.g. a new hold-down part) is stale -- the Codex case that the original
-    8-component frame hit, where lag-screw.SLDPRT was a new, unchecked dep."""
+    8-component frame hit, where vn-lag-screw.SLDPRT was a new, unchecked dep."""
     old = tmp_path / "build_widget.py"
     old.write_text("A = 1\n", encoding="utf-8")
-    new = tmp_path / "lag-screw.SLDPRT"
+    new = tmp_path / "vn-lag-screw.SLDPRT"
     new.write_text("body\n", encoding="utf-8")
     # Ledger only knows `old`; `new` is a current dep with no saved state.
     db = {"part:widget": {"deps:": [str(old)], str(old): _state(old)}}
     stale = verify._stale_in_db(db, [_producer(tmp_path, deps=[old, new])])
-    assert stale and "new dep lag-screw.SLDPRT" in stale[0]
+    assert stale and "new dep vn-lag-screw.SLDPRT" in stale[0]
 
 
 def test_missing_target_is_flagged(tmp_path: Path) -> None:
@@ -102,16 +102,16 @@ def test_missing_dep_file_is_flagged(tmp_path: Path) -> None:
 
 def test_producers_walk_refs_and_include_current_deps() -> None:
     """frame -> its parts; the top assembly -> sub-assemblies AND their parts. Deps are
-    the CURRENT graph: frame must list lag-screw.SLDPRT (added with the hold-downs)."""
-    frame = {t: (deps, tgt) for t, deps, tgt in verify._producers("frame")}
-    assert "assembly:frame" in frame
-    assert "part:rocker_arm_support" in frame and "part:harmonic_base" in frame
-    frame_deps = [Path(d).name for d in frame["assembly:frame"][0]]
-    assert "lag-screw.SLDPRT" in frame_deps  # the dep the old recorded-only loop missed
+    the CURRENT graph: frame must list vn-lag-screw.SLDPRT (added with the hold-downs)."""
+    frame = {t: (deps, tgt) for t, deps, tgt in verify._producers("fr-frame")}
+    assert "assembly:fr_frame" in frame
+    assert "part:fr_rocker_arm_support" in frame and "part:fr_harmonic_base" in frame
+    frame_deps = [Path(d).name for d in frame["assembly:fr_frame"][0]]
+    assert "vn-lag-screw.SLDPRT" in frame_deps  # the dep the old recorded-only loop missed
 
-    top = {t for t, _, _ in verify._producers("harmonic-analyzer")}
-    assert "assembly:harmonic_analyzer" in top
-    assert any(t.startswith("assembly:") and t != "assembly:harmonic_analyzer" for t in top)
+    top = {t for t, _, _ in verify._producers("ha-harmonic-analyzer")}
+    assert "assembly:ha_harmonic_analyzer" in top
+    assert any(t.startswith("assembly:") and t != "assembly:ha_harmonic_analyzer" for t in top)
     assert any(t.startswith("part:") for t in top)  # recursed into a sub-assembly's parts
 
 

@@ -37,7 +37,7 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-`crank-pin` and the `pivot-shaft` blank — plain turned steel, no bore, no step.
+`dt-crank-pin` and the `ch-pivot-shaft` blank — plain turned steel, no bore, no step.
 :::
 
 ---

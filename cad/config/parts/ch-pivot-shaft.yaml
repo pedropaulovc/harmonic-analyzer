@@ -1,0 +1,10 @@
+ch-pivot-shaft:
+  number: MHA-CH-005
+  category: ch
+  material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finished steel bar, Ø10
+  finish: turned, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "turned (steel) between centres from Ø10 bar; plain end cut and domed to fit"

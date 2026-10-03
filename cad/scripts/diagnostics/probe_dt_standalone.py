@@ -1,4 +1,4 @@
-r"""Throwaway: is drive-train.SLDASM broken ON DISK, or only when flexible?
+r"""Throwaway: is dt-drive-train.SLDASM broken ON DISK, or only when flexible?
 Open it standalone, rebuild, report What's Wrong with the fixed byref call."""
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from _assembly import whats_wrong
 async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
-    dt = (OUT_SLDASM / "drive-train.SLDASM").resolve()
+    dt = (OUT_SLDASM / "dt-drive-train.SLDASM").resolve()
     adapter = PyWin32Adapter({})
     await adapter.connect()
     await adapter.open_model(str(dt))
@@ -28,7 +28,7 @@ async def main():
     ww = whats_wrong(adapter, doc)
     errs = [(n, c) for n, c, w in ww if not w]
     warns = [(n, c) for n, c, w in ww if w]
-    log(f"standalone drive-train.SLDASM: {len(errs)} errors, {len(warns)} warnings")
+    log(f"standalone dt-drive-train.SLDASM: {len(errs)} errors, {len(warns)} warnings")
     for n, c in errs[:25]:
         log(f"    ERROR {n!r} code={c}")
     for n, c in warns[:10]:

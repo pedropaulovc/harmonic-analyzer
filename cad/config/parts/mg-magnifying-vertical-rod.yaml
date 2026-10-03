@@ -1,0 +1,10 @@
+mg-magnifying-vertical-rod:
+  number: MHA-MG-004
+  category: mg
+  material: Brass
+  material_specification: Brass
+  finish: machined
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "machined (brass)"

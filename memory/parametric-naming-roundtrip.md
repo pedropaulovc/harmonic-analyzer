@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Goal the user is driving toward: make fine GUI adjustments to parts and have them
 reflected back in the scripts. Chosen path (NOT authored-part tiers, NOT a
 feature-tree decompiler): keep scripts as source, but have each build script emit

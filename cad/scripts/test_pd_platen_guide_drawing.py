@@ -1,0 +1,710 @@
+"""Offline contracts for the platen-guide manufacturing drawing."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+import pytest
+from PIL import Image
+
+import cut_release
+import package_native
+import draw_pd_platen_guide as drawing
+import build_pd_platen_guide as guide
+import _drawing_common as drawing_common
+from _drawing_registry import DRAWINGS, DRAWING_TEMPLATES, DrawingLayout
+from _drawing_common import (
+    _contact_preview_grid,
+    _gtol_frame_xml,
+    property_link,
+    render_pdf_png,
+    sanitize_pdf_metadata,
+)
+from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, blind_cut_dia_mm
+from pd_platen_guide_spec import TAPPED_HOLE_SPEC
+
+
+def test_platen_guide_native_front_is_hole_entry_face() -> None:
+    source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert "reverse_direction=True" in source
+    assert "(0.0, 0.0, 1.0)" in source
+    assert "UpdateStandardViews" not in source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"*Front", FRONT_VIEW_X_M, FRONT_VIEW_Y_M' in source
+
+
+def test_contact_preview_grid_preserves_legacy_layout_and_scales() -> None:
+    assert [_contact_preview_grid(pages) for pages in (2, 3, 4)] == [
+        (2, 2),
+        (2, 2),
+        (2, 2),
+    ]
+    assert [_contact_preview_grid(pages) for pages in (5, 6)] == [(3, 2), (3, 2)]
+    assert [_contact_preview_grid(pages) for pages in (7, 8, 9)] == [
+        (3, 3),
+        (3, 3),
+        (3, 3),
+    ]
+    assert _contact_preview_grid(10) == (4, 3)
+    with pytest.raises(ValueError, match="at least 2 pages"):
+        _contact_preview_grid(1)
+
+
+def test_five_page_contact_preview_preserves_aspect_and_unused_cell(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pdf = tmp_path / "five-pages.pdf"
+    png = tmp_path / "contact.png"
+    colors = [
+        (220, 20, 20),
+        (20, 180, 20),
+        (20, 20, 220),
+        (220, 180, 20),
+        (180, 20, 180),
+    ]
+    Image.init()
+    pages = [Image.new("RGB", (1224, 792), color) for color in colors]
+    pages[0].save(
+        pdf,
+        save_all=True,
+        append_images=pages[1:],
+        resolution=72,
+    )
+    monkeypatch.setitem(
+        drawing_common.DRAWING_TEMPLATES,
+        DrawingLayout.LANDSCAPE,
+        replace(
+            DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE],
+            dpi=30,
+            pixel_size=(510, 330),
+        ),
+    )
+
+    render_pdf_png(
+        pdf,
+        png,
+        layout=DrawingLayout.LANDSCAPE,
+        expected_pages=5,
+    )
+
+    with Image.open(png) as preview:
+        assert preview.size == (510, 330)
+        assert preview.info["dpi"] == pytest.approx((30, 30), abs=0.1)
+        centers = ((85, 82), (255, 82), (425, 82), (85, 247), (255, 247))
+        for center, color in zip(centers, colors, strict=True):
+            assert preview.getpixel(center) == pytest.approx(color, abs=2)
+        assert preview.getpixel((425, 247)) == (255, 255, 255)
+        assert preview.getpixel((85, 10)) == (255, 255, 255)
+
+
+def test_portrait_raster_crops_pdfium_width_rounding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import pypdfium2 as pdfium
+    from pypdf import PdfWriter
+
+    pdf = tmp_path / "portrait-width-plus-one.pdf"
+    png = tmp_path / "portrait.png"
+    writer = PdfWriter()
+    writer.add_blank_page(width=793, height=1224)
+    writer.write(pdf)
+    monkeypatch.setitem(
+        drawing_common.DRAWING_TEMPLATES,
+        DrawingLayout.PORTRAIT,
+        replace(
+            DRAWING_TEMPLATES[DrawingLayout.PORTRAIT],
+            dpi=30,
+            pixel_size=(330, 510),
+        ),
+    )
+    document = pdfium.PdfDocument(str(pdf))
+    page = document[0]
+    uncropped = page.render(scale=30 / 72).to_pil()
+    page.close()
+    document.close()
+    assert uncropped.size == (331, 510)
+    uncropped.close()
+
+    render_pdf_png(pdf, png, layout=DrawingLayout.PORTRAIT)
+
+    with Image.open(png) as preview:
+        assert preview.size == (330, 510)
+        assert preview.info["dpi"] == pytest.approx((30, 30), abs=0.1)
+
+
+def test_drawing_hole_sizes_follow_unc_policy() -> None:
+    assert guide.TAPPED_HOLE_SPEC is TAPPED_HOLE_SPEC
+    assert drawing.THREAD_DESIGNATION == "#4-40 UNC-2B"
+    assert drawing.THREAD_TAP_DRILL_MM == blind_cut_dia_mm(TAPPED_HOLE_SPEC)
+    assert drawing.THREAD_MAJOR_DIA_MM == THREAD_MAJOR_MM[TAPPED_HOLE_SPEC.size]
+    assert CLEARANCE_MM[("#4", "normal")] == 3.264
+
+
+def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
+    assert guide.LOCK_STATION_X == pytest.approx(
+        (guide.GUIDE_LENGTH * 0.3, guide.GUIDE_LENGTH * 0.7)
+    )
+    assert guide.HOLE_X == pytest.approx(
+        tuple(
+            station + offset
+            for station in guide.LOCK_STATION_X
+            for offset in (-guide.LOCK_SCREW_DX, guide.LOCK_SCREW_DX)
+        )
+    )
+    assert guide.SCREW_STATION_X == pytest.approx(
+        tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
+    )
+    source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert source.count("TAPPED_HOLE_SPEC,") == 1
+    assert "screw_spec = TAPPED_HOLE_SPEC" in source
+    assert "lock_spec = LOCK_TAP_SPEC" in source
+    assert '"tapped_bottoming", "#4-40"' not in source
+
+
+def test_drawing_splits_front_and_rear_tap_tables() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert '"*Back", FRONT_VIEW_X_M, BACK_VIEW_Y_M' in source
+    assert source.count("insert_hole_table(") == 2
+    assert 'starting_hole_tag="B"' in source
+    assert source.count("hole_entities=") == 2
+    assert "for station in FRONT_X" in source
+    assert "for station in REAR_X" in source
+
+
+# R9-64: the guide screws' front receivers are tapped THROUGH, so no thread
+# or drill depth exists to stack (a blind tap could not hold full thread to
+# the screw's reach and keep a bottoming tap's lead without its drill point
+# breaking through a faced lock seat). Recomputed from the catalogue screw
+# and the platen's counterbore, not from the build's derived constants.
+_GUIDE_SCREW_LEN_MAX = 0.25 * 25.4  # 90114A511; B18.6.3 band +0/-0.03 in
+_PLATEN_PASSAGE = 3.85 - 2.9178  # plate less the stock-head counterbore
+
+
+def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
+    spec = guide.TAPPED_HOLE_SPEC
+    assert (spec.kind, spec.size, spec.end) == ("tapped", "#4-40", "through_all")
+    assert spec.depth_mm == 0.0 and not spec.overrides_mm
+    reach = _GUIDE_SCREW_LEN_MAX - _PLATEN_PASSAGE
+    assert guide.GUIDE_SCREW_THREAD_ENGAGEMENT == pytest.approx(reach)
+    # The tip against the shallowest seat (the faced lock seats over A2/A4).
+    seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
+    assert seat_min - reach == pytest.approx(3.5022, abs=1e-9)
+    assert guide.GUIDE_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - reach)
+    # The assembly's blind-bottom check reads the same tip clearance.
+    assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE == guide.GUIDE_SCREW_TIP_INSIDE_MIN
+    # Full thread over the whole reach, even on the shortest catalogue screw.
+    shortest = reach - 0.03 * 25.4
+    assert shortest / THREAD_MAJOR_MM["#4-40"] >= 1.5
+
+
+# R9-48: the lock receivers are #4-40 taps THROUGH the rail, so no depth band
+# can starve the 3/8 lock screws. Recomputed here from the catalogue and the
+# printed bands, not from the build's derived constants.
+_IN = 25.4
+_LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91255A108; B18.6.3 band +0/-0.03 in
+_LOCK_THICK_MIN = 2.0 - 0.13  # 2.000 at 3 places: title block +/-0.13
+_GUIDE_DEPTH_MIN = 10.0 - 0.50  # 10.00 +0/-0.50 on the guide sheet
+_BAR_DEPTH_MIN = 9.0 - 0.13  # MHA-PD-007 9.00 +/-0.13
+_LOCK_GAP_FIT_MIN = 0.05  # the faced lock seats (R9-47)
+
+
+def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
+    spec = guide.LOCK_TAP_SPEC
+    assert (spec.kind, spec.size, spec.end) == ("tapped", "#4-40", "through_all")
+    assert spec.depth_mm == 0.0 and not spec.overrides_mm
+    seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
+    tip_reach_max = _LOCK_SCREW_LEN_MAX - _LOCK_THICK_MIN
+    assert seat_min - tip_reach_max == pytest.approx(1.265, abs=1e-9)
+    assert guide.LOCK_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - tip_reach_max)
+
+
+def test_lock_through_tap_exits_clear_the_front_taps() -> None:
+    # Each through tap exits the platen-mating face 7.0 from a front tap:
+    # both majors at the 9X Ø0.20 position, both mouths broken 0.25.
+    c2c = min(
+        abs(lock - front)
+        for lock in (80.892 - 7.0, 80.892 + 7.0, 188.748 - 7.0, 188.748 + 7.0)
+        for front in (26.964, 80.892, 134.82, 188.748, 242.676)
+    )
+    wall = c2c - 0.20 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.25
+    assert wall == pytest.approx(3.455, abs=1e-3)
+    assert wall >= 1.5
+    assert guide.LOCK_TAP_EXIT_WALL_MIN == pytest.approx(wall)
+
+
+def test_drawing_contract_imports_without_pywin32() -> None:
+    script = """
+import builtins
+real_import = builtins.__import__
+def blocked(name, *args, **kwargs):
+    if name in {'pythoncom', 'pywintypes'} or name.startswith('win32com'):
+        raise ImportError(f'blocked {name}')
+    return real_import(name, *args, **kwargs)
+builtins.__import__ = blocked
+import test_pd_platen_guide_drawing
+"""
+    subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).parent,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_required_drawing_paths() -> None:
+    assert drawing.SLDDRW.as_posix().endswith("/slddrw/pd-platen-guide.SLDDRW")
+    assert drawing.PDF.as_posix().endswith("/pdf/pd-platen-guide.pdf")
+    assert drawing.PNG.as_posix().endswith("/png/pd-platen-guide_drawing.png")
+
+
+def test_sheet_carries_no_notes_block_restating_the_position_frame() -> None:
+    # The 9X position frame already says it; "HOLE POSITION PER FCF." only
+    # repeated it (rule 6), and nothing else needs a note.
+    assert not hasattr(guide, "DRAWING_NOTES")
+    for module in (guide, drawing):
+        assert "Manufacturing Notes" not in Path(module.__file__).read_text(
+            encoding="utf-8"
+        )
+
+
+def test_bar_slide_face_carries_the_only_roughness_symbol() -> None:
+    import build_pd_paper_drive_assembly as assembly
+    from _gtol_spec import PlanarFace
+    from _surface_finish import MACHINED_UM
+    from pd_platen_guide_spec import SURFACE_FINISHES
+
+    # The top rail hangs by its local y 0 face on the bar's top edge, and the
+    # assembly keeps the part's y (Ry 180), so that face is the running one.
+    assert assembly.BAR_TOP_Y == assembly.GUIDE_Y[1]
+    assert [(c.key, c.roughness_um, c.face) for c in SURFACE_FINISHES] == [
+        ("bar_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0))
+    ]
+    build_source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert "author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)" in (
+        build_source
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_surface_finish(") == 1
+    assert 'surface_finish_by_key(SURFACE_FINISHES, "bar_slide")' in source
+    # Its leader lands between the A1 and B1 axes, clear of both, at a point
+    # projected from the controlled face's front edge (model y 0, z 0). The
+    # 234a39c87 farm sheet drew that edge 1.1 mm under the hard-coded sheet y
+    # the leader once asked for, past the 1 mm attachment readback limit.
+    assert guide.SCREW_STATION_X[0] < drawing.BAR_SLIDE_STATION_MM < guide.HOLE_X[0]
+    assert (
+        "leader_attach_xy=model_point_in_view(\n"
+        "            adapter,\n"
+        "            front,\n"
+        "            (BAR_SLIDE_STATION_MM / 1000.0, 0.0, 0.0),"
+    ) in source
+
+
+def test_part_authors_the_printed_dimensions_and_places() -> None:
+    from pd_platen_guide_spec import (
+        DRAWING_DIMENSIONS,
+        DRAWING_PRECISION,
+        DRAWING_PRECISION_BY_NAME,
+        GUIDE_DEPTH_PLACES,
+    )
+
+    assert DRAWING_DIMENSIONS == {
+        "GuideProfile": {"Length", "Height"},
+        "Guide": {"Depth"},
+    }
+    # The length only meets the platen's edges and the holes locate from the
+    # left end at basic stations: .X. The height prints at the places the
+    # paper-drive lock-station sweep judges it at.
+    assert DRAWING_PRECISION == {
+        "GuideProfile": {"Length": 1, "Height": GUIDE_DEPTH_PLACES},
+        "Guide": {"Depth": GUIDE_DEPTH_PLACES},
+    }
+    assert DRAWING_PRECISION_BY_NAME == {
+        "Length": 1,
+        "Height": GUIDE_DEPTH_PLACES,
+        "Depth": GUIDE_DEPTH_PLACES,
+    }
+    build_source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build_source
+    assert "in DRAWING_DIMENSIONS.items()" in build_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert (
+        "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
+        in source
+    )
+    # Both views import only their own features' marked dimensions, never the
+    # whole model's (which the farm log warns about and then deletes again).
+    assert source.count("curate_view_dimensions(") == 2
+    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
+
+
+# The rear view's auto-placed hole-table origin, measured on the v38 sheet:
+# its "Y" glyph tops out 20.2 mm above the view centre and its "0 -> X" row
+# bottoms out 19.2 mm below. The front table's A5 row ends at ~0.191 and the
+# length's text above the front view starts at ~0.138.
+_ORIGIN_ABOVE_M = 0.0202
+_ORIGIN_BELOW_M = 0.0192
+_FRONT_TABLE_BOTTOM_M = 0.191
+_LENGTH_TEXT_TOP_M = 0.1382
+
+
+def test_rear_view_origin_clears_the_table_and_the_length() -> None:
+    air = 0.004
+    assert drawing.BACK_VIEW_Y_M + _ORIGIN_ABOVE_M + air <= _FRONT_TABLE_BOTTOM_M
+    assert drawing.BACK_VIEW_Y_M - _ORIGIN_BELOW_M - air >= _LENGTH_TEXT_TOP_M
+
+
+def test_native_gdt_replaces_datum_flatness_parallelism_notes() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("add_datum_feature(") == 3
+    assert 'label="guide bottom edge",' in source
+    assert source.count("add_feature_control_frame(") == 3
+    assert 'characteristic="flatness"' in source
+    assert 'characteristic="parallelism"' in source
+    assert 'characteristic="position"' in source
+    assert "def _manufacturing_notes" not in source
+    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+
+
+def test_datum_b_surface_symbol_is_clear_of_every_hole_axis() -> None:
+    hole_axis_x = {
+        drawing.FRONT_LEFT_X_M + station / 1000.0
+        for station in (*drawing.REAR_X, *drawing.FRONT_X)
+    }
+    assert drawing.DATUM_B_SYMBOL_X_M == pytest.approx(
+        drawing.FRONT_LEFT_X_M + guide.GUIDE_LENGTH * 0.6 / 1000.0
+    )
+    assert min(
+        abs(drawing.DATUM_B_SYMBOL_X_M - x) for x in hole_axis_x
+    ) == pytest.approx((guide.GUIDE_LENGTH * 0.1 - guide.LOCK_SCREW_DX) / 1000.0)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "def _bottom_surface_edge(" in source
+    assert 'visible_view_entities(view, 1, label="platen-guide bottom edge")' in source
+    assert "if span_mm < GUIDE_LENGTH - 0.1:" in source
+    assert "datum_b_entity = _bottom_surface_edge(front)" in source
+    assert "entity=datum_b_entity" in source
+    assert "symbol_xy=(DATUM_B_SYMBOL_X_M, 0.098)" in source
+
+
+def test_gdt_xml_and_note_links_use_native_drawing_contracts() -> None:
+    xml = _gtol_frame_xml("position", "0.20", datums=("A", "B", "C"), diameter=True)
+    assert "GTOL-POSI" in xml
+    assert "<PrimaryRangeSymbol>phi</PrimaryRangeSymbol>" in xml
+    assert xml.count("<DatumCompartment>") == 3
+    assert property_link("Manufacturing Notes") == '$PRPSHEET:"Manufacturing Notes"'
+    assert "GTOL-SPROF" in _gtol_frame_xml("profile_surface", "0.10", datums=("C",))
+
+
+def test_pdf_metadata_is_project_owned(tmp_path: Path) -> None:
+    from pypdf import PdfReader, PdfWriter
+
+    pdf = tmp_path / "drawing.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=1224, height=792)
+    writer.add_metadata({"/Author": "seat-user"})
+    writer.write(pdf)
+    sanitize_pdf_metadata(pdf, title="Drawing")
+    metadata = PdfReader(pdf).metadata
+    assert metadata.author == "Harmonic Analyzer Project"
+    assert metadata.title == "Drawing"
+
+
+def test_pdf_metadata_preserves_multisheet_packages(tmp_path: Path) -> None:
+    from pypdf import PdfReader, PdfWriter
+
+    pdf = tmp_path / "drawing.pdf"
+    writer = PdfWriter()
+    for _sheet in range(4):
+        writer.add_blank_page(width=1224, height=792)
+    writer.write(pdf)
+    sanitize_pdf_metadata(pdf, title="Four-Sheet Drawing", expected_pages=4)
+    reader = PdfReader(pdf)
+    assert len(reader.pages) == 4
+    assert reader.metadata.title == "Four-Sheet Drawing"
+
+
+def test_drawing_template_layout_contracts() -> None:
+    assert {
+        layout: (
+            template.path.name,
+            template.width_m,
+            template.height_m,
+            template.dpi,
+            template.pixel_size,
+            template.title_block_left_m,
+            template.title_block_top_m,
+        )
+        for layout, template in DRAWING_TEMPLATES.items()
+    } == {
+        DrawingLayout.LANDSCAPE: (
+            "harmonic-analyzer-landscape.DRWDOT",
+            0.4318,
+            0.2794,
+            300,
+            (5100, 3300),
+            0.216,
+            0.066,
+        ),
+        DrawingLayout.PORTRAIT: (
+            "harmonic-analyzer-portrait.DRWDOT",
+            0.2794,
+            0.4318,
+            300,
+            (3300, 5100),
+            0.0636,
+            0.066,
+        ),
+    }
+    assert all(
+        template.path.is_file() and template.path.stat().st_size > 0
+        for template in DRAWING_TEMPLATES.values()
+    )
+
+
+def test_drawing_registry_is_unique_and_selects_layout_assets() -> None:
+    assert len({spec.name for spec in DRAWINGS}) == len(DRAWINGS)
+    assert len({spec.part for spec in DRAWINGS}) == len(DRAWINGS)
+    outputs = [path for spec in DRAWINGS for path in spec.outputs.values()]
+    assert len(set(outputs)) == len(outputs)
+    assert all(
+        spec.assets
+        == tuple(
+            DRAWING_TEMPLATES[layout].path
+            for layout in dict.fromkeys((spec.layout, *spec.additional_layouts))
+        )
+        for spec in DRAWINGS
+    )
+
+
+def _prepared_native_tree(
+    monkeypatch, tmp_path: Path, drawing_outputs: dict, fake_pack
+) -> Path:
+    """Point package_native at a throwaway repo with a faked Pack-and-Go, and
+    point the (SolidWorks-free) publisher at the tree it prepares."""
+    out = tmp_path / "native"
+    monkeypatch.setattr(package_native, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        package_native, "OUT_SLDASM", tmp_path / "cad" / "out" / "sldasm"
+    )
+    monkeypatch.setattr(package_native, "RELEASE_DIR", tmp_path / "release")
+    monkeypatch.setattr(package_native, "DRAWING_OUTPUTS", drawing_outputs)
+    monkeypatch.setattr(package_native, "_pack_and_go_document", fake_pack)
+    package_native.RELEASE_DIR.mkdir(exist_ok=True)
+    package_native.prepare_out(out)
+    monkeypatch.setattr(cut_release, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(
+        cut_release, "NATIVE_PACKAGE_FILE", out / package_native.SIDECAR_NAME
+    )
+    return out
+
+
+def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None:
+    sources: dict[str, Path] = {}
+    for kind, name in (
+        ("slddrw", "pd-platen-guide.SLDDRW"),
+        ("pdf", "pd-platen-guide.pdf"),
+        ("png", "pd-platen-guide_drawing.png"),
+    ):
+        source = tmp_path / "source" / kind / name
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(kind.encode())
+        sources[kind] = source
+    monkeypatch.setattr(cut_release, "DRAWING_OUTPUTS", {"pd_platen_guide": sources})
+
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    staged = cut_release.stage_drawings(stage)
+    assert staged == {
+        "platen_guide:pdf": "pdf/pd-platen-guide.pdf",
+        "platen_guide:png": "png/pd-platen-guide_drawing.png",
+    }
+    for relpath in staged.values():
+        assert (stage / relpath).is_file()
+
+    referenced_model = tmp_path / "source" / "sldprt" / "pd-platen-guide.SLDPRT"
+    referenced_model.parent.mkdir(parents=True)
+    referenced_model.write_bytes(b"referenced model")
+
+    def fake_pack(_sw, source, doc_type, archive):
+        assert source == sources["slddrw"]
+        assert doc_type == package_native.SW_DOC_DRAWING
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(source.name, source.read_bytes())
+            package.writestr("pd-platen-guide.SLDPRT", b"referenced model")
+        return (source, referenced_model)
+
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"pd_platen_guide": sources}, fake_pack
+    )
+    drawings = package_native.package_drawings(object(), out, {})
+    package_native.write_sidecar(out, "R2026x-test", (), drawings)
+
+    # The publisher holds no seat: it copies the prepared tree and rebuilds the
+    # very drawing facts the COM half used to return inline.
+    native = cut_release.stage_native(stage, cut_release.load_native_package())
+    assert native == {
+        "platen_guide:solidworks_slddrw": "solidworks/pd-platen-guide.SLDDRW",
+        "platen_guide:slddrw": "slddrw/pd-platen-guide.SLDDRW",
+    }
+    assert (stage / "solidworks" / "pd-platen-guide.SLDDRW").read_bytes() == b"slddrw"
+    assert (
+        stage / "solidworks" / "pd-platen-guide.SLDPRT"
+    ).read_bytes() == b"referenced model"
+    assert (stage / "slddrw" / "pd-platen-guide.SLDDRW").read_bytes() == b"slddrw"
+    assert (
+        stage / "slddrw" / "pd-platen-guide.SLDPRT"
+    ).read_bytes() == b"referenced model"
+
+
+def test_native_package_sidecar_carries_only_repo_relative_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The sidecar is written on a farm worker and read on the submitter, whose
+    checkout is somewhere else: an absolute path would point at the worker's
+    disk."""
+    drawing = tmp_path / "source" / "slddrw" / "pd-platen-guide.SLDDRW"
+    drawing.parent.mkdir(parents=True)
+    drawing.write_bytes(b"slddrw")
+
+    def fake_pack(_sw, source, _doc_type, archive):
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(source.name, source.read_bytes())
+        return (source,)
+
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"pd_platen_guide": {"slddrw": drawing}}, fake_pack
+    )
+    drawings = package_native.package_drawings(object(), out, {})
+    sidecar = package_native.write_sidecar(out, "R2026x-test", (), drawings)
+
+    assert sidecar["schema"] == 1
+    assert sidecar["solidworks_revision"] == "R2026x-test"
+    assert sidecar["out_dir"] == "native"
+    assert sidecar["native_dir"] == "native/solidworks"
+    assert sidecar["drawing_dir"] == "native/slddrw"
+    assert sidecar["native_files"] == 1
+    assert sidecar["drawing_files"] == 1
+    assert sidecar["drawings"]["pd_platen_guide"] == {
+        "source": "source/slddrw/pd-platen-guide.SLDDRW",
+        "native_slddrw": "native/solidworks/pd-platen-guide.SLDDRW",
+        "portable_slddrw": "native/slddrw/pd-platen-guide.SLDDRW",
+        "sources": ["source/slddrw/pd-platen-guide.SLDDRW"],
+    }
+
+    def _strings(node):
+        if isinstance(node, dict):
+            return [s for value in node.values() for s in _strings(value)]
+        if isinstance(node, list):
+            return [s for value in node for s in _strings(value)]
+        return [node] if isinstance(node, str) else []
+
+    assert not [
+        text for text in _strings(sidecar) if "\\" in text or ":" in text[1:3]
+    ]
+
+
+def test_release_rejects_a_truncated_prepared_native_tree(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A partial remote-cache restore must fail the release, not ship a bundle
+    whose solidworks/ is missing documents."""
+    drawing = tmp_path / "source" / "slddrw" / "pd-platen-guide.SLDDRW"
+    drawing.parent.mkdir(parents=True)
+    drawing.write_bytes(b"slddrw")
+
+    def fake_pack(_sw, source, _doc_type, archive):
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(source.name, source.read_bytes())
+        return (source,)
+
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"pd_platen_guide": {"slddrw": drawing}}, fake_pack
+    )
+    drawings = package_native.package_drawings(object(), out, {})
+    package_native.write_sidecar(out, "R2026x-test", (), drawings)
+    (out / "solidworks" / "pd-platen-guide.SLDDRW").unlink()
+
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    with pytest.raises(RuntimeError, match="recorded 1"):
+        cut_release.stage_native(stage, cut_release.load_native_package())
+
+
+def test_release_rejects_a_stale_native_package_schema(
+    tmp_path: Path, monkeypatch
+) -> None:
+    sidecar = tmp_path / "native-package.json"
+    sidecar.write_text('{"schema": 0}', encoding="utf-8")
+    monkeypatch.setattr(cut_release, "NATIVE_PACKAGE_FILE", sidecar)
+
+    with pytest.raises(SystemExit, match="doit package:release"):
+        cut_release.load_native_package()
+
+    sidecar.unlink()
+    with pytest.raises(SystemExit, match="doit package:release"):
+        cut_release.load_native_package()
+
+
+def test_release_accepts_pack_rewrite_of_same_original_source(
+    tmp_path: Path, monkeypatch
+) -> None:
+    drawing = tmp_path / "source" / "slddrw" / "pn-pen-assembly.SLDDRW"
+    assembly = tmp_path / "source" / "sldasm" / "pn-pen.SLDASM"
+    drawing.parent.mkdir(parents=True)
+    assembly.parent.mkdir(parents=True)
+    drawing.write_bytes(b"drawing")
+    assembly.write_bytes(b"source assembly")
+
+    def fake_pack(_sw, _source, _doc_type, archive):
+        with zipfile.ZipFile(archive, "w") as package:
+            package.writestr(drawing.name, b"drawing")
+            package.writestr(assembly.name, b"drawing Pack-and-Go rewrite")
+        return (drawing, assembly)
+
+    out = _prepared_native_tree(
+        monkeypatch, tmp_path, {"pn_pen_assembly": {"slddrw": drawing}}, fake_pack
+    )
+    # The top assembly's Pack-and-Go laid its own rewrite down first; it wins.
+    (out / "solidworks" / assembly.name).write_bytes(b"top-level Pack-and-Go rewrite")
+
+    drawings = package_native.package_drawings(
+        object(), out, {assembly.name.casefold(): assembly}
+    )
+
+    assert drawings["pn_pen_assembly"]["native_slddrw"] == (
+        "native/solidworks/pn-pen-assembly.SLDDRW"
+    )
+    assert (out / "solidworks" / assembly.name).read_bytes() == (
+        b"top-level Pack-and-Go rewrite"
+    )
+    assert (out / "slddrw" / assembly.name).read_bytes() == (
+        b"drawing Pack-and-Go rewrite"
+    )
+
+
+def test_release_rejects_pack_collision_from_distinct_original_sources(
+    tmp_path: Path,
+) -> None:
+    first = tmp_path / "one" / "pn-pen.SLDASM"
+    second = tmp_path / "two" / "pn-pen.SLDASM"
+    first.parent.mkdir()
+    second.parent.mkdir()
+    first.write_bytes(b"one")
+    second.write_bytes(b"two")
+    archive = tmp_path / "pack.zip"
+    with zipfile.ZipFile(archive, "w") as package:
+        package.writestr(first.name, b"rewrite")
+    destination = tmp_path / "destination"
+    destination.mkdir()
+
+    with pytest.raises(RuntimeError, match="different sources"):
+        package_native._merge_pack_and_go_zip(
+            archive,
+            (second,),
+            ((destination, {first.name.casefold(): first}),),
+        )

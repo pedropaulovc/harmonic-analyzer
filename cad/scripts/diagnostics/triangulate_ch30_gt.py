@@ -159,7 +159,7 @@ MODEL_NOW = {
     # deferred with the north bearing / helical end gears)
     "pinion_front": (-10.38, 90.518, -144.0),  # tee-handle hub (HANDLE_Z)
     "pinion_back": (-10.38, 90.518, 91.25),  # back stub free end
-    "top_frame": (223.1, 1040.7, 138.1),  # boss-extreme convention (2026-08-02
+    "fr_top_frame": (223.1, 1040.7, 138.1),  # boss-extreme convention (2026-08-02
     # rederive): x/z = boss extremes 197/112 + Ø52.2/2 (photo silhouette read
     # ±223.2), y = boss top 1040.7;
     # rail faces ±214.1 / ±131.0, rail top face 1036.2
@@ -429,7 +429,7 @@ def main() -> int:
 
     if args.json_out:
         out = {
-            "top_frame": {"TX": top[0], "TY": top[1], "TZ": top[2]},
+            "fr_top_frame": {"TX": top[0], "TY": top[1], "TZ": top[2]},
             "columns": {"X": col[0], "Z": col[1]},
             "features": {k: list(map(float, feats[k])) for k in prob.feat_names},
             "rms_px": float(np.sqrt((err**2).mean())),

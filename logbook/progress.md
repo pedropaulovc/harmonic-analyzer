@@ -32,14 +32,16 @@ This table is only the entry-derived hours roll-up.
 |---|---:|---:|---:|---|
 | — | | | | |
 
-`0 / 102` part types started (`uv run python -m doit list --all | rg -c '^part:'`).
+`0 / 146` registered part families started. The inventory and identity lookup
+are documented in the [subsystem identity guide](../cad/docs/subsystem-identities.md);
+bench progress comes from the entries above.
 
 ## Blocked on
 
 | # | blocker | blocks | action |
 |---|---|---|---|
 | 1 | Gear-cutter blanks + tool steel not sourced | M10 | Source gear-cutter blanks and tool steel. |
-| 2 | `summing-lever` body and knife-edge methods undecided | ch. 27; no module assigned yet | Decide cast / fabricate / hog and integral / insert before buying stock. |
+| 2 | `sm-summing-lever` body and knife-edge methods undecided | ch. 27; no module assigned yet | Decide cast / fabricate / hog and integral / insert before buying stock. |
 | 3 | Spring specification not written | ch. 31 | Rate matching across 20 channels is a spec problem first. |
 
 ## Rhythm

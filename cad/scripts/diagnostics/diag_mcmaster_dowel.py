@@ -21,7 +21,7 @@ harvest is one Revolve1 of five faces: a flat Ø0.115 end face and a cone at
 other (the round end).  Its diameter band is the family's, read on the
 98381A433/434/489 pages; the model is drawn at nominal.
 
-98381A474 (1/8 x 7/8, the MHA-169 latch pin since R9-50) is [INFERENCE]: the
+98381A474 (1/8 x 7/8, the MHA-VN-042 latch pin since R9-50) is [INFERENCE]: the
 7/8 in length of the 1/8 series (98381A467 1/8 in through 98381A479
 1-3/4 in, dt-logs mcmaster-skus.md "Round 6 - additions"; a reseller lists
 98381A474 as 1/8 x 7/8,

@@ -1,0 +1,11 @@
+dt-alignment-pinion:
+  number: MHA-DT-001
+  category: dt
+  title: Alignment Pinion Drum
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: bore as reamed; teeth as cut
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "gear cutting (hob/shaper)"

@@ -39,7 +39,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _assembly  # noqa: E402
 
 FULLY, UNDER = 3, 2
-ASM = "drive-train"
+ASM = "dt-drive-train"
 
 
 def _attempt(fn, default=None):

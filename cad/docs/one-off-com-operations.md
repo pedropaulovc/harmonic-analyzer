@@ -1,5 +1,7 @@
 # Running a one-off COM operation
 
+> Dated incidents and calibration examples retain their recorded identifiers and paths. Current identities are listed in [subsystem identities](subsystem-identities.md).
+
 Mid-incident playbook for the question *"I need SolidWorks to do ONE thing —
 how do I run it from here?"*. This checkout has **no local seat**: every
 SolidWorks-touching task runs on the farm
@@ -55,14 +57,14 @@ errors and exits 0/20/21/22 for succeeded/failed/launcher-died/cancelled.
 
 ```powershell
 .\build.cmd --help                    # wrapper options + farm defaults, then doit's commands
-.\build.cmd part:cone_gear            # one leaf on the farm
+.\build.cmd part:dt_cone_gear            # one leaf on the farm
 .\build.cmd --leaf-timeout 90 build   # whole closure, 90 min per attempt
 ```
 
 Nothing reaches the fleet until the requested task names are known-good.
 `build.py` loads the doit graph, resolves your selection against it, and exits
 3 naming the offending target when a name is unknown — dashed spellings such as
-`part:arbor-pedestal` included, because it never normalizes a dash into an
+`part:dt-arbor-pedestal` included, because it never normalizes a dash into an
 underscore. No fleet query, no workflow and no action happen on that path.
 
 Then, once per run and still before the first action, `build.py`'s farm
@@ -252,8 +254,8 @@ category, exit code and log blob. The workflow id is
 characters of the requested commit). From the pool checkout:
 
 ```powershell
-uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py status "leaf:part:cone_gear:<64hex>:900s"
-uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py logs   "leaf:part:cone_gear:<64hex>:900s"
+uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py status "leaf:part:dt_cone_gear:<64hex>:900s"
+uv run --frozen --project ../solidworks-pool python ../solidworks-pool/farm.py logs   "leaf:part:dt_cone_gear:<64hex>:900s"
 ```
 
 The submitter logs each ID twice: `Farm workflow requested: <id>` immediately

@@ -2,7 +2,7 @@ r"""Isolated repro: can an assembly OPENED from disk be saved in place silently,
 with no UIAutomation watchdog?
 
 Background: build_engagement_configs first tried ``adapter.save_file(PATH)`` and
-it destroyed drive-train.SLDASM. The conclusion drawn at the time -- "this Makers
+it destroyed dt-drive-train.SLDASM. The conclusion drawn at the time -- "this Makers
 seat refuses every silent save, only the blocking Save() + a Save-All dialog
 watchdog persists" -- is suspect: every NORMAL build saves fine through the SAME
 ``save_file`` (via save_assembly_and_images). The difference is only that a normal
@@ -16,7 +16,7 @@ params passed as proper pywin32 BYREF VARIANTs (the adapter's no-path branch
 passes ``None, None``, which fails the COM call and falls through to the blocking
 ``Save()``).
 
-It works on a COPY so the real drive-train.SLDASM stays pristine, and tries the
+It works on a COPY so the real dt-drive-train.SLDASM stays pristine, and tries the
 candidate save calls in order, logging mtime + GetSaveFlag + error/warning codes.
 
     uv run python cad\scripts\diagnostics\repro_inplace_save.py
@@ -62,7 +62,7 @@ SILENT = 1           # swSaveAsOptions_Silent
 # retry below silently asked for AvoidRebuildOnSave and never actually saved
 # references -- a false failure on the very path it was written to exercise.
 SAVE_REFERENCED = 4
-SRC = OUT_SLDASM / "drive-train.SLDASM"
+SRC = OUT_SLDASM / "dt-drive-train.SLDASM"
 COPY = OUT_SLDASM / "_repro_inplace.SLDASM"
 
 

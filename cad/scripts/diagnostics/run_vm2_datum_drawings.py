@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 
 from _drawing_registry import DRAWINGS_BY_NAME  # noqa: E402
 
-SPECS = tuple(DRAWINGS_BY_NAME[name] for name in ("pinion_lift_rod", "rack_pinion"))
+SPECS = tuple(DRAWINGS_BY_NAME[name] for name in ("dt_pinion_lift_rod", "pd_rack_pinion"))
 
 
 def digest(path):
@@ -34,12 +34,12 @@ def main():
     if os.environ.get("HARMONIC_SW_AUTOSTART") != "0" or os.environ.get("HARMONIC_REMOTE_CACHE_MODE") != "off":
         raise RuntimeError("requires attach-only mode and remote cache off")
     command = [sys.executable, "-m", "doit", "-n", "4",
-               "drawing:pinion_lift_rod", "drawing:rack_pinion"]
+               "drawing:dt_pinion_lift_rod", "drawing:pd_rack_pinion"]
     sources = [ROOT / f"cad/out/sldprt/{spec.artifact_stem}.SLDPRT" for spec in SPECS]
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     adapter = subprocess.check_output(["git", "-C", "SolidworksMCP-python", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     scripts = [ROOT / f"cad/scripts/{name}" for name in (
-        "draw_pinion_lift_rod.py", "draw_rack_pinion.py", "_native_axis_datum.py",
+        "draw_dt_pinion_lift_rod.py", "draw_pd_rack_pinion.py", "_native_axis_datum.py",
         "_rack_bore_finish.py", "_drawing_common.py")]
     report = {"kind": "vm2-normal-datum-drawing-tasks", "head": head, "adapter": adapter,
               "command": command, "cwd": str(ROOT), "status": "running",

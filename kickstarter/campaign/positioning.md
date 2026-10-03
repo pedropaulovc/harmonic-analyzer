@@ -46,7 +46,8 @@
      into its frequencies mechanically.
   2. Their own donations page says complex pieces are the ones they struggle to
      produce, because it is hard to find someone who can turn the theory into an
-     object. A 102-part working analyzer is the far end of that scale.
+     object. An analyzer with [146 registered part families](../../cad/docs/subsystem-identities.md)
+     is the far end of that scale.
   3. It makes the book's audience and the machine's audience different people,
      which is unusual and good: machinists fund it, schoolchildren use it.
 
@@ -55,7 +56,8 @@
   institution agreeing to appear in a crowdfunding campaign. See
   [`risks.md`](risks.md).
 - **The hard half is already done and public.** A complete parametric CAD model
-  with 102 parts, verified assemblies, and a photo-comparison gallery scoring
+  with [146 registered part families](../../cad/docs/subsystem-identities.md),
+  verified assemblies, and a photo-comparison gallery scoring
   it against the surviving machine. Backers can look at it before they pledge.
 - **It is a genuine skills ladder.** Facing a bar → turning bushings to a length
   tolerance → boring → indexed gear cutting with self-made form cutters. A
@@ -88,8 +90,9 @@ machining tradition exists. The bridge — *here is how you actually cut a
 
 ## Proof points to lead with (all verifiable today)
 
-- 102 parts, 8 sub-assemblies, 95 curated manufacturing drawings. (Counted from
-  the build graph: `uv run python -m doit list --all`, needs no SolidWorks seat.)
+- [146 registered part families and 8 assembly identities](../../cad/docs/subsystem-identities.md).
+  These are registry counts; obtain current task and drawing counts from
+  `uv run python -m doit list --all` rather than treating them as the same inventory.
 - Every dimension traced to a source (book page, photograph, or derivation) with
   a confidence level — `cad/config/dimensions.yaml`.
 - Assemblies gated on degrees of freedom, interference and mass properties on

@@ -70,7 +70,7 @@ DEFAULT_TEXT_OVERLAP_TOL_M = 0.0003
 DEFAULT_MOVE_CLEARANCE_M = 0.002
 
 # An arrowhead, or an outside arrow's tail, nearer another annotation's text
-# than this reads as part of that text (MHA-092 round 2: the 5.56's arrow
+# than this reads as part of that text (MHA-DT-021 round 2: the 5.56's arrow
 # 0.4 mm from "Ra 3.2", the 10.7's inside the 3.97's tolerance stack). The
 # fleet rule: the layout audit gates on it, and ``_drawing_leaders`` checks
 # placed sheets against it -- one constant, so the two cannot drift.

@@ -1,7 +1,0 @@
-channel-lever:
-  number: MHA-009
-  material_family: ferrous_noncritical
-  finish: RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores
-  quantity: 20
-  tolerance_class: machined_block
-  process: "machined from solid stock or casting"

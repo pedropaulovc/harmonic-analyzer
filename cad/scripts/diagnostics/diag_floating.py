@@ -1,4 +1,4 @@
-r"""Diagnostic: find what renders above the top frame in harmonic-analyzer.SLDASM.
+r"""Diagnostic: find what renders above the top frame in ha-harmonic-analyzer.SLDASM.
 
 Scans ALL components (any suppression/visibility state) and reports any whose
 world box reaches y > 1150 mm, plus visible top-level assembly sketches.
@@ -19,7 +19,7 @@ from _common import _flag  # noqa: E402
 
 import _telemetry  # noqa: E402
 
-ASM = Path(__file__).resolve().parents[1] / "out" / "sldasm" / "harmonic-analyzer.SLDASM"
+ASM = Path(__file__).resolve().parents[1] / "out" / "sldasm" / "ha-harmonic-analyzer.SLDASM"
 
 
 async def build(adapter) -> dict[str, str]:

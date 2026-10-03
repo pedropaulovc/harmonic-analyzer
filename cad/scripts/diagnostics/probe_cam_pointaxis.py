@@ -39,8 +39,8 @@ STUDY = "Motion Study 2"
 
 
 def _gear_rod(parts):
-    gear = next((p for p in parts if "cylinder-gear" in p), None)
-    rod = next((p for p in parts if "connecting-rod" in p), None)
+    gear = next((p for p in parts if "dt-cylinder-gear" in p), None)
+    rod = next((p for p in parts if "ch-connecting-rod" in p), None)
     return gear, rod
 
 
@@ -82,7 +82,7 @@ async def main():
     for _sub, _mate, name, _mtype, parts, _val in _iter_mates(
             adapter, doc, read_values=False):
         joined = " ".join(parts)
-        if "cylinder-gear" in joined and "connecting-rod" in joined:
+        if "dt-cylinder-gear" in joined and "ch-connecting-rod" in joined:
             gear, rod = _gear_rod(parts)
             cams.append((name, gear, rod))
     log(f"  found {len(cams)} cam couplings")
@@ -118,9 +118,9 @@ async def main():
     log("  one-time walk to cache crank + cone-shaft + cyl-gear ...")
     comps = _components(adapter)
     cached = {
-        "crank": _find_one(adapter, "crankshaft-1", comps=comps)[0],
-        "coneshaft": _find_one(adapter, "cone-gear-shaft-1", comps=comps)[0],
-        "cylgear0": _find_one(adapter, "cylinder-gear-1", comps=comps)[0],
+        "crank": _find_one(adapter, "dt-crankshaft-1", comps=comps)[0],
+        "coneshaft": _find_one(adapter, "dt-cone-gear-shaft-1", comps=comps)[0],
+        "cylgear0": _find_one(adapter, "dt-cylinder-gear-1", comps=comps)[0],
     }
 
     for run in range(1, 4):

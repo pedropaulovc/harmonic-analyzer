@@ -80,7 +80,7 @@ async def _suppress_pen_travel(adapter):
     best = (None, -1.0)
     for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
         lone = _lone_real(parts, "output")
-        if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
+        if mtype != DISTANCE or lone is None or _family(lone) != "pn-pen-rod":
             continue
         val = _mate_value(adapter, mate, mtype) or 0.0
         if val > best[1]:
@@ -115,7 +115,7 @@ async def main():
     #    position (its skew X-axis can't be geared; its motion is lumped into the
     #    summing<->wheel gear ratio).
     await _suppress_named(adapter, "output-1",
-                          ("summing-lever", "magnifying-wheel"),
+                          ("sm-summing-lever", "mg-magnifying-wheel"),
                           (ANGLE,), "summing+wheel rock")
     await _suppress_pen_travel(adapter)
 
@@ -130,16 +130,16 @@ async def main():
     top = adapter.currentModel
     adapter.currentModel = out_doc
     try:
-        w1 = await gear_mate(adapter, _entity_ref("summing-lever-1", "Axis1", "AXIS"),
-                             _entity_ref("magnifying-wheel-1", "Axis1", "AXIS"),
+        w1 = await gear_mate(adapter, _entity_ref("sm-summing-lever-1", "Axis1", "AXIS"),
+                             _entity_ref("mg-magnifying-wheel-1", "Axis1", "AXIS"),
                              RATIO_SUM_WHEEL, label="WIRE1 summing->wheel (parallel Z)")
         log(f"  WIRE1 summing->wheel: {w1.get('name')}")
     except Exception as exc:  # noqa: BLE001
         log(f"  WIRE1 FAILED: {exc}")
     try:
-        rack_ref = _entity_ref("pen-rod-1", "Axis1", "AXIS")
+        rack_ref = _entity_ref("pn-pen-rod-1", "Axis1", "AXIS")
         rack_ref.mark = 64
-        pinion_ref = _entity_ref("magnifying-wheel-1", "Axis1", "AXIS")
+        pinion_ref = _entity_ref("mg-magnifying-wheel-1", "Axis1", "AXIS")
         pinion_ref.mark = 128
         w2 = await rack_pinion_mate(adapter, rack_ref, pinion_ref,
                                     pinion_pitch_diameter=WIRE2_PITCH_MM,
@@ -153,7 +153,7 @@ async def main():
     # 4) DIRECT motor on the summing-lever Axis1 (knife rotation axis) -- the
     #    stand-in for the spring force balance, isolating the coupling chain.
     motor = check("motor summing", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary", entity=_entity_ref("summing-lever-1", "Axis1", "AXIS"),
+        motor_type="rotary", entity=_entity_ref("sm-summing-lever-1", "Axis1", "AXIS"),
         speed=SUM_RPM, study_name=STUDY)))
     log(f"  motor on summing-lever Axis1 ({SUM_RPM} RPM): {motor}")
 
@@ -163,17 +163,17 @@ async def main():
     adapter._attempt(lambda: top.EditRebuild3(), default=None)
     check("calc", await adapter.calculate_motion(MotionStudyRefParameters(name=STUDY)))
 
-    marker, _ = _find_one(adapter, "pen-marker")
-    sl, _ = _find_one(adapter, "summing-lever-1")
-    ml, _ = _find_one(adapter, "magnifying-lever-1")
-    wh, _ = _find_one(adapter, "magnifying-wheel-1")
+    marker, _ = _find_one(adapter, "pn-pen-marker")
+    sl, _ = _find_one(adapter, "sm-summing-lever-1")
+    ml, _ = _find_one(adapter, "mg-magnifying-lever-1")
+    wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
     base, spans, ys = {}, {}, []
     for t in TIMES:
         await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=STUDY))
         if marker is not None:
             from build_motion_study import _world
             ys.append(_world(_comp_xform(adapter, marker), [0, 0, 0])[1])
-        for key, comp in (("summing", sl), ("mag-lever", ml), ("wheel", wh)):
+        for key, comp in (("sm-summing", sl), ("mag-lever", ml), ("wheel", wh)):
             if comp is None:
                 continue
             a = _comp_xform(adapter, comp)
@@ -181,7 +181,7 @@ async def main():
             spans[key] = max(spans.get(key, 0.0), _rot_angle(base[key], a))
     if ys:
         log(f"  pen-marker Y span = {max(ys) - min(ys):.3f} mm")
-    log(f"  ROCK summing={spans.get('summing', 0):.1f}  "
+    log(f"  ROCK summing={spans.get('sm-summing', 0):.1f}  "
         f"mag-lever={spans.get('mag-lever', 0):.1f}  wheel={spans.get('wheel', 0):.1f}")
     await adapter.disconnect()
     _telemetry.info("Disconnected (NOT saved).")

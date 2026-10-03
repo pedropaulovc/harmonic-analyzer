@@ -1,0 +1,10 @@
+pd-transgear-feed-pinion:
+  number: MHA-PD-010
+  category: pd
+  material: SAE 1018 CF bar, ASTM A108-24
+  material_specification: SAE 1018 CF bar, ASTM A108-24
+  finish: oiled
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "turned; gear cutting (hob/shaper); flat milled"

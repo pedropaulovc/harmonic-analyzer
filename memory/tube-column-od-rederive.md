@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 **M6.11 (2026-06-19): tube-frame column OD rederived from the ch30 8-views → Ø25.4 mm (1"), superseding legacy Ø1.375" (Ø34.925, ~45% oversize, no book numeric).**
 
 **Method (photogrammetry).** The 4 quarter views (p003/p005/p007/p009) resolve the frame into 4 *isolated single columns* — front/back/side views merge the same-x or same-z column pairs (~2° off-axis azimuths add ~11 mm of pair-offset) and are unreliable. Under the manifest's orthographic euler cameras a vertical cylinder's apparent width = OD × scale (isotropic, azimuth-independent). Per-view scale (px/mm) fit from the known corner stations (±197, ±112) + azimuth: `screen_x = scale·(x·cosA + z·sinA) + c`, R² 0.94–0.99. Cross-checked independently by the **460 mm base plate** = ~1500 px in the front view → 3.26 px/mm, matching the column-spacing scale and confirming the ±197 stations (back-solves 402 vs 394). 7 isolated-column silhouette reads (gradient edges vs black bg) = **Ø23.8 ± 1.0 mm**; base-scale variant ~24.7. Rounded to **1" stock** (1896 Gaertner machine = imperial tube). User chose 1"/25.4 + "cascade everything".

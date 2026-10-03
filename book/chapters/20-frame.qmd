@@ -15,19 +15,19 @@ Everything else hangs off this. Build it first, and build it square.
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `harmonic-base` | TODO | TODO | TODO |
-| `tube-frame` | TODO | TODO | TODO |
-| `top-frame` | TODO | TODO | TODO |
-| `support-bar` | TODO | TODO | TODO |
-| `rocker-arm-support` | TODO | TODO | TODO |
-| `foot-screw` | TODO | TODO | TODO |
-| `frame-side-screw` | TODO | TODO | TODO |
+| `fr-harmonic-base` | TODO | TODO | TODO |
+| `fr-tube-frame` | TODO | TODO | TODO |
+| `fr-top-frame` | TODO | TODO | TODO |
+| `pd-support-bar` | TODO | TODO | TODO |
+| `fr-rocker-arm-support` | TODO | TODO | TODO |
+| `vn-foot-screw` | TODO | TODO | TODO |
+| `vn-frame-side-screw` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 
 ## What will fight you
 
-The rocker-arm support is modelled as a cast iron casting with 6.35 mm shell walls and R12.7-relieved internal corners; cutting it from bar is a benign substitution. Its four foot holes are 1/2-13 UNC-2B through the 6.35 mm foot, with a Ø10.716 mm tap drill (Ø10.72 displayed; 27/64 in). The dimensions and thread class come from `cad/scripts/build_rocker_arm_support.py` and `cad/scripts/_holes.py`.
+The rocker-arm support is modelled as a cast iron casting with 6.35 mm shell walls and R12.7-relieved internal corners; cutting it from bar is a benign substitution. Its four foot holes are 1/2-13 UNC-2B through the 6.35 mm foot, with a Ø10.716 mm tap drill (Ø10.72 displayed; 27/64 in). The dimensions and thread class come from `cad/scripts/build_fr_rocker_arm_support.py` and `cad/scripts/_holes.py`.
 
 ## Making each part
 

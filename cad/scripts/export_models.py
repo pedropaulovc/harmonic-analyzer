@@ -101,8 +101,8 @@ SRC_DIGESTS = OUT_STL / "export-src.json"
 # mismatch invalidates the whole cache -> full regeneration through the new logic.
 _EXPORTER_KEY = "__exporter__"
 NEUTRAL_MANIFEST = CAD_ROOT / "out" / "reports" / "release-neutral.json"
-NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@3"
-TOP_ASSEMBLY = "harmonic-analyzer"
+NEUTRAL_SCHEMA = "ha-harmonic-analyzer/release-neutral@3"
+TOP_ASSEMBLY = "ha-harmonic-analyzer"
 
 # Comparison gallery, produced separately from the exported STLs by
 # ``--comparisons``. The PEP-723 tools run without SolidWorks; render_offline

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 **2026-07-02 (merged to main; work branch `drive-train/ch30-gt-reposition`, since deleted):** the whole drive train was
 re-anchored on the bundle-adjusted ch30 GT
 (`cad/scripts/diagnostics/triangulate_ch30_gt.py`, ground truth in

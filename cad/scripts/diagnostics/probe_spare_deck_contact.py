@@ -23,8 +23,8 @@ sys.path.insert(0, str(ROOT / "cad/scripts"))
 from _common import _early_bound  # noqa: E402
 from _transforms import ROT_X_NEG90  # noqa: E402
 import _telemetry  # noqa: E402
-from build_paper_drive_assembly import SPARE_GEAR_POS  # noqa: E402
-from harmonic_base_spec import STACK_HEIGHT  # noqa: E402
+from build_pd_paper_drive_assembly import SPARE_GEAR_POS  # noqa: E402
+from fr_harmonic_base_spec import STACK_HEIGHT  # noqa: E402
 from diagnostics._owned_native_session import (  # noqa: E402
     require_owned_diagnostic_environment,
     run_owned_diagnostic,
@@ -243,17 +243,17 @@ def contact(owner, report):
     owner.assert_active()
     assembly = bound(owner.root, "IAssemblyDoc")
     top = assembly.GetComponents(True)
-    paper, paper_row = component(owner, top, "paper-drive.SLDASM", None)
-    frame, frame_row = component(owner, top, "frame.SLDASM", None)
+    paper, paper_row = component(owner, top, "pd-paper-drive.SLDASM", None)
+    frame, frame_row = component(owner, top, "fr-frame.SLDASM", None)
     spare, spare_row = component(
-        owner, paper.GetChildren(), "transgear-removable.SLDPRT", paper, "T18"
+        owner, paper.GetChildren(), "pd-transgear-removable.SLDPRT", paper, "T18"
     )
     base, base_row = component(
-        owner, frame.GetChildren(), "harmonic-base.SLDPRT", frame
+        owner, frame.GetChildren(), "fr-harmonic-base.SLDPRT", frame
     )
     report["components"] = {
         "paper": paper_row,
-        "frame": frame_row,
+        "fr-frame": frame_row,
         "spare": spare_row,
         "base": base_row,
     }
@@ -271,7 +271,7 @@ def contact(owner, report):
         "spare position",
     )
     identity = (1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-    for role in ("paper", "frame", "base"):
+    for role in ("paper", "fr-frame", "base"):
         near(
             report["components"][role]["transform"][:12],
             (*identity, 0.0, 0.0, 0.0),
@@ -335,22 +335,22 @@ def contact(owner, report):
     # Re-resolve from the same top, retaining same-instance proof, not only names.
     final_top = assembly.GetComponents(True)
     final_paper, final_paper_row = component(
-        owner, final_top, "paper-drive.SLDASM", None
+        owner, final_top, "pd-paper-drive.SLDASM", None
     )
-    final_frame, final_frame_row = component(owner, final_top, "frame.SLDASM", None)
+    final_frame, final_frame_row = component(owner, final_top, "fr-frame.SLDASM", None)
     final_spare, final_spare_row = component(
         owner,
         final_paper.GetChildren(),
-        "transgear-removable.SLDPRT",
+        "pd-transgear-removable.SLDPRT",
         final_paper,
         "T18",
     )
     final_base, final_base_row = component(
-        owner, final_frame.GetChildren(), "harmonic-base.SLDPRT", final_frame
+        owner, final_frame.GetChildren(), "fr-harmonic-base.SLDPRT", final_frame
     )
     for role, old, fresh, row in (
         ("paper", paper, final_paper, final_paper_row),
-        ("frame", frame, final_frame, final_frame_row),
+        ("fr-frame", frame, final_frame, final_frame_row),
         ("spare", spare, final_spare, final_spare_row),
         ("base", base, final_base, final_base_row),
     ):
@@ -453,7 +453,7 @@ async def measure(adapter, report, report_path, expected_sha):
     errors = []
     completed = False
     try:
-        source = (ROOT / "cad/out/sldasm/harmonic-analyzer.SLDASM").resolve(strict=True)
+        source = (ROOT / "cad/out/sldasm/ha-harmonic-analyzer.SLDASM").resolve(strict=True)
         if digest(source) != expected_sha:
             raise RuntimeError("saved top SHA differs from explicit expected input")
         owner = OwnedAssembly(adapter, source)

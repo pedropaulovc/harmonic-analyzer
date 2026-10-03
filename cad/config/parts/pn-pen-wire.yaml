@@ -1,0 +1,9 @@
+pn-pen-wire:
+  number: MHA-PN-006
+  category: pn
+  material: ASTM A228 music wire
+  material_specification: ASTM A228 music wire
+  finish: as-supplied bright wire; no coating
+  quantity: 1
+  tolerance_class: machined_block
+  process: "drawn steel wire"

@@ -47,6 +47,7 @@ from _drawing_layout_check import (
     format_findings,
 )
 from _drawing_layout_audit import annotation_display, run_layout_audit
+from _drawing_title_fields import assert_title_fields, audit_records, read_title_fields
 from _layout_audit import display_box, estimated_text_runs, line_segment
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
@@ -162,7 +163,7 @@ _SF_BOX_DOWN_M = 0.0
 # layout audit (``_drawing_layout_audit``) boxes their text from its display
 # data and checks it against text, lines and model edges on every sheet. The
 # 8 mm nominal square they used to get here was never overlap-checked, so
-# MHA-092's "20.8"/"8.42" and its callouts over the right view passed.
+# MHA-DT-021's "20.8"/"8.42" and its callouts over the right view passed.
 _ANNOT_DIM = 4
 
 
@@ -535,7 +536,7 @@ def describe_selected_entity(
     """What a drawing-view pick actually resolved to, as scalar telemetry fields.
 
     The failure this exists for: ``AddHoleCallout2`` answered ``None`` to a
-    coordinate pick that had succeeded (drawing:rocker_arm, worker5,
+    coordinate pick that had succeeded (drawing:ch_rocker_arm, worker5,
     2026-09-20) and the leaf log could not say whether the selected EDGE was
     the hole rim, the strap arc 2.3 sheet-mm below it, or the hidden back-face
     rim under it. Recorded: the view (name, scale, position, outline), the
@@ -793,7 +794,7 @@ def add_datum_feature(
     the leader meets the symbol, not the symbol centre, and an edge attachment
     re-solves along its edge once the tag moves, so a correctly placed tag
     reads up to its half-extent plus that re-solve away from the request:
-    measured 4.8 mm on ``drawing:pinion_cam`` datum D and 17.3 mm on its
+    measured 4.8 mm on ``drawing:dt_pinion_cam`` datum D and 17.3 mm on its
     OD-attached datum C (2026-09-16, identical on two seats; both print at the
     request). An ignored ``SetPosition2`` leaves the tag at its default drop,
     12-20 mm off the attachment and 40 mm+ from any request it was aimed at,
@@ -3242,7 +3243,7 @@ def _model_item_paths(adapter: Any, view: Any) -> tuple[tuple[str, str], ...]:
 
     A projected view answers to its own name.  A DERIVED view does not.  On
     top_frame's Section View A-A, every combination of
-    ``"CapRecessProfile@top-frame-7@Section View A-A"`` with SKETCH,
+    ``"CapRecessProfile@fr-top-frame-7@Section View A-A"`` with SKETCH,
     BODYFEATURE, "" and SOLIDBODY refuses -- for instance suffixes 1..20
     (``RootDrawingComponent2(True)`` reads 'top-frame-16', which refuses too)
     and for the sheet-qualified view name -- while the section itself selects
@@ -4132,7 +4133,7 @@ def face_silhouettes_through(
 
     This replaces ``SelectByID2`` at the sheet point.  That call hit-tests the
     seat's graphics window, so the same point on the same geometry can miss on
-    one worker and hit on another: ``drawing:pinion_arbor`` (key 870279bc)
+    one worker and hit on another: ``drawing:dt_pinion_arbor`` (key 870279bc)
     missed its front-journal flank at sheet (0.25355, 0.166) on
     swmaker00000a@10 and hit on swmaker000004@4, and missed on @10 again at
     the next commit.  The sweep then showed what sits under that point: the
@@ -5423,7 +5424,7 @@ def _spread_balloons(
             "GetLeaderPointsAtIndex",
         )
         # SetPosition moves the ANCHOR, which is not the circle centre: it sits
-        # a constant ~(+4.0, -1.7) mm off it (#866, 40 balloons on MHA-A03).
+        # a constant ~(+4.0, -1.7) mm off it (#866, 40 balloons on MHA-DT-000).
         # Carry that offset so the CIRCLE lands on its ring slot.
         anchor = annotation.GetPosition()
         if anchor is None or len(anchor) < 2:
@@ -6991,7 +6992,7 @@ def _gdt_display(
     ``IAnnotation::GetDisplayData``, read by the shared layout audit's reader
     (``annotation_display``): lines, arcs, triangles and text runs where
     SolidWorks draws them. NOT the ``IGtol`` / ``IDatumTag`` primitives
-    (``GetLineAtIndex`` and kin) this used to read -- on MHA-062 at 4:1
+    (``GetLineAtIndex`` and kin) this used to read -- on MHA-DT-019 at 4:1
     (pc-gdt-ink-diag, a89a13a7a) a leadered FCF's primitives are a crossed
     2h x 2h placeholder square at the leader's far end plus the leader's last
     run, never the frame, and a datum tag's box lies about (-9.9, -5.0) mm off
@@ -7262,7 +7263,7 @@ def _datum_leader_segments(
 
     But the leader IS DRAWN, and it IS readable -- as the tag's display data
     (``IAnnotation::GetDisplayData`` lines, sheet space). NOT
-    ``IDatumTag::GetLineAtIndex``: at 4:1 on MHA-062 those primitives drew the
+    ``IDatumTag::GetLineAtIndex``: at 4:1 on MHA-DT-019 those primitives drew the
     box (-9.9, -5.0) mm off its ink and a jog to it the sheet never printed
     (pc-gdt-ink-diag, a89a13a7a), a phantom leader run. Without this, a datum tag routed straight
     across a neighbouring view is invisible to BOTH audits: its box is
@@ -7665,6 +7666,7 @@ async def finalize_drawing(
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
     # contract.
+    title_sources: dict[str, tuple[Any, str]] = {}
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -7769,6 +7771,10 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
+        title_sources[sheet_name] = (
+            linked_model,
+            str(adapter._get_attr_or_call(first_view, "ReferencedConfiguration") or ""),
+        )
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
     # Isometric view is present, the finalizer owns its high-quality Shaded With
@@ -7821,6 +7827,11 @@ async def finalize_drawing(
         # A check may activate the sheet it reads.
         if not ddoc.ActivateSheet(sheet_names[0]):
             raise RuntimeError("failed to restore first drawing sheet after the settled checks")
+    # The DWG. NO. and PART cells, read off the settled sheets before anything
+    # is saved: each prints its linked model's full Number and Title, on one
+    # line inside its ruled cell (_drawing_title_fields).
+    title_fields = read_title_fields(ddoc, title_sources, resolved_layouts)
+    assert_title_fields(title_fields)
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot
@@ -7860,6 +7871,7 @@ async def finalize_drawing(
         report=layout_report_path(outputs.slddrw.stem),
         sheet_layouts=resolved_layouts,
         is_pictorial=is_pictorial_orientation,
+        title_fields=audit_records(title_fields),
     )
     # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
     # session, and the next run (or a from-scratch rebuild deleting the

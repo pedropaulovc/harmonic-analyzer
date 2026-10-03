@@ -4,7 +4,7 @@ r"""Fast inner-loop rig: prove ONE channel's motion linkage before scaling to
 
 Artifact A pins each moving part to ground as a static POSE (the real
 rod<->rocker + rod<->cam revolutes are deferred to the motion study -- see
-build_channel_assembly._pin_design_pose). This rig builds the REAL linkage from
+build_ch_channel_assembly._pin_design_pose). This rig builds the REAL linkage from
 scratch at one channel's design pose and drives it from the cam:
 
     cam (cylinder-gear, motor on its bore; eccentric lobe orbits)
@@ -28,7 +28,7 @@ import math
 import sys
 import channel_kinematics
 
-from build_channel_assembly import (
+from build_ch_channel_assembly import (
     ARM_MID_DZ,
     ARM_PIVOT_LOCAL_Y,
     CAM_DZ,
@@ -38,7 +38,7 @@ from build_channel_assembly import (
     rot_z_rows,
     z_station,
 )
-from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X
+from dt_cone_pivot_post_installation import CHANNEL_Z0, DRUM_X
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows
 from _common import (
     _flag,
@@ -55,7 +55,7 @@ from _assembly import (
     place_component,
 )
 
-# drive-train cam (build_drive_train_assembly / build_cylinder_gear)
+# drive-train cam (build_dt_drive_train_assembly / build_dt_cylinder_gear)
 X_DRUM, Y_DRIVE, Z_DRUM0, Z_PITCH = DRUM_X, 90.518, CHANNEL_Z0, 7.0568
 DRUM_FACE = 3.0
 GEAR_PHASE_DEG = 1.5
@@ -170,7 +170,7 @@ async def build(adapter):
     # is free for the motor.
     await place_component(
         adapter,
-        "pivot-shaft",
+        "ch-pivot-shaft",
         [PIVOT[0], PIVOT[1], 0.0],
         [0, 0, 0],
         [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -179,7 +179,7 @@ async def build(adapter):
     cylinder_rows = compose_rows(ROT_Y_180, rot_z_rows(-GEAR_PHASE_DEG))
     cam = await place_component(
         adapter,
-        "cylinder-gear",
+        "dt-cylinder-gear",
         [X_DRUM, Y_DRIVE, zj + DRUM_FACE / 2.0],
         euler_from_rows(cylinder_rows),
         cylinder_rows,
@@ -188,7 +188,7 @@ async def build(adapter):
     )
     rod = await place_component(
         adapter,
-        "connecting-rod",
+        "ch-connecting-rod",
         [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
         [0, 0, state["rod_tilt"]],
         rot_z_rows(state["rod_tilt"]),
@@ -197,7 +197,7 @@ async def build(adapter):
     )
     rocker = await place_component(
         adapter,
-        "rocker-arm",
+        "ch-rocker-arm",
         [PIVOT[0] + arm_dx, PIVOT[1] - arm_dy, z_mid],
         [0, 0, state["arm_tilt"]],
         rot_z_rows(state["arm_tilt"]),
@@ -243,7 +243,7 @@ async def build(adapter):
     # cam drives rod: rod ring axis (Axis1) <-> cam lobe axis (Axis3). Two
     # named axes -> coincident (coaxial); fast + mirror-agnostic, no face walk
     # (the geared part has ~thousands of faces and the lobe face will not select
-    # through the nested/flexible sub anyway -- see build_cylinder_gear).
+    # through the nested/flexible sub anyway -- see build_dt_cylinder_gear).
     await coincident_mate(
         adapter,
         named_ref(f"Axis1@{rod}", "AXIS"),
@@ -263,7 +263,7 @@ async def build(adapter):
     adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
     log(
         f"  after joints: rocker status "
-        f"{adapter._attempt(lambda: _find(adapter, 'rocker-arm')[0].GetConstrainedStatus(), default=-1)}"
+        f"{adapter._attempt(lambda: _find(adapter, 'ch-rocker-arm')[0].GetConstrainedStatus(), default=-1)}"
     )
 
     # motor on the cam bore; solve; sample the rocker rotation.
@@ -280,7 +280,7 @@ async def build(adapter):
         ),
     )
     log(f"  study {made['name']!r}")
-    cam_c, cam_n = _find(adapter, "cylinder-gear")
+    cam_c, cam_n = _find(adapter, "dt-cylinder-gear")
     # Motor on the cam BORE axis by name (Axis2) -- selecting a face on this
     # geared part walks ~thousands of tooth faces (~10 min, live-caught).
     check(
@@ -307,7 +307,7 @@ async def build(adapter):
                 MotionTimeParameters(time=time_s, study_name="")
             ),
         )
-        rk, _ = _find(adapter, "rocker-arm")
+        rk, _ = _find(adapter, "ch-rocker-arm")
         a = _comp_xform(adapter, rk)
         base = base or a
         log(f"    t={time_s}: rocker rock = {_rot_angle(base, a):.2f} deg")

@@ -1,5 +1,7 @@
 # Rack source-hash change: native reproduction
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 The drawing's `THRU - REAM` callout writes through to the imported model
 dimension. `IDisplayDimension.SetText(4, ...)` changes the source dimension's
 below-text and makes the part dirty. The subsequent native drawing

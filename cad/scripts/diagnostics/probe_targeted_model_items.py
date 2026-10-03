@@ -52,7 +52,7 @@ from _common import _early_bound  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import null_callout  # noqa: E402
 
 DRAWING = Path(
-    sys.argv[1] if len(sys.argv) > 1 else ROOT / "cad/out/slddrw/tube-frame.SLDDRW"
+    sys.argv[1] if len(sys.argv) > 1 else ROOT / "cad/out/slddrw/fr-tube-frame.SLDDRW"
 ).resolve()
 TARGET_VIEW = sys.argv[2] if len(sys.argv) > 2 else None
 MASK = 0x8000 | 0x20000  # marked-for-drawing | hole-wizard location

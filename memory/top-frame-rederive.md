@@ -1,3 +1,6 @@
+
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
 # Top-frame rederive (2026-08-02, PR #459)
 
 The top frame is now ONE webbed casting (`build_top_frame.py`), photo-measured,

@@ -1,5 +1,7 @@
 # Datum attachment probe results
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Historical report of the pre-migration investigation, not current recipe or
 PR status. The unchanged-recipe statements below describe that experiment.
 See [complete production checks](production-checks.md) and the later

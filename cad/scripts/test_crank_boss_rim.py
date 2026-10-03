@@ -1,4 +1,4 @@
-"""Offline contracts for the 64T against the v36 MHA-016's north side
+"""Offline contracts for the 64T against the v36 MHA-DT-005's north side
 (crank_boss_rim) and its SolidWorks positive control (gear64_post_measure).
 
 The collar still seats the 64T's south face after its northward growth to
@@ -13,10 +13,10 @@ from types import SimpleNamespace
 
 import pytest
 
-import cone_gear_shaft_spec as shaft
-import cone_pivot_post_spec as post
+import dt_cone_gear_shaft_spec as shaft
+import dt_cone_pivot_post_spec as post
 import crank_boss_rim as rim
-import crank_drive_gear_spec as gear64
+import dt_crank_drive_gear_spec as gear64
 import gear64_post_measure
 
 FEATURES = {"crank boss", "head", "body", "cone boss end"}
@@ -48,7 +48,7 @@ def test_the_floor_is_the_ruled_quarter_millimetre() -> None:
 
 
 def test_the_64t_station_is_the_collar_stack() -> None:
-    """#916 (Main's ruling (b), 2026-09-27): the 64T is set against MHA-014's
+    """#916 (Main's ruling (b), 2026-09-27): the 64T is set against MHA-DT-004's
     thrust collar, which bears on the cone boss's north end; toward the post it
     moves by the boss end long (ConeBossLen's .XX row, half per end) and the
     collar thin (CollarWidth's row).  The two butts are closed nominally."""

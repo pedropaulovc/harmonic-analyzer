@@ -6,11 +6,12 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
+import _config
 import _telemetry
 from _common import _early_bound
 
 
-_PART_NUMBER = re.compile(r"MHA-\d{3}\Z")
+_PART_NUMBER = re.compile(r"MHA-(?:HA|CH|DT|VN|FR|MG|PD|PN|SM|SH)-(?!000)[0-9]{3}\Z")
 _USER_SPECIFIED_PART_NUMBER = 8  # swBOMPartNumber_UserSpecified
 
 
@@ -21,10 +22,12 @@ def apply_grouped_bom_properties(
     part_number: str,
     description: str,
 ) -> None:
-    """Stamp identical native BOM metadata on every grouped configuration."""
+    """Stamp a registered, non-assembly Number on every grouped configuration."""
     number = part_number.strip().upper()
     if not _PART_NUMBER.fullmatch(number):
         raise ValueError(f"invalid grouped BOM part number {part_number!r}")
+    if not any(row.get("number") == number for row in _config.parts().values()):
+        raise ValueError(f"unregistered grouped BOM part number {part_number!r}")
     text = description.strip()
     if not text:
         raise ValueError("grouped BOM description must not be blank")

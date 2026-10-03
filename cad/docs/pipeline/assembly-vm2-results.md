@@ -1,5 +1,7 @@
 # Independent assembly validation on vm-solidworks
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../subsystem-identities.md) for the canonical migration map.
+
 > Historical VM2 evidence on the source/adapter revisions below, not a full-build
 > acceptance for the main-based extraction. See the
 > [health-only extraction boundary](assembly-health-main-extraction.md).

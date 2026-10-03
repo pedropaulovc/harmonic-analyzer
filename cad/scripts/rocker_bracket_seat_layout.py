@@ -1,11 +1,11 @@
-r"""MHA-089's top rail and the rocker pivot brackets' hold-down seats (#743 PR2).
+r"""MHA-FR-005's top rail and the rocker pivot brackets' hold-down seats (#743 PR2).
 
 PURE DATA, no SolidWorks/COM imports: ``build_rocker_arm_support`` cuts the
 rail and its seats from it, and the channel assembly places the screws from
 it. Kept out of ``rocker_arm_support_spec`` on purpose: the base, frame and
 drive train import that module, and a rail or seat edit must not re-key them.
 
-Each MHA-123 bracket is held by two MHA-143 (McMaster 90280A197, #8-32 x 3/4
+Each MHA-CH-008 bracket is held by two MHA-VN-032 (McMaster 90280A197, #8-32 x 3/4
 slotted fillister) through its #8 close-clearance foot holes into
 bottoming-tapped seats in the support's top rail, transferred from the set
 bracket at assembly (the south bracket is feeler-set, so its seats cannot be
@@ -19,7 +19,7 @@ rocker pivot do not move, and the foot, base interface and hold-down drills
 are untouched. The window is then 165.1 wide by WINDOW_HEIGHT tall -- no
 longer square.
 
-The stack is checked at the printed worst case: MHA-123's foot at .XX, the
+The stack is checked at the printed worst case: MHA-CH-008's foot at .XX, the
 seat and rail depths at .X, the screw at its +0/-0.76 commercial length band,
 and the 0.25 edge break at the seat mouth. Every check raises on import.
 """
@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import math
 
-import pivot_bracket_spec as _bracket
+import ch_pivot_bracket_spec as _bracket
 from _hole_spec import (
     DRILL_POINT_H,
     NUMBER_DRILL_MM,
@@ -36,8 +36,8 @@ from _hole_spec import (
     THREAD_MAJOR_MM,
     HoleSpec,
 )
-from rocker_arm_support_section_spec import FOOT_THICKNESS, HALF_Y, NARROW
-from rocker_arm_support_spec import SUPPORT_WORLD_X, SUPPORT_WORLD_Z
+from fr_rocker_arm_support_section_spec import FOOT_THICKNESS, HALF_Y, NARROW
+from fr_rocker_arm_support_spec import SUPPORT_WORLD_X, SUPPORT_WORLD_Z
 from rocker_bank_layout import PIVOT_BRACKET_Z, STACK_MID_Z
 
 LINEAR_1PL = 0.8  # title-block .X band
@@ -45,7 +45,7 @@ LINEAR_2PL = 0.508  # title-block .XX band
 EDGE_BREAK = 0.25  # title-block edge break, also the novice spare
 RULE12_WEB_TARGET = 2.0
 
-# MHA-143: the channel assembly pins these to the stock part it places.
+# MHA-VN-032: the channel assembly pins these to the stock part it places.
 SCREW_THREAD = "#8-32"
 SCREW_LENGTH = 19.05  # under-head length, 3/4 in
 SCREW_LENGTH_BAND = (0.0, 0.76)  # (+, -): commercial screw length tolerance

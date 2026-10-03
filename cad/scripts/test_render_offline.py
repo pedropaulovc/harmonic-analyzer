@@ -163,7 +163,7 @@ def test_stale_only_refreshes_align_without_launching_blender(
     monkeypatch.setattr(renderer.composite, "COMP", tmp_path)
     pair = {
         "id": "pair",
-        "model": "harmonic_analyzer",
+        "model": "ha_harmonic_analyzer",
         "camera": {"zoom": 1.0},
         "reference": {"path": "reference.png"},
         "align": {"scale": 1.0, "dx_px": 0, "dy_px": 0},
@@ -221,7 +221,7 @@ def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
     """
     stl = tmp_path / "cone-gear--t102.STL"
     stl.write_bytes(b"solid restored\n")
-    src = tmp_path / "cone-gear.SLDPRT"
+    src = tmp_path / "dt-cone-gear.SLDPRT"
     src.write_bytes(b"source rebuilt later\n")
     os.utime(stl, (1_600_000_000, 1_600_000_000))
     assert stl.stat().st_mtime < src.stat().st_mtime
@@ -248,7 +248,7 @@ def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
 def test_missing_export_still_fails_the_renderer(tmp_path: Path) -> None:
     """Existence is the one freshness question the isolated renderer can answer."""
     renderer = _load_render_offline()
-    src = tmp_path / "cone-gear.SLDPRT"
+    src = tmp_path / "dt-cone-gear.SLDPRT"
     src.write_bytes(b"x")
 
     with pytest.raises(FileNotFoundError):

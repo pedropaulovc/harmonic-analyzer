@@ -55,7 +55,7 @@ import _telemetry
 from _common import _early_bound, _flag_only
 
 # pywin32 / solidworks_mcp COM imports stay FUNCTION-LOCAL (the _assembly.py
-# convention): this module is imported by build_channel_assembly, which the
+# convention): this module is imported by build_ch_channel_assembly, which the
 # SolidWorks-free gates import for pure geometry helpers on machines where
 # pywin32 is not installed (it is a sys_platform == 'win32' dependency).
 

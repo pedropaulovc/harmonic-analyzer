@@ -3,21 +3,21 @@
 from __future__ import annotations
 
 import _config
-import arbor_pedestal_spec
-import cone_gear_notes
-import cone_gear_shaft_spec
-import cone_pivot_post_spec
-import cone_tip_block_spec
-import cone_swing_platform_spec
+import dt_arbor_pedestal_spec
+import dt_cone_gear_notes
+import dt_cone_gear_shaft_spec
+import dt_cone_pivot_post_spec
+import dt_cone_tip_block_spec
+import dt_cone_swing_platform_spec
 
 
 SHEETS = (
-    ("arbor-pedestal", arbor_pedestal_spec),
-    ("cone-gear", cone_gear_notes),
-    ("cone-gear-shaft", cone_gear_shaft_spec),
-    ("cone-pivot-post", cone_pivot_post_spec),
-    ("cone-tip-block", cone_tip_block_spec),
-    ("cone-swing-platform", cone_swing_platform_spec),
+    ("dt-arbor-pedestal", dt_arbor_pedestal_spec),
+    ("dt-cone-gear", dt_cone_gear_notes),
+    ("dt-cone-gear-shaft", dt_cone_gear_shaft_spec),
+    ("dt-cone-pivot-post", dt_cone_pivot_post_spec),
+    ("dt-cone-tip-block", dt_cone_tip_block_spec),
+    ("dt-cone-swing-platform", dt_cone_swing_platform_spec),
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (

@@ -216,7 +216,7 @@ def _crank_axis_face(adapter, comp):
 def _entity_path(name2: str, feature: str, title: str) -> str:
     """Build a SelectByID entity ref for a feature in a (nested) component.
 
-    Name2 'drive-train-1/crankshaft-1' -> 'Axis1@crankshaft-1@drive-train-1@title'
+    Name2 'drive-train-1/crankshaft-1' -> 'Axis1@dt-crankshaft-1@dt-drive-train-1@title'
     """
     parts = name2.split("/")
     return f"{feature}@" + "@".join(reversed(parts)) + f"@{title}"
@@ -230,12 +230,12 @@ async def build(adapter):
 
     check("create_assembly", await adapter.create_assembly())
     fr = check("insert frame", await adapter.insert_component(
-        InsertComponentParameters(file_path=_sub_path("frame"),
+        InsertComponentParameters(file_path=_sub_path("fr-frame"),
                                   position=[0, 0, 0], rotation=[0, 0, 0])))
     if not fr.get("fixed"):
         await adapter.fix_component(ComponentRefParameters(name=fr["name"]))
     dt = check("insert drive-train", await adapter.insert_component(
-        InsertComponentParameters(file_path=_sub_path("drive-train"),
+        InsertComponentParameters(file_path=_sub_path("dt-drive-train"),
                                   position=[0, 0, 0], rotation=[0, 0, 0])))
     dt_name = dt["name"]  # e.g. 'drive-train-1'
     asm = adapter.currentModel
@@ -252,10 +252,10 @@ async def build(adapter):
 
     _set_flexible(adapter, dt_name)
     adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-    comp, _ = _find_comp(adapter, "drive-train")
+    comp, _ = _find_comp(adapter, "dt-drive-train")
     log(f"drive-train Solving after flexible = {_solving(adapter, comp)} (1=flex)")
-    log(f"crank-drive-gear status: {_status(adapter, 'crank-drive-gear')}")
-    log(f"cylinder-gear-1 status: {_status(adapter, 'cylinder-gear-1')}")
+    log(f"crank-drive-gear status: {_status(adapter, 'dt-crank-drive-gear')}")
+    log(f"dt-cylinder-gear-1 status: {_status(adapter, 'dt-cylinder-gear-1')}")
 
     # --- find the crank driver INSIDE the sub model, suppress via retarget -----
     sub_model = adapter._attempt(lambda c=comp: c.GetModelDoc2(), default=None)
@@ -264,14 +264,14 @@ async def build(adapter):
     DISTANCE = 5
     driver = None
     for name, mtype, comps in _mates(adapter, sub_model):
-        if mtype == DISTANCE and any("crank-handle" in c for c in comps):
+        if mtype == DISTANCE and any("dt-crank-handle" in c for c in comps):
             driver = name
             log(f"crank driver (in sub) = {name} comps={comps}")
             break
     if driver is None:
         raise RuntimeError("crank driver not found in drive-train sub model")
 
-    log(f"crankshaft before suppress: {_status(adapter, 'crankshaft')}")
+    log(f"crankshaft before suppress: {_status(adapter, 'dt-crankshaft')}")
     saved = adapter.currentModel
     try:
         adapter.currentModel = sub_model
@@ -280,9 +280,9 @@ async def build(adapter):
     finally:
         adapter.currentModel = saved
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    log(f"crankshaft after ForceRebuild3(False): {_status(adapter, 'crankshaft')}")
+    log(f"crankshaft after ForceRebuild3(False): {_status(adapter, 'dt-crankshaft')}")
     adapter._attempt(lambda: adapter.currentModel.EditRebuild3(), default=None)
-    log(f"crankshaft after EditRebuild3:        {_status(adapter, 'crankshaft')}  (want UNDER(2))")
+    log(f"crankshaft after EditRebuild3:        {_status(adapter, 'dt-crankshaft')}  (want UNDER(2))")
 
     # --- select the crank rotation axis via GetCorrespondingEntity --------------
     # Research verdict: stop hand-building SelectByID2 name strings for parts
@@ -292,7 +292,7 @@ async def build(adapter):
     # IComponent2.GetCorrespondingEntity -- nesting- and flexible-state-agnostic,
     # and a cylindrical face fully defines a rotary motor's axis. Re-fetch the
     # component AFTER the rebuild (a pre-rebuild pointer can report stale state).
-    cs_comp, cs_name = _find_comp(adapter, "crankshaft")
+    cs_comp, cs_name = _find_comp(adapter, "dt-crankshaft")
     if cs_comp is None:
         raise RuntimeError("crankshaft component not found after rebuild")
     inner = cs_name.split("/")[-1]
@@ -336,12 +336,12 @@ async def build(adapter):
     # Sample the cam by reading its Transform2 off the dispatch (the nested
     # by-name GetComponentByName lookup does not resolve 'sub/part'). Measure the
     # full relative rotation from t=0 so rotation about ANY axis is captured.
-    cam, cam_name = _find_comp(adapter, "cylinder-gear-1")
+    cam, cam_name = _find_comp(adapter, "dt-cylinder-gear-1")
     base = None
     samples = []
     for t in (0.0, 0.5, 1.0, 1.5, 2.0):
         check(f"set_time {t}", await adapter.set_motion_time(MotionTimeParameters(time=t, study_name="")))
-        cam, _ = _find_comp(adapter, "cylinder-gear-1")  # re-fetch each frame
+        cam, _ = _find_comp(adapter, "dt-cylinder-gear-1")  # re-fetch each frame
         a = _comp_xform(adapter, cam)
         base = base or a
         ang = _rot_angle(base, a)

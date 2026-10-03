@@ -11,6 +11,10 @@ The book is the main machining and publication deliverable. The
 [Kickstarter](../kickstarter/README.md) funds the work. The
 [AI story](../ai-story/README.md) is a separate, first-class workstream.
 
+Part tables and CAD source links use the canonical subsystem-prefixed identities.
+The [subsystem identity guide](../cad/docs/subsystem-identities.md) lists drawing
+numbers and the old-to-current lookup for historical bench records.
+
 ## Work status
 
 Current Book workstream status and sequencing live in the

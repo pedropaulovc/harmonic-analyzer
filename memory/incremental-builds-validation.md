@@ -7,6 +7,9 @@ metadata:
   originSessionId: b8e105f4-aaf4-4af3-969f-59d752838e16
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 PR #5 (branch `incremental-builds-doit`, worktree `C:\src\harmonic-analyzer-doit`) adds the `refresh_assembly` primitive (reopen + per-config `ForceRebuild3` + DOF/interference/health gates + in-place `Save3`, no re-insert/re-mate) + a `doit` part→assembly DAG (`dodo.py`/`_buildgraph.py`) replacing `build_all.py`.
 
 **Runtime-validated 2026-06-18 off the v0.2.0 release bundle** (from-scratch part build is blocked — see below — so validation ran on the already-built machine). Setup trick: `gh release download v0.2.0`, extract `solidworks/` (90 parts + 5 assemblies, Pack-and-Go flat) **flat into `cad/out/sldasm/`** so each `.SLDASM` resolves its siblings; `cad/out/sldasm` is gitignored, `cad/out/_bundle` is NOT. Build venv = `C:\src\SolidworksMCP-python\.venv\Scripts\python.exe`; needs `doit` + **`pillow`** installed and **`PYTHONUTF8=1`** (else `∩`-glyph print → cp1252 `UnicodeEncodeError`).

@@ -4,7 +4,7 @@ must be the rows the assembly actually places each component with.
 The diagnostic executes at import (it reads a machine-local golden pose dump),
 so this reads its ``expect(DT, ...)`` calls from source and evaluates their
 rows against the SolidWorks-free assembly module.  Codex P3 on #814: 485eaf434
-phased MHA-059 (``pinion-lift-rod``) by ``LIFT_ROD_ROWS`` but the validator
+phased MHA-DT-016 (``pinion-lift-rod``) by ``LIFT_ROD_ROWS`` but the validator
 still expected IDENTITY, a false ``drow`` failure. Translations are also
 cross-checked against the restored fixed crank axis.
 """
@@ -17,11 +17,11 @@ from pathlib import Path
 import pytest
 
 import _transforms
-import build_drive_train_assembly as drive
+import build_dt_drive_train_assembly as drive
 
 SCRIPTS = Path(__file__).resolve().parent
 DIAGNOSTIC = SCRIPTS / "diagnostics" / "check_mirror_retirement.py"
-ASSEMBLY = SCRIPTS / "build_drive_train_assembly.py"
+ASSEMBLY = SCRIPTS / "build_dt_drive_train_assembly.py"
 
 
 def _calls(path: Path, name: str) -> list[ast.Call]:
@@ -111,7 +111,7 @@ CHECKED = [
 
 def test_the_cross_check_covers_the_pinion_rig() -> None:
     covered = {component for component, _ in CHECKED}
-    assert {"pinion-lift-rod-1", "pinion-lever-1", "pinion-arbor-1"} <= covered
+    assert {"dt-pinion-lift-rod-1", "dt-pinion-lever-1", "dt-pinion-arbor-1"} <= covered
 
 
 def _position_expectations() -> list[tuple[str, ast.expr]]:
@@ -136,12 +136,12 @@ POSITIONED = _position_expectations()
 def test_the_cross_check_covers_the_crank_family_translations() -> None:
     covered = {component for component, _ in POSITIONED}
     assert {
-        "crankshaft-1",
-        "crank-hub-1",
-        "crank-hub-pin-1",
-        "crank-pinion-1",
-        "crank-arm-1",
-        "crank-handle-1",
+        "dt-crankshaft-1",
+        "dt-crank-hub-1",
+        "vn-crank-hub-pin-1",
+        "dt-crank-pinion-1",
+        "dt-crank-arm-1",
+        "dt-crank-handle-1",
     } <= covered
 
 
@@ -217,7 +217,7 @@ SHAFT_DIAGNOSTIC_EXPECTATIONS = _shaft_diagnostic_expectations()
 
 
 def test_on_shaft_cross_check_covers_helper_seeded_gears() -> None:
-    assert {"crank-drive-gear", "cone-gear"} <= SHAFT_HELPER_PLACEMENTS.keys()
+    assert {"dt-crank-drive-gear", "dt-cone-gear"} <= SHAFT_HELPER_PLACEMENTS.keys()
     assert SHAFT_HELPER_PLACEMENTS.keys() == SHAFT_DIAGNOSTIC_EXPECTATIONS.keys()
 
 

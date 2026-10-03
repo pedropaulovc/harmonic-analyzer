@@ -1,9 +1,0 @@
-transgear-knob-thrust-ring:
-  title: Transgear Knob Thrust Ring
-  number: MHA-156
-  material: Brass
-  material_specification: C36000 free-machining brass
-  finish: bright machined, oiled
-  quantity: 1
-  tolerance_class: machined_block
-  process: "turned from bar (brass): drill the bore, face both ends to length"

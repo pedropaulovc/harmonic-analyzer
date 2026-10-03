@@ -44,8 +44,8 @@ def lifecycle_inputs(input_path, *, mode, ink_refresh, rack_dimension_location):
         if rack_dimension_location != "original":
             raise ValueError("production layout must already come from its recipe")
         specifications = {
-            "pinion-lift-rod": ("pinion_lift_rod_spec", "ROD_DIA", 0.00002),
-            "rack-pinion": ("rack_pinion_spec", "BORE_DIA", 0.0001),
+            "dt-pinion-lift-rod": ("dt_pinion_lift_rod_spec", "ROD_DIA", 0.00002),
+            "pd-rack-pinion": ("pd_rack_pinion_spec", "BORE_DIA", 0.0001),
         }
         matches = [stem for stem in specifications
                    if path == ROOT / "cad/out/slddrw" / f"{stem}.SLDDRW"]
@@ -414,7 +414,7 @@ def main():
                 raise RuntimeError("missing datum/dimension ink primitives")
             checkpoint()
             assert_production_diameter_clearance(row, inputs["mode"])
-            if inputs["mode"] == "production" and source.stem == "rack-pinion":
+            if inputs["mode"] == "production" and source.stem == "pd-rack-pinion":
                 row.update(read_rack_finish(app, view, edge))
                 checkpoint()
                 row.update(assert_rack_finish(row))
@@ -424,7 +424,7 @@ def main():
             return row
 
         def diameter_annotation(view):
-            name = "RodDia" if source.stem == "pinion-lift-rod" else "BoreDia"
+            name = "RodDia" if source.stem == "dt-pinion-lift-rod" else "BoreDia"
             annotations = [_early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()]
             matches = [item for item in annotations if int(item.GetType()) == 4 and dimension_name(adapter, item) == name]
             if len(matches) != 1:
@@ -480,7 +480,7 @@ def main():
         try:
             draw, view, edge = await open_drawing()
             if args.rack_dimension_location == "above":
-                if source.stem != "rack-pinion":
+                if source.stem != "pd-rack-pinion":
                     raise RuntimeError("rack layout delta is only valid for rack-pinion")
                 dimension = diameter_annotation(view)
                 previous = list(dimension.GetPosition())

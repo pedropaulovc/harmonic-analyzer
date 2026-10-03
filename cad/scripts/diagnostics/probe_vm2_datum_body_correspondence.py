@@ -39,7 +39,7 @@ def main():
         expected = [{key: row[key] for key in ("path", "title", "type", "state")} for row in witness["documents"]]
         if rows != expected or len(rows) != 2:
             raise RuntimeError("document inventory differs from witness")
-        source = ROOT / "cad/out/sldprt/rack-pinion.SLDPRT"
+        source = ROOT / "cad/out/sldprt/pd-rack-pinion.SLDPRT"
         source_row = next(row for row in witness["documents"] if row["type"] == 1)
         if Path(source_row["path"]).resolve() != source or digest(source) != source_row["saved_sha256_after"]:
             raise RuntimeError("source identity differs")

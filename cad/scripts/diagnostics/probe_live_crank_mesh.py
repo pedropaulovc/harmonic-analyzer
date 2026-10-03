@@ -21,7 +21,7 @@ import _common  # noqa: F401  -- diagnostics import shim
 from _common import _early_bound, _read_member, check, log, run_build  # noqa: E402
 from _assembly import component_transform, place_component  # noqa: E402
 
-import build_drive_train_assembly as dta  # noqa: E402
+import build_dt_drive_train_assembly as dta  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[2] / "out" / "png" / "diag-crank-mesh"
 
@@ -58,22 +58,22 @@ async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
     g0 = dta.cone_station(GEAR64_CENTRE_STATION)
     await place_component(
-        adapter, "crank-drive-gear",
+        adapter, "dt-crank-drive-gear",
         [g0[0] - dta.GEAR64_FACE / 2.0 * dta.SIN_I, dta.Y_DRIVE,
          g0[2] - dta.GEAR64_FACE / 2.0 * dta.COS_I],
         [0.0, dta.INCLINE_DEG, 0.0], dta.ROT_Y_INCLINE,
         ground=True, label="64T at design",
     )
     await place_component(
-        adapter, "crank-pinion",
+        adapter, "dt-crank-pinion",
         [X16, Y16, dta.PINION_TOOTH_Z - dta.PINION_FACE / 2.0],
         [0.0, 0.0, -dta.PINION_SEED_DEG], dta.rot_z_rows(-dta.PINION_SEED_DEG),
         ground=True, label="16T at design",
     )
 
     # Read back the placed spins (paranoia: both grounded, must be exact).
-    a16 = component_transform(adapter, "crank-pinion-1")
-    a64 = component_transform(adapter, "crank-drive-gear-1")
+    a16 = component_transform(adapter, "dt-crank-pinion-1")
+    a64 = component_transform(adapter, "dt-crank-drive-gear-1")
     phi16 = _spin_off_z(a16, dta.PINION_SEED_DEG)
     phi64 = _spin_off_u(a64)
     log(f"pinion spin off design: {phi16:+.4f} deg (about +z)")

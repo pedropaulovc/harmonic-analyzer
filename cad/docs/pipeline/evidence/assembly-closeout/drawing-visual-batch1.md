@@ -1,5 +1,7 @@
 # Partial drawing visual receipt: title fields, batch 1
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Frozen build head: `64c3dab4875354a7d44d709539e001db920a0377`.
 Initial filename list pinned: `2026-09-08T04:59:00.264888+00:00`; 14 files. No subsequently produced drawings were added.
 

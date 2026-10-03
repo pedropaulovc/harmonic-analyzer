@@ -200,14 +200,14 @@ critical_features:
     nominal: null
     quantity: phase
     class: channel
-    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-014 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
+    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-DT-004 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
   cone_land_clock:
     tolerance: 1.0
     unit: deg
     nominal: null
     quantity: phase
     class: channel
-    holds: "MHA-014 note ALL FLATS PARALLEL. at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø1.588 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
+    holds: "MHA-DT-004 note ALL FLATS PARALLEL. at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø1.588 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
   station_setting:
     tolerance: 0.25
     nominal: null

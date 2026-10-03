@@ -27,7 +27,7 @@ from _assembly import (
 
 # Distance drivers seed their side from magnifier's flip seeds
 # (cad/config/assemblies/magnifier.yaml), the assembly this probe mirrors.
-activate_assembly_contract("magnifier")
+activate_assembly_contract("mg-magnifier")
 
 WHEEL_X = 53.0
 WHEEL_BAR_Y = 575.7
@@ -58,9 +58,9 @@ def _status(adapter, comp):
 
 async def build(adapter):
     check("create_assembly", await adapter.create_assembly())
-    ax = await place_component(adapter, "wheel-axle", [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
+    ax = await place_component(adapter, "mg-wheel-axle", [WHEEL_X, WHEEL_BAR_Y, BAR_FRONT_Z],
                                [-90.0, 0.0, 0.0], ROT_X_NEG90)
-    wh = await place_component(adapter, "magnifying-wheel",
+    wh = await place_component(adapter, "mg-magnifying-wheel",
                                [WHEEL_X, WHEEL_BAR_Y, WHEEL_MID_Z], [0.0, 0.0, 0.0],
                                IDENTITY, ground=False)
     wh_o = _org(adapter, wh)

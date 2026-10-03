@@ -1,5 +1,7 @@
 # Drawing-context body identity
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 The first complete-recipe attempt at `509e70460507f33f860ea6727a6fea8c4410ad50`
 stopped before datum insertion on both drawings. Its new body guard compared a
 drawing-context edge body directly to the source part's solid body. Both drawing

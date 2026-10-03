@@ -1,0 +1,10 @@
+mg-magnifying-clamp:
+  number: MHA-MG-002
+  category: mg
+  material: Brass
+  material_specification: Brass
+  finish: machined; chemically blackened (brass black)
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "machined (brass)"

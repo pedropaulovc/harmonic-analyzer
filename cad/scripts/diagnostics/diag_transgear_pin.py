@@ -17,7 +17,7 @@ import sys
 
 import _common
 import _telemetry
-import build_transgear_removable as btr
+import build_pd_transgear_removable as btr
 
 _orig = _common.dimension_between
 

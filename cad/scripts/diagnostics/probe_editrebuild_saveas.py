@@ -62,7 +62,7 @@ async def _trial(adapter, src, rebuild_name):
 
 
 async def main() -> None:
-    arg = sys.argv[1] if len(sys.argv) > 1 else "frame"
+    arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     src = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     adapter = PyWin32Adapter({})
     with _telemetry.span("probe.editrebuild_saveas", target=str(src), stem=src.stem):

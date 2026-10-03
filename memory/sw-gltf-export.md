@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 SolidWorks 2023+ exports glTF binary via plain `SaveAs3("<path>.glb", 0, silent)` — the
 format is inferred from the extension (no format enum; the adapter's `export_file`
 maps "glb"→41 but never passes it). Verified live on R2026x with `magnifier.SLDASM`

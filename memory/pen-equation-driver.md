@@ -7,6 +7,9 @@ metadata:
   originSessionId: 045bacc1-f12e-48b0-b137-916b2b43a02d
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 **F5 pen driver — DE-RISKED (2026-06-16, throwaway `probe_pen_equation.py`).** The plan wants the pen-rod Y-travel mate equation-driven from a crank-angle global so the SW pose reproduces `truth_model.pen_y(θ) = magnify·Σ aⱼ·cos(j·θ+φⱼ)` (j=1..20) with NO force solver. Proven live on SW 2026:
 
 - **SW equation manager REJECTS a single 20-term expression** (`set_global_variable`/`Add2` returns -1 → "Failed to add equation"). Not a syntax issue — diagnostic ladder showed global×global, `cos("Global")` (trig of a global, DEGREES), spaced/unspaced, and a 2-term sum ALL evaluate fine; the 20-term (708-char) sum fails both spaced and unspaced. **There is a length/term-count ceiling** (≥2 terms OK, 20 too many — exact boundary not probed).

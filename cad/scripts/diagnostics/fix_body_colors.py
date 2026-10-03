@@ -30,8 +30,8 @@ import _telemetry  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 
 FIXES = {
-    "platen-paper": PAPER_WHITE,
-    "crank-handle": STAINED_OAK,
+    "pd-platen-paper": PAPER_WHITE,
+    "dt-crank-handle": STAINED_OAK,
 }
 
 

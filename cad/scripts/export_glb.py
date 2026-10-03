@@ -28,7 +28,7 @@ _MISSING_STATES = {0, 5}
 
 
 def _src() -> Path:
-    arg = sys.argv[1] if len(sys.argv) > 1 else "harmonic-analyzer"
+    arg = sys.argv[1] if len(sys.argv) > 1 else "ha-harmonic-analyzer"
     p = Path(arg)
     if p.suffix.lower() == ".sldasm":
         return p

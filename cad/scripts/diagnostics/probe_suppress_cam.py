@@ -54,7 +54,7 @@ async def main():
     for _sub, _mate, name, _mtype, parts, _val in _iter_mates(
             adapter, doc, read_values=False):
         joined = " ".join(parts)
-        if "cylinder-gear" in joined and "connecting-rod" in joined:
+        if "dt-cylinder-gear" in joined and "ch-connecting-rod" in joined:
             cam_names.append(name)
     log(f"  found {len(cam_names)} cam couplings: {cam_names[:3]}...")
 
@@ -70,8 +70,8 @@ async def main():
 
     log("  one-time walk to cache crankshaft + cylinder-gear ...")
     comps = _components(adapter)
-    crank = _find_one(adapter, "crankshaft-1", comps=comps)
-    gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
+    crank = _find_one(adapter, "dt-crankshaft-1", comps=comps)
+    gears = _by_z_rank(adapter, "dt-cylinder-gear", comps=comps)
     targets = {"crank": crank, "cylgear0": gears[0] if gears else (None, None)}
 
     base, spans = {}, {}

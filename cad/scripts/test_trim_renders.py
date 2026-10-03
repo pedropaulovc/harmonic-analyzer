@@ -27,7 +27,7 @@ def test_pdf_thumbnail_uses_requested_sheet_at_full_sheet_resolution(tmp_path: P
     source = tmp_path / "assembly.pdf"
     _colored_pdf(source)
     drive = tmp_path / "drive.png"
-    frame = tmp_path / "frame.png"
+    frame = tmp_path / "fr-frame.png"
 
     trim_renders.render_pdf_sheet(source, drive, 3)
     trim_renders.render_pdf_sheet(source, frame, 2)
@@ -56,14 +56,14 @@ def test_pdf_thumbnail_refuses_missing_sheet(tmp_path: Path, page_index: int) ->
 def test_missing_release_inputs_do_not_replace_old_thumbnails(tmp_path: Path) -> None:
     target = tmp_path / "images"
     target.mkdir()
-    old = target / "frame.png"
+    old = target / "fr-frame.png"
     old.write_bytes(b"previously published frame")
 
     with pytest.raises(FileNotFoundError, match="required README image sources are missing"):
         trim_renders.regenerate_readme_images(tmp_path / "missing-release", target)
 
     assert old.read_bytes() == b"previously published frame"
-    assert not (target / "pinion-arbor-drawing.png").exists()
+    assert not (target / "dt-pinion-arbor-drawing.png").exists()
 
 
 def test_incomplete_prepared_set_cannot_partially_replace_images(tmp_path: Path) -> None:

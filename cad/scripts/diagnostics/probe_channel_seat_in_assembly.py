@@ -22,9 +22,9 @@ os.environ.setdefault("CHANNEL_COUNT", "1")
 
 import dodo  # noqa: E402
 import _native_spring_contact as contact  # noqa: E402
-import build_channel_assembly as bca  # noqa: E402
+import build_ch_channel_assembly as bca  # noqa: E402
 import channel_kinematics  # noqa: E402
-import channel_spring_stock_geom as channel_stock  # noqa: E402
+import vn_channel_spring_stock_geom as channel_stock  # noqa: E402
 import settled_spring_seats  # noqa: E402
 from _assembly import component_transform  # noqa: E402
 from _common import _early_bound, run_build  # noqa: E402
@@ -54,9 +54,9 @@ def _probe(adapter, asm_name: str, *, channel_count: int) -> None:
     found = contact._assembly_spring_instances(
         adapter, contact._CHANNEL_CONTACT_FAMILIES
     )
-    spring = found["channel-spring-installed"][0].name
-    hook = found["spring-hook"][0].name
-    lever = found["channel-lever"][0].name
+    spring = found["vn-channel-spring-installed"][0].name
+    hook = found["vn-spring-hook"][0].name
+    lever = found["ch-channel-lever"][0].name
     state = channel_kinematics.solve_state(amplitude)
     rows = compose_rows(rot_z_rows(state["lever_tilt"]), ROT_Y_180)
     z_mid = bca.z_station(0) + bca.ARM_MID_DZ

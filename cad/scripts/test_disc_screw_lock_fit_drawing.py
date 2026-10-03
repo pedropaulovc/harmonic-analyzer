@@ -1,4 +1,4 @@
-"""Ruling R9-47, parts (1) and (2): the MHA-161 disc screws cut to fit and the
+"""Ruling R9-47, parts (1) and (2): the MHA-VN-039 disc screws cut to fit and the
 platen's float faced to fit, each judged at the printed worst case.
 
 Each test recomputes the worst corner from the catalogue and the printed
@@ -13,11 +13,11 @@ import importlib.util
 
 import pytest
 
-import paper_drive_assembly_steps as steps
-import platen_guide_spec as guide
-import rack_pinion_spec as disc
-import transgear_disc_hub_spec as hub
-import transgear_disc_screw_spec as screw
+import pd_paper_drive_assembly_steps as steps
+import pd_platen_guide_spec as guide
+import pd_rack_pinion_spec as disc
+import pd_transgear_disc_hub_spec as hub
+import vn_transgear_disc_screw_spec as screw
 
 IN = 25.4
 # 91794A055: #0-80 x 1/4 under the head; ASME B18.6.3 length band +0/-0.03 in.
@@ -25,11 +25,11 @@ SHANK_LEN = 0.25 * IN
 LENGTH_MINUS = 0.03 * IN
 MAJOR = 0.060 * IN
 PITCH = IN / 80.0
-# MHA-159 flange 2.40 (title block 3-place +/-0.13); MHA-070 face 3.00 +/-0.13.
+# MHA-PD-017 flange 2.40 (title block 3-place +/-0.13); MHA-PD-006 face 3.00 +/-0.13.
 FLANGE = 2.4
 FACE = 3.0
 THREE_PLACE = 0.13
-# MHA-070's tap mouths: a 0.10 burr break on each, its loss counted from the
+# MHA-PD-006's tap mouths: a 0.10 burr break on each, its loss counted from the
 # tap drill (rack_pinion_spec, as printed on its sheet; R9-63).
 MOUTH_BREAK = 0.10
 
@@ -80,7 +80,7 @@ def test_cut_tips_sit_inside_the_disc_and_keep_one_and_a_half_d() -> None:
 
 
 def test_assembly_places_the_cut_tip_inside_the_disc_rear_face() -> None:
-    import build_paper_drive_assembly as assembly
+    import build_pd_paper_drive_assembly as assembly
 
     tip = assembly.DISC_SCREW_Z0 + screw.LENGTH
     assert assembly.DISC_Z0 + assembly.DISC_FACE - tip == pytest.approx(0.1)
@@ -89,7 +89,7 @@ def test_assembly_places_the_cut_tip_inside_the_disc_rear_face() -> None:
 def test_a_disc_too_thin_for_the_cut_screw_is_refused(monkeypatch) -> None:
     # A 2.6 face at its printed min leaves the cut screw under 1.5D.
     monkeypatch.setattr(disc, "FACE_WIDTH_MIN", 2.6)
-    with pytest.raises(AssertionError, match="MHA-161 disc screw .* worst engagement"):
+    with pytest.raises(AssertionError, match="MHA-VN-039 disc screw .* worst engagement"):
         _exec_fresh(screw)
 
 
@@ -97,7 +97,7 @@ def test_a_stock_screw_stopping_short_of_the_window_is_refused(monkeypatch) -> N
     # A disc that may run 0.40 thick leaves the shortest stock 0.342 inside:
     # no cut can bring it back into the window.
     monkeypatch.setattr(disc, "FACE_WIDTH_MAX", FACE + 0.40)
-    with pytest.raises(AssertionError, match="MHA-161 disc screw tip .* shortest"):
+    with pytest.raises(AssertionError, match="MHA-VN-039 disc screw tip .* shortest"):
         _exec_fresh(screw)
 
 
@@ -126,15 +126,15 @@ def test_platen_float_fitted_to_keep_the_disc_clear_of_the_platen() -> None:
 
 
 def test_a_float_window_the_rails_cannot_reach_is_refused(monkeypatch) -> None:
-    import build_platen_guide
+    import build_pd_platen_guide
 
     monkeypatch.setattr(guide, "LOCK_GAP_FIT", (0.05, 0.40))
     with pytest.raises(AssertionError, match="as-made lock gap under the fitted"):
-        _exec_fresh(build_platen_guide)
+        _exec_fresh(build_pd_platen_guide)
 
 
 def test_both_fit_ups_are_one_line_a06_steps_in_order() -> None:
-    import draw_paper_drive_assembly as drawing
+    import draw_pd_paper_drive_assembly as drawing
 
     seq = steps.SEQUENCE
     assert seq.index("lock-seats-faced") == seq.index("guide-locks-set") + 1

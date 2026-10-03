@@ -2,7 +2,7 @@
 
 ``transgear_hanger_joints`` judges each joint at the worst case of the printed
 bands and refuses to import when one fails. These tests show that each check
-still fires when a mating number drifts, and that the MHA-168 sheet line
+still fires when a mating number drifts, and that the MHA-VN-041 sheet line
 states the worst case it computes.
 """
 
@@ -14,14 +14,14 @@ import math
 
 import pytest
 
-import support_bar_spec as bar
-import transgear_arm_geometry as arm
-import transgear_arm_plate_geometry as plate
+import pd_support_bar_spec as bar
+import pd_transgear_arm_geometry as arm
+import pd_transgear_arm_plate_geometry as plate
 import transgear_hanger_joints as joints
-import transgear_latch_pin_spec as latch_pin
-import transgear_pivot_screw_spec as pivot
-import transgear_pivot_spacer_spec as spacer
-import transgear_pivot_spring_spec as spring
+import vn_transgear_latch_pin_spec as latch_pin
+import vn_transgear_pivot_screw_spec as pivot
+import pd_transgear_pivot_spacer_spec as spacer
+import vn_transgear_pivot_spring_spec as spring
 from _hole_spec import TAP_DRILL_MM
 
 
@@ -60,7 +60,7 @@ def test_the_bar_tap_countersink_is_charged_to_the_tap_drill(monkeypatch) -> Non
 def test_the_spring_room_stays_inside_the_springs_catalogue_travel(
     monkeypatch,
 ) -> None:
-    """R9-71: the MHA-184 spring holds the arm on the spacer at every printed
+    """R9-71: the MHA-VN-049 spring holds the arm on the spacer at every printed
     corner, never pressed past its catalogue working height.  The old floor
     (7.00, the free pivot's 0.10..0.35 head play) leaves the spring loose."""
     assert joints.SPRING_ROOM_MIN == pytest.approx(0.70, abs=1e-9)
@@ -102,9 +102,9 @@ def test_both_plate_screws_enter_their_taps_at_the_worst_pitch_mismatch(
     """The arm's tap pitch at one limit, the plate's hole pitch at the other:
     the bands the two builds apply on the stations, against the float of two
     basic #8-32 majors in the smallest drilled holes."""
-    import transgear_arm_plate_screw_spec as screw
-    import transgear_arm_plate_spec as plate_spec
-    import transgear_arm_spec as arm_spec
+    import vn_transgear_arm_plate_screw_spec as screw
+    import pd_transgear_arm_plate_spec as plate_spec
+    import pd_transgear_arm_spec as arm_spec
 
     taps = arm.PLATE_TAP_STATIONS
     holes = [x for x, _y in plate.SCREW_HOLES]
@@ -130,9 +130,9 @@ def test_both_plate_screws_enter_their_taps_at_the_worst_pitch_mismatch(
 def _eccentric_corner():
     """The plate-screw corner from the printed rows, independent of the
     joint module: (eccentric lift, countersink seat shift, tap entry loss)."""
-    import transgear_arm_plate_screw_spec as screw
-    import transgear_arm_plate_spec as plate_spec
-    import transgear_arm_spec as arm_spec
+    import vn_transgear_arm_plate_screw_spec as screw
+    import pd_transgear_arm_plate_spec as plate_spec
+    import pd_transgear_arm_spec as arm_spec
 
     taps = arm.PLATE_TAP_STATIONS
     holes = [x for x, _y in plate.SCREW_HOLES]
@@ -163,8 +163,8 @@ def test_every_stock_plate_screw_stands_past_the_cut_on_an_eccentric_seat(
     """R9-44: shortest stock screw (ASME B18.6.3, +0/-0.03 in), thickest
     plate and arm, head proud on a small countersink and riding its eccentric
     seat: the tip still clears the highest cut by its incomplete first thread."""
-    import transgear_arm_plate_screw_spec as screw
-    import transgear_arm_plate_spec as plate_spec
+    import vn_transgear_arm_plate_screw_spec as screw
+    import pd_transgear_arm_plate_spec as plate_spec
 
     lift, shift, entry = _eccentric_corner()
     assert lift == pytest.approx(0.1495, abs=5e-4)
@@ -191,7 +191,7 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
 ) -> None:
     """Cut flush: full thread from the rear tap countersink to the front face,
     where the front countersink and the cut-end break overlap."""
-    import transgear_arm_plate_screw_spec as screw
+    import vn_transgear_arm_plate_screw_spec as screw
 
     _lift, _shift, entry = _eccentric_corner()
     worst = arm.THICKNESS - arm.THICKNESS_BAND - entry - max(entry, 0.1)
@@ -206,15 +206,15 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
     assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
     # A cut-end break past the arm's 1.5 D margin starves the joint.
     monkeypatch.setattr(screw, "CUT_END_BREAK_MAX", 1.7)
-    with pytest.raises(AssertionError, match="MHA-166 worst engagement"):
+    with pytest.raises(AssertionError, match="MHA-VN-040 worst engagement"):
         _reload_joints()
 
 
 def test_plate_notch_face_clears_the_arm_edge_at_every_limit(monkeypatch) -> None:
     """The face is not a locating surface: worst air stays positive with the
     plate floated to its extremes on the two screws."""
-    import transgear_arm_plate_screw_spec as screw
-    import transgear_arm_plate_spec as plate_spec
+    import vn_transgear_arm_plate_screw_spec as screw
+    import pd_transgear_arm_plate_spec as plate_spec
 
     c = (plate.SCREW_HOLE_DIA + plate.DRILL_GROWTH - screw.THREAD_MAJOR_MIN) / 2.0
     (x1, _), (x2, _) = sorted(plate.SCREW_HOLES)
@@ -241,7 +241,7 @@ def test_pivot_sheet_line_prints_a_worst_engagement_it_never_overstates() -> Non
     printed = joints.PIVOT_ENGAGEMENT_WORST_PRINTED
     assert printed <= joints.PIVOT_ENGAGEMENT_WORST_D < printed + 0.01
     assert f"{printed:.2f}D MIN" in joints.PIVOT_SCREW_INSTALLATION_NOTES
-    assert "MHA-074 BLIND TAP" in joints.PIVOT_SCREW_INSTALLATION_NOTES
+    assert "MHA-PD-007 BLIND TAP" in joints.PIVOT_SCREW_INSTALLATION_NOTES
 
 
 def test_pivot_engagement_starts_below_the_vendor_thread_neck(monkeypatch) -> None:
@@ -287,7 +287,7 @@ def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
     monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.05)
     monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.05)
     with pytest.raises(
-        AssertionError, match=r"MHA-169 pin / MHA-127 strip far face.* 0\.419 short"
+        AssertionError, match=r"MHA-VN-042 pin / MHA-PD-014 strip far face.* 0\.419 short"
     ):
         _reload_joints()
 
@@ -312,7 +312,7 @@ def test_the_reamed_hole_keeps_the_press_at_both_limits(monkeypatch) -> None:
 @pytest.mark.parametrize(
     "module",
     [bar, arm, plate],
-    ids=["support-bar", "transgear-arm", "transgear-arm-plate"],
+    ids=["pd-support-bar", "pd-transgear-arm", "pd-transgear-arm-plate"],
 )
 def test_every_wall_holds_the_target_at_the_printed_worst_case(module) -> None:
     for name, (nominal, worst) in module.WALLS.items():

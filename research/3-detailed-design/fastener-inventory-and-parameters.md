@@ -11,6 +11,8 @@
 > [`period-accurate-fastener-parameters.md`](period-accurate-fastener-parameters.md)
 > (same warning).
 
+> Identity migration: the CAD inventory below is historical evidence; its original part numbers, script names and recorded dimensions are preserved. Current identities and registry paths are in the [subsystem identity guide](../../cad/docs/subsystem-identities.md).
+
 Hand-off document for the CAD fastener-detailing pass. Cross-derives **every**
 fastener in the machine from three independent sources and assigns the most
 plausible period-correct parameters (thread system, pitch, length, head, drive,

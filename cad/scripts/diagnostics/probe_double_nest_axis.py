@@ -2,14 +2,14 @@ r"""Throwaway probe: does a named reference axis inside a part nested in a
 subassembly select by name via SelectByID2 -- RIGID vs FLEXIBLE?
 
 The cam couplings + crank motor in build_motion_study all failed with
-"Failed to select mate entity (AXIS at 'Axis1@connecting-rod-1@channel-1@
+"Failed to select mate entity (AXIS at 'Axis1@ch-connecting-rod-1@ch-channel-1@
 harmonic-analyzer')". The 1-channel rig that "proved" the named-axis recipe
 placed parts DIRECTLY (single nesting), so it never exercised part-in-sub-in-top.
 
 This builds a CLEAN throwaway parent (create_assembly makes a NEW doc, leaving
 the user's harmonic-analyzer session open and untouched -> model tab active, no
-motion study to block selection), inserts channel.SLDASM as channel-1 (genuine
-`connecting-rod-1@channel-1@<parent>` double nesting, identical structure to the
+motion study to block selection), inserts ch-channel.SLDASM as channel-1 (genuine
+`connecting-rod-1@ch-channel-1@<parent>` double nesting, identical structure to the
 failing case), then:
 
   1. enumerates the rod's RefAxis features by name (confirm Axis1/Axis2 exist);
@@ -90,11 +90,11 @@ async def main():
     )
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
-    ch_path = (OUT_SLDASM / "channel.SLDASM").resolve()
+    ch_path = (OUT_SLDASM / "ch-channel.SLDASM").resolve()
     if not ch_path.exists():
         log(f"missing {ch_path}")
         return
-    log(f"channel.SLDASM = {ch_path} ({ch_path.stat().st_size} bytes)")
+    log(f"ch-channel.SLDASM = {ch_path} ({ch_path.stat().st_size} bytes)")
 
     adapter = PyWin32Adapter({})
     _telemetry.info("Connecting ...")
@@ -109,7 +109,7 @@ async def main():
     asm = title[:-7] if title.lower().endswith(".sldasm") else title
     log(f"parent title={title!r} asm={asm!r}")
 
-    log("insert channel.SLDASM as channel-1 ...")
+    log("insert ch-channel.SLDASM as channel-1 ...")
     res = await adapter.insert_component(
         InsertComponentParameters(
             file_path=str(ch_path), position=[0.0, 0.0, 0.0], rotation=[0.0, 0.0, 0.0]
@@ -123,9 +123,9 @@ async def main():
     sub = data["name"]
     log(f"  inserted as {sub!r} (fixed={data.get('fixed')})")
 
-    comp = _find_comp(adapter, doc, "connecting-rod-1")
+    comp = _find_comp(adapter, doc, "ch-connecting-rod-1")
     if comp is None:
-        log("connecting-rod-1 NOT FOUND under the inserted sub")
+        log("ch-connecting-rod-1 NOT FOUND under the inserted sub")
         await adapter.disconnect()
         return
     full = str(_read_member(comp, "Name2"))
@@ -174,8 +174,8 @@ async def main():
 
     # 4) Face-walk COST on the cylinder-gear (the perf blocker the named axis was
     #    meant to dodge). Insert drive-train, time finding a gear's lobe face.
-    log("insert drive-train.SLDASM (to time the cylinder-gear face walk) ...")
-    dt_path = (OUT_SLDASM / "drive-train.SLDASM").resolve()
+    log("insert dt-drive-train.SLDASM (to time the cylinder-gear face walk) ...")
+    dt_path = (OUT_SLDASM / "dt-drive-train.SLDASM").resolve()
     if dt_path.exists():
         res2 = await adapter.insert_component(
             InsertComponentParameters(
@@ -184,7 +184,7 @@ async def main():
         )
         if res2.is_success:
             dtsub = res2.data["name"]
-            gear = _find_comp(adapter, doc, "cylinder-gear-1")
+            gear = _find_comp(adapter, doc, "dt-cylinder-gear-1")
             if gear is not None:
                 gname = str(_read_member(gear, "Name2"))
                 gpart = adapter._attempt(lambda: gear.GetModelDoc2(), default=None)

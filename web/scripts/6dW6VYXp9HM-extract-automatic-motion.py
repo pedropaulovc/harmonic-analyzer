@@ -91,14 +91,14 @@ class Projection:
     def __init__(self, native, candidate, anchors):
         self.channel = native["channel"]
         self.rest = {row["partPath"]: np.array(row["restWorldMatrix"]).reshape(4, 4, order="F")
-                     for row in native["rest"] if "/rocker-arm-" in row["partPath"]}
+                     for row in native["rest"] if "/ch-rocker-arm-" in row["partPath"]}
         self.anchors = {a["id"]: a for a in anchors}
         self.camera = np.array(candidate["analyticMirroredCameraParameters"])
         self.camera_rotation = Rotation.from_rotvec(self.camera[:3]).as_matrix()
 
     def point(self, beta, index, local):
         # Exact existing cap_world convention, including native saved rest angle.
-        rest = self.rest[f"harmonic-analyzer/channel/rocker-arm-{index + 1}"]
+        rest = self.rest[f"ha-harmonic-analyzer/ch-channel/ch-rocker-arm-{index + 1}"]
         rest_angle = math.atan2(-rest[1, 0], -rest[0, 0])
         pivot = np.array([*np.array(self.channel["pivotMm"]) / 1000, rest[2, 3]])
         at_rest = np.asarray(local) @ rest[:3, :3].T + rest[:3, 3]
@@ -380,7 +380,7 @@ def main():
                             "amplitudesAndHiddenSetup": "Original first frozen source-FIT complete witness held fixed; not recovered historical settings. Rocker cap motion is independent of these amplitude settings."},
               "fixedInput": fixed_input,
               "stationCorrespondence": [{"sourceStation": k, "harmonic": k, "nativeStationIndex": 20-k,
-                                         "nativePartPath": f"harmonic-analyzer/channel/rocker-arm-{21-k}"} for k in range(1, 21)],
+                                         "nativePartPath": f"ha-harmonic-analyzer/ch-channel/ch-rocker-arm-{21-k}"} for k in range(1, 21)],
               "frames": [{"frameIndex": row["frameIndex"], "timeSeconds": row["timeSeconds"], "sourceImage": row["sourceImage"],
                           "crankTurns": float(chosen["turns"][i]), "rockerAnglesRad": chosen["rocker"][i].tolist()} for i, row in enumerate(frames)],
               "diagnostics": {"signedAlternatives": branch_reports, "nativeForwardSmoke": native_report,

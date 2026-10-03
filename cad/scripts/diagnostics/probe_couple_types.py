@@ -106,7 +106,7 @@ async def main():
 
     await _flex_output(adapter)
     await _suppress_named(adapter, "output-1",
-                          ("summing-lever", "magnifying-lever", "magnifying-wheel"),
+                          ("sm-summing-lever", "mg-magnifying-lever", "mg-magnifying-wheel"),
                           (ANGLE,), "summing+mag+wheel rock")
 
     _, out_doc = _sub_model(adapter, "output-1")
@@ -116,19 +116,19 @@ async def main():
         log("  === coupling-type matrix ===")
         await _del(adapter, await _gear(
             adapter, "A gear summing(Z)<->wheel(Z) PARALLEL",
-            "summing-lever-1", "Axis1", "magnifying-wheel-1", "Axis1", [5.0, 1.0]))
+            "sm-summing-lever-1", "Axis1", "mg-magnifying-wheel-1", "Axis1", [5.0, 1.0]))
         await _del(adapter, await _gear(
             adapter, "B gear mag(X)<->wheel(Z) skew",
-            "magnifying-lever-1", "Axis1", "magnifying-wheel-1", "Axis1", [5.0, 1.0]))
+            "mg-magnifying-lever-1", "Axis1", "mg-magnifying-wheel-1", "Axis1", [5.0, 1.0]))
         await _del(adapter, await _rack(
             adapter, "C rack vertical-rod<->wheel d20",
-            "magnifying-vertical-rod-1", "Axis1", "magnifying-wheel-1", "Axis1", 20.0))
+            "mg-magnifying-vertical-rod-1", "Axis1", "mg-magnifying-wheel-1", "Axis1", 20.0))
         await _del(adapter, await _rack(
             adapter, "D rack output-fixture<->wheel d20",
-            "output-fixture-1", "Axis1", "magnifying-wheel-1", "Axis1", 20.0))
+            "mg-output-fixture-1", "Axis1", "mg-magnifying-wheel-1", "Axis1", 20.0))
         await _del(adapter, await _rack(
             adapter, "E rack pen-rod<->wheel d100 (sanity)",
-            "pen-rod-1", "Axis1", "magnifying-wheel-1", "Axis1", 100.0))
+            "pn-pen-rod-1", "Axis1", "mg-magnifying-wheel-1", "Axis1", 100.0))
     finally:
         adapter.currentModel = top
     await adapter.disconnect()

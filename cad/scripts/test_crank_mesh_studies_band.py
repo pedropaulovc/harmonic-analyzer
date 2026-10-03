@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "diagnostics"))
 
 import crank_mesh_backlash_study as backlash  # noqa: E402
 import crossed_mesh_study as cms  # noqa: E402
-from crank_pinion_spec import FACE_WIDTH, SHOULDER_LENGTH, TURNED_DIA  # noqa: E402
+from dt_crank_pinion_spec import FACE_WIDTH, SHOULDER_LENGTH, TURNED_DIA  # noqa: E402
 
 
 @pytest.fixture(scope="module")

@@ -15,14 +15,14 @@ A few millimetres of summing-lever travel become a few centimetres of pen travel
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `magnifying-lever` | TODO | TODO | TODO |
-| `magnifying-wheel` | TODO | TODO | TODO |
-| `magnifying-bracket` | TODO | TODO | TODO |
-| `magnifying-clamp` | TODO | TODO | TODO |
-| `magnifying-vertical-rod` | TODO | TODO | TODO |
-| `lever-wire` | TODO | TODO | TODO |
-| `wheel-axle` | TODO | TODO | TODO |
-| `wheel-bar` | TODO | TODO | TODO |
+| `mg-magnifying-lever` | TODO | TODO | TODO |
+| `mg-magnifying-wheel` | TODO | TODO | TODO |
+| `mg-magnifying-bracket` | TODO | TODO | TODO |
+| `mg-magnifying-clamp` | TODO | TODO | TODO |
+| `mg-magnifying-vertical-rod` | TODO | TODO | TODO |
+| `mg-lever-wire` | TODO | TODO | TODO |
+| `mg-wheel-axle` | TODO | TODO | TODO |
+| `mg-wheel-bar` | TODO | TODO | TODO |
 | `pivot-ball-mount` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}

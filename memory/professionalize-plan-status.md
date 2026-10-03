@@ -7,6 +7,9 @@ metadata:
   originSessionId: 045bacc1-f12e-48b0-b137-916b2b43a02d
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Executing `C:\Users\pedro\.claude\plans\i-want-to-professionalize-stateful-star.md` on branch `professionalize-cad`. Each commit fast-forward-pushed to `origin/main` (user wants main to track the work; `git push origin professionalize-cad:main` + `git branch -f main professionalize-cad`).
 
 > **NOTE (later drift):** this is a ~2026-06-16 status snapshot. The verify SUITE NAMES

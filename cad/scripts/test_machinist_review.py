@@ -897,7 +897,7 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
         "minor": [],
     }
     review = mr.Review(
-        name="crank_arm",
+        name="dt_crank_arm",
         kind="part",
         sources=["x.png"],
         source_sha256=["b" * 64],
@@ -929,7 +929,7 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
     )
     assert expected in index
     data = json.loads((tmp_path / "crank_arm.json").read_text())
-    assert data["name"] == "crank_arm"
+    assert data["name"] == "dt_crank_arm"
     assert data["sources"] == ["x.png"]
 
 

@@ -90,7 +90,7 @@ IN = 25.4  # inch -> mm
 
 # Roller-chain link component prefixes; contact between two of these is an
 # articulating-mechanism contact, not an interference fault (check_no_interference).
-_CHAIN_LINK_PREFIXES = ("chain-inner-link", "chain-outer-link")
+_CHAIN_LINK_PREFIXES = ("vn-chain-inner-link", "vn-chain-outer-link")
 
 DEFAULT_VIEWS = ("isometric",)
 _ROUTINE_PART_VIEWS = frozenset(
@@ -1421,7 +1421,7 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
     configuration stale.  Saved that way, an assembly placing it opens with
     NeedsRebuild2=1 and fails verify:soundness's saved-rebuild-clean, and the
     #267 reconcile re-saves only the assembly, never the child.  The pc-p1r
-    probe (dt-logs/pc-p1r/probe-saved-rebuild.jsonl) read MHA-135's INSTALLED
+    probe (dt-logs/pc-p1r/probe-saved-rebuild.jsonl) read MHA-DT-030's INSTALLED
     configuration stale in the saved part, and cone-gear's unplaced Default.
 
     Same shape as _assembly.rebuild_if_needed_before_save (1013334c3): every
@@ -1787,12 +1787,12 @@ def part_properties(part_name: str) -> dict[str, str]:
     # HOLES row reads these via $PRPSHEET and supplies the +/- around them.
     props["TOL_HOLE_MINUS"] = str(_config.title_block("drilled_hole")["display_minus"])
     props["TOL_HOLE_PLUS"] = str(_config.title_block("drilled_hole")["display_plus"])
-    # Per-channel stretched springs (build_channel_assembly) are length variants of
+    # Per-channel stretched springs (build_ch_channel_assembly) are length variants of
     # the registered base part -- they inherit its material / tolerance / fit so
     # the tolerance audit stays clean without 10 redundant registry rows.
     registry_name = part_name
-    if part_name.startswith("channel-spring-installed-stretch"):
-        registry_name = "channel-spring-installed"
+    if part_name.startswith("vn-channel-spring-installed-stretch"):
+        registry_name = "vn-channel-spring-installed"
     try:
         reg = _config.parts(registry_name)
     except KeyError:
@@ -2636,7 +2636,7 @@ async def force_rebuild(adapter: Any) -> None:
 # ---------------------------------------------------------------------------
 # Mate family: semantic kinematic joints + driving dimensions.
 #
-# Generalised from build_frame_assembly's plane-plane mate. Every component is
+# Generalised from build_fr_frame_assembly's plane-plane mate. Every component is
 # inserted at its exact final (mirrored) transform, so a correctly solved mate
 # must NOT move it. distance / angle / coincident (and alignment-sensitive
 # concentric) mates can pick the far-side solution; pass ``verify=(comp_name,

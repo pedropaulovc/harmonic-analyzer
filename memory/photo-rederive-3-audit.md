@@ -1,3 +1,6 @@
+
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
 # Photo re-derive pass 3 -- user review list + evidence (2026-09-02)
 
 > Not a status board (see the GitHub project). Working list for the third

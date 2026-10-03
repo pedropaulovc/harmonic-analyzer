@@ -51,8 +51,8 @@ import dodo  # noqa: E402
 import _config  # noqa: E402
 import _telemetry  # noqa: E402
 import channel_kinematics  # noqa: E402
-import channel_spring_stock_geom as channel_stock  # noqa: E402
-import gooseneck_geom  # noqa: E402
+import vn_channel_spring_stock_geom as channel_stock  # noqa: E402
+import sm_gooseneck_geom  # noqa: E402
 import spring_mount_geom as spring_mounts  # noqa: E402
 from _assembly import (  # noqa: E402
     assert_pose_ledger,
@@ -76,8 +76,8 @@ from _cwm import put_component_pose  # noqa: E402
 from _spring import build_spring  # noqa: E402
 from _stock_fastener import _blank_recipe_references  # noqa: E402
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rot_z_rows  # noqa: E402
-from build_channel_assembly import ARM_MID_DZ, FULCRUM, IDENTITY, z_station  # noqa: E402
-from cone_pivot_post_installation import SUMMING_Z  # noqa: E402
+from build_ch_channel_assembly import ARM_MID_DZ, FULCRUM, IDENTITY, z_station  # noqa: E402
+from dt_cone_pivot_post_installation import SUMMING_Z  # noqa: E402
 from diagnostics._seat_search import ContactSolution, solve_component_contact  # noqa: E402
 from diagnostics.diag_build_1330K524 import build_1330K524  # noqa: E402
 
@@ -165,7 +165,7 @@ async def _calibrate_channel(
     z_mid = z_station(station) + ARM_MID_DZ
     pose = spring_mounts.channel_pose(amplitude)
     seed = pose
-    variant = f"channel-spring-calib{variant_index:02d}"
+    variant = f"vn-channel-spring-calib{variant_index:02d}"
     state = channel_kinematics.solve_state(amplitude)
     lever_rows = compose_rows(rot_z_rows(state["lever_tilt"]), ROT_Y_180)
     ux, uy = pose.axis_xy
@@ -302,7 +302,7 @@ async def _build_counter_variant(adapter, name: str, length_mm: float) -> None:
             delattr(adapter, "_mcm_com_map")
     _blank_recipe_references(adapter)
     await force_rebuild(adapter)
-    await apply_material(adapter, str(_config.parts("counter-spring")["material"]))
+    await apply_material(adapter, str(_config.parts("vn-counter-spring")["material"]))
     await apply_color(adapter, SPRING_BLACK)
     await save_part_and_images(adapter, name, [])
     _close_active_part(adapter)
@@ -320,9 +320,9 @@ async def _calibrate_counter(
     gooseneck_y = (
         seed.upper_eye_xy[1]
         + spring_mounts.counter_upper_support_offset(seed.axis_xy)
-        - gooseneck_geom.ARM_Y
+        - sm_gooseneck_geom.ARM_Y
     )
-    variant = f"counter-spring-calib-{preset}"
+    variant = f"vn-counter-spring-calib-{preset}"
     await _build_counter_variant(adapter, variant, seed.length_mm)
     lower_direction = (-ux, -uy, 0.0)
     upper_direction = (0.0, -1.0, 0.0)

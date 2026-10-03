@@ -68,7 +68,7 @@ from preflight_release import _discard_open_documents
 
 # Coupled ratios (from the paper-drive build): chain T12:T24 = 12:24, gear
 # 12:120, rack-pinion pi*FEED_PD per feed-pinion revolution.
-from build_paper_drive_assembly import (
+from build_pd_paper_drive_assembly import (
     CHAIN_CRANK_CENTRE,
     DISC_TEETH,
     FEED_PD,
@@ -119,7 +119,7 @@ GEAR_SENSE = -1.0  # sign of (disc Z) / (knob shaft Z): external 12:120 mesh
 # (2026-07-07 drag test: the original platen-axis-referenced mate fed the
 # paper BACKWARD at this constant's old -1 value, every magnitude passing).
 # Do NOT re-calibrate this constant to whatever the model does -- it states
-# the physics; flip the MATE (build_paper_drive_assembly, rack_pinion_mate
+# the physics; flip the MATE (build_pd_paper_drive_assembly, rack_pinion_mate
 # flip=) until this assert holds.
 FEED_SIGN = +1.0    # sign of (platen dX) / (feed-pinion signed-Z deg)
 
@@ -211,7 +211,7 @@ def _removables_by_role(adapter: Any) -> dict[str, str]:
         "T24": KNOB_SHAFT_XY,
         "T18": SPARE_GEAR_POS[:2],
     }
-    insts = [n for n in component_names(adapter) if n.startswith("transgear-removable")]
+    insts = [n for n in component_names(adapter) if n.startswith("pd-transgear-removable")]
     out: dict[str, str] = {}
     for role, (kx, ky) in known.items():
         best, bestd = None, 1e9
@@ -239,13 +239,13 @@ def _one(adapter: Any, stem: str) -> str:
 async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     roles = _removables_by_role(adapter)
     t12, t24 = roles["T12"], roles["T24"]
-    collar = _one(adapter, "transgear-drive-collar")
-    knob_shaft = _one(adapter, "transgear-knob-shaft")
-    feed_pinion = _one(adapter, "transgear-feed-pinion")
-    disc = _one(adapter, "rack-pinion")
+    collar = _one(adapter, "pd-transgear-drive-collar")
+    knob_shaft = _one(adapter, "pd-transgear-knob-shaft")
+    feed_pinion = _one(adapter, "pd-transgear-feed-pinion")
+    disc = _one(adapter, "pd-rack-pinion")
     # The platen BODY exactly (platen-<n>), not a "platen-rack"/"platen-clip" sibling.
     platen = next((n for n in component_names(adapter)
-                   if n.rsplit("-", 1)[0] == "platen"), "")
+                   if n.rsplit("-", 1)[0] == "pd-platen"), "")
     if not platen:
         raise RuntimeError("no platen-<n> body component found")
     log(
@@ -386,7 +386,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
         f"  knob shaft  {z_shaft:+6.2f} deg  (Lock to collar, integral 12T, signed)\n"
         f"  120T disc   {z_disc:+6.2f} deg  (gear mate 12:120, signed)\n"
         f"  feed pinion {z_feed:+6.2f} deg  (Lock to disc, signed)\n"
-        f"  platen      {d_platen:+7.3f} mm  (rack-pinion, pi*{FEED_PD:.2f}/rev;"
+        f"  pd_platen      {d_platen:+7.3f} mm  (rack-pinion, pi*{FEED_PD:.2f}/rev;"
         f" NET {NET_RACK_TRAVEL_PER_CRANK_REV:.3f}/crank-rev)\n"
         f"  roller chain {'links advanced (Dynamic seed drive)' if chain_moved else 'static visual -- SW has no sprocket->link coupling'}")
     return {"crank_deg": f"{d_crank:.2f}", "platen_mm": f"{d_platen:.3f}",
@@ -395,7 +395,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
 
 async def build(adapter: Any) -> dict[str, str]:
     check("open paper-drive",
-          await adapter.open_model(str(OUT_SLDASM / "paper-drive.SLDASM")))
+          await adapter.open_model(str(OUT_SLDASM / "pd-paper-drive.SLDASM")))
     try:
         result = await _drive_and_measure(adapter)
         # Standalone-only (the verify:kinematics gate calls _drive_and_measure
@@ -403,7 +403,7 @@ async def build(adapter: Any) -> dict[str, str]:
         # train -- crank +30 deg, everything downstream displaced. The model
         # still discards unsaved below; only PNGs are written.
         from _common import OUT_PNG
-        png_dir = OUT_PNG / "paper-drive"
+        png_dir = OUT_PNG / "pd-paper-drive"
         png_dir.mkdir(parents=True, exist_ok=True)
         for view in ("front", "isometric"):
             img = (png_dir / f"paper-drive_driven_{view}.png").resolve()
@@ -429,14 +429,14 @@ async def _attempt_chain_advance(adapter: Any, d_crank_deg: float) -> bool:
     from solidworks_mcp.adapters.base import MoveComponentParameters
     try:
         links = sorted(n for n in component_names(adapter)
-                       if n.startswith(("chain-inner-link", "chain-outer-link")))
+                       if n.startswith(("vn-chain-inner-link", "vn-chain-outer-link")))
         if len(links) < 3:
             return False
         seed = links[0]                       # the pattern's seed link
         probe = links[len(links) // 2]        # a link far around the loop
         before = component_origin(adapter, probe)
         # Chain surface travel on the crank T12 pitch circle (_chain reads the
-        # #25 pitch radius from transgear_removable_spec).
+        # #25 pitch radius from pd_transgear_removable_spec).
         arc = math.radians(abs(d_crank_deg)) * PITCH_R_T12
         # Delta along the loop tangent at the seed's station (0 -> arc).
         x0, y0, _ = loop_point_tangent(0.0, dx=KNOB_SHAFT_XY[0], dy=KNOB_SHAFT_XY[1],

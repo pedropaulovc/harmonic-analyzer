@@ -1,18 +1,18 @@
-"""End play of the cone gear stack on MHA-014, and of MHA-014 in its bearings.
+"""End play of the cone gear stack on MHA-DT-004, and of MHA-DT-004 in its bearings.
 
 Two independent floats (user ruling 2026-09-29):
 
-* The stack (MHA-021 and the twenty MHA-013) floats on the shaft between
-  MHA-014's integral thrust collar and the MHA-096 set-screw shaft collar.  At
-  fit-up the stack is pushed onto the thrust collar, the MHA-096 collar is
+* The stack (MHA-DT-007 and the twenty MHA-DT-003) floats on the shaft between
+  MHA-DT-004's integral thrust collar and the MHA-VN-016 set-screw shaft collar.  At
+  fit-up the stack is pushed onto the thrust collar, the MHA-VN-016 collar is
   pushed against T006 over one COLLAR_FEELER leaf and its set screw locked on
   the Sec4 D-flat.  That gap is how far the stack can float north in service,
   whatever the shaft does.  The feeler follows the cylinder bank's rule
   (cylinder_bank_layout.BANK_END_FEELER): the smallest 0.05 blade whose
   tightest setting keeps MIN_END_PLAY with MARGIN_SPARE to spare.
-* The shaft floats between the MHA-016 boss (its thrust collar's south face)
-  and the MHA-097 cup (its tip), SHAFT_END_PLAY, set by the cup screw alone.
-  The tip block and the MHA-096 collar never touch
+* The shaft floats between the MHA-DT-005 boss (its thrust collar's south face)
+  and the MHA-VN-017 cup (its tip), SHAFT_END_PLAY, set by the cup screw alone.
+  The tip block and the MHA-VN-016 collar never touch
   (build_drive_train_assembly's collar-to-block air).
 
 Import-free on purpose: the shaft spec, the gear-mesh proof and the assembly
@@ -36,7 +36,7 @@ STACK_FLOAT = (
     COLLAR_FEELER - COLLAR_FEELER_BAND,
     COLLAR_FEELER + COLLAR_FEELER_BAND,
 )
-# (min, max) shaft end play at MHA-A03 step 3: the cup screw is run in until
+# (min, max) shaft end play at MHA-DT-000 step 3: the cup screw is run in until
 # the shaft just stops shuttling, then backed off 1/8 turn (0.099 on the
 # #10-32).  0.05: the shaft never runs clamped.  0.25: the most the
 # collar-to-block air, the adjuster's embed window and the drum's engaged-zone

@@ -173,7 +173,7 @@ def readout_report(
     report = {
         "nominal": nom.__dict__,
         "closed_form": {
-            "magnifier": {
+            "mg-magnifier": {
                 "ordinate_capacity_full_scale_bars": capacity,
                 "lever_radius_min_mm": nom.lever_r_min,
                 "lever_radius_built_mm": nom.lever_r_built,
@@ -338,7 +338,7 @@ def prepared_readme_release(
             writer.write(target)
     gltf = release_root / "gltf"
     gltf.mkdir()
-    (gltf / "harmonic-analyzer.glb").write_bytes(b"external renderer input")
+    (gltf / "ha-harmonic-analyzer.glb").write_bytes(b"external renderer input")
 
     # The expensive graphics collaborator is isolated, but cropping, PDFium,
     # byte-for-byte drawings, image installation, and YAML replacement are real.
@@ -354,7 +354,7 @@ def prepared_readme_release(
     revision.write_text("next_revision: v22\n", encoding="utf-8")
     native = tmp_path / "native"
     native.mkdir()
-    (native / "harmonic-analyzer.SLDASM").write_bytes(b"preflight input")
+    (native / "ha-harmonic-analyzer.SLDASM").write_bytes(b"preflight input")
     scene = tmp_path / "scene.json"
     scene.write_text('{"unit":"mm"}', encoding="utf-8")
     zip_path = release_root.with_suffix(".zip")
@@ -412,14 +412,14 @@ def test_release_installs_images_and_revision_only_after_successful_publication(
 
     if publication == "successful":
         assert revision.read_text(encoding="utf-8") == "next_revision: v23\n"
-        assert (images / "pinion-arbor-drawing.png").read_bytes() == (
-            release_root / "png" / "pinion-arbor_drawing.png"
+        assert (images / "dt-pinion-arbor-drawing.png").read_bytes() == (
+            release_root / "png" / "dt-pinion-arbor_drawing.png"
         ).read_bytes()
-        with Image.open(images / "frame.png") as image:
+        with Image.open(images / "fr-frame.png") as image:
             assert image.size == (68, 68)
-        with Image.open(images / "drive-train-assembly-sheet-4.png") as image:
+        with Image.open(images / "dt-drive-train-assembly-sheet-4.png") as image:
             assert image.convert("RGB").getpixel((150, 75)) == (255, 255, 0)
-        with Image.open(images / "frame-assembly-sheet-3.png") as image:
+        with Image.open(images / "fr-frame-assembly-sheet-3.png") as image:
             assert image.convert("RGB").getpixel((150, 75)) == (0, 0, 255)
     else:
         assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
@@ -434,7 +434,7 @@ def test_missing_readme_artifact_fails_before_tag_or_publish(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     release_root, images, revision = prepared_readme_release
-    (release_root / "png" / "frame" / "frame_isometric.png").unlink()
+    (release_root / "png" / "fr-frame" / "fr-frame_isometric.png").unlink()
 
     def git(*args: str, **_kwargs: object) -> str:
         if args[:2] == ("tag", "-a") or args[0] == "push":
@@ -447,7 +447,7 @@ def test_missing_readme_artifact_fails_before_tag_or_publish(
     )
     monkeypatch.setattr(sys, "argv", ["cut_release.py", "v22"])
 
-    with pytest.raises(FileNotFoundError, match="frame_isometric.png"):
+    with pytest.raises(FileNotFoundError, match="fr-frame_isometric.png"):
         cut_release.main()
 
     assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"

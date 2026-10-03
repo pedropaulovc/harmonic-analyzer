@@ -19,7 +19,7 @@ ForceRebuild3 in the session, and again AFTER — if "Force poisons the session"
 second Edit trial would go dirty.
 
     HARMONIC_COM_SEAT=1 uv run python cad/scripts/diagnostics/probe_rebuild_matrix.py \
-        C:/src/harmonic-analyzer/.claude/worktrees/main_control/cad/out/sldasm/frame.SLDASM
+        C:/src/harmonic-analyzer/.claude/worktrees/main_control/cad/out/sldasm/fr-frame.SLDASM
 """
 
 from __future__ import annotations
@@ -185,7 +185,7 @@ async def _trial(adapter, src: Path, idx: int, verb: str, mode: str, opts: int):
 
 
 async def main() -> None:
-    arg = sys.argv[1] if len(sys.argv) > 1 else "frame"
+    arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     src = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     src_md5 = _md5(src)
     _telemetry.info(f"source={src}\nsource md5={src_md5} size={src.stat().st_size}")

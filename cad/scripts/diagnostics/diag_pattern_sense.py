@@ -1,6 +1,6 @@
 r"""Empirical revalidation of the LocalLinearPattern retirement claims (#8 era).
 
-History under test (build_channel_assembly.py:1030 comment + the #8 memory):
+History under test (build_ch_channel_assembly.py:1030 comment + the #8 memory):
 
   H1  the pattern direction sense, taken from the pivot shaft's cylindrical
       face, resolves unreliably at 20 channels (clean at 3) -- flips are real
@@ -41,7 +41,7 @@ from _assembly import (  # noqa: E402
     component_transform,
     place_component,
 )
-from build_channel_assembly import (  # noqa: E402
+from build_ch_channel_assembly import (  # noqa: E402
     ARM_MID_DZ,
     CHANNELS,
     IDENTITY,
@@ -63,7 +63,7 @@ REPS = 5  # trials per (count, variant) cell
 SEED_TOL = 0.5  # mm; Z classification slack
 
 # Top inter-channel gap: where the retired code seeded the bank (old
-# build_channel_assembly z_gap_top = z_mid(top) - PITCH/2).
+# build_ch_channel_assembly z_gap_top = z_mid(top) - PITCH/2).
 Z_TOP_GAP = z_station(CHANNELS - 1) + ARM_MID_DZ - PITCH / 2.0
 PIVOT_OD_PT = [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0]  # historic face pick
 
@@ -102,7 +102,7 @@ async def _fresh_rig(adapter) -> str:
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     check("create_assembly", await adapter.create_assembly())
     await place_component(
-        adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
+        adapter, "ch-pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
         [0.0, 0.0, 0.0], IDENTITY, ground=True, label="pivot-shaft (grounded)",
     )
     return await place_component(
@@ -124,7 +124,7 @@ async def _pattern_adapter(adapter, seed: str, n: int):
 async def _pattern_axis(adapter, seed: str, n: int, flip: bool):
     """The REVIVED production shape: explicit reference-axis direction
     (BankZ = Top ∩ Right) + the plumbed flip_direction -- what
-    build_channel_assembly._pattern_bank now ships. Measures whether the
+    build_ch_channel_assembly._pattern_bank now ships. Measures whether the
     axis pick is sense-deterministic and which flip value lands 'down'."""
     axis = (await adapter.create_axis(
         CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])

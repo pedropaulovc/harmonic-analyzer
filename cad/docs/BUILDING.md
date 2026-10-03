@@ -1,5 +1,7 @@
 # Building the model
 
+Canonical stems and drawing numbers come from the frozen [subsystem identity registries](subsystem-identities.md): `cad/config/parts/<prefixed-stem>.yaml` for parts and `cad/config/assemblies/<prefixed-stem>.yaml` for assemblies. Task stems use underscores; output basenames use dashes. Assembly drawings use number 000 and retain the `-assembly` artifact suffix; parts start at 001 within each subsystem.
+
 The CAD model is generated headlessly from a clean checkout. Every task that
 drives COM needs a SolidWorks seat, and there are two ways to have one:
 
@@ -73,10 +75,10 @@ uv run python -m doit build_bare
 
 # Just one part (doit selection does NOT run reverse dependents — the dependent
 # .SLDASM/renders stay stale until you run plain `doit` or select them explicitly)
-uv run python -m doit part:cone_gear
+uv run python -m doit part:dt_cone_gear
 
 # Just one assembly (+ its stale prerequisites), or a single gate
-uv run python -m doit assembly:paper_drive
+uv run python -m doit assembly:pd_paper_drive
 uv run python -m doit verify:soundness        # one SW gate
 uv run python -m doit check:math              # one offline gate
 
@@ -138,8 +140,8 @@ Bypass the cheap refresh by deleting its target — a missing target makes doit
 take the FULL branch (hooks included):
 
 ```powershell
-del cad\out\sldasm\paper-drive.SLDASM
-uv run python -m doit assembly:paper_drive
+del cad\out\sldasm\pd-paper-drive.SLDASM
+uv run python -m doit assembly:pd_paper_drive
 ```
 
 ## Repository layout

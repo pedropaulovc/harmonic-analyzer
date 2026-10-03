@@ -37,7 +37,7 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-The 0.4 mm alignment notch on one `cylinder-gear`, indexed to +Y — then prove you can repeat it on a second.
+The 0.4 mm alignment notch on one `dt-cylinder-gear`, indexed to +Y — then prove you can repeat it on a second.
 :::
 
 ---
@@ -45,5 +45,5 @@ The 0.4 mm alignment notch on one `cylinder-gear`, indexed to +Y — then prove 
 **Sources for this chapter**
 
 - `references/gears-and-gear-cutting/`
-- `cad/scripts/build_cylinder_gear.py`
+- `cad/scripts/build_dt_cylinder_gear.py`
 

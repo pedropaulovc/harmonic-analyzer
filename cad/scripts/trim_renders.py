@@ -41,24 +41,24 @@ PAD = 24
 THRESHOLD = 30
 
 README_RENDERS = {
-    "harmonic-analyzer": "hero.png",
-    "frame": "frame.png",
-    "drive-train": "drive-train.png",
-    "channel": "channel.png",
-    "summing": "summing.png",
-    "magnifier": "magnifier.png",
-    "pen": "pen.png",
-    "paper-drive": "paper-drive.png",
+    "ha-harmonic-analyzer": "hero.png",
+    "fr-frame": "fr-frame.png",
+    "dt-drive-train": "dt-drive-train.png",
+    "ch-channel": "ch-channel.png",
+    "sm-summing": "sm-summing.png",
+    "mg-magnifier": "mg-magnifier.png",
+    "pn-pen": "pn-pen.png",
+    "pd-paper-drive": "pd-paper-drive.png",
 }
 
 README_DRAWINGS = {
-    "rocker-arm-support": "rocker-arm-support-drawing.png",
-    "pinion-arbor": "pinion-arbor-drawing.png",
+    "fr-rocker-arm-support": "fr-rocker-arm-support-drawing.png",
+    "dt-pinion-arbor": "dt-pinion-arbor-drawing.png",
 }
 
 README_PDF_SHEETS = {
-    "drive-train-assembly-sheet-4.png": ("drive-train-assembly.pdf", 3),
-    "frame-assembly-sheet-3.png": ("frame-assembly.pdf", 2),
+    "dt-drive-train-assembly-sheet-4.png": ("dt-drive-train-assembly.pdf", 3),
+    "fr-frame-assembly-sheet-3.png": ("fr-frame-assembly.pdf", 2),
 }
 DISPLAY_POSE_NAME = "cad-model-display-pose.png"
 README_IMAGE_NAMES = (
@@ -235,7 +235,7 @@ def regenerate_readme_images(
         *(png / name / f"{name}_isometric.png" for name in README_RENDERS),
         *(png / f"{name}_drawing.png" for name in README_DRAWINGS),
         *(release_root / "pdf" / name for name, _ in README_PDF_SHEETS.values()),
-        release_root / "gltf" / "harmonic-analyzer.glb",
+        release_root / "gltf" / "ha-harmonic-analyzer.glb",
     ]
     missing = [str(path) for path in inputs if not path.is_file()]
     if missing:
@@ -253,7 +253,7 @@ def regenerate_readme_images(
         render_pdf_sheet(release_root / "pdf" / pdf_name, output_dir / docs_name, page_index)
         _telemetry.info(f"{output_dir / docs_name}: {pdf_name} sheet {page_index + 1}")
     render_display_pose(
-        release_root / "gltf" / "harmonic-analyzer.glb",
+        release_root / "gltf" / "ha-harmonic-analyzer.glb",
         output_dir / DISPLAY_POSE_NAME,
         blender=blender,
     )

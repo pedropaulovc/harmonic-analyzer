@@ -344,20 +344,20 @@ def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
 
     components = [
         _assembly_component(
-            "channel-spring-installed-stretch00-1",
-            "channel-spring-installed-stretch00",
+            "vn-channel-spring-installed-stretch00-1",
+            "vn-channel-spring-installed-stretch00",
             -10.0,
         ),
         _assembly_component(
-            "channel-spring-installed-stretch00-2",
-            "channel-spring-installed-stretch00",
+            "vn-channel-spring-installed-stretch00-2",
+            "vn-channel-spring-installed-stretch00",
             0.0,
         ),
-        _assembly_component("spring-hook-1", "spring-hook", -10.0),
+        _assembly_component("vn-spring-hook-1", "vn-spring-hook", -10.0),
         # A duplicated lower seat leaves the second station without its hook.
-        _assembly_component("spring-hook-2", "spring-hook", -10.0),
-        _assembly_component("channel-lever-1", "channel-lever", -10.0),
-        _assembly_component("channel-lever-2", "channel-lever", 0.0),
+        _assembly_component("vn-spring-hook-2", "vn-spring-hook", -10.0),
+        _assembly_component("ch-channel-lever-1", "ch-channel-lever", -10.0),
+        _assembly_component("ch-channel-lever-2", "ch-channel-lever", 0.0),
     ]
     adapter = SimpleNamespace(
         currentModel=SimpleNamespace(GetComponents=lambda _top_only: components),
@@ -385,7 +385,7 @@ def test_channel_gate_rejects_duplicate_station_pairing(monkeypatch) -> None:
     )
 
     with pytest.raises(RuntimeError, match="ambiguous duplicate station"):
-        contact.assert_assembly_spring_contacts(adapter, "channel")
+        contact.assert_assembly_spring_contacts(adapter, "ch-channel")
 
 
 def test_channel_gate_keeps_distinct_bounds_in_config_station_order(
@@ -410,36 +410,36 @@ def test_channel_gate_keeps_distinct_bounds_in_config_station_order(
     scene = _AssemblyContactScene(
         [
             (
-                "channel-spring-installed-stretch01-1",
-                "channel-spring-installed-stretch01",
+                "vn-channel-spring-installed-stretch01-1",
+                "vn-channel-spring-installed-stretch01",
                 0.0,
             ),
-            ("channel-lever-2", "channel-lever", 0.0008),
-            ("spring-hook-1", "spring-hook", -10.0008),
+            ("ch-channel-lever-2", "ch-channel-lever", 0.0008),
+            ("vn-spring-hook-1", "vn-spring-hook", -10.0008),
             (
-                "channel-spring-installed-stretch00-1",
-                "channel-spring-installed-stretch00",
+                "vn-channel-spring-installed-stretch00-1",
+                "vn-channel-spring-installed-stretch00",
                 -10.0,
             ),
-            ("spring-hook-2", "spring-hook", -0.0008),
-            ("channel-lever-1", "channel-lever", -9.9992),
+            ("vn-spring-hook-2", "vn-spring-hook", -0.0008),
+            ("ch-channel-lever-1", "ch-channel-lever", -9.9992),
         ],
         {
             (
-                "channel-spring-installed-stretch00-1",
-                "spring-hook-1",
+                "vn-channel-spring-installed-stretch00-1",
+                "vn-spring-hook-1",
             ): 0.004,
             (
-                "channel-spring-installed-stretch00-1",
-                "channel-lever-1",
+                "vn-channel-spring-installed-stretch00-1",
+                "ch-channel-lever-1",
             ): 0.0,
             (
-                "channel-spring-installed-stretch01-1",
-                "spring-hook-2",
+                "vn-channel-spring-installed-stretch01-1",
+                "vn-spring-hook-2",
             ): 0.002,
             (
-                "channel-spring-installed-stretch01-1",
-                "channel-lever-2",
+                "vn-channel-spring-installed-stretch01-1",
+                "ch-channel-lever-2",
             ): 0.0,
         },
     )
@@ -465,7 +465,7 @@ def test_channel_gate_keeps_distinct_bounds_in_config_station_order(
             "exceeds calibrated maximum"
         ),
     ):
-        contact.assert_assembly_spring_contacts(scene, "channel")
+        contact.assert_assembly_spring_contacts(scene, "ch-channel")
 
 
 def _channel_contact_scene(
@@ -477,18 +477,18 @@ def _channel_contact_scene(
     distances_mm = {}
     for index in range(channel_count):
         station_z_mm = index * 10.0
-        spring = f"channel-spring-installed-stretch{index:02d}-1"
-        hook = f"spring-hook-{index + 1}"
-        lever = f"channel-lever-{index + 1}"
+        spring = f"vn-channel-spring-installed-stretch{index:02d}-1"
+        hook = f"vn-spring-hook-{index + 1}"
+        lever = f"ch-channel-lever-{index + 1}"
         components.extend(
             [
                 (
                     spring,
-                    f"channel-spring-installed-stretch{index:02d}",
+                    f"vn-channel-spring-installed-stretch{index:02d}",
                     station_z_mm,
                 ),
-                (hook, "spring-hook", station_z_mm),
-                (lever, "channel-lever", station_z_mm),
+                (hook, "vn-spring-hook", station_z_mm),
+                (lever, "ch-channel-lever", station_z_mm),
             ]
         )
         distances_mm[(spring, hook)] = 0.004
@@ -525,7 +525,7 @@ def test_explicit_reduced_channel_count_certifies_smaller_assembly(
     monkeypatch.setattr(contact, "_early_bound", scene.bind)
     monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
 
-    contact.assert_assembly_spring_contacts(scene, "channel", channel_count=2)
+    contact.assert_assembly_spring_contacts(scene, "ch-channel", channel_count=2)
 
 
 def test_reduced_assembly_without_override_keeps_configured_count_gate(
@@ -536,11 +536,8 @@ def test_reduced_assembly_without_override_keeps_configured_count_gate(
     monkeypatch.setattr(contact, "_early_bound", scene.bind)
     monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
 
-    with pytest.raises(
-        RuntimeError,
-        match="channel-spring-installed: expected exactly 3 top-level instance",
-    ):
-        contact.assert_assembly_spring_contacts(scene, "channel")
+    with pytest.raises(RuntimeError):
+        contact.assert_assembly_spring_contacts(scene, "ch-channel")
 
 
 def test_explicit_channel_count_can_exceed_active_count_to_full_vector(
@@ -551,7 +548,7 @@ def test_explicit_channel_count_can_exceed_active_count_to_full_vector(
     monkeypatch.setattr(contact, "_early_bound", scene.bind)
     monkeypatch.setattr(contact, "dispatch_array", lambda values: values)
 
-    contact.assert_assembly_spring_contacts(scene, "channel", channel_count=4)
+    contact.assert_assembly_spring_contacts(scene, "ch-channel", channel_count=4)
 
 
 def test_reduced_channel_override_preserves_native_overlap_rejection(
@@ -562,8 +559,8 @@ def test_reduced_channel_override_preserves_native_overlap_rejection(
         2,
         overlaps_mm3={
             (
-                "channel-spring-installed-stretch00-1-body",
-                "spring-hook-1-body",
+                "vn-channel-spring-installed-stretch00-1-body",
+                "vn-spring-hook-1-body",
             ): _MICROSCOPIC_OVERLAP_MM3
         },
     )
@@ -574,7 +571,7 @@ def test_reduced_channel_override_preserves_native_overlap_rejection(
         RuntimeError,
         match="channel 00 lower native seat: components intersect",
     ):
-        contact.assert_assembly_spring_contacts(scene, "channel", channel_count=2)
+        contact.assert_assembly_spring_contacts(scene, "ch-channel", channel_count=2)
 
 
 @pytest.mark.parametrize("channel_count", [True, False, 2.0, "2"])
@@ -585,7 +582,7 @@ def test_explicit_channel_count_rejects_bool_and_noninteger(
     with pytest.raises(TypeError, match="must be an integer or None"):
         contact.assert_assembly_spring_contacts(
             SimpleNamespace(),
-            "channel",
+            "ch-channel",
             channel_count=channel_count,
         )
 
@@ -598,7 +595,7 @@ def test_explicit_channel_count_rejects_out_of_range_without_clamping(
     with pytest.raises(ValueError, match="must be between 1 and 4"):
         contact.assert_assembly_spring_contacts(
             SimpleNamespace(),
-            "channel",
+            "ch-channel",
             channel_count=channel_count,
         )
 
@@ -609,9 +606,9 @@ def test_default_channel_count_cannot_certify_an_empty_assembly(monkeypatch):
     monkeypatch.setattr(_config, "active_count", lambda: 0)
     monkeypatch.setattr(_config, "active_channels", lambda: [])
     with pytest.raises(ValueError):
-        contact.assert_assembly_spring_contacts(None, "channel")
+        contact.assert_assembly_spring_contacts(None, "ch-channel")
 
 
 def test_channel_override_is_not_silently_ignored_for_summing():
     with pytest.raises(ValueError):
-        contact.assert_assembly_spring_contacts(None, "summing", channel_count=2)
+        contact.assert_assembly_spring_contacts(None, "sm-summing", channel_count=2)

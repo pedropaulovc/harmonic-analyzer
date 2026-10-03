@@ -1,7 +1,7 @@
 // Shared by the importer, browser and verifier. This validates a compiled/tracked
 // approval record, never a manifest supplied by the downloaded model.
 export const REPRESENTATION_KIND = 'lossless-web-model-representation'
-export const REPRESENTATION_PATH = 'models/harmonic-analyzer.glb'
+export const REPRESENTATION_PATH = 'models/ha-harmonic-analyzer.glb'
 export const PIPELINE_VERSION = 1
 export const PIPELINE_STEPS = Object.freeze(['exact-dedup', 'meshopt'])
 

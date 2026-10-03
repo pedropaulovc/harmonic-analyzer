@@ -39,7 +39,7 @@ def test_update_pair_pose_resets_unpreviewed_framing_transforms() -> None:
     pair = {
         "camera": {
             "mode": "euler",
-            "frame_components": ["cone_gear"],
+            "frame_components": ["dt_cone_gear"],
         },
         "align": {"scale": 1.13, "dx_px": 20, "dy_px": -247},
     }

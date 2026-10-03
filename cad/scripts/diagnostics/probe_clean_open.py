@@ -1,4 +1,4 @@
-r"""Isolate WHAT dirties harmonic-analyzer.SLDASM.
+r"""Isolate WHAT dirties ha-harmonic-analyzer.SLDASM.
 
 Distinguishes three hypotheses for the dirty-on-open the user observed:
 
@@ -30,7 +30,7 @@ import comtypes.client  # noqa: E402
 
 SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"
 SW_TYPELIB_VER = (34, 0)
-ASSEMBLY = r"C:\src\harmonic-analyzer\cad\out\sldasm\harmonic-analyzer.SLDASM"
+ASSEMBLY = r"C:\src\ha-harmonic-analyzer\cad\out\sldasm\ha-harmonic-analyzer.SLDASM"
 SW_DOC_ASSEMBLY = 2
 SW_OPEN_SILENT = 1
 

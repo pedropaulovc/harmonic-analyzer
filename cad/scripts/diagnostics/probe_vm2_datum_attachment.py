@@ -28,8 +28,8 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path[:0] = [str(ROOT), str(ROOT / "cad/scripts")]
 HISTORICAL_REPLAY_COMMIT = "6976b79e4bcf3bf158cf4a688813e01967177299"
 HISTORICAL_RECIPE_BLOBS = {
-    "pinion_lift_rod": "a95acf171a8b005e53b93dbb5319450cff71b09a",
-    "rack_pinion": "a8f00d149d55d23115d149eeb77b31aefc1d1f48",
+    "dt_pinion_lift_rod": "a95acf171a8b005e53b93dbb5319450cff71b09a",
+    "pd_rack_pinion": "a8f00d149d55d23115d149eeb77b31aefc1d1f48",
 }
 
 
@@ -63,7 +63,7 @@ class DatumBoundary(Exception):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("part", choices=("pinion_lift_rod", "rack_pinion"))
+    parser.add_argument("part", choices=("dt_pinion_lift_rod", "pd_rack_pinion"))
     parser.add_argument("selection", choices=("coordinate", "edge", "dimension"))
     parser.add_argument("placement", choices=("requested", "native"))
     parser.add_argument("output", type=Path)
@@ -145,7 +145,7 @@ def main():
             report["original_call"] = kwargs.copy()
             report["view_position"] = list(view.Position)
             report["view_scale"] = list(view.ScaleRatio)
-            diameter = recipe.ROD_DIA if args.part == "pinion_lift_rod" else recipe.BORE_DIA
+            diameter = recipe.ROD_DIA if args.part == "dt_pinion_lift_rod" else recipe.BORE_DIA
             edge = visible_circle_edge(adapter, view, diameter)
             curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
             if not curve.IsCircle():
@@ -159,7 +159,7 @@ def main():
                 kwargs["entity"] = edge
             dimension = None
             if args.selection == "dimension":
-                name = "RodDia" if args.part == "pinion_lift_rod" else "BoreDia"
+                name = "RodDia" if args.part == "dt_pinion_lift_rod" else "BoreDia"
                 annotations = [_early_bound(raw, "IAnnotation") for raw in view.GetAnnotations() or ()]
                 dimensions = [annotation for annotation in annotations if int(annotation.GetType()) == 4]
                 names = [common.dimension_name(adapter, annotation) for annotation in dimensions]

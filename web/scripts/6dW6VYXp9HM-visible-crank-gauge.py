@@ -55,7 +55,7 @@ camera.position.fromArray(req.camera.positionMetres);
 camera.quaternion.fromArray(req.camera.quaternion).normalize();camera.updateMatrixWorld(true);
 const data=MECHANISM_DATA.renderFrames;
 const pivot=new THREE.Vector3(...data.crankPivotMm).multiplyScalar(.001);
-const rest=new THREE.Vector3(...data.worldMatrices['harmonic-analyzer/drive-train/crank-handle-1'].slice(12,15));
+const rest=new THREE.Vector3(...data.worldMatrices['ha-harmonic-analyzer/dt-drive-train/dt-crank-handle-1'].slice(12,15));
 const axis=new THREE.Vector3(...data.crankAxis),input=createMechanismInput(),pose=createMechanismPose();
 Object.assign(input,req.baseInput,{amplitudes:new Float64Array(req.baseInput.amplitudes),
  phases:new Float64Array(req.baseInput.phases),setup:{...req.baseInput.setup,driveCrankOffsetTurns:req.driveOffset}});

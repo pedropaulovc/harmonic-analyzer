@@ -3,8 +3,8 @@
 No SolidWorks: the seat and the source part are test doubles, and the
 assertions read the real OTel spans the leaf would export.
 
-2026-09-28 drawing:crank_hub (swmaker000008) and 2026-09-17
-drawing:pinion_handle (swmaker000005) opened their source part as the first
+2026-09-28 drawing:dt_crank_hub (swmaker000008) and 2026-09-17
+drawing:dt_pinion_handle (swmaker000005) opened their source part as the first
 document of a seat launched seconds earlier and read '' for every custom
 property of a correctly published part; both drew clean on a warmer seat.
 Pinned here:
@@ -605,7 +605,7 @@ def test_exit_89_flushes_its_telemetry_and_names_itself(monkeypatch):
     monkeypatch.setattr(_common._watchdog, "stop", Mock())
     monkeypatch.setattr(_common, "discard_open_documents", Mock())
     monkeypatch.setattr(_common, "_resident_output_documents", lambda _adapter: [])
-    monkeypatch.setattr(sys, "argv", ["draw_crank_hub.py"])
+    monkeypatch.setattr(sys, "argv", ["draw_dt_crank_hub.py"])
     monkeypatch.delenv("TRACEPARENT", raising=False)
     shutdown = Mock()
     monkeypatch.setattr(_telemetry, "shutdown", shutdown)
@@ -666,7 +666,7 @@ def test_exit_89_survives_telemetry_that_fails_on_the_way_out(monkeypatch, spans
     monkeypatch.setattr(_telemetry, "annotate", _decide)
 
     with pytest.raises(SystemExit) as caught:
-        with _telemetry.build_session("crank_hub", script="draw_crank_hub.py"):
+        with _telemetry.build_session("dt_crank_hub", script="draw_dt_crank_hub.py"):
             _seat_forensics.record_seat_provenance(_Adapter(_Seat(False)))
 
     assert type(caught.value) is _watchdog.SeatNotReady
@@ -705,7 +705,7 @@ def test_exit_89_takes_the_recover_and_retry_path(monkeypatch):
         dodo._sw_lifecycle, "force_recover", lambda: (calls.append("recover"), "connected")[1]
     )
 
-    dodo._exec_com(["x"], "drawing:crank_hub")
+    dodo._exec_com(["x"], "drawing:dt_crank_hub")
 
     assert calls == ["run", "recover", "run"], calls
 
@@ -732,13 +732,13 @@ def test_a_farm_leaf_reruns_a_still_starting_seat_once_without_touching_it(
     monkeypatch,
 ):
     dodo, calls = _farm_leaf(monkeypatch, 89, 0)
-    dodo._exec_com(["x"], "drawing:crank_hub")
+    dodo._exec_com(["x"], "drawing:dt_crank_hub")
     assert calls == ["run", "run"]
 
 
 def test_a_farm_leaf_whose_seat_never_starts_fails_after_one_rerun(monkeypatch):
     dodo, calls = _farm_leaf(monkeypatch, 89, 89)
-    dodo._exec_com(["x"], "drawing:crank_hub")
+    dodo._exec_com(["x"], "drawing:dt_crank_hub")
     assert calls == ["run", "run", "fail 89"]
 
 
@@ -748,5 +748,5 @@ def test_a_farm_leaf_reruns_nothing_else(monkeypatch, rc):
     dialog-bound seat itself); only a seat that is merely still starting heals
     in place."""
     dodo, calls = _farm_leaf(monkeypatch, rc)
-    dodo._exec_com(["x"], "drawing:crank_hub")
+    dodo._exec_com(["x"], "drawing:dt_crank_hub")
     assert calls == ["run", f"fail {rc}"]

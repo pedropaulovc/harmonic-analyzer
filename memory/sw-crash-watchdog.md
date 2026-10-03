@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Findings from the 2026-07-17 crash (SW crashed 22:29:50, stuck "Generating
 crash report" 8.5 h+), now implemented as `cad/scripts/_watchdog.py` +
 `check:watchdog` (PR ops/com-watchdog):

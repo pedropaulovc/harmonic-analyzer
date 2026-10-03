@@ -1,5 +1,7 @@
 # Main-based assembly health extraction
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../subsystem-identities.md) for the canonical migration map.
+
 This branch isolates the accepted native top-level health traversal change from
 the drawing stack. Its **new-tree full native build and visual gate are pending**.
 The historical VM2 acceptance is supporting evidence, not a transferred gate.

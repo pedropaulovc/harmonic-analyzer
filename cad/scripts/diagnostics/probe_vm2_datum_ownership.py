@@ -141,7 +141,7 @@ def main():
                 if witness["kind"] != "vm2-normal-datum-drawing-tasks" or witness["status"] != "passed":
                     raise RuntimeError("requires a successful normal production receipt")
                 allowed = {}
-                for stem in ("pinion-lift-rod", "rack-pinion"):
+                for stem in ("dt-pinion-lift-rod", "pd-rack-pinion"):
                     source = ROOT / f"cad/out/sldprt/{stem}.SLDPRT"
                     drawing = ROOT / f"cad/out/slddrw/{stem}.SLDDRW"
                     allowed[str(source)] = (1, witness["source_sha256_after"][str(source)], source)
@@ -196,7 +196,7 @@ def main():
                 if (witness["pid"], witness["revision"]) != (report["pid"], report["revision"]):
                     raise RuntimeError("probe seat identity changed")
                 source = Path(witness["source"]).resolve(strict=True)
-                if source.parent != ROOT / "cad/out/sldprt" or source.stem not in {"pinion-lift-rod", "rack-pinion"}:
+                if source.parent != ROOT / "cad/out/sldprt" or source.stem not in {"dt-pinion-lift-rod", "pd-rack-pinion"}:
                     raise RuntimeError("probe source is outside the two owned parts")
                 rows = report["documents"]
                 parts = [row for row in rows if row["type"] == 1]

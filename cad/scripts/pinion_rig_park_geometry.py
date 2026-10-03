@@ -2,7 +2,7 @@
 
 The pinion drum's parked station, the strap pivot it swings on, the strap's
 lean and the follower pin's line, and the lift axis the eccentric cams turn
-on.  build_drive_train_assembly places the rig from these, and the MHA-A03 fit-up
+on.  build_drive_train_assembly places the rig from these, and the MHA-DT-000 fit-up
 text (pinion_rig_tip_gap) derives the bench rest gap from the same numbers,
 so neither reads the other and no library module reaches a build script (#880).
 
@@ -16,9 +16,9 @@ import math
 
 import _config
 from cone_line import DP_TRAIN, X_DRUM, Y_BASE_TOP, Y_DRIVE
-from pinion_bracket_geometry import C2C as STRAP_C2C
-from pinion_bracket_geometry import PIN_DROP as FPIN_DROP
-from pinion_pivot_block_geometry import LIFT_BORE_RISE, LIFT_BORE_SPACING
+from dt_pinion_bracket_geometry import C2C as STRAP_C2C
+from dt_pinion_bracket_geometry import PIN_DROP as FPIN_DROP
+from dt_pinion_pivot_block_geometry import LIFT_BORE_RISE, LIFT_BORE_SPACING
 
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
 # The rig stays level-inboard of the cylinder bank. Its user-authoritative 32T

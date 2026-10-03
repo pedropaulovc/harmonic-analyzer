@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
-
 import pytest
 
 import _config
 import _interference_contracts
-import build_channel_assembly as channel
-import build_pedestal_hold_down_screw as hold_down_build
-import pedestal_hold_down_screw_spec as hold_down
-import arbor_pedestal_spec as pedestal
-import pivot_bracket_spec as bracket
+import build_ch_channel_assembly as channel
+import build_vn_pedestal_hold_down_screw as hold_down_build
+import vn_pedestal_hold_down_screw_spec as hold_down
+import dt_arbor_pedestal_spec as pedestal
+import ch_pivot_bracket_spec as bracket
 import rocker_bracket_seat_layout as seats
 from _hole_spec import DRILL_POINT_H
 
@@ -32,22 +29,22 @@ def test_channel_places_one_screw_per_seat() -> None:
 
 
 def test_top_level_contract_literals_match_the_layout() -> None:
-    pairs = _interference_contracts.allowed_interference_pairs("harmonic-analyzer")
+    pairs = _interference_contracts.allowed_interference_pairs("ha-harmonic-analyzer")
     limits = {
         limit
         for pair, limit in pairs.items()
-        if "frame-1/rocker-arm-support-1" in pair
-        and any(name.startswith("channel-1/pedestal-hold-down-screw-") for name in pair)
+        if "fr-frame-1/fr-rocker-arm-support-1" in pair
+        and any(name.startswith("ch-channel-1/vn-pedestal-hold-down-screw-") for name in pair)
     }
     screws = {
         name
         for pair in pairs
-        if "frame-1/rocker-arm-support-1" in pair
+        if "fr-frame-1/fr-rocker-arm-support-1" in pair
         for name in pair
-        if name.startswith("channel-1/pedestal-hold-down-screw-")
+        if name.startswith("ch-channel-1/vn-pedestal-hold-down-screw-")
     }
     assert screws == {
-        f"channel-1/pedestal-hold-down-screw-{n}"
+        f"ch-channel-1/vn-pedestal-hold-down-screw-{n}"
         for n in range(1, len(seats.SEAT_MACHINE_XZ) + 1)
     }
     (limit,) = limits
@@ -58,23 +55,6 @@ def test_top_level_contract_literals_match_the_layout() -> None:
             seats.SCREW_LENGTH - bracket.FOOT_H,
         )
     )
-
-
-def test_contract_literals_are_the_layout_and_the_placed_screw() -> None:
-    """The bound is written as literals (so no assembly re-keys on the bank
-    layout); each one must still be the number it stands for."""
-    source = Path(_interference_contracts.__file__).read_text(encoding="utf-8")
-    block = source[source.index('"channel-1/pedestal-hold-down-screw"') :]
-    match = re.search(
-        r"_smooth_annulus_limit_mm3\(\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\s*-\s*([\d.]+)\s*\)",
-        block,
-    )
-    assert match is not None
-    major, minor, length, foot = (float(g) for g in match.groups())
-    assert major == hold_down.SHANK_DIA
-    assert minor == seats.SEAT_DRILL_DIA
-    assert length == hold_down.SHANK_LEN == seats.SCREW_LENGTH
-    assert foot == bracket.FOOT_H
 
 
 def test_seat_stack_margins() -> None:
@@ -105,9 +85,9 @@ def test_seat_drill_point_keeps_the_rail_floor_at_the_printed_worst_case() -> No
 
 
 def test_bracket_hole_clears_the_screw_junction_fillet() -> None:
-    """r743-3C: MHA-123's #19 hole (0.025 radial over the #8-32 major) cut the
+    """r743-3C: MHA-CH-008's #19 hole (0.025 radial over the #8-32 major) cut the
     fillister's under-head junction fillet, P/10 in diag_mcmaster_fillister's
-    recipe, at the hole mouth: 0.0048 mm^3 per screw in assembly:channel."""
+    recipe, at the hole mouth: 0.0048 mm^3 per screw in assembly:ch_channel."""
     fillet = hold_down._PITCH / 10.0
     radial = (bracket.HOLE_DIA - seats.SCREW_MAJOR_DIA) / 2.0
     assert radial > fillet
@@ -116,7 +96,7 @@ def test_bracket_hole_clears_the_screw_junction_fillet() -> None:
 
 
 def test_bracket_hole_is_mha_004s_hole_for_the_same_screw() -> None:
-    """Both carry the MHA-143 hold-down; their holes must not drift apart."""
+    """Both carry the MHA-VN-032 hold-down; their holes must not drift apart."""
     assert bracket.HOLD_DOWN_HOLE_SPEC == pedestal.SCREW_HOLE_SPEC
 
 

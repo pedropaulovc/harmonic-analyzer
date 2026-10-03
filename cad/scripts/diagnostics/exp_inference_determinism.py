@@ -27,7 +27,7 @@ import asyncio
 
 import _telemetry
 
-# Hex-bolt head geometry (verbatim from build_hex_bolt.py).
+# Hex-bolt head geometry (verbatim from build_vn_hex_bolt.py).
 HEAD_AF = 12.7
 HEAD_H = 5.5
 RADIUS = HEAD_AF / math.sqrt(3.0)

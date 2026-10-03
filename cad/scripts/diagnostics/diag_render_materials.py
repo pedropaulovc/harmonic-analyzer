@@ -23,7 +23,7 @@ import _telemetry  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PARTS = ("tube-frame", "platen-paper", "crank-handle", "amplitude-bar", "harmonic-base")
+PARTS = ("fr-tube-frame", "pd-platen-paper", "dt-crank-handle", "ch-amplitude-bar", "fr-harmonic-base")
 
 
 async def build(adapter) -> dict[str, str]:

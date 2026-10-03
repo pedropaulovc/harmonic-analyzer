@@ -15,13 +15,13 @@ Twenty spur gears from six to a hundred and twenty teeth on one shaft, turning o
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `cone-gear` ×20 (T006–T120) | TODO | TODO | TODO |
-| `cone-gear-shaft` | TODO | TODO | TODO |
-| `cone-tip-block` | TODO | TODO | TODO |
-| `cone-tip-collar` (MHA-096) | 1 | black-oxide 1215 steel | 1/16 in bore set-screw shaft collar, McMaster 9414T1 (`cone_tip_collar_spec.py`: `BORE_DIA`, `SKU`) |
-| `cone-tip-adjuster` | TODO | TODO | TODO |
-| `cone-tip-pinch-screw` | TODO | TODO | TODO |
-| `cone-tip-block-screw` (MHA-140) | 1 | black-oxide alloy steel | #4-40 × 3/8 socket head cap screw, McMaster 91251A108 (`cone_tip_block_screw_spec.py`: `THREAD`, `SHANK_LEN`) |
+| `dt-cone-gear` ×20 (T006–T120) | TODO | TODO | TODO |
+| `dt-cone-gear-shaft` | TODO | TODO | TODO |
+| `dt-cone-tip-block` | TODO | TODO | TODO |
+| `vn-cone-tip-collar` (MHA-VN-016) | 1 | black-oxide 1215 steel | 1/16 in bore set-screw shaft collar, McMaster 9414T1 (`vn_cone_tip_collar_spec.py`: `BORE_DIA`, `SKU`) |
+| `vn-cone-tip-adjuster` | TODO | TODO | TODO |
+| `vn-cone-tip-pinch-screw` | TODO | TODO | TODO |
+| `vn-cone-tip-block-screw` (MHA-VN-030) | 1 | black-oxide alloy steel | #4-40 × 3/8 socket head cap screw, McMaster 91251A108 (`vn_cone_tip_block_screw_spec.py`: `THREAD`, `SHANK_LEN`) |
 
 : {tbl-colwidths="[40,10,25,25]"}
 
@@ -43,7 +43,7 @@ TODO
 **Sources for this chapter**
 
 - `cad/scripts/build_*.py` (geometry — the source of truth)
-- `cad/scripts/cone_tip_collar_spec.py`, `cad/scripts/cone_tip_block_screw_spec.py` (stock collar and hold-down screw sizes)
+- `cad/scripts/vn_cone_tip_collar_spec.py`, `cad/scripts/vn_cone_tip_block_screw_spec.py` (stock collar and hold-down screw sizes)
 - `cad/config/parts/*.yaml` (material, appearance, registry)
 - `cad/docs/machining-dfm.md` (setups, hazards, routing)
 - `logbook/entries/` (what actually happened)

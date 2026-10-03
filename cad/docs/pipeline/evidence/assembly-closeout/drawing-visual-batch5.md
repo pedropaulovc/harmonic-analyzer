@@ -1,5 +1,7 @@
 # Closeout title-field visual inspection — batch 5
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Frozen source head: `64c3dab4875354a7d44d709539e001db920a0377`.
 
 Pinned at `2026-09-08T05:18:16.562564+00:00`. The initial completed root `*_drawing.png` remainder contained 18 sheets after excluding the 51 names in batches 1–4. All 18 were copied and inspected; no later outputs were added. The full sheets are 5100 × 3300 pixels. Each title crop is the original pixels from `[3060, 2508, 5100, 3300]`, with no resizing or annotation. Exact source-byte copies, source timestamps, full-image SHA-256 values and crop SHA-256 values are retained in [the manifest](title-fields-batch5-manifest.json) and `title-fields-batch5-images/`.

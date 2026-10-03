@@ -44,7 +44,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     insert_helix,
     thread_sweep_cut,
 )
-from frame_cross_screw_spec import HEAD_DIA, HEAD_H, PITCH, SHANK_DIA, SHANK_LEN
+from vn_frame_cross_screw_spec import HEAD_DIA, HEAD_H, PITCH, SHANK_DIA, SHANK_LEN
 
 FILLISTER_SIZES = {
     # part:        (major dia, length, head height, head dia, pitch)
@@ -65,8 +65,8 @@ FILLISTER_SIZES = {
     "91794A055": (1.524, 6.35, 1.397, 2.4384, 25.4 / 80.0),
     # MSC 40923898 (mfr 1456MSL), 1/4-20 x 3-1/2 slotted fillister, fully
     # threaded; MSC lists no head sizes, so the head is ASME B18.6.3's 1/4
-    # maximum (A 0.414, O 0.237).  The supplied 3-1/2 in length: MHA-142
-    # (build_post_mount_screw) cuts it to fit, never this row.
+    # maximum (A 0.414, O 0.237).  The supplied 3-1/2 in length: MHA-VN-031
+    # (build_vn_post_mount_screw) cuts it to fit, never this row.
     "40923898": (6.35, 3.5 * 25.4, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0),
 }
 

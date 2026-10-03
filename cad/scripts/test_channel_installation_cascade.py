@@ -8,14 +8,14 @@ import pytest
 
 import _config
 import _cwm
-import build_channel_assembly as channel
+import build_ch_channel_assembly as channel
 import channel_kinematics
-import connecting_rod_spec
+import ch_connecting_rod_spec
 import cylinder_bank_layout
-import fulcrum_shaft_spec
+import ch_fulcrum_shaft_spec
 import rocker_bank_layout
 from _assembly import _seed_flip, activate_assembly_contract
-from cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
+from dt_cone_pivot_post_installation import CHANNEL_Z0, DRUM_X, MECHANISM_Z_SHIFT
 
 
 def test_machine_config_and_channel_interface_share_one_installation_contract() -> None:
@@ -36,7 +36,7 @@ def test_machine_config_and_channel_interface_share_one_installation_contract() 
 
 
 def test_rocker_and_rod_reclose_the_level_plumb_neutral_pose() -> None:
-    assert connecting_rod_spec.CENTER_DISTANCE == channel.ROD_C2C
+    assert ch_connecting_rod_spec.CENTER_DISTANCE == channel.ROD_C2C
     assert abs(channel_kinematics.ARC["arm_tilt"]) < 0.02
     assert abs(channel_kinematics.ARC["rod_tilt"]) < 0.02
 
@@ -61,8 +61,8 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
     bracket_lo, bracket_hi = channel.PIVOT_BRACKET_Z
     assert pivot_min < bracket_lo < row_min < row_max < bracket_hi < pivot_max
 
-    fulcrum_min = channel.FULCRUM_SHAFT_Z - fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
-    fulcrum_max = channel.FULCRUM_SHAFT_Z + fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
+    fulcrum_min = channel.FULCRUM_SHAFT_Z - ch_fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
+    fulcrum_max = channel.FULCRUM_SHAFT_Z + ch_fulcrum_shaft_spec.SHAFT_LENGTH / 2.0
     assert fulcrum_min < row_min < row_max < fulcrum_max
     # The end keepers grip the shaft ENDS: ball centres 2.25 inboard of each
     # end, feet + screws inboard of the corner-boss lands (2026-08-02 remount).
@@ -73,8 +73,8 @@ def test_existing_shafts_and_translated_mounts_cover_the_shifted_bank() -> None:
 
 
 def test_positive_fulcrum_station_uses_the_relearned_mate_side() -> None:
-    activate_assembly_contract("channel")
-    assert _seed_flip("fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z)
+    activate_assembly_contract("ch-channel")
+    assert _seed_flip("ch-fulcrum-shaft-1 datum z d=35.41", channel.FULCRUM_SHAFT_Z)
 
 
 def test_copied_internal_rod_axial_mate_is_reset_to_the_seed_side(
@@ -88,9 +88,9 @@ def test_copied_internal_rod_axial_mate_is_reset_to_the_seed_side(
     monkeypatch.setattr(_cwm, "_component_distance_mate", lambda *_a, **_kw: mate)
 
     assert _cwm.ensure_component_distance_mate_flip(
-        object(), "connecting-rod-3", 4.05, True
+        object(), "ch-connecting-rod-3", 4.05, True
     )
     assert mate.Flipped is True
     assert not _cwm.ensure_component_distance_mate_flip(
-        object(), "connecting-rod-3", 4.05, True
+        object(), "ch-connecting-rod-3", 4.05, True
     )

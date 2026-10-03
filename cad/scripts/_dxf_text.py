@@ -3,7 +3,7 @@ r"""Text -> closed polygons -> minimal DXF, for engraving numerals at build time
 SolidWorks-free. The COM adapter has no sketch-text API, so engraved lettering
 follows the nameplate precedent: a vendored DXF of CLOSED loops that
 ``adapter.import_dxf_dwg`` inserts as one sketch and a cut-extrude engraves as
-one feature (``build_nameplate`` / ``cad/references/nameplate-engraving.dxf``).
+one feature (``build_nameplate`` / ``cad/references/fr-nameplate-engraving.dxf``).
 The nameplate's DXF was traced off a photo; a ruled scale's numerals are plain
 type, so this module renders them from a font instead:
 

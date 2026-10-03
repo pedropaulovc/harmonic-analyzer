@@ -19,7 +19,7 @@ centreline rides each sprocket's PITCH circle (where a real chain seats -- the
 rollers rest in the tooth seats, the plates STRADDLE the 2.8-wide
 sprocket, and the tips pass between them; only the roller<->tooth seating
 remains as intended contact, whitelisted in
-build_paper_drive_assembly.check_no_interference), the common
+build_pd_paper_drive_assembly.check_no_interference), the common
 external tangent taut line on the +n side (the support-bar side), and a
 slack arc sagging SAG below the straight external tangent on the -n side,
 tangent-continuous at all four junctions (internal tangency:
@@ -31,12 +31,12 @@ from __future__ import annotations
 
 import math
 
-import transgear_removable_spec as _removable
+import pd_transgear_removable_spec as _removable
 from cone_line import X_CRANK, Y_CRANK
 
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (43.7878, 256.8933)  # build_paper_drive_assembly KNOB_SHAFT_XY
+KNOB_CENTRE = (43.7878, 256.8933)  # build_pd_paper_drive_assembly KNOB_SHAFT_XY
 # mirrored: the knob axis K = stud S (0, 266.2007) + the permanent 12T:120T
 # DP38 mesh centre distance 44.766 at machine -168 deg (CONTRACT-paper-drive
 # axis points; the arm plate's bore datum puts it there).
@@ -46,7 +46,7 @@ KNOB_CENTRE = (43.7878, 256.8933)  # build_paper_drive_assembly KNOB_SHAFT_XY
 CRANK_CENTRE = (-X_CRANK, Y_CRANK)
 # The chain count and droop below are re-solved from this centre automatically.
 
-# Mounted removables (ANSI #25, transgear_removable_spec): tip r = OD / 2.
+# Mounted removables (ANSI #25, pd_transgear_removable_spec): tip r = OD / 2.
 TIP_R_T24 = _removable.outside_dia(_removable.TEETH["T24"]) / 2.0  # 26.0
 TIP_R_T12 = _removable.outside_dia(_removable.TEETH["T12"]) / 2.0  # 13.75
 # Pitch r = p / (2 sin(180/N)) -- the chain pin centreline rides here.
@@ -58,7 +58,7 @@ PITCH_R_T12 = _removable.pitch_dia(_removable.TEETH["T12"]) / 2.0  # 12.27
 # base, not the teeth". The plates straddle the wheel (z stack below), but the
 # rollers and the tooth seats share the chain plane; that roller<->tooth
 # contact is intended mesh, whitelisted in
-# build_paper_drive_assembly.check_no_interference (chain-link <->
+# build_pd_paper_drive_assembly.check_no_interference (chain-link <->
 # transgear-removable), exactly as link<->link contact already is.
 WRAP_R_A = PITCH_R_T24  # knob T24 pitch circle
 WRAP_R_B = PITCH_R_T12  # crank T12 pitch circle
@@ -209,10 +209,10 @@ assert abs(
 
 # --- roller chain ------------------------------------------------------------
 # A real ANSI #25 roller chain (pitch 1/4 in EXACT, roller Ø3.30 from
-# transgear_removable_spec; see LINK_PITCH/LINK_COUNT above): alternating
+# pd_transgear_removable_spec; see LINK_PITCH/LINK_COUNT above): alternating
 # INNER links (2 inner plates + 2 rollers) and OUTER links (2 outer plates + 2
 # pins), filled along the centreline loop by the connected-linkage chain
-# pattern (build_paper_drive_assembly._insert_roller_chain). The in-plane
+# pattern (build_pd_paper_drive_assembly._insert_roller_chain). The in-plane
 # envelope stays +-2.4 (the retired #13 ball chain's 4.8 bead).
 
 # Every clearance is >= 0.25 mm and nothing relies on exact tangency: the

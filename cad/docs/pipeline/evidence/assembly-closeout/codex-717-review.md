@@ -1,5 +1,7 @@
 # PR 717 Codex full-diff rereview
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 **Result: clean. No open actionable code findings in PR 717's own diff. Geometry equivalence is not claimed.**
 
 | Item | Exact identity |

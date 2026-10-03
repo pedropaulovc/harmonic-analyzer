@@ -27,52 +27,52 @@ def _write(path: Path, mtime: float) -> None:
 def test_assembly_fallback_does_not_require_retired_step(
     tmp_path: Path, monkeypatch
 ) -> None:
-    src = tmp_path / "sldasm" / "frame.SLDASM"
+    src = tmp_path / "sldasm" / "fr-frame.SLDASM"
     boxes = tmp_path / "boxes"
     gltf = tmp_path / "gltf"
     step = tmp_path / "step"
     now = time.time()
     _write(src, now - 10)
     _write(boxes / "frame.json", now)
-    _write(gltf / "frame.glb", now)
+    _write(gltf / "fr-frame.glb", now)
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
     monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "OUT_STEP", step)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
-    assert not export_models.asm_source_changed("frame", src, {})
+    assert not export_models.asm_source_changed("fr-frame", src, {})
 
 
 def test_assembly_fallback_still_requires_current_scene_and_glb(
     tmp_path: Path, monkeypatch
 ) -> None:
-    src = tmp_path / "sldasm" / "frame.SLDASM"
+    src = tmp_path / "sldasm" / "fr-frame.SLDASM"
     boxes = tmp_path / "boxes"
     gltf = tmp_path / "gltf"
     now = time.time()
     _write(src, now)
     _write(boxes / "frame.json", now - 10)
-    _write(gltf / "frame.glb", now + 10)
+    _write(gltf / "fr-frame.glb", now + 10)
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
     monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
-    assert export_models.asm_source_changed("frame", src, {})
+    assert export_models.asm_source_changed("fr-frame", src, {})
 
 
 def test_subassembly_fallback_does_not_require_a_scene(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    src = tmp_path / "sldasm" / "frame.SLDASM"
+    src = tmp_path / "sldasm" / "fr-frame.SLDASM"
     gltf = tmp_path / "gltf"
     now = time.time()
     _write(src, now - 10)
-    _write(gltf / "frame.glb", now)
+    _write(gltf / "fr-frame.glb", now)
     monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
     assert not export_models.asm_source_changed(
-        "frame", src, {}, require_scene=False,
+        "fr-frame", src, {}, require_scene=False,
     )
 
 
@@ -290,12 +290,12 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     boxes = tmp_path / "boxes"
     png = tmp_path / "png"
     for path in (sldprt / "sample-part.SLDPRT",
-                 sldasm / "harmonic-analyzer.SLDASM",
+                 sldasm / "ha-harmonic-analyzer.SLDASM",
                  stl / "sample-part.STL",
-                 gltf / "harmonic-analyzer.glb"):
+                 gltf / "ha-harmonic-analyzer.glb"):
         _write(path, time.time())
     boxes.mkdir(parents=True)
-    _write(png / "harmonic-analyzer/harmonic-analyzer_isometric.png", time.time())
+    _write(png / "ha-harmonic-analyzer/ha-harmonic-analyzer_isometric.png", time.time())
     (boxes / "harmonic-analyzer.json").write_text(
         '{"unit":"mm","components":[{"part":"sample-part",'
         '"cfg":"C1","mesh":"sample-part--c1"}]}',
@@ -359,8 +359,8 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "COLORS", stl / "colors.json")
     monkeypatch.setattr(export_models, "SRC_DIGESTS", stl / "export-src.json")
     monkeypatch.setattr(export_models, "part_stems", lambda: ["sample_part"])
-    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("harmonic_analyzer",))
-    monkeypatch.setattr(export_models, "manifest_models", lambda: ["harmonic_analyzer"])
+    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("ha_harmonic_analyzer",))
+    monkeypatch.setattr(export_models, "manifest_models", lambda: ["ha_harmonic_analyzer"])
     monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
     monkeypatch.setattr(export_models, "_certified_outputs", lambda: {})
     monkeypatch.setattr(
@@ -369,7 +369,7 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "load_colors", lambda: {"sample-part": (1, 1, 1)})
     monkeypatch.setattr(
         export_models, "load_src_digests",
-        lambda: {"sample-part": "part-v1", "harmonic-analyzer": "asm-v1"},
+        lambda: {"sample-part": "part-v1", "ha-harmonic-analyzer": "asm-v1"},
     )
     monkeypatch.setattr(
         export_models, "src_digest",
@@ -641,7 +641,7 @@ def test_rendered_pair_parser_ignores_composite_progress() -> None:
 
 
 def test_routine_view_cleanup_preserves_configuration_renders(tmp_path: Path) -> None:
-    part = "cone-gear"
+    part = "dt-cone-gear"
     generic_iso = tmp_path / f"{part}_isometric.png"
     stale_front = tmp_path / f"{part}_front.png"
     stale_top = tmp_path / f"{part}_top.png"
@@ -703,7 +703,7 @@ def test_sanitize_glb_drops_mismatched_texcoord_and_untextures_the_material(
             }
         ],
     }
-    glb = tmp_path / "top-frame.glb"
+    glb = tmp_path / "fr-top-frame.glb"
     glb.write_bytes(_glb_bytes(gltf))
     dropped = export_models.sanitize_glb(glb)
     assert dropped == [
@@ -925,13 +925,13 @@ def _gallery_fixture(tmp_path: Path, monkeypatch) -> dict:
         (tmp_path / name).mkdir()
     (tmp_path / "sldasm" / "demo-asm.SLDASM").write_bytes(b"asm")
     (tmp_path / "sldprt" / "demo-part.SLDPRT").write_bytes(b"part")
-    (tmp_path / "sldprt" / "cone-gear.SLDPRT").write_bytes(b"cone")
+    (tmp_path / "sldprt" / "dt-cone-gear.SLDPRT").write_bytes(b"cone")
     (tmp_path / "boxes" / "demo-asm.json").write_text(
         json.dumps(
             {
                 "unit": "mm",
                 "components": [
-                    {"part": "cone-gear", "cfg": "t102", "mesh": "cone-gear--t102"},
+                    {"part": "dt-cone-gear", "cfg": "t102", "mesh": "cone-gear--t102"},
                     {"part": "demo-part", "cfg": "", "mesh": "demo-part"},
                 ],
             }
@@ -993,7 +993,7 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
     certifying an STL with no model behind it.
     """
     manifest = _gallery_fixture(tmp_path, monkeypatch)
-    (tmp_path / "sldprt" / "cone-gear.SLDPRT").unlink()
+    (tmp_path / "sldprt" / "dt-cone-gear.SLDPRT").unlink()
 
     with pytest.raises(FileNotFoundError, match="is missing but cone-gear--t102"):
         export_models.assert_gallery_inputs_current(manifest)
