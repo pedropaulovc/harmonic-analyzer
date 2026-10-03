@@ -1,9 +1,11 @@
-"""Offline behavior of drawing requirements and their certified STEP binding."""
+"""Offline drawing requirements, exact datum domains and raw STEP binding."""
 
 from __future__ import annotations
 
+import ast
 import hashlib
-import json
+import math
+import re
 import tomllib
 from pathlib import Path
 
@@ -11,39 +13,36 @@ import pytest
 from prechips.model import Features
 
 import export_features as exporter
-import rocker_arm_notes
 from _export_feature_faces import FeatureFaceError, face_name
+from _part_pmi import _FaceGeometry, _face_matches
 
 
-def _certified(tmp_path: Path, parts: tuple[str, ...] = ("rocker_arm",)) -> Path:
-    output = tmp_path / "out"
-    source_digest = exporter.feature_sources_sha256()
-    for stem in parts:
-        labels = [face_name(feature, 1) for feature in exporter.feature_selectors(stem)]
-        if stem == "rocker_arm":
-            labels.insert(0, face_name("pivot_bore", 1))
-        rows = ["ISO-10303-21;", "HEADER;", "ENDSEC;", "DATA;"]
-        rows += [f"#{index} = ADVANCED_FACE('{label}',(#1),#2,.T.);" for index, label in enumerate(labels, start=10)]
-        rows += ["ENDSEC;", "END-ISO-10303-21;"]
-        content = "\n".join(rows).encode("utf-8")
-        dashed = stem.replace("_", "-")
-        path = output / "features" / stem / f"{dashed}.STEP"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content)
-        (path.parent / "neutral.json").write_text(json.dumps({
-            "schema": "harmonic-analyzer/features-neutral@1",
-            "stem": stem,
-            "exporter": "exporter-v1",
-            "feature_sources_sha256": source_digest,
-            "drawing_revision": "v38",
-            "native_sha256": "a" * 64,
-            "step": {"path": path.name, "bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()},
-        }), encoding="utf-8")
-    return output
+def _step(tmp_path: Path, stem: str) -> Path:
+    labels = [face_name(feature, 1) for feature in exporter.feature_selectors(stem)]
+    if stem == "rocker_arm":
+        labels.insert(0, face_name("pivot_bore", 1))
+    rows = ["ISO-10303-21;", "HEADER;", "ENDSEC;", "DATA;"]
+    rows += [f"#{index} = ADVANCED_FACE('{label}',(#1),#2,.T.);" for index, label in enumerate(labels, start=10)]
+    rows += ["ENDSEC;", "END-ISO-10303-21;"]
+    path = tmp_path / stem / f"{stem.replace('_', '-')}.STEP"
+    path.parent.mkdir(parents=True)
+    path.write_bytes("\r\n".join(rows).encode("utf-8"))
+    return path
 
 
 def _load(path: Path) -> dict:
     return tomllib.loads(path.read_text(encoding="utf-8"))
+
+
+def _plane(normal: tuple[float, float, float], point_mm: tuple[float, float, float]) -> _FaceGeometry:
+    return _FaceGeometry(None, 4001, (*normal, *(v / 1000 for v in point_mm)), normal, ())
+
+
+def _owners(stem: str, geometry: _FaceGeometry) -> list[str]:
+    return [
+        feature for feature, selectors in exporter.feature_selectors(stem).items()
+        if any(_face_matches(geometry, selector) for selector in selectors)
+    ]
 
 
 def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> None:
@@ -55,7 +54,10 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert features["hub_od"]["dia"] == [9.69, 10.71]
     assert features["hub_faces"]["length"] == [7.0565, 7.1065]
     assert features["hub_faces"]["length_nominal"] == 7.0565
-    assert features["profile_outer"]["tip_land"] == [5.08, 6.10]
+    for name in ("tip_land_pos_x", "tip_land_neg_x"):
+        assert features[name]["tip_land"] == [5.08, 6.10]
+    for name in ("strap_datum_b", "strap_faces"):
+        assert features[name]["thickness"] == [1.99, 3.01]
     assert features["rod_hole"]["dia"] == [1.994, 2.094]
     assert features["rod_hole"]["nominal_dia"] == 1.994
     assert features["rod_hole"]["precision"]["dia"] == 2
@@ -63,10 +65,12 @@ def test_rocker_bands_respect_native_nominals_and_displayed_general_rows() -> No
     assert features["rod_hole"]["at"] == pytest.approx([133.06740213488345, 16.456064115939025, 0.0])
 
 
-def test_unknown_requirement_and_reference_do_not_acquire_acceptance_bands() -> None:
+def test_unknown_requirements_and_references_do_not_acquire_acceptance_bands() -> None:
     features = exporter.requirement_manifest("rocker_arm")["features"]
-    assert features["profile_outer"]["land_angle_deg"] == "unknown"
-    assert "land_angle_deg" in features["profile_outer"]["requirements"]
+    for name in ("tip_land_pos_x", "tip_land_neg_x"):
+        assert features[name]["land_angle_deg"] == "unknown"
+        assert features[name]["requirements"] == ["tip_land", "land_angle_deg"]
+    assert features["profile_outer"]["requirements"] == ["bottom_radius", "bottom_arc_len", "mirror_symmetric"]
     assert "depth_ref" not in features["profile_outer"]["requirements"]
     assert "centre_from_pivot_ref" not in features["top_edge"]["requirements"]
     shaft = exporter.requirement_manifest("pivot_shaft")
@@ -76,18 +80,44 @@ def test_unknown_requirement_and_reference_do_not_acquire_acceptance_bands() -> 
     assert shaft["features"]["pivot_journal"]["length"] == [5.2, 6.8]
 
 
-def test_bracket_without_drawing_preserves_unknown_acceptance() -> None:
-    manifest = exporter.requirement_manifest("pivot_bracket")
-    assert manifest["drawing"]["revision"] == "unknown"
-    assert manifest["datums"] == "unknown"
-    assert manifest["features"]["shaft_bore"]["nominal_dia"] == 6.5
-    assert manifest["features"]["shaft_bore"]["dia"] == "unknown"
-    assert manifest["features"]["hold_down_1"]["station"] == "unknown"
-    assert all(feature["requirements"] == "unknown" for feature in manifest["features"].values())
+def test_rocker_datum_domains_are_only_the_drawing_bore_broad_face_and_positive_tip() -> None:
+    manifest = exporter.requirement_manifest("rocker_arm")
+    rocker = exporter.rocker
+    assert manifest["datums"]["A"]["feature"] == "pivot_bore"
+    assert manifest["datums"]["B"]["feature"] == "strap_datum_b"
+    assert manifest["datums"]["C"]["feature"] == "tip_land_pos_x"
+    assert _owners("rocker_arm", _plane((0, 0, 1), (0, 0, rocker.ARM_THICKNESS / 2))) == ["strap_datum_b"]
+    assert _owners("rocker_arm", _plane((0, 0, -1), (0, 0, -rocker.ARM_THICKNESS / 2))) == ["strap_faces"]
+    # The authored land is radial from the top arc's endpoint. Its surface
+    # normal is perpendicular to that radius, independently of selector code.
+    radial_x = rocker.TOP_END_X / rocker.R_TOP
+    radial_y = (rocker.TOP_END_Y - rocker.CENTER_Y) / rocker.R_TOP
+    tip = (rocker.ROD_TIP_X, rocker.TOP_END_Y + rocker.TIP_FACE * radial_y, 0.0)
+    assert _owners("rocker_arm", _plane((-radial_y, radial_x, 0), tip)) == ["tip_land_pos_x"]
+    assert _owners("rocker_arm", _plane((radial_y, radial_x, 0), (-tip[0], tip[1], 0))) == ["tip_land_neg_x"]
+    bottom = (rocker.BOT_END_X, rocker.CENTER_Y - math.sqrt(rocker.R_BOTTOM**2 - rocker.BOT_END_X**2))
+    dx, dy = bottom[0] - tip[0], bottom[1] - tip[1]
+    length = math.hypot(dx, dy)
+    assert _owners("rocker_arm", _plane((-dy / length, dx / length, 0), tip)) == ["profile_outer"]
+    assert "datum" not in manifest["features"]["profile_outer"]
+    assert "datum" not in manifest["features"]["strap_faces"]
+    assert "datum" not in manifest["features"]["tip_land_neg_x"]
 
 
-def test_cone_native_tolerances_and_angularity_are_not_position_or_general_bands() -> None:
-    features = exporter.requirement_manifest("cone_pivot_post")["features"]
+def test_shaft_finish_applies_only_to_south_shoulder_not_north_seat() -> None:
+    shaft = exporter.shaft
+    features = exporter.requirement_manifest("pivot_shaft")["features"]
+    assert _owners("pivot_shaft", _plane((0, 0, 1), (0, 0, -shaft.JOURNAL_LENGTH))) == ["shoulder_north_face"]
+    assert _owners("pivot_shaft", _plane((0, 0, -1), (0, 0, shaft.SHOULDER_SOUTH_Z_MM))) == ["shoulder_thrust"]
+    assert features["shoulder_north_face"]["length"] == features["shoulder_thrust"]["length"] == [0.99, 2.01]
+    assert features["shoulder_north_face"]["requirements"] == ["length"]
+    assert "finish_ra" not in features["shoulder_north_face"]
+    assert features["shoulder_thrust"]["finish_ra"] == 1.6
+
+
+def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
+    manifest = exporter.requirement_manifest("cone_pivot_post")
+    features = manifest["features"]
     crank = features["crank_bore"]
     assert crank["dia"] == [11.413, 11.443]
     assert features["journal_bore"]["dia"] == [12.2558, 12.2858]
@@ -97,212 +127,131 @@ def test_cone_native_tolerances_and_angularity_are_not_position_or_general_bands
     assert crank["angularity_datums"] == ["A", "B"]
     assert "angularity_dia" in crank["requirements"]
     assert "position_dia" not in crank
-    assert "height" not in crank["requirements"]  # crank height is REF, not a second chain
+    assert "height" not in crank["requirements"]
     assert "unknown" in features["journal_bore"]["requirements"]
     assert features["mount_west"]["dia"] == [7.14248, 7.24248]
     assert features["mount_west"]["nominal_dia"] == 7.14248
     assert features["mount_west"]["precision"]["dia"] == 2
+    selectors = exporter.feature_selectors("cone_pivot_post")
+    for datum in exporter.cone.PART_DATUMS:
+        assert selectors[manifest["datums"][datum.letter]["feature"]] == (datum.face,)
+    # A same-diameter face away from the drawing journal must not become A.
+    diameter = exporter.cone.BORE_DIA / 1000
+    remote = _FaceGeometry(None, 4002, (0, 0, 0, 0, 0, 1, diameter / 2), None, (-diameter, 0, -0.1, diameter, 0.005, 0.1))
+    assert not _face_matches(remote, selectors["journal_bore"][0])
 
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
-def test_certified_step_binds_split_patches_without_importing_part_documents(tmp_path: Path, stem: str) -> None:
-    output = _certified(tmp_path, (stem,))
-    paths = exporter.write_manifests([stem.replace("_", "-")], out=output)
-    bundle = output / "features" / stem
-    assert paths == [bundle / "features.toml"]
-    manifest = _load(paths[0])
+def test_raw_step_face_sets_and_values_satisfy_installed_consumer_schema(tmp_path: Path, stem: str) -> None:
+    step = _step(tmp_path, stem)
+    content = step.read_bytes()
+    path = exporter.write_manifest(stem.replace("_", "-"), step, revision="v40")
+    assert path == step.with_name("features.toml")
+    manifest = _load(path)
     loaded = Features.model_validate(manifest)
     if stem == "rocker_arm":
         assert loaded.features["pivot_bore"].faces == [
             "#10/ADVANCED_FACE[1]/HAF_PIVOT_BORE__P01",
             "#11/ADVANCED_FACE[2]/HAF_PIVOT_BORE__P01",
         ]
-    step = bundle / f"{stem.replace('_', '-')}.STEP"
-    assert manifest["step"] == step.name
-    assert (paths[0].parent / manifest["step"]).read_bytes() == step.read_bytes()
-    assert manifest["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest()
-    assert manifest["drawing"]["revision"] == ("unknown" if stem == "pivot_bracket" else "v38")
-    assert manifest["cite"]["step_sha256"] == [
-        f"harmonic-analyzer/cad/out/features/{stem}/neutral.json",
-        f"harmonic-analyzer/cad/out/features/{stem}/{step.name}",
-    ]
-    receipt_path = bundle / "neutral.json"
-    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-    content = paths[0].read_bytes()
-    receipt["features"] = {"path": "features.toml", "bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
-    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
-    receipt_bytes = receipt_path.read_bytes()
-    assert exporter.write_manifests([stem], out=output) == paths
-    assert paths[0].read_bytes() == content
-    assert receipt_path.read_bytes() == receipt_bytes
-    with pytest.raises(ValueError, match="unsupported"):
-        exporter.write_manifests([stem, "unrelated_part"], out=output)
-    assert paths[0].read_bytes() == content
-
-
-def test_certified_step_preserves_ansi_metadata_and_binds_ascii_face_labels(tmp_path: Path) -> None:
-    output = _certified(tmp_path)
-    step = output / "features" / "rocker_arm" / "rocker-arm.STEP"
-    prefix, suffix = step.read_bytes().split(b"HEADER;\n", 1)
-    content = prefix + b"HEADER;\nFILE_DESCRIPTION(('M\xe9tal \x80 metadata'),'2;1');\n" + suffix
-    step.write_bytes(content)
-    certificate_path = step.parent / "neutral.json"
-    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
-    record = certificate["step"]
-    record["bytes"] = len(content)
-    record["sha256"] = hashlib.sha256(content).hexdigest()
-    certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
-    path = exporter.write_manifests(["rocker_arm"], out=output)[0]
-    manifest = _load(path)
-    assert manifest["features"]["pivot_bore"]["faces"] == [
-        "#10/ADVANCED_FACE[1]/HAF_PIVOT_BORE__P01",
-        "#11/ADVANCED_FACE[2]/HAF_PIVOT_BORE__P01",
-    ]
-    assert manifest["step_sha256"] == record["sha256"]
+        assert loaded.features[loaded.datums["B"].feature].faces == ["#15/ADVANCED_FACE[6]/HAF_STRAP_DATUM_B__P01"]
+        assert loaded.features[loaded.datums["C"].feature].faces == ["#18/ADVANCED_FACE[9]/HAF_TIP_LAND_POS_X__P01"]
+    assert loaded.step == step.name
+    assert loaded.step_sha256 == hashlib.sha256(content).hexdigest()
+    assert loaded.drawing.revision == "v40"
+    assert manifest["cite"]["step_sha256"] == [f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"]
+    assert {file.name for file in path.parent.iterdir()} == {step.name, "features.toml"}
     assert step.read_bytes() == content
 
 
-@pytest.mark.parametrize("corruption", [
-    "content", "size", "hash", "path", "step_record", "schema", "stem", "exporter",
-    "native_sha256", "missing_native_sha256", "drawing_revision",
-    "feature_sources_sha256", "missing_feature_sources_sha256",
-    "missing_receipt", "invalid_json", "non_object_receipt",
-    "features_content", "features_size", "features_hash", "features_path",
-    "features_record", "missing_features", "features_requirements",
-])
-def test_certificate_drift_never_overwrites_existing_manifest(tmp_path: Path, corruption: str) -> None:
-    output = _certified(tmp_path)
-    existing = exporter.write_manifests(["rocker_arm"], out=output)[0]
-    previous = existing.read_bytes()
-    certificate_path = existing.parent / "neutral.json"
-    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
-    certificate["features"] = {
-        "path": "features.toml", "bytes": len(previous), "sha256": hashlib.sha256(previous).hexdigest(),
-    }
-    record = certificate["step"]
-    if corruption == "content":
-        step = existing.parent / "rocker-arm.STEP"
-        step.write_bytes(step.read_bytes().replace(b"PIVOT_BORE", b"WRONG_BORE"))
-    elif corruption == "size":
-        record["bytes"] += 1
-    elif corruption == "hash":
-        record["sha256"] = "0" * 64
-    elif corruption == "path":
-        record["path"] = "../step/rocker-arm.STEP"
-    elif corruption == "step_record":
-        del certificate["step"]
-    elif corruption == "stem":
-        certificate["stem"] = "pivot_shaft"
-    elif corruption == "exporter":
-        del certificate["exporter"]
-    elif corruption in {"native_sha256", "feature_sources_sha256"}:
-        certificate[corruption] = "invalid"
-    elif corruption in {"missing_native_sha256", "missing_feature_sources_sha256"}:
-        del certificate[corruption.removeprefix("missing_")]
-    elif corruption == "drawing_revision":
-        certificate["drawing_revision"] = None
-    elif corruption == "features_content":
-        existing.write_bytes(previous + b"# changed after certification\n")
-        previous = existing.read_bytes()
-    elif corruption == "features_size":
-        certificate["features"]["bytes"] += 1
-    elif corruption == "features_hash":
-        certificate["features"]["sha256"] = "0" * 64
-    elif corruption == "features_path":
-        certificate["features"]["path"] = "other.toml"
-    elif corruption == "features_record":
-        certificate["features"] = None
-    elif corruption == "features_requirements":
-        certificate["drawing_revision"] = "v999"
-    elif corruption == "schema":
-        certificate["schema"] = "unknown"
-    certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
-    if corruption == "missing_receipt":
-        certificate_path.unlink()
-    elif corruption == "invalid_json":
-        certificate_path.write_text("{broken", encoding="utf-8")
-    elif corruption == "non_object_receipt":
-        certificate_path.write_text("[]", encoding="utf-8")
-    elif corruption == "missing_features":
-        existing.unlink()
-    with pytest.raises((ValueError, FileNotFoundError)):
-        exporter.write_manifests(["rocker_arm"], out=output)
-    if corruption == "missing_features":
-        assert not existing.exists()
-    else:
-        assert existing.read_bytes() == previous
+def test_raw_step_ansi_metadata_and_line_endings_are_never_rewritten(tmp_path: Path) -> None:
+    step = _step(tmp_path, "rocker_arm")
+    content = step.read_bytes().replace(b"HEADER;\r\n", b"HEADER;\r\nFILE_DESCRIPTION(('M\xe9tal \x80 metadata'),'2;1');\r\n")
+    step.write_bytes(content)
+    path = exporter.write_manifest("rocker_arm", step, revision="v40")
+    assert _load(path)["step_sha256"] == hashlib.sha256(content).hexdigest()
+    assert step.read_bytes() == content
 
 
-def test_all_requested_manifests_validate_before_any_write(tmp_path: Path) -> None:
-    output = _certified(tmp_path, ("rocker_arm", "pivot_shaft"))
-    path = output / "features" / "pivot_shaft" / "pivot-shaft.STEP"
-    text = path.read_text(encoding="utf-8").replace(face_name("north_dome", 1), "NONE")
-    path.write_text(text, encoding="utf-8")
-    certificate_path = path.parent / "neutral.json"
-    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
-    certificate["step"].update({"bytes": len(path.read_bytes()), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
-    certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
-    existing = output / "features" / "rocker_arm" / "features.toml"
-    existing.write_bytes(b"previous certified output")
-    with pytest.raises(FeatureFaceError, match="north_dome"):
-        exporter.write_manifests(["rocker_arm", "pivot_shaft"], out=output)
-    assert existing.read_bytes() == b"previous certified output"
-    assert not (path.parent / "features.toml").exists()
-
-
-@pytest.mark.parametrize("revision", ["v38", "unknown"])
-def test_certificate_revision_is_preserved_not_rebound_to_current_config(tmp_path: Path, monkeypatch, revision: str) -> None:
-    output = _certified(tmp_path)
+def test_writer_uses_supplied_revision_and_replaces_adjacent_manifest(tmp_path: Path, monkeypatch) -> None:
+    step = _step(tmp_path, "rocker_arm")
     monkeypatch.setattr(exporter._config, "release_revision", lambda: "v999")
-    certificate_path = output / "features" / "rocker_arm" / "neutral.json"
-    certificate = json.loads(certificate_path.read_text(encoding="utf-8"))
-    certificate["drawing_revision"] = revision
-    certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
-    path = exporter.write_manifests(["rocker_arm"], out=output)[0]
-    assert _load(path)["drawing"]["revision"] == revision
-    del certificate["drawing_revision"]
-    certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
-    path = exporter.write_manifests(["rocker_arm"], out=output)[0]
-    assert _load(path)["drawing"]["revision"] == "unknown"
+    path = exporter.write_manifest("rocker_arm", step, revision="v40")
+    old_digest = _load(path)["step_sha256"]
+    step.write_bytes(step.read_bytes() + b"\r\n/* raw export header changed */\r\n")
+    assert exporter.write_manifest("rocker_arm", step, revision="v41") == path
+    manifest = _load(path)
+    assert manifest["drawing"]["revision"] == "v41"
+    assert manifest["step_sha256"] == hashlib.sha256(step.read_bytes()).hexdigest() != old_digest
+    assert exporter.SOURCE_MAP["drawing_revision"][0] in manifest["drawing"]["cite"]
 
 
-def test_construction_requires_explicit_permission_in_actual_notes(monkeypatch) -> None:
-    assert exporter.requirement_manifest("rocker_arm")["construction"] == "one_piece"
-    permission = "BUILT-UP CONSTRUCTION IS PERMITTED."
-    monkeypatch.setattr(rocker_arm_notes, "BUILT_UP_PERMISSION_NOTE", permission)
-    with pytest.raises(ValueError, match="explicit text in DRAWING_NOTES"):
-        exporter.requirement_manifest("rocker_arm")
-    monkeypatch.setattr(rocker_arm_notes, "DRAWING_NOTES", rocker_arm_notes.DRAWING_NOTES + "\n" + permission)
-    assert exporter.requirement_manifest("rocker_arm")["construction"] == "built_up_permitted"
+def test_missing_label_fails_before_installing_requirements(tmp_path: Path) -> None:
+    step = _step(tmp_path, "pivot_shaft")
+    step.write_bytes(step.read_bytes().replace(face_name("north_dome", 1).encode(), b"NONE"))
+    with pytest.raises(FeatureFaceError, match="north_dome"):
+        exporter.write_manifest("pivot_shaft", step, revision="v40")
+    assert not step.with_name("features.toml").exists()
 
 
-def test_cli_selects_only_requested_part_and_rejects_unknown_stem(tmp_path: Path, monkeypatch, capsys) -> None:
-    output = _certified(tmp_path, ("rocker_arm", "pivot_shaft"))
-    monkeypatch.setattr(exporter, "OUT", output)
-    assert exporter.main(["--parts", "pivot-shaft"]) == 0
-    assert _load(output / "features" / "pivot_shaft" / "features.toml")["part"] == "pivot-shaft"
-    assert not (output / "features" / "rocker_arm" / "features.toml").exists()
-    assert str(output / "features" / "pivot_shaft" / "features.toml") in capsys.readouterr().out
+def test_unsupported_part_is_rejected_without_a_bundle(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unsupported"):
-        exporter.main(["--parts", "not_a_part"])
+        exporter.write_manifest("unrelated_part", tmp_path / "missing.STEP", revision="v40")
 
 
-def test_source_fingerprint_tracks_citation_bytes_but_not_checkout_eols_or_revision(tmp_path: Path, monkeypatch) -> None:
-    # Substitute only the source inventory; production normalization stays in
-    # the pure manifest reader and never imports the build/COM runtime.
-    config = tmp_path / "cad" / "config"
-    config.mkdir(parents=True)
-    source = config / "title_block.yaml"
-    release = config / "release.yaml"
-    source.write_bytes(b"linear: 0.51\n")
-    release.write_bytes(b"next_revision: v38\n")
-    monkeypatch.setattr(exporter, "REPO", tmp_path)
-    monkeypatch.setattr(exporter._config, "CONFIG_DIR", config)
-    monkeypatch.setattr(exporter, "source_paths", lambda: (source, release))
-    original = exporter.feature_sources_sha256()
-    source.write_bytes(b"linear: 0.51\r\n")
-    assert exporter.feature_sources_sha256() == original
-    release.write_bytes(b"next_revision: v40\n")
-    assert exporter.feature_sources_sha256() == original
-    source.write_bytes(b"# Moves the cited line\nlinear: 0.51\n")
-    assert exporter.feature_sources_sha256() != original
+@pytest.mark.parametrize("stem,module", [("rocker_arm", exporter.rocker_notes), ("pivot_shaft", exporter.shaft), ("cone_pivot_post", exporter.cone)])
+def test_construction_uses_the_actual_drawing_notes_and_explicit_permission(monkeypatch, stem, module) -> None:
+    original = exporter.requirement_manifest(stem)
+    assert original["construction"] == "one_piece"
+    assert original["notes"]["manufacturing"] == module.DRAWING_NOTES.splitlines()
+    citation = original["cite"]["construction"]
+    assert citation == exporter._cite(module, "DRAWING_NOTES")
+    permission = "BUILT-UP CONSTRUCTION IS PERMITTED."
+    monkeypatch.setattr(module, "BUILT_UP_PERMISSION_NOTE", permission, raising=False)
+    with pytest.raises(ValueError, match="explicit text in DRAWING_NOTES"):
+        exporter.requirement_manifest(stem)
+    monkeypatch.setattr(module, "DRAWING_NOTES", module.DRAWING_NOTES + "\n" + permission)
+    manifest = exporter.requirement_manifest(stem)
+    assert manifest["construction"] == "built_up_permitted"
+    assert manifest["notes"]["manufacturing"][-1] == permission
+    assert manifest["cite"]["construction"] == citation
+
+
+def test_every_hand_typed_source_citation_is_registered_used_and_still_anchored() -> None:
+    pattern = re.compile(r"harmonic-analyzer/[^\s:]+\.(?:py|yaml):\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*")
+    tree = ast.parse(Path(exporter.__file__).read_text(encoding="utf-8"))
+    source_map = next(node for node in tree.body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SOURCE_MAP" for target in node.targets))
+    def literals(node):
+        return {
+            (child.lineno, match.group())
+            for child in ast.walk(node) if isinstance(child, ast.Constant) and isinstance(child.value, str)
+            for match in pattern.finditer(child.value)
+        }
+    all_literals = literals(tree)
+    registered_literals = literals(source_map)
+    assert all_literals == registered_literals
+    registered = {reference for reference, _anchors in exporter.SOURCE_MAP.values()}
+    assert {reference for _line, reference in all_literals} == registered
+    def strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for child in value.values():
+                yield from strings(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from strings(child)
+    emitted = {citation for stem in exporter.SUPPORTED_PARTS for citation in strings(exporter.requirement_manifest(stem))}
+    assert registered <= emitted
+    assert exporter.SOURCE_MAP["rocker_datum_b"][0] in registered
+    for name, (reference, anchors) in exporter.SOURCE_MAP.items():
+        filename, ranges = reference.removeprefix("harmonic-analyzer/").split(":")
+        lines = (exporter.REPO / filename).read_text(encoding="utf-8").splitlines()
+        ranges = ranges.split(",")
+        assert len(ranges) == len(anchors), name
+        for span, tokens in zip(ranges, anchors, strict=True):
+            start, _, end = span.partition("-")
+            text = "\n".join(lines[int(start) - 1:int(end or start)])
+            assert tokens, name
+            for token in tokens:
+                assert token in text, f"{name}: {reference} no longer contains {token!r}"

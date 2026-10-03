@@ -14,7 +14,7 @@ quantity_cite = "harmonic-analyzer/cad/config/parts/rocker-arm.yaml:5"
 
 [drawing]
 number = "MHA-071"
-revision = "unknown" # release.yaml:3 configures v38; no certified STEP/drawing export pairs with this plan
+revision = "unknown" # no released STEP/drawing revision is paired with this authored plan
 cite = ["harmonic-analyzer/cad/config/parts/rocker-arm.yaml:2", "harmonic-analyzer/cad/config/release.yaml:1-3"]
 
 [paths]
@@ -114,7 +114,7 @@ direction = "conventional" # author's choice
 [[setups.ops]]
 op = 20
 do = "rough_face"
-feature = "strap_faces"
+feature = "strap_datum_b"
 tool = "endmills-lms-6784/3-8in-2fl"
 holder = "r8-collets-lms-4860/3-8in"
 to_z = -2.07825 # author's choice, finish strap Z-2.27825 + 0.20 allowance
@@ -125,7 +125,7 @@ note = "Around the hub island, keeping the rails."
 [[setups.ops]]
 op = 25
 do = "finish_face"
-feature = "strap_faces"
+feature = "strap_datum_b"
 tool = "endmills-lms-6784/3-8in-4fl"
 holder = "r8-collets-lms-4860/3-8in"
 to_z = -2.27825 # upper strap face: HUB_PROUD = (7.0565 - 2.5)/2 below the hub face
@@ -438,6 +438,24 @@ note = "Bottom arc, both radial lands, tapered ends; the rails and ears come off
 [setups.ops.checks]
 bottom_radius = "unknown" # no R816 profile/template gauge in inventory
 bottom_arc_len = "unknown" # 6 in caliper cannot span the 266.70 mm arc
+
+[[setups.ops]]
+op = 41
+do = "inspect"
+feature = "tip_land_pos_x"
+note = "The +X land is cut in op 40's unchanged profile pass; its checks now follow its separate datum-C face set."
+
+[setups.ops.checks]
+tip_land = "calipers" # author's choice; inventory verification remains required
+land_angle_deg = "unknown" # no qualified angular/profile method; consumer limit stays unknown
+
+[[setups.ops]]
+op = 42
+do = "inspect"
+feature = "tip_land_neg_x"
+note = "The -X land is cut in op 40's unchanged profile pass; the same authored checks follow its separate face set."
+
+[setups.ops.checks]
 tip_land = "calipers" # author's choice; inventory verification remains required
 land_angle_deg = "unknown" # no qualified angular/profile method; consumer limit stays unknown
 

@@ -1,19 +1,17 @@
-"""Export drawing requirements from pure CAD contracts and certified STEP bytes.
+"""Write adjacent drawing requirements bound to the just-exported raw STEP.
 
-No SolidWorks document is opened or saved. ``export_models --features`` writes
-each part's adjacent STEP and ``neutral.json`` receipt, then calls
-``write_manifests(parts, out=CAD_OUT)`` to write ``features/<stem>/features.toml``.
-The standalone CLI accepts underscore or dashed stems and requires those
-per-part receipts, not a full-release certificate.
+No SolidWorks document is opened or saved. The exporter calls
+``write_manifest(stem, step, revision=release_revision())`` after naming and
+exporting the part's requirement faces. Face sets come from that STEP's labels;
+its unmodified bytes supply ``step_sha256``.
 
-Construction is one_piece unless a <stem>_notes module explicitly supplies
+Construction is one_piece unless the actual drawing notes explicitly supply
 BUILT_UP_PERMISSION_NOTE, whose exact, nonempty text must occur in DRAWING_NOTES.
 A material/process alternative (casting or solid stock) is not built-up permission.
 """
 
 from __future__ import annotations
 
-import argparse
 import ast
 import hashlib
 import importlib
@@ -23,14 +21,13 @@ import math
 from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Iterable
+from typing import Any
 
 import _config
 import _hole_spec
 import _surface_finish
 import cone_gear_shaft_spec as cone_shaft
 import cone_pivot_post_spec as cone
-import pivot_bracket_spec as bracket
 import pivot_shaft_spec as shaft
 import rocker_arm_notes as rocker_notes
 import rocker_arm_spec as rocker
@@ -38,59 +35,129 @@ import rocker_bank_layout as bank
 from _gtol_spec import CylinderFace, FaceSpec, PlanarFace, SphereFace
 from _printed_tolerance import printed_band_mm, printed_deviations
 
-SUPPORTED_PARTS = ("rocker_arm", "pivot_shaft", "pivot_bracket", "cone_pivot_post")
+SUPPORTED_PARTS = ("rocker_arm", "pivot_shaft", "cone_pivot_post")
 REPO = Path(__file__).resolve().parents[2]
+CONFIG_DIR = REPO / "cad" / "config"
 OUT = REPO / "cad" / "out"
 UNKNOWN = "unknown"
 
 
+# The only hand-authored file:line citations. Each comma-separated range has
+# its own symbol/number anchors; the offline tripwire checks every entry and
+# rejects unregistered literals elsewhere in this generator.
+SOURCE_MAP = {
+    "rocker_hole": (
+        "harmonic-analyzer/cad/scripts/build_rocker_arm.py:510-516",
+        (("ROD_HOLE_SPEC", "expect_dia_mm"),),
+    ),
+    "rocker_hole_callout": (
+        "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:435-445",
+        (("add_native_hole_callout", 'label="rod-pin hole"'),),
+    ),
+    "hole_callout": (
+        "harmonic-analyzer/cad/scripts/_drawing_common.py:1860-1874,1901,1949-1966",
+        (("dia_tolerance_mm",), ("AddHoleCallout2",), ("compose_hole_callout_prefix",)),
+    ),
+    "rocker_position": (
+        "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:539-549",
+        (("add_feature_control_frame", 'datums=("A", "B", "C")'),),
+    ),
+    "cone_mount": (
+        "harmonic-analyzer/cad/scripts/build_cone_pivot_post.py:116-123",
+        (("ATTACHMENT_HOLE_SPEC", "CounterBoreDepth"),),
+    ),
+    "cone_mount_callout": (
+        "harmonic-analyzer/cad/scripts/draw_cone_pivot_post.py:1269-1280",
+        (("add_native_hole_callout", 'label="mounting counterbores"'),),
+    ),
+    "rocker_strap_frame": (
+        "harmonic-analyzer/cad/scripts/build_rocker_arm.py:396-403",
+        (("depth=ARM_THICKNESS", "both_directions=True"),),
+    ),
+    "rocker_hub_frame": (
+        "harmonic-analyzer/cad/scripts/build_rocker_arm.py:424-434",
+        (("depth=HUB_LENGTH", "both_directions=True"),),
+    ),
+    "cone_frame": (
+        "harmonic-analyzer/cad/scripts/build_cone_pivot_post.py:10-16,372-395",
+        (("body stands on Top at y=0",), ('create_sketch("Top")', "depth=BLOCK_HEIGHT")),
+    ),
+    "rocker_datum_a": (
+        "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:476-495",
+        (('datum="A"', "_require_datum_on_bore"),),
+    ),
+    "rocker_datum_b": (
+        "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:510-529",
+        (("RIGHT_CENTER[0] - ARM_THICKNESS / 2000.0", 'datum="B"'),),
+    ),
+    "right_view_frame": (
+        "harmonic-analyzer/cad/scripts/draw_pivot_shaft.py:66-70",
+        (('"*Right"', "Model -Z runs to the sheet's right"),),
+    ),
+    "rocker_datum_c": (
+        "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:530-538",
+        (("_sheet_xy(_TIP_FACE_MID_X, _TIP_FACE_MID_Y)", 'datum="C"'),),
+    ),
+    "drawing_revision": (
+        "harmonic-analyzer/cad/config/release.yaml:1-3",
+        (("next_revision:",),),
+    ),
+    "drawing_properties": (
+        "harmonic-analyzer/cad/scripts/_common.py:1751-1765",
+        (("def part_properties", '"Revision": _config.release_revision()'),),
+    ),
+    "material_defaults": (
+        "harmonic-analyzer/cad/config/parts/_defaults.yaml:21-27",
+        (("material_families:", "material_specification:"),),
+    ),
+    "linear_1pl": (
+        "harmonic-analyzer/cad/config/title_block.yaml:25",
+        (("linear_1pl:", "value_in: 0.03"),),
+    ),
+    "linear_2pl": (
+        "harmonic-analyzer/cad/config/title_block.yaml:26",
+        (("linear_2pl:", "value_in: 0.02"),),
+    ),
+    "linear_3pl": (
+        "harmonic-analyzer/cad/config/title_block.yaml:27",
+        (("linear_3pl:", "value_in: 0.005"),),
+    ),
+    "angular": (
+        "harmonic-analyzer/cad/config/title_block.yaml:28",
+        (("angular:", "value_deg: 1.0"),),
+    ),
+    "drilled_hole": (
+        "harmonic-analyzer/cad/config/title_block.yaml:66",
+        (("drilled_hole:", "plus_mm: 0.10", "minus_mm: 0.0"),),
+    ),
+    "edge_break": (
+        "harmonic-analyzer/cad/config/title_block.yaml:43-45",
+        (("edge_break:", "radius_mm: 0.25", "chamfer_max_mm: 0.25"),),
+    ),
+}
+
+
+def _source_cite(*keys: str) -> list[str]:
+    return [SOURCE_MAP[key][0] for key in keys]
+
+
 def source_paths() -> tuple[Path, ...]:
-    """Source/citation inputs not visible through ordinary import traversal."""
+    """Import and citation inputs; config accessor reads use doit's _config_deps."""
     from _buildgraph import module_deps_of
 
-    modules = (
-        _config, _hole_spec, _surface_finish, cone_shaft, cone, bracket,
-        shaft, rocker_notes, rocker, bank,
-    )
-    paths = {Path(module.__file__).resolve() for module in modules}
     script = Path(__file__).resolve()
-    paths.add(script)
-    paths.update(Path(path).resolve() for path in module_deps_of(script))
-    # Imported geometry contracts also read machine/fits/material documents
-    # through dynamic _config accessors. Conservatively include those YAML
-    # inputs rather than omitting a dimension-bearing indirect read.
-    paths.update(path.resolve() for path in _config.CONFIG_DIR.rglob("*.yaml"))
+    paths = {script, *(Path(path).resolve() for path in module_deps_of(script))}
+    paths.update(
+        REPO / reference.removeprefix("harmonic-analyzer/").partition(":")[0]
+        for reference, _anchors in SOURCE_MAP.values()
+    )
     for stem in SUPPORTED_PARTS:
-        note_spec = importlib.util.find_spec(f"{stem}_notes")
-        if note_spec is not None and note_spec.origin is not None:
-            paths.add(Path(note_spec.origin).resolve())
-    paths.update(REPO / "cad" / "scripts" / name for name in (
-        "_common.py", "_drawing_common.py", "draw_rocker_arm.py", "build_rocker_arm.py",
-        "draw_pivot_shaft.py", "build_pivot_shaft.py",
-        "draw_cone_pivot_post.py", "build_cone_pivot_post.py", "build_pivot_bracket.py",
-    ))
+        notes = _notes_module(stem)
+        note_path = Path(notes.__file__).resolve()
+        paths.add(note_path)
+        paths.update(Path(path).resolve() for path in module_deps_of(note_path))
+        paths.add(CONFIG_DIR / "parts" / f"{stem.replace('_', '-')}.yaml")
     return tuple(sorted(paths))
-
-
-def feature_sources_sha256() -> str:
-    """Bind requirements/citations to raw canonical source bytes, not mtimes.
-
-    YAML comments can move a citation even without changing geometry; they
-    therefore remain in this identity. A release-only revision bump is excluded
-    because the certificate independently preserves the exported revision.
-    """
-    release = (_config.CONFIG_DIR / "release.yaml").resolve()
-    digest = hashlib.sha256()
-    for path in sorted(set(source_paths()) - {release}):
-        content = path.read_bytes()
-        # Match the shared source-cache Git text heuristic without importing
-        # dodo or its runtime dependencies into this portable manifest reader.
-        if b"\0" not in content[:8000]:
-            content = content.replace(b"\r\n", b"\n")
-        digest.update(path.relative_to(REPO).as_posix().encode("utf-8") + b"\0")
-        digest.update(len(content).to_bytes(8, "big"))
-        digest.update(content)
-    return digest.hexdigest()
 
 
 def _stem(stem: str) -> str:
@@ -202,9 +269,14 @@ def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
             "rod_hole": (CylinderFace(_hole_spec.blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)),),
             "hub_od": (CylinderFace(rocker.HUB_DIA),),
             "hub_faces": tuple(PlanarFace((0, 0, sign), rocker.HUB_LENGTH / 2) for sign in (-1, 1)),
-            "strap_faces": tuple(PlanarFace((0, 0, sign), rocker.ARM_THICKNESS / 2) for sign in (-1, 1)),
+            # Standard Right-view sheet +X is model -Z (right_view_frame).
+            # The drawing tags sheet LEFT of centre, hence the +Z broad face.
+            "strap_datum_b": (PlanarFace((0, 0, 1), rocker.ARM_THICKNESS / 2),),
+            "strap_faces": (PlanarFace((0, 0, -1), rocker.ARM_THICKNESS / 2),),
             "top_edge": (CylinderFace(2 * rocker.R_TOP),),
-            "profile_outer": (CylinderFace(2 * rocker.R_BOTTOM), *right, *tips),
+            "tip_land_pos_x": (right[0],),
+            "tip_land_neg_x": (tips[0],),
+            "profile_outer": (CylinderFace(2 * rocker.R_BOTTOM), right[1], tips[1]),
         }
     if stem == "pivot_shaft":
         north = -shaft.JOURNAL_LENGTH
@@ -213,9 +285,8 @@ def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
             "pivot_bearing": (shaft.SURFACE_FINISHES[0].face,),
             "pivot_journal": (shaft.SURFACE_FINISHES[1].face,),
             "shoulder_od": (CylinderFace(shaft.SHOULDER_DIA),),
-            "shoulder_thrust": (
-                PlanarFace((0, 0, 1), north), shaft.SURFACE_FINISHES[2].face,
-            ),
+            "shoulder_north_face": (PlanarFace((0, 0, 1), north),),
+            "shoulder_thrust": (shaft.SURFACE_FINISHES[2].face,),
             "north_relief": (
                 CylinderFace(shaft.RELIEF_DIA, contains_z_mm=north + shaft.RELIEF_WIDTH / 2),
                 PlanarFace((0, 0, -1), -(north + shaft.RELIEF_WIDTH)),
@@ -226,25 +297,6 @@ def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
             ),
             "north_dome": (SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, shaft.DOME_HEIGHT - shaft.DOME_SPHERE_RADIUS)),),
             "south_dome": (SphereFace(2 * shaft.DOME_SPHERE_RADIUS, (0, 0, -bank.PIVOT_SHAFT_LENGTH + shaft.DOME_SPHERE_RADIUS - shaft.DOME_HEIGHT)),),
-        }
-    if stem == "pivot_bracket":
-        return {
-            "shaft_bore": (CylinderFace(bracket.BORE_DIA),),
-            "foot": (
-                PlanarFace((0, -1, 0), 0),
-                PlanarFace((0, 1, 0), bracket.FOOT_H),
-                *(PlanarFace((sign, 0, 0), bracket.FOOT_W / 2) for sign in (-1, 1)),
-                PlanarFace((0, 0, 1), bracket.FOOT_Z1),
-            ),
-            "ear": (
-                CylinderFace(bracket.EAR_W),
-                *(PlanarFace((sign, 0, 0), bracket.EAR_W / 2) for sign in (-1, 1)),
-                *(PlanarFace((0, 0, sign), bracket.EAR_T / 2) for sign in (-1, 1)),
-            ),
-            **{
-                f"hold_down_{index}": (CylinderFace(bracket.HOLE_DIA, contains_z_mm=z),)
-                for index, z in enumerate(bracket.HOLE_Z, start=1)
-            },
         }
     normal = cone.SURFACE_FINISHES[3].face.normal
     return {
@@ -322,7 +374,7 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
             "thickness": (_band(rocker.ARM_THICKNESS, p), ("ARM_THICKNESS",)),
             "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
             "upper_z": (rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
-            "lower_z": (-rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)), "datum": ("B", ("ARM_THICKNESS",)),
+            "lower_z": (-rocker.ARM_THICKNESS / 2, ("ARM_THICKNESS",)),
         }, precision={"thickness": p}),
         "top_edge": _feature(rocker, "profile", ["height_above_pivot", "radius", "arc_len"], {
             "height_above_pivot": (_band(rocker.TOP_EDGE_ABOVE_PIVOT, top_p, rocker.TOP_EDGE_BAND), ("TOP_EDGE_ABOVE_PIVOT", "TOP_EDGE_BAND")),
@@ -333,33 +385,43 @@ def _rocker_features() -> dict[str, dict[str, Any]]:
             "centre_from_pivot_ref": (rocker.CENTER_Y - rocker.PIVOT_MID_Y, ("CENTER_Y", "PIVOT_MID_Y")),
             "end": (list(_rocker_points()[0]), ("TOP_END_X", "TOP_END_Y")),
         }, precision={"height_above_pivot": top_p, "radius": p, "arc_len": p}),
-        "profile_outer": _feature(rocker, "profile", ["bottom_radius", "bottom_arc_len", "tip_land", "land_angle_deg", "mirror_symmetric"], {
+        "profile_outer": _feature(rocker, "profile", ["bottom_radius", "bottom_arc_len", "mirror_symmetric"], {
             "bottom_radius": (_band(rocker.R_BOTTOM, p), ("R_BOTTOM",)),
             "bottom_radius_nominal": (rocker.R_BOTTOM, ("R_BOTTOM",)),
             "arc_centre": ([0.0, rocker.CENTER_Y, 0.0], ("CENTER_Y",)), "top_edge_feature": ("top_edge", ("R_TOP",)),
             "bottom_arc_len": (_band(rocker.BOT_ARC_LEN, p), ("BOT_ARC_LEN",)),
-            "tip_land": (_band(rocker.TIP_FACE, p), ("TIP_FACE",)),
-            "land_angle_deg": (UNKNOWN, ("TIP_FACE",)),
-            "land_angle_nominal_deg": (land_angle, ("TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "TIP_FACE", "R_TOP", "CENTER_Y")),
             "mirror_symmetric": (True, ("R_BOTTOM",)), "depth_ref": (rocker.ARM_DEPTH, ("ARM_DEPTH",)),
             "bottom_end": (list(bottom), ("BOT_END_X", "R_BOTTOM", "CENTER_Y")),
             "radial_tip_end": (list(tip), ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
-            "datum": ("C", ("TIP_FACE",)),
-        }, precision={"bottom_radius": p, "bottom_arc_len": p, "tip_land": p, "land_angle_deg": UNKNOWN}),
+        }, precision={"bottom_radius": p, "bottom_arc_len": p}),
     }
+    result["strap_datum_b"] = _feature(rocker, "face", ["thickness"], {
+        "thickness": (_band(rocker.ARM_THICKNESS, p), ("ARM_THICKNESS",)),
+        "thickness_nominal": (rocker.ARM_THICKNESS, ("ARM_THICKNESS",)),
+        "plane": ({"frame": "model", "axis": "z", "value": rocker.ARM_THICKNESS / 2}, ("ARM_THICKNESS",)),
+        "datum": ("B", ("ARM_THICKNESS",)),
+    }, precision={"thickness": p})
+    result["strap_datum_b"]["cite"]["datum"] = _source_cite("rocker_datum_b", "right_view_frame")
+    result["pivot_bore"]["cite"]["datum"] = _source_cite("rocker_datum_a")
+    for name, sign in (("tip_land_pos_x", 1), ("tip_land_neg_x", -1)):
+        result[name] = _feature(rocker, "face", ["tip_land", "land_angle_deg"], {
+            "tip_land": (_band(rocker.TIP_FACE, p), ("TIP_FACE",)),
+            "land_angle_deg": (UNKNOWN, ("TIP_FACE",)),
+            "land_angle_nominal_deg": (land_angle, ("TOP_END_X", "TOP_END_Y", "ROD_TIP_X", "TIP_FACE", "R_TOP", "CENTER_Y")),
+            "radial_tip_end": ([sign * tip[0], tip[1]], ("ROD_TIP_X", "TOP_END_Y", "TIP_FACE", "R_TOP", "CENTER_Y")),
+            "top_edge_feature": ("top_edge", ("R_TOP",)),
+        }, precision={"tip_land": p, "land_angle_deg": UNKNOWN})
+    result["tip_land_pos_x"]["datum"] = "C"
+    result["tip_land_pos_x"]["cite"]["datum"] = _source_cite("rocker_datum_c")
     notes_cite = _cite(rocker_notes, "DRAWING_NOTES")
-    for name in ("pivot_bore", "strap_faces", "top_edge", "profile_outer", "hub_od"):
+    for name in ("pivot_bore", "strap_faces", "strap_datum_b", "top_edge", "profile_outer", "tip_land_pos_x", "tip_land_neg_x", "hub_od"):
         for key in result[name]["cite"]:
             result[name]["cite"][key] += notes_cite
     result["hub_od"]["cite"]["coaxiality_dia"] = _cite(rocker_notes, "HUB_COAXIALITY_DIA", "DRAWING_NOTES")
     result["rod_hole"]["cite"]["nominal_dia"] += _cite(_hole_spec, "NUMBER_DRILL_MM")
     result["rod_hole"]["cite"]["dia"] += _cite(_hole_spec, "NUMBER_DRILL_MM")
-    result["rod_hole"]["cite"]["dia"] += [
-        "harmonic-analyzer/cad/scripts/build_rocker_arm.py:510-516",
-        "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:435-445",
-        "harmonic-analyzer/cad/scripts/_drawing_common.py:1860-1874,1901,1949-1966",
-    ]
-    result["rod_hole"]["cite"]["position_datums"] = ["harmonic-analyzer/cad/scripts/draw_rocker_arm.py:539-549"]
+    result["rod_hole"]["cite"]["dia"] += _source_cite("rocker_hole", "rocker_hole_callout", "hole_callout")
+    result["rod_hole"]["cite"]["position_datums"] = _source_cite("rocker_position")
     return result
 
 
@@ -393,13 +455,18 @@ def _shaft_features() -> dict[str, dict[str, Any]]:
         "dia": (_band(shaft.SHOULDER_DIA, p["ShoulderDia"]), ("SHOULDER_DIA",)),
         "dia_nominal": (shaft.SHOULDER_DIA, ("SHOULDER_DIA",)),
     }, precision={"dia": p["ShoulderDia"]})
+    result["shoulder_north_face"] = _feature(shaft, "face", ["length"], {
+        "length": (_band(shaft.SHOULDER_LENGTH, p["ShoulderLength"]), ("SHOULDER_LENGTH",)),
+        "length_nominal": (shaft.SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
+        "plane": ({"frame": "model", "axis": "z", "value": -shaft.JOURNAL_LENGTH}, ("JOURNAL_LENGTH",)),
+    }, precision={"length": p["ShoulderLength"]})
     result["shoulder_thrust"] = _feature(shaft, "face", ["length", "finish_ra"], {
         "length": (_band(shaft.SHOULDER_LENGTH, p["ShoulderLength"]), ("SHOULDER_LENGTH",)),
         "length_nominal": (shaft.SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
         "upper_z": (-shaft.JOURNAL_LENGTH, ("JOURNAL_LENGTH",)),
         "lower_z": (shaft.SHOULDER_SOUTH_Z_MM, ("SHOULDER_SOUTH_Z_MM",)),
         "finish_ra": (_surface_finish.MACHINED_UM, ("SURFACE_FINISHES",)),
-        "note": ("Ra applies only to the south shoulder face; the north face only seats on the ear.", ("SURFACE_FINISHES",)),
+        "plane": ({"frame": "model", "axis": "z", "value": shaft.SHOULDER_SOUTH_Z_MM}, ("SHOULDER_SOUTH_Z_MM",)),
     }, precision={"length": p["ShoulderLength"], "finish_ra": 1})
     for name, z in (("north_relief", -shaft.JOURNAL_LENGTH + shaft.RELIEF_WIDTH / 2), ("south_relief", shaft.SHOULDER_SOUTH_Z_MM - shaft.RELIEF_WIDTH / 2)):
         result[name] = _feature(shaft, "groove", ["dia", "width"], {
@@ -417,39 +484,6 @@ def _shaft_features() -> dict[str, dict[str, Any]]:
             "base_z": (z, ("__frame__",)), "note": (shaft.DOME_CALLOUT, ("DOME_CALLOUT",)),
         }, precision={"height": p["DomeHeight"]})
     result["south_dome"]["cite"]["base_z"] = _cite(bank, "PIVOT_SHAFT_LENGTH")
-    return result
-
-
-def _bracket_features() -> dict[str, dict[str, Any]]:
-    # There is no curated bracket drawing or marked dimension contract. Do not
-    # turn geometry/design-stack assumptions into invented acceptance limits.
-    result = {
-        "shaft_bore": _feature(bracket, "hole", UNKNOWN, {
-            "at": ([0.0, bracket.BORE_H, 0.0], ("BORE_H",)), "axis": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "nominal_dia": (bracket.BORE_DIA, ("BORE_DIA",)), "dia": (UNKNOWN, ("BORE_DIA",)),
-            "thru": (True, ("BORE_DIA", "EAR_T")),
-        }),
-        "foot": _feature(bracket, "profile", UNKNOWN, {
-            "nominal_width": (bracket.FOOT_W, ("FOOT_W",)), "width": (UNKNOWN, ("FOOT_W",)),
-            "nominal_height": (bracket.FOOT_H, ("FOOT_H",)), "height": (UNKNOWN, ("FOOT_H",)),
-            "nominal_length": (bracket.FOOT_LEN, ("FOOT_LEN",)), "length": (UNKNOWN, ("FOOT_LEN",)),
-        }),
-        "ear": _feature(bracket, "profile", UNKNOWN, {
-            "nominal_width": (bracket.EAR_W, ("EAR_W",)), "width": (UNKNOWN, ("EAR_W",)),
-            "nominal_thickness": (bracket.EAR_T, ("EAR_T",)), "thickness": (UNKNOWN, ("EAR_T",)),
-            "nominal_radius": (bracket.EAR_ARCH_R, ("EAR_ARCH_R",)), "radius": (UNKNOWN, ("EAR_ARCH_R",)),
-        }),
-    }
-    for index, z in enumerate(bracket.HOLE_Z, start=1):
-        result[f"hold_down_{index}"] = _feature(bracket, "hole", UNKNOWN, {
-            "at": ([0.0, bracket.FOOT_H, z], ("FOOT_H", "HOLE_Z")), "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
-            "nominal_dia": (bracket.HOLE_DIA, ("HOLE_DIA",)), "dia": (UNKNOWN, ("HOLE_DIA",)),
-            "thru": (bracket.HOLD_DOWN_HOLE_SPEC.end == "through_all", ("HOLD_DOWN_HOLE_SPEC",)),
-            "station_nominal": (z, ("HOLE_Z",)), "station": (UNKNOWN, ("HOLE_Z",)),
-        })
-    for feature in result.values():
-        feature["precision"] = UNKNOWN
-        feature["note"] = "No curated manufacturing drawing exists; nominal model geometry is not a tolerance."
     return result
 
 
@@ -524,36 +558,38 @@ def _cone_features() -> dict[str, dict[str, Any]]:
             "dia": (_band(cone.ATTACHMENT_CBORE_DIA, p[dim]), ("ATTACHMENT_CBORE_DIA",)), "nominal_dia": (cone.ATTACHMENT_CBORE_DIA, ("ATTACHMENT_CBORE_DIA",)),
             "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, p[dim]), ("ATTACHMENT_CBORE_DEPTH",)), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
         }, precision={"dia": p[dim], "depth": p[dim]})
-        result[name]["cite"]["dia"] += [
-            "harmonic-analyzer/cad/scripts/build_cone_pivot_post.py:116-123",
-            "harmonic-analyzer/cad/scripts/draw_cone_pivot_post.py:1269-1280",
-            "harmonic-analyzer/cad/scripts/_drawing_common.py:1860-1874,1901,1949-1966",
-        ]
+        result[name]["cite"]["dia"] += _source_cite("cone_mount", "cone_mount_callout", "hole_callout")
     return result
 
 
-def _construction(stem: str) -> tuple[str, list[str]]:
+def _notes_module(stem: str) -> ModuleType:
     name = f"{stem}_notes"
-    if importlib.util.find_spec(name) is None:
-        return "one_piece", ["harmonic-analyzer/cad/scripts/export_features.py:1"]
-    module = importlib.import_module(name)
+    if importlib.util.find_spec(name) is not None:
+        return importlib.import_module(name)
+    # These specs supply the native Manufacturing Notes property consumed by
+    # the corresponding drawings' property-linked note.
+    return {"pivot_shaft": shaft, "cone_pivot_post": cone}[stem]
+
+
+def _construction(module: ModuleType) -> tuple[str, list[str]]:
     permission = getattr(module, "BUILT_UP_PERMISSION_NOTE", None)
     if permission is None:
         return "one_piece", _cite(module, "DRAWING_NOTES")
-    if not isinstance(permission, str) or not permission.strip() or permission not in getattr(module, "DRAWING_NOTES", ""):
-        raise ValueError(f"{name}.BUILT_UP_PERMISSION_NOTE must be explicit text in DRAWING_NOTES")
-    return "built_up_permitted", _cite(module, "BUILT_UP_PERMISSION_NOTE", "DRAWING_NOTES")
+    if not isinstance(permission, str) or not permission.strip() or permission not in module.DRAWING_NOTES:
+        raise ValueError(f"{module.__name__}.BUILT_UP_PERMISSION_NOTE must be explicit text in DRAWING_NOTES")
+    return "built_up_permitted", _cite(module, "DRAWING_NOTES")
 
 
 def requirement_manifest(stem: str) -> dict[str, Any]:
-    """Pure requirement data, before binding it to certified STEP face names."""
+    """Pure drawing requirement data, before binding it to STEP face names."""
     stem = _stem(stem)
     dashed = stem.replace("_", "-")
-    module = {"rocker_arm": rocker, "pivot_shaft": shaft, "pivot_bracket": bracket, "cone_pivot_post": cone}[stem]
-    features = {"rocker_arm": _rocker_features, "pivot_shaft": _shaft_features, "pivot_bracket": _bracket_features, "cone_pivot_post": _cone_features}[stem]()
-    construction, construction_cite = _construction(stem)
+    module = {"rocker_arm": rocker, "pivot_shaft": shaft, "cone_pivot_post": cone}[stem]
+    features = {"rocker_arm": _rocker_features, "pivot_shaft": _shaft_features, "cone_pivot_post": _cone_features}[stem]()
+    notes_module = _notes_module(stem)
+    construction, construction_cite = _construction(notes_module)
     row = _config.parts(dashed)
-    registry_path = _config.CONFIG_DIR / "parts" / f"{dashed}.yaml"
+    registry_path = CONFIG_DIR / "parts" / f"{dashed}.yaml"
     registry_cite = (
         f"harmonic-analyzer/cad/config/parts/{dashed}.yaml:"
         f"1-{len(registry_path.read_text(encoding='utf-8').splitlines())}"
@@ -562,7 +598,15 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         f"linear_{places}pl": printed_band_mm(places) for places in (1, 2, 3)
     }
     general.update({"angular_deg": float(_config.title_block("angular")["value_deg"]), "drilled_hole_plus": float(_config.title_block("drilled_hole")["plus_mm"]), "drilled_hole_minus": float(_config.title_block("drilled_hole")["minus_mm"]), "edge_break_r": float(_config.title_block("edge_break")["radius_mm"]), "chamfer_max": float(_config.title_block("edge_break")["chamfer_max_mm"])})
-    general["cite"] = {key: f"harmonic-analyzer/cad/config/title_block.yaml:{line}" for key, line in (("linear_1pl", 25), ("linear_2pl", 26), ("linear_3pl", 27), ("angular_deg", 28), ("drilled_hole_plus", 66), ("drilled_hole_minus", 66), ("edge_break_r", 45), ("chamfer_max", 45))}
+    general["cite"] = {
+        key: _source_cite(source)
+        for key, source in (
+            ("linear_1pl", "linear_1pl"), ("linear_2pl", "linear_2pl"),
+            ("linear_3pl", "linear_3pl"), ("angular_deg", "angular"),
+            ("drilled_hole_plus", "drilled_hole"), ("drilled_hole_minus", "drilled_hole"),
+            ("edge_break_r", "edge_break"), ("chamfer_max", "edge_break"),
+        )
+    }
     for feature in features.values():
         for key in feature.get("precision", {}) if isinstance(feature.get("precision"), dict) else ():
             if stem == "rocker_arm":
@@ -570,7 +614,7 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
                     rocker_notes, "DRAWING_PRECISION", "DEFAULT_DRAWING_PRECISION",
                 )
             if key in feature["cite"] and isinstance(feature.get(key), list) and len(feature[key]) == 2:
-                feature["cite"][key].append("harmonic-analyzer/cad/config/title_block.yaml:25-28,66")
+                feature["cite"][key] += _source_cite(f"linear_{feature['precision'][key]}pl", "angular", "drilled_hole")
         if "finish_ra" in feature:
             feature["cite"]["finish_ra"] += _cite(
                 _surface_finish,
@@ -580,29 +624,25 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
                 feature["precision"]["finish_ra"] = _finish_precision()
                 feature["cite"]["precision.finish_ra"] = _cite(_surface_finish, "ra")
         feature["faces"] = UNKNOWN
-    notes_module = rocker_notes if stem == "rocker_arm" else module
-    notes = getattr(notes_module, "DRAWING_NOTES", None)
+    notes = notes_module.DRAWING_NOTES
     frame_cite = _cite(module, "__frame__")
     if stem == "rocker_arm":
-        frame_cite += [
-            "harmonic-analyzer/cad/scripts/build_rocker_arm.py:396-403",
-            "harmonic-analyzer/cad/scripts/build_rocker_arm.py:424-434",
-        ]
+        frame_cite += _source_cite("rocker_strap_frame", "rocker_hub_frame")
     elif stem == "cone_pivot_post":
-        frame_cite += ["harmonic-analyzer/cad/scripts/build_cone_pivot_post.py:10-16,372-395"]
+        frame_cite += _source_cite("cone_frame")
     for feature in features.values():
         for key in ("axis", "at", "normal", "plane"):
             if key in feature:
                 feature["cite"][key] += frame_cite
     frames: dict[str, Any] = {"model": {"origin": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 1.0, 0.0], "z": [0.0, 0.0, 1.0], "cite": frame_cite}, "setup": UNKNOWN}
-    datums: dict[str, Any] | str = UNKNOWN if stem == "pivot_bracket" else {}
+    datums: dict[str, Any] = {}
     if stem == "rocker_arm":
         for name, sign in (("A", 1), ("B", -1)):
             frames[name] = {"origin": [0.0, rocker.PIVOT_MID_Y, sign * rocker.HUB_LENGTH / 2], "x": [1.0, 0.0, 0.0], "y": [0.0, float(sign), 0.0], "z": [0.0, 0.0, float(sign)], "binding": UNKNOWN, "cite": _cite(rocker, "PIVOT_MID_Y", "HUB_LENGTH")}
         datums = {
-            "A": {"feature": "pivot_bore", "surface": "pivot bore cylinder", "cite": "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:476-495"},
-            "B": {"feature": "strap_faces", "surface": UNKNOWN, "cite": "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:510-529"},
-            "C": {"feature": "profile_outer", "surface": "rod-side (+X) radial tip land", "cite": "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:530-538"},
+            "A": {"feature": "pivot_bore", "surface": "pivot bore cylinder", "cite": _source_cite("rocker_datum_a")},
+            "B": {"feature": "strap_datum_b", "surface": "+Z broad strap face", "cite": _source_cite("rocker_datum_b", "right_view_frame")},
+            "C": {"feature": "tip_land_pos_x", "surface": "rod-side (+X) radial tip land", "cite": _source_cite("rocker_datum_c")},
         }
     elif stem == "cone_pivot_post":
         datums = {"A": {"feature": "journal_bore", "surface": "cone journal bore cylinder", "cite": _cite(cone, "PART_DATUMS")}, "B": {"feature": "foot_seat", "surface": "foot seat plane", "cite": _cite(cone, "PART_DATUMS")}}
@@ -610,9 +650,9 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         "part": dashed, "units": "mm", "precision": rocker_notes.DEFAULT_DRAWING_PRECISION if stem == "rocker_arm" else UNKNOWN,
         "step": f"{dashed}.STEP", "step_sha256": UNKNOWN, "construction": construction, "cite_root": "harmonic-analyzer",
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": _cite(rocker_notes, "DEFAULT_DRAWING_PRECISION") if stem == "rocker_arm" else frame_cite, "frames": frame_cite},
-        "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [registry_cite, "harmonic-analyzer/cad/config/release.yaml:1-3", "harmonic-analyzer/cad/scripts/_common.py:1751-1765"]},
-        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": UNKNOWN, "cite": [registry_cite, "harmonic-analyzer/cad/config/parts/_defaults.yaml:21-27"]},
-        "notes": {"manufacturing": notes.splitlines() if notes is not None else UNKNOWN, "process": row.get("process", UNKNOWN), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": ([registry_cite, "harmonic-analyzer/cad/config/title_block.yaml:43-45"] + (_cite(notes_module, "DRAWING_NOTES") if notes else []))},
+        "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [registry_cite, *_source_cite("drawing_revision", "drawing_properties")]},
+        "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": UNKNOWN, "cite": [registry_cite, *_source_cite("material_defaults")]},
+        "notes": {"manufacturing": notes.splitlines(), "process": row.get("process", UNKNOWN), "edge_break": f"REMOVE BURRS AND BREAK SHARP EDGES {_config.title_block('edge_break')['display_r']} OR CHAMFER {_config.title_block('edge_break')['display_chamfer']} MAX", "cite": [registry_cite, *_source_cite("edge_break"), *_cite(notes_module, "DRAWING_NOTES")]},
         "general_tolerances": general, "frames": frames, "datums": datums, "features": features,
     }
 
@@ -634,7 +674,7 @@ def _toml(data: dict[str, Any]) -> str:
         if isinstance(item, dict):
             return "{ " + ", ".join(f"{value(key)} = {value(entry)}" for key, entry in item.items()) + " }"
         raise TypeError(f"unsupported TOML value: {type(item).__name__}")
-    lines = ["# Generated from CAD drawing contracts and certified STEP bytes; do not hand edit."]
+    lines = ["# Generated from CAD drawing contracts and adjacent raw STEP bytes; do not hand edit."]
     def table(node: dict[str, Any], path: tuple[str, ...] = ()) -> None:
         if path:
             lines.extend(("", "[" + ".".join(value(key) for key in path) + "]"))
@@ -648,110 +688,31 @@ def _toml(data: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _certified_bytes(path: Path, record: Any) -> bytes:
-    if not isinstance(record, dict) or record.get("path") != path.name:
-        raise ValueError(f"certified feature bundle path differs: {path}")
-    content = path.read_bytes()
-    if (
-        not content
-        or type(record.get("bytes")) is not int
-        or record["bytes"] != len(content)
-        or record.get("sha256") != hashlib.sha256(content).hexdigest()
-    ):
-        raise ValueError(f"certified feature bundle bytes/SHA-256 differ: {path}; rerun --features")
-    return content
+def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
+    """Bind all labelled STEP faces and write the adjacent requirements TOML."""
+    from prechips.model import Features
 
-
-def write_manifests(parts: Iterable[str] | None = None, *, out: Path | None = None) -> list[Path]:
-    """Write adjacent manifests only after every requested bundle validates.
-
-    Receipts bind the current requirement sources and exact raw STEP bytes.
-    Exporter/native identities are recorded by the producer; checking them
-    never imports COM or requires native files outside the portable bundle.
-    A final receipt's manifest must still be its certified bytes.
-    """
     from _export_feature_faces import step_face_sets
 
-    output = OUT if out is None else Path(out)
-    selected = SUPPORTED_PARTS if parts is None else tuple(dict.fromkeys(_stem(stem) for stem in parts))
-    if not selected:
-        return []
-    source_digest = feature_sources_sha256()
-    pending = []
-    for stem in selected:
-        dashed = stem.replace("_", "-")
-        bundle = output / "features" / stem
-        receipt_path = bundle / "neutral.json"
-        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        if not isinstance(receipt, dict) or receipt.get("schema") != "harmonic-analyzer/features-neutral@1":
-            raise ValueError(f"unsupported feature neutral receipt schema: {stem}; rerun --features")
-        if receipt.get("stem") != stem:
-            raise ValueError(f"feature neutral receipt stem differs: {stem}")
-        exporter = receipt.get("exporter")
-        native_digest = receipt.get("native_sha256")
-        if not isinstance(exporter, str) or not exporter.strip():
-            raise ValueError(f"feature neutral receipt exporter identity is missing: {stem}")
-        if (
-            not isinstance(native_digest, str)
-            or len(native_digest) != 64
-            or any(char not in "0123456789abcdef" for char in native_digest)
-        ):
-            raise ValueError(f"feature neutral receipt native SHA-256 is invalid: {stem}")
-        if receipt.get("feature_sources_sha256") != source_digest:
-            raise ValueError(f"feature neutral requirement sources changed: {stem}; rerun --features")
-        revision = receipt.get("drawing_revision", UNKNOWN)
-        if not isinstance(revision, str) or not revision.strip():
-            raise ValueError(f"feature neutral receipt drawing revision is invalid: {stem}")
-        path = bundle / f"{dashed}.STEP"
-        record = receipt.get("step")
-        content = _certified_bytes(path, record)
-        manifest = requirement_manifest(stem)
-        selectors = feature_selectors(stem)
-        if selectors.keys() != manifest["features"].keys():
-            raise ValueError(f"feature selector/requirement domains differ: {stem}")
-        faces = step_face_sets(content.decode("latin-1"), selectors.keys())
-        used = set()
-        for name, feature in manifest["features"].items():
-            labels = faces.get(name)
-            if not labels or used.intersection(labels):
-                raise ValueError(f"missing or overlapping STEP face set: {stem}.{name}")
-            used.update(labels)
-            feature["faces"] = labels
-            feature["cite"]["faces"] = [
-                f"harmonic-analyzer/cad/out/features/{stem}/{dashed}.STEP",
-                f"harmonic-analyzer/cad/out/features/{stem}/neutral.json",
-            ]
-        manifest["step_sha256"] = record["sha256"]
-        manifest["cite"]["step_sha256"] = [
-            f"harmonic-analyzer/cad/out/features/{stem}/neutral.json",
-            f"harmonic-analyzer/cad/out/features/{stem}/{dashed}.STEP",
-        ]
-        if stem != "pivot_bracket":
-            manifest["drawing"]["revision"] = revision
-            manifest["drawing"]["cite"].append(f"harmonic-analyzer/cad/out/features/{stem}/neutral.json")
-        manifest_path = bundle / "features.toml"
-        manifest_bytes = _toml(manifest).encode("utf-8")
-        if "features" in receipt and _certified_bytes(manifest_path, receipt["features"]) != manifest_bytes:
-            raise ValueError(f"certified feature manifest differs from receipt requirements: {stem}; rerun --features")
-        pending.append((manifest_path, manifest_bytes))
-    for path, content in pending:
-        partial = path.with_suffix(".toml.partial")
-        partial.write_bytes(content)
-        partial.replace(path)
-    return [path for path, _content in pending]
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--parts", nargs="+", help="supported part stems (space- or comma-separated)")
-    args = parser.parse_args(argv)
-    parts = None
-    if args.parts is not None:
-        parts = [_stem(part) for item in args.parts for part in item.split(",")]
-    for path in write_manifests(parts):
-        print(path)
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    stem = _stem(stem)
+    step = Path(step)
+    content = step.read_bytes()
+    manifest = requirement_manifest(stem)
+    selectors = feature_selectors(stem)
+    if selectors.keys() != manifest["features"].keys():
+        raise ValueError(f"feature selector/requirement domains differ: {stem}")
+    faces = step_face_sets(content.decode("latin-1"), selectors.keys())
+    step_cite = f"harmonic-analyzer/cad/out/features/{stem}/{step.name}"
+    for name, feature in manifest["features"].items():
+        feature["faces"] = faces[name]
+        feature["cite"]["faces"] = [step_cite]
+    manifest["step"] = step.name
+    manifest["step_sha256"] = hashlib.sha256(content).hexdigest()
+    manifest["cite"]["step_sha256"] = [step_cite]
+    manifest["drawing"]["revision"] = revision
+    Features.model_validate(manifest)
+    path = step.with_name("features.toml")
+    partial = path.with_suffix(".toml.partial")
+    partial.write_text(_toml(manifest), encoding="utf-8", newline="\n")
+    partial.replace(path)
+    return path

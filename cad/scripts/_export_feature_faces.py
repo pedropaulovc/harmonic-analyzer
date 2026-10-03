@@ -18,9 +18,9 @@ names the native faces and the face sets are read back by those names:
    face names into the ``ADVANCED_FACE`` labels, and split periodic faces on
    (the AP214 representation v38 shipped: the issue #1204 spike
    found the v38 rocker-arm pivot bore as ``ADVANCED_FACE`` ordinals 1 and 16,
-   two Ø6.5 halves).  One named native periodic face is therefore expected to
-   label SEVERAL STEP faces with the same name (to be seat-proven).  The
-   STEP bytes are exactly what ``SaveAs3`` wrote; nothing rewrites them.
+   two Ø6.5 halves). One named native periodic face can label SEVERAL STEP
+   faces with the same name. ``export_models`` requires exactly two exported
+   rocker pivot-bore patches. Nothing rewrites the raw ``SaveAs3`` STEP bytes.
 3. :func:`step_face_sets` reads the labels back into face sets of STEP face
    references (``#<entity>/ADVANCED_FACE[<ordinal>]/<label>``) -- every face
    whose label a feature owns -- and refuses a missing feature or label, an
@@ -107,8 +107,8 @@ def step_face_sets(
     EVERY face whose label the feature owns, so a periodic native face split
     into several STEP faces sharing one label contributes all of them.
 
-    ``expected_features`` is either the feature keys (manifest regeneration from
-    a certified STEP: a label's feature is read from the name, and each
+    ``expected_features`` is either the feature keys (manifest generation from
+    the adjacent STEP: a label's feature is read from the name, and each
     feature's distinct patch numbers must be 1..n) or the ``{feature: labels}``
     :func:`name_feature_faces` assigned (the export itself: every assigned label
     must label at least one STEP face and every prefixed label must be

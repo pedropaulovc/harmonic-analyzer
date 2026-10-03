@@ -43,13 +43,12 @@ export above can run on a SolidWorks farm worker that has no renderer:
 
     uv run python cad\\scripts\\export_models.py --comparisons
 
-``--features <stem> ...`` is the separate, STEP-only feature-bundle producer
+``--features <stem> ...`` is the separate feature-bundle producer
 (the doit ``package:features`` leaf). For each supported part it writes ONLY
 ``cad/out/features/<stem>/<dashed>.STEP`` (the same named, default-configuration
-``SaveAs3`` export the full run writes to ``cad/out/step``), a STEP receipt
-``neutral.json``, then ``export_features.write_manifests`` writes
-``features.toml`` and the receipt is finalised over its bytes. It never touches
-the global STEP/STL/PNG, colour, source-digest or release-neutral files:
+``SaveAs3`` export the full run writes to ``cad/out/step``) and an adjacent
+``features.toml`` bound to those raw STEP bytes by ``export_features.write_manifest``.
+It never touches the global STEP/STL/PNG, colour, source-digest or release-neutral files:
 
     uv run python cad\\scripts\\export_models.py --features rocker_arm pivot_shaft
 """
@@ -90,7 +89,7 @@ from _common import (  # noqa: E402
 )
 from _buildgraph import ASSEMBLY_ORDER, part_stems  # noqa: E402
 from _config import release_revision  # noqa: E402
-from _export_feature_faces import name_feature_faces, step_face_sets  # noqa: E402
+from _export_feature_faces import FeatureFaceError, name_feature_faces, step_face_sets  # noqa: E402
 
 import _telemetry  # noqa: E402
 
@@ -101,11 +100,8 @@ OUT_BOXES = CAD_ROOT / "out" / "boxes"
 OUT_SLDPRT = CAD_ROOT / "out" / "sldprt"
 OUT_SLDASM = CAD_ROOT / "out" / "sldasm"
 OUT_PNG = CAD_ROOT / "out" / "png"
-# ``--features`` bundles: features/<underscore-stem>/{<dashed>.STEP, neutral.json,
-# features.toml}, owned by that mode alone (export_features writes the manifest).
+# ``--features`` owns features/<underscore-stem>/{<dashed>.STEP, features.toml}.
 OUT_FEATURES = CAD_ROOT / "out" / "features"
-FEATURES_RECEIPT = "neutral.json"
-FEATURES_RECEIPT_SCHEMA = "harmonic-analyzer/features-neutral@1"
 FEATURES_MANIFEST = "features.toml"
 COLORS = OUT_STL / "colors.json"
 # Per-output source-recipe digests: ``mesh|dashed-assembly -> digest`` recorded at
@@ -144,9 +140,9 @@ PREF_STEP_AP = 75            # int: swStepAP -> 214 (carries colours)
 # properties"); step_face_sets re-reads every named STEP, so a seat that drops
 # the names fails the export instead of shipping 'NONE'. Split periodic is ON,
 # the AP214 representation v38 shipped (its rocker-arm pivot bore is two Ø6.5
-# cylinder halves): one named periodic native face labels every exported patch
-# with its name, and step_face_sets puts every face carrying a feature's label
-# in its set. STEP face ordinals are local to one file.
+# cylinder halves). Every named STEP is checked for both bore patches; a writer
+# that labels only one half fails rather than shipping an incomplete face set.
+# STEP face ordinals are local to one file.
 TOGGLE_STEP_SPLIT_PERIODIC = 396   # swStepExportSplitPeriodic
 TOGGLE_STEP_FACE_EDGE_PROPS = 397  # swStepExportFaceEdgeProps
 
@@ -433,29 +429,28 @@ def save_colors(colors: dict) -> None:
 
 
 def _exporter_digest() -> str:
-    """Digest of the exporter's own source CLOSURE -- this module plus every repo-local
-    helper it transitively imports (_common's STL
-    preference constants, ...) -- stamped into the cache so a change to ANY export /
-    format / scene / colour logic invalidates every recorded output even when no CAD
-    recipe changed (codex review). Best-effort: if the closure can't be resolved, fall
-    back to this module alone; if even that can't be read, '' (a stable, round-tripping
-    value) -- never blocking an export.
+    """Digest the exporter's source/config closure, including face-naming inputs.
 
-    Hash GIT-CANONICAL bytes (``dodo._canonical_file_bytes``), never raw ones: this
-    sentinel is compared ACROSS checkouts -- an export that ran on a farm worker is
-    read back on the submitter -- and a worker's LF checkout hashes identical code
-    differently from a CRLF one, which invalidated every farm-produced ledger and
-    silently forced a full re-export (and failed the gallery's freshness check).
+    The same requirements feed the outer export cache key and this freshness
+    sentinel: a cache miss after a naming change must also regenerate the STEP,
+    not reuse an older per-model ledger. Text uses Git-canonical bytes across
+    LF/CRLF checkouts; YAML uses the shared parsed-content digest.
+
+    Best-effort: if dependency discovery fails, fall back to this module alone;
+    if even that cannot be read, return a stable empty digest.
     """
     self_path = Path(__file__).resolve()
     try:
-        from _buildgraph import module_deps_of
-        canon = _import_dodo()._canonical_file_bytes
+        dodo = _import_dodo()
+        canon = dodo._canonical_file_bytes
         files = sorted({self_path, *(Path(p).resolve()
-                                     for p in module_deps_of(self_path))})
+                                     for p in dodo._export_requirement_deps())})
         h = hashlib.md5()
         for f in files:
-            h.update(canon(str(f)))
+            h.update(
+                dodo.ContentChecker._digest(str(f)).encode("ascii")
+                if f.suffix.lower() in {".yaml", ".yml"} else canon(str(f))
+            )
         return h.hexdigest()
     except Exception:
         try:
@@ -880,7 +875,12 @@ def _save_feature_step(doc: Any, stem: str, out: Path) -> None:
     caller closes the part unsaved and checks the native's SHA-256."""
     names = name_feature_faces(doc, stem)
     _save_as(doc, out)
-    step_face_sets(out.read_text(encoding="latin-1"), names)
+    faces = step_face_sets(out.read_text(encoding="latin-1"), names)
+    if stem == "rocker_arm" and len(faces["pivot_bore"]) != 2:
+        raise FeatureFaceError(
+            f"{stem}.pivot_bore: expected exactly 2 STEP patches, "
+            f"found {len(faces['pivot_bore'])}"
+        )
 
 
 def _require_native_unchanged(native: Path, before: str) -> None:
@@ -889,19 +889,6 @@ def _require_native_unchanged(native: Path, before: str) -> None:
             f"{native.name} changed on disk during its named feature-face export; "
             "the native part must never be saved"
         )
-
-
-def _bundle_record(path: Path) -> dict[str, Any]:
-    """A bundle file's receipt record: its name inside the bundle, size, SHA-256."""
-    if not _nonempty(path):
-        raise RuntimeError(f"feature bundle output missing/empty: {path}")
-    return {"path": path.name, "bytes": path.stat().st_size, "sha256": _file_sha256(path)}
-
-
-def _write_receipt(path: Path, receipt: dict[str, Any]) -> None:
-    temporary = path.with_name(f"{path.name}.partial")
-    temporary.write_text(json.dumps(receipt, indent=1), encoding="utf-8")
-    temporary.replace(path)
 
 
 def _effective_tex_coord(info: dict[str, Any]) -> int:
@@ -1483,28 +1470,18 @@ def refresh_comparison_gallery() -> None:
 
 
 def export_feature_bundles(stems: list[str]) -> int:
-    """``--features``: one isolated STEP-only bundle per supported part.
+    """Write one isolated named STEP and adjacent manifest per supported part.
 
-    Each part opens once, gets the full export's named STEP
-    (:func:`_save_feature_step`, same preferences and configuration) written to
-    ``features/<stem>/<dashed>.STEP``, closes unsaved, and must leave its native
-    byte-identical.  Its STEP receipt binds the exporter, feature sources,
-    drawing revision, native SHA-256 and the STEP's bytes; after every STEP is
-    exported ``export_features.write_manifests`` writes ``features.toml`` from
-    those receipts, and each receipt is finalised over the manifest's bytes.
-    No global ledger, certificate or neutral output is read or written.
+    Each part opens once, exports through the full export's named STEP path,
+    closes unsaved, and must leave its native byte-identical before the manifest
+    reads and binds the just-written STEP. No global export output is touched.
     """
-    from export_features import feature_sources_sha256, write_manifests  # noqa: PLC0415
+    from export_features import write_manifest  # noqa: PLC0415
 
     natives = {stem: OUT_SLDPRT / f"{stem.replace('_', '-')}.SLDPRT" for stem in stems}
     missing = sorted(path.name for path in natives.values() if not path.is_file())
     if missing:
         raise RuntimeError(f"--features: native part(s) not built: {', '.join(missing)}")
-    identity = {
-        "exporter": _exporter_digest(),
-        "feature_sources_sha256": feature_sources_sha256(),
-        "drawing_revision": release_revision(),
-    }
 
     async def build(adapter: Any) -> dict[str, str]:
         enforce_preferences(adapter, EXPORT_PREFERENCES)
@@ -1512,12 +1489,9 @@ def export_feature_bundles(stems: list[str]) -> int:
         for stem in stems:
             native = natives[stem]
             bundle = OUT_FEATURES / stem
-            receipt = bundle / FEATURES_RECEIPT
             step = bundle / f"{stem.replace('_', '-')}.STEP"
             with _telemetry.span("export.feature_bundle", part=stem):
                 bundle.mkdir(parents=True, exist_ok=True)
-                # Nothing certified against the previous STEP may outlive it.
-                receipt.unlink(missing_ok=True)
                 (bundle / FEATURES_MANIFEST).unlink(missing_ok=True)
                 native_sha = _file_sha256(native)
                 check(f"open {native.name}", await adapter.open_model(str(native)))
@@ -1525,33 +1499,14 @@ def export_feature_bundles(stems: list[str]) -> int:
                 log(f"saved {step.name} ({step.stat().st_size / 1e6:.1f} MB)")
                 adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
                 _require_native_unchanged(native, native_sha)
-                _write_receipt(receipt, {
-                    "schema": FEATURES_RECEIPT_SCHEMA,
-                    "stem": stem,
-                    **identity,
-                    "native_sha256": native_sha,
-                    "step": _bundle_record(step),
-                })
+                write_manifest(stem, step, revision=release_revision())
             done[stem] = "exported"
         return done
 
     rc = run_build(build)
-    if rc != 0:
-        return rc
-    expected = {(OUT_FEATURES / stem / FEATURES_MANIFEST).resolve() for stem in stems}
-    written = {Path(path).resolve() for path in write_manifests(stems, out=OUT_FEATURES.parent)}
-    if written != expected:
-        raise RuntimeError(
-            f"feature manifests written {sorted(map(str, written))} != "
-            f"expected {sorted(map(str, expected))}"
-        )
-    for stem in stems:
-        receipt = OUT_FEATURES / stem / FEATURES_RECEIPT
-        final = json.loads(receipt.read_text(encoding="utf-8"))
-        final["features"] = _bundle_record(OUT_FEATURES / stem / FEATURES_MANIFEST)
-        _write_receipt(receipt, final)
-    _telemetry.event("export.feature_bundles", parts=len(stems))
-    return 0
+    if rc == 0:
+        _telemetry.event("export.feature_bundles", parts=len(stems))
+    return rc
 
 
 def _parse_args() -> argparse.Namespace:
@@ -1581,7 +1536,7 @@ def _parse_args() -> argparse.Namespace:
         nargs="+",
         metavar="STEM",
         help="export ONLY the isolated feature bundles of these supported parts "
-             "(cad/out/features/<stem>/: named STEP, receipt, features.toml); "
+             "(cad/out/features/<stem>/: named STEP, features.toml); "
              "touches no global export output, ledger or certificate",
     )
     args = parser.parse_args()

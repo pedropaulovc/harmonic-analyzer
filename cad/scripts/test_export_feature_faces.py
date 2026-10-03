@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import re
 import sys
 from pathlib import Path
@@ -232,10 +231,7 @@ class _Face:
 class _PartDoc:
     """IPartDoc entity-name semantics: SetEntityName refuses a named face or a
     name already used in the part, and GetEntityName reads the name back.
-
-    The native bore is ONE periodic Ø6.5 face; :meth:`step_text` emulates a
-    split-periodic AP214 export, writing every cylinder as two ADVANCED_FACE
-    halves that both carry the native face's name."""
+    Its STEP fixture is synthetic input, not proof of SolidWorks' writer."""
 
     def __init__(self) -> None:
         faces = [
@@ -300,20 +296,15 @@ _EXPORTED_SETS = {
 }
 
 
-def test_one_named_native_bore_yields_both_exported_halves_on_every_export(
+def test_name_feature_faces_assigns_native_names_without_claiming_step_behavior(
     selectors,
 ) -> None:
     doc = _PartDoc()
 
-    names = name_feature_faces(doc, "rocker_arm")
-
-    assert names == {"pivot_bore": [_BORE_1], "hub_top": [_TOP_1]}
+    assert name_feature_faces(doc, "rocker_arm") == {
+        "pivot_bore": [_BORE_1], "hub_top": [_TOP_1],
+    }
     assert [face.name for face in doc.faces] == [_BORE_1, "", _TOP_1]
-    assert step_face_sets(doc.step_text(), names) == _EXPORTED_SETS
-    # A fresh session naming the same part re-exports the same face sets.
-    again = _PartDoc()
-    assert name_feature_faces(again, "rocker_arm") == names
-    assert step_face_sets(again.step_text(), names) == _EXPORTED_SETS
 
 
 def test_name_feature_faces_refuses_to_rename_a_named_face(selectors) -> None:
@@ -344,13 +335,16 @@ def test_name_feature_faces_fails_on_a_wrong_read_back(selectors) -> None:
 
 
 class _ExportDoc(_PartDoc):
-    """An opened part.  SaveAs3 writes the split-periodic STEP of its current
-    names (``drop_names``: a seat that loses them); ``native`` emulates an
-    export that wrongly saves the part."""
+    """An opened part with independently controllable STEP naming failures.
+    ``native`` emulates an export that wrongly saves the part."""
 
-    def __init__(self, *, drop_names: bool = False, native: Path | None = None) -> None:
+    def __init__(
+        self, *, drop_names: bool = False, drop_half: bool = False,
+        native: Path | None = None,
+    ) -> None:
         super().__init__()
         self.drop_names = drop_names
+        self.drop_half = drop_half
         self.native = native
         self.ConfigurationManager = SimpleNamespace(
             ActiveConfiguration=SimpleNamespace(Name="Default")
@@ -360,6 +354,8 @@ class _ExportDoc(_PartDoc):
         out = Path(path)
         if out.suffix == ".STEP":
             text = self.step_text()
+            if self.drop_half:
+                text = text.replace(_BORE_1, "NONE", 1)
             out.write_bytes((text.replace("HAF_", "NONE_") if self.drop_names else text).encode("ascii"))
             if self.native is not None:
                 self.native.write_bytes(b"saved by the export")
@@ -369,42 +365,32 @@ class _ExportDoc(_PartDoc):
 
 
 _STEMS = ("frame_rail", "rocker_arm")
-_ROCKER_BUNDLE = ("rocker-arm.STEP", "neutral.json", "features.toml")
+_ROCKER_BUNDLE = ("rocker-arm.STEP", "features.toml")
 
 
 def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
-    """Point export_models at ``tmp_path``: a fake seat opening a fresh
-    ``doc(native_path)`` per part, and a fake export_features whose
-    write_manifests reads each bundle's STEP receipt as the real one does
-    (``seen["refuse"]`` makes it reject them).  Returns ``(run, seen)``."""
+    """Point export_models at isolated outputs and a synthetic seat.
+    The manifest writer is a boundary double; generator tests own its schema."""
     sldprt = tmp_path / "sldprt"
     sldprt.mkdir()
     for stem in _STEMS:
         (sldprt / f"{stem.replace('_', '-')}.SLDPRT").write_bytes(b"native part")
-    seen: dict = {"opened": [], "receipts": [], "preferences": []}
+    seen: dict = {"opened": [], "preferences": [], "drop_half": False}
 
-    def write_manifests(parts: list[str], *, out: Path) -> list[Path]:
-        written = []
-        for stem in parts:
-            bundle = out / "features" / stem
-            receipt = json.loads((bundle / "neutral.json").read_text(encoding="utf-8"))
-            seen["receipts"].append(receipt)
-            if seen.get("refuse"):
-                raise ValueError("receipt refused")
-            path = bundle / "features.toml"
-            path.write_text(
-                f'step = "{receipt["step"]["path"]}"\n'
-                f'step_sha256 = "{receipt["step"]["sha256"]}"\n',
-                encoding="utf-8",
-            )
-            written.append(path)
-        return written
+    def write_manifest(stem: str, step: Path, *, revision: str) -> Path:
+        path = step.with_name("features.toml")
+        path.write_text(
+            f'step = "{step.name}"\n'
+            f'step_sha256 = "{hashlib.sha256(step.read_bytes()).hexdigest()}"\n'
+            f'[drawing]\nrevision = "{revision}"\n',
+            encoding="utf-8",
+        )
+        return path
 
     monkeypatch.setitem(sys.modules, "export_features", SimpleNamespace(
         SUPPORTED_PARTS=("rocker_arm",),
         feature_selectors=lambda _stem: _SELECTORS,
-        feature_sources_sha256=lambda: "sources-v1",
-        write_manifests=write_manifests,
+        write_manifest=write_manifest,
     ))
 
     class _Adapter:
@@ -414,6 +400,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
         async def open_model(self, path: str):
             seen["opened"].append(Path(path).name)
             self.currentModel = doc(Path(path))
+            self.currentModel.drop_half |= seen["drop_half"]
             return SimpleNamespace(is_success=True, data=None)
 
         def _attempt(self, call, default=None):
@@ -456,7 +443,6 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
     def run(*argv: str) -> dict:
         monkeypatch.setattr(sys, "argv", ["export_models.py", *argv])
         seen["opened"].clear()
-        seen["receipts"].clear()
         seen["rc"] = export_models.main()
         return seen
 
@@ -470,15 +456,7 @@ def _tree(root: Path) -> dict[str, bytes]:
     }
 
 
-def _record(path: Path) -> dict:
-    return {
-        "path": path.name,
-        "bytes": path.stat().st_size,
-        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-    }
-
-
-def test_feature_bundle_writes_only_its_bundle_and_finalises_the_receipt(
+def test_feature_bundle_writes_only_step_and_manifest_without_saving_native(
     tmp_path: Path, monkeypatch,
 ) -> None:
     run, seen = _exporter(tmp_path, monkeypatch)
@@ -496,25 +474,11 @@ def test_feature_bundle_writes_only_its_bundle_and_finalises_the_receipt(
     bundle = tmp_path / "features" / "rocker_arm"
     step = bundle / "rocker-arm.STEP"
     assert step_face_sets(step.read_text(), ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
-    step_receipt = {
-        "schema": "harmonic-analyzer/features-neutral@1",
-        "stem": "rocker_arm",
-        "exporter": "exporter-v1",
-        "feature_sources_sha256": "sources-v1",
-        "drawing_revision": "v41",
-        "native_sha256": hashlib.sha256(b"native part").hexdigest(),
-        "step": _record(step),
-    }
-    # The manifest is written from the STEP-only receipt; the final receipt
-    # then certifies the manifest's own bytes.
-    assert seen["receipts"] == [step_receipt]
-    assert json.loads((bundle / "neutral.json").read_text(encoding="utf-8")) == {
-        **step_receipt, "features": _record(bundle / "features.toml"),
-    }
+    assert (bundle / "features.toml").is_file()
     assert seen["preferences"] == [export_models.EXPORT_PREFERENCES]
 
 
-def test_full_export_names_the_same_step_the_bundle_exports(
+def test_full_and_scoped_exports_keep_their_paths_disjoint_and_native_unsaved(
     tmp_path: Path, monkeypatch,
 ) -> None:
     run, seen = _exporter(tmp_path, monkeypatch)
@@ -531,8 +495,8 @@ def test_full_export_names_the_same_step_the_bundle_exports(
 
     run("--features", "rocker_arm")
 
-    # One naming + SaveAs3 path under one preference spec: same STEP bytes.
-    assert (tmp_path / "features" / "rocker_arm" / "rocker-arm.STEP").read_bytes() == full
+    scoped = (tmp_path / "features" / "rocker_arm" / "rocker-arm.STEP").read_text()
+    assert step_face_sets(scoped, ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
     assert seen["preferences"] == [export_models.EXPORT_PREFERENCES] * 2
 
 
@@ -546,7 +510,7 @@ def test_export_fails_when_the_step_drops_the_face_names(
 
     with pytest.raises(FeatureFaceError, match="pivot_bore: no named STEP face"):
         run(*argv)
-    assert not (tmp_path / "features" / "rocker_arm" / "neutral.json").exists()
+    assert not (tmp_path / "features" / "rocker_arm" / "features.toml").exists()
 
 
 @pytest.mark.parametrize("argv", [(), ("--features", "rocker_arm")], ids=["full", "bundle"])
@@ -557,22 +521,51 @@ def test_export_fails_when_the_native_part_is_saved(
 
     with pytest.raises(RuntimeError, match="rocker-arm.SLDPRT changed on disk"):
         run(*argv)
-    assert not (tmp_path / "features" / "rocker_arm" / "neutral.json").exists()
+    assert not (tmp_path / "features" / "rocker_arm" / "features.toml").exists()
 
 
-def test_a_failed_rerun_leaves_no_manifest_certified_against_the_new_step(
+@pytest.mark.parametrize("argv", [(), ("--features", "rocker_arm")], ids=["full", "bundle"])
+def test_export_refuses_a_periodic_bore_with_only_one_named_half(
+    tmp_path: Path, monkeypatch, argv: tuple[str, ...],
+) -> None:
+    run, _seen = _exporter(
+        tmp_path, monkeypatch, doc=lambda _native: _ExportDoc(drop_half=True),
+    )
+
+    with pytest.raises(FeatureFaceError, match="pivot_bore: expected exactly 2 STEP patches, found 1"):
+        run(*argv)
+    assert not (tmp_path / "features" / "rocker_arm" / "features.toml").exists()
+
+
+def test_export_refuses_more_than_two_named_rocker_bore_patches(tmp_path: Path, selectors) -> None:
+    doc = _ExportDoc()
+    doc.step_text = lambda: _step(_BORE_1, _BORE_1, _BORE_1, "NONE", _TOP_1)
+
+    with pytest.raises(FeatureFaceError, match="expected exactly 2 STEP patches, found 3"):
+        export_models._save_feature_step(doc, "rocker_arm", tmp_path / "rocker-arm.STEP")
+
+
+def test_a_failed_rerun_removes_the_previous_manifest(
     tmp_path: Path, monkeypatch,
 ) -> None:
     run, seen = _exporter(tmp_path, monkeypatch)
     run("--features", "rocker_arm")
-    seen["refuse"] = True
+    seen["drop_half"] = True
 
-    with pytest.raises(ValueError, match="receipt refused"):
+    with pytest.raises(FeatureFaceError, match="expected exactly 2 STEP patches"):
         run("--features", "rocker_arm")
 
-    bundle = tmp_path / "features" / "rocker_arm"
-    assert not (bundle / "features.toml").exists()
-    assert "features" not in json.loads((bundle / "neutral.json").read_text(encoding="utf-8"))
+    assert not (tmp_path / "features" / "rocker_arm" / "features.toml").exists()
+
+
+def test_feature_export_preserves_the_build_runner_exit_code(tmp_path: Path, monkeypatch) -> None:
+    run, seen = _exporter(tmp_path, monkeypatch)
+    monkeypatch.setattr(export_models, "run_build", lambda _build: 37)
+
+    run("--features", "rocker_arm")
+
+    assert seen["rc"] == 37
+    assert not (tmp_path / "features").exists()
 
 
 @pytest.mark.parametrize(
