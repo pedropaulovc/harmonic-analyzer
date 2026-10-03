@@ -294,9 +294,13 @@ It must contain the six original MP4s under `videos/`. `preview:reference` serve
 them locally with range support without copying footage into publication assets.
 Default public playback remains the official YouTube embed.
 The verifier serves `dist/`, exercises the original media, and reports per-video
-coverage, rendered landmark errors and timing. The default `verify:sync` run is
-strict full **2% / 0.5-second** acceptance across all six videos, exercising both
-official YouTube and local original media, audio, compact mode and manual controls.
+coverage, rendered landmark errors and timing. Its default goal uses strict
+**2% / 0.5-second** bounds across all six videos, exercising both official YouTube
+and local original media, audio, compact mode and manual controls. A passed
+`sourceMeasurement` does not qualify full geometry: no current full-native,
+all-stock swept-spring or posed-surface qualification consumer is implemented.
+Full acceptance therefore remains unmeasured and returns nonzero until that
+genuine bound qualification is available; injected pass metadata cannot certify it.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.
 Diagnostic landmark receipts also retain the actual native marker's world
@@ -434,14 +438,23 @@ roles / 3,293,594 vertices**. This bounded ownership
 proof is not all-vertex spring GPU numerical equivalence, original-footage
 normal-route acceptance or first-surface/source proof.
 
-The repaired all-six observation adoption, family producers and source-track
-transaction passed (**74.17 seconds**), preserving all source facts and required
-losses. Source, playback and sync-consumer suites passed **51 / 10 / 88 tests**;
-the repaired build passed in **8.05 seconds**. JavaScript chunks fell from about
-**195 MB to 105 MB** (largest Intro **27.842 MB**). This is not deploy-ready or
-normal-route/source acceptance; actual source-stage verification has not run.
+At published checkpoint `7ec232aa`, all-six observation adoption, family producers
+and the source-track transaction completed in **74.17 seconds**. Source, playback
+and sync-consumer suites passed **51 / 10 / 88 tests**; the build passed in
+**8.05 seconds**. JavaScript chunks fell from about **195 MB to 105 MB** (largest
+Intro **27.842 MB**). Later review and execution exposed lost source-only endcard/
+transition layouts and Operation facts; those facts still require correction.
+This checkpoint is not deploy-ready or normal-route/source acceptance.
 Original MP4 SHA, 1920×1080 dimensions, FPS and actual PTS passed for all six;
 raw-file/clock identity is not decoded-image replay or footage-fit proof.
+
+The subsequent strict-consumer corrections passed **92 tests** and the identical
+historical/current probe. Original Operation change points omitted from the
+measurement census fell from **19 to zero**; missing authored samples remain
+required. Seven absent/failed/stale/wrong-model/incomplete/metadata-only native
+claims previously received full passes. They now preserve meaningful source-only
+success while leaving full acceptance unmeasured. Source-layout/event adoption
+fixes and current numerical/full-native qualification remain pending.
 
 The historical source-v37 import produced the same result in two runs:
 

@@ -87,11 +87,53 @@ test('incremental runs select one video without requiring the other five', () =>
   assert.equal(options.scoped, true)
 })
 
-test('meaningful compact change keys are required without reviving per-exposure certificates', () => {
+test('the original source event census is independent of compact keys and keeps missing authored samples', () => {
   const track = { frames: [...observations.frames, frame(0.5)].sort((a, b) => a.timeSeconds - b.timeSeconds), coverage: { changeTimesSeconds: [0.5] } }
   const census = sourceCensus(observations, track, native, parseOptions(['--stage', '50']))
   assert.ok(census.rows.some(row => row.timeSeconds === 0.5 && row.reasons.includes('authored-change-point')))
-  assert.ok(!census.rows.some(row => row.timeSeconds === 0.1 || row.timeSeconds === 0.2))
+  for (const time of observations.coverage.changeTimesSeconds) {
+    const row = census.rows.find(row => row.timeSeconds === time)
+    assert.ok(row.reasons.includes('original-change-point'))
+    assert.equal(row.diagnosticOnly, false)
+    assert.equal(row.frame, null)
+    assert.match(row.unavailableReason, /Missing authored sample/)
+  }
+})
+
+test('source-declared change events do not borrow nearby authored keys or collapse distinct decimal times', () => {
+  const loss = { anchorId: 'event-loss', viewId: 'main', role: 'check', required: true, reason: 'Original event feature unavailable' }
+  const source = { shots: observations.shots, coverage: { changeTimesSeconds: [0.4, 0.6, 0.6000001] },
+    frames: [frame(0), { ...frame(0.4), unavailable: [loss] }, frame(0.6), frame(0.6000001), frame(1), frame(2)] }
+  const track = { frames: [frame(0), frame(0.4001), frame(0.6), frame(1), frame(2)], coverage: { changeTimesSeconds: [] } }
+  const census = sourceCensus(source, track, native, parseOptions(['--stage', '50']))
+  const declared = census.rows.filter(row => row.reasons.includes('original-change-point'))
+  assert.deepEqual(declared.map(row => row.timeSeconds), [0.4, 0.6, 0.6000001])
+  assert.equal(declared[0].frame, null)
+  assert.equal(declared[0].sourceUnavailable.find(item => item.anchorId === 'event-loss').required, true)
+  assert.equal(declared[1].frame.timeSeconds, 0.6)
+  assert.equal(declared[2].frame, null)
+  const video = videoFixture()
+  video.samples = census.rows.filter(row => row.timeSeconds !== 0.6000001).map(row => ({
+    ...structuredClone(video.samples[0]), timeSeconds: row.timeSeconds, sampleTimeSeconds: row.frame?.timeSeconds ?? null,
+    reasons: row.reasons, required: row.required, unavailable: [], measurements: [measurement('fixed', 'fixed'), measurement('moving', 'moving')] }))
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.missingCensusSamples, 1)
+  assert.equal(video.coverage.complete, false)
+  assert.ok(video.unavailableReasons.some(item => item.timeSeconds === 0.4 && item.anchorId === 'event-loss'))
+})
+
+test('requesting an omitted original event cannot turn diagnostic interpolation into its authored measurement', () => {
+  const original = { ...frame(0.5), landmarks: [{ anchorId: 'source-feature', viewId: 'main', status: 'observed', pixel: [31, 47] }] }
+  const source = { shots: observations.shots, coverage: { changeTimesSeconds: [0.5] },
+    frames: [frame(0), original, frame(1), frame(2)] }
+  const track = { frames: observations.frames, coverage: { changeTimesSeconds: [] } }
+  for (const args of [['--stage', '50'], ['--stage', '50', '--times', '0.5']]) {
+    const row = sourceCensus(source, track, native, parseOptions(args)).rows.find(row => row.timeSeconds === 0.5)
+    assert.ok(row.reasons.includes('original-change-point'))
+    assert.equal(row.diagnosticOnly, false)
+    assert.equal(row.frame, null)
+    assert.match(row.unavailableReason, /Missing authored sample/)
+  }
 })
 
 test('missing source samples and out-of-duration requests stay explicitly unavailable', () => {
@@ -1497,18 +1539,20 @@ test('the same admitted95px point and CHECK contour fail strict full acceptance 
   }
 })
 
-test('strict point and CHECK contour limits include38.4px equality but refuse the first larger measured bound', () => {
+test('strict source point and CHECK contour limits include38.4px equality without certifying unmeasured full geometry', () => {
   for (const kind of ['point', 'contour']) {
     for (const errorPx of [20, 38.4]) {
       const positive = eligiblePixelVideo(kind, errorPx)
       finishVideo(positive.video, positive.census, parseOptions([]))
-      assert.equal(positive.video.status, 'passed')
-      assert.equal(positive.video.acceptanceMeasurement.status, 'passed')
+      assert.equal(positive.video.sourceMeasurement.status, 'passed')
+      assert.equal(positive.video.status, 'unavailable')
+      assert.equal(positive.video.acceptanceMeasurement.status, 'unmeasured')
       assert.equal(positive.subject.status, 'passed')
     }
     const outside = eligiblePixelVideo(kind, 38.400001)
     finishVideo(outside.video, outside.census, parseOptions([]))
     assert.equal(outside.subject.status, 'failed')
+    assert.equal(outside.video.sourceMeasurement.status, 'failed')
     assert.equal(outside.video.acceptanceMeasurement.status, 'failed')
   }
 })
@@ -1523,7 +1567,7 @@ test('an admitted FIT point with a preassigned pass cannot hide a finite strict 
   assert.equal(fixture.video.landmarks.movingChecks, 1)
 })
 
-test('strict acceptance requires both original players and a passed manual interaction receipt', () => {
+test('strict source qualification requires both original players and a passed manual interaction receipt', () => {
   for (const [receipt, code] of [['youtube', 'official-player-unmeasured'],
     ['local', 'local-player-unmeasured'], ['interaction', 'interaction-unmeasured']]) {
     for (const state of [undefined, 'unavailable', 'failed']) {
@@ -1534,6 +1578,7 @@ test('strict acceptance requires both original players and a passed manual inter
       finishVideo(fixture.video, fixture.census, parseOptions([]))
       assert.notEqual(fixture.video.status, 'passed')
       assert.notEqual(fixture.video.acceptanceMeasurement.status, 'passed')
+      assert.notEqual(fixture.video.sourceMeasurement.status, 'passed')
       assert.ok(fixture.video.failures.some(item => item.code === code))
     }
   }
@@ -1605,24 +1650,62 @@ test('selected-video and time-scoped full runs cannot become all-six acceptance 
     assert.equal(report.status, 'partial')
     assert.equal(report.acceptanceMeasurement.status, 'unmeasured')
     assert.equal(report.acceptanceMeasurement.scope, 'all-six-videos')
+    assert.equal(report.sourceMeasurement.status, 'unmeasured')
     if (options.scoped) {
-      assert.ok(report.videos.every(video => video.acceptanceMeasurement.status === 'unmeasured'))
-      assert.ok(report.videos.every(video => video.acceptanceMeasurement.scopedSamples.status === 'passed'))
+      assert.ok(report.videos.every(video => video.sourceMeasurement.status === 'unmeasured'))
+      assert.ok(report.videos.every(video => video.sourceMeasurement.scopedSamples.status === 'passed'))
     } else {
-      assert.ok(report.videos.every(video => video.acceptanceMeasurement.status === 'passed'))
+      assert.ok(report.videos.every(video => video.sourceMeasurement.status === 'passed'))
     }
+    assert.ok(report.videos.every(video => video.acceptanceMeasurement.status === 'unmeasured'))
   }
 })
 
-test('all six unique routes with genuinely strict finished receipts can certify full acceptance', () => {
+test('all six unique routes can pass strict source measurement while full geometry acceptance remains unmeasured', () => {
   const options = parseOptions([])
   const report = { goal: verificationGoal(options), failures: [], videos: finishedRouteReceipts(options) }
   finishReport(report, options)
-  assert.equal(report.status, 'passed')
-  assert.equal(report.acceptanceMeasurement.status, 'passed')
+  assert.equal(report.sourceMeasurement.status, 'passed')
+  assert.equal(report.status, 'unavailable')
+  assert.equal(report.acceptanceMeasurement.status, 'unmeasured')
   assert.equal(report.acceptanceMeasurement.tolerancePx, 38.4)
-  assert.ok(report.videos.every(video => video.acceptanceMeasurement.kind === 'full-acceptance'
-    && video.acceptanceMeasurement.scope === 'video' && !Object.hasOwn(video, 'stageMeasurement')))
+  assert.ok(report.videos.every(video => video.sourceMeasurement.status === 'passed'
+    && video.acceptanceMeasurement.kind === 'full-acceptance' && video.acceptanceMeasurement.scope === 'video'
+    && video.acceptanceMeasurement.status === 'unmeasured' && !Object.hasOwn(video, 'stageMeasurement')))
+})
+
+test('unchanged admitted landmarks and partial CHECK contours cannot accept absent failed stale wrong-tuple or incomplete geometry', () => {
+  for (const kind of ['point', 'contour']) for (const state of ['absent', 'unavailable', 'failed', 'old-code', 'wrong-tuple', 'incomplete', 'metadata-pass']) {
+    const fixture = eligiblePixelVideo(kind, 20)
+    if (state !== 'absent') fixture.video.nativeQualification = {
+      status: state === 'metadata-pass' ? 'passed' : state,
+      fullNative: { status: 'passed', drawableCount: state === 'incomplete' ? 20 : 462 },
+      sweptSpring: { status: state === 'failed' ? 'failed' : 'passed',
+        maxWorldErrorMetres: state === 'failed' ? 3.33e-7 : 0 },
+      posedSurface: { status: 'passed' },
+      modelSha256: state === 'wrong-tuple' ? '0'.repeat(64) : MODEL_SHA256,
+      executedCodeSha256: state === 'old-code' ? '0'.repeat(64) : '1'.repeat(64),
+    }
+    finishVideo(fixture.video, fixture.census, parseOptions([]))
+    assert.equal(fixture.subject.status, 'passed')
+    assert.equal(fixture.video.sourceMeasurement.status, 'passed')
+    assert.equal(fixture.video.acceptanceMeasurement.status, 'unmeasured')
+    assert.equal(fixture.video.status, 'unavailable')
+  }
+})
+
+test('preassigned all-six full passes cannot replace the absent native geometry qualification consumer', () => {
+  const options = parseOptions([])
+  const videos = finishedRouteReceipts(options)
+  for (const video of videos) {
+    video.status = 'passed'
+    video.acceptanceMeasurement.status = 'passed'
+  }
+  const report = { failures: [], videos, nativeQualification: { status: 'passed' } }
+  finishReport(report, options)
+  assert.equal(report.sourceMeasurement.status, 'passed')
+  assert.equal(report.status, 'unavailable')
+  assert.equal(report.acceptanceMeasurement.status, 'unmeasured')
 })
 
 test('missing duplicate foreign failed or stage-only route receipts cannot certify all-six strict acceptance', () => {
@@ -1644,6 +1727,7 @@ test('missing duplicate foreign failed or stage-only route receipts cannot certi
     finishReport(report, options)
     assert.notEqual(report.status, 'passed')
     assert.notEqual(report.acceptanceMeasurement.status, 'passed')
+    assert.notEqual(report.sourceMeasurement.status, 'passed')
     if (mismatch === 'measured-failure') {
       assert.equal(report.status, 'failed')
       assert.equal(report.acceptanceMeasurement.status, 'failed')

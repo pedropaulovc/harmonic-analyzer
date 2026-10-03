@@ -12,6 +12,11 @@ const STAGES = [50, 20, 10, 5]
 const NATIVE_MODEL_IDENTITY = { modelSha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT }
 let approvedModelRepresentation = null
 const VIDEO_SLUGS = ['intro-history', 'synthesis', 'analysis', 'operation', 'machine-spin', 'rocker-arms']
+const UNMEASURED_NATIVE_ACCEPTANCE = Object.freeze([
+  'Complete current native geometry qualification bound to the actual loaded source/delivery tuple and executed production code',
+  'Actual all-stock/all-vertex swept-spring qualification, including the production material/shadow paths',
+  'Complete current posed-surface/source eligibility qualification, not diagnostic markers or declared partial CHECK edges',
+])
 const SOURCE_HASHES = [
   '595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d',
   'a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725',
@@ -26,7 +31,7 @@ const assert = (condition, reason) => { if (!condition) throw new Error(reason) 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const delay = ms => new Promise(done => setTimeout(done, ms))
 const maximumField = (rows, field) => rows.reduce((maximum, row) => finite(row[field]) ? Math.max(maximum ?? 0, row[field]) : maximum, null)
-const HELP = `Usage: npm --prefix web run verify:sync -- [--stage 50|20|10|5] [--video <id|slug>] [--from seconds --to seconds | --times t,t,...] [--player local|youtube|both] [--headless|--headed] [--output directory]\nDefault: ALL SIX videos, strict final 2% of the 1920px frame width = 38.4px, timing <=0.5s, headless Chromium.\nExplicit stages 50/20/10/5 are intermediate ERROR qualifications (960/384/192/96px), never coverage fractions or final2% acceptance.\nPer-video and time-scoped runs measure available samples without an all-six preflight. Selected/scoped strict runs NEVER certify all-six acceptance; time-scoped qualification never certifies a whole-video stage. Full acceptance requires actual byte-identical local original and official YouTube playback/audio/compact checks plus paused native manual operation/orbit. Stage5 retains official-player checks; coarse stages default to local original playback.\nRequires built dist, original MP4s in HARMONIC_REFERENCE_ROOT/videos (default web/.vite/reference-root), ffprobe/ffmpeg and Playwright Chromium. The original full-acceptance attempt budget remains external; scoped qualification is not full acceptance. Old certification code remains in git history; retained private diagnostic evidence is unchanged.\nExamples:\n  npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119\n  npm --prefix web run verify:sync -- --stage 20 --video machine-spin\n  npm --prefix web run verify:sync\n`
+const HELP = `Usage: npm --prefix web run verify:sync -- [--stage 50|20|10|5] [--video <id|slug>] [--from seconds --to seconds | --times t,t,...] [--player local|youtube|both] [--headless|--headed] [--output directory]\nDefault: ALL SIX videos, strict final 2% of the 1920px frame width = 38.4px, timing <=0.5s, headless Chromium.\nExplicit stages 50/20/10/5 are intermediate ERROR qualifications (960/384/192/96px), never coverage fractions or final2% acceptance.\nThe census independently retains original declared change events as well as compact keys and every integer second; missing authored source-event samples remain unavailable. Per-video and time-scoped runs measure available samples without an all-six preflight. Selected/scoped strict runs NEVER certify all-six acceptance; time-scoped qualification never certifies a whole-video stage. Full acceptance requires actual byte-identical local original and official YouTube playback/audio/compact checks plus paused native manual operation/orbit AND current model/executed-production-code-bound full-native, swept-spring and posed-surface qualification. This verifier currently measures strict source fidelity but has no native-geometry qualification consumer: sourceMeasurement can pass while full acceptance remains unmeasured, overall unavailable and exit1. Supplied pass metadata cannot replace that missing qualification. Stage5 retains official-player checks; coarse stages default to local original playback.\nRequires built dist, original MP4s in HARMONIC_REFERENCE_ROOT/videos (default web/.vite/reference-root), ffprobe/ffmpeg and Playwright Chromium. The original full-acceptance attempt budget remains external; scoped qualification is not full acceptance. Old certification code remains in git history; retained private diagnostic evidence is unchanged.\nExamples:\n  npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119\n  npm --prefix web run verify:sync -- --stage 20 --video machine-spin\n  npm --prefix web run verify:sync\n`
 
 // Native orbit normalization can perturb stored floats without moving the camera.
 // Compare physical pose, not JSON bytes; invalid poses must never pass either gate.
@@ -391,12 +396,13 @@ export function sourceCensus(observations, track, native, options) {
   }
   const add = (time, reason, contourGroup = null) => {
     if (!finite(time) || time < 0 || time >= native.durationSeconds && !contourGroup) return
-    const key = time.toFixed(6), row = times.get(key) ?? { timeSeconds: time, reasons: [], contourGroups: [] }
+    const row = times.get(time) ?? { timeSeconds: time, reasons: [], contourGroups: [] }
     if (!row.reasons.includes(reason)) row.reasons.push(reason)
     if (contourGroup && !row.contourGroups.includes(contourGroup)) row.contourGroups.push(contourGroup)
-    times.set(key, row)
+    times.set(time, row)
   }
   for (let time = 0; time < native.durationSeconds; time++) add(time, 'every-second')
+  for (const time of observations.coverage?.changeTimesSeconds ?? []) add(time, 'original-change-point')
   for (const time of track.coverage?.changeTimesSeconds ?? []) add(time, 'authored-change-point')
   for (const shot of sourceShots) { add(shot.startSeconds, 'shot-start'); add(shot.endSeconds, 'shot-end') }
   for (const frame of track.frames) add(frame.timeSeconds, 'authored-sample')
@@ -468,7 +474,9 @@ export function sourceCensus(observations, track, native, options) {
     const sourceFrames = [...new Set([...(originalRequired && original ? [original] : []), ...contourGroups.flatMap(group => group.originals)])]
     const sourceViewMappings = sourceFrames.flatMap(source => (source.views ?? []).map(view => ({ originalViewId: view.id, ...compactSourceViewRequirement(source, view.id, governing?.views ?? []) })))
     const expectedViewIds = [...new Set([...sourceViewMappings.flatMap(mapping => mapping.viewIds), ...(compactRequired || contourRequired ? governing?.views?.map(view => view.id) ?? [] : [])])]
-    const tolerance = row.reasons.includes('every-second') ? 1e-5 : 1 / native.fps + 0.001
+    // A declared original event needs its own authored key. A nearby key is not
+    // evidence of an event snap; preserve the event and its missing sample.
+    const tolerance = row.reasons.includes('original-change-point') ? 0 : row.reasons.includes('every-second') ? 1e-5 : 1 / native.fps + 0.001
     // Original losses belong to their declared nominal/decoded exposure even
     // when no compact camera/input sample can be selected. Never borrow the
     // nearest source frame's controls for a different census time.
@@ -480,7 +488,7 @@ export function sourceCensus(observations, track, native, options) {
     if (contourSource && (!frame || !exactSourceExposure(contourSource, frame))) { frame = null; unavailableReason = 'No compact camera/input selection at the exact CHECK source exposure' }
     if (contourUnavailable) { frame = null; unavailableReason = 'CHECK aliases or missing pixels have no single exact source exposure authority; no alias camera/input is selected' }
     const between = from && to && from.shotId === shot?.id && to.shotId === shot.id && row.timeSeconds > from.timeSeconds + 1e-6 && row.timeSeconds < to.timeSeconds - 1e-6
-    if (!contourRequired && between && (row.reasons.includes('mid-interval') || row.reasons.includes('requested-sample'))) {
+    if (!contourRequired && !row.reasons.includes('original-change-point') && between && (row.reasons.includes('mid-interval') || row.reasons.includes('requested-sample'))) {
       if (original && original.decodedTimeSeconds > from.timeSeconds && original.decodedTimeSeconds < to.timeSeconds
         && Math.abs(original.decodedTimeSeconds - row.timeSeconds) <= 1 / native.fps + 0.001) {
         const mapped = compactSourceLandmarks(original, from.views ?? [])
@@ -1408,10 +1416,11 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
 }
 export function finishVideo(video, census, options) {
   const goal = verificationGoal(options)
-  const sourceRows = new Map((census.selected ?? census.rows).map(row => [row.timeSeconds.toFixed(6), row]))
+  const sourceRows = new Map((census.selected ?? census.rows).map(row => [row.timeSeconds, row]))
   for (const sample of video.samples) {
-    const row = sourceRows.get(sample.timeSeconds.toFixed(6))
-    sample.unavailable = mergeUnavailable(row?.frame, [...(row?.sourceUnavailable ?? sourceFrameUnavailable(row?.frame)), ...sample.unavailable])
+    const row = sourceRows.get(sample.timeSeconds)
+    sample.unavailable = mergeUnavailable(row?.frame, [...(row?.sourceUnavailable ?? sourceFrameUnavailable(row?.frame)),
+      ...(row?.unavailableReason ? [{ reason: row.unavailableReason }] : []), ...sample.unavailable])
     // Recheck the combined qualified error, not a coarse-stage status. FIT point
     // residuals still gate image fidelity; FIT-only curves are retained separately.
     let pixelFailure = false
@@ -1430,10 +1439,10 @@ export function finishVideo(video, census, options) {
   const passed = required.filter(sample => sample.status === 'passed' && !sample.unavailable.length && hasMeasurement(sample)
     && sample.measurements.every(item => item.status === 'passed') && (sample.contourChecks ?? []).every(item => item.role === 'check' && item.status === 'passed')
     && finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds <= CLOCK_LIMIT)
-  const selectedTimes = new Map(mandatory.map(sample => [sample.timeSeconds.toFixed(6), sample]))
+  const selectedTimes = new Map(mandatory.map(sample => [sample.timeSeconds, sample]))
   const selectedRows = (census.selected ?? census.rows).filter(row => !row.diagnosticOnly)
   const missingCensusSamples = selectedRows.filter(row => {
-    const sample = selectedTimes.get(row.timeSeconds.toFixed(6))
+    const sample = selectedTimes.get(row.timeSeconds)
     return !sample || sample.required !== row.required
   }).length
   const unique = new Map()
@@ -1493,22 +1502,38 @@ export function finishVideo(video, census, options) {
   const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed') || (sample.contourChecks ?? []).some(item => item.role === 'check' && item.status === 'failed'))
     || mandatoryClockFailures.length > 0 || diagnosticFailures.length > 0 || diagnosticContourFailures.length > 0 || diagnosticClockFailures.length > 0
   const measurement = { tolerancePx: goal.tolerancePx, status: options.scoped ? 'unmeasured' : video.status === 'passed' ? 'passed' : measuredFailure || video.status === 'failed' ? 'failed' : 'unmeasured', scopedSamples: options.scoped ? { status: required.length && passed.length === required.length && missingCensusSamples === 0 && mandatory.length === selectedRows.length && !video.failures.length ? 'passed' : measuredFailure ? 'failed' : 'unavailable' } : null }
-  if (goal.kind === 'full-acceptance') video.acceptanceMeasurement = { ...measurement, kind: goal.kind, scope: 'video' }
-  else video.stageMeasurement = { ...measurement, stage: goal.stage }
+  if (goal.kind === 'full-acceptance') {
+    video.sourceMeasurement = { ...measurement, kind: 'strict-source-measurement', scope: 'video' }
+    // No full-native/swept-spring/posed-surface qualification consumer exists in
+    // this verifier. Actual source receipts stay meaningful, but neither finite
+    // channel angles, marker pixels nor supplied pass metadata can fill that gap.
+    video.acceptanceMeasurement = { ...measurement, kind: goal.kind, scope: 'video',
+      status: measurement.status === 'failed' ? 'failed' : 'unmeasured',
+      unmeasuredRequirements: UNMEASURED_NATIVE_ACCEPTANCE }
+    if (video.status === 'passed') video.status = 'unavailable'
+  } else video.stageMeasurement = { ...measurement, stage: goal.stage }
 }
 
-/** Only complete strict receipts for the six actual route identities certify all-six. */
+/** Exact unique route receipts qualify source measurements, never missing native proofs. */
 export function finishReport(report, options) {
   const goal = verificationGoal(options)
   const allSix = options.videos.length === VIDEO_IDS.length && VIDEO_IDS.every(id => options.videos.includes(id))
   const allSelected = report.videos.length === options.videos.length
     && options.videos.every(id => report.videos.filter(video => video.videoId === id).length === 1)
-  const passed = allSelected && !report.failures.length && report.videos.every(video => video.status === 'passed'
-    && (goal.kind !== 'full-acceptance' || video.acceptanceMeasurement?.status === 'passed'))
-  const failed = report.videos.some(video => video.status === 'failed' || video.stageMeasurement?.status === 'failed' || video.acceptanceMeasurement?.status === 'failed')
-  report.status = options.scoped || goal.kind === 'full-acceptance' && !allSix ? 'partial' : passed ? 'passed' : failed ? 'failed' : 'unavailable'
-  if (goal.kind === 'full-acceptance') report.acceptanceMeasurement = { kind: goal.kind, tolerancePx: goal.tolerancePx, scope: 'all-six-videos',
-    status: options.scoped || !allSix ? 'unmeasured' : report.status === 'passed' ? 'passed' : report.status === 'failed' ? 'failed' : 'unmeasured' }
+  const failed = report.videos.some(video => video.status === 'failed' || video.stageMeasurement?.status === 'failed'
+    || video.sourceMeasurement?.status === 'failed' || video.acceptanceMeasurement?.status === 'failed')
+  if (goal.kind === 'full-acceptance') {
+    const sourcePassed = allSelected && !report.failures.length && report.videos.every(video => video.sourceMeasurement?.status === 'passed')
+    const sourceStatus = options.scoped || !allSix ? 'unmeasured' : sourcePassed ? 'passed' : failed ? 'failed' : 'unmeasured'
+    report.sourceMeasurement = { kind: 'strict-source-measurement', tolerancePx: goal.tolerancePx, scope: 'all-six-videos', status: sourceStatus }
+    report.status = options.scoped || !allSix ? 'partial' : failed ? 'failed' : 'unavailable'
+    report.acceptanceMeasurement = { kind: goal.kind, tolerancePx: goal.tolerancePx, scope: 'all-six-videos',
+      status: options.scoped || !allSix || !failed ? 'unmeasured' : 'failed',
+      unmeasuredRequirements: UNMEASURED_NATIVE_ACCEPTANCE }
+  } else {
+    const passed = allSelected && !report.failures.length && report.videos.every(video => video.status === 'passed')
+    report.status = options.scoped ? 'partial' : passed ? 'passed' : failed ? 'failed' : 'unavailable'
+  }
 }
 
 export async function verifySync(options = parseOptions(process.argv.slice(2))) {
@@ -1585,11 +1610,11 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
         finishVideo(video, census, options)
       } catch (error) { video.failures.push({ code: 'video-prerequisite', reason: error.message }); video.unavailableReasons.push({ reason: error.message }) }
       if (census) {
-        const measuredTimes = new Set(video.samples.filter(sample => !sample.diagnosticOnly).map(sample => sample.timeSeconds.toFixed(6)))
-        const unmeasured = census.selected.filter(row => !row.diagnosticOnly && !measuredTimes.has(row.timeSeconds.toFixed(6)))
+        const measuredTimes = new Set(video.samples.filter(sample => !sample.diagnosticOnly).map(sample => sample.timeSeconds))
+        const unmeasured = census.selected.filter(row => !row.diagnosticOnly && !measuredTimes.has(row.timeSeconds))
         if (unmeasured.length) video.failures.push({ code: 'unmeasured-census', reason: `${unmeasured.length} selected mandatory samples were not measured` })
       }
-      if (video.status !== 'passed') report.failures.push({ videoId: id, status: video.status, reasons: video.failures, unavailableSamples: video.coverage?.unavailableRequiredSamples ?? null })
+      if (video.status !== 'passed' && video.sourceMeasurement?.status !== 'passed') report.failures.push({ videoId: id, status: video.status, reasons: video.failures, unavailableSamples: video.coverage?.unavailableRequiredSamples ?? null })
       await writeFile(resolve(outputDirectory, `${id}.json`), `${JSON.stringify(video, null, 2)}\n`)
       console.log(JSON.stringify({ videoId: id, goal: goal.kind, stage: goal.stage, tolerancePx: goal.tolerancePx, status: video.status, coverage: video.coverage, maxErrorPx: video.maxErrorPx, unavailableReasons: video.unavailableReasons.length }))
     }

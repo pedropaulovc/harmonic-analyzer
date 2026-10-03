@@ -76,23 +76,41 @@ synchronization or source acceptance. All six observations and source tracks
 have since been adopted/generated under **`content/v39/`**; root `content/`
 receipts remain immutable old-release history. Current native associations
 preserve required losses: **Intro 16, Synthesis 16, Analysis 21, Operation 169,
-Spin 42, Rocker 0**. Source-only facts remain; unavailable native associations
-do not become fabricated paths or coordinates. Literal-serialized native body
+Spin 42, Rocker 0**. Unavailable native associations do not become fabricated
+paths or coordinates. Later review identified lost source-only layouts and
+Operation facts; preservation of those obligations remains pending.
+Literal-serialized native body
 proofs and digests live once at the current root; closed references are verified
 before measurement, without inline fallback or rewriting immutable lineage.
 
-The repaired all-six observation adoption, family producers and source-track
-transaction passed in **74.17 seconds**, preserving all source observations and
-required losses. Source, playback and sync-consumer suites passed **51 / 10 /
-88 tests**. A **95 px** point-plus-CHECK-contour control failed against the exact
-unpublished prior revision, then passed the corrected full suite, including
-the **38.4 px** boundary and an explicit stage-5 positive.
+At published checkpoint `7ec232aa`, all-six observation adoption, family producers
+and the source-track transaction completed in **74.17 seconds**. Source, playback
+and sync-consumer suites passed **51 / 10 / 88 tests**. Those checks did not catch
+the lost Analysis endcard/Synthesis transition layouts or Operation source facts
+identified by the subsequent review and reproduced directly against the adopter.
+A **95 px** point-plus-CHECK-contour control failed against the exact unpublished
+prior revision, then passed the corrected full suite, including the **38.4 px**
+boundary and an explicit stage-5 positive.
 The repaired build passed in **8.05 seconds**, reducing JavaScript chunks from
 about **195 MB to 105 MB**, largest Intro **27.842 MB**; Rocker observations are
-**65,340,336 bytes**, below GitHub's 100 MB file limit. This does not claim a
-successful push, deploy readiness or normal-route acceptance.
+**65,340,336 bytes**, below GitHub's 100 MB file limit. The checkpoint push succeeded
+with GitHub's greater-than-50-MiB warning; deployment and normal-route acceptance
+remain unmeasured.
 All six remain unmeasured at intermediate **50/20/10/5%** and strict **2%**
 acceptance; actual source-stage verification has not run.
+
+Subsequent strict-consumer corrections passed **92 tests**. The identical exact
+`7ec232aa`/working-tree probe used original Operation observations and compact
+track digests: **228 declared changes / 67 compact omissions / 19 independently
+missing census times** before, **zero missing times** after. The originally
+omitted `180.24673333333334 s` now retains a missing-authored-sample obligation;
+`180.11326666666668 s` was already counted by another loop and remains a positive.
+The synthetic false-complete census became three mandatory rows with two missing
+samples. Seven native-qualification states (absent, unavailable, failed, stale
+code, wrong model, incomplete geometry and injected pass metadata) previously
+received full passes. They now retain source-only success while keeping full
+acceptance unmeasured. This removes a false transition; it does not implement or
+prove the still-required genuine current native qualification.
 
 Original MP4 SHA, **1920×1080**, FPS and actual PTS passed for all six, with
 frame counts **6,544 Intro / 8,196 Synthesis / 7,328 Analysis / 21,190 Operation /
@@ -289,9 +307,14 @@ with timing bounded by 0.5 seconds.
 Intermediate qualification proceeds **50% → 20% → 10% → 5% of source frame width**.
 These are maximum landmark-position errors, not percentages of videos covered:
 960, 384, 192 and 96 pixels at 1920 pixels wide. Canonical `npm run verify:sync`
-defaults to strict full **2% (38.4 px at 1920) / 0.5-second** acceptance across
+defaults to strict **2% (38.4 px at 1920) / 0.5-second** source measurement across
 all six videos, exercising both official YouTube and local original media, audio,
-compact mode and manual controls. Intermediate passes are not retagged as final.
+compact mode and manual controls. Full acceptance additionally requires current
+full-native, all-stock swept-spring and posed-surface qualification. No consumer
+for that genuine bound proof is implemented yet; full acceptance remains
+unmeasured/overall unavailable and returns nonzero even when source measurement
+passes. Finite mechanism angles or injected qualification metadata cannot satisfy
+it. Intermediate passes are not retagged as final.
 
 Start with working approximate camera and mechanism tracking across **all six**
 videos, then present an actual browser demo before refining to 20%, 10%
