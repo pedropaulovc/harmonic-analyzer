@@ -1047,6 +1047,22 @@ different view's descriptor. Presentation records and failures use the same
 ownership boundary: taking one view consumes only that view, and malformed
 own-view rows remain available for Node refusal rather than being filtered out.
 
+Draw-owned side values are sampled by a chained `Material.onBeforeRender`
+callback before Three temporarily switches transparent DoubleSide materials
+through BackSide and FrontSide passes. The producer registers only current
+inventory materials while capture is enabled. Draw records keep the owning
+view's side; delayed retrieval never replaces it with another view's live side.
+Disposal restores the original callbacks and clears prepared-side state.
+
+The exact `d5ae87fd8…` before control passed seven of nine Node cases but failed
+both delayed-side cases. Actual GPU controls retained all eleven positive
+observations while reproducing those two failures. After repair, all nine Node
+cases and all thirteen GPU observations passed, including real transparent
+BackSide/FrontSide submissions. Both GPU runs restored material properties,
+callbacks, GL functions, visibility and live context state without creating a
+tab, context, renderer or material. These are descriptor-ownership controls,
+not source/material-pixel acceptance.
+
 The actual BEFORE receipt
 `web/.vite/verification-output/native-p2-transition-controls-2026-10-03T23-51-08-172Z.json`
 reproduced the defects on the original Intro **1.8018 s** viewer. Unchanged

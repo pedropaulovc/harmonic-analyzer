@@ -318,7 +318,13 @@ export function createNativeQualificationProducer({ machine, viewer }: { machine
       requireValue(!disposed && enabled && Number.isSafeInteger(epoch), 'beginView needs an enabled live producer and actual draw epoch')
       viewGeneration++
       inventory = machine.nativeQualificationInventory()
-      paths.clear(); for (const entry of inventory) paths.set(entry.object, entry.path)
+      paths.clear()
+      for (const entry of inventory) {
+        paths.set(entry.object, entry.path)
+        const materials = entry.object.material
+        if (Array.isArray(materials)) for (const material of materials) materialCapture!.prepare(material)
+        else materialCapture!.prepare(materials)
+      }
       presentationEntries.clear(); for (const entry of viewer.nativeQualificationPresentationInventory()) presentationEntries.set(entry.object, entry)
       const viewKey = `${epoch}:${viewId}`
       viewEpochs.set(viewId, epoch); materialCapture!.beginView(viewKey); observer!.begin(viewKey)

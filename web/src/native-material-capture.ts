@@ -9,6 +9,8 @@ export interface NativeMaterialByteSink {
 export interface NativeMaterialCapture {
   /** Select the exact epoch:viewId before observing that view's standard draws. */
   beginView(key: string): void
+  /** Install before rendering so Three's temporary two-pass side stays draw-local. */
+  prepare(material: THREE.Material): void
   /** Called immediately before the real standard draw; does not replace it. */
   observeDraw(material: THREE.Material): void
   capture(material: THREE.Material, sink: NativeMaterialByteSink, key: string): Promise<string>
@@ -71,6 +73,8 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
   const snapshots = new Map<string, Map<THREE.Material, MaterialRecord>>()
   let retainedEpoch: string | null = null
   let currentViewSnapshots: Map<THREE.Material, MaterialRecord> | null = null
+  const preparedSides = new Map<THREE.Material, THREE.Side>()
+  const materialHooks = new Map<THREE.Material, { original: THREE.Material['onBeforeRender']; observed: THREE.Material['onBeforeRender'] }>()
   const uploads = new WeakMap<NativeMaterialByteSink, Map<string, Promise<string>>>()
   const byteHashes = new WeakMap<Uint8Array, Promise<string>>()
   const mutationOriginals = new Map<string, (...args: unknown[]) => unknown>()
@@ -251,33 +255,49 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
       insist(!disposed, 'Original material capture disposed')
       const epoch = key.slice(0, key.indexOf(':'))
       if (epoch !== retainedEpoch) { snapshots.clear(); retainedEpoch = epoch }
+      preparedSides.clear()
       currentViewSnapshots = new Map()
       snapshots.set(key, currentViewSnapshots)
     },
+    prepare(material) {
+      insist(!disposed, 'Original material capture disposed')
+      const existing = materialHooks.get(material)
+      if (existing && material.onBeforeRender === existing.observed) return
+      const original = material.onBeforeRender
+      const observed: THREE.Material['onBeforeRender'] = function (this: THREE.Material, renderer, scene, camera, geometry, object, group) {
+        original.call(this, renderer, scene, camera, geometry, object, group)
+        // The material callback precedes Three's transparent BackSide/FrontSide
+        // split. Retain the side after the original callback, in this view only.
+        if (currentViewSnapshots) preparedSides.set(material, material.side)
+      }
+      materialHooks.set(material, { original, observed })
+      material.onBeforeRender = observed
+    },
     observeDraw(material) {
       insist(currentViewSnapshots, 'Original material capture view is unavailable')
-      currentViewSnapshots.set(material, snapshot(material, true))
+      const record = snapshot(material, true), side = preparedSides.get(material)
+      if (side !== undefined) record.properties.side = side
+      currentViewSnapshots.set(material, record)
     },
     async capture(material, sink, key) {
       const viewSnapshots = snapshots.get(key)
       insist(viewSnapshots, 'Original material capture view is unavailable')
       const record = viewSnapshots.get(material) ?? snapshot(material, false), textures = []
-      // Three temporarily changes DoubleSide to BackSide/FrontSide for its
-      // approved transparent two-pass draw. Original side is restored before
-      // this same-view transaction serializes the material identity.
-      const properties = { ...record.properties, side: material.side }
       for (const texture of record.textures) {
         if (texture.source.authority === 'unmeasured-original-gpu-texture') { textures.push(texture); continue }
         const { bytes, ...source } = texture.source, objectSHA256 = await upload(bytes, sink)
         const span: NativeByteSpan = { objectSHA256, objectByteLength: bytes.byteLength, byteOffset: 0, byteLength: bytes.byteLength, scalar: 'u8', components: 4, count: source.width * source.height }
         textures.push({ ...texture, source: { ...source, bytes: span } })
       }
-      return upload(new TextEncoder().encode(canonicalJson({ ...record, properties, textures })), sink)
+      return upload(new TextEncoder().encode(canonicalJson({ ...record, textures })), sink)
     },
     dispose() {
       if (disposed) return
       disposed = true
       snapshots.clear(); currentViewSnapshots = null
+      preparedSides.clear()
+      for (const [material, hook] of materialHooks) if (material.onBeforeRender === hook.observed) material.onBeforeRender = hook.original
+      materialHooks.clear()
       for (const [name, original] of mutationOriginals) mutable[name] = original
       mutationOriginals.clear()
       if (resources) {

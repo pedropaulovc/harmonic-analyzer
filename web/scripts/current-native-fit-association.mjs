@@ -6,10 +6,10 @@
  * This low-level descriptor check does not admit raw/model bytes; the outer
  * exporter and explicit constructors retain the actual protected-byte gate.
  */
-import { CURRENT_NATIVE_RAW_SHA256, canonicalJson, jsonDigest, sha256 } from './native-model-byte-proof.mjs'
+import { CURRENT_NATIVE_RAW_SHA256, canonicalJson, jsonDigest } from './native-model-byte-proof.mjs'
+import { describeRawNativePrimitive } from './native-source-feature-bindings.mjs'
 
 const same = (a, b) => canonicalJson(a) === canonicalJson(b)
-const widths = { 1: 'SCALAR', 2: 'VEC2', 3: 'VEC3', 4: 'VEC4' }
 const finite = value => Array.isArray(value) && value.length === 3 && value.every(Number.isFinite)
 const fail = message => { throw new Error(`Current native fit association: ${message}`) }
 
@@ -33,11 +33,7 @@ export function reproveCurrentNativeFitAssociationPrimitives({ nativeModel, inve
     if (!original || !same(proof.currentWorldMatrix, Array.from(original.restMatrixF64))) continue
     const rawPrimitive = nativeModel.document.meshes[primitive.meshIndex].primitives[primitive.primitiveIndex]
     const indices = nativeModel.accessor(rawPrimitive.indices)
-    const descriptor = { mode: 4, attributes: Object.fromEntries(Object.entries(primitive.attributes).map(([name, attribute]) => [name, {
-      componentType: attribute.componentType, type: widths[attribute.itemSize], count: attribute.count,
-      normalized: attribute.normalized, typedBytesSha256: sha256(attribute.bytes),
-    }])), indices: { componentType: indices.componentType, type: 'SCALAR', count: indices.count, normalized: indices.normalized,
-      typedBytesSha256: sha256(indices.bytes) }, material: primitive.material }
+    const descriptor = describeRawNativePrimitive(primitive, indices)
     if (proof.primitives.some(candidate => same(candidate, descriptor))) candidates.push(primitive)
   }
   return candidates

@@ -4,18 +4,20 @@ The eight-point arithmetic fixture has independent pinhole pixels. It is not a
 fabricated real CURRENT462 pose or source observation. Real original CPU/raw
 world exports must additionally be exercised by the parent CLI smoke.
 
-python web/scripts/test_current_native_source_fit.py
+uv run --no-project --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/test_current_native_source_fit.py
 """
 import copy
 import importlib.util
 import math
+import os
 from pathlib import Path
 import unittest
 
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-SPEC = importlib.util.spec_from_file_location("current_native_source_fit_under_test", HERE / "current-native-source-fit.py")
+MODULE = Path(os.environ.get("CURRENT_NATIVE_SOURCE_FIT_PY_MODULE", HERE / "current-native-source-fit.py")).resolve()
+SPEC = importlib.util.spec_from_file_location("current_native_source_fit_under_test", MODULE)
 ADAPTER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ADAPTER)
 CLOSURE = "c" * 64
@@ -130,6 +132,63 @@ class CurrentNativeFitTests(unittest.TestCase):
         packet["authored"]["inputSelection"].update(field="chosenInput", state="independently-measured")
         with self.assertRaisesRegex(ValueError, "cannot become independent source truth"):
             ADAPTER.fit_current_native_packet(packet, CLOSURE)
+
+    def test_original_clocks_require_finite_numeric_values_without_coercion(self):
+        self.assertEqual(ADAPTER.fit_current_native_packet(fixture(), CLOSURE)["status"], "candidate-passed")
+        for field in ("timeSeconds", "decodedTimeSeconds"):
+            for bad in ("1", None, True):
+                with self.subTest(field=field, value=bad):
+                    packet = fixture()
+                    packet["original"]["frame"][field] = bad
+                    packet["authored"]["frame"][field] = bad
+                    binding_field = "timeSeconds" if field == "timeSeconds" else "recordedOriginalDecodedTimeSeconds"
+                    packet["sourceBinding"][binding_field] = bad
+                    with self.assertRaises(ValueError):
+                        ADAPTER.fit_current_native_packet(packet, CLOSURE)
+
+    def test_exact_decoded_clock_also_refuses_strings_null_nan_and_boolean(self):
+        self.assertEqual(ADAPTER.fit_current_native_packet(fixture(), CLOSURE)["status"], "candidate-passed")
+        for bad in ("1", None, float("nan"), True):
+            with self.subTest(value=bad):
+                packet = fixture()
+                packet["sourceBinding"]["decodedTimeSeconds"] = bad
+                with self.assertRaises(ValueError):
+                    ADAPTER.fit_current_native_packet(packet, CLOSURE)
+
+    def test_nonnull_declared_or_resolved_warp_refuses_at_every_selected_owner(self):
+        for field in ("imagePlaneWarp", "resolvedImagePlaneWarp"):
+            for location in ("original frame", "original view", "authored frame", "authored view"):
+                for warp in ({"kind": "independent-test-only-corner-interior-obligation"}, False, 0, ""):
+                    with self.subTest(field=field, location=location, warp=warp):
+                        packet = fixture()
+                        if location.endswith("view"):
+                            packet["original"]["frame"]["views"] = [{"id": "main", "rectSourcePixels": [0, 0, 1920, 1080]}]
+                            packet["authored"]["frame"]["views"] = [{"id": "main", "rectSourcePixels": [0, 0, 1920, 1080],
+                                "input": packet["authored"]["input"]}]
+                        frame = packet["original"]["frame"] if location.startswith("original") else packet["authored"]["frame"]
+                        owner = frame["views"][0] if location.endswith("view") else frame
+                        owner[field] = None
+                        self.assertEqual(ADAPTER.fit_current_native_packet(packet, CLOSURE)["status"], "candidate-passed")
+                        owner[field] = warp
+                        result = ADAPTER.fit_current_native_packet(packet, CLOSURE)
+                        self.assertEqual(result["status"], "refused")
+                        self.assertTrue(any("corner/interior CHECK" in reason for reason in result["reasons"]))
+                        self.assertIsNone(result["camera"])
+                        self.assertFalse(result["sourceAcceptance"])
+                        self.assertFalse(result["nativeAcceptance"])
+                        self.assertFalse(result["gpuAcceptance"])
+
+    def test_unselected_view_warps_do_not_change_selected_unwarped_view(self):
+        packet = fixture()
+        packet["original"]["frame"]["views"] = [
+            {"id": "main", "rectSourcePixels": [0, 0, 1920, 1080]},
+            {"id": "unselected", "rectSourcePixels": [0, 0, 1920, 1080], "resolvedImagePlaneWarp": False},
+        ]
+        packet["authored"]["frame"]["views"] = [
+            {"id": "main", "rectSourcePixels": [0, 0, 1920, 1080], "input": packet["authored"]["input"]},
+            {"id": "unselected", "rectSourcePixels": [0, 0, 1920, 1080], "imagePlaneWarp": False},
+        ]
+        self.assertEqual(ADAPTER.fit_current_native_packet(packet, CLOSURE)["status"], "candidate-passed")
 
 
 if __name__ == "__main__":

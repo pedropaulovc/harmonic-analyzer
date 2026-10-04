@@ -1,8 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { currentNativeFitSourceTuple, prepareCurrentNativeFitSource, currentNativeFitWorldPoint,
-  independentCurrentNativeFitRows, assertPrivateCurrentNativeFitOutput, createExactAssociatedCurrentNativeFitDefinitions } from './current-native-source-fit.mjs'
-import { CURRENT_NATIVE_RAW_SHA256, jsonDigest, sha256 } from './native-model-byte-proof.mjs'
+import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { CURRENT_NATIVE_RAW_SHA256, CURRENT_NATIVE_DELIVERY_SHA256, jsonDigest, sha256 } from './native-model-byte-proof.mjs'
+
+const sourceFitURL = process.env.CURRENT_NATIVE_SOURCE_FIT_MODULE
+  ? pathToFileURL(resolve(process.env.CURRENT_NATIVE_SOURCE_FIT_MODULE)) : new URL('./current-native-source-fit.mjs', import.meta.url)
+const { currentNativeFitSourceTuple, prepareCurrentNativeFitSource, currentNativeFitWorldPoint,
+  independentCurrentNativeFitRows, assertPrivateCurrentNativeFitOutput, createExactAssociatedCurrentNativeFitDefinitions,
+  exportCurrentNativeSourceFit } = await import(sourceFitURL.href)
+const axisFitURL = process.env.CURRENT_NATIVE_AXIS_FIT_MODULE
+  ? pathToFileURL(resolve(process.env.CURRENT_NATIVE_AXIS_FIT_MODULE)) : new URL('./current-native-axis-fit.mjs', import.meta.url)
+const { createCurrentNativeAxisFitDefinitions } = await import(axisFitURL.href)
+const privateRoot = resolve(dirname(fileURLToPath(sourceFitURL)), '../.vite/verification-output')
 
 // Deliberately three vertices, not a fabricated CURRENT462 inventory. These
 // arithmetic fixtures prove refusal/coordinate behavior only; the root's actual
@@ -136,7 +148,7 @@ test('private command never targets canonical tracks or parent-directory escape'
   assert.throws(() => assertPrivateCurrentNativeFitOutput('web/.vite/verification-output/../../content/false-track.json'), /never canonical/)
 })
 
-test('an unchanged typed association still needs an actual closed raw feature, not its historical world point', () => {
+function associationFixture() {
   const f = triangleFixture(), s = sourceFixture(), source = prepareCurrentNativeFitSource(s)
   const originalAnchor = { id: source.landmarks[0].anchorId, partPath: f.primitive.path, partLocalMetres: [0.25, 0.25, 0], correspondenceEvidence: 'Actual independently measured source feature' }
   s.originalObservations.anchors = [originalAnchor]
@@ -159,6 +171,11 @@ test('an unchanged typed association still needs an actual closed raw feature, n
   const args = { nativeModel: { primitives: new Map([[f.primitive.path, f.primitive]]), document: { meshes }, accessor: () => indices },
     poseOracle: { inventory: { drawables: [f.original] } }, originalObservations: s.originalObservations, currentAnchors: [anchor],
     source, selections: [{ anchorId: originalAnchor.id }] }
+  return { args, anchor, originalAnchor, descriptor }
+}
+
+test('an unchanged typed association still needs an actual closed raw feature, not its historical world point', () => {
+  const { args, anchor, originalAnchor, descriptor } = associationFixture()
   const actual = createExactAssociatedCurrentNativeFitDefinitions(args)[0]
   assert.equal(actual.witness.kind, 'triangle-point')
   assert.deepEqual(actual.witness.barycentric, [0.5, 0.25, 0.25])
@@ -172,4 +189,187 @@ test('an unchanged typed association still needs an actual closed raw feature, n
   anchor.nativeAssociation.proof.historicalAnchorSha256 = jsonDigest(originalAnchor)
   descriptor.attributes.POSITION.typedBytesSha256 = 'e'.repeat(64)
   assert.match(createExactAssociatedCurrentNativeFitDefinitions(args)[0].unavailableReason, /no closed raw surface witness/)
+})
+
+function exportFixture() {
+  const s = sourceFixture(), f = triangleFixture()
+  const barycentrics = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0.5, 0.5, 0], [0.5, 0, 0.5],
+    [0, 0.5, 0.5], [0.5, 0.25, 0.25], [0.25, 0.5, 0.25]]
+  const landmarks = barycentrics.map((_, i) => ({ anchorId: `test-only-export-point-${i}`, role: i < 6 ? 'fit' : 'check',
+    pixel: [400 + i * 30, 300 + i * 20], status: 'observed', uncertaintyPx: 4, method: 'test-only-arithmetic' }))
+  s.originalObservations.frames[0].landmarks = landmarks
+  s.authoredFrame.landmarks = structuredClone(landmarks)
+  s.originalObservations.model = { fixture: 'one-triangle-arithmetic-only' }
+  s.originalObservations.anchors = landmarks.map(l => ({ id: l.anchorId, description: 'Independent test-only point identity' }))
+  const source = prepareCurrentNativeFitSource(s)
+  const featureDefinitions = landmarks.map((originalLandmark, i) => {
+    const correspondence = { state: 'chosen-unmeasured', evidence: { fixture: 'test-only-triangle-point' } }
+    const evidence = { sourceBinding: source.sourceBinding, originalLandmark, correspondence }
+    return { ...evidence, witness: { ...f.witness, anchorId: originalLandmark.anchorId,
+      barycentric: barycentrics[i], sourceFeatureEvidenceSHA256: jsonDigest(evidence) } }
+  })
+  return { ...s, featureDefinitions, nativeModel: { rawSHA256: CURRENT_NATIVE_RAW_SHA256, primitives: new Map([[f.primitive.path, f.primitive]]) },
+    poseOracle: { inventory: { rawSHA256: CURRENT_NATIVE_RAW_SHA256, deliverySHA256: CURRENT_NATIVE_DELIVERY_SHA256,
+      closureSHA256: hash, drawables: [f.original] }, solve: () => ({ drawables: [f.pose] }) },
+    provenance: Object.fromEntries(['originalObservationsSHA256', 'authoredFrameSHA256', 'selectionSHA256', 'decodedFrameSHA256'].map(k => [k, hash])) }
+}
+
+function axisFixture() {
+  const s = sourceFixture(), source = prepareCurrentNativeFitSource(s), vertices = [], indices = []
+  for (const z of [-1, 1]) for (let k = 0; k < 8; k++) vertices.push(Math.cos(k * Math.PI / 4), Math.sin(k * Math.PI / 4), z)
+  for (let k = 0; k < 8; k++) {
+    const a = k, b = (k + 1) % 8
+    indices.push(a, b, b + 8, a, b + 8, a + 8)
+  }
+  for (const base of [0, 8]) for (let k = 1; k < 7; k++) indices.push(base, base + k, base + k + 1)
+  const primitive = { path: 'test-only/axis-cylinder', rawPath: 'test-only/axis-cylinder', rawPrimitiveSHA256: hash,
+    nodeIndex: 4, primitiveIndex: 0, instanceOf: null, positions: new Float32Array(vertices), index: new Uint32Array(indices) }
+  const id = source.landmarks[0].anchorId
+  s.originalObservations.anchors = [{ id, description: 'Test-only physical shaft axis' }]
+  const control = { anchorId: id, rawNodeIndex: 4, rawPrimitiveIndex: 0, rawPartPath: primitive.rawPath, rawPrimitiveSHA256: hash,
+    axisIndex: 2, sectionCoordinates: [-0.5, 0.5], axisPointCoordinate: 'maximum',
+    sourceSemanticEvidence: 'Independent test-only axis declaration; no source/native qualification', sourceRasterImageSHA256: imageHash }
+  return { nativeModel: { rawSHA256: CURRENT_NATIVE_RAW_SHA256, primitives: new Map([[primitive.path, primitive]]) },
+    originalObservations: s.originalObservations, source, controls: [control] }
+}
+
+for (const field of ['timeSeconds', 'decodedTimeSeconds']) {
+  for (const [label, value] of [['numeric string', '0'], ['null', null], ['NaN', NaN]]) {
+    test(`original ${field} refuses ${label} instead of arithmetic coercion`, () => {
+      const s = sourceFixture(), frame = s.originalObservations.frames[0]
+      frame.timeSeconds = 0; frame.decodedTimeSeconds = 0
+      s.decodedFrame.decodedTimestampTicks = 0; s.decodedFrame.decodedTimeSeconds = 0
+      const positive = currentNativeFitSourceTuple(s.originalObservations, frame, 'main', s.decodedFrame)
+      assert.equal(positive.timeSeconds, 0)
+      assert.equal(positive.recordedOriginalDecodedTimeSeconds, 0)
+      frame[field] = value
+      assert.throws(() => currentNativeFitSourceTuple(s.originalObservations, frame, 'main', s.decodedFrame), /finite numeric original source clocks/)
+    })
+  }
+}
+
+test('matching original and authored string clocks cannot prepare a consumable packet', () => {
+  const s = sourceFixture()
+  assert.equal(prepareCurrentNativeFitSource(s).sourceBinding.timeSeconds, 27)
+  for (const frame of [s.originalObservations.frames[0], s.authoredFrame]) {
+    frame.timeSeconds = '27'; frame.decodedTimeSeconds = '26.993633'
+  }
+  assert.throws(() => prepareCurrentNativeFitSource(s), /finite numeric original source clocks/)
+})
+
+for (const field of ['imagePlaneWarp', 'resolvedImagePlaneWarp']) {
+  for (const location of ['original frame', 'original view', 'authored frame', 'authored view']) {
+    for (const warp of [{ kind: 'independent-test-only-corner-interior-obligation' }, false, 0, '']) {
+      test(`${location} ${field}=${JSON.stringify(warp)} keeps the camera-only export ineligible`, () => {
+        const args = exportFixture()
+        if (location.endsWith('view')) {
+          args.originalObservations.frames[0].views = [{ id: 'main', rectSourcePixels: [0, 0, 1920, 1080] }]
+          args.authoredFrame.views = [{ id: 'main', rectSourcePixels: [0, 0, 1920, 1080], input: args.authoredFrame.input,
+            provenance: args.authoredFrame.provenance }]
+        }
+        const positive = exportCurrentNativeSourceFit(args)
+        assert.equal(positive.eligibility.ready, true)
+        assert.deepEqual([positive.eligibility.distinctFitCount, positive.eligibility.distinctCheckCount], [6, 2])
+        const frame = location.startsWith('original') ? args.originalObservations.frames[0] : args.authoredFrame
+        const owner = location.endsWith('view') ? frame.views[0] : frame
+        owner[field] = null
+        assert.equal(exportCurrentNativeSourceFit(args).eligibility.ready, true)
+        owner[field] = warp
+        assert.deepEqual(prepareCurrentNativeFitSource(args).imagePlaneWarp, warp)
+        const refused = exportCurrentNativeSourceFit(args)
+        assert.equal(refused.eligibility.ready, false)
+        assert.ok(refused.eligibility.reasons.some(r => /camera-only fit refuses warped views/.test(r)))
+        assert.equal(refused.sourceAcceptance, false)
+        assert.equal(refused.nativeAcceptance, false)
+        assert.deepEqual(refused.original.frame, args.originalObservations.frames[0])
+        assert.deepEqual(refused.authored.frame, args.authoredFrame)
+      })
+    }
+  }
+}
+
+test('a warp owned only by a different view cannot block the selected unwarped view', () => {
+  const args = exportFixture()
+  args.originalObservations.frames[0].views = [
+    { id: 'main', rectSourcePixels: [0, 0, 1920, 1080] },
+    { id: 'unselected', rectSourcePixels: [0, 0, 1920, 1080], resolvedImagePlaneWarp: false },
+  ]
+  args.authoredFrame.views = [
+    { id: 'main', rectSourcePixels: [0, 0, 1920, 1080], input: args.authoredFrame.input, provenance: args.authoredFrame.provenance },
+    { id: 'unselected', rectSourcePixels: [0, 0, 1920, 1080], imagePlaneWarp: false },
+  ]
+  assert.equal(prepareCurrentNativeFitSource(args).imagePlaneWarp, null)
+  assert.equal(exportCurrentNativeSourceFit(args).eligibility.ready, true)
+})
+
+for (const location of ['original', 'current']) for (const reverse of [false, true]) {
+  test(`exact association refuses duplicate ${location} anchor identities${reverse ? ' in reverse order' : ''}`, () => {
+    const { args, anchor, originalAnchor } = associationFixture()
+    assert.equal(createExactAssociatedCurrentNativeFitDefinitions(args)[0].witness.kind, 'triangle-point')
+    const conflicting = structuredClone(location === 'original' ? originalAnchor : anchor)
+    if (location === 'original') conflicting.description = 'Conflicting source identity'
+    else conflicting.nativeAssociation.status = 'unavailable'
+    const rows = [location === 'original' ? originalAnchor : anchor, conflicting]
+    if (reverse) rows.reverse()
+    if (location === 'original') args.originalObservations.anchors = rows
+    else args.currentAnchors = rows
+    assert.throws(() => createExactAssociatedCurrentNativeFitDefinitions(args), /duplicate anchor identity/)
+  })
+}
+
+for (const reverse of [false, true]) {
+  test(`axis preparation refuses duplicate source anchor identities${reverse ? ' in reverse order' : ''}`, () => {
+    const args = axisFixture()
+    const positive = createCurrentNativeAxisFitDefinitions(args)[0]
+    assert.equal(positive.witness.kind, 'geometric-axis')
+    assert.equal(positive.rawAxisGeometry.pointIsSurfacePoint, false)
+    const original = args.originalObservations.anchors[0], conflicting = { ...original, description: 'Conflicting axis source identity' }
+    args.originalObservations.anchors = reverse ? [conflicting, original] : [original, conflicting]
+    assert.throws(() => createCurrentNativeAxisFitDefinitions(args), /duplicate anchor identity/)
+  })
+
+  test(`world export refuses duplicate source anchor identities${reverse ? ' in reverse order' : ''}`, () => {
+    const args = exportFixture()
+    assert.equal(exportCurrentNativeSourceFit(args).eligibility.ready, true)
+    const original = args.originalObservations.anchors[0], conflicting = { ...original, description: 'Conflicting original source identity' }
+    args.originalObservations.anchors.push(conflicting)
+    if (reverse) args.originalObservations.anchors.reverse()
+    assert.throws(() => exportCurrentNativeSourceFit(args), /duplicate anchor identity/)
+  })
+}
+
+test('private output admits a new nested private file but refuses symlink-parent escape before writing', async () => {
+  await mkdir(privateRoot, { recursive: true })
+  const owned = await mkdtemp(join(privateRoot, 'source-fit-output-test-'))
+  const external = await mkdtemp(join(tmpdir(), 'source-fit-external-test-'))
+  try {
+    const nested = join(owned, 'nested')
+    await mkdir(nested)
+    const positive = join(nested, 'private-packet.json')
+    await writeFile(assertPrivateCurrentNativeFitOutput(positive), 'inert private packet\n', { flag: 'wx' })
+    assert.equal(await readFile(positive, 'utf8'), 'inert private packet\n')
+    await assert.rejects(writeFile(assertPrivateCurrentNativeFitOutput(positive), 'replacement', { flag: 'wx' }), { code: 'EEXIST' })
+
+    const sentinel = join(external, 'sentinel.txt')
+    await writeFile(sentinel, 'owned external sentinel\n', { flag: 'wx' })
+    await symlink(external, join(owned, 'linked'), 'dir')
+    const escaped = join(external, 'must-remain-absent.json')
+    let refusal
+    try {
+      await writeFile(assertPrivateCurrentNativeFitOutput(join(owned, 'linked', 'must-remain-absent.json')), 'inert escaped packet\n', { flag: 'wx' })
+    } catch (error) { refusal = error }
+    let escapedExists = true
+    try { await access(escaped) } catch (error) { if (error.code === 'ENOENT') escapedExists = false; else throw error }
+    assert.equal(escapedExists, false, 'an admitted parent symlink must not create even an inert external packet')
+    assert.match(refusal?.message ?? '', /never canonical/)
+    assert.equal(await readFile(sentinel, 'utf8'), 'owned external sentinel\n')
+
+    const finalLink = join(nested, 'final-link.json')
+    await symlink(sentinel, finalLink)
+    await assert.rejects(writeFile(assertPrivateCurrentNativeFitOutput(finalLink), 'replacement', { flag: 'wx' }), { code: 'EEXIST' })
+    assert.equal(await readFile(sentinel, 'utf8'), 'owned external sentinel\n')
+  } finally {
+    await rm(owned, { recursive: true, force: true })
+    await rm(external, { recursive: true, force: true })
+  }
 })

@@ -553,12 +553,22 @@ verification passed for the **240-member** executed-source/output archive.
 These finite-state measurements do not establish source-camera correspondence,
 material/shadow pixels or six-video acceptance.
 
-The explicitly admitted web contract suite passed **281 tests**, including
+The explicitly admitted web contract suite passed **332 tests**, including
 original CPU replay, closed-section axes, surface support, material epoch/view
-ownership and presentation isolation. Seven Python fit-boundary tests passed.
+ownership and presentation isolation. Eleven Python fit-boundary tests passed.
 Virtual axes remain camera-only controls: a wall hit cannot turn an empty axis
 point into an opaque first surface. Warp-plus-mirror contour rays use the warp
 once, without an additional mirror.
+
+Source-fit admission rejects duplicate anchor identities, nonnumeric source
+clocks and every non-null declared or resolved selected-view warp. Private
+exports require an existing private parent, refuse escaped symlink parents,
+and preserve exclusive-create protection. Run the web-local Python boundary
+suite separately from the CAD `doit` graph:
+
+```sh
+uv run --no-project --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/test_current_native_source_fit.py
+```
 
 Current raw-geometry camera diagnostics retain the original source pixels and
 FIT/CHECK roles:
@@ -568,7 +578,12 @@ FIT/CHECK roles:
 | Intro 809 | 6 / 2 | 1.413 / 2.612 | 24.251 |
 | Analysis 426 | 6 / 2 | 9.848 / 16.579 | 5.011 |
 | Rocker 0 | 28 / 10 | 3.717 / 7.971 | 5.176 |
-| Synthesis 72 | 6 / 1 | Refused: missing second CHECK | — |
+| Synthesis 72 | 6 / 2 | 6.794 / 9.383 | 11.825 |
+| Operation 12408 (414 s) | 6 / 2 | 46.839 / 72.915 | **66.414 — failed** |
+
+The original Synthesis six-FIT/one-CHECK refusal remains retained. Its fresh
+second CHECK is the actual fixed axle's virtual axis at the stored nut-front
+plane: a chosen camera-only correspondence, not restored nut-surface lineage.
 
 The diagnostic bound is **38.4 px** at 1920-pixel source width. The earlier Intro
 six-FIT/zero-CHECK packet remains retained as a before control. Source depth,

@@ -130,17 +130,22 @@ export function nativeWitnessAtOriginalPoint(primitive, localPoint, anchorId, so
   throw new Error('Original native coordinate has no genuine stored-vertex or triangle surface support')
 }
 
-const primitiveProofs = new WeakMap()
-function originalPrimitiveProof(primitive, nativeModel) {
-  if (primitiveProofs.has(primitive)) return primitiveProofs.get(primitive)
+/** Describe current raw typed bytes without retaining a primitive proof. */
+export function describeRawNativePrimitive(primitive, indices) {
   const widths = { 1: 'SCALAR', 2: 'VEC2', 3: 'VEC3', 4: 'VEC4' }
-  const rawPrimitive = nativeModel.document.meshes[primitive.meshIndex].primitives[primitive.primitiveIndex]
-  const indices = nativeModel.accessor(rawPrimitive.indices)
-  const descriptor = { mode: 4, attributes: Object.fromEntries(Object.entries(primitive.attributes).map(([name, attribute]) => [name, {
+  return { mode: 4, attributes: Object.fromEntries(Object.entries(primitive.attributes).map(([name, attribute]) => [name, {
     componentType: attribute.componentType, type: widths[attribute.itemSize], count: attribute.count, normalized: attribute.normalized,
     typedBytesSha256: sha256(attribute.bytes),
   }])), indices: { componentType: indices.componentType, type: 'SCALAR', count: indices.count, normalized: indices.normalized,
     typedBytesSha256: sha256(indices.bytes) }, material: primitive.material }
+}
+
+const primitiveProofs = new WeakMap()
+function originalPrimitiveProof(primitive, nativeModel) {
+  if (primitiveProofs.has(primitive)) return primitiveProofs.get(primitive)
+  const rawPrimitive = nativeModel.document.meshes[primitive.meshIndex].primitives[primitive.primitiveIndex]
+  const indices = nativeModel.accessor(rawPrimitive.indices)
+  const descriptor = describeRawNativePrimitive(primitive, indices)
   primitiveProofs.set(primitive, descriptor)
   return descriptor
 }

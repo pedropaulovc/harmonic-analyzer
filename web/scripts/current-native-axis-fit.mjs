@@ -19,6 +19,15 @@ const fail = message => { throw new Error(`Current raw axis feature: ${message}`
 const controlKeys = ['anchorId', 'rawNodeIndex', 'rawPrimitiveIndex', 'rawPartPath', 'rawPrimitiveSHA256', 'axisIndex',
   'sectionCoordinates', 'axisPointCoordinate', 'sourceSemanticEvidence', 'sourceRasterImageSHA256']
 
+function uniqueById(rows, label) {
+  const result = new Map()
+  for (const row of rows) {
+    if (typeof row?.id !== 'string' || !row.id.trim() || result.has(row.id)) fail(`${label} has an absent or duplicate anchor identity`)
+    result.set(row.id, row)
+  }
+  return result
+}
+
 function outerCycle(section) {
   if (!section.cycles.length) fail('declared open raw plane has no closed contour')
   const circles = section.cycles.map(cycle => ({ cycle, circle: nativeSectionCircle(cycle) }))
@@ -60,7 +69,7 @@ export function prepareCurrentRawAxisWitness(primitive, control, anchorId, sourc
 
 export function createCurrentNativeAxisFitDefinitions({ nativeModel, originalObservations, source, controls }) {
   if (nativeModel?.rawSHA256 !== CURRENT_NATIVE_RAW_SHA256 || !(nativeModel.primitives instanceof Map) || !Array.isArray(controls)) fail('protected actual current raw model and independently authored controls required')
-  const anchors = new Map((originalObservations.anchors ?? []).map(anchor => [anchor.id, anchor])), selectedIds = new Set()
+  const anchors = uniqueById(originalObservations.anchors ?? [], 'Original source anchors'), selectedIds = new Set()
   return controls.map(control => {
     const id = control?.anchorId, originalLandmark = source.landmarks.find(l => l.anchorId === id), originalAnchor = anchors.get(id)
     if (!originalLandmark || selectedIds.has(id)) fail('unknown/duplicate original axis control identity')

@@ -31,6 +31,7 @@
  * its four FITs remain insufficient. Missing observations remain in rows/original.
  * Output must be new and private; this command cannot publish canonical tracks.
  */
+import { realpathSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve, relative, dirname, sep } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
@@ -53,6 +54,15 @@ const text = v => typeof v === 'string' && v.trim().length > 0
 const states = ['chosen-unmeasured', 'independently-measured']
 const setupKeys = ['meanLineAngleRad', 'platenOffsetM', 'wireFixtureOffsetM', 'coneSwingRad', 'pinionCamRad', 'heldChannelTurns', 'driveCrankOffsetTurns']
 const provedWorldTopologies = new WeakMap()
+
+function uniqueById(rows, label) {
+  const result = new Map()
+  for (const row of rows) {
+    if (!text(row?.id) || result.has(row.id)) fail(`${label} has an absent or duplicate anchor identity`)
+    result.set(row.id, row)
+  }
+  return result
+}
 
 function validateInput(input) {
   if (!input || !Number.isFinite(input.crankTurns) || !finite(input.amplitudes, 20) || input.amplitudes.some(a => Math.abs(a) > 1)
@@ -82,6 +92,7 @@ export function currentNativeFitSourceTuple(observations, frame, originalViewId,
   requireSHA(image[hashName], 'original source image')
   if (!Number.isSafeInteger(image.frameIndex) || image.frameIndex < 0 || image.sourceSha256 !== source.sha256
       || image.width !== source.width || image.height !== source.height) fail('exact original source image identity required')
+  if (!Number.isFinite(frame.timeSeconds) || !Number.isFinite(frame.decodedTimeSeconds)) fail('finite numeric original source clocks required')
   if (!decodedFrame || decodedFrame.frameIndex !== image.frameIndex || decodedFrame.sourceSha256 !== source.sha256
       || decodedFrame[hashName] !== image[hashName] || !Number.isSafeInteger(decodedFrame.decodedTimestampTicks)
       || !/^\d+\/\d+$/.test(decodedFrame.timeBase ?? '') || !Number.isFinite(decodedFrame.decodedTimeSeconds)) fail('independently retained exact decoded frame/PTS/image correspondence required')
@@ -140,7 +151,9 @@ export function prepareCurrentNativeFitSource({ originalObservations, authoredFr
   }
   return { originalFrame, originalView, authoredView, sourceBinding, landmarks, input, partOverrides,
     viewport: { rectSourcePixels: clone(rect), width: rect[2], height: rect[3], presentation },
-    imagePlaneWarp: originalView.imagePlaneWarp ?? originalFrame.imagePlaneWarp ?? authoredView.imagePlaneWarp ?? authoredFrame.imagePlaneWarp ?? null }
+    imagePlaneWarp: originalView.imagePlaneWarp ?? originalFrame.imagePlaneWarp ?? authoredView.imagePlaneWarp ?? authoredFrame.imagePlaneWarp
+      ?? originalView.resolvedImagePlaneWarp ?? originalFrame.resolvedImagePlaneWarp
+      ?? authoredView.resolvedImagePlaneWarp ?? authoredFrame.resolvedImagePlaneWarp ?? null }
 }
 
 /** Original slotted-head source facts produce four chosen-unmeasured raw
@@ -163,8 +176,8 @@ export function createIntroCurrentNativeFitDefinitions({ nativeModel, sourceInsp
  * Historical world coordinates and historical cameras are never read here. */
 export function createExactAssociatedCurrentNativeFitDefinitions({ nativeModel, poseOracle, originalObservations, currentAnchors, source, selections }) {
   if (!Array.isArray(selections) || !Array.isArray(currentAnchors)) fail('explicit exact-association selections/current anchors required')
-  const originals = new Map((originalObservations.anchors ?? []).map(a => [a.id, a]))
-  const anchors = new Map(currentAnchors.map(a => [a.id, a])), inventory = new Map(poseOracle.inventory.drawables.map(d => [d.path, d]))
+  const originals = uniqueById(originalObservations.anchors ?? [], 'Original source anchors')
+  const anchors = uniqueById(currentAnchors, 'Current source anchors'), inventory = new Map(poseOracle.inventory.drawables.map(d => [d.path, d]))
   const selected = new Set()
   return selections.map(selection => {
     const id = selection?.anchorId, originalLandmark = source.landmarks.find(l => l.anchorId === id), anchor = anchors.get(id)
@@ -285,7 +298,7 @@ export function exportCurrentNativeSourceFit({ nativeModel, poseOracle, original
   const originals = new Map(poseOracle.inventory.drawables.map(d => [d.path, d]))
   const posed = poseOracle.solve(source.input, source.partOverrides)
   const poses = new Map(posed.drawables.map(d => [d.path, d]))
-  const anchors = new Map((originalObservations.anchors ?? []).map(a => [a.id, a]))
+  const anchors = uniqueById(originalObservations.anchors ?? [], 'Original source anchors')
   const rows = source.landmarks.map(originalLandmark => {
     const row = { originalLandmark: clone(originalLandmark), originalAnchor: clone(anchors.get(originalLandmark.anchorId) ?? null), status: 'unmeasured-native' }
     try {
@@ -308,7 +321,7 @@ export function exportCurrentNativeSourceFit({ nativeModel, poseOracle, original
   const available = rows.filter(r => r.status === 'world-exported'), fit = available.filter(r => r.originalLandmark.role === 'fit'), check = available.filter(r => r.originalLandmark.role === 'check')
   const reasons = []
   if (fit.length < 6 || check.length < 2) reasons.push(`Need >=6 distinct original FIT and >=2 held-out CHECK; exported ${fit.length}/${check.length}`)
-  if (source.imagePlaneWarp) reasons.push('Image-plane warp is separate: original four corner FITs and disjoint interior CHECK obligations unchanged; camera-only fit refuses warped views')
+  if (source.imagePlaneWarp !== null) reasons.push('Image-plane warp is separate: original four corner FITs and disjoint interior CHECK obligations unchanged; camera-only fit refuses warped views')
   const [x, y, width] = source.viewport.rectSourcePixels
   const landmarks = available.map(r => {
     const l = clone(r.originalLandmark)
@@ -354,6 +367,9 @@ export function assertPrivateCurrentNativeFitOutput(path) {
   const privateRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../.vite/verification-output'), output = resolve(path)
   const suffix = relative(privateRoot, output)
   if (!suffix || suffix === '..' || suffix.startsWith(`..${sep}`) || suffix.startsWith(sep)) fail('output must be a new private web/.vite/verification-output file, never canonical source content')
+  const actualPrivateRoot = realpathSync(privateRoot), actualParent = realpathSync(dirname(output))
+  const actualSuffix = relative(actualPrivateRoot, actualParent)
+  if (actualSuffix === '..' || actualSuffix.startsWith(`..${sep}`) || actualSuffix.startsWith(sep)) fail('output must be a new private web/.vite/verification-output file, never canonical source content')
   return output
 }
 

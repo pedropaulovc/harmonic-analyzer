@@ -62,6 +62,12 @@ def fit_current_native_packet(packet, closure_sha256):
     original = packet["original"]
     source, frame = original["source"], original["frame"]
     binding = packet["sourceBinding"]
+    if not all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+               for value in (frame.get("timeSeconds"), frame.get("decodedTimeSeconds"))):
+        raise ValueError("Finite numeric original source clocks required")
+    decoded_clock = binding.get("decodedTimeSeconds")
+    if not (isinstance(decoded_clock, (int, float)) and not isinstance(decoded_clock, bool) and math.isfinite(decoded_clock)):
+        raise ValueError("Finite numeric independent decoded clock required")
     image = frame["sourceImage"]
     _fitter.source_image_key(image, source, "Original source")
     if (binding.get("sourceImage") != image or binding.get("sourceSha256") != source["sha256"]
@@ -147,7 +153,8 @@ def fit_current_native_packet(packet, closure_sha256):
     check_count = sum(l["role"] == "check" for l in landmarks)
     if fit_count < 6 or check_count < 2:
         reasons.append(f"Need >=6 distinct original FIT and >=2 held-out CHECK; exported {fit_count}/{check_count}")
-    if (view.get("imagePlaneWarp") or frame.get("imagePlaneWarp") or authored_view.get("imagePlaneWarp") or authored_frame.get("imagePlaneWarp")):
+    if any(owner.get(field) is not None for owner in (view, frame, authored_view, authored_frame)
+           for field in ("imagePlaneWarp", "resolvedImagePlaneWarp")):
         reasons.append("Image-plane warp requires unchanged independent source corner/interior CHECK closure; camera-only routine refuses it")
     result = {"schemaVersion": 1, "kind": "current-native-source-camera-candidate", "sourceAcceptance": False,
               "nativeAcceptance": False, "gpuAcceptance": False, "sourceBinding": copy.deepcopy(binding),

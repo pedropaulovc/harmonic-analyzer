@@ -73,14 +73,17 @@ test('a later hidden epoch serializes changed installed material, not an earlier
   const drawn = await f.record(original)
   assert.equal(drawn.properties.alphaTest, 0)
   assert.equal(drawn.properties.roughness, 0.3)
+  assert.equal(drawn.properties.side, THREE.FrontSide)
   original.alphaTest = 1.001
   original.roughness = 0.91
+  original.side = THREE.BackSide
   original.color.setRGB(0.9, 0.05, 0.4)
   original.clippingPlanes = [new THREE.Plane(new THREE.Vector3(1, 0, 0), -0.125)]
   f.begin('72:left') // No observeDraw: this material has no submission in the new epoch.
   const hidden = await f.record(original)
   assert.equal(hidden.properties.alphaTest, 1.001)
   assert.equal(hidden.properties.roughness, 0.91)
+  assert.equal(hidden.properties.side, THREE.BackSide)
   assert.deepEqual(hidden.properties.color, original.color.toArray())
   assert.deepEqual(hidden.clippingPlanes, [[1, 0, 0, -0.125]])
 })
@@ -121,6 +124,8 @@ test('same-view transparent two-pass snapshot keeps the restored original materi
   original.transparent = true
   original.side = THREE.DoubleSide
   f.begin('106:transparent')
+  f.capture.prepare?.(original)
+  original.onBeforeRender()
   original.side = THREE.BackSide
   f.capture.observeDraw(original)
   original.side = THREE.FrontSide
@@ -142,6 +147,55 @@ test('delayed capture of an earlier view selects its actual draw after another v
   f.capture.observeDraw(original)
   assert.equal((await f.record(original)).properties.alphaTest, 0.75)
   assert.deepEqual(await f.record(original, '117:left'), left)
+})
+
+test('delayed retrieval preserves FrontSide left and BackSide right descriptors independently', async t => {
+  const f = fixture(t), original = material(t)
+  original.side = THREE.FrontSide
+  f.begin('117:left')
+  f.capture.observeDraw(original)
+  const left = await f.record(original)
+  assert.equal(left.properties.side, THREE.FrontSide)
+  original.side = THREE.BackSide
+  f.begin('117:right')
+  f.capture.observeDraw(original)
+  const right = await f.record(original)
+  assert.equal(right.properties.side, THREE.BackSide)
+  const delayedLeft = await f.record(original, '117:left')
+  const delayedRight = await f.record(original, '117:right')
+  assert.equal(delayedLeft.properties.side, THREE.FrontSide)
+  assert.equal(delayedRight.properties.side, THREE.BackSide)
+  assert.deepEqual(delayedLeft, left)
+  assert.deepEqual(delayedRight, right)
+})
+
+test('delayed transparent two-pass retrieval retains DoubleSide without borrowing another view side', async t => {
+  const f = fixture(t), original = material(t)
+  original.transparent = true
+  original.side = THREE.DoubleSide
+  f.begin('118:left')
+  f.capture.prepare?.(original)
+  original.onBeforeRender()
+  original.side = THREE.BackSide
+  f.capture.observeDraw(original)
+  original.side = THREE.FrontSide
+  f.capture.observeDraw(original)
+  original.side = THREE.DoubleSide
+  const left = await f.record(original)
+  assert.equal(left.properties.side, THREE.DoubleSide)
+  original.side = THREE.BackSide
+  f.begin('118:right')
+  f.capture.prepare?.(original)
+  original.onBeforeRender()
+  f.capture.observeDraw(original)
+  const right = await f.record(original)
+  assert.equal(right.properties.side, THREE.BackSide)
+  assert.equal(right.properties.transparent, true)
+  const delayedLeft = await f.record(original, '118:left')
+  assert.equal(delayedLeft.properties.side, THREE.DoubleSide)
+  assert.equal(delayedLeft.properties.transparent, true)
+  assert.deepEqual(delayedLeft, left)
+  assert.deepEqual(await f.record(original, '118:right'), right)
 })
 
 test('a new epoch removes earlier view draw authority and refuses foreign or omitted capture keys', async t => {
