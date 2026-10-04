@@ -68,7 +68,7 @@ function sourcePixelToNative(pixel, binding, viewport) {
     const [x, y, width, height] = binding.rectSourcePixels
     p = [(pixel[0] - x) / width, (pixel[1] - y) / height]
   }
-  if (binding.presentation === 'horizontal-mirror') p[0] = 1 - p[0]
+  if (!warp && binding.presentation === 'horizontal-mirror') p[0] = 1 - p[0]
   const result = [Math.floor(p[0] * viewport[0]), viewport[1] - 1 - Math.floor(p[1] * viewport[1])]
   return result.every((value, axis) => value >= 0 && value < viewport[axis]) ? result : null
 }

@@ -109,7 +109,8 @@ export function observeNativePrograms(renderer: THREE.WebGLRenderer, paths: Map<
   const originalDraws = new Map<string, (...args: number[]) => void>()
   const records = new Map<string, CapturedNativeDraw[]>()
   const failures = new Map<string, string[]>()
-  const presentationRecords: CapturedPresentationDraw[] = [], presentationFailures: string[] = []
+  const presentationRecords = new Map<string, CapturedPresentationDraw[]>()
+  const presentationFailures = new Map<string, string[]>()
   const sourcesByProgram = new WeakMap<WebGLProgram, CapturedNativeDraw['sources']>()
   const bufferVersions = new WeakMap<WebGLBuffer, number>()
   const bufferBytes = new WeakMap<WebGLBuffer, { version: number; bytes: Uint8Array }>()
@@ -244,10 +245,12 @@ export function observeNativePrograms(renderer: THREE.WebGLRenderer, paths: Map<
                 samplerBindings.push({ uniform: uniform.name, unit, boundMatchesMaterialTexture: texture && installed ? bound === installed : null, textureUUID: texture?.uuid ?? null, textureVersion: texture?.version ?? null })
               }
             } finally { gl.activeTexture(previousUnit) }
-            presentationRecords.push({ kind: entry.kind, viewId: viewKey.slice(viewKey.indexOf(':') + 1), phase: entry.phase, sourceRole: entry.sourceRole,
+            const rows = presentationRecords.get(viewKey) ?? []
+            rows.push({ kind: entry.kind, viewId: viewKey.slice(viewKey.indexOf(':') + 1), phase: entry.phase, sourceRole: entry.sourceRole,
               geometry: activeDraw.geometry, sources, attributes, uniforms, indices, drawRange: { start, count, mode: 4 }, vertexCount: position.count,
               viewportBackingPixels: Array.from(gl.getParameter(gl.VIEWPORT) as Int32Array) as [number, number, number, number],
               scissorBackingPixels: Array.from(gl.getParameter(gl.SCISSOR_BOX) as Int32Array) as [number, number, number, number], scissorTest: gl.isEnabled(gl.SCISSOR_TEST), samplerBindings })
+            presentationRecords.set(viewKey, rows)
           } else {
             const record: CapturedNativeDraw = { ...activeDraw, sources, attributes, uniforms, indices, drawRange: { start, count, mode: 4 },
               family: submittedFamily(activeDraw.material, sources, uniforms),
@@ -258,8 +261,10 @@ export function observeNativePrograms(renderer: THREE.WebGLRenderer, paths: Map<
             rows.push(record); records.set(viewKey, rows)
           }
         } catch (error) {
-          if (activeDraw.presentation) presentationFailures.push(`${activeDraw.presentation.kind}: ${error instanceof Error ? error.message : String(error)}`)
-          else {
+          if (activeDraw.presentation) {
+            const rows = presentationFailures.get(viewKey) ?? []
+            rows.push(`${activeDraw.presentation.kind}: ${error instanceof Error ? error.message : String(error)}`); presentationFailures.set(viewKey, rows)
+          } else {
             const rows = failures.get(viewKey) ?? []
             rows.push(`${activeDraw.path}: ${error instanceof Error ? error.message : String(error)}`); failures.set(viewKey, rows)
           }
@@ -271,16 +276,16 @@ export function observeNativePrograms(renderer: THREE.WebGLRenderer, paths: Map<
   return { gl, begin(key: string) {
     requireValue(!disposed, 'Native observer disposed')
     const epoch = key.slice(0, key.indexOf(':'))
-    if (epoch !== retainedEpoch) { records.clear(); failures.clear(); presentationRecords.length = 0; presentationFailures.length = 0; retainedEpoch = epoch }
-    viewKey = key; records.set(key, []); failures.set(key, [])
+    if (epoch !== retainedEpoch) { records.clear(); failures.clear(); presentationRecords.clear(); presentationFailures.clear(); retainedEpoch = epoch }
+    viewKey = key; records.set(key, []); failures.set(key, []); presentationRecords.set(key, []); presentationFailures.set(key, [])
   },
     take(key: string) {
-      const result = { records: records.get(key) ?? [], presentations: presentationRecords.slice(), failures: [...(failures.get(key) ?? []), ...presentationFailures] }
-      records.delete(key); failures.delete(key); return result
+      const result = { records: records.get(key) ?? [], presentations: presentationRecords.get(key) ?? [], failures: [...(failures.get(key) ?? []), ...(presentationFailures.get(key) ?? [])] }
+      records.delete(key); failures.delete(key); presentationRecords.delete(key); presentationFailures.delete(key); return result
     },
     restore() {
       if (disposed) return
-      disposed = true; viewKey = null; records.clear(); failures.clear(); presentationRecords.length = 0; presentationFailures.length = 0
+      disposed = true; viewKey = null; records.clear(); failures.clear(); presentationRecords.clear(); presentationFailures.clear()
       renderer.renderBufferDirect = originalDirect
       for (const [name, original] of originalDraws) mutableGL[name] = original
       gl.bufferData = originalBufferData; gl.bufferSubData = originalBufferSubData; gl.copyBufferSubData = originalCopyBufferSubData

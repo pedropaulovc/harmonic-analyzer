@@ -1,10 +1,23 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import { pathToFileURL } from 'node:url'
 import { Matrix4, PerspectiveCamera, Vector2, Vector3, BufferGeometry, Float32BufferAttribute, Mesh, MeshStandardMaterial, DoubleSide, Raycaster } from 'three'
 import { parseNativeRawGLB, createNativeByteReader, canonicalJson, jsonDigest, sha256 } from './native-model-byte-proof.mjs'
 import { createNativeMaterialProof } from './native-material-proof.mjs'
 import { nativeHorizontalSections, nativeSectionCircle, verifyNativeMeshFeatureWitness } from './native-mesh-feature-witness.mjs'
-import { proveNativeRaster } from './native-qualification.mjs'
+// Test-only immutable module seam. Expose the private final feature consumer
+// without replacing any production body, predicate, dependency or geometry.
+const qualificationURL = process.env.NATIVE_QUALIFICATION_PATH
+  ? pathToFileURL(process.env.NATIVE_QUALIFICATION_PATH)
+  : new URL('./native-qualification.mjs', import.meta.url)
+const qualificationSource = (await readFile(qualificationURL, 'utf8')).replace(
+  /\bfrom\s+(['"])([^'"]+)\1/g,
+  (_, quote, specifier) => `from ${quote}${specifier.startsWith('.') ? new URL(specifier, qualificationURL).href : import.meta.resolve(specifier)}${quote}`,
+)
+const { proveNativeRaster, computedFeatureEligibility } = await import(
+  `data:text/javascript;base64,${Buffer.from(`${qualificationSource}\nexport { computedFeatureEligibility }\n`).toString('base64')}`,
+)
 
 // Real parser/material/section/surface consumer, with independent Three raycasts
 // generating the synthetic fixture's complete finite ID and depth planes.
@@ -31,10 +44,14 @@ function rawFixture(sharedEdge = false) {
     const a = ring(0.2, 0.06, k), b = ring(0.4, 0.06, k), c = ring(0.4, 0.06, (k + 1) % 8), d = ring(0.2, 0.06, (k + 1) % 8)
     occluderIndices.push(add(a, b, c), add(a, c, d))
   }
-  const positions = new Float32Array(triangles.flat()), normals = new Float32Array(positions.length), indices = Uint32Array.from({ length: positions.length / 3 }, (_, i) => i)
+  const positions = new Float32Array(triangles.flat()), indices = Uint32Array.from({ length: positions.length / 3 }, (_, i) => i)
+  return { raw: rawGLB(positions, indices, 'same-authentic-head-body'), floorIndices, occluderIndices }
+}
+function rawGLB(positions, indices, name) {
+  const normals = new Float32Array(positions.length)
   for (let i = 0; i < normals.length; i += 3) normals[i + 1] = 1
   const binary = Buffer.concat([positions, normals, indices].map(a => Buffer.from(a.buffer)))
-  const document = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ name: 'same-authentic-head-body', mesh: 0 }], buffers: [{ byteLength: binary.length }],
+  const document = { asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ name, mesh: 0 }], buffers: [{ byteLength: binary.length }],
     bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: positions.byteLength }, { buffer: 0, byteOffset: positions.byteLength, byteLength: normals.byteLength }, { buffer: 0, byteOffset: positions.byteLength + normals.byteLength, byteLength: indices.byteLength }],
     accessors: [{ bufferView: 0, componentType: 5126, count: positions.length / 3, type: 'VEC3' }, { bufferView: 1, componentType: 5126, count: normals.length / 3, type: 'VEC3' }, { bufferView: 2, componentType: 5125, count: indices.length, type: 'SCALAR' }],
     materials: [{ name: 'opaque-native-fixture', doubleSided: true, pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 1 } }],
@@ -43,7 +60,7 @@ function rawFixture(sharedEdge = false) {
   const header = Buffer.alloc(20), binHeader = Buffer.alloc(8)
   header.writeUInt32LE(0x46546c67, 0); header.writeUInt32LE(2, 4); header.writeUInt32LE(28 + padded.length + binary.length, 8); header.writeUInt32LE(padded.length, 12); header.writeUInt32LE(0x4e4f534a, 16)
   binHeader.writeUInt32LE(binary.length, 0); binHeader.writeUInt32LE(0x004e4942, 4)
-  return { raw: Buffer.concat([header, padded, binHeader, binary]), floorIndices, occluderIndices }
+  return Buffer.concat([header, padded, binHeader, binary])
 }
 function packDepth(depth) {
   const value = Math.round(Math.min(1, Math.max(0, depth)) * (2 ** 24 - 1)) / (2 ** 24 - 1)
@@ -56,6 +73,99 @@ function triangleRecord(primitive, triangleIndex) {
   const vertexIndices = Array.from(primitive.index.subarray(triangleIndex * 3, triangleIndex * 3 + 3))
   const localPointsMetres = vertexIndices.map(index => Array.from(primitive.positions.subarray(index * 3, index * 3 + 3)))
   return { triangleIndex, vertexIndices, localPointsMetres }
+}
+function featureEligibility(expectedDraw, entries, posedMap, raster) {
+  const inventory = { drawables: [...posedMap].map(([path, pose]) => ({ path, restMatrixF64: [...pose.matrixWorld] })) }
+  // These finite geometry fixtures claim no protected-original motion law or
+  // fixed/moving CHECK authority. The actual first-surface consumer still runs.
+  const poseOracle = { inventory, solve: async () => { throw new Error('Controlled fixture has no original CPU motion qualification') } }
+  return computedFeatureEligibility({ ...expectedDraw, binding: { ...expectedDraw.binding, input: { crankTurns: 0, amplitudes: [0] }, partOverrides: [] } }, entries, posedMap, raster, poseOracle)
+}
+function rawHollowCylinder() {
+  const vertices = [], indices = [], sides = 8
+  for (const radius of [0.25, 0.125]) for (const y of [-0.25, 0.25]) for (let k = 0; k < sides; k++) {
+    const angle = (k % 4 + 0.5) * Math.PI / 4, sign = k < 4 ? 1 : -1
+    vertices.push([sign * radius * Math.cos(angle), y, sign * radius * Math.sin(angle)])
+  }
+  const quad = (a, b, c, d) => indices.push(a, b, c, a, c, d)
+  for (let k = 0; k < sides; k++) {
+    const next = (k + 1) % sides
+    quad(k, next, sides + next, sides + k)
+  }
+  const outerTriangleIndices = Array.from({ length: indices.length / 3 }, (_, i) => i)
+  for (let k = 0; k < sides; k++) {
+    const next = (k + 1) % sides
+    quad(2 * sides + k, 3 * sides + k, 3 * sides + next, 2 * sides + next)
+    // Closed annular ends, not disks: the complete axis is a genuine void.
+    quad(k, 2 * sides + k, 2 * sides + next, next)
+    quad(sides + k, sides + next, 3 * sides + next, 3 * sides + k)
+  }
+  return { raw: rawGLB(new Float32Array(vertices.flat()), new Uint32Array(indices), 'closed-indexed-hollow-native-shaft'), outerTriangleIndices }
+}
+
+async function hollowAxisFixture() {
+  const { raw, outerTriangleIndices } = rawHollowCylinder(), parsed = parseNativeRawGLB(raw), model = { ...parsed, rawSHA256: sha256(raw) }
+  const primitive = [...model.primitives.values()][0], path = primitive.path
+  const edgeIncidence = new Map()
+  for (let offset = 0; offset < primitive.index.length; offset += 3) for (const [a, b] of [[0, 1], [1, 2], [2, 0]]) {
+    const endpoints = [primitive.index[offset + a], primitive.index[offset + b]].sort((x, y) => x - y), key = endpoints.join(',')
+    edgeIncidence.set(key, (edgeIncidence.get(key) ?? 0) + 1)
+  }
+  assert.ok([...edgeIncidence.values()].every(count => count === 2), 'the indexed hollow shaft must be a closed two-manifold, including annular ends')
+  const cycles = [-0.125, 0.125].map(y => {
+    const section = nativeHorizontalSections(primitive, y)
+    assert.equal(section.cycles.length, 2, 'a hollow shaft has separate closed outer and inner raw section loops')
+    const cycle = section.cycles.find(row => canonicalJson(row.triangleIndices) === canonicalJson(outerTriangleIndices))
+    assert.ok(cycle, 'independently frozen support must select the complete outer section')
+    return cycle
+  })
+  const binding = { sourceVideoId: 'private-closed-hollow-axis-control', sourceSha256: '0'.repeat(64), sourceImage: { pixelFormat: 'bgr8', sha256Bgr8: '1'.repeat(64), width: WIDTH, height: HEIGHT, frameIndex: 0 }, decodedFrameIndex: 0, decodedTimestampTicks: '0', timeBase: '1/1', decodedTimeSeconds: 0, shotId: 'one', viewId: 'main' }
+  const evidence = { originalSourceBinding: binding }, anchorId = 'virtual-hollow-axis'
+  const witness = Object.freeze({ anchorId, partPath: path, rawPrimitiveSHA256: primitive.rawPrimitiveSHA256, sourceFeatureEvidenceSHA256: jsonDigest(evidence),
+    kind: 'geometric-axis', construction: 'axis-from-two-native-sections-v1', sectionPlaneLocal: Object.freeze([0, 1, 0, 0.125]),
+    secondSectionPlaneLocal: Object.freeze([0, 1, 0, -0.125]), rimTriangleIndices: Object.freeze([...outerTriangleIndices]), axisPointCoordinate: 0 })
+  const feature = verifyNativeMeshFeatureWitness(witness, primitive)
+  assert.equal(feature.pointIsSurfacePoint, false)
+  assert.ok(Math.hypot(...feature.localPointMetres) <= 1e-7, 'the independently section-derived point must lie in the shaft void')
+  assert.ok(cycles.every(cycle => cycle.endpoints.every(endpoint => Math.hypot(endpoint.localMetres[0], endpoint.localMetres[2]) > 0.125)))
+  const matrix = new Matrix4().makeRotationY(0.21); matrix.setPosition(0.03125, -0.0625, 0.015625)
+  const axisPoint = new Vector3().fromArray(feature.localPointMetres).applyMatrix4(matrix)
+  const cameraObject = new PerspectiveCamera(90, 1, 0.005, 100)
+  cameraObject.position.copy(new Vector3(1, 0.125, 0.1875).applyMatrix4(matrix)); cameraObject.lookAt(axisPoint)
+  cameraObject.updateProjectionMatrix(); cameraObject.updateMatrixWorld(true)
+  const camera = { view: cameraObject.matrixWorldInverse, projection: cameraObject.projectionMatrix, inverseProjection: cameraObject.projectionMatrixInverse, world: cameraObject.matrixWorld }
+  const projected = axisPoint.clone().project(cameraObject), pixel = [Math.floor((projected.x + 1) * WIDTH / 2), Math.floor((projected.y + 1) * HEIGHT / 2)]
+  const geometry = new BufferGeometry(); geometry.setAttribute('position', new Float32BufferAttribute(primitive.positions, 3)); geometry.setIndex(Array.from(primitive.index))
+  const material = new MeshStandardMaterial({ side: DoubleSide }), mesh = new Mesh(geometry, material)
+  mesh.matrixAutoUpdate = false; mesh.matrix.copy(matrix); mesh.updateMatrixWorld(true)
+  const raycaster = new Raycaster(), idBytes = new Uint8Array(WIDTH * HEIGHT * 4), colorBytes = new Uint8Array(idBytes.length), depthBytes = new Uint8Array(idBytes.length)
+  let actualAnchor = null
+  for (let y = 0; y < HEIGHT; y++) for (let x = 0; x < WIDTH; x++) {
+    raycaster.setFromCamera(new Vector2((x + 0.5) / WIDTH * 2 - 1, (y + 0.5) / HEIGHT * 2 - 1), cameraObject)
+    const hit = raycaster.intersectObject(mesh, false).find(row => { const p = row.point.clone().project(cameraObject); return p.z >= -1 && p.z <= 1 })
+    const offset = (y * WIDTH + x) * 4
+    if (!hit) { depthBytes.set([255, 255, 255, 255], offset); continue }
+    idBytes.set([1, 0, 0, 255], offset); colorBytes.set([255, 255, 255, 255], offset)
+    depthBytes.set(packDepth(hit.point.clone().project(cameraObject).z * 0.5 + 0.5), offset)
+    if (x === pixel[0] && y === pixel[1]) actualAnchor = { triangleIndex: hit.faceIndex, worldPointMetres: hit.point.toArray() }
+  }
+  geometry.dispose(); material.dispose()
+  assert.ok(actualAnchor && outerTriangleIndices.includes(actualAnchor.triangleIndex), 'the independently cast virtual-axis ray must genuinely hit its sealed outer section triangle')
+  assert.ok(new Vector3().fromArray(actualAnchor.worldPointMetres).distanceTo(axisPoint) > 0.125, 'the opaque wall hit must be physically separate from the virtual void point')
+  const objects = new Map(), put = bytes => { const hash = sha256(bytes); objects.set(hash, bytes); return hash }, json = value => put(Buffer.from(canonicalJson(value)))
+  const reader = createNativeByteReader({ get: async hash => { assert.ok(objects.has(hash)); return objects.get(hash) } })
+  const plane = (encoding, targetSemantics, bytes) => ({ width: WIDTH, height: HEIGHT, origin: 'bottom-left', coordinateSpace: 'native-viewport', viewportBackingPixels: [0, 0, WIDTH, HEIGHT], encoding, depthBits: 24,
+    bytes: { objectSHA256: put(bytes), objectByteLength: bytes.length, byteOffset: 0, byteLength: bytes.length, scalar: 'u8', components: 4, count: WIDTH * HEIGHT }, targetSemantics, sampleCount: 0, textureColorSpace: '', depthAttachment: { type: 'fixture-depth24', bits: 24 } })
+  const receipt = { raster: { nativeMaterialRGBA: plane('rgba8', 'actual-production-material-offscreen', colorBytes), nativeMaterialDepth: plane('three-rgba-depth-v1', 'actual-production-material-offscreen', depthBytes),
+    nativePathID: plane('path-id-rgb24-low-r', 'depth-tested-native-id-diagnostic', idBytes), nativeIDDepth: plane('three-rgba-depth-v1', 'depth-tested-native-id-diagnostic', depthBytes) } }
+  const materialProof = await createNativeMaterialProof({ rawGLBBytes: raw, model }), expectedMaterial = materialProof.expectedFor(primitive)
+  const descriptor = Object.fromEntries(['schemaVersion', 'type', 'name', 'properties', 'clippingPlanes', 'textures'].map(key => [key, expectedMaterial[key]]))
+  const expectedDraw = { binding, witnesses: [witness], sourceFrame: {}, sourceView: {}, bodyProof: { rays: [{ anchorId, pixel }], sourceFeatures: [{ anchorId, evidence }], featureSupports: [], contours: [] } }
+  const entry = { primitive, springOracle: null, attributes: { position: primitive.attributes.POSITION, normal: primitive.attributes.NORMAL } }
+  const entries = new Map([[path, entry]]), posedMap = new Map([[path, { matrixWorld: matrix.elements, effectiveVisibility: 'visible', springLengthM: null, binding: null, bindingOwnerPath: null, station: null }]])
+  const result = await proveNativeRaster(reader, receipt, expectedDraw, entries, posedMap, camera, new Map(), materialProof, [{ path, materialSlotsSHA256: [json(descriptor)] }])
+  const features = await featureEligibility(expectedDraw, entries, posedMap, result)
+  return { result, features, actualAnchor, axisPoint: axisPoint.toArray(), outerTriangleIndices }
 }
 
 async function fixture(includeFloorSupports, boundaryControl = null) {
@@ -157,8 +267,10 @@ async function fixture(includeFloorSupports, boundaryControl = null) {
   })
   const expectedDraw = { binding, witnesses: [witness], sourceFrame: {}, sourceView: {}, bodyProof: { rays, sourceFeatures: [{ anchorId, evidence }], featureSupports: wallControl ? [] : [support], contours: [] } }
   const entry = { primitive, springOracle: null, attributes: { position: primitive.attributes.POSITION, normal: primitive.attributes.NORMAL } }, matrixWorld = new Matrix4().elements
-  const result = await proveNativeRaster(reader, receipt, expectedDraw, new Map([[path, entry]]), new Map([[path, { matrixWorld, effectiveVisibility: 'visible', springLengthM: null }]]), camera, new Map(), materialProof, [{ path, materialSlotsSHA256: [json(descriptor)] }])
-  return { result, floorIndices, endpointCount: cycle.endpoints.length, actualAnchor, occluderIndices, marker: feature.localPointMetres, markerPixel: rays[0].pixel, path }
+  const entries = new Map([[path, entry]]), posedMap = new Map([[path, { matrixWorld, effectiveVisibility: 'visible', springLengthM: null, binding: null, bindingOwnerPath: null, station: null }]])
+  const result = await proveNativeRaster(reader, receipt, expectedDraw, entries, posedMap, camera, new Map(), materialProof, [{ path, materialSlotsSHA256: [json(descriptor)] }])
+  const features = await featureEligibility(expectedDraw, entries, posedMap, result)
+  return { result, features, floorIndices, endpointCount: cycle.endpoints.length, actualAnchor, occluderIndices, marker: feature.localPointMetres, markerPixel: rays[0].pixel, path }
 }
 
 test('same-body occlusion is not visible native rim support', async () => {
@@ -174,9 +286,11 @@ test('same-body occlusion is not visible native rim support', async () => {
 })
 
 test('two distinct visible native floor facets qualify without claiming occluded rim visibility', async () => {
-  const { result, floorIndices, endpointCount } = await fixture(true)
+  const { result, features, floorIndices, endpointCount } = await fixture(true)
   assert.deepEqual(result.failures, [])
   assert.deepEqual(result.gaps, [])
+  assert.equal(features[0].status, 'qualified')
+  assert.equal(features[0].firstSurface, true, 'a genuine visible floor feature must retain first-surface authority')
   const support = result.witnesses[0].footprint
   assert.equal(support.rawClosedSection, true)
   assert.equal(support.visibleRimCount, 0)
@@ -191,9 +305,11 @@ test('two distinct visible native floor facets qualify without claiming occluded
 })
 
 test('shared-edge marker retains genuine first-surface support on its declared floor facet', async () => {
-  const { result, floorIndices, actualAnchor, marker } = await fixture(true, 'declared-floor')
+  const { result, features, floorIndices, actualAnchor, marker } = await fixture(true, 'declared-floor')
   assert.deepEqual(result.failures, [])
   assert.deepEqual(result.gaps, [])
+  assert.equal(features[0].status, 'qualified')
+  assert.equal(features[0].firstSurface, true)
   const witness = result.witnesses[0]
   assert.equal(witness.nearestHit.triangleIndex, floorIndices[0])
   assert.equal(witness.nearestHit.triangleIndex, actualAnchor.triangleIndex)
@@ -201,9 +317,11 @@ test('shared-edge marker retains genuine first-surface support on its declared f
 })
 
 test('shared-edge marker admits the authentic coplanar neighbouring floor first hit', async () => {
-  const { result, floorIndices, actualAnchor, marker, markerPixel } = await fixture(true, 'coplanar-neighbour')
+  const { result, features, floorIndices, actualAnchor, marker, markerPixel } = await fixture(true, 'coplanar-neighbour')
   assert.deepEqual(result.failures, [])
   assert.deepEqual(result.gaps, [])
+  assert.equal(features[0].status, 'qualified')
+  assert.equal(features[0].firstSurface, true, 'an incident coplanar neighbouring floor remains genuine surface support')
   const witness = result.witnesses[0]
   assert.equal(witness.nearestHit.triangleIndex, floorIndices[1])
   assert.equal(witness.nearestHit.triangleIndex, actualAnchor.triangleIndex)
@@ -225,4 +343,19 @@ test('shared-edge incidence never admits a nearer noncoplanar face of the same n
   assert.ok(occluderIndices.includes(witness.nearestHit.triangleIndex))
   assert.ok(Math.abs(witness.nearestHit.worldPointMetres[1] - Math.fround(0.06)) <= 1e-7)
   assert.ok(witness.nearestHit.worldPointMetres[1] > marker[1])
+})
+
+test('an admitted wall ray never turns a closed hollow-shaft virtual axis into an opaque first-surface feature', async () => {
+  const { result, features, actualAnchor, axisPoint, outerTriangleIndices } = await hollowAxisFixture()
+  assert.deepEqual(result.failures, [], 'authentic raw geometry, material, ID and depth admission must succeed before the feature-authority assertion')
+  assert.deepEqual(result.gaps, [], 'the control must reach final feature eligibility without an unrelated missing prerequisite')
+  const rasterWitness = result.witnesses[0]
+  assert.equal(rasterWitness.pointIsSurfacePoint, false)
+  assert.equal(rasterWitness.nearestHit.triangleIndex, actualAnchor.triangleIndex)
+  assert.ok(outerTriangleIndices.includes(rasterWitness.nearestHit.triangleIndex))
+  assert.ok(new Vector3().fromArray(rasterWitness.nearestHit.worldPointMetres).distanceTo(new Vector3().fromArray(axisPoint)) > 0.125)
+  assert.equal(features[0].firstSurface, false, 'a verified virtual axis in the shaft void cannot inherit opaque first-surface authority from a different supporting wall point')
+  assert.equal(features[0].status, 'unmeasured')
+  assert.equal(features[0].firstSurfaceProof, null)
+  assert.ok(new Vector3().fromArray(features[0].posedPointMetres).distanceTo(new Vector3().fromArray(axisPoint)) <= 1e-7, 'the camera-only analytic point remains available without opaque surface authority')
 })

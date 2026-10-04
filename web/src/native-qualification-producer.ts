@@ -320,7 +320,8 @@ export function createNativeQualificationProducer({ machine, viewer }: { machine
       inventory = machine.nativeQualificationInventory()
       paths.clear(); for (const entry of inventory) paths.set(entry.object, entry.path)
       presentationEntries.clear(); for (const entry of viewer.nativeQualificationPresentationInventory()) presentationEntries.set(entry.object, entry)
-      viewEpochs.set(viewId, epoch); observer!.begin(`${epoch}:${viewId}`)
+      const viewKey = `${epoch}:${viewId}`
+      viewEpochs.set(viewId, epoch); materialCapture!.beginView(viewKey); observer!.begin(viewKey)
     },
     enableCapture(): void {
       requireValue(!disposed, 'producer was disposed')
@@ -348,6 +349,7 @@ export function createNativeQualificationProducer({ machine, viewer }: { machine
         for (const key of context.consumerVerifiedPhysicalStates) verifiedPhysicalStates.add(key)
         const capture = context.sceneCapture, epoch = viewEpochs.get(binding.viewId), generation = viewGeneration
         requireValue(capture.status === 'captured' && capture.viewId === binding.viewId && epoch === binding.sourceDrawRevision && capture.drawRevision === epoch && capture.completedDrawEpoch === binding.completedSceneDrawEpoch && capture.timeSeconds === binding.timeSeconds, 'completed scene/source draw epoch is stale')
+        const viewKey = `${epoch}:${binding.viewId}`
         // Keep the independently bound raw camera. Model only the original
         // Scene write/read convention, using logical dimensions, never ceil FBOs.
         const logicalDimensions: readonly [number, number] = binding.resolvedImagePlaneWarp?.unwarpedViewportPixels ?? [binding.rectSourcePixels[2], binding.rectSourcePixels[3]]
@@ -369,7 +371,7 @@ export function createNativeQualificationProducer({ machine, viewer }: { machine
           const entry = inventory[index]!, state = capture.drawables[index]!
           requireValue(state.path === entry.path && state.bindingOwnerPath === entry.bindingOwnerPath && state.station === entry.station && canonicalJson(serializeNativeBinding(state.binding)) === canonicalJson(serializeNativeBinding(entry.binding)), 'same-epoch actual binding/owner inventory differs')
           const materialSlotsSHA256: string[] = []
-          for (const material of state.materials) materialSlotsSHA256.push(await materialCapture!.capture(material, byteSink))
+          for (const material of state.materials) materialSlotsSHA256.push(await materialCapture!.capture(material, byteSink, viewKey))
           states.push({ path: state.path, matrixWorldF64: await put(arrayBytes(state.matrixWorld), { scalar: 'f64le', components: 16, count: 1 }, 'static'), effectiveVisibility: state.effectiveVisibility,
             groups: state.groups, drawRange: state.drawRange, materialSlotsSHA256, bindingOwnerPath: state.bindingOwnerPath, binding: serializeNativeBinding(state.binding), station: state.station, springLengthM: state.springLengthM })
         }

@@ -1038,6 +1038,15 @@ raster inputs. Opaque custom closure/resource changes still require the normal
 Three material/texture update signal or the machine's physical revision;
 these observations do not qualify arbitrary custom shader semantics.
 
+Material capture requires an exact `epoch:viewId` key for `beginView` and
+`capture`. Draw records are retained per view only within the current epoch;
+advancing the epoch clears earlier authority. A nondrawn material describes its
+current installed properties, but texture/sampler evidence remains unmeasured
+without a standard draw in that view. Missing or foreign keys cannot borrow a
+different view's descriptor. Presentation records and failures use the same
+ownership boundary: taking one view consumes only that view, and malformed
+own-view rows remain available for Node refusal rather than being filtered out.
+
 The actual BEFORE receipt
 `web/.vite/verification-output/native-p2-transition-controls-2026-10-03T23-51-08-172Z.json`
 reproduced the defects on the original Intro **1.8018 s** viewer. Unchanged
@@ -1087,12 +1096,44 @@ Earlier views remain readable through later per-view inputs in the completed
 batch; a subsequent physical update and actual viewport change refuse old
 reads. All **69 created textures / 46 framebuffers / one buffer** are deleted,
 with **zero** created resources remaining live and ordinary references restored.
-No child ran builds, generators, browser or GPU controls. The actual AFTER
+No child ran builds, generators, browser or GPU controls. These earlier AFTER
 fixtures had **no available landmark baseline**: their null landmark reads do
 not independently prove a landmark captured→stale transition. Genuine Plane
-clipping remains **unexecuted**. These are bounded lifecycle controls, not
-source-pixel, all-six, full-native, shader-numerical or canvas/offscreen-colour
-qualification, and they do not promote byte/code provenance or eligibility.
+clipping was **unexecuted in those fixtures**, not established as unavailable.
+These bounded controls do not establish source-pixel, all-six, full-native,
+shader-numerical or canvas/offscreen-colour qualification, and do not promote
+byte/code provenance or eligibility.
+
+The later parent-owned genuine-Plane receipt is
+`web/.vite/verification-output/native-genuine-plane-controls-20261004-2026-10-04T02-01-05-395Z.json`.
+The observed Vite Three module matched the existing scene/material prototypes.
+Both local and global passing→rejecting→recovery controls measured selected
+ID pixels **5,533→0→5,533**, with zero production/ID packed-depth disagreements
+on the original nonempty selected support. All four planes recovered exactly.
+Five material and five renderer clipping-state changes refused old observations
+without draws, submissions, upload/allocation/readback or state-changing calls;
+four side-effect-free `isContextLost` queries remained recorded. All restoration
+checks passed; **24 textures / 16 framebuffers / eight buffers** were created and
+deleted, with zero live-created handles. Landmark invalidation remains unproven.
+
+The material epoch control retained immutable `0f9bf11a2` before evidence and
+ran the current module on the same existing viewer:
+`web/.vite/verification-output/native-material-epoch-controls-current-2026-10-04T02-08-15-199Z.json`.
+Both changed-hidden arms previously borrowed old/foreign descriptors; all five
+current arms now match installed properties. Visible positives submit **88**
+standard draws; hidden arms submit **zero**. Seven behavioral controls also pass,
+including delayed earlier-view retrieval, epoch invalidation, missing-key refusal
+and nondrawn texture authority. Exact original state is restored; no viewer,
+context, material or tab is created.
+
+The presentation control uses the unchanged helper and source time
+**141.55808333333331 s** on the ten-view Spin layout. Immutable before takes each
+contained **35–42 foreign rows**. The current receipt
+`web/.vite/verification-output/native-presentation-epoch-controls-current-after-2026-10-04T02-09-25-814Z.json`
+retains all **43 own submissions**, with zero foreign rows in every take and
+exact observer/input/pose/camera/renderer restoration. Six behavioral controls
+also pass, including independent failure ownership and malformed own-row refusal.
+These are lifecycle and ownership proofs, not source/native acceptance.
 
 ### Browser verification
 

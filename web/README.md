@@ -553,14 +553,28 @@ verification passed for the **240-member** executed-source/output archive.
 These finite-state measurements do not establish source-camera correspondence,
 material/shadow pixels or six-video acceptance.
 
-The integrated native/source-consumer suite passed **198 tests**, including
-original CPU replay and Cartesian closed-section axis controls. The protected
-raw/delivery exporter recovered **six genuine Intro FIT controls**, while
-retaining **zero held-out CHECKs** and eight unavailable native mappings in that
-packet. Seven Python fit-boundary tests passed. New raw-axis constructions are
-camera diagnostics only: chosen source depth cannot authorize opaque surface
-support or become an independently measured CHECK. No old world coordinates or
-chosen mechanical inputs are promoted to observations.
+The explicitly admitted web contract suite passed **281 tests**, including
+original CPU replay, closed-section axes, surface support, material epoch/view
+ownership and presentation isolation. Seven Python fit-boundary tests passed.
+Virtual axes remain camera-only controls: a wall hit cannot turn an empty axis
+point into an opaque first surface. Warp-plus-mirror contour rays use the warp
+once, without an additional mirror.
+
+Current raw-geometry camera diagnostics retain the original source pixels and
+FIT/CHECK roles:
+
+| Source exposure | FIT / held-out CHECK | FIT RMS / maximum (px) | CHECK maximum (px) |
+|---|---:|---:|---:|
+| Intro 809 | 6 / 2 | 1.413 / 2.612 | 24.251 |
+| Analysis 426 | 6 / 2 | 9.848 / 16.579 | 5.011 |
+| Rocker 0 | 28 / 10 | 3.717 / 7.971 | 5.176 |
+| Synthesis 72 | 6 / 1 | Refused: missing second CHECK | — |
+
+The diagnostic bound is **38.4 px** at 1920-pixel source width. The earlier Intro
+six-FIT/zero-CHECK packet remains retained as a before control. Source depth,
+physical correspondence and mechanical inputs remain chosen, not independently
+measured. These candidates do not establish opaque support, camera/lens recovery,
+GPU fidelity or six-video acceptance; no historical world coordinates are reused.
 
 The historical source-v37 import produced the same result in two runs:
 

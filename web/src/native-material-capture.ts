@@ -7,9 +7,11 @@ export interface NativeMaterialByteSink {
   put(bytes: Uint8Array, options: { retention: 'static' }): Promise<{ sha256: string; byteLength: number }>
 }
 export interface NativeMaterialCapture {
+  /** Select the exact epoch:viewId before observing that view's standard draws. */
+  beginView(key: string): void
   /** Called immediately before the real standard draw; does not replace it. */
   observeDraw(material: THREE.Material): void
-  capture(material: THREE.Material, sink: NativeMaterialByteSink): Promise<string>
+  capture(material: THREE.Material, sink: NativeMaterialByteSink, key: string): Promise<string>
   dispose(): void
 }
 const propertyNames = [
@@ -66,7 +68,9 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
   const drawArrays = gl.drawArrays
   const versions = new WeakMap<WebGLTexture, number>()
   const cached = new WeakMap<WebGLTexture, { key: string; width: number; height: number; bytes: Uint8Array }>()
-  const snapshots = new WeakMap<THREE.Material, MaterialRecord>()
+  const snapshots = new Map<string, Map<THREE.Material, MaterialRecord>>()
+  let retainedEpoch: string | null = null
+  let currentViewSnapshots: Map<THREE.Material, MaterialRecord> | null = null
   const uploads = new WeakMap<NativeMaterialByteSink, Map<string, Promise<string>>>()
   const byteHashes = new WeakMap<Uint8Array, Promise<string>>()
   const mutationOriginals = new Map<string, (...args: unknown[]) => unknown>()
@@ -170,6 +174,7 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
     }
   }
   function textureSource(texture: THREE.Texture, slot: string, originalDraw: boolean): GpuSource | Unmeasured {
+    if (!originalDraw) return { authority: 'unmeasured-original-gpu-texture', reason: 'Original material has no actual standard draw in this view' }
     const properties = renderer.properties.get(texture) as { __webglTexture?: WebGLTexture; __version?: number }
     const installed = properties.__webglTexture
     if (!installed) return { authority: 'unmeasured-original-gpu-texture', reason: 'Original renderer has not installed this texture' }
@@ -179,7 +184,7 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
     const savedActive = gl.getParameter(gl.ACTIVE_TEXTURE) as number
     let unit = savedActive - gl.TEXTURE0
     let binding: Binding = { authority: 'renderer-installed-texture', uniform: null, unit: null, boundMatchesTexture: null }
-    const program = originalDraw ? gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null : null
+    const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null
     if (program) {
       const location = gl.getUniformLocation(program, slot)
       if (location !== null) {
@@ -242,12 +247,24 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
     return result
   }
   return {
-    observeDraw(material) { snapshots.set(material, snapshot(material, true)) },
-    async capture(material, sink) {
-      const record = snapshots.get(material) ?? snapshot(material, false), textures = []
+    beginView(key) {
+      insist(!disposed, 'Original material capture disposed')
+      const epoch = key.slice(0, key.indexOf(':'))
+      if (epoch !== retainedEpoch) { snapshots.clear(); retainedEpoch = epoch }
+      currentViewSnapshots = new Map()
+      snapshots.set(key, currentViewSnapshots)
+    },
+    observeDraw(material) {
+      insist(currentViewSnapshots, 'Original material capture view is unavailable')
+      currentViewSnapshots.set(material, snapshot(material, true))
+    },
+    async capture(material, sink, key) {
+      const viewSnapshots = snapshots.get(key)
+      insist(viewSnapshots, 'Original material capture view is unavailable')
+      const record = viewSnapshots.get(material) ?? snapshot(material, false), textures = []
       // Three temporarily changes DoubleSide to BackSide/FrontSide for its
       // approved transparent two-pass draw. Original side is restored before
-      // this same-epoch transaction serializes the material identity.
+      // this same-view transaction serializes the material identity.
       const properties = { ...record.properties, side: material.side }
       for (const texture of record.textures) {
         if (texture.source.authority === 'unmeasured-original-gpu-texture') { textures.push(texture); continue }
@@ -260,6 +277,7 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
     dispose() {
       if (disposed) return
       disposed = true
+      snapshots.clear(); currentViewSnapshots = null
       for (const [name, original] of mutationOriginals) mutable[name] = original
       mutationOriginals.clear()
       if (resources) {

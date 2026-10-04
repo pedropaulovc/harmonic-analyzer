@@ -715,7 +715,8 @@ async function computedFeatureEligibility(expectedDraw, entries, posedMap, raste
       row.restPointMetres = new Vector3().fromArray(feature.localPointMetres).applyMatrix4(new Matrix4().fromArray(originalInventory.get(witness.partPath).restMatrixF64)).toArray()
       row.posedPointMetres = new Vector3().fromArray(local).applyMatrix4(new Matrix4().fromArray(pose.matrixWorld)).toArray()
       const support = raster?.witnesses.find(item => item.anchorId === witness.anchorId)
-      if (support && !raster.failures.length && !raster.gaps.some(reason => reason.includes(witness.anchorId))) { row.firstSurface = true; row.firstSurfaceProof = support.nearestHit; row.status = 'qualified' }
+      if (!feature.pointIsSurfacePoint) row.reason = 'Virtual native feature is camera-only; opaque first-surface support unmeasured'
+      else if (support && !raster.failures.length && !raster.gaps.some(reason => reason.includes(witness.anchorId))) { row.firstSurface = true; row.firstSurfaceProof = support.nearestHit; row.status = 'qualified' }
       if (fixedEligibility.status === 'fixed') row.motion = 'fixed'
       features.push(row)
     } catch (error) { row.reason = error.message; features.push(row) }
