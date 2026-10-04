@@ -1,9 +1,7 @@
-# Copied from https://github.com/pedropaulovc/prechips/blob/0dd7614/examples/inventory/pedro-shop.toml
-# Inventory verification flags and author-choice process proposals are unchanged.
 # Pedro shop inventory, rev 6. No purchases or measurements added.
 # YAML nulls are the explicit string "unknown"; all original verify flags remain.
 # Category cutover: workholding → fixtures; measuring → gauges; collet/QCTP sets → holders.
-# Under PLAN rev 6, verify = true always makes dependent results unknown, not warn/pass.
+# Vendor verify flags remain; envelope facts require their own measured evidence.
 # Drill nominal diameters below are cited identities, not measured geometry.
 # Centre-drill angle_deg = 60 is a centre-seat angle, NOT a drill point_angle.
 stock = []
@@ -16,10 +14,18 @@ make = "Precision Matthews"
 source = "https://www.precisionmatthews.com/products/pm-30mv"
 control = "cncjs over grbl-class controller; operated manually via XHC WHB04B-6 pendant + EL400 DRO emulator"
 operation_mode = "manual_with_digital_positioning"
-spindle_to_table_max_in = 17
 headstock_tilt_deg = 90
 note = "CNC conversion replaces leadscrews/dials; travels may differ slightly — measure soft limits in grbl ($130-$132)."
 verify = true
+
+[machines.PM-30MV.envelope]
+spindle_to_table_max_in = { value = 17, verify = true }
+spindle_to_table_min_mm = "unknown"
+
+[machines.PM-30MV.envelope.travel_in]
+x = { value = 23, verify = true }
+y = { value = 8.75, verify = true }
+z = { value = 14, verify = true }
 
 [machines.PM-30MV.spindle]
 taper = "R8"
@@ -30,16 +36,6 @@ hp = 2
 drive = "belt_bldc"
 two_ranges = true
 
-[machines.PM-30MV.travel_in]
-x = 23
-y = 8.75
-z = 14
-quill = 3
-
-[machines.PM-30MV.table_in]
-length = 33
-width = 8.25
-t_slot = "9/16 (14 mm)"
 
 [machines.PM-30MV.leadscrew]
 tpi = 10
@@ -566,7 +562,7 @@ standard = "R8"
 drawbar = "7/16-20"
 sizes_in = ["1/8", "3/16", "1/4", "5/16", "3/8", "7/16", "1/2", "9/16", "5/8", "11/16", "3/4", "13/16", "7/8"]
 runout_max_in = 0.0005
-gauge_len = "unknown"
+gauge_len_mm = "unknown"
 grip_mm = "unknown"
 
 [holders.r8-collets-lms-4860.source]
@@ -580,7 +576,7 @@ standard = "unknown"
 sizes_mm = []
 present = "unknown"
 verify = true
-gauge_len = "unknown"
+gauge_len_mm = "unknown"
 grip_mm = "unknown"
 
 [holders.lathe-collets]
@@ -589,7 +585,7 @@ standard = "unknown"
 note = "PM offers ER-40 / 5C D1-4 chucks as options; none confirmed"
 present = "unknown"
 verify = true
-gauge_len = "unknown"
+gauge_len_mm = "unknown"
 grip_mm = "unknown"
 
 [holders.qctp-axa-lms-2280]
@@ -598,7 +594,7 @@ series = "AXA"
 max_shank_in = 0.5
 note = "QCTP marked 250-111 seen on the JET in photos; confirm it is this set and that it moved to the PM-1127"
 verify = true
-gauge_len = "unknown"
+gauge_len_mm = "unknown"
 grip_mm = "unknown"
 
 [holders.qctp-axa-lms-2280.holders]

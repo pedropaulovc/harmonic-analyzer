@@ -82,6 +82,18 @@ SOURCE_MAP = {
         "harmonic-analyzer/cad/scripts/build_cone_pivot_post.py:10-16,372-395",
         (("body stands on Top at y=0",), ('create_sketch("Top")', "depth=BLOCK_HEIGHT")),
     ),
+    "cone_head_frame": (
+        "harmonic-analyzer/cad/scripts/build_cone_pivot_post.py:399-429",
+        (("HEAD_BASE_Y..BLOCK_HEIGHT", 'base_plane="Top Plane", offset=HEAD_BASE_Y', "depth=HEAD_HEIGHT"),),
+    ),
+    "cone_crank_axis": (
+        "harmonic-analyzer/cad/scripts/build_cone_pivot_post.py:439-478",
+        (("Straight crank boss along +Z", "offset=CRANK_BOSS_START_Z", "CRANK_BORE_HEIGHT,", "depth=CRANK_BOSS_LENGTH"),),
+    ),
+    "cone_journal_axis": (
+        "harmonic-analyzer/cad/scripts/build_cone_pivot_post.py:126-136",
+        (("journal axis runs through (0, BORE_HEIGHT, 0)", "(sin I, 0, cos I)", "CONE_BOSS_LENGTH/2 either side"),),
+    ),
     "rocker_datum_a": (
         "harmonic-analyzer/cad/scripts/draw_rocker_arm.py:476-495",
         (('datum="A"', "_require_datum_on_bore"),),
@@ -243,6 +255,51 @@ def _drilled_band(model: float, places: int) -> list[float]:
     # Precision is metadata, not evidence that a Python-rounded helper string
     # replaced the callout's diameter or re-centred its drilled-hole band.
     return _band(model, places, (float(row["plus_mm"]), -float(row["minus_mm"])))
+
+
+def _z_mm(
+    feature: dict[str, Any], low: float, high: float, cite: list[str],
+    frame: tuple[str, dict[str, Any]] | None = None,
+) -> None:
+    # prechips (rules/turned_profile.py, coordinates.py) reads z_mm as points
+    # on the feature frame's +Z axis, resolving that frame only from this
+    # manifest. It is the nominal extent of the feature's own surface along
+    # its turned axis -- never a cut-to-fit, setup or acceptance requirement.
+    feature["z_mm"] = [round(low, 12), round(high, 12)]
+    feature["cite"]["z_mm"] = list(cite)
+    if frame is not None:
+        name, source = frame
+        feature["frame"] = name
+        feature["cite"]["frame"] = list(source["cite"])
+        feature["cite"]["z_mm"] += source["cite"]
+
+
+def _cone_source_frames() -> dict[str, dict[str, Any]]:
+    """Rigid copies of model on the post's authored cylinder axes.
+
+    Geometry only: they carry no binding and propose no setup or fixture;
+    ``frames.setup`` stays unknown. Each +Z is a spec axis, so turned
+    features off model Z can state their axial z_mm extents.
+    """
+    # The journal axis, (sin I, 0, cos I): the journal bore's exported axis.
+    normal = cone.SURFACE_FINISHES[3].face.normal
+    axis = (-normal[0], -normal[2])
+    note = "geometry-only source frame on an authored spec axis; not a setup"
+    return {
+        # Body and head share the vertical post axis; the foot is at y=0.
+        "body_axis": {
+            "origin": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 0.0, -1.0], "z": [0.0, 1.0, 0.0],
+            "note": note, "cite": [*_cite(cone, "__frame__"), *_source_cite("cone_frame", "cone_head_frame")],
+        },
+        "crank_axis": {
+            "origin": [0.0, cone.CRANK_BORE_HEIGHT, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 1.0, 0.0], "z": [0.0, 0.0, 1.0],
+            "note": note, "cite": [*_cite(cone, "CRANK_BORE_HEIGHT"), *_source_cite("cone_frame", "cone_crank_axis")],
+        },
+        "cone_axis": {
+            "origin": [0.0, cone.BORE_HEIGHT, 0.0], "x": [axis[1], 0.0, -axis[0]], "y": [0.0, 1.0, 0.0], "z": [axis[0], 0.0, axis[1]],
+            "note": note, "cite": [*_cite(cone, "BORE_HEIGHT", "INCLINE_DEG", "SURFACE_FINISHES"), *_source_cite("cone_frame", "cone_journal_axis")],
+        },
+    }
 
 
 def _plane_between(
@@ -493,9 +550,27 @@ def _shaft_features() -> dict[str, dict[str, Any]]:
             "height": (_band(shaft.DOME_HEIGHT, p["DomeHeight"]), ("DOME_HEIGHT",)),
             "height_nominal": (shaft.DOME_HEIGHT, ("DOME_HEIGHT",)),
             "sphere_radius": (shaft.DOME_SPHERE_RADIUS, ("DOME_SPHERE_RADIUS",)),
+            "base_radius": (shaft.SHAFT_DIA / 2, ("SHAFT_DIA",)),
             "base_z": (z, ("__frame__",)), "note": (shaft.DOME_CALLOUT, ("DOME_CALLOUT",)),
         }, precision={"height": p["DomeHeight"]})
     result["south_dome"]["cite"]["base_z"] = _cite(bank, "PIVOT_SHAFT_LENGTH")
+    # Model Z is the turned axis, origin at the north end of the cylinder.
+    # Each O.D. spans its drawn length; the relief grooves overlay it at the
+    # shoulder faces, as prechips gives a groove priority over its cylinder.
+    # Each dome rises from a cylinder end to its apex.
+    north, south = -shaft.JOURNAL_LENGTH, shaft.SHOULDER_SOUTH_Z_MM
+    shoulder = ("JOURNAL_LENGTH", "SHOULDER_LENGTH", "SHOULDER_SOUTH_Z_MM")
+    length = bank.PIVOT_SHAFT_LENGTH
+    for name, low, high, names, bank_names in (
+        ("north_dome", 0.0, shaft.DOME_HEIGHT, ("DOME_HEIGHT",), ()),
+        ("pivot_journal", north, 0.0, ("JOURNAL_LENGTH",), ()),
+        ("north_relief", north, north + shaft.RELIEF_WIDTH, ("JOURNAL_LENGTH", "RELIEF_WIDTH"), ()),
+        ("shoulder_od", south, north, shoulder, ()),
+        ("south_relief", south - shaft.RELIEF_WIDTH, south, (*shoulder, "RELIEF_WIDTH"), ()),
+        ("pivot_bearing", -length, south, shoulder, ("PIVOT_SHAFT_LENGTH",)),
+        ("south_dome", -length - shaft.DOME_HEIGHT, -length, ("DOME_HEIGHT",), ("PIVOT_SHAFT_LENGTH",)),
+    ):
+        _z_mm(result[name], low, high, [*_cite(shaft, *names), *_cite(bank, *bank_names)])
     return result
 
 
@@ -557,13 +632,18 @@ def _cone_features() -> dict[str, dict[str, Any]]:
         "land_angle_nominal_deg": p["InclineAngle"],
     })
     crank["cite"].update({"separation": _cite(cone, "CRANK_ABOVE_CONE", "CRANK_ABOVE_CONE_BAND"), "height_from": _cite(cone, "CRANK_ABOVE_CONE"), "height_nominal": _cite(cone, "CRANK_BORE_HEIGHT"), "angularity_dia": _cite(cone, "CRANK_BORE_ANGULARITY_MM", "GEOMETRIC_CONTROLS"), "angularity_datums": _cite(cone, "GEOMETRIC_CONTROLS"), "dimension_type": _cite(cone, "BASIC_DIMENSIONS"), "land_angle_nominal_deg": _cite(cone, "INCLINE_DEG", "BASIC_DIMENSIONS")})
+    # The angularity zone over the boss length bounds the bore axis direction
+    # to this angle: a derived landing allowance, not a printed angle band,
+    # so it never joins the requirements beside the BASIC angle and its frame.
+    crank["angle_tol_deg"] = cone.CRANK_BORE_ANGLE_LIMIT_DEG
+    crank["cite"]["angle_tol_deg"] = _cite(cone, "CRANK_BORE_ANGLE_LIMIT_DEG")
     for side, x, dim in (("west", -cone.ATTACHMENT_X, "MountWestX"), ("east", cone.ATTACHMENT_X, "MountEastX")):
         name = f"mount_{side}"
         result[name] = _feature(cone, "hole", ["dia", "thru", "station"], {
             "at": ([x, cone.BLOCK_HEIGHT, 0.0], ("ATTACHMENT_X", "BLOCK_HEIGHT")), "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
             "dia": (_drilled_band(cone.ATTACHMENT_THRU_DIA, p[dim]), ("ATTACHMENT_THRU_DIA",)),
             "nominal_dia": (cone.ATTACHMENT_THRU_DIA, ("ATTACHMENT_THRU_DIA",)), "thru": (True, ("ATTACHMENT_THRU_DIA",)),
-            "station": (_band(cone.ATTACHMENT_X, p[dim]), ("ATTACHMENT_X",)), "station_nominal": (x, ("ATTACHMENT_X",)),
+            "station": (_band(x, p[dim]), ("ATTACHMENT_X",)), "station_nominal": (x, ("ATTACHMENT_X",)),
         }, precision={"dia": p[dim], "station": p[dim]})
         result[f"{name}_counterbore"] = _feature(cone, "counterbore", ["dia", "depth"], {
             "parent": (name, ("ATTACHMENT_THRU_DIA",)),
@@ -571,6 +651,19 @@ def _cone_features() -> dict[str, dict[str, Any]]:
             "depth": (_band(cone.ATTACHMENT_CBORE_DEPTH, p[dim]), ("ATTACHMENT_CBORE_DEPTH",)), "depth_ref": (cone.ATTACHMENT_CBORE_DEPTH, ("ATTACHMENT_CBORE_DEPTH",)),
         }, precision={"dia": p[dim], "depth": p[dim]})
         result[name]["cite"]["dia"] += _source_cite("cone_mount", "cone_mount_callout", "hole_callout")
+    # Axial extents along each cylinder's own spec axis. The body's O.D. ends
+    # where the coaxial, larger head begins; both bosses span their authored
+    # end faces (crank: CrankBossStartZ + CrankBossLen; cone: mid-plane pads).
+    frames = _cone_source_frames()
+    head = ("HEAD_BASE_Y", "BLOCK_HEIGHT", "HEAD_HEIGHT")
+    crank_ends = ("CRANK_BOSS_START_Z", "CRANK_BOSS_NORTH_FACE", "HEAD_DIA", "CRANK_BOSS_END_Z", "CRANK_BOSS_LENGTH", "CRANK_BOSS_LENGTH_IN")
+    for name, frame, low, high, names in (
+        ("body", "body_axis", 0.0, cone.HEAD_BASE_Y, head),
+        ("head", "body_axis", cone.HEAD_BASE_Y, cone.BLOCK_HEIGHT, head),
+        ("crank_boss", "crank_axis", cone.CRANK_BOSS_START_Z, cone.CRANK_BOSS_END_Z, crank_ends),
+        ("cone_boss", "cone_axis", -cone.CONE_BOSS_LENGTH / 2, cone.CONE_BOSS_LENGTH / 2, ("CONE_BOSS_LENGTH", "BLOCK_DIA")),
+    ):
+        _z_mm(result[name], low, high, _cite(cone, *names), (frame, frames[frame]))
     return result
 
 
@@ -661,6 +754,9 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         for key in ("axis", "at", "normal", "plane"):
             if key in feature:
                 feature["cite"][key] += frame_cite
+        if "z_mm" in feature:
+            # Source frames are rigid copies of model; cite each shared fact once.
+            feature["cite"]["z_mm"] = list(dict.fromkeys([*feature["cite"]["z_mm"], *frame_cite]))
     frames: dict[str, Any] = {"model": {"origin": [0.0, 0.0, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 1.0, 0.0], "z": [0.0, 0.0, 1.0], "cite": frame_cite}, "setup": UNKNOWN}
     datums: dict[str, Any] = {}
     if stem == "rocker_arm":
@@ -673,9 +769,11 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
         }
     elif stem == "cone_pivot_post":
         datums = {"A": {"feature": "journal_bore", "surface": "cone journal bore cylinder", "cite": _cite(cone, "PART_DATUMS")}, "B": {"feature": "foot_seat", "surface": "foot seat plane", "cite": _cite(cone, "PART_DATUMS")}}
+        frames.update(_cone_source_frames())
+    volume = {"volume_mm3": cone.HARVESTED_VOLUME_MM3, "volume_cite": _cite(cone, "HARVESTED_VOLUME_MM3")} if stem == "cone_pivot_post" else {}
     return {
         "part": dashed, "units": "mm", "precision": rocker_notes.DEFAULT_DRAWING_PRECISION if stem == "rocker_arm" else UNKNOWN,
-        "step": f"{dashed}.STEP", "step_sha256": UNKNOWN, "construction": construction, "cite_root": "harmonic-analyzer",
+        "step": f"{dashed}.STEP", "step_sha256": UNKNOWN, "construction": construction, **volume, "cite_root": "harmonic-analyzer",
         "cite": {"construction": construction_cite, "units": frame_cite, "precision": _cite(rocker_notes, "DEFAULT_DRAWING_PRECISION") if stem == "rocker_arm" else frame_cite, "frames": frame_cite},
         "drawing": {"number": row["number"], "revision": UNKNOWN, "cite": [*registry_cite("number"), *_source_cite("drawing_revision", "drawing_properties")]},
         "material": {"spec": row.get("material_specification", UNKNOWN), "name": row.get("material", UNKNOWN), "finish": row.get("finish", UNKNOWN), "thickness": UNKNOWN, "cite": registry_cite("material_specification", "material", "finish")},

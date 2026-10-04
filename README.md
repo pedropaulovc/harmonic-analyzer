@@ -161,8 +161,9 @@ Without a seat you can still run the offline gates
 glTF exports plus the drawing PDFs.
 
 Drawing-bound requirement manifests for the rocker arm, pivot shaft and cone
-pivot post are exported with named STEP face sets. The
-`check:traveler_rocker_arm` gate prints the committed process plan through
+pivot post are exported with named STEP face sets. Their
+`check:traveler_rocker_arm`, `check:traveler_pivot_shaft` and
+`check:traveler_cone_pivot_post` gates print the committed process plans through
 [prechips](https://github.com/pedropaulovc/prechips); shop blockers are advisory
 to this CAD gate, not permission to machine. See the
 [export/traveler contract](cad/docs/pipeline/features-travelers.md).
