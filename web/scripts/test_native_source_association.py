@@ -8,6 +8,7 @@ import struct
 import tempfile
 import unittest
 from unittest.mock import patch
+from test_source_adoption_reconciliation import approved_fixture_digest
 
 
 HERE = Path(__file__).resolve().parent
@@ -324,9 +325,14 @@ class SourceAdoptionBoundaryTests(SyntheticNativeFiles):
         root = self.root / 'historical'
         root.mkdir(exist_ok=True)
         video_id = document['source']['videoId']
-        for suffix, data in (('observations', document),
-                             ('source-track', supplement or document)):
+        final = copy.deepcopy(supplement or document)
+        final["kind"] = "compact-source-track"
+        for suffix, data in (('observations', document), ('source-track', final)):
             (root / f'{video_id}.{suffix}.json').write_text(json.dumps(data))
+        authority = patch.dict(adoption.RECORDED_SOURCE_LAYOUT_DIGESTS, {video_id: {
+            "observations": approved_fixture_digest(document), "source-track": approved_fixture_digest(final)}})
+        authority.start()
+        self.addCleanup(authority.stop)
         return root
 
     def test_adoption_retains_source_exposure_roles_pixels_layout_without_old_receipts(self):
@@ -340,9 +346,11 @@ class SourceAdoptionBoundaryTests(SyntheticNativeFiles):
         for key in ('timeSeconds', 'decodedTimeSeconds', 'decodedFrameIndex',
                     'sourceFrameIndex', 'nativeFrame', 'sourceImage', 'landmarks'):
             self.assertEqual(frame[key], original[key])
-        for key in ('id', 'rectSourcePixels', 'presentation', 'imagePlaneWarp',
+        for key in ('id', 'rectSourcePixels', 'presentation',
                     'composite', 'sourceViewIds', 'sourceViewMappingEvidence'):
             self.assertEqual(frame['views'][0][key], original['views'][0][key])
+        self.assertNotIn('imagePlaneWarp', frame['views'][0])
+        self.assertEqual(frame['views'][0]['retiredNativePresentation']['model'], native.HISTORICAL_SOURCE)
         for context in (frame, frame['views'][0]):
             self.assertIsNone(context['camera'])
             self.assertIsNone(context['mechanicalState']['input'])
@@ -384,7 +392,8 @@ class SourceAdoptionBoundaryTests(SyntheticNativeFiles):
     def test_supplemental_union_requires_exact_pts_hash_and_layout(self):
         for mismatch in (None, 'pts', 'hash', 'layout'):
             with self.subTest(mismatch=mismatch):
-                original = historical_document(adoption.common.VIDEO_IDS[0])['frames'][0]
+                document = historical_document(adoption.common.VIDEO_IDS[0])
+                original = document['frames'][0]
                 original['landmarks'] = original['landmarks'][:1]
                 supplement = copy.deepcopy(original)
                 supplement['landmarks'] = [{'anchorId': 'supplemental-check',
@@ -396,7 +405,12 @@ class SourceAdoptionBoundaryTests(SyntheticNativeFiles):
                 elif mismatch == 'layout':
                     supplement['views'][0]['rectSourcePixels'] = [0, 0, 320, 360]
                 frames = [adoption.source_frame(original)]
-                adoption.retain_supplemental_frames(frames, [supplement])
+                if mismatch == 'layout':
+                    with self.assertRaisesRegex(ValueError, 'layout'):
+                        adoption.retain_supplemental_frames(frames, [supplement], document['source'])
+                    self.assertEqual(frames, [adoption.source_frame(original)])
+                    continue
+                adoption.retain_supplemental_frames(frames, [supplement], document['source'])
                 if mismatch is None:
                     self.assertEqual(frames[0]['landmarks'],
                                      original['landmarks'] + supplement['landmarks'])
@@ -413,10 +427,11 @@ class SourceAdoptionBoundaryTests(SyntheticNativeFiles):
                                      supplement['views'][0]['rectSourcePixels'])
 
     def test_supplement_without_actual_pts_refuses_instead_of_borrowing(self):
-        frame = historical_document(adoption.common.VIDEO_IDS[0])['frames'][0]
+        document = historical_document(adoption.common.VIDEO_IDS[0])
+        frame = document['frames'][0]
         frame['decodedTimeSeconds'] = None
         with self.assertRaises(ValueError):
-            adoption.retain_supplemental_frames([], [frame])
+            adoption.retain_supplemental_frames([], [frame], document['source'])
 
     def test_historical_model_video_and_source_mismatch_refuse_adoption(self):
         video_id = adoption.common.VIDEO_IDS[0]
@@ -561,7 +576,11 @@ class SourceAdoptionBoundaryTests(SyntheticNativeFiles):
         root = self.write_historical(document, compact)
         (root / f'{video_id}.track.json').write_text(json.dumps(diagnostic))
         before = {path.name: path.read_bytes() for path in root.iterdir()}
-        result = adoption.adopt_video(video_id, self.association(), root)
+        with patch.dict(adoption.RECORDED_SOURCE_LAYOUT_DIGESTS,
+                        {video_id: {"observations": approved_fixture_digest(document),
+                                    "track": approved_fixture_digest(diagnostic),
+                                    "source-track": approved_fixture_digest(compact)}}):
+            result = adoption.adopt_video(video_id, self.association(), root)
         self.assertEqual(result['compactChangeTimesSeconds'], [0.1, 0.15, 0.25])
         for original in [*document['frames'], *diagnostic['frames'], *compact['frames']]:
             retained = next(frame for frame in result['frames']

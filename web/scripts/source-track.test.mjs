@@ -224,3 +224,213 @@ test('unavailable native features retain source pixels without accepting ghost p
     assert.throws(() => new CompactVideoReference(mutated, video), /Unavailable source features/)
   }
 })
+
+function crossfadeFixture() {
+  const track = fixture()
+  for (const frame of track.frames) {
+    frame.views = ['outgoing', 'incoming'].map((id, index) => ({
+      ...structuredClone(frame.views[0]), id,
+      composite: { mode: 'crossfade', groupId: 'source-dissolve', imageLayerId: id, opacity: index ? 0.7 : 0.3 },
+      compositeProvenance: { kind: 'chosen-unmeasured', evidence: 'Synthetic source-observed layer topology; numeric image weights chosen, not measured.' },
+    }))
+  }
+  return track
+}
+
+test('source crossfade retains ordered topology and chosen unmeasured alpha during playback', () => {
+  const track = crossfadeFixture(), reference = new CompactVideoReference(track, video)
+  for (const time of [0, 0.5, 1.5]) {
+    const sample = reference.at(time)
+    assert.equal(sample.state, 'approximate')
+    assert.deepEqual(sample.views.map(view => view.id), ['outgoing', 'incoming'])
+    for (const view of sample.views) {
+      const declared = track.frames[Math.floor(time)].views.find(item => item.id === view.id)
+      assert.deepEqual(view.composite, declared.composite)
+      assert.deepEqual(view.compositeProvenance, declared.compositeProvenance)
+      assert.deepEqual(view.sourceLayout.map(entry => [entry.viewId, entry.composite, entry.compositeProvenance]),
+        track.frames[Math.floor(time)].views.map(item => [item.id, item.composite, item.compositeProvenance]))
+    }
+  }
+})
+
+test('camera provenance cannot authorize missing malformed or falsely measured source alpha', () => {
+  for (const provenance of [undefined, null, {}, { kind: 'measured', evidence: 'Camera fit certificate' },
+    { kind: 'chosen-unmeasured', evidence: '   ' }, { kind: 'chosen-unmeasured', evidence: 'Candidate', measured: true }]) {
+    for (const cameraKind of ['source-fit', 'source-informed-framing']) {
+      const track = crossfadeFixture()
+      track.frames[0].views[0].compositeProvenance = provenance
+      track.frames[0].views[0].cameraProvenance.kind = cameraKind
+      assert.throws(() => new CompactVideoReference(track, video), /[Cc]omposite|crossfade/)
+    }
+  }
+  const opaque = fixture()
+  opaque.frames[0].views[0].compositeProvenance = { kind: 'measured', evidence: 'Not an approved alpha authority' }
+  assert.throws(() => new CompactVideoReference(opaque, video), /[Cc]omposite/)
+})
+
+const overrideCheckIds = ['override-check-left', 'override-check-right']
+function overrideFixture() {
+  const track = fixture()
+  track.anchors = overrideCheckIds.map(id => ({
+    id, kind: 'physical-feature', description: 'Synthetic CHECK identity for source override playback controls, not a measured native association.',
+  }))
+  for (const frame of track.frames) frame.landmarks = overrideCheckIds.map((anchorId, index) => ({
+    anchorId, viewId: 'main', role: 'check', status: 'observed', method: 'manual',
+    pixel: [400 + index * 800, 540], uncertaintyPx: 2,
+  }))
+  return track
+}
+function authoredOverrides(frame) {
+  const sourceEvidence = {
+    evidence: 'Synthetic original-source-shaped disassembly evidence for runtime controls only.',
+    sourceTimeSeconds: frame.decodedTimeSeconds, landmarkIds: [...overrideCheckIds],
+  }
+  return [
+    { partPath: 'harmonic-analyzer/channel/connecting-rod-1', visibility: 'visible',
+      worldPositionMetres: [0.123, 0.456, -0.078], worldQuaternion: [0, 0, 1, 0], ...sourceEvidence },
+    { partPath: 'harmonic-analyzer/channel/connecting-rod-2', visibility: 'hidden', ...sourceEvidence },
+  ]
+}
+
+test('authored absolute source poses and visibility survive exact and held selections then clear in both reused playback buffers', () => {
+  const track = overrideFixture(), overrides = authoredOverrides(track.frames[0])
+  viewAt(track, 0).partOverrides = overrides
+  const reference = new CompactVideoReference(track, video)
+  for (const time of [0, 0.75]) {
+    const view = reference.at(time).views[0]
+    assert.equal(view.partOverrides, overrides)
+    assert.equal(view.partOverrides[0].worldPositionMetres, overrides[0].worldPositionMetres)
+    assert.equal(view.partOverrides[0].worldQuaternion, overrides[0].worldQuaternion)
+    assert.equal(view.partOverrides[0].landmarkIds, overrides[0].landmarkIds)
+    assert.equal(view.partOverrides[1].visibility, 'hidden')
+    assertCamera(view.camera, cameraAt(0))
+    closeNumber(view.input.crankTurns, 0)
+    assert.equal(view.sourceSampling.selection, 'decoded-exposure')
+  }
+  const empty = reference.at(1).views[0].partOverrides
+  assert.deepEqual(empty, [])
+  assert.equal(reference.at(2).views[0].partOverrides, empty)
+  assert.equal(reference.at(0).views[0].partOverrides, overrides)
+  assert.equal(reference.at(1).views[0].partOverrides, empty)
+})
+
+test('different absolute placement visibility or source evidence holds the whole input and camera until the next authored frame', () => {
+  const changes = [
+    overrides => { overrides[0].worldPositionMetres = [0.321, 0.456, -0.078] },
+    overrides => { overrides[0].worldQuaternion = [0, 0, 0, 1] },
+    overrides => { overrides[0].visibility = 'hidden' },
+    overrides => { overrides[1].visibility = 'visible' },
+    overrides => { overrides[0].evidence = 'Different synthetic source evidence for the same absolute pose.' },
+    overrides => { overrides[0].landmarkIds = [...overrideCheckIds].reverse() },
+  ]
+  for (const change of changes) {
+    const track = overrideFixture()
+    // Same valid decoded exposure isolates the changed physical/evidence field
+    // from the independent timestamp boundary exercised below.
+    track.frames[0].decodedTimeSeconds = 0.5
+    track.frames[1].decodedTimeSeconds = 0.5
+    const from = authoredOverrides(track.frames[0]), next = authoredOverrides(track.frames[1])
+    change(next)
+    viewAt(track, 0).partOverrides = from
+    viewAt(track, 1).partOverrides = next
+    const reference = new CompactVideoReference(track, video), held = reference.at(0.5).views[0]
+    assert.equal(held.partOverrides, from)
+    assertCamera(held.camera, cameraAt(0))
+    closeNumber(held.input.crankTurns, 0)
+    assert.deepEqual(held.sourceSampling, {
+      fromTimeSeconds: 0, toTimeSeconds: 0, mix: 0, selection: 'decoded-exposure', cameraSelection: 'decoded-exposure',
+    })
+    const selected = reference.at(1).views[0]
+    assert.equal(selected.partOverrides, next)
+    assertCamera(selected.camera, cameraAt(1))
+    closeNumber(selected.input.crankTurns, 0.1)
+  }
+})
+
+test('a new source exposure is an override boundary even when its absolute pose and CHECK identities are unchanged', () => {
+  const track = overrideFixture()
+  for (const index of [0, 1]) viewAt(track, index).partOverrides = authoredOverrides(track.frames[index])
+  const held = interior(track)
+  assert.equal(held.partOverrides, viewAt(track, 0).partOverrides)
+  assertCamera(held.camera, cameraAt(0))
+  closeNumber(held.input.crankTurns, 0)
+  assert.equal(held.sourceSampling.selection, 'decoded-exposure')
+})
+
+test('identical complete authored override states do not disable existing input and camera continuity', () => {
+  const track = overrideFixture()
+  for (const index of [0, 1]) {
+    track.frames[index].decodedTimeSeconds = 0.5
+    viewAt(track, index).partOverrides = authoredOverrides(track.frames[index])
+  }
+  const view = interior(track)
+  assert.equal(view.partOverrides, viewAt(track, 0).partOverrides)
+  assertCamera(view.camera, cameraAt(0.5))
+  closeNumber(view.input.crankTurns, 0.05)
+  assert.equal(view.sourceSampling.selection, 'continuous')
+  assert.equal(view.sourceSampling.cameraSelection, 'continuous')
+})
+
+test('source overrides reject malformed containers foreign paths unknown physical fields and invalid absolute states', () => {
+  for (const overrides of [null, {}, 'hidden', [null], [[]]]) {
+    const track = overrideFixture()
+    viewAt(track, 0).partOverrides = overrides
+    assert.throws(() => new CompactVideoReference(track, video))
+  }
+  const invalid = [
+    { partPath: 'different-machine/channel/connecting-rod-1' },
+    { partPath: 'harmonic-analyzer/channel/*' },
+    { partPath: 'harmonic-analyzer/channel/connecting-rod-1?' },
+    { worldScale: [1, 1, 1] },
+    { matrixWorld: Array(16).fill(0) },
+    { visibility: 'transparent' },
+    { visibility: undefined },
+    { worldPositionMetres: [0, 1] },
+    { worldPositionMetres: new Float64Array([0, 1, 2]) },
+    { worldPositionMetres: [0, NaN, 2] },
+    { worldPositionMetres: Array(3) },
+    { worldQuaternion: [0, 0, 1] },
+    { worldQuaternion: [0, 0, 0, Infinity] },
+    { worldQuaternion: [0, 0, 0, 0] },
+    { worldQuaternion: [0, 0, 0, 2] },
+    { worldQuaternion: Array(4) },
+  ]
+  for (const fields of invalid) {
+    const track = overrideFixture()
+    viewAt(track, 0).partOverrides = [{ ...authoredOverrides(track.frames[0])[0], ...fields }]
+    assert.throws(() => new CompactVideoReference(track, video))
+  }
+  const duplicate = overrideFixture(), override = authoredOverrides(duplicate.frames[0])[0]
+  viewAt(duplicate, 0).partOverrides = [override, { ...override }]
+  assert.throws(() => new CompactVideoReference(duplicate, video))
+})
+
+test('authored source overrides need all original metadata fields bound to the current same-view observed CHECKs', () => {
+  const invalid = [
+    override => { delete override.evidence },
+    override => { delete override.sourceTimeSeconds },
+    override => { delete override.landmarkIds },
+    override => { delete override.evidence; delete override.sourceTimeSeconds; delete override.landmarkIds },
+    override => { override.evidence = ' \n\t ' },
+    override => { override.evidence = {} },
+    override => { override.sourceTimeSeconds = NaN },
+    override => { override.sourceTimeSeconds = 0.01 },
+    override => { override.landmarkIds = [] },
+    override => { override.landmarkIds = [overrideCheckIds[0], overrideCheckIds[0]] },
+    override => { override.landmarkIds = [1] },
+    override => { override.landmarkIds = Array(1) },
+    override => { override.landmarkIds = ['absent-original-check'] },
+    (_, track) => { track.frames[0].landmarks = [] },
+    (_, track) => { track.frames[0].landmarks[0].role = 'fit' },
+    (_, track) => {
+      track.frames[0].views.push({ ...structuredClone(viewAt(track, 0)), id: 'inset', partOverrides: undefined })
+      track.frames[0].landmarks[0].viewId = 'inset'
+    },
+  ]
+  for (const change of invalid) {
+    const track = overrideFixture(), override = authoredOverrides(track.frames[0])[0]
+    change(override, track)
+    viewAt(track, 0).partOverrides = [override]
+    assert.throws(() => new CompactVideoReference(track, video))
+  }
+})

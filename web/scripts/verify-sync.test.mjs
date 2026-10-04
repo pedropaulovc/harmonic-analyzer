@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 const { parseOptions, verificationGoal, finishReport, sourceCensus, sourceContourSidecar: joinSourceContours, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, measureFrame, measureContours, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } = await import(process.env.HARMONIC_VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
-import { jsonDigest, sourceLayoutForViews, MODEL_SHA256, MODEL_COMMIT, nativeBodyAssociationIndex } from './verify-reference.mjs'
+import { jsonDigest, sourceLayoutForViews, sameSourceLayout, sourceCompositeProvenanceError, MODEL_SHA256, MODEL_COMMIT, nativeBodyAssociationIndex, nativeFrameExposureError } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
 const BODY_PATH = 'harmonic-analyzer/channel/connecting-rod-20'
@@ -85,6 +85,91 @@ test('incremental runs select one video without requiring the other five', () =>
   assert.deepEqual(census.selected.map(row => row.timeSeconds), [1])
   assert.deepEqual(census.rows.filter(row => row.reasons.includes('mid-interval')).map(row => row.timeSeconds), [])
   assert.equal(options.scoped, true)
+})
+
+test('every-native-frame coverage retains every exact exposure and cannot borrow a nominal event pose', () => {
+  const clock = { ...native, pts: [0, 0.25, 0.5, 1, 2], observedSha256: '1'.repeat(64) }
+  const originals = clock.pts.map((time, index) => ({ ...frame(time), sourceImage: sourceImage(index, 'b'.repeat(64)) }))
+  originals[1].views.push({ id: 'original-inset' })
+  originals[1].unavailable = [{ anchorId: 'missing-native-check', viewId: 'original-inset', role: 'check', required: true, reason: 'Actual source CHECK unavailable' }]
+  const event = { ...originals[1], timeSeconds: 0.2500001 }
+  const source = { shots: observations.shots, frames: [...originals, event],
+    coverage: { requiredEveryNativeFrame: true, changeTimesSeconds: [event.timeSeconds] } }
+  const track = { frames: [originals[0], event, ...originals.slice(2)], coverage: {} }
+  const census = sourceCensus(source, track, clock, parseOptions(['--stage', '50']))
+  const exposures = census.rows.filter(row => row.reasons.includes('every-native-frame'))
+  assert.deepEqual(exposures.map(row => [row.timeSeconds, row.nativeFrameIndex]), clock.pts.map((time, index) => [time, index]))
+  assert.ok(exposures.every(row => row.required && !row.diagnosticOnly))
+  assert.equal(exposures[1].frame, null)
+  assert.ok(exposures[1].expectedViewIds.includes('original-inset'))
+  assert.equal(exposures[1].sourceUnavailable.find(item => item.anchorId === 'missing-native-check').required, true)
+  assert.equal(exposures[2].frame.sourceImage.frameIndex, 2)
+  const retainedEvent = census.rows.find(row => row.timeSeconds === event.timeSeconds)
+  assert.equal(retainedEvent.nativeFrameIndex, undefined)
+  assert.equal(retainedEvent.frame.timeSeconds, event.timeSeconds)
+})
+
+test('requested native exposures stay mandatory and cannot interpolate missing authored pose or source pixels', () => {
+  const clock = { ...native, pts: [0, 0.5, 1, 2], observedSha256: '1'.repeat(64) }
+  const originals = clock.pts.map((time, index) => ({ ...frame(time), sourceImage: sourceImage(index, 'b'.repeat(64)) }))
+  originals[1].landmarks = [{ anchorId: 'actual-source', pixel: [31, 47], role: 'check', status: 'observed', method: 'manual' }]
+  const source = { shots: observations.shots, frames: originals, coverage: { requiredEveryNativeFrame: true } }
+  const track = { frames: originals.filter(frame => frame.timeSeconds !== 0.5), coverage: {} }
+  const census = sourceCensus(source, track, clock, parseOptions(['--times', '0.5']))
+  assert.equal(census.selected.length, 1)
+  assert.equal(census.selected[0].nativeFrameIndex, 1)
+  assert.equal(census.selected[0].diagnosticOnly, false)
+  assert.equal(census.selected[0].frame, null)
+  assert.equal(census.rows.filter(row => Number.isInteger(row.nativeFrameIndex)).length, clock.pts.length)
+  const video = videoFixture()
+  video.samples = census.rows.filter(row => row.frame).map(row => ({
+    ...structuredClone(video.samples[0]), timeSeconds: row.timeSeconds, sampleTimeSeconds: row.frame.timeSeconds,
+    reasons: row.reasons, required: row.required, measurements: [measurement('fixed', 'fixed'), measurement('moving', 'moving')] }))
+  finishVideo(video, { ...census, selected: census.rows }, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, false)
+  assert.equal(video.coverage.missingCensusSamples, 1)
+})
+
+test('native exposure selection rejects nearby time, wrong frame, wrong source and changed original pixel bytes', () => {
+  const clock = { ...native, pts: [0, 0.5, 1, 2], observedSha256: '1'.repeat(64) }
+  const originals = clock.pts.map((time, index) => ({ ...frame(time), sourceImage: sourceImage(index, 'b'.repeat(64)) }))
+  const source = { shots: observations.shots, frames: originals, coverage: {} }
+  for (const mutate of [
+    selected => { selected.decodedTimeSeconds += 0.0001 },
+    selected => { selected.sourceImage.frameIndex = 2 },
+    selected => { selected.sourceImage.sourceSha256 = '2'.repeat(64) },
+    selected => { selected.sourceImage.sha256Bgr8 = 'c'.repeat(64) },
+    selected => { delete selected.sourceImage },
+  ]) {
+    const frames = structuredClone(originals)
+    mutate(frames[1])
+    const row = sourceCensus(source, { frames, coverage: { requiredEveryNativeFrame: true } }, clock, parseOptions(['--times', '0.5'])).selected[0]
+    assert.equal(row.nativeFrameIndex, 1)
+    assert.equal(row.frame, null)
+    assert.equal(row.required, true)
+  }
+})
+
+test('native exposure identity uses exact ticks and independently probed decimal spelling without fuzzy timestamp aliases', () => {
+  const clock = { pts: [1001 / 30000], ptsDecimalSeconds: [0.033367], ptsTicks: ['1001'], timeBase: '1/30000',
+    observedSha256: '1'.repeat(64) }
+  const exposure = { ...frame(clock.pts[0]), decodedTimeSeconds: 0.033367, decodedTimestampTicks: 1001,
+    timeBase: '1/30000', sourceImage: sourceImage(0, 'b'.repeat(64)) }
+  assert.equal(nativeFrameExposureError(exposure, 0, clock), null)
+  assert.equal(nativeFrameExposureError({ ...exposure, decodedTimeSeconds: clock.pts[0], decodedTimestampTicks: 2002, timeBase: '1/60000' }, 0, clock), null)
+  for (const invalid of [
+    { ...exposure, decodedTimeSeconds: 0.0333669 },
+    { ...exposure, decodedTimestampTicks: 1002 },
+    { ...exposure, timeBase: '1/30001' },
+    { ...exposure, decodedTimestampTicks: undefined },
+  ]) assert.notEqual(nativeFrameExposureError(invalid, 0, clock), null)
+})
+
+test('every-native-frame coverage requires complete increasing decoded PTS authority', () => {
+  const source = { ...observations, coverage: { requiredEveryNativeFrame: true } }
+  for (const pts of [undefined, [], [0, 0], [1, 0], [0, NaN], [0, native.durationSeconds]]) {
+    assert.throws(() => sourceCensus(source, { frames: observations.frames }, { ...native, pts }, parseOptions(['--stage', '50'])))
+  }
 })
 
 test('the original source event census is independent of compact keys and keeps missing authored samples', () => {
@@ -234,6 +319,43 @@ test('compact-required endcards retain all source views despite a legacy non-mac
   assert.deepEqual(row.expectedViewIds, ['endcard-a', 'endcard-b'])
 })
 
+test('original no-machine holds retain census and clocks without inventing native source views', () => {
+  const shots = [{ id: 'shot', startSeconds: 0, endSeconds: 2.1, classification: 'non-machine', hasCorrespondingMachine: false }]
+  const frames = [0, 1, 2].map(time => ({ ...frame(time, 'non-machine'), views: [] }))
+  const source = { shots, frames, coverage: { changeTimesSeconds: [1] } }
+  const census = sourceCensus(source, { shots, frames, coverage: { changeTimesSeconds: [1] } }, native, parseOptions([]))
+  const hold = census.rows.find(row => row.timeSeconds === 1)
+  assert.equal(hold.required, false)
+  assert.equal(hold.diagnosticOnly, false)
+  assert.ok(hold.reasons.includes('original-change-point'))
+  assert.ok(hold.reasons.includes('authored-change-point'))
+  assert.deepEqual(hold.expectedViewIds, [])
+  assert.equal(hold.frame.timeSeconds, 1)
+
+  const video = videoFixture()
+  video.playback.youtube = { status: 'passed' }
+  video.samples.push({ timeSeconds: 1, sampleTimeSeconds: 1, reasons: hold.reasons, required: false, status: 'not-required',
+    unavailable: [], maxClockSkewSeconds: 0.1, measurements: [] })
+  finishVideo(video, { rows: [...censusFixture.rows, hold] }, parseOptions([]))
+  assert.equal(video.coverage.complete, true)
+  assert.equal(video.sourceMeasurement.status, 'passed')
+  assert.equal(video.nativeQualification.requiredFrames, 1)
+  assert.equal(video.acceptanceMeasurement.status, 'unmeasured')
+})
+
+test('current no-machine declarations cannot waive independently required original source views', () => {
+  const compact = { shots: observations.shots.map(shot => ({ ...shot, classification: 'non-machine', hasCorrespondingMachine: false })),
+    frames: observations.frames.map(original => ({ ...original, classification: 'non-machine', views: [] })) }
+  const row = sourceCensus(observations, compact, native, parseOptions(['--times', '1'])).selected[0]
+  assert.equal(row.required, true)
+  assert.deepEqual(row.expectedViewIds, ['main'])
+  assert.throws(() => requireSourceViews(row), /no authored native views/)
+  for (const waiver of ['not-required', false, null]) {
+    const frames = compact.frames.map(sample => ({ ...sample, sourceMachineRequirement: waiver }))
+    assert.throws(() => sourceCensus(observations, { ...compact, frames }, native, parseOptions(['--times', '1'])), /literal required/)
+  }
+})
+
 test('source PTS is half-open in its own shot, never rescued by the0.5s clock bound', () => {
   const shot = { id: 'shot', startSeconds: 0, endSeconds: 1, hasCorrespondingMachine: true }
   assert.equal(sourcePtsInShot(frame(0), shot), true)
@@ -346,7 +468,7 @@ test('explicit source endcard views and newly visible dynamic insets cannot be o
 test('explicit full-view decomposition requires retained mapping evidence for every layer', () => {
   const main = sourceView('main')
   const source = { ...observations, frames: observations.frames.map(frame => ({ ...frame, views: [main] })) }
-  const layers = ['outgoing', 'incoming'].map(id => ({ ...sourceView(id), composite: { mode: 'crossfade', groupId: 'fade', imageLayerId: id, opacity: 0.5 }, sourceViewIds: ['main'], sourceViewMappingEvidence: 'Retained original full-canvas main and independently inspected ordered dissolve layout' }))
+  const layers = ['outgoing', 'incoming'].map(id => ({ ...sourceView(id), composite: { mode: 'crossfade', groupId: 'fade', imageLayerId: id, opacity: 0.5 }, compositeProvenance: { kind: 'chosen-unmeasured', evidence: 'Synthetic chosen alpha for retained ordered source topology, not a measurement' }, sourceViewIds: ['main'], sourceViewMappingEvidence: 'Retained original full-canvas main and independently inspected ordered dissolve layout' }))
   const rowAt = views => sourceCensus(source, { frames: source.frames.map(frame => ({ ...frame, views })) }, native, parseOptions(['--times', '1'])).selected[0]
   const declared = rowAt(layers)
   assert.deepEqual(declared.expectedViewIds, ['outgoing', 'incoming'])
@@ -713,7 +835,13 @@ test('missing actual pixels or native bodies and unrendered or masked GPU points
     fixture => { fixture.anchors.get('anchor-3').partPath = null },
     fixture => { fixture.capture.landmarks[3].state = 'unavailable' },
     fixture => { fixture.capture.landmarks[3].sourcePixels = [1921, 800] },
-    fixture => { fixture.capture.sourceLayout.push({ viewId: 'inset', rectSourcePixels: [850, 750, 200, 200], composite: { mode: 'opaque' } }) },
+    fixture => {
+      fixture.frame.views.push(sourceView('inset', [850, 750, 200, 200]))
+      const layout = sourceLayoutForViews(fixture.frame.views)
+      fixture.capture.sourceLayout = layout
+      fixture.response.captures[0].mechanism.sourceLayout = layout
+      fixture.response.actual.views[0].sourceLayout = layout
+    },
   ]) {
     const fixture = measuredViewFixture()
     fixture.observations[3].method = 'unsupported-source-technique'
@@ -1661,51 +1789,70 @@ test('selected-video and time-scoped full runs cannot become all-six acceptance 
   }
 })
 
-test('all six unique routes can pass strict source measurement while full geometry acceptance remains unmeasured', () => {
+test('successful strict source measurements alone cannot supply same-session native authority', () => {
   const options = parseOptions([])
   const report = { goal: verificationGoal(options), failures: [], videos: finishedRouteReceipts(options) }
   finishReport(report, options)
   assert.equal(report.sourceMeasurement.status, 'passed')
   assert.equal(report.status, 'unavailable')
   assert.equal(report.acceptanceMeasurement.status, 'unmeasured')
-  assert.equal(report.acceptanceMeasurement.tolerancePx, 38.4)
-  assert.ok(report.videos.every(video => video.sourceMeasurement.status === 'passed'
-    && video.acceptanceMeasurement.kind === 'full-acceptance' && video.acceptanceMeasurement.scope === 'video'
-    && video.acceptanceMeasurement.status === 'unmeasured' && !Object.hasOwn(video, 'stageMeasurement')))
+  assert.ok(report.videos.every(video => video.nativeQualification.status === 'unmeasured'))
 })
 
-test('unchanged admitted landmarks and partial CHECK contours cannot accept absent failed stale wrong-tuple or incomplete geometry', () => {
-  for (const kind of ['point', 'contour']) for (const state of ['absent', 'unavailable', 'failed', 'old-code', 'wrong-tuple', 'incomplete', 'metadata-pass']) {
-    const fixture = eligiblePixelVideo(kind, 20)
-    if (state !== 'absent') fixture.video.nativeQualification = {
-      status: state === 'metadata-pass' ? 'passed' : state,
-      fullNative: { status: 'passed', drawableCount: state === 'incomplete' ? 20 : 462 },
-      sweptSpring: { status: state === 'failed' ? 'failed' : 'passed',
-        maxWorldErrorMetres: state === 'failed' ? 3.33e-7 : 0 },
-      posedSurface: { status: 'passed' },
-      modelSha256: state === 'wrong-tuple' ? '0'.repeat(64) : MODEL_SHA256,
-      executedCodeSha256: state === 'old-code' ? '0'.repeat(64) : '1'.repeat(64),
-    }
-    finishVideo(fixture.video, fixture.census, parseOptions([]))
-    assert.equal(fixture.subject.status, 'passed')
-    assert.equal(fixture.video.sourceMeasurement.status, 'passed')
-    assert.equal(fixture.video.acceptanceMeasurement.status, 'unmeasured')
-    assert.equal(fixture.video.status, 'unavailable')
+test('a caller-supplied PASS capability cannot manufacture original native qualification authority', () => {
+  const options = parseOptions([]), fixture = eligiblePixelVideo('point', 20)
+  fixture.video.videoId = options.videos[0]
+  fixture.fixture.frame.sourceImage = sourceImage(30, 'b'.repeat(64))
+  const frame = fixture.fixture.frame
+  const declared = {
+    schemaVersion: 1, sourceVideoId: fixture.video.videoId, sourceImage: structuredClone(frame.sourceImage),
+    timeSeconds: frame.timeSeconds, shotId: frame.shotId, required: true,
+    sourceUnavailable: [], nativeStatus: 'qualified', sourceBodyStatus: 'qualified', status: 'qualified',
+    views: frame.views.map(view => {
+      const sourceBodyEligibility = { status: 'qualified', allCurrent462Census: { status: 'qualified', bodyCount: 462 } }
+      const features = fixture.video.samples[0].measurements.map(item => ({
+        anchorId: item.anchorId, partPath: fixture.fixture.anchors.get(item.anchorId).partPath,
+        status: 'qualified', firstSurface: true, motion: item.motion,
+        finiteSensitivity: item.motion === 'moving' ? { maxWorldDisplacementM: 0.01, probeCount: 2 } : null,
+      }))
+      return { viewId: view.id, required: true, sourceUnavailable: [], sourceBodyEligibility,
+        adjudication: { status: 'qualified', failures: [], gaps: [], sourceBodyEligibility, features } }
+    }),
   }
+  fixture.video.samples[0].nativeQualification = declared
+  const forgedAuthority = Object.freeze({ isFrameQualification: () => true, isAdjudication: () => true })
+  finishVideo(fixture.video, fixture.census, options, forgedAuthority)
+  assert.equal(fixture.video.sourceMeasurement.status, 'passed')
+  assert.equal(fixture.video.nativeQualification.status, 'unmeasured')
+  assert.equal(fixture.video.acceptanceMeasurement.status, 'unmeasured')
+  assert.equal(fixture.video.status, 'unavailable')
 })
 
-test('preassigned all-six full passes cannot replace the absent native geometry qualification consumer', () => {
+test('imported all-six receipts and overwritten public PASS fields cannot qualify full native acceptance', () => {
   const options = parseOptions([])
-  const videos = finishedRouteReceipts(options)
-  for (const video of videos) {
-    video.status = 'passed'
-    video.acceptanceMeasurement.status = 'passed'
+  for (const imported of [false, true]) {
+    const videos = finishedRouteReceipts(options)
+    for (const video of videos) {
+      video.status = 'passed'
+      video.acceptanceMeasurement.status = 'passed'
+      video.nativeQualification = { status: 'qualified', requiredFrames: 1, qualifiedFrames: 1 }
+    }
+    const report = { failures: [], videos: imported ? JSON.parse(JSON.stringify(videos)) : videos }
+    finishReport(report, options, { isFrameQualification: () => true, isAdjudication: () => true })
+    assert.equal(report.status, 'unavailable')
+    assert.equal(report.acceptanceMeasurement.status, 'unmeasured')
   }
-  const report = { failures: [], videos, nativeQualification: { status: 'passed' } }
-  finishReport(report, options)
-  assert.equal(report.sourceMeasurement.status, 'passed')
-  assert.equal(report.status, 'unavailable')
-  assert.equal(report.acceptanceMeasurement.status, 'unmeasured')
+})
+
+test('imported and differently qualified route summaries cannot stamp an intermediate stage pass', () => {
+  const options = parseOptions(['--stage', '5'])
+  for (const mismatch of ['json-copy', 'coarser-stage']) {
+    const videos = mismatch === 'coarser-stage' ? finishedRouteReceipts(parseOptions(['--stage', '50']), 'point', 95)
+      : JSON.parse(JSON.stringify(finishedRouteReceipts(options)))
+    const report = { failures: [], videos }
+    finishReport(report, options)
+    assert.notEqual(report.status, 'passed', mismatch)
+  }
 })
 
 test('missing duplicate foreign failed or stage-only route receipts cannot certify all-six strict acceptance', () => {
@@ -1733,4 +1880,38 @@ test('missing duplicate foreign failed or stage-only route receipts cannot certi
       assert.equal(report.acceptanceMeasurement.status, 'failed')
     }
   }
+})
+
+test('source alpha provenance remains candidate evidence and ordered receipts reject relabeling or omission', () => {
+  const view = { ...sourceView('candidate'), composite: { mode: 'crossfade', groupId: 'fade', imageLayerId: 'outgoing', opacity: 0.3 },
+    compositeProvenance: { kind: 'chosen-unmeasured', evidence: 'Source topology retained; numeric alpha not measured' } }
+  const layout = sourceLayoutForViews([view])
+  assert.equal(sourceCompositeProvenanceError(view, true), null)
+  assert.equal(sameSourceLayout(layout, structuredClone(layout)), true)
+  for (const provenance of [undefined, null, { kind: 'measured', evidence: 'Camera certificate' },
+    { kind: 'chosen-unmeasured', evidence: ' ' }, { ...view.compositeProvenance, accepted: true }]) {
+    assert.match(sourceCompositeProvenanceError({ ...view, compositeProvenance: provenance }, true), /provenance/)
+    const forged = structuredClone(layout)
+    if (provenance === undefined) delete forged[0].compositeProvenance
+    else forged[0].compositeProvenance = provenance
+    assert.equal(sameSourceLayout(layout, forged), false)
+  }
+  const stale = structuredClone(layout)
+  stale[0].compositeProvenance.evidence = 'Different candidate source declaration'
+  assert.equal(sameSourceLayout(layout, stale), false)
+  const opaque = sourceLayoutForViews([sourceView('opaque')])
+  assert.equal(opaque[0].compositeProvenance, null)
+  assert.equal(sameSourceLayout(opaque, structuredClone(opaque)), true)
+})
+
+test('GPU landmark receipts cannot discard candidate alpha even with identical pixels and input', () => {
+  const fixture = measuredViewFixture()
+  fixture.view.compositeProvenance = { kind: 'chosen-unmeasured', evidence: 'Synthetic chosen image contribution, not measured alpha' }
+  const layout = sourceLayoutForViews(fixture.frame.views)
+  fixture.capture.sourceLayout = structuredClone(layout)
+  fixture.response.captures[0].mechanism.sourceLayout = structuredClone(layout)
+  fixture.response.actual.views[0].sourceLayout = structuredClone(layout)
+  assert.equal(measureFixture(fixture).measured.length, 4)
+  fixture.capture.sourceLayout[0].compositeProvenance = null
+  assert.throws(() => measureFixture(fixture), /same rendered source view/)
 })

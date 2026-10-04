@@ -8,6 +8,8 @@ import { assertModelRepresentationBytes, REPRESENTATION_KIND, REPRESENTATION_PAT
 import { BINDINGS, instanceIndex, type Binding } from './bindings'
 import { createMechanismInput, createMechanismPose, solveMechanism, MECHANISM_DATA, type MechanismInput, type MechanismPose } from './mechanics'
 import { PAPER_FEED_MULTIPLIER } from './kinematics'
+import type { NativeDrawableSnapshot, NativePresentationInventoryEntry, NativePrimitiveAssociation, NativeQualificationCaptureMode, NativeQualificationInventoryEntry, NativeRasterCapture, NativeSceneCapture } from './native-qualification-types'
+import { NativeQualificationRasterCapture } from './native-qualification-raster'
 
 export type Point3 = readonly [number, number, number]
 export type Quaternion4 = readonly [number, number, number, number]
@@ -22,6 +24,8 @@ export type InteractionMode = 'following-video' | 'exploring'
 export type Presentation = 'native' | 'horizontal-mirror'
 /** Rendered-image contributions, never native mesh material opacity. */
 export type SourceComposite = { mode: 'opaque' } | { mode: 'crossfade'; groupId: string; imageLayerId: string; opacity: number }
+/** Source image alpha is a documented choice, never a measured source observation. */
+export type SourceCompositeProvenance = { kind: 'chosen-unmeasured'; evidence: string }
 export interface ImagePlaneWarp {
   kind: 'homography'
   unwarpedViewportPixels: readonly [number, number]
@@ -32,6 +36,7 @@ export interface SourceLayoutEntry {
   rectSourcePixels: readonly [number, number, number, number]
   presentation: Presentation
   composite: SourceComposite | null
+  compositeProvenance: SourceCompositeProvenance | null
   resolvedImagePlaneWarp: ImagePlaneWarp | null
 }
 interface RenderedSourceSupport {
@@ -48,7 +53,24 @@ export interface SourceView {
   rectSourcePixels: readonly [number, number, number, number]
   presentation?: Presentation
   composite?: SourceComposite
+  compositeProvenance?: SourceCompositeProvenance
   imagePlaneWarp?: ImagePlaneWarp
+  partOverrides?: readonly PartOverride[]
+}
+
+const SOURCE_COMPOSITE_EVIDENCE = /\S/
+
+export function assertSourceCompositeProvenance(view: { composite?: SourceComposite; compositeProvenance?: SourceCompositeProvenance }, requireCrossfade = false): void {
+  const provenance = view.compositeProvenance
+  if (provenance !== undefined) {
+    if (typeof provenance !== 'object' || provenance === null || Array.isArray(provenance)) throw new Error('Source composite provenance must be a chosen-unmeasured evidence object.')
+    const keys = Reflect.ownKeys(provenance)
+    if (keys.length !== 2 || !keys.includes('kind') || !keys.includes('evidence') || provenance.kind !== 'chosen-unmeasured'
+      || typeof provenance.evidence !== 'string' || !SOURCE_COMPOSITE_EVIDENCE.test(provenance.evidence)) {
+      throw new Error('Source composite provenance requires exactly chosen-unmeasured kind and nonblank evidence; measured or unknown fields are not permitted.')
+    }
+  }
+  if (requireCrossfade && view.composite?.mode === 'crossfade' && provenance === undefined) throw new Error('Source crossfade alpha requires explicit chosen-unmeasured provenance.')
 }
 /**
  * Diagnostic landmark located by exactly one of `partLocalMetres` (native node
@@ -171,6 +193,8 @@ export interface Machine {
   readonly partPaths: readonly string[]
   /** Actual qualified native drawable paths; querying does not allocate GPU resources. */
   readonly nativeDrawablePartPaths: readonly string[]
+  /** Authentic loaded meshes and parser ancestry; no renderer or classifier is created. */
+  nativeQualificationInventory(): readonly NativeQualificationInventoryEntry[]
   update(input: MechanismInput, overrides?: readonly PartOverride[]): void
   /** Add another genuine native part instance, sharing its original geometry. */
   addPartInstance(sourcePartPath: string, instancePath: string): 'added' | 'already-present' | 'missing-source'
@@ -219,6 +243,12 @@ export interface Viewer {
   readRenderedLandmarks(viewId: string): RenderedLandmarks | null
   setPartVisibilityProbe(probe: PartVisibilityProbe | null): void
   readRenderedPartVisibility(viewId: string): RenderedPartVisibility
+  /** Opt-in only; requires an installed full native part-visibility probe. */
+  setNativeQualificationCaptureMode(mode: NativeQualificationCaptureMode): void
+  /** Reads one completed same-epoch native capture; never renders or creates a probe. */
+  readNativeQualificationCapture(viewId: string): NativeSceneCapture
+  /** Existing presentation quad identities and live sampler roles; never renders. */
+  nativeQualificationPresentationInventory(): readonly NativePresentationInventoryEntry[]
   /** Remove listeners/controls and dispose every viewer-owned GPU resource. */
   dispose(): void
 }
@@ -255,6 +285,7 @@ interface ProbeInternals {
   readonly pass: { value: number }
   readonly pointSize: { value: number }
   readonly revision: { value: number }
+  readonly materialObservations: NativeMaterialObservations
 }
 const probeInternals = new WeakMap<LandmarkProbe, ProbeInternals>()
 
@@ -318,17 +349,26 @@ interface ViewCapture {
   sourceOpacity: number
 }
 const CAPTURE_STATES: readonly RenderedLandmarkState[] = ['rendered', 'unresolved', 'not-visible']
+/** GLTFLoader records primitive indices although its public reference type omits them. */
+interface NativePrimitiveLoaderReference {
+  readonly nodes?: number
+  readonly meshes?: number
+  readonly primitives?: number
+}
 interface NativeDrawable {
   path: string
   object: THREE.Mesh | THREE.Line | THREE.Points
-  original: THREE.Material | THREE.Material[]
+  /** Exact live assignment saved at this capture's entry, never an install-time original. */
+  liveAssignment: THREE.Material | THREE.Material[]
   diagnostic: THREE.Material | THREE.Material[]
+  readonly slots: { state: NativeMaterialState; diagnostic: THREE.Material }[]
 }
 interface PartVisibilityInternals {
   readonly entries: NativeDrawable[]
   readonly revision: { value: number }
   readonly inventoryRevision: { value: number }
   readonly synchronize: () => void
+  readonly materialObservations: NativeMaterialObservations
 }
 interface PartVisibilityCapture {
   epoch: number
@@ -349,7 +389,164 @@ interface PartVisibilityCapture {
   uncertaintySourcePixels: number
 }
 const partVisibilityInternals = new WeakMap<PartVisibilityProbe, PartVisibilityInternals>()
+const nativeQualificationEntries = new WeakMap<THREE.Mesh, NativeQualificationInventoryEntry>()
 const COMPOSITE_TOLERANCE = 1e-6
+
+interface NativeMaterialObservations {
+  snapshot(): void
+  fresh(): boolean
+  clear(): void
+}
+interface NativeMaterialState {
+  readonly material: THREE.Material
+  readonly value: MaterialValueSnapshot
+}
+interface MaterialValueSnapshot {
+  readonly value: unknown
+  readonly keys: readonly string[] | null
+  readonly children: readonly MaterialValueSnapshot[]
+  readonly fixedKeys: boolean
+}
+// Renderer bookkeeping and application annotations are not raster inputs.
+const MATERIAL_BOOKKEEPING: Record<string, true | undefined> = { id: true, uuid: true, name: true, userData: true, _listeners: true }
+const TEXTURE_STATE_KEYS = [
+  'mapping', 'channel', 'wrapS', 'wrapT', 'magFilter', 'minFilter', 'anisotropy',
+  'format', 'internalFormat', 'type', 'colorSpace', 'generateMipmaps',
+  'premultiplyAlpha', 'flipY', 'unpackAlignment', 'compareFunction',
+  'offset', 'repeat', 'center', 'rotation', 'matrixAutoUpdate', 'matrix',
+  'version', 'source',
+] as const
+const TEXTURE_SOURCE_STATE_KEYS = ['version'] as const
+const nativeMaterialStates = new WeakMap<THREE.Material, NativeMaterialState>()
+
+/** Snapshot structured raster inputs only on change; reads compare without serialization/allocation. */
+function snapshotMaterialValue(value: unknown, ancestors: Set<object>, material = false, textureSource = false): MaterialValueSnapshot {
+  let keys: readonly string[] | null = null
+  let fixedKeys = false
+  if (value !== null && typeof value === 'object' && !ancestors.has(value)) {
+    if (value instanceof THREE.Texture) {
+      keys = TEXTURE_STATE_KEYS
+      fixedKeys = true
+    } else if (textureSource) {
+      keys = TEXTURE_SOURCE_STATE_KEYS
+      fixedKeys = true
+    } else if (material || Array.isArray(value) || ArrayBuffer.isView(value)
+      || Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null
+      || value instanceof THREE.Color || value instanceof THREE.Vector2 || value instanceof THREE.Vector3
+      || value instanceof THREE.Vector4 || value instanceof THREE.Quaternion || value instanceof THREE.Plane
+      || value instanceof THREE.Matrix3 || value instanceof THREE.Matrix4) {
+      const ownKeys = Object.keys(value).filter(key => !material || MATERIAL_BOOKKEEPING[key] !== true)
+      if (Array.isArray(value) || ArrayBuffer.isView(value)) ownKeys.push('length')
+      if (material) {
+        // These hooks normally live on the prototype. Keep their references,
+        // not a repeatedly stringified cache key or an opaque closure's internals.
+        if (!ownKeys.includes('onBeforeCompile')) ownKeys.push('onBeforeCompile')
+        if (!ownKeys.includes('customProgramCacheKey')) ownKeys.push('customProgramCacheKey')
+      }
+      keys = ownKeys
+    }
+  }
+  const children: MaterialValueSnapshot[] = []
+  if (keys) {
+    ancestors.add(value as object)
+    const record = value as Record<string, unknown>
+    for (const key of keys) children.push(snapshotMaterialValue(record[key], ancestors, false, value instanceof THREE.Texture && key === 'source'))
+    ancestors.delete(value as object)
+  }
+  return { value, keys, children, fixedKeys }
+}
+
+function materialValueFresh(snapshot: MaterialValueSnapshot, value: unknown, material = false): boolean {
+  if (!Object.is(snapshot.value, value)) return false
+  if (!snapshot.keys) return true
+  const record = value as Record<string, unknown>
+  if (!snapshot.fixedKeys) {
+    let count = 0
+    for (const key in record) if (Object.hasOwn(record, key) && (!material || MATERIAL_BOOKKEEPING[key] !== true)) count++
+    if (Array.isArray(value) || ArrayBuffer.isView(value)) count++
+    if (material) {
+      if (!Object.hasOwn(record, 'onBeforeCompile')) count++
+      if (!Object.hasOwn(record, 'customProgramCacheKey')) count++
+    }
+    if (count !== snapshot.keys.length) return false
+  }
+  for (let i = 0; i < snapshot.keys.length; i++) {
+    const key = snapshot.keys[i]!
+    if (!snapshot.fixedKeys && key !== 'length' && key !== 'onBeforeCompile' && key !== 'customProgramCacheKey' && !Object.hasOwn(record, key)) return false
+    if (!materialValueFresh(snapshot.children[i]!, record[key])) return false
+  }
+  return true
+}
+
+function observeNativeMaterial(material: THREE.Material): NativeMaterialState {
+  const previous = nativeMaterialStates.get(material)
+  if (previous && materialValueFresh(previous.value, material, true)) return previous
+  const state = { material, value: snapshotMaterialValue(material, new Set(), true) }
+  nativeMaterialStates.set(material, state)
+  return state
+}
+
+function nativeMaterialStatesFresh(states: readonly NativeMaterialState[]): boolean {
+  for (const state of states) if (!materialValueFresh(state.value, state.material, true)) return false
+  return true
+}
+
+function createNativeMaterialObservations(drawables: readonly { object: THREE.Mesh | THREE.Line | THREE.Points }[], synchronize: () => void): NativeMaterialObservations {
+  const assignments: { assignment: THREE.Material | THREE.Material[]; materials: THREE.Material[] }[] = []
+  const observers = new WeakMap<THREE.Material, { epoch: number; state: NativeMaterialState }>()
+  const states: NativeMaterialState[] = []
+  let epoch = 0
+  return {
+    snapshot() {
+      synchronize()
+      epoch++
+      let stateCount = 0
+      for (let i = 0; i < drawables.length; i++) {
+        const assignment = drawables[i]!.object.material
+        let captured = assignments[i]
+        if (!captured) {
+          captured = { assignment, materials: [] }
+          assignments[i] = captured
+        }
+        captured.assignment = assignment
+        const count = Array.isArray(assignment) ? assignment.length : 1
+        captured.materials.length = count
+        for (let slot = 0; slot < count; slot++) {
+          const material = Array.isArray(assignment) ? assignment[slot]! : assignment
+          captured.materials[slot] = material
+          let observer = observers.get(material)
+          if (!observer) {
+            observer = { epoch: -1, state: observeNativeMaterial(material) }
+            observers.set(material, observer)
+          }
+          if (observer.epoch === epoch) continue
+          observer.epoch = epoch
+          observer.state = observeNativeMaterial(material)
+          states[stateCount++] = observer.state
+        }
+      }
+      assignments.length = drawables.length
+      states.length = stateCount
+    },
+    fresh() {
+      if (assignments.length !== drawables.length) return false
+      for (let i = 0; i < assignments.length; i++) {
+        const captured = assignments[i]!
+        const live = drawables[i]!.object.material
+        if (live !== captured.assignment) return false
+        if (Array.isArray(live)) {
+          if (live.length !== captured.materials.length) return false
+          for (let slot = 0; slot < live.length; slot++) if (live[slot] !== captured.materials[slot]) return false
+        } else if (live !== captured.materials[0]) return false
+      }
+      return nativeMaterialStatesFresh(states)
+    },
+    clear() {
+      assignments.length = 0
+      states.length = 0
+    },
+  }
+}
 const compositeValidationGroups = new Set<string>()
 const compositeValidationImages = new Set<string>()
 const supportCache = new WeakMap<object, { valid: boolean; values: Float64Array; polygon: number[]; scratch: number[]; inverse: THREE.Matrix3; quantization: number }>()
@@ -426,9 +623,12 @@ function sourceSupport(view: Pick<SourceView, 'rectSourcePixels' | 'imagePlaneWa
 }
 
 /** Exact positive-area arrangement slabs; one weight per image support union. */
-export function assertSourceCompositeWeights(views: readonly Pick<SourceView, 'rectSourcePixels' | 'composite' | 'imagePlaneWarp'>[]): void {
+export function assertSourceCompositeWeights(views: readonly Pick<SourceView, 'rectSourcePixels' | 'composite' | 'compositeProvenance' | 'imagePlaneWarp'>[]): void {
   compositeValidationGroups.clear()
-  for (const view of views) sourceSupport(view)
+  for (const view of views) {
+    assertSourceCompositeProvenance(view)
+    sourceSupport(view)
+  }
   for (let i = 0; i < views.length;) {
     const composite = views[i]!.composite
     if (!composite || composite.mode === 'opaque') { i++; continue }
@@ -579,7 +779,8 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
   })
   // This screen-space blit is presentation only, never replacement machine geometry.
   const quadGeometry = new THREE.PlaneGeometry(2, 2)
-  mirrorScene.add(new THREE.Mesh(quadGeometry, mirrorMaterial))
+  const mirrorQuad = new THREE.Mesh(quadGeometry, mirrorMaterial)
+  mirrorScene.add(mirrorQuad)
   const warpScene = new THREE.Scene()
   const warpInverse = new THREE.Matrix3()
   const warpGrid = new THREE.Vector2()
@@ -604,7 +805,8 @@ void main() {
 }`,
     depthTest: false, depthWrite: false, blending: THREE.NoBlending, toneMapped: false,
   })
-  warpScene.add(new THREE.Mesh(quadGeometry, warpMaterial))
+  const warpQuad = new THREE.Mesh(quadGeometry, warpMaterial)
+  warpScene.add(warpQuad)
   let activeView: SourceView | null = null
   let activeViewIndex = -1
   let diagnosticDraw = false
@@ -632,9 +834,34 @@ void main() {
 }`,
     depthTest: false, depthWrite: false, toneMapped: false,
   })
-  compositeScene.add(new THREE.Mesh(quadGeometry, compositeMaterial))
+  const compositeQuad = new THREE.Mesh(quadGeometry, compositeMaterial)
+  compositeScene.add(compositeQuad)
   let compositeImageTarget: THREE.WebGLRenderTarget | null = null
   let compositeSumTarget: THREE.WebGLRenderTarget | null = null
+  const nativePresentationInventory: readonly NativePresentationInventoryEntry[] = Object.freeze([
+    Object.freeze({
+      kind: 'source-warp' as const, object: warpQuad,
+      get phase() { return diagnosticDraw ? 'diagnostic-presentation' as const : 'source-presentation' as const },
+      get inputTexture() { return warpMaterial.uniforms.image?.value ?? null },
+      get sourceRole() { return warpMaterial.uniforms.image?.value === mirrorTarget.texture ? 'native-colour-stage' as const : null },
+    }),
+    Object.freeze({
+      kind: 'horizontal-mirror' as const, object: mirrorQuad,
+      get phase() { return diagnosticDraw ? 'diagnostic-presentation' as const : 'source-presentation' as const },
+      get inputTexture() { return mirrorMaterial.uniforms.image?.value ?? null },
+      get sourceRole() { return mirrorMaterial.uniforms.image?.value === mirrorTarget.texture ? 'native-colour-stage' as const : null },
+    }),
+    Object.freeze({
+      kind: 'source-composite' as const, object: compositeQuad,
+      get phase() { return diagnosticDraw ? 'diagnostic-presentation' as const : 'source-presentation' as const },
+      get inputTexture() { return compositeMaterial.uniforms.image?.value ?? null },
+      get sourceRole() {
+        const texture = compositeMaterial.uniforms.image?.value
+        return compositeImageTarget !== null && texture === compositeImageTarget.texture ? 'source-composite-image' as const
+          : compositeSumTarget !== null && texture === compositeSumTarget.texture ? 'source-composite-sum' as const : null
+      },
+    }),
+  ])
 
   // GPU landmark readback state. Targets/buffers allocate on first capture or
   // actual size change only; the steady-state frame loop allocates nothing.
@@ -657,12 +884,23 @@ void main() {
   let contourOrdinals = new Uint32Array(0)
   let contourFlags = new Uint8Array(0)
   const visibilityCaptures = new Map<string, PartVisibilityCapture>()
-  const viewSnapshots = new Map<string, { epoch: number; view: SourceView; groupId: string | null; imageLayerId: string | null; id: string; warpKind: string | null; presentation: Presentation; values: Float64Array }>()
+  let nativeQualificationCaptureMode: NativeQualificationCaptureMode = 'disabled'
+  let nativeQualificationRaster: NativeQualificationRasterCapture | null = null
+  const nativeQualificationCaptures = new Map<string, { capture: NativeSceneCapture; inventoryRevision: number; materialStates: NativeMaterialState[] }>()
+  const nativeSourceViewport = new THREE.Vector4()
+  const viewSnapshots = new Map<string, { epoch: number; view: SourceView; groupId: string | null; imageLayerId: string | null; id: string; warpKind: string | null; presentation: Presentation; provenanceKind: SourceCompositeProvenance['kind'] | null; provenanceEvidence: string | null; values: Float64Array }>()
   const frameCameraPosition = new THREE.Vector3()
   const frameCameraQuaternion = new THREE.Quaternion()
   const frameCameraProjection = new THREE.Matrix4()
   let frameWidth = 0
   let frameHeight = 0
+  let frameBackingWidth = 0
+  let frameBackingHeight = 0
+  let frameCanvasWidth = 0
+  let frameCanvasHeight = 0
+  let framePixelRatio = 0
+  let frameLocalClippingEnabled = false
+  let frameClippingPlanes: MaterialValueSnapshot | null = null
   let frameFov = 0
   let frameAspect = 0
   let renderedViews: readonly SourceView[] | null = null
@@ -790,6 +1028,7 @@ void main() {
   }
 
   function beginFrame() {
+    if (nativeQualificationCaptureMode === 'enabled') nativeQualificationCaptures.clear()
     renderer.setRenderTarget(null)
     renderer.setScissorTest(false)
     renderer.setViewport(0, 0, canvas.clientWidth, canvas.clientHeight)
@@ -938,7 +1177,8 @@ void main() {
       resolvedImagePlaneWarp: copyWarp(warp),
       nativeViewportBackingPixels: warp ? [Math.ceil(warp.unwarpedViewportPixels[0]), Math.ceil(warp.unwarpedViewportPixels[1])] : null,
       destinationCellSourcePixels: [SOURCE_WIDTH / gate.width * canvas.clientWidth / gl.drawingBufferWidth, SOURCE_HEIGHT / gate.height * canvas.clientHeight / gl.drawingBufferHeight],
-      sourceLayout: capturedViewOrder.map(member => ({ viewId: member.id, rectSourcePixels: [...member.rectSourcePixels], presentation: member.presentation ?? 'native', composite: member.composite ? { ...member.composite } : null, resolvedImagePlaneWarp: copyWarp(member.imagePlaneWarp) })),
+      sourceLayout: capturedViewOrder.map(member => ({ viewId: member.id, rectSourcePixels: [...member.rectSourcePixels], presentation: member.presentation ?? 'native', composite: member.composite ? { ...member.composite } : null,
+        compositeProvenance: member.compositeProvenance ? { kind: member.compositeProvenance.kind, evidence: member.compositeProvenance.evidence } : null, resolvedImagePlaneWarp: copyWarp(member.imagePlaneWarp) })),
     }
   }
 
@@ -1020,7 +1260,7 @@ void main() {
     if (!probe && !visibilityProbe) return
     let snapshot = viewSnapshots.get(view.id)
     if (!snapshot) {
-      snapshot = { epoch: -1, view, groupId: null, imageLayerId: null, id: view.id, warpKind: null, presentation: 'native', values: new Float64Array(27) }
+      snapshot = { epoch: -1, view, groupId: null, imageLayerId: null, id: view.id, warpKind: null, presentation: 'native', provenanceKind: null, provenanceEvidence: null, values: new Float64Array(27) }
       viewSnapshots.set(view.id, snapshot)
     }
     snapshot.epoch = drawEpoch
@@ -1030,6 +1270,8 @@ void main() {
     snapshot.id = view.id
     snapshot.imageLayerId = view.composite?.mode === 'crossfade' ? view.composite.imageLayerId : null
     snapshot.warpKind = view.imagePlaneWarp?.kind ?? null
+    snapshot.provenanceKind = view.compositeProvenance?.kind ?? null
+    snapshot.provenanceEvidence = view.compositeProvenance?.evidence ?? null
     for (let i = 0; i < 11; i++) snapshot.values[i + 15] = i < 2 ? view.imagePlaneWarp?.unwarpedViewportPixels[i] ?? NaN : view.imagePlaneWarp?.renderToSourcePixels[i - 2] ?? NaN
     const values = snapshot.values
     for (let i = 0; i < 3; i++) values[i] = view.camera.positionMetres[i]!
@@ -1043,8 +1285,17 @@ void main() {
   }
 
   function capturesFresh() {
-    if (frameWidth !== canvas.clientWidth || frameHeight !== canvas.clientHeight || frameFov !== camera.fov || frameAspect !== camera.aspect
+    if (frameWidth !== canvas.clientWidth || frameHeight !== canvas.clientHeight
+      || frameBackingWidth !== gl.drawingBufferWidth || frameBackingHeight !== gl.drawingBufferHeight
+      || frameCanvasWidth !== canvas.width || frameCanvasHeight !== canvas.height || framePixelRatio !== renderer.getPixelRatio()
+      || frameFov !== camera.fov || frameAspect !== camera.aspect
       || !frameCameraPosition.equals(camera.position) || !frameCameraQuaternion.equals(camera.quaternion) || !frameCameraProjection.equals(camera.projectionMatrix)) return false
+    if (gl.isContextLost() || frameLocalClippingEnabled !== renderer.localClippingEnabled
+      || !frameClippingPlanes || !materialValueFresh(frameClippingPlanes, renderer.clippingPlanes)) return false
+    const landmarkMaterials = probe?.status === 'active' ? probeInternals.get(probe)?.materialObservations : undefined
+    const visibilityMaterials = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe)?.materialObservations : undefined
+    if (landmarkMaterials && !landmarkMaterials.fresh()) return false
+    if (visibilityMaterials && visibilityMaterials !== landmarkMaterials && !visibilityMaterials.fresh()) return false
     if (renderedViews) {
       if (renderedViews.length !== capturedViewOrder.length) return false
       for (let i = 0; i < renderedViews.length; i++) if (renderedViews[i] !== capturedViewOrder[i]) return false
@@ -1057,6 +1308,8 @@ void main() {
       if (values[26] !== (view.composite ? view.composite.mode === 'opaque' ? 1 : 2 : 0)) return false
       if (snapshot.groupId !== (view.composite?.mode === 'crossfade' ? view.composite.groupId : null) || snapshot.presentation !== (view.presentation ?? 'native')) return false
       if (snapshot.id !== view.id || snapshot.imageLayerId !== (view.composite?.mode === 'crossfade' ? view.composite.imageLayerId : null) || snapshot.warpKind !== (view.imagePlaneWarp?.kind ?? null)) return false
+      if (snapshot.provenanceKind !== (view.compositeProvenance?.kind ?? null) || snapshot.provenanceEvidence !== (view.compositeProvenance?.evidence ?? null)) return false
+      try { assertSourceCompositeProvenance(view) } catch { return false }
       for (let i = 0; i < 11; i++) if (!Object.is(values[i + 15], i < 2 ? view.imagePlaneWarp?.unwarpedViewportPixels[i] ?? NaN : view.imagePlaneWarp?.renderToSourcePixels[i - 2] ?? NaN)) return false
       for (let i = 0; i < 3; i++) if (values[i] !== view.camera.positionMetres[i]) return false
       for (let i = 0; i < 4; i++) if (values[i + 3] !== view.camera.quaternion[i]) return false
@@ -1073,6 +1326,19 @@ void main() {
     renderedVisibilityRevision = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe)!.revision.value : -1
     frameWidth = canvas.clientWidth
     frameHeight = canvas.clientHeight
+    frameBackingWidth = gl.drawingBufferWidth
+    frameBackingHeight = gl.drawingBufferHeight
+    frameCanvasWidth = canvas.width
+    frameCanvasHeight = canvas.height
+    framePixelRatio = renderer.getPixelRatio()
+    frameLocalClippingEnabled = renderer.localClippingEnabled
+    if (!frameClippingPlanes || !materialValueFresh(frameClippingPlanes, renderer.clippingPlanes)) {
+      frameClippingPlanes = snapshotMaterialValue(renderer.clippingPlanes, new Set())
+    }
+    const landmarkMaterials = probe?.status === 'active' ? probeInternals.get(probe)?.materialObservations : undefined
+    const visibilityMaterials = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe)?.materialObservations : undefined
+    landmarkMaterials?.snapshot()
+    if (visibilityMaterials !== landmarkMaterials) visibilityMaterials?.snapshot()
     frameFov = camera.fov
     frameAspect = camera.aspect
     frameCameraPosition.copy(camera.position)
@@ -1094,6 +1360,7 @@ void main() {
       camera.aspect = SOURCE_WIDTH / SOURCE_HEIGHT
       camera.updateProjectionMatrix()
       drawView(FULL_FRAME, 'native', null, mirrorTarget, false)
+      captureNativeQualification(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
       diagnosticDraw = true
       captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
       capturePartVisibility(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
@@ -1190,6 +1457,7 @@ void main() {
           }
           if (opacity > 0) {
             drawView(rect, presentation, group === null ? null : compositeImageTarget, mirrorTarget, true)
+            captureNativeQualification(view.id, rect, presentation, timeSeconds, opacity)
             const next = views[i + 1]?.composite
             if (group !== null && member?.mode === 'crossfade' && (next?.mode !== 'crossfade' || next.groupId !== group || next.imageLayerId !== member.imageLayerId)) {
               compositeMaterial.uniforms.stage!.value = 0
@@ -1204,6 +1472,7 @@ void main() {
               compositeBlit(FULL_FRAME, compositeSumTarget, compositeImageTarget!)
             }
           }
+          if (opacity === 0) captureNativeQualification(view.id, rect, presentation, timeSeconds, opacity)
           // Higher subviews of this same image mask every diagnostic raster too.
           diagnosticDraw = true
           captureView(view.id, rect, presentation, timeSeconds, opacity)
@@ -1594,8 +1863,8 @@ void main() {
     renderer.setClearColor(0x000000, 0)
     // No substitute meshes: render the very same native objects, geometry,
     // transforms, shader deformation, alpha/clipping and material-side rules.
-    for (const entry of entries) entry.object.material = entry.diagnostic
     try {
+      for (const entry of entries) entry.object.material = entry.diagnostic
       camera.layers.disable(PROBE_LAYER)
       drawView(rect, presentation, target, stage, true)
       renderer.getCurrentViewport(probeViewport)
@@ -1671,7 +1940,7 @@ void main() {
         capture.contourSampleCounts[path] = sample + 1
       }
     } finally {
-      for (const entry of entries) entry.object.material = entry.original
+      for (const entry of entries) entry.object.material = entry.liveAssignment
       camera.layers.mask = layers
       scene.background = background
       renderer.setClearColor(savedClearColor, alpha)
@@ -1706,6 +1975,7 @@ void main() {
     contourFlags = new Uint8Array(0)
     visibilityProbe = next
     visibilityCaptures.clear()
+    nativeQualificationCaptures.clear()
     renderedVisibilityRevision = -1
     if (!next) {
       visibilityTarget?.dispose(); visibilityMirrorTarget?.dispose()
@@ -1763,6 +2033,143 @@ void main() {
     }
   }
 
+  function setNativeQualificationCaptureMode(next: NativeQualificationCaptureMode) {
+    if (disposed) throw new Error('Viewer is disposed.')
+    if (next !== 'disabled' && next !== 'enabled') throw new TypeError('Native qualification capture mode must be disabled or enabled.')
+    if (next === nativeQualificationCaptureMode) return
+    if (next === 'enabled' && (visibilityProbe?.status !== 'active' || !partVisibilityInternals.has(visibilityProbe))) {
+      throw new Error('Native qualification capture requires an active Machine part-visibility probe.')
+    }
+    nativeQualificationCaptureMode = next
+    drawEpoch++
+    completedDrawEpoch = -1
+    nativeQualificationCaptures.clear()
+    if (next === 'disabled') {
+      nativeQualificationRaster?.dispose()
+      nativeQualificationRaster = null
+    }
+  }
+
+  function emptyNativeQualificationCapture(viewId: string, status: NativeSceneCapture['status'], reason: string): NativeSceneCapture {
+    return {
+      status, reason, viewId, drawRevision: null, completedDrawEpoch: null, timeSeconds: null,
+      camera: null, rectSourcePixels: null, presentation: null, sourceOpacity: null,
+      resolvedImagePlaneWarp: null, sourceLayout: [], nativeViewportBackingPixels: null,
+      destinationCellSourcePixels: [0, 0], sourceStageViewportBackingPixels: null,
+      sourceStageScissorBackingPixels: null, drawables: [],
+      nativeMaterialRGBA: null, nativeMaterialDepth: null, nativePathID: null, nativeIDDepth: null,
+    }
+  }
+
+  function captureNativeQualification(viewId: string, rect: readonly [number, number, number, number], presentation: Presentation, timeSeconds: number | null, sourceOpacity: number) {
+    if (nativeQualificationCaptureMode === 'disabled') return
+    const internals = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe) : undefined
+    if (!internals) throw new Error('Native qualification capture lost its active native part-visibility probe.')
+    internals.synchronize()
+    const capture = emptyNativeQualificationCapture(viewId, 'unavailable', 'Source view has zero image opacity; its native material raster was not consumed.')
+    capture.drawRevision = drawEpoch
+    capture.timeSeconds = timeSeconds
+    capture.rectSourcePixels = [...rect]
+    capture.presentation = presentation
+    capture.sourceOpacity = sourceOpacity
+    const nominalWidth = activeView?.imagePlaneWarp?.unwarpedViewportPixels[0] ?? rect[2]
+    const nominalHeight = activeView?.imagePlaneWarp?.unwarpedViewportPixels[1] ?? rect[3]
+    capture.camera = {
+      positionMetres: [camera.position.x, camera.position.y, camera.position.z],
+      quaternion: [camera.quaternion.x, camera.quaternion.y, camera.quaternion.z, camera.quaternion.w],
+      verticalFovDegrees: camera.fov,
+      ...(camera.view?.enabled ? { principalPointViewportPixels: [nominalWidth / 2 - camera.view.offsetX, nominalHeight / 2 - camera.view.offsetY] as const } : {}),
+    }
+    capture.drawables = internals.entries.map((entry): NativeDrawableSnapshot => {
+      if (!(entry.object instanceof THREE.Mesh)) throw new Error(`Native qualification requires a genuine triangle mesh: ${entry.path}`)
+      const inventory = nativeQualificationEntries.get(entry.object)
+      if (!inventory || inventory.path !== entry.path) throw new Error(`Native qualification mesh lacks authentic inventory ancestry: ${entry.path}`)
+      const geometry = entry.object.geometry
+      const availableCount = geometry.index?.count ?? geometry.getAttribute('position').count
+      return {
+        path: entry.path, matrixWorld: new Float64Array(entry.object.matrixWorld.elements),
+        effectiveVisibility: nativelyHidden(entry.object) || !camera.layers.test(entry.object.layers) ? 'hidden' : 'visible',
+        groups: geometry.groups.map(group => ({ start: group.start, count: group.count, materialIndex: group.materialIndex ?? 0 })),
+        drawRange: { start: geometry.drawRange.start, count: Math.max(0, Math.min(geometry.drawRange.count, availableCount - geometry.drawRange.start)) },
+        materials: Array.isArray(entry.liveAssignment) ? entry.liveAssignment.slice() : [entry.liveAssignment],
+        bindingOwnerPath: inventory.bindingOwnerPath, binding: inventory.binding, station: inventory.station,
+        springLengthM: inventory.spring?.length.value ?? null,
+      }
+    })
+    const materialStates: NativeMaterialState[] = []
+    for (const entry of internals.entries) for (const slot of entry.slots) materialStates.push(slot.state)
+    nativeQualificationCaptures.set(viewId, { capture, inventoryRevision: internals.inventoryRevision.value, materialStates })
+    if (sourceOpacity === 0) return
+
+    // Record the actual production-stage viewport before any opt-in offscreen
+    // render. Its integer rounding is part of the native-to-source mapping.
+    renderer.getCurrentViewport(nativeSourceViewport)
+    capture.sourceStageViewportBackingPixels = [nativeSourceViewport.x, nativeSourceViewport.y, nativeSourceViewport.z, nativeSourceViewport.w]
+    capture.sourceStageScissorBackingPixels = [viewScissorPixels.x, viewScissorPixels.y, viewScissorPixels.z, viewScissorPixels.w]
+    const grid = activeView?.imagePlaneWarp?.unwarpedViewportPixels
+    const width = grid ? Math.ceil(grid[0]) : presentation === 'horizontal-mirror' ? mirrorTarget.width : nativeSourceViewport.z
+    const height = grid ? Math.ceil(grid[1]) : presentation === 'horizontal-mirror' ? mirrorTarget.height : nativeSourceViewport.w
+    if (width <= 0 || height <= 0) {
+      capture.reason = 'Source view has no integer native raster support.'
+      return
+    }
+    assertTargetCapacity(width, height, 'Native qualification viewport', viewId)
+    capture.nativeViewportBackingPixels = [width, height]
+    if (!nativeQualificationRaster) nativeQualificationRaster = new NativeQualificationRasterCapture(renderer)
+    const raster = nativeQualificationRaster
+    const background = scene.background
+    const layers = camera.layers.mask
+    const clearColor = renderer.getClearColor(new THREE.Color())
+    const clearAlpha = renderer.getClearAlpha()
+    const originalDiagnosticDraw = diagnosticDraw
+    try {
+      camera.layers.disable(PROBE_LAYER)
+      const material = raster.capture(scene, camera, width, height)
+      const plane = (pixels: Uint8Array, encoding: NativeRasterCapture['encoding'], targetSemantics: NativeRasterCapture['targetSemantics'],
+        result: typeof material, textureColorSpace: string): NativeRasterCapture => ({
+        pixels, width: result.width, height: result.height, origin: result.origin,
+        coordinateSpace: 'native-viewport', viewportBackingPixels: [0, 0, result.width, result.height],
+        encoding, depthBits: result.depthBits, targetSemantics, sampleCount: result.sampleCount,
+        textureColorSpace, depthAttachment: { ...result.depthAttachment },
+      })
+      capture.nativeMaterialRGBA = plane(material.colorRgba8, 'rgba8', 'actual-production-material-offscreen', material, material.textureColorSpace)
+      capture.nativeMaterialDepth = plane(material.depthPackedRgba8, 'three-rgba-depth-v1', 'actual-production-material-offscreen', material, material.depthPackedTextureColorSpace)
+      scene.background = null
+      renderer.setClearColor(0x000000, 0)
+      diagnosticDraw = true
+      for (const entry of internals.entries) entry.object.material = entry.diagnostic
+      const ids = raster.capture(scene, camera, width, height)
+      capture.nativePathID = plane(ids.colorRgba8, 'path-id-rgb24-low-r', 'depth-tested-native-id-diagnostic', ids, ids.textureColorSpace)
+      capture.nativeIDDepth = plane(ids.depthPackedRgba8, 'three-rgba-depth-v1', 'depth-tested-native-id-diagnostic', ids, ids.depthPackedTextureColorSpace)
+      capture.status = 'captured'
+      capture.reason = null
+    } finally {
+      for (const entry of internals.entries) entry.object.material = entry.liveAssignment
+      scene.background = background
+      camera.layers.mask = layers
+      renderer.setClearColor(clearColor, clearAlpha)
+      diagnosticDraw = originalDiagnosticDraw
+    }
+  }
+
+  function readNativeQualificationCapture(viewId: string): NativeSceneCapture {
+    if (disposed || visibilityProbe?.status === 'disposed') return emptyNativeQualificationCapture(viewId, 'disposed', 'Viewer or native probe is disposed.')
+    if (nativeQualificationCaptureMode === 'disabled') return emptyNativeQualificationCapture(viewId, 'unavailable', 'Native qualification capture is disabled.')
+    const internals = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe) : undefined
+    if (!internals) return emptyNativeQualificationCapture(viewId, 'unavailable', 'No active native part-visibility probe.')
+    const stored = nativeQualificationCaptures.get(viewId)
+    if (!stored || completedDrawEpoch !== drawEpoch || stored.capture.drawRevision !== drawEpoch
+      || stored.inventoryRevision !== internals.inventoryRevision.value || renderedVisibilityRevision !== internals.revision.value
+      || !capturesFresh() || !nativeMaterialStatesFresh(stored.materialStates)) {
+      return emptyNativeQualificationCapture(viewId, 'stale', 'Native capture is not from the current completed draw epoch.')
+    }
+    const support = capturedSupport(viewId)
+    return {
+      ...stored.capture, ...support, completedDrawEpoch,
+      nativeViewportBackingPixels: stored.capture.nativeViewportBackingPixels,
+    }
+  }
+
   function dispose() {
     if (disposed) return
     disposed = true
@@ -1776,6 +2183,9 @@ void main() {
     setLandmarkProbe(null)
     setPartVisibilityProbe(null)
     releaseProbeTargets()
+    nativeQualificationCaptures.clear()
+    nativeQualificationRaster?.dispose()
+    nativeQualificationRaster = null
     referenceGeometry.dispose(); referenceMaterial.dispose()
     mirrorTarget.dispose(); mirrorMaterial.dispose(); quadGeometry.dispose()
     warpMaterial.dispose()
@@ -1787,7 +2197,8 @@ void main() {
   resize()
   return {
     renderer, scene, camera, resize, render, preflightViews, renderViews, applyCamera, setInteraction, fitView, setLandmarkProbe, readRenderedLandmarks,
-    setPartVisibilityProbe, readRenderedPartVisibility, dispose,
+    setPartVisibilityProbe, readRenderedPartVisibility, setNativeQualificationCaptureMode, readNativeQualificationCapture, dispose,
+    nativeQualificationPresentationInventory() { return nativePresentationInventory },
     get controls() { return controls },
   }
 }
@@ -1837,6 +2248,10 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   const nativeDrawables: Pick<NativeDrawable, 'path' | 'object'>[] = []
   const nativeDrawablePaths: string[] = []
   const nativeDrawableSeen = new WeakSet<THREE.Object3D>()
+  const qualificationInventory: NativeQualificationInventoryEntry[] = []
+  const primitiveAssociations = new WeakMap<THREE.Object3D, NativePrimitiveAssociation>()
+  const primitiveRestWorlds = new WeakMap<THREE.Object3D, Float64Array>()
+  const instanceAncestors = new WeakMap<THREE.Object3D, string>()
   let nativeInventoryRevision = -1
   const visibilityProbes = new Set<PartVisibilityProbe>()
   const probes = new Set<LandmarkProbe>()
@@ -1879,6 +2294,15 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       const visit = (node: THREE.Object3D, parentPath: string) => {
         const originalName = typeof node.userData.name === 'string' ? node.userData.name : node.name
         const path = parentPath ? `${parentPath}/${originalName}` : originalName
+        const association: NativePrimitiveLoaderReference | undefined = gltf.parser.associations.get(node)
+        let nodeIndex = association?.nodes ?? null
+        for (let ancestor = node.parent; nodeIndex === null && ancestor; ancestor = ancestor.parent) {
+          nodeIndex = gltf.parser.associations.get(ancestor)?.nodes ?? null
+        }
+        primitiveAssociations.set(node, {
+          nodeIndex, meshIndex: association?.meshes ?? null, primitiveIndex: association?.primitives ?? null,
+        })
+        primitiveRestWorlds.set(node, new Float64Array(node.matrixWorld.elements))
         if (node !== loaded) {
           const part: RestPart = {
             path, node, position: node.position.clone(), quaternion: node.quaternion.clone(),
@@ -2153,6 +2577,9 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       local.decompose(part.node.position, part.node.quaternion, part.node.scale)
     }
     root!.updateMatrixWorld(true)
+    // Built-in modelMatrix uploads round translation to F32. Keep the residual
+    // tied to the final drawable matrix, including simultaneous source overrides.
+    for (const part of parts.values()) part.spring?.refreshWorldTranslations()
   }
 
   function finalWorld(part: RestPart): THREE.Matrix4 {
@@ -2417,7 +2844,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       },
     }
     probes.add(probe)
-    probeInternals.set(probe, { markers, passes: Math.ceil(slots / SLOTS_PER_PASS), pass, pointSize, revision })
+    probeInternals.set(probe, { markers, passes: Math.ceil(slots / SLOTS_PER_PASS), pass, pointSize, revision, materialObservations })
     return probe
   }
 
@@ -2440,16 +2867,39 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       nativeDrawables.push({ path, object })
       nativeDrawablePaths.push(path)
       nativeDrawableSeen.add(object)
+      if (object instanceof THREE.Mesh) {
+        let bindingOwner: RestPart | null = null
+        const restMatrixWorld = primitiveRestWorlds.get(object)
+        if (!restMatrixWorld) throw new Error(`Native qualification mesh lacks an authentic loaded rest matrix: ${path}`)
+        let spring: SpringDeformer | null = null
+        for (let node: THREE.Object3D | null = object; node && node !== root; node = node.parent) {
+          const part = partsByNode.get(node)
+          if (!bindingOwner && part?.binding) bindingOwner = part
+          if (!spring && part?.spring?.meshes.includes(object)) spring = part.spring
+        }
+        const entry: NativeQualificationInventoryEntry = {
+          path, object,
+          restMatrixWorldF64: restMatrixWorld,
+          association: primitiveAssociations.get(object) ?? { nodeIndex: null, meshIndex: null, primitiveIndex: null },
+          instanceOf: instanceAncestors.get(object) ?? null,
+          bindingOwnerPath: bindingOwner?.path ?? null,
+          binding: bindingOwner?.binding ?? null,
+          station: bindingOwner && bindingOwner.station >= 0 ? bindingOwner.station : null,
+          spring: spring ? { stock: spring.stock, restLengthM: spring.restLengthM, length: spring.length } : null,
+        }
+        qualificationInventory.push(entry)
+        nativeQualificationEntries.set(object, entry)
+      }
     })
     nativeInventoryRevision = inventoryRevision.value
   }
+
+  const materialObservations = createNativeMaterialObservations(nativeDrawables, synchronizeNativeInventory)
 
   function createPartVisibilityProbe(): PartVisibilityProbe {
     if (availability !== 'available' || !root) throw new Error('Native model is unavailable; a full-geometry visibility probe cannot be created.')
     const entries: NativeDrawable[] = []
     const drawablePaths: string[] = []
-    const materials: THREE.Material[] = []
-    let synchronizedRevision = -1
     let status: PartVisibilityProbe['status'] = 'active'
 
     function diagnostic(source: THREE.Material, id: number): THREE.Material {
@@ -2468,26 +2918,46 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       }
       result.customProgramCacheKey = () => `${nativeCacheKey}:native-path-id`
       result.blending = THREE.NoBlending
-      result.depthTest = true
-      result.depthWrite = true
       result.toneMapped = false
-      materials.push(result)
       return result
     }
 
     function synchronize() {
-      if (status !== 'active' || synchronizedRevision === inventoryRevision.value) return
+      if (status !== 'active') return
       synchronizeNativeInventory()
       if (nativeDrawables.length > 0xffffff) throw new Error('Native visibility inventory exceeds RGB8 path IDs.')
-      for (let i = entries.length; i < nativeDrawables.length; i++) {
+      for (let i = 0; i < nativeDrawables.length; i++) {
         const drawable = nativeDrawables[i]!
-        const original = drawable.object.material
-        const id = i + 1
-        const replacement = Array.isArray(original) ? original.map(material => diagnostic(material, id)) : diagnostic(original, id)
-        entries.push({ path: drawable.path, object: drawable.object, original, diagnostic: replacement })
-        drawablePaths.push(drawable.path)
+        const live = drawable.object.material
+        let entry = entries[i]
+        if (!entry) {
+          entry = { path: drawable.path, object: drawable.object, liveAssignment: live, diagnostic: [], slots: [] }
+          entries.push(entry)
+          drawablePaths.push(drawable.path)
+        }
+        entry.liveAssignment = live
+        const count = Array.isArray(live) ? live.length : 1
+        let diagnostics = Array.isArray(entry.diagnostic) ? entry.diagnostic : null
+        if (Array.isArray(live) && !diagnostics) diagnostics = []
+        for (let slot = 0; slot < count; slot++) {
+          const source = Array.isArray(live) ? live[slot]! : live
+          const previous = entry.slots[slot]
+          const state = previous?.state.material === source && materialValueFresh(previous.state.value, source, true)
+            ? previous.state : observeNativeMaterial(source)
+          if (!previous || previous.state !== state) {
+            const replacement = diagnostic(source, i + 1)
+            previous?.diagnostic.dispose()
+            entry.slots[slot] = { state, diagnostic: replacement }
+          }
+          if (Array.isArray(live)) diagnostics![slot] = entry.slots[slot]!.diagnostic
+        }
+        for (let slot = count; slot < entry.slots.length; slot++) entry.slots[slot]!.diagnostic.dispose()
+        entry.slots.length = count
+        if (Array.isArray(live)) {
+          diagnostics!.length = count
+          entry.diagnostic = diagnostics!
+        } else entry.diagnostic = entry.slots[0]!.diagnostic
       }
-      synchronizedRevision = inventoryRevision.value
     }
 
     synchronize()
@@ -2498,8 +2968,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       dispose() {
         if (status === 'disposed') return
         status = 'disposed'
-        for (const material of materials) material.dispose()
-        materials.length = 0
+        for (const entry of entries) for (const slot of entry.slots) slot.diagnostic.dispose()
         entries.length = 0
         drawablePaths.length = 0
         visibilityProbes.delete(probe)
@@ -2507,7 +2976,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       },
     }
     visibilityProbes.add(probe)
-    partVisibilityInternals.set(probe, { entries, revision, inventoryRevision, synchronize })
+    partVisibilityInternals.set(probe, { entries, revision, inventoryRevision, synchronize, materialObservations })
     return probe
   }
 
@@ -2516,6 +2985,21 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     const source = parts.get(sourcePartPath)
     if (!source || !root) { warnOverride(sourcePartPath); return 'missing-source' }
     const node = source.node.clone(true)
+    synchronizeNativeInventory()
+    // Clone ancestry is copied from the exact original objects, before any
+    // diagnostic children are removed; names never stand in for parser identity.
+    const copyAncestry = (original: THREE.Object3D, clone: THREE.Object3D) => {
+      const association = primitiveAssociations.get(original)
+      if (association) primitiveAssociations.set(clone, association)
+      const restMatrixWorld = primitiveRestWorlds.get(original)
+      if (restMatrixWorld) primitiveRestWorlds.set(clone, restMatrixWorld)
+      if (original instanceof THREE.Mesh) {
+        const entry = nativeQualificationEntries.get(original)
+        if (entry) instanceAncestors.set(clone, entry.instanceOf ?? entry.path)
+      }
+      for (let i = 0; i < original.children.length; i++) copyAncestry(original.children[i]!, clone.children[i]!)
+    }
+    copyAncestry(source.node, node)
     // Diagnostic markers belong to their probe, never to a new native instance.
     const clonedMarkers: THREE.Object3D[] = []
     node.traverse(child => { if (child.userData.landmarkMarker) clonedMarkers.push(child) })
@@ -2528,6 +3012,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       scale: source.scale.clone(), world: source.world.clone(), parentInverse: source.parentInverse.clone(), visible: false,
       overrideWorld: new THREE.Matrix4(), finalWorld: new THREE.Matrix4(), overrideEpoch: -1, finalEpoch: -1,
     }
+    if (source.spring) instance.spring = source.spring.cloneFor(node)
     node.visible = false
     parts.set(instancePath, instance)
     partsByNode.set(node, instance)
@@ -2548,7 +3033,10 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     root = null
     availability = 'unavailable'
     nativeDrawables.length = 0
+    materialObservations.clear()
     nativeDrawablePaths.length = 0
+    for (const entry of qualificationInventory) nativeQualificationEntries.delete(entry.object)
+    qualificationInventory.length = 0
     parts.clear()
     paths.length = 0
     driven.length = 0
@@ -2559,6 +3047,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     input, pose, missing, loadError, provenance, partPaths: paths, update, addPartInstance, createLandmarkProbe, createPartVisibilityProbe, dispose,
     get availability() { return availability },
     get nativeDrawablePartPaths() { synchronizeNativeInventory(); return nativeDrawablePaths },
+    nativeQualificationInventory() { synchronizeNativeInventory(); return qualificationInventory },
   }
 }
 
@@ -2571,6 +3060,10 @@ function disposeNativeObject(object: THREE.Object3D) {
     if (!(node instanceof THREE.Mesh || node instanceof THREE.Line || node instanceof THREE.Points)) return
     geometries.add(node.geometry)
     for (const material of Array.isArray(node.material) ? node.material : [node.material]) materials.add(material)
+    if (node instanceof THREE.Mesh) {
+      if (node.customDepthMaterial) materials.add(node.customDepthMaterial)
+      if (node.customDistanceMaterial) materials.add(node.customDistanceMaterial)
+    }
   })
   for (const material of materials) {
     for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value)
@@ -2597,10 +3090,16 @@ function nativeWireLength(part: RestPart): number {
 
 interface SpringDeformer {
   length: { value: number }
+  readonly stock: SpringStock
+  readonly restLengthM: number
   /** Meshes whose vertices this deformer's shader moves. */
   readonly meshes: readonly THREE.Mesh[]
   /** Install this spring's exact native vertex deformation on a material. */
   deform(material: THREE.Material): void
+  /** Refresh only the three translation residuals after final matrixWorld updates. */
+  refreshWorldTranslations(): void
+  /** Share physical length, but own cloned materials and drawable translation handles. */
+  cloneFor(node: THREE.Object3D): SpringDeformer
   /** The native per-vertex deformation attributes for a point in mesh geometry metres. */
   markerCoordinates(point: THREE.Vector3, out: SpringCoordinates): void
 }
@@ -2612,6 +3111,13 @@ interface SpringCoordinates {
   tangent: THREE.Vector3
 }
 const preparedSprings = new WeakMap<THREE.BufferGeometry, Map<string, THREE.BufferGeometry>>()
+const springShaderFunctions: Partial<Record<SpringStock, string>> = {}
+const springMarkerWorldTranslationLow = { value: new THREE.Vector3() }
+const springWorldPositionChunk = THREE.ShaderChunk.worldpos_vertex.replace(
+  'worldPosition = modelMatrix * worldPosition;',
+  'worldPosition = vec4(modelMatrix[3].xyz + (mat3(modelMatrix) * worldPosition.xyz + springWorldTranslationLow), 1.0);',
+)
+if (springWorldPositionChunk === THREE.ShaderChunk.worldpos_vertex) throw new Error('Native spring precision requires the pinned Three world-position chunk.')
 
 /**
  * Deform the authentic swept-wire mesh, not a replacement TubeGeometry.
@@ -2620,10 +3126,10 @@ const preparedSprings = new WeakMap<THREE.BufferGeometry, Map<string, THREE.Buff
  * Hook assemblies translate rigidly; coil centreline pitch changes with L.
  * A minimal tangent rotation preserves each original wire section's radius
  * (scaling vertex X itself would squash the wire). Buffers/programs allocate
- * only here. The frame loop changes one length uniform and one rigid matrix.
+ * only here. Frames change length, rigid matrices and three translation residuals;
+ * authentic position/normal/classification buffers and the CPU stock law stay fixed.
  */
-function createSpringDeformer(node: THREE.Object3D, restLengthM: number, stock: SpringStock): SpringDeformer {
-  const length = { value: restLengthM }
+function createSpringDeformer(node: THREE.Object3D, restLengthM: number, stock: SpringStock, length = { value: restLengthM }): SpringDeformer {
   const rest = { value: restLengthM }
   const counter = stock === 'counter'
   const source = counter ? MECHANISM_DATA.counter : MECHANISM_DATA.spring
@@ -2749,12 +3255,13 @@ function createSpringDeformer(node: THREE.Object3D, restLengthM: number, stock: 
     }
   }
 
-  const shaderFunctions = `
+  const shaderFunctions = springShaderFunctions[stock] ??= `
 attribute vec2 springCoordinate;
 attribute vec3 springRestCentre;
 attribute vec3 springRestTangent;
 uniform float springLength;
 uniform float springRestLength;
+uniform vec3 springWorldTranslationLow;
 vec3 springTurn(vec3 v, vec3 from, vec3 to) {
   vec3 crossAxis = cross(from, to);
   float cosine = dot(from, to);
@@ -2768,7 +3275,10 @@ void springCurve(out vec3 centre, out vec3 tangent) {
     tangent = springRestTangent;
   } else if (abs(kind) < 0.5) {
     float height = springLength - ${2 * inset + endCorrection};
-    float angle = t * ${turns * 2 * Math.PI};
+    float coarse = floor(t * 4096.0) / 4096.0;
+    float fine = t - coarse;
+    float phase = fract(fract(coarse * ${turns.toFixed(1)}) + fine * ${turns.toFixed(1)});
+    float angle = phase * 6.283185307179586;
     centre = vec3(-springLength * 0.5 + ${inset} + height * t, -${radius} * sin(angle), ${radius} * cos(angle));
     tangent = normalize(vec3(height, -${radius * turns * 2 * Math.PI} * cos(angle), -${radius * turns * 2 * Math.PI} * sin(angle)));
   } else {
@@ -2785,36 +3295,59 @@ void springCurve(out vec3 centre, out vec3 tangent) {
     if (kind > 0.0) { centre.xz *= -1.0; tangent.xz *= -1.0; }
   }
 }
+vec3 springPosition(vec3 nativePosition, vec3 centre, vec3 tangent) {
+  return centre + springTurn(nativePosition - springRestCentre, springRestTangent, tangent);
+}
+vec3 springNormal(vec3 nativeNormal, vec3 tangent) {
+  return springTurn(nativeNormal, springRestTangent, tangent);
+}
 `
-  // The single deformation hook: native spring meshes and probe markers both
-  // compile exactly this vertex code against the same length uniforms.
-  function deform(material: THREE.Material) {
-    material.onBeforeCompile = shader => {
+  // One real deformation factory serves native colour, depth, distance, ID and
+  // marker materials. Curve state cannot depend on a conditional normal chunk:
+  // Three depth/distance shaders omit that chunk without displacement mapping.
+  function deform(material: THREE.Material, translationLow = springMarkerWorldTranslationLow) {
+    const nativeCompile = material.onBeforeCompile
+    const cacheKey = `${material.customProgramCacheKey()}:native-stock-spring:${stock}:phase4096-split-world`
+    material.onBeforeCompile = (shader, activeRenderer) => {
+      nativeCompile.call(material, shader, activeRenderer)
       shader.uniforms.springLength = length
       shader.uniforms.springRestLength = rest
-      shader.vertexShader = shaderFunctions + shader.vertexShader
-      shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
-#include <beginnormal_vertex>
+      shader.uniforms.springWorldTranslationLow = translationLow
+      if (!shader.vertexShader.includes('void main() {') || !shader.vertexShader.includes('#include <begin_vertex>')) throw new Error('Native spring material lacks its pinned vertex deformation slots.')
+      shader.vertexShader = shaderFunctions + shader.vertexShader.replace('void main() {', `void main() {
 vec3 springNewCentre;
 vec3 springNewTangent;
 springCurve(springNewCentre, springNewTangent);
-objectNormal = springTurn(objectNormal, springRestTangent, springNewTangent);
+`)
+      shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
+#include <beginnormal_vertex>
+objectNormal = springNormal(objectNormal, springNewTangent);
 `)
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
-vec3 transformed = springNewCentre + springTurn(position - springRestCentre, springRestTangent, springNewTangent);
+vec3 transformed = springPosition(position, springNewCentre, springNewTangent);
 `)
+      // Leave project_vertex and its double-assembled camera-relative
+      // modelViewMatrix path alone; do not project a rounded world position.
+      shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', springWorldPositionChunk)
     }
-    material.customProgramCacheKey = () => `native-stock-spring:${stock}`
+    material.customProgramCacheKey = () => cacheKey
   }
-  const deformedClone = (sourceMaterial: THREE.Material) => {
+  const deformedClone = (sourceMaterial: THREE.Material, translationLow: { value: THREE.Vector3 }) => {
     const result = sourceMaterial.clone()
-    deform(result)
+    deform(result, translationLow)
     return result
   }
   const meshes: THREE.Mesh[] = []
+  const worldTranslations: { mesh: THREE.Mesh; uniform: { value: THREE.Vector3 } }[] = []
+  function refreshWorldTranslations() {
+    for (const { mesh, uniform } of worldTranslations) {
+      const matrix = mesh.matrixWorld.elements
+      uniform.value.set(matrix[12]! - Math.fround(matrix[12]!), matrix[13]! - Math.fround(matrix[13]!), matrix[14]! - Math.fround(matrix[14]!))
+    }
+  }
   node.traverse(object => {
     if (!(object instanceof THREE.Mesh)) return
-    const original = object.geometry
+    const original: THREE.BufferGeometry = object.geometry
     let versions = preparedSprings.get(original)
     if (!versions) { versions = new Map(); preparedSprings.set(original, versions) }
     const cacheKey = `${stock}:${restLengthM}`
@@ -2838,16 +3371,31 @@ vec3 transformed = springNewCentre + springTurn(position - springRestCentre, spr
       versions.set(cacheKey, prepared)
       geometry = prepared
     }
+    // Native clones already carry these exact cached classification buffers.
+    preparedSprings.set(geometry, versions)
     object.geometry = geometry
     // Source bounding spheres describe the saved length, not the extended coil.
     object.frustumCulled = false
     meshes.push(object)
-    object.material = Array.isArray(object.material) ? object.material.map(deformedClone) : deformedClone(object.material)
+    const translationLow = { value: new THREE.Vector3() }
+    worldTranslations.push({ mesh: object, uniform: translationLow })
+    object.material = Array.isArray(object.material) ? object.material.map(material => deformedClone(material, translationLow)) : deformedClone(object.material, translationLow)
+    const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking })
+    const distance = new THREE.MeshDistanceMaterial()
+    deform(depth, translationLow)
+    deform(distance, translationLow)
+    object.customDepthMaterial = depth
+    object.customDistanceMaterial = distance
   })
+  node.updateWorldMatrix(true, true)
+  refreshWorldTranslations()
   return {
     length,
+    stock, restLengthM,
     meshes,
     deform,
+    refreshWorldTranslations,
+    cloneFor(instance) { return createSpringDeformer(instance, restLengthM, stock, length) },
     markerCoordinates(vertex, out) {
       // Eye/bore anchors are in a rigid end assembly even though their bore
       // centres do not lie on the swept-wire surface used for classification;

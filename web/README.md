@@ -281,7 +281,12 @@ HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analy
 # Headless bounded Analysis03 demonstration; not a fidelity acceptance pass:
 HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --from 5.9 --to 7.1 --player local --headless
 
-# Strict full all-video acceptance: official YouTube and local original media:
+# Strict full all-video acceptance also requires independently admitted original
+# CPU and spring references. These are local, ignored verification artifacts:
+export HARMONIC_ORIGINAL_NATIVE_CPU_CLOSURE="$PWD/web/.vite/verification-output/native-original-9e72-cpu-closure-20261003"
+export HARMONIC_ORIGINAL_NATIVE_CPU_CLOSURE_SHA256="d3f0bcdeaea5924931d82715ace92e483eb123e0685419ccb5940c06c6730413"
+export HARMONIC_ORIGINAL_SPRING_ORACLE="$PWD/web/.vite/verification-output/native-v39-spring-baseline-20261003/original-f64-oracle-sealed-20261003.mjs"
+export HARMONIC_ORIGINAL_SPRING_ORACLE_SHA256="e84fd4318890130e8183ebdcce1560796b24b6e0b4ac3e15b890545c8dd9a5fa"
 HARMONIC_HEADLESS=1 npm --prefix web run build && HARMONIC_HEADLESS=1 npm --prefix web run verify:sync
 
 # Local demonstration of the unchanged private original footage:
@@ -297,10 +302,24 @@ The verifier serves `dist/`, exercises the original media, and reports per-video
 coverage, rendered landmark errors and timing. Its default goal uses strict
 **2% / 0.5-second** bounds across all six videos, exercising both official YouTube
 and local original media, audio, compact mode and manual controls. A passed
-`sourceMeasurement` does not qualify full geometry: no current full-native,
-all-stock swept-spring or posed-surface qualification consumer is implemented.
-Full acceptance therefore remains unmeasured and returns nonzero until that
-genuine bound qualification is available; injected pass metadata cannot certify it.
+`sourceMeasurement` does not qualify full geometry. The native qualification
+caller enables the actual scene capture, streams binary evidence into a run-owned
+store, and adjudicates it against the independently admitted original references.
+Full acceptance requires the same run's protected frame and per-view results:
+complete authentic native inventory, all-stock/all-vertex physical proof, actual
+production material and ID/depth first-surface support, and separate complete
+current-model source-body eligibility. Imported PASS metadata, partial CHECK
+edges, four Intro FIT features, or physical-only results cannot satisfy that gate.
+Missing original references fail explicitly; the recorded manifest hash must
+come from independent admission, not a manifest's own claimed hash or a refreshed
+current-source reference. The CPU archive executes the unchanged published
+`9e72eb482a22797f48af5a6df2b00832b7137ace` physical code with separately identified
+read-only observations; its texture warning remains outside GPU/material proof.
+Qualification covers the actual required decoded-source census, not arbitrary
+interactive motion. Camera-only views use fresh finite linear/projective
+enclosures from adjudicated physical outputs; selected camera transform-feedback
+and actual raster evidence remain distinct. No full native/source acceptance is
+claimed merely by implementing this caller or admitting its references.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.
 Diagnostic landmark receipts also retain the actual native marker's world
@@ -443,8 +462,8 @@ and the source-track transaction completed in **74.17 seconds**. Source, playbac
 and sync-consumer suites passed **51 / 10 / 88 tests**; the build passed in
 **8.05 seconds**. JavaScript chunks fell from about **195 MB to 105 MB** (largest
 Intro **27.842 MB**). Later review and execution exposed lost source-only endcard/
-transition layouts and Operation facts; those facts still require correction.
-This checkpoint is not deploy-ready or normal-route/source acceptance.
+transition layouts and Operation facts; the subsequent source reconciliation
+restored them. This checkpoint is not deploy-ready or normal-route/source acceptance.
 Original MP4 SHA, 1920×1080 dimensions, FPS and actual PTS passed for all six;
 raw-file/clock identity is not decoded-image replay or footage-fit proof.
 
@@ -453,8 +472,95 @@ historical/current probe. Original Operation change points omitted from the
 measurement census fell from **19 to zero**; missing authored samples remain
 required. Seven absent/failed/stale/wrong-model/incomplete/metadata-only native
 claims previously received full passes. They now preserve meaningful source-only
-success while leaving full acceptance unmeasured. Source-layout/event adoption
-fixes and current numerical/full-native qualification remain pending.
+success while leaving full acceptance unmeasured. Current numerical/full-native
+qualification remains pending.
+
+The subsequent source reconciliation regenerated all six tracks transactionally
+in **73.37 seconds**. **70 Python source tests** and **106 playback/sync-consumer
+tests** passed. Actual adopter and generated-content probes retained the eight
+Analysis endcard views, single-main Synthesis transition, Operation observations
+and declared events without promoting old camera/input/warp/native certificates.
+Crossfade alpha remains explicitly **chosen-unmeasured** in runtime ordered
+receipts; a camera certificate cannot make it measured. These checks establish
+source-obligation retention and decoder behavior, not rendered footage fidelity.
+The integrated build passed in **6.98 seconds**. A runtime-decoder smoke exercised
+all **6,681 authored samples / 15,483 views** from the actual generated JSON;
+results remained approximate or no-machine, with no source qualification.
+
+The built site also passed a headed, sequential smoke on all six routes using
+the original local MP4s and the current native model. Playback advanced by
+**1.019–1.031 seconds** per route; the unmuted compact player remained
+**222×200 px**. Paused orbiting and manual crank changes worked, with no missing
+bindings or page exceptions. All six screenshots were inspected. The sole
+console error was a missing favicon. This is normal-route smoke evidence,
+not official YouTube playback or source-camera/mechanism fidelity acceptance.
+
+An exact historical/current census control now respects Analysis's declared
+**every-native-frame** obligation: **7,328 indexed exposures** at time base
+**1/30000**, versus zero native-exposure rows at `9e72eb48`. The current census
+still exposes **6,653 missing exact authored poses** and **6,913 unavailable
+native rows**; nearby nominal events cannot substitute for them. Five boundary
+tests passed. This corrects an omitted obligation, not the missing calibration.
+
+An independently pinned original-CPU archive from published `9e72eb48` passed
+both admission and archived replay: **21 frozen modules**, **479 native names**,
+**462 drawables** and **21 springs**. Two actual authored Synthesis inputs
+changed the original poses and spring lengths; round-trip restoration and
+simultaneous child/parent absolute overrides also passed. The closure pin is
+`d3f0bcdeaea5924931d82715ace92e483eb123e0685419ccb5940c06c6730413`.
+Read-only observations do not change the original physical rules. The real
+Node GLTF loader reported an unresolved texture blob; these results establish
+geometry and physical-pose reference replay, not texture, material, GPU or
+source-frame fidelity.
+
+The corrected camera-round-trip build passed in **7.18 seconds**; **18**
+source-playback tests passed, including absolute-override retention, exposure
+boundaries and clearing reused buffers. A same-renderer GPU capture smoke passed
+on **three authored cases / 18 views**, exercising four real colour/ID/depth
+planes, source warp, horizontal mirroring and ordered compositing. Pose and
+one-CSS-pixel viewport changes invalidated old captures; retained byte copies
+stayed stable. Disabling capture restored ordinary pixels and reclaimed all
+**69 textures, 46 framebuffers and one buffer** it created. The three screenshots
+were inspected. This proves capture behavior, not all-vertex numerical bounds,
+source-image comparison or full-native acceptance.
+
+The native first-surface consumer also passed a narrow raw-geometry regression:
+the original screw-head floor spans triangles **38163 and 38164** at their
+coplanar shared edge. The retained before-version wrongly refused the genuine
+38164 hit; the corrected version accepts either floor triangle while still
+refusing a noncoplanar wall of the same body. The source marker and its FIT
+observation are unchanged, as is the **1e−7 m** position bound. These controls use
+the actual raw head and an independent CPU reference raster, not captured GPU
+pixels or whole-scene/source acceptance. Five permanent surface/support controls
+passed with the actual low-red-byte ID encoding. Against the retained pre-fix
+helper, only the genuine neighbouring-floor case failed; the other four passed.
+
+Original numerical references are admitted by independently pinned archived
+bytes, not by their filenames. The spring oracle recovered from the original
+executed script's sealed source map is **28,920 bytes**, SHA-256
+`e84fd4318890130e8183ebdcce1560796b24b6e0b4ac3e15b890545c8dd9a5fa`.
+The subsequently extended 32,053-byte helper is not that original reference.
+This distinction preserves the original position law; it does not establish
+production shader, normal, material or source-frame qualification.
+
+The production numerical bank measured **16 states / 21 springs** in each of
+four shader families: **52,697,504 vertex readings per family**. Standard and
+distance world-position errors stayed within the unchanged **1e−7 m** bound;
+the maximum was **9.3307e−8 m**, with zero violations. Native-ID and depth local
+positions also stayed within the bound. Standard object-normal error peaked at
+**8.2223e−6**; no normal acceptance threshold was invented. Independent
+verification passed for the **240-member** executed-source/output archive.
+These finite-state measurements do not establish source-camera correspondence,
+material/shadow pixels or six-video acceptance.
+
+The integrated native/source-consumer suite passed **198 tests**, including
+original CPU replay and Cartesian closed-section axis controls. The protected
+raw/delivery exporter recovered **six genuine Intro FIT controls**, while
+retaining **zero held-out CHECKs** and eight unavailable native mappings in that
+packet. Seven Python fit-boundary tests passed. New raw-axis constructions are
+camera diagnostics only: chosen source depth cannot authorize opaque surface
+support or become an independently measured CHECK. No old world coordinates or
+chosen mechanical inputs are promoted to observations.
 
 The historical source-v37 import produced the same result in two runs:
 

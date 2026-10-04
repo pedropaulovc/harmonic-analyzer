@@ -1,6 +1,6 @@
 import { Quaternion } from 'three'
 import { createMechanismInput, createMechanismPose, MECHANISM_DATA, type MechanismInput } from './mechanics'
-import { assertSourceCompositeWeights, type CameraRecord, type ImagePlaneWarp, type SourceComposite, type SourceLayoutEntry } from './scene'
+import { assertSourceCompositeWeights, assertSourceCompositeProvenance, type CameraRecord, type ImagePlaneWarp, type PartOverride, type SourceComposite, type SourceCompositeProvenance, type SourceLayoutEntry } from './scene'
 import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
 import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIdentity, NativeModelIdentity, SourceShot, ReferenceState, SourceSample } from './timeline'
 import type { Video } from './video-catalog'
@@ -11,6 +11,12 @@ export const SOURCE_STAGE_PERCENTAGES = [50, 20, 10, 5] as const
 export const LANDMARK_LIMIT_PX = SOURCE_WIDTH * 0.05
 const EMPTY_CONSTRAINTS: readonly SourceConstraint[] = []
 const EMPTY_GEOMETRY_ASSUMPTIONS: readonly NativeGeometryAssumption[] = []
+const EMPTY_PART_OVERRIDES: readonly PartOverride[] = Object.freeze([])
+const PART_OVERRIDE_FIELDS: Record<string, true> = {
+  partPath: true, visibility: true, worldPositionMetres: true, worldQuaternion: true,
+  evidence: true, sourceTimeSeconds: true, landmarkIds: true,
+}
+const NATIVE_PART_PATH = /^harmonic-analyzer\/[^/*?]+(?:\/[^/*?]+)*$/
 const OPAQUE_COMPOSITE: SourceComposite = { mode: 'opaque' }
 const PHASE_PERIOD_RAD = 2 * Math.PI
 const UNMEASURED_STAGE = Object.freeze({ status: 'unmeasured' as const })
@@ -24,6 +30,12 @@ export interface SourceStageMeasurement {
   measuredSamples?: number
   requiredSamples?: number
 }
+/** Existing sourcePartOverride record; source evidence is retained, never synthesized. */
+export interface SourcePartOverride extends PartOverride {
+  evidence: string
+  sourceTimeSeconds: number
+  landmarkIds: readonly string[]
+}
 export interface CompactSourceView {
   id: string
   /** Explicit source-view identities represented by this rendered layer; never inferred aliases. */
@@ -34,6 +46,7 @@ export interface CompactSourceView {
   presentation: 'native' | 'horizontal-mirror'
   camera: CameraRecord | null
   input: SerializedInput | null
+  partOverrides?: readonly SourcePartOverride[]
   provenance: { kind: 'chosen-feasible'; evidence: string; unobservedInputFields: InputField[] }
   cameraProvenance?: { kind: 'source-fit' | 'source-transfer' | 'source-informed-framing'; evidence: string; family: string }
   cameraContinuityFamily?: string
@@ -42,6 +55,7 @@ export interface CompactSourceView {
   /** Nonblank source evidence required for continuous-shot interpolation. */
   cameraInterpolationEvidence?: string
   composite?: SourceComposite
+  compositeProvenance?: SourceCompositeProvenance
   imagePlaneWarp?: ImagePlaneWarp
 }
 export interface CompactSourceFrame {
@@ -123,6 +137,44 @@ function requireCamera(camera: CameraRecord, label: string): void {
   if (camera.principalPointViewportPixels) {
     if (camera.principalPointViewportPixels.length !== 2) throw new Error(`${label}: invalid principal point.`)
     camera.principalPointViewportPixels.forEach((value) => finite(value, label))
+  }
+}
+
+/** Same closed source override shape and current-exposure CHECK binding as verify-reference. */
+function requirePartOverrides(view: CompactSourceView, frame: CompactSourceFrame, label: string): void {
+  const overrides = view.partOverrides
+  if (overrides === undefined) return
+  if (!Array.isArray(overrides)) throw new Error(`${label}: source part overrides must be an array.`)
+  const partPaths = new Set<string>()
+  for (const override of overrides) {
+    if (!override || typeof override !== 'object' || Array.isArray(override)
+      || Object.keys(override).some((key) => !Object.hasOwn(PART_OVERRIDE_FIELDS, key))
+      || typeof override.partPath !== 'string' || !NATIVE_PART_PATH.test(override.partPath)
+      || partPaths.has(override.partPath)) throw new Error(`${label}: source part overrides need unique qualified native paths and supported fields.`)
+    partPaths.add(override.partPath)
+    if (Object.hasOwn(override, 'visibility') && !['visible', 'hidden'].includes(override.visibility!)) throw new Error(`${label}: invalid source part visibility.`)
+    if (Object.hasOwn(override, 'worldPositionMetres')) {
+      if (!Array.isArray(override.worldPositionMetres) || override.worldPositionMetres.length !== 3) throw new Error(`${label}: invalid source part position.`)
+      for (const value of override.worldPositionMetres) finite(value, `${label}: source part position`)
+    }
+    if (Object.hasOwn(override, 'worldQuaternion')) {
+      if (!Array.isArray(override.worldQuaternion) || override.worldQuaternion.length !== 4) throw new Error(`${label}: invalid source part quaternion.`)
+      for (const value of override.worldQuaternion) finite(value, `${label}: source part quaternion`)
+      if (Math.abs(Math.hypot(...override.worldQuaternion) - 1) > 0.002) throw new Error(`${label}: source part quaternion is not normalized.`)
+    }
+    if (typeof override.evidence !== 'string' || !override.evidence.trim()
+      || typeof override.sourceTimeSeconds !== 'number' || !Number.isFinite(override.sourceTimeSeconds)
+      || override.sourceTimeSeconds !== frame.decodedTimeSeconds
+      || !Array.isArray(override.landmarkIds) || !override.landmarkIds.length
+      || new Set(override.landmarkIds).size !== override.landmarkIds.length) {
+      throw new Error(`${label}: source part overrides need complete current decoded-exposure evidence and same-view observed CHECK landmarks.`)
+    }
+    for (const id of override.landmarkIds) {
+      if (typeof id !== 'string' || !id.trim()
+        || !frame.landmarks.some((item) => item.anchorId === id && item.status === 'observed' && item.role === 'check' && (item.viewId ?? 'main') === view.id)) {
+        throw new Error(`${label}: source part overrides need current same-view observed CHECK landmarks.`)
+      }
+    }
   }
 }
 
@@ -220,11 +272,12 @@ export class CompactVideoReference {
       const required = frame.sourceMachineRequirement === 'required' || frame.classification === 'machine' || (frame.classification === 'non-machine' ? shot.hasCorrespondingMachine === true : shot.hasCorrespondingMachine !== false)
       if (new Set(frame.views.map((view) => view.id)).size !== frame.views.length) throw new Error(`Duplicate source view at ${t}s.`)
       const layout: SourceLayoutEntry[] = frame.views.map((view) => {
+        assertSourceCompositeProvenance(view, true)
         if (view.rectSourcePixels?.length !== 4) throw new Error(`Invalid source viewport at ${t}s.`)
         view.rectSourcePixels.forEach((value) => finite(value, 'Source viewport'))
         const [x, y, w, h] = view.rectSourcePixels
         if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > SOURCE_WIDTH || y + h > SOURCE_HEIGHT || !['native', 'horizontal-mirror'].includes(view.presentation)) throw new Error(`Source viewport exceeds the source frame at ${t}s.`)
-        return { viewId: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite ?? OPAQUE_COMPOSITE, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null }
+        return { viewId: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite ?? OPAQUE_COMPOSITE, compositeProvenance: view.compositeProvenance ?? null, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null }
       })
       try {
         assertSourceCompositeWeights(frame.views)
@@ -245,6 +298,7 @@ export class CompactVideoReference {
             || typeof view.sourceViewMappingEvidence !== 'string' || !view.sourceViewMappingEvidence.trim()) throw new Error(`${label}: source-view mapping needs nonempty unique identities and explicit evidence.`)
         }
         if (view.camera) requireCamera(view.camera, label)
+        requirePartOverrides(view, frame, label)
         if (!view.provenance || view.provenance.kind !== 'chosen-feasible' || !view.provenance.evidence?.trim() || !Array.isArray(view.provenance.unobservedInputFields)
           || new Set(view.provenance.unobservedInputFields).size !== view.provenance.unobservedInputFields.length || view.provenance.unobservedInputFields.some((field) => !INPUT_FIELDS.includes(field))) throw new Error(`${label}: chosen inputs need explicit unobserved provenance.`)
         const input = view.input === null ? null : compileInput(view.input, label)
@@ -264,7 +318,8 @@ export class CompactVideoReference {
       from.continuousToNext = from.available && next.available && from.required && next.required && next.observation.shotId === from.observation.shotId
         && next.views.length === from.views.length && equalRecord(from.layout, next.layout)
         && from.views.every((view, index) => view.observation.id === next.views[index]!.observation.id && view.input?.gearing === next.views[index]!.input?.gearing
-          && (view.input?.setup.counterHeightM === null) === (next.views[index]!.input?.setup.counterHeightM === null))
+          && (view.input?.setup.counterHeightM === null) === (next.views[index]!.input?.setup.counterHeightM === null)
+          && equalRecord(view.observation.partOverrides ?? EMPTY_PART_OVERRIDES, next.views[index]!.observation.partOverrides ?? EMPTY_PART_OVERRIDES))
       if (from.continuousToNext) {
         for (let index = 0; index < from.views.length; index++) {
           from.views[index]!.inputChangesToNext = !equalRecord(from.views[index]!.observation.input, next.views[index]!.observation.input)
@@ -335,7 +390,7 @@ export class CompactVideoReference {
           out = {
             id: a.observation.id, camera: { positionMetres: [0, 0, 0], quaternion: [0, 0, 0, 1], verticalFovDegrees: 45, principalPointViewportPixels: [0, 0] },
             rectSourcePixels: [0, 0, SOURCE_WIDTH, SOURCE_HEIGHT], presentation: 'native', input: createMechanismInput(),
-            mechanicalProvenance: 'chosen', unobservedInputFields: [],
+            mechanicalProvenance: 'chosen', unobservedInputFields: [], partOverrides: EMPTY_PART_OVERRIDES,
             sourceSampling: { fromTimeSeconds: 0, toTimeSeconds: 0, mix: 0, selection: 'decoded-exposure', cameraSelection: 'decoded-exposure' },
             authoredImagePlaneWarp: null, sourceLayout: [], nativeGeometryAssumptions: [],
           }
@@ -354,8 +409,10 @@ export class CompactVideoReference {
           }
         }
         out.rectSourcePixels = a.observation.rectSourcePixels
+        out.partOverrides = a.observation.partOverrides ?? EMPTY_PART_OVERRIDES
         out.presentation = a.observation.presentation
         out.composite = a.observation.composite ?? OPAQUE_COMPOSITE
+        out.compositeProvenance = a.observation.compositeProvenance
         out.imagePlaneWarp = a.observation.imagePlaneWarp
         out.authoredImagePlaneWarp = a.observation.imagePlaneWarp ?? null
         out.sourceLayout = from.layout

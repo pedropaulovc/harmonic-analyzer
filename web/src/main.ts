@@ -1,4 +1,4 @@
-import { assertSourceCompositeWeights, createViewer, loadMachine, ViewCapacityError, type CameraRecord, type Machine, type SourceView } from './scene'
+import { assertSourceCompositeWeights, assertSourceCompositeProvenance, createViewer, loadMachine, ViewCapacityError, type CameraRecord, type Machine, type SourceView } from './scene'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, physicalChannelAngle, squareWave } from './kinematics'
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
@@ -7,6 +7,11 @@ import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT
 import type { CompactVideoReference } from './source-track'
 import { createSourceVideoPlayer } from './source-player'
 import { INPUT_FIELDS, equalRecord, type InputField } from './source-witness'
+import type { NativeDrawBinding } from './native-qualification-types'
+import type { PartOverride } from './scene'
+import type { NativeQualificationProducer, NativeQualificationCaptureContext, NativeQualificationByteSink } from './native-qualification-producer'
+import { createNativeQualificationProducer } from './native-qualification-producer'
+import { canonicalJson } from '../native-qualification-contract.mjs'
 
 function element<T extends HTMLElement>(selector: string): T {
   const found = document.querySelector<T>(selector)
@@ -58,6 +63,19 @@ const stateLabels: Record<PlaybackState, string> = {
 const input = createMechanismInput()
 const reviewRollbackInput = createMechanismInput()
 let machine: Machine | null = null
+let nativeQualificationProducer: NativeQualificationProducer | null = null
+let nativeQualificationMachine: Machine | null = null
+let nativeQualificationBusy = false
+interface NativeFeatureMarker {
+  id: string
+  partPath: string
+  partLocalMetres: [number, number, number]
+  sourceFeatureEvidenceSHA256: string
+  sourceVideoId: string
+  timeSeconds: number
+  viewId: string
+}
+let nativeFeatureMarkers: readonly NativeFeatureMarker[] = []
 let reference: CompactVideoReference | null = null
 let player: VideoPlayer | null = null
 let video: Video | null = null
@@ -76,6 +94,7 @@ let playerSize: 'expanded' | 'compact' = 'expanded'
 let activeViews: readonly PlaybackView[] = []
 let initialCamera: CameraRecord | null = null
 let explorationOrigin: 'interactive-default' | 'chosen-feasible-reconstruction' = 'interactive-default'
+const NO_PART_OVERRIDES: readonly PartOverride[] = []
 interface MechanismDraw {
   status: 'solved-for-draw' | 'rendered'
   viewId: string
@@ -88,6 +107,7 @@ interface MechanismDraw {
   imagePlaneWarp: PlaybackView['authoredImagePlaneWarp']
   resolvedImagePlaneWarp: NonNullable<PlaybackView['imagePlaneWarp']> | null
   sourceLayout: PlaybackView['sourceLayout']
+  partOverrides: readonly PartOverride[]
   channelAnglesRad: Float64Array
   platenTravelM: number
   penTravelM: number
@@ -98,6 +118,7 @@ let sourceDrawTimeSeconds = 0
 let sourceDrawRevision = 0
 let diagnosticReference: CompactVideoReference | null = null
 let diagnosticMachine: Machine | null = null
+let diagnosticFeatureTime: number | null = null
 let lastTick = performance.now()
 let lastHud = 0
 const channelInputs: { amplitude: HTMLInputElement; phase: HTMLInputElement; value: HTMLOutputElement }[] = []
@@ -127,7 +148,15 @@ function cameraRecord(): CameraRecord {
 function configureLandmarkProbe(): void {
   const enabled = verificationEnabled && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused'
     && reference !== null && machine?.availability === 'available'
-  if (enabled ? diagnosticReference === reference && diagnosticMachine === machine : diagnosticReference === null && diagnosticMachine === null) return
+  const featureTime = nativeFeatureMarkers.some(marker => marker.sourceVideoId === video?.id && marker.timeSeconds === modelTime) ? modelTime : null
+  if (enabled ? diagnosticReference === reference && diagnosticMachine === machine && diagnosticFeatureTime === featureTime : diagnosticReference === null && diagnosticMachine === null) return
+  viewer.setNativeQualificationCaptureMode('disabled')
+  if (!enabled) {
+    nativeQualificationProducer?.dispose()
+    nativeQualificationProducer = null
+    nativeQualificationMachine = null
+    nativeFeatureMarkers = []
+  }
   viewer.setLandmarkProbe(null)
   viewer.setPartVisibilityProbe(null)
   diagnosticReference = null
@@ -135,7 +164,14 @@ function configureLandmarkProbe(): void {
   if (!enabled || !reference || machine?.availability !== 'available') return
   diagnosticReference = reference
   diagnosticMachine = machine
-  viewer.setLandmarkProbe(machine.createLandmarkProbe(reference.data.anchors))
+  diagnosticFeatureTime = featureTime
+  const replacements = new Map(nativeFeatureMarkers.filter(marker => marker.sourceVideoId === video?.id && marker.timeSeconds === modelTime).map(marker => [marker.id, marker]))
+  viewer.setLandmarkProbe(machine.createLandmarkProbe(reference.data.anchors.map(anchor => {
+    const marker = replacements.get(anchor.id)
+    if (!marker) return anchor
+    const { worldMetres: _worldMetres, ...rest } = anchor
+    return { ...rest, partPath: marker.partPath, partLocalMetres: marker.partLocalMetres }
+  })))
 }
 
 function renderPending(): void {
@@ -144,10 +180,19 @@ function renderPending(): void {
   viewer.render()
 }
 
-function updateMachine(source: MechanismInput): void {
+function updateMachine(source: MechanismInput, partOverrides: readonly PartOverride[] = NO_PART_OVERRIDES): void {
   if (machine?.availability !== 'available') return
   physicsState = 'unavailable'
-  machine.update(source)
+  // Source names do not establish current native identity. Resolve every exact
+  // authored target before changing any pose; retired paths remain unavailable.
+  for (const override of partOverrides) {
+    const path = override.partPath
+    if (!machine.partPaths.includes(path)
+      || !machine.nativeDrawablePartPaths.some(drawable => drawable === path || drawable.startsWith(`${path}/`))) {
+      throw new Error(`Source part override has no actual current native drawable binding: ${path}`)
+    }
+  }
+  machine.update(source, partOverrides)
   physicsState = 'available'
   paintRevision = 'pending'
 }
@@ -177,6 +222,7 @@ function validateSourceViews(views: readonly PlaybackView[]): void {
   if (machine.missing.length) throw new Error(`Source reconstruction has unresolved native joints: ${machine.missing.join(', ')}.`)
   assertSourceCompositeWeights(views)
   for (const view of views) {
+    assertSourceCompositeProvenance(view, true)
     if (!Object.hasOwn(view, 'authoredImagePlaneWarp') || !Object.hasOwn(view, 'sourceLayout')
       || view.authoredImagePlaneWarp === undefined || !Array.isArray(view.sourceLayout)
       || view.sourceLayout.length !== views.length
@@ -184,9 +230,11 @@ function validateSourceViews(views: readonly PlaybackView[]): void {
     for (let index = 0; index < views.length; index++) {
       const actual = views[index]!
       const entry = view.sourceLayout[index]!
-      if (!entry || Object.keys(entry).length !== 5 || entry.viewId !== actual.id
+      if (!entry || Object.keys(entry).length !== 6 || entry.viewId !== actual.id
         || !equalRecord(entry.rectSourcePixels, actual.rectSourcePixels)
         || entry.presentation !== actual.presentation || !equalRecord(entry.composite, actual.composite)
+        || !Object.hasOwn(entry, 'compositeProvenance')
+        || !equalRecord(entry.compositeProvenance, actual.compositeProvenance ?? null)
         || !Object.hasOwn(entry, 'resolvedImagePlaneWarp')
         || !equalRecord(entry.resolvedImagePlaneWarp, actual.imagePlaneWarp ?? null)) throw new Error(`Source view ${view.id} has stale or incomplete ordered source support.`)
     }
@@ -233,12 +281,13 @@ function retryFollowing(): void {
 
 function applyView(view: PlaybackView, drawRevision: number): void {
   if (!machine || machine.availability !== 'available') return
-  updateMachine(view.input)
+  nativeQualificationProducer?.beginView(view.id, drawRevision)
+  updateMachine(view.input, view.partOverrides ?? NO_PART_OVERRIDES)
   let draw = mechanismDraws.get(view.id)
   if (!draw) {
     draw = { status: 'solved-for-draw', viewId: view.id, timeSeconds: sourceDrawTimeSeconds, sourceDrawRevision: drawRevision,
       input: createMechanismInput(), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, nativeGeometryAssumptions: view.nativeGeometryAssumptions,
-      imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout,
+      imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, partOverrides: view.partOverrides ?? NO_PART_OVERRIDES,
       channelAnglesRad: new Float64Array(20), platenTravelM: 0, penTravelM: 0, effectiveBankDriveTurns: 0 }
     mechanismDraws.set(view.id, draw)
   }
@@ -252,6 +301,7 @@ function applyView(view: PlaybackView, drawRevision: number): void {
   draw.imagePlaneWarp = view.authoredImagePlaneWarp
   draw.resolvedImagePlaneWarp = view.imagePlaneWarp ?? null
   draw.sourceLayout = view.sourceLayout
+  draw.partOverrides = view.partOverrides ?? NO_PART_OVERRIDES
   draw.channelAnglesRad.set(machine.pose.channelAnglesRad)
   draw.platenTravelM = machine.pose.platenTravelM
   draw.penTravelM = machine.pose.magnifier.penTravelM
@@ -282,7 +332,7 @@ function renderedMechanism(viewId: string) {
     method: 'actual-native-mechanism-solve' as const, input: serializeInput(draw.input),
     mechanicalProvenance: draw.mechanicalProvenance, unobservedInputFields: draw.unobservedInputFields,
     nativeGeometryAssumptions: draw.nativeGeometryAssumptions,
-    imagePlaneWarp: draw.imagePlaneWarp, resolvedImagePlaneWarp: draw.resolvedImagePlaneWarp, sourceLayout: draw.sourceLayout,
+    imagePlaneWarp: draw.imagePlaneWarp, resolvedImagePlaneWarp: draw.resolvedImagePlaneWarp, sourceLayout: draw.sourceLayout, partOverrides: draw.partOverrides,
     channelAnglesRad: Array.from(draw.channelAnglesRad), platenTravelM: draw.platenTravelM, penTravelM: draw.penTravelM, effectiveBankDriveTurns: draw.effectiveBankDriveTurns,
   }
 }
@@ -720,7 +770,7 @@ if (verificationEnabled) {
         nativeGeometryAssumptions: reference?.data.nativeGeometryAssumptions ?? [],
         physics: machine && physicsState === 'available' ? { renderedViewId: mode === 'exploring' ? 'exploring' : activeViews[activeViews.length - 1]?.id ?? null, mechanicalProvenance: mode === 'exploring' ? null : activeViews[activeViews.length - 1]?.mechanicalProvenance ?? null, springForcesN: Array.from(machine.pose.springForcesN), springLengthsM: Array.from(machine.pose.springLengthsM), equilibriumResidualNm: machine.pose.equilibriumResidualNm, platenTravelM: machine.pose.platenTravelM, summingAngleRad: machine.pose.summingAngleRad } : null,
         playerAudio: player?.getAudio() ?? null,
-        views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, sourceSampling: view.sourceSampling, nativeGeometryAssumptions: view.nativeGeometryAssumptions, renderedMechanism: renderedMechanism(view.id) })),
+        views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, compositeProvenance: view.compositeProvenance, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, sourceSampling: view.sourceSampling, nativeGeometryAssumptions: view.nativeGeometryAssumptions, partOverrides: view.partOverrides ?? NO_PART_OVERRIDES, renderedMechanism: renderedMechanism(view.id) })),
       }
     },
     compactData() { return reference?.data ?? null },
@@ -806,6 +856,110 @@ if (verificationEnabled) {
       if (machine?.availability !== 'available') throw new Error('A compatible native mechanism is required.')
       viewer.setPartVisibilityProbe(machine.createPartVisibilityProbe())
       if (activeViews.length) drawSourceViews(activeViews, modelTime)
+    },
+    async enableNativeQualification(options: { featureMarkers?: readonly NativeFeatureMarker[] } = {}) {
+      if (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused' || machine?.availability !== 'available') throw new Error('Native qualification requires a paused current original source frame and compatible native mechanism.')
+      if (nativeQualificationBusy) throw new Error('A native byte capture is active.')
+      const currentMachine = machine
+      if (options.featureMarkers && !equalRecord(options.featureMarkers, nativeFeatureMarkers)) {
+        for (const marker of options.featureMarkers) {
+          if (!reference?.data.anchors.some(anchor => anchor.id === marker.id) || marker.sourceVideoId !== video?.id
+            || !Number.isFinite(marker.timeSeconds) || !marker.viewId || !marker.partPath.startsWith('harmonic-analyzer/')
+            || marker.partLocalMetres.length !== 3 || !marker.partLocalMetres.every(Number.isFinite)
+            || !/^[a-f0-9]{64}$/.test(marker.sourceFeatureEvidenceSHA256)) throw new Error('Native marker lacks its original source/physical feature binding.')
+        }
+        nativeFeatureMarkers = options.featureMarkers
+        diagnosticReference = null
+      }
+      configureLandmarkProbe()
+      if (!nativeQualificationProducer || nativeQualificationMachine !== currentMachine) {
+        nativeQualificationProducer?.dispose()
+        nativeQualificationProducer = createNativeQualificationProducer({ machine: currentMachine, viewer })
+        nativeQualificationMachine = currentMachine
+      }
+      if (!activeViews.length || viewer.readRenderedPartVisibility(activeViews[0]!.id).status !== 'captured') {
+        viewer.setNativeQualificationCaptureMode('disabled')
+        viewer.setPartVisibilityProbe(currentMachine.createPartVisibilityProbe())
+      }
+      viewer.setNativeQualificationCaptureMode('enabled')
+      nativeQualificationProducer.enableCapture()
+      drawSourceViews(activeViews, modelTime)
+      return this.snapshot()
+    },
+    nativeQualificationState(viewId: string) {
+      const capture = sourceCapture(viewer.readNativeQualificationCapture(viewId))
+      return {
+        status: capture.status, reason: capture.reason, viewId: capture.viewId, drawRevision: capture.drawRevision,
+        completedDrawEpoch: capture.completedDrawEpoch, timeSeconds: capture.timeSeconds, camera: capture.camera,
+        rectSourcePixels: capture.rectSourcePixels, presentation: capture.presentation, sourceOpacity: capture.sourceOpacity,
+        imagePlaneWarp: capture.imagePlaneWarp, resolvedImagePlaneWarp: capture.resolvedImagePlaneWarp, sourceLayout: capture.sourceLayout,
+        nativeViewportBackingPixels: capture.nativeViewportBackingPixels, destinationCellSourcePixels: capture.destinationCellSourcePixels,
+        sourceStageViewportBackingPixels: capture.sourceStageViewportBackingPixels, sourceStageScissorBackingPixels: capture.sourceStageScissorBackingPixels,
+      }
+    },
+    async captureNativeQualification(request: { binding: NativeDrawBinding; sinkEndpoint: string; context: Omit<NativeQualificationCaptureContext, 'sceneCapture'> }) {
+      if (!nativeQualificationProducer || nativeQualificationMachine !== machine || nativeQualificationBusy) throw new Error('Enable a native capture before requesting one unique source view.')
+      const producer = nativeQualificationProducer
+      const binding = request.binding
+      const validate = () => {
+        const capture = sourceCapture(viewer.readNativeQualificationCapture(binding.viewId))
+        const view = activeViews.find(item => item.id === binding.viewId), mechanism = renderedMechanism(binding.viewId)
+        if (!view || capture.status !== 'captured' || mechanism.status !== 'rendered' || producer !== nativeQualificationProducer
+          || binding.sourceVideoId !== video?.id || binding.sourceSha256 !== reference?.data.source.sha256
+          || binding.timeSeconds !== modelTime || binding.sourceDrawRevision !== sourceDrawRevision
+          || binding.completedSceneDrawEpoch !== capture.completedDrawEpoch || binding.sourceDrawRevision !== capture.drawRevision
+          || binding.modelSourceCommit !== machine?.provenance.sourceCommit || binding.modelRawSHA256 !== machine?.provenance.sourceSha256
+          || binding.modelDeliverySHA256 !== machine?.provenance.observedSha256 || binding.modelDeliveryByteLength !== machine?.provenance.observedByteLength
+          || binding.currentBuildClosureSHA256 !== request.context.codeClosureSHA256
+          || !equalRecord(binding.input, serializeInput(view.input)) || !equalRecord(binding.rectSourcePixels, view.rectSourcePixels)
+          || !equalRecord(binding.camera, view.camera) || binding.presentation !== (view.presentation ?? 'native')
+          || !equalRecord(binding.composite, view.composite ?? { mode: 'opaque' })
+          || !equalRecord(binding.compositeProvenance, view.compositeProvenance ?? null)
+          || !equalRecord(binding.imagePlaneWarp, view.authoredImagePlaneWarp)
+          || !equalRecord(binding.resolvedImagePlaneWarp, capture.resolvedImagePlaneWarp)
+          || !equalRecord(binding.sourceLayout, capture.sourceLayout)
+          || !equalRecord(binding.partOverrides, view.partOverrides ?? NO_PART_OVERRIDES)
+          || !equalRecord(binding.partOverrides, 'partOverrides' in mechanism ? mechanism.partOverrides : NO_PART_OVERRIDES)
+          || binding.sourceImage.pixelFormat !== 'bgr8' || binding.sourceImage.sourceSha256 !== binding.sourceSha256
+          || binding.sourceImage.frameIndex !== binding.decodedFrameIndex
+          || Math.abs((player?.getTime() ?? Infinity) - binding.decodedTimeSeconds) > 0.5) throw new Error('Native bytes have no closed current source/model/input/camera/layout/epoch binding.')
+        return capture
+      }
+      nativeQualificationBusy = true
+      try {
+        const sceneCapture = validate()
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalJson(binding.input)))
+        const inputSHA256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+        if (inputSHA256 !== binding.inputSHA256) throw new Error('Native complete physical input hash differs.')
+        validate()
+        const endpoint = new URL(request.sinkEndpoint, location.href)
+        if (endpoint.origin !== location.origin || !endpoint.pathname.startsWith('/__native-qualification/')) throw new Error('Native binary sink must be this owned verification server.')
+        const sink: NativeQualificationByteSink = {
+          async put(bytes, { retention }) {
+            const hash = await crypto.subtle.digest('SHA-256', bytes as BufferSource)
+            const sha256 = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
+            const response = await fetch(new URL(sha256, endpoint), { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-native-retention': retention }, body: bytes as BodyInit })
+            if (!response.ok) throw new Error(`Native binary upload failed: HTTP ${response.status}`)
+            const stored = await response.json() as { sha256: string; byteLength: number; retention: typeof retention }
+            const priority = { transient: 0, static: 1, reference: 2, 'selected-case': 3 }
+            if (stored.sha256 !== sha256 || stored.byteLength !== bytes.byteLength || !(stored.retention in priority) || priority[stored.retention] < priority[retention]) throw new Error('Native binary sink returned changed content identity.')
+            return stored
+          },
+        }
+        const receipt = await producer.captureView(binding, sink, { ...request.context, sceneCapture })
+        validate()
+        return receipt
+      } finally { nativeQualificationBusy = false }
+    },
+    disableNativeQualification() {
+      if (nativeQualificationBusy) throw new Error('Wait for the active native capture before disabling it.')
+      viewer.setNativeQualificationCaptureMode('disabled')
+      nativeQualificationProducer?.dispose()
+      nativeQualificationProducer = null
+      nativeQualificationMachine = null
+      nativeFeatureMarkers = []
+      diagnosticReference = null
+      configureLandmarkProbe()
     },
     renderedMechanism,
     assertSourceCompositeWeights,

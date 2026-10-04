@@ -72472,5 +72472,9 @@
     }
   ],
   "historicalCandidateNumbersSha256": "efc133091e7865dc920b6d115c81f2ab749944f0deeda7c1fa1c8a4cb65ca916",
-  "qualification": "Original source facts plus separately proven narrow native associations and chosen/unobserved current inputs/framing. Native station/setup ownership is checked, not current posed mechanism feasibility, fitted-camera transfer, source-first-surface, all21-stock numeric/GPU, geometry/raster or 50/20/10/5-percent stage acceptance."
+  "qualification": "Original source facts plus separately proven narrow native associations and chosen/unobserved current inputs/framing. Native station/setup ownership is checked, not current posed mechanism feasibility, fitted-camera transfer, source-first-surface, all21-stock numeric/GPU, geometry/raster or 50/20/10/5-percent stage acceptance.",
+  "headFeatureChoices": {
+    "path": "web/.vite/verification-output/intro-head-current-choices-20261003.json",
+    "sha256": "81ca2e7ac15c4d7cf0d2f682738145cc1390cdea1b5068c715c21b0d1a9a60ef"
+  }
 }

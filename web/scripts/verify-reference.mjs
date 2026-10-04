@@ -173,6 +173,27 @@ export function sourceImageError(image, source, native = null) {
 export function sourceImageKey(image) {
   return `${image?.frameIndex}/${image?.pixelFormat}/${image?.sha256Bgr8 ?? image?.sha256Gray8}`
 }
+/** Exact indexed exposure authority; independently probed decimal spelling is
+ * accepted, but nearby timestamps are never an exposure-selection rule. */
+export function nativeFrameExposureError(frame, frameIndex, native) {
+  if (!Number.isInteger(frameIndex) || !finite(native?.pts?.[frameIndex])
+    || frame?.sourceImage?.frameIndex !== frameIndex
+    || sourceImageError(frame?.sourceImage, native.observedSha256 ? { sha256: native.observedSha256 } : null, native)) return 'Missing original indexed source image identity'
+  if (!finite(frame.decodedTimeSeconds) || frame.decodedTimeSeconds !== native.pts[frameIndex]
+    && frame.decodedTimeSeconds !== native.ptsDecimalSeconds?.[frameIndex]) return 'Decoded time is not the exact indexed native PTS or its independently probed decimal spelling'
+  if (frame.decodedTimestampTicks !== undefined || frame.timeBase !== undefined) {
+    try {
+      const tick = frame.decodedTimestampTicks
+      if (!(typeof tick === 'string' && /^\d+$/.test(tick) || Number.isSafeInteger(tick) && tick >= 0)
+        || typeof frame.timeBase !== 'string' || !/^[1-9]\d*\/[1-9]\d*$/.test(frame.timeBase)
+        || !Array.isArray(native.ptsTicks) || typeof native.timeBase !== 'string') return 'Missing exact native tick/timebase authority'
+      const [numerator, denominator] = frame.timeBase.split('/').map(BigInt)
+      const [nativeNumerator, nativeDenominator] = native.timeBase.split('/').map(BigInt)
+      if (BigInt(tick) * numerator * nativeDenominator !== BigInt(native.ptsTicks[frameIndex]) * nativeNumerator * denominator) return 'Source tick/timebase identifies a different original exposure'
+    } catch { return 'Invalid exact native tick/timebase authority' }
+  }
+  return null
+}
 /** Visit every claimed exposure, including proofs, registration parents and shared-rig maps. */
 export function claimedSourceImages(data) {
   const images = []
@@ -269,8 +290,20 @@ export function sourceLocalizationFootprintBounds(view, observation, points, geo
   }
   return {warp,boundsViewportPixels:[minX-geometryRadius,minY-geometryRadius,maxX+geometryRadius,maxY+geometryRadius]}
 }
+/** Candidate image weights do not establish measured alpha or source geometry. */
+export function sourceCompositeProvenanceError(view, requireCrossfade = false) {
+  const provenance = view?.compositeProvenance
+  if (provenance !== undefined && (!exactKeys(provenance, ['kind', 'evidence'])
+    || provenance.kind !== 'chosen-unmeasured' || !text(provenance.evidence))) return 'Composite provenance must be closed chosen-unmeasured with nonblank evidence'
+  if (requireCrossfade && view?.composite?.mode === 'crossfade' && provenance === undefined) return 'Current source-track crossfade needs chosen-unmeasured composite provenance'
+  return null
+}
 export function sourceLayoutForViews(views) {
-  return views.map(view=>({viewId:view.id,rectSourcePixels:view.rectSourcePixels,presentation:view.presentation,composite:view.composite??{mode:'opaque'},resolvedImagePlaneWarp:independentlyResolvedWarp(view)}))
+  return views.map(view=>{
+    const error = sourceCompositeProvenanceError(view)
+    if (error) throw new Error(error)
+    return {viewId:view.id,rectSourcePixels:view.rectSourcePixels,presentation:view.presentation,composite:view.composite??{mode:'opaque'},compositeProvenance:view.compositeProvenance??null,resolvedImagePlaneWarp:independentlyResolvedWarp(view)}
+  })
 }
 export function sameResolvedImagePlaneWarp(a,b) {
   if (a===null||b===null) return a===b
@@ -280,9 +313,12 @@ export function sameResolvedImagePlaneWarp(a,b) {
   return finite(scale)&&scale!==0&&a.renderToSourcePixels.every((value,i)=>Math.abs(value-scale*b.renderToSourcePixels[i])<=1e-8*Math.max(1,Math.abs(value)))
 }
 export function sameSourceLayout(a,b) {
-  return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((view,i)=>exactKeys(view,['viewId','rectSourcePixels','presentation','composite','resolvedImagePlaneWarp'])
+  const keys=['viewId','rectSourcePixels','presentation','composite','compositeProvenance','resolvedImagePlaneWarp']
+  const valid=view=>exactKeys(view,keys)&&(view.compositeProvenance===null||(view.compositeProvenance!==undefined&&!sourceCompositeProvenanceError(view)))
+  return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((view,i)=>valid(view)&&valid(b[i])
     &&view.viewId===b[i].viewId&&canonicalJson(view.rectSourcePixels)===canonicalJson(b[i].rectSourcePixels)&&view.presentation===b[i].presentation
-    &&canonicalJson(view.composite)===canonicalJson(b[i].composite)&&sameResolvedImagePlaneWarp(view.resolvedImagePlaneWarp,b[i].resolvedImagePlaneWarp))
+    &&canonicalJson(view.composite)===canonicalJson(b[i].composite)&&canonicalJson(view.compositeProvenance)===canonicalJson(b[i].compositeProvenance)
+    &&sameResolvedImagePlaneWarp(view.resolvedImagePlaneWarp,b[i].resolvedImagePlaneWarp))
 }
 /** Actual convex support, intersected with the clipping ROI (quad may extend it). */
 export function sourceSupportPolygon(view) {
@@ -910,7 +946,7 @@ export function inspectReference(data, expectedId, native = null) {
 export async function probeSource(path, expected, { signal } = {}) {
   const observedSha256 = await sha256File(path)
   if (observedSha256 !== expected.sha256) throw new Error(`Source SHA256 mismatch: ${path}`)
-  const { stdout } = await runTool('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_streams', '-show_format', '-show_frames', '-show_entries', 'stream=width,height,avg_frame_rate,duration:format=duration:frame=best_effort_timestamp_time', '-of', 'json', path], { signal })
+  const { stdout } = await runTool('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_streams', '-show_format', '-show_frames', '-show_entries', 'stream=width,height,time_base,avg_frame_rate,duration:format=duration:frame=best_effort_timestamp,best_effort_timestamp_time', '-of', 'json', path], { signal })
   const probe = JSON.parse(stdout), stream = probe.streams?.[0]
   const [numerator, denominator] = (stream?.avg_frame_rate ?? '').split('/').map(Number)
   const fps = numerator / denominator
@@ -918,11 +954,21 @@ export async function probeSource(path, expected, { signal } = {}) {
   let declaredFps = typeof declared === 'number' ? declared : declared?.numerator / declared?.denominator
   if (typeof declared === 'string') { const terms = declared.split('/').map(Number); declaredFps = terms.length === 2 ? terms[0] / terms[1] : Number(declared) }
   if (!finite(declaredFps) || Math.abs(declaredFps - fps) > 0.0001) throw new Error(`Actual source frame rate differs from observations: ${fps}/${declaredFps}`)
-  const pts = (probe.frames ?? []).map(frame => Number(frame.best_effort_timestamp_time))
-  if (stream?.width !== 1920 || stream?.height !== 1080 || !finite(fps) || fps <= 0 || !pts.length || pts.some((value, index) => !finite(value) || (index && value <= pts[index - 1]))) throw new Error(`Invalid actual decoded stream/PTS: ${path}`)
+  const timeBase = stream?.time_base
+  if (typeof timeBase !== 'string' || !/^[1-9]\d*\/[1-9]\d*$/.test(timeBase)) throw new Error(`Missing exact original source timebase: ${path}`)
+  const [timeNumerator, timeDenominator] = timeBase.split('/').map(BigInt)
+  const ptsTicks = (probe.frames ?? []).map(frame => {
+    const tick = frame.best_effort_timestamp
+    if (!(typeof tick === 'string' && /^\d+$/.test(tick) || Number.isSafeInteger(tick) && tick >= 0)) throw new Error(`Missing exact original decoded timestamp ticks: ${path}`)
+    return String(tick)
+  })
+  const pts = ptsTicks.map(tick => Number(BigInt(tick) * timeNumerator) / Number(timeDenominator))
+  const ptsDecimalSeconds = (probe.frames ?? []).map(frame => Number(frame.best_effort_timestamp_time))
+  if (stream?.width !== 1920 || stream?.height !== 1080 || !finite(fps) || fps <= 0 || !pts.length
+    || pts.some((value, index) => !finite(value) || !finite(ptsDecimalSeconds[index]) || (index && (BigInt(ptsTicks[index]) <= BigInt(ptsTicks[index - 1]) || value <= pts[index - 1])))) throw new Error(`Invalid actual decoded stream/PTS: ${path}`)
   const durationSeconds = Number(probe.format?.duration)
   if (Math.abs(durationSeconds - expected.durationSeconds) > 0.05) throw new Error(`Actual source duration differs from observations: ${durationSeconds}/${expected.durationSeconds}`)
-  return { observedSha256, width: stream.width, height: stream.height, fps, durationSeconds, nativeFrameCount: pts.length, pts }
+  return { observedSha256, width: stream.width, height: stream.height, fps, durationSeconds, nativeFrameCount: pts.length, pts, ptsDecimalSeconds, ptsTicks, timeBase }
 }
 
 export async function loadReferences(webRoot, referenceRoot, { signal } = {}) {

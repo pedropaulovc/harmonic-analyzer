@@ -99,6 +99,10 @@ def view_record(original, camera, state, evidence):
     warp = common.resolve_warp(original)
     if composite:
         result["composite"] = composite
+        result["compositeProvenance"] = copy.deepcopy(original.get("compositeProvenance") or {
+            "kind": "chosen-unmeasured",
+            "evidence": "Original composite topology remains a source obligation. Retained numeric opacity is an unmeasured presentation candidate, not source alpha or current native/GPU qualification.",
+        })
     if warp:
         result["imagePlaneWarp"] = warp
     return result

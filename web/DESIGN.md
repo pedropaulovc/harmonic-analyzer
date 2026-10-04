@@ -78,7 +78,7 @@ receipts remain immutable old-release history. Current native associations
 preserve required losses: **Intro 16, Synthesis 16, Analysis 21, Operation 169,
 Spin 42, Rocker 0**. Unavailable native associations do not become fabricated
 paths or coordinates. Later review identified lost source-only layouts and
-Operation facts; preservation of those obligations remains pending.
+Operation facts; the subsequent source reconciliation restored those obligations.
 Literal-serialized native body
 proofs and digests live once at the current root; closed references are verified
 before measurement, without inline fallback or rewriting immutable lineage.
@@ -111,6 +111,19 @@ code, wrong model, incomplete geometry and injected pass metadata) previously
 received full passes. They now retain source-only success while keeping full
 acceptance unmeasured. This removes a false transition; it does not implement or
 prove the still-required genuine current native qualification.
+
+The repaired source-only reconciliation regenerated all six tracks transactionally
+in **73.37 seconds**. **70 Python source tests** and **106 playback/sync-consumer
+tests** passed; actual all-six adopter and generated-content probes preserved
+Analysis's eight endcard views, the single-main Synthesis transition, Operation's
+observed sequence/states/paired measurements/view rectangles and declared events.
+The frozen source-layout census excludes camera, input, fitted warp and native
+certificate authority. Sealed Spin phase/reference-image proof is normalized
+before strict exact-exposure union; contradictory pixels, roles, uncertainty,
+layout or pre-existing proof remain conflicts. Closed runtime ordered layouts
+retain crossfade provenance as **chosen-unmeasured**, never measured alpha.
+This proves source-obligation retention, not source/full-native acceptance.
+
 
 Original MP4 SHA, **1920×1080**, FPS and actual PTS passed for all six, with
 frame counts **6,544 Intro / 8,196 Synthesis / 7,328 Analysis / 21,190 Operation /
@@ -914,10 +927,172 @@ covering **462 native drawables / 6,953,932 vertices / 17,370,204 indices**
 and six exact native-script closures.
 
 This is diagnostic instrumented replication of the actual submitted shader,
-not pixels, source, shadow or final-material qualification. The original world
-uniform was inactive, with zero CPU activations. No production shader fix or
-all-vertex GPU equivalence is established; historical 435-part CPU and declared
-three-part synthetic controls do not prove the current 462-row model.
+not pixels, source, shadow or final-material qualification. The original
+`modelMatrix` world uniform was **active and captured from the actual submitted
+GPU program** in every evaluated spring program. All strict world copies
+completed with **zero uncaptured-uniform refusals / zero CPU provider activations**.
+At that baseline checkpoint no production fix or all-vertex GPU equivalence had
+been established; historical 435-part CPU and declared three-part synthetic
+controls do not prove the current 462-row model.
+
+The subsequent production correction keeps the original CPU curve, classifier,
+native attributes, physical coefficients and **1e−7 m** bound unchanged. Its stock
+spring shader splits the coil coordinate into a 1/4096 coarse term and a residual
+before phase reduction, and splits each actual mesh's world translation into
+Float32 high/low parts. The owned low-translation uniform is refreshed after the
+complete physical update; native clones share the physical span but retain their
+own mesh translation and standard, ID, depth and distance material hooks.
+Camera-relative `modelViewMatrix` projection remains the existing Three.js path.
+
+The **2026-10-03 22:58** parent-owned production diagnostic executed the same
+**16 feasible states × all 21 spring roles**, with **52,697,504 positions per
+material family**, all finite at execution:
+
+| Actual material family | Measured local maximum (m) | Measured world maximum (m) | Outside 1e−7 m |
+|---|---:|---:|---:|
+| Standard | 2.103578687235213e−8 | 9.330670405754766e−8 | 0 local / 0 world |
+| Native ID | 2.103578687235213e−8 | Unconsumed / unmeasured | 0 local |
+| Custom depth | 2.103578687235213e−8 | Unconsumed / unmeasured | 0 local |
+| Custom distance | 2.103578687235213e−8 | 9.330670405754766e−8 | 0 local / 0 world |
+
+The worst consumed world result leaves **6.6932959424523375e−9 m** of margin in this
+observed bank, not a universal error enclosure. Standard normal coverage was
+complete, with maximum **8.222334615475389e−6** dimensionless error and an explicitly
+**null acceptance threshold**. Standard view error **2.518623869179701e−7 m** and maximum
+clip-component error **4.1439845688273635e−7** are separate diagnostics, not the world-space
+metre budget. The run restored original input and reported no execution failures
+or page errors.
+
+The protected reference is the **unchanged 28,920-byte original** position and
+classification factory, SHA-256
+`e84fd4318890130e8183ebdcce1560796b24b6e0b4ac3e15b890545c8dd9a5fa`,
+in `original-f64-oracle-sealed-20261003.mjs`. Its API has no normal extension.
+The separate **6,671-byte normal-only diagnostic**, SHA-256
+`d06dd74591b962e4b03c4315bd3b7471907568d425982bca170ca491c2adeeb7`,
+uses only that factory's immutable parameters and original unwrapped Binary64
+tangent/transport law; it is not a replacement position reference or normal
+acceptance policy. The independent Node archive verifier passed the
+**1,331,924,992-byte / 240-member** archive, SHA-256
+`6ab1a8492e3edb942f23fb171605d28879e3e08129f8c5ebd1b0543b359e5568`,
+including selected compiled-to-source correspondence, exact reference identities,
+finite archived chosen-state outputs and all-16-state original F64 receipt
+correspondence. Other states retain execution metrics and hashes, not all raw GPU
+outputs for independent offline rechecking. Evidence is under
+`web/.vite/verification-output/native-v39-spring-baseline-20261003/production-actual-2026-10-03T22-58-25-176Z-mxt5zua8/`.
+
+This remains an epilogue-instrumented relink of the actual submitted source and
+captured uniforms; its optimizer is separate from the original draw. Dedicated
+shadow renders exercise the actual depth/distance material factories, not
+source-shadow pixels. The receipt's `sourceAcceptance`, `productionQualification`
+and `eligibilityExport` remain **false**: material, shadow, camera and source-pixel
+qualification, full input-state coverage and source fidelity are not promoted.
+
+The separately executed opt-in native-capture smoke passed **three actual
+authored cases / 18 ordered views**, covering all **462 inventory rows** and
+production colour/depth plus native ID/separate diagnostic-depth planes. Cases
+included Intro at **1.8018 s**, Intro's seven-view ordered-opaque layout at
+**54.6546 s**, and Spin's ten-view warp/mirror/composite layout at
+**141.55808333333331 s**. It verified current completed epochs, staleness after a
+physical update and an actual one-CSS-pixel resize, retained readback copies and
+disabled-state restoration. All **69 textures / 46 framebuffers / one buffer**
+created during the smoke were deleted, with zero owned live allocations and
+unchanged baseline **seven textures / 174 geometries / 16 programs**. The three
+same-frame screenshots were visually inspected; they are not source-frame
+comparisons or numerical shader proof. These single-sample linear offscreen
+production-material rasters do not claim canvas/MSAA/source-colour equivalence.
+Evidence is
+`web/.vite/verification-output/native-enabled-capture-smoke-2026-10-03T22-51-24-071Z.json`.
+
+### Native capture lifecycle
+
+Native, native-surface visibility and depth-off landmark readers share a
+completed-draw freshness boundary. Besides CSS geometry and camera/layout
+state, it retains the actual GL drawing-buffer dimensions, canvas backing
+dimensions and renderer pixel ratio. Changing the backing alone at unchanged
+CSS size refuses the old observations (`stale` for native/visibility, `null`
+for landmarks); a subsequent `Viewer.resize()` and completed draw establish a
+new boundary. Lost contexts and changed renderer clipping state also refuse
+observations. Readers neither redraw nor synchronize away a changed state.
+
+Each diagnostic pass saves the exact live native material assignment at entry,
+including a material array's identity and order, and restores that assignment
+in `finally`. Inventory-install-time materials are not restoration authority.
+Only affected probe-owned ID clones are refreshed or disposed when an assigned
+material or its raster properties change. Fresh clones retain the current
+alpha test, side, clipping planes, visibility, depth and polygon-offset state;
+their ID output still uses no blending and no tone mapping. Custom native
+compile hooks retain their original spring uniform closures and precision law.
+Production material assignments, depth/distance hooks and shader arithmetic
+are not rewritten by capture.
+
+Freshness observes live assignments and structured material inputs, including
+in-place colour/vector/plane values, standard texture transforms and version,
+shader uniforms/defines and compile-hook identities. Unchanged frames reuse
+their observation storage and owned clones; reads compare without material
+serialization or snapshot allocation. Native drawable reports carry authentic
+captured material references, not diagnostic clones, and refuse consumption
+after relevant state changes. Per-view native state is retained separately so
+a later view cannot silently relabel an earlier material raster. Application
+annotations (`userData`, names) and renderer event-listener bookkeeping are not
+raster inputs. Opaque custom closure/resource changes still require the normal
+Three material/texture update signal or the machine's physical revision;
+these observations do not qualify arbitrary custom shader semantics.
+
+The actual BEFORE receipt
+`web/.vite/verification-output/native-p2-transition-controls-2026-10-03T23-51-08-172Z.json`
+reproduced the defects on the original Intro **1.8018 s** viewer. Unchanged
+CSS **960 × 600**, ratio **1→0.5**, and actual backing **960 × 600→480 × 300**
+still exposed old native epoch **40**. A live same-class magenta replacement
+was restored to the install-time original. In-place `alphaTest=1.001` submitted
+that value for production but **0** for ID: all **5,533** selected ID pixels
+remained, with **5,533** production/ID packed-depth disagreements. FrontSide
+had zero selected disagreements; BackSide submitted **1** for production but
+**0** for ID, again with **5,533** selected disagreements and unchanged ID/depth
+planes. Genuine Plane clipping was explicitly **unexecuted** (no existing
+clonable Plane). These remain BEFORE facts, not full/native/source qualification.
+
+The parent-owned AFTER run used the unchanged original driver on the sole
+headed page and renderer. Its receipt is
+`web/.vite/verification-output/native-p2-transition-controls-2026-10-04T00-30-25-909Z.json`.
+The same backing-only transition now returns `stale` for native and visibility,
+without exposing the old epoch. Same-class replacement assignments survive both
+ordinary-disabled and enabled draws; native reports retain the replacement
+references, and ordinary/enabled canvas bytes have **zero differences**.
+With `alphaTest=1.001`, selected ID pixels fall from **5,533 to zero**; both
+production and ID depth change at all **5,533** baseline selected pixels.
+FrontSide retains **5,533** selected pixels and BackSide **5,457**; both have
+**zero** selected production/ID packed-depth disagreements. These actual side
+counts are observations, not an assumed silhouette invariant.
+
+The separately parent-executed extended receipt is
+`web/.vite/verification-output/native-p2-transition-extended-controls-2026-10-04T00-33-06-345Z.json`.
+All **five** array steps preserve the exact assignment and slot references;
+enabled snapshots report the assigned slots. Same-array slot replacement and
+new-array identity with unchanged slots both refuse old native/visibility
+observations with **zero GL draws / zero renderer submissions** between reads.
+The genuine selected mesh had no groups: its valid one-slot array naturally
+drew no selected triangles. This proves restoration/freshness, not visible
+multi-material triangle coverage. All **four depthTest/depthWrite combinations**
+submit matching live ID flags and preserve ordinary/enabled canvas bytes
+exactly. In-place alphaTest, side, depthTest and depthWrite changes made after
+completion but before drawing each return stale native/visibility results,
+absent native planes/part rows, and **zero** intervening draw/submission calls.
+Cleanup restores original material/array/geometry/input/camera/renderer/GL
+references and values, disposes only helper-owned material clones, and restores
+ordinary pixels and retained baseline byte copies without differences.
+
+The parent also reran the existing **three-case / 18-view** capture helper:
+`web/.vite/verification-output/native-enabled-capture-smoke-2026-10-04T00-32-39-949Z.json`.
+Earlier views remain readable through later per-view inputs in the completed
+batch; a subsequent physical update and actual viewport change refuse old
+reads. All **69 created textures / 46 framebuffers / one buffer** are deleted,
+with **zero** created resources remaining live and ordinary references restored.
+No child ran builds, generators, browser or GPU controls. The actual AFTER
+fixtures had **no available landmark baseline**: their null landmark reads do
+not independently prove a landmark captured→stale transition. Genuine Plane
+clipping remains **unexecuted**. These are bounded lifecycle controls, not
+source-pixel, all-six, full-native, shader-numerical or canvas/offscreen-colour
+qualification, and they do not promote byte/code provenance or eligibility.
 
 ### Browser verification
 

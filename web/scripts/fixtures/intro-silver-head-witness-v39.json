@@ -1,0 +1,50 @@
+{
+  "kind": "original-v39-intro809-slotted-head-floor-proof-fixture",
+  "rawSHA256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+  "sourceInspection": {
+    "kind": "actual-original-decoded-source-raster-inspection",
+    "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+    "frameIndex": 809,
+    "decodedTimestampTicks": 809809,
+    "timeBase": "1/30000",
+    "decodedTimeSeconds": 26.99363333333333,
+    "sha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75",
+    "width": 1920,
+    "height": 1080,
+    "headCrops": [
+      { "anchorId": "frame-cross-screw-6", "role": "fit", "pixel": [783.0021362304688, 110.01241302490234], "uncertaintyPx": 4 },
+      { "anchorId": "frame-cross-screw-5", "role": "fit", "pixel": [1138.9964599609375, 112.00497436523438], "uncertaintyPx": 4 },
+      { "anchorId": "frame-cross-screw-2", "role": "fit", "pixel": [792.0613403320312, 985.03076171875], "uncertaintyPx": 4 },
+      { "anchorId": "frame-cross-screw-1", "role": "fit", "pixel": [1138.9500732421875, 979.997802734375], "uncertaintyPx": 4 }
+    ]
+  },
+  "actualRawExpectation": {
+    "positionTypedBytesSHA256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8",
+    "indexTypedBytesSHA256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28",
+    "vertexCount": 69366,
+    "uniquePositionCount": 23576,
+    "indexCount": 141138,
+    "floorYMetres": 0.002962084487080574,
+    "actualMaximumYMetres": 0.004556158557534218,
+    "invalidNominalYMetres": 0.004572,
+    "triangleIndex": 38163,
+    "vertexIndices": [58580, 58579, 58581],
+    "barycentric": [0.5, 4.0407171659413437e-16, 0.4999999999999996],
+    "floorTrianglePointsMetres": [
+      [4.336808689942018e-19, 0.002962084487080574, -0.0039750998839735985],
+      [-0.0005366384866647422, 0.002962084487080574, 0.003938710317015648],
+      [0, 0.002962084487080574, 0.0039750998839735985]
+    ],
+    "sectionYMetres": 0.001481042243540287,
+    "closedSectionEdgePointCount": 128,
+    "sectionRadiusBoundsMetres": [0.0039615229531286544, 0.0039750998839735985]
+  },
+  "actualInstances": [
+    { "anchorId": "frame-cross-screw-6", "rawNodeIndex": 300, "rawMeshIndex": 282, "primitiveIndex": 0, "positionAccessorIndex": 960, "indicesAccessorIndex": 959, "translationMetres": [0.19699999690055847, 1.0179500579833984, -0.13760000467300415] },
+    { "anchorId": "frame-cross-screw-5", "rawNodeIndex": 299, "rawMeshIndex": 281, "primitiveIndex": 0, "positionAccessorIndex": 957, "indicesAccessorIndex": 956, "translationMetres": [-0.19699999690055847, 1.0179500579833984, -0.13760000467300415] },
+    { "anchorId": "frame-cross-screw-2", "rawNodeIndex": 297, "rawMeshIndex": 279, "primitiveIndex": 0, "positionAccessorIndex": 951, "indicesAccessorIndex": 950, "translationMetres": [0.19699999690055847, 0.038100000470876694, -0.13300000131130219] },
+    { "anchorId": "frame-cross-screw-1", "rawNodeIndex": 284, "rawMeshIndex": 266, "primitiveIndex": 0, "positionAccessorIndex": 912, "indicesAccessorIndex": 911, "translationMetres": [-0.19699999690055847, 0.038100000470876694, -0.13300000131130219] }
+  ],
+  "positionBoundMetres": 1e-7,
+  "scope": "Actual immutable raw geometry and original four FIT source facts only. Parent runtime must independently prove posed source first-surface and visible head/rim support. No source, camera, GPU, held-out CHECK or stage acceptance."
+}

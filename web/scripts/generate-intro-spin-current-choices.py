@@ -2,6 +2,7 @@
 """Produce explicit current Intro/Spin choices, native associations and prerequisites.
 
 Parent-only command, after adopt-v39-source-observations.py:
+  node web/scripts/generate-intro-head-feature-choices.mjs --output web/.vite/verification-output/intro-head-current-choices-20261003.json
   uv run --no-project --active python web/scripts/generate-intro-spin-current-choices.py --runtime-census web/.vite/native-v39-smoke-corrected-20261003.json
 Then run generate-v39-source-tracks.py, the all-six canonical transaction.
 Individual family scripts require --output for unpublished diagnostics. This producer reads
@@ -21,6 +22,7 @@ import importlib.util
 import json
 import math
 import struct
+import subprocess
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -253,7 +255,75 @@ def nib_identity(raw, old_profile):
             "qualification": "Exact current stored native apex/incident facets only. Seam indices are one support point; no posed nearest-hit, independent source feature/contact or GPU eligibility is measured."}
 
 
-def intro_packets(model, mech, semantics, layers, raw):
+INTRO_HEAD_FEATURE_METHOD = "actual-v39-raw-slot-floor-feature-choice-v1"
+INTRO_HEAD_CHOICES_DEFAULT = common.WEB / ".vite/verification-output/intro-head-current-choices-20261003.json"
+
+
+def verified_intro_head_choices(path):
+    """Recompute raw/source choices in Node; serialized coordinates are not authority."""
+    result = subprocess.run(
+        ["node", str(HERE / "generate-intro-head-feature-choices.mjs"), "--verify", str(path)],
+        check=False, capture_output=True, text=True,
+    )
+    if result.returncode:
+        raise ValueError("Current Intro head choices failed fresh original raw/source recomputation: " + result.stderr.strip())
+    verified = json.loads(result.stdout)
+    if set(verified) != {"packet", "path", "sha256"}:
+        raise ValueError("Current Intro head verification has an unexpected result shape")
+    return verified
+
+
+def intro_head_associations(verified, source_anchors, source_frame):
+    """Keep original source facts separate from the chosen actual floor correspondence."""
+    packet = verified["packet"]
+    if (packet["kind"] != "current-intro-raw-head-feature-choices" or packet["videoId"] != INTRO
+            or packet["modelRawSHA256"] != native.APPROVED_SOURCE["sha256"]
+            or packet["modelSourceCommit"] != native.APPROVED_SOURCE["sourceCommit"]):
+        raise ValueError("Current Intro floor choices belong to a different original native source")
+    source_points = {row["anchorId"]: row for row in source_frame["landmarks"]}
+    associations = {}
+    for choice in packet["choices"]:
+        anchor_id = choice["anchorId"]
+        original = source_anchors[anchor_id]
+        binding = choice["sourceBinding"]
+        point = source_points[anchor_id]
+        if (anchor_id in associations or choice["state"] != "chosen-unmeasured"
+                or choice["correspondenceChoice"]["state"] != "chosen-unmeasured"
+                or binding["sourceSHA256"] != packet["sourceSha256"]
+                or binding["frameIndex"] != source_frame["sourceImage"]["frameIndex"]
+                or str(binding["decodedTimestampTicks"]) != str(source_frame["decodedTimestampTicks"])
+                or binding["timeBase"] != source_frame["timeBase"]
+                or any(point[key] != binding[key] for key in ("pixel", "role", "uncertaintyPx"))
+                or binding["role"] != "fit" or binding["uncertaintyPx"] != 4):
+            raise ValueError("Current Intro head choice changed an original FIT pixel, role, exposure or uncertainty")
+        if original["kind"] != "physical-feature":
+            raise ValueError("Original head feature kind changed")
+        proof = {
+            "method": INTRO_HEAD_FEATURE_METHOD,
+            "currentSource": copy.deepcopy(native.APPROVED_SOURCE),
+            "qualifiedPartPath": choice["partPath"], "partLocalMetres": copy.deepcopy(choice["partLocalMetres"]),
+            "frozenWitness": copy.deepcopy(choice["frozenWitness"]),
+            "sourceFeatureEvidenceSHA256": choice["frozenWitness"]["sourceFeatureEvidenceSHA256"],
+            "sourceBinding": copy.deepcopy(binding),
+            "geometryEvidenceSHA256": choice["geometryEvidenceSHA256"],
+            "correspondenceChoice": copy.deepcopy(choice["correspondenceChoice"]),
+            "currentChoicePacket": {"path": verified["path"], "sha256": verified["sha256"]},
+            "originalSourceCorrespondenceEvidence": original.get("correspondenceEvidence"),
+            "qualification": packet["qualification"],
+        }
+        anchor = {key: copy.deepcopy(original[key]) for key in ("id", "kind", "description") if key in original}
+        anchor.update({
+            "partPath": choice["partPath"], "partLocalMetres": copy.deepcopy(choice["partLocalMetres"]),
+            "correspondenceEvidence": "Original independently measured Intro809 silver-head FIT pixel/4px uncertainty retained. Fresh original-v39 indexed slot-floor triangle centre is a separate chosen-unmeasured native correspondence, not a source-depth observation, virtual head-envelope centre, mesh vertex or camera-derived alias. Current pose/camera and rendered first-surface/rim/slot support remain unmeasured.",
+            "nativeAssociation": {"status": "mapped", "reason": None, "proof": copy.deepcopy(proof)},
+        })
+        associations[anchor_id] = {"status": "mapped", "reason": None, "anchor": anchor, "proof": proof}
+    if set(associations) != {f"frame-cross-screw-{index}" for index in (1, 2, 5, 6)}:
+        raise ValueError("Current Intro head choices must preserve exactly the four original FIT feature identities")
+    return associations
+
+
+def intro_packets(model, mech, semantics, layers, raw, head_features):
     source = common.load_observations(INTRO)
     historical_obs, obs_lineage = historical(INTRO + ".observations.json")
     old_seed, seed_lineage = historical(INTRO + ".static-camera-seeds.json")
@@ -278,16 +348,18 @@ def intro_packets(model, mech, semantics, layers, raw):
                "sourceFramings": source_framings([historical_obs, old_camera_track]),
                "historicalLineage": [obs_lineage, camera_lineage, seed_lineage, profile_lineage, request_lineage],
                "historicalCandidateNumbersSha256": native.json_digest(originals), "qualification": QUALIFICATION}
+    choices["headFeatureChoices"] = {"path": head_features["path"], "sha256": head_features["sha256"]}
     original_frame = next(frame for frame in historical_obs["frames"] if frame.get("sourceImage") == old_seed["sourceFrame"]["sourceImage"])
     if original_frame["landmarks"] != old_seed["sourceFrame"]["landmarks"]:
         raise ValueError("Intro static seed must retain exact source controls")
     anchors = {anchor["id"]: anchor for anchor in historical_obs["anchors"]}
+    fresh_heads = intro_head_associations(head_features, anchors, old_seed["sourceFrame"])
     support = []
     for row in old_seed["nativeSupport"]:
         anchor = anchors[row["anchorId"]]
         if (anchor["partPath"], anchor["kind"]) != (row["partPath"], row["kind"]):
             raise ValueError("Intro static native feature identity differs from its original source")
-        association = common.associate_native_anchor(anchor)
+        association = fresh_heads.get(row["anchorId"]) or common.associate_native_anchor(anchor)
         support.append({"anchorId": row["anchorId"], "status": association["status"],
                         "anchor": association["anchor"], "proof": association["proof"], "reason": association["reason"]})
     pending = {"eligible": None, "status": "unmeasured", "declaredFitPoints": sum(row["role"] == "fit" for row in old_seed["sourceFrame"]["landmarks"]),
@@ -298,7 +370,7 @@ def intro_packets(model, mech, semantics, layers, raw):
                "qualification": QUALIFICATION}
     static = {"schemaVersion": 1, "videoId": INTRO, "sourceSha256": source["source"]["sha256"], "modelSha256": model["sha256"],
               "sourceFrame": copy.deepcopy(old_seed["sourceFrame"]), "nativeSupport": support, "calibrationEligibility": pending,
-              "nativeGeometryScope": "Exact same-path unchanged local-feature association in current authored rest frames only; no chosen-input pose or current source eligibility.",
+              "nativeGeometryScope": "Four freshly raw-indexed actual slot-floor features are chosen-unmeasured native correspondences to unchanged original FIT controls; other same-path associations retain their narrow original scope. No chosen-input pose, source-depth identification, current camera or rendered first-surface eligibility.",
               "historicalLineage": [seed_lineage], "historicalInput": None, "currentCompleteNativeInput": None,
               "cameraApplication": "none; old RAW-rest static CPU camera is historical diagnostics only, never current fitted/framing authority",
               "sourceAcceptance": False, "GPUAcceptance": False, "qualification": QUALIFICATION}
@@ -437,12 +509,15 @@ def spin_packets(model, mech, semantics, layers):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime-census", required=True, type=Path, help="Actual parent current native-viewer smoke JSON; never an old full435 export")
+    parser.add_argument("--intro-head-feature-choices", type=Path, default=INTRO_HEAD_CHOICES_DEFAULT,
+                        help="Parent-generated current Node raw/source head choices; freshly recomputed before adoption")
     args = parser.parse_args()
     model = common.current_model_identity()
     raw = native.native_association().new
     mech, semantics = input_semantics(model, raw)
     layers = observed_layers(args.runtime_census, model, raw)
-    packets = intro_packets(model, mech, semantics, layers, raw)
+    head_features = verified_intro_head_choices(args.intro_head_feature_choices)
+    packets = intro_packets(model, mech, semantics, layers, raw, head_features)
     spin, phase_map = spin_packets(model, mech, semantics, layers)
     packets.update(spin)
     # Prepare the entire family packet set before publication. Source-only phase

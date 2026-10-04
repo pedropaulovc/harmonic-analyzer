@@ -145,7 +145,7 @@
       }
     },
     "resolvedImagePlaneWarp": {"type": "object", "additionalProperties": false, "required": ["kind", "unwarpedViewportPixels", "renderToSourcePixels"], "properties": {"kind": {"const": "homography"}, "unwarpedViewportPixels": {"$ref": "#/$defs/warpViewport"}, "renderToSourcePixels": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"type": "number"}}}, "description": "Derived row-major native-unmirrored-viewport to original source-global pixel H. Independently recomputed from four measured corners; never an authored second authority."},
-    "sourceLayout": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["viewId", "rectSourcePixels", "presentation", "composite", "resolvedImagePlaneWarp"], "properties": {"viewId": {"$ref": "#/$defs/sourceEvidence"}, "rectSourcePixels": {"$ref": "#/$defs/xyzw"}, "presentation": {"enum": ["native", "horizontal-mirror"]}, "composite": {"$ref": "#/$defs/sourceComposite"}, "resolvedImagePlaneWarp": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/resolvedImagePlaneWarp"}]}}}, "description": "Complete ordered simultaneous view support. Later views in one image mask earlier supported pixels; distinct fading images contribute their common image weight once."},
+    "sourceLayout": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["viewId", "rectSourcePixels", "presentation", "composite", "compositeProvenance", "resolvedImagePlaneWarp"], "properties": {"viewId": {"$ref": "#/$defs/sourceEvidence"}, "rectSourcePixels": {"$ref": "#/$defs/xyzw"}, "presentation": {"enum": ["native", "horizontal-mirror"]}, "composite": {"$ref": "#/$defs/sourceComposite"}, "compositeProvenance": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sourceCompositeProvenance"}]}, "resolvedImagePlaneWarp": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/resolvedImagePlaneWarp"}]}}}, "description": "Complete ordered simultaneous view support. Later views in one image mask earlier supported pixels; distinct fading images contribute their common image weight once. Candidate composite provenance never establishes measured source alpha, camera, input, warp or native geometry."},
     "pixelPair": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
     "cameraMeasurement": {
       "type": "object",
@@ -310,6 +310,11 @@
         {"type": "object", "required": ["mode", "groupId", "imageLayerId", "opacity"], "additionalProperties": false, "properties": {"mode": {"const": "crossfade"}, "groupId": {"$ref": "#/$defs/sourceEvidence"}, "imageLayerId": {"$ref": "#/$defs/sourceEvidence"}, "opacity": {"type": "number", "minimum": 0, "maximum": 1}}}
       ]
     },
+    "sourceCompositeProvenance": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "evidence"],
+      "properties": {"kind": {"const": "chosen-unmeasured"}, "evidence": {"type": "string", "minLength": 1, "pattern": "\\S"}},
+      "description": "Chosen numeric image contribution retained as explicitly unmeasured; source topology remains authoritative without granting alpha or native/source-fidelity acceptance."
+    },
     "sourcePartOverride": {
       "type": "object",
       "required": ["partPath", "evidence", "sourceTimeSeconds", "landmarkIds"],
@@ -419,6 +424,7 @@
         "nativeLineChecks": {"type": "array", "items": {"$ref": "#/$defs/nativeLineCheck"}},
         "sourceContourChecks": {"type": "array", "items": {"$ref": "#/$defs/sourceContourCheck"}},
         "composite": {"$ref": "#/$defs/sourceComposite"},
+        "compositeProvenance": {"$ref": "#/$defs/sourceCompositeProvenance"},
         "compositeEvidence": {"$ref": "#/$defs/sourceEvidence"},
         "mechanicalState": {"$ref": "#/$defs/mechanicalState"},
         "partOverrides": {"type": "array", "items": {"$ref": "#/$defs/sourcePartOverride"}}
@@ -446,6 +452,7 @@
         "sourceContourChecks": {"type": "array", "items": {"$ref": "#/$defs/sourceContourCheck"}},
         "partOverrides": {"type": "array", "items": {"$ref": "#/$defs/sourcePartOverride"}},
         "composite": {"$ref": "#/$defs/sourceComposite"},
+        "compositeProvenance": {"$ref": "#/$defs/sourceCompositeProvenance"},
         "compositeEvidence": {"$ref": "#/$defs/sourceEvidence"},
         "cameraEvidence": {"$ref": "#/$defs/cameraEvidence"},
         "imagePlaneWarp": {"$ref": "#/$defs/imagePlaneWarp"},

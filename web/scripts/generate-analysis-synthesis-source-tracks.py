@@ -12,6 +12,8 @@ are active. Root observations, old camera/input numbers and certificates are
 immutable historical lineage. Retained numeric candidates are newly chosen and
 unmeasured for v39, not transferred fits or native REST/world/GPU support. Original
 source clocks/pixels/FIT/CHECK roles and required losses remain original facts.
+Numeric composite opacity retains explicit chosen-unmeasured provenance, not
+source alpha or current native/GPU qualification.
 """
 from __future__ import annotations
 
@@ -93,6 +95,10 @@ class Generator:
                 view["imagePlaneWarp"] = copy.deepcopy(warp)
             if composite:
                 view["composite"] = copy.deepcopy(composite)
+                view["compositeProvenance"] = copy.deepcopy(original.get("compositeProvenance", {
+                    "kind": "chosen-unmeasured",
+                    "evidence": "Original composite topology remains a source obligation. Retained numeric opacity is an unmeasured presentation candidate, not source alpha or current native/GPU qualification.",
+                }))
             for field in ("sourceViewIds", "sourceViewMappingEvidence"):
                 if field in original:
                     view[field] = copy.deepcopy(original[field])

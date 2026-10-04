@@ -12,6 +12,7 @@ conflicting corresponding source points fail closed rather than choosing a donor
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 import math
@@ -40,6 +41,91 @@ SETUP_FIELDS = (
 INPUT_FIELDS = ["crankTurns", "gearing", "magnification"] + [
     f"{name}[{i}]" for name in ("amplitudes", "phases") for i in range(20)
 ] + [f"setup.{name}" for name in SETUP_FIELDS]
+
+
+def retain_phase_point_provenance(data, family):
+    """Copy actual phase/patch evidence; never synthesize generic seed scores."""
+    declaration = family["independentSourcePhaseMap"]
+    path = WEB.parent / declaration["path"]
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != declaration["sha256"]:
+        raise ValueError("Retained Spin phase-map bytes disagree with the declared source evidence hash.")
+    phase_map = json.loads(raw)
+    rig = next(rig for rig in data["sourceCameraRigs"] if rig["id"] == phase_map["rigId"])
+    registrations = {row["sourceImage"]["frameIndex"]: row for row in phase_map["sourceFrameMap"]}
+    references = {row["phaseIndex"]: row["sourceImage"] for row in phase_map["references"]}
+    measurements = {(row["phaseIndex"], row["anchorId"], row["role"]): row for row in rig["measurements"]}
+    recovered = validated_retained = direct_edges = unresolved = 0
+    for frame in data["frames"]:
+        image = frame.get("sourceImage")
+        registration = registrations.get((image or {}).get("frameIndex"))
+        for point in frame.get("landmarks", []):
+            existing = point.get("trackingEvidence") or {}
+            retained_phase = existing.get("kind") == "retained-source-phase-patch-reacquisition"
+            if existing and not retained_phase:
+                # A different original proof is not additive phase enrichment.
+                # Preserve it so exact-exposure equality can reject a conflict.
+                continue
+            if retained_phase and point.get("method") not in ("template-match", "image-edge"):
+                raise ValueError("Retained source phase tracking has an incompatible original measurement method")
+            if point.get("method") != "template-match" and not retained_phase:
+                continue
+            evidence = point.get("measurementEvidence") or {}
+            if not registration or registration["sourceImage"] != image or evidence.get("sourceImage") != image:
+                unresolved += 1
+                if retained_phase:
+                    raise ValueError("Retained Spin phase tracking differs from its exact original source exposure")
+                continue
+            phase_index = registration["referencePhaseIndex"]
+            seed = measurements.get((phase_index, point["anchorId"], point["role"]))
+            reference_image = references[phase_index]
+            if (not seed or seed["measurementEvidence"]["sourceImage"] != reference_image
+                    or registration["referenceSourceImage"] != reference_image
+                    or evidence.get("referenceFrameIndex") != reference_image["frameIndex"]
+                    or evidence.get("referencePixel") != seed["pixel"]):
+                unresolved += 1
+                if retained_phase:
+                    raise ValueError("Retained Spin phase tracking differs from its original independent reference feature")
+                continue
+            tracking = {
+                "kind": "retained-source-phase-patch-reacquisition",
+                "sourceImage": copy.deepcopy(image),
+                "referenceSourceImage": copy.deepcopy(reference_image),
+                "referenceMeasurement": copy.deepcopy(seed),
+                "actualWholeMachineRoiNcc": registration["ncc"],
+                "wholeMachineRoiSourcePixels": copy.deepcopy(registration["roiSourcePixels"]),
+                "actualSourcePatchNcc": evidence["actualPatchNcc"],
+                "actualSearchOffsetPixels": copy.deepcopy(evidence["actualSearchOffsetPixels"]),
+                "phaseMap": copy.deepcopy(declaration),
+                "qualification": "Actual source phase/patch scores and independent image-edge reference, not a manual-seed whole-view template certificate; generic .998/.97 qualifications are not asserted.",
+            }
+            if retained_phase and (
+                    existing.get("phaseMap", {}).get("sha256") != declaration["sha256"]
+                    or any(existing.get(key) != value for key, value in tracking.items()
+                           if key not in ("phaseMap", "qualification"))):
+                raise ValueError("Retained Spin phase tracking conflicts with original numeric source proof")
+            # Same bytes are published under the explicit current source-only
+            # namespace. Validate all retained proofs before using this identical
+            # declaration on raw/compact aliases; do not relax landmark equality.
+            point["trackingEvidence"] = tracking
+            if retained_phase:
+                validated_retained += 1
+            else:
+                recovered += 1
+            if image == reference_image and point["pixel"] == seed["pixel"] and seed["method"] == "image-edge":
+                if ("referenceImageEdgeMeasurement" in evidence
+                        and evidence["referenceImageEdgeMeasurement"] != seed["measurementEvidence"]):
+                    raise ValueError("Retained source phase image-edge evidence conflicts with the original independent reference")
+                # This is the actual independently measured edge exposure itself,
+                # not a later image inferred from that edge or a camera projection.
+                point["method"] = "image-edge"
+                point["measurementEvidence"]["referenceImageEdgeMeasurement"] = copy.deepcopy(seed["measurementEvidence"])
+                direct_edges += 1
+    return {"phaseMap": copy.deepcopy(declaration), "actualRawPointProvenanceRecovered": recovered,
+            "retainedSourceProofDeclarationsValidated": validated_retained,
+            "countingScope": "Source point declarations, including exact-image aliases; not independent source images or native support features.",
+            "exactReferenceExposureImageEdges": direct_edges, "rawProvenanceUnavailable": unresolved,
+            "qualification": "Source evidence retained, not blanket template admission. Other reacquisitions still need an independently admissible seed and adequate actual target source-view/feature correlations."}
 
 
 def load_observations(video_id, prefer_track=False):

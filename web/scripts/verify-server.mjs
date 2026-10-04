@@ -35,7 +35,7 @@ export function buildBase(indexHtml, requested = undefined) {
 }
 
 /** One owned ephemeral server. Never connects to, kills, or reuses a parent's dev service. */
-export async function serveDist(distRoot, { base, requests = [], signal, referenceRoot, port = 0 } = {}) {
+export async function serveDist(distRoot, { base, requests = [], signal, referenceRoot, port = 0, nativeByteStore } = {}) {
   const root = resolve(distRoot)
   const index = await readFile(join(root, 'index.html'), 'utf8')
   const basePath = buildBase(index, base)
@@ -43,6 +43,7 @@ export async function serveDist(distRoot, { base, requests = [], signal, referen
   const server = createServer(async (request, response) => {
     let pathname = '', path
     try {
+      if (nativeByteStore && await nativeByteStore.handleRequest(request, response)) return
       pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname)
       if (pathname !== basePath.slice(0, -1) && !pathname.startsWith(basePath)) { response.writeHead(404); response.end('Not under the built simulator base'); return }
       if (pathname === basePath.slice(0, -1)) { response.writeHead(308, { location: `${basePath}${new URL(request.url, 'http://localhost').search}` }); response.end(); return }
