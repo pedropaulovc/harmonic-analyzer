@@ -1276,7 +1276,7 @@ requires-dist = [
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.20" },
     { name = "opentelemetry-sdk", specifier = ">=1.20" },
     { name = "pillow", specifier = ">=10.0" },
-    { name = "prechips", git = "https://github.com/pedropaulovc/prechips?rev=d43cdf9c51213d9f7e9b0e2bb7801bd7b6afb893" },
+    { name = "prechips", git = "https://github.com/pedropaulovc/prechips?rev=55cae713860a491b8925aed1ad8a24fb30502fe0" },
     { name = "pypdf", specifier = ">=6.14.2" },
     { name = "pypdfium2", specifier = ">=5.11.0" },
     { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=306" },
@@ -2490,7 +2490,7 @@ wheels = [
 [[package]]
 name = "prechips"
 version = "0.1"
-source = { git = "https://github.com/pedropaulovc/prechips?rev=d43cdf9c51213d9f7e9b0e2bb7801bd7b6afb893#d43cdf9c51213d9f7e9b0e2bb7801bd7b6afb893" }
+source = { git = "https://github.com/pedropaulovc/prechips?rev=55cae713860a491b8925aed1ad8a24fb30502fe0#55cae713860a491b8925aed1ad8a24fb30502fe0" }
 dependencies = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
