@@ -1,8 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { CURRENT_NATIVE_RAW_SHA256, CURRENT_NATIVE_DELIVERY_SHA256, jsonDigest, sha256 } from './native-model-byte-proof.mjs'
 
@@ -373,3 +373,59 @@ test('private output admits a new nested private file but refuses symlink-parent
     await rm(external, { recursive: true, force: true })
   }
 })
+
+async function privateRootGuardFixture(web) {
+  const scripts = join(web, 'scripts'), original = fileURLToPath(sourceFitURL), moduleName = basename(original)
+  await mkdir(scripts, { recursive: true })
+  // Materialize the immutable module under test without rewriting its source.
+  // Symlink sibling modules so their own original import contexts remain intact.
+  await writeFile(join(scripts, moduleName), await readFile(original), { flag: 'wx' })
+  for (const name of await readdir(dirname(original))) {
+    if (name.endsWith('.mjs') && name !== moduleName) await symlink(join(dirname(original), name), join(scripts, name))
+  }
+  const alias = `${web}-alias`
+  await symlink(web, alias, 'dir')
+  const module = await import(pathToFileURL(join(alias, 'scripts', moduleName)).href)
+  return module.assertPrivateCurrentNativeFitOutput
+}
+
+for (const redirectedEntry of ['verification-output', '.vite']) {
+  test(`a redirected ${redirectedEntry} cannot become private output authority`, async () => {
+    const owned = await mkdtemp(join(tmpdir(), 'source-fit-root-redirect-test-'))
+    try {
+      const web = join(owned, 'web'), fixturePrivateRoot = join(web, '.vite', 'verification-output')
+      const guard = await privateRootGuardFixture(web)
+      const nested = join(fixturePrivateRoot, 'nested')
+      await mkdir(nested, { recursive: true })
+      const positive = join(nested, 'private-packet.json')
+      await writeFile(guard(positive), 'inert private packet\n', { flag: 'wx' })
+      assert.equal(await readFile(positive, 'utf8'), 'inert private packet\n')
+      await assert.rejects(writeFile(guard(positive), 'replacement', { flag: 'wx' }), { code: 'EEXIST' })
+      await symlink(nested, join(fixturePrivateRoot, 'within-private'), 'dir')
+      const withinPrivate = join(fixturePrivateRoot, 'within-private', 'another-private-packet.json')
+      await writeFile(guard(withinPrivate), 'inert internal-alias packet\n', { flag: 'wx' })
+      assert.equal(await readFile(join(nested, 'another-private-packet.json'), 'utf8'), 'inert internal-alias packet\n')
+
+      const external = join(owned, 'external-inert-tree')
+      const externalOutputRoot = redirectedEntry === '.vite' ? join(external, 'verification-output') : external
+      await mkdir(externalOutputRoot, { recursive: true })
+      const sentinel = join(externalOutputRoot, 'sentinel.txt')
+      await writeFile(sentinel, 'owned external sentinel\n', { flag: 'wx' })
+      const entry = redirectedEntry === '.vite' ? join(web, '.vite') : fixturePrivateRoot
+      await rm(entry, { recursive: true })
+      await symlink(external, entry, 'dir')
+      const output = join(fixturePrivateRoot, 'must-remain-absent.json')
+      let refusal
+      try { await writeFile(guard(output), 'inert escaped packet\n', { flag: 'wx' }) }
+      catch (error) { refusal = error }
+      let escapedExists = true
+      try { await access(join(externalOutputRoot, 'must-remain-absent.json')) }
+      catch (error) { if (error.code === 'ENOENT') escapedExists = false; else throw error }
+      assert.equal(escapedExists, false, 'a redirected private root must not authorize even an inert external packet')
+      assert.match(refusal?.message ?? '', /never canonical/)
+      assert.equal(await readFile(sentinel, 'utf8'), 'owned external sentinel\n')
+    } finally {
+      await rm(owned, { recursive: true, force: true })
+    }
+  })
+}

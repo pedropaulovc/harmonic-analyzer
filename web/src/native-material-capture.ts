@@ -11,6 +11,8 @@ export interface NativeMaterialCapture {
   beginView(key: string): void
   /** Install before rendering so Three's temporary two-pass side stays draw-local. */
   prepare(material: THREE.Material): void
+  /** Reconcile ownership once after preparing every current inventory material. */
+  finishPreparation(): void
   /** Called immediately before the real standard draw; does not replace it. */
   observeDraw(material: THREE.Material): void
   capture(material: THREE.Material, sink: NativeMaterialByteSink, key: string): Promise<string>
@@ -54,6 +56,7 @@ type Unmeasured = { authority: 'unmeasured-original-gpu-texture'; reason: string
 type GpuSource = { authority: 'original-renderer-gpu-texture-level0'; width: number; height: number; encoding: 'rgba8'; origin: 'texture-row0'; bytes: Uint8Array; sampler: Sampler; binding: Binding; format: number; type: number; internalFormat: string | null; premultiplyAlpha: boolean; unpackAlignment: number }
 type TextureRecord = { slot: string; wrapS: number; wrapT: number; minFilter: number; magFilter: number; flipY: boolean; colorSpace: string; channel: number; offset: number[]; repeat: number[]; center: number[]; rotation: number; matrix: number[]; source: GpuSource | Unmeasured }
 type MaterialRecord = { schemaVersion: 1; type: string; name: string; properties: Record<string, unknown>; clippingPlanes: number[][]; textures: TextureRecord[] }
+type MaterialHook = { original: THREE.Material['onBeforeRender']; observed: THREE.Material['onBeforeRender']; generation: number }
 const insist: (condition: unknown, message: string) => asserts condition = (condition, message) => { if (!condition) throw new Error(message) }
 
 /**
@@ -74,7 +77,8 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
   let retainedEpoch: string | null = null
   let currentViewSnapshots: Map<THREE.Material, MaterialRecord> | null = null
   const preparedSides = new Map<THREE.Material, THREE.Side>()
-  const materialHooks = new Map<THREE.Material, { original: THREE.Material['onBeforeRender']; observed: THREE.Material['onBeforeRender'] }>()
+  const materialHooks = new Map<THREE.Material, MaterialHook>()
+  let preparationGeneration = 0
   const uploads = new WeakMap<NativeMaterialByteSink, Map<string, Promise<string>>>()
   const byteHashes = new WeakMap<Uint8Array, Promise<string>>()
   const mutationOriginals = new Map<string, (...args: unknown[]) => unknown>()
@@ -250,9 +254,16 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
     }
     return result
   }
+  function releaseRetiredMaterial(hook: MaterialHook, material: THREE.Material): void {
+    if (hook.generation === preparationGeneration) return
+    if (material.onBeforeRender === hook.observed) material.onBeforeRender = hook.original
+    materialHooks.delete(material)
+    preparedSides.delete(material)
+  }
   return {
     beginView(key) {
       insist(!disposed, 'Original material capture disposed')
+      preparationGeneration++
       const epoch = key.slice(0, key.indexOf(':'))
       if (epoch !== retainedEpoch) { snapshots.clear(); retainedEpoch = epoch }
       preparedSides.clear()
@@ -262,7 +273,7 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
     prepare(material) {
       insist(!disposed, 'Original material capture disposed')
       const existing = materialHooks.get(material)
-      if (existing && material.onBeforeRender === existing.observed) return
+      if (existing && material.onBeforeRender === existing.observed) { existing.generation = preparationGeneration; return }
       const original = material.onBeforeRender
       const observed: THREE.Material['onBeforeRender'] = function (this: THREE.Material, renderer, scene, camera, geometry, object, group) {
         original.call(this, renderer, scene, camera, geometry, object, group)
@@ -270,8 +281,14 @@ export function createNativeMaterialCapture(renderer: THREE.WebGLRenderer): Nati
         // split. Retain the side after the original callback, in this view only.
         if (currentViewSnapshots) preparedSides.set(material, material.side)
       }
-      materialHooks.set(material, { original, observed })
+      materialHooks.set(material, { original, observed, generation: preparationGeneration })
       material.onBeforeRender = observed
+    },
+    finishPreparation() {
+      insist(!disposed && currentViewSnapshots, 'Original material capture view is unavailable')
+      // Reuse this callback rather than allocating a closure or entry tuples
+      // for every full-inventory preparation pass.
+      materialHooks.forEach(releaseRetiredMaterial)
     },
     observeDraw(material) {
       insist(currentViewSnapshots, 'Original material capture view is unavailable')

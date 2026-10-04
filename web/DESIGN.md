@@ -1049,10 +1049,12 @@ own-view rows remain available for Node refusal rather than being filtered out.
 
 Draw-owned side values are sampled by a chained `Material.onBeforeRender`
 callback before Three temporarily switches transparent DoubleSide materials
-through BackSide and FrontSide passes. The producer registers only current
-inventory materials while capture is enabled. Draw records keep the owning
-view's side; delayed retrieval never replaces it with another view's live side.
-Disposal restores the original callbacks and clears prepared-side state.
+through BackSide and FrontSide passes. The producer marks current inventory
+materials each view and sweeps retired assignments once before drawing. Stable
+materials reuse their callbacks; retirement restores only callbacks still owned
+by this capture, preserving externally replaced callbacks. Draw records keep the
+owning view's side even after retirement. Disposal clears remaining hooks and
+prepared-side state.
 
 The exact `d5ae87fd8…` before control passed seven of nine Node cases but failed
 both delayed-side cases. Actual GPU controls retained all eleven positive
@@ -1062,6 +1064,17 @@ BackSide/FrontSide submissions. Both GPU runs restored material properties,
 callbacks, GL functions, visibility and live context state without creating a
 tab, context, renderer or material. These are descriptor-ownership controls,
 not source/material-pixel acceptance.
+
+The exact `13155528d…` retirement control passed ten of twelve Node cases but
+failed both retired-callback cases. After repair all twelve passed. A real
+production-producer smoke exercised three successive cloned-material assignments,
+stable callback reuse, restoration of retired callbacks while capture remained
+enabled, preservation of an external callback, and ordinary disabled recovery.
+All six draw arms and eight behavioral observations passed. Its overall receipt
+remains failed because the private helper's exact final GL-binding comparison
+failed; all capture-owned GPU handles and three owned clones were released.
+This is runtime evidence for callback retirement, not a clean helper-restoration
+verdict, garbage-collection measurement or source fidelity.
 
 The actual BEFORE receipt
 `web/.vite/verification-output/native-p2-transition-controls-2026-10-03T23-51-08-172Z.json`

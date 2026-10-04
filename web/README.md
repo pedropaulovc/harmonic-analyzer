@@ -553,7 +553,7 @@ verification passed for the **240-member** executed-source/output archive.
 These finite-state measurements do not establish source-camera correspondence,
 material/shadow pixels or six-video acceptance.
 
-The explicitly admitted web contract suite passed **332 tests**, including
+The explicitly admitted web contract suite passed **337 tests**, including
 original CPU replay, closed-section axes, surface support, material epoch/view
 ownership and presentation isolation. Eleven Python fit-boundary tests passed.
 Virtual axes remain camera-only controls: a wall hit cannot turn an empty axis
@@ -562,9 +562,9 @@ once, without an additional mirror.
 
 Source-fit admission rejects duplicate anchor identities, nonnumeric source
 clocks and every non-null declared or resolved selected-view warp. Private
-exports require an existing private parent, refuse escaped symlink parents,
-and preserve exclusive-create protection. Run the web-local Python boundary
-suite separately from the CAD `doit` graph:
+exports require an existing private parent, reject redirected private roots
+and escaped symlink parents, and preserve exclusive-create protection. Run the
+web-local Python boundary suite separately from the CAD `doit` graph:
 
 ```sh
 uv run --no-project --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/test_current_native_source_fit.py

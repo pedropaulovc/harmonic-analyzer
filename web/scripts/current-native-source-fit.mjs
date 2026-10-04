@@ -364,12 +364,14 @@ async function readSpringFactory(path, pin) {
 }
 
 export function assertPrivateCurrentNativeFitOutput(path) {
-  const privateRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../.vite/verification-output'), output = resolve(path)
+  const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+  const privateRoot = resolve(webRoot, '.vite/verification-output'), output = resolve(path)
   const suffix = relative(privateRoot, output)
   if (!suffix || suffix === '..' || suffix.startsWith(`..${sep}`) || suffix.startsWith(sep)) fail('output must be a new private web/.vite/verification-output file, never canonical source content')
+  const expectedPrivateRoot = resolve(realpathSync(webRoot), '.vite/verification-output')
   const actualPrivateRoot = realpathSync(privateRoot), actualParent = realpathSync(dirname(output))
   const actualSuffix = relative(actualPrivateRoot, actualParent)
-  if (actualSuffix === '..' || actualSuffix.startsWith(`..${sep}`) || actualSuffix.startsWith(sep)) fail('output must be a new private web/.vite/verification-output file, never canonical source content')
+  if (actualPrivateRoot !== expectedPrivateRoot || actualSuffix === '..' || actualSuffix.startsWith(`..${sep}`) || actualSuffix.startsWith(sep)) fail('output must be a new private web/.vite/verification-output file, never canonical source content')
   return output
 }
 

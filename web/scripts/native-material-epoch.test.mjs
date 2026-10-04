@@ -49,6 +49,14 @@ function fixture(t) {
     // The immutable reviewed implementation predates the lifecycle method.
     // Absence is deliberately not a test failure: its descriptor behavior is.
     begin(key) { viewKey = key; capture.beginView?.(key) },
+    beginAssigned(key, materials) {
+      viewKey = key
+      capture.beginView?.(key)
+      for (const material of materials) capture.prepare?.(material)
+      // Immutable controls lack retirement reconciliation. The failure oracle
+      // is the retired material's callback ownership, not this method's presence.
+      capture.finishPreparation?.()
+    },
     async record(material, ...keys) {
       const sha256 = await capture.capture(material, sink, keys.length ? keys[0] : viewKey)
       return JSON.parse(new TextDecoder().decode(objects.get(sha256)))
@@ -228,4 +236,83 @@ test('a current nondrawn texture assignment is described without borrowing previ
   assert.deepEqual(current.textures[0].offset, [0.125, 0.25])
   assert.equal(current.textures[0].source.authority, 'unmeasured-original-gpu-texture')
   assert.match(current.textures[0].source.reason, /draw/i)
+})
+
+test('retired assigned materials regain original callbacks without reallocating stable hooks', async t => {
+  const f = fixture(t), stable = material(t)
+  const assigned = Array.from({ length: 4 }, () => material(t))
+  const originals = assigned.map((current, index) => {
+    const texture = new THREE.Texture()
+    t.after(() => texture.dispose())
+    current.map = texture
+    const callback = function () { this.side = index % 2 === 0 ? THREE.FrontSide : THREE.BackSide }
+    current.onBeforeRender = callback
+    return callback
+  })
+  f.beginAssigned('151:left', [assigned[0], stable])
+  const stableHook = stable.onBeforeRender
+  assigned[0].onBeforeRender()
+  assert.equal((await f.record(assigned[0])).properties.side, THREE.FrontSide)
+  for (let index = 1; index < assigned.length; index++) {
+    f.beginAssigned(`${151 + index}:left`, [assigned[index], stable])
+    assert.equal(stable.onBeforeRender, stableHook, 'an unchanged assignment must reuse its installed callback')
+    assigned[index].onBeforeRender()
+    assert.equal((await f.record(assigned[index])).properties.side, index % 2 === 0 ? THREE.FrontSide : THREE.BackSide)
+    assert.equal(assigned[index - 1].onBeforeRender, originals[index - 1], 'a retired texture material must regain its original callback while capture stays enabled')
+  }
+  stable.onBeforeRender()
+  f.capture.observeDraw(stable)
+  assert.equal((await f.record(stable)).properties.side, THREE.FrontSide)
+})
+
+test('retiring an earlier view material releases its callback without changing delayed two-pass descriptors', async t => {
+  const f = fixture(t), leftMaterial = material(t), rightMaterial = material(t)
+  const originalLeftCallback = leftMaterial.onBeforeRender
+  leftMaterial.transparent = true
+  leftMaterial.side = THREE.DoubleSide
+  f.beginAssigned('162:left', [leftMaterial])
+  leftMaterial.onBeforeRender()
+  leftMaterial.side = THREE.BackSide
+  f.capture.observeDraw(leftMaterial)
+  leftMaterial.side = THREE.FrontSide
+  f.capture.observeDraw(leftMaterial)
+  leftMaterial.side = THREE.DoubleSide
+  const left = await f.record(leftMaterial)
+  assert.equal(left.properties.side, THREE.DoubleSide)
+  rightMaterial.side = THREE.BackSide
+  f.beginAssigned('162:right', [rightMaterial])
+  rightMaterial.onBeforeRender()
+  f.capture.observeDraw(rightMaterial)
+  const right = await f.record(rightMaterial)
+  assert.equal(right.properties.side, THREE.BackSide)
+  leftMaterial.side = THREE.FrontSide
+  const delayedLeft = await f.record(leftMaterial, '162:left')
+  assert.equal(delayedLeft.properties.side, THREE.DoubleSide)
+  assert.equal(delayedLeft.properties.transparent, true)
+  assert.deepEqual(delayedLeft, left)
+  assert.deepEqual(await f.record(rightMaterial, '162:right'), right)
+  assert.equal(leftMaterial.onBeforeRender, originalLeftCallback, 'same-epoch retirement must release the old callback without discarding its retained draw')
+})
+
+test('retirement and disposal preserve callbacks externally replaced during enabled capture', async t => {
+  const f = fixture(t), retired = material(t), current = material(t)
+  retired.onBeforeRender = function () { this.side = THREE.FrontSide }
+  f.beginAssigned('173:left', [retired, current])
+  const currentHook = current.onBeforeRender
+  const external = function () { this.side = THREE.BackSide }
+  retired.onBeforeRender = external
+  f.beginAssigned('174:left', [current])
+  assert.equal(current.onBeforeRender, currentHook)
+  assert.equal(retired.onBeforeRender, external)
+  retired.side = THREE.FrontSide
+  retired.onBeforeRender()
+  assert.equal(retired.side, THREE.BackSide)
+  current.onBeforeRender()
+  f.capture.observeDraw(current)
+  assert.equal((await f.record(current)).properties.side, THREE.FrontSide)
+  f.capture.dispose()
+  assert.equal(retired.onBeforeRender, external)
+  retired.side = THREE.FrontSide
+  retired.onBeforeRender()
+  assert.equal(retired.side, THREE.BackSide)
 })
