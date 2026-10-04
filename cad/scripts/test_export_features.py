@@ -127,6 +127,7 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     assert crank["angularity_dia"] == 0.10
     assert crank["angularity_datums"] == ["A", "B"]
     assert "angularity_dia" in crank["requirements"]
+    assert "angle_tol_deg" not in crank["requirements"]
     assert "position_dia" not in crank
     assert "height" not in crank["requirements"]
     assert "unknown" in features["journal_bore"]["requirements"]
@@ -140,6 +141,102 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     diameter = exporter.cone.BORE_DIA / 1000
     remote = _FaceGeometry(None, 4002, (0, 0, 0, 0, 0, 1, diameter / 2), None, (-diameter, 0, -0.1, diameter, 0.005, 0.1))
     assert not _face_matches(remote, selectors["journal_bore"][0])
+
+
+def test_mount_stations_lie_in_their_own_signed_bands_and_mirror() -> None:
+    features = exporter.requirement_manifest("cone_pivot_post")["features"]
+    west, east = features["mount_west"], features["mount_east"]
+    for hole in (west, east):
+        low, high = hole["station"]
+        assert low < hole["station_nominal"] < high
+        assert hole["station_nominal"] == hole["at"][0]
+    assert west["station_nominal"] < 0 < east["station_nominal"]
+    assert west["station"] == [-value for value in reversed(east["station"])]
+
+
+def _plane_z(face) -> float:
+    assert face.normal[:2] == (0, 0) and abs(face.normal[2]) == 1
+    return face.offset_mm * face.normal[2]
+
+
+def test_shaft_axial_extents_tile_the_turned_axis_with_reliefs_overlaid_at_the_shoulder() -> None:
+    features = exporter.requirement_manifest("pivot_shaft")["features"]
+    selectors = exporter.feature_selectors("pivot_shaft")
+    order = ("south_dome", "pivot_bearing", "shoulder_od", "pivot_journal", "north_dome")
+    spans = {name: features[name]["z_mm"] for name in (*order, "north_relief", "south_relief")}
+    assert all(features[name]["frame"] == "model" and low < high for name, (low, high) in spans.items())
+    for below, above in zip(order, order[1:]):
+        assert spans[below][1] == pytest.approx(spans[above][0]), (below, above)
+    # The shoulder's two faces bound it and the O.D.s either side.
+    assert _plane_z(selectors["shoulder_north_face"][0]) == pytest.approx(spans["shoulder_od"][1])
+    assert _plane_z(selectors["shoulder_thrust"][0]) == pytest.approx(spans["shoulder_od"][0])
+    # Each relief lies inside its O.D., flush against one shoulder face and
+    # ending at its own step face; every named patch lies inside its span.
+    for groove, host, shoulder_end, step_end in (("north_relief", "pivot_journal", 0, 1), ("south_relief", "pivot_bearing", 1, 0)):
+        assert spans[host][0] <= spans[groove][0] < spans[groove][1] <= spans[host][1]
+        assert spans[groove][shoulder_end] == pytest.approx(spans["shoulder_od"][1 - shoulder_end])
+        assert spans[groove][step_end] == pytest.approx(_plane_z(selectors[groove][1]))
+    for name in ("pivot_bearing", "pivot_journal", "north_relief", "south_relief"):
+        low, high = spans[name]
+        assert low < selectors[name][0].contains_z_mm < high, name
+    # Domes run from the end circle of the O.D. to the sphere's apex.
+    for name, apex_index, base_index in (("north_dome", 1, 0), ("south_dome", 0, 1)):
+        sphere = selectors[name][0]
+        radius, centre = sphere.diameter_mm / 2, sphere.center_mm[2]
+        apex, base = spans[name][apex_index], spans[name][base_index]
+        assert abs(apex - centre) == pytest.approx(radius)
+        assert features[name]["base_radius"] ** 2 + (base - centre) ** 2 == pytest.approx(radius**2)
+        assert features[name]["base_radius"] * 2 == pytest.approx(features["pivot_bearing"]["dia_nominal"])
+
+
+def _on_axis(point: list[float], at: list[float], axis: list[float]) -> bool:
+    offset = [p - a for p, a in zip(point, at)]
+    along = sum(o * v for o, v in zip(offset, axis))
+    return all(abs(o - along * v) < 1e-9 for o, v in zip(offset, axis))
+
+
+def _on_plane(point: list[float], face) -> bool:
+    return abs(sum(p * n for p, n in zip(point, face.normal)) - face.offset_mm) < 1e-9
+
+
+def test_cone_axial_extents_map_through_source_frames_onto_authored_faces() -> None:
+    from prechips.rules.coordinates import model_point
+
+    manifest = exporter.requirement_manifest("cone_pivot_post")
+    features, frames = manifest["features"], manifest["frames"]
+    selectors = exporter.feature_selectors("cone_pivot_post")
+    assert frames["setup"] == "unknown"
+
+    def ends(name: str) -> list[list[float]]:
+        frame = frames[features[name]["frame"]]
+        return [model_point([0.0, 0.0, z], frame) for z in features[name]["z_mm"]]
+
+    foot, body_top = ends("body")
+    head_base, head_top = ends("head")
+    assert foot == pytest.approx([0.0, 0.0, 0.0]) and _on_plane(foot, selectors["foot_seat"][0])
+    assert body_top == pytest.approx(head_base)
+    assert _on_plane(head_top, selectors["head"][1])
+    crank = features["crank_bore"]
+    for point, face in zip(ends("crank_boss"), selectors["crank_boss_faces"]):
+        assert _on_axis(point, crank["at"], crank["axis"]) and _on_plane(point, face)
+    journal = features["journal_bore"]
+    north, south = ends("cone_boss")
+    for point, face in ((north, selectors["cone_boss_north_face"][0]), (south, selectors["cone_boss_south_face"][0])):
+        assert _on_axis(point, journal["at"], journal["axis"]) and _on_plane(point, face)
+
+
+def test_turned_profile_resolves_only_spans_coaxial_with_its_setup() -> None:
+    from prechips.rules.turned_profile import _axial_span
+
+    cone = exporter.cone
+    manifest = exporter.requirement_manifest("cone_pivot_post")
+    features, frames = manifest["features"], manifest["frames"]
+    # A spindle on the post axis facing the head top: setup +Z runs model -Y.
+    spindle = {"origin": [0.0, cone.BLOCK_HEIGHT, 0.0], "x": [1.0, 0.0, 0.0], "y": [0.0, 0.0, 1.0], "z": [0.0, -1.0, 0.0]}
+    assert _axial_span(features["head"], spindle, frames, 1.0) == pytest.approx((0.0, cone.HEAD_HEIGHT))
+    assert _axial_span(features["body"], spindle, frames, 1.0) == pytest.approx((cone.HEAD_HEIGHT, cone.BLOCK_HEIGHT))
+    assert _axial_span(features["crank_boss"], spindle, frames, 1.0) is None
+    assert _axial_span(features["cone_boss"], spindle, frames, 1.0) is None
 
 
 @pytest.mark.parametrize("stem", exporter.SUPPORTED_PARTS)
