@@ -326,7 +326,8 @@ def _wrap_template_title(ddoc: Any, sheet_view: Any) -> dict[str, Any]:
     (the DRWDOT is never saved). ``EditTemplate``/``EditSheet`` return
     nothing, so each mode change is read back through ``GetEditSheet``
     (False in template mode, True in sheet mode) and a mode not entered
-    raises."""
+    raises. Use the production reader's same whole-link parser, including
+    native FONT controls and the SW-Title(Title) summary descriptor."""
     result: dict[str, Any] = {}
     ddoc.EditTemplate()
     if bool(ddoc.GetEditSheet()):
@@ -338,9 +339,11 @@ def _wrap_template_title(ddoc: Any, sheet_view: Any) -> dict[str, Any]:
             if int(annotation.OwnerType) != 2 or int(annotation.GetType()) != _ANNOT_NOTE:
                 continue
             note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-            name = title_fields._linked_name(str(note.PropertyLinkedText or ""))
+            link = str(note.PropertyLinkedText or "")
+            name = title_fields._linked_name(link)
             if name not in title_fields.TITLE_FIELD_PROPERTIES["Title"]:
                 continue
+            result["link"] = link
             text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
             text_format.LineLength = WRAP_M
             result["wrap_set"] = _read(lambda: annotation.SetTextFormat(0, False, text_format))

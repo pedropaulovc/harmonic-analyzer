@@ -11,6 +11,14 @@ its resolved text (``GetText``), whether it prints that text in capitals
 items it and its display data hold, its text format -- beside the
 linked model's stored value for the property the link names, and beside the
 drawing's own frozen identity (:func:`registry_identity`).
+
+Native ``FONT size=...PTS`` controls may surround the whole source-property
+link; they are formatting, not visible identity text. The template's
+``SW-Title(Title)`` names the source document's summary Title, not a custom
+property with that spelling. Only a complete, single ``$PRPSHEET`` link is
+recognized: extra visible text, mixed links and other property scopes do
+not identify a source-model title cell.
+
 :func:`assert_title_fields` holds each reading to the contract:
 
 * every sheet documents the drawing's own source (``DrawingSpec.source``);
@@ -58,20 +66,27 @@ from _identity_shapes import CATEGORIES, NUMBER, STEM
 from _layout_audit import TITLE_FIELD_CLEARANCE_M
 
 # The properties each identity cell's note may link, by cell. The PART cell
-# prints the summary Title (``SW-Title``) or the custom ``Title``; both carry
-# the slug (``_common.part_properties``, ``_common.apply_summary_info``).
+# prints the summary Title or custom Title; both are stamped from the slug.
+# The official Get/Set Column Types example spells the built-in summary
+# property SW-Title(Title), as the native template note does.
 TITLE_FIELD_PROPERTIES: Mapping[str, frozenset[str]] = {
     "Number": frozenset({"Number"}),
-    "Title": frozenset({"Title", "SW-Title"}),
+    "Title": frozenset({"Title", "SW-Title", "SW-Title(Title)"}),
 }
-# A note whose whole text is one sheet-property link: $PRPSHEET:"Number",
-# $PRPSHEET:{Number} or $PRPSHEET:Number.
-_LINK = re.compile(r'\$PRPSHEET:(?:"([^"]+)"|\{([^}]+)\}|(\S+))')
+# A whole source-sheet property link, optionally surrounded by native font
+# size controls. Never strip arbitrary tags or markup inside a property name:
+# that could turn a literal/mixed note into an apparently valid source link.
+_FONT_SIZE = r"<FONT size=[0-9]+(?:\.[0-9]+)?PTS>"
+_LINK = re.compile(
+    rf"(?:{_FONT_SIZE})*"
+    + r'\$PRPSHEET:(?:"([^"<>]+)"|\{([^}<>]+)\}|([^"{}<>\s$]+))'
+    + rf"(?:{_FONT_SIZE})*"
+)
 # swAnnotationOwner_e.swAnnotationOwner_DrawingTemplate, swAnnotationType_e.swNote
 _OWNER_DRAWING_TEMPLATE = 2
 _ANNOT_NOTE = 6
-# swSummInfoField_e for the built-in property a "SW-" link names.
-_SUMMARY_FIELDS = {"SW-Title": 0}
+# Both SDK spellings denote swSummInfoField_e.swSumInfoTitle, not custom props.
+_SUMMARY_FIELDS = {"SW-Title": 0, "SW-Title(Title)": 0}
 # The one part whose sheets print a per-configuration Number: its build
 # stamps ``dt_cone_gear_spec.configuration_number`` (registry Number +
 # "-T###") on each configuration named "T###".
@@ -231,6 +246,7 @@ def _mm(box: Sequence[float]) -> str:
 
 
 def _linked_name(link: str) -> str | None:
+    """The exact property descriptor in one complete source-sheet link."""
     match = _LINK.fullmatch(link.strip())
     if match is None:
         return None
@@ -272,9 +288,9 @@ def registry_source(spec: DrawingSpec, identity: tuple[str, str], model: Any, co
 
 def linked_property(model: Any, configuration: str, name: str) -> str:
     """The stored value a ``$PRPSHEET`` link to ``name`` resolves on
-    ``model``: a built-in ``SW-`` summary field, else the view
-    configuration's property, else the file's (cone-gear stamps each
-    configuration's own Number over the file-level one).
+    ``model``: either explicit summary-Title descriptor (``SW-Title`` or
+    ``SW-Title(Title)``), else the view configuration's property, else the
+    file's (cone-gear stamps each configuration's own Number).
 
     ``GetCustomInfoValue`` reads the stored value of one configuration;
     ``ICustomPropertyManager::Get6`` with ``UseCached=False`` instead loops

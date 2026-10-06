@@ -30,6 +30,8 @@ CELLS = dict(DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE].title_cells_m)
 NUMBER_EXTENT = (0.31278, 0.02376, 0.36418, 0.02861)
 TITLE_EXTENT = (0.31271, 0.03680, 0.38795, 0.04157)
 CHAR_HEIGHT = 0.0052
+# swmaker000004 native DetailItem245 from the one-view legacy discovery.
+NATIVE_TITLE_LINK = '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"'
 
 
 class _Note:
@@ -138,7 +140,13 @@ def _cone_gear(**kwargs):
 
 
 def _sheet(
-    number="MHA-DT-003-T006", title="dt-cone-gear", *, number_link='$PRPSHEET:"Number"', items=1, upper=False
+    number="MHA-DT-003-T006",
+    title="dt-cone-gear",
+    *,
+    number_link='$PRPSHEET:"Number"',
+    title_link=NATIVE_TITLE_LINK,
+    items=1,
+    upper=False,
 ):
     return _SheetView(
         "Sheet1",
@@ -146,7 +154,7 @@ def _sheet(
             _Note('$PRPSHEET:"Revision"', "39", (0.3770, 0.0240, 0.3850, 0.0290)),
             _Note(number_link, number, NUMBER_EXTENT, items=items, upper=upper),
             _Note('$PRPSHEET:"Number"', number, (0.05, 0.05, 0.10, 0.055), owner=1),
-            _Note('$PRPSHEET:"SW-Title"', title, TITLE_EXTENT, upper=upper),
+            _Note(title_link, title, TITLE_EXTENT, upper=upper),
         ],
     )
 
@@ -204,6 +212,35 @@ def test_each_cell_prints_the_registry_identity_its_model_holds(number_link):
             {"source": "Title", "text": "dt-cone-gear", "cell": list(CELLS["Title"])},
         ]
     }
+
+
+
+@pytest.mark.parametrize(
+    "title_link",
+    [NATIVE_TITLE_LINK, '$PRPSHEET:"SW-Title(Title)"', '$PRPSHEET:"SW-Title"'],
+)
+def test_native_summary_title_descriptor_reads_summary_not_a_same_named_custom_property(title_link):
+    model = _Model(
+        str(CONE_GEAR.source),
+        1,
+        {
+            "": {
+                "Number": "MHA-DT-003",
+                "Title": "vn-wrong-custom-title",
+                "SW-Title(Title)": "vn-wrong-custom-summary-descriptor",
+                "SW-Title": "vn-wrong-custom-summary-name",
+            },
+            "T006": {"Number": "MHA-DT-003-T006"},
+        },
+        "dt-cone-gear",
+    )
+    readings = _read(_sheet(title_link=title_link), model)
+    assert [(reading.source, reading.model_value, reading.printed) for reading in readings] == [
+        ("Number", "MHA-DT-003-T006", "MHA-DT-003-T006"),
+        ("Title", "dt-cone-gear", "dt-cone-gear"),
+    ]
+    assert_title_fields(readings)
+    assert model.Name == "Default" and model.GetSaveFlag() is False
 
 
 @pytest.mark.parametrize(
@@ -360,10 +397,10 @@ def test_a_template_that_no_longer_links_one_note_per_cell_fails(notes):
 @pytest.mark.parametrize(
     ("link", "owner"),
     [
-        ('$PRPSHEET:"SW-Title"', 1),
-        ('$PRPSHEET:"SW-Title"', 0),
-        ('$PRP:"SW-Title"', 2),
-        ('$PRPVIEW:"SW-Title"', 2),
+        (NATIVE_TITLE_LINK, 1),
+        (NATIVE_TITLE_LINK, 0),
+        ('<FONT size=15PTS>$PRP:"SW-Title(Title)"', 2),
+        ('<FONT size=15PTS>$PRPVIEW:"SW-Title(Title)"', 2),
     ],
     ids=["drawing-owned", "view-owned", "drawing-property", "view-property"],
 )
@@ -375,3 +412,41 @@ def test_only_a_template_owned_sheet_source_link_can_supply_the_title(link, owne
     ]
     with pytest.raises(RuntimeError):
         _read(_SheetView("Sheet1", notes), _cone_gear())
+
+
+@pytest.mark.parametrize(
+    "title_link",
+    [
+        '<FONT size=15PTS>PART: $PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"-suffix',
+        '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"$PRPSHEET:"Number"',
+        '<FONT size=15PTS>$PRP:"Title"$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS>$PRPSHEET:"SW-Title(Author)"',
+        '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)-extra"',
+        '<FONT size=15PTS>$PRPSHEET:"SW-<FONT size=15PTS>Title(Title)"',
+        '<TEXT>$PRPSHEET:"SW-Title(Title)"',
+        '<FONT size=15PTS title=hidden>$PRPSHEET:"SW-Title(Title)"',
+        "dt-cone-gear",
+    ],
+    ids=[
+        "visible-prefix", "visible-suffix", "two-sheet-links", "mixed-scopes",
+        "wrong-summary-label", "extended-property-name", "markup-inside-property",
+        "unknown-tag", "unknown-font-attribute", "literal-title",
+    ],
+)
+def test_title_link_lookalikes_cannot_supply_a_source_identity(title_link):
+    with pytest.raises(RuntimeError):
+        _read(_sheet(title_link=title_link), _cone_gear())
+
+
+def test_two_template_title_links_are_ambiguous_even_when_both_values_match():
+    sheet = _SheetView(
+        "Sheet1",
+        [
+            _Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", NUMBER_EXTENT),
+            _Note(NATIVE_TITLE_LINK, "dt-cone-gear", TITLE_EXTENT),
+            _Note('$PRPSHEET:"SW-Title"', "dt-cone-gear", TITLE_EXTENT),
+        ],
+    )
+    with pytest.raises(RuntimeError):
+        _read(sheet, _cone_gear())
