@@ -2984,18 +2984,29 @@ def task_verify():
     }
 
     # Temporary one-view observation route; success is a catalog, not Title-fit proof.
+    # Separate executable source makes the mode a real hashed input; argv is not keyed.
+    discovery = (SCRIPTS_DIR / "diagnostics" / "probe_title_link_discovery.py").resolve()
+    discovery_deps = sorted(
+        {
+            str(discovery),
+            *_helper_deps(discovery),
+            *(str(template.path.resolve()) for template in DRAWING_TEMPLATES.values()),
+            str(RELEASE_VERSION_FILE),
+            _submodule_dep(),
+        }
+    )
     discovery_outputs = [DISCOVERY_REPORT, DISCOVERY_PDF]
     yield {
         "name": "title_link_discovery",
-        "file_dep": probe_deps,
+        "file_dep": discovery_deps,
         "targets": [str(path) for path in discovery_outputs],
         "actions": [
             (
                 _cached_com_action,
                 [
                     "verify:title_link_discovery",
-                    [sys.executable, str(probe), "--legacy-only"],
-                    probe_deps,
+                    [sys.executable, str(discovery)],
+                    discovery_deps,
                     discovery_outputs,
                     "title-link-discovery",
                 ],

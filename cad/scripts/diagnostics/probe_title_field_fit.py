@@ -35,8 +35,8 @@ undeclared. The report is written whatever happens; then every control
 (:func:`_check_controls`) must hold or the probe fails, its
 ``control_failures`` saying which.
 
-``--legacy-only`` is the smaller observational discovery route: one v39
-scratch part, one landscape view, :data:`DISCOVERY_REPORT` and
+``probe_title_link_discovery.py`` is the smaller observational route: one
+v39 scratch part, one landscape view, :data:`DISCOVERY_REPORT` and
 :data:`DISCOVERY_PDF`. Success means a raw native catalog and PDF were
 captured, NOT that the Title reader passed. Both native enumeration paths
 (``IView.GetAnnotations`` and ``IView.GetNotes``) are logged before the
@@ -48,7 +48,6 @@ Delete this script and its dodo task once the proof is recorded.
 
 from __future__ import annotations
 
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -925,7 +924,4 @@ async def probe(adapter: Any, *, legacy_only: bool = False) -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--legacy-only", action="store_true", help="capture one landscape legacy catalog, not fit proof")
-    arguments = parser.parse_args()
-    sys.exit(run_build(lambda adapter: probe(adapter, legacy_only=arguments.legacy_only)))
+    sys.exit(run_build(probe))
