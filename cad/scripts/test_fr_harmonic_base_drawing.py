@@ -1491,11 +1491,6 @@ def test_cross_tap_drill_keeps_the_bottoming_lead_past_the_deepest_thread() -> N
     assert CASTING_TAP_DRILL_DEPTH - (CASTING_FULL_THREAD_DEPTH + part.SEAT_DEPTH_BAND) >= lead
 
 
-# hb-render-6 sheet 2: the hole table's right edge, the TOP VIEW caption's
-# bottom and the ORIGIN note's top, the neighbours of the socket-fit note.
-HB_RENDER_6_TABLE_RIGHT_X_M = 0.1626
-HB_RENDER_6_TOP_CAPTION_BOTTOM_Y_M = 0.2329
-HB_RENDER_6_ORIGIN_NOTE_TOP_Y_M = 0.1866
 SOCKET_FIT_MIN_MARGIN_M = 0.003
 
 

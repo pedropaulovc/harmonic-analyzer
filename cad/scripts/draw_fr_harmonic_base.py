@@ -190,9 +190,7 @@ SOCKET_FIT_NOTE = (
 )
 SOCKET_FIT_NOTE_XY = (0.344, 0.228)
 SOCKET_FIT_STATION = max(COLUMN_SOCKET_XZ, key=lambda station: (station[0], -station[1]))
-# hb-render-6's sheet-2 notes at the default note height: 2.49 mm per
-# character and 4.6 mm per row, the text hanging from its top-left anchor.
-NOTE_CHAR_M = 0.00249
+# R9's native note row pitch is 4.52 mm; use 4.6 mm conservatively.
 NOTE_ROW_M = 0.0046
 # Sheet-2 hole callout text anchors. _check_hole_sheet_callouts proves each
 # clears the others, the notes, the table, the table's datum origin and every
