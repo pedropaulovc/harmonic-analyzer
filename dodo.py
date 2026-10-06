@@ -1394,8 +1394,9 @@ _CHECK_NAMES = (
     "traveler_dt_cone_pivot_post",
 )
 # Checks outside the every-build set. verify_telemetry is opt-in;
-# features_bound is required only by release. Union must match the specs.
-_OPTIONAL_CHECK_NAMES = ("verify_telemetry", "features_bound")
+# features_bound and reference_catalog are required only by release.
+# Union must match the specs.
+_OPTIONAL_CHECK_NAMES = ("verify_telemetry", "features_bound", "reference_catalog")
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str, task: str) -> None:
@@ -3081,7 +3082,6 @@ def task_check():
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",
-        REPO_ROOT / "cad" / "comparisons" / "tools" / "test_seed_manifest.py",
         REPO_ROOT / "cad" / "comparisons" / "tools" / "test_pose_to_meshprobe.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
         # Builder gates handed to save's final deep rebuild (drive-train) must
@@ -3319,16 +3319,12 @@ def task_check():
                     "render_offline.py",
                     "release_diff.py",
                     "render_diff.py",
-                    "seed_manifest.py",
                     "pose_to_meshprobe.py",
                 )
             ),
-            # The pairing and real-catalog behavior tests read these at runtime.
+            # Release pairing tests read the sealed identity map at runtime.
             str(
                 (REPO_ROOT / "cad" / "config" / "identity-migration-map.json").resolve()
-            ),
-            str(
-                (REPO_ROOT / "references" / "curation" / "stills_catalog.json").resolve()
             ),
             # The historical roll-sign check only reads existing renders; their
             # absence skips its empirical half without invoking either renderer.
@@ -3764,6 +3760,51 @@ def task_check():
             "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
                     "--out", str(CAD_OUT)],
         },
+        # Reference data is deliberately absent from build/build_bare and farm
+        # source workspaces. The real-catalog behavior suite is release-only,
+        # never skipped or weakened when its required catalog is unavailable.
+        "reference_catalog": {
+            "file_dep": [
+                str((REPO_ROOT / "dodo.py").resolve()),
+                str(
+                    (
+                        REPO_ROOT / "cad" / "comparisons" / "tools"
+                        / "test_seed_manifest.py"
+                    ).resolve()
+                ),
+                *(
+                    str(
+                        (REPO_ROOT / "cad" / "comparisons" / "tools" / name).resolve()
+                    )
+                    for name in ("seed_manifest.py", "pose_to_meshprobe.py")
+                ),
+                str(
+                    (REPO_ROOT / "cad" / "config" / "identity-migration-map.json").resolve()
+                ),
+                str(
+                    (REPO_ROOT / "references" / "curation" / "stills_catalog.json").resolve()
+                ),
+                # part_stems scans these filenames instead of importing them.
+                *(str(path.resolve()) for path in SCRIPTS_DIR.glob("build_*.py")),
+            ],
+            "cmd": [
+                *pytest_cmd,
+                str(
+                    REPO_ROOT / "cad" / "comparisons" / "tools"
+                    / "test_seed_manifest.py"
+                ),
+            ],
+            # file_dep alone does not notice a source removed from the scan.
+            "uptodate": [
+                config_changed(
+                    {
+                        "catalog_part_sources": [
+                            path.name for path in sorted(SCRIPTS_DIR.glob("build_*.py"))
+                        ]
+                    }
+                )
+            ],
+        },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
     # spec added here without the matching name (or vice versa) would silently never run
@@ -4038,6 +4079,7 @@ def task_release():
             "package:release",
             "preflight",
             "check:features_bound",
+            "check:reference_catalog",
             # Temporary probe-export root edge; removed with the native probe.
             "verify:title_field_probe",
             "verify:title_link_discovery",

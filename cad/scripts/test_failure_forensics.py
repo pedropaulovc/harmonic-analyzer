@@ -1081,8 +1081,8 @@ def test_px_per_mm_is_measured_and_yields_a_snap_floor(tmp_path, monkeypatch):
         _seat_forensics, "_frame_geometry",
         lambda adapter: {
             "frame_hwnd": 0x1234,
-            "fr-frame_left": 0,
-            "fr-frame_top": 0,
+            "frame_left": 0,
+            "frame_top": 0,
             "frame_width_px": 2000,
             "frame_height_px": 1200,
             "frame_area_px": 2_400_000,

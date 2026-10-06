@@ -61,14 +61,21 @@ The top-level assembly build and refresh export the parts-only BOM to
 cache output. Older BOM paths in dated evidence remain historical provenance,
 not current output aliases.
 
+`check:reference_catalog` validates historical catalog entries against current
+model identities. It is a release prerequisite, not an every-build check:
+`build` and `build_bare` can leave the excluded `references` submodule
+uninitialized. The catalog check and release require that submodule and fail
+if its catalog is missing.
+
 Drawing callouts retain complete category-qualified Numbers and process
 information. Longer cross-part notes, such as the crankshaft's mating-part
 callout, must fit their existing reserved field by placement and wrapping;
 do not abbreviate Numbers or relax the field bounds.
 Per-configuration Gear Data and linked Manufacturing or Installation Notes
-retain their complete mate identifiers when reflowed. Rebuild the owning model
-when this linked text changes; a drawing-only rebuild does not update the
-model's source property.
+retain their complete mate identifiers when reflowed. Gear Data and
+Manufacturing Notes are model-owned: rebuild the owning model when they change.
+Registry Installation Notes are drawing-owned and are stamped when the
+purchased-part drawing rebuilds.
 
 ## Historical evidence
 

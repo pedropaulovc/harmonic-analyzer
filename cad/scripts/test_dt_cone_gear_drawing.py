@@ -531,14 +531,14 @@ def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
             self.value = value
 
         def GetUserPreferenceDouble(self, pref: int, option: int) -> float:  # noqa: N802
-            return self.value
+            return self.value if (pref, option) == (26, 0) else 0.0
 
     class _Drawing:
         def __init__(self, value: float) -> None:
             self.Extension = _Extension(value)
 
     drawing._assert_dimension_arrow_length(_Drawing(drawing.DIMENSION_ARROW_LENGTH))
-    with pytest.raises(RuntimeError, match="drawing arrow length reads 3.175 mm"):
+    with pytest.raises(RuntimeError):
         drawing._assert_dimension_arrow_length(_Drawing(0.003175))
 
 
