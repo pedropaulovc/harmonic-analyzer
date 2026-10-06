@@ -1347,6 +1347,56 @@ class OrdinaryProducerLiveGuardTests(unittest.TestCase):
 
 
 
+class SourcePairPublicationOrderingTests(unittest.TestCase):
+    @contextmanager
+    def publication_fixture(self, failure_phase):
+        """Control producer failure, not native eligibility or publication I/O."""
+        videos = ('6dW6VYXp9HM', '8KmVDxkia_w')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            web = root / 'web'
+            content = web / 'content'
+            content.mkdir(parents=True)
+            paths = tuple(content / f'{video}.source-track.json' for video in videos)
+            previous = (b'{"previous":"analysis-must-survive"}\n',
+                        b'{"previous":"synthesis-must-survive"}\n')
+            for path, raw in zip(paths, previous):
+                path.write_bytes(raw)
+
+            class ControlledProducerFailure(ValueError):
+                pass
+
+            class ControlledGenerator:
+                def __init__(self, video_id):
+                    self.video_id = video_id
+                    if video_id == videos[1] and failure_phase == 'constructor':
+                        raise ControlledProducerFailure('Controlled second constructor refusal')
+
+                def build(self):
+                    if self.video_id == videos[1] and failure_phase == 'build':
+                        raise ControlledProducerFailure('Controlled second build refusal')
+                    return {
+                        'schemaVersion': 1, 'kind': 'compact-source-track',
+                        'source': {'videoId': self.video_id},
+                        'model': copy.deepcopy(CurrentGenerationGateTests.current_model_source),
+                        'shots': [], 'frames': [], 'coverage': {'status': 'unmeasured'},
+                        'stages': {str(stage): {'status': 'unmeasured'} for stage in (50, 20, 10, 5)},
+                    }
+
+            with patch.object(camera_tracks, 'ROOT', root), patch.object(
+                    camera_tracks.common, 'WEB', web), patch.object(
+                    camera_tracks, 'Generator', ControlledGenerator), patch(
+                    'sys.argv', [str(HERE / 'generate-analysis-synthesis-source-tracks.py')]):
+                yield paths, previous, ControlledProducerFailure
+
+    def test_second_constructor_or_build_refusal_preserves_both_published_outputs(self):
+        for phase in ('constructor', 'build'):
+            with self.subTest(phase=phase), self.publication_fixture(phase) as (paths, previous, refusal):
+                with self.assertRaises(refusal):
+                    camera_tracks.main()
+                self.assertEqual(tuple(path.read_bytes() for path in paths), previous)
+
+
 class SpinPresentationTests(unittest.TestCase):
     def assert_seed_refused_before_observations(self, seed):
         with tempfile.TemporaryDirectory() as directory:

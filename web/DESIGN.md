@@ -104,8 +104,12 @@ mechanics-data's own claim. Generated native provenance must independently match
 its raw, map and canonical fields. All six retained historical source packets
 identify the earlier raw export and are rejected against the approved v39 scene
 until fresh source qualification.
-Analysis/Synthesis repeat native and retained numerical checks at build time;
-in-process model-label replacement cannot approve earlier native calibration.
+Analysis/Synthesis repeat native association and calibration checks at build time.
+Analysis also revalidates its consumed retained numerical/camera data; Synthesis
+revalidates automatic-motion candidates and times, while its other framing and
+lineage fields remain construction-time data. The retained framing's old-model
+pins refuse current v39 generation. In-process model-label replacement cannot
+approve earlier native calibration.
 The producer supplies its executed-module census to the shared live seal gate.
 Whole-pair construction and derivation finish before either output is published.
 

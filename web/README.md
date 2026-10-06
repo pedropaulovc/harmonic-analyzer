@@ -134,8 +134,11 @@ publication, and check normalized live approval, producer, classifier, scene and
 native-math inputs against current-consumer seals. Producers declare the additional
 modules they execute; Analysis seals the bank-controls module's actual loaded
 path. Synthesis checks both primary and secondary observations. Construction and
-build recheck consumed native calibration, candidate, motion, held-camera and
-framing associations, including retained numerical values. A new model label
+build recheck native model associations and retained calibration. Analysis also
+rechecks consumed numerical inputs, motion indexes and held-camera/bank data.
+Synthesis rechecks automatic-motion candidates and times; its additional framing
+cameras and lineage hashes are construction-time data. Its old-model framing
+pins still refuse v39 generation. A new model label
 cannot approve old native readbacks. The pair is constructed and built before
 either output is prepared or published. Changed or missing live inputs refuse
 even when a matching historical snapshot exists.

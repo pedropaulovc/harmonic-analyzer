@@ -587,6 +587,10 @@ def main() -> None:
                 lower_radius *= 0.9
             if not droop(lower_radius) > sag > droop(10000.0):
                 raise ValueError(f"Mounted chain {gearing} has no slack-radius bracket")
+        # Check the actual solved radius as well as the archived search bounds:
+        # future helper brackets must not silently clamp the published droop.
+        if not abs(values["_droop"](values["SLACK_R"]) - values["SAG"]) < 1e-6:
+            raise ValueError(f"Mounted chain {gearing} slack radius does not match its sag")
         if not (
             loop_length(bracket["_LO_SAG"]) < target_length
             < loop_length(bracket["_HI_SAG"])
