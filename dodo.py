@@ -2949,110 +2949,6 @@ def task_verify():
         "verbosity": 2,
     }
 
-    # Temporary opt-in route-B probe; remove after native template evidence is captured.
-    from diagnostics.probe_title_field_fit import PDFS, REPORT as probe_report
-    from diagnostics.probe_title_field_fit import DISCOVERY_PDF, DISCOVERY_REPORT
-    from _drawing_registry import DrawingLayout
-    from diagnostics.probe_title_wrap_control import PDFS as wrap_control_pdfs
-    from diagnostics.probe_title_wrap_control import REPORT as wrap_control_report
-
-    probe = (SCRIPTS_DIR / "diagnostics" / "probe_title_field_fit.py").resolve()
-    probe_outputs = [probe_report, *PDFS.values()]
-    probe_deps = sorted(
-        {
-            str(probe),
-            *_helper_deps(probe),
-            *(str(template.path.resolve()) for template in DRAWING_TEMPLATES.values()),
-            str(RELEASE_VERSION_FILE),
-            _submodule_dep(),
-        }
-    )
-    yield {
-        "name": "title_field_probe",
-        "file_dep": probe_deps,
-        "targets": [str(path) for path in probe_outputs],
-        "actions": [
-            (
-                _cached_com_action,
-                [
-                    "verify:title_field_probe",
-                    [sys.executable, str(probe)],
-                    probe_deps,
-                    probe_outputs,
-                    "title-field-probe",
-                ],
-            )
-        ],
-        "clean": True,
-        "verbosity": 2,
-    }
-
-    # Temporary one-view observation route; success is a catalog, not Title-fit proof.
-    # Separate executable source makes the mode a real hashed input; argv is not keyed.
-    discovery = (SCRIPTS_DIR / "diagnostics" / "probe_title_link_discovery.py").resolve()
-    discovery_deps = sorted(
-        {
-            str(discovery),
-            *_helper_deps(discovery),
-            *(str(template.path.resolve()) for template in DRAWING_TEMPLATES.values()),
-            str(RELEASE_VERSION_FILE),
-            _submodule_dep(),
-        }
-    )
-    discovery_outputs = [DISCOVERY_REPORT, DISCOVERY_PDF]
-    yield {
-        "name": "title_link_discovery",
-        "file_dep": discovery_deps,
-        "targets": [str(path) for path in discovery_outputs],
-        "actions": [
-            (
-                _cached_com_action,
-                [
-                    "verify:title_link_discovery",
-                    [sys.executable, str(discovery)],
-                    discovery_deps,
-                    discovery_outputs,
-                    "title-link-discovery",
-                ],
-            )
-        ],
-        "clean": True,
-        "verbosity": 2,
-    }
-
-    # Temporary two-view native calibration, with an actual physical-wrap negative.
-    # Its separate executable fixes the mode in a real hashed file dependency.
-    wrap_control = (SCRIPTS_DIR / "diagnostics" / "probe_title_wrap_control.py").resolve()
-    wrap_control_deps = sorted(
-        {
-            str(wrap_control),
-            *_helper_deps(wrap_control),
-            str(DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE].path.resolve()),
-            str(RELEASE_VERSION_FILE),
-            _submodule_dep(),
-        }
-    )
-    wrap_control_outputs = [wrap_control_report, *wrap_control_pdfs.values()]
-    yield {
-        "name": "title_wrap_control",
-        "file_dep": wrap_control_deps,
-        "targets": [str(path) for path in wrap_control_outputs],
-        "actions": [
-            (
-                _cached_com_action,
-                [
-                    "verify:title_wrap_control",
-                    [sys.executable, str(wrap_control)],
-                    wrap_control_deps,
-                    wrap_control_outputs,
-                    "title-wrap-control",
-                ],
-            )
-        ],
-        "clean": True,
-        "verbosity": 2,
-    }
-
 
 def task_check():
     """SolidWorks-FREE checks -- no COM, so they run in parallel under ``-n N``.
@@ -4079,10 +3975,6 @@ def task_release():
             "package:release",
             "preflight",
             "check:features_bound",
-            # Temporary probe-export root edge; removed with the native probe.
-            "verify:title_field_probe",
-            "verify:title_link_discovery",
-            "verify:title_wrap_control",
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),

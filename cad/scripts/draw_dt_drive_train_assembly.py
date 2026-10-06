@@ -233,15 +233,16 @@ GENERAL_NOTES_ISO_GAP = VIEW_CAPTION_GAP
 # --- sheet 2: BOM in two columns + reference isometric -----------------------
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.022,
-    "description": 0.118,
+    "part": 0.031,
+    "description": 0.109,
     "quantity": 0.012,
 }
 BOM_COLUMN_WIDTH = sum(BOM_COLUMN_WIDTHS.values())
-# Measured, not derived: in the 118 mm column, four 41-character descriptions
-# kept one line and the 47-character MHA-VN-006 row wrapped to 10.195 mm
-# (farm leaf 20260923T044055Z-1-20b23f24, swmaker000005).
-BOM_DESCRIPTION_MAX_CHARS = 41
+# The identity-cutover failure PDF (leaf 20261006T052150Z-1-e7f83086)
+# wrapped every full Number in the old 22 mm cell: MHA-VN- plus 3 digits
+# advances 28.52 mm at the unchanged Century Gothic font. Its longest full
+# description advances 107.45 mm. Reallocate 9 mm from DESCRIPTION to Number,
+# retaining the table/blank reference strip width and native text air.
 BOM_ANCHOR = (0.018, 0.252)
 BOM_SECOND_COLUMN_X = BOM_ANCHOR[0] + BOM_COLUMN_WIDTH + 0.008
 BOM_ROW_HEIGHT = 0.006
@@ -1165,11 +1166,39 @@ def bom_row_fit(requested: float, actual: float) -> Literal["short", "exact", "g
     return "grown"
 
 
-def bom_split_row(data_rows: int) -> int:
-    """Data rows in the FIRST column: the larger half, so column two is never taller."""
-    if data_rows < 2:
+def bom_split_row(data_heights: Sequence[float], *, header_height: float) -> int:
+    """Choose a contiguous, height-balanced split inside each column's own floor.
+
+    Heights are native readbacks after sizing/rebuild, not requested row heights.
+    Both pieces repeat the header; the right piece must clear the title block.
+    A count-balanced split need not fit when only some descriptions wrap.
+    """
+    if len(data_heights) < 2:
         raise ValueError("a split BOM needs at least two data rows")
-    return (data_rows + 1) // 2
+    total_height = sum(data_heights)
+    first_height = header_height
+    second_anchor = (BOM_SECOND_COLUMN_X, BOM_ANCHOR[1])
+    best_row = None
+    best_difference = math.inf
+    for first_rows, row_height in enumerate(data_heights[:-1], start=1):
+        first_height += row_height
+        second_height = 2.0 * header_height + total_height - first_height
+        if bom_extent_violations(BOM_ANCHOR, BOM_COLUMN_WIDTH, first_height):
+            continue
+        if bom_extent_violations(second_anchor, BOM_COLUMN_WIDTH, second_height):
+            continue
+        difference = abs(first_height - second_height)
+        # Equal-height choices keep the larger half first, as before.
+        if difference <= best_difference + BOM_HEIGHT_TOLERANCE:
+            best_row = first_rows
+            best_difference = difference
+    if best_row is None:
+        raise ValueError(
+            "no two-column BOM split fits the native row heights "
+            f"({len(data_heights)} data rows, "
+            f"{(total_height + 2.0 * header_height) * 1000.0:.3f} mm including headers)"
+        )
+    return best_row
 
 
 def bom_extent_violations(
@@ -1201,6 +1230,13 @@ def bom_extent_violations(
         violations.append(
             f"bottom edge {bottom * 1000:.3f} mm enters the title block "
             f"(floor {title_block_floor * 1000:.3f} mm)"
+        )
+    # The left field stops above the package sheet-number note, not at the
+    # paper edge. A height-aware asymmetric split must not consume that footer.
+    if right <= template.title_block_left_m and bottom < NOTE_FIELD_LEFT[3]:
+        violations.append(
+            f"bottom edge {bottom * 1000:.3f} mm enters the sheet-number field "
+            f"(floor {NOTE_FIELD_LEFT[3] * 1000:.3f} mm)"
         )
     if bottom < clearance:
         violations.append(f"bottom edge {bottom * 1000:.3f} mm is off the sheet")
@@ -2150,8 +2186,8 @@ def _validate_source(source_model: Any) -> SourceFacts:
 
 def _validate_bom(
     adapter: Any, table: Any, facts: SourceFacts
-) -> tuple[tuple[tuple[str, str], ...], int]:
-    """Rewrite part numbers, prove identities/quantities; return (stem, item) and part column."""
+) -> tuple[tuple[tuple[str, str], ...], int, tuple[float, ...]]:
+    """Prove full identities/quantities; return items, header count and native heights."""
     table = _early_bound(table, "ITableAnnotation")
     rows = int(table.RowCount)
     columns = int(table.ColumnCount)
@@ -2160,6 +2196,8 @@ def _validate_bom(
         raise RuntimeError(
             f"drive-train BOM is {rows}x{columns}; expected {len(components) + 1} rows"
         )
+    # Insertion may print file stems. This snapshot identifies the component
+    # behind each row; it is not the final identity/text-metric readback.
     contents = tuple(
         tuple(str(table.DisplayedText(row, column) or "").strip() for column in range(columns))
         for row in range(rows)
@@ -2176,18 +2214,6 @@ def _validate_bom(
     part_column = column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER")
     description_column = column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION")
     quantity_column = column_named(lambda cell: cell.startswith("QTY"), "QTY.")
-    for column, width in (
-        (item_column, BOM_COLUMN_WIDTHS["item"]),
-        (part_column, BOM_COLUMN_WIDTHS["part"]),
-        (description_column, BOM_COLUMN_WIDTHS["description"]),
-        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
-    ):
-        actual_width = float(table.SetColumnWidth(column, width, 0))
-        if abs(actual_width - width) > 1e-6:
-            raise RuntimeError(
-                f"drive-train BOM column {column} width did not persist: "
-                f"{actual_width * 1000:.3f} mm"
-            )
 
     actual: dict[str, tuple[int, str, str, str]] = {}
     for row_index, row in enumerate(contents[1:], start=1):
@@ -2218,12 +2244,39 @@ def _validate_bom(
                 f"drive-train BOM quantity for {stem!r} is {quantity!r}, "
                 f"model has {facts.count(stem)}"
             )
+
+    for column, width in (
+        (item_column, BOM_COLUMN_WIDTHS["item"]),
+        (part_column, BOM_COLUMN_WIDTHS["part"]),
+        (description_column, BOM_COLUMN_WIDTHS["description"]),
+        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
+    ):
+        actual_width = float(table.SetColumnWidth(column, width, 0))
+        if abs(actual_width - width) > 1e-6:
+            raise RuntimeError(
+                f"drive-train BOM column {column} width did not persist: "
+                f"{actual_width * 1000:.3f} mm"
+            )
+    # Resolve the final Numbers and allocated widths before asking SolidWorks
+    # for minimum row heights; SetText2 readback alone does not rebuild layout.
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("drive-train BOM identity/column rebuild failed")
     header_count = int(table.GetHeaderCount())
     setter_heights = tuple(float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)) for row in range(rows))
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("drive-train BOM rebuild failed")
-    for row, setter_height in enumerate(setter_heights):
-        height = float(table.GetRowHeight(row))
+    final_contents = tuple(
+        tuple(str(table.DisplayedText(row, column) or "").strip() for column in range(columns))
+        for row in range(rows)
+    )
+    for stem, (row_index, item, _description, _quantity) in actual.items():
+        row = final_contents[row_index]
+        seen = (row[item_column], row[part_column], row[description_column], row[quantity_column])
+        want = (item, BOM_PART_NUMBERS[stem], BOM_DESCRIPTIONS[stem], str(facts.count(stem)))
+        if seen != want:
+            raise RuntimeError(f"drive-train BOM final cells for {stem!r} {seen!r} != {want!r}")
+    row_heights = tuple(float(table.GetRowHeight(row)) for row in range(rows))
+    for row, (setter_height, height) in enumerate(zip(setter_heights, row_heights, strict=True)):
         fit = bom_row_fit(BOM_ROW_HEIGHT, height)
         _telemetry.event(
             "drawing.bom_row_height",
@@ -2232,16 +2285,13 @@ def _validate_bom(
             fit=fit,
             setter_mm=setter_height * 1000.0,
             actual_mm=height * 1000.0,
-            cells=contents[row],
+            cells=final_contents[row],
         )
         if fit == "short":
             raise RuntimeError(f"drive-train BOM row {row} is {height * 1000:.3f} mm, below request")
         if fit == "grown" and row >= header_count:
             _telemetry.warn(f"drive-train BOM data row {row} grew to {height * 1000:.3f} mm")
-    for stem, (row_index, *_rest) in actual.items():
-        if str(table.DisplayedText(row_index, part_column) or "").strip() != BOM_PART_NUMBERS[stem]:
-            raise RuntimeError(f"drive-train BOM part number for {stem!r} reverted")
-    return tuple((stem, actual[stem][1]) for stem in components), header_count
+    return tuple((stem, actual[stem][1]) for stem in components), header_count, row_heights
 
 
 def _bom_feature_name(table: Any) -> str:
@@ -2253,10 +2303,14 @@ def _bom_feature_name(table: Any) -> str:
     return name
 
 
-def _split_bom(adapter: Any, table: Any, *, data_rows: int, header_count: int) -> None:
+def _split_bom(
+    adapter: Any, table: Any, *, row_heights: Sequence[float], header_count: int
+) -> None:
     """Split the BOM into two side-by-side columns and hold both to the sheet."""
     table = _early_bound(table, "ITableAnnotation")
-    first_rows = bom_split_row(data_rows)
+    first_rows = bom_split_row(
+        row_heights[header_count:], header_height=sum(row_heights[:header_count])
+    )
     split_after = header_count + first_rows - 1  # 0-based row index
     second = table.Split(2, split_after)  # swTableSplit_AfterRow
     if second is None:
@@ -2477,9 +2531,9 @@ def _insert_bom(adapter: Any, view: Any, facts: SourceFacts) -> tuple[str, dict[
         configuration_grouping="same-part",
         label="drive-train",
     )
-    items, header_count = _validate_bom(adapter, table, facts)
+    items, header_count, row_heights = _validate_bom(adapter, table, facts)
     bom_name = _bom_feature_name(table)
-    _split_bom(adapter, table, data_rows=len(facts.components), header_count=header_count)
+    _split_bom(adapter, table, row_heights=row_heights, header_count=header_count)
     _heading(adapter, 2)
     _caption_under(
         adapter,

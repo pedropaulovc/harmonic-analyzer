@@ -50,6 +50,12 @@ Grouped BOM part properties read the Number, category and description once
 from the part's own frozen registry row, selected by canonical `part_name`.
 The Number must be category-qualified with a nonzero part sequence; the
 caller depends only on its own row.
+Same-part family grouping keeps the family Number in the BOM and lists the
+complete configuration range and quantities in its description and station
+references; it does not replace configuration-specific drawing Numbers.
+Table widths and contiguous splits must accommodate the final displayed
+identities and measured native row heights, including repeated headers and
+the sheet's reserved floors.
 Assembly `000` Numbers are assembly references, not part Numbers.
 
 Assembly `allowed_free_stems` and `required_free_stems` lists use canonical
@@ -77,6 +83,15 @@ retain their complete mate identifiers when reflowed. Gear Data and
 Manufacturing Notes are model-owned: rebuild the owning model when they change.
 Registry Installation Notes are drawing-owned and are stamped when the
 purchased-part drawing rebuilds.
+
+Title and Number fields are read from their native template-owned property
+links without changing the model's configuration or dirty state. One physical
+row is established from complete horizontal native display baselines, not
+`INote.GetTextCount` or `IDisplayData.GetTextCount`: those count text items.
+Multiple runs on one baseline are one row; ambiguous or refused display reads
+fail the contract. Field bounds, fonts and complete identities remain strict.
+`LineLength` alone can be inert on a fixed template box, so a persisted width
+setting is not evidence that the printed text wrapped.
 
 ## Historical evidence
 

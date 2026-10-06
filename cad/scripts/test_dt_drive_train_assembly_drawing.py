@@ -335,9 +335,30 @@ def test_grouped_bom_stamps_registered_identity_on_every_configuration(
         assert configuration.UseDescriptionInBOM is True
 
 
-def test_bom_descriptions_keep_one_line() -> None:
-    for stem, text in drawing.BOM_DESCRIPTIONS.items():
-        assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
+def test_bom_full_native_identities_retain_text_air() -> None:
+    """The failure PDF's unchanged Century Gothic glyph advances, in metres.
+
+    The old 22 mm Number cell held the 20.757 mm MHA-VN- prefix with
+    1.243 mm total air, but wrapped its final three digits on every row.
+    The full identities must keep at least that visible air, not merely fit
+    their prefix. The widest full description measured 107.45 mm.
+    """
+    glyph_advances = {
+        **dict.fromkeys("0123456789", 0.00258611),
+        "M": 0.00428859,
+        "H": 0.00318727,
+        "A": 0.00345347,
+        "-": 0.00154931,
+        "D": 0.00347213,
+        "T": 0.00198808,
+        "V": 0.00327594,
+        "N": 0.00345347,
+    }
+    native_air = 0.001243
+    for number in drawing.BOM_PART_NUMBERS.values():
+        full_width = sum(glyph_advances[character] for character in number)
+        assert drawing.BOM_COLUMN_WIDTHS["part"] >= full_width + native_air, number
+    assert drawing.BOM_COLUMN_WIDTHS["description"] >= 0.107450 + native_air
 
 
 def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
@@ -653,11 +674,54 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert table.splitlines()[1].startswith("STN  1  T120")
 
 
-def test_bom_split_keeps_the_second_column_no_taller() -> None:
-    assert drawing.bom_split_row(39) == 20
-    assert drawing.bom_split_row(42) == 21
-    with pytest.raises(ValueError):
-        drawing.bom_split_row(1)
+@pytest.mark.parametrize(("data_rows", "first_rows"), ((39, 20), (54, 27)))
+def test_bom_native_equal_heights_keep_the_larger_half_first(
+    data_rows: int, first_rows: int,
+) -> None:
+    heights = (0.006,) * data_rows
+    assert drawing.bom_split_row(heights, header_height=0.0101683) == first_rows
+
+
+def test_bom_split_requires_a_data_row_in_each_piece() -> None:
+    with pytest.raises(ValueError, match="at least two"):
+        drawing.bom_split_row((0.006,), header_height=0.0101683)
+
+
+def test_bom_split_uses_native_wrapping_heights_not_row_counts() -> None:
+    # Four late descriptions wrap to the native two-line height. A 27/27
+    # count split enters the right-hand title block, while 28/26 fits.
+    heights = (0.006,) * 50 + (0.0101683,) * 4
+    header = 0.0101683
+    second_anchor = (drawing.BOM_SECOND_COLUMN_X, drawing.BOM_ANCHOR[1])
+    count_height = header + sum(heights[27:])
+    assert any(
+        "title block" in finding
+        for finding in drawing.bom_extent_violations(
+            second_anchor, drawing.BOM_COLUMN_WIDTH, count_height
+        )
+    )
+    split = drawing.bom_split_row(heights, header_height=header)
+    assert split == 28
+    for anchor, data in ((drawing.BOM_ANCHOR, heights[:split]), (second_anchor, heights[split:])):
+        assert drawing.bom_extent_violations(
+            anchor, drawing.BOM_COLUMN_WIDTH, header + sum(data)
+        ) == []
+
+
+def test_bom_refuses_the_observed_all_wrapped_native_layout() -> None:
+    # 54 data rows plus repeated headers at 10.1683 mm cannot fit the two
+    # legal floors. The old 27/27 split read bottom = -32.713 mm.
+    heights = (0.0101683,) * 54
+    with pytest.raises(ValueError, match="no two-column BOM split fits"):
+        drawing.bom_split_row(heights, header_height=0.0101683)
+
+
+@pytest.mark.parametrize(
+    ("actual", "fit"),
+    ((0.005998, "short"), (0.0060005, "exact"), (0.0101683, "grown")),
+)
+def test_bom_native_row_height_classification(actual: float, fit: str) -> None:
+    assert drawing.bom_row_fit(0.006, actual) == fit
 
 
 def test_bom_reference_view_and_caption_fit_right_of_the_bom() -> None:
@@ -665,8 +729,11 @@ def test_bom_reference_view_and_caption_fit_right_of_the_bom() -> None:
     # ~10.2 mm. Under the first column the view was placed for 20 rows; at 27
     # the bottom row (MHA-DT-015) ran through it (st19 dt-02).
     data_rows = len(drawing.bom_components(drawing.instance_counts(_instances())))
-    first_rows = drawing.bom_split_row(data_rows)
-    first_height = 0.0102 + first_rows * drawing.BOM_ROW_HEIGHT
+    header = 0.0101683
+    first_rows = drawing.bom_split_row(
+        (drawing.BOM_ROW_HEIGHT,) * data_rows, header_height=header
+    )
+    first_height = header + first_rows * drawing.BOM_ROW_HEIGHT
     first_bottom = drawing.BOM_ANCHOR[1] - first_height
     half = drawing.REFERENCE_ISO_HALF_OUTLINE
     assert (0.068 + half) > first_bottom  # the old centre (0.110, 0.068)
@@ -697,6 +764,30 @@ def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:
     assert drawing.bom_extent_violations(drawing.BOM_ANCHOR, 0.164, 0.130) == []
     assert drawing.bom_extent_violations((0.300, 0.100), 0.100, 0.050)
     assert drawing.bom_extent_violations((0.001, 0.200), 0.100, 0.050)
+    second_anchor = (drawing.BOM_SECOND_COLUMN_X, drawing.BOM_ANCHOR[1])
+    floor_height = drawing.BOM_ANCHOR[1] - (
+        drawing.DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
+        + drawing.BOM_SHEET_CLEARANCE
+    )
+    assert drawing.bom_extent_violations(
+        second_anchor, drawing.BOM_COLUMN_WIDTH, floor_height - 1e-7
+    ) == []
+    assert any(
+        "title block" in finding
+        for finding in drawing.bom_extent_violations(
+            second_anchor, drawing.BOM_COLUMN_WIDTH, floor_height + 1e-7
+        )
+    )
+    first_floor_height = drawing.BOM_ANCHOR[1] - drawing.NOTE_FIELD_LEFT[3]
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, drawing.BOM_COLUMN_WIDTH, first_floor_height - 1e-7
+    ) == []
+    assert any(
+        "sheet-number field" in finding
+        for finding in drawing.bom_extent_violations(
+            drawing.BOM_ANCHOR, drawing.BOM_COLUMN_WIDTH, first_floor_height + 1e-7
+        )
+    )
 
 
 def test_balloon_attachment_gate_names_every_mismatch() -> None:
