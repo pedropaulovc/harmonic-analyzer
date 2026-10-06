@@ -1,6 +1,5 @@
 pd-rack-pinion:
   number: MHA-PD-006
-  category: pd
   material: Brass
   material_specification: C36000 free-machining brass
   finish: gear teeth cut; polished brass

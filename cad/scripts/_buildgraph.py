@@ -671,44 +671,22 @@ class _AssemblySources:
         if isinstance(node, ast.IfExp):
             return self.strings(node.body, trail) | self.strings(node.orelse, trail)
         if isinstance(node, ast.JoinedStr):
-            values = {""}
-            for piece in node.values:
-                if isinstance(piece, ast.Constant) and isinstance(piece.value, str):
-                    fragments = {piece.value}
-                elif isinstance(piece, ast.FormattedValue):
-                    try:
-                        fragments = self.strings(piece.value, trail)
-                    except ValueError:
-                        if not all(values):
-                            return self.fail(node)
-                        fragments = {"*"}
-                else:
-                    return self.fail(node)
-                values = {prefix + suffix for prefix in values for suffix in fragments}
-            if not values or not all(values):
+            prefix = node.values[0] if node.values else None
+            if (
+                not isinstance(prefix, ast.Constant)
+                or not isinstance(prefix.value, str)
+                or not prefix.value
+            ):
                 return self.fail(node)
-            return values
-        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-            return self.strings(node.right, trail)
-        if isinstance(node, ast.Call) and self.call_name(node) in {"str", "Path"}:
-            return self.strings(self.argument(node, 0, "path"), trail)
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in {"resolve", "absolute"}
-            and not node.args
-            and not node.keywords
-        ):
-            return self.strings(node.func.value, trail)
+            return {prefix.value + ("*" if len(node.values) > 1 else "")}
         if isinstance(node, ast.Call) and self.call_name(node) in {
             "_part",
             "_subassembly",
         }:
             self.validate_path_wrapper(node)
-            extension = ".SLDPRT" if self.call_name(node) == "_part" else ".SLDASM"
-            return {name + extension for name in self.strings(self.argument(node, 0, "name"), trail)}
+            return self.strings(self.argument(node, 0, "name"), trail)
         if isinstance(node, ast.Call) and self.call_name(node) == "part_path":
-            return {name + ".SLDPRT" for name in self.strings(self.argument(node, 0, "part"), trail)}
+            return self.strings(self.argument(node, 0, "name"), trail)
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -784,12 +762,10 @@ class _AssemblySources:
             if not isinstance(call, ast.Call):
                 continue
             name = self.call_name(call)
-            if name.startswith("AddComponent"):
-                self.fail(call)  # native insertion must use an enumerated source sink
             if name == "place_component":
-                expressions.append((self.argument(call, 1, "part"), ".SLDPRT"))
+                expressions.append(self.argument(call, 1, "part"))
             if name == "InsertComponentParameters":
-                expressions.append((self.argument(call, 0, "file_path"), ""))
+                expressions.append(self.argument(call, 0, "file_path"))
             if name == "insert_component":
                 parameters = self.argument(call, 0, "parameters")
                 if (
@@ -821,46 +797,14 @@ class _AssemblySources:
                 ]
                 if len(fields) != 1:
                     self.fail(item)
-                expressions.extend((value, ".SLDPRT") for value in fields)
+                expressions.extend(fields)
         names = set()
-        for expression, extension in expressions:
-            resolved = {name + extension for name in self.strings(expression)}
-            if not resolved or any(
-                not re.search(r"\.(?:SLDPRT|SLDASM)$", name, re.IGNORECASE)
-                for name in resolved
-            ):
+        for expression in expressions:
+            resolved = self.strings(expression)
+            if not resolved:
                 self.fail(expression)
             names.update(resolved)
         return frozenset(names)
-
-
-def generated_source_names(source: str) -> frozenset[str]:
-    """Names actually passed to the native spring producer in this builder.
-
-    An arbitrary suffix of a registered part is not a generated model. Only
-    calls to the imported production emitter establish these local outputs.
-    """
-    scan = _AssemblySources(source)
-    emitters = {
-        alias.asname or alias.name
-        for node in scan.tree.body
-        if isinstance(node, ast.ImportFrom) and node.module == "_spring"
-        for alias in node.names
-        if alias.name == "build_spring"
-    }
-    names = set()
-    for node in ast.walk(scan.tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in emitters:
-            names.update(scan.strings(scan.argument(node, 1, "part_name")))
-    return frozenset(names)
-
-
-def generated_source_owner(name: str, part_names) -> str:
-    """The registered base of a generated native model, never an assembly."""
-    parents = [stem for stem in part_names if name.startswith(stem + "-")]
-    if not parents:
-        raise ValueError(f"generated model {name!r} has no registered part producer")
-    return max(parents, key=len)
 
 
 def references_of(asm_stem: str) -> list[str]:
@@ -873,44 +817,31 @@ def references_of(asm_stem: str) -> list[str]:
     ``file_dep`` on the referenced ``.SLDPRT``/sub-``.SLDASM`` target, so order
     and the refresh/full decision fall out of the graph.
     """
-    from fnmatch import fnmatchcase
-
-    parts = part_stems()
-    candidates = parts + [a for a in ASSEMBLY_ORDER if a != asm_stem]
+    candidates = part_stems() + [a for a in ASSEMBLY_ORDER if a != asm_stem]
     by_name = {stem.replace("_", "-"): stem for stem in candidates}
-    part_names = {stem.replace("_", "-") for stem in parts}
     found = set()
     source = script_for(asm_stem).read_text(encoding="utf-8")
-    generated = {
-        name: generated_source_owner(name, part_names)
-        for name in generated_source_names(source)
-    }
-    for raw_name in _assembly_source_names(source):
-        name = raw_name.replace("\\", "/").rsplit("/", 1)[-1]
-        extension = re.search(r"\.(SLDPRT|SLDASM)$", name, flags=re.IGNORECASE)
-        kind = extension[1].upper() if extension else None
-        if extension:
-            name = name[:extension.start()]
-        eligible = {
-            dashed: stem for dashed, stem in by_name.items()
-            if kind is None or (dashed in part_names) == (kind == "SLDPRT")
-        }
-        if name in eligible:
-            found.add(eligible[name])
+    for name in _assembly_source_names(source):
+        name = name.replace("\\", "/").rsplit("/", 1)[-1]
+        name = re.sub(r"\.(?:SLDPRT|SLDASM)$", "", name, flags=re.IGNORECASE)
+        if name in by_name:
+            found.add(by_name[name])
             continue
-        matches = {
-            stem for dashed, stem in eligible.items()
-            if "*" in name and fnmatchcase(dashed, name)
-        }
-        if kind != "SLDASM":
-            for variant, owner in generated.items():
-                if name == variant or ("*" not in name and fnmatchcase(name, variant)):
-                    matches.add(by_name[owner])
-        if matches:
-            found.update(matches)
-            continue
+        if name.endswith("*"):
+            prefix = name[:-1]
+            matches = {
+                stem for dashed, stem in by_name.items() if dashed.startswith(prefix)
+            }
+            # In-script variants inherit the longest existing producer family,
+            # not the shorter 'channel' assembly prefix.
+            parents = [dashed for dashed in by_name if prefix.startswith(dashed + "-")]
+            if parents:
+                matches.add(by_name[max(parents, key=len)])
+            if matches:
+                found.update(matches)
+                continue
         raise ValueError(
-            f"Unresolved assembly source {raw_name!r} in {script_for(asm_stem)}"
+            f"Unresolved assembly source {name!r} in {script_for(asm_stem)}"
         )
     return [stem for stem in candidates if stem in found]
 

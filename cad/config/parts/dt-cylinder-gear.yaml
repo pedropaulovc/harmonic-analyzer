@@ -1,6 +1,5 @@
 dt-cylinder-gear:
   number: MHA-DT-012
-  category: dt
   material: Brass
   material_specification: C36000 free-machining brass
   finish: "POLISH COSMETIC FACES ONLY; EXCLUDE BORE, CAM OD AND TEETH"

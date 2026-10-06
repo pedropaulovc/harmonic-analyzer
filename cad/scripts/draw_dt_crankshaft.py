@@ -548,7 +548,7 @@ def _visible_cross_hole_edge(
                 break
     if not candidates:
         raise RuntimeError(
-            f"dt_crankshaft {view_label} view has no visible edge adjacent to a "
+            f"crankshaft {view_label} view has no visible edge adjacent to a "
             f"hole cylindrical face at radius {expected_radius_m:g} m"
         )
     return candidates[0]

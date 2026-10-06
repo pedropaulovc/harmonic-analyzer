@@ -1,6 +1,5 @@
 ha-measuring-stick-stop:
   number: MHA-HA-002
-  category: ha
   material_family: ferrous_noncritical
   finish: "black oxide; thumbscrew head bright"
   tolerance_class: machined_block

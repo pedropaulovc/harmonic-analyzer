@@ -1,6 +1,5 @@
 dt-cylinder-end-disc:
   number: MHA-DT-026
-  category: dt
   title: Cylinder Bank Thrust Washer
   material: Plain Carbon Steel
   material_specification: SAE 1018 CF bar, ASTM A108-24

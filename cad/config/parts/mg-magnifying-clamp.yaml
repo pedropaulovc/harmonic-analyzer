@@ -1,6 +1,5 @@
 mg-magnifying-clamp:
   number: MHA-MG-002
-  category: mg
   material: Brass
   material_specification: Brass
   finish: machined; chemically blackened (brass black)

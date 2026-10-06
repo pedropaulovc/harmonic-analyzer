@@ -1,5 +1,4 @@
 number: MHA-FR-000
-category: fr
 # frame assembly contract -- per-assembly build data read through
 # cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the frame
 # closure (its assembly leaf, its verify_soundness leaf, and whatever consumes

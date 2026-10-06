@@ -1,6 +1,5 @@
 pd-platen:
   number: MHA-PD-002
-  category: pd
   material: Brass
   tolerance_class: plate_profile
   process: "machined (brass)"

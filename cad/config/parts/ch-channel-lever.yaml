@@ -1,6 +1,5 @@
 ch-channel-lever:
   number: MHA-CH-002
-  category: ch
   material_family: ferrous_noncritical
   finish: RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores
   quantity: 20

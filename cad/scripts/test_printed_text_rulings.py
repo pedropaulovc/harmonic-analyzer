@@ -136,7 +136,7 @@ def test_the_scan_reaches_known_printed_text() -> None:
     constants = printed_constants()
     assert "sm_knife_mount_spec.DRAWING_NOTES" in constants
     assert "draw_dt_drive_train_assembly.CHECKS" in constants
-    assert "knife-mount.material_specification" in printed_registry_fields()
+    assert "sm-knife-mount.material_specification" in printed_registry_fields()
 
 
 def test_no_printed_text_cites_an_internal_rule_or_ruling() -> None:

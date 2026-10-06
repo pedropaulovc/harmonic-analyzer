@@ -1,6 +1,5 @@
 ch-rocker-arm:
   number: MHA-CH-006
-  category: ch
   material_family: ferrous_noncritical
   finish: matte black oxide
   quantity: 20

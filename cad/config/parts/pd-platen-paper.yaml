@@ -1,6 +1,5 @@
 pd-platen-paper:
   number: MHA-PD-004
-  category: pd
   material: Oak
   tolerance_class: plate_profile
   process: "turned (wood)"

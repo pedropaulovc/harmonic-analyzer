@@ -1739,6 +1739,16 @@ def test_sw_ensure_once_runs_once_and_respects_the_opt_out(monkeypatch):
     assert calls == [1]
 
 
+def test_task_span_carries_its_pipeline_stage_resource():
+    """Task labels map to the pipeline stage advertised by their subprocess."""
+    dodo = _load_dodo()
+    assert dodo._stage_name("part:pn_pen_rod") == "part-build"
+    assert dodo._stage_name("assembly:pn_pen") == "assembly-build"
+    assert dodo._stage_name("drawing:pn_pen_rod") == "drawing-export"
+    assert dodo._stage_name("verify soundness") == "verify-soundness"
+    assert dodo._stage_name("nothing recognisable") == "harmonic-analyzer"
+
+
 def test_external_logs_follow_warning_default_and_explicit_verbosity(monkeypatch):
     dodo = _load_dodo()
     monkeypatch.delenv("HARMONIC_VERBOSITY", raising=False)
@@ -2865,8 +2875,17 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     )
     drawing = dodo._drawing_file_deps("vn_frame_side_screw")
     assembly = dodo._recipe_files("pn_pen")
-    for deps in (part, drawing, assembly):
-        assert catalog not in deps
+    for label, deps in (
+        ("part-vn_frame_side_screw", part),
+        ("drawing-vn_frame_side_screw", drawing),
+        ("assembly-pn_pen", assembly),
+    ):
+        assert catalog not in deps, label
+        assert any(
+            Path(dep).name == f"{label}.digest"
+            and Path(dep).parent.name == ".fastener-catalog"
+            for dep in deps
+        ), label
     assert dodo._fastener_rows_env("part:vn_frame_side_screw") == "vn-frame-side-screw"
     assert dodo._fastener_rows_env("drawing:vn_frame_side_screw") == "vn-frame-side-screw"
     # pen's closure imports build_vn_pen_set_screw for its constants; that module's

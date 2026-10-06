@@ -1,6 +1,5 @@
 pn-pen-frame:
   number: MHA-PN-001
-  category: pn
   material: C36000 free-machining brass
   tolerance_class: machined_block
   process: "machined (brass)"

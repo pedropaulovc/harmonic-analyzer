@@ -25,7 +25,6 @@ Usage:
 import argparse
 import json
 import re
-import warnings
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
@@ -65,7 +64,7 @@ PHOTO_FOCUS = {
     "rocker arms (top comb)": ["ch_rocker_arm"],
     "amplitude bars": ["ch_amplitude_bar"],
     "measuring stick / cord hanger": ["ha_measuring_stick"],
-    "channel springs": ["vn_channel_spring_installed"],
+    "channel springs": ["channel_spring"],
     "channel levers": ["ch_channel_lever"],
     "summing lever": ["sm_summing_lever"],
     "counter spring": ["vn_counter_spring"],
@@ -75,12 +74,12 @@ PHOTO_FOCUS = {
     "platen + rack": ["pd_platen", "pd_platen_rack"],
     "pen mechanism (modern)": ["pn_pen_frame", "pn_pen_marker"],
     "translational gearing / chain": ["pd_transgear_knob_shaft", "pd_chain_sprocket"],
-    "pinion gear": ["dt_alignment_pinion"],
+    "pinion gear": ["pinion_drum"],
     "tube frame columns": ["fr_tube_frame"],
     "top casting": ["fr_top_frame"],
     "base casting": ["fr_harmonic_base"],
-    "rocker arm supports (a-frames)": ["fr_rocker_arm_support"],
-    # "nameplate" intentionally skipped: not included in the photo focus table
+    "rocker arm supports (a-frames)": ["a_frame", "fr_rocker_arm_support"],
+    # "nameplate" intentionally skipped: no CAD part
 }
 
 VIEW_AZ = [
@@ -156,7 +155,6 @@ def make_pair(pid: str, model: str, ref_path: str, source: str, camera: dict,
 def seed_from_catalog(parts: set[str]) -> list[dict]:
     entries = json.loads(CATALOG.read_text(encoding="utf-8"))["entries"]
     identities = catalog_identities()
-    current = set(identities.values())
     pairs = []
     for e in entries:
         if not e.get("keep"):
@@ -165,15 +163,6 @@ def seed_from_catalog(parts: set[str]) -> list[dict]:
         cls = e.get("class")
         if cls not in ("machine", "machine-detail", "mixed", "drawing"):
             continue
-        unresolved = [c for c in comps if c not in current]
-        if unresolved:
-            # Semantic reference labels are provenance, not permission to
-            # guess a current CAD owner (e.g. retired crank_pedestal).
-            warnings.warn(
-                f"catalog {e['id']}: unresolved component labels {unresolved!r}; "
-                "preserved without assigning a CAD identity",
-                stacklevel=2,
-            )
         frame: list[str] = []
         if cls == "machine" or "ha_harmonic_analyzer" in comps:
             model = "ha_harmonic_analyzer"

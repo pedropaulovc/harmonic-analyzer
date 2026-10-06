@@ -1,7 +1,6 @@
 pd-transgear-arm:
   title: Transgear Arm
   number: MHA-PD-018
-  category: pd
   material: AISI 1018 cold-finished steel
   material_specification: AISI 1018 cold-finished steel bar, ASTM A108
   finish: bright machined; protect with ISO VG 32 machine-oil film

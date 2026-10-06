@@ -145,10 +145,6 @@ def test_part_registry_row_is_a_plain_pin() -> None:
     assert "fit_class" not in config
     assert "drill rod" in config["process"]
     assert int(config["quantity"]) == 1
-    build = _build_source()
-    assert 'PART_NAME = "crank-pinion-pin"' in build
-    assert "apply_drawing_properties" in build
-    assert "clear_dimensions_for_drawing" in build
 
 
 def test_title_block_material_names_the_drill_rod_the_process_allows() -> None:

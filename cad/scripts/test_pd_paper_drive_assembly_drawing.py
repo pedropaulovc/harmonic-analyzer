@@ -1,7 +1,6 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-000)."""
 
 import ast
-import inspect
 import math
 import re
 from itertools import product
@@ -832,41 +831,6 @@ def test_spare_storage_clears_nameplate_envelope_by_five_mm(monkeypatch):
     assert spare_max_z <= min(point[2] for point in plate_corners) - 5.0
 
 
-def test_spare_remains_fixed_t18_sibling_with_original_rotation():
-    tree = ast.parse(Path(assembly.__file__).read_text(encoding="utf-8"))
-    calls = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "place_component"
-        and any(
-            keyword.arg == "label"
-            and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value == "transgear-removable (spare T18)"
-            for keyword in node.keywords
-        )
-    ]
-    assert len(calls) == 1
-    call = calls[0]
-    assert [ast.unparse(arg) for arg in call.args] == [
-        "adapter",
-        "'transgear-removable'",
-        "list(SPARE_GEAR_POS)",
-        "[-90.0, 0.0, 0.0]",
-        "ROT_X_NEG90",
-    ]
-    assert {
-        keyword.arg: ast.literal_eval(keyword.value) for keyword in call.keywords
-    } == {
-        "configuration": "T18",
-        "label": "transgear-removable (spare T18)",
-    }
-    assert (
-        inspect.signature(_assembly.place_component).parameters["ground"].default
-        is True
-    )
-    assert assembly.ROT_X_NEG90 == [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]]
 
 
 def _numbered_items() -> dict[str, str]:

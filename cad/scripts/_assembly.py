@@ -78,7 +78,7 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
     }
 
 
-@_telemetry.traced("assembly.ensure_identity")
+@_telemetry.traced("assembly.ensure_revision")
 def _ensure_assembly_identity(adapter: Any, asm_name: str, model: Any = None) -> bool:
     """Restamp stale release Revision and frozen per-assembly Number."""
     target = adapter.currentModel if model is None else model

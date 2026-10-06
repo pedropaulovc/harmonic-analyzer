@@ -332,8 +332,6 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
             prev_tag,
             "--new-local",
             str(stage),
-            "--expect-root",
-            TOP_ASSEMBLY,
             "--out",
             str(diff_dir),
             "--summary-json",
@@ -674,7 +672,6 @@ def write_provenance(
             "entrypoint": "doit release",
         },
         "model": {
-            "top_assembly": TOP_ASSEMBLY,
             "documents": facts.get("documents"),
             "native_documents": facts.get("native_documents"),
             "parts": facts.get("parts"),

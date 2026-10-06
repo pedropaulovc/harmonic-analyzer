@@ -26,7 +26,7 @@ import yaml
 CONTRACT_DIR = Path(__file__).resolve().parent.parent / "config" / "assemblies"
 
 _REQUIRED_KEYS = frozenset(
-    {"number", "category", "flip_invert", "allowed_free_stems", "required_free_stems", "free_dof"}
+    {"number", "flip_invert", "allowed_free_stems", "required_free_stems", "free_dof"}
 )
 _KNOWN_KEYS = _REQUIRED_KEYS | {"free_dof_per_active_channel"}
 
@@ -51,7 +51,6 @@ class AssemblyContract:
     stem: str
     path: Path
     number: str
-    category: str
     flip_invert: frozenset[str]
     allowed_free_stems: tuple[str, ...]
     required_free_stems: tuple[str, ...]
@@ -107,7 +106,6 @@ def assembly_contract(stem: str) -> AssemblyContract:
         stem=stem,
         path=path,
         number=_text(path, "number", doc["number"]),
-        category=_text(path, "category", doc["category"]),
         flip_invert=frozenset(_string_list(path, "flip_invert", doc["flip_invert"])),
         allowed_free_stems=_string_list(
             path, "allowed_free_stems", doc["allowed_free_stems"]

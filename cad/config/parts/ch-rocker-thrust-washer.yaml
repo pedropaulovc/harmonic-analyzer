@@ -1,6 +1,5 @@
 ch-rocker-thrust-washer:
   number: MHA-CH-009
-  category: ch
   title: Rocker Bank Thrust Washer
   # rocker_thrust_washer_spec.MATERIAL_TITLE: the title block's MATERIAL cell.
   material: "1008 CR sheet, ASTM A1008 CS"

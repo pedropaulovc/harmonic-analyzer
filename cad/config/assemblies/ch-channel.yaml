@@ -1,5 +1,4 @@
 number: MHA-CH-000
-category: ch
 # channel assembly contract -- per-assembly build data read through
 # cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the channel
 # closure (its assembly leaf, its verify_soundness leaf, and whatever consumes

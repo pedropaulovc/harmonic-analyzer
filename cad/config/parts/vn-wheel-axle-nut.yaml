@@ -1,6 +1,5 @@
 vn-wheel-axle-nut:
   number: MHA-VN-025
-  category: vn
   material: Plain Carbon Steel
   finish: "bright"
   tolerance_class: visual_noncritical

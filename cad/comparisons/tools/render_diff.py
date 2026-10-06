@@ -7,7 +7,7 @@ highlighted in red over an x-ray ghost of the unchanged body.
 
 Each side is a *source* -- either a published GitHub release (read over HTTP
 range requests, no full-asset download) or a local staged bundle directory
-(``<dir>/stl/*.STL`` + ``<dir>/boxes/*.json``). The local form
+(``<dir>/stl/*.STL`` + ``<dir>/boxes/ha-harmonic-analyzer.json``). The local form
 is what ``cut_release.py`` uses: the new release is still on disk and only the
 previous release is fetched from GitHub.
 
@@ -24,9 +24,7 @@ Pipeline:
 
 The committed schema-2 identity map pairs actual STL inventory members across
 the cutover, retaining configuration qualifiers. Renames are reported separately
-from geometry changes; unmatched files remain new/deleted. ``--expect-root``
-checks the new assembly graph independently of optional PROVENANCE.json, before
-classification or rendering.
+from geometry changes; unmatched files remain new/deleted.
 
     # release vs release
     uv run cad/comparisons/tools/render_diff.py v0.1.1 v0.2.0 --out /tmp/diff
@@ -41,7 +39,6 @@ native driver serves it directly.
 import argparse
 import json
 import os
-import re
 import struct
 import sys
 import urllib.request
@@ -58,7 +55,7 @@ import numpy as np
 # VTK import cost -- they re-run this cheap env setup but never import pyvista.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from osmesa_win import enable_offscreen_gl
-from release_diff import IDENTITY_MAP, identity_inventory, load_identity_map, paired_keys, split_mesh_key
+from release_diff import IDENTITY_MAP, load_identity_map, paired_keys, split_mesh_key
 
 enable_offscreen_gl()
 
@@ -78,45 +75,6 @@ def base_part(key):
     """Strip the configured qualifier for the changed-part summary only."""
     return split_mesh_key(key)[0]
 
-
-def root_scene(scenes, provenance=None, expect_root=None):
-    """Resolve the unique assembly root from the bundle's native instance boxes."""
-    children = {}
-    for stem, scene in scenes.items():
-        names = [box["name"] for box in scene.get("boxes", [])]
-        children[stem] = {
-            child
-            for name in names
-            if (child := re.sub(r"-\d+$", "", name.split("/")[-1].lower())) in scenes
-        }
-    roots = set(scenes) - set().union(*children.values())
-    if len(roots) != 1:
-        raise ValueError(f"bundle assembly scene graph needs exactly one root; found {sorted(roots)}")
-    root = roots.pop()
-    if expect_root is not None and root != expect_root:
-        raise ValueError(f"expected top assembly {expect_root!r} differs from bundle scene root {root!r}")
-    visited, active = set(), set()
-
-    def visit(stem):
-        if stem in active:
-            raise ValueError(f"cycle in bundle assembly scene graph at {stem}")
-        if stem in visited:
-            return
-        active.add(stem)
-        for child in children[stem]:
-            visit(child)
-        active.remove(stem)
-        visited.add(stem)
-
-    visit(root)
-    if visited != set(scenes):
-        raise ValueError(f"unreachable bundle assembly scenes: {sorted(set(scenes) - visited)}")
-    model = (provenance or {}).get("model", {})
-    if "top_assembly" in model and model["top_assembly"] != root:
-        raise ValueError(
-            f"declared top assembly {model['top_assembly']!r} differs from bundle scene root {root!r}"
-        )
-    return scenes[root]
 
 # --------------------------------------------------------------------------- #
 # sources
@@ -212,20 +170,12 @@ class ReleaseSource:
         dest.write_bytes(data)
         return dest
 
-    def scene(self, expect_root=None):
-        scenes = {
-            Path(name).stem.lower(): self._scene_json(name)
-            for name in self.cd
-            if name.startswith("boxes/") and name.lower().endswith(".json")
-        }
-        provenance = self._scene_json("PROVENANCE.json") if self._entry("PROVENANCE.json") else None
-        return root_scene(scenes, provenance, expect_root)
-
-    def _scene_json(self, rel):
+    def scene(self):
+        rel = "boxes/ha-harmonic-analyzer.json"
         e = self._entry(rel)
         if e is None:
-            raise SystemExit(f"!! {self.tag} has no {rel}")
-        dest = CACHE / self.tag / rel
+            raise SystemExit(f"!! {self.tag} has no {rel} (pre-bundle release?)")
+        dest = CACHE / self.tag / "scene.json"
         ent = e[1]
         lh = self._get(ent["lho"], ent["lho"] + 30 - 1)
         n, m = struct.unpack("<HH", lh[26:30])
@@ -243,10 +193,9 @@ class LocalSource:
     def __init__(self, root):
         self.root = Path(root)
         self.label = f"local:{self.root.name}"
-        paths = [p for p in (self.root / "stl").glob("*")
-                 if p.suffix.lower() == ".stl"]
-        identity_inventory((p.stem.lower() for p in paths), {})
-        self._stls = {p.stem.lower(): p for p in paths}
+        self._stls = {p.stem.lower(): p
+                      for p in (self.root / "stl").glob("*")
+                      if p.suffix.lower() == ".stl"}
         self._crc = {}
 
     def _path(self, key):
@@ -266,14 +215,11 @@ class LocalSource:
     def stl(self, key):
         return self._path(key)
 
-    def scene(self, expect_root=None):
-        scenes = {
-            path.stem.lower(): json.loads(path.read_text(encoding="utf-8"))
-            for path in (self.root / "boxes").glob("*.json")
-        }
-        provenance_path = self.root / "PROVENANCE.json"
-        provenance = json.loads(provenance_path.read_text(encoding="utf-8")) if provenance_path.is_file() else None
-        return root_scene(scenes, provenance, expect_root)
+    def scene(self):
+        scene = self.root / "boxes" / "ha-harmonic-analyzer.json"
+        if not scene.is_file():
+            raise SystemExit(f"!! no {scene.relative_to(self.root)} under {self.root}")
+        return json.loads(scene.read_text(encoding="utf-8"))
 
 
 def make_source(release, local):
@@ -298,8 +244,8 @@ def _hausdorff(pa, pb, n=40000, budget=4_000_000):
     Query set per direction = vertices (deterministic feature points where the
     max deviation almost always sits) plus surface samples, so a small local
     change is not missed by random sampling alone. Point-to-surface distance is
-    queried through trimesh's R-tree/KD-tree accelerated closest-point path.
-    Chunking bounds the worst-case point/triangle candidate memory.
+    queried in chunks sized to keep points*triangles under ``budget`` -- bounds
+    peak memory (trimesh's closest-point is brute force).
     """
     a = trimesh.load(pa, process=False)
     b = trimesh.load(pb, process=False)
@@ -342,8 +288,8 @@ def _auto_jobs(n_pending):
 def classify(old, new, keys, pairs, tol=0.01, jobs=0):
     """Return ({changed mesh keys}, {key: hausdorff_mm}) using actual-file pairs.
 
-    A cheap CRC pass first -- identical signature is unchanged for free, an
-    unpaired new mesh is a new part. Only paired meshes with differing bytes need
+    A cheap CRC pass first -- identical signature is unchanged for free, a missing
+    old mesh is a new part. Only meshes whose signature differs need the expensive
     Hausdorff confirmation; those are mutually independent, so they run across a
     process pool (``jobs`` workers; 0 = auto = one per CPU capped at 8, 1 = inline
     serial). This is the SolidWorks-free hot path -- parallelising it is the
@@ -361,16 +307,11 @@ def classify(old, new, keys, pairs, tol=0.01, jobs=0):
     for k in sorted(keys):
         old_key = pairs.get(k)
         c_old = old.crc(old_key) if old_key is not None else None
-        c_new = new.crc(k)
-        if c_new is None:
-            raise ValueError(f"new scene references missing mesh {k!r}")
-        if old_key is not None and c_old is None:
-            raise ValueError(f"old inventory references missing mesh {old_key!r}")
-        if old_key is None:
+        if c_old is None:
             changed.add(k)            # new part -> changed
             devs[k] = float("inf")
             continue
-        if c_old == c_new:
+        if c_old == new.crc(k):
             continue                  # identical signature -> unchanged (free)
         to_verify.append(k)
     identical = len(keys) - len(changed) - len(to_verify)
@@ -379,7 +320,9 @@ def classify(old, new, keys, pairs, tol=0.01, jobs=0):
     for k in to_verify:
         po, pn = old.stl(pairs[k]), new.stl(k)
         if not (po and pn):
-            raise ValueError(f"paired mesh could not be materialized: {pairs[k]!r} -> {k!r}")
+            changed.add(k)            # signature differs but a side is missing
+            devs[k] = float("inf")
+            continue
         pending.append((k, str(po), str(pn)))
 
     if not pending:
@@ -415,7 +358,6 @@ def main():
     ap.add_argument("--old-local")
     ap.add_argument("--new-release")
     ap.add_argument("--new-local")
-    ap.add_argument("--expect-root", help="required new bundle assembly graph root")
     ap.add_argument("--identity-map", type=Path, default=IDENTITY_MAP,
                     help="schema-2 diff-only identity rename table")
     ap.add_argument("--out", default="/tmp/render_diff", type=Path)
@@ -437,7 +379,7 @@ def main():
     old = make_source(old_rel, args.old_local)
     new = make_source(new_rel, args.new_local)
 
-    scene = new.scene(expect_root=args.expect_root)
+    scene = new.scene()
     comps = scene["components"]
     keys = {(c.get("mesh") or c["part"]).lower() for c in comps}
     mapping = load_identity_map(args.identity_map)

@@ -1,6 +1,5 @@
 vn-chain-inner-link:
   number: MHA-VN-002
-  category: vn
   material: Plain Carbon Steel
   tolerance_class: machined_block
   process: "machined (steel)"

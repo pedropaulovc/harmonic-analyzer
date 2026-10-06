@@ -1935,9 +1935,6 @@ def _soundness_file_deps(stem: str) -> list[str]:
         str(VERIFY_PY),
         str(POSTBUILD_PY),
         str(INTERFERENCE_CONTRACTS_PY),
-        str((SCRIPTS_DIR / "_identity.py").resolve()),
-        str((SCRIPTS_DIR / "_identity_shapes.py").resolve()),
-        str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
         assembly_contract_file(stem),
         _sldasm(stem),
         _assembly_execution_token(stem),
@@ -1975,9 +1972,6 @@ def _kinematics_file_deps() -> list[str]:
     return [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
-        str((SCRIPTS_DIR / "_identity.py").resolve()),
-        str((SCRIPTS_DIR / "_identity_shapes.py").resolve()),
-        str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
         _sldasm("pn_pen"),
         _assembly_execution_token("pn_pen"),
         _sldasm("mg_magnifier"),
@@ -2001,9 +1995,6 @@ def _preflight_file_deps() -> list[str]:
         str(VERIFY_PY),
         str((SCRIPTS_DIR / "_assembly.py").resolve()),
         str(POSTBUILD_PY),
-        str((SCRIPTS_DIR / "_identity.py").resolve()),
-        str((SCRIPTS_DIR / "_identity_shapes.py").resolve()),
-        str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
         _sldasm("dt_drive_train"),
         _assembly_execution_token("dt_drive_train"),
         _sldasm("ch_channel"),
@@ -2908,9 +2899,6 @@ def task_verify():
         "file_dep": [
             str(VERIFY_PY),
             str(POSTBUILD_PY),
-            str((SCRIPTS_DIR / "_identity.py").resolve()),
-            str((SCRIPTS_DIR / "_identity_shapes.py").resolve()),
-            str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
             *child_stamps,
         ],
         "targets": [soundness_stamp],
@@ -2977,7 +2965,6 @@ def task_check():
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_release_diff.py",
-        REPO_ROOT / "cad" / "comparisons" / "tools" / "test_pose_to_meshprobe.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
         # Builder gates handed to save's final deep rebuild (drive-train) must
         # read AFTER it, cost no second rebuild, and still block the save.
@@ -3087,7 +3074,7 @@ def task_check():
         # The mirror-retirement diagnostic's drive-train rows equal the rows the
         # assembly places with (Codex on #814 and #844).
         SCRIPTS_DIR / "test_mirror_retirement_expectations.py",
-        # Every offline test in cad/scripts and comparisons/tools runs in some
+        # Every offline test in cad/scripts runs in some
         # check:* gate or is exempted with a reason (Codex on #844).
         SCRIPTS_DIR / "test_check_gate_enrollment.py",
         # No module assigns an UPPERCASE name twice at top level: a merge that
@@ -3194,14 +3181,6 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
-            # Newly added tool tests must rerun the enrollment scan, even before
-            # they are registered in recipe_tests. Scripts are tracked above.
-            *(
-                str(path.resolve())
-                for path in (REPO_ROOT / "cad" / "comparisons" / "tools").glob(
-                    "test_*.py"
-                )
-            ),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(
@@ -3212,31 +3191,11 @@ def task_check():
                     "render_offline.py",
                     "release_diff.py",
                     "render_diff.py",
-                    "pose_to_meshprobe.py",
                 )
             ),
             # Release pairing tests read the sealed identity map at runtime.
             str(
                 (REPO_ROOT / "cad" / "config" / "identity-migration-map.json").resolve()
-            ),
-            # The historical roll-sign check only reads existing renders; their
-            # absence skips its empirical half without invoking either renderer.
-            *(
-                str(path.resolve())
-                for path in (
-                    REPO_ROOT
-                    / "cad"
-                    / "comparisons"
-                    / "render"
-                    / "harmonic_analyzer--ch11-p002-img05.jpg",
-                    REPO_ROOT
-                    / "cad"
-                    / "comparisons"
-                    / "render"
-                    / "meshprobe"
-                    / "harmonic_analyzer--ch11-p002-img05.png",
-                )
-                if path.is_file()
             ),
         }
     )

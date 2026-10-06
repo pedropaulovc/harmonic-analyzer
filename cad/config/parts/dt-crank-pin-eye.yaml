@@ -1,6 +1,5 @@
 dt-crank-pin-eye:
   number: MHA-DT-028
-  category: dt
   material: Brass
   finish: "bright"
   tolerance_class: visual_noncritical

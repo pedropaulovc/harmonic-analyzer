@@ -1,6 +1,5 @@
 fr-nameplate:
   number: MHA-FR-004
-  category: fr
   material: Brass
   tolerance_class: visual_noncritical
   process: "engraved brass plate"

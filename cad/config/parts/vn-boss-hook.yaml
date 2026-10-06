@@ -1,7 +1,6 @@
 vn-boss-hook:
   title: Counter Spring Anchor
   number: MHA-VN-001
-  category: vn
   stock_name: 'Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)'
   supplier: McMaster-Carr
   supplier_skus: [9490T1]

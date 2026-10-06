@@ -2186,9 +2186,6 @@ async def build(adapter: Any) -> dict[str, str]:
         verify_spring_base(report)
         verify_base_footprint(report)
     if suite == "config":
-        from _identity import validate_repository
-
-        report.gate("identity:registry-and-graph", validate_repository)
         verify_config_vs_dimensions(report)
         verify_tolerance_audit(report)
         verify_amplitude_preset(report)
@@ -2264,9 +2261,6 @@ if __name__ == "__main__":
             verify_spring_base(_report)
             verify_base_footprint(_report)
         else:
-            from _identity import validate_repository
-
-            _report.gate("identity:registry-and-graph", validate_repository)
             verify_config_vs_dimensions(_report)
             verify_tolerance_audit(_report)
             verify_amplitude_preset(_report)

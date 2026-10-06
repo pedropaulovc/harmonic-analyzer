@@ -1,6 +1,5 @@
 mg-magnifying-lever:
   number: MHA-MG-003
-  category: mg
   material: Brass
   material_specification: Brass
   finish: machined

@@ -1,6 +1,5 @@
 dt-crank-pin-ring:
   number: MHA-DT-027
-  category: dt
   material: Brass
   finish: "bright"
   tolerance_class: visual_noncritical

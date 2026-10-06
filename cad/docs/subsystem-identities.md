@@ -41,14 +41,9 @@ Drawing registry lookups use the underscore task name, for example
 
 Follow [BUILDING.md](BUILDING.md) and [the supervised farm-launch contract](../../DEVELOPING.md#supervised-farm-launches) for executor and launch requirements. Geometric API names, features, sketches, dimensions, mate labels and machine-configuration concepts are unchanged by this naming policy.
 
-The offline configuration gate (`verify.py --suite config`, selected through
-`check:config`) validates category and Number agreement, assembly `000` and
-part sequences starting at `001`, unique Numbers across both kinds, and closure
-between registries, producers, drawings and dependency references. Assembly
-saves and refreshes stamp the Number from the assembly's own YAML contract.
-Each part's frozen registry row, selected by canonical `part_name`, owns its
-Number and category. The Number must be category-qualified with a nonzero part
-sequence; a consumer depends only on its own row.
+Assembly saves and refreshes stamp the Number from the assembly's own YAML
+contract. Each part's frozen registry row, selected by canonical `part_name`,
+owns its Number; a consumer depends only on its own row.
 Configuration variants retain their qualified drawing Numbers; family grouping
 does not replace them.
 Assembly `000` Numbers are assembly references, not part Numbers.

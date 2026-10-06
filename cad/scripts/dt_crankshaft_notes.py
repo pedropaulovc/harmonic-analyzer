@@ -55,4 +55,4 @@ DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
 # right from the dimension line beside the end view and must end before the
 # dome tip's extension lines (machinist review of 19e33c6c2: the two-row
 # form ran ~44 mm wide, across them).
-DRIVE_PIN_LOCATION_CALLOUT = "PINS SLIP\nINTO\nSPROCKET\nMHA-081"
+DRIVE_PIN_LOCATION_CALLOUT = "PINS SLIP\nINTO\nSPROCKET\nMHA-PD-009"
