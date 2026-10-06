@@ -81,7 +81,7 @@ from _drawing_layout_audit import annotation_display  # noqa: E402
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout  # noqa: E402
 from _drawing_title_fields import TitleFieldContractError, TitleSource, assert_title_fields  # noqa: E402
 from _layout_audit import TITLE_FIELD_CLEARANCE_M, find_title_field_misfits, title_field_fits  # noqa: E402
-from _pdf_ink import Span, page_ink, read_pdf_ink  # noqa: E402
+from _pdf_ink import ROW_BASELINE_FRACTION, Span, page_ink, read_pdf_ink  # noqa: E402
 from solidworks_mcp.adapters.solidworks.drawing import place_view, save_drawing  # noqa: E402
 
 OUT = CAD_ROOT / "out" / "probe" / "title-field-fit"
@@ -138,7 +138,10 @@ def _read(read: Callable[[], Any]) -> Any:
     except Exception as exc:  # noqa: BLE001 - a refused read is evidence too
         return f"<error: {exc}>"
     if isinstance(value, (tuple, list)):
-        return [float(item) if isinstance(item, (int, float)) else str(item) for item in value]
+        return [
+            item if isinstance(item, dict) else float(item) if isinstance(item, (int, float)) else str(item)
+            for item in value
+        ]
     if value is None or isinstance(value, (bool, int, float, str, dict)):
         return value
     return str(value)
@@ -443,6 +446,43 @@ def _display_state(annotation: Any) -> dict[str, Any]:
     return {"count": count, "items": items}
 
 
+def _display_rows(display: Any, char_height: Any) -> dict[str, Any]:
+    """Physical rows of this horizontal Title, from actual display baselines.
+    R7's linked auto-box note has one logical INote text/paragraph item but
+    six displayed rows. Display runs alone are not rows: merge runs sharing
+    a baseline using the PDF glyph grouping's existing height fraction."""
+    if not isinstance(display, dict) or not isinstance(char_height, (int, float)) or char_height <= 0:
+        return {"count": None, "error": "display data or native character height is unreadable"}
+    count, items = display.get("count"), display.get("items")
+    if not isinstance(count, int) or not isinstance(items, list) or len(items) != count:
+        return {"count": None, "error": "native display item count/array is incomplete"}
+    baselines = []
+    for item in items:
+        text, position = item.get("text"), item.get("position_offset")
+        if (
+            not isinstance(text, str) or text.startswith("<error:")
+            or not isinstance(position, list) or len(position) != 3
+            or not all(isinstance(value, (int, float)) for value in position)
+        ):
+            return {"count": None, "error": "a native display text/baseline read was refused"}
+        if text.strip():
+            baselines.append((position[1], item["index"]))
+    tolerance = ROW_BASELINE_FRACTION * char_height
+    groups: list[dict[str, Any]] = []
+    last = float("-inf")
+    for baseline, index in sorted(baselines):
+        if baseline - last > tolerance:
+            groups.append({"baseline_y": baseline, "display_indices": []})
+        groups[-1]["display_indices"].append(index)
+        last = baseline
+    return {
+        "count": len(groups),
+        "groups": groups,
+        "tolerance_m": tolerance,
+        "metric": "grouped nonempty IDisplayData text-position Y baselines; not logical text/paragraph count",
+    }
+
+
 def _template_title(sheet_view: Any) -> tuple[Any, Any]:
     found = []
     for raw in sheet_view.GetAnnotations() or ():
@@ -483,6 +523,7 @@ def _wrap_state(annotation: Any, note: Any) -> dict[str, Any]:
         for index in range(1, count + 1)
     ] if isinstance(count, int) else []
     state["display_data"] = _read(lambda: _display_state(annotation))
+    state["native_rows"] = _display_rows(state["display_data"], state["height"])
     state["paragraphs"] = _read(lambda: _paragraph_state(annotation))
     point, upper, extent = state["text_point"], state["upper_right"], state["extent"]
     if (
@@ -493,9 +534,13 @@ def _wrap_state(annotation: Any, note: Any) -> dict[str, Any]:
     ):
         state["box_width"] = upper[0] - point[0]
         state["ink_width"] = extent[3] - extent[0]
-        # swTextJustification_e.swTextJustificationLeft = 1. A spare right
-        # edge in this actual left-aligned note distinguishes its fixed box.
-        state["fixed_box"] = state["justification"] == 1 and upper[0] - extent[3] > 0.0001
+        # GetUpperRight on R7's moved owner-1 note retained its insertion
+        # coordinates. Do not classify a box from those inconsistent corners.
+        state["box_geometry_consistent"] = abs(upper[1] - extent[4]) <= TITLE_FIELD_CLEARANCE_M
+        state["fixed_box"] = (
+            state["justification"] == 1 and upper[0] - extent[3] > 0.0001
+            if state["box_geometry_consistent"] else None
+        )
     else:
         state["fixed_box"] = None
     return state
@@ -566,6 +611,7 @@ def _wrap_template_title(
         and before.get("box_width") == after.get("box_width")
         and before["text_count"] == before["display_count"] == 1
         and after["text_count"] == after["display_count"] == 1
+        and before["native_rows"].get("count") == after["native_rows"].get("count") == 1
         and before["extent"] == after["extent"]
     ):
         raise RuntimeError("LineLength-only control did not preserve an observed one-row fixed template box")
@@ -1009,6 +1055,7 @@ def _force_wraps(
         raise RuntimeError("native positive baseline reads changed source/drawing state")
     if (
         template_original["text_count"] != 1 or template_original["display_count"] != 1
+        or template_original["native_rows"].get("count") != 1
         or template_original.get("fixed_box") is not True
     ):
         raise RuntimeError("native positive baseline did not observe a one-row fixed template Title")
@@ -1052,8 +1099,8 @@ def _force_wraps(
     if actual_style != expected_style or decoy["after"]["text_format"].get("LineLength") != WRAP_M:
         raise RuntimeError("matched positive control did not preserve the original font/style and imposed width")
     if not (
-        isinstance(decoy["after"]["text_count"], int) and decoy["after"]["text_count"] >= 2
-        and isinstance(decoy["after"]["display_count"], int) and decoy["after"]["display_count"] >= 2
+        isinstance(decoy["after"]["native_rows"].get("count"), int)
+        and decoy["after"]["native_rows"]["count"] >= 2
     ):
         raise RuntimeError("matched drawing-owned positive control did not really wrap natively")
     if title_fields._model_state(source.model) != source_before:
@@ -1140,7 +1187,7 @@ def _physical_wrap_failures(capture: Mapping[str, Any], baseline: Mapping[str, A
         failures.append(f"{capture['key']}: physical-wrap Title is not its exact source: {reading!r}")
     if reading is None or not (
         "multi-line" in reading["problem_kinds"] and "outside-cell" in reading["problem_kinds"]
-        and reading["text_count"] >= 2 and reading["display_count"] >= 2
+        and reading["display_count"] >= 2
     ):
         failures.append(f"{capture['key']}: no real native/display multiline outside-cell refusal: {reading!r}")
     rows = next((row["rows"] for row in sheet["physical_rows"] if row["source"] == "Title"), None)
@@ -1155,6 +1202,15 @@ def _physical_wrap_failures(capture: Mapping[str, Any], baseline: Mapping[str, A
         failures.append(f"{capture['key']}: not exactly one physical template Title: {notes!r}")
     else:
         note = notes[0]
+        diagnostics = note.get("wrap_diagnostics")
+        native_rows = diagnostics.get("native_rows") if isinstance(diagnostics, dict) else None
+        if (
+            not isinstance(native_rows, dict) or not isinstance(native_rows.get("count"), int)
+            or native_rows["count"] < 2
+        ):
+            failures.append(
+                f"{capture['key']}: real template negative lacks multiple measured native baselines: {native_rows!r}"
+            )
         for field in (
             "link", "height", "height_points", "all_upper_case", "justification",
             "position", "use_doc_format", "text_format",
@@ -1200,6 +1256,10 @@ def _wrapped_failures(wrapped: Mapping[str, Any]) -> list[str]:
         kinds == ["wrap-width"] and reading["text_count"] == 1 and reading["display_count"] == 1,
         f"wrapped-landscape Title: expected only wrap-width, with one actual native/display row: {reading!r}",
     )
+    need(
+        mutation.get("after", {}).get("native_rows", {}).get("count") == 1,
+        f"wrapped-landscape Title: inert control has more than one measured native baseline: {mutation!r}",
+    )
     number = readings.get((name, "Number"))
     need(number is not None and number["problem_kinds"] == [], f"wrapped-landscape Number: {number!r}")
     fit = next((fit for fit in sheet["printed_fits"] if fit["source"] == "Title"), None)
@@ -1230,8 +1290,9 @@ def _wrapped_failures(wrapped: Mapping[str, Any]) -> list[str]:
             f"wrapped-landscape: drawing-owned control font/style {native_style!r} != {baseline_style!r}",
         )
         need(
-            isinstance(decoy.get("text_count"), int) and decoy["text_count"] >= 2
-            and isinstance(decoy.get("display_count"), int) and decoy["display_count"] >= 2,
+            isinstance(decoy.get("wrap_diagnostics"), dict)
+            and isinstance(decoy["wrap_diagnostics"].get("native_rows", {}).get("count"), int)
+            and decoy["wrap_diagnostics"]["native_rows"]["count"] >= 2,
             f"wrapped-landscape: drawing-owned positive control is not natively multiline: {decoy!r}",
         )
         printed = sheet.get("drawing_title_control_pdf") or {}
