@@ -81,6 +81,9 @@ do not abbreviate Numbers or relax the field bounds.
 The base's complete tube-fit instruction uses four short rows and an associative
 leader to the nearest socket. Reallocating a note or dimension shelf must
 preserve neighboring text, witness, leader and sheet-frame clearances.
+Pick the visible socket rim by sheet point before inserting its attached note,
+then verify the source edge and settled native leader. Attaching only an edge
+object after insertion can send the leader through the bore to its far rim.
 Per-configuration Gear Data and linked Manufacturing or Installation Notes
 retain their complete mate identifiers when reflowed. Gear Data and
 Manufacturing Notes are model-owned: rebuild the owning model when they change.

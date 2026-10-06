@@ -1548,6 +1548,40 @@ def test_four_row_socket_fit_note_clears_native_right_field_and_f4() -> None:
     assert any("F4 text" in clash for clash in historical_clashes)
 
 
+def test_socket_fit_leader_rejects_native_r12_far_arc() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    # Actual R12: LEFT left the TOP row, not the speculative bottom row,
+    # and the attached circle re-solved to its far/left arc across section A.
+    native_segment = (0.3465, 0.2262, 0.3266, 0.2212)
+    assert not sheet.socket_fit_leader_clears_cut(native_segment)
+
+
+def test_socket_fit_leader_accepts_the_visible_near_rim() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    x, y = sheet._plan_xy(*sheet.SOCKET_FIT_STATION, center=sheet.HOLE_TOP_CENTER)
+    radius = sheet.COLUMN_SOCKET_DIAMETER * sheet.VIEW_SCALE / 2000.0
+    near_rim_segment = (
+        sheet.SOCKET_FIT_NOTE_XY[0] - 0.0005, 0.2262,
+        x + radius, y,
+    )
+    assert sheet.socket_fit_leader_clears_cut(near_rim_segment)
+
+
+def test_socket_fit_leader_requires_full_two_mm_section_clearance() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    cut_x = sheet._plan_xy(sheet.COLUMN_X, 0.0, center=sheet.HOLE_TOP_CENTER)[0]
+    start_x = sheet.SOCKET_FIT_NOTE_XY[0] - 0.0005
+    assert sheet.socket_fit_leader_clears_cut(
+        (start_x, 0.2262, cut_x + 0.002, 0.223)
+    )
+    assert not sheet.socket_fit_leader_clears_cut(
+        (start_x, 0.2262, cut_x + 0.00199, 0.223)
+    )
+
+
 # R9 PDF ink, not the old source estimate: SECTION A-A reaches y82.35 mm.
 # The 3.556 mm printed font height is the text-to-text minimum; lines/arrows
 # need 2 mm. Keep the measured calibration separate from current positions.

@@ -27,6 +27,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_attached_note,
     add_native_hole_callout,
     add_surface_finish,
     create_blank_drawing_sheets,
@@ -41,6 +42,7 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hole_callout_precision,
@@ -51,7 +53,13 @@ from _drawing_common import (
     visible_component_entities,
 )
 
-from _drawing_common import _iter_tables, _iter_view_annotations, sheet_drawable_region
+from _drawing_common import (
+    _assert_attached_to,
+    _assert_leader_lands,
+    _iter_tables,
+    _iter_view_annotations,
+    sheet_drawable_region,
+)
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
@@ -100,7 +108,6 @@ from fr_harmonic_base_spec import (
 )
 from fr_frame_attachment_spec import BASE_SCREW_SEAT_Z, BASE_SCREW_Y
 from pinion_rig_fitup import RIG_SET_STEP, TRANSFER_AFTER_RIG_SET
-from solidworks_mcp.adapters.com_variant import dispatch_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     _note_text,
     add_note,
@@ -391,6 +398,19 @@ def _hole_rim(x_mm: float, z_mm: float, diameter_mm: float) -> tuple[float, floa
     return _plan_xy(x_mm + diameter_mm / 2.0, z_mm, center=HOLE_TOP_CENTER)
 
 
+def socket_fit_leader_clears_cut(
+    segment: tuple[float, float, float, float],
+) -> bool:
+    """The A4 note's straight leader must clear the bore cut on its near side.
+
+    R12's edge-object attachment kept one edge but landed on the far/left arc:
+    (346.5, 226.2) -> (326.6, 221.2) mm crossed section A at x 329.2 mm.
+    Both ends must remain on the right, at the required 2 mm line clearance.
+    """
+    cut_x = _plan_xy(COLUMN_X, 0.0, center=HOLE_TOP_CENTER)[0]
+    return min(segment[0], segment[2]) >= cut_x + 0.002
+
+
 @_telemetry.traced("drawing.base_cross_tap_edge")
 def _cross_tap_edge(view: Any, *, x_mm: float = COLUMN_X) -> Any:
     """Pick the tap entry itself, not the nearby larger spotface circle."""
@@ -554,33 +574,6 @@ def _add_base_height(
     if abs(actual_mm - expected_mm) > 1e-5:
         raise RuntimeError(f"{label} measured {actual_mm}, expected {expected_mm} mm")
     return display
-
-
-def _attached_note(
-    adapter: Any,
-    view: Any,
-    edge: Any,
-    text: str,
-    position: tuple[float, float],
-    *,
-    leader_side: int,
-) -> None:
-    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(
-        view_name(adapter, view)
-    ):
-        raise RuntimeError("failed to activate base feature-note view")
-    note = add_note(adapter, text, *position)
-    if note is None:
-        raise RuntimeError(f"failed to create base feature note {text!r}")
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    if not annotation.SetAttachedEntities(dispatch_array([edge])):
-        raise RuntimeError(f"failed to attach base feature note {text!r}")
-    if annotation.SetLeader3(1, leader_side, True, False, False, False) != 0:
-        raise RuntimeError(f"failed to give base feature note a leader: {text!r}")
-    if not annotation.SetPosition2(*position, 0.0):
-        raise RuntimeError(f"failed to position base feature note {text!r}")
-    if int(annotation.GetAttachedEntityCount3()) != 1:
-        raise RuntimeError(f"base feature note lost its source edge: {text!r}")
 
 
 def _serial_edge(view: Any) -> Any:
@@ -1509,13 +1502,15 @@ async def build(adapter: Any) -> dict[str, str]:
     add_note(adapter, "TOP VIEW SCALE 1:4", 0.100, 0.255)
     add_note(adapter, "FRONT VIEW SCALE 1:4", 0.105, 0.075)
     add_note(adapter, "ISOMETRIC VIEW SCALE 1:6", 0.3183, 0.145)
-    _attached_note(
+    serial_edge = _serial_edge(top)
+    add_attached_note(
         adapter,
         top,
-        _serial_edge(top),
-        f'STAMPED ID "{SERIAL_TEXT}"\n{SERIAL_HEIGHT_MM:.1f} HIGH\nAPPROX AS SHOWN',
-        SERIAL_NOTE_XY,
-        leader_side=0,  # swLeaderSide_e.swLS_SMART
+        text=f'STAMPED ID "{SERIAL_TEXT}"\n{SERIAL_HEIGHT_MM:.1f} HIGH\nAPPROX AS SHOWN',
+        note_xy=SERIAL_NOTE_XY,
+        label="base stamped identifier",
+        entity=serial_edge,
+        attached_to=serial_edge,
     )
     deck_control = surface_finish_by_key(PART_SURFACE_FINISHES, "deck")
     deck_face = _resolve_faces(
@@ -1701,13 +1696,22 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     drawing_model.EditRebuild3()
     _spread_hole_tags(hole_top, hole_table)
-    _attached_note(
+    socket_fit_edge = hole_entities[
+        TABLE_HOLES.index((*SOCKET_FIT_STATION, COLUMN_SOCKET_DIAMETER))
+    ]
+    socket_fit_rim = _hole_rim(*SOCKET_FIT_STATION, COLUMN_SOCKET_DIAMETER)
+    # Pick the visible +X rim BEFORE InsertNote, not the bare edge object:
+    # R12's SetAttachedEntities/LEFT path re-solved to the far arc and ran
+    # through the bore and section backbone. The shared point-pick helper
+    # also proves the resulting single attached EDGE is this table edge.
+    socket_fit_note = add_attached_note(
         adapter,
         hole_top,
-        hole_entities[TABLE_HOLES.index((*SOCKET_FIT_STATION, COLUMN_SOCKET_DIAMETER))],
-        SOCKET_FIT_NOTE,
-        SOCKET_FIT_NOTE_XY,
-        leader_side=_LEADER_SIDE_LEFT,
+        text=SOCKET_FIT_NOTE,
+        entity_xy=socket_fit_rim,
+        note_xy=SOCKET_FIT_NOTE_XY,
+        label="base assigned tube matched fit",
+        attached_to=socket_fit_edge,
     )
     # The transferred seats: each group is its own native Hole Wizard
     # feature, so one associative callout per group carries its size and
@@ -1879,6 +1883,35 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate the holes sheet for the leader sides")
     for label, display in hole_sheet_callouts.items():
         _attach_leader_nearest_hole(adapter, display, label)
+    # Observe the settled native note before either recipe or final layout
+    # guard can fail. Task-log telemetry survives even without a PDF bundle.
+    rebuild_drawing(adapter, label="base socket fit native readback")
+    fit_note = _early_bound(socket_fit_note, "INote")
+    fit_annotation = _early_bound(fit_note.GetAnnotation(), "IAnnotation")
+    fit_points = tuple(float(value) for value in (fit_annotation.GetLeaderPointsAtIndex(0) or ()))
+    fit_extent = tuple(float(value) for value in (fit_note.GetExtent() or ()))
+    fit_count = int(fit_annotation.GetAttachedEntityCount3())
+    _telemetry.info(
+        "BASE_SOCKET_FIT_NATIVE "
+        f"requested_tip_mm={tuple(value * 1000.0 for value in socket_fit_rim)!r}; "
+        f"attached_entity_count={fit_count}; "
+        f"leader_points_mm={tuple(value * 1000.0 for value in fit_points)!r}; "
+        f"note_extent_mm={tuple(value * 1000.0 for value in fit_extent)!r}"
+    )
+    if len(fit_points) != 6 or len(fit_extent) != 6:
+        raise RuntimeError("base socket fit has no complete native straight leader / note extent")
+    _assert_attached_to(
+        adapter, fit_annotation, socket_fit_edge, entity_type="EDGE",
+        what="socket matched-fit note", label="base assigned tube matched fit",
+    )
+    if not socket_fit_leader_clears_cut(
+        (fit_points[0], fit_points[1], fit_points[-3], fit_points[-2])
+    ):
+        raise RuntimeError("base socket fit leader does not clear section A by 2 mm on its right")
+    _assert_leader_lands(
+        fit_annotation, socket_fit_rim,
+        what="socket matched-fit note", label="base assigned tube matched fit",
+    )
     _check_hole_sheet_callouts(
         adapter,
         ddoc,
