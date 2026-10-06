@@ -67,6 +67,38 @@ The video embeds use the official YouTube IFrame API. Downloaded source videos,
 reference screenshots and the GLB remain untracked; the site does not host or
 redistribute the footage.
 
+## Canonical identity evidence audit
+
+`content/canonical-native/manifest.json` seals 29 identity-only derivatives.
+The sole mapping authority is `../cad/config/identity-migration-map.json`.
+Original evidence files and `canonical-native/historical-code/` snapshots are
+immutable inputs; the offline audit never executes archived producers, fetches
+network data or recovers files from Git.
+
+```sh
+npm --prefix web run verify:identity-evidence
+# From web/: read-only seals and deterministic byte replay
+uv run --isolated --no-project python scripts/canonical-native-evidence.py validate
+uv run --isolated --no-project python scripts/canonical-native-evidence.py check
+# Explicit authoring only, after an intentional mapping/input change:
+uv run --isolated --no-project python scripts/canonical-native-evidence.py generate
+```
+
+`verify:sync` runs the identity evidence check first. Both read-only commands
+check original, derivative, historical-snapshot and current-consumer SHA-256
+seals, original numeric-token certificates, dependency pins and deterministic
+replay. `generate` rewrites only declared derivatives, current SHA pins and
+the manifest's existing seals. JSON numbers are never parsed as floating-point
+values; all original numeric lexemes remain byte-identical. The six observation
+derivatives additionally remove only JSON whitespace outside quoted strings and
+have exactly one EOF newline. Evidence paths are translated only for declared
+manifest members; authored source tracks remain directly under `content/`.
+
+These certificates establish identity/provenance preservation, **not** fresh
+geometry, source-camera or browser qualification. A real canonical CAD export,
+model re-pin, mechanics/magnifier regeneration and native/browser qualification
+are still required. There is no runtime old-to-new GLB alias.
+
 ## Fidelity and verification
 
 The interactive mechanism uses CAD-derived eccentric cams, connecting rods,

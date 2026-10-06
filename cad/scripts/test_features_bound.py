@@ -18,7 +18,7 @@ from _export_feature_faces import face_name
 def _labels(stem: str, *, pivot_bore_faces: int = 2) -> list[str]:
     """One face per feature; the split rocker pivot bore labels both halves."""
     labels = [face_name(feature, 1) for feature in export_features.feature_selectors(stem)]
-    if stem == "rocker_arm":
+    if stem == "ch_rocker_arm":
         labels.extend([face_name("pivot_bore", 1)] * (pivot_bore_faces - 1))
     return labels
 

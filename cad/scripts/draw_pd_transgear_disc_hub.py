@@ -179,7 +179,7 @@ END_KEEP = {
 }
 SIDE_KEEP = {
     "HubDia": (HUB_FRONT_X - 0.014, AXIS_Y),
-    "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
+    "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.0035),
     "FlangeDia": (SPIGOT_END_X + 0.077, AXIS_Y),
     "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.008),
     "SpigotLength": (SPIGOT_END_X + 0.012, AXIS_Y + _FLANGE_R + 0.008),

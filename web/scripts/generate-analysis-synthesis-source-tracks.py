@@ -52,25 +52,25 @@ common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
 ANALYSIS = "web/content/canonical-native/analysis-recovery-calibration-evidence/four-seed-source-fit-census"
 CALIBRATION = "web/content/canonical-native/analysis-synthesis.frozen-generation-evidence.json"
-CALIBRATION_SHA256 = "ea52b562bfacc3aaccaaf3e9e5b249ed6e5e943dce3116867b25d5d567079e84"
+CALIBRATION_SHA256 = "bb90174f9cde0af041411ad0a10a4f6180f872f1f8bf6f100713cf10f0dcdc07"
 FRAMING_GPU = "web/content/canonical-native/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
-FRAMING_GPU_SHA256 = "b82d48c6d175056ece6dd214cc543877754e8aa0045f4b9b36acfa496762086e"
+FRAMING_GPU_SHA256 = "3494957dca0a4f25cab012212fc2187add6739a248899b27b5c2880e50c18480"
 AUTOMATIC_MOTION = "web/content/canonical-native/6dW6VYXp9HM.automatic-motion.json"
-AUTOMATIC_MOTION_SHA256 = "42dab6d69342dc33d6d35f3db69edb0a1dc017cf82d7b4293203bced0fa5a5b3"
+AUTOMATIC_MOTION_SHA256 = "18dfae8b7d3b4f91043b3a4e85bd4fd36433688fcf342e2ab5f999ecff0b84dc"
 MOTION_CONTROLS = "web/content/canonical-native/6dW6VYXp9HM.motion-controls.json"
-MOTION_CONTROLS_SHA256 = "28c5ecf8a2fb0037c218466ad5d8c69f3a8ef9a247fe2fcff9d4a6ef10c20f22"
+MOTION_CONTROLS_SHA256 = "ed4e1a527f5e6e20e8d73e5a858d9032effb45d8ecb7b64602c633579976802a"
 VISIBLE_CRANK_MOTION = "web/content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json"
-VISIBLE_CRANK_MOTION_SHA256 = "97a1dfb9059ede15c43e80f48450628f1186f0079012fed608383557bde889ca"
+VISIBLE_CRANK_MOTION_SHA256 = "477396926f25f5d422f9664cdeb404e4c27ac06542c5f7d1f0e1af01c852dcac"
 VISIBLE_CRANK_GAUGE = "web/content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json"
-VISIBLE_CRANK_GAUGE_SHA256 = "6557b6b9421b20ae2c8e050572f1d9df49f45345d15b238b19e3bb7ae88c68f9"
+VISIBLE_CRANK_GAUGE_SHA256 = "7269b541fd6561818807953dbbb2ef3c80b0fdc65924777836706e44bd3725bc"
 ANALYSIS_SOURCE_SHA256 = "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52"
 ANALYSIS_MODEL_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
 AUTOMATIC_NATIVE_MATH = ("web/src/mechanics.ts", "web/src/mechanics-data.ts",
                          "web/src/kinematics.ts", "web/src/magnifier.ts")
 SYNTHESIS_AUTOMATIC_MOTION = "web/content/canonical-native/8KmVDxkia_w.automatic-motion.json"
-SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "307cb8395c2a83b8b7561381aef83a8ef80f4ec3e8b9e9b0087857dc5b1b8a11"
+SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "408cfbfea17b5eafbe29a74e475a818fc23e77be2ac6594f0a67e3112a05772e"
 SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json"
-SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "3b720ddebc9a2e8ed0e1bf5a2df39e4007a1c5d41c72adf9f91de23623a888dd"
+SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "5c1d620e6e7cdbfe6fdb4f7322d7176690f69df0a645f07777ea884cdcba484b"
 SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
 
 
@@ -1035,7 +1035,7 @@ class Generator:
         path = "web/content/canonical-native/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
         raw = (ROOT / path).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
-        if digest != "1e2bb491699b30d37c0ac3d3b8fce5b4f9720fb368acf2f58245d584160d1b3a":
+        if digest != "1a307a1b1675ebf6d5bc931e2d70a906e8921a04ba14032d40306970f9e6d707":
             raise ValueError("Chosen cam-rod physical probe artifact changed")
         probe = json.loads(raw)
         lineage = probe["lineage"]
@@ -1043,7 +1043,7 @@ class Generator:
         receipt_path = "web/content/canonical-native/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json"
         receipt_raw = (ROOT / receipt_path).read_bytes()
         receipt_hash = hashlib.sha256(receipt_raw).hexdigest()
-        if receipt_hash != receipt_record["sha256"] or receipt_hash != "5ea03969980912f4c220abcc2daa14e6c08b8900b95d90db7174a1b9a0a3b83c":
+        if receipt_hash != receipt_record["sha256"] or receipt_hash != "2015fedf072a0c080ca3ecabc328e1ef38622f667e0b1f4d2a5d50783e428c8e":
             raise ValueError("Chosen cam-rod actual world receipt changed")
         receipt = json.loads(receipt_raw)
         if (probe["status"] != "candidate-enumeration-only"

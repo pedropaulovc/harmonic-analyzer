@@ -163,6 +163,28 @@ def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
     assert left > 0.248 + 0.015
 
 
+def test_every_cited_number_prints_whole_on_one_line() -> None:
+    """Hyphen-breaking wrap printed the shaft as "MHA-" / "CH-005" across two
+    lines of step 1; a fitter cannot read a Number split at its hyphen. Every
+    Number the steps cite prints whole, each occurrence on one line."""
+    cited = {
+        _config.parts(stem)["number"]
+        for stem in (
+            "ch-rocker-arm",
+            "ch-pivot-shaft",
+            "ch-pivot-bracket",
+            "ch-rocker-thrust-washer",
+            "fr-rocker-arm-support",
+        )
+    } | {FITUP_DRAWING_NUMBER}
+    lines = drawing.FITUP_STEPS.splitlines()
+    joined = " ".join(drawing.FITUP_STEPS.split())
+    for number in sorted(cited):
+        # Anchor: the steps cite it, so the per-line count below is not vacuous.
+        assert joined.count(number) > 0, number
+        assert sum(line.count(number) for line in lines) == joined.count(number), number
+
+
 def test_the_shaft_supplied_long_is_cut_to_fit_before_the_end_play_is_accepted() -> None:
     """Codex #936 (PRRT_kwDOPHDy386mSteE): MHA-CH-005 is supplied long with its
     plain end uncut, and its print defers the length to the assembly, but no

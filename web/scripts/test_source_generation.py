@@ -902,8 +902,8 @@ class SpinPresentationTests(unittest.TestCase):
     def assert_seed_refused_before_observations(self, seed):
         with tempfile.TemporaryDirectory() as directory:
             web = Path(directory)
-            (web / 'content' / 'canonical-native').mkdir()
-            (web / 'content' / 'canonical-native' / 'canonical-native' / 'XPQwKRt4Y2k.source-seeds.json').write_text(
+            (web / 'content' / 'canonical-native').mkdir(parents=True)
+            (web / 'content' / 'canonical-native' / 'XPQwKRt4Y2k.source-seeds.json').write_text(
                 json.dumps({'views': {'endcard-analysis': seed}}))
             with patch.object(spin.common, 'WEB', web), patch.object(
                     spin.common, 'load_observations',

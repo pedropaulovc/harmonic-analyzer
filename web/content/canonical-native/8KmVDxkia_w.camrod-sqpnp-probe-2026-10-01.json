@@ -1,4 +1,4 @@
-{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json","originalSha256":"5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321","mappingSchemaVersion":2,"mappingSha256":"34fd295a40af2718260c1c898bf4a329ee0255398004c0aa384ac69391a95d4f","originalNumericLexemeSha256":"b6cf3243d859e17c7f69f1b8dfd0419f73482230eb1d26cdf4f1c24f5983174c","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{"web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json":"222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc","web/content/8KmVDxkia_w.observations.json":"3ac8e4df14487799637091859bdad58cc88a96c28a90c22ba1893772b5ee0f05"}},
+{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json","originalSha256":"5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321","mappingSchemaVersion":2,"mappingSha256":"1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd","originalNumericLexemeSha256":"b6cf3243d859e17c7f69f1b8dfd0419f73482230eb1d26cdf4f1c24f5983174c","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{"web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json":"222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc","web/content/8KmVDxkia_w.observations.json":"3ac8e4df14487799637091859bdad58cc88a96c28a90c22ba1893772b5ee0f05"}},
   "kind": "chosen-sparse-original-three-FIT-fixed-intrinsics-SQPNP-probe",
   "status": "candidate-enumeration-only",
   "sourceAcceptance": "unavailable",
@@ -149,10 +149,10 @@
     "nativeDenominator": 435,
     "observations": {
       "path": "web/content/canonical-native/8KmVDxkia_w.observations.json",
-      "sha256": "a6286b7a4b75455adc8b8ac9aa9f6b3dbdd2e66239fa6c4e19cfd2a3973f0e02"
+      "sha256": "18e076f5da9a4468b3eb39b8a74e9141f3dd272ceaca655d35b77a33b8d9a3ee"
     },
     "currentAuthoredTrack": {
-      "path": "web/content/canonical-native/8KmVDxkia_w.source-track.json",
+      "path": "web/content/8KmVDxkia_w.source-track.json",
       "sha256": "534e838d04eab746987cf2690e9063852ee6d63ea9613678c0d6beb863323599"
     },
     "sceneCurrentSourceSha256": "7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b",
@@ -163,7 +163,7 @@
     },
     "actualWorldReceipt": {
       "path": "web/.vite/verification-output/synthesis-camrod-native-world-receipt-2026-10-01.json",
-      "sha256": "5ea03969980912f4c220abcc2daa14e6c08b8900b95d90db7174a1b9a0a3b83c"
+      "sha256": "2015fedf072a0c080ca3ecabc328e1ef38622f667e0b1f4d2a5d50783e428c8e"
     },
     "timeSeconds": 100,
     "decodedTimeSeconds": 100.01658333333333,

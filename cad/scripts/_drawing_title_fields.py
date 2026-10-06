@@ -6,18 +6,22 @@ notes. The template authored those notes once; the strings they print change
 with every part, so only the finished sheet says whether a value printed
 whole, on one line, inside its ruled cell. :func:`read_title_fields` reads
 each linked note natively -- its unresolved link (``PropertyLinkedText``),
-its resolved text (``GetText``), its sheet-space box (``GetExtent``), how
-many text items it and its display data hold, its text format -- beside the
+its resolved text (``GetText``), whether it prints that text in capitals
+(``AllUpperCase``), its sheet-space box (``GetExtent``), how many text
+items it and its display data hold, its text format -- beside the
 linked model's stored value for the property the link names, and beside the
 drawing's own frozen identity (:func:`registry_identity`).
 :func:`assert_title_fields` holds each reading to the contract:
 
 * every sheet documents the drawing's own source (``DrawingSpec.source``);
-* that source's frozen identity is authoritative: the linked model's
-  property and the printed text both equal it (a part's registry Number and
-  slug, as ``_common.part_properties`` stamps them, only dt-cone-gear's
-  Number extended with its view configuration's ``-T###``; an assembly's
-  contract Number and stem);
+* that source's frozen identity is authoritative and whole: the Title a
+  registry stem of a known category, the Number that category's
+  ``MHA-XX-###`` (``_identity_shapes``) -- only dt-cone-gear's extended with
+  its view configuration's ``-T###`` -- as ``_common.part_properties``
+  stamps a part's, or an assembly's contract Number and stem;
+* the linked model's property and the printed text both equal it, case
+  included: a note set ``AllUpperCase`` may not print a lowercase Title in
+  capitals;
 * the note's extent lies inside its cell's rules
   (``DrawingTemplateSpec.title_cells_m``) with ``TITLE_FIELD_CLEARANCE_M`` of
   air;
@@ -27,10 +31,13 @@ drawing's own frozen identity (:func:`registry_identity`).
 
 Reading the model changes nothing: the stored-value reads loop over no
 configuration, and the model's active configuration and dirty flag are
-read back unchanged. Nothing shortens, hides or shrinks an identity to make
-it fit: a breach fails the drawing (:class:`TitleFieldContractError`, its
-breaches by kind), and the fix is the template's cell. The exported PDF
-proves the same fit a second way, on the printed glyphs
+read back unchanged. This code never changes a note's font, height, width
+or text to make a value fit: a breach fails the drawing
+(:class:`TitleFieldContractError`, its breaches by kind), and the fix is the
+template's cell. It pins no typeface, height or width factor of its own; a
+template edit that shrinks a note is caught where its print then leaves the
+cell or its one line. The exported PDF proves the same fit a second way, on
+the printed glyphs in their exact case
 (``_layout_audit.find_title_field_misfits``), so a native read that stopped
 tracking the print cannot pass alone.
 """
@@ -47,6 +54,7 @@ import _telemetry
 from _assembly_contract import assembly_contract
 from _common import _early_bound, _read_member, part_properties
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, DrawingSpec
+from _identity_shapes import CATEGORIES, NUMBER, STEM
 from _layout_audit import TITLE_FIELD_CLEARANCE_M
 
 # The properties each identity cell's note may link, by cell. The PART cell
@@ -64,15 +72,33 @@ _OWNER_DRAWING_TEMPLATE = 2
 _ANNOT_NOTE = 6
 # swSummInfoField_e for the built-in property a "SW-" link names.
 _SUMMARY_FIELDS = {"SW-Title": 0}
-# The identity shapes (the registry's, ``_identity``): a configuration may
-# extend its part's Number with a tooth count (``dt_cone_gear_spec``).
-_NUMBER = re.compile(r"MHA-([A-Z]{2})-[0-9]{3}(?:-T[0-9]{3})?")
-_TITLE = re.compile(r"([a-z]{2})-[a-z0-9]+(?:-[a-z0-9]+)*")
 # The one part whose sheets print a per-configuration Number: its build
 # stamps ``dt_cone_gear_spec.configuration_number`` (registry Number +
 # "-T###") on each configuration named "T###".
 _CONFIGURATION_NUMBERED = frozenset({"dt-cone-gear"})
 _CONFIGURATION = re.compile(r"T[0-9]{3}")
+
+
+def _not_identity(source: str, number: str, title: str) -> str | None:
+    """Why ``source``'s half of a sheet's ``(number, title)`` is not one
+    frozen identity, or None. The Title is a registry stem of a known
+    category; the Number is that category's ``MHA-XX-###``, which only
+    dt-cone-gear's sheets extend with their configuration's ``-T###``."""
+    if source == "Title":
+        if STEM.fullmatch(title) is None or title[:2] not in CATEGORIES:
+            return f"the registry Title {title!r} is not a registry stem"
+        return None
+    base = number
+    if title in _CONFIGURATION_NUMBERED:
+        base, dash, configuration = number.rpartition("-")
+        if not dash or _CONFIGURATION.fullmatch(configuration) is None:
+            return f"the registry Number {number!r} is not {title}'s Number with its -T### configuration"
+    match = NUMBER.fullmatch(base)
+    if match is None:
+        return f"the registry Number {number!r} is not a full MHA-XX-### identity"
+    if match[1].lower() != title[:2]:
+        return f"the registry Number {number!r} is not of the Title {title!r}'s category"
+    return None
 
 
 @dataclass(frozen=True)
@@ -118,18 +144,21 @@ class TitleFieldReading:
     """One identity note on one sheet, as SolidWorks reports it.
 
     Boxes are ``(left, bottom, right, top)`` in sheet metres; ``extent`` is
-    ``INote::GetExtent``, ``cell`` the template cell's rules. ``expected`` is
-    the registry identity, ``model_value`` the linked model's stored
-    property. ``text_count`` is ``INote::GetTextCount``, ``display_count``
-    ``IDisplayData::GetTextCount`` (-1 where SolidWorks answered no display
-    data)."""
+    ``INote::GetExtent``, ``cell`` the template cell's rules. ``identity``
+    is the sheet's registry ``(Number, Title)`` and ``expected`` this
+    cell's half of it, ``model_value`` the linked model's stored property.
+    ``all_upper_case`` is ``INote::AllUpperCase``: the note prints its text
+    in capitals. ``text_count`` is ``INote::GetTextCount``,
+    ``display_count`` ``IDisplayData::GetTextCount`` (-1 where SolidWorks
+    answered no display data)."""
 
     sheet: str
     source: str
     link: str
-    expected: str
+    identity: tuple[str, str]
     model_value: str
     printed: str
+    all_upper_case: bool
     extent: tuple[float, float, float, float]
     cell: tuple[float, float, float, float]
     char_height: float
@@ -137,6 +166,16 @@ class TitleFieldReading:
     line_length: float
     text_count: int
     display_count: int
+
+    @property
+    def expected(self) -> str:
+        number, title = self.identity
+        return number if self.source == "Number" else title
+
+    @property
+    def shown(self) -> str:
+        """The text as the note prints it, capitals included."""
+        return self.printed.upper() if self.all_upper_case else self.printed
 
     @property
     def clearance(self) -> float:
@@ -147,16 +186,17 @@ class TitleFieldReading:
 
     def problems(self, clearance: float = TITLE_FIELD_CLEARANCE_M) -> list[tuple[str, str]]:
         """``(kind, detail)`` for every breach (see :class:`TitleFieldBreach`)."""
-        shape = _NUMBER if self.source == "Number" else _TITLE
         found = []
-        if shape.fullmatch(self.expected) is None:
-            found.append(("not-identity", f"the registry {self.source} {self.expected!r} is not a full identity"))
+        not_identity = _not_identity(self.source, *self.identity)
+        if not_identity is not None:
+            found.append(("not-identity", not_identity))
         if self.model_value != self.expected:
             found.append(
                 ("model-mismatch", f"the linked model holds {self.model_value!r} where the registry has {self.expected!r}")
             )
-        if self.printed != self.expected:
-            found.append(("readback", f"prints {self.printed!r} where the registry has {self.expected!r}"))
+        if self.shown != self.expected:
+            capitals = " (AllUpperCase)" if self.all_upper_case else ""
+            found.append(("readback", f"prints {self.shown!r}{capitals} where the registry has {self.expected!r}"))
         if self.clearance < clearance:
             found.append(
                 (
@@ -353,9 +393,10 @@ def _measure_title_fields(
                     sheet=sheet,
                     source=source,
                     link=link,
-                    expected=source_of.expected(source),
+                    identity=(source_of.number, source_of.title),
                     model_value=linked_property(source_of.model, source_of.configuration, name),
                     printed=str(note.GetText() or ""),
+                    all_upper_case=bool(note.AllUpperCase),
                     extent=(extent[0], extent[1], extent[3], extent[4]),
                     cell=cells[source],
                     char_height=float(note.GetHeight() or 0.0),
@@ -397,6 +438,7 @@ def assert_title_fields(readings: Sequence[TitleFieldReading]) -> None:
             expected=reading.expected,
             model_value=reading.model_value,
             printed=reading.printed,
+            all_upper_case=reading.all_upper_case,
             chars=len(reading.printed),
             extent_left_mm=x0 * 1000,
             extent_bottom_mm=y0 * 1000,

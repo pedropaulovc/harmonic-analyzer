@@ -15,12 +15,10 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from _identity_shapes import CATEGORIES, NUMBER, STEM
+
 if TYPE_CHECKING:
     from _drawing_registry import DrawingSpec
-
-CATEGORIES = frozenset({"ha", "ch", "dt", "fr", "mg", "pd", "pn", "sm", "vn", "sh"})
-_STEM = re.compile(r"[a-z]{2}-[a-z0-9]+(?:-[a-z0-9]+)*")
-_NUMBER = re.compile(r"MHA-([A-Z]{2})-([0-9]{3})")
 
 
 def validate_registries(
@@ -52,11 +50,11 @@ def validate_registries(
                 errors.append(f"{label}: invalid category {category!r}")
             if (
                 not isinstance(stem, str)
-                or not _STEM.fullmatch(stem)
+                or not STEM.fullmatch(stem)
                 or not stem.startswith(f"{category}-")
             ):
                 errors.append(f"{label}: stem/category mismatch ({category!r})")
-            match = _NUMBER.fullmatch(number) if isinstance(number, str) else None
+            match = NUMBER.fullmatch(number) if isinstance(number, str) else None
             if match is None:
                 errors.append(f"{label}: invalid Number {number!r}; expected MHA-XX-NNN")
                 continue

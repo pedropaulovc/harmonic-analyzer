@@ -1,4 +1,4 @@
-{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/XPQwKRt4Y2k.source-seeds.json","originalSha256":"bffbfa78d70c5a3c3cf6758eaf26bd1ee23e5b227adcf3f8d8c42060fc3c7af7","mappingSchemaVersion":2,"mappingSha256":"34fd295a40af2718260c1c898bf4a329ee0255398004c0aa384ac69391a95d4f","originalNumericLexemeSha256":"ab97deee19351cb2d998e296f08c46720505b933ad6125af106cd9071a50bc20","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{"web/content/XPQwKRt4Y2k.source-phase-map.json":"1726d46537adcb7437399192d5b8ba4f3ee0b1b67bb48a3c42b35759e5838cb1"}},
+{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/XPQwKRt4Y2k.source-seeds.json","originalSha256":"bffbfa78d70c5a3c3cf6758eaf26bd1ee23e5b227adcf3f8d8c42060fc3c7af7","mappingSchemaVersion":2,"mappingSha256":"1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd","originalNumericLexemeSha256":"ab97deee19351cb2d998e296f08c46720505b933ad6125af106cd9071a50bc20","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{"web/content/XPQwKRt4Y2k.source-phase-map.json":"1726d46537adcb7437399192d5b8ba4f3ee0b1b67bb48a3c42b35759e5838cb1"}},
   "schemaVersion": 1,
   "videoId": "XPQwKRt4Y2k",
   "sourcePacket": "web/.vite/verification-output/spin-witness/full-required-view-diagonal-alternative-map.json",
@@ -16784,10 +16784,10 @@
     },
     "independentSourcePhaseMap": {
       "path": "web/content/canonical-native/XPQwKRt4Y2k.source-phase-map.json",
-      "sha256": "8856c6951219263b86092c629d0911ed1cd1d5a020b007b2ec2e9757590a53cc",
+      "sha256": "f8cf7e6ae543a8efa2ca10bfcbda429004bb8ded212f019f24cec5ed1b17269d",
       "originalArtifact": {
         "path": "web/.vite/verification-output/spin-witness/rig-replay/actual-phase-map.json",
-        "sha256": "8856c6951219263b86092c629d0911ed1cd1d5a020b007b2ec2e9757590a53cc"
+        "sha256": "f8cf7e6ae543a8efa2ca10bfcbda429004bb8ded212f019f24cec5ed1b17269d"
       },
       "sourceExposureIdentityCount": 2698
     },

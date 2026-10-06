@@ -280,7 +280,7 @@ def selectors(monkeypatch) -> dict[str, tuple]:
 
     monkeypatch.setitem(
         sys.modules, "export_features",
-        SimpleNamespace(feature_selectors=feature_selectors, SUPPORTED_PARTS=("rocker_arm",)),
+        SimpleNamespace(feature_selectors=feature_selectors, SUPPORTED_PARTS=("ch_rocker_arm",)),
     )
     return {"calls": calls}
 
@@ -301,7 +301,7 @@ def test_name_feature_faces_assigns_native_names_without_claiming_step_behavior(
 ) -> None:
     doc = _PartDoc()
 
-    assert name_feature_faces(doc, "rocker_arm") == {
+    assert name_feature_faces(doc, "ch_rocker_arm") == {
         "pivot_bore": [_BORE_1], "hub_top": [_TOP_1],
     }
     assert [face.name for face in doc.faces] == [_BORE_1, "", _TOP_1]
@@ -312,7 +312,7 @@ def test_name_feature_faces_refuses_to_rename_a_named_face(selectors) -> None:
     doc.faces[2].name = "Face<mate>"
 
     with pytest.raises(FeatureFaceError, match="already named 'Face<mate>'"):
-        name_feature_faces(doc, "rocker_arm")
+        name_feature_faces(doc, "ch_rocker_arm")
 
 
 def test_name_feature_faces_fails_when_set_entity_name_is_refused(selectors) -> None:
@@ -320,7 +320,7 @@ def test_name_feature_faces_fails_when_set_entity_name_is_refused(selectors) -> 
     doc.SetEntityName = lambda _face, _name: False
 
     with pytest.raises(FeatureFaceError, match="returned False"):
-        name_feature_faces(doc, "rocker_arm")
+        name_feature_faces(doc, "ch_rocker_arm")
 
 
 def test_name_feature_faces_fails_on_a_wrong_read_back(selectors) -> None:
@@ -328,7 +328,7 @@ def test_name_feature_faces_fails_on_a_wrong_read_back(selectors) -> None:
     doc.misreport = "Face7"
 
     with pytest.raises(FeatureFaceError, match="read back 'Face7'"):
-        name_feature_faces(doc, "rocker_arm")
+        name_feature_faces(doc, "ch_rocker_arm")
 
 
 # --- export_models integration ------------------------------------------------
@@ -364,8 +364,8 @@ class _ExportDoc(_PartDoc):
         return 1
 
 
-_STEMS = ("frame_rail", "rocker_arm")
-_ROCKER_BUNDLE = ("rocker-arm.STEP", "features.toml")
+_STEMS = ("frame_rail", "ch_rocker_arm")
+_ROCKER_BUNDLE = ("ch-rocker-arm.STEP", "features.toml")
 
 
 def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
@@ -388,7 +388,7 @@ def _exporter(tmp_path: Path, monkeypatch, doc=lambda _native: _ExportDoc()):
         return path
 
     monkeypatch.setitem(sys.modules, "export_features", SimpleNamespace(
-        SUPPORTED_PARTS=("rocker_arm",),
+        SUPPORTED_PARTS=("ch_rocker_arm",),
         feature_selectors=lambda _stem: _SELECTORS,
         write_manifest=write_manifest,
     ))
@@ -462,17 +462,17 @@ def test_feature_bundle_writes_only_step_and_manifest_without_saving_native(
     run, seen = _exporter(tmp_path, monkeypatch)
     before = _tree(tmp_path)
 
-    run("--features", "rocker-arm")
+    run("--features", "ch-rocker-arm")
 
     assert seen["rc"] == 0
-    assert seen["opened"] == ["rocker-arm.SLDPRT"]
+    assert seen["opened"] == ["ch-rocker-arm.SLDPRT"]
     after = _tree(tmp_path)
     # Nothing outside the bundle is written: no global STEP/STL/PNG, colours,
     # ledger or certificate, and the native keeps its bytes.
     assert {key: after[key] for key in before} == before
-    assert set(after) - set(before) == {f"features/rocker_arm/{name}" for name in _ROCKER_BUNDLE}
-    bundle = tmp_path / "features" / "rocker_arm"
-    step = bundle / "rocker-arm.STEP"
+    assert set(after) - set(before) == {f"features/ch_rocker_arm/{name}" for name in _ROCKER_BUNDLE}
+    bundle = tmp_path / "features" / "ch_rocker_arm"
+    step = bundle / "ch-rocker-arm.STEP"
     assert step_face_sets(step.read_text(), ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
     assert (bundle / "features.toml").is_file()
     assert seen["preferences"] == [export_models.EXPORT_PREFERENCES]
@@ -486,21 +486,21 @@ def test_full_and_scoped_exports_keep_their_paths_disjoint_and_native_unsaved(
     run()
 
     assert seen["rc"] == 0
-    assert seen["opened"] == ["frame-rail.SLDPRT", "rocker-arm.SLDPRT"]
-    full = (tmp_path / "step" / "rocker-arm.STEP").read_bytes()
+    assert seen["opened"] == ["frame-rail.SLDPRT", "ch-rocker-arm.SLDPRT"]
+    full = (tmp_path / "step" / "ch-rocker-arm.STEP").read_bytes()
     assert step_face_sets(full.decode(), ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
     assert "HAF_" not in (tmp_path / "step" / "frame-rail.STEP").read_text()
     assert not (tmp_path / "features").exists()  # the full export writes no bundle
-    assert (tmp_path / "sldprt" / "rocker-arm.SLDPRT").read_bytes() == b"native part"
+    assert (tmp_path / "sldprt" / "ch-rocker-arm.SLDPRT").read_bytes() == b"native part"
 
-    run("--features", "rocker_arm")
+    run("--features", "ch_rocker_arm")
 
-    scoped = (tmp_path / "features" / "rocker_arm" / "rocker-arm.STEP").read_text()
+    scoped = (tmp_path / "features" / "ch_rocker_arm" / "ch-rocker-arm.STEP").read_text()
     assert step_face_sets(scoped, ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
     assert seen["preferences"] == [export_models.EXPORT_PREFERENCES] * 2
 
 
-@pytest.mark.parametrize("argv", [(), ("--features", "rocker_arm")], ids=["full", "bundle"])
+@pytest.mark.parametrize("argv", [(), ("--features", "ch_rocker_arm")], ids=["full", "bundle"])
 def test_export_fails_when_the_step_drops_the_face_names(
     tmp_path: Path, monkeypatch, argv: tuple[str, ...],
 ) -> None:
@@ -510,10 +510,10 @@ def test_export_fails_when_the_step_drops_the_face_names(
 
     with pytest.raises(FeatureFaceError, match="pivot_bore: no named STEP face"):
         run(*argv)
-    assert not (tmp_path / "features" / "rocker_arm" / "features.toml").exists()
+    assert not (tmp_path / "features" / "ch_rocker_arm" / "features.toml").exists()
 
 
-@pytest.mark.parametrize("argv", [(), ("--features", "rocker_arm")], ids=["full", "bundle"])
+@pytest.mark.parametrize("argv", [(), ("--features", "ch_rocker_arm")], ids=["full", "bundle"])
 def test_export_fails_when_the_native_part_is_saved(
     tmp_path: Path, monkeypatch, argv: tuple[str, ...],
 ) -> None:
@@ -521,10 +521,10 @@ def test_export_fails_when_the_native_part_is_saved(
 
     with pytest.raises(RuntimeError, match="rocker-arm.SLDPRT changed on disk"):
         run(*argv)
-    assert not (tmp_path / "features" / "rocker_arm" / "features.toml").exists()
+    assert not (tmp_path / "features" / "ch_rocker_arm" / "features.toml").exists()
 
 
-@pytest.mark.parametrize("argv", [(), ("--features", "rocker_arm")], ids=["full", "bundle"])
+@pytest.mark.parametrize("argv", [(), ("--features", "ch_rocker_arm")], ids=["full", "bundle"])
 def test_export_refuses_a_periodic_bore_with_only_one_named_half(
     tmp_path: Path, monkeypatch, argv: tuple[str, ...],
 ) -> None:
@@ -534,7 +534,7 @@ def test_export_refuses_a_periodic_bore_with_only_one_named_half(
 
     with pytest.raises(FeatureFaceError, match="pivot_bore: expected exactly 2 STEP patches, found 1"):
         run(*argv)
-    assert not (tmp_path / "features" / "rocker_arm" / "features.toml").exists()
+    assert not (tmp_path / "features" / "ch_rocker_arm" / "features.toml").exists()
 
 
 def test_export_refuses_more_than_two_named_rocker_bore_patches(tmp_path: Path, selectors) -> None:
@@ -542,27 +542,27 @@ def test_export_refuses_more_than_two_named_rocker_bore_patches(tmp_path: Path, 
     doc.step_text = lambda: _step(_BORE_1, _BORE_1, _BORE_1, "NONE", _TOP_1)
 
     with pytest.raises(FeatureFaceError, match="expected exactly 2 STEP patches, found 3"):
-        export_models._save_feature_step(doc, "rocker_arm", tmp_path / "rocker-arm.STEP")
+        export_models._save_feature_step(doc, "ch_rocker_arm", tmp_path / "ch-rocker-arm.STEP")
 
 
 def test_a_failed_rerun_removes_the_previous_manifest(
     tmp_path: Path, monkeypatch,
 ) -> None:
     run, seen = _exporter(tmp_path, monkeypatch)
-    run("--features", "rocker_arm")
+    run("--features", "ch_rocker_arm")
     seen["drop_half"] = True
 
     with pytest.raises(FeatureFaceError, match="expected exactly 2 STEP patches"):
-        run("--features", "rocker_arm")
+        run("--features", "ch_rocker_arm")
 
-    assert not (tmp_path / "features" / "rocker_arm" / "features.toml").exists()
+    assert not (tmp_path / "features" / "ch_rocker_arm" / "features.toml").exists()
 
 
 def test_feature_export_preserves_the_build_runner_exit_code(tmp_path: Path, monkeypatch) -> None:
     run, seen = _exporter(tmp_path, monkeypatch)
     monkeypatch.setattr(export_models, "run_build", lambda _build: 37)
 
-    run("--features", "rocker_arm")
+    run("--features", "ch_rocker_arm")
 
     assert seen["rc"] == 37
     assert not (tmp_path / "features").exists()
@@ -572,15 +572,15 @@ def test_feature_export_preserves_the_build_runner_exit_code(tmp_path: Path, mon
     "argv",
     [
         ["--features", "frame_rail"],
-        ["--features", "rocker_arm", "--force"],
-        ["--features", "rocker_arm", "--record-digests"],
-        ["--features", "rocker_arm", "--comparisons"],
+        ["--features", "ch_rocker_arm", "--force"],
+        ["--features", "ch_rocker_arm", "--record-digests"],
+        ["--features", "ch_rocker_arm", "--comparisons"],
     ],
     ids=["unsupported-part", "forced", "recording", "with-comparisons"],
 )
 def test_features_flag_rejects_invalid_selections(monkeypatch, argv: list[str]) -> None:
     monkeypatch.setitem(
-        sys.modules, "export_features", SimpleNamespace(SUPPORTED_PARTS=("rocker_arm",)),
+        sys.modules, "export_features", SimpleNamespace(SUPPORTED_PARTS=("ch_rocker_arm",)),
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py", *argv])
 

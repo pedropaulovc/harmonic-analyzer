@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 from typing import Any
 
 import _config
 import _telemetry
 from _common import _early_bound
+from _identity_shapes import CATEGORIES, NUMBER
 
 
-_PART_NUMBER = re.compile(r"MHA-(?:HA|CH|DT|VN|FR|MG|PD|PN|SM|SH)-(?!000)[0-9]{3}\Z")
 _USER_SPECIFIED_PART_NUMBER = 8  # swBOMPartNumber_UserSpecified
 
 
@@ -25,9 +24,11 @@ def apply_grouped_bom_properties(
     row = _config.parts(part_name)
     number = row.get("number")
     category = row.get("category")
-    if not isinstance(number, str) or not _PART_NUMBER.fullmatch(number):
+    match = NUMBER.fullmatch(number) if isinstance(number, str) else None
+    # Grouped BOM metadata is part-only: 000 is every assembly's sequence.
+    if match is None or match[1].lower() not in CATEGORIES or match[2] == "000":
         raise ValueError(f"{part_name}: invalid grouped BOM part number {number!r}")
-    if category != number.split("-")[1].lower() or not part_name.startswith(f"{category}-"):
+    if category != match[1].lower() or not part_name.startswith(f"{category}-"):
         raise ValueError(f"{part_name}: grouped BOM Number/category mismatch")
     description = row.get("description")
     if not isinstance(description, str) or not description.strip():

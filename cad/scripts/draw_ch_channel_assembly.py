@@ -115,11 +115,14 @@ def _fitup_steps() -> str:
     }
     lines = ["ROCKER BANK FIT-UP"]
     for key in steps.SEQUENCE:
+        # A part Number (MHA-CH-008) never splits at its hyphens.
         lines += textwrap.wrap(
             text[key],
             width=FITUP_LINE_WIDTH,
             initial_indent=f"{steps.step_number(key)}. ",
             subsequent_indent="   ",
+            break_on_hyphens=False,
+            break_long_words=False,
         )
     return "\n".join(lines)
 

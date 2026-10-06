@@ -613,12 +613,23 @@ def test_render_diff_local_source_uses_top_scene(
     spec.loader.exec_module(render_diff)
     boxes = tmp_path / "boxes"
     boxes.mkdir()
-    (boxes / "channel.json").write_text('{"scene": "channel"}', encoding="utf-8")
-    (boxes / "harmonic-analyzer.json").write_text(
-        '{"scene": "top"}', encoding="utf-8",
+    (boxes / "ch-channel.json").write_text(
+        '{"scene": "channel", "boxes": []}', encoding="utf-8",
+    )
+    top = {"scene": "top", "boxes": [{"name": "ch-channel-1"}]}
+    (boxes / "ha-harmonic-analyzer.json").write_text(
+        json.dumps(top), encoding="utf-8",
     )
 
-    assert render_diff.LocalSource(tmp_path).scene() == {"scene": "top"}
+    source = render_diff.LocalSource(tmp_path)
+    assert source.scene(expect_root="ha-harmonic-analyzer") == top
+    with pytest.raises(ValueError, match="expected top assembly"):
+        source.scene(expect_root="harmonic-analyzer")
+    (tmp_path / "PROVENANCE.json").write_text(
+        json.dumps({"model": {"top_assembly": "wrong-root"}}), encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="declared top assembly"):
+        source.scene(expect_root="ha-harmonic-analyzer")
 
 
 def test_gallery_with_missing_score_is_incomplete(tmp_path: Path, monkeypatch) -> None:
@@ -878,7 +889,7 @@ def test_exporter_ledger_reuses_only_equivalent_naming_inputs(
     monkeypatch.setattr(export_models, "_import_dodo", lambda: dodo)
     monkeypatch.setattr(dodo, "_export_requirement_deps", lambda: deps)
     monkeypatch.setattr(export_models, "SRC_DIGESTS", tmp_path / "export-src.json")
-    ledger = {"rocker-arm": "model-recipe"}
+    ledger = {"ch-rocker-arm": "model-recipe"}
     export_models.save_src_digests(ledger)
 
     if change == "line-endings":

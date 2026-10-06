@@ -1389,9 +1389,9 @@ _CHECK_NAMES = (
     # Threaded-joint retention (drawing-simplicity-policy rule 9). Audit-only
     # while joint_retention.ENFORCEMENT is AUDIT: it reports, never fails.
     "joint_retention",
-    "traveler_rocker_arm",
-    "traveler_pivot_shaft",
-    "traveler_cone_pivot_post",
+    "traveler_ch_rocker_arm",
+    "traveler_ch_pivot_shaft",
+    "traveler_dt_cone_pivot_post",
 )
 # Checks outside the every-build set. verify_telemetry is opt-in;
 # features_bound is required only by release. Union must match the specs.
@@ -3568,13 +3568,13 @@ def task_check():
                 str(REPORTS / "joint-retention.md"),
             ],
         },
-        "traveler_rocker_arm": {
+        "traveler_ch_rocker_arm": {
             "file_dep": [
-                str((REPO_ROOT / "cad/process/rocker_arm/plan.toml").resolve()),
+                str((REPO_ROOT / "cad/process/ch_rocker_arm/plan.toml").resolve()),
                 *(str((REPO_ROOT / "cad/process/shop" / name).resolve())
                   for name in ("inventory.toml", "shop-policy.toml", "cutting-data.toml")),
-                str((CAD_OUT / "features/rocker_arm/features.toml").resolve()),
-                str((CAD_OUT / "features/rocker_arm/rocker-arm.STEP").resolve()),
+                str((CAD_OUT / "features/ch_rocker_arm/features.toml").resolve()),
+                str((CAD_OUT / "features/ch_rocker_arm/ch-rocker-arm.STEP").resolve()),
                 str((REPO_ROOT / "pyproject.toml").resolve()),
                 str((REPO_ROOT / "uv.lock").resolve()),
                 str((REPO_ROOT / "dodo.py").resolve()),
@@ -3582,23 +3582,23 @@ def task_check():
             ],
             "cmd": [
                 sys.executable, str(SCRIPTS_DIR / "check_traveler.py"),
-                str(REPO_ROOT / "cad/process/rocker_arm/plan.toml"),
-                "--out", str(REPORTS / "traveler_rocker_arm"),
+                str(REPO_ROOT / "cad/process/ch_rocker_arm/plan.toml"),
+                "--out", str(REPORTS / "traveler_ch_rocker_arm"),
             ],
-            "label": "check:traveler_rocker_arm",
+            "label": "check:traveler_ch_rocker_arm",
             "task_dep": ["package:features"],
             "targets": [
-                str(REPORTS / "traveler_rocker_arm/report.json"),
-                str(REPORTS / "traveler_rocker_arm/traveler.html"),
+                str(REPORTS / "traveler_ch_rocker_arm/report.json"),
+                str(REPORTS / "traveler_ch_rocker_arm/traveler.html"),
             ],
         },
-        "traveler_pivot_shaft": {
+        "traveler_ch_pivot_shaft": {
             "file_dep": [
-                str((REPO_ROOT / "cad/process/pivot_shaft/plan.toml").resolve()),
+                str((REPO_ROOT / "cad/process/ch_pivot_shaft/plan.toml").resolve()),
                 *(str((REPO_ROOT / "cad/process/shop" / name).resolve())
                   for name in ("inventory.toml", "shop-policy.toml", "cutting-data.toml")),
-                str((CAD_OUT / "features/pivot_shaft/features.toml").resolve()),
-                str((CAD_OUT / "features/pivot_shaft/pivot-shaft.STEP").resolve()),
+                str((CAD_OUT / "features/ch_pivot_shaft/features.toml").resolve()),
+                str((CAD_OUT / "features/ch_pivot_shaft/ch-pivot-shaft.STEP").resolve()),
                 str((REPO_ROOT / "pyproject.toml").resolve()),
                 str((REPO_ROOT / "uv.lock").resolve()),
                 str((REPO_ROOT / "dodo.py").resolve()),
@@ -3606,23 +3606,23 @@ def task_check():
             ],
             "cmd": [
                 sys.executable, str(SCRIPTS_DIR / "check_traveler.py"),
-                str(REPO_ROOT / "cad/process/pivot_shaft/plan.toml"),
-                "--out", str(REPORTS / "traveler_pivot_shaft"),
+                str(REPO_ROOT / "cad/process/ch_pivot_shaft/plan.toml"),
+                "--out", str(REPORTS / "traveler_ch_pivot_shaft"),
             ],
-            "label": "check:traveler_pivot_shaft",
+            "label": "check:traveler_ch_pivot_shaft",
             "task_dep": ["package:features"],
             "targets": [
-                str(REPORTS / "traveler_pivot_shaft/report.json"),
-                str(REPORTS / "traveler_pivot_shaft/traveler.html"),
+                str(REPORTS / "traveler_ch_pivot_shaft/report.json"),
+                str(REPORTS / "traveler_ch_pivot_shaft/traveler.html"),
             ],
         },
-        "traveler_cone_pivot_post": {
+        "traveler_dt_cone_pivot_post": {
             "file_dep": [
-                str((REPO_ROOT / "cad/process/cone_pivot_post/plan.toml").resolve()),
+                str((REPO_ROOT / "cad/process/dt_cone_pivot_post/plan.toml").resolve()),
                 *(str((REPO_ROOT / "cad/process/shop" / name).resolve())
                   for name in ("inventory.toml", "shop-policy.toml", "cutting-data.toml")),
-                str((CAD_OUT / "features/cone_pivot_post/features.toml").resolve()),
-                str((CAD_OUT / "features/cone_pivot_post/cone-pivot-post.STEP").resolve()),
+                str((CAD_OUT / "features/dt_cone_pivot_post/features.toml").resolve()),
+                str((CAD_OUT / "features/dt_cone_pivot_post/dt-cone-pivot-post.STEP").resolve()),
                 str((REPO_ROOT / "pyproject.toml").resolve()),
                 str((REPO_ROOT / "uv.lock").resolve()),
                 str((REPO_ROOT / "dodo.py").resolve()),
@@ -3630,14 +3630,14 @@ def task_check():
             ],
             "cmd": [
                 sys.executable, str(SCRIPTS_DIR / "check_traveler.py"),
-                str(REPO_ROOT / "cad/process/cone_pivot_post/plan.toml"),
-                "--out", str(REPORTS / "traveler_cone_pivot_post"),
+                str(REPO_ROOT / "cad/process/dt_cone_pivot_post/plan.toml"),
+                "--out", str(REPORTS / "traveler_dt_cone_pivot_post"),
             ],
-            "label": "check:traveler_cone_pivot_post",
+            "label": "check:traveler_dt_cone_pivot_post",
             "task_dep": ["package:features"],
             "targets": [
-                str(REPORTS / "traveler_cone_pivot_post/report.json"),
-                str(REPORTS / "traveler_cone_pivot_post/traveler.html"),
+                str(REPORTS / "traveler_dt_cone_pivot_post/report.json"),
+                str(REPORTS / "traveler_dt_cone_pivot_post/traveler.html"),
             ],
         },
         "features_bound": {

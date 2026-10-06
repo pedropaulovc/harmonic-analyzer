@@ -1657,7 +1657,7 @@ sections:
         - 'ch. 14 pp. 26–29 + ch. 30 front view: clevis grips the pivot ball at (−72, 252) — M6.5 apex crop; ch30 p008 (brightened) shows the full windowed frame; the M6.4 "ears grip the pinion bar" read is REFUTED (bar now floats)'
         - scaled
         - med
-      - - Transgear pin, bushings and ring (MHA-PD-023..182, R9-68; supersede the MHA-082 stud, MHA-160 cap nut and MHA-178 shim)
+      - - Transgear pin, bushings and ring (MHA-PD-023..025 and MHA-VN-047, R9-68; supersede the MHA-082 stud, MHA-160 cap nut and MHA-178 shim)
         - 'plain steel pin `pd-transgear-pin` (MHA-PD-023, Ø3.900 ground) pressed from the rear through the arm''s reamed hole at S, its domed head seated on the arm''s rear face −116.46; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `pd-transgear-rear-bushing` (MHA-PD-024, faced to fit, to −130.4); the steel feed sleeve MHA-PD-010 (−130.4..−157.75), carrying the 120T disc on its Ø10 seat shoulder (−144.65..−147.65) and the brass hub MHA-PD-017 on its Ø9 boss and D-flat; brass `pd-transgear-front-bushing` (MHA-PD-025, faced to fit, nose −157.75 to −162.78); the side-mount ring `vn-transgear-retaining-ring` (MHA-VN-047, McMaster 97431A260) in the pin''s groove, −163.08..−163.71. The front bushing sets the disc-to-12T air m 0.10-0.20, the rear bushing the cluster float 0.2-0.4 (model: cluster rearward)'
         - —
         - 'ruling R9-68 (rev 5, candidate B); `transgear_pin_spec`, `transgear_cluster_fit`, `transgear_rear_bushing_spec`, `transgear_front_bushing_spec`, `transgear_retaining_ring_spec`; ch23 p.59 page002_img04'

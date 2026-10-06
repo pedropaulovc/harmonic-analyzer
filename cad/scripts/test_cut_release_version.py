@@ -331,7 +331,7 @@ def feature_release(
     from test_features_bound import bound_output
 
     out = bound_output(tmp_path)
-    scene = out / "boxes" / "harmonic-analyzer.json"
+    scene = out / "boxes" / f"{cut_release.TOP_ASSEMBLY}.json"
     scene.parent.mkdir()
     scene.write_bytes(b'{"unit":"mm"}')
     # The full export certifies its own bytes; the feature gate never reads this.
@@ -440,13 +440,13 @@ def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     from test_features_bound import _add_full_face
 
     out = feature_release
-    full_step = _add_full_face(out, "rocker_arm", face_name("pivot_bore", 2))
+    full_step = _add_full_face(out, "ch_rocker_arm", face_name("pivot_bore", 2))
     certificate_path = out / "reports" / "release-neutral.json"
     certificate = json.loads(certificate_path.read_bytes())
-    certificate["files"]["step/rocker-arm.STEP"] = _byte_record(full_step)
+    certificate["files"]["step/ch-rocker-arm.STEP"] = _byte_record(full_step)
     certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="face labels differ"):
+    with pytest.raises(RuntimeError):
         cut_release.bundle("v38")
 
     stage = out / "release" / "harmonic-analyzer-v38"

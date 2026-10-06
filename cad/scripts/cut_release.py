@@ -28,7 +28,7 @@ What it does, in order:
      validated and staged: AP214 STEP for every part, fine binary STL for every
      part/assembly plus distinct configurations, and the build-owned isometric
      PNG for every document. Also copies the millimetre
-     scene graph (``cad/out/boxes/harmonic-analyzer.json`` from export_models.py)
+     scene graph (``cad/out/boxes/ha-harmonic-analyzer.json`` from export_models.py)
      so the comparison gallery renders from the bundle with no SolidWorks.
      The independently produced feature bundles are checked for the same face
      labels and patch counts as the full STEPs, then copied intact under
@@ -332,6 +332,8 @@ def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
             prev_tag,
             "--new-local",
             str(stage),
+            "--expect-root",
+            TOP_ASSEMBLY,
             "--out",
             str(diff_dir),
             "--summary-json",
@@ -895,7 +897,7 @@ def bundle(
     package = load_native_package()
     revision = package["solidworks_revision"]
 
-    stage = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}"
+    stage = RELEASE_DIR / f"{PROJECT_SLUG}-{version}"
     if stage.exists():
         shutil.rmtree(stage)  # regenerate-don't-repair: stale staging never shipped
     stage.mkdir(parents=True)
@@ -1223,7 +1225,7 @@ def _start_release_log(version: str) -> tuple[Path, Any]:
     stops at the ``gh release create`` that uploads it -- the publish tail and the
     final summary print after it are not in the asset (they go to the console).
     """
-    log_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-release.log"
+    log_path = RELEASE_DIR / f"{PROJECT_SLUG}-{version}-release.log"
     fh = log_path.open("w", encoding="utf-8")
     saved_out, saved_err = sys.stdout, sys.stderr
     sys.stdout = _Tee(saved_out, fh)
@@ -1292,7 +1294,7 @@ def main() -> int:
                 traceback.print_exc()
                 return 1
 
-            release_root = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}"
+            release_root = RELEASE_DIR / f"{PROJECT_SLUG}-{version}"
             with tempfile.TemporaryDirectory(
                 dir=RELEASE_DIR, prefix=f".{version}-readme-images-"
             ) as temporary:
@@ -1322,7 +1324,7 @@ def main() -> int:
                                 f"release {version} was published at {url}, but could not "
                                 "install all generated README images and the revision bump; "
                                 "recover with `uv run python cad/scripts/trim_renders.py "
-                                f"--release-root cad/out/release/{TOP_ASSEMBLY}-{version}`, "
+                                f"--release-root cad/out/release/{PROJECT_SLUG}-{version}`, "
                                 f"set {RELEASE_VERSION_FILE} to "
                                 f"next_revision: {prepared.next_version}, and commit both "
                                 "in one generated-only follow-up PR before the next release. "

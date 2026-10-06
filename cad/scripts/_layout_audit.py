@@ -3656,12 +3656,13 @@ class TitleFieldFit:
     """One title-block identity value as the sheet printed it.
 
     ``printed`` is the glyph box of the one PDF text object that prints the
-    WHOLE value -- None when no single object does (blank, cut, or wrapped:
-    pdfium makes each text-showing operator its own object, so a second
-    line is a second object). ``rows`` is how many distinct glyph baselines
-    that object stands on (``_pdf_ink.Span.rows``). ``clearance`` is the
-    box's least distance inside the cell's rules, negative where it crosses
-    one, ``-inf`` when nothing printed it.
+    WHOLE value in its exact case -- None when no single object does (blank,
+    cut, wrapped, or printed in capitals: pdfium makes each text-showing
+    operator its own object, so a second line is a second object). ``rows``
+    is how many distinct glyph baselines that object stands on
+    (``_pdf_ink.Span.rows``). ``clearance`` is the box's least distance
+    inside the cell's rules, negative where it crosses one, ``-inf`` when
+    nothing printed it.
     """
 
     source: str
@@ -3676,18 +3677,30 @@ class TitleFieldFit:
         return self.printed is not None and self.rows == 1
 
 
+def _printed_text(text: str) -> str:
+    """A title-block identity as the PDF prints it, case kept: ``ink_key``
+    without its case fold, so a slug printed in capitals is not the slug."""
+    return re.sub(r"\s+", "", _TOKEN.sub("", text))
+
+
+def _printed_spans(dump: Mapping[str, Any]) -> list[tuple[str, InkSpan]]:
+    """Each PDF text object with its case-kept text (:func:`_printed_text`)."""
+    raws = (dump.get("ink") or {}).get("spans", ())
+    return [(_printed_text(str(raw[0])), span) for raw, span in zip(raws, ink_spans(dump), strict=True)]
+
+
 def title_field_fits(dump: Mapping[str, Any]) -> list[TitleFieldFit]:
     """Every ``title_fields`` value the collector recorded, measured on the
     page's ink. A dump from before the collector recorded them has none."""
-    spans = ink_spans(dump)
+    spans = _printed_spans(dump)
     fits = []
     for field in dump.get("title_fields") or ():
         text = str(field["text"])
         cell = Box(*_floats(field["cell"])[:4])
-        key = ink_key(text)
+        key = _printed_text(text)
         printed, rows, clearance = None, 0, -math.inf
-        for span in spans:
-            if not key or span.key != key:
+        for printed_text, span in spans:
+            if not key or printed_text != key:
                 continue
             box = span.box
             inside = min(box.xmin - cell.xmin, cell.xmax - box.xmax, box.ymin - cell.ymin, cell.ymax - box.ymax)
@@ -3703,18 +3716,18 @@ def find_title_field_misfits(
     dump: Mapping[str, Any], *, clearance: float = TITLE_FIELD_CLEARANCE_M
 ) -> list[Finding]:
     """A title-block identity value (DWG. NO. ``Number``, PART ``Title``) not
-    printed whole on one line inside its ruled cell. The template note wraps
-    at its authored width and a wrapped line lands on the next cell's
-    caption; nothing may shorten or shrink the identity to fit, so the fix is
-    the template's cell, never the string."""
+    printed whole, in its exact case, on one line inside its ruled cell. The
+    template note wraps at its authored width and a wrapped line lands on the
+    next cell's caption; nothing may shorten or shrink the identity to fit, so
+    the fix is the template's cell, never the string."""
     sheet = str(dump.get("sheet", ""))
-    spans = ink_spans(dump)
+    spans = _printed_spans(dump)
     findings = []
     for fit in title_field_fits(dump):
         if fit.fits and fit.clearance >= clearance:
             continue
         if fit.printed is None:
-            pieces = [span.key for span in spans if span.box.overlaps(fit.cell, tol=0.0) is not None]
+            pieces = [text for text, span in spans if span.box.overlaps(fit.cell, tol=0.0) is not None]
             detail = (
                 f"{fit.source} {fit.text!r} is not printed whole on one line in its cell "
                 f"{fit.cell.format_mm()}; the cell prints {pieces!r}"

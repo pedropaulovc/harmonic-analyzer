@@ -296,7 +296,6 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
     import _buildgraph as bg
 
     dodo = _load_dodo()
-    grouped_callers = set()
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
         script = spec.script.resolve()
         own_build = f"build_{spec.part}.py"
@@ -318,18 +317,33 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
             assert source.name == own_build, (stem, source.name, calls)
             assert {arg for _name, arg in calls} == {"PART_NAME"}, (stem, calls)
             assert _module_part_name(source) == spec.part.replace("_", "-"), stem
-            if any(name == "apply_grouped_bom_properties" for name, _arg in calls):
-                grouped_callers.add(source.name)
-    # Each grouped source is a positive control: losing its closure, helper call,
-    # or part-name argument must not silently remove its own-row proof.
-    for source in (
-        "build_dt_cone_gear.py",
-        "build_dt_crank_handle_ferrule.py",
-        "build_dt_crank_handle_pivot_screw.py",
-        "build_dt_pinion_lever_pin.py",
-        "build_pd_transgear_removable.py",
-    ):
-        assert source in grouped_callers, f"{source} missing grouped own-row proof"
+
+
+@pytest.mark.parametrize(
+    "stem",
+    (
+        "dt_cone_gear",
+        "dt_crank_handle_ferrule",
+        "dt_crank_handle_pivot_screw",
+        "dt_pinion_lever_pin",
+        "pd_transgear_removable",
+    ),
+)
+def test_grouped_producers_read_their_own_row_and_feed_the_registered_drawing(stem):
+    import _buildgraph as bg
+
+    dodo = _load_dodo()
+    source = bg.script_for(stem).resolve()
+    assert source in {path.resolve() for path in bg.part_scripts()}
+    spec = dodo.DRAWINGS_BY_NAME[stem]
+    assert spec.part == stem
+    assert _module_part_name(source) == spec.source.stem == stem.replace("_", "-")
+    calls = _helper_name_arguments(source)
+    assert [arg for name, arg in calls if name == "apply_grouped_bom_properties"] == [
+        "PART_NAME"
+    ]
+    assert {arg for _name, arg in calls} == {"PART_NAME"}
+    assert str(bg.artefact_for(source).resolve()) in dodo._drawing_file_deps(stem)
 
 
 @pytest.fixture
@@ -3109,7 +3123,7 @@ def isolated_export_keys(tmp_path, monkeypatch):
     "source",
     [
         "export_features.py", "_export_feature_faces.py", "_part_pmi.py",
-        "rocker_arm_spec.py", "rocker_bank_layout.py", "draw_rocker_arm.py",
+        "ch_rocker_arm_spec.py", "rocker_bank_layout.py", "draw_ch_rocker_arm.py",
     ],
 )
 def test_export_face_naming_inputs_invalidate_outer_key_and_internal_ledger(

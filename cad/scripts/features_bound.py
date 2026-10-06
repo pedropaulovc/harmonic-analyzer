@@ -32,7 +32,7 @@ _REBUILD = "regenerate package:features and export before releasing"
 # A split periodic face labels each STEP half with its native name. The issue
 # #1204 spike found the v38 rocker-arm pivot bore as two Ø6.5 halves, so a
 # half-labelled split (one patch) must fail here, not ship a partial datum A.
-_STEP_FACE_COUNTS = {"rocker_arm": {"pivot_bore": 2}}
+_STEP_FACE_COUNTS = {"ch_rocker_arm": {"pivot_bore": 2}}
 
 FaceLabels = dict[str, Counter[str]]
 

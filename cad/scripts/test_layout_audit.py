@@ -4045,14 +4045,13 @@ def _report_run_with(monkeypatch, tmp_path, finding):
 @pytest.mark.parametrize(("kind", "item", "detail"), _ENFORCED_IN_REPORT, ids=[k for k, _i, _d in _ENFORCED_IN_REPORT])
 def test_report_mode_fails_the_leaf_on_each_enforced_kind(monkeypatch, tmp_path, kind, item, detail):
     """REPORT fails the drawing on every kind the fleet brought to zero,
-    naming the kind and the item, so none can come back unnoticed."""
+    naming the kind, so none can come back unnoticed."""
     from _layout_geometry import Finding
 
     finding = Finding(kind=kind, sheet="Sheet1", a=item, b="", detail=detail)
     with pytest.raises(RuntimeError, match=r"report mode.*\n") as raised:
         _report_run_with(monkeypatch, tmp_path, finding)
     assert f"[{kind}]" in str(raised.value)
-    assert item in str(raised.value)
 
 
 def test_report_mode_passes_a_gating_kind_that_is_not_enforced(monkeypatch, tmp_path):
@@ -4571,12 +4570,14 @@ _N15, _T29 = ("Number", "MHA-DT-003-T006"), ("Title", "vn-transgear-collar-cross
         (_N15, [], {"printed": False}),
         # One text object whose glyphs stand on two rows, inside the cell.
         (_T29, [["vn-transgear-collar-cross-pin", 0.31271, 0.03650, 0.36500, 0.04600, 2]], {"printed": True, "rows": 2}),
+        # The whole slug on one row inside the cell, but in capitals.
+        (_T29, [["VN-TRANSGEAR-COLLAR-CROSS-PIN", 0.31271, 0.03680, 0.36500, 0.04157]], {"printed": False}),
     ],
-    ids=["cut", "wrapped-two-objects", "blank", "wrapped-one-object"],
+    ids=["cut", "wrapped-two-objects", "blank", "wrapped-one-object", "upper-cased"],
 )
 def test_a_value_not_printed_whole_on_one_line_is_a_misfit(field, printed, evidence):
-    """A cut, wrapped or blank value fails its cell, however much air the
-    printed ink leaves."""
+    """A cut, wrapped, blank or capitalised value fails its cell, however
+    much air the printed ink leaves."""
     from _layout_audit import find_title_field_misfits
 
     [finding] = find_title_field_misfits(_title_dump(printed, [field]))

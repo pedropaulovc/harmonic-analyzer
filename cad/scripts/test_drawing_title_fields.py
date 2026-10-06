@@ -35,9 +35,10 @@ CHAR_HEIGHT = 0.0052
 class _Note:
     """An IAnnotation and its INote in one."""
 
-    def __init__(self, link, text, extent, *, owner=2, kind=6, items=1):
+    def __init__(self, link, text, extent, *, owner=2, kind=6, items=1, upper=False):
         self.OwnerType = owner
         self.PropertyLinkedText = link
+        self.AllUpperCase = upper
         self._kind, self._text, self._extent, self._items = kind, text, extent, items
 
     def GetType(self):  # noqa: N802 - COM name
@@ -89,9 +90,9 @@ class _Model:
     """A linked model: per-configuration stored properties, a summary
     Title, and the state a read must not move."""
 
-    def __init__(self, path, kind, scopes, title, *, moves_on_read=False):
+    def __init__(self, path, kind, scopes, title, *, moves_on_read=False, dirties_on_read=False):
         self._path, self._kind, self._scopes, self._title = path, kind, scopes, title
-        self._moves = moves_on_read
+        self._moves, self._dirties, self._dirty = moves_on_read, dirties_on_read, False
         self.ConfigurationManager = self
         self.ActiveConfiguration = self
         self.Name = "Default"
@@ -103,7 +104,7 @@ class _Model:
         return self._kind
 
     def GetSaveFlag(self):  # noqa: N802 - COM name
-        return False
+        return self._dirty
 
     def SummaryInfo(self, field):  # noqa: N802 - COM name
         return self._title if field == 0 else ""
@@ -111,6 +112,7 @@ class _Model:
     def GetCustomInfoValue(self, scope, name):  # noqa: N802 - COM name
         if self._moves and scope:
             self.Name = scope
+        self._dirty = self._dirty or self._dirties
         return self._scopes.get(scope, {}).get(name, "")
 
 
@@ -135,14 +137,16 @@ def _cone_gear(**kwargs):
     )
 
 
-def _sheet(number="MHA-DT-003-T006", title="dt-cone-gear", *, number_link='$PRPSHEET:"Number"', items=1):
+def _sheet(
+    number="MHA-DT-003-T006", title="dt-cone-gear", *, number_link='$PRPSHEET:"Number"', items=1, upper=False
+):
     return _SheetView(
         "Sheet1",
         [
             _Note('$PRPSHEET:"Revision"', "39", (0.3770, 0.0240, 0.3850, 0.0290)),
-            _Note(number_link, number, NUMBER_EXTENT, items=items),
+            _Note(number_link, number, NUMBER_EXTENT, items=items, upper=upper),
             _Note('$PRPSHEET:"Number"', number, (0.05, 0.05, 0.10, 0.055), owner=1),
-            _Note('$PRPSHEET:"SW-Title"', title, TITLE_EXTENT),
+            _Note('$PRPSHEET:"SW-Title"', title, TITLE_EXTENT, upper=upper),
         ],
     )
 
@@ -223,22 +227,86 @@ def test_the_registry_identity_is_authoritative(model_number, printed, kinds):
     assert _kinds(raised) == kinds
 
 
-def _reading(extent=NUMBER_EXTENT, *, line_length=0.0, text_count=1, display_count=1, printed="MHA-DT-003-T006"):
+def test_a_note_printing_in_capitals_breaches_only_the_lowercase_title():
+    """``AllUpperCase`` prints the slug in capitals; the Number already is."""
+    with pytest.raises(TitleFieldContractError) as raised:
+        assert_title_fields(_read(_sheet(upper=True), _cone_gear()))
+    assert _kinds(raised) == {("Title", "readback")}
+
+
+def _reading(
+    extent=None,
+    *,
+    source="Number",
+    identity=("MHA-DT-003-T006", "dt-cone-gear"),
+    line_length=0.0,
+    text_count=1,
+    display_count=1,
+    printed=None,
+):
+    expected = identity[0] if source == "Number" else identity[1]
     return TitleFieldReading(
         sheet="Sheet1",
-        source="Number",
-        link='$PRPSHEET:"Number"',
-        expected="MHA-DT-003-T006",
-        model_value="MHA-DT-003-T006",
-        printed=printed,
-        extent=extent,
-        cell=CELLS["Number"],
+        source=source,
+        link='$PRPSHEET:"Number"' if source == "Number" else '$PRPSHEET:"SW-Title"',
+        identity=identity,
+        model_value=expected,
+        printed=expected if printed is None else printed,
+        all_upper_case=False,
+        extent=extent or (NUMBER_EXTENT if source == "Number" else TITLE_EXTENT),
+        cell=CELLS[source],
         char_height=CHAR_HEIGHT,
         typeface="Century Gothic",
         line_length=line_length,
         text_count=text_count,
         display_count=display_count,
     )
+
+
+@pytest.mark.parametrize(
+    ("identity", "source"),
+    [
+        # -T### extends dt-cone-gear's Number alone, and always does.
+        (("MHA-VN-037-T006", "vn-transgear-collar-cross-pin"), "Number"),
+        (("MHA-DT-003", "dt-cone-gear"), "Number"),
+        (("MHA-DT-003-6", "dt-cone-gear"), "Number"),
+        # Number and Title of different categories.
+        (("MHA-PD-015", "vn-transgear-collar-cross-pin"), "Number"),
+        # A slug of no registry category, or not a slug.
+        (("MHA-XX-015", "xx-transgear-knob-thrust-ring"), "Title"),
+        (("MHA-PD-015", "pd-Transgear-knob"), "Title"),
+        # v39's shapes.
+        (("MHA-013", "cone-gear"), "Number"),
+        (("MHA-013", "cone-gear"), "Title"),
+    ],
+    ids=[
+        "suffix-off-cone-gear",
+        "cone-gear-bare",
+        "cone-gear-bad-suffix",
+        "cross-category",
+        "unknown-category",
+        "not-a-slug",
+        "v39-number",
+        "v39-title",
+    ],
+)
+def test_a_registry_value_that_is_not_one_frozen_identity_fails(identity, source):
+    with pytest.raises(TitleFieldContractError) as raised:
+        assert_title_fields([_reading(source=source, identity=identity)])
+    assert _kinds(raised) == {(source, "not-identity")}
+
+
+@pytest.mark.parametrize("source", ["Number", "Title"])
+@pytest.mark.parametrize(
+    "identity",
+    [
+        ("MHA-DT-003-T006", "dt-cone-gear"),
+        ("MHA-PD-015", "pd-transgear-knob-thrust-ring"),
+        ("MHA-HA-000", "ha-harmonic-analyzer"),
+    ],
+)
+def test_a_whole_identity_passes(identity, source):
+    assert_title_fields([_reading(source=source, identity=identity)])
 
 
 @pytest.mark.parametrize(
@@ -265,9 +333,10 @@ def test_a_wrap_width_wider_than_the_cell_and_the_cells_air_pass():
     assert_title_fields([_reading(line_length=0.200)])
 
 
-def test_a_read_that_moves_the_models_configuration_fails():
+@pytest.mark.parametrize("change", ["moves_on_read", "dirties_on_read"])
+def test_a_read_that_moves_the_models_configuration_or_dirties_it_fails(change):
     with pytest.raises(TitleFieldContractError) as raised:
-        _read(_sheet(), _cone_gear(moves_on_read=True))
+        _read(_sheet(), _cone_gear(**{change: True}))
     assert _kinds(raised) == {("model", "model-changed")}
 
 

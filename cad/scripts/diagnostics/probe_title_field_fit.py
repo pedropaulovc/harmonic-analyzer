@@ -8,17 +8,17 @@ The identity cutover prints a 10-character ``MHA-XX-###`` (cone-gear sheets a
 characters in PART, where v39 printed 7-character Numbers. On drawings from
 the checked-in templates (neither file is modified or saved) it records what
 SolidWorks itself reports for every sheet note (owner, ``PropertyLinkedText``,
-``GetText``, ``GetExtent``, position, text point, heights, text-item and
-display-data counts, text format), the contract's readings and structured
-breaches, the linked model's (configuration, dirty) state around the reads,
-and the exported PDF's title-block glyph runs with the printed-fit measure
-(rows included):
+``GetText``, ``AllUpperCase``, ``GetExtent``, position, text point, heights,
+text-item and display-data counts, text format), the contract's readings and
+structured breaches, the linked model's (configuration, dirty) state around
+the reads, and the exported PDF's title-block glyph runs with the
+printed-fit measure (rows included):
 
 * ``CASES`` x both templates: the v39 shape (positive control of the
-  identity-shape gate), a 10-character Number with a 29-character Title,
-  the widest Number with the other 29-character Title, and an overlong
-  negative that must breach its cells;
-* ``wrapped-landscape``: the 29-character Title forced to wrap -- a
+  identity-shape gate), both 29-character slugs with their 10-character
+  registry Numbers, cone-gear's 15-character configuration Number with its
+  slug, and an overlong negative that must breach its cells;
+* ``wrapped-landscape``: a 29-character Title forced to wrap -- a
   drawing-owned note with the same link and a narrow wrap width, and the
   template's own PART note given that wrap width on this drawing copy only --
   to calibrate how SolidWorks reports a wrapped note (text items, display
@@ -31,7 +31,9 @@ and the exported PDF's title-block glyph runs with the printed-fit measure
 
 Outputs (all under ``cad/out/probe/title-field-fit/``): :data:`REPORT` and
 :data:`PDFS`. Scratch parts and drawings land in ``scratch/`` beside them,
-undeclared.
+undeclared. The report is written whatever happens; then every control
+(:func:`_check_controls`) must hold or the probe fails, its
+``control_failures`` saying which.
 
 Delete this script and its dodo task once the proof is recorded.
 """
@@ -63,7 +65,7 @@ from _drawing_common import new_project_drawing, rebuild_drawing  # noqa: E402
 from _drawing_layout_audit import annotation_display  # noqa: E402
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout  # noqa: E402
 from _drawing_title_fields import TitleFieldContractError, TitleSource, assert_title_fields  # noqa: E402
-from _layout_audit import find_title_field_misfits, title_field_fits  # noqa: E402
+from _layout_audit import TITLE_FIELD_CLEARANCE_M, find_title_field_misfits, title_field_fits  # noqa: E402
 from _pdf_ink import Span, page_ink, read_pdf_ink  # noqa: E402
 from solidworks_mcp.adapters.solidworks.drawing import place_view, save_drawing  # noqa: E402
 
@@ -74,17 +76,24 @@ REPORT = OUT / "title-field-fit.json"
 CASES = {
     # v39's cone-gear sheet 1 printed exactly these.
     "control-v39": ("MHA-013", "cone-gear"),
-    # The registry row of the 29-character pd slug.
+    # The registry rows of the two 29-character slugs.
     "number10-title29": ("MHA-PD-015", "pd-transgear-knob-thrust-ring"),
-    # The widest Number any sheet prints (cone-gear's configuration Number)
-    # beside the other 29-character slug.
-    "number15-title29": ("MHA-DT-003-T006", "vn-transgear-collar-cross-pin"),
+    "number10-title29-vn": ("MHA-VN-037", "vn-transgear-collar-cross-pin"),
+    # The widest Number any sheet prints: cone-gear's configuration Number.
+    "number15-cone-gear": ("MHA-DT-003-T006", "dt-cone-gear"),
     # Must breach both cells in both templates.
     "overlong": (
         "MHA-DT-003-T006-MHA-DT-003-T006",
         "vn-transgear-collar-cross-pin-with-a-title-far-longer-than-any-part-cell-holds",
     ),
 }
+# The cases the contract must pass whole, natively and on the PDF.
+NORMAL_CASES = ("number10-title29", "number10-title29-vn", "number15-cone-gear")
+# The case the wrapped capture forces to wrap.
+WRAPPED_CASE = "number10-title29-vn"
+SOURCES = ("Number", "Title")
+# The template note's style a longer value must print in: v39's.
+STYLE = ("TypeFaceName", "CharHeight", "WidthFactor", "CharSpacingFactor")
 LAYOUTS = (DrawingLayout.LANDSCAPE, DrawingLayout.PORTRAIT)
 # configs-2sheet: configuration -> (sheet layout, its own Number)
 CONFIG_FILE_NUMBER = "MHA-DT-003"
@@ -156,6 +165,7 @@ def _sheet_notes(adapter: Any, sheet_view: Any) -> list[dict[str, Any]]:
                 "name": _read(annotation.GetName),
                 "link": _read(lambda: note.PropertyLinkedText),
                 "text": _read(note.GetText),
+                "all_upper_case": _read(lambda: note.AllUpperCase),
                 "extent": _read(note.GetExtent),
                 "position": _read(annotation.GetPosition),
                 "text_point": _read(note.GetTextPoint2),
@@ -182,6 +192,10 @@ def _sheet_views(ddoc: Any) -> dict[str, Any]:
             sheet_view = _early_bound(entries[0], "IView")
             views[str(sheet_view.GetName2() or "")] = sheet_view
     return views
+
+
+def _active_sheet(ddoc: Any) -> str:
+    return str(_early_bound(ddoc.GetCurrentSheet(), "ISheet").GetName() or "")
 
 
 def _link_property_view(adapter: Any, ddoc: Any, sheet_name: str, view: Any) -> None:
@@ -309,7 +323,12 @@ async def _scratch_part(
         if str(model.GetCustomInfoValue(configuration, "Number")) != value:
             raise RuntimeError(f"{configuration}: Number did not take")
     if configs:
-        model.ShowConfiguration2("Default")
+        # The configs capture reads with the model on Default: hold it there.
+        if not model.ShowConfiguration2("Default"):
+            raise RuntimeError(f"ShowConfiguration2('Default') failed on {name}")
+        active = title_fields._model_state(model)[0]
+        if active != "Default":
+            raise RuntimeError(f"{name}: active configuration {active!r} after ShowConfiguration2('Default')")
     path = SCRATCH / f"title-fit-{name}.SLDPRT"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.unlink(missing_ok=True)
@@ -342,10 +361,12 @@ def _contract(ddoc: Any, sources: Mapping[str, TitleSource], layouts: Mapping[st
         {
             "sheet": r.sheet,
             "source": r.source,
-            "link": r.link,
+            "identity": list(r.identity),
             "expected": r.expected,
             "model_value": r.model_value,
             "printed": r.printed,
+            "all_upper_case": r.all_upper_case,
+            "cell": list(r.cell),
             "extent": list(r.extent),
             "height_mm": (r.extent[3] - r.extent[1]) * 1000,
             "height_per_char_height": (r.extent[3] - r.extent[1]) / r.char_height if r.char_height else None,
@@ -379,7 +400,11 @@ def _capture(
     ddoc = _early_bound(draw, "IDrawingDoc")
     sheet_names = [str(name) for name in ddoc.GetSheetNames() or ()]
     # Read with the first sheet active: every other sheet is read unactivated.
-    ddoc.ActivateSheet(sheet_names[0])
+    if not ddoc.ActivateSheet(sheet_names[0]):
+        raise RuntimeError(f"title fit {key}: failed to activate {sheet_names[0]!r}")
+    active_before = _active_sheet(ddoc)
+    if active_before != sheet_names[0]:
+        raise RuntimeError(f"title fit {key}: sheet {active_before!r} active after activating {sheet_names[0]!r}")
     views = _sheet_views(ddoc)
     capture: dict[str, Any] = {
         "key": key,
@@ -394,6 +419,8 @@ def _capture(
         },
         "contract": _contract(ddoc, sources, layouts),
     }
+    # The sheet the contract read with active, before and after the reads.
+    capture["active_sheet"] = [active_before, _active_sheet(ddoc)]
     pdf = PDFS[key]
     saved = save_drawing(adapter, str(SCRATCH / f"title-fit-{key}.SLDDRW"), pdf_path=str(pdf))
     if set(saved) != {"drawing", "pdf"}:
@@ -507,7 +534,9 @@ def _configs_two_sheets(adapter: Any, part: Path) -> dict[str, Any]:
         _link_property_view(adapter, ddoc, name, view)
         sources[name] = (view, number)
         layouts[name] = layout
-    ddoc.ActivateSheet(names[0])
+    # The drawing-owned control note lands on the active sheet: T006.
+    if not ddoc.ActivateSheet(names[0]) or _active_sheet(ddoc) != names[0]:
+        raise RuntimeError(f"configs-2sheet: {names[0]!r} is not the active sheet ({_active_sheet(ddoc)!r})")
     control = _insert_linked_note(draw, '$PRPSHEET:"Number"', (0.05, 0.20), wrap=None)
     rebuild_drawing(adapter, label="title fit configs-2sheet")
     resolved = {
@@ -528,38 +557,218 @@ def _force_wraps(draw: Any, ddoc: Any, sheet_view: Any) -> dict[str, Any]:
     }
 
 
+def _only_sheet(capture: Mapping[str, Any]) -> tuple[str, Mapping[str, Any]]:
+    sheets = capture["sheets"]
+    if len(sheets) != 1:
+        raise RuntimeError(f"{capture['key']}: expected one sheet, captured {sorted(sheets)}")
+    return next(iter(sheets.items()))
+
+
+def _readings(capture: Mapping[str, Any], failures: list[str]) -> dict[tuple[str, str], Mapping[str, Any]]:
+    """The capture's contract readings by (sheet, source); a refused read is a
+    failure."""
+    contract = capture["contract"]
+    for refusal in ("read_breaches", "read_error"):
+        if refusal in contract:
+            failures.append(f"{capture['key']}: the contract refused the read: {contract[refusal]!r}")
+    return {(reading["sheet"], reading["source"]): reading for reading in contract.get("readings", ())}
+
+
+def _style(sheet: Mapping[str, Any], source: str) -> dict[str, Any] | None:
+    """The template note's height and text-format style for ``source``'s cell,
+    or None when the note is not exactly one or a value was refused."""
+    notes = [
+        note
+        for note in sheet["notes"]
+        if note.get("owner") == 2
+        and title_fields._linked_name(str(note.get("link") or "")) in title_fields.TITLE_FIELD_PROPERTIES[source]
+    ]
+    if len(notes) != 1 or not isinstance(notes[0].get("text_format"), dict):
+        return None
+    style = {"height": notes[0].get("height"), **{name: notes[0]["text_format"].get(name) for name in STYLE}}
+    if any(value is None or (isinstance(value, str) and value.startswith("<error")) for value in style.values()):
+        return None
+    return style
+
+
+def _is_true(value: Any) -> bool:
+    """A COM BOOL as JSON: true, and not a refused read's error string."""
+    return isinstance(value, (bool, int)) and bool(value)
+
+
+def _check_controls(captures: list[Mapping[str, Any]]) -> list[str]:
+    """Every positive and negative control the captures must show; each
+    failure says what was observed."""
+    by_key = {capture["key"]: capture for capture in captures}
+    failures: list[str] = []
+
+    def need(ok: bool, message: str) -> None:
+        if not ok:
+            failures.append(message)
+
+    clearance_mm = TITLE_FIELD_CLEARANCE_M * 1000
+    for layout in LAYOUTS:
+        # control-v39: only its pre-cutover shapes breach -- nothing about fit.
+        control = by_key[f"control-v39-{layout.value}"]
+        control_name, control_sheet = _only_sheet(control)
+        readings = _readings(control, failures)
+        for source in SOURCES:
+            reading = readings.get((control_name, source))
+            kinds = None if reading is None else sorted(set(reading["problem_kinds"]))
+            need(kinds == ["not-identity"], f"{control['key']} {source}: expected only not-identity, read {kinds!r}")
+        for case in NORMAL_CASES:
+            key = f"{case}-{layout.value}"
+            capture = by_key[key]
+            name, sheet = _only_sheet(capture)
+            readings = _readings(capture, failures)
+            need(capture["contract"].get("breaches") == [], f"{key}: breaches {capture['contract'].get('breaches')!r}")
+            need(sheet["printed_misfits"] == [], f"{key}: PDF misfits {sheet['printed_misfits']!r}")
+            fits = {fit["source"]: fit for fit in sheet["printed_fits"]}
+            rows = {row["source"]: row["rows"] for row in sheet["physical_rows"]}
+            for source in SOURCES:
+                reading = readings.get((name, source))
+                if reading is None:
+                    failures.append(f"{key} {source}: no native reading")
+                    continue
+                x0, _y0, x1, _y1 = sheet["cells"][source]
+                width_mm = (x1 - x0) * 1000
+                line_length = reading["line_length_mm"]
+                need(
+                    line_length == 0 or line_length >= width_mm,
+                    f"{key} {source}: LineLength {line_length:.3f} mm inside its {width_mm:.3f} mm cell",
+                )
+                need(
+                    reading["text_count"] == 1 and reading["display_count"] == 1,
+                    f"{key} {source}: text items {reading['text_count']}, display {reading['display_count']}",
+                )
+                need(
+                    reading["clearance_mm"] >= clearance_mm,
+                    f"{key} {source}: native clearance {reading['clearance_mm']:.3f} mm",
+                )
+                fit = fits.get(source)
+                need(
+                    fit is not None
+                    and fit["printed"] is not None
+                    and fit["rows"] == 1
+                    and fit["clearance_mm"] >= clearance_mm,
+                    f"{key} {source}: PDF fit {fit!r}",
+                )
+                need(rows.get(source) == 1, f"{key} {source}: {rows.get(source)!r} physical baseline rows")
+                style, control_style = _style(sheet, source), _style(control_sheet, source)
+                need(
+                    style is not None and style == control_style,
+                    f"{key} {source}: style {style!r} differs from control-v39's {control_style!r}",
+                )
+            title = CASES[case][1]
+            need(
+                any(str(span[0]).strip() == title for span in sheet["title_block_spans"]),
+                f"{key}: no title-block span prints {title!r} in its exact case",
+            )
+        # overlong: both cells breach natively and on the PDF.
+        key = f"overlong-{layout.value}"
+        capture = by_key[key]
+        name, sheet = _only_sheet(capture)
+        readings = _readings(capture, failures)
+        misfits = {misfit["a"] for misfit in sheet["printed_misfits"]}
+        for source in SOURCES:
+            reading = readings.get((name, source))
+            kinds = None if reading is None else reading["problem_kinds"]
+            need(kinds is not None and "outside-cell" in kinds, f"{key} {source}: no outside-cell in {kinds!r}")
+            need(f"title {source}" in misfits, f"{key} {source}: no PDF misfit in {sorted(misfits)!r}")
+
+    # wrapped-landscape: the template PART note really took the narrow wrap.
+    wrapped = by_key["wrapped-landscape"]
+    name, sheet = _only_sheet(wrapped)
+    mutation = wrapped["mutations"].get("template_title") or {}
+    need(
+        mutation.get("template_mode") is True and mutation.get("sheet_mode") is True and _is_true(mutation.get("wrap_set")),
+        f"wrapped-landscape: template mutation {mutation!r}",
+    )
+    reading = _readings(wrapped, failures).get((name, "Title"))
+    kinds = None if reading is None else reading["problem_kinds"]
+    need(kinds is not None and "wrap-width" in kinds, f"wrapped-landscape Title: no wrap-width in {kinds!r}")
+    fit = next((fit for fit in sheet["printed_fits"] if fit["source"] == "Title"), None)
+    need(
+        fit is not None and (fit["printed"] is None or fit["rows"] >= 2),
+        f"wrapped-landscape Title: PDF prints it whole on one row ({fit!r})",
+    )
+    rows = next((row["rows"] for row in sheet["physical_rows"] if row["source"] == "Title"), None)
+    need(rows == 2, f"wrapped-landscape Title: {rows!r} physical baseline rows, not 2")
+
+    # configs-2sheet: per-sheet configuration Numbers, read without moving the
+    # model, with T006 active and the portrait T120 sheet never activated.
+    configs = by_key["configs-2sheet"]
+    contract = configs["contract"]
+    readings = _readings(configs, failures)
+    names = list(CONFIGS)
+    need(
+        "model_state_after" in contract and contract["model_state_before"] == contract["model_state_after"],
+        f"configs-2sheet: model state {contract.get('model_state_before')!r} -> {contract.get('model_state_after')!r}",
+    )
+    need(list(configs["sheets"]) == names, f"configs-2sheet: sheets {list(configs['sheets'])!r}")
+    need(configs["active_sheet"] == [names[0], names[0]], f"configs-2sheet: active sheet {configs['active_sheet']!r}")
+    for name, (layout, number) in CONFIGS.items():
+        need(
+            configs["sheets"].get(name, {}).get("layout") == layout.value,
+            f"configs-2sheet {name}: layout {configs['sheets'].get(name, {}).get('layout')!r}",
+        )
+        reading = readings.get((name, "Number"))
+        observed = None if reading is None else (reading["expected"], reading["model_value"], reading["printed"])
+        need(observed == (number, number, number), f"configs-2sheet {name} Number: {observed!r}, not its own {number!r}")
+    control = configs["drawing_note_control"]
+    need(control.get("inserted") is True, f"configs-2sheet: drawing-owned note {control!r}")
+    owned = [
+        note
+        for note in configs["sheets"].get(names[0], {}).get("notes", ())
+        if note.get("owner") != 2 and title_fields._linked_name(str(note.get("link") or "")) == "Number"
+    ]
+    need(len(owned) == 1, f"configs-2sheet: {len(owned)} drawing-owned Number note(s)")
+    taken = [reading["extent"] for reading in readings.values()]
+    for note in owned:
+        extent = note.get("extent")
+        box = [extent[0], extent[1], extent[3], extent[4]] if isinstance(extent, list) and len(extent) >= 6 else None
+        need(box is not None and box not in taken, f"configs-2sheet: a reading took the drawing-owned note {extent!r}")
+    return failures
+
+
 async def probe(adapter: Any) -> dict[str, str]:
     OUT.mkdir(parents=True, exist_ok=True)
-    captures = []
-    parts = {}
-    for case, (number, title) in CASES.items():
-        parts[case] = await _scratch_part(adapter, case, number, title)
-        for layout in LAYOUTS:
-            captures.append(_single_sheet(adapter, f"{case}-{layout.value}", parts[case], layout, number, title))
-    number, title = CASES["number15-title29"]
-    captures.append(
-        _single_sheet(
-            adapter, "wrapped-landscape", parts["number15-title29"], DrawingLayout.LANDSCAPE, number, title, _force_wraps
+    captures: list[dict[str, Any]] = []
+    report: dict[str, Any] = {
+        "cases": {case: list(value) for case, value in CASES.items()},
+        "configs": {name: [layout.value, value] for name, (layout, value) in CONFIGS.items()},
+        "wrap_m": WRAP_M,
+        "captures": captures,
+    }
+    try:
+        parts = {}
+        for case, (number, title) in CASES.items():
+            parts[case] = await _scratch_part(adapter, case, number, title)
+            for layout in LAYOUTS:
+                captures.append(_single_sheet(adapter, f"{case}-{layout.value}", parts[case], layout, number, title))
+        number, title = CASES[WRAPPED_CASE]
+        captures.append(
+            _single_sheet(
+                adapter, "wrapped-landscape", parts[WRAPPED_CASE], DrawingLayout.LANDSCAPE, number, title, _force_wraps
+            )
         )
-    )
-    configs_part = await _scratch_part(
-        adapter, "configs", CONFIG_FILE_NUMBER, CONFIG_TITLE, {name: value for name, (_l, value) in CONFIGS.items()}
-    )
-    captures.append(_configs_two_sheets(adapter, configs_part))
-    discard_open_documents(adapter)
-    REPORT.write_text(
-        json.dumps(
-            {
-                "cases": {case: list(value) for case, value in CASES.items()},
-                "configs": {name: [layout.value, value] for name, (layout, value) in CONFIGS.items()},
-                "wrap_m": WRAP_M,
-                "captures": captures,
-            },
-            indent=2,
-            default=str,
-        ),
-        encoding="utf-8",
-    )
+        configs_part = await _scratch_part(
+            adapter, "configs", CONFIG_FILE_NUMBER, CONFIG_TITLE, {name: value for name, (_l, value) in CONFIGS.items()}
+        )
+        captures.append(_configs_two_sheets(adapter, configs_part))
+        discard_open_documents(adapter)
+        report["control_failures"] = _check_controls(captures)
+    except BaseException as exc:
+        report["error"] = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        # Written whatever happened: a failed probe's evidence is the point.
+        REPORT.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+    if report["control_failures"]:
+        raise RuntimeError(
+            f"title field probe: {len(report['control_failures'])} control(s) failed "
+            f"(see {REPORT}):\n" + "\n".join(report["control_failures"])
+        )
     return {"report": str(REPORT), **{key: str(path) for key, path in PDFS.items()}}
 
 
