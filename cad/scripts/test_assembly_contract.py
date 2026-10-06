@@ -12,6 +12,7 @@ dodo narrows each assembly task to its OWN file. These tests keep it that way:
 * each build activates exactly its own contract, so the file its seeds come
   from is the file its recipe depends on;
 * the contract files cover ``ASSEMBLY_ORDER`` exactly and parse;
+* canonical component-name datum labels retain their learned flip polarities;
 * the seed audit records, warns and refuses as documented.
 
     uv run pytest cad/scripts/test_assembly_contract.py
@@ -244,6 +245,43 @@ def test_seed_flip_reads_only_the_active_assembly(fresh_seed_state):
     assert not _assembly._seed_flip("lift rod axial d=12.00", -12.0)
     _assembly.activate_assembly_contract("ch-channel")
     assert not _assembly._seed_flip("lift rod axial d=12.00", 12.0)
+
+
+@pytest.mark.parametrize(
+    "component",
+    [
+        "vn-frame-side-screw",
+        "ch-fulcrum-shaft",
+        "ch-pivot-bracket",
+        "vn-pedestal-hold-down-screw",
+        "ch-rocker-thrust-washer",
+    ],
+)
+@pytest.mark.parametrize("axis", ("x", "y", "z"))
+def test_canonical_channel_datum_keeps_its_learned_side(
+    fresh_seed_state, component, axis
+):
+    """The channel's datum labels use native component names, not prose.
+
+    A namespace cutover must carry the learned inversion with that label;
+    missing it puts a positive target on the opposite side of the datum.
+    """
+    _assembly.activate_assembly_contract("ch-channel")
+    label = f"{component}-1 datum {axis} d=199.90"
+    assert _assembly._seed_flip(label, 199.9) is True
+    assert _assembly._seed_flip(label, -199.9) is False
+    _assembly.activate_assembly_contract("dt-drive-train")
+    assert _assembly._seed_flip(label, 199.9) is False
+
+
+@pytest.mark.parametrize("axis, inverted", (("x", False), ("y", True), ("z", False)))
+def test_canonical_mirrored_bracket_keeps_its_distinct_learned_side(
+    fresh_seed_state, axis, inverted
+):
+    _assembly.activate_assembly_contract("ch-channel")
+    label = f"ch-pivot-bracket-2 datum {axis} d=72.90"
+    assert _assembly._seed_flip(label, 72.9, " @npn") is inverted
+    assert _assembly._seed_flip(label, -72.9, " @npn") is not inverted
 
 
 def test_seed_audit_logs_queries_and_warns_on_dead_entries(

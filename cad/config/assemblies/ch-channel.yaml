@@ -20,30 +20,30 @@ category: ch
 # free_dof (+ free_dof_per_active_channel x active channels): the operational
 #   DOF the saved model ships free (verify:soundness).
 flip_invert:
-  - frame side screw datum x
-  - frame side screw datum y
-  - frame side screw datum z
-  - fulcrum shaft datum x
-  - fulcrum shaft datum y
-  - fulcrum shaft datum z
-  # (was "pivot ball mount datum x/y/z" -- the rocker pivot stands became
-  # pivot-bracket 2026-09; same datum-locate idiom, same learned sides)
-  - pivot bracket datum x
-  - pivot bracket datum y
-  - pivot bracket datum z
-  - pivot bracket datum y @npn
+  - vn frame side screw datum x
+  - vn frame side screw datum y
+  - vn frame side screw datum z
+  - ch fulcrum shaft datum x
+  - ch fulcrum shaft datum y
+  - ch fulcrum shaft datum z
+  # The old pivot-ball mounts became ch-pivot-bracket 2026-09; same
+  # datum-locate idiom and learned sides, keyed by canonical component names.
+  - ch pivot bracket datum x
+  - ch pivot bracket datum y
+  - ch pivot bracket datum z
+  - ch pivot bracket datum y @npn
   # #743 PR2: the channel's datum-located MHA-VN-032 bracket hold-downs,
   # inserted IDENTITY like the brackets whose x/y/z seeds they share
   # (r743-4D: the channel build's first MISS was the washer's x; the
   # hold-downs follow it in the same datum-locate loop).
-  - pedestal hold down screw datum x
-  - pedestal hold down screw datum y
-  - pedestal hold down screw datum z
+  - vn pedestal hold down screw datum x
+  - vn pedestal hold down screw datum y
+  - vn pedestal hold down screw datum z
   # #743 PR2: the MHA-CH-009 south thrust washer, datum-located IDENTITY
   # like the pivot brackets (r743-4D flip-seed MISS on its x).
-  - rocker thrust washer datum x
-  - rocker thrust washer datum y
-  - rocker thrust washer datum z
+  - ch rocker thrust washer datum x
+  - ch rocker thrust washer datum y
+  - ch rocker thrust washer datum z
 allowed_free_stems:
   - ch-rocker-arm
   - ch-connecting-rod

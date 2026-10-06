@@ -505,6 +505,20 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     assert not (pedestal_seats | {sheet.TRANSFER_SPRING_HOLE}) & set(sheet.TABLE_HOLES)
 
 
+def test_spotface_depth_band_never_leaves_an_unfaced_head_seat() -> None:
+    from _fit_limits import deviations
+
+    lower_depth_mm, _upper_depth_mm = deviations(
+        fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM
+    )
+    minimum_depth_mm = part.BASE_SPOTFACE_DEPTH + lower_depth_mm
+    # The shallowest permitted cut must reach the screw-head seat plane.
+    # Any negative lower deviation leaves the cast ring above that plane;
+    # a deeper permissible cut does not require a particular upper deviation.
+    cast_to_head_seat_mm = part.BASE_SPOTFACE_PLANE_Z - part.BASE_SCREW_SEAT_Z
+    assert minimum_depth_mm >= cast_to_head_seat_mm
+
+
 def test_isometric_render_hides_model_annotations_only_after_the_save(
     monkeypatch, tmp_path
 ) -> None:
@@ -524,11 +538,13 @@ def test_isometric_render_hides_model_annotations_only_after_the_save(
         shown = True
 
         def SetUserPreferenceToggle(self, pref, option, value):
-            self.shown = value
+            if (pref, option) != (31, 0):  # swDisplayAnnotations, no detailing option
+                return False
+            self.shown = bool(value)
             return True
 
         def GetUserPreferenceToggle(self, pref, option):
-            return self.shown
+            return self.shown if (pref, option) == (31, 0) else False
 
     extension = Extension()
 

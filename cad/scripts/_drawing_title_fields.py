@@ -176,8 +176,9 @@ class TitleFieldReading:
     ``display_count`` is ``IDisplayData::GetTextCount`` (-1 for a refused
     read). Neither counts rows: a resolved property note can have zero
     logical items, and one logical item can wrap into many display runs.
-    ``display_row_y`` groups native horizontal lower-anchor Y offsets,
-    relative to the common display origin, without a sheet-space transform.
+    ``display_row_y`` groups horizontal lower-anchor Y values from the
+    reported native coordinates in the common display frame; grouping is
+    translation invariant.
     ``display_row_error`` keeps missing, blank or ambiguous display reads
     from claiming a row. The exported PDF remains the printed-fit proof."""
 
@@ -265,9 +266,10 @@ class TitleFieldReading:
 def _display_rows(annotation: Any) -> tuple[int, tuple[float, ...], str]:
     """Read physical rows, not ``INote`` items or ``IDisplayData`` runs.
 
-    The SDK's zero-based text positions are offsets from one display origin.
-    Horizontal lower-anchor runs therefore share a row exactly when their Y
-    offsets agree, irrespective of font-run splits or logical note shape.
+    The SDK's text-position indices are zero-based. Y comparisons in the
+    reported native coordinates' common display frame are translation
+    invariant. Horizontal lower-anchor runs share a row when those Y
+    values agree, irrespective of font-run splits or logical note shape.
     Upper/centre anchors and rotated runs do not establish that baseline
     contract; refuse them rather than guessing a height-based transform.
     Every run must answer, contain visible text and have a complete finite

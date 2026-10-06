@@ -415,7 +415,7 @@ def test_a_wrap_width_wider_than_the_cell_and_the_cells_air_pass():
 
 @pytest.mark.parametrize("logical_items", [0, 1, 2])
 def test_rendered_property_rows_do_not_depend_on_logical_item_shape(logical_items):
-    """The four actual purchased-note failures have shape 0 logical / 1 display;
+    """Actual purchased-note failures have shape 0 logical / 1 display;
     the same physical invariant also holds without assuming a vendor shape."""
     spec = DRAWINGS_BY_NAME["vn_transgear_collar_cross_pin"]
     number, title = registry_identity(spec)
@@ -460,18 +460,37 @@ def test_one_logical_item_with_the_actual_six_native_baselines_is_refused():
     assert _kinds(raised) == {("Title", "multi-line")}
 
 
-def test_multiple_native_runs_on_one_baseline_are_one_row():
+def test_multiple_native_lower_anchor_runs_on_one_baseline_are_one_row():
     sheet = _sheet()
     sheet._notes[-1] = _Note(
         NATIVE_TITLE_LINK,
         "dt-cone-gear",
         TITLE_EXTENT,
         items=2,
-        display=_Display(_run("dt-", 0.037492040792435455), _run("cone-gear", 0.037492040792435455, x=0.321)),
+        display=_Display(
+            _run("dt-", 0.037492040792435455),
+            _run("cone-gear", 0.037492040792435455, x=0.321, reference=4),
+        ),
     )
     readings = _read(sheet, _cone_gear())
     assert next(reading for reading in readings if reading.source == "Title").display_row_count == 1
     assert_title_fields(readings)
+
+
+def test_close_but_distinct_native_baselines_are_two_rows():
+    """20 micrometres is above numerical noise but far below a font-height merge."""
+    sheet = _sheet()
+    sheet._notes[-1] = _Note(
+        NATIVE_TITLE_LINK,
+        "dt-cone-gear",
+        TITLE_EXTENT,
+        display=_Display(_run("dt-", 0.037492), _run("cone-gear", 0.037472, x=0.321)),
+    )
+    readings = _read(sheet, _cone_gear())
+    assert next(reading for reading in readings if reading.source == "Title").display_row_count == 2
+    with pytest.raises(TitleFieldContractError) as raised:
+        assert_title_fields(readings)
+    assert _kinds(raised) == {("Title", "multi-line")}
 
 
 @pytest.mark.parametrize(
