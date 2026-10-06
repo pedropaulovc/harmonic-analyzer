@@ -465,7 +465,7 @@ def test_knife_load_cases_include_configured_and_scaled_reference_vectors(
         forces = [
             nom.spring_initial_tension
             + nom.spring_rate
-            * (pose.length_mm - eb.channel_spring_installed_spec.FREE_LENGTH_MM)
+            * (pose.length_mm - eb.vn_channel_spring_installed_spec.FREE_LENGTH_MM)
             for pose in poses
         ]
         assert case["channel_moment_N_mm"] == pytest.approx(
@@ -704,7 +704,7 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
 
 def test_rod_drive_is_on_the_crank_side(nom):
     """Machine hand: the rod pin sits at -X of the pivot (crank side) while the
-    bars ride +X -- build_channel_assembly._arc_geometry's -X branch. A +X bar
+    bars ride +X -- build_ch_channel_assembly._arc_geometry's -X branch. A +X bar
     therefore reads NEGATIVE at the top of stroke (the lobe lifts the crank
     side), which the procedure absorbs as a sign convention."""
     h = eb.harmonic_content(nom.d_max, nom, null=eb.null_station(nom))
@@ -1086,7 +1086,7 @@ def test_reserved_terms_are_scored_on_the_worst_broad_input(report):
 
 
 def test_reference_inputs_stay_on_the_lifting_side():
-    """build_channel_assembly rejects amplitude_mm < 0, so no reference input may
+    """build_ch_channel_assembly rejects amplitude_mm < 0, so no reference input may
     put a bar at a negative station."""
     for name, x in eb.reference_inputs().items():
         assert np.all(x >= 0.0), name
