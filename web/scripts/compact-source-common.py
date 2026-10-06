@@ -12,6 +12,7 @@ conflicting corresponding source points fail closed rather than choosing a donor
 from __future__ import annotations
 
 import copy
+import gzip
 import json
 import math
 import re
@@ -29,9 +30,36 @@ INPUT_FIELDS = ["crankTurns", "gearing", "magnification"] + [
 ] + [f"setup.{name}" for name in SETUP_FIELDS]
 
 
+def read_observations(path):
+    """Read observation JSON; gzip corruption and JSON errors propagate."""
+    path = Path(path)
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt", encoding="utf-8") as stream:
+            return json.load(stream)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_observations(path, data):
+    """Keep canonical observations compressed; plain temporary JSON is supported."""
+    path = Path(path)
+    canonical = (WEB / "content" / "canonical-native").resolve()
+    if path.resolve().is_relative_to(canonical) and path.name.endswith(".observations.json"):
+        raise ValueError("Canonical observation output must end in .observations.json.gz")
+    contents = json.dumps(data, indent=2) + "\n"
+    if path.suffix == ".gz":
+        with path.open("wb") as stored:
+            with gzip.GzipFile(filename="", mode="wb", fileobj=stored, compresslevel=9, mtime=0) as compressed:
+                compressed.write(contents.encode("utf-8"))
+    else:
+        path.write_text(contents, encoding="utf-8")
+
+
 def load_observations(video_id, prefer_track=False):
-    suffix = "track" if prefer_track and (WEB / "content" / "canonical-native" / f"{video_id}.track.json").exists() else "observations"
-    return json.loads((WEB / "content" / "canonical-native" / f"{video_id}.{suffix}.json").read_text())
+    content = WEB / "content" / "canonical-native"
+    track = content / f"{video_id}.track.json"
+    if prefer_track and track.exists():
+        return json.loads(track.read_text())
+    return read_observations(content / f"{video_id}.observations.json.gz")
 
 
 def historical_code_bytes(path, expected_sha256):

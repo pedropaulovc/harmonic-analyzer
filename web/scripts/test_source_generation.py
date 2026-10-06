@@ -2,6 +2,7 @@
 import copy
 from contextlib import contextmanager
 import importlib.util
+import gzip
 import hashlib
 import io
 import json
@@ -102,6 +103,42 @@ def retain(data, selected=None):
     if selected is None:
         selected = copy.deepcopy(data['frames'][0])
     return common.retain_exact_exposure_landmarks([selected], data)[0]
+
+
+class ObservationStorageBoundaryTests(unittest.TestCase):
+    def test_bad_or_missing_gzip_never_uses_plain_canonical_sibling(self):
+        valid = gzip.compress(b'{"frames": []}', mtime=0)
+        bad_crc = valid[:-8] + bytes([valid[-8] ^ 1]) + valid[-7:]
+        cases = (
+            ('missing', None, FileNotFoundError),
+            ('bad-header', b'not a gzip stream', gzip.BadGzipFile),
+            ('truncated', valid[:-8], EOFError),
+            ('bad-crc', bad_crc, gzip.BadGzipFile),
+            ('invalid-json', gzip.compress(b'{"frames":', mtime=0), json.JSONDecodeError),
+        )
+        for label, stored, error in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                web = Path(directory)
+                content = web / 'content' / 'canonical-native'
+                content.mkdir(parents=True)
+                (content / 'fixture.observations.json').write_text('{"frames": []}')
+                if stored is not None:
+                    (content / 'fixture.observations.json.gz').write_bytes(stored)
+                with patch.object(common, 'WEB', web), self.assertRaises(error):
+                    common.load_observations('fixture')
+
+    def test_plain_canonical_observation_output_is_refused_before_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            web = Path(directory)
+            content = web / 'content' / 'canonical-native'
+            content.mkdir(parents=True)
+            path = content / 'fixture.observations.json'
+            with patch.object(common, 'WEB', web), self.assertRaisesRegex(
+                    ValueError, 'Canonical observation output must end in'):
+                common.write_observations(path, {'frames': []})
+            self.assertFalse(path.exists())
+
+
 
 
 class ExactExposureLandmarkTests(unittest.TestCase):

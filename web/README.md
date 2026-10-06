@@ -92,8 +92,20 @@ replay. `generate` rewrites only declared derivatives, current SHA pins and
 the manifest's existing seals. JSON numbers are never parsed as floating-point
 values; all original numeric lexemes remain byte-identical. The six observation
 derivatives additionally remove only JSON whitespace outside quoted strings and
-have exactly one EOF newline. Evidence paths are translated only for declared
+have exactly one decoded EOF newline. They are stored as deterministic
+`*.observations.json.gz` files; current generators and verifiers decode gzip.
+The manifest seals both stored bytes (`sha256`) and decoded bytes
+(`decodedSha256`). Gzip uses compression level 9, zero timestamp and no embedded
+filename. Historical capture commands keep their recorded plaintext paths;
+they are provenance, not current loader aliases. Evidence paths are translated
+only for declared
 manifest members; authored source tracks remain directly under `content/`.
+Current path/hash projection targets required regeneration records and the three
+current `sourceObservations` metadata fields. Duplicate projection containers or
+authority members are ambiguous and refused; unrelated capture duplicates remain
+byte-exact.
+Inactive inputs do not authorize path/hash projection; their captured duplicates
+remain uninterpreted even when a neighboring current input is updated.
 Sealed canonical files are exempt from Git newline conversion. Replay preserves
 the original non-observation whitespace bytes; observation packets use the
 compact LF form above. Do not convert sealed derivatives to checkout-native
@@ -102,6 +114,9 @@ The manifest explicitly declares `canonicalConsumerHashNormalization` as
 `CRLF-to-LF` for editable current code/data inputs only. Their hashes certify
 the normalized text, not checkout byte identity. Original evidence, historical
 snapshots, mapping bytes and derivative dependency pins are never normalized.
+
+Compression reduces current storage, not Git ancestry. Oversized historical
+blobs remain unless history is explicitly rewritten.
 
 Native bindings use explicit root/component or root/assembly/component forms,
 with optional structural `/mesh` or indexed `/mesh_N` leaves. Identity and
@@ -117,6 +132,7 @@ Qualification-case `negative-native-` names embed the corresponding native
 locator after that schema-specific prefix and translate it as a concrete
 binding. Historical localhost web-route commands are not native CAD locators
 and retain their original route spelling.
+Inventory includes those schema-specific labels, not lookalike prose elsewhere.
 Before replay returns any output (and before `generate` writes), all 29 original
 members are inventoried. One failure packet lists every undeclared occurrence
 in source-path/traversal order with its exact JSONPath, binding and reason;
@@ -337,6 +353,13 @@ files and the motion producer script. Its cam-rod `sceneCurrentSourceSha256` als
 checks that root's actual `web/src/scene.ts`: even cosmetic byte changes require
 new bound GPU evidence. These gates do not use historical snapshots or the
 manifest's normalized consumer seals as substitutes for current source.
+`web/.gitattributes` fixes those five live source inputs and the three current
+raw-hashed regeneration inputs (the Operation producer, shared source reader and
+native bindings) to LF on checkout, including with `core.autocrlf=true`.
+Producer and consumer hashes still use exact bytes. This source-authority
+contract is separate from the 53 normalized
+identity-audit inputs. Historical code, original packets and geometry remain
+exact-byte evidence.
 Historical behavioral fixtures scope the exact archived scene and all four
 producer/math sources to those intended source paths, for both byte and text
 reads. They leave original packets and receipt seals untouched and replay only

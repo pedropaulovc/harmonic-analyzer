@@ -1,5 +1,7 @@
 """Offline identity grammar/transaction regressions; run by the coordinating root."""
+from contextlib import contextmanager
 import importlib.util
+import gzip
 import json
 from pathlib import Path
 import tempfile
@@ -137,6 +139,244 @@ class NativeEvidenceTests(unittest.TestCase):
             self.assertEqual([r['objectMemberIndex'] for r in records[:2]], [0, 1])
             self.assertEqual([r['location'] for r in records], ['value', 'value', 'key', 'value'])
             self.assertEqual({p: p.read_bytes() for p in root.rglob('*') if p.is_file()}, before)
+
+    def test_case_label_inventory_collects_all_unknown_labels_and_drawable_paths(self):
+        raw = (
+            b'{"independentSourceCalibration":{"sourceNonIdentifiableFixedPartQualification":{"cases":['
+            b'{"name":"negative-native-harmonic-analyzer/unknown-label-1",'
+            b'"name":"negative-native-harmonic-analyzer/unknown-label-2",'
+            b'"nativePartPaths":["harmonic-analyzer/unknown-drawable-1"]},'
+            b'{"name":"negative-native-harmonic-analyzer/unknown-label-3",'
+            b'"nativePartPaths":["harmonic-analyzer/unknown-drawable-2"]}]}}}')
+        records = evidence.native_binding_occurrences(raw, 'labels.json', MAPPING, set())
+        prefix = '$["independentSourceCalibration"]["sourceNonIdentifiableFixedPartQualification"]["cases"]'
+        self.assertEqual([
+            (record['sourcePacket'], record['jsonPath'], record['binding'],
+             record['location'], record.get('objectMemberIndex')) for record in records
+        ], [
+            ('labels.json', prefix + '[0]["name"]', 'harmonic-analyzer/unknown-label-1', 'value', 0),
+            ('labels.json', prefix + '[0]["name"]', 'harmonic-analyzer/unknown-label-2', 'value', 1),
+            ('labels.json', prefix + '[0]["nativePartPaths"][0]', 'harmonic-analyzer/unknown-drawable-1', 'value', None),
+            ('labels.json', prefix + '[1]["name"]', 'harmonic-analyzer/unknown-label-3', 'value', 0),
+            ('labels.json', prefix + '[1]["nativePartPaths"][0]', 'harmonic-analyzer/unknown-drawable-2', 'value', None),
+        ])
+
+    def test_case_label_mapping_is_known_and_schema_specific_not_a_prose_alias(self):
+        outside = 'negative-native-harmonic-analyzer/unknown-outside-label-1'
+        note = 'negative-native-harmonic-analyzer/unknown-case-prose-1'
+        raw = json.dumps({
+            'name': outside,
+            'independentSourceCalibration': {'sourceNonIdentifiableFixedPartQualification': {'cases': [
+                {'name': 'negative-native-harmonic-analyzer/frame/tube-frame-3', 'note': note},
+            ]}},
+        }).encode('utf8')
+        self.assertEqual(evidence.native_binding_occurrences(raw, 'labels.json', MAPPING, set()), [])
+        translate, _ = evidence.contextual_native_mapper(raw, 'labels.json', MAPPING, set())
+        changed = json.loads(evidence.strings(raw, {}, translate))
+        case = changed['independentSourceCalibration']['sourceNonIdentifiableFixedPartQualification']['cases'][0]
+        self.assertEqual(case['name'], 'negative-native-ha-harmonic-analyzer/fr-frame/fr-tube-frame-3')
+        self.assertEqual(case['note'], note)
+        self.assertEqual(changed['name'], outside)
+
+
+class CanonicalObservationCodecTests(unittest.TestCase):
+    @contextmanager
+    def authored_fixture(self):
+        raw = (b'{"n":1.2300e-09,"historicalCommand":"python fit-source.py '
+               b'web/content/snapshot.observations.json"}\n')
+        row = {
+            'path': 'web/content/canonical-native/snapshot.observations.json.gz',
+            'contentEncoding': 'gzip',
+            'decodedSha256': evidence.digest(raw),
+            'sha256': evidence.digest(raw),
+            'originalPath': 'web/content/snapshot.observations.json',
+            'originalSha256': evidence.digest(raw),
+            'originalNumericLexemeSha256': evidence.numbers(raw),
+            'archivedNativeBindings': [],
+        }
+        mapping_bytes = json.dumps(MAPPING).encode('utf8')
+        manifest = {
+            'mappingSchemaVersion': 2,
+            'mappingSha256': evidence.digest(mapping_bytes),
+            'originalSourceCommit': 'fixture-original',
+            'derivatives': [row],
+            'historicalCodeSnapshots': [],
+            'canonicalConsumerInputs': [],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stored = root / row['path']
+            stored.parent.mkdir(parents=True)
+            (root / row['originalPath']).write_bytes(raw)
+            (root / evidence.MANIFEST).write_text(json.dumps(manifest), encoding='utf8')
+            (root / evidence.MAP).parent.mkdir(parents=True)
+            (root / evidence.MAP).write_bytes(mapping_bytes)
+            with patch.object(evidence, 'ROOT', root):
+                with patch.object(evidence.sys, 'argv', ['evidence', 'generate']):
+                    evidence.main()
+                yield root, row, stored
+
+    def test_decoding_rejects_corruption_and_changed_numeric_or_provenance_seals(self):
+        with self.authored_fixture() as (_, row, stored):
+            valid = stored.read_bytes()
+            decoded = evidence.decoded_derivative(row, valid)
+            self.assertIn(b'1.2300e-09', decoded)
+            self.assertEqual(json.loads(decoded)['historicalCommand'],
+                             'python fit-source.py web/content/canonical-native/snapshot.observations.json')
+            bad_crc = valid[:-8] + bytes([valid[-8] ^ 1]) + valid[-7:]
+            cases = (
+                ('header', b'not a gzip stream'),
+                ('truncated', valid[:-8]),
+                ('crc', bad_crc),
+                ('json', evidence.encode_observations(b'{"n":')),
+                ('numeric-lexeme', evidence.encode_observations(
+                    decoded.replace(b'1.2300e-09', b'1.23e-9'))),
+                ('provenance', evidence.encode_observations(
+                    decoded.replace(row['originalSha256'].encode('ascii'), b'0' * 64))),
+            )
+            for label, wire in cases:
+                with self.subTest(label=label), self.assertRaises(ValueError):
+                    evidence.decoded_derivative(row, wire)
+
+    def test_check_rejects_reencoded_payload_even_with_honest_wire_and_decoded_seals(self):
+        with self.authored_fixture() as (root, _, stored):
+            decoded = gzip.decompress(stored.read_bytes())
+            replacement = gzip.compress(decoded, compresslevel=9, mtime=1)
+            stored.write_bytes(replacement)
+            manifest_path = root / evidence.MANIFEST
+            manifest = json.loads(manifest_path.read_bytes())
+            manifest['derivatives'][0]['sha256'] = evidence.digest(replacement)
+            manifest['derivatives'][0]['decodedSha256'] = evidence.digest(decoded)
+            manifest_path.write_text(json.dumps(manifest), encoding='utf8')
+            with patch.object(evidence.sys, 'argv', ['evidence', 'check']), self.assertRaises(ValueError):
+                evidence.main()
+
+    def test_capture_dependencies_and_current_inputs_keep_separate_payload_and_wire_identities(self):
+        with self.authored_fixture() as (root, observation, stored):
+            plain_path = observation['path'][:-3]
+            plain_sha = evidence.digest(gzip.decompress(stored.read_bytes()))
+            captured = {'path': plain_path, 'sha256': plain_sha}
+            probe_raw = json.dumps({'lineage': {'observations': {
+                'path': observation['originalPath'],
+                'sha256': observation['originalSha256'],
+            }}}).encode('utf8')
+            probe = {
+                'path': 'web/content/canonical-native/probe.json',
+                'sha256': evidence.digest(probe_raw),
+                'originalPath': 'web/content/probe.json',
+                'originalSha256': evidence.digest(probe_raw),
+                'originalNumericLexemeSha256': evidence.numbers(probe_raw),
+                'archivedNativeBindings': [],
+            }
+            (root / probe['originalPath']).write_bytes(probe_raw)
+            manifest_path = root / evidence.MANIFEST
+            manifest = json.loads(manifest_path.read_bytes())
+            manifest['derivatives'].append(probe)
+            manifest_path.write_text(json.dumps(manifest), encoding='utf8')
+            track_path = root / 'web/content/snapshot.source-track.json'
+            track = {'evidence': {
+                'generatorInputs': [{**captured, 'requiredForRegeneration': True}],
+                'synthesisCoarseFraming': {'sourceObservations': plain_path},
+                'historicalReportInputs': {'reports': [captured]},
+            }}
+            track_path.write_text(json.dumps(track), encoding='utf8')
+            with patch.object(evidence.sys, 'argv', ['evidence', 'generate']):
+                evidence.main()
+            self.assertEqual(json.loads((root / probe['path']).read_bytes())['lineage']['observations'],
+                             captured)
+            changed = json.loads(track_path.read_bytes())['evidence']
+            self.assertEqual(changed['generatorInputs'][0], {
+                'path': observation['path'], 'sha256': evidence.digest(stored.read_bytes()),
+                'requiredForRegeneration': True,
+            })
+            self.assertEqual(changed['synthesisCoarseFraming']['sourceObservations'], observation['path'])
+            self.assertEqual(changed['historicalReportInputs']['reports'], [captured])
+            changed['generatorInputs'][0]['path'] = 'web/content/snapshot.source-track.json'
+            track_path.write_text(json.dumps({'evidence': changed}), encoding='utf8')
+            with patch.object(evidence.sys, 'argv', ['evidence', 'generate']), self.assertRaises(ValueError):
+                evidence.main()
+
+
+class CurrentTrackProjectionTests(unittest.TestCase):
+    def setUp(self):
+        self.old_path = 'web/content/review.observations.json'
+        self.new_path = 'web/content/canonical-native/review.observations.json.gz'
+        plain = b'{"frames":[]}\n'
+        self.wire = evidence.encode_observations(plain)
+        self.old_sha = evidence.digest(plain)
+        self.manifest = {'derivatives': [{
+            'originalPath': self.old_path, 'path': self.new_path, 'contentEncoding': 'gzip',
+        }]}
+
+    def input_record(self, required):
+        return json.dumps({
+            'path': self.old_path, 'sha256': self.old_sha, 'requiredForRegeneration': required,
+        }, separators=(',', ':')).encode('utf8')
+
+    def project(self, raw):
+        return evidence.current_track_inputs(
+            raw, 'projection.json', self.manifest, {self.new_path: self.wire}, {})
+
+    def test_duplicate_projection_containers_and_authority_leaves_fail_closed(self):
+        false = self.input_record(False)
+        true = self.input_record(True)
+        old_path = json.dumps(self.old_path).encode('utf8')
+        sha = json.dumps(self.old_sha).encode('ascii')
+        cases = [
+            ('generatorInputs-false-true', b'{"evidence":{"generatorInputs":[' + false
+             + b'],"generatorInputs":[' + true + b']}}'),
+            ('generatorInputs-true-false', b'{"evidence":{"generatorInputs":[' + true
+             + b'],"generatorInputs":[' + false + b']}}'),
+            ('evidence', b'{"evidence":{"generatorInputs":[' + false
+             + b']},"evidence":{"generatorInputs":[' + true + b']}}'),
+            ('input-path', b'{"evidence":{"generatorInputs":[{"path":' + old_path
+             + b',"path":' + old_path + b',"sha256":' + sha + b',"requiredForRegeneration":true}]}}'),
+            ('input-sha', b'{"evidence":{"generatorInputs":[{"path":' + old_path
+             + b',"sha256":' + sha + b',"sha256":' + sha + b',"requiredForRegeneration":true}]}}'),
+            ('input-required', b'{"evidence":{"generatorInputs":[{"path":' + old_path
+             + b',"sha256":' + sha + b',"requiredForRegeneration":false,"requiredForRegeneration":true}]}}'),
+        ]
+        for label in ('analysisStationaryFrontCamera', 'synthesisCoarseFraming', 'synthesisWheelFraming'):
+            key = json.dumps(label).encode('ascii')
+            record = b'{"sourceObservations":' + old_path + b'}'
+            cases.append((label + '-container', b'{"evidence":{' + key + b':' + record
+                          + b',' + key + b':' + record + b'}}'))
+            cases.append((label + '-leaf', b'{"evidence":{' + key + b':{"sourceObservations":'
+                          + old_path + b',"sourceObservations":' + old_path + b'}}}'))
+        for label, raw in cases:
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                self.project(raw)
+
+    def test_inactive_input_duplicates_remain_byte_exact_beside_active_input(self):
+        old_path = json.dumps(self.old_path).encode('utf8')
+        sha = json.dumps(self.old_sha).encode('ascii')
+        older_sha = json.dumps(evidence.digest(b'{"frames":[{"frame":0}]}\n')).encode('ascii')
+        for required in (b',"requiredForRegeneration":false', b''):
+            with self.subTest(required=required):
+                captured = (b'{"path":"web/content/captured-older.observations.json","path":' + old_path
+                            + b',"sha256":' + older_sha + b',"sha256":' + sha
+                            + required + b',"n":1.2300e-09}')
+                raw = (b'{"evidence":{"generatorInputs":[' + captured + b','
+                       + self.input_record(True) + b']}}')
+                changed = self.project(raw)
+                self.assertIn(captured, changed)
+                records = json.loads(changed)['evidence']['generatorInputs']
+                self.assertEqual(records[1], {
+                    'path': self.new_path, 'sha256': evidence.digest(self.wire), 'requiredForRegeneration': True,
+                })
+
+    def test_unrelated_archival_duplicates_remain_byte_exact_during_current_projection(self):
+        false = self.input_record(False)
+        archive = (b'"archive":{"evidence":{"generatorInputs":[' + false
+                   + b'],"generatorInputs":[' + false + b']},"n":1.2300e-09},'
+                   b'"archive":{"note":"captured duplicate"}')
+        raw = b'{' + archive + b',"evidence":{"generatorInputs":[' + self.input_record(True) + b']}}'
+        changed = self.project(raw)
+        self.assertIn(archive, changed)
+        record = json.loads(changed)['evidence']['generatorInputs'][0]
+        self.assertEqual(record, {
+            'path': self.new_path, 'sha256': evidence.digest(self.wire), 'requiredForRegeneration': True,
+        })
 
 
 if __name__ == '__main__':

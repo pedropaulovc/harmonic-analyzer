@@ -8,8 +8,8 @@
   "geometryQualification": "Unchanged historical geometry/source observations. Native namespace translation does not requalify current CAD/renderer or source-camera correspondence.",
   "derivatives": [
     {
-      "path": "web/content/canonical-native/4mBuyixt22U.observations.json",
-      "sha256": "57a140ec7fda4d285bd5774efeb9771af69b07e550c18353421ffad755deb3ab",
+      "path": "web/content/canonical-native/4mBuyixt22U.observations.json.gz",
+      "sha256": "9617be7a9c13793d44ba212aca7cd4b703c42c157f1b254dabb8313c614afebc",
       "originalPath": "web/content/4mBuyixt22U.observations.json",
       "originalSha256": "9ec73bdc70407eeecc63390789b3f7b8549c757c6ea887738dac40b1f532c8ba",
       "originalNumericLexemeSha256": "6f2c3e94c200e544dfb9d624b26a46eba02c1acf3fbdfffea949ef4cec8101e0",
@@ -24,7 +24,9 @@
         "harmonic-analyzer/paper-drive/transgear-pinion-1",
         "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304",
         "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304_1"
-      ]
+      ],
+      "contentEncoding": "gzip",
+      "decodedSha256": "57a140ec7fda4d285bd5774efeb9771af69b07e550c18353421ffad755deb3ab"
     },
     {
       "path": "web/content/canonical-native/4mBuyixt22U.source-seeds.json",
@@ -59,12 +61,14 @@
       "archivedNativeBindings": []
     },
     {
-      "path": "web/content/canonical-native/6dW6VYXp9HM.observations.json",
-      "sha256": "1f1d7b85280f239796354a274ae7c0244c4960fa63cb0a686e1b90f1b02bff48",
+      "path": "web/content/canonical-native/6dW6VYXp9HM.observations.json.gz",
+      "sha256": "36e56a7e852ee52a752f8dc9476e2d68c04db0486231655fcb220fc231ad15ec",
       "originalPath": "web/content/6dW6VYXp9HM.observations.json",
       "originalSha256": "fa69d6cab6173baa7061e825e51651a8fc56bbbc66b6543c4510cd7851d64e36",
       "originalNumericLexemeSha256": "ed25ccd72673dd971656ebc2fb1e6265f65c11d945444c84c3ab5b54b93b3cd8",
-      "archivedNativeBindings": []
+      "archivedNativeBindings": [],
+      "contentEncoding": "gzip",
+      "decodedSha256": "1f1d7b85280f239796354a274ae7c0244c4960fa63cb0a686e1b90f1b02bff48"
     },
     {
       "path": "web/content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json",
@@ -131,12 +135,14 @@
       "archivedNativeBindings": []
     },
     {
-      "path": "web/content/canonical-native/8KmVDxkia_w.observations.json",
-      "sha256": "18e076f5da9a4468b3eb39b8a74e9141f3dd272ceaca655d35b77a33b8d9a3ee",
+      "path": "web/content/canonical-native/8KmVDxkia_w.observations.json.gz",
+      "sha256": "37fd89414b70d39e53aafad2e388a4caf1f4093685b6789ca8d6ddefb3be5234",
       "originalPath": "web/content/8KmVDxkia_w.observations.json",
       "originalSha256": "3ac8e4df14487799637091859bdad58cc88a96c28a90c22ba1893772b5ee0f05",
       "originalNumericLexemeSha256": "7698c9cad963ac84ed885467036af3084d1356865e4225778b9943f05fc7e5c4",
-      "archivedNativeBindings": []
+      "archivedNativeBindings": [],
+      "contentEncoding": "gzip",
+      "decodedSha256": "18e076f5da9a4468b3eb39b8a74e9141f3dd272ceaca655d35b77a33b8d9a3ee"
     },
     {
       "path": "web/content/canonical-native/8KmVDxkia_w.track.json",
@@ -147,8 +153,8 @@
       "archivedNativeBindings": []
     },
     {
-      "path": "web/content/canonical-native/NAsM30MAHLg.observations.json",
-      "sha256": "e104fac523a60bb522ae363695587aa7181ce59ef3756bbf3c3a54a61a5a14cb",
+      "path": "web/content/canonical-native/NAsM30MAHLg.observations.json.gz",
+      "sha256": "de1919ef790a7a1809f505db89b334ee13b20dd10a6d47fdeccfcaa243abf4fa",
       "originalPath": "web/content/NAsM30MAHLg.observations.json",
       "originalSha256": "d5955bf34a9e006325e7902049cd842e20f2eb178c25954ffaff75ee8f0e7513",
       "originalNumericLexemeSha256": "75976a03282b535f16e973bd123c4046e1c9110aebb476e9951520f1ab2d3d1a",
@@ -164,15 +170,19 @@
         "harmonic-analyzer/paper-drive/transgear-stub-1",
         "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304",
         "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304_1"
-      ]
+      ],
+      "contentEncoding": "gzip",
+      "decodedSha256": "e104fac523a60bb522ae363695587aa7181ce59ef3756bbf3c3a54a61a5a14cb"
     },
     {
-      "path": "web/content/canonical-native/XPQwKRt4Y2k.observations.json",
-      "sha256": "be746f33d35aa3cabb6bcb150aff0ec43aca276c0f9d2be494448fafc5e6fe2c",
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.observations.json.gz",
+      "sha256": "25a73ca485521a5bb85a99698924034af65b4de039aa38a5348da39845bd2ecf",
       "originalPath": "web/content/XPQwKRt4Y2k.observations.json",
       "originalSha256": "03cc4f030e820faf185251cd30d1c33d3413cbc6a690b1f96c6f2d4596406a5d",
       "originalNumericLexemeSha256": "10d90d753dc41d855823cc57804fffea86bcb4beff6f6e21f413df4c9af1fb84",
-      "archivedNativeBindings": []
+      "archivedNativeBindings": [],
+      "contentEncoding": "gzip",
+      "decodedSha256": "be746f33d35aa3cabb6bcb150aff0ec43aca276c0f9d2be494448fafc5e6fe2c"
     },
     {
       "path": "web/content/canonical-native/XPQwKRt4Y2k.source-phase-map.json",
@@ -258,12 +268,14 @@
       ]
     },
     {
-      "path": "web/content/canonical-native/jfH-NbsmvD4.observations.json",
-      "sha256": "f51142694c686a43ee01fbd1ea0ea34d5ce66c41a9c88f7ab7be968a66777892",
+      "path": "web/content/canonical-native/jfH-NbsmvD4.observations.json.gz",
+      "sha256": "406a6853e022f1680f378c2576cc598fbbdcebf466e75796958ad4c9432de106",
       "originalPath": "web/content/jfH-NbsmvD4.observations.json",
       "originalSha256": "b45849dd41648dfa0c0a15f7bbce20a5042707bd609e2913304057518e366117",
       "originalNumericLexemeSha256": "83acff5ab7c67d8ec11755ed972f8d8fce8eb13d9344a93a516efc8549acccc5",
-      "archivedNativeBindings": []
+      "archivedNativeBindings": [],
+      "contentEncoding": "gzip",
+      "decodedSha256": "f51142694c686a43ee01fbd1ea0ea34d5ce66c41a9c88f7ab7be968a66777892"
     },
     {
       "path": "web/content/canonical-native/jfH-NbsmvD4.source-seeds.json",
@@ -339,12 +351,12 @@
     },
     {
       "path": "web/scripts/compact-operation-rocker.py",
-      "sha256": "e0360be6ff2c64daa6ee8a87ec305b3f25281df992a94ec4418f64b0ddc31fdb",
+      "sha256": "550b0fc5e3df92af41f2b9cb6a17a231437cce7dc24abf24387a2150c1b5ebb2",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/compact-source-common.py",
-      "sha256": "dea8f85f0a3c67d467dd66cfcd039d7461efb6c4cba43e379b26370aaea796e1",
+      "sha256": "bb982f567ff742631b75f329b5114b09155dbb65c2169095db17ff20b56fc565",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -374,7 +386,7 @@
     },
     {
       "path": "web/scripts/fit-source.py",
-      "sha256": "88856d6ed10d19d772208f5fbad9e2babddfe557d02c423f84d16420f5bae23d",
+      "sha256": "df3b09d77356ddeb4a2bde44b412adae5778b0bb9b737d45a728371b17e24510",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -389,7 +401,7 @@
     },
     {
       "path": "web/scripts/generate-analysis-synthesis-source-tracks.py",
-      "sha256": "d8d8c14bf7a6e851003230cc3e575d3bd76815675e841d863c55369003ea7e54",
+      "sha256": "fe029b46525d455325351075a20973314554ab7e68b728cd6cb3a81347f56cad",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -399,7 +411,7 @@
     },
     {
       "path": "web/scripts/generate-spin-source-controls.py",
-      "sha256": "6e1c0e054c63566b13853de8bff35f4ae27a94b471c80ff7b58084dac73d569a",
+      "sha256": "a06dbbdad494a11e55d7b63bd92271f43079ca4ad2779b69fc62f8f89b1d9160",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -414,7 +426,7 @@
     },
     {
       "path": "web/scripts/NAsM30MAHLg-calibrate-static.py",
-      "sha256": "165e638880694b463e5c8a17218a1567b1c739179a0ec05909a5b822a9bd5dba",
+      "sha256": "9e8b9608c0be077259fc25069233f4206157ea0ace96d491746df256c0fe15cd",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -424,7 +436,7 @@
     },
     {
       "path": "web/scripts/observe-source.py",
-      "sha256": "9bda24eee19139cdc7a8d2b2d0e7b9dd8a2fd1076ab8f44e2ca72e6e660ae764",
+      "sha256": "e3208d81c0c2ac69015da84757aba9d2e08899250183182ced2a2dc11d048b79",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -449,12 +461,12 @@
     },
     {
       "path": "web/scripts/test_source_generation.py",
-      "sha256": "9deba277c4b2b8aa07e466352f838e4743498dfef65f5f4ced32b9b8fda7147f",
+      "sha256": "f0ca51c43bf0d7e49face9e7b04cd9ad328fdad7e014e0842afa3ceb872b4fcb",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/verify-reference.mjs",
-      "sha256": "6b44e98315e96d2f7d87248f6a5316e5bdf7cb9082bd81e8bf74d85470eb81df",
+      "sha256": "3d09990dcb51c95c7c3e44a4a599b7bc49b22959111920b722b73e7889ec6972",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -464,12 +476,12 @@
     },
     {
       "path": "web/scripts/verify-sync.mjs",
-      "sha256": "21749c879859a66171e5b936f2da720db61df085c8fdede2cbe09ab6e7e41914",
+      "sha256": "c891ebd4b1d32e288d5354285cd41c7cf8733edaf720f8ceb33712c0c7448d6f",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/verify-sync.test.mjs",
-      "sha256": "7db913c7a07e964a909de6fc9df3707ad21138016fec70a27ba4e1d76ba368aa",
+      "sha256": "4400945bc2178c529375d18b7d8f9327e41b23085c0ee02161d305e4bd361527",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -549,17 +561,17 @@
     },
     {
       "path": "web/content/4mBuyixt22U.source-track.json",
-      "sha256": "e0683efd871f00bd28ed09c72f3f60a0de9fb480c516d952057977c71d8f842e",
+      "sha256": "601b4e4a87e5bef237c08d8b5a4c94c3781ff70ce8389e2ec9abe1b61d158f8e",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/content/6dW6VYXp9HM.source-track.json",
-      "sha256": "aeb10a3653f7c8d7264b8e4c3a9b4b35f0211d22b4420cdcf3ec823b45414ec5",
+      "sha256": "d469083532a2c9149d08557536acd994e6c56637de4d9dcaa52af44693b9b392",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/content/8KmVDxkia_w.source-track.json",
-      "sha256": "6d45dd41c1caa085e944fbda3c7d78661f1ee8f9cf5f7455754592be665dba89",
+      "sha256": "9f55bc1a784b9cdcb19170729fdc9d22a6ae4cfc2d60f1836947e404f657552a",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -574,7 +586,7 @@
     },
     {
       "path": "web/content/jfH-NbsmvD4.source-track.json",
-      "sha256": "1fa526a88db430be30c9360ac500913bec8cd4787a393a417bd721413da4b606",
+      "sha256": "6472c9d5d4518c3d598e31a8d582e2a1bec62f361d3f9f8176a8aa92065a3443",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -584,7 +596,7 @@
     },
     {
       "path": "web/scripts/canonical-native-evidence.py",
-      "sha256": "b32c8be3ce0c5e0c14cb009097817434150d90c4d9993887aef3dc5713c14900",
+      "sha256": "3e5de6bc17c48de92286d056d763d3f8ea19807a13fa969448f5023255454135",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     }
   ]

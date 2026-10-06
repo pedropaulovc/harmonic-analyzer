@@ -1,12 +1,39 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { gzipSync } from 'node:zlib'
 import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } from './verify-sync.mjs'
-import { jsonDigest, MODEL_SHA256, MODEL_COMMIT } from './verify-reference.mjs'
+import { jsonDigest, loadCanonicalObservations, MODEL_SHA256, MODEL_COMMIT } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
 const frame = (time, classification = 'machine') => ({ timeSeconds: time, decodedTimeSeconds: time, shotId: 'shot', classification, views: [{ id: 'main' }] })
 const observations = { shots: [{ id: 'shot', startSeconds: 0, endSeconds: 2.1, classification: 'machine', hasCorrespondingMachine: true }], frames: [frame(0), frame(1), frame(2)], coverage: { changeTimesSeconds: [0.1, 0.2] } }
+
+test('canonical observation loading rejects missing, corrupt or invalid gzip without using plain siblings', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'canonical-observation-boundaries-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const content = join(root, 'content', 'canonical-native')
+  await mkdir(content, { recursive: true })
+  await writeFile(join(content, 'fixture.observations.json'), '{"frames": []}')
+  const valid = gzipSync('{"frames": []}')
+  const badCrc = Buffer.from(valid)
+  badCrc[badCrc.length - 8] ^= 1
+  for (const [label, stored, error] of [
+    ['missing', null, { code: 'ENOENT' }],
+    ['bad-header', Buffer.from('not a gzip stream'), { code: 'Z_DATA_ERROR' }],
+    ['truncated', valid.subarray(0, -8), { code: 'Z_BUF_ERROR' }],
+    ['bad-crc', badCrc, { code: 'Z_DATA_ERROR' }],
+    ['invalid-json', gzipSync('{"frames":'), SyntaxError],
+  ]) {
+    await t.test(label, async () => {
+      if (stored !== null) await writeFile(join(content, 'fixture.observations.json.gz'), stored)
+      await assert.rejects(loadCanonicalObservations(root, 'fixture'), error)
+    })
+  }
+})
 
 test('paused camera pose ignores normalization jitter but rejects actual translation, rotation and zoom', () => {
   const camera = { positionMetres: [1.4665951818671157, 1.0722987956210683, 2.0027832566537382], quaternion: [0, 0, 0, 1], verticalFovDegrees: 35 }

@@ -2,7 +2,7 @@
 """Sample actual local source frames and conservatively track manually identified features.
 
 python web/scripts/observe-source.py --source /private/source.mp4
-  --observations web/content/canonical-native/XPQwKRt4Y2k.observations.json --output /tmp/observed.json
+  --observations web/content/canonical-native/XPQwKRt4Y2k.observations.json.gz --output /tmp/observed.json
 
 Only numeric observations are written. Never copies source frames/video into the repo.
 Content classification comes from the human-observed shot census, NOT guessed image labels.
@@ -19,12 +19,17 @@ They remain manual observations, not new flow or template-match measurements.
 import argparse
 import copy
 import hashlib
+import importlib.util
 import json
 import math
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+SPEC = importlib.util.spec_from_file_location("compact_source_common", Path(__file__).with_name("compact-source-common.py"))
+common = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(common)
 
 
 def digest(path):
@@ -539,13 +544,13 @@ def main():
         help="Independently measure only actual source images matching a manual seed view",
     )
     args = parser.parse_args()
-    observations = json.loads(args.observations.read_text())
+    observations = common.read_observations(args.observations)
     if observations.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
         parser.error("--observations must select a materialized canonical-native derivative, not archived original evidence")
     output = observe(
         observations, args.source, args.match_repeated_view
     )
-    args.output.write_text(json.dumps(output, indent=2) + "\n")
+    common.write_observations(args.output, output)
     print(
         json.dumps(
             {

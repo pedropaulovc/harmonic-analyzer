@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, loadCanonicalObservations, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 import { assertNativeSourceAssociation, assertModelRepresentationBytes, REPRESENTATION_KIND } from '../model-representation.mjs'
 
@@ -224,7 +224,7 @@ export function sourceCensus(observations, track, native, options) {
 
 async function loadRecord(id, referenceRoot, signal) {
   const track = JSON.parse(await readFile(resolve(WEB_ROOT, `content/${id}.source-track.json`), 'utf8'))
-  const observations = JSON.parse(await readFile(resolve(WEB_ROOT, `content/canonical-native/${id}.observations.json`), 'utf8'))
+  const observations = await loadCanonicalObservations(WEB_ROOT, id)
   assert(track.kind === 'compact-source-track' && track.schemaVersion === 1, 'Expected the compact source-track contract')
   const expectedHash = SOURCE_HASHES[VIDEO_IDS.indexOf(id)]
   assert(track.source?.videoId === id && track.source.sha256 === expectedHash && observations.source?.sha256 === expectedHash, 'Compact/source census identity differs from retained original MP4 SHA256')
