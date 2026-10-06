@@ -230,7 +230,7 @@ def test_top_edge_height_is_a_banded_model_dimension() -> None:
     # The centre is an equation of the printed height, so the model can't
     # hold one value while the sheet prints another.
     assert '"ArmDepth" / 2 + "TopAbovePivot" + "CurveRadius"' in build
-    assert rocker_arm_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"] == 2
+    assert ch_rocker_arm_notes.DRAWING_PRECISION["TopEdgeReference"]["TopAbovePivot"] == 2
 
 
 def test_pivot_bore_ream_band_rides_its_diameter_not_a_note() -> None:
