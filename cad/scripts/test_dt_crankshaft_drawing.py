@@ -13,7 +13,16 @@ import dt_crank_hub_geometry as geometry
 import dt_crankshaft_notes as notes
 import dt_crankshaft_spec as spec
 import draw_dt_crankshaft as drawing
+from _drawing_layout_check import DrawableRegion
 from _hole_spec import blind_cut_dia_mm
+from _layout_audit import find_leader_through_text
+from _layout_geometry import (
+    AnnotationGeometry,
+    Box,
+    Segment,
+    SheetGeometry,
+    segment_box_distance,
+)
 from _surface_finish import MACHINED_UM
 
 
@@ -470,30 +479,87 @@ def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
     assert spec.PINION_SEAT_DIA_BAND == spec.SHAFT_DIA_BAND
 
 
-def test_retention_pin_note_clears_the_profile_and_title_block() -> None:
-    assert drawing.PINION_PIN_X == pytest.approx(
-        drawing.DOME_ROOT_X + part.PINION_PIN_STATION_Y * drawing.SHEET_SCALE[0] / 1000.0
+# R11 native text-only extent and enforced audit geometry. The measured block
+# carries the complete four-line process at the unchanged template font.
+_R11_RETENTION_TEXT = (
+    0.22447823411371237,
+    0.24645135785953182,
+    0.33218272909699,
+    0.2645609632107024,
+)
+_R11_RETENTION_LEADER = Segment(0.3272, 0.2490, 0.3529, 0.1768, "leader")
+_R11_SEAT_TEXT = Box(0.3270, 0.2084, 0.3556, 0.2120)
+
+
+def _retention_pin_sheet(leader: Segment) -> SheetGeometry:
+    return SheetGeometry(
+        name="Sheet1",
+        width=0.4318,
+        height=0.2794,
+        region=DrawableRegion.from_margins(
+            0.4318, 0.2794, left=0.0127, right=0.0127, bottom=0.0127, top=0.0127
+        ),
+        annotations=(
+            AnnotationGeometry(
+                label="16T retention-pin transfer",
+                kind="note",
+                owner="side",
+                segments=(leader,),
+            ),
+            AnnotationGeometry(
+                label="PinionSeatDiaDim",
+                kind="dim",
+                owner="side",
+                text_boxes=(_R11_SEAT_TEXT,),
+            ),
+        ),
     )
-    assert drawing.JOURNAL_END_X < drawing.PINION_PIN_X < drawing.FAR_END_X
-    # The note block (top-left anchored; sized for up to 3.5 mm note text)
-    # stays inside its field: right of the cross-hole callout's text, above
-    # the diameter row, left of the isometric and inside the border.
-    lines = drawing.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n")
-    height = 0.0035
-    char_w, line_h = 0.8 * height, 1.7 * height
-    x0, y0 = drawing.PINION_PIN_NOTE_XY
-    right = x0 + char_w * max(map(len, lines))
-    bottom = y0 - line_h * len(lines)
-    field_x0, field_y0, field_x1, field_y1 = drawing.PINION_PIN_NOTE_FIELD
-    assert field_x0 == pytest.approx(drawing.HOLE_CALLOUT_XY[0] + 0.032)
-    assert field_x1 == pytest.approx(drawing.ISO_CENTER[0] - 0.012)
-    assert field_y1 < 0.2667
-    assert field_x0 < x0 and right < field_x1
-    assert y0 <= field_y1
-    # Every diameter under the note's span keeps its text below the note.
-    for name, (dx, dy) in drawing.DIAMETER_POSITIONS.items():
-        if dx > x0 - 0.030:
-            assert bottom > dy + 0.010, name
+
+
+def test_native_retention_pin_leader_crossing_seat_text_is_rejected() -> None:
+    # Reproduce the consumer-facing native gate from the observed final
+    # segment and obstacle, including its chord and crossing coordinates.
+    findings = find_leader_through_text(_retention_pin_sheet(_R11_RETENTION_LEADER))
+    assert [(finding.kind, finding.b) for finding in findings] == [
+        ("leader-through-text", "PinionSeatDiaDim")
+    ]
+    assert findings[0].extra["overlap_mm"] == pytest.approx(3.84, abs=0.03)
+    assert findings[0].at_mm == pytest.approx((341.0, 210.2), abs=0.1)
+
+
+def test_full_retention_pin_note_allocation_clears_native_seat_text() -> None:
+    # Move the full native box; no smaller font, abbreviations or width model.
+    dx, dy = drawing._shift_into_field(
+        _R11_RETENTION_TEXT,
+        drawing.PINION_PIN_NOTE_FIELD,
+        drawing.NOTE_FIELD_MARGIN,
+        placement="right",
+    )
+    x0, y0, x1, y1 = _R11_RETENTION_TEXT
+    allocated = Box(x0 + dx, y0 + dy, x1 + dx, y1 + dy)
+    assert dx > 0.050
+    assert allocated.width == pytest.approx(x1 - x0)
+    assert allocated.height == pytest.approx(y1 - y0)
+    assert drawing._shift_into_field(
+        (allocated.xmin, allocated.ymin, allocated.xmax, allocated.ymax),
+        drawing.PINION_PIN_NOTE_FIELD,
+        drawing.NOTE_FIELD_MARGIN,
+        placement="minimal",
+    ) == pytest.approx((0.0, 0.0), abs=1e-12)
+    assert allocated.ymin > max(y for _x, y in drawing.DIAMETER_POSITIONS.values()) + 0.010
+    assert allocated.ymax < 0.2667
+    # With the straight leader pinned to the text's right side, its start
+    # translates with the measured box and its associative hole tip stays put.
+    leader = Segment(
+        _R11_RETENTION_LEADER.x0 + dx,
+        _R11_RETENTION_LEADER.y0 + dy,
+        _R11_RETENTION_LEADER.x1,
+        _R11_RETENTION_LEADER.y1,
+        "leader",
+    )
+    assert drawing._inside((leader.x1, leader.y1), drawing.PINION_PIN_HOLE_WINDOW)
+    assert find_leader_through_text(_retention_pin_sheet(leader)) == []
+    assert segment_box_distance(leader, _R11_SEAT_TEXT) > 0.008
 
 
 def test_note_text_is_shifted_into_its_field_from_the_measured_box() -> None:
@@ -502,16 +568,26 @@ def test_note_text_is_shifted_into_its_field_from_the_measured_box() -> None:
     field = (0.26, 0.17, 0.378, 0.2657)
     margin = drawing.NOTE_FIELD_MARGIN
     inside = (0.30, 0.235, 0.35, 0.25)
-    assert drawing._shift_into_field(inside, field, margin) == (0.0, 0.0)
-    dx, dy = drawing._shift_into_field((0.30, 0.24, 0.35, 0.2665), field, margin)
+    assert drawing._shift_into_field(
+        inside, field, margin, placement="minimal"
+    ) == (0.0, 0.0)
+    dx, dy = drawing._shift_into_field(
+        (0.30, 0.24, 0.35, 0.2665), field, margin, placement="minimal"
+    )
     assert dx == 0.0 and dy == pytest.approx(0.2657 - margin - 0.2665)
-    dx, dy = drawing._shift_into_field((0.25, 0.20, 0.30, 0.21), field, margin)
+    dx, dy = drawing._shift_into_field(
+        (0.25, 0.20, 0.30, 0.21), field, margin, placement="minimal"
+    )
     assert dx == pytest.approx(0.26 + margin - 0.25) and dy == 0.0
-    dx, dy = drawing._shift_into_field((0.34, 0.165, 0.39, 0.18), field, margin)
+    dx, dy = drawing._shift_into_field(
+        (0.34, 0.165, 0.39, 0.18), field, margin, placement="minimal"
+    )
     assert dx == pytest.approx(0.378 - margin - 0.39)
     assert dy == pytest.approx(0.17 + margin - 0.165)
     with pytest.raises(RuntimeError, match="over by 0.0020 wide"):
-        drawing._shift_into_field((0.26, 0.20, 0.378 + 0.0, 0.21), field, margin)
+        drawing._shift_into_field(
+            (0.26, 0.20, 0.378 + 0.0, 0.21), field, margin, placement="minimal"
+        )
 
 
 def test_leader_tip_is_the_point_nearest_the_hole_and_must_land_on_it() -> None:
