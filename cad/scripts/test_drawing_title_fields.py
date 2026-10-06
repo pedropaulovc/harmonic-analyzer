@@ -34,14 +34,47 @@ CHAR_HEIGHT = 0.0052
 NATIVE_TITLE_LINK = '<FONT size=15PTS>$PRPSHEET:"SW-Title(Title)"'
 
 
+def _run(text, y, *, x=0.3124416033363626, reference=1, angle=0.0):
+    return (text, (x, y, 0.0), reference, angle)
+
+
+class _Display:
+    """Independent native runs: logical INote items need not match them."""
+
+    def __init__(self, *runs, count=None):
+        self._runs = runs
+        self._count = len(runs) if count is None else count
+
+    def GetTextCount(self):  # noqa: N802 - COM name
+        return self._count
+
+    def GetTextAtIndex(self, index):  # noqa: N802 - COM name
+        return self._runs[index][0]
+
+    def GetTextPositionAtIndex(self, index):  # noqa: N802 - COM name
+        position = self._runs[index][1]
+        if isinstance(position, Exception):
+            raise position
+        return position
+
+    def GetTextRefPositionAtIndex(self, index):  # noqa: N802 - COM name
+        return self._runs[index][2]
+
+    def GetTextAngleAtIndex(self, index):  # noqa: N802 - COM name
+        return self._runs[index][3]
+
+
 class _Note:
     """An IAnnotation and its INote in one."""
 
-    def __init__(self, link, text, extent, *, owner=2, kind=6, items=1, upper=False):
+    def __init__(self, link, text, extent, *, owner=2, kind=6, items=1, upper=False, display=None, no_display=False):
         self.OwnerType = owner
         self.PropertyLinkedText = link
         self.AllUpperCase = upper
         self._kind, self._text, self._extent, self._items = kind, text, extent, items
+        self._display = None if no_display else (
+            display if display is not None else _Display(_run(text, extent[1], x=extent[0]))
+        )
 
     def GetType(self):  # noqa: N802 - COM name
         return self._kind
@@ -66,7 +99,7 @@ class _Note:
         return self._items
 
     def GetDisplayData(self):  # noqa: N802 - COM name
-        return self
+        return self._display
 
 
 class _SheetView:
@@ -279,6 +312,8 @@ def _reading(
     line_length=0.0,
     text_count=1,
     display_count=1,
+    display_row_y=(0.02376,),
+    display_row_error="",
     printed=None,
 ):
     expected = identity[0] if source == "Number" else identity[1]
@@ -297,6 +332,8 @@ def _reading(
         line_length=line_length,
         text_count=text_count,
         display_count=display_count,
+        display_row_y=display_row_y,
+        display_row_error=display_row_error,
     )
 
 
@@ -351,14 +388,20 @@ def test_a_whole_identity_passes(identity, source):
     [
         (_reading((0.31278, 0.02376, 0.37700, 0.02861)), "outside-cell"),
         (_reading((0.31278, 0.02376, 0.37571 - 0.0001, 0.02861)), "outside-cell"),
-        # A 9.11 mm tall two-line wrap of 5.2 mm characters, still inside the cell.
-        (_reading((0.31278, 0.01950, 0.36418, 0.02861), text_count=2, display_count=2), "multi-line"),
-        (_reading(display_count=2), "multi-line"),
-        (_reading(display_count=-1), "multi-line"),
+        # A 9.11 mm tall two-row wrap of 5.2 mm characters, still inside the cell.
+        (
+            _reading(
+                (0.31278, 0.01950, 0.36418, 0.02861),
+                text_count=2,
+                display_count=2,
+                display_row_y=(0.01950, 0.02579),
+            ),
+            "multi-line",
+        ),
         (_reading(printed="MHA-DT-003-\nT006"), "multi-line"),
         (_reading(line_length=0.030), "wrap-width"),
     ],
-    ids=["past-rev-rule", "inside-the-air", "wrapped", "display-wrapped", "no-display-data", "line-break", "narrow-wrap"],
+    ids=["past-rev-rule", "inside-the-air", "wrapped", "line-break", "narrow-wrap"],
 )
 def test_a_value_not_whole_on_one_line_inside_its_cell_fails(reading, kind):
     with pytest.raises(TitleFieldContractError) as raised:
@@ -368,6 +411,104 @@ def test_a_value_not_whole_on_one_line_inside_its_cell_fails(reading, kind):
 
 def test_a_wrap_width_wider_than_the_cell_and_the_cells_air_pass():
     assert_title_fields([_reading(line_length=0.200)])
+
+
+@pytest.mark.parametrize("logical_items", [0, 1, 2])
+def test_rendered_property_rows_do_not_depend_on_logical_item_shape(logical_items):
+    """The four actual purchased-note failures have shape 0 logical / 1 display;
+    the same physical invariant also holds without assuming a vendor shape."""
+    spec = DRAWINGS_BY_NAME["vn_transgear_collar_cross_pin"]
+    number, title = registry_identity(spec)
+    model = _Model(str(spec.source), 1, {"": {"Number": number}}, title)
+    sheet = _SheetView(
+        "Sheet1",
+        [
+            _Note('$PRPSHEET:"Number"', number, NUMBER_EXTENT, items=logical_items),
+            _Note(NATIVE_TITLE_LINK, title, TITLE_EXTENT, items=logical_items),
+        ],
+    )
+    readings = _read(sheet, model, configuration="Default", spec=spec)
+    assert {(reading.source, reading.display_row_count) for reading in readings} == {("Number", 1), ("Title", 1)}
+    assert_title_fields(readings)
+
+
+def test_one_logical_item_with_the_actual_six_native_baselines_is_refused():
+    """R7's physical wrap remains a defect even if its box fits the identity cell."""
+    spec = DRAWINGS_BY_NAME["vn_transgear_collar_cross_pin"]
+    number, title = registry_identity(spec)
+    display = _Display(
+        _run("vn-", 0.19370833265129478, x=0.05),
+        _run("transge", 0.1874166661174968, x=0.05),
+        _run("ar-", 0.18112499958369882, x=0.05),
+        _run("collar-", 0.17483333304990084, x=0.05),
+        _run("cross-", 0.16854166651610286, x=0.05),
+        _run("pin", 0.16224999998230488, x=0.05),
+    )
+    model = _Model(str(spec.source), 1, {"": {"Number": number}}, title)
+    sheet = _SheetView(
+        "Sheet1",
+        [
+            _Note('$PRPSHEET:"Number"', number, NUMBER_EXTENT),
+            _Note(NATIVE_TITLE_LINK, title, TITLE_EXTENT, items=1, display=display),
+        ],
+    )
+    readings = _read(sheet, model, configuration="Default", spec=spec)
+    title_reading = next(reading for reading in readings if reading.source == "Title")
+    assert title_reading.display_row_count == 6
+    with pytest.raises(TitleFieldContractError) as raised:
+        assert_title_fields(readings)
+    assert _kinds(raised) == {("Title", "multi-line")}
+
+
+def test_multiple_native_runs_on_one_baseline_are_one_row():
+    sheet = _sheet()
+    sheet._notes[-1] = _Note(
+        NATIVE_TITLE_LINK,
+        "dt-cone-gear",
+        TITLE_EXTENT,
+        items=2,
+        display=_Display(_run("dt-", 0.037492040792435455), _run("cone-gear", 0.037492040792435455, x=0.321)),
+    )
+    readings = _read(sheet, _cone_gear())
+    assert next(reading for reading in readings if reading.source == "Title").display_row_count == 1
+    assert_title_fields(readings)
+
+
+@pytest.mark.parametrize(
+    "display",
+    [
+        _Display(_run("dt-", 0.037492), _run("cone-gear", 0.031200)),
+        # Equal Y is not a shared baseline when a run uses an upper/centre
+        # anchor or rotation: height-based conversion would be an assumption.
+        _Display(_run("dt-", 0.037492), _run("cone-gear", 0.037492, reference=0)),
+        _Display(_run("dt-", 0.037492), _run("cone-gear", 0.037492, angle=0.2)),
+        _Display(_run("dt-", 0.037492), _run(" ", 0.031200), _run("cone-gear", 0.037492)),
+        _Display(_run("dt-cone-gear\n", 0.037492)),
+        _Display(),
+        _Display(_run("", 0.037492)),
+        _Display(_run("dt-cone-gear", float("nan"))),
+        _Display(("dt-cone-gear", (0.31244, 0.037492), 1, 0.0)),
+        _Display(("dt-cone-gear", None, 1, 0.0)),
+        _Display(("dt-cone-gear", RuntimeError("native position read refused"), 1, 0.0)),
+        _Display(_run("dt-cone-gear", 0.037492), count=2),
+        _Display(count=-1),
+        None,
+    ],
+    ids=[
+        "two-rows", "mixed-anchors", "rotated-run", "blank-row", "display-line-break",
+        "no-runs", "blank-run", "nonfinite-position", "incomplete-position", "missing-position",
+        "refused-position", "incomplete-run-array", "refused-count", "missing-display-data",
+    ],
+)
+def test_incomplete_blank_or_ambiguous_native_rows_cannot_prove_one_line(display):
+    """Zero logical items must not exempt a real wrap or a failed display read."""
+    sheet = _sheet()
+    sheet._notes[-1] = _Note(
+        NATIVE_TITLE_LINK, "dt-cone-gear", TITLE_EXTENT, items=0, display=display, no_display=display is None
+    )
+    with pytest.raises(TitleFieldContractError) as raised:
+        assert_title_fields(_read(sheet, _cone_gear()))
+    assert _kinds(raised) == {("Title", "multi-line")}
 
 
 @pytest.mark.parametrize("change", ["moves_on_read", "dirties_on_read"])

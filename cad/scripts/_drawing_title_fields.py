@@ -7,8 +7,8 @@ with every part, so only the finished sheet says whether a value printed
 whole, on one line, inside its ruled cell. :func:`read_title_fields` reads
 each linked note natively -- its unresolved link (``PropertyLinkedText``),
 its resolved text (``GetText``), whether it prints that text in capitals
-(``AllUpperCase``), its sheet-space box (``GetExtent``), how many text
-items it and its display data hold, its text format -- beside the
+(``AllUpperCase``), its sheet-space box (``GetExtent``), its structural text
+item counts and rendered text-row positions, its text format -- beside the
 linked model's stored value for the property the link names, and beside the
 drawing's own frozen identity (:func:`registry_identity`).
 
@@ -33,9 +33,9 @@ not identify a source-model title cell.
 * the note's extent lies inside its cell's rules
   (``DrawingTemplateSpec.title_cells_m``) with ``TITLE_FIELD_CLEARANCE_M`` of
   air;
-* one line: the note and its display data each hold exactly one text item,
-  the text carries no line break, and no wrap width narrower than the cell
-  is set.
+* one rendered row: all native display text runs share one horizontal
+  baseline, the text carries no line break, and no wrap width narrower
+  than the cell is set. Logical text items and display runs are not rows.
 
 Reading the model changes nothing: the stored-value reads loop over no
 configuration, and the model's active configuration and dirty flag are
@@ -52,6 +52,7 @@ tracking the print cannot pass alone.
 
 from __future__ import annotations
 
+import math
 import os
 import re
 from dataclasses import dataclass
@@ -92,6 +93,14 @@ _SUMMARY_FIELDS = {"SW-Title": 0, "SW-Title(Title)": 0}
 # "-T###") on each configuration named "T###".
 _CONFIGURATION_NUMBERED = frozenset({"dt-cone-gear"})
 _CONFIGURATION = re.compile(r"T[0-9]{3}")
+# Native display positions are unrounded doubles. This is only a numerical
+# equality tolerance (one nanometre), not a fraction of the font height:
+# distinct row offsets must never be merged by a font-dependent fit bound.
+_ROW_POSITION_EPSILON_M = 1e-9
+_ROW_ANGLE_EPSILON_RAD = 1e-9
+# swTextPosition_e: only the documented lower anchors have a baseline Y
+# independent of a run's height. The R7 native template positive reads 1.
+_LOWER_TEXT_REFERENCES = frozenset({1, 4})
 
 
 def _not_identity(source: str, number: str, title: str) -> str | None:
@@ -163,9 +172,14 @@ class TitleFieldReading:
     is the sheet's registry ``(Number, Title)`` and ``expected`` this
     cell's half of it, ``model_value`` the linked model's stored property.
     ``all_upper_case`` is ``INote::AllUpperCase``: the note prints its text
-    in capitals. ``text_count`` is ``INote::GetTextCount``,
-    ``display_count`` ``IDisplayData::GetTextCount`` (-1 where SolidWorks
-    answered no display data)."""
+    in capitals. ``text_count`` is the structural ``INote::GetTextCount``;
+    ``display_count`` is ``IDisplayData::GetTextCount`` (-1 for a refused
+    read). Neither counts rows: a resolved property note can have zero
+    logical items, and one logical item can wrap into many display runs.
+    ``display_row_y`` groups native horizontal lower-anchor Y offsets,
+    relative to the common display origin, without a sheet-space transform.
+    ``display_row_error`` keeps missing, blank or ambiguous display reads
+    from claiming a row. The exported PDF remains the printed-fit proof."""
 
     sheet: str
     source: str
@@ -181,6 +195,13 @@ class TitleFieldReading:
     line_length: float
     text_count: int
     display_count: int
+    display_row_y: tuple[float, ...]
+    display_row_error: str
+
+    @property
+    def display_row_count(self) -> int:
+        """Rendered rows, or -1 when native display data cannot prove them."""
+        return -1 if self.display_row_error else len(self.display_row_y)
 
     @property
     def expected(self) -> str:
@@ -220,12 +241,13 @@ class TitleFieldReading:
                     f"{_mm(self.cell)} (needs {clearance * 1000:.2f} mm)",
                 )
             )
-        if self.text_count != 1 or self.display_count != 1 or "\n" in self.printed or "\r" in self.printed:
+        if self.display_row_count != 1 or "\n" in self.printed or "\r" in self.printed:
             found.append(
                 (
                     "multi-line",
-                    f"the note holds {self.text_count} text item(s), its display data "
-                    f"{self.display_count}: not one line",
+                    f"native display rows {self.display_row_count} from {self.display_count} run(s); "
+                    f"logical text items {self.text_count} (not rows): "
+                    f"{self.display_row_error or 'not one unbroken rendered row'}",
                 )
             )
         width = self.cell[2] - self.cell[0]
@@ -238,6 +260,52 @@ class TitleFieldReading:
                 )
             )
         return found
+
+
+def _display_rows(annotation: Any) -> tuple[int, tuple[float, ...], str]:
+    """Read physical rows, not ``INote`` items or ``IDisplayData`` runs.
+
+    The SDK's zero-based text positions are offsets from one display origin.
+    Horizontal lower-anchor runs therefore share a row exactly when their Y
+    offsets agree, irrespective of font-run splits or logical note shape.
+    Upper/centre anchors and rotated runs do not establish that baseline
+    contract; refuse them rather than guessing a height-based transform.
+    Every run must answer, contain visible text and have a complete finite
+    position. Refusals remain failed measurements, never zero/one-row data.
+    """
+    try:
+        raw = annotation.GetDisplayData()
+        if raw is None:
+            return -1, (), "SolidWorks answered no display data"
+        display = _early_bound(raw, "IDisplayData")
+        count = int(display.GetTextCount())
+    except Exception as exc:  # noqa: BLE001 - retain native refusal as a contract breach
+        return -1, (), f"display data read refused: {type(exc).__name__}: {exc}"
+    if count < 0:
+        return count, (), f"invalid native display item count {count}"
+    offsets = []
+    for index in range(count):
+        try:
+            text = display.GetTextAtIndex(index)
+            position = tuple(float(value) for value in display.GetTextPositionAtIndex(index))
+            reference = int(display.GetTextRefPositionAtIndex(index))
+            angle = float(display.GetTextAngleAtIndex(index))
+        except Exception as exc:  # noqa: BLE001 - a missing run cannot prove one row
+            return count, (), f"display run {index} read refused: {type(exc).__name__}: {exc}"
+        if not isinstance(text, str) or not text.strip() or "\n" in text or "\r" in text:
+            return count, (), f"display run {index} has blank, unreadable or multiline text"
+        if len(position) != 3 or not all(math.isfinite(value) for value in position):
+            return count, (), f"display run {index} has no complete finite position"
+        if reference not in _LOWER_TEXT_REFERENCES or not math.isfinite(angle) or abs(angle) > _ROW_ANGLE_EPSILON_RAD:
+            return count, (), f"display run {index} has no horizontal lower-anchor baseline (ref={reference}, angle={angle})"
+        offsets.append(position[1])
+    rows = []
+    for offset in sorted(offsets):
+        # Compare with the row's first offset, not its last run: a chain of
+        # near neighbours must not bridge two distinct row positions.
+        if not rows or offset - rows[-1] > _ROW_POSITION_EPSILON_M:
+            rows.append(offset)
+    return count, tuple(rows), ""
 
 
 def _mm(box: Sequence[float]) -> str:
@@ -404,6 +472,7 @@ def _measure_title_fields(
                 raise RuntimeError(f"sheet {sheet!r}: the {source} note answered no extent ({extent!r})")
             text_format = annotation.GetTextFormat(0)
             text_format = _early_bound(text_format, "ITextFormat") if text_format is not None else None
+            display_count, display_row_y, display_row_error = _display_rows(annotation)
             readings.append(
                 TitleFieldReading(
                     sheet=sheet,
@@ -419,7 +488,9 @@ def _measure_title_fields(
                     typeface=str(text_format.TypeFaceName or "") if text_format is not None else "",
                     line_length=float(text_format.LineLength or 0.0) if text_format is not None else 0.0,
                     text_count=int(note.GetTextCount()),
-                    display_count=_display_count(annotation),
+                    display_count=display_count,
+                    display_row_y=display_row_y,
+                    display_row_error=display_row_error,
                 )
             )
         after = _model_state(source_of.model)
@@ -469,6 +540,9 @@ def assert_title_fields(readings: Sequence[TitleFieldReading]) -> None:
             line_length_mm=reading.line_length * 1000,
             text_count=reading.text_count,
             display_count=reading.display_count,
+            display_row_count=reading.display_row_count,
+            display_row_y_mm=[value * 1000 for value in reading.display_row_y],
+            display_row_error=reading.display_row_error,
         )
         breaches += [
             TitleFieldBreach(reading.sheet, reading.source, kind, detail) for kind, detail in reading.problems()

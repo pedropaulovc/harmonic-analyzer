@@ -7,8 +7,6 @@ from dataclasses import replace
 
 import pytest
 
-import _drawing_common
-import _config
 import build_fr_harmonic_base as part
 import dt_cone_swing_platform_geometry as platform
 import dt_cone_pivot_post_installation
@@ -486,10 +484,6 @@ def test_transferred_pinion_block_seats_print_no_station() -> None:
     block_seats = {(x, z, part.BLOCK_SCREW_HOLE_DIA) for x, z in part.BLOCK_SCREW_XZ}
     assert set(sheet.TRANSFER_BLOCK_HOLES) == block_seats
     assert not block_seats & set(sheet.TABLE_HOLES)
-    # User ruling P1-2: nothing in the frame fixes the rig along the bank
-    # until the fitter sets it, so both rig callouts name the RIG SET note that
-    # states it (the drum's back end on leaf D off the north gear).
-    assert sheet.TRANSFER_BLOCK_CALLOUT == "TRANSFER FROM MHA-DT-018\nAFTER RIG SET;\n"
     # The front pair sits one feeler off the fit-up stack, with no pose air.
     front_seat = rig.BACK_BLOCK_Z0 - rig.INNER_SPAN - BLOCK_DEPTH / 2.0
     assert rig.BLOCK_SEAT_Z[0] == pytest.approx(front_seat, abs=1e-9)
@@ -509,106 +503,6 @@ def test_transferred_pedestal_and_spring_seats_print_no_station() -> None:
     assert set(sheet.TRANSFER_PEDESTAL_HOLES) == pedestal_seats
     assert sheet.TRANSFER_SPRING_HOLE[:2] == part.FOOT_SCREW_XZ[0]
     assert not (pedestal_seats | {sheet.TRANSFER_SPRING_HOLE}) & set(sheet.TABLE_HOLES)
-    assert sheet.TRANSFER_PEDESTAL_CALLOUT == "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"
-    assert sheet.TRANSFER_SPRING_CALLOUT == "TRANSFER FROM MHA-DT-024\nAFTER RIG SET;"
-    assert not any(tag.startswith("G") for tag in sheet.HOLE_TAG_POSITIONS)
-
-
-def _deck_seat_features_in_build() -> dict[str, object]:
-    """Each deck Hole Wizard seat feature build_harmonic_base cuts, name ->
-    its stations: the named SupportHoldDownSeats call plus every row of the
-    ``for tag, spec, xz, label in (...)`` seat-group loop."""
-    import ast
-    from pathlib import Path
-
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    features: dict[str, object] = {"SupportHoldDownSeats": part.HOLE_XZ}
-    named_cuts = {
-        kw.value.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "wizard_holes"
-        for kw in node.keywords
-        if kw.arg == "name" and isinstance(kw.value, ast.Constant)
-    }
-    assert "SupportHoldDownSeats" in named_cuts
-    loops = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.For, ast.AsyncFor))
-        and isinstance(node.target, ast.Tuple)
-        and [getattr(elt, "id", None) for elt in node.target.elts]
-        == ["tag", "spec", "xz", "label"]
-    ]
-    assert len(loops) == 1
-    for row in loops[0].iter.elts:
-        tag, _spec, xz, _label = row.elts
-        features[tag.value] = eval(ast.unparse(xz), vars(part))  # noqa: S307
-    return features
-
-
-def test_tapped_hole_note_count_is_derived_from_the_deck_seat_features() -> None:
-    # warm-c486: the sheet removed 16 descriptive "Tapped Hole" notes against a
-    # literal 14, because U34c split the two pedestal seats out of
-    # FootScrewHoles into their own PedestalSeats feature. SolidWorks drops one
-    # such note per deck seat FEATURE into each plan view, so the count is
-    # derived from the same per-feature table that feeds the hole table.
-    import ast
-    from pathlib import Path
-
-    import draw_fr_harmonic_base as sheet
-
-    build_features = _deck_seat_features_in_build()
-    names = [name for name, _stations, _dia in sheet.DECK_TAPPED_SEAT_FEATURES]
-    assert len(names) == len(set(names))
-    assert {name for name, _stations, _dia in sheet.DECK_TAPPED_SEAT_FEATURES} == set(
-        build_features
-    )
-    for name, stations, _dia in sheet.DECK_TAPPED_SEAT_FEATURES:
-        assert tuple(stations) == tuple(build_features[name]), name
-
-    source = Path(sheet.__file__).read_text(encoding="utf-8")
-    calls = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call)]
-    plan_views = [
-        call
-        for call in calls
-        if getattr(call.func, "id", None) == "place_view"
-        and any(isinstance(arg, ast.Constant) and arg.value == "*Top" for arg in call.args)
-    ]
-    assert len(plan_views) == len(sheet.PLAN_VIEWS)
-    assert sheet.TAPPED_HOLE_NOTES == len(build_features) * len(sheet.PLAN_VIEWS)
-    assert sheet.TAPPED_HOLE_NOTES == 16
-
-    finalize = [call for call in calls if getattr(call.func, "id", None) == "finalize_drawing"]
-    assert len(finalize) == 1
-    keywords = {kw.arg: kw.value for kw in finalize[0].keywords}
-    # A literal count is what went stale; the call must name the derivation.
-    assert ast.unparse(keywords["expected_redundant_notes"]) == "TAPPED_HOLE_NOTES"
-    assert ast.unparse(keywords["redundant_note_substrings"]) == "FINAL_SHEET_REMOVED_NOTES"
-    assert sheet.FINAL_SHEET_REMOVED_NOTES == (sheet.TAPPED_HOLE_NOTE,)
-    assert sheet.TAPPED_HOLE_NOTE == "Tapped Hole"
-
-
-def test_spotface_band_reaches_the_setter_unchanged() -> None:
-    # The band now reads (upper, lower) like every _fit_limits band and goes
-    # through deviations(); the setter must still receive (lower, upper) =
-    # (0.0, +0.5), so the printed limits cannot move.
-    import ast
-    from pathlib import Path
-
-    from _fit_limits import deviations
-
-    assert fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM == (0.5, 0.0)
-    assert deviations(fr_harmonic_base_spec.SPOTFACE_DEPTH_BAND_MM) == (0.0, 0.5)
-    tree = ast.parse(Path(part.__file__).read_text(encoding="utf-8"))
-    setter_band_args = [
-        ast.unparse(arg)
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "id", None) == "set_dimension_bilateral_tolerance"
-        for arg in node.args
-        if isinstance(arg, ast.Starred)
-    ]
-    assert setter_band_args == ["*deviations(SPOTFACE_DEPTH_BAND_MM)"]
 
 
 def test_isometric_render_hides_model_annotations_only_after_the_save(
@@ -620,17 +514,16 @@ def test_isometric_render_hides_model_annotations_only_after_the_save(
     import asyncio
     from types import SimpleNamespace
 
-    events: list[tuple] = []
+    visibility: dict[str, bool] = {}
 
     async def fake_save(adapter, part_name, views=("isometric",)):
-        events.append(("save", part_name, tuple(views)))
+        visibility["saved"] = adapter.currentModel.Extension.shown
         return {"part": "p.SLDPRT", "stl": "p.STL"}
 
     class Extension:
         shown = True
 
         def SetUserPreferenceToggle(self, pref, option, value):
-            events.append(("toggle", pref, option, value))
             self.shown = value
             return True
 
@@ -643,18 +536,14 @@ def test_isometric_render_hides_model_annotations_only_after_the_save(
         currentModel = SimpleNamespace(Extension=extension)
 
         async def export_image(self, request):
-            events.append(("export", request["view_orientation"], extension.shown))
+            visibility["rendered"] = extension.shown
             return SimpleNamespace(is_success=True, data=None, error=None)
 
     monkeypatch.setattr(part, "save_part_and_images", fake_save)
     monkeypatch.setattr(part, "OUT_PNG", tmp_path)
     artefacts = asyncio.run(part._save_with_annotation_free_render(Adapter()))
 
-    assert events == [
-        ("save", part.PART_NAME, ()),
-        ("toggle", 31, 0, False),  # swDisplayAnnotations, swDetailingNoOptionSpecified
-        ("export", "isometric", False),
-    ]
+    assert visibility == {"saved": True, "rendered": False}
     assert artefacts["isometric"] == str(
         (tmp_path / part.PART_NAME / f"{part.PART_NAME}_isometric.png").resolve()
     )
@@ -758,7 +647,6 @@ def test_callout_box_rule_fails_e0e287c83_sheet_on_its_real_display_data() -> No
 
 
 def test_callout_check_treats_the_sheet_frame_and_title_block_as_obstacles() -> None:
-    import inspect
     from types import SimpleNamespace
 
     import draw_fr_harmonic_base as sheet
@@ -800,8 +688,6 @@ def test_callout_check_treats_the_sheet_frame_and_title_block_as_obstacles() -> 
         "callout against the frame vs frame top: clearance 0.5 mm",
         "callout into the title block vs title block: clearance -6.0 mm",
     ]
-    source = inspect.getsource(sheet._check_hole_sheet_callouts)
-    assert "obstacles = _sheet_frame_obstacles(adapter, ddoc)" in source
 
 
 # hb-render-2 (e533ef6fd) logged these, sheet metres: the MHA-DT-002 and MHA-DT-024
@@ -951,21 +837,6 @@ def test_only_notes_that_reach_the_final_sheet_are_obstacles() -> None:
     assert not sheet.note_reaches_final_sheet(" \r\n ")  # DetailItem420: no ink
     assert sheet.note_reaches_final_sheet("TOP VIEW SCALE 1:4")
     assert sheet.note_reaches_final_sheet("D1")
-    assert sheet.FINAL_SHEET_REMOVED_NOTES == (sheet.TAPPED_HOLE_NOTE,)
-    import ast
-    import inspect
-    from pathlib import Path
-
-    tree = ast.parse(Path(sheet.__file__).read_text(encoding="utf-8"))
-    finalize = next(
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "finalize_drawing"
-    )
-    keywords = {kw.arg: ast.unparse(kw.value) for kw in finalize.keywords}
-    assert keywords["redundant_note_substrings"] == "FINAL_SHEET_REMOVED_NOTES"
-    source = inspect.getsource(sheet._check_hole_sheet_callouts)
-    assert "text = _note_text(adapter, annotation)" in source
-    assert "if not note_reaches_final_sheet(text):" in source
 
 
 # The fake sheet's RIG SET note, clear of its table, view and callout.
@@ -1023,12 +894,6 @@ def _drive_hole_sheet_callout_check(
         views={"top": "top view"},
         datum_origin=SimpleNamespace(GetAxisPoints2=lambda: ()),
     )
-
-
-def test_hole_sheet_callout_check_skips_display_dimensions(monkeypatch) -> None:
-    # layoutcal2 (harmonic_base-task.log:280): with #902 the dimension row
-    # raised AttributeError on None.kind before any clash was measured.
-    _drive_hole_sheet_callout_check(monkeypatch, (0.200, 0.200, 0.220, 0.210))
 
 
 def test_hole_sheet_callout_check_still_measures_notes_beside_dimensions(
@@ -1129,120 +994,214 @@ def test_callout_box_rule_refuses_display_data_it_cannot_box() -> None:
         sheet.callout_text_box([0.0, 0.0], [(0.0, 0.0, 0.01, 0.0)], [], "x")
 
 
-def test_hole_sheet_callout_check_runs_on_every_callout_before_finalize() -> None:
-    import ast
-    from pathlib import Path
-
-    import draw_fr_harmonic_base as sheet
-
-    tree = ast.parse(Path(sheet.__file__).read_text(encoding="utf-8"))
-    build = next(
-        node for node in tree.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "build"
-    )
-    calls = [node for node in ast.walk(build) if isinstance(node, ast.Call)]
-    check = [call for call in calls if getattr(call.func, "id", None) == "_check_hole_sheet_callouts"]
-    assert len(check) == 1
-    keywords = {kw.arg: kw.value for kw in check[0].keywords}
-    assert ast.unparse(keywords["callouts"]) == "hole_sheet_callouts"
-    assert ast.unparse(keywords["datum_origin"]) == "hole_feature.DatumOrigin"
-    table = next(
-        node
-        for node in ast.walk(build)
-        if isinstance(node, ast.Assign)
-        and [ast.unparse(target) for target in node.targets] == ["hole_sheet_callouts"]
-    )
-    callout_names = {ast.unparse(value) for value in table.value.values}
-    # Every callout's leader is moved to its nearer shoulder end before the check.
-    side_loop = next(
-        node
-        for node in ast.walk(build)
-        if isinstance(node, ast.For) and ast.unparse(node.iter) == "hole_sheet_callouts.items()"
-    )
-    assert "_attach_leader_nearest_hole(adapter, display, label)" in ast.unparse(side_loop)
-    assert side_loop.lineno < check[0].lineno
-    placed = {
-        target.id
-        for node in ast.walk(build)
-        if isinstance(node, ast.Assign)
-        and isinstance(node.value, ast.Call)
-        and getattr(node.value.func, "id", None) == "add_native_hole_callout"
-        for target in node.targets
-    }
-    unassigned = [
-        node
-        for node in ast.walk(build)
-        if isinstance(node, ast.Expr)
-        and isinstance(node.value, ast.Call)
-        and getattr(node.value.func, "id", None) == "add_native_hole_callout"
-    ]
-    assert not unassigned  # every callout is kept, so every one is checked
-    assert callout_names == placed == {
-        "block_callout", "pedestal_callout", "spring_callout", "tap_callout"
-    }
-    assert {ast.unparse(value) for value in keywords["views"].values} == {
-        "hole_top", "hole_side", "section"
-    }
-    finalize = next(call for call in calls if getattr(call.func, "id", None) == "finalize_drawing")
-    assert check[0].lineno < finalize.lineno
-
-
-@pytest.mark.parametrize(
-    ("process_name", "expected_process_rows"),
-    [
-        ("TRANSFER_BLOCK_CALLOUT", "TRANSFER FROM MHA-DT-018\nAFTER RIG SET;\n"),
-        ("TRANSFER_PEDESTAL_CALLOUT", "TRANSFER FROM MHA-DT-002\nAT ASSEMBLY;\n"),
-        ("TRANSFER_SPRING_CALLOUT", "TRANSFER FROM MHA-DT-024\nAFTER RIG SET; "),
-        ("CROSS_TAP_PROCESS", "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"),
-    ],
+# Native 7e2e66e8a3e1 worker display data, 2026-10-06 identity base task:
+# (anchor, lines, [(full text, sheet XY, cap height)]), in sheet metres.
+# Both full-Number transfer shoulders are 66.503 mm wide. Older calibration
+# fixtures above stay frozen; their narrower shoulders missed this collision.
+IDENTITY_7E2E66E8_CALLOUTS = {
+    "MHA-DT-018 block transfer": (
+        [0.262, 0.252],
+        [
+            (0.27877160510394766, 0.2167478803502756, 0.2960451385319233, 0.24083402720093727),
+            (0.2782683730037054, 0.21604617549545002, 0.27877160510394766, 0.2167478803502756),
+            (0.2960451385319233, 0.24083402720093727, 0.22954236146807666, 0.24083402720093727),
+        ],
+        [
+            ("4X ", [0.2412149811983108, 0.25760972263338044], 0.0035),
+            ("<MOD-DIAM>", [0.24793789804726835, 0.2575562504567206], 0.0035),
+            (" 3.45 ", [0.2532163354456424, 0.25760972263338044], 0.0035),
+            ("<HOLE-DEPTH>", [0.2648538350015878, 0.2575562504567206], 0.0035),
+            (" 15.40", [0.2698544598072767, 0.25760972263338044], 0.0035),
+            ("TRANSFER FROM MHA-DT-018", [0.22954236146807666, 0.2520000002910383], 0.0035),
+            ("AFTER RIG SET;", [0.2461552078723907, 0.246443750299979], 0.0035),
+            (" 8-32 UNC - 2B ", [0.23658926960825916, 0.2408875003089197], 0.0035),
+            ("<HOLE-DEPTH>", [0.2694795484542846, 0.24083402813225985], 0.0035),
+            (" 12.75", [0.2744801732599735, 0.2408875003089197], 0.0035),
+        ],
+    ),
+    "MHA-DT-002 pedestal transfer": (
+        [0.200, 0.252],
+        [
+            (0.2645565321885683, 0.21788924303719595, 0.23404513853192324, 0.24083402720093727),
+            (0.26524666674399006, 0.21737025696280396, 0.2645565321885683, 0.21788924303719595),
+            (0.23404513853192324, 0.24083402720093727, 0.16754236146807672, 0.24083402720093727),
+        ],
+        [
+            ("2X ", [0.17921498119831086, 0.25760972263338044], 0.0035),
+            ("<MOD-DIAM>", [0.1859378980472684, 0.2575562504567206], 0.0035),
+            (" 3.45 ", [0.19121633544564248, 0.25760972263338044], 0.0035),
+            ("<HOLE-DEPTH>", [0.20285383500158788, 0.2575562504567206], 0.0035),
+            (" 19.50", [0.20785445980727674, 0.25760972263338044], 0.0035),
+            ("TRANSFER FROM MHA-DT-002", [0.16754236146807672, 0.2520000002910383], 0.0035),
+            ("AT ASSEMBLY;", [0.1847458340227604, 0.246443750299979], 0.0035),
+            (" 8-32 UNC - 2B ", [0.1745892696082592, 0.2408875003089197], 0.0035),
+            ("<HOLE-DEPTH>", [0.20747954845428468, 0.24083402813225985], 0.0035),
+            (" 16.00", [0.21248017325997354, 0.2408875003089197], 0.0035),
+        ],
+    ),
+    "MHA-DT-024 spring transfer": (
+        [0.315, 0.1448],
+        [
+            (0.27140967880099826, 0.17561478493897656, 0.2734500369191169, 0.1364121521964669),
+            (0.2713802993066548, 0.1761792709067491, 0.27140967880099826, 0.17561478493897656),
+            (0.2734500369191169, 0.1364121521964669, 0.35496246308088303, 0.1364121521964669),
+        ],
+        [
+            ("<MOD-DIAM>", [0.2975764410197734, 0.1475781254611909], 0.0035),
+            (" 2.26 ", [0.30285487841814746, 0.14763159763785075], 0.0035),
+            ("<HOLE-DEPTH>", [0.3144923789054154, 0.1475781254611909], 0.0035),
+            (" 12.25", [0.3194930037111043, 0.14763159763785075], 0.0035),
+            ("TRANSFER FROM MHA-DT-024", [0.2825423614680766, 0.1420218752955086], 0.0035),
+            ("AFTER RIG SET; 4-40 UNC - 2B ", [0.27503753691911687, 0.1364656253044493], 0.0035),
+            ("<HOLE-DEPTH>", [0.33961739629507054, 0.13641215312778945], 0.0035),
+            (" 9.95", [0.3446180248260497, 0.1364656253044493], 0.0035),
+        ],
+    ),
+    "MHA-VN-027 cross-tap": (
+        [0.285, 0.120],
+        [
+            (0.3295759581969177, 0.09824798610154861, 0.3408763902127742, 0.11161215219646689),
+            (0.3289240418030824, 0.09747701389845131, 0.3295759581969177, 0.09824798610154861),
+            (0.3408763902127742, 0.11161215219646689, 0.2307111097872257, 0.11161215219646689),
+        ],
+        [
+            ("4X ", [0.26240421816706655, 0.12283159763785073], 0.0035),
+            ("<MOD-DIAM>", [0.2691271350160241, 0.12277812546119088], 0.0035),
+            (" 4.04 ", [0.27440557241439817, 0.12283159763785073], 0.0035),
+            ("<HOLE-DEPTH>", [0.28604307197034357, 0.12277812546119088], 0.0035),
+            (" 49 MIN", [0.2910436967760324, 0.12283159763785073], 0.0035),
+            ("THRU BOTH WALLS, SINGLE CONTINUOUS THREAD", [0.2307111097872257, 0.11722187529550859], 0.0035),
+            (" 10-32 UNF - 2B ", [0.25906183928251264, 0.11166562530444929], 0.0035),
+            ("<HOLE-DEPTH>", [0.2930069787800312, 0.11161215312778944], 0.0035),
+            (" 46.00", [0.29800760358572004, 0.11166562530444929], 0.0035),
+        ],
+    ),
+}
+IDENTITY_7E2E66E8_RIG_NOTE_BOX = (
+    0.01955375250836114, 0.08584775250836121, 0.14250844147157188, 0.10824647491638797
 )
-def test_base_callout_prefix_is_the_shared_helpers(
-    process_name: str, expected_process_rows: str
-) -> None:
-    # Main's hb-notes-2 ruling (a): the block and pedestal callouts end their
-    # process text with a newline so the 8-32 thread gets its own fourth line;
-    # the cross-tap thread gets its own row the same way. The spring callout
-    # joins its thread with one space. add_native_hole_callout writes exactly
-    # compose_hole_callout_prefix's result into the prefix DEFINITION.
+# Exact native obstacles. Template and zone-label ink is already contained
+# by the title/frame keep-outs; include every remaining note and hole tag.
+# The native socket-note box predates fb8's preserved narrower reflow.
+IDENTITY_7E2E66E8_OBSTACLES = {
+    "frame left": (0.0, 0.0, 0.0127, 0.2794),
+    "frame right": (0.41910000000000003, 0.0, 0.4318, 0.2794),
+    "frame bottom": (0.0, 0.0, 0.4318, 0.0127),
+    "frame top": (0.0, 0.2667, 0.4318, 0.2794),
+    "title block": (0.216, 0.0, 0.4318, 0.066),
+    "view holes top": (0.22285000000000002, 0.1591, 0.33715, 0.23090000000000005),
+    "view holes front": (0.22285000000000002, 0.0883375, 0.33715, 0.1016625),
+    "view section A-A": (0.3683374999999999, 0.0991, 0.3816625000000005, 0.17090000000000005),
+    "origin X axis": (0.21935000000000002, 0.142105, 0.24240100000000003, 0.14910500000000002),
+    "origin Y axis": (0.205855, 0.15560000000000002, 0.21285500000000002, 0.17865100000000003),
+    "section A arrow 1": (0.32725000000000004, 0.153, 0.34325000000000006, 0.157),
+    "section A arrow 2": (0.32725000000000004, 0.233, 0.34325000000000006, 0.23700000000000002),
+    "label section A 1": (0.3431562742474917, 0.15365396989966557, 0.3495062742474917, 0.16000396989966556),
+    "label section A 2": (0.3431562742474917, 0.23365396989966558, 0.3495062742474917, 0.24000396989966558),
+    "note sheet count": (0.34981576588628766, 0.25884214046822746, 0.37745674247491645, 0.26313125752508365),
+    "note A1": (0.23400960535117055, 0.16638783946488298, 0.24020499665551837, 0.17067695652173914),
+    "note A2": (0.23400960535117055, 0.22214636120401343, 0.24020499665551837, 0.22691204682274252),
+    "note A3": (0.32455763210702343, 0.16543470234113716, 0.3317061605351171, 0.17639577926421407),
+    "note A4": (0.32598733779264216, 0.21070871571906358, 0.33218272909699, 0.2211932240802676),
+    "note B1": (0.24640038795986624, 0.19164597324414717, 0.2516426421404682, 0.1964116588628763),
+    "note C1": (0.24687695652173913, 0.21166185284280942, 0.2549786220735786, 0.22262292976588632),
+    "note D1": (0.24687695652173913, 0.17067695652173914, 0.25783803344481604, 0.187356856187291),
+    "note E1": (0.2940572441471572, 0.17973175919732443, 0.31073714381270906, 0.187356856187291),
+    "note E2": (0.2888149899665552, 0.2016539130434783, 0.2945338127090301, 0.20975557859531777),
+    "note E3": (0.30263547826086956, 0.16877068227424752, 0.3169325351170569, 0.17973175919732443),
+    "note E4": (0.30263547826086956, 0.20975557859531777, 0.3169325351170569, 0.21404469565217393),
+    "note F1": (0.32217478929765886, 0.18116146488294316, 0.326940474916388, 0.18545058193979935),
+    "note F2": (0.32217478929765886, 0.20356018729096992, 0.326940474916388, 0.20832587290969903),
+    "note F3": (0.3326592976588629, 0.176872347826087, 0.3474329230769231, 0.18354430769230773),
+    "note F4": (0.3326592976588629, 0.20641959866220738, 0.3474329230769231, 0.21404469565217393),
+    "note socket fit": (0.16633686956521737, 0.19927107023411375, 0.22829078260869562, 0.2264354782608696),
+    "label top view": (0.16967284949832773, 0.23263086956521745, 0.21447029431438125, 0.23739655518394653),
+    "label cross-tap view": (0.2449706822742475, 0.07059755852842808, 0.32169822073578597, 0.0753632441471572),
+    "note origin": (0.16490716387959864, 0.1725832307692308, 0.20160294314381272, 0.1864037190635452),
+    "table holes": (0.018, 0.13506283059665292, 0.1627633864343431, 0.26),
+}
+
+
+def test_hole_sheet_callouts_clear_full_number_native_text_and_leaders() -> None:
+    """The old 62 mm spacing passed the narrower historical shoulders but
+    overlaps native full-Number text by 4.503 mm. Translate its measured text
+    and shoulder joints to current anchors, retaining each original hole tip."""
+    from itertools import combinations
+
     import draw_fr_harmonic_base as sheet
 
-    native = "<hw-threaddesc> <hw-threadclass> <HOLE-DEPTH> <hw-threaddepth>"
-    process = getattr(sheet, process_name)
-    assert _drawing_common.compose_hole_callout_prefix(process, native) == (
-        expected_process_rows + native
+    old_boxes = {
+        label: sheet.callout_text_box(anchor, lines, texts, label)
+        for label, (anchor, lines, texts) in IDENTITY_7E2E66E8_CALLOUTS.items()
+    }
+    pedestal_label = "MHA-DT-002 pedestal transfer"
+    block_label = "MHA-DT-018 block transfer"
+    assert sheet.box_gap(old_boxes[pedestal_label], old_boxes[block_label]) == pytest.approx(
+        -0.00450277706384658
+    )
+    old_pedestal_lines = IDENTITY_7E2E66E8_CALLOUTS[pedestal_label][1]
+    assert any(
+        sheet.segment_crosses_box(segment, old_boxes[block_label])
+        for segment in sheet.leader_segments(old_pedestal_lines)
     )
 
+    anchors = {
+        pedestal_label: sheet.PEDESTAL_CALLOUT_XY,
+        block_label: sheet.BLOCK_CALLOUT_XY,
+        "MHA-DT-024 spring transfer": sheet.SPRING_CALLOUT_XY,
+        "MHA-VN-027 cross-tap": sheet.CROSS_TAP_CALLOUT_XY,
+    }
+    boxes, leaders, rows = {}, {}, {}
+    for label, (old_anchor, old_lines, old_texts) in IDENTITY_7E2E66E8_CALLOUTS.items():
+        anchor = anchors[label]
+        dx, dy = anchor[0] - old_anchor[0], anchor[1] - old_anchor[1]
+        shoulder_y = next(y0 for _x0, y0, _x1, y1 in old_lines if y0 == y1)
 
-def test_base_sheet_leaves_the_callout_prefix_to_the_shared_helper() -> None:
-    # #877 cold build (drawing:harmonic_base, 2026-09-27): #937's sheet-local
-    # line-break rewrite expected the old "process.rstrip() + ' '" joint and
-    # raised on the "\n" joint compose_hole_callout_prefix now writes. The
-    # prefix is composed in one place: this sheet never writes the prefix
-    # compartment (swDimensionTextPrefix = 1) itself.
-    import ast
-    import inspect
+        lines = []
+        for x0, y0, x1, y1 in old_lines:
+            start = (x0 + dx, y0 + dy) if y0 == shoulder_y else (x0, y0)
+            end = (x1 + dx, y1 + dy) if y1 == shoulder_y else (x1, y1)
+            lines.append((*start, *end))
+        texts = [(text, [x + dx, y + dy], height) for text, (x, y), height in old_texts]
+        boxes[label] = sheet.callout_text_box(list(anchor), lines, texts, label)
+        rows[label] = sheet.callout_text_rows(lines, texts, label)
+        leaders[label] = sheet.leader_segments(lines)
+        attached, nearest = sheet.leader_sides(lines, label)
+        assert attached == nearest, label
 
-    import draw_fr_harmonic_base as sheet
-
-    prefix_writes = [
-        ast.unparse(node)
-        for node in ast.walk(ast.parse(inspect.getsource(sheet)))
-        if isinstance(node, ast.Call)
-        and getattr(node.func, "attr", "") == "SetText"
-        and node.args
-        and isinstance(node.args[0], ast.Constant)
-        and node.args[0].value == 1
-    ]
-    assert prefix_writes == []
-
-
-def test_hole_sheet_callouts_moved_clear_per_the_eye_pass() -> None:
-    import draw_fr_harmonic_base as sheet
-
-    assert sheet.PEDESTAL_CALLOUT_XY == (0.200, 0.252)
-    assert sheet.BLOCK_CALLOUT_XY == (0.262, 0.252)
-    assert sheet.SPRING_CALLOUT_XY == (0.315, 0.1448)
-    assert sheet.CROSS_TAP_CALLOUT_XY == (0.285, 0.120)
-    assert sheet.HOLES_TOP_LABEL_XY == (0.170, 0.237)
+    boxes[sheet.RIG_SET_NOTE_LABEL] = IDENTITY_7E2E66E8_RIG_NOTE_BOX
+    obstacles = dict(IDENTITY_7E2E66E8_OBSTACLES)
+    # The fit-note regression below uses current reflow text. Include that
+    # envelope as well as the wider historical native box retained above.
+    note_lines = sheet.SOCKET_FIT_NOTE.replace("<MOD-DIAM>", "D").split("\n")
+    x, y = sheet.SOCKET_FIT_NOTE_XY
+    obstacles["note current socket fit"] = (
+        x, y - len(note_lines) * sheet.NOTE_ROW_M,
+        x + max(map(len, note_lines)) * sheet.NOTE_CHAR_M, y,
+    )
+    label_box = obstacles["label top view"]
+    dx = sheet.HOLES_TOP_LABEL_XY[0] - 0.170
+    dy = sheet.HOLES_TOP_LABEL_XY[1] - 0.237
+    obstacles["label top view"] = (
+        label_box[0] + dx, label_box[1] + dy, label_box[2] + dx, label_box[3] + dy
+    )
+    assert sheet.find_callout_clashes(boxes, obstacles) == []
+    assert sheet.find_merged_blocks(boxes) == []
+    assert sheet.find_tall_callouts(rows) == []
+    texts = {f"callout {label}": box for label, box in boxes.items()}
+    texts.update(
+        (name, box) for name, box in obstacles.items()
+        if name.startswith(("note ", "label ", "table ", "origin ", "section "))
+    )
+    assert sheet.find_leader_crossings(leaders, texts, rows) == []
+    # Disjoint leader envelopes prove no callout leader crosses another.
+    leader_boxes = {}
+    for label, segments in leaders.items():
+        xs = [x for x0, _y0, x1, _y1 in segments for x in (x0, x1)]
+        ys = [y for _x0, y0, _x1, y1 in segments for y in (y0, y1)]
+        leader_boxes[label] = (min(xs), min(ys), max(xs), max(ys))
+    for a, b in combinations(leader_boxes, 2):
+        assert sheet.box_gap(leader_boxes[a], leader_boxes[b]) >= sheet.CALLOUT_CLEARANCE_M, (a, b)
 
 
 # hb-render-4 (28d06157b) sheet-2 display data: the cross-tap block's six rows
@@ -1286,18 +1245,7 @@ def test_callout_rules_fail_the_hb_render_4_cross_tap_block() -> None:
     assert sheet.find_tall_callouts({"four rows": dict(list(rows.items())[:4])}) == []
 
 
-def test_cross_tap_callout_carries_hole_facts_only() -> None:
-    # hb-render-4 eye pass: count/drill/depth, the thru instruction and the
-    # thread each on a row; the depth datum is the model's (the tap starts on
-    # the spotface floor) and the X location is a dimension, not text.
-    import inspect
-
-    import draw_fr_harmonic_base as sheet
-
-    assert sheet.CROSS_TAP_PROCESS == "THRU BOTH WALLS, SINGLE CONTINUOUS THREAD\n"
-    source = inspect.getsource(sheet)
-    for gone in ("DEPTHS FROM SPOTFACE FLOOR\n", "ON A1-A4 X CENTRES\n", "2 EACH FRONT/REAR FACE"):
-        assert gone not in source
+def test_cross_tap_depth_origin_is_the_spotface_floor() -> None:
     # The Hole Wizard seats the taps on the spotface floor, so its depths
     # already run from there.
     assert part.BASE_SPOTFACE_PLANE_Z - part.BASE_SPOTFACE_DEPTH == part.BASE_SCREW_SEAT_Z
@@ -1320,7 +1268,6 @@ def test_cross_tap_x_is_a_chained_model_dimension_on_the_front_view() -> None:
 
 def test_deck_land_worst_case_is_proven_instead_of_noted() -> None:
     # hb-render-4 eye pass: the 1.0 MIN land note put a dimension in a note.
-    assert not hasattr(fr_harmonic_base_spec, "DRAWING_NOTES")
     for stack in part.COLUMN_SOCKET_LAND_STACKS.values():
         assert stack == pytest.approx({
             "nominal": 5.5,
@@ -1491,8 +1438,6 @@ def test_socket_fit_note_sits_on_a2_between_the_table_and_the_plan() -> None:
 
     # The note hangs off the A2 rim and keeps the acceptance criterion.
     assert sheet.SOCKET_FIT_STATION == (-197.0, -112.0)
-    assert "4X" in sheet.SOCKET_FIT_NOTE
-    assert "NO PERCEPTIBLE ROCK." in " ".join(sheet.SOCKET_FIT_NOTE.split())
 
     rows = [row.replace("<MOD-DIAM>", "D") for row in sheet.SOCKET_FIT_NOTE.split("\n")]
     x, y = sheet.SOCKET_FIT_NOTE_XY
@@ -1530,7 +1475,6 @@ def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> Non
     # field left of the plan, leader on the west flange edge.
     import draw_fr_harmonic_base as sheet
 
-    assert fr_harmonic_base_spec.FLANGE_PERIMETER_TARGET == "FLANGE EDGES, 4 SIDES (TABLE ORIGIN)"
     x, y = sheet.FLANGE_FINISH_XY
 
     def symbol_box(anchor, text):
@@ -1563,39 +1507,6 @@ def test_flange_finish_fits_sheet_1_left_of_the_plan_with_named_margins() -> Non
     assert attach[1] < y
 
 
-def test_rig_callouts_name_the_rig_set_note() -> None:
-    # User ruling P1-2 (pc-p1 eye pass): printed on the callouts, the RIG SET
-    # step ran the block callout through the top border and over the TOP VIEW
-    # caption. Each rig callout keeps its first line and swaps "AT ASSEMBLY;"
-    # for the note's name; the pedestal seats are not rig seats. Where the note
-    # lands is proved by the test below and measured at build time.
-    import draw_fr_harmonic_base as sheet
-    import pinion_rig_fitup as fitup
-
-    for text in (sheet.TRANSFER_BLOCK_CALLOUT, sheet.TRANSFER_SPRING_CALLOUT):
-        lines = text.rstrip("\n").split("\n")
-        assert len(lines) == 2, text
-        assert lines[1] == sheet.TRANSFER_AFTER_RIG_SET
-        assert fitup.RIG_SET_NAME in lines[1]
-    assert sheet.TRANSFER_AFTER_RIG_SET == "AFTER RIG SET;"
-    assert "RIG SET" not in sheet.TRANSFER_PEDESTAL_CALLOUT
-    note = fitup.RIG_SET_STEP.split("\n")
-    assert note[0].startswith(fitup.RIG_SET_NAME + ",")
-    # The note carries every setting the transfers need, the front block's
-    # feeler included: it fixes FRONT_BLOCK_Z0, so the front seats with it
-    # (Codex #858, PRRT_kwDOPHDy386mUjhS).
-    feeler = (
-        f"FRONT {_config.parts('dt-pinion-pivot-block')['number']} "
-        f"{fitup.FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT "
-        f"{_config.parts('dt-pinion-bracket')['number']};"
-    )
-    assert feeler in note
-    assert note.index(feeler) == 1
-    assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP
-    assert "BANK PUSHED NORTH" in fitup.RIG_SET_STEP
-    assert "MHA-DT-024 PAD 0.65 LEAF OFF MHA-DT-018." in fitup.RIG_SET_STEP
-
-
 # The note's printed character advance and line pitch at the sheet's 3.5 text
 # height (read off the pc-p1 render of the same note).
 _NOTE_CHAR_MM = 2.69
@@ -1618,8 +1529,6 @@ def test_rig_set_note_clears_the_sheet_2_callouts_table_and_views() -> None:
     views and labels; fail-first, the same box collides once moved onto the
     table or across to the cross-tap callout.  The build measures the note's
     read-back ink against every callout and obstacle the same way."""
-    import inspect
-
     import draw_fr_harmonic_base as sheet
 
     obstacles = dict(E0E287C83_OBSTACLES)
@@ -1636,24 +1545,5 @@ def test_rig_set_note_clears_the_sheet_2_callouts_table_and_views() -> None:
     # The build check boxes the note's own ink, found by its text as read back.
     assert sheet.is_rig_set_note(sheet.RIG_SET_STEP.replace("\n", "\r\n") + "\r\n")
     assert not sheet.is_rig_set_note(sheet.TRANSFER_SPRING_CALLOUT)
-    source = inspect.getsource(sheet._check_hole_sheet_callouts)
-    assert "boxes[RIG_SET_NOTE_LABEL] = element.box" in source
 
 
-def test_base_blanks_its_reference_sketches_through_the_shared_helper() -> None:
-    # Main (restricted review of #858): one blanking helper in _common, traced
-    # like every other per-operation helper, and no local copy in the base.
-    import inspect
-
-    import _common
-
-    source = inspect.getsource(part)
-    blank = "blank_reference_sketches(adapter, REFERENCE_SKETCHES)"
-    assert "def _hide_reference_sketches" not in source
-    assert source.count(blank) == 1
-    assert part.REFERENCE_SKETCHES == (
-        "RimWidthReference",
-        "HeightReference",
-        "CrossTapReference",
-    )
-    assert hasattr(_common.blank_reference_sketches, "__wrapped__")

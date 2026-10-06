@@ -212,7 +212,15 @@ NOTE_ROW_M = 0.0046
 # cut to three rows (hb-render-4 eye pass), is centred in the gap between the
 # front view and the spring block, about 10 mm clear of each.
 PEDESTAL_CALLOUT_XY = (0.200, 0.252)
-BLOCK_CALLOUT_XY = (0.262, 0.252)
+# The 7e2e66e8a3e1 native identity run measured 66.503 mm shoulders for both
+# four-row transfer blocks: their former 62 mm anchor spacing overlapped by
+# 4.503 mm and put the pedestal leader through the block text. Moving only
+# the block 12 mm right leaves 7.497 mm between them, 5.590 mm below the top
+# frame and 9.934 mm above the plan. Its right-shoulder joint is x 308.045 mm,
+# still 19.205 mm left of section arrow A; the hole remains right of the
+# shoulder midpoint, so the existing nearest-end routing fans the leaders
+# apart without crossing either block. Pedestal, socket-fit and origin stay put.
+BLOCK_CALLOUT_XY = (0.274, 0.252)
 SPRING_CALLOUT_XY = (0.315, 0.1448)
 CROSS_TAP_CALLOUT_XY = (0.285, 0.120)
 # The holes-sheet plan's view label, top-left corner. Centred over the plan it

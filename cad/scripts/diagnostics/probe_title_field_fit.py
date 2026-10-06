@@ -696,6 +696,9 @@ def _contract(ddoc: Any, sources: Mapping[str, TitleSource], layouts: Mapping[st
             "line_length_mm": r.line_length * 1000,
             "text_count": r.text_count,
             "display_count": r.display_count,
+            "display_row_count": r.display_row_count,
+            "display_row_y": list(r.display_row_y),
+            "display_row_error": r.display_row_error,
             "problem_kinds": [kind for kind, _detail in r.problems()],
         }
         for r in readings
@@ -1187,7 +1190,7 @@ def _physical_wrap_failures(capture: Mapping[str, Any], baseline: Mapping[str, A
         failures.append(f"{capture['key']}: physical-wrap Title is not its exact source: {reading!r}")
     if reading is None or not (
         "multi-line" in reading["problem_kinds"] and "outside-cell" in reading["problem_kinds"]
-        and reading["display_count"] >= 2
+        and reading["display_row_count"] >= 2 and not reading["display_row_error"]
     ):
         failures.append(f"{capture['key']}: no real native/display multiline outside-cell refusal: {reading!r}")
     rows = next((row["rows"] for row in sheet["physical_rows"] if row["source"] == "Title"), None)
@@ -1253,7 +1256,7 @@ def _wrapped_failures(wrapped: Mapping[str, Any]) -> list[str]:
     reading = readings.get((name, "Title"))
     kinds = None if reading is None else reading["problem_kinds"]
     need(
-        kinds == ["wrap-width"] and reading["text_count"] == 1 and reading["display_count"] == 1,
+        kinds == ["wrap-width"] and reading["display_row_count"] == 1 and not reading["display_row_error"],
         f"wrapped-landscape Title: expected only wrap-width, with one actual native/display row: {reading!r}",
     )
     need(
@@ -1360,8 +1363,8 @@ def _check_controls(captures: list[Mapping[str, Any]]) -> list[str]:
                     f"{key} {source}: LineLength {line_length:.3f} mm inside its {width_mm:.3f} mm cell",
                 )
                 need(
-                    reading["text_count"] == 1 and reading["display_count"] == 1,
-                    f"{key} {source}: text items {reading['text_count']}, display {reading['display_count']}",
+                    reading["display_row_count"] == 1 and not reading["display_row_error"],
+                    f"{key} {source}: native rows {reading['display_row_count']}, error {reading['display_row_error']!r}",
                 )
                 need(
                     reading["clearance_mm"] >= clearance_mm,
