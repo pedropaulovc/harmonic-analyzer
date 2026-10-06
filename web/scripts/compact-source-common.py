@@ -81,24 +81,26 @@ def load_approved_model_source():
     return json.loads(result.stdout)
 
 
-def validate_current_generation_inputs(observations, producer_path, *, additional_observations=()):
+def validate_current_generation_inputs(observations, producer_path, *, additional_observations=(),
+                                       executed_inputs=()):
     """Require independently approved live source/code, never archive fallback.
 
     This gate is for ordinary generation. Historical receipt validation remains
     a separate operation and cannot make old hardware eligible for current code.
+    Producers declare every extra executed module; this shared gate owns only
+    the mandatory live loader, approval record and renderer/math dependencies.
     """
-    producer = Path(producer_path)
-    relative = (producer.resolve().relative_to(WEB.parent.resolve()).as_posix()
-                if producer.is_absolute() else producer.as_posix())
+    def relative_path(path):
+        path = Path(path)
+        return (path.resolve().relative_to(WEB.parent.resolve()).as_posix()
+                if path.is_absolute() else path.as_posix())
     paths = {
-        relative, "web/scripts/compact-source-common.py", "web/src/bindings.ts", "web/src/scene.ts",
+        relative_path(producer_path), "web/scripts/compact-source-common.py", "web/src/bindings.ts", "web/src/scene.ts",
         "web/src/mechanics.ts", "web/src/mechanics-data.ts", "web/src/magnifier.ts", "web/src/kinematics.ts",
         "web/scripts/approved-model.mjs", "web/model-representation.mjs",
         "web/content/model-representation.json",
     }
-    if (relative == "web/scripts/generate-analysis-synthesis-source-tracks.py"
-            and observations.get("source", {}).get("videoId") == "6dW6VYXp9HM"):
-        paths.add("web/scripts/generate-analysis-bank-source-controls.py")
+    paths.update(relative_path(path) for path in executed_inputs)
     manifest = json.loads((WEB / "content/canonical-native/manifest.json").read_bytes())
     if manifest.get("canonicalConsumerHashNormalization") != "CRLF-to-LF":
         raise ValueError("Current live consumer hash normalization differs")

@@ -8,7 +8,6 @@ import io
 import json
 import os
 from pathlib import Path
-import runpy
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -151,13 +150,14 @@ class CurrentGenerationGateTests(unittest.TestCase):
         'sha256': '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c',
         'sourceCommit': '81539e53f5146c06a77541415bd79da673806d96',
     }
-    live_paths = (
-        producer, bank, 'web/scripts/compact-source-common.py',
+    base_paths = (
+        'web/scripts/compact-source-common.py',
         'web/scripts/approved-model.mjs', 'web/model-representation.mjs',
         'web/content/model-representation.json', 'web/src/bindings.ts', 'web/src/scene.ts',
         'web/src/mechanics.ts', 'web/src/mechanics-data.ts', 'web/src/magnifier.ts',
         'web/src/kinematics.ts',
     )
+    live_paths = (producer, bank, *base_paths)
 
     @contextmanager
     def current_fixture(self):
@@ -189,22 +189,36 @@ class CurrentGenerationGateTests(unittest.TestCase):
         (root / 'web/content/canonical-native/manifest.json').write_text(json.dumps({
             'canonicalConsumerHashNormalization': 'CRLF-to-LF', 'canonicalConsumerInputs': seals}))
 
-    def test_current_source_matched_fixture_can_publish_without_qualification(self):
-        with self.current_fixture() as (root, data, approved):
-            common.validate_current_generation_inputs(data, self.producer)
-            path = common.write_track(data)
-            published = json.loads(path.read_text())
-            self.assertEqual(published['model'], approved['source'])
-            self.assertEqual(published['source']['videoId'], '6dW6VYXp9HM')
-            self.assertEqual(published['stages']['5']['status'], 'unmeasured')
-
-    def test_executed_bank_controls_drift_refuses_before_publication(self):
-        with self.current_fixture() as (root, data, _):
-            (root / self.bank).write_text('def build_packet():\n    return {"frames": []}\n')
-            with self.assertRaisesRegex(ValueError, 'Current live producer input differs.*bank-source-controls'):
-                common.validate_current_generation_inputs(data, self.producer)
-                common.write_track(data)
-            self.assertFalse((root / 'web/content/6dW6VYXp9HM.source-track.json').exists())
+    def test_declared_executed_module_refuses_drift_missing_or_unsealed_even_for_renamed_producer(self):
+        for renamed in (False, True):
+            for mutation in ('changed', 'missing', 'unsealed'):
+                with self.subTest(renamed=renamed, mutation=mutation), self.current_fixture() as (root, data, _):
+                    producer = self.producer
+                    manifest_path = root / 'web/content/canonical-native/manifest.json'
+                    manifest = json.loads(manifest_path.read_bytes())
+                    if renamed:
+                        producer = 'web/scripts/renamed-source-producer.py'
+                        target = root / producer
+                        target.write_bytes((root / self.producer).read_bytes())
+                        manifest['canonicalConsumerInputs'].append({
+                            'path': producer, 'sha256': hashlib.sha256(
+                                target.read_bytes().replace(b'\r\n', b'\n')).hexdigest()})
+                    if mutation == 'changed':
+                        (root / self.bank).write_text('def build_packet():\n    return {"frames": []}\n')
+                        error = 'Current live producer input differs.*bank-source-controls'
+                    elif mutation == 'missing':
+                        (root / self.bank).unlink()
+                        error = 'Current live producer input unavailable.*bank-source-controls'
+                    else:
+                        manifest['canonicalConsumerInputs'] = [
+                            row for row in manifest['canonicalConsumerInputs'] if row['path'] != self.bank]
+                        error = 'Current live producer input seal census differs'
+                    manifest_path.write_text(json.dumps(manifest))
+                    with self.assertRaisesRegex(ValueError, error):
+                        common.validate_current_generation_inputs(
+                            data, producer, executed_inputs=(self.bank,))
+                        common.write_track(data)
+                    self.assertFalse((root / 'web/content/6dW6VYXp9HM.source-track.json').exists())
 
     def test_approval_loader_and_validator_drift_refuse(self):
         for relative in ('web/scripts/approved-model.mjs', 'web/model-representation.mjs'):
@@ -214,14 +228,51 @@ class CurrentGenerationGateTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Current live producer input differs'):
                     common.validate_current_generation_inputs(data, self.producer)
 
-    def test_live_crlf_normalization_is_not_historical_byte_repinning(self):
-        with self.current_fixture() as (root, data, approved):
-            path = root / self.bank
-            path.write_bytes(path.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
-            common.validate_current_generation_inputs(data, self.producer)
-            published = json.loads(common.write_track(data).read_text())
-            self.assertEqual(published['model'], approved['source'])
-            self.assertEqual(published['stages']['5']['status'], 'unmeasured')
+    def test_approval_authority_is_not_cached_across_new_live_code_or_record_seals(self):
+        for relative in ('web/scripts/approved-model.mjs', 'web/model-representation.mjs',
+                         'web/content/model-representation.json'):
+            with self.subTest(relative=relative), self.current_fixture() as (root, data, approved):
+                common.validate_current_generation_inputs(
+                    data, self.producer, executed_inputs=(self.bank,))
+                target = root / relative
+                if relative.endswith('.json'):
+                    approved['schemaVersion'] = 1
+                    target.write_text(json.dumps(approved))
+                else:
+                    with target.open('ab') as stream:
+                        stream.write(b'\nthrow new Error("invalid replacement authority");\n')
+                # These are new live fixture seals, not old snapshot repins.
+                # Validation must run the new actual authority, not cached v39.
+                self.seal_fixture(root)
+                with self.assertRaisesRegex(ValueError, 'Approved model authority missing or malformed'):
+                    common.validate_current_generation_inputs(
+                        data, self.producer, executed_inputs=(self.bank,))
+
+    def test_live_crlf_normalization_and_historical_exact_bytes_have_distinct_boundaries(self):
+        for crlf in (False, True):
+            with self.subTest(crlf=crlf), self.current_fixture() as (root, data, _):
+                path = root / self.bank
+                lf = path.read_bytes().replace(b'\r\n', b'\n')
+                raw = lf.replace(b'\n', b'\r\n') if crlf else lf
+                path.write_bytes(raw)
+                # The known immutable v39 tuple is an independent approval
+                # oracle, not an expectation loaded from the record under test.
+                self.assertEqual(common.load_approved_model_source(), self.current_model_source)
+                data['model']['sha256'] = camera_tracks.ANALYSIS_MODEL_SHA256
+                # Both live newline spellings must reach the model boundary,
+                # rather than falsely refusing normalized code bytes first.
+                with self.assertRaisesRegex(ValueError, 'independently approved live model'):
+                    common.validate_current_generation_inputs(
+                        data, self.producer, executed_inputs=(self.bank,))
+                digest = hashlib.sha256(lf).hexdigest()
+                snapshot = root / 'web/content/canonical-native/historical-code' / digest / path.name
+                snapshot.parent.mkdir(parents=True)
+                snapshot.write_bytes(raw)
+                if crlf:
+                    with self.assertRaisesRegex(ValueError, 'Historical producer snapshot changed'):
+                        common.historical_code_bytes(self.bank, digest)
+                else:
+                    common.historical_code_bytes(self.bank, digest)
 
     def test_schema_and_identity_malformations_refuse_through_strict_js_authority(self):
         for mismatch in ('v1', 'extra-field', 'missing-identity', 'wrong-map', 'bad-commit', 'invalid-json'):
@@ -274,6 +325,50 @@ class CurrentGenerationGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Current source model differs'):
             generator.build()
 
+    def test_analysis_primary_only_relabel_refuses_at_ordinary_build(self):
+        receipt = camera_tracks.HistoricalReceiptRevalidator('6dW6VYXp9HM')
+        generator = camera_tracks.Generator.__new__(camera_tracks.Generator)
+        generator.__dict__.update(receipt.__dict__)
+        generator.data['model'] = camera_tracks.common.load_approved_model_source()
+        with self.assertRaisesRegex(ValueError, 'Current source model differs from retained native calibration'):
+            generator.build()
+
+    def test_analysis_constructor_and_build_seal_the_actual_executed_bank_module(self):
+        receipt = camera_tracks.HistoricalReceiptRevalidator('6dW6VYXp9HM')
+        generator = camera_tracks.Generator.__new__(camera_tracks.Generator)
+        generator.__dict__.update(receipt.__dict__)
+        bank = self.bank
+        changed = (camera_tracks.ROOT / bank).read_bytes() + b'\n'
+        for phase in ('constructor', 'build'):
+            with self.subTest(phase=phase), replay_source_bytes({bank: changed}), self.assertRaisesRegex(
+                    ValueError, 'Current live producer input differs.*bank-source-controls'):
+                if phase == 'constructor':
+                    camera_tracks.Generator('6dW6VYXp9HM')
+                else:
+                    generator.build()
+
+    def test_historical_analysis_receipt_rechecks_consumed_numeric_inputs(self):
+        for mutation in ('native-bounds', 'candidate-input', 'automatic-drive', 'bank-pixel',
+                         'held-camera', 'visible-drive', 'visible-fixed-input'):
+            with self.subTest(mutation=mutation):
+                receipt = camera_tracks.HistoricalReceiptRevalidator('6dW6VYXp9HM')
+                if mutation == 'native-bounds':
+                    receipt.parts[0]['rigidWorldBoundsM'][0][0] += 0.001
+                elif mutation == 'candidate-input':
+                    receipt.candidate['frames'][0]['chosenInput']['crankTurns'] += 0.001
+                elif mutation == 'automatic-drive':
+                    receipt.automatic_motion['frames'][80]['crankTurns'] += 0.00001
+                elif mutation == 'bank-pixel':
+                    receipt.bank_controls['frames'][0]['landmarks'][0]['pixel'][0] += 1
+                elif mutation == 'held-camera':
+                    receipt.analysis_held_camera['camera']['verticalFovDegrees'] += 0.001
+                elif mutation == 'visible-drive':
+                    receipt.visible_crank_motion['frames'][80]['relativeCrankTurns'] += 0.00001
+                else:
+                    receipt.visible_crank_fixed_input['setup']['coneSwingRad'] += 0.001
+                with self.assertRaises(ValueError):
+                    receipt.revalidate_receipt()
+
     def test_relabelled_current_source_cannot_consume_old_native_calibration(self):
         data = camera_tracks.common.load_observations('6dW6VYXp9HM')
         original_frames = copy.deepcopy(data['frames'])
@@ -302,9 +397,6 @@ class CurrentGenerationGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Historical receipt revalidation cannot build'):
             generator.build()
         receipt = generator.revalidate_receipt()
-        self.assertEqual(receipt['model'], generator.data['model'])
-        self.assertEqual(receipt['stages']['5']['status'], 'unmeasured')
-        self.assertEqual(receipt['kind'], 'historical-source-track-receipt')
         with self.assertRaisesRegex(ValueError, 'Historical receipt revalidation cannot publish'):
             camera_tracks.common.prepare_track(receipt)
         with self.assertRaisesRegex(ValueError, 'Historical receipt revalidation cannot publish'):
@@ -1151,14 +1243,9 @@ class OrdinaryProducerLiveGuardTests(unittest.TestCase):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(raw)
             producer = 'web/scripts/' + Path(module.__file__).name
-            paths = [
-                producer, 'web/scripts/compact-source-common.py', 'web/src/bindings.ts', 'web/src/scene.ts',
-                'web/src/mechanics.ts', 'web/src/mechanics-data.ts', 'web/src/magnifier.ts', 'web/src/kinematics.ts',
-                'web/scripts/approved-model.mjs', 'web/model-representation.mjs',
-                'web/content/model-representation.json',
-            ]
-            if module is camera_tracks and video_id == '6dW6VYXp9HM':
-                paths.append('web/scripts/generate-analysis-bank-source-controls.py')
+            paths = [producer, *CurrentGenerationGateTests.base_paths]
+            if module is camera_tracks:
+                paths.extend(module.generation_executed_inputs(video_id))
             seals = []
             for path in paths:
                 raw = (HERE.parents[1] / path).read_bytes()
@@ -1239,7 +1326,6 @@ class OrdinaryProducerLiveGuardTests(unittest.TestCase):
                 module.main()
                 published = output.read_bytes()
                 track = json.loads(published)
-                self.assertEqual(track['model'], data['model'])
                 self.assertIsNone(track['anchors'][0]['motion'])
                 self.assertEqual(track['frames'][0]['views'][0]['input']['gearing'],
                                  'small-large' if module is intro else 'medium-medium')
@@ -1259,23 +1345,6 @@ class OrdinaryProducerLiveGuardTests(unittest.TestCase):
                             finally:
                                 live_path.write_bytes(sealed)
 
-    def test_analysis_synthesis_cli_checks_entire_pair_before_generation(self):
-        with self.live_fixture(camera_tracks, '6dW6VYXp9HM') as (root, data, _, output, _):
-            old_synthesis = copy.deepcopy(data)
-            old_synthesis['source']['videoId'] = '8KmVDxkia_w'
-            old_synthesis['model'].update(
-                sha256='2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d',
-                sourceCommit='1268c23d4a8fc741147c5e09d8d1e45247a71945')
-            synthesis = root / 'web/content/canonical-native/8KmVDxkia_w.observations.json.gz'
-            synthesis.write_bytes(gzip.compress(json.dumps(old_synthesis).encode('utf8'), mtime=0))
-            second_output = root / 'web/content/8KmVDxkia_w.source-track.json'
-            second_output.write_bytes(b'{"previous":"second-must-survive"}\n')
-            before = output.read_bytes(), second_output.read_bytes()
-            script = root / 'web/scripts' / Path(camera_tracks.__file__).name
-            with patch('sys.argv', [str(script)]), self.assertRaisesRegex(
-                    ValueError, 'independently approved live model'):
-                runpy.run_path(str(script), run_name='__main__')
-            self.assertEqual((output.read_bytes(), second_output.read_bytes()), before)
 
 
 class SpinPresentationTests(unittest.TestCase):

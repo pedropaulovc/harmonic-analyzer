@@ -81,6 +81,7 @@ SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "d049a9528092198a4321545a9f3e0d7559bed1baef1
 SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json"
 SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "4536dd456352d23817eed6ee93790c0a62602816726ef5432de50161e55ccee7"
 SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
+ANALYSIS_BANK_CONTROLS = "web/scripts/generate-analysis-bank-source-controls.py"
 SYNTHESIS_OBSERVATIONS = "web/content/canonical-native/8KmVDxkia_w.observations.json.gz"
 
 
@@ -152,23 +153,24 @@ def load_generation_observations(video_id):
     return data, framing
 
 
-def validate_generation_inputs(video_id, data, framing):
+def generation_executed_inputs(video_id):
+    return (ANALYSIS_BANK_CONTROLS,) if video_id == "6dW6VYXp9HM" else ()
+
+
+def validate_generation_inputs(video_id, data, framing, *, executed_inputs):
     if data["source"]["videoId"] != video_id:
         raise ValueError("Current generation source video identity differs")
     common.validate_current_generation_inputs(
         data, Path(__file__),
-        additional_observations=(framing,) if video_id == "8KmVDxkia_w" else ())
-
-
-def load_current_generation_inputs(video_id):
-    data, framing = load_generation_observations(video_id)
-    validate_generation_inputs(video_id, data, framing)
-    return data, framing
+        additional_observations=(framing,) if video_id == "8KmVDxkia_w" else (),
+        executed_inputs=executed_inputs)
 
 
 class Generator:
     def __init__(self, video_id):
-        data, framing = load_current_generation_inputs(video_id)
+        data, framing = load_generation_observations(video_id)
+        validate_generation_inputs(
+            video_id, data, framing, executed_inputs=generation_executed_inputs(video_id))
         self._initialize(video_id, data, framing)
 
     def _initialize(self, video_id, data, framing):
@@ -181,10 +183,7 @@ class Generator:
         self.native = self.calibration_input("native")
         self.candidate = self.calibration_input("candidate")
         self.request = self.calibration_input("request")
-        if (self.native["modelSha256"] != self.data["model"]["sha256"]
-                or self.candidate["geometryAuthority"]["originalGlbSha256"] != self.data["model"]["sha256"]):
-            raise ValueError("Current source model differs from retained native calibration; "
-                             "recapture and rebind native bounds, landmarks and camera evidence")
+        self.validate_native_calibration()
         self.base = self.native["mechanical"][0]["chosenInput"]
         self.shots = {s["id"]: s for s in self.data["shots"]}
         self.analysis_held_camera = self.analysis_held_camera_packet() if self.analysis else None
@@ -200,25 +199,21 @@ class Generator:
                 for f in (0.25,0.5,0.75)]
         self.synthesis_automatic_motion = (
             self.synthesis_automatic_motion_packet() if video_id == "8KmVDxkia_w" else None)
-        requested = {row["frameIndex"]: row["chosenInput"] for row in self.request["requests"] if row["kind"] == "all204-chosen-native-forward-input"}
-        if any(requested[row["frameIndex"]] != row["chosenInput"] for row in self.candidate["frames"]):
-            raise ValueError("Frozen Analysis candidate and serialized complete input request differ.")
         self.bank_controls = None
+        self.bank_controls_module = None
         self.analysis_snapshots, self.analysis_continuity = None, None
         if self.analysis:
             self.analysis_snapshots, self.analysis_continuity = self.continue_analysis_roots()
         if self.analysis:
-            controls_spec = importlib.util.spec_from_file_location("analysis_bank_controls", WEB / "scripts/generate-analysis-bank-source-controls.py")
-            controls_module = importlib.util.module_from_spec(controls_spec)
-            controls_spec.loader.exec_module(controls_module)
+            controls_spec = importlib.util.spec_from_file_location("analysis_bank_controls", ROOT / ANALYSIS_BANK_CONTROLS)
+            self.bank_controls_module = importlib.util.module_from_spec(controls_spec)
+            controls_spec.loader.exec_module(self.bank_controls_module)
             # Reuse the original source-control derivation and all of its
             # exposure/station/CHECK guards, but never read private evidence.
             for name in ("centres","ledger","bankReport"):
                 self.calibration_input(name)
-            self.bank_controls = controls_module.build_packet()
-            if (self.bank_controls["model"] != self.data["model"]
-                    or self.bank_controls["source"] != self.data["source"]):
-                raise ValueError("Analysis bank controls source/model identity differs")
+            self.bank_controls = self.bank_controls_module.build_packet()
+            self.validate_analysis_bank_controls()
             self.data["anchors"].extend(copy.deepcopy(self.bank_controls["anchors"]))
             controls = {row["sourceImage"]["frameIndex"]: row for row in self.bank_controls["frames"]}
             for frame in self.data["frames"]:
@@ -317,6 +312,96 @@ class Generator:
                     # every original identity conflict has been refused.
                     frame["sourceImage"] = visible_crank_source_image(row)
             self.data["compactChangeTimesSeconds"].extend(self.visible_crank_times)
+
+    def validate_native_calibration(self):
+        """Bind actual consumed native geometry and inputs, not model labels alone."""
+        if (self.native["modelSha256"] != self.data["model"]["sha256"]
+                or self.candidate["geometryAuthority"]["originalGlbSha256"] != self.data["model"]["sha256"]):
+            raise ValueError("Current source model differs from retained native calibration; "
+                             "recapture and rebind native bounds, landmarks and camera evidence")
+        requested = {row["frameIndex"]: row["chosenInput"] for row in self.request["requests"]
+                     if row["kind"] == "all204-chosen-native-forward-input"}
+        if any(requested[row["frameIndex"]] != row["chosenInput"] for row in self.candidate["frames"]):
+            raise ValueError("Frozen Analysis candidate and serialized complete input request differ.")
+
+    def validate_analysis_bank_controls(self):
+        if (self.bank_controls["model"] != self.data["model"]
+                or self.bank_controls["source"] != self.data["source"]):
+            raise ValueError("Analysis bank controls source/model identity differs")
+
+    def validate_retained_inputs(self):
+        """Recheck mutable consumed packets against their exact retained authority.
+
+        Live code/approval seals are checked separately on every ordinary build.
+        This also serves receipt-only replay: numerical history is revalidated,
+        never promoted to current model or renderer authority.
+        """
+        self.validate_native_calibration()
+        calibration, digest = load_pinned(
+            CALIBRATION, CALIBRATION_SHA256, "Retained Analysis/Synthesis calibration")
+        if self.calibration != calibration or self.calibration_hash != digest:
+            raise ValueError("Retained calibration numerical inputs changed in memory")
+        for name in ("native", "candidate", "request", "motion", "pinhole"):
+            if getattr(self, name) != self.calibration_input(name):
+                raise ValueError(f"Retained {name} calibration numerical inputs changed in memory")
+        if (self.base != self.native["mechanical"][0]["chosenInput"]
+                or self.parts != self.native["mechanical"][0]["all435"]):
+            raise ValueError("Consumed native baseline input/component bounds changed in memory")
+        if not self.analysis:
+            self.validate_retained_framing_native_source()
+            packet, _ = load_pinned(SYNTHESIS_AUTOMATIC_MOTION,
+                SYNTHESIS_AUTOMATIC_MOTION_SHA256, "Synthesis automatic motion")
+            candidate = next(row for row in packet["bankCandidates"]
+                             if row["id"] == SYNTHESIS_AUTOMATIC_BRANCH)
+            motion = self.synthesis_automatic_motion
+            if (packet["model"] != self.data["model"] or motion["packet"] != packet
+                    or motion["candidate"] != candidate
+                    or motion["times"] != [row["timeSeconds"] for row in candidate["knots"]]):
+                raise ValueError("Synthesis automatic motion retained numerical association changed")
+            return
+        self.validate_analysis_bank_controls()
+        if self.bank_controls != self.bank_controls_module.build_packet():
+            raise ValueError("Analysis bank controls retained numerical inputs changed in memory")
+        anchors = {anchor["id"]: anchor for anchor in self.data["anchors"]}
+        rows = {}
+        for frame in self.data["frames"]:
+            rows.setdefault(frame.get("decodedFrameIndex"), []).append(frame)
+        if any(anchors.get(anchor["id"]) != anchor for anchor in self.bank_controls["anchors"]):
+            raise ValueError("Analysis bank controls consumed native anchors changed")
+        for control in self.bank_controls["frames"]:
+            originals = rows.get(control["decodedFrameIndex"], [])
+            if (not originals or any(
+                    frame.get("sourceImage") != control["sourceImage"]
+                    or frame["shotId"] != control["shotId"]
+                    or not math.isclose(frame["decodedTimeSeconds"], control["decodedTimeSeconds"],
+                                        rel_tol=0., abs_tol=1e-9)
+                    or any(point not in frame["landmarks"] for point in control["landmarks"])
+                    or any(point not in frame.get("unavailable", []) for point in control["unavailable"])
+                    for frame in originals)):
+                raise ValueError("Analysis bank controls consumed source/native exposure association changed")
+        if self.automatic_motion != self.analysis_automatic_motion_packet():
+            raise ValueError("Analysis automatic motion retained numerical inputs changed in memory")
+        if (self.automatic_motion_frames != {row["frameIndex"]: row for row in self.automatic_motion["frames"]}
+                or self.automatic_motion_times != [row["timeSeconds"] for row in self.automatic_motion["frames"]]):
+            raise ValueError("Analysis automatic motion consumed native exposure index changed")
+        visible, gauge = self.analysis_visible_crank_packet()
+        if self.visible_crank_motion != visible or self.visible_crank_gauge != gauge:
+            raise ValueError("Analysis visible crank retained numerical inputs changed in memory")
+        fixed = copy.deepcopy(gauge["baseChosenInput"])
+        fixed["setup"]["driveCrankOffsetTurns"] = gauge["chosenGauge"]["driveCrankOffsetTurns"]
+        if (self.visible_crank_frames != {row["frameIndex"]: row for row in visible["frames"]}
+                or self.visible_crank_times != [row["timeSeconds"] for row in visible["frames"]]
+                or self.visible_crank_fixed_input != fixed):
+            raise ValueError("Analysis visible crank consumed native input/exposure association changed")
+        held = self.analysis_held_camera_packet()
+        if (any(self.analysis_held_camera[key] != value for key, value in held.items() if key != "application")
+                or any(self.analysis_held_camera["application"][key] != value
+                       for key, value in held["application"].items()
+                       if key not in ("appliedViewCount", "appliedExposures"))):
+            raise ValueError("Analysis held-camera consumed source/native association changed")
+        snapshots, continuity = self.continue_analysis_roots()
+        if self.analysis_snapshots != snapshots or self.analysis_continuity != continuity:
+            raise ValueError("Analysis retained inverse-root numerical inputs changed in memory")
 
     def chosen_camera_continuity_packet(self, video_id, packet):
         """Optional authored permissions, bounded by unchanged native source rows."""
@@ -1664,7 +1749,10 @@ class Generator:
         return output
 
     def build(self):
-        validate_generation_inputs(self.video_id, self.data, self.framing_observations)
+        executed = ((Path(self.bank_controls_module.__file__),) if self.analysis else ())
+        validate_generation_inputs(
+            self.video_id, self.data, self.framing_observations, executed_inputs=executed)
+        self.validate_retained_inputs()
         return self._build()
 
     def _build(self):
@@ -1881,6 +1969,7 @@ class HistoricalReceiptRevalidator(Generator):
         raise ValueError("Historical receipt revalidation cannot build an ordinary source track")
 
     def revalidate_receipt(self):
+        self.validate_retained_inputs()
         receipt = self._build()
         receipt["kind"] = "historical-source-track-receipt"
         return receipt
@@ -1891,11 +1980,11 @@ def main():
     parser.add_argument("--video", choices=("6dW6VYXp9HM", "8KmVDxkia_w"),
                         help="Regenerate only this video; default validates the complete pair before publishing.")
     args = parser.parse_args()
-    # The default still prepares the complete pair before publishing either.
+    # Construct/preflight the complete pair once before any build or publication.
+    # Build rechecks mutable data and fresh live seals; approval is never cached.
     videos = (args.video,) if args.video else ("6dW6VYXp9HM", "8KmVDxkia_w")
-    for video_id in videos:
-        load_current_generation_inputs(video_id)
-    tracks = [Generator(video_id).build() for video_id in videos]
+    generators = [Generator(video_id) for video_id in videos]
+    tracks = [generator.build() for generator in generators]
     outputs = [(track, *common.prepare_track(track)) for track in tracks]
     for track, path, contents in outputs:
         path.write_text(contents)

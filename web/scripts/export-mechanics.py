@@ -561,6 +561,50 @@ def main() -> None:
         values = {"__name__": f"exported_chain_{gearing}"}
         # Whole archived source with mounted pitch radii and actual native link count.
         exec(compile(ast.fix_missing_locations(tree), chain.__file__, "exec"), values)  # noqa: S102
+        # Assertions in the archived helper remain active in normal execution,
+        # but Python -O must not publish a loop which misses its native length.
+        # Re-evaluate its original sag bracket, before bisection overwrote it.
+        bracket_assignment = next(
+            node for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Tuple)
+                and [item.id for item in target.elts] == ["_LO_SAG", "_HI_SAG"]
+                for target in node.targets
+            )
+        )
+        bracket = dict(values)
+        exec(compile(ast.Module(body=[bracket_assignment], type_ignores=[]),
+                     chain.__file__, "exec"), bracket)  # noqa: S102
+        loop_length = values["_loop_length"]
+        target_length = values["CENTRELINE_LEN"]
+        for sag in (bracket["_LO_SAG"], bracket["_HI_SAG"], values["SAG"]):
+            # Mirror the archived slack-radius bracket (including its lower
+            # bound search), without relying on its optimizable assert.
+            lower_radius = max(knob_radius, crank_radius) + values["D"] / 2.0
+            droop = values["_droop"]
+            while droop(lower_radius) < sag:
+                lower_radius *= 0.9
+            if not droop(lower_radius) > sag > droop(10000.0):
+                raise ValueError(f"Mounted chain {gearing} has no slack-radius bracket")
+        if not (
+            loop_length(bracket["_LO_SAG"]) < target_length
+            < loop_length(bracket["_HI_SAG"])
+        ):
+            raise ValueError(f"Mounted chain {gearing} cannot bracket the native chain length")
+        if not abs(loop_length(values["SAG"]) - target_length) < 1e-6:
+            raise ValueError(f"Mounted chain {gearing} does not close on the native chain length")
+        if not abs(
+            values["SPAN_A"] + values["SPAN_SLACK"] + values["SPAN_B"]
+            - 2.0 * math.pi
+        ) < 1e-9:
+            raise ValueError(f"Mounted chain {gearing} arc spans do not close a full turn")
+        if not abs(
+            knob_radius * values["SPAN_A"] + crank_radius * values["SPAN_B"]
+            + values["SLACK_R"] * values["SPAN_SLACK"] + values["TAUT_LEN"]
+            - target_length
+        ) < 1e-6:
+            raise ValueError(f"Mounted chain {gearing} arc length does not close on the native chain")
         chain_paths[gearing] = {
             "arcsMm": [
                 [0.0, 0.0, knob_radius, values["_ANG_N"], values["SPAN_A"]],

@@ -104,6 +104,10 @@ mechanics-data's own claim. Generated native provenance must independently match
 its raw, map and canonical fields. All six retained historical source packets
 identify the earlier raw export and are rejected against the approved v39 scene
 until fresh source qualification.
+Analysis/Synthesis repeat native and retained numerical checks at build time;
+in-process model-label replacement cannot approve earlier native calibration.
+The producer supplies its executed-module census to the shared live seal gate.
+Whole-pair construction and derivation finish before either output is published.
 
 For a release already pinned with matching canonical metadata, the command
 `npm --prefix web run fetch-model -- /path/to/raw.glb` validates the existing raw
@@ -138,6 +142,9 @@ Before publication, new-source adoption checks the archived CAD against the
 actual immutable exports/functions in `kinematics.ts`: channel count/order,
 physical tooth ratios, cone reduction, paper-chain/reducer/feed pitch and senses,
 and total signed feed. Magnifier minimum/built/maximum ratios remain checked.
+Mounted chain paths retain all 68 native links. Sag/radius brackets, solved loop
+length and arc closure use the archived numerical bounds, with explicit refusal
+checks that remain active under Python optimization.
 The nib rest is the raw marker-origin world datum `magnifier.penRestMm`, checked
 against the archived assembly's `MARKER_POS` within 0.002 mm. It is distinct from
 the rod-wire endpoint `penWireBottomMm`. Runtime uses that nib XYZ datum and adds

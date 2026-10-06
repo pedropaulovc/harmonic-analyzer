@@ -131,11 +131,14 @@ Ordinary producers for all six videos validate the trusted tracked representatio
 through the same strict v2 `approved-model.mjs` loader used by offline verifiers.
 They compare observations with its approved raw tuple before derivation or
 publication, and check normalized live approval, producer, classifier, scene and
-native-math inputs against current-consumer seals. Analysis also seals its
-executed bank-controls producer. Synthesis checks both primary and secondary
-observations; native calibration and framing readbacks retain their own model
-association. Changed or missing live inputs refuse even when a matching
-historical snapshot exists.
+native-math inputs against current-consumer seals. Producers declare the additional
+modules they execute; Analysis seals the bank-controls module's actual loaded
+path. Synthesis checks both primary and secondary observations. Construction and
+build recheck consumed native calibration, candidate, motion, held-camera and
+framing associations, including retained numerical values. A new model label
+cannot approve old native readbacks. The pair is constructed and built before
+either output is prepared or published. Changed or missing live inputs refuse
+even when a matching historical snapshot exists.
 Analysis/Synthesis historical replay uses
 `HistoricalReceiptRevalidator.revalidate_receipt()`. Its receipt cannot be built
 or published as a current source track. Historical lineage never supplies
@@ -388,8 +391,8 @@ manifest's normalized consumer seals as substitutes for current source.
 raw-hashed regeneration inputs (the Operation producer, shared source reader and
 native bindings) to LF on checkout, including with `core.autocrlf=true`.
 Producer and consumer hashes still use exact bytes. This source-authority
-contract is separate from the 53 normalized
-identity-audit inputs. Historical code, original packets and geometry remain
+contract is separate from the normalized identity-audit inputs listed in the
+manifest. Historical code, original packets and geometry remain
 exact-byte evidence.
 Historical behavioral fixtures scope the exact archived scene and all four
 producer/math sources to those intended source paths, for both byte and text
