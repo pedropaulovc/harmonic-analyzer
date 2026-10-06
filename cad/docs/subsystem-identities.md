@@ -34,6 +34,10 @@ uv run python -m doit part:dt_cone_gear
 uv run python -m doit assembly:pd_paper_drive
 uv run python -m doit drawing:dt_drive_train_assembly
 ```
+Drawing registry lookups use the underscore task name, for example
+`DRAWINGS_BY_NAME["dt_crankshaft"]`. The dashed `artifact_stem`
+(`dt-crankshaft`) names exported files; it is not a registry key or alias.
+
 
 Follow [BUILDING.md](BUILDING.md) and [the supervised farm-launch contract](../../DEVELOPING.md#supervised-farm-launches) for executor and launch requirements. Geometric API names, features, sketches, dimensions, mate labels and machine-configuration concepts are unchanged by this naming policy.
 

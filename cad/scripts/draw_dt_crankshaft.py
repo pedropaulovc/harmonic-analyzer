@@ -98,7 +98,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
 )
 
 
-SPEC = DRAWINGS_BY_NAME["dt-crankshaft"]
+SPEC = DRAWINGS_BY_NAME["dt_crankshaft"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(

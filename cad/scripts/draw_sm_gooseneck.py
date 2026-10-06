@@ -38,7 +38,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
-SPEC = DRAWINGS_BY_NAME["sm-gooseneck"]
+SPEC = DRAWINGS_BY_NAME["sm_gooseneck"]
 PART_STEM = SPEC.artifact_stem
 SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
 OUTPUTS = DrawingOutputs(
