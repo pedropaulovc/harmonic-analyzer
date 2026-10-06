@@ -8,6 +8,7 @@ import io
 import json
 import os
 from pathlib import Path
+import runpy
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -26,6 +27,7 @@ def load_script(filename, name):
 common = load_script('compact-source-common.py', 'source_generation_common')
 spin = load_script('compact-spin.py', 'source_generation_spin')
 rocker = load_script('compact-operation-rocker.py', 'source_generation_rocker')
+intro = load_script('generate-intro-source-track.py', 'source_generation_intro')
 camera_tracks = load_script(os.environ.get('SOURCE_GENERATOR_PATH',
                                           'generate-analysis-synthesis-source-tracks.py'),
                             'source_generation_camera_tracks')
@@ -205,7 +207,8 @@ def rocker_exposure():
     data['shots'] = [{'id': 'machine', 'classification': 'machine',
                      'startSeconds': 0, 'endSeconds': 3,
                      'hasCorrespondingMachine': True}]
-    data.update(model={}, anchors=[])
+    approved = json.loads((rocker.WEB / 'content/model-representation.json').read_bytes())
+    data.update(model=copy.deepcopy(approved['source']), anchors=[])
     state = {
         'nativeFrame': 30, 'timeSeconds': 1.01, 'sourceImage': image,
         'completeInput': {
@@ -967,6 +970,142 @@ class AnalysisAutomaticMotionTests(unittest.TestCase):
         self.assertFalse(diagnostics['chosenGauge']['historicalNativeHomeIdentified'])
         self.assertFalse(diagnostics['cameraAssociation']['sourceNativeCameraQualified'])
         self.assertFalse(diagnostics['qualification']['stageAcceptance'])
+
+
+class OrdinaryProducerLiveGuardTests(unittest.TestCase):
+    @contextmanager
+    def live_fixture(self, module, video_id):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            web = root / 'web'
+            def store(path, raw):
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(raw)
+            producer = 'web/scripts/' + Path(module.__file__).name
+            paths = [
+                producer, 'web/scripts/compact-source-common.py', 'web/src/bindings.ts', 'web/src/scene.ts',
+                'web/src/mechanics.ts', 'web/src/mechanics-data.ts', 'web/src/magnifier.ts', 'web/src/kinematics.ts',
+            ]
+            seals = []
+            for path in paths:
+                raw = (HERE.parents[1] / path).read_bytes()
+                sha = hashlib.sha256(raw.replace(b'\r\n', b'\n')).hexdigest()
+                store(path, raw)
+                seals.append({'path': path, 'sha256': sha})
+                # Even a matching SHA-addressed archive cannot replace a missing
+                # or altered live path during ordinary generation.
+                store('web/content/canonical-native/historical-code/' + hashlib.sha256(raw).hexdigest()
+                      + '/' + Path(path).name, raw)
+            store('web/content/canonical-native/manifest.json', json.dumps({
+                'canonicalConsumerHashNormalization': 'CRLF-to-LF',
+                'canonicalConsumerInputs': seals, 'historicalCodeSnapshots': [],
+            }).encode('utf8'))
+            approved = (HERE.parent / 'content/model-representation.json').read_bytes()
+            store('web/content/model-representation.json', approved)
+            source_model = json.loads(approved)['source']
+            data = {
+                'source': {'videoId': video_id, 'sha256': 'b' * 64, 'width': 1920, 'height': 1080,
+                           'durationSeconds': 1, 'fps': {'numerator': 1, 'denominator': 1}},
+                'model': {**source_model, 'units': 'metres', 'axes': 'X-width/Y-height/Z-depth'},
+                'anchors': [{'id': 'gta.paper.screw17',
+                             'partPath': 'ha-harmonic-analyzer/pd-paper-drive/vn-fillister-screw-17',
+                             'partLocalMetres': [0, 0, 0], 'correspondenceEvidence': 'Source marker'}],
+                'shots': [{'id': 'machine', 'startSeconds': 0, 'endSeconds': 1,
+                           'classification': 'machine', 'hasCorrespondingMachine': True}],
+                'frames': [{'timeSeconds': 0, 'decodedTimeSeconds': 0, 'shotId': 'machine',
+                            'classification': 'machine', 'landmarks': [],
+                            'views': [{'id': 'main', 'presentation': 'native',
+                                       'rectSourcePixels': [0, 0, 1920, 1080]}]}],
+                'sourceCameraRigs': [{'id': 'fixture-phase-rig', 'measurements': []}],
+            }
+            phase_path = 'web/content/canonical-native/XPQwKRt4Y2k.source-phase-map.json'
+            phase_bytes = json.dumps({'rigId': 'fixture-phase-rig', 'references': [], 'sourceFrameMap': []}).encode('utf8')
+            store(phase_path, phase_bytes)
+            seeds = {
+                'views': {'main': {'candidateId': 'fixture', 'camera': {
+                    'positionMetres': [0, 0, 1], 'quaternion': [0, 0, 0, 1], 'verticalFovDegrees': 45}}},
+                'candidates': {'fixture': {
+                    'packet': 'fixture-source-choice', 'sha256': 'c' * 64, 'unobservedInputFields': [],
+                    'input': {'crankTurns': 0, 'amplitudes': [0] * 20, 'phases': [0] * 20,
+                              'gearing': 'medium-medium', 'magnification': 1,
+                              'setup': {key: 0 for key in common.SETUP_FIELDS}}}},
+                'montageSourceControls': {'anchors': [], 'frames': [], 'method': 'fixture-source-only',
+                                         'qualification': 'unmeasured', 'summary': {}, 'trackingFailures': []},
+                'staticSourceFamily': {
+                    'id': 'fixture-phase-rig', 'kind': 'source-static', 'sourceSha256': 'b' * 64,
+                    'phaseImages': [], 'independentSourcePhaseMap': {
+                        'path': phase_path, 'sha256': hashlib.sha256(phase_bytes).hexdigest()}},
+                'staticMotion': {'shotAmendments': []}, 'physicalSourceCrossfades': {'frames': {}},
+                'sourceMeasurementLimits': {'guide': 'No measured guide controls.'},
+            }
+            store('web/content/canonical-native/XPQwKRt4Y2k.source-seeds.json', json.dumps(seeds).encode('utf8'))
+            observation = web / 'content/canonical-native' / f'{video_id}.observations.json.gz'
+            output = web / 'content' / f'{video_id}.source-track.json'
+            store(output.relative_to(root), b'{"previous":"must-survive-refusal"}\n')
+            with patch.object(module.common, 'WEB', web), patch.object(module, '__file__', str(root / producer)):
+                module.common.native_motion_bindings.cache_clear()
+                try:
+                    observation.write_bytes(gzip.compress(json.dumps(data).encode('utf8'), mtime=0))
+                    yield root, data, observation, output, paths
+                finally:
+                    module.common.native_motion_bindings.cache_clear()
+
+    def test_old_source_refuses_intro_and_spin_without_publishing(self):
+        for module, video_id in ((intro, 'NAsM30MAHLg'), (spin, 'XPQwKRt4Y2k')):
+            with self.subTest(video=video_id), self.live_fixture(module, video_id) as (_, data, source, output, _):
+                data['model'].update(
+                    sha256='2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d',
+                    sourceCommit='1268c23d4a8fc741147c5e09d8d1e45247a71945')
+                source.write_bytes(gzip.compress(json.dumps(data).encode('utf8'), mtime=0))
+                previous = output.read_bytes()
+                with self.assertRaisesRegex(ValueError, 'independently approved live model'):
+                    module.main()
+                self.assertEqual(output.read_bytes(), previous)
+
+    def test_fresh_intro_and_spin_publish_but_live_renderer_drift_cannot_borrow_archive(self):
+        for module, video_id in ((intro, 'NAsM30MAHLg'), (spin, 'XPQwKRt4Y2k')):
+            with self.subTest(video=video_id), self.live_fixture(module, video_id) as (root, data, _, output, paths):
+                module.main()
+                published = output.read_bytes()
+                track = json.loads(published)
+                self.assertEqual(track['model'], data['model'])
+                self.assertIsNone(track['anchors'][0]['motion'])
+                self.assertEqual(track['frames'][0]['views'][0]['input']['gearing'],
+                                 'small-large' if module is intro else 'medium-medium')
+                for path in paths:
+                    live_path = root / path
+                    sealed = live_path.read_bytes()
+                    for mutation in ('changed', 'missing'):
+                        with self.subTest(path=path, mutation=mutation):
+                            if mutation == 'changed':
+                                live_path.write_bytes(sealed + b'\n')
+                            else:
+                                live_path.unlink()
+                            try:
+                                with self.assertRaisesRegex(ValueError, 'live producer input (differs|unavailable)'):
+                                    module.main()
+                                self.assertEqual(output.read_bytes(), published)
+                            finally:
+                                live_path.write_bytes(sealed)
+
+    def test_analysis_synthesis_cli_checks_entire_pair_before_generation(self):
+        with self.live_fixture(camera_tracks, '6dW6VYXp9HM') as (root, data, _, output, _):
+            old_synthesis = copy.deepcopy(data)
+            old_synthesis['source']['videoId'] = '8KmVDxkia_w'
+            old_synthesis['model'].update(
+                sha256='2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d',
+                sourceCommit='1268c23d4a8fc741147c5e09d8d1e45247a71945')
+            synthesis = root / 'web/content/canonical-native/8KmVDxkia_w.observations.json.gz'
+            synthesis.write_bytes(gzip.compress(json.dumps(old_synthesis).encode('utf8'), mtime=0))
+            second_output = root / 'web/content/8KmVDxkia_w.source-track.json'
+            second_output.write_bytes(b'{"previous":"second-must-survive"}\n')
+            before = output.read_bytes(), second_output.read_bytes()
+            script = root / 'web/scripts' / Path(camera_tracks.__file__).name
+            with patch('sys.argv', [str(script)]), self.assertRaisesRegex(
+                    ValueError, 'independently approved live model'):
+                runpy.run_path(str(script), run_name='__main__')
+            self.assertEqual((output.read_bytes(), second_output.read_bytes()), before)
 
 
 class SpinPresentationTests(unittest.TestCase):

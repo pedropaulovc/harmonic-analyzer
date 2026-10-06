@@ -34,6 +34,8 @@ a physical trajectory; seed CPU diagnostics do not qualify held exposures/GPU.
 Synthesis rocker-bank uses separately pinned source-timed cumulative drive for
 all20 stations, with explicit chosen +sense/common-upper phase and same-shot
 unmeasured endpoint holds. Other shots retain their previous candidate inputs.
+Ordinary CLI generation first requires every selected video's observations to
+match the independently approved live source and current sealed renderer inputs.
 """
 from __future__ import annotations
 import argparse
@@ -1820,6 +1822,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # The default still prepares the complete pair before publishing either.
     videos = (args.video,) if args.video else ("6dW6VYXp9HM", "8KmVDxkia_w")
+    for video_id in videos:
+        observations = common.load_observations(video_id, prefer_track=video_id != "6dW6VYXp9HM")
+        common.validate_current_generation_inputs(observations, Path(__file__))
     tracks = [Generator(video_id).build() for video_id in videos]
     outputs = [(track, *common.prepare_track(track)) for track in tracks]
     for track, path, contents in outputs:

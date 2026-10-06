@@ -178,13 +178,117 @@ class CadIdentityMap:
 
 
 def magnifier_installation(path: Path) -> dict[str, float]:
-    """Read the archived assembly's numeric datums without importing COM code."""
+    """Read numeric datums; refuse unsupported module-scope writes, never guess."""
+    tree = ast.parse(path.read_text(), filename=str(path))
     assignments = {}
-    for statement in ast.parse(path.read_text(), filename=str(path)).body:
-        if isinstance(statement, ast.Assign):
+    unsupported = set()
+
+    class Bindings(ast.NodeVisitor):
+        def __init__(self, global_names=None):
+            self.global_names = global_names
+
+        def bind(self, name):
+            if self.global_names is None or name in self.global_names:
+                unsupported.add(name)
+
+        def visit_Name(self, node):
+            if isinstance(node.ctx, (ast.Store, ast.Del)):
+                self.bind(node.id)
+
+        def visit_FunctionDef(self, node):
+            self.bind(node.name)
+            for expression in (*node.decorator_list, *node.args.defaults,
+                               *[value for value in node.args.kw_defaults if value is not None]):
+                self.visit(expression)
+            self.visit_scope_body(node.body)
+
+        def visit_scope_body(self, body):
+            # Local writes are not assembly datums. Explicit global writes are.
+            global_names = set()
+
+            class Globals(ast.NodeVisitor):
+                def visit_Global(self, declaration):
+                    global_names.update(declaration.names)
+
+                def visit_FunctionDef(self, declaration):
+                    pass
+
+                visit_AsyncFunctionDef = visit_FunctionDef
+                visit_ClassDef = visit_FunctionDef
+                visit_Lambda = visit_FunctionDef
+
+            declarations = Globals()
+            for statement in body:
+                declarations.visit(statement)
+            bindings = Bindings(global_names)
+            for statement in body:
+                bindings.visit(statement)
+
+        visit_AsyncFunctionDef = visit_FunctionDef
+
+        def visit_ClassDef(self, node):
+            self.bind(node.name)
+            for expression in (*node.decorator_list, *node.bases,
+                               *[keyword.value for keyword in node.keywords]):
+                self.visit(expression)
+            self.visit_scope_body(node.body)
+
+        def visit_Lambda(self, node):
+            for expression in (*node.args.defaults,
+                               *[value for value in node.args.kw_defaults if value is not None]):
+                self.visit(expression)
+
+        def visit_Import(self, node):
+            for alias in node.names:
+                self.bind(alias.asname or alias.name.split(".")[0])
+
+        def visit_ImportFrom(self, node):
+            for alias in node.names:
+                self.bind(alias.asname or alias.name)
+
+        def visit_ExceptHandler(self, node):
+            if node.name:
+                self.bind(node.name)
+            self.generic_visit(node)
+
+        def visit_ListComp(self, node):
+            # Comprehension targets have their own scope; walrus writes do not.
+            for generator in node.generators:
+                self.visit(generator.iter)
+                for condition in generator.ifs:
+                    self.visit(condition)
+            if isinstance(node, ast.DictComp):
+                self.visit(node.key)
+                self.visit(node.value)
+            else:
+                self.visit(node.elt)
+
+        visit_SetComp = visit_ListComp
+        visit_DictComp = visit_ListComp
+        visit_GeneratorExp = visit_ListComp
+
+        def visit_MatchAs(self, node):
+            if node.name:
+                self.bind(node.name)
+            self.generic_visit(node)
+
+        visit_MatchStar = visit_MatchAs
+
+        def visit_MatchMapping(self, node):
+            if node.rest:
+                self.bind(node.rest)
+            self.generic_visit(node)
+
+    bindings = Bindings()
+    for statement in tree.body:
+        if isinstance(statement, ast.Assign) and all(
+            isinstance(target, ast.Name) for target in statement.targets
+        ):
             for target in statement.targets:
-                if isinstance(target, ast.Name):
-                    assignments.setdefault(target.id, []).append(statement.value)
+                assignments.setdefault(target.id, []).append(statement.value)
+            bindings.visit(statement.value)
+        else:
+            bindings.visit(statement)
     operations = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
@@ -195,7 +299,7 @@ def magnifier_installation(path: Path) -> dict[str, float]:
     def number(node, active: frozenset[str]) -> float:
         if isinstance(node, ast.Constant) and type(node.value) in (float, int):
             return float(node.value)
-        if isinstance(node, ast.Name) and node.id not in active:
+        if isinstance(node, ast.Name) and node.id not in active and node.id not in unsupported:
             expressions = assignments.get(node.id, [])
             if len(expressions) == 1:
                 return number(expressions[0], active | {node.id})

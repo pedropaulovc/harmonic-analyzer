@@ -6,10 +6,9 @@ import { resolve, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { gunzip } from 'node:zlib'
 import { promisify } from 'node:util'
+import { LIVE_MODEL_SOURCE } from './approved-model.mjs'
 
 export const VIDEO_IDS = Object.freeze(['NAsM30MAHLg', '8KmVDxkia_w', '6dW6VYXp9HM', 'jfH-NbsmvD4', 'XPQwKRt4Y2k', '4mBuyixt22U'])
-export const MODEL_SHA256 = '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c'
-export const MODEL_COMMIT = '81539e53f5146c06a77541415bd79da673806d96'
 export const PIXEL_LIMIT = 1920 * 0.02
 export const CLOCK_LIMIT = 0.5
 const EPSILON = 1e-6
@@ -649,7 +648,7 @@ export function inspectReference(data, expectedId, native = null) {
     fail('source-identity', 'Expected this public video, its SHA256, 1920×1080 and a positive duration')
     return summary
   }
-  if (data.model?.sha256 !== MODEL_SHA256 || data.model?.sourceCommit !== MODEL_COMMIT || data.model?.units !== 'metres' || data.model?.axes !== 'X-width/Y-height/Z-depth') fail('model-identity', 'Observations must target the authentic released metre CAD export')
+  if (data.model?.sha256 !== LIVE_MODEL_SOURCE.sha256 || data.model?.sourceCommit !== LIVE_MODEL_SOURCE.sourceCommit || data.model?.units !== 'metres' || data.model?.axes !== 'X-width/Y-height/Z-depth') fail('model-identity', 'Observations must target the authentic released metre CAD export')
   if (coverage?.status !== 'complete' || !Array.isArray(coverage?.blockers) || coverage.blockers.length) fail('blocked-coverage', JSON.stringify(coverage ?? null))
   if (coverage?.requiredEveryIntegerSecond !== true) fail('integer-census', 'All integer seconds must be required')
   const images = new Map()

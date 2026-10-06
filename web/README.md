@@ -45,6 +45,12 @@ Existing source tracks are stale for a new raw model and reject source-following
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
 representation and provenance contract.
 
+The current imported model is the approved **v39** release. All six retained
+source tracks still identify the earlier raw model and are rejected for
+source-following against v39. Original-video playback and manual exploration
+remain separate from that guard. Fresh v39 source captures and qualification are
+required; no v39 source-following or footage-fidelity pass is claimed.
+
 Playback can start while the model or source track loads. Source-following starts
 automatically when both are ready; pausing retains manual exploration. Status
 announcements exclude the running clock. Force readouts are physical calculations,
@@ -102,10 +108,14 @@ filename. Historical capture commands keep their recorded plaintext paths;
 they are provenance, not current loader aliases. Evidence paths are translated
 only for declared
 manifest members; authored source tracks remain directly under `content/`.
-Current path/hash projection targets required regeneration records and the three
-current `sourceObservations` metadata fields. Duplicate projection containers or
-authority members are ambiguous and refused; unrelated capture duplicates remain
-byte-exact.
+Path/hash projection updates explicitly current regeneration inputs and the three
+current `sourceObservations` metadata fields. Required producer-code records must
+declare their usage. `historical-producer-lineage` retains its recorded SHA and
+an exact commit/source-path/hash-addressed snapshot origin; it is never re-sealed
+against a changed live classifier. The nine original-capture snapshots and three
+prior identity-migrated input snapshots have distinct provenance. Duplicate
+projection containers or authority members are ambiguous and refused; unrelated
+capture duplicates remain byte-exact.
 Inactive inputs do not authorize path/hash projection; their captured duplicates
 remain uninterpreted even when a neighboring current input is updated.
 Sealed canonical files are exempt from Git newline conversion. Replay preserves
@@ -116,6 +126,13 @@ The manifest explicitly declares `canonicalConsumerHashNormalization` as
 `CRLF-to-LF` for editable current code/data inputs only. Their hashes certify
 the normalized text, not checkout byte identity. Original evidence, historical
 snapshots, mapping bytes and derivative dependency pins are never normalized.
+
+Ordinary producers for all six videos compare observations with the trusted
+tracked representation's approved raw tuple before building or publishing.
+They check normalized live producer, classifier, scene and native-math bytes
+against current-consumer seals. Changed or missing live inputs refuse even when
+a matching historical snapshot exists. Historical lineage is never a fallback
+for current generation.
 
 Compression reduces current storage, not Git ancestry. Oversized historical
 blobs remain unless history is explicitly rewritten.
@@ -160,6 +177,9 @@ spring, wire and magnifier. It solves quasistatic torque balance. It does not
 simulate tooth collisions, friction or inertia. The amplitude controls show CAD
 station millimetres; calibration to the video's engraved measuring sticks is
 not established.
+
+The source evidence described below belongs to the earlier model. Its measured
+results and chosen settings do not qualify the current v39 scene.
 
 Source-following tracks combine source cameras with complete feasible physical
 inputs. Hidden settings may be chosen and are labelled unobserved, not recovered

@@ -62,42 +62,6 @@ def load_observations(video_id, prefer_track=False):
     return read_observations(content / f"{video_id}.observations.json.gz")
 
 
-def validate_current_generation_inputs(observations, producer_path):
-    """Require independently approved live source/code, never archive fallback.
-
-    This gate is for ordinary generation. Historical receipt validation remains
-    a separate operation and cannot make old hardware eligible for current code.
-    """
-    approved = json.loads((WEB / "content/model-representation.json").read_bytes())
-    source = approved["source"]
-    if any(observations.get("model", {}).get(field) != source[field] for field in ("sha256", "sourceCommit")):
-        raise ValueError("Current source model differs from independently approved live model")
-    producer = Path(producer_path)
-    relative = (producer.resolve().relative_to(WEB.parent.resolve()).as_posix()
-                if producer.is_absolute() else producer.as_posix())
-    paths = {
-        relative, "web/scripts/compact-source-common.py", "web/src/bindings.ts", "web/src/scene.ts",
-        "web/src/mechanics.ts", "web/src/mechanics-data.ts", "web/src/magnifier.ts", "web/src/kinematics.ts",
-    }
-    manifest = json.loads((WEB / "content/canonical-native/manifest.json").read_bytes())
-    if manifest.get("canonicalConsumerHashNormalization") != "CRLF-to-LF":
-        raise ValueError("Current live consumer hash normalization differs")
-    seals = [row for row in manifest["canonicalConsumerInputs"] if row["path"] in paths]
-    if len(seals) != len(paths) or {row["path"] for row in seals} != paths:
-        raise ValueError("Current live producer input seal census differs")
-    for seal in seals:
-        path, sha = seal["path"], seal.get("sha256")
-        if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{64}", sha) is None:
-            raise ValueError(f"Current live producer input lacks SHA: {path}")
-        try:
-            raw = (WEB.parent / path).read_bytes()
-        except OSError as error:
-            raise ValueError(f"Current live producer input unavailable: {path}") from error
-        actual = hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
-        if actual != sha:
-            raise ValueError(f"Current live producer input differs: {path}")
-
-
 def historical_code_bytes(path, expected_sha256):
     """Verify a sealed historical producer snapshot, never today's renderer.
 
@@ -547,12 +511,9 @@ def anchor_motion(anchor):
     # A spin/swing binding alone does not prove that this point is off its axis.
     # Crank/cone also have compound platform motion: their unidentified centres
     # remain unknown, rather than being certified fixed or moving by prose.
-    if motion in (None, "crank", "cone-spin", "cylinder", "wheel",
-                  "paper-knob", "paper-feed", "paper-sprocket",
+    if motion in (None, "crank", "cone-spin", "cylinder", "wheel", "paper-gear",
                   "pinion-swing", "pinion-cam", "pinion-lever"):
         return None
-    if motion == "paper-fixed":
-        return "fixed"
     return "moving"
 
 

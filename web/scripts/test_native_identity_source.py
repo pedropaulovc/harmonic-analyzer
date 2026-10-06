@@ -108,6 +108,74 @@ class NativeIdentitySourceTests(unittest.TestCase):
             with self.subTest(boundary=boundary), self.assertRaises(ValueError):
                 validate_path_projection(raw, "a" * 64, changed, self.identity_map)
 
+
+class MagnifierInstallationTests(unittest.TestCase):
+    # Released assembly datums, including its dependency-derived installed top.
+    SOURCE = (
+        "LEVER_ROD_Y = 979.7\n"
+        "LEVER_ROD_Z = -128.3\n"
+        "VROD_TOP_Y = LEVER_ROD_Y + 5.0\n"
+        "FIXTURE_Y0 = 915.7\n"
+    )
+    EXPECTED = {
+        "LEVER_ROD_Y": 979.7,
+        "LEVER_ROD_Z": -128.3,
+        "VROD_TOP_Y": 984.7,
+        "FIXTURE_Y0": 915.7,
+    }
+
+    def parse_source(self, source):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "build_magnifier_assembly.py"
+            path.write_text(source)
+            return magnifier_installation(path)
+
+    def test_released_literal_and_dependency_datums_are_exact(self):
+        self.assertEqual(self.parse_source(self.SOURCE), self.EXPECTED)
+
+    def test_module_rebinding_cannot_return_stale_installed_points(self):
+        for rebinding in (
+            "VROD_TOP_Y += 10.0\n",
+            "VROD_TOP_Y, spare = (994.7, 0)\n",
+            "VROD_TOP_Y: float = 994.7\n",
+            "VROD_TOP_Y = 994.7\n",
+            "if True:\n    VROD_TOP_Y = 994.7\n",
+            "del VROD_TOP_Y\n",
+            "for VROD_TOP_Y in (994.7,):\n    pass\n",
+            "def install():\n    global VROD_TOP_Y\n    VROD_TOP_Y += 10.0\n",
+            "class Installation:\n    global VROD_TOP_Y\n    VROD_TOP_Y += 10.0\n",
+        ):
+            with self.subTest(rebinding=rebinding):
+                with self.assertRaisesRegex(ValueError, "magnifier installation datum"):
+                    self.parse_source(self.SOURCE + rebinding)
+
+    def test_rebound_dependency_cannot_return_stale_installed_top(self):
+        source = self.SOURCE.replace(
+            "VROD_TOP_Y = LEVER_ROD_Y + 5.0",
+            "OFFSET = 5.0\nVROD_TOP_Y = LEVER_ROD_Y + OFFSET",
+        )
+        for rebinding in (
+            "OFFSET += 10.0\n",
+            "OFFSET, spare = (15.0, 0)\n",
+            "OFFSET: float = 15.0\n",
+            "OFFSET = 15.0\n",
+        ):
+            with self.subTest(rebinding=rebinding):
+                with self.assertRaisesRegex(ValueError, "magnifier installation datum"):
+                    self.parse_source(source + rebinding)
+
+    def test_unrelated_and_local_bindings_do_not_rebind_module_datums(self):
+        source = self.SOURCE + (
+            "unused = 1\nunused += 2\n"
+            "def local():\n"
+            "    VROD_TOP_Y = 0\n"
+            "    VROD_TOP_Y += 1\n"
+            "    LEVER_ROD_Y, spare = (0, 1)\n"
+            "    FIXTURE_Y0: float = 0\n"
+            "samples = [VROD_TOP_Y for VROD_TOP_Y in (0, 1)]\n"
+        )
+        self.assertEqual(self.parse_source(source), self.EXPECTED)
+
     def test_missing_or_non_numeric_assembly_datum_has_no_layout_fallback(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "build_magnifier_assembly.py"

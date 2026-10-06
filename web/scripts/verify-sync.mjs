@@ -3,15 +3,16 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, loadCanonicalObservations, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, CLOCK_LIMIT, loadCanonicalObservations, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 import { assertNativeSourceAssociation, assertModelRepresentationBytes, REPRESENTATION_KIND } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
+import { APPROVED_MODEL_REPRESENTATION, LIVE_MODEL_SOURCE } from './approved-model.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const STAGES = [50, 20, 10, 5]
 const NATIVE_MODEL_IDENTITY = nativeProvenanceFromModule(await readFile(resolve(WEB_ROOT, 'src/mechanics-data.ts'), 'utf8'))
-let approvedModelRepresentation = null
+const approvedModelRepresentation = APPROVED_MODEL_REPRESENTATION
 const VIDEO_SLUGS = ['intro-history', 'synthesis', 'analysis', 'operation', 'machine-spin', 'rocker-arms']
 const SOURCE_HASHES = [
   '595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d',
@@ -229,7 +230,7 @@ async function loadRecord(id, referenceRoot, signal) {
   assert(track.kind === 'compact-source-track' && track.schemaVersion === 1, 'Expected the compact source-track contract')
   const expectedHash = SOURCE_HASHES[VIDEO_IDS.indexOf(id)]
   assert(track.source?.videoId === id && track.source.sha256 === expectedHash && observations.source?.sha256 === expectedHash, 'Compact/source census identity differs from retained original MP4 SHA256')
-  assert(track.model?.sha256 === MODEL_SHA256 && track.model.sourceCommit === MODEL_COMMIT && track.model.units === 'metres', 'Compact track must use the full unchanged native CAD model')
+  assert(track.model?.sha256 === LIVE_MODEL_SOURCE.sha256 && track.model.sourceCommit === LIVE_MODEL_SOURCE.sourceCommit && track.model.units === 'metres', 'Compact track must use the full unchanged native CAD model')
   assert(Array.isArray(track.frames) && track.frames.length && track.frames.every((frame, index) => finite(frame.timeSeconds) && (finite(frame.decodedTimeSeconds) || (frame.decodedTimeSeconds === null && frame.sourceSampleUnavailable === true && !frame.views?.length && !frame.landmarks?.length && !frame.sourceImage)) && (!index || frame.timeSeconds > track.frames[index - 1].timeSeconds)), 'Compact samples must have finite increasing source times and native PTS, or explicit unavailable source-clock rows')
   assert(Array.isArray(track.anchors) && new Set(track.anchors.map(anchor => anchor.id)).size === track.anchors.length, 'Compact native anchors must have unique identities')
   const sourcePath = resolve(referenceRoot, 'videos', `${id}.mp4`)
@@ -333,7 +334,7 @@ export function requireModel(actual, id, representation = approvedModelRepresent
   assert(actual.modelState === 'ready' && !actual.missingBindings?.length, 'Full native model is unavailable or has unresolved bindings')
   const approved = assertNativeSourceAssociation(representation, nativeIdentity)
   const provenance = actual.modelProvenance
-  assert(provenance?.identity === 'matched' && provenance.sourceSha256 === MODEL_SHA256 && provenance.sourceCommit === MODEL_COMMIT
+  assert(provenance?.identity === 'matched' && provenance.sourceSha256 === approved.source.sha256 && provenance.sourceCommit === approved.source.sourceCommit
     && provenance.representationKind === REPRESENTATION_KIND
     && provenance.expectedSha256 === approved.representation.sha256 && provenance.expectedByteLength === approved.representation.byteLength, 'Actual native source/compiled representation identity mismatch')
   assertModelRepresentationBytes(approved, nativeIdentity, { sha256: provenance.observedSha256, byteLength: provenance.observedByteLength })
@@ -1010,14 +1011,14 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
   if (options.help) { console.log(HELP); return 0 }
   const startedAt = new Date().toISOString(), outputDirectory = resolve(options.output ?? resolve(WEB_ROOT, '.vite/verification-output', `stage-${options.stage}-${startedAt.replace(/[:.]/g, '-')}`))
   await mkdir(outputDirectory, { recursive: true })
-  const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sourceSha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT, sourceIntegrity: 'unmeasured', representation: null, representationIntegrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Every integer second, authored/visible change and actual source view remains mandatory; missing/failed required measurements never pass. Extra interior observations are diagnostic: missing/inadmissible oracles do not add certification prerequisites, but independently admitted measured pixel counterexamples still fail the stage. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
+  const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sourceSha256: LIVE_MODEL_SOURCE.sha256, sourceCommit: LIVE_MODEL_SOURCE.sourceCommit, sourceIntegrity: 'unmeasured', representation: null, representationIntegrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Every integer second, authored/visible change and actual source view remains mandatory; missing/failed required measurements never pass. Extra interior observations are diagnostic: missing/inadmissible oracles do not add certification prerequisites, but independently admitted measured pixel counterexamples still fail the stage. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
   const abort = new AbortController(), interrupt = () => abort.abort(new Error('Verification interrupted'))
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
   let server, browser, context, page
   try {
     const referenceRoot = resolve(process.env.HARMONIC_REFERENCE_ROOT ?? resolve(WEB_ROOT, '.vite/reference-root'))
     report.builtAssets = await distManifest(resolve(WEB_ROOT, 'dist'))
-    approvedModelRepresentation = assertNativeSourceAssociation(JSON.parse(await readFile(resolve(WEB_ROOT, 'content/model-representation.json'), 'utf8')), NATIVE_MODEL_IDENTITY)
+    assertNativeSourceAssociation(approvedModelRepresentation, NATIVE_MODEL_IDENTITY)
     const builtModel = report.builtAssets.find(asset => asset.path === approvedModelRepresentation.representation.path)
     assert(builtModel, 'Built optimized model is missing')
     assertModelRepresentationBytes(approvedModelRepresentation, NATIVE_MODEL_IDENTITY, { sha256: builtModel.sha256, byteLength: builtModel.bytes })

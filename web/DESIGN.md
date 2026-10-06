@@ -32,11 +32,16 @@ The [manifest](content/canonical-native/manifest.json) seals stored-byte and
 original SHA-256 values, mapping revision/digest, numeric-token preservation and
 historical-code snapshots. Compressed observation records also seal the decoded
 payload separately from the stored gzip bytes. Old capture paths/plaintext hashes
-remain immutable historical provenance, not current lookups. Historical-code
-seals prove original lineage only.
-Translation does not qualify current CAD, renderer or source-camera correspondence;
-canonical farm export, metadata re-export and renderer requalification remain
-required.
+remain immutable historical provenance, not current lookups. Nine snapshots seal
+original capture inputs; three others seal prior identity-migrated producer
+inputs at an explicit commit/path origin. Historical required producer records
+retain those hashes even when the live hardware classifier changes.
+Independent normalized current-consumer seals detect live drift. Ordinary source
+production requires the approved live source tuple and sealed live code, scene
+and native mathematics; archived inputs cannot satisfy that requirement.
+Identity translation does not qualify current CAD, renderer or source-camera
+correspondence. Native metadata/compatibility and actual rendered qualification
+remain separate gates.
 
 The raw GLB hash and source revision must match the generated mechanical data.
 The browser separately verifies the actual optimized bytes against the compiled
@@ -90,6 +95,14 @@ A public manifest is not a trust authority. Native observations and their model
 SHA remain tied to the raw export. Runtime `observedSha256` identifies the actual
 optimized bytes; explicit `sourceSha256` identifies the native association.
 Raw, canonical and optimized hashes must not be substituted for one another.
+
+The browser and offline verifiers use the reviewed, tracked representation record
+as their live approval authority. Offline `approved-model.mjs` strictly validates
+that record; expected source identity is not inferred from mechanics-data's own
+claim. Generated native provenance must independently match its raw, map and
+canonical fields. All six retained historical source packets identify the earlier
+raw export and are rejected against the approved v39 scene until fresh source
+qualification.
 
 For a release already pinned with matching canonical metadata, the command
 `npm --prefix web run fetch-model -- /path/to/raw.glb` validates the existing raw

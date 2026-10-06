@@ -1,4 +1,5 @@
 """Offline identity grammar/transaction regressions; run by the coordinating root."""
+import copy
 from contextlib import contextmanager
 import importlib.util
 import gzip
@@ -12,6 +13,10 @@ spec = importlib.util.spec_from_file_location(
     'canonical_native_evidence', Path(__file__).with_name('canonical-native-evidence.py'))
 evidence = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evidence)
+producer_spec = importlib.util.spec_from_file_location(
+    'canonical_lineage_rocker', Path(__file__).with_name('compact-operation-rocker.py'))
+rocker = importlib.util.module_from_spec(producer_spec)
+producer_spec.loader.exec_module(rocker)
 
 MAPPING = {'schema_version': 2, 'identities': [
     {'old_stem': 'harmonic-analyzer', 'new_stem': 'ha-harmonic-analyzer'},
@@ -377,6 +382,252 @@ class CurrentTrackProjectionTests(unittest.TestCase):
         self.assertEqual(record, {
             'path': self.new_path, 'sha256': evidence.digest(self.wire), 'requiredForRegeneration': True,
         })
+
+class HistoricalTrackLineageTests(unittest.TestCase):
+    @contextmanager
+    def lineage_fixture(self):
+        video_id = '4mBuyixt22U'
+        old_model = {
+            'sha256': '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d',
+            'sourceCommit': '1268c23d4a8fc741147c5e09d8d1e45247a71945',
+            'units': 'metres', 'axes': 'X-width/Y-height/Z-depth',
+        }
+        live_model = {
+            'sha256': '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c',
+            'sourceCommit': '81539e53f5146c06a77541415bd79da673806d96',
+        }
+        anchor = {
+            'id': 'gta.paper.screw17',
+            'partPath': 'ha-harmonic-analyzer/pd-paper-drive/vn-fillister-screw-17',
+            'partLocalMetres': [0, 0, 0], 'correspondenceEvidence': 'Retained source correspondence',
+        }
+        old_bindings = (
+            "const PAPER = 'ha-harmonic-analyzer/pd-paper-drive/'\n"
+            "export const BINDINGS: readonly Binding[] = [\n"
+            "  family('screws', PAPER, 'vn-fillister-screw', 'paper-carriage'),\n]\n"
+        ).encode('utf8')
+        live_bindings = (
+            "const PAPER = 'ha-harmonic-analyzer/pd-paper-drive/'\n"
+            "export const BINDINGS: readonly Binding[] = [\n"
+            "  group('screws', PAPER, 'vn-fillister-screw-(?:[1-9]|1[0-4])|vn-guide-lock-screw-[1-8]', 'paper-carriage'),\n]\n"
+        ).encode('utf8')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def store(path, raw):
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(raw)
+            store('web/src/bindings.ts', old_bindings)
+            with patch.object(rocker.common, 'WEB', root / 'web'):
+                rocker.common.native_motion_bindings.cache_clear()
+                motion = rocker.common.anchor_motion(anchor)
+                self.assertEqual(motion, 'moving')
+            rocker.common.native_motion_bindings.cache_clear()
+            data = {
+                'source': {'videoId': video_id, 'sha256': 'b' * 64, 'width': 1920, 'height': 1080,
+                           'durationSeconds': 1, 'fps': {'numerator': 1, 'denominator': 1}},
+                'model': old_model, 'anchors': [anchor],
+                'shots': [{'id': 'machine', 'startSeconds': 0, 'endSeconds': 1,
+                           'classification': 'machine', 'hasCorrespondingMachine': True}],
+                'frames': [{'timeSeconds': 0, 'decodedTimeSeconds': 0, 'nativeFrame': 0,
+                            'shotId': 'machine', 'classification': 'machine', 'landmarks': [],
+                            'views': [{'id': 'main', 'presentation': 'native',
+                                       'rectSourcePixels': [0, 0, 1920, 1080]}]}],
+            }
+            original = f'web/content/{video_id}.observations.json'
+            output = f'web/content/canonical-native/{video_id}.observations.json.gz'
+            raw = json.dumps(data).encode('utf8')
+            row = {
+                'originalPath': original, 'path': output, 'contentEncoding': 'gzip',
+                'originalSha256': evidence.digest(raw),
+                'originalNumericLexemeSha256': evidence.numbers(raw),
+                'archivedNativeBindings': [], 'sha256': evidence.digest(raw),
+            }
+            manifest = {
+                'mappingSchemaVersion': 2, 'originalSourceCommit': 'fixture-capture',
+                'derivatives': [row], 'historicalCodeSnapshots': [], 'canonicalConsumerInputs': [],
+            }
+            records = [{'path': original, 'sha256': row['originalSha256'],
+                        'role': 'original-source-observations', 'requiredForRegeneration': True}]
+            code = [
+                ('web/scripts/compact-operation-rocker.py', 'generator', b'# prior migrated generator\n',
+                 b'# live generator\n'),
+                ('web/scripts/compact-source-common.py', 'shared-source-selector', b'# prior migrated selector\n',
+                 b'# live selector\n'),
+                ('web/src/bindings.ts', 'native-anchor-motion-lineage', old_bindings, live_bindings),
+            ]
+            for path, role, prior, live in code:
+                sha = evidence.digest(prior)
+                snapshot = 'web/content/canonical-native/historical-code/' + sha + '/' + Path(path).name
+                origin = {'sourceCommit': 'a' * 40, 'sourcePath': path}
+                records.append({
+                    'path': path, 'role': role, 'sha256': sha, 'requiredForRegeneration': True,
+                    'usage': evidence.HISTORICAL_PRODUCER_USAGE,
+                    'origin': {**origin, 'snapshotPath': snapshot},
+                })
+                manifest['historicalCodeSnapshots'].append({
+                    'path': snapshot, 'sha256': sha, 'origin': origin,
+                    'scope': 'Prior identity-migrated code only; not original capture or current approval.',
+                })
+                manifest['canonicalConsumerInputs'].append({'path': path, 'sha256': evidence.consumer_digest(live)})
+                store(snapshot, prior)
+                store(path, live)
+                store('web/content/canonical-native/historical-code/' + evidence.digest(live)
+                      + '/' + Path(path).name, live)
+            for path in ('web/src/scene.ts', 'web/src/mechanics.ts', 'web/src/mechanics-data.ts',
+                         'web/src/magnifier.ts', 'web/src/kinematics.ts'):
+                live = ('// live ' + path + '\n').encode('utf8')
+                manifest['canonicalConsumerInputs'].append({'path': path, 'sha256': evidence.consumer_digest(live)})
+                store(path, live)
+                store('web/content/canonical-native/historical-code/' + evidence.digest(live)
+                      + '/' + Path(path).name, live)
+            track_name = f'web/content/{video_id}.source-track.json'
+            track = {'model': old_model, 'anchors': [{**anchor, 'motion': motion}],
+                     'evidence': {'generatorInputs': records}}
+            store(original, raw)
+            store(track_name, json.dumps(track).encode('utf8'))
+            store(evidence.MAP, json.dumps(MAPPING).encode('utf8'))
+            store(evidence.MANIFEST, json.dumps(manifest).encode('utf8'))
+            store('web/content/model-representation.json', json.dumps({'source': live_model}).encode('utf8'))
+            seeds = {
+                'historicalReportInputs': [],
+                'states': [{'nativeFrame': 0, 'timeSeconds': 0,
+                            'sourceImage': {'frameIndex': 0, 'pixelFormat': 'bgr8',
+                                            'width': 1920, 'height': 1080, 'sourceSha256': 'b' * 64,
+                                            'sha256Bgr8': 'c' * 64},
+                            'completeInput': {
+                                'crankTurns': 0, 'amplitudes': [0] * 20, 'phases': [0] * 20,
+                                'gearing': 'medium-medium', 'magnification': 1,
+                                'setup': {key: 0 for key in rocker.common.SETUP_FIELDS},
+                            }}],
+                'bodyCandidate': {'camera': {'positionMetres': [0, 0, 1],
+                                            'quaternion': [0, 0, 0, 1], 'verticalFovDegrees': 45}},
+            }
+            store(f'web/content/canonical-native/{video_id}.source-seeds.json', json.dumps(seeds).encode('utf8'))
+            with patch.object(evidence, 'ROOT', root), patch.object(rocker, 'WEB', root / 'web'), \
+                    patch.object(rocker.common, 'WEB', root / 'web'), \
+                    patch.object(rocker, '__file__', str(root / code[0][0])):
+                rocker.common.native_motion_bindings.cache_clear()
+                try:
+                    with patch.object(evidence.sys, 'argv', ['evidence', 'generate']):
+                        evidence.main()
+                    yield root, data, live_model, track_name, output
+                finally:
+                    rocker.common.native_motion_bindings.cache_clear()
+
+    def check(self):
+        with patch.object(evidence.sys, 'argv', ['evidence', 'check']):
+            evidence.main()
+
+    def test_prior_motion_and_hashes_survive_changed_classifier_but_live_drift_refuses(self):
+        with self.lineage_fixture() as (root, data, _, track_name, output):
+            track = json.loads((root / track_name).read_bytes())
+            records = track['evidence']['generatorInputs']
+            self.assertEqual(track['model'], data['model'])
+            self.assertEqual(track['anchors'], [{**data['anchors'][0], 'motion': 'moving'}])
+            self.assertIsNone(rocker.common.anchor_motion(data['anchors'][0]))
+            self.assertEqual(records[0]['path'], output)
+            self.assertEqual(records[0]['sha256'], evidence.digest((root / output).read_bytes()))
+            for record in records[1:]:
+                prior = (root / record['origin']['snapshotPath']).read_bytes()
+                live = (root / record['path']).read_bytes()
+                self.assertEqual(record['sha256'], evidence.digest(prior))
+                self.assertNotEqual(record['sha256'], evidence.digest(live))
+                self.assertIs(record['requiredForRegeneration'], True)
+            self.check()
+            bindings = root / 'web/src/bindings.ts'
+            bindings.write_bytes(bindings.read_bytes() + b'\n// unsealed live change\n')
+            with self.assertRaisesRegex(ValueError, 'normalized current consumer SHA'):
+                self.check()
+            self.assertEqual(json.loads((root / track_name).read_bytes()), track)
+
+    def test_historical_semantics_require_exact_origin_certificate_and_independent_live_seal(self):
+        with self.lineage_fixture() as (root, _, _, track_name, _):
+            baseline = json.loads((root / track_name).read_bytes())
+            manifest = json.loads((root / evidence.MANIFEST).read_bytes())
+            cases = ('optional', 'missing-origin', 'wrong-origin', 'repinned-live-sha', 'missing-certificate',
+                     'wrong-certificate-origin', 'changed-snapshot', 'missing-live-seal', 'undeclared-usage')
+            for fault in cases:
+                with self.subTest(fault=fault):
+                    track, changed_manifest = copy.deepcopy(baseline), copy.deepcopy(manifest)
+                    record = track['evidence']['generatorInputs'][-1]
+                    snapshot = root / record['origin']['snapshotPath']
+                    original_bytes = snapshot.read_bytes()
+                    if fault == 'optional':
+                        record['requiredForRegeneration'] = False
+                    elif fault == 'missing-origin':
+                        del record['origin']
+                    elif fault == 'wrong-origin':
+                        record['origin']['sourceCommit'] = 'b' * 40
+                    elif fault == 'repinned-live-sha':
+                        record['sha256'] = evidence.digest((root / record['path']).read_bytes())
+                    elif fault == 'missing-certificate':
+                        changed_manifest['historicalCodeSnapshots'].pop()
+                    elif fault == 'wrong-certificate-origin':
+                        changed_manifest['historicalCodeSnapshots'][-1]['origin']['sourcePath'] = 'web/src/scene.ts'
+                    elif fault == 'changed-snapshot':
+                        snapshot.write_bytes(original_bytes + b'\n')
+                    elif fault == 'missing-live-seal':
+                        changed_manifest['canonicalConsumerInputs'] = [
+                            seal for seal in changed_manifest['canonicalConsumerInputs'] if seal['path'] != record['path']]
+                    else:
+                        del record['usage']
+                    try:
+                        with self.assertRaises(ValueError):
+                            evidence.current_track_inputs(
+                                json.dumps(track).encode('utf8'), track_name, changed_manifest, {}, {})
+                    finally:
+                        snapshot.write_bytes(original_bytes)
+
+    def test_fresh_producer_uses_live_approval_and_seals_never_archived_fallback(self):
+        with self.lineage_fixture() as (root, data, live_model, track_name, output):
+            captured = (root / track_name).read_bytes()
+            with self.assertRaisesRegex(ValueError, 'independently approved live model'):
+                rocker.rocker()
+            fresh = copy.deepcopy(data)
+            fresh['model'] = {**data['model'], **live_model}
+            (root / output).write_bytes(evidence.encode_observations(json.dumps(fresh).encode('utf8')))
+            regenerated = rocker.rocker()
+            self.assertEqual(regenerated['model'], fresh['model'])
+            self.assertEqual(regenerated['anchors'], [{**fresh['anchors'][0], 'motion': None}])
+            self.assertEqual(regenerated['frames'][0]['views'][0]['input']['crankTurns'], 0)
+            self.assertEqual((root / track_name).read_bytes(), captured)
+            manifest = json.loads((root / evidence.MANIFEST).read_bytes())
+            for path in (seal['path'] for seal in manifest['canonicalConsumerInputs']):
+                live_path = root / path
+                current = live_path.read_bytes()
+                for mutation in ('changed', 'missing'):
+                    with self.subTest(path=path, mutation=mutation):
+                        if mutation == 'changed':
+                            live_path.write_bytes(current + b'\n')
+                        else:
+                            live_path.unlink()
+                        try:
+                            with self.assertRaisesRegex(ValueError, 'live producer input (differs|unavailable)'):
+                                rocker.rocker()
+                        finally:
+                            live_path.write_bytes(current)
+
+    def test_duplicate_historical_usage_and_origin_authorities_refuse(self):
+        with self.lineage_fixture() as (root, _, _, track_name, _):
+            track = json.loads((root / track_name).read_bytes())
+            manifest = json.loads((root / evidence.MANIFEST).read_bytes())
+            record = track['evidence']['generatorInputs'][-1]
+            origin = json.dumps(record['origin'], separators=(',', ':')).encode('utf8')
+            commit = json.dumps(record['origin']['sourceCommit']).encode('ascii')
+            encoded = json.dumps(record, separators=(',', ':')).encode('utf8')
+            variants = (
+                b'{"usage":"current-regeneration-input",' + encoded[1:],
+                b'{"role":"generator",' + encoded[1:],
+                b'{"origin":' + origin + b',' + encoded[1:],
+                encoded.replace(origin, b'{"sourceCommit":' + commit + b',' + origin[1:]),
+            )
+            for raw_record in variants:
+                raw = b'{"evidence":{"generatorInputs":[' + raw_record + b']}}'
+                with self.subTest(record=raw_record), self.assertRaisesRegex(
+                        ValueError, 'duplicate current projection member'):
+                    evidence.current_track_inputs(raw, track_name, manifest, {}, {})
+
 
 
 if __name__ == '__main__':

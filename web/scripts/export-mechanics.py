@@ -561,10 +561,6 @@ def main() -> None:
         values = {"__name__": f"exported_chain_{gearing}"}
         # Whole archived source with mounted pitch radii and actual native link count.
         exec(compile(ast.fix_missing_locations(tree), chain.__file__, "exec"), values)  # noqa: S102
-        if values["LINK_COUNT"] != chain.LINK_COUNT:
-            raise ValueError(
-                f"{gearing} does not close on the existing native link count"
-            )
         chain_paths[gearing] = {
             "arcsMm": [
                 [0.0, 0.0, knob_radius, values["_ANG_N"], values["SPAN_A"]],

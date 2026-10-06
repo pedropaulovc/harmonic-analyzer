@@ -30,9 +30,12 @@ PRESERVATION = ('All original numeric JSON tokens retained byte-for-byte. Only '
                 'identity/dependency strings translated; no geometric re-export '
                 'or renderer/camera requalification.')
 SCOPE = ('Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; '
-         'not a claim of byte identity, geometric or GPU/source verification.')
+         'detects live consumer drift, not captured producer lineage, byte identity, '
+         'geometric or GPU/source verification.')
 CONSUMER_NORMALIZATION = 'CRLF-to-LF'
 CURRENT_OBSERVATION_LABELS = ('analysisStationaryFrontCamera', 'synthesisCoarseFraming', 'synthesisWheelFraming')
+HISTORICAL_PRODUCER_USAGE = 'historical-producer-lineage'
+HISTORICAL_PRODUCER_ROLES = ('generator', 'shared-source-selector', 'native-anchor-motion-lineage')
 
 
 def digest(data: bytes) -> str:
@@ -442,15 +445,47 @@ def current_projection_fields(data: bytes, name: str):
         current['generatorInputs'] = []
         for index, record in enumerate(records):
             path = f'$["evidence"]["generatorInputs"][{index}]'
-            projected = select(record, ('requiredForRegeneration',), path)
-            if projected.get('requiredForRegeneration') is True:
-                projected.update(select(record, ('path', 'sha256'), path))
+            projected = select(record, ('requiredForRegeneration', 'usage'), path)
+            if (projected.get('requiredForRegeneration') is True
+                    or projected.get('usage') == HISTORICAL_PRODUCER_USAGE):
+                projected.update(select(record, ('path', 'sha256', 'role', 'origin'), path))
+                if 'origin' in projected:
+                    projected['origin'] = select(
+                        projected['origin'], ('sourceCommit', 'sourcePath', 'snapshotPath'), path + '["origin"]')
             current['generatorInputs'].append(projected)
     return current
 
 
+def validate_historical_track_input(record, name, manifest):
+    """Prior identity-migrated lineage is not original capture or a live pin."""
+    require(record.get('requiredForRegeneration'), True, name + ' historical regeneration requirement')
+    if record.get('role') not in HISTORICAL_PRODUCER_ROLES:
+        raise ValueError(name + ': historical producer lineage requires a declared code role')
+    path, sha = record.get('path'), record.get('sha256')
+    origin = record.get('origin')
+    if (not isinstance(path, str) or not path.endswith(('.py', '.ts'))
+            or not isinstance(sha, str) or re.fullmatch(r'[0-9a-f]{64}', sha) is None
+            or not isinstance(origin, dict)
+            or not isinstance(origin.get('sourceCommit'), str)
+            or re.fullmatch(r'[0-9a-f]{40}', origin['sourceCommit']) is None):
+        raise ValueError(name + ': historical producer lineage requires exact SHA and Git origin')
+    require(origin.get('sourcePath'), path, name + ' historical source path')
+    snapshot = ('web/content/canonical-native/historical-code/' + sha + '/' + Path(path).name)
+    require(origin.get('snapshotPath'), snapshot, name + ' historical snapshot path')
+    certificates = [row for row in manifest['historicalCodeSnapshots'] if row['path'] == snapshot]
+    require(len(certificates), 1, name + ' historical snapshot certificate count')
+    certificate = certificates[0]
+    require(certificate['sha256'], sha, name + ' historical snapshot certificate SHA')
+    require(certificate.get('origin'), {
+        'sourceCommit': origin['sourceCommit'], 'sourcePath': path,
+    }, name + ' historical snapshot certificate origin')
+    require(digest(file_path(snapshot).read_bytes()), sha, name + ' historical producer SHA')
+    if not any(row['path'] == path for row in manifest['canonicalConsumerInputs']):
+        raise ValueError(name + ': historical producer requires a separate current consumer seal: ' + path)
+
+
 def current_track_inputs(data: bytes, name: str, manifest, outputs, code_updates) -> bytes:
-    """Project only demonstrated current generator input/observation fields."""
+    """Project live storage reads, preserving explicitly certified prior lineage."""
     current = current_projection_fields(data, name)
     artifacts = {row['originalPath']: row['path'] for row in manifest['derivatives']}
     observations = {row['path'][:-3]: row['path'] for row in manifest['derivatives']
@@ -467,8 +502,16 @@ def current_track_inputs(data: bytes, name: str, manifest, outputs, code_updates
             if isinstance(old, str) and old in observations:
                 changes[f'$["evidence"]["{label}"]["sourceObservations"]'] = observations[old]
     for index, record in enumerate(current.get('generatorInputs', [])):
+        usage = record.get('usage')
+        if usage == HISTORICAL_PRODUCER_USAGE:
+            validate_historical_track_input(record, name, manifest)
+            continue
+        if record.get('requiredForRegeneration') is True and usage not in (None, 'current-regeneration-input'):
+            raise ValueError(name + ': unsupported required generator input usage: ' + str(usage))
         if record.get('requiredForRegeneration') is not True:
             continue
+        if record.get('role') in HISTORICAL_PRODUCER_ROLES and usage is None:
+            raise ValueError(name + ': required producer code must declare current or historical usage')
         old = record['path']
         if not isinstance(old, str) or not isinstance(record['sha256'], str):
             raise ValueError(name + ': current generator input requires path and SHA strings')
