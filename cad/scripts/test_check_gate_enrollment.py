@@ -1,4 +1,4 @@
-"""Every offline test file under ``cad/scripts`` runs inside some ``check:*`` gate.
+"""Every offline test under ``cad/scripts`` and comparison tools runs in a gate.
 
 ``dodo`` enrolls tests explicitly (plus the ``test_*_drawing.py`` glob), so a new
 test file that nobody enrolls passes in the local suite and never runs in a
@@ -15,6 +15,12 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPTS.parents[1]
+
+TOOLS = (REPO_ROOT / "cad" / "comparisons" / "tools").resolve()
+TEST_SOURCES = {
+    SCRIPTS: "test_check_gate_enrollment.py",
+    TOOLS: "test_seed_manifest.py",
+}
 
 # Test files that deliberately run in no check:* gate, each with its reason.
 EXEMPT: dict[str, str] = {}
@@ -57,8 +63,26 @@ def _load_dodo():
     return module
 
 
+def _test_file_key(path: Path) -> str:
+    """Preserve script exemption keys while distinguishing tool test filenames."""
+    if path.parent == SCRIPTS:
+        return path.name
+    return path.relative_to(REPO_ROOT).as_posix()
+
+
+def _offline_test_files() -> set[str]:
+    files: set[str] = set()
+    for directory, anchor in TEST_SOURCES.items():
+        paths = set(directory.glob("test_*.py"))
+        assert directory / anchor in paths, (
+            f"offline test scan of {directory} did not find its anchor {anchor}"
+        )
+        files.update(_test_file_key(path) for path in paths)
+    return files
+
+
 def _collected_by_check_gates() -> dict[str, list[str]]:
-    """Test file name -> the check:* tasks whose pytest command collects it."""
+    """Test source -> the check:* tasks whose pytest command collects it."""
     collected: dict[str, list[str]] = {}
     for task in _load_dodo().task_check():
         _run, (cmd, *_rest) = task["actions"][0]
@@ -66,15 +90,16 @@ def _collected_by_check_gates() -> dict[str, list[str]]:
             path = Path(str(arg))
             if path.suffix != ".py" or not path.name.startswith("test_"):
                 continue
-            if path.resolve().parent != SCRIPTS:
+            path = path.resolve()
+            if path.parent not in TEST_SOURCES:
                 continue
-            collected.setdefault(path.name, []).append(task["name"])
+            collected.setdefault(_test_file_key(path), []).append(task["name"])
     return collected
 
 
 def test_every_offline_test_file_runs_in_a_check_gate() -> None:
     collected = _collected_by_check_gates()
-    on_disk = {path.name for path in SCRIPTS.glob("test_*.py")}
+    on_disk = _offline_test_files()
     orphans = sorted(on_disk - set(collected) - set(EXEMPT) - PENDING_TRIAGE)
     assert not orphans, (
         "test files no check:* gate collects (enroll them in dodo.task_check, "
@@ -84,7 +109,7 @@ def test_every_offline_test_file_runs_in_a_check_gate() -> None:
 
 def test_exemptions_name_real_uncollected_files() -> None:
     collected = _collected_by_check_gates()
-    on_disk = {path.name for path in SCRIPTS.glob("test_*.py")}
+    on_disk = _offline_test_files()
     listed = set(EXEMPT) | PENDING_TRIAGE
     assert not (listed - on_disk), (
         f"exempted files that no longer exist: {sorted(listed - on_disk)}"

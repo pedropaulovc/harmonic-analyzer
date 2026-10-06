@@ -182,10 +182,11 @@ CLOCK_ARC_CENTRE_TOL = 0.0005
 CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")
 # Top-aligned with the manufacturing notes: the 14-line block (header + 13
 # rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
-# line; the 15-line block ends ~52.6 mm down, still above the largest side
-# view (top 0.197) with FaceWidth below it.  Its widest row may
-# not pass the MATES WITH row (66 characters, ~122 mm): the sheet count sits
-# at x 0.3496 (a 78-character row reached 0.3588 and failed the audit).
+# line; the reserved 15-line block ends ~52.6 mm down, still above the largest
+# side view (top 0.197) with FaceWidth below it. The complete mate row wraps
+# onto a continuation line within this height; no line may exceed 66
+# characters (~122 mm). The sheet count sits at x 0.3496 (a 78-character row
+# reached 0.3588 and failed the audit).
 GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height/width budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056

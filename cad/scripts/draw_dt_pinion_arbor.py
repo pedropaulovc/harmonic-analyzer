@@ -260,9 +260,11 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # Measured with the text set at x 0.250:
 # - pc-r9 ("1/16 DRILL THRU" widest) underlined 232.4-269.1 mm, so the text
 #   centres 0.75 mm right of its position;
-# - pc-r10 ("FOR MHA-VN-033 SPRING PIN", 22 characters) bent at 280.1, a 58.7 mm
+# - pc-r10 ("FOR MHA-145 SPRING PIN", 22 characters) bent at 280.1, a 58.7 mm
 #   underline, 2.67 mm per character;
 # - the leader meets the hole 0.4 mm left of its axis (pc-r10, 269.1 mm).
+# These are recorded pre-migration calibration inputs, not current mate
+# identities; the live callout width below uses the complete current Number.
 # The font is proportional, so the per-character advance overstates a line
 # of narrow glyphs.  pc-r9's line reads 3 mm narrower than the estimate,
 # which stands the bend left of the hole, away from the station text.

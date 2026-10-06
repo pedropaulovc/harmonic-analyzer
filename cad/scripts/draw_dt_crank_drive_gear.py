@@ -130,7 +130,12 @@ FRONT_KEEP = {
         GEAR_DATA_BOTTOM - TIP_DIA_TEXT_GAP - TIP_DIA_TEXT_HALF_HEIGHT,
     ),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
-    "BoreAF": (FRONT_CENTER[0] + 0.090, FRONT_CENTER[1] + 0.028),
+    # Centre the complete AF block in the lane between the tooth-tip circle
+    # and the section's south face; the longer mate Number stays intact.
+    "BoreAF": (
+        (FRONT_CENTER[0] + HALF_OD + SECTION_CENTER[0] - FACE_WIDTH_HALF) / 2.0,
+        FRONT_CENTER[1] + 0.028,
+    ),
 }
 # Longitudinal centre section A-A instead of a plain side view: the south
 # bore chamfer is internal, and a targeted import delivers the chamfer's

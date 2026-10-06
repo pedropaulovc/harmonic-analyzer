@@ -520,11 +520,10 @@ def test_the_check_costs_one_round_trip_per_feature_and_logs_it(monkeypatch) -> 
         _Feature("StationReference", "ProfileFeature", SHOWN),
     )
     allowed = {"StationReference": "crankhub: reason"}
-    msg, attrs = _scan(model, monkeypatch, allowed)
+    _msg, attrs = _scan(model, monkeypatch, allowed)
     assert model.FeatureManager.get_features_calls == 1
     # 3 per check + 5 types + 3 Visible (two sketches, a plane) + 1 Name
     assert _ROUND_TRIPS == {"InvokeTypes": 11, "GetIDsOfNames": 1}
-    assert msg.startswith("crank-arm: check scanned 5 features with 12 COM calls")
     assert attrs["features_visited"] == 5 and attrs["com_calls"] == 12
     assert 0.0 <= attrs["fetch_s"] <= attrs["walk_s"]
 

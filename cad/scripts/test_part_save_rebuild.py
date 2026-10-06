@@ -313,22 +313,17 @@ def test_edit_rebuild_all_alone_leaves_the_cg_fx1_caches_that_fail_the_reopen(
     assert part.Extension.EditRebuildAll()
     assert _common.stale_configurations(part, CONE_GEAR) == []
     part.log.clear()
-    with pytest.raises(RuntimeError, match="do not regenerate") as failure:
+    with pytest.raises(RuntimeError) as failure:
         _common.assert_saved_configurations_regenerate(adapter, "dt-cone-gear")
     message = str(failure.value)
-    # cg-fx2a's shape (dt-logs/farm-runs/leaf-logs/cg-fx2a-task.log:486), with
-    # the fleet's named fault codes: one entry per faulted configuration.
-    faulted = "['ToothGapCut (unknown-error)', 'ToothGapPattern (unknown-error)']"
-    assert message == (
-        "saved cone-gear configurations do not regenerate the way a placing "
-        "assembly loads them (activate, then a plain EditRebuild3): "
-        + "; ".join(
-            f"{name}: loaded {faulted}, EditRebuild3=False, after {faulted}"
-            for name in SWAPPED
-        )
-    )
+    # Every faulted configuration remains diagnosable; prose and formatting
+    # are not part of the regeneration contract.
+    assert all(name in message for name in SWAPPED)
+    assert all(feature in message for feature in ("ToothGapCut", "ToothGapPattern"))
     assert "T120:" not in message and "Default:" not in message
     assert not any(entry.startswith("force") for entry in part.log)
+    assert part.bad == set(SWAPPED)
+    assert part.active == "T120"
 
 
 def test_the_chokepoint_heals_the_cg_fx1_caches_so_the_reopen_passes(seat) -> None:

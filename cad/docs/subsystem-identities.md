@@ -65,6 +65,10 @@ Drawing callouts retain complete category-qualified Numbers and process
 information. Longer cross-part notes, such as the crankshaft's mating-part
 callout, must fit their existing reserved field by placement and wrapping;
 do not abbreviate Numbers or relax the field bounds.
+Per-configuration Gear Data and linked Manufacturing or Installation Notes
+retain their complete mate identifiers when reflowed. Rebuild the owning model
+when this linked text changes; a drawing-only rebuild does not update the
+model's source property.
 
 ## Historical evidence
 

@@ -119,7 +119,7 @@ def test_fastener_refuses_rows_outside_the_builds_cache_key(monkeypatch):
 
     from _fastener_catalog import fastener
 
-    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "frame-side-screw,clamp-screw")
+    monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "vn-frame-side-screw,vn-clamp-screw")
     assert fastener("vn-clamp-screw").part_name == "vn-clamp-screw"
     with pytest.raises(KeyError, match="outside this build's cache key"):
         fastener("vn-lag-screw")

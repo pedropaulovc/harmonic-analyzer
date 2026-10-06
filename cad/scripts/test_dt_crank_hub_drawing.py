@@ -141,8 +141,8 @@ def test_hub_overall_band_is_loosened_to_what_the_rear_face_stacks_hold() -> Non
         seat_face=dt_crankshaft_spec.SEAT_COLLAR,
         seat_face_band=dt_crankshaft_spec.SEAT_COLLAR_BAND,
         hub_rear=geometry.HUB_LENGTH,
-        plate_min=dt_crankshaft_spec.transgear_removable_spec.PLATE
-        + min(dt_crankshaft_spec.transgear_removable_spec.PLATE_BAND),
+        plate_min=dt_crankshaft_spec.pd_transgear_removable_spec.PLATE
+        + min(dt_crankshaft_spec.pd_transgear_removable_spec.PLATE_BAND),
     )
     air, engagement = dt_crankshaft_spec.drive_pin_front_clearances(
         dt_crankshaft_spec.DRIVE_PIN_PROUD_RANGE,

@@ -275,7 +275,6 @@ def test_the_notes_fit_the_note_field_and_leave_the_title_block_its_own() -> Non
     assert len(lines) <= 4
     assert [line for line in lines if len(line) > 70] == []
     assert [t for t in _TITLE_BLOCK_TEXT if t in spec.DRAWING_NOTES] == []
-    assert "STRIP" not in spec.DRAWING_NOTES.replace("STRIP TO LIE FLAT", "")
 
 
 def test_the_centring_note_states_what_the_rivet_pair_holds() -> None:

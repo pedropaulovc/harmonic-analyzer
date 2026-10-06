@@ -351,42 +351,56 @@ def test_drawing_fleet_owns_placement_not_manufacturing_values() -> None:
     )
 
 
-def test_detector_flags_render_time_precision_but_not_tolerance_places() -> None:
-    source = """
-from _drawing_common import set_dimension_precision
+@pytest.mark.parametrize(
+    "call, expected_rules",
+    (
+        (
+            'set_dimension_precision(adapter, dims, {"HubDia": 1})',
+            ["drawing-owned-precision"],
+        ),
+        ("display.SetPrecision3(1, -1, -1, -1)", ["drawing-owned-precision"]),
+        ("display.SetPrecision3(-1, -1, 3, -1)", []),
+    ),
+)
+def test_detector_flags_render_time_precision_but_not_tolerance_places(
+    call: str, expected_rules: list[str]
+) -> None:
+    source = f"from _drawing_common import set_dimension_precision\n{call}\n"
+    assert _rules(source) == expected_rules
 
-set_dimension_precision(adapter, dims, {"HubDia": 1})
-display.SetPrecision3(1, -1, -1, -1)
-display.SetPrecision3(-1, -1, 3, -1)
-"""
-    violations = drawing_specification_violations(source)
-    assert [(item.line, item.rule) for item in violations] == [
-        (4, "drawing-owned-precision"),
-        (5, "drawing-owned-precision"),
-    ]
 
-
-def test_precision_exception_is_the_spec_reference_precision_only() -> None:
-    """Only DRAWING_REFERENCE_PRECISION (direct, aliased, module attribute, or an
-    item of it) may reach SetPrecision3; any other *_spec value is spec data,
-    not a places statement, and still writes a drawing-owned precision."""
-    source = """
+@pytest.mark.parametrize(
+    "expression, allowed",
+    (
+        ("DRAWING_REFERENCE_PRECISION", True),
+        ('DRAWING_REFERENCE_PRECISION["central web width"]', True),
+        ("REF", True),
+        (
+            'fr_top_frame_spec.DRAWING_REFERENCE_PRECISION["central web width"]',
+            True,
+        ),
+        (
+            'top_frame_spec.DRAWING_REFERENCE_PRECISION["central web width"]',
+            True,
+        ),
+        ("RING_HEIGHT", False),
+        ("top_frame_spec.RING_HEIGHT", False),
+        ("top_frame_spec.DRAWING_PRECISION", False),
+    ),
+)
+def test_precision_exception_is_the_spec_reference_precision_only(
+    expression: str, allowed: bool
+) -> None:
+    """Only the part's reference places, not other spec data, may reach SetPrecision3."""
+    source = f"""
 import fr_top_frame_spec
+import fr_top_frame_spec as top_frame_spec
 from fr_harmonic_base_spec import DRAWING_REFERENCE_PRECISION as REF
-from fr_tube_frame_spec import DRAWING_REFERENCE_PRECISION, SHANK_DIA
+from fr_top_frame_spec import DRAWING_REFERENCE_PRECISION, RING_HEIGHT
 
-display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
-display.SetPrecision3(DRAWING_REFERENCE_PRECISION["Height"], -1, -1, -1)
-display.SetPrecision3(REF, -1, -1, -1)
-display.SetPrecision3(top_frame_spec.DRAWING_REFERENCE_PRECISION["Web"], -1, -1, -1)
-display.SetPrecision3(SHANK_DIA, -1, -1, -1)
-display.SetPrecision3(top_frame_spec.WEB_WIDTH, -1, -1, -1)
+display.SetPrecision3({expression}, -1, -1, -1)
 """
-    violations = drawing_specification_violations(source)
-    assert [(item.line, item.rule) for item in violations] == [
-        (10, "drawing-owned-precision"),
-        (11, "drawing-owned-precision"),
-    ]
+    assert _rules(source) == ([] if allowed else ["drawing-owned-precision"])
 
 
 def test_precision_rule_is_scoped_to_migrated_drawings(tmp_path: Path) -> None:

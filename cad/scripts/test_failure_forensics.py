@@ -1137,7 +1137,7 @@ def test_the_main_window_rect_is_recorded_as_comparable_integers(tmp_path):
     assert geometry["frame_width_px"] == 1024
     assert geometry["frame_height_px"] == 640
     assert geometry["frame_area_px"] == 1024 * 640
-    assert (geometry["fr-frame_left"], geometry["fr-frame_top"]) == (12, 34)
+    assert (geometry["frame_left"], geometry["frame_top"]) == (12, 34)
     assert geometry["frame_client_width_px"] == 1008
     assert geometry["frame_state"] == "normal"
     # The comparison the investigation had to do by hand, now arithmetic:

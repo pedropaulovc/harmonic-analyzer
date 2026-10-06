@@ -183,8 +183,8 @@ HOLE_TABLE_ANCHOR = (0.018, 0.260)
 # not text-editable, so the note marks their diameter as reference.
 SOCKET_FIT_NOTE = (
     "4X: FIT TO ASSIGNED\n"
-    "MHA-FR-003 TUBE: CLOSE\n"
-    "HAND-SLIP, NO\n"
+    "MHA-FR-003 TUBE:\n"
+    "CLOSE HAND-SLIP, NO\n"
     "PERCEPTIBLE ROCK.\n"
     "TABLE <MOD-DIAM> REF.\n"
     "RETAIN MATCH MARKS."

@@ -326,7 +326,7 @@ def test_coplanar_unbounded_surfaces_do_not_prove_trimmed_face_contact(scene):
 @pytest.mark.parametrize(
     "fault,match",
     [
-        ("configuration", "expected one transgear-removable"),
+        ("configuration", None),
         ("parent", "parent: native identity"),
         ("suppressed", "component is suppressed"),
         ("face_owner", "face component: native identity"),

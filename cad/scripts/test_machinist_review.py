@@ -921,14 +921,14 @@ def test_review_serialises_and_indexes(tmp_path: Path) -> None:
         "gpt-5.6-sol",
         "high",
     )
-    markdown = (tmp_path / "crank_arm.md").read_text(encoding="utf-8")
+    markdown = (tmp_path / "dt_crank_arm.md").read_text(encoding="utf-8")
     assert "by codex/gpt-5.6-sol (high)" in markdown
     index = mr.render_index(loaded)
     expected = (
-        "| [crank_arm](crank_arm.md) | part | 1 | FAIL | FIX | 0 | 1 | 0 | 0 | yes |"
+        "| [dt_crank_arm](dt_crank_arm.md) | part | 1 | FAIL | FIX | 0 | 1 | 0 | 0 | yes |"
     )
     assert expected in index
-    data = json.loads((tmp_path / "crank_arm.json").read_text())
+    data = json.loads((tmp_path / "dt_crank_arm.json").read_text())
     assert data["name"] == "dt_crank_arm"
     assert data["sources"] == ["x.png"]
 

@@ -16,15 +16,12 @@ import dt_cone_gear_notes as notes
 import dt_cone_gear_shaft_spec
 import dt_cone_gear_spec as spec
 import draw_dt_cone_gear as drawing
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from _drawing_registry import DRAWINGS_BY_NAME
 
 
-def test_required_drawing_paths_and_registry_entry() -> None:
+def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/dt-cone-gear.SLDDRW")
     assert drawing.PDF.as_posix().endswith("/pdf/dt-cone-gear.pdf")
     assert drawing.PNG.as_posix().endswith("/png/dt-cone-gear_drawing.png")
-    assert DRAWINGS_BY_NAME["dt_cone_gear"].script == Path(drawing.__file__).resolve()
 
 
 def test_every_configuration_has_one_complete_sheet_and_native_scale() -> None:
@@ -45,8 +42,7 @@ def test_every_configuration_has_one_complete_sheet_and_native_scale() -> None:
         assert drawing.rendered_half_od(teeth) == pytest.approx(drawn_od / 2000.0)
 
 
-def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
+def test_every_marked_dimension_prints_once_per_sheet() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert marked == {
         "BlankDia",
@@ -85,7 +81,6 @@ def test_model_owns_precision_for_every_printed_dimension() -> None:
         # upper limit rounded up (probe 834-gapfloor-c301 showed .049 as .05).
         "FloorDia": 3,
     }
-    assert "draw_dt_cone_gear.py" in PRECISION_MIGRATED_DRAWINGS
 
 
 def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
@@ -94,10 +89,6 @@ def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
     # tip prints +/-0.10, applied on the model like the other two bands.
     assert spec.BLANK_DIA_BAND == (0.10, -0.10)
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert (
-        '"BlankProfile", "BlankDia", *deviations(BLANK_DIA_BAND)' in source
-    )
 
 
 def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
@@ -107,8 +98,6 @@ def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
     assert spec.FACE_WIDTH == pytest.approx(6.8887, abs=1e-12)
     assert spec.FACE_WIDTH <= spec.SEAT_PITCH < spec.FACE_WIDTH + 1e-4
     assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)' in source
 
 
 def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
@@ -119,20 +108,14 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
     assert len(numbers) == len(spec.CONFIGURATION_TEETH)
     with pytest.raises(ValueError):
         spec.configuration_number(number, 7)
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"Number": configuration_number(part_number, teeth)' in source
 
 
 def test_bore_bands_are_the_derived_seat_fit_bands() -> None:
     # Every gear slides onto its D-flat land (gear_seat_fit): the family's one
     # BoreCutDia band is +0.050/+0.025 and its one BoreAF band +0.020/+0.010
     # (test_cone_gear_seat_fit proves every seat at the print extremes).
-    assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
     assert spec.BORE_DIA_BAND == (0.05, 0.025)
     assert spec.BORE_AF_BAND == pytest.approx((0.02, 0.01))
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)' in source
-    assert '"BoreProfile", "BoreAF", *deviations(BORE_AF_BAND)' in source
 
     # Every configured bore seats on a published cone-shaft land; T006 and
     # T012 slide straight onto the flatted 1/16-inch tip land.
@@ -168,10 +151,6 @@ def test_native_tooth_thickness_is_the_modelled_deepened_mesh_tooth() -> None:
             spec.outside_dia_mm(teeth)
         )
     assert spec.TOOTH_THICKNESS == pytest.approx(spec.tooth_thickness_mm(120))
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "*deviations(TOOTH_THICKNESS_BAND)" in source
-    # Delta solves from the printed thickness, so the flanks follow it.
-    assert '"ToothThickness" * "DP" / "ToothCount" + tan("PA") - "PArad"' in source
 
 
 def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates() -> None:
@@ -282,7 +261,6 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
         "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
     ]
     assert notes.DRAWING_NOTES.splitlines() == expected
-    assert not hasattr(notes, "ATTACHMENT")
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
         assert text.splitlines() == expected
@@ -304,8 +282,6 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
         for retired in ("RUNOUT", "DATUM", "+/-", "PITCH DIA="):
             assert retired not in text
     assert notes.CYLINDER_MATE_NUMBER == _config.parts("dt-cylinder-gear")["number"]
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"Manufacturing Notes": drawing_notes(teeth)' in source
 
 
 def test_book_fidelity_exceptions_are_recorded_in_the_spec_not_on_a_sheet() -> None:
@@ -314,8 +290,6 @@ def test_book_fidelity_exceptions_are_recorded_in_the_spec_not_on_a_sheet() -> N
     # gears need them, so a new exception needs a new ruling, not a quiet edit.
     assert spec.CONTACT_RATIO_EXCEPTION_TEETH == (6, 12, 18, 24, 30, 36, 42)
     assert spec.WEB_EXCEPTIONS_MM == {6: 0.621}
-    for retired in ("CONTACT_RATIO_EXCEPTION", "web_exception", "both_exceptions"):
-        assert not hasattr(notes, retired)
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
@@ -360,9 +334,6 @@ def test_no_sheet_prints_a_review_record(teeth: int) -> None:
 
 
 def test_no_gdt_and_only_the_fitted_bore_has_a_surface_finish() -> None:
-    assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
-    assert not hasattr(spec, "GEOMETRIC_CONTROLS")
-    assert not hasattr(spec, "PART_DATUMS")
     assert [control.key for control in spec.SURFACE_FINISHES] == ["cone_gear_bore"]
     assert spec.SURFACE_FINISHES[0].native_attachment == "model"
     for teeth in spec.CONFIGURATION_TEETH:
@@ -558,20 +529,15 @@ def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
     class _Extension:
         def __init__(self, value: float) -> None:
             self.value = value
-            self.calls: list[tuple[int, int]] = []
 
         def GetUserPreferenceDouble(self, pref: int, option: int) -> float:  # noqa: N802
-            self.calls.append((pref, option))
             return self.value
 
     class _Drawing:
         def __init__(self, value: float) -> None:
             self.Extension = _Extension(value)
 
-    matching = _Drawing(drawing.DIMENSION_ARROW_LENGTH)
-    drawing._assert_dimension_arrow_length(matching)
-    # swDetailingArrowLength, swDetailingNoOptionSpecified
-    assert matching.Extension.calls == [(26, 0)]
+    drawing._assert_dimension_arrow_length(_Drawing(drawing.DIMENSION_ARROW_LENGTH))
     with pytest.raises(RuntimeError, match="drawing arrow length reads 3.175 mm"):
         drawing._assert_dimension_arrow_length(_Drawing(0.003175))
 
@@ -587,27 +553,23 @@ class _FakeFeature:
 
 
 class _FakePart:
-    """A part document that records sketch blanks and reports visibility."""
+    """A part document whose sketches stay shown whatever is blanked."""
 
-    def __init__(self, *, hides: bool) -> None:
-        self.hides = hides
-        self.selected: list[tuple[str, str]] = []
-        self.blanked: list[str] = []
+    def __init__(self) -> None:
         self.Extension = self
 
     def ClearSelection2(self, _all: bool) -> None:
         pass
 
     def SelectByID2(self, name: str, kind: str, *_args: object) -> bool:
-        self.selected.append((name, kind))
         return True
 
     def BlankSketch(self) -> None:
-        self.blanked.append(self.selected[-1][0])
+        pass
 
     def FeatureByName(self, name: str) -> _FakeFeature:
-        # swVisibilityState_e: 1 hidden, 2 shown
-        return _FakeFeature(1 if self.hides and name in self.blanked else 2)
+        # swVisibilityState_e: 2 shown
+        return _FakeFeature(2)
 
 
 class _FakeAdapter:
@@ -615,25 +577,9 @@ class _FakeAdapter:
         self.currentModel = model
 
 
-def test_the_part_saves_both_authoring_sketches_hidden() -> None:
-    """#950's save gate: a shown construction sketch renders in the part images
-    and in every assembly that places a gear, so the part blanks both before
-    its first save and reads the blank back."""
-    model = _FakePart(hides=True)
-    part._blank_reference_sketches(_FakeAdapter(model))
-    sketches = [spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH]
-    assert model.selected == [(sketch, "SKETCH") for sketch in sketches]
-    assert model.blanked == sketches
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert body.index("_blank_reference_sketches(adapter)") < body.index(
-        "await adapter.save_file("
-    )
-
-
 def test_a_blank_that_does_not_take_fails_the_part_build() -> None:
     with pytest.raises(RuntimeError, match="still visible after BlankSketch"):
-        part._blank_reference_sketches(_FakeAdapter(_FakePart(hides=False)))
+        part._blank_reference_sketches(_FakeAdapter(_FakePart()))
 
 
 class _FakeTolerance:

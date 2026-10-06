@@ -292,8 +292,8 @@ def test_band_uses_are_found() -> None:
     helpers = [u for u in BAND_USES if u.order == "upper_lower"]
     assert len(helpers) >= 50, len(helpers)
     ids = {f"{u.module}:{u.expression}" for u in BAND_USES}
-    assert "build_crank_drive_gear:BORE_DIA_BAND" in ids
-    assert "build_cone_gear_shaft:band" in ids
+    assert "build_dt_crank_drive_gear:BORE_DIA_BAND" in ids
+    assert "build_dt_cone_gear_shaft:band" in ids
 
 
 def test_known_bad_ids_are_live() -> None:
