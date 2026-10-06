@@ -137,6 +137,46 @@ def _read(read: Callable[[], Any]) -> Any:
     return str(value)
 
 
+def _observe_construction(observations: list[dict[str, Any]], stage: str, **values: Any) -> None:
+    record = {"stage": stage, **values}
+    observations.append(record)
+    _telemetry.info(f"title construction: {json.dumps(record, default=str)}")
+
+
+def _drawing_state(adapter: Any, draw: Any) -> dict[str, Any]:
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    return {
+        "application_document": _read(lambda: _early_bound(adapter.swApp.ActiveDoc, "IModelDoc2").GetTitle()),
+        "adapter_document": _read(lambda: adapter.currentModel.GetTitle()),
+        "active_sheet": _read(lambda: _active_sheet(ddoc)),
+        "sheet_mode": _read(ddoc.GetEditSheet),
+        "drawing_dirty": _read(_early_bound(draw, "IModelDoc2").GetSaveFlag),
+    }
+
+
+def _activate_probe_drawing(adapter: Any, target: Any, observations: list[dict[str, Any]]) -> Any:
+    """Rebind the adapter too: new_project_drawing made the donor current."""
+    target = _early_bound(target, "IModelDoc2")
+    _observe_construction(observations, "drawing.activate.before", state=_drawing_state(adapter, target))
+    activation = adapter.swApp.ActivateDoc3(str(target.GetTitle()), False, 2, 0)
+    if not isinstance(activation, tuple) or len(activation) != 2:
+        raise RuntimeError(f"probe drawing activation returned {activation!r}, not (document, errors)")
+    activated, errors = activation
+    if activated is None or int(errors) != 0:
+        raise RuntimeError(f"probe drawing activation failed (document={activated!r}, errors={errors!r})")
+    activated = _early_bound(activated, "IModelDoc2")
+    active = _early_bound(adapter.swApp.ActiveDoc, "IModelDoc2")
+    same_target = int(adapter.swApp.IsSame(activated, target))
+    same_active = int(adapter.swApp.IsSame(active, target)) if active is not None else 0
+    _observe_construction(observations, "drawing.activate.identity", errors=int(errors),
+                          returned_is_target=same_target, active_is_target=same_active)
+    if same_target != 1 or same_active != 1:
+        raise RuntimeError("probe drawing activation did not return and activate the target drawing")
+    adapter.currentModel = activated
+    _observe_construction(observations, "drawing.activate.after", state=_drawing_state(adapter, activated))
+    return activated
+
+
 def _text_format(annotation: Any) -> dict[str, Any]:
     raw = annotation.GetTextFormat(0)
     if raw is None:
@@ -276,9 +316,10 @@ def _link_property_view(adapter: Any, ddoc: Any, sheet_name: str, view: Any) -> 
         raise RuntimeError(f"{sheet_name}: CustomPropertyView {linked!r} != {name!r}")
 
 
-def _add_donor_sheet(adapter: Any, target: Any, layout: DrawingLayout, name: str) -> None:
-    """A blank sheet of ``layout`` pasted into ``target`` from a donor drawing
-    of that template (``draw_fr_frame_assembly._insert_template_sheet``)."""
+def _add_donor_sheet(
+    adapter: Any, target: Any, layout: DrawingLayout, name: str, observations: list[dict[str, Any]]
+) -> None:
+    """Copy a blank template sheet, restoring both application and adapter."""
     target = _early_bound(target, "IModelDoc2")
     donor, donor_sheet = new_project_drawing(adapter, layout=layout)
     donor = _early_bound(donor, "IModelDoc2")
@@ -289,7 +330,7 @@ def _add_donor_sheet(adapter: Any, target: Any, layout: DrawingLayout, name: str
         if not donor.Extension.SelectByID2(donor_name, "SHEET", 0.0, 0.0, 0.0, False, 0, null_callout(), 0):
             raise RuntimeError(f"failed to select donor sheet {donor_name!r}")
         donor.EditCopy()
-        adapter.swApp.ActivateDoc3(str(target.GetTitle()), False, 2, 0)
+        target = _activate_probe_drawing(adapter, target, observations)
         ddoc = _early_bound(target, "IDrawingDoc")
         before = tuple(ddoc.GetSheetNames() or ())
         ddoc.PasteSheet(2, 2)
@@ -299,9 +340,13 @@ def _add_donor_sheet(adapter: Any, target: Any, layout: DrawingLayout, name: str
         if not ddoc.ActivateSheet(added[0]):
             raise RuntimeError(f"failed to activate pasted sheet {added[0]!r}")
         _early_bound(ddoc.GetCurrentSheet(), "ISheet").SetName(name)
+        if _active_sheet(ddoc) != name:
+            raise RuntimeError(f"pasted sheet did not take name {name!r}")
+        _observe_construction(observations, "drawing.donor.pasted", sheet=name,
+                              state=_drawing_state(adapter, target))
     finally:
         adapter.swApp.CloseDoc(donor_title)
-        adapter.swApp.ActivateDoc3(str(target.GetTitle()), False, 2, 0)
+        _activate_probe_drawing(adapter, target, observations)
 
 
 def _insert_linked_note(draw: Any, link: str, xy: tuple[float, float], *, wrap: float | None) -> dict[str, Any]:
@@ -320,39 +365,104 @@ def _insert_linked_note(draw: Any, link: str, xy: tuple[float, float], *, wrap: 
     return result
 
 
-def _wrap_template_title(ddoc: Any, sheet_view: Any) -> dict[str, Any]:
-    """Give the template's own PART note a narrow wrap width on THIS drawing
-    (the DRWDOT is never saved). ``EditTemplate``/``EditSheet`` return
-    nothing, so each mode change is read back through ``GetEditSheet``
-    (False in template mode, True in sheet mode) and a mode not entered
-    raises. Use the production reader's same whole-link parser, including
-    native FONT controls and the SW-Title(Title) summary descriptor."""
+def _wrap_state(annotation: Any, note: Any) -> dict[str, Any]:
+    return {
+        "name": _read(annotation.GetName),
+        "owner": _read(lambda: annotation.OwnerType),
+        "link": _read(lambda: note.PropertyLinkedText),
+        "text": _read(note.GetText),
+        "height": _read(note.GetHeight),
+        "height_points": _read(note.GetHeightInPoints),
+        "all_upper_case": _read(lambda: note.AllUpperCase),
+        "justification": _read(note.GetTextJustification),
+        "position": _read(annotation.GetPosition),
+        "extent": _read(note.GetExtent),
+        "text_count": _read(note.GetTextCount),
+        "display_count": _read(lambda: title_fields._display_count(annotation)),
+        "use_doc_format": _read(lambda: annotation.GetUseDocTextFormat(0)),
+        "text_format": _read(lambda: _text_format(annotation)),
+    }
+
+
+def _wrap_template_title(
+    adapter: Any, ddoc: Any, sheet_view: Any, observations: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Wrap the real scratch template cell without changing its font/style.
+
+    IAnnotation.SetTextFormat documents that embedded rich text blocks a
+    specific format change. Clear rich formatting with UseDoc=True/null,
+    then restore the original specific format with only LineLength changed.
+    No literal newline or drawing-owned replacement can stand in for this.
+    """
     result: dict[str, Any] = {}
     ddoc.EditTemplate()
     if bool(ddoc.GetEditSheet()):
         raise RuntimeError("EditTemplate left the drawing in sheet mode")
     result["template_mode"] = True
     try:
+        found = []
         for raw in sheet_view.GetAnnotations() or ():
             annotation = _early_bound(raw, "IAnnotation")
             if int(annotation.OwnerType) != 2 or int(annotation.GetType()) != _ANNOT_NOTE:
                 continue
             note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
             link = str(note.PropertyLinkedText or "")
-            name = title_fields._linked_name(link)
-            if name not in title_fields.TITLE_FIELD_PROPERTIES["Title"]:
-                continue
-            result["link"] = link
-            text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
-            text_format.LineLength = WRAP_M
-            result["wrap_set"] = _read(lambda: annotation.SetTextFormat(0, False, text_format))
-        if "wrap_set" not in result:
-            raise RuntimeError("no template note links the PART cell")
+            if title_fields._linked_name(link) in title_fields.TITLE_FIELD_PROPERTIES["Title"]:
+                found.append((annotation, note))
+        if len(found) != 1:
+            raise RuntimeError(f"template wrap needs one native PART cell, found {len(found)}")
+        annotation, note = found[0]
+        before = _wrap_state(annotation, note)
+        result["before"] = before
+        result["link"] = before["link"]
+        _observe_construction(observations, "wrap.template.before", state=before)
+        if not isinstance(before["text_format"], dict) or not before["text_format"]:
+            raise RuntimeError("template PART original font/style was unreadable")
+        original_values = [before["height"], before["height_points"], *before["text_format"].values()]
+        if any(value is None or (isinstance(value, str) and value.startswith("<error:")) for value in original_values):
+            raise RuntimeError("template PART original font/style has refused fields")
+        text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+        result["clear_set"] = _read(lambda: annotation.SetTextFormat(0, True, None))
+        _observe_construction(observations, "wrap.template.clear", returned=result["clear_set"],
+                              state=_wrap_state(annotation, note))
+        if not _is_true(result["clear_set"]):
+            raise RuntimeError("template PART rich-format clear was refused")
+        text_format.LineLength = WRAP_M
+        result["wrap_set"] = _read(lambda: annotation.SetTextFormat(0, False, text_format))
+        _observe_construction(observations, "wrap.template.restore", returned=result["wrap_set"],
+                              state=_wrap_state(annotation, note))
+        if not _is_true(result["wrap_set"]):
+            raise RuntimeError("template PART original-format restoration was refused")
     finally:
         ddoc.EditSheet()
         if not bool(ddoc.GetEditSheet()):
             raise RuntimeError("EditSheet left the drawing in template mode")
     result["sheet_mode"] = True
+    rebuild_drawing(adapter, label="title fit template wrap readback")
+    after = _wrap_state(annotation, note)
+    result["after"] = after
+    _observe_construction(observations, "wrap.template.after", state=after,
+                          drawing_state=_drawing_state(adapter, adapter.currentModel))
+    for key in (
+        "name", "owner", "text", "height", "height_points", "all_upper_case",
+        "justification", "position", "use_doc_format",
+    ):
+        if after[key] != before[key]:
+            raise RuntimeError(f"template wrap changed {key}: {before[key]!r} -> {after[key]!r}")
+    if title_fields._linked_name(str(after["link"])) != title_fields._linked_name(str(before["link"])):
+        raise RuntimeError("template wrap changed the source property link")
+    if not isinstance(before["text_format"], dict) or not isinstance(after["text_format"], dict):
+        raise RuntimeError("template wrap could not read both font/style snapshots")
+    old_style = {key: value for key, value in before["text_format"].items() if key != "LineLength"}
+    new_style = {key: value for key, value in after["text_format"].items() if key != "LineLength"}
+    if new_style != old_style:
+        raise RuntimeError(f"template wrap changed original font/style: {old_style!r} -> {new_style!r}")
+    if after["text_format"].get("LineLength") != WRAP_M:
+        raise RuntimeError("template PART wrap width did not persist")
+    if not isinstance(after["text_count"], int) or not isinstance(after["display_count"], int):
+        raise RuntimeError("template PART wrapped text/display counts were unreadable")
+    if after["text_count"] < 2 or after["display_count"] < 2:
+        raise RuntimeError("template PART still renders on one native row after the wrap mutation")
     return result
 
 
@@ -608,25 +718,66 @@ def _single_sheet(
     return _capture(adapter, key, draw, sources, {sheet_name: layout}, {"mutations": extra}, pdf_path=pdf_path)
 
 
-def _configs_two_sheets(adapter: Any, part: Path) -> dict[str, Any]:
+def _configs_two_sheets(adapter: Any, part: Path, observations: list[dict[str, Any]]) -> dict[str, Any]:
     names = list(CONFIGS)
     first_layout = CONFIGS[names[0]][0]
     draw, sheet = new_project_drawing(adapter, layout=first_layout)
     ddoc = _early_bound(draw, "IDrawingDoc")
     _early_bound(sheet, "ISheet").SetName(names[0])
+    if _active_sheet(ddoc) != names[0]:
+        raise RuntimeError("configs-2sheet: first sheet rename did not take")
     for name in names[1:]:
-        _add_donor_sheet(adapter, draw, CONFIGS[name][0], name)
+        _add_donor_sheet(adapter, draw, CONFIGS[name][0], name, observations)
+    draw = _activate_probe_drawing(adapter, draw, observations)
+    ddoc = _early_bound(draw, "IDrawingDoc")
     sources, layouts = {}, {}
+    model_before = None
     for name in names:
         layout, number = CONFIGS[name]
         template = DRAWING_TEMPLATES[layout]
-        if not ddoc.ActivateSheet(name):
+        if not ddoc.ActivateSheet(name) or _active_sheet(ddoc) != name:
             raise RuntimeError(f"failed to activate {name!r}")
+        _observe_construction(observations, "configs.view.before", sheet=name, model_path=str(part),
+                              state=_drawing_state(adapter, draw))
         view = place_view(adapter, str(part), "*Front", template.width_m * 0.3, template.height_m * 0.6)
+        model = _early_bound(view.ReferencedDocument, "IModelDoc2")
+        model_path = Path(str(model.GetPathName() or ""))
+        if not title_fields._same_file(model_path, part):
+            raise RuntimeError(f"configs-2sheet {name}: view references {model_path}, not {part}")
+        before = title_fields._model_state(model)
+        if model_before is None:
+            model_before = before
+        _observe_construction(observations, "configs.configuration.before", sheet=name,
+                              view=str(view.GetName2()), referenced_configuration=str(view.ReferencedConfiguration),
+                              source_model_state=list(before))
         view.ReferencedConfiguration = name
         _link_property_view(adapter, ddoc, name, view)
+        # The SDK requires EditRebuild3 after a view configuration changes.
+        rebuild_drawing(adapter, label=f"title fit configs-2sheet {name}")
+        configuration = str(view.ReferencedConfiguration or "")
+        _observe_construction(observations, "configs.configuration.after", sheet=name,
+                              view=str(view.GetName2()), referenced_configuration=configuration,
+                              source_model_state=list(title_fields._model_state(model)),
+                              state=_drawing_state(adapter, draw))
+        if configuration != name:
+            raise RuntimeError(f"configs-2sheet {name}: view configuration is {configuration!r}")
         sources[name] = (view, number)
         layouts[name] = layout
+    model = _early_bound(sources[names[0]][0].ReferencedDocument, "IModelDoc2")
+    # Authoring view configurations must not leave this scratch source on one
+    # of them: the read contract is exercised with its original Default active.
+    state = title_fields._model_state(model)
+    if state[0] != "Default":
+        switched = _read(lambda: model.ShowConfiguration2("Default"))
+        _observe_construction(observations, "configs.source.restore-default", returned=switched,
+                              before=list(state), after=list(title_fields._model_state(model)))
+        if not _is_true(switched):
+            raise RuntimeError("configs-2sheet: source Default configuration restoration was refused")
+    final_state = title_fields._model_state(model)
+    _observe_construction(observations, "configs.source.before-capture",
+                          original_state=list(model_before), current_state=list(final_state))
+    if model_before != final_state or final_state[0] != "Default":
+        raise RuntimeError(f"configs-2sheet construction changed source state {model_before!r} -> {final_state!r}")
     # The drawing-owned control note lands on the active sheet: T006.
     if not ddoc.ActivateSheet(names[0]) or _active_sheet(ddoc) != names[0]:
         raise RuntimeError(f"configs-2sheet: {names[0]!r} is not the active sheet ({_active_sheet(ddoc)!r})")
@@ -640,13 +791,19 @@ def _configs_two_sheets(adapter: Any, part: Path) -> dict[str, Any]:
         "configurations": {name: str(view.ReferencedConfiguration or "") for name, (view, _n) in sources.items()},
         "drawing_note_control": control,
     }
+    _observe_construction(observations, "configs.capture.before", state=_drawing_state(adapter, draw),
+                          source_model_state=list(title_fields._model_state(model)), **extra)
     return _capture(adapter, "configs-2sheet", draw, resolved, layouts, extra)
 
 
-def _force_wraps(draw: Any, ddoc: Any, sheet_view: Any) -> dict[str, Any]:
+def _force_wraps(
+    adapter: Any, draw: Any, ddoc: Any, sheet_view: Any, observations: list[dict[str, Any]]
+) -> dict[str, Any]:
+    decoy = _insert_linked_note(draw, '$PRPSHEET:"SW-Title"', (0.05, 0.20), wrap=WRAP_M)
+    _observe_construction(observations, "wrap.drawing-decoy", mutation=decoy)
     return {
-        "drawing_note": _insert_linked_note(draw, '$PRPSHEET:"SW-Title"', (0.05, 0.20), wrap=WRAP_M),
-        "template_title": _wrap_template_title(ddoc, sheet_view),
+        "drawing_note": decoy,
+        "template_title": _wrap_template_title(adapter, ddoc, sheet_view, observations),
     }
 
 
@@ -792,19 +949,25 @@ def _check_controls(captures: list[Mapping[str, Any]]) -> list[str]:
     name, sheet = _only_sheet(wrapped)
     mutation = wrapped["mutations"].get("template_title") or {}
     need(
-        mutation.get("template_mode") is True and mutation.get("sheet_mode") is True and _is_true(mutation.get("wrap_set")),
+        mutation.get("template_mode") is True and mutation.get("sheet_mode") is True
+        and _is_true(mutation.get("clear_set")) and _is_true(mutation.get("wrap_set")),
         f"wrapped-landscape: template mutation {mutation!r}",
     )
     reading = _readings(wrapped, failures).get((name, "Title"))
     kinds = None if reading is None else reading["problem_kinds"]
     need(kinds is not None and "wrap-width" in kinds, f"wrapped-landscape Title: no wrap-width in {kinds!r}")
+    need(
+        reading is not None and "multi-line" in reading["problem_kinds"]
+        and reading["text_count"] >= 2 and reading["display_count"] >= 2,
+        f"wrapped-landscape Title: no actual multiple native rows in {reading!r}",
+    )
     fit = next((fit for fit in sheet["printed_fits"] if fit["source"] == "Title"), None)
     need(
         fit is not None and (fit["printed"] is None or fit["rows"] >= 2),
         f"wrapped-landscape Title: PDF prints it whole on one row ({fit!r})",
     )
     rows = next((row["rows"] for row in sheet["physical_rows"] if row["source"] == "Title"), None)
-    need(rows == 2, f"wrapped-landscape Title: {rows!r} physical baseline rows, not 2")
+    need(isinstance(rows, int) and rows >= 2, f"wrapped-landscape Title: {rows!r} physical baseline rows, not multiple")
 
     # configs-2sheet: per-sheet configuration Numbers, read without moving the
     # model, with T006 active and the portrait T120 sheet never activated.
@@ -846,6 +1009,7 @@ async def probe(adapter: Any, *, legacy_only: bool = False) -> dict[str, str]:
     OUT.mkdir(parents=True, exist_ok=True)
     report_path = DISCOVERY_REPORT if legacy_only else REPORT
     captures: list[dict[str, Any]] = []
+    observations: list[dict[str, Any]] = []
     report: dict[str, Any] = {
         "mode": "native-link-discovery" if legacy_only else "full-title-field-proof",
         "success_means": "raw observations captured, not Title fit passed" if legacy_only else "all controls passed",
@@ -853,6 +1017,7 @@ async def probe(adapter: Any, *, legacy_only: bool = False) -> dict[str, str]:
         "configs": {name: [layout.value, value] for name, (layout, value) in CONFIGS.items()},
         "wrap_m": WRAP_M,
         "captures": captures,
+        "construction_observations": observations,
     }
     try:
         number, title = CASES["control-v39"]
@@ -900,17 +1065,40 @@ async def probe(adapter: Any, *, legacy_only: bool = False) -> dict[str, str]:
         number, title = CASES[WRAPPED_CASE]
         captures.append(
             _single_sheet(
-                adapter, "wrapped-landscape", parts[WRAPPED_CASE], DrawingLayout.LANDSCAPE, number, title, _force_wraps
+                adapter, "wrapped-landscape", parts[WRAPPED_CASE], DrawingLayout.LANDSCAPE, number, title,
+                lambda draw, ddoc, sheet_view: _force_wraps(adapter, draw, ddoc, sheet_view, observations),
             )
         )
         configs_part = await _scratch_part(
             adapter, "configs", CONFIG_FILE_NUMBER, CONFIG_TITLE, {name: value for name, (_l, value) in CONFIGS.items()}
         )
-        captures.append(_configs_two_sheets(adapter, configs_part))
+        captures.append(_configs_two_sheets(adapter, configs_part, observations))
         discard_open_documents(adapter)
         report["control_failures"] = _check_controls(captures)
     except BaseException as exc:
         report["error"] = f"{type(exc).__name__}: {exc}"
+        # Failed leaves do not publish normal outputs. Keep completed native/PDF
+        # controls and fatal-construction observations in task.log as well.
+        partial = {
+            "error": report["error"],
+            "construction_observations": observations,
+            "captures": [
+                {
+                    "key": capture["key"],
+                    "mutations": capture.get("mutations"),
+                    "contract": capture["contract"],
+                    "active_sheet": capture["active_sheet"],
+                    "observation_state": capture["observation_state"],
+                    "pdf": capture["pdf"],
+                    "sheets": {
+                        name: {key: sheet[key] for key in ("source", "printed_fits", "printed_misfits", "physical_rows")}
+                        for name, sheet in capture["sheets"].items()
+                    },
+                }
+                for capture in captures
+            ],
+        }
+        _telemetry.info(f"title partial proof after fatal construction: {json.dumps(partial, default=str)}")
         raise
     finally:
         # Written whatever happened: a failed probe's evidence is the point.
