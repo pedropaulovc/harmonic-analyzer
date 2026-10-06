@@ -44,7 +44,7 @@ def historical_scene_bytes():
 @contextmanager
 def replay_scene_bytes(data):
     """Test-only source filesystem fixture, never a digest/receipt override."""
-    scene_path = camera_tracks.WEB / 'src/scene.ts'
+    scene_path = camera_tracks.WEB / 'content/canonical-native/historical-code' / HISTORICAL_SCENE_SHA256 / 'scene.ts'
     read_bytes = Path.read_bytes
 
     def read_source(path):
@@ -425,7 +425,7 @@ class PresenterOriginalViewTests(unittest.TestCase):
         frame['views'][1]['rectSourcePixels'] = [960, 0, 960, 1080]
         packet = {'schemaVersion': 1, 'videoId': '8KmVDxkia_w',
                   'sourceSha256': data['source']['sha256'], 'permissions': []}
-        permission_path = camera_tracks.WEB / 'content/8KmVDxkia_w.chosen-camera-continuity.json'
+        permission_path = camera_tracks.WEB / 'content/canonical-native/8KmVDxkia_w.chosen-camera-continuity.json'
         read_text = Path.read_text
 
         def read_packet(path, *args, **kwargs):
@@ -444,7 +444,7 @@ class AnalysisAutomaticMotionTests(unittest.TestCase):
         cls.track = cls.generator.build()
         # Fixtures stay beside these tests even when the actual producer is an
         # earlier git revision selected by SOURCE_GENERATOR_PATH.
-        content = HERE.parent / 'content'
+        content = HERE.parent / 'content' / 'canonical-native'
         cls.packet = json.loads((content / '6dW6VYXp9HM.automatic-motion.json').read_text())
         cls.controls = json.loads((content / '6dW6VYXp9HM.motion-controls.json').read_text())
         cls.visible = json.loads((content / '6dW6VYXp9HM.visible-crank-motion.json').read_text())
@@ -902,8 +902,8 @@ class SpinPresentationTests(unittest.TestCase):
     def assert_seed_refused_before_observations(self, seed):
         with tempfile.TemporaryDirectory() as directory:
             web = Path(directory)
-            (web / 'content').mkdir()
-            (web / 'content' / 'XPQwKRt4Y2k.source-seeds.json').write_text(
+            (web / 'content' / 'canonical-native').mkdir()
+            (web / 'content' / 'canonical-native' / 'canonical-native' / 'XPQwKRt4Y2k.source-seeds.json').write_text(
                 json.dumps({'views': {'endcard-analysis': seed}}))
             with patch.object(spin.common, 'WEB', web), patch.object(
                     spin.common, 'load_observations',
@@ -940,7 +940,7 @@ class SynthesisAutomaticSourceDriveTests(unittest.TestCase):
         }
         # These fixtures remain beside the tests when SOURCE_GENERATOR_PATH
         # selects an exact historical producer copied to a sibling file.
-        content = HERE.parent / 'content'
+        content = HERE.parent / 'content' / 'canonical-native'
         cls.packet = json.loads((content / '8KmVDxkia_w.automatic-motion.json').read_text())
         cls.candidate = next(row for row in cls.packet['bankCandidates']
                              if row['id'] == 'bank-direction-+1')

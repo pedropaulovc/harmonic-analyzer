@@ -15,7 +15,7 @@ ROOT = WEB.parent
 spec = importlib.util.spec_from_file_location("compact_source_common", WEB / "scripts/compact-source-common.py")
 common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
-BASE = WEB / "content/analysis-recovery-calibration-evidence"
+BASE = WEB / "content/canonical-native/analysis-recovery-calibration-evidence"
 
 
 def load(path):

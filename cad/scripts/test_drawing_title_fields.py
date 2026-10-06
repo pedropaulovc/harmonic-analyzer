@@ -1,6 +1,7 @@
 """SolidWorks-free contract for the title block's identity cells
 (``_drawing_title_fields``): each sheet's DWG. NO. and PART notes print the
-linked model's full Number and Title, on one line inside their ruled cells.
+registry's frozen identity, which the linked model also holds, on one line
+inside their ruled cells, and reading the model changes nothing.
 
 The COM side is faked at the members the module reads; extents are sheet
 metres from the v39 cone-gear sheet and the cut-over identities' widths.
@@ -8,11 +9,22 @@ metres from the v39 cone-gear sheet and the cut-over identities' widths.
 
 from __future__ import annotations
 
+from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 
 import _drawing_title_fields as title_fields
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
-from _drawing_title_fields import TitleFieldReading, assert_title_fields, audit_records, read_title_fields
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_title_fields import (
+    TitleFieldContractError,
+    TitleFieldReading,
+    assert_title_fields,
+    audit_records,
+    read_title_fields,
+    registry_identity,
+    registry_source,
+)
 
 CELLS = dict(DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE].title_cells_m)
 NUMBER_EXTENT = (0.31278, 0.02376, 0.36418, 0.02861)
@@ -23,10 +35,10 @@ CHAR_HEIGHT = 0.0052
 class _Note:
     """An IAnnotation and its INote in one."""
 
-    def __init__(self, link, text, extent, *, owner=2, kind=6, height=CHAR_HEIGHT):
+    def __init__(self, link, text, extent, *, owner=2, kind=6, items=1):
         self.OwnerType = owner
         self.PropertyLinkedText = link
-        self._kind, self._text, self._extent, self._height = kind, text, extent, height
+        self._kind, self._text, self._extent, self._items = kind, text, extent, items
 
     def GetType(self):  # noqa: N802 - COM name
         return self._kind
@@ -42,10 +54,16 @@ class _Note:
         return (x0, y0, 0.0, x1, y1, 0.0)
 
     def GetHeight(self):  # noqa: N802 - COM name
-        return self._height
+        return CHAR_HEIGHT
 
     def GetTextFormat(self, _index):  # noqa: N802 - COM name
         return None
+
+    def GetTextCount(self):  # noqa: N802 - COM name
+        return self._items
+
+    def GetDisplayData(self):  # noqa: N802 - COM name
+        return self
 
 
 class _SheetView:
@@ -67,31 +85,33 @@ class _Doc:
         return self._rows
 
 
-class _Manager:
-    def __init__(self, values):
-        self._values = values
-
-    def Get6(self, name, _cached):  # noqa: N802 - COM name
-        if name not in self._values:
-            return (1, "", "", False, False)
-        return (2, self._values[name], self._values[name], True, False)
-
-
-class _Extension:
-    def __init__(self, scopes):
-        self._scopes = scopes
-
-    def CustomPropertyManager(self, scope):  # noqa: N802 - COM name
-        return _Manager(self._scopes.get(scope, {}))
-
-
 class _Model:
-    def __init__(self, scopes, title):
-        self.Extension = _Extension(scopes)
-        self._title = title
+    """A linked model: per-configuration stored properties, a summary
+    Title, and the state a read must not move."""
+
+    def __init__(self, path, kind, scopes, title, *, moves_on_read=False):
+        self._path, self._kind, self._scopes, self._title = path, kind, scopes, title
+        self._moves = moves_on_read
+        self.ConfigurationManager = self
+        self.ActiveConfiguration = self
+        self.Name = "Default"
+
+    def GetPathName(self):  # noqa: N802 - COM name
+        return self._path
+
+    def GetType(self):  # noqa: N802 - COM name
+        return self._kind
+
+    def GetSaveFlag(self):  # noqa: N802 - COM name
+        return False
 
     def SummaryInfo(self, field):  # noqa: N802 - COM name
         return self._title if field == 0 else ""
+
+    def GetCustomInfoValue(self, scope, name):  # noqa: N802 - COM name
+        if self._moves and scope:
+            self.Name = scope
+        return self._scopes.get(scope, {}).get(name, "")
 
 
 @pytest.fixture(autouse=True)
@@ -100,32 +120,78 @@ def _unbound(monkeypatch):
     monkeypatch.setattr(title_fields, "_read_member", getattr)
 
 
-# The cone-gear shape: the view's configuration stamps its own Number over
-# the file-level one, and the Title is the summary slug.
-CONE_GEAR = _Model({"": {"Number": "MHA-DT-003"}, "T006": {"Number": "MHA-DT-003-T006"}}, "dt-cone-gear")
+CONE_GEAR = DRAWINGS_BY_NAME["dt_cone_gear"]
 
 
-@pytest.mark.parametrize(
-    ("number_link", "title_link"),
-    [('$PRPSHEET:"Number"', '$PRPSHEET:"SW-Title"'), ("$PRPSHEET:{Number}", " $PRPSHEET:{SW-Title} ")],
-)
-def test_each_cell_prints_its_linked_models_full_identity(number_link, title_link):
-    """The configuration's Number wins over the file's, the summary Title is
-    read for an SW-Title link, and neither the drawing's own notes nor the
-    template's other property notes are taken for an identity cell."""
-    sheet = _SheetView(
+def _cone_gear(**kwargs):
+    # The cone-gear shape: each configuration stamps its own Number over the
+    # file-level one, and the Title is the summary slug.
+    return _Model(
+        str(CONE_GEAR.source),
+        1,
+        {"": {"Number": "MHA-DT-003"}, "T006": {"Number": "MHA-DT-003-T006"}},
+        "dt-cone-gear",
+        **kwargs,
+    )
+
+
+def _sheet(number="MHA-DT-003-T006", title="dt-cone-gear", *, number_link='$PRPSHEET:"Number"', items=1):
+    return _SheetView(
         "Sheet1",
         [
             _Note('$PRPSHEET:"Revision"', "39", (0.3770, 0.0240, 0.3850, 0.0290)),
-            _Note(number_link, "MHA-DT-003-T006", NUMBER_EXTENT),
-            _Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", (0.05, 0.05, 0.10, 0.055), owner=1),
-            _Note(title_link, "dt-cone-gear", TITLE_EXTENT),
+            _Note(number_link, number, NUMBER_EXTENT, items=items),
+            _Note('$PRPSHEET:"Number"', number, (0.05, 0.05, 0.10, 0.055), owner=1),
+            _Note('$PRPSHEET:"SW-Title"', title, TITLE_EXTENT),
         ],
     )
-    readings = read_title_fields(_Doc(sheet), {"Sheet1": (CONE_GEAR, "T006")}, {"Sheet1": DrawingLayout.LANDSCAPE})
-    assert [(r.source, r.expected, r.printed) for r in readings] == [
-        ("Number", "MHA-DT-003-T006", "MHA-DT-003-T006"),
-        ("Title", "dt-cone-gear", "dt-cone-gear"),
+
+
+def _read(sheet, model, configuration="T006", spec=CONE_GEAR):
+    """The public gate: the identity is always the drawing's own."""
+    return read_title_fields(_Doc(sheet), spec, {"Sheet1": (model, configuration)}, {"Sheet1": DrawingLayout.LANDSCAPE})
+
+
+def _kinds(raised):
+    return {(breach.source, breach.kind) for breach in raised.value.breaches}
+
+
+def test_the_identity_is_the_drawings_own_frozen_one():
+    identity = registry_identity(CONE_GEAR)
+    assert identity == ("MHA-DT-003", "dt-cone-gear")
+    # Only dt-cone-gear takes its view configuration's variant.
+    assert registry_source(CONE_GEAR, identity, None, "T006").number == "MHA-DT-003-T006"
+    with pytest.raises(RuntimeError):
+        registry_source(CONE_GEAR, identity, None, "Default")
+    screw = DRAWINGS_BY_NAME["vn_pedestal_hold_down_screw"]
+    assert registry_source(screw, registry_identity(screw), None, "T006").number == "MHA-VN-032"
+    # An assembly's is its contract's frozen Number and its stem.
+    assert registry_identity(DRAWINGS_BY_NAME["ha_harmonic_analyzer_assembly"]) == ("MHA-HA-000", "ha-harmonic-analyzer")
+    # part_properties' stretched-spring variants keep their own slug and the base row's Number.
+    stretched = SimpleNamespace(source=Path("C:/x/vn-channel-spring-installed-stretch03.SLDPRT"), source_kind="part")
+    assert registry_identity(stretched) == ("MHA-VN-004", "vn-channel-spring-installed-stretch03")
+    with pytest.raises(KeyError):
+        registry_identity(SimpleNamespace(source=Path("C:/x/vn-not-a-part.SLDPRT"), source_kind="part"))
+    with pytest.raises(FileNotFoundError):
+        registry_identity(SimpleNamespace(source=Path("C:/x/xx-not-an-assembly.SLDASM"), source_kind="assembly"))
+
+
+def test_a_sheet_linked_to_another_model_fails_before_any_identity_is_read():
+    screw = _Model(str(DRAWINGS_BY_NAME["vn_pedestal_hold_down_screw"].source), 1, {}, "")
+    with pytest.raises(TitleFieldContractError) as raised:
+        _read(_sheet(), screw)
+    assert _kinds(raised) == {("model", "foreign-source")}
+
+
+@pytest.mark.parametrize("number_link", ['$PRPSHEET:"Number"', "$PRPSHEET:{Number}", " $PRPSHEET:Number "])
+def test_each_cell_prints_the_registry_identity_its_model_holds(number_link):
+    """The configuration's stored Number wins over the file's, the summary
+    Title is read for an SW-Title link, and neither the drawing's own notes
+    nor the template's other property notes are taken for an identity cell."""
+    readings = _read(_sheet(number_link=number_link), _cone_gear())
+    assert [(r.source, r.expected, r.model_value, r.printed) for r in readings] == [
+        ("Number", "MHA-DT-003-T006", "MHA-DT-003-T006", "MHA-DT-003-T006"),
+        ("Title", "dt-cone-gear", "dt-cone-gear", "dt-cone-gear"),
     ]
     assert_title_fields(readings)
     assert audit_records(readings) == {
@@ -136,75 +202,87 @@ def test_each_cell_prints_its_linked_models_full_identity(number_link, title_lin
     }
 
 
-def _reading(source, expected, printed, extent, *, height=CHAR_HEIGHT):
+@pytest.mark.parametrize(
+    ("model_number", "printed", "kinds"),
+    [
+        # Same category, wrong number: the model and its print agree, the registry does not.
+        ("MHA-DT-004-T006", "MHA-DT-004-T006", {("Number", "model-mismatch"), ("Number", "readback")}),
+        # The file-level Number printed where the configuration's is due.
+        ("MHA-DT-003-T006", "MHA-DT-003", {("Number", "readback")}),
+        ("MHA-DT-003-T006", "MHA-DT-003-T0", {("Number", "readback")}),
+        ("MHA-DT-003-T012", "MHA-DT-003-T012", {("Number", "model-mismatch"), ("Number", "readback")}),
+    ],
+    ids=["same-category-number", "file-level-printed", "cut", "other-variant"],
+)
+def test_the_registry_identity_is_authoritative(model_number, printed, kinds):
+    model = _Model(
+        str(CONE_GEAR.source), 1, {"": {"Number": "MHA-DT-003"}, "T006": {"Number": model_number}}, "dt-cone-gear"
+    )
+    with pytest.raises(TitleFieldContractError) as raised:
+        assert_title_fields(_read(_sheet(number=printed), model))
+    assert _kinds(raised) == kinds
+
+
+def _reading(extent=NUMBER_EXTENT, *, line_length=0.0, text_count=1, display_count=1, printed="MHA-DT-003-T006"):
     return TitleFieldReading(
         sheet="Sheet1",
-        source=source,
-        link=f'$PRPSHEET:"{source}"',
-        expected=expected,
+        source="Number",
+        link='$PRPSHEET:"Number"',
+        expected="MHA-DT-003-T006",
+        model_value="MHA-DT-003-T006",
         printed=printed,
         extent=extent,
-        cell=CELLS[source],
-        char_height=height,
+        cell=CELLS["Number"],
+        char_height=CHAR_HEIGHT,
         typeface="Century Gothic",
-        line_length=0.0,
+        line_length=line_length,
+        text_count=text_count,
+        display_count=display_count,
     )
 
 
-_TITLE_OK = _reading("Title", "dt-cone-gear", "dt-cone-gear", TITLE_EXTENT)
-
-
 @pytest.mark.parametrize(
-    ("number", "message"),
+    ("reading", "kind"),
     [
-        (_reading("Number", "MHA-DT-003-T006", "MHA-DT-003", NUMBER_EXTENT), "prints 'MHA-DT-003' where"),
-        (_reading("Number", "MHA-DT-003-T006", "MHA-DT-003-T0", NUMBER_EXTENT), "prints 'MHA-DT-003-T0' where"),
-        (_reading("Number", "MHA-013", "MHA-013", NUMBER_EXTENT), "'MHA-013' is not a full identity"),
-        (_reading("Number", "", "", NUMBER_EXTENT), "'' is not a full identity"),
-        (
-            _reading("Number", "MHA-DT-003-T006", "MHA-DT-003-T006", (0.31278, 0.02376, 0.37700, 0.02861)),
-            "is -1.29 mm inside its cell",
-        ),
-        (
-            # Two 4 mm lines in a 9.1 mm tall extent, still inside the cell.
-            _reading(
-                "Number", "MHA-DT-003-T006", "MHA-DT-003-T006", (0.31278, 0.01950, 0.36418, 0.02861), height=0.0040
-            ),
-            "not one line",
-        ),
+        (_reading((0.31278, 0.02376, 0.37700, 0.02861)), "outside-cell"),
+        (_reading((0.31278, 0.02376, 0.37571 - 0.0001, 0.02861)), "outside-cell"),
+        # A 9.11 mm tall two-line wrap of 5.2 mm characters, still inside the cell.
+        (_reading((0.31278, 0.01950, 0.36418, 0.02861), text_count=2, display_count=2), "multi-line"),
+        (_reading(display_count=2), "multi-line"),
+        (_reading(display_count=-1), "multi-line"),
+        (_reading(printed="MHA-DT-003-\nT006"), "multi-line"),
+        (_reading(line_length=0.030), "wrap-width"),
     ],
-    ids=["stale", "cut", "old-number", "blank", "past-rev-rule", "wrapped"],
+    ids=["past-rev-rule", "inside-the-air", "wrapped", "display-wrapped", "no-display-data", "line-break", "narrow-wrap"],
 )
-def test_a_breach_fails_the_drawing_naming_sheet_and_cell(number, message):
-    with pytest.raises(RuntimeError, match="title block identity contract") as raised:
-        assert_title_fields([number, _TITLE_OK])
-    assert "sheet 'Sheet1' Number: " in str(raised.value)
-    assert message in str(raised.value)
+def test_a_value_not_whole_on_one_line_inside_its_cell_fails(reading, kind):
+    with pytest.raises(TitleFieldContractError) as raised:
+        assert_title_fields([reading])
+    assert kind in {breach.kind for breach in raised.value.breaches}
 
 
-def test_a_number_and_title_of_different_categories_fail():
-    number = _reading("Number", "MHA-VN-030", "MHA-VN-030", NUMBER_EXTENT)
-    with pytest.raises(RuntimeError, match="'MHA-VN-030' and Title 'dt-cone-gear' name different categories"):
-        assert_title_fields([number, _TITLE_OK])
+def test_a_wrap_width_wider_than_the_cell_and_the_cells_air_pass():
+    assert_title_fields([_reading(line_length=0.200)])
+
+
+def test_a_read_that_moves_the_models_configuration_fails():
+    with pytest.raises(TitleFieldContractError) as raised:
+        _read(_sheet(), _cone_gear(moves_on_read=True))
+    assert _kinds(raised) == {("model", "model-changed")}
 
 
 @pytest.mark.parametrize(
-    ("notes", "message"),
+    "notes",
     [
-        ([_Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", NUMBER_EXTENT)], r"no template note links the \['Title'\]"),
-        (
-            [
-                _Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", NUMBER_EXTENT),
-                _Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", NUMBER_EXTENT),
-                _Note('$PRPSHEET:"Title"', "dt-cone-gear", TITLE_EXTENT),
-            ],
-            "two template notes link the Number cell",
-        ),
+        [_Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", NUMBER_EXTENT)],
+        [
+            _Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", NUMBER_EXTENT),
+            _Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", NUMBER_EXTENT),
+            _Note('$PRPSHEET:"Title"', "dt-cone-gear", TITLE_EXTENT),
+        ],
     ],
     ids=["missing", "duplicate"],
 )
-def test_a_template_that_no_longer_links_one_note_per_cell_fails(notes, message):
-    with pytest.raises(RuntimeError, match=message):
-        read_title_fields(
-            _Doc(_SheetView("Sheet1", notes)), {"Sheet1": (CONE_GEAR, "T006")}, {"Sheet1": DrawingLayout.LANDSCAPE}
-        )
+def test_a_template_that_no_longer_links_one_note_per_cell_fails(notes):
+    with pytest.raises(RuntimeError):
+        _read(_SheetView("Sheet1", notes), _cone_gear())

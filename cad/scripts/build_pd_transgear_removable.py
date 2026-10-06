@@ -52,7 +52,6 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 import _telemetry
 import pd_transgear_removable_spec as spec
 from _common import (
@@ -884,12 +883,10 @@ async def build(adapter) -> dict[str, str]:
         )
     _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
-    grouped_spec = _config.parts(PART_NAME)
     apply_grouped_bom_properties(
         adapter,
         [name for name, _teeth in spec.CONFIGS],
-        part_number=str(grouped_spec.get("number", "")),
-        description=str(grouped_spec.get("description", "")),
+        part_name=PART_NAME,
     )
     check(
         f"activate {spec.DEFAULT_CONFIG} for saved views",

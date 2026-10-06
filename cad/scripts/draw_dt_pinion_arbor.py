@@ -1275,6 +1275,7 @@ async def build(adapter: Any) -> dict[str, str]:
     outputs = await finalize_drawing(
         adapter,
         OUTPUTS,
+        spec=SPEC,
         pdf_title="Integral Pinion Arbor Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

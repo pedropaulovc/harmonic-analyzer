@@ -7,7 +7,7 @@ highlighted in red over an x-ray ghost of the unchanged body.
 
 Each side is a *source* -- either a published GitHub release (read over HTTP
 range requests, no full-asset download) or a local staged bundle directory
-(``<dir>/stl/*.STL`` + ``<dir>/boxes/harmonic-analyzer.json``). The local form
+(``<dir>/stl/*.STL`` + ``<dir>/boxes/*.json``). The local form
 is what ``cut_release.py`` uses: the new release is still on disk and only the
 previous release is fetched from GitHub.
 
@@ -71,6 +71,43 @@ def base_part(key):
     """Strip per-config suffixes (cone-gear--t024, ...-stretch07) to the part."""
     return re.sub(r"(--t\d+|-stretch\d+)$", "", key)
 
+
+def root_scene(scenes, provenance=None):
+    """Resolve the unique assembly root from the bundle's native instance boxes."""
+    children = {}
+    for stem, scene in scenes.items():
+        names = [box["name"] for box in scene.get("boxes", [])]
+        children[stem] = {
+            child
+            for name in names
+            if (child := re.sub(r"-\d+$", "", name.split("/")[-1].lower())) in scenes
+        }
+    roots = set(scenes) - set().union(*children.values())
+    if len(roots) != 1:
+        raise ValueError(f"bundle assembly scene graph needs exactly one root; found {sorted(roots)}")
+    root = roots.pop()
+    visited, active = set(), set()
+
+    def visit(stem):
+        if stem in active:
+            raise ValueError(f"cycle in bundle assembly scene graph at {stem}")
+        if stem in visited:
+            return
+        active.add(stem)
+        for child in children[stem]:
+            visit(child)
+        active.remove(stem)
+        visited.add(stem)
+
+    visit(root)
+    if visited != set(scenes):
+        raise ValueError(f"unreachable bundle assembly scenes: {sorted(set(scenes) - visited)}")
+    model = (provenance or {}).get("model", {})
+    if "top_assembly" in model and model["top_assembly"] != root:
+        raise ValueError(
+            f"declared top assembly {model['top_assembly']!r} differs from bundle scene root {root!r}"
+        )
+    return scenes[root]
 
 # --------------------------------------------------------------------------- #
 # sources
@@ -164,11 +201,19 @@ class ReleaseSource:
         return dest
 
     def scene(self):
-        rel = "boxes/harmonic-analyzer.json"
+        scenes = {
+            Path(name).stem.lower(): self._scene_json(name)
+            for name in self.cd
+            if name.startswith("boxes/") and name.lower().endswith(".json")
+        }
+        provenance = self._scene_json("PROVENANCE.json") if self._entry("PROVENANCE.json") else None
+        return root_scene(scenes, provenance)
+
+    def _scene_json(self, rel):
         e = self._entry(rel)
         if e is None:
-            raise SystemExit(f"!! {self.tag} has no {rel} (pre-bundle release?)")
-        dest = CACHE / self.tag / "scene.json"
+            raise SystemExit(f"!! {self.tag} has no {rel}")
+        dest = CACHE / self.tag / rel
         ent = e[1]
         lh = self._get(ent["lho"], ent["lho"] + 30 - 1)
         n, m = struct.unpack("<HH", lh[26:30])
@@ -207,10 +252,13 @@ class LocalSource:
         return self._path(key)
 
     def scene(self):
-        scene = self.root / "boxes" / "harmonic-analyzer.json"
-        if not scene.is_file():
-            raise SystemExit(f"!! no {scene.relative_to(self.root)} under {self.root}")
-        return json.loads(scene.read_text(encoding="utf-8"))
+        scenes = {
+            path.stem.lower(): json.loads(path.read_text(encoding="utf-8"))
+            for path in (self.root / "boxes").glob("*.json")
+        }
+        provenance_path = self.root / "PROVENANCE.json"
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8")) if provenance_path.is_file() else None
+        return root_scene(scenes, provenance)
 
 
 def make_source(release, local):

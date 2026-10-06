@@ -22,6 +22,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -96,7 +97,7 @@ def test_shared_module_holds_no_per_assembly_table(module):
 def test_stem_keyed_table_detector_sees_a_table(tmp_path):
     probe = tmp_path / "probe.py"
     probe.write_text(
-        'X: dict[str, int] = {"drive-train": 1}\nY = frozenset({"channel"})\n',
+        'X: dict[str, int] = {"dt-drive-train": 1}\nY = frozenset({"ch_channel"})\n',
         encoding="utf-8",
     )
     assert _stem_keyed_tables(probe) == ["X", "Y"]
@@ -267,15 +268,7 @@ def test_seed_audit_logs_queries_and_warns_on_dead_entries(
     monkeypatch.setattr(
         _assembly,
         "_ACTIVE_CONTRACT",
-        type(contract)(
-            stem=contract.stem,
-            path=contract.path,
-            flip_invert=contract.flip_invert | {"never queried seat"},
-            allowed_free_stems=contract.allowed_free_stems,
-            required_free_stems=contract.required_free_stems,
-            free_dof=contract.free_dof,
-            free_dof_per_active_channel=contract.free_dof_per_active_channel,
-        ),
+        replace(contract, flip_invert=contract.flip_invert | {"never queried seat"}),
     )
     _assembly.audit_flip_seeds("sm-summing")
     assert dict(events)["flip_seeds.dead"]["dead"] == ["never queried seat"]

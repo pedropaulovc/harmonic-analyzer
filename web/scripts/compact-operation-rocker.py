@@ -31,14 +31,14 @@ def input_record(path, role, raw=None):
 
 
 def load_seeds(video_id):
-    path = WEB / "content" / f"{video_id}.source-seeds.json"
+    path = WEB / "content" / "canonical-native" / f"{video_id}.source-seeds.json"
     raw = path.read_bytes()
     return json.loads(raw), input_record(path, "immutable-authored-choices-and-source-evidence", raw)
 
 
 def retain_generator_inputs(track, seeds, seed_input):
     track["evidence"]["generatorInputs"] = [
-        input_record(WEB / "content" / f'{track["source"]["videoId"]}.observations.json',
+        input_record(WEB / "content" / "canonical-native" / f'{track["source"]["videoId"]}.observations.json',
                      "original-source-observations"),
         seed_input,
         input_record(Path(__file__), "generator"),

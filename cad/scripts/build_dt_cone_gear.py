@@ -92,7 +92,6 @@ import sys
 import time
 from typing import Any
 
-import _config
 from _drawing_marks import (
     _named_dimension,
     add_angular_reference_dimension,
@@ -1550,14 +1549,10 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.success(f"{first_name} volume reproduced on revisit: {revisit:.1f} mm^3")
 
     check("activate T120 for saved views", await adapter.set_active_configuration("T120"))
-    grouped_spec = _config.parts(PART_NAME)
-    part_number = str(grouped_spec.get("number", ""))
-    description = str(grouped_spec.get("description", "")).strip()
-    apply_grouped_bom_properties(
+    part_number, description = apply_grouped_bom_properties(
         adapter,
         [name for name, _teeth in CONFIGS],
-        part_number=part_number,
-        description=description,
+        part_name=PART_NAME,
     )
     apply_custom_properties(adapter, {"Description": description})
     await report_mass_properties(adapter)

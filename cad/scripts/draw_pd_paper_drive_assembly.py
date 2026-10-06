@@ -978,7 +978,7 @@ def _step_text() -> dict[str, str]:
         "hanger-pivoted": (
             f"{_N['vn-transgear-pivot-spring']} SPRING, THEN ARM, ON THE "
             f"{_N['vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR; PRESS "
-            f"THE {_N['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE SHOULDER, "
+            f"{_N['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE SHOULDER, "
             "FLUSH WITH ITS END ON A FLAT. SEAT IT IN THE "
             f"{_N['pd-support-bar']} BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER; "
             "THE ARM FALLS FREELY."
@@ -1000,7 +1000,7 @@ def _step_text() -> dict[str, str]:
             f"{_N['vn-transgear-disc-screw']} SCREWS."
         ),
         "disc-screws-cut": (
-            f"CUT {_N['vn-transgear-disc-screw']} TIPS "
+            f"CUT {_N['vn-transgear-disc-screw']} "
             f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW DISC REAR FACE; "
             f"BREAK {disc_screw.CUT_END_BREAK_TEXT}."
         ),
@@ -1032,11 +1032,11 @@ def _step_text() -> dict[str, str]:
             "RING INTO THE PLATE BORE FROM THE FRONT, PUSHED REARWARD. CUP ON THE "
             f"JOURNAL ON A {knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS; "
             f"MATCH-DRILL {cup_pin.HOLE_TEXT} THROUGH BOTH "
-            f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS THE PIN "
+            f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS PIN "
             "IN, CENTRED. COLLAR ON THE CORE UNPINNED, PINS FORWARD."
         ),
         "latch-bracket-fitted": (
-            f"SCREW THE {_N['pd-latch-hook-bracket']} BRACKET TO THE BAR WITH "
+            f"FIX THE {_N['pd-latch-hook-bracket']} BRACKET TO THE BAR WITH "
             f"{TRANSGEAR_QUANTITIES['vn-latch-hook-bracket-screw']} "
             f"{_N['vn-latch-hook-bracket-screw']} SCREWS."
         ),
@@ -1055,8 +1055,8 @@ def _step_text() -> dict[str, str]:
             f"FLAP, ITS HOLE'S LOWER EDGE ON THE {_N['vn-transgear-latch-pin']} PIN, "
             f"ITS RIVET HOLES {steps.HOOK_SET_Y_TEXT} ABOVE THE FLAP'S LOWER EDGE, "
             f"THE FRONT ONE {steps.HOOK_SET_Z_TEXT} REAR OF THE BAR, "
-            f"{steps.HOOK_SET_TEXT}, ELSE REPORT; CLAMP. DRILL THE FLAP THROUGH "
-            f"THEM PER {_N['pd-latch-hook-bracket']}; SET "
+            f"{steps.HOOK_SET_TEXT}, ELSE REPORT; CLAMP. MATCH-DRILL THE FLAP "
+            f"PER {_N['pd-latch-hook-bracket']}; SET "
             f"{TRANSGEAR_QUANTITIES['vn-latch-hook-rivet']} "
             f"{_N['vn-latch-hook-rivet']} RIVETS. UNCLAMP, LATCH, RE-RUN THE TRAVEL."
         ),
@@ -1097,7 +1097,7 @@ def _step_text() -> dict[str, str]:
             f"CLAMP THE COLLAR WITH A \u00d8{steps.CLAMP_SLEEVE_OD:.1f}/"
             f"\u00d8{steps.CLAMP_SLEEVE_ID:.1f} SLEEVE OVER THE STUD ON THE PILOT "
             f"FACE, TIGHTENED BY THE THUMBNUT. {collar.CROSS_PIN_DRILL_PHRASE}; "
-            "FIT THE "
+            "FIT "
             f"{_N['vn-transgear-collar-cross-pin']} SPRING PIN IN THE SLOT. SLEEVE "
             "AND SHIM OUT; T24 ON, NUT TIGHT ON THE PILOT."
         ),
@@ -1132,13 +1132,15 @@ def _step_text() -> dict[str, str]:
 
 
 def _step_column(heading: str, keys: tuple[str, ...], text: dict[str, str]) -> str:
-    lines = textwrap.wrap(heading, width=FITUP_LINE_WIDTH)
+    # A part number's hyphens never break a line: each number prints whole.
+    lines = textwrap.wrap(heading, width=FITUP_LINE_WIDTH, break_on_hyphens=False)
     for key in keys:
         lines += textwrap.wrap(
             text[key],
             width=FITUP_LINE_WIDTH,
             initial_indent=f"{steps.step_number(key)}. ",
             subsequent_indent="   ",
+            break_on_hyphens=False,
         )
     return "\n".join(lines)
 
@@ -1199,6 +1201,7 @@ ASSEMBLED_CAPTIONS = {
             f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR ITEMS: SHEET "
             f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
             width=FITUP_LINE_WIDTH,
+            break_on_hyphens=False,
         )
     )
     for scale in ISO_SCALE_LADDER
@@ -1841,6 +1844,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
+        spec=SPEC,
         layout=SPEC.layout,
         pdf_title="Paper-Drive Assembly Drawing",
         scale=ASSEMBLED_SCALE,

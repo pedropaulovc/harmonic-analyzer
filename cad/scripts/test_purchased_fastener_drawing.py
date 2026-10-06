@@ -214,7 +214,7 @@ def test_spec_layout_selects_template_dimensions_and_reaches_all_layout_checks(
 
     monkeypatch.setattr(purchased, "sheet_drawable_region", drawable_region)
 
-    async def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
+    async def finalize(_adapter, actual_outputs, *, spec, layout, pdf_title, scale):
         calls.append(("finalize", layout, pdf_title, scale))
         assert actual_outputs.slddrw == outputs["slddrw"]
         assert actual_outputs.pdf == outputs["pdf"]

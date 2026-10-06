@@ -414,13 +414,16 @@ HUB_LENGTH_CALLOUT = (
     "\nFACED TO FIT"
 )
 # The spigot's native h6 limits print with the dimension; the callout names
-# the mate and the clearance the pair gives.
+# the mate and the clearance the pair gives.  The box centres on the spigot
+# diameter beside the flange's, so no line may print wider than the clearance
+# line: the mate's name and number share one line, BORE) closes on the next.
 SPIGOT_CALLOUT_BELOW = "\n".join(
     (
         "SPIGOT",
         f"(DIA CLR {DISC.SPIGOT_DIAMETRAL_CLEARANCE[0]:.3f}-"
         f"{DISC.SPIGOT_DIAMETRAL_CLEARANCE[1]:.3f}",
-        f"IN {DISC_NAME} {DISC_NUMBER} BORE)",
+        f"IN {DISC_NAME} {DISC_NUMBER}",
+        "BORE)",
     )
 )
 

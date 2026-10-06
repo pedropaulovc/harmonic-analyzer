@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from _assembly_contract import assembly_contract
+import _config
 import dt_cone_gear_stack
 import cone_stack_end_play
 import draw_dt_drive_train_assembly as drawing
@@ -82,7 +83,8 @@ def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
     # turnable until the tip is centred in the cup, and is locked before the
     # end play is set (Codex P1 on #1136).
     order = (
-        f"PUSH MHA-096 ONTO A {cone_stack_end_play.COLLAR_FEELER:.2f} FEELER ON T006",
+        f"PUSH {_config.parts('vn-cone-tip-collar')['number']} ONTO A "
+        f"{cone_stack_end_play.COLLAR_FEELER:.2f} FEELER ON T006",
         "LOCK ITS SET SCREW",
         "THREAD MHA-VN-017 INTO MHA-DT-021",
         "TURN MHA-DT-005 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP",

@@ -16,7 +16,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
 )
-from _drawing_registry import DrawingLayout
+from _drawing_registry import DrawingLayout, DrawingSpec
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -25,6 +25,7 @@ async def build_simple_three_view_drawing(
     adapter: Any,
     *,
     source: Path,
+    spec: DrawingSpec,
     outputs: DrawingOutputs,
     layout: DrawingLayout,
     sheet_scale: tuple[float, float],
@@ -82,6 +83,7 @@ async def build_simple_three_view_drawing(
     return await finalize_drawing(
         adapter,
         outputs,
+        spec=spec,
         layout=layout,
         pdf_title=pdf_title,
         scale=sheet_scale,

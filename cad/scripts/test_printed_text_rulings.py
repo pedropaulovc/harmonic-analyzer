@@ -39,6 +39,31 @@ PRINTED_CONSTANT = re.compile(
     r"^[A-Z0-9_]*(?:NOTES?|STEPS?|CALLOUTS?|HEADING|CAPTION|CHECKS|PLACEHOLDER)$"
 )
 
+# Each scan route must reach real manufacturing text from its own source.
+# A rich notes module must not conceal a missed spec or registry scan.
+PRINTED_TEXT_ANCHORS = {
+    "dt_cone_gear_notes.*": "WEB",
+    "dt_crank_drive_gear_notes.*": "CONTACT RATIO",
+    "dt_crankshaft_notes.*": "DRIVE-PIN",
+    "pd_transgear_removable_notes.*": "WEB",
+    "dt_crank_handle_spec.DRAWING_NOTES": "TENON END FACE",
+    "pd_transgear_disc_hub_spec.FACING_NOTE": "FACED TO FIT",
+    "transgear_hanger_joints.PIVOT_SCREW_INSTALLATION_NOTES": "THREAD ENGAGEMENT",
+}
+REGISTRY_TEXT_ANCHORS = {
+    "fr-harmonic-base.finish": "MASK+OIL",
+    "dt-pinion-bracket.material_specification": "1018",
+    "vn-transgear-arm-plate-screw.installation_notes": "CUT EACH TIP",
+    "vn-transgear-disc-screw.installation_notes": "CUT EACH TIP",
+}
+
+
+def _assert_scan_anchors(texts: dict[str, str], anchors: dict[str, str]) -> None:
+    for source, anchor in anchors.items():
+        assert anchor in texts.get(source, ""), (
+            f"{source}: printed-text scan did not reach manufacturing anchor {anchor!r}"
+        )
+
 
 def _strings(node: ast.AST) -> list[str]:
     return [
@@ -91,6 +116,7 @@ def printed_constants() -> dict[str, str]:
             for target in targets:
                 if isinstance(target, ast.Name) and PRINTED_CONSTANT.match(target.id):
                     found[f"{path.stem}.{target.id}"] = " ".join(_strings(node.value))
+    _assert_scan_anchors(found, PRINTED_TEXT_ANCHORS)
     return found
 
 
@@ -104,6 +130,7 @@ def printed_registry_fields() -> dict[str, str]:
             for field in PRINTED_FIELDS:
                 if row.get(field):
                     found[f"{stem}.{field}"] = str(row[field])
+    _assert_scan_anchors(found, REGISTRY_TEXT_ANCHORS)
     return found
 
 
@@ -178,6 +205,26 @@ EXCEPTION_TAG = re.compile(
     r"#\s*Named exception:\s*(MHA-[A-Z]{2}-\d{3})\s+([a-z][a-z ]*[a-z])\s*\("
 )
 
+# Per-emitter manufacturing anchors detect a source lost from the tag glob;
+# the row-to-tag checks below also enforce the reverse registry direction.
+TAGGED_EMITTER_ANCHORS = {
+    "dt_cone_gear_notes.py": "web",
+    "dt_cone_swing_platform_spec.py": "engagement",
+    "dt_cone_tip_block_spec.py": "engagement",
+    "dt_crank_drive_gear_notes.py": "contact ratio",
+    "dt_crank_handle_butt_cup_spec.py": "pocket wall",
+    "dt_crank_handle_spec.py": "oak feathers",
+    "dt_crank_pin_spec.py": "web",
+    "dt_crank_pinion_spec.py": "boss wall",
+    "dt_crankshaft_notes.py": "rim",
+    "pd_transgear_drive_collar_spec.py": "collar rim",
+    "pd_transgear_feed_pinion_spec.py": "flat wall",
+    "pd_transgear_pivot_spacer_spec.py": "wall",
+    "pd_transgear_removable_notes.py": "web",
+    "transgear_hanger_joints.py": "engagement",
+    "vn_post_mount_screw_spec.py": "engagement",
+}
+
 
 def named_exception_rows() -> list[tuple[str, str]]:
     """``(MHA number, row text)`` per Named exceptions row: the first number in
@@ -233,6 +280,11 @@ def tagged_emitters() -> list[tuple[str, str, str, str]]:
             found.append(
                 (f"{path.name}:{index + 1}", tag.group(1), tag.group(2), printed)
             )
+    for source, anchor in TAGGED_EMITTER_ANCHORS.items():
+        assert any(
+            where.split(":", 1)[0] == source and words == anchor
+            for where, _part, words, _printed in found
+        ), f"{source}: tag scan did not reach manufacturing shortfall {anchor!r}"
     return found
 
 

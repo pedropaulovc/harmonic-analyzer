@@ -171,16 +171,16 @@ def load_pairs(path: Path) -> tuple[list[dict], str]:
     """Return ([{id, model, camera}], kind) from a manifest / deltas / bare-camera JSON."""
     doc = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(doc, dict) and isinstance(doc.get("pairs"), list):
-        pairs = [dict(p, model=p.get("model", "harmonic_analyzer"))
+        pairs = [dict(p, model=p.get("model", "ha_harmonic_analyzer"))
                  for p in doc["pairs"] if p.get("camera")]
         return pairs, "manifest"
     if isinstance(doc, dict) and "camera" in doc:  # findings/<pair>_deltas.json
         pid = doc.get("pair") or path.stem
-        pair = {"id": pid, "model": "harmonic_analyzer", "camera": doc["camera"]}
+        pair = {"id": pid, "model": "ha_harmonic_analyzer", "camera": doc["camera"]}
         _enrich_from_manifest(pair)  # recover reference/model for canvas sizing
         return [pair], "deltas"
     if isinstance(doc, dict) and {"az_deg", "el_deg"} & doc.keys():  # bare camera dict
-        return [{"id": path.stem, "model": "harmonic_analyzer", "camera": doc}], "camera"
+        return [{"id": path.stem, "model": "ha_harmonic_analyzer", "camera": doc}], "camera"
     raise SystemExit(f"{path}: not a manifest, deltas, or camera JSON")
 
 

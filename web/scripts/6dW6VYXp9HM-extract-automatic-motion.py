@@ -25,8 +25,8 @@ from scipy.spatial.transform import Rotation
 WEB = Path(__file__).resolve().parents[1]
 ROOT = WEB.parent
 VIDEO_ID = "6dW6VYXp9HM"
-CONTROLS = WEB / f"content/{VIDEO_ID}.motion-controls.json"
-OUTPUT = WEB / f"content/{VIDEO_ID}.automatic-motion.json"
+CONTROLS = WEB / f"content/canonical-native/{VIDEO_ID}.motion-controls.json"
+OUTPUT = WEB / f"content/canonical-native/{VIDEO_ID}.automatic-motion.json"
 PRIVATE = WEB / f".vite/verification-output/{VIDEO_ID}-automatic-motion"
 
 

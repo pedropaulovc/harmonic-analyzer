@@ -1,0 +1,4403 @@
+{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/8KmVDxkia_w.automatic-motion.json","originalSha256":"68b33f73055a49bbdbfad4e86d4f59ccc45e39b93be0b5b7fa71f3ec490dae3b","mappingSchemaVersion":2,"mappingSha256":"34fd295a40af2718260c1c898bf4a329ee0255398004c0aa384ac69391a95d4f","originalNumericLexemeSha256":"34366ff76c1efc900281740bc3a9f7d110c0cf47a55e0869de3a7ee83b61eec6","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{"web/content/8KmVDxkia_w.automatic-motion-evidence.json":"7a193758b02166ad02604274cd08b89135b2941f54301312d242efcc508e8233"}},
+  "schemaVersion": 1,
+  "videoId": "8KmVDxkia_w",
+  "source": {
+    "videoId": "8KmVDxkia_w",
+    "sha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+    "width": 1920,
+    "height": 1080,
+    "fps": {
+      "numerator": 24000,
+      "denominator": 1001
+    },
+    "timeBase": "1/24000",
+    "decodedFrameCount": 8196,
+    "nativePtsRule": "frameIndex*1001; all8196 actual ffprobe best_effort_timestamp verified",
+    "rights": "Numeric independently observed pixels, source identity and derived cameras only. No source video, book/plot artwork or source images are redistributed."
+  },
+  "model": {
+    "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+    "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945",
+    "units": "metres",
+    "axes": "X-width/Y-height/Z-depth"
+  },
+  "generationDependencies": {
+    "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json": {
+      "sha256": "3b720ddebc9a2e8ed0e1bf5a2df39e4007a1c5d41c72adf9f91de23623a888dd"
+    },
+    "web/src/mechanics-data.ts": {
+      "sha256": "e8fe87dfd899b6ea08ea7f7ce133e633fbf871ca7c24aed3885f6f507ef78285"
+    },
+    "web/src/kinematics.ts": {
+      "sha256": "8bb5ffa3046609f9b3afa69dc72e37297e86c6a1d15fd1bdaf21b70b47ea561f"
+    },
+    "web/src/mechanics.ts": {
+      "sha256": "731ae554aee8b77b7643073d4107f59a04ea530ad41612ec8de00316aaec183c"
+    },
+    "web/scripts/generate-8KmVDxkia_w-automatic-motion.py": {
+      "sha256": "4a7467b622c6191ee0a2c0bf5c53ca2c721b86f1c831617bea433a0c803b46b8"
+    }
+  },
+  "bankInterval": {
+    "shotId": "rocker-bank",
+    "startFrame": 2541,
+    "endFrame": 2983,
+    "startSeconds": 105.980875,
+    "endSeconds": 124.41595833333334,
+    "sourcePlaybackLabel": "4x playback; all rates are in published video time, never divide runtime rate by4"
+  },
+  "bankCandidates": [
+    {
+      "id": "bank-direction-+1",
+      "directionBranch": 1,
+      "directionAuthority": "unresolved-source-equivalent-physical-sense-choice",
+      "staticPhasesRad": [
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085
+      ],
+      "requiredSetup": {
+        "coneSwingRad": 0.0,
+        "driveCrankOffsetTurns": 0.0
+      },
+      "hiddenInputPolicy": "Preserve complete old feasible baseline amplitudes/gearing/magnification/other setup honestly chosen and unobserved; never promote to source measurements.",
+      "knots": [
+        {
+          "timeSeconds": 105.980875,
+          "crankTurns": 0.0
+        },
+        {
+          "timeSeconds": 106.64820833333333,
+          "crankTurns": 0.6775722266796275
+        },
+        {
+          "timeSeconds": 106.68991666666666,
+          "crankTurns": 0.7288778430440614
+        },
+        {
+          "timeSeconds": 106.731625,
+          "crankTurns": 0.7815527097149545
+        },
+        {
+          "timeSeconds": 106.77333333333333,
+          "crankTurns": 0.8356067637690068
+        },
+        {
+          "timeSeconds": 106.81504166666667,
+          "crankTurns": 0.8910400052062375
+        },
+        {
+          "timeSeconds": 106.85675,
+          "crankTurns": 0.9478424969499087
+        },
+        {
+          "timeSeconds": 106.89845833333334,
+          "crankTurns": 1.0059944364435056
+        },
+        {
+          "timeSeconds": 106.94016666666667,
+          "crankTurns": 1.0654662983285326
+        },
+        {
+          "timeSeconds": 106.981875,
+          "crankTurns": 1.1262190471754197
+        },
+        {
+          "timeSeconds": 107.02358333333333,
+          "crankTurns": 1.1882044187346836
+        },
+        {
+          "timeSeconds": 107.06529166666667,
+          "crankTurns": 1.2513652676819544
+        },
+        {
+          "timeSeconds": 107.107,
+          "crankTurns": 1.315635979351344
+        },
+        {
+          "timeSeconds": 107.14870833333333,
+          "crankTurns": 1.3809429424906197
+        },
+        {
+          "timeSeconds": 107.19041666666666,
+          "crankTurns": 1.4472050796319629
+        },
+        {
+          "timeSeconds": 107.232125,
+          "crankTurns": 1.514334431256982
+        },
+        {
+          "timeSeconds": 107.27383333333333,
+          "crankTurns": 1.5822367895470586
+        },
+        {
+          "timeSeconds": 107.31554166666666,
+          "crankTurns": 1.650812377152839
+        },
+        {
+          "timeSeconds": 107.35725,
+          "crankTurns": 1.7199565660923226
+        },
+        {
+          "timeSeconds": 107.39895833333334,
+          "crankTurns": 1.7895606315978942
+        },
+        {
+          "timeSeconds": 107.44066666666667,
+          "crankTurns": 1.8595125354806703
+        },
+        {
+          "timeSeconds": 107.482375,
+          "crankTurns": 1.9296977333683614
+        },
+        {
+          "timeSeconds": 107.52408333333334,
+          "crankTurns": 2.0
+        },
+        {
+          "timeSeconds": 107.56579166666667,
+          "crankTurns": 2.0707473116500377
+        },
+        {
+          "timeSeconds": 107.64920833333333,
+          "crankTurns": 2.2120635911832327
+        },
+        {
+          "timeSeconds": 107.69091666666667,
+          "crankTurns": 2.282545096237285
+        },
+        {
+          "timeSeconds": 107.732625,
+          "crankTurns": 2.352852633894187
+        },
+        {
+          "timeSeconds": 107.77433333333333,
+          "crankTurns": 2.4229463140094682
+        },
+        {
+          "timeSeconds": 107.81604166666666,
+          "crankTurns": 2.4927885895066364
+        },
+        {
+          "timeSeconds": 107.85775,
+          "crankTurns": 2.5623446677508057
+        },
+        {
+          "timeSeconds": 107.89945833333333,
+          "crankTurns": 2.6315828917440856
+        },
+        {
+          "timeSeconds": 107.94116666666666,
+          "crankTurns": 2.700475086966271
+        },
+        {
+          "timeSeconds": 107.982875,
+          "crankTurns": 2.7689968700608114
+        },
+        {
+          "timeSeconds": 108.02458333333334,
+          "crankTurns": 2.837127915983867
+        },
+        {
+          "timeSeconds": 108.06629166666667,
+          "crankTurns": 2.904852180689888
+        },
+        {
+          "timeSeconds": 108.108,
+          "crankTurns": 2.9721580769134377
+        },
+        {
+          "timeSeconds": 108.14970833333334,
+          "crankTurns": 3.0390386011217236
+        },
+        {
+          "timeSeconds": 108.19141666666667,
+          "crankTurns": 3.105491410246767
+        },
+        {
+          "timeSeconds": 108.233125,
+          "crankTurns": 3.1715188473565483
+        },
+        {
+          "timeSeconds": 108.27483333333333,
+          "crankTurns": 3.2371279159838577
+        },
+        {
+          "timeSeconds": 108.31654166666667,
+          "crankTurns": 3.302330203394133
+        },
+        {
+          "timeSeconds": 108.35825,
+          "crankTurns": 3.367141753632946
+        },
+        {
+          "timeSeconds": 108.39995833333333,
+          "crankTurns": 3.4315828917440903
+        },
+        {
+          "timeSeconds": 108.44166666666666,
+          "crankTurns": 3.495678001084141
+        },
+        {
+          "timeSeconds": 108.483375,
+          "crankTurns": 3.559455256173303
+        },
+        {
+          "timeSeconds": 108.52508333333333,
+          "crankTurns": 3.622946314009465
+        },
+        {
+          "timeSeconds": 108.56679166666666,
+          "crankTurns": 3.6861859672275137
+        },
+        {
+          "timeSeconds": 108.6085,
+          "crankTurns": 3.7492117629039647
+        },
+        {
+          "timeSeconds": 108.65020833333334,
+          "crankTurns": 3.812063591183242
+        },
+        {
+          "timeSeconds": 108.69191666666667,
+          "crankTurns": 3.8747832482330473
+        },
+        {
+          "timeSeconds": 108.733625,
+          "crankTurns": 3.937413978316708
+        },
+        {
+          "timeSeconds": 108.77533333333334,
+          "crankTurns": 4.0
+        },
+        {
+          "timeSeconds": 108.81704166666667,
+          "crankTurns": 4.062112065811312
+        },
+        {
+          "timeSeconds": 108.90045833333333,
+          "crankTurns": 4.186281766481962
+        },
+        {
+          "timeSeconds": 108.94216666666667,
+          "crankTurns": 4.248312617043728
+        },
+        {
+          "timeSeconds": 108.983875,
+          "crankTurns": 4.310290141573104
+        },
+        {
+          "timeSeconds": 109.02558333333333,
+          "crankTurns": 4.372201919880422
+        },
+        {
+          "timeSeconds": 109.06729166666666,
+          "crankTurns": 4.434036127183984
+        },
+        {
+          "timeSeconds": 109.109,
+          "crankTurns": 4.495781641197116
+        },
+        {
+          "timeSeconds": 109.15070833333333,
+          "crankTurns": 4.557428142853313
+        },
+        {
+          "timeSeconds": 109.19241666666667,
+          "crankTurns": 4.61896620975733
+        },
+        {
+          "timeSeconds": 109.234125,
+          "crankTurns": 4.680387401515768
+        },
+        {
+          "timeSeconds": 109.27583333333334,
+          "crankTurns": 4.7416843361747025
+        },
+        {
+          "timeSeconds": 109.31754166666667,
+          "crankTurns": 4.802850757071728
+        },
+        {
+          "timeSeconds": 109.35925,
+          "crankTurns": 4.863881589497276
+        },
+        {
+          "timeSeconds": 109.40095833333334,
+          "crankTurns": 4.924772986651971
+        },
+        {
+          "timeSeconds": 109.44266666666667,
+          "crankTurns": 4.985522364483844
+        },
+        {
+          "timeSeconds": 109.52608333333333,
+          "crankTurns": 5.106591168470149
+        },
+        {
+          "timeSeconds": 109.56779166666666,
+          "crankTurns": 5.166911892527573
+        },
+        {
+          "timeSeconds": 109.6095,
+          "crankTurns": 5.227093181314143
+        },
+        {
+          "timeSeconds": 109.65120833333333,
+          "crankTurns": 5.287138881629238
+        },
+        {
+          "timeSeconds": 109.69291666666666,
+          "crankTurns": 5.34705406818242
+        },
+        {
+          "timeSeconds": 109.734625,
+          "crankTurns": 5.406844997636103
+        },
+        {
+          "timeSeconds": 109.77633333333333,
+          "crankTurns": 5.466519051944225
+        },
+        {
+          "timeSeconds": 109.81804166666667,
+          "crankTurns": 5.526084671500167
+        },
+        {
+          "timeSeconds": 109.85975,
+          "crankTurns": 5.585551278699154
+        },
+        {
+          "timeSeconds": 109.90145833333334,
+          "crankTurns": 5.64492919260771
+        },
+        {
+          "timeSeconds": 109.94316666666667,
+          "crankTurns": 5.70422953551251
+        },
+        {
+          "timeSeconds": 109.984875,
+          "crankTurns": 5.763464132195254
+        },
+        {
+          "timeSeconds": 110.02658333333333,
+          "crankTurns": 5.822645402845604
+        },
+        {
+          "timeSeconds": 110.06829166666667,
+          "crankTurns": 5.881786250582038
+        },
+        {
+          "timeSeconds": 110.15170833333333,
+          "crankTurns": 6.0
+        },
+        {
+          "timeSeconds": 110.19341666666666,
+          "crankTurns": 6.079986756705384
+        },
+        {
+          "timeSeconds": 110.235125,
+          "crankTurns": 6.159805106384461
+        },
+        {
+          "timeSeconds": 110.27683333333333,
+          "crankTurns": 6.239288263862649
+        },
+        {
+          "timeSeconds": 110.31854166666666,
+          "crankTurns": 6.318272672049496
+        },
+        {
+          "timeSeconds": 110.36025,
+          "crankTurns": 6.396599577082867
+        },
+        {
+          "timeSeconds": 110.40195833333334,
+          "crankTurns": 6.47411655721545
+        },
+        {
+          "timeSeconds": 110.44366666666667,
+          "crankTurns": 6.550678990719401
+        },
+        {
+          "timeSeconds": 110.485375,
+          "crankTurns": 6.626151448672795
+        },
+        {
+          "timeSeconds": 110.52708333333334,
+          "crankTurns": 6.700408999214072
+        },
+        {
+          "timeSeconds": 110.56879166666667,
+          "crankTurns": 6.773338410704191
+        },
+        {
+          "timeSeconds": 110.6105,
+          "crankTurns": 6.844839242209205
+        },
+        {
+          "timeSeconds": 110.65220833333333,
+          "crankTurns": 6.914824810801366
+        },
+        {
+          "timeSeconds": 110.69391666666667,
+          "crankTurns": 6.9832230263631025
+        },
+        {
+          "timeSeconds": 110.735625,
+          "crankTurns": 7.0499770858542625
+        },
+        {
+          "timeSeconds": 110.77733333333333,
+          "crankTurns": 7.115046020356442
+        },
+        {
+          "timeSeconds": 110.81904166666666,
+          "crankTurns": 7.178405089626061
+        },
+        {
+          "timeSeconds": 110.86075,
+          "crankTurns": 7.24004602035644
+        },
+        {
+          "timeSeconds": 110.90245833333333,
+          "crankTurns": 7.299977085854257
+        },
+        {
+          "timeSeconds": 110.94416666666666,
+          "crankTurns": 7.3582230263630946
+        },
+        {
+          "timeSeconds": 110.985875,
+          "crankTurns": 7.414824810801355
+        },
+        {
+          "timeSeconds": 111.02758333333334,
+          "crankTurns": 7.46983924220921
+        },
+        {
+          "timeSeconds": 111.06929166666667,
+          "crankTurns": 7.523338410704193
+        },
+        {
+          "timeSeconds": 111.111,
+          "crankTurns": 7.575408999214072
+        },
+        {
+          "timeSeconds": 111.15270833333334,
+          "crankTurns": 7.626151448672791
+        },
+        {
+          "timeSeconds": 111.19441666666667,
+          "crankTurns": 7.675678990719393
+        },
+        {
+          "timeSeconds": 111.236125,
+          "crankTurns": 7.72411655721544
+        },
+        {
+          "timeSeconds": 111.27783333333333,
+          "crankTurns": 7.77159957708288
+        },
+        {
+          "timeSeconds": 111.31954166666667,
+          "crankTurns": 7.818272672049507
+        },
+        {
+          "timeSeconds": 111.40295833333333,
+          "crankTurns": 7.909805106384466
+        },
+        {
+          "timeSeconds": 111.44466666666666,
+          "crankTurns": 7.954986756705386
+        },
+        {
+          "timeSeconds": 111.486375,
+          "crankTurns": 8.0
+        },
+        {
+          "timeSeconds": 111.52808333333333,
+          "crankTurns": 8.066302900859222
+        },
+        {
+          "timeSeconds": 111.56979166666666,
+          "crankTurns": 8.13258746702161
+        },
+        {
+          "timeSeconds": 111.6115,
+          "crankTurns": 8.198835551929154
+        },
+        {
+          "timeSeconds": 111.65320833333334,
+          "crankTurns": 8.265029383370818
+        },
+        {
+          "timeSeconds": 111.69491666666667,
+          "crankTurns": 8.331151745849612
+        },
+        {
+          "timeSeconds": 111.736625,
+          "crankTurns": 8.39718615723679
+        },
+        {
+          "timeSeconds": 111.77833333333334,
+          "crankTurns": 8.463117037900828
+        },
+        {
+          "timeSeconds": 111.82004166666667,
+          "crankTurns": 8.52892987057552
+        },
+        {
+          "timeSeconds": 111.86175,
+          "crankTurns": 8.59461134932677
+        },
+        {
+          "timeSeconds": 111.90345833333333,
+          "crankTurns": 8.660149516089497
+        },
+        {
+          "timeSeconds": 111.94516666666667,
+          "crankTurns": 8.725533883373545
+        },
+        {
+          "timeSeconds": 111.986875,
+          "crankTurns": 8.790755541879538
+        },
+        {
+          "timeSeconds": 112.02858333333333,
+          "crankTurns": 8.85580725192034
+        },
+        {
+          "timeSeconds": 112.07029166666666,
+          "crankTurns": 8.920683517710046
+        },
+        {
+          "timeSeconds": 112.112,
+          "crankTurns": 8.985380643758182
+        },
+        {
+          "timeSeconds": 112.15370833333333,
+          "crankTurns": 9.04989677279044
+        },
+        {
+          "timeSeconds": 112.19541666666667,
+          "crankTurns": 9.114231904806838
+        },
+        {
+          "timeSeconds": 112.237125,
+          "crankTurns": 9.178387897081645
+        },
+        {
+          "timeSeconds": 112.27883333333334,
+          "crankTurns": 9.242368445105356
+        },
+        {
+          "timeSeconds": 112.32054166666667,
+          "crankTurns": 9.306179044663878
+        },
+        {
+          "timeSeconds": 112.36225,
+          "crankTurns": 9.369826935444344
+        },
+        {
+          "timeSeconds": 112.40395833333334,
+          "crankTurns": 9.43332102674613
+        },
+        {
+          "timeSeconds": 112.44566666666667,
+          "crankTurns": 9.49667180605939
+        },
+        {
+          "timeSeconds": 112.487375,
+          "crankTurns": 9.559891231449212
+        },
+        {
+          "timeSeconds": 112.52908333333333,
+          "crankTurns": 9.622992608849689
+        },
+        {
+          "timeSeconds": 112.57079166666666,
+          "crankTurns": 9.685990455527023
+        },
+        {
+          "timeSeconds": 112.65420833333333,
+          "crankTurns": 9.811738777735592
+        },
+        {
+          "timeSeconds": 112.69591666666666,
+          "crankTurns": 9.874522950892583
+        },
+        {
+          "timeSeconds": 112.737625,
+          "crankTurns": 9.937270642794708
+        },
+        {
+          "timeSeconds": 112.77933333333333,
+          "crankTurns": 10.0
+        },
+        {
+          "timeSeconds": 112.82104166666667,
+          "crankTurns": 10.075974701798023
+        },
+        {
+          "timeSeconds": 112.86275,
+          "crankTurns": 10.15180307584055
+        },
+        {
+          "timeSeconds": 112.90445833333334,
+          "crankTurns": 10.227340042788963
+        },
+        {
+          "timeSeconds": 112.94616666666667,
+          "crankTurns": 10.302443009487188
+        },
+        {
+          "timeSeconds": 112.987875,
+          "crankTurns": 10.376973085516267
+        },
+        {
+          "timeSeconds": 113.02958333333333,
+          "crankTurns": 10.450796268158431
+        },
+        {
+          "timeSeconds": 113.07129166666667,
+          "crankTurns": 10.52378458566105
+        },
+        {
+          "timeSeconds": 113.113,
+          "crankTurns": 10.595817189046489
+        },
+        {
+          "timeSeconds": 113.15470833333333,
+          "crankTurns": 10.666781383153005
+        },
+        {
+          "timeSeconds": 113.19641666666666,
+          "crankTurns": 10.736573588110087
+        },
+        {
+          "timeSeconds": 113.238125,
+          "crankTurns": 10.80510022304544
+        },
+        {
+          "timeSeconds": 113.27983333333333,
+          "crankTurns": 10.872278504483948
+        },
+        {
+          "timeSeconds": 113.32154166666666,
+          "crankTurns": 10.938037152627125
+        },
+        {
+          "timeSeconds": 113.36325,
+          "crankTurns": 11.002316999487205
+        },
+        {
+          "timeSeconds": 113.44666666666667,
+          "crankTurns": 11.12626709762267
+        },
+        {
+          "timeSeconds": 113.488375,
+          "crankTurns": 11.185883573589013
+        },
+        {
+          "timeSeconds": 113.53008333333334,
+          "crankTurns": 11.243914156446195
+        },
+        {
+          "timeSeconds": 113.57179166666667,
+          "crankTurns": 11.30036561133464
+        },
+        {
+          "timeSeconds": 113.6135,
+          "crankTurns": 11.355258175957804
+        },
+        {
+          "timeSeconds": 113.65520833333333,
+          "crankTurns": 11.408625387921248
+        },
+        {
+          "timeSeconds": 113.69691666666667,
+          "crankTurns": 11.460513798601598
+        },
+        {
+          "timeSeconds": 113.738625,
+          "crankTurns": 11.510982575986613
+        },
+        {
+          "timeSeconds": 113.78033333333333,
+          "crankTurns": 11.56010299987479
+        },
+        {
+          "timeSeconds": 113.82204166666666,
+          "crankTurns": 11.60795785374123
+        },
+        {
+          "timeSeconds": 113.90545833333333,
+          "crankTurns": 11.700255173896327
+        },
+        {
+          "timeSeconds": 113.94716666666666,
+          "crankTurns": 11.744913915217236
+        },
+        {
+          "timeSeconds": 113.988875,
+          "crankTurns": 11.788737791398598
+        },
+        {
+          "timeSeconds": 114.03058333333334,
+          "crankTurns": 11.83185477419306
+        },
+        {
+          "timeSeconds": 114.07229166666667,
+          "crankTurns": 11.874398866318359
+        },
+        {
+          "timeSeconds": 114.114,
+          "crankTurns": 11.916508958193473
+        },
+        {
+          "timeSeconds": 114.15570833333334,
+          "crankTurns": 11.958327642974469
+        },
+        {
+          "timeSeconds": 114.19741666666667,
+          "crankTurns": 12.0
+        },
+        {
+          "timeSeconds": 114.239125,
+          "crankTurns": 12.08714650291238
+        },
+        {
+          "timeSeconds": 114.28083333333333,
+          "crankTurns": 12.17406862445317
+        },
+        {
+          "timeSeconds": 114.32254166666667,
+          "crankTurns": 12.260544441620045
+        },
+        {
+          "timeSeconds": 114.36425,
+          "crankTurns": 12.346356921214793
+        },
+        {
+          "timeSeconds": 114.40595833333333,
+          "crankTurns": 12.431296297704451
+        },
+        {
+          "timeSeconds": 114.44766666666666,
+          "crankTurns": 12.515162371456391
+        },
+        {
+          "timeSeconds": 114.489375,
+          "crankTurns": 12.59776670216738
+        },
+        {
+          "timeSeconds": 114.53108333333333,
+          "crankTurns": 12.678934673454975
+        },
+        {
+          "timeSeconds": 114.57279166666666,
+          "crankTurns": 12.758507405991162
+        },
+        {
+          "timeSeconds": 114.6145,
+          "crankTurns": 12.836343498217529
+        },
+        {
+          "timeSeconds": 114.65620833333334,
+          "crankTurns": 12.912320575570234
+        },
+        {
+          "timeSeconds": 114.69791666666667,
+          "crankTurns": 12.986336631241507
+        },
+        {
+          "timeSeconds": 114.739625,
+          "crankTurns": 13.058311143787446
+        },
+        {
+          "timeSeconds": 114.78133333333334,
+          "crankTurns": 13.12818595933787
+        },
+        {
+          "timeSeconds": 114.82304166666667,
+          "crankTurns": 13.195925928742254
+        },
+        {
+          "timeSeconds": 114.86475,
+          "crankTurns": 13.261519292671203
+        },
+        {
+          "timeSeconds": 114.90645833333333,
+          "crankTurns": 13.324977810454108
+        },
+        {
+          "timeSeconds": 114.94816666666667,
+          "crankTurns": 13.386336631241496
+        },
+        {
+          "timeSeconds": 114.989875,
+          "crankTurns": 13.445653908903555
+        },
+        {
+          "timeSeconds": 115.03158333333333,
+          "crankTurns": 13.503010164884179
+        },
+        {
+          "timeSeconds": 115.07329166666666,
+          "crankTurns": 13.558507405991168
+        },
+        {
+          "timeSeconds": 115.15670833333333,
+          "crankTurns": 13.664433368834052
+        },
+        {
+          "timeSeconds": 115.19841666666666,
+          "crankTurns": 13.715162371456392
+        },
+        {
+          "timeSeconds": 115.240125,
+          "crankTurns": 13.7646296310378
+        },
+        {
+          "timeSeconds": 115.28183333333334,
+          "crankTurns": 13.813023587881471
+        },
+        {
+          "timeSeconds": 115.32354166666667,
+          "crankTurns": 13.860544441620055
+        },
+        {
+          "timeSeconds": 115.36525,
+          "crankTurns": 13.90740195778651
+        },
+        {
+          "timeSeconds": 115.40695833333334,
+          "crankTurns": 13.95381316957905
+        },
+        {
+          "timeSeconds": 115.44866666666667,
+          "crankTurns": 14.0
+        },
+        {
+          "timeSeconds": 115.490375,
+          "crankTurns": 14.077921992587806
+        },
+        {
+          "timeSeconds": 115.53208333333333,
+          "crankTurns": 14.15572066946949
+        },
+        {
+          "timeSeconds": 115.57379166666666,
+          "crankTurns": 14.233274066011617
+        },
+        {
+          "timeSeconds": 115.6155,
+          "crankTurns": 14.310462904923476
+        },
+        {
+          "timeSeconds": 115.65720833333333,
+          "crankTurns": 14.38717190308404
+        },
+        {
+          "timeSeconds": 115.69891666666666,
+          "crankTurns": 14.463291034607968
+        },
+        {
+          "timeSeconds": 115.740625,
+          "crankTurns": 14.538716736312232
+        },
+        {
+          "timeSeconds": 115.78233333333333,
+          "crankTurns": 14.613353042376012
+        },
+        {
+          "timeSeconds": 115.82404166666667,
+          "crankTurns": 14.687112635762348
+        },
+        {
+          "timeSeconds": 115.86575,
+          "crankTurns": 14.759917804881752
+        },
+        {
+          "timeSeconds": 115.90745833333334,
+          "crankTurns": 14.831701295016817
+        },
+        {
+          "timeSeconds": 115.94916666666667,
+          "crankTurns": 14.90240704517886
+        },
+        {
+          "timeSeconds": 115.990875,
+          "crankTurns": 14.97199080232387
+        },
+        {
+          "timeSeconds": 116.03258333333333,
+          "crankTurns": 15.04042060619813
+        },
+        {
+          "timeSeconds": 116.07429166666667,
+          "crankTurns": 15.107677139501428
+        },
+        {
+          "timeSeconds": 116.116,
+          "crankTurns": 15.17375393953146
+        },
+        {
+          "timeSeconds": 116.15770833333333,
+          "crankTurns": 15.238657468990532
+        },
+        {
+          "timeSeconds": 116.19941666666666,
+          "crankTurns": 15.30240704517885
+        },
+        {
+          "timeSeconds": 116.241125,
+          "crankTurns": 15.365034628350138
+        },
+        {
+          "timeSeconds": 116.28283333333333,
+          "crankTurns": 15.426584471548402
+        },
+        {
+          "timeSeconds": 116.32454166666666,
+          "crankTurns": 15.487112635762328
+        },
+        {
+          "timeSeconds": 116.40795833333334,
+          "crankTurns": 15.60538340297892
+        },
+        {
+          "timeSeconds": 116.44966666666667,
+          "crankTurns": 15.663291034607985
+        },
+        {
+          "timeSeconds": 116.491375,
+          "crankTurns": 15.720505236417386
+        },
+        {
+          "timeSeconds": 116.53308333333334,
+          "crankTurns": 15.777129571590152
+        },
+        {
+          "timeSeconds": 116.57479166666667,
+          "crankTurns": 15.833274066011628
+        },
+        {
+          "timeSeconds": 116.6165,
+          "crankTurns": 15.889054002802832
+        },
+        {
+          "timeSeconds": 116.65820833333333,
+          "crankTurns": 15.944588659254476
+        },
+        {
+          "timeSeconds": 116.69991666666667,
+          "crankTurns": 16.0
+        },
+        {
+          "timeSeconds": 116.741625,
+          "crankTurns": 16.061537351129502
+        },
+        {
+          "timeSeconds": 116.78333333333333,
+          "crankTurns": 16.123105268551218
+        },
+        {
+          "timeSeconds": 116.82504166666666,
+          "crankTurns": 16.184734004905838
+        },
+        {
+          "timeSeconds": 116.86675,
+          "crankTurns": 16.2464531887495
+        },
+        {
+          "timeSeconds": 116.90845833333333,
+          "crankTurns": 16.308291520524712
+        },
+        {
+          "timeSeconds": 116.95016666666666,
+          "crankTurns": 16.370276478054972
+        },
+        {
+          "timeSeconds": 116.991875,
+          "crankTurns": 16.432434034585114
+        },
+        {
+          "timeSeconds": 117.03358333333334,
+          "crankTurns": 16.494788392260684
+        },
+        {
+          "timeSeconds": 117.07529166666667,
+          "crankTurns": 16.557361733781104
+        },
+        {
+          "timeSeconds": 117.117,
+          "crankTurns": 16.620173994775282
+        },
+        {
+          "timeSeconds": 117.15870833333334,
+          "crankTurns": 16.68324265923499
+        },
+        {
+          "timeSeconds": 117.20041666666667,
+          "crankTurns": 16.74658258010547
+        },
+        {
+          "timeSeconds": 117.242125,
+          "crankTurns": 16.81020582687413
+        },
+        {
+          "timeSeconds": 117.28383333333333,
+          "crankTurns": 16.87412156172126
+        },
+        {
+          "timeSeconds": 117.36725,
+          "crankTurns": 17.002852074535912
+        },
+        {
+          "timeSeconds": 117.40895833333333,
+          "crankTurns": 17.06766994881803
+        },
+        {
+          "timeSeconds": 117.45066666666666,
+          "crankTurns": 17.132786472035416
+        },
+        {
+          "timeSeconds": 117.492375,
+          "crankTurns": 17.198195483331265
+        },
+        {
+          "timeSeconds": 117.53408333333333,
+          "crankTurns": 17.263887820525298
+        },
+        {
+          "timeSeconds": 117.57579166666666,
+          "crankTurns": 17.329851414130104
+        },
+        {
+          "timeSeconds": 117.65920833333334,
+          "crankTurns": 17.462530327744556
+        },
+        {
+          "timeSeconds": 117.70091666666667,
+          "crankTurns": 17.52920822813352
+        },
+        {
+          "timeSeconds": 117.742625,
+          "crankTurns": 17.596082929667894
+        },
+        {
+          "timeSeconds": 117.78433333333334,
+          "crankTurns": 17.663130230202146
+        },
+        {
+          "timeSeconds": 117.82604166666667,
+          "crankTurns": 17.73032415649145
+        },
+        {
+          "timeSeconds": 117.86775,
+          "crankTurns": 17.797637230712297
+        },
+        {
+          "timeSeconds": 117.90945833333333,
+          "crankTurns": 17.865040752422193
+        },
+        {
+          "timeSeconds": 117.95116666666667,
+          "crankTurns": 17.932505093064986
+        },
+        {
+          "timeSeconds": 117.992875,
+          "crankTurns": 18.0
+        },
+        {
+          "timeSeconds": 118.03458333333333,
+          "crankTurns": 18.088927778727403
+        },
+        {
+          "timeSeconds": 118.07629166666666,
+          "crankTurns": 18.17761166005263
+        },
+        {
+          "timeSeconds": 118.118,
+          "crankTurns": 18.265810418764488
+        },
+        {
+          "timeSeconds": 118.15970833333333,
+          "crankTurns": 18.353288144756647
+        },
+        {
+          "timeSeconds": 118.20141666666666,
+          "crankTurns": 18.439816827708142
+        },
+        {
+          "timeSeconds": 118.243125,
+          "crankTurns": 18.52517885521219
+        },
+        {
+          "timeSeconds": 118.28483333333334,
+          "crankTurns": 18.609169396983145
+        },
+        {
+          "timeSeconds": 118.32654166666667,
+          "crankTurns": 18.69159864902014
+        },
+        {
+          "timeSeconds": 118.36825,
+          "crankTurns": 18.772293913139325
+        },
+        {
+          "timeSeconds": 118.40995833333334,
+          "crankTurns": 18.851101489091334
+        },
+        {
+          "timeSeconds": 118.45166666666667,
+          "crankTurns": 18.92788835853339
+        },
+        {
+          "timeSeconds": 118.493375,
+          "crankTurns": 19.002543642406103
+        },
+        {
+          "timeSeconds": 118.53508333333333,
+          "crankTurns": 19.07497981574763
+        },
+        {
+          "timeSeconds": 118.57679166666667,
+          "crankTurns": 19.145133666635495
+        },
+        {
+          "timeSeconds": 118.6185,
+          "crankTurns": 19.212966988749635
+        },
+        {
+          "timeSeconds": 118.66020833333333,
+          "crankTurns": 19.278466999968828
+        },
+        {
+          "timeSeconds": 118.70191666666666,
+          "crankTurns": 19.34164648241429
+        },
+        {
+          "timeSeconds": 118.743625,
+          "crankTurns": 19.402543642406094
+        },
+        {
+          "timeSeconds": 118.78533333333333,
+          "crankTurns": 19.46122169186671
+        },
+        {
+          "timeSeconds": 118.82704166666667,
+          "crankTurns": 19.517768155758006
+        },
+        {
+          "timeSeconds": 118.91045833333334,
+          "crankTurns": 19.62493198235347
+        },
+        {
+          "timeSeconds": 118.95216666666667,
+          "crankTurns": 19.675836063649808
+        },
+        {
+          "timeSeconds": 118.993875,
+          "crankTurns": 19.725178855212178
+        },
+        {
+          "timeSeconds": 119.03558333333334,
+          "crankTurns": 19.77315016104149
+        },
+        {
+          "timeSeconds": 119.07729166666667,
+          "crankTurns": 19.819954811423326
+        },
+        {
+          "timeSeconds": 119.119,
+          "crankTurns": 19.8658104187645
+        },
+        {
+          "timeSeconds": 119.16070833333333,
+          "crankTurns": 19.91094499338597
+        },
+        {
+          "timeSeconds": 119.20241666666666,
+          "crankTurns": 19.955594445394073
+        },
+        {
+          "timeSeconds": 119.244125,
+          "crankTurns": 20.0
+        },
+        {
+          "timeSeconds": 119.28583333333333,
+          "crankTurns": 20.08940180882726
+        },
+        {
+          "timeSeconds": 119.32754166666666,
+          "crankTurns": 20.178621649643702
+        },
+        {
+          "timeSeconds": 119.36925,
+          "crankTurns": 20.267480207941855
+        },
+        {
+          "timeSeconds": 119.41095833333334,
+          "crankTurns": 20.355803437526944
+        },
+        {
+          "timeSeconds": 119.45266666666667,
+          "crankTurns": 20.443425098502182
+        },
+        {
+          "timeSeconds": 119.494375,
+          "crankTurns": 20.530189181421004
+        },
+        {
+          "timeSeconds": 119.53608333333334,
+          "crankTurns": 20.615952182255985
+        },
+        {
+          "timeSeconds": 119.57779166666667,
+          "crankTurns": 20.700585195010714
+        },
+        {
+          "timeSeconds": 119.6195,
+          "crankTurns": 20.78397579145949
+        },
+        {
+          "timeSeconds": 119.66120833333333,
+          "crankTurns": 20.866029660604056
+        },
+        {
+          "timeSeconds": 119.70291666666667,
+          "crankTurns": 20.946671983940274
+        },
+        {
+          "timeSeconds": 119.744625,
+          "crankTurns": 21.025848526480434
+        },
+        {
+          "timeSeconds": 119.78633333333333,
+          "crankTurns": 21.103526427621482
+        },
+        {
+          "timeSeconds": 119.82804166666666,
+          "crankTurns": 21.179694680326584
+        },
+        {
+          "timeSeconds": 119.86975,
+          "crankTurns": 21.254364291632573
+        },
+        {
+          "timeSeconds": 119.91145833333333,
+          "crankTurns": 21.327568122142505
+        },
+        {
+          "timeSeconds": 119.95316666666666,
+          "crankTurns": 21.39936040684409
+        },
+        {
+          "timeSeconds": 119.994875,
+          "crankTurns": 21.469815964241462
+        },
+        {
+          "timeSeconds": 120.03658333333334,
+          "crankTurns": 21.539029105332908
+        },
+        {
+          "timeSeconds": 120.07829166666667,
+          "crankTurns": 21.607112258344074
+        },
+        {
+          "timeSeconds": 120.16170833333334,
+          "crankTurns": 21.740418822142313
+        },
+        {
+          "timeSeconds": 120.20341666666667,
+          "crankTurns": 21.805941746403406
+        },
+        {
+          "timeSeconds": 120.245125,
+          "crankTurns": 21.870929341951403
+        },
+        {
+          "timeSeconds": 120.28683333333333,
+          "crankTurns": 21.93555565498111
+        },
+        {
+          "timeSeconds": 120.32854166666667,
+          "crankTurns": 21.999999999999996
+        },
+        {
+          "timeSeconds": 120.37025,
+          "crankTurns": 22.078501670065187
+        },
+        {
+          "timeSeconds": 120.41195833333333,
+          "crankTurns": 22.156849235300257
+        },
+        {
+          "timeSeconds": 120.45366666666666,
+          "crankTurns": 22.23489007498881
+        },
+        {
+          "timeSeconds": 120.495375,
+          "crankTurns": 22.312474522349174
+        },
+        {
+          "timeSeconds": 120.53708333333333,
+          "crankTurns": 22.38945730590727
+        },
+        {
+          "timeSeconds": 120.57879166666666,
+          "crankTurns": 22.46569894854034
+        },
+        {
+          "timeSeconds": 120.6205,
+          "crankTurns": 22.54106711071789
+        },
+        {
+          "timeSeconds": 120.66220833333334,
+          "crankTurns": 22.615437865003674
+        },
+        {
+          "timeSeconds": 120.70391666666667,
+          "crankTurns": 22.68869688954471
+        },
+        {
+          "timeSeconds": 120.745625,
+          "crankTurns": 22.760740569053194
+        },
+        {
+          "timeSeconds": 120.78733333333334,
+          "crankTurns": 22.83147699267835
+        },
+        {
+          "timeSeconds": 120.82904166666667,
+          "crankTurns": 22.900826839158185
+        },
+        {
+          "timeSeconds": 120.87075,
+          "crankTurns": 22.96872414072659
+        },
+        {
+          "timeSeconds": 120.91245833333333,
+          "crankTurns": 23.035116918419
+        },
+        {
+          "timeSeconds": 120.95416666666667,
+          "crankTurns": 23.099967682658214
+        },
+        {
+          "timeSeconds": 120.995875,
+          "crankTurns": 23.163253794299575
+        },
+        {
+          "timeSeconds": 121.03758333333333,
+          "crankTurns": 23.224967682658214
+        },
+        {
+          "timeSeconds": 121.07929166666666,
+          "crankTurns": 23.285116918418993
+        },
+        {
+          "timeSeconds": 121.121,
+          "crankTurns": 23.343724140726586
+        },
+        {
+          "timeSeconds": 121.16270833333333,
+          "crankTurns": 23.400826839158174
+        },
+        {
+          "timeSeconds": 121.20441666666666,
+          "crankTurns": 23.456476992678336
+        },
+        {
+          "timeSeconds": 121.246125,
+          "crankTurns": 23.510740569053194
+        },
+        {
+          "timeSeconds": 121.28783333333334,
+          "crankTurns": 23.563696889544705
+        },
+        {
+          "timeSeconds": 121.32954166666667,
+          "crankTurns": 23.61543786500367
+        },
+        {
+          "timeSeconds": 121.41295833333334,
+          "crankTurns": 23.715698948540354
+        },
+        {
+          "timeSeconds": 121.45466666666667,
+          "crankTurns": 23.764457305907282
+        },
+        {
+          "timeSeconds": 121.496375,
+          "crankTurns": 23.812474522349184
+        },
+        {
+          "timeSeconds": 121.53808333333333,
+          "crankTurns": 23.85989007498882
+        },
+        {
+          "timeSeconds": 121.57979166666667,
+          "crankTurns": 23.90684923530026
+        },
+        {
+          "timeSeconds": 121.6215,
+          "crankTurns": 23.95350167006519
+        },
+        {
+          "timeSeconds": 121.66320833333333,
+          "crankTurns": 24.0
+        },
+        {
+          "timeSeconds": 121.70491666666666,
+          "crankTurns": 24.098274577511706
+        },
+        {
+          "timeSeconds": 121.746625,
+          "crankTurns": 24.19622188473
+        },
+        {
+          "timeSeconds": 121.78833333333333,
+          "crankTurns": 24.29351907713074
+        },
+        {
+          "timeSeconds": 121.83004166666667,
+          "crankTurns": 24.389852101877477
+        },
+        {
+          "timeSeconds": 121.87175,
+          "crankTurns": 24.484919944847174
+        },
+        {
+          "timeSeconds": 121.91345833333334,
+          "crankTurns": 24.578438701330022
+        },
+        {
+          "timeSeconds": 121.95516666666667,
+          "crankTurns": 24.67014541535348
+        },
+        {
+          "timeSeconds": 121.996875,
+          "crankTurns": 24.75980163571075
+        },
+        {
+          "timeSeconds": 122.03858333333334,
+          "crankTurns": 24.84719664060426
+        },
+        {
+          "timeSeconds": 122.08029166666667,
+          "crankTurns": 24.932150287296526
+        },
+        {
+          "timeSeconds": 122.122,
+          "crankTurns": 25.014515448231627
+        },
+        {
+          "timeSeconds": 122.16370833333333,
+          "crankTurns": 25.09418000068297
+        },
+        {
+          "timeSeconds": 122.20541666666666,
+          "crankTurns": 25.1710683430209
+        },
+        {
+          "timeSeconds": 122.247125,
+          "crankTurns": 25.24514241709497
+        },
+        {
+          "timeSeconds": 122.33054166666666,
+          "crankTurns": 25.384885818601987
+        },
+        {
+          "timeSeconds": 122.37225,
+          "crankTurns": 25.450668805815035
+        },
+        {
+          "timeSeconds": 122.41395833333333,
+          "crankTurns": 25.51386330727091
+        },
+        {
+          "timeSeconds": 122.45566666666667,
+          "crankTurns": 25.574616450525564
+        },
+        {
+          "timeSeconds": 122.497375,
+          "crankTurns": 25.633108378316443
+        },
+        {
+          "timeSeconds": 122.53908333333334,
+          "crankTurns": 25.689549812441125
+        },
+        {
+          "timeSeconds": 122.58079166666667,
+          "crankTurns": 25.74417920410642
+        },
+        {
+          "timeSeconds": 122.66420833333333,
+          "crankTurns": 25.849074632686307
+        },
+        {
+          "timeSeconds": 122.70591666666667,
+          "crankTurns": 25.89992558843371
+        },
+        {
+          "timeSeconds": 122.747625,
+          "crankTurns": 25.95012642936356
+        },
+        {
+          "timeSeconds": 122.78933333333333,
+          "crankTurns": 26.000000000000004
+        },
+        {
+          "timeSeconds": 122.83104166666666,
+          "crankTurns": 26.091995548543284
+        },
+        {
+          "timeSeconds": 122.87275,
+          "crankTurns": 26.18373245541611
+        },
+        {
+          "timeSeconds": 122.91445833333333,
+          "crankTurns": 26.274955331517106
+        },
+        {
+          "timeSeconds": 122.95616666666666,
+          "crankTurns": 26.365415251980075
+        },
+        {
+          "timeSeconds": 122.997875,
+          "crankTurns": 26.454872886548674
+        },
+        {
+          "timeSeconds": 123.03958333333334,
+          "crankTurns": 26.543101509293244
+        },
+        {
+          "timeSeconds": 123.08129166666667,
+          "crankTurns": 26.629889849820806
+        },
+        {
+          "timeSeconds": 123.123,
+          "crankTurns": 26.715044750123027
+        },
+        {
+          "timeSeconds": 123.16470833333334,
+          "crankTurns": 26.79839359365012
+        },
+        {
+          "timeSeconds": 123.20641666666667,
+          "crankTurns": 26.879786476064137
+        },
+        {
+          "timeSeconds": 123.248125,
+          "crankTurns": 26.95909809037301
+        },
+        {
+          "timeSeconds": 123.28983333333333,
+          "crankTurns": 27.036229302738676
+        },
+        {
+          "timeSeconds": 123.33154166666667,
+          "crankTurns": 27.111108399142598
+        },
+        {
+          "timeSeconds": 123.37325,
+          "crankTurns": 27.183691987231175
+        },
+        {
+          "timeSeconds": 123.41495833333333,
+          "crankTurns": 27.25396554199974
+        },
+        {
+          "timeSeconds": 123.45666666666666,
+          "crankTurns": 27.321943588452953
+        },
+        {
+          "timeSeconds": 123.498375,
+          "crankTurns": 27.387669518944428
+        },
+        {
+          "timeSeconds": 123.54008333333333,
+          "crankTurns": 27.451215047492695
+        },
+        {
+          "timeSeconds": 123.58179166666666,
+          "crankTurns": 27.512679307935816
+        },
+        {
+          "timeSeconds": 123.6235,
+          "crankTurns": 27.57218760726589
+        },
+        {
+          "timeSeconds": 123.66520833333334,
+          "crankTurns": 27.629889849820803
+        },
+        {
+          "timeSeconds": 123.70691666666667,
+          "crankTurns": 27.68595865215038
+        },
+        {
+          "timeSeconds": 123.748625,
+          "crankTurns": 27.740587172262977
+        },
+        {
+          "timeSeconds": 123.79033333333334,
+          "crankTurns": 27.79398668055152
+        },
+        {
+          "timeSeconds": 123.83204166666667,
+          "crankTurns": 27.846383902945686
+        },
+        {
+          "timeSeconds": 123.91545833333333,
+          "crankTurns": 27.949138405686146
+        },
+        {
+          "timeSeconds": 123.95716666666667,
+          "crankTurns": 28.0
+        },
+        {
+          "timeSeconds": 123.998875,
+          "crankTurns": 28.067692795348233
+        },
+        {
+          "timeSeconds": 124.04058333333333,
+          "crankTurns": 28.135385590696465
+        },
+        {
+          "timeSeconds": 124.08229166666666,
+          "crankTurns": 28.203078386044698
+        },
+        {
+          "timeSeconds": 124.124,
+          "crankTurns": 28.27077118139293
+        },
+        {
+          "timeSeconds": 124.16570833333333,
+          "crankTurns": 28.33846397674116
+        },
+        {
+          "timeSeconds": 124.20741666666666,
+          "crankTurns": 28.406156772089393
+        },
+        {
+          "timeSeconds": 124.249125,
+          "crankTurns": 28.473849567437654
+        },
+        {
+          "timeSeconds": 124.29083333333334,
+          "crankTurns": 28.541542362785886
+        },
+        {
+          "timeSeconds": 124.33254166666667,
+          "crankTurns": 28.60923515813412
+        },
+        {
+          "timeSeconds": 124.37425,
+          "crankTurns": 28.67692795348235
+        },
+        {
+          "timeSeconds": 124.41595833333334,
+          "crankTurns": 28.74462074883058
+        }
+      ],
+      "conditionalSourcePixelGauges": {
+        "far20Metal": [
+          166.026930505457,
+          1272.2747034444192
+        ],
+        "nearest1Joint": [
+          716.0290607308415,
+          1372.9126908641292
+        ],
+        "meaning": "Source-only per-feature affine Y vs native rocker angle; NOT recovered camera or GPU/native-projection acceptance."
+      },
+      "independentControls": {
+        "far20Metal": {
+          "fitExposures": [
+            2578,
+            2608
+          ],
+          "checkCount": 18,
+          "absoluteResidualPx": {
+            "median": 12.082153841282206,
+            "p95": 23.885028334246215,
+            "max": 26.499658848599324
+          },
+          "rows": [
+            {
+              "frameIndex": 2580,
+              "observedPixel": [
+                775,
+                323
+              ],
+              "predictedYPx": 329.072628488851,
+              "residualYPx": 6.072628488851024,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2610,
+              "observedPixel": [
+                809,
+                178
+              ],
+              "predictedYPx": 167.6480126696651,
+              "residualYPx": -10.351987330334907,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2640,
+              "observedPixel": [
+                773,
+                331
+              ],
+              "predictedYPx": 330.6649852864887,
+              "residualYPx": -0.3350147135113275,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2670,
+              "observedPixel": [
+                809,
+                165
+              ],
+              "predictedYPx": 167.97617412756134,
+              "residualYPx": 2.976174127561336,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2700,
+              "observedPixel": [
+                784,
+                332
+              ],
+              "predictedYPx": 324.9788418488439,
+              "residualYPx": -7.021158151156101,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2730,
+              "observedPixel": [
+                809,
+                169
+              ],
+              "predictedYPx": 178.496242263323,
+              "residualYPx": 9.496242263323012,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2760,
+              "observedPixel": [
+                779,
+                334
+              ],
+              "predictedYPx": 316.7940166066801,
+              "residualYPx": -17.20598339331991,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2790,
+              "observedPixel": [
+                809,
+                175
+              ],
+              "predictedYPx": 187.07381090214005,
+              "residualYPx": 12.073810902140053,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2820,
+              "observedPixel": [
+                785,
+                321
+              ],
+              "predictedYPx": 297.95046450856375,
+              "residualYPx": -23.049535491436245,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2850,
+              "observedPixel": [
+                809,
+                171
+              ],
+              "predictedYPx": 184.90492205882506,
+              "residualYPx": 13.904922058825065,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2880,
+              "observedPixel": [
+                782,
+                333
+              ],
+              "predictedYPx": 320.90950321957564,
+              "residualYPx": -12.09049678042436,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2910,
+              "observedPixel": [
+                809,
+                165
+              ],
+              "predictedYPx": 177.70306532305315,
+              "residualYPx": 12.703065323053153,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2940,
+              "observedPixel": [
+                782,
+                332
+              ],
+              "predictedYPx": 327.0386427495073,
+              "residualYPx": -4.961357250492711,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2970,
+              "observedPixel": [
+                809,
+                162
+              ],
+              "predictedYPx": 167.11940932720185,
+              "residualYPx": 5.119409327201851,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2625,
+              "observedPixel": [
+                778,
+                283
+              ],
+              "predictedYPx": 256.5003411514007,
+              "residualYPx": -26.499658848599324,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2719,
+              "observedPixel": [
+                779,
+                225
+              ],
+              "predictedYPx": 242.475583627324,
+              "residualYPx": 17.475583627324,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2813,
+              "observedPixel": [
+                781,
+                266
+              ],
+              "predictedYPx": 242.57637705063962,
+              "residualYPx": -23.42362294936038,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2932,
+              "observedPixel": [
+                779,
+                311
+              ],
+              "predictedYPx": 289.2654559594562,
+              "residualYPx": -21.734544040543824,
+              "uncertaintyPx": 6
+            }
+          ]
+        },
+        "nearest1PhysicalJoint": {
+          "fitExposures": [
+            2541,
+            2973
+          ],
+          "checkCount": 17,
+          "absoluteResidualPx": {
+            "median": 6.3221131371101364,
+            "p95": 8.310973804014019,
+            "max": 9.42656912320831
+          },
+          "rows": [
+            {
+              "frameIndex": 2565,
+              "observedPixel": [
+                1449.622802734375,
+                717.7242431640625
+              ],
+              "predictedYPx": 716.366781112949,
+              "residualYPx": -1.3574620511135436,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2589,
+              "observedPixel": [
+                1449.1380615234375,
+                721.0753173828125
+              ],
+              "predictedYPx": 718.2078377936677,
+              "residualYPx": -2.86747958914475,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2613,
+              "observedPixel": [
+                1448.5887451171875,
+                725.742431640625
+              ],
+              "predictedYPx": 721.3131247832184,
+              "residualYPx": -4.429306857406573,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2637,
+              "observedPixel": [
+                1447.85205078125,
+                731.4863891601562
+              ],
+              "predictedYPx": 725.4141292353519,
+              "residualYPx": -6.072259924804371,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2661,
+              "observedPixel": [
+                1446.9412841796875,
+                737.6986083984375
+              ],
+              "predictedYPx": 731.3764952613274,
+              "residualYPx": -6.3221131371101364,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2685,
+              "observedPixel": [
+                1445.975830078125,
+                744.6396484375
+              ],
+              "predictedYPx": 737.3237096378616,
+              "residualYPx": -7.3159387996383884,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2709,
+              "observedPixel": [
+                1444.9676513671875,
+                752.9229125976562
+              ],
+              "predictedYPx": 745.1768115415581,
+              "residualYPx": -7.746101056098155,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2733,
+              "observedPixel": [
+                1443.6478271484375,
+                762.38671875
+              ],
+              "predictedYPx": 752.9601496267917,
+              "residualYPx": -9.42656912320831,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2757,
+              "observedPixel": [
+                1442.6177978515625,
+                770.934814453125
+              ],
+              "predictedYPx": 762.9027394789096,
+              "residualYPx": -8.032074974215448,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2781,
+              "observedPixel": [
+                1441.4144287109375,
+                779.7056884765625
+              ],
+              "predictedYPx": 772.6858005398173,
+              "residualYPx": -7.019887936745249,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2805,
+              "observedPixel": [
+                1440.618896484375,
+                790.3829956054688
+              ],
+              "predictedYPx": 782.4661275255859,
+              "residualYPx": -7.9168680798828746,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2829,
+              "observedPixel": [
+                1439.821044921875,
+                800.9380493164062
+              ],
+              "predictedYPx": 793.2657224069777,
+              "residualYPx": -7.672326909428534,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2853,
+              "observedPixel": [
+                1438.9510498046875,
+                812.7362060546875
+              ],
+              "predictedYPx": 805.3166293696462,
+              "residualYPx": -7.4195766850413065,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2877,
+              "observedPixel": [
+                1438.4503173828125,
+                822.6113891601562
+              ],
+              "predictedYPx": 817.459321296008,
+              "residualYPx": -5.152067864148194,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2901,
+              "observedPixel": [
+                1437.8543701171875,
+                831.966064453125
+              ],
+              "predictedYPx": 828.9903264146711,
+              "residualYPx": -2.975738038453869,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2925,
+              "observedPixel": [
+                1437.1376953125,
+                842.333984375
+              ],
+              "predictedYPx": 839.4509734845971,
+              "residualYPx": -2.883010890402943,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2949,
+              "observedPixel": [
+                1437.017578125,
+                851.07470703125
+              ],
+              "predictedYPx": 849.9417813924711,
+              "residualYPx": -1.1329256387789428,
+              "uncertaintyPx": 6
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bank-direction--1",
+      "directionBranch": -1,
+      "directionAuthority": "unresolved-source-equivalent-physical-sense-choice",
+      "staticPhasesRad": [
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085,
+        0.024861791156517085
+      ],
+      "requiredSetup": {
+        "coneSwingRad": 0.0,
+        "driveCrankOffsetTurns": 0.0
+      },
+      "hiddenInputPolicy": "Preserve complete old feasible baseline amplitudes/gearing/magnification/other setup honestly chosen and unobserved; never promote to source measurements.",
+      "knots": [
+        {
+          "timeSeconds": 105.980875,
+          "crankTurns": -0.0
+        },
+        {
+          "timeSeconds": 106.64820833333333,
+          "crankTurns": -0.6775722266796275
+        },
+        {
+          "timeSeconds": 106.68991666666666,
+          "crankTurns": -0.7288778430440614
+        },
+        {
+          "timeSeconds": 106.731625,
+          "crankTurns": -0.7815527097149545
+        },
+        {
+          "timeSeconds": 106.77333333333333,
+          "crankTurns": -0.8356067637690068
+        },
+        {
+          "timeSeconds": 106.81504166666667,
+          "crankTurns": -0.8910400052062375
+        },
+        {
+          "timeSeconds": 106.85675,
+          "crankTurns": -0.9478424969499087
+        },
+        {
+          "timeSeconds": 106.89845833333334,
+          "crankTurns": -1.0059944364435056
+        },
+        {
+          "timeSeconds": 106.94016666666667,
+          "crankTurns": -1.0654662983285326
+        },
+        {
+          "timeSeconds": 106.981875,
+          "crankTurns": -1.1262190471754197
+        },
+        {
+          "timeSeconds": 107.02358333333333,
+          "crankTurns": -1.1882044187346836
+        },
+        {
+          "timeSeconds": 107.06529166666667,
+          "crankTurns": -1.2513652676819544
+        },
+        {
+          "timeSeconds": 107.107,
+          "crankTurns": -1.315635979351344
+        },
+        {
+          "timeSeconds": 107.14870833333333,
+          "crankTurns": -1.3809429424906197
+        },
+        {
+          "timeSeconds": 107.19041666666666,
+          "crankTurns": -1.4472050796319629
+        },
+        {
+          "timeSeconds": 107.232125,
+          "crankTurns": -1.514334431256982
+        },
+        {
+          "timeSeconds": 107.27383333333333,
+          "crankTurns": -1.5822367895470586
+        },
+        {
+          "timeSeconds": 107.31554166666666,
+          "crankTurns": -1.650812377152839
+        },
+        {
+          "timeSeconds": 107.35725,
+          "crankTurns": -1.7199565660923226
+        },
+        {
+          "timeSeconds": 107.39895833333334,
+          "crankTurns": -1.7895606315978942
+        },
+        {
+          "timeSeconds": 107.44066666666667,
+          "crankTurns": -1.8595125354806703
+        },
+        {
+          "timeSeconds": 107.482375,
+          "crankTurns": -1.9296977333683614
+        },
+        {
+          "timeSeconds": 107.52408333333334,
+          "crankTurns": -2.0
+        },
+        {
+          "timeSeconds": 107.56579166666667,
+          "crankTurns": -2.0707473116500377
+        },
+        {
+          "timeSeconds": 107.64920833333333,
+          "crankTurns": -2.2120635911832327
+        },
+        {
+          "timeSeconds": 107.69091666666667,
+          "crankTurns": -2.282545096237285
+        },
+        {
+          "timeSeconds": 107.732625,
+          "crankTurns": -2.352852633894187
+        },
+        {
+          "timeSeconds": 107.77433333333333,
+          "crankTurns": -2.4229463140094682
+        },
+        {
+          "timeSeconds": 107.81604166666666,
+          "crankTurns": -2.4927885895066364
+        },
+        {
+          "timeSeconds": 107.85775,
+          "crankTurns": -2.5623446677508057
+        },
+        {
+          "timeSeconds": 107.89945833333333,
+          "crankTurns": -2.6315828917440856
+        },
+        {
+          "timeSeconds": 107.94116666666666,
+          "crankTurns": -2.700475086966271
+        },
+        {
+          "timeSeconds": 107.982875,
+          "crankTurns": -2.7689968700608114
+        },
+        {
+          "timeSeconds": 108.02458333333334,
+          "crankTurns": -2.837127915983867
+        },
+        {
+          "timeSeconds": 108.06629166666667,
+          "crankTurns": -2.904852180689888
+        },
+        {
+          "timeSeconds": 108.108,
+          "crankTurns": -2.9721580769134377
+        },
+        {
+          "timeSeconds": 108.14970833333334,
+          "crankTurns": -3.0390386011217236
+        },
+        {
+          "timeSeconds": 108.19141666666667,
+          "crankTurns": -3.105491410246767
+        },
+        {
+          "timeSeconds": 108.233125,
+          "crankTurns": -3.1715188473565483
+        },
+        {
+          "timeSeconds": 108.27483333333333,
+          "crankTurns": -3.2371279159838577
+        },
+        {
+          "timeSeconds": 108.31654166666667,
+          "crankTurns": -3.302330203394133
+        },
+        {
+          "timeSeconds": 108.35825,
+          "crankTurns": -3.367141753632946
+        },
+        {
+          "timeSeconds": 108.39995833333333,
+          "crankTurns": -3.4315828917440903
+        },
+        {
+          "timeSeconds": 108.44166666666666,
+          "crankTurns": -3.495678001084141
+        },
+        {
+          "timeSeconds": 108.483375,
+          "crankTurns": -3.559455256173303
+        },
+        {
+          "timeSeconds": 108.52508333333333,
+          "crankTurns": -3.622946314009465
+        },
+        {
+          "timeSeconds": 108.56679166666666,
+          "crankTurns": -3.6861859672275137
+        },
+        {
+          "timeSeconds": 108.6085,
+          "crankTurns": -3.7492117629039647
+        },
+        {
+          "timeSeconds": 108.65020833333334,
+          "crankTurns": -3.812063591183242
+        },
+        {
+          "timeSeconds": 108.69191666666667,
+          "crankTurns": -3.8747832482330473
+        },
+        {
+          "timeSeconds": 108.733625,
+          "crankTurns": -3.937413978316708
+        },
+        {
+          "timeSeconds": 108.77533333333334,
+          "crankTurns": -4.0
+        },
+        {
+          "timeSeconds": 108.81704166666667,
+          "crankTurns": -4.062112065811312
+        },
+        {
+          "timeSeconds": 108.90045833333333,
+          "crankTurns": -4.186281766481962
+        },
+        {
+          "timeSeconds": 108.94216666666667,
+          "crankTurns": -4.248312617043728
+        },
+        {
+          "timeSeconds": 108.983875,
+          "crankTurns": -4.310290141573104
+        },
+        {
+          "timeSeconds": 109.02558333333333,
+          "crankTurns": -4.372201919880422
+        },
+        {
+          "timeSeconds": 109.06729166666666,
+          "crankTurns": -4.434036127183984
+        },
+        {
+          "timeSeconds": 109.109,
+          "crankTurns": -4.495781641197116
+        },
+        {
+          "timeSeconds": 109.15070833333333,
+          "crankTurns": -4.557428142853313
+        },
+        {
+          "timeSeconds": 109.19241666666667,
+          "crankTurns": -4.61896620975733
+        },
+        {
+          "timeSeconds": 109.234125,
+          "crankTurns": -4.680387401515768
+        },
+        {
+          "timeSeconds": 109.27583333333334,
+          "crankTurns": -4.7416843361747025
+        },
+        {
+          "timeSeconds": 109.31754166666667,
+          "crankTurns": -4.802850757071728
+        },
+        {
+          "timeSeconds": 109.35925,
+          "crankTurns": -4.863881589497276
+        },
+        {
+          "timeSeconds": 109.40095833333334,
+          "crankTurns": -4.924772986651971
+        },
+        {
+          "timeSeconds": 109.44266666666667,
+          "crankTurns": -4.985522364483844
+        },
+        {
+          "timeSeconds": 109.52608333333333,
+          "crankTurns": -5.106591168470149
+        },
+        {
+          "timeSeconds": 109.56779166666666,
+          "crankTurns": -5.166911892527573
+        },
+        {
+          "timeSeconds": 109.6095,
+          "crankTurns": -5.227093181314143
+        },
+        {
+          "timeSeconds": 109.65120833333333,
+          "crankTurns": -5.287138881629238
+        },
+        {
+          "timeSeconds": 109.69291666666666,
+          "crankTurns": -5.34705406818242
+        },
+        {
+          "timeSeconds": 109.734625,
+          "crankTurns": -5.406844997636103
+        },
+        {
+          "timeSeconds": 109.77633333333333,
+          "crankTurns": -5.466519051944225
+        },
+        {
+          "timeSeconds": 109.81804166666667,
+          "crankTurns": -5.526084671500167
+        },
+        {
+          "timeSeconds": 109.85975,
+          "crankTurns": -5.585551278699154
+        },
+        {
+          "timeSeconds": 109.90145833333334,
+          "crankTurns": -5.64492919260771
+        },
+        {
+          "timeSeconds": 109.94316666666667,
+          "crankTurns": -5.70422953551251
+        },
+        {
+          "timeSeconds": 109.984875,
+          "crankTurns": -5.763464132195254
+        },
+        {
+          "timeSeconds": 110.02658333333333,
+          "crankTurns": -5.822645402845604
+        },
+        {
+          "timeSeconds": 110.06829166666667,
+          "crankTurns": -5.881786250582038
+        },
+        {
+          "timeSeconds": 110.15170833333333,
+          "crankTurns": -6.0
+        },
+        {
+          "timeSeconds": 110.19341666666666,
+          "crankTurns": -6.079986756705384
+        },
+        {
+          "timeSeconds": 110.235125,
+          "crankTurns": -6.159805106384461
+        },
+        {
+          "timeSeconds": 110.27683333333333,
+          "crankTurns": -6.239288263862649
+        },
+        {
+          "timeSeconds": 110.31854166666666,
+          "crankTurns": -6.318272672049496
+        },
+        {
+          "timeSeconds": 110.36025,
+          "crankTurns": -6.396599577082867
+        },
+        {
+          "timeSeconds": 110.40195833333334,
+          "crankTurns": -6.47411655721545
+        },
+        {
+          "timeSeconds": 110.44366666666667,
+          "crankTurns": -6.550678990719401
+        },
+        {
+          "timeSeconds": 110.485375,
+          "crankTurns": -6.626151448672795
+        },
+        {
+          "timeSeconds": 110.52708333333334,
+          "crankTurns": -6.700408999214072
+        },
+        {
+          "timeSeconds": 110.56879166666667,
+          "crankTurns": -6.773338410704191
+        },
+        {
+          "timeSeconds": 110.6105,
+          "crankTurns": -6.844839242209205
+        },
+        {
+          "timeSeconds": 110.65220833333333,
+          "crankTurns": -6.914824810801366
+        },
+        {
+          "timeSeconds": 110.69391666666667,
+          "crankTurns": -6.9832230263631025
+        },
+        {
+          "timeSeconds": 110.735625,
+          "crankTurns": -7.0499770858542625
+        },
+        {
+          "timeSeconds": 110.77733333333333,
+          "crankTurns": -7.115046020356442
+        },
+        {
+          "timeSeconds": 110.81904166666666,
+          "crankTurns": -7.178405089626061
+        },
+        {
+          "timeSeconds": 110.86075,
+          "crankTurns": -7.24004602035644
+        },
+        {
+          "timeSeconds": 110.90245833333333,
+          "crankTurns": -7.299977085854257
+        },
+        {
+          "timeSeconds": 110.94416666666666,
+          "crankTurns": -7.3582230263630946
+        },
+        {
+          "timeSeconds": 110.985875,
+          "crankTurns": -7.414824810801355
+        },
+        {
+          "timeSeconds": 111.02758333333334,
+          "crankTurns": -7.46983924220921
+        },
+        {
+          "timeSeconds": 111.06929166666667,
+          "crankTurns": -7.523338410704193
+        },
+        {
+          "timeSeconds": 111.111,
+          "crankTurns": -7.575408999214072
+        },
+        {
+          "timeSeconds": 111.15270833333334,
+          "crankTurns": -7.626151448672791
+        },
+        {
+          "timeSeconds": 111.19441666666667,
+          "crankTurns": -7.675678990719393
+        },
+        {
+          "timeSeconds": 111.236125,
+          "crankTurns": -7.72411655721544
+        },
+        {
+          "timeSeconds": 111.27783333333333,
+          "crankTurns": -7.77159957708288
+        },
+        {
+          "timeSeconds": 111.31954166666667,
+          "crankTurns": -7.818272672049507
+        },
+        {
+          "timeSeconds": 111.40295833333333,
+          "crankTurns": -7.909805106384466
+        },
+        {
+          "timeSeconds": 111.44466666666666,
+          "crankTurns": -7.954986756705386
+        },
+        {
+          "timeSeconds": 111.486375,
+          "crankTurns": -8.0
+        },
+        {
+          "timeSeconds": 111.52808333333333,
+          "crankTurns": -8.066302900859222
+        },
+        {
+          "timeSeconds": 111.56979166666666,
+          "crankTurns": -8.13258746702161
+        },
+        {
+          "timeSeconds": 111.6115,
+          "crankTurns": -8.198835551929154
+        },
+        {
+          "timeSeconds": 111.65320833333334,
+          "crankTurns": -8.265029383370818
+        },
+        {
+          "timeSeconds": 111.69491666666667,
+          "crankTurns": -8.331151745849612
+        },
+        {
+          "timeSeconds": 111.736625,
+          "crankTurns": -8.39718615723679
+        },
+        {
+          "timeSeconds": 111.77833333333334,
+          "crankTurns": -8.463117037900828
+        },
+        {
+          "timeSeconds": 111.82004166666667,
+          "crankTurns": -8.52892987057552
+        },
+        {
+          "timeSeconds": 111.86175,
+          "crankTurns": -8.59461134932677
+        },
+        {
+          "timeSeconds": 111.90345833333333,
+          "crankTurns": -8.660149516089497
+        },
+        {
+          "timeSeconds": 111.94516666666667,
+          "crankTurns": -8.725533883373545
+        },
+        {
+          "timeSeconds": 111.986875,
+          "crankTurns": -8.790755541879538
+        },
+        {
+          "timeSeconds": 112.02858333333333,
+          "crankTurns": -8.85580725192034
+        },
+        {
+          "timeSeconds": 112.07029166666666,
+          "crankTurns": -8.920683517710046
+        },
+        {
+          "timeSeconds": 112.112,
+          "crankTurns": -8.985380643758182
+        },
+        {
+          "timeSeconds": 112.15370833333333,
+          "crankTurns": -9.04989677279044
+        },
+        {
+          "timeSeconds": 112.19541666666667,
+          "crankTurns": -9.114231904806838
+        },
+        {
+          "timeSeconds": 112.237125,
+          "crankTurns": -9.178387897081645
+        },
+        {
+          "timeSeconds": 112.27883333333334,
+          "crankTurns": -9.242368445105356
+        },
+        {
+          "timeSeconds": 112.32054166666667,
+          "crankTurns": -9.306179044663878
+        },
+        {
+          "timeSeconds": 112.36225,
+          "crankTurns": -9.369826935444344
+        },
+        {
+          "timeSeconds": 112.40395833333334,
+          "crankTurns": -9.43332102674613
+        },
+        {
+          "timeSeconds": 112.44566666666667,
+          "crankTurns": -9.49667180605939
+        },
+        {
+          "timeSeconds": 112.487375,
+          "crankTurns": -9.559891231449212
+        },
+        {
+          "timeSeconds": 112.52908333333333,
+          "crankTurns": -9.622992608849689
+        },
+        {
+          "timeSeconds": 112.57079166666666,
+          "crankTurns": -9.685990455527023
+        },
+        {
+          "timeSeconds": 112.65420833333333,
+          "crankTurns": -9.811738777735592
+        },
+        {
+          "timeSeconds": 112.69591666666666,
+          "crankTurns": -9.874522950892583
+        },
+        {
+          "timeSeconds": 112.737625,
+          "crankTurns": -9.937270642794708
+        },
+        {
+          "timeSeconds": 112.77933333333333,
+          "crankTurns": -10.0
+        },
+        {
+          "timeSeconds": 112.82104166666667,
+          "crankTurns": -10.075974701798023
+        },
+        {
+          "timeSeconds": 112.86275,
+          "crankTurns": -10.15180307584055
+        },
+        {
+          "timeSeconds": 112.90445833333334,
+          "crankTurns": -10.227340042788963
+        },
+        {
+          "timeSeconds": 112.94616666666667,
+          "crankTurns": -10.302443009487188
+        },
+        {
+          "timeSeconds": 112.987875,
+          "crankTurns": -10.376973085516267
+        },
+        {
+          "timeSeconds": 113.02958333333333,
+          "crankTurns": -10.450796268158431
+        },
+        {
+          "timeSeconds": 113.07129166666667,
+          "crankTurns": -10.52378458566105
+        },
+        {
+          "timeSeconds": 113.113,
+          "crankTurns": -10.595817189046489
+        },
+        {
+          "timeSeconds": 113.15470833333333,
+          "crankTurns": -10.666781383153005
+        },
+        {
+          "timeSeconds": 113.19641666666666,
+          "crankTurns": -10.736573588110087
+        },
+        {
+          "timeSeconds": 113.238125,
+          "crankTurns": -10.80510022304544
+        },
+        {
+          "timeSeconds": 113.27983333333333,
+          "crankTurns": -10.872278504483948
+        },
+        {
+          "timeSeconds": 113.32154166666666,
+          "crankTurns": -10.938037152627125
+        },
+        {
+          "timeSeconds": 113.36325,
+          "crankTurns": -11.002316999487205
+        },
+        {
+          "timeSeconds": 113.44666666666667,
+          "crankTurns": -11.12626709762267
+        },
+        {
+          "timeSeconds": 113.488375,
+          "crankTurns": -11.185883573589013
+        },
+        {
+          "timeSeconds": 113.53008333333334,
+          "crankTurns": -11.243914156446195
+        },
+        {
+          "timeSeconds": 113.57179166666667,
+          "crankTurns": -11.30036561133464
+        },
+        {
+          "timeSeconds": 113.6135,
+          "crankTurns": -11.355258175957804
+        },
+        {
+          "timeSeconds": 113.65520833333333,
+          "crankTurns": -11.408625387921248
+        },
+        {
+          "timeSeconds": 113.69691666666667,
+          "crankTurns": -11.460513798601598
+        },
+        {
+          "timeSeconds": 113.738625,
+          "crankTurns": -11.510982575986613
+        },
+        {
+          "timeSeconds": 113.78033333333333,
+          "crankTurns": -11.56010299987479
+        },
+        {
+          "timeSeconds": 113.82204166666666,
+          "crankTurns": -11.60795785374123
+        },
+        {
+          "timeSeconds": 113.90545833333333,
+          "crankTurns": -11.700255173896327
+        },
+        {
+          "timeSeconds": 113.94716666666666,
+          "crankTurns": -11.744913915217236
+        },
+        {
+          "timeSeconds": 113.988875,
+          "crankTurns": -11.788737791398598
+        },
+        {
+          "timeSeconds": 114.03058333333334,
+          "crankTurns": -11.83185477419306
+        },
+        {
+          "timeSeconds": 114.07229166666667,
+          "crankTurns": -11.874398866318359
+        },
+        {
+          "timeSeconds": 114.114,
+          "crankTurns": -11.916508958193473
+        },
+        {
+          "timeSeconds": 114.15570833333334,
+          "crankTurns": -11.958327642974469
+        },
+        {
+          "timeSeconds": 114.19741666666667,
+          "crankTurns": -12.0
+        },
+        {
+          "timeSeconds": 114.239125,
+          "crankTurns": -12.08714650291238
+        },
+        {
+          "timeSeconds": 114.28083333333333,
+          "crankTurns": -12.17406862445317
+        },
+        {
+          "timeSeconds": 114.32254166666667,
+          "crankTurns": -12.260544441620045
+        },
+        {
+          "timeSeconds": 114.36425,
+          "crankTurns": -12.346356921214793
+        },
+        {
+          "timeSeconds": 114.40595833333333,
+          "crankTurns": -12.431296297704451
+        },
+        {
+          "timeSeconds": 114.44766666666666,
+          "crankTurns": -12.515162371456391
+        },
+        {
+          "timeSeconds": 114.489375,
+          "crankTurns": -12.59776670216738
+        },
+        {
+          "timeSeconds": 114.53108333333333,
+          "crankTurns": -12.678934673454975
+        },
+        {
+          "timeSeconds": 114.57279166666666,
+          "crankTurns": -12.758507405991162
+        },
+        {
+          "timeSeconds": 114.6145,
+          "crankTurns": -12.836343498217529
+        },
+        {
+          "timeSeconds": 114.65620833333334,
+          "crankTurns": -12.912320575570234
+        },
+        {
+          "timeSeconds": 114.69791666666667,
+          "crankTurns": -12.986336631241507
+        },
+        {
+          "timeSeconds": 114.739625,
+          "crankTurns": -13.058311143787446
+        },
+        {
+          "timeSeconds": 114.78133333333334,
+          "crankTurns": -13.12818595933787
+        },
+        {
+          "timeSeconds": 114.82304166666667,
+          "crankTurns": -13.195925928742254
+        },
+        {
+          "timeSeconds": 114.86475,
+          "crankTurns": -13.261519292671203
+        },
+        {
+          "timeSeconds": 114.90645833333333,
+          "crankTurns": -13.324977810454108
+        },
+        {
+          "timeSeconds": 114.94816666666667,
+          "crankTurns": -13.386336631241496
+        },
+        {
+          "timeSeconds": 114.989875,
+          "crankTurns": -13.445653908903555
+        },
+        {
+          "timeSeconds": 115.03158333333333,
+          "crankTurns": -13.503010164884179
+        },
+        {
+          "timeSeconds": 115.07329166666666,
+          "crankTurns": -13.558507405991168
+        },
+        {
+          "timeSeconds": 115.15670833333333,
+          "crankTurns": -13.664433368834052
+        },
+        {
+          "timeSeconds": 115.19841666666666,
+          "crankTurns": -13.715162371456392
+        },
+        {
+          "timeSeconds": 115.240125,
+          "crankTurns": -13.7646296310378
+        },
+        {
+          "timeSeconds": 115.28183333333334,
+          "crankTurns": -13.813023587881471
+        },
+        {
+          "timeSeconds": 115.32354166666667,
+          "crankTurns": -13.860544441620055
+        },
+        {
+          "timeSeconds": 115.36525,
+          "crankTurns": -13.90740195778651
+        },
+        {
+          "timeSeconds": 115.40695833333334,
+          "crankTurns": -13.95381316957905
+        },
+        {
+          "timeSeconds": 115.44866666666667,
+          "crankTurns": -14.0
+        },
+        {
+          "timeSeconds": 115.490375,
+          "crankTurns": -14.077921992587806
+        },
+        {
+          "timeSeconds": 115.53208333333333,
+          "crankTurns": -14.15572066946949
+        },
+        {
+          "timeSeconds": 115.57379166666666,
+          "crankTurns": -14.233274066011617
+        },
+        {
+          "timeSeconds": 115.6155,
+          "crankTurns": -14.310462904923476
+        },
+        {
+          "timeSeconds": 115.65720833333333,
+          "crankTurns": -14.38717190308404
+        },
+        {
+          "timeSeconds": 115.69891666666666,
+          "crankTurns": -14.463291034607968
+        },
+        {
+          "timeSeconds": 115.740625,
+          "crankTurns": -14.538716736312232
+        },
+        {
+          "timeSeconds": 115.78233333333333,
+          "crankTurns": -14.613353042376012
+        },
+        {
+          "timeSeconds": 115.82404166666667,
+          "crankTurns": -14.687112635762348
+        },
+        {
+          "timeSeconds": 115.86575,
+          "crankTurns": -14.759917804881752
+        },
+        {
+          "timeSeconds": 115.90745833333334,
+          "crankTurns": -14.831701295016817
+        },
+        {
+          "timeSeconds": 115.94916666666667,
+          "crankTurns": -14.90240704517886
+        },
+        {
+          "timeSeconds": 115.990875,
+          "crankTurns": -14.97199080232387
+        },
+        {
+          "timeSeconds": 116.03258333333333,
+          "crankTurns": -15.04042060619813
+        },
+        {
+          "timeSeconds": 116.07429166666667,
+          "crankTurns": -15.107677139501428
+        },
+        {
+          "timeSeconds": 116.116,
+          "crankTurns": -15.17375393953146
+        },
+        {
+          "timeSeconds": 116.15770833333333,
+          "crankTurns": -15.238657468990532
+        },
+        {
+          "timeSeconds": 116.19941666666666,
+          "crankTurns": -15.30240704517885
+        },
+        {
+          "timeSeconds": 116.241125,
+          "crankTurns": -15.365034628350138
+        },
+        {
+          "timeSeconds": 116.28283333333333,
+          "crankTurns": -15.426584471548402
+        },
+        {
+          "timeSeconds": 116.32454166666666,
+          "crankTurns": -15.487112635762328
+        },
+        {
+          "timeSeconds": 116.40795833333334,
+          "crankTurns": -15.60538340297892
+        },
+        {
+          "timeSeconds": 116.44966666666667,
+          "crankTurns": -15.663291034607985
+        },
+        {
+          "timeSeconds": 116.491375,
+          "crankTurns": -15.720505236417386
+        },
+        {
+          "timeSeconds": 116.53308333333334,
+          "crankTurns": -15.777129571590152
+        },
+        {
+          "timeSeconds": 116.57479166666667,
+          "crankTurns": -15.833274066011628
+        },
+        {
+          "timeSeconds": 116.6165,
+          "crankTurns": -15.889054002802832
+        },
+        {
+          "timeSeconds": 116.65820833333333,
+          "crankTurns": -15.944588659254476
+        },
+        {
+          "timeSeconds": 116.69991666666667,
+          "crankTurns": -16.0
+        },
+        {
+          "timeSeconds": 116.741625,
+          "crankTurns": -16.061537351129502
+        },
+        {
+          "timeSeconds": 116.78333333333333,
+          "crankTurns": -16.123105268551218
+        },
+        {
+          "timeSeconds": 116.82504166666666,
+          "crankTurns": -16.184734004905838
+        },
+        {
+          "timeSeconds": 116.86675,
+          "crankTurns": -16.2464531887495
+        },
+        {
+          "timeSeconds": 116.90845833333333,
+          "crankTurns": -16.308291520524712
+        },
+        {
+          "timeSeconds": 116.95016666666666,
+          "crankTurns": -16.370276478054972
+        },
+        {
+          "timeSeconds": 116.991875,
+          "crankTurns": -16.432434034585114
+        },
+        {
+          "timeSeconds": 117.03358333333334,
+          "crankTurns": -16.494788392260684
+        },
+        {
+          "timeSeconds": 117.07529166666667,
+          "crankTurns": -16.557361733781104
+        },
+        {
+          "timeSeconds": 117.117,
+          "crankTurns": -16.620173994775282
+        },
+        {
+          "timeSeconds": 117.15870833333334,
+          "crankTurns": -16.68324265923499
+        },
+        {
+          "timeSeconds": 117.20041666666667,
+          "crankTurns": -16.74658258010547
+        },
+        {
+          "timeSeconds": 117.242125,
+          "crankTurns": -16.81020582687413
+        },
+        {
+          "timeSeconds": 117.28383333333333,
+          "crankTurns": -16.87412156172126
+        },
+        {
+          "timeSeconds": 117.36725,
+          "crankTurns": -17.002852074535912
+        },
+        {
+          "timeSeconds": 117.40895833333333,
+          "crankTurns": -17.06766994881803
+        },
+        {
+          "timeSeconds": 117.45066666666666,
+          "crankTurns": -17.132786472035416
+        },
+        {
+          "timeSeconds": 117.492375,
+          "crankTurns": -17.198195483331265
+        },
+        {
+          "timeSeconds": 117.53408333333333,
+          "crankTurns": -17.263887820525298
+        },
+        {
+          "timeSeconds": 117.57579166666666,
+          "crankTurns": -17.329851414130104
+        },
+        {
+          "timeSeconds": 117.65920833333334,
+          "crankTurns": -17.462530327744556
+        },
+        {
+          "timeSeconds": 117.70091666666667,
+          "crankTurns": -17.52920822813352
+        },
+        {
+          "timeSeconds": 117.742625,
+          "crankTurns": -17.596082929667894
+        },
+        {
+          "timeSeconds": 117.78433333333334,
+          "crankTurns": -17.663130230202146
+        },
+        {
+          "timeSeconds": 117.82604166666667,
+          "crankTurns": -17.73032415649145
+        },
+        {
+          "timeSeconds": 117.86775,
+          "crankTurns": -17.797637230712297
+        },
+        {
+          "timeSeconds": 117.90945833333333,
+          "crankTurns": -17.865040752422193
+        },
+        {
+          "timeSeconds": 117.95116666666667,
+          "crankTurns": -17.932505093064986
+        },
+        {
+          "timeSeconds": 117.992875,
+          "crankTurns": -18.0
+        },
+        {
+          "timeSeconds": 118.03458333333333,
+          "crankTurns": -18.088927778727403
+        },
+        {
+          "timeSeconds": 118.07629166666666,
+          "crankTurns": -18.17761166005263
+        },
+        {
+          "timeSeconds": 118.118,
+          "crankTurns": -18.265810418764488
+        },
+        {
+          "timeSeconds": 118.15970833333333,
+          "crankTurns": -18.353288144756647
+        },
+        {
+          "timeSeconds": 118.20141666666666,
+          "crankTurns": -18.439816827708142
+        },
+        {
+          "timeSeconds": 118.243125,
+          "crankTurns": -18.52517885521219
+        },
+        {
+          "timeSeconds": 118.28483333333334,
+          "crankTurns": -18.609169396983145
+        },
+        {
+          "timeSeconds": 118.32654166666667,
+          "crankTurns": -18.69159864902014
+        },
+        {
+          "timeSeconds": 118.36825,
+          "crankTurns": -18.772293913139325
+        },
+        {
+          "timeSeconds": 118.40995833333334,
+          "crankTurns": -18.851101489091334
+        },
+        {
+          "timeSeconds": 118.45166666666667,
+          "crankTurns": -18.92788835853339
+        },
+        {
+          "timeSeconds": 118.493375,
+          "crankTurns": -19.002543642406103
+        },
+        {
+          "timeSeconds": 118.53508333333333,
+          "crankTurns": -19.07497981574763
+        },
+        {
+          "timeSeconds": 118.57679166666667,
+          "crankTurns": -19.145133666635495
+        },
+        {
+          "timeSeconds": 118.6185,
+          "crankTurns": -19.212966988749635
+        },
+        {
+          "timeSeconds": 118.66020833333333,
+          "crankTurns": -19.278466999968828
+        },
+        {
+          "timeSeconds": 118.70191666666666,
+          "crankTurns": -19.34164648241429
+        },
+        {
+          "timeSeconds": 118.743625,
+          "crankTurns": -19.402543642406094
+        },
+        {
+          "timeSeconds": 118.78533333333333,
+          "crankTurns": -19.46122169186671
+        },
+        {
+          "timeSeconds": 118.82704166666667,
+          "crankTurns": -19.517768155758006
+        },
+        {
+          "timeSeconds": 118.91045833333334,
+          "crankTurns": -19.62493198235347
+        },
+        {
+          "timeSeconds": 118.95216666666667,
+          "crankTurns": -19.675836063649808
+        },
+        {
+          "timeSeconds": 118.993875,
+          "crankTurns": -19.725178855212178
+        },
+        {
+          "timeSeconds": 119.03558333333334,
+          "crankTurns": -19.77315016104149
+        },
+        {
+          "timeSeconds": 119.07729166666667,
+          "crankTurns": -19.819954811423326
+        },
+        {
+          "timeSeconds": 119.119,
+          "crankTurns": -19.8658104187645
+        },
+        {
+          "timeSeconds": 119.16070833333333,
+          "crankTurns": -19.91094499338597
+        },
+        {
+          "timeSeconds": 119.20241666666666,
+          "crankTurns": -19.955594445394073
+        },
+        {
+          "timeSeconds": 119.244125,
+          "crankTurns": -20.0
+        },
+        {
+          "timeSeconds": 119.28583333333333,
+          "crankTurns": -20.08940180882726
+        },
+        {
+          "timeSeconds": 119.32754166666666,
+          "crankTurns": -20.178621649643702
+        },
+        {
+          "timeSeconds": 119.36925,
+          "crankTurns": -20.267480207941855
+        },
+        {
+          "timeSeconds": 119.41095833333334,
+          "crankTurns": -20.355803437526944
+        },
+        {
+          "timeSeconds": 119.45266666666667,
+          "crankTurns": -20.443425098502182
+        },
+        {
+          "timeSeconds": 119.494375,
+          "crankTurns": -20.530189181421004
+        },
+        {
+          "timeSeconds": 119.53608333333334,
+          "crankTurns": -20.615952182255985
+        },
+        {
+          "timeSeconds": 119.57779166666667,
+          "crankTurns": -20.700585195010714
+        },
+        {
+          "timeSeconds": 119.6195,
+          "crankTurns": -20.78397579145949
+        },
+        {
+          "timeSeconds": 119.66120833333333,
+          "crankTurns": -20.866029660604056
+        },
+        {
+          "timeSeconds": 119.70291666666667,
+          "crankTurns": -20.946671983940274
+        },
+        {
+          "timeSeconds": 119.744625,
+          "crankTurns": -21.025848526480434
+        },
+        {
+          "timeSeconds": 119.78633333333333,
+          "crankTurns": -21.103526427621482
+        },
+        {
+          "timeSeconds": 119.82804166666666,
+          "crankTurns": -21.179694680326584
+        },
+        {
+          "timeSeconds": 119.86975,
+          "crankTurns": -21.254364291632573
+        },
+        {
+          "timeSeconds": 119.91145833333333,
+          "crankTurns": -21.327568122142505
+        },
+        {
+          "timeSeconds": 119.95316666666666,
+          "crankTurns": -21.39936040684409
+        },
+        {
+          "timeSeconds": 119.994875,
+          "crankTurns": -21.469815964241462
+        },
+        {
+          "timeSeconds": 120.03658333333334,
+          "crankTurns": -21.539029105332908
+        },
+        {
+          "timeSeconds": 120.07829166666667,
+          "crankTurns": -21.607112258344074
+        },
+        {
+          "timeSeconds": 120.16170833333334,
+          "crankTurns": -21.740418822142313
+        },
+        {
+          "timeSeconds": 120.20341666666667,
+          "crankTurns": -21.805941746403406
+        },
+        {
+          "timeSeconds": 120.245125,
+          "crankTurns": -21.870929341951403
+        },
+        {
+          "timeSeconds": 120.28683333333333,
+          "crankTurns": -21.93555565498111
+        },
+        {
+          "timeSeconds": 120.32854166666667,
+          "crankTurns": -21.999999999999996
+        },
+        {
+          "timeSeconds": 120.37025,
+          "crankTurns": -22.078501670065187
+        },
+        {
+          "timeSeconds": 120.41195833333333,
+          "crankTurns": -22.156849235300257
+        },
+        {
+          "timeSeconds": 120.45366666666666,
+          "crankTurns": -22.23489007498881
+        },
+        {
+          "timeSeconds": 120.495375,
+          "crankTurns": -22.312474522349174
+        },
+        {
+          "timeSeconds": 120.53708333333333,
+          "crankTurns": -22.38945730590727
+        },
+        {
+          "timeSeconds": 120.57879166666666,
+          "crankTurns": -22.46569894854034
+        },
+        {
+          "timeSeconds": 120.6205,
+          "crankTurns": -22.54106711071789
+        },
+        {
+          "timeSeconds": 120.66220833333334,
+          "crankTurns": -22.615437865003674
+        },
+        {
+          "timeSeconds": 120.70391666666667,
+          "crankTurns": -22.68869688954471
+        },
+        {
+          "timeSeconds": 120.745625,
+          "crankTurns": -22.760740569053194
+        },
+        {
+          "timeSeconds": 120.78733333333334,
+          "crankTurns": -22.83147699267835
+        },
+        {
+          "timeSeconds": 120.82904166666667,
+          "crankTurns": -22.900826839158185
+        },
+        {
+          "timeSeconds": 120.87075,
+          "crankTurns": -22.96872414072659
+        },
+        {
+          "timeSeconds": 120.91245833333333,
+          "crankTurns": -23.035116918419
+        },
+        {
+          "timeSeconds": 120.95416666666667,
+          "crankTurns": -23.099967682658214
+        },
+        {
+          "timeSeconds": 120.995875,
+          "crankTurns": -23.163253794299575
+        },
+        {
+          "timeSeconds": 121.03758333333333,
+          "crankTurns": -23.224967682658214
+        },
+        {
+          "timeSeconds": 121.07929166666666,
+          "crankTurns": -23.285116918418993
+        },
+        {
+          "timeSeconds": 121.121,
+          "crankTurns": -23.343724140726586
+        },
+        {
+          "timeSeconds": 121.16270833333333,
+          "crankTurns": -23.400826839158174
+        },
+        {
+          "timeSeconds": 121.20441666666666,
+          "crankTurns": -23.456476992678336
+        },
+        {
+          "timeSeconds": 121.246125,
+          "crankTurns": -23.510740569053194
+        },
+        {
+          "timeSeconds": 121.28783333333334,
+          "crankTurns": -23.563696889544705
+        },
+        {
+          "timeSeconds": 121.32954166666667,
+          "crankTurns": -23.61543786500367
+        },
+        {
+          "timeSeconds": 121.41295833333334,
+          "crankTurns": -23.715698948540354
+        },
+        {
+          "timeSeconds": 121.45466666666667,
+          "crankTurns": -23.764457305907282
+        },
+        {
+          "timeSeconds": 121.496375,
+          "crankTurns": -23.812474522349184
+        },
+        {
+          "timeSeconds": 121.53808333333333,
+          "crankTurns": -23.85989007498882
+        },
+        {
+          "timeSeconds": 121.57979166666667,
+          "crankTurns": -23.90684923530026
+        },
+        {
+          "timeSeconds": 121.6215,
+          "crankTurns": -23.95350167006519
+        },
+        {
+          "timeSeconds": 121.66320833333333,
+          "crankTurns": -24.0
+        },
+        {
+          "timeSeconds": 121.70491666666666,
+          "crankTurns": -24.098274577511706
+        },
+        {
+          "timeSeconds": 121.746625,
+          "crankTurns": -24.19622188473
+        },
+        {
+          "timeSeconds": 121.78833333333333,
+          "crankTurns": -24.29351907713074
+        },
+        {
+          "timeSeconds": 121.83004166666667,
+          "crankTurns": -24.389852101877477
+        },
+        {
+          "timeSeconds": 121.87175,
+          "crankTurns": -24.484919944847174
+        },
+        {
+          "timeSeconds": 121.91345833333334,
+          "crankTurns": -24.578438701330022
+        },
+        {
+          "timeSeconds": 121.95516666666667,
+          "crankTurns": -24.67014541535348
+        },
+        {
+          "timeSeconds": 121.996875,
+          "crankTurns": -24.75980163571075
+        },
+        {
+          "timeSeconds": 122.03858333333334,
+          "crankTurns": -24.84719664060426
+        },
+        {
+          "timeSeconds": 122.08029166666667,
+          "crankTurns": -24.932150287296526
+        },
+        {
+          "timeSeconds": 122.122,
+          "crankTurns": -25.014515448231627
+        },
+        {
+          "timeSeconds": 122.16370833333333,
+          "crankTurns": -25.09418000068297
+        },
+        {
+          "timeSeconds": 122.20541666666666,
+          "crankTurns": -25.1710683430209
+        },
+        {
+          "timeSeconds": 122.247125,
+          "crankTurns": -25.24514241709497
+        },
+        {
+          "timeSeconds": 122.33054166666666,
+          "crankTurns": -25.384885818601987
+        },
+        {
+          "timeSeconds": 122.37225,
+          "crankTurns": -25.450668805815035
+        },
+        {
+          "timeSeconds": 122.41395833333333,
+          "crankTurns": -25.51386330727091
+        },
+        {
+          "timeSeconds": 122.45566666666667,
+          "crankTurns": -25.574616450525564
+        },
+        {
+          "timeSeconds": 122.497375,
+          "crankTurns": -25.633108378316443
+        },
+        {
+          "timeSeconds": 122.53908333333334,
+          "crankTurns": -25.689549812441125
+        },
+        {
+          "timeSeconds": 122.58079166666667,
+          "crankTurns": -25.74417920410642
+        },
+        {
+          "timeSeconds": 122.66420833333333,
+          "crankTurns": -25.849074632686307
+        },
+        {
+          "timeSeconds": 122.70591666666667,
+          "crankTurns": -25.89992558843371
+        },
+        {
+          "timeSeconds": 122.747625,
+          "crankTurns": -25.95012642936356
+        },
+        {
+          "timeSeconds": 122.78933333333333,
+          "crankTurns": -26.000000000000004
+        },
+        {
+          "timeSeconds": 122.83104166666666,
+          "crankTurns": -26.091995548543284
+        },
+        {
+          "timeSeconds": 122.87275,
+          "crankTurns": -26.18373245541611
+        },
+        {
+          "timeSeconds": 122.91445833333333,
+          "crankTurns": -26.274955331517106
+        },
+        {
+          "timeSeconds": 122.95616666666666,
+          "crankTurns": -26.365415251980075
+        },
+        {
+          "timeSeconds": 122.997875,
+          "crankTurns": -26.454872886548674
+        },
+        {
+          "timeSeconds": 123.03958333333334,
+          "crankTurns": -26.543101509293244
+        },
+        {
+          "timeSeconds": 123.08129166666667,
+          "crankTurns": -26.629889849820806
+        },
+        {
+          "timeSeconds": 123.123,
+          "crankTurns": -26.715044750123027
+        },
+        {
+          "timeSeconds": 123.16470833333334,
+          "crankTurns": -26.79839359365012
+        },
+        {
+          "timeSeconds": 123.20641666666667,
+          "crankTurns": -26.879786476064137
+        },
+        {
+          "timeSeconds": 123.248125,
+          "crankTurns": -26.95909809037301
+        },
+        {
+          "timeSeconds": 123.28983333333333,
+          "crankTurns": -27.036229302738676
+        },
+        {
+          "timeSeconds": 123.33154166666667,
+          "crankTurns": -27.111108399142598
+        },
+        {
+          "timeSeconds": 123.37325,
+          "crankTurns": -27.183691987231175
+        },
+        {
+          "timeSeconds": 123.41495833333333,
+          "crankTurns": -27.25396554199974
+        },
+        {
+          "timeSeconds": 123.45666666666666,
+          "crankTurns": -27.321943588452953
+        },
+        {
+          "timeSeconds": 123.498375,
+          "crankTurns": -27.387669518944428
+        },
+        {
+          "timeSeconds": 123.54008333333333,
+          "crankTurns": -27.451215047492695
+        },
+        {
+          "timeSeconds": 123.58179166666666,
+          "crankTurns": -27.512679307935816
+        },
+        {
+          "timeSeconds": 123.6235,
+          "crankTurns": -27.57218760726589
+        },
+        {
+          "timeSeconds": 123.66520833333334,
+          "crankTurns": -27.629889849820803
+        },
+        {
+          "timeSeconds": 123.70691666666667,
+          "crankTurns": -27.68595865215038
+        },
+        {
+          "timeSeconds": 123.748625,
+          "crankTurns": -27.740587172262977
+        },
+        {
+          "timeSeconds": 123.79033333333334,
+          "crankTurns": -27.79398668055152
+        },
+        {
+          "timeSeconds": 123.83204166666667,
+          "crankTurns": -27.846383902945686
+        },
+        {
+          "timeSeconds": 123.91545833333333,
+          "crankTurns": -27.949138405686146
+        },
+        {
+          "timeSeconds": 123.95716666666667,
+          "crankTurns": -28.0
+        },
+        {
+          "timeSeconds": 123.998875,
+          "crankTurns": -28.067692795348233
+        },
+        {
+          "timeSeconds": 124.04058333333333,
+          "crankTurns": -28.135385590696465
+        },
+        {
+          "timeSeconds": 124.08229166666666,
+          "crankTurns": -28.203078386044698
+        },
+        {
+          "timeSeconds": 124.124,
+          "crankTurns": -28.27077118139293
+        },
+        {
+          "timeSeconds": 124.16570833333333,
+          "crankTurns": -28.33846397674116
+        },
+        {
+          "timeSeconds": 124.20741666666666,
+          "crankTurns": -28.406156772089393
+        },
+        {
+          "timeSeconds": 124.249125,
+          "crankTurns": -28.473849567437654
+        },
+        {
+          "timeSeconds": 124.29083333333334,
+          "crankTurns": -28.541542362785886
+        },
+        {
+          "timeSeconds": 124.33254166666667,
+          "crankTurns": -28.60923515813412
+        },
+        {
+          "timeSeconds": 124.37425,
+          "crankTurns": -28.67692795348235
+        },
+        {
+          "timeSeconds": 124.41595833333334,
+          "crankTurns": -28.74462074883058
+        }
+      ],
+      "conditionalSourcePixelGauges": {
+        "far20Metal": [
+          166.026930505457,
+          1272.2747034444192
+        ],
+        "nearest1Joint": [
+          716.029035900688,
+          1371.7396428401507
+        ],
+        "meaning": "Source-only per-feature affine Y vs native rocker angle; NOT recovered camera or GPU/native-projection acceptance."
+      },
+      "independentControls": {
+        "far20Metal": {
+          "fitExposures": [
+            2578,
+            2608
+          ],
+          "checkCount": 18,
+          "absoluteResidualPx": {
+            "median": 12.037660666199827,
+            "p95": 23.62646104995697,
+            "max": 26.245135487062385
+          },
+          "rows": [
+            {
+              "frameIndex": 2580,
+              "observedPixel": [
+                775,
+                323
+              ],
+              "predictedYPx": 329.0799612246161,
+              "residualYPx": 6.079961224616113,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2610,
+              "observedPixel": [
+                809,
+                178
+              ],
+              "predictedYPx": 167.65009899965932,
+              "residualYPx": -10.34990100034068,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2640,
+              "observedPixel": [
+                773,
+                331
+              ],
+              "predictedYPx": 330.66085912063215,
+              "residualYPx": -0.33914087936784654,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2670,
+              "observedPixel": [
+                809,
+                165
+              ],
+              "predictedYPx": 167.97344818248447,
+              "residualYPx": 2.973448182484475,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2700,
+              "observedPixel": [
+                784,
+                332
+              ],
+              "predictedYPx": 324.97681373047726,
+              "residualYPx": -7.023186269522739,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2730,
+              "observedPixel": [
+                809,
+                169
+              ],
+              "predictedYPx": 178.45706227265953,
+              "residualYPx": 9.457062272659527,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2760,
+              "observedPixel": [
+                779,
+                334
+              ],
+              "predictedYPx": 316.82059342416426,
+              "residualYPx": -17.179406575835742,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2790,
+              "observedPixel": [
+                809,
+                175
+              ],
+              "predictedYPx": 186.99517259206715,
+              "residualYPx": 11.99517259206715,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2820,
+              "observedPixel": [
+                785,
+                321
+              ],
+              "predictedYPx": 298.0675019308396,
+              "residualYPx": -22.932498069160374,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2850,
+              "observedPixel": [
+                809,
+                171
+              ],
+              "predictedYPx": 184.8365832772564,
+              "residualYPx": 13.836583277256409,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2880,
+              "observedPixel": [
+                782,
+                333
+              ],
+              "predictedYPx": 320.9198512596675,
+              "residualYPx": -12.080148740332504,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2910,
+              "observedPixel": [
+                809,
+                165
+              ],
+              "predictedYPx": 177.66727702831685,
+              "residualYPx": 12.667277028316846,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2940,
+              "observedPixel": [
+                782,
+                332
+              ],
+              "predictedYPx": 327.03262411303774,
+              "residualYPx": -4.967375886962259,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2970,
+              "observedPixel": [
+                809,
+                162
+              ],
+              "predictedYPx": 167.11823769223236,
+              "residualYPx": 5.118237692232356,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2625,
+              "observedPixel": [
+                778,
+                283
+              ],
+              "predictedYPx": 256.7548645129376,
+              "residualYPx": -26.245135487062385,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2719,
+              "observedPixel": [
+                779,
+                225
+              ],
+              "predictedYPx": 242.21649152585732,
+              "residualYPx": 17.21649152585732,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2813,
+              "observedPixel": [
+                781,
+                266
+              ],
+              "predictedYPx": 242.83565796835575,
+              "residualYPx": -23.164342031644253,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2932,
+              "observedPixel": [
+                779,
+                311
+              ],
+              "predictedYPx": 289.42310334556623,
+              "residualYPx": -21.576896654433767,
+              "uncertaintyPx": 6
+            }
+          ]
+        },
+        "nearest1PhysicalJoint": {
+          "fitExposures": [
+            2541,
+            2973
+          ],
+          "checkCount": 17,
+          "absoluteResidualPx": {
+            "median": 6.284475387131238,
+            "p95": 8.162576537822632,
+            "max": 9.305466325401312
+          },
+          "rows": [
+            {
+              "frameIndex": 2565,
+              "observedPixel": [
+                1449.622802734375,
+                717.7242431640625
+              ],
+              "predictedYPx": 716.3666809089003,
+              "residualYPx": -1.357562255162179,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2589,
+              "observedPixel": [
+                1449.1380615234375,
+                721.0753173828125
+              ],
+              "predictedYPx": 718.2090519591378,
+              "residualYPx": -2.8662654236746903,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2613,
+              "observedPixel": [
+                1448.5887451171875,
+                725.742431640625
+              ],
+              "predictedYPx": 721.319861106363,
+              "residualYPx": -4.422570534262036,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2637,
+              "observedPixel": [
+                1447.85205078125,
+                731.4863891601562
+              ],
+              "predictedYPx": 725.4317508755029,
+              "residualYPx": -6.054638284653379,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2661,
+              "observedPixel": [
+                1446.9412841796875,
+                737.6986083984375
+              ],
+              "predictedYPx": 731.4141330113063,
+              "residualYPx": -6.284475387131238,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2685,
+              "observedPixel": [
+                1445.975830078125,
+                744.6396484375
+              ],
+              "predictedYPx": 737.3839088268807,
+              "residualYPx": -7.255739610619344,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2709,
+              "observedPixel": [
+                1444.9676513671875,
+                752.9229125976562
+              ],
+              "predictedYPx": 745.2680403842735,
+              "residualYPx": -7.65487221338276,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2733,
+              "observedPixel": [
+                1443.6478271484375,
+                762.38671875
+              ],
+              "predictedYPx": 753.0812524245987,
+              "residualYPx": -9.305466325401312,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2757,
+              "observedPixel": [
+                1442.6177978515625,
+                770.934814453125
+              ],
+              "predictedYPx": 763.057960362197,
+              "residualYPx": -7.876854090927964,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2781,
+              "observedPixel": [
+                1441.4144287109375,
+                779.7056884765625
+              ],
+              "predictedYPx": 772.8678223188365,
+              "residualYPx": -6.837866157726012,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2805,
+              "observedPixel": [
+                1440.618896484375,
+                790.3829956054688
+              ],
+              "predictedYPx": 782.666449115926,
+              "residualYPx": -7.716546489542793,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2829,
+              "observedPixel": [
+                1439.821044921875,
+                800.9380493164062
+              ],
+              "predictedYPx": 793.4749546985323,
+              "residualYPx": -7.463094617873935,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2853,
+              "observedPixel": [
+                1438.9510498046875,
+                812.7362060546875
+              ],
+              "predictedYPx": 805.520716795204,
+              "residualYPx": -7.215489259483547,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2877,
+              "observedPixel": [
+                1438.4503173828125,
+                822.6113891601562
+              ],
+              "predictedYPx": 817.6417667080208,
+              "residualYPx": -4.969622452135468,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2901,
+              "observedPixel": [
+                1437.8543701171875,
+                831.966064453125
+              ],
+              "predictedYPx": 829.1374482751341,
+              "residualYPx": -2.8286161779908525,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2925,
+              "observedPixel": [
+                1437.1376953125,
+                842.333984375
+              ],
+              "predictedYPx": 839.5547673795343,
+              "residualYPx": -2.779216995465731,
+              "uncertaintyPx": 6
+            },
+            {
+              "frameIndex": 2949,
+              "observedPixel": [
+                1437.017578125,
+                851.07470703125
+              ],
+              "predictedYPx": 849.9931790937735,
+              "residualYPx": -1.0815279374764941,
+              "uncertaintyPx": 6
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "sourceMotionQuality": "rough-measured-source-timed-candidate; conditional pixel gauges do not qualify every individual6px localization bound",
+  "bankMeasurement": {
+    "unsignedCrankAdvanceTurns": 28.74462074883058,
+    "averageUnsignedCrankTurnsPerVideoSecond": 1.5592346521621676,
+    "halfSweepUnsignedCrankTurnsPerVideoSecondRange": [
+      1.2960012960012908,
+      1.8443095366172242
+    ],
+    "chosenWithinSweepCrankTurnsPerVideoSecondRange": [
+      0.9991374311815759,
+      2.356233626654333
+    ],
+    "withinSweepFits": [
+      {
+        "halfSweep": 0,
+        "shapeRad": -0.3009534155980646,
+        "fitCount": 21
+      },
+      {
+        "halfSweep": 1,
+        "shapeRad": 0.06132169124521467,
+        "fitCount": 29
+      },
+      {
+        "halfSweep": 2,
+        "shapeRad": 0.024886660146112585,
+        "fitCount": 30
+      },
+      {
+        "halfSweep": 3,
+        "shapeRad": 0.280238059466131,
+        "fitCount": 31
+      },
+      {
+        "halfSweep": 4,
+        "shapeRad": 0.027742425370715723,
+        "fitCount": 30
+      },
+      {
+        "halfSweep": 5,
+        "shapeRad": 0.29198523460511405,
+        "fitCount": 32
+      },
+      {
+        "halfSweep": 6,
+        "shapeRad": 0.3077597291922106,
+        "fitCount": 29
+      },
+      {
+        "halfSweep": 7,
+        "shapeRad": 0.16913885520862468,
+        "fitCount": 29
+      },
+      {
+        "halfSweep": 8,
+        "shapeRad": -0.04625018282468132,
+        "fitCount": 29
+      },
+      {
+        "halfSweep": 9,
+        "shapeRad": 0.33452776365649745,
+        "fitCount": 29
+      },
+      {
+        "halfSweep": 10,
+        "shapeRad": 0.16261893223401566,
+        "fitCount": 25
+      },
+      {
+        "halfSweep": 11,
+        "shapeRad": 0.25643846042109947,
+        "fitCount": 31
+      },
+      {
+        "halfSweep": 12,
+        "shapeRad": 0.32744515195321094,
+        "fitCount": 25
+      },
+      {
+        "halfSweep": 13,
+        "shapeRad": 0.28854269880437416,
+        "fitCount": 27
+      },
+      {
+        "halfSweep": 14,
+        "shapeRad": null,
+        "fitCount": 12,
+        "scope": "endpoint-limited partial source sweep"
+      }
+    ],
+    "sourceHigh20Extrema": [
+      {
+        "frameIndex": 2578,
+        "timeSeconds": 107.52408333333334,
+        "kind": "lower",
+        "unsignedPhaseRad": 3.141592653589793
+      },
+      {
+        "frameIndex": 2608,
+        "timeSeconds": 108.77533333333334,
+        "kind": "upper",
+        "unsignedPhaseRad": 6.283185307179586
+      },
+      {
+        "frameIndex": 2641,
+        "timeSeconds": 110.15170833333333,
+        "kind": "lower",
+        "unsignedPhaseRad": 9.42477796076938
+      },
+      {
+        "frameIndex": 2673,
+        "timeSeconds": 111.486375,
+        "kind": "upper",
+        "unsignedPhaseRad": 12.566370614359172
+      },
+      {
+        "frameIndex": 2704,
+        "timeSeconds": 112.77933333333333,
+        "kind": "lower",
+        "unsignedPhaseRad": 15.707963267948966
+      },
+      {
+        "frameIndex": 2738,
+        "timeSeconds": 114.19741666666667,
+        "kind": "upper",
+        "unsignedPhaseRad": 18.84955592153876
+      },
+      {
+        "frameIndex": 2768,
+        "timeSeconds": 115.44866666666667,
+        "kind": "lower",
+        "unsignedPhaseRad": 21.991148575128552
+      },
+      {
+        "frameIndex": 2798,
+        "timeSeconds": 116.69991666666667,
+        "kind": "upper",
+        "unsignedPhaseRad": 25.132741228718345
+      },
+      {
+        "frameIndex": 2829,
+        "timeSeconds": 117.992875,
+        "kind": "lower",
+        "unsignedPhaseRad": 28.274333882308138
+      },
+      {
+        "frameIndex": 2859,
+        "timeSeconds": 119.244125,
+        "kind": "upper",
+        "unsignedPhaseRad": 31.41592653589793
+      },
+      {
+        "frameIndex": 2885,
+        "timeSeconds": 120.32854166666667,
+        "kind": "lower",
+        "unsignedPhaseRad": 34.55751918948772
+      },
+      {
+        "frameIndex": 2917,
+        "timeSeconds": 121.66320833333333,
+        "kind": "upper",
+        "unsignedPhaseRad": 37.69911184307752
+      },
+      {
+        "frameIndex": 2944,
+        "timeSeconds": 122.78933333333333,
+        "kind": "lower",
+        "unsignedPhaseRad": 40.840704496667314
+      },
+      {
+        "frameIndex": 2972,
+        "timeSeconds": 123.95716666666667,
+        "kind": "upper",
+        "unsignedPhaseRad": 43.982297150257104
+      }
+    ],
+    "annotationFITCount": 409,
+    "physicalCHECKHoldout": {
+      "far20Metal": "exposure-disjoint-from-annotation-FIT",
+      "nearest1PhysicalJoint": "feature-pixel-held-out-at-annotation-FIT-exposures"
+    },
+    "cadenceRule": "Actually observed H20 upper/lower extrema establish cumulative half-sweep branch (2crank-equivalent turns each). Dense source annotation FIT Y chooses one bounded smooth within-sweep phase shape; positive angular derivative is declared single-sense continuation, not measured exact speed at unobservable extrema. Far-H20 physical-metal CHECK exposures never fit cadence. H1 cross-feature CHECK pixels stay out of cadence and pixel-gauge objectives, but their exposure times overlap annotation FIT. Final partial sweep is endpoint-limited. Linear interpolation of cumulative crankTurns between native-source keys; no modulo, wall-clock clock or manual control.",
+    "phaseAssociation": "All20stations use native upper-extreme phase at f2541 as explicitly source-informed/chosen initial alignment; measured H20 temporal drive then feeds exact physical harmonics20..1. H1 feature-pixel-held-out physical controls diagnose this choice."
+  },
+  "lowerCrank": {
+    "intervalSeconds": [
+      270.35341666666665,
+      271.22929166666665
+    ],
+    "binding": "ha-harmonic-analyzer/dt-drive-train/dt-crank-arm-1 grouped crank with crankshaft-1; not upper paper/feed shaft",
+    "direction": 1,
+    "directionAuthority": "CAD\u2212Z/front; source-right=CAD\u2212X, observed clockwise image rotation corresponds +native globalZ crank",
+    "crankTurnsPerVideoSecond": 2.2650453989279002,
+    "referenceSeconds": 270.35341666666665,
+    "crankTurnsAtReferenceModuloOne": 0.5035648736920837,
+    "integerHomeAuthority": "Unobserved full-turn integer gauge; only actual arm orientation modulo1turn is observed.",
+    "independentControlCount": 7,
+    "independentAngularResidualRad": {
+      "median": 0.3095166666053615,
+      "p95": 0.4235744704146526,
+      "max": 0.4372109487516518
+    },
+    "phaseMatchQualified": false,
+    "phaseQuality": "rough source-ray/constant-rate fit only; independent max angular residual is reported, not hidden or promoted to close crank phase match",
+    "fitCount": 7,
+    "phaseLaw": "crankTurns=crankTurnsAtReferenceModuloOne+(time-referenceSeconds)*crankTurnsPerVideoSecond; native released crank-arm home is screen-down in this CAD\u2212Z source view.",
+    "bankTransferPermitted": false
+  },
+  "limitations": [
+    "Bank crank rotation itself is out of frame: + and \u2212 physical drive alternatives are retained; source lower-crank sign/cadence cannot transfer across editorial cuts.",
+    "All20amplitude-bar foot settings are unobserved in the rocker-bank crop. Preserve complete old feasible all-zero baseline as chosen hidden input, not source coefficient recovery. Rocker motion itself is independent of foot amplitudes.",
+    "Only station20 cadence and station1 physical relative motion have numeric controls. Stations2..19 phase alignment is a source-informed chosen prior, not20independently recovered historical phases.",
+    "No source pixel qualifies native camera/geometry/rendering. No historical source-sealed pose/world/code witness is rewritten."
+  ],
+  "acceptance": {
+    "sourceTimedAutomaticCandidate": true,
+    "signedBankDriveRecovered": false,
+    "twentyHistoricalPhasesRecovered": false,
+    "amplitudeSettingsRecovered": false,
+    "nativeCameraGeometryOrGpuAccepted": false,
+    "historicalWitnessesRewritten": false
+  }
+}

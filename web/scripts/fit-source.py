@@ -2,7 +2,7 @@
 """Fit genuinely observed source pixels to CAD landmarks; never use check pixels to fit.
 
 Requires numpy, scipy, opencv-python-headless (source-fit-requirements.txt).
-Example: python web/scripts/fit-source.py web/content/XPQwKRt4Y2k.observations.json
+Example: python web/scripts/fit-source.py web/content/canonical-native/XPQwKRt4Y2k.observations.json
   --inventory /tmp/harmonic-web-model/model-inventory.json --output /tmp/spin-fitted.json
 The inventory supplies named part-local-to-world matrices. Output is numeric data only.
 Exit 0 means measured CPU candidates pass, NOT GPU/source acceptance or video coverage.
@@ -1651,8 +1651,11 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
+    observations = json.loads(args.observations.read_text())
+    if observations.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
+        parser.error("--observations must select a materialized canonical-native derivative, not archived original evidence")
     fitted, report = run(
-        json.loads(args.observations.read_text()),
+        observations,
         json.loads(args.inventory.read_text()),
     )
     if args.output:

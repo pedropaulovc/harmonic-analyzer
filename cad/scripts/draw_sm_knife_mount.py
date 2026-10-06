@@ -201,6 +201,7 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
+        spec=SPEC,
         pdf_title="Knife-Mount Bearing Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

@@ -1,0 +1,550 @@
+{
+  "schemaVersion": 1,
+  "kind": "canonical-native-evidence-derivative-manifest",
+  "mappingSchemaVersion": 2,
+  "mappingSha256": "34fd295a40af2718260c1c898bf4a329ee0255398004c0aa384ac69391a95d4f",
+  "originalSourceCommit": "bfde892a5",
+  "geometryQualification": "Unchanged historical geometry/source observations. Native namespace translation does not requalify current CAD/renderer or source-camera correspondence.",
+  "derivatives": [
+    {
+      "path": "web/content/canonical-native/4mBuyixt22U.observations.json",
+      "sha256": "4a3efa66e01d90221602cc6aa748b45ea3608be3849a420f292769166e26558b",
+      "originalPath": "web/content/4mBuyixt22U.observations.json",
+      "originalSha256": "9ec73bdc70407eeecc63390789b3f7b8549c757c6ea887738dac40b1f532c8ba",
+      "originalNumericLexemeSha256": "6f2c3e94c200e544dfb9d624b26a46eba02c1acf3fbdfffea949ef4cec8101e0",
+      "archivedNativeBindings": [
+        "harmonic-analyzer/drive-train/cone-tip-bushing-1",
+        "harmonic-analyzer/drive-train/cone-tip-shim-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-2",
+        "harmonic-analyzer/paper-drive/bracket-screw-3",
+        "harmonic-analyzer/paper-drive/transgear-bracket-1",
+        "harmonic-analyzer/paper-drive/transgear-latch-1",
+        "harmonic-analyzer/paper-drive/transgear-pinion-1",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304_1"
+      ]
+    },
+    {
+      "path": "web/content/canonical-native/4mBuyixt22U.source-seeds.json",
+      "sha256": "adb52ee990993c341d5643c4daaa495bf5888bc7e91ef17e26f745d2de24895e",
+      "originalPath": "web/content/4mBuyixt22U.source-seeds.json",
+      "originalSha256": "afc7ba567c3e2d15cfea686303f468bf9db2f5069abc97961d3e1ef69c598536",
+      "originalNumericLexemeSha256": "7144d48c77ae22d7f321b605a6a88b25f359bb328b190d01d885c3f53d312bcd",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.automatic-motion.json",
+      "sha256": "42dab6d69342dc33d6d35f3db69edb0a1dc017cf82d7b4293203bced0fa5a5b3",
+      "originalPath": "web/content/6dW6VYXp9HM.automatic-motion.json",
+      "originalSha256": "37e00fb2569363dedf22d99cdc54229138990934497239d8b7201b97da2f0cc8",
+      "originalNumericLexemeSha256": "5206ab9aa33b5d4c513541a32786709e70e1631b78fcd3074527eacb15b793c7",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.chosen-camera-continuity.json",
+      "sha256": "16dfaf71ab786f36f9d57edb2a7528e4c7a96f7e969c830a8f4fbe8f3925fb91",
+      "originalPath": "web/content/6dW6VYXp9HM.chosen-camera-continuity.json",
+      "originalSha256": "a7bc2002dc543a61f27a8170454880af24d22e94a8d3dac296db30c5b5e7d262",
+      "originalNumericLexemeSha256": "6b658384eb480f535a2453fe15cc56ea92f5a77c26bb5501afb5fc2850d6a2be",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.motion-controls.json",
+      "sha256": "28c5ecf8a2fb0037c218466ad5d8c69f3a8ef9a247fe2fcff9d4a6ef10c20f22",
+      "originalPath": "web/content/6dW6VYXp9HM.motion-controls.json",
+      "originalSha256": "208d4a18a5c152805015e48b8be227a1825c1c03497c0e9370be109d6ca4daab",
+      "originalNumericLexemeSha256": "5653ab09e4f9f553eba0c9920d4449b5016ea9b8e85944e128274656eda91262",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.observations.json",
+      "sha256": "d4f9d2e93c5a48ef0bae03b7e8439a0f6686b66a480f9c00b25898a2ca45cd2b",
+      "originalPath": "web/content/6dW6VYXp9HM.observations.json",
+      "originalSha256": "fa69d6cab6173baa7061e825e51651a8fc56bbbc66b6543c4510cd7851d64e36",
+      "originalNumericLexemeSha256": "ed25ccd72673dd971656ebc2fb1e6265f65c11d945444c84c3ab5b54b93b3cd8",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json",
+      "sha256": "6557b6b9421b20ae2c8e050572f1d9df49f45345d15b238b19e3bb7ae88c68f9",
+      "originalPath": "web/content/6dW6VYXp9HM.visible-crank-gauge.json",
+      "originalSha256": "6e58a2b704f81c211c31eb45a0c429521de114338e5e4c349ef74f9b509a973e",
+      "originalNumericLexemeSha256": "dbb3dda90125952bb6c675264c584cd801de5dba6d23c247b7e777e9c1f5b021",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json",
+      "sha256": "97a1dfb9059ede15c43e80f48450628f1186f0079012fed608383557bde889ca",
+      "originalPath": "web/content/6dW6VYXp9HM.visible-crank-motion.json",
+      "originalSha256": "0433129092cb167a69d29b3a9712b81f5cb70701d173c97323c6045e33b827ba",
+      "originalNumericLexemeSha256": "952dd972f3427045493492cd77160fa5d2429f83d794a0b65b92147b02f74fa6",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json",
+      "sha256": "3b720ddebc9a2e8ed0e1bf5a2df39e4007a1c5d41c72adf9f91de23623a888dd",
+      "originalPath": "web/content/8KmVDxkia_w.automatic-motion-evidence.json",
+      "originalSha256": "7a193758b02166ad02604274cd08b89135b2941f54301312d242efcc508e8233",
+      "originalNumericLexemeSha256": "ad4e6a5f572203c92863d2e9604542d019ed9ff2c43351e44396e8a31370f3b8",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.automatic-motion.json",
+      "sha256": "307cb8395c2a83b8b7561381aef83a8ef80f4ec3e8b9e9b0087857dc5b1b8a11",
+      "originalPath": "web/content/8KmVDxkia_w.automatic-motion.json",
+      "originalSha256": "68b33f73055a49bbdbfad4e86d4f59ccc45e39b93be0b5b7fa71f3ec490dae3b",
+      "originalNumericLexemeSha256": "34366ff76c1efc900281740bc3a9f7d110c0cf47a55e0869de3a7ee83b61eec6",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json",
+      "sha256": "1e2bb491699b30d37c0ac3d3b8fce5b4f9720fb368acf2f58245d584160d1b3a",
+      "originalPath": "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json",
+      "originalSha256": "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321",
+      "originalNumericLexemeSha256": "b6cf3243d859e17c7f69f1b8dfd0419f73482230eb1d26cdf4f1c24f5983174c",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json",
+      "sha256": "5ea03969980912f4c220abcc2daa14e6c08b8900b95d90db7174a1b9a0a3b83c",
+      "originalPath": "web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json",
+      "originalSha256": "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc",
+      "originalNumericLexemeSha256": "e93f2d1d4d3dafd18c1fa8036ec9c4f4747ccced3b1673a349d4c132e1ba1775",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.chosen-camera-continuity.json",
+      "sha256": "80890f737bc709b5fc5b178194a49bf907f7530605484b4a9792ed0626ebd194",
+      "originalPath": "web/content/8KmVDxkia_w.chosen-camera-continuity.json",
+      "originalSha256": "f8fccbaa293558fc3a91b88bb614c6e1779937fd8a52364f2ec6ad9d958afd31",
+      "originalNumericLexemeSha256": "ab39324e7f97786827b9dd2ba598d8285710e06d7ecd5f5ce493d1c7afab7856",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json",
+      "sha256": "b82d48c6d175056ece6dd214cc543877754e8aa0045f4b9b36acfa496762086e",
+      "originalPath": "web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json",
+      "originalSha256": "239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173",
+      "originalNumericLexemeSha256": "04ef40145c0f6cca49b050d7ecdc2ebc89b438a19a7f132c06ac0ea919fe40ce",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.observations.json",
+      "sha256": "a6286b7a4b75455adc8b8ac9aa9f6b3dbdd2e66239fa6c4e19cfd2a3973f0e02",
+      "originalPath": "web/content/8KmVDxkia_w.observations.json",
+      "originalSha256": "3ac8e4df14487799637091859bdad58cc88a96c28a90c22ba1893772b5ee0f05",
+      "originalNumericLexemeSha256": "7698c9cad963ac84ed885467036af3084d1356865e4225778b9943f05fc7e5c4",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.track.json",
+      "sha256": "fba64f193caa4f6b35717a22787dc94af56cd52152ff37e31e07f1e675ab6bf9",
+      "originalPath": "web/content/8KmVDxkia_w.track.json",
+      "originalSha256": "2c1e2828471d3eded27c635a1280810f92e4cad6220dd732912f673ee78b4441",
+      "originalNumericLexemeSha256": "97a2674a69dad20a98e0d77a070d223bfcb6b739507adfae250f100d22a7e53a",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/NAsM30MAHLg.observations.json",
+      "sha256": "ce4edb31adafaa8de4ee89994a24580fd84717f24497ffe419b956697cc1163f",
+      "originalPath": "web/content/NAsM30MAHLg.observations.json",
+      "originalSha256": "d5955bf34a9e006325e7902049cd842e20f2eb178c25954ffaff75ee8f0e7513",
+      "originalNumericLexemeSha256": "75976a03282b535f16e973bd123c4046e1c9110aebb476e9951520f1ab2d3d1a",
+      "archivedNativeBindings": [
+        "harmonic-analyzer/drive-train/cone-tip-bushing-1",
+        "harmonic-analyzer/drive-train/cone-tip-shim-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-2",
+        "harmonic-analyzer/paper-drive/bracket-screw-3",
+        "harmonic-analyzer/paper-drive/transgear-bracket-1",
+        "harmonic-analyzer/paper-drive/transgear-latch-1",
+        "harmonic-analyzer/paper-drive/transgear-pinion-1",
+        "harmonic-analyzer/paper-drive/transgear-stub-1",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304_1"
+      ]
+    },
+    {
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.observations.json",
+      "sha256": "7c0322b8b0e22a84119a2dd436877b1c86c682941c8f8063373fcd37f50b68ec",
+      "originalPath": "web/content/XPQwKRt4Y2k.observations.json",
+      "originalSha256": "03cc4f030e820faf185251cd30d1c33d3413cbc6a690b1f96c6f2d4596406a5d",
+      "originalNumericLexemeSha256": "10d90d753dc41d855823cc57804fffea86bcb4beff6f6e21f413df4c9af1fb84",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.source-phase-map.json",
+      "sha256": "8856c6951219263b86092c629d0911ed1cd1d5a020b007b2ec2e9757590a53cc",
+      "originalPath": "web/content/XPQwKRt4Y2k.source-phase-map.json",
+      "originalSha256": "1726d46537adcb7437399192d5b8ba4f3ee0b1b67bb48a3c42b35759e5838cb1",
+      "originalNumericLexemeSha256": "9940761f7ffd9bc472e7a6ada1885c6acbc072d89f146ec5cf09888bfe70774d",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.source-seeds.json",
+      "sha256": "ea8015f6fe57fafd7118b73d39a9a2bb973f8ef64078cf17af0850f1b6aa695e",
+      "originalPath": "web/content/XPQwKRt4Y2k.source-seeds.json",
+      "originalSha256": "bffbfa78d70c5a3c3cf6758eaf26bd1ee23e5b227adcf3f8d8c42060fc3c7af7",
+      "originalNumericLexemeSha256": "ab97deee19351cb2d998e296f08c46720505b933ad6125af106cd9071a50bc20",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.track.json",
+      "sha256": "c25db2d59525494926d4596515327021a862f7e0a5e2d66fe002b32ae3649ed4",
+      "originalPath": "web/content/XPQwKRt4Y2k.track.json",
+      "originalSha256": "6761948c9f2ffb156ce3575dd8143590da45ff455cf6650764953f977c45fc3a",
+      "originalNumericLexemeSha256": "6a7fe0a8b8ecc7ae95c84c8eca5cba030dec996c56ec3fe0f6e04977cdf7312e",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/augmented-face-frozen-check/augmented-frozen-report.json",
+      "sha256": "6061d2ab361dcc0c2c91e4496c797bf472cf2041ca5d47e23a772953c39c6d54",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/augmented-face-frozen-check/augmented-frozen-report.json",
+      "originalSha256": "1a359667f6f65c89b8e6f1aa2857f7882fa43b51276dbb218fe31787b7672296",
+      "originalNumericLexemeSha256": "182a5b3ac8abc7d5f6f29c87dca8469d9c35c4b7c0a5bfa093a046a99d3d1d80",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/augmented-face-frozen-check/interior-cap-check-ledger.json",
+      "sha256": "a3787e24e99ec7bbbafebe8387666ce39a2ca792dccf73ddbd17433c85041f84",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/augmented-face-frozen-check/interior-cap-check-ledger.json",
+      "originalSha256": "0ffc002e73d43b56b0da45cae9640d812688b643f40783f2673b60ec08ed0a44",
+      "originalNumericLexemeSha256": "86f8aeca66fe439471b146b95da6045faf9ba3f52745035bc2a7a574c88095e6",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/fit-centres204.json",
+      "sha256": "be867220ded502ae4e327cba2e9ed8d24d6eb1ff70b0e9685e04773cee2e1fa2",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/fit-centres204.json",
+      "originalSha256": "bb34d8e681cadd54993d6014643ffa79005cb0e7cca66b0f275f35e4efb4cec9",
+      "originalNumericLexemeSha256": "bc00f06825ce89dec107aff5355da5581c2c66e41f1bf58123c462b087effa53",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/four-seed-source-fit-census/all204-cpu-forward-request.json",
+      "sha256": "76eceeff69e50087fb6112c35d897c8bd3a9f05fe416075bae03186321d8e01e",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/four-seed-source-fit-census/all204-cpu-forward-request.json",
+      "originalSha256": "915a19bea975c579180dea344588211d1ce41727afcc221fddd080732cb2a5ff",
+      "originalNumericLexemeSha256": "4d3cd8754204496c5b200715293831919b27860090e11c4b66a8502ac89f8247",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/four-seed-source-fit-census/candidate.json",
+      "sha256": "2588dc828783fd39e48fb64bfe921470c31e0e67378101d76c0283a134a9dc9a",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/four-seed-source-fit-census/candidate.json",
+      "originalSha256": "d31f43dad05a538536de25e75fd95b07ea31adbf97946b9d6bbb4c5ef440a034",
+      "originalNumericLexemeSha256": "985ef9389ff3f8e179c9b871175dccefb36aef7a146a66f49ccd3aa4443d93d8",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-synthesis.frozen-generation-evidence.json",
+      "sha256": "ea52b562bfacc3aaccaaf3e9e5b249ed6e5e943dce3116867b25d5d567079e84",
+      "originalPath": "web/content/analysis-synthesis.frozen-generation-evidence.json",
+      "originalSha256": "425beca33506fcb307c3892808b7871a8ee2f06b7aa90f7103fc6993e6319267",
+      "originalNumericLexemeSha256": "62037ee2bd113d2aadffecad177688815a90ea531cf6722e6ad706d1963d24b6",
+      "archivedNativeBindings": [
+        "harmonic-analyzer/drive-train/cone-tip-bushing-1",
+        "harmonic-analyzer/drive-train/cone-tip-shim-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-2",
+        "harmonic-analyzer/paper-drive/bracket-screw-3",
+        "harmonic-analyzer/paper-drive/transgear-bracket-1",
+        "harmonic-analyzer/paper-drive/transgear-latch-1",
+        "harmonic-analyzer/paper-drive/transgear-pinion-1",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304_1"
+      ]
+    },
+    {
+      "path": "web/content/canonical-native/jfH-NbsmvD4.observations.json",
+      "sha256": "b8167b0989a33c11b354748cd299b376045d577f25308ac545bb64e4f70111e9",
+      "originalPath": "web/content/jfH-NbsmvD4.observations.json",
+      "originalSha256": "b45849dd41648dfa0c0a15f7bbce20a5042707bd609e2913304057518e366117",
+      "originalNumericLexemeSha256": "83acff5ab7c67d8ec11755ed972f8d8fce8eb13d9344a93a516efc8549acccc5",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/jfH-NbsmvD4.source-seeds.json",
+      "sha256": "6d6b87be5075f2a0ca3d0501cf03a34640e1f240e57711e888a8c16c36405b1b",
+      "originalPath": "web/content/jfH-NbsmvD4.source-seeds.json",
+      "originalSha256": "5353f7cd2d8ff06a01332c14fc9056c46e3afea487083d2d606ce2e3e7fb4eaf",
+      "originalNumericLexemeSha256": "b31c7f84a6d481e0915476076b0965e10ae387f02460b82e9c4bda95f5bc98a0",
+      "archivedNativeBindings": []
+    }
+  ],
+  "historicalCodeSnapshots": [
+    {
+      "path": "web/content/canonical-native/historical-code/0025485bd0106f33508be0945502644b59cec6a6268abbe3e4060ea11dd91709/6dW6VYXp9HM-extract-automatic-motion.py",
+      "sha256": "0025485bd0106f33508be0945502644b59cec6a6268abbe3e4060ea11dd91709",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/4a7467b622c6191ee0a2c0bf5c53ca2c721b86f1c831617bea433a0c803b46b8/generate-8KmVDxkia_w-automatic-motion.py",
+      "sha256": "4a7467b622c6191ee0a2c0bf5c53ca2c721b86f1c831617bea433a0c803b46b8",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/731ae554aee8b77b7643073d4107f59a04ea530ad41612ec8de00316aaec183c/mechanics.ts",
+      "sha256": "731ae554aee8b77b7643073d4107f59a04ea530ad41612ec8de00316aaec183c",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b/scene.ts",
+      "sha256": "7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/8351d8e92dd3f050786a27ccedb569d8be390279f5a1a4a169f1395fe3578712/6dW6VYXp9HM-visible-crank-extract.py",
+      "sha256": "8351d8e92dd3f050786a27ccedb569d8be390279f5a1a4a169f1395fe3578712",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/8bb5ffa3046609f9b3afa69dc72e37297e86c6a1d15fd1bdaf21b70b47ea561f/kinematics.ts",
+      "sha256": "8bb5ffa3046609f9b3afa69dc72e37297e86c6a1d15fd1bdaf21b70b47ea561f",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/935abfe377c6acf3dbab380270e97567b7000b4947fcd82cd2e4684d7aa46015/magnifier.ts",
+      "sha256": "935abfe377c6acf3dbab380270e97567b7000b4947fcd82cd2e4684d7aa46015",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/c9e03db0df4dd3640a954fa572478241315206c0d179f28dd2a1395701805288/bindings.ts",
+      "sha256": "c9e03db0df4dd3640a954fa572478241315206c0d179f28dd2a1395701805288",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/e8fe87dfd899b6ea08ea7f7ce133e633fbf871ca7c24aed3885f6f507ef78285/mechanics-data.ts",
+      "sha256": "e8fe87dfd899b6ea08ea7f7ce133e633fbf871ca7c24aed3885f6f507ef78285",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    }
+  ],
+  "canonicalConsumerInputs": [
+    {
+      "path": "web/scripts/6dW6VYXp9HM-extract-automatic-motion.py",
+      "sha256": "3592e31fa21bdcbb6e950c1b5c426151038dc7f36935148cbb291df649cc9089",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/6dW6VYXp9HM-visible-crank-extract.py",
+      "sha256": "afa4fdf1f5c3c96208fae5ab77da47019976d3099b46212906652f1e300e8256",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/6dW6VYXp9HM-visible-crank-gauge.py",
+      "sha256": "78d1913a3580aac8c137254f9bfdb7ff4c186b1658ec333bba20e96152a6df2f",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/compact-operation-rocker.py",
+      "sha256": "3160a5aa4cb1414e47622551cb17450fe426b84b56678ba5250d2c52d07a661e",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/compact-source-common.py",
+      "sha256": "e1d9740905fa42b8458cdaca8f8dce0ea6ca81771eb55c1fcf41989a0d50cd7a",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/compact-spin.py",
+      "sha256": "8f445761f6c84af583b88c877a85c5b9fda7e868f5c895f70f12ebee9f9f7f76",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/export-magnifier.py",
+      "sha256": "a61fd765d74aae9c63020ee9f3f7b0129b1d2239a4a73cac047ed8cebb0121e4",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/export-mechanics.py",
+      "sha256": "53c3419ab9418c6506338097448297448eecf8c023514eb161ffd351d924cf03",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/fetch-model.mjs",
+      "sha256": "f41a7ea8419874694b688bc0d0f5e0ff492f32884411f7de844a40ade556f137",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/fetch-model.test.mjs",
+      "sha256": "599ed3c8163c56ff79ef419e30a4abf719df0aeffa8478e2d9eb8da3096e3fea",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/fit-source.py",
+      "sha256": "60b2c6743773cfb3dd2a673f4909b6a907da3a2e5027bb5a2f0069642fb73f44",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-8KmVDxkia_w-automatic-motion.py",
+      "sha256": "c5e61927f6826ffd5a1f803c2df5a53f790a0e0b80313d67356e09d47ba4fa38",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-analysis-bank-source-controls.py",
+      "sha256": "b887009b4a19fe2104bd04b46c30c3bb7ae5e518f80b242ad5f017db8f534e59",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-analysis-synthesis-source-tracks.py",
+      "sha256": "8ac19edec0940f4fb0746827998006642fa88cc774f30a314ff784e8ef6d57f0",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-intro-source-track.py",
+      "sha256": "5f418f2b0b369696d8940d6fafd758283771155c4ab0c47abf2f34f80781f9ab",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-spin-source-controls.py",
+      "sha256": "87928c72a5537284365b7cd3ffe5c3c53e105aa4cefc498c28c53ed66769b8f4",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/model-loader.test.mjs",
+      "sha256": "847cd35c180e986357b88d1fa286852e3709976099858dc4fd96c8c3b08fee9f",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/model-representation.test.mjs",
+      "sha256": "fd15921060ca400338b133f77e4545e84a3a33a89130847756a7db85870d182e",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/NAsM30MAHLg-calibrate-static.py",
+      "sha256": "2c88ee6c19828990e14be2c8084ee25273dbf3ef4f1df89920ffc3590c62398b",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/native-math-compatibility.mjs",
+      "sha256": "6edac6cf9a86f1f2f409e832bc3b0ec13e9879cdabea53e2f879b4f97712a52a",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/observe-source.py",
+      "sha256": "4305971f598a1e3be0f47b3d891e2a6e555cb5f55f483ae12e705f084f80c070",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/optimize-model.mjs",
+      "sha256": "fbe852f1a6782bbb780159158a4b415a2796c9591021dcfd756582352eb4458e",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/optimize-model.test.mjs",
+      "sha256": "fee62f73bd2dfd23a330a22b4cb3ac29893ad7b2e8e4619b90efadf197910e0a",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/serve-verification.mjs",
+      "sha256": "4adff64c0a96e968cb504ad98a4c6e756f9f97e083a6493e5e632a7f41174c5f",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/source-track.test.mjs",
+      "sha256": "34d4bdd4df405b2ede855febf86341f67782b5173b557887fffad7f409af5534",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/test_source_generation.py",
+      "sha256": "3e9f3193b059960847e5eed5fe20b3e8c1a65dbfe94edf5e6d5c065d55784136",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/verify-reference.mjs",
+      "sha256": "ef231f250aa7f50d77b5512459e8a031e789ffbdde949d163a66e6ab902b8d12",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/verify-server.mjs",
+      "sha256": "ada8d989d0926574b10f997a40ec0a5db24f57843f4ebb9aea8c096a07c3210c",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/verify-sync.mjs",
+      "sha256": "8722b8b63330fe00b61731685eeacc8af9975c24d2aa8c5bb426befdcbf5e81f",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/verify-sync.test.mjs",
+      "sha256": "112955c0da4b9df5bdb175d4e46744b34de2964bcfcdf0447099ae4b52c65327",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/XPQwKRt4Y2k-mechanics.py",
+      "sha256": "15be85768b24cbdcb7859cc4f6cc6712395a97d735d2d89a1865ca56a3d5aea4",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/bindings.ts",
+      "sha256": "71cb42df534d525432b5b8748d1f0ed38338abddd5adae5e3eb62208a71ab8ee",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/image-plane-homography.ts",
+      "sha256": "efbb26e31c14be421367cdc3a26fce19be44cffbedb7d74ddab3c249e213298f",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/kinematics.ts",
+      "sha256": "f055c737deb0c553beaf5a093359532636cbf05472ca215f67a15d2d1b897b19",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/magnifier.ts",
+      "sha256": "6d03f76dfbb8f4c9a4b38c888b3b8438a4fb41e1f5b56702d9f2b88508274c9a",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/main.ts",
+      "sha256": "f9bb631b90e29d752ab3b931b537dfce2f1d4b9eb3e2f08f1f2ece10c0813df7",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/mechanics-data.ts",
+      "sha256": "d0a5182af6e47510db552c8f48f6529463a0f510480a1764535a95a14adee6f5",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/mechanics.ts",
+      "sha256": "de9548d8c8ad127b2956c22c3da70293cffbcfe825c273f46383be50097d4923",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/scene.ts",
+      "sha256": "1bcbf0359c2def383b161c875c64b932754cdafaad5e5934737eb69abf9696ed",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/source-player.ts",
+      "sha256": "38e3ce832428c0e8f485b5fad3be44d5b6ea046adcc6c3f1b3624aba7ae4a0d4",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/source-track.ts",
+      "sha256": "ed0d7f2176b4f9b85b74b96fa1b7bc6776c617530a72148a0cdd6bd2b7e7f80d",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/source-witness.ts",
+      "sha256": "0b6ee90573b987a0b50e6b686fe8189175ac5854aee4a65bf47c8163e6504c18",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/timeline.ts",
+      "sha256": "fa07bafd49c893d42d777a226a215a2a3a7138f8f2f0816251cf9254488e7485",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/video-catalog.ts",
+      "sha256": "9e083e5adff981f996658aab9aedd3773f3591c892b6bf2f3174c49db963c86e",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/youtube-player.ts",
+      "sha256": "85613f279cbb1a4783a73be815b0b7154867d38ba28a4e80351ffe3353e775a5",
+      "scope": "Current consumer code/data input hash only; not a claim of geometric or GPU/source verification."
+    }
+  ]
+}

@@ -28,7 +28,7 @@ import numpy as np
 WEB = Path(__file__).resolve().parents[1]
 VIDEO = WEB / '.vite/reference-root/videos/6dW6VYXp9HM.mp4'
 PRIVATE = WEB / '.vite/verification-output/6dW6VYXp9HM-visible-crank'
-OUTPUT = WEB / 'content/6dW6VYXp9HM.visible-crank-motion.json'
+OUTPUT = WEB / 'content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json'
 EXPECTED_SHA = '5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52'
 FIRST, LAST = 2392, 2598
 

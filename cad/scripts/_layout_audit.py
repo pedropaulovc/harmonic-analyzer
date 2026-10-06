@@ -607,17 +607,21 @@ def ink_key(text: str) -> str:
 
 @dataclass(frozen=True)
 class InkSpan:
-    """One PDF text object: what it says and its tight glyph box."""
+    """One PDF text object: what it says, its tight glyph box, and how many
+    printed rows its glyphs stand on (``_pdf_ink.Span.rows``; a dump from
+    before rows were recorded reads one)."""
 
     key: str
     box: Box
+    rows: int = 1
 
 
 def ink_spans(dump: Mapping[str, Any]) -> list[InkSpan]:
     spans = []
     for raw in (dump.get("ink") or {}).get("spans", ()):
-        text, *box = raw
-        spans.append(InkSpan(ink_key(str(text)), Box(*_floats(box)[:4])))
+        text, *rest = raw
+        values = _floats(rest)
+        spans.append(InkSpan(ink_key(str(text)), Box(*values[:4]), int(values[4]) if len(values) > 4 else 1))
     return spans
 
 
@@ -3652,17 +3656,24 @@ class TitleFieldFit:
     """One title-block identity value as the sheet printed it.
 
     ``printed`` is the glyph box of the one PDF text object that prints the
-    WHOLE value -- None when no single object does (blank, cut, or wrapped
-    onto a second line, which SolidWorks writes as a second text object).
-    ``clearance`` is that box's least distance inside the cell's rules,
-    negative where it crosses one, ``-inf`` when nothing printed it.
+    WHOLE value -- None when no single object does (blank, cut, or wrapped:
+    pdfium makes each text-showing operator its own object, so a second
+    line is a second object). ``rows`` is how many distinct glyph baselines
+    that object stands on (``_pdf_ink.Span.rows``). ``clearance`` is the
+    box's least distance inside the cell's rules, negative where it crosses
+    one, ``-inf`` when nothing printed it.
     """
 
     source: str
     text: str
     cell: Box
     printed: Box | None
+    rows: int
     clearance: float
+
+    @property
+    def fits(self) -> bool:
+        return self.printed is not None and self.rows == 1
 
 
 def title_field_fits(dump: Mapping[str, Any]) -> list[TitleFieldFit]:
@@ -3674,7 +3685,7 @@ def title_field_fits(dump: Mapping[str, Any]) -> list[TitleFieldFit]:
         text = str(field["text"])
         cell = Box(*_floats(field["cell"])[:4])
         key = ink_key(text)
-        printed, clearance = None, -math.inf
+        printed, rows, clearance = None, 0, -math.inf
         for span in spans:
             if not key or span.key != key:
                 continue
@@ -3683,8 +3694,8 @@ def title_field_fits(dump: Mapping[str, Any]) -> list[TitleFieldFit]:
             # The same string elsewhere on the sheet (a BOM row) is farther
             # outside the cell than the title block's own value.
             if inside > clearance:
-                printed, clearance = box, inside
-        fits.append(TitleFieldFit(str(field["source"]), text, cell, printed, clearance))
+                printed, rows, clearance = box, span.rows, inside
+        fits.append(TitleFieldFit(str(field["source"]), text, cell, printed, rows, clearance))
     return fits
 
 
@@ -3700,7 +3711,7 @@ def find_title_field_misfits(
     spans = ink_spans(dump)
     findings = []
     for fit in title_field_fits(dump):
-        if fit.printed is not None and fit.clearance >= clearance:
+        if fit.fits and fit.clearance >= clearance:
             continue
         if fit.printed is None:
             pieces = [span.key for span in spans if span.box.overlaps(fit.cell, tol=0.0) is not None]
@@ -3711,9 +3722,9 @@ def find_title_field_misfits(
             where = fit.cell
         else:
             detail = (
-                f"{fit.source} {fit.text!r} prints {fit.printed.format_mm()}, "
+                f"{fit.source} {fit.text!r} prints {fit.printed.format_mm()} on {fit.rows} row(s), "
                 f"{fit.clearance * MM:.2f} mm inside its cell {fit.cell.format_mm()} "
-                f"(needs {clearance * MM:.2f} mm)"
+                f"(needs one row and {clearance * MM:.2f} mm)"
             )
             where = fit.printed
         findings.append(
@@ -3724,7 +3735,11 @@ def find_title_field_misfits(
                 b="",
                 detail=detail,
                 at_mm=tuple(value * MM for value in where.center()),
-                extra={} if fit.printed is None else {"clearance_mm": round(fit.clearance * MM, 3)},
+                extra=(
+                    {"printed": False}
+                    if fit.printed is None
+                    else {"printed": True, "rows": fit.rows, "clearance_mm": round(fit.clearance * MM, 3)}
+                ),
             )
         )
     return findings

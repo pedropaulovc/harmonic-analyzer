@@ -540,21 +540,21 @@ DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE, TURNED_BAND_FITUP_NO
 # the check closes: Codex P2 on #1154, review 3).  Each cut answers its own
 # reading only (build_dt_drive_train_assembly.t120_fitup_cuts).  Either fit-up
 # limit passes the feeler at every corner (build_dt_drive_train_assembly asserts
-# it), so the check always closes.  Its last line is short: the step carries
-# on after it on the same line.
+# it), so the check always closes.  Its first line is short: it carries on
+# the step's seat sentence on the same line.  Its last line is short: the
+# step carries on after it on the same line.
 T120_FITUP_PUSHED = (PINION_NUMBER, "T120")
 # Named exception: MHA-DT-010 turned band (drawing-simplicity-policy.md, "Named exceptions").
 T120_FITUP_ASSEMBLY_CHECK = "\n".join(
     (
-        f"   WORST-CASE T120 CLEARANCE: TURNED BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
-        f"SHOULDER {T120_SHOULDER_AIR_WORST:.2f}. PUSH",
-        f"   {T120_FITUP_PUSHED[0]} AND {T120_FITUP_PUSHED[1]} TOWARD EACH OTHER; "
-        "TURN MHA-DT-007 SLOWLY BY HAND,",
-        f"   READING A {T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND. BAND TO T120 TIPS: "
-        "IF THE FEELER",
-        "   STOPS, TURN BAND DOWN, "
-        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN. SHOULDER TO T120 SOUTH FACE: IF",
-        "   THE FEELER STOPS, FACE SHOULDER BACK, "
-        f"{SHOULDER_LENGTH_FITUP_MIN:.{SHOULDER_LENGTH_PLACES}f} MIN. RESET, RECHECK.",
+        "WORST-CASE T120 CLEARANCE: TURNED BAND",
+        f"   {T120_TURNED_BAND_RADIAL_WORST:.2f}, SHOULDER {T120_SHOULDER_AIR_WORST:.2f}. "
+        f"PUSH {T120_FITUP_PUSHED[0]} AND {T120_FITUP_PUSHED[1]} TOWARD EACH OTHER;",
+        "   TURN MHA-DT-007 SLOWLY BY HAND, READING A "
+        f"{T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND.",
+        "   BAND TO T120 TIPS: IF THE FEELER STOPS, TURN BAND DOWN, "
+        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN.",
+        "   SHOULDER TO T120 SOUTH FACE: IF THE FEELER STOPS, FACE SHOULDER",
+        f"   BACK, {SHOULDER_LENGTH_FITUP_MIN:.{SHOULDER_LENGTH_PLACES}f} MIN. RESET, RECHECK.",
     )
 )

@@ -1,10 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Independent source observations in the original CAD frame",
+  "title": "Materialized canonical-native derivative of independent source observations",
   "type": "object",
-  "required": ["schemaVersion", "source", "model", "anchors", "shots", "frames", "coverage"],
+  "required": ["schemaVersion", "identityDerivative", "source", "model", "anchors", "shots", "frames", "coverage"],
   "properties": {
     "schemaVersion": {"const": 1},
+    "identityDerivative": {
+      "type": "object",
+      "required": ["kind", "originalSourceCommit", "originalPath", "originalSha256", "mappingSchemaVersion", "mappingSha256", "originalNumericLexemeSha256", "measurementPreservation", "archivedNativeBindings"],
+      "properties": {
+        "kind": {"const": "materialized-canonical-native-identity-derivative"},
+        "originalSourceCommit": {"type": "string", "minLength": 1},
+        "originalPath": {"type": "string", "minLength": 1},
+        "originalSha256": {"$ref": "#/$defs/hash"},
+        "mappingSchemaVersion": {"const": 2},
+        "mappingSha256": {"$ref": "#/$defs/hash"},
+        "originalNumericLexemeSha256": {"$ref": "#/$defs/hash"},
+        "measurementPreservation": {"type": "string", "minLength": 1},
+        "archivedNativeBindings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
     "source": {
       "type": "object",
       "required": ["videoId", "sha256", "width", "height", "durationSeconds", "fps"],

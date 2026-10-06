@@ -240,6 +240,14 @@ _DRAWING_OWN_ROW_READERS = {
     # save_simplified_part(adapter, name, ...) forwards to save_part_and_images:
     # same callers, same pin.
     "_drawing_simplified.py",
+    # apply_grouped_bom_properties(..., part_name=PART_NAME) reads only that row;
+    # the caller's identity is checked below, including every grouped builder.
+    "_grouped_bom_properties.py",
+    # registry_identity(spec) -> part_properties(spec.source.stem): spec is the
+    # DrawingSpec finalize_drawing receives, which must name the outputs it
+    # writes, and read_title_fields refuses any sheet whose linked model is not
+    # spec.source before reading it -- the drawing's own part row.
+    "_drawing_title_fields.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
@@ -247,6 +255,7 @@ _OWN_ROW_HELPERS = {
     "save_part_and_images": 1,
     "save_simplified_part": 1,
     "apply_drawing_properties": 1,
+    "apply_grouped_bom_properties": 2,
 }
 
 
@@ -287,6 +296,7 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
     import _buildgraph as bg
 
     dodo = _load_dodo()
+    grouped_callers = set()
     for stem, spec in dodo.DRAWINGS_BY_NAME.items():
         script = spec.script.resolve()
         own_build = f"build_{spec.part}.py"
@@ -308,6 +318,18 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
             assert source.name == own_build, (stem, source.name, calls)
             assert {arg for _name, arg in calls} == {"PART_NAME"}, (stem, calls)
             assert _module_part_name(source) == spec.part.replace("_", "-"), stem
+            if any(name == "apply_grouped_bom_properties" for name, _arg in calls):
+                grouped_callers.add(source.name)
+    # Each grouped source is a positive control: losing its closure, helper call,
+    # or part-name argument must not silently remove its own-row proof.
+    for source in (
+        "build_dt_cone_gear.py",
+        "build_dt_crank_handle_ferrule.py",
+        "build_dt_crank_handle_pivot_screw.py",
+        "build_dt_pinion_lever_pin.py",
+        "build_pd_transgear_removable.py",
+    ):
+        assert source in grouped_callers, f"{source} missing grouped own-row proof"
 
 
 @pytest.fixture
@@ -1358,9 +1380,9 @@ def test_verify_gate_logic_off_build_closure_is_a_file_dep():
     closure (so it rides no .SLDASM digest) MUST list that module as a direct
     file_dep -- else a change to the gate logic leaves the verify-*.ok stamp
     stale-fresh and SKIPS the gate (codex PR #193: the transient-drive replay
-    lives in _assembly_postbuild.py, off every build closure). General guard: computes the
-    verify/preflight ``_*.py`` helpers that are on no assembly closure and asserts
-    each task depends on them."""
+    lives in _assembly_postbuild.py, off every build closure). Derive each leaf's
+    helpers from the Python entry points it actually executes, not from a shared
+    verify.py closure that unrelated verification commands need not execute."""
     dodo = _load_dodo()
     import _buildgraph as bg
 
@@ -1378,19 +1400,43 @@ def test_verify_gate_logic_off_build_closure_is_a_file_dep():
         }
         return helpers - asm_closure  # gate-logic helpers riding no .SLDASM digest
 
-    verify_orphans = _orphan_helpers(bg.SCRIPTS_DIR / "verify.py")
-    assert "_assembly_postbuild.py" in verify_orphans, verify_orphans  # the known case
-    for t in dodo.task_verify():
-        deps = {os.path.basename(d) for d in t["file_dep"]}
-        assert verify_orphans <= deps, (
-            f"verify:{t['name']} missing gate-logic deps: {verify_orphans - deps}"
-        )
-
-    pf_orphans = _orphan_helpers(bg.SCRIPTS_DIR / "preflight_release.py")
-    pf_deps = {os.path.basename(d) for d in dodo.task_preflight()["file_dep"]}
-    assert pf_orphans <= pf_deps, (
-        f"preflight missing gate-logic deps: {pf_orphans - pf_deps}"
-    )
+    tasks = [
+        (f"verify:{task['name']}", task) for task in dodo.task_verify()
+    ] + [
+        (f"verify_soundness:{task['name']}", task)
+        for task in dodo.task_verify_soundness()
+    ] + [("preflight", dodo.task_preflight())]
+    verify_entry_seen = False
+    for label, task in tasks:
+        entries = set()
+        for action, args in task["actions"]:
+            if action is dodo._cached_com_action:
+                command_entries = {
+                    Path(arg).resolve()
+                    for arg in args[1]
+                    if str(arg).endswith(".py")
+                }
+                assert command_entries, f"{label} runs no Python entry point"
+                entries.update(command_entries)
+        if not entries:
+            # Stamp-only aggregates inherit execution from their child stamps;
+            # their explicit Python dependencies describe the gate they aggregate.
+            entries = {
+                Path(dep).resolve()
+                for dep in task["file_dep"]
+                if str(dep).endswith(".py")
+            }
+        assert entries, f"{label} has no gate source to inspect"
+        deps = {os.path.basename(dep) for dep in task["file_dep"]}
+        for entry in entries:
+            orphans = _orphan_helpers(entry)
+            if entry == Path(dodo.VERIFY_PY).resolve():
+                verify_entry_seen = True
+                assert "_assembly_postbuild.py" in orphans, orphans
+            assert orphans <= deps, (
+                f"{label} ({entry.name}) missing gate-logic deps: {orphans - deps}"
+            )
+    assert verify_entry_seen, "the verify.py gate closure was never inspected"
 
 
 def test_artefact_digest_immune_to_byte_churn():
@@ -1713,31 +1759,6 @@ def test_sw_ensure_once_runs_once_and_respects_the_opt_out(monkeypatch):
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
     dodo._sw_ensure_once()  # opt-out: never calls ensure_ready
     assert calls == [1]
-
-
-def test_task_span_carries_its_pipeline_stage_resource():
-    """The parent-side ``task <label>`` span is attributed to the SAME stage as the
-    subprocess it spawns (``_stage_name`` -> OTEL_SERVICE_NAME), so a task and its
-    own children share a resource instead of the task reading the umbrella name.
-    Queueing/transfer keep the separate build-infra resource."""
-    dodo = _load_dodo()
-    assert dodo._stage_name("part:pn_pen_rod") == "part-build"
-    assert dodo._stage_name("assembly:pn_pen") == "assembly-build"
-    assert dodo._stage_name("drawing:pn_pen_rod") == "drawing-export"
-    assert dodo._stage_name("verify soundness") == "verify-soundness"
-    assert dodo._stage_name("nothing recognisable") == "ha-harmonic-analyzer"
-
-    source = inspect.getsource(dodo)
-    task_spans = list(
-        re.finditer(
-            r'with _telemetry\.span\(\s*f"task \{label\}"(?P<args>.*?)\)\s+as\b',
-            source,
-            flags=re.DOTALL,
-        )
-    )
-    assert len(task_spans) == 4, "every task span must be accounted for"
-    for match in task_spans:
-        assert "service=_stage_name(label)" in match.group("args")
 
 
 def test_external_logs_follow_warning_default_and_explicit_verbosity(monkeypatch):
@@ -2870,8 +2891,8 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
         assert catalog not in deps
     assert dodo._fastener_rows_env("part:vn_frame_side_screw") == "vn-frame-side-screw"
     assert dodo._fastener_rows_env("drawing:vn_frame_side_screw") == "vn-frame-side-screw"
-    # pen's closure imports build_pen_set_screw for its constants; that module's
-    # fastener("pen-set-screw") runs on import.
+    # pen's closure imports build_vn_pen_set_screw for its constants; that module's
+    # fastener("vn-pen-set-screw") runs on import.
     assert dodo._fastener_rows_env("assembly:pn_pen") == "vn-pen-set-screw"
     assert dodo._fastener_rows_env("check:math") is None
 

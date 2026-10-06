@@ -1357,7 +1357,7 @@ def test_a_pdf_page_dumps_its_text_and_only_its_black_stroked_lines():
         ),
     )
     ink = page_ink(page)
-    assert ink["spans"] == [["6.0", 0.1, 0.1, 0.106, 0.1033]]
+    assert ink["spans"] == [["6.0", 0.1, 0.1, 0.106, 0.1033, 0]]
     assert ink["strokes"] == [[0.1, 0.1, 0.2, 0.1, 0.00025, 0], [0.1, 0.11, 0.2, 0.11, 0.00025, 1]]
 
 
@@ -4556,26 +4556,32 @@ def test_a_value_past_its_cells_rule_is_a_misfit():
     assert find_title_field_misfits(_title_dump([["MHA-DT-003-T006", 0.31278, 0.02376, edge, 0.02861]], fields))
 
 
+_N15, _T29 = ("Number", "MHA-DT-003-T006"), ("Title", "vn-transgear-collar-cross-pin")
+
+
 @pytest.mark.parametrize(
-    "printed",
+    ("field", "printed", "evidence"),
     [
-        [["MHA-DT-003-T0", 0.31278, 0.02376, 0.35800, 0.02861]],
-        [["vn-transgear-collar-", 0.31271, 0.03755, 0.36500, 0.04157], ["cross-pin", 0.31271, 0.02900, 0.33500, 0.03300]],
-        [],
+        (_N15, [["MHA-DT-003-T0", 0.31278, 0.02376, 0.35800, 0.02861]], {"printed": False}),
+        (
+            _T29,
+            [["vn-transgear-collar-", 0.31271, 0.03755, 0.36500, 0.04157], ["cross-pin", 0.31271, 0.02900, 0.33500, 0.03300]],
+            {"printed": False},
+        ),
+        (_N15, [], {"printed": False}),
+        # One text object whose glyphs stand on two rows, inside the cell.
+        (_T29, [["vn-transgear-collar-cross-pin", 0.31271, 0.03650, 0.36500, 0.04600, 2]], {"printed": True, "rows": 2}),
     ],
-    ids=["cut", "wrapped", "blank"],
+    ids=["cut", "wrapped-two-objects", "blank", "wrapped-one-object"],
 )
-def test_a_value_not_printed_whole_on_one_line_is_a_misfit(printed):
-    """A cut, wrapped (SolidWorks prints each line as its own text object) or
-    blank value matches no single span: the finding names what the cell
-    printed instead."""
+def test_a_value_not_printed_whole_on_one_line_is_a_misfit(field, printed, evidence):
+    """A cut, wrapped or blank value fails its cell, however much air the
+    printed ink leaves."""
     from _layout_audit import find_title_field_misfits
 
-    expected = "vn-transgear-collar-cross-pin" if len(printed) == 2 else "MHA-DT-003-T006"
-    source = "Title" if len(printed) == 2 else "Number"
-    [finding] = find_title_field_misfits(_title_dump(printed, [(source, expected)]))
-    assert "not printed whole on one line" in finding.detail
-    assert "clearance_mm" not in finding.extra
+    [finding] = find_title_field_misfits(_title_dump(printed, [field]))
+    assert (finding.kind, finding.a) == ("title-field-misfit", f"title {field[0]}")
+    assert evidence.items() <= finding.extra.items()
 
 
 def test_the_value_is_judged_by_its_print_in_the_cell_not_elsewhere():

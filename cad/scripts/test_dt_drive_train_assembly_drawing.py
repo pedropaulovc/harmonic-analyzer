@@ -16,6 +16,7 @@ import dt_crank_handle_spec as handle_spec
 import draw_dt_drive_train_assembly as drawing
 import dt_drive_train_assembly_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
+from _assembly_contract import assembly_contract
 
 SCRIPTS = Path(__file__).resolve().parent
 PARTS = SCRIPTS.parent / "config" / "parts"
@@ -25,6 +26,11 @@ RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
 # Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b).
 EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008"})
+EXTERNAL_ASSEMBLY_NUMBERS = {
+    "ch-channel": "MHA-CH-000",
+    "fr-frame": "MHA-FR-000",
+    "pd-paper-drive": "MHA-PD-000",
+}
 
 
 def _builder_stems() -> set[str]:
@@ -113,7 +119,7 @@ def test_bom_catalog_numbers_match_the_parts_registry() -> None:
         assert printed == [skus[0]], stem
 
 
-def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
+def test_package_text_cites_only_bom_or_external_numbers() -> None:
     texts = (
         drawing.ASSEMBLED_HEADING,
         drawing.CONE_CRANK_STEPS,
@@ -129,7 +135,9 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
     cited = set(re.findall(r"\bMHA-[A-Z0-9-]+\b", "\n".join(texts)))
     assert cited, "package text contains no part references"
     bom = set(drawing.BOM_PART_NUMBERS.values())
-    assert cited <= bom | EXTERNAL_NUMBERS
+    for stem, number in EXTERNAL_ASSEMBLY_NUMBERS.items():
+        assert assembly_contract(stem).number == number
+    assert cited <= bom | EXTERNAL_NUMBERS | set(EXTERNAL_ASSEMBLY_NUMBERS.values())
 
 
 def test_note_lines_fit_a_half_sheet_field() -> None:
@@ -245,30 +253,53 @@ def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
 
 
 @pytest.mark.parametrize(
-    "number",
+    ("field", "value"),
     (
-        "MHA-014",
-        "MHA-ZZ-001",
-        "MHA-DT-000",
-        "MHA-DT-999",
-        "MHA-CH-036",
-        "MHA-DT-014-extra",
-        "MHA-DT-٠١٤",
+        ("number", "MHA-014"),
+        ("number", "MHA-ZZ-001"),
+        ("number", "MHA-DT-000"),
+        ("number", "MHA-CH-003"),
+        ("number", "MHA-DT-003-extra"),
+        ("number", "MHA-DT-٠٠٣"),
+        ("number", 3),
+        ("category", "zz"),
+        ("category", "ch"),
+        ("description", ""),
+        ("description", None),
     ),
 )
-def test_grouped_bom_rejects_invalid_or_unregistered_numbers_before_native_access(
-    number: str,
+def test_grouped_bom_rejects_invalid_registry_metadata_before_native_access(
+    monkeypatch, field: str, value: object,
 ) -> None:
+    import _config
+    import _grouped_bom_properties as grouped
+
+    row = _config.parts("dt-cone-gear")
+    row[field] = value
+    monkeypatch.setattr(grouped._config, "parts", lambda _stem: row)
+
+    class Adapter:
+        @property
+        def currentModel(self):
+            raise AssertionError("invalid metadata reached native configuration access")
+
+    with pytest.raises(ValueError):
+        grouped.apply_grouped_bom_properties(
+            Adapter(), ["Default"], part_name="dt-cone-gear"
+        )
+
+
+def test_grouped_bom_refuses_unregistered_part_stem_before_native_access() -> None:
     import _grouped_bom_properties as grouped
 
     class Adapter:
         @property
         def currentModel(self):
-            raise AssertionError("invalid Number reached native configuration access")
+            raise AssertionError("unregistered stem reached native configuration access")
 
-    with pytest.raises(ValueError, match="grouped BOM part number"):
+    with pytest.raises(KeyError):
         grouped.apply_grouped_bom_properties(
-            Adapter(), ["Default"], part_number=number, description="Cone gear"
+            Adapter(), ["Default"], part_name="dt-unregistered-grouped-part"
         )
 
 
@@ -294,8 +325,7 @@ def test_grouped_bom_stamps_registered_identity_on_every_configuration(
     grouped.apply_grouped_bom_properties(
         SimpleNamespace(currentModel=model),
         tuple(configurations),
-        part_number=f" {row['number'].lower()} ",
-        description=f" {row['description']} ",
+        part_name="dt-cone-gear",
     )
     for configuration in configurations.values():
         assert configuration.BOMPartNoSource == 8

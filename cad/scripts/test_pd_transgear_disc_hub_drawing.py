@@ -26,6 +26,7 @@ import pd_transgear_disc_hub_geometry as joint
 import pd_transgear_disc_hub_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _assembly_contract import assembly_contract
 from _layout_geometry import Box, estimate_text_box
 
 WALL_FLOOR = 2.0
@@ -500,7 +501,9 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
         name_by_number[number] = name
     printed = " ".join(_sheet_text().split())
     cited = re.findall(r"\bMHA-[A-Z0-9-]+\b", printed)
-    assert set(cited) == set(name_by_number)
+    assembly_number = assembly_contract("pd-paper-drive").number
+    assert assembly_number == "MHA-PD-000"
+    assert set(cited) == set(name_by_number) | {assembly_number}
     for number, name in name_by_number.items():
         assert printed.count(f"{name} {number}") == printed.count(number), number
 

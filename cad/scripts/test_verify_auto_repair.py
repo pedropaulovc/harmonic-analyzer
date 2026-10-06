@@ -229,7 +229,7 @@ def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) ->
         component("structural-bracket-1"),
     ]
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
-    (tmp_path / ".channel.dof.json").write_text(
+    (tmp_path / ".ch-channel.dof.json").write_text(
         json.dumps({"stem": "ch-channel", "specs": [{"verify": ["ch-rocker-arm-1", []]}]}),
         encoding="utf-8",
     )
@@ -244,7 +244,7 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
 
     assembly_path = tmp_path / "ch-channel.SLDASM"
     assembly_path.write_bytes(b"byte-stable assembly")
-    proof = tmp_path / ".channel.massprops.sha"
+    proof = tmp_path / ".ch-channel.massprops.sha"
     proof.write_text("same-digest\n", encoding="utf-8")
     saves = []
 

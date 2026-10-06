@@ -49,7 +49,7 @@ from _drawing_layout_check import (
 from _drawing_layout_audit import annotation_display, run_layout_audit
 from _drawing_title_fields import assert_title_fields, audit_records, read_title_fields
 from _layout_audit import display_box, estimated_text_runs, line_segment
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, DrawingSpec, layout_report_path
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -7603,6 +7603,7 @@ async def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
     *,
+    spec: DrawingSpec,
     layout: DrawingLayout,
     pdf_title: str,
     scale: tuple[float, float] = (1.0, 1.0),
@@ -7615,10 +7616,20 @@ async def finalize_drawing(
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG.
 
+    ``spec`` is the drawing's own registry entry: its outputs are
+    ``outputs``, and every sheet must document its ``source``, whose frozen
+    identity the title block prints (:func:`read_title_fields`).
+
     ``settled_checks`` run after the last rebuild, before anything is
     saved: a readback taken when an annotation was placed says nothing
     about the drawing the later rebuilds leave (:func:`assert_balloon_landings`).
     """
+    if (outputs.slddrw, outputs.pdf, outputs.png) != (
+        spec.outputs["slddrw"],
+        spec.outputs["pdf"],
+        spec.outputs["png"],
+    ):
+        raise ValueError(f"finalize_drawing outputs {outputs!r} are not {spec.name}'s {spec.outputs!r}")
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
@@ -7830,7 +7841,7 @@ async def finalize_drawing(
     # The DWG. NO. and PART cells, read off the settled sheets before anything
     # is saved: each prints its linked model's full Number and Title, on one
     # line inside its ruled cell (_drawing_title_fields).
-    title_fields = read_title_fields(ddoc, title_sources, resolved_layouts)
+    title_fields = read_title_fields(ddoc, spec, title_sources, resolved_layouts)
     assert_title_fields(title_fields)
 
     # Persist the native drawing and PDF once from the fully loaded authored

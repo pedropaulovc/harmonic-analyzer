@@ -27,6 +27,7 @@ import pd_transgear_rear_bushing_spec as rear_bushing
 import pd_transgear_removable_spec as sprocket
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+from _assembly_contract import assembly_contract
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 STEP_POINTER = re.compile(r"(MHA-[A-Z]{2}-000)\s+STEP\s+(\d+)")
@@ -526,10 +527,12 @@ def test_no_sheet_prints_a_forbidden_word() -> None:
             assert word not in text.upper(), (word, text)
 
 
-def test_fitup_part_references_are_in_the_bom() -> None:
+def test_fitup_references_are_in_the_bom_or_drive_train_assembly() -> None:
     printed = set(re.findall(r"\bMHA-[A-Z0-9-]+\b", drawing.FITUP_STEPS))
     assert printed, "fit-up steps contain no part references"
-    assert printed <= set(drawing.BOM_PART_NUMBERS.values())
+    drive_train_number = assembly_contract("dt-drive-train").number
+    assert drive_train_number == "MHA-DT-000"
+    assert printed <= set(drawing.BOM_PART_NUMBERS.values()) | {drive_train_number}
 
 
 def test_the_knob_stack_prints_front_to_rear() -> None:

@@ -19,7 +19,6 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 from _common import (
     SketchDims,
     _early_bound,
@@ -210,12 +209,10 @@ async def build(adapter) -> dict[str, str]:
     if not bool(_skim_feature(adapter).IsSuppressed()):
         raise RuntimeError(f"Skim is not suppressed in {default_config}")
     await volume_check(adapter, "as-made ferrule (default)", V_FERRULE, 0.005 * V_FERRULE)
-    grouped_spec = _config.parts(PART_NAME)
     apply_grouped_bom_properties(
         adapter,
         [default_config, INSTALLED_CONFIG],
-        part_number=str(grouped_spec["number"]),
-        description=str(grouped_spec["description"]),
+        part_name=PART_NAME,
     )
     await report_mass_properties(adapter)
     require_material_in_every_configuration(

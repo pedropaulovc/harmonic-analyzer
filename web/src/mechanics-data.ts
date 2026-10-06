@@ -8339,7 +8339,7 @@ export const MECHANISM_DATA = {
         -0.09158579260110855,
         1.0
       ],
-      "ha-harmonic-analyzer/dt-drive-train/dt-cone-tip-shim-1": [
+      "archived-not-current:harmonic-analyzer/drive-train/cone-tip-shim-1": [
         0.9762271175797497,
         0.0,
         -0.2167501439026669,
@@ -8483,7 +8483,7 @@ export const MECHANISM_DATA = {
         0.0852808728814125,
         1.0
       ],
-      "ha-harmonic-analyzer/dt-drive-train/dt-cone-tip-bushing-1": [
+      "archived-not-current:harmonic-analyzer/drive-train/cone-tip-bushing-1": [
         0.9762271199317707,
         0.0,
         -0.21675012260867454,
@@ -11669,7 +11669,7 @@ export const MECHANISM_DATA = {
         -0.1550000011920929,
         1.0
       ],
-      "ha-harmonic-analyzer/pd-paper-drive/pd-bracket-screw-2": [
+      "archived-not-current:harmonic-analyzer/paper-drive/bracket-screw-2": [
         -1.0,
         0.0,
         -1.2246468525851679e-16,
@@ -12281,7 +12281,7 @@ export const MECHANISM_DATA = {
         -0.15620000660419464,
         1.0
       ],
-      "ha-harmonic-analyzer/pd-paper-drive/pd-transgear-pinion-1": [
+      "archived-not-current:harmonic-analyzer/paper-drive/transgear-pinion-1": [
         0.9986295349713389,
         0.05233595251871104,
         3.557707519018659e-17,
@@ -12389,7 +12389,7 @@ export const MECHANISM_DATA = {
         -0.1391499936580658,
         1.0
       ],
-      "ha-harmonic-analyzer/pd-paper-drive/pd-transgear-bracket-1": [
+      "archived-not-current:harmonic-analyzer/paper-drive/transgear-bracket-1": [
         1.0,
         0.0,
         0.0,
@@ -12407,7 +12407,7 @@ export const MECHANISM_DATA = {
         -0.1298999935388565,
         1.0
       ],
-      "ha-harmonic-analyzer/pd-paper-drive/pd-transgear-stub-1": [
+      "archived-not-current:harmonic-analyzer/paper-drive/transgear-stub-1": [
         1.0,
         0.0,
         0.0,
@@ -12425,7 +12425,7 @@ export const MECHANISM_DATA = {
         -0.125900000333786,
         1.0
       ],
-      "ha-harmonic-analyzer/pd-paper-drive/pd-bracket-screw-1": [
+      "archived-not-current:harmonic-analyzer/paper-drive/bracket-screw-1": [
         -1.0,
         0.0,
         -1.2246468525851679e-16,
@@ -12443,7 +12443,7 @@ export const MECHANISM_DATA = {
         -0.125900000333786,
         1.0
       ],
-      "ha-harmonic-analyzer/pd-paper-drive/pd-transgear-latch-1": [
+      "archived-not-current:harmonic-analyzer/paper-drive/transgear-latch-1": [
         -0.9510568387079559,
         -0.30901704229911786,
         1.1143326873711704e-24,
@@ -12479,7 +12479,7 @@ export const MECHANISM_DATA = {
         -0.14839999377727509,
         1.0
       ],
-      "ha-harmonic-analyzer/pd-paper-drive/pd-bracket-screw-3": [
+      "archived-not-current:harmonic-analyzer/paper-drive/bracket-screw-3": [
         1.0,
         0.0,
         0.0,

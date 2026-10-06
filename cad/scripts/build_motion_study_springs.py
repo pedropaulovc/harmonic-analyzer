@@ -314,7 +314,7 @@ async def _suppress_pen_travel(adapter):
     for _f, mate, name, mtype, parts, _v in _iter_mates(
         adapter, model, read_values=False
     ):
-        lone = _lone_real(parts, "pen")
+        lone = _lone_real(parts, "pn-pen")
         if mtype != DISTANCE or lone is None or _family(lone) != "pn-pen-rod":
             continue
         if name == "DRIVE_pen_travel":

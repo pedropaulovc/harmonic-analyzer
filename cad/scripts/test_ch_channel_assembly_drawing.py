@@ -47,7 +47,7 @@ def _sequence_steps(text: str) -> dict[str, str]:
 def test_channel_assembly_keeps_registry_outputs_and_precomputed_placement() -> None:
     spec = DRAWINGS_BY_NAME["ch_channel_assembly"]
     assert spec.source_kind == "assembly"
-    assert spec.part == "ch-channel"
+    assert spec.part == "ch_channel"
     assert drawing.SOURCE == spec.source
     assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
         spec.outputs["slddrw"], spec.outputs["pdf"], spec.outputs["png"]

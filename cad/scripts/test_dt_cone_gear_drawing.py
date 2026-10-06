@@ -194,7 +194,7 @@ def test_each_sheet_gets_its_own_tooth_system_block_without_dimension_duplicates
         assert "WHOLE DEPTH" not in data
         assert notes.CYLINDER_MATE_NUMBER in data
         assert (
-            f"BACKLASH WITH MHA-027, ACCEPT AT ASSEMBLY (mm):  "
+            f"BACKLASH WITH {_config.parts('dt-cylinder-gear')['number']}, ACCEPT AT ASSEMBLY (mm):  "
             f"{spec.BACKLASH_ACCEPTANCE_MM[0]:.2f} TO "
             f"{spec.BACKLASH_ACCEPTANCE_MM[1]:.2f}"
         ) in data

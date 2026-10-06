@@ -1925,6 +1925,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   const knife = new THREE.Vector3().fromArray(MECHANISM_DATA.summing.knifeMm).multiplyScalar(0.001)
   const crankPart = parts.get('ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1')
   const conePart = parts.get('ha-harmonic-analyzer/dt-drive-train/dt-cone-gear-shaft-1')
+  const reducerDisc = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-rack-pinion-1')
   const crankPivot = crankPart ? new THREE.Vector3().setFromMatrixPosition(crankPart.world) : new THREE.Vector3()
   const conePivot = conePart ? new THREE.Vector3().setFromMatrixPosition(conePart.world) : new THREE.Vector3()
   const coneAxis = conePart ? new THREE.Vector3().setFromMatrixColumn(conePart.world, 2).normalize() : new THREE.Vector3(0, 0, 1)
@@ -2149,9 +2150,10 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     const name = part.shortName
     const knobAngle = pose.crankAngleRad * MECHANISM_DATA.paperDrive.chainRatioFine * PAPER_FEED_MULTIPLIER[input.gearing]
     const feedAngle = knobAngle * MECHANISM_DATA.paperDrive.externalMeshSense * MECHANISM_DATA.paperDrive.reducerRatio
-    const angle = name === 'pd-rack-pinion-1' || name === 'pd-transgear-feed-pinion-1' ? feedAngle : knobAngle
+    const feedRotor = name === 'pd-rack-pinion-1' || name === 'pd-transgear-feed-pinion-1' || name === 'pd-transgear-disc-hub-1' || name.startsWith('vn-transgear-disc-screw-')
+    const angle = feedRotor ? feedAngle : knobAngle
     // Resetting a platen datum does not wind the feed gears; only crank turns do.
-    pivot.setFromMatrixPosition(part.world)
+    pivot.setFromMatrixPosition(feedRotor && reducerDisc ? reducerDisc.world : part.world)
     rotate(part, pivot, Z, angle)
   }
 
@@ -2576,7 +2578,7 @@ const preparedSprings = new WeakMap<THREE.BufferGeometry, Map<string, THREE.Buff
 
 /**
  * Deform the authentic swept-wire mesh, not a replacement TubeGeometry.
- * Source: vn_channel_spring_stock_geom.py / counter_spring_stock_geom.py and
+ * Source: vn_channel_spring_stock_geom.py / vn_counter_spring_stock_geom.py and
  * diagnostics/diag_build_9432K31.py:109-159 at the pinned release commit.
  * Hook assemblies translate rigidly; coil centreline pitch changes with L.
  * A minimal tangent rotation preserves each original wire section's radius

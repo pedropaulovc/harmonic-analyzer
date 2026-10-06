@@ -16,6 +16,7 @@ import json
 import math
 import re
 from functools import lru_cache
+import hashlib
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[1]
@@ -29,8 +30,23 @@ INPUT_FIELDS = ["crankTurns", "gearing", "magnification"] + [
 
 
 def load_observations(video_id, prefer_track=False):
-    suffix = "track" if prefer_track and (WEB / "content" / f"{video_id}.track.json").exists() else "observations"
-    return json.loads((WEB / "content" / f"{video_id}.{suffix}.json").read_text())
+    suffix = "track" if prefer_track and (WEB / "content" / "canonical-native" / f"{video_id}.track.json").exists() else "observations"
+    return json.loads((WEB / "content" / "canonical-native" / f"{video_id}.{suffix}.json").read_text())
+
+
+def historical_code_bytes(path, expected_sha256):
+    """Verify a sealed historical producer snapshot, never today's renderer.
+
+    These bytes establish only original evidence lineage. They do not qualify
+    canonical geometry, current code, or a new GPU/source comparison.
+    """
+    if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
+        raise ValueError("Historical code evidence requires a SHA256 seal")
+    snapshot = WEB / "content/canonical-native/historical-code" / expected_sha256 / Path(path).name
+    raw = snapshot.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError(f"Historical producer snapshot changed: {path}")
+    return raw
 
 
 def needs_machine(frame, data):
@@ -415,7 +431,7 @@ FIXED_ANCHOR_PARTS = {
         ("mg-magnifier", "mg-wheel-bar", (1,)), ("mg-magnifier", "vn-wheel-axle-nut", (1,)),
         ("mg-magnifier", "vn-clamp-screw", (1, 2)), ("mg-magnifier", "sh-column-clamp-front", (1,)),
         ("pd-paper-drive", "pd-support-bar", (1,)), ("pd-paper-drive", "vn-clamp-screw", range(1, 5)),
-        ("pd-paper-drive", "pd-transgear-stub", (1,)), ("pn-pen", "vn-hanger-screw", (1,)),
+        ("pn-pen", "vn-hanger-screw", (1,)),
     )
     for index in indices
 }

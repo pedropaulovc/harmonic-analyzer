@@ -8,6 +8,7 @@ from dataclasses import replace
 import pytest
 
 import _drawing_common
+import _config
 import build_fr_harmonic_base as part
 import dt_cone_swing_platform_geometry as platform
 import dt_cone_pivot_post_installation
@@ -1595,7 +1596,11 @@ def test_rig_callouts_name_the_rig_set_note() -> None:
     # The note carries every setting the transfers need, the front block's
     # feeler included: it fixes FRONT_BLOCK_Z0, so the front seats with it
     # (Codex #858, PRRT_kwDOPHDy386mUjhS).
-    feeler = f"FRONT MHA-061 {fitup.FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT MHA-056;"
+    feeler = (
+        f"FRONT {_config.parts('dt-pinion-pivot-block')['number']} "
+        f"{fitup.FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT "
+        f"{_config.parts('dt-pinion-bracket')['number']};"
+    )
     assert feeler in note
     assert note.index(feeler) == 1
     assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP

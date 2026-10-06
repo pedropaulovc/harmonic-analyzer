@@ -135,7 +135,7 @@ def fit_candidate(frame, points, initial, fit_source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--observations", default="web/content/NAsM30MAHLg.observations.json"
+        "--observations", default="web/content/canonical-native/NAsM30MAHLg.observations.json"
     )
     parser.add_argument(
         "--evidence", default="/tmp/harmonic-web-reference/evidence/NAsM30MAHLg"
@@ -152,6 +152,8 @@ def main():
     fit_source = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fit_source)
     obs = json.loads(Path(args.observations).read_text())
+    if obs.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
+        parser.error("--observations must select a materialized canonical-native derivative, not archived original evidence")
     candidate = json.loads((evidence / "codex-fixed-fit-result.json").read_text())
     seeds = candidate["candidateFrame"]["landmarks"]
     anchors = candidate["candidateAnchors"]

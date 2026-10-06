@@ -33,10 +33,10 @@ from scipy.optimize import minimize_scalar
 WEB = Path(__file__).resolve().parents[1]
 ROOT = WEB.parent
 VIDEO_ID = "6dW6VYXp9HM"
-SOURCE = WEB / f"content/{VIDEO_ID}.visible-crank-motion.json"
-CONTROLS = WEB / f"content/{VIDEO_ID}.motion-controls.json"
+SOURCE = WEB / f"content/canonical-native/{VIDEO_ID}.visible-crank-motion.json"
+CONTROLS = WEB / f"content/canonical-native/{VIDEO_ID}.motion-controls.json"
 NATIVE_DATA = WEB / "src/mechanics-data.ts"
-OUTPUT = WEB / f"content/{VIDEO_ID}.visible-crank-gauge.json"
+OUTPUT = WEB / f"content/canonical-native/{VIDEO_ID}.visible-crank-gauge.json"
 PRIVATE = WEB / f".vite/verification-output/{VIDEO_ID}-visible-crank-gauge"
 CAMERA = {
     "positionMetres": [-0.5447613584304803, 0.16357081791578632, -0.07001628230473755],

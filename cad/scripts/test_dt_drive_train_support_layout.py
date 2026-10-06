@@ -7,6 +7,7 @@ import math
 import pytest
 
 import _fit_limits
+import _config
 import build_dt_drive_train_assembly as drive
 import pinion_rig_fitup as FITUP
 import pinion_rig_layout as RIG
@@ -1080,7 +1081,8 @@ def test_set_pin_never_stands_proud_and_keeps_its_webs() -> None:
     # still grips a pin diameter.
     step_line = FITUP.SHAFT_DRILL_STEP.split("\n")[-1]
     assert step_line == (
-        f"BOTH ENDS 0 TO {pin.PIN_SUB_FLUSH_MAX:.1f} BELOW THE MHA-056 EDGES."
+        f"BOTH ENDS 0 TO {pin.PIN_SUB_FLUSH_MAX:.1f} BELOW THE "
+        f"{_config.parts('dt-pinion-bracket')['number']} EDGES."
     )
     assert pin.PIN_SUB_FLUSH_MAX == pytest.approx(2.8)
     assert 0.0 <= pin.PIN_BURIED_MARGIN <= 2.0 * pin.PIN_SUB_FLUSH_MAX

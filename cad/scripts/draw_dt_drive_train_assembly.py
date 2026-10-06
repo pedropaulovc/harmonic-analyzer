@@ -307,10 +307,11 @@ NOTE_LINE_PITCH = 0.004525
 # ~47 lines fit the full left column, ~24 the right one above the 1:8 reference
 # view that every sheet needs for its title-block property links
 # (finalize_drawing refuses a sheet without a view: r8, leaf
-# 20260923T214354Z-1-4126331f). Sheet 6 carries steps 1-7 alone on the left, its
-# right field kept free for D1 (#957); the general notes sit on sheet 1 under its
-# heading; the bank's steps 8-10 fill sheet 7's left field; the rig's steps
-# continue on sheet 8 beside the station table (Main, B1 re-ruling 2026-09-26).
+# 20260923T214354Z-1-4126331f). Sheet 6 carries steps 1-6 on the left and step 7
+# at the top of its right field, the rest of that field kept free for D1 (#957);
+# the general notes sit on sheet 1 under its heading; the bank's steps 8-10 fill
+# sheet 7's left field; the rig's steps continue on sheet 8 beside the station
+# table (Main, B1 re-ruling 2026-09-26).
 # package_note_fields lists every field and its blocks.
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
@@ -534,14 +535,14 @@ CONE_CRANK_STEPS = "\n".join(
         # so the fitter centres the tip in the cup before locking the post
         # (Codex P1 on #1136, 9e9982c5d).
         "3. PUSH THE STACK ONTO THE MHA-DT-004 COLLAR. PUSH MHA-VN-016 ONTO A",
-        f"   {COLLAR_FEELER:.2f} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT.",
-        "   THREAD MHA-VN-017 INTO MHA-DT-021 TO THE TIP. TURN MHA-DT-005 ON ITS",
+        f"   {COLLAR_FEELER:.2f} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT. THREAD",
+        "   MHA-VN-017 INTO MHA-DT-021 TO THE TIP. TURN MHA-DT-005 ON ITS",
         "   SCREWS UNTIL THE TIP CENTRES IN THE CUP; TIGHTEN BOTH MHA-VN-031",
         "   AND RECHECK. THREAD MHA-VN-017 ON UNTIL MHA-DT-004 JUST STOPS",
         "   SHUTTLING AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
         "   MHA-VN-018 ACROSS THE SLIT. END PLAY "
-        f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR INDICATOR.",
-        "   MHA-VN-017 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
+        f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR",
+        "   INDICATOR. MHA-VN-017 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-VN-044 press to the blind-hole floor (their proud
@@ -554,37 +555,43 @@ CONE_CRANK_STEPS = "\n".join(
         # are feeler-checked against T120 before the pin is drilled.  The
         # pair may rub on T120 until that check closes, so the seat and the
         # check come first, turning by hand, and the free-running revolution
-        # after them (Codex P2 on #1154, review 3).  The check's last line is
-        # short; the step carries on after it.
-        "4. PRESS 2X MHA-VN-044 TO THE MHA-DT-011 COLLAR HOLE FLOORS. FIT MHA-DT-011 IN",
-        "   THE MHA-DT-005 CRANK BORE; SLIDE MHA-DT-010 ON UNPINNED, TOOTH IN GAP",
-        f"   WITH MHA-DT-007. FIT MHA-DT-036 PER SHEET {FIT_SHEET}. WITH MHA-DT-036 SEATED,",
-        f"   SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER.",
-        T120_FITUP_ASSEMBLY_CHECK + " THEN",
-        "   TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
-        "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL/REAM MHA-DT-029 AT BOSS",
-        "   MID-LENGTH WITH MHA-DT-011, FLUSH BOTH SIDES; RE-CHECK NO BINDING.",
-        "5. PAPER-DRIVE T12 ON MHA-DT-011 BEFORE THE ARM, HOLES OVER 2X MHA-VN-044.",
+        # after them (Codex P2 on #1154, review 3).  The check's first line
+        # carries on the seat sentence and its last line is short; the step
+        # carries on after it.
+        "4. PRESS 2X MHA-VN-044 TO THE MHA-DT-011 COLLAR HOLE FLOORS. FIT",
+        "   MHA-DT-011 IN THE MHA-DT-005 CRANK BORE; SLIDE MHA-DT-010 ON",
+        f"   UNPINNED, TOOTH IN GAP WITH MHA-DT-007. FIT MHA-DT-036 PER SHEET {FIT_SHEET}.",
+        f"   WITH MHA-DT-036 SEATED, SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS",
+        "   NORTH FACE WITH A FEELER. "
+        + T120_FITUP_ASSEMBLY_CHECK
+        + " THEN TURN MHA-DT-007 ONE FULL",
+        "   REVOLUTION; IT MUST NEVER BIND (ELSE CHECK THE PARTS AND BORE",
+        "   SPACING). THEN MATCH-DRILL/REAM MHA-DT-029 AT BOSS MID-LENGTH WITH",
+        "   MHA-DT-011, FLUSH BOTH SIDES; RE-CHECK NO BINDING.",
+        "5. PAPER-DRIVE T12 ON MHA-DT-011 BEFORE THE ARM,",
+        "   HOLES OVER 2X MHA-VN-044.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-031 pressed into the arm and
         # seam-pinned by MHA-VN-029 (a 4 m6 dowel, 4.0 long = half the arm); the
         # MHA-DT-009 cross-hole runs behind the arm through the hub barrel. The
         # handle rides the MHA-DT-032 shoulder screw. Wording from crankhub.
         "6. PRESS MHA-DT-031 INTO MHA-DT-006 TO THE SHOULDER, FACES FLUSH.",
-        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-VN-029 FLUSH. SLIDE",
-        f"   ONTO MHA-DT-011, SET HUB FRONT FACE FLUSH WITH THE {HUB_FRONT_FACE_DATUM},",
-        "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
-        "   SHAFT; LIGHT-DRIVE MHA-DT-009, REMOVABLE BY TAP ON SMALL END. HANG",
+        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-VN-029 FLUSH.",
+        "   SLIDE ONTO MHA-DT-011, SET HUB FRONT FACE FLUSH WITH THE",
+        f"   {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM",
+        "   1:48 THROUGH HUB AND SHAFT; LIGHT-DRIVE MHA-DT-009, REMOVABLE BY",
+        "   TAP ON SMALL END. HANG MHA-DT-027 FROM THE PIN HEAD; CLAMP",
         # Codex #1140: the keeper chain's length and topology belong on the
         # sheet; the bead count is the spec's solve, never a typed number.
-        "   MHA-DT-027 FROM THE PIN HEAD; CLAMP MHA-DT-028 UNDER MHA-VN-006. CUT MHA-VN-035",
-        f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-DT-028 LOOP AND MHA-DT-027; SNAP",
-        "   ONE END BEAD INTO EACH DOME OF MHA-VN-036.",
+        f"   MHA-DT-028 UNDER MHA-VN-006. CUT MHA-VN-035 TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT",
+        "   THROUGH THE MHA-DT-028 LOOP AND MHA-DT-027; SNAP ONE END BEAD INTO",
+        "   EACH DOME OF MHA-VN-036.",
         # Local review of 747487c71: the cup cures centred on the screw, or
         # its offset can bind the head and shoulder.
-        "7. EPOXY MHA-DT-034 ON THE MHA-DT-008 TENON, MHA-DT-035 IN ITS BUTT; CURE ON",
-        "   THE WAXED MHA-DT-032 THROUGH BOTH. FIT IT; SLIDE MHA-DT-008 ON; THREAD IT",
-        "   INTO MHA-DT-006, LOCTITE 222, SHOULDER TIGHT; END PLAY 0.25-1.0; FILE",
-        f"   TIP FLUSH TO ARM INBOARD FACE, BREAK EDGE. CYLINDER BANK: SHEET {BANK_SHEET}.",
+        "7. EPOXY MHA-DT-034 ON THE MHA-DT-008 TENON, MHA-DT-035 IN ITS BUTT;",
+        "   CURE ON THE WAXED MHA-DT-032 THROUGH BOTH. FIT IT; SLIDE MHA-DT-008",
+        "   ON; THREAD IT INTO MHA-DT-006, LOCTITE 222, SHOULDER TIGHT; END",
+        "   PLAY 0.25-1.0; FILE TIP FLUSH TO ARM INBOARD FACE, BREAK EDGE.",
+        f"   CYLINDER BANK: SHEET {BANK_SHEET}.",
     )
 )
 
@@ -630,10 +637,10 @@ BANK_STEPS = "\n".join(
         "   SLIDE THE STACK OFF IN ORDER.",
         "9. BASE MHA-FR-001 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-020) NOT FITTED.",
-        "9A. BACK MHA-DT-002 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
-        "   MHA-FR-001 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO X AND Y.",
-        "   SET THE STRAP INNER FACE TO Y 70.44-70.63 AND THE MANDREL CENTRE",
-        "   (EDGE-FIND BOTH SIDES, HALVE) TO X 168.11-168.31.",
+        "9A. BACK MHA-DT-002 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND",
+        "   BOTH MHA-FR-001 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO",
+        "   X AND Y. SET THE STRAP INNER FACE TO Y 70.44-70.63 AND THE MANDREL",
+        "   CENTRE (EDGE-FIND BOTH SIDES, HALVE) TO X 168.11-168.31.",
         "   SPOT MHA-FR-001 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH;",
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
         "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
@@ -643,23 +650,25 @@ BANK_STEPS = "\n".join(
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
         # So the loaded mandrel leaves the base for the drill and tap.
         "9B. FROM THE FRONT, LOAD ONE MHA-DT-026, THE STACK IN ORDER, THEN THE",
-        "   OTHER MHA-DT-026. PUSH THE BANK BACK, CLOSED UP ON THE BACK MHA-DT-026.",
-        "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
-        "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-002 ON.",
+        "   OTHER MHA-DT-026. PUSH THE BANK BACK, CLOSED UP ON THE BACK",
+        "   MHA-DT-026. PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON",
+        "   PARALLELS); TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT",
+        "   MHA-DT-002 ON.",
         "9C. SLIDE THE FRONT MHA-DT-002 ON UNTIL A 0.45 LEAF BETWEEN ITS STRAP",
-        "   AND THE FRONT MHA-DT-026 IS LIGHTLY PINCHED. SET X 168.11-168.31 AND",
-        "   SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW THE LOADED MANDREL",
-        "   OUT OF THE BACK MHA-DT-002, HOLDING BOTH MHA-DT-026, AND LAY IT IN",
-        "   V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE. DRILL AND",
-        "   TAP AS 9A. PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-002, PUSH",
-        "   THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET",
-        "   THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK.",
+        "   AND THE FRONT MHA-DT-026 IS LIGHTLY PINCHED. SET X 168.11-168.31",
+        "   AND SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW THE LOADED",
+        "   MANDREL OUT OF THE BACK MHA-DT-002, HOLDING BOTH MHA-DT-026, AND",
+        "   LAY IT IN V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE.",
+        "   DRILL AND TAP AS 9A. PASS THE MANDREL BACK THROUGH THE BACK",
+        "   MHA-DT-002, PUSH THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT",
+        "   MHA-DT-002; RE-SET THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK.",
         "9D. MEASURE MHA-DT-002 OUTER FACE TO OUTER FACE. TURN MHA-DT-013: ITS",
         "   CYLINDER IS THAT SPAN, PLUS A 1.5 DOME EACH END (SEE ITS PRINT).",
-        "9E. PUSH MHA-DT-013 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
-        "   THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD (DEPTH GAUGE).",
-        "   SPOT MHA-DT-013 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
-        "   BLOW OUT CHIPS. RUN THE BACK MHA-VN-034 IN TIGHT, THEN THE FRONT ONE.",
+        "9E. PUSH MHA-DT-013 IN FROM THE BACK, END TO END WITH THE MANDREL,",
+        "   UNTIL THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD",
+        "   (DEPTH GAUGE). SPOT MHA-DT-013 THROUGH EACH CROWN TAP WITH A #43",
+        "   DRILL, 0.5 DEEP; BLOW OUT CHIPS.",
+        "   RUN THE BACK MHA-VN-034 IN TIGHT, THEN THE FRONT ONE.",
         # F3: the leaf reads the end play only with the bank closed up on
         # the back washer; pulled forward it reads nothing.
         "9F. THE BANK TURNS FREE BY HAND. BANK PUSHED BACK:",
@@ -673,11 +682,11 @@ BANK_STEPS = "\n".join(
         # cites this step by key (channel_steps.NORTH_BRACKET_SET_REF). The
         # band the rod pins need from it is open: #948.
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-005 SCREWED DOWN ON THE BASE"
-        " (FRAME ASSEMBLY MHA-FR-000 STEP 8),",
-        "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE MHA-FR-005",
-        "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 67.62-67.81;",
-        "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE MHA-FR-005 SEAT",
-        "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
+        " (FRAME ASSEMBLY MHA-FR-000",
+        "   STEP 8), DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE",
+        "   MHA-FR-005 RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y",
+        "   67.62-67.81; CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE",
+        "   MHA-FR-005 SEAT CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
         f"   PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
     )
 )
@@ -769,7 +778,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "cams-and-lever-fitted",
             f"FIT {cams}X MHA-DT-023 AND MHA-DT-016 ON MHA-DT-017 IN THE MHA-DT-018 LIFT "
             "BORES, EACH CAM ECCENTRIC DOWN, ITS M2.5 SET SCREW (SUPPLIED WITH "
-            "MHA-DT-023) LOOSE. SEAT MHA-DT-016 ON MHA-DT-017 TO THE BORE FLOOR.",
+            "MHA-DT-023) LOOSE. SEAT MHA-DT-016 TO ITS BORE FLOOR.",
         ),
         # U28 corollary (Main 2026-09-23): the rig's east-west locate is its
         # parked tip gap, on the level line of centres, where block travel
@@ -778,7 +787,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # bank.
         (
             "rig-located",
-            "LOCATE THE RIG ON BASE MHA-FR-001 (FRAME ASSEMBLY MHA-FR-000); ITS SEATS "
+            "LOCATE THE RIG ON BASE MHA-FR-001; ITS SEATS "
             "ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-DT-018 LOOSE ON THE "
             f"BASE WITH MHA-DT-024 FITTED: {SPRING_EAST_WEST}. PARK MHA-DT-016: THE "
             "MHA-DT-025 PINS REST ON THE CAMS UNDER THE SPRING. FACE A MHA-DT-001 "
@@ -787,7 +796,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"{TIP_GAP.TIP_GAP_ACCEPT_TEXT}. SET IT AT THE FRONT AND BACK "
             "STATIONS TO SQUARE BOTH MHA-DT-018 TO THE DRUM.",
         ),
-        ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH MHA-DT-018."),
+        ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH BLOCKS."),
         # The seats' drill, tap and depth are the MHA-FR-001 transfer callouts'
         # (build_fr_harmonic_base), so the sheet names the print, never a copy.
         (
@@ -826,8 +835,9 @@ CHECKS = "\n".join(
         "   CONE SET 1/4 TURN (16T:64T).",
         # User ruling 2026-09-28: the fixed-centre crank mesh must never bind;
         # no backlash acceptance interval or fit-up target remains.
-        "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-007",
-        "   TURN; EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE MHA-DT-003 PRINT.",
+        "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH ONE FULL",
+        "   MHA-DT-007 TURN; EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE",
+        "   MHA-DT-003 PRINT.",
         "3. EACH MHA-DT-012 TURNS FREELY ON MHA-DT-013 WITHOUT AXIAL BINDING.",
         # The same bound the MHA-DT-012 print states (dt_cylinder_gear_notes).
         f"   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO {RING_OVERHANG_TEXT} (AT LEAST",
@@ -835,13 +845,14 @@ CHECKS = "\n".join(
         # MHA-VN-015 is the DISENGAGED stop (build_dt_cone_swing_platform
         # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
         # it, so the cone set comes back on its meshes, not on the stop.
-        "4. CONE SWING (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014 TO",
-        "   THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. SWING IT BACK UNTIL ALL",
-        "   {cone_gears} MESHES RE-ENGAGE; TIGHTEN MHA-VN-013.",
+        "4. CONE SWING (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON",
+        "   MHA-VN-014 TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. SWING",
+        "   IT BACK UNTIL ALL {cone_gears} MESHES RE-ENGAGE; TIGHTEN MHA-VN-013.",
         "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-DT-012 BY HAND",
-        "   UNTIL ITS NOTCH LINES UP. TURN MHA-DT-016 TO ENGAGE MHA-DT-001; TURN",
-        "   MHA-DT-001 BY MHA-DT-015 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
-        "   (SINES). RETURN MHA-DT-016 TO PARK; RE-ENGAGE THE CONE SET.",
+        "   UNTIL ITS NOTCH LINES UP. TURN MHA-DT-016 TO ENGAGE MHA-DT-001;",
+        "   TURN MHA-DT-001 BY MHA-DT-015 UNTIL ALL NOTCHES POINT UP (COSINES)",
+        "   OR 90 DEG (SINES). RETURN MHA-DT-016 TO PARK;",
+        "   RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-DT-024 HOLDS MHA-DT-001 CLEAR OF EVERY MHA-DT-012.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_FEELER:.2f} FEELER IS SNUG TIP TO TIP",
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
@@ -862,10 +873,12 @@ SETUP_NOTES = "\n".join(
 INTERFACE_NOTES = "\n".join(
     (
         "EXTERNAL INTERFACES - NOT BOM ITEMS",
-        "BASE MHA-FR-001 (FRAME ASSEMBLY MHA-FR-000) RECEIVES MHA-VN-014, MHA-VN-013,",
-        "MHA-VN-015, {slotted}X MHA-VN-019, {foot}X MHA-VN-020 AND {hold_down}X MHA-VN-032.",
+        "BASE MHA-FR-001 (FRAME ASSEMBLY MHA-FR-000) RECEIVES MHA-VN-014,",
+        "MHA-VN-013, MHA-VN-015, {slotted}X MHA-VN-019, {foot}X MHA-VN-020 AND",
+        "{hold_down}X MHA-VN-032.",
         "PAPER DRIVE MHA-PD-000: T12 CHAIN WHEEL ON MHA-DT-011.",
-        "CHANNEL ASSEMBLY MHA-CH-000: CONNECTING RODS RUN ON THE MHA-DT-012 CAMS.",
+        "CHANNEL ASSEMBLY MHA-CH-000: CONNECTING RODS RUN ON THE",
+        "MHA-DT-012 CAMS.",
     )
 )
 
@@ -901,17 +914,18 @@ _RECESS_MID = (PINION_RECESS_MIN + PINION_RECESS_MAX) / 2.0
 CRANK_WASHER_FIT_NOTES = "\n".join(
     (
         f"MHA-DT-036 THRUST WASHER FIT (STEP {steps.step_number('crank-mesh-checked')})",
-        "A. TRIAL FIT WITHOUT MHA-DT-036, MHA-DT-010 UNPINNED ON THE "
-        f"{PINION_SEAT_FEELER:.2f} FEELER,",
-        f"   MHA-DT-011 END {_RECESS_MID:.2f} BELOW MHA-DT-010 NORTH FACE: MEASURE MHA-DT-011 "
-        "COLLAR",
-        "   REAR FACE TO MHA-DT-005 BOSS SOUTH FACE "
-        f"({WASHER_GAP_MIN:.2f}-{WASHER_GAP_MAX:.2f}).",
-        "B. WITHDRAW BOTH. FACE MHA-DT-036 TO THAT GAP; SLIDE IT ONTO MHA-DT-011",
-        "   FROM THE REAR, FLAT ON THE COLLAR. REFIT MHA-DT-011 AND MHA-DT-010.",
-        "C. MHA-DT-036 SEATED ON THE BOSS AND MHA-DT-010 ON THE FEELER: MHA-DT-011 END",
-        f"   {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-DT-010 NORTH FACE, "
-        f"END PLAY {PINION_SEAT_FEELER:.2f}.",
+        "A. TRIAL FIT WITHOUT MHA-DT-036, MHA-DT-010 UNPINNED ON THE",
+        f"   {PINION_SEAT_FEELER:.2f} FEELER, MHA-DT-011 END {_RECESS_MID:.2f} BELOW MHA-DT-010 "
+        "NORTH FACE:",
+        "   MEASURE MHA-DT-011 COLLAR REAR FACE TO MHA-DT-005 BOSS SOUTH FACE",
+        f"   ({WASHER_GAP_MIN:.2f}-{WASHER_GAP_MAX:.2f}).",
+        "B. WITHDRAW BOTH. FACE MHA-DT-036 TO THAT GAP; SLIDE IT ONTO",
+        "   MHA-DT-011 FROM THE REAR, FLAT ON THE COLLAR. REFIT MHA-DT-011",
+        "   AND MHA-DT-010.",
+        "C. MHA-DT-036 SEATED ON THE BOSS AND MHA-DT-010 ON THE FEELER:",
+        f"   MHA-DT-011 END {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-DT-010 "
+        "NORTH FACE,",
+        f"   END PLAY {PINION_SEAT_FEELER:.2f}.",
     )
 )
 
@@ -1307,10 +1321,14 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
     Sheet 1's bounds here are nominal (the heading's lines at NOTE_LINE_PITCH
     under ASSEMBLED_HEADING_XY, the isometric's top at ASSEMBLED_ISO_TOP); its
     placement re-derives them from the measured heading and isometric. Sheet
-    6's right field stays empty: it is reserved for D1 (#957).
+    6's right field carries only the crank-handle step at its top; the rest
+    stays reserved for D1 (#957).
     """
     heading_lines = len(heading_text(1, ASSEMBLED_HEADING).splitlines())
     cone_gears = facts.count("dt-cone-gear")
+    cone_crank = CONE_CRANK_STEPS.format(cone_gears=cone_gears)
+    handle_step = cone_crank.index(f"\n{steps.step_number('crank-handle-fitted')}. ")
+    cone_crank_heading = cone_crank.split("\n", 1)[0]
     return (
         NoteField(
             1,
@@ -1325,10 +1343,16 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             SEQUENCE_SHEET,
             f"sheet {SEQUENCE_SHEET} left note field",
             NOTE_FIELD_LEFT,
+            (("cone and crank sequence", cone_crank[:handle_step]),),
+        ),
+        NoteField(
+            SEQUENCE_SHEET,
+            f"sheet {SEQUENCE_SHEET} right note field",
+            ISO_RIGHT_FIELD,
             (
                 (
-                    "cone and crank sequence",
-                    CONE_CRANK_STEPS.format(cone_gears=cone_gears),
+                    "crank handle sequence",
+                    f"{cone_crank_heading} (CONT.){cone_crank[handle_step:]}",
                 ),
             ),
         ),
@@ -1364,7 +1388,6 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             ISO_RIGHT_FIELD,
             (
                 ("cone station table", station_table_text(facts.cone_rows())),
-                ("fit placeholder", FIT_PLACEHOLDER),
                 ("crank washer fit", CRANK_WASHER_FIT_NOTES),
             ),
         ),
@@ -1372,7 +1395,12 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             CHECKS_SHEET,
             f"sheet {CHECKS_SHEET} left note field",
             NOTE_FIELD_LEFT,
-            (("functional checks", CHECKS.format(cone_gears=cone_gears)),),
+            (
+                ("functional checks", CHECKS.format(cone_gears=cone_gears)),
+                # The fixed-centre crank mesh statement cites check 2: it
+                # stands under the checks, clear of the sheet 8 fit-up.
+                ("fit placeholder", FIT_PLACEHOLDER),
+            ),
         ),
         NoteField(
             CHECKS_SHEET,
@@ -2591,7 +2619,7 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _reference_iso(
         adapter, caption="FINISHED ASSEMBLY 1:8", label="sequence reference isometric"
     )
-    # The right field stays empty: it is reserved for D1 (#957).
+    # The right field carries step 7 at its top; the rest is reserved for D1 (#957).
     return _stack_sheet_note_fields(adapter, facts, SEQUENCE_SHEET)
 
 
@@ -2781,6 +2809,7 @@ async def build(adapter: Any) -> dict[str, str]:
             artifacts = await finalize_drawing(
                 adapter,
                 OUTPUTS,
+                spec=SPEC,
                 layout=SPEC.layout,
                 pdf_title="Drive-Train Assembly Drawing Package",
                 scale=ASSEMBLED_SCALE,

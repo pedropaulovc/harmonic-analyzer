@@ -224,7 +224,7 @@ export function sourceCensus(observations, track, native, options) {
 
 async function loadRecord(id, referenceRoot, signal) {
   const track = JSON.parse(await readFile(resolve(WEB_ROOT, `content/${id}.source-track.json`), 'utf8'))
-  const observations = JSON.parse(await readFile(resolve(WEB_ROOT, `content/${id}.observations.json`), 'utf8'))
+  const observations = JSON.parse(await readFile(resolve(WEB_ROOT, `content/canonical-native/${id}.observations.json`), 'utf8'))
   assert(track.kind === 'compact-source-track' && track.schemaVersion === 1, 'Expected the compact source-track contract')
   const expectedHash = SOURCE_HASHES[VIDEO_IDS.indexOf(id)]
   assert(track.source?.videoId === id && track.source.sha256 === expectedHash && observations.source?.sha256 === expectedHash, 'Compact/source census identity differs from retained original MP4 SHA256')

@@ -2459,9 +2459,9 @@ def test_fastener_recipe_records_an_absent_selected_row():
     """A selected key that does not exist yet is part of the recipe, so adding it
     moves the key of every task that asked for it."""
     ghost = frozenset({"not-yet-catalogued"})
-    removed = _CATALOG.replace(
-        '"frame-side-screw": _stock(', '"frame-side-screw-x": _stock(', 1
-    )
+    marker = '"vn-frame-side-screw": _stock('
+    assert _CATALOG.count(marker) == 1
+    removed = _CATALOG.replace(marker, '"vn-frame-side-screw-x": _stock(', 1)
     assert bg.dict_table_recipe(_CATALOG, "FASTENERS", ghost) == bg.dict_table_recipe(
         removed, "FASTENERS", ghost
     )

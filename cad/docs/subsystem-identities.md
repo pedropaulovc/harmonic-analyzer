@@ -6,7 +6,7 @@ Current part and assembly identities are frozen in [`cad/config/parts/`](../conf
 
 Use `<prefix>-<descriptive-name>` for native model and exported asset basenames, and `<prefix>_<descriptive_name>` for Python module and doit task stems. Assembly builders and drawing artefacts retain their `_assembly` or `-assembly` suffix. For example, `dt-drive-train.SLDASM` is built by `build_dt_drive_train_assembly.py`; its drawing artefact stem is `dt-drive-train-assembly`.
 
-Drawing Numbers use `MHA-<CATEGORY>-<NNN>`. `000` is the category's assembly drawing; parts start at `001`. HA, CH, DT, FR, MG, PD, PN and SM have assemblies. VN and SH contain parts only. The cutover assigned part sequences by the old numeric identifier within each evidence-derived category. The numbers are stored in the registries, not recalculated when the graph changes. Configuration variants share their part family's Number; installed channel spring stretch variants retain the base Number.
+Drawing Numbers use `MHA-<CATEGORY>-<NNN>`. `000` is the category's assembly drawing; parts start at `001`. HA, CH, DT, FR, MG, PD, PN and SM have assemblies. VN and SH contain parts only. The cutover assigned part sequences by the old numeric identifier within each evidence-derived category. The numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the new family Number, such as `MHA-DT-003-T006` for a cone-gear configuration; installed channel spring stretch variants retain the unqualified base Number.
 
 | Prefix | Category | Parts |
 |---|---|---:|
@@ -42,8 +42,10 @@ The offline configuration gate (`verify.py --suite config`, selected through
 part sequences starting at `001`, unique Numbers across both kinds, and closure
 between registries, producers, drawings and dependency references. Assembly
 saves and refreshes stamp the Number from the assembly's own YAML contract.
-Grouped BOM part properties accept category-qualified part Numbers with a
-nonzero sequence only when they identify an exact frozen parts-registry entry.
+Grouped BOM part properties read the Number, category and description once
+from the part's own frozen registry row, selected by canonical `part_name`.
+The Number must be category-qualified with a nonzero part sequence; the
+caller depends only on its own row.
 Assembly `000` Numbers are assembly references, not part Numbers.
 
 ## Historical evidence

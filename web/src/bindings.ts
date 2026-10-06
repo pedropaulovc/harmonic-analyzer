@@ -40,10 +40,10 @@ export const BINDINGS: readonly Binding[] = [
   // Pinned release build_drive_train_assembly:4225-4241 locks the anchor screw to the arm.
   group('crank', drive, '(?:dt-crankshaft|dt-crank-arm|dt-crank-hub|vn-crank-hub-pin|dt-crank-pin|dt-crank-pin-eye|dt-crank-handle-pivot-screw|dt-crank-pin-ring|dt-crank-handle|dt-crank-pinion|dt-crank-pinion-pin|vn-fillister-screw)-1', 'crank', 12),
   family('coneGears', drive, 'dt-cone-gear', 'cone-spin'),
-  group('coneShaft', drive, '(?:dt-cone-gear-shaft|dt-crank-drive-gear)-1', 'cone-spin', 2),
+  group('coneShaft', drive, '(?:dt-cone-gear-shaft|dt-crank-drive-gear|vn-cone-tip-collar)-1', 'cone-spin', 3),
   // Source build_drive_train_assembly:4505-4555 carries post/fasteners;
   // :3772-3799 makes the lock knob and pivot screw base-bolted statics.
-  group('conePlatform', drive, '(?:dt-cone-swing-platform|dt-cone-tip-block|dt-cone-tip-bushing|vn-cone-tip-pinch-screw|vn-cone-tip-adjuster|dt-cone-tip-shim|dt-cone-pivot-post)-1|vn-post-mount-screw-[12]', 'cone-swing', 9),
+  group('conePlatform', drive, '(?:dt-cone-swing-platform|dt-cone-tip-block|vn-cone-tip-pinch-screw|vn-cone-tip-adjuster|vn-cone-tip-block-screw|dt-cone-pivot-post)-1|vn-post-mount-screw-[12]', 'cone-swing', 8),
   family('cylinderGears', drive, 'dt-cylinder-gear', 'cylinder'),
   family('connectingRods', channel, 'ch-connecting-rod', 'rod'),
   family('rockerArms', channel, 'ch-rocker-arm', 'rocker'),
@@ -68,7 +68,7 @@ export const BINDINGS: readonly Binding[] = [
   group('alignmentPinionSwing', drive, 'dt-pinion-bracket-[12]|dt-alignment-pinion-1|dt-pinion-arbor-1|vn-pinion-strap-pin-[123]|dt-pinion-handle-1|dt-pinion-arbor-collar-1', 'pinion-swing', 9),
   group('alignmentPinionCam', drive, 'dt-pinion-cam-[12]|dt-pinion-lift-rod-1|dt-pinion-cam-pin-[12]', 'pinion-cam', 5),
   group('alignmentPinionLever', drive, 'dt-pinion-lever-1|dt-pinion-lever-pin-1', 'pinion-lever', 2),
-  group('paperGears', paper, '(?:pd-transgear-pinion|pd-transgear-feed-pinion|pd-rack-pinion|pd-transgear-knob-shaft|pd-transgear-thumbnut)-1', 'paper-gear', 5),
+  group('paperGears', paper, '(?:pd-transgear-feed-pinion|pd-rack-pinion|pd-transgear-disc-hub|pd-transgear-knob-shaft|pd-transgear-thumbnut)-1|vn-transgear-disc-screw-[123]', 'paper-gear', 8),
   group('paperChain', paper, 'vn-chain-(?:outer|inner)-link-(?:[1-9]|[12][0-9]|3[0-3])', 'chain-link', 66),
   group('paperSprockets', paper, 'pd-transgear-removable-[123]', 'paper-gear', 3),
   group('magnifierFixture', magnifier, 'mg-output-fixture-1', 'magnifier-fixture', 1),

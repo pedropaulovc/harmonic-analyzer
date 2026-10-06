@@ -1935,6 +1935,8 @@ def _soundness_file_deps(stem: str) -> list[str]:
         str(VERIFY_PY),
         str(POSTBUILD_PY),
         str(INTERFERENCE_CONTRACTS_PY),
+        str((SCRIPTS_DIR / "_identity.py").resolve()),
+        str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
         assembly_contract_file(stem),
         _sldasm(stem),
         _assembly_execution_token(stem),
@@ -1972,6 +1974,8 @@ def _kinematics_file_deps() -> list[str]:
     return [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
+        str((SCRIPTS_DIR / "_identity.py").resolve()),
+        str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
         _sldasm("pn_pen"),
         _assembly_execution_token("pn_pen"),
         _sldasm("mg_magnifier"),
@@ -1995,6 +1999,8 @@ def _preflight_file_deps() -> list[str]:
         str(VERIFY_PY),
         str((SCRIPTS_DIR / "_assembly.py").resolve()),
         str(POSTBUILD_PY),
+        str((SCRIPTS_DIR / "_identity.py").resolve()),
+        str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
         _sldasm("dt_drive_train"),
         _assembly_execution_token("dt_drive_train"),
         _sldasm("ch_channel"),
@@ -2896,7 +2902,13 @@ def task_verify():
         # file_dep), so without it every dispatched verify_soundness:<stem> leaf is
         # refused as "not in the packaged graph".
         "task_dep": [f"verify_soundness:{stem}" for stem in ASSEMBLY_ORDER],
-        "file_dep": [str(VERIFY_PY), str(POSTBUILD_PY), *child_stamps],
+        "file_dep": [
+            str(VERIFY_PY),
+            str(POSTBUILD_PY),
+            str((SCRIPTS_DIR / "_identity.py").resolve()),
+            str((SCRIPTS_DIR / "_drawing_registry.py").resolve()),
+            *child_stamps,
+        ],
         "targets": [soundness_stamp],
         "actions": [(_write_stamp, ["verify soundness", soundness_stamp])],
         "clean": True,
@@ -2933,16 +2945,10 @@ def task_verify():
     }
 
     # Temporary opt-in route-B probe; remove after native template evidence is captured.
+    from diagnostics.probe_title_field_fit import PDFS, REPORT as probe_report
+
     probe = (SCRIPTS_DIR / "diagnostics" / "probe_title_field_fit.py").resolve()
-    probe_dir = CAD_OUT / "probe" / "title-field-fit"
-    probe_outputs = [
-        probe_dir / "title-field-fit.json",
-        *(
-            probe_dir / f"{case}-{layout.value}.pdf"
-            for case in ("control-v39", "number10-title29", "number15-title29")
-            for layout in DRAWING_TEMPLATES
-        ),
-    ]
+    probe_outputs = [probe_report, *PDFS.values()]
     probe_deps = sorted(
         {
             str(probe),
@@ -3714,7 +3720,7 @@ def task_export():
     return {
         "file_dep": deps,
         "targets": [
-            str((CAD_OUT / "boxes" / "harmonic-analyzer.json").resolve()),
+            str((CAD_OUT / "boxes" / "ha-harmonic-analyzer.json").resolve()),
             str((REPORTS / "release-neutral.json").resolve()),
         ],
         # Neutral release formats require soundness and kinematics, independent
@@ -3920,6 +3926,8 @@ def task_release():
             "package:release",
             "preflight",
             "check:features_bound",
+            # Temporary probe-export root edge; removed with the native probe.
+            "verify:title_field_probe",
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),

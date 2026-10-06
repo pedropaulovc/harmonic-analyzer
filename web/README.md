@@ -92,7 +92,7 @@ discrete mechanical changes still hold the decoded exposure. This is unmeasured
 source-informed framing, not recovered camera history or a fidelity pass.
 The final **5% / 0.5-second** limits and other videos' policies remain unchanged.
 
-The optional `content/<videoId>.chosen-camera-continuity.json` permission packet
+The optional `content/canonical-native/<videoId>.chosen-camera-continuity.json` permission packet
 pins source SHA, shot bounds, native coverage and unmeasured main/whole framing
 evidence. No packet preserves the old policy. Analysis03 retains all 90 source
 observation rows covering the contiguous native exposures 132..218. Synthesis's
@@ -115,10 +115,10 @@ before publishing either.
 Analysis has bounded cumulative source-drive authority for the visible crank
 (79.8130667..86.6866 seconds) and mirrored bank (112.3122..119.0856333 seconds).
 The authoritative packets are
-[`6dW6VYXp9HM.visible-crank-motion.json`](content/6dW6VYXp9HM.visible-crank-motion.json),
-[`6dW6VYXp9HM.visible-crank-gauge.json`](content/6dW6VYXp9HM.visible-crank-gauge.json),
-[`6dW6VYXp9HM.automatic-motion.json`](content/6dW6VYXp9HM.automatic-motion.json)
-and [`6dW6VYXp9HM.motion-controls.json`](content/6dW6VYXp9HM.motion-controls.json).
+[`6dW6VYXp9HM.visible-crank-motion.json`](content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json),
+[`6dW6VYXp9HM.visible-crank-gauge.json`](content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json),
+[`6dW6VYXp9HM.automatic-motion.json`](content/canonical-native/6dW6VYXp9HM.automatic-motion.json)
+and [`6dW6VYXp9HM.motion-controls.json`](content/canonical-native/6dW6VYXp9HM.motion-controls.json).
 They separate observed relative motion from chosen native sign/home and hidden
 setup. Same-shot margins hold the nearest new input through the real cut;
 other shots, views and presentations retain their existing paths.
@@ -127,8 +127,8 @@ source-specific producers and limits. These drives remain chosen approximations;
 source camera and geometry fidelity are unaccepted.
 
 Synthesis's rocker-bank interval **105.980875..124.4159583 seconds** uses
-[automatic-motion inputs](content/8KmVDxkia_w.automatic-motion.json) and
-[source evidence](content/8KmVDxkia_w.automatic-motion-evidence.json), produced by
+[automatic-motion inputs](content/canonical-native/8KmVDxkia_w.automatic-motion.json) and
+[source evidence](content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json), produced by
 [`generate-8KmVDxkia_w-automatic-motion.py`](scripts/generate-8KmVDxkia_w-automatic-motion.py).
 The source's 4× label describes published-video playback: mean cadence is
 1.559234652 turns/s, with unsigned cumulative drive of 28.744620749 turns across
@@ -253,12 +253,21 @@ Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
 pixel format. Formats never alias each other; sampling diagnostics list
 supported formats and any unsupported source declarations.
 
-Source generators use committed observations, chosen seed states and immutable
-numeric calibration metadata under `content/`. Original private capture paths
-and hashes remain provenance links, not regeneration dependencies. No source
-video or screenshots are included in those inputs. Capture-bound renderer and
-model hashes remain strict; changing the renderer requires recapturing its
-bound evidence.
+Source generators and active loaders use the identity-translated observations,
+seed states, calibration and motion packets under `content/canonical-native/`.
+The originals under `content/` remain byte-exact archival evidence from
+`bfde892a5`; fitting, observation and static-calibration commands refuse those
+original observation files as current inputs.
+
+The [derivative manifest](content/canonical-native/manifest.json) records each
+derivative and original SHA-256, mapping revision and digest, preserved numeric
+tokens, and sealed historical-code snapshots. Those code seals establish
+original lineage only. They do not qualify the current renderer or CAD.
+Original private capture paths and observation hashes remain provenance links,
+not regeneration dependencies; no source video or screenshots are included.
+Capture-bound renderer and model hashes remain strict. Canonical farm GLB
+export, metadata re-export and current-renderer recapture/requalification are
+still required before claiming current-model source fidelity.
 Lossless delivery optimization keeps the native raw hash authoritative; it does
 not recalibrate observations or establish geometry/source fidelity acceptance.
 

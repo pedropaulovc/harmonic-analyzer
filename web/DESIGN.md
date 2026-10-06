@@ -14,6 +14,18 @@ reference hashes. `youtube-player.ts` owns the visible official embed.
 `scene.ts` applies the physical pose to the lossless delivery representation of
 the full native GLB.
 
+Active observation, calibration and motion inputs live under
+`content/canonical-native/`. These identity-translated derivatives preserve the
+original numeric observations; originals under `content/` remain byte-exact
+archival evidence from `bfde892a5`. Fitting, observation and static-calibration
+commands refuse original observation files as current inputs.
+The [manifest](content/canonical-native/manifest.json) seals derivative and
+original SHA-256 values, mapping revision/digest, numeric-token preservation and
+historical-code snapshots. Historical-code seals prove original lineage only.
+Translation does not qualify current CAD, renderer or source-camera correspondence;
+canonical farm export, metadata re-export and renderer requalification remain
+required.
+
 The raw GLB hash and source revision must match the generated mechanical data.
 The browser separately verifies the actual optimized bytes against the compiled
 representation record before loading them with the Meshopt decoder. A rejected
@@ -226,7 +238,7 @@ cut, layout, gearing and counter-height-mode guards remain authoritative.
 Analysis03's bounded **4.4044..7.307300000000001-second** interval and
 Synthesis's presenter-to-spin **25.984291667..26.609916667-second** interval
 opt in to this chosen continuous framing through the same optional
-`content/<videoId>.chosen-camera-continuity.json` permission convention.
+`content/canonical-native/<videoId>.chosen-camera-continuity.json` permission convention.
 Position, quaternion rotation, FOV and principal point interpolate; Synthesis
 holds its existing front-camera position/quaternion and blends its chosen
 principal-point/FOV reframing keys. Its 16 retained source rows cover native
@@ -257,8 +269,8 @@ interpolation. Both roots preserve the observed rocker angle but may change an
 unobserved cam/rod orientation. The original rod bounds, CHECK pixels and
 branch-choice audit remain required; phase history is not recovered.
 
-Synthesis's [automatic-motion packet](content/8KmVDxkia_w.automatic-motion.json)
-and [evidence packet](content/8KmVDxkia_w.automatic-motion-evidence.json) are
+Synthesis's [automatic-motion packet](content/canonical-native/8KmVDxkia_w.automatic-motion.json)
+and [evidence packet](content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json) are
 produced by
 [`generate-8KmVDxkia_w-automatic-motion.py`](scripts/generate-8KmVDxkia_w-automatic-motion.py).
 They bound the rocker bank to **105.980875..124.4159583 seconds**, with 410 native
@@ -314,19 +326,19 @@ The source-specific producers
 and [`6dW6VYXp9HM-extract-automatic-motion.py`](scripts/6dW6VYXp9HM-extract-automatic-motion.py)
 produce the numerical authority consumed by
 [`generate-analysis-synthesis-source-tracks.py`](scripts/generate-analysis-synthesis-source-tracks.py).
-The crank's [motion packet](content/6dW6VYXp9HM.visible-crank-motion.json)
+The crank's [motion packet](content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json)
 records clockwise source motion at 0.90..0.98 turns/second over full cycles,
 then the actual bottom hold, within 79.8130667..86.6866 seconds.
 Source-native sign and absolute home remain `null`. The separate
-[chosen gauge](content/6dW6VYXp9HM.visible-crank-gauge.json) applies
+[chosen gauge](content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json) applies
 `nativeT = -relativeT + 0.711801723` while preserving the initial bank pose.
 Actual native crank projection under the existing camera gives normalized
 projection-angle RMS 9.19 degrees and maximum 11.34 degrees. This chooses an
 integration gauge without establishing historical physical home or qualifying
 the camera.
 
-The bank's [automatic-motion packet](content/6dW6VYXp9HM.automatic-motion.json)
-uses the frozen [motion controls](content/6dW6VYXp9HM.motion-controls.json) for
+The bank's [automatic-motion packet](content/canonical-native/6dW6VYXp9HM.automatic-motion.json)
+uses the frozen [motion controls](content/canonical-native/6dW6VYXp9HM.motion-controls.json) for
 112.3122..119.0856333 seconds. It advances effective cumulative `T` by
 3.890576427 turns with twenty constant driving-shaft phases and amplitudes,
 retaining the first chosen complete hidden setup. These phases are not rocker

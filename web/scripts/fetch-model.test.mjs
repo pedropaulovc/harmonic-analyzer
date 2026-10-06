@@ -295,7 +295,7 @@ test('compatible future geometry publishes with source/config provenance changes
 
 test('staged fixed feed and spring-shape changes are refused before any live model, descriptor or native publication', async t => {
   for (const [name, path, from, to, parameter] of [
-    ['reducer teeth', 'cad/scripts/transgear_pinion_spec.py', 'TEETH = 12', 'TEETH = 13', 'paperDrive.reducerRatio'],
+    ['reducer teeth', 'cad/scripts/pd_transgear_knob_shaft_spec.py', 'TEETH = 12', 'TEETH = 13', 'paperDrive.reducerRatio'],
     ['rack pitch', 'cad/scripts/pd_transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 32.0', 'paperDrive.feedPitchDiameterMm'],
     ['signed feed', 'cad/scripts/build_kinematic_probe.py', 'FEED_SIGN = +1.0', 'FEED_SIGN = -1.0', 'paperDrive.rackFeedSense'],
     ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/vn_counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997', 'counter.deformation.coilEndInsetMm'],

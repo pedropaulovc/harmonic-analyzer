@@ -6,35 +6,47 @@ notes. The template authored those notes once; the strings they print change
 with every part, so only the finished sheet says whether a value printed
 whole, on one line, inside its ruled cell. :func:`read_title_fields` reads
 each linked note natively -- its unresolved link (``PropertyLinkedText``),
-its resolved text (``GetText``), its sheet-space box (``GetExtent``), its
-character height and text format -- beside the linked model's own value for
-the property the link names. :func:`assert_title_fields` holds each reading
-to the contract:
+its resolved text (``GetText``), its sheet-space box (``GetExtent``), how
+many text items it and its display data hold, its text format -- beside the
+linked model's stored value for the property the link names, and beside the
+drawing's own frozen identity (:func:`registry_identity`).
+:func:`assert_title_fields` holds each reading to the contract:
 
-* the linked property is a full identity (``MHA-XX-###``, cone-gear's
-  ``-T###`` configuration suffix included; a ``xx-`` slug whose category
-  matches the Number's), and the note prints exactly it: the readback;
+* every sheet documents the drawing's own source (``DrawingSpec.source``);
+* that source's frozen identity is authoritative: the linked model's
+  property and the printed text both equal it (a part's registry Number and
+  slug, as ``_common.part_properties`` stamps them, only dt-cone-gear's
+  Number extended with its view configuration's ``-T###``; an assembly's
+  contract Number and stem);
 * the note's extent lies inside its cell's rules
   (``DrawingTemplateSpec.title_cells_m``) with ``TITLE_FIELD_CLEARANCE_M`` of
   air;
-* one line: the extent is less than two character heights tall.
+* one line: the note and its display data each hold exactly one text item,
+  the text carries no line break, and no wrap width narrower than the cell
+  is set.
 
-Nothing shortens, hides or shrinks an identity to make it fit: a misfit fails
-the drawing, and the fix is the template's cell. The exported PDF proves the
-same fit a second way, on the printed glyphs
-(``_layout_audit.find_title_field_misfits``), so an extent that stopped
+Reading the model changes nothing: the stored-value reads loop over no
+configuration, and the model's active configuration and dirty flag are
+read back unchanged. Nothing shortens, hides or shrinks an identity to make
+it fit: a breach fails the drawing (:class:`TitleFieldContractError`, its
+breaches by kind), and the fix is the template's cell. The exported PDF
+proves the same fit a second way, on the printed glyphs
+(``_layout_audit.find_title_field_misfits``), so a native read that stopped
 tracking the print cannot pass alone.
 """
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import _telemetry
-from _common import _early_bound, _read_member
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
+from _assembly_contract import assembly_contract
+from _common import _early_bound, _read_member, part_properties
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, DrawingSpec
 from _layout_audit import TITLE_FIELD_CLEARANCE_M
 
 # The properties each identity cell's note may link, by cell. The PART cell
@@ -52,14 +64,53 @@ _OWNER_DRAWING_TEMPLATE = 2
 _ANNOT_NOTE = 6
 # swSummInfoField_e for the built-in property a "SW-" link names.
 _SUMMARY_FIELDS = {"SW-Title": 0}
-# swCustomInfoGetResult_e.swCustomInfoGetResult_NotPresent
-_NOT_PRESENT = 1
 # The identity shapes (the registry's, ``_identity``): a configuration may
 # extend its part's Number with a tooth count (``dt_cone_gear_spec``).
 _NUMBER = re.compile(r"MHA-([A-Z]{2})-[0-9]{3}(?:-T[0-9]{3})?")
 _TITLE = re.compile(r"([a-z]{2})-[a-z0-9]+(?:-[a-z0-9]+)*")
-# A wrapped value is at least two lines of its character height tall.
-_LINES_TALL = 2.0
+# The one part whose sheets print a per-configuration Number: its build
+# stamps ``dt_cone_gear_spec.configuration_number`` (registry Number +
+# "-T###") on each configuration named "T###".
+_CONFIGURATION_NUMBERED = frozenset({"dt-cone-gear"})
+_CONFIGURATION = re.compile(r"T[0-9]{3}")
+
+
+@dataclass(frozen=True)
+class TitleSource:
+    """What one sheet's identity cells must print: the model its
+    ``$PRPSHEET`` links resolve on, the configuration its property view
+    shows, and the registry identity."""
+
+    model: Any
+    configuration: str
+    number: str
+    title: str
+
+    def expected(self, source: str) -> str:
+        return self.number if source == "Number" else self.title
+
+
+@dataclass(frozen=True)
+class TitleFieldBreach:
+    """One breach of the contract: ``kind`` is one of ``foreign-source``,
+    ``not-identity``, ``model-mismatch``, ``readback``, ``outside-cell``,
+    ``multi-line``, ``wrap-width``, ``model-changed``."""
+
+    sheet: str
+    source: str
+    kind: str
+    detail: str
+
+    def format(self) -> str:
+        return f"sheet {self.sheet!r} {self.source} [{self.kind}]: {self.detail}"
+
+
+class TitleFieldContractError(RuntimeError):
+    """The title block identity contract failed; ``breaches`` says how."""
+
+    def __init__(self, breaches: Sequence[TitleFieldBreach]) -> None:
+        self.breaches = tuple(breaches)
+        super().__init__("title block identity contract:\n" + "\n".join(b.format() for b in self.breaches))
 
 
 @dataclass(frozen=True)
@@ -67,18 +118,25 @@ class TitleFieldReading:
     """One identity note on one sheet, as SolidWorks reports it.
 
     Boxes are ``(left, bottom, right, top)`` in sheet metres; ``extent`` is
-    ``INote::GetExtent``, ``cell`` the template cell's rules."""
+    ``INote::GetExtent``, ``cell`` the template cell's rules. ``expected`` is
+    the registry identity, ``model_value`` the linked model's stored
+    property. ``text_count`` is ``INote::GetTextCount``, ``display_count``
+    ``IDisplayData::GetTextCount`` (-1 where SolidWorks answered no display
+    data)."""
 
     sheet: str
     source: str
     link: str
     expected: str
+    model_value: str
     printed: str
     extent: tuple[float, float, float, float]
     cell: tuple[float, float, float, float]
     char_height: float
     typeface: str
     line_length: float
+    text_count: int
+    display_count: int
 
     @property
     def clearance(self) -> float:
@@ -87,23 +145,42 @@ class TitleFieldReading:
         (x0, y0, x1, y1), (cx0, cy0, cx1, cy1) = self.extent, self.cell
         return min(x0 - cx0, cx1 - x1, y0 - cy0, cy1 - y1)
 
-    def problems(self, clearance: float = TITLE_FIELD_CLEARANCE_M) -> list[str]:
+    def problems(self, clearance: float = TITLE_FIELD_CLEARANCE_M) -> list[tuple[str, str]]:
+        """``(kind, detail)`` for every breach (see :class:`TitleFieldBreach`)."""
         shape = _NUMBER if self.source == "Number" else _TITLE
         found = []
         if shape.fullmatch(self.expected) is None:
-            found.append(f"the linked model's {self.source} {self.expected!r} is not a full identity")
+            found.append(("not-identity", f"the registry {self.source} {self.expected!r} is not a full identity"))
+        if self.model_value != self.expected:
+            found.append(
+                ("model-mismatch", f"the linked model holds {self.model_value!r} where the registry has {self.expected!r}")
+            )
         if self.printed != self.expected:
-            found.append(f"prints {self.printed!r} where the linked model has {self.expected!r}")
+            found.append(("readback", f"prints {self.printed!r} where the registry has {self.expected!r}"))
         if self.clearance < clearance:
             found.append(
-                f"extent {_mm(self.extent)} is {self.clearance * 1000:.2f} mm inside its cell "
-                f"{_mm(self.cell)} (needs {clearance * 1000:.2f} mm)"
+                (
+                    "outside-cell",
+                    f"extent {_mm(self.extent)} is {self.clearance * 1000:.2f} mm inside its cell "
+                    f"{_mm(self.cell)} (needs {clearance * 1000:.2f} mm)",
+                )
             )
-        height = self.extent[3] - self.extent[1]
-        if not self.char_height > 0.0 or height >= _LINES_TALL * self.char_height:
+        if self.text_count != 1 or self.display_count != 1 or "\n" in self.printed or "\r" in self.printed:
             found.append(
-                f"extent is {height * 1000:.2f} mm tall for {self.char_height * 1000:.2f} mm "
-                "characters: not one line"
+                (
+                    "multi-line",
+                    f"the note holds {self.text_count} text item(s), its display data "
+                    f"{self.display_count}: not one line",
+                )
+            )
+        width = self.cell[2] - self.cell[0]
+        if 0.0 < self.line_length < width:
+            found.append(
+                (
+                    "wrap-width",
+                    f"the note wraps at {self.line_length * 1000:.2f} mm, inside its "
+                    f"{width * 1000:.2f} mm cell",
+                )
             )
         return found
 
@@ -120,39 +197,120 @@ def _linked_name(link: str) -> str | None:
     return next(group for group in match.groups() if group is not None)
 
 
+def _same_file(a: Path, b: Path) -> bool:
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
+def registry_identity(spec: DrawingSpec) -> tuple[str, str]:
+    """The frozen ``(Number, Title)`` of ``spec``'s own source -- the only
+    identity the contract ever reads: the parts-registry row
+    ``dodo._expand_parts_token`` gives a drawing, or its assembly's contract.
+    A part's are what its build stamps (``_common.part_properties``); an
+    assembly's are its contract's frozen Number
+    (``_assembly_contract.assembly_contract``) and its stem, as ``_assembly``
+    stamps them."""
+    stem = spec.source.stem
+    if spec.source_kind == "assembly":
+        return assembly_contract(stem).number, stem
+    properties = part_properties(stem)
+    if "Number" not in properties:
+        raise KeyError(f"{stem} has no parts-registry Number")
+    return properties["Number"], properties["Title"]
+
+
+def registry_source(spec: DrawingSpec, identity: tuple[str, str], model: Any, configuration: str) -> TitleSource:
+    """What a sheet of ``spec``'s drawing must print, its links resolving on
+    ``model`` in ``configuration``: ``identity`` (:func:`registry_identity`),
+    dt-cone-gear's Number alone extended with the configuration's ``-T###``."""
+    number, title = identity
+    if spec.source.stem in _CONFIGURATION_NUMBERED:
+        if _CONFIGURATION.fullmatch(configuration) is None:
+            raise RuntimeError(f"{spec.name} view shows configuration {configuration!r}, not a T### configuration")
+        number = f"{number}-{configuration}"
+    return TitleSource(model, configuration, number, title)
+
+
 def linked_property(model: Any, configuration: str, name: str) -> str:
-    """The value a ``$PRPSHEET`` link to ``name`` resolves on ``model``: a
-    built-in ``SW-`` summary field, else the view configuration's property,
-    else the file's (cone-gear stamps each configuration's own Number over
-    the file-level one)."""
+    """The stored value a ``$PRPSHEET`` link to ``name`` resolves on
+    ``model``: a built-in ``SW-`` summary field, else the view
+    configuration's property, else the file's (cone-gear stamps each
+    configuration's own Number over the file-level one).
+
+    ``GetCustomInfoValue`` reads the stored value of one configuration;
+    ``ICustomPropertyManager::Get6`` with ``UseCached=False`` instead loops
+    through the model's configurations for one never activated and may
+    leave another active."""
+    document = _early_bound(model, "IModelDoc2")
     if name in _SUMMARY_FIELDS:
-        return str(_early_bound(model, "IModelDoc2").SummaryInfo(_SUMMARY_FIELDS[name]) or "")
-    extension = _read_member(model, "Extension")
-    if extension is None:
-        raise RuntimeError(f"linked model has no Extension to read {name!r}")
+        return str(document.SummaryInfo(_SUMMARY_FIELDS[name]) or "")
     for scope in dict.fromkeys((configuration, "")):
-        manager = extension.CustomPropertyManager(scope)
-        if manager is None:
-            raise RuntimeError(f"CustomPropertyManager unavailable for {scope!r}")
-        result = _early_bound(manager, "ICustomPropertyManager").Get6(name, False)
-        if int(result[0]) != _NOT_PRESENT:
-            return str(result[2] or "")
+        value = str(document.GetCustomInfoValue(scope, name) or "")
+        if value:
+            return value
     return ""
+
+
+def _model_state(model: Any) -> tuple[str, bool]:
+    """The model's active configuration and dirty flag."""
+    document = _early_bound(model, "IModelDoc2")
+    manager = _read_member(document, "ConfigurationManager")
+    active = _read_member(manager, "ActiveConfiguration") if manager is not None else None
+    name = str(_read_member(active, "Name") or "") if active is not None else ""
+    return name, bool(document.GetSaveFlag())
+
+
+def _display_count(annotation: Any) -> int:
+    display = annotation.GetDisplayData()
+    if display is None:
+        return -1
+    return int(_early_bound(display, "IDisplayData").GetTextCount())
 
 
 def read_title_fields(
     ddoc: Any,
+    spec: DrawingSpec,
     sources: Mapping[str, tuple[Any, str]],
     layouts: Mapping[str, DrawingLayout],
 ) -> list[TitleFieldReading]:
-    """Every sheet's two identity notes, read without activating a sheet.
+    """Every sheet of ``spec``'s drawing: its two identity notes, held to the
+    drawing's own frozen identity.
 
     ``sources`` maps each sheet to the model its ``$PRPSHEET`` links resolve
     on and the configuration its property view shows; ``layouts`` to its
-    template. ``IDrawingDoc::GetViews`` leads each sheet's row with the sheet
-    view, whose ``GetAnnotations`` returns the template's notes (owner 2)
-    beside the drawing's. A sheet with no note, or two, linking a cell's
-    property raises: the template changed under the contract."""
+    template. Every sheet must document the drawing's own source
+    (``spec.source``) -- one linked to any other model breaches
+    ``foreign-source`` before any identity is read -- so the only identity
+    read is the drawing's own (:func:`registry_identity`)."""
+    foreign = []
+    for sheet, (model, _configuration) in sources.items():
+        linked = Path(str(_early_bound(model, "IModelDoc2").GetPathName() or ""))
+        if not _same_file(linked, spec.source):
+            foreign.append(
+                TitleFieldBreach(sheet, "model", "foreign-source", f"links {linked} where {spec.name} documents {spec.source}")
+            )
+    if foreign:
+        raise TitleFieldContractError(foreign)
+    identity = registry_identity(spec)
+    return _measure_title_fields(
+        ddoc,
+        {sheet: registry_source(spec, identity, model, configuration) for sheet, (model, configuration) in sources.items()},
+        layouts,
+    )
+
+
+def _measure_title_fields(
+    ddoc: Any,
+    sources: Mapping[str, TitleSource],
+    layouts: Mapping[str, DrawingLayout],
+) -> list[TitleFieldReading]:
+    """The native measurement under :func:`read_title_fields`, read without
+    activating a sheet.
+
+    ``IDrawingDoc::GetViews`` leads each sheet's row with the sheet view,
+    whose ``GetAnnotations`` returns the template's notes (owner 2) beside
+    the drawing's. A sheet with no note, or two, linking a cell's property
+    raises: the template changed under the contract. So does a model whose
+    active configuration or dirty flag the reads changed."""
     readings = []
     seen = []
     for row in ddoc.GetViews() or ():
@@ -161,7 +319,7 @@ def read_title_fields(
             continue
         sheet_view = _early_bound(entries[0], "IView")
         sheet = str(sheet_view.GetName2() or "")
-        model, configuration = sources[sheet]
+        source_of = sources[sheet]
         cells = dict(DRAWING_TEMPLATES[layouts[sheet]].title_cells_m)
         found: dict[str, tuple[Any, Any, str, str]] = {}
         for raw in sheet_view.GetAnnotations() or ():
@@ -183,6 +341,7 @@ def read_title_fields(
         missing = sorted(set(TITLE_FIELD_PROPERTIES) - set(found))
         if missing:
             raise RuntimeError(f"sheet {sheet!r}: no template note links the {missing} cell(s)")
+        before = _model_state(source_of.model)
         for source, (annotation, note, link, name) in sorted(found.items()):
             extent = [float(value) for value in note.GetExtent() or ()]
             if len(extent) < 6:
@@ -194,14 +353,29 @@ def read_title_fields(
                     sheet=sheet,
                     source=source,
                     link=link,
-                    expected=linked_property(model, configuration, name),
+                    expected=source_of.expected(source),
+                    model_value=linked_property(source_of.model, source_of.configuration, name),
                     printed=str(note.GetText() or ""),
                     extent=(extent[0], extent[1], extent[3], extent[4]),
                     cell=cells[source],
                     char_height=float(note.GetHeight() or 0.0),
                     typeface=str(text_format.TypeFaceName or "") if text_format is not None else "",
                     line_length=float(text_format.LineLength or 0.0) if text_format is not None else 0.0,
+                    text_count=int(note.GetTextCount()),
+                    display_count=_display_count(annotation),
                 )
+            )
+        after = _model_state(source_of.model)
+        if after != before:
+            raise TitleFieldContractError(
+                [
+                    TitleFieldBreach(
+                        sheet,
+                        "model",
+                        "model-changed",
+                        f"reading the linked model moved its (configuration, dirty) from {before!r} to {after!r}",
+                    )
+                ]
             )
         seen.append(sheet)
     if sorted(seen) != sorted(sources):
@@ -210,8 +384,9 @@ def read_title_fields(
 
 
 def assert_title_fields(readings: Sequence[TitleFieldReading]) -> None:
-    """Record every reading, then raise on any breach of the contract."""
-    failures = []
+    """Record every reading, then raise :class:`TitleFieldContractError` on
+    any breach."""
+    breaches = []
     for reading in readings:
         x0, y0, x1, y1 = reading.extent
         _telemetry.event(
@@ -220,6 +395,7 @@ def assert_title_fields(readings: Sequence[TitleFieldReading]) -> None:
             source=reading.source,
             link=reading.link,
             expected=reading.expected,
+            model_value=reading.model_value,
             printed=reading.printed,
             chars=len(reading.printed),
             extent_left_mm=x0 * 1000,
@@ -227,26 +403,20 @@ def assert_title_fields(readings: Sequence[TitleFieldReading]) -> None:
             extent_right_mm=x1 * 1000,
             extent_top_mm=y1 * 1000,
             width_mm=(x1 - x0) * 1000,
+            height_mm=(y1 - y0) * 1000,
             cell_right_mm=reading.cell[2] * 1000,
             clearance_mm=reading.clearance * 1000,
             char_height_mm=reading.char_height * 1000,
             typeface=reading.typeface,
             line_length_mm=reading.line_length * 1000,
+            text_count=reading.text_count,
+            display_count=reading.display_count,
         )
-        failures += [f"sheet {reading.sheet!r} {reading.source}: {problem}" for problem in reading.problems()]
-    by_sheet: dict[str, dict[str, str]] = {}
-    for reading in readings:
-        by_sheet.setdefault(reading.sheet, {})[reading.source] = reading.expected
-    for sheet, values in sorted(by_sheet.items()):
-        number = _NUMBER.fullmatch(values.get("Number", ""))
-        title = _TITLE.fullmatch(values.get("Title", ""))
-        if number is not None and title is not None and number[1].lower() != title[1]:
-            failures.append(
-                f"sheet {sheet!r}: Number {values['Number']!r} and Title {values['Title']!r} "
-                "name different categories"
-            )
-    if failures:
-        raise RuntimeError("title block identity contract:\n" + "\n".join(failures))
+        breaches += [
+            TitleFieldBreach(reading.sheet, reading.source, kind, detail) for kind, detail in reading.problems()
+        ]
+    if breaches:
+        raise TitleFieldContractError(breaches)
 
 
 def audit_records(readings: Sequence[TitleFieldReading]) -> dict[str, list[dict[str, Any]]]:

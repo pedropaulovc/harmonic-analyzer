@@ -19,18 +19,20 @@ def apply_grouped_bom_properties(
     adapter: Any,
     configuration_names: Sequence[str],
     *,
-    part_number: str,
-    description: str,
-) -> None:
-    """Stamp a registered, non-assembly Number on every grouped configuration."""
-    number = part_number.strip().upper()
-    if not _PART_NUMBER.fullmatch(number):
-        raise ValueError(f"invalid grouped BOM part number {part_number!r}")
-    if not any(row.get("number") == number for row in _config.parts().values()):
-        raise ValueError(f"unregistered grouped BOM part number {part_number!r}")
+    part_name: str,
+) -> tuple[str, str]:
+    """Stamp the part's frozen registry metadata; return its Number and description."""
+    row = _config.parts(part_name)
+    number = row.get("number")
+    category = row.get("category")
+    if not isinstance(number, str) or not _PART_NUMBER.fullmatch(number):
+        raise ValueError(f"{part_name}: invalid grouped BOM part number {number!r}")
+    if category != number.split("-")[1].lower() or not part_name.startswith(f"{category}-"):
+        raise ValueError(f"{part_name}: grouped BOM Number/category mismatch")
+    description = row.get("description")
+    if not isinstance(description, str) or not description.strip():
+        raise ValueError(f"{part_name}: grouped BOM description must not be blank")
     text = description.strip()
-    if not text:
-        raise ValueError("grouped BOM description must not be blank")
     if not configuration_names:
         raise ValueError("grouped BOM configuration list must not be empty")
 
@@ -63,3 +65,4 @@ def apply_grouped_bom_properties(
     _telemetry.success(
         f"grouped BOM metadata: {number}, {len(configuration_names)} configurations"
     )
+    return number, text

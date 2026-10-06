@@ -663,6 +663,7 @@ export function inspectReference(data, expectedId, native = null) {
   summary.sourcePixelFormats = [...new Set([...images.keys()].map(key => key.split('/')[1]))].sort()
   const anchors = new Map()
   for (const anchor of data.anchors ?? []) {
+    if (anchor.partPath?.startsWith('archived-not-current:')) fail('archived-native-binding', `${anchor.id}: retained observations reference retired geometry and cannot certify a current native binding`)
     if (!text(anchor.id) || anchors.has(anchor.id) || !['physical-feature', 'section-center'].includes(anchor.kind) || !text(anchor.partPath) || !text(anchor.correspondenceEvidence) || !text(anchor.description)) fail('anchor-correspondence', `Invalid/duplicate anchor ${anchor.id}`)
     if (vector(anchor.partLocalMetres, 3) === vector(anchor.worldMetres, 3)) fail('anchor-point', `${anchor.id} needs exactly one finite local or world point`)
     // Fixed CAD-world points cannot serve as articulated moving-part observations.
@@ -831,7 +832,7 @@ export async function loadReferences(webRoot, referenceRoot, { signal } = {}) {
   const records = [], failures = []
   for (const id of VIDEO_IDS) {
     try {
-      const data = JSON.parse(await readFile(resolve(webRoot, `content/${id}.observations.json`), 'utf8'))
+      const data = JSON.parse(await readFile(resolve(webRoot, `content/canonical-native/${id}.observations.json`), 'utf8'))
       const entry = metadata.find(item => item.id === id)
       if (!entry || entry.sha256 !== data.source?.sha256) throw new Error('Measured source identity differs from independent acquisition metadata')
       // Keep paths relocatable without requiring original /tmp directories.
