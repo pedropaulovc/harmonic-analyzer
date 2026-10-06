@@ -8,6 +8,9 @@ import { assertModelRepresentationBytes, REPRESENTATION_KIND, REPRESENTATION_PAT
 import { BINDINGS, instanceIndex, type Binding } from './bindings'
 import { createMechanismInput, createMechanismPose, solveMechanism, MECHANISM_DATA, type MechanismInput, type MechanismPose } from './mechanics'
 import { PAPER_FEED_MULTIPLIER } from './kinematics'
+import { captureNativePrimitives, diagnosticNativePrimitiveMetadata, inspectNativeTargetSurfaceTarget, nativeCaptureModels, nativeInputSnapshot, prepareNativeTargetSurfaceAssociation, sealNativeDrawState, nativeRenderSubmissions, trackNativePrimitiveSubmissions, unavailableNativePrimitiveSnapshot, type NativeCaptureModel, type NativeDrawStateToken, type NativeInputSnapshot, type NativeObject, type NativePrimitiveDraw, type NativePrimitiveModelSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmission, type NativePrimitiveSubmissionMetadata, type NativeSpringEvaluator, type NativeTargetSurfaceAssociation, type NativeTargetSurfaceInspection, type NativeTargetSurfacePass, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
+import { NATIVE_RUNTIME_INSTANCES, OPERATING_SOURCE_ASSEMBLY, type SourceAssemblyState } from './source-assembly'
+import { measureNativeTargetShaderFeedback, type NativeTargetShaderFeedbackResult } from './native-target-shader-feedback'
 
 export type Point3 = readonly [number, number, number]
 export type Quaternion4 = readonly [number, number, number, number]
@@ -34,9 +37,14 @@ export interface SourceLayoutEntry {
   composite: SourceComposite | null
   resolvedImagePlaneWarp: ImagePlaneWarp | null
 }
+/** Actual draw provenance, distinct from the five-field photon-layout alias. */
+export interface CapturedSourceLayoutEntry extends SourceLayoutEntry {
+  sourceAssembly: SourceAssemblyState
+}
 interface RenderedSourceSupport {
   resolvedImagePlaneWarp: ImagePlaneWarp | null
-  sourceLayout: SourceLayoutEntry[]
+  sourceAssembly: SourceAssemblyState | null
+  sourceLayout: CapturedSourceLayoutEntry[]
   nativeViewportBackingPixels: [number, number] | null
   destinationCellSourcePixels: [number, number]
 }
@@ -49,6 +57,18 @@ export interface SourceView {
   presentation?: Presentation
   composite?: SourceComposite
   imagePlaneWarp?: ImagePlaneWarp
+  /** Held atomically at authored samples, independent of camera/input interpolation. */
+  sourceAssembly?: SourceAssemblyState
+}
+
+/** Owned capture copies; preserve every chosen gauge and source witness verbatim. */
+export function captureSourceLayout(views: readonly SourceView[]): CapturedSourceLayoutEntry[] {
+  return views.map(view => ({
+    viewId: view.id, rectSourcePixels: [...view.rectSourcePixels], presentation: view.presentation ?? 'native',
+    composite: view.composite ? { ...view.composite } : null,
+    resolvedImagePlaneWarp: view.imagePlaneWarp ? { kind: 'homography', unwarpedViewportPixels: [...view.imagePlaneWarp.unwarpedViewportPixels], renderToSourcePixels: [...view.imagePlaneWarp.renderToSourcePixels] } : null,
+    sourceAssembly: structuredClone(view.sourceAssembly ?? OPERATING_SOURCE_ASSEMBLY.state),
+  }))
 }
 /**
  * Diagnostic landmark located by exactly one of `partLocalMetres` (native node
@@ -61,6 +81,8 @@ export interface SourceView {
 export interface LandmarkAnchor {
   readonly id: string
   readonly partPath?: string
+  /** Only an explicitly declared genuine live instance may use this association. */
+  readonly runtimeTemplatePartPath?: string
   readonly partLocalMetres?: Point3
   readonly worldMetres?: Point3
 }
@@ -68,6 +90,8 @@ export interface LandmarkProbeAnchor {
   readonly id: string
   readonly state: 'measurable' | 'unresolved'
   readonly reason: string | null
+  readonly partPath: string | null
+  readonly runtimeTemplatePartPath: string | null
 }
 /** GPU diagnostic markers attached to native nodes; never alters native geometry. */
 export interface LandmarkProbe {
@@ -79,6 +103,8 @@ export interface LandmarkProbe {
 export type RenderedLandmarkState = 'rendered' | 'unresolved' | 'not-visible'
 export interface RenderedLandmark {
   id: string
+  partPath: string | null
+  runtimeTemplatePartPath: string | null
   state: RenderedLandmarkState
   /** Actual marker vertex in native world metres at this view's draw, independent of pixel eligibility. */
   worldMetres: [number, number, number] | null
@@ -145,6 +171,19 @@ export interface PartOverride {
   worldPositionMetres?: Point3
   worldQuaternion?: Quaternion4
 }
+/**
+ * Leased read-only NORMAL-solved state immediately before source overrides.
+ * Matrix copies are native Float64, column-major, and never camera-relative.
+ * Every read expires when this same update's provider callback returns.
+ */
+export interface NormalSolvedBaseline {
+  readonly partPaths: readonly string[]
+  readWorldMatrix(partPath: string, outWorldMatrix: Float64Array): boolean
+  readVisibility(partPath: string, mode?: 'self' | 'effective'): boolean | null
+  readGearSeatWorldMatrix(seat: 'upper' | 'crank', outWorldMatrix: Float64Array): boolean
+  readSeatedGearPartPath(seat: 'upper' | 'crank'): string | null
+}
+export type PartOverrideProvider = (baseline: NormalSolvedBaseline) => readonly PartOverride[]
 export interface ModelProvenance {
   sourceCommit: string
   /** Pinned RAW native CAD identity, not an observation of downloaded bytes. */
@@ -168,18 +207,22 @@ export interface Machine {
   readonly partPaths: readonly string[]
   /** Actual qualified native drawable paths; querying does not allocate GPU resources. */
   readonly nativeDrawablePartPaths: readonly string[]
-  update(input: MechanismInput, overrides?: readonly PartOverride[]): void
+  update(input: MechanismInput, overrides?: readonly PartOverride[] | PartOverrideProvider): void
   /** Add another genuine native part instance, sharing its original geometry. */
   addPartInstance(sourcePartPath: string, instancePath: string): 'added' | 'already-present' | 'missing-source'
   /** Diagnostic GPU markers on actual native nodes; install with Viewer.setLandmarkProbe. */
   createLandmarkProbe(anchors: readonly LandmarkAnchor[]): LandmarkProbe
   createPartVisibilityProbe(): PartVisibilityProbe
+  /** Verification-only CPU geometry from this viewer's last completed current native draw; never rerenders. */
+  nativePrimitiveSnapshot(viewer: Viewer, viewId?: string): NativePrimitiveSnapshot
   /** Remove the native root from the scene and free its GPU resources and probes. */
   dispose(): void
 }
 export interface LoadMachineOptions {
   /** GLB location; defaults to the pinned harmonic-analyzer export. */
   url?: string
+  /** Retain decoded primitive associations only for the existing verification bridge. */
+  nativePrimitiveSnapshots?: boolean
 }
 
 /** Predictable device-capacity refusal, before a prepared source sample is published. */
@@ -202,7 +245,7 @@ export interface Viewer {
   readonly controls: OrbitControls
   resize(): void
   /** Exploring/rest draw; captures landmarks under EXPLORING_VIEW_ID when a probe is installed. */
-  render(): void
+  render(sourceAssembly?: SourceAssemblyState): void
   /** Pure hardware/target-size check; never allocates targets or changes draw/camera state. */
   preflightViews(views: readonly SourceView[]): void
   renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number): void
@@ -217,6 +260,111 @@ export interface Viewer {
   readRenderedPartVisibility(viewId: string): RenderedPartVisibility
   /** Remove listeners/controls and dispose every viewer-owned GPU resource. */
   dispose(): void
+}
+const nativeViewerReaders = new WeakMap<Viewer, (root: THREE.Object3D, viewId?: string) => NativePrimitiveSnapshot>()
+const diagnosticNativeRoots = new WeakSet<THREE.Object3D>()
+export interface NativeTargetSurfaceReadbackState {
+  method: 'current-native-depth-target-surface-association'
+  equivalence: 'depth-native-not-colour-or-composite'
+  sourceProof: false
+  sourceAcceptance: false
+  numericVertexResidualBoundMetres: null
+  gpuPositionRoundingBoundMetres: null
+  eligibility: 'unresolved'
+}
+export type NativeTargetSurfaceReadback = NativeTargetSurfaceReadbackState & ({
+  status: 'readback'
+  reason: null
+  request: NativeTargetSurfaceRequest
+  model: NativeTargetSurfacePass['model']
+  machineRevision: number
+  inventoryRevision: number
+  input: NativeTargetSurfacePass['input']
+  draw: NativePrimitiveDraw
+  census: NativeTargetSurfacePass['census']
+  runtimeInstanceDeclarations: NativeTargetSurfacePass['runtimeInstanceDeclarations']
+  target: Pick<NativeTargetSurfacePass['target'], 'record' | 'primitiveId' | 'canonicalPrimitiveId' | 'classVertexIndices' | 'incidentTriangleIndexOffsets' | 'triangleCount'>
+  nativeStage: { width: number; height: number; viewportBackingPixels: number[]; scissorBackingPixels: number[]; scissorTest: boolean; pixelCentreBacking: readonly [number, number] }
+  association: NativeTargetSurfaceAssociation
+} | {
+  status: 'unavailable' | 'stale'
+  reason: string
+  request: NativeTargetSurfaceRequest
+  model: null
+  machineRevision: null
+  inventoryRevision: null
+  input: null
+  draw: null
+  census: null
+  runtimeInstanceDeclarations: null
+  target: null
+  nativeStage: null
+  association: null
+})
+
+export interface NativeTargetCpuReference {
+  model: NativePrimitiveModelSnapshot
+  machineRevision: number
+  inventoryRevision: number
+  input: NativeInputSnapshot
+  sourceAssembly: SourceAssemblyState
+  matrixWorld: readonly number[]
+  targetPrimitiveId: string
+  targetVertexIndices: readonly number[]
+  /** Exact selected Float64 xyz rows from the pre-lease current-frame snapshot. */
+  worldPositions: Float64Array
+}
+export interface NativeTargetShaderMeasurementRequest extends NativeTargetSurfaceRequest {
+  cpuReference: NativeTargetCpuReference
+}
+export interface NativeTargetShaderReadback {
+  status: 'measured' | 'unavailable'
+  reason: string
+  method: 'current-native-target-clip-shader-feedback'
+  sourceProof: false
+  sourceAcceptance: false
+  qualification: 'observed-native-clip-arithmetic-derived-float64-world-not-gpu-world'
+  eligibility: 'unresolved'
+  independentNumericBoundMetres: null
+  model: NativePrimitiveModelSnapshot | null
+  machineRevision: number | null
+  inventoryRevision: number | null
+  input: NativeInputSnapshot | null
+  /** Original completed colour receipt; control observations live only in feedback.controlledSubmission. */
+  associationDraw: NativePrimitiveDraw | null
+  target: Pick<NativeTargetSurfaceInspection['target'], 'record' | 'primitiveId' | 'canonicalPrimitiveId' | 'classVertexIndices' | 'incidentTriangleIndexOffsets' | 'triangleCount'> | null
+  feedback: NativeTargetShaderFeedbackResult | null
+}
+
+export interface NativeStagePointMapping {
+  status: 'mapped' | 'unavailable'
+  reason: string | null
+  method: 'inverse-executed-image-support-not-native-gpu-centroid'
+  sourceProof: false
+  sourceAcceptance: false
+  viewId: string
+  sourcePixels: readonly [number, number]
+  nativeStageBackingPixel: readonly [number, number] | null
+  nativeStagePointBackingPixels: readonly [number, number] | null
+  sampleCentreOffsetBackingPixels: readonly [number, number] | null
+  draw: NativePrimitiveDraw | null
+}
+
+export interface NativeDiagnosticViewerLease {
+  restoreProbes(): void
+  release(): void
+  readNativeDrawMetadata(): NativePrimitiveSubmissionMetadata
+  readNativeTargetSurfaceAssociation(request: NativeTargetSurfaceRequest): NativeTargetSurfaceReadback
+  readRegisteredNativeLandmarkAnchors(): readonly LandmarkAnchor[]
+  resolveNativeStagePixelFromSourcePixel(viewId: string, sourcePixels: readonly [number, number]): NativeStagePointMapping
+  measureNativeTargetShaderFeedback(request: NativeTargetShaderMeasurementRequest): NativeTargetShaderReadback
+}
+const nativeDiagnosticViewers = new WeakMap<Viewer, () => NativeDiagnosticViewerLease>()
+/** Available only for the already-created verification Viewer, never a new scene. */
+export function beginNativeDiagnosticViewerLease(viewer: Viewer): NativeDiagnosticViewerLease {
+  const begin = nativeDiagnosticViewers.get(viewer)
+  if (!begin) throw new Error('Native diagnostic leases require the current verification Viewer')
+  return begin()
 }
 
 export const EXPLORING_VIEW_ID = 'exploring'
@@ -240,6 +388,8 @@ const RASTER_SAMPLE_LIMIT = 256
 
 interface ProbeMarker {
   id: string
+  partPath: string | null
+  runtimeTemplatePartPath: string | null
   /** Global marker slot; -1 when unresolved at probe creation. */
   slot: number
   reason: string | null
@@ -247,6 +397,7 @@ interface ProbeMarker {
 }
 interface ProbeInternals {
   readonly markers: readonly ProbeMarker[]
+  readonly sourceAnchors: readonly LandmarkAnchor[]
   readonly passes: number
   readonly pass: { value: number }
   readonly pointSize: { value: number }
@@ -514,7 +665,7 @@ const ORBIT_SETTINGS = [
  * frame. `onControlsChange` receives every exploring-controls 'change' event,
  * across control rebuilds.
  */
-export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => void): Viewer {
+export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => void, nativePrimitiveVerification = false): Viewer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
   renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -635,6 +786,7 @@ void main() {
   // GPU landmark readback state. Targets/buffers allocate on first capture or
   // actual size change only; the steady-state frame loop allocates nothing.
   let probe: LandmarkProbe | null = null
+  let nativeDiagnosticLeaseActive = false
   let probeTarget: THREE.WebGLRenderTarget | null = null
   let probeMirrorTarget: THREE.WebGLRenderTarget | null = null
   let readback = new Uint8Array(0)
@@ -652,7 +804,7 @@ void main() {
   let contourOrdinals = new Uint32Array(0)
   let contourFlags = new Uint8Array(0)
   const visibilityCaptures = new Map<string, PartVisibilityCapture>()
-  const viewSnapshots = new Map<string, { epoch: number; view: SourceView; groupId: string | null; imageLayerId: string | null; id: string; warpKind: string | null; presentation: Presentation; values: Float64Array }>()
+  const viewSnapshots = new Map<string, { epoch: number; view: SourceView; assemblyKey: string; groupId: string | null; imageLayerId: string | null; id: string; warpKind: string | null; presentation: Presentation; values: Float64Array }>()
   const frameCameraPosition = new THREE.Vector3()
   const frameCameraQuaternion = new THREE.Quaternion()
   const frameCameraProjection = new THREE.Matrix4()
@@ -673,6 +825,79 @@ void main() {
   referencePoints.frustumCulled = false
   const referenceScene = new THREE.Scene()
   referenceScene.add(referencePoints)
+  let nativeContextRevision = 0
+  let controlSubmissionRevision = 0
+  let nativeCompletedEpoch = -1
+  let nativeDrawTimeSeconds: number | null = null
+  let manualSourceAssembly = OPERATING_SOURCE_ASSEMBLY.state
+  let frameAssemblyKey = ''
+  let nativeDraw: { model: NativeCaptureModel; token: NativeDrawStateToken; draw: NativePrimitiveDraw; cameraKey: string } | null = null
+  let nativeDrawError: string | null = null
+  const nativeViewport = nativePrimitiveVerification ? new THREE.Vector4() : null
+  const nativeScissor = nativePrimitiveVerification ? new THREE.Vector4() : null
+  const invalidateNativeContext = () => {
+    nativeContextRevision++
+    nativeCompletedEpoch = -1
+    nativeDraw = null
+    nativeDrawError = 'The native WebGL context was lost or restored; a new completed native draw is required'
+  }
+  if (nativePrimitiveVerification) {
+    canvas.addEventListener('webglcontextlost', invalidateNativeContext)
+    canvas.addEventListener('webglcontextrestored', invalidateNativeContext)
+  }
+
+  function nativeCameraKey() {
+    return JSON.stringify([camera.position.toArray(), camera.quaternion.toArray(), camera.scale.toArray(), camera.matrix.toArray(), camera.matrixWorld.toArray(),
+      camera.matrixWorldInverse.toArray(), camera.projectionMatrix.toArray(), camera.projectionMatrixInverse.toArray(), camera.fov, camera.aspect, camera.near, camera.far, camera.layers.mask, camera.view])
+  }
+
+  function renderNativeScene() {
+    if (!nativePrimitiveVerification || diagnosticDraw) {
+      renderer.render(scene, camera)
+      return
+    }
+    const submissions: NativePrimitiveSubmission[] = []
+    nativeRenderSubmissions.set(renderer, submissions)
+    try {
+      renderer.render(scene, camera)
+    } finally {
+      nativeRenderSubmissions.delete(renderer)
+    }
+    nativeDraw = null
+    nativeDrawError = null
+    for (const root of scene.children) {
+      const model = nativeCaptureModels.get(root)
+      if (!model) continue
+      try {
+        const target = renderer.getRenderTarget()
+        // Actual GL viewport/scissor at the native draw, before mirror/warp/composite blits.
+        nativeViewport!.fromArray(gl.getParameter(gl.VIEWPORT) as Int32Array)
+        nativeScissor!.fromArray(gl.getParameter(gl.SCISSOR_BOX) as Int32Array)
+        const draw: NativePrimitiveDraw = {
+          drawRevision: drawEpoch, rendererFrame: renderer.info.render.frame, contextRevision: nativeContextRevision,
+          submittedAtPerformanceMs: performance.now(), viewId: activeView?.id ?? EXPLORING_VIEW_ID, timeSeconds: nativeDrawTimeSeconds,
+          camera: { uuid: camera.uuid, positionMetres: camera.position.toArray(), quaternion: camera.quaternion.toArray(), verticalFovDegrees: camera.fov,
+            aspect: camera.aspect, near: camera.near, far: camera.far, layersMask: camera.layers.mask, viewOffset: camera.view ? { ...camera.view } : null,
+            matrixWorld: camera.matrixWorld.toArray(), matrixWorldInverse: camera.matrixWorldInverse.toArray(), projectionMatrix: camera.projectionMatrix.toArray(), projectionMatrixInverse: camera.projectionMatrixInverse.toArray() },
+          viewportBackingPixels: nativeViewport!.toArray(), scissorBackingPixels: nativeScissor!.toArray(), scissorTest: gl.isEnabled(gl.SCISSOR_TEST),
+          renderTarget: target ? { uuid: target.texture.uuid, width: target.width, height: target.height } : null,
+          canvas: { width: canvas.width, height: canvas.height, clientWidth: canvas.clientWidth, clientHeight: canvas.clientHeight, devicePixelRatio: renderer.getPixelRatio() },
+          presentation: activeView?.presentation ?? 'native', rectSourcePixels: [...(activeView?.rectSourcePixels ?? FULL_FRAME)],
+          sourceOpacity: activeView?.composite?.mode === 'crossfade' ? activeView.composite.opacity : 1,
+          nativeRenderCallbacks: submissions,
+          imagePlaneWarp: activeView?.imagePlaneWarp ? structuredClone(activeView.imagePlaneWarp) : null,
+          sourceAssembly: structuredClone(activeView ? activeView.sourceAssembly ?? OPERATING_SOURCE_ASSEMBLY.state : manualSourceAssembly),
+          sourceLayout: renderedViews ? captureSourceLayout(renderedViews) : [],
+        }
+        if (nativeDraw) throw new Error('Multiple verification native roots are present; the completed draw is ambiguous')
+        nativeDraw = { model, token: sealNativeDrawState(model), draw, cameraKey: nativeCameraKey() }
+      } catch (error) {
+        nativeDraw = null
+        nativeDrawError = error instanceof Error ? error.message : String(error)
+        return
+      }
+    }
+  }
 
   function resize() {
     const w = canvas.clientWidth
@@ -736,7 +961,15 @@ void main() {
     camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion)
     syncControlsBasis()
     controls.target.copy(camera.position).addScaledVector(forward, distance)
+    // Synchronize OrbitControls' spherical state, but keep the authored/current
+    // camera exact: lookAt/update performs ~ulp-sized TRS recomputation even
+    // with zero user motion, which would invalidate current-frame capture.
+    savedPosition.copy(camera.position)
+    savedQuaternion.copy(camera.quaternion)
     controls.update()
+    camera.position.copy(savedPosition)
+    camera.quaternion.copy(savedQuaternion)
+    camera.updateMatrixWorld(true)
   }
 
   function applyCamera(record: CameraRecord) {
@@ -931,9 +1164,10 @@ void main() {
     const copyWarp = (value: ImagePlaneWarp | undefined): ImagePlaneWarp | null => value ? { kind: 'homography', unwarpedViewportPixels: [...value.unwarpedViewportPixels], renderToSourcePixels: [...value.renderToSourcePixels] } : null
     return {
       resolvedImagePlaneWarp: copyWarp(warp),
+      sourceAssembly: structuredClone(view ? view.sourceAssembly ?? OPERATING_SOURCE_ASSEMBLY.state : manualSourceAssembly),
       nativeViewportBackingPixels: warp ? [Math.ceil(warp.unwarpedViewportPixels[0]), Math.ceil(warp.unwarpedViewportPixels[1])] : null,
       destinationCellSourcePixels: [SOURCE_WIDTH / gate.width * canvas.clientWidth / gl.drawingBufferWidth, SOURCE_HEIGHT / gate.height * canvas.clientHeight / gl.drawingBufferHeight],
-      sourceLayout: capturedViewOrder.map(member => ({ viewId: member.id, rectSourcePixels: [...member.rectSourcePixels], presentation: member.presentation ?? 'native', composite: member.composite ? { ...member.composite } : null, resolvedImagePlaneWarp: copyWarp(member.imagePlaneWarp) })),
+      sourceLayout: captureSourceLayout(capturedViewOrder),
     }
   }
 
@@ -950,7 +1184,7 @@ void main() {
       renderer.setRenderTarget(mirrorStage)
       renderer.setScissorTest(false)
       renderer.clear(true, true, true)
-      renderer.render(scene, camera)
+      renderNativeScene()
       renderer.setRenderTarget(output)
       renderer.setScissorTest(true)
       viewport(rect[0], rect[1], rect[2], rect[3])
@@ -974,7 +1208,7 @@ void main() {
       renderer.setRenderTarget(mirrorStage)
       renderer.setScissorTest(false)
       renderer.clear(true, true, true)
-      renderer.render(scene, camera)
+      renderNativeScene()
       renderer.setRenderTarget(output)
       renderer.setScissorTest(true)
       viewport(rect[0], rect[1], rect[2], rect[3])
@@ -986,7 +1220,7 @@ void main() {
       renderer.setScissorTest(true)
       viewport(rect[0], rect[1], rect[2], rect[3])
       if (clearOutput) renderer.clear(true, true, false)
-      renderer.render(scene, camera)
+      renderNativeScene()
     }
     if (diagnosticDraw && output) maskHigherViews(output, rect)
   }
@@ -1012,14 +1246,15 @@ void main() {
   }
 
   function snapshotView(view: SourceView) {
-    if (!probe && !visibilityProbe) return
+    if (!probe && !visibilityProbe && !nativePrimitiveVerification) return
     let snapshot = viewSnapshots.get(view.id)
     if (!snapshot) {
-      snapshot = { epoch: -1, view, groupId: null, imageLayerId: null, id: view.id, warpKind: null, presentation: 'native', values: new Float64Array(27) }
+      snapshot = { epoch: -1, view, assemblyKey: '', groupId: null, imageLayerId: null, id: view.id, warpKind: null, presentation: 'native', values: new Float64Array(27) }
       viewSnapshots.set(view.id, snapshot)
     }
     snapshot.epoch = drawEpoch
     snapshot.view = view
+    snapshot.assemblyKey = JSON.stringify(view.sourceAssembly ?? OPERATING_SOURCE_ASSEMBLY.state)
     snapshot.groupId = view.composite?.mode === 'crossfade' ? view.composite.groupId : null
     snapshot.presentation = view.presentation ?? 'native'
     snapshot.id = view.id
@@ -1040,6 +1275,7 @@ void main() {
   function capturesFresh() {
     if (frameWidth !== canvas.clientWidth || frameHeight !== canvas.clientHeight || frameFov !== camera.fov || frameAspect !== camera.aspect
       || !frameCameraPosition.equals(camera.position) || !frameCameraQuaternion.equals(camera.quaternion) || !frameCameraProjection.equals(camera.projectionMatrix)) return false
+    if (!renderedViews && frameAssemblyKey !== JSON.stringify(manualSourceAssembly)) return false
     if (renderedViews) {
       if (renderedViews.length !== capturedViewOrder.length) return false
       for (let i = 0; i < renderedViews.length; i++) if (renderedViews[i] !== capturedViewOrder[i]) return false
@@ -1048,6 +1284,7 @@ void main() {
       if (snapshot.epoch !== drawEpoch) continue
       const view = snapshot.view
       const values = snapshot.values
+      if (snapshot.assemblyKey !== JSON.stringify(view.sourceAssembly ?? OPERATING_SOURCE_ASSEMBLY.state)) return false
       if (view.rectSourcePixels.length !== 4 || (view.imagePlaneWarp && (view.imagePlaneWarp.unwarpedViewportPixels.length !== 2 || view.imagePlaneWarp.renderToSourcePixels.length !== 9))) return false
       if (values[26] !== (view.composite ? view.composite.mode === 'opaque' ? 1 : 2 : 0)) return false
       if (snapshot.groupId !== (view.composite?.mode === 'crossfade' ? view.composite.groupId : null) || snapshot.presentation !== (view.presentation ?? 'native')) return false
@@ -1073,12 +1310,19 @@ void main() {
     frameCameraPosition.copy(camera.position)
     frameCameraQuaternion.copy(camera.quaternion)
     frameCameraProjection.copy(camera.projectionMatrix)
+    if (!renderedViews && (probe || visibilityProbe || nativePrimitiveVerification)) frameAssemblyKey = JSON.stringify(manualSourceAssembly)
   }
 
-  function render() {
+  function render(sourceAssembly: SourceAssemblyState = OPERATING_SOURCE_ASSEMBLY.state) {
     if (disposed) throw new Error('Viewer is disposed.')
-    if (mode === 'exploring') controls.update()
+    manualSourceAssembly = sourceAssembly
+    if (mode === 'exploring' && (controls.enableDamping || controls.autoRotate)) controls.update()
     drawEpoch++
+    if (nativePrimitiveVerification) {
+      nativeCompletedEpoch = -1
+      nativeDraw = null
+      nativeDrawTimeSeconds = null
+    }
     renderedViews = null
     activeView = null
     activeViewIndex = -1
@@ -1088,11 +1332,15 @@ void main() {
     camera.updateProjectionMatrix()
     drawView(FULL_FRAME, 'native', null, mirrorTarget, false)
     diagnosticDraw = true
-    captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
-    capturePartVisibility(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
-    diagnosticDraw = false
+    try {
+      captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
+      capturePartVisibility(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
+    } finally {
+      diagnosticDraw = false
+    }
     finishCaptures()
     renderer.setScissorTest(false)
+    if (nativePrimitiveVerification && !gl.isContextLost()) nativeCompletedEpoch = drawEpoch
   }
 
   function assertTargetCapacity(width: number, height: number, label: string, viewId?: string) {
@@ -1130,9 +1378,25 @@ void main() {
     preflightViews(views)
     assertSourceCompositeWeights(views)
     drawEpoch++
+    if (nativePrimitiveVerification) {
+      nativeCompletedEpoch = -1
+      nativeDraw = null
+      nativeDrawTimeSeconds = timeSeconds
+    }
     renderedViews = views
-    capturedViewOrder.length = probe || visibilityProbe ? views.length : 0
-    beginFrame()
+    capturedViewOrder.length = probe || visibilityProbe || nativePrimitiveVerification ? views.length : 0
+    if (views.length === 0) {
+      // An explicit non-machine exposure has no native colour surface. Clear
+      // the old composition; do not substitute an exploring/default camera.
+      activeView = null
+      activeViewIndex = -1
+      renderer.getClearColor(savedClearColor)
+      const alpha = renderer.getClearAlpha()
+      renderer.setClearColor(0x000000, 1)
+      beginFrame()
+      renderer.setClearColor(savedClearColor, alpha)
+      if (nativePrimitiveVerification) nativeDrawError = 'The completed source composition has no native colour view'
+    } else beginFrame()
     for (let i = 0; i < views.length;) {
       const first = views[i]!
       const group = first.composite?.mode === 'crossfade' ? first.composite.groupId : null
@@ -1155,11 +1419,15 @@ void main() {
         const opacity = member?.mode === 'crossfade' ? member.opacity : 1
         const rect = view.rectSourcePixels
         const presentation = view.presentation ?? 'native'
-        beforeView?.(view, i)
-        const grid = view.imagePlaneWarp?.unwarpedViewportPixels
-        writeCamera(camera, view.camera, grid?.[0] ?? rect[2], grid?.[1] ?? rect[3])
+        // Zero source contribution must not solve an undrawn pose or move the
+        // live camera away from this frame's last actual native colour draw.
+        if (opacity > 0) {
+          beforeView?.(view, i)
+          const grid = view.imagePlaneWarp?.unwarpedViewportPixels
+          writeCamera(camera, view.camera, grid?.[0] ?? rect[2], grid?.[1] ?? rect[3])
+        }
         snapshotView(view)
-        if (probe || visibilityProbe) capturedViewOrder[i] = view
+        if (probe || visibilityProbe || nativePrimitiveVerification) capturedViewOrder[i] = view
         const previous = i > 0 ? views[i - 1]!.composite : undefined
         if (group !== null && member?.mode === 'crossfade' && (previous?.mode !== 'crossfade' || previous.groupId !== group || previous.imageLayerId !== member.imageLayerId)) {
           renderer.getClearColor(savedClearColor)
@@ -1188,9 +1456,12 @@ void main() {
         }
         // Higher subviews of this same image mask every diagnostic raster too.
         diagnosticDraw = true
-        captureView(view.id, rect, presentation, timeSeconds, opacity)
-        capturePartVisibility(view.id, rect, presentation, timeSeconds, opacity)
-        diagnosticDraw = false
+        try {
+          captureView(view.id, rect, presentation, timeSeconds, opacity)
+          capturePartVisibility(view.id, rect, presentation, timeSeconds, opacity)
+        } finally {
+          diagnosticDraw = false
+        }
         i++
         if (group === null) break
       } while (i < views.length)
@@ -1205,6 +1476,7 @@ void main() {
     finishCaptures()
     renderer.setRenderTarget(null)
     renderer.setScissorTest(false)
+    if (nativePrimitiveVerification && !gl.isContextLost()) nativeCompletedEpoch = drawEpoch
   }
 
   const probeTargetOptions = { depthBuffer: false, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, type: THREE.UnsignedByteType }
@@ -1504,6 +1776,8 @@ void main() {
         const v = i * 5
         return {
           id: marker.id,
+          partPath: marker.partPath,
+          runtimeTemplatePartPath: marker.runtimeTemplatePartPath,
           state: CAPTURE_STATES[capture.states[i]!]!,
           worldMetres: capture.worldReasons[i] === null ? [capture.worldValues[i * 3]!, capture.worldValues[i * 3 + 1]!, capture.worldValues[i * 3 + 2]!] : null,
           worldReason: capture.worldReasons[i]!,
@@ -1693,7 +1967,7 @@ void main() {
     const capture = visibilityCaptures.get(viewId)
     const status: RenderedPartVisibility['status'] = disposed || visibilityProbe?.status === 'disposed' ? 'disposed' : !internals ? 'unavailable'
       : !capture || capture.epoch !== drawEpoch || capture.inventoryRevision !== internals.inventoryRevision.value || renderedVisibilityRevision !== internals.revision.value || !capturesFresh() ? 'stale' : 'captured'
-    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, camera: null, sourceOpacity: null, resolvedImagePlaneWarp: null, sourceLayout: [], nativeViewportBackingPixels: null, destinationCellSourcePixels: [0, 0], parts: [] }
+    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, camera: null, sourceOpacity: null, resolvedImagePlaneWarp: null, sourceAssembly: null, sourceLayout: [], nativeViewportBackingPixels: null, destinationCellSourcePixels: [0, 0], parts: [] }
     const cssX = canvas.clientWidth / gl.drawingBufferWidth
     const cssY = canvas.clientHeight / gl.drawingBufferHeight
     const rect = capture.rect
@@ -1742,6 +2016,11 @@ void main() {
     disposed = true
     drawEpoch++
     removeEventListener('resize', resize)
+    if (nativePrimitiveVerification) {
+      canvas.removeEventListener('webglcontextlost', invalidateNativeContext)
+      canvas.removeEventListener('webglcontextrestored', invalidateNativeContext)
+      nativeDraw = null
+    }
     controls.removeEventListener('change', onControlsChange)
     viewSnapshots.clear()
     renderedViews = null
@@ -1759,11 +2038,225 @@ void main() {
     renderer.dispose()
   }
   resize()
-  return {
+  const viewer: Viewer = {
     renderer, scene, camera, resize, render, preflightViews, renderViews, applyCamera, setInteraction, fitView, setLandmarkProbe, readRenderedLandmarks,
     setPartVisibilityProbe, readRenderedPartVisibility, dispose,
     get controls() { return controls },
   }
+  if (nativePrimitiveVerification) nativeViewerReaders.set(viewer, (root, viewId) => {
+    if (disposed || gl.isContextLost()) return unavailableNativePrimitiveSnapshot('The native viewer is disposed or its WebGL context is lost')
+    if (nativeDiagnosticLeaseActive) return unavailableNativePrimitiveSnapshot('Native primitive capture is suspended during a diagnostic renderer lease', 'stale')
+    if (!nativeDraw) return unavailableNativePrimitiveSnapshot(nativeDrawError ?? 'No completed identity-matched native draw is available')
+    if (nativeDraw.model.root !== root) return unavailableNativePrimitiveSnapshot('The native draw belongs to a different Machine/root')
+    if (nativeCompletedEpoch !== drawEpoch || nativeDraw.draw.drawRevision !== drawEpoch || nativeDraw.draw.contextRevision !== nativeContextRevision
+      || nativeDraw.cameraKey !== nativeCameraKey() || !capturesFresh()
+      || canvas.width !== nativeDraw.draw.canvas.width || canvas.height !== nativeDraw.draw.canvas.height) return unavailableNativePrimitiveSnapshot('The native draw/context/camera/canvas state is stale', 'stale')
+    if (viewId !== undefined && viewId !== nativeDraw.draw.viewId) return unavailableNativePrimitiveSnapshot(`Only the current native draw ${nativeDraw.draw.viewId} retains its posed geometry; view ${viewId} is not current`, 'stale')
+    return captureNativePrimitives(nativeDraw.model, nativeDraw.draw, nativeDraw.token)
+  })
+  if (nativePrimitiveVerification) nativeDiagnosticViewers.set(viewer, () => {
+    if (disposed || gl.isContextLost() || nativeDiagnosticLeaseActive) throw new Error('The native diagnostic Viewer is unavailable or already leased')
+    nativeDiagnosticLeaseActive = true
+    const savedProbe = probe
+    const savedVisibility = visibilityProbe
+    const hiddenMarkers = savedProbe ? probeInternals.get(savedProbe)!.markers.filter(marker => marker.object !== null).map(marker => ({ object: marker.object!, visible: marker.object!.visible })) : []
+    for (const marker of hiddenMarkers) marker.object.visible = false
+    probe = null
+    visibilityProbe = null
+    const roots = scene.children.filter(root => nativeCaptureModels.has(root))
+    for (const root of roots) diagnosticNativeRoots.add(root)
+    let probesRestored = false
+    let released = false
+    const requireLease = () => { if (released || !nativeDiagnosticLeaseActive) throw new Error('The native diagnostic Viewer lease has expired') }
+    const restoreProbes = () => {
+      requireLease()
+      if (probesRestored) return
+      if (probe !== savedProbe) probe?.dispose()
+      if (visibilityProbe !== savedVisibility) visibilityProbe?.dispose()
+      probe = savedProbe
+      visibilityProbe = savedVisibility
+      for (const marker of hiddenMarkers) marker.object.visible = marker.visible
+      captures.clear()
+      visibilityCaptures.clear()
+      probesRestored = true
+    }
+    const requireCurrentDraw = () => {
+      requireLease()
+      if (!nativeDraw || disposed || gl.isContextLost() || nativeCompletedEpoch !== drawEpoch
+        || nativeDraw.model.root.parent !== scene || nativeDraw.draw.drawRevision !== drawEpoch || nativeDraw.draw.contextRevision !== nativeContextRevision
+        || nativeDraw.cameraKey !== nativeCameraKey() || !capturesFresh()
+        || canvas.width !== nativeDraw.draw.canvas.width || canvas.height !== nativeDraw.draw.canvas.height) throw new Error('No completed current diagnostic native submission is available')
+      return nativeDraw
+    }
+    return {
+      restoreProbes,
+      release() {
+        if (released) return
+        try { restoreProbes() } finally {
+          for (const root of roots) diagnosticNativeRoots.delete(root)
+          nativeDiagnosticLeaseActive = false
+          released = true
+        }
+      },
+      readNativeDrawMetadata() {
+        const current = requireCurrentDraw()
+        return diagnosticNativePrimitiveMetadata(current.model, current.draw, current.token)
+      },
+      readRegisteredNativeLandmarkAnchors() {
+        requireLease()
+        return structuredClone(savedProbe ? probeInternals.get(savedProbe)!.sourceAnchors : [])
+      },
+      resolveNativeStagePixelFromSourcePixel(viewId, sourcePixels) {
+        const common = { method: 'inverse-executed-image-support-not-native-gpu-centroid' as const, sourceProof: false as const, sourceAcceptance: false as const,
+          viewId, sourcePixels: [...sourcePixels] as [number, number] }
+        try {
+          const current = requireCurrentDraw()
+          if (viewId !== current.draw.viewId || !sourcePixels.every(Number.isFinite)) throw new Error('Image support mapping requires the exact current native view and finite source pixels')
+          const view = viewId === EXPLORING_VIEW_ID ? undefined : viewSnapshots.get(viewId)?.view
+          if (viewId !== EXPLORING_VIEW_ID && !view) throw new Error('The completed current source view has no retained executed support')
+          if (view && !sourcePointSupported(view, sourcePixels[0], sourcePixels[1], view.imagePlaneWarp ? sourceSupport(view).inverse.elements : null)) throw new Error('The source point is outside the executed destination/image support')
+          const rect = view?.rectSourcePixels ?? FULL_FRAME
+          let localX = sourcePixels[0] - rect[0], localY = sourcePixels[1] - rect[1]
+          const grid = view?.imagePlaneWarp?.unwarpedViewportPixels ?? [rect[2], rect[3]]
+          if (view?.imagePlaneWarp) {
+            const point = new THREE.Vector3(sourcePixels[0], sourcePixels[1], 1).applyMatrix3(sourceSupport(view).inverse)
+            if (!Number.isFinite(point.z) || point.z === 0) throw new Error('The executed inverse image support is singular at this source point')
+            localX = point.x / point.z
+            localY = point.y / point.z
+          } else if (view?.presentation === 'horizontal-mirror') localX = rect[2] - localX
+          if (!Number.isFinite(localX) || !Number.isFinite(localY) || localX < 0 || localY < 0 || localX >= grid[0]! || localY >= grid[1]!) throw new Error('The source point is outside this current native image support')
+          const viewport = current.draw.viewportBackingPixels
+          const x = viewport[0]! + localX / grid[0]! * viewport[2]!
+          const y = viewport[1]! + (1 - localY / grid[1]!) * viewport[3]!
+          const pixelX = Math.floor(x), pixelY = Math.floor(y)
+          const width = current.draw.renderTarget?.width ?? current.draw.canvas.width
+          const height = current.draw.renderTarget?.height ?? current.draw.canvas.height
+          if (pixelX < 0 || pixelY < 0 || pixelX >= width || pixelY >= height) throw new Error('The mapped native-stage point has no backing pixel in the completed target')
+          return { ...common, status: 'mapped', reason: null, nativeStageBackingPixel: [pixelX, pixelY],
+            nativeStagePointBackingPixels: [x, y], sampleCentreOffsetBackingPixels: [pixelX + 0.5 - x, pixelY + 0.5 - y], draw: structuredClone(current.draw) }
+        } catch (error) {
+          return { ...common, status: 'unavailable', reason: error instanceof Error ? error.message : String(error),
+            nativeStageBackingPixel: null, nativeStagePointBackingPixels: null, sampleCentreOffsetBackingPixels: null, draw: null }
+        }
+      },
+      measureNativeTargetShaderFeedback(request) {
+        const qualification = { method: 'current-native-target-clip-shader-feedback' as const, sourceProof: false as const, sourceAcceptance: false as const,
+          qualification: 'observed-native-clip-arithmetic-derived-float64-world-not-gpu-world' as const, eligibility: 'unresolved' as const, independentNumericBoundMetres: null }
+        let inspection: NativeTargetSurfaceInspection | null = null
+        try {
+          const current = requireCurrentDraw()
+          inspection = inspectNativeTargetSurfaceTarget(current.model, current.draw, current.token, request)
+          const reference = request.cpuReference
+          const exactArray = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((value, index) => Object.is(value, b[index]))
+          if (!reference || JSON.stringify(reference.model) !== JSON.stringify(inspection.model)
+            || reference.machineRevision !== inspection.machineRevision || reference.inventoryRevision !== inspection.inventoryRevision
+            || JSON.stringify(reference.input) !== JSON.stringify(inspection.input)
+            || JSON.stringify(reference.sourceAssembly) !== JSON.stringify(inspection.draw.sourceAssembly)
+            || reference.targetPrimitiveId !== inspection.target.primitiveId
+            || !exactArray(reference.matrixWorld, inspection.target.record.matrixWorld)
+            || !exactArray(reference.targetVertexIndices, inspection.target.classVertexIndices)
+            || !(reference.worldPositions instanceof Float64Array) || reference.worldPositions.length !== inspection.target.classVertexIndices.length * 3
+            || !reference.worldPositions.every(Number.isFinite)) throw new Error('Target shader feedback requires exact model/input/assembly/matrix/class-associated Float64 rows from the same pre-lease native capture')
+          const beforeSample = () => {
+            if (!current.token.matches() || requireCurrentDraw() !== current) throw new Error('The current native model/draw changed during target shader feedback')
+          }
+          beforeSample()
+          const feedback = measureNativeTargetShaderFeedback({ renderer, camera, scene, object: inspection.target.object,
+            targetPrimitiveId: inspection.target.primitiveId, targetVertexIndices: inspection.target.classVertexIndices, cpuWorldPositions: reference.worldPositions,
+            requestedTriangleIndexOffset: request.targetIndexOffset, controlSubmissionRevision: ++controlSubmissionRevision,
+            associatedColourDraw: { drawRevision: current.draw.drawRevision, contextRevision: current.draw.contextRevision,
+              viewId: current.draw.viewId, timeSeconds: current.draw.timeSeconds }, beforeSample })
+          beforeSample()
+          return { ...qualification, status: feedback.status, reason: feedback.reason, model: inspection.model, machineRevision: inspection.machineRevision,
+            inventoryRevision: inspection.inventoryRevision, input: inspection.input, associationDraw: inspection.draw,
+            target: { record: inspection.target.record, primitiveId: inspection.target.primitiveId, canonicalPrimitiveId: inspection.target.canonicalPrimitiveId,
+              classVertexIndices: [...inspection.target.classVertexIndices], incidentTriangleIndexOffsets: [...inspection.target.incidentTriangleIndexOffsets], triangleCount: inspection.target.triangleCount }, feedback }
+        } catch (error) {
+          return { ...qualification, status: 'unavailable', reason: error instanceof Error ? error.message : String(error), model: inspection?.model ?? null,
+            machineRevision: inspection?.machineRevision ?? null, inventoryRevision: inspection?.inventoryRevision ?? null, input: inspection?.input ?? null,
+            associationDraw: inspection?.draw ?? null, target: null, feedback: null }
+        }
+      },
+      readNativeTargetSurfaceAssociation(request) {
+        const qualification: NativeTargetSurfaceReadbackState = { method: 'current-native-depth-target-surface-association', equivalence: 'depth-native-not-colour-or-composite',
+          sourceProof: false, sourceAcceptance: false, numericVertexResidualBoundMetres: null, gpuPositionRoundingBoundMetres: null, eligibility: 'unresolved' }
+        let pass: NativeTargetSurfacePass | null = null
+        let target: THREE.WebGLRenderTarget | null = null
+        try {
+          const current = requireCurrentDraw()
+          const draw = current.draw
+          const width = draw.renderTarget?.width ?? draw.canvas.width
+          const height = draw.renderTarget?.height ?? draw.canvas.height
+          assertTargetCapacity(width, height, 'Native target-surface association', draw.viewId)
+          const [x, y] = request.nativeStageBackingPixel
+          const viewport = draw.viewportBackingPixels
+          const scissor = draw.scissorBackingPixels
+          if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= width || y >= height
+            || x + 0.5 < viewport[0]! || x + 0.5 >= viewport[0]! + viewport[2]! || y + 0.5 < viewport[1]! || y + 0.5 >= viewport[1]! + viewport[3]!
+            || draw.scissorTest && (x + 0.5 < scissor[0]! || x + 0.5 >= scissor[0]! + scissor[2]! || y + 0.5 < scissor[1]! || y + 0.5 >= scissor[1]! + scissor[3]!)) throw new Error('Requested native-stage pixel is outside this completed native viewport/scissor support')
+          if (scene.overrideMaterial || renderer.shadowMap.enabled) throw new Error('Native target-surface association does not support an override material or enabled shadow pass')
+          pass = prepareNativeTargetSurfaceAssociation(current.model, draw, current.token, request)
+          target = new THREE.WebGLRenderTarget(width, height, { depthBuffer: true, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, type: THREE.UnsignedByteType, samples: 0 })
+          target.viewport.fromArray(viewport)
+          target.scissor.fromArray(scissor)
+          target.scissorTest = draw.scissorTest
+          const savedTarget = renderer.getRenderTarget()
+          const savedViewport = renderer.getViewport(new THREE.Vector4())
+          const savedScissor = renderer.getScissor(new THREE.Vector4())
+          const savedScissorTest = renderer.getScissorTest()
+          const savedBackground = scene.background
+          const savedLayers = camera.layers.mask
+          const savedAutoClear = renderer.autoClear
+          const clearColour = renderer.getClearColor(new THREE.Color())
+          const clearAlpha = renderer.getClearAlpha()
+          const previousDiagnostic = diagnosticDraw
+          const pixel = new Uint8Array(4)
+          try {
+            for (const entry of pass.entries) entry.object.material = entry.diagnosticMaterial
+            pass.target.object.geometry = pass.target.diagnosticGeometry
+            scene.background = null
+            camera.layers.disable(PROBE_LAYER)
+            diagnosticDraw = true
+            renderer.autoClear = false
+            renderer.setClearColor(0x000000, 0)
+            renderer.setRenderTarget(target)
+            renderer.clear(true, true, true)
+            // Same actual scene, current shader laws, world matrices and full
+            // native occluding scope. This is depth-native, not colour-equivalent.
+            renderer.render(scene, camera)
+            renderer.readRenderTargetPixels(target, x, y, 1, 1, pixel)
+          } finally {
+            for (const entry of pass.entries) entry.object.material = entry.originalMaterial
+            pass.target.object.geometry = pass.target.originalGeometry
+            scene.background = savedBackground
+            camera.layers.mask = savedLayers
+            diagnosticDraw = previousDiagnostic
+            renderer.autoClear = savedAutoClear
+            renderer.setClearColor(clearColour, clearAlpha)
+            renderer.setRenderTarget(savedTarget)
+            renderer.setViewport(savedViewport)
+            renderer.setScissor(savedScissor)
+            renderer.setScissorTest(savedScissorTest)
+          }
+          if (!current.token.matches() || requireCurrentDraw() !== current) throw new Error('The native model/draw changed during target-surface association')
+          return { ...qualification, status: 'readback', reason: null, request: structuredClone(pass.request),
+            model: pass.model, machineRevision: pass.machineRevision, inventoryRevision: pass.inventoryRevision, input: pass.input, draw: pass.draw,
+            census: pass.census, runtimeInstanceDeclarations: pass.runtimeInstanceDeclarations,
+            target: { record: pass.target.record, primitiveId: pass.target.primitiveId, canonicalPrimitiveId: pass.target.canonicalPrimitiveId,
+              classVertexIndices: [...pass.target.classVertexIndices], incidentTriangleIndexOffsets: [...pass.target.incidentTriangleIndexOffsets], triangleCount: pass.target.triangleCount },
+            nativeStage: { width, height, viewportBackingPixels: [...viewport], scissorBackingPixels: [...scissor], scissorTest: draw.scissorTest, pixelCentreBacking: [x + 0.5, y + 0.5] },
+            association: pass.decodePixel(pixel) }
+        } catch (error) {
+          return { ...qualification, status: 'unavailable', reason: error instanceof Error ? error.message : String(error), request: structuredClone(request),
+            model: null, machineRevision: null, inventoryRevision: null, input: null, draw: null, census: null, runtimeInstanceDeclarations: null, target: null, nativeStage: null, association: null }
+        } finally {
+          target?.dispose()
+          pass?.dispose()
+        }
+      },
+    }
+  })
+  return viewer
 }
 
 interface RestPart {
@@ -1789,6 +2282,16 @@ interface RestPart {
   overrideEpoch: number
   finalEpoch: number
 }
+interface NativeGLTFAssociation {
+  nodes?: number
+  meshes?: number
+  primitives?: number
+}
+interface NativeGLTFMetadata {
+  nodeMeshes: (number | null)[]
+  meshPrimitives: { mode: number; positionAccessor: number | null; indexAccessor: number | null }[][]
+}
+
 
 /**
  * Missing files/names warn and remain inspectable; they never count as verified
@@ -1807,8 +2310,11 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   let overrideEpoch = 0
   const driven: RestPart[] = []
   const overridesSeen = new Set<string>()
+  const currentOverrideMisses: string[] = []
   const revision = { value: 0 }
   const inventoryRevision = { value: 0 }
+  let baselinePathRevision = -1
+  let baselinePaths: readonly string[] = []
   const nativeDrawables: Pick<NativeDrawable, 'path' | 'object'>[] = []
   const nativeDrawablePaths: string[] = []
   const nativeDrawableSeen = new WeakSet<THREE.Object3D>()
@@ -1827,6 +2333,11 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   let loadError: string | null = null
   let root: THREE.Object3D | null = null
   let parsed: THREE.Object3D | null = null
+  let snapshotAssociations: WeakMap<THREE.Object3D, NativeGLTFAssociation> | null = null
+  let snapshotMetadata: NativeGLTFMetadata | null = null
+  let snapshotUpdateVerified = false
+  let snapshotSolvedInputKey: string | null = null
+  const snapshotOrigins = options.nativePrimitiveSnapshots ? new WeakMap<THREE.Object3D, THREE.Object3D>() : null
   try {
     const response = await fetch(url)
     if (!response.ok) throw new Error(`Model request returned HTTP ${response.status}`)
@@ -1848,6 +2359,20 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       await MeshoptDecoder.ready
       const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(buffer, new URL('.', new URL(url, location.href)).href)
       provenance.generator = gltf.asset.generator ?? null
+      if (options.nativePrimitiveSnapshots) {
+        const associations = new WeakMap<THREE.Object3D, NativeGLTFAssociation>()
+        gltf.scene.traverse(object => {
+          const reference = gltf.parser.associations.get(object) as NativeGLTFAssociation | undefined
+          if (reference) associations.set(object, { nodes: reference.nodes, meshes: reference.meshes, primitives: reference.primitives })
+        })
+        snapshotAssociations = associations
+        // Copy only identity/accessor ordinals; never retain parser caches or BIN.
+        snapshotMetadata = {
+          nodeMeshes: gltf.parser.json.nodes.map((node: { mesh?: number }) => node.mesh ?? null),
+          meshPrimitives: gltf.parser.json.meshes.map((mesh: { primitives: { mode?: number; attributes: { POSITION?: number }; indices?: number }[] }) =>
+            mesh.primitives.map(primitive => ({ mode: primitive.mode ?? 4, positionAccessor: primitive.attributes.POSITION ?? null, indexAccessor: primitive.indices ?? null }))),
+        }
+      }
       const loaded = gltf.scene
       parsed = loaded
       loaded.updateMatrixWorld(true)
@@ -1902,6 +2427,8 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   } catch (error) {
     if (parsed && !root) disposeNativeObject(parsed)
     parsed = null
+    snapshotAssociations = null
+    snapshotMetadata = null
     parts.clear()
     paths.length = 0
     driven.length = 0
@@ -1910,6 +2437,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     missing.push(`model unavailable: ${loadError}`)
   }
   if (missing.length) console.warn(`[machine] unverified bindings/model:\n${missing.join('\n')}`)
+  const bindingFailures = options.nativePrimitiveSnapshots ? [...missing] : missing
 
   const a = new THREE.Vector3()
   const b = new THREE.Vector3()
@@ -1945,19 +2473,20 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   }
   const upperSprocket = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-1')
   const crankSprocket = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-2')
-  const spareSprocket = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3')
+  const spareSprocket = parts.get(NATIVE_RUNTIME_INSTANCES.upperMedium.templatePartPath)
   const paperKnobPart = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-transgear-knob-shaft-1')
   const paperFeedPart = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-rack-pinion-1')
   const paperKnobRotation = new THREE.Matrix4()
   const paperFeedRotation = new THREE.Matrix4()
-  const upperMediumPath = 'ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3@upper'
-  const crankMediumPath = 'ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3@crank'
-  if (spareSprocket) {
-    addPartInstance(spareSprocket.path, upperMediumPath)
-    addPartInstance(spareSprocket.path, crankMediumPath)
+  const upperMediumPath = NATIVE_RUNTIME_INSTANCES.upperMedium.partPath
+  const crankMediumPath = NATIVE_RUNTIME_INSTANCES.crankMedium.partPath
+  for (const declaration of Object.values(NATIVE_RUNTIME_INSTANCES)) {
+    if (parts.has(declaration.templatePartPath)) addPartInstance(declaration.templatePartPath, declaration.partPath)
   }
   const upperMedium = parts.get(upperMediumPath)
   const crankMedium = parts.get(crankMediumPath)
+  let normalUpperSeatedGear: RestPart | null = null
+  let normalCrankSeatedGear: RestPart | null = null
 
   function around(out: THREE.Matrix4, centre: THREE.Vector3, direction: THREE.Vector3, angle: number) {
     quaternion.setFromAxisAngle(direction, angle)
@@ -2000,14 +2529,17 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     Object.assign(input.setup, source.setup)
   }
   function warnOverride(path: string) {
+    if (options.nativePrimitiveSnapshots && !currentOverrideMisses.includes(path)) currentOverrideMisses.push(path)
     if (overridesSeen.has(path)) return
     overridesSeen.add(path)
     missing.push(`source override missing native part: ${path}`)
     console.warn(`[machine] source override missing native part: ${path}`)
   }
 
-  function update(source: MechanismInput, overrides?: readonly PartOverride[]) {
+  function update(source: MechanismInput, overrides?: readonly PartOverride[] | PartOverrideProvider) {
     revision.value++
+    if (options.nativePrimitiveSnapshots) currentOverrideMisses.length = 0
+    if (options.nativePrimitiveSnapshots) snapshotUpdateVerified = false
     copyInput(source)
     solveMechanism(input, pose)
     if (availability !== 'available') return
@@ -2105,8 +2637,64 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     }
     driveSprockets(knobAngle)
     root!.updateMatrixWorld(true)
+    let resolvedOverrides: readonly PartOverride[] | undefined
+    if (typeof overrides === 'function') {
+      if (baselinePathRevision !== inventoryRevision.value) {
+        baselinePaths = Object.freeze([...parts.keys()])
+        baselinePathRevision = inventoryRevision.value
+      }
+      const baselineRevision = revision.value
+      let baselineActive = true
+      let providerCompleted = false
+      const requireBaseline = () => {
+        if (!baselineActive || revision.value !== baselineRevision || availability !== 'available' || !root) throw new Error('Normal-solved baseline is valid only within the current update provider callback')
+      }
+      try {
+        resolvedOverrides = overrides({
+          get partPaths() { requireBaseline(); return baselinePaths },
+          readWorldMatrix(partPath, outWorldMatrix) {
+            requireBaseline()
+            if (!(outWorldMatrix instanceof Float64Array) || outWorldMatrix.length !== 16) throw new RangeError('Native baseline matrix output must be a Float64Array of exactly 16 components')
+            const part = parts.get(partPath)
+            if (!part) return false
+            outWorldMatrix.set(part.node.matrixWorld.elements)
+            return true
+          },
+          readVisibility(partPath, mode = 'effective') {
+            requireBaseline()
+            const part = parts.get(partPath)
+            if (!part) return null
+            if (mode === 'self') return part.node.visible
+            for (let node: THREE.Object3D | null = part.node; node; node = node.parent) if (!node.visible) return false
+            return true
+          },
+          readSeatedGearPartPath(seat) {
+            requireBaseline()
+            const part = seat === 'upper' ? normalUpperSeatedGear : seat === 'crank' ? normalCrankSeatedGear : null
+            if (!part) return null
+            for (let node: THREE.Object3D | null = part.node; node; node = node.parent) if (!node.visible) return null
+            return part.path
+          },
+          readGearSeatWorldMatrix(seat, outWorldMatrix) {
+            requireBaseline()
+            if (!(outWorldMatrix instanceof Float64Array) || outWorldMatrix.length !== 16) throw new RangeError('Native gear-seat matrix output must be a Float64Array of exactly 16 components')
+            const part = seat === 'upper' ? normalUpperSeatedGear : seat === 'crank' ? normalCrankSeatedGear : null
+            if (!part) return false
+            for (let node: THREE.Object3D | null = part.node; node; node = node.parent) if (!node.visible) return false
+            outWorldMatrix.set(part.node.matrixWorld.elements)
+            return true
+          },
+        })
+        requireBaseline()
+        if (!Array.isArray(resolvedOverrides)) throw new TypeError('Native override provider must return a PartOverride array')
+        providerCompleted = true
+      } finally {
+        baselineActive = false
+        if (!providerCompleted && options.nativePrimitiveSnapshots) snapshotUpdateVerified = false
+      }
+    } else resolvedOverrides = overrides
     overrideEpoch++
-    if (overrides) for (const override of overrides) {
+    if (resolvedOverrides) for (const override of resolvedOverrides) {
       const part = parts.get(override.partPath)
       if (!part) { warnOverride(override.partPath); continue }
       if (override.visibility) part.node.visible = override.visibility === 'visible'
@@ -2119,7 +2707,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     }
     // Absolute source observations apply simultaneously. A child-first JSON
     // ordering must not let a later parent transform move the child's target.
-    if (overrides) for (const override of overrides) {
+    if (resolvedOverrides) for (const override of resolvedOverrides) {
       const part = parts.get(override.partPath)
       if (!part || part.overrideEpoch !== overrideEpoch) continue
       const parent = partsByNode.get(part.node.parent!)
@@ -2128,6 +2716,10 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       local.decompose(part.node.position, part.node.quaternion, part.node.scale)
     }
     root!.updateMatrixWorld(true)
+    if (options.nativePrimitiveSnapshots) {
+      snapshotSolvedInputKey = JSON.stringify(nativeInputSnapshot(input))
+      snapshotUpdateVerified = true
+    }
   }
 
   function finalWorld(part: RestPart): THREE.Matrix4 {
@@ -2212,7 +2804,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     endpoint(part, restAnchor, origin, angle - part.chainRestChordAngleRad!)
   }
 
-  function sprocketAt(part: RestPart, frame: RestPart, angle: number) {
+  function sprocketAt(part: RestPart, frame: RestPart, angle: number, seat: 'upper' | 'crank') {
     desired.copy(frame.world)
     pivot.setFromMatrixPosition(desired)
     around(delta, pivot, Z, angle)
@@ -2220,22 +2812,26 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     if (frame === crankSprocket) desired.premultiply(swing)
     setWorld(part, desired)
     part.node.visible = true
+    if (seat === 'upper') normalUpperSeatedGear = part
+    else normalCrankSeatedGear = part
   }
 
   function driveSprockets(knobAngle: number) {
+    normalUpperSeatedGear = null
+    normalCrankSeatedGear = null
     if (!upperSprocket || !crankSprocket || !spareSprocket || !upperMedium || !crankMedium) return
     if (input.gearing === 'medium-medium') {
       upperSprocket.node.visible = false
       crankSprocket.node.visible = false
       spareSprocket.node.visible = false
-      sprocketAt(upperMedium, upperSprocket, knobAngle)
-      sprocketAt(crankMedium, crankSprocket, pose.crankAngleRad)
+      sprocketAt(upperMedium, upperSprocket, knobAngle, 'upper')
+      sprocketAt(crankMedium, crankSprocket, pose.crankAngleRad, 'crank')
     } else if (input.gearing === 'large-small') {
-      sprocketAt(upperSprocket, crankSprocket, pose.crankAngleRad)
-      sprocketAt(crankSprocket, upperSprocket, knobAngle)
+      sprocketAt(upperSprocket, crankSprocket, pose.crankAngleRad, 'crank')
+      sprocketAt(crankSprocket, upperSprocket, knobAngle, 'upper')
     } else {
-      sprocketAt(upperSprocket, upperSprocket, knobAngle)
-      sprocketAt(crankSprocket, crankSprocket, pose.crankAngleRad)
+      sprocketAt(upperSprocket, upperSprocket, knobAngle, 'upper')
+      sprocketAt(crankSprocket, crankSprocket, pose.crankAngleRad, 'crank')
     }
   }
 
@@ -2260,6 +2856,28 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
 
   function finitePoint(value: unknown): value is Point3 {
     return Array.isArray(value) && value.length === 3 && value.every(item => typeof item === 'number' && Number.isFinite(item))
+  }
+
+  function runtimeTemplateGeometryMatches(part: RestPart, templatePartPath: string): boolean {
+    const template = parts.get(templatePartPath)
+    if (!template || part.node.userData.nativeInstanceSource !== templatePartPath || part.node.userData.nativeInstancePath !== part.path) return false
+    let primitiveCount = 0
+    const matches = (source: THREE.Object3D, instance: THREE.Object3D): boolean => {
+      if (source instanceof THREE.Mesh || source instanceof THREE.Line || source instanceof THREE.Points) {
+        if (!(instance instanceof THREE.Mesh || instance instanceof THREE.Line || instance instanceof THREE.Points) || source.geometry !== instance.geometry) return false
+        primitiveCount++
+      }
+      let instanceIndex = 0
+      for (const child of source.children) {
+        if (child.userData.landmarkMarker) continue
+        while (instance.children[instanceIndex]?.userData.landmarkMarker) instanceIndex++
+        const copy = instance.children[instanceIndex++]
+        if (!copy || !matches(child, copy)) return false
+      }
+      while (instance.children[instanceIndex]?.userData.landmarkMarker) instanceIndex++
+      return instanceIndex === instance.children.length
+    }
+    return matches(template.node, part.node) && primitiveCount > 0
   }
 
   function createLandmarkProbe(anchors: readonly LandmarkAnchor[]): LandmarkProbe {
@@ -2312,6 +2930,13 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       if (typeof anchor.partPath !== 'string') return { reason: 'partPath must name the anchor\'s native part' }
       const part = parts.get(anchor.partPath)
       if (!part) return { reason: `native part missing: ${anchor.partPath}` }
+      const declaration = Object.values(NATIVE_RUNTIME_INSTANCES).find(entry => entry.partPath === part.path)
+      if (declaration) {
+        if (anchor.runtimeTemplatePartPath !== declaration.templatePartPath || hasWorld || anchor.partLocalMetres === undefined) return { reason: 'genuine runtime anchor requires its declared template and explicit partLocalMetres; template REST/worldMetres is not live-instance evidence' }
+        if (!runtimeTemplateGeometryMatches(part, declaration.templatePartPath)) return { reason: 'live runtime instance does not share its declared native template geometry' }
+      } else if (anchor.runtimeTemplatePartPath !== undefined || part.node.userData.nativeInstanceSource !== undefined) {
+        return { reason: 'runtime template association is not one of the declared genuine native instances' }
+      }
       if (hasWorld) {
         if (!finitePoint(anchor.worldMetres)) return { reason: 'worldMetres must be three finite metres' }
         if (part.world.determinant() === 0) return { reason: 'native part rest matrix is singular; worldMetres has no part-local coordinate' }
@@ -2366,14 +2991,16 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       else if (seen.has(id)) placed = { reason: 'duplicate anchor id' }
       else placed = place(anchor, id)
       if (id) seen.add(id)
-      if ('object' in placed) markers.push({ id, slot: slots++, reason: null, object: placed.object })
-      else markers.push({ id, slot: -1, reason: placed.reason, object: null })
+      const partPath = typeof anchor?.partPath === 'string' ? anchor.partPath : null
+      const runtimeTemplatePartPath = typeof anchor?.runtimeTemplatePartPath === 'string' ? anchor.runtimeTemplatePartPath : null
+      if ('object' in placed) markers.push({ id, partPath, runtimeTemplatePartPath, slot: slots++, reason: null, object: placed.object })
+      else markers.push({ id, partPath, runtimeTemplatePartPath, slot: -1, reason: placed.reason, object: null })
     }
 
     let status: LandmarkProbe['status'] = 'active'
     const probe: LandmarkProbe = {
       visibilityMode: 'depth-off-landmark-projection',
-      anchors: markers.map(item => ({ id: item.id, state: item.slot >= 0 ? 'measurable' : 'unresolved', reason: item.reason })),
+      anchors: markers.map(item => ({ id: item.id, partPath: item.partPath, runtimeTemplatePartPath: item.runtimeTemplatePartPath, state: item.slot >= 0 ? 'measurable' : 'unresolved', reason: item.reason })),
       get status() { return status },
       dispose() {
         if (status === 'disposed') return
@@ -2392,7 +3019,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       },
     }
     probes.add(probe)
-    probeInternals.set(probe, { markers, passes: Math.ceil(slots / SLOTS_PER_PASS), pass, pointSize, revision })
+    probeInternals.set(probe, { markers, sourceAnchors: structuredClone(anchors), passes: Math.ceil(slots / SLOTS_PER_PASS), pass, pointSize, revision })
     return probe
   }
 
@@ -2491,6 +3118,14 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     const source = parts.get(sourcePartPath)
     if (!source || !root) { warnOverride(sourcePartPath); return 'missing-source' }
     const node = source.node.clone(true)
+    if (snapshotOrigins) {
+      const associate = (original: THREE.Object3D, clone: THREE.Object3D) => {
+        snapshotOrigins.set(clone, snapshotOrigins.get(original) ?? original)
+        for (let i = 0; i < original.children.length; i++) associate(original.children[i]!, clone.children[i]!)
+      }
+      associate(source.node, node)
+      trackNativePrimitiveSubmissions(node)
+    }
     // Diagnostic markers belong to their probe, never to a new native instance.
     const clonedMarkers: THREE.Object3D[] = []
     node.traverse(child => { if (child.userData.landmarkMarker) clonedMarkers.push(child) })
@@ -2516,6 +3151,10 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     for (const probe of [...probes]) probe.dispose()
     for (const probe of [...visibilityProbes]) probe.dispose()
     revision.value++
+    snapshotUpdateVerified = false
+    snapshotAssociations = null
+    snapshotMetadata = null
+    if (root) nativeCaptureModels.delete(root)
     if (root) {
       root.removeFromParent()
       disposeNativeObject(root)
@@ -2530,8 +3169,62 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   }
 
   solveMechanism(input, pose)
+  if (root && snapshotAssociations && snapshotMetadata && options.nativePrimitiveSnapshots) {
+    const captureRoot = root
+    const associations = snapshotAssociations
+    const metadata = snapshotMetadata
+    trackNativePrimitiveSubmissions(captureRoot)
+    const sourceObject = (object: THREE.Object3D) => snapshotOrigins?.get(object) ?? object
+    nativeCaptureModels.set(captureRoot, {
+      root: captureRoot, provenance, input, identityMapSha256: modelRepresentation.identity.mapSha256,
+      canonicalModelSha256: modelRepresentation.identity.canonicalSha256, semanticSha256: modelRepresentation.equivalence.semanticSha256,
+      expectedArtifactPrimitiveCount: modelRepresentation.equivalence.drawableCount,
+      revision: () => revision.value,
+      inventoryRevision: () => inventoryRevision.value, bindingFailures, currentOverrideMisses,
+      verified: () => diagnosticNativeRoots.has(captureRoot) ? 'Native geometry is leased for diagnostic-only rendering'
+        : availability !== 'available' || root !== captureRoot || captureRoot.parent !== scene ? 'Native model is unavailable or detached'
+        : provenance.identity !== 'matched' ? 'Native model bytes are not identity-matched'
+          : !snapshotUpdateVerified ? 'No successfully completed current native mechanism update'
+            : snapshotSolvedInputKey !== JSON.stringify(nativeInputSnapshot(input)) ? 'The current native input has changed without a completed mechanism update'
+              : bindingFailures.length ? `Native bindings are unverified: ${bindingFailures.join('; ')}` : null,
+      identity(object) {
+        const original = sourceObject(object)
+        const reference = associations.get(original)
+        if (reference?.meshes === undefined || reference.primitives === undefined) throw new Error(`Native drawable ${object.name} has no decoded glTF primitive association`)
+        for (let ancestor: THREE.Object3D | null = original; ancestor && ancestor !== captureRoot; ancestor = ancestor.parent) {
+          const nodeIndex = associations.get(ancestor)?.nodes
+          if (nodeIndex === undefined) continue
+          const part = partsByNode.get(ancestor)
+          const primitive = metadata.meshPrimitives[reference.meshes]?.[reference.primitives]
+          if (!part || !primitive || metadata.nodeMeshes[nodeIndex] !== reference.meshes || !Number.isSafeInteger(primitive.positionAccessor)) throw new Error(`Native drawable ${object.name} has an inconsistent canonical node/primitive association`)
+          return { canonicalId: `${part.path}#primitive/${reference.primitives}`, nodePath: part.path, nativeNodeIndex: nodeIndex,
+            representationMeshIndex: reference.meshes, primitiveIndex: reference.primitives, gltfMode: primitive.mode,
+            positionAccessor: primitive.positionAccessor!, indexAccessor: primitive.indexAccessor }
+        }
+        throw new Error(`Native drawable ${object.name} lacks an authored native mesh node`)
+      },
+      runtimeTemplate(object: NativeObject): NativeObject | null {
+        const original = sourceObject(object)
+        return original !== object && (original instanceof THREE.Mesh || original instanceof THREE.Line || original instanceof THREE.Points) ? original : null
+      },
+      spring(object: NativeObject): NativeSpringEvaluator | null {
+        const original = sourceObject(object)
+        for (let ancestor: THREE.Object3D | null = original; ancestor && ancestor !== captureRoot; ancestor = ancestor.parent) {
+          const spring = partsByNode.get(ancestor)?.spring
+          if (spring && spring.meshes.includes(original as THREE.Mesh)) return spring
+        }
+        return null
+      },
+    })
+  }
   return {
     input, pose, missing, loadError, provenance, partPaths: paths, update, addPartInstance, createLandmarkProbe, createPartVisibilityProbe, dispose,
+    nativePrimitiveSnapshot(viewer, viewId) {
+      if (!root || availability !== 'available') return unavailableNativePrimitiveSnapshot(loadError ?? `Native model ${availability}`)
+      if (!options.nativePrimitiveSnapshots) return unavailableNativePrimitiveSnapshot('Native primitive capture was not enabled for this verification Machine')
+      const read = nativeViewerReaders.get(viewer)
+      return read ? read(root, viewId) : unavailableNativePrimitiveSnapshot('Native primitive capture was not enabled for this verification Viewer')
+    },
     get availability() { return availability },
     get nativeDrawablePartPaths() { synchronizeNativeInventory(); return nativeDrawablePaths },
   }
@@ -2570,7 +3263,7 @@ function nativeWireLength(part: RestPart): number {
   return length
 }
 
-interface SpringDeformer {
+interface SpringDeformer extends NativeSpringEvaluator {
   length: { value: number }
   /** Meshes whose vertices this deformer's shader moves. */
   readonly meshes: readonly THREE.Mesh[]
@@ -2761,6 +3454,8 @@ void springCurve(out vec3 centre, out vec3 tangent) {
   }
 }
 `
+  const positionExpression = 'vec3 transformed = springNewCentre + springTurn(position - springRestCentre, springRestTangent, springNewTangent);'
+  const normalExpression = 'objectNormal = springTurn(objectNormal, springRestTangent, springNewTangent);'
   // The single deformation hook: native spring meshes and probe markers both
   // compile exactly this vertex code against the same length uniforms.
   function deform(material: THREE.Material) {
@@ -2773,10 +3468,10 @@ void springCurve(out vec3 centre, out vec3 tangent) {
 vec3 springNewCentre;
 vec3 springNewTangent;
 springCurve(springNewCentre, springNewTangent);
-objectNormal = springTurn(objectNormal, springRestTangent, springNewTangent);
+${normalExpression}
 `)
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
-vec3 transformed = springNewCentre + springTurn(position - springRestCentre, springRestTangent, springNewTangent);
+${positionExpression}
 `)
     }
     material.customProgramCacheKey = () => `native-stock-spring:${stock}`
@@ -2821,8 +3516,47 @@ vec3 transformed = springNewCentre + springTurn(position - springRestCentre, spr
   })
   return {
     length,
+    restLength: rest,
     meshes,
     deform,
+    descriptor() {
+      return {
+        kind: 'native-stock-spring', stock, uniforms: { springLength: length.value, springRestLength: rest.value },
+        constants: { radiusM: radius, insetM: inset, endCorrectionM: endCorrection, turns }, shaderFunctions, positionExpression, normalExpression,
+        cpuEvaluation: 'float64-existing-native-curve-with-decoded-float32-attributes',
+      }
+    },
+    evaluate(geometry, index, vertex, out) {
+      // Consume the shader's already-decoded Float32 attributes, never reclassify
+      // local rows. Existing curve() is the same centreline used to prepare them;
+      // the descriptor seals its full live GLSL counterpart and uniform state.
+      const coordinate = geometry.getAttribute('springCoordinate')
+      const centre = geometry.getAttribute('springRestCentre')
+      const tangent = geometry.getAttribute('springRestTangent')
+      const kind = coordinate.getX(index)
+      const t = coordinate.getY(index)
+      point.fromBufferAttribute(centre, index)
+      trialTangent.fromBufferAttribute(tangent, index)
+      if (Math.abs(kind) > 1.5) {
+        out.copy(vertex)
+        out.x += Math.sign(kind) * (length.value - rest.value) * 0.5
+        return
+      }
+      curve(Math.abs(kind) < 0.5 ? 0 : kind, t, length.value, coordinates.centre, coordinates.tangent)
+      residue.subVectors(vertex, point)
+      trial.crossVectors(trialTangent, coordinates.tangent)
+      // Native springTurn's minimal tangent rotation, evaluated in Float64.
+      // Use scalar cross products so capture adds no persistent per-frame scratch.
+      const x = trial.y * residue.z - trial.z * residue.y
+      const y = trial.z * residue.x - trial.x * residue.z
+      const z = trial.x * residue.y - trial.y * residue.x
+      const denominator = Math.max(1 + trialTangent.dot(coordinates.tangent), 0.000001)
+      out.set(
+        coordinates.centre.x + residue.x + x + (trial.y * z - trial.z * y) / denominator,
+        coordinates.centre.y + residue.y + y + (trial.z * x - trial.x * z) / denominator,
+        coordinates.centre.z + residue.z + z + (trial.x * y - trial.y * x) / denominator,
+      )
+    },
     markerCoordinates(vertex, out) {
       // Eye/bore anchors are in a rigid end assembly even though their bore
       // centres do not lie on the swept-wire surface used for classification;

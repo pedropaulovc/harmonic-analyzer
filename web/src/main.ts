@@ -1,12 +1,14 @@
-import { assertSourceCompositeWeights, createViewer, loadMachine, ViewCapacityError, type CameraRecord, type Machine, type SourceView } from './scene'
+import { assertSourceCompositeWeights, beginNativeDiagnosticViewerLease, captureSourceLayout, createViewer, EXPLORING_VIEW_ID, loadMachine, ViewCapacityError, type CameraRecord, type CapturedSourceLayoutEntry, type LandmarkAnchor, type Machine, type NativeStagePointMapping, type NativeTargetShaderMeasurementRequest, type NativeTargetShaderReadback, type NativeTargetSurfaceReadback, type PartOverrideProvider, type SourceLayoutEntry, type SourceView, type Viewer } from './scene'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, physicalChannelAngle, squareWave } from './kinematics'
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
-import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT_PX, type PlaybackView, type ReferenceState } from './timeline'
-import type { CompactVideoReference } from './source-track'
+import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT_PX, type PlaybackView, type ReferenceState, type SourceSample } from './timeline'
+import type { CompactVideoReference, DiagnosticSourcePublicationState } from './source-track'
 import { createSourceVideoPlayer } from './source-player'
 import { INPUT_FIELDS, equalRecord, type InputField } from './source-witness'
+import { unavailableNativePrimitiveSnapshot, type NativeInputSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmissionMetadata, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
+import { compileSourceAssemblyState, createSourceAssemblyBuffer, OPERATING_SOURCE_ASSEMBLY, solveSourceAssembly, type CompiledSourceAssembly, type SourceAssemblyBuffer, type SourceAssemblyState } from './source-assembly'
 
 function element<T extends HTMLElement>(selector: string): T {
   const found = document.querySelector<T>(selector)
@@ -57,6 +59,13 @@ const stateLabels: Record<PlaybackState, string> = {
 }
 const input = createMechanismInput()
 const reviewRollbackInput = createMechanismInput()
+let currentAssembly = OPERATING_SOURCE_ASSEMBLY
+let solvingAssembly = OPERATING_SOURCE_ASSEMBLY
+let assemblyBuffer: SourceAssemblyBuffer | undefined
+const assemblyOverrides: PartOverrideProvider = baseline => {
+  assemblyBuffer ??= createSourceAssemblyBuffer()
+  return solveSourceAssembly(solvingAssembly, baseline, assemblyBuffer)
+}
 let machine: Machine | null = null
 let reference: CompactVideoReference | null = null
 let player: VideoPlayer | null = null
@@ -67,6 +76,52 @@ let mode: 'following-video' | 'exploring' | 'reference-review' = 'exploring'
 let referenceSeek: 'idle' | 'seeking' = 'idle'
 let referenceState: ReferenceState = 'unavailable'
 let modelState: 'loading' | 'ready' | 'unavailable' = 'loading'
+let nativeDiagnosticLeaseActive = false
+interface NativeDiagnosticRestoration {
+  status: 'restored' | 'failed'
+  sourceProof: false
+  sourceAcceptance: false
+  inputRestored: boolean
+  cameraRestored: boolean
+  assemblyRestored: boolean
+  layoutRestored: boolean
+  paintRevision: 'clean' | 'pending'
+}
+let lastNativeDiagnosticRestoration: NativeDiagnosticRestoration | null = null
+interface NativeDiagnosticPublicationSnapshot {
+  sourceProof: false
+  sourceAcceptance: false
+  prepareCount: number
+  commitCount: number
+  publishedBank: 0 | 1
+  publishedSample: SourceSample
+  activeViews: readonly PlaybackView[]
+  referenceState: ReferenceState
+  modelTime: number
+  sourceDrawRevision: number
+  paintRevision: 'clean' | 'pending'
+  externalInput: NativeInputSnapshot
+}
+interface NativeDiagnosticPublication {
+  readonly implementation: { renderSourceText: string; prepareAtText: string; commitPreparedText: string }
+  renderSource(timeSeconds: number): void
+  snapshot(): NativeDiagnosticPublicationSnapshot
+}
+interface NativeDiagnosticContext {
+  readonly viewer: Viewer
+  readonly machine: Machine
+  readonly input: MechanismInput
+  readonly provenance: Machine['provenance']
+  readonly metadata: { sourceProof: false; sourceAcceptance: false; method: 'current-native-scoped-diagnostic-lease' }
+  snapshot(): unknown
+  nativePrimitiveSnapshot(): NativePrimitiveSnapshot
+  readNativeDrawMetadata(): NativePrimitiveSubmissionMetadata
+  readNativeTargetSurfaceAssociation(request: NativeTargetSurfaceRequest): NativeTargetSurfaceReadback
+  readRegisteredNativeLandmarkAnchors(): readonly LandmarkAnchor[]
+  resolveNativeStagePixelFromSourcePixel(viewId: string, sourcePixels: readonly [number, number]): NativeStagePointMapping
+  measureNativeTargetShaderFeedback(request: NativeTargetShaderMeasurementRequest): NativeTargetShaderReadback
+  withPublicationSamples<T>(samples: readonly SourceSample[], anchors: readonly LandmarkAnchor[], run: (transaction: NativeDiagnosticPublication) => T | Promise<T>): Promise<T>
+}
 let modelTime = 0
 let manualMotion: 'idle' | 'turning' = 'idle'
 let manualRevision: 'pending' | 'clean' = 'pending'
@@ -87,7 +142,8 @@ interface MechanismDraw {
   nativeGeometryAssumptions: PlaybackView['nativeGeometryAssumptions']
   imagePlaneWarp: PlaybackView['authoredImagePlaneWarp']
   resolvedImagePlaneWarp: NonNullable<PlaybackView['imagePlaneWarp']> | null
-  sourceLayout: PlaybackView['sourceLayout']
+  sourceAssembly: SourceAssemblyState
+  sourceLayout: readonly SourceLayoutEntry[]
   channelAnglesRad: Float64Array
   platenTravelM: number
   penTravelM: number
@@ -96,6 +152,7 @@ interface MechanismDraw {
 const mechanismDraws = new Map<string, MechanismDraw>()
 let sourceDrawTimeSeconds = 0
 let sourceDrawRevision = 0
+let sourceDrawLayout: readonly SourceLayoutEntry[] = []
 let diagnosticReference: CompactVideoReference | null = null
 let diagnosticMachine: Machine | null = null
 let lastTick = performance.now()
@@ -125,6 +182,7 @@ function cameraRecord(): CameraRecord {
 }
 
 function configureLandmarkProbe(): void {
+  if (nativeDiagnosticLeaseActive) return
   const enabled = verificationEnabled && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused'
     && reference !== null && machine?.availability === 'available'
   if (enabled ? diagnosticReference === reference && diagnosticMachine === machine : diagnosticReference === null && diagnosticMachine === null) return
@@ -141,13 +199,19 @@ function configureLandmarkProbe(): void {
 function renderPending(): void {
   if (paintRevision === 'clean') return
   paintRevision = 'clean'
-  viewer.render()
+  if (mode !== 'exploring' && referenceState === 'no-machine') drawSourceViews([], modelTime)
+  else viewer.render(currentAssembly.state)
 }
 
-function updateMachine(source: MechanismInput): void {
+
+function updateMachine(source: MechanismInput, assembly: CompiledSourceAssembly = currentAssembly): void {
   if (machine?.availability !== 'available') return
   physicsState = 'unavailable'
-  machine.update(source)
+  // The provider reads this update's fresh normal solve, never the previous
+  // source view's detached transforms. Operating uses the full normal reset.
+  solvingAssembly = assembly
+  machine.update(source, assembly.state.kind === 'operating' ? undefined : assemblyOverrides)
+  currentAssembly = assembly
   physicsState = 'available'
   paintRevision = 'pending'
 }
@@ -160,6 +224,20 @@ function primaryView(): PlaybackView | undefined {
     if (nextArea > 0 && nextArea > area) { area = nextArea; selected = view }
   }
   return selected
+}
+
+function currentInputMeaning(drawViewId?: string) {
+  if (mode === 'exploring') return 'manual-physical-input'
+  if (!primaryView() || drawViewId === EXPLORING_VIEW_ID) return 'unverified-retained-physical-input'
+  return 'chosen-feasible-approximation'
+}
+
+function lastContributingView(): PlaybackView | undefined {
+  for (let i = activeViews.length - 1; i >= 0; i--) {
+    const view = activeViews[i]!
+    if (view.composite?.mode !== 'crossfade' || view.composite.opacity > 0) return view
+  }
+  return undefined
 }
 
 function updateControlState(): void {
@@ -197,10 +275,10 @@ function explore(): void {
   const chosen = primaryView()
   if (chosen && machine?.availability === 'available') {
     copyInput(chosen.input)
-    updateMachine(input)
+    updateMachine(input, compileSourceAssemblyState(chosen.sourceAssembly))
     viewer.applyCamera(chosen.camera)
     explorationOrigin = 'chosen-feasible-reconstruction'
-  }
+  } else if (machine?.availability === 'available') updateMachine(input, OPERATING_SOURCE_ASSEMBLY)
   activeViews = []
   mode = 'exploring'
   configureLandmarkProbe()
@@ -233,12 +311,12 @@ function retryFollowing(): void {
 
 function applyView(view: PlaybackView): void {
   if (!machine || machine.availability !== 'available') return
-  updateMachine(view.input)
+  updateMachine(view.input, compileSourceAssemblyState(view.sourceAssembly))
   let draw = mechanismDraws.get(view.id)
   if (!draw) {
     draw = { status: 'solved-for-draw', viewId: view.id, timeSeconds: sourceDrawTimeSeconds, sourceDrawRevision,
       input: createMechanismInput(), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, nativeGeometryAssumptions: view.nativeGeometryAssumptions,
-      imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout,
+      imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceAssembly: currentAssembly.state, sourceLayout: sourceDrawLayout,
       channelAnglesRad: new Float64Array(20), platenTravelM: 0, penTravelM: 0, effectiveBankDriveTurns: 0 }
     mechanismDraws.set(view.id, draw)
   }
@@ -251,7 +329,8 @@ function applyView(view: PlaybackView): void {
   draw.nativeGeometryAssumptions = view.nativeGeometryAssumptions
   draw.imagePlaneWarp = view.authoredImagePlaneWarp
   draw.resolvedImagePlaneWarp = view.imagePlaneWarp ?? null
-  draw.sourceLayout = view.sourceLayout
+  draw.sourceAssembly = currentAssembly.state
+  draw.sourceLayout = sourceDrawLayout
   draw.channelAnglesRad.set(machine.pose.channelAnglesRad)
   draw.platenTravelM = machine.pose.platenTravelM
   draw.penTravelM = machine.pose.magnifier.penTravelM
@@ -261,6 +340,7 @@ function applyView(view: PlaybackView): void {
 function drawSourceViews(views: readonly PlaybackView[], timeSeconds: number): void {
   sourceDrawTimeSeconds = timeSeconds
   sourceDrawRevision++
+  sourceDrawLayout = verificationEnabled ? captureSourceLayout(views) : views[0]?.sourceLayout ?? []
   viewer.renderViews(views, beforeView, timeSeconds)
   for (const view of views) {
     const draw = mechanismDraws.get(view.id)
@@ -270,14 +350,14 @@ function drawSourceViews(views: readonly PlaybackView[], timeSeconds: number): v
 
 function renderedMechanism(viewId: string) {
   const draw = mechanismDraws.get(viewId)
-  if (!draw) return { status: 'unavailable' as const, viewId, imagePlaneWarp: null, resolvedImagePlaneWarp: null, sourceLayout: [] }
+  if (!draw) return { status: 'unavailable' as const, viewId, imagePlaneWarp: null, resolvedImagePlaneWarp: null, sourceAssembly: null, sourceLayout: [] }
   return {
     status: mode === 'exploring' || referenceState === 'unavailable' || draw.timeSeconds !== modelTime ? 'stale' as const : draw.status,
     viewId, timeSeconds: draw.timeSeconds, sourceDrawRevision: draw.sourceDrawRevision,
     method: 'actual-native-mechanism-solve' as const, input: serializeInput(draw.input),
     mechanicalProvenance: draw.mechanicalProvenance, unobservedInputFields: draw.unobservedInputFields,
     nativeGeometryAssumptions: draw.nativeGeometryAssumptions,
-    imagePlaneWarp: draw.imagePlaneWarp, resolvedImagePlaneWarp: draw.resolvedImagePlaneWarp, sourceLayout: draw.sourceLayout,
+    imagePlaneWarp: draw.imagePlaneWarp, resolvedImagePlaneWarp: draw.resolvedImagePlaneWarp, sourceAssembly: draw.sourceAssembly, sourceLayout: draw.sourceLayout,
     channelAnglesRad: Array.from(draw.channelAnglesRad), platenTravelM: draw.platenTravelM, penTravelM: draw.penTravelM, effectiveBankDriveTurns: draw.effectiveBankDriveTurns,
   }
 }
@@ -287,11 +367,13 @@ function sourceCapture<T extends {
   viewId: string
   timeSeconds: number | null
   resolvedImagePlaneWarp: NonNullable<PlaybackView['imagePlaneWarp']> | null
-  sourceLayout: PlaybackView['sourceLayout']
+  sourceAssembly: SourceAssemblyState | null
+  sourceLayout: readonly CapturedSourceLayoutEntry[]
 }>(capture: T) {
   const draw = mechanismDraws.get(capture.viewId)
   const bound = draw?.status === 'rendered' && draw.timeSeconds === capture.timeSeconds
     && equalRecord(draw.resolvedImagePlaneWarp, capture.resolvedImagePlaneWarp)
+    && equalRecord(draw.sourceAssembly, capture.sourceAssembly)
     && equalRecord(draw.sourceLayout, capture.sourceLayout)
   return {
     ...capture,
@@ -323,7 +405,9 @@ function renderSource(timeSeconds: number): void {
     return
   }
   if (sample.views.length === 0) {
-    renderPending()
+    if (currentAssembly.state.kind !== 'operating') updateMachine(input, OPERATING_SOURCE_ASSEMBLY)
+    drawSourceViews(sample.views, timeSeconds)
+    paintRevision = 'clean'
   } else {
     const chosen = primaryView()
     if (chosen) copyInput(chosen.input)
@@ -402,7 +486,7 @@ function updateHud(): void {
     minimum = Math.min(minimum, force)
     maximum = Math.max(maximum, force)
   }
-  const forceView = mode === 'exploring' ? undefined : activeViews[activeViews.length - 1]
+  const forceView = mode === 'exploring' ? undefined : lastContributingView()
   const forceProvenance = mode === 'exploring' ? 'Manual physical calculation — not source measurements' : forceView ? 'Chosen-input physical calculation — not source measurements' : 'Last physical calculation — source reconstruction unavailable, not source-measured'
   const counterChoice = forceView?.unobservedInputFields.includes('setup.counterHeightM') ? `\nCounter ${forceView.input.setup.counterHeightM === null ? 'auto-level algorithm' : 'height'} chosen, not measured` : ''
   forceReadout.value = `${forceProvenance}${forceView ? ` · view ${forceView.id}` : ''}\n20 springs · ${minimum.toFixed(2)}–${maximum.toFixed(2)} N\nTorque residual ${machine.pose.equilibriumResidualNm.toExponential(1)} N·m\nPaper feed ${(machine.pose.platenTravelM * 1000).toFixed(2)} mm${counterChoice}`
@@ -476,6 +560,7 @@ async function selectVideo(next: Video): Promise<void> {
   reference = null
   activeViews = []
   explorationOrigin = 'interactive-default'
+  currentAssembly = OPERATING_SOURCE_ASSEMBLY
   configureLandmarkProbe()
   referenceSeek = 'idle'
   video = next
@@ -565,7 +650,7 @@ async function fetchMachine(): Promise<void> {
   retryModel.hidden = true
   updateControlState()
   try {
-    machine = await loadMachine(viewer.scene)
+    machine = await loadMachine(viewer.scene, { nativePrimitiveSnapshots: verificationEnabled })
     if (machine.availability !== 'available') throw new Error(machine.loadError ?? 'The CAD model is unavailable.')
     modelState = 'ready'
     updateMachine(input)
@@ -591,6 +676,7 @@ function tick(now: number): void {
   requestAnimationFrame(tick)
   const elapsed = Math.min((now - lastTick) / 1000, 0.25)
   lastTick = now
+  if (nativeDiagnosticLeaseActive) return
   try {
     if (mode === 'following-video' && player) {
       renderSource(player.getTime())
@@ -605,7 +691,7 @@ function tick(now: number): void {
         notice(physicsError, '')
       }
       if (paintRevision === 'pending') renderPending()
-      else viewer.controls.update()
+      else if (viewer.controls.enableDamping || viewer.controls.autoRotate) viewer.controls.update()
     } else if (paintRevision === 'pending') {
       if (activeViews.length) drawSourceViews(activeViews, modelTime)
       else renderPending()
@@ -627,7 +713,7 @@ function tick(now: number): void {
   if (now - lastHud >= 100) { updateHud(); lastHud = now }
 }
 
-const viewer = createViewer(canvas, () => { paintRevision = 'pending' })
+const viewer = createViewer(canvas, () => { paintRevision = 'pending' }, verificationEnabled)
 new ResizeObserver(() => { paintRevision = 'pending' }).observe(canvas.parentElement!)
 buildVideoNavigation()
 buildChannelControls()
@@ -696,25 +782,208 @@ window.addEventListener('popstate', selectRoute)
 
 if (verificationEnabled) {
   const bridge = {
+    async withNativeDiagnosticLease<T>(run: (context: NativeDiagnosticContext) => T | Promise<T>): Promise<T> {
+      if (nativeDiagnosticLeaseActive || typeof run !== 'function') throw new Error('A native diagnostic lease is already active or its callback is invalid')
+      if (!machine || machine.availability !== 'available' || physicsState !== 'available' || manualRevision !== 'clean' || paintRevision !== 'clean'
+        || referenceSeek !== 'idle' || player?.getState() === 'playing' || player?.getState() === 'buffering') throw new Error('Native diagnostics require a current completed idle native model/frame and paused source')
+      const actualMachine = machine
+      const actualReference = reference
+      const actualPlayer = player
+      const saved = {
+        input: structuredClone(input), machineInput: structuredClone(actualMachine.input), camera: cameraRecord(), assembly: currentAssembly,
+        views: activeViews, layout: captureSourceLayout(activeViews), mode, referenceState, modelTime, sourceDrawTimeSeconds, sourceDrawRevision, sourceDrawLayout,
+        manualMotion, manualRevision, explorationOrigin, diagnosticReference, diagnosticMachine,
+        draws: new Map([...mechanismDraws].map(([id, draw]) => [id, structuredClone(draw)])),
+        controlsTarget: viewer.controls.target.clone(), controlsEnabled: viewer.controls.enabled,
+        enableDamping: viewer.controls.enableDamping, autoRotate: viewer.controls.autoRotate,
+        canvasStyle: canvas.style.cssText, pixelRatio: viewer.renderer.getPixelRatio(),
+        sceneBackground: viewer.scene.background, sceneEnvironment: viewer.scene.environment,
+        cameraUp: viewer.camera.up.clone(), cameraNear: viewer.camera.near, cameraFar: viewer.camera.far, cameraLayers: viewer.camera.layers.mask,
+        cameraScale: viewer.camera.scale.clone(), cameraZoom: viewer.camera.zoom, cameraFocus: viewer.camera.focus,
+        cameraFilmGauge: viewer.camera.filmGauge, cameraFilmOffset: viewer.camera.filmOffset, cameraAspect: viewer.camera.aspect,
+        cameraView: viewer.camera.view ? { ...viewer.camera.view } : null,
+      }
+      const rendererMethods = ['render', 'clear', 'setRenderTarget', 'readRenderTargetPixels'] as const
+      const originals = rendererMethods.map(key => ({ key, value: viewer.renderer[key] }))
+      const gl = viewer.renderer.getContext()
+      const glMethods = ['createFramebuffer', 'createTexture', 'createRenderbuffer'] as const
+      const glOriginals = glMethods.map(key => ({ key, value: gl[key] }))
+      const viewerLease = beginNativeDiagnosticViewerLease(viewer)
+      nativeDiagnosticLeaseActive = true
+      lastNativeDiagnosticRestoration = null
+      let publicationActive = false
+      let contextLive = true
+      const requireLease = () => {
+        if (!contextLive || !nativeDiagnosticLeaseActive || machine !== actualMachine || reference !== actualReference || player !== actualPlayer) throw new Error('The native diagnostic lease expired or the selected native/source context changed')
+      }
+      try {
+        return await run({
+          viewer, machine: actualMachine, input, provenance: actualMachine.provenance,
+          metadata: { sourceProof: false, sourceAcceptance: false, method: 'current-native-scoped-diagnostic-lease' },
+          snapshot() { requireLease(); return { ...bridge.snapshot(), sourceProof: false, sourceAcceptance: false } },
+          nativePrimitiveSnapshot() { requireLease(); return unavailableNativePrimitiveSnapshot('Native capture is suspended during diagnostic-only rendering', 'stale') },
+          readNativeDrawMetadata() { requireLease(); return viewerLease.readNativeDrawMetadata() },
+          readNativeTargetSurfaceAssociation(request) { requireLease(); return viewerLease.readNativeTargetSurfaceAssociation(request) },
+          readRegisteredNativeLandmarkAnchors() { requireLease(); return viewerLease.readRegisteredNativeLandmarkAnchors() },
+          resolveNativeStagePixelFromSourcePixel(viewId, sourcePixels) { requireLease(); return viewerLease.resolveNativeStagePixelFromSourcePixel(viewId, sourcePixels) },
+          measureNativeTargetShaderFeedback(request) { requireLease(); return viewerLease.measureNativeTargetShaderFeedback(request) },
+          async withPublicationSamples(samples, anchors, callback) {
+            requireLease()
+            if (!actualReference || publicationActive || typeof callback !== 'function') throw new Error('Diagnostic publication requires the same loaded source reference and a single callback')
+            publicationActive = true
+            const publicationState = { mode, referenceState, activeViews, modelTime, sourceDrawRevision, sourceDrawTimeSeconds, sourceDrawLayout,
+              input: structuredClone(input), machineInput: structuredClone(actualMachine.input), assembly: currentAssembly, camera: cameraRecord() }
+            try {
+              viewer.setLandmarkProbe(actualMachine.createLandmarkProbe(anchors))
+              return await actualReference.withDiagnosticSamples(samples, (state: DiagnosticSourcePublicationState) => {
+                let active = true
+                const requireTransaction = () => { requireLease(); if (!active) throw new Error('The diagnostic publication transaction has expired') }
+                const transaction: NativeDiagnosticPublication = {
+                  implementation: { renderSourceText: renderSource.toString(), prepareAtText: state.prepareAtImplementation, commitPreparedText: state.commitPreparedImplementation },
+                  renderSource(timeSeconds) { requireTransaction(); renderSource(timeSeconds) },
+                  snapshot() {
+                    requireTransaction()
+                    return { ...state.snapshot(), sourceProof: false, sourceAcceptance: false, activeViews: structuredClone(activeViews),
+                      referenceState, modelTime, sourceDrawRevision, paintRevision, externalInput: structuredClone(serializeInput(input)) }
+                  },
+                }
+                return Promise.resolve(callback(transaction)).finally(() => { active = false })
+              })
+            } finally {
+              mode = publicationState.mode
+              referenceState = publicationState.referenceState
+              activeViews = publicationState.activeViews
+              modelTime = publicationState.modelTime
+              sourceDrawRevision = publicationState.sourceDrawRevision
+              sourceDrawTimeSeconds = publicationState.sourceDrawTimeSeconds
+              sourceDrawLayout = publicationState.sourceDrawLayout
+              copyInput(publicationState.input)
+              updateMachine(publicationState.machineInput, publicationState.assembly)
+              viewer.applyCamera(publicationState.camera)
+              publicationActive = false
+            }
+          },
+        })
+      } finally {
+        contextLive = false
+        let restored = false
+        try {
+          for (const { key, value } of originals) Object.defineProperty(viewer.renderer, key, { configurable: true, writable: true, value })
+          for (const { key, value } of glOriginals) Object.defineProperty(gl, key, { configurable: true, writable: true, value })
+          canvas.style.cssText = saved.canvasStyle
+          viewer.renderer.setPixelRatio(saved.pixelRatio)
+          viewer.resize()
+          viewer.scene.background = saved.sceneBackground
+          viewer.scene.environment = saved.sceneEnvironment
+          viewerLease.restoreProbes()
+          mode = saved.mode
+          referenceState = saved.referenceState
+          activeViews = saved.views
+          modelTime = saved.modelTime
+          manualMotion = saved.manualMotion
+          explorationOrigin = saved.explorationOrigin
+          diagnosticReference = saved.diagnosticReference
+          diagnosticMachine = saved.diagnosticMachine
+          copyInput(saved.input)
+          updateMachine(saved.machineInput, saved.assembly)
+          viewer.camera.up.copy(saved.cameraUp)
+          viewer.camera.near = saved.cameraNear
+          viewer.camera.far = saved.cameraFar
+          viewer.camera.layers.mask = saved.cameraLayers
+          viewer.setInteraction(saved.mode === 'exploring' ? 'exploring' : 'following-video')
+          viewer.controls.target.copy(saved.controlsTarget)
+          viewer.controls.enabled = saved.controlsEnabled
+          viewer.controls.enableDamping = false
+          viewer.controls.autoRotate = false
+          viewer.applyCamera(saved.camera)
+          // applyCamera rebases controls and normalizes an authored quaternion.
+          // A restoration receipt instead owns exact already-solved camera bits.
+          viewer.camera.position.fromArray(saved.camera.positionMetres)
+          viewer.camera.quaternion.fromArray(saved.camera.quaternion)
+          viewer.camera.up.copy(saved.cameraUp)
+          viewer.camera.scale.copy(saved.cameraScale)
+          viewer.camera.zoom = saved.cameraZoom
+          viewer.camera.focus = saved.cameraFocus
+          viewer.camera.filmGauge = saved.cameraFilmGauge
+          viewer.camera.filmOffset = saved.cameraFilmOffset
+          viewer.camera.aspect = saved.cameraAspect
+          viewer.camera.view = saved.cameraView ? { ...saved.cameraView } : null
+          viewer.camera.updateProjectionMatrix()
+          viewer.camera.updateMatrixWorld(true)
+          viewer.controls.target.copy(saved.controlsTarget)
+          if (saved.mode !== 'exploring' && saved.views.length) drawSourceViews(saved.views, saved.modelTime)
+          else if (saved.mode !== 'exploring' && saved.referenceState === 'no-machine') viewer.renderViews([], undefined, saved.modelTime)
+          else viewer.render(saved.assembly.state)
+          sourceDrawRevision = saved.sourceDrawRevision
+          sourceDrawTimeSeconds = saved.sourceDrawTimeSeconds
+          sourceDrawLayout = saved.sourceDrawLayout
+          mechanismDraws.clear()
+          for (const [id, draw] of saved.draws) mechanismDraws.set(id, draw)
+          viewer.controls.enableDamping = saved.enableDamping
+          viewer.controls.autoRotate = saved.autoRotate
+          manualRevision = saved.manualRevision
+          paintRevision = 'clean'
+          restored = true
+        } finally {
+          viewerLease.release()
+          nativeDiagnosticLeaseActive = false
+          lastTick = performance.now()
+          lastNativeDiagnosticRestoration = {
+            status: restored ? 'restored' : 'failed', sourceProof: false, sourceAcceptance: false,
+            inputRestored: equalRecord(serializeInput(input), serializeInput(saved.input)),
+            cameraRestored: equalRecord(cameraRecord(), saved.camera),
+            assemblyRestored: currentAssembly === saved.assembly,
+            layoutRestored: equalRecord(captureSourceLayout(activeViews), saved.layout), paintRevision,
+          }
+        }
+      }
+    },
     snapshot() {
       const chosen = mode === 'exploring' ? undefined : primaryView()
+      const sourceLayout = verificationEnabled ? captureSourceLayout(activeViews) : chosen?.sourceLayout ?? []
       return {
         videoId: video?.id ?? null, playerVideoId: player?.getVideoId() ?? null, mode, playerState: player?.getState() ?? playbackState,
         videoTime: player?.getTime() ?? null, modelTime, referenceState, modelState, missingBindings: machine?.missing ?? [],
         modelProvenance: machine?.provenance ?? null, camera: cameraRecord(), input: serializeInput(input),
+        diagnosticLease: { active: nativeDiagnosticLeaseActive, restoration: lastNativeDiagnosticRestoration },
         sourceDrawRevision, sourceDrawTimeSeconds, diagnosticCapture: diagnosticReference !== null && diagnosticReference === reference && diagnosticMachine === machine && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? 'paused-reference-review' : 'disabled',
         sourceFollowing: reference ? { kind: reference.kind, stageLadder: SOURCE_STAGE_PERCENTAGES, finalTolerancePx: LANDMARK_LIMIT_PX, stages: reference.stageStatus, stageEvidence: 'unmeasured: no independently bound rendered report loaded', sourceMeasurements: reference.data.sourceMeasurements ?? null } : null,
         imagePlaneWarp: chosen ? chosen.authoredImagePlaneWarp : null,
         resolvedImagePlaneWarp: chosen?.imagePlaneWarp ?? null,
-        sourceLayout: chosen?.sourceLayout ?? [],
+        sourceAssembly: physicsState === 'available' ? currentAssembly.state : null, sourceLayout,
         mechanicalProvenance: mode === 'exploring' ? null : primaryView()?.mechanicalProvenance ?? null,
         unobservedInputFields: mode === 'exploring' ? INPUT_FIELDS : primaryView()?.unobservedInputFields ?? INPUT_FIELDS,
-        explorationOrigin, inputMeaning: mode === 'exploring' ? 'manual-physical-input' : !primaryView() ? 'unverified-retained-physical-input' : 'chosen-feasible-approximation',
+        explorationOrigin, inputMeaning: currentInputMeaning(),
         nativeGeometryAssumptions: reference?.data.nativeGeometryAssumptions ?? [],
-        physics: machine && physicsState === 'available' ? { renderedViewId: mode === 'exploring' ? 'exploring' : activeViews[activeViews.length - 1]?.id ?? null, mechanicalProvenance: mode === 'exploring' ? null : activeViews[activeViews.length - 1]?.mechanicalProvenance ?? null, springForcesN: Array.from(machine.pose.springForcesN), springLengthsM: Array.from(machine.pose.springLengthsM), equilibriumResidualNm: machine.pose.equilibriumResidualNm, platenTravelM: machine.pose.platenTravelM, summingAngleRad: machine.pose.summingAngleRad } : null,
+        physics: machine && physicsState === 'available' ? { renderedViewId: mode === 'exploring' ? EXPLORING_VIEW_ID : lastContributingView()?.id ?? null, mechanicalProvenance: mode === 'exploring' ? null : lastContributingView()?.mechanicalProvenance ?? null, springForcesN: Array.from(machine.pose.springForcesN), springLengthsM: Array.from(machine.pose.springLengthsM), equilibriumResidualNm: machine.pose.equilibriumResidualNm, platenTravelM: machine.pose.platenTravelM, summingAngleRad: machine.pose.summingAngleRad } : null,
         playerAudio: player?.getAudio() ?? null,
-        views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, sourceSampling: view.sourceSampling, nativeGeometryAssumptions: view.nativeGeometryAssumptions, renderedMechanism: renderedMechanism(view.id) })),
+        views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceAssembly: view.sourceAssembly ?? OPERATING_SOURCE_ASSEMBLY.state, sourceLayout: verificationEnabled ? sourceLayout : view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, sourceSampling: view.sourceSampling, nativeGeometryAssumptions: view.nativeGeometryAssumptions, renderedMechanism: renderedMechanism(view.id) })),
       }
+    },
+    nativePrimitiveSnapshot(viewId?: string) {
+      // Capture the real manual frame even when every source packet is unavailable.
+      // Never solve a pose, select an old camera or request another native draw here.
+      let capture: NativePrimitiveSnapshot
+      if (nativeDiagnosticLeaseActive) capture = unavailableNativePrimitiveSnapshot('Native capture is suspended during diagnostic-only rendering', 'stale')
+      else if (!machine || modelState !== 'ready') capture = unavailableNativePrimitiveSnapshot(`Native model ${modelState}: ${machine?.loadError ?? 'no loaded Machine'}`)
+      else if (physicsState !== 'available') capture = unavailableNativePrimitiveSnapshot('The current native mechanical update is unverified')
+      else if (manualRevision !== 'clean' || paintRevision !== 'clean' || referenceSeek !== 'idle') capture = unavailableNativePrimitiveSnapshot('The current input, paint or source seek has not completed its native draw', 'stale')
+      else capture = machine.nativePrimitiveSnapshot(viewer, viewId)
+      const draw = capture.status === 'captured' ? capture.manifest.draw : null
+      const sourceBound = draw !== null && mode !== 'exploring' && primaryView() !== undefined
+        && draw.viewId !== EXPLORING_VIEW_ID && referenceState !== 'unavailable' && draw.timeSeconds === modelTime
+        && activeViews.some(view => view.id === draw.viewId && (view.composite?.mode !== 'crossfade' || view.composite.opacity > 0)
+          && equalRecord(view.sourceAssembly ?? OPERATING_SOURCE_ASSEMBLY.state, draw.sourceAssembly))
+      return { ...capture, context: {
+        videoId: video?.id ?? null, playerVideoId: player?.getVideoId() ?? null, mode,
+        playerState: player?.getState() ?? playbackState, videoTimeSeconds: player?.getTime() ?? null,
+        modelTimeSeconds: modelTime, sourceDrawRevision, sourceDrawTimeSeconds, referenceState,
+        inputMeaning: currentInputMeaning(draw?.viewId),
+        sourceFollowing: mode === 'exploring' ? 'disabled-manual-mode' : sourceBound ? 'chosen-feasible-not-source-qualified' : 'unavailable',
+        nativeDrawViewId: draw?.viewId ?? null, nativeGeometryIssues: capture.manifest?.issues ?? null,
+        sourceAssembly: draw?.sourceAssembly ?? null,
+        manualMotion, referenceSeek, physicsState, modelState,
+      } }
     },
     compactData() { return reference?.data ?? null },
     pauseVideo() { player?.pause(); return this.snapshot() },
@@ -739,6 +1008,7 @@ if (verificationEnabled) {
       validateSourceViews(prepared.views)
       viewer.preflightViews(prepared.views)
       copyInput(input, reviewRollbackInput)
+      const previousAssembly = currentAssembly
       try {
         mode = 'reference-review'
         referenceSeek = 'seeking'
@@ -768,7 +1038,7 @@ if (verificationEnabled) {
           activeViews = []
           referenceState = 'unavailable'
           copyInput(reviewRollbackInput)
-          updateMachine(input)
+          updateMachine(input, previousAssembly)
           viewer.applyCamera(previousCamera)
           viewer.setInteraction('exploring')
           nativePlayer.pause()

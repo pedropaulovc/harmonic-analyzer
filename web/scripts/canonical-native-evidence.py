@@ -36,6 +36,21 @@ CONSUMER_NORMALIZATION = 'CRLF-to-LF'
 CURRENT_OBSERVATION_LABELS = ('analysisStationaryFrontCamera', 'synthesisCoarseFraming', 'synthesisWheelFraming')
 HISTORICAL_PRODUCER_USAGE = 'historical-producer-lineage'
 HISTORICAL_PRODUCER_ROLES = ('generator', 'shared-source-selector', 'native-anchor-motion-lineage')
+FRESH_CONSUMER_INPUTS = (
+    'web/scripts/fresh-source-observations.py',
+    'web/scripts/fresh-source-observations.mjs',
+    'web/scripts/fresh-source-observations.schema.json',
+    'web/scripts/fresh-source-tracks.py',
+    'web/scripts/source-observations.schema.json',
+    'web/scripts/native-identity-map.mjs',
+    'web/src/native-primitive-snapshot.ts',
+    'web/src/source-assembly.ts',
+    'web/src/native-landmark-eligibility.ts',
+    'web/src/native-target-shader-feedback.ts',
+    'web/scripts/current-native-eligibility-report.mjs',
+    'web/scripts/current-first-surface.py',
+)
+CURRENT_INVENTORY_PATH = 'web/content/v39-source/native-inventory.json'
 
 
 def digest(data: bytes) -> str:
@@ -557,11 +572,35 @@ def consumer_updates(manifest, outputs):
     return updates
 
 
+def validate_current_inventory_registration(manifest):
+    """The exporter result is exact-byte data authority, never a text/code repin."""
+    record = manifest.get('currentSourceInventory')
+    if (not isinstance(record, dict) or set(record) != {'path', 'sha256'}
+            or record['path'] != CURRENT_INVENTORY_PATH
+            or not isinstance(record['sha256'], str)
+            or re.fullmatch(r'[0-9a-f]{64}', record['sha256']) is None):
+        raise ValueError('Current source inventory requires explicit independent registration')
+    require(digest(file_path(record['path']).read_bytes()), record['sha256'],
+            'exact current source inventory bytes')
+    if any(row['path'] == CURRENT_INVENTORY_PATH for row in manifest['canonicalConsumerInputs']):
+        raise ValueError('Current source inventory cannot be CRLF-normalized consumer code')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('generate', 'validate', 'check'))
     args = parser.parse_args()
     manifest = json.loads(file_path(MANIFEST).read_bytes())
+    validate_current_inventory_registration(manifest)
+    inputs = manifest['canonicalConsumerInputs']
+    paths = {row['path'] for row in inputs}
+    if len(paths) != len(inputs):
+        raise ValueError('Duplicate current consumer input paths')
+    missing = sorted(set(FRESH_CONSUMER_INPUTS) - paths)
+    if args.command == 'generate':
+        inputs.extend({'path': path, 'sha256': '', 'scope': SCOPE} for path in missing)
+    elif missing:
+        raise ValueError('Missing fresh current consumer input seals: ' + ', '.join(missing))
     mapping_bytes = file_path(MAP).read_bytes()
     outputs = replay(manifest, mapping_bytes)
     updates = consumer_updates(manifest, outputs)

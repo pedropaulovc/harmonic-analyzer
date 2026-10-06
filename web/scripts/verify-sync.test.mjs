@@ -4,10 +4,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } from './verify-sync.mjs'
+import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } from './verify-sync.mjs'
 import { jsonDigest, loadCanonicalObservations } from './verify-reference.mjs'
 import { NATIVE_IDENTITY_MAP_SHA256 } from '../model-representation.mjs'
 import { LIVE_MODEL_SOURCE } from './approved-model.mjs'
+import { loadCurrentObservations, currentSourceAssemblyChangeTimes } from './fresh-source-observations.mjs'
+import { joinCurrentNativeEligibilityReport } from './current-native-eligibility-report.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
@@ -35,6 +37,35 @@ test('canonical observation loading rejects missing, corrupt or invalid gzip wit
       await assert.rejects(loadCanonicalObservations(root, 'fixture'), error)
     })
   }
+})
+
+test('current census refuses missing fresh records despite an intact historical sibling before MP4 work', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'fresh-source-missing-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const id = 'NAsM30MAHLg', content = join(root, 'content', 'canonical-native')
+  await mkdir(content, { recursive: true })
+  await writeFile(join(content, `${id}.observations.json.gz`), gzipSync(JSON.stringify({
+    schemaVersion: 1, identityDerivative: { kind: 'materialized-canonical-native-identity-derivative' },
+    source: { videoId: id }, frames: [{ timeSeconds: 0 }],
+  })))
+  const expectedPath = join(root, 'content', 'v39-source', `${id}.observations.json`)
+  await assert.rejects(loadCurrentObservations(root, id), error => error.code === 'ENOENT' && error.path === expectedPath)
+  await assert.rejects(loadRecord(id, join(root, 'absent-mp4-root'), undefined, { webRoot: root }),
+    error => error.code === 'ENOENT' && error.path === expectedPath)
+})
+
+test('a canonical derivative header in the fresh namespace cannot start MP4 probing', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'fresh-source-legacy-header-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const id = '6dW6VYXp9HM', content = join(root, 'content', 'v39-source')
+  await mkdir(content, { recursive: true })
+  await writeFile(join(content, `${id}.observations.json`), JSON.stringify({
+    schemaVersion: 1, kind: 'current-source-observations',
+    identityDerivative: { kind: 'materialized-canonical-native-identity-derivative' },
+    source: { videoId: id },
+  }))
+  await assert.rejects(loadRecord(id, join(root, 'absent-mp4-root'), undefined, { webRoot: root }),
+    error => error.code === 'historical-source-evidence' && error.field === 'identityDerivative')
 })
 
 test('paused camera pose ignores normalization jitter but rejects actual translation, rotation and zoom', () => {
@@ -101,6 +132,47 @@ test('meaningful compact change keys are required without reviving per-exposure 
   const census = sourceCensus(observations, track, native, parseOptions(['--stage', '50']))
   assert.ok(census.rows.some(row => row.timeSeconds === 0.5 && row.reasons.includes('authored-change-point')))
   assert.ok(!census.rows.some(row => row.timeSeconds === 0.1 || row.timeSeconds === 0.2))
+})
+
+test('fresh observed changes cannot be erased by an authored compact change list', () => {
+  const current = { ...observations, kind: 'current-source-observations' }
+  const track = { frames: observations.frames, coverage: { changeTimesSeconds: [] } }
+  const census = sourceCensus(current, track, native, parseOptions(['--stage', '50']))
+  for (const time of [0.1, 0.2]) {
+    const row = census.rows.find(row => row.timeSeconds === time)
+    assert.deepEqual(row.reasons, ['observed-change-point'])
+    assert.equal(row.frame, null)
+    assert.equal(row.required, true)
+  }
+})
+
+test('measured physical assembly transitions cannot be erased by authored sample/change lists', async () => {
+  const state = releaseTurns => ({
+    kind: 'source-assembly',
+    provenance: { kind: 'chosen-feasible', videoId: 'jfH-NbsmvD4', frameIndex: 20,
+      evidence: 'Independent source release support; hidden phase chosen.',
+      unobservedDegreesOfFreedom: ['thread phase'] },
+    retainingNut: { attachment: 'threaded', releaseTurns },
+  })
+  const current = { ...observations, kind: 'current-source-observations',
+    source: { videoId: 'jfH-NbsmvD4' }, coverage: { changeTimesSeconds: [] },
+    frames: [frame(0), { ...frame(0.2), views: [{ id: 'main', sourceAssembly: state(1) }] },
+      { ...frame(0.3), views: [{ id: 'main', sourceAssembly: { ...state(1),
+        provenance: { ...state(1).provenance, evidence: 'Different supporting evidence only.' } } }] },
+      { ...frame(0.4), views: [{ id: 'main', sourceAssembly: state(2) }] },
+      frame(0.5), frame(1), frame(2)] }
+  const track = { frames: observations.frames, coverage: { changeTimesSeconds: [] } }
+  assert.throws(() => sourceCensus(current, track, native, parseOptions(['--stage', '50'])))
+  const physicalChanges = await currentSourceAssemblyChangeTimes(current)
+  assert.deepEqual(physicalChanges, [0.2, 0.4, 0.5])
+  const census = sourceCensus(current, track, native, parseOptions(['--stage', '50']), physicalChanges)
+  for (const time of physicalChanges) {
+    const row = census.rows.find(row => row.timeSeconds === time)
+    assert.deepEqual(row.reasons, ['observed-assembly-change'])
+    assert.equal(row.frame, null)
+    assert.equal(row.required, true)
+  }
+  assert.ok(!census.rows.some(row => row.timeSeconds === 0.3))
 })
 
 test('missing source samples and out-of-duration requests stay explicitly unavailable', () => {
@@ -344,17 +416,152 @@ const manualSeedFrame = (fixture, timeSeconds = 0, decodedTimeSeconds = 0, viewI
 })
 
 function measuredViewFixture() {
-  const view = sourceView('main'), frame = { timeSeconds: 1, decodedTimeSeconds: 1, views: [view], sourceImage: sourceImage(30, 'actual-target') }
+  const view = { ...sourceView('main'), sourceAssembly: { kind: 'operating' } }, frame = { timeSeconds: 1, decodedTimeSeconds: 1, views: [view], sourceImage: sourceImage(30, 'actual-target') }
   const positions = [[100, 100], [900, 100], [100, 800], [900, 800]]
   const observations = positions.map((pixel, index) => ({ anchorId: `anchor-${index}`, role: index < 2 ? 'fit' : 'check', pixel, status: 'observed', method: 'manual', uncertaintyPx: 1 }))
   const anchors = new Map(observations.map((observed, index) => [observed.anchorId, { kind: 'physical-feature', partPath: `native/part-${index}`, partLocalMetres: [0, 0, 0], correspondenceEvidence: 'Independently identified physical feature', motion: index === 2 ? 'moving' : 'fixed' }]))
-  const layout = [{ viewId: 'main', rectSourcePixels: view.rectSourcePixels, presentation: 'native', composite: { mode: 'opaque' } }]
+  const layout = [{ viewId: 'main', rectSourcePixels: view.rectSourcePixels, presentation: 'native', composite: { mode: 'opaque' }, resolvedImagePlaneWarp: null, sourceAssembly: { kind: 'operating' } }]
   const capture = { method: 'gpu-readback', status: 'captured', visibilityMode: 'depth-off-landmark-projection', viewId: 'main', timeSeconds: 1, sourceLayout: layout, resolvedImagePlaneWarp: null, landmarks: observations.map(observed => ({ id: observed.anchorId, state: 'rendered', sourcePixels: observed.pixel, canvasPixels: observed.pixel, uncertaintySourcePixels: 0.5 })) }
   const mechanism = { method: 'actual-native-mechanism-solve', status: 'rendered', viewId: 'main', timeSeconds: 1, sourceDrawRevision: 1, channelAnglesRad: Array(20).fill(0), input: view.input, sourceLayout: layout, resolvedImagePlaneWarp: null }
   const response = { captures: [{ viewId: 'main', capture, mechanism }], actual: { views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: 1 }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
   return { view, frame, observations, anchors, response, capture, seeds: new Map() }
 }
 const measureFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 96, fixture.anchors, fixture.seeds)
+
+// One synthetic triangle and independently PROVIDED bounds, not real GPU/source evidence.
+async function controlledEligibilityResponse(deriveNativeStagePixelRay) {
+  const { createHash } = await import('node:crypto')
+  const id = 'native/controlled#primitive/0', classVertexIds = [0]
+  const matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+  const worldMatrix = [...matrix]; worldMatrix[14] = -1
+  const localPositions = new Float32Array([0, 0, 0, 1, 0, 0.1, 0, 1, 0.1])
+  const worldPositions = Float64Array.from(localPositions)
+  for (let index = 2; index < worldPositions.length; index += 3) worldPositions[index] -= 1
+  const buffers = { localPositions, indices: new Uint32Array([0, 1, 2]), worldPositions }
+  const draw = { drawRevision: 1, contextRevision: 1, rendererFrame: 1, submittedAtPerformanceMs: 1, viewId: 'controlled', timeSeconds: 1,
+    camera: { uuid: 'camera', positionMetres: [0, 0, 0], quaternion: [0, 0, 0, 1], verticalFovDegrees: 90, aspect: 1, near: 0.1, far: 10,
+      layersMask: 1, viewOffset: null, matrixWorld: matrix, matrixWorldInverse: matrix,
+      projectionMatrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -10.1 / 9.9, -1, 0, 0, -2 / 9.9, 0],
+      projectionMatrixInverse: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -9.9 / 2, 0, 0, -1, 10.1 / 2] },
+    viewportBackingPixels: [0, 0, 101, 101], scissorBackingPixels: [0, 0, 101, 101], scissorTest: true, renderTarget: null,
+    canvas: { width: 101, height: 101, clientWidth: 101, clientHeight: 101, devicePixelRatio: 1 }, presentation: 'native',
+    rectSourcePixels: [0, 0, 1920, 1080], sourceOpacity: 1, imagePlaneWarp: null, sourceAssembly: { kind: 'operating' }, sourceLayout: [],
+    nativeRenderCallbacks: [{ objectUuid: 'object', materialUuid: 'material', group: null }] }
+  const row = { id, identity: { canonicalId: id, nodePath: 'native/controlled', nativeNodeIndex: 1, representationMeshIndex: 0,
+    primitiveIndex: 0, gltfMode: 4, positionAccessor: 0, indexAccessor: 1 }, scope: 'artifact', runtimeInstance: null,
+    objectUuid: 'object', geometryUuid: 'geometry', vertexCount: 3, indexCount: 3,
+    decodedPosition: { componentType: 'Float32', itemSize: 3, normalized: false }, matrixWorld: worldMatrix,
+    drawMode: 'triangles', drawRange: { effectiveStart: 0, effectiveCount: 3 }, groups: [], materials: [{ uuid: 'material' }],
+    renderedPresence: 'native-render-callback-observed', renderSubmissions: draw.nativeRenderCallbacks,
+    deformation: { kind: 'matrix-only' }, buffers: { localPositions: `${id}/localPositions`, indices: `${id}/indices`, worldPositions: `${id}/worldPositions` } }
+  const model = { runtimeRootUuid: 'root', provenance: { identity: 'matched', sourceSha256: 'a'.repeat(64), expectedSha256: 'b'.repeat(64), observedSha256: 'b'.repeat(64) },
+    identityMapSha256: 'c'.repeat(64), canonicalModelSha256: 'd'.repeat(64), semanticSha256: 'e'.repeat(64) }
+  const census = { artifactPrimitiveCount: 1, artifactMeshNodeCount: 1, runtimeClonePrimitiveCount: 0,
+    springPrimitiveCount: 0, artifactSpringPrimitiveCount: 0, runtimeCloneSpringPrimitiveCount: 0 }
+  const metadata = { status: 'current-diagnostic-submission', method: 'current-native-renderer-submission-metadata', reason: null,
+    sourceProof: false, sourceAcceptance: false, sourceQualification: 'not-performed', gpuSafety: 'independent-gpu-rounding-raster-and-first-surface-proof-required',
+    model, machineRevision: 1, inventoryRevision: 1, input: {}, draw, census, runtimeInstanceDeclarations: [] }
+  const snapshot = { status: 'captured', method: 'current-native-cpu-geometry', buffers: { [id]: buffers }, manifest: {
+    schemaVersion: 1, method: 'current-native-cpu-geometry', worldCoordinatePrecision: 'float64-cpu-not-exact-gpu',
+    geometricResidualToleranceMetres: 1e-7, bufferEncoding: 'typed-arrays-packed-xyz-no-welding', bufferByteOrder: 'little-endian',
+    model, machineRevision: 1, inventoryRevision: 1, input: {}, draw, census, runtimeInstanceDeclarations: [],
+    primitives: [row], runtimeClones: [], issues: { bindingFailures: [], currentOverrideMisses: [] } } }
+  const target = { primitiveId: id, exactLocalPosition: [0, 0, 0], nativeStageBackingPixel: [50, 50] }
+  const anchor = { id: 'apex', partPath: 'native/controlled', partLocalMetres: [0, 0, 0] }
+  const capture = { method: 'gpu-readback', visibilityMode: 'depth-off-landmark-projection', status: 'captured', viewId: 'controlled', timeSeconds: 1,
+    presentation: 'native', sourceOpacity: 1, sourceAssembly: draw.sourceAssembly, sourceLayout: [], resolvedImagePlaneWarp: null, nativeViewportBackingPixels: [101, 101],
+    landmarks: [{ id: 'apex', partPath: anchor.partPath, runtimeTemplatePartPath: null, state: 'rendered', worldMetres: [0, 0, -1],
+      sourcePixels: [960, 540], canvasPixels: [50.5, 50.5], uncertaintySourcePixels: 0.5, uncertaintyCanvasPixels: 0.5 }] }
+  const bufferReceipts = Object.entries(buffers).map(([name, array]) => ({ primitiveId: id, name, arrayType: array.constructor.name, byteLength: array.byteLength,
+    sha256: createHash('sha256').update(new Uint8Array(array.buffer, array.byteOffset, array.byteLength)).digest('hex') }))
+  const hit = { primitiveId: id, identity: row.identity, scope: 'artifact', runtimeInstance: null, triangleIndex: 0, indexOffset: 0,
+    vertexIds: [0, 1, 2], materialUuid: 'material', distanceMetres: 1, barycentric: [1, 0, 0], worldPointMetres: [0, 0, -1], targetResidualMetres: 0, targetClassIncident: true }
+  const cpu = { metadata, ray: deriveNativeStagePixelRay(draw, target.nativeStageBackingPixel), bufferReceipts, result: {
+    eligibility: 'eligible-cpu-exact-local-class', targetPrimitiveId: id, targetLocalCoordinate: target.exactLocalPosition, classVertexIds,
+    geometricResidualToleranceMetres: 1e-7, firstHit: hit, coincidentClosestHits: [hit],
+    scope: { primitiveCount: 1, artifactPrimitiveCount: 1, runtimeClonePrimitiveCount: 0, springPrimitiveCount: 0, drawSubmissionCount: 1, limitations: [], rayProofLimited: false },
+    safety: { sourceQualification: 'not-performed', gpuSafety: 'unmeasured-independent-proof-required', worldCoordinatePrecision: 'float64-cpu-not-exact-gpu',
+      gpuRoundingBoundMetres: null, rasterFirstSurfaceCertificate: false, genericApproval: false } } }
+  const flags = { sourceProof: false, sourceAcceptance: false, numericVertexResidualBoundMetres: null, gpuPositionRoundingBoundMetres: null, eligibility: 'unresolved' }
+  const gpu = { ...flags, status: 'readback', method: 'current-native-depth-target-surface-association', equivalence: 'depth-native-not-colour-or-composite',
+    model, machineRevision: 1, inventoryRevision: 1, input: {}, draw, census, runtimeInstanceDeclarations: [],
+    request: { expectedDrawRevision: 1, expectedContextRevision: 1, expectedViewId: 'controlled', expectedTimeSeconds: 1,
+      targetPrimitiveId: id, exactLocalPosition: target.exactLocalPosition, nativeStageBackingPixel: target.nativeStageBackingPixel, targetIndexOffset: 0 },
+    target: { record: row, primitiveId: id, canonicalPrimitiveId: id, classVertexIndices: classVertexIds, incidentTriangleIndexOffsets: [0] },
+    nativeStage: { width: 101, height: 101, viewportBackingPixels: draw.viewportBackingPixels, scissorBackingPixels: draw.scissorBackingPixels,
+      scissorTest: true, pixelCentreBacking: [50.5, 50.5] },
+    association: { ...flags, status: 'target-incident-triangle', primitiveId: id, canonicalPrimitiveId: id, triangleIndexOffset: 0,
+      requestedTriangleIndexOffset: 0, targetClassVertexIndices: classVertexIds, incidentTriangleIndexOffsets: [0], rawPixel: [1, 0, 0, 255] } }
+  const independentGpuProof = { method: 'independent-gpu-position-and-residual-bound', status: 'bounded', measurement: 'gpu-position-readback',
+    evidenceSha256: 'f'.repeat(64), controlEvidenceSha256: '1'.repeat(64), metadata, bufferReceipts, targetPrimitiveId: id,
+    exactLocalPosition: target.exactLocalPosition, classVertexIds, nativeStageBackingPixel: target.nativeStageBackingPixel,
+    gpuRoundingBoundMetres: 2e-8, numericVertexResidualBoundMetres: 3e-8 }
+  return { captures: [{ viewId: 'controlled', capture }], nativeEligibilityEvidence: { snapshot, currentMetadata: metadata, registeredAnchors: [anchor],
+    queries: [{ queryId: 'controlled/apex', target, cpu, gpu, independentGpuProof }], collection: { status: 'synthetic-consumer-control' } } }
+}
+
+test('optional native eligibility cannot suppress pixel errors or qualify stale draw evidence', async () => {
+  const { createServer } = await import('vite')
+  const { fileURLToPath } = await import('node:url')
+  const server = await createServer({ root: fileURLToPath(new URL('../', import.meta.url)), configFile: false,
+    server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' })
+  try {
+    const { joinNativeLandmarkEligibility, deriveNativeStagePixelRay } = await server.ssrLoadModule('/src/native-landmark-eligibility.ts')
+    const fixture = measuredViewFixture()
+    fixture.frame.landmarks = fixture.observations
+    const before = measureFixture(fixture)
+    fixture.response.nativeEligibilityEvidence = {
+      snapshot: { method: 'current-native-cpu-geometry', status: 'stale', reason: 'The previous view no longer retains posed geometry', manifest: null, buffers: null },
+      currentMetadata: null, registeredAnchors: [...fixture.anchors].map(([id, anchor]) => ({ id, ...anchor })),
+      queries: fixture.observations.map(observed => ({ queryId: `main/${observed.anchorId}`, target: {
+        primitiveId: `${fixture.anchors.get(observed.anchorId).partPath}#primitive/0`,
+        exactLocalPosition: [0, 0, 0], nativeStageBackingPixel: [0, 0],
+      } })),
+      collection: { status: 'collected', snapshotStatus: 'stale' },
+    }
+    const eligibility = await joinCurrentNativeEligibilityReport(joinNativeLandmarkEligibility, fixture.frame, fixture.response)
+    assert.ok(eligibility.landmarks.every(item => item.state === 'unresolved' && item.reasons.includes('missing-or-stale-current-native-snapshot')))
+    assert.deepEqual(measureFixture(fixture), before)
+    const passingVideo = videoFixture()
+    passingVideo.samples[0].nativeLandmarkEligibility = eligibility
+    finishVideo(passingVideo, censusFixture, parseOptions(['--stage', '50']))
+    assert.equal(passingVideo.status, 'passed')
+    assert.equal(passingVideo.coverage.complete, true)
+    const controlled = await controlledEligibilityResponse(deriveNativeStagePixelRay)
+    const boundedEligibility = await joinCurrentNativeEligibilityReport(joinNativeLandmarkEligibility,
+      { landmarks: [{ viewId: 'controlled', anchorId: 'apex', role: 'check' }] }, controlled)
+    assert.equal(boundedEligibility.state, 'eligible')
+    fixture.capture.landmarks[2].sourcePixels = [1200, 800]
+    fixture.capture.landmarks[2].canvasPixels = [1200, 800]
+    const failure = measureFixture(fixture), moving = failure.measured.find(item => item.anchorId === 'anchor-2')
+    assert.equal(moving.rawErrorPx, 1100)
+    assert.equal(moving.errorPx, 1101.5)
+    assert.equal(moving.status, 'failed')
+    const video = videoFixture()
+    Object.assign(video.samples[0], { measurements: failure.measured, unavailable: failure.unavailable, excluded: failure.excluded,
+      status: 'failed', nativeLandmarkEligibility: boundedEligibility })
+    finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+    assert.equal(video.stageMeasurement.status, 'failed')
+    assert.equal(video.landmarks.maxErrorPx, 1101.5)
+    assert.equal(video.sourceLandmarkExclusions.mandatory, 0)
+  } finally { await server.close() }
+})
+
+test('GPU source proof cannot substitute a stale physical attachment state while input and camera match', () => {
+  const fixture = measuredViewFixture()
+  assert.equal(measureFixture(fixture).measured.length, 4)
+  fixture.view.sourceAssembly = {
+    kind: 'source-assembly',
+    provenance: { kind: 'chosen-feasible', videoId: 'jfH-NbsmvD4', frameIndex: 30,
+      evidence: 'Independent actual source nut-release witness.', unobservedDegreesOfFreedom: ['thread phase'] },
+    retainingNut: { attachment: 'threaded', releaseTurns: 2 },
+  }
+  assert.throws(() => measureFixture(fixture))
+  fixture.capture.sourceLayout[0].sourceAssembly = structuredClone(fixture.view.sourceAssembly)
+  // Even identical stale camera/input/layout receipts cannot hide an operating
+  // state reported by the actual view while the requested nut is released.
+  assert.throws(() => measureFixture(fixture))
+})
 
 test('schema template matching admits only independent seed and actual correlation provenance', () => {
   const fixture = measuredViewFixture(), observed = fixture.observations[3]

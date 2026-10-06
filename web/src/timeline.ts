@@ -37,6 +37,8 @@ export interface ReferenceAnchor {
   /** Unknown source motion remains null/absent, never an implied moving/fixed label. */
   motion?: 'fixed' | 'moving' | null
   partPath?: string
+  /** Exact native template association for a declared runtime instance; local coordinates only. */
+  runtimeTemplatePartPath?: string
   partLocalMetres?: [number, number, number]
   worldMetres?: [number, number, number]
   description: string

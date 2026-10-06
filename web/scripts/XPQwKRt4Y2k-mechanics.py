@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Private static-source constraints, using registered spin images and native equations.
+"""Private historical static-source constraints from registered Spin pixels.
 
-Run with uv --no-project --with numpy --with scipy --with opencv-python-headless.
-No source images, cameras, observation tracks, or full physical input are written
-under web/. This helper consumes another owner's registration, not a camera fit.
+Require --historical-diagnostic and private verification/external temporary output.
+Original source/model associations must match the executed native data. Current
+source records are not inputs; diagnostics never amend published/canonical tracks.
 """
 
 from __future__ import annotations
@@ -20,9 +20,50 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
+WEB = Path(__file__).resolve().parents[1]
+HISTORICAL_MODEL_SHA = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
+HISTORICAL_COMMIT = "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+SOURCE_SHA = "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+
+
+def private_output(path):
+    output = Path(path).resolve()
+    external_temp = not output.is_relative_to(WEB.resolve()) and any(
+        output.is_relative_to(Path(temp)) for temp in ("/tmp", "/var/tmp"))
+    if output.is_relative_to((WEB / "content").resolve()) or not (
+            output.is_relative_to((WEB / ".vite/verification-output").resolve()) or external_temp):
+        raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals")
+    return output
+
+
+def load_historical_json(path, *, historical_diagnostic=False):
+    if historical_diagnostic is not True:
+        raise ValueError("Spin mechanics inputs require historical_diagnostic=True")
+    if path.resolve().is_relative_to((WEB / "content/v39-source").resolve()):
+        raise ValueError("Historical diagnostics cannot consume current source namespace inputs")
+    record = json.loads(path.read_text())
+    if isinstance(record, dict):
+        if (
+                str(record.get("kind", "")).startswith(("current-", "fresh-"))
+                or record.get("freshSourceRecord") is not None):
+            raise ValueError("Spin mechanics diagnostics cannot consume current source records")
+        model = record.get("model", {})
+        source = record.get("source", {})
+        if (
+                any(record[key] != HISTORICAL_MODEL_SHA for key in ("nativeModelSha256", "modelSha256") if key in record)
+                or ("sha256" in model and model["sha256"] != HISTORICAL_MODEL_SHA)
+                or ("sourceCommit" in model and model["sourceCommit"] != HISTORICAL_COMMIT)
+                or ("sha256" in source and source["sha256"] != SOURCE_SHA)
+                or ("videoId" in source and source["videoId"] != "XPQwKRt4Y2k")
+                or ("sourceSha256" in record and record["sourceSha256"] != SOURCE_SHA)
+                or ("videoId" in record and record["videoId"] != "XPQwKRt4Y2k")):
+            raise ValueError("Spin mechanics diagnostics require the original historical source/model tuple")
+    return record
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--historical-diagnostic", action="store_true", required=True)
     parser.add_argument("--registration", type=Path, required=True)
     parser.add_argument("--pixels", type=Path, required=True)
     parser.add_argument("--inventory", type=Path, required=True)
@@ -33,13 +74,40 @@ def main() -> None:
     parser.add_argument("--loop-gray", type=Path)
     parser.add_argument("--identities", type=Path)
     args = parser.parse_args()
-    root = Path(__file__).resolve().parents[1]
+    try:
+        output = private_output(args.output)
+    except ValueError as error:
+        parser.error(str(error))
+    current = (WEB / "content/v39-source").resolve()
+    inputs = (args.registration, args.pixels, args.inventory, args.hashes,
+              args.views, args.crops, args.loop_gray, args.identities)
+    if any(path.resolve().is_relative_to(current) for path in inputs if path is not None):
+        parser.error("Historical diagnostics cannot consume current source namespace inputs")
+    root = WEB
     evidence = args.pixels.parent
-    registration = json.loads(args.registration.read_text())
+    registration = load_historical_json(args.registration, historical_diagnostic=True)
     params = np.array(registration["parameters"], dtype=float)
-    pixels = json.loads(args.pixels.read_text())
-    inventory = json.loads(args.inventory.read_text())
-    hashes = json.loads(args.hashes.read_text())
+    pixels = load_historical_json(args.pixels, historical_diagnostic=True)
+    inventory = load_historical_json(args.inventory, historical_diagnostic=True)
+    hashes = load_historical_json(args.hashes, historical_diagnostic=True)
+    if (
+            pixels.get("videoId") != "XPQwKRt4Y2k"
+            or pixels.get("sourceSha256") != SOURCE_SHA
+            or inventory.get("sha256") != HISTORICAL_MODEL_SHA):
+        raise ValueError("Spin mechanics diagnostics require the original historical source/model tuple")
+    text = (WEB / "src/mechanics-data.ts").read_text()
+    native_data = json.loads(text.split("export const MECHANISM_DATA = ", 1)[1].rsplit(" as const", 1)[0])
+    if (
+            native_data.get("provenance", {}).get("modelSha256") != HISTORICAL_MODEL_SHA
+            or native_data.get("provenance", {}).get("sourceCommit") != HISTORICAL_COMMIT):
+        raise ValueError("Current native data cannot reuse the original historical Spin association")
+    view_packet = None if args.views is None else load_historical_json(args.views, historical_diagnostic=True)
+    crop_packet = None if args.crops is None else load_historical_json(args.crops, historical_diagnostic=True)
+    identity_packet = None if args.identities is None else load_historical_json(args.identities, historical_diagnostic=True)
+    math_paths = [WEB / path for path in (
+        "src/mechanics.ts", "src/mechanics-data.ts", "src/kinematics.ts", "src/magnifier.ts")]
+    native_math_hashes = {str(path.relative_to(WEB.parent)): hashlib.sha256(path.read_bytes()).hexdigest()
+                          for path in math_paths}
     native_script = f"""
 import {{MECHANISM_DATA,createMechanismInput,createMechanismPose,solveMechanism}} from {json.dumps(str(root / "src/mechanics.ts"))};
 import {{physicalChannelAngle}} from {json.dumps(str(root / "src/kinematics.ts"))};
@@ -66,10 +134,14 @@ console.log(JSON.stringify({{data:MECHANISM_DATA,pose,gauge}},(k,v)=>k==='_work'
 """
     native = json.loads(
         subprocess.run(
-            ["bun", "-e", native_script], check=True, capture_output=True, text=True
+            ["bun", "-e", native_script], cwd=WEB, check=True, capture_output=True, text=True
         ).stdout
     )
     data = native["data"]
+    if (
+            data.get("provenance", {}).get("modelSha256") != HISTORICAL_MODEL_SHA
+            or data.get("provenance", {}).get("sourceCommit") != HISTORICAL_COMMIT):
+        raise ValueError("Executed native data differs from the original historical Spin association")
     # Exact conservative upstream domain bound; counter/wire settings do not
     # enter solveChannel. This is NOT a source absence/occlusion verdict.
     c = data["channel"]
@@ -504,7 +576,7 @@ console.log(JSON.stringify(pose,(k,v)=>ArrayBuffer.isView(v)?Array.from(v):v));
 """
     exact_output = json.loads(
         subprocess.run(
-            ["bun", "-e", output_script], check=True, capture_output=True, text=True
+            ["bun", "-e", output_script], cwd=WEB, check=True, capture_output=True, text=True
         ).stdout
     )
     native_wire_error = max(
@@ -530,13 +602,14 @@ console.log(JSON.stringify({{input,pose}},(k,v)=>k==='_work'?undefined:ArrayBuff
 """
     witness = json.loads(
         subprocess.run(
-            ["bun", "-e", witness_script], check=True, capture_output=True, text=True
+            ["bun", "-e", witness_script], cwd=WEB, check=True, capture_output=True, text=True
         ).stdout
     )
     witness["provenance"] = (
         "Chosen complete feasible native witness, not recovered historical physical input. GPU/source checks and full view visibility remain the integrator acceptance gate."
     )
     witness["historicalFullPhysicalInput"] = None
+    witness.update({"historicalDiagnostic": True, "publishable": False, "productionIntegrated": False})
     witness["visiblePoseCompletenessClaimed"] = False
     witness["partOverrides"] = []
     witness["functionalLinkageAssumption"] = {
@@ -677,17 +750,17 @@ console.log(JSON.stringify({{input,pose}},(k,v)=>k==='_work'?undefined:ArrayBuff
         if args.crops is None
         else {
             p["targetFrameIndex"]: p
-            for p in json.loads(args.crops.read_text())["packets"]
+            for p in crop_packet["packets"]
         }
     )
     gray = None if args.loop_gray is None else np.load(args.loop_gray, mmap_mode="r")
-    views = [] if args.views is None else json.loads(args.views.read_text())["frames"]
+    views = [] if view_packet is None else view_packet["frames"]
     identities = (
         {}
         if args.identities is None
         else {
             p["sourceImage"]["frameIndex"]: p
-            for p in json.loads(args.identities.read_text())["sourceFrameMap"]
+            for p in identity_packet["sourceFrameMap"]
         }
     )
     for view in views:
@@ -828,10 +901,13 @@ console.log(JSON.stringify({{input,pose}},(k,v)=>k==='_work'?undefined:ArrayBuff
             )
         loop_mappings.append(row)
     result = {
+        "kind": "historical-spin-mechanics-diagnostic",
+        "historicalDiagnostic": True, "publishable": False, "productionIntegrated": False,
         "videoId": pixels["videoId"],
         "sourceSha256": pixels["sourceSha256"],
         "nativeModelSha256": inventory["sha256"],
         "nativeMechanicsSourceCommit": data["provenance"]["sourceCommit"],
+        "nativeMathSha256": native_math_hashes,
         "registrationInput": str(args.registration),
         "registrationSha256": hashlib.sha256(
             args.registration.read_bytes()
@@ -923,7 +999,12 @@ console.log(JSON.stringify({{input,pose}},(k,v)=>k==='_work'?undefined:ArrayBuff
         "completeFeasibleWitnessCandidate": witness,
         "fullPhysicalInput": None,
     }
-    args.output.write_text(json.dumps(result, indent=2) + "\n")
+    if native_math_hashes != {
+            str(path.relative_to(WEB.parent)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in math_paths}:
+        raise ValueError("Actually executed native math changed during the historical diagnostic")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, indent=2) + "\n")
     print(
         json.dumps(
             {

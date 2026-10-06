@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import gzip
 import json
+import importlib.util
 import math
 import re
 import subprocess
@@ -29,6 +30,19 @@ SETUP_FIELDS = (
 INPUT_FIELDS = ["crankTurns", "gearing", "magnification"] + [
     f"{name}[{i}]" for name in ("amplitudes", "phases") for i in range(20)
 ] + [f"setup.{name}" for name in SETUP_FIELDS]
+CURRENT_PRODUCERS = {
+    "web/scripts/fresh-source-tracks.py",
+    "web/scripts/generate-analysis-synthesis-source-tracks.py",
+    "web/scripts/compact-operation-rocker.py",
+    "web/scripts/generate-intro-source-track.py",
+    "web/scripts/compact-spin.py",
+}
+
+
+_FRESH_SPEC = importlib.util.spec_from_file_location(
+    "fresh_source_observations", Path(__file__).with_name("fresh-source-observations.py"))
+fresh = importlib.util.module_from_spec(_FRESH_SPEC)
+_FRESH_SPEC.loader.exec_module(fresh)
 
 
 def read_observations(path):
@@ -55,7 +69,13 @@ def write_observations(path, data):
         path.write_text(contents, encoding="utf-8")
 
 
-def load_observations(video_id, prefer_track=False):
+def load_observations(video_id):
+    """Ordinary generation reads only independently measured current observations."""
+    return fresh.load_observations(video_id, web_root=WEB)
+
+
+def load_historical_observations(video_id, prefer_track=False):
+    """Explicit immutable diagnostic input; never eligible for ordinary publication."""
     content = WEB / "content" / "canonical-native"
     track = content / f"{video_id}.track.json"
     if prefer_track and track.exists():
@@ -83,24 +103,29 @@ def load_approved_model_source():
 
 def validate_current_generation_inputs(observations, producer_path, *, additional_observations=(),
                                        executed_inputs=()):
-    """Require independently approved live source/code, never archive fallback.
+    """Require fresh observations and uncached independently sealed live code."""
+    validate_current_generation_seals(producer_path, executed_inputs=executed_inputs)
+    for data in (observations, *additional_observations):
+        fresh.validate_observations(data, web_root=WEB)
 
-    This gate is for ordinary generation. Historical receipt validation remains
-    a separate operation and cannot make old hardware eligible for current code.
-    Producers declare every extra executed module; this shared gate owns only
-    the mandatory live loader, approval record and renderer/math dependencies.
-    """
+
+def validate_current_generation_seals(producer_path, *, executed_inputs=()):
+    """Shared current EOL-seal census for publication and readback preflight."""
     def relative_path(path):
         path = Path(path)
         return (path.resolve().relative_to(WEB.parent.resolve()).as_posix()
                 if path.is_absolute() else path.as_posix())
+    producer = relative_path(producer_path)
+    if producer not in CURRENT_PRODUCERS:
+        raise ValueError("Current source record names an undeclared ordinary producer")
     paths = {
-        relative_path(producer_path), "web/scripts/compact-source-common.py", "web/src/bindings.ts", "web/src/scene.ts",
+        producer, "web/scripts/fresh-source-tracks.py", "web/scripts/compact-source-common.py", "web/src/bindings.ts", "web/src/scene.ts",
         "web/src/mechanics.ts", "web/src/mechanics-data.ts", "web/src/magnifier.ts", "web/src/kinematics.ts",
         "web/scripts/approved-model.mjs", "web/model-representation.mjs",
         "web/content/model-representation.json",
     }
     paths.update(relative_path(path) for path in executed_inputs)
+    paths.update(relative_path(path) for path in fresh.EXECUTED_INPUTS)
     manifest = json.loads((WEB / "content/canonical-native/manifest.json").read_bytes())
     if manifest.get("canonicalConsumerHashNormalization") != "CRLF-to-LF":
         raise ValueError("Current live consumer hash normalization differs")
@@ -118,12 +143,6 @@ def validate_current_generation_inputs(observations, producer_path, *, additiona
         actual = hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
         if actual != sha:
             raise ValueError(f"Current live producer input differs: {path}")
-    source = load_approved_model_source()
-    for data in (observations, *additional_observations):
-        model = data.get("model") if isinstance(data, dict) else None
-        if (not isinstance(model, dict)
-                or any(model.get(field) != source[field] for field in ("sha256", "sourceCommit"))):
-            raise ValueError("Current source model differs from independently approved live model")
 
 
 def historical_code_bytes(path, expected_sha256):
@@ -157,6 +176,9 @@ def needs_machine(frame, data):
 
 def canonicalize_cut_clock(data):
     """Preserve cuts on their recorded native clock, not rounded decimal text."""
+    if data.get("kind") == "current-source-observations":
+        # Fresh annotations carry the actual PTS clock. Do not infer it from fps.
+        return
     fps_record = data["source"]["fps"]
     fps = fps_record["numerator"] / fps_record["denominator"]
     corrections = data.setdefault("samplingDiagnostics", {}).setdefault("cutClockCorrections", [])
@@ -175,10 +197,16 @@ def canonicalize_cut_clock(data):
 
 def compact_change_times(data):
     """Snap rounded event labels within their cut uncertainty to the real cut."""
+    if data.get("kind") == "current-source-observations":
+        authored = set(data.get("coverage", {}).get("changeTimesSeconds", []))
+        if any("sourceAssembly" in view for frame in data["frames"] for view in frame["views"]):
+            authored.update(fresh.assembly_change_times(data, web_root=WEB))
+        return authored
     fps = data["source"]["fps"]["numerator"] / data["source"]["fps"]["denominator"]
     boundaries = [(shot["startSeconds"], max(float(shot.get("boundaryUncertaintySeconds", 0)), 1 / fps), shot["id"]) for shot in data["shots"]]
     result, snaps = set(), []
-    for original in data.get("compactChangeTimesSeconds", []):
+    changes = data.get("compactChangeTimesSeconds", [])
+    for original in changes:
         if abs(original * fps - round(original * fps)) < 1e-6:
             result.add(original)
             continue
@@ -589,7 +617,7 @@ def build_track(data, frame_views_callback, evidence_notes=None):
     shots = [{key: copy.deepcopy(shot[key]) for key in ("id", "startSeconds", "endSeconds", "classification", "hasCorrespondingMachine", "reason", "internalMechanismMotion", "internalMotionEvidence", "internalMotionSourceEvidence") if key in shot} for shot in data["shots"]]
     anchors = []
     for anchor in data["anchors"]:
-        item = {key: copy.deepcopy(anchor[key]) for key in ("id", "kind", "partPath", "partLocalMetres", "worldMetres", "description", "correspondenceEvidence") if key in anchor}
+        item = {key: copy.deepcopy(anchor[key]) for key in ("id", "kind", "partPath", "runtimeTemplatePartPath", "partLocalMetres", "worldMetres", "description", "correspondenceEvidence") if key in anchor}
         item["motion"] = anchor_motion(anchor)
         anchors.append(item)
     frames, blockers = [], []
@@ -619,12 +647,14 @@ def build_track(data, frame_views_callback, evidence_notes=None):
     result = {"schemaVersion": 1, "kind": "compact-source-track",
               "source": {key: copy.deepcopy(data["source"][key]) for key in source_keys if key in data["source"]},
               "model": copy.deepcopy(data["model"]), "anchors": anchors, "shots": shots, "frames": frames,
-              "coverage": {"status": "blocked" if blockers else "complete", "blockers": blockers, "requiredEveryIntegerSecond": True,
-                           "changeTimesSeconds": sorted(set(row["timeSeconds"] for row in frames if not float(row["timeSeconds"]).is_integer())),
-                           "legacyChangeSampleCount": len(data.get("coverage", {}).get("changeTimesSeconds", [])),
-                           "samplingPolicy": "Every integer second, every shot edge, quarter-fade checks, and retained camera/layout/observed-motion keys. Legacy per-exposure certification expansion is diagnostic only."},
+              "nativeIdentity": copy.deepcopy(data.get("nativeIdentity")),
+              "coverage": {"status": "blocked" if blockers or data.get("coverage", {}).get("status") == "blocked" else "complete",
+                           "blockers": list(data.get("coverage", {}).get("blockers", [])) + blockers,
+                           "requiredEveryIntegerSecond": True,
+                           "changeTimesSeconds": sorted(set(data.get("coverage", {}).get("changeTimesSeconds", [])) | set(row["timeSeconds"] for row in frames if not float(row["timeSeconds"]).is_integer())),
+                           "samplingPolicy": "Every integer second, every observed change, shot edge, quarter-fade check, and retained camera/layout/observed-motion key. No per-part exposure certificate gates playback."},
               "stages": {str(stage): {"status": "unmeasured"} for stage in (50, 20, 10, 5)},
-              "evidence": {"interpretation": "Chosen source-informed physically feasible playback candidates. Historical hidden inputs are not recovered. Retained camera FIT/CHECK residuals are CPU diagnostics, not current GPU measurements or stage passes.",
+              "evidence": {"interpretation": "Chosen source-informed physically feasible playback candidates. Hidden inputs are not recovered. Camera FIT/CHECK residuals are CPU diagnostics, not current GPU measurements or stage passes.",
                            "notes": list(evidence_notes or [])}}
     required_views = [(frame, view) for frame in frames if needs_machine(frame, data) for view in frame["views"]]
     checked_views = sum(any(point.get("role") == "check" and point.get("viewId", "main") == view["id"] for point in frame["landmarks"]) for frame, view in required_views)
@@ -645,10 +675,62 @@ def build_track(data, frame_views_callback, evidence_notes=None):
     return result
 
 
+def bind_source_record(track, data, producer_path, *, executed_inputs=()):
+    """Publication is associated with exact fresh observations, never borrowed receipts."""
+    video_id = data["source"]["videoId"]
+    path = WEB / "content/v39-source" / f"{video_id}.observations.json"
+    raw = path.read_bytes()
+    current = fresh.validate_observations(json.loads(raw), video_id=video_id, web_root=WEB)
+    if current != data:
+        raise ValueError("Publication data differs from the actual fresh observation record")
+    def relative(path):
+        path = Path(path)
+        return path.resolve().relative_to(WEB.parent).as_posix() if path.is_absolute() else path.as_posix()
+    track["sourceRecord"] = {
+        "kind": "current-source-observations",
+        "path": path.relative_to(WEB).as_posix(),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "producerPath": relative(producer_path),
+        "executedInputs": sorted({relative(path) for path in executed_inputs}),
+    }
+    return track
+
+
+def _validate_publication(track):
+    record = track.get("sourceRecord")
+    video_id = track.get("source", {}).get("videoId")
+    expected = f"content/v39-source/{video_id}.observations.json"
+    if (track.get("kind") != "compact-source-track" or not isinstance(record, dict)
+            or record.get("kind") != "current-source-observations"
+            or record.get("path") != expected or not isinstance(record.get("producerPath"), str)
+            or not isinstance(record.get("executedInputs"), list)):
+        raise ValueError("Only an actual fresh observation assembly can publish a current source track")
+    raw = (WEB / expected).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != record.get("sha256"):
+        raise ValueError("Fresh source observations changed before publication")
+    data = fresh.validate_observations(json.loads(raw), video_id=video_id, web_root=WEB)
+    validate_current_generation_inputs(data, record["producerPath"],
+                                       executed_inputs=record["executedInputs"])
+    if any(track.get(key) != data.get(key) for key in ("source", "model", "nativeIdentity")):
+        raise ValueError("Current track source/native authority differs from fresh data")
+    # Recompute selection and assembly, including exact-exposure unions; this cannot
+    # bless a substituted old camera, borrowed native point, or authored stage pass.
+    expected_track = build_track(copy.deepcopy(data),
+                                 lambda frame: copy.deepcopy(frame["views"]),
+                                 track.get("evidence", {}).get("notes", []))
+    if expected_track["coverage"]["status"] != "complete":
+        raise ValueError("Current publication requires complete source clocks/layouts/cameras/physical inputs")
+    for key in ("anchors", "shots", "frames", "coverage", "stages", "sourceMeasurements",
+                "nativeGeometryAssumptions"):
+        if track.get(key) != expected_track.get(key):
+            raise ValueError(f"Current track {key} differs from the actual fresh assembly")
+
+
 def prepare_track(track):
     """Serialize without publishing, so paired outputs can be prepared together."""
     if track.get("kind") == "historical-source-track-receipt":
         raise ValueError("Historical receipt revalidation cannot publish a source track")
+    _validate_publication(track)
     path = WEB / "content" / f'{track["source"]["videoId"]}.source-track.json'
     return path, json.dumps(track, separators=(",", ":"), allow_nan=False) + "\n"
 

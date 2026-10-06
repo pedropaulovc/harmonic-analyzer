@@ -3,11 +3,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, CLOCK_LIMIT, loadCanonicalObservations, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 import { assertNativeSourceAssociation, assertModelRepresentationBytes, REPRESENTATION_KIND } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
 import { APPROVED_MODEL_REPRESENTATION, LIVE_MODEL_SOURCE } from './approved-model.mjs'
+import { loadCurrentObservations, validateCurrentTrackAssociation, currentSourceAssemblyChangeTimes, normalizeCurrentTrackAssemblies, currentSourceLayoutForViews as sourceLayoutForViews } from './fresh-source-observations.mjs'
+import { loadCurrentNativeEligibilityModule, collectCurrentNativeEligibilityEvidence, joinCurrentNativeEligibilityReport, unavailableCurrentNativeEligibilityReport } from './current-native-eligibility-report.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const STAGES = [50, 20, 10, 5]
@@ -29,6 +31,7 @@ const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const delay = ms => new Promise(done => setTimeout(done, ms))
 const maximumField = (rows, field) => rows.reduce((maximum, row) => finite(row[field]) ? Math.max(maximum ?? 0, row[field]) : maximum, null)
 const HELP = `Usage: npm --prefix web run verify:sync -- [--stage 50|20|10|5] [--video <id|slug>] [--from seconds --to seconds | --times t,t,...] [--player local|youtube|both] [--headless|--headed] [--output directory]\nDefault: ALL SIX videos, final 5% of the 1920px frame width = 96px, timing <=0.5s, headless Chromium.\nStages 50/20/10/5 are ERROR tolerances (960/384/192/96px), never coverage fractions.\nPer-video and time-scoped runs measure available samples without an all-six preflight. A time-scoped report is partial, NEVER a whole-video stage pass. Stage 5 requires actual official YouTube playback/audio/compact checks; coarse stages default to byte-identical local original playback.\nRequires built dist, original MP4s in HARMONIC_REFERENCE_ROOT/videos (default web/.vite/reference-root), ffprobe/ffmpeg and Playwright Chromium. No attempt cap. Old certification code remains in git history; retained private diagnostic evidence is unchanged.\nExamples:\n  npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119\n  npm --prefix web run verify:sync -- --stage 20 --video machine-spin\n  npm --prefix web run verify:sync\n`
+const NATIVE_ELIGIBILITY_HELP = `\nOptional --native-eligibility requires --times t,t,... and collects the full current native primitive buffers once per requested required frame. It runs the tracked CPU first-surface guard and actual native target/depth and shader-feedback APIs, with an independent eligible/ineligible/unresolved report. Missing GPU bounds stay unresolved; eligibility NEVER changes source pixel errors, coverage, playback, or source acceptance. Only the last current native draw retains geometry; earlier simultaneous views stay unresolved. Default runs do not collect full native geometry.\nExample:\n  npm --prefix web run verify:sync -- --stage 50 --video intro-history --times 6.84 --native-eligibility\n`
 
 // Native orbit normalization can perturb stored floats without moving the camera.
 // Compare physical pose, not JSON bytes; invalid poses must never pass either gate.
@@ -53,12 +56,13 @@ export function compareCameraPose(before, after) {
   return { status: equivalent ? 'equivalent' : 'changed', positionMetres, quaternionChord, rotationRadians, verticalFovDegrees, tolerances }
 }
 export function parseOptions(args) {
-  const options = { stage: 5, videos: [], from: null, to: null, times: null, player: null, headed: process.env.HARMONIC_HEADLESS === '0', output: null }
+  const options = { stage: 5, videos: [], from: null, to: null, times: null, player: null, headed: process.env.HARMONIC_HEADLESS === '0', output: null, nativeEligibility: false }
   for (let index = 0; index < args.length; index++) {
     const option = args[index]
     if (option === '--help') return { help: true }
     if (option === '--headed') { options.headed = true; continue }
     if (option === '--headless') { options.headed = false; continue }
+    if (option === '--native-eligibility') { options.nativeEligibility = true; continue }
     assert(['--stage', '--video', '--from', '--to', '--times', '--player', '--output'].includes(option), `Unknown option ${option}`)
     const value = args[++index]
     assert(value !== undefined && !value.startsWith('--'), `${option} requires a value`)
@@ -80,6 +84,7 @@ export function parseOptions(args) {
   assert(options.from === null || options.to === null || options.from <= options.to, '--from must not exceed --to')
   assert(options.times === null || (options.times.length > 0 && options.times.every(time => finite(time) && time >= 0)), '--times needs finite nonnegative source times')
   assert(options.times === null || (options.from === null && options.to === null), '--times cannot be combined with --from/--to')
+  assert(!options.nativeEligibility || options.times !== null, '--native-eligibility requires explicitly requested --times; full native geometry is collected once per requested current frame, never during default playback')
   options.player ??= options.stage === 5 ? 'both' : 'local'
   assert(['local', 'youtube', 'both'].includes(options.player), '--player must be local, youtube or both')
   if (!options.videos.length) options.videos = [...VIDEO_IDS]
@@ -140,8 +145,15 @@ function compactSourceLandmarks(original, views, observations = original.landmar
   return { landmarks, unavailable }
 }
 
+/** Draw association includes physical state; photon/layout continuity deliberately does not. */
+export function capturedSourceLayoutForViews(views) {
+  return sourceLayoutForViews(views).map((entry, index) => ({
+    ...entry, sourceAssembly: views[index].sourceAssembly ?? { kind: 'operating' },
+  }))
+}
+
 /** Source census is retained separately from authored camera/input candidates. */
-export function sourceCensus(observations, track, native, options) {
+export function sourceCensus(observations, track, native, options, assemblyChangeTimes = null) {
   const times = new Map(), sourceShots = track.shots ?? observations.shots
   const originalShots = new Map(observations.shots.map(shot => [shot.id, shot]))
   const compactShots = new Map(sourceShots.map(shot => [shot.id, shot]))
@@ -153,6 +165,12 @@ export function sourceCensus(observations, track, native, options) {
   }
   for (let time = 0; time < native.durationSeconds; time++) add(time, 'every-second')
   for (const time of track.coverage?.changeTimesSeconds ?? []) add(time, 'authored-change-point')
+  if (observations.kind === 'current-source-observations') {
+    for (const time of observations.coverage.changeTimesSeconds ?? []) add(time, 'observed-change-point')
+    assert(assemblyChangeTimes !== null || !observations.frames.some(frame => frame.views?.some(view => view.sourceAssembly !== undefined)),
+      'Source assembly census requires actual compiler-derived physical change times')
+    for (const time of assemblyChangeTimes ?? []) add(time, 'observed-assembly-change')
+  }
   for (const shot of sourceShots) { add(shot.startSeconds, 'shot-start'); add(shot.endSeconds, 'shot-end') }
   for (const frame of track.frames) add(frame.timeSeconds, 'authored-sample')
   // Preserve real view membership/cut changes, not every exposure of continuous motion.
@@ -224,18 +242,22 @@ export function sourceCensus(observations, track, native, options) {
   return { rows, selected }
 }
 
-async function loadRecord(id, referenceRoot, signal) {
-  const track = JSON.parse(await readFile(resolve(WEB_ROOT, `content/${id}.source-track.json`), 'utf8'))
-  const observations = await loadCanonicalObservations(WEB_ROOT, id)
+export async function loadRecord(id, referenceRoot, signal, { webRoot = WEB_ROOT } = {}) {
+  const observations = await loadCurrentObservations(webRoot, id)
+  const rawTrack = JSON.parse(await readFile(resolve(webRoot, `content/${id}.source-track.json`), 'utf8'))
+  await validateCurrentTrackAssociation(rawTrack, observations, webRoot)
+  const digest = jsonDigest(rawTrack)
+  const track = await normalizeCurrentTrackAssemblies(rawTrack, { webRoot })
   assert(track.kind === 'compact-source-track' && track.schemaVersion === 1, 'Expected the compact source-track contract')
   const expectedHash = SOURCE_HASHES[VIDEO_IDS.indexOf(id)]
   assert(track.source?.videoId === id && track.source.sha256 === expectedHash && observations.source?.sha256 === expectedHash, 'Compact/source census identity differs from retained original MP4 SHA256')
   assert(track.model?.sha256 === LIVE_MODEL_SOURCE.sha256 && track.model.sourceCommit === LIVE_MODEL_SOURCE.sourceCommit && track.model.units === 'metres', 'Compact track must use the full unchanged native CAD model')
   assert(Array.isArray(track.frames) && track.frames.length && track.frames.every((frame, index) => finite(frame.timeSeconds) && (finite(frame.decodedTimeSeconds) || (frame.decodedTimeSeconds === null && frame.sourceSampleUnavailable === true && !frame.views?.length && !frame.landmarks?.length && !frame.sourceImage)) && (!index || frame.timeSeconds > track.frames[index - 1].timeSeconds)), 'Compact samples must have finite increasing source times and native PTS, or explicit unavailable source-clock rows')
   assert(Array.isArray(track.anchors) && new Set(track.anchors.map(anchor => anchor.id)).size === track.anchors.length, 'Compact native anchors must have unique identities')
+  const assemblyChangeTimes = await currentSourceAssemblyChangeTimes(observations, { webRoot })
   const sourcePath = resolve(referenceRoot, 'videos', `${id}.mp4`)
   const native = await probeSource(sourcePath, track.source, { signal })
-  return { id, track, observations, sourcePath, native, digest: jsonDigest(track) }
+  return { id, track, observations, sourcePath, native, assemblyChangeTimes, digest }
 }
 
 /** A bad diagnostic identity cannot erase independent successful exposures in the same decode batch. */
@@ -531,6 +553,10 @@ export function measureView(view, response, frame, observations, tolerancePx, an
   assert(mechanism?.method === 'actual-native-mechanism-solve' && mechanism.status === 'rendered' && mechanism.viewId === view.id && mechanism.timeSeconds === capture.timeSeconds && Number.isInteger(mechanism.sourceDrawRevision) && mechanism.sourceDrawRevision > 0 && mechanism.channelAnglesRad?.length === 20 && mechanism.channelAnglesRad.every(finite), 'Missing/stale native full physical solve')
   assert(rendered && jsonDigest(mechanism.input) === jsonDigest(rendered.input) && jsonDigest(mechanism.sourceLayout) === jsonDigest(capture.sourceLayout) && jsonDigest(mechanism.resolvedImagePlaneWarp) === jsonDigest(capture.resolvedImagePlaneWarp), 'Readback and native input/layout/warp do not belong to the same rendered source view')
   assert(jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation, 'Rendered source view ROI/orientation differs from sample')
+  assert(jsonDigest(capture.sourceLayout) === jsonDigest(capturedSourceLayoutForViews(frame.views)),
+    'GPU/native source layout did not draw the authored held physical assembly state')
+  assert(jsonDigest(rendered.sourceAssembly) === jsonDigest(view.sourceAssembly ?? { kind: 'operating' }),
+    'Rendered physical assembly descriptor differs from the source exposure')
   const near = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, index) => finite(value) && Math.abs(value - b[index]) <= 1e-7)
   if (frame.measuredInterpolation) {
     const sampling = rendered.sourceSampling, [fromTime, toTime] = frame.interpolationInterval
@@ -907,13 +933,18 @@ export function requireSourceViews(row) {
   assert(!orphanViews.length, `Original source landmark view(s) lack an evidenced compact-view mapping: ${orphanViews.join(',')}`)
 }
 
-async function measureSamples(page, embed, record, census, video, tolerancePx, outputDirectory) {
+async function measureSamples(page, embed, record, census, video, tolerancePx, outputDirectory, options) {
   const anchors = new Map(record.track.anchors.map(anchor => [anchor.id, anchor]))
   const seeds = sourceSeedIndex([...record.observations.frames, ...record.track.frames])
   const measuredFrames = new Map()
+  let eligibilityModule, eligibilityModuleError
+  try { eligibilityModule = await loadCurrentNativeEligibilityModule() }
+  catch (error) { eligibilityModuleError = error.message }
   for (const row of census.selected) {
     const sample = { timeSeconds: row.timeSeconds, reasons: row.reasons, diagnosticOnly: row.diagnosticOnly === true, required: row.required, sourceShotId: row.sourceShotId, sampleTimeSeconds: row.frame?.timeSeconds ?? null, sourceImageReplay: row.sourceImageReplay ?? null, status: 'unavailable', measurements: [], unavailable: [], excluded: [] }
     video.samples.push(sample)
+    if (row.required) sample.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(row.frame,
+      eligibilityModuleError ?? 'The required current frame has not been reviewed', eligibilityModuleError ? 'module-seal-unavailable' : 'required-frame-not-reviewed')
     if (!row.frame) { sample.unavailable.push({ reason: row.unavailableReason }); continue }
     const frame = row.frame
     try {
@@ -937,6 +968,17 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
         }
         const maxClockSkewSeconds = clocks.length ? Math.max(...clocks) : null
         result = { measurements, unavailable, excluded, maxClockSkewSeconds, status: measurements.some(item => item.status === 'failed') || maxClockSkewSeconds !== null && maxClockSkewSeconds > CLOCK_LIMIT ? 'failed' : unavailable.length || !measurements.length || maxClockSkewSeconds === null ? 'unavailable' : 'passed' }
+        // Qualification is an optional report, never a measurement or playback gate.
+        try {
+          if (eligibilityModule) {
+            response.nativeEligibilityEvidence = await collectCurrentNativeEligibilityEvidence(page, frame, response, eligibilityModule,
+              { collect: options.nativeEligibility })
+            result.nativeLandmarkEligibility = await joinCurrentNativeEligibilityReport(eligibilityModule.joinNativeLandmarkEligibility, frame, response)
+            result.nativeLandmarkEligibility.consumerSeals = eligibilityModule.seals
+          } else result.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(frame, eligibilityModuleError)
+        } catch (error) {
+          result.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(frame, error.message, 'native-evidence-collection-unavailable')
+        }
         measuredFrames.set(frame.timeSeconds, result)
       }
       Object.assign(sample, result)
@@ -1008,7 +1050,7 @@ export function finishVideo(video, census, options) {
 }
 
 export async function verifySync(options = parseOptions(process.argv.slice(2))) {
-  if (options.help) { console.log(HELP); return 0 }
+  if (options.help) { console.log(HELP + NATIVE_ELIGIBILITY_HELP); return 0 }
   const startedAt = new Date().toISOString(), outputDirectory = resolve(options.output ?? resolve(WEB_ROOT, '.vite/verification-output', `stage-${options.stage}-${startedAt.replace(/[:.]/g, '-')}`))
   await mkdir(outputDirectory, { recursive: true })
   const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sourceSha256: LIVE_MODEL_SOURCE.sha256, sourceCommit: LIVE_MODEL_SOURCE.sourceCommit, sourceIntegrity: 'unmeasured', representation: null, representationIntegrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Every integer second, authored/visible change and actual source view remains mandatory; missing/failed required measurements never pass. Extra interior observations are diagnostic: missing/inadmissible oracles do not add certification prerequisites, but independently admitted measured pixel counterexamples still fail the stage. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
@@ -1025,17 +1067,6 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
     report.model.sourceIntegrity = 'associated-to-pinned-native-release'
     report.model.representation = approvedModelRepresentation
     report.model.representationIntegrity = 'passed'
-    server = await serveDist(resolve(WEB_ROOT, 'dist'), { referenceRoot, requests: report.serverRequests, signal: abort.signal, base: process.env.SIMULATOR_BASE })
-    report.baseUrl = server.url
-    const { chromium } = await import('playwright')
-    const softwareGl = process.env.HARMONIC_SOFTWARE_GL === '1'
-    report.rendererChoice = softwareGl ? 'explicit-swiftshader' : 'native-browser-default'
-    browser = await chromium.launch({ executablePath: process.env.HARMONIC_CHROME ?? '/usr/bin/google-chrome', headless: !options.headed, args: [...(softwareGl ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : []), '--no-sandbox', '--disable-dev-shm-usage'], timeout: 30_000 })
-    abort.signal.addEventListener('abort', () => void browser.close(), { once: true })
-    context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 }); context.setDefaultTimeout(20_000)
-    page = await context.newPage()
-    page.on('pageerror', error => report.browserLog.push({ type: 'pageerror', reason: error.message }))
-    report.browserVersion = browser.version()
     for (const id of options.videos) {
       const video = { videoId: id, status: 'unavailable', failures: [], samples: [], playback: {}, source: null, coverage: null, maxErrorPx: null, unavailableReasons: [] }
       report.videos.push(video)
@@ -1043,11 +1074,25 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
       try {
         if (abort.signal.aborted) throw abort.signal.reason
         const record = await loadRecord(id, referenceRoot, abort.signal)
+        // Invalid/missing current source authority must fail before starting GPU work.
+        if (!browser) {
+          server = await serveDist(resolve(WEB_ROOT, 'dist'), { referenceRoot, requests: report.serverRequests, signal: abort.signal, base: process.env.SIMULATOR_BASE })
+          report.baseUrl = server.url
+          const { chromium } = await import('playwright')
+          const softwareGl = process.env.HARMONIC_SOFTWARE_GL === '1'
+          report.rendererChoice = softwareGl ? 'explicit-swiftshader' : 'native-browser-default'
+          browser = await chromium.launch({ executablePath: process.env.HARMONIC_CHROME ?? '/usr/bin/google-chrome', headless: !options.headed, args: [...(softwareGl ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : []), '--no-sandbox', '--disable-dev-shm-usage'], timeout: 30_000 })
+          abort.signal.addEventListener('abort', () => void browser.close(), { once: true })
+          context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 }); context.setDefaultTimeout(20_000)
+          page = await context.newPage()
+          page.on('pageerror', error => report.browserLog.push({ type: 'pageerror', reason: error.message }))
+          report.browserVersion = browser.version()
+        }
         video.source = { sha256: record.native.observedSha256, width: record.native.width, height: record.native.height, fps: record.native.fps, durationSeconds: record.native.durationSeconds, nativeFrameCount: record.native.nativeFrameCount, trackDigest: record.digest, nativeGeometryAssumptions: record.track.nativeGeometryAssumptions ?? record.observations.nativeGeometryAssumptions ?? [], geometricExceptionsInterpretation: 'Narrow retained source/native exceptions remain uncertified, never whole-view or landmark waivers.' }
         const staticControls = await staticSourceControls(record)
         video.source.staticMotionDiagnostics = staticControls.diagnostics
         video.shots = record.track.shots.map(shot => ({ id: shot.id, internalMechanismMotion: shot.internalMechanismMotion ?? 'unknown', internalMotionEvidence: shot.internalMotionEvidence ?? null, sourceStaticControls: staticControls.shots.get(shot.id) ?? null }))
-        census = sourceCensus(record.observations, record.track, record.native, options)
+        census = sourceCensus(record.observations, record.track, record.native, options, record.assemblyChangeTimes)
         assert(census.selected.length > 0, 'Selected time window contains no source census samples')
         // Mandatory original images remain gating; optional interpolation probes
         // replay only new identities and report missing oracles diagnostically.
@@ -1064,7 +1109,7 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
         // Playback checks are independent of landmark availability: useful measurement must still run after a UI failure.
         try { await playbackChecks(page, embed, record, video, outputDirectory) }
         catch (error) { if (video.playback[measurementPlayer]) Object.assign(video.playback[measurementPlayer], { status: 'failed', reason: error.message }); video.failures.push({ code: `${measurementPlayer}-playback`, reason: error.message }) }
-        try { await pause(page, embed); await measureSamples(page, embed, record, census, video, report.limits.sourceLandmarkPx, outputDirectory) }
+        try { await pause(page, embed); await measureSamples(page, embed, record, census, video, report.limits.sourceLandmarkPx, outputDirectory, options) }
         catch (error) { video.failures.push({ code: 'source-measurement', reason: error.message }) }
         try { video.interaction = await interactionChecks(page, embed, id, outputDirectory) }
         catch (error) { video.interaction = error.interaction ?? { status: 'failed', reason: error.message }; video.failures.push({ code: 'manual-interaction', reason: error.message, report: video.interaction.report ?? null }) }

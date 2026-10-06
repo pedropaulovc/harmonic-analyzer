@@ -6,6 +6,10 @@
   "mappingSha256": "1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd",
   "originalSourceCommit": "bfde892a5",
   "geometryQualification": "Unchanged historical geometry/source observations. Native namespace translation does not requalify current CAD/renderer or source-camera correspondence.",
+  "currentSourceInventory": {
+    "path": "web/content/v39-source/native-inventory.json",
+    "sha256": "d1a26ddf98c4671b0f14b8d4a4b163a844e06e8eb27c825739ed7f2f36242476"
+  },
   "derivatives": [
     {
       "path": "web/content/canonical-native/4mBuyixt22U.observations.json.gz",

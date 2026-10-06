@@ -1,23 +1,22 @@
 #!/usr/bin/env python3
-"""Shot-local visible main-crank measurements; images remain private.
+"""Private original-MP4 visible-crank pixel/motion receipt.
 
-Run: uv run --no-project --python web/.vite/calibration-venv/bin/python \
-    web/scripts/6dW6VYXp9HM-visible-crank-extract.py
-No bank phase, native handedness, camera, or home is inferred by this producer.
+The default output and preview crops stay in private .vite verification storage.
+--output may select another private verification path or external temporary file,
+never published/canonical content. No native metadata or native code is consumed.
+The filename-derived source-pixel-support directory follows --output; the default
+uses a distinct source-pixels folder, never the original private capture folder.
 
-Packet API: linearly interpolate frames[].relativeCrankTurns only inside
-interval.startSeconds..endSeconds. Positive means clockwise in ORIGINAL pixels.
-Native crankTurns requires an explicitly chosen +/- sign and shot-local offset;
-neither is measured. Preserve one fixed chosen-feasible20 phase/amplitude setup
-as unobserved. Never join this zero to the separate112..119s bank shot.
+Linearly interpolate frames[].relativeCrankTurns only inside the measured shot
+interval. Positive means clockwise in ORIGINAL pixels; native shaft sign/home,
+bank setup and source/native camera remain unobserved and have no authority here.
 
 The narrow source ellipse is an affine approximation, not camera calibration:
 full windings/periods are observable; sub-turn phase and local speed are
 approximate. Independent disjoint steel-pixel controls never enter the fit.
-Native identity metadata is read from MECHANISM_DATA through Bun at execution.
-Producer/native/kinematics hashes must stay unchanged until packet publication.
 """
 from pathlib import Path
+import argparse
 import hashlib
 import json
 import subprocess
@@ -27,10 +26,20 @@ import numpy as np
 
 WEB = Path(__file__).resolve().parents[1]
 VIDEO = WEB / '.vite/reference-root/videos/6dW6VYXp9HM.mp4'
-PRIVATE = WEB / '.vite/verification-output/6dW6VYXp9HM-visible-crank'
-OUTPUT = WEB / 'content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json'
+PRIVATE = WEB / '.vite/verification-output/6dW6VYXp9HM-source-pixels'
+OUTPUT = PRIVATE / 'source-pixel-receipt.json'
 EXPECTED_SHA = '5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52'
 FIRST, LAST = 2392, 2598
+
+
+def private_output(path):
+    output = Path(path).resolve()
+    external_temp = not output.is_relative_to(WEB.resolve()) and any(
+        output.is_relative_to(Path(temp)) for temp in ('/tmp', '/var/tmp'))
+    if output.is_relative_to((WEB / 'content').resolve()) or not (
+            output.is_relative_to((WEB / '.vite/verification-output').resolve()) or external_temp):
+        raise ValueError('Source-pixel receipts require private .vite/verification-output or external temporary output; cannot write published content or canonical originals')
+    return output
 
 
 def sha(path):
@@ -146,23 +155,25 @@ def relative_motion(rows):
 
 
 def main():
-    PRIVATE.mkdir(parents=True, exist_ok=True)
-    lineage_paths = [Path(__file__), WEB/'src/mechanics-data.ts', WEB/'src/kinematics.ts']
-    lineage_hashes = [sha(path) for path in lineage_paths]
-    native = json.loads(subprocess.check_output([
-        'bun', '--eval',
-        'import {MECHANISM_DATA as d} from "./src/mechanics-data.ts";'
-        'const r=d.renderFrames;'
-        'const m=r.worldMatrices["ha-harmonic-analyzer/dt-drive-train/dt-crank-handle-1"];'
-        'console.log(JSON.stringify({nativePivotMm:r.crankPivotMm,nativeAxis:r.crankAxis,'
-        'nativeHandleRestCentreMm:m.slice(12,15).map(v=>v*1000)}));'
-    ], cwd=WEB))
-    assert all(len(vector) == 3 and np.isfinite(vector).all() for vector in native.values())
-    assert sha(VIDEO) == EXPECTED_SHA, 'Unexpected original source identity'
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--video', type=Path, default=VIDEO)
+    parser.add_argument('--output', type=Path, default=OUTPUT)
+    args = parser.parse_args()
+    try:
+        output = private_output(args.output)
+        support = private_output(output.parent / f'{output.stem}-source-pixel-support')
+    except ValueError as error:
+        parser.error(str(error))
+    if args.video.resolve().is_relative_to((WEB / 'content/v39-source').resolve()):
+        parser.error('Original source-pixel extraction cannot consume current source namespace inputs')
+    producer_hash = sha(Path(__file__))
+    if sha(args.video) != EXPECTED_SHA:
+        raise ValueError('Unexpected original source identity')
+    support.mkdir(parents=True, exist_ok=True)
     probe = json.loads(subprocess.check_output([
         'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_frames',
-        '-show_entries', 'frame=pts,best_effort_timestamp_time', '-of', 'json', str(VIDEO)]))['frames']
-    cap = cv2.VideoCapture(str(VIDEO))
+        '-show_entries', 'frame=pts,best_effort_timestamp_time', '-of', 'json', str(args.video)]))['frames']
+    cap = cv2.VideoCapture(str(args.video))
     cap.set(cv2.CAP_PROP_POS_FRAMES, FIRST)
     rows = []
     previews = []
@@ -190,53 +201,53 @@ def main():
     cap.release()
     while len(previews)%12:
         previews.append(np.zeros_like(previews[0]))
-    cv2.imwrite(str(PRIVATE/'track-contact.png'), np.vstack([np.hstack(previews[i:i+12]) for i in range(0,len(previews),12)]))
-    save(PRIVATE/'measurements.json', rows)
+    cv2.imwrite(str(support/'track-contact.png'), np.vstack([np.hstack(previews[i:i+12]) for i in range(0,len(previews),12)]))
+    save(support/'measurements.json', {
+        'kind': 'historical-source-pixel-measurements', 'historicalDiagnostic': True,
+        'publishable': False, 'productionIntegrated': False,
+        'geometryAuthority': None, 'authorityScope': 'original-source-pixels-only',
+        'frames': rows})
     assert all(row['fitFeature'] is not None for row in rows), 'Do not interpolate unavailable FIT observations'
     motion = relative_motion(rows)
     packet = {
-        'schemaVersion': 1, 'kind': 'shot-local-visible-main-crank-relative-motion',
+        'schemaVersion': 1, 'kind': 'historical-source-pixel-crank-motion-receipt',
+        'historicalDiagnostic': True, 'publishable': False, 'productionIntegrated': False,
+        'authorityScope': 'original-source-pixels-only', 'geometryAuthority': None,
         'source': {'videoId': '6dW6VYXp9HM', 'sha256': EXPECTED_SHA, 'width': 1920, 'height': 1080,
                    'fps': {'numerator': 30000, 'denominator': 1001}, 'ptsTimeBase': '1/30000',
                    'pixelCoordinates': 'original full-resolution x-right y-down; no mirror or crop transform',
                    'imageHashConvention': 'SHA256 of OpenCV-decoded contiguous original 1080x1920x3 uint8 BGR bytes',
                    'opencvVersion': cv2.__version__, 'rights': 'Numeric evidence only; source images and video remain private.'},
-        'lineage': {'producerPath': 'web/scripts/'+Path(__file__).name, 'producerSha256': lineage_hashes[0],
-                    'nativeGeometryPath': 'web/src/mechanics-data.ts', 'nativeGeometrySha256': lineage_hashes[1],
-                    'nativeGeometryDerivation': 'Bun imports MECHANISM_DATA: renderFrames.crankPivotMm, renderFrames.crankAxis, and renderFrames.worldMatrices[crank-handle-1][12:15]*1000. No copied native coordinates.',
-                    'verification': 'Producer/nativeGeometry/kinematics SHA256 checked before extraction and immediately before packet publication; changed inputs abort.',
-                    'kinematicsPath': 'web/src/kinematics.ts', 'kinematicsSha256': lineage_hashes[2]},
+        'lineage': {'producerPath': 'web/scripts/'+Path(__file__).name, 'producerSha256': producer_hash,
+                    'verification': 'Original MP4 SHA256 checked before extraction; producer and MP4 SHA256 checked immediately before writing the private receipt. No native geometry/kinematics read or executed.'},
         'interval': {'shotId': 'analysis-16', 'shotBoundsSeconds': [79.44603333333333,87.02026666666667],
                      'startSeconds': rows[0]['timeSeconds'], 'endSeconds': rows[-1]['timeSeconds'],
                      'firstFrameIndex': FIRST, 'lastFrameIndex': LAST, 'continuousNativeFrames': True,
                      'excluded': 'Shot boundary/dissolve margins outside this bounded interval; no extrapolation beyond last sample.'},
-        'shaftIdentity': {
-            'source': 'Hand turns long steel arm on shaft immediately left of cone large-end drive, with chain sprocket and green bearing. Upper/downward arm exposures are the same main crank, not a second lower paper/feed crank.',
-            'nativePaths': ['ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1','ha-harmonic-analyzer/dt-drive-train/dt-crank-arm-1','ha-harmonic-analyzer/dt-drive-train/dt-crank-handle-1'],
-            **native,
-            'correspondenceAuthority': 'Assembly identity and adjacent cone/chain topology; not a calibrated source/native projection.',
-            'sourceStationOrder': 'left-to-right harmonic20..1; native station j=0..19 harmonic20-j, increasing Z pitch; pre93s unmirrored shot'},
+        'sourceFeatureIdentity': {
+            'source': 'Hand turns the long steel arm immediately left of the cone/chain and green bearing; collar and independent distal steel contour are original-pixel features only.',
+            'nativeCorrespondence': None,
+            'correspondenceAuthority': 'Source pixels only; no native part/material identity or geometry approval inferred.'},
         'authority': {
             'qualified': ['actual-source native-frame PTS and BGR hashes','2D collar trajectory with lateral component','clockwise image-plane winding','shot-local relative zero','observed complete-cycle periods','independent steel silhouette controls'],
             'approximate': ['within-cycle relativeCrankTurns from source-only affine ellipse','localSpeedTurnsPerSecond'],
-            'unobservable': ['absolute shaft home','native +Z handedness mapping','all20 channel phases and amplitudes','source/native measured camera'],
+            'unobservable': ['absolute shaft home','native handedness mapping','all20 channel phases and amplitudes','source/native measured camera','native material/body correspondence'],
             'nativeSignCandidates': [-1,1], 'selectedNativeSign': None, 'absoluteNativeHomeTurns': None,
+            'sourceNativeCamera': None, 'nativeGeometryApproved': False,
             'phaseTransferToOtherShots': False, 'forbiddenPhaseTransferIntervalSeconds': [112.3122,119.085633],
             'sceneQualification': 'No source50/20/10/5 or full77..87 scene-calibration claim.'},
         'integration': {
             'timeDomain': 'original source seconds; closed sample domain only; outside returns null',
             'interpolation': 'piecewise linear between adjacent native-frame relativeCrankTurns; no extrapolation or across-cut bridge',
             'relativeZero': {'frameIndex': FIRST, 'timeSeconds': rows[0]['timeSeconds'], 'turns': 0, 'meaning': 'first observed exposure, not shaft home'},
-            'nativeInputFormula': 'crankTurns = explicitChosenNativeSign * relativeCrankTurns + explicitChosenShotLocalOffsetTurns',
-            'nativeSignRequirement': 'Caller must expose +/- selection as chosen/unobserved until independently measured; never promote to source authority.',
-            'fixedSetupRequirement': 'Caller supplies one fixed20 amplitudes/phases vector from its existing chosen-feasible setup, explicitly unobserved. This packet supplies none and must not fabricate zero phases.',
-            'physicalChannelAngleFormula': '(20-j)*pi/40*crankTurns + fixedPhaseRad[j], j=0..19',
-            'separation': 'Drive evidence only; no manual camera workaround or time-varying per-channel pose substitution. Existing bank packet at112..119 remains separate.'},
+            'scope': 'Private source-pixel diagnostic only; no native input binding or production integration. Native sign, absolute home, setup and source/native camera require separate evidence.'},
         'measurement': motion, 'frames': rows}
-    assert [sha(path) for path in lineage_paths] == lineage_hashes, 'Producer or native/kinematic inputs changed during extraction'
-    save(OUTPUT, packet)
+    if sha(Path(__file__)) != producer_hash or sha(args.video) != EXPECTED_SHA:
+        raise ValueError('Producer or original source changed during extraction')
+    save(output, packet)
     print(json.dumps(motion))
-    print(json.dumps({'frames':len(rows),'missing':[r['frameIndex'] for r in rows if r['fitFeature'] is None]}))
+    print(json.dumps({'output':str(output),'supportDirectory':str(support),
+                      'frames':len(rows),'missing':[r['frameIndex'] for r in rows if r['fitFeature'] is None]}))
 
 
 if __name__ == '__main__':
