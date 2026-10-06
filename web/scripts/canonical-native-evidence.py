@@ -20,15 +20,24 @@ MANIFEST = 'web/content/canonical-native/manifest.json'
 MAP = 'cad/config/identity-migration-map.json'
 STRING = re.compile(rb'"(?:[^"\\]|\\.)*"')
 TOKEN = re.compile(rb'"(?:[^"\\]|\\.)*"|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?')
-NATIVE = re.compile(r'(?<![/\w:-])harmonic-analyzer/([a-z0-9-]+)/([a-z0-9-]+)(/mesh_[0-9_]+)?')
+NATIVE = re.compile(r'(?<![/\w:-])harmonic-analyzer/[^\s"\'<>`,;:()\[\]{}]+')
+MESH = re.compile(r'mesh(?:_[0-9]+(?:_[0-9]+)*)?')
 PRESERVATION = ('All original numeric JSON tokens retained byte-for-byte. Only '
                 'identity/dependency strings translated; no geometric re-export '
                 'or renderer/camera requalification.')
-SCOPE = 'Current consumer code/data input hash only; not a claim of geometric or GPU/source verification.'
+SCOPE = ('Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; '
+         'not a claim of byte identity, geometric or GPU/source verification.')
+CONSUMER_NORMALIZATION = 'CRLF-to-LF'
 
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def consumer_digest(data: bytes) -> str:
+    # Current editable text inputs follow Git newline conversion. Evidence,
+    # original/snapshot certificates and dependency pins always use digest().
+    return digest(data.replace(b'\r\n', b'\n'))
 
 
 def file_path(name: str) -> Path:
@@ -58,53 +67,173 @@ def strings(data: bytes, replacements: dict[str, str], native=None) -> bytes:
     member_paths = {old: new for old, new in replacements.items() if old.startswith('web/content/')}
     path_pattern = (re.compile(r'(?<![\w-])(?:' + '|'.join(re.escape(p) for p in member_paths)
                                + r')(?![\w./-])') if member_paths else None)
-    encoded = {json.dumps(old).encode('utf8') for old in replacements}
     def replace(match):
         raw = match[0]
-        if raw not in encoded and b'web/content/' not in raw and b'harmonic-analyzer/' not in raw:
-            return raw
+        # Decode keys as well as values, including escaped slashes/unicode.
+        # Only changed string tokens are serialized; number tokens never are.
         value = json.loads(raw)
         changed = replacements.get(value, value)
         if path_pattern is not None and changed == value:
             changed = path_pattern.sub(lambda m: member_paths[m[0]], changed)
         if native is not None:
-            changed = native(changed)
+            changed = native(changed, match.start())
         if changed == value:
             return raw
         return json.dumps(changed, ensure_ascii=False, separators=(',', ':')).encode('utf8')
     return STRING.sub(replace, data)
 
 
+class UndeclaredNativeBinding(ValueError):
+    def __init__(self, binding, reason):
+        self.binding = binding
+        self.reason = reason
+        super().__init__(f'Undeclared native binding: {binding}: {reason}')
+
+
+class NativeBindingInventoryError(ValueError):
+    def __init__(self, occurrences):
+        self.occurrences = occurrences
+        super().__init__('Undeclared native bindings:\n' + json.dumps(
+            {'occurrences': occurrences}, ensure_ascii=False, indent=2))
+
+
+class ObjectPairs(list):
+    """Diagnostic-only object representation retaining duplicate members."""
+
+
 def native_mapper(mapping, archived):
     stems = {row['old_stem']: row['new_stem'] for row in mapping['identities']}
     variants = sorted(mapping['variants'], key=lambda row: -len(row['old_prefix']))
     ordered_stems = sorted(stems, key=len, reverse=True)
-    def component(value):
+    def component(value, selector=False):
         if value in stems:
             return stems[value]
         for old in ordered_stems:
             suffix = value[len(old):]
-            if value.startswith(old) and re.fullmatch(r'-[0-9]+', suffix):
+            if value.startswith(old) and ((selector and suffix == '-*') or re.fullmatch(r'-[0-9]+', suffix)):
                 return stems[old] + suffix
         for variant in variants:
             old = variant['old_prefix']
-            if value.startswith(old):
+            if value.startswith(old) and re.fullmatch(r'[a-z0-9-]*', value[len(old):]):
                 return variant['new_prefix'] + value[len(old):]
         return None
-    def translate(value):
+    def translate(value, offset=None, selector=False):
         def replace(match):
-            original = match[0]
+            # A sentence's terminating period is not a path segment. Interior
+            # periods, wildcards, @ annotations and extra segments stay whole
+            # so unsupported locators cannot be translated by partial match.
+            original = match[0].rstrip('.')
+            punctuation = match[0][len(original):]
             if original in archived:
-                return 'archived-not-current:' + original
-            assembly, part, mesh = match.groups()
-            mapped = component(part)
-            if assembly not in stems or mapped is None:
-                raise ValueError(f'Undeclared native binding: {original}')
-            return stems['harmonic-analyzer'] + '/' + stems[assembly] + '/' + mapped + (mesh or '')
+                return 'archived-not-current:' + original + punctuation
+            segments = original.split('/')[1:]
+            mesh = ''
+            if segments and MESH.fullmatch(segments[-1]):
+                mesh = '/' + segments.pop()
+            if len(segments) == 1:
+                mapped = component(segments[0], selector)
+                if mapped is not None:
+                    return stems['harmonic-analyzer'] + '/' + mapped + mesh + punctuation
+            elif len(segments) == 2:
+                assembly, part = segments
+                role = ''
+                # Actual addPartInstance locators, declared in scene.ts and its
+                # sealed historical producer; not general-purpose CAD aliases.
+                if assembly == 'paper-drive' and part in (
+                        'transgear-removable-3@upper', 'transgear-removable-3@crank'):
+                    part, role_name = part.split('@')
+                    role = '@' + role_name
+                mapped = component(part, selector)
+                if assembly in stems and mapped is not None:
+                    return stems['harmonic-analyzer'] + '/' + stems[assembly] + '/' + mapped + role + mesh + punctuation
+            raise UndeclaredNativeBinding(original, 'unsupported path form or undeclared identity segment')
         value = value.replace('/harmonic-analyzer/models/harmonic-analyzer.glb',
                               '/harmonic-analyzer/models/' + stems['harmonic-analyzer'] + '.glb')
         return NATIVE.sub(replace, value)
     return translate
+
+
+def native_string_contexts(raw):
+    """Yield decoded string-token contexts in lexical order, retaining duplicates."""
+    class NumberLexeme(str):
+        pass
+    def walk(value, path, member=None, hypothesis=False):
+        if isinstance(value, str) and not isinstance(value, NumberLexeme):
+            yield value, path, member, 'value', hypothesis
+        elif isinstance(value, ObjectPairs):
+            for index, (key, child) in enumerate(value):
+                child_path = path + '[' + json.dumps(key, ensure_ascii=False) + ']'
+                yield key, child_path, index, 'key', False
+                unbound_family = (key == 'candidatePartFamily'
+                                  and re.fullmatch(r'\$\["visibleMotionFeatures"\]\["[^"]+"\]', path) is not None
+                                  and [v for k, v in value if k == 'partPath'] == [None])
+                yield from walk(child, child_path, index, unbound_family)
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                yield from walk(child, f'{path}[{index}]')
+    yield from walk(json.loads(raw, object_pairs_hook=ObjectPairs,
+                               parse_float=NumberLexeme, parse_int=NumberLexeme), '$')
+
+
+def contextual_native_mapper(raw, source, mapping, archived):
+    translate = native_mapper(mapping, archived)
+    contexts = {}
+    tokens = list(STRING.finditer(raw))
+    decoded = list(native_string_contexts(raw))
+    require(len(tokens), len(decoded), source + ' string context inventory')
+    for token, (value, path, member, location, hypothesis) in zip(tokens, decoded):
+        require(json.loads(token[0]), value, source + ' string context order')
+        contexts[token.start()] = (path, member, location, hypothesis)
+    def transform(value, offset):
+        path, _, location, hypothesis = contexts[offset]
+        # This diagnostic schema explicitly contains family selectors rather
+        # than concrete drawable bindings, including the accompanying error.
+        selector = location == 'value' and re.fullmatch(
+            r'\$\["independentSourceCalibration"\]\["sourceNonIdentifiableFixedPartQualification"\]'
+            r'\["cases"\]\[[0-9]+\](?:\["nativePartPaths"\]\[[0-9]+\]|\["error"\])', path) is not None
+        case_name = location == 'value' and re.fullmatch(
+            r'\$\["independentSourceCalibration"\]\["sourceNonIdentifiableFixedPartQualification"\]'
+            r'\["cases"\]\[[0-9]+\]\["name"\]', path) is not None
+        if case_name and value.startswith('negative-native-'):
+            # The immutable case label embeds its nativePartPaths locator after
+            # this schema-specific prefix; it is not a general prose alias.
+            return 'negative-native-' + translate(value[len('negative-native-'):])
+        if hypothesis:
+            # Unbound candidatePartFamily is a symbolic range hypothesis, not
+            # a declared drawable. Translate only its known hierarchy; retain
+            # the historical family symbol, never invent a CAD identity.
+            stems = {row['old_stem']: row['new_stem'] for row in mapping['identities']}
+            def family(match):
+                binding = match[0].rstrip('.')
+                grammar = re.fullmatch(
+                    r'harmonic-analyzer/([a-z0-9-]+)/([a-z0-9-]+)-([0-9]+)\.\.([0-9]+)', binding)
+                if grammar is None or grammar[1] not in stems or int(grammar[3]) > int(grammar[4]):
+                    raise UndeclaredNativeBinding(binding, 'unsupported unbound family selector grammar')
+                return (stems['harmonic-analyzer'] + '/' + stems[grammar[1]] + '/'
+                        + grammar[2] + '-' + grammar[3] + '..' + grammar[4]
+                        + match[0][len(binding):])
+            return NATIVE.sub(family, value)
+        return translate(value, selector=selector)
+    return transform, contexts
+
+
+def native_binding_occurrences(raw, source, mapping, archived):
+    """Inventory only; the lexical raw-token transformer authors output bytes."""
+    translate, contexts = contextual_native_mapper(raw, source, mapping, archived)
+    occurrences = []
+    for token in STRING.finditer(raw):
+        path, member, location, _ = contexts[token.start()]
+        for match in NATIVE.finditer(json.loads(token[0])):
+            try:
+                translate(match[0], token.start())
+            except UndeclaredNativeBinding as error:
+                occurrence = {'sourcePacket': source, 'jsonPath': path,
+                              'binding': error.binding, 'reason': error.reason,
+                              'location': location}
+                if member is not None:
+                    occurrence['objectMemberIndex'] = member
+                occurrences.append(occurrence)
+    return occurrences
 
 
 def require(actual, expected, label):
@@ -135,6 +264,12 @@ def replay(manifest, mapping_bytes):
                                      if m[0][1:-1].decode('ascii') in by_sha})
     for row in manifest['historicalCodeSnapshots']:
         require(digest(file_path(row['path']).read_bytes()), row['sha256'], row['path'] + ' historical SHA')
+    occurrences = []
+    for row in sorted(rows, key=lambda row: row['originalPath']):
+        occurrences.extend(native_binding_occurrences(
+            originals[row['path']], row['originalPath'], mapping, set(row['archivedNativeBindings'])))
+    if occurrences:
+        raise NativeBindingInventoryError(occurrences)
     outputs = {}
     pending = list(rows)
     while pending:
@@ -152,7 +287,8 @@ def replay(manifest, mapping_bytes):
                 parent = next(r for r in rows if r['path'] == dependency)
                 replacements[parent['originalSha256']] = digest(outputs[dependency])
                 historical[parent['originalPath']] = parent['originalSha256']
-            body = strings(raw, replacements, native_mapper(mapping, set(row['archivedNativeBindings'])))
+            translate, _ = contextual_native_mapper(raw, row['originalPath'], mapping, set(row['archivedNativeBindings']))
+            body = strings(raw, replacements, translate)
             require(numbers(body), row['originalNumericLexemeSha256'], name + ' derivative numeric seal')
             header = {
                 'kind': 'materialized-canonical-native-identity-derivative',
@@ -226,20 +362,29 @@ def main():
         manifest['mappingSha256'] = digest(mapping_bytes)
         for row in manifest['derivatives']:
             row['sha256'] = digest(outputs[row['path']])
+        manifest['canonicalConsumerHashNormalization'] = CONSUMER_NORMALIZATION
         for row in manifest['canonicalConsumerInputs']:
-            row['sha256'] = digest(file_path(row['path']).read_bytes())
+            row['sha256'] = consumer_digest(file_path(row['path']).read_bytes())
+            row['scope'] = SCOPE
         file_path(MANIFEST).write_bytes((json.dumps(manifest, indent=2) + '\n').encode('utf8'))
     else:
         require(digest(mapping_bytes), manifest['mappingSha256'], 'mapping SHA')
+        require(manifest['canonicalConsumerHashNormalization'], CONSUMER_NORMALIZATION,
+                'current consumer hash normalization')
+        mismatches = []
         for row in manifest['derivatives']:
             data = file_path(row['path']).read_bytes()
-            require(digest(data), row['sha256'], row['path'] + ' derivative SHA')
+            if digest(data) != row['sha256']:
+                mismatches.append(row['path'] + ': derivative SHA differs')
             if data != outputs[row['path']]:
-                raise ValueError(row['path'] + ': deterministic byte replay differs')
+                mismatches.append(row['path'] + ': deterministic byte replay differs')
+        if mismatches:
+            raise ValueError('\n'.join(mismatches))
         if updates:
             raise ValueError('Stale current consumer pins: ' + ', '.join(updates))
         for row in manifest['canonicalConsumerInputs']:
-            require(digest(file_path(row['path']).read_bytes()), row['sha256'], row['path'] + ' current consumer SHA')
+            require(consumer_digest(file_path(row['path']).read_bytes()), row['sha256'],
+                    row['path'] + ' normalized current consumer SHA')
     print(f'{args.command}: {len(outputs)} identity derivatives; immutable/numeric/current seals checked; no geometry qualification')
 
 

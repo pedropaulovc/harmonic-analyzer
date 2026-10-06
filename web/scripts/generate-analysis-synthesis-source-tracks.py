@@ -52,25 +52,25 @@ common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
 ANALYSIS = "web/content/canonical-native/analysis-recovery-calibration-evidence/four-seed-source-fit-census"
 CALIBRATION = "web/content/canonical-native/analysis-synthesis.frozen-generation-evidence.json"
-CALIBRATION_SHA256 = "bb90174f9cde0af041411ad0a10a4f6180f872f1f8bf6f100713cf10f0dcdc07"
+CALIBRATION_SHA256 = "17ee12cb004eacb839b6f54deca609c66568c66574348361f88da9eca37e8d96"
 FRAMING_GPU = "web/content/canonical-native/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
-FRAMING_GPU_SHA256 = "3494957dca0a4f25cab012212fc2187add6739a248899b27b5c2880e50c18480"
+FRAMING_GPU_SHA256 = "3fd41a1048d1c265d2258741e0c23041d8701354926cc474e15e59dea93e3c33"
 AUTOMATIC_MOTION = "web/content/canonical-native/6dW6VYXp9HM.automatic-motion.json"
-AUTOMATIC_MOTION_SHA256 = "18dfae8b7d3b4f91043b3a4e85bd4fd36433688fcf342e2ab5f999ecff0b84dc"
+AUTOMATIC_MOTION_SHA256 = "567e95075e1c377c4da50594e451f1b65554b35899ec4617d1b0e876f03e61e9"
 MOTION_CONTROLS = "web/content/canonical-native/6dW6VYXp9HM.motion-controls.json"
-MOTION_CONTROLS_SHA256 = "ed4e1a527f5e6e20e8d73e5a858d9032effb45d8ecb7b64602c633579976802a"
+MOTION_CONTROLS_SHA256 = "449200f16562037b2abdecb642906bdfa7c4925c7a88bf1c25a6b33581bd0f38"
 VISIBLE_CRANK_MOTION = "web/content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json"
-VISIBLE_CRANK_MOTION_SHA256 = "477396926f25f5d422f9664cdeb404e4c27ac06542c5f7d1f0e1af01c852dcac"
+VISIBLE_CRANK_MOTION_SHA256 = "cb822c8bf6e76c78d83c655f40bcf40d78cd295d0b38617543ac2ce6b97df91c"
 VISIBLE_CRANK_GAUGE = "web/content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json"
-VISIBLE_CRANK_GAUGE_SHA256 = "7269b541fd6561818807953dbbb2ef3c80b0fdc65924777836706e44bd3725bc"
+VISIBLE_CRANK_GAUGE_SHA256 = "b5d790f41128d0acec4f13d7d604c9af72ed41446deb52442e903aff828ad50f"
 ANALYSIS_SOURCE_SHA256 = "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52"
 ANALYSIS_MODEL_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
 AUTOMATIC_NATIVE_MATH = ("web/src/mechanics.ts", "web/src/mechanics-data.ts",
                          "web/src/kinematics.ts", "web/src/magnifier.ts")
 SYNTHESIS_AUTOMATIC_MOTION = "web/content/canonical-native/8KmVDxkia_w.automatic-motion.json"
-SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "408cfbfea17b5eafbe29a74e475a818fc23e77be2ac6594f0a67e3112a05772e"
+SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "d049a9528092198a4321545a9f3e0d7559bed1baef1d348f44bccba459ea6db1"
 SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json"
-SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "5c1d620e6e7cdbfe6fdb4f7322d7176690f69df0a645f07777ea884cdcba484b"
+SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "4536dd456352d23817eed6ee93790c0a62602816726ef5432de50161e55ccee7"
 SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
 
 
@@ -382,6 +382,7 @@ class Generator:
                 or not math.isclose(shot["endSeconds"],124.49103333333333,abs_tol=1e-9,rel_tol=0.)):
             raise ValueError("Analysis automatic motion must end inside the unchanged analysis-22 shot.")
         smoke = packet["diagnostics"]["nativeForwardSmoke"]
+        # Replay the original forward proof; this does not qualify current math.
         hashes = smoke["nativeMathSha256"]
         if (set(hashes) != set(AUTOMATIC_NATIVE_MATH)
                 or smoke["status"] != "all-native-inputs-solved" or smoke["sourceExposures"] != 204
@@ -502,6 +503,7 @@ class Generator:
                 or qualification["sourceSelectedNativeSign"] is not None
                 or qualification["sourceAbsoluteNativeHomeTurns"] is not None):
             raise ValueError("Analysis visible crank gauge must remain a chosen, shot-local native association.")
+        # This sealed winding proof describes the original producer only.
         hashes = gauge["nativeMathSha256"]
         if (set(hashes) != set(AUTOMATIC_NATIVE_MATH)
                 or any(hashlib.sha256(common.historical_code_bytes(path, hashes[path])).hexdigest() != hashes[path]
@@ -542,6 +544,7 @@ class Generator:
                        for key,value in zip(("startSeconds","endSeconds"),interval["shotBoundsSeconds"]))):
             raise ValueError("Analysis visible crank authority requires the unchanged original shot.")
         lineage = packet["lineage"]
+        # Extraction lineage is historical, not a current geometry qualification.
         for prefix in ("nativeGeometry","kinematics"):
             path = lineage[f"{prefix}Path"]
             expected = "web/src/mechanics-data.ts" if prefix == "nativeGeometry" else "web/src/kinematics.ts"
@@ -583,7 +586,7 @@ class Generator:
             raise ValueError("Analysis visible crank source-relative zero/domain changed.")
 
     def synthesis_automatic_motion_packet(self):
-        """Bind new motion authority without rewriting historical source/code seals."""
+        """Require current-root dependency bytes without rewriting original seals."""
         try:
             packet, packet_hash = load_pinned(SYNTHESIS_AUTOMATIC_MOTION,
                 SYNTHESIS_AUTOMATIC_MOTION_SHA256, "Synthesis automatic motion")
@@ -608,7 +611,7 @@ class Generator:
             raise ValueError("Synthesis automatic native-math/evidence dependency census differs")
         for path, record in dependencies.items():
             try:
-                actual = hashlib.sha256((ROOT/path).read_bytes() if path.startswith("web/content/canonical-native/") else common.historical_code_bytes(path, record["sha256"])).hexdigest()
+                actual = hashlib.sha256((ROOT/path).read_bytes()).hexdigest()
             except OSError as error:
                 raise ValueError(f"Synthesis automatic dependency unavailable: {path}") from error
             if actual != record["sha256"]:
@@ -1035,7 +1038,7 @@ class Generator:
         path = "web/content/canonical-native/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
         raw = (ROOT / path).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
-        if digest != "1a307a1b1675ebf6d5bc931e2d70a906e8921a04ba14032d40306970f9e6d707":
+        if digest != "7d47b6b3774dd9113620a9ab835bef26174c337acac8e1030cb707c9ba38ece4":
             raise ValueError("Chosen cam-rod physical probe artifact changed")
         probe = json.loads(raw)
         lineage = probe["lineage"]
@@ -1043,9 +1046,13 @@ class Generator:
         receipt_path = "web/content/canonical-native/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json"
         receipt_raw = (ROOT / receipt_path).read_bytes()
         receipt_hash = hashlib.sha256(receipt_raw).hexdigest()
-        if receipt_hash != receipt_record["sha256"] or receipt_hash != "2015fedf072a0c080ca3ecabc328e1ef38622f667e0b1f4d2a5d50783e428c8e":
+        if receipt_hash != receipt_record["sha256"] or receipt_hash != "83c3a1f00cc5414b3edaa2fd62e72de437f4d7adb756263139671abb0f57033c":
             raise ValueError("Chosen cam-rod actual world receipt changed")
         receipt = json.loads(receipt_raw)
+        try:
+            scene_hash = hashlib.sha256((ROOT / "web/src/scene.ts").read_bytes()).hexdigest()
+        except OSError as error:
+            raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs: current scene unavailable") from error
         if (probe["status"] != "candidate-enumeration-only"
                 or probe["selection"] != "none; retain every returned pose; CHECK not evaluated"
                 or probe["chosenIntrinsics"]["verticalFovDegrees"] != 30
@@ -1055,7 +1062,7 @@ class Generator:
                 or lineage["nativeModelSha256"] != self.native["modelSha256"]
                 or lineage["nativeDenominator"] != 435
                 or lineage["originalLandmarks"] != previous["originalLandmarks"]
-                or lineage["sceneCurrentSourceSha256"] != hashlib.sha256(common.historical_code_bytes("web/src/scene.ts", lineage["sceneCurrentSourceSha256"])).hexdigest()):
+                or lineage["sceneCurrentSourceSha256"] != scene_hash):
             raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs")
         frame = next(frame for frame in self.data["frames"]
                      if frame["shotId"] == "cam-rod" and frame["timeSeconds"] == 100)

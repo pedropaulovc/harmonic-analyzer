@@ -85,14 +85,47 @@ uv run --isolated --no-project python scripts/canonical-native-evidence.py gener
 ```
 
 `verify:sync` runs the identity evidence check first. Both read-only commands
-check original, derivative, historical-snapshot and current-consumer SHA-256
-seals, original numeric-token certificates, dependency pins and deterministic
+check exact original, derivative and historical-snapshot SHA-256 seals,
+CRLF-to-LF-normalized current-consumer input seals, original numeric-token
+certificates, dependency pins and deterministic
 replay. `generate` rewrites only declared derivatives, current SHA pins and
 the manifest's existing seals. JSON numbers are never parsed as floating-point
 values; all original numeric lexemes remain byte-identical. The six observation
 derivatives additionally remove only JSON whitespace outside quoted strings and
 have exactly one EOF newline. Evidence paths are translated only for declared
 manifest members; authored source tracks remain directly under `content/`.
+Sealed canonical files are exempt from Git newline conversion. Replay preserves
+the original non-observation whitespace bytes; observation packets use the
+compact LF form above. Do not convert sealed derivatives to checkout-native
+CRLF: dependency SHA pins refer to their exact replay bytes.
+The manifest explicitly declares `canonicalConsumerHashNormalization` as
+`CRLF-to-LF` for editable current code/data inputs only. Their hashes certify
+the normalized text, not checkout byte identity. Original evidence, historical
+snapshots, mapping bytes and derivative dependency pins are never normalized.
+
+Native bindings use explicit root/component or root/assembly/component forms,
+with optional structural `/mesh` or indexed `/mesh_N` leaves. Identity and
+instance suffix translation uses the sole map; unsupported segments fail closed.
+The qualification-case `nativePartPaths`/error fields may contain mapped-stem
+`-*` family selectors, not concrete drawables. An unbound visible-motion feature
+(`partPath: null`) may retain a well-formed numeric `candidatePartFamily` range:
+only its declared root/assembly translate; its opaque historical family symbol
+is not promoted to a current part identity. The source-backed spare-sprocket
+`@upper`/`@crank` consumer-instance suffixes remain intact. These semantic forms
+do not permit unknown concrete `partPath` bindings or general suffix aliases.
+Qualification-case `negative-native-` names embed the corresponding native
+locator after that schema-specific prefix and translate it as a concrete
+binding. Historical localhost web-route commands are not native CAD locators
+and retain their original route spelling.
+Before replay returns any output (and before `generate` writes), all 29 original
+members are inventoried. One failure packet lists every undeclared occurrence
+in source-path/traversal order with its exact JSONPath, binding and reason;
+duplicate object members and occurrences remain distinct. Keys and values are
+decoded for escaped slashes. This diagnostic walk retains numeric lexemes as
+strings and never authors JSON; output still uses lexical string-token rewrites.
+Only exact existing archived-binding entries receive `archived-not-current:`.
+Byte-replay failures list every mismatching derivative path, rather than
+stopping at the first packet.
 
 These certificates establish identity/provenance preservation, **not** fresh
 geometry, source-camera or browser qualification. A real canonical CAD export,
@@ -295,6 +328,19 @@ The [derivative manifest](content/canonical-native/manifest.json) records each
 derivative and original SHA-256, mapping revision and digest, preserved numeric
 tokens, and sealed historical-code snapshots. Those code seals establish
 original lineage only. They do not qualify the current renderer or CAD.
+Analysis's native forward-smoke, visible-crank winding proof and extraction-lineage
+code seals verify their original historical producers, not today's native math.
+Missing, unreadable or modified historical snapshots reject with `ValueError`.
+Synthesis's automatic-motion `generationDependencies`, by contrast, require exact
+current bytes at the intended generation root, including all three native-math
+files and the motion producer script. Its cam-rod `sceneCurrentSourceSha256` also
+checks that root's actual `web/src/scene.ts`: even cosmetic byte changes require
+new bound GPU evidence. These gates do not use historical snapshots or the
+manifest's normalized consumer seals as substitutes for current source.
+Historical behavioral fixtures scope the exact archived scene and all four
+producer/math sources to those intended source paths, for both byte and text
+reads. They leave original packets and receipt seals untouched and replay only
+original evidence; they do not approve the current scene, math, model or GPU.
 Original private capture paths and observation hashes remain provenance links,
 not regeneration dependencies; no source video or screenshots are included.
 Capture-bound renderer and model hashes remain strict. Canonical farm GLB
@@ -352,9 +398,9 @@ all twenty spring lengths changed independently. Three continuous original-MP4
 Analysis/Synthesis clips had no stall, pause or error events; the maximum
 video/completed-draw delta was 54.341 ms after an explicit initial 0.1-second
 startup exclusion. This is not an FPS measurement or a new source calibration.
-The 49 source regressions pass using a historical source fixture; production
-camrod's current-code guard still refuses the old scene receipt. No historical
-receipt was rehashed or accepted as fresh calibration.
+Source-regression replay uses explicit historical source fixtures; production
+cam-rod and automatic-motion current-code guards still refuse stale evidence.
+No historical receipt is rehashed or accepted as fresh calibration.
 The 33 model tests pass, including real-exporter acceptance of compatible future
 geometry and rejection of unsupported ratio, pitch, feed-sign and spring-profile
 changes before publication. A current raw reimport reproduced the same optimized

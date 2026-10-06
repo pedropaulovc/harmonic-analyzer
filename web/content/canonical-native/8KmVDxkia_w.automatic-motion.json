@@ -23,7 +23,7 @@
   },
   "generationDependencies": {
     "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json": {
-      "sha256": "5c1d620e6e7cdbfe6fdb4f7322d7176690f69df0a645f07777ea884cdcba484b"
+      "sha256": "4536dd456352d23817eed6ee93790c0a62602816726ef5432de50161e55ccee7"
     },
     "web/src/mechanics-data.ts": {
       "sha256": "e8fe87dfd899b6ea08ea7f7ce133e633fbf871ca7c24aed3885f6f507ef78285"

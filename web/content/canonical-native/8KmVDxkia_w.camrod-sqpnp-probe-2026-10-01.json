@@ -163,7 +163,7 @@
     },
     "actualWorldReceipt": {
       "path": "web/.vite/verification-output/synthesis-camrod-native-world-receipt-2026-10-01.json",
-      "sha256": "2015fedf072a0c080ca3ecabc328e1ef38622f667e0b1f4d2a5d50783e428c8e"
+      "sha256": "83c3a1f00cc5414b3edaa2fd62e72de437f4d7adb756263139671abb0f57033c"
     },
     "timeSeconds": 100,
     "decodedTimeSeconds": 100.01658333333333,

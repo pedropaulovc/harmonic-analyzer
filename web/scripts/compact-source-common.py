@@ -40,10 +40,13 @@ def historical_code_bytes(path, expected_sha256):
     These bytes establish only original evidence lineage. They do not qualify
     canonical geometry, current code, or a new GPU/source comparison.
     """
-    if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
+    if not isinstance(expected_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
         raise ValueError("Historical code evidence requires a SHA256 seal")
     snapshot = WEB / "content/canonical-native/historical-code" / expected_sha256 / Path(path).name
-    raw = snapshot.read_bytes()
+    try:
+        raw = snapshot.read_bytes()
+    except OSError as error:
+        raise ValueError(f"Historical producer snapshot unavailable: {path}") from error
     if hashlib.sha256(raw).hexdigest() != expected_sha256:
         raise ValueError(f"Historical producer snapshot changed: {path}")
     return raw

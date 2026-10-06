@@ -16784,10 +16784,10 @@
     },
     "independentSourcePhaseMap": {
       "path": "web/content/canonical-native/XPQwKRt4Y2k.source-phase-map.json",
-      "sha256": "f8cf7e6ae543a8efa2ca10bfcbda429004bb8ded212f019f24cec5ed1b17269d",
+      "sha256": "6e315044a40d927307de88e14fd377014e7e4629ab01e78364064c4c8b633e59",
       "originalArtifact": {
         "path": "web/.vite/verification-output/spin-witness/rig-replay/actual-phase-map.json",
-        "sha256": "f8cf7e6ae543a8efa2ca10bfcbda429004bb8ded212f019f24cec5ed1b17269d"
+        "sha256": "6e315044a40d927307de88e14fd377014e7e4629ab01e78364064c4c8b633e59"
       },
       "sourceExposureIdentityCount": 2698
     },

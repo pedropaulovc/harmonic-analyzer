@@ -3,6 +3,7 @@ import copy
 from contextlib import contextmanager
 import importlib.util
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -34,31 +35,46 @@ HISTORICAL_SCENE_SHA256 = '7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b57
 
 def historical_scene_bytes():
     # Exact git blob cad3a39e17fe912b8143e6ed4ed9946cfe6869a1 from
-    # 1af315999:web/src/scene.ts; portable even in archives/shallow checkouts.
-    data = (HERE / 'fixtures/camrod-scene-7b28468c.ts.txt').read_bytes()
-    if hashlib.sha256(data).hexdigest() != HISTORICAL_SCENE_SHA256:
-        raise ValueError('Historical scene replay fixture changed')
-    return data
+    # 1af315999:web/src/scene.ts, retained in the sealed canonical archive.
+    return common.historical_code_bytes('web/src/scene.ts', HISTORICAL_SCENE_SHA256)
 
 
 @contextmanager
-def replay_scene_bytes(data):
-    """Test-only source filesystem fixture, never a digest/receipt override."""
-    scene_path = camera_tracks.WEB / 'content/canonical-native/historical-code' / HISTORICAL_SCENE_SHA256 / 'scene.ts'
-    read_bytes = Path.read_bytes
+def replay_source_bytes(sources):
+    """Scope actual source bytes to intended ROOT paths, never override seals."""
+    fixtures = {camera_tracks.ROOT / relative: data for relative, data in sources.items()}
+    read_bytes, read_text = Path.read_bytes, Path.read_text
 
     def read_source(path):
-        return data if path == scene_path else read_bytes(path)
+        return fixtures[path] if path in fixtures else read_bytes(path)
 
-    with patch.object(Path, 'read_bytes', read_source):
+    def read_source_text(path, encoding=None, errors=None, **kwargs):
+        if path not in fixtures:
+            return read_text(path, encoding=encoding, errors=errors, **kwargs)
+        with io.TextIOWrapper(io.BytesIO(fixtures[path]), encoding=encoding,
+                              errors=errors, **kwargs) as source:
+            return source.read()
+
+    with patch.object(Path, 'read_bytes', read_source), \
+            patch.object(Path, 'read_text', read_source_text):
         yield
 
 
+def historical_synthesis_dependencies():
+    """Exact old producer/math bytes, not a claim about today's source files."""
+    packet = json.loads((HERE.parent / 'content/canonical-native/8KmVDxkia_w.automatic-motion.json').read_bytes())
+    return {path: common.historical_code_bytes(path, record['sha256'])
+            for path, record in packet['generationDependencies'].items()
+            if not path.startswith('web/content/')}
+
+
 def historical_synthesis_generator():
-    # These behavioral tests replay retained source/input calibration. They do
-    # not observe today's renderer, approve its model, or refresh GPU evidence.
-    # Run the real constructor/guards against the original sealed source bytes.
-    with replay_scene_bytes(historical_scene_bytes()):
+    # Replay retained source/input calibration, not current renderer/model/GPU
+    # approval. The constructor reads all four code dependencies plus scene.ts;
+    # both byte seals and native-data text see the same actual archived bytes.
+    sources = historical_synthesis_dependencies()
+    sources['web/src/scene.ts'] = historical_scene_bytes()
+    with replay_source_bytes(sources):
         return camera_tracks.Generator('8KmVDxkia_w')
 
 
@@ -649,6 +665,24 @@ class AnalysisAutomaticMotionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     generator.validate_analysis_automatic_motion(packet, controls)
 
+        proof_path = 'web/src/mechanics.ts'
+        hashes = self.packet['diagnostics']['nativeForwardSmoke']['nativeMathSha256']
+        for missing in (False, True):
+            with self.subTest(historical_snapshot='missing' if missing else 'modified'), \
+                    tempfile.TemporaryDirectory() as directory:
+                web = Path(directory)
+                for path, digest in hashes.items():
+                    if path == proof_path and missing:
+                        continue
+                    target = web / 'content/canonical-native/historical-code' / digest / Path(path).name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    raw = common.historical_code_bytes(path, digest)
+                    target.write_bytes(raw + b'\n' if path == proof_path else raw)
+                reason = 'unavailable' if missing else 'changed'
+                with patch.object(camera_tracks.common, 'WEB', web), \
+                        self.assertRaisesRegex(ValueError, f'Historical producer snapshot {reason}: {proof_path}$'):
+                    self.generator.validate_analysis_automatic_motion(self.packet, self.controls)
+
     def test_runtime_native_identity_or_camera_mismatch_cannot_borrow_fitted_drive(self):
         for mismatch in ('hash', 'pts', 'camera'):
             with self.subTest(mismatch=mismatch):
@@ -1093,13 +1127,15 @@ class SynthesisAutomaticSourceDriveCurrentOnlyTests(unittest.TestCase):
                 self.assertAlmostEqual(value['crankTurns'], knots[row['timeSeconds']], places=10)
 
         paths = [camera_tracks.SYNTHESIS_AUTOMATIC_MOTION, *packet['generationDependencies']]
+        sealed_sources = historical_synthesis_dependencies()
         for mismatch in ('h1-exposure-authority', 'h1-disjoint-time', 'h20-fit-overlap'):
             with self.subTest(mismatch=mismatch), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 for relative in paths:
                     target = root / relative
                     target.parent.mkdir(parents=True, exist_ok=True)
-                    target.write_bytes((camera_tracks.ROOT / relative).read_bytes())
+                    target.write_bytes(sealed_sources[relative] if relative in sealed_sources
+                                       else (camera_tracks.ROOT / relative).read_bytes())
                 changed_packet, changed_evidence = copy.deepcopy(packet), copy.deepcopy(evidence)
                 expected_error = 'H1 CHECK feature-pixel holdout'
                 if mismatch == 'h1-exposure-authority':
@@ -1151,31 +1187,49 @@ class SynthesisAutomaticSourceDriveCurrentOnlyTests(unittest.TestCase):
                             frame['sourceImage']['sha256Bgr8'] = '0' * 64
                         else:
                             frame['decodedTimeSeconds'] += 0.001
-                with self.assertRaises(ValueError):
+                with replay_source_bytes(historical_synthesis_dependencies()), self.assertRaises(ValueError):
                     generator.synthesis_automatic_motion_packet()
 
     def test_current_only_missing_motion_and_changed_native_math_never_fall_back_to_old_fold(self):
         generator = self.fixture(load_motion=False)
         packet = json.loads((camera_tracks.ROOT / camera_tracks.SYNTHESIS_AUTOMATIC_MOTION).read_text())
         paths = [camera_tracks.SYNTHESIS_AUTOMATIC_MOTION, *packet['generationDependencies']]
-        for mismatch in ('missing-motion', 'changed-native-math'):
+        sealed_sources = historical_synthesis_dependencies()
+        changed_paths = {
+            'changed-native-math': 'web/src/mechanics.ts',
+            'changed-native-data': 'web/src/mechanics-data.ts',
+            'changed-kinematics': 'web/src/kinematics.ts',
+            'changed-motion-producer': 'web/scripts/generate-8KmVDxkia_w-automatic-motion.py',
+        }
+        for mismatch in ('missing-motion', 'missing-native-math', *changed_paths):
             with self.subTest(mismatch=mismatch), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                if mismatch == 'changed-native-math':
+                expected_error = 'Required Synthesis automatic motion/evidence unavailable'
+                if mismatch != 'missing-motion':
+                    # Every other dependency starts with its exact declared bytes;
+                    # refusal must identify this mutation, not unrelated live drift.
                     for relative in paths:
+                        if mismatch == 'missing-native-math' and relative == 'web/src/mechanics.ts':
+                            continue
                         target = root / relative
                         target.parent.mkdir(parents=True, exist_ok=True)
-                        target.write_bytes((camera_tracks.ROOT / relative).read_bytes())
-                    native_math = root / 'web/src/mechanics.ts'
-                    native_math.write_bytes(native_math.read_bytes() + b'\n')
-                with patch.object(camera_tracks, 'ROOT', root), self.assertRaises(ValueError):
+                        target.write_bytes(sealed_sources[relative] if relative in sealed_sources
+                                           else (camera_tracks.ROOT / relative).read_bytes())
+                    if mismatch == 'missing-native-math':
+                        expected_error = 'Synthesis automatic dependency unavailable: web/src/mechanics.ts'
+                    else:
+                        changed_path = changed_paths[mismatch]
+                        dependency = root / changed_path
+                        dependency.write_bytes(dependency.read_bytes() + b'\n')
+                        expected_error = f'Synthesis automatic native-math dependency differs: {changed_path}'
+                with patch.object(camera_tracks, 'ROOT', root), self.assertRaisesRegex(ValueError, expected_error):
                     generator.synthesis_automatic_motion_packet()
 
 
 class CamrodRendererLineageTests(unittest.TestCase):
     def test_historical_replay_does_not_approve_current_scene(self):
         generator = historical_synthesis_generator()
-        current_scene = (camera_tracks.WEB / 'src/scene.ts').read_bytes()
+        current_scene = (camera_tracks.ROOT / 'web/src/scene.ts').read_bytes()
         self.assertNotEqual(hashlib.sha256(current_scene).hexdigest(), HISTORICAL_SCENE_SHA256)
         # No filesystem fixture here: the real live source seal must refuse
         # the historical GPU packet even when unrelated replay tests pass.
@@ -1184,7 +1238,7 @@ class CamrodRendererLineageTests(unittest.TestCase):
 
     def test_even_cosmetic_source_change_requires_new_gpu_evidence(self):
         generator = historical_synthesis_generator()
-        with replay_scene_bytes(historical_scene_bytes() + b'\n'), \
+        with replay_source_bytes({'web/src/scene.ts': historical_scene_bytes() + b'\n'}), \
                 self.assertRaisesRegex(ValueError, 'source/native/code/intrinsics lineage differs'):
             generator.synthesis_coarse_framing_packet()
 
