@@ -124,6 +124,9 @@ class NativeInventoryTests(unittest.TestCase):
                 projection["identity"]["canonicalSha256"] = "f" * 64
             else:
                 projection["identity"]["mapSha256"] = "f" * 64
+                approved = copy.deepcopy(self.approved)
+                approved["identity"]["mapSha256"] = projection["identity"]["mapSha256"]
+                overrides["approved"] = approved
             with self.subTest(boundary=boundary), self.assertRaises(ValueError):
                 self.assemble(**overrides)
 
@@ -172,6 +175,108 @@ class NativeInventoryTests(unittest.TestCase):
                 self.assertEqual(refusal.exception.code, 2)
             self.assertEqual(model.read_bytes(), original)
             self.assertEqual(alias.read_bytes(), original)
+
+    def test_output_aliases_preserve_other_artifacts_and_publish_consumable_inventory(self):
+        fitter = load_script("fit-source.py", "native_inventory_alias_fitter")
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            original = directory / "other-artifact"
+            original.write_bytes(b"Independent artifact, not an exporter input\n")
+            original_bytes = original.read_bytes()
+            authority = {"projection": self.projection, "approved": self.approved}
+            for kind in ("hardlink", "symlink"):
+                output = directory / f"{kind}.json"
+                if kind == "hardlink":
+                    output.hardlink_to(original)
+                else:
+                    output.symlink_to(original)
+                arguments = ["export-native-inventory.py", "--model", str(self.model),
+                             "--source-commit", self.commit, "--expected-model-sha256", self.digest,
+                             "--output", str(output)]
+                with self.subTest(kind=kind), patch.object(exporter, "native_authority", return_value=authority):
+                    with patch("sys.argv", arguments), contextlib.redirect_stdout(io.StringIO()):
+                        exporter.main()
+                    self.assertEqual(original.read_bytes(), original_bytes)
+                    self.assertFalse(output.is_symlink())
+                    self.assertFalse(output.samefile(original))
+                    point = fitter.world_points({
+                        "model": {"sha256": self.digest},
+                        "anchors": [{"id": "alias-witness",
+                                     "partPath": "ha-harmonic-analyzer/mg-magnifier/mg-magnifying-lever-1",
+                                     "partLocalMetres": [1, 2, 0],
+                                     "correspondenceEvidence": "Synthetic transform-order control"}],
+                    }, json.loads(output.read_text()))["alias-witness"]
+                    for actual, expected in zip(point, [-4, 6, 3]):
+                        self.assertAlmostEqual(actual, expected, places=12)
+
+    def test_failed_publication_preserves_previous_inventory_and_removes_candidates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "inventory.json"
+            previous = json.dumps(self.assemble()).encode()
+            output.write_bytes(previous)
+            real_temporary_file = exporter.tempfile.NamedTemporaryFile
+
+            @contextlib.contextmanager
+            def interrupted_write(*args, **kwargs):
+                with real_temporary_file(*args, **kwargs) as stream:
+                    class Interrupted:
+                        name = stream.name
+
+                        def write(self, text):
+                            stream.write(text[:len(text) // 2])
+                            stream.flush()
+                            raise OSError("Injected partial disk write")
+                    yield Interrupted()
+
+            for failure in ("write", "replace"):
+                injection = (patch.object(exporter.tempfile, "NamedTemporaryFile", interrupted_write)
+                             if failure == "write" else
+                             patch.object(exporter.os, "replace", side_effect=OSError("Injected replace failure")))
+                with self.subTest(failure=failure), injection, self.assertRaises(OSError):
+                    exporter.publish_inventory(output, json.dumps(self.assemble(), indent=2))
+                self.assertEqual(output.read_bytes(), previous)
+                self.assertEqual(set(output.parent.iterdir()), {output})
+
+    def test_census_bytes_cannot_be_paired_with_later_transform_digest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            model = directory / "changing.glb"
+            replacement = directory / "replacement.glb"
+            output = directory / "inventory.json"
+            write_fixture(model, self.document)
+            changed = copy.deepcopy(self.document)
+            changed["meshes"][0]["primitives"].append({"attributes": {"POSITION": 0}})
+            write_fixture(replacement, changed)
+            projection = json.loads(subprocess.check_output(
+                ["node", str(HERE / "native-identity-map.mjs"), "--model", str(replacement), "--paths-only"],
+                text=True,
+            ))
+            approved = copy.deepcopy(self.approved)
+            approved["source"]["sha256"] = projection["rawSha256"]
+            approved["identity"] = projection["identity"]
+            # Match every later-byte identity gate, but keep the old drawable approval.
+            # An unbound first census would incorrectly publish this mixed-byte inventory.
+            authority = {"projection": projection, "approved": approved}
+            previous = json.dumps(self.assemble()).encode()
+            output.write_bytes(previous)
+            original_glb_nodes = exporter.glb_nodes
+
+            def rewrite_before_transform_read(path):
+                path.write_bytes(replacement.read_bytes())
+                return original_glb_nodes(path)
+
+            arguments = ["export-native-inventory.py", "--model", str(model),
+                         "--source-commit", self.commit, "--expected-model-sha256", projection["rawSha256"],
+                         "--output", str(output)]
+            with patch.object(exporter, "native_authority", return_value=authority):
+                with patch.object(exporter, "glb_nodes", side_effect=rewrite_before_transform_read):
+                    with patch("sys.argv", arguments), contextlib.redirect_stderr(io.StringIO()):
+                        with self.assertRaises(SystemExit) as refusal:
+                            exporter.main()
+            self.assertEqual(refusal.exception.code, 2)
+            self.assertEqual(model.read_bytes(), replacement.read_bytes())
+            self.assertEqual(output.read_bytes(), previous)
+            self.assertEqual(set(directory.iterdir()), {model, replacement, output})
 
     def test_malformed_transforms_are_rejected_not_repaired_or_defaulted(self):
         identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]

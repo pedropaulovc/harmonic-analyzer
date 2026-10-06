@@ -84,6 +84,9 @@ redistribute the footage.
 native rest matrices under canonical qualified paths. It independently checks
 the release pair, v2 approval, sole identity map and canonical digest. The raw
 GLB and CAD tree remain read-only, including hard-linked output aliases.
+Publication replaces the destination entry atomically, preserving any other
+hard-link or symlink targets and the previous inventory if writing fails.
+The bytes used for the mesh census are digest-bound to the transform input.
 
 ```sh
 # From the repository root; the approved raw GLB remains private.
@@ -103,6 +106,9 @@ part-local-metres to native-world-metres, and checks the original raw-model
 digest before using any landmark. This inventory does not supply source
 observations, camera calibration, motion evidence, historical bounds or
 source-fidelity qualification.
+General affine matrices remain unchanged. The v39 rest matrices are rigid within
+1e-6 orthogonality/determinant tolerance; rotational overrides in the fitter
+assume rigid rest transforms and are not qualified for scaled or sheared inputs.
 
 The inventory tests are enrolled in `test:model`. They are web-only tooling,
 not CAD/doit tests; their independent transform and immutable-input controls

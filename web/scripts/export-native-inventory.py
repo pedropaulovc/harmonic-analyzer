@@ -20,11 +20,14 @@ consumer, so no historical bounds or derived world landmarks are emitted.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import struct
 import subprocess
+import tempfile
 
 from native_identity_source import (
     CadIdentityMap,
@@ -119,15 +122,30 @@ def scene_nodes(document: dict) -> dict[str, dict]:
 
 
 def read_native_nodes(model: Path) -> tuple[dict, dict, dict, str]:
+    parsed_digest = hashlib.sha256()
     with model.open("rb") as stream:
-        magic, version, size = struct.unpack("<III", stream.read(12))
-        length, kind = struct.unpack("<II", stream.read(8))
-        if (magic != 0x46546C67 or version != 2 or size != model.stat().st_size
+        header = stream.read(12)
+        chunk_header = stream.read(8)
+        parsed_digest.update(header)
+        parsed_digest.update(chunk_header)
+        magic, version, size = struct.unpack("<III", header)
+        length, kind = struct.unpack("<II", chunk_header)
+        if (magic != 0x46546C67 or version != 2 or size != os.fstat(stream.fileno()).st_size
                 or kind != 0x4E4F534A or length % 4 or 20 + length > size):
             raise ValueError("Not a complete GLB 2 file with a JSON first chunk")
-        document = json.loads(stream.read(length))
+        text = stream.read(length)
+        parsed_digest.update(text)
+        document = json.loads(text)
+        bytes_read = 20 + len(text)
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            parsed_digest.update(chunk)
+            bytes_read += len(chunk)
+        if bytes_read != size:
+            raise ValueError("GLB changed length while reading native census")
     metadata = scene_nodes(document)
     raw_nodes, digest = glb_nodes(model)
+    if digest != parsed_digest.hexdigest():
+        raise ValueError("GLB changed between native census and transform reads")
     if set(raw_nodes) != set(metadata):
         raise ValueError("Raw transform paths differ from active-scene metadata")
     for path, world in raw_nodes.items():
@@ -198,6 +216,22 @@ def export_inventory(model: Path, source_commit: str, expected_model_sha256: str
     )
 
 
+def publish_inventory(output: Path, encoded: str) -> None:
+    """Replace the directory entry, never write through an existing output alias."""
+    candidate = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=output.parent,
+            prefix=f".{output.name}.", suffix=".tmp", delete=False,
+        ) as stream:
+            candidate = Path(stream.name)
+            stream.write(encoded)
+        os.replace(candidate, output)
+    finally:
+        if candidate is not None:
+            candidate.unlink(missing_ok=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", type=Path, required=True)
@@ -208,11 +242,14 @@ def main() -> None:
     try:
         output = args.output.resolve()
         model = args.model.resolve()
-        if output == model or (output.exists() and output.samefile(model)) or output.is_relative_to(ROOT / "cad"):
+        cad = ROOT / "cad"
+        if (output == model or (output.exists() and output.samefile(model))
+                or output.is_relative_to(cad)
+                or Path(os.path.abspath(args.output)).is_relative_to(cad)):
             raise ValueError("The native model and CAD tree are read-only")
         inventory = export_inventory(args.model, args.source_commit, args.expected_model_sha256)
         encoded = json.dumps(inventory, indent=2, allow_nan=False) + "\n"
-        args.output.write_text(encoded, encoding="utf-8")
+        publish_inventory(args.output, encoded)
     except (OSError, ValueError, KeyError, TypeError, struct.error) as error:
         parser.error(str(error))
     print(json.dumps({"output": str(args.output), "sha256": inventory["sha256"],
