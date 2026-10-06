@@ -11,6 +11,10 @@ pen rod slides in, and a #8-32 tapped hanger-screw hole passes through the strap
 top from behind.  The part is tall and narrow (~82 x 22), so the front profile is
 the sole ortho view at 2:1 with an isometric to its right.
 
+The two lower width dimensions occupy centred lanes below the guide block.
+Their rendered rows and native strokes, the other imported dimensions, the tap
+callout, and the complete linked notes are checked again after the final rebuild.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_pn_pen_hanger.py pen-hanger
@@ -23,20 +27,31 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    PLACE_SETTLE_M,
+    annotation_ink,
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_clear,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _holes import TAP_DRILL_MM
 from build_pn_pen_hanger import (
     BLOCK_HALF,
@@ -92,15 +107,76 @@ def _fy(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - _BBOX_CY) * VIEW_SCALE / 1000.0
 
 
-# Per-view survivors of the marked-dimension import (all Front-plane sketch dims):
-# the block width, the strap bottom/top widths and the strap rise.  Positioned to
-# the left / top of the tall narrow view, clear of the mid-band notes.
+# Per-view survivors of the marked-dimension import (all Front-plane sketch dims).
+# Centre the two lower widths on their actual model features, not the asymmetric
+# profile's outline centre. The shorter strap width uses the inner lower lane.
 FRONT_KEEP = {
     "StrapTopRun": (FRONT_CENTER[0], _fy(STRAP_TOP_Y) + 0.012),
     "StrapTaperDy": (_fx(_BBOX_X[0]) - 0.018, FRONT_CENTER[1]),
-    "StrapBotWidth": (_fx(_BBOX_X[0]) - 0.014, _fy(BLOCK_HALF) + 0.006),
-    "BlockWidth": (FRONT_CENTER[0], _fy(-BLOCK_HALF) - 0.012),
+    "StrapBotWidth": (
+        _fx((STRAP_BOT_X[0] + STRAP_BOT_X[1]) / 2.0),
+        _fy(-BLOCK_HALF) - 0.012,
+    ),
+    "BlockWidth": (_fx(0.0), _fy(-BLOCK_HALF) - 0.026),
 }
+
+# These fields reserve whole text rows; the dimension/witness lines are read
+# separately, so no ordinary dimension is treated as a mirrored callout shoulder.
+FRONT_TEXT_FIELDS = {
+    "StrapBotWidth": (
+        _fx(0.0) - 0.012,
+        _fy(-BLOCK_HALF) - 0.018,
+        _fx(0.0) + 0.012,
+        _fy(-BLOCK_HALF) - 0.007,
+    ),
+    "BlockWidth": (
+        _fx(0.0) - 0.012,
+        _fy(-BLOCK_HALF) - 0.032,
+        _fx(0.0) + 0.012,
+        _fy(-BLOCK_HALF) - 0.021,
+    ),
+}
+
+
+def _assert_settled_layout(
+    adapter: Any, annotations: dict[str, Any], note_rows: dict[str, int]
+) -> None:
+    """Check the complete annotation map, including frame/title stroke clearance."""
+    region = sheet_region(adapter)
+    drawable = (region.xmin, region.ymin, region.xmax, region.ymax)
+    fields = {label: drawable for label in annotations}
+    fields.update(FRONT_TEXT_FIELDS)
+    inks = assert_annotation_reservations(
+        adapter,
+        annotations,
+        fields,
+        check_own_lines=tuple(FRONT_TEXT_FIELDS),
+    )
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    obstacles = {
+        "frame left": (0.0, 0.0, region.xmin, template.height_m),
+        "frame right": (region.xmax, 0.0, template.width_m, template.height_m),
+        "frame bottom": (0.0, 0.0, template.width_m, region.ymin),
+        "frame top": (0.0, region.ymax, template.width_m, template.height_m),
+        "title block": (
+            template.title_block_left_m,
+            0.0,
+            template.width_m,
+            template.title_block_top_m,
+        ),
+    }
+    for label, ink in inks.items():
+        if label in note_rows and ink.row_count != note_rows[label]:
+            raise RuntimeError(f"{label} did not retain its complete native note rows")
+        for row in ink.rows:
+            require_clear(label, row, obstacles)
+        for index, line in enumerate(ink.lines):
+            box = line.box()
+            require_clear(
+                f"{label} native line {index}",
+                (box.xmin, box.ymin, box.xmax, box.ymax),
+                obstacles,
+            )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -153,13 +229,18 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, top, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_dimensions = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    annotations = {
+        dimension_name(adapter, annotation): annotation for annotation in front_dimensions
+    }
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the hanger-screw hole")
 
     # Pick the tap-drill rim, not the cosmetic thread or the hole centre.
     # Keep its native size/class/THRU callout above the manufacturing notes.
-    add_native_hole_callout(
+    tap_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=(
@@ -171,14 +252,42 @@ async def build(adapter: Any) -> dict[str, str]:
         process="TAP",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.115, 0.175)
-    add_property_linked_note(adapter, "Front View Note", 0.030, 0.036)
-    add_property_linked_note(adapter, "Top View Note", 0.170, 0.195)
-    add_property_linked_note(adapter, "Isometric View Note", 0.286, 0.104)
+    # GetAnnotation is a no-argument method returning nullable VT_DISPATCH on
+    # both IDisplayDimension and INote (sldworks_2026.py); bind each native owner.
+    tap_annotation = _early_bound(tap_callout, "IDisplayDimension").GetAnnotation()
+    if tap_annotation is None:
+        raise RuntimeError("hanger-screw through tap has no native annotation")
+    annotations["hanger-screw through tap"] = _early_bound(tap_annotation, "IAnnotation")
+    notes = {}
+    for property_name, xy in (
+        ("Manufacturing Notes", (0.115, 0.175)),
+        ("Front View Note", (0.030, 0.036)),
+        ("Top View Note", (0.170, 0.195)),
+        ("Isometric View Note", (0.286, 0.104)),
+    ):
+        note = _early_bound(add_property_linked_note(adapter, property_name, *xy), "INote")
+        annotation = note.GetAnnotation()
+        if annotation is None:
+            raise RuntimeError(f"{property_name} has no native annotation")
+        notes[property_name] = _early_bound(annotation, "IAnnotation")
+    annotations.update(notes)
 
     # Materialize the iso's cosmetic thread before the strict final note cleanup;
     # otherwise its descriptive label first appears during the native drawing save.
     import_cosmetic_threads(adapter, iso)
+    rebuild_drawing(adapter, label="pen-hanger annotation reservations")
+    note_rows = {
+        label: annotation_ink(adapter, annotation, label=label).row_count
+        for label, annotation in notes.items()
+    }
+    for label, field in FRONT_TEXT_FIELDS.items():
+        place_annotation_in_field(
+            adapter,
+            annotations[label],
+            label=label,
+            field=field,
+            margin=CLEAR_GAP_M + PLACE_SETTLE_M,
+        )
 
     return await finalize_drawing(
         adapter,
@@ -187,6 +296,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen Hanger Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_settled_layout(adapter, annotations, note_rows),
+        ),
         redundant_note_substrings=("#8-32 Tapped Hole",),
         expected_redundant_notes=1,
     )

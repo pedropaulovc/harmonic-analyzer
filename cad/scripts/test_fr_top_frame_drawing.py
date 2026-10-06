@@ -132,6 +132,23 @@ def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
     assert not kept - set(spec.DRAWING_PRECISION_BY_NAME)
 
 
+def test_vertical_socket_pitch_rows_clear_rear_hanger_text_and_left_rail() -> None:
+    from _layout_geometry import estimate_text_box
+
+    # R11 native REAR HANGER Z ends at 57.974 mm. The rail boundary is
+    # model geometry projected at this sheet's scale, not the padded view
+    # outline. Its same-font mate row measured 0.768 glyph/cap; 0.80 covers it.
+    rail_left = drawing.DETAIL_TOP_CENTER[0] - part.OUTER_X * drawing.DETAIL_VIEW_SCALE / 1000.0
+    for row in drawing.SOCKET_VERTICAL_PITCH_CALLOUT.splitlines():
+        box = estimate_text_box(
+            row, anchor=drawing.SOCKET_VERTICAL_PITCH_XY,
+            height=0.0035, reference=2, advance_ratio=0.80,
+        )
+        assert box is not None
+        assert box.xmin >= 0.057974 + 0.002
+        assert box.xmax <= rail_left - 0.002
+
+
 # --- #946 leader-over-part: RD4 and the cap seat Ra 3.2 -------------------
 #
 # The sheets are projected here from the model constants, as the build reads

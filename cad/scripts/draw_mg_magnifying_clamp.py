@@ -20,7 +20,13 @@ from typing import Any
 from mg_magnifying_clamp_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    annotation_ink,
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_clear,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -29,6 +35,8 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
+    dimension_name,
+    rebuild_drawing,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -37,7 +45,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _surface_finish import surface_finish_by_key
 from mg_magnifying_clamp_spec import (
     BLOCK_DEPTH,
@@ -85,21 +93,21 @@ def _front_y(model_y_mm: float) -> float:
 
 
 FRONT_KEEP = {
-    # ABOVE the view: the band under the view is only ~6 mm tall before the
-    # notes paragraph starts, so any below-view placement strikes the notes
-    # (eye pass, twice); the front-top to plan-bottom gap is ~50 mm and the
-    # perpendicularity frame sits right at +0.052, so a centred dim clears.
+    # The overall height is outside the front view on the right. Its old
+    # left-hand witness crossed the lever-bore callout.
     "Width": (FRONT_CENTER[0], _front_y(BLOCK_HEIGHT) + 0.014),
-    "Height": (FRONT_CENTER[0] - BLOCK_WIDTH * 2.0 / 1000.0 - 0.022, FRONT_CENTER[1]),
+    "Height": (FRONT_CENTER[0] + BLOCK_WIDTH * 2.0 / 1000.0 + 0.032, FRONT_CENTER[1]),
     "LeverBoreYDim": (
         FRONT_CENTER[0] + BLOCK_WIDTH * 2.0 / 1000.0 + 0.020,
         _front_y(LEVER_BORE_Y / 2.0),
     ),
-    "LeverBoreDiaDim": (FRONT_CENTER[0] - 0.045, _front_y(LEVER_BORE_Y) + 0.030),
+    "LeverBoreDiaDim": (0.048, _front_y(LEVER_BORE_Y) - 0.004),
 }
 TOP_KEEP = {
-    "RodBoreXDim": (_front_x(ROD_BORE_X / 2.0), TOP_CENTER[1] - 0.038),
-    "RodBoreDiaDim": (_front_x(ROD_BORE_X) + 0.034, TOP_CENTER[1] + 0.030),
+    # Put the station above the plan: its former long witnesses crossed the
+    # front width and the native cosmetic-thread note.
+    "RodBoreXDim": (_front_x(ROD_BORE_X / 2.0), TOP_CENTER[1] + 0.038),
+    "RodBoreDiaDim": (0.200, TOP_CENTER[1] + 0.032),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
@@ -110,6 +118,56 @@ DIMENSION_CALLOUTS = {
 
 RIGHT_HALF_Z = BLOCK_DEPTH / 2.0 * SHEET_SCALE[0] / 1000.0
 RIGHT_HALF_Y = BLOCK_HEIGHT / 2.0 * SHEET_SCALE[0] / 1000.0
+
+# Text reservations are sheet-space drafting lanes, not model dimensions.
+# The settled check includes the native witnesses, leaders and centre marks.
+TEXT_FIELDS = {
+    "Width": (0.104, 0.181, 0.138, 0.190),
+    "Height": (0.180, 0.101, 0.200, 0.137),
+    "LeverBoreYDim": (0.167, 0.090, 0.187, 0.121),
+    "LeverBoreDiaDim": (0.019, 0.130, 0.077, 0.158),
+    "RodBoreXDim": (0.119, 0.246, 0.147, 0.264),
+    "RodBoreDiaDim": (0.174, 0.239, 0.257, 0.263),
+    "thumb-screw thread": (0.023, 0.245, 0.080, 0.264),
+    "block depth": (0.201, 0.214, 0.249, 0.235),
+    "datum A": (0.264, 0.082, 0.286, 0.104),
+    "top-face parallelism": (0.266, 0.184, 0.306, 0.207),
+    "lever bore finish": (0.155, 0.147, 0.197, 0.171),
+    "manufacturing notes": (0.018, 0.024, 0.212, 0.064),
+}
+
+
+def _assert_readability(
+    adapter: Any, allocated: dict[str, Any], views: tuple[Any, ...], char_height: float
+) -> None:
+    """Re-read the exported field against every surviving native annotation."""
+    annotations = dict(allocated)
+    allocated_names = {
+        str(_early_bound(item, "IAnnotation").GetName()) for item in allocated.values()
+    }
+    for index, view in enumerate(views):
+        for raw in _early_bound(view, "IView").GetAnnotations() or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            if int(annotation.Visible) in (2, 3):
+                continue
+            name = str(annotation.GetName())
+            if name not in allocated_names:
+                annotations[f"view {index}: {name}"] = annotation
+    inks = assert_annotation_reservations(
+        adapter,
+        annotations,
+        TEXT_FIELDS,
+        text_heights={"lever bore finish": char_height, "Width": char_height},
+        check_own_lines=tuple(FRONT_KEEP) + tuple(TOP_KEEP) + ("block depth",),
+    )
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    keepout = (template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m)
+    for label in TEXT_FIELDS:
+        ink = inks[label]
+        require_clear(label, ink.text, {"title block": keepout})
+        for line in ink.lines:
+            box = line.box()
+            require_clear(label, (box.xmin, box.ymin, box.xmax, box.ymax), {"title block": keepout})
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -174,54 +232,64 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *top_annotations], DIMENSION_CALLOUTS
     )
+    allocated = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in [*front_annotations, *top_annotations]
+    }
+    heights = annotation_ink(adapter, allocated["Width"], label="ordinary width text").heights
+    char_height = heights[0]
+    if any(abs(height - char_height) > 1e-7 for height in heights):
+        raise RuntimeError("clamp ordinary dimension has mixed native text heights")
     for view, label in ((front, "front"), (top, "top")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
 
     # Block depth (12): dimension the right view's flat front/back silhouette
     # faces (a prism section, so the edges are pickable).
-    add_edge_dimension(
+    depth = add_edge_dimension(
         adapter,
         right,
         p0=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
         p1=(RIGHT_CENTER[0] + RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] - RIGHT_HALF_Y - 0.014),
+        text_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + RIGHT_HALF_Y + 0.050),
         label="block-depth overall",
     )
 
-    # The #4-40 thumb-screw hole is a small top-view circle whose exact sheet
-    # edge is not a dependable pick at this scale; its size + function ride the
-    # notes (spec DRAWING_NOTES) and the top-view centre mark locates it, rather
-    # than a fragile associative callout.
+    # The imported native cosmetic-thread note remains associated with the
+    # top-view tapped hole. Give it its own above-left lane.
+    thread_notes = [
+        _early_bound(raw, "IAnnotation")
+        for raw in _early_bound(top, "IView").GetAnnotations() or ()
+        if int(_early_bound(raw, "IAnnotation").GetType()) == 6
+        and int(_early_bound(raw, "IAnnotation").Visible) not in (2, 3)
+    ]
+    if len(thread_notes) != 1:
+        raise RuntimeError("clamp top view has no unique native thumb-screw note")
 
     # Datum A = the block bottom seat (front view); Ra 1.6 on the lever bore (the
     # functional sliding surface), tagged on its rim.
-    # Datum A hangs off the END view's bottom edge: everything below the front
-    # view belongs to the notes paragraph, which swallowed the flag at both
-    # round-1 positions (obscured, then inside the notes text).
-    add_datum_feature(
+    # Keep both the datum box and its complete leader above the title block.
+    datum = add_datum_feature(
         adapter,
         right,
         edge_xy=(RIGHT_CENTER[0] + 0.010, _front_y(0.0)),
-        symbol_xy=(RIGHT_CENTER[0] + 0.024, _front_y(0.0) - 0.020),
+        symbol_xy=(RIGHT_CENTER[0] + 0.049, _front_y(0.0) + 0.024),
         datum="A",
         label="block bottom seat",
     )
-    add_feature_control_frame(
+    parallelism = add_feature_control_frame(
         adapter,
-        # The top face on the END view (hidden lines removed, so no bore column
-        # to misread; datum A is on the same view): in the front view the
-        # 20.00 width dimension's extension lines box in the whole top edge,
-        # and the old leader crossed its right one (layout audit).
+        # The frame is right of the depth witnesses, so neither its text nor
+        # the frame can be cut by the new above-view overall depth.
         right,
         edge_xy=(RIGHT_CENTER[0] + 0.012, _front_y(BLOCK_HEIGHT)),
-        frame_xy=(RIGHT_CENTER[0] + 0.020, _front_y(BLOCK_HEIGHT) + 0.019),
+        frame_xy=(RIGHT_CENTER[0] + 0.045, _front_y(BLOCK_HEIGHT) + 0.019),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["block top-face parallelism"],
         datums=("A",),
         label="block top-face parallelism",
     )
-    add_surface_finish(
+    finish = add_surface_finish(
         adapter,
         front,
         edge_xy=(
@@ -231,10 +299,25 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.030, _front_y(LEVER_BORE_Y) + 0.008),
         control=surface_finish_by_key(SURFACE_FINISHES, "lever_bore"),
         label="lever bore finish",
+        char_height=char_height,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
+    notes = add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.180)
+
+    allocated.update(
+        {
+            "thumb-screw thread": thread_notes[0],
+            "block depth": _early_bound(depth, "IDisplayDimension").GetAnnotation(),
+            "datum A": _early_bound(datum, "IDatumTag").GetAnnotation(),
+            "top-face parallelism": _early_bound(parallelism, "IGtol").GetAnnotation(),
+            "lever bore finish": _early_bound(finish, "ISFSymbol").GetAnnotation(),
+            "manufacturing notes": _early_bound(notes, "INote").GetAnnotation(),
+        }
+    )
+    rebuild_drawing(adapter, label="clamp annotation fields")
+    for label, field in TEXT_FIELDS.items():
+        place_annotation_in_field(adapter, allocated[label], label=label, field=field)
 
     return await finalize_drawing(
         adapter,
@@ -243,6 +326,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Magnifying Clamp Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_readability(adapter, allocated, (front, top, right), char_height),
+        ),
     )
 
 

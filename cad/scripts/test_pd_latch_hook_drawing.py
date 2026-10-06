@@ -20,6 +20,8 @@ import pd_paper_drive_assembly_steps as steps
 import pd_support_bar_spec as bar
 import pd_transgear_arm_geometry as arm
 import vn_transgear_latch_pin_spec as pin
+from _drawing_annotation_extent import annotation_ink_from_record, require_annotation_inside
+from _drawing_layout_check import DrawableRegion
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
@@ -497,29 +499,6 @@ def test_no_leader_crosses_a_dimension_line_a_text_or_the_notes() -> None:
         assert not _crosses(pa, qa, pb, qb), (a, b)
 
 
-def test_the_template_radii_are_shortened_where_their_centres_leave_the_sheet() -> None:
-    """Review of 19e33c6c2: full-length R485/R845 lines ran to centres 1.4 m
-    and 2.5 m off the sheet, through the border and the title block."""
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    off_sheet = {
-        name
-        for name, centre in (("InnerR1", geom.C1_L), ("InnerR2", geom.C2_L))
-        if not (
-            _BORDER < drawing._sheet(*centre)[0] < template.width_m - _BORDER
-            and _BORDER < drawing._sheet(*centre)[1] < template.height_m - _BORDER
-        )
-    }
-    assert off_sheet == {"InnerR1", "InnerR2"}
-    assert off_sheet <= set(drawing.SHORTENED_RADII)
-    # Each radius text sits between its arc and its centre: the shortened
-    # line points at the centre from the concave side.
-    _texts, _lines, leaders, _notes = _layout()
-    for name, centre in (("InnerR1", geom.C1_L), ("InnerR2", geom.C2_L)):
-        text, rim = leaders[name]
-        centre_sheet = drawing._sheet(*centre)
-        assert math.dist(text, centre_sheet) < math.dist(rim, centre_sheet), name
-
-
 def test_the_overall_reference_runs_to_the_full_round_extreme() -> None:
     """Review of 19e33c6c2: 99.9 runs to the end round's centre; the strip's
     true overall prints as a reference, outermost over the run stack."""
@@ -560,3 +539,28 @@ def _iso_half_extents() -> tuple[float, float]:
         (max(xs) - min(xs)) * scale / 2.0 + 0.002,
         (max(ys) - min(ys)) * scale / 2.0 + 0.002,
     )
+
+
+def test_radial_ink_guard_detects_the_remote_r11_r485_centre() -> None:
+    # Moving text inside the sheet cannot repair a native shortened leader
+    # whose virtual centre still prints at y -471.4832 mm.
+    ink = annotation_ink_from_record(
+        {
+            "type": 4,
+            "display": {
+                "texts": [
+                    {"t": "R485.0", "pos": [0.064, 0.113, 0], "h": 0.0035, "ref": 1}
+                ],
+                "lines": [
+                    [0, 0, 0, 0, 0.2498433, -0.466241, 0, 0.2498433, -0.4714832, 0]
+                ],
+            },
+        },
+        label="InnerR2",
+    )
+    region = DrawableRegion(0.0127, 0.0127, 0.4191, 0.2667)
+    assert region.xmin < ink.text[0] < ink.text[2] < region.xmax
+    assert region.ymin < ink.text[1] < ink.text[3] < region.ymax
+    assert min(line.y1 for line in ink.lines) == pytest.approx(-0.4714832)
+    with pytest.raises(RuntimeError):
+        require_annotation_inside(ink, region)

@@ -29,7 +29,16 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    PLACE_SETTLE_M,
+    annotation_ink,
+    place_annotation_in_field,
+    require_annotation_in_field,
+    require_annotation_inside,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -40,12 +49,14 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
+from _drawing_layout_check import DrawableRegion
 from _section_axis import create_section_axis_centerline, position_section_caption
 from dt_crank_handle_spec import (
     DRAWING_DIMENSIONS,
@@ -117,6 +128,20 @@ DIMENSION_CALLOUTS = {
 }
 CUT_START = (RIGHT_CENTER[0], RIGHT_CENTER[1] - END_R - 0.006)
 CUT_END = (RIGHT_CENTER[0], RIGHT_CENTER[1] + END_R + 0.006)
+
+
+def manufacturing_note_field(region: DrawableRegion) -> tuple[float, float, float, float]:
+    """Reserve the complete linked block left of the title and below the section."""
+    return (
+        region.xmin,
+        region.ymin,
+        DRAWING_TEMPLATES[SPEC.layout].title_block_left_m,
+        # The section caption's native extent starts at y=105.86 mm in R11.
+        # Reserve its full text height below the commanded caption point.
+        CAPTION_XY[1] - 0.010,
+    )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -210,7 +235,24 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.086)
+    manufacturing_note = add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.086)
+    manufacturing_note = _early_bound(manufacturing_note, "INote")
+    note_annotation = _early_bound(manufacturing_note.GetAnnotation(), "IAnnotation")
+    rebuild_drawing(adapter, label="crank-handle manufacturing-note allocation")
+    note_region = sheet_region(adapter)
+    note_field = manufacturing_note_field(note_region)
+    # R11's full 198.53 mm row crossed the title border. Move the entire
+    # linked block from its native extent; neither its prose nor font changes.
+    place_annotation_in_field(
+        adapter, note_annotation, label="crank-handle manufacturing notes",
+        field=note_field, margin=CLEAR_GAP_M + PLACE_SETTLE_M,
+    )
+
+    def require_manufacturing_notes_clear() -> None:
+        ink = annotation_ink(adapter, note_annotation, label="crank-handle manufacturing notes")
+        require_annotation_in_field(ink, note_field, margin=CLEAR_GAP_M)
+        require_annotation_inside(ink, note_region)
+
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
 
     return await finalize_drawing(
@@ -220,6 +262,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Crank Handle Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(require_manufacturing_notes_clear,),
     )
 
 

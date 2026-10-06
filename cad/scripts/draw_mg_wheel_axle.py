@@ -8,13 +8,21 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    annotation_ink,
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_clear,
+)
 from _drawing_common import (
     DrawingOutputs,
     PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
+    dimension_name,
+    rebuild_drawing,
     finalize_drawing,
     find_edge_near,
     project_part_pmi,
@@ -25,7 +33,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _surface_finish import surface_finish_by_key
 from mg_wheel_axle_spec import (
     COLLAR_DIA as COLLAR_DIA,
@@ -87,7 +95,7 @@ FRONT_KEEP = {
     ),
     "CollarLength": (
         FRONT_CENTER[0] + FLANGE_DIA / 2.0 * _K + 0.012,
-        _front_y(_TOTAL_LEN - COLLAR_LEN / 2.0),
+        _front_y(_TOTAL_LEN - COLLAR_LEN / 2.0) - 0.0105,
     ),
 }
 END_KEEP = {
@@ -113,6 +121,48 @@ DIMENSION_CALLOUTS: dict[str, str] = {}
 # sheet-authored; the same placement is now driven from the model PMI spec).
 _DATUM_B_OFFSET = (0.038, -0.052)
 _DATUM_B_ANGLE = math.atan2(_DATUM_B_OFFSET[1], _DATUM_B_OFFSET[0])
+
+# The complete one-line process note fits the open band between the front
+# and end views. It must not be shortened to fit beside the title block.
+TEXT_FIELDS = {
+    "CollarLength": (0.160, 0.116, 0.181, 0.126),
+    "manufacturing notes": (0.018, 0.138, 0.260, 0.152),
+    "stud bearing finish": (0.045, 0.098, 0.080, 0.126),
+}
+
+
+def _assert_readability(
+    adapter: Any, allocated: dict[str, Any], views: tuple[Any, ...], char_height: float
+) -> None:
+    """Check the final native note, collar text and all neighbouring ink."""
+    annotations = dict(allocated)
+    allocated_names = {
+        str(_early_bound(item, "IAnnotation").GetName()) for item in allocated.values()
+    }
+    for index, view in enumerate(views):
+        for raw in _early_bound(view, "IView").GetAnnotations() or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            if int(annotation.Visible) in (2, 3):
+                continue
+            name = str(annotation.GetName())
+            if name not in allocated_names:
+                annotations[f"view {index}: {name}"] = annotation
+    inks = assert_annotation_reservations(
+        adapter,
+        annotations,
+        TEXT_FIELDS,
+        row_limits={"manufacturing notes": 1},
+        text_heights={"stud bearing finish": char_height, "FlangeLength": char_height},
+        check_own_lines=("CollarLength",),
+    )
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    keepout = (template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m)
+    for label in TEXT_FIELDS:
+        ink = inks[label]
+        require_clear(label, ink.text, {"title block": keepout})
+        for line in ink.lines:
+            box = line.box()
+            require_clear(label, (box.xmin, box.ymin, box.xmax, box.ymax), {"title block": keepout})
 
 
 def _view_center_delta(
@@ -211,6 +261,14 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, [*front_annotations, *end_annotations], DIMENSION_CALLOUTS
     )
+    allocated = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in [*front_annotations, *end_annotations]
+    }
+    heights = annotation_ink(adapter, allocated["FlangeLength"], label="ordinary flange text").heights
+    char_height = heights[0]
+    if any(abs(height - char_height) > 1e-7 for height in heights):
+        raise RuntimeError("axle ordinary dimension has mixed native text heights")
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to axle end view")
 
@@ -252,7 +310,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # depends on its attachment (a datum tag only lands in a view aligned
     # with its face), and the projection fails loud on any mismatch. Placements track the measured view-centre deltas
     # (fpt/ept), the same corrections the retired edge picks used.
-    project_part_pmi(
+    pmi = project_part_pmi(
         adapter,
         placements={
             "datum:A": PmiDrawingPlacement(
@@ -290,33 +348,30 @@ async def build(adapter: Any) -> dict[str, str]:
         controls=GEOMETRIC_CONTROLS,
         label="wheel axle PMI",
     )
-    # The stud OD is dimensioned in the end view, but its Ra belongs on the
-    # FRONT view. The symbol's TEXT renders ABOVE its arm (ASME Y14.36) and runs
-    # ~13..39 mm to the RIGHT of the anchor, so in the end view it cannot clear
-    # the O35 flange circle at ANY height the 12.7 mm left margin allows -- the
-    # arc reaches x=0.0534 at bore height while the text would need to stop by
-    # x=0.0144 -- and it printed over the arc. (The audit cannot catch that: it
-    # boxes the symbol as a nominal square about its anchor.) On the profile the
-    # stud's left flank has ~45 mm of empty sheet beside it, which takes the
-    # short, roughly horizontal leader this symbol wants.
+    # The finish stays attached to the native stud silhouette in the profile.
+    # Correct only the inherited text height to the ordinary sheet text;
+    # neither the finish requirement nor the attached entity changes.
     stud_flank_y = _front_y(FLANGE_LEN + STUD_LEN / 2.0)
-    add_surface_finish(
+    finish = add_surface_finish(
         adapter,
         front,
         # A cylinder's side outline is a SILHOUETTE, not a model edge.
         edge_xy=fpt(FRONT_CENTER[0] - STUD_DIA / 2.0 * _K, stud_flank_y),
-        # Text lands at x~0.058..0.084: clear of the stud flank (x=0.0975) and
-        # of the O9 collar (x>=0.0915), which starts a further 9 mm up.
+        # The ordinary-sized text stays in the empty lane left of the stud.
         symbol_xy=fpt(0.045, stud_flank_y),
         control=surface_finish_by_key(SURFACE_FINISHES, "stud_bearing"),
         label="stud bearing finish",
         entity_type="SILHOUETTE",
+        char_height=char_height,
     )
 
-    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.048)
+    notes = add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.145)
+    allocated.update(pmi)
+    allocated["manufacturing notes"] = _early_bound(notes, "INote").GetAnnotation()
+    allocated["stud bearing finish"] = _early_bound(finish, "ISFSymbol").GetAnnotation()
+    rebuild_drawing(adapter, label="wheel axle annotation fields")
+    for label, field in TEXT_FIELDS.items():
+        place_annotation_in_field(adapter, allocated[label], label=label, field=field)
 
     return await finalize_drawing(
         adapter,
@@ -325,6 +380,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Wheel Axle Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_readability(adapter, allocated, (front, end), char_height),
+        ),
     )
 
 

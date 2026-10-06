@@ -25,7 +25,11 @@ from typing import Any
 
 import _telemetry
 import build_ha_measuring_stick as part
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    assert_annotation_reservations,
+    place_annotation_in_field,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -53,6 +57,13 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)  # 1:1 whole sheet (200 mm bar)
+FRONT_VIEW_NAME = "*Back"
+FRONT_VIEW_SCALE = (1, 1)
+ISOMETRIC_VIEW_SCALE = (1, 2)
+
+# The note field occupies the lower-left lane, clear of the bar view above,
+# isometric view to the right, title block, footer and zone frame.
+MANUFACTURING_NOTE_FIELD = (0.017, 0.017, 0.210, 0.178)
 
 # Sheet layout (meters).  The ruled face (front) runs full width across the top;
 # the isometric (1:2) sits mid-right; the notes fill the lower-left.
@@ -138,18 +149,70 @@ async def build(adapter: Any) -> dict[str, str]:
     # Tick cuts are engraved into the back broad face, so the back view is the
     # actual ruled face.  The old front view showed an untouched rectangle and
     # forced the machinist to infer every graduation from prose.
-    front = place_view(adapter, str(SOURCE), "*Back", *FRONT_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
+    front = place_view(
+        adapter,
+        str(SOURCE),
+        FRONT_VIEW_NAME,
+        *FRONT_CENTER,
+        scale=FRONT_VIEW_SCALE,
+    )
+    iso = place_view(
+        adapter,
+        str(SOURCE),
+        "*Isometric",
+        *ISO_CENTER,
+        scale=ISOMETRIC_VIEW_SCALE,
+    )
     _rotate_ruled_face(adapter, front)
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
     _add_scale_labels(adapter)
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.110)
-    add_property_linked_note(adapter, "Front View Note", 0.040, 0.184)
-    add_property_linked_note(adapter, "Isometric View Note", 0.250, 0.092)
+    manufacturing_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.135
+    )
+    front_note = add_property_linked_note(adapter, "Front View Note", 0.040, 0.184)
+    isometric_note = add_property_linked_note(
+        adapter, "Isometric View Note", 0.250, 0.092
+    )
+    manufacturing_annotation = _early_bound(
+        _early_bound(manufacturing_note, "INote", "GetAnnotation").GetAnnotation(),
+        "IAnnotation",
+    )
+    front_note_annotation = _early_bound(
+        _early_bound(front_note, "INote", "GetAnnotation").GetAnnotation(),
+        "IAnnotation",
+    )
+    isometric_note_annotation = _early_bound(
+        _early_bound(isometric_note, "INote", "GetAnnotation").GetAnnotation(),
+        "IAnnotation",
+    )
+    place_annotation_in_field(
+        adapter,
+        manufacturing_annotation,
+        label="measuring-stick manufacturing notes",
+        field=MANUFACTURING_NOTE_FIELD,
+    )
+    annotations = {
+        "Manufacturing Notes": manufacturing_annotation,
+        "Front View Note": front_note_annotation,
+        "Isometric View Note": isometric_note_annotation,
+        **{
+            f"front dimension {index}": annotation
+            for index, annotation in enumerate(front_annotations)
+        },
+    }
+
+    def assert_final_note_layout() -> None:
+        assert_annotation_reservations(
+            adapter,
+            annotations,
+            {"Manufacturing Notes": MANUFACTURING_NOTE_FIELD},
+        )
 
     return await finalize_drawing(
         adapter,
@@ -158,6 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Measuring Stick Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(assert_final_note_layout,),
     )
 
 

@@ -18,9 +18,12 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import assert_annotation_reservations, place_annotation_in_field
 from _drawing_common import (
     DrawingOutputs,
+    _assert_attached_to,
+    add_attached_note,
     add_datum_feature,
     add_feature_control_frame,
     add_leader_note,
@@ -28,6 +31,7 @@ from _drawing_common import (
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -129,9 +133,22 @@ TAP_PICK = (
     TAP_SHEET_CENTER[1] + _TAP_SHEET_RADIUS * math.sin(math.radians(225.0)),
 )
 
+# Keep the numeric mouth break on the native tap; the assembly transfer is
+# its own two-row note attached to that SAME tap edge, not a general note.
+TAP_MOUTH_CALLOUT, _SEPARATOR, TAP_PROCESS_CALLOUT = TAP_CALLOUT_QUALIFIER.partition("\n")
+if not _SEPARATOR or not TAP_PROCESS_CALLOUT:
+    raise RuntimeError("rack-pinion transfer requirement has no associated-note block")
+TAP_PROCESS_XY = (0.018, 0.135)
+BORE_FINISH_CHAR_HEIGHT = 0.0025  # standard surface symbols, as on knob cup
+TEXT_FIELDS = {
+    "disc tap callout": (0.108, 0.106, 0.212, 0.126),
+    "disc tap transfer": (0.016, 0.123, 0.155, 0.142),
+    "bore finish": (0.250, 0.093, 0.294, 0.112),
+}
+
 
 def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Append the mouth-break and transfer lines to the one thread compartment."""
+    """Append the mouth break; transfer remains on its associated tap note."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
     thread_parts = [
@@ -143,7 +160,7 @@ def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
         )
     updated = dict(definitions)
     part = thread_parts[0]
-    updated[part] = f"{updated[part].rstrip()}\n{TAP_CALLOUT_QUALIFIER}"
+    updated[part] = f"{updated[part].rstrip()}\n{TAP_MOUTH_CALLOUT}"
     return updated
 
 
@@ -159,12 +176,44 @@ def _set_tap_callout_text(display: Any) -> None:
     if (
         persisted != updated
         or len(thread) != 1
-        or not thread[0].rstrip().endswith(TAP_CALLOUT_QUALIFIER)
+        or not thread[0].rstrip().endswith(TAP_MOUTH_CALLOUT)
     ):
         raise RuntimeError(
             "rack-pinion tap callout lines did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
+
+
+def _set_feature_text_height(annotation: Any, *, height: float, label: str) -> None:
+    """Keep the native typeface while assigning the established text role."""
+    annotation = _early_bound(annotation, "IAnnotation")
+    text_format = annotation.GetTextFormat(0)
+    if text_format is None:
+        raise RuntimeError(f"{label} has no native text format")
+    text_format.CharHeight = height
+    if not annotation.SetTextFormat(0, False, text_format):
+        raise RuntimeError(f"{label} refused its established text height")
+
+
+def _assert_feature_allocations(
+    adapter: Any, allocated: dict[str, Any], tap_edge: Any, bore_edge: Any
+) -> None:
+    for label, edge in (("disc tap transfer", tap_edge), ("bore finish", bore_edge)):
+        _assert_attached_to(
+            adapter, allocated[label], edge, entity_type="EDGE", what="feature annotation", label=label
+        )
+    assert_annotation_reservations(
+        adapter,
+        allocated,
+        TEXT_FIELDS,
+        row_limits={"disc tap callout": 4, "disc tap transfer": 4},
+        text_heights={
+            "disc tap callout": 0.0035,
+            "disc tap transfer": 0.0035,
+            "bore finish": BORE_FINISH_CHAR_HEIGHT,
+        },
+        check_own_lines=("disc tap callout",),
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -280,10 +329,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Explicit entity selection supplies the insertion point. No post-insertion
     # endpoint setter: that setter drops the semantic association on this symbol.
-    add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)
+    bore_finish = add_rack_bore_finish(
+        adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION
+    )
+    _set_feature_text_height(
+        bore_finish.GetAnnotation(), height=BORE_FINISH_CHAR_HEIGHT, label="bore finish"
+    )
 
-    # The native thread and drill ride the callout; the mouth breaks and the
-    # assembly transfer are the spec's lines under it.
+    # Thread/drill and the mouth break stay native. The process block attaches
+    # to the very edge the native callout owns, preserving feature association.
     tap_callout = add_native_hole_callout(
         adapter,
         front,
@@ -292,9 +346,37 @@ async def build(adapter: Any) -> dict[str, str]:
         label="#0-80 transferred disc taps",
     )
     _set_tap_callout_text(tap_callout)
+    tap_annotation = _early_bound(tap_callout.GetAnnotation(), "IAnnotation")
+    tap_entities = tuple(tap_annotation.GetAttachedEntities3() or ())
+    if len(tap_entities) != 1 or tuple(tap_annotation.GetAttachedEntityTypes() or ()) != (1,):
+        raise RuntimeError("disc tap callout has no unique associated edge")
+    tap_edge = tap_entities[0]
+    process_note = add_attached_note(
+        adapter,
+        front,
+        text=TAP_PROCESS_CALLOUT,
+        entity_xy=TAP_PICK,
+        attached_to=tap_edge,
+        note_xy=TAP_PROCESS_XY,
+        label="disc taps transferred through hub flange",
+    )
 
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)
+    allocated = {
+        dimension_name(adapter, item): item
+        for item in [*front_annotations, *right_annotations]
+    }
+    allocated["disc tap callout"] = tap_annotation
+    allocated["disc tap transfer"] = _early_bound(process_note.GetAnnotation(), "IAnnotation")
+    _set_feature_text_height(
+        allocated["disc tap transfer"], height=0.0035, label="disc tap transfer"
+    )
+    allocated["bore finish"] = _early_bound(bore_finish.GetAnnotation(), "IAnnotation")
+    for name in ("disc tap callout", "disc tap transfer"):
+        place_annotation_in_field(
+            adapter, allocated[name], label=name, field=TEXT_FIELDS[name], margin=0.0
+        )
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -302,6 +384,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rack-Pinion Disc Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_feature_allocations(adapter, allocated, tap_edge, bore_edge),
+        ),
         # SolidWorks pins its own "... Tapped Hole" note to the face view once
         # the tap carries a hole callout; the callout already states it.
         redundant_note_substrings=("Tapped Hole",),

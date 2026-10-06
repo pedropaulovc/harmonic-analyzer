@@ -82,7 +82,8 @@ from _drawing_common import (
     view_configuration,
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES, DrawingLayout
+from _pdf_ink import PageInk, Span, read_pdf_ink
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -136,23 +137,21 @@ ISO_RING_LIMITS = (0.235, 0.069, 0.418, 0.267)
 ASSEMBLED_CAPTION_XY = (0.018, 0.120)
 
 # --- sheet 2: BOM left, ballooned transgear isometric right ------------------
-# The drive-train BOM's column widths (MHA-DT-000), on the same template: its
-# 118 mm description column held 41 characters on one line, and a wrapped
-# description read 10.195 mm for two lines there (5.1 a line).  At its 6.0
-# row the 44 rows here (MHA-VN-049 added, R9-71) ran past the inner border at
-# the sheet's foot, so the rows close to 5.5: the table ends 0.0200 up,
-# 7.3 mm clear of the 0.0127 border.
+# R11 wrapped every full Number in the old 22 mm cell, growing all 42 data
+# rows to 10.2 mm and losing the lower 17 rows off the sheet. DT's native R11
+# proof holds the full Number at 31 mm with the unchanged font. Transfer 9 mm
+# from DESCRIPTION, retaining this table's 164 mm width, anchor and balloons.
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.022,
-    "description": 0.118,
+    "part": 0.031,
+    "description": 0.109,
     "quantity": 0.012,
 }
-BOM_DESCRIPTION_MAX_CHARS = 41
 BOM_ROW_HEIGHT = 0.0055
+BOM_HEIGHT_TOLERANCE = 1e-6
 BOM_ANCHOR = (0.018, 0.262)
-# The ASME B landscape sheet's inner border, bottom edge, and the clearance
-# the BOM keeps above it.
+# The table's actual settled heights, including its taller header and any
+# wrapped descriptions, must clear the native zone border and title block.
 SHEET_INNER_BORDER_BOTTOM = 0.0127
 BOM_BORDER_CLEARANCE = 0.003
 # The transgear alone at 2:3, right of the inner view's ring and above the
@@ -231,12 +230,19 @@ FITUP_FIRST_COLUMN_KEY = "latch-pin-pressed"
 FITUP_SECOND_COLUMN_KEY = "hook-set-and-riveted"
 FITUP_CHAIN_KEY = "fitup-pose-set"
 
-SHEET_SCALES = {
-    SHEET_NAMES[0]: ASSEMBLED_SCALE,
-    SHEET_NAMES[1]: TRANSGEAR_VIEW_SCALE,
-    SHEET_NAMES[2]: EXPLODED_SCALE,
-    SHEET_NAMES[3]: FITUP_SCALE,
-}
+def package_sheet_scales(
+    exploded_scale: tuple[float, float],
+) -> dict[str, tuple[float, float]]:
+    """A fresh finalizer map carrying the scale selected on sheet 3."""
+    return {
+        SHEET_NAMES[0]: ASSEMBLED_SCALE,
+        SHEET_NAMES[1]: TRANSGEAR_VIEW_SCALE,
+        SHEET_NAMES[2]: exploded_scale,
+        SHEET_NAMES[3]: FITUP_SCALE,
+    }
+
+
+SHEET_SCALES = package_sheet_scales(EXPLODED_SCALE)
 
 # --- BOM identities ------------------------------------------------------------
 # Literal stems, so the config-dependency analysis reads exactly these rows.
@@ -379,16 +385,6 @@ BOM_DESCRIPTIONS = {
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
     raise AssertionError("paper-drive BOM description coverage is incomplete")
-# The registry's grouped-row description is the builder's to stamp and may
-# wrap; every written description keeps to one line.
-GROUPED_DESCRIPTION_STEMS = frozenset({"pd-transgear-removable"})
-_LONG = sorted(
-    stem
-    for stem, text in BOM_DESCRIPTIONS.items()
-    if len(text) > BOM_DESCRIPTION_MAX_CHARS and stem not in GROUPED_DESCRIPTION_STEMS
-)
-if _LONG:
-    raise AssertionError(f"paper-drive BOM descriptions wrap: {_LONG}")
 BOM_NORMALIZED_ALIASES = {
     number.casefold(): stem for stem, number in BOM_PART_NUMBERS.items()
 }
@@ -1305,14 +1301,309 @@ def _create_sheets(adapter: Any) -> None:
             raise RuntimeError(f"failed to set paper-drive sheet scale: {name}")
 
 
+@dataclass(frozen=True)
+class BomGeometry:
+    """The table the final rebuild left, in sheet metres, not a row budget."""
+
+    anchor: tuple[float, float]
+    column_widths: tuple[float, ...]
+    row_heights: tuple[float, ...]
+    cells: tuple[tuple[str, ...], ...]
+    columns: tuple[int, int, int, int]  # item, Number, description, quantity
+    inner_border: tuple[float, float, float, float]
+
+
+def bom_row_fit(actual: float) -> str:
+    """DT's native height classification, against PD's own requested height."""
+    if not math.isfinite(actual) or actual < BOM_ROW_HEIGHT - BOM_HEIGHT_TOLERANCE:
+        return "short"
+    if actual <= BOM_ROW_HEIGHT + BOM_HEIGHT_TOLERANCE:
+        return "exact"
+    return "grown"
+
+
+def bom_extent_violations(
+    anchor: tuple[float, float],
+    width: float,
+    height: float,
+    *,
+    inner_border: tuple[float, float, float, float] | None = None,
+) -> list[str]:
+    """DT's measured-piece protocol, with PD's zone-border and title floors."""
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    if inner_border is None:
+        margin = SHEET_INNER_BORDER_BOTTOM
+        inner_border = (margin, margin, template.width_m - margin, template.height_m - margin)
+    left, top = anchor
+    right, bottom = left + width, top - height
+    if not all(math.isfinite(value) for value in (*anchor, width, height, *inner_border)):
+        return ["table geometry is not finite"]
+    if width <= 0.0 or height <= 0.0:
+        return ["table geometry has no positive width/height"]
+    clearance = BOM_BORDER_CLEARANCE
+    violations = []
+    for edge, value, limit, outside in (
+        ("left", left, inner_border[0] + clearance, left < inner_border[0] + clearance),
+        ("right", right, inner_border[2] - clearance, right > inner_border[2] - clearance),
+        ("top", top, inner_border[3] - clearance, top > inner_border[3] - clearance),
+        ("bottom", bottom, inner_border[1] + clearance, bottom < inner_border[1] + clearance),
+    ):
+        if outside:
+            violations.append(
+                f"{edge} edge {value * 1000:.3f} mm crosses the inner border "
+                f"clearance at {limit * 1000:.3f} mm"
+            )
+    title_floor = template.title_block_top_m + clearance
+    if right > template.title_block_left_m - clearance and bottom < title_floor:
+        violations.append(
+            f"bottom edge {bottom * 1000:.3f} mm enters the title block "
+            f"(floor {title_floor * 1000:.3f} mm)"
+        )
+    return violations
+
+
+def _bom_columns(contents: Sequence[Sequence[str]]) -> tuple[int, int, int, int]:
+    header = tuple(" ".join(cell.split()).upper() for cell in contents[0])
+
+    def column_named(predicate: Callable[[str], bool], label: str) -> int:
+        matches = [index for index, cell in enumerate(header) if predicate(cell)]
+        if len(matches) != 1:
+            raise RuntimeError(f"paper-drive BOM has no unique {label} column: {header!r}")
+        return matches[0]
+
+    return (
+        column_named(lambda cell: cell.startswith("ITEM NO"), "ITEM NO."),
+        column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER"),
+        column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION"),
+        column_named(lambda cell: cell.startswith("QTY"), "QTY."),
+    )
+
+
+@_telemetry.traced("drawing.paper_drive_bom_native")
+def _assert_native_bom(
+    adapter: Any,
+    table: Any,
+    counts: Counter[str],
+    items: dict[str, str],
+    *,
+    phase: str,
+    setter_heights: Sequence[float] = (),
+) -> BomGeometry:
+    """Read the whole settled table and log every measured row before refusing.
+
+    The unchanged PD sheet has one legal 164 mm field; a second piece would
+    cover its ballooned views. Refuse an overflow or unexpected native split
+    rather than silently moving a piece or dropping its repeated header.
+    """
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    table = _early_bound(table, "ITableAnnotation")
+    rows, columns = int(table.RowCount), int(table.ColumnCount)
+    header_count = int(table.GetHeaderCount())
+    split = tuple(int(value) for value in table.GetSplitInformation(0, 0, 0, 0))
+    _telemetry.event(
+        "drawing.pd_bom_shape",
+        phase=phase,
+        rows=rows,
+        columns=columns,
+        header_count=header_count,
+        split_information=split,
+    )
+    if rows != len(BOM_PART_NUMBERS) + 1 or columns != 4 or header_count != 1:
+        raise RuntimeError(f"paper-drive BOM shape/header changed: {rows}x{columns}, {header_count} headers")
+    contents = tuple(
+        tuple(str(table.DisplayedText(row, column) or "").strip() for column in range(columns))
+        for row in range(rows)
+    )
+    roles = _bom_columns(contents)
+    widths = tuple(float(table.GetColumnWidth(column)) for column in range(columns))
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(rows))
+    annotation = _early_bound(table.GetAnnotation(), "IAnnotation")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    sheet = _early_bound(_early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet")
+    top, bottom, right, left = (float(sheet.GetZoneMargin(side)) for side in range(4))
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    border = (left, bottom, template.width_m - right, template.height_m - top)
+    geometry = BomGeometry((position[0], position[1]), widths, heights, contents, roles, border)
+    findings = bom_extent_violations(
+        geometry.anchor, sum(widths), sum(heights), inner_border=border
+    )
+    if int(table.AnchorType) != 1:
+        findings.append("native table anchor is not top-left")
+    if len(split) != 5 or split[0] != 0 or split[2] > 1:
+        findings.append(f"unexpected split {split!r}; PD's single BOM field cannot hold a second piece")
+    if any(abs(got - want) > BOM_HEIGHT_TOLERANCE for got, want in zip(geometry.anchor, BOM_ANCHOR, strict=True)):
+        findings.append(f"native table anchor moved to {geometry.anchor!r}")
+    for role, column in zip(BOM_COLUMN_WIDTHS, roles, strict=True):
+        actual_width = widths[column]
+        _telemetry.event(
+            "drawing.pd_bom_column",
+            phase=phase,
+            column=column,
+            role=role,
+            requested_mm=BOM_COLUMN_WIDTHS[role] * 1000.0,
+            actual_mm=actual_width * 1000.0,
+        )
+        if not math.isfinite(actual_width) or abs(actual_width - BOM_COLUMN_WIDTHS[role]) > BOM_HEIGHT_TOLERANCE:
+            findings.append(f"{role} column width did not persist: {actual_width * 1000:.3f} mm")
+        if table.ColumnHidden(column) is not False:
+            findings.append(f"{role} column is hidden")
+    item_column, part_column, description_column, quantity_column = roles
+    seen = set()
+    for row, cells in enumerate(contents):
+        fit = bom_row_fit(heights[row])
+        _telemetry.event(
+            "drawing.bom_row_height",
+            package="paper-drive",
+            phase=phase,
+            row=row,
+            row_kind="header" if row < header_count else "data",
+            fit=fit,
+            requested_mm=BOM_ROW_HEIGHT * 1000.0,
+            setter_mm=setter_heights[row] * 1000.0 if setter_heights else -1.0,
+            actual_mm=heights[row] * 1000.0,
+            cells=cells,
+        )
+        if fit == "short":
+            findings.append(f"row {row} is below its minimum requested height")
+        if table.RowHidden(row) is not False:
+            findings.append(f"row {row} is hidden")
+        if row < header_count:
+            continue
+        number = cells[part_column]
+        stem = BOM_NORMALIZED_ALIASES.get(number.casefold())
+        if stem is None or stem in seen:
+            findings.append(f"row {row} has an unknown/repeated Number {number!r}")
+            continue
+        seen.add(stem)
+        actual_cells = (cells[item_column], number, cells[description_column], cells[quantity_column])
+        wanted = (items[stem], BOM_PART_NUMBERS[stem], BOM_DESCRIPTIONS[stem], str(counts[stem]))
+        if actual_cells != wanted:
+            findings.append(f"row {row} final cells {actual_cells!r} != {wanted!r}")
+    if seen != set(BOM_PART_NUMBERS):
+        findings.append(f"missing families {sorted(set(BOM_PART_NUMBERS) - seen)!r}")
+    _telemetry.event(
+        "drawing.bom_piece",
+        package="paper-drive",
+        phase=phase,
+        piece="whole",
+        anchor_mm=tuple(value * 1000.0 for value in geometry.anchor),
+        extent_mm=(position[0] * 1000.0, (position[1] - sum(heights)) * 1000.0,
+                   (position[0] + sum(widths)) * 1000.0, position[1] * 1000.0),
+        inner_border_mm=tuple(value * 1000.0 for value in border),
+        rows=rows,
+        header_count=header_count,
+        width_mm=sum(widths) * 1000.0,
+        height_mm=sum(heights) * 1000.0,
+        violations=tuple(findings),
+    )
+    if findings:
+        raise RuntimeError("paper-drive BOM refused: " + "; ".join(findings))
+    return geometry
+
+
+@dataclass(frozen=True)
+class BomCellFit:
+    row: int
+    column: int
+    text: str
+    printed: str
+    physical_rows: int
+    cell: tuple[float, float, float, float]
+    ink: tuple[float, float, float, float] | None
+    clearance: float
+    violations: tuple[str, ...]
+
+
+def bom_cell_fits(geometry: BomGeometry, page: PageInk) -> tuple[BomCellFit, ...]:
+    """Full cell text and real glyph-baseline counts; no predicted line lengths.
+
+    Reuse the PDF ink reader's glyphs and Span.rows rather than estimating
+    widths from characters. Joining a cell's glyphs also handles a wrapped
+    description printed as several PDF text objects.
+    """
+    fits = []
+    top = geometry.anchor[1]
+    for row, height in enumerate(geometry.row_heights):
+        bottom = top - height
+        left = geometry.anchor[0]
+        for column, width in enumerate(geometry.column_widths):
+            right = left + width
+            cell = (left, bottom, right, top)
+            glyphs = tuple(
+                glyph for glyph in page.glyphs
+                if left <= (glyph.xmin + glyph.xmax) / 2.0 < right
+                and bottom <= (glyph.ymin + glyph.ymax) / 2.0 < top
+            )
+            printed = "".join(glyph.char for glyph in glyphs)
+            text = geometry.cells[row][column]
+            ink = None
+            physical_rows = 0
+            clearance = -math.inf
+            if glyphs:
+                ink = (min(g.xmin for g in glyphs), min(g.ymin for g in glyphs),
+                       max(g.xmax for g in glyphs), max(g.ymax for g in glyphs))
+                physical_rows = Span(printed, *ink, glyphs).rows
+                clearance = min(ink[0] - left, ink[1] - bottom, right - ink[2], top - ink[3])
+            violations = []
+            if printed != "".join(text.split()):
+                violations.append(f"printed {printed!r} != full cell text {text!r}")
+            if clearance < -BOM_HEIGHT_TOLERANCE:
+                violations.append("cell ink leaves its native ruled cell")
+            if row > 0 and column != geometry.columns[2] and physical_rows != 1:
+                violations.append(f"identity/item/quantity prints on {physical_rows} physical rows")
+            fits.append(BomCellFit(row, column, text, printed, physical_rows, cell, ink,
+                                   clearance, tuple(violations)))
+            left = right
+        top = bottom
+    return tuple(fits)
+
+
+@_telemetry.traced("drawing.paper_drive_bom_printed")
+def _assert_printed_bom(path: Path, geometry: BomGeometry) -> None:
+    pages = read_pdf_ink(path)
+    if len(pages) != len(SHEET_NAMES):
+        raise RuntimeError(f"paper-drive BOM PDF has {len(pages)} pages")
+    fits = bom_cell_fits(geometry, pages[1])
+    findings = []
+    # One bounded proof span, one event per physical table row. Per-cell
+    # events would exceed OTel's default 128-event limit and evict the header.
+    columns = len(geometry.column_widths)
+    for offset in range(0, len(fits), columns):
+        row_fits = fits[offset:offset + columns]
+        row_findings = tuple(
+            f"column {fit.column}: {v}" for fit in row_fits for v in fit.violations
+        )
+        _telemetry.event(
+            "drawing.pd_bom_cell_ink",
+            row=row_fits[0].row,
+            columns=tuple(fit.column for fit in row_fits),
+            texts=tuple(fit.text for fit in row_fits),
+            printed=tuple(fit.printed for fit in row_fits),
+            physical_rows=tuple(fit.physical_rows for fit in row_fits),
+            cells_mm=tuple(tuple(value * 1000.0 for value in fit.cell) for fit in row_fits),
+            ink_mm=tuple(
+                tuple(value * 1000.0 for value in fit.ink) if fit.ink else ()
+                for fit in row_fits
+            ),
+            clearance_mm=tuple(
+                fit.clearance * 1000.0 if math.isfinite(fit.clearance) else "unprinted"
+                for fit in row_fits
+            ),
+            violations=row_findings,
+        )
+        findings.extend(f"row {row_fits[0].row}: {v}" for v in row_findings)
+    if findings:
+        raise RuntimeError("paper-drive printed BOM refused: " + "; ".join(findings))
+
+
 def _validate_bom(
     adapter: Any, table: Any, counts: Counter[str]
 ) -> tuple[tuple[str, str], ...]:
-    """Rewrite part numbers, prove identities/quantities; return (stem, item)."""
+    """Resolve identities/widths, rebuild, then size and prove native heights."""
     table = _early_bound(table, "ITableAnnotation")
     rows = int(table.RowCount)
     columns = int(table.ColumnCount)
-    if rows != len(BOM_PART_NUMBERS) + 1 or columns < 4:
+    if rows != len(BOM_PART_NUMBERS) + 1 or columns != 4:
         raise RuntimeError(
             f"paper-drive BOM is {rows}x{columns}; expected {len(BOM_PART_NUMBERS) + 1} rows"
         )
@@ -1323,30 +1614,7 @@ def _validate_bom(
         )
         for row in range(rows)
     )
-    header = tuple(cell.upper() for cell in contents[0])
-
-    def column_named(predicate: Callable[[str], bool], label: str) -> int:
-        matches = [index for index, cell in enumerate(header) if predicate(cell)]
-        if len(matches) != 1:
-            raise RuntimeError(
-                f"paper-drive BOM has no unique {label} column: {header!r}"
-            )
-        return matches[0]
-
-    item_column = column_named(lambda cell: cell.startswith("ITEM NO"), "ITEM NO.")
-    part_column = column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER")
-    description_column = column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION")
-    quantity_column = column_named(lambda cell: cell.startswith("QTY"), "QTY.")
-    for column, width in (
-        (item_column, BOM_COLUMN_WIDTHS["item"]),
-        (part_column, BOM_COLUMN_WIDTHS["part"]),
-        (description_column, BOM_COLUMN_WIDTHS["description"]),
-        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
-    ):
-        if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
-            raise RuntimeError(f"paper-drive BOM column {column} width did not persist")
-    for row in range(rows):
-        table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
+    item_column, part_column, description_column, quantity_column = _bom_columns(contents)
 
     actual: dict[str, tuple[int, str, str, str]] = {}
     for row_index, row in enumerate(contents[1:], start=1):
@@ -1384,14 +1652,25 @@ def _validate_bom(
                 f"paper-drive BOM quantity for {stem!r} is {quantity!r}, "
                 f"model has {counts[stem]}"
             )
+    for column, width in (
+        (item_column, BOM_COLUMN_WIDTHS["item"]),
+        (part_column, BOM_COLUMN_WIDTHS["part"]),
+        (description_column, BOM_COLUMN_WIDTHS["description"]),
+        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
+    ):
+        table.SetColumnWidth(column, width, 0)
+    # Match DT's proven order: final text/widths must rebuild before minimum
+    # row sizing. SetRowHeight's retval can be larger; only GetRowHeight after
+    # the second rebuild is the table's persisted height.
     if not adapter.currentModel.EditRebuild3():
-        raise RuntimeError("paper-drive BOM rebuild failed")
-    for stem, (row_index, *_rest) in actual.items():
-        applied = str(table.DisplayedText(row_index, part_column) or "").strip()
-        if applied != BOM_PART_NUMBERS[stem]:
-            raise RuntimeError(
-                f"paper-drive BOM part number for {stem!r} reads {applied!r}"
-            )
+        raise RuntimeError("paper-drive BOM identity/column rebuild failed")
+    setter_heights = tuple(float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)) for row in range(rows))
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("paper-drive BOM row-sizing rebuild failed")
+    _assert_native_bom(
+        adapter, table, counts, {stem: values[1] for stem, values in actual.items()},
+        phase="sized", setter_heights=setter_heights,
+    )
     return tuple((stem, actual[stem][1]) for stem in BOM_PART_NUMBERS)
 
 
@@ -1737,9 +2016,10 @@ def _balloon_assembled_sheet(
     )
 
 
-def _place_exploded_sheet(adapter: Any, table: Any, items: dict[str, str]) -> list[Any]:
-    """The builder's PAPER_DRIVE_EXPLODED, only the platen-and-support
-    families shown, each ballooned once; their steps left of it."""
+def _place_exploded_sheet(
+    adapter: Any, table: Any, items: dict[str, str]
+) -> tuple[list[Any], tuple[float, float]]:
+    """Balloon the platen-and-support explode; return landings and fitted scale."""
     _activate_sheet(adapter, SHEET_NAMES[2])
     label = "platen and support exploded"
     view = place_view(
@@ -1780,7 +2060,7 @@ def _place_exploded_sheet(adapter: Any, table: Any, items: dict[str, str]) -> li
         EXPLODED_CAPTION_XY,
         label="exploded-view caption",
     )
-    return landings
+    return landings, scale
 
 
 def _place_fitup_sheet(adapter: Any) -> None:
@@ -1837,11 +2117,17 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = _place_assembled_sheet(adapter)
     landings, table, items = _place_bom_sheet(adapter, counts)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
-    landings += _place_exploded_sheet(adapter, table, items)
+    exploded_landings, exploded_scale = _place_exploded_sheet(adapter, table, items)
+    landings += exploded_landings
     _place_fitup_sheet(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
+    bom_geometry: BomGeometry | None = None
 
-    return await finalize_drawing(
+    def assert_settled_bom() -> None:
+        nonlocal bom_geometry
+        bom_geometry = _assert_native_bom(adapter, table, counts, items, phase="settled")
+
+    artifacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         spec=SPEC,
@@ -1850,9 +2136,16 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=ASSEMBLED_SCALE,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts=SHEET_LAYOUTS,
-        sheet_scales=SHEET_SCALES,
-        settled_checks=(lambda: assert_balloon_landings(adapter, landings),),
+        sheet_scales=package_sheet_scales(exploded_scale),
+        settled_checks=(
+            assert_settled_bom,
+            lambda: assert_balloon_landings(adapter, landings),
+        ),
     )
+    if bom_geometry is None:
+        raise RuntimeError("paper-drive finalizer did not settle the BOM")
+    _assert_printed_bom(OUTPUTS.pdf, bom_geometry)
+    return artifacts
 
 
 def _parse_args() -> argparse.Namespace:

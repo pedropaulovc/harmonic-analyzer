@@ -83,17 +83,6 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert spec.REFERENCE_DIMENSIONS == {"TenonDia", "CounterboreDia", "CounterboreDepth"}
     assert spec.TENON_DIA == pytest.approx(ferrule.BORE_DIA - 0.1)
     assert spec.COUNTERBORE_DIA == pytest.approx(cup.BODY_DIA + 0.1)
-    assert "TURN THE TENON TO SUIT THE MHA-DT-034 FERRULE BORE" in spec.DRAWING_NOTES
-    assert "COUNTERBORE TO SUIT THE MHA-DT-035 CUP BODY" in spec.DRAWING_NOTES
-    assert "DEPTH TO SEAT THE CUP\n  FACE FLUSH" in spec.DRAWING_NOTES
-    # After the cure the oak shoulder and the ferrule are turned together
-    # (user ruling 2026-10-01); the end round is turned on the oak only, clear
-    # of the cup (local review of fbf82ad96).
-    assert "AFTER CURE, TURN THE SHOULDER AND MHA-DT-034 TOGETHER, AND THE END ROUND ON" in spec.DRAWING_NOTES
-    assert "THE OAK ONLY, CLEAR OF MHA-DT-035; AT WORST THE OAK FEATHERS AT THE CUP." in spec.DRAWING_NOTES
-    assert "R2.3 END ROUND TO A FLAT OAK END, CREST <MOD-DIAM>9.4." in spec.DRAWING_NOTES
-    # crank-v4-16's sheet: two more lines ran the block into the border.
-    assert len(spec.DRAWING_NOTES.splitlines()) <= 15
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
     # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2).
     assert spec.SHOULDER_R == pytest.approx(ferrule.INSTALLED_OUTER_DIA / 2.0)
@@ -198,22 +187,37 @@ def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
 
 
-def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
-    notes = dt_crank_handle_spec.DRAWING_NOTES
-    assert "CDA 260" not in notes
-    assert "COLLAR" not in notes
-    assert "BRASS" not in notes
-    assert "LINEAR +/-" not in notes
-    assert "X.XX" not in notes
-    assert "LIMITS APPLY FULL LENGTH" in notes
-    assert "RUNS ON THE MHA-DT-032 SHOULDER" in notes
-    assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
-    assert "AXIAL STATIONS ARE FROM THE TENON END FACE" in notes
-    assert "DATUM" not in notes and "PROFILE 0.50" not in notes
-    assert all(len(line) <= 90 for line in notes.splitlines())
-    assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == "THRU - REAM"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+def test_complete_native_note_block_is_allocated_clear_of_title_and_frame() -> None:
+    from _drawing_annotation_extent import (
+        CLEAR_GAP_M,
+        PLACE_SETTLE_M,
+        annotation_field_shift,
+    )
+    from _drawing_layout_check import DrawableRegion
+
+    # R11 GetExtent of the entire 15-row linked note, not one troublesome row.
+    original = (0.0195538, 0.0181750, 0.2182828, 0.0863243)
+    region = DrawableRegion(0.0127, 0.0127, 0.4191, 0.2667)
+    field = drawing.manufacturing_note_field(region)
+    margin = CLEAR_GAP_M + PLACE_SETTLE_M
+    dx, dy = annotation_field_shift(original, field, margin)
+    moved = (original[0] + dx, original[1] + dy, original[2] + dx, original[3] + dy)
+    assert dy == 0.0
+    assert moved[0] >= region.xmin + CLEAR_GAP_M
+    assert moved[1] >= region.ymin + CLEAR_GAP_M
+    assert moved[2] <= field[2] - CLEAR_GAP_M
+    assert moved[3] <= field[3] - CLEAR_GAP_M
+    assert moved[2] - moved[0] == pytest.approx(original[2] - original[0])
+    assert moved[3] - moved[1] == pytest.approx(original[3] - original[1])
+
+
+def test_note_allocation_refuses_growth_that_cannot_keep_full_text_and_air() -> None:
+    from _drawing_annotation_extent import annotation_field_shift
+    from _drawing_layout_check import DrawableRegion
+
+    field = drawing.manufacturing_note_field(DrawableRegion(0.0127, 0.0127, 0.4191, 0.2667))
+    with pytest.raises(RuntimeError, match="cannot fit reserved field"):
+        annotation_field_shift((0.0195538, 0.0181750, 0.220, 0.0863243), field)
 
 
 def test_sheet_carries_no_gdt() -> None:

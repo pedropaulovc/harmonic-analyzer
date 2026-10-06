@@ -2,6 +2,8 @@
 
 import math
 import re
+from collections import Counter
+from dataclasses import replace
 from itertools import product
 
 import pytest
@@ -28,6 +30,7 @@ import pd_transgear_removable_spec as sprocket
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _assembly_contract import assembly_contract
+from _pdf_ink import Glyph, PageInk
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 STEP_POINTER = re.compile(r"(MHA-[A-Z]{2}-000)\s+STEP\s+(\d+)")
@@ -188,24 +191,285 @@ def test_the_steps_fit_their_fields() -> None:
     assert drawing.EXPLODED_CAPTION_XY[1] - NOTE_LINE_PITCH > template.title_block_top_m
 
 
-def test_the_bom_fits_left_of_the_title_block_and_inside_the_border() -> None:
-    """Machinist review of 6c385465d: item 41 sat below the inner border; the
-    old check stopped at the sheet's edge."""
-    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    left, top = drawing.BOM_ANCHOR
+def test_bom_floor_uses_native_header_and_wrapped_description_heights() -> None:
+    # The taller native header plus one grown description just fit. A second
+    # grown row does not; the removed character-count budget could not see it.
+    header = 0.0101683
+    data = [0.0055] * 42
+    data[-1] = 0.0101683
     width = sum(drawing.BOM_COLUMN_WIDTHS.values())
-    # A description past the measured one-line length wraps to a second line.
-    wrapped = sum(
-        len(text) > drawing.BOM_DESCRIPTION_MAX_CHARS
-        for text in drawing.BOM_DESCRIPTIONS.values()
+    assert drawing.bom_extent_violations(drawing.BOM_ANCHOR, width, header + sum(data)) == []
+    data[-2] = 0.0101683
+    assert any("bottom" in v for v in drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, width, header + sum(data)
+    ))
+    # R11's 42 wrapped Numbers plus header measured 437.2 mm, not 43*5.5.
+    assert drawing.bom_extent_violations(drawing.BOM_ANCHOR, width, 0.4372)
+
+
+def test_bom_refuses_crossing_the_native_floor_and_title_keepout() -> None:
+    width = sum(drawing.BOM_COLUMN_WIDTHS.values())
+    floor = drawing.SHEET_INNER_BORDER_BOTTOM + drawing.BOM_BORDER_CLEARANCE
+    height = drawing.BOM_ANCHOR[1] - floor
+    assert drawing.bom_extent_violations(drawing.BOM_ANCHOR, width, height - 1e-7) == []
+    assert any("bottom" in v for v in drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, width, height + 1e-7
+    ))
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    anchor = (template.title_block_left_m + 0.001, drawing.BOM_ANCHOR[1])
+    height = anchor[1] - template.title_block_top_m - drawing.BOM_BORDER_CLEARANCE
+    assert drawing.bom_extent_violations(anchor, width, height - 1e-7) == []
+    assert any("title block" in v for v in drawing.bom_extent_violations(
+        anchor, width, height + 1e-7
+    ))
+
+
+@pytest.mark.parametrize(
+    ("actual", "fit"),
+    ((0.005498, "short"), (0.0055005, "exact"), (0.0101683, "grown"), (math.nan, "short")),
+)
+def test_bom_classifies_persisted_heights_not_setter_requests(actual, fit) -> None:
+    assert drawing.bom_row_fit(actual) == fit
+
+
+class _NativeBom:
+    """Native refusal/settling model: sizing sees old wrapping until rebuild."""
+
+    RowCount = 43
+    ColumnCount = 4
+    AnchorType = 1
+
+    def __init__(self, grown_rows=(), refused_column=None):
+        self.counts = Counter({stem: 1 for stem in drawing.BOM_PART_NUMBERS})
+        self.cells = [["ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."]] + [
+            [str(index), stem, drawing.BOM_DESCRIPTIONS[stem], "1"]
+            for index, stem in enumerate(drawing.BOM_PART_NUMBERS, start=1)
+        ]
+        self.widths = [0.012, 0.022, 0.118, 0.012]
+        self.heights = [0.0101683] * self.RowCount
+        self.layout_ready = False
+        self.grown_rows = set(grown_rows)
+        self.refused_column = refused_column
+        self.hidden_rows = set()
+        self.split = (0, 0, 1, 0, 42)
+
+    def DisplayedText(self, row, column):
+        return self.cells[row][column]
+
+    def IsCellTextEditable(self, row, column):
+        return True
+
+    def SetText2(self, row, column, include_hidden, text):
+        self.cells[row][column] = text
+        self.layout_ready = False
+        return None  # indexed propput is VT_VOID, not a success bool
+
+    def SetColumnWidth(self, column, width, options):
+        if column != self.refused_column:
+            self.widths[column] = width
+        self.layout_ready = False
+        return width  # even this plausible retval must not replace the getter
+
+    def SetRowHeight(self, row, height, options):
+        if self.layout_ready:
+            self.heights[row] = max(height, 0.0101683) if row == 0 or row in self.grown_rows else height
+        return self.heights[row]
+
+    def GetColumnWidth(self, column):
+        return self.widths[column]
+
+    def GetRowHeight(self, row):
+        return self.heights[row]
+
+    def GetHeaderCount(self):
+        return 1
+
+    def GetSplitInformation(self, index, count, start, end):
+        return self.split
+
+    def GetAnnotation(self):
+        return self
+
+    def GetPosition(self):
+        return (*drawing.BOM_ANCHOR, 0.0)
+
+    def ColumnHidden(self, column):
+        return False
+
+    def RowHidden(self, row):
+        return row in self.hidden_rows
+
+
+class _BomModel:
+    def __init__(self, table):
+        self.table = table
+
+    def EditRebuild3(self):
+        self.table.layout_ready = all(
+            row[1] == drawing.BOM_PART_NUMBERS[stem]
+            for row, stem in zip(self.table.cells[1:], drawing.BOM_PART_NUMBERS, strict=True)
+        )
+        return True
+
+    def ActivateSheet(self, name):
+        return name == drawing.SHEET_NAMES[1]
+
+    def GetCurrentSheet(self):
+        return self
+
+    def GetName(self):
+        return drawing.SHEET_NAMES[1]
+
+    def GetZoneMargin(self, side):
+        return 0.0127
+
+
+def _bom_adapter(monkeypatch, table):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, interface: obj)
+    return SimpleNamespace(currentModel=_BomModel(table))
+
+
+def test_bom_rebuilds_final_number_widths_before_native_minimum_sizing(monkeypatch) -> None:
+    table = _NativeBom(grown_rows=(42,))
+    adapter = _bom_adapter(monkeypatch, table)
+    items = dict(drawing._validate_bom(adapter, table, table.counts))
+    geometry = drawing._assert_native_bom(adapter, table, table.counts, items, phase="settled")
+    assert tuple(geometry.cells[row][1] for row in range(1, 43)) == tuple(drawing.BOM_PART_NUMBERS.values())
+    assert geometry.row_heights == (0.0101683, *(0.0055 for _ in range(41)), 0.0101683)
+    assert geometry.anchor[1] - sum(geometry.row_heights) == pytest.approx(0.0161634)
+
+
+def test_bom_refuses_unmoved_width_even_if_setter_claims_request(monkeypatch) -> None:
+    table = _NativeBom(refused_column=1)
+    with pytest.raises(RuntimeError, match="part column width"):
+        drawing._validate_bom(_bom_adapter(monkeypatch, table), table, table.counts)
+
+
+def test_bom_refuses_two_grown_native_rows_not_a_predicted_height(monkeypatch) -> None:
+    table = _NativeBom(grown_rows=(41, 42))
+    with pytest.raises(RuntimeError, match="bottom edge"):
+        drawing._validate_bom(_bom_adapter(monkeypatch, table), table, table.counts)
+
+
+@pytest.mark.parametrize("change", ("Number", "description", "quantity", "hidden", "height", "split"))
+def test_settled_bom_refuses_late_native_changes(monkeypatch, change) -> None:
+    table = _NativeBom()
+    adapter = _bom_adapter(monkeypatch, table)
+    items = dict(drawing._validate_bom(adapter, table, table.counts))
+    if change == "Number":
+        table.cells[-1][1] = "MHA-VN-"
+    elif change == "description":
+        table.cells[-1][2] = table.cells[-1][2][:-3]
+    elif change == "quantity":
+        table.cells[-1][3] = "99"
+    elif change == "hidden":
+        table.hidden_rows.add(42)
+    elif change == "height":
+        table.heights[-1] = 0.030
+    else:
+        table.split = (1, 0, 2, 0, 24)
+    with pytest.raises(RuntimeError, match="BOM refused"):
+        drawing._assert_native_bom(adapter, table, table.counts, items, phase="settled")
+
+
+def _printed_bom_cell_fixture():
+    """Glyph inputs to the real ink consumer, with independently placed rows."""
+    geometry = drawing.BomGeometry(
+        (0.018, 0.262), (0.012, 0.031, 0.109, 0.012), (0.0101683, 0.0101683),
+        (("ITEM NO.", "PART NUMBER", "DESCRIPTION", "QTY."),
+         ("1", "MHA-PD-007", "PAPER-DRIVE SUPPORT BAR", "1")),
+        (0, 1, 2, 3), (0.0127, 0.0127, 0.4191, 0.2667),
     )
-    assert wrapped <= len(drawing.GROUPED_DESCRIPTION_STEMS)
-    height = (len(drawing.BOM_PART_NUMBERS) + 1 + wrapped) * drawing.BOM_ROW_HEIGHT
-    assert left + width < template.title_block_left_m
-    assert top - height >= (
-        drawing.SHEET_INNER_BORDER_BOTTOM + drawing.BOM_BORDER_CLEARANCE
+    glyphs = []
+    top = geometry.anchor[1]
+    for row, height in enumerate(geometry.row_heights):
+        left = geometry.anchor[0]
+        for column, width in enumerate(geometry.column_widths):
+            baseline = top - 0.004
+            for index, char in enumerate("".join(geometry.cells[row][column].split())):
+                x = left + 0.002 + index * 0.001
+                glyphs.append(Glyph(char, x, baseline, x + 0.0008, baseline + 0.002, baseline))
+            left += width
+        top -= height
+    return geometry, PageInk(0.4318, 0.2794, tuple(glyphs), (), ())
+
+
+def test_full_number_fits_the_cell_at_empirically_measured_native_glyph_widths() -> None:
+    # DT R11's unchanged Century Gothic advances: the widest VN identity is
+    # 28.52 mm, so a 22 mm cell loses its suffix even though native text is full.
+    advances = {
+        **dict.fromkeys("0123456789", 0.00258611),
+        "M": 0.00428859, "H": 0.00318727, "A": 0.00345347,
+        "-": 0.00154931, "V": 0.00327594, "N": 0.00345347,
+    }
+    geometry, page = _printed_bom_cell_fixture()
+    widths = tuple(drawing.BOM_COLUMN_WIDTHS.values())
+    cells = (geometry.cells[0], ("1", "MHA-VN-021", geometry.cells[1][2], "1"))
+    geometry = replace(geometry, column_widths=widths, cells=cells)
+    number_left = geometry.anchor[0] + widths[0]
+    glyphs = [g for g in page.glyphs if not (0.030 <= g.xmin < 0.061 and g.ymin < 0.252)]
+    x, baseline = number_left + 0.001243 / 2.0, 0.2478317
+    for char in cells[1][1]:
+        advance = advances[char]
+        glyphs.append(Glyph(char, x, baseline, x + advance, baseline + 0.002, baseline))
+        x += advance
+    fit = drawing.bom_cell_fits(geometry, replace(page, glyphs=tuple(glyphs)))[5]
+    assert fit.printed == cells[1][1]
+    assert fit.physical_rows == 1 and not fit.violations
+
+
+def test_printed_bom_counts_physical_number_baselines_and_keeps_description() -> None:
+    geometry, page = _printed_bom_cell_fixture()
+    fits = drawing.bom_cell_fits(geometry, page)
+    assert all(not fit.violations for fit in fits)
+    assert fits[5].printed == "MHA-PD-007" and fits[5].physical_rows == 1
+    # Exactly the same characters, split at the observed R11 Number break.
+    wrapped = tuple(
+        replace(g, ymin=g.ymin - 0.004, ymax=g.ymax - 0.004, baseline=g.baseline - 0.004)
+        if g.char.isdigit() and 0.030 <= g.xmin < 0.061 and g.ymin < 0.252 else g
+        for g in page.glyphs
     )
-    assert top < template.height_m - 0.003
+    fit = drawing.bom_cell_fits(geometry, replace(page, glyphs=wrapped))[5]
+    assert fit.printed == "MHA-PD-007" and fit.physical_rows == 2
+    assert any("physical rows" in violation for violation in fit.violations)
+
+
+def test_printed_description_can_wrap_only_inside_its_cell() -> None:
+    geometry, page = _printed_bom_cell_fixture()
+    wrapped = tuple(
+        replace(g, ymin=g.ymin - 0.004, ymax=g.ymax - 0.004, baseline=g.baseline - 0.004)
+        if 0.070 < g.xmin < 0.170 and g.ymin < 0.252 else g
+        for g in page.glyphs
+    )
+    fit = drawing.bom_cell_fits(geometry, replace(page, glyphs=wrapped))[6]
+    assert fit.printed == "PAPER-DRIVESUPPORTBAR" and fit.physical_rows == 2
+    assert not fit.violations
+    # A row whose setter echoed a short request can clip the same glyphs.
+    shorter = replace(geometry, row_heights=(geometry.row_heights[0], 0.0055))
+    assert drawing.bom_cell_fits(shorter, replace(page, glyphs=wrapped))[6].violations
+
+
+def test_printed_bom_refuses_missing_suffix_quantity_and_cell_ink_overrun() -> None:
+    geometry, page = _printed_bom_cell_fixture()
+    for column, fit_index in ((1, 5), (3, 7)):
+        left = geometry.anchor[0] + sum(geometry.column_widths[:column])
+        right = left + geometry.column_widths[column]
+        missing = tuple(g for g in page.glyphs if not (
+            left <= g.xmin < right and g.ymin < 0.252 and g.char.isdigit()
+        ))
+        fit = drawing.bom_cell_fits(geometry, replace(page, glyphs=missing))[fit_index]
+        assert any("full cell text" in violation for violation in fit.violations)
+    # Centre stays in the Number cell; its actual ink crosses the left rule.
+    crossed = tuple(
+        replace(g, xmin=0.0295, xmax=0.0315)
+        if g.char == "M" and 0.030 <= g.xmin < 0.061 and g.ymin < 0.252 else g
+        for g in page.glyphs
+    )
+    assert any("ruled cell" in v for v in drawing.bom_cell_fits(
+        geometry, replace(page, glyphs=crossed)
+    )[5].violations)
 
 
 def test_bom_rows_are_exactly_the_round10_families() -> None:
@@ -1077,6 +1341,31 @@ def test_the_exploded_view_steps_down_on_its_native_outline() -> None:
     with pytest.raises(ValueError, match=r"no t scale fits: .*1:3.*1:4.*1:5"):
         drawing.step_down_to_fit(view.outline_at, ladder, limits, name="t")
     assert set(drawing.EXPLODED_CAPTIONS) == set(ladder)
+
+
+@pytest.mark.parametrize(
+    ("native_width_at_one_third", "expected"),
+    ((0.120, (1.0, 3.0)), (0.200, (1.0, 4.0)), (0.2119, (1.0, 5.0))),
+)
+def test_final_sheet_scale_follows_each_exploded_fit_transition(
+    native_width_at_one_third, expected,
+) -> None:
+    view = _PaddedView((native_width_at_one_third, 0.100), (1.0, 3.0), 0.0127)
+    selected, _ = drawing.step_down_to_fit(
+        view.outline_at, drawing.EXPLODED_SCALE_LADDER, drawing.EXPLODED_RING_LIMITS,
+        name="platen and support",
+    )
+    scales = drawing.package_sheet_scales(selected)
+    assert selected == expected
+    assert scales[drawing.SHEET_NAMES[2]] == selected
+    # A later build which fits at 1:3 cannot inherit this build's 1:4/1:5.
+    next_view = _PaddedView((0.120, 0.100), (1.0, 3.0), 0.0127)
+    next_selected, _ = drawing.step_down_to_fit(
+        next_view.outline_at, drawing.EXPLODED_SCALE_LADDER, drawing.EXPLODED_RING_LIMITS,
+        name="platen and support",
+    )
+    assert drawing.package_sheet_scales(next_selected)[drawing.SHEET_NAMES[2]] == (1.0, 3.0)
+    assert scales[drawing.SHEET_NAMES[2]] == expected
 
 
 def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:

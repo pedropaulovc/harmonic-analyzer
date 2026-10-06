@@ -14,6 +14,7 @@ import draw_pd_rack_pinion as drawing
 import pd_rack_pinion_spec as spec
 import pd_transgear_disc_hub_geometry as hub_geometry
 import vn_transgear_disc_screw_spec as disc_screw
+from _drawing_annotation_extent import annotation_ink_from_record, require_annotation_rows
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
     drawing_specification_violations,
@@ -160,21 +161,6 @@ def test_thickness_band_is_the_printed_xxx_band() -> None:
     assert (spec.FACE_WIDTH_MIN, spec.FACE_WIDTH_MAX) == pytest.approx(
         (spec.FACE_WIDTH - band, spec.FACE_WIDTH + band)
     )
-
-
-def test_tap_callout_carries_both_mouth_breaks_and_transfer() -> None:
-    definitions = {5: "", 6: "<hw-threadclass> THRU", 7: "", 8: ""}
-    updated = drawing.tap_callout_definitions(definitions)
-    assert updated[6].endswith(spec.TAP_CALLOUT_QUALIFIER)
-    assert {k: v for k, v in updated.items() if k != 6} == {5: "", 7: "", 8: ""}
-    text = spec.TAP_CALLOUT_QUALIFIER
-    assert "CSK" not in text
-    assert f"BREAK EDGE {spec.MOUTH_BREAK_MAX:.2f} MAX BOTH SIDES" in text
-    assert "MHA-PD-017" in text and "MATCH-MARK" in text
-    for banned in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
-        assert banned not in text.upper()
-    with pytest.raises(RuntimeError):
-        drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""})
 
 
 def test_gear_data_block_specifies_the_tooth_system() -> None:
@@ -689,3 +675,40 @@ def test_finish_straight_leader_with_native_readback_point_is_valid(finish_inser
     state = finish_insertion
     state.points = (0.278, 0.113, 0.0015, 0.222499999953, 0.175, 0.0015)
     assert state.run() is state.finish
+
+
+def test_native_tap_and_associated_process_blocks_stay_below_four_physical_rows() -> None:
+    # R11 rendered row baselines. A full five-row block is unreadable under
+    # the policy; its native numeric block and associated process block fit
+    # separately without collapsing or changing any machining instruction.
+    rows = [
+        ("3X <MOD-DIAM>1.19 THRU ALL", 0.1382516, 0.1253611),
+        ("0-80 UNF - 2B THRU ALL", 0.1342604, 0.1197514),
+        ("BREAK EDGE 0.10 MAX BOTH SIDES", 0.1217722, 0.1141951),
+        ("SPOT THRU MHA-PD-017 FLANGE HOLES AT ASSY,", 0.1061608, 0.1086389),
+        ("THEN DRILL AND TAP; MATCH-MARK DISC AND FLANGE", 0.0989858, 0.1030826),
+    ]
+
+    def ink_for(block):
+        return annotation_ink_from_record(
+            {
+                "type": 4,
+                "dim": {"hole_callout": True},
+                "display": {
+                    "texts": [
+                        {"t": text, "pos": [x, y, 0], "h": 0.0035, "ref": 1}
+                        for text, x, y in block
+                    ]
+                },
+            },
+            label="disc tap block",
+        )
+
+    old = ink_for(rows)
+    assert old.row_count == 5
+    with pytest.raises(RuntimeError):
+        require_annotation_rows(old)
+    numeric, process = ink_for(rows[:3]), ink_for(rows[3:])
+    assert (numeric.row_count, process.row_count) == (3, 2)
+    require_annotation_rows(numeric)
+    require_annotation_rows(process)

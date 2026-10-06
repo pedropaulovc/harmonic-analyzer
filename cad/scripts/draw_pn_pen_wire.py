@@ -9,6 +9,10 @@ The wire is a hair-thin Ø0.8 steel run (WIRE 2 of the amplification chain),
 modelled as the straight rest-pose length only.  The sheet magnifies to 2:1 so
 the run is legible; the isometric matches.
 
+The elevation caption has its own lower-left field below the complete notes.
+Native note rows and the run dimension's strokes are re-read after the final
+rebuild, before export; no note wording, font, view, or model geometry is changed.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_pn_pen_wire.py pen-wire
@@ -21,18 +25,29 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    PLACE_SETTLE_M,
+    annotation_ink,
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_clear,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 
@@ -55,12 +70,58 @@ SHEET_SCALE = (2.0, 1.0)  # 2:1 whole sheet (hair-thin 62.7 mm wire)
 # the notes fill the lower-left.
 FRONT_CENTER = (0.110, 0.155)
 ISO_CENTER = (0.300, 0.170)
+ELEVATION_CAPTION_XY = (0.040, 0.032)
+ELEVATION_CAPTION_FIELD = (0.030, 0.025, 0.100, 0.035)
 
 # Per-view survivor of the marked-dimension import: the run length only (the
 # Ø0.8 diameter is a note -- a 0.8 mm circle is below the view's ink width).
 FRONT_KEEP = {
     "Depth": (0.078, 0.155),
 }
+
+
+def _assert_settled_layout(
+    adapter: Any, annotations: dict[str, Any], note_rows: dict[str, int]
+) -> None:
+    """Prove full native note rows, text/line clearance, and frame/title containment."""
+    region = sheet_region(adapter)
+    drawable = (region.xmin, region.ymin, region.xmax, region.ymax)
+    fields = {label: drawable for label in annotations}
+    fields["Elevation View Note"] = ELEVATION_CAPTION_FIELD
+    inks = assert_annotation_reservations(adapter, annotations, fields)
+    caption_gap = (
+        inks["Manufacturing Notes"].text[1] - inks["Elevation View Note"].text[3]
+    )
+    if caption_gap <= CLEAR_GAP_M:
+        raise RuntimeError(
+            f"elevation caption needs more than 2 mm below the full notes; "
+            f"native gap is {caption_gap * 1000.0:.4f} mm"
+        )
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    obstacles = {
+        "frame left": (0.0, 0.0, region.xmin, template.height_m),
+        "frame right": (region.xmax, 0.0, template.width_m, template.height_m),
+        "frame bottom": (0.0, 0.0, template.width_m, region.ymin),
+        "frame top": (0.0, region.ymax, template.width_m, template.height_m),
+        "title block": (
+            template.title_block_left_m,
+            0.0,
+            template.width_m,
+            template.title_block_top_m,
+        ),
+    }
+    for label, ink in inks.items():
+        if label in note_rows and ink.row_count != note_rows[label]:
+            raise RuntimeError(f"{label} did not retain its complete native note rows")
+        for row in ink.rows:
+            require_clear(label, row, obstacles)
+        for index, line in enumerate(ink.lines):
+            box = line.box()
+            require_clear(
+                f"{label} native line {index}",
+                (box.xmin, box.ymin, box.xmax, box.ymax),
+                obstacles,
+            )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -110,11 +171,38 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.016, 0.086)
-    add_property_linked_note(adapter, "Elevation View Note", 0.040, 0.036)
-    add_property_linked_note(adapter, "Isometric View Note", 0.270, 0.100)
+    front_dimensions = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    annotations = {
+        dimension_name(adapter, annotation): annotation for annotation in front_dimensions
+    }
+    notes = {}
+    for property_name, xy in (
+        ("Manufacturing Notes", (0.016, 0.086)),
+        ("Elevation View Note", ELEVATION_CAPTION_XY),
+        ("Isometric View Note", (0.270, 0.100)),
+    ):
+        note = _early_bound(add_property_linked_note(adapter, property_name, *xy), "INote")
+        # INote.GetAnnotation() is a method returning nullable VT_DISPATCH
+        # (sldworks_2026.py), not a property or an IAnnotation already.
+        annotation = note.GetAnnotation()
+        if annotation is None:
+            raise RuntimeError(f"{property_name} has no native annotation")
+        notes[property_name] = _early_bound(annotation, "IAnnotation")
+    annotations.update(notes)
+    rebuild_drawing(adapter, label="pen-wire annotation reservations")
+    note_rows = {
+        label: annotation_ink(adapter, annotation, label=label).row_count
+        for label, annotation in notes.items()
+    }
+    place_annotation_in_field(
+        adapter,
+        annotations["Elevation View Note"],
+        label="Elevation View Note",
+        field=ELEVATION_CAPTION_FIELD,
+        margin=CLEAR_GAP_M + PLACE_SETTLE_M,
+    )
 
     return await finalize_drawing(
         adapter,
@@ -123,6 +211,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen Wire Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_settled_layout(adapter, annotations, note_rows),
+        ),
     )
 
 

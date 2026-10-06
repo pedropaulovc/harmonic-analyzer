@@ -1,4 +1,4 @@
-r"""Create the curated machinist drawing for the pen square rod."""
+r"""Create the pen square-rod drawing with settled native ink reservations."""
 
 from __future__ import annotations
 
@@ -9,6 +9,11 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_clear,
+)
 from _drawing_common import (
     DrawingOutputs,
     _edge_endpoint_key,
@@ -18,6 +23,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     project_part_pmi,
     new_project_drawing,
@@ -31,7 +37,7 @@ from _drawing_common import (
 )
 from _gear_drawing_entities import visible_circle_edge
 from _hole_spec import blind_cut_dia_mm
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _surface_finish import surface_finish_by_key
 from pn_pen_rod_spec import (
     GEOMETRIC_CONTROLS,
@@ -70,15 +76,6 @@ ISO_CENTER = (0.340, 0.195)
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0] - 0.030, FRONT_CENTER[1]),
-    # x offset -0.034 (the Depth spelling below), NOT the view centre: Section
-    # measures the 5 mm square across, so at 1:1 its two extension lines land
-    # 4.7 mm apart (measured x=0.0679 and x=0.0726) while the toleranced text
-    # renders 24.5 mm wide. Centred on FRONT_CENTER[0] the text spanned
-    # 0.0580..0.0820, so BOTH extension lines ran through it and struck out
-    # "+0.00/-0.05". text_xy is the text CENTRE, so -0.034 puts the run at
-    # 0.0238..0.0483: clear of the left extension line by 19.6 mm and of the
-    # drawn border rule (gray, x=~0.0126) by ~11.2 mm. No gate sees this -- a
-    # dimension exposes no GetExtent, so only the render shows it.
     "Section": (
         FRONT_CENTER[0] - 0.034,
         FRONT_CENTER[1] - ROD_LENGTH / 2000.0 - 0.012,
@@ -90,6 +87,47 @@ TOP_KEEP = {
 # No-oversize bands on both functional slide dimensions live on the source model.
 DIMENSION_CALLOUTS: dict[str, str] = {}
 TOP_DIMENSION_CALLOUTS: dict[str, str] = {}
+
+# Separate the two tolerance stacks, hole locator and view caption; the complete
+# property-linked process note uses the otherwise empty mid-right shelf.
+ANNOTATION_FIELDS = {
+    "Section": (0.020, 0.052, 0.055, 0.071),
+    "Depth": (0.020, 0.234, 0.055, 0.255),
+    "wire-hole centerline location": (0.020, 0.219, 0.052, 0.234),
+    "bottom_end_squareness": (0.073, 0.060, 0.112, 0.072),
+    "Manufacturing Notes": (0.155, 0.085, 0.415, 0.111),
+    "Top View Note": (0.095, 0.252, 0.150, 0.266),
+}
+
+
+def _assert_release_readability(
+    adapter: Any, annotations: dict[str, Any], views: tuple[Any, ...]
+) -> None:
+    """Read the ink the final export will print, not insertion coordinates."""
+    inks = assert_annotation_reservations(
+        adapter,
+        annotations,
+        ANNOTATION_FIELDS,
+        row_limits={"Manufacturing Notes": 2, "Top View Note": 1},
+        check_own_lines=("Section", "Depth", "wire-hole centerline location"),
+    )
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    title = {
+        "title-block": (
+            template.title_block_left_m, 0.0,
+            template.width_m, template.title_block_top_m,
+        )
+    }
+    view_boxes = {
+        f"view {index}": tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+        for index, view in enumerate(views)
+    }
+    for label in ANNOTATION_FIELDS:
+        ink = inks[label]
+        require_clear(label, ink.text, {**title, **view_boxes})
+        for line in ink.lines:
+            box = line.box()
+            require_clear(label, (box.xmin, box.ymin, box.xmax, box.ymax), title)
 
 
 @_telemetry.traced("drawing.verify_dimension_value", label_param="label")
@@ -250,7 +288,7 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         p0=front_side,
         p1=hole_center,
-        text_xy=(FRONT_CENTER[0] - 0.030, hole_center_y + 0.020),
+        text_xy=(FRONT_CENTER[0] - 0.040, hole_center_y + 0.010),
         label="wire-hole centerline location",
         orientation="horizontal",
         entities=(left_edge, wire_hole_edge),
@@ -261,14 +299,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _require_dimension_value(
         wire_hole_x, ROD_SECTION / 2.0, label="wire-hole centerline location"
     )
-    # Text up-RIGHT of the top view, not beside it: at (+0.034, +0.017) the
-    # leader climbed 45 deg into the 4:1 top view's outline (audit
-    # leader-crosses-view, View3). (+0.046, +0.015) puts the shoulder at
-    # y ~0.2322 from x ~0.0959, so the 25 deg leader passes 1.9 mm under the top
-    # view's padded outline corner (85.6, 229.4) and 9 mm from its square; the
-    # text (x 0.0975..0.1344, y 0.2331..0.2367) sits 2.5 mm above the right
-    # view's outline and 12 mm right of the top view's.
-    add_native_hole_callout(
+    wire_hole_callout = add_native_hole_callout(
         adapter,
         front,
         edge=wire_hole_edge,
@@ -276,13 +307,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen-rod wire hole",
     )
 
-    # GD&T is model PMI (pn_pen_rod_spec.PART_DATUMS/GEOMETRIC_CONTROLS, authored
-    # by build_pn_pen_rod) — project it and place it where the hand-authored
-    # symbols used to sit. All three annotations land in the single front view,
-    # and the projection fails loud on any mismatch. The squareness frame stays BELOW the rod: up-right
-    # of its target its leader crossed the Ra's leader in an X at the rod's
-    # bottom corner; from below the two run on opposite sides of that corner.
-    project_part_pmi(
+    # Keep the bottom squareness frame below the 145.00 witness at y=0.075.
+    # Its model PMI, native attachment and tolerance remain unchanged.
+    pmi_annotations = project_part_pmi(
         adapter,
         placements={
             "datum:A": PmiDrawingPlacement(
@@ -297,7 +324,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ),
             "bottom_end_squareness": PmiDrawingPlacement(
                 view=front,
-                position=(FRONT_CENTER[0] + 0.005, FRONT_CENTER[1] - 0.070),
+                position=(FRONT_CENTER[0] + 0.010, FRONT_CENTER[1] - 0.082),
                 attachment_xy=front_bottom,
             ),
         },
@@ -305,19 +332,8 @@ async def build(adapter: Any) -> dict[str, str]:
         controls=GEOMETRIC_CONTROLS,
         label="pen rod PMI",
     )
-    # LEFT of the rod, at the fleet's 2.5 mm Ra height: from (0.170, 0.068) at
-    # the default height the leader ran 100 mm back across the right view and
-    # the 145.00 dimension line (audit leader-crosses-line / leader-crosses-view).
-    # The slide face is the rod's -X face, seen edge-on as its LEFT edge
-    # (x 0.0675), so the only uncrossed approach is from the band between the
-    # front view's outline (x 0.0619) and the 150.00 dimension line (x 0.040) --
-    # 22 mm, too narrow for the default ~42 mm body, wide enough for the 2.5 mm
-    # one (~17 mm: x-0.0022 to x+0.0147, y to y+0.0072). Target down-RIGHT of
-    # the anchor, so the bent leader's 7.6 mm stub runs right under the open ▽
-    # and drops 4.7 mm onto the face -- away from the body, never through it.
-    # Body x 0.0426..0.0595 keeps 2.6 mm off the 150.00 line and 2.4 mm off the
-    # view outline; its top (0.1121) stays 4.4 mm under datum A's box.
-    add_surface_finish(
+    # The established native 2.5 mm slide-finish symbol stays left of the rod.
+    slide_finish = add_surface_finish(
         adapter,
         front,
         edge_xy=(front_side[0], FRONT_CENTER[1] - 0.050),
@@ -327,10 +343,25 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
 
-    # The manufacturing note is wider than most sheets' notes. Keep its anchor
-    # near the left zone margin; the layout audit owns the title-block clearance.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.015, 0.058)
-    add_property_linked_note(adapter, "Top View Note", 0.036, 0.266)
+    manufacturing_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.160, 0.106
+    )
+    top_note = add_property_linked_note(adapter, "Top View Note", 0.100, 0.263)
+    annotations = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in (*front_annotations, *top_annotations)
+    }
+    annotations.update(pmi_annotations)
+    annotations.update({
+        "wire-hole length location": _early_bound(wire_hole_y, "IDisplayDimension").GetAnnotation(),
+        "wire-hole centerline location": _early_bound(wire_hole_x, "IDisplayDimension").GetAnnotation(),
+        "wire-hole callout": _early_bound(wire_hole_callout, "IDisplayDimension").GetAnnotation(),
+        "slide face finish": _early_bound(slide_finish, "ISFSymbol").GetAnnotation(),
+        "Manufacturing Notes": _early_bound(manufacturing_note, "INote").GetAnnotation(),
+        "Top View Note": _early_bound(top_note, "INote").GetAnnotation(),
+    })
+    for label, field in ANNOTATION_FIELDS.items():
+        place_annotation_in_field(adapter, annotations[label], label=label, field=field)
 
     return await finalize_drawing(
         adapter,
@@ -339,6 +370,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen Rod Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_release_readability(adapter, annotations, (front, right, top, iso)),
+        ),
     )
 
 

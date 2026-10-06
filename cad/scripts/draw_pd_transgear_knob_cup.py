@@ -16,13 +16,15 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import assert_annotation_reservations, place_annotation_in_field
 from _drawing_common import (
     DrawingOutputs,
     add_surface_finish,
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -80,13 +82,18 @@ SECTION_LINE = (
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
 
 FACE_KEEP = {
-    "BoreDia": (0.040, 0.225),
+    "BoreDia": (0.075, 0.235),
 }
-# The section spans sheet y 0.154 .. 0.186: the O.D. below it, the length
-# outboard on the right.
+# The section spans sheet y 0.154 .. 0.186. Reserve the caption's native
+# two-row field at y 0.118 .. 0.133; the O.D. owns the lower y 0.096 .. 0.110
+# lane, and the length stands outboard on the right.
 SECTION_KEEP = {
-    "CupDia": (0.200, 0.130),
+    "CupDia": (0.200, 0.105),
     "CupLength": (0.255, SECTION_CENTER[1]),
+}
+TEXT_FIELDS = {
+    "BoreDia": (0.028, 0.222, 0.124, 0.253),
+    "CupDia": (0.181, 0.096, 0.220, 0.110),
 }
 
 
@@ -195,6 +202,22 @@ async def build(adapter: Any) -> dict[str, str]:
         label="cup front (running) face finish",
         char_height=0.0025,
     )
+    allocated = {
+        dimension_name(adapter, item): item
+        for item in [*face_annotations, *section_annotations]
+    }
+    captions = [
+        _early_bound(raw, "IAnnotation")
+        for raw in section.GetAnnotations() or ()
+        if int(_early_bound(raw, "IAnnotation").GetType()) == 6
+    ]
+    if len(captions) != 1:
+        raise RuntimeError("knob cup section has no unique native caption")
+    allocated["section caption"] = captions[0]
+    for name, field in TEXT_FIELDS.items():
+        place_annotation_in_field(
+            adapter, allocated[name], label=name, field=field, margin=0.0
+        )
 
     return await finalize_drawing(
         adapter,
@@ -203,6 +226,15 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Knob Cup Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: assert_annotation_reservations(
+                adapter,
+                allocated,
+                TEXT_FIELDS,
+                text_heights={name: 0.0035 for name in TEXT_FIELDS},
+                check_own_lines=("BoreDia", "CupDia"),
+            ),
+        ),
     )
 
 

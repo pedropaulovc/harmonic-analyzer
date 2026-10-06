@@ -21,7 +21,13 @@ from typing import Any
 from mg_magnifying_wheel_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    annotation_ink,
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_clear,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -30,6 +36,8 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
+    dimension_name,
+    rebuild_drawing,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -38,7 +46,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _surface_finish import surface_finish_by_key
 from mg_magnifying_wheel_spec import (
     BORE_DIA,
@@ -80,7 +88,9 @@ FRONT_KEEP = {
         FRONT_CENTER[1] + _RIM_R + 0.006,
     ),
     "HubDiaDim": (FRONT_CENTER[0] + _HUB_R + 0.030, FRONT_CENTER[1] - 0.006),
-    "BoreDiaDim": (FRONT_CENTER[0] - _HUB_R - 0.030, FRONT_CENTER[1] + 0.004),
+    # Outside the rim and below the horizontal centre mark. Moving this
+    # native bore callout leaves both coincident centre marks untouched.
+    "BoreDiaDim": (0.046, FRONT_CENTER[1] - 0.022),
     "SpokeWidthDim": (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] + _HUB_R + 0.020),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
@@ -91,6 +101,44 @@ DIMENSION_CALLOUTS = {
 
 RIGHT_HALF_HUB = HUB_AXIAL * SHEET_SCALE[0] / 2000.0
 RIGHT_HALF_RIM = RIM_AXIAL * SHEET_SCALE[0] / 2000.0
+
+TEXT_FIELDS = {
+    "BoreDiaDim": (0.023, 0.117, 0.071, 0.140),
+    "hub drum finish": (0.176, 0.088, 0.212, 0.112),
+}
+
+
+def _assert_readability(
+    adapter: Any, allocated: dict[str, Any], views: tuple[Any, ...], char_height: float
+) -> None:
+    """Check the actual callout against both native centre-mark strokes."""
+    annotations = dict(allocated)
+    allocated_names = {
+        str(_early_bound(item, "IAnnotation").GetName()) for item in allocated.values()
+    }
+    for index, view in enumerate(views):
+        for raw in _early_bound(view, "IView").GetAnnotations() or ():
+            annotation = _early_bound(raw, "IAnnotation")
+            if int(annotation.Visible) in (2, 3):
+                continue
+            name = str(annotation.GetName())
+            if name not in allocated_names:
+                annotations[f"view {index}: {name}"] = annotation
+    inks = assert_annotation_reservations(
+        adapter,
+        annotations,
+        TEXT_FIELDS,
+        text_heights={"hub drum finish": char_height, "RimOuterDiaDim": char_height},
+        check_own_lines=("BoreDiaDim",),
+    )
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    keepout = (template.title_block_left_m, 0.0, template.width_m, template.title_block_top_m)
+    for label in TEXT_FIELDS:
+        ink = inks[label]
+        require_clear(label, ink.text, {"title block": keepout})
+        for line in ink.lines:
+            box = line.box()
+            require_clear(label, (box.xmin, box.ymin, box.xmax, box.ymax), {"title block": keepout})
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -149,6 +197,14 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    allocated = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in front_annotations
+    }
+    heights = annotation_ink(adapter, allocated["RimOuterDiaDim"], label="ordinary rim text").heights
+    char_height = heights[0]
+    if any(abs(height - char_height) > 1e-7 for height in heights):
+        raise RuntimeError("wheel ordinary dimension has mixed native text heights")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to wheel bore")
 
@@ -203,7 +259,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         label="rim runout to the bore",
     )
-    add_surface_finish(
+    finish = add_surface_finish(
         adapter,
         front,
         # Land at -60 deg, mid-window between the -30/-90 spokes, and hang the
@@ -213,6 +269,7 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.065),
         control=surface_finish_by_key(SURFACE_FINISHES, "hub_drum"),
         label="hub drum finish",
+        char_height=char_height,
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
@@ -221,6 +278,11 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Isometric View Note", 0.320, 0.085)
 
+    allocated["hub drum finish"] = _early_bound(finish, "ISFSymbol").GetAnnotation()
+    rebuild_drawing(adapter, label="wheel bore annotation field")
+    for label, field in TEXT_FIELDS.items():
+        place_annotation_in_field(adapter, allocated[label], label=label, field=field)
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -228,6 +290,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Magnifying Wheel Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_readability(adapter, allocated, (front, right), char_height),
+        ),
     )
 
 

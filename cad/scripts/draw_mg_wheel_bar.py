@@ -20,15 +20,22 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _drawing_annotation_extent import (
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
     add_edge_dimension,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
@@ -67,7 +74,8 @@ LEFT_END = FRONT_CENTER[0] - _HALF_LEN
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.030),
-    "Side": (LEFT_END - 0.020, FRONT_CENTER[1]),
+    # The old 20 mm offset put the leading digit beyond the native zone frame.
+    "Side": (LEFT_END - 0.012, FRONT_CENTER[1]),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
@@ -125,7 +133,9 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right):
         set_hidden_lines_visible(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
     curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to wheel-bar bores")
@@ -162,6 +172,31 @@ async def build(adapter: Any) -> dict[str, str]:
     # (x >= 0.264) -- the first run landed it 25.6 x 4.5 mm into the block.
     add_property_linked_note(adapter, "Isometric View Note", 0.180, 0.070)
 
+    # Measure the ordinary linear dimension's rows and all rendered primitives;
+    # a callout shoulder or text anchor alone cannot prove the outside arrows fit.
+    rebuild_drawing(adapter, label="measure wheel-bar side reservation")
+    annotations = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in front_annotations
+    }
+    region = sheet_region(adapter)
+    side_fields = {
+        "Side": (
+            region.xmin,
+            FRONT_CENTER[1] - 0.015,
+            LEFT_END,
+            FRONT_CENTER[1] + 0.015,
+        )
+    }
+    place_annotation_in_field(
+        adapter, annotations["Side"], label="Side", field=side_fields["Side"]
+    )
+
+    def settled_side_ink() -> None:
+        # Re-read after finalizer regeneration: text, witnesses and arrowheads
+        # must all remain inside the actual sheet frame, irrespective of audit mode.
+        assert_annotation_reservations(adapter, annotations, side_fields)
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -169,6 +204,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Wheel Bar Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(settled_side_ink,),
     )
 
 

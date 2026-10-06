@@ -1,9 +1,13 @@
 r"""Create the curated machinist drawing for the pen v-block.
 
-The SLDPRT remains authoritative.  This recipe supplies only the pen-v-block
+The SLDPRT remains authoritative. This recipe supplies only the pen-v-block
 views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
+
+The repaired annotation lanes are measured again after the final rebuild:
+stock-depth ink stays above the title band, and native callout text stays off
+neighbouring views, witnesses, datums and dimension lines.
 
 The sheet runs at 4:1 (the block is 32 mm end to end); the isometric carries an
 explicit 2:1 override so it stays clear of the title block.
@@ -22,7 +26,12 @@ from typing import Any
 from pn_pen_v_block_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_clear,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -34,6 +43,7 @@ from _drawing_common import (
     dimension_name,
     finalize_drawing,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
     set_basic_dimension,
     set_dimension_callouts,
@@ -41,7 +51,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _surface_finish import surface_finish_by_key
 from pn_pen_v_block_spec import (
     BLOCK_DEPTH,
@@ -77,9 +87,9 @@ SHEET_SCALE = (4.0, 1.0)
 # view is 128 x 72 mm.  Third angle: the top view (block seen from above,
 # carrying the two pen bores) sits ABOVE the front view; the right view (16 x 18
 # stock section) sits to its right.
-FRONT_CENTER = (0.130, 0.115)
-TOP_CENTER = (0.130, 0.215)
-RIGHT_CENTER = (0.265, 0.115)
+FRONT_CENTER = (0.130, 0.135)
+TOP_CENTER = (0.130, 0.225)
+RIGHT_CENTER = (0.265, 0.135)
 ISO_CENTER = (0.360, 0.225)
 
 
@@ -107,17 +117,15 @@ FRONT_KEEP = {
     # dim would overprint the top view's Bore0X (10.00) above the front view;
     # it goes in the free band under the front view instead (the old slit row).
     "ScrewHoleCx": (_sheet_x(SCREW_HOLE_XY[0] / 2.0), 0.070),
-    # +0.012 keeps this vertical dimension's line (drawn at the text's x, from the
-    # block bottom up to the hole centre) out of datum C's box in the crowded
-    # corridor between the front and right views; its text still clears the front
-    # view's right edge (x=0.194) by ~3 mm.
-    "ScrewHoleCz": (_sheet_x(BLOCK_LENGTH) + 0.012, _front_y(SCREW_HOLE_XY[1])),
-    "ScrewHoleDiaDim": (_sheet_x(BLOCK_LENGTH) + 0.024, _front_y(16.0)),
+    # The text belongs between the endpoints, not on its own hole-centre
+    # witness. Keep the native line in the corridor left of datum C.
+    "ScrewHoleCz": (_sheet_x(BLOCK_LENGTH) + 0.012, _front_y(8.5)),
+    "ScrewHoleDiaDim": (_sheet_x(BLOCK_LENGTH) + 0.015, _front_y(16.0)),
 }
 TOP_KEEP = {
-    "Bore0X": (_sheet_x(BORE_X[0] / 2.0), TOP_CENTER[1] - 0.042),
-    "Bore1X": (_sheet_x(BORE_X[1] / 2.0), TOP_CENTER[1] - 0.052),
-    "Bore0Dia": (_sheet_x(BORE_X[0]) + 0.030, TOP_CENTER[1] + 0.042),
+    "Bore0X": (_sheet_x(BORE_X[0] / 2.0), 0.1885),
+    "Bore1X": (_sheet_x(BORE_X[1] / 2.0), 0.181),
+    "Bore0Dia": (0.030, 0.255),
     # Bottom groove band (a Top-plane sketch, so its Z dims project into the
     # top view). GrooveWidth's extension lines start at the groove edges' RIGHT
     # ends (x=0.202), so text LEFT of the view dragged them across the whole view
@@ -129,9 +137,11 @@ TOP_KEEP = {
     "GrooveZ0": (_sheet_x(0.0) - 0.032, TOP_CENTER[1] - 0.024),
 }
 RIGHT_KEEP = {
-    "Depth": (RIGHT_CENTER[0], 0.068),
-    # The groove rise, seen in the end section left of the right view.
-    "GrooveDepth": (RIGHT_CENTER[0] - 0.046, 0.088),
+    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.047),
+    # Move the entire groove-depth display to the right-hand lane. Its model
+    # witnesses extend below the stock; raising the aligned front/right group
+    # keeps those native strokes, not merely its text, clear of the title band.
+    "GrooveDepth": (RIGHT_CENTER[0] + 0.062, RIGHT_CENTER[1] - 0.028),
 }
 
 # Right-view half extents at 4:1: the 16 (Z) x 18 (Y) stock section.
@@ -142,6 +152,71 @@ DIMENSION_CALLOUTS = {
     "ScrewHoleDiaDim": "THRU",
     "Chamfer2dx": "X 45 DEG, 2 PLACES",
 }
+
+# Chamfer text leaves its short dimension line through the existing native
+# linear OffsetText path; no multiline suffix sits on a chamfer witness.
+CHAMFER_TEXT_POSITION = (0.275, 0.196)
+ANNOTATION_FIELDS = {
+    "Chamfer2dx": (0.250, 0.185, 0.305, 0.203),
+    "ScrewHoleCz": (0.205, 0.127, 0.226, 0.141),
+    "ScrewHoleDiaDim": (0.207, 0.154, 0.228, 0.173),
+    "Depth": (0.249, 0.079, 0.283, 0.096),
+    "GrooveDepth": (0.314, 0.098, 0.339, 0.118),
+    "datum C": (0.214, 0.108, 0.227, 0.123),
+    "block-height overall": (0.300, 0.127, 0.329, 0.143),
+    "block top-face parallelism": (0.296, 0.173, 0.332, 0.188),
+    "Bore0X": (0.062, 0.184, 0.092, 0.194),
+    "Bore1X": (0.095, 0.176, 0.128, 0.185),
+    "Bore0Dia": (0.020, 0.243, 0.050, 0.265),
+    "datum A": (0.171, 0.080, 0.185, 0.096),
+    "pen bore finish 0": (0.150, 0.252, 0.176, 0.266),
+    "pen bore finish 1": (0.180, 0.252, 0.206, 0.266),
+}
+
+
+def _assert_release_readability(
+    adapter: Any, annotations: dict[str, Any], views: tuple[Any, ...],
+    owners: dict[str, int],
+) -> None:
+    """Refuse actual text/line collisions or title intrusion after settling."""
+    inks = assert_annotation_reservations(
+        adapter,
+        annotations,
+        ANNOTATION_FIELDS,
+        text_heights={"pen bore finish 0": 0.0025, "pen bore finish 1": 0.0025},
+        # BASIC station boxes intentionally enclose their own text. Their
+        # witnesses still participate in all foreign row/line checks below.
+        check_own_lines=("Chamfer2dx", "ScrewHoleCz", "Depth", "GrooveDepth"),
+    )
+    chamfer = _early_bound(annotations["Chamfer2dx"], "IAnnotation")
+    display = _early_bound(chamfer.GetSpecificAnnotation(), "IDisplayDimension")
+    if display.OffsetText is not True:
+        raise RuntimeError("native chamfer text did not leave its dimension line")
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    title = {
+        "title-block": (
+            template.title_block_left_m, 0.0,
+            template.width_m, template.title_block_top_m,
+        )
+    }
+    view_boxes = {
+        index: tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+        for index, view in enumerate(views)
+    }
+    for label in ANNOTATION_FIELDS:
+        ink = inks[label]
+        # Like the native audit, exempt the owning view's padded outline:
+        # a witness or on-view symbol is allowed to reference its own geometry.
+        other_views = {
+            f"view {index}": box
+            for index, box in view_boxes.items()
+            if index != owners[label]
+        }
+        require_clear(label, ink.text, {**title, **other_views})
+        for line in ink.lines:
+            box = line.box()
+            require_clear(label, (box.xmin, box.ymin, box.xmax, box.ymax), title)
+
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -213,6 +288,9 @@ async def build(adapter: Any) -> dict[str, str]:
         [*front_annotations, *top_annotations, *right_annotations],
         DIMENSION_CALLOUTS,
     )
+    offset_dimension_text(
+        adapter, front_annotations, {"Chamfer2dx": CHAMFER_TEXT_POSITION}
+    )
     # The two bore stations from datum B are the nominal locations the A-B-C
     # position FCF controls, so they must be BASIC -- leaving them under the
     # general/title-block tolerance would double-tolerance the bore positions.
@@ -233,7 +311,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _bottom_land_x = (
         RIGHT_CENTER[0] - RIGHT_HALF_Z + GROOVE_Z0 / 2.0 * SHEET_SCALE[0] / 1000.0
     )
-    add_edge_dimension(
+    block_height = add_edge_dimension(
         adapter,
         right,
         p0=(_bottom_land_x, RIGHT_CENTER[1] - RIGHT_HALF_Y),
@@ -249,14 +327,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # Native datum/GD&T/surface annotations.  A = the bottom face the block
     # seats on; B = the left end the slit and both bore stations run from;
     # C = the broad front face.
-    # Hangs below the bottom edge (a perpendicular standoff -- an X offset would
-    # run along the edge and leave the attachment triangle no room). x=30 mm is
-    # the one pocket in the band below the view: the 26.00 dimension line stops
-    # at x=0.170 and the 32.00 sits down at y=0.058, so x 0.175..0.194 is clear
-    # between the edge and the 32.00 line. The 7.1 mm box lands at y 0.0639..0.071
-    # on an 8 mm leader, clearing the 32.00 line by 5.9 mm and the 32.00's right
-    # extension line (x=0.194) by 4.5 mm.
-    add_datum_feature(
+    # Datum A hangs below the unchanged bottom face, between the native lower
+    # dimension chain and the raised aligned view group.
+    datum_a = add_datum_feature(
         adapter,
         front,
         edge_xy=(_sheet_x(30.0), _front_y(0.0)),
@@ -264,7 +337,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="block bottom face",
     )
-    add_datum_feature(
+    datum_b = add_datum_feature(
         adapter,
         top,
         edge_xy=(_sheet_x(0.0), TOP_CENTER[1]),
@@ -272,15 +345,10 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="block left end",
     )
-    add_datum_feature(
+    datum_c = add_datum_feature(
         adapter,
         right,
         edge_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
-        # -0.010, not -0.016: symbol_xy is the box's RIGHT edge here (the leader
-        # arrives from the right), so the 7.1 mm box grows LEFT -- at -0.016 it
-        # spanned x 0.2097..0.2168 and the ScrewHoleCz dimension line, vertical at
-        # x=0.214, ran straight through it and struck out the "C". Pairs with the
-        # ScrewHoleCz move to x=0.206: box left edge 0.2157 now clears it by 9.7 mm.
         symbol_xy=(RIGHT_CENTER[0] - RIGHT_HALF_Z - 0.010, RIGHT_CENTER[1] - 0.020),
         datum="C",
         label="block broad face",
@@ -289,7 +357,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # the right silhouette, which coincides with the chamfer line for bore 1, and
     # off the top point, which sat 1 mm under the groove edge line.
     bore_r45 = 0.0113
-    add_feature_control_frame(
+    bore_position = add_feature_control_frame(
         adapter,
         top,
         # Bore 1's lower-right point, not bore 0's right point (0.114, 0.215):
@@ -305,11 +373,11 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="2X",
         label="pen bore position",
     )
-    add_feature_control_frame(
+    top_parallelism = add_feature_control_frame(
         adapter,
         right,
         edge_xy=(RIGHT_CENTER[0], RIGHT_CENTER[1] + RIGHT_HALF_Y),
-        frame_xy=(0.300, 0.165),
+        frame_xy=(0.300, RIGHT_CENTER[1] + RIGHT_HALF_Y + 0.014),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["block top-face parallelism"],
         datums=("A",),
@@ -318,48 +386,67 @@ async def build(adapter: Any) -> dict[str, str]:
     # Ra 1.6 on BOTH pen bores (the 2X functional pair) -- add_surface_finish
     # attaches to one edge, so each bore carries its own symbol; a single symbol
     # would leave the other Ø8 bore without the finish requirement.
-    #
-    # Both symbols sit ABOVE the top view at the fleet's 2.5 mm Ra height, each
-    # dropping onto its bore's upper-right 45 deg point. From the old right-side
-    # anchors (0.205, 0.244/0.220) both leaders had to run left across Bore1X's
-    # extension line (x=0.162) and, for bore 0, Bore0X's (x=0.098), the groove
-    # line and the Ø8.00 leader (audit leader-crosses-line x5). The band above
-    # the view (y 0.2526..0.2667) is 14 mm -- too low for the default ~19 mm
-    # body, enough for the 7 mm one. Bore 0's leader passes 4 mm under the Ø8.00
-    # shoulder; its text (x 0.1603..0.1697) is 9.9 mm from bore 1's leader. Both
-    # bodies sit 2.4 mm above the view outline, tops at y 0.262.
-    add_surface_finish(
+    # Retain the native 2.5 mm symbols above the raised top view. Each leader
+    # stays on its own side of the bore-station witnesses; the bore-size callout
+    # has its separate upper-left lane.
+    bore_finish_0 = add_surface_finish(
         adapter,
         top,
         edge_xy=(_sheet_x(BORE_X[0]) + bore_r45, TOP_CENTER[1] + bore_r45),
-        symbol_xy=(0.155, 0.255),
+        symbol_xy=(0.155, 0.2575),
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_0"),
         label="pen bore finish (bore 0)",
         char_height=0.0025,
     )
-    add_surface_finish(
+    bore_finish_1 = add_surface_finish(
         adapter,
         top,
         edge_xy=(_sheet_x(BORE_X[1]) + bore_r45, TOP_CENTER[1] + bore_r45),
-        symbol_xy=(0.185, 0.255),
+        symbol_xy=(0.185, 0.2575),
         control=surface_finish_by_key(SURFACE_FINISHES, "pen_bore_1"),
         label="pen bore finish (bore 1)",
         char_height=0.0025,
     )
 
-    # x=0.020: the anchor is the text's left edge, so the ink starts here. The
-    # sheet's 0.0127 zone margin and the re-centred border rule (~0.0126) now
-    # agree, so 0.020 clears the rule and the audit enforces the same bound.
-    # y=0.046, not 0.070: this block is SIX lines (26.6 mm tall, anchored at its
-    # top line) and the front view's bottom edge is only at y=0.079, so anchoring
-    # it at 0.070 overlapped the whole 32.00/26.00 locator chain -- both dimension
-    # lines span the view's full width and printed through the note text like
-    # strikethrough. Dimensions are CollisionScope.NONE, so no gate sees this.
-    # 0.046 drops the block clear below the 32.00 text (bottom y 0.055) while
-    # keeping its own bottom at 0.0194 -- ~6.8 mm above the drawn bottom rule
-    # (~0.0126, now on the declared 12.7 mm margin).
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.046)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.180)
+    manufacturing_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.046
+    )
+    iso_note = add_property_linked_note(
+        adapter, "Isometric View Note", 0.330, 0.180
+    )
+    annotations = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in (*front_annotations, *top_annotations, *right_annotations)
+    }
+    annotations.update({
+        "block-height overall": _early_bound(block_height, "IDisplayDimension").GetAnnotation(),
+        "datum A": _early_bound(datum_a, "IDatumTag").GetAnnotation(),
+        "datum B": _early_bound(datum_b, "IDatumTag").GetAnnotation(),
+        "datum C": _early_bound(datum_c, "IDatumTag").GetAnnotation(),
+        "pen bore position": _early_bound(bore_position, "IGtol").GetAnnotation(),
+        "block top-face parallelism": _early_bound(top_parallelism, "IGtol").GetAnnotation(),
+        "pen bore finish 0": _early_bound(bore_finish_0, "ISFSymbol").GetAnnotation(),
+        "pen bore finish 1": _early_bound(bore_finish_1, "ISFSymbol").GetAnnotation(),
+        "Manufacturing Notes": _early_bound(manufacturing_note, "INote").GetAnnotation(),
+        "Isometric View Note": _early_bound(iso_note, "INote").GetAnnotation(),
+    })
+    owners = {
+        dimension_name(adapter, annotation): index
+        for index, imported in enumerate(
+            (front_annotations, top_annotations, right_annotations)
+        )
+        for annotation in imported
+    }
+    owners.update({
+        "datum C": 2,
+        "block-height overall": 2,
+        "block top-face parallelism": 2,
+        "datum A": 0,
+        "pen bore finish 0": 1,
+        "pen bore finish 1": 1,
+    })
+    for label, field in ANNOTATION_FIELDS.items():
+        place_annotation_in_field(adapter, annotations[label], label=label, field=field)
 
     return await finalize_drawing(
         adapter,
@@ -368,6 +455,11 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Pen V-Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_release_readability(
+                adapter, annotations, (front, top, right, iso), owners
+            ),
+        ),
     )
 
 

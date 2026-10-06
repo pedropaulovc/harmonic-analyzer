@@ -417,6 +417,22 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     assert relief_x + relief_half < drawing.INBOARD_X
 
 
+
+def test_rear_face_mate_rows_fit_inside_the_native_overall_witnesses() -> None:
+    from _layout_geometry import estimate_text_box
+
+    # R11's native witnesses are at INBOARD_X / OUTBOARD_X. The same-font
+    # rows measured up to 0.773 glyph/cap; 0.80 reserves a conservative ink
+    # width at the measured 3.5 mm cap height.
+    for row in drawing.DIMENSION_CALLOUTS["HubLength"].splitlines():
+        box = estimate_text_box(
+            row, anchor=drawing.SIDE_KEEP["HubLength"],
+            height=0.0035, reference=2, advance_ratio=0.80,
+        )
+        assert box is not None
+        assert box.xmin >= drawing.INBOARD_X + 0.002
+        assert box.xmax <= drawing.OUTBOARD_X - 0.002
+
 def test_station_reference_sketch_lies_in_the_side_view_plane() -> None:
     # A standalone reference sketch imports its dimension natively only on the
     # plane of the view that prints it; on Front, the *Right side view got the

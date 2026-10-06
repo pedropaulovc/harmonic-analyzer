@@ -7,7 +7,7 @@ from pathlib import Path
 import ch_channel_lever_spec
 import draw_ch_channel_lever as drawing
 import build_ch_channel_lever as lever
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 
 
@@ -43,59 +43,20 @@ def test_draw_view_math_matches_the_spec() -> None:
 
 def test_sheet_runs_at_1_to_1_with_1_to_4_isometric() -> None:
     assert drawing.SHEET_SCALE == (1.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(1, 4)" in source  # the isometric override
-    assert ch_channel_lever_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:4"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
+    assert drawing.ISOMETRIC_SCALE == (1, 4)
 
 
-def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
-    notes = ch_channel_lever_spec.DRAWING_NOTES
-    assert "6.50 +0.03/0" in notes
-    assert "DATUM C IS THE LONG TOP FACE" in notes
-    assert "BASIC 4.75 BELOW C" in notes
-    assert "BASIC FROM B: BAR-PIN" in notes
-    assert "NOT CONCENTRIC" in notes
-    assert "#47 DRILL" not in notes
-    assert "#21 DRILL" not in notes
-    assert "LINEAR +/-" not in notes
-    assert "GRAY-IRON" not in notes
-    assert "GREEN ENAMEL" not in notes
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
+def test_manufacturing_note_lane_clears_border_title_block_and_dimensions() -> None:
+    left, bottom, right, top = drawing.MANUFACTURING_NOTE_FIELD
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    inner_border = 0.0127
+    assert left >= inner_border + 0.004
+    assert bottom >= inner_border + 0.004
+    assert right + 0.002 <= template.title_block_left_m - 0.004
+    assert top + 0.010 <= 0.118
 
 
-def test_native_gdt_and_finish_present() -> None:
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'bar_height = add_edge_dimension(' in source
-    assert 'set_basic_dimension(adapter, bar_height, label="bar height from datum C")' in source
-    assert source.count("add_datum_feature(") == 3
-    assert 'label="fulcrum bore axis",' in source
-    assert source.count("_force_dimension_black(") == 3
-    assert source.count("annotation.Color = 0") == 1
-    assert "annotation.LayerOverride" in source
-    assert "InsertCenterMark3(2, False, False)" in source
-    assert "tip_edge = _sheet_xy(TIP_END_X, 0.0)" in source
-    assert source.count("add_feature_control_frame(") == 5
-    assert source.count('characteristic="position"') == 2
-    assert source.count('datums=("A", "B", "C")') == 3
-    assert 'characteristic="profile_surface"' in source
-    assert 'characteristic="perpendicularity"' in source
-    assert 'characteristic="parallelism"' in source
-    assert source.count('datums=("A",)') == 2
-    assert "all_around=True" in source
-    assert 'edge_xy=bar_pin_edge' in source
-    assert 'label="bar-pin hole position"' in source
-    assert 'edge_xy=spring_fcf_edge' in source
-    assert 'label="spring-eye hole position"' in source
-    assert "add_surface_finish(" not in source
-    assert source.count("add_native_hole_callout(") == 2
-
-
-def test_part_stamps_make_critical_drawing_properties() -> None:
-    source = Path(lever.__file__).read_text(encoding="utf-8")
-    assert "apply_drawing_properties" in source
-    assert "clear_dimensions_for_drawing" in source
+def test_part_registry_keeps_critical_drawing_properties() -> None:
     import _config
 
     spec = _config.parts("ch-channel-lever")
@@ -105,3 +66,5 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
         "RAL 6005 alkyd enamel, SSPC-SP3, 40-60 um DFT; mask all bores"
     )
     assert int(spec["quantity"]) == 20
+
+

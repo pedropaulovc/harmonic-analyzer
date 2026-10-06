@@ -39,6 +39,14 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    annotation_ink,
+    require_annotation_clear,
+    require_annotation_in_field,
+    require_annotation_inside,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -48,6 +56,7 @@ from _drawing_common import (
     create_section_view,
     check_drawing_layout,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -207,14 +216,16 @@ PIVOT_FINISH_EDGE = PIVOT_FINISH_LEADER
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "REAM THRU",
     "ArborBoreDia": "REAM THRU",
-    "PinSeatDia": "FOLLOWER SEAT FOR MHA-DT-025\nBLIND FLAT-BOTTOM\nREAM",
+    # Keep the complete mate/process callout in the lane between the overall
+    # reference and the front silhouette, without crowding either edge.
+    "PinSeatDia": "FOLLOWER SEAT FOR\nMHA-DT-025\nBLIND FLAT-BOTTOM\nREAM",
     "CrossHoleDia": CROSS_HOLE_CALLOUT,
 }
 PIN_SEAT_DEPTH_CALLOUT = "FOLLOWER SEAT\nREAM DEPTH FROM\nENTRY FACE"
 
 
 
-def _overall_reference(adapter: Any, left: Any) -> None:
+def _overall_reference(adapter: Any, left: Any) -> Any:
     """The (43.0) overall between the flank's top and bottom runs.
 
     Both end caps are half-cylinders whose axes run through the bar, so the
@@ -248,6 +259,7 @@ def _overall_reference(adapter: Any, left: Any) -> None:
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
     if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError("overall length reference precision did not persist")
+    return display
 
 def _seat_depth_dimension(adapter: Any, section: Any) -> Any:
     """Import the part's marked seat depth into Section B-B.
@@ -352,7 +364,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="seat flank",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _overall_reference(adapter, left)
+    overall_reference = _overall_reference(adapter, left)
     for view, label in ((front, "strap face"), (left, "seat flank")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to {label} view")
@@ -383,6 +395,28 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, [*annotations, seat_depth], DRAWING_PRECISION_BY_NAME
     )
+    seat_annotation = next(
+        annotation for annotation in left_annotations
+        if dimension_name(adapter, annotation) == "PinSeatDia"
+    )
+
+    def require_follower_callout_clear() -> None:
+        seat = annotation_ink(adapter, seat_annotation, label="follower seat diameter")
+        overall = annotation_ink(
+            adapter, overall_reference.GetAnnotation(), label="overall length reference",
+        )
+        outline = tuple(float(value) for value in left.GetOutline())
+        front_outline = tuple(float(value) for value in front.GetOutline())
+        field = (
+            overall.text[2], outline[1], front_outline[0], ARBOR_FINISH_XY[1],
+        )
+        require_annotation_in_field(seat, field, margin=CLEAR_GAP_M)
+        require_annotation_clear(seat, (overall,), check_own_lines=True)
+        require_annotation_inside(seat, sheet_region(adapter))
+        display = _early_bound(seat_annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        if str(display.GetText(4) or "").replace("\r", "") != DIMENSION_CALLOUTS["PinSeatDia"]:
+            raise RuntimeError("follower-seat mate/process callout did not persist")
+
 
     for index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
@@ -401,6 +435,7 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
+        settled_checks=(require_follower_callout_clear,),
     )
 
 

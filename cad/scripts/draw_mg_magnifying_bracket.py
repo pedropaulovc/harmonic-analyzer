@@ -23,13 +23,19 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, check, run_build
+from _drawing_annotation_extent import (
+    assert_annotation_reservations,
+    place_annotation_in_field,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -64,8 +70,11 @@ ISO_CENTER = (0.340, 0.130)
 # part's Top plane).  Arm/flange dim names are disambiguated in the build
 # (ArmWidth/ArmDepth vs FlangeWidth/FlangeDepth) so this keep map is unambiguous.
 TOP_KEEP = {
-    "ArmWidth": (0.088, 0.170),
-    "ArmDepth": (0.142, 0.182),
+    # ArmWidth's line belongs below the arm's native y=147.85 mm end, not
+    # through the flange-depth lane. ArmDepth sits right of the flange's
+    # x=127.5 mm witness, with room for the full two-row callout.
+    "ArmWidth": (0.088, 0.137),
+    "ArmDepth": (0.160, 0.182),
     "FlangeWidth": (0.110, 0.216),
     "FlangeDepth": (0.089, 0.205),
 }
@@ -78,6 +87,18 @@ DIMENSION_CALLOUTS = {
     "ArmDepth": "ARM LENGTH",
     "FlangeWidth": "FLANGE WIDTH",
     "FlangeDepth": "FLANGE DEPTH",
+}
+
+# Native R11 geometry: the arm is x=117.5..127.5, y=147.85..202.15 mm;
+# the flange is x=102.5..127.5, y=154.3..158.85 mm. Keep the flange-width
+# lane above, arm-width below, flange-depth left and arm-length right.
+# Reservations bound actual rendered rows, never the linear dimension's
+# shoulder-mirrored union; the final guard also checks every peer's native lines.
+DIMENSION_FIELDS = {
+    "ArmWidth": (0.065, 0.125, 0.108, 0.145),
+    "ArmDepth": (0.140, 0.170, 0.185, 0.191),
+    "FlangeWidth": (0.090, 0.207, 0.138, 0.228),
+    "FlangeDepth": (0.047, 0.195, 0.095, 0.216),
 }
 
 
@@ -146,6 +167,21 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", 0.315, 0.095)
 
+    rebuild_drawing(adapter, label="measure bracket dimension lanes")
+    annotations = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in top_annotations
+    }
+    for label, field in DIMENSION_FIELDS.items():
+        place_annotation_in_field(
+            adapter, annotations[label], label=label, field=field
+        )
+
+    def settled_dimension_lanes() -> None:
+        # Both a line crossing ARM WIDTH and an extension touching ARM LENGTH
+        # must fail on the geometry that will actually be exported.
+        assert_annotation_reservations(adapter, annotations, DIMENSION_FIELDS)
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -153,6 +189,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Magnifying Bracket Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(settled_dimension_lanes,),
     )
 
 

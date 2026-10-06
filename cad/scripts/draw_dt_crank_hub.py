@@ -9,6 +9,14 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    annotation_ink,
+    require_annotation_clear,
+    require_annotation_in_field,
+    require_annotation_inside,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
@@ -16,6 +24,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_view_centerline,
     assert_imported_precision,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -149,7 +158,9 @@ ISO_NOTE_XY = (0.345, 0.180)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
-    "HubLength": HUB_LENGTH_CALLOUT,
+    # The full mate number is wider than the 50.4 mm paper span. Reflow
+    # only its descriptive compartment, leaving the native size and band.
+    "HubLength": HUB_LENGTH_CALLOUT.replace("SPROCKET ", "SPROCKET\n"),
     "ReliefLength": RELIEF_LENGTH_CALLOUT,
 }
 
@@ -270,6 +281,20 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
+    side_by_name = {dimension_name(adapter, annotation): annotation for annotation in right_annotations}
+
+    def require_hub_length_callout_clear() -> None:
+        overall = annotation_ink(adapter, side_by_name["HubLength"], label="hub overall length")
+        relief = annotation_ink(adapter, side_by_name["ReliefLength"], label="hub relief length")
+        region = sheet_region(adapter)
+        field = (INBOARD_X, region.ymin, OUTBOARD_X, _ROW_Y[0])
+        require_annotation_in_field(overall, field, margin=CLEAR_GAP_M)
+        require_annotation_clear(overall, (relief,), check_own_lines=True)
+        require_annotation_inside(overall, region)
+        display = _early_bound(side_by_name["HubLength"].GetSpecificAnnotation(), "IDisplayDimension")
+        if str(display.GetText(4) or "").replace("\r", "") != DIMENSION_CALLOUTS["HubLength"]:
+            raise RuntimeError("hub rear-face mate callout did not persist")
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -277,6 +302,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Crank Through Hub Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(require_hub_length_callout_clear,),
     )
 
 

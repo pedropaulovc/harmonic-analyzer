@@ -24,7 +24,11 @@ from ch_channel_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _hole_spec import blind_cut_dia_mm
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    assert_annotation_reservations,
+    place_annotation_in_field,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -75,6 +79,12 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)  # 1:1
+
+# The property-linked process note has its own lower-left lane: inside the
+# zone frame, left of the title-block keep-out, and below the view dimensions.
+MANUFACTURING_NOTE_FIELD = (0.017, 0.017, 0.210, 0.100)
+
+ISOMETRIC_SCALE = (1, 4)
 
 _NOSE_R = BAR_TALL / 2.0  # 4.75
 _BBOX_CX = (-_NOSE_R + TIP_END_X) / 2.0  # front-view X centre
@@ -203,7 +213,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # 3 x 9.5 plate section in the end view, so the plate thickness and the
     # broad-face datum are read here, along the length clear of the hub.
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4))
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISOMETRIC_SCALE
+    )
     for view in (right, top, iso):
         set_hidden_lines_removed(adapter, view)
     set_hidden_lines_visible(adapter, front)
@@ -416,8 +428,41 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-eye hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.075)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
+    manufacturing_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.075
+    )
+    isometric_note = add_property_linked_note(
+        adapter, "Isometric View Note", 0.330, 0.175
+    )
+    manufacturing_annotation = _early_bound(
+        _early_bound(manufacturing_note, "INote", "GetAnnotation").GetAnnotation(),
+        "IAnnotation",
+    )
+    isometric_annotation = _early_bound(
+        _early_bound(isometric_note, "INote", "GetAnnotation").GetAnnotation(),
+        "IAnnotation",
+    )
+    place_annotation_in_field(
+        adapter,
+        manufacturing_annotation,
+        label="channel-lever manufacturing notes",
+        field=MANUFACTURING_NOTE_FIELD,
+    )
+    annotations = {
+        "Manufacturing Notes": manufacturing_annotation,
+        "Isometric View Note": isometric_annotation,
+        **{
+            f"front dimension {index}": annotation
+            for index, annotation in enumerate(front_annotations)
+        },
+    }
+
+    def assert_final_note_layout() -> None:
+        assert_annotation_reservations(
+            adapter,
+            annotations,
+            {"Manufacturing Notes": MANUFACTURING_NOTE_FIELD},
+        )
 
     return await finalize_drawing(
         adapter,
@@ -426,6 +471,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Channel Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(assert_final_note_layout,),
     )
 
 

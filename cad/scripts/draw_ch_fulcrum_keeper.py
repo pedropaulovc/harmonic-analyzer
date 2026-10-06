@@ -24,6 +24,13 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_annotation_clear,
+    require_annotation_inside,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     _edge_endpoint_key,
@@ -50,6 +57,7 @@ from ch_fulcrum_keeper_spec import (
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
+    dimension_name,
     place_view,
 )
 
@@ -68,14 +76,23 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
 
+ORTHOGRAPHIC_SCALE = (2, 1)
+ISOMETRIC_SCALE = (1, 1)
+
 # Sheet layout (meters).  The front (side-profile) view's model bbox is
 # X -23..+4.75 (ball proud of the lug) by Y 0..32.2; at 2:1 that is
 # ~55.5 x 64.4 mm.  Third angle: the plan (top view) rides above the front,
 # the end view (right) sits to its right, the isometric top-right.
-FRONT_CENTER = (0.110, 0.130)
+# Raise the aligned front/right pair to reserve room for the full process note;
+# keep the front/top views X-aligned and front/right views Y-aligned.
+FRONT_CENTER = (0.110, 0.145)
 TOP_CENTER = (0.110, 0.228)
-RIGHT_CENTER = (0.225, 0.130)
+RIGHT_CENTER = (0.225, 0.145)
 ISO_CENTER = (0.330, 0.190)
+
+# Full process notes stay in the lower-left lane, left of the title block and
+# above the inner border/footer. Their native text box is measured and fitted.
+MANUFACTURING_NOTE_FIELD = (0.017, 0.0167, 0.210, 0.091)
 
 # Model bbox centres the projected views are laid out around.
 _X_MID = (-FOOT_REACH + 4.75) / 2.0  # -9.125 (ball cap at +4.75)
@@ -119,6 +136,9 @@ def _visible_outboard_lug_edge(adapter: Any, view: Any) -> Any:
 
 # Handy picks derived from the layout above.
 SEAT_EDGE_Y = _front_y(0.0)  # the foot seating face (datum A)
+DATUM_A_MODEL_X_MM = -3.0
+DATUM_A_EDGE_XY = (_front_x(DATUM_A_MODEL_X_MM), SEAT_EDGE_Y)
+DATUM_A_SYMBOL_XY = (DATUM_A_EDGE_XY[0], SEAT_EDGE_Y - 0.010)
 LUG_FACE_X = _front_x(LUG_HALF_T)  # outboard lug face (datum B)
 HOLE_X_SHEET = _front_x(SCREW_X)  # screw-hole station, shared by the top view
 CBORE_R_SHEET = CBORE_DIA_MM * SHEET_SCALE[0] / 2000.0
@@ -127,13 +147,13 @@ CBORE_R_SHEET = CBORE_DIA_MM * SHEET_SCALE[0] / 2000.0
 # sheet position.  The profile pair stacks below the front view; the end
 # view carries the width plus the shaft-axis / crown stack.
 FRONT_KEEP = {
-    "FootReach": (0.096, 0.086),
-    "PadLen": (0.084, 0.078),
+    "FootReach": (0.096, 0.106),
+    "PadLen": (0.084, 0.096),
 }
 RIGHT_KEEP = {
-    "Depth": (0.225, 0.172),
-    "ShaftAxisH": (0.196, 0.126),
-    "CrownDia": (0.225, 0.180),
+    "Depth": (0.225, 0.187),
+    "ShaftAxisH": (0.196, 0.141),
+    "CrownDia": (0.225, 0.195),
 }
 
 
@@ -179,15 +199,27 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    front = place_view(
+        adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=ORTHOGRAPHIC_SCALE
+    )
+    top = place_view(
+        adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=ORTHOGRAPHIC_SCALE
+    )
+    right = place_view(
+        adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=ORTHOGRAPHIC_SCALE
+    )
+    iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISOMETRIC_SCALE
+    )
     for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
 
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    )
 
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to top view")
@@ -195,11 +227,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # Native datum/GD&T annotations.  Datum A is the foot seating face (the
     # part sits on the rail top face and the screw clamps normal to it);
     # datum B is the outboard lug face (the shaft-end locating plane).
-    add_datum_feature(
+    datum_a = add_datum_feature(
         adapter,
         front,
-        edge_xy=(_front_x(-18.0), SEAT_EDGE_Y),
-        symbol_xy=(_front_x(-18.0), SEAT_EDGE_Y - 0.010),
+        edge_xy=DATUM_A_EDGE_XY,
+        symbol_xy=DATUM_A_SYMBOL_XY,
         datum="A",
         label="keeper seating face",
     )
@@ -250,8 +282,53 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(0.040, 0.238),
         label="keeper foot screw hole",
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.062)
-    add_property_linked_note(adapter, "Isometric View Note", 0.310, 0.150)
+    manufacturing_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.062
+    )
+    isometric_note = add_property_linked_note(
+        adapter, "Isometric View Note", 0.310, 0.150
+    )
+    manufacturing_annotation = _early_bound(
+        _early_bound(manufacturing_note, "INote", "GetAnnotation").GetAnnotation(),
+        "IAnnotation",
+    )
+    isometric_annotation = _early_bound(
+        _early_bound(isometric_note, "INote", "GetAnnotation").GetAnnotation(),
+        "IAnnotation",
+    )
+    datum_a_annotation = _early_bound(
+        _early_bound(datum_a, "IDatumTag", "GetAnnotation").GetAnnotation(),
+        "IAnnotation",
+    )
+    place_annotation_in_field(
+        adapter,
+        manufacturing_annotation,
+        label="fulcrum-keeper manufacturing notes",
+        field=MANUFACTURING_NOTE_FIELD,
+    )
+    annotations = {
+        "Manufacturing Notes": manufacturing_annotation,
+        "Isometric View Note": isometric_annotation,
+        "Datum A": datum_a_annotation,
+        **{
+            f"front dimension {dimension_name(adapter, annotation)}": annotation
+            for annotation in front_annotations
+        },
+        **{
+            f"right dimension {dimension_name(adapter, annotation)}": annotation
+            for annotation in right_annotations
+        },
+    }
+
+    def assert_final_note_layout() -> None:
+        inks = assert_annotation_reservations(
+            adapter,
+            annotations,
+            {"Manufacturing Notes": MANUFACTURING_NOTE_FIELD},
+        )
+        datum_a_ink = inks["Datum A"]
+        require_annotation_clear(datum_a_ink, list(inks.values()))
+        require_annotation_inside(datum_a_ink, sheet_region(adapter))
 
     return await finalize_drawing(
         adapter,
@@ -260,6 +337,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Fulcrum Keeper Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(assert_final_note_layout,),
     )
 
 

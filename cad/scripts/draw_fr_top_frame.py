@@ -28,6 +28,14 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from solidworks_mcp.adapters.com_variant import double_array
+from _drawing_annotation_extent import (
+    CLEAR_GAP_M,
+    annotation_ink,
+    require_annotation_clear,
+    require_annotation_in_field,
+    require_annotation_inside,
+    sheet_region,
+)
 from _drawing_common import (
     DrawingOutputs,
     FaceLabel,
@@ -223,6 +231,8 @@ GEOMETRY_FRONT_CENTER = (0.145, 0.090)
 # 1:2.  The 25.5 sockets and their 52.2 bosses are the features a machinist
 # sets up from, and at 1:3 they were 8.5 mm of paper.
 DETAIL_TOP_CENTER = (0.215, 0.160)
+SOCKET_VERTICAL_PITCH_XY = (0.083, 0.168)
+SOCKET_VERTICAL_PITCH_CALLOUT = "MATCHES\nMHA-FR-001"
 # The socket Ra symbol reads off the near-side rim of the rear east socket,
 # in the sheet's own empty lower-left corner, so its leader crosses neither
 # the 224.00 pitch lane nor the 4X socket qualifier above the view.
@@ -1697,16 +1707,18 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_mm=2*COLUMN_X, orientation="horizontal", center=True,
         suffix="MATCHES MHA-FR-001",
     )
-    _checked_dimension(
+    socket_vertical_pitch = _checked_dimension(
         adapter, detail_top,
         # Left sockets, not right (clears leader-crosses-line HANGER DRILL x
         # 224.00): extension lines x 312.5->82 at y 216/104 become 115.5->82.
         p0=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
         p1=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
-        text_xy=(0.083, 0.168), label="socket vertical pitch",
+        text_xy=SOCKET_VERTICAL_PITCH_XY, label="socket vertical pitch",
         expected_mm=REAR_COLUMN_Z-FRONT_COLUMN_Z, orientation="vertical",
         center=True,
-        suffix="MATCHES MHA-FR-001",
+        # The single-row mate reached the rail and nearly met REAR HANGER Z.
+        # Keep the full identity on its own row; the native 224.00 is unchanged.
+        suffix=SOCKET_VERTICAL_PITCH_CALLOUT,
     )
     stud_edge = model_point_in_view(
         adapter,
@@ -1805,11 +1817,13 @@ async def build(adapter: Any) -> dict[str, str]:
          KEEPER_TAP_Z_REAR - FRONT_COLUMN_Z, (0.372, 0.160), "vertical",
          "rear keeper z from upper sockets", "REAR KEEPER Z"),
     ):
-        _checked_dimension(
+        station_dimension = _checked_dimension(
             adapter, detail_top, p0=p0, p1=p1, text_xy=xy, label=label,
             expected_mm=expected, orientation=orientation, center=True,
             suffix=suffix,
         )
+        if label == "rear hanger z from upper sockets":
+            rear_hanger_z = station_dimension
     detail_top_note = add_note(adapter, HOLE_STATION_NOTE, *HOLE_STATION_NOTE_XY)
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.040, 0.045, char_height=0.0035,
@@ -2390,6 +2404,28 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(
         adapter, imported_annotations, DRAWING_PRECISION_BY_NAME
     )
+
+    def require_socket_vertical_pitch_clear() -> None:
+        if not ddoc.ActivateSheet("HOLES-SOCKETS"):
+            raise RuntimeError("failed to activate socket-pitch sheet for final readback")
+        pitch = annotation_ink(
+            adapter, socket_vertical_pitch.GetAnnotation(), label="socket vertical pitch",
+        )
+        hanger = annotation_ink(
+            adapter, rear_hanger_z.GetAnnotation(), label="rear hanger z from upper sockets",
+        )
+        region = sheet_region(adapter)
+        rail_edge = model_point_in_view(
+            adapter, detail_top, (-OUTER_X / 1000.0, HALF_H / 1000.0, 0.0),
+            label="left socket-pitch rail boundary",
+        )
+        field = (hanger.text[2], region.ymin, rail_edge[0], region.ymax)
+        require_annotation_in_field(pitch, field, margin=CLEAR_GAP_M)
+        require_annotation_clear(pitch, (hanger,), check_own_lines=True)
+        require_annotation_inside(pitch, region)
+        if str(socket_vertical_pitch.GetText(4) or "").replace("\r", "") != SOCKET_VERTICAL_PITCH_CALLOUT:
+            raise RuntimeError("socket vertical-pitch mate callout did not persist")
+
     return await finalize_drawing(
         adapter,
         OUTPUTS,
@@ -2400,6 +2436,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts={name: SPEC.layout for name in SHEET_NAMES},
         sheet_scales=SHEET_SCALES,
+        settled_checks=(require_socket_vertical_pitch_clear,),
         # The associative feature callouts replace SolidWorks' own descriptive
         # thread notes: every note the inventory above found must go, and the
         # count it hands over is this run's own, logged per view with it.

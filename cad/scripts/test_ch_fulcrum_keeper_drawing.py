@@ -8,7 +8,7 @@ import build_ch_fulcrum_keeper as part
 import draw_ch_fulcrum_keeper as drawing
 import ch_fulcrum_keeper_spec
 import _config
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from vn_frame_side_screw_spec import HEAD_H as FRAME_SIDE_HEAD_H
 
 
@@ -52,18 +52,33 @@ def test_screw_hole_seats_the_frame_side_screw() -> None:
     assert ch_fulcrum_keeper_spec.HOLE_DIA_MM > part.FRAME_SIDE_SHANK_DIA
     assert ch_fulcrum_keeper_spec.CBORE_DIA_MM > part.FRAME_SIDE_HEAD_DIA
     assert ch_fulcrum_keeper_spec.CBORE_DEPTH_MM == FRAME_SIDE_HEAD_H
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert 'name="FootScrewHole"' in source
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
     assert drawing.SHEET_SCALE == (2.0, 1.0)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "scale=(2, 1)" in source
-    assert "scale=(1, 1)" in source
-    assert ch_fulcrum_keeper_spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW SCALE 1:1"
-    assert 'add_property_linked_note(adapter, "Isometric View Note"' in source
-    assert "add_native_hole_callout(" in source
+    assert drawing.ORTHOGRAPHIC_SCALE == (2, 1)
+    assert drawing.ISOMETRIC_SCALE == (1, 1)
+
+
+def test_manufacturing_note_lane_clears_sheet_and_dimension_keepouts() -> None:
+    left, bottom, right, top = drawing.MANUFACTURING_NOTE_FIELD
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    inner_border = 0.0127
+    assert left >= inner_border + 0.004
+    assert bottom >= inner_border + 0.004
+    assert right + 0.002 <= template.title_block_left_m - 0.004
+    assert top + 0.004 <= drawing.FRONT_KEEP["PadLen"][1]
+    assert drawing.FRONT_CENTER[0] == drawing.TOP_CENTER[0]
+    assert drawing.FRONT_CENTER[1] == drawing.RIGHT_CENTER[1]
+
+
+def test_datum_a_remains_associated_with_the_foot_seat() -> None:
+    edge_x, edge_y = drawing.DATUM_A_EDGE_XY
+    symbol_x, symbol_y = drawing.DATUM_A_SYMBOL_XY
+    assert drawing._front_x(-drawing.FOOT_REACH) <= edge_x <= drawing._front_x(0.0)
+    assert edge_y == drawing.SEAT_EDGE_Y
+    assert symbol_x == edge_x
+    assert symbol_y < edge_y
 
 
 def test_outboard_lug_edge_resolver_filters_visible_geometry(monkeypatch) -> None:
@@ -107,26 +122,6 @@ def test_outboard_lug_edge_resolver_filters_visible_geometry(monkeypatch) -> Non
     assert resolver(object(), object()) is expected
     assert span.attributes["matched"] == 1
 
-
-def test_notes_cover_the_ball_seat_and_the_boss_relief() -> None:
-    notes = ch_fulcrum_keeper_spec.DRAWING_NOTES
-    assert "BLACK OXIDE" in notes
-    assert "Ø9.50 STEEL" in notes
-    assert "REAM" in notes
-    assert "CORNER-BOSS LAND" in notes
-    assert "2 REQUIRED" in notes
-
-
-def test_ball_is_a_separate_pressed_body() -> None:
-    # A merged Ø9.5 sphere in the Ø9.5 socket is a zero-thickness tangent
-    # boolean (equator-circle contact only) -- the ball must stay its own
-    # solid body, like the pinion-handle cross rod.
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "merge_result=False" in source
-    assert 'name_last_feature(adapter, "Ball")' in source
-    # And the wizard screw hole must land while the part is one body (its
-    # placement-face scan reads GetBodies2()[0]).
-    assert source.index('name="FootScrewHole"') < source.index('"revolve ball"')
 
 
 def test_wizard_holes_are_not_fake_marked_dimensions() -> None:

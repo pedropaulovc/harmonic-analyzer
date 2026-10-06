@@ -20,6 +20,12 @@ import pd_transgear_removable_spec as removable
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _printed_tolerance import printed_band_mm
+from _drawing_annotation_extent import (
+    annotation_ink_from_record,
+    boxes_clear,
+    require_annotation_clear,
+    require_annotation_in_field,
+)
 
 # Default-format note text, measured on r743-rocker-fix3's render, as
 # test_paper_drive_assembly_drawing and test_channel_assembly_drawing use them.
@@ -253,12 +259,14 @@ def test_slot_placement_prints_the_stacks_centring_term() -> None:
 
 
 def test_side_view_od_band_stands_clear_of_the_slot_width() -> None:
-    # Review of 8b5e1f354: at 0.032 left of the rear face the Ø17.50's band
-    # touched the slot width's 1.8.  Text estimate: 3.5 mm caps.
+    # Both stacked tolerance rows matter, not just the "1.8" nominal.
+    # PD-6 moves the slot block below its witnesses; test 2-D reservations
+    # rather than requiring the obsolete same-height horizontal allocation.
     char = 0.0035 * 0.746
-    od_right = drawing.SIDE_KEEP["CollarDia"][0] + char * len("\u00d817.50 -0.1") / 2.0
-    slot_left = drawing.SIDE_KEEP["SlotWidth"][0] - char * len("1.8") / 2.0
-    assert slot_left - od_right >= 0.0035
+    cx, cy = drawing.SIDE_KEEP["CollarDia"]
+    half = char * len("\u00d817.50 -0.1") / 2.0
+    od_box = (cx - half, cy - 0.005, cx + half, cy + 0.005)
+    assert boxes_clear(od_box, drawing.SIDE_TEXT_FIELDS["SlotWidth"], gap=0.0035)
     end_view_right = drawing.END_CENTER[0] + drawing.HALF_OD
     od_left = drawing.SIDE_KEEP["CollarDia"][0] - char * len("\u00d817.50 -0.1") / 2.0
     assert od_left - end_view_right >= 0.010
@@ -525,3 +533,80 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
     assert carried["Manufacturing Notes"] == spec.DRAWING_NOTES
     assert carried["Isometric View Note"] == spec.ISOMETRIC_VIEW_NOTE
+
+
+def test_native_slot_witness_cannot_strike_through_its_tolerance_stack() -> None:
+    # R11 actual SlotWidth ink, including the +0.1/0.0 rows, not a centred
+    # nominal-only estimate. The lower horizontal witness strikes the ink.
+    ink = annotation_ink_from_record(
+        {
+            "type": 4,
+            "display": {
+                "texts": [
+                    {"t": " 1.8 ", "pos": [0.1973806, 0.1605278, 0], "h": 0.0035},
+                    {"t": "+", "pos": [0.2064319, 0.165, 0], "h": 0.0035},
+                    {"t": "0.1", "pos": [0.2092611, 0.165, 0], "h": 0.0035},
+                    {"t": "0.0", "pos": [0.2092611, 0.1604743, 0], "h": 0.0035},
+                ],
+                "lines": [
+                    [0, 0, 0, 0, 0.2274, 0.1614, 0, 0.2062, 0.1614, 0]
+                ],
+            },
+        },
+        label="SlotWidth",
+    )
+    assert ink.row_count == 2
+    with pytest.raises(RuntimeError):
+        require_annotation_clear(ink, [ink], check_own_lines=True)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_native_collar_witness_cannot_cross_the_pilot_fit_block(reverse) -> None:
+    # R11 measured nominal row and actual CollarLength witness. The guard
+    # must work when either the fit block or the witness is the selected ink.
+    fit = annotation_ink_from_record(
+        {
+            "type": 4,
+            "display": {
+                "texts": [
+                    {"t": "2.90", "pos": [0.2384743, 0.1235562, 0], "h": 0.0035}
+                ]
+            },
+        },
+        label="PilotLength",
+    )
+    witness = annotation_ink_from_record(
+        {
+            "type": 4,
+            "display": {
+                "lines": [
+                    [0, 0, 0, 0, 0.2372, 0.199, 0, 0.2372, 0.0902219, 0]
+                ]
+            },
+        },
+        label="CollarLength witness",
+        allow_no_text=True,
+    )
+    selected, neighbour = (witness, fit) if reverse else (fit, witness)
+    with pytest.raises(RuntimeError):
+        require_annotation_clear(selected, [neighbour])
+
+
+def test_leading_blank_cannot_falsely_place_native_length_text_inside_a_field() -> None:
+    # The actual native start of R11's " 4.000 " is conservative containment
+    # ink even when the ordinary collision rows skip the leading blank.
+    ink = annotation_ink_from_record(
+        {
+            "type": 4,
+            "display": {
+                "texts": [
+                    {"t": " 4.000 ", "pos": [0.2220882, 0.0912219, 0], "h": 0.0035}
+                ]
+            },
+        },
+        label="CollarLength",
+    )
+    assert ink.text[0] == pytest.approx(0.2220882)
+    assert ink.rows[0][0] > 0.223
+    with pytest.raises(RuntimeError):
+        require_annotation_in_field(ink, (0.223, 0.090, 0.260, 0.099))

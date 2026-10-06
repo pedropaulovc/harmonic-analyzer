@@ -19,12 +19,14 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import assert_annotation_reservations, place_annotation_in_field
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -93,19 +95,23 @@ END_KEEP = {
     "PinPosY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] + PIN_R / 2.0),
     "PinNegY": (END_CENTER[0] - HALF_OD - 0.012, END_CENTER[1] - PIN_R / 2.0),
 }
-# The side view: both lengths from the seat face stacked below with the
-# overall under them, the O.D. left of the rear face outside the slot width,
-# the pilot right of its front face, the slot depth above its notch.  The
-# pilot length reads innermost; its three-line fit callout hangs ~0.016
-# below it, so the collar length and the overall step out past it.
+# The collar length is the inner lower stack. The pilot's complete fit block
+# stands to the right of every length witness, below that stack; moving only
+# the view cannot clear witnesses which run through the old centred text.
 SIDE_KEEP = {
-    "PilotLength": ((_SEAT_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.012),
-    "CollarLength": ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.036),
+    "PilotLength": (0.288, 0.099),
+    "CollarLength": ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.012),
     # 0.040 left: at 0.032 the O.D.'s band touched the slot width's value.
     "CollarDia": (_REAR_X - 0.040, SIDE_CENTER[1]),
     "PilotDia": (_PILOT_X + 0.014, SIDE_CENTER[1]),
     "SlotDepth": (_REAR_X + 0.004, SIDE_CENTER[1] + HALF_OD + 0.012),
-    "SlotWidth": (_REAR_X - 0.014, SIDE_CENTER[1]),
+    # Seven millimetres between slot witnesses cannot hold stacked tolerance
+    # text: place it below both witnesses, still left of the side silhouette.
+    "SlotWidth": (_REAR_X - 0.019, SIDE_CENTER[1] - 0.021),
+}
+SIDE_TEXT_FIELDS = {
+    "PilotLength": (0.258, 0.086, 0.319, 0.111),
+    "SlotWidth": (0.190, 0.133, 0.214, 0.153),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.050)
 # The overall's picks, pilot front face then rear face.  Each face's outer
@@ -141,7 +147,7 @@ def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
     return callouts
 
 
-def _overall_reference(adapter: Any, side: Any) -> None:
+def _overall_reference(adapter: Any, side: Any) -> Any:
     """The (6.9) overall, pilot front face to rear face (rule 7)."""
     label = "drive-collar overall length reference"
     display = add_edge_dimension(
@@ -164,6 +170,7 @@ def _overall_reference(adapter: Any, side: Any) -> None:
     display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
     if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError(f"{label} precision did not persist")
+    return _early_bound(display.GetAnnotation(), "IAnnotation")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -240,11 +247,17 @@ async def build(adapter: Any) -> dict[str, str]:
         _printable_above_callouts(DIMENSION_CALLOUTS_ABOVE),
         location="above",
     )
-    _overall_reference(adapter, side)
+    overall_annotation = _overall_reference(adapter, side)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the collar end view")
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    allocated = {dimension_name(adapter, item): item for item in annotations}
+    allocated["overall length reference"] = overall_annotation
+    for name, field in SIDE_TEXT_FIELDS.items():
+        place_annotation_in_field(
+            adapter, allocated[name], label=name, field=field, margin=0.0
+        )
 
     return await finalize_drawing(
         adapter,
@@ -253,6 +266,16 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Drive Collar Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: assert_annotation_reservations(
+                adapter,
+                allocated,
+                SIDE_TEXT_FIELDS,
+                row_limits={"PilotLength": 4},
+                text_heights={name: 0.0035 for name in SIDE_TEXT_FIELDS},
+                check_own_lines=("PilotLength", "SlotWidth"),
+            ),
+        ),
     )
 
 

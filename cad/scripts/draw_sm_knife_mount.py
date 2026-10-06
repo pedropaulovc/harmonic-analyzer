@@ -7,6 +7,8 @@ unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
 and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
 depth added across the right-view section.
+Final native ink reservations keep the bore callout clear of the height line
+and retain the fleet's standard surface-finish symbol size.
 
 Run with SolidWorks open::
 
@@ -22,7 +24,12 @@ from typing import Any
 from sm_knife_mount_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import (
+    assert_annotation_reservations,
+    place_annotation_in_field,
+    require_clear,
+)
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -31,6 +38,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -39,7 +47,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES
 from _surface_finish import surface_finish_by_key
 from sm_knife_mount_spec import (
     BLK_BOT,
@@ -82,7 +90,7 @@ def _front_y(model_y_mm: float) -> float:
 
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
+    "BlockHeight": (FRONT_CENTER[0] - 0.075, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
@@ -92,6 +100,45 @@ DIMENSION_CALLOUTS = {
 
 RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 RIGHT_HALF_Y = (BLK_TOP - BLK_BOT) / 2.0 * SHEET_SCALE[0] / 1000.0
+
+# Keep the native bore size/THRU untouched; move its crossing height line to a
+# separate left lane. Finish content and its edge association also stay native.
+ANNOTATION_FIELDS = {
+    "BlockHeight": (0.025, 0.128, 0.051, 0.150),
+    "BoreDia": (0.053, 0.148, 0.079, 0.164),
+    "knife bore finish": (0.160, 0.104, 0.190, 0.125),
+}
+
+
+def _assert_release_readability(
+    adapter: Any, annotations: dict[str, Any], views: tuple[Any, ...]
+) -> None:
+    """Prove the settled bore text, height line and finish remain separate."""
+    inks = assert_annotation_reservations(
+        adapter,
+        annotations,
+        ANNOTATION_FIELDS,
+        text_heights={"knife bore finish": 0.0025},
+        check_own_lines=("BlockHeight",),
+    )
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    title = {
+        "title-block": (
+            template.title_block_left_m, 0.0,
+            template.width_m, template.title_block_top_m,
+        )
+    }
+    view_boxes = {
+        f"view {index}": tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+        for index, view in enumerate(views)
+    }
+    for label in ANNOTATION_FIELDS:
+        ink = inks[label]
+        require_clear(label, ink.text, {**title, **view_boxes})
+        for line in ink.lines:
+            box = line.box()
+            require_clear(label, (box.xmin, box.ymin, box.xmax, box.ymax), title)
+
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -155,7 +202,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to add ASME center mark to knife bore")
 
     # Block depth (14): dimension the right view's flat front/back faces.
-    add_edge_dimension(
+    block_depth = add_edge_dimension(
         adapter,
         right,
         p0=(RIGHT_CENTER[0] - RIGHT_HALF_Z, RIGHT_CENTER[1]),
@@ -167,7 +214,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Datum A = the block top seat (hangs 0.25 under the top-frame casting
     # underside; carries the 1/2-13 knife-hanger-stud tap); Ra 0.8 on the
     # bore's working upper wall, tagged on the bore rim (a real circular edge).
-    add_datum_feature(
+    top_datum = add_datum_feature(
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(BLK_TOP)),
@@ -175,7 +222,7 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="block top seat",
     )
-    add_feature_control_frame(
+    bore_position = add_feature_control_frame(
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0], _front_y(BORE_CY) + R_BORE * SHEET_SCALE[0] / 1000.0),
@@ -186,17 +233,36 @@ async def build(adapter: Any) -> dict[str, str]:
         diameter=True,
         label="knife-bore position",
     )
-    add_surface_finish(
+    bore_finish = add_surface_finish(
         adapter,
         front,
         edge_xy=(FRONT_CENTER[0] + R_BORE * SHEET_SCALE[0] / 1000.0, _front_y(BORE_CY)),
         symbol_xy=(FRONT_CENTER[0] + 0.052, _front_y(BORE_CY) - 0.020),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_bore"),
         label="knife bore finish",
+        char_height=0.0025,
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)
+    manufacturing_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.070
+    )
+    iso_note = add_property_linked_note(
+        adapter, "Isometric View Note", 0.330, 0.175
+    )
+    annotations = {
+        dimension_name(adapter, annotation): annotation
+        for annotation in front_annotations
+    }
+    annotations.update({
+        "block-depth overall": _early_bound(block_depth, "IDisplayDimension").GetAnnotation(),
+        "datum A": _early_bound(top_datum, "IDatumTag").GetAnnotation(),
+        "knife-bore position": _early_bound(bore_position, "IGtol").GetAnnotation(),
+        "knife bore finish": _early_bound(bore_finish, "ISFSymbol").GetAnnotation(),
+        "Manufacturing Notes": _early_bound(manufacturing_note, "INote").GetAnnotation(),
+        "Isometric View Note": _early_bound(iso_note, "INote").GetAnnotation(),
+    })
+    for label, field in ANNOTATION_FIELDS.items():
+        place_annotation_in_field(adapter, annotations[label], label=label, field=field)
 
     return await finalize_drawing(
         adapter,
@@ -205,6 +271,9 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Knife-Mount Bearing Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: _assert_release_readability(adapter, annotations, (front, right, top, iso)),
+        ),
     )
 
 

@@ -26,6 +26,7 @@ import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 import transgear_hanger_joints as joints
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import assert_annotation_reservations, place_annotation_in_field
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -33,6 +34,7 @@ from _drawing_common import (
     add_property_linked_note,
     assert_imported_precision,
     create_section_view,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -97,7 +99,7 @@ PNG = OUTPUTS.png
 # at x 0.189 so the section's floor-depth text, hanging left of its
 # dimension line under the pivot end, keeps inside the left border
 # (machinist reviews of 19e33c6c2 and 8b5e1f354: at 0.178 it reached x 1.5
-# mm).  The end view moves 2 mm with it, so the 14.0 keeps clear of it.
+# mm). The end view stands farther right, leaving air beside the 14.0 text.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -105,7 +107,7 @@ FRONT_CENTER = (0.189, 0.205)
 # Low enough that the counterbore callout above the section clears the
 # overall-length reference under the station stack.
 SECTION_CENTER = (FRONT_CENTER[0], 0.094)
-END_CENTER = (0.357, FRONT_CENTER[1])
+END_CENTER = (0.363, FRONT_CENTER[1])
 ISO_CENTER = (0.370, 0.115)
 ISO_NOTE_XY = (0.335, 0.080)
 # The front view centres on the outline's bounding box (x -R .. tip).
@@ -184,10 +186,17 @@ SECTION_KEEP = {
     ),
 }
 END_KEEP = {
-    "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.010),
-    "PinHoleZ": (_end_x(PIN_HOLE_Z / 2.0), _end_y(-PIVOT_END_R) - 0.010),
-    # Absolute x: the callout's right edge sits 2 mm inside the right border.
-    "PinHoleDia": (0.385, _end_y(0.0) + 0.018),
+    # Separate lower lanes for stock and pin offset; the four-row bore block
+    # owns the upper lane, above the end outline and inside the right border.
+    "Depth": (END_CENTER[0], 0.170),
+    "PinHoleZ": (0.398, 0.154),
+    "PinHoleDia": (0.378, 0.250),
+}
+END_TEXT_FIELDS = {
+    "PinHoleDia": (0.338, 0.238, 0.417, 0.2645),
+    "Depth": (0.325, 0.164, 0.406, 0.173),
+    "PinHoleZ": (0.381, 0.148, 0.416, 0.158),
+    "EndWidth": (0.334, 0.200, 0.348, 0.210),
 }
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
@@ -459,6 +468,11 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _set_tap_callout_text(callout, qualifier, label=label)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    allocated = {dimension_name(adapter, item): item for item in annotations}
+    for name, field in END_TEXT_FIELDS.items():
+        place_annotation_in_field(
+            adapter, allocated[name], label=name, field=field, margin=0.0
+        )
 
     return await finalize_drawing(
         adapter,
@@ -467,6 +481,15 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Arm Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(
+            lambda: assert_annotation_reservations(
+                adapter,
+                allocated,
+                END_TEXT_FIELDS,
+                text_heights={name: 0.0035 for name in END_TEXT_FIELDS},
+                check_own_lines=("PinHoleDia", "PinHoleZ"),
+            ),
+        ),
         # SolidWorks pins its own "... Tapped Hole" note to the front view
         # once a tap carries a hole callout; the plate-tap callout already
         # states the thread and drill.

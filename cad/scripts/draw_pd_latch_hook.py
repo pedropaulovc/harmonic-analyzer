@@ -21,6 +21,7 @@ from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
+from _drawing_annotation_extent import assert_annotation_reservations
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -57,6 +58,7 @@ from pd_latch_hook_spec import (
     OVERALL_LENGTH,
     PIN_HOLE_CALLOUT,
     RIVET_HOLE_CALLOUT,
+    TEMPLATE_VALUES,
     TIP_RUN_CALLOUT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -107,9 +109,9 @@ CALLOUTS_ABOVE = {
     "JunctionRun": JUNCTION_RUN_CALLOUT,
     "TipRun": TIP_RUN_CALLOUT,
 }
-# The template radii's centres sit 1.4 m and 2.5 m off the sheet at 3:1: a
-# full-length radius line runs through the border and the title block.
-SHORTENED_RADII = ("InnerR1", "InnerR2")
+# Keep R845's valid shortened jog. R485's native outside-arrow leader stops
+# at its arc; both model-owned radius/centre construction callouts remain.
+RADIAL_DIMENSIONS = ("InnerR1", "InnerR2")
 
 # Text positions: the runs stacked above the strip, shortest nearest, with
 # the reference overall outermost; the template radii below their arcs and
@@ -126,6 +128,10 @@ FRONT_KEEP = {
     "RivetRun": _sheet(10.0, 7.0),
     "RivetPitch": _sheet(12.0, -1.0),
     "RivetHoleDia": _sheet(10.0, -14.0),
+}
+RADIAL_TEXT_FIELDS = {
+    "InnerR1": (0.214, 0.103, 0.274, 0.127),
+    "InnerR2": (0.047, 0.095, 0.112, 0.128),
 }
 OVERALL_TEXT_Y = 28.0  # local mm above the top cut's centre
 # Picks for the reference overall: the top cut, clear of the rivet holes,
@@ -163,15 +169,14 @@ def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
         )
 
 
-def _shorten_radii(
+def _allocate_radii(
     adapter: Any, annotations: list[Any], names: tuple[str, ...]
 ) -> None:
-    """Foreshorten the named radius dimensions and read each one back.
+    """Retain R845's proven jog; allocate R485 with the native arc leader.
 
-    ``IDisplayDimension::ShortenedRadius`` draws the radius line toward the
-    centre but stops it short of it -- the jogged radius for a centre beyond
-    the sheet.  A property put that SolidWorks ignores still returns, so the
-    flag is read back.
+    R11's shortened InnerR2 jog reached y -471.483 mm. Only that broken jog
+    takes the arbor pedestal's native outside-arrow allocation. The model
+    values and explicit centre/tangency constructions remain intact.
     """
     remaining = set(names)
     for annotation in annotations:
@@ -180,12 +185,47 @@ def _shorten_radii(
         if name not in remaining:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.ShortenedRadius = True
-        if not bool(display.ShortenedRadius):
-            raise RuntimeError(f"radius {name!r} did not keep its shortened leader")
+        if name == "InnerR1":
+            display.ShortenedRadius = True
+            if not bool(display.ShortenedRadius):
+                raise RuntimeError("R845 did not retain its valid shortened jog")
+            remaining.discard(name)
+            continue
+        display.ShortenedRadius = False
+        display.ArcExtensionLineOrOppositeSide = False
+        display.ArrowSide = 1  # swDimensionArrowsSide_e.swDimArrowsOutside
+        if (
+            bool(display.Diametric)
+            or bool(display.ShortenedRadius)
+            or bool(display.ArcExtensionLineOrOppositeSide)
+            or int(display.ArrowSide) != 1
+        ):
+            raise RuntimeError(f"radius {name!r} did not keep its native arc leader")
+        x, y = FRONT_KEEP[name]
+        if not annotation.SetPosition2(x, y, 0.0):
+            raise RuntimeError(f"radius {name!r} refused its native allocation")
         remaining.discard(name)
     if remaining:
-        raise RuntimeError(f"radii not shortened: {sorted(remaining)}")
+        raise RuntimeError(f"radii not allocated: {sorted(remaining)}")
+
+
+def _assert_radial_allocations(adapter: Any, allocated: dict[str, Any]) -> None:
+    """Final model values plus ink bounds, not just a native presentation flag."""
+    for name in RADIAL_DIMENSIONS:
+        annotation = _early_bound(allocated[name], "IAnnotation")
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        if bool(display.GetOverride()) or bool(display.ShortenedRadius) != (name == "InnerR1"):
+            raise RuntimeError(f"{name} lost its model-owned radial presentation")
+        assert_dimension_measures(
+            adapter, display, expected_mm=TEMPLATE_VALUES[name], label=name, tolerance_mm=1e-3
+        )
+    assert_annotation_reservations(
+        adapter,
+        allocated,
+        RADIAL_TEXT_FIELDS,
+        text_heights={name: 0.0035 for name in RADIAL_DIMENSIONS},
+        check_own_lines=RADIAL_DIMENSIONS,
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -245,7 +285,7 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
-    _shorten_radii(adapter, annotations, SHORTENED_RADII)
+    _allocate_radii(adapter, annotations, RADIAL_DIMENSIONS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0015):
         raise RuntimeError(
             "failed to add ASME center marks to the latch-hook face view"
@@ -273,9 +313,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, _early_bound(overall, "IDisplayDimension").GetAnnotation(), label=label
     )
     _set_reference_precision(adapter, overall, label)
-    add_property_linked_note(
+    notes = add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.003
     )
+    allocated = {dimension_name(adapter, item): item for item in annotations}
+    allocated["manufacturing notes"] = _early_bound(notes.GetAnnotation(), "IAnnotation")
 
     return await finalize_drawing(
         adapter,
@@ -284,6 +326,7 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Latch Hook Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        settled_checks=(lambda: _assert_radial_allocations(adapter, allocated),),
     )
 
 

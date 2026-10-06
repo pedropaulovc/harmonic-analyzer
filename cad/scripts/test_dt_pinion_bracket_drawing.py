@@ -241,6 +241,24 @@ def test_hole_callout_leaders_keep_off_the_other_hole() -> None:
     assert abs(bearing[0] - bearing[1]) >= 45.0
 
 
+def test_follower_callout_rows_fit_between_reference_text_and_front_silhouette() -> None:
+    from _layout_geometry import estimate_text_box
+
+    # R11's reference ends at 119.54 mm; native front outline starts at
+    # 189.412 mm. A 0.80 glyph/cap ratio conservatively covers the measured
+    # Century Gothic rows (3.5 mm cap height), without a character-count cap.
+    field_left = 0.11954
+    field_right = 0.189412
+    for row in drawing.DIMENSION_CALLOUTS["PinSeatDia"].splitlines():
+        box = estimate_text_box(
+            row, anchor=drawing.LEFT_KEEP["PinSeatDia"],
+            height=0.0035, reference=2, advance_ratio=0.80,
+        )
+        assert box is not None
+        assert box.xmin >= field_left + 0.002
+        assert box.xmax <= field_right - 0.002
+
+
 def test_section_labels_hang_clear_of_the_centre_distance_arrows() -> None:
     # Layout audit (text-on-line, gating): the section cut ended on the 28.00
     # centre distance's dimension line, so the right B label hung under that

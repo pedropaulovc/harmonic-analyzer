@@ -24,6 +24,8 @@ import transgear_hanger_joints as joints
 import vn_transgear_latch_pin_spec as pin
 import pd_transgear_pin_spec as cluster_pin
 import vn_transgear_pivot_screw_spec as pivot_screw
+from _drawing_annotation_extent import annotation_ink_from_record, require_annotation_inside
+from _drawing_layout_check import DrawableRegion
 from _drawing_common import DRAWING_TEMPLATES
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -437,3 +439,33 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
     assert set(required) <= set(part._SAVED_DRAWING_PROPERTIES)
+
+
+def test_native_pin_callout_ink_rejects_the_r11_right_border_breach() -> None:
+    # R11 PDF/IDisplayData: complete press instruction plus its shoulder.
+    # A point/nominal-only check misses the instruction's rightmost ink.
+    ink = annotation_ink_from_record(
+        {
+            "type": 4,
+            "display": {
+                "texts": [
+                    {
+                        "t": "PRESS PIN MHA-VN-042 TO FLOOR",
+                        "pos": [0.3474503, 0.2156962, 0.1416],
+                        "h": 0.0035,
+                        "ref": 1,
+                        "ang": 0.0,
+                    }
+                ],
+                "lines": [
+                    [0, 0, 0, 0, 0.3458628, 0.2101399, 0, 0.4225497, 0.2101399, 0]
+                ],
+            },
+        },
+        label="PinHoleDia",
+    )
+    region = DrawableRegion(0.0127, 0.0127, 0.4191, 0.2667)
+    assert ink.text[2] > region.xmax
+    assert max(line.x1 for line in ink.lines) == pytest.approx(0.4225497)
+    with pytest.raises(RuntimeError):
+        require_annotation_inside(ink, region)
