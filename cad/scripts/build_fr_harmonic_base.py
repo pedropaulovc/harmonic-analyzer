@@ -714,7 +714,7 @@ for _label, _seat, _engagement in (
         PEDESTAL_SCREW_ENGAGEMENT,
     ),
     (
-        "fr-nameplate",
+        "nameplate",
         NAMEPLATE_SEAT_SPEC,
         NAMEPLATE_SCREW_LEN - fr_nameplate_spec.PLATE_THICKNESS,
     ),

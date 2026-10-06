@@ -8,9 +8,11 @@ text as process.rstrip() + " ", which ate the prefix's closing line break.
 
 from __future__ import annotations
 
+import inspect
+
 import _drawing_common as dc
 
-# Historical RD1 read-back, before the subsystem identity cutover.
+# The probe's read-back: the post's prefix rows and the native format text.
 PROBE_PREFIX = "MATCH-DRILL/REAM WITH\nMHA-091 AT ASSEMBLY;\nREAM (.1255 IN) FROM FOOT\n"
 PROBE_NATIVE = "2X <MOD-DIAM> 3.188 <HOLE-DEPTH> 8.5"
 
@@ -28,3 +30,9 @@ def test_a_closing_line_break_puts_the_native_size_on_its_own_row() -> None:
 def test_a_one_line_process_still_joins_with_one_space() -> None:
     assert dc.compose_hole_callout_prefix("DRILL ", " 2X <MOD-DIAM>") == "DRILL 2X <MOD-DIAM>"
     assert dc.compose_hole_callout_prefix("A\nB", "2X") == "A\nB 2X"
+
+
+def test_add_native_hole_callout_composes_through_it() -> None:
+    source = inspect.getsource(dc.add_native_hole_callout)
+    assert "compose_hole_callout_prefix(process, existing)" in source
+    assert 'process.rstrip() + " "' not in source

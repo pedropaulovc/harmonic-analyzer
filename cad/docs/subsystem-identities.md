@@ -46,58 +46,25 @@ The offline configuration gate (`verify.py --suite config`, selected through
 part sequences starting at `001`, unique Numbers across both kinds, and closure
 between registries, producers, drawings and dependency references. Assembly
 saves and refreshes stamp the Number from the assembly's own YAML contract.
-Grouped BOM part properties read the Number, category and description once
-from the part's own frozen registry row, selected by canonical `part_name`.
-The Number must be category-qualified with a nonzero part sequence; the
-caller depends only on its own row.
-Same-part family grouping keeps the family Number in the BOM and lists the
-complete configuration range and quantities in its description and station
-references; it does not replace configuration-specific drawing Numbers.
-Table widths and contiguous splits must accommodate the final displayed
-identities and measured native row heights, including repeated headers and
-the sheet's reserved floors.
+Each part's frozen registry row, selected by canonical `part_name`, owns its
+Number and category. The Number must be category-qualified with a nonzero part
+sequence; a consumer depends only on its own row.
+Configuration variants retain their qualified drawing Numbers; family grouping
+does not replace them.
 Assembly `000` Numbers are assembly references, not part Numbers.
 
 Assembly `allowed_free_stems` and `required_free_stems` lists use canonical
 registered part stems, including vendor families coupled to moving components.
 The material palette's `casting_green_parts` list uses those same canonical
 part identities; the domain grouping and operational DOF counts are unchanged.
-The top-level assembly build and refresh export the parts-only BOM to
-`cad/out/ha-harmonic-analyzer-bom.csv`, which is also the declared assembly
-cache output. Older BOM paths in dated evidence remain historical provenance,
-not current output aliases.
-
-`check:reference_catalog` validates historical catalog entries against current
-model identities. Run it explicitly when changing the catalog seeding utility
-or its identity mapping. Like `check:verify_telemetry`, it is outside both the
-build and release closures. It requires an initialized `references` submodule
-and fails if its catalog is missing; normal release still needs the submodule
-for the gallery.
+The current top-level assembly BOM path is
+`cad/out/ha-harmonic-analyzer-bom.csv`; older BOM paths in dated evidence are
+historical provenance, not current output aliases.
 
 Drawing callouts retain complete category-qualified Numbers and process
-information. Longer cross-part notes, such as the crankshaft's mating-part
-callout, must fit their existing reserved field by placement and wrapping;
-do not abbreviate Numbers or relax the field bounds.
-The base's complete tube-fit instruction uses four short rows and an associative
-leader to the nearest socket. Reallocating a note or dimension shelf must
-preserve neighboring text, witness, leader and sheet-frame clearances.
-Pick the visible socket rim by sheet point before inserting its attached note,
-then verify the source edge and settled native leader. Attaching only an edge
-object after insertion can send the leader through the bore to its far rim.
+information; do not abbreviate Numbers in cross-part callouts.
 Per-configuration Gear Data and linked Manufacturing or Installation Notes
-retain their complete mate identifiers when reflowed. Gear Data and
-Manufacturing Notes are model-owned: rebuild the owning model when they change.
-Registry Installation Notes are drawing-owned and are stamped when the
-purchased-part drawing rebuilds.
-
-Title and Number fields are read from their native template-owned property
-links without changing the model's configuration or dirty state. One physical
-row is established from complete horizontal native display baselines, not
-`INote.GetTextCount` or `IDisplayData.GetTextCount`: those count text items.
-Multiple runs on one baseline are one row; ambiguous or refused display reads
-fail the contract. Field bounds, fonts and complete identities remain strict.
-`LineLength` alone can be inert on a fixed template box, so a persisted width
-setting is not evidence that the printed text wrapped.
+retain their complete mate identifiers.
 
 ## Historical evidence
 

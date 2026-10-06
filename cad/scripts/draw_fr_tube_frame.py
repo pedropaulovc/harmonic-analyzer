@@ -347,7 +347,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 "cross-hole callout is not aligned with its source station: "
                 f"{placed[1] * 1000.0:g} vs {hole_text[1] * 1000.0:g} mm"
             )
-    # The part authored these places (fr_tube_frame_spec.DRAWING_PRECISION); this
+    # The part authored these places (tube_frame_spec.DRAWING_PRECISION); this
     # sheet only proves they survived the import. A silent fallback to the
     # drawing document's two places would print the 1018.8 cut length as
     # 1018.77 and ask for a band the match-cut note explicitly refuses.
@@ -415,7 +415,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Tube Frame Column Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

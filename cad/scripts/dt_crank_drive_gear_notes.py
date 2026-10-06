@@ -116,7 +116,7 @@ GEAR_DATA = gear_data_note(
 # The seat's owner, quoted only to identify the mate (rule 6). Hard-coded
 # rather than read from ``_config.parts``: this module is in the part's
 # rebuild closure, and a cross-part config read would make cone-gear-shaft.yaml
-# a rebuild dependency of this gear. ``test_dt_crank_drive_gear_drawing`` checks
+# a rebuild dependency of this gear. ``test_crank_drive_gear_drawing`` checks
 # it against the registry offline, where a cross-check costs nothing.
 SHAFT_MATE_NUMBER = "MHA-DT-004"
 

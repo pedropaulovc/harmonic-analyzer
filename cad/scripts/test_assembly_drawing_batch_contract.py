@@ -238,7 +238,7 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
 
     monkeypatch.setattr(_assembly_drawing, "place_view", place)
 
-    async def finalize(_adapter, actual_outputs, *, spec, layout, pdf_title, scale):
+    async def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
         calls.append(("finalize", actual_outputs, layout, pdf_title, scale))
         return {"pdf": str(actual_outputs.pdf)}
 
@@ -248,7 +248,6 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         _assembly_drawing.build_simple_three_view_drawing(
             adapter,
             source=source,
-            spec=SimpleNamespace(),
             outputs=outputs,
             layout=DrawingLayout.PORTRAIT,
             sheet_scale=(1.0, 4.0),

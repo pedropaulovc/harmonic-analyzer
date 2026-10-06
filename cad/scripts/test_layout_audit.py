@@ -697,7 +697,6 @@ def _run(live, mode, report, stem="fixture"):
         report=report,
         sheet_layouts={},
         is_pictorial=lambda _o: False,
-        title_fields={},
         mode=mode,
     )
 
@@ -1357,7 +1356,7 @@ def test_a_pdf_page_dumps_its_text_and_only_its_black_stroked_lines():
         ),
     )
     ink = page_ink(page)
-    assert ink["spans"] == [["6.0", 0.1, 0.1, 0.106, 0.1033, 0]]
+    assert ink["spans"] == [["6.0", 0.1, 0.1, 0.106, 0.1033]]
     assert ink["strokes"] == [[0.1, 0.1, 0.2, 0.1, 0.00025, 0], [0.1, 0.11, 0.2, 0.11, 0.00025, 1]]
 
 
@@ -1492,9 +1491,7 @@ def test_the_collector_fails_loud_rather_than_audit_no_sheet(monkeypatch, tmp_pa
     cache a clean zero-sheet report."""
     from pathlib import Path
 
-    kwargs = {
-        "stem": "x", "pdf": Path("x.pdf"), "sheet_layouts": {}, "is_pictorial": lambda _o: False, "title_fields": {},
-    }
+    kwargs = {"stem": "x", "pdf": Path("x.pdf"), "sheet_layouts": {}, "is_pictorial": lambda _o: False}
     live, adapter = _fake_drawing(monkeypatch, sheet_names=RuntimeError("RPC"), views=(), pages=[object()])
     with pytest.raises(RuntimeError, match="RPC"):
         live.collect_sheet_dumps(adapter, **kwargs)
@@ -2546,7 +2543,7 @@ def test_a_page_the_size_of_another_sheet_fails_loud(monkeypatch):
     adapter.currentModel.Sheet = lambda _name: Sheet()
     with pytest.raises(RuntimeError, match=r"431\.8 x 279\.4 mm but page 0 of x\.pdf is 279\.4 x 215\.9 mm"):
         live.collect_sheet_dumps(
-            adapter, stem="x", pdf=Path("x.pdf"), sheet_layouts={}, is_pictorial=lambda _o: False, title_fields={}
+            adapter, stem="x", pdf=Path("x.pdf"), sheet_layouts={}, is_pictorial=lambda _o: False
         )
 
 
@@ -2590,7 +2587,7 @@ def test_a_collector_fault_carries_what_was_collected(monkeypatch):
     adapter.currentModel.Sheet = lambda _name: Sheet()
     with pytest.raises(RuntimeError) as raised:
         live.collect_sheet_dumps(
-            adapter, stem="x", pdf=Path("x.pdf"), sheet_layouts={}, is_pictorial=lambda _o: False, title_fields={}
+            adapter, stem="x", pdf=Path("x.pdf"), sheet_layouts={}, is_pictorial=lambda _o: False
         )
     message = str(raised.value)
     assert "1 sheet(s) dumped {'A': {}}" in message
@@ -4029,7 +4026,6 @@ _ENFORCED_IN_REPORT = [
     ("line-through-own-text", "note DetailItem7", "line of 'note DetailItem7' runs 2.10mm through its own text"),
     ("merged-blocks", "note DetailItem8", "'note DetailItem8' and 'note DetailItem11' read as one block"),
     ("shoulder-crosses-line", "hole-callout RD3", "shoulder of 'hole-callout RD3' crosses 'dim Width'"),
-    ("title-field-misfit", "title Number", "Number 'MHA-DT-003-T006' prints [312.8,23.8]..[377.0,28.6]mm"),
 ]
 
 
@@ -4045,13 +4041,14 @@ def _report_run_with(monkeypatch, tmp_path, finding):
 @pytest.mark.parametrize(("kind", "item", "detail"), _ENFORCED_IN_REPORT, ids=[k for k, _i, _d in _ENFORCED_IN_REPORT])
 def test_report_mode_fails_the_leaf_on_each_enforced_kind(monkeypatch, tmp_path, kind, item, detail):
     """REPORT fails the drawing on every kind the fleet brought to zero,
-    naming the kind, so none can come back unnoticed."""
+    naming the kind and the item, so none can come back unnoticed."""
     from _layout_geometry import Finding
 
     finding = Finding(kind=kind, sheet="Sheet1", a=item, b="", detail=detail)
     with pytest.raises(RuntimeError, match=r"report mode.*\n") as raised:
         _report_run_with(monkeypatch, tmp_path, finding)
     assert f"[{kind}]" in str(raised.value)
+    assert item in str(raised.value)
 
 
 def test_report_mode_passes_a_gating_kind_that_is_not_enforced(monkeypatch, tmp_path):
@@ -4498,101 +4495,3 @@ def test_a_refused_center_mark_count_is_sent_as_a_primitive(monkeypatch):
         "read_failed": ["before"],
     }
     assert all(isinstance(value, (str, bool, int, float, list)) for value in attrs.values())
-
-
-# --------------------------------------------------------------------------
-# title-field-misfit: the DWG. NO. and PART values, measured on the print
-# --------------------------------------------------------------------------
-
-# The v39 release's cone-gear sheet 1 (pdfium glyph boxes): its DWG. NO. and
-# PART values, and how far the cut-over identities run from the same anchors.
-_V39_NUMBER = ["MHA-013-T006", 0.31278, 0.02376, 0.35410, 0.02861]
-_V39_TITLE = ["cone-gear", 0.31271, 0.03755, 0.33946, 0.04157]
-
-
-def _title_dump(spans, fields):
-    from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
-
-    cells = dict(DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE].title_cells_m)
-    dump = _dump(spans=spans, print_rest=False)
-    dump["title_fields"] = [{"source": source, "text": text, "cell": list(cells[source])} for source, text in fields]
-    return dump
-
-
-def test_identity_values_printed_whole_inside_their_cells_pass():
-    """The v39 cone-gear values, and the widest cut-over identities from the
-    same anchors (MHA-DT-003-T006 is 51.4 mm, vn-pedestal-hold-down-screw
-    75.2 mm), print inside their cells: nothing to report."""
-    from _layout_audit import find_title_field_misfits, title_field_fits
-
-    v39 = _title_dump([_V39_NUMBER, _V39_TITLE], [("Number", "MHA-013-T006"), ("Title", "cone-gear")])
-    assert find_title_field_misfits(v39) == []
-    wide = _title_dump(
-        [
-            ["MHA-DT-003-T006", 0.31278, 0.02376, 0.36418, 0.02861],
-            ["vn-pedestal-hold-down-screw", 0.31271, 0.03680, 0.38795, 0.04157],
-        ],
-        [("Number", "MHA-DT-003-T006"), ("Title", "vn-pedestal-hold-down-screw")],
-    )
-    assert find_title_field_misfits(wide) == []
-    number = next(fit for fit in title_field_fits(wide) if fit.source == "Number")
-    # The left air is the least (2.19 mm); the REV divider stands 11.5 mm off.
-    assert number.clearance == pytest.approx(0.31278 - 0.31059)
-    assert number.printed.xmax == pytest.approx(0.36418)
-
-
-def test_a_value_past_its_cells_rule_is_a_misfit():
-    """A DWG. NO. running onto the REV divider (375.71 mm) is reported with how
-    far it crossed; one within the air of the rule is too."""
-    from _layout_audit import TITLE_FIELD_CLEARANCE_M, find_title_field_misfits
-
-    fields = [("Number", "MHA-DT-003-T006")]
-    over = _title_dump([["MHA-DT-003-T006", 0.31278, 0.02376, 0.37700, 0.02861]], fields)
-    [finding] = find_title_field_misfits(over)
-    assert (finding.kind, finding.a) == ("title-field-misfit", "title Number")
-    assert finding.extra["clearance_mm"] == pytest.approx(-1.29, abs=1e-3)
-    edge = 0.37571 - TITLE_FIELD_CLEARANCE_M / 2
-    assert find_title_field_misfits(_title_dump([["MHA-DT-003-T006", 0.31278, 0.02376, edge, 0.02861]], fields))
-
-
-_N15, _T29 = ("Number", "MHA-DT-003-T006"), ("Title", "vn-transgear-collar-cross-pin")
-
-
-@pytest.mark.parametrize(
-    ("field", "printed", "evidence"),
-    [
-        (_N15, [["MHA-DT-003-T0", 0.31278, 0.02376, 0.35800, 0.02861]], {"printed": False}),
-        (
-            _T29,
-            [["vn-transgear-collar-", 0.31271, 0.03755, 0.36500, 0.04157], ["cross-pin", 0.31271, 0.02900, 0.33500, 0.03300]],
-            {"printed": False},
-        ),
-        (_N15, [], {"printed": False}),
-        # One text object whose glyphs stand on two rows, inside the cell.
-        (_T29, [["vn-transgear-collar-cross-pin", 0.31271, 0.03650, 0.36500, 0.04600, 2]], {"printed": True, "rows": 2}),
-        # The whole slug on one row inside the cell, but in capitals.
-        (_T29, [["VN-TRANSGEAR-COLLAR-CROSS-PIN", 0.31271, 0.03680, 0.36500, 0.04157]], {"printed": False}),
-    ],
-    ids=["cut", "wrapped-two-objects", "blank", "wrapped-one-object", "upper-cased"],
-)
-def test_a_value_not_printed_whole_on_one_line_is_a_misfit(field, printed, evidence):
-    """A cut, wrapped, blank or capitalised value fails its cell, however
-    much air the printed ink leaves."""
-    from _layout_audit import find_title_field_misfits
-
-    [finding] = find_title_field_misfits(_title_dump(printed, [field]))
-    assert (finding.kind, finding.a) == ("title-field-misfit", f"title {field[0]}")
-    assert evidence.items() <= finding.extra.items()
-
-
-def test_the_value_is_judged_by_its_print_in_the_cell_not_elsewhere():
-    """The same string printed elsewhere (a BOM row) neither stands in for a
-    missing title-block value nor fails a present one."""
-    from _layout_audit import find_title_field_misfits
-
-    bom = ["vn-pedestal-hold-down-screw", 0.05, 0.20, 0.10, 0.204]
-    fields = [("Title", "vn-pedestal-hold-down-screw")]
-    cell = ["vn-pedestal-hold-down-screw", 0.31271, 0.03680, 0.38795, 0.04157]
-    assert find_title_field_misfits(_title_dump([bom, cell], fields)) == []
-    [finding] = find_title_field_misfits(_title_dump([bom], fields))
-    assert finding.extra["clearance_mm"] < -100

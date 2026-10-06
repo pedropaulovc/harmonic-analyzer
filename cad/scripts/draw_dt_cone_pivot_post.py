@@ -3,7 +3,7 @@ r"""Create the curated machinist drawing for the v2 cone pivot post.
 The SLDPRT remains authoritative.  This recipe places the plan, the front
 elevation, a true-shape cone-journal view, a native section through the cone
 bore plane and a pictorial isometric on one sheet, and imports exactly the
-model dimensions ``dt_cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks; shared
+model dimensions ``cone_pivot_post_spec.DRAWING_DIMENSIONS`` marks; shared
 sheet/template, import, curation and export behaviour lives in
 ``_drawing_common``.
 
@@ -250,7 +250,7 @@ JOURNAL_TEXT_OFFSETS = {
 # The station is labelled: Main's rim-8339 ruling found the spot-face era's
 # bare 18.88 station was not read as one.
 # The cone bore's rims bound the thrust ring the shaft collar bears on, with
-# the collar's OD edge (dt_cone_gear_shaft_spec: ring - 2 x break >= 1.5), so the
+# the collar's OD edge (cone_gear_shaft_spec: ring - 2 x break >= 1.5), so the
 # bore's callout prints the same break as the collar instead of the title
 # block's 0.25.
 DIMENSION_CALLOUTS = {
@@ -1213,7 +1213,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # #906: the plan angle feeds the crank bore's angularity frame (rule 4).
     set_basic_dimensions(adapter, annotations, BASIC_DIMENSIONS)
-    # The part authored these places (dt_cone_pivot_post_spec.DRAWING_PRECISION);
+    # The part authored these places (cone_pivot_post_spec.DRAWING_PRECISION);
     # this sheet only proves they survived the import.  A silent fallback to
     # the drawing document's two places would print the running bores without
     # the third place their fit band is written in.
@@ -1358,7 +1358,7 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=north_anchor,
     )
     # #906 (USER RULING 2026-09-26): the crank bore's angularity to the cone
-    # journal, model PMI (dt_cone_pivot_post_spec.PART_DATUMS /
+    # journal, model PMI (cone_pivot_post_spec.PART_DATUMS /
     # GEOMETRIC_CONTROLS) projected here.  Datum A tags the journal bore in
     # View B, the only view that shows it true; datum B tags the foot seat
     # edge-on in the elevation, left of the body and clear of the foot-seat
@@ -1433,7 +1433,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Cone Pivot Post Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

@@ -1,8 +1,11 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-000)."""
 
+import ast
+import inspect
 import math
 import re
 from itertools import product
+from pathlib import Path
 
 import pytest
 
@@ -27,7 +30,6 @@ import pd_transgear_rear_bushing_spec as rear_bushing
 import pd_transgear_removable_spec as sprocket
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
-from _assembly_contract import assembly_contract
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
 STEP_POINTER = re.compile(r"(MHA-[A-Z]{2}-000)\s+STEP\s+(\d+)")
@@ -108,6 +110,21 @@ def _number(stem: str) -> str:
     return _config.parts(stem)["number"]
 
 
+def _literal_number(script: str, key: str) -> str:
+    """The drawing number a build script stamps into its Number property."""
+    path = Path(drawing.__file__).with_name(script)
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    values = {
+        node.values[index].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Dict)
+        for index, item in enumerate(node.keys)
+        if isinstance(item, ast.Constant) and item.value == key
+    }
+    (value,) = values
+    return value
+
+
 def test_paper_drive_keeps_registry_outputs_and_names_its_sheets() -> None:
     spec = DRAWINGS_BY_NAME["pd_paper_drive_assembly"]
     assert spec.source_kind == "assembly"
@@ -122,9 +139,9 @@ def test_paper_drive_keeps_registry_outputs_and_names_its_sheets() -> None:
 
 
 def test_the_step_registry_names_this_sheet() -> None:
-    from _assembly_contract import assembly_contract
-
-    assert steps.DRAWING_NUMBER == assembly_contract("pd-paper-drive").number
+    assert steps.DRAWING_NUMBER == _literal_number(
+        "build_pd_paper_drive_assembly.py", "Number"
+    )
     assert steps.step_ref(steps.SEQUENCE[3]) == f"{steps.DRAWING_NUMBER} STEP 4"
     with pytest.raises(KeyError):
         steps.step_number("no-such-step")
@@ -527,12 +544,11 @@ def test_no_sheet_prints_a_forbidden_word() -> None:
             assert word not in text.upper(), (word, text)
 
 
-def test_fitup_references_are_in_the_bom_or_drive_train_assembly() -> None:
-    printed = set(re.findall(r"\bMHA-[A-Z0-9-]+\b", drawing.FITUP_STEPS))
-    assert printed, "fit-up steps contain no part references"
-    drive_train_number = assembly_contract("dt-drive-train").number
-    assert drive_train_number == "MHA-DT-000"
-    assert printed <= set(drawing.BOM_PART_NUMBERS.values()) | {drive_train_number}
+def test_no_retired_part_is_named_on_the_sheet() -> None:
+    retired = {"MHA-079", "MHA-080", "MHA-108", "MHA-109"}
+    printed = set(re.findall(r"MHA-[A-Z]{2}-\d{3}", drawing.FITUP_STEPS))
+    assert not printed & retired
+    assert printed <= set(drawing.BOM_PART_NUMBERS.values())
 
 
 def test_the_knob_stack_prints_front_to_rear() -> None:
@@ -814,6 +830,43 @@ def test_spare_storage_clears_nameplate_envelope_by_five_mm(monkeypatch):
         )
     )
     assert spare_max_z <= min(point[2] for point in plate_corners) - 5.0
+
+
+def test_spare_remains_fixed_t18_sibling_with_original_rotation():
+    tree = ast.parse(Path(assembly.__file__).read_text(encoding="utf-8"))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "place_component"
+        and any(
+            keyword.arg == "label"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "transgear-removable (spare T18)"
+            for keyword in node.keywords
+        )
+    ]
+    assert len(calls) == 1
+    call = calls[0]
+    assert [ast.unparse(arg) for arg in call.args] == [
+        "adapter",
+        "'transgear-removable'",
+        "list(SPARE_GEAR_POS)",
+        "[-90.0, 0.0, 0.0]",
+        "ROT_X_NEG90",
+    ]
+    assert {
+        keyword.arg: ast.literal_eval(keyword.value) for keyword in call.keywords
+    } == {
+        "configuration": "T18",
+        "label": "transgear-removable (spare T18)",
+    }
+    assert (
+        inspect.signature(_assembly.place_component).parameters["ground"].default
+        is True
+    )
+    assert assembly.ROT_X_NEG90 == [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]]
 
 
 def _numbered_items() -> dict[str, str]:

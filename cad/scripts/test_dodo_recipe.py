@@ -240,14 +240,6 @@ _DRAWING_OWN_ROW_READERS = {
     # save_simplified_part(adapter, name, ...) forwards to save_part_and_images:
     # same callers, same pin.
     "_drawing_simplified.py",
-    # apply_grouped_bom_properties(..., part_name=PART_NAME) reads only that row;
-    # the caller's identity is checked below, including every grouped builder.
-    "_grouped_bom_properties.py",
-    # registry_identity(spec) -> part_properties(spec.source.stem): spec is the
-    # DrawingSpec finalize_drawing receives, which must name the outputs it
-    # writes, and read_title_fields refuses any sheet whose linked model is not
-    # spec.source before reading it -- the drawing's own part row.
-    "_drawing_title_fields.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
@@ -255,7 +247,6 @@ _OWN_ROW_HELPERS = {
     "save_part_and_images": 1,
     "save_simplified_part": 1,
     "apply_drawing_properties": 1,
-    "apply_grouped_bom_properties": 2,
 }
 
 
@@ -317,33 +308,6 @@ def test_drawing_closures_read_no_foreign_dynamic_part_row():
             assert source.name == own_build, (stem, source.name, calls)
             assert {arg for _name, arg in calls} == {"PART_NAME"}, (stem, calls)
             assert _module_part_name(source) == spec.part.replace("_", "-"), stem
-
-
-@pytest.mark.parametrize(
-    "stem",
-    (
-        "dt_cone_gear",
-        "dt_crank_handle_ferrule",
-        "dt_crank_handle_pivot_screw",
-        "dt_pinion_lever_pin",
-        "pd_transgear_removable",
-    ),
-)
-def test_grouped_producers_read_their_own_row_and_feed_the_registered_drawing(stem):
-    import _buildgraph as bg
-
-    dodo = _load_dodo()
-    source = bg.script_for(stem).resolve()
-    assert source in {path.resolve() for path in bg.part_scripts()}
-    spec = dodo.DRAWINGS_BY_NAME[stem]
-    assert spec.part == stem
-    assert _module_part_name(source) == spec.source.stem == stem.replace("_", "-")
-    calls = _helper_name_arguments(source)
-    assert [arg for name, arg in calls if name == "apply_grouped_bom_properties"] == [
-        "PART_NAME"
-    ]
-    assert {arg for _name, arg in calls} == {"PART_NAME"}
-    assert str(bg.artefact_for(source).resolve()) in dodo._drawing_file_deps(stem)
 
 
 @pytest.fixture

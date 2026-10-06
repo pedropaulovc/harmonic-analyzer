@@ -269,7 +269,7 @@ CUT_PARENT_SCALE = {CutParent.SIDE: SIDE_SCALE, CutParent.TIP_DETAIL: TIP_DETAIL
 # A cutting line on the detail spans its land, not the detail's whole view, so
 # SolidWorks leaves the full section open (leaf 20260929T212413Z-1-c1463903:
 # B-B "did not close"); it is made a partial section, as
-# draw_dt_cone_swing_platform cut C-C from its detail.  The line still runs past
+# draw_cone_swing_platform cut C-C from its detail.  The line still runs past
 # its land on both sides, so the partial cut is the whole D.
 PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 
@@ -474,7 +474,7 @@ def _add_shaft_axis(adapter: Any, view: Any) -> None:
     if centerline is None:
         raise RuntimeError("failed to sketch the shaft axis centreline")
     # A sheet sketch line prints in the under-defined sketch blue (run
-    # f2e72b0f); colour it black, as draw_fr_top_frame's owned centrelines are.
+    # f2e72b0f); colour it black, as draw_top_frame's owned centrelines are.
     segment = _early_bound(centerline, "ISketchSegment")
     segment.Color = 0
     if int(segment.Color) != 0:
@@ -1432,7 +1432,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Cone Gear Shaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

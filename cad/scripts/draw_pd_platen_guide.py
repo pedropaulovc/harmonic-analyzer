@@ -241,7 +241,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # extension lines (y 0.1075 and 0.1125); at 0.1111 the upper one ran
     # through it (extension-through-own-text). Both dimensions live in the
     # GuideProfile sketch (Front plane). Their places, and the depth's, are the
-    # part's (pd_platen_guide_spec.DRAWING_PRECISION); the sheet proves the import
+    # part's (platen_guide_spec.DRAWING_PRECISION); the sheet proves the import
     # kept them.
     annotations = [
         *curate_view_dimensions(
@@ -362,7 +362,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # x=0.0399 extension line).
     #
     # TRADEOFF, deliberate: a datum tag re-attaches at the point on its entity
-    # NEAREST the symbol (draw_ch_fulcrum_shaft.py; wheel-axle's datum A proves it for
+    # NEAREST the symbol (draw_fulcrum_shaft.py; wheel-axle's datum A proves it for
     # straight edges too -- pick x=0.13125, symbol x=0.13725, triangle rendered at
     # 0.1376). The end edge spans only y 0.1086..0.1136, so a symbol below it slides
     # the triangle to the bottom corner (0.040, 0.1086) rather than mid-edge. The
@@ -450,7 +450,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Platen Guide Manufacturing Drawing",
         layout=SPEC.layout,
     )

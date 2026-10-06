@@ -7,4 +7,4 @@ vn-crank-hub-pin:
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: purchased ISO 2338 4 mm m6 steel dowel stock, cut to length; match-reamed axial seam fit
+  process: "dowel stock cut to length; match-reamed axial seam fit"

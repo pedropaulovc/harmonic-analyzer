@@ -1,7 +1,7 @@
 """Author the paper drive's named exploded presentation (PAPER_DRIVE_EXPLODED).
 
 Follows ``_drive_train_explode``: the builder owns the presentation, the
-drawing only consumes it. Each step of ``pd_paper_drive_explode_spec.EXPLODE_STEPS``
+drawing only consumes it. Each step of ``paper_drive_explode_spec.EXPLODE_STEPS``
 is authored along a global axis, read back as a world translation of exactly
 the intended instances (every other instance, the chain links included, reads
 unmoved), and the assembly is collapsed again before save -- the saved

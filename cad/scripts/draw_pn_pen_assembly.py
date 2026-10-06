@@ -35,7 +35,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await build_simple_three_view_drawing(
         adapter,
         source=SOURCE,
-        spec=SPEC,
         outputs=OUTPUTS,
         layout=SPEC.layout,
         sheet_scale=SHEET_SCALE,

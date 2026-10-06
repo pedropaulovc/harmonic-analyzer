@@ -13,7 +13,7 @@ and tooth-tip runout frames said nothing a hobby shop could hold that the bore
 and blank limits do not already imply. The one roughness symbol is rule 5's
 running-surface case: the bore is a size-toleranced fit and a fit lives on the
 peaks too. The decimal places are the PART's
-(``dt_crank_drive_gear_spec.DRAWING_PRECISION``, applied natively by
+(``crank_drive_gear_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_drive_gear``); this script only reads them back off the sheet.
 
 Drawn 3:2 -- at 1:1 a 65 mm disc left two thirds of a B sheet empty, and the
@@ -130,12 +130,7 @@ FRONT_KEEP = {
         GEAR_DATA_BOTTOM - TIP_DIA_TEXT_GAP - TIP_DIA_TEXT_HALF_HEIGHT,
     ),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
-    # Centre the complete AF block in the lane between the tooth-tip circle
-    # and the section's south face; the longer mate Number stays intact.
-    "BoreAF": (
-        (FRONT_CENTER[0] + HALF_OD + SECTION_CENTER[0] - FACE_WIDTH_HALF) / 2.0,
-        FRONT_CENTER[1] + 0.028,
-    ),
+    "BoreAF": (FRONT_CENTER[0] + 0.090, FRONT_CENTER[1] + 0.028),
 }
 # Longitudinal centre section A-A instead of a plain side view: the south
 # bore chamfer is internal, and a targeted import delivers the chamfer's
@@ -164,8 +159,8 @@ SECTION_KEEP = {
 # those dimensions. No process word: a reamer would cut away the flat, and
 # the dimensions define the D-profile (user ruling 2026-09-29, machinist
 # review of the #1128 full build). The mate's name lives here, not beside
-# its number in dt_crank_drive_gear_notes, which is in the part's rebuild
-# closure; test_dt_crank_drive_gear_drawing checks it against the registry.
+# its number in crank_drive_gear_notes, which is in the part's rebuild
+# closure; test_crank_drive_gear_drawing checks it against the registry.
 SHAFT_MATE_NAME = "CONE GEAR SHAFT"
 BORE_CALLOUT = (
     "THRU\n"
@@ -325,7 +320,7 @@ def _bore_leaders_clear(
     set_near_side_diameter(tip, "tip diameter")
     # Native, the bore diameter's line runs rim to rim through the centre,
     # across the centre cut (run 20260929T120308584Z); one arrow on the
-    # lower-left rim keeps it below the line, as draw_dt_crank_arm's hub seat.
+    # lower-left rim keeps it below the line, as draw_crank_arm's hub seat.
     bore = _named(adapter, annotations, "BoreDia")
     set_near_side_diameter(bore, "bore diameter")
     rebuild_drawing(adapter, label="tip and bore diameter near-side leaders")
@@ -482,7 +477,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Crank-Drive Gear Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

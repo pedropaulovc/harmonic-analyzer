@@ -130,7 +130,7 @@ RIGHT_CENTER = (0.245, FRONT_CENTER[1])
 ISO_CENTER = (0.355, 0.150)
 # The D-bore prints in its own enlarged view: a *Front model view of the
 # sheet's configuration, cropped by a circle round the bore (the MHA-VN-031
-# pattern of draw_ch_amplitude_bar and draw_dt_pinion_arbor; their native detail
+# pattern of draw_amplitude_bar and draw_pinion_arbor; their native detail
 # views would not take moved or imported dimensions).  At sheet scale the
 # flat is 0.76-2.3 mm deep, 1.02 mm on T006's 8:1; enlarged, 2.5-3.1 mm.
 # The view sits lower left, under the front view and left of the thickness
@@ -164,7 +164,7 @@ BORE_VIEW_LABEL_DROP = 0.016
 BORE_VIEW_AF_GAP = 0.004
 BORE_VIEW_AF_HALF_WIDTH = 0.022
 # The bore axis must land within 0.1 mm of BORE_VIEW_CENTER after the move
-# (draw_ch_amplitude_bar's detail tolerance), and the title within 1 mm.
+# (draw_amplitude_bar's detail tolerance), and the title within 1 mm.
 BORE_VIEW_POSITION_TOL_M = 1e-4
 NOTE_CENTRING_TOL_M = 0.001
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
@@ -182,11 +182,10 @@ CLOCK_ARC_CENTRE_TOL = 0.0005
 CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")
 # Top-aligned with the manufacturing notes: the 14-line block (header + 13
 # rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
-# line; the reserved 15-line block ends ~52.6 mm down, still above the largest
-# side view (top 0.197) with FaceWidth below it. The complete mate row wraps
-# onto a continuation line within this height; no line may exceed 66
-# characters (~122 mm). The sheet count sits at x 0.3496 (a 78-character row
-# reached 0.3588 and failed the audit).
+# line; the 15-line block ends ~52.6 mm down, still above the largest side
+# view (top 0.197) with FaceWidth below it.  Its widest row may
+# not pass the MATES WITH row (66 characters, ~122 mm): the sheet count sits
+# at x 0.3496 (a 78-character row reached 0.3588 and failed the audit).
 GEAR_DATA_POS = (0.215, 0.263)
 # Rendered height/width budget of the Gear Data block, for the layout test.
 GEAR_DATA_HEIGHT = 0.056
@@ -1000,7 +999,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Cone Gear Batch Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

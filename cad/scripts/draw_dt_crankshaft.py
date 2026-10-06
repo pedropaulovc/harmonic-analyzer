@@ -25,7 +25,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from typing import Any, Callable, Literal, Sequence
+from typing import Any, Callable, Sequence
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
@@ -248,7 +248,7 @@ DIAMETER_POSITIONS = {
 # equal-size callout also governs the inboard land.
 CALLOUTS_ABOVE = {"ShaftDiaDim": f"{len(SHAFT_CORE_LANDS)}X", "JournalDiaDim": "2X"}
 # The lower drive-pin location names the mate its +/-0.025 serves
-# (dt_crankshaft_notes), in the clear field under its text.
+# (crankshaft_notes), in the clear field under its text.
 CALLOUTS_BELOW = {
     "OverallLength": "OVERALL",
     "DrivePinOffset2": DRIVE_PIN_LOCATION_CALLOUT,
@@ -293,7 +293,7 @@ DRIVE_PIN_CALLOUT_XY = (0.066, 0.250)
 HOLE_CALLOUT_XY = (PIN_X + 0.072, 0.247)
 # The 16T retention-pin hole is match-drilled through the seated pinion's
 # boss at assembly, so the sheet prints the pinion sheet's own matched-fit
-# note with the mates swapped (dt_crank_pinion_spec.CRANKSHAFT_PIN_HOLE_PROCESS,
+# note with the mates swapped (crank_pinion_spec.CRANKSHAFT_PIN_HOLE_PROCESS,
 # also the part property checked below): the operation, where it runs, the
 # pin it is reamed to, the fit's acceptance and flush -- no size, no station.
 # A bare transfer note gave the shaft's machinist none of these (machinist
@@ -301,16 +301,14 @@ HOLE_CALLOUT_XY = (PIN_X + 0.072, 0.247)
 # round shaft has a saddle rim, not a circle, so a native Hole Wizard
 # callout cannot bind to it (run1-61671871a).  Its TEXT sits, anchored
 # upper-left, in the free field above the far-end seat, right of the cross-hole
-# callout's text (which spans ~30 mm right of its centre). Its measured text
-# box is right-aligned in that field, with the leader leaving its right side.
-# R11's left-aligned box fit, but its leader crossed the Ø9 seat dimension's
-# text at (341.0, 210.2) mm. The reserved right edge routes it past that text
-# without changing the hole attachment, process words or font.
+# callout's text (which spans ~30 mm right of its centre) and left of the
+# isometric; it is placed from its own measured box.
 # Its leader must end on the hole, which the side view shows straddling the
 # axis -- below the field's floor -- so the leader is held to the hole's
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
+PINION_PIN_NOTE_XY = (0.270, 0.250)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],
@@ -326,13 +324,6 @@ PINION_PIN_HOLE_WINDOW = (
     _sheet_y(PINION_SEAT_DIA / 2.0),
 )
 NOTE_FIELD_MARGIN = 0.001
-_PINION_NOTE_LEADER_SIDE = 2  # swLeaderSide_e.swLS_RIGHT
-# Insert at the field's inset upper-left, then allocate the complete process
-# note against its right edge from the native text extent, not a glyph estimate.
-PINION_PIN_NOTE_XY = (
-    PINION_PIN_NOTE_FIELD[0] + NOTE_FIELD_MARGIN,
-    PINION_PIN_NOTE_FIELD[3] - NOTE_FIELD_MARGIN,
-)
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.376, 0.108)
 
@@ -431,18 +422,11 @@ def _band_hole_depth(display: Any, band: str, draw: Any, label: str) -> None:
 Box = tuple[float, float, float, float]
 
 
-def _shift_into_field(
-    text: Box,
-    field: Box,
-    margin: float,
-    *,
-    placement: Literal["minimal", "right"],
-) -> tuple[float, float]:
+def _shift_into_field(text: Box, field: Box, margin: float) -> tuple[float, float]:
     """Return the (dx, dy) that brings a measured text box ``margin`` inside ``field``.
 
-    Boxes are (x0, y0, x1, y1) in sheet metres. ``placement="minimal"`` keeps an
-    already-contained box still; ``placement="right"`` reserves the field's
-    right edge for an attached note's leader. An oversized box fails loud.
+    Boxes are (x0, y0, x1, y1) in sheet metres.  A box already inside moves
+    (0, 0); one too big for the field fails loud, naming the overflow.
     """
     x0, y0, x1, y1 = text
     fx0, fy0, fx1, fy1 = field
@@ -454,8 +438,6 @@ def _shift_into_field(
             f"over by {max(-spare_x, 0.0):.4f} wide, {max(-spare_y, 0.0):.4f} tall"
         )
     dx = max(0.0, fx0 + margin - x0) - max(0.0, x1 - (fx1 - margin))
-    if placement == "right":
-        dx = fx1 - margin - x1
     dy = max(0.0, fy0 + margin - y0) - max(0.0, y1 - (fy1 - margin))
     return dx, dy
 
@@ -478,14 +460,13 @@ def _note_text_box(drawing_model: Any, annotation: Any, note: Any, label: str) -
     """Measure a leadered note's TEXT box: GetExtent includes the leader.
 
     The leader is hidden for the read and restored (straight, as
-    ``add_attached_note`` makes it), pinned to this note's reserved right side,
-    then re-verified to still attach once.
+    ``add_attached_note`` makes it), then re-verified to still attach once.
     """
-    if annotation.SetLeader3(0, _PINION_NOTE_LEADER_SIDE, True, False, False, False) != 0:
+    if annotation.SetLeader3(0, 0, True, False, False, False) != 0:  # swNO_LEADER
         raise RuntimeError(f"{label}: could not hide the leader to measure the text")
     drawing_model.GraphicsRedraw2()
     extent = tuple(float(v) for v in (note.GetExtent() or ()))
-    if annotation.SetLeader3(1, _PINION_NOTE_LEADER_SIDE, True, False, False, False) != 0:
+    if annotation.SetLeader3(1, 0, True, False, False, False) != 0:  # swSTRAIGHT
         raise RuntimeError(f"{label}: could not restore the leader")
     drawing_model.GraphicsRedraw2()
     if int(annotation.GetLeaderCount()) != 1 or int(annotation.GetAttachedEntityCount3()) != 1:
@@ -500,67 +481,27 @@ def _place_note_text_in_field(
 ) -> None:
     """Move a leadered note's text inside ``field`` from its measured box.
 
-    Its leader must still end inside ``hole``. Final native text and both leader
-    readbacks are recorded before the placement guards and the shared audit.
+    Its leader must still end inside ``hole``.  Everything read is logged.
     """
     note = _early_bound(note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     text = _note_text_box(drawing_model, annotation, note, label)
-    dx, dy = _shift_into_field(text, field, NOTE_FIELD_MARGIN, placement="right")
+    dx, dy = _shift_into_field(text, field, NOTE_FIELD_MARGIN)
     if dx or dy:
         x, y = (float(v) for v in tuple(annotation.GetPosition())[:2])
         if not annotation.SetPosition2(x + dx, y + dy, 0.0):
             raise RuntimeError(f"{label}: failed to move the note by ({dx}, {dy})")
         text = _note_text_box(drawing_model, annotation, note, label)
     leader = tuple(float(v) for v in (note.GetLeaderInfo() or ()))
-    registered_leader = tuple(
-        float(v) for v in (annotation.GetLeaderPointsAtIndex(0) or ())
-    )
-    leader_side = int(annotation.GetLeaderSide())
-    leader_style = int(annotation.GetLeaderStyle())
-    owner_type = int(annotation.OwnerType)
-    attached_count = int(annotation.GetAttachedEntityCount3())
-    dangling = bool(annotation.IsDangling())
     centre = ((hole[0] + hole[2]) / 2.0, (hole[1] + hole[3]) / 2.0)
-    _telemetry.event(
-        "drawing.retention_pin_note",
-        label=label,
-        text=str(note.GetText()),
-        text_box_m=text,
-        field_m=field,
-        movement_m=(dx, dy),
-        leader_info_m=leader,
-        registered_leader_m=registered_leader,
-        hole_window_m=hole,
-        leader_side=leader_side,
-        leader_style=leader_style,
-        owner_type=owner_type,
-        attached_count=attached_count,
-        dangling=dangling,
-    )
     tip = _leader_tip(leader, centre)
-    registered_tip = _leader_tip(registered_leader, centre)
     _telemetry.info(
-        f"{label}: final text box {text} moved ({dx:.4f}, {dy:.4f}); "
-        f"leader {leader}; registered leader {registered_leader}; "
-        f"tips {tip}, {registered_tip}; "
-        f"side {leader_side}, style {leader_style}, owner {owner_type}, "
-        f"attached {attached_count}, dangling {dangling}"
+        f"{label}: text box {text} moved ({dx:.4f}, {dy:.4f}); leader {leader}; tip {tip}"
     )
-    if (
-        leader_side != _PINION_NOTE_LEADER_SIDE
-        or leader_style != 1  # swLeaderStyle_e.swSTRAIGHT
-        or owner_type != 0  # swAnnotationOwner_e.swAnnotationOwner_DrawingView
-        or attached_count != 1
-        or dangling
-    ):
-        raise RuntimeError(f"{label}: final note lost its right-side attached leader")
-    if _shift_into_field(text, field, 0.0, placement="minimal") != (0.0, 0.0):
+    if _shift_into_field(text, field, 0.0) != (0.0, 0.0):
         raise RuntimeError(f"{label}: text box {text} left its field {field}")
-    if not _inside(tip, hole) or not _inside(registered_tip, hole):
-        raise RuntimeError(
-            f"{label}: leader tips {tip}, {registered_tip} are off the hole window {hole}"
-        )
+    if not _inside(tip, hole):
+        raise RuntimeError(f"{label}: leader tip {tip} is off the hole window {hole}")
 
 
 def _visible_cross_hole_edge(
@@ -929,6 +870,13 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=PINION_PIN_NOTE_XY,
         label="16T retention-pin transfer",
     )
+    _place_note_text_in_field(
+        drawing_model,
+        pinion_note,
+        PINION_PIN_NOTE_FIELD,
+        hole=PINION_PIN_HOLE_WINDOW,
+        label="16T retention-pin transfer",
+    )
     add_surface_finish(
         adapter,
         side,
@@ -963,21 +911,13 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # The end view's hidden lines show the cross-hole running across the
     # dome end, which clocks the punched fiducial to it (rule 7: a cross-hole
-    # through a turned part).  Re-assert after the last end-view annotation
-    # so the export regenerates the dashed edges (layout-tuning refusal e).
+    # through a turned part).  Re-asserted last so the export regenerates the
+    # dashed edges after every annotation (layout-tuning refusal e).
     set_hidden_lines_visible(adapter, end)
-    _place_note_text_in_field(
-        drawing_model,
-        pinion_note,
-        PINION_PIN_NOTE_FIELD,
-        hole=PINION_PIN_HOLE_WINDOW,
-        label="16T retention-pin transfer",
-    )
 
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Crankshaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

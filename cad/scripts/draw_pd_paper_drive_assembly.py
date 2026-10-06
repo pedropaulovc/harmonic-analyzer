@@ -469,7 +469,7 @@ COLLAR_LANDING_MM = (
 )
 # A listed circle is the rim within these of its modelled centre and radius,
 # its axis along the collar's (both senses), and the arc holding the landing
-# when its closest point to it is within 1e-6 m (draw_pd_transgear_disc_hub's).
+# when its closest point to it is within 1e-6 m (draw_transgear_disc_hub's).
 _RIM_CENTER_TOL_MM = 1e-4
 _RIM_RADIUS_TOL_MM = 1e-4
 _RIM_AXIS_TOL = 1e-6
@@ -896,7 +896,7 @@ KNOB_END_FLOAT_RANGE = (
 # §13.2 procedure (4): past this gap the T24 seat would pass the collar's
 # SEAT_MAX_FROM_F in front of the 12T front face.
 COLLAR_GAP_MAX = collar.SEAT_MAX_FROM_F - collar.LENGTH
-# The platen's screw stations (pd_platen_spec): its front counterbores take the
+# The platen's screw stations (platen_spec): its front counterbores take the
 # guide screws, its through-taps the clip screws.
 GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
 CLIP_SCREWS = len(platen.SOCKET_XY)
@@ -978,7 +978,7 @@ def _step_text() -> dict[str, str]:
         "hanger-pivoted": (
             f"{_N['vn-transgear-pivot-spring']} SPRING, THEN ARM, ON THE "
             f"{_N['vn-transgear-pivot-screw']} SHOULDER SCREW FROM THE REAR; PRESS "
-            f"{_N['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE SHOULDER, "
+            f"THE {_N['pd-transgear-pivot-spacer']} SPACER, AS MADE, ON THE SHOULDER, "
             "FLUSH WITH ITS END ON A FLAT. SEAT IT IN THE "
             f"{_N['pd-support-bar']} BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER; "
             "THE ARM FALLS FREELY."
@@ -1000,7 +1000,7 @@ def _step_text() -> dict[str, str]:
             f"{_N['vn-transgear-disc-screw']} SCREWS."
         ),
         "disc-screws-cut": (
-            f"CUT {_N['vn-transgear-disc-screw']} "
+            f"CUT {_N['vn-transgear-disc-screw']} TIPS "
             f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW DISC REAR FACE; "
             f"BREAK {disc_screw.CUT_END_BREAK_TEXT}."
         ),
@@ -1032,11 +1032,11 @@ def _step_text() -> dict[str, str]:
             "RING INTO THE PLATE BORE FROM THE FRONT, PUSHED REARWARD. CUP ON THE "
             f"JOURNAL ON A {knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS; "
             f"MATCH-DRILL {cup_pin.HOLE_TEXT} THROUGH BOTH "
-            f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS PIN "
+            f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS THE PIN "
             "IN, CENTRED. COLLAR ON THE CORE UNPINNED, PINS FORWARD."
         ),
         "latch-bracket-fitted": (
-            f"FIX THE {_N['pd-latch-hook-bracket']} BRACKET TO THE BAR WITH "
+            f"SCREW THE {_N['pd-latch-hook-bracket']} BRACKET TO THE BAR WITH "
             f"{TRANSGEAR_QUANTITIES['vn-latch-hook-bracket-screw']} "
             f"{_N['vn-latch-hook-bracket-screw']} SCREWS."
         ),
@@ -1049,14 +1049,14 @@ def _step_text() -> dict[str, str]:
         ),
         # Machinist review of 0316d0951: the set is measured on the hook's
         # rivet holes from the MHA-PD-021 datums, the flap's lower edge and the
-        # bar's back face under its base (pd_latch_hook_bracket_spec.HOOK_SET_YZ).
+        # bar's back face under its base (latch_hook_bracket_spec.HOOK_SET_YZ).
         "hook-set-and-riveted": (
             f"HOLDING THAT MESH, SET THE {_N['pd-latch-hook']} HOOK ON THE BRACKET "
             f"FLAP, ITS HOLE'S LOWER EDGE ON THE {_N['vn-transgear-latch-pin']} PIN, "
             f"ITS RIVET HOLES {steps.HOOK_SET_Y_TEXT} ABOVE THE FLAP'S LOWER EDGE, "
             f"THE FRONT ONE {steps.HOOK_SET_Z_TEXT} REAR OF THE BAR, "
-            f"{steps.HOOK_SET_TEXT}, ELSE REPORT; CLAMP. MATCH-DRILL THE FLAP "
-            f"PER {_N['pd-latch-hook-bracket']}; SET "
+            f"{steps.HOOK_SET_TEXT}, ELSE REPORT; CLAMP. DRILL THE FLAP THROUGH "
+            f"THEM PER {_N['pd-latch-hook-bracket']}; SET "
             f"{TRANSGEAR_QUANTITIES['vn-latch-hook-rivet']} "
             f"{_N['vn-latch-hook-rivet']} RIVETS. UNCLAMP, LATCH, RE-RUN THE TRAVEL."
         ),
@@ -1097,7 +1097,7 @@ def _step_text() -> dict[str, str]:
             f"CLAMP THE COLLAR WITH A \u00d8{steps.CLAMP_SLEEVE_OD:.1f}/"
             f"\u00d8{steps.CLAMP_SLEEVE_ID:.1f} SLEEVE OVER THE STUD ON THE PILOT "
             f"FACE, TIGHTENED BY THE THUMBNUT. {collar.CROSS_PIN_DRILL_PHRASE}; "
-            "FIT "
+            "FIT THE "
             f"{_N['vn-transgear-collar-cross-pin']} SPRING PIN IN THE SLOT. SLEEVE "
             "AND SHIM OUT; T24 ON, NUT TIGHT ON THE PILOT."
         ),
@@ -1132,15 +1132,13 @@ def _step_text() -> dict[str, str]:
 
 
 def _step_column(heading: str, keys: tuple[str, ...], text: dict[str, str]) -> str:
-    # A part number's hyphens never break a line: each number prints whole.
-    lines = textwrap.wrap(heading, width=FITUP_LINE_WIDTH, break_on_hyphens=False)
+    lines = textwrap.wrap(heading, width=FITUP_LINE_WIDTH)
     for key in keys:
         lines += textwrap.wrap(
             text[key],
             width=FITUP_LINE_WIDTH,
             initial_indent=f"{steps.step_number(key)}. ",
             subsequent_indent="   ",
-            break_on_hyphens=False,
         )
     return "\n".join(lines)
 
@@ -1201,7 +1199,6 @@ ASSEMBLED_CAPTIONS = {
             f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR ITEMS: SHEET "
             f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
             width=FITUP_LINE_WIDTH,
-            break_on_hyphens=False,
         )
     )
     for scale in ISO_SCALE_LADDER
@@ -1844,7 +1841,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         layout=SPEC.layout,
         pdf_title="Paper-Drive Assembly Drawing",
         scale=ASSEMBLED_SCALE,

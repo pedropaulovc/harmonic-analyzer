@@ -386,7 +386,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
         f"  knob shaft  {z_shaft:+6.2f} deg  (Lock to collar, integral 12T, signed)\n"
         f"  120T disc   {z_disc:+6.2f} deg  (gear mate 12:120, signed)\n"
         f"  feed pinion {z_feed:+6.2f} deg  (Lock to disc, signed)\n"
-        f"  pd_platen      {d_platen:+7.3f} mm  (rack-pinion, pi*{FEED_PD:.2f}/rev;"
+        f"  platen      {d_platen:+7.3f} mm  (rack-pinion, pi*{FEED_PD:.2f}/rev;"
         f" NET {NET_RACK_TRAVEL_PER_CRANK_REV:.3f}/crank-rev)\n"
         f"  roller chain {'links advanced (Dynamic seed drive)' if chain_moved else 'static visual -- SW has no sprocket->link coupling'}")
     return {"crank_deg": f"{d_crank:.2f}", "platen_mm": f"{d_platen:.3f}",

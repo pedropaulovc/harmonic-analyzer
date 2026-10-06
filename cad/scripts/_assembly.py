@@ -82,22 +82,30 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
 def _ensure_assembly_identity(adapter: Any, asm_name: str, model: Any = None) -> bool:
     """Restamp stale release Revision and frozen per-assembly Number."""
     target = adapter.currentModel if model is None else model
-    expected = {
-        "Revision": _config.release_revision(),
-        "Number": assembly_contract(asm_name).number,
-    }
-    changed = {}
-    for key, value in expected.items():
-        current = str(
-            adapter._attempt(lambda key=key: target.GetCustomInfoValue("", key), default="")
-            or ""
+    expected = _config.release_revision()
+    current = str(
+        adapter._attempt(lambda: target.GetCustomInfoValue("", "Revision"), default="")
+        or ""
+    )
+    revision_changed = current != expected
+    if revision_changed:
+        apply_custom_properties(adapter, {"Revision": expected}, model=target)
+        _telemetry.event(
+            "assembly.revision_restamped",
+            previous=current,
+            revision=expected,
         )
-        if current != value:
-            changed[key] = value
-            log(f"assembly {key} {current!r} -> {value!r}")
-    if not changed:
-        return False
-    apply_custom_properties(adapter, changed, model=target)
+        log(f"assembly Revision {current!r} -> {expected}")
+
+    number = assembly_contract(asm_name).number
+    current_number = str(
+        adapter._attempt(lambda: target.GetCustomInfoValue("", "Number"), default="")
+        or ""
+    )
+    if current_number == number:
+        return revision_changed
+    apply_custom_properties(adapter, {"Number": number}, model=target)
+    log(f"assembly Number {current_number!r} -> {number!r}")
     return True
 
 

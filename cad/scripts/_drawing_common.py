@@ -47,9 +47,8 @@ from _drawing_layout_check import (
     format_findings,
 )
 from _drawing_layout_audit import annotation_display, run_layout_audit
-from _drawing_title_fields import assert_title_fields, audit_records, read_title_fields
 from _layout_audit import display_box, estimated_text_runs, line_segment
-from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, DrawingSpec, layout_report_path
+from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
     bool_array,
@@ -7603,7 +7602,6 @@ async def finalize_drawing(
     adapter: Any,
     outputs: DrawingOutputs,
     *,
-    spec: DrawingSpec,
     layout: DrawingLayout,
     pdf_title: str,
     scale: tuple[float, float] = (1.0, 1.0),
@@ -7616,20 +7614,10 @@ async def finalize_drawing(
 ) -> dict[str, str]:
     """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG.
 
-    ``spec`` is the drawing's own registry entry: its outputs are
-    ``outputs``, and every sheet must document its ``source``, whose frozen
-    identity the title block prints (:func:`read_title_fields`).
-
     ``settled_checks`` run after the last rebuild, before anything is
     saved: a readback taken when an annotation was placed says nothing
     about the drawing the later rebuilds leave (:func:`assert_balloon_landings`).
     """
-    if (outputs.slddrw, outputs.pdf, outputs.png) != (
-        spec.outputs["slddrw"],
-        spec.outputs["pdf"],
-        spec.outputs["png"],
-    ):
-        raise ValueError(f"finalize_drawing outputs {outputs!r} are not {spec.name}'s {spec.outputs!r}")
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
@@ -7677,7 +7665,6 @@ async def finalize_drawing(
     # real view after all views exist, validate the linked model's tolerance and
     # current-release Revision properties, and hold every sheet to the same ASME B
     # contract.
-    title_sources: dict[str, tuple[Any, str]] = {}
     for sheet_name in sheet_names:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate drawing sheet {sheet_name!r}")
@@ -7782,10 +7769,6 @@ async def finalize_drawing(
                 TITLE_BLOCK_COPYRIGHT_PROPERTY,
             ),
         )
-        title_sources[sheet_name] = (
-            linked_model,
-            str(adapter._get_attr_or_call(first_view, "ReferencedConfiguration") or ""),
-        )
 
     # Explicit recipe-requested cleanup remains sheet-scoped. When a standard
     # Isometric view is present, the finalizer owns its high-quality Shaded With
@@ -7838,11 +7821,6 @@ async def finalize_drawing(
         # A check may activate the sheet it reads.
         if not ddoc.ActivateSheet(sheet_names[0]):
             raise RuntimeError("failed to restore first drawing sheet after the settled checks")
-    # The DWG. NO. and PART cells, read off the settled sheets before anything
-    # is saved: each prints its linked model's full Number and Title, on one
-    # line inside its ruled cell (_drawing_title_fields).
-    title_fields = read_title_fields(ddoc, spec, title_sources, resolved_layouts)
-    assert_title_fields(title_fields)
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot
@@ -7882,7 +7860,6 @@ async def finalize_drawing(
         report=layout_report_path(outputs.slddrw.stem),
         sheet_layouts=resolved_layouts,
         is_pictorial=is_pictorial_orientation,
-        title_fields=audit_records(title_fields),
     )
     # Release the file: SolidWorks keeps the saved SLDDRW open past the COM
     # session, and the next run (or a from-scratch rebuild deleting the

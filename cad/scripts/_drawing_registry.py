@@ -39,15 +39,6 @@ class DrawingTemplateSpec:
     pixel_size: tuple[int, int]
     title_block_left_m: float
     title_block_top_m: float
-    # The ruled title-block cells that print the drawing's identity, as
-    # ``(source, (left, bottom, right, top))`` in sheet metres: "Number" is the
-    # DWG. NO. cell ($PRPSHEET:"Number"), "Title" the PART cell (the linked
-    # document's summary Title). Measured off the rules of the v39 release PDFs
-    # (cone-gear landscape, cylinder-gear portrait; stroke centres). The layout
-    # audit holds each printed value whole on one line inside its cell
-    # (``_layout_audit.find_title_field_misfits``); re-measure with the
-    # keep-out above when the block moves or a rule is redrawn.
-    title_cells_m: tuple[tuple[str, tuple[float, float, float, float]], ...]
 
 
 # Hand-made in SolidWorks (title block, tolerance block, embedded ASME B sheet
@@ -62,10 +53,6 @@ DRAWING_TEMPLATES = {
         pixel_size=(5100, 3300),
         title_block_left_m=0.216,
         title_block_top_m=0.066,
-        title_cells_m=(
-            ("Number", (0.31059, 0.01919, 0.37571, 0.03588)),
-            ("Title", (0.31059, 0.03588, 0.41906, 0.04748)),
-        ),
     ),
     DrawingLayout.PORTRAIT: DrawingTemplateSpec(
         path=TEMPLATES_DIR / "harmonic-analyzer-portrait.DRWDOT",
@@ -75,10 +62,6 @@ DRAWING_TEMPLATES = {
         pixel_size=(3300, 5100),
         title_block_left_m=0.0636,
         title_block_top_m=0.066,
-        title_cells_m=(
-            ("Number", (0.16316, 0.01933, 0.22197, 0.03552)),
-            ("Title", (0.16316, 0.03552, 0.26666, 0.04766)),
-        ),
     ),
 }
 
@@ -103,9 +86,9 @@ class DrawingSpec:
     def source(self) -> Path:
         """The authoritative CAD model this drawing documents.
 
-        Build scripts emit dashed artefact names (``ch_fulcrum_shaft`` ->
-        ``ch-fulcrum-shaft.SLDPRT``, ``pn_pen`` -> ``pn-pen.SLDASM``), so the
-        source stem is ``part`` with each ``_`` dashed.
+        Build scripts emit dashed artefact names (``fulcrum_shaft`` ->
+        ``ch-fulcrum-shaft.SLDPRT``, ``pen`` -> ``pn-pen.SLDASM``), so the source stem
+        is the dashed ``part``.
         """
         stem = self.part.replace("_", "-")
         if self.source_kind == "assembly":

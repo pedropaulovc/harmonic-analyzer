@@ -282,7 +282,7 @@ def test_the_notes_name_exactly_the_parts_the_drive_pins_press_into() -> None:
                 hosts |= stems - pins
     assert hosts == {"dt-crankshaft", "pd-transgear-drive-collar"}
     numbers = {_config.parts(host)["number"] for host in hosts}
-    assert set(re.findall(r"\bMHA-[A-Z0-9-]+\b", notes.DRAWING_NOTES)) == numbers
+    assert set(re.findall(r"MHA-[A-Z]{2}-\d+", notes.DRAWING_NOTES)) == numbers
 
 
 def test_gears_carry_no_frames_or_datums() -> None:

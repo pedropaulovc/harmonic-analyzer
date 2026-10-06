@@ -129,7 +129,7 @@ _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
 _ROW_PITCH = 0.010
 _ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(6))
 # The prefixed texts' centre right of F: half the wider text's printed width
-# (test_pd_transgear_knob_shaft_drawing) and an arrow's air.
+# (test_transgear_knob_shaft_drawing) and an arrow's air.
 _CUTTER_TEXT_INSET = 0.040
 SIDE_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
@@ -287,7 +287,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Transgear Knob Shaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

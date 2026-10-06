@@ -18,9 +18,7 @@ by the sheet's own view):
 * section lines (``IDrSection`` line, arrows, label origins, text height) and
   detail circles (``IView::GetDetailCircleInfo2``);
 * tables, boxed from anchor + row/column spans (as ``_drawing_common`` does);
-* the sheet size, zone margins and title-block keep-out, and the identity
-  values its DWG. NO. and PART cells must print, with each cell's rules
-  (handed in by ``finalize_drawing``, which read them off the linked model);
+* the sheet size, zone margins and title-block keep-out;
 * the sheet's page of the exported PDF (``_pdf_ink``): every text object with
   its tight glyph box, and every black stroke with its width and dash. The
   PDF is where text and model edges are measured; COM says what each is.
@@ -37,7 +35,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping
 
 import _telemetry
 from _common import _early_bound
@@ -459,12 +457,9 @@ def collect_sheet_dumps(
     pdf: Path,
     sheet_layouts: Mapping[str, DrawingLayout],
     is_pictorial: Callable[[str], bool],
-    title_fields: Mapping[str, Sequence[Mapping[str, Any]]],
 ) -> list[dict[str, Any]]:
     """One dump per sheet of the adapter's open drawing, no sheet activated,
-    each carrying its page of the exported ``pdf`` and the identity values its
-    title block must print (``title_fields``, by sheet name:
-    ``_drawing_title_fields.audit_records``)."""
+    each carrying its page of the exported ``pdf``."""
     with _telemetry.span("layout.read_pdf", pdf=pdf.name) as span:
         pages = read_pdf_ink(pdf)
         span.set_attribute("pages", len(pages))
@@ -472,8 +467,7 @@ def collect_sheet_dumps(
         reader = _Reader(adapter)
         try:
             dumps = _collect_com(
-                adapter, reader, stem=stem, pdf=pdf, pages=pages, sheet_layouts=sheet_layouts,
-                is_pictorial=is_pictorial, title_fields=title_fields,
+                adapter, reader, stem=stem, pdf=pdf, pages=pages, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
             )
         finally:
             for key, value in reader.cost_attributes().items():
@@ -491,7 +485,6 @@ def _collect_com(
     pages: list[PageInk],
     sheet_layouts: Mapping[str, DrawingLayout],
     is_pictorial: Callable[[str], bool],
-    title_fields: Mapping[str, Sequence[Mapping[str, Any]]],
 ) -> list[dict[str, Any]]:
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     # GetViews' sheet order is undetermined; the PDF prints GetSheetNames order.
@@ -511,7 +504,7 @@ def _collect_com(
         try:
             dump = _dump_sheet(
                 reader, ddoc, entries, index=index, stem=stem, pdf=pdf, pages=pages, page_of=page_of,
-                sheet_layouts=sheet_layouts, is_pictorial=is_pictorial, title_fields=title_fields,
+                sheet_layouts=sheet_layouts, is_pictorial=is_pictorial,
             )
         except Exception as exc:
             raise _collector_fault(stem, dumps, reader, exc) from exc
@@ -547,7 +540,6 @@ def _dump_sheet(
     page_of: Mapping[str, int],
     sheet_layouts: Mapping[str, DrawingLayout],
     is_pictorial: Callable[[str], bool],
-    title_fields: Mapping[str, Sequence[Mapping[str, Any]]],
 ) -> dict[str, Any]:
     """One sheet's dump: ``entries`` is its ``GetViews`` row (sheet view first)."""
     sheet_view = reader.bind(entries[0], "IView")
@@ -587,7 +579,6 @@ def _dump_sheet(
         dump["title_block"] = _round(
             (template.title_block_left_m, 0.0, width, template.title_block_top_m)
         )
-    dump["title_fields"] = [dict(field) for field in title_fields.get(name, ())]
     tables: dict[str, dict[str, Any]] = {}
     for view in entries:
         view = reader.bind(view, "IView")
@@ -624,7 +615,6 @@ def run_layout_audit(
     report: Path,
     sheet_layouts: Mapping[str, DrawingLayout],
     is_pictorial: Callable[[str], bool],
-    title_fields: Mapping[str, Sequence[Mapping[str, Any]]],
     mode: LayoutAuditMode = LAYOUT_AUDIT_MODE,
 ) -> None:
     """Dump and audit every sheet, write ``report``; raise on a finding
@@ -640,8 +630,7 @@ def run_layout_audit(
         report.unlink(missing_ok=True)
         started = time.perf_counter()
         dumps = collect_sheet_dumps(
-            adapter, stem=stem, pdf=pdf, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial,
-            title_fields=title_fields,
+            adapter, stem=stem, pdf=pdf, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
         )
         collected = time.perf_counter() - started
         with _telemetry.span("layout.findings", stem=stem) as child:

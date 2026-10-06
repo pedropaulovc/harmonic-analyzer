@@ -8,7 +8,7 @@ isometric, both 1:1.  No single length suits every in-band post and plate
 (post_mount_screw_spec's U27 check), so the length prints as a REFERENCE,
 "(86.2)", with no band and the cut-to-fit acceptance beneath it: cut at
 assembly, end flush to the spec band's allowance short of the MHA-DT-020
-underside, never proud (vn_post_mount_screw_spec.CUT_TO_FIT_CALLOUT -- no MHA-DT-000
+underside, never proud (post_mount_screw_spec.CUT_TO_FIT_CALLOUT -- no MHA-DT-000
 procedure sheet exists to carry it, Codex P1 on #857).  The cut end's break
 is a deburr (Main's MHA-VN-031 eye pass on #857): a 0.1 dimension at 1:1 is
 illegible and its printed +0/-0.1 band read as allowing no break at all, so
@@ -146,7 +146,7 @@ TIP_VIEW_LABEL = (
 )
 _CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 # The tip reference must land within 0.1 mm of DETAIL_CENTER after the move:
-# draw_dt_cylinder_gear's notch-detail outline-centre tolerance.
+# draw_cylinder_gear's notch-detail outline-centre tolerance.
 TIP_VIEW_POSITION_TOLERANCE_M = 1e-4
 
 
@@ -786,7 +786,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title=TITLE,
         scale=SHEET_SCALE,
         layout=SPEC.layout,

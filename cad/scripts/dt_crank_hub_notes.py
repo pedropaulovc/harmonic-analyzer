@@ -99,7 +99,7 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-009"
 
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
 # FRONT, with a bought ANSI #25 chain on the crank T12.  Not printed: the
-# drive train asserts both from the same names (build_dt_drive_train_assembly).
+# drive train asserts both from the same names (build_drive_train_assembly).
 # The hub is placed by the fitter (front face flush with the shaft's dome
 # root, the crank face z -183, before the match-ream), so its printed
 # overall length -- not the arm's stock thickness -- places its rear face.
@@ -108,14 +108,14 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-PD-009"
 #     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    25.2 +/-0.10
 #     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
 #                                                                    3.85 +/-0.05
-#     removable seat face           pd_transgear_removable_spec.SEAT_FACE_Z
-#                                   + dt_crankshaft_spec.SEAT_COLLAR_BAND
+#     removable seat face           transgear_removable_spec.SEAT_FACE_Z
+#                                   + crankshaft_spec.SEAT_COLLAR_BAND
 #                                                                    -154.3 +0.1/-0.5
 #     T12 wheel plate               PLATE + PLATE_BAND               2.8 +0/-0.10
 #     chain reach ahead of seat     CHAIN_REACH_FRONT = W/2 + G      6.2865
 #                                   (ANSI_ROLLER_WIDTH 3.175 / 2 + ANSI_HALF_WIDTH
 #                                   4.699, chain floated frontmost)
-#   A  chain -> relief shoulder, in two poses (dt_crank_hub_geometry.
+#   A  chain -> relief shoulder, in two poses (crank_hub_geometry.
 #      chain_shoulder_axial_air; floor CHAIN_SHOULDER_AIR_MIN 0.2135):
 #      seated, the wheel on the seat face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)

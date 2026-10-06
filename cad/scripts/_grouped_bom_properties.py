@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import Any
 
-import _config
 import _telemetry
 from _common import _early_bound
-from _identity_shapes import CATEGORIES, NUMBER
 
 
+_PART_NUMBER = re.compile(r"MHA-[A-Z]{2}-\d{3}\Z")
 _USER_SPECIFIED_PART_NUMBER = 8  # swBOMPartNumber_UserSpecified
 
 
@@ -18,22 +18,16 @@ def apply_grouped_bom_properties(
     adapter: Any,
     configuration_names: Sequence[str],
     *,
-    part_name: str,
-) -> tuple[str, str]:
-    """Stamp the part's frozen registry metadata; return its Number and description."""
-    row = _config.parts(part_name)
-    number = row.get("number")
-    category = row.get("category")
-    match = NUMBER.fullmatch(number) if isinstance(number, str) else None
-    # Grouped BOM metadata is part-only: 000 is every assembly's sequence.
-    if match is None or match[1].lower() not in CATEGORIES or match[2] == "000":
-        raise ValueError(f"{part_name}: invalid grouped BOM part number {number!r}")
-    if category != match[1].lower() or not part_name.startswith(f"{category}-"):
-        raise ValueError(f"{part_name}: grouped BOM Number/category mismatch")
-    description = row.get("description")
-    if not isinstance(description, str) or not description.strip():
-        raise ValueError(f"{part_name}: grouped BOM description must not be blank")
+    part_number: str,
+    description: str,
+) -> None:
+    """Stamp identical native BOM metadata on every grouped configuration."""
+    number = part_number.strip().upper()
+    if not _PART_NUMBER.fullmatch(number):
+        raise ValueError(f"invalid grouped BOM part number {part_number!r}")
     text = description.strip()
+    if not text:
+        raise ValueError("grouped BOM description must not be blank")
     if not configuration_names:
         raise ValueError("grouped BOM configuration list must not be empty")
 
@@ -66,4 +60,3 @@ def apply_grouped_bom_properties(
     _telemetry.success(
         f"grouped BOM metadata: {number}, {len(configuration_names)} configurations"
     )
-    return number, text

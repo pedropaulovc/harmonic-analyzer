@@ -1,8 +1,8 @@
 """Author the drive-train's named exploded presentation (DRIVE_TRAIN_EXPLODED).
 
-Mirrors ``build_sm_summing_assembly._create_summing_explode``: the builder owns
+Mirrors ``build_summing_assembly._create_summing_explode``: the builder owns
 the presentation, the drawing only consumes it. Each step of
-``dt_drive_train_assembly_spec.EXPLODE_STEPS`` is authored along a global axis or
+``drive_train_assembly_spec.EXPLODE_STEPS`` is authored along a global axis or
 along the cone axis (the stationary post's journal), read back as a world
 translation of exactly the intended instances, and the assembly is collapsed
 again before save -- the saved operational pose (the free kinematic model) is

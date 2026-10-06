@@ -74,7 +74,7 @@ def _fitup_steps() -> str:
     play_low, play_high = ROCKER_END_PLAY
     stack_low, stack_high = STACK_L20_ACCEPT
     feeler_step = steps.step_number("south-bracket-feeler-set")
-    # The pivot shaft is supplied long, its plain end uncut (ch_pivot_shaft_spec):
+    # The pivot shaft is supplied long, its plain end uncut (pivot_shaft_spec):
     # the cylinder ends PLAIN_END_CUT_BAND past the south ear's outer face and
     # the dome stands DOME_HEIGHT beyond that, so the saw cut sits that far
     # past a scribe on the ear face. The shoulder cannot pass either ear or a
@@ -115,14 +115,11 @@ def _fitup_steps() -> str:
     }
     lines = ["ROCKER BANK FIT-UP"]
     for key in steps.SEQUENCE:
-        # A part Number (MHA-CH-008) never splits at its hyphens.
         lines += textwrap.wrap(
             text[key],
             width=FITUP_LINE_WIDTH,
             initial_indent=f"{steps.step_number(key)}. ",
             subsequent_indent="   ",
-            break_on_hyphens=False,
-            break_long_words=False,
         )
     return "\n".join(lines)
 
@@ -184,7 +181,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         layout=SPEC.layout,
         pdf_title="Channel Assembly Drawing",
         scale=SHEET_SCALE,

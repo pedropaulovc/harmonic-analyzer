@@ -129,15 +129,12 @@ def test_the_bond_step_counts_one_pin_per_strap() -> None:
     and that quantity is one per strap."""
     import _config
 
-    pin_row = _config.parts("dt-pinion-cam-pin")
-    pins = pin_row["quantity"]
+    pins = _config.parts("dt-pinion-cam-pin")["quantity"]
     straps = _config.parts("dt-pinion-bracket")
     assert straps["number"] == dt_pinion_cam_pin_spec.SEAT_NUMBER
     assert pins == straps["quantity"] == 2
     step = dt_pinion_cam_pin_spec.ASSEMBLY_STEP
-    assert step.startswith(
-        f"BOND {pins}X {pin_row['number']}, ONE INTO EACH {straps['number']} "
-    )
+    assert step.startswith(f"BOND {pins}X MHA-DT-025, ONE INTO EACH MHA-DT-014 ")
 
 
 def test_no_gdt_and_the_crown_carries_the_finish() -> None:

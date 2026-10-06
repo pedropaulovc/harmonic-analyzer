@@ -1572,7 +1572,6 @@ async def build(adapter: Any) -> dict[str, str]:
         artifacts = await finalize_drawing(
             adapter,
             OUTPUTS,
-            spec=SPEC,
             layout=SPEC.layout,
             pdf_title="Frame Assembly Drawing Package",
             scale=SHEET_SCALE,

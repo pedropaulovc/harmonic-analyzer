@@ -114,8 +114,8 @@ DIMENSION_CALLOUTS = {
     "CollarCy": "ECCENTRICITY\nBORE AXIS TO OD AXIS",
     "TapDrillDia": "TAP DRILL THRU TO BORE\nM2.5 X 0.45-6H",
 }
-# Decimal places are the part's (dt_pinion_cam_spec.DRAWING_PRECISION, applied
-# by build_dt_pinion_cam): two on the critical bore, OD and eccentricity and on
+# Decimal places are the part's (pinion_cam_spec.DRAWING_PRECISION, applied
+# by build_pinion_cam): two on the critical bore, OD and eccentricity and on
 # the tap drill, one everywhere else.  The sheet only reads them back.
 
 
@@ -320,7 +320,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Pinion Lift Cam Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

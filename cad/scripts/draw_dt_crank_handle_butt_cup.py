@@ -84,7 +84,7 @@ ISO_NOTE_POS = (0.335, 0.170)
 _S = VIEW_SCALE[0] / 1000.0
 BODY_R = BODY_DIA * _S / 2.0  # 0.0205
 HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.02025
-# The section lays the part's +X to the right (the draw_dt_crank_pinion
+# The section lays the part's +X to the right (the draw_crank_pinion
 # convention), so the face is the right edge and the floor the left.
 FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 
@@ -194,7 +194,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Crank Handle Butt Cup Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

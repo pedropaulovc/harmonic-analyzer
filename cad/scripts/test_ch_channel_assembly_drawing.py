@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 
-import _config
 from _assembly_contract import assembly_contract
+import _config
 import ch_channel_assembly_steps as steps
 import draw_ch_channel_assembly as drawing
 import dt_drive_train_steps
@@ -44,6 +44,8 @@ def _sequence_steps(text: str) -> dict[str, str]:
     return bodies
 
 
+
+
 def test_channel_assembly_keeps_registry_outputs_and_precomputed_placement() -> None:
     spec = DRAWINGS_BY_NAME["ch_channel_assembly"]
     assert spec.source_kind == "assembly"
@@ -59,8 +61,6 @@ def test_channel_assembly_keeps_registry_outputs_and_precomputed_placement() -> 
 
 
 def test_the_step_registry_names_this_sheet_and_the_fitup_sheet() -> None:
-    assert steps.DRAWING_NUMBER == assembly_contract("ch-channel").number
-    assert FITUP_DRAWING_NUMBER == assembly_contract("dt-drive-train").number
     for index, key in enumerate(steps.SEQUENCE, start=1):
         assert steps.step_number(key) == index
     assert steps.step_ref("south-bracket-feeler-set") == "MHA-CH-000 STEP 4"
@@ -153,6 +153,8 @@ def test_the_feeler_set_and_its_acceptance_are_printed_from_the_layout() -> None
     assert "FEELER" not in _step_body("south-washer-fitted")
 
 
+
+
 def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
     left, top = drawing.FITUP_NOTE_XY
     right_limit, bottom_limit = drawing.FITUP_FIELD_LIMIT
@@ -161,28 +163,6 @@ def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
     assert top - len(lines) * NOTE_LINE_PITCH > bottom_limit
     # The isometric's right edge sat at x ~0.248 on the v36 render.
     assert left > 0.248 + 0.015
-
-
-def test_every_cited_number_prints_whole_on_one_line() -> None:
-    """Hyphen-breaking wrap printed the shaft as "MHA-" / "CH-005" across two
-    lines of step 1; a fitter cannot read a Number split at its hyphen. Every
-    Number the steps cite prints whole, each occurrence on one line."""
-    cited = {
-        _config.parts(stem)["number"]
-        for stem in (
-            "ch-rocker-arm",
-            "ch-pivot-shaft",
-            "ch-pivot-bracket",
-            "ch-rocker-thrust-washer",
-            "fr-rocker-arm-support",
-        )
-    } | {FITUP_DRAWING_NUMBER}
-    lines = drawing.FITUP_STEPS.splitlines()
-    joined = " ".join(drawing.FITUP_STEPS.split())
-    for number in sorted(cited):
-        # Anchor: the steps cite it, so the per-line count below is not vacuous.
-        assert joined.count(number) > 0, number
-        assert sum(line.count(number) for line in lines) == joined.count(number), number
 
 
 def test_the_shaft_supplied_long_is_cut_to_fit_before_the_end_play_is_accepted() -> None:

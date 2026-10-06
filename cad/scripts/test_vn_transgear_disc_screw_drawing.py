@@ -365,8 +365,7 @@ def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
     assert all(len(line) <= 70 for line in lines), lines
     flat = " ".join(lines)
     assert (
-        f"CUT EACH TIP {screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE "
-        f"{_config.parts('pd-rack-pinion')['number']} DISC "
+        f"CUT EACH TIP {screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE MHA-PD-006 DISC "
         "REAR FACE AT ASSEMBLY;"
     ) in flat
     assert f"BREAK THE CUT END {screw.CUT_END_BREAK_TEXT}." in flat

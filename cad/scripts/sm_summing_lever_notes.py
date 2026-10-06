@@ -20,7 +20,7 @@ from sm_summing_lever_spec import (
     PLATE_T,
 )
 
-# --- Marked-dimension contract.  build_sm_summing_lever marks exactly these. ---
+# --- Marked-dimension contract.  build_summing_lever marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateWidth", "PlateLength"},
     "CylinderProfile": {"CylDia"},

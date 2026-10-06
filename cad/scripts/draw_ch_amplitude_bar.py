@@ -236,7 +236,7 @@ FINISH_CHAR_HEIGHT = 0.0025
 FINISH_SHOULDER = 0.0063
 
 
-# The cropped-detail helpers below are copied from draw_dt_pinion_spring's pc-r15
+# The cropped-detail helpers below are copied from draw_pinion_spring's pc-r15
 # kink detail (d6b8ed93f); a shared crop module is #1036, after the release.
 
 
@@ -703,7 +703,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Amplitude Bar Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

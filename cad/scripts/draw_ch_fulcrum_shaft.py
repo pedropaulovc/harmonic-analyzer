@@ -216,8 +216,8 @@ async def build(adapter: Any) -> dict[str, str]:
         FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
         FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
     )
-    # GD&T is model PMI (ch_fulcrum_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_ch_fulcrum_shaft) — project it and place it where the
+    # GD&T is model PMI (fulcrum_shaft_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
+    # authored by build_fulcrum_shaft) — project it and place it where the
     # hand-authored symbols used to sit (sheet-LEFT of the *Right view is the
     # model +Z end, so the +Z squareness frame takes the left-end spot). Which
     # VIEW receives each annotation depends on its attachment (a datum tag
@@ -289,7 +289,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Fulcrum Shaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

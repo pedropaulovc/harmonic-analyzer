@@ -157,7 +157,7 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
 # against the diameter-picked bore edge before the tag goes in, and the tag's
 # attachment is checked again after it does. The triangle then re-attaches at
 # the bore point nearest the box, on the 135-degree ray (see
-# draw_pd_platen_guide's datum C note).
+# draw_platen_guide's datum C note).
 PIVOT_DATUM_STANDOFF = 0.020
 PIVOT_DATUM_ANGLE = math.radians(135.0)
 PIVOT_BORE_SHEET_R = PIVOT_HOLE_DIA / 2.0 * _S / 1000.0
@@ -560,7 +560,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Rocker Arm Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

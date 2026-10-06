@@ -246,8 +246,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="stud circle datum-B pick",
     )
 
-    # GD&T is model PMI (mg_wheel_axle_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_mg_wheel_axle) — project it and place it where the
+    # GD&T is model PMI (wheel_axle_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
+    # authored by build_wheel_axle) — project it and place it where the
     # hand-authored symbols used to sit. Which VIEW receives each annotation
     # depends on its attachment (a datum tag only lands in a view aligned
     # with its face), and the projection fails loud on any mismatch. Placements track the measured view-centre deltas
@@ -321,7 +321,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Wheel Axle Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

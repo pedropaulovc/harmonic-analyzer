@@ -234,7 +234,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Keep datum and finish on opposite ridges so their leaders stay distinct.
     # One sweep of the plan's visible edges serves every named pick below.
     # The ridge is the hexagon's top vertex line, y = HEX_H/2 (vertex-up
-    # sketch centred on the pivot axis, build_sm_summing_lever._hex_collar).
+    # sketch centred on the pivot axis, build_summing_lever._hex_collar).
     top_edges = scan_view_edges(top, label="summing lever top plan")
     knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
     datum_ridge = top_edges.exact_line_through(
@@ -294,7 +294,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # axis (the +Z trunnion ridge, the finish's) to the anchor tap. Both
     # endpoints are named: the ridge line through a mid-stub point, the tap's
     # rim on the boss top (centre (TIP_X, ANCHOR_H/2, 0), the hole wizard's
-    # placement in build_sm_summing_lever._counter_anchor_tap).
+    # placement in build_summing_lever._counter_anchor_tap).
     ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
     anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
     dim_ridge = top_edges.exact_line_through(
@@ -343,7 +343,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # value check alone cannot tell the seed rim from the nineteen others at
     # the same X or any equal-pitch pair. The picks below are the rims'
     # model positions (the hole wizard's seed at HOLE_Z_LAST, the pattern
-    # marching -Z by CHANNEL_PITCH; build_sm_summing_lever).
+    # marching -Z by CHANNEL_PITCH; build_summing_lever).
     plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
     end_edge = _end_face_edge(top_edges, x_mm=10.0)
     add_datum_feature(
@@ -476,7 +476,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Summing Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

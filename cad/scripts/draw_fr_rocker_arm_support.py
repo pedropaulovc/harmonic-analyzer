@@ -300,7 +300,7 @@ def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     native_view = _early_bound(view, "IView")
-    # The positive control (draw_dt_pinion_arbor's cropped 2:1 *Top, 3107bfa95)
+    # The positive control (draw_pinion_arbor's cropped 2:1 *Top, 3107bfa95)
     # rebuilds after placing and locates the fence from the view's own model
     # transform. r743-p1s-A did neither, and its crop did not take. So: rebuild,
     # then prove where the part landed (origin on VIEW_B_CENTER, +X running
@@ -815,7 +815,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Rocker-Arm Support Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

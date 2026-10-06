@@ -20,7 +20,7 @@ from __future__ import annotations
 # overlaps the view or pushes it across the border (layout audit).  The
 # title-block surface row is never restated here (simplicity policy rule 1).
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  build_ch_connecting_rod marks exactly these. ---
+# print shows.  build_connecting_rod marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingDiscProfile": {"RingOuterDia"},
     "StrapBoreProfile": {"StrapBoreDia"},

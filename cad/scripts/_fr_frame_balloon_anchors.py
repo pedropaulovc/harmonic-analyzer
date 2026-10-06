@@ -38,7 +38,7 @@ on swmaker000005, 000007 and 000008, and the walk then took lag-screw-2 at
 hit result choosing the instance, so the pin makes that choice instead.
 
 The nameplate screw is pinned to fillister-screw-3, the plate's west rear
-corner (``fr_nameplate_spec.MOUNT_HOLE_XZ[2]``). The explode withdraws the four
+corner (``nameplate_spec.MOUNT_HOLE_XZ[2]``). The explode withdraws the four
 screws 35 mm straight up off the lifted plate, and in the isometric the
 first screw's corner is the plate's nearest: its screw hangs over the
 engraving, where run 20260928T194845954Z-44f5de00de924735961d14f4aad40337

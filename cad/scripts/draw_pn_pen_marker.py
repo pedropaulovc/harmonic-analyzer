@@ -307,7 +307,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Pen Marker Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

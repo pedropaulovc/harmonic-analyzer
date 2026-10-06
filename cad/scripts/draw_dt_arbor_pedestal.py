@@ -495,7 +495,7 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     # The strap band, hold-down station and lateral locations are owned by
-    # reference sketches the part saves blanked (dt_arbor_pedestal_spec
+    # reference sketches the part saves blanked (arbor_pedestal_spec
     # REFERENCE_SKETCHES); the hidden-owner curate shows each in the one view
     # that dimensions it.
     front_annotations = curate_view_dimensions(
@@ -618,7 +618,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Cylinder-Arbor Pedestal Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

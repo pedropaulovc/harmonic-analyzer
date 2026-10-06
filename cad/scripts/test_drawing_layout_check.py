@@ -1628,7 +1628,7 @@ def test_leaders_converging_on_one_point_are_stacked_not_crossed():
     # ~2.4 mm arrowheads, so no reader can see it. The gate's first sweep DID
     # report this; it was the only false positive in 23 sheets.
     datum = LeaderSegment("datum A", "gdt", 0.3650, 0.1100, 0.3520, 0.1100, owner="Iso")
-    other = LeaderSegment("fr-frame", "gdt", 0.3389, 0.0885, 0.3650, 0.1102, owner="Iso")
+    other = LeaderSegment("frame", "gdt", 0.3389, 0.0885, 0.3650, 0.1102, owner="Iso")
     assert find_leader_leader_crossings([datum, other]) == []
 
 
@@ -2186,7 +2186,7 @@ def test_anchor_instance_skips_a_hidden_instance_and_a_hidden_parent():
 def test_pinned_anchor_instance_must_be_shown():
     pinned = drawing_common.BalloonAnchor(point_mm=(0.0, 0.0, 0.0), instance="dt-cone-gear-4")
     assert _chosen(_instances("dt-cone-gear-1", "dt-cone-gear-4"), anchor=pinned) == "dt-cone-gear-4"
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="cone-gear has no shown instance cone-gear-4"):
         _chosen(_instances("dt-cone-gear-1", "dt-cone-gear-4", hidden={"dt-cone-gear-4"}), anchor=pinned)
 
 
@@ -2496,10 +2496,10 @@ def test_frozen_anchor_selects_at_its_exploded_projection_and_records_it(monkeyp
     ]
 
 
-def test_frozen_anchor_that_hits_nothing_refuses_a_balloon(monkeypatch):
+def test_frozen_anchor_that_hits_nothing_fails_naming_the_stem(monkeypatch):
     view = _exploded_view(_instances("dt-cone-gear-1"), [])
     sheet = _AnchorSheet({})
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="cone-gear frozen balloon anchor .* selects no edge"):
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
     assert sheet.balloons == []
 
@@ -2509,7 +2509,7 @@ def test_frozen_anchor_on_another_components_edge_fails(monkeypatch):
     part in front with the wrong item's number."""
     view = _exploded_view(_instances("dt-cone-gear-1"), [])
     sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("dt-crank-pinion-1")})
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="selects an edge of crank-pinion-1, not cone-gear-1"):
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
     assert sheet.balloons == []
 
@@ -2517,7 +2517,7 @@ def test_frozen_anchor_on_another_components_edge_fails(monkeypatch):
 def test_a_family_without_a_frozen_anchor_fails_before_any_balloon(monkeypatch):
     view = _exploded_view(_instances("dt-cone-gear-1", "dt-crank-pinion-1"), [])
     sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("dt-cone-gear-1")})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"no balloon anchor for \['crank-pinion'\]"):
         _balloon(
             monkeypatch,
             sheet,
@@ -2553,10 +2553,11 @@ def test_anchor_instance_is_the_full_path_not_its_last_segment():
 def test_frozen_hit_on_the_same_named_part_of_another_subassembly_fails(monkeypatch):
     view = _exploded_view(_pair_of_subassemblies(), [])
     sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("sub-1/dt-cone-gear-1")})
-    with pytest.raises(RuntimeError):
+    with pytest.raises(
+        RuntimeError, match="selects an edge of sub-1/cone-gear-1, not sub-2/cone-gear-1"
+    ):
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _SUB_2})
     assert sheet.balloons == []
-    assert sheet.selected == []
 
 
 _SUBASSEMBLY_EXPLODE = [((0.0, 0.25, 0.0), ["sub-1/dt-cone-gear-1"]), ((0.03, 0.0, 0.0), ["sub-2"])]
@@ -2620,24 +2621,27 @@ def test_an_exploded_view_whose_configuration_reads_no_steps_is_refused(referenc
 
 
 @pytest.mark.parametrize(
-    "attach",
+    ("attach", "why"),
     [
-        lambda edge: ((edge, edge), (1, 1)),
-        lambda edge: ((edge,), (46,)),
-        lambda edge: ((None,), (0,)),
-        lambda edge: ((_AnchorEdge("sub-1/dt-cone-gear-1"),), (1,)),
+        (lambda edge: ((edge, edge), (1, 1)), "2 entities"),
+        (lambda edge: ((edge,), (46,)), r"types \[46\]"),
+        (lambda edge: ((None,), (0,)), r"owned by \[''\]"),
+        (
+            lambda edge: ((_AnchorEdge("sub-1/dt-cone-gear-1"),), (1,)),
+            r"owned by \['sub-1/cone-gear-1'\]",
+        ),
     ],
     ids=["two-entities", "silhouette", "dangling", "same-named-other-instance"],
 )
 def test_balloon_must_attach_to_exactly_one_edge_of_the_exact_instance(
-    monkeypatch, attach
+    monkeypatch, attach, why
 ):
     view = _exploded_view(_pair_of_subassemblies(), [])
     sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("sub-2/dt-cone-gear-1")}, attach=attach)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(
+        RuntimeError, match=f"must attach to one edge of sub-2/cone-gear-1; .*{why}"
+    ):
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _SUB_2})
-    assert sheet.selected == []
-    assert sheet.selection_point is None
 
 
 _WALK = drawing_common.BalloonAnchor()
@@ -2669,7 +2673,7 @@ def test_walk_tries_the_same_points_however_the_body_breaks_ties(monkeypatch):
         return _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
 
     probe = _AnchorSheet({})
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="no verifiably visible edge"):
         run(_comb(), probe)
     claimed = probe.hits[2]
     shuffle = random.Random(865)
@@ -2700,7 +2704,7 @@ def test_walk_anchors_identically_on_a_640_and_an_820_pixel_seat_window(monkeypa
         return _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
 
     probe = _AnchorSheet({})
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="no verifiably visible edge"):
         run(probe)
     first, second = probe.hits[:2]
     anchors = []
@@ -2821,7 +2825,7 @@ def test_a_balloon_leader_that_ends_off_its_claimed_point_fails_the_sheet(monkey
     landing: 0.46 mm is already the neighbouring part at 1:8."""
     hit, landing = _MEASURED_LANDINGS[case]
     view, sheet = _walked_to(hit, landing, honours_point=False)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="cone-gear balloon leader attachment moved"):
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
 
 
@@ -2837,7 +2841,11 @@ def test_a_later_rebuild_that_moves_a_landed_leader_fails_the_final_proof(monkey
     adapter = _FakeAdapter(sheet)
     drawing_common.assert_balloon_landings(adapter, sheet.landings)
     sheet.balloons[0].end = landing
-    with pytest.raises(RuntimeError):
+    with pytest.raises(
+        RuntimeError,
+        match=r"1 balloon\(s\) changed after the final rebuild: .*cone-gear balloon leader "
+        r"attachment moved",
+    ):
         drawing_common.assert_balloon_landings(adapter, sheet.landings)
 
 
@@ -2922,7 +2930,7 @@ def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge
     [0, drawing_common._VISIBLE_EDGES_PER_INSTANCE + 1],
     ids=["none-listed", "over-the-cap"],
 )
-def test_walk_without_a_hit_or_a_listed_edge_refuses_other_instances(monkeypatch, listed):
+def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypatch, listed):
     """No hit and nothing listed (or too much to fetch) for the first
     instance fails, even though the second's own walk point is drawn and
     lists a drawable edge: letting the second stand in makes a hit result, or
@@ -2946,7 +2954,12 @@ def test_walk_without_a_hit_or_a_listed_edge_refuses_other_instances(monkeypatch
 
     view.GetVisibleEntities2 = fetch
     sheet = _AnchorSheet({(0.0, 0.06): spare})
-    with pytest.raises(RuntimeError):
+    with pytest.raises(
+        RuntimeError,
+        match=r"cone-gear has no verifiably visible edge: no hit test found ink of cone-gear-1 "
+        rf"at sheet mm \[\(0\.00, 50\.00\)\]: 1 body extreme points, then 0 points along "
+        rf"its {listed} listed visible edges \(sampled when 1-{drawing_common._VISIBLE_EDGES_PER_INSTANCE}\)",
+    ):
         _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
     assert sheet.balloons == []
     assert sheet.hits == [(0.0, 0.05)]

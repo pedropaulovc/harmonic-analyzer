@@ -24,7 +24,7 @@ from ch_rocker_arm_spec import (
 )
 
 # The top edge's one-sided height over the pivot is a model dimension with
-# its band on the part (ch_rocker_arm_spec.TOP_EDGE_BAND, policy rule 2), so no
+# its band on the part (rocker_arm_spec.TOP_EDGE_BAND, policy rule 2), so no
 # note carries it. The hub is the other end of that chain: an OD off the bore
 # axis by e lifts its top e toward the cheeks, and nothing else relates the two features. A
 # plain note, not a frame (Main 2026-09-26); turning the hub and reaming the
@@ -38,7 +38,7 @@ HUB_COAXIALITY_DIA = 0.50
 # fit and count, never a second copy of a sheet dimension.  16.00 depth is a
 # REF: it is fixed by the concentric R800/R816 edges.
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
-# print shows.  build_ch_rocker_arm marks exactly these. ---
+# print shows.  build_rocker_arm marks exactly these. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StrapProfile": {"TopRadius", "BottomRadius"},
     "PivotHoleProfile": {"PivotDia"},
@@ -66,7 +66,7 @@ BUILT_UP_PERMISSION_NOTE = None
 DRAWING_NOTES = "\n".join(
     (
         # r743-3: the 21-line block rendered 0.76 over NOTES_CEILING; notes
-        # 1-2 say the same in two fewer lines (test_ch_rocker_arm_drawing keeps a
+        # 1-2 say the same in two fewer lines (test_rocker_arm_drawing keeps a
         # full line of headroom at the measured pitch).
         "1. MIRROR-SYMMETRIC ABOUT THE PIVOT AXIS;",
         "   ROD-PIN HOLE (1X) AT THE END SHOWN.",

@@ -4255,7 +4255,7 @@ SWING_FOOTPRINTS: dict[str, tuple[Plan, ...]] = {
         max(_SPRING_PLAN_X) + SPRING_T,
         *_SPRING_Z_BAND,
     ),
-    "fr-nameplate": tuple(
+    "nameplate": tuple(
         (corner[0], corner[2])
         for corner in (
             nameplate_mount_point((u, v, 0.0))
@@ -4290,7 +4290,7 @@ SWING_OCCUPANT_SEATS: dict[str, tuple[Plan, ...]] = {
         xz for xz in BASE_BLOCK_XZ if BLOCK_BACK_Z0 <= xz[1] <= BLOCK_BACK_Z0 + BLOCK_DEPTH
     ),
     "pinion spring": tuple(BASE_FOOT_XZ),
-    "fr-nameplate": tuple(BASE_NAMEPLATE_XZ),
+    "nameplate": tuple(BASE_NAMEPLATE_XZ),
     "serial stamp": (BASE_SERIAL_XZ,),
 }
 for _occupant, _seats in SWING_OCCUPANT_SEATS.items():

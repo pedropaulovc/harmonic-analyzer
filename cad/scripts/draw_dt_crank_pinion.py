@@ -12,7 +12,7 @@ No datums, no feature control frames, one roughness symbol (the bore): a
 removable stock pinion pinned to its crankshaft is not on the GD&T allowlist
 (rules 3-5). The bore's native limits and feature callout jointly identify its
 mating crankshaft and required diametral clearance. The decimal places are the
-PART's (``dt_crank_pinion_spec.DRAWING_PRECISION``, applied natively by
+PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_pinion``); this script only reads them back off the sheet.
 
 Drawn 3:1: the longitudinal section and its diameter/length dimensions
@@ -315,7 +315,7 @@ PIN_HOLE_EDGE = (
     RIGHT_CENTER[1] + PIN_DIA * VIEW_SCALE[0] / 2000.0,
 )
 PIN_HOLE_CALLOUT = (0.260, RIGHT_CENTER[1] + HALF_OD + 0.056)
-# The shared matched-fit note (dt_crank_pinion_spec.pin_hole_note): match drill
+# The shared matched-fit note (crank_pinion_spec.pin_hole_note): match drill
 # with the shaft at the boss mid-length, ream to fit the named pin (the fit to
 # the actual pin governs the hole, not a drill size), the fit's acceptance and
 # flush both sides.
@@ -530,7 +530,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Crank Pinion Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

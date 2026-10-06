@@ -15,7 +15,6 @@ pypdfium2 is used (already a dependency for the PNG render); PyMuPDF is AGPL.
 from __future__ import annotations
 
 import ctypes
-import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -24,24 +23,15 @@ import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_raw
 
 POINT_M = 0.0254 / 72.0
-# The glyphs of one printed row share a baseline to rounding; a second row sits
-# a line pitch away, more than a glyph's own size. Two baselines within this
-# fraction of the run's largest glyph are one row.
-ROW_BASELINE_FRACTION = 0.1
 
 
 @dataclass(frozen=True)
 class Glyph:
-    """One inked character: its tight box, and ``baseline``, its origin's
-    offset across the writing direction (pdfium's char origin and angle), in
-    sheet metres -- equal for every glyph on one printed row."""
-
     char: str
     xmin: float
     ymin: float
     xmax: float
     ymax: float
-    baseline: float
 
 
 @dataclass(frozen=True)
@@ -54,22 +44,6 @@ class Span:
     xmax: float
     ymax: float
     glyphs: tuple[Glyph, ...]
-
-    @property
-    def rows(self) -> int:
-        """How many printed rows the object's glyphs stand on: the distinct
-        baselines among its glyphs (:data:`ROW_BASELINE_FRACTION`). Baselines,
-        not boxes: a wrapped line's capitals can reach into the line above's
-        descenders when the line pitch is under the glyph height."""
-        if not self.glyphs:
-            return 0
-        tolerance = ROW_BASELINE_FRACTION * max(max(g.xmax - g.xmin, g.ymax - g.ymin) for g in self.glyphs)
-        rows, last = 0, float("-inf")
-        for baseline in sorted(g.baseline for g in self.glyphs):
-            if baseline - last > tolerance:
-                rows += 1
-            last = baseline
-        return rows
 
 
 @dataclass(frozen=True)
@@ -116,12 +90,7 @@ def _text_runs(page: "pdfium.PdfPage") -> tuple[list[Glyph], list[Span]]:
         left, bottom, right, top = text_page.get_charbox(index)
         if right <= left or top <= bottom:
             continue
-        x, y = ctypes.c_double(), ctypes.c_double()
-        angle = float(pdfium_raw.FPDFText_GetCharAngle(text_page.raw, index))
-        if not pdfium_raw.FPDFText_GetCharOrigin(text_page.raw, index, x, y) or angle < 0.0:
-            raise ValueError(f"PDF glyph {char!r} answered no origin or angle")
-        baseline = (y.value * math.cos(angle) - x.value * math.sin(angle)) * POINT_M
-        glyph = Glyph(char, left * POINT_M, bottom * POINT_M, right * POINT_M, top * POINT_M, baseline)
+        glyph = Glyph(char, left * POINT_M, bottom * POINT_M, right * POINT_M, top * POINT_M)
         glyphs.append(glyph)
         owner = pdfium_raw.FPDFText_GetTextObject(text_page.raw, index)
         key = ctypes.cast(owner, ctypes.c_void_p).value or 0
@@ -267,13 +236,11 @@ def read_pdf_ink(path: Path) -> list[PageInk]:
 
 
 def page_ink(page: PageInk) -> dict[str, Any]:
-    """A page as layout-dump data: every text object with its glyph box and
-    row count (:attr:`Span.rows`), and every black stroked line (the frame and
-    title block print grey, and arrowheads and section arrows are filled)."""
+    """A page as layout-dump data: every text object with its glyph box, and
+    every black stroked line (the frame and title block print grey, and
+    arrowheads and section arrows are filled)."""
     return {
-        "spans": [
-            [span.text, *_round((span.xmin, span.ymin, span.xmax, span.ymax)), span.rows] for span in page.spans
-        ],
+        "spans": [[span.text, *_round((span.xmin, span.ymin, span.xmax, span.ymax))] for span in page.spans],
         "strokes": [
             [*_round((stroke.x0, stroke.y0, stroke.x1, stroke.y1, stroke.width)), int(stroke.dashed)]
             for stroke in page.strokes

@@ -7,7 +7,7 @@ the side view where a turned part's diameter sits beside its axial extent
 saying where the stock may come from. No datums, no frames, no roughness
 symbol, no band: the match-drilled hole it is driven into (crank_pinion_spec)
 is the fit.
-The decimal places are the PART's (``dt_crank_pinion_pin_spec.DRAWING_PRECISION``,
+The decimal places are the PART's (``crank_pinion_pin_spec.DRAWING_PRECISION``,
 applied natively by ``build_crank_pinion_pin``); this script only reads them
 back off the sheet.
 
@@ -147,7 +147,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Crank Pinion Retention Pin Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

@@ -259,7 +259,7 @@ SECTION_KEEP: dict[str, tuple[float, float]] = {}
 #
 # r3: the pinch-hole height from the foot stands past the block's south face,
 # on the right; both witnesses leave the south face, whose outline hides the
-# model's reference line (build_dt_cone_tip_block, PinchHeightReference).
+# model's reference line (build_cone_tip_block, PinchHeightReference).
 PINCH_HEIGHT_LINE_X = _right_x(Z_SOUTH) + 0.010
 RIGHT_KEEP = {
     "PinchDepthCenter": (
@@ -1901,7 +1901,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Cone Tip Block Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

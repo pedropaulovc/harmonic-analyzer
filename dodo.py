@@ -1393,10 +1393,9 @@ _CHECK_NAMES = (
     "traveler_ch_pivot_shaft",
     "traveler_dt_cone_pivot_post",
 )
-# Checks outside the every-build set: verify_telemetry and reference_catalog
-# are opt-in; features_bound is required only by release.
-# Union must match the specs.
-_OPTIONAL_CHECK_NAMES = ("verify_telemetry", "features_bound", "reference_catalog")
+# Checks outside the every-build set. verify_telemetry is opt-in;
+# features_bound is required only by release. Union must match the specs.
+_OPTIONAL_CHECK_NAMES = ("verify_telemetry", "features_bound")
 
 
 def _run_stamped(cmd: list[str], label: str, stamp: str, task: str) -> None:
@@ -3025,8 +3024,6 @@ def task_check():
         SCRIPTS_DIR / "test_stock_fastener.py",
         # The shared layout audit's own contract (_layout_audit.py finders + ink model).
         SCRIPTS_DIR / "test_layout_audit.py",
-        # Full native Number/Title readback and ruled-cell fit failures.
-        SCRIPTS_DIR / "test_drawing_title_fields.py",
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
@@ -3655,51 +3652,6 @@ def task_check():
             "task_dep": ["package:features", "export"],
             "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
                     "--out", str(CAD_OUT)],
-        },
-        # Reference data is deliberately absent from build/build_bare and farm
-        # source workspaces. The real-catalog behavior suite is explicitly opt-in,
-        # never skipped or weakened when its required catalog is unavailable.
-        "reference_catalog": {
-            "file_dep": [
-                str((REPO_ROOT / "dodo.py").resolve()),
-                str(
-                    (
-                        REPO_ROOT / "cad" / "comparisons" / "tools"
-                        / "test_seed_manifest.py"
-                    ).resolve()
-                ),
-                *(
-                    str(
-                        (REPO_ROOT / "cad" / "comparisons" / "tools" / name).resolve()
-                    )
-                    for name in ("seed_manifest.py", "pose_to_meshprobe.py")
-                ),
-                str(
-                    (REPO_ROOT / "cad" / "config" / "identity-migration-map.json").resolve()
-                ),
-                str(
-                    (REPO_ROOT / "references" / "curation" / "stills_catalog.json").resolve()
-                ),
-                # part_stems scans these filenames instead of importing them.
-                *(str(path.resolve()) for path in SCRIPTS_DIR.glob("build_*.py")),
-            ],
-            "cmd": [
-                *pytest_cmd,
-                str(
-                    REPO_ROOT / "cad" / "comparisons" / "tools"
-                    / "test_seed_manifest.py"
-                ),
-            ],
-            # file_dep alone does not notice a source removed from the scan.
-            "uptodate": [
-                config_changed(
-                    {
-                        "catalog_part_sources": [
-                            path.name for path in sorted(SCRIPTS_DIR.glob("build_*.py"))
-                        ]
-                    }
-                )
-            ],
         },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a

@@ -233,16 +233,15 @@ GENERAL_NOTES_ISO_GAP = VIEW_CAPTION_GAP
 # --- sheet 2: BOM in two columns + reference isometric -----------------------
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.031,
-    "description": 0.109,
+    "part": 0.022,
+    "description": 0.118,
     "quantity": 0.012,
 }
 BOM_COLUMN_WIDTH = sum(BOM_COLUMN_WIDTHS.values())
-# The identity-cutover failure PDF (leaf 20261006T052150Z-1-e7f83086)
-# wrapped every full Number in the old 22 mm cell: MHA-VN- plus 3 digits
-# advances 28.52 mm at the unchanged Century Gothic font. Its longest full
-# description advances 107.45 mm. Reallocate 9 mm from DESCRIPTION to Number,
-# retaining the table/blank reference strip width and native text air.
+# Measured, not derived: in the 118 mm column, four 41-character descriptions
+# kept one line and the 47-character MHA-VN-006 row wrapped to 10.195 mm
+# (farm leaf 20260923T044055Z-1-20b23f24, swmaker000005).
+BOM_DESCRIPTION_MAX_CHARS = 41
 BOM_ANCHOR = (0.018, 0.252)
 BOM_SECOND_COLUMN_X = BOM_ANCHOR[0] + BOM_COLUMN_WIDTH + 0.008
 BOM_ROW_HEIGHT = 0.006
@@ -308,11 +307,10 @@ NOTE_LINE_PITCH = 0.004525
 # ~47 lines fit the full left column, ~24 the right one above the 1:8 reference
 # view that every sheet needs for its title-block property links
 # (finalize_drawing refuses a sheet without a view: r8, leaf
-# 20260923T214354Z-1-4126331f). Sheet 6 carries steps 1-6 on the left and step 7
-# at the top of its right field, the rest of that field kept free for D1 (#957);
-# the general notes sit on sheet 1 under its heading; the bank's steps 8-10 fill
-# sheet 7's left field; the rig's steps continue on sheet 8 beside the station
-# table (Main, B1 re-ruling 2026-09-26).
+# 20260923T214354Z-1-4126331f). Sheet 6 carries steps 1-7 alone on the left, its
+# right field kept free for D1 (#957); the general notes sit on sheet 1 under its
+# heading; the bank's steps 8-10 fill sheet 7's left field; the rig's steps
+# continue on sheet 8 beside the station table (Main, B1 re-ruling 2026-09-26).
 # package_note_fields lists every field and its blocks.
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
@@ -359,7 +357,7 @@ FULL_DETAIL_CAPTION = "GEAR TEETH AND SCREW THREADS AS MODELED"
 # --- BOM identities: released part numbers and descriptions ------------------
 # The model owns the part number (each component's "Number" property, read and
 # cross-checked at build time); the description column is drawing wording.
-# test_dt_drive_train_assembly_drawing.py pins every number against the parts
+# test_drive_train_assembly_drawing.py pins every number against the parts
 # registry and every builder-inserted family against this table.
 BOM_PART_NUMBERS = {
     "dt-cylinder-gear-shaft": "MHA-DT-013",
@@ -532,18 +530,18 @@ CONE_CRANK_STEPS = "\n".join(
         # (cone_stack_end_play).  U32 (user, 2026-09-23): option 1A turn-set,
         # worded without the pitch (#10-32: 1/8 turn is ~0.10).  The tip's
         # lateral error is taken up by turning MHA-DT-005 on its screws'
-        # clearance (TIP_LATERAL_CAPACITY_MM in build_dt_drive_train_assembly),
+        # clearance (TIP_LATERAL_CAPACITY_MM in build_drive_train_assembly),
         # so the fitter centres the tip in the cup before locking the post
         # (Codex P1 on #1136, 9e9982c5d).
         "3. PUSH THE STACK ONTO THE MHA-DT-004 COLLAR. PUSH MHA-VN-016 ONTO A",
-        f"   {COLLAR_FEELER:.2f} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT. THREAD",
-        "   MHA-VN-017 INTO MHA-DT-021 TO THE TIP. TURN MHA-DT-005 ON ITS",
+        f"   {COLLAR_FEELER:.2f} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT.",
+        "   THREAD MHA-VN-017 INTO MHA-DT-021 TO THE TIP. TURN MHA-DT-005 ON ITS",
         "   SCREWS UNTIL THE TIP CENTRES IN THE CUP; TIGHTEN BOTH MHA-VN-031",
         "   AND RECHECK. THREAD MHA-VN-017 ON UNTIL MHA-DT-004 JUST STOPS",
         "   SHUTTLING AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
         "   MHA-VN-018 ACROSS THE SLIT. END PLAY "
-        f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR",
-        "   INDICATOR. MHA-VN-017 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
+        f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR INDICATOR.",
+        "   MHA-VN-017 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-VN-044 press to the blind-hole floor (their proud
@@ -556,43 +554,37 @@ CONE_CRANK_STEPS = "\n".join(
         # are feeler-checked against T120 before the pin is drilled.  The
         # pair may rub on T120 until that check closes, so the seat and the
         # check come first, turning by hand, and the free-running revolution
-        # after them (Codex P2 on #1154, review 3).  The check's first line
-        # carries on the seat sentence and its last line is short; the step
-        # carries on after it.
-        "4. PRESS 2X MHA-VN-044 TO THE MHA-DT-011 COLLAR HOLE FLOORS. FIT",
-        "   MHA-DT-011 IN THE MHA-DT-005 CRANK BORE; SLIDE MHA-DT-010 ON",
-        f"   UNPINNED, TOOTH IN GAP WITH MHA-DT-007. FIT MHA-DT-036 PER SHEET {FIT_SHEET}.",
-        f"   WITH MHA-DT-036 SEATED, SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS",
-        "   NORTH FACE WITH A FEELER. "
-        + T120_FITUP_ASSEMBLY_CHECK
-        + " THEN TURN MHA-DT-007 ONE FULL",
-        "   REVOLUTION; IT MUST NEVER BIND (ELSE CHECK THE PARTS AND BORE",
-        "   SPACING). THEN MATCH-DRILL/REAM MHA-DT-029 AT BOSS MID-LENGTH WITH",
-        "   MHA-DT-011, FLUSH BOTH SIDES; RE-CHECK NO BINDING.",
-        "5. PAPER-DRIVE T12 ON MHA-DT-011 BEFORE THE ARM,",
-        "   HOLES OVER 2X MHA-VN-044.",
+        # after them (Codex P2 on #1154, review 3).  The check's last line is
+        # short; the step carries on after it.
+        "4. PRESS 2X MHA-VN-044 TO THE MHA-DT-011 COLLAR HOLE FLOORS. FIT MHA-DT-011 IN",
+        "   THE MHA-DT-005 CRANK BORE; SLIDE MHA-DT-010 ON UNPINNED, TOOTH IN GAP",
+        f"   WITH MHA-DT-007. FIT MHA-DT-036 PER SHEET {FIT_SHEET}. WITH MHA-DT-036 SEATED,",
+        f"   SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER.",
+        T120_FITUP_ASSEMBLY_CHECK + " THEN",
+        "   TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
+        "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL/REAM MHA-DT-029 AT BOSS",
+        "   MID-LENGTH WITH MHA-DT-011, FLUSH BOTH SIDES; RE-CHECK NO BINDING.",
+        "5. PAPER-DRIVE T12 ON MHA-DT-011 BEFORE THE ARM, HOLES OVER 2X MHA-VN-044.",
         # U33 (user, 2026-09-23): crank hub MHA-DT-031 pressed into the arm and
         # seam-pinned by MHA-VN-029 (a 4 m6 dowel, 4.0 long = half the arm); the
         # MHA-DT-009 cross-hole runs behind the arm through the hub barrel. The
         # handle rides the MHA-DT-032 shoulder screw. Wording from crankhub.
         "6. PRESS MHA-DT-031 INTO MHA-DT-006 TO THE SHOULDER, FACES FLUSH.",
-        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-VN-029 FLUSH.",
-        "   SLIDE ONTO MHA-DT-011, SET HUB FRONT FACE FLUSH WITH THE",
-        f"   {HUB_FRONT_FACE_DATUM}, PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM",
-        "   1:48 THROUGH HUB AND SHAFT; LIGHT-DRIVE MHA-DT-009, REMOVABLE BY",
-        "   TAP ON SMALL END. HANG MHA-DT-027 FROM THE PIN HEAD; CLAMP",
+        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-VN-029 FLUSH. SLIDE",
+        f"   ONTO MHA-DT-011, SET HUB FRONT FACE FLUSH WITH THE {HUB_FRONT_FACE_DATUM},",
+        "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
+        "   SHAFT; LIGHT-DRIVE MHA-DT-009, REMOVABLE BY TAP ON SMALL END. HANG",
         # Codex #1140: the keeper chain's length and topology belong on the
         # sheet; the bead count is the spec's solve, never a typed number.
-        f"   MHA-DT-028 UNDER MHA-VN-006. CUT MHA-VN-035 TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT",
-        "   THROUGH THE MHA-DT-028 LOOP AND MHA-DT-027; SNAP ONE END BEAD INTO",
-        "   EACH DOME OF MHA-VN-036.",
+        "   MHA-DT-027 FROM THE PIN HEAD; CLAMP MHA-DT-028 UNDER MHA-VN-006. CUT MHA-VN-035",
+        f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-DT-028 LOOP AND MHA-DT-027; SNAP",
+        "   ONE END BEAD INTO EACH DOME OF MHA-VN-036.",
         # Local review of 747487c71: the cup cures centred on the screw, or
         # its offset can bind the head and shoulder.
-        "7. EPOXY MHA-DT-034 ON THE MHA-DT-008 TENON, MHA-DT-035 IN ITS BUTT;",
-        "   CURE ON THE WAXED MHA-DT-032 THROUGH BOTH. FIT IT; SLIDE MHA-DT-008",
-        "   ON; THREAD IT INTO MHA-DT-006, LOCTITE 222, SHOULDER TIGHT; END",
-        "   PLAY 0.25-1.0; FILE TIP FLUSH TO ARM INBOARD FACE, BREAK EDGE.",
-        f"   CYLINDER BANK: SHEET {BANK_SHEET}.",
+        "7. EPOXY MHA-DT-034 ON THE MHA-DT-008 TENON, MHA-DT-035 IN ITS BUTT; CURE ON",
+        "   THE WAXED MHA-DT-032 THROUGH BOTH. FIT IT; SLIDE MHA-DT-008 ON; THREAD IT",
+        "   INTO MHA-DT-006, LOCTITE 222, SHOULDER TIGHT; END PLAY 0.25-1.0; FILE",
+        f"   TIP FLUSH TO ARM INBOARD FACE, BREAK EDGE. CYLINDER BANK: SHEET {BANK_SHEET}.",
     )
 )
 
@@ -638,10 +630,10 @@ BANK_STEPS = "\n".join(
         "   SLIDE THE STACK OFF IN ORDER.",
         "9. BASE MHA-FR-001 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-020) NOT FITTED.",
-        "9A. BACK MHA-DT-002 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND",
-        "   BOTH MHA-FR-001 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO",
-        "   X AND Y. SET THE STRAP INNER FACE TO Y 70.44-70.63 AND THE MANDREL",
-        "   CENTRE (EDGE-FIND BOTH SIDES, HALVE) TO X 168.11-168.31.",
+        "9A. BACK MHA-DT-002 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
+        "   MHA-FR-001 HOLE-TABLE DATUM FACES (SEE ITS PRINT); ZERO DRO X AND Y.",
+        "   SET THE STRAP INNER FACE TO Y 70.44-70.63 AND THE MANDREL CENTRE",
+        "   (EDGE-FIND BOTH SIDES, HALVE) TO X 168.11-168.31.",
         "   SPOT MHA-FR-001 THROUGH THE FOOT HOLE WITH AN 11/64 TRANSFER PUNCH;",
         "   LIFT OFF. DRILL #29 X 19.5, TAP #8-32 X 16.0 (PLUG, THEN",
         "   BOTTOMING); BLOW OUT CHIPS. REFIT, RE-SET Y AND X, TIGHTEN",
@@ -651,25 +643,23 @@ BANK_STEPS = "\n".join(
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
         # So the loaded mandrel leaves the base for the drill and tap.
         "9B. FROM THE FRONT, LOAD ONE MHA-DT-026, THE STACK IN ORDER, THEN THE",
-        "   OTHER MHA-DT-026. PUSH THE BANK BACK, CLOSED UP ON THE BACK",
-        "   MHA-DT-026. PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON",
-        "   PARALLELS); TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT",
-        "   MHA-DT-002 ON.",
+        "   OTHER MHA-DT-026. PUSH THE BANK BACK, CLOSED UP ON THE BACK MHA-DT-026.",
+        "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
+        "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-002 ON.",
         "9C. SLIDE THE FRONT MHA-DT-002 ON UNTIL A 0.45 LEAF BETWEEN ITS STRAP",
-        "   AND THE FRONT MHA-DT-026 IS LIGHTLY PINCHED. SET X 168.11-168.31",
-        "   AND SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW THE LOADED",
-        "   MANDREL OUT OF THE BACK MHA-DT-002, HOLDING BOTH MHA-DT-026, AND",
-        "   LAY IT IN V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE.",
-        "   DRILL AND TAP AS 9A. PASS THE MANDREL BACK THROUGH THE BACK",
-        "   MHA-DT-002, PUSH THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT",
-        "   MHA-DT-002; RE-SET THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK.",
+        "   AND THE FRONT MHA-DT-026 IS LIGHTLY PINCHED. SET X 168.11-168.31 AND",
+        "   SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW THE LOADED MANDREL",
+        "   OUT OF THE BACK MHA-DT-002, HOLDING BOTH MHA-DT-026, AND LAY IT IN",
+        "   V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE. DRILL AND",
+        "   TAP AS 9A. PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-002, PUSH",
+        "   THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET",
+        "   THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK.",
         "9D. MEASURE MHA-DT-002 OUTER FACE TO OUTER FACE. TURN MHA-DT-013: ITS",
         "   CYLINDER IS THAT SPAN, PLUS A 1.5 DOME EACH END (SEE ITS PRINT).",
-        "9E. PUSH MHA-DT-013 IN FROM THE BACK, END TO END WITH THE MANDREL,",
-        "   UNTIL THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD",
-        "   (DEPTH GAUGE). SPOT MHA-DT-013 THROUGH EACH CROWN TAP WITH A #43",
-        "   DRILL, 0.5 DEEP; BLOW OUT CHIPS.",
-        "   RUN THE BACK MHA-VN-034 IN TIGHT, THEN THE FRONT ONE.",
+        "9E. PUSH MHA-DT-013 IN FROM THE BACK, END TO END WITH THE MANDREL, UNTIL",
+        "   THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD (DEPTH GAUGE).",
+        "   SPOT MHA-DT-013 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
+        "   BLOW OUT CHIPS. RUN THE BACK MHA-VN-034 IN TIGHT, THEN THE FRONT ONE.",
         # F3: the leaf reads the end play only with the bank closed up on
         # the back washer; pulled forward it reads nothing.
         "9F. THE BANK TURNS FREE BY HAND. BANK PUSHED BACK:",
@@ -683,12 +673,12 @@ BANK_STEPS = "\n".join(
         # cites this step by key (channel_steps.NORTH_BRACKET_SET_REF). The
         # band the rod pins need from it is open: #948.
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-005 SCREWED DOWN ON THE BASE"
-        " (FRAME ASSEMBLY MHA-FR-000",
-        "   STEP 8), DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE",
-        "   MHA-FR-005 RAIL, EAR TO THE BACK.",
-        "   SET ITS EAR INNER FACE TO Y 67.62-67.81; CLAMP. DRILL AND TAP THE",
-        "   RAIL THROUGH ITS FEET PER THE MHA-FR-005 SEAT CALLOUT (VIEW B);",
-        f"   SCREW IT DOWN AND RECHECK Y. PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
+        " (FRAME ASSEMBLY MHA-FR-000 STEP 8),",
+        "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE MHA-FR-005",
+        "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 67.62-67.81;",
+        "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE MHA-FR-005 SEAT",
+        "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
+        f"   PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
     )
 )
 
@@ -714,7 +704,7 @@ _STEP_LINE_WIDTH = 70
 
 # MHA-DT-024's east-west station, in the strap's swing plane (Main's TbPB
 # ruling Q2(2) A): the foot hole where the preload gates put it
-# (dt_pinion_spring_section), the crest then bearing on the parked flank.  RIG
+# (pinion_spring_section), the crest then bearing on the parked flank.  RIG
 # SET's pad leaf sets the other axis, along the bank.  The window a fitter
 # must hold it in is known issue #1037, which ships this as the interim.
 SPRING_EAST_WEST = (
@@ -779,7 +769,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             "cams-and-lever-fitted",
             f"FIT {cams}X MHA-DT-023 AND MHA-DT-016 ON MHA-DT-017 IN THE MHA-DT-018 LIFT "
             "BORES, EACH CAM ECCENTRIC DOWN, ITS M2.5 SET SCREW (SUPPLIED WITH "
-            "MHA-DT-023) LOOSE. SEAT MHA-DT-016 TO ITS BORE FLOOR.",
+            "MHA-DT-023) LOOSE. SEAT MHA-DT-016 ON MHA-DT-017 TO THE BORE FLOOR.",
         ),
         # U28 corollary (Main 2026-09-23): the rig's east-west locate is its
         # parked tip gap, on the level line of centres, where block travel
@@ -788,7 +778,7 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
         # bank.
         (
             "rig-located",
-            "LOCATE THE RIG ON BASE MHA-FR-001; ITS SEATS "
+            "LOCATE THE RIG ON BASE MHA-FR-001 (FRAME ASSEMBLY MHA-FR-000); ITS SEATS "
             "ARE TRANSFERRED, NOT PRE-DRILLED. SET BOTH MHA-DT-018 LOOSE ON THE "
             f"BASE WITH MHA-DT-024 FITTED: {SPRING_EAST_WEST}. PARK MHA-DT-016: THE "
             "MHA-DT-025 PINS REST ON THE CAMS UNDER THE SPRING. FACE A MHA-DT-001 "
@@ -797,9 +787,9 @@ def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
             f"{TIP_GAP.TIP_GAP_ACCEPT_TEXT}. SET IT AT THE FRONT AND BACK "
             "STATIONS TO SQUARE BOTH MHA-DT-018 TO THE DRUM.",
         ),
-        ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH BLOCKS."),
+        ("rig-set", f"{_RIG_SET_STEP}\nCLAMP BOTH MHA-DT-018."),
         # The seats' drill, tap and depth are the MHA-FR-001 transfer callouts'
-        # (build_fr_harmonic_base), so the sheet names the print, never a copy.
+        # (build_harmonic_base), so the sheet names the print, never a copy.
         (
             "rig-seats-transferred",
             f"SPOT MHA-FR-001 THROUGH THE {slotted} MHA-DT-018 HOLES AND THE MHA-DT-024 "
@@ -836,24 +826,22 @@ CHECKS = "\n".join(
         "   CONE SET 1/4 TURN (16T:64T).",
         # User ruling 2026-09-28: the fixed-centre crank mesh must never bind;
         # no backlash acceptance interval or fit-up target remains.
-        "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH ONE FULL",
-        "   MHA-DT-007 TURN; EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE",
-        "   MHA-DT-003 PRINT.",
+        "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-007",
+        "   TURN; EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE MHA-DT-003 PRINT.",
         "3. EACH MHA-DT-012 TURNS FREELY ON MHA-DT-013 WITHOUT AXIAL BINDING.",
-        # The same bound the MHA-DT-012 print states (dt_cylinder_gear_notes).
+        # The same bound the MHA-DT-012 print states (cylinder_gear_notes).
         f"   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO {RING_OVERHANG_TEXT} (AT LEAST",
         f"   {RING_ON_CAM_PERCENT}% OF THE RING WIDTH STAYS ON THE CAM).",
-        # MHA-VN-015 is the DISENGAGED stop (build_dt_cone_swing_platform
+        # MHA-VN-015 is the DISENGAGED stop (build_cone_swing_platform
         # swing_hardware_geometry): engaged, the plate edge stands >= 2.0 off
         # it, so the cone set comes back on its meshes, not on the stop.
-        "4. CONE SWING (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON",
-        "   MHA-VN-014 TO THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. SWING",
-        "   IT BACK UNTIL ALL {cone_gears} MESHES RE-ENGAGE; TIGHTEN MHA-VN-013.",
+        "4. CONE SWING (P1): LOOSEN MHA-VN-013; SWING THE CONE SET ON MHA-VN-014 TO",
+        "   THE MHA-VN-015 STOP, CLEAR OF EVERY MHA-DT-012. SWING IT BACK UNTIL ALL",
+        "   {cone_gears} MESHES RE-ENGAGE; TIGHTEN MHA-VN-013.",
         "5. ZEROING (P2), CONE SET SWUNG CLEAR: TURN EACH MHA-DT-012 BY HAND",
-        "   UNTIL ITS NOTCH LINES UP. TURN MHA-DT-016 TO ENGAGE MHA-DT-001;",
-        "   TURN MHA-DT-001 BY MHA-DT-015 UNTIL ALL NOTCHES POINT UP (COSINES)",
-        "   OR 90 DEG (SINES). RETURN MHA-DT-016 TO PARK;",
-        "   RE-ENGAGE THE CONE SET.",
+        "   UNTIL ITS NOTCH LINES UP. TURN MHA-DT-016 TO ENGAGE MHA-DT-001; TURN",
+        "   MHA-DT-001 BY MHA-DT-015 UNTIL ALL NOTCHES POINT UP (COSINES) OR 90 DEG",
+        "   (SINES). RETURN MHA-DT-016 TO PARK; RE-ENGAGE THE CONE SET.",
         "6. PARKED, MHA-DT-024 HOLDS MHA-DT-001 CLEAR OF EVERY MHA-DT-012.",
         f"7. PARKED, PINS ON THE CAMS: A {TIP_GAP.TIP_GAP_FEELER:.2f} FEELER IS SNUG TIP TO TIP",
         f"   AT THE FRONT AND BACK STATIONS; {TIP_GAP.TIP_GAP_ACCEPT_TEXT}",
@@ -874,12 +862,10 @@ SETUP_NOTES = "\n".join(
 INTERFACE_NOTES = "\n".join(
     (
         "EXTERNAL INTERFACES - NOT BOM ITEMS",
-        "BASE MHA-FR-001 (FRAME ASSEMBLY MHA-FR-000) RECEIVES MHA-VN-014,",
-        "MHA-VN-013, MHA-VN-015, {slotted}X MHA-VN-019, {foot}X MHA-VN-020 AND",
-        "{hold_down}X MHA-VN-032.",
+        "BASE MHA-FR-001 (FRAME ASSEMBLY MHA-FR-000) RECEIVES MHA-VN-014, MHA-VN-013,",
+        "MHA-VN-015, {slotted}X MHA-VN-019, {foot}X MHA-VN-020 AND {hold_down}X MHA-VN-032.",
         "PAPER DRIVE MHA-PD-000: T12 CHAIN WHEEL ON MHA-DT-011.",
-        "CHANNEL ASSEMBLY MHA-CH-000: CONNECTING RODS RUN ON THE",
-        "MHA-DT-012 CAMS.",
+        "CHANNEL ASSEMBLY MHA-CH-000: CONNECTING RODS RUN ON THE MHA-DT-012 CAMS.",
     )
 )
 
@@ -915,18 +901,17 @@ _RECESS_MID = (PINION_RECESS_MIN + PINION_RECESS_MAX) / 2.0
 CRANK_WASHER_FIT_NOTES = "\n".join(
     (
         f"MHA-DT-036 THRUST WASHER FIT (STEP {steps.step_number('crank-mesh-checked')})",
-        "A. TRIAL FIT WITHOUT MHA-DT-036, MHA-DT-010 UNPINNED ON THE",
-        f"   {PINION_SEAT_FEELER:.2f} FEELER, MHA-DT-011 END {_RECESS_MID:.2f} BELOW MHA-DT-010 "
-        "NORTH FACE:",
-        "   MEASURE MHA-DT-011 COLLAR REAR FACE TO MHA-DT-005 BOSS SOUTH FACE",
-        f"   ({WASHER_GAP_MIN:.2f}-{WASHER_GAP_MAX:.2f}).",
-        "B. WITHDRAW BOTH. FACE MHA-DT-036 TO THAT GAP; SLIDE IT ONTO",
-        "   MHA-DT-011 FROM THE REAR, FLAT ON THE COLLAR. REFIT MHA-DT-011",
-        "   AND MHA-DT-010.",
-        "C. MHA-DT-036 SEATED ON THE BOSS AND MHA-DT-010 ON THE FEELER:",
-        f"   MHA-DT-011 END {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-DT-010 "
-        "NORTH FACE,",
-        f"   END PLAY {PINION_SEAT_FEELER:.2f}.",
+        "A. TRIAL FIT WITHOUT MHA-DT-036, MHA-DT-010 UNPINNED ON THE "
+        f"{PINION_SEAT_FEELER:.2f} FEELER,",
+        f"   MHA-DT-011 END {_RECESS_MID:.2f} BELOW MHA-DT-010 NORTH FACE: MEASURE MHA-DT-011 "
+        "COLLAR",
+        "   REAR FACE TO MHA-DT-005 BOSS SOUTH FACE "
+        f"({WASHER_GAP_MIN:.2f}-{WASHER_GAP_MAX:.2f}).",
+        "B. WITHDRAW BOTH. FACE MHA-DT-036 TO THAT GAP; SLIDE IT ONTO MHA-DT-011",
+        "   FROM THE REAR, FLAT ON THE COLLAR. REFIT MHA-DT-011 AND MHA-DT-010.",
+        "C. MHA-DT-036 SEATED ON THE BOSS AND MHA-DT-010 ON THE FEELER: MHA-DT-011 END",
+        f"   {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-DT-010 NORTH FACE, "
+        f"END PLAY {PINION_SEAT_FEELER:.2f}.",
     )
 )
 
@@ -1166,39 +1151,11 @@ def bom_row_fit(requested: float, actual: float) -> Literal["short", "exact", "g
     return "grown"
 
 
-def bom_split_row(data_heights: Sequence[float], *, header_height: float) -> int:
-    """Choose a contiguous, height-balanced split inside each column's own floor.
-
-    Heights are native readbacks after sizing/rebuild, not requested row heights.
-    Both pieces repeat the header; the right piece must clear the title block.
-    A count-balanced split need not fit when only some descriptions wrap.
-    """
-    if len(data_heights) < 2:
+def bom_split_row(data_rows: int) -> int:
+    """Data rows in the FIRST column: the larger half, so column two is never taller."""
+    if data_rows < 2:
         raise ValueError("a split BOM needs at least two data rows")
-    total_height = sum(data_heights)
-    first_height = header_height
-    second_anchor = (BOM_SECOND_COLUMN_X, BOM_ANCHOR[1])
-    best_row = None
-    best_difference = math.inf
-    for first_rows, row_height in enumerate(data_heights[:-1], start=1):
-        first_height += row_height
-        second_height = 2.0 * header_height + total_height - first_height
-        if bom_extent_violations(BOM_ANCHOR, BOM_COLUMN_WIDTH, first_height):
-            continue
-        if bom_extent_violations(second_anchor, BOM_COLUMN_WIDTH, second_height):
-            continue
-        difference = abs(first_height - second_height)
-        # Equal-height choices keep the larger half first, as before.
-        if difference <= best_difference + BOM_HEIGHT_TOLERANCE:
-            best_row = first_rows
-            best_difference = difference
-    if best_row is None:
-        raise ValueError(
-            "no two-column BOM split fits the native row heights "
-            f"({len(data_heights)} data rows, "
-            f"{(total_height + 2.0 * header_height) * 1000.0:.3f} mm including headers)"
-        )
-    return best_row
+    return (data_rows + 1) // 2
 
 
 def bom_extent_violations(
@@ -1230,13 +1187,6 @@ def bom_extent_violations(
         violations.append(
             f"bottom edge {bottom * 1000:.3f} mm enters the title block "
             f"(floor {title_block_floor * 1000:.3f} mm)"
-        )
-    # The left field stops above the package sheet-number note, not at the
-    # paper edge. A height-aware asymmetric split must not consume that footer.
-    if right <= template.title_block_left_m and bottom < NOTE_FIELD_LEFT[3]:
-        violations.append(
-            f"bottom edge {bottom * 1000:.3f} mm enters the sheet-number field "
-            f"(floor {NOTE_FIELD_LEFT[3] * 1000:.3f} mm)"
         )
     if bottom < clearance:
         violations.append(f"bottom edge {bottom * 1000:.3f} mm is off the sheet")
@@ -1357,14 +1307,10 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
     Sheet 1's bounds here are nominal (the heading's lines at NOTE_LINE_PITCH
     under ASSEMBLED_HEADING_XY, the isometric's top at ASSEMBLED_ISO_TOP); its
     placement re-derives them from the measured heading and isometric. Sheet
-    6's right field carries only the crank-handle step at its top; the rest
-    stays reserved for D1 (#957).
+    6's right field stays empty: it is reserved for D1 (#957).
     """
     heading_lines = len(heading_text(1, ASSEMBLED_HEADING).splitlines())
     cone_gears = facts.count("dt-cone-gear")
-    cone_crank = CONE_CRANK_STEPS.format(cone_gears=cone_gears)
-    handle_step = cone_crank.index(f"\n{steps.step_number('crank-handle-fitted')}. ")
-    cone_crank_heading = cone_crank.split("\n", 1)[0]
     return (
         NoteField(
             1,
@@ -1379,16 +1325,10 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             SEQUENCE_SHEET,
             f"sheet {SEQUENCE_SHEET} left note field",
             NOTE_FIELD_LEFT,
-            (("cone and crank sequence", cone_crank[:handle_step]),),
-        ),
-        NoteField(
-            SEQUENCE_SHEET,
-            f"sheet {SEQUENCE_SHEET} right note field",
-            ISO_RIGHT_FIELD,
             (
                 (
-                    "crank handle sequence",
-                    f"{cone_crank_heading} (CONT.){cone_crank[handle_step:]}",
+                    "cone and crank sequence",
+                    CONE_CRANK_STEPS.format(cone_gears=cone_gears),
                 ),
             ),
         ),
@@ -1424,6 +1364,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             ISO_RIGHT_FIELD,
             (
                 ("cone station table", station_table_text(facts.cone_rows())),
+                ("fit placeholder", FIT_PLACEHOLDER),
                 ("crank washer fit", CRANK_WASHER_FIT_NOTES),
             ),
         ),
@@ -1431,12 +1372,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             CHECKS_SHEET,
             f"sheet {CHECKS_SHEET} left note field",
             NOTE_FIELD_LEFT,
-            (
-                ("functional checks", CHECKS.format(cone_gears=cone_gears)),
-                # The fixed-centre crank mesh statement cites check 2: it
-                # stands under the checks, clear of the sheet 8 fit-up.
-                ("fit placeholder", FIT_PLACEHOLDER),
-            ),
+            (("functional checks", CHECKS.format(cone_gears=cone_gears)),),
         ),
         NoteField(
             CHECKS_SHEET,
@@ -2186,8 +2122,8 @@ def _validate_source(source_model: Any) -> SourceFacts:
 
 def _validate_bom(
     adapter: Any, table: Any, facts: SourceFacts
-) -> tuple[tuple[tuple[str, str], ...], int, tuple[float, ...]]:
-    """Prove full identities/quantities; return items, header count and native heights."""
+) -> tuple[tuple[tuple[str, str], ...], int]:
+    """Rewrite part numbers, prove identities/quantities; return (stem, item) and part column."""
     table = _early_bound(table, "ITableAnnotation")
     rows = int(table.RowCount)
     columns = int(table.ColumnCount)
@@ -2196,8 +2132,6 @@ def _validate_bom(
         raise RuntimeError(
             f"drive-train BOM is {rows}x{columns}; expected {len(components) + 1} rows"
         )
-    # Insertion may print file stems. This snapshot identifies the component
-    # behind each row; it is not the final identity/text-metric readback.
     contents = tuple(
         tuple(str(table.DisplayedText(row, column) or "").strip() for column in range(columns))
         for row in range(rows)
@@ -2214,6 +2148,18 @@ def _validate_bom(
     part_column = column_named(lambda cell: cell == "PART NUMBER", "PART NUMBER")
     description_column = column_named(lambda cell: cell == "DESCRIPTION", "DESCRIPTION")
     quantity_column = column_named(lambda cell: cell.startswith("QTY"), "QTY.")
+    for column, width in (
+        (item_column, BOM_COLUMN_WIDTHS["item"]),
+        (part_column, BOM_COLUMN_WIDTHS["part"]),
+        (description_column, BOM_COLUMN_WIDTHS["description"]),
+        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
+    ):
+        actual_width = float(table.SetColumnWidth(column, width, 0))
+        if abs(actual_width - width) > 1e-6:
+            raise RuntimeError(
+                f"drive-train BOM column {column} width did not persist: "
+                f"{actual_width * 1000:.3f} mm"
+            )
 
     actual: dict[str, tuple[int, str, str, str]] = {}
     for row_index, row in enumerate(contents[1:], start=1):
@@ -2244,39 +2190,12 @@ def _validate_bom(
                 f"drive-train BOM quantity for {stem!r} is {quantity!r}, "
                 f"model has {facts.count(stem)}"
             )
-
-    for column, width in (
-        (item_column, BOM_COLUMN_WIDTHS["item"]),
-        (part_column, BOM_COLUMN_WIDTHS["part"]),
-        (description_column, BOM_COLUMN_WIDTHS["description"]),
-        (quantity_column, BOM_COLUMN_WIDTHS["quantity"]),
-    ):
-        actual_width = float(table.SetColumnWidth(column, width, 0))
-        if abs(actual_width - width) > 1e-6:
-            raise RuntimeError(
-                f"drive-train BOM column {column} width did not persist: "
-                f"{actual_width * 1000:.3f} mm"
-            )
-    # Resolve the final Numbers and allocated widths before asking SolidWorks
-    # for minimum row heights; SetText2 readback alone does not rebuild layout.
-    if not adapter.currentModel.EditRebuild3():
-        raise RuntimeError("drive-train BOM identity/column rebuild failed")
     header_count = int(table.GetHeaderCount())
     setter_heights = tuple(float(table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)) for row in range(rows))
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("drive-train BOM rebuild failed")
-    final_contents = tuple(
-        tuple(str(table.DisplayedText(row, column) or "").strip() for column in range(columns))
-        for row in range(rows)
-    )
-    for stem, (row_index, item, _description, _quantity) in actual.items():
-        row = final_contents[row_index]
-        seen = (row[item_column], row[part_column], row[description_column], row[quantity_column])
-        want = (item, BOM_PART_NUMBERS[stem], BOM_DESCRIPTIONS[stem], str(facts.count(stem)))
-        if seen != want:
-            raise RuntimeError(f"drive-train BOM final cells for {stem!r} {seen!r} != {want!r}")
-    row_heights = tuple(float(table.GetRowHeight(row)) for row in range(rows))
-    for row, (setter_height, height) in enumerate(zip(setter_heights, row_heights, strict=True)):
+    for row, setter_height in enumerate(setter_heights):
+        height = float(table.GetRowHeight(row))
         fit = bom_row_fit(BOM_ROW_HEIGHT, height)
         _telemetry.event(
             "drawing.bom_row_height",
@@ -2285,13 +2204,16 @@ def _validate_bom(
             fit=fit,
             setter_mm=setter_height * 1000.0,
             actual_mm=height * 1000.0,
-            cells=final_contents[row],
+            cells=contents[row],
         )
         if fit == "short":
             raise RuntimeError(f"drive-train BOM row {row} is {height * 1000:.3f} mm, below request")
         if fit == "grown" and row >= header_count:
             _telemetry.warn(f"drive-train BOM data row {row} grew to {height * 1000:.3f} mm")
-    return tuple((stem, actual[stem][1]) for stem in components), header_count, row_heights
+    for stem, (row_index, *_rest) in actual.items():
+        if str(table.DisplayedText(row_index, part_column) or "").strip() != BOM_PART_NUMBERS[stem]:
+            raise RuntimeError(f"drive-train BOM part number for {stem!r} reverted")
+    return tuple((stem, actual[stem][1]) for stem in components), header_count
 
 
 def _bom_feature_name(table: Any) -> str:
@@ -2303,14 +2225,10 @@ def _bom_feature_name(table: Any) -> str:
     return name
 
 
-def _split_bom(
-    adapter: Any, table: Any, *, row_heights: Sequence[float], header_count: int
-) -> None:
+def _split_bom(adapter: Any, table: Any, *, data_rows: int, header_count: int) -> None:
     """Split the BOM into two side-by-side columns and hold both to the sheet."""
     table = _early_bound(table, "ITableAnnotation")
-    first_rows = bom_split_row(
-        row_heights[header_count:], header_height=sum(row_heights[:header_count])
-    )
+    first_rows = bom_split_row(data_rows)
     split_after = header_count + first_rows - 1  # 0-based row index
     second = table.Split(2, split_after)  # swTableSplit_AfterRow
     if second is None:
@@ -2531,9 +2449,9 @@ def _insert_bom(adapter: Any, view: Any, facts: SourceFacts) -> tuple[str, dict[
         configuration_grouping="same-part",
         label="drive-train",
     )
-    items, header_count, row_heights = _validate_bom(adapter, table, facts)
+    items, header_count = _validate_bom(adapter, table, facts)
     bom_name = _bom_feature_name(table)
-    _split_bom(adapter, table, row_heights=row_heights, header_count=header_count)
+    _split_bom(adapter, table, data_rows=len(facts.components), header_count=header_count)
     _heading(adapter, 2)
     _caption_under(
         adapter,
@@ -2673,7 +2591,7 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _reference_iso(
         adapter, caption="FINISHED ASSEMBLY 1:8", label="sequence reference isometric"
     )
-    # The right field carries step 7 at its top; the rest is reserved for D1 (#957).
+    # The right field stays empty: it is reserved for D1 (#957).
     return _stack_sheet_note_fields(adapter, facts, SEQUENCE_SHEET)
 
 
@@ -2863,7 +2781,6 @@ async def build(adapter: Any) -> dict[str, str]:
             artifacts = await finalize_drawing(
                 adapter,
                 OUTPUTS,
-                spec=SPEC,
                 layout=SPEC.layout,
                 pdf_title="Drive-Train Assembly Drawing Package",
                 scale=ASSEMBLED_SCALE,

@@ -277,7 +277,7 @@ def test_both_frames_stand_inside_the_sheet_clear_of_every_annotation() -> None:
     for mark in _FRAMES:
         frame, (landing_x, landing_y) = _frame_box(mark), mark.nominal_landing
         near_x = frame.xmax if mark.outboard < 0.0 else frame.xmin
-        symbols[f"{mark.key} frame"] = frame
+        symbols[f"{mark.key} fr_frame"] = frame
         symbols[f"{mark.key} frame leader"] = Box(
             min(near_x, landing_x), landing_y, max(near_x, landing_x), landing_y
         )

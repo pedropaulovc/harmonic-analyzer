@@ -220,7 +220,8 @@ def test_no_note_line_carries_a_dimension() -> None:
     """Rule 6 (Codex P1 on #814): the Ø6 bar size lives in the registry's
     material specification and the imported RodDia, never in a note."""
     for line in spec.DRAWING_NOTES.splitlines():
-        text = re.sub(r"\bMHA-[A-Z]{2}-\d{3}\b", "", line).replace(arbor.RETAINING_COMPOUND, "")
+        text = re.sub(r"MHA-[A-Z]{2}-\d+", "", line).replace(arbor.RETAINING_COMPOUND, "")
         assert not re.search(r"\d", text), line
+    assert "USE COLD-FINISHED BAR AS RECEIVED." in spec.DRAWING_NOTES
     assert "6 mm" in _config.parts("dt-pinion-handle")["material_specification"]
 

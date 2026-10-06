@@ -124,7 +124,7 @@ _REAR_X = _side_x(0.0)
 _NOSE_X = _side_x(OVERALL_LENGTH)
 _ROW_PITCH = 0.008
 # The prefixed texts' centre left of the rear face: half the wider text's
-# printed width (test_pd_transgear_feed_pinion_drawing) and an arrow's air.
+# printed width (test_transgear_feed_pinion_drawing) and an arrow's air.
 _CUTTER_TEXT_INSET = 0.040
 _FLAT_SHEET_DROP = FLAT_TO_AXIS * VIEW_SCALE[0] / 1000.0
 
@@ -419,7 +419,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Transgear Pinion Sleeve Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

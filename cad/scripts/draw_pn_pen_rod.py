@@ -276,8 +276,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pen-rod wire hole",
     )
 
-    # GD&T is model PMI (pn_pen_rod_spec.PART_DATUMS/GEOMETRIC_CONTROLS, authored
-    # by build_pn_pen_rod) — project it and place it where the hand-authored
+    # GD&T is model PMI (pen_rod_spec.PART_DATUMS/GEOMETRIC_CONTROLS, authored
+    # by build_pen_rod) — project it and place it where the hand-authored
     # symbols used to sit. All three annotations land in the single front view,
     # and the projection fails loud on any mismatch. The squareness frame stays BELOW the rod: up-right
     # of its target its leader crossed the Ra's leader in an X at the rod's
@@ -335,7 +335,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Pen Rod Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

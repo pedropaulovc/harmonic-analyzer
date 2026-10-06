@@ -25,6 +25,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     POLISHED_STEEL,
     SketchDims,
@@ -528,10 +529,12 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "as-turned screw (default)", V_FINAL, 0.02 * V_SLOT)
     # The configuration description wins over the drive-train BOM's written
     # cell, so it is the text that BOM prints (the MHA-DT-030 precedent).
+    grouped_spec = _config.parts(PART_NAME)
     apply_grouped_bom_properties(
         adapter,
         [default_config, INSTALLED_CONFIG],
-        part_name=PART_NAME,
+        part_number=str(grouped_spec["number"]),
+        description=str(grouped_spec["description"]),
     )
     await report_mass_properties(adapter)
     require_material_in_every_configuration(

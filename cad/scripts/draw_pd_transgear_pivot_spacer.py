@@ -145,7 +145,7 @@ BLOCKING_LAYOUT_FINDINGS = frozenset({"text-on-line", "text-on-text"})
 # Datum A is the bore's axis, put on the end view's bore circle by
 # SolidWorks' native placement, as the disc hub's is.  Each end face's
 # perpendicularity frame attaches by entity to the FACE on the profile, as
-# the hub's frames do (draw_pd_transgear_disc_hub.py): a sheet pick on an
+# the hub's frames do (draw_transgear_disc_hub.py): a sheet pick on an
 # edge-on face's line can find no edge there, and a symbol left on the rim
 # the face shares with the O.D. reads as controlling the cylinder.  Each
 # finds its face's O.D. rim by model geometry and takes, of the rim's two
@@ -577,7 +577,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Transgear Pivot Spacer Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

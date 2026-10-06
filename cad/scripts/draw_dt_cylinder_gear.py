@@ -113,8 +113,8 @@ DIMENSION_CALLOUTS = {
     "NotchDepth": "FROM OD",
     "NotchPhase": "NOTCH CCW FROM CAM LOBE",
 }
-# Decimal places are the part's (dt_cylinder_gear_spec.DRAWING_PRECISION,
-# applied by build_dt_cylinder_gear); the sheet only reads them back.
+# Decimal places are the part's (cylinder_gear_spec.DRAWING_PRECISION,
+# applied by build_cylinder_gear); the sheet only reads them back.
 
 
 def _project_mm(
@@ -644,7 +644,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Cylinder Gear Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

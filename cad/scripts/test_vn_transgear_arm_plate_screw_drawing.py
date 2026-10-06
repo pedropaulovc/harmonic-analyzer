@@ -411,8 +411,7 @@ def test_sheet_states_the_cut_and_no_size_in_the_registry_names() -> None:
     flat = " ".join(lines)
     proud = joints.PLATE_SCREW_CUT_PROUD_MAX
     assert (
-        f"CUT EACH TIP FLUSH TO {proud:.2f} PROUD OF THE "
-        f"{_config.parts('pd-transgear-arm')['number']} ARM FRONT FACE "
+        f"CUT EACH TIP FLUSH TO {proud:.2f} PROUD OF THE MHA-PD-018 ARM FRONT FACE "
         "AT ASSEMBLY;"
     ) in flat
     assert f"BREAK THE CUT END {screw.CUT_END_BREAK_MAX:.1f} MAX." in flat

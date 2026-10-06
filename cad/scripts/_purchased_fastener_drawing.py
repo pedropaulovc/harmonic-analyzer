@@ -543,7 +543,6 @@ async def _build_reference_sheet(
     return await finalize_drawing(
         adapter,
         DrawingOutputs(slddrw=paths["slddrw"], pdf=paths["pdf"], png=paths["png"]),
-        spec=spec,
         layout=spec.layout,
         pdf_title=title,
         scale=scale,

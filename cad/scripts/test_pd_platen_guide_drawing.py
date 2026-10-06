@@ -520,8 +520,8 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     stage.mkdir()
     staged = cut_release.stage_drawings(stage)
     assert staged == {
-        "pd_platen_guide:pdf": "pdf/pd-platen-guide.pdf",
-        "pd_platen_guide:png": "png/pd-platen-guide_drawing.png",
+        "platen_guide:pdf": "pdf/pd-platen-guide.pdf",
+        "platen_guide:png": "png/pd-platen-guide_drawing.png",
     }
     for relpath in staged.values():
         assert (stage / relpath).is_file()
@@ -548,8 +548,8 @@ def test_release_stages_all_drawing_formats(tmp_path: Path, monkeypatch) -> None
     # very drawing facts the COM half used to return inline.
     native = cut_release.stage_native(stage, cut_release.load_native_package())
     assert native == {
-        "pd_platen_guide:solidworks_slddrw": "solidworks/pd-platen-guide.SLDDRW",
-        "pd_platen_guide:slddrw": "slddrw/pd-platen-guide.SLDDRW",
+        "platen_guide:solidworks_slddrw": "solidworks/pd-platen-guide.SLDDRW",
+        "platen_guide:slddrw": "slddrw/pd-platen-guide.SLDDRW",
     }
     assert (stage / "solidworks" / "pd-platen-guide.SLDDRW").read_bytes() == b"slddrw"
     assert (

@@ -607,21 +607,17 @@ def ink_key(text: str) -> str:
 
 @dataclass(frozen=True)
 class InkSpan:
-    """One PDF text object: what it says, its tight glyph box, and how many
-    printed rows its glyphs stand on (``_pdf_ink.Span.rows``; a dump from
-    before rows were recorded reads one)."""
+    """One PDF text object: what it says and its tight glyph box."""
 
     key: str
     box: Box
-    rows: int = 1
 
 
 def ink_spans(dump: Mapping[str, Any]) -> list[InkSpan]:
     spans = []
     for raw in (dump.get("ink") or {}).get("spans", ()):
-        text, *rest = raw
-        values = _floats(rest)
-        spans.append(InkSpan(ink_key(str(text)), Box(*values[:4]), int(values[4]) if len(values) > 4 else 1))
+        text, *box = raw
+        spans.append(InkSpan(ink_key(str(text)), Box(*_floats(box)[:4])))
     return spans
 
 
@@ -3643,121 +3639,6 @@ def find_read_errors(dump: Mapping[str, Any]) -> list[Finding]:
     ]
 
 
-# Air between a title-block value's printed glyphs and every rule of its cell
-# (``DrawingTemplateSpec.title_cells_m``): a rule's half width plus visible
-# paper. On the v39 release the tightest value sat 1.67 mm off a rule
-# (cone-gear's PART descender over the DWG. NO. rule); the widest DWG. NO.,
-# MHA-013-T006, ended 21.6 mm short of the REV rule.
-TITLE_FIELD_CLEARANCE_M = 0.00025
-
-
-@dataclass(frozen=True)
-class TitleFieldFit:
-    """One title-block identity value as the sheet printed it.
-
-    ``printed`` is the glyph box of the one PDF text object that prints the
-    WHOLE value in its exact case -- None when no single object does (blank,
-    cut, wrapped, or printed in capitals: pdfium makes each text-showing
-    operator its own object, so a second line is a second object). ``rows``
-    is how many distinct glyph baselines that object stands on
-    (``_pdf_ink.Span.rows``). ``clearance`` is the box's least distance
-    inside the cell's rules, negative where it crosses one, ``-inf`` when
-    nothing printed it.
-    """
-
-    source: str
-    text: str
-    cell: Box
-    printed: Box | None
-    rows: int
-    clearance: float
-
-    @property
-    def fits(self) -> bool:
-        return self.printed is not None and self.rows == 1
-
-
-def _printed_text(text: str) -> str:
-    """A title-block identity as the PDF prints it, case kept: ``ink_key``
-    without its case fold, so a slug printed in capitals is not the slug."""
-    return re.sub(r"\s+", "", _TOKEN.sub("", text))
-
-
-def _printed_spans(dump: Mapping[str, Any]) -> list[tuple[str, InkSpan]]:
-    """Each PDF text object with its case-kept text (:func:`_printed_text`)."""
-    raws = (dump.get("ink") or {}).get("spans", ())
-    return [(_printed_text(str(raw[0])), span) for raw, span in zip(raws, ink_spans(dump), strict=True)]
-
-
-def title_field_fits(dump: Mapping[str, Any]) -> list[TitleFieldFit]:
-    """Every ``title_fields`` value the collector recorded, measured on the
-    page's ink. A dump from before the collector recorded them has none."""
-    spans = _printed_spans(dump)
-    fits = []
-    for field in dump.get("title_fields") or ():
-        text = str(field["text"])
-        cell = Box(*_floats(field["cell"])[:4])
-        key = _printed_text(text)
-        printed, rows, clearance = None, 0, -math.inf
-        for printed_text, span in spans:
-            if not key or printed_text != key:
-                continue
-            box = span.box
-            inside = min(box.xmin - cell.xmin, cell.xmax - box.xmax, box.ymin - cell.ymin, cell.ymax - box.ymax)
-            # The same string elsewhere on the sheet (a BOM row) is farther
-            # outside the cell than the title block's own value.
-            if inside > clearance:
-                printed, rows, clearance = box, span.rows, inside
-        fits.append(TitleFieldFit(str(field["source"]), text, cell, printed, rows, clearance))
-    return fits
-
-
-def find_title_field_misfits(
-    dump: Mapping[str, Any], *, clearance: float = TITLE_FIELD_CLEARANCE_M
-) -> list[Finding]:
-    """A title-block identity value (DWG. NO. ``Number``, PART ``Title``) not
-    printed whole, in its exact case, on one line inside its ruled cell. The
-    template note wraps at its authored width and a wrapped line lands on the
-    next cell's caption; nothing may shorten or shrink the identity to fit, so
-    the fix is the template's cell, never the string."""
-    sheet = str(dump.get("sheet", ""))
-    spans = _printed_spans(dump)
-    findings = []
-    for fit in title_field_fits(dump):
-        if fit.fits and fit.clearance >= clearance:
-            continue
-        if fit.printed is None:
-            pieces = [text for text, span in spans if span.box.overlaps(fit.cell, tol=0.0) is not None]
-            detail = (
-                f"{fit.source} {fit.text!r} is not printed whole on one line in its cell "
-                f"{fit.cell.format_mm()}; the cell prints {pieces!r}"
-            )
-            where = fit.cell
-        else:
-            detail = (
-                f"{fit.source} {fit.text!r} prints {fit.printed.format_mm()} on {fit.rows} row(s), "
-                f"{fit.clearance * MM:.2f} mm inside its cell {fit.cell.format_mm()} "
-                f"(needs one row and {clearance * MM:.2f} mm)"
-            )
-            where = fit.printed
-        findings.append(
-            Finding(
-                kind="title-field-misfit",
-                sheet=sheet,
-                a=f"title {fit.source}",
-                b="",
-                detail=detail,
-                at_mm=tuple(value * MM for value in where.center()),
-                extra=(
-                    {"printed": False}
-                    if fit.printed is None
-                    else {"printed": True, "rows": fit.rows, "clearance_mm": round(fit.clearance * MM, 3)}
-                ),
-            )
-        )
-    return findings
-
-
 def find_duplicate_annotations(
     dump: Mapping[str, Any], *, tol: float = DUPLICATE_POSITION_TOL_M
 ) -> list[Finding]:
@@ -3878,7 +3759,6 @@ GATING_KINDS = frozenset(
         "merged-blocks",
         "tall-block",
         "text-on-view",
-        "title-field-misfit",
     }
 )
 
@@ -3912,18 +3792,13 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
         "line-through-own-text",
         "merged-blocks",
         "shoulder-crosses-line",
-        # No fleet count: enforced from its first build. finalize_drawing
-        # already refused any sheet whose identity notes' INote extents miss
-        # their cells (_drawing_title_fields), so on a sheet that reaches the
-        # audit this fires only where the print disagrees with those extents.
-        "title-field-misfit",
     }
 )
 # Kinds one drawing enforces under REPORT before the fleet does, because its
 # recipe rests a check on them. frame-assembly's short-leader balloons prove
 # their leader start only on the read right after SetPosition: after the
 # rebuild COM reports the start the fit render left, not the one the PDF
-# draws (draw_fr_frame_assembly._short_frame_balloon). The printed leader is
+# draws (draw_frame_assembly._short_frame_balloon). The printed leader is
 # measured here, so a leader printed from inside its own ring fails the leaf,
 # and so does one whose printed start the page leaves ambiguous.
 # frame-assembly reads zero of both on replay of runs 20260928T124727673Z
@@ -3998,7 +3873,6 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_unclaimed_text(model),
         *find_edgeless_views(model),
         *find_read_errors(dump),
-        *find_title_field_misfits(dump),
         *find_duplicate_annotations(dump),
         *find_duplicate_thread_callouts(dump, sheet),
         *(f for f in find_text_separation(sheet) if frozenset((f.a, f.b)) not in reported),

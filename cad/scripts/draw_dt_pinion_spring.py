@@ -100,7 +100,7 @@ ISO_CENTER = (0.350, 0.150)
 # and pc-r12 but only KinkR in pc-r13 (leaf 20260927T001822Z-1-ba1f4546),
 # with the same script and a dimensionally identical part; a cropped model
 # view takes a targeted import like any principal view (MHA-DT-022's detail A,
-# 522920510; draw_dt_crank_arm's top view).  Its crop circle's centre is where
+# 522920510; draw_crank_arm's top view).  Its crop circle's centre is where
 # pc-r12 printed the native detail's.
 DETAIL_CENTER = (0.240, 0.184)
 DETAIL_SCALE = (5, 1)
@@ -219,7 +219,7 @@ HOLE_CALLOUT_XY = (_PAD_EAST + 0.035, TOP_CENTER[1] - 0.019)
 # The #4 normal clearance (3.264 mm = 0.1285 in) is a No. 30 drill; the shop
 # reaches for the number, the native size compartment still prints the diameter.
 HOLE_PROCESS = "#30 DRILL"
-# The pad hole where build_dt_pinion_spring's Hole Wizard puts it (model mm): on
+# The pad hole where build_pinion_spring's Hole Wizard puts it (model mm): on
 # the foot's top face, centred across the pad, which stands PAD_Z off the
 # strip's centre plane.  The callout picks its rim at the +z quadrant.  pc-r11
 # (0c5636eab) picked z HOLE_DIA/2, the rim while the pad was centred on the
@@ -742,7 +742,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Pinion Return Leaf Spring Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

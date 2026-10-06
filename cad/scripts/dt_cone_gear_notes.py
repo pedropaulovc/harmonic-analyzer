@@ -17,8 +17,8 @@ CYLINDER_MATE_NUMBER = "MHA-DT-012"
 
 # The U42 gears' worst-case transverse contact ratio with MHA-DT-012, rounded
 # DOWN to two places so no sheet claims more than the part has.  Sheet text, so it lives here and not in
-# dt_cone_gear_spec (which the drive-train imports);
-# test_dt_cone_gear_mesh_design re-derives every value from the drive-train pose
+# cone_gear_spec (which the drive-train imports);
+# test_cone_gear_mesh_design re-derives every value from the drive-train pose
 # and the printed bands, over exactly spec.CONTACT_RATIO_EXCEPTION_TEETH.
 WORST_CONTACT_RATIO: dict[int, float] = {
     6: 0.17,
@@ -77,9 +77,7 @@ def gear_data(teeth: int) -> str:
         ("TOOTH FORM", spec.TOOTH_FORM),
         (
             "MATES WITH",
-            # Keep the complete mate identity and tooth qualifiers within the
-            # existing 66-character gear-data column.
-            f"CYLINDER GEAR {CYLINDER_MATE_NUMBER},\n120T, FULL STANDARD THICKNESS",
+            f"CYLINDER GEAR {CYLINDER_MATE_NUMBER}, 120T, FULL STANDARD THICKNESS",
         ),
         # The drive-train cone is backed off its drum on inclined axes, so the
         # 120T tips never reach the reference-centre-distance depth; the cone
@@ -106,9 +104,9 @@ def gear_data(teeth: int) -> str:
 
 # The named shortfalls (user rulings U42 and U40, 2026-09-23) print once each,
 # as GEAR DATA rows (web_row, contact_ratio_row), never again in these notes.
-# Which gears carry them stays in dt_cone_gear_spec (CONTACT_RATIO_EXCEPTION_TEETH,
+# Which gears carry them stays in cone_gear_spec (CONTACT_RATIO_EXCEPTION_TEETH,
 # WEB_EXCEPTIONS_MM); each printed value is pinned to its derivation by
-# test_dt_cone_gear_mesh_design and test_dt_cone_gear_drawing.
+# test_cone_gear_mesh_design and test_cone_gear_drawing.
 DRAWING_NOTES = "\n".join(
     (
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",

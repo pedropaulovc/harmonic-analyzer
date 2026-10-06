@@ -6,7 +6,6 @@ import ast
 import math
 import re
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -16,7 +15,6 @@ import dt_crank_handle_spec as handle_spec
 import draw_dt_drive_train_assembly as drawing
 import dt_drive_train_assembly_spec as spec
 from _drawing_registry import DRAWINGS_BY_NAME
-from _assembly_contract import assembly_contract
 
 SCRIPTS = Path(__file__).resolve().parent
 PARTS = SCRIPTS.parent / "config" / "parts"
@@ -26,11 +24,6 @@ RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
 # Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b).
 EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008"})
-EXTERNAL_ASSEMBLY_NUMBERS = {
-    "ch-channel": "MHA-CH-000",
-    "fr-frame": "MHA-FR-000",
-    "pd-paper-drive": "MHA-PD-000",
-}
 
 
 def _builder_stems() -> set[str]:
@@ -119,7 +112,7 @@ def test_bom_catalog_numbers_match_the_parts_registry() -> None:
         assert printed == [skus[0]], stem
 
 
-def test_package_text_cites_only_bom_or_external_numbers() -> None:
+def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
     texts = (
         drawing.ASSEMBLED_HEADING,
         drawing.CONE_CRANK_STEPS,
@@ -132,12 +125,9 @@ def test_package_text_cites_only_bom_or_external_numbers() -> None:
         drawing.CRANK_WASHER_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
-    cited = set(re.findall(r"\bMHA-[A-Z0-9-]+\b", "\n".join(texts)))
-    assert cited, "package text contains no part references"
+    cited = set(re.findall(r"MHA-[A-Z]{2}-\d{3}", "\n".join(texts)))
     bom = set(drawing.BOM_PART_NUMBERS.values())
-    for stem, number in EXTERNAL_ASSEMBLY_NUMBERS.items():
-        assert assembly_contract(stem).number == number
-    assert cited <= bom | EXTERNAL_NUMBERS | set(EXTERNAL_ASSEMBLY_NUMBERS.values())
+    assert cited <= bom | EXTERNAL_NUMBERS
 
 
 def test_note_lines_fit_a_half_sheet_field() -> None:
@@ -244,6 +234,22 @@ def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
     printed = []
     for build in grouped:
         stem = build.stem.removeprefix("build_").replace("_", "-")
+        source = build.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        stamped = [
+            ast.get_source_segment(source, keyword.value)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and getattr(node.func, "id", None) == "apply_grouped_bom_properties"
+            for keyword in node.keywords
+            if keyword.arg == "description"
+        ]
+        # The builder passes a local it read from the row, or the row read inline.
+        assert stamped, build.name
+        assert all("title" not in text for text in stamped), (build.name, stamped)
+        assert re.search(r"""\(["']description["']""", source) or re.search(
+            r"""\[["']description["']\]""", source
+        ), build.name
         if stem not in drawing.BOM_DESCRIPTIONS:
             continue
         row = yaml.safe_load((PARTS / f"{stem}.yaml").read_text(encoding="utf-8"))[stem]
@@ -252,113 +258,9 @@ def test_grouped_parts_stamp_the_description_the_bom_prints() -> None:
     assert {"dt-cone-gear", "dt-pinion-lever-pin"} <= set(printed)
 
 
-@pytest.mark.parametrize(
-    ("field", "value"),
-    (
-        ("number", "MHA-014"),
-        ("number", "MHA-ZZ-001"),
-        ("number", "MHA-DT-000"),
-        ("number", "MHA-CH-003"),
-        ("number", "MHA-DT-003-extra"),
-        ("number", "MHA-DT-٠٠٣"),
-        ("number", 3),
-        ("category", "zz"),
-        ("category", "ch"),
-        ("description", ""),
-        ("description", None),
-    ),
-)
-def test_grouped_bom_rejects_invalid_registry_metadata_before_native_access(
-    monkeypatch, field: str, value: object,
-) -> None:
-    import _config
-    import _grouped_bom_properties as grouped
-
-    row = _config.parts("dt-cone-gear")
-    row[field] = value
-    monkeypatch.setattr(grouped._config, "parts", lambda _stem: row)
-
-    class Adapter:
-        @property
-        def currentModel(self):
-            raise AssertionError("invalid metadata reached native configuration access")
-
-    with pytest.raises(ValueError):
-        grouped.apply_grouped_bom_properties(
-            Adapter(), ["Default"], part_name="dt-cone-gear"
-        )
-
-
-def test_grouped_bom_refuses_unregistered_part_stem_before_native_access() -> None:
-    import _grouped_bom_properties as grouped
-
-    class Adapter:
-        @property
-        def currentModel(self):
-            raise AssertionError("unregistered stem reached native configuration access")
-
-    with pytest.raises(KeyError):
-        grouped.apply_grouped_bom_properties(
-            Adapter(), ["Default"], part_name="dt-unregistered-grouped-part"
-        )
-
-
-def test_grouped_bom_stamps_registered_identity_on_every_configuration(
-    monkeypatch,
-) -> None:
-    import _config
-    import _grouped_bom_properties as grouped
-
-    row = _config.parts("dt-cone-gear")
-    configurations = {
-        name: SimpleNamespace(
-            BOMPartNoSource=0,
-            AlternateName="obsolete",
-            UseAlternateNameInBOM=False,
-            Description="obsolete",
-            UseDescriptionInBOM=False,
-        )
-        for name in ("Default", "T120")
-    }
-    model = SimpleNamespace(GetConfigurationByName=configurations.get)
-    monkeypatch.setattr(grouped, "_early_bound", lambda value, _interface: value)
-    grouped.apply_grouped_bom_properties(
-        SimpleNamespace(currentModel=model),
-        tuple(configurations),
-        part_name="dt-cone-gear",
-    )
-    for configuration in configurations.values():
-        assert configuration.BOMPartNoSource == 8
-        assert configuration.AlternateName == row["number"]
-        assert configuration.UseAlternateNameInBOM is True
-        assert configuration.Description == row["description"]
-        assert configuration.UseDescriptionInBOM is True
-
-
-def test_bom_full_native_identities_retain_text_air() -> None:
-    """The failure PDF's unchanged Century Gothic glyph advances, in metres.
-
-    The old 22 mm Number cell held the 20.757 mm MHA-VN- prefix with
-    1.243 mm total air, but wrapped its final three digits on every row.
-    The full identities must keep at least that visible air, not merely fit
-    their prefix. The widest full description measured 107.45 mm.
-    """
-    glyph_advances = {
-        **dict.fromkeys("0123456789", 0.00258611),
-        "M": 0.00428859,
-        "H": 0.00318727,
-        "A": 0.00345347,
-        "-": 0.00154931,
-        "D": 0.00347213,
-        "T": 0.00198808,
-        "V": 0.00327594,
-        "N": 0.00345347,
-    }
-    native_air = 0.001243
-    for number in drawing.BOM_PART_NUMBERS.values():
-        full_width = sum(glyph_advances[character] for character in number)
-        assert drawing.BOM_COLUMN_WIDTHS["part"] >= full_width + native_air, number
-    assert drawing.BOM_COLUMN_WIDTHS["description"] >= 0.107450 + native_air
+def test_bom_descriptions_keep_one_line() -> None:
+    for stem, text in drawing.BOM_DESCRIPTIONS.items():
+        assert len(text) <= drawing.BOM_DESCRIPTION_MAX_CHARS, stem
 
 
 def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
@@ -674,54 +576,11 @@ def test_cone_station_rows_run_front_to_back() -> None:
     assert table.splitlines()[1].startswith("STN  1  T120")
 
 
-@pytest.mark.parametrize(("data_rows", "first_rows"), ((39, 20), (54, 27)))
-def test_bom_native_equal_heights_keep_the_larger_half_first(
-    data_rows: int, first_rows: int,
-) -> None:
-    heights = (0.006,) * data_rows
-    assert drawing.bom_split_row(heights, header_height=0.0101683) == first_rows
-
-
-def test_bom_split_requires_a_data_row_in_each_piece() -> None:
-    with pytest.raises(ValueError, match="at least two"):
-        drawing.bom_split_row((0.006,), header_height=0.0101683)
-
-
-def test_bom_split_uses_native_wrapping_heights_not_row_counts() -> None:
-    # Four late descriptions wrap to the native two-line height. A 27/27
-    # count split enters the right-hand title block, while 28/26 fits.
-    heights = (0.006,) * 50 + (0.0101683,) * 4
-    header = 0.0101683
-    second_anchor = (drawing.BOM_SECOND_COLUMN_X, drawing.BOM_ANCHOR[1])
-    count_height = header + sum(heights[27:])
-    assert any(
-        "title block" in finding
-        for finding in drawing.bom_extent_violations(
-            second_anchor, drawing.BOM_COLUMN_WIDTH, count_height
-        )
-    )
-    split = drawing.bom_split_row(heights, header_height=header)
-    assert split == 28
-    for anchor, data in ((drawing.BOM_ANCHOR, heights[:split]), (second_anchor, heights[split:])):
-        assert drawing.bom_extent_violations(
-            anchor, drawing.BOM_COLUMN_WIDTH, header + sum(data)
-        ) == []
-
-
-def test_bom_refuses_the_observed_all_wrapped_native_layout() -> None:
-    # 54 data rows plus repeated headers at 10.1683 mm cannot fit the two
-    # legal floors. The old 27/27 split read bottom = -32.713 mm.
-    heights = (0.0101683,) * 54
-    with pytest.raises(ValueError, match="no two-column BOM split fits"):
-        drawing.bom_split_row(heights, header_height=0.0101683)
-
-
-@pytest.mark.parametrize(
-    ("actual", "fit"),
-    ((0.005998, "short"), (0.0060005, "exact"), (0.0101683, "grown")),
-)
-def test_bom_native_row_height_classification(actual: float, fit: str) -> None:
-    assert drawing.bom_row_fit(0.006, actual) == fit
+def test_bom_split_keeps_the_second_column_no_taller() -> None:
+    assert drawing.bom_split_row(39) == 20
+    assert drawing.bom_split_row(42) == 21
+    with pytest.raises(ValueError):
+        drawing.bom_split_row(1)
 
 
 def test_bom_reference_view_and_caption_fit_right_of_the_bom() -> None:
@@ -729,11 +588,8 @@ def test_bom_reference_view_and_caption_fit_right_of_the_bom() -> None:
     # ~10.2 mm. Under the first column the view was placed for 20 rows; at 27
     # the bottom row (MHA-DT-015) ran through it (st19 dt-02).
     data_rows = len(drawing.bom_components(drawing.instance_counts(_instances())))
-    header = 0.0101683
-    first_rows = drawing.bom_split_row(
-        (drawing.BOM_ROW_HEIGHT,) * data_rows, header_height=header
-    )
-    first_height = header + first_rows * drawing.BOM_ROW_HEIGHT
+    first_rows = drawing.bom_split_row(data_rows)
+    first_height = 0.0102 + first_rows * drawing.BOM_ROW_HEIGHT
     first_bottom = drawing.BOM_ANCHOR[1] - first_height
     half = drawing.REFERENCE_ISO_HALF_OUTLINE
     assert (0.068 + half) > first_bottom  # the old centre (0.110, 0.068)
@@ -764,30 +620,6 @@ def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:
     assert drawing.bom_extent_violations(drawing.BOM_ANCHOR, 0.164, 0.130) == []
     assert drawing.bom_extent_violations((0.300, 0.100), 0.100, 0.050)
     assert drawing.bom_extent_violations((0.001, 0.200), 0.100, 0.050)
-    second_anchor = (drawing.BOM_SECOND_COLUMN_X, drawing.BOM_ANCHOR[1])
-    floor_height = drawing.BOM_ANCHOR[1] - (
-        drawing.DRAWING_TEMPLATES[drawing.SPEC.layout].title_block_top_m
-        + drawing.BOM_SHEET_CLEARANCE
-    )
-    assert drawing.bom_extent_violations(
-        second_anchor, drawing.BOM_COLUMN_WIDTH, floor_height - 1e-7
-    ) == []
-    assert any(
-        "title block" in finding
-        for finding in drawing.bom_extent_violations(
-            second_anchor, drawing.BOM_COLUMN_WIDTH, floor_height + 1e-7
-        )
-    )
-    first_floor_height = drawing.BOM_ANCHOR[1] - drawing.NOTE_FIELD_LEFT[3]
-    assert drawing.bom_extent_violations(
-        drawing.BOM_ANCHOR, drawing.BOM_COLUMN_WIDTH, first_floor_height - 1e-7
-    ) == []
-    assert any(
-        "sheet-number field" in finding
-        for finding in drawing.bom_extent_violations(
-            drawing.BOM_ANCHOR, drawing.BOM_COLUMN_WIDTH, first_floor_height + 1e-7
-        )
-    )
 
 
 def test_balloon_attachment_gate_names_every_mismatch() -> None:

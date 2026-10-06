@@ -296,7 +296,7 @@ def test_swing_occupants_are_the_parts_standing_on_the_seats() -> None:
         "front pivot block",
         "back pivot block",
         "pinion spring",
-        "fr-nameplate",
+        "nameplate",
         "serial stamp",
     }
     assert set(bdt.SWING_ROUND_OCCUPANTS) == {f"column socket {i}" for i in range(4)}

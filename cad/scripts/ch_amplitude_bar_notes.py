@@ -19,9 +19,9 @@ from ch_amplitude_bar_spec import TOP_PIN_HOLE_SPEC
 # so open-to-opposite-ends / common-plane IS the model truth, and the pin
 # hole runs thru the top-notch cheeks at mid-depth. Each notch's centring
 # ledge, width and depth -- the bottom depth with its one-sided band
-# (ch_amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), each ledge with
+# (amplitude_bar_spec.BOTTOM_NOTCH_DEPTH_BAND), each ledge with
 # NOTCH_OFFSET_TOLERANCE_MM -- print as model dimensions in its end's detail,
-# and the floor's Ra is a native symbol there (ch_amplitude_bar_drawing_spec),
+# and the floor's Ra is a native symbol there (amplitude_bar_drawing_spec),
 # never here (policy rule 2, Codex #936 PRRT_kwDOPHDy386mWF0L).
 # "ROOTS R0.40 MAX." is a Main-ruled exception (2026-09-27): it limits the
 # cutter's corner at an unmodelled root, so nothing in the model can carry it.

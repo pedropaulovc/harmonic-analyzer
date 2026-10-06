@@ -119,7 +119,7 @@ CROP_NO_ERROR = 1
 # this shape intensity (1 most .. 5 least).
 DETAIL_BREAK_INTENSITY = 3
 # The head centre must land within 0.1 mm of DETAIL_CENTER after the move
-# (draw_vn_post_mount_screw's tip-view tolerance).
+# (draw_post_mount_screw's tip-view tolerance).
 DETAIL_POSITION_TOL_M = 1e-4
 # The detail's model axis must run the profile's way on the sheet.
 DETAIL_AXIS_MIN_DOT = 0.999
@@ -179,7 +179,7 @@ BACK_RA_XY = (
 RA_SYMBOL_EXTENT = (-0.0019, 0.0151, 0.0062)
 FLANK_SIGN = {"lower": -1.0, "upper": 1.0}
 # Each land's diameter is measured at a short witness JOURNAL_DIA_POINT_FROM_
-# CROWN_END in from its crown-side end (build_dt_pinion_arbor, pinned equal by
+# CROWN_END in from its crown-side end (build_pinion_arbor, pinned equal by
 # test), and its line stands 1 mm from that point, so its extensions are ~1 mm
 # rather than a run along the flank (Main, 2026-09-24).  The text hangs away
 # from the side its extensions come from: left of the front line, right of the
@@ -228,7 +228,7 @@ BOND_ZONE_TEXT_XY = (_sheet_x(BOND_ZONE_DIA_Z), 0.190)
 # the black silhouette, which at 1:1 read as a break in the outline, i.e. a
 # groove or relief to a machinist (Main, 5471a6ef).  Each is re-coloured in
 # the view to the outline's black; the model sketch and its dimension are
-# untouched.  The spans (model z, mm) mirror build_dt_pinion_arbor's
+# untouched.  The spans (model z, mm) mirror build_pinion_arbor's
 # DRUM_STATION_POINT_LEN / BOND_ZONE_WITNESS_LEN, pinned by test.
 REFERENCE_WITNESS_COLOR = 0  # COLORREF black, the outline's colour.
 DRUM_STATION_POINT_LEN = 1.0
@@ -263,8 +263,6 @@ DIAMETER_BLOCK_SIZE = (0.027, 0.014)
 # - pc-r10 ("FOR MHA-145 SPRING PIN", 22 characters) bent at 280.1, a 58.7 mm
 #   underline, 2.67 mm per character;
 # - the leader meets the hole 0.4 mm left of its axis (pc-r10, 269.1 mm).
-# These are recorded pre-migration calibration inputs, not current mate
-# identities; the live callout width below uses the complete current Number.
 # The font is proportional, so the per-character advance overstates a line
 # of narrow glyphs.  pc-r9's line reads 3 mm narrower than the estimate,
 # which stands the bend left of the hole, away from the station text.
@@ -1277,7 +1275,6 @@ async def build(adapter: Any) -> dict[str, str]:
     outputs = await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Integral Pinion Arbor Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,

@@ -80,8 +80,8 @@ ISO_SCALE = (1, 2)
 # it arrives in a temporary "*Top" donor and is then MOVED (never copied) onto
 # the side view, which is where a turned part's diameters belong.  The donor
 # then carries no manufacturing information and is deleted.  Pattern and
-# verification from draw_dt_pinion_handle (its grip/tube diameters make the same
-# trip); a farm leaf of draw_dt_cone_gear_shaft re-proved it on a stepped shaft.
+# verification from draw_pinion_handle (its grip/tube diameters make the same
+# trip); a farm leaf of draw_cone_gear_shaft re-proved it on a stepped shaft.
 DONOR_CENTER = (0.355, 0.248)
 DONOR_KEEP = {"ShaftDia": (0.392, DONOR_CENTER[1])}
 PROFILE_DIAMETERS = {"ShaftDia": (0.196, 0.222)}
@@ -98,7 +98,7 @@ PROFILE_KEEP = {
 # both pedestals journal.  A revolved/extruded flank is a drawing SILHOUETTE,
 # not a model edge, so the pick names that entity type.
 # A straight-up leader (same x as the pick) keeps it off the geometry, as on
-# draw_ch_pivot_shaft's identical O.D. flank; the Ra text renders above the arm.
+# draw_pivot_shaft's identical O.D. flank; the Ra text renders above the arm.
 FINISH_EDGE = (SHAFT_LEFT_X + 0.038, SHAFT_FLANK_Y)
 FINISH_SYMBOL = (FINISH_EDGE[0], 0.206)
 
@@ -280,7 +280,6 @@ async def build(adapter: Any) -> dict[str, str]:
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        spec=SPEC,
         pdf_title="Cylinder Gear Shaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
