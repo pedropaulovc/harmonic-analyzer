@@ -34,8 +34,9 @@ a physical trajectory; seed CPU diagnostics do not qualify held exposures/GPU.
 Synthesis rocker-bank uses separately pinned source-timed cumulative drive for
 all20 stations, with explicit chosen +sense/common-upper phase and same-shot
 unmeasured endpoint holds. Other shots retain their previous candidate inputs.
-Ordinary CLI generation first requires every selected video's observations to
-match the independently approved live source and current sealed renderer inputs.
+Ordinary CLI and imported Generator generation require every source/native input
+to match the independently approved live source and current sealed code before
+derivation. HistoricalReceiptRevalidator is receipt-only, never publication.
 """
 from __future__ import annotations
 import argparse
@@ -67,6 +68,12 @@ VISIBLE_CRANK_GAUGE = "web/content/canonical-native/6dW6VYXp9HM.visible-crank-ga
 VISIBLE_CRANK_GAUGE_SHA256 = "b5d790f41128d0acec4f13d7d604c9af72ed41446deb52442e903aff828ad50f"
 ANALYSIS_SOURCE_SHA256 = "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52"
 ANALYSIS_MODEL_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
+# The pinned framing subset retains original native readbacks but no model
+# fields. Its original capture used this exact raw source, not a fresh approval.
+FRAMING_GPU_MODEL_SOURCE = {
+    "sha256": ANALYSIS_MODEL_SHA256,
+    "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945",
+}
 AUTOMATIC_NATIVE_MATH = ("web/src/mechanics.ts", "web/src/mechanics-data.ts",
                          "web/src/kinematics.ts", "web/src/magnifier.ts")
 SYNTHESIS_AUTOMATIC_MOTION = "web/content/canonical-native/8KmVDxkia_w.automatic-motion.json"
@@ -74,6 +81,7 @@ SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "d049a9528092198a4321545a9f3e0d7559bed1baef1
 SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json"
 SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "4536dd456352d23817eed6ee93790c0a62602816726ef5432de50161e55ccee7"
 SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
+SYNTHESIS_OBSERVATIONS = "web/content/canonical-native/8KmVDxkia_w.observations.json.gz"
 
 
 def load(path):
@@ -138,10 +146,46 @@ def look_camera(target, yaw, elevation, span, aspect):
             "verticalFovDegrees": fov}
 
 
+def load_generation_observations(video_id):
+    data = common.load_observations(video_id, prefer_track=video_id != "6dW6VYXp9HM")
+    framing = load(SYNTHESIS_OBSERVATIONS) if video_id == "8KmVDxkia_w" else None
+    return data, framing
+
+
+def validate_generation_inputs(video_id, data, framing):
+    if data["source"]["videoId"] != video_id:
+        raise ValueError("Current generation source video identity differs")
+    common.validate_current_generation_inputs(
+        data, Path(__file__),
+        additional_observations=(framing,) if video_id == "8KmVDxkia_w" else ())
+
+
+def load_current_generation_inputs(video_id):
+    data, framing = load_generation_observations(video_id)
+    validate_generation_inputs(video_id, data, framing)
+    return data, framing
+
+
 class Generator:
     def __init__(self, video_id):
+        data, framing = load_current_generation_inputs(video_id)
+        self._initialize(video_id, data, framing)
+
+    def _initialize(self, video_id, data, framing):
+        self.video_id = video_id
+        self.framing_observations = framing
         self.analysis = video_id == "6dW6VYXp9HM"
-        self.data = common.load_observations(video_id, prefer_track=not self.analysis)
+        self.data = data
+        self.calibration, self.calibration_hash = load_pinned(
+            CALIBRATION, CALIBRATION_SHA256, "Retained Analysis/Synthesis calibration")
+        self.native = self.calibration_input("native")
+        self.candidate = self.calibration_input("candidate")
+        self.request = self.calibration_input("request")
+        if (self.native["modelSha256"] != self.data["model"]["sha256"]
+                or self.candidate["geometryAuthority"]["originalGlbSha256"] != self.data["model"]["sha256"]):
+            raise ValueError("Current source model differs from retained native calibration; "
+                             "recapture and rebind native bounds, landmarks and camera evidence")
+        self.base = self.native["mechanical"][0]["chosenInput"]
         self.shots = {s["id"]: s for s in self.data["shots"]}
         self.analysis_held_camera = self.analysis_held_camera_packet() if self.analysis else None
         if self.analysis:
@@ -154,14 +198,8 @@ class Generator:
                 self.shots[name]["startSeconds"] + f*(self.shots[name]["endSeconds"]-self.shots[name]["startSeconds"])
                 for name in ("analysis-03","analysis-05","analysis-07","analysis-13","analysis-15","analysis-17","analysis-19","analysis-28")
                 for f in (0.25,0.5,0.75)]
-        self.calibration, self.calibration_hash = load_pinned(
-            CALIBRATION, CALIBRATION_SHA256, "Retained Analysis/Synthesis calibration")
-        self.native = self.calibration_input("native")
-        self.base = self.native["mechanical"][0]["chosenInput"]
         self.synthesis_automatic_motion = (
             self.synthesis_automatic_motion_packet() if video_id == "8KmVDxkia_w" else None)
-        self.candidate = self.calibration_input("candidate")
-        self.request = self.calibration_input("request")
         requested = {row["frameIndex"]: row["chosenInput"] for row in self.request["requests"] if row["kind"] == "all204-chosen-native-forward-input"}
         if any(requested[row["frameIndex"]] != row["chosenInput"] for row in self.candidate["frames"]):
             raise ValueError("Frozen Analysis candidate and serialized complete input request differ.")
@@ -178,6 +216,9 @@ class Generator:
             for name in ("centres","ledger","bankReport"):
                 self.calibration_input(name)
             self.bank_controls = controls_module.build_packet()
+            if (self.bank_controls["model"] != self.data["model"]
+                    or self.bank_controls["source"] != self.data["source"]):
+                raise ValueError("Analysis bank controls source/model identity differs")
             self.data["anchors"].extend(copy.deepcopy(self.bank_controls["anchors"]))
             controls = {row["sourceImage"]["frameIndex"]: row for row in self.bank_controls["frames"]}
             for frame in self.data["frames"]:
@@ -931,10 +972,19 @@ class Generator:
                 raise ValueError(f"GPU framing FIT evidence changed: {path}/{anchor}")
         return row, digest
 
+    def validate_retained_framing_native_source(self):
+        if (any(self.data["model"].get(field) != value
+                or self.framing_observations["model"].get(field) != value
+                for field, value in FRAMING_GPU_MODEL_SOURCE.items())
+                or self.native["modelSha256"] != FRAMING_GPU_MODEL_SOURCE["sha256"]):
+            raise ValueError("Retained framing GPU evidence targets a different native source; "
+                             "recapture and rebind framing readbacks before current generation")
+
     def synthesis_coarse_framing_packet(self):
         """Bound own-shot approximate cameras to retained exact native evidence."""
-        observations_path = "web/content/canonical-native/8KmVDxkia_w.observations.json.gz"
-        observations = load(observations_path)
+        self.validate_retained_framing_native_source()
+        observations_path = SYNTHESIS_OBSERVATIONS
+        observations = self.framing_observations
         report_path = FRAMING_GPU
         width, height = 1920, 1080
         target, span = self.envelope("cone", width/height)
@@ -1188,8 +1238,9 @@ class Generator:
 
     def synthesis_wheel_framing_packet(self):
         """Choose wheel-macro translation from its single original FIT only."""
-        path = "web/content/canonical-native/8KmVDxkia_w.observations.json.gz"
-        observations = load(path)
+        self.validate_retained_framing_native_source()
+        path = SYNTHESIS_OBSERVATIONS
+        observations = self.framing_observations
         original = next(frame for frame in observations["frames"]
                         if frame["shotId"] == "wheel-macro" and frame["timeSeconds"] == 252.00175)
         image = original["sourceImage"]
@@ -1613,6 +1664,10 @@ class Generator:
         return output
 
     def build(self):
+        validate_generation_inputs(self.video_id, self.data, self.framing_observations)
+        return self._build()
+
+    def _build(self):
         if self.analysis_held_camera:
             self.analysis_held_camera["application"]["appliedViewCount"] = 0
             self.analysis_held_camera["application"]["appliedExposures"] = []
@@ -1815,7 +1870,23 @@ class Generator:
             raise ValueError("Chosen camera permission has no eligible generated main/whole framing views.")
 
 
-if __name__ == "__main__":
+class HistoricalReceiptRevalidator(Generator):
+    """Replay original sealed receipts without authorizing current generation."""
+
+    def __init__(self, video_id):
+        data, framing = load_generation_observations(video_id)
+        self._initialize(video_id, data, framing)
+
+    def build(self):
+        raise ValueError("Historical receipt revalidation cannot build an ordinary source track")
+
+    def revalidate_receipt(self):
+        receipt = self._build()
+        receipt["kind"] = "historical-source-track-receipt"
+        return receipt
+
+
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--video", choices=("6dW6VYXp9HM", "8KmVDxkia_w"),
                         help="Regenerate only this video; default validates the complete pair before publishing.")
@@ -1823,10 +1894,13 @@ if __name__ == "__main__":
     # The default still prepares the complete pair before publishing either.
     videos = (args.video,) if args.video else ("6dW6VYXp9HM", "8KmVDxkia_w")
     for video_id in videos:
-        observations = common.load_observations(video_id, prefer_track=video_id != "6dW6VYXp9HM")
-        common.validate_current_generation_inputs(observations, Path(__file__))
+        load_current_generation_inputs(video_id)
     tracks = [Generator(video_id).build() for video_id in videos]
     outputs = [(track, *common.prepare_track(track)) for track in tracks]
     for track, path, contents in outputs:
         path.write_text(contents)
         print(f"{path.relative_to(ROOT)}: {len(track['shots'])} shots, {len(track['frames'])} compact frames, {sum(len(f['views']) for f in track['frames'])} views; coverage={track['coverage']['status']}; stages unmeasured")
+
+
+if __name__ == "__main__":
+    main()

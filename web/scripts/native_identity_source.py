@@ -18,12 +18,32 @@ from pathlib import Path, PurePosixPath
 
 
 MAP_SHA256 = "1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd"
-RELEASE_MODELS = {
-    "1268c23d4a8fc741147c5e09d8d1e45247a71945":
-        "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
-    "81539e53f5146c06a77541415bd79da673806d96":
-        "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
-}
+
+
+def _released_models() -> dict[str, str]:
+    records = json.loads(Path(__file__).with_name("released-models.json").read_text(encoding="utf-8"))
+    if not isinstance(records, list) or not records:
+        raise ValueError("Invalid released-models.json; expected unique exact commit/raw SHA256 pairs")
+    commits: dict[str, str] = {}
+    digests: set[str] = set()
+    for record in records:
+        if (
+            not isinstance(record, dict)
+            or set(record) != {"sourceCommit", "modelSha256"}
+            or not isinstance(record["sourceCommit"], str)
+            or not re.fullmatch(r"[0-9a-f]{40}", record["sourceCommit"])
+            or not isinstance(record["modelSha256"], str)
+            or not re.fullmatch(r"[0-9a-f]{64}", record["modelSha256"])
+            or record["sourceCommit"] in commits
+            or record["modelSha256"] in digests
+        ):
+            raise ValueError("Invalid released-models.json; expected unique exact commit/raw SHA256 pairs")
+        commits[record["sourceCommit"]] = record["modelSha256"]
+        digests.add(record["modelSha256"])
+    return commits
+
+
+RELEASE_MODELS = _released_models()
 
 
 def glb_nodes(path: Path) -> tuple[dict[str, list[float]], str]:

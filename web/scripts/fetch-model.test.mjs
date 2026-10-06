@@ -91,7 +91,7 @@ async function releaseFixture(t, editSource = null) {
   // geometry-provenance commit whose module identities predate this cutover.
   for (const directory of ['scripts', 'config']) await cp(join(repository, 'cad', directory), join(f.directory, 'cad', directory), { recursive: true, filter: path => !path.split(/[\\/]/).includes('__pycache__') })
   await mkdir(join(f.webRoot, 'scripts'))
-  for (const name of ['export-mechanics.py', 'native_identity_source.py', 'native-identity-map.mjs', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
+  for (const name of ['export-mechanics.py', 'native_identity_source.py', 'released-models.json', 'native-identity-map.mjs', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
   await copyFile(join(web, 'model-representation.mjs'), join(f.webRoot, 'model-representation.mjs'))
   for (const name of ['kinematics.ts', 'magnifier.ts', 'scene.ts']) await copyFile(join(web, 'src', name), join(f.webRoot, 'src', name))
   if (editSource) {
@@ -160,12 +160,38 @@ test('current commit remains digest-pinned even when both identity options are e
   assert.equal(authorizeSourceImport({ sourceCommit: commit, modelSha256: wrong }, approvedV39.sourceSha256, approvedV39).sourceCommit, approvedV39.sourceCommit)
 })
 
+test('current native pin remains fixed for a release not yet in the known-pair authority', () => {
+  const native = { sourceCommit: commit, modelSha256: '1'.repeat(64) }
+  assert.throws(() => authorizeSourceImport(native, '2'.repeat(64), {
+    sourceCommit: commit, sourceSha256: '2'.repeat(64),
+  }), /current native commit .* is pinned/)
+  assert.deepEqual(authorizeSourceImport(native, native.modelSha256), {
+    sourceCommit: commit, modelSha256: native.modelSha256, regenerateMetadata: false,
+  })
+})
+
+test('released raw bytes require their exact source commit before new-release approval', () => {
+  const native = { sourceCommit: commit, modelSha256: '1'.repeat(64) }
+  for (const release of [
+    { sourceCommit: '1268c23d4a8fc741147c5e09d8d1e45247a71945', sourceSha256: '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d' },
+    { sourceCommit: '81539e53f5146c06a77541415bd79da673806d96', sourceSha256: '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c' },
+  ]) {
+    assert.throws(() => authorizeSourceImport(native, release.sourceSha256, { ...release, sourceCommit: 'b'.repeat(40) }), /requires its exact source commit/)
+    assert.throws(() => authorizeSourceImport(native, 'f'.repeat(64), { ...release, sourceSha256: 'f'.repeat(64) }), /remains pinned/)
+    assert.deepEqual(authorizeSourceImport(native, release.sourceSha256, release), {
+      sourceCommit: release.sourceCommit, modelSha256: release.sourceSha256, regenerateMetadata: true,
+    })
+  }
+})
+
 test('new release authority requires explicit commit and approved digest, not the computed hash alone', () => {
   const native = { sourceCommit: commit, modelSha256: '1'.repeat(64) }, rawSha256 = '2'.repeat(64)
   assert.throws(() => authorizeSourceImport(native, rawSha256), /--source-commit/)
   assert.throws(() => authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40) }), /both --source-commit/)
   assert.throws(() => authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40), sourceSha256: '3'.repeat(64) }), /approved release digest/)
-  assert.equal(authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40), sourceSha256: rawSha256 }).regenerateMetadata, true)
+  assert.deepEqual(authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40), sourceSha256: rawSha256 }), {
+    sourceCommit: 'b'.repeat(40), modelSha256: rawSha256, regenerateMetadata: true,
+  })
   for (const args of [['--source-commit', 'b'.repeat(39)], ['--source-sha256', '2'.repeat(63)], ['--source-commit', 'B'.repeat(40)], ['--unknown']]) assert.throws(() => parseImportOptions(args))
 })
 
@@ -177,6 +203,7 @@ test('unavailable exact CAD archive preserves all previous live artifacts and na
   await mkdir(join(f.webRoot, 'scripts'))
   await copyFile(new URL('./export-mechanics.py', import.meta.url), join(f.webRoot, 'scripts/export-mechanics.py'))
   await copyFile(new URL('./native_identity_source.py', import.meta.url), join(f.webRoot, 'scripts/native_identity_source.py'))
+  await copyFile(new URL('./released-models.json', import.meta.url), join(f.webRoot, 'scripts/released-models.json'))
   await copyFile(new URL('./native-identity-map.mjs', import.meta.url), join(f.webRoot, 'scripts/native-identity-map.mjs'))
   await copyFile(new URL('../model-representation.mjs', import.meta.url), join(f.webRoot, 'model-representation.mjs'))
   await mkdir(join(f.directory, 'cad/config'), { recursive: true })

@@ -19,10 +19,15 @@ import { projectNativeIdentity, validateNativeIdentityProjection } from './nativ
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SHA256 = /^[0-9a-f]{64}$/
 const COMMIT = /^[0-9a-f]{40}$/
-const PINNED_RELEASES = [
-  { sourceCommit: '1268c23d4a8fc741147c5e09d8d1e45247a71945', modelSha256: '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d' },
-  { sourceCommit: '81539e53f5146c06a77541415bd79da673806d96', modelSha256: '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c' },
-]
+const RELEASE_PAIRS = JSON.parse(await readFile(new URL('./released-models.json', import.meta.url), 'utf8'))
+if (!Array.isArray(RELEASE_PAIRS) || RELEASE_PAIRS.length === 0 ||
+    RELEASE_PAIRS.some(release => !release || Object.keys(release).sort().join(',') !== 'modelSha256,sourceCommit' ||
+      typeof release.sourceCommit !== 'string' || !COMMIT.test(release.sourceCommit) ||
+      typeof release.modelSha256 !== 'string' || !SHA256.test(release.modelSha256)) ||
+    new Set(RELEASE_PAIRS.map(release => release.sourceCommit)).size !== RELEASE_PAIRS.length ||
+    new Set(RELEASE_PAIRS.map(release => release.modelSha256)).size !== RELEASE_PAIRS.length) {
+  throw new Error('Invalid released-models.json; expected unique exact commit/raw SHA256 pairs')
+}
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const HELP = `Usage: npm run fetch-model -- [raw.glb] [--source-commit <40hex> --source-sha256 <approved64hex>]
 No path: select ha-harmonic-analyzer.glb from cad/out/gltf.
@@ -69,9 +74,13 @@ export function authorizeSourceImport(native, actualSha256, { sourceCommit = nul
   if (sourceCommit !== null && !COMMIT.test(sourceCommit)) throw new Error('Invalid --source-commit; expected 40 lowercase hexadecimal characters')
   if (sourceSha256 !== null && !SHA256.test(sourceSha256)) throw new Error('Invalid --source-sha256; expected 64 lowercase hexadecimal characters')
   const commit = sourceCommit ?? native.sourceCommit
-  const pinned = PINNED_RELEASES.find(release => release.sourceCommit === commit)
+  const pinned = RELEASE_PAIRS.find(release => release.sourceCommit === commit)
   if (pinned && (actualSha256 !== pinned.modelSha256 || sourceSha256 !== null && sourceSha256 !== pinned.modelSha256)) {
     throw new Error(`Released native commit ${commit} remains pinned to raw SHA256 ${pinned.modelSha256}; --source-commit cannot authorize different bytes for that release`)
+  }
+  const releasedRaw = RELEASE_PAIRS.find(release => release.modelSha256 === actualSha256)
+  if (releasedRaw && releasedRaw.sourceCommit !== commit) {
+    throw new Error(`Raw model SHA256 ${actualSha256} requires its exact source commit ${releasedRaw.sourceCommit}; --source-commit cannot relabel released bytes`)
   }
   if (commit === native.sourceCommit) {
     if (actualSha256 !== native.modelSha256 || sourceSha256 !== null && sourceSha256 !== native.modelSha256) {

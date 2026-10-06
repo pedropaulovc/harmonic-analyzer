@@ -481,6 +481,11 @@ class HistoricalTrackLineageTests(unittest.TestCase):
                 store(path, live)
                 store('web/content/canonical-native/historical-code/' + evidence.digest(live)
                       + '/' + Path(path).name, live)
+            for path in ('web/scripts/approved-model.mjs', 'web/model-representation.mjs',
+                         'web/content/model-representation.json'):
+                live = (Path(__file__).resolve().parents[2] / path).read_bytes()
+                manifest['canonicalConsumerInputs'].append({'path': path, 'sha256': evidence.consumer_digest(live)})
+                store(path, live)
             track_name = f'web/content/{video_id}.source-track.json'
             track = {'model': old_model, 'anchors': [{**anchor, 'motion': motion}],
                      'evidence': {'generatorInputs': records}}
@@ -488,7 +493,6 @@ class HistoricalTrackLineageTests(unittest.TestCase):
             store(track_name, json.dumps(track).encode('utf8'))
             store(evidence.MAP, json.dumps(MAPPING).encode('utf8'))
             store(evidence.MANIFEST, json.dumps(manifest).encode('utf8'))
-            store('web/content/model-representation.json', json.dumps({'source': live_model}).encode('utf8'))
             seeds = {
                 'historicalReportInputs': [],
                 'states': [{'nativeFrame': 0, 'timeSeconds': 0,

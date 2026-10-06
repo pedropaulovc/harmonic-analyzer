@@ -96,13 +96,14 @@ SHA remain tied to the raw export. Runtime `observedSha256` identifies the actua
 optimized bytes; explicit `sourceSha256` identifies the native association.
 Raw, canonical and optimized hashes must not be substituted for one another.
 
-The browser and offline verifiers use the reviewed, tracked representation record
-as their live approval authority. Offline `approved-model.mjs` strictly validates
-that record; expected source identity is not inferred from mechanics-data's own
-claim. Generated native provenance must independently match its raw, map and
-canonical fields. All six retained historical source packets identify the earlier
-raw export and are rejected against the approved v39 scene until fresh source
-qualification.
+The browser, offline verifiers and ordinary Python source producers use the
+reviewed, tracked representation record as their live approval authority.
+`approved-model.mjs` applies the same strict v2 validation for the Node verifiers
+and the Python producer gate; expected identity is never inferred from
+mechanics-data's own claim. Generated native provenance must independently match
+its raw, map and canonical fields. All six retained historical source packets
+identify the earlier raw export and are rejected against the approved v39 scene
+until fresh source qualification.
 
 For a release already pinned with matching canonical metadata, the command
 `npm --prefix web run fetch-model -- /path/to/raw.glb` validates the existing raw
@@ -120,6 +121,11 @@ npm --prefix web run fetch-model -- /path/to/new.glb --source-commit <full40hexa
 The commit is a full 40-hex CAD revision and the hash is the approved 64-hex raw
 release digest, not the optimized digest. Neither flag alone authorizes adoption,
 and naming the current source commit cannot approve arbitrary replacement bytes.
+`scripts/released-models.json` is the sole known release commit/raw-digest table
+for the JavaScript importer and Python exporter. Both directions are pinned:
+a known commit requires its exact raw bytes, and known raw bytes require their
+exact commit. The importer rejects a conflicting pair before identity projection
+or optimization.
 The command archives the exact matching CAD revision for the parameterized
 `export-mechanics.py`. Original module filenames are resolved through the CAD
 identity map without rewriting the archived source or installing module aliases.

@@ -127,12 +127,19 @@ The manifest explicitly declares `canonicalConsumerHashNormalization` as
 the normalized text, not checkout byte identity. Original evidence, historical
 snapshots, mapping bytes and derivative dependency pins are never normalized.
 
-Ordinary producers for all six videos compare observations with the trusted
-tracked representation's approved raw tuple before building or publishing.
-They check normalized live producer, classifier, scene and native-math bytes
-against current-consumer seals. Changed or missing live inputs refuse even when
-a matching historical snapshot exists. Historical lineage is never a fallback
-for current generation.
+Ordinary producers for all six videos validate the trusted tracked representation
+through the same strict v2 `approved-model.mjs` loader used by offline verifiers.
+They compare observations with its approved raw tuple before derivation or
+publication, and check normalized live approval, producer, classifier, scene and
+native-math inputs against current-consumer seals. Analysis also seals its
+executed bank-controls producer. Synthesis checks both primary and secondary
+observations; native calibration and framing readbacks retain their own model
+association. Changed or missing live inputs refuse even when a matching
+historical snapshot exists.
+Analysis/Synthesis historical replay uses
+`HistoricalReceiptRevalidator.revalidate_receipt()`. Its receipt cannot be built
+or published as a current source track. Historical lineage never supplies
+current eligibility.
 
 Compression reduces current storage, not Git ancestry. Oversized historical
 blobs remain unless history is explicitly rewritten.

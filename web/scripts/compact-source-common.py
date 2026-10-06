@@ -16,6 +16,7 @@ import gzip
 import json
 import math
 import re
+import subprocess
 from functools import lru_cache
 import hashlib
 from pathlib import Path
@@ -62,23 +63,42 @@ def load_observations(video_id, prefer_track=False):
     return read_observations(content / f"{video_id}.observations.json.gz")
 
 
-def validate_current_generation_inputs(observations, producer_path):
+def load_approved_model_source():
+    """Use the same strict v2 authority loader as the importer and browser."""
+    loader = (WEB / "scripts/approved-model.mjs").resolve().as_uri()
+    try:
+        result = subprocess.run(
+            ["node", "--input-type=module", "--eval",
+             "const { LIVE_MODEL_SOURCE } = await import(process.argv[1]); "
+             "console.log(JSON.stringify(LIVE_MODEL_SOURCE));", loader],
+            capture_output=True, text=True, encoding="utf-8", check=False)
+    except OSError as error:
+        raise ValueError("Approved model authority unavailable; install Node and restore "
+                         "web/scripts/approved-model.mjs and web/content/model-representation.json") from error
+    if result.returncode:
+        raise ValueError("Approved model authority missing or malformed; restore the reviewed strict v2 "
+                         "web/content/model-representation.json and its validator: " + result.stderr.strip())
+    return json.loads(result.stdout)
+
+
+def validate_current_generation_inputs(observations, producer_path, *, additional_observations=()):
     """Require independently approved live source/code, never archive fallback.
 
     This gate is for ordinary generation. Historical receipt validation remains
     a separate operation and cannot make old hardware eligible for current code.
     """
-    approved = json.loads((WEB / "content/model-representation.json").read_bytes())
-    source = approved["source"]
-    if any(observations.get("model", {}).get(field) != source[field] for field in ("sha256", "sourceCommit")):
-        raise ValueError("Current source model differs from independently approved live model")
     producer = Path(producer_path)
     relative = (producer.resolve().relative_to(WEB.parent.resolve()).as_posix()
                 if producer.is_absolute() else producer.as_posix())
     paths = {
         relative, "web/scripts/compact-source-common.py", "web/src/bindings.ts", "web/src/scene.ts",
         "web/src/mechanics.ts", "web/src/mechanics-data.ts", "web/src/magnifier.ts", "web/src/kinematics.ts",
+        "web/scripts/approved-model.mjs", "web/model-representation.mjs",
+        "web/content/model-representation.json",
     }
+    if (relative == "web/scripts/generate-analysis-synthesis-source-tracks.py"
+            and observations.get("source", {}).get("videoId") == "6dW6VYXp9HM"):
+        paths.add("web/scripts/generate-analysis-bank-source-controls.py")
     manifest = json.loads((WEB / "content/canonical-native/manifest.json").read_bytes())
     if manifest.get("canonicalConsumerHashNormalization") != "CRLF-to-LF":
         raise ValueError("Current live consumer hash normalization differs")
@@ -96,6 +116,12 @@ def validate_current_generation_inputs(observations, producer_path):
         actual = hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
         if actual != sha:
             raise ValueError(f"Current live producer input differs: {path}")
+    source = load_approved_model_source()
+    for data in (observations, *additional_observations):
+        model = data.get("model") if isinstance(data, dict) else None
+        if (not isinstance(model, dict)
+                or any(model.get(field) != source[field] for field in ("sha256", "sourceCommit"))):
+            raise ValueError("Current source model differs from independently approved live model")
 
 
 def historical_code_bytes(path, expected_sha256):
@@ -619,6 +645,8 @@ def build_track(data, frame_views_callback, evidence_notes=None):
 
 def prepare_track(track):
     """Serialize without publishing, so paired outputs can be prepared together."""
+    if track.get("kind") == "historical-source-track-receipt":
+        raise ValueError("Historical receipt revalidation cannot publish a source track")
     path = WEB / "content" / f'{track["source"]["videoId"]}.source-track.json'
     return path, json.dumps(track, separators=(",", ":"), allow_nan=False) + "\n"
 
