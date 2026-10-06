@@ -308,7 +308,6 @@ HOLE_CALLOUT_XY = (PIN_X + 0.072, 0.247)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-PINION_PIN_NOTE_XY = (0.270, 0.250)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],
@@ -324,6 +323,13 @@ PINION_PIN_HOLE_WINDOW = (
     _sheet_y(PINION_SEAT_DIA / 2.0),
 )
 NOTE_FIELD_MARGIN = 0.001
+# Start the complete four-line process note at the field's inset upper-left.
+# Canonical Numbers lengthened it: the former fixed origin overflowed right,
+# and moving left alone would put its bottom over the diameter row.
+PINION_PIN_NOTE_XY = (
+    PINION_PIN_NOTE_FIELD[0] + NOTE_FIELD_MARGIN,
+    PINION_PIN_NOTE_FIELD[3] - NOTE_FIELD_MARGIN,
+)
 NOTES_XY = (0.016, 0.062)
 ISO_NOTE_XY = (0.376, 0.108)
 

@@ -72,7 +72,7 @@ def test_notes_stay_within_rule_six() -> None:
 def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
     # W15: the boss recess survives the printed limits, while the shaft
     # datum independently lands on the post's restored north face.
-    pinion = spec.crank_pinion_spec
+    pinion = spec.dt_crank_pinion_spec
     assert spec.SHAFT_LENGTH == round(spec.SHAFT_LENGTH, pinion.SHAFT_LENGTH_PLACES)
     assert spec.DRAWING_PRECISION["Shaft"]["Depth"] == pinion.SHAFT_LENGTH_PLACES
     assert pinion.SHAFT_END_RECESS_MIN <= spec.SHAFT_END_RECESS <= pinion.SHAFT_END_RECESS_MAX
@@ -116,7 +116,7 @@ def test_seat_collar_lands_the_wheel_seat_and_leaves_the_washer_its_fit() -> Non
     assert spec.COLLAR_REAR + spec.COLLAR_STATION_TOL < spec.JOURNAL_START
     # Bottomed dowels stand proud by the drive-train's pin length budget.
     assert (
-        bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.crank_seat_drive_pin_spec.LENGTH
+        bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.vn_crank_seat_drive_pin_spec.LENGTH
         == (pytest.approx(removable.DRIVE_PIN_TIP_Z))
     )
 
@@ -457,7 +457,7 @@ def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
     # range the W15 pin-wall and recess stacks carry) must hold.
     import _config
 
-    pinion = spec.crank_pinion_spec
+    pinion = spec.dt_crank_pinion_spec
     assert spec.STEP_CORNER_RADIUS_MAX == _config.title_block("edge_break")["radius_mm"]
     standoff = spec.SEAT_STEP + spec.STATION_ROW + spec.STEP_CORNER_RADIUS_MAX - part.SEAT_PINION
     assert standoff == pytest.approx(spec.SEAT_STEP_STANDOFF_WORST)
