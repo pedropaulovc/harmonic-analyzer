@@ -1138,6 +1138,60 @@ IDENTITY_7E2E66E8_OBSTACLES = {
 }
 
 
+# R9 sheet 2, Century Gothic at the unchanged 3.5 mm note height. These are
+# the embedded native PDF's glyph advances (1000/em); its 51.5229 mm
+# "RETAIN MATCH MARKS." row fixes the em at 4.666084 mm. The diameter token
+# is a separate native display-data glyph, 5.2784 mm wide. Unlike the older
+# average-character estimate, this catches wide full-Number/process rows.
+R9_NOTE_EM_M = 0.004666084042745879
+R9_NOTE_GLYPH_UNITS = {
+    " ": 277, "-": 332, ".": 277, ",": 277, ":": 277, ";": 277, "/": 437,
+    **dict.fromkeys("0123456789", 554),
+    "A": 740, "B": 574, "C": 813, "D": 744, "E": 536, "F": 485,
+    "G": 872, "H": 683, "I": 226, "K": 591, "L": 462, "M": 919,
+    "N": 740, "O": 869, "P": 592, "R": 607, "S": 498, "T": 426,
+    "U": 655, "V": 702, "W": 960, "X": 609, "Y": 592, "Z": 480,
+}
+R9_DIAMETER_GLYPH_WIDTH_M = 0.0052784
+R9_F4_ANCHOR = (0.343, 0.214)
+R9_F4_TEXT_BOX = (0.343, 0.2094743, 0.3478465, 0.2129743)
+R9_F4_LEADER_TIP = (0.3326736, 0.2062196)
+
+
+def _native_socket_fit_text_box() -> tuple[float, float, float, float]:
+    import draw_fr_harmonic_base as sheet
+
+    rows = sheet.SOCKET_FIT_NOTE.replace("<MOD-DIAM>", "Ø").split("\n")
+    widths = [
+        sum(
+            R9_DIAMETER_GLYPH_WIDTH_M
+            if char == "Ø"
+            else R9_NOTE_GLYPH_UNITS[char] * R9_NOTE_EM_M / 1000.0
+            for char in row
+        )
+        for row in rows
+    ]
+    x, y = sheet.SOCKET_FIT_NOTE_XY
+    return x, y - len(rows) * sheet.NOTE_ROW_M, x + max(widths), y
+
+
+def _current_f4_obstacle_box() -> tuple[float, float, float, float]:
+    import draw_fr_harmonic_base as sheet
+
+    dx = sheet.HOLE_TAG_POSITIONS["F4"][0] - R9_F4_ANCHOR[0]
+    dy = sheet.HOLE_TAG_POSITIONS["F4"][1] - R9_F4_ANCHOR[1]
+    x0, y0, x1, y1 = R9_F4_TEXT_BOX
+    tip_x, tip_y = R9_F4_LEADER_TIP
+    # Move the text, not its physical hole tip. A 0.5 mm halo conservatively
+    # encloses the short leader and native annotation padding as well.
+    return (
+        min(x0 + dx, tip_x) - 0.0005,
+        min(y0 + dy, tip_y) - 0.0005,
+        max(x1 + dx, tip_x) + 0.0005,
+        max(y1 + dy, tip_y) + 0.0005,
+    )
+
+
 def test_hole_sheet_callouts_clear_full_number_native_text_and_leaders() -> None:
     """The old 62 mm spacing passed the narrower historical shoulders but
     overlaps native full-Number text by 4.503 mm. Translate its measured text
@@ -1187,14 +1241,10 @@ def test_hole_sheet_callouts_clear_full_number_native_text_and_leaders() -> None
 
     boxes[sheet.RIG_SET_NOTE_LABEL] = IDENTITY_7E2E66E8_RIG_NOTE_BOX
     obstacles = dict(IDENTITY_7E2E66E8_OBSTACLES)
-    # The fit-note regression below uses current reflow text. Include that
-    # envelope as well as the wider historical native box retained above.
-    note_lines = sheet.SOCKET_FIT_NOTE.replace("<MOD-DIAM>", "D").split("\n")
-    x, y = sheet.SOCKET_FIT_NOTE_XY
-    obstacles["note current socket fit"] = (
-        x, y - len(note_lines) * sheet.NOTE_ROW_M,
-        x + max(map(len, note_lines)) * sheet.NOTE_CHAR_M, y,
-    )
+    # Include the entire current process note at measured native glyph width,
+    # and the reallocated F4 tag with its physical leader tip retained.
+    obstacles["note current socket fit"] = _native_socket_fit_text_box()
+    obstacles["note F4"] = _current_f4_obstacle_box()
     label_box = obstacles["label top view"]
     dx = sheet.HOLES_TOP_LABEL_XY[0] - 0.170
     dy = sheet.HOLES_TOP_LABEL_XY[1] - 0.237
@@ -1449,34 +1499,99 @@ HB_RENDER_6_ORIGIN_NOTE_TOP_Y_M = 0.1866
 SOCKET_FIT_MIN_MARGIN_M = 0.003
 
 
-def test_socket_fit_note_sits_on_a2_between_the_table_and_the_plan() -> None:
+def test_four_row_socket_fit_note_clears_native_right_field_and_f4() -> None:
     import draw_fr_harmonic_base as sheet
 
-    # The note hangs off the A2 rim and keeps the acceptance criterion.
-    assert sheet.SOCKET_FIT_STATION == (-197.0, -112.0)
+    rows = sheet.SOCKET_FIT_NOTE.split("\n")
+    assert len(rows) <= sheet.CALLOUT_ROW_LIMIT
+    box = _native_socket_fit_text_box()
+    obstacles = dict(IDENTITY_7E2E66E8_OBSTACLES)
+    obstacles["note F4"] = _current_f4_obstacle_box()
+    assert sheet.find_callout_clashes({"socket fit": box}, obstacles) == []
 
-    rows = [row.replace("<MOD-DIAM>", "D") for row in sheet.SOCKET_FIT_NOTE.split("\n")]
-    x, y = sheet.SOCKET_FIT_NOTE_XY
-    box = (
-        x,
-        y - len(rows) * sheet.NOTE_ROW_M,
-        x + max(len(row) for row in rows) * sheet.NOTE_CHAR_M,
-        y,
-    )
-    plan_left = sheet._plan_xy(
-        -fr_harmonic_base_spec.BOTTOM_LENGTH / 2.0, 0.0, center=sheet.HOLE_TOP_CENTER
+    plan_right = sheet._plan_xy(
+        fr_harmonic_base_spec.BOTTOM_LENGTH / 2.0, 0.0,
+        center=sheet.HOLE_TOP_CENTER,
     )[0]
     margins = {
-        "hole table": box[0] - HB_RENDER_6_TABLE_RIGHT_X_M,
-        "plan west edge": plan_left - box[2],
-        "TOP VIEW caption": HB_RENDER_6_TOP_CAPTION_BOTTOM_Y_M - box[3],
-        "ORIGIN note": box[1] - HB_RENDER_6_ORIGIN_NOTE_TOP_Y_M,
+        "plan east edge": box[0] - plan_right,
+        "right frame": obstacles["frame right"][0] - box[2],
+        "upper section label": obstacles["label section A 2"][1] - box[3],
     }
     assert {name: gap for name, gap in margins.items() if gap < SOCKET_FIT_MIN_MARGIN_M} == {}
-    # The A2 rim sits level with the note's top rows, so the leader runs
-    # nearly flat across the gap instead of down through the ORIGIN note.
-    a2 = sheet._plan_xy(*sheet.SOCKET_FIT_STATION, center=sheet.HOLE_TOP_CENTER)
-    assert box[1] < a2[1] < box[3]
+    # The foreign tag's leader uses the 2 mm line-to-text rule; its actual
+    # text separately needs a full printed-font-height gap. Do not mistake
+    # the tip-inclusive annotation box for a text box.
+    assert sheet.box_gap(box, obstacles["note F4"]) >= SECTION_LINE_CLEARANCE_M
+    f4_dx = sheet.HOLE_TAG_POSITIONS["F4"][0] - R9_F4_ANCHOR[0]
+    f4_dy = sheet.HOLE_TAG_POSITIONS["F4"][1] - R9_F4_ANCHOR[1]
+    f4_text = (
+        R9_F4_TEXT_BOX[0] + f4_dx, R9_F4_TEXT_BOX[1] + f4_dy,
+        R9_F4_TEXT_BOX[2] + f4_dx, R9_F4_TEXT_BOX[3] + f4_dy,
+    )
+    assert sheet.box_gap(box, f4_text) >= R9_TEXT_HEIGHT_M
+    assert margins["upper section label"] >= R9_TEXT_HEIGHT_M
+    # A short left-side leader uses the nearest real socket, not a long
+    # diagonal across the plan from the historical A2 station.
+    station_centres = {
+        station: sheet._plan_xy(*station, center=sheet.HOLE_TOP_CENTER)
+        for station in sheet.COLUMN_SOCKET_XZ
+    }
+    assert sheet.SOCKET_FIT_STATION == min(
+        station_centres,
+        key=lambda station: (
+            (station_centres[station][0] - box[0]) ** 2
+            + (station_centres[station][1] - (box[1] + box[3]) / 2.0) ** 2
+        ),
+    )
+    assert station_centres[sheet.SOCKET_FIT_STATION][0] < box[0]
+    # Native F4's old text overlaps the new four-row field. This negative
+    # control makes deleting the accompanying tag reallocation observable.
+    historical_clashes = sheet.find_callout_clashes(
+        {"socket fit": box}, {"F4 text": R9_F4_TEXT_BOX}
+    )
+    assert any("F4 text" in clash for clash in historical_clashes)
+
+
+# R9 PDF ink, not the old source estimate: SECTION A-A reaches y82.35 mm.
+# The 3.556 mm printed font height is the text-to-text minimum; lines/arrows
+# need 2 mm. Keep the measured calibration separate from current positions.
+R9_RIM_ANCHOR_Y_M = 0.0928
+R9_SPOTFACE_ANCHOR_Y_M = 0.113
+R9_SECTION_LABEL_TOP_Y_M = 0.08235
+R9_RIM_ARROW_BOTTOM_Y_M = 0.08407
+R9_RIM_WITNESS_BOTTOM_Y_M = 0.08343
+R9_RIM_SHELF_Y_M = 0.08445
+R9_RIM_TEXT_BOTTOM_Y_M = 0.0854
+R9_RIM_TEXT_TOP_Y_M = 0.1001
+R9_SPOTFACE_SHELF_Y_M = 0.1029181
+R9_RIM_SPOTFACE_TEXT_GAP_M = 0.00377
+R9_TEXT_HEIGHT_M = 0.003556
+SECTION_LINE_CLEARANCE_M = 0.002
+
+
+def test_rim_shelf_clears_actual_section_label_and_spotface_neighbour() -> None:
+    import draw_fr_harmonic_base as sheet
+
+    rim_dy = sheet.SECTION_KEEP["RimHeight"][1] - R9_RIM_ANCHOR_Y_M
+    spotface_dy = sheet.SECTION_KEEP["SpotFaceDepth"][1] - R9_SPOTFACE_ANCHOR_Y_M
+    line_gaps = {
+        "arrow to section label": R9_RIM_ARROW_BOTTOM_Y_M + rim_dy - R9_SECTION_LABEL_TOP_Y_M,
+        "witness to section label": R9_RIM_WITNESS_BOTTOM_Y_M + rim_dy - R9_SECTION_LABEL_TOP_Y_M,
+        "shelf to section label": R9_RIM_SHELF_Y_M + rim_dy - R9_SECTION_LABEL_TOP_Y_M,
+        "spotface shelf to rim text": (
+            R9_SPOTFACE_SHELF_Y_M + spotface_dy - R9_RIM_TEXT_TOP_Y_M - rim_dy
+        ),
+    }
+    assert {
+        name: gap for name, gap in line_gaps.items()
+        if gap < SECTION_LINE_CLEARANCE_M
+    } == {}
+    text_gaps = {
+        "rim to section label": R9_RIM_TEXT_BOTTOM_Y_M + rim_dy - R9_SECTION_LABEL_TOP_Y_M,
+        "spotface to rim": R9_RIM_SPOTFACE_TEXT_GAP_M + spotface_dy - rim_dy,
+    }
+    assert {name: gap for name, gap in text_gaps.items() if gap < R9_TEXT_HEIGHT_M} == {}
 
 
 # hb-render-5's sheet frame: the drawable region starts 12.7 mm in from the

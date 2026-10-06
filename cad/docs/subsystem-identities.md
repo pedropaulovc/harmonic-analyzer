@@ -78,6 +78,9 @@ Drawing callouts retain complete category-qualified Numbers and process
 information. Longer cross-part notes, such as the crankshaft's mating-part
 callout, must fit their existing reserved field by placement and wrapping;
 do not abbreviate Numbers or relax the field bounds.
+The base's complete tube-fit instruction uses four short rows and an associative
+leader to the nearest socket. Reallocating a note or dimension shelf must
+preserve neighboring text, witness, leader and sheet-frame clearances.
 Per-configuration Gear Data and linked Manufacturing or Installation Notes
 retain their complete mate identifiers when reflowed. Gear Data and
 Manufacturing Notes are model-owned: rebuild the owning model when they change.
