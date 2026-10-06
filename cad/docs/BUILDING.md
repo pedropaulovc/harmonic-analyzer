@@ -30,6 +30,11 @@ git submodule update --init --recursive
 uv sync
 ```
 
+The locked core dependencies include `rtree` and `scipy` for the release
+comparison's accelerated nearest-surface queries. Filename identity changes
+are paired before the Hausdorff comparison; a rename alone is not a geometry
+change.
+
 ## The pipeline is one doit graph
 
 The **entire** pipeline — build → verify → export → release — is one
@@ -98,6 +103,12 @@ publisher prepares all generated README images from the staged, versioned
 Missing inputs or rendering tools fail before the tag; there is no fallback to
 stale images. Only after successful publication does it install those images
 under `cad/docs/images/` and advance `next_revision`.
+
+The bundle's `READOUT.md` is rendered from the error-budget report's canonical
+`closed_form["mg-magnifier"]` section. The project/archive slug remains
+`harmonic-analyzer`; operating-document links stay inside `docs/`, repository
+citations are pinned to the release tag, and third-party reference scans retain
+their source paths without being redistributed.
 
 Submit that post-release refresh in a follow-up PR whose only changes are the
 `cad/config/release.yaml` `next_revision` bump and the regenerated README image

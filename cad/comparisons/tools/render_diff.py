@@ -298,8 +298,8 @@ def _hausdorff(pa, pb, n=40000, budget=4_000_000):
     Query set per direction = vertices (deterministic feature points where the
     max deviation almost always sits) plus surface samples, so a small local
     change is not missed by random sampling alone. Point-to-surface distance is
-    queried in chunks sized to keep points*triangles under ``budget`` -- bounds
-    peak memory (trimesh's closest-point is brute force).
+    queried through trimesh's R-tree/KD-tree accelerated closest-point path.
+    Chunking bounds the worst-case point/triangle candidate memory.
     """
     a = trimesh.load(pa, process=False)
     b = trimesh.load(pb, process=False)

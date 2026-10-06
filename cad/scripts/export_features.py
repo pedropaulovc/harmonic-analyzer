@@ -55,7 +55,7 @@ SOURCE_MAP = {
         (("add_native_hole_callout", 'label="rod-pin hole"'),),
     ),
     "hole_callout": (
-        "harmonic-analyzer/cad/scripts/_drawing_common.py:1860-1874,1901,1949-1966",
+        "harmonic-analyzer/cad/scripts/_drawing_common.py:1861-1876,1902,1950-1967",
         (("dia_tolerance_mm",), ("AddHoleCallout2",), ("compose_hole_callout_prefix",)),
     ),
     "rocker_position": (

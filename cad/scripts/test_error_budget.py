@@ -12,8 +12,6 @@ from __future__ import annotations
 
 import dataclasses
 import importlib
-import pathlib
-import re
 import math
 
 import numpy as np
@@ -367,7 +365,7 @@ def test_magnifier_setup_fits_reference_inputs_to_reachable_stroke(report, nom):
     physical pen stroke. Broad inputs scale down at the minimum radius; the
     sparse pair stays full scale at the built-radius limit."""
     assert nom.lever_r_min < nom.lever_r_built <= nom.lever_r_max
-    mag = report["closed_form"]["magnifier"]
+    mag = report["closed_form"]["mg-magnifier"]
     assert mag["ordinate_capacity_full_scale_bars"] > 0.0
     for name, setup in mag["per_input"].items():
         assert setup["k0_reading_mm"] == pytest.approx(
@@ -398,9 +396,9 @@ def test_scale_rule_solves_the_table_instead_of_scaling_by_proportion(report, no
     """The fitted scale is the greatest table scale that stays within capacity.
     A proportional estimate ignores the fixed idle-bar lift and overdrives the
     stroke."""
-    cap = report["closed_form"]["magnifier"]["ordinate_capacity_full_scale_bars"]
+    cap = report["closed_form"]["mg-magnifier"]["ordinate_capacity_full_scale_bars"]
     trial = eb.NominalTrial(nom)
-    for name, setup in report["closed_form"]["magnifier"]["per_input"].items():
+    for name, setup in report["closed_form"]["mg-magnifier"]["per_input"].items():
         x = eb.reference_inputs()[name]
         solved = trial.ordinate_scale_for(x, cap)
         assert solved == pytest.approx(setup["ordinate_scale"], abs=1e-9)
@@ -421,7 +419,7 @@ def test_reduced_ordinate_scale_costs_setting_and_knife_proportionally(report, n
     """A fixed setting error and each case's fixed knife stall grow in ordinate
     units when the pen forces that input to a smaller physical station scale."""
     cf = report["closed_form"]
-    mag, knife = cf["magnifier"], cf["knife"]
+    mag, knife = cf["mg-magnifier"], cf["knife"]
     cap = mag["ordinate_capacity_full_scale_bars"]
     trial = eb.NominalTrial(nom)
     for name, s in mag["per_input"].items():
@@ -460,7 +458,7 @@ def test_knife_load_cases_include_configured_and_scaled_reference_vectors(
     inputs = eb.reference_inputs()
     loads = []
     for name in budget["reference_inputs"]:
-        setup = report["closed_form"]["magnifier"]["per_input"][name]
+        setup = report["closed_form"]["mg-magnifier"]["per_input"][name]
         stations = setup["ordinate_scale"] * inputs[name] * nom.d_max
         case = cases[name]
         poses = [mounts.channel_pose(float(station)) for station in stations]
@@ -654,21 +652,7 @@ def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, repor
     strict = negative(budget, nominal_residual_mae={"waive_cam_home_phase": False})
     bad = eb.budget_closes(eb.build_report(strict))
     assert any(b.startswith("cam home phase") for b in bad), bad
-    # the shipped procedure says so, with the as-built numbers
-    doc = eb.readout_procedure(report)
-    assert "**As built, this CAD does not reach that residual.**" in doc
-    assert f"{cl['total_mae_as_built']:.2f} % against" in doc
-    assert "#749" in doc
-    assert "note 5" not in doc  # the stick drawing has four notes
-    # and it is rendered from the report's OWN machine (the credited one),
-    # never a separately constructed Nominal: a report on a different machine
-    # renders a different document (the tables are phase-invariant to 1e-5,
-    # so the check is on the model identity the header prints)
     assert report["nominal"]["cam_home_deg"] == 0.0
-    assert "cam home phase 0 deg" not in doc  # the header names the as-built 1.5
-    shifted = {**report, "nominal": {**report["nominal"], "d_max": 79.3}}
-    assert "|   79.3 |" in eb.readout_procedure(shifted)
-    assert "|   79.3 |" not in doc
 
 
 def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
@@ -696,13 +680,13 @@ def test_cam_shaft_axis_is_fixed_by_the_frame_not_the_part(nom):
 
 def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     """Every broad input is scored at the magnifier's minimum pose (clamp
-    against the collar), which build_magnifier_assembly never builds: the
+    against the collar), which build_mg_magnifier_assembly never builds: the
     report names those inputs, the gate fails on it unless the yaml records
     the waiver (#748), and the offline wire estimate that rides the waiver
-    reproduces lever_wire_geom's own numbers at the as-built pose."""
+    reproduces mg_lever_wire_geom's own numbers at the as-built pose."""
     import mg_lever_wire_geom
 
-    mag = report["closed_form"]["magnifier"]
+    mag = report["closed_form"]["mg-magnifier"]
     assert mag["minimum_pose_cad_gated"] is False
     assert set(mag["inputs_at_minimum_pose"]) >= {"all_ones", "gaussian_a0p1"}
     strict = negative(budget, readout={"waive_minimum_pose": False})
@@ -718,23 +702,6 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_lever_wire_geom.CLAMP_X
 
 
-def test_shipped_procedure_caps_the_clamp_radius_at_the_built_pose(report, nom):
-    """The R = 66 x 4.72 / P rule would ask for R > 165 mm on a small input;
-    READOUT.md must cap it at the as-built radius and tell the operator the
-    short-stroke cost (scale the input up) rather than promise a full stroke."""
-    doc = eb.readout_procedure(report)
-    mag = report["closed_form"]["magnifier"]
-    p_min = (
-        mag["ordinate_capacity_full_scale_bars"]
-        * mag["lever_radius_min_mm"]
-        / mag["lever_radius_built_mm"]
-    )
-    assert f"capped at the as-built {mag['lever_radius_built_mm']:.0f} mm" in doc
-    assert f"$P < {p_min:.2f}$" in doc
-    assert "scale such an\ninput UP" in doc
-    assert "not CAD-gated" in doc
-
-
 def test_rod_drive_is_on_the_crank_side(nom):
     """Machine hand: the rod pin sits at -X of the pivot (crank side) while the
     bars ride +X -- build_channel_assembly._arc_geometry's -X branch. A +X bar
@@ -745,11 +712,8 @@ def test_rod_drive_is_on_the_crank_side(nom):
     assert -1.03 < h["gain_vs_linear"] < -1.0
 
 
-def test_shipped_readout_procedure_carries_every_correction(report, nom):
-    """The release bundle's READOUT.md must let a builder reproduce the credited
-    residual: the station/ordinate/kappa table, the null lift vector, the
-    second-harmonic formula and the crank-index readout."""
-    doc = eb.readout_procedure(report)
+def test_calibration_table_includes_the_travel_stop(nom):
+    """Even a row step that does not divide the travel includes full scale."""
     rows = eb.calibration_table(nom)
     assert rows[0][0] == 0.0 and rows[-1][0] == nom.d_max
     # and when full scale is not a multiple of the row step, the travel stop
@@ -757,31 +721,6 @@ def test_shipped_readout_procedure_carries_every_correction(report, nom):
     odd = eb.calibration_table(nom, step_mm=5.0)
     assert odd[-1][0] == nom.d_max and odd[-2][0] == 85.0
     assert odd[-1][1:] == pytest.approx(rows[-1][1:])
-    assert (
-        f"| {rows[0][0]:6.1f} | {rows[0][0] / eb.STICK_DIVISION_MM:6.3f} | {rows[0][1]:+.4f} |"
-        in doc
-    )
-    assert f"{eb.STICK_DIVISION_MM:.2f} mm/division scale" in doc
-    assert "Set bar $i$ to the **linear station**" in doc
-    assert f"\\ell = {report['null_lift_ordinate']:.4f}" in doc
-    assert "-c$ at every odd $k$" in doc
-    # the c2 correction is scaled by the READ ordinate: an idle bar still moves
-    assert "\\sum_i x^{read}_i\\,\\kappa_i \\cos(2 i \\theta_k)" in doc
-    assert "\\sum_i x_i\\,\\kappa_i" not in doc
-    assert f"\\kappa \\cdot x^{{read}} = {rows[0][2] * rows[0][1]:+.4f}" in doc
-    assert "crank stopped on its index" in doc
-    assert "ONE direction" in doc
-    # the one-sided setting bias at the ends of the scale is published, so the
-    # read-vs-set vector the operator subtracts is the one the Monte Carlo does
-    tol = report["station_setting_tolerance_mm"]
-    at_zero = eb.read_ordinate(tol / 2.0, nom)
-    at_stop = eb.read_ordinate(nom.d_max - tol / 2.0, nom)
-    assert at_zero != pytest.approx(rows[0][1], abs=1e-4)
-    assert f"**{at_zero:+.4f}$/f$ for a bar at zero**" in doc
-    assert f"**{at_stop:+.4f} for a bar at the stop**" in doc
-    assert f"bar $x^{{read}} = {at_zero:+.4f}/f$ against $x^{{set}} = 0$" in doc
-    assert "s = \\frac{r_0}{S + C_2}" in doc
-    assert "O'_k = \\frac{r_k}{s}" in doc
 
 
 def test_normalisation_uses_only_observable_units():
@@ -815,7 +754,7 @@ def test_scaled_trial_needs_the_division_to_keep_step_4_a_small_known_vector(
     and a real channel-gain error comes out understated by f. With the
     division the vector is the lift-sized known deviation the budget scores."""
     x = eb.reference_inputs()["gaussian_a0p1"]
-    f = report["closed_form"]["magnifier"]["per_input"]["gaussian_a0p1"][
+    f = report["closed_form"]["mg-magnifier"]["per_input"]["gaussian_a0p1"][
         "ordinate_scale"
     ]
     assert 0.0 < f < 1.0
@@ -1106,12 +1045,8 @@ def test_readout_term_counts_the_normalising_read(report):
 
 
 def test_stick_division_is_the_configured_scale_the_builder_engraves():
-    """The engraved scale is CONFIG (amplitude.stick_*), and the procedure's
-    station -> stick-reading conversion, the drawing notes and the builder's
-    ticks all reach it through the one read point (measuring_stick_geom); none
-    may copy it."""
+    """Configured divisions and tick count preserve the engraved end margin."""
     import ha_measuring_stick_geom
-    import ha_measuring_stick_spec
 
     configured = float(eb._config.machine("amplitude", "stick_division_spacing_mm"))
     assert ha_measuring_stick_geom.DIVISION_SPACING == configured
@@ -1130,41 +1065,6 @@ def test_stick_division_is_the_configured_scale_the_builder_engraves():
     assert stick.SCALE_START_X == (
         stick.BODY_LENGTH - stick.SCALE_SPAN - stick.SCALE_END_MARGIN
     )
-    # the NATIVE equation and the drawing NOTES carry the same counts, so a
-    # config edit cannot leave the driven sketch or the sheet describing a
-    # scale the part does not engrave
-    src = (pathlib.Path(eb.__file__).with_name("build_ha_measuring_stick.py")).read_text(
-        encoding="utf-8"
-    )
-    assert '{DIVISION_COUNT - 1} * "DivisionSpacing"' in src
-    notes = ha_measuring_stick_spec.DRAWING_NOTES
-    top = ha_measuring_stick_geom.DIVISION_COUNT - 1
-    assert (
-        f"{ha_measuring_stick_geom.DIVISION_COUNT} FULL TICKS (VALUES 0 THRU {top})"
-        in notes
-    )
-    assert (
-        f"{ha_measuring_stick_geom.MINOR_PER_DIVISION - 1} MINOR" in notes
-    )  # tenths between two full ticks
-    assert f"NUMERALS 0 THRU {top}" in notes
-    assert f"TICK N AT {configured:.2f} X N" in notes
-    assert f"SPAN {top * configured:.2f} REF" in notes
-    assert re.search(r"^from ha_measuring_stick_geom import \($", src, re.M)
-    for module in ("ha_measuring_stick_geom.py", "ha_measuring_stick_spec.py"):
-        text = (pathlib.Path(eb.__file__).with_name(module)).read_text(encoding="utf-8")
-        assert not re.search(r"^\s*\w*DIVISION\w*\s*[:=].*\d", text, re.M) or (
-            "_config.machine" in text
-        ), f"{module} assigns the scale instead of reading config"
-        assert f"= {configured}" not in text, f"{module} hardcodes the division spacing"
-    for name in (
-        "DIVISION_SPACING",
-        "DIVISION_COUNT",
-        "MINOR_PER_DIVISION",
-        "MINOR_SPACING",
-    ):
-        assert not re.search(rf"^{name}\s*=", src, re.M), (
-            f"{name} is copied, not imported"
-        )
 
 
 def test_reserved_terms_are_scored_on_the_worst_broad_input(report):

@@ -1592,7 +1592,7 @@ def closed_form_terms(
         "lost_motion": lost_motion,
         "readout": readout,
         "timebase": timebase,
-        "magnifier": magnifier,
+        "mg-magnifier": magnifier,
     }
 
 
@@ -2038,7 +2038,7 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
             "no catalog-valid counter setting"
         )
     # TODO(#748): CAD-gate the magnifier's minimum pose.
-    mag = r["closed_form"]["magnifier"]
+    mag = r["closed_form"]["mg-magnifier"]
     if (
         mag["inputs_at_minimum_pose"]
         and not mag["minimum_pose_cad_gated"]
@@ -2092,7 +2092,7 @@ def readout_procedure(r: dict[str, Any]) -> str:
     credited one) so neither can drift from what check:budget proved."""
     nom = Nominal(**r["nominal"])
     cf = r["closed_form"]
-    mag = cf["magnifier"]
+    mag = cf["mg-magnifier"]
     rows = calibration_table(nom)
     lift = r["null_lift_ordinate"]
     trial = NominalTrial(nom)
@@ -2357,7 +2357,7 @@ def _main() -> int:
                 f"{r['closure']['nominal_residual_mae']:.3f} with the lobe cut "
                 "half a pitch from the crest -- closure is conditional on #749"
             )
-        mag = r["closed_form"]["magnifier"]
+        mag = r["closed_form"]["mg-magnifier"]
         # TODO(#748): CAD-gate the magnifier's minimum pose, then drop this
         # waiver.
         if mag["inputs_at_minimum_pose"] and r["minimum_pose_waived"]:

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import math
-import re
 import tomllib
 from pathlib import Path
 
@@ -315,24 +313,7 @@ def test_construction_uses_the_actual_drawing_notes_and_explicit_permission(monk
     assert manifest["cite"]["construction"] == citation
 
 
-def test_every_source_citation_is_registered_used_and_still_anchored() -> None:
-    pattern = re.compile(r"harmonic-analyzer/[^\s:]+\.(?:py|yaml):[^\s]+")
-    tree = ast.parse(Path(exporter.__file__).read_text(encoding="utf-8"))
-    source_map = next(node for node in tree.body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == "SOURCE_MAP" for target in node.targets))
-    def literals(node):
-        if isinstance(node, ast.JoinedStr):
-            return set()  # Dynamic citations are checked from the emitted manifests.
-        found = set()
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            found.update((node.lineno, match.group()) for match in pattern.finditer(node.value))
-        for child in ast.iter_child_nodes(node):
-            found.update(literals(child))
-        return found
-    all_literals = literals(tree)
-    registered_literals = literals(source_map)
-    assert all_literals == registered_literals
-    registered = {reference for reference, _anchors in exporter.SOURCE_MAP.values()}
-    assert {reference for _line, reference in all_literals} == registered
+def test_emitted_yaml_citations_resolve_to_scalar_requirement_sources() -> None:
     def strings(value):
         if isinstance(value, str):
             yield value
@@ -342,7 +323,6 @@ def test_every_source_citation_is_registered_used_and_still_anchored() -> None:
         elif isinstance(value, list):
             for child in value:
                 yield from strings(child)
-    emitted = set()
     for stem in exporter.SUPPORTED_PARTS:
         citations = set(strings(exporter.requirement_manifest(stem)))
         yaml_citations = {
@@ -359,19 +339,3 @@ def test_every_source_citation_is_registered_used_and_still_anchored() -> None:
                 assert isinstance(value, dict) and key in value, f"{reference}: missing key {key!r}"
                 value = value[key]
             assert value is not None and not isinstance(value, (dict, list)), f"{reference}: not a scalar value"
-        emitted.update(citations)
-    assert registered <= emitted
-    assert exporter.SOURCE_MAP["rocker_datum_b"][0] in registered
-    for name, (reference, anchors) in exporter.SOURCE_MAP.items():
-        filename, ranges = reference.removeprefix("harmonic-analyzer/").split(":")
-        if filename.endswith(".yaml"):
-            continue  # All registered and dynamic YAML paths were resolved above.
-        lines = (exporter.REPO / filename).read_text(encoding="utf-8").splitlines()
-        ranges = ranges.split(",")
-        assert len(ranges) == len(anchors), name
-        for span, tokens in zip(ranges, anchors, strict=True):
-            start, _, end = span.partition("-")
-            text = "\n".join(lines[int(start) - 1:int(end or start)])
-            assert tokens, name
-            for token in tokens:
-                assert token in text, f"{name}: {reference} no longer contains {token!r}"

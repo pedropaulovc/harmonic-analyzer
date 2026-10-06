@@ -1,7 +1,7 @@
 """Offline tests for requirement-feature face naming and STEP read-back.
 
 Every SolidWorks object here is a synthetic double: these tests prove the
-selection, naming, parsing and export-ordering rules, NOT that a seat's STEP
+selection, naming, parsing and export-isolation rules, NOT that a seat's STEP
 writer carries face names (that needs the farm proof described in issue #1204).
 """
 
@@ -364,7 +364,7 @@ class _ExportDoc(_PartDoc):
         return 1
 
 
-_STEMS = ("frame_rail", "ch_rocker_arm")
+_STEMS = ("fr_frame_rail", "ch_rocker_arm")
 _ROCKER_BUNDLE = ("ch-rocker-arm.STEP", "features.toml")
 
 
@@ -482,22 +482,31 @@ def test_full_and_scoped_exports_keep_their_paths_disjoint_and_native_unsaved(
     tmp_path: Path, monkeypatch,
 ) -> None:
     run, seen = _exporter(tmp_path, monkeypatch)
+    native_before = _tree(tmp_path / "sldprt")
 
     run()
 
     assert seen["rc"] == 0
-    assert seen["opened"] == ["frame-rail.SLDPRT", "ch-rocker-arm.SLDPRT"]
     full = (tmp_path / "step" / "ch-rocker-arm.STEP").read_bytes()
     assert step_face_sets(full.decode(), ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
-    assert "HAF_" not in (tmp_path / "step" / "frame-rail.STEP").read_text()
+    assert {path.name for path in (tmp_path / "step").iterdir()} == {
+        "fr-frame-rail.STEP", "ch-rocker-arm.STEP",
+    }
+    assert "HAF_" not in (tmp_path / "step" / "fr-frame-rail.STEP").read_text()
     assert not (tmp_path / "features").exists()  # the full export writes no bundle
-    assert (tmp_path / "sldprt" / "ch-rocker-arm.SLDPRT").read_bytes() == b"native part"
+    assert _tree(tmp_path / "sldprt") == native_before
+    full_outputs = _tree(tmp_path)
 
     run("--features", "ch_rocker_arm")
 
     scoped = (tmp_path / "features" / "ch_rocker_arm" / "ch-rocker-arm.STEP").read_text()
     assert step_face_sets(scoped, ["pivot_bore", "hub_top"]) == _EXPORTED_SETS
-    assert seen["preferences"] == [export_models.EXPORT_PREFERENCES] * 2
+    after = _tree(tmp_path)
+    assert {key: after[key] for key in full_outputs} == full_outputs
+    assert set(after) - set(full_outputs) == {
+        f"features/ch_rocker_arm/{name}" for name in _ROCKER_BUNDLE
+    }
+    assert _tree(tmp_path / "sldprt") == native_before
 
 
 @pytest.mark.parametrize("argv", [(), ("--features", "ch_rocker_arm")], ids=["full", "bundle"])
