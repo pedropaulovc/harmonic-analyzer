@@ -37,7 +37,7 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-Finish the `crank-handle` and one `connecting-rod` — one polished, one deliberately rough, as the original's are.
+Finish the `dt-crank-handle` and one `ch-connecting-rod` — one polished, one deliberately rough, as the original's are.
 :::
 
 ---

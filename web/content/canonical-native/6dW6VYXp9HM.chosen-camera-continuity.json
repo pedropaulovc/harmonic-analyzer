@@ -1,0 +1,21 @@
+{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/6dW6VYXp9HM.chosen-camera-continuity.json","originalSha256":"a7bc2002dc543a61f27a8170454880af24d22e94a8d3dac296db30c5b5e7d262","mappingSchemaVersion":2,"mappingSha256":"1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd","originalNumericLexemeSha256":"6b658384eb480f535a2453fe15cc56ea92f5a77c26bb5501afb5fc2850d6a2be","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{}},
+  "schemaVersion": 1,
+  "videoId": "6dW6VYXp9HM",
+  "sourceSha256": "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52",
+  "permissions": [
+    {
+      "shotId": "analysis-03",
+      "viewId": "main",
+      "componentFamily": "whole",
+      "startSeconds": 4.4044,
+      "endSeconds": 7.307300000000001,
+      "startDecodedFrameIndex": 132,
+      "lastDecodedFrameIndex": 218,
+      "cameraProvenanceKind": "source-informed-framing",
+      "measurementStatus": "unmeasured",
+      "cameraInterpolation": "continuous-shot",
+      "cameraInterpolationEvidence": "Retained web/content/canonical-native/6dW6VYXp9HM.observations.json describes analysis-03 as one presenter-driven front-to-rear machine rotation with a fixed studio camera; every native exposure132..218 is retained. Permission applies only inside analysis-03/main, never across source cuts or view/layout/donor changes. Existing Generator.camera whole-family yaw-ramp keys remain unchanged; continuous-shot sampling blends their chosen positions/intrinsics and shortest quaternion slerp without the generic greater-than30degree branch reset. All90 retained observation rows have null cameras. The30degree focal,25percent framing margin, elevation, half-turn cadence and chord-shaped interpolated path remain chosen/unmeasured, not a calibrated orbit or historical camera recovery. Complete mechanism settings remain unobservable/held. Source boundaries retain0.2second uncertainty; FIT/CHECK pixels and source clocks are unchanged. Smoothness grants no spatial-stage/5percent fidelity or0.5second clock acceptance.",
+      "cameraContinuityFamily": "source-informed-framing:analysis-03:main:whole:chosen-presenter-turn"
+    }
+  ]
+}

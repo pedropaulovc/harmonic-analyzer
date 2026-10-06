@@ -10,9 +10,9 @@ import pytest
 
 import _drawing_marks
 from _fit_limits import REAM_SLIDE
-from pinion_cam_pin_spec import PIN_DIA_BAND
-from pinion_cam_spec import BORE_BAND as CAM_BORE_BAND
-from pinion_lever_spec import BORE_BAND as LEVER_BORE_BAND
+from dt_pinion_cam_pin_spec import PIN_DIA_BAND
+from dt_pinion_cam_spec import BORE_BAND as CAM_BORE_BAND
+from dt_pinion_lever_spec import BORE_BAND as LEVER_BORE_BAND
 
 
 class _Display:

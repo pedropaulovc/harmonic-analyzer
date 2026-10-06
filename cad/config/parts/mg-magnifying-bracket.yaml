@@ -1,0 +1,8 @@
+mg-magnifying-bracket:
+  number: MHA-MG-001
+  material_family: ferrous_noncritical
+  finish: machined
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "machined from solid stock or casting"

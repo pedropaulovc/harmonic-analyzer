@@ -1,5 +1,7 @@
 # Drawing layout audit
 
+> Dated incidents and calibration examples retain their recorded identifiers and paths. Current identities are listed in [subsystem identities](subsystem-identities.md).
+
 > Design and contract for the unified layout audit that every manufacturing
 > drawing runs from `finalize_drawing`. It enforces the machine-checkable part
 > of [drawing-simplicity-policy.md](drawing-simplicity-policy.md) rule 8. Code:
@@ -249,7 +251,7 @@ datum-origin case replay from the calibration run's dumps.
 2. **GATE**: one commit, landed before the release cut. It flips the mode and
    removes the superseded audits: the 6 explicit `check_drawing_layout`
    calls, the 3 `audit_sheet` calls, `diagnostics/drawing_layout_audit`'s own
-   collector, and `draw_harmonic_base`'s local checks. An allow-list entry
+   collector, and `draw_fr_harmonic_base`'s local checks. An allow-list entry
    needs a cited ruling.
 
 Not checked:

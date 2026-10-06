@@ -1,10 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Independent source observations in the original CAD frame",
+  "title": "Materialized canonical-native derivative of independent source observations",
   "type": "object",
-  "required": ["schemaVersion", "source", "model", "anchors", "shots", "frames", "coverage"],
+  "required": ["schemaVersion", "identityDerivative", "source", "model", "anchors", "shots", "frames", "coverage"],
   "properties": {
     "schemaVersion": {"const": 1},
+    "identityDerivative": {
+      "type": "object",
+      "required": ["kind", "originalSourceCommit", "originalPath", "originalSha256", "mappingSchemaVersion", "mappingSha256", "originalNumericLexemeSha256", "measurementPreservation", "archivedNativeBindings"],
+      "properties": {
+        "kind": {"const": "materialized-canonical-native-identity-derivative"},
+        "originalSourceCommit": {"type": "string", "minLength": 1},
+        "originalPath": {"type": "string", "minLength": 1},
+        "originalSha256": {"$ref": "#/$defs/hash"},
+        "mappingSchemaVersion": {"const": 2},
+        "mappingSha256": {"$ref": "#/$defs/hash"},
+        "originalNumericLexemeSha256": {"$ref": "#/$defs/hash"},
+        "measurementPreservation": {"type": "string", "minLength": 1},
+        "archivedNativeBindings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
     "source": {
       "type": "object",
       "required": ["videoId", "sha256", "width", "height", "durationSeconds", "fps"],
@@ -47,7 +62,7 @@
     "xyzw": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}},
     "classification": {"enum": ["machine", "non-machine", "transition", "unobservable"]},
     "sourceEvidence": {"type": "string", "minLength": 1, "pattern": "\\S"},
-    "nativePartPath": {"type": "string", "pattern": "^harmonic-analyzer/[^/*?]+(?:/[^/*?]+)*$"},
+    "nativePartPath": {"type": "string", "pattern": "^ha-harmonic-analyzer/[^/*?]+(?:/[^/*?]+)*$"},
     "timeInterval": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number", "minimum": 0}},
     "nativeGeometryAssumptions": {
       "type": "array",
@@ -70,7 +85,7 @@
         "id": {"const": "rod-head-functional-equivalence"},
         "status": {"const": "user-approved-pending-cad-match"},
         "scope": {"const": "rod-head-topology-only"},
-        "nativePartPaths": {"type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": {"type": "string", "pattern": "^harmonic-analyzer/channel/connecting-rod-(?:[1-9]|1[0-9]|20)$"}},
+        "nativePartPaths": {"type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": {"type": "string", "pattern": "^ha-harmonic-analyzer/ch-channel/ch-connecting-rod-(?:[1-9]|1[0-9]|20)$"}},
         "authority": {"const": "the one plate-like head vs u crosspiece is a discrepancy but both serve the same purpose; the 3d model will be fixed later to match device; animate assuming they will match later"},
         "sourceCounterpart": {"const": "Filmed U-shaped connecting-rod junction/crosspiece"},
         "interpretation": {"const": "Functional linkage mapping for animation only; not a current geometric-fidelity pass."}
@@ -84,7 +99,7 @@
         "id": {"const": "lower-rocker-side-face-functional-exception"},
         "status": {"const": "user-approved-absent-uncertified"},
         "scope": {"const": "two-lower-rocker-side-face-features-only"},
-        "nativePartPaths": {"type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": {"type": "string", "pattern": "^harmonic-analyzer/channel/rocker-arm-(?:[1-9]|1[0-9]|20)$"}},
+        "nativePartPaths": {"type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": {"type": "string", "pattern": "^ha-harmonic-analyzer/ch-channel/ch-rocker-arm-(?:[1-9]|1[0-9]|20)$"}},
         "authority": {"const": "Allow a narrow functional exception"},
         "sourceCounterpart": {"const": "Two small rimmed/recessed lower-rocker side-face features either side of the fulcrum"},
         "sourceFeatureIds": {"const": ["lower-rocker-nearest-left-face-bore", "lower-rocker-nearest-right-face-bore"]},

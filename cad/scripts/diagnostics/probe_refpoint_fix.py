@@ -74,7 +74,7 @@ async def main():
     log(f"ActiveDoc = {str(_read_member(doc, 'GetTitle'))!r}")
 
     # 1) ring-centre RefPoint on the shared rod part doc (in memory).
-    rod_comp, _ = _find_one(adapter, "connecting-rod-1", toplevel=False)
+    rod_comp, _ = _find_one(adapter, "ch-connecting-rod-1", toplevel=False)
     part = adapter._attempt(lambda: rod_comp.GetModelDoc2(), default=None)
     if part is None:
         log("  could not resolve connecting-rod part doc")
@@ -101,18 +101,18 @@ async def main():
     log("  walking top-level mates to clear any leftover cams ...")
     for _s, _m, name, _t, parts, _v in _iter_mates(adapter, doc, read_values=False):
         joined = " ".join(parts)
-        if "cylinder-gear" in joined and "connecting-rod" in joined:
+        if "dt-cylinder-gear" in joined and "ch-connecting-rod" in joined:
             await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=False))
             await adapter.delete_mate(MateRefParameters(name=name))
 
     log("  one-time walk to pair gears<->rods + cache sample targets ...")
     comps = _components(adapter)
-    gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
-    rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
+    gears = _by_z_rank(adapter, "dt-cylinder-gear", comps=comps)
+    rods = _by_z_rank(adapter, "ch-connecting-rod", comps=comps)
     n = min(len(gears), len(rods))
     cached = {
-        "crank": _find_one(adapter, "crankshaft-1", comps=comps)[0],
-        "coneshaft": _find_one(adapter, "cone-gear-shaft-1", comps=comps)[0],
+        "crank": _find_one(adapter, "dt-crankshaft-1", comps=comps)[0],
+        "coneshaft": _find_one(adapter, "dt-cone-gear-shaft-1", comps=comps)[0],
         "cylgear0": gears[0][0] if gears else None,
     }
 

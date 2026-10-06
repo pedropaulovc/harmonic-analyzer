@@ -61,8 +61,8 @@ def main():
 
     async def probe(adapter):
         app = adapter.swApp
-        source = ROOT / "cad/out/sldprt/rack-pinion.SLDPRT"
-        control = ROOT / "cad/out/slddrw/rack-pinion.SLDDRW"
+        source = ROOT / "cad/out/sldprt/pd-rack-pinion.SLDPRT"
+        control = ROOT / "cad/out/slddrw/pd-rack-pinion.SLDDRW"
         docs = [_early_bound(raw, "IModelDoc2") for raw in app.GetDocuments() or ()]
         actual = [(str(doc.GetPathName()), str(doc.GetTitle()), int(doc.GetType()),
                    "dirty" if doc.GetSaveFlag() else "clean") for doc in docs]

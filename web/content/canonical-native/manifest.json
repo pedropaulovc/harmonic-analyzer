@@ -1,0 +1,591 @@
+{
+  "schemaVersion": 1,
+  "kind": "canonical-native-evidence-derivative-manifest",
+  "mappingSchemaVersion": 2,
+  "canonicalConsumerHashNormalization": "CRLF-to-LF",
+  "mappingSha256": "1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd",
+  "originalSourceCommit": "bfde892a5",
+  "geometryQualification": "Unchanged historical geometry/source observations. Native namespace translation does not requalify current CAD/renderer or source-camera correspondence.",
+  "derivatives": [
+    {
+      "path": "web/content/canonical-native/4mBuyixt22U.observations.json",
+      "sha256": "57a140ec7fda4d285bd5774efeb9771af69b07e550c18353421ffad755deb3ab",
+      "originalPath": "web/content/4mBuyixt22U.observations.json",
+      "originalSha256": "9ec73bdc70407eeecc63390789b3f7b8549c757c6ea887738dac40b1f532c8ba",
+      "originalNumericLexemeSha256": "6f2c3e94c200e544dfb9d624b26a46eba02c1acf3fbdfffea949ef4cec8101e0",
+      "archivedNativeBindings": [
+        "harmonic-analyzer/drive-train/cone-tip-bushing-1",
+        "harmonic-analyzer/drive-train/cone-tip-shim-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-2",
+        "harmonic-analyzer/paper-drive/bracket-screw-3",
+        "harmonic-analyzer/paper-drive/transgear-bracket-1",
+        "harmonic-analyzer/paper-drive/transgear-latch-1",
+        "harmonic-analyzer/paper-drive/transgear-pinion-1",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304_1"
+      ]
+    },
+    {
+      "path": "web/content/canonical-native/4mBuyixt22U.source-seeds.json",
+      "sha256": "1f78a45e41b99f4e70d79d11b6b6e623ff060dede03b9d04d1359ba341800a88",
+      "originalPath": "web/content/4mBuyixt22U.source-seeds.json",
+      "originalSha256": "afc7ba567c3e2d15cfea686303f468bf9db2f5069abc97961d3e1ef69c598536",
+      "originalNumericLexemeSha256": "7144d48c77ae22d7f321b605a6a88b25f359bb328b190d01d885c3f53d312bcd",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.automatic-motion.json",
+      "sha256": "567e95075e1c377c4da50594e451f1b65554b35899ec4617d1b0e876f03e61e9",
+      "originalPath": "web/content/6dW6VYXp9HM.automatic-motion.json",
+      "originalSha256": "37e00fb2569363dedf22d99cdc54229138990934497239d8b7201b97da2f0cc8",
+      "originalNumericLexemeSha256": "5206ab9aa33b5d4c513541a32786709e70e1631b78fcd3074527eacb15b793c7",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.chosen-camera-continuity.json",
+      "sha256": "7f7826cde015cd2299d2b2b11da64df3b22599ddfb4d2ad8dd073a6c0a4359d8",
+      "originalPath": "web/content/6dW6VYXp9HM.chosen-camera-continuity.json",
+      "originalSha256": "a7bc2002dc543a61f27a8170454880af24d22e94a8d3dac296db30c5b5e7d262",
+      "originalNumericLexemeSha256": "6b658384eb480f535a2453fe15cc56ea92f5a77c26bb5501afb5fc2850d6a2be",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.motion-controls.json",
+      "sha256": "449200f16562037b2abdecb642906bdfa7c4925c7a88bf1c25a6b33581bd0f38",
+      "originalPath": "web/content/6dW6VYXp9HM.motion-controls.json",
+      "originalSha256": "208d4a18a5c152805015e48b8be227a1825c1c03497c0e9370be109d6ca4daab",
+      "originalNumericLexemeSha256": "5653ab09e4f9f553eba0c9920d4449b5016ea9b8e85944e128274656eda91262",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.observations.json",
+      "sha256": "1f1d7b85280f239796354a274ae7c0244c4960fa63cb0a686e1b90f1b02bff48",
+      "originalPath": "web/content/6dW6VYXp9HM.observations.json",
+      "originalSha256": "fa69d6cab6173baa7061e825e51651a8fc56bbbc66b6543c4510cd7851d64e36",
+      "originalNumericLexemeSha256": "ed25ccd72673dd971656ebc2fb1e6265f65c11d945444c84c3ab5b54b93b3cd8",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json",
+      "sha256": "b5d790f41128d0acec4f13d7d604c9af72ed41446deb52442e903aff828ad50f",
+      "originalPath": "web/content/6dW6VYXp9HM.visible-crank-gauge.json",
+      "originalSha256": "6e58a2b704f81c211c31eb45a0c429521de114338e5e4c349ef74f9b509a973e",
+      "originalNumericLexemeSha256": "dbb3dda90125952bb6c675264c584cd801de5dba6d23c247b7e777e9c1f5b021",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json",
+      "sha256": "cb822c8bf6e76c78d83c655f40bcf40d78cd295d0b38617543ac2ce6b97df91c",
+      "originalPath": "web/content/6dW6VYXp9HM.visible-crank-motion.json",
+      "originalSha256": "0433129092cb167a69d29b3a9712b81f5cb70701d173c97323c6045e33b827ba",
+      "originalNumericLexemeSha256": "952dd972f3427045493492cd77160fa5d2429f83d794a0b65b92147b02f74fa6",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json",
+      "sha256": "4536dd456352d23817eed6ee93790c0a62602816726ef5432de50161e55ccee7",
+      "originalPath": "web/content/8KmVDxkia_w.automatic-motion-evidence.json",
+      "originalSha256": "7a193758b02166ad02604274cd08b89135b2941f54301312d242efcc508e8233",
+      "originalNumericLexemeSha256": "ad4e6a5f572203c92863d2e9604542d019ed9ff2c43351e44396e8a31370f3b8",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.automatic-motion.json",
+      "sha256": "d049a9528092198a4321545a9f3e0d7559bed1baef1d348f44bccba459ea6db1",
+      "originalPath": "web/content/8KmVDxkia_w.automatic-motion.json",
+      "originalSha256": "68b33f73055a49bbdbfad4e86d4f59ccc45e39b93be0b5b7fa71f3ec490dae3b",
+      "originalNumericLexemeSha256": "34366ff76c1efc900281740bc3a9f7d110c0cf47a55e0869de3a7ee83b61eec6",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json",
+      "sha256": "7d47b6b3774dd9113620a9ab835bef26174c337acac8e1030cb707c9ba38ece4",
+      "originalPath": "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json",
+      "originalSha256": "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321",
+      "originalNumericLexemeSha256": "b6cf3243d859e17c7f69f1b8dfd0419f73482230eb1d26cdf4f1c24f5983174c",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json",
+      "sha256": "83c3a1f00cc5414b3edaa2fd62e72de437f4d7adb756263139671abb0f57033c",
+      "originalPath": "web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json",
+      "originalSha256": "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc",
+      "originalNumericLexemeSha256": "e93f2d1d4d3dafd18c1fa8036ec9c4f4747ccced3b1673a349d4c132e1ba1775",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.chosen-camera-continuity.json",
+      "sha256": "0426c27d327d5e0ffac9d52bc41fb7ed950c1b9ac4e3f2ae6a045b25941d02be",
+      "originalPath": "web/content/8KmVDxkia_w.chosen-camera-continuity.json",
+      "originalSha256": "f8fccbaa293558fc3a91b88bb614c6e1779937fd8a52364f2ec6ad9d958afd31",
+      "originalNumericLexemeSha256": "ab39324e7f97786827b9dd2ba598d8285710e06d7ecd5f5ce493d1c7afab7856",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json",
+      "sha256": "3fd41a1048d1c265d2258741e0c23041d8701354926cc474e15e59dea93e3c33",
+      "originalPath": "web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json",
+      "originalSha256": "239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173",
+      "originalNumericLexemeSha256": "04ef40145c0f6cca49b050d7ecdc2ebc89b438a19a7f132c06ac0ea919fe40ce",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.observations.json",
+      "sha256": "18e076f5da9a4468b3eb39b8a74e9141f3dd272ceaca655d35b77a33b8d9a3ee",
+      "originalPath": "web/content/8KmVDxkia_w.observations.json",
+      "originalSha256": "3ac8e4df14487799637091859bdad58cc88a96c28a90c22ba1893772b5ee0f05",
+      "originalNumericLexemeSha256": "7698c9cad963ac84ed885467036af3084d1356865e4225778b9943f05fc7e5c4",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/8KmVDxkia_w.track.json",
+      "sha256": "a9c444cdad3cbe026239d719b9787834e6a1b7410fac2aa5fbbd0f0497b258a2",
+      "originalPath": "web/content/8KmVDxkia_w.track.json",
+      "originalSha256": "2c1e2828471d3eded27c635a1280810f92e4cad6220dd732912f673ee78b4441",
+      "originalNumericLexemeSha256": "97a2674a69dad20a98e0d77a070d223bfcb6b739507adfae250f100d22a7e53a",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/NAsM30MAHLg.observations.json",
+      "sha256": "e104fac523a60bb522ae363695587aa7181ce59ef3756bbf3c3a54a61a5a14cb",
+      "originalPath": "web/content/NAsM30MAHLg.observations.json",
+      "originalSha256": "d5955bf34a9e006325e7902049cd842e20f2eb178c25954ffaff75ee8f0e7513",
+      "originalNumericLexemeSha256": "75976a03282b535f16e973bd123c4046e1c9110aebb476e9951520f1ab2d3d1a",
+      "archivedNativeBindings": [
+        "harmonic-analyzer/drive-train/cone-tip-bushing-1",
+        "harmonic-analyzer/drive-train/cone-tip-shim-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-2",
+        "harmonic-analyzer/paper-drive/bracket-screw-3",
+        "harmonic-analyzer/paper-drive/transgear-bracket-1",
+        "harmonic-analyzer/paper-drive/transgear-latch-1",
+        "harmonic-analyzer/paper-drive/transgear-pinion-1",
+        "harmonic-analyzer/paper-drive/transgear-stub-1",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304_1"
+      ]
+    },
+    {
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.observations.json",
+      "sha256": "be746f33d35aa3cabb6bcb150aff0ec43aca276c0f9d2be494448fafc5e6fe2c",
+      "originalPath": "web/content/XPQwKRt4Y2k.observations.json",
+      "originalSha256": "03cc4f030e820faf185251cd30d1c33d3413cbc6a690b1f96c6f2d4596406a5d",
+      "originalNumericLexemeSha256": "10d90d753dc41d855823cc57804fffea86bcb4beff6f6e21f413df4c9af1fb84",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.source-phase-map.json",
+      "sha256": "6e315044a40d927307de88e14fd377014e7e4629ab01e78364064c4c8b633e59",
+      "originalPath": "web/content/XPQwKRt4Y2k.source-phase-map.json",
+      "originalSha256": "1726d46537adcb7437399192d5b8ba4f3ee0b1b67bb48a3c42b35759e5838cb1",
+      "originalNumericLexemeSha256": "9940761f7ffd9bc472e7a6ada1885c6acbc072d89f146ec5cf09888bfe70774d",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.source-seeds.json",
+      "sha256": "bd80814f5e6fe5945cb89aae462ea5a8b37b69c37df5dc4a8a1caf1c4f5249bd",
+      "originalPath": "web/content/XPQwKRt4Y2k.source-seeds.json",
+      "originalSha256": "bffbfa78d70c5a3c3cf6758eaf26bd1ee23e5b227adcf3f8d8c42060fc3c7af7",
+      "originalNumericLexemeSha256": "ab97deee19351cb2d998e296f08c46720505b933ad6125af106cd9071a50bc20",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/XPQwKRt4Y2k.track.json",
+      "sha256": "39fc02e656bb5a127e3239b0f053432e4671d1e63d152723f711490cb63a2e0f",
+      "originalPath": "web/content/XPQwKRt4Y2k.track.json",
+      "originalSha256": "6761948c9f2ffb156ce3575dd8143590da45ff455cf6650764953f977c45fc3a",
+      "originalNumericLexemeSha256": "6a7fe0a8b8ecc7ae95c84c8eca5cba030dec996c56ec3fe0f6e04977cdf7312e",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/augmented-face-frozen-check/augmented-frozen-report.json",
+      "sha256": "001d95a707f381fbdfdb90930ebb8095fe0a7fe725f61a4ce16ab62fa71e6847",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/augmented-face-frozen-check/augmented-frozen-report.json",
+      "originalSha256": "1a359667f6f65c89b8e6f1aa2857f7882fa43b51276dbb218fe31787b7672296",
+      "originalNumericLexemeSha256": "182a5b3ac8abc7d5f6f29c87dca8469d9c35c4b7c0a5bfa093a046a99d3d1d80",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/augmented-face-frozen-check/interior-cap-check-ledger.json",
+      "sha256": "6a87d4097d0e3888326e3ae79bc2447d8f8fc864bb54e3844c06ad7b1938c270",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/augmented-face-frozen-check/interior-cap-check-ledger.json",
+      "originalSha256": "0ffc002e73d43b56b0da45cae9640d812688b643f40783f2673b60ec08ed0a44",
+      "originalNumericLexemeSha256": "86f8aeca66fe439471b146b95da6045faf9ba3f52745035bc2a7a574c88095e6",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/fit-centres204.json",
+      "sha256": "7c2cb72e9d69bd9f65d9f897ae93f2292e684335a39260fdfaac6ef2634865d5",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/fit-centres204.json",
+      "originalSha256": "bb34d8e681cadd54993d6014643ffa79005cb0e7cca66b0f275f35e4efb4cec9",
+      "originalNumericLexemeSha256": "bc00f06825ce89dec107aff5355da5581c2c66e41f1bf58123c462b087effa53",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/four-seed-source-fit-census/all204-cpu-forward-request.json",
+      "sha256": "d0e94a3842d5b7c1a16d39a2563ed8590d0bfbe30cc4cf8b2462b0bee3168998",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/four-seed-source-fit-census/all204-cpu-forward-request.json",
+      "originalSha256": "915a19bea975c579180dea344588211d1ce41727afcc221fddd080732cb2a5ff",
+      "originalNumericLexemeSha256": "4d3cd8754204496c5b200715293831919b27860090e11c4b66a8502ac89f8247",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-recovery-calibration-evidence/four-seed-source-fit-census/candidate.json",
+      "sha256": "3270328ae58dbc08d020237bc39a76db5d5e57beb185b78c43523962cb511a74",
+      "originalPath": "web/content/analysis-recovery-calibration-evidence/four-seed-source-fit-census/candidate.json",
+      "originalSha256": "d31f43dad05a538536de25e75fd95b07ea31adbf97946b9d6bbb4c5ef440a034",
+      "originalNumericLexemeSha256": "985ef9389ff3f8e179c9b871175dccefb36aef7a146a66f49ccd3aa4443d93d8",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/analysis-synthesis.frozen-generation-evidence.json",
+      "sha256": "17ee12cb004eacb839b6f54deca609c66568c66574348361f88da9eca37e8d96",
+      "originalPath": "web/content/analysis-synthesis.frozen-generation-evidence.json",
+      "originalSha256": "425beca33506fcb307c3892808b7871a8ee2f06b7aa90f7103fc6993e6319267",
+      "originalNumericLexemeSha256": "62037ee2bd113d2aadffecad177688815a90ea531cf6722e6ad706d1963d24b6",
+      "archivedNativeBindings": [
+        "harmonic-analyzer/drive-train/cone-tip-bushing-1",
+        "harmonic-analyzer/drive-train/cone-tip-shim-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-1",
+        "harmonic-analyzer/paper-drive/bracket-screw-2",
+        "harmonic-analyzer/paper-drive/bracket-screw-3",
+        "harmonic-analyzer/paper-drive/transgear-bracket-1",
+        "harmonic-analyzer/paper-drive/transgear-latch-1",
+        "harmonic-analyzer/paper-drive/transgear-pinion-1",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304",
+        "harmonic-analyzer/paper-drive/transgear-stub-1/mesh_304_1"
+      ]
+    },
+    {
+      "path": "web/content/canonical-native/jfH-NbsmvD4.observations.json",
+      "sha256": "f51142694c686a43ee01fbd1ea0ea34d5ce66c41a9c88f7ab7be968a66777892",
+      "originalPath": "web/content/jfH-NbsmvD4.observations.json",
+      "originalSha256": "b45849dd41648dfa0c0a15f7bbce20a5042707bd609e2913304057518e366117",
+      "originalNumericLexemeSha256": "83acff5ab7c67d8ec11755ed972f8d8fce8eb13d9344a93a516efc8549acccc5",
+      "archivedNativeBindings": []
+    },
+    {
+      "path": "web/content/canonical-native/jfH-NbsmvD4.source-seeds.json",
+      "sha256": "e000adf94a87688067d32fec557b3b532d3a9be6994231853b8480bbbdb596ac",
+      "originalPath": "web/content/jfH-NbsmvD4.source-seeds.json",
+      "originalSha256": "5353f7cd2d8ff06a01332c14fc9056c46e3afea487083d2d606ce2e3e7fb4eaf",
+      "originalNumericLexemeSha256": "b31c7f84a6d481e0915476076b0965e10ae387f02460b82e9c4bda95f5bc98a0",
+      "archivedNativeBindings": []
+    }
+  ],
+  "historicalCodeSnapshots": [
+    {
+      "path": "web/content/canonical-native/historical-code/0025485bd0106f33508be0945502644b59cec6a6268abbe3e4060ea11dd91709/6dW6VYXp9HM-extract-automatic-motion.py",
+      "sha256": "0025485bd0106f33508be0945502644b59cec6a6268abbe3e4060ea11dd91709",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/4a7467b622c6191ee0a2c0bf5c53ca2c721b86f1c831617bea433a0c803b46b8/generate-8KmVDxkia_w-automatic-motion.py",
+      "sha256": "4a7467b622c6191ee0a2c0bf5c53ca2c721b86f1c831617bea433a0c803b46b8",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/731ae554aee8b77b7643073d4107f59a04ea530ad41612ec8de00316aaec183c/mechanics.ts",
+      "sha256": "731ae554aee8b77b7643073d4107f59a04ea530ad41612ec8de00316aaec183c",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b/scene.ts",
+      "sha256": "7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/8351d8e92dd3f050786a27ccedb569d8be390279f5a1a4a169f1395fe3578712/6dW6VYXp9HM-visible-crank-extract.py",
+      "sha256": "8351d8e92dd3f050786a27ccedb569d8be390279f5a1a4a169f1395fe3578712",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/8bb5ffa3046609f9b3afa69dc72e37297e86c6a1d15fd1bdaf21b70b47ea561f/kinematics.ts",
+      "sha256": "8bb5ffa3046609f9b3afa69dc72e37297e86c6a1d15fd1bdaf21b70b47ea561f",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/935abfe377c6acf3dbab380270e97567b7000b4947fcd82cd2e4684d7aa46015/magnifier.ts",
+      "sha256": "935abfe377c6acf3dbab380270e97567b7000b4947fcd82cd2e4684d7aa46015",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/c9e03db0df4dd3640a954fa572478241315206c0d179f28dd2a1395701805288/bindings.ts",
+      "sha256": "c9e03db0df4dd3640a954fa572478241315206c0d179f28dd2a1395701805288",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    },
+    {
+      "path": "web/content/canonical-native/historical-code/e8fe87dfd899b6ea08ea7f7ce133e633fbf871ca7c24aed3885f6f507ef78285/mechanics-data.ts",
+      "sha256": "e8fe87dfd899b6ea08ea7f7ce133e633fbf871ca7c24aed3885f6f507ef78285",
+      "scope": "Immutable original producer bytes for historical evidence lineage only; never executed as current code."
+    }
+  ],
+  "canonicalConsumerInputs": [
+    {
+      "path": "web/scripts/6dW6VYXp9HM-extract-automatic-motion.py",
+      "sha256": "6c232adaeff4a537d3f55ebc9570589620ed5a2f55c13ed98514fed8f6c0839b",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/6dW6VYXp9HM-visible-crank-extract.py",
+      "sha256": "0d1034103f58379b69df50b64358c2d76b48220e78ed27f4f1a6fabf7dbd0fa5",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/6dW6VYXp9HM-visible-crank-gauge.py",
+      "sha256": "bff0662eb4b3ac32cd86f1aa86f95bcfad7e29d9ba3613bf246867ed84ad9add",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/compact-operation-rocker.py",
+      "sha256": "e0360be6ff2c64daa6ee8a87ec305b3f25281df992a94ec4418f64b0ddc31fdb",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/compact-source-common.py",
+      "sha256": "dea8f85f0a3c67d467dd66cfcd039d7461efb6c4cba43e379b26370aaea796e1",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/compact-spin.py",
+      "sha256": "52ca3728d05f8827d971b0712b3959a3f880338c84f2d053018c970a239b9175",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/export-magnifier.py",
+      "sha256": "2ca6968c0c6c6521812cfdb089575788992acbbb12afa06f827e9dcf9839bdbf",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/export-mechanics.py",
+      "sha256": "7324a2a02913a769ac207fcc308462144df066e08e1f8f800485f8df7bd9269a",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/fetch-model.mjs",
+      "sha256": "f2397d8e7143f0ced5d1dafc75683ffe9b616f2d2787420be51f9b354094ccab",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/fetch-model.test.mjs",
+      "sha256": "ed2d1413b42880d6b9d1afcb9dbe6614b1c0c9fdce8f6b6b869b7201dee18bb5",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/fit-source.py",
+      "sha256": "88856d6ed10d19d772208f5fbad9e2babddfe557d02c423f84d16420f5bae23d",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-8KmVDxkia_w-automatic-motion.py",
+      "sha256": "5a4eebdb4b5565626fdd22d7e0e2a83f49bfdfc3c3171a3c140990eabcb50783",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-analysis-bank-source-controls.py",
+      "sha256": "72ef35d55018b22f7925e3c35967b4d83a8673a9542111c45f30808eed121dca",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-analysis-synthesis-source-tracks.py",
+      "sha256": "d8d8c14bf7a6e851003230cc3e575d3bd76815675e841d863c55369003ea7e54",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-intro-source-track.py",
+      "sha256": "35b6c158be299e16fcec6740dba1daabb12b8ac8f7a3dcae7cc2d3bb992e8c4c",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/generate-spin-source-controls.py",
+      "sha256": "6e1c0e054c63566b13853de8bff35f4ae27a94b471c80ff7b58084dac73d569a",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/model-loader.test.mjs",
+      "sha256": "b8214068df01d992f3d2fce2ace9c06e1e999d5929401838c4555e7e1f343a5a",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/model-representation.test.mjs",
+      "sha256": "a60437558b267eaba628a61679c2eab9e46904a9814f8b145a7cc1faf056d031",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/NAsM30MAHLg-calibrate-static.py",
+      "sha256": "165e638880694b463e5c8a17218a1567b1c739179a0ec05909a5b822a9bd5dba",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/native-math-compatibility.mjs",
+      "sha256": "9a6a183c409d73a16d6be5eeaa5722f45c07883fbb6354c28289e818db561ac1",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/observe-source.py",
+      "sha256": "9bda24eee19139cdc7a8d2b2d0e7b9dd8a2fd1076ab8f44e2ca72e6e660ae764",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/optimize-model.mjs",
+      "sha256": "3bb48c0fe69a49de407e8ced9f7124e730468482626c9984a286902e670d71e1",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/optimize-model.test.mjs",
+      "sha256": "770600814896940e0d6024fb817310bacd23b3f2daf6faa1f156ad2f35483d17",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/serve-verification.mjs",
+      "sha256": "1af7a3cbd3030fa3e99534e0a3d51aff72dfd80254059694d2cf78f77fc88887",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/source-track.test.mjs",
+      "sha256": "f2e2409aa62f9bb4c9821e09eca8ea154c1b102efca4e88e582cb04cde49869f",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/test_source_generation.py",
+      "sha256": "9deba277c4b2b8aa07e466352f838e4743498dfef65f5f4ced32b9b8fda7147f",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/verify-reference.mjs",
+      "sha256": "6b44e98315e96d2f7d87248f6a5316e5bdf7cb9082bd81e8bf74d85470eb81df",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/verify-server.mjs",
+      "sha256": "7e386b1390748735ed749ea84aa3a8c766a02761feeec868dfd0a6400feae523",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/verify-sync.mjs",
+      "sha256": "21749c879859a66171e5b936f2da720db61df085c8fdede2cbe09ab6e7e41914",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/verify-sync.test.mjs",
+      "sha256": "7db913c7a07e964a909de6fc9df3707ad21138016fec70a27ba4e1d76ba368aa",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/XPQwKRt4Y2k-mechanics.py",
+      "sha256": "e2d3f88582d5c49fa10ebed7fbbc8208d2eae6b922e4744d33c4787f2c97620e",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/bindings.ts",
+      "sha256": "1228e3b388996ce52cdc3f2f95a85320a0164eed221659cad9bc06edf496d952",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/image-plane-homography.ts",
+      "sha256": "fd756310336f3eeed5eb637d78f3583c0400b9d76850060c30623e571d58ac71",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/kinematics.ts",
+      "sha256": "8bb5ffa3046609f9b3afa69dc72e37297e86c6a1d15fd1bdaf21b70b47ea561f",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/magnifier.ts",
+      "sha256": "935abfe377c6acf3dbab380270e97567b7000b4947fcd82cd2e4684d7aa46015",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/main.ts",
+      "sha256": "b5434463371d72dc714eccf6fbabd80e4628543a28a7f6d49623943bec223883",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/mechanics-data.ts",
+      "sha256": "7d9f53258e226bd386dc2394132fcd237b5d110fc9cd88f475ac2501685a5553",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/mechanics.ts",
+      "sha256": "731ae554aee8b77b7643073d4107f59a04ea530ad41612ec8de00316aaec183c",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/scene.ts",
+      "sha256": "bf228c4223b82729359cfd019c6ff6b68c7a70094d849673051d8495775a6039",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/source-player.ts",
+      "sha256": "2b4e2ec25980da8400613f0ccb0771f5626de3fbc75d79228fa32a77609371c9",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/source-track.ts",
+      "sha256": "0c32d3f09732fba1e3f3843353c28a24eae14352874e8b28f82a5e8ee417e9e0",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/source-witness.ts",
+      "sha256": "65665fa5fbebd670c233ce7c3d824ea82320bf5a1d2f39e32004781faa391fa1",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/timeline.ts",
+      "sha256": "fb3b6339b30241c4d780aa87a60b63256c05a11a5701e5ac30e634ab9f345b05",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/video-catalog.ts",
+      "sha256": "61e95101603f1326f92ff87beebc3356bbd702b8cf64ce49b5c195ffb984fe45",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/src/youtube-player.ts",
+      "sha256": "88d60a85a5cb09771fb58bba308358022fc946cec05a470902f93d8b3079a372",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/content/4mBuyixt22U.source-track.json",
+      "sha256": "e0683efd871f00bd28ed09c72f3f60a0de9fb480c516d952057977c71d8f842e",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/content/6dW6VYXp9HM.source-track.json",
+      "sha256": "aeb10a3653f7c8d7264b8e4c3a9b4b35f0211d22b4420cdcf3ec823b45414ec5",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/content/8KmVDxkia_w.source-track.json",
+      "sha256": "6d45dd41c1caa085e944fbda3c7d78661f1ee8f9cf5f7455754592be665dba89",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/content/NAsM30MAHLg.source-track.json",
+      "sha256": "8cb7e9c75c16aac81f68d84fa731b939930aeba3c379e91db31d4500751c1847",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/content/XPQwKRt4Y2k.source-track.json",
+      "sha256": "335d76bbc1d957cf57efe3fb1446676149c2996d0ba9c4865c476f7551fa53da",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/content/jfH-NbsmvD4.source-track.json",
+      "sha256": "1fa526a88db430be30c9360ac500913bec8cd4787a393a417bd721413da4b606",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/package.json",
+      "sha256": "a91fa4023b1c69d4a1b243b6364964859c038d8e8d317dcaa80b187ba70b51f0",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    },
+    {
+      "path": "web/scripts/canonical-native-evidence.py",
+      "sha256": "b32c8be3ce0c5e0c14cb009097817434150d90c4d9993887aef3dc5713c14900",
+      "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
+    }
+  ]
+}

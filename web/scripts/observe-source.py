@@ -2,7 +2,7 @@
 """Sample actual local source frames and conservatively track manually identified features.
 
 python web/scripts/observe-source.py --source /private/source.mp4
-  --observations web/content/XPQwKRt4Y2k.observations.json --output /tmp/observed.json
+  --observations web/content/canonical-native/XPQwKRt4Y2k.observations.json --output /tmp/observed.json
 
 Only numeric observations are written. Never copies source frames/video into the repo.
 Content classification comes from the human-observed shot census, NOT guessed image labels.
@@ -539,8 +539,11 @@ def main():
         help="Independently measure only actual source images matching a manual seed view",
     )
     args = parser.parse_args()
+    observations = json.loads(args.observations.read_text())
+    if observations.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
+        parser.error("--observations must select a materialized canonical-native derivative, not archived original evidence")
     output = observe(
-        json.loads(args.observations.read_text()), args.source, args.match_repeated_view
+        observations, args.source, args.match_repeated_view
     )
     args.output.write_text(json.dumps(output, indent=2) + "\n")
     print(

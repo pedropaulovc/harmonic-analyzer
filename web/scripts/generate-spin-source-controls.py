@@ -25,7 +25,7 @@ def main():
     parser.add_argument("--reference-root", type=Path, default=Path(os.environ.get("HARMONIC_REFERENCE_ROOT", WEB / ".vite" / "reference-root")))
     parser.add_argument("--output", type=Path, default=WEB / ".vite" / "verification-output" / "compact-track-refinement" / "spin-montage-source-controls.json")
     args = parser.parse_args()
-    source = json.loads((WEB / "content" / "XPQwKRt4Y2k.observations.json").read_text())
+    source = json.loads((WEB / "content" / "canonical-native" / "XPQwKRt4Y2k.observations.json").read_text())
     compact = json.loads((WEB / "content" / "XPQwKRt4Y2k.source-track.json").read_text())
     catalog = source["sourceMeasurements"]["endcardViewCatalog"]
     fps = source["source"]["fps"]["numerator"] / source["source"]["fps"]["denominator"]

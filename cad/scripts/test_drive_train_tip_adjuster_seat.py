@@ -12,9 +12,9 @@ import math
 
 import pytest
 
-import build_drive_train_assembly as bdt
-from build_cone_tip_adjuster import CUP_DEPTH, CUP_DIA
-from cone_gear_shaft_spec import ADJUSTER_EMBED, SECTIONS
+import build_dt_drive_train_assembly as bdt
+from build_vn_cone_tip_adjuster import CUP_DEPTH, CUP_DIA
+from dt_cone_gear_shaft_spec import ADJUSTER_EMBED, SECTIONS
 
 
 def test_seat_depth_is_the_end_radius_over_the_cup_half_angle() -> None:

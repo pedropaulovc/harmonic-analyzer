@@ -32,7 +32,7 @@ nastier than the plain free-DOF case:
   already-placed gear differentially.
 
 The remedy this script demonstrates (the production recipe shipped in
-build_drive_train_assembly.py): DELETE the copied gear mate (nothing then
+build_dt_drive_train_assembly.py): DELETE the copied gear mate (nothing then
 stores any spin state), PUT the copy at the design phase (holds -- exactly
 the diag_cwm_min case), and author a FRESH gear mate, which records the
 correct phase from the CURRENT pose and carries its ratio natively.

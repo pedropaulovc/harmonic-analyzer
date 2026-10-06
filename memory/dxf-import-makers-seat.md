@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Two hard, verified facts about `adapter.import_dxf_dwg`
 (`IFeatureManager::InsertDwgOrDxfFile2`) on THIS SolidWorks 2026 3DEXPERIENCE
 "for Makers" seat, found debugging the nameplate engraving (PR #143):
@@ -19,8 +22,8 @@ Two hard, verified facts about `adapter.import_dxf_dwg`
    "SetSheetScale works" was from a blocks/INSERT DXF; it does NOT carry to flat
    modelspace.) Edition-agnostic fix: **author the DXF at FINAL plate-mm** — scale
    + centre the geometry offline so it already spans the target width on the plate
-   centre, then import at `scale=1.0, position=(0,0)`. `test_nameplate_geometry`'s
-   golden width then equals the plate footprint (88 mm), and `build_nameplate`'s
+   centre, then import at `scale=1.0, position=(0,0)`. `test_fr_nameplate_geometry`'s
+   golden width then equals the plate footprint (88 mm), and `build_fr_nameplate`'s
    `ENGRAVING_SCALE`→1.0 / `ENGRAVING_POSITION`→(0,0) act as swap guards.
    `GetPosition`/`GetSheetScale` getters raise "Parameter not optional" (byref
    out-params under late binding) — unrelated red herring.

@@ -38,7 +38,7 @@ async def main():
     top_title = str(_read_member(top, "GetTitle"))
     log(f"top = {top_title!r}")
 
-    rod_comp, _ = _find_one(adapter, "connecting-rod-1", toplevel=False)
+    rod_comp, _ = _find_one(adapter, "ch-connecting-rod-1", toplevel=False)
     part = adapter._attempt(lambda: rod_comp.GetModelDoc2(), default=None)
     title = str(_read_member(part, "GetTitle"))
     log(f"rod part = {title!r}")

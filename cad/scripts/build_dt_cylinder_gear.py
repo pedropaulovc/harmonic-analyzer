@@ -1,0 +1,639 @@
+r"""Reproduction script: cylinder gear with integral eccentric cam (book ch. 13).
+
+All 20 cylinder gears are identical (DIMENSIONS.md ch. 13: 120 teeth each,
+derived from the k/80 gear law), so this is a single non-configured part (no
+configurations). The involute tooth-gap profile reuses the cone gear's
+live-validated ``CreateEquationSpline2`` technique (see ``build_dt_cone_gear.py``)
+with literal numeric expressions (document units = inches, trig in radians
+inside curve expressions) -- that geometry is MESH-CRITICAL (it must conjugate
+the mating gear) and is therefore kept fully literal: no equation-manager
+globals, no recorded/driven sketch dims on the toothed blank or tooth-gap
+sketches. The ORDINARY auxiliary features (cam disc, alignment notch, shaft
+bore) DO carry self-naming + editable globals + deferred driving, like the
+other parametric parts.
+
+Features, in order:
+
+1. Gear blank: disc at tip radius ``Ra`` (OD 2.449" = 62.2 mm), face width 3 mm,
+   extruded z = 0..3 from the Front plane. The face width comes from the
+   M6 axial-budget resolution (Appendix C #6): face/pitch = 0.38 measured
+   on the p.22 stack macro x the 7.5 mm axial pitch.
+2. One tooth gap (six equation curves: two involute flanks, base chord, two
+   radial extensions, outer clearance arc) cut through, then circular-
+   patterned 120x about the gear axis (reference axis Top x Right = Z).
+3. Integral eccentric cam (book ch. 13, pp. 22-25): one of the 20 cams that
+   convert each gear's rotation into the near-sinusoidal reciprocation of its
+   connecting rod (displacement = ECCENTRICITY x sin(theta)). Disc OD 30.6 mm,
+   centre offset +Y by the 8.64 mm eccentricity, boss-extruded from the Front
+   plane through the blank to the OVERALL thickness z = 0..7.0565 (#743: the
+   overall thickness is the station pitch, so the bank stacks cam face on back
+   face and the cam fills the connecting-rod slot; the cam's own thickness,
+   4.0565, is a reference). Cam disc centred on the bore, offset +Y by the
+   eccentricity -- the
+   lobe points +Y, the NOTCH side: the ch14 end views prove the rocker tips sit
+   at the TOP of their stroke at notch-up/0-cranks, so lobe-up is the cos-mode
+   home pose; the pre-ROM-fit build authored it -Y, 180 deg off). The throw is
+   MEASURED from the ch14 end-view ROM fit (tip half-amplitude 9.458 mm x
+   127.37/139.5); the real machine drives the rod with a CUT TEMPLATE cam (the
+   p.25 teardrop outline; Michelson 1898 closing note), modeled here as the
+   kinematically-equivalent circular eccentric-and-strap -- the ring centre
+   follows the same simple-harmonic orbit the template was cut to produce.
+   (This is the former standalone ``build_eccentric_cam.py`` / ``eccentric-cam``
+   part, MHA-029, now folded into the gear -- the cam was always integral.)
+4. Alignment notch: 3 mm deep saw KERF cut between two teeth (the p.23
+   "notch" photo shows a thin kerf -- the real gears keep all 120 teeth, NOT
+   a missing tooth). +Y (90 deg = 30*gamma) is a tooth crest at 120 T, so the
+   kerf is seated in the adjacent root valley (90 deg + gamma/2); the flanking
+   crests stay intact. "Notches aligned to top = cosine mode" (pp. 66-67).
+   Gear face only, after the pattern so it is not replicated.
+5. Plain shaft bore 3/8" through gear + cam, on the gear axis. No keyway:
+   gear k turns k/80 rev per crank turn (ch. 29 gear law), so the 20 gears
+   all spin at DIFFERENT speeds and cannot be keyed to a common shaft --
+   they run free on a stationary arbor (DIMENSIONS.md ch. 13, "M6.2 keyway
+   refutation"). The legacy keyway was fiction and was removed in M6.2.
+
+Every feature's volume delta is asserted against an analytic expectation
+(same DP 49.82 / PA 14.5 deg tooth profile as the cone set, narrower face).
+The notch delta integrates the
+exact involute solid-fraction over the notch window (the notch floor sits
+below the base circle, so part of the window is full annulus and part is
+tooth-fraction fill).
+
+Dimensions: cad/DIMENSIONS.md "Chapter 13".
+
+Layout: gear axis = Z through the origin, gear z = 0..3 mm, cam z = 3..7.0565,
+cam lobe +Y, notch +Y (lobe on the notch side).
+
+Run (SolidWorks already open)::
+
+    uv run python cad\scripts\build_dt_cylinder_gear.py
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+
+from _common import (
+    IN,
+    SketchDims,
+    _flag,
+    _feature_by_name,
+    _read_member,
+    add_line_chain,
+    anchor_point_to_origin,
+    apply_material,
+    check,
+    define_circle,
+    dimension_between,
+    dump_dimensions,
+    drive_dimension,
+    ensure_fully_defined,
+    force_rebuild,
+    name_bore_axis,
+    name_last_feature,
+    name_dimensions,
+    report_mass_properties,
+    run_build,
+    set_global,
+    set_sketch_direct_db,
+)
+from _drawing_marks import (
+    add_angular_reference_dimension,
+    apply_drawing_precision,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_angular_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from _drawing_simplified import save_simplified_part
+from _fit_limits import deviations
+from _gear import build_fixed_gear, volume_check
+from _part_pmi import author_part_pmi
+from involute_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
+from dt_cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
+from dt_cylinder_gear_spec import (
+    BORE_DIA as BORE_DIAMETER,
+    CAM_DIA as CAM_DIAMETER,
+    CAM_DIA_BAND,
+    CAM_PHASE_TOLERANCE_DEG,
+    CAM_THICKNESS,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    ECCENTRICITY,
+    ECCENTRICITY_TOLERANCE_MM,
+    FACE_WIDTH,
+    FACE_WIDTH_TOLERANCE_MM,
+    NOTCH_CENTER_X,
+    NOTCH_DEPTH,
+    NOTCH_FLOOR_RADIUS,
+    NOTCH_DEPTH_TOLERANCE_MM,
+    NOTCH_MEAN_RADIUS,
+    NOTCH_PHASE_DEG,
+    NOTCH_WIDTH,
+    NOTCH_WIDTH_BAND,
+    OUTSIDE_DIA,
+    OVERALL_THICKNESS,
+    OVERALL_THICKNESS_BAND,
+    SURFACE_FINISHES,
+    TEETH,
+)
+
+import _telemetry
+
+PART_NAME = "dt-cylinder-gear"
+MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
+
+# Shared geometry lives in dt_cylinder_gear_spec; assemblies consume it directly.
+NOTCH_CLEARANCE = 1.5  # kerf overshoot past the OD so the cut always opens (geom)
+
+BORE_RADIUS = BORE_DIAMETER / 2.0
+
+FACTS = gear_facts(TEETH, DP)  # inches; same DP/PA as the cone set by construction
+RA_MM = OUTSIDE_DIA / 2.0
+RB_MM = FACTS["Rb"] * IN
+NOTCH_FLOOR = NOTCH_FLOOR_RADIUS
+NOTCH_OUTER = RA_MM + NOTCH_CLEARANCE  # clearance past the OD so the cut always opens
+# +Y is a tooth crest.  The spec owns the first-root-CCW kerf centre so the
+# part and the drawing's phase/depth picks cannot drift.
+NOTCH_X = NOTCH_CENTER_X
+
+THROUGH_ALL = OVERALL_THICKNESS + 2.0  # bore cut depth
+
+
+def is_solid(x: float, y: float) -> bool:
+    """Exact solid test for the toothed disc cross-section at (x, y) in mm.
+
+    Mirrors the modeled cut: gap floor is the base-circle CHORD (between the
+    two flank starts), flanks are the involute from ``Delta``/``Gamma-Delta``
+    (see build_dt_cone_gear's profile derivation).
+    """
+    r = math.hypot(x, y)
+    if r > RA_MM:
+        return False
+    gamma, delta = FACTS["Gamma"], FACTS["Delta"]
+    psi = math.atan2(y, x) % gamma
+    if r >= RB_MM:
+        t = math.sqrt((r / RB_MM) ** 2 - 1.0)
+        inv = t - math.atan(t)
+        return not (delta - inv < psi < gamma - delta + inv)
+    if not (delta < psi < gamma - delta):
+        return True
+    r_chord = (
+        RB_MM * math.cos((gamma - 2.0 * delta) / 2.0) / math.cos(psi - gamma / 2.0)
+    )
+    return r <= r_chord
+
+
+def notch_solid_area(step: float = 0.004) -> float:
+    """Solid area (mm^2) of the toothed disc inside the kerf window.
+
+    The kerf is the vertical slot ``x in [NOTCH_X +- W/2], y in [floor, outer]``
+    seated in the +Y valley; most of the window is empty gap, so the removed
+    solid is small (~0.60 mm^2) -- the kerf only bites the root web, not teeth.
+    """
+    nx = max(2, round(NOTCH_WIDTH / step))
+    ny = max(2, round((NOTCH_OUTER - NOTCH_FLOOR) / step))
+    dx = NOTCH_WIDTH / nx
+    dy = (NOTCH_OUTER - NOTCH_FLOOR) / ny
+    hits = 0
+    for i in range(nx):
+        x = NOTCH_X - NOTCH_WIDTH / 2.0 + (i + 0.5) * dx
+        for j in range(ny):
+            y = NOTCH_FLOOR + (j + 0.5) * dy
+            if is_solid(x, y):  # kerf in the +Y valley: window coords are global
+                hits += 1
+    return hits * dx * dy
+
+
+def _ref_axis_start_mm(adapter, axis_name: str) -> list[float] | None:
+    """Start point (mm) of a named reference axis via IRefAxis.GetRefAxisParams."""
+    model = adapter.currentModel
+    feat = _read_member(model, "FirstFeature")
+    for _ in range(50000):
+        if not feat:
+            return None
+        _flag(feat, "IFeature")
+        if str(_read_member(feat, "Name")) == axis_name:
+            axis = adapter._attempt(
+                lambda f=feat: f.GetSpecificFeature2(), default=None
+            )
+            if axis is None:
+                return None
+            _flag(axis, "IRefAxis")
+            p = adapter._attempt(lambda a=axis: a.GetRefAxisParams(), default=None)
+            if p is None:
+                return None
+            return [float(p[0]) * 1000.0, float(p[1]) * 1000.0, float(p[2]) * 1000.0]
+        feat = _read_member(feat, "GetNextFeature")
+    return None
+
+
+async def _name_lobe_axis(adapter) -> str:
+    """Named reference axis through the eccentric cam-lobe centre (part-local
+    x 0, y +ECCENTRICITY), along Z, for the motion study's cam->rod coupling.
+
+    The Henrici cam coupling (artifact B) makes each connecting-rod ring
+    (Axis1@connecting-rod) coaxial with its drive-train cylinder-gear lobe. A
+    face-based concentric on this geared part is catastrophic (walking ~thousands
+    of tooth faces) and the lobe face will not select through the nested,
+    flexible sub. A *named* axis is fast, mirror-agnostic and selects by name --
+    the same pattern the bore axis already uses. The offset-plane sign for
+    "Top Plane + ECC" is verified against GetRefAxisParams (Y must land at the
+    lobe side, +ECC), so a flipped SW offset convention fails loudly here rather
+    than silently building a wrong-side cam axis.
+    """
+    axis_name = await name_bore_axis(
+        adapter, "Right Plane", 0.0, "Top Plane", ECCENTRICITY, "cam lobe axis"
+    )
+    start = _ref_axis_start_mm(adapter, axis_name)
+    if start is None:
+        raise RuntimeError(f"could not read lobe axis {axis_name} params")
+    if abs(start[0]) > 0.1 or abs(start[1] - ECCENTRICITY) > 0.1:
+        raise RuntimeError(
+            f"lobe axis misplaced at (x={start[0]:.3f}, y={start[1]:.3f}); "
+            f"expected (0, {ECCENTRICITY:.3f}) -- Top Plane offset sign flipped"
+        )
+    _telemetry.success(f"lobe axis {axis_name} at (x {start[0]:.3f}, y {start[1]:.3f})")
+    return axis_name
+
+
+async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    check("create_part", await adapter.create_part())
+
+    # Editable knobs (Tools > Equations) for the ORDINARY auxiliary features --
+    # the cam disc, the alignment notch and the shaft bore. The toothed blank and
+    # its 120x tooth-gap pattern are NOT exposed here: that geometry is
+    # mesh-critical (it must conjugate the mating gear), so build_fixed_gear keeps
+    # it literal and no sketch dim on it is recorded or driven. The mm suffix is
+    # load-bearing -- this is an INCH document and the equation manager reads BARE
+    # numbers in document units (an unsuffixed 30.6 would be read as 30.6 in).
+    await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    await set_global(adapter, "CamDiameter", f"{CAM_DIAMETER}mm")
+    await set_global(adapter, "OverallThickness", f"{OVERALL_THICKNESS}mm")
+    await set_global(adapter, "Eccentricity", f"{ECCENTRICITY}mm")
+    await set_global(adapter, "BoreDiameter", f"{BORE_DIAMETER}mm")
+    await set_global(adapter, "NotchDepth", f"{NOTCH_DEPTH}mm")
+    await set_global(adapter, "NotchWidth", f"{NOTCH_WIDTH}mm")
+    await set_global(adapter, "NotchClearance", f"{NOTCH_CLEARANCE}mm")
+
+    # Drive equations for the auxiliary sketches are collected here and applied in
+    # one deferred batch at the end (every target must resolve against the
+    # finished model, after a rebuild).
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Toothed disc (blank + gap + 120x pattern, z = 0..FACE_WIDTH).  The shared
+    # helper intentionally leaves gear geometry literal, but this part's released
+    # print needs the original ±0.05 blank width.  Give the first extrusion and
+    # its depth stable semantic names, then drive and tolerance that real model
+    # dimension.
+    disc = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    v_teeth = disc.volume
+    _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
+    _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")
+    gear_depth = name_dimensions(adapter, "GearBlank", ["FaceWidth"])
+    drive_jobs += [(gear_depth[0], '"FaceWidth"')]
+    volume = v_teeth
+
+    # ------------------------------------------------------------------
+    # Integral cam on the far gear face (z = 3..OVERALL), lobe +Y (notch side).
+    # It is extruded from the Front plane THROUGH the blank so its one depth
+    # dimension is the overall thickness -- the station pitch the solid bank
+    # stacks on (#743), carrying the print band.  The cam disc (radius <= 23.94)
+    # lies wholly inside the blank's solid web (root radius 30.0), so the part
+    # inside z = 0..FACE_WIDTH merges without changing the blank.
+    # ------------------------------------------------------------------
+    # Cam disc: ordinary auxiliary circle, centred +Y from the bore.  On the
+    # Front plane the on-axis x coordinate drops; record what is emitted and
+    # mark only the Y offset and diameter for the drawing.
+    cam = SketchDims()
+    check("create_sketch cam on Front", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter,
+        0.0,
+        ECCENTRICITY,
+        CAM_DIAMETER / 2.0,
+        "cam disc",
+        dims=cam,
+        names=("CamCx", "CamCy", "CamDia"),
+        drives=(None, '"Eccentricity"', '"CamDiameter"'),
+    )
+    await ensure_fully_defined(adapter, "cam sketch")
+    check("exit_sketch cam", await adapter.exit_sketch())
+    name_last_feature(adapter, "CamProfile")
+    drive_jobs += cam.apply(adapter, "CamProfile")
+    check(
+        "extrude cam",
+        await adapter.create_extrusion(ExtrusionParameters(depth=OVERALL_THICKNESS)),
+    )
+    name_last_feature(adapter, "CamBoss")
+    cam_depth = name_dimensions(adapter, "CamBoss", ["OverallThickness"])
+    drive_jobs += [(cam_depth[0], '"OverallThickness"')]
+    # Only the part beyond the blank adds material.
+    v_cam = math.pi * (CAM_DIAMETER / 2.0) ** 2 * CAM_THICKNESS
+    volume = await volume_check(adapter, "cam boss", volume + v_cam, 0.005 * v_cam)
+
+    # The extrude direction has an ambiguous sign: assert the cam actually
+    # landed at z > FACE_WIDTH, on +Y.
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"cam COM check failed: {mass.error}")
+    com = [float(c) for c in mass.data.center_of_mass]
+    com_z = (
+        v_teeth * FACE_WIDTH / 2.0 + v_cam * (FACE_WIDTH + CAM_THICKNESS / 2.0)
+    ) / volume
+    com_y = v_cam * ECCENTRICITY / volume
+    if abs(com[2] - com_z) > 0.1 or abs(com[1] - com_y) > 0.1:
+        raise RuntimeError(
+            f"cam misplaced: COM {com}, expected y {com_y:.3f} z {com_z:.3f} "
+            "-- extrude direction flipped"
+        )
+    _telemetry.success(f"cam placement: COM y {com[1]:.3f} z {com[2]:.3f}")
+
+    # ------------------------------------------------------------------
+    # Alignment notch at +Y (top = cosine mode): a thin saw KERF seated in
+    # the tooth valley nearest +Y (between two teeth, no tooth removed --
+    # p.23 "notch" photo), gear face only. The slot is axis-aligned at
+    # x = NOTCH_X (the valley centreline projected onto X).
+    # ------------------------------------------------------------------
+    notch_dims = SketchDims()
+    check("create_sketch notch", await adapter.create_sketch("Front"))
+    # Inference OFF: with it on, the bottom corners snap coincident onto the
+    # flank-start vertices at the base circle ~0.5 mm away (live-caught: the
+    # rectangle came back 3.32 mm wide with its floor at r = Rb and the width
+    # dimension silently driven).
+    set_sketch_direct_db(adapter, True)
+    notch = await add_line_chain(
+        adapter,
+        [
+            (NOTCH_X - NOTCH_WIDTH / 2.0, NOTCH_FLOOR),
+            (NOTCH_X + NOTCH_WIDTH / 2.0, NOTCH_FLOOR),
+            (NOTCH_X + NOTCH_WIDTH / 2.0, NOTCH_OUTER),
+            (NOTCH_X - NOTCH_WIDTH / 2.0, NOTCH_OUTER),
+        ],
+    )
+    depth_witness = check(
+        "notch depth construction witness",
+        await adapter.add_centerline(
+            NOTCH_X,
+            NOTCH_FLOOR,
+            0.0,
+            RA_MM,
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    bottom, right, top, left = notch
+    for ent, relation in (
+        (bottom, "horizontal"),
+        (top, "horizontal"),
+        (right, "vertical"),
+        (left, "vertical"),
+    ):
+        check(
+            f"notch {relation}",
+            await adapter.add_sketch_constraint(ent, None, relation),
+        )
+    check(
+        "dimension notch width",
+        await adapter.add_sketch_dimension(bottom, None, "linear", NOTCH_WIDTH),
+    )
+    notch_dims.record("NotchWidth", '"NotchWidth"')
+    check(
+        "dimension notch height",
+        await adapter.add_sketch_dimension(
+            right, None, "linear", NOTCH_OUTER - NOTCH_FLOOR
+        ),
+    )
+    notch_dims.record("NotchHeight", '"NotchDepth" + "NotchClearance"')
+    # The construction witness makes the depth a real, source-driven model
+    # dimension.  Its start is the floor midpoint and its end is the actual
+    # +Y tooth crest, so the imported drawing dimension has deterministic
+    # extension origins and reads 3.0 rather than selecting a nearby involute.
+    check(
+        "notch witness floor midpoint",
+        await adapter.add_sketch_constraint(
+            f"{depth_witness}.start", bottom, "midpoint"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{depth_witness}.end", 0.0, RA_MM, "notch tooth crest"
+    )
+    notch_dims.record("NotchTipRadius", None)
+    await dimension_between(
+        adapter,
+        f"{depth_witness}.end",
+        f"{depth_witness}.start",
+        "horizontal_distance",
+        abs(NOTCH_X),
+        "notch root phase",
+    )
+    notch_dims.record("NotchCenterX", None)
+    await dimension_between(
+        adapter,
+        f"{depth_witness}.start",
+        f"{depth_witness}.end",
+        "vertical_distance",
+        NOTCH_DEPTH,
+        "notch depth",
+    )
+    notch_dims.record("NotchDepth", '"NotchDepth"')
+    # The cam-phase datum, natively: the lobe axis (origin -> the +Y crest, the
+    # direction CamCy offsets the cam) and the notch radial (origin -> the kerf
+    # centreline x = NOTCH_X at the mean notch radius) meet at NOTCH_PHASE_DEG,
+    # half a circular pitch. A DRIVEN angular dimension between them carries
+    # the error budget's cam_phase tolerance (drawing-simplicity rule 2: the
+    # band goes on the dimension, not in a note); the kerf stays located by
+    # NotchCenterX, so its geometry is unchanged and the sketch fully defined.
+    set_sketch_direct_db(adapter, True)
+    lobe_axis = check(
+        "notch lobe-axis construction line",
+        await adapter.add_centerline(0.0, 0.0, 0.0, RA_MM),
+    )
+    notch_radial = check(
+        "notch radial construction line",
+        await adapter.add_centerline(
+            0.0,
+            0.0,
+            NOTCH_X,
+            NOTCH_MEAN_RADIUS * math.cos(math.radians(NOTCH_PHASE_DEG)),
+        ),
+    )
+    set_sketch_direct_db(adapter, False)
+    await anchor_point_to_origin(adapter, f"{lobe_axis}.start", 0.0, 0.0, "lobe axis")
+    check(
+        "lobe axis ends on the +Y crest",
+        await adapter.add_sketch_constraint(
+            f"{lobe_axis}.end", f"{depth_witness}.end", "coincident"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{notch_radial}.start", 0.0, 0.0, "notch radial"
+    )
+    # the radial's tip rides the kerf centreline: same x as the floor midpoint
+    check(
+        "notch radial ends on the kerf centreline",
+        await adapter.add_sketch_constraint(
+            f"{notch_radial}.end", f"{depth_witness}.start", "vertical_points"
+        ),
+    )
+    check(
+        "dimension notch mean radius",
+        await adapter.add_sketch_dimension(
+            notch_radial, None, "linear", NOTCH_MEAN_RADIUS
+        ),
+    )
+    notch_dims.record("NotchMeanRadius", None)
+    # Text point INSIDE the 1.5 deg sector (SolidWorks picks which of the four
+    # angles the text sits in; 0.4 deg off the lobe axis, well clear of the
+    # radial at 1.5 deg) -- a point outside it reads the 178.5 supplement.
+    await add_angular_reference_dimension(
+        adapter,
+        lobe_axis,
+        notch_radial,
+        (-0.3, RA_MM + 12.0),
+        "notch phase",
+        expected_degrees=NOTCH_PHASE_DEG,
+    )
+    notch_dims.record("NotchPhase")
+    await ensure_fully_defined(adapter, "notch sketch")
+    check("exit_sketch notch", await adapter.exit_sketch())
+    name_last_feature(adapter, "NotchProfile")
+    drive_jobs += notch_dims.apply(adapter, "NotchProfile")
+    check(
+        "cut notch",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 1.0)),
+    )
+    name_last_feature(adapter, "NotchKerf")
+    v_notch = notch_solid_area() * FACE_WIDTH
+    # Looser band than the old square: the kerf removes only ~1.8 mm^3, so the
+    # grid-integration error on notch_solid_area is relatively larger.
+    volume = await volume_check(adapter, "notch", volume - v_notch, 0.06 * v_notch)
+
+    # ------------------------------------------------------------------
+    # Shaft bore through gear + cam (the bore circle is fully inside the
+    # eccentric cam disc: ecc 8.64 + bore_r 4.76 = 13.40 < cam_r 15.3,
+    # a 1.90 mm wall at the thin side).
+    # ------------------------------------------------------------------
+    # Shaft bore: ordinary on-axis circle (origin centre -> no centre dims, just
+    # the diameter), driven by the BoreDiameter knob.
+    bore = SketchDims()
+    check("create_sketch bore", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        BORE_RADIUS,
+        "bore",
+        dims=bore,
+        names=("BoreCx", "BoreCz", "BoreDia"),
+        drives=(None, None, '"BoreDiameter"'),
+    )
+    await ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bore.apply(adapter, "BoreProfile")
+    check(
+        "cut bore",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=THROUGH_ALL)),
+    )
+    name_last_feature(adapter, "Bore")
+    v_bore = math.pi * BORE_RADIUS**2 * OVERALL_THICKNESS
+    volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+
+    # Named bore axis (gear axis = Z through the origin) for view-independent
+    # assembly mate selection: the gear rides the arbor coincident axis-to-axis
+    # and meshes its cone gear via a gear mate (M6 mated-DOF drive train).
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
+
+    # Axis3: the eccentric cam-lobe centre axis (motion-study cam->rod coupling).
+    await _name_lobe_axis(adapter)
+
+    # Apply the deferred drive equations now -- after the whole model + a rebuild
+    # exists, so every target resolves. Each equation evaluates to the value just
+    # built, so the geometry must not move; the re-check is the proof. The
+    # blank-width and auxiliary cam/notch/bore dimensions are driven; the tooth
+    # profile itself stays literal (volume_check here is the same one used above).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    notch_readback = {
+        str(row["full_name"]).split("@", 1)[0]: float(row["value_mm"])
+        for row in dump_dimensions(adapter, "NotchProfile")
+    }
+    for name, expected in (
+        ("NotchTipRadius", RA_MM),
+        ("NotchCenterX", abs(NOTCH_X)),
+        ("NotchDepth", NOTCH_DEPTH),
+    ):
+        actual = notch_readback.get(name)
+        if actual is None or not math.isclose(actual, expected, abs_tol=1e-6):
+            raise RuntimeError(
+                f"{name}@NotchProfile readback {actual!r}, expected {expected:g} mm"
+            )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "GearBlank",
+        "FaceWidth",
+        FACE_WIDTH_TOLERANCE_MM,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "CamProfile", "CamDia", *deviations(CAM_DIA_BAND)
+    )
+    # Centred (cylinder_bank_layout asserts it), so it prints +/-.
+    set_dimension_symmetric_tolerance(
+        adapter, "CamBoss", "OverallThickness", OVERALL_THICKNESS_BAND[0]
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "CamProfile",
+        "CamCy",
+        ECCENTRICITY_TOLERANCE_MM,
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "NotchProfile", "NotchWidth", *deviations(NOTCH_WIDTH_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter,
+        "NotchProfile",
+        "NotchDepth",
+        NOTCH_DEPTH_TOLERANCE_MM,
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter,
+        "NotchProfile",
+        "NotchPhase",
+        CAM_PHASE_TOLERANCE_DEG,
+        require_driven=True,
+    )
+    volume = await volume_check(
+        adapter, "driven cylinder gear (equations neutral)", volume, 0.01 * v_bore
+    )
+
+    await apply_material(adapter, MATERIAL)
+    await report_mass_properties(adapter)
+
+    # Mark exactly the blank, fitted bore, functional cam, stacking thickness
+    # and phase-kerf dimensions and author their decimal places on the part
+    # (policy rule 2: the places are the tolerance, so the sheet reads them
+    # back instead of rewriting them).  The drawing adds only a checked
+    # reference cam thickness.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+    )
+    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+
+
+if __name__ == "__main__":
+    sys.exit(run_build(build))

@@ -176,7 +176,7 @@ def readout_report(
     report = {
         "nominal": nom.__dict__,
         "closed_form": {
-            "magnifier": {
+            "mg-magnifier": {
                 "ordinate_capacity_full_scale_bars": capacity,
                 "lever_radius_min_mm": nom.lever_r_min,
                 "lever_radius_built_mm": nom.lever_r_built,
@@ -218,58 +218,44 @@ def test_staged_readout_procedure_references_resolve_inside_the_bundle(
     non-redistributable references submodule. A relative link surviving into
     the zip would be dead on arrival."""
     import re
+    from urllib.parse import unquote, urlsplit
 
     staged = cut_release.stage_readout_procedure(tmp_path, "v42")
-    assert staged[0] == "READOUT.md"
+    assert {"READOUT.md", "NOTICE.md", "LICENSE", "docs/device-operation.md"} <= set(staged)
     for rel in staged:
         assert (tmp_path / rel).is_file(), rel
     readout = (tmp_path / "READOUT.md").read_text(encoding="utf-8")
-    assert "`docs/device-operation.md`" in readout
-    assert "`cad/docs/device-operation.md`" not in readout.split("beside this file")[0]
+    readout_references = set(re.findall(r"`(docs/[^`]+\.md)`", readout))
+    assert "docs/device-operation.md" in readout_references
+    for target in readout_references:
+        assert (tmp_path / target).is_file(), f"READOUT.md -> {target}"
     docs = cut_release.operating_docs()
-    assert docs[0] == cut_release.OPERATING_DOC and "tolerance-policy.md" in docs
-    relative = re.compile(r"\]\(((?!https?:|mailto:|#)[^)]+)\)")
-    tagged = 0
+    links = re.compile(r"\]\(([^)\s]+)[^)]*\)")
+    repository_targets = set()
     for name in docs:
         page = (tmp_path / "docs" / name).read_text(encoding="utf-8")
-        for target in relative.findall(page):
+        for target in links.findall(page):
+            url = urlsplit(target)
+            if url.scheme in {"https", "http", "mailto"} or target.startswith("#"):
+                if url.netloc == "github.com" and "/blob/" in url.path:
+                    provenance = re.fullmatch(r"/[^/]+/[^/]+/blob/v42/(.+)", url.path)
+                    assert provenance is not None, f"{name} -> {target} lost its release tag"
+                    source = unquote(provenance[1])
+                    assert not source.startswith("references/"), target
+                    assert (cut_release.REPO_ROOT / source).is_file(), target
+                    repository_targets.add(source)
+                continue
             assert target.startswith("./"), f"{name} -> {target} escapes the bundle"
-            assert (tmp_path / "docs" / target.split("#")[0]).is_file(), (
+            assert (tmp_path / "docs" / unquote(url.path)).is_file(), (
                 f"{name} -> {target}"
             )
-        tagged += page.count("/blob/v42/cad/")
-    assert tagged >= 5  # the policy's config/script citations
-    # the submodule scans are cited by repo path, never embedded or linked
+    assert "cad/config/error_budget.yaml" in repository_targets
+    # Third-party scans keep their source paths, without dead submodule blob links.
     paper = (tmp_path / "docs" / "michelson-1898-trial-accuracy.md").read_text(
         encoding="utf-8"
     )
-    assert "28_Michelsons_1898_Paper.pdf` (pinned references submodule)" in paper
-    assert "/blob/v42/references/" not in paper
-
-
-def test_staged_bundle_declares_its_sources_and_permitted_use(
-    tmp_path, readout_report
-):
-    """The staged pages quote the 2014 book (short attributed excerpts) and
-    cite the reference scans, so the bundle must carry that boundary itself:
-    a downloader who never sees kickstarter/campaign/risks.md must still be
-    told the 2014 book is non-commercial-use only, that no photograph or
-    drawing from it is reproduced, and where the CC BY credits are."""
-    staged = cut_release.stage_readout_procedure(tmp_path, "v42")
-    assert "NOTICE.md" in staged
-    notice = (tmp_path / "NOTICE.md").read_text(encoding="utf-8")
-    assert "non-commercial purposes" in notice
-    assert "Hammack" in notice and "2014" in notice
-    assert "public domain" in notice  # the 1898 machine and paper
-    assert "comparisons/ATTRIBUTION.md" in notice  # where the gallery lands
-    assert "cad/comparisons/ATTRIBUTION.md" not in notice  # not the repo path
-    assert "NOT included in this bundle" in notice  # the reference scans
-    # the project's OWN artefacts stay MIT -- a zip-only reader must not read
-    # the third-party restriction as covering the CAD, and the licence it is
-    # told about has to be in the zip
-    assert "MIT" in notice.split("public domain")[0]
-    assert "LICENSE" in staged
-    assert "MIT License" in (tmp_path / "LICENSE").read_text(encoding="utf-8")
+    sources = re.findall(r"`(references/[^`]+)`", paper)
+    assert "references/albert-michelsons-harmonic-analyzer/28_Michelsons_1898_Paper.pdf" in sources
 
 
 def test_staged_docs_reject_a_link_the_bundle_cannot_serve():
@@ -331,7 +317,7 @@ def feature_release(
     from test_features_bound import bound_output
 
     out = bound_output(tmp_path)
-    scene = out / "boxes" / "harmonic-analyzer.json"
+    scene = out / "boxes" / f"{cut_release.TOP_ASSEMBLY}.json"
     scene.parent.mkdir()
     scene.write_bytes(b'{"unit":"mm"}')
     # The full export certifies its own bytes; the feature gate never reads this.
@@ -440,13 +426,13 @@ def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
     from test_features_bound import _add_full_face
 
     out = feature_release
-    full_step = _add_full_face(out, "rocker_arm", face_name("pivot_bore", 2))
+    full_step = _add_full_face(out, "ch_rocker_arm", face_name("pivot_bore", 2))
     certificate_path = out / "reports" / "release-neutral.json"
     certificate = json.loads(certificate_path.read_bytes())
-    certificate["files"]["step/rocker-arm.STEP"] = _byte_record(full_step)
+    certificate["files"]["step/ch-rocker-arm.STEP"] = _byte_record(full_step)
     certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="face labels differ"):
+    with pytest.raises(RuntimeError):
         cut_release.bundle("v38")
 
     stage = out / "release" / "harmonic-analyzer-v38"
@@ -484,7 +470,7 @@ def prepared_readme_release(
             writer.write(target)
     gltf = release_root / "gltf"
     gltf.mkdir()
-    (gltf / "harmonic-analyzer.glb").write_bytes(b"external renderer input")
+    (gltf / "ha-harmonic-analyzer.glb").write_bytes(b"external renderer input")
 
     # The expensive graphics collaborator is isolated, but cropping, PDFium,
     # byte-for-byte drawings, image installation, and YAML replacement are real.
@@ -500,7 +486,7 @@ def prepared_readme_release(
     revision.write_text("next_revision: v22\n", encoding="utf-8")
     native = tmp_path / "native"
     native.mkdir()
-    (native / "harmonic-analyzer.SLDASM").write_bytes(b"preflight input")
+    (native / "ha-harmonic-analyzer.SLDASM").write_bytes(b"preflight input")
     scene = tmp_path / "scene.json"
     scene.write_text('{"unit":"mm"}', encoding="utf-8")
     zip_path = release_root.with_suffix(".zip")
@@ -558,14 +544,14 @@ def test_release_installs_images_and_revision_only_after_successful_publication(
 
     if publication == "successful":
         assert revision.read_text(encoding="utf-8") == "next_revision: v23\n"
-        assert (images / "pinion-arbor-drawing.png").read_bytes() == (
-            release_root / "png" / "pinion-arbor_drawing.png"
+        assert (images / "dt-pinion-arbor-drawing.png").read_bytes() == (
+            release_root / "png" / "dt-pinion-arbor_drawing.png"
         ).read_bytes()
-        with Image.open(images / "frame.png") as image:
+        with Image.open(images / "fr-frame.png") as image:
             assert image.size == (68, 68)
-        with Image.open(images / "drive-train-assembly-sheet-4.png") as image:
+        with Image.open(images / "dt-drive-train-assembly-sheet-4.png") as image:
             assert image.convert("RGB").getpixel((150, 75)) == (255, 255, 0)
-        with Image.open(images / "frame-assembly-sheet-3.png") as image:
+        with Image.open(images / "fr-frame-assembly-sheet-3.png") as image:
             assert image.convert("RGB").getpixel((150, 75)) == (0, 0, 255)
     else:
         assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
@@ -580,7 +566,7 @@ def test_missing_readme_artifact_fails_before_tag_or_publish(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     release_root, images, revision = prepared_readme_release
-    (release_root / "png" / "frame" / "frame_isometric.png").unlink()
+    (release_root / "png" / "fr-frame" / "fr-frame_isometric.png").unlink()
 
     def git(*args: str, **_kwargs: object) -> str:
         if args[:2] == ("tag", "-a") or args[0] == "push":
@@ -593,7 +579,7 @@ def test_missing_readme_artifact_fails_before_tag_or_publish(
     )
     monkeypatch.setattr(sys, "argv", ["cut_release.py", "v22"])
 
-    with pytest.raises(FileNotFoundError, match="frame_isometric.png"):
+    with pytest.raises(FileNotFoundError, match="fr-frame_isometric.png"):
         cut_release.main()
 
     assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"

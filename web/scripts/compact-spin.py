@@ -100,7 +100,7 @@ def validate_seed_presentations(seeds):
 
 
 def main():
-    seeds = json.loads((common.WEB / "content" / "XPQwKRt4Y2k.source-seeds.json").read_text())
+    seeds = json.loads((common.WEB / "content" / "canonical-native" / "XPQwKRt4Y2k.source-seeds.json").read_text())
     validate_seed_presentations(seeds)
     data = common.load_observations("XPQwKRt4Y2k")
     controls = seeds["montageSourceControls"]

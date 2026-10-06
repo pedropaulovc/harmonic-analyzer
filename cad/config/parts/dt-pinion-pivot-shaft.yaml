@@ -1,0 +1,10 @@
+dt-pinion-pivot-shaft:
+  title: Pinion Pivot Shaft
+  number: MHA-DT-019
+  material: AISI 1018 cold-finished steel shafting
+  material_specification: AISI 1018 cold-finished steel shafting
+  finish: precision turned or ground; protect with ISO VG 32 machine-oil film
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "machined (steel)"

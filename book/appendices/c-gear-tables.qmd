@@ -43,6 +43,6 @@ TODO
 
 **Sources for this chapter**
 
-- `cad/scripts/build_cone_gear.py` (DP, PA)
+- `cad/scripts/build_dt_cone_gear.py` (DP, PA)
 - `cad/config/machine/gear_train.yaml`
 

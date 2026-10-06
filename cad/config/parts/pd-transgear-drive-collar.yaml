@@ -1,0 +1,9 @@
+pd-transgear-drive-collar:
+  title: Transgear Drive Collar
+  number: MHA-PD-022
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: bright machined, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned from bar (brass): face both ends, turn the pilot, ream the bore and the two drive-pin holes through, mill the rear slot"

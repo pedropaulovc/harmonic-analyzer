@@ -8,14 +8,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import _assembly_drawing
-import draw_channel_assembly
-import draw_drive_train_assembly
-import draw_frame_assembly
-import draw_harmonic_analyzer_assembly
-import draw_magnifier_assembly
-import draw_paper_drive_assembly
-import draw_pen_assembly
-import draw_summing_assembly
+import draw_ch_channel_assembly
+import draw_dt_drive_train_assembly
+import draw_fr_frame_assembly
+import draw_ha_harmonic_analyzer_assembly
+import draw_mg_magnifier_assembly
+import draw_pd_paper_drive_assembly
+import draw_pn_pen_assembly
+import draw_sm_summing_assembly
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -37,14 +37,14 @@ def _load_dodo():
 
 
 ASSEMBLY_DRAWINGS = (
-    draw_pen_assembly,
-    draw_channel_assembly,
-    draw_drive_train_assembly,
-    draw_frame_assembly,
-    draw_magnifier_assembly,
-    draw_paper_drive_assembly,
-    draw_summing_assembly,
-    draw_harmonic_analyzer_assembly,
+    draw_pn_pen_assembly,
+    draw_ch_channel_assembly,
+    draw_dt_drive_train_assembly,
+    draw_fr_frame_assembly,
+    draw_mg_magnifier_assembly,
+    draw_pd_paper_drive_assembly,
+    draw_sm_summing_assembly,
+    draw_ha_harmonic_analyzer_assembly,
 )
 
 SIMPLE_ASSEMBLY_DRAWINGS = tuple(
@@ -55,10 +55,10 @@ SIMPLE_ASSEMBLY_DRAWINGS = tuple(
     # sheet left it when it became three sheets with its own fit-up steps.
     if drawing
     not in (
-        draw_frame_assembly,
-        draw_drive_train_assembly,
-        draw_channel_assembly,
-        draw_paper_drive_assembly,
+        draw_fr_frame_assembly,
+        draw_dt_drive_train_assembly,
+        draw_ch_channel_assembly,
+        draw_pd_paper_drive_assembly,
     )
 )
 
@@ -82,41 +82,41 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
         deps = dodo._drawing_file_deps(spec.name)
         assert str(spec.source) in deps
         assert dodo._assembly_execution_token(spec.part) in deps
-        if drawing is draw_frame_assembly:
-            frame_dir = Path(draw_frame_assembly.__file__).resolve().parent
+        if drawing is draw_fr_frame_assembly:
+            frame_dir = Path(draw_fr_frame_assembly.__file__).resolve().parent
             assert {
-                str(frame_dir / "frame_attachment_spec.py"),
-                str(frame_dir / "frame_cross_screw_spec.py"),
-                str(frame_dir / "tube_frame_cap_spec.py"),
+                str(frame_dir / "fr_frame_attachment_spec.py"),
+                str(frame_dir / "vn_frame_cross_screw_spec.py"),
+                str(frame_dir / "vn_tube_frame_cap_spec.py"),
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
-        elif drawing is draw_channel_assembly:
-            scripts_dir = Path(draw_channel_assembly.__file__).resolve().parent
+        elif drawing is draw_ch_channel_assembly:
+            scripts_dir = Path(draw_ch_channel_assembly.__file__).resolve().parent
             assert {
-                str(scripts_dir / "channel_assembly_steps.py"),
+                str(scripts_dir / "ch_channel_assembly_steps.py"),
                 str(scripts_dir / "rocker_bank_layout.py"),
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
-        elif drawing is draw_drive_train_assembly:
-            scripts_dir = Path(draw_drive_train_assembly.__file__).resolve().parent
-            assert str(scripts_dir / "drive_train_assembly_spec.py") in deps
+        elif drawing is draw_dt_drive_train_assembly:
+            scripts_dir = Path(draw_dt_drive_train_assembly.__file__).resolve().parent
+            assert str(scripts_dir / "dt_drive_train_assembly_spec.py") in deps
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps
-        elif drawing is draw_paper_drive_assembly:
-            scripts_dir = Path(draw_paper_drive_assembly.__file__).resolve().parent
+        elif drawing is draw_pd_paper_drive_assembly:
+            scripts_dir = Path(draw_pd_paper_drive_assembly.__file__).resolve().parent
             # The steps module, the drive-train steps it reuses, and every
             # spec/geometry module whose constants the sheets print.
             assert {
                 str(scripts_dir / name)
                 for name in (
-                    "paper_drive_assembly_steps.py",
-                    "drive_train_steps.py",
-                    "transgear_collar_cross_pin_spec.py",
-                    "transgear_drive_collar_spec.py",
-                    "transgear_disc_screw_spec.py",
-                    "transgear_pivot_screw_spec.py",
-                    "transgear_knob_shaft_spec.py",
+                    "pd_paper_drive_assembly_steps.py",
+                    "dt_drive_train_steps.py",
+                    "vn_transgear_collar_cross_pin_spec.py",
+                    "pd_transgear_drive_collar_spec.py",
+                    "vn_transgear_disc_screw_spec.py",
+                    "vn_transgear_pivot_screw_spec.py",
+                    "pd_transgear_knob_shaft_spec.py",
                     "transgear_hanger_joints.py",
-                    "latch_hook_bracket_geometry.py",
+                    "pd_latch_hook_bracket_geometry.py",
                 )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps

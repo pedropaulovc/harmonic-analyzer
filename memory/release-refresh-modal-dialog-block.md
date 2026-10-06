@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 `doit release` (and any incremental `refresh_assembly`) failed at the FIRST COM
 step with `open <asm> failed: Failed to open model: …\frame.SLDASM`, while a
 full `doit` build of the same model was green minutes earlier. Root cause was

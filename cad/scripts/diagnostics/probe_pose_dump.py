@@ -33,14 +33,14 @@ import _telemetry  # noqa: E402
 from _common import OUT_SLDASM, _flag, _read_member, log  # noqa: E402
 
 ASSEMBLIES = (
-    "frame",
-    "channel",
-    "drive-train",
-    "magnifier",
-    "summing",
-    "pen",
-    "paper-drive",
-    "harmonic-analyzer",
+    "fr-frame",
+    "ch-channel",
+    "dt-drive-train",
+    "mg-magnifier",
+    "sm-summing",
+    "pn-pen",
+    "pd-paper-drive",
+    "ha-harmonic-analyzer",
 )
 
 TRANS_TOL_MM = 1e-3

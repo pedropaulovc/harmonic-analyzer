@@ -1,0 +1,13 @@
+vn-cone-tip-collar:
+  title: Cone Tip Stack Collar
+  number: MHA-VN-016
+  stock_name: Black-Oxide Carbon Steel Set Screw Shaft Collar
+  supplier: McMaster-Carr
+  supplier_skus: [9414T1]
+  material: Plain Carbon Steel
+  material_specification: "1215 carbon steel, black oxide; McMaster-Carr 9414T1"
+  finish: black oxide
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

@@ -69,10 +69,10 @@ async def main():
     # (2) ONE walk -> cache target dispatches (pay 269s once, not per frame).
     log("  one-time walk to cache target dispatches ...")
     comps = _components(adapter)
-    crank = _find_one(adapter, "crankshaft-1", comps=comps)
-    gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
-    rocks = _by_z_rank(adapter, "rocker-arm", comps=comps)
-    rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
+    crank = _find_one(adapter, "dt-crankshaft-1", comps=comps)
+    gears = _by_z_rank(adapter, "dt-cylinder-gear", comps=comps)
+    rocks = _by_z_rank(adapter, "ch-rocker-arm", comps=comps)
+    rods = _by_z_rank(adapter, "ch-connecting-rod", comps=comps)
     targets = {
         "crank": crank,
         "cylgear0": gears[0] if gears else (None, None),

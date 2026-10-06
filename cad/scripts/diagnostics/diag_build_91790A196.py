@@ -8,7 +8,7 @@ is pending (``transgear_arm_plate_screw_spec``).
 Built by the shared 91790A oval recipe in ``diag_mcmaster_oval.py`` (see its
 docstring for the live-page facts and the [INFERENCE] head, slot and thread
 laws).  Without arguments it builds the supplied screw; ``cut_length`` with
-``cut_end_break`` draws it cut to fit, as the MHA-166 part installs it.  No
+``cut_end_break`` draws it cut to fit, as the MHA-VN-040 part installs it.  No
 vendor SLDPRT is downloaded or committed, so the standalone run is
 catalog-only (the supplied screw).
 

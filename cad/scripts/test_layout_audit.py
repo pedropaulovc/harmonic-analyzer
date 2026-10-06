@@ -141,13 +141,13 @@ def _kinds(findings):
 
 
 # --------------------------------------------------------------------------
-# Real display data: MHA-035 harmonic base, sheet 2
+# Real display data: MHA-FR-001 harmonic base, sheet 2
 # --------------------------------------------------------------------------
 
-# hb-render-2 (e533ef6fd's layout): the MHA-004 transfer callout, as the leaf
+# hb-render-2 (e533ef6fd's layout): the MHA-DT-002 transfer callout, as the leaf
 # logged its IDisplayDimension display data.
 HB2_PEDESTAL = (
-    "MHA-004",
+    "MHA-DT-002",
     [
         (0.264542, 0.218153, 0.23054, 0.240834),
         (0.265261, 0.217673, 0.264542, 0.218153),
@@ -159,7 +159,7 @@ HB2_PEDESTAL = (
         (" 3.45 ", 0.191216, 0.25761),
         ("<HOLE-DEPTH>", 0.202854, 0.257556),
         (" 19.50", 0.207854, 0.25761),
-        ("TRANSFER FROM MHA-004", 0.171047, 0.252),
+        ("TRANSFER FROM MHA-DT-002", 0.171047, 0.252),
         ("AT ASSEMBLY;", 0.184746, 0.246444),
         (" 8-32 UNC - 2B ", 0.174589, 0.240888),
         ("<HOLE-DEPTH>", 0.20748, 0.240834),
@@ -167,7 +167,7 @@ HB2_PEDESTAL = (
     ],
 )
 HB2_BLOCK = (
-    "MHA-061",
+    "MHA-DT-018",
     [
         (0.278736, 0.216933, 0.29254, 0.240834),
         (0.278304, 0.216185, 0.278736, 0.216933),
@@ -179,7 +179,7 @@ HB2_BLOCK = (
         (" 3.45 ", 0.253216, 0.25761),
         ("<HOLE-DEPTH>", 0.264854, 0.257556),
         (" 15.00", 0.269854, 0.25761),
-        ("TRANSFER FROM MHA-061", 0.233047, 0.252),
+        ("TRANSFER FROM MHA-DT-018", 0.233047, 0.252),
         ("AT ASSEMBLY;", 0.246746, 0.246444),
         (" 8-32 UNC - 2B ", 0.236589, 0.240888),
         ("<HOLE-DEPTH>", 0.26948, 0.240834),
@@ -194,10 +194,10 @@ HB4_TOP_LABEL = (0.169863, 0.23265, 0.214585, 0.237034)
 # 'view holes top'); the label and every callout sit outside it.
 HOLES_TOP_OUTLINE = (0.22285, 0.1591, 0.33715, 0.2309)
 
-# hb-render-4: the MHA-114 spring callout and the MHA-132 cross-tap callout
+# hb-render-4: the MHA-DT-024 spring callout and the MHA-VN-027 cross-tap callout
 # whose top row sits 1.7 mm under the spring callout's underline.
 HB4_SPRING = (
-    "MHA-114",
+    "MHA-DT-024",
     [
         (0.271414, 0.175759, 0.274041, 0.136412),
         (0.271376, 0.176323, 0.271414, 0.175759),
@@ -208,14 +208,14 @@ HB4_SPRING = (
         (" 2.26 ", 0.302855, 0.147632),
         ("<HOLE-DEPTH>", 0.314492, 0.147578),
         (" 11.30", 0.319493, 0.147632),
-        ("TRANSFER FROM MHA-114", 0.286047, 0.142022),
+        ("TRANSFER FROM MHA-DT-024", 0.286047, 0.142022),
         ("AT ASSEMBLY; 4-40 UNC - 2B ", 0.275628, 0.136466),
         ("<HOLE-DEPTH>", 0.339027, 0.136412),
         (" 9.28", 0.344027, 0.136466),
     ],
 )
 HB4_CROSS_TAP = (
-    "MHA-132",
+    "MHA-VN-027",
     [
         (0.329717, 0.098055, 0.342356, 0.103278),
         (0.328783, 0.09767, 0.329717, 0.098055),
@@ -227,7 +227,7 @@ HB4_CROSS_TAP = (
         (" 4.04 ", 0.274406, 0.131166),
         ("<HOLE-DEPTH>", 0.286043, 0.131113),
         (" 48 MIN", 0.291044, 0.131166),
-        ("MHA-132 TUBE CROSS-SCREWS", 0.250907, 0.125556),
+        ("MHA-VN-027 TUBE CROSS-SCREWS", 0.250907, 0.125556),
         ("THRU BOTH WALLS, SINGLE CONTINUOUS THREAD", 0.230711, 0.12),
         ("DEPTHS FROM SPOTFACE FLOOR", 0.248979, 0.114444),
         ("ON A1-A4 X CENTRES", 0.261375, 0.108888),
@@ -246,12 +246,12 @@ def _holes_sheet(top_label, *callouts):
 
 
 def test_e533ef6fd_leader_through_the_top_view_label_is_found():
-    """Positive control: hb-render-2's MHA-004 leader struck "TOP VIEW SCALE 1:4"."""
+    """Positive control: hb-render-2's MHA-DT-002 leader struck "TOP VIEW SCALE 1:4"."""
     findings = audit_dump(_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK))
     hits = [
         f
         for f in findings
-        if f.kind == "leader-through-text" and "MHA-004" in f.a and "TOP VIEW" in f.b
+        if f.kind == "leader-through-text" and "MHA-DT-002" in f.a and "TOP VIEW" in f.b
     ]
     assert len(hits) == 1
     assert severity(hits[0]) is FindingSeverity.GATING
@@ -278,7 +278,7 @@ def test_hb_render_4_cross_tap_under_the_spring_underline_reads_as_one_callout()
         f
         for f in findings
         if f.kind in ("text-clearance", "merged-blocks", "text-separation")
-        and {f.a.split()[1], f.b.split()[1]} == {"MHA-114", "MHA-132"}
+        and {f.a.split()[1], f.b.split()[1]} == {"MHA-DT-024", "MHA-VN-027"}
     ]
     assert pair
     assert min(f.extra["gap_mm"] for f in pair) == pytest.approx(1.75, abs=0.05)
@@ -293,7 +293,7 @@ def test_stacked_callouts_under_a_row_pitch_apart_read_as_one_block():
         _holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK, HB4_SPRING, HB4_CROSS_TAP)
     ).geometry
     merged = find_merged_blocks(sheet)
-    assert [(f.a.split()[1], f.b.split()[1]) for f in merged] == [("MHA-114", "MHA-132")]
+    assert [(f.a.split()[1], f.b.split()[1]) for f in merged] == [("MHA-DT-024", "MHA-VN-027")]
     assert merged[0].extra["gap_mm"] == pytest.approx(1.75, abs=0.05)
     assert merged[0].extra["limit_mm"] == pytest.approx(5.556, abs=0.01)
     assert severity(merged[0]) is FindingSeverity.GATING
@@ -304,7 +304,7 @@ def test_a_callout_over_four_rows_is_a_tall_block():
     rows (Main's 4-row ruling). The 3-row spring and 4-row transfer pass."""
     findings = audit_dump(_holes_sheet(HB4_TOP_LABEL, HB2_PEDESTAL, HB4_SPRING, HB4_CROSS_TAP))
     tall = [f for f in findings if f.kind == "tall-block"]
-    assert [(f.a, f.extra["rows"]) for f in tall] == [("hole-callout MHA-132", 6)]
+    assert [(f.a, f.extra["rows"]) for f in tall] == [("hole-callout MHA-VN-027", 6)]
     assert severity(tall[0]) is FindingSeverity.GATING
 
 
@@ -328,7 +328,7 @@ def test_callout_rows_centre_on_the_shoulder_and_tokens_are_one_glyph():
 
 
 def test_touching_dimension_texts_fail_the_clearance():
-    """MHA-092's "20.8" and "8.42" printed as "20.88.42": zero gap, no overlap.
+    """MHA-DT-021's "20.8" and "8.42" printed as "20.88.42": zero gap, no overlap.
     A penetration test passes that; a clearance test does not."""
     advance = 0.6
     h = 0.0035
@@ -370,7 +370,7 @@ def test_a_dimension_text_under_a_note_fails_the_clearance(note_x, expected):
 
 
 def test_text_crossed_by_a_foreign_view_edge_is_found():
-    """MHA-092's ADJUSTER ENTRY: a callout's text crossed by ANOTHER view's
+    """MHA-DT-021's ADJUSTER ENTRY: a callout's text crossed by ANOTHER view's
     outline edge. Model edges are the PDF's 0.25 mm solid strokes."""
     # A single vertical model edge of the right view at x = 0.130.
     right_view = _view("right", (0.128, 0.078, 0.170, 0.162))
@@ -418,7 +418,7 @@ def test_text_crossed_by_a_hidden_edge_is_found_but_not_by_its_own_centre_mark()
 
 
 def _mha_092_pre_287c_sheet():
-    """MHA-092's three collisions as Main's I31 eye pass measured them, rebuilt
+    """MHA-DT-021's three collisions as Main's I31 eye pass measured them, rebuilt
     as display data (the calibration run's own dump replaces this once logged):
 
     * plan "20.8" 0.68 mm left of "8.42" -- same view, no overlap;
@@ -573,7 +573,7 @@ def test_a_leader_crossing_another_dimension_line_is_found():
 
 def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
     """swing, #902 case 2: collect_document tags only the run touching the
-    text as leader, so MHA-091 RD1's rim-to-shelf diagonal read "line" and a
+    text as leader, so MHA-DT-020 RD1's rim-to-shelf diagonal read "line" and a
     leader crossing it passed audit_sheet. The shared audit takes every
     display line of a hole callout as leader. RD1's lines are the S1 @
     ac4fa6dd0 dump's; RD3 is moved so its diagonal crosses RD1's."""
@@ -837,7 +837,7 @@ def test_the_audit_span_carries_per_class_counts(monkeypatch, tmp_path):
 # hb-render-5 (375bf2aad, supports' fix): the cross-tap cut to three rows and
 # lowered 10 mm clear of the spring block (dt-logs/hb-render-5 line 54).
 HB5_CROSS_TAP = (
-    "MHA-132",
+    "MHA-VN-027",
     [
         (0.3295759581969177, 0.09824798610154864, 0.3408763902127743, 0.11161215219646692),
         (0.3289240418030824, 0.09747701389845134, 0.3295759581969177, 0.09824798610154864),
@@ -867,7 +867,7 @@ def test_hb_render_5_fixed_cross_tap_passes_the_block_rules():
         f
         for f in findings
         if f.kind in ("merged-blocks", "tall-block", "text-clearance", "text-separation")
-        and "MHA-132" in f.a + f.b
+        and "MHA-VN-027" in f.a + f.b
     ]
 
 
@@ -1284,7 +1284,7 @@ def test_arrow_clearance_to_a_balloon_is_measured_to_its_ring():
 
 
 def test_a_leader_across_a_section_cutting_line_gates():
-    """Main's ruling: gating -- the MHA-025 finish leader was moved off its
+    """Main's ruling: gating -- the MHA-DT-010 finish leader was moved off its
     A-A line for exactly this."""
     callout = _hole_callout(
         "C", [(0.160, 0.120, 0.190, 0.150), (0.190, 0.150, 0.230, 0.150)], [("THRU", 0.190, 0.1502)]
@@ -1647,7 +1647,7 @@ def test_a_dimension_line_across_a_foreign_extension_line_gates_only_at_text():
 
 
 # --------------------------------------------------------------------------
-# Arrow and extension line near foreign text (Main's ruling on swing's MHA-092
+# Arrow and extension line near foreign text (Main's ruling on swing's MHA-DT-021
 # round-2 rule). Ink measured off the 287c5cf6a cone-tip-block render, sheet
 # mm (C:/src/dt-logs/handoffs/mha092-r2-fixtures.md).
 # --------------------------------------------------------------------------
@@ -3084,7 +3084,7 @@ def test_diagonal_balloons_are_separated_by_their_circles():
 
 
 def test_a_tables_own_grid_line_is_not_a_line_through_its_text():
-    """drive-train-assembly's BOM: the table came back as a sheet annotation
+    """dt-drive-train-assembly's BOM: the table came back as a sheet annotation
     labelled with its first row AND as ``tables`` ``table <name>``, so its own
     column rule read as a foreign line through the table."""
     table = {
@@ -3148,7 +3148,7 @@ def test_reciprocal_dimension_crossings_are_one_finding_the_worse():
 
 
 def test_a_dimensions_own_extension_line_through_its_text_gates():
-    """conegear's MHA-014 (#916 388d1e3fb): "10.781", parked outside its
+    """conegear's MHA-DT-004 (#916 388d1e3fb): "10.781", parked outside its
     extension lines, printed with its own collar-face witness line through
     "0" and "7". text-on-line skips an annotation's own ink, so nothing saw
     it. A witness line that only touches a row's corner is not a strike."""
@@ -3268,7 +3268,7 @@ def _finish_symbol(leader):
 
 
 def test_a_finish_symbols_leader_through_its_own_text_gates():
-    """Main's gate-gap sweep (3), MHA-116's crown Ra: a finish symbol's leader
+    """Main's gate-gap sweep (3), MHA-DT-025's crown Ra: a finish symbol's leader
     reaches the audit as ``leader`` (its registered GetLeaderPointsAtIndex
     runs; the display copy is dropped), so a leader struck back through its
     own "Ra" text is leader-through-own-text. The real symbol, leader clear
@@ -3313,7 +3313,7 @@ def test_mha116s_crown_finish_leader_through_its_ra_text_gates():
 
 
 def _crown_finish_strikes(mm, y):
-    """leader-through-own-text on MHA-116's crown finish symbol rooted at
+    """leader-through-own-text on MHA-DT-025's crown finish symbol rooted at
     (120, ``y``) mm, its leader running to the crown point (152.6, 159.0)."""
     symbol = {
         "type": 7,
@@ -3339,7 +3339,7 @@ def _crown_finish_strikes(mm, y):
 
 
 # --------------------------------------------------------------------------
-# Real case: MHA-089 rocker-arm-support, datum origin (af13c8ff8)
+# Real case: MHA-FR-005 rocker-arm-support, datum origin (af13c8ff8)
 # --------------------------------------------------------------------------
 
 # DetailItem361 as the leaf logged it: "0"/"X" on the X axis (one baseline),
@@ -3399,7 +3399,7 @@ def test_a_datum_origins_axis_between_its_own_labels_is_not_through_its_text():
 
 
 # --------------------------------------------------------------------------
-# Real cases: MHA-089 rocker-arm-support, rocker fix3 (6a5d8dd5c)
+# Real cases: MHA-FR-005 rocker-arm-support, rocker fix3 (6a5d8dd5c)
 # --------------------------------------------------------------------------
 #
 # reviewfirst's packet (dt-logs/layout-blindspots/mha089-rocker/cases.json):
@@ -3432,12 +3432,12 @@ def _rocker_span(text, box):
 
 def _rocker_seat_note(fixed):
     """A: the plan's 177.8 left extension line (x 60.54) through the seat
-    note's "TRANSFER FROM MHA-123"; fixed by wrapping the note (widest row
+    note's "TRANSFER FROM MHA-CH-008"; fixed by wrapping the note (widest row
     ends at x 52.1)."""
     row = ((16.1, 244.8), (52.1 if fixed else 73.7, 248.4))
-    note = _note("SeatNote", "TRANSFER FROM MHA-123", (row[0][0] * _MM, row[0][1] * _MM, row[1][0] * _MM, row[1][1] * _MM))
+    note = _note("SeatNote", "TRANSFER FROM MHA-CH-008", (row[0][0] * _MM, row[0][1] * _MM, row[1][0] * _MM, row[1][1] * _MM))
     width = _rocker_dim("Depth", "177.8", ((95.0, 258.0), (105.0, 261.5)), lines=[(60.54, 141.53, 60.54, 256.19)])
-    spans = [_rocker_span("TRANSFER FROM MHA-123", row), _rocker_span("177.8", ((95.0, 258.0), (105.0, 261.5)))]
+    spans = [_rocker_span("TRANSFER FROM MHA-CH-008", row), _rocker_span("177.8", ((95.0, 258.0), (105.0, 261.5)))]
     return _dump(views=[_view("plan", (0.010, 0.130, 0.200, 0.265), [width])], sheet_annotations=[note], spans=spans, print_rest=False)
 
 
@@ -4076,7 +4076,7 @@ def test_report_mode_passes_a_gating_kind_that_is_not_enforced(monkeypatch, tmp_
 def test_frame_assembly_fails_its_leaf_on_a_leader_printed_through_its_own_balloon(
     monkeypatch, tmp_path, com_inside_m, ink, kind
 ):
-    """frame-assembly's short-leader balloons check their leader start only
+    """fr-frame-assembly's short-leader balloons check their leader start only
     right after SetPosition; after the rebuild the printed leader is the
     evidence, so REPORT fails that drawing on a leader printed 1.5 mm inside
     its ring (read from the ring by COM), or on two printed starts. A COM
@@ -4088,12 +4088,12 @@ def test_frame_assembly_fails_its_leaf_on_a_leader_printed_through_its_own_ballo
     live = _patch_collect(monkeypatch, [dump])
     assert not {"leader-through-own-text", "leader-ink-ambiguous"} & _layout_audit.ENFORCED_KINDS
     _run(live, LayoutAuditMode.REPORT, tmp_path / "other.json")
-    frame = tmp_path / "frame-assembly.json"
+    frame = tmp_path / "fr-frame-assembly.json"
     if kind is None:
-        _run(live, LayoutAuditMode.REPORT, frame, stem="frame-assembly")
+        _run(live, LayoutAuditMode.REPORT, frame, stem="fr-frame-assembly")
         return
     with pytest.raises(RuntimeError, match=rf"(?s)frame-assembly .*\[{kind}\]"):
-        _run(live, LayoutAuditMode.REPORT, frame, stem="frame-assembly")
+        _run(live, LayoutAuditMode.REPORT, frame, stem="fr-frame-assembly")
 
 
 _ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -4135,7 +4135,7 @@ def test_a_zero_length_display_line_is_no_ink_and_is_counted():
     dump = _dump(views=[_view("Drawing View1", (0.030, 0.060, 0.125, 0.165), [CPP_MAIN_BODY_HT])])
     findings = [f for f in audit_dump(dump) if "MainBodyHt" in f.a or "MainBodyHt" in f.b]
     assert not {"outside-border", "keep-out"} & set(_kinds(findings))
-    report, _gating = audit_report("cone-pivot-post", LayoutAuditMode.REPORT, [dump])
+    report, _gating = audit_report("dt-cone-pivot-post", LayoutAuditMode.REPORT, [dump])
     assert report["summary"]["degenerate_lines"] == {"Sheet2": 15}
 
 
@@ -4289,7 +4289,7 @@ def test_a_sheet_note_restating_a_view_callouts_thread_gates():
         ("#8-32 Tapped Hole", ["#8-32"]),
         ("4X M6x1.0 - 6H", ["M6X1.0"]),
         ("1018 CF FLAT 1/4 x 2-1/2 in", []),
-        ("TRANSFER FROM MHA-016", []),
+        ("TRANSFER FROM MHA-DT-005", []),
         ("DIMENSIONING AND TOLERANCING PER ASME Y14.5-2018", []),
     ],
 )
@@ -4339,7 +4339,7 @@ def test_an_annotation_on_a_non_printing_layer_is_counted_not_audited(state, aud
     dump = {**_dump(views=[view]), "layers": {"COSMETIC-THREADS-HIDDEN": state}}
     labels = {a.label for a in sheet_model(dump).geometry.annotations}
     assert any("DetailItem349" in label for label in labels) is audited
-    report, _gating = audit_report("cone-swing-platform", LayoutAuditMode.REPORT, [dump])
+    report, _gating = audit_report("dt-cone-swing-platform", LayoutAuditMode.REPORT, [dump])
     assert report["summary"]["hidden_layer"] == ({} if audited else {"Sheet2": 1})
 
 
@@ -4356,7 +4356,7 @@ def test_a_view_owned_annotation_on_a_hidden_layer_counts_once():
         **_dump(views=[view], sheet_annotations=[SWING_HIDDEN_TAPPED_HOLE]),
         "layers": {"COSMETIC-THREADS-HIDDEN": {"visible": True, "printable": False}},
     }
-    report, _gating = audit_report("cone-swing-platform", LayoutAuditMode.REPORT, [dump])
+    report, _gating = audit_report("dt-cone-swing-platform", LayoutAuditMode.REPORT, [dump])
     assert report["summary"]["hidden_layer"] == {"Sheet2": 1}
 
 

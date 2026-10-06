@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 # Paper-drive rework — reference findings + design (2026-07-07)
 
 User-reported issues (8) audited against book ch22/ch23, videos 2/4 + 4/4, ch30

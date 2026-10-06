@@ -39,7 +39,9 @@ cutters for the gear train's pitch do not exist, so you make your own. The book
 says exactly where the difficulty is instead of pretending it's uniform.
 
 **How long does a build take?**
-Unknown, honestly. There are 102 parts, and six of them repeat about 20 times.
+Unknown, honestly. The CAD inventory has
+[146 registered part families](../../cad/docs/subsystem-identities.md), including
+parts repeated across the twenty channels.
 The logbook records real hours per part as they are cut, and the book publishes
 those numbers.
 

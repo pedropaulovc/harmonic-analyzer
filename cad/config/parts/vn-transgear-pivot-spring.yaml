@@ -1,0 +1,15 @@
+vn-transgear-pivot-spring:
+  title: Transgear Pivot Spring
+  number: MHA-VN-049
+  stock_name: Curved Disc Spring
+  supplier: McMaster-Carr
+  supplier_skus: [9715K43]
+  material: Plain Carbon Steel
+  material_specification: "High-carbon steel curved disc spring for 0.190 shaft; McMaster-Carr 9715K43"
+  finish: plain; no coating
+  installation_notes: |-
+    INSTALLATION - ON THE MHA-VN-041 SHOULDER, UNDER ITS HEAD,
+    IN THE MHA-PD-018 SPOT FACE.
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

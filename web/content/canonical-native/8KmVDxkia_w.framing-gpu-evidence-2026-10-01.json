@@ -1,0 +1,200 @@
+{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json","originalSha256":"239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173","mappingSchemaVersion":2,"mappingSha256":"1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd","originalNumericLexemeSha256":"04ef40145c0f6cca49b050d7ecdc2ebc89b438a19a7f132c06ac0ea919fe40ce","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{}},
+  "kind": "immutable-selected-synthesis-framing-gpu-evidence",
+  "videoId": "8KmVDxkia_w",
+  "originalReport": {
+    "path": "web/.vite/verification-output/stage50-seed-clock-repaired-native-2026-10-01/8KmVDxkia_w.json",
+    "sha256": "4ddd093195390857e2caabf94c9a2ee9e71ac286367a58fb6160e05be037ae3f"
+  },
+  "retention": "Exact parsed original cone-overview62 and wheel-macro252.00175 sample rows, including unchanged FIT/CHECK roles, readbacks, capture clocks, source-image replay and draw revisions. Other report samples and whole-report acceptance diagnostics are not active inputs; this subset claims no source acceptance.",
+  "samples": [
+    {
+      "timeSeconds": 62,
+      "reasons": [
+        "every-second",
+        "authored-sample"
+      ],
+      "diagnosticOnly": false,
+      "required": true,
+      "sourceShotId": "cone-overview",
+      "sampleTimeSeconds": 62,
+      "sourceImageReplay": null,
+      "status": "unavailable",
+      "measurements": [
+        {
+          "viewId": "main",
+          "anchorId": "crank-axis-back",
+          "role": "fit",
+          "motion": "unknown",
+          "sourcePixels": [
+            469,
+            329
+          ],
+          "method": "gpu-readback",
+          "nativePixels": [
+            1075.8,
+            381
+          ],
+          "canvasPixels": [
+            896.5,
+            351.5
+          ],
+          "rawErrorPx": 609.0240060949978,
+          "sourceUncertaintyPx": 5,
+          "rasterUncertaintyPx": 0.848528137423857,
+          "errorPx": 614.8725342324217,
+          "errorFrameWidthPercent": 32.02461115793863,
+          "status": "passed",
+          "captureTimeSeconds": 62,
+          "nativeMediaTime": 62.020291,
+          "sourceDrawRevision": 304,
+          "sourceSampling": {
+            "fromTimeSeconds": 62,
+            "toTimeSeconds": 63,
+            "mix": 0,
+            "selection": "continuous",
+            "cameraSelection": "decoded-exposure"
+          },
+          "independentMidIntervalObservation": false
+        },
+        {
+          "viewId": "main",
+          "anchorId": "cylinder-axis-back",
+          "role": "fit",
+          "motion": "fixed",
+          "sourcePixels": [
+            1430,
+            704
+          ],
+          "method": "gpu-readback",
+          "nativePixels": [
+            1595.4,
+            519
+          ],
+          "canvasPixels": [
+            1329.5,
+            466.5
+          ],
+          "rawErrorPx": 248.15753061311685,
+          "sourceUncertaintyPx": 5,
+          "rasterUncertaintyPx": 0.848528137423857,
+          "errorPx": 254.00605875054072,
+          "errorFrameWidthPercent": 13.229482226590664,
+          "status": "passed",
+          "captureTimeSeconds": 62,
+          "nativeMediaTime": 62.020291,
+          "sourceDrawRevision": 304,
+          "sourceSampling": {
+            "fromTimeSeconds": 62,
+            "toTimeSeconds": 63,
+            "mix": 0,
+            "selection": "continuous",
+            "cameraSelection": "decoded-exposure"
+          },
+          "independentMidIntervalObservation": false
+        }
+      ],
+      "unavailable": [
+        {
+          "viewId": "main",
+          "status": "source-unavailable",
+          "reason": "Required source view has no independent CHECK landmarks; FIT residuals are diagnostic only"
+        }
+      ],
+      "excluded": [],
+      "maxClockSkewSeconds": 0.02029100000000028
+    },
+    {
+      "timeSeconds": 252.00175,
+      "reasons": [
+        "authored-change-point",
+        "shot-end",
+        "shot-start",
+        "authored-sample",
+        "retained-layout-change"
+      ],
+      "diagnosticOnly": false,
+      "required": true,
+      "sourceShotId": "wheel-macro",
+      "sampleTimeSeconds": 252.00175,
+      "sourceImageReplay": null,
+      "status": "passed",
+      "measurements": [
+        {
+          "viewId": "main",
+          "anchorId": "wheel-centre",
+          "role": "fit",
+          "motion": "fixed",
+          "sourcePixels": [
+            1145,
+            555
+          ],
+          "method": "gpu-readback",
+          "nativePixels": [
+            959.4,
+            547.8
+          ],
+          "canvasPixels": [
+            799.5,
+            490.5
+          ],
+          "rawErrorPx": 185.73960266997454,
+          "sourceUncertaintyPx": 5,
+          "rasterUncertaintyPx": 0.848528137423857,
+          "errorPx": 191.58813080739841,
+          "errorFrameWidthPercent": 9.978548479552,
+          "status": "passed",
+          "captureTimeSeconds": 252.00175,
+          "nativeMediaTime": 252.00175,
+          "sourceDrawRevision": 689,
+          "sourceSampling": {
+            "fromTimeSeconds": 252.00175,
+            "toTimeSeconds": 253,
+            "mix": 0,
+            "selection": "continuous",
+            "cameraSelection": "decoded-exposure"
+          },
+          "independentMidIntervalObservation": false
+        },
+        {
+          "viewId": "main",
+          "anchorId": "wheel-hanger-screw",
+          "role": "check",
+          "motion": "fixed",
+          "sourcePixels": [
+            1695,
+            556
+          ],
+          "method": "gpu-readback",
+          "nativePixels": [
+            1431,
+            533.4
+          ],
+          "canvasPixels": [
+            1192.5,
+            478.5
+          ],
+          "rawErrorPx": 264.9655826706556,
+          "sourceUncertaintyPx": 5,
+          "rasterUncertaintyPx": 0.848528137423857,
+          "errorPx": 270.8141108080794,
+          "errorFrameWidthPercent": 14.10490160458747,
+          "status": "passed",
+          "captureTimeSeconds": 252.00175,
+          "nativeMediaTime": 252.00175,
+          "sourceDrawRevision": 689,
+          "sourceSampling": {
+            "fromTimeSeconds": 252.00175,
+            "toTimeSeconds": 253,
+            "mix": 0,
+            "selection": "continuous",
+            "cameraSelection": "decoded-exposure"
+          },
+          "independentMidIntervalObservation": false
+        }
+      ],
+      "unavailable": [],
+      "excluded": [],
+      "maxClockSkewSeconds": 0
+    }
+  ]
+}

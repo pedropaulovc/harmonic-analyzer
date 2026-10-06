@@ -13,7 +13,7 @@ Implementation and fidelity limits are described in [`DESIGN.md`](DESIGN.md).
 
 ```sh
 npm --prefix web ci
-npm --prefix web run fetch-model -- /path/to/harmonic-analyzer.glb
+npm --prefix web run fetch-model -- /path/to/ha-harmonic-analyzer.glb
 npm --prefix web run dev
 ```
 
@@ -21,7 +21,7 @@ The model is a generated artifact, absent from a fresh checkout. Use the exact
 raw CAD export identified by `src/mechanics-data.ts`; incompatible bytes are
 rejected. `fetch-model` validates the current raw pin, performs lossless exact
 deduplication and Meshopt compression, then publishes only the optimized GLB.
-It also accepts the existing `cad/out/gltf/` export when no path is supplied.
+It also accepts `cad/out/gltf/ha-harmonic-analyzer.glb` when no path is supplied.
 The raw cache stays outside public assets under `web/.vite/model-source/`.
 Missing models and failed YouTube playback produce visible errors.
 
@@ -67,6 +67,71 @@ The video embeds use the official YouTube IFrame API. Downloaded source videos,
 reference screenshots and the GLB remain untracked; the site does not host or
 redistribute the footage.
 
+## Canonical identity evidence audit
+
+`content/canonical-native/manifest.json` seals 29 identity-only derivatives.
+The sole mapping authority is `../cad/config/identity-migration-map.json`.
+Original evidence files and `canonical-native/historical-code/` snapshots are
+immutable inputs; the offline audit never executes archived producers, fetches
+network data or recovers files from Git.
+
+```sh
+npm --prefix web run verify:identity-evidence
+# From web/: read-only seals and deterministic byte replay
+uv run --isolated --no-project python scripts/canonical-native-evidence.py validate
+uv run --isolated --no-project python scripts/canonical-native-evidence.py check
+# Explicit authoring only, after an intentional mapping/input change:
+uv run --isolated --no-project python scripts/canonical-native-evidence.py generate
+```
+
+`verify:sync` runs the identity evidence check first. Both read-only commands
+check exact original, derivative and historical-snapshot SHA-256 seals,
+CRLF-to-LF-normalized current-consumer input seals, original numeric-token
+certificates, dependency pins and deterministic
+replay. `generate` rewrites only declared derivatives, current SHA pins and
+the manifest's existing seals. JSON numbers are never parsed as floating-point
+values; all original numeric lexemes remain byte-identical. The six observation
+derivatives additionally remove only JSON whitespace outside quoted strings and
+have exactly one EOF newline. Evidence paths are translated only for declared
+manifest members; authored source tracks remain directly under `content/`.
+Sealed canonical files are exempt from Git newline conversion. Replay preserves
+the original non-observation whitespace bytes; observation packets use the
+compact LF form above. Do not convert sealed derivatives to checkout-native
+CRLF: dependency SHA pins refer to their exact replay bytes.
+The manifest explicitly declares `canonicalConsumerHashNormalization` as
+`CRLF-to-LF` for editable current code/data inputs only. Their hashes certify
+the normalized text, not checkout byte identity. Original evidence, historical
+snapshots, mapping bytes and derivative dependency pins are never normalized.
+
+Native bindings use explicit root/component or root/assembly/component forms,
+with optional structural `/mesh` or indexed `/mesh_N` leaves. Identity and
+instance suffix translation uses the sole map; unsupported segments fail closed.
+The qualification-case `nativePartPaths`/error fields may contain mapped-stem
+`-*` family selectors, not concrete drawables. An unbound visible-motion feature
+(`partPath: null`) may retain a well-formed numeric `candidatePartFamily` range:
+only its declared root/assembly translate; its opaque historical family symbol
+is not promoted to a current part identity. The source-backed spare-sprocket
+`@upper`/`@crank` consumer-instance suffixes remain intact. These semantic forms
+do not permit unknown concrete `partPath` bindings or general suffix aliases.
+Qualification-case `negative-native-` names embed the corresponding native
+locator after that schema-specific prefix and translate it as a concrete
+binding. Historical localhost web-route commands are not native CAD locators
+and retain their original route spelling.
+Before replay returns any output (and before `generate` writes), all 29 original
+members are inventoried. One failure packet lists every undeclared occurrence
+in source-path/traversal order with its exact JSONPath, binding and reason;
+duplicate object members and occurrences remain distinct. Keys and values are
+decoded for escaped slashes. This diagnostic walk retains numeric lexemes as
+strings and never authors JSON; output still uses lexical string-token rewrites.
+Only exact existing archived-binding entries receive `archived-not-current:`.
+Byte-replay failures list every mismatching derivative path, rather than
+stopping at the first packet.
+
+These certificates establish identity/provenance preservation, **not** fresh
+geometry, source-camera or browser qualification. A real canonical CAD export,
+model re-pin, mechanics/magnifier regeneration and native/browser qualification
+are still required. There is no runtime old-to-new GLB alias.
+
 ## Fidelity and verification
 
 The interactive mechanism uses CAD-derived eccentric cams, connecting rods,
@@ -92,7 +157,7 @@ discrete mechanical changes still hold the decoded exposure. This is unmeasured
 source-informed framing, not recovered camera history or a fidelity pass.
 The final **5% / 0.5-second** limits and other videos' policies remain unchanged.
 
-The optional `content/<videoId>.chosen-camera-continuity.json` permission packet
+The optional `content/canonical-native/<videoId>.chosen-camera-continuity.json` permission packet
 pins source SHA, shot bounds, native coverage and unmeasured main/whole framing
 evidence. No packet preserves the old policy. Analysis03 retains all 90 source
 observation rows covering the contiguous native exposures 132..218. Synthesis's
@@ -115,10 +180,10 @@ before publishing either.
 Analysis has bounded cumulative source-drive authority for the visible crank
 (79.8130667..86.6866 seconds) and mirrored bank (112.3122..119.0856333 seconds).
 The authoritative packets are
-[`6dW6VYXp9HM.visible-crank-motion.json`](content/6dW6VYXp9HM.visible-crank-motion.json),
-[`6dW6VYXp9HM.visible-crank-gauge.json`](content/6dW6VYXp9HM.visible-crank-gauge.json),
-[`6dW6VYXp9HM.automatic-motion.json`](content/6dW6VYXp9HM.automatic-motion.json)
-and [`6dW6VYXp9HM.motion-controls.json`](content/6dW6VYXp9HM.motion-controls.json).
+[`6dW6VYXp9HM.visible-crank-motion.json`](content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json),
+[`6dW6VYXp9HM.visible-crank-gauge.json`](content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json),
+[`6dW6VYXp9HM.automatic-motion.json`](content/canonical-native/6dW6VYXp9HM.automatic-motion.json)
+and [`6dW6VYXp9HM.motion-controls.json`](content/canonical-native/6dW6VYXp9HM.motion-controls.json).
 They separate observed relative motion from chosen native sign/home and hidden
 setup. Same-shot margins hold the nearest new input through the real cut;
 other shots, views and presentations retain their existing paths.
@@ -127,8 +192,8 @@ source-specific producers and limits. These drives remain chosen approximations;
 source camera and geometry fidelity are unaccepted.
 
 Synthesis's rocker-bank interval **105.980875..124.4159583 seconds** uses
-[automatic-motion inputs](content/8KmVDxkia_w.automatic-motion.json) and
-[source evidence](content/8KmVDxkia_w.automatic-motion-evidence.json), produced by
+[automatic-motion inputs](content/canonical-native/8KmVDxkia_w.automatic-motion.json) and
+[source evidence](content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json), produced by
 [`generate-8KmVDxkia_w-automatic-motion.py`](scripts/generate-8KmVDxkia_w-automatic-motion.py).
 The source's 4× label describes published-video playback: mean cadence is
 1.559234652 turns/s, with unsigned cumulative drive of 28.744620749 turns across
@@ -166,7 +231,7 @@ The user separately allows a narrow exception for only the two small
 rimmed/recessed lower-rocker side-face features either side of the fulcrum.
 They are absent from all twenty native rockers and remain explicitly
 **uncertified**, not pending a promised CAD correction. The closed declaration
-names both exact source features and only `harmonic-analyzer/channel/rocker-arm-1..20`
+names both exact source features and only `ha-harmonic-analyzer/ch-channel/ch-rocker-arm-1..20`
 paths. The HUD identifies this exception separately from the rod-head mapping;
 reports retain both exact records when declared.
 
@@ -253,12 +318,34 @@ Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
 pixel format. Formats never alias each other; sampling diagnostics list
 supported formats and any unsupported source declarations.
 
-Source generators use committed observations, chosen seed states and immutable
-numeric calibration metadata under `content/`. Original private capture paths
-and hashes remain provenance links, not regeneration dependencies. No source
-video or screenshots are included in those inputs. Capture-bound renderer and
-model hashes remain strict; changing the renderer requires recapturing its
-bound evidence.
+Source generators and active loaders use the identity-translated observations,
+seed states, calibration and motion packets under `content/canonical-native/`.
+The originals under `content/` remain byte-exact archival evidence from
+`bfde892a5`; fitting, observation and static-calibration commands refuse those
+original observation files as current inputs.
+
+The [derivative manifest](content/canonical-native/manifest.json) records each
+derivative and original SHA-256, mapping revision and digest, preserved numeric
+tokens, and sealed historical-code snapshots. Those code seals establish
+original lineage only. They do not qualify the current renderer or CAD.
+Analysis's native forward-smoke, visible-crank winding proof and extraction-lineage
+code seals verify their original historical producers, not today's native math.
+Missing, unreadable or modified historical snapshots reject with `ValueError`.
+Synthesis's automatic-motion `generationDependencies`, by contrast, require exact
+current bytes at the intended generation root, including all three native-math
+files and the motion producer script. Its cam-rod `sceneCurrentSourceSha256` also
+checks that root's actual `web/src/scene.ts`: even cosmetic byte changes require
+new bound GPU evidence. These gates do not use historical snapshots or the
+manifest's normalized consumer seals as substitutes for current source.
+Historical behavioral fixtures scope the exact archived scene and all four
+producer/math sources to those intended source paths, for both byte and text
+reads. They leave original packets and receipt seals untouched and replay only
+original evidence; they do not approve the current scene, math, model or GPU.
+Original private capture paths and observation hashes remain provenance links,
+not regeneration dependencies; no source video or screenshots are included.
+Capture-bound renderer and model hashes remain strict. Canonical farm GLB
+export, metadata re-export and current-renderer recapture/requalification are
+still required before claiming current-model source fidelity.
 Lossless delivery optimization keeps the native raw hash authoritative; it does
 not recalibrate observations or establish geometry/source fidelity acceptance.
 
@@ -287,6 +374,10 @@ bytes, not the instance-expanded triangle count. No frame-rate improvement is
 established. Fidelity verification still uses all twenty channels and the full
 geometry; it must not substitute reduced geometry.
 
+The source-v37 measurements and verification results below are preserved from
+that snapshot. Use the [subsystem identity guide](../cad/docs/subsystem-identities.md)
+for current CAD identities.
+
 The current source-v37 import produced the same result in two runs:
 
 | Representation | Bytes |
@@ -307,9 +398,9 @@ all twenty spring lengths changed independently. Three continuous original-MP4
 Analysis/Synthesis clips had no stall, pause or error events; the maximum
 video/completed-draw delta was 54.341 ms after an explicit initial 0.1-second
 startup exclusion. This is not an FPS measurement or a new source calibration.
-The 49 source regressions pass using a historical source fixture; production
-camrod's current-code guard still refuses the old scene receipt. No historical
-receipt was rehashed or accepted as fresh calibration.
+Source-regression replay uses explicit historical source fixtures; production
+cam-rod and automatic-motion current-code guards still refuse stale evidence.
+No historical receipt is rehashed or accepted as fresh calibration.
 The 33 model tests pass, including real-exporter acceptance of compatible future
 geometry and rejection of unsupported ratio, pitch, feed-sign and spring-profile
 changes before publication. A current raw reimport reproduced the same optimized

@@ -53,14 +53,14 @@ _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECAS
 # still enumerates the assembly tasks. The former monolithic ``output`` is split
 # by function into summing -> magnifier -> pen (the value chain) + paper-drive.
 ASSEMBLY_ORDER = (
-    "frame",
-    "drive_train",
-    "channel",
-    "summing",
-    "magnifier",
-    "pen",
-    "paper_drive",
-    "harmonic_analyzer",
+    "fr_frame",
+    "dt_drive_train",
+    "ch_channel",
+    "sm_summing",
+    "mg_magnifier",
+    "pn_pen",
+    "pd_paper_drive",
+    "ha_harmonic_analyzer",
 )
 
 # Scripts that match build_*.py but produce no .SLDPRT part in the SolidWorks
@@ -1780,7 +1780,7 @@ def data_deps_of(script: Path) -> list[str]:
     must treat as ``file_dep`` (and fold into the remote-cache key).
 
     ``module_deps_of`` only follows Python imports; a build that imports a data
-    file (``build_nameplate`` -> ``cad/references/nameplate-engraving.dxf`` via
+    file (``build_nameplate`` -> ``cad/references/fr-nameplate-engraving.dxf`` via
     ``adapter.import_dxf_dwg``) has no import edge to it, so an edit to the DXF
     would otherwise not rebuild the part. This scans the script's transitive
     module closure source for quoted ``*.dxf``/``*.dwg`` literals and resolves
@@ -1824,7 +1824,7 @@ def _data_literals(text: str) -> tuple[str, ...]:
 # which re-aggregates them transparently), so the dependency can be per-subsystem
 # / per-part rather than per-file:
 # ``config_files_of`` returns config-relative TOKENS: a concrete path
-# (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/cone-gear.yaml"``)
+# (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/dt-cone-gear.yaml"``)
 # or one of four dynamic tokens -- ``"machine/*"`` (whole machine family, for a
 # dynamic subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part
 # name in ``_common.part_properties``), ``"title_block"`` (title_block.yaml,
@@ -2284,27 +2284,27 @@ def stamps_title_block_properties(script: Path) -> bool:
 TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_tolerance",
-        "boss_hook_spec",
-        "build_drive_train_assembly",
-        "build_harmonic_base",
-        "build_wheel_bar",
-        "cone_pivot_post_spec",
-        "cone_swing_platform_geometry",
-        "cone_swing_platform_spec",
-        "cone_tip_block_spec",
+        "vn_boss_hook_spec",
+        "build_dt_drive_train_assembly",
+        "build_fr_harmonic_base",
+        "build_mg_wheel_bar",
+        "dt_cone_pivot_post_spec",
+        "dt_cone_swing_platform_geometry",
+        "dt_cone_swing_platform_spec",
+        "dt_cone_tip_block_spec",
         "crank_boss_rim",
-        "crank_hub_geometry",
-        "crank_pinion_spec",
-        "crankshaft_spec",
+        "dt_crank_hub_geometry",
+        "dt_crank_pinion_spec",
+        "dt_crankshaft_spec",
         "error_budget",
         "export_features",
-        "harmonic_base_fasteners",
-        "guide_lock_screw_spec",
-        "post_mount_screw_spec",
-        "spring_hook_spec",
-        "swing_stop_screw_spec",
-        "transgear_disc_hub_spec",
-        "transgear_removable_notes",
+        "fr_harmonic_base_fasteners",
+        "vn_guide_lock_screw_spec",
+        "vn_post_mount_screw_spec",
+        "vn_spring_hook_spec",
+        "vn_swing_stop_screw_spec",
+        "pd_transgear_disc_hub_spec",
+        "pd_transgear_removable_notes",
     }
 )
 
@@ -2331,6 +2331,6 @@ def dependents_of(stem: str) -> list[str]:
     .SLDASM`` -- so ``references_of`` is the DIRECT inverse only.
     """
     deps = [asm for asm in ASSEMBLY_ORDER if asm != stem and stem in references_of(asm)]
-    if deps and "harmonic_analyzer" not in deps:
-        deps.append("harmonic_analyzer")
+    if deps and "ha_harmonic_analyzer" not in deps:
+        deps.append("ha_harmonic_analyzer")
     return deps

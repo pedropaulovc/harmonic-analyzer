@@ -50,27 +50,27 @@ ROOT = WEB.parent
 spec = importlib.util.spec_from_file_location("compact_source_common", WEB / "scripts/compact-source-common.py")
 common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
-ANALYSIS = "web/content/analysis-recovery-calibration-evidence/four-seed-source-fit-census"
-CALIBRATION = "web/content/analysis-synthesis.frozen-generation-evidence.json"
-CALIBRATION_SHA256 = "425beca33506fcb307c3892808b7871a8ee2f06b7aa90f7103fc6993e6319267"
-FRAMING_GPU = "web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
-FRAMING_GPU_SHA256 = "239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173"
-AUTOMATIC_MOTION = "web/content/6dW6VYXp9HM.automatic-motion.json"
-AUTOMATIC_MOTION_SHA256 = "37e00fb2569363dedf22d99cdc54229138990934497239d8b7201b97da2f0cc8"
-MOTION_CONTROLS = "web/content/6dW6VYXp9HM.motion-controls.json"
-MOTION_CONTROLS_SHA256 = "208d4a18a5c152805015e48b8be227a1825c1c03497c0e9370be109d6ca4daab"
-VISIBLE_CRANK_MOTION = "web/content/6dW6VYXp9HM.visible-crank-motion.json"
-VISIBLE_CRANK_MOTION_SHA256 = "0433129092cb167a69d29b3a9712b81f5cb70701d173c97323c6045e33b827ba"
-VISIBLE_CRANK_GAUGE = "web/content/6dW6VYXp9HM.visible-crank-gauge.json"
-VISIBLE_CRANK_GAUGE_SHA256 = "6e58a2b704f81c211c31eb45a0c429521de114338e5e4c349ef74f9b509a973e"
+ANALYSIS = "web/content/canonical-native/analysis-recovery-calibration-evidence/four-seed-source-fit-census"
+CALIBRATION = "web/content/canonical-native/analysis-synthesis.frozen-generation-evidence.json"
+CALIBRATION_SHA256 = "17ee12cb004eacb839b6f54deca609c66568c66574348361f88da9eca37e8d96"
+FRAMING_GPU = "web/content/canonical-native/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
+FRAMING_GPU_SHA256 = "3fd41a1048d1c265d2258741e0c23041d8701354926cc474e15e59dea93e3c33"
+AUTOMATIC_MOTION = "web/content/canonical-native/6dW6VYXp9HM.automatic-motion.json"
+AUTOMATIC_MOTION_SHA256 = "567e95075e1c377c4da50594e451f1b65554b35899ec4617d1b0e876f03e61e9"
+MOTION_CONTROLS = "web/content/canonical-native/6dW6VYXp9HM.motion-controls.json"
+MOTION_CONTROLS_SHA256 = "449200f16562037b2abdecb642906bdfa7c4925c7a88bf1c25a6b33581bd0f38"
+VISIBLE_CRANK_MOTION = "web/content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json"
+VISIBLE_CRANK_MOTION_SHA256 = "cb822c8bf6e76c78d83c655f40bcf40d78cd295d0b38617543ac2ce6b97df91c"
+VISIBLE_CRANK_GAUGE = "web/content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json"
+VISIBLE_CRANK_GAUGE_SHA256 = "b5d790f41128d0acec4f13d7d604c9af72ed41446deb52442e903aff828ad50f"
 ANALYSIS_SOURCE_SHA256 = "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52"
 ANALYSIS_MODEL_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
 AUTOMATIC_NATIVE_MATH = ("web/src/mechanics.ts", "web/src/mechanics-data.ts",
                          "web/src/kinematics.ts", "web/src/magnifier.ts")
-SYNTHESIS_AUTOMATIC_MOTION = "web/content/8KmVDxkia_w.automatic-motion.json"
-SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "68b33f73055a49bbdbfad4e86d4f59ccc45e39b93be0b5b7fa71f3ec490dae3b"
-SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/8KmVDxkia_w.automatic-motion-evidence.json"
-SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "7a193758b02166ad02604274cd08b89135b2941f54301312d242efcc508e8233"
+SYNTHESIS_AUTOMATIC_MOTION = "web/content/canonical-native/8KmVDxkia_w.automatic-motion.json"
+SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "d049a9528092198a4321545a9f3e0d7559bed1baef1d348f44bccba459ea6db1"
+SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json"
+SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "4536dd456352d23817eed6ee93790c0a62602816726ef5432de50161e55ccee7"
 SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
 
 
@@ -197,7 +197,7 @@ class Generator:
             self.data["compactChangeTimesSeconds"].extend(self.automatic_motion_times)
         self.motion = self.calibration_input("motion")
         self.pinhole = self.calibration_input("pinhole")
-        self.donors = load("web/content/XPQwKRt4Y2k.source-seeds.json")
+        self.donors = load("web/content/canonical-native/XPQwKRt4Y2k.source-seeds.json")
         self.seeds = [(f["shotId"], f["timeSeconds"], f["camera"]) for f in self.data["frames"] if common.compact_camera(f.get("camera"))]
         self.features = {}
         for f in self.data["frames"]:
@@ -205,19 +205,19 @@ class Generator:
                 self.features.setdefault(point["featureId"], []).append((f["decodedTimeSeconds"], point["pixel"][1]))
         # These semantic groups refer to actual unchanged native part bounds.
         self.groups = {
-            "whole": ("/frame/", "/base/"), "spring": ("/channel/channel-lever-", "/channel/spring-"),
-            "bar": ("/channel/rocker-arm-", "/channel/amplitude-bar-"),
-            "cone": ("/drive-train/cone", "/drive-train/cylinder", "/drive-train/crank"),
-            "pen": ("/pen/pen-frame-", "/paper-drive/platen-"),
-            "wheel": ("/magnifier/magnifying-wheel-", "/magnifier/wheel-axle-"),
-            "top": ("/magnifier/magnifying-lever-", "/summing/"),
-            "knife": ("/summing/",), "clamp": ("/magnifier/clamp-",),
+            "whole": ("/fr-frame/", "/fr-harmonic-base-"), "spring": ("/ch-channel/ch-channel-lever-", "/ch-channel/vn-spring-"),
+            "bar": ("/ch-channel/ch-rocker-arm-", "/ch-channel/ch-amplitude-bar-"),
+            "cone": ("/dt-drive-train/dt-cone", "/dt-drive-train/vn-cone", "/dt-drive-train/dt-cylinder", "/dt-drive-train/dt-crank", "/dt-drive-train/vn-crank"),
+            "pen": ("/pn-pen/pn-pen-frame-", "/pd-paper-drive/pd-platen-"),
+            "wheel": ("/mg-magnifier/mg-magnifying-wheel-", "/mg-magnifier/mg-wheel-axle-", "/mg-magnifier/vn-wheel-axle-"),
+            "top": ("/mg-magnifier/mg-magnifying-lever-", "/sm-summing/"),
+            "knife": ("/sm-summing/",), "clamp": ("/mg-magnifier/vn-clamp-",),
         }
         self.parts = self.native["mechanical"][0]["all435"]
         self.presenter_reframing = None
         self.synthesis_coarse_framing = None
         self.synthesis_wheel_framing = None
-        permission_path = WEB / "content" / f"{video_id}.chosen-camera-continuity.json"
+        permission_path = WEB / "content" / "canonical-native" / f"{video_id}.chosen-camera-continuity.json"
         permission_packet = json.loads(permission_path.read_text()) if permission_path.exists() else None
         if not self.analysis:
             self.presenter_reframing = self.presenter_reframing_keys()
@@ -382,10 +382,11 @@ class Generator:
                 or not math.isclose(shot["endSeconds"],124.49103333333333,abs_tol=1e-9,rel_tol=0.)):
             raise ValueError("Analysis automatic motion must end inside the unchanged analysis-22 shot.")
         smoke = packet["diagnostics"]["nativeForwardSmoke"]
+        # Replay the original forward proof; this does not qualify current math.
         hashes = smoke["nativeMathSha256"]
         if (set(hashes) != set(AUTOMATIC_NATIVE_MATH)
                 or smoke["status"] != "all-native-inputs-solved" or smoke["sourceExposures"] != 204
-                or any(hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != hashes[path]
+                or any(hashlib.sha256(common.historical_code_bytes(path, hashes[path])).hexdigest() != hashes[path]
                        for path in AUTOMATIC_NATIVE_MATH)):
             raise ValueError("Analysis automatic motion native math authority changed.")
         frozen = controls["frozenCandidate"]
@@ -401,7 +402,7 @@ class Generator:
         rest = controls["nativeRest"]["rest"]
         if (controls["nativeRest"]["channel"]["count"] != 20 or len(rest) != 20
                 or {row["partPath"] for row in rest} != {
-                    f"harmonic-analyzer/channel/rocker-arm-{station}" for station in range(1,21)}
+                    f"ha-harmonic-analyzer/ch-channel/ch-rocker-arm-{station}" for station in range(1,21)}
                 or any(len(row["restWorldMatrix"]) != 16
                        or any(type(value) not in (int,float) or not math.isfinite(value)
                               for value in row["restWorldMatrix"]) for row in rest)):
@@ -416,7 +417,7 @@ class Generator:
             raise ValueError("Analysis automatic motion needs one finite complete fixed native input.")
         correspondence = [
             {"sourceStation":station,"harmonic":station,"nativeStationIndex":20-station,
-             "nativePartPath":f"harmonic-analyzer/channel/rocker-arm-{21-station}"}
+             "nativePartPath":f"ha-harmonic-analyzer/ch-channel/ch-rocker-arm-{21-station}"}
             for station in range(1,21)]
         if packet["stationCorrespondence"] != correspondence:
             raise ValueError("Analysis automatic motion source/native station association changed.")
@@ -502,9 +503,10 @@ class Generator:
                 or qualification["sourceSelectedNativeSign"] is not None
                 or qualification["sourceAbsoluteNativeHomeTurns"] is not None):
             raise ValueError("Analysis visible crank gauge must remain a chosen, shot-local native association.")
+        # This sealed winding proof describes the original producer only.
         hashes = gauge["nativeMathSha256"]
         if (set(hashes) != set(AUTOMATIC_NATIVE_MATH)
-                or any(hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != hashes[path]
+                or any(hashlib.sha256(common.historical_code_bytes(path, hashes[path])).hexdigest() != hashes[path]
                        for path in AUTOMATIC_NATIVE_MATH)):
             raise ValueError("Analysis visible crank native math proof authority changed.")
         frame = next(frame for frame in self.data["frames"]
@@ -542,10 +544,11 @@ class Generator:
                        for key,value in zip(("startSeconds","endSeconds"),interval["shotBoundsSeconds"]))):
             raise ValueError("Analysis visible crank authority requires the unchanged original shot.")
         lineage = packet["lineage"]
+        # Extraction lineage is historical, not a current geometry qualification.
         for prefix in ("nativeGeometry","kinematics"):
             path = lineage[f"{prefix}Path"]
             expected = "web/src/mechanics-data.ts" if prefix == "nativeGeometry" else "web/src/kinematics.ts"
-            if path != expected or hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != lineage[f"{prefix}Sha256"]:
+            if path != expected or hashlib.sha256(common.historical_code_bytes(path, lineage[f"{prefix}Sha256"])).hexdigest() != lineage[f"{prefix}Sha256"]:
                 raise ValueError("Analysis visible crank native geometry authority changed.")
         rows = packet["frames"]
         if len(rows) != 207:
@@ -583,7 +586,7 @@ class Generator:
             raise ValueError("Analysis visible crank source-relative zero/domain changed.")
 
     def synthesis_automatic_motion_packet(self):
-        """Bind new motion authority without rewriting historical source/code seals."""
+        """Require current-root dependency bytes without rewriting original seals."""
         try:
             packet, packet_hash = load_pinned(SYNTHESIS_AUTOMATIC_MOTION,
                 SYNTHESIS_AUTOMATIC_MOTION_SHA256, "Synthesis automatic motion")
@@ -736,7 +739,7 @@ class Generator:
 
     def analysis_held_camera_packet(self):
         """Pin original own-shot evidence before any generated controls mutate it."""
-        path = "web/content/6dW6VYXp9HM.observations.json"
+        path = "web/content/canonical-native/6dW6VYXp9HM.observations.json"
         shot = self.shots["analysis-06"]
         reason = "Whole machine front held steady; presenter gestures and two explanatory text panels appear."
         if (shot["startSeconds"] != 14.2142 or shot["endSeconds"] != 33.26656666666667
@@ -858,7 +861,7 @@ class Generator:
                          "coarseDisplayBodyXBoundsPixels":[left,right]})
         return {"kind":"chosen-single-body-source-informed-framing",
                 "sourceViews":["main"], "measurementStatus":"unmeasured",
-                "sourceLineage":"web/content/8KmVDxkia_w.track.json",
+                "sourceLineage":"web/content/canonical-native/8KmVDxkia_w.track.json",
                 "sourceSha256":self.data["source"]["sha256"],
                 "displayViewportPixels":[1568,882],
                 "keys":keys, "baselineCamera":baseline,
@@ -928,7 +931,7 @@ class Generator:
 
     def synthesis_coarse_framing_packet(self):
         """Bound own-shot approximate cameras to retained exact native evidence."""
-        observations_path = "web/content/8KmVDxkia_w.observations.json"
+        observations_path = "web/content/canonical-native/8KmVDxkia_w.observations.json"
         observations = load(observations_path)
         report_path = FRAMING_GPU
         width, height = 1920, 1080
@@ -1032,20 +1035,24 @@ class Generator:
 
     def synthesis_camrod_physical_pose(self, previous, observations):
         """Publish root's FIT-only upright choice from a pinned sparse probe."""
-        path = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
+        path = "web/content/canonical-native/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
         raw = (ROOT / path).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
-        if digest != "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321":
+        if digest != "7d47b6b3774dd9113620a9ab835bef26174c337acac8e1030cb707c9ba38ece4":
             raise ValueError("Chosen cam-rod physical probe artifact changed")
         probe = json.loads(raw)
         lineage = probe["lineage"]
         receipt_record = lineage["actualWorldReceipt"]
-        receipt_path = "web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json"
+        receipt_path = "web/content/canonical-native/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json"
         receipt_raw = (ROOT / receipt_path).read_bytes()
         receipt_hash = hashlib.sha256(receipt_raw).hexdigest()
-        if receipt_hash != receipt_record["sha256"] or receipt_hash != "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc":
+        if receipt_hash != receipt_record["sha256"] or receipt_hash != "83c3a1f00cc5414b3edaa2fd62e72de437f4d7adb756263139671abb0f57033c":
             raise ValueError("Chosen cam-rod actual world receipt changed")
         receipt = json.loads(receipt_raw)
+        try:
+            scene_hash = hashlib.sha256((ROOT / "web/src/scene.ts").read_bytes()).hexdigest()
+        except OSError as error:
+            raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs: current scene unavailable") from error
         if (probe["status"] != "candidate-enumeration-only"
                 or probe["selection"] != "none; retain every returned pose; CHECK not evaluated"
                 or probe["chosenIntrinsics"]["verticalFovDegrees"] != 30
@@ -1055,7 +1062,7 @@ class Generator:
                 or lineage["nativeModelSha256"] != self.native["modelSha256"]
                 or lineage["nativeDenominator"] != 435
                 or lineage["originalLandmarks"] != previous["originalLandmarks"]
-                or lineage["sceneCurrentSourceSha256"] != hashlib.sha256((WEB / "src/scene.ts").read_bytes()).hexdigest()):
+                or lineage["sceneCurrentSourceSha256"] != scene_hash):
             raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs")
         frame = next(frame for frame in self.data["frames"]
                      if frame["shotId"] == "cam-rod" and frame["timeSeconds"] == 100)
@@ -1179,7 +1186,7 @@ class Generator:
 
     def synthesis_wheel_framing_packet(self):
         """Choose wheel-macro translation from its single original FIT only."""
-        path = "web/content/8KmVDxkia_w.observations.json"
+        path = "web/content/canonical-native/8KmVDxkia_w.observations.json"
         observations = load(path)
         original = next(frame for frame in observations["frames"]
                         if frame["shotId"] == "wheel-macro" and frame["timeSeconds"] == 252.00175)

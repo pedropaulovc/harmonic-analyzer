@@ -34,6 +34,7 @@ async def build(adapter):
     return await build_simple_three_view_drawing(
         adapter,
         source=SOURCE,
+        layout=SPEC.layout,
         outputs=OUTPUTS,
         sheet_scale=SHEET_SCALE,
         front_center=FRONT_CENTER,
@@ -61,7 +62,7 @@ the per-assembly files pin each registry row, output mapping, scale, and centers
 
 ## Frame package
 
-`draw_frame_assembly.py` uses three ASME B sheets: landscape working views,
+`draw_fr_frame_assembly.py` uses three ASME B sheets: landscape working views,
 portrait exploded view with native BOM and balloons, and landscape assembly
 instructions. The registry includes both orientation templates as dependencies.
 Finalization checks each native sheet and each exported PDF page against its
@@ -78,5 +79,5 @@ source features. Explode validation checks component movement in world
 coordinates; a view's exploded flag alone does not establish correct separation.
 The drawing lifecycle also checks that the source assembly remains unchanged.
 
-Use `uv run python -m doit drawing:frame_assembly` to regenerate the package.
+Use `uv run python -m doit drawing:fr_frame_assembly` to regenerate the package.
 Inspect every page and complete the blind machinist review before release.

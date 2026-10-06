@@ -92,6 +92,14 @@ measurement, hour count, accepted quantity or scrap count into a board field.
 Summary files may present derived roll-ups only when they name the authoritative
 source.
 
+Current part and assembly identities follow
+[`cad/docs/subsystem-identities.md`](cad/docs/subsystem-identities.md).
+Per-part and per-assembly registry files own frozen `MHA-<CATEGORY>-<NNN>`
+Numbers and prefixed stems. Assembly drawings use `000`; part families start
+at `001`. Use prefixed underscore stems in task selections and prefixed dashed
+stems in filenames. Historical measurements, releases and bench records retain
+their original identifiers; use the migration table to find the current model.
+
 Historical plans stay unchanged as provenance, but their opening notice must say
 that they are not current status or schedule and must link to the project.
 
@@ -223,7 +231,7 @@ such build:
 - No finite local timer. A cold leaf has measured 61.5 min and a full closure
   runs for hours, so a Bash job or a 300 s tool deadline kills a still-valid
   build and leaves the remote workflow running.
-- Task names use underscores (`part:pen_rod`). An unknown or dashed target is
+- Task names use prefixed underscores (`part:pn_pen_rod`). An unknown or dashed target is
   refused with doit's invalid-command exit 3, naming the target, before any
   fleet query or workflow submission; a failed farm preflight exits 2. Neither
   runs an action.
@@ -262,25 +270,26 @@ such build:
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
-| `check:traveler_rocker_arm`, `check:traveler_pivot_shaft`, `check:traveler_cone_pivot_post` | **no** | no (parallel; needs exported manifest + STEP) | no |
+| `check:traveler_ch_rocker_arm`, `check:traveler_ch_pivot_shaft`, `check:traveler_dt_cone_pivot_post` | **no** | no (parallel; needs exported manifest + STEP) | no |
 | `check:features_bound` | **no** | no (release only; compares scoped/full STEP face labels and patch counts) | no |
-| `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
+| `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
-`package:features` builds only `rocker_arm`, `pivot_shaft` and `cone_pivot_post`
-and writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`.
-The manifest's `step_sha256` binds the raw adjacent STEP; this self-contained
-bundle is the consumer artefact. Full `export` is independent; neither producer
-overwrites the other's paths. The release-only `check:features_bound` compares
-the two sessions' face-label sets and patch counts per label, requires two rocker
+`package:features` builds only `ch_rocker_arm`, `ch_pivot_shaft` and
+`dt_cone_pivot_post` and writes
+`cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`. The manifest's
+`step_sha256` binds the raw adjacent STEP; this self-contained bundle is the
+consumer artefact. Full `export` is independent; neither producer overwrites
+the other's paths. The release-only `check:features_bound` compares the two
+sessions' face-label sets and patch counts per label, requires two rocker
 pivot-bore patches and reports both digests. It does not require byte equality:
 SolidWorks timestamps headers and renumbers entities. Release staging copies the
-verified scoped bundles under `features/`.
-The three build/release traveler checks use pinned prechips and `cad/process/`:
-exit 3 (bad input) fails; exit 2 (machining blockers) logs every `✗` as **warn**
-and passes; exit 4 (required unknown) and 0 pass. This is not machining approval.
-See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
+verified scoped bundles under `features/`. The three build/release
+traveler checks use pinned prechips and `cad/process/`: exit 3 (bad input) fails;
+exit 2 (machining blockers) logs every `✗` as **warn** and passes; exit 4
+(required unknown) and 0 pass. This is not machining approval. See [feature
+exports and travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
@@ -290,7 +299,7 @@ See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
 - Under `--executor farm` each leaf gets 15 min on the worker by default. A cold
   run (nothing in the remote cache, workers that must shallow-fetch the exact
   commit and synchronize the locked external environment, and a cold SolidWorks
-  start) needs more — the slowest measured leaf was `part:fulcrum_keeper` at
+  start) needs more — the slowest measured pre-migration leaf was `part:fulcrum_keeper` at
   61.5 min — so pass `--leaf-timeout <minutes>` (or set
   `HARMONIC_FARM_LEAF_TIMEOUT_S`); the farm clamps the request to 60 s–3 h.
   Leaving it at the default on a cold run costs one retry and then a
@@ -355,38 +364,46 @@ selection.
   created, and repeat `clean -ffdx` cannot erase the environment running the
   build.
 
-**Why `references` qualifies.** The reference photographs are read only by the
-comparison gallery: `cad/comparisons/manifest.json` pairs point at
-`references/albert-michelsons-harmonic-analyzer/...`, and the only runtime
-reader is `export_models._gallery_inputs` (`REPO / pair["reference"]["path"]`),
-reachable solely from `refresh_comparison_gallery` — i.e. `export_models.py
---comparisons`, the `gallery` task, which is Blender+GPU-bound and deliberately
-NOT farm-dispatchable (see the table above and "Comparison gallery"). No
-farm-dispatchable task's `file_dep` or action touches the submodule: the
-`REFERENCES_DIR` every build script imports is `cad/references` (`_common.py`),
-a tracked in-repo directory of vendored DXF/vendor models, and `cut_release.py`
-only *string-matches* the `references/` prefix when it rewrites doc links (it
-reads no file there — and `release` runs on the submitter anyway).
+**Why `references` qualifies.** The release consumer of this excluded
+submodule is the comparison gallery:
 
-**If a future task starts needing it**, worker graph preparation fails when any
-admitted task's `file_dep` or target resolves under an excluded submodule,
-naming the task and path. Do not expect `git submodule status` to notice: it
-*requires* the excluded path to read `-`, so absence is exactly what it asserts.
-An **undeclared runtime read** (a path the task opens without declaring it as a
-`file_dep`) escapes that gate and surfaces inside the leaf as `Dependent file …
-does not exist` / `FileNotFoundError`. Fix it by making that task submitter-only
-like `gallery`, or by removing the exclusion — never by teaching the task to
-tolerate a missing reference.
+- The gallery reads reference photographs named by
+  `cad/comparisons/manifest.json` pairs (for example,
+  `references/albert-michelsons-harmonic-analyzer/...`) through
+  `export_models._gallery_inputs` (`REPO / pair["reference"]["path"]`). The
+  `gallery` task invokes `export_models.py --comparisons`; it is Blender+GPU
+  bound and deliberately NOT farm-dispatchable.
 
-**Excluded does not mean optional locally.** The submitter still computes the
-doit graph and cache keys from its local project inputs, so farm preflight
-requires those inputs and initialized non-excluded submodules to be clean. It
-allows an excluded submodule to stay uninitialized; it does not claim dirty
-local inputs will be rebuilt from committed `HEAD`. `gallery` runs on the
-submitter, reads the manifest photographs directly, and is in `release`'s
-closure, so a release without `references` cloned passes farm preflight, runs
-every COM leaf, and then fails in `export_models._gallery_input_digest`. Run
-`git submodule update --init references` before a release.
+The gallery runs on the submitter and takes no COM seat; it is in
+the normal release closure. No farm-dispatchable task's `file_dep` or action
+touches the submodule: the `REFERENCES_DIR` every build script imports is
+`cad/references` (`_common.py`), a tracked in-repo directory of vendored
+DXF/vendor models, and `cut_release.py` only *string-matches* the `references/`
+prefix when it rewrites doc links (it reads no file there — `release` runs on
+the submitter anyway).
+
+**Excluded-submodule guard covers the exported task graph.** Farm graph export
+serializes the selected `build` and `release` closures and rejects any serialized
+task whose declared `file_dep` or target resolves under an excluded submodule,
+including a task whose action otherwise runs on the submitter. A task requiring
+a declared file under `references` must stay outside those closures or
+`references` must no longer be excluded. Merely
+marking it submitter-only does not bypass this check. Keep runtime inputs
+declared; do not hide them by dropping `file_dep` or tolerate their absence.
+The gallery's existing submitter-side photo read is not a pattern for adding
+another undeclared reference input. Do not expect `git submodule status` to
+establish release readiness: workers require an excluded path to read `-`, so
+absence is exactly what that state asserts.
+
+**Excluded does not mean optional locally.** Farm preflight runs against the
+submitter checkout: it requires inputs and initialized non-excluded submodules
+to be clean, but permits excluded `references` to remain uninitialized there.
+Worker preparation then leaves that excluded submodule uninitialized as
+declared. This does not claim dirty local inputs will be rebuilt from committed
+`HEAD`. `gallery` is in `release`'s closure, runs on the submitter, and reads
+manifest photographs. Thus farm preflight can pass and COM leaves can finish
+while `gallery` later fails on the submitter if `references` is uninitialized;
+initialize it before a release with `git submodule update --init references`.
 
 ## The COM seat lock (do not break this)
 
@@ -509,7 +526,7 @@ signals, three fatal, one log-only:
   `HARMONIC_COM_OP_TIMEOUT` seconds (default 900). Calibrated from ~3 weeks of
   `traces.jsonl`: the longest single healthy COM op on record is ~230 s
   (`verify.rebuild`), so 15 min is ~4× headroom — while whole COM tasks
-  legitimately run ~27 min (`assembly:summing`), which is why the timeout keys
+  legitimately run ~27 min (measured as pre-migration `assembly:summing`), which is why the timeout keys
   on per-op activity, never on process lifetime. Any task-level watchdog must
   use ≥ 40 min.
 - **Hung window — log-only, never fatal.** A SLDWORKS.exe top-level window
@@ -670,7 +687,7 @@ fail a build):
 - **`doit cache_status`** — per part/assembly: HIT/MISS (a backend presence probe,
   no download) + key + the per-dep digests, so *any miss is explainable in one
   command*. Positional args after `--`: label substrings to filter
-  (`doit cache_status -- cone_gear`), `miss` (only misses), `all` (dump dep digests
+  (`doit cache_status -- dt_cone_gear`), `miss` (only misses), `all` (dump dep digests
   for every task, not just misses). A `DRIFT(...)` flag marks a task whose current
   key differs from the last key this seat published.
 - **`HARMONIC_CACHE_DEBUG=1`** — during a real build, logs every `(digest, relpath)`
@@ -857,7 +874,7 @@ every-build battery: **gear-ratios** is DEMOTED to the release preflight (it was
 of a run and re-proves a property the tooth-count config already fixes, which
 `check:math` validates analytically); **channel-independence** (the retired
 `subsystems` suite's one unique gate) is FOLDED IN — soundness already opens
-`channel`, so it runs there; and **component-count is REMOVED** (every failure it
+`ch-channel`, so it runs there; and **component-count is REMOVED** (every failure it
 ever raised was a stale band or a gate bug, never a real regression — `_COMPONENT_BAND`
 stays as reference data). The **DOF gate splits by whether the assembly has
 freed operational DOF** (see "Default-free DOF" below): an assembly with freed
@@ -871,8 +888,8 @@ OUTSIDE that list reads under-constrained (the exact-set direction — an
 unintended freedom, e.g. a dropped mate on a structural part, fails soundness
 loud). Every assembly with nothing freed gets the strict 0-DOF check,
 unchanged. All NON-DOF gates always run on the as-built model. gear-ratios
-runs at release only, in `preflight_release.py`, on the reopened `drive-train`
-+ `channel` (the only assemblies carrying real gear meshes).
+runs at release only, in `preflight_release.py`, on the reopened `dt-drive-train`
++ `ch-channel` (the only assemblies carrying real gear meshes).
 (History: `subsystems` used to re-open all 8 and repeat the whole battery — ~95%
 duplicate COM work — then was trimmed to only `channel`-independence, and is now
 folded into soundness entirely; see `memory/release-perf-incremental.md` and
@@ -1016,7 +1033,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
   keeping the mate `kind` as an attribute. Prefer a name that says WHICH thing over
   one that says only the operation TYPE.
 - **The build body is one `<kind>.build` phase span.** `dodo._exec` opens a span
-  NAMED for the doit task (`task part:cone_gear`, `task assembly:drive_train`) — the
+  NAMED for the doit task (`task part:dt_cone_gear`, `task assembly:dt_drive_train`) — the
   build subprocess CONTINUES it via the injected `TRACEPARENT`. Inside the
   subprocess `run_build` opens ONE inner `part.build` / `assembly.build` phase span
   around the `build()` body (a sibling of `sw.connect` / `sw.disconnect`), so the
@@ -1040,7 +1057,7 @@ scripts that `from _common import log, check` are instrumented unchanged.
   at provider creation). Add a new stage to `_stage_name` when a new task family
   appears. The doit PARENT's `task <label>` span uses `_stage_name` too (via
   `service=` on `_telemetry.span`), so a task and the subprocess it spawns share one
-  resource — `task part:cone_gear` reads `part-build`, `task assembly:pen` reads
+  resource — `task part:dt_cone_gear` reads `part-build`, `task assembly:pn_pen` reads
   `assembly-build`, a drawing reads `drawing-export` — instead of the task reading
   the umbrella name while its own children read the stage. `harmonic-analyzer` is
   now a namespace and a fallback for an unmapped label, not a span label.

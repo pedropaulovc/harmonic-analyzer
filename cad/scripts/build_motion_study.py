@@ -1,5 +1,5 @@
 r"""Phase F (artifact B): the OPERATION simulation -- a throwaway SOLIDWORKS
-Motion study that opens the default-free harmonic-analyzer.SLDASM and
+Motion study that opens the default-free ha-harmonic-analyzer.SLDASM and
 drives the whole device from a single crank motor, with the channel/counter
 springs as real force elements and the two amplifying wires as motion
 couplings. It NEVER re-saves the .SLDASM (artifact A stays fully-defined on
@@ -7,7 +7,7 @@ disk; this study lives only in the dirtied in-memory doc + an exported video).
 
 Pipeline (see plan from-other-conversation-current-tender-meteor.md, Part 3):
 
-  1. open harmonic-analyzer.SLDASM (seven machine-authored subassemblies).
+  1. open ha-harmonic-analyzer.SLDASM (seven machine-authored subassemblies).
   2. for the six MOVING subs (drive-train/channel/summing/magnifier/pen/
      paper-drive; frame stays fixed):
      float -> ground the rigid pose at identity with 3 coincident plane mates
@@ -19,7 +19,7 @@ Pipeline (see plan from-other-conversation-current-tender-meteor.md, Part 3):
   4. add 20 cross-assembly CAM couplings: each channel connecting-rod ring axis
       rides its drive-train cylinder-gear eccentric lobe axis (cross-sub, so it
       IS allowed at the top level). The rod-rocker revolutes and rocker-foot arc
-      couplings already ship in channel.SLDASM and must not be duplicated.
+      couplings already ship in ch-channel.SLDASM and must not be duplicated.
   5. crank MOTOR: a rotary constant-speed motor on the crankshaft axis -- the
      one physical input that runs the device.
   6. 21 SPRING force elements: 20 channel springs + 1 counter spring, using
@@ -78,7 +78,7 @@ from _assembly import (
 # phase-f motion-study memory (point-on-axis cam de-redundancy).
 ROD_BORE_EDGE_MM = [25.5, 0.0, 1.5]
 
-# Rocker-arm part-local geometry (build_rocker_arm.py): part origin at the strap
+# Rocker-arm part-local geometry (build_ch_rocker_arm.py): part origin at the strap
 # bottom, pivot bore at (0, 8), the R800 concave TOP edge has its arc centre at
 # (0, CENTER_Y=816); the top edge passes through (0, 16) at the +Z face (z =
 # +ARM_THICKNESS/2 = 1.25). A point on that top arc edge lets create_reference_
@@ -90,22 +90,22 @@ FOOT_COEFF_MM = 60.0  # uniform foot offset along the arc = the amplitude coeff.
 # the neutral ~0. A solid uniform value makes every channel transmit; per-channel
 # variation (the harmonic synthesis) layers on later via coeff_fn.
 ROCKER_PIVOT_LOCAL = [0.0, 8.0, 0.0]  # pivot bore = rocker Axis1
-# Amplitude-bar foot axis (build_channel_assembly BAR_FOOT_LOCAL = bar Axis2) and
+# Amplitude-bar foot axis (build_ch_channel_assembly BAR_FOOT_LOCAL = bar Axis2) and
 # top-pin (bar Axis1, the swing pivot, BAR_TOP_PIN_LOCAL); part-local mm.
 BAR_FOOT_LOCAL = [3.175, 0.0, 3.175]
 BAR_TOP_PIN_LOCAL = [3.175, 801.95, 3.175]  # 808.3 bar - 6.35 pin drop
 
 # ---- study constants --------------------------------------------------------
-ASM = "harmonic-analyzer"
+ASM = "ha-harmonic-analyzer"
 MOVING_SUBS = (
-    "drive-train-1",
-    "channel-1",
-    "summing-1",
-    "magnifier-1",
-    "pen-1",
-    "paper-drive-1",
-)  # frame-1 stays fixed
-FRAME_SUB = "frame-1"
+    "dt-drive-train-1",
+    "ch-channel-1",
+    "sm-summing-1",
+    "mg-magnifier-1",
+    "pn-pen-1",
+    "pd-paper-drive-1",
+)  # fr-frame-1 stays fixed
+FRAME_SUB = "fr-frame-1"
 
 CRANK_RPM = 20.0  # gentle: 1 rev / 3 s at 20 RPM
 DURATION_S = 6.0  # two crank revolutions
@@ -132,9 +132,9 @@ RIGID, FLEXIBLE = "rigid", "flexible"
 # Purchased-spring catalogue rates (N/mm -> N/m). Supplier display-coil
 # turn counts are not physical active-coil counts and cannot define stiffness.
 STOCK_KCH = (
-    float(_config.parts("channel-spring-installed")["spring_rate_n_per_mm"]) * 1000.0
+    float(_config.parts("vn-channel-spring-installed")["spring_rate_n_per_mm"]) * 1000.0
 )
-STOCK_KCT = float(_config.parts("counter-spring")["spring_rate_n_per_mm"]) * 1000.0
+STOCK_KCT = float(_config.parts("vn-counter-spring")["spring_rate_n_per_mm"]) * 1000.0
 
 # Only explicit positive environment overrides replace the catalogue rates.
 # Unset, zero or negative => catalogue rate (the normal stock-spring study).
@@ -184,10 +184,10 @@ def _find_comps(adapter, needle, model=None, comps=None):
 def _part_family(name2):
     """Component Name2 -> exact part family.
 
-    ``"drive-train-1/cylinder-gear-1"`` -> ``"cylinder-gear"`` and
-    ``"drive-train-1/cylinder-gear-shaft-1"`` -> ``"cylinder-gear-shaft"`` --
+    ``"dt-drive-train-1/dt-cylinder-gear-1"`` -> ``"dt-cylinder-gear"`` and
+    ``"dt-drive-train-1/dt-cylinder-gear-shaft-1"`` -> ``"dt-cylinder-gear-shaft"`` --
     so a family match never confuses a part with another whose name it is a
-    prefix of (the substring ``"cylinder-gear"`` matched the shaft too).
+    prefix of (the substring ``"dt-cylinder-gear"`` matched the shaft too).
     """
     part = name2.split("/")[-1]
     return part.rsplit("-", 1)[0]
@@ -197,7 +197,7 @@ def _find_family(adapter, family, model=None, comps=None):
     """Components whose part family equals ``family`` EXACTLY (dispatch, name).
 
     Use this, not :func:`_find_comps`, whenever the needle is a prefix of a
-    longer real part name (``cylinder-gear`` vs ``cylinder-gear-shaft``). Pass
+    longer real part name (``dt-cylinder-gear`` vs ``dt-cylinder-gear-shaft``). Pass
     ``comps`` to reuse a single enumeration.
     """
     if comps is None:
@@ -300,7 +300,7 @@ def _iter_mates(adapter, model, read_values=True, progress_every=0):
 
 def _root_title(sub_name):
     """Sub instance name -> the doc-root part name it shows up as in its own
-    mate group ("drive-train-1" -> "drive-train")."""
+    mate group ("dt-drive-train-1" -> "dt-drive-train")."""
     return sub_name.rsplit("-", 1)[0]
 
 
@@ -320,7 +320,7 @@ def _lone_real(parts, root):
 
 
 def _family(part_name):
-    """ "rocker-arm-12" -> "rocker-arm" (strip the trailing instance suffix)."""
+    """ "ch-rocker-arm-12" -> "ch-rocker-arm" (strip the trailing instance suffix)."""
     return part_name.rsplit("-", 1)[0]
 
 
@@ -373,16 +373,16 @@ async def _flex_subs(adapter):
 # many instances is a pose driver; a per-instance-unique value is an axial hold.
 SUPPRESS_RECUR = 5  # a value seen in >= this many instances == pose/spin driver
 
-# The channel-1 mate-classify walk reads ~240 mates (~1-3 s each through the
+# The ch-channel-1 mate-classify walk reads ~240 mates (~1-3 s each through the
 # flexible sub) -- the dominant per-iteration cost (~500 s). The result is
-# DETERMINISTIC for a given channel.SLDASM, and the suppressible mate NAMES
-# (Distance17@channel-1 ...) are stable as long as the file is not rebuilt. Cache
-# the name list keyed on channel.SLDASM's mtime so repeat runs skip the walk and
+# DETERMINISTIC for a given ch-channel.SLDASM, and the suppressible mate NAMES
+# (Distance17@ch-channel-1 ...) are stable as long as the file is not rebuilt. Cache
+# the name list keyed on ch-channel.SLDASM's mtime so repeat runs skip the walk and
 # just re-apply the ~140 suppresses (~150 s). Set MOTION_NOCACHE=1 to force a
 # fresh walk (e.g. after the classifier logic changes). The cache is throwaway
 # build state -- it never touches artifact A.
 SUPPRESS_CACHE = OUT_SLDASM / "_motion_cache" / "channel_suppress.json"
-CHANNEL_SLDASM = OUT_SLDASM / "channel.SLDASM"
+CHANNEL_SLDASM = OUT_SLDASM / "ch-channel.SLDASM"
 
 
 def _channel_mtime():
@@ -397,7 +397,7 @@ def _load_suppress_cache():
     except (OSError, ValueError):
         return None
     if abs(float(data.get("mtime", -1.0)) - _channel_mtime()) > 1.0:
-        log("  channel suppress cache STALE (channel.SLDASM changed) -- re-walking")
+        log("  channel suppress cache STALE (ch-channel.SLDASM changed) -- re-walking")
         return None
     return list(data.get("names", []))
 
@@ -466,15 +466,15 @@ async def _suppress_recurring(adapter, sub_name, families, label):
 
 
 async def _suppress_channel(adapter):
-    """ONE classify-once pass over channel-1's mate group -- replaces the
+    """ONE classify-once pass over ch-channel-1's mate group -- replaces the
     separate flexible-sub walks (rocker spin, lever spin, rod drivers, bar spin)
     with a single walk. The mate walk on a flexible sub is the dominant per-
     iteration cost (hundreds of seconds; one walk hit 635s), so collapsing the
     walks is a big iteration speedup with zero classification change. Two rules:
 
-      * connecting-rod single-part DISTANCE/ANGLE -> free the rod fully (the two
+      * ch-connecting-rod single-part DISTANCE/ANGLE -> free the rod fully (the two
         new revolutes define it).
-      * rocker-arm / channel-lever / amplitude-bar single-part DISTANCE with a
+      * ch-rocker-arm / ch-channel-lever / ch-amplitude-bar single-part DISTANCE with a
         value RECURRING across >= SUPPRESS_RECUR instances -> a pose/spin driver
         -> suppress; a per-instance-unique value -> an axial-Z station hold ->
         KEEP. All channels share one solved state (only Z varies), so each
@@ -496,7 +496,7 @@ async def _suppress_channel(adapter):
     """
     from collections import Counter
 
-    sub_name = "channel-1"
+    sub_name = "ch-channel-1"
     cached = _load_suppress_cache()
     if cached is not None:
         log(
@@ -509,7 +509,7 @@ async def _suppress_channel(adapter):
     root = _root_title(sub_name)
     targets = []
     recur = []  # (name, family, rounded_mm) for spin-vs-axial bucketing
-    log("  classify channel-1 mates (single pass) ...")
+    log("  classify ch-channel-1 mates (single pass) ...")
     for _f, mate, name, mtype, parts, _val in _iter_mates(
         adapter, model, read_values=False, progress_every=40
     ):
@@ -518,11 +518,11 @@ async def _suppress_channel(adapter):
         lone_fam = _family(lone) if lone else None
         if lone_fam is None:
             continue
-        if lone_fam == "connecting-rod" and mtype in (DISTANCE, ANGLE):
+        if lone_fam == "ch-connecting-rod" and mtype in (DISTANCE, ANGLE):
             targets.append(name)  # free the rod fully
             continue
         if (
-            lone_fam in ("rocker-arm", "channel-lever", "amplitude-bar")
+            lone_fam in ("ch-rocker-arm", "ch-channel-lever", "ch-amplitude-bar")
             and mtype == DISTANCE
         ):
             val = _mate_value(adapter, mate, mtype)  # lazy: candidates only
@@ -545,7 +545,7 @@ async def _do_suppress(adapter, sub_name, targets, label):
     # currentModel MUST stay the top assembly: suppress_mate(component=sub_name)
     # resolves the component against currentModel then retargets to its model doc
     # itself (GetModelDoc2). Switching currentModel to the sub doc here makes that
-    # component lookup fail ("Component not found: 'drive-train-1'").
+    # component lookup fail ("Component not found: 'dt-drive-train-1'").
     from solidworks_mcp.adapters.base import SuppressMateParameters
 
     log(f"  {label}: suppressing {len(targets)} mates in {sub_name}")
@@ -587,7 +587,7 @@ def _dump_sub_mates(adapter, sub_name):
 # spec records `Right Plane@crank-arm` (the crank-handle name rule misses it)
 # and per-channel amplitude values are unique (the recurring-value rule reads
 # them as axial holds) -- codex review 2026-07-04, two P2s.
-_REPLAY_DOF_KEYS = {"drive-train": ("cone_swing",)}
+_REPLAY_DOF_KEYS = {"dt-drive-train": ("cone_swing",)}
 
 
 async def _replay_setup_drives(adapter):
@@ -647,23 +647,23 @@ async def _suppress_drivers(adapter, level, dump=False):
     # drive-train: the crank-angle driver (crank-handle <-> root) -- unique, so
     # matched by name. Frees the whole gear train to spin from the motor.
     await _suppress_named(
-        adapter, "drive-train-1", ("crank-handle",), (DISTANCE, ANGLE), "crank driver"
+        adapter, "dt-drive-train-1", ("dt-crank-handle",), (DISTANCE, ANGLE), "crank driver"
     )
 
     # channel: free the cam-follower chain. THREE families, three rules:
     #
-    #  * rocker-arm -> recurring-only: suppress the constant spin driver, KEEP
+    #  * ch-rocker-arm -> recurring-only: suppress the constant spin driver, KEEP
     #    the per-station axial-Z hold so each rocker stays at its channel station
     #    (the rocker pivot revolute is a real two-part mate, untouched).
     #
-    #  * channel-lever -> recurring-only: suppress the constant J4 spin driver so
+    #  * ch-channel-lever -> recurring-only: suppress the constant J4 spin driver so
     #    the lever is FREE to rotate about its fulcrum, KEEP its per-station
     #    axial-Z hold and its J4 fulcrum revolute. The lever is driven by the
     #    rocker THROUGH the amplitude bar (the real four-bar -- _add_foot_arc_
     #    joints), not a gear: the bar foot rides the rocker arc and its top swings
     #    on the lever pin, so the seesawing rocker drives the lever up/down.
     #
-    #  * amplitude-bar -> recurring-only: suppress the foot-X spin_driver so the
+    #  * ch-amplitude-bar -> recurring-only: suppress the foot-X spin_driver so the
     #    bar can SWING about its top pin (book ch.15/17 + user-confirmed: the bars
     #    are swinging couplers, NOT rigid with the lever -- keeping the spin_driver
     #    made the bar a rigid vertical stick; an earlier lock-to-lever made it
@@ -673,13 +673,13 @@ async def _suppress_drivers(adapter, level, dump=False):
     #    mates (R800 arc-centre + pivot radius), closing the four-bar. The
     #    coefficient = the foot's pivot radius (F6c: set per bar from its slide).
     #
-    #  * connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
+    #  * ch-connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
     #    which spin_driver implements as a DISTANCE mate). Artifact A pins the rod
     #    purely with these four drivers and deliberately omits the rod<->rocker
-    #    and rod<->cam revolutes (build_channel_assembly._pin_design_pose). The
+    #    and rod<->cam revolutes (build_ch_channel_assembly._pin_design_pose). The
     #    rod must be FULLY free so the two new revolutes can define it: the in-sub
     #    rod-pin<->rocker-bore coincident (_add_rod_rocker_revolutes, authored in
-    #    channel.SLDASM's own context) pins the pin to the rocker bore, and the
+    #    ch-channel.SLDASM's own context) pins the pin to the rocker bore, and the
     #    top-level cam ring<->lobe (_add_cam_couplings, cross-sub) pins the ring
     #    to the eccentric lobe; together they are the 1-DOF four-bar driven by the
     #    crank. (Earlier theory that a kept ring-Z over-constrains was WRONG --
@@ -699,9 +699,9 @@ async def _suppress_drivers(adapter, level, dump=False):
 def _entity_ref(name2, prefix, etype):
     """A depth-2-safe ``MateEntityRef`` for a named axis inside a nested part.
 
-    ``name2`` is the top-level component path ("channel-1/connecting-rod-1") and
+    ``name2`` is the top-level component path ("ch-channel-1/ch-connecting-rod-1") and
     ``prefix`` the part-local named feature ("Axis1"). The hand-built reversed
-    string ``Axis1@connecting-rod-1@channel-1@harmonic-analyzer`` resolves only
+    string ``Axis1@ch-connecting-rod-1@ch-channel-1@ha-harmonic-analyzer`` resolves only
     one level deep and returns False for a part nested in a flexible sub; the
     component+name ref maps the base IFeature through GetCorresponding instead
     (PR #64). ``GetCorresponding`` is depth-agnostic, so the assembly title is
@@ -721,15 +721,15 @@ def _by_z_rank(adapter, family, comps=None):
     monotonically in Z, so the i-th entry of two such lists is the same
     station -- robust pairing without trusting instance-suffix order (a rod's
     Z sits between its own gear and the next station's gear, so nearest-Z
-    pairing would mis-match). Exact-family match so ``cylinder-gear`` does not
-    also drag in ``cylinder-gear-shaft``. Pass ``comps`` to reuse one walk.
+    pairing would mis-match). Exact-family match so ``dt-cylinder-gear`` does not
+    also drag in ``dt-cylinder-gear-shaft``. Pass ``comps`` to reuse one walk.
     """
     hits = _find_family(adapter, family, comps=comps)
     return sorted(hits, key=lambda t: _comp_z_mm(adapter, t[0]))
 
 
 async def _add_rod_rocker_revolutes(adapter):
-    """Per channel, INSIDE channel.SLDASM: rod pin Axis2 <-> rocker bore Axis2.
+    """Per channel, INSIDE ch-channel.SLDASM: rod pin Axis2 <-> rocker bore Axis2.
 
     This is the rod<->rocker pin joint of the four-bar, and it CANNOT be a
     top-level mate. AddMate5 rejects a mate between two components that are both
@@ -749,15 +749,15 @@ async def _add_rod_rocker_revolutes(adapter):
     fully-defined on disk). coincident, not concentric (concentric on two axes is
     rejected by AddMate5 even cross-sub).
     """
-    _, ch_doc = _sub_model(adapter, "channel-1")
+    _, ch_doc = _sub_model(adapter, "ch-channel-1")
     top = adapter.currentModel
     adapter.currentModel = ch_doc
     ok = n = 0
     try:
-        log("  enumerating channel.SLDASM parts for in-sub rod<->rocker ...")
+        log("  enumerating ch-channel.SLDASM parts for in-sub rod<->rocker ...")
         comps = _components(adapter, ch_doc)
-        rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
-        rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
+        rods = _by_z_rank(adapter, "ch-connecting-rod", comps=comps)
+        rockers = _by_z_rank(adapter, "ch-rocker-arm", comps=comps)
         n = min(len(rods), len(rockers))
         log(
             f"  in-sub rod<->rocker: {len(rods)} rods, {len(rockers)} rockers "
@@ -791,7 +791,7 @@ async def _add_ring_centre_point(adapter):
     (proven: the same model recalcs to 11.9/0/0 deg). The rod's ORIGIN feature is
     NOT mateable (AddMate5 unknown error), so create a real RefPoint at the ring
     centre: the arc centre of the Ø51 bore edge. All 20 instances share
-    connecting-rod.SLDPRT, so ONE point on that part doc is inherited by every
+    ch-connecting-rod.SLDPRT, so ONE point on that part doc is inherited by every
     instance via GetCorresponding; the part is NEVER saved (artifact A on disk is
     untouched). Selection in a component's part doc requires it be the ACTIVE doc
     -> ActivateDoc3 round-trip. Returns the point feature name (e.g. "Point2").
@@ -800,9 +800,9 @@ async def _add_ring_centre_point(adapter):
 
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
-    rod_comp, _ = _find_one(adapter, "connecting-rod-1")
+    rod_comp, _ = _find_one(adapter, "ch-connecting-rod-1")
     if rod_comp is None:
-        raise RuntimeError("connecting-rod-1 not found for ring-centre point")
+        raise RuntimeError("ch-connecting-rod-1 not found for ring-centre point")
     part = _read_member(rod_comp, "GetModelDoc2")
     if part is None:
         raise RuntimeError("connecting-rod part doc unresolved")
@@ -836,7 +836,7 @@ async def _add_cam_couplings(adapter):
     """Per channel, at TOP level: rod ring-centre POINT on cam lobe Axis3 (cross-sub).
 
     A POINT-ON-AXIS coincident: the rod ring-centre RefPoint
-    (_add_ring_centre_point) on Axis3@cylinder-gear (the eccentric cam-lobe axis).
+    (_add_ring_centre_point) on Axis3@dt-cylinder-gear (the eccentric cam-lobe axis).
     This is 2 constraints (position only) -- it pins the ring to the orbiting lobe
     WITHOUT re-fixing the rod orientation that the rod<->rocker pin already fixes,
     so the 20 parallel four-bar loops are NOT over-constrained and Basic Motion
@@ -851,8 +851,8 @@ async def _add_cam_couplings(adapter):
     point_name = await _add_ring_centre_point(adapter)
     log("  enumerating components for cam pairing (single full-tree walk) ...")
     comps = _components(adapter)
-    gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
-    rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
+    gears = _by_z_rank(adapter, "dt-cylinder-gear", comps=comps)
+    rods = _by_z_rank(adapter, "ch-connecting-rod", comps=comps)
     n = min(len(gears), len(rods))
     log(f"  cam couplings: {len(gears)} gears, {len(rods)} rods -> {n} channels")
     cam_ok = 0
@@ -934,7 +934,7 @@ def _arc_y(x):
 async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
     """Create a Z foot-pin axis at rocker-local (coeff, arc_y(coeff)).
 
-    Built on the SHARED rocker-arm.SLDPRT (any instance's GetModelDoc2) so all
+    Built on the SHARED ch-rocker-arm.SLDPRT (any instance's GetModelDoc2) so all
     20 rockers inherit it via GetCorresponding; the part is NEVER saved. The axis
     is the intersection of a Right-Plane offset (x = coeff) and a Top-Plane
     offset (y = arc_y) -- the same construction proven on the minimal rig. Part
@@ -993,7 +993,7 @@ async def _make_rocker_foot_axis(adapter, rk_comp, coeff):
 
 
 async def _add_foot_axis_joints(adapter, coeff_fn=None):
-    """Per channel, INSIDE channel.SLDASM: coincident bar foot <-> rocker arc axis.
+    """Per channel, INSIDE ch-channel.SLDASM: coincident bar foot <-> rocker arc axis.
 
     The PROVEN coincident-axis foot (build_fourbar_test). ONE coincident mate
     pins the bar foot (Axis2) to a Z-axis built into the rocker at the
@@ -1014,15 +1014,15 @@ async def _add_foot_axis_joints(adapter, coeff_fn=None):
     pivot); default a uniform solid coefficient so every channel transmits.
     """
     coeff_fn = coeff_fn or (lambda i: FOOT_COEFF_MM)
-    _, ch_doc = _sub_model(adapter, "channel-1")
+    _, ch_doc = _sub_model(adapter, "ch-channel-1")
     top = adapter.currentModel
 
     # Phase 1 (top active): enumerate channels, then create the foot-pin axes on
     # the shared rocker part (cached per distinct coefficient).
     adapter.currentModel = ch_doc
     comps = _components(adapter, ch_doc)
-    rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
-    bars = _by_z_rank(adapter, "amplitude-bar", comps=comps)
+    rockers = _by_z_rank(adapter, "ch-rocker-arm", comps=comps)
+    bars = _by_z_rank(adapter, "ch-amplitude-bar", comps=comps)
     n = min(len(rockers), len(bars))
     adapter.currentModel = top
     log(f"  foot-axis: {len(rockers)} rockers, {len(bars)} bars -> {n} channels")
@@ -1061,7 +1061,7 @@ async def _add_foot_axis_joints(adapter, coeff_fn=None):
 async def _add_crank_motor(adapter):
     from solidworks_mcp.adapters.base import MotionMotorParameters
 
-    cs_comp, cs_name = _find_one(adapter, "crankshaft")
+    cs_comp, cs_name = _find_one(adapter, "dt-crankshaft")
     if cs_comp is None:
         raise RuntimeError("crankshaft component not found")
     # Motor on the crankshaft BORE axis by name (Axis1) -- a component-face ref
@@ -1108,7 +1108,7 @@ async def _sample_pen(adapter, study_name=""):
 
     samples = []
     steps = 24
-    marker, _ = _find_one(adapter, "pen-marker")  # enumerate ONCE, not per step
+    marker, _ = _find_one(adapter, "pn-pen-marker")  # enumerate ONCE, not per step
     if marker is None:
         log("    pen-marker not found")
         return samples
@@ -1231,10 +1231,10 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
     failed to transmit under the dynamic solve."""
     from solidworks_mcp.adapters.base import MotionTimeParameters
 
-    probes = _by_z_rank(adapter, "rocker-arm")[:n_probe]
-    crank, _ = _find_one(adapter, "crankshaft-1")
+    probes = _by_z_rank(adapter, "ch-rocker-arm")[:n_probe]
+    crank, _ = _find_one(adapter, "dt-crankshaft-1")
     if crank is not None:
-        probes = probes + [(crank, "crankshaft")]
+        probes = probes + [(crank, "dt-crankshaft")]
     base = {}
     spans = {}
     crank_samples = []
@@ -1249,7 +1249,7 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
         row = []
         for comp, name in probes:
             a = _comp_xform(adapter, comp)
-            if name == "crankshaft":
+            if name == "dt-crankshaft":
                 crank_samples.append((t, a))
             if a is None:
                 row.append("  n/a")
@@ -1271,9 +1271,9 @@ async def _sample_rockers(adapter, study_name="", n_probe=3):
     #     cam-follower chain decoupled, so the rockers never move. Watching the
     #     crank alone misses that -- gate the rockers too.
     if crank is not None:
-        assert_motion_progressed(crank_samples, DURATION_S, "crankshaft")
+        assert_motion_progressed(crank_samples, DURATION_S, "dt-crankshaft")
         rocker_max = max(
-            (v for k, v in spans.items() if k != "crankshaft"), default=0.0
+            (v for k, v in spans.items() if k != "dt-crankshaft"), default=0.0
         )
         if rocker_max < ROCKER_MIN_DEG:
             raise RuntimeError(
@@ -1321,7 +1321,7 @@ async def _sample_chain(adapter, study_name="", n_steps=12):
     from solidworks_mcp.adapters.base import MotionTimeParameters
 
     parts = []
-    for needle in ("channel-lever-1", "summing-lever-1", "magnifying-wheel-1"):
+    for needle in ("ch-channel-lever-1", "sm-summing-lever-1", "mg-magnifying-wheel-1"):
         comp, name = _find_one(adapter, needle)
         if comp is not None:
             parts.append((needle, comp))

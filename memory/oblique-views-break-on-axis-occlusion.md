@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 A part placed **on the same line as a structural member** (e.g. the gooseneck
 counter-spring post on the east column line, machine x 197, z 0) is optically
 fused with that member in **both** the front and side elevations — its lower
@@ -29,4 +32,4 @@ background.
   1.58 mm/px). Horizontal extents are azimuth-foreshortened; don't trust them.
 - Result: gooseneck post tip at machine y ≈ 880, ~120 below the plate (NOT the
   ~40 first guessed from the occluded front view). See [[harmonic-analyzer-project]],
-  `build_gooseneck.py`, `cad/config/dimensions.yaml` (book ch. 19).
+  `build_sm_gooseneck.py`, `cad/config/dimensions.yaml` (book ch. 19).

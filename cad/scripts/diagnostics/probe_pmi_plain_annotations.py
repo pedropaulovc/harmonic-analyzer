@@ -33,13 +33,13 @@ import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _drawing_common import create_section_view, model_point_in_view  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
-from wheel_axle_spec import (  # noqa: E402
+from mg_wheel_axle_spec import (  # noqa: E402
     GEOMETRIC_CONTROLS,
     PART_DATUMS,
     STUD_BEARING_FACE,
 )
 
-SOURCE = CAD_ROOT / "out" / "sldprt" / "wheel-axle.SLDPRT"
+SOURCE = CAD_ROOT / "out" / "sldprt" / "mg-wheel-axle.SLDPRT"
 SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "wheel-axle-plain.SLDPRT"
 SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "wheel-axle-plain.SLDDRW"
 OUT_PDF = CAD_ROOT / "out" / "pdf" / "wheel-axle-plain.pdf"

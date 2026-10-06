@@ -2,7 +2,7 @@ r"""McMaster 98381A434 -- alloy steel dowel pin, 3/32" diameter, 1/4" long.
 
 One of the 98381A* sizes built by the shared recipe in
 ``diag_mcmaster_dowel.py`` (see its docstring for the catalogue facts).
-Used as crank-seat-drive-pin (MHA-173).
+Used as crank-seat-drive-pin (MHA-VN-044).
 
 Run standalone (SolidWorks open)::
 

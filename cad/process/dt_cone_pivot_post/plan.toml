@@ -1,0 +1,525 @@
+# Copied from https://github.com/pedropaulovc/prechips/blob/55cae713860a491b8925aed1ad8a24fb30502fe0/examples/cone-pivot-post/plan.toml
+# Inventory verification flags, author-choice process proposals and the
+# plan-authored T1/M2/J3/C4 frames (origins, axes, binding, cites) are unchanged.
+# Hand-authored M2 one-piece candidate; PLANNED, not a verified machining route.
+# All blank allowances, grip, jogs, feeds and depths marked AUTHOR'S CHOICE.
+# No speed, source material grade, available blank, tool reach or setup binding is invented.
+part = "dt-cone-pivot-post"
+features = "../../out/features/dt_cone_pivot_post/features.toml"
+construction = "one_piece"
+quantity = 1 # parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.quantity
+quantity_cite = ["harmonic-analyzer/cad/config/parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.quantity"]
+
+[drawing]
+number = "MHA-DT-005" # parts/dt-cone-pivot-post.yaml:dt-cone-pivot-post.number
+revision = "unknown"
+
+[paths]
+inventory = "../shop/inventory.toml"
+policy = "../shop/shop-policy.toml"
+cutting_data = "../shop/cutting-data.toml"
+
+[stock]
+form = "round_bar"
+material = "unknown" # source only pins ferrous_noncritical, not a purchased grade
+on_hand = false # inventory stock=[]; this is a procurement candidate, not an inventory item
+ dia_mm = 110.0 # AUTHOR'S CHOICE: radius55 covers hypot(50.6591,21.93/2)=51.8322
+length_mm = 120.0 # AUTHOR'S CHOICE: body86 + foot allowance6 + sacrificial top grip28
+north_allowance_mm = 6.0 # AUTHOR'S CHOICE: exposed foot-facing allowance
+south_grip_mm = 28.0 # AUTHOR'S CHOICE: past the finished top at body Y86
+note = "AUTHOR'S CHOICE: bar parallel model Y. The complete crank boss reach fits inside radius55; no Ø45 envelope is claimed. Keep both integral journal pads during roughing. Catalogue identity and material grade unknown; M4 swept-envelope/clearance proof not supplied."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,49-67"]
+
+# Existing shaft convention: X diametric, Z toward the exposed end. The EL400
+# is only a manual reference; its installation on this lathe remains unknown.
+[dro]
+controller = "unknown"
+manual = "Electronica EL400 Operation Manual"
+manual_url = "https://www.dropros.com/documents/EL400%20OpManual.pdf"
+mode = "abs"
+radius_mode = false # AUTHOR'S CHOICE: a physical10mm X jog displays20mm on the lathe
+[dro.direction]
+x = "away_from_spindle_axis" # AUTHOR'S CHOICE; verify each machine's positive sense
+y = "away" # AUTHOR'S CHOICE: existing EL400 positive mill-Y convention
+z = "toward_exposed_end"
+
+# Plan-owned setup frames (PLAN.md §4.1; docs/plan.md "frames"). The exported
+# manifest declares only `model` and an unknown `setup`; these restore the
+# pre-export T1/M2/J3/C4 transforms and citations verbatim (3a561db
+# examples/cone-pivot-post/features.toml). Origins and axes are model
+# coordinates; every physical binding remains unknown.
+[frames.T1]
+origin = [0.0, 0.0, 0.0]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 0.0, 1.0]
+z = [0.0, -1.0, 0.0]
+binding = "unknown"
+note = "AUTHOR'S CHOICE: foot-exposed frame (one-piece lathe S1, built-up mill S0); +Z toward the foot, +X radial withdrawal on the lathe."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,373-376"]
+
+# Head top at Z86 = exported body height_nominal.
+[frames.M2]
+origin = [0.0, 0.0, 0.0]
+x = [1.0, 0.0, 0.0]
+y = [0.0, 0.0, -1.0]
+z = [0.0, 1.0, 0.0]
+binding = "unknown"
+note = "AUTHOR'S CHOICE: foot-down milling; Z0 at finished foot, head top at Z86."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:29-33,79-81,373-376"]
+
+# Origin = exported journal_bore at; setup -Z = exported journal_bore axis.
+[frames.J3]
+origin = [0.0, 33.368, 0.0]
+x = [0.9762272058393484, 0.0, -0.21674972336567902]
+y = [0.0, -1.0, 0.0]
+z = [-0.21674972336567902, 0.0, -0.9762272058393484]
+binding = "unknown"
+note = "AUTHOR'S CHOICE: spindle toward the north cone-boss face; trig basis derived from the 12.5182 degree horizontal plan angle, not a tilt."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:62-67,268-279"]
+
+# Origin = exported crank_bore at Y72.7 and crank_boss_faces station_nominal 21.3753.
+[frames.C4]
+origin = [0.0, 72.7, -21.3753]
+x = [1.0, 0.0, 0.0]
+y = [0.0, -1.0, 0.0]
+z = [0.0, 0.0, -1.0]
+binding = "unknown"
+note = "AUTHOR'S CHOICE: crank boss north face Z0; depth goes into boss along negative setup Z."
+cite = ["AUTHOR'S CHOICE", "harmonic-analyzer/cad/scripts/dt_cone_pivot_post_spec.py:49-57"]
+
+# S1 only turns BELOW the inclined pad (lowest pad Y33.368-17.2/2=24.768).
+# Do not turn the full body/head and thereby remove either integral boss.
+[[setups]]
+id = "S1"
+machine = "PM-1127VF-LB"
+frame = "T1" # plan.frames.T1, AUTHOR'S CHOICE; exported `setup` and physical binding stay unknown
+stock_in = "authored_round_blank"
+coolant = "CRC cutting oil brushed on" # AUTHOR'S CHOICE; inventory consumable, not speed evidence
+deburr_mm = 0.25 # title_block.yaml:edge_break.radius_mm, edge_break.chamfer_max_mm
+deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
+[setups.stock_state]
+od_mm = 110.0 # AUTHOR'S CHOICE: declared blank OD, not a measurement
+north_end_z = 6.0 # AUTHOR'S CHOICE: foot allowance in T1
+south_end_z = -114.0 # AUTHOR'S CHOICE: 86+28 behind the foot
+note = "AUTHOR'S CHOICE: jaws end at model Y86/T1 Z-86; stock runs to Y114."
+[setups.hold]
+fixture = "chuck-4jaw-6-d1-4"
+support = "none" # AUTHOR'S CHOICE: unsupported route; shop ratio remains unknown
+ grip_on = "sacrificial upper28mm past the final head top"
+grip_mm = 28.0
+stickout_mm = 92.0 # AUTHOR'S CHOICE: exposed foot allowance6 + body86; L/D=92/110
+fixed_jaw = "not_applicable"
+jaws_along = "not_applicable"
+parallels = "not_applicable"
+jaw_above_parallels_mm = "not_applicable"
+stop = "AUTHOR'S CHOICE: jaw fronts at T1 Z-86; separately verify tool clearance"
+clamp = "AUTHOR'S CHOICE: centre in four-jaw; tighten all jaws and remove key before cutting"
+[setups.zero.x]
+feature = "spindle_axis"
+edge_mm = 0.0
+from = "+x"
+method = "trial_cut_measure" # EL4009.2.1 p62; measured diameter unavailable
+ tool = "turning-tools-warner-lms-4132/AR"
+gauge = "unknown" # no inventory outside micrometer spans the110mm trial-cut blank
+check_jog_mm = 10.0 # AUTHOR'S CHOICE
+[setups.zero.z]
+face = "foot_seat"
+edge_mm = 0.0
+from = "+z"
+method = "face_then_set"
+after_op = 10
+ tool = "turning-tools-warner-lms-4132/AR"
+paper_mm = 0.0 # AUTHOR'S CHOICE: direct cut face
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "foot_seat"
+tool = "turning-tools-warner-lms-4132/AR"
+holder = "qctp-axa-lms-2280/1-turning-facing"
+to_z = 0.0
+direction = "radially_inward"
+doc_mm = 0.25 # AUTHOR'S CHOICE, not cutting-data proof
+feed_mm_rev = 0.05 # AUTHOR'S CHOICE; RPM unknown
+note = "AUTHOR'S CHOICE: remove6mm axial allowance in passes and establish datum B; reach/nose geometry and speed remain unresolved."
+[setups.ops.checks]
+finish_ra = "unknown"
+[[setups.ops]]
+op = 20
+do = "rough_turn"
+feature = "body"
+tool = "turning-tools-warner-lms-4132/AR"
+holder = "qctp-axa-lms-2280/1-turning-facing"
+z_from = 0.0
+z_to = -24.5 # AUTHOR'S CHOICE: stop short of inclined pad lowest Y24.768
+rough_allowance_mm = 0.4 # AUTHOR'S CHOICE: on DIAMETER
+ direction = "toward_chuck"
+doc_mm = 0.25
+feed_mm_rev = 0.05
+[[setups.ops]]
+op = 30
+do = "finish_turn"
+feature = "body"
+tool = "turning-tools-warner-lms-4132/AR"
+holder = "qctp-axa-lms-2280/1-turning-facing"
+z_from = 0.0
+z_to = -24.5
+ direction = "toward_chuck"
+doc_mm = 0.1 # AUTHOR'S CHOICE
+feed_mm_rev = 0.03 # AUTHOR'S CHOICE
+note = "AUTHOR'S CHOICE: only the lower body region; S2 finishes the remaining outline without cutting off the bosses."
+[setups.ops.checks]
+dia = "micrometers/1-2in"
+height = "calipers"
+
+[[setups]]
+id = "S2"
+machine = "PM-30MV"
+frame = "M2" # plan.frames.M2, AUTHOR'S CHOICE; physical binding unknown
+stock_in = "S1_integral_blank"
+coolant = "CRC cutting oil brushed on"
+deburr_mm = 0.25
+deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
+[setups.stock_state]
+top_z = 114.0 # AUTHOR'S CHOICE: sacrificial upper grip before removal
+bottom_z = 0.0
+note = "AUTHOR'S CHOICE: nominal foot-down placement; toolpaths around both integral pads and real clamping contacts are unproven."
+[setups.stock_state.local_thickness]
+mount_west = 86.0 # spec:30, AUTHOR'S CHOICE: drill after top faced to86
+mount_east = 86.0
+[setups.hold]
+fixture = "unknown" # no suitable full-envelope integral-blank nest is recorded
+support = "unknown"
+grip_on = "finished lower-body region and foot; contact geometry unknown"
+grip_mm = 20.0 # AUTHOR'S CHOICE target; no manufactured nest claimed
+fixed_jaw = "not_applicable"
+jaws_along = "not_applicable"
+parallels = "not_applicable"
+jaw_above_parallels_mm = "not_applicable"
+stop = "AUTHOR'S CHOICE: indicate foot datum B and body axis; stop geometry unknown"
+clamp = "AUTHOR'S CHOICE: restraint must clear complete head and crank boss; hardware selection unknown"
+[setups.zero.transfer]
+from = "S1"
+indicate = ["foot_seat", "body"]
+gauge = "dial-indicator"
+runout_limit_mm = "unknown" # no sourced refixture budget
+[setups.zero.x]
+feature = "body_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "dial-indicator"
+check_jog_mm = 10.0
+[setups.zero.y]
+feature = "body_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "dial-indicator"
+check_jog_mm = 10.0
+[setups.zero.z]
+face = "foot_seat"
+edge_mm = 0.0
+from = "+z"
+method = "touch_then_set"
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "head"
+tool = "unknown"
+holder = "unknown"
+to_z = 86.0 # source spec:30; removes AUTHOR'S CHOICE28mm grip
+ direction = "positive_setup_x"
+note = "AUTHOR'S CHOICE: remove sacrificial grip; reach and fixture/tool identities remain unknown."
+[setups.ops.checks]
+dia = "calipers"
+height = "calipers"
+[[setups.ops]]
+op = 20
+do = "profile"
+feature = "body"
+tool = "unknown"
+holder = "unknown"
+stock_to_leave_mm = 0.0
+ direction = "around_retained_integral_pads"
+note = "AUTHOR'S CHOICE: finish body outline outside S1 turned region, retain both bosses; no swept toolpath/envelope or physical clearance proof is supplied."
+[setups.ops.checks]
+dia = "calipers"
+height = "calipers"
+[[setups.ops]]
+op = 30
+do = "profile"
+feature = "head"
+tool = "unknown"
+holder = "unknown"
+stock_to_leave_mm = 0.0
+ direction = "around_retained_crank_boss"
+[setups.ops.checks]
+dia = "calipers"
+height = "calipers"
+[[setups.ops]]
+op = 40
+do = "profile"
+feature = "crank_boss"
+tool = "unknown"
+holder = "unknown"
+stock_to_leave_mm = 0.0
+ direction = "along_crank_axis"
+[setups.ops.checks]
+dia = "calipers"
+[[setups.ops]]
+op = 45
+do = "inspect"
+feature = "crank_boss_faces"
+note = "Existing crank-boss length/station checks, keyed to the exported face owner."
+[setups.ops.checks]
+length = "calipers"
+station = "calipers"
+[[setups.ops]]
+op = 50
+do = "profile"
+feature = "cone_boss"
+tool = "unknown"
+holder = "unknown"
+stock_to_leave_mm = 0.0
+ direction = "along_inclined_journal_axis"
+[setups.ops.checks]
+dia = "calipers"
+[[setups.ops]]
+op = 60
+do = "spot"
+feature = "mount_west"
+tool = "unknown"
+holder = "unknown"
+depth_mm = 0.5 # AUTHOR'S CHOICE
+[[setups.ops]]
+op = 70
+do = "drill"
+feature = "mount_west"
+tool = "unknown" # no measured7.14248mm drill is asserted
+holder = "unknown"
+exit_mm = 0.5 # AUTHOR'S CHOICE; actual drill-point target remains unknown
+[setups.ops.checks]
+dia = "unknown"
+station = "calipers"
+[[setups.ops]]
+op = 80
+do = "counterbore"
+feature = "mount_west_counterbore"
+tool = "unknown"
+holder = "unknown"
+depth_mm = 6.0198 # spec:81 nominal; acceptance band in manifest
+[setups.ops.checks]
+dia = "calipers"
+depth = "calipers"
+[[setups.ops]]
+op = 90
+do = "spot"
+feature = "mount_east"
+tool = "unknown"
+holder = "unknown"
+depth_mm = 0.5
+[[setups.ops]]
+op = 100
+do = "drill"
+feature = "mount_east"
+tool = "unknown"
+holder = "unknown"
+exit_mm = 0.5
+[setups.ops.checks]
+dia = "unknown"
+station = "calipers"
+[[setups.ops]]
+op = 110
+do = "counterbore"
+feature = "mount_east_counterbore"
+tool = "unknown"
+holder = "unknown"
+depth_mm = 6.0198
+[setups.ops.checks]
+dia = "calipers"
+depth = "calipers"
+
+[[setups]]
+id = "S3"
+machine = "PM-30MV"
+frame = "J3" # plan.frames.J3, AUTHOR'S CHOICE; physical binding unknown
+stock_in = "S2_integral_profile"
+coolant = "CRC cutting oil brushed on"
+deburr_mm = 0.1 # cone rim limit: dt_cone_gear_shaft_spec.py:79-97,111-113; draw:264
+deburr_cite = ["harmonic-analyzer/cad/scripts/dt_cone_gear_shaft_spec.py:79-97,111-113", "harmonic-analyzer/cad/scripts/draw_dt_cone_pivot_post.py:254-264"]
+[setups.stock_state]
+top_z = 21.0055 # spec:67 half face-to-face; construction J3 frame
+bottom_z = -21.0055
+[setups.stock_state.local_thickness]
+journal_bore = 42.011 # spec:67
+[setups.hold]
+fixture = "BS-0"
+support = "unknown" # suitable asymmetrical-body restraint is not in the inventory
+ grip_on = "AUTHOR'S CHOICE: body, clocked against foot datum B; clamping adapter unknown"
+grip_mm = 20.0
+fixed_jaw = "not_applicable"
+jaws_along = "not_applicable"
+parallels = "not_applicable"
+jaw_above_parallels_mm = "not_applicable"
+stop = "AUTHOR'S CHOICE: indicate foot B before changing bore-axis yaw"
+clamp = "AUTHOR'S CHOICE: verify asymmetrical post restraint and mill spindle clearance; adapter unknown"
+[setups.hold.index]
+fixture = "BS-0"
+feature = "crank_bore" # exported owner of the BASIC inter-bore angle
+angle_deg = 12.5182 # spec:62,327,387 BASIC plan angle; not bore tilt
+positions = 1 # AUTHOR'S CHOICE: one angular setting, NO closure claim
+[setups.zero.transfer]
+from = "S2"
+indicate = ["foot_seat", "body"]
+gauge = "dial-indicator"
+runout_limit_mm = "unknown"
+[setups.zero.x]
+feature = "journal_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "dial-indicator"
+check_jog_mm = 10.0
+[setups.zero.y]
+feature = "journal_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "dial-indicator"
+check_jog_mm = 10.0
+[setups.zero.z]
+face = "cone_boss_north_face"
+edge_mm = 21.0055
+from = "+z"
+method = "touch_then_set"
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.ops]]
+op = 10
+do = "face"
+feature = "cone_boss_north_face"
+tool = "unknown"
+holder = "unknown"
+to_z = 21.0055
+ direction = "positive_setup_x"
+[setups.ops.checks]
+finish_ra = "unknown"
+length = "calipers" # existing cone-boss length check, on its exported owner after final facing
+[[setups.ops]]
+op = 20
+do = "spot"
+feature = "journal_bore"
+tool = "unknown"
+holder = "unknown"
+depth_mm = 0.5
+[[setups.ops]]
+op = 30
+do = "drill"
+feature = "journal_bore"
+tool = "unknown"
+holder = "unknown"
+exit_mm = 0.5
+[[setups.ops]]
+op = 40
+do = "bore"
+feature = "journal_bore"
+tool = "unknown"
+holder = "unknown"
+direction = "negative_setup_z" # AUTHOR'S CHOICE: feed into journal along spindle axis
+exit_mm = 0.5
+note = "AUTHOR'S CHOICE: finish the running journal, establish datum A, retain B clocking; neither a verified bore gauge nor cutter reach is available."
+[setups.ops.checks]
+dia = "unknown"
+height = "unknown"
+finish_ra = "unknown"
+
+[[setups]]
+id = "S4"
+machine = "PM-30MV"
+frame = "C4" # plan.frames.C4, AUTHOR'S CHOICE; physical binding unknown
+stock_in = "S3_finished_datum_A"
+coolant = "CRC cutting oil brushed on"
+deburr_mm = 0.25
+deburr_cite = ["harmonic-analyzer/cad/config/title_block.yaml:edge_break.radius_mm", "harmonic-analyzer/cad/config/title_block.yaml:edge_break.chamfer_max_mm"]
+[setups.stock_state]
+top_z = 0.0 # crank north machined face in C4, spec:53-54
+bottom_z = -72.0344 # spec:55-56
+[setups.stock_state.local_thickness]
+crank_bore = 72.0344
+[setups.hold]
+fixture = "unknown"
+support = "unknown"
+grip_on = "AUTHOR'S CHOICE: finished cone bore A and foot B; fixture/mating arbor unknown"
+grip_mm = 20.0
+fixed_jaw = "not_applicable"
+jaws_along = "not_applicable"
+parallels = "not_applicable"
+jaw_above_parallels_mm = "not_applicable"
+stop = "AUTHOR'S CHOICE: clock on B and indicate finished A, not a pilot hole"
+clamp = "AUTHOR'S CHOICE: maintain A/B orientation during crank boring; actual hardware unknown"
+[setups.zero.transfer]
+from = "S3"
+indicate = ["journal_bore", "foot_seat"]
+gauge = "dial-indicator"
+runout_limit_mm = "unknown" # Ø.10 angularity is NOT a scalar runout budget
+[setups.zero.x]
+feature = "crank_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "dial-indicator"
+check_jog_mm = 10.0
+[setups.zero.y]
+feature = "crank_axis"
+edge_mm = 0.0
+from = "indicated"
+method = "indicate_axis"
+tool = "dial-indicator"
+check_jog_mm = 10.0
+[setups.zero.z]
+face = "crank_boss_faces"
+edge_mm = 0.0
+from = "+z"
+method = "touch_then_set"
+tool = "unknown"
+paper_mm = 0.0
+check_jog_mm = 10.0
+retouch_after = []
+[[setups.ops]]
+op = 10
+do = "spot"
+feature = "crank_bore"
+tool = "unknown"
+holder = "unknown"
+depth_mm = 0.5
+[[setups.ops]]
+op = 20
+do = "drill"
+feature = "crank_bore"
+tool = "unknown"
+holder = "unknown"
+exit_mm = 0.5
+[[setups.ops]]
+op = 30
+do = "bore"
+feature = "crank_bore"
+tool = "unknown"
+holder = "unknown"
+direction = "negative_setup_z" # AUTHOR'S CHOICE: feed into crank boss
+exit_mm = 0.5
+note = "AUTHOR'S CHOICE: finish crank bore at sourced spacing from A; separately inspect Ø.10 angularity to A/B, not the BASIC cone-angle value."
+[setups.ops.checks]
+dia = "unknown"
+separation = "unknown"
+angularity_dia = "unknown"
+finish_ra = "unknown"
+[setups.ops.inspection_methods]
+angularity_dia = "unknown" # no calibrated datum-fixture geometric inspection supplied

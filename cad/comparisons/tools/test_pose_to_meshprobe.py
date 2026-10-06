@@ -37,7 +37,7 @@ BBOX = ((-200.0, -300.0, -150.0), (250.0, 400.0, 200.0), 700.0, [])
 def _pair(roll: float) -> dict:
     return {
         "id": PAIR,
-        "model": "harmonic_analyzer",
+        "model": "ha_harmonic_analyzer",
         "camera": {"mode": "euler", "az_deg": -133.18, "el_deg": 0.0, "roll_deg": roll,
                    "zoom": 10.24, "target_mm": [-12.78, 94.46, -55.58],
                    "perspective": {"focal_length_mm": 86.92}},

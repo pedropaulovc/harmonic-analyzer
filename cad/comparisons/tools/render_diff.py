@@ -7,9 +7,10 @@ highlighted in red over an x-ray ghost of the unchanged body.
 
 Each side is a *source* -- either a published GitHub release (read over HTTP
 range requests, no full-asset download) or a local staged bundle directory
-(``<dir>/stl/*.STL`` + ``<dir>/boxes/harmonic-analyzer.json``). The local form
-is what ``cut_release.py`` uses: the new release is still on disk and only the
-previous release is fetched from GitHub.
+(``<dir>/stl/*.STL`` + ``<dir>/boxes/<top-assembly>.json``). The top-assembly
+scene is resolved from the sealed identity map and the actual inventory on either
+side of the cutover. The local form is what ``cut_release.py`` uses: the new
+release is still on disk and only the previous release is fetched from GitHub.
 
 Pipeline:
   1. classify every scene-graph mesh -- equal signature (zip CRC32 / file
@@ -21,6 +22,10 @@ Pipeline:
      SolidWorks transform, colour red if its mesh changed else ghost grey;
   3. render N camera angles to PNG with an offscreen VTK context and write a
      diff_summary.json (changed parts + per-mesh deviation + image names).
+
+The committed schema-2 identity map pairs actual STL inventory members across
+the cutover, retaining configuration qualifiers. Renames are reported separately
+from geometry changes; unmatched files remain new/deleted.
 
     # release vs release
     uv run cad/comparisons/tools/render_diff.py v0.1.1 v0.2.0 --out /tmp/diff
@@ -52,6 +57,7 @@ import numpy as np
 # VTK import cost -- they re-run this cheap env setup but never import pyvista.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from osmesa_win import enable_offscreen_gl
+from release_diff import IDENTITY_MAP, identity_inventory, load_identity_map, paired_keys
 
 enable_offscreen_gl()
 
@@ -68,13 +74,26 @@ GHOST = (0.80, 0.80, 0.82)    # unchanged -> light grey
 
 
 def base_part(key):
-    """Strip per-config suffixes (cone-gear--t024, ...-stretch07) to the part."""
+    """Group tooth/stretch variants for the summary, not mesh classification."""
     return re.sub(r"(--t\d+|-stretch\d+)$", "", key)
 
 
 # --------------------------------------------------------------------------- #
 # sources
 # --------------------------------------------------------------------------- #
+def _scene_member(names, mapping):
+    """Resolve the historical/current top-assembly scene from actual members."""
+    top_assembly = mapping.get("harmonic-analyzer", "ha-harmonic-analyzer")
+    scene_names = {
+        "boxes/harmonic-analyzer.json",
+        f"boxes/{top_assembly}.json",
+    }
+    matches = [name for name in names if name.lower() in scene_names]
+    identity_inventory((Path(name).stem for name in matches),
+                       {"harmonic-analyzer": top_assembly})
+    return matches[0] if matches else None
+
+
 class ReleaseSource:
     """A published GitHub release zip, read incrementally over HTTP ranges."""
 
@@ -139,8 +158,11 @@ class ReleaseSource:
         return None if e is None else (rel, e)
 
     def _stl_entry(self, key):
-        return (self._entry(f"stl/{key}.stl")
-                or self._entry(f"stl/{base_part(key)}.stl"))
+        return self._entry(f"stl/{key}.stl")
+
+    def mesh_keys(self):
+        return [Path(name).stem.lower() for name in self.cd
+                if name.lower().startswith("stl/") and name.lower().endswith(".stl")]
 
     def crc(self, key):
         e = self._stl_entry(key)
@@ -163,11 +185,12 @@ class ReleaseSource:
         dest.write_bytes(data)
         return dest
 
-    def scene(self):
-        rel = "boxes/harmonic-analyzer.json"
+    def scene(self, mapping=None):
+        mapping = load_identity_map() if mapping is None else mapping
+        rel = _scene_member(self.cd, mapping)
+        if rel is None:
+            raise SystemExit(f"!! {self.tag} has no top-assembly boxes scene")
         e = self._entry(rel)
-        if e is None:
-            raise SystemExit(f"!! {self.tag} has no {rel} (pre-bundle release?)")
         dest = CACHE / self.tag / "scene.json"
         ent = e[1]
         lh = self._get(ent["lho"], ent["lho"] + 30 - 1)
@@ -192,8 +215,10 @@ class LocalSource:
         self._crc = {}
 
     def _path(self, key):
-        return (self._stls.get(key.lower())
-                or self._stls.get(base_part(key).lower()))
+        return self._stls.get(key.lower())
+
+    def mesh_keys(self):
+        return list(self._stls)
 
     def crc(self, key):
         p = self._path(key)
@@ -206,10 +231,14 @@ class LocalSource:
     def stl(self, key):
         return self._path(key)
 
-    def scene(self):
-        scene = self.root / "boxes" / "harmonic-analyzer.json"
-        if not scene.is_file():
-            raise SystemExit(f"!! no {scene.relative_to(self.root)} under {self.root}")
+    def scene(self, mapping=None):
+        mapping = load_identity_map() if mapping is None else mapping
+        names = [p.relative_to(self.root).as_posix()
+                 for p in (self.root / "boxes").glob("*") if p.is_file()]
+        rel = _scene_member(names, mapping)
+        if rel is None:
+            raise SystemExit(f"!! no top-assembly boxes scene under {self.root}")
+        scene = self.root / rel
         return json.loads(scene.read_text(encoding="utf-8"))
 
 
@@ -276,8 +305,8 @@ def _auto_jobs(n_pending):
     return max(1, min(cpu, 8, n_pending))
 
 
-def classify(old, new, keys, tol=0.01, jobs=0):
-    """Return ({changed mesh keys}, {key: hausdorff_mm}).
+def classify(old, new, keys, pairs, tol=0.01, jobs=0):
+    """Return ({changed mesh keys}, {key: hausdorff_mm}) using actual-file pairs.
 
     A cheap CRC pass first -- identical signature is unchanged for free, a missing
     old mesh is a new part. Only meshes whose signature differs need the expensive
@@ -296,7 +325,8 @@ def classify(old, new, keys, tol=0.01, jobs=0):
     to_verify = []                # [key] -- CRC signature differs, needs geometry verify
     pending = []                  # [(key, old_path, new_path)] -- materialised for the pool
     for k in sorted(keys):
-        c_old = old.crc(k)
+        old_key = pairs.get(k)
+        c_old = old.crc(old_key) if old_key is not None else None
         if c_old is None:
             changed.add(k)            # new part -> changed
             devs[k] = float("inf")
@@ -308,7 +338,7 @@ def classify(old, new, keys, tol=0.01, jobs=0):
     print(f"CRC pass: {len(changed)} new, {len(to_verify)} to geometry-verify, "
           f"{identical} identical (of {len(keys)} meshes)", flush=True)
     for k in to_verify:
-        po, pn = old.stl(k), new.stl(k)
+        po, pn = old.stl(pairs[k]), new.stl(k)
         if not (po and pn):
             changed.add(k)            # signature differs but a side is missing
             devs[k] = float("inf")
@@ -348,6 +378,8 @@ def main():
     ap.add_argument("--old-local")
     ap.add_argument("--new-release")
     ap.add_argument("--new-local")
+    ap.add_argument("--identity-map", type=Path, default=IDENTITY_MAP,
+                    help="schema-2 diff-only identity rename table")
     ap.add_argument("--out", default="/tmp/render_diff", type=Path)
     ap.add_argument("--summary-json", type=Path)
     ap.add_argument("--res", type=int, default=1600)
@@ -367,13 +399,19 @@ def main():
     old = make_source(old_rel, args.old_local)
     new = make_source(new_rel, args.new_local)
 
-    scene = new.scene()
+    mapping = load_identity_map(args.identity_map)
+    scene = new.scene(mapping)
     comps = scene["components"]
-    keys = {(c.get("mesh") or c["part"]) for c in comps}
+    keys = {(c.get("mesh") or c["part"]).lower() for c in comps}
+    old_keys, new_keys = old.mesh_keys(), new.mesh_keys()
+    pairs = paired_keys(old_keys, new_keys, mapping)
+    renamed = {k: v for k, v in pairs.items() if k != v}
+    deleted = sorted(set(old_keys) - set(pairs.values()))
+    added = sorted(set(new_keys) - set(pairs))
     print(f"scene: {len(comps)} components, {len(keys)} unique meshes")
 
     print("classifying changed meshes ...", flush=True)
-    changed, devs = classify(old, new, keys, jobs=args.jobs)
+    changed, devs = classify(old, new, keys, pairs, jobs=args.jobs)
     changed_bases = sorted({base_part(k) for k in changed})
     print(f"\nCHANGED parts ({len(changed_bases)}): "
           f"{', '.join(changed_bases) or '(none)'}\n", flush=True)
@@ -388,7 +426,7 @@ def main():
     pl.set_background("white")
     n_hi = 0
     for idx, c in enumerate(comps, 1):
-        key = c.get("mesh") or c["part"]
+        key = (c.get("mesh") or c["part"]).lower()
         p = new.stl(key)
         if p is None:
             continue
@@ -425,6 +463,9 @@ def main():
 
     summary = {
         "old": old.label, "new": new.label,
+        "renamed_meshes": dict(sorted(renamed.items())),
+        "new_meshes": added,
+        "deleted_meshes": deleted,
         "changed_parts": changed_bases,
         "changed_meshes": {k: (None if devs[k] == float("inf") else devs[k])
                            for k in sorted(changed)},

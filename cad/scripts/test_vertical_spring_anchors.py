@@ -17,8 +17,8 @@ import pytest
 
 import channel_frame_geom
 import channel_kinematics
-import channel_lever_spec
-import gooseneck_geom
+import ch_channel_lever_spec
+import sm_gooseneck_geom
 import spring_mount_geom
 
 # The prints carry these stations to two decimals, so plumb is held to half of
@@ -34,7 +34,7 @@ def test_lever_reach_puts_the_neutral_spring_hole_over_the_channel_anchor() -> N
     # The reach is the fulcrum-to-anchor span, corrected for the neutral tilt.
     phi = math.radians(channel_kinematics.solve_state(0.0)["lever_tilt"])
     fulcrum_x = channel_frame_geom.LEVER_FULCRUM_XY[0]
-    assert channel_lever_spec.LEVER_SPRING_X == pytest.approx(
+    assert ch_channel_lever_spec.LEVER_SPRING_X == pytest.approx(
         (fulcrum_x - anchor_x) / math.cos(phi), abs=PLUMB_TOL_MM
     )
 
@@ -57,8 +57,8 @@ def test_gooseneck_arm_end_hangs_the_counter_eye_over_its_anchor() -> None:
     )
     # Stated the other way: the arm end face is the only free term, so it is the
     # thing a future edit must keep, not the eye position it produces.
-    assert gooseneck_geom.ARM_END_X == pytest.approx(
-        spring_mount_geom.COLUMN_X - anchor_x + gooseneck_geom.SCREW_SHANK_LEN / 2.0,
+    assert sm_gooseneck_geom.ARM_END_X == pytest.approx(
+        spring_mount_geom.COLUMN_X - anchor_x + sm_gooseneck_geom.SCREW_SHANK_LEN / 2.0,
         abs=PLUMB_TOL_MM,
     )
 

@@ -5,8 +5,11 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 `cad/scripts/build_kinematic_probe.py` (PR #189) drives the crank +30° on the built
-`paper-drive.SLDASM` and reads the whole feed train back; `verify:kinematics` runs
+`pd-paper-drive.SLDASM` and reads the whole feed train back; `verify:kinematics` runs
 its `_drive_and_measure` as the `paper-drive:crank-feed` gate. Findings that will
 trip up anyone reasoning about this model:
 

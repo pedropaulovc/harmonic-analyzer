@@ -1,5 +1,7 @@
 # Proposed native datum placement contract
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Historical proposal, not the approved implementation. VM1
 [approved a different design](https://github.com/pedropaulovc/harmonic-analyzer/pull/702#issuecomment-5578660244):
 a narrowly imported native-axis helper for these two recipes, leaving

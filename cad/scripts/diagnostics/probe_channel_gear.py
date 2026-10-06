@@ -7,7 +7,7 @@ ignores. The spring summation (proven viable by poc_spring_adder.py) therefore
 never gets a moving anchor.
 
 Fix candidate: replace the dead contact with a GEAR mate rocker(Axis1) <->
-channel-lever(Axis1) (parallel Z axes), authored INSIDE channel.SLDASM (both
+channel-lever(Axis1) (parallel Z axes), authored INSIDE ch-channel.SLDASM (both
 parts share the one flexible sub, so a top-level mate is rejected -- same as the
 rod<->rocker revolute). The bar's foot spin driver (a foot-bore->plane DISTANCE,
 i.e. pinned to ground) is suppressed so the lever is free for the gear to drive;
@@ -66,7 +66,7 @@ async def _flex_channel(adapter):
         ComponentRefParameters, SetComponentSolvingParameters,
     )
     asm = adapter.currentModel
-    sub = "channel-1"
+    sub = "ch-channel-1"
     await adapter.float_component(ComponentRefParameters(name=sub))
     for plane in ("Front Plane", "Top Plane", "Right Plane"):
         await coincident_mate(
@@ -92,7 +92,7 @@ async def main():
     # (True = discard unsaved) gives a fresh disk load -- artifact A is never
     # saved, so nothing is lost.
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    asm_path = str((OUT_SLDASM / "harmonic-analyzer.SLDASM").resolve())
+    asm_path = str((OUT_SLDASM / "ha-harmonic-analyzer.SLDASM").resolve())
     await adapter.open_model(asm_path)
     log(f"opened {asm_path}")
 
@@ -113,15 +113,15 @@ async def main():
     await _suppress_channel(adapter)
 
     # add the ch0 gear INSIDE channel.SLDASM (both parts in the one flexible sub).
-    _, ch_doc = _sub_model(adapter, "channel-1")
+    _, ch_doc = _sub_model(adapter, "ch-channel-1")
     top = adapter.currentModel
     adapter.currentModel = ch_doc
     rocker_n = lever_n = None
     try:
         comps = _components(adapter, ch_doc)
-        rockers = _by_z_rank(adapter, "rocker-arm", comps=comps)
-        levers = _by_z_rank(adapter, "channel-lever", comps=comps)
-        bars = _by_z_rank(adapter, "amplitude-bar", comps=comps)
+        rockers = _by_z_rank(adapter, "ch-rocker-arm", comps=comps)
+        levers = _by_z_rank(adapter, "ch-channel-lever", comps=comps)
+        bars = _by_z_rank(adapter, "ch-amplitude-bar", comps=comps)
         rocker_n, lever_n = rockers[0][1], levers[0][1]
         bar_n = bars[0][1]
         log(f"  ch0 rocker={rocker_n!r} lever={lever_n!r} bar={bar_n!r}")

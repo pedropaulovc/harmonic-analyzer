@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Learned building the crank-arm and rocker-arm-support prints (2026-07-11, PRs #243/#246 stacked on #225):
 
 1. **Always pass an explicit `scale=` to `place_view`.** A view placed without one can silently auto-scale (the rocker-arm-support bottom view came in at 1:2 on a 1:1 sheet), which shifts every coordinate-based `SelectByID2` pick on that view. Symptom: "failed to select … vertex/edge" with coordinates that look right.
@@ -57,10 +60,10 @@ BOM + auto-balloons):
     which only `save_part_and_images` stamps) and the MATERIAL cell links the
     custom property **`Material`** — not `Material Specification`. An assembly
     build must stamp both (plus Number/Revision/TOL_* — see
-    `build_pen_assembly.py`), or the print ships blank cells that
+    `build_pn_pen_assembly.py`), or the print ships blank cells that
     `finalize_drawing`'s TOL-only validation does not catch. The DWG. NO. cell
-    fits ~7 characters (`MHA-###` / `MHA-A##`); a longer id overlaps the REV
-    cell.
+    Historical template fit: the DWG. NO. cell accommodated ~7 characters
+    (`MHA-###` / `MHA-A##`). Current numbers use `MHA-<subsystem>-NNN`; check the new number on the rendered sheet before accepting its fit.
 
 19. **A named part entity beats a coordinate pick — UNPROVEN here, but the API
     path is documented (2026-07-26, Pedro's suggestion).** Every attached

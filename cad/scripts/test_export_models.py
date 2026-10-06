@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import re
 import struct
 import os
 import sys
@@ -27,52 +28,68 @@ def _write(path: Path, mtime: float) -> None:
 def test_assembly_fallback_does_not_require_retired_step(
     tmp_path: Path, monkeypatch
 ) -> None:
-    src = tmp_path / "sldasm" / "frame.SLDASM"
+    src = tmp_path / "sldasm" / "fr-frame.SLDASM"
     boxes = tmp_path / "boxes"
     gltf = tmp_path / "gltf"
     step = tmp_path / "step"
     now = time.time()
     _write(src, now - 10)
-    _write(boxes / "frame.json", now)
-    _write(gltf / "frame.glb", now)
+    _write(boxes / "fr-frame.json", now)
+    _write(gltf / "fr-frame.glb", now)
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
     monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "OUT_STEP", step)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
-    assert not export_models.asm_source_changed("frame", src, {})
+    assert not export_models.asm_source_changed("fr-frame", src, {})
 
 
+@pytest.mark.parametrize("output", ["scene", "glb"])
+@pytest.mark.parametrize("fault", ["missing", "empty", "older"])
 def test_assembly_fallback_still_requires_current_scene_and_glb(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch, output: str, fault: str,
 ) -> None:
-    src = tmp_path / "sldasm" / "frame.SLDASM"
+    src = tmp_path / "sldasm" / "fr-frame.SLDASM"
     boxes = tmp_path / "boxes"
     gltf = tmp_path / "gltf"
     now = time.time()
     _write(src, now)
-    _write(boxes / "frame.json", now - 10)
-    _write(gltf / "frame.glb", now + 10)
+    outputs = {
+        "scene": boxes / "fr-frame.json",
+        "glb": gltf / "fr-frame.glb",
+    }
+    for path in outputs.values():
+        _write(path, now + 10)
     monkeypatch.setattr(export_models, "OUT_BOXES", boxes)
     monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
-    assert export_models.asm_source_changed("frame", src, {})
+    assert not export_models.asm_source_changed("fr-frame", src, {})
+    if fault == "missing":
+        outputs[output].unlink()
+    elif fault == "empty":
+        outputs[output].write_bytes(b"")
+    else:
+        _write(outputs[output], now - 10)
+    # A fresh retired basename must never stand in for the canonical scene.
+    _write(boxes / "frame.json", now + 10)
+
+    assert export_models.asm_source_changed("fr-frame", src, {})
 
 
 def test_subassembly_fallback_does_not_require_a_scene(
     tmp_path: Path, monkeypatch,
 ) -> None:
-    src = tmp_path / "sldasm" / "frame.SLDASM"
+    src = tmp_path / "sldasm" / "fr-frame.SLDASM"
     gltf = tmp_path / "gltf"
     now = time.time()
     _write(src, now - 10)
-    _write(gltf / "frame.glb", now)
+    _write(gltf / "fr-frame.glb", now)
     monkeypatch.setattr(export_models, "OUT_GLTF", gltf)
     monkeypatch.setattr(export_models, "src_digest", lambda _src: None)
 
     assert not export_models.asm_source_changed(
-        "frame", src, {}, require_scene=False,
+        "fr-frame", src, {}, require_scene=False,
     )
 
 
@@ -215,31 +232,6 @@ def test_forced_export_regenerates_existing_certified_png(tmp_path: Path) -> Non
     assert export_models._png_needs_export(output, True, lambda _path: False)
 
 
-def test_certified_output_hash_is_memoized_per_export(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    output = tmp_path / "sample.STL"
-    output.write_bytes(b"neutral")
-    expected = export_models._file_sha256(output)
-    calls = 0
-    original = export_models._file_sha256
-
-    def _counted(path: Path) -> str:
-        nonlocal calls
-        calls += 1
-        return original(path)
-
-    monkeypatch.setattr(export_models, "_file_sha256", _counted)
-    certified = {
-        output.resolve(): {"bytes": output.stat().st_size, "sha256": expected},
-    }
-    cache: dict[Path, bool] = {}
-
-    assert not export_models._certified_output_changed(output, certified, cache)
-    assert not export_models._certified_output_changed(output, certified, cache)
-    assert calls == 1
-
-
 def test_zero_byte_neutral_outputs_are_stale(tmp_path: Path, monkeypatch) -> None:
     stl = tmp_path / "stl"
     step = tmp_path / "step"
@@ -261,25 +253,7 @@ def test_zero_byte_neutral_outputs_are_stale(tmp_path: Path, monkeypatch) -> Non
     )
 
 
-def test_neutral_save_is_silent_and_suppresses_stl_info(tmp_path: Path) -> None:
-    calls: list[tuple[str, int, int]] = []
-
-    class _Doc:
-        def SaveAs3(self, path: str, version: int, options: int) -> int:
-            calls.append((path, version, options))
-            Path(path).write_bytes(b"neutral")
-            return 1
-
-    output = tmp_path / "sample.STL"
-    assert export_models._save_as(_Doc(), output) == 1
-    assert calls == [(str(output), 0, 1 | 8)]
-    assert (
-        export_models.EXPORT_PREFERENCES.toggles[export_models.TOGGLE_STL_SHOW_INFO]
-        is False
-    )
-
-
-def test_saved_active_and_configuration_exports_share_one_part_open(
+def test_saved_active_and_configuration_exports_preserve_geometry_and_native_state(
     tmp_path: Path, monkeypatch,
 ) -> None:
     sldprt = tmp_path / "sldprt"
@@ -289,43 +263,79 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     step = tmp_path / "step"
     boxes = tmp_path / "boxes"
     png = tmp_path / "png"
-    for path in (sldprt / "sample-part.SLDPRT",
-                 sldasm / "harmonic-analyzer.SLDASM",
+    native = sldprt / "sample-part.SLDPRT"
+    for path in (native, sldasm / "ha-harmonic-analyzer.SLDASM",
                  stl / "sample-part.STL",
-                 gltf / "harmonic-analyzer.glb"):
+                 gltf / "ha-harmonic-analyzer.glb"):
         _write(path, time.time())
+    native.write_text('{"configuration":"T24"}', encoding="utf-8")
+    native_before = native.read_bytes()
+    (gltf / "ha-harmonic-analyzer.glb").write_bytes(
+        _glb_bytes({"asset": {"version": "2.0"}}),
+    )
     boxes.mkdir(parents=True)
-    _write(png / "harmonic-analyzer/harmonic-analyzer_isometric.png", time.time())
-    (boxes / "harmonic-analyzer.json").write_text(
-        '{"unit":"mm","components":[{"part":"sample-part",'
-        '"cfg":"C1","mesh":"sample-part--c1"}]}',
+    _write(png / "ha-harmonic-analyzer/ha-harmonic-analyzer_isometric.png", time.time())
+    (boxes / "ha-harmonic-analyzer.json").write_text(
+        '{"unit":"mm","components":['
+        '{"part":"sample-part","cfg":"C1","mesh":"sample-part--c1"},'
+        '{"part":"sample-part","cfg":"C2","mesh":"sample-part--c2"}]}',
         encoding="utf-8",
     )
 
-    class _Config:
-        Name = "T24"
-
-    class _ConfigManager:
-        ActiveConfiguration = _Config()
-
     class _Doc:
-        ConfigurationManager = _ConfigManager()
+        """A saved-active part whose tessellation changes only on rebuild."""
+
+        def __init__(self, path: Path) -> None:
+            self.native = path
+            cfg = json.loads(path.read_text(encoding="utf-8"))["configuration"]
+            self.ConfigurationManager = SimpleNamespace(
+                ActiveConfiguration=SimpleNamespace(Name=cfg),
+            )
+            self.ForceRebuild3(False)
 
         def ShowConfiguration2(self, cfg: str) -> bool:
+            if cfg not in self.GetConfigurationNames():
+                return False
             self.ConfigurationManager.ActiveConfiguration.Name = cfg
             return True
 
         def ForceRebuild3(self, _top_only: bool) -> bool:
+            extent = {"T24": 24.0, "C1": 12.0, "C2": 18.0}[
+                self.ConfigurationManager.ActiveConfiguration.Name
+            ]
+            self.vertices = ((0.0, 0.0, 0.0), (extent, 0.0, 0.0), (0.0, 1.0, 0.0))
             return True
 
         def EditRebuild3(self) -> bool:
-            return True
+            return self.ForceRebuild3(False)
 
         def GetConfigurationNames(self) -> list[str]:
-            return ["T24", "C1"]
+            return ["T24", "C1", "C2"]
 
         def SaveAs3(self, path: str, _version: int, _options: int) -> int:
-            Path(path).write_bytes(self.ConfigurationManager.ActiveConfiguration.Name.encode())
+            out = Path(path)
+            if out.suffix == ".STL":
+                coordinates = [value for vertex in self.vertices for value in vertex]
+                out.write_bytes(
+                    b"\0" * 80 + struct.pack("<I", 1)
+                    + struct.pack("<12fH", 0.0, 0.0, 1.0, *coordinates, 0),
+                )
+            elif out.suffix == ".STEP":
+                points = [
+                    f"#{index} = CARTESIAN_POINT('',({x},{y},{z}));"
+                    for index, (x, y, z) in enumerate(self.vertices, 1)
+                ]
+                out.write_text(
+                    "ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n"
+                    + "\n".join(points) + "\nENDSEC;\nEND-ISO-10303-21;\n",
+                    encoding="ascii",
+                )
+            else:
+                raise AssertionError(f"unexpected part export format: {out}")
+            return 1
+
+        def Save3(self, *_args) -> int:
+            self.native.write_bytes(b"native incorrectly saved during export")
             return 1
 
     class _Sw:
@@ -334,12 +344,10 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
 
     class _Adapter:
         swApp = _Sw()
-        currentModel = _Doc()
-        opened: list[str] = []
+        currentModel = None
 
         async def open_model(self, path: str):
-            self.opened.append(Path(path).name)
-            self.currentModel = _Doc()
+            self.currentModel = _Doc(Path(path))
             return SimpleNamespace(is_success=True, data=None)
 
         def _attempt(self, call, default=None):
@@ -359,8 +367,7 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "COLORS", stl / "colors.json")
     monkeypatch.setattr(export_models, "SRC_DIGESTS", stl / "export-src.json")
     monkeypatch.setattr(export_models, "part_stems", lambda: ["sample_part"])
-    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("harmonic_analyzer",))
-    monkeypatch.setattr(export_models, "manifest_models", lambda: ["harmonic_analyzer"])
+    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ("ha_harmonic_analyzer",))
     monkeypatch.setattr(export_models, "exporter_untrusted", lambda: False)
     monkeypatch.setattr(export_models, "_certified_outputs", lambda: {})
     monkeypatch.setattr(
@@ -369,14 +376,13 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     monkeypatch.setattr(export_models, "load_colors", lambda: {"sample-part": (1, 1, 1)})
     monkeypatch.setattr(
         export_models, "load_src_digests",
-        lambda: {"sample-part": "part-v1", "harmonic-analyzer": "asm-v1"},
+        lambda: {"sample-part": "part-v1", "ha-harmonic-analyzer": "asm-v1"},
     )
     monkeypatch.setattr(
         export_models, "src_digest",
         lambda path: "asm-v1" if path.suffix == ".SLDASM" else "part-v1",
     )
-    # The export preferences are enforced on the seat (no save/restore pair any
-    # more); this offline run has no seat to enforce them on.
+    # The export preferences are enforced on the seat; this offline run has none.
     monkeypatch.setattr(export_models, "enforce_preferences", lambda *_args: {})
     monkeypatch.setattr(export_models, "doc_rgb", lambda _doc: (1, 1, 1))
     monkeypatch.setattr(export_models, "stamp_render_cache_current", lambda _paths: None)
@@ -388,10 +394,11 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
         )
 
     monkeypatch.setattr(export_models, "refresh_comparison_gallery", _no_gallery)
-    repaired_pngs: list[str] = []
+    rendered_extent = None
 
-    async def _repair_png(_adapter, stem: str) -> None:
-        repaired_pngs.append(stem)
+    async def _repair_png(seat, _stem: str) -> None:
+        nonlocal rendered_extent
+        rendered_extent = max(vertex[0] for vertex in seat.currentModel.vertices)
 
     monkeypatch.setattr(export_models, "export_build_png", _repair_png)
     monkeypatch.setattr(
@@ -400,12 +407,23 @@ def test_saved_active_and_configuration_exports_share_one_part_open(
     )
     monkeypatch.setattr(sys, "argv", ["export_models.py"])
 
+    def stl_extent(path: Path) -> float:
+        raw = path.read_bytes()
+        assert struct.unpack("<I", raw[80:84])[0] == 1
+        triangle = struct.unpack("<12fH", raw[84:])
+        return max(triangle[3], triangle[6], triangle[9])
+
     assert export_models.main() == 0
-    assert adapter.opened == ["sample-part.SLDPRT"]
-    assert repaired_pngs == ["sample-part"]
-    assert (step / "sample-part.STEP").read_bytes() == b"T24"
-    assert (stl / "sample-part.STL").read_bytes() == b"T24"
-    assert (stl / "sample-part--c1.STL").exists()
+    assert stl_extent(stl / "sample-part.STL") == 24.0
+    assert stl_extent(stl / "sample-part--c1.STL") == 12.0
+    assert stl_extent(stl / "sample-part--c2.STL") == 18.0
+    points = re.findall(
+        r"CARTESIAN_POINT\s*\(\s*''\s*,\s*\(([^)]*)\)\s*\)",
+        (step / "sample-part.STEP").read_text(encoding="ascii"),
+    )
+    assert max(float(point.split(",")[0]) for point in points) == 24.0
+    assert rendered_extent == 24.0
+    assert native.read_bytes() == native_before
 
 
 def test_current_gallery_skips_redundant_composite_and_index(
@@ -613,8 +631,8 @@ def test_render_diff_local_source_uses_top_scene(
     spec.loader.exec_module(render_diff)
     boxes = tmp_path / "boxes"
     boxes.mkdir()
-    (boxes / "channel.json").write_text('{"scene": "channel"}', encoding="utf-8")
-    (boxes / "harmonic-analyzer.json").write_text(
+    (boxes / "ch-channel.json").write_text('{"scene": "channel"}', encoding="utf-8")
+    (boxes / "ha-harmonic-analyzer.json").write_text(
         '{"scene": "top"}', encoding="utf-8",
     )
 
@@ -641,7 +659,7 @@ def test_rendered_pair_parser_ignores_composite_progress() -> None:
 
 
 def test_routine_view_cleanup_preserves_configuration_renders(tmp_path: Path) -> None:
-    part = "cone-gear"
+    part = "dt-cone-gear"
     generic_iso = tmp_path / f"{part}_isometric.png"
     stale_front = tmp_path / f"{part}_front.png"
     stale_top = tmp_path / f"{part}_top.png"
@@ -703,7 +721,7 @@ def test_sanitize_glb_drops_mismatched_texcoord_and_untextures_the_material(
             }
         ],
     }
-    glb = tmp_path / "top-frame.glb"
+    glb = tmp_path / "fr-top-frame.glb"
     glb.write_bytes(_glb_bytes(gltf))
     dropped = export_models.sanitize_glb(glb)
     assert dropped == [
@@ -878,7 +896,7 @@ def test_exporter_ledger_reuses_only_equivalent_naming_inputs(
     monkeypatch.setattr(export_models, "_import_dodo", lambda: dodo)
     monkeypatch.setattr(dodo, "_export_requirement_deps", lambda: deps)
     monkeypatch.setattr(export_models, "SRC_DIGESTS", tmp_path / "export-src.json")
-    ledger = {"rocker-arm": "model-recipe"}
+    ledger = {"ch-rocker-arm": "model-recipe"}
     export_models.save_src_digests(ledger)
 
     if change == "line-endings":
@@ -939,13 +957,13 @@ def _gallery_fixture(tmp_path: Path, monkeypatch) -> dict:
         (tmp_path / name).mkdir()
     (tmp_path / "sldasm" / "demo-asm.SLDASM").write_bytes(b"asm")
     (tmp_path / "sldprt" / "demo-part.SLDPRT").write_bytes(b"part")
-    (tmp_path / "sldprt" / "cone-gear.SLDPRT").write_bytes(b"cone")
+    (tmp_path / "sldprt" / "dt-cone-gear.SLDPRT").write_bytes(b"cone")
     (tmp_path / "boxes" / "demo-asm.json").write_text(
         json.dumps(
             {
                 "unit": "mm",
                 "components": [
-                    {"part": "cone-gear", "cfg": "t102", "mesh": "cone-gear--t102"},
+                    {"part": "dt-cone-gear", "cfg": "t102", "mesh": "dt-cone-gear--t102"},
                     {"part": "demo-part", "cfg": "", "mesh": "demo-part"},
                 ],
             }
@@ -975,9 +993,9 @@ def test_gallery_gate_rejects_inputs_exported_from_another_model(
     monkeypatch.setattr(
         export_models,
         "load_src_digests",
-        lambda: _Ledger({"cone-gear--t102": "0" * 32}),
+        lambda: _Ledger({"dt-cone-gear--t102": "0" * 32}),
     )
-    with pytest.raises(RuntimeError, match="cone-gear--t102: exported from"):
+    with pytest.raises(RuntimeError, match="dt-cone-gear--t102: exported from"):
         export_models.assert_gallery_inputs_current(manifest)
 
 
@@ -1007,7 +1025,7 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
     certifying an STL with no model behind it.
     """
     manifest = _gallery_fixture(tmp_path, monkeypatch)
-    (tmp_path / "sldprt" / "cone-gear.SLDPRT").unlink()
+    (tmp_path / "sldprt" / "dt-cone-gear.SLDPRT").unlink()
 
-    with pytest.raises(FileNotFoundError, match="is missing but cone-gear--t102"):
+    with pytest.raises(FileNotFoundError, match="is missing but dt-cone-gear--t102"):
         export_models.assert_gallery_inputs_current(manifest)

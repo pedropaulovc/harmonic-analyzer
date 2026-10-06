@@ -1,6 +1,6 @@
 r"""Throwaway diagnostic: WHY does the magnifier drive replay read status=6?
 
-Replays the recorded DOF manifest on a fresh magnifier.SLDASM (exactly what
+Replays the recorded DOF manifest on a fresh mg-magnifier.SLDASM (exactly what
 verify:kinematics does), then dumps GetWhatsWrong (feature + swFeatureError_e
 code + warning flag) and every component's GetConstrainedStatus -- ground truth
 for which replayed driver conflicts (code 46/47) instead of theorizing.
@@ -68,7 +68,7 @@ async def main():
     _telemetry.info("Connecting ...")
     await adapter.connect()
 
-    path = (OUT_SLDASM / "magnifier.SLDASM").resolve()
+    path = (OUT_SLDASM / "mg-magnifier.SLDASM").resolve()
     await adapter.open_model(str(path))
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
@@ -78,7 +78,7 @@ async def main():
         log(f"    [{'WARN' if wn else 'ERROR'}] {n!r} code={ec} ({_ERR.get(ec, ec)})")
     _statuses(adapter, model)
 
-    specs = load_dof_manifest("magnifier")
+    specs = load_dof_manifest("mg-magnifier")
     log(f"replaying {len(specs)} DOF manifest spec(s) ...")
     names = await author_dof_drives(adapter, specs)
     log(f"replayed: {names}")
@@ -93,7 +93,7 @@ async def main():
     # plane) (the spin angle) -- compare against the recorded spec scalars.
     import math
     from _assembly import component_transform
-    arr = component_transform(adapter, "lever-wire-1")
+    arr = component_transform(adapter, "mg-lever-wire-1")
     zrow = arr[6:9]  # part z-axis image = Front@hw normal
     org_z = arr[11] * 1000.0
     log(f"=== MEASURED at pose: hub z={org_z:.4f} (spec 142.77); "

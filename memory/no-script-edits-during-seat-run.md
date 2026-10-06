@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Seen 2026-09-02 (PR #650): while `doit -n 4 build_bare`/`build` was running on the seat,
 editing `crank_arm_spec.py` (66 -> 75) and later `build_harmonic_base.py` produced two
 distinct failure shapes:

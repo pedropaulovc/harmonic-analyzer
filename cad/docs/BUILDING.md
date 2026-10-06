@@ -1,5 +1,7 @@
 # Building the model
 
+Canonical stems and drawing numbers come from the frozen [subsystem identity registries](subsystem-identities.md): `cad/config/parts/<prefixed-stem>.yaml` for parts and `cad/config/assemblies/<prefixed-stem>.yaml` for assemblies. Task stems use underscores; output basenames use dashes. Assembly drawings use number 000 and retain the `-assembly` artifact suffix; parts start at 001 within each subsystem.
+
 The CAD model is generated headlessly from a clean checkout. Every task that
 drives COM needs a SolidWorks seat, and there are two ways to have one:
 
@@ -27,6 +29,11 @@ build cache, auth, provisioning) and the supervised farm-launch contract read
 git submodule update --init --recursive
 uv sync
 ```
+
+The locked core dependencies include `rtree` and `scipy` for the release
+comparison's accelerated nearest-surface queries. Filename identity changes
+are paired before the Hausdorff comparison; a rename alone is not a geometry
+change.
 
 ## The pipeline is one doit graph
 
@@ -73,10 +80,10 @@ uv run python -m doit build_bare
 
 # Just one part (doit selection does NOT run reverse dependents — the dependent
 # .SLDASM/renders stay stale until you run plain `doit` or select them explicitly)
-uv run python -m doit part:cone_gear
+uv run python -m doit part:dt_cone_gear
 
 # Just one assembly (+ its stale prerequisites), or a single gate
-uv run python -m doit assembly:paper_drive
+uv run python -m doit assembly:pd_paper_drive
 uv run python -m doit verify:soundness        # one SW gate
 uv run python -m doit check:math              # one offline gate
 
@@ -96,6 +103,12 @@ publisher prepares all generated README images from the staged, versioned
 Missing inputs or rendering tools fail before the tag; there is no fallback to
 stale images. Only after successful publication does it install those images
 under `cad/docs/images/` and advance `next_revision`.
+
+The bundle's `READOUT.md` is rendered from the error-budget report's canonical
+`closed_form["mg-magnifier"]` section. The project/archive slug remains
+`harmonic-analyzer`; operating-document links stay inside `docs/`, repository
+citations are pinned to the release tag, and third-party reference scans retain
+their source paths without being redistributed.
 
 Submit that post-release refresh in a follow-up PR whose only changes are the
 `cad/config/release.yaml` `next_revision` bump and the regenerated README image
@@ -138,8 +151,8 @@ Bypass the cheap refresh by deleting its target — a missing target makes doit
 take the FULL branch (hooks included):
 
 ```powershell
-del cad\out\sldasm\paper-drive.SLDASM
-uv run python -m doit assembly:paper_drive
+del cad\out\sldasm\pd-paper-drive.SLDASM
+uv run python -m doit assembly:pd_paper_drive
 ```
 
 ## Repository layout

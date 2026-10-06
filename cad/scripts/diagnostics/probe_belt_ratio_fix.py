@@ -14,7 +14,7 @@ This spike experiments on the built model in ONE session, never saving:
      EngageBelt True (commit) -> the belt mates re-author from the corrected
      definition -> drive + measure again.
 
-Run (SolidWorks already open, paper-drive.SLDASM built)::
+Run (SolidWorks already open, pd-paper-drive.SLDASM built)::
 
     uv run python cad/scripts/diagnostics/probe_belt_ratio_fix.py
 """
@@ -146,7 +146,7 @@ def _belt_commit(adapter: Any, *, diameters: list[float] | None,
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    asm = OUT_SLDASM / "paper-drive.SLDASM"
+    asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
     check("open paper-drive", await adapter.open_model(str(asm)))
     try:
         roles = _removables_by_role(adapter)

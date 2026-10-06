@@ -1,5 +1,5 @@
 r"""McMaster 91829A205 -- slotted 18-8 stainless precision shoulder screw,
-shoulder Ø3/16 x 1/2, 8-32 x 3/16 (MHA-168, the transgear pivot screw).
+shoulder Ø3/16 x 1/2, 8-32 x 3/16 (MHA-VN-041, the transgear pivot screw).
 
 Catalogue: the live page (``transgear-evidence/mcmaster-skus.md``, R1,
 re-verified 2026-09-30).  Laws: the vendor model
@@ -82,7 +82,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     split_at_plane,
     thread_sweep_cut,
 )
-from transgear_pivot_screw_spec import (  # noqa: E402
+from vn_transgear_pivot_screw_spec import (  # noqa: E402
     FULL_THREAD_START,
     HEAD_CHAMFER,
     HEAD_DIA,

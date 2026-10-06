@@ -30,7 +30,7 @@ import comtypes.client  # noqa: E402
 
 SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"  # SldWorks type library
 SW_TYPELIB_VER = (34, 0)
-ASSEMBLY = r"C:\src\harmonic-analyzer\cad\out\sldasm\paper-drive.SLDASM"
+ASSEMBLY = r"C:\src\harmonic-analyzer\cad\out\sldasm\pd-paper-drive.SLDASM"
 
 SW_DOC_ASSEMBLY = 2
 SW_OPEN_SILENT = 1
@@ -68,8 +68,8 @@ def _probe(mod: Any, sw: Any, doc: Any) -> int:
     ext = doc.Extension
     selmgr = doc.SelectionManager
     sprockets: dict[str, object] = {}
-    for cfg, cname in (("T12", "transgear-removable-2@paper-drive"),
-                       ("T24", "transgear-removable-1@paper-drive")):
+    for cfg, cname in (("T12", "pd-transgear-removable-2@pd-paper-drive"),
+                       ("T24", "pd-transgear-removable-1@pd-paper-drive")):
         doc.ClearSelection2(True)
         ok = ext.SelectByID2(cname, "COMPONENT", 0.0, 0.0, 0.0, False, 0, None, 0)
         comp = selmgr.GetSelectedObjectsComponent3(1, -1) if ok else None

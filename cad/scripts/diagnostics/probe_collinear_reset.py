@@ -55,19 +55,19 @@ async def main():
     from solidworks_mcp.adapters.base import MateRefParameters, SuppressMateParameters
     for _s, _m, name, _t, parts, _v in _iter_mates(adapter, doc, read_values=False):
         j = " ".join(parts)
-        if "cylinder-gear" in j and "connecting-rod" in j:
+        if "dt-cylinder-gear" in j and "ch-connecting-rod" in j:
             await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=False))
             await adapter.delete_mate(MateRefParameters(name=name))
 
     log("  one-time walk to pair + cache ...")
     comps = _components(adapter)
-    gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
-    rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
-    rocks = _by_z_rank(adapter, "rocker-arm", comps=comps)
+    gears = _by_z_rank(adapter, "dt-cylinder-gear", comps=comps)
+    rods = _by_z_rank(adapter, "ch-connecting-rod", comps=comps)
+    rocks = _by_z_rank(adapter, "ch-rocker-arm", comps=comps)
     n = min(len(gears), len(rods))
     cached = {
-        "crank": _find_one(adapter, "crankshaft-1", comps=comps)[0],
-        "coneshaft": _find_one(adapter, "cone-gear-shaft-1", comps=comps)[0],
+        "crank": _find_one(adapter, "dt-crankshaft-1", comps=comps)[0],
+        "coneshaft": _find_one(adapter, "dt-cone-gear-shaft-1", comps=comps)[0],
         "cylgear0": gears[0][0] if gears else None,
     }
     for i, (c, _nm) in enumerate(rocks[:4]):

@@ -1,0 +1,5 @@
+pd-support-bar:
+  number: MHA-PD-007
+  material: Plain Carbon Steel
+  tolerance_class: machined_block
+  process: "machined (steel); back face drilled and tapped for the transgear pivot (flat-bottomed blind tap) and the latch-hook bracket (through taps)"

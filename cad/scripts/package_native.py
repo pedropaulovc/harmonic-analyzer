@@ -23,7 +23,7 @@ stale member, and the transient Pack-and-Go ``.zip`` archives are deleted again:
 the prepared tree, not the zips, is the artefact.
 
 EVERY path inside ``native-package.json`` is a POSIX path RELATIVE TO THE
-REPOSITORY ROOT (``cad/out/release/native/solidworks/harmonic-analyzer.SLDASM``),
+REPOSITORY ROOT (``cad/out/release/native/solidworks/ha-harmonic-analyzer.SLDASM``),
 never absolute -- the file is written on a farm worker and read on the submitter,
 whose checkout lives elsewhere. ``out_dir`` records the prepared tree's own
 repo-relative directory, so the publisher turns any member path into the
@@ -62,7 +62,7 @@ from _drawing_registry import DRAWINGS
 import _telemetry
 
 REPO_ROOT = CAD_ROOT.parent
-TOP_ASSEMBLY = "harmonic-analyzer"
+TOP_ASSEMBLY = "ha-harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
 # Default prepared-tree location; the whole directory is this task's cached output.
 NATIVE_DIR = RELEASE_DIR / "native"

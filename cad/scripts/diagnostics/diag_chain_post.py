@@ -20,7 +20,7 @@ from _common import _flag, _read_member  # type: ignore[attr-defined]  # noqa: E
 # Placements copied from the assembly scripts (pre-mirror frames).
 CHAIN_POS = ([65.0, 241.78, -83.3], [0.0, 0.0, 0.0],
              [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
-# cone-pivot-post placement from build_drive_train_assembly (read there:
+# cone-pivot-post placement from build_dt_drive_train_assembly (read there:
 # rotated block at the cone big-end station).
 import math  # noqa: E402
 
@@ -34,14 +34,14 @@ async def build(adapter) -> dict[str, str]:
     # Recover the post's exact placement from the saved drive-train.SLDASM
     # instead of duplicating its derivation: open it and read the comp box.
     check("open drive-train", await adapter.open_model(
-        str((OUT_SLDPRT.parent / "sldasm" / "drive-train.SLDASM").resolve())))
+        str((OUT_SLDPRT.parent / "sldasm" / "dt-drive-train.SLDASM").resolve())))
     asm = adapter.currentModel
     _flag(asm, "IAssemblyDoc")
     boxes = {}
     for comp in list(adapter._attempt(lambda a=asm: a.GetComponents(False), default=None) or []):
         _flag(comp, "IComponent2")
         name = str(_read_member(comp, "Name2"))
-        if "cone-pivot-post" in name or "transgear-removable" in name:
+        if "dt-cone-pivot-post" in name or "pd-transgear-removable" in name:
             box = adapter._attempt(lambda c=comp: c.GetBox(False, False), default=None)
             if box:
                 boxes[name] = [round(float(v) * 1000.0, 2) for v in box]
@@ -55,7 +55,7 @@ async def build(adapter) -> dict[str, str]:
     for comp in list(adapter._attempt(lambda a=asm: a.GetComponents(False), default=None) or []):
         _flag(comp, "IComponent2")
         name = str(_read_member(comp, "Name2"))
-        if "drive-chain" in name or "transgear-removable" in name or "knob-shaft" in name:
+        if "drive-chain" in name or "pd-transgear-removable" in name or "knob-shaft" in name:
             box = adapter._attempt(lambda c=comp: c.GetBox(False, False), default=None)
             if box:
                 b = [round(float(v) * 1000.0, 2) for v in box]

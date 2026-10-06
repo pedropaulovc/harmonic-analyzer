@@ -65,14 +65,14 @@ import _telemetry
 # DOF by the PART FAMILY its drivers pin, suppresses every single-real driver on
 # that family, and checks the family goes free. (subassembly, family, label.)
 PROBES = [
-    ("drive-train", "crank-handle", "crank input (the 1 operating DOF)"),
+    ("dt-drive-train", "dt-crank-handle", "crank input (the 1 operating DOF)"),
     # p1: the swing driver pins the PLATFORM (the post/tip block/shaft ride it by
     # seat mates, so no rider family carries a swing driver of its own).
-    ("drive-train", "cone-swing-platform", "p1 cone swing-to-disengage"),
+    ("dt-drive-train", "dt-cone-swing-platform", "p1 cone swing-to-disengage"),
     # p2: the swing driver pins the FRONT STRAP (the pinion itself is tied to the
     # strap by two-real mates, so its family carries no swing driver of its own).
-    ("drive-train", "pinion-bracket", "p2 pinion swing-to-engage"),
-    ("channel", "amplitude-bar", "p0 amplitude slides (all 20)"),
+    ("dt-drive-train", "dt-pinion-bracket", "p2 pinion swing-to-engage"),
+    ("ch-channel", "ch-amplitude-bar", "p0 amplitude slides (all 20)"),
 ]
 
 
@@ -108,7 +108,7 @@ def _drivers_by_family(adapter: Any, model: Any, root: str) -> dict[str, list[st
     """Walk MODEL's mate group once and group the single-real-part DISTANCE/ANGLE
     driver mates by the family of the part they pin.
 
-    ``root`` is the sub's doc-root pseudo-part name (``"drive-train"``); a driver
+    ``root`` is the sub's doc-root pseudo-part name (``"dt-drive-train"``); a driver
     dim references that root plane plus exactly one real part, so ``_real_parts``
     leaving one name marks a driver and names the part it controls."""
     out: dict[str, list[str]] = {}
@@ -199,7 +199,7 @@ async def _probe_sub(adapter: Any, sub: str, probes: list[tuple]) -> list[str]:
 
 async def build(adapter: Any) -> dict[str, str]:
     rows: list[str] = []
-    for sub in ("drive-train", "channel"):
+    for sub in ("dt-drive-train", "ch-channel"):
         rows += await _probe_sub(adapter, sub, PROBES)
         adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
 

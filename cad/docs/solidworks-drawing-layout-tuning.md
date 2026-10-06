@@ -1,5 +1,7 @@
 # SolidWorks drawing layout tuning
 
+> Dated incidents and calibration examples retain their recorded identifiers and paths. Current identities are listed in [subsystem identities](subsystem-identities.md).
+
 Source of truth for the managed skill `solidworks-drawing-layout-tuning`. Keep
 this file and the skill in sync; the skill is minted from this body.
 
@@ -134,7 +136,7 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   run 20260928T141421973Z, swmaker000008). Read at fit after the rebuild on
   swmaker000005 (run 20260928T142458776Z), the same SetPosition gave
   (92.85, 249.98), 1.14 mm off. Place and check a ring zoomed
-  (`_drawing_common._zoomed_on`; `draw_frame_assembly._short_frame_balloon`
+  (`_drawing_common._zoomed_on`; `draw_fr_frame_assembly._short_frame_balloon`
   re-zooms after its fit rebuild); at fit, check only model values such as
   `GetPosition`. On 1024x640 seats the leader start COM reports is 0.15 to
   0.78 mm from where the PDF starts that leader, on the printed ring; the
@@ -346,7 +348,7 @@ The same holds for a section after `IDrSection::SetReversedCutDirection`:
 the reversal stood thumbnut A-A rim-up, yet `SetViewPosition` on its
 creation target left the seat projected one nut length (48.3 mm at 3:1)
 above where a centred rim-up section puts it (run 20261001T142942518Z).
-`draw_transgear_thumbnut._centre_section_outline` re-centres by the outline.
+`draw_pd_transgear_thumbnut._centre_section_outline` re-centres by the outline.
 
 **k. A datum or dimension picked by sheet coordinate where two lines meet.**
 Don't: hang a datum tag or a locating dimension on `SelectByID2("", "EDGE",
@@ -374,7 +376,7 @@ why. Every datum and dimension of summing-lever's pattern definition (A, B,
 76.20, 39.85, 8.43, 7.06) is identity-checked. A coordinate-only datum
 (`edge_xy` alone) is proved only to sit on what its hit-test returned; it is
 acceptable where no second line runs inside the hit radius of the pick, and
-`draw_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
+`draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
 
 ## The sheet-split rule
@@ -416,8 +418,8 @@ string-replacement script. Run `uv run --frozen ruff check` and never
   synchronously and let it queue; `com.seat.wait` in the log is normal.
 - **The lock serializes, it does not isolate — so the lock holder OWNS the
   session.** Every process drives the same SolidWorks, whose open-document
-  table is keyed by FILENAME: a read-only probe that opens `top-frame.SLDDRW`
-  also loads `top-frame.SLDPRT` read-only, and a later `part:top_frame` build
+  table is keyed by FILENAME: a read-only probe that opens `fr-top-frame.SLDDRW`
+  also loads `fr-top-frame.SLDPRT` read-only, and a later `part:fr_top_frame` build
   binds to that resident copy and fails on its first `Select2` (measured
   2026-09-16, twice). The contract: whoever acquires the seat is right to,
   and must, `ISldWorks::CloseAllDocuments(True)` and start from an empty

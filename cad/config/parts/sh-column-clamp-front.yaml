@@ -1,0 +1,7 @@
+sh-column-clamp-front:
+  number: MHA-SH-001
+  material_family: ferrous_noncritical
+  finish: black enamel; bore, bar face + ear holes masked
+  quantity: 3
+  tolerance_class: machined_block
+  process: "machined from solid stock or casting"

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 **2026-07-02 (merged to main; work branch `drive-train/ch30-gt-reposition`, since deleted):** the whole drive train was
 re-anchored on the bundle-adjusted ch30 GT
 (`cad/scripts/diagnostics/triangulate_ch30_gt.py`, ground truth in

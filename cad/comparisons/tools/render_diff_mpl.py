@@ -9,8 +9,8 @@ wireframe for spatial context. Four views to PNG via the Agg backend -- no GPU,
 no GL context, no external driver.
 
     uv run cad/comparisons/tools/render_diff_mpl.py \
-        --scene cad/out/boxes/harmonic-analyzer.json --stl-dir cad/out/stl \
-        --changed channel-spring-installed,measuring-stick,rocker-arm,transgear-removable \
+        --scene cad/out/boxes/ha-harmonic-analyzer.json --stl-dir cad/out/stl \
+        --changed vn-channel-spring-installed,ha-measuring-stick,ch-rocker-arm,pd-transgear-removable \
         --out .render_diff_v020
 """
 from __future__ import annotations

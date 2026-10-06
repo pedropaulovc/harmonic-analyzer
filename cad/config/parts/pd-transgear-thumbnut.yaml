@@ -1,0 +1,9 @@
+pd-transgear-thumbnut:
+  title: Transgear Thumbnut
+  number: MHA-PD-013
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: bright machined, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned from bar (brass): straight-knurl the head, turn the waist and flange, dish the front face, tap 1/4-20 through, countersink both ends"

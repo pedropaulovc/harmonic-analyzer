@@ -1,7 +1,7 @@
 r"""Throwaway probe: why does cone-swing-platform-1 read FULLY DEFINED in the
 saved drive-train even though its swing angle driver is deferred?
 
-Opens drive-train.SLDASM read-only, ForceRebuild3s (stale-status pitfall),
+Opens dt-drive-train.SLDASM read-only, ForceRebuild3s (stale-status pitfall),
 prints every top-level component's GetConstrainedStatus, then dumps every mate
 that references cone-swing-platform-1 (or any part whose status is fully
 defined but should swing). Never saves.
@@ -25,8 +25,8 @@ _MATE_NAME = {
 }
 
 FOCUS = (
-    "cone-swing-platform", "cone-pivot-post", "cone-tip-block",
-    "cone-tip-collar", "cone-tip-adjuster", "cone-tip-pinch-screw",
+    "dt-cone-swing-platform", "dt-cone-pivot-post", "dt-cone-tip-block",
+    "vn-cone-tip-collar", "vn-cone-tip-adjuster", "vn-cone-tip-pinch-screw",
 )
 
 
@@ -47,7 +47,7 @@ def _mate_value(adapter, mate, mtype):
 
 
 async def build(adapter):
-    path = str((OUT_SLDASM / "drive-train.SLDASM").resolve())
+    path = str((OUT_SLDASM / "dt-drive-train.SLDASM").resolve())
     res = await adapter.open_model(path)
     if not res.is_success:
         log(f"open failed: {res.error}")

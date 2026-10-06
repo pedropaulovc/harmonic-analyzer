@@ -15,31 +15,31 @@ The crank also drives the paper sideways, through a reduction, a chain, and a ra
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `platen` | TODO | TODO | TODO |
-| `platen-rack` | TODO | TODO | TODO |
-| `platen-guide` | TODO | TODO | TODO |
-| `platen-clip` | TODO | TODO | TODO |
-| `platen-paper` | TODO | TODO | TODO |
-| `rack-pinion` | TODO | TODO | TODO |
-| `transgear-feed-pinion` | TODO | TODO | TODO |
-| `transgear-disc-hub` | TODO | TODO | TODO |
-| `transgear-rear-bushing` | TODO | TODO | TODO |
-| `transgear-front-bushing` | TODO | TODO | TODO |
-| `transgear-knob-shaft` | TODO | TODO | TODO |
-| `transgear-drive-collar` | TODO | TODO | TODO |
-| `transgear-thumbnut` | TODO | TODO | TODO |
-| `transgear-knob-thrust-ring` | TODO | TODO | TODO |
-| `transgear-knob-cup` | TODO | TODO | TODO |
-| `transgear-arm` | TODO | TODO | TODO |
-| `transgear-arm-plate` | TODO | TODO | TODO |
-| `transgear-pivot-spacer` | TODO | TODO | TODO |
-| `latch-hook-bracket` | TODO | TODO | TODO |
-| `latch-hook` | TODO | TODO | TODO |
-| `transgear-removable` | TODO | TODO | TODO |
-| `transgear-pin` | TODO | TODO | TODO |
-| `chain-sprocket` | TODO | TODO | TODO |
-| `chain-inner-link` | TODO | TODO | TODO |
-| `chain-outer-link` | TODO | TODO | TODO |
+| `pd-platen` | TODO | TODO | TODO |
+| `pd-platen-rack` | TODO | TODO | TODO |
+| `pd-platen-guide` | TODO | TODO | TODO |
+| `pd-platen-clip` | TODO | TODO | TODO |
+| `pd-platen-paper` | TODO | TODO | TODO |
+| `pd-rack-pinion` | TODO | TODO | TODO |
+| `pd-transgear-feed-pinion` | TODO | TODO | TODO |
+| `pd-transgear-disc-hub` | TODO | TODO | TODO |
+| `pd-transgear-rear-bushing` | TODO | TODO | TODO |
+| `pd-transgear-front-bushing` | TODO | TODO | TODO |
+| `pd-transgear-knob-shaft` | TODO | TODO | TODO |
+| `pd-transgear-drive-collar` | TODO | TODO | TODO |
+| `pd-transgear-thumbnut` | TODO | TODO | TODO |
+| `pd-transgear-knob-thrust-ring` | TODO | TODO | TODO |
+| `pd-transgear-knob-cup` | TODO | TODO | TODO |
+| `pd-transgear-arm` | TODO | TODO | TODO |
+| `pd-transgear-arm-plate` | TODO | TODO | TODO |
+| `pd-transgear-pivot-spacer` | TODO | TODO | TODO |
+| `pd-latch-hook-bracket` | TODO | TODO | TODO |
+| `pd-latch-hook` | TODO | TODO | TODO |
+| `pd-transgear-removable` | TODO | TODO | TODO |
+| `pd-transgear-pin` | TODO | TODO | TODO |
+| `pd-chain-sprocket` | TODO | TODO | TODO |
+| `vn-chain-inner-link` | TODO | TODO | TODO |
+| `vn-chain-outer-link` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

@@ -280,7 +280,7 @@ class MockAdapter:
         stem = Path(path).stem
         self._current = MockModel(stem, COMPONENT_COUNTS.get(stem, 8))
         # drive-train ships with its operational DOF genuinely free.
-        self._current._free_pose = stem == "drive-train"
+        self._current._free_pose = stem == "dt-drive-train"
         return _Result(True)
 
     async def list_configurations(self) -> _Result:
@@ -312,7 +312,7 @@ def _fake_gear_links(owner: str):
         cyl = int(verify._config.machine("gear_train", "fundamental_cone_teeth"))
         links = [{
             "numerator": crank_num, "denominator": crank_den,
-            "sides": [{"component": "crank-pinion-1"}, {"component": "crank-drive-gear-1"}],
+            "sides": [{"component": "dt-crank-pinion-1"}, {"component": "dt-crank-drive-gear-1"}],
         }]
         for ch in verify._config.active_channels():
             links.append({
@@ -324,7 +324,7 @@ def _fake_gear_links(owner: str):
     return inner
 
 
-def _patch_com_seam(monkeypatch, gear_owner: str = "drive-train") -> None:
+def _patch_com_seam(monkeypatch, gear_owner: str = "dt-drive-train") -> None:
     """Replace the win32-only COM seam (GetWhatsWrong / MateGroup walk) with the
     sleepy fakes; everything else stays production code."""
     # whats_wrong() calls the early-bound GetWhatsWrong and consumes its return
@@ -402,7 +402,7 @@ def _dur(span) -> float:
 # --------------------------------------------------------------------------- #
 def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     """The dof gate no longer emits one span per component (the de-noise)."""
-    spans, report = _run_soundness(["frame", "drive-train"], monkeypatch, tmp_path)
+    spans, report = _run_soundness(["fr-frame", "dt-drive-train"], monkeypatch, tmp_path)
     assert report.failed == [], report.failed
     assert _by_name(spans, "dof.check") == []  # the flood is gone
     # frame is fully defined (strict 0-DOF), so its gate is the aggregate gate.dof.
@@ -425,20 +425,20 @@ def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
 def test_whats_wrong_collapses_to_one_span_per_health_gate(monkeypatch, tmp_path):
     """The per-target What's Wrong flood collapses to ONE span carrying the count
     -- the literal "multiple whats_wrong calls in sequence" the task flags."""
-    spans, _ = _run_soundness(["frame", "drive-train"], monkeypatch, tmp_path)
+    spans, _ = _run_soundness(["fr-frame", "dt-drive-train"], monkeypatch, tmp_path)
     ww = _by_name(spans, "health.whats_wrong")
     # one per health gate (frame + drive-train), NOT one per target (each target
     # = the top doc + one per top-level component, which is what used to flood).
     assert len(ww) == 2, [s.attributes for s in ww]
     dt = max(ww, key=lambda s: s.attributes.get("targets", 0))
-    assert dt.attributes["targets"] == COMPONENT_COUNTS["drive-train"] + 1  # comps + top doc
+    assert dt.attributes["targets"] == COMPONENT_COUNTS["dt-drive-train"] + 1  # comps + top doc
     assert dt.attributes["errors"] == 0
 
 
 def test_soundness_rebuild_spans_name_only_real_rebuilds(monkeypatch, tmp_path):
     """Soundness passes a shared rebuild result into every gate, so its trace must
     not claim that DOF, over-constrained, or health rebuilt the model again."""
-    spans, report = _run_soundness(["frame"], monkeypatch, tmp_path)
+    spans, report = _run_soundness(["fr-frame"], monkeypatch, tmp_path)
     assert report.failed == [], report.failed
     assert len(_by_name(spans, "verify.rebuild")) == 1
     assert _by_name(spans, "dof.rebuild") == []
@@ -448,7 +448,7 @@ def test_soundness_rebuild_spans_name_only_real_rebuilds(monkeypatch, tmp_path):
 
     collect = _by_name(spans, "health.collect_targets")
     assert len(collect) == 1
-    assert collect[0].attributes["targets"] == COMPONENT_COUNTS["frame"] + 1
+    assert collect[0].attributes["targets"] == COMPONENT_COUNTS["fr-frame"] + 1
 
 
 def _health_target_case(monkeypatch, child_errors=()):
@@ -574,16 +574,16 @@ def test_health_preserves_shared_rebuild_result(monkeypatch, rebuild_source):
 def test_open_and_activate_are_spanned(monkeypatch, tmp_path):
     """The per-assembly open+activate (8-27 s real) is no longer an unspanned gap
     between gates."""
-    spans, _ = _run_soundness(["frame", "drive-train"], monkeypatch, tmp_path)
+    spans, _ = _run_soundness(["fr-frame", "dt-drive-train"], monkeypatch, tmp_path)
     opens = _by_name(spans, "verify.open")
-    assert {s.attributes.get("name") for s in opens} == {"frame", "drive-train"}
+    assert {s.attributes.get("name") for s in opens} == {"fr-frame", "dt-drive-train"}
     assert all(_dur(s) > 0 for s in opens)
 
 
 def test_trace_is_one_tree_with_far_fewer_spans(monkeypatch, tmp_path):
     """Everything hangs off the one root trace, and a 51-component assembly now
     emits a modest span count instead of the ~110 per-item leaves it used to."""
-    spans, _ = _run_soundness(["drive-train"], monkeypatch, tmp_path)
+    spans, _ = _run_soundness(["dt-drive-train"], monkeypatch, tmp_path)
     assert len({s.context.trace_id for s in spans}) == 1  # no gaps
     # Pre-fix: ~51 dof.check + ~52 health.whats_wrong + the gate/op spans = 110+.
     # Post-fix the per-item leaves are gone; the whole drive-train pass is small
@@ -600,7 +600,7 @@ def test_free_dof_gate_is_single_necessity_span_not_park_phases(monkeypatch, tmp
     park machinery's spans (``gate.dof_expected_free`` with ``park.*`` phase
     children, the release ``gate.park_closure``) must not appear anywhere --
     this pins the park-driver removal."""
-    spans, report = _run_soundness(["drive-train"], monkeypatch, tmp_path)
+    spans, report = _run_soundness(["dt-drive-train"], monkeypatch, tmp_path)
     assert report.failed == [], report.failed
     (gate,) = _by_name(spans, "gate.dof_free_necessity")
     assert gate.status.status_code.name == "OK"
@@ -621,7 +621,7 @@ def test_soundness_shares_one_rebuild_across_dof_over_health(monkeypatch, tmp_pa
     perf fix): a fully-defined assembly's model is re-solved exactly once -- the
     single ``verify.rebuild`` -- not three times (was ~50 s x3 on the top assembly).
     """
-    spans, report = _run_soundness(["frame"], monkeypatch, tmp_path)  # frame => fully-defined
+    spans, report = _run_soundness(["fr-frame"], monkeypatch, tmp_path)  # frame => fully-defined
     assert report.failed == [], report.failed
     # The single shared re-solve span is emitted once for the one assembly.
     assert len(_by_name(spans, "verify.rebuild")) == 1
@@ -655,7 +655,7 @@ def _demo() -> None:
             for obj, attr, old in reversed(self._undo):
                 setattr(obj, attr, old)
 
-    names = ["frame", "drive-train", "channel"]
+    names = ["fr-frame", "dt-drive-train", "ch-channel"]
     print(
         f"\n=== mock verify:soundness over {names}  "
         f"(HARMONIC_MOCK_SCALE={SCALE}) ===\n"

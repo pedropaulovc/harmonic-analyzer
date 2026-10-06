@@ -1,0 +1,21 @@
+{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/8KmVDxkia_w.chosen-camera-continuity.json","originalSha256":"f8fccbaa293558fc3a91b88bb614c6e1779937fd8a52364f2ec6ad9d958afd31","mappingSchemaVersion":2,"mappingSha256":"1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd","originalNumericLexemeSha256":"ab39324e7f97786827b9dd2ba598d8285710e06d7ecd5f5ce493d1c7afab7856","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{}},
+  "schemaVersion": 1,
+  "videoId": "8KmVDxkia_w",
+  "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+  "permissions": [
+    {
+      "shotId": "presenter-to-spin",
+      "viewId": "main",
+      "componentFamily": "whole",
+      "startSeconds": 25.984291667,
+      "endSeconds": 26.609916667,
+      "startDecodedFrameIndex": 623,
+      "lastDecodedFrameIndex": 637,
+      "cameraInterpolation": "continuous-shot",
+      "cameraInterpolationEvidence": "Source-informed chosen continuous shot: existing presenter_reframing_keys/presenter_reframing_camera in web/scripts/generate-analysis-synthesis-source-tracks.py describe one front-facing body moving middle-to-left. Existing principal-point/FOV keys express continuous reframing rather than independent held camera poses; front-camera position/quaternion stay fixed. Actual base input lineage is web/content/canonical-native/8KmVDxkia_w.track.json, with 16 retained rows covering all 15 unique native exposures623..637. Original track.json retains legacy outgoing/incoming null-camera layer guesses on 13 rows; the producer's existing source-inspected single-machine normalization makes these one full-frame native main view before permission validation, without editing the source file. Native hint PTS are25.94258333333333(frame622, donor outside the transition),26.026(frame624),26.067708333333332(frame625),26.151125(frame627),26.56820833333333(frame637). Frame622 has an original native image hash; the other four hint keys have null image identity and remain null. The single-body interpretation, coarse horizontal framing hints, height/vertical-centre interpolation and held orientation remain chosen/unmeasured, not independent pixel measurements or recovered historical camera poses. Permission applies only to the full-frame native main/whole presenter-to-spin composition. Source cameras remain null, source pixels and FIT/CHECK roles remain unchanged, mechanical inputs remain chosen, and matching stages remain unmeasured. This continuity grants no source-fidelity or final5%/0.5-second acceptance claim.",
+      "cameraContinuityFamily": "source-informed-framing:8KmVDxkia_w:presenter-to-spin:main:chosen-principal-point-fov:branch0",
+      "cameraProvenanceKind": "source-informed-framing",
+      "measurementStatus": "unmeasured"
+    }
+  ]
+}

@@ -21,7 +21,7 @@ hours_actual: 0
 ## References
 
 - `references/machining-for-hobbyists-getting-started/08_chapter-6-working-on-lathe.pdf`
-- `cad/docs/machining-dfm.md` (`cone-gear-shaft`, `pivot-shaft`, `fulcrum-shaft`)
+- `cad/docs/machining-dfm.md` (`dt-cone-gear-shaft`, `ch-pivot-shaft`, `ch-fulcrum-shaft`)
 
 ## Practice
 
@@ -33,7 +33,7 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-**`pivot-shaft`** (Ø6.35 × 203.2, L/D 32:1) and **`fulcrum-shaft`** (Ø6.35 × 182, 29:1). Then, when M02-M05 are all solid, the **`cone-gear-shaft`** — five steps ending in a Ø0.79 × 34 mm journal in steel, 43:1.
+**`ch-pivot-shaft`** (Ø6.35 × 203.2, L/D 32:1) and **`ch-fulcrum-shaft`** (Ø6.35 × 182, 29:1). Then, when M02-M05 are all solid, the **`dt-cone-gear-shaft`** — five steps ending in a Ø0.79 × 34 mm journal in steel, 43:1.
 
 ## Competency check
 

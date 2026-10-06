@@ -1,7 +1,7 @@
 r"""Throwaway: attach to the LIVE prepped harmonic-analyzer (flexed + suppressed
 + 20 cam mates already added by a stopped build_motion_study kinematic run) and
-diagnose why ch00 rod-pin <-> rocker-bore (Axis2@connecting-rod-1 <->
-Axis2@rocker-arm-1) coincident returns AddMate5 status 0 (ErrorUknown) while the
+diagnose why ch00 rod-pin <-> rocker-bore (Axis2@ch-connecting-rod-1 <->
+Axis2@ch-rocker-arm-1) coincident returns AddMate5 status 0 (ErrorUknown) while the
 cam mate (Axis1@rod <-> Axis3@gear) succeeds.
 
 No 11-min prefix: stopping the python process leaves the SW doc open with all
@@ -18,7 +18,7 @@ import math
 import _telemetry
 from _common import _flag, _read_member, log
 
-# part-local bore locals (mm) from build_channel_assembly.py
+# part-local bore locals (mm) from build_ch_channel_assembly.py
 ROD_PIN_BORE_LOCAL = [0.0, 127.0, 0.0]      # rod Axis2 (rocker pin)
 ROD_RING_BORE_LOCAL = [0.0, 0.0, 0.0]       # rod Axis1 (cam ring centre)
 ROCKER_ROD_BORE_LOCAL = [25.4, 8.39937, 0.0]  # rocker Axis2 (rod pin)
@@ -92,8 +92,8 @@ async def main():
     adapter.currentModel = doc
     log(f"ActiveDoc = {str(_read_member(doc, 'GetTitle'))!r}")
 
-    rod, rod_n = _find(adapter, doc, "channel-1/connecting-rod-1")
-    rk, rk_n = _find(adapter, doc, "channel-1/rocker-arm-1")
+    rod, rod_n = _find(adapter, doc, "ch-channel-1/ch-connecting-rod-1")
+    rk, rk_n = _find(adapter, doc, "ch-channel-1/ch-rocker-arm-1")
     log(f"rod={rod_n!r} rocker={rk_n!r}")
     if rod is None or rk is None:
         log("missing components -- abort")
@@ -123,8 +123,8 @@ async def main():
     adapter._attempt(lambda: doc.ClearSelection2(True))
 
     # --- mate variants (each captures the AddMate5 status via result.error) ---
-    rod2 = MateEntityRef(entity_type="AXIS", component="channel-1/connecting-rod-1", name="Axis2")
-    rk2 = MateEntityRef(entity_type="AXIS", component="channel-1/rocker-arm-1", name="Axis2")
+    rod2 = MateEntityRef(entity_type="AXIS", component="ch-channel-1/ch-connecting-rod-1", name="Axis2")
+    rk2 = MateEntityRef(entity_type="AXIS", component="ch-channel-1/ch-rocker-arm-1", name="Axis2")
     log("  --- mate variants Axis2@rod <-> Axis2@rocker ---")
     for align in ("closest", "aligned", "anti_aligned"):
         await _try_mate(adapter, "coincident", rod2, rk2, align)

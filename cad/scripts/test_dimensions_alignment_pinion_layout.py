@@ -15,10 +15,10 @@ from pathlib import Path
 
 import yaml
 
-import build_drive_train_assembly as dt
-import pinion_bracket_geometry as strap
-from pinion_arbor_spec import SHAFT_LEN as ARBOR_LEN
-import pinion_spring_geometry as spring
+import build_dt_drive_train_assembly as dt
+import dt_pinion_bracket_geometry as strap
+from dt_pinion_arbor_spec import SHAFT_LEN as ARBOR_LEN
+import dt_pinion_spring_geometry as spring
 
 DIMENSIONS = Path(__file__).resolve().parents[1] / "config" / "dimensions.yaml"
 

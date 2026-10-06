@@ -1,0 +1,282 @@
+r"""Create the curated machinist drawing for the pinion strap torque shaft.
+
+A plain Ø6.35 turned steel shaft with a shallow spherical crown at each end.
+Modelled on the fulcrum-shaft slice: a 2:1 end view carries the diameter, the
+1:1 side view carries the length, and a 1:2 isometric stays clear of the title
+block.
+
+Run with SolidWorks open::
+
+    uv run python cad\scripts\draw_dt_pinion_pivot_shaft.py dt-pinion-pivot-shaft
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+import sys
+from typing import Any
+
+from dt_pinion_pivot_shaft_spec import GEOMETRIC_TOLERANCES_MM
+
+import _telemetry
+from _common import CAD_ROOT, check, run_build
+from _drawing_annotation_extent import gdt_box, place_callout_clear
+from _drawing_common import (
+    DrawingOutputs,
+    add_datum_feature,
+    add_feature_control_frame,
+    add_property_linked_note,
+    add_surface_finish,
+    curate_view_dimensions,
+    finalize_drawing,
+    new_project_drawing,
+    read_required_properties,
+    set_dimension_callouts,
+    set_hidden_lines_removed,
+    stamp_drawing_summary,
+)
+from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
+from dt_drive_train_steps import step_ref
+from dt_pinion_pivot_shaft_spec import (
+    CAP_RADIUS,
+    CAP_SAG,
+    PIN_HOLE_CALLOUT,
+    SHAFT_DIA as SHAFT_DIA,
+    SHAFT_LEN,
+    SURFACE_FINISHES,
+)
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
+
+
+SPEC = DRAWINGS_BY_NAME["dt_pinion_pivot_shaft"]
+PART_STEM = SPEC.artifact_stem
+SOURCE = CAD_ROOT / "out" / "sldprt" / f"{PART_STEM}.SLDPRT"
+OUTPUTS = DrawingOutputs(
+    slddrw=SPEC.outputs["slddrw"],
+    pdf=SPEC.outputs["pdf"],
+    png=SPEC.outputs["png"],
+)
+SLDDRW = OUTPUTS.slddrw
+PDF = OUTPUTS.pdf
+PNG = OUTPUTS.png
+
+SHEET_SCALE = (1.0, 1.0)
+END_VIEW_SCALE = 4.0
+FRONT_CENTER = (0.055, 0.205)
+RIGHT_CENTER = (
+    FRONT_CENTER[0] + SHAFT_LEN * SHEET_SCALE[0] / 2000.0 + 0.045,
+    FRONT_CENTER[1],
+)
+ISO_CENTER = (0.355, 0.205)
+# 1:2, like fulcrum-shaft's identical long turned shaft: at 1:1 the ~180 mm
+# isometric bar runs over the right zone border, so the pictorial is halved and
+# a scale callout keeps the title block honest.
+ISO_SCALE = (1, 2)
+
+FRONT_KEEP = {
+    # Left of the end view, so the leader rises right from the underline and
+    # never crosses the stacked tolerance (Main eye pass on pc-ea2: under the
+    # view its leader ran back through "-0.02").
+    "ShaftDia": (0.030, 0.167),
+}
+RIGHT_KEEP = {
+    "Depth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - 0.025),
+    # Option E-a: the set-pin holes read as solid circles in the side view.
+    # Only the size is printed; the match-drill callout carries the location.
+    # pc-ea eye pass: below the view its text ran into the 182.0 body
+    # dimension's callout, so it sits above the view between the datum frame
+    # and the Ra flag, its leader dropping to the left-hand hole.
+    "PinHoleDia": (0.125, 0.241),
+}
+# The holes are drilled at MHA-DT-000's SHAFT DRILL SET, so the callout points
+# at that step through the registry (Codex #858, PRRT_kwDOPHDy386mTbPB).
+SHAFT_DRILL_STEP_KEY = "straps-pinned-to-torque-shaft"
+DIMENSION_CALLOUTS = {
+    "ShaftDia": "FINAL SIZE",
+    "Depth": "CYLINDRICAL BODY\nBETWEEN CROWN ROOT CIRCLES",
+    "PinHoleDia": f"{PIN_HOLE_CALLOUT},\nPER {step_ref(SHAFT_DRILL_STEP_KEY)}",
+}
+
+
+async def build(adapter: Any) -> dict[str, str]:
+    if not SOURCE.is_file():
+        raise FileNotFoundError(f"source part is missing: {SOURCE}")
+
+    check("open pinion-pivot-shaft source", await adapter.open_model(str(SOURCE)))
+    read_required_properties(
+        adapter.currentModel,
+        (
+            "Number",
+            "Revision",
+            "Title",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+            "Iso View Note",
+        ),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+            "End View Note",
+            "Iso View Note",
+        ),
+    )
+    drawing_model, _sheet = new_project_drawing(
+        adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
+    )
+    stamp_drawing_summary(
+        adapter,
+        drawing_model,
+        {
+            0: "Pinion Torque Shaft Manufacturing Drawing",
+            1: "Harmonic Analyzer hobby-machinist book drawing",
+            2: "Harmonic Analyzer Project",
+            3: "pinion torque shaft; pivot shaft; turned steel",
+            4: "Generated from the project-owned ASME B drawing standard",
+        },
+    )
+
+    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
+    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(1, 1))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (front, right, iso):
+        set_hidden_lines_removed(adapter, view)
+
+    front_annotations = curate_view_dimensions(
+        adapter, front, keep=FRONT_KEEP, view_label="front"
+    )
+    right_annotations = curate_view_dimensions(
+        adapter, right, keep=RIGHT_KEEP, view_label="right"
+    )
+    set_dimension_callouts(
+        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    )
+    # SolidWorks classifies a solid circular end silhouette under the same
+    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
+    # makes the API a guaranteed no-op even though the end view is circular.
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to shaft end view")
+
+    end_radius = SHAFT_DIA * END_VIEW_SCALE / 2000.0
+    end_top = (FRONT_CENTER[0], FRONT_CENTER[1] + end_radius)
+    end_upper = (
+        FRONT_CENTER[0] + end_radius * math.cos(math.radians(50.0)),
+        FRONT_CENTER[1] + end_radius * math.sin(math.radians(50.0)),
+    )
+    cylindricity = add_feature_control_frame(
+        adapter,
+        front,
+        edge_xy=end_upper,
+        frame_xy=(0.065, 0.232),
+        characteristic="cylindricity",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot cylindrical body"],
+        label="pinion pivot cylindrical body",
+    )
+    datum_a = add_datum_feature(
+        adapter,
+        front,
+        edge_xy=end_top,
+        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.024),
+        datum="A",
+        label="pinion pivot cylindrical-body axis",
+    )
+    crown_axial = CAP_SAG / 2.0
+    crown_radial = math.sqrt(CAP_RADIUS**2 - (CAP_RADIUS - CAP_SAG + crown_axial) ** 2)
+    right_crown_face = (
+        RIGHT_CENTER[0] + (SHAFT_LEN / 2.0 + crown_axial) / 1000.0,
+        RIGHT_CENTER[1] + crown_radial / 2000.0,
+    )
+    body_face = (
+        RIGHT_CENTER[0],
+        RIGHT_CENTER[1] + SHAFT_DIA * SHEET_SCALE[0] / 4000.0,
+    )
+    crown_profile = add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=right_crown_face,
+        # Right of the crown, not left (was (0.245, 0.228)): the 33 mm "BOTH
+        # CROWNS" row outruns the 20 mm frame, so the leader out of the frame's
+        # right side ran through it (leader-through-own-text). From here the
+        # shoulder leaves the frame's left side and the leader drops near-vertical
+        # to the crown, 6 mm left of the row and 2.4 mm past the 187.0 witness end.
+        frame_xy=(0.295, 0.228),
+        characteristic="profile_surface",
+        tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot crown profile"],
+        datums=(),
+        quantity="BOTH CROWNS",
+        label="pinion pivot crown profile",
+        entity_type="FACE",
+    )
+    bearing_finish = add_surface_finish(
+        adapter,
+        right,
+        edge_xy=body_face,
+        symbol_xy=(0.155, 0.205),
+        control=surface_finish_by_key(SURFACE_FINISHES, "bearing"),
+        label="pinion pivot bearing finish",
+        entity_type="FACE",
+    )
+
+    # pc-r7 eye pass: the cylindricity frame and datum A sat on the
+    # match-drill callout's text, and the Ra bar on its shoulder.  The callout
+    # is moved from the symbols' read-back boxes, not by a hand-tuned
+    # coordinate, and the placement is asserted, so a longer callout moves
+    # further instead of re-colliding.
+    place_callout_clear(
+        adapter,
+        next(
+            annotation
+            for annotation in right_annotations
+            if dimension_name(adapter, annotation) == "PinHoleDia"
+        ),
+        label="MHA-DT-019 match-drill callout",
+        below={
+            "bearing finish": gdt_box(
+                adapter, bearing_finish.GetAnnotation(), label="bearing Ra"
+            ),
+        },
+        beside={
+            "cylindricity frame": gdt_box(
+                adapter, cylindricity.GetAnnotation(), label="cylindricity frame"
+            ),
+            "datum A": gdt_box(adapter, datum_a.GetAnnotation(), label="datum A"),
+            "crown profile frame": gdt_box(
+                adapter, crown_profile.GetAnnotation(), label="crown profile frame"
+            ),
+        },
+    )
+
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.108)
+    add_property_linked_note(adapter, "End View Note", 0.020, 0.140)
+    add_property_linked_note(adapter, "Iso View Note", 0.325, 0.157)
+
+    return await finalize_drawing(
+        adapter,
+        OUTPUTS,
+        pdf_title="Pinion Torque Shaft Manufacturing Drawing",
+        scale=SHEET_SCALE,
+        layout=SPEC.layout,
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("part", choices=[PART_STEM])
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    _parse_args()
+    _telemetry.set_service("drawing-export")
+    sys.exit(run_build(build))

@@ -1,0 +1,97 @@
+number: MHA-DT-000
+# drive-train assembly contract -- per-assembly build data read through
+# cad/scripts/_assembly_contract.py. Editing this file re-keys ONLY the drive-train
+# closure (its assembly leaf, its verify_soundness leaf, and whatever consumes
+# its saved .SLDASM), never a sibling assembly.
+#
+# flip_invert: _assembly._flip_sig signatures (+ " @<diag>" orientation suffix
+#   for a rotation/mirror twin) whose distance driver seats OPPOSITE the plain
+#   sign rule. List every signature THIS build queries that needs inverting; a
+#   signature shared with another assembly goes in both files. A build that
+#   lands a mate on the wrong side fails with "flip-seed MISS ... toggle sig",
+#   naming this file; the end-of-build seed audit logs every queried signature
+#   and warns on entries no mate queried.
+# allowed_free_stems: the exact component families allowed to read
+#   under-constrained (freed operational DOF + everything coupled to them).
+#   Shared by the incremental refresh and verify:soundness.
+# required_free_stems: one family per freed DOF that must itself read
+#   under-constrained (verify:soundness necessity).
+# free_dof (+ free_dof_per_active_channel x active channels): the operational
+#   DOF the saved model ships free (verify:soundness).
+flip_invert:
+  - alignment pinion axial
+  - axial seat
+  - cam follower back seat depth
+  - cam follower front seat depth
+  - cone gear axial seat
+  - cone platform height
+  - crankshaft axial (on the plate)
+  - lever axial seat
+  - lift rod axial
+  - pinch head seat @ppn
+  - pinion arbor axial
+  - pinion cam back set pin axial
+  - pinion cam front set pin axial
+  - tip block axial seat
+  - tip collar axial seat
+  # Option E-a: the pinned torque shaft's axial station (pc-ea run).
+  - torque shaft axial
+allowed_free_stems:
+  - dt-alignment-pinion
+  - dt-cone-gear
+  - dt-cone-gear-shaft
+  - dt-cone-pivot-post
+  - dt-cone-swing-platform
+  - vn-cone-tip-adjuster
+  - dt-cone-tip-block
+  - vn-cone-tip-block-screw
+  - vn-cone-tip-collar
+  - vn-cone-tip-pinch-screw
+  - dt-crank-arm
+  - dt-crank-drive-gear
+  - dt-crank-handle
+  # MHA-DT-034/MHA-DT-035: bonded to the handle, they ride its crank spin.
+  - dt-crank-handle-butt-cup
+  - dt-crank-handle-ferrule
+  - dt-crank-handle-pivot-screw
+  - dt-crank-hub
+  - vn-crank-hub-pin
+  - dt-crank-pin
+  - dt-crank-pin-eye
+  - dt-crank-pin-ring
+  - dt-crank-pinion
+  - dt-crank-pinion-pin
+  # MHA-DT-036/173: closed on the crankshaft, they turn with the freed crank spin.
+  - vn-crank-seat-drive-pin
+  - dt-crank-seat-washer
+  - dt-crankshaft
+  - dt-cylinder-gear
+  - vn-fillister-screw
+  # MHA-VN-035/150: lock-mated to the arm, they ride the crank spin.
+  - vn-keeper-chain
+  - vn-keeper-chain-link
+  - dt-pinion-arbor
+  # MHA-DT-033: lock-mated to MHA-DT-022, it rides the freed engage swing.
+  - dt-pinion-arbor-collar
+  - dt-pinion-bracket
+  - dt-pinion-cam
+  - dt-pinion-cam-pin
+  - dt-pinion-handle
+  - dt-pinion-lever
+  - vn-post-mount-screw
+  # MHA-DT-030: locked to the lift rod, it turns with the freed rod spin.
+  - dt-pinion-lever-pin
+  - dt-pinion-lift-rod
+  # Option E-a: pinned to both straps, the torque shaft swings with them.
+  - dt-pinion-pivot-shaft
+  # MHA-VN-033: locked in each strap's cross hole, it swings with the strap.
+  - vn-pinion-strap-pin
+# One family per freed DOF that must ITSELF read under-constrained.
+required_free_stems:
+  - dt-crankshaft
+  - dt-cone-swing-platform
+  - dt-pinion-bracket
+  - dt-pinion-lift-rod
+# The crank spin, the cone-platform swing, the pinion engage swing and the
+# lift-rod/cam spin (PR8).
+free_dof: 4

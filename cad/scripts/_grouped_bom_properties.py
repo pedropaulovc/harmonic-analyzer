@@ -10,7 +10,7 @@ import _telemetry
 from _common import _early_bound
 
 
-_PART_NUMBER = re.compile(r"MHA-\d{3}\Z")
+_PART_NUMBER = re.compile(r"MHA-[A-Z]{2}-\d{3}\Z")
 _USER_SPECIFIED_PART_NUMBER = 8  # swBOMPartNumber_UserSpecified
 
 

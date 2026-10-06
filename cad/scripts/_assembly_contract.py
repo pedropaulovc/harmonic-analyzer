@@ -26,7 +26,7 @@ import yaml
 CONTRACT_DIR = Path(__file__).resolve().parent.parent / "config" / "assemblies"
 
 _REQUIRED_KEYS = frozenset(
-    {"flip_invert", "allowed_free_stems", "required_free_stems", "free_dof"}
+    {"number", "flip_invert", "allowed_free_stems", "required_free_stems", "free_dof"}
 )
 _KNOWN_KEYS = _REQUIRED_KEYS | {"free_dof_per_active_channel"}
 
@@ -50,6 +50,7 @@ class AssemblyContract:
 
     stem: str
     path: Path
+    number: str
     flip_invert: frozenset[str]
     allowed_free_stems: tuple[str, ...]
     required_free_stems: tuple[str, ...]
@@ -69,6 +70,12 @@ def _string_list(path: Path, key: str, value: object) -> tuple[str, ...]:
     if duplicates:
         raise ValueError(f"{path}: {key} lists {duplicates} more than once")
     return tuple(value)
+
+
+def _text(path: Path, key: str, value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{path}: {key} must be a non-empty string")
+    return value
 
 
 def _count(path: Path, key: str, value: object) -> int:
@@ -98,6 +105,7 @@ def assembly_contract(stem: str) -> AssemblyContract:
     return AssemblyContract(
         stem=stem,
         path=path,
+        number=_text(path, "number", doc["number"]),
         flip_invert=frozenset(_string_list(path, "flip_invert", doc["flip_invert"])),
         allowed_free_stems=_string_list(
             path, "allowed_free_stems", doc["allowed_free_stems"]

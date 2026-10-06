@@ -23,7 +23,7 @@ from win32com.client import VARIANT  # noqa: E402
 from _common import _early_bound, _read_member, check, log, run_build  # noqa: E402
 from _assembly import place_component  # noqa: E402
 from _transforms import compose_rows, rot_z_rows  # noqa: E402
-import build_drive_train_assembly as dta  # noqa: E402
+import build_dt_drive_train_assembly as dta  # noqa: E402
 
 
 def _transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
@@ -82,7 +82,7 @@ async def build(adapter) -> dict[str, str]:
     post_position[1] = dta.Y_BASE_TOP + dta.PLAT_T
     post = await place_component(
         adapter,
-        "cone-pivot-post",
+        "dt-cone-pivot-post",
         post_position,
         [0.0, 180.0, 0.0],
         dta.ROT_Y_180,
@@ -97,7 +97,7 @@ async def build(adapter) -> dict[str, str]:
     ]
     gear = await place_component(
         adapter,
-        "crank-drive-gear",
+        "dt-crank-drive-gear",
         gear_position,
         [0.0, dta.INCLINE_DEG, 0.0],
         dta.ROT_Y_INCLINE,
@@ -112,7 +112,7 @@ async def build(adapter) -> dict[str, str]:
     ]
     pinion = await place_component(
         adapter,
-        "crank-pinion",
+        "dt-crank-pinion",
         pinion_position,
         [0.0, 0.0, -dta.PINION_SEED_DEG],
         rot_z_rows(-dta.PINION_SEED_DEG),

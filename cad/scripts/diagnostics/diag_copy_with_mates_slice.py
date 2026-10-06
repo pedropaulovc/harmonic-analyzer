@@ -64,9 +64,9 @@ from _assembly import (  # noqa: E402
     world_point,
 )
 
-# Distance drivers seed their side from channel's flip seeds
-# (cad/config/assemblies/channel.yaml), the assembly this probe mirrors.
-activate_assembly_contract("channel")
+# Distance drivers seed their side from ch-channel's flip seeds
+# (cad/config/assemblies/ch-channel.yaml), the assembly this probe mirrors.
+activate_assembly_contract("ch-channel")
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler  # noqa: E402
 import _telemetry  # noqa: E402
 import channel_kinematics  # noqa: E402
@@ -78,7 +78,7 @@ from solidworks_mcp.adapters.solidworks.assembly import (  # noqa: E402
     _mate_group_subfeatures,
     _read_member,
 )
-from build_channel_assembly import (  # noqa: E402
+from build_ch_channel_assembly import (  # noqa: E402
     ARM_ARC_CENTER_LOCAL_Y,
     ARM_MID_DZ,
     ARM_PIVOT_LOCAL_Y,
@@ -110,7 +110,7 @@ N_COPY_STATIONS = 4  # copies land at channels SEED_J+1 .. SEED_J+N
 SLICE_MATES = 12  # J1(3) + J2(3) + J4(2) + J3(3) + J5(1), creation order
 PIVOT_OD_PT = [PIVOT[0] + SHAFT_R, PIVOT[1], 0.0]
 FULC_OD_PT = [FULCRUM[0] + SHAFT_R, FULCRUM[1], 0.0]
-CHAIN_PARTS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
+CHAIN_PARTS = ("ch-rocker-arm", "ch-connecting-rod", "ch-amplitude-bar", "ch-channel-lever")
 
 
 # Semantic identity of each dimension mate in the slice, classified by the
@@ -120,17 +120,17 @@ CHAIN_PARTS = ("rocker-arm", "connecting-rod", "amplitude-bar", "channel-lever")
 # ROOT). Unique for this chain, so a copied dim is identifiable no matter
 # what order the copy created it in.
 _SEM_BY_OWNERS = {
-    frozenset({"rocker-arm", "pivot-bushing"}): "J1a",
-    frozenset({"rocker-arm", "ROOT"}): "J1s",
-    frozenset({"connecting-rod", "rocker-arm"}): "J2a",
-    frozenset({"connecting-rod", "ROOT"}): "J2s",
-    frozenset({"amplitude-bar", "ROOT"}): "footX",
-    frozenset({"amplitude-bar", "rocker-arm"}): "J5",
+    frozenset({"ch-rocker-arm", "pivot-bushing"}): "J1a",
+    frozenset({"ch-rocker-arm", "ROOT"}): "J1s",
+    frozenset({"ch-connecting-rod", "ch-rocker-arm"}): "J2a",
+    frozenset({"ch-connecting-rod", "ROOT"}): "J2s",
+    frozenset({"ch-amplitude-bar", "ROOT"}): "footX",
+    frozenset({"ch-amplitude-bar", "ch-rocker-arm"}): "J5",
 }
 _KNOWN_PART_PREFIXES = set(CHAIN_PARTS) | {
     "pivot-bushing",
-    "pivot-shaft",
-    "fulcrum-shaft",
+    "ch-pivot-shaft",
+    "ch-fulcrum-shaft",
 }
 # Position of each semantic dim in _seed_chain's creation-order dims list.
 _DIMS_IDX_BY_SEM = {"J1a": 1, "J1s": 2, "J2a": 4, "J2s": 5, "footX": 10, "J5": 11}
@@ -227,7 +227,7 @@ async def _seed_chain(
 
     rocker = await place_component(
         adapter,
-        "rocker-arm",
+        "ch-rocker-arm",
         [PIVOT[0] - arm_origin_dx, PIVOT[1] - arm_origin_dy, z_mid],
         euler_from_rows(arm_rows),
         arm_rows,
@@ -236,7 +236,7 @@ async def _seed_chain(
     )
     rod = await place_component(
         adapter,
-        "connecting-rod",
+        "ch-connecting-rod",
         [RING_CENTER[0], RING_CENTER[1], zj + CAM_DZ],
         euler_from_rows(rod_rows),
         rod_rows,
@@ -245,7 +245,7 @@ async def _seed_chain(
     )
     bar = await place_component(
         adapter,
-        "amplitude-bar",
+        "ch-amplitude-bar",
         [st["bar_origin_x"], st["bar_origin_y"], z_mid - BAR_WIDTH / 2.0],
         [st["bar_tilt"], -90.0, 0.0],
         bar_rows,
@@ -254,7 +254,7 @@ async def _seed_chain(
     )
     lever = await place_component(
         adapter,
-        "channel-lever",
+        "ch-channel-lever",
         [FULCRUM[0], FULCRUM[1], z_mid],
         euler_from_rows(lever_rows),
         lever_rows,
@@ -339,7 +339,7 @@ async def _seed_chain(
         row = [
             d
             for d in _dim_mates_with_owners(adapter)
-            if d["owners"] == frozenset({"connecting-rod", "ROOT"})
+            if d["owners"] == frozenset({"ch-connecting-rod", "ROOT"})
         ][-1]
         log(f"rod spin [{tag}]: authored FlipDimension={row['flip']}")
         if row["flip"] is False:
@@ -427,10 +427,10 @@ async def _seed_chain(
     dims += [foot_r]
 
     comps = {
-        "rocker-arm": rocker,
-        "connecting-rod": rod,
-        "amplitude-bar": bar,
-        "channel-lever": lever,
+        "ch-rocker-arm": rocker,
+        "ch-connecting-rod": rod,
+        "ch-amplitude-bar": bar,
+        "ch-channel-lever": lever,
     }
     return comps, dims, time.perf_counter() - t0
 
@@ -501,7 +501,7 @@ async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
     await place_component(
         adapter,
-        "pivot-shaft",
+        "ch-pivot-shaft",
         [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -510,7 +510,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await place_component(
         adapter,
-        "fulcrum-shaft",
+        "ch-fulcrum-shaft",
         [FULCRUM[0], FULCRUM[1], 0.0],
         [0.0, 0.0, 0.0],
         IDENTITY,
@@ -741,7 +741,7 @@ async def build(adapter) -> dict[str, str]:
                 if inst in d["instances"]
                 and (
                     "ROOT" in d["owners"]
-                    or d["owners"] == frozenset({"rocker-arm", "pivot-bushing"})
+                    or d["owners"] == frozenset({"ch-rocker-arm", "pivot-bushing"})
                 )
             ]
             for d in cands:

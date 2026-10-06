@@ -7,12 +7,15 @@ metadata:
   originSessionId: 86222888-efe3-4a2b-8220-a86f1509aa3a
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Multi-config parts (`cone-gear` ×20 tooth counts, `transgear-removable` ×3:
 T12/T18/T24) ship **one neutral STL per configuration**. Both export paths —
 `export_models.export_part_stls` and `cut_release.export_neutral` — switched
 configs with `doc.ShowConfiguration2(cfg)` then **immediately** `SaveAs3`'d the
 mesh with **no rebuild between**. SolidWorks regenerates config switches
-**LAZILY** (same root cause documented in `build_cone_gear.py` for the 20-config
+**LAZILY** (same root cause documented in `build_dt_cone_gear.py` for the 20-config
 gear), so `SaveAs3` captured the *previous* config's still-tessellated solid. A
 config's STL **non-deterministically held an adjacent configuration**.
 

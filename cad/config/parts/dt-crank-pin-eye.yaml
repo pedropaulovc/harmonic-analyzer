@@ -1,0 +1,7 @@
+dt-crank-pin-eye:
+  number: MHA-DT-028
+  material: Brass
+  finish: "bright"
+  tolerance_class: visual_noncritical
+  quantity: 1
+  process: "formed brass wire eye, tail clamped under the anchor screw"

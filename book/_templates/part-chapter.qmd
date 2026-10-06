@@ -26,7 +26,7 @@ meets them.
 
 ## `<part-name>` {#sec-<label>-<part>}
 
-**Drawing:** sheet N (`figures/generated/drawings/<part>.pdf`)
+**Drawing:** sheet N (`figures/generated/drawings/<prefixed-part>.pdf`)
 **Stock:** <size and form>
 **Setups:** <n>
 **Time:** <real hours, from the logbook>
@@ -66,7 +66,7 @@ What to verify before moving on, and what is still adjustable later.
 
 **Sources for this chapter**
 
-- `cad/scripts/build_<part>.py` (geometry — the source of truth)
-- `cad/config/parts/<dashed-name>.yaml` (material, registry)
+- `cad/scripts/build_<prefixed_part>.py` (geometry — the source of truth)
+- `cad/config/parts/<prefixed-dashed-name>.yaml` (material, registry)
 - `cad/docs/machining-dfm.md`
 - `logbook/entries/<date>-<slug>.md`

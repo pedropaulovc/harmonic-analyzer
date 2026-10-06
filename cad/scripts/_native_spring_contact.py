@@ -324,13 +324,13 @@ class _AssemblySpringInstance:
     station_z_mm: float
 
 
-_CHANNEL_SPRING_FAMILY = "channel-spring-installed"
+_CHANNEL_SPRING_FAMILY = "vn-channel-spring-installed"
 _CHANNEL_CONTACT_FAMILIES = (
     _CHANNEL_SPRING_FAMILY,
-    "spring-hook",
-    "channel-lever",
+    "vn-spring-hook",
+    "ch-channel-lever",
 )
-_SUMMING_CONTACT_FAMILIES = ("counter-spring", "boss-hook", "gooseneck")
+_SUMMING_CONTACT_FAMILIES = ("vn-counter-spring", "vn-boss-hook", "sm-gooseneck")
 _STATION_LOOKUP_TOLERANCE_MM = 1e-3
 
 
@@ -460,9 +460,9 @@ def assert_assembly_spring_contacts(
     form one spring/hook/lever triplet per selected amplitude. Summing has one
     counter chain. No component is moved and no rebuild is requested.
     """
-    if channel_count is not None and asm_name != "channel":
+    if channel_count is not None and asm_name != "ch-channel":
         raise ValueError("channel_count applies only to the channel assembly")
-    if asm_name == "channel":
+    if asm_name == "ch-channel":
         import _config
         import settled_spring_seats
 
@@ -504,13 +504,13 @@ def assert_assembly_spring_contacts(
         )
         hooks = _match_station_family(
             springs,
-            "spring-hook",
-            _ordered_family("spring-hook", found["spring-hook"], count),
+            "vn-spring-hook",
+            _ordered_family("vn-spring-hook", found["vn-spring-hook"], count),
         )
         levers = _match_station_family(
             springs,
-            "channel-lever",
-            _ordered_family("channel-lever", found["channel-lever"], count),
+            "ch-channel-lever",
+            _ordered_family("ch-channel-lever", found["ch-channel-lever"], count),
         )
         # selected_channels is config-row/index order. Because the configured
         # pitch is positive, ascending actual station Z has that same order;
@@ -538,21 +538,21 @@ def assert_assembly_spring_contacts(
             )
         return
 
-    if asm_name == "summing":
+    if asm_name == "sm-summing":
         import settled_spring_seats
 
         seat, _gooseneck_y = settled_spring_seats.counter_seat()
         found = _assembly_spring_instances(adapter, _SUMMING_CONTACT_FAMILIES)
-        counter = _ordered_family("counter-spring", found["counter-spring"], 1)
+        counter = _ordered_family("vn-counter-spring", found["vn-counter-spring"], 1)
         boss = _match_station_family(
             counter,
-            "boss-hook",
-            _ordered_family("boss-hook", found["boss-hook"], 1),
+            "vn-boss-hook",
+            _ordered_family("vn-boss-hook", found["vn-boss-hook"], 1),
         )
         gooseneck = _match_station_family(
             counter,
-            "gooseneck",
-            _ordered_family("gooseneck", found["gooseneck"], 1),
+            "sm-gooseneck",
+            _ordered_family("sm-gooseneck", found["sm-gooseneck"], 1),
         )
         counter_instance = counter[0]
         boss_instance = boss[0]

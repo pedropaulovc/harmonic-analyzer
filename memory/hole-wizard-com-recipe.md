@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Everything needed to author native `HoleWzd` features from Python lives in
 `cad/scripts/_holes.py` (`wizard_holes` + `HoleSpec`), probe-verified on this
 seat by `diagnostics/diag_hole_wizard.py` (6/6 volume-exact, 2026-07-11).

@@ -3,7 +3,7 @@
 The rocker-pivot and lever-fulcrum shaft axes (machine x, y) are OWNED by
 ``cad/config/machine/channels.yaml`` (``channels.rocker_pivot_xy_mm`` /
 ``channels.lever_fulcrum_xy_mm``), the cylinder-gear shaft axis by
-``cone_pivot_post_installation.DRUM_X`` + ``gear_train.drive_axis_y_mm`` and
+``dt_cone_pivot_post_installation.DRUM_X`` + ``gear_train.drive_axis_y_mm`` and
 the cams' home phase by ``gear_train.cylinder_lock_phase_deg``; this module
 is the one read point the channel/drive-train assemblies' placement and the
 offline error budget (``error_budget.py``) import, so none copies a literal
@@ -14,7 +14,7 @@ drawing-free convention as ``magnifying_lever_geom``.
 from __future__ import annotations
 
 import _config
-from cone_pivot_post_installation import DRUM_X
+from dt_cone_pivot_post_installation import DRUM_X
 
 ROCKER_PIVOT_XY: tuple[float, float] = tuple(
     float(v) for v in _config.machine("channels", "rocker_pivot_xy_mm")

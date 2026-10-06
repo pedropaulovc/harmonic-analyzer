@@ -15,7 +15,7 @@ from diagnostics import probe_spare_deck_contact as probe
 def context(monkeypatch, tmp_path):
     from solidworks_mcp.adapters import pywin32_adapter
 
-    source = tmp_path / "cad/out/sldasm/harmonic-analyzer.SLDASM"
+    source = tmp_path / "cad/out/sldasm/ha-harmonic-analyzer.SLDASM"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"unchanged saved top")
     sha = probe.digest(source)

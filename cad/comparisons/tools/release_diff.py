@@ -19,12 +19,20 @@ Bundles are read straight from the GitHub release zips over HTTP range
 requests -- only the central directory and the needed members are fetched,
 never the whole 460 MB asset.
 
+The committed schema-2 identity map groups actual STEP inventory members by
+canonical identity while retaining configuration suffixes and actual cache
+basenames on both sides. Duplicate logical identities are rejected. New,
+deleted and renamed members are reported separately from geometry verdicts;
+``--parts`` accepts either spelling, but only members paired in both bundles.
+
     uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0
     uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0 --parts summing-lever,knife-mount
     uv run cad/comparisons/tools/release_diff.py v0.1.1 v0.2.0 --top 5   # auto-pick most-changed
 """
 
 import argparse
+import json
+import re
 import os
 import struct
 import urllib.request
@@ -36,6 +44,61 @@ import numpy as np
 import trimesh
 
 CACHE = Path(os.environ.get("RELEASE_DIFF_CACHE", "/tmp/release_diff_cache"))
+IDENTITY_MAP = Path(__file__).resolve().parents[2] / "config" / "identity-migration-map.json"
+
+
+def load_identity_map(path=IDENTITY_MAP):
+    """Load the sealed schema-2 rename table for diff pairing only."""
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 2:
+        raise ValueError("release diff identity map requires schema_version 2")
+    mapping = {}
+    targets = set()
+    for row in payload["identities"]:
+        old, new = row["old_stem"], row["new_stem"]
+        if old != old.lower() or new != new.lower() or "_" in old or "_" in new:
+            raise ValueError(f"identity map requires dashed lowercase stems: {old!r}, {new!r}")
+        if old in mapping or new in targets:
+            raise ValueError(f"duplicate identity map entry: {old!r}, {new!r}")
+        mapping[old] = new
+        targets.add(new)
+    return mapping
+
+
+def split_mesh_key(key):
+    """Separate the exporter configuration, or a generated stretch qualifier."""
+    stem, separator, configuration = key.partition("--")
+    if separator:
+        return stem, separator + configuration
+    suffix = re.search(r"-stretch\d+$", key)
+    return (key[:suffix.start()], suffix.group()) if suffix else (key, "")
+
+
+def canonical_key(key, mapping):
+    """Translate only the stem, preserving the complete configuration qualifier."""
+    stem, suffix = split_mesh_key(key)
+    stem = stem.lower()
+    return mapping.get(stem, stem) + suffix
+
+
+def identity_inventory(keys, mapping):
+    """Index actual members by logical identity; ambiguous bundles are invalid."""
+    inventory = {}
+    for actual in keys:
+        logical = canonical_key(actual, mapping)
+        if logical in inventory:
+            raise ValueError(
+                f"duplicate logical identity {logical!r}: {inventory[logical]!r}, {actual!r}"
+            )
+        inventory[logical] = actual
+    return inventory
+
+
+def paired_keys(old_keys, new_keys, mapping):
+    """Return new-actual -> old-actual pairs from the two actual inventories."""
+    old = identity_inventory(old_keys, mapping)
+    new = identity_inventory(new_keys, mapping)
+    return {actual: old[logical] for logical, actual in new.items() if logical in old}
 
 
 # --------------------------------------------------------------------------- #
@@ -138,11 +201,11 @@ def solid_volume(shape):
     return props.Mass()  # mm^3
 
 
-def boolean_cut(tag_a, tag_b, base):
+def boolean_cut(tag_a, tag_b, base_a, base_b):
     """Return removed/added material volumes (mm^3) via exact CAD booleans."""
     from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
-    a = read_step(CACHE / tag_a / f"{base}.step")
-    b = read_step(CACHE / tag_b / f"{base}.step")
+    a = read_step(CACHE / tag_a / f"{base_a}.step")
+    b = read_step(CACHE / tag_b / f"{base_b}.step")
     va, vb = solid_volume(a), solid_volume(b)
     removed = solid_volume(BRepAlgoAPI_Cut(a, b).Shape())   # in A, not in B
     added = solid_volume(BRepAlgoAPI_Cut(b, a).Shape())     # in B, not in A
@@ -186,9 +249,9 @@ def _directed(src, dst):
     return _surface_dist(dst, _query_points(src))
 
 
-def mesh_deviation(tag_a: str, tag_b: str, base: str) -> dict[str, Any]:
-    a = trimesh.load(CACHE / tag_a / f"{base}.stl", process=False)
-    b = trimesh.load(CACHE / tag_b / f"{base}.stl", process=False)
+def mesh_deviation(tag_a: str, tag_b: str, base_a: str, base_b: str) -> dict[str, Any]:
+    a = trimesh.load(CACHE / tag_a / f"{base_a}.stl", process=False)
+    b = trimesh.load(CACHE / tag_b / f"{base_b}.stl", process=False)
     d_ab = _directed(a, b)
     d_ba = _directed(b, a)
     hausdorff = float(max(d_ab.max(), d_ba.max()))
@@ -208,6 +271,8 @@ def main():
     ap.add_argument("tag_a")
     ap.add_argument("tag_b")
     ap.add_argument("--parts", help="comma-separated part basenames")
+    ap.add_argument("--identity-map", type=Path, default=IDENTITY_MAP,
+                    help="schema-2 diff-only identity rename table")
     ap.add_argument("--top", type=int, default=0,
                     help="auto-select N parts with largest STEP byte delta")
     ap.add_argument("--no-boolean", action="store_true",
@@ -218,22 +283,37 @@ def main():
     print("reading central directories ...", flush=True)
     ca, cb = central_dir(ua), central_dir(ub)
 
+    mapping = load_identity_map(args.identity_map)
+
     def steps(cd):
-        return {Path(n).stem.lower(): e for n, e in cd.items()
-                if n.lower().startswith("step/") and n.lower().endswith(".step")}
+        entries = [(Path(n).stem.lower(), e) for n, e in cd.items()
+                   if n.lower().startswith("step/") and n.lower().endswith(".step")]
+        identity_inventory((key for key, _ in entries), mapping)
+        return dict(entries)
     sa, sb = steps(ca), steps(cb)
-    common = sorted(set(sa) & set(sb))
+    pairs = paired_keys(sa, sb, mapping)
+    common = sorted(pairs)
+    added = sorted(set(sb) - set(pairs))
+    deleted = sorted(set(sa) - set(pairs.values()))
+    print(f"new parts: {', '.join(added) or '(none)'}")
+    print(f"deleted parts: {', '.join(deleted) or '(none)'}")
+    renamed = {new: old for new, old in pairs.items() if new != old}
+    print(f"renamed parts: {renamed}")
 
     # CRC32 (from the central directory) is the change signal: a geometry edit can
     # rewrite coordinates while preserving the exact byte count, so STEP size is
     # NOT a reliable gate. Rank CRC-different parts by |size delta| only for a
     # stable, readable order.
-    changed_crc = [k for k in common if sa[k]["crc"] != sb[k]["crc"]]
-    same_crc = [k for k in common if sa[k]["crc"] == sb[k]["crc"]]
-    changed_crc.sort(key=lambda k: -abs(sb[k]["uncomp"] - sa[k]["uncomp"]))
+    changed_crc = [k for k in common if sa[pairs[k]]["crc"] != sb[k]["crc"]]
+    same_crc = [k for k in common if sa[pairs[k]]["crc"] == sb[k]["crc"]]
+    changed_crc.sort(key=lambda k: -abs(sb[k]["uncomp"] - sa[pairs[k]]["uncomp"]))
 
     if args.parts:
-        parts = [p.strip().lower() for p in args.parts.split(",")]
+        requested = {canonical_key(p.strip(), mapping) for p in args.parts.split(",")}
+        parts = [k for k in common if canonical_key(k, mapping) in requested]
+        missing = requested - {canonical_key(k, mapping) for k in parts}
+        if missing:
+            ap.error(f"requested parts are not paired in both bundles: {sorted(missing)}")
     elif args.top:
         parts = changed_crc[:args.top]
     else:
@@ -247,26 +327,29 @@ def main():
           f"analyzing {len(parts)}: {', '.join(parts)}\n")
 
     for base in parts:
+        base_a, base_b = pairs[base], base
         # fetch the two STEP + two STL members for this part, tracking which
         # (sub-folder) are present in BOTH bundles -- an analysis whose input is
         # missing from either side must be skipped, never run against a stale
         # cache file left by an earlier part.
         present = {"step": True, "stl": True}
         for sub, ext in (("step", ".step"), ("stl", ".stl")):
-            for tag, url, cd in ((args.tag_a, ua, ca), (args.tag_b, ub, cb)):
-                e = member(cd, sub, base, ext)
+            for tag, url, cd, actual in (
+                (args.tag_a, ua, ca, base_a), (args.tag_b, ub, cb, base_b),
+            ):
+                e = member(cd, sub, actual, ext)
                 if e is None:
-                    print(f"  !! {tag}: missing {sub}/{base}{ext}")
+                    print(f"  !! {tag}: missing {sub}/{actual}{ext}")
                     present[sub] = False
                     continue
-                extract(url, e, CACHE / tag / f"{base}{ext}")
+                extract(url, e, CACHE / tag / f"{actual}{ext}")
 
         print(f"### {base}")
         if not present["stl"]:
             print("  (3c) mesh:    SKIPPED (member missing from a bundle)")
         else:
             try:
-                md = mesh_deviation(args.tag_a, args.tag_b, base)
+                md = mesh_deviation(args.tag_a, args.tag_b, base_a, base_b)
                 verdict = ("IDENTICAL (within mesh tol)"
                            if md["hausdorff_mm"] < 1e-3 else "CHANGED")
                 print(f"  (3c) mesh:    ~Hausdorff={md['hausdorff_mm']:.4f} mm  "
@@ -285,7 +368,7 @@ def main():
             print("  (3b) solid:   SKIPPED (member missing from a bundle)")
         elif not args.no_boolean:
             try:
-                bc = boolean_cut(args.tag_a, args.tag_b, base)
+                bc = boolean_cut(args.tag_a, args.tag_b, base_a, base_b)
                 eq = bc["removed"] < 1e-3 and bc["added"] < 1e-3
                 print(f"  (3b) solid:   removed={bc['removed']:.2f} mm^3  "
                       f"added={bc['added']:.2f} mm^3  net={bc['net']:+.2f} mm^3 "

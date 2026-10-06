@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 meshprobe (`uv run meshprobe`, pedropaulovc/meshprobe, pinned `>=1.4.0`) inspects/renders release
 GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93–#102):
 

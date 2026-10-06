@@ -52,10 +52,10 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     ("package_native.py", "_release_seat"): frozenset({"release_seat_working_directory"}),
     # A failed drive-train package audit: the evidence PDF's directory, read
     # after the failure, nothing read back into the model.
-    ("draw_drive_train_assembly.py", "_export_failure_pdf"): frozenset({"OUT_FAILURES"}),
-    # The same for MHA-016's native layout gate: exported after the gate
+    ("draw_dt_drive_train_assembly.py", "_export_failure_pdf"): frozenset({"OUT_FAILURES"}),
+    # The same for MHA-DT-005's native layout gate: exported after the gate
     # failed, then the gate's error is re-raised.
-    ("draw_cone_pivot_post.py", "_export_failure_pdf"): frozenset({"OUT_FAILURES"}),
+    ("draw_dt_cone_pivot_post.py", "_export_failure_pdf"): frozenset({"OUT_FAILURES"}),
     # A refused rebuild: reads the What's Wrong table, then raises through
     # capture_com_failure.  Nothing after it runs.
     ("_common.py", "force_rebuild"): frozenset({"capture_rebuild_failure"}),

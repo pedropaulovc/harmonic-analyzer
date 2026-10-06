@@ -1,14 +1,14 @@
 r"""Shared involute-gear authoring helpers (fixed tooth count).
 
 The tooth-gap technique is the cone gear's live-validated recipe (see
-``build_cone_gear.py`` for the involute derivation and the SW 2026 parser
+``build_dt_cone_gear.py`` for the involute derivation and the SW 2026 parser
 facts): six ``CreateEquationSpline2`` curves -- two involute flanks, base
 chord, two radial extensions, outer clearance arc -- cut through a disc
 blank and circular-patterned about the gear axis. Here the expressions are
 literal numerics (document units = inches, trig in radians), which is all a
-non-configured gear needs; ``build_cone_gear.py`` keeps its own global-
+non-configured gear needs; ``build_dt_cone_gear.py`` keeps its own global-
 variable variant for the configuration-driven cone set, and
-``build_transgear_removable.py`` reuses that variant for its 3 configurations.
+``build_pd_transgear_removable.py`` reuses that variant for its 3 configurations.
 
 Every step is volume-asserted against the exact analytic expectation
 (``gap_area_in_disc`` Green's-theorem integration), so a regeneration or
@@ -398,7 +398,7 @@ async def boss_tooth_swept(
     check("exit_sketch tooth", await adapter.exit_sketch())
 
     # Path: a fully-defined line up the gear axis (origin coincidence +
-    # vertical + one length dim -- the build_boss_hook recipe).
+    # vertical + one length dim -- the build_vn_boss_hook recipe).
     check("create_sketch tooth path", await adapter.create_sketch("Top"))
     line = check(
         "tooth path line",

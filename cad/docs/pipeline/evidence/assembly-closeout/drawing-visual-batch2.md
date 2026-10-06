@@ -1,5 +1,7 @@
 # Shared title fields: pinned visual batch 2
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Head: `64c3dab4875354a7d44d709539e001db920a0377`.
 Checkout: `C:/src/ha-assembly-closeout-independent`.
 

@@ -21,7 +21,7 @@ from scipy.optimize import minimize_scalar
 from scipy.signal import find_peaks, savgol_filter
 
 WEB = Path(__file__).resolve().parents[1]
-EVIDENCE = WEB/'content/8KmVDxkia_w.automatic-motion-evidence.json'
+EVIDENCE = WEB/'content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json'
 DATA = WEB/'src/mechanics-data.ts'
 KINEMATICS = WEB/'src/kinematics.ts'
 MECHANICS = WEB/'src/mechanics.ts'
@@ -241,7 +241,7 @@ def build_packet():
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output',type=Path,default=WEB/'content/8KmVDxkia_w.automatic-motion.json')
+    parser.add_argument('--output',type=Path,default=WEB/'content/canonical-native/8KmVDxkia_w.automatic-motion.json')
     args=parser.parse_args()
     packet=build_packet()
     args.output.parent.mkdir(parents=True,exist_ok=True)

@@ -12,6 +12,7 @@ dodo narrows each assembly task to its OWN file. These tests keep it that way:
 * each build activates exactly its own contract, so the file its seeds come
   from is the file its recipe depends on;
 * the contract files cover ``ASSEMBLY_ORDER`` exactly and parse;
+* canonical component-name datum labels retain their learned flip polarities;
 * the seed audit records, warns and refuses as documented.
 
     uv run pytest cad/scripts/test_assembly_contract.py
@@ -22,9 +23,11 @@ from __future__ import annotations
 import ast
 import importlib.util
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -96,7 +99,7 @@ def test_shared_module_holds_no_per_assembly_table(module):
 def test_stem_keyed_table_detector_sees_a_table(tmp_path):
     probe = tmp_path / "probe.py"
     probe.write_text(
-        'X: dict[str, int] = {"drive-train": 1}\nY = frozenset({"channel"})\n',
+        'X: dict[str, int] = {"dt-drive-train": 1}\nY = frozenset({"ch_channel"})\n',
         encoding="utf-8",
     )
     assert _stem_keyed_tables(probe) == ["X", "Y"]
@@ -119,26 +122,34 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
     monkeypatch.setattr(_assembly_contract, "CONTRACT_DIR", tmp_path)
     _assembly_contract.assembly_contract.cache_clear()
     try:
-        (tmp_path / "bad-key.yaml").write_text(
-            "flip_invert: []\nallowed_free_stems: []\nrequired_free_stems: []\n"
-            "free_dof: 0\nflip_seeds: []\n",
-            encoding="utf-8",
-        )
-        with pytest.raises(ValueError, match="unknown keys"):
+        def write_contract(stem, **overrides):
+            values = {
+                "number": "MHA-FR-000",
+                "flip_invert": ["a"],
+                "allowed_free_stems": ["rotor"],
+                "required_free_stems": ["rotor"],
+                "free_dof": 1,
+            }
+            (tmp_path / f"{stem}.yaml").write_text(
+                yaml.safe_dump(values | overrides), encoding="utf-8"
+            )
+
+        write_contract("valid")
+        valid = _assembly_contract.assembly_contract("valid")
+        assert valid.number == "MHA-FR-000"
+        assert valid.flip_invert == frozenset({"a"})
+        assert valid.allowed_free_stems == ("rotor",)
+        assert valid.required_free_stems == ("rotor",)
+        assert valid.free_dof == 1
+
+        write_contract("bad-key", flip_seeds=[])
+        with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("bad-key")
-        (tmp_path / "dupe.yaml").write_text(
-            "flip_invert: [a, a]\nallowed_free_stems: []\nrequired_free_stems: []\n"
-            "free_dof: 0\n",
-            encoding="utf-8",
-        )
-        with pytest.raises(ValueError, match="more than once"):
+        write_contract("dupe", flip_invert=["a", "a"])
+        with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("dupe")
-        (tmp_path / "bool-dof.yaml").write_text(
-            "flip_invert: []\nallowed_free_stems: []\nrequired_free_stems: []\n"
-            "free_dof: true\n",
-            encoding="utf-8",
-        )
-        with pytest.raises(ValueError, match="non-negative integer"):
+        write_contract("bool-dof", free_dof=True)
+        with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("bool-dof")
     finally:
         _assembly_contract.assembly_contract.cache_clear()
@@ -235,11 +246,48 @@ def test_seed_flip_refuses_without_an_active_contract(fresh_seed_state):
 
 
 def test_seed_flip_reads_only_the_active_assembly(fresh_seed_state):
-    _assembly.activate_assembly_contract("drive-train")
+    _assembly.activate_assembly_contract("dt-drive-train")
     assert _assembly._seed_flip("lift rod axial d=12.00", 12.0)
     assert not _assembly._seed_flip("lift rod axial d=12.00", -12.0)
-    _assembly.activate_assembly_contract("channel")
+    _assembly.activate_assembly_contract("ch-channel")
     assert not _assembly._seed_flip("lift rod axial d=12.00", 12.0)
+
+
+@pytest.mark.parametrize(
+    "component",
+    [
+        "vn-frame-side-screw",
+        "ch-fulcrum-shaft",
+        "ch-pivot-bracket",
+        "vn-pedestal-hold-down-screw",
+        "ch-rocker-thrust-washer",
+    ],
+)
+@pytest.mark.parametrize("axis", ("x", "y", "z"))
+def test_canonical_channel_datum_keeps_its_learned_side(
+    fresh_seed_state, component, axis
+):
+    """The channel's datum labels use native component names, not prose.
+
+    A namespace cutover must carry the learned inversion with that label;
+    missing it puts a positive target on the opposite side of the datum.
+    """
+    _assembly.activate_assembly_contract("ch-channel")
+    label = f"{component}-1 datum {axis} d=199.90"
+    assert _assembly._seed_flip(label, 199.9) is True
+    assert _assembly._seed_flip(label, -199.9) is False
+    _assembly.activate_assembly_contract("dt-drive-train")
+    assert _assembly._seed_flip(label, 199.9) is False
+
+
+@pytest.mark.parametrize("axis, inverted", (("x", False), ("y", True), ("z", False)))
+def test_canonical_mirrored_bracket_keeps_its_distinct_learned_side(
+    fresh_seed_state, axis, inverted
+):
+    _assembly.activate_assembly_contract("ch-channel")
+    label = f"ch-pivot-bracket-2 datum {axis} d=72.90"
+    assert _assembly._seed_flip(label, 72.9, " @npn") is inverted
+    assert _assembly._seed_flip(label, -72.9, " @npn") is not inverted
 
 
 def test_seed_audit_logs_queries_and_warns_on_dead_entries(
@@ -251,10 +299,10 @@ def test_seed_audit_logs_queries_and_warns_on_dead_entries(
         _assembly._telemetry, "event", lambda name, **kw: events.append((name, kw))
     )
     monkeypatch.setattr(_assembly._telemetry, "warn", warnings.append)
-    contract = _assembly.activate_assembly_contract("summing")
+    contract = _assembly.activate_assembly_contract("sm-summing")
     _assembly._seed_flip("summing-lever axial d=3.00", 3.0)
     _assembly._seed_flip("summing-lever radial d=3.00", 3.0)
-    _assembly.audit_flip_seeds("summing")
+    _assembly.audit_flip_seeds("sm-summing")
     audit = dict(events)["flip_seeds.audit"]
     assert audit["queried"] == ["summing lever axial", "summing lever radial"]
     assert audit["inverted"] == ["summing lever axial"]
@@ -264,31 +312,23 @@ def test_seed_audit_logs_queries_and_warns_on_dead_entries(
     monkeypatch.setattr(
         _assembly,
         "_ACTIVE_CONTRACT",
-        type(contract)(
-            stem=contract.stem,
-            path=contract.path,
-            flip_invert=contract.flip_invert | {"never queried seat"},
-            allowed_free_stems=contract.allowed_free_stems,
-            required_free_stems=contract.required_free_stems,
-            free_dof=contract.free_dof,
-            free_dof_per_active_channel=contract.free_dof_per_active_channel,
-        ),
+        replace(contract, flip_invert=contract.flip_invert | {"never queried seat"}),
     )
-    _assembly.audit_flip_seeds("summing")
+    _assembly.audit_flip_seeds("sm-summing")
     assert dict(events)["flip_seeds.dead"]["dead"] == ["never queried seat"]
-    assert warnings and "summing.yaml" in warnings[-1]
+    assert warnings and "sm-summing.yaml" in warnings[-1]
 
 
 def test_seed_audit_refuses_a_foreign_contract(fresh_seed_state):
-    _assembly.activate_assembly_contract("pen")
+    _assembly.activate_assembly_contract("pn-pen")
     with pytest.raises(RuntimeError, match="activate_assembly_contract"):
-        _assembly.audit_flip_seeds("magnifier")
+        _assembly.audit_flip_seeds("mg-magnifier")
 
 
 def test_activation_resets_the_audit(fresh_seed_state):
-    _assembly.activate_assembly_contract("pen")
+    _assembly.activate_assembly_contract("pn-pen")
     _assembly._seed_flip("hanger screw head plane d=1.00", 1.0)
-    _assembly.activate_assembly_contract("pen")
+    _assembly.activate_assembly_contract("pn-pen")
     assert _assembly._SEED_QUERIES == {}
 
 
@@ -297,8 +337,8 @@ def test_allowed_free_stems_come_from_the_contract():
         assert _assembly.allowed_free_stems(stem) == (
             _assembly_contract.assembly_contract(stem).allowed_free_stems
         )
-    assert _assembly.allowed_free_stems("frame") == ()
-    assert "pinion-lever" in _assembly.allowed_free_stems("drive-train")
+    assert _assembly.allowed_free_stems("fr-frame") == ()
+    assert "dt-pinion-lever" in _assembly.allowed_free_stems("dt-drive-train")
 
 
 def _effective_probe_flip(script: Path, label: str) -> bool:

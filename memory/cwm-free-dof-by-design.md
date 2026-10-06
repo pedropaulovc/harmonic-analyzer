@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 The CopyWithMates2 "wander" chased in #227/#231/#232/#233 is **by design, not a
 bug** (concluded 2026-07-10 with Pedro, SW 2024 SP3 + SW 2026 SP2, via raw
 pywin32 + an early-bound C# Interop port; diagnostic lives at
@@ -53,7 +56,7 @@ scale can't summon a strong non-design attractor (mirrored/rotated transforms,
 coincident PLANE axial mates, 4-part multi-loop, ~100 components — proven by
 `diag_cwm_attractor.py` #227, put held in all nine minimal cells).
 
-MITIGATION (shipping in `build_channel_assembly` via `_cwm.copy_with_mates`,
+MITIGATION (shipping in `build_ch_channel_assembly` via `_cwm.copy_with_mates`,
 `_cwm.py` lines 22-30): put the chain at the design pose (makes the design branch
 the nearest) → author transient driver mates pinning each free DOF (a real DRIVEN
 solve rewrites the copied mates' stored state) → delete the drivers. Put-alone

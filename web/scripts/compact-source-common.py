@@ -16,6 +16,7 @@ import json
 import math
 import re
 from functools import lru_cache
+import hashlib
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[1]
@@ -29,8 +30,26 @@ INPUT_FIELDS = ["crankTurns", "gearing", "magnification"] + [
 
 
 def load_observations(video_id, prefer_track=False):
-    suffix = "track" if prefer_track and (WEB / "content" / f"{video_id}.track.json").exists() else "observations"
-    return json.loads((WEB / "content" / f"{video_id}.{suffix}.json").read_text())
+    suffix = "track" if prefer_track and (WEB / "content" / "canonical-native" / f"{video_id}.track.json").exists() else "observations"
+    return json.loads((WEB / "content" / "canonical-native" / f"{video_id}.{suffix}.json").read_text())
+
+
+def historical_code_bytes(path, expected_sha256):
+    """Verify a sealed historical producer snapshot, never today's renderer.
+
+    These bytes establish only original evidence lineage. They do not qualify
+    canonical geometry, current code, or a new GPU/source comparison.
+    """
+    if not isinstance(expected_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
+        raise ValueError("Historical code evidence requires a SHA256 seal")
+    snapshot = WEB / "content/canonical-native/historical-code" / expected_sha256 / Path(path).name
+    try:
+        raw = snapshot.read_bytes()
+    except OSError as error:
+        raise ValueError(f"Historical producer snapshot unavailable: {path}") from error
+    if hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError(f"Historical producer snapshot changed: {path}")
+    return raw
 
 
 def needs_machine(frame, data):
@@ -398,37 +417,37 @@ def compact_composite(view):
 # These identities are supported by the retained anchor correspondence evidence:
 # fixed castings/support fasteners, not every unbound part or assembly descendant.
 FIXED_ANCHOR_PARTS = {
-    f"harmonic-analyzer/{group}/{name}-{index}"
+    f"ha-harmonic-analyzer/{group}/{name}-{index}"
     for group, name, indices in (
-        ("frame", "harmonic-base", (1,)), ("frame", "top-frame", (1,)),
-        ("frame", "tube-frame", range(1, 5)), ("frame", "tube-frame-cap", (4,)),
-        ("frame", "frame-cross-screw", range(1, 9)), ("frame", "fillister-screw", range(1, 5)),
-        ("frame", "nameplate", (1,)), ("frame", "rocker-arm-support", (1,)),
-        ("frame", "gooseneck-set-screw", (1,)),
-        ("channel", "pivot-shaft", (1,)), ("channel", "fulcrum-shaft", (1,)),
-        ("channel", "pivot-bracket", (1,)), ("channel", "pedestal-hold-down-screw", (2,)),
-        ("drive-train", "arbor-pedestal", (1, 2)),
-        ("drive-train", "pedestal-hold-down-screw", (1, 2)),
-        ("drive-train", "cone-lock-knob", (1,)), ("drive-train", "cone-pivot-screw", (1,)),
-        ("drive-train", "cylinder-gear-shaft", (1,)), ("drive-train", "cylinder-end-disc", (1,)),
-        ("drive-train", "pinion-pivot-shaft", (1,)),
-        ("magnifier", "wheel-bar", (1,)), ("magnifier", "wheel-axle-nut", (1,)),
-        ("magnifier", "clamp-screw", (1, 2)), ("magnifier", "column-clamp-front", (1,)),
-        ("paper-drive", "support-bar", (1,)), ("paper-drive", "clamp-screw", range(1, 5)),
-        ("paper-drive", "transgear-stub", (1,)), ("pen", "hanger-screw", (1,)),
+        ("fr-frame", "fr-harmonic-base", (1,)), ("fr-frame", "fr-top-frame", (1,)),
+        ("fr-frame", "fr-tube-frame", range(1, 5)), ("fr-frame", "vn-tube-frame-cap", (4,)),
+        ("fr-frame", "vn-frame-cross-screw", range(1, 9)), ("fr-frame", "vn-fillister-screw", range(1, 5)),
+        ("fr-frame", "fr-nameplate", (1,)), ("fr-frame", "fr-rocker-arm-support", (1,)),
+        ("fr-frame", "vn-gooseneck-set-screw", (1,)),
+        ("ch-channel", "ch-pivot-shaft", (1,)), ("ch-channel", "ch-fulcrum-shaft", (1,)),
+        ("ch-channel", "ch-pivot-bracket", (1,)), ("ch-channel", "vn-pedestal-hold-down-screw", (2,)),
+        ("dt-drive-train", "dt-arbor-pedestal", (1, 2)),
+        ("dt-drive-train", "vn-pedestal-hold-down-screw", (1, 2)),
+        ("dt-drive-train", "vn-cone-lock-knob", (1,)), ("dt-drive-train", "vn-cone-pivot-screw", (1,)),
+        ("dt-drive-train", "dt-cylinder-gear-shaft", (1,)), ("dt-drive-train", "dt-cylinder-end-disc", (1,)),
+        ("dt-drive-train", "dt-pinion-pivot-shaft", (1,)),
+        ("mg-magnifier", "mg-wheel-bar", (1,)), ("mg-magnifier", "vn-wheel-axle-nut", (1,)),
+        ("mg-magnifier", "vn-clamp-screw", (1, 2)), ("mg-magnifier", "sh-column-clamp-front", (1,)),
+        ("pd-paper-drive", "pd-support-bar", (1,)), ("pd-paper-drive", "vn-clamp-screw", range(1, 5)),
+        ("pn-pen", "vn-hanger-screw", (1,)),
     )
     for index in indices
 }
 FIXED_AXIS_ANCHORS = {
-    ("harmonic-analyzer/magnifier/magnifying-wheel-1", "wheel.center"),
-    ("harmonic-analyzer/paper-drive/transgear-knob-shaft-1", "feed-knob.center"),
-    ("harmonic-analyzer/paper-drive/transgear-knob-shaft-1", "transgear.knob.axis"),
-    ("harmonic-analyzer/paper-drive/transgear-knob-shaft-1", "paper-chain-axis"),
-    ("harmonic-analyzer/paper-drive/transgear-knob-shaft-1", "gta.paper.knob.axis"),
-    ("harmonic-analyzer/paper-drive/rack-pinion-1", "gta.paper.rack.axis"),
-    ("harmonic-analyzer/paper-drive/rack-pinion-1", "gta.paper.disc.axis"),
-    ("harmonic-analyzer/paper-drive/transgear-thumbnut-1", "gta.paper.upper.axis"),
-    ("harmonic-analyzer/paper-drive/transgear-removable-2", "gta.paper.lower.axis"),
+    ("ha-harmonic-analyzer/mg-magnifier/mg-magnifying-wheel-1", "wheel.center"),
+    ("ha-harmonic-analyzer/pd-paper-drive/pd-transgear-knob-shaft-1", "feed-knob.center"),
+    ("ha-harmonic-analyzer/pd-paper-drive/pd-transgear-knob-shaft-1", "transgear.knob.axis"),
+    ("ha-harmonic-analyzer/pd-paper-drive/pd-transgear-knob-shaft-1", "paper-chain-axis"),
+    ("ha-harmonic-analyzer/pd-paper-drive/pd-transgear-knob-shaft-1", "gta.paper.knob.axis"),
+    ("ha-harmonic-analyzer/pd-paper-drive/pd-rack-pinion-1", "gta.paper.rack.axis"),
+    ("ha-harmonic-analyzer/pd-paper-drive/pd-rack-pinion-1", "gta.paper.disc.axis"),
+    ("ha-harmonic-analyzer/pd-paper-drive/pd-transgear-thumbnut-1", "gta.paper.upper.axis"),
+    ("ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-2", "gta.paper.lower.axis"),
 }
 
 

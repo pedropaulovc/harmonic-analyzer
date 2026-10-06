@@ -174,9 +174,9 @@ async def main():
     log("created empty POC assembly (never saved)")
 
     # shafts (fixed vertical guides) + bushings (vertical sliders).
-    s_in1 = await _insert(adapter, "pivot-shaft", [X_IN1, IN_Y, 0.0], fixed=True)
-    s_in2 = await _insert(adapter, "pivot-shaft", [X_IN2, IN_Y, 0.0], fixed=True)
-    s_out = await _insert(adapter, "pivot-shaft", [X_OUT, OUT_SHAFT_Y, 0.0], fixed=True)
+    s_in1 = await _insert(adapter, "ch-pivot-shaft", [X_IN1, IN_Y, 0.0], fixed=True)
+    s_in2 = await _insert(adapter, "ch-pivot-shaft", [X_IN2, IN_Y, 0.0], fixed=True)
+    s_out = await _insert(adapter, "ch-pivot-shaft", [X_OUT, OUT_SHAFT_Y, 0.0], fixed=True)
     b_in1 = await _insert(adapter, "pivot-bushing", [X_IN1, IN_Y, 0.0], fixed=False)
     b_in2 = await _insert(adapter, "pivot-bushing", [X_IN2, IN_Y, 0.0], fixed=False)
     b_out = await _insert(adapter, "pivot-bushing", [X_OUT, OUT_BUSH_Y, 0.0], fixed=False)

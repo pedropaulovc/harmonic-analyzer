@@ -7,6 +7,9 @@ metadata:
   originSessionId: 1f309627-0ce3-4562-b4bc-935d4f44247a
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 The M6.4 summing-lever model (knife-edge TUBE + Ø14 bore on an external diamond
 knife-bar) is WRONG per the user (authoritative on the physical machine). The real
 summing lever:

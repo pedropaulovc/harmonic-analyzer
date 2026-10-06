@@ -7,6 +7,9 @@ metadata:
   originSessionId: ba03bcc4-d81e-4e71-bbc7-7926c9a87d29
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Phase F = build_motion_study.py (artifact B): throwaway Basic Motion
 (physical_simulation; MotionAnalysis UNLICENSED on this Makers seat) opening
 the static fully-defined harmonic-analyzer.SLDASM, never re-saving it. See

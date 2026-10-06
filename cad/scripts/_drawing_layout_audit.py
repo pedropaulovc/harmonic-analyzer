@@ -260,7 +260,7 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
                 "ls": round(float(reader.call(lambda i=index: data.GetTextLineSpacingAtIndex(i), 0.0)), 7),
             }
         )
-        # The run's own width (MHA-062, gdtdiag2: "BOTH CROWNS" 34.1 mm, as
+        # The run's own width (MHA-DT-019, gdtdiag2: "BOTH CROWNS" 34.1 mm, as
         # printed). Its GetTextInBoxHeightAtIndex twin read 0.0 there, so the
         # height stays GetTextHeightAtIndex.
         width = reader.optional(lambda i=index: data.GetTextInBoxWidthAtIndex(i))

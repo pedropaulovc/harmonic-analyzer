@@ -98,7 +98,7 @@ def _part_driver_names(adapter: Any, root: str, part: str) -> list[str]:
     """Names of every single-real DISTANCE/ANGLE driver pinning EXACTLY ``part``.
 
     For p0 only ONE bar is driven, so its drivers are matched by full instance
-    name (``amplitude-bar-7``), not family -- the other 19 bars stay pinned.
+    name (``ch-amplitude-bar-7``), not family -- the other 19 bars stay pinned.
     """
     names: list[str] = []
     for _f, _m, name, mtype, parts, _v in _iter_mates(
@@ -207,19 +207,19 @@ async def _drive_p1(adapter: Any) -> dict[str, str]:
     its tip-end vertical pivot (Axis1, "swing pivot"). The driven needle is
     the pivot POST: it rides the plate 194.5 from the pivot, so its arc
     proves the riders follow the swing."""
-    path = str(OUT_SLDASM / "drive-train.SLDASM")
+    path = str(OUT_SLDASM / "dt-drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
     mates = check("list mates", await adapter.list_mates())
     await _suppress(adapter, _gear_mate_names(mates), "p1 gear meshes")
     _assert_dof_already_free(_family_driver_names(
-        adapter, "drive-train", "cone-swing-platform", only_type=ANGLE),
+        adapter, "dt-drive-train", "dt-cone-swing-platform", only_type=ANGLE),
         "p1 cone-platform swing")
-    plate, plate_name = _find_one(adapter, "cone-swing-platform")
+    plate, plate_name = _find_one(adapter, "dt-cone-swing-platform")
     if plate is None:
         raise RuntimeError("p1: cone-swing-platform not found")
     motor_axis = _entity_ref(plate_name, "Axis1", "AXIS")
     return await _run_swing_study(
-        adapter, motor_axis, "cone-pivot-post",
+        adapter, motor_axis, "dt-cone-pivot-post",
         "p1 cone disengage", "drive-train-p1-cone-swing")
 
 
@@ -230,17 +230,17 @@ async def _drive_p2(adapter: Any) -> dict[str, str]:
     exactly the p1 locator pattern), then motor a strap about its pivot bore
     (Axis1, collinear with the torque shaft); the journaled pinion must ride
     the arc."""
-    path = str(OUT_SLDASM / "drive-train.SLDASM")
+    path = str(OUT_SLDASM / "dt-drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
     _assert_dof_already_free(_family_driver_names(
-        adapter, "drive-train", "pinion-bracket", only_type=ANGLE),
+        adapter, "dt-drive-train", "dt-pinion-bracket", only_type=ANGLE),
         "p2 pinion swing")
-    bracket, bracket_name = _find_one(adapter, "pinion-bracket")
+    bracket, bracket_name = _find_one(adapter, "dt-pinion-bracket")
     if bracket is None:
         raise RuntimeError("p2: pinion-bracket not found")
     motor_axis = _entity_ref(bracket_name, "Axis1", "AXIS")
     return await _run_swing_study(
-        adapter, motor_axis, "alignment-pinion",
+        adapter, motor_axis, "dt-alignment-pinion",
         "p2 pinion engage", "drive-train-p2-pinion-swing")
 
 
@@ -249,13 +249,13 @@ async def _drive_p0(adapter: Any) -> dict[str, str]:
     coefficient). ONE bar's amplitude DOF is already free (its drive spec is
     recorded, never authored -- the other 19 bars stay pinned by their own
     recorded specs), then motor it about its top-pin bore (Axis1)."""
-    path = str(OUT_SLDASM / "channel.SLDASM")
+    path = str(OUT_SLDASM / "ch-channel.SLDASM")
     check("open channel", await adapter.open_model(path))
-    bar, bar_name = _find_one(adapter, "amplitude-bar")
+    bar, bar_name = _find_one(adapter, "ch-amplitude-bar")
     if bar is None:
         raise RuntimeError("p0: amplitude-bar not found")
     _assert_dof_already_free(
-        _part_driver_names(adapter, "channel", bar_name), f"p0 amplitude ({bar_name})")
+        _part_driver_names(adapter, "ch-channel", bar_name), f"p0 amplitude ({bar_name})")
     motor_axis = _entity_ref(bar_name, "Axis1", "AXIS")
     return await _run_swing_study(
         adapter, motor_axis, bar_name,

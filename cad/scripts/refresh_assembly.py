@@ -16,8 +16,8 @@ Run (SolidWorks already open)::
 
     uv run python cad\scripts\refresh_assembly.py <stem>
 
-where ``<stem>`` is an assembly stem (``output``, ``drive_train``,
-``harmonic_analyzer``, ...); ``_`` and ``-`` are interchangeable.
+where ``<stem>`` is an assembly stem (``pd_paper_drive``, ``dt_drive_train``,
+``ha_harmonic_analyzer``, ...); ``_`` and ``-`` are interchangeable.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import sys
 from _common import run_build
 from _assembly import refresh_assembly
 
-USAGE = "usage: refresh_assembly.py <assembly-stem>  (e.g. paper-drive, drive-train)"
+USAGE = "usage: refresh_assembly.py <assembly-stem>  (e.g. pd-paper-drive, dt-drive-train)"
 
 
 def main() -> int:
@@ -44,7 +44,7 @@ def main() -> int:
         from _interference_contracts import allowed_interference_pairs
 
         native_contact_check = None
-        if asm_name in ("channel", "summing"):
+        if asm_name in ("ch-channel", "sm-summing"):
             from _native_spring_contact import assert_assembly_spring_contacts
 
             native_contact_check = assert_assembly_spring_contacts
@@ -55,11 +55,11 @@ def main() -> int:
             allowed_pairs=allowed_interference_pairs(asm_name),
             native_contact_check=native_contact_check,
         )
-        if asm_name == "harmonic-analyzer":
+        if asm_name == "ha-harmonic-analyzer":
             # The top assembly's eight-views gallery + parts-only BOM are not part
             # of the generic refresh tail; regenerate them on the still-open doc so
             # a subassembly change does not leave them stale (codex review #6).
-            from build_harmonic_analyzer_assembly import export_gallery_and_bom
+            from build_ha_harmonic_analyzer_assembly import export_gallery_and_bom
 
             artefacts.update(await export_gallery_and_bom(adapter))
         return artefacts

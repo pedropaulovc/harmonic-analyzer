@@ -102,7 +102,7 @@ sections:
       (the photographed 11.0" plate leaves only 1.6 mm in Z at the ±112 column
       stations, which manufacturing tolerances could consume). The columns stay
       at the photographed stations; only the base plate grew. Source of truth:
-      `cad/scripts/harmonic_base_spec.py` (TOP_WIDTH derivation).
+      `cad/scripts/fr_harmonic_base_spec.py` (TOP_WIDTH derivation).
       Frame column 107 cm is the top-down anchor for tube-frame length; 147 − 107 =
       40 cm of counter-spring rod arc above the frame.
 - heading: Chapter 26/29/8/9 — System-level facts (gear law, scale references)
@@ -181,16 +181,16 @@ sections:
         - '2026-09 re-derive from the ch30 FRONT view (p002 registered pair: 107 px hub-to-pivot vs the model''s 92 px at 66 -> 77, less ~2% perspective) cross-checked on the ch11 p.13 studio photo (~78 at the arm-width scale). The earlier 66 was scaled on the angle-90 side view, where the crank is the closest object to the camera and the base depth it was scaled against sits ~200 mm behind it. The crank hangs straight DOWN; with cone-pivot-post-v2 fixing Y_CRANK = 129.850 the handle axis sits 4.05 mm above the base top, the grip hanging in front of the base. SUPERSEDES 66 and the former ~150.'
         - scaled
         - med
-      - - Taper pin + keeper ring (MHA-024)
-        - '45-long 1:48 pin through separate hub MHA-137 + crankshaft only at local station 13.6 (world z −169.4); big end 4.45 proud of the hub barrel; round Ø10 brass wire ring (Ø1.0 wire, `crank-pin-ring` MHA-128) through a Ø2.1 cross-hole 3.7 from the big end, sized for the ring''s wire arc; tied to the arm''s wire eye (MHA-130) by one loop of keeper chain (MHA-149) through eye and ring, closed by an MHA-150 loop link (`keeper_chain_spec.py`)'
+      - - Taper pin + keeper ring (MHA-DT-009)
+        - '45-long 1:48 pin through separate hub MHA-DT-031 + crankshaft only at local station 13.6 (world z −169.4); big end 4.45 proud of the hub barrel; round Ø10 brass wire ring (Ø1.0 wire, `dt-crank-pin-ring` MHA-DT-027) through a Ø2.1 cross-hole 3.7 from the big end, sized for the ring''s wire arc; tied to the arm''s wire eye (MHA-DT-028) by one loop of keeper chain (MHA-VN-035) through eye and ring, closed by an MHA-VN-036 loop link (`vn_keeper_chain_spec.py`)'
         - —
-        - 'ch11 p.14 page002_img01 (removable pin head and brass ring) + primary crank construction photo; the hub #14 and shaft #9 pilots are match-reamed together. The arm is outboard of this station and is not drilled by MHA-024. The fillister anchor and wire eye remain on the arm; the chain is lost, and is reconstructed with McMaster 3606T118 #3 brass bead chain looped through both and joined by a 3606T811 loop link, each strand long enough to draw the pin fully out of the hub.'
+        - 'ch11 p.14 page002_img01 (removable pin head and brass ring) + primary crank construction photo; the hub #14 and shaft #9 pilots are match-reamed together. The arm is outboard of this station and is not drilled by MHA-DT-009. The fillister anchor and wire eye remain on the arm; the chain is lost, and is reconstructed with McMaster 3606T118 #3 brass bead chain looped through both and joined by a 3606T811 loop link, each strand long enough to draw the pin fully out of the hub.'
         - scaled + construction
         - med
       - - Handle length
         - '58 mm (slim egg grip; Ø15 × 7 collar at the arm; 2026-09-02 user re-read: the 44 egg was too stubby)'
         - '2.28'
-        - 'ch11 p.14 close-up (2026-09 re-derive): the grip is a short egg, widest ~28 from the collar, not a 90 baton — SUPERSEDES the p.12 arm-proportion read (`crank_handle_spec.py`)'
+        - 'ch11 p.14 close-up (2026-09 re-derive): the grip is a short egg, widest ~28 from the collar, not a 90 baton — SUPERSEDES the p.12 arm-proportion read (`dt_crank_handle_spec.py`)'
         - scaled
         - med
       - - Handle diameter
@@ -211,26 +211,26 @@ sections:
         - 'U29: 1 x 5/16-in cold-finished flat bar, width as supplied; the photograph ratio would give 23.6 at the 1.3x hub scale. Keeps the cheek around the Ø19.4 hub seat at 2.05 worst case (U27).'
         - user ruling
         - med
-      - - Separate crank hub MHA-137
-        - 'Ø19.4 × 8 through-seat; Ø22.25 rear barrel × 13.35 (z −175..−161.65; diameter at .XX, R9-38: the arm shoulder keeps a 0.255 radial land over the largest matched seat after both edge breaks) then a Ø16.50 × 3.85 chain-relief spigot (diameter at .XX, R9-37: a real #25 plate on the T12, floated on its pins, keeps 0.23 radial air) to overall length 25.2 ±0.10 from the front face (front face lined up flush with the MHA-026 dome root, z −183, before the MHA-024 match-ream) (rear face z −157.8, 0.7 air in front of the removable T12; the #25 plates wrapping the T12 pass over the relief, and a bought chain clears its shoulder by 0.2135 at print-worst even with the T12 floated forward onto the hub); Ø9.550 +0.030/−0.000 through bore'
+      - - Separate crank hub MHA-DT-031
+        - 'Ø19.4 × 8 through-seat; Ø22.25 rear barrel × 13.35 (z −175..−161.65; diameter at .XX, R9-38: the arm shoulder keeps a 0.255 radial land over the largest matched seat after both edge breaks) then a Ø16.50 × 3.85 chain-relief spigot (diameter at .XX, R9-37: a real #25 plate on the T12, floated on its pins, keeps 0.23 radial air) to overall length 25.2 ±0.10 from the front face (front face lined up flush with the MHA-DT-011 dome root, z −183, before the MHA-DT-009 match-ream) (rear face z −157.8, 0.7 air in front of the removable T12; the #25 plates wrapping the T12 pass over the relief, and a bought chain clears its shoulder by 0.2135 at print-worst even with the T12 floated forward onto the hub); Ø9.550 +0.030/−0.000 through bore'
         - —
         - 'primary construction photo and user-confirmed through-hub topology. The arm and hub are a matched light arbor-press fit against the shoulder; the bore reuses the project shaft-in-bushing fit, giving 0.025..0.075 diametral shaft clearance.'
         - derived construction
         - med
-      - - Axial seam pin MHA-138
+      - - Axial seam pin MHA-VN-029
         - 'Ø4 m6 dowel stock × 4.0, parallel to shaft at six o’clock, centre radius 9.7'
         - —
         - 'user selected the axial arm↔hub seam key after rejecting radial/Scotch alternatives; diameter is the stock dowel just under the U29 1.3x scale of the primary outboard ratio 0.59 (4.43), leaving a 2.05 worst-case hub web, and length is exactly half the 8-mm arm thickness. It does not intersect the shaft bore.'
         - scaled + stated topology
         - med
       - - Crankshaft diameter
-        - 9.525 mm (3/8") on the crank-hub seat and the removable-sprocket pilot; integral seat collar z −154.3..−144.5: Ø17.5 × 5.8 seat spigot (a bought #25 chain wrapping the T12 passes over it) then Ø20.6 body, 2 × Ø2.38 reamed blind drive-pin holes on Ø14 BC in the spigot face; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 111.3)
+        - 9.525 mm (3/8") on the crank-hub seat and the removable-sprocket pilot; integral seat collar z −154.3..−144.5: Ø17.5 × 5.8 seat spigot (a bought #25 chain wrapping the T12 passes over it) then Ø20.6 body, 2 × Ø2.38 reamed blind drive-pin holes on Ø14 BC in the spigot face; restored integral Ø11.388 journal runs directly in MHA-DT-005; the 16T pinion sits on a Ø9.0 seat step (local 111.3)
         - '0.375'
         - 'User ruling 2026-09-28 restores the integral running journal while retaining the single-cutter 16T seat and existing hub geometry. The smaller pinion root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst. The removable T12 seats on the collar''s front face (ch23 p.56 catalog shot: two drive pins through the sprocket); a Ø20.6 washer, faced at assembly to 0.50–4.00 from a 4.30 MIN blank, closes the collar to the post boss. The pin hole to spigot rim (0.56 nominal, 0.48 print-worst) is a named exception, User 2026-09-30.'
         - legacy
         - med
       - - Crankshaft bearing
-        - 'Integral Ø11.388 journal in the restored MHA-016 Ø11.438 crank bore; relieved middle Ø10.4, journal local stations 40.755105572..107.7 and relief 54.4..92.7.'
+        - 'Integral Ø11.388 journal in the restored MHA-DT-005 Ø11.438 crank bore; relieved middle Ø10.4, journal local stations 40.755105572..107.7 and relief 54.4..92.7.'
         - —
         - 'User ruling 2026-09-28: restore the journal and its relief. The shaft runs directly in the post, with the shaft_in_bushing clearance class; there is no separate crank bearing sleeve.'
         - derived
@@ -238,7 +238,7 @@ sections:
       - - Arm thickness
         - 8.0 mm
         - '0.315'
-        - primary construction photo; also fixes the MHA-137 shoulder station and MHA-138 half-depth
+        - primary construction photo; also fixes the MHA-DT-031 shoulder station and MHA-VN-029 half-depth
         - scaled
         - med
       - - Square-end overhang past pivot
@@ -260,9 +260,9 @@ sections:
         - construction
         - high
       - - Tapered-pin cross-hole
-        - '~Ø5 mm through MHA-137 rear barrel + shaft at local station 13.6'
+        - '~Ø5 mm through MHA-DT-031 rear barrel + shaft at local station 13.6'
         - ~0.20
-        - p.14 photo and removable MHA-024 small end; hub and shaft pilots are match-reamed to the custom 1:48 pin
+        - p.14 photo and removable MHA-DT-009 small end; hub and shaft pilots are match-reamed to the custom 1:48 pin
         - scaled
         - med
       - - Crankshaft length
@@ -274,10 +274,10 @@ sections:
   - prose: |2
 
       Construction: the wooden handle rotates on the metal arm. The arm is a matched
-      light arbor press fit on separate through hub MHA-137, against its inboard
-      shoulder. Axial pin MHA-138 is driven from the outboard face at six o'clock,
+      light arbor press fit on separate through hub MHA-DT-031, against its inboard
+      shoulder. Axial pin MHA-VN-029 is driven from the outboard face at six o'clock,
       parallel to the crankshaft, and keys only the arm/hub seam for 4 mm. Removable
-      taper pin MHA-024 crosses the hub and shaft behind the arm; removing it releases
+      taper pin MHA-DT-009 crosses the hub and shaft behind the arm; removing it releases
       the matched arm/hub assembly for gear service. Simple punched witnesses on the
       arm and shaft dome aid re-alignment; they are not machined dimples.
 
@@ -298,13 +298,13 @@ sections:
       - - Gear face width
         - 7 mm
         - '0.276'
-        - photo callout p.18 — historical 7 mm; the 2026-09-28 user-ruled touching stack instead sets the model face to 6.8887 ±0.025 (`cone_gear_spec.FACE_WIDTH`), one 6.888787817263312-mm seat pitch
+        - photo callout p.18 — historical 7 mm; the 2026-09-28 user-ruled touching stack instead sets the model face to 6.8887 ±0.025 (`dt_cone_gear_spec.FACE_WIDTH`), one 6.888787817263312-mm seat pitch
         - annotated
         - high
       - - Cone set axial length
         - 150 mm
         - '5.91'
-        - photo callout p.18; the 2026-09-28 model has twenty touching 6.8887 ±0.025 faces, accepted as a 137.774 ±0.20 stack (`cone_gear_stack.STACK_L20`); the adjacent 64T is 7.2113 ±0.025, bearing on the shaft collar. The photographed 150-mm arrow remains a separate, inconsistent historical annotation.
+        - photo callout p.18; the 2026-09-28 model has twenty touching 6.8887 ±0.025 faces, accepted as a 137.774 ±0.20 stack (`dt_cone_gear_stack.STACK_L20`); the adjacent 64T is 7.2113 ±0.025, bearing on the shaft collar. The photographed 150-mm arrow remains a separate, inconsistent historical annotation.
         - annotated
         - high
       - - Gear count
@@ -350,9 +350,9 @@ sections:
         - derived
         - high
       - - Cone shaft diameter
-        - 'stepped from the front end: Ø12.2308 journal shaft-local 0–43.011; Ø15.875 integral thrust collar shaft-local 43.011–44.6922184176 (north face supports the 64T south face and is the drawing length origin); Ø9.525 / 6.35 / 3.175 / 1.5875 gear lands with co-clocked local +X flats, nominal AF 8.763 / 5.842 / 2.921 / 1.460 respectively, each +0/−0.010. The three seat steps are 1.0 mm south of the T030/T024/T018 interfaces at cone stations 100.717 / 107.606 / 114.495; the Ø1.5875 land ends at shaft-local 201.6406869456 (cone station 139.7338259477). Its flat runs from the T018 step through the tip end, and the MHA-096 set-screw collar locks on it.'
+        - 'stepped from the front end: Ø12.2308 journal shaft-local 0–43.011; Ø15.875 integral thrust collar shaft-local 43.011–44.6922184176 (north face supports the 64T south face and is the drawing length origin); Ø9.525 / 6.35 / 3.175 / 1.5875 gear lands with co-clocked local +X flats, nominal AF 8.763 / 5.842 / 2.921 / 1.460 respectively, each +0/−0.010. The three seat steps are 1.0 mm south of the T030/T024/T018 interfaces at cone stations 100.717 / 107.606 / 114.495; the Ø1.5875 land ends at shaft-local 201.6406869456 (cone station 139.7338259477). Its flat runs from the T018 step through the tip end, and the MHA-VN-016 set-screw collar locks on it.'
         - 12.2308/9.525/6.35/3.175/1.5875
-        - 'The Ø12.2308 front journal runs in the Ø12.2808 post bore with 0.05 diametral clearance and spans the 42.011 post body plus 1.0 proud. The four shaft gear lands gain one milled flat each at the same +X clock. Gears are slip-fitted, faces touching from the collar-supported 64T through T006; the MHA-096 stock collar (McMaster 9414T1) is set 0.45 off T006 and its set screw locked on the terminal D-flat. Cone-axis station 139.7338259477 + shaft-local offset 61.9068609979 = shaft-local station 201.6406869456. The pivot does not shift.'
+        - 'The Ø12.2308 front journal runs in the Ø12.2808 post bore with 0.05 diametral clearance and spans the 42.011 post body plus 1.0 proud. The four shaft gear lands gain one milled flat each at the same +X clock. Gears are slip-fitted, faces touching from the collar-supported 64T through T006; the MHA-VN-016 stock collar (McMaster 9414T1) is set 0.45 off T006 and its set screw locked on the terminal D-flat. Cone-axis station 139.7338259477 + shaft-local offset 61.9068609979 = shaft-local station 201.6406869456. The pivot does not shift.'
         - legacy + derived
         - high
       - - Gear bores (configured `BoreDia`, with matching D-flat)
@@ -371,7 +371,7 @@ sections:
 
       Notes: all 20 gears rotate together on one D-flat shaft. Their 6.8887 ±0.025
       faces touch from the collar-supported 64T to T006; accept the twenty-gear
-      stack at 137.774 ±0.20. The MHA-096 set-screw collar is pushed onto a
+      stack at 137.774 ±0.20. The MHA-VN-016 set-screw collar is pushed onto a
       0.45 mm feeler against T006 and locked on the D-flat, for 0.35–0.55 mm
       stack end play; the tip block never touches it.
       Engagement with cylinder gears is oblique (partial engagement → distinct
@@ -384,8 +384,8 @@ sections:
       to align the gears without adhesive: a deliberate departure from that
       photographed detail. The cone set pivots out of engagement for sine/cosine
       alignment (ch. 25). The 6-tooth involute is severely undercut at standard
-      proportions, so `build_cone_gear.py` models stub-form gap floors. All 20
-      tooth counts are configurations T006..T120 of `cone-gear.SLDPRT` with
+      proportions, so `build_dt_cone_gear.py` models stub-form gap floors. All 20
+      tooth counts are configurations T006..T120 of `dt-cone-gear.SLDPRT` with
       configured bores. The separate dark 64T beside T120 engages the crank (p.20).
 - heading: Chapter 13 — Cylinder Gear Set (pp. 22–25)
   elements:
@@ -472,13 +472,13 @@ sections:
         - derived
         - low
       - - Cylinder bank thrust washers ×2 (#743, 2026-09-25)
-        - Ø25 × Ø9.6 × 1.50 ±0.05 turned steel washer, one between each end gear and its arbor-pedestal strap (MHA-121)
+        - Ø25 × Ø9.6 × 1.50 ±0.05 turned steel washer, one between each end gear and its arbor-pedestal strap (MHA-DT-026)
         - '0.98'
-        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap, the front one is feeler-set 0.45 off the front strap (`cylinder_bank_layout.py`, `build_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
+        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap, the front one is feeler-set 0.45 off the front strap (`cylinder_bank_layout.py`, `build_dt_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
         - derived
         - med
       - - Arbor ends and set screws (#743, 2026-09-25)
-        - arbor ends domed, 1.5 proud of each strap; one #4-40 × 1/4 cup-point set screw in each pedestal crown apex (MHA-147)
+        - arbor ends domed, 1.5 proud of each strap; one #4-40 × 1/4 cup-point set screw in each pedestal crown apex (MHA-VN-034)
         - '0.06'
         - 'p.23/25 + ch25 p.67: the bright dome on each pedestal is the arbor end; ch12 p.18 and the user ruling on #743 (Q3) put a set screw at each strap apex. Supersedes the Ø10 dome cap screw MHA-125 (`build_dome_cap_screw.py`, deleted)'
         - derived
@@ -490,7 +490,7 @@ sections:
       rotation to near-sinusoidal reciprocation of the rod → rocker arm. Notches aligned
       to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
 
-      M4 build (`build_cylinder_gear.py`): single non-configured part — 120T involute
+      M4 build (`build_dt_cylinder_gear.py`): single non-configured part — 120T involute
       ring (cone-gear equation-curve technique, toothed-disc volume reproduces the
       cone gear's T120 configuration), integral cam boss (lobe +Y, toward the
       notch: the ch14 end views show the 0-crank tip row LEVEL at the TOP of the
@@ -513,7 +513,7 @@ sections:
       ch. 25 setup pinion (turns all 20 gears as one only after the cone pivots
       out of engagement). The legacy `parameters.kcl` cam keyway (3.2 × 1.5) and
       matching shaft keyseat were legacy fiction — both removed in M6.2
-      (`build_cylinder_gear.py`, `build_cylinder_gear_shaft.py`).
+      (`build_dt_cylinder_gear.py`, `build_dt_cylinder_gear_shaft.py`).
 
       ### Drive-train layout (M6.2, eight-views 0°/90° + ch. 12 p.18 top-down)
 
@@ -569,12 +569,12 @@ sections:
         - 'M6.7: a perpendicular gear''s contact tooth sits r·sin i along-shaft south of its centre, so each centre rides r_j·sin i NORTH of its drum plane. The +55 ± 5 photo blob NO LONGER agrees in x (the smaller cone pulled the big-end inboard to +13.9) — flagged consequence of the 62.2 anchor'
         - low
       - - 64T drive gear
-        - perpendicular on the 3/8" land at effective shaft station −12.109, centre (x, z) = (−123.312, −64.454), 7.2113 mm face; its south face bears on the MHA-014 thrust collar (unchanged) and its north face touches T120's south face (no axial air)
+        - perpendicular on the 3/8" land at effective shaft station −12.109, centre (x, z) = (−123.312, −64.454), 7.2113 mm face; its south face bears on the MHA-DT-004 thrust collar (unchanged) and its north face touches T120's south face (no axial air)
         - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. User ruling 2026-09-28 grows the face 6.5 → 7.2113 mm northward from the unchanged collar face until it meets T120, the first joint of the solid gear stack; its D-bore locates it rotationally. The south face does not move; with the post's ConeBossLen printed .XX (user ruling 2026-09-29), the v36 post's print-worst crank boss clearance is 0.479 mm (the 64T turned 0.05 long in addendum, R9-56), above its 0.25 floor. The fixed-centre mesh is required not to bind; the re-measured backlash study keeps ≥ 0.162 mm at the tightest corner.
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −84.702 − (30.59 − 1.5295j)·cos i, z_j = −31.685 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 90.518; ALL 20 perpendicular to the shaft (true cone, p.18)
-        - 'M6.7 exact tracking: the 20 mesh-derived centres are collinear iff sin i = 1.5295/7.0565 (asserted in `build_drive_train_assembly.py`); elegance check: tan(cone half-angle) = 1.5295/6.889 = tan i, so the drum-side generator runs parallel to the drum axis — the p.18 seam'
+        - 'M6.7 exact tracking: the 20 mesh-derived centres are collinear iff sin i = 1.5295/7.0565 (asserted in `build_dt_drive_train_assembly.py`); elegance check: tan(cone half-angle) = 1.5295/6.889 = tan i, so the drum-side generator runs parallel to the drum axis — the p.18 seam'
         - low
       - - Cylinder arbor (stationary)
         - 'x = −60.394, y = 90.518 (v2-derived drive height), along Z, spans z −86.912..+100.088 (length 187): the arbor follows the recentered gear/channel family while the post remains fixed.'
@@ -585,15 +585,15 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.5-mm shaft spans z −183..−45.5 with its integral dome outboard. Its integral seat collar spans z −154.3..−144.5 (the removable T12 seats on its front face, sprocket −157.1..−154.3); the MHA-172 washer, faced at assembly to 0.50–4.00 from a 4.30 MIN blank, closes it to the post boss. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 2.1 north, 9.5 → 11.6 mm (user ruling 2026-09-30, then rulings R9-55 and R9-56): full OD over the 8.5 shoulder, the north 3.1 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.6 mm overall. Its Ø3.175 pin station, 18.6, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.6.'
+        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.5-mm shaft spans z −183..−45.5 with its integral dome outboard. Its integral seat collar spans z −154.3..−144.5 (the removable T12 seats on its front face, sprocket −157.1..−154.3); the MHA-DT-036 washer, faced at assembly to 0.50–4.00 from a 4.30 MIN blank, closes it to the post boss. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 2.1 north, 9.5 → 11.6 mm (user ruling 2026-09-30, then rulings R9-55 and R9-56): full OD over the 8.5 shoulder, the north 3.1 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.6 mm overall. Its Ø3.175 pin station, 18.6, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.6.'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
         - crank T12 sprocket on the restored fixed axis (−129.336, 129.850, z −155.7 chain plane) up to the transgear knob-shaft T24; ANSI #25 link count and sag are solved by _chain.py from those centres
-        - v2 cast-in crank-axis cascade; both sprockets share one band −157.1..−154.3, chain plane −155.7 (`transgear_removable_spec`)
+        - v2 cast-in crank-axis cascade; both sprockets share one band −157.1..−154.3, chain plane −155.7 (`pd_transgear_removable_spec`)
         - med
       - - Cone pivot
-        - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post; the thin tip is end-play located by the cup-ended adjuster carried in the black block, and the MHA-096 set-screw collar retains the gear stack on the shaft. The post and block both stand ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
+        - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post; the thin tip is end-play located by the cup-ended adjuster carried in the black block, and the MHA-VN-016 set-screw collar retains the gear stack on the shaft. The post and block both stand ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
         - p.18 + ch. 12 notes; v4 stills (t00393/t00396/t00417 engage/disengage)
         - high
   - prose: |2
@@ -607,52 +607,52 @@ sections:
       - source
       - confidence
       rows:
-      - - '`arbor-pedestal` ×2 (south + north; ch30 GT height; PR3 reshape)'
+      - - '`dt-arbor-pedestal` ×2 (south + north; ch30 GT height; PR3 reshape)'
         - 'black japanned casting: foot flange 24 × 16 × 5 + tapered strap 10 thick (Z) narrowing 24 → 20 wide up to a R10 semicircular dome, 49.718 tall total; Ø9.5 clamp bore along Z at height 39.718 (bore abs y 90.518), cascaded from the v2 post drive line'
         - 'at (−53.216, −55.085) south and (−53.216, +132.915) north; the 187-mm arbor spans z −54.585..+132.415 and seats inside both pedestal bores. Both supports translate with the cylinder bank and the rear frame/base extension.'
         - ch30 GT (cyl_front); shape from still t00393 / v4_pinion_008 (base:top taper ~1.2, scaled off the 120T OD 62.2)
         - med (GT height; shape photo-scaled)
-      - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
+      - - '`dt-cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
         - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 16 east / 8 west (north, pivot) → east 24 / west 37 (south, big end) over 223.354 along the cone axis; south edge leaves 3.175 mm (1/8 in) beyond the Ø42.011 cone-pivot-post south rim; two native 1/4-20 UNC-2B through taps derive from the post''s 25.96 attachment pitch; the north-west trim leaves 0.370 mm exact plan clearance to the recentered north arbor pedestal; plan corners are NE R10 / NW R8 / SW R5 / SE R12; native 1/4-in close-clearance pivot hole Ø6.756 clears the pivot screw''s stock Ø6.35 shoulder without imposing an unsupported precision bearing fit; Ø10.50 × 0.25-deep top relief leaves 6.10 local pivot-bearing thickness; 8-wide OPEN lock notch follows the R208.436 swing chord from its closed centre 33.00 west / 205.808 south of the pivot; carries the fixed part-local crank-axis reference 41.654 east of the pivot and 79.05 above the plate bottom; plate top remains y 57.15'
         - 'FLOATED, pivot at cone station 152.272 = (−87.683, +96.019) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft, tip block and crank rig all ride it. The p1 disengage DOF remains FREE by default and sweeps 4.686°. The post and carrier retain their rederived world placement; only the working cone/cylinder/channel family is recentered along the unchanged cone-bore line. The base preserves its front edge and extends only at the rear.'
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; v2 envelope/mount cascade from cone-pivot-post-v2.SLDPRT, whose height was manually rederived from ch30 Eight Views image 2 (page003_img01.png) and whose proportions follow ch11 page002_img05.jpeg / page002_img06.jpeg
         - med (role high, dims low)
-      - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
+      - - '`dt-cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
         - 'Restored v36 green cast body: Ø42.011 × 86.0 tall, with Ø42.7506 × 26.6 upper head (y 59.4..86); straight crank boss Ø21.93 with Ø11.438 running bore on the body centreline at y 72.7, harvested length 2.8360 in (72.0344 mm), with no north spot face. Inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, yawed 12.5182° about the vertical body axis. The crank bore retains its diametral angularity frame; later nongeometric drawing improvements remain. Two vertical ANSI-inch 1/4 fillister counterbores moved inward onto 25.96 centres for the Ø42.8 head wall (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
         - 'stands on the cone swing platform at exact Ry180, cross-pairing the two mounting-hole axes and putting the crank boss outside the machine. The post and carrier retain the ch30-fitted +1.484 X / +35.415 Z world placement. The working cone/cylinder/channel family is independently recentered 33.115 mm toward the post along its unchanged inclined bore; the post fit is not a machine-wide translation.'
         - 'User ruling 2026-09-28 restores the v36 post geometry, including its Ø42.7506 head. Manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png), with proportions from ch11 page002_img05.jpeg and page002_img06.jpeg; other feature dimensions harvested from cone-pivot-post-v2.SLDPRT.'
         - 'med (86 mm height and proportions photo-derived; other restored v36 feature dimensions exact)'
-      - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
-        - 'black steel straight prism 17 × 9.750 × 47.93 tall standing directly on the swing platform (2026-09-29 user ruling, eight-views-4 photo); #10-32 UNF-2B thread tapped THROUGH on the cone axis 33.368 above the foot (±0.10), 90° countersinks to Ø5.0 both ends, carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit, floor 0.65 below the axis, crossed by the #4-40 pinch joint 42.22 above the foot, 8.85 over the axis (McMaster 91794A112, head on the +X (west) face); held down by one #4-40 × 3/8 socket head cap screw (MHA-140, McMaster 91251A108) from under the platform into a blind tapped hole in the foot, 1.00 east of the cone axis like the platform''s hold-down hole off the cone line (both ±0.10). Width and depth print .XXX for the platform containment, the adjuster''s embed window and the collar air. No shim, flange, slot or heel.'
+      - - '`dt-cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
+        - 'black steel straight prism 17 × 9.750 × 47.93 tall standing directly on the swing platform (2026-09-29 user ruling, eight-views-4 photo); #10-32 UNF-2B thread tapped THROUGH on the cone axis 33.368 above the foot (±0.10), 90° countersinks to Ø5.0 both ends, carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit, floor 0.65 below the axis, crossed by the #4-40 pinch joint 42.22 above the foot, 8.85 over the axis (McMaster 91794A112, head on the +X (west) face); held down by one #4-40 × 3/8 socket head cap screw (MHA-VN-030, McMaster 91251A108) from under the platform into a blind tapped hole in the foot, 1.00 east of the cone axis like the platform''s hold-down hole off the cone line (both ±0.10). Width and depth print .XXX for the platform containment, the adjuster''s embed window and the collar air. No shim, flange, slot or heel.'
         - 'centre (−89.948, +85.818) = cone shaft station 141.822, standing ON the swing platform beside T006; north face 146.697 (5.575 south of the pivot, the pivot-screw head''s air, ≥ 0.20 at print-worst), south face 136.947, which the block grows toward. At the 7.38 mm nominal adjuster engagement (1.0D working window 5.31..9.14, 5.35..9.10 at print-worst), the shaft tip contacts the McMaster 94025A164 conical cup apex at station 139.734.'
         - 'ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry); 2026-09-21 user-approved DFM correction grows only the block top and controls the pinch axis relative to the unchanged adjuster axis'
         - med (GT-anchored)
-      - - '`cone-lock-knob` (clamps the swing plate engaged/disengaged)'
+      - - '`vn-cone-lock-knob` (clamps the swing plate engaged/disengaged)'
         - 'McMaster-Carr 93585A190 18-8 stainless steel high-profile knurled-head thumb screw: Ø15.875 × 12.7 knurled head (131 straight ridges, 0.794 × 45° rim chamfers) with no collar, over a 1/4-20 stud (Ø6.35) 19.05 long; the head underside seats on the plate top and the stud passes through the open notch into the base tap. Through the 6.35 plate, engagement is 12.70 gross and 11.7475 full-profile after the 0.9525 tip chamfer. The base has 19.30 full thread depth and 25.65 drill depth before the drill point, accepting the full stud when the head seats on the bare base.'
         - 'base-bolted STATIC at (−100.076, −112.048), head seat y 57.15; the PLATE is the mover. Loosen the knob and its open notch sweeps past the stationary stud 2.610 mm to the mouth, then swings clear (4.686° total from the southern 33-mm notch-seat cascade, leaving 6.5 mm designed head clearance at the stop). The notch seat keeps the station fixed for the former Ø25.4 head; the Ø15.875 head clears the pivot post by 6.76 and the T120/64T gear row; tightened with no plate under it, the head fences the mouth and locks the plate DISENGAGED ("Unscrewing this knob allows the cone gear set to swing away", v4 6:48).'
-        - McMaster-Carr 93585A190 recipe (`cad/scripts/diagnostics/diag_build_93585A190.py`, gated against the supplied SLDPRT); engagement and depths from `cad/scripts/build_cone_lock_knob.py` and `cad/scripts/build_harmonic_base.py`; v4_t00411 ("knob" label) + v4_t00417 top view; ch12 p.16 text
+        - McMaster-Carr 93585A190 recipe (`cad/scripts/diagnostics/diag_build_93585A190.py`, gated against the supplied SLDPRT); engagement and depths from `cad/scripts/build_vn_cone_lock_knob.py` and `cad/scripts/build_fr_harmonic_base.py`; v4_t00411 ("knob" label) + v4_t00417 top view; ch12 p.16 text
         - high (stock dimensions exact; function and placement derived)
-      - - '`cone-pivot-screw` (the physical p1 pivot pin)'
+      - - '`vn-cone-pivot-screw` (the physical p1 pivot pin)'
         - 'McMaster-Carr 91829A560 slotted 18-8 stainless precision shoulder screw — head Ø9.525 × 4.7625, ground Ø6.35 shoulder × 6.35, followed by a 9.525-long #10-24 UNC-2A threaded tail; 15.875 total under-head length; tail engages a matching blind #10-24 UNC-2B bottoming-tapped base seat with 9.775 full thread depth (0.25 tip reserve), 12.00 cylindrical drill depth and 2.225 tap lead before the drill point'
         - 'base-threaded STATIC at the swing pivot (−87.683, 96.019); shoulder bottoms on the base top while the platform''s Ø10.50 × 0.25-deep relief leaves 6.10 local bearing thickness and 0.25 axial running clearance below the head; the harmonic base carries the matching blind #10-24 UNC-2B tap (agreement asserted in the drive-train assembly)'
         - McMaster-Carr 91829A560 model + v4 top stills (slotted head at the plate tip)
         - med (role high, dims low)
-      - - '`swing-stop-screw` (p1 travel limit)'
+      - - '`vn-swing-stop-screw` (p1 travel limit)'
         - 'McMaster-Carr 90280A108 steel narrow fillister-head slotted screw, the foot screw''s SKU (user decision 2026-09-29): head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 9.525, screwed fully home (full 9.525 embed, 3.35D) so the head seats on the base top and its whole 2.7178 height sits inside the 6.35 platform edge (below the tolerance-low plate top); the head is the stop. The base receiver has 10.3 full thread depth and 14.5 drill depth before the drill point.'
         - 'base-threaded STATIC at (−140.050, +2.403), derived so the 223.354-long plate''s EAST taper edge just touches the head flank at the 4.686° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 8.569 mm signed clearance to the head (derived and asserted against the base hole).'
-        - 'McMaster-Carr 90280A108 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
+        - 'McMaster-Carr 90280A108 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_vn_swing_stop_screw.py` and `cad/scripts/build_fr_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
-      - - '`cone-tip-collar` (MHA-096 set-screw collar retaining the gear stack)'
+      - - '`vn-cone-tip-collar` (MHA-VN-016 set-screw collar retaining the gear stack)'
         - 'McMaster-Carr 9414T1 black-oxide steel set-screw shaft collar: Ø6.35 (1/4 in) OD × 4.7625 (3/16 in) wide, Ø1.5875 (1/16 in) bore, one #2-56 cup-point set screw'
         - 'on the shaft''s terminal land at cone-axis stations 129.7223..134.4848: pushed onto a 0.45 feeler against T006 and its set screw locked on the D-flat, so the collar, not the tip block, holds the 0.35–0.55 stack float. Its north face stays 2.46 south of the tip block (≥ 0.11 at print-worst); it never touches the block.'
         - McMaster-Carr 9414T1 (stock); v4_t00471 / 7:49 (collar between the smallest gear and the tip block); user ruling 2026-09-29
         - high (stock dimensions exact; role by user ruling)
-      - - '`cone-tip-adjuster` (axial end-play screw, partially hollow)'
+      - - '`vn-cone-tip-adjuster` (axial end-play screw, partially hollow)'
         - McMaster-Carr 94025A164 slotted 18-8 stainless #10-32 × 3/8 cup-tip set screw (rule-12 E11); vendor 45° conical cup depth 1.2065 from the cup rim to its apex (Sketch2 Line7)
-        - 'threaded into the tip block''s north face (through #10-32 tap) to 7.38 mm nominal engagement, never under 1.0D of full thread at print-worst (user-ruled exception to 1.5D: it carries only the shaft''s end-play thrust), its cup seating the shaft tip at cone-axis station 139.734; run in until the shaft just stops shuttling, back off 1/8 turn for 0.05–0.25 mm shaft end play, then lock with the block''s slit and pinch screw. The stack''s 0.35–0.55 mm float is the MHA-096 collar''s, set by its 0.45 feeler.'
+        - 'threaded into the tip block''s north face (through #10-32 tap) to 7.38 mm nominal engagement, never under 1.0D of full thread at print-worst (user-ruled exception to 1.5D: it carries only the shaft''s end-play thrust), its cup seating the shaft tip at cone-axis station 139.734; run in until the shaft just stops shuttling, back off 1/8 turn for 0.05–0.25 mm shaft end play, then lock with the block''s slit and pinch screw. The stack''s 0.35–0.55 mm float is the MHA-VN-016 collar''s, set by its 0.45 feeler.'
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
-      - - '`cone-tip-pinch-screw` (locks the adjuster)'
+      - - '`vn-cone-tip-pinch-screw` (locks the adjuster)'
         - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 15.875 (rule-12 E1: 6.26 = 2.20D of far-jaw thread, from the slit''s far wall, at the printed worst case; tip 0.995 inside the -X face at the width minimum).'
         - 'across the tip block''s top slit (head on the +X (west) face, y 110.35): the near jaw is normal-clearance and the far jaw is native #4-40 UNC-2B; tightening pinches the slit closed around the #10-32 adjuster so its end-play setting cannot back off.'
         - McMaster-Carr 91794A112 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
@@ -782,11 +782,11 @@ sections:
       - confidence
       rows:
       - - Pivot shaft
-        - 'Ø6.35 along Z at (x, y) = (+72.9, 253.8); #743 PR2 (Reading 1): turned from Ø10 bar with an integral Ø10 × 1.5 shoulder on the north ear''s inner face, the cylinder spanning both ears (cut to fit, nominal 156.6) and each end domed 1.5 proud; the rocker stack closes south on the Ø10 × 1.5 MHA-148 washer, feeler-set 0.45 to the south ear (`rocker_bank_layout.py`). Was 170, centred on the stack mid-plane'
+        - 'Ø6.35 along Z at (x, y) = (+72.9, 253.8); #743 PR2 (Reading 1): turned from Ø10 bar with an integral Ø10 × 1.5 shoulder on the north ear''s inner face, the cylinder spanning both ears (cut to fit, nominal 156.6) and each end domed 1.5 proud; the rocker stack closes south on the Ø10 × 1.5 MHA-CH-009 washer, feeler-set 0.45 to the south ear (`rocker_bank_layout.py`). Was 170, centred on the stack mid-plane'
         - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The fixed support remains at its old world location while the channel bank recenters to z +3.088 and the longer rocker lever reaches drum x −60.394.'
         - med (x, y photo + frame; dia low)
       - - Support casting ×1 (windowed rocker-arm support)
-        - 'green 177.8 × 177.8 windowed casting, 63.5 thick tapering to 16.94 at the apex, authored window-normal local Z and installed Ry+90 at its original machine location (+72.9, 0). Three measured p2 reliefs follow the recentered pivot rig while retaining the guarded ligaments to the four 5/16 hold-down clearance drills (`cad/scripts/build_rocker_arm_support.py`).'
+        - 'green 177.8 × 177.8 windowed casting, 63.5 thick tapering to 16.94 at the apex, authored window-normal local Z and installed Ry+90 at its original machine location (+72.9, 0). Three measured p2 reliefs follow the recentered pivot rig while retaining the guarded ligaments to the four 5/16 hold-down clearance drills (`cad/scripts/build_fr_rocker_arm_support.py`).'
         - 'front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6. M6.9 REINSTATED the windowed-frame reading M6.3/M6.5 refuted: ch30 p008 (+x side, brightened) plainly shows the windowed portal frame (~184 wide, ~127 window). The p008 uprights read ~28–40 deep and near-uniform → side depth 40 → 20 (supersedes the legacy 63.5 → 16.9 strong taper). M6.5''s refutation of a second free-standing SOUTH frustum stands (the calibrated v3 side view shows ONE frustum at the back, z +69..+134 footprint; the south ball is gripped by the clevis). M6.12: photo Z-scale is perspective-compressed, so the casting''s Z geometry stays anchored on the mechanically-locked neighbours (both pivot balls, the channel grid, the parked stick z ≤ −118; the "ch25 handle z ≥ −98" pin is OBSOLETE — the restored ch30-GT alignment pinion carries its tee handle at z −144, well south of the plate — the band now rests on the stick + photo read alone).'
         - photo + legacy height
         - med
@@ -796,11 +796,11 @@ sections:
         - med
       - - Hold-down hex-head screws ×4 (M6.10)
         - 'McMaster 92240A540 18-8 stainless hex-head screws install top-down: 1/4-20 UNC-2A, 3/4 in nominal under-head length, fully threaded, 7/16 in across flats × 5/32 in head, ASME B18.2.1. Each exact vendor-modeled 0.277813 mm under-head washer transition bears on the support; the shank passes through a 5/16 drill in the 6.35-thick foot into a blind 1/4-20 UNC-2B base seat at machine (x, z) = (55.44 or 90.36, −60.32 or +60.32). Installed engagement is 12.422187 mm (1.956D); the seat is sized at its printed .XX worst case: full thread 13.20 mm (engagement + 0.25 tip reserve + 0.51 band, rounded up to 0.05), cylindrical tap-drill depth 20.60 mm (full thread + 2 x 0.51 band + five 1.27 mm pitches). No underside counterbore.'
-        - 'four-hole pattern and foot thickness from `cad/scripts/build_rocker_arm_support.py`; base thread/drill contract from `cad/scripts/build_harmonic_base.py`; purchased identity from `cad/scripts/build_lag_screw.py`; supplied vendor SLDPRT harvested read-only and matched by `cad/scripts/diagnostics/diag_build_92240A540.py`; placed in frame.SLDASM'
+        - 'four-hole pattern and foot thickness from `cad/scripts/build_fr_rocker_arm_support.py`; base thread/drill contract from `cad/scripts/build_fr_harmonic_base.py`; purchased identity from `cad/scripts/build_vn_lag_screw.py`; supplied vendor SLDPRT harvested read-only and matched by `cad/scripts/diagnostics/diag_build_92240A540.py`; placed in fr-frame.SLDASM'
         - high (catalog + native vendor model + assembly contract)
       - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
-        - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear 14 × 6 arched R7 about the Ø6.5 shaft bore at 25.2 above the seat (#743 PR2: the bright dome on the ear is the shaft''s own domed end, so the brazed Ø16 ball is gone); north bracket turned Ry180 in channel.SLDASM'
-        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at the rocker_bank_layout ear stations (north ear inner face on the shaft shoulder, south feeler-set) so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_pivot_bracket.py`)'
+        - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear 14 × 6 arched R7 about the Ø6.5 shaft bore at 25.2 above the seat (#743 PR2: the bright dome on the ear is the shaft''s own domed end, so the brazed Ø16 ball is gone); north bracket turned Ry180 in ch-channel.SLDASM'
+        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at the rocker_bank_layout ear stations (north ear inner face on the shaft shoulder, south feeler-set) so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_ch_pivot_bracket.py`)'
         - scaled
         - med
       - - Rocker-arm pivot hubs (integral; the ×19 spacer bushings are retired 2026-09-02)
@@ -825,7 +825,7 @@ sections:
       arms rest LEVEL (tilt 0 — the ch14 end views show the 0-crank tip row
       flat at the TOP of the stroke), rods plumb (tilt 0); the ±ecc 8.64 cam
       throw swings each tip ±9.46 about that level line.
-      Re-authored as `cad/scripts/build_rocker_arm.py` (supersedes the legacy
+      Re-authored as `cad/scripts/build_ch_rocker_arm.py` (supersedes the legacy
       `oscilating-arms` part, which had no surviving source).
 - heading: Chapter 15 — Amplitude Bars (pp. 30–33)
   elements:
@@ -939,9 +939,9 @@ sections:
         - stated
         - high
       - - Scale span (10 divisions)
-        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `measuring-stick-numerals.dxf`)
+        - 142 mm (14.20 per division; nine 1.42-pitch minor ticks per division; 0.5 end margin at the 10 end); numerals 0-10 engraved 2.0 high, turned 90° with their tops toward the 10 end, 0.6 past each full tick (2026-09-02, `ha-measuring-stick-numerals.dxf`)
         - '5.59'
-        - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_measuring_stick.py`)'
+        - 'pp.34–37 plates re-read 2026-09 (the earlier 80 mm was a low read): the ruling runs ~0.71 of the 200 bar with tenths between the numbered ticks; close to the 146.05 half-arm (ch.14), so the face is near 1:1 mm — see notes (`build_ha_measuring_stick.py`)'
         - scaled
         - med
       - - Body thickness
@@ -953,7 +953,7 @@ sections:
       - - Stop block (2026-09)
         - 'black 12 mm cube with a closed 8.4 × 3.4 window for the bar (floor 4.0 up) and a Ø7 × 3.5 knurled thumbscrew UNDERNEATH (2026-09-02, p.34: square block, screw below); parked at the 2 mark, so the stick stands propped on the block 7.95 above the deck'
         - —
-        - 'pp.34–35: the sliding/locking stop the text names sits on the bar as a small dark block with a bright screw head (`build_measuring_stick_stop.py`)'
+        - 'pp.34–35: the sliding/locking stop the text names sits on the bar as a small dark block with a bright screw head (`build_ha_measuring_stick_stop.py`)'
         - scaled
         - low
   - prose: |2
@@ -1027,7 +1027,7 @@ sections:
       - - Lever length (fulcrum→spring hole c2c)
         - 175.05 mm
         - '6.89'
-        - 'M6.4: the 254 "clean 2:1" guess (and the M2 ~240 scaling) is photo-REFUTED — calibrated ch. 30 front view: the lever bank ends at x ≈ −30, the summing-lever plate (pivot bolt read x ≈ +13..17, plate 44.45 wide) sits directly under the tab line, and the 32 mm springs can only bridge tab → plate at x ≈ −22; p.39 shows the bar pin ~5 bar-heights from the tip (50.8/9.5 ✓, 127/9.5 ✗). Bar pin stays at 127 (bar line −72.9, high). SUPERSEDES the 177.8 (7") photo round-number 2026-09-14: the reach is now SET by the vertical spring axis — the hook hole must stand plumb over the summing-lever anchor at |x| 24.85 (knife −15 + `summing_lever_spec.HOLE_X` 39.85), so c2c = |x| 199.9 fulcrum − 24.85 = 175.05 (the neutral lever tilt −0.0022° adds 1.3e−7, far below the ±0.10 hook-arm allocation). 7" left the spring leaning 2.75 mm off plumb → motion ratio 175.05/127 = 1.378 (`channel_lever_spec.py`)'
+        - 'M6.4: the 254 "clean 2:1" guess (and the M2 ~240 scaling) is photo-REFUTED — calibrated ch. 30 front view: the lever bank ends at x ≈ −30, the summing-lever plate (pivot bolt read x ≈ +13..17, plate 44.45 wide) sits directly under the tab line, and the 32 mm springs can only bridge tab → plate at x ≈ −22; p.39 shows the bar pin ~5 bar-heights from the tip (50.8/9.5 ✓, 127/9.5 ✗). Bar pin stays at 127 (bar line −72.9, high). SUPERSEDES the 177.8 (7") photo round-number 2026-09-14: the reach is now SET by the vertical spring axis — the hook hole must stand plumb over the summing-lever anchor at |x| 24.85 (knife −15 + `sm_summing_lever_spec.HOLE_X` 39.85), so c2c = |x| 199.9 fulcrum − 24.85 = 175.05 (the neutral lever tilt −0.0022° adds 1.3e−7, far below the ±0.10 hook-arm allocation). 7" left the spring leaning 2.75 mm off plumb → motion ratio 175.05/127 = 1.378 (`ch_channel_lever_spec.py`)'
         - derived
         - med
       - - Bar-pin hole
@@ -1043,9 +1043,9 @@ sections:
         - derived
         - med
       - - Lever fulcrum
-        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`fulcrum-shaft`) along Z at (x, y, centre-z) = (+199.9, 1061.4, +3.088), with black end keepers (`fulcrum-keeper`, MHA-120) on the rail top face 1036.2: ball centres z 3.088 ± 88.75 = −85.662/+91.838 (2.25 inboard of the shaft ends), feet screwed by #8-32 frame-side screws (MHA-117) into tapped rail holes at z 3.088 ± 74.0 = −70.912/+77.088; Ø12 × 4.0565 spacer bushings ×19'
+        - 'Ø6.5 pivot hole at 0; common Ø6.35 × 182 shaft (`ch-fulcrum-shaft`) along Z at (x, y, centre-z) = (+199.9, 1061.4, +3.088), with black end keepers (`ch-fulcrum-keeper`, MHA-CH-007) on the rail top face 1036.2: ball centres z 3.088 ± 88.75 = −85.662/+91.838 (2.25 inboard of the shaft ends), feet screwed by #8-32 frame-side screws (MHA-VN-022) into tapped rail holes at z 3.088 ± 74.0 = −70.912/+77.088; Ø12 × 4.0565 spacer bushings ×19'
         - —
-        - 'p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1061.4 − 25.2 = 1036.2; ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); thread from `cad/scripts/build_frame_side_screw.py` and `cad/scripts/build_top_frame.py` KEEPER_TAP_SPEC'
+        - 'p.40 bottom-left clevis+ball = the shaft END mount (mirror of the rocker pivot design); rail top = 1061.4 − 25.2 = 1036.2; ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); thread from `cad/scripts/build_vn_frame_side_screw.py` and `cad/scripts/build_fr_top_frame.py` KEEPER_TAP_SPEC'
         - measured
         - med
       - raw: '| Lever tip | bar steps to a 6.0-tall centred tab at x 169 (p.39/p.41), rounded r3 tip, Ø4 spring-hook hole at 175.05, 8 mm overhang (tip r3 centre 180.05, end 183.05; the photo-read step stays at 169, so the tab is 14.05 long with 4.03 between the step and the hole edge); fork/clip fittings deferred (photogrammetry 195527397) | — | p.39, p.40; the Ø3 photo read is infeasible — the spring''s r 2.75 Ø1-wire eye threading the 3.0 plate needs eye-drop margins |√(ρ²−1.5²)−D| ≤ hole_r − 0.1 at ρ = 2.25/3.25, best ~0.05 through Ø3, ~0.3 through Ø4 (M6.3 toroid solve) | scaled→derived | med |'
@@ -1082,15 +1082,15 @@ sections:
         - ch. 14 layout table
         - med
       - - Top-lever fulcrum shaft
-        - 'Ø6.35 × 182 (`fulcrum-shaft`) along Z at (+199.9, 1061.4) — M6.5: 228.6 tips fell inside the west columns'
+        - 'Ø6.35 × 182 (`ch-fulcrum-shaft`) along Z at (+199.9, 1061.4) — M6.5: 228.6 tips fell inside the west columns'
         - ch. 17 rows (2026-08-02 rederive)
         - med
       - - Top frame (NEW part)
         - 'green cast ring around the 4 columns at z ±112 (column pitch 394 × 224, plan centre z 0) — ONE casting absorbing the old top-crossbar and gooseneck clamp. Rail band y 999.7..1036.2 (H 36.5; assembly insert TOP_FRAME_MID_Y 1017.95); side rails 34.2 wide, outer faces x ±214.1 / inner ±179.9; front/rear rails 38.0 wide, outer z ±131.0 / inner ±93.0; corner bosses Ø52.2 at (±197, ±112), y 993.4..1040.7 (proud 4.5 above the rail top, hanging 6.3 below the bottom), bored Ø25.5 through, tapped #8-32 side-screw holes with Ø9 × 0.5 spot-faces; integral FULL-height crossbar 22 wide on the knife line, spanning z −93..+93 flush top and bottom, 2 stud clearance holes Ø13.49 at z −83.972/+90.148, plan gussets ~18 × 18 at the rail junctions; gooseneck hub on the east rail (full-height rib 27 wide centred z +3.088 at the rail-face planes, Ø17.0 bore through along Y, underside boss Ø30 proud 8.0 + 2 V-gussets, tapped 1/4-20 set-screw hole along X at y 1017.95 with a 16 × 16 × 2 cast pocket); recessed web panels (flanges 8.0; web 12.7 (0.5 in) thick centred on each rail — setback 10.75/face side rails, 12.65/face front-rear) on BOTH faces of all 4 rails.'
-        - 'ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); side-screw thread from `cad/scripts/build_frame_side_screw.py` and `cad/scripts/build_top_frame.py` SIDE_TAP_SPEC'
+        - 'ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive); side-screw thread from `cad/scripts/build_vn_frame_side_screw.py` and `cad/scripts/build_fr_top_frame.py` SIDE_TAP_SPEC'
         - measured/med
       - - Ball mounts ×2
-        - 'rocker pair at seats y 228.6: z −107.912 and +84.588; the lever pair is SUPERSEDED by fulcrum-keeper end brackets (`fulcrum-keeper`, MHA-120, AISI 1018 black oxide, qty 2) on the rail top face 1036.2 (ch17 p.40 clevis+ball; ch30 top view: black brackets + slotted screws, no chrome posts) — 2026-08-02 remount. Keeper: foot 26 × 14 × 8 (pad ends z-extent 85.34 < boss circle 85.9; underside relieved to +4.8 over the 4.5-proud boss land), lug 14 wide × 6 thick, crown Ø14 about the shaft axis (25.2 above the seat), Ø9.5 pressed ball bored Ø6.5 for the Ø6.35 shaft end. The channel/summing families share the +3.088 recentered residual while the support and columns retain their original stations. Rocker-pair part itself unchanged.'
+        - 'rocker pair at seats y 228.6: z −107.912 and +84.588; the lever pair is SUPERSEDED by fulcrum-keeper end brackets (`ch-fulcrum-keeper`, MHA-CH-007, AISI 1018 black oxide, qty 2) on the rail top face 1036.2 (ch17 p.40 clevis+ball; ch30 top view: black brackets + slotted screws, no chrome posts) — 2026-08-02 remount. Keeper: foot 26 × 14 × 8 (pad ends z-extent 85.34 < boss circle 85.9; underside relieved to +4.8 over the 4.5-proud boss land), lug 14 wide × 6 thick, crown Ø14 about the shaft axis (25.2 above the seat), Ø9.5 pressed ball bored Ø6.5 for the Ø6.35 shaft end. The channel/summing families share the +3.088 recentered residual while the support and columns retain their original stations. Rocker-pair part itself unchanged.'
         - 'ch. 14 / ch. 17; lever z from boss-bore clearance; seat from ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
         - measured/med
       - - Amplitude bars (default)
@@ -1098,7 +1098,7 @@ sections:
         - 'ch. 15 notes + assembly solve (level rest pose); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
         - measured/med
       - - Springs (default)
-        - 'INSTALLED (stretched) between lever tab holes (−22.10, 1061.39 at the −0.002° neutral lever tilt) and the summing-plate hook arms, rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; top eye centre 3.37 below the hole (1058.02), bottom eye on the spring-hook arm at 986.24; installed body 67.78 (+5.8: top eye −4.5 with the fulcrum bank, bottom eye −10.3 with the summing plate — canonical channel-spring-installed re-derived; verify:math spring:neutral-body-canonical pins it to the solver''s neutral gap)'
+        - 'INSTALLED (stretched) between lever tab holes (−22.10, 1061.39 at the −0.002° neutral lever tilt) and the summing-plate hook arms, rotated 90° about Y so the eye ring (r 2.75, plane ⊥ lever face) threads the Ø4 hole; top eye centre 3.37 below the hole (1058.02), bottom eye on the spring-hook arm at 986.24; installed body 67.78 (+5.8: top eye −4.5 with the fulcrum bank, bottom eye −10.3 with the summing plate — canonical vn-channel-spring-installed re-derived; verify:math spring:neutral-body-canonical pins it to the solver''s neutral gap)'
         - 'ch. 17/18 + assembly solve (level rest pose); ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive)'
         - measured/med
       - - Default mechanism state
@@ -1237,7 +1237,7 @@ sections:
       - - Bottom lead
         - straight 40 mm drop, coil bottom → ring that hangs on the boss hook (ring centre machine y 1001.7, rod top 1004.7 — summing end −10.3, 2026-08-02 rederive)
         - —
-        - 'M6.4 hang solve (`build_summing_assembly.py`: ring inner top 1006.15 vs rod top 1006.2), shifted −10.3 with the casting underside 999.7'
+        - 'M6.4 hang solve (`build_sm_summing_assembly.py`: ring inner top 1006.15 vs rod top 1006.2), shifted −10.3 with the casting underside 999.7'
         - derived
         - low
       - - Adjustment post
@@ -1247,9 +1247,9 @@ sections:
         - stated
         - high (feature)
       - - Gooseneck
-        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 90° bend R 51 (the 180° candy-cane is refuted, M6.8); horizontal arm running 50.8 past the bend exit to an end face at machine |x| 95.2 (the part dimension is `gooseneck_geom.ARM_END_X` -101.8: the tube is inserted mirrored at the column line x 197, so machine |x| = 197 - 101.8), carrying the axial #6-32 slotted spring screw whose exposed shank hangs the counter spring''s top eye plumb above the boss hook at |x| 91.2; the arm HEIGHT is the tension adjustment (set by the counter-spring balance, `spring_mount_geom.GOOSENECK_ORIGIN_Y`), not a photo read'
+        - 'Ø16 chrome tube: vertical leg machine x 197 (east column line), y 880..1390 — geometry UNCHANGED by the 2026-08-02 rederive; the post drops ≈120 below the rail underside (999.7, unchanged) and ends in a free tip, passing through the Ø17 clearance bore in the top-frame''s east-rail hub and gripped by the hub''s square-head set screw (clamp deleted); 90° bend R 51 (the 180° candy-cane is refuted, M6.8); horizontal arm running 50.8 past the bend exit to an end face at machine |x| 95.2 (the part dimension is `sm_gooseneck_geom.ARM_END_X` -101.8: the tube is inserted mirrored at the column line x 197, so machine |x| = 197 - 101.8), carrying the axial #6-32 slotted spring screw whose exposed shank hangs the counter spring''s top eye plumb above the boss hook at |x| 91.2; the arm HEIGHT is the tension adjustment (set by the counter-spring balance, `spring_mount_geom.GOOSENECK_ORIGIN_Y`), not a photo read'
         - —
-        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin -- SUPERSEDED 2026-09-02 (ch19 p.45 page001_img02): a #6-32 slotted screw driven AXIALLY into the arm''s plugged end face (Ø3.6 shank, Ø10 head — head since grown to Ø12 for the 1330K524 double-loop eye), the counter spring''s top eye hanging on the shank against the head. Arm END re-derived 2026-09-14 for the vertical counter axis: the eye rides the exposed shank''s midpoint, so the arm end face moved to machine |x| 95.2 from 101.75 (part ARM_END_X −95.25 → −101.8, a 44.25 → 50.8 straight run past the R51 bend) to hang the eye plumb at |x| 91.2 — the summing lever''s counter anchor (`gooseneck_geom.py`, `spring_mount_geom.COUNTER_ANCHOR_XY`); the arm HEIGHT stays the sliding tension adjustment'
+        - 'tip drop: ch. 7 back-left ¾ view (page001_img17) — free tip clear of the columns at image y 491, machine 880 by frame-height scale (41 mm/26 px), cross-checked by the Ø16 silhouette (10 px). Leg-top/bend: 0.515 px/mm + p3 90° page; tip "slotted screw" modeled as lug + pin -- SUPERSEDED 2026-09-02 (ch19 p.45 page001_img02): a #6-32 slotted screw driven AXIALLY into the arm''s plugged end face (Ø3.6 shank, Ø10 head — head since grown to Ø12 for the 1330K524 double-loop eye), the counter spring''s top eye hanging on the shank against the head. Arm END re-derived 2026-09-14 for the vertical counter axis: the eye rides the exposed shank''s midpoint, so the arm end face moved to machine |x| 95.2 from 101.75 (part ARM_END_X −95.25 → −101.8, a 44.25 → 50.8 straight run past the R51 bend) to hang the eye plumb at |x| 91.2 — the summing lever''s counter anchor (`sm_gooseneck_geom.py`, `spring_mount_geom.COUNTER_ANCHOR_XY`); the arm HEIGHT stays the sliding tension adjustment'
         - scaled + derived
         - leg-top med, drop med
       - - Gooseneck clamp
@@ -1419,19 +1419,19 @@ sections:
         - stated
         - high
       - - Wheel axle (M6.4)
-        - flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification) -- 2026-09-02 (ch21 p.51): the tip collar is now a Ø9 x 1 WASHER under a separate AF 8 x 3 hex nut (`wheel-axle-nut` MHA-129); stud 17 long, tip 3 proud
+        - flange Ø35 × 3 seated on the bar front face; Ø5 stud × 14 the wheel bore rides; Ø9 × 4 retaining collar (photo's washer + hex nut collapsed to a collar — simplification) -- 2026-09-02 (ch21 p.51): the tip collar is now a Ø9 x 1 WASHER under a separate AF 8 x 3 hex nut (`vn-wheel-axle-nut` MHA-VN-025); stud 17 long, tip 3 proud
         - —
         - p.50–51
         - scaled
         - low
       - - Wheel bar (M6.4/M6.8; clamp unified with the platen bar 2026-07)
-        - '10 tall × 9 deep steel HALF-width bar (`wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar) at y 575.7, back face −129.9 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 22 × 9-family stock depth as the ONE 22 × 9 × 452 `support-bar` at y 306.734 (see ch. 22)'
+        - '10 tall × 9 deep steel HALF-width bar (`mg-wheel-bar`, x −226..+8, the clamped end 29 past the west column like the support-bar) at y 575.7, back face −129.9 on the front clamp arc, front face −138.9 (the shared platen-back plane) — the magnifying wheel''s own bar, same 22 × 9-family stock depth as the ONE 22 × 9 × 452 `pd-support-bar` at y 306.734 (see ch. 22)'
         - —
         - 'M6.4 layout; p3 90° view: bars run tangent IN FRONT of the columns (z −112)'
         - derived
         - low
       - - Column clamp (two-piece, wheel bar — unified with the platen-bar clamps 2026-07)
-        - 'the same black two-piece semi-arc pair as the platen bar''s (`column-clamp-front`/`-back`, ch. 22 row): front arc face at −129.9 carries the bar back face, back arc closes on the Ø25.4 column, two clamp screws through the bar flanking the column (heads recessed 0.2 below the bar front so the refitted platen can slide across the east clamp). The green one-piece channel collar (and its backed-out pinch screw) is RETIRED — no consumer left'
+        - 'the same black two-piece semi-arc pair as the platen bar''s (`sh-column-clamp-front`/`-back`, ch. 22 row): front arc face at −129.9 carries the bar back face, back arc closes on the Ø25.4 column, two clamp screws through the bar flanking the column (heads recessed 0.2 below the bar front so the refitted platen can slide across the east clamp). The green one-piece channel collar (and its backed-out pinch screw) is RETIRED — no consumer left'
         - —
         - p.50–55 (ch30 p005 two-piece arcs)
         - scaled + derived
@@ -1448,10 +1448,10 @@ sections:
       z −146.9 (axle flange on the bar front −138.9).
 
       Wires modeled (2026-07-04): the two amplification wires are now geometry —
-      straight rest-pose Ø0.8 steel rods (`lever-wire` MHA-115: fixture hook
+      straight rest-pose Ø0.8 steel rods (`mg-lever-wire` MHA-MG-009: fixture hook
       (−150, 925.35, −137.95) → hub-groove tangent at z −142.77, a ~0.8° lean
       ducking behind the rim ring into the hub's back groove band — see the
-      ch20 depth re-anchor; `pen-wire` MHA-100: rim 3-o'clock tangent →
+      ch20 depth re-anchor; `pn-pen-wire` MHA-PN-006: rim 3-o'clock tangent →
       pen-rod wire hole at y 513). The lever-wire ARTICULATES (ball joint at the
       hook + axis-axis stand-off tangency to the hub) and carries the WIRE-1
       yoke coupling to the wheel; wraps/tie-offs and compliance stay unmodeled;
@@ -1492,7 +1492,7 @@ sections:
       - - Rack bar (rework E3)
         - '269.64 × 12 × 6, brass, teeth-down at the platen''s bottom edge, crests protruding 2 below it (band y 271.234..283.234, z −138.9..−132.9)'
         - —
-        - 'ch22 back-side photo (the exposed rack band below the bottom guide rail is ~10-12 tall, not 30); teeth cut at DP 30 / PA 14.5° (ch. 23 measurement), 101 gaps at p = 2.660 mm — `build_platen_rack.py`'
+        - 'ch22 back-side photo (the exposed rack band below the bottom guide rail is ~10-12 tall, not 30); teeth cut at DP 30 / PA 14.5° (ch. 23 measurement), 101 gaps at p = 2.660 mm — `build_pd_platen_rack.py`'
         - scaled
         - low
       - - Support bar + two-piece clamps (rework E1/E2)
@@ -1502,7 +1502,7 @@ sections:
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.9178 counterbores (stock 2.7178 heads 0.2 sub-flush so the paper lies flat) with the 6.35 shanks passing the 0.9322 web left in the 3.85 plate and threading 5.4178 into #4-40 through taps on the rail fronts (R9-64; tips 3.5022 inside the shallowest seat); 4 black lock plates 22 × 15.65 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 #4-40 × 3/8 button-head socket cap screws `guide-lock-screw` each — MHA-176, McMaster 91255A108 into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), lapping 1.0 past each rail''s outer edge (R9-59), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 2.65 (R9-61), the top pair hangs 9.65 over it — so the platen cannot fall off without colliding with the east column clamp'
+        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.9178 counterbores (stock 2.7178 heads 0.2 sub-flush so the paper lies flat) with the 6.35 shanks passing the 0.9322 web left in the 3.85 plate and threading 5.4178 into #4-40 through taps on the rail fronts (R9-64; tips 3.5022 inside the shallowest seat); 4 black lock plates 22 × 15.65 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 #4-40 × 3/8 button-head socket cap screws `vn-guide-lock-screw` each — MHA-VN-046, McMaster 91255A108 into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), lapping 1.0 past each rail''s outer edge (R9-59), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 2.65 (R9-61), the top pair hangs 9.65 over it — so the platen cannot fall off without colliding with the east column clamp'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
@@ -1510,7 +1510,7 @@ sections:
       - - Guide lock plates (2026-09-02)
         - '22 × 15.65 × 2 (was 19 tall): 1.0 lip (R9-59) + 5 rail + 7 channel + 2.65 bar overlap (R9-61: the book read''s 3 less 0.35 so the set plate clears the pivot spacer)'
         - —
-        - 'ch22 p.54: the locks read low against the rail (`guide_lock_spec.py`)'
+        - 'ch22 p.54: the locks read low against the rail (`pd_guide_lock_spec.py`)'
         - scaled
         - low
       - - Paper holder springs (×2)
@@ -1603,14 +1603,14 @@ sections:
         - 'M4c keyframe measurement: rack pitch 2.66 mm; the DP 30 conclusion stands, but the M4c 120T/OD-105 read of the keyframes is superseded — see the rack-pinion row'
         - scaled + counted
         - med
-      - - Reducer disc ("fourth gear"; part `rack-pinion`)
-        - '120T DP 38: PD 80.21, OD 81.55, 3 mm face, Ø10 bore on the feed-pinion sleeve''s spigot, screwed to the brass hub''s flange (MHA-159) by 3 × #0-80 fillisters (MHA-161), brass — the 4/4 video''s narrated 120T count, FFT-ring-confirmed on ch30 p002 (~115–119 peak); it does NOT touch the rack (paper-drive rework E7/E8 REFUTES the M6.4 96T-DP30-meshes-rack read: the measured rack/disc pitch ratio ≈ 1.27 matches DP 38, and the disc rides in FRONT of the platen face)'
+      - - Reducer disc ("fourth gear"; part `pd-rack-pinion`)
+        - '120T DP 38: PD 80.21, OD 81.55, 3 mm face, Ø10 bore on the feed-pinion sleeve''s spigot, screwed to the brass hub''s flange (MHA-PD-017) by 3 × #0-80 fillisters (MHA-VN-039), brass — the 4/4 video''s narrated 120T count, FFT-ring-confirmed on ch30 p002 (~115–119 peak); it does NOT touch the rack (paper-drive rework E7/E8 REFUTES the M6.4 96T-DP30-meshes-rack read: the measured rack/disc pitch ratio ≈ 1.27 matches DP 38, and the disc rides in FRONT of the platen face)'
         - 3.211 OD
         - '4/4 video narration + FFT ring count + pitch-ratio cross-check (2.660/2.101 = 1.266); OD ≈ 82 ± 2.5 measured on ch30 p002; memory/paper-drive-rework.md E7'
         - counted + scaled
         - med
       - - Removable gear tooth form
-        - 'ANSI #25 roller-chain sprocket (6.35 pitch, Ø3.30 roller): ANSI B29.1 (ACA) standard tooth form, seating curve R = 0.5025·Dr + 0.0015 in = 1.696 on the pitch circle, working curve E = 1.3025·Dr + 0.0015 in = 4.336, straight yz and topping curve F (2.757 / 2.708 / 2.682) out to the turned OD; T12 / T18 / T24 PD 24.53 / 36.57 / 48.65, OD 27.5 / 39.8 / 52.0, bottom Ø (PD − Dr) 21.23 / 33.27 / 45.35 (`transgear_removable_spec`)'
+        - 'ANSI #25 roller-chain sprocket (6.35 pitch, Ø3.30 roller): ANSI B29.1 (ACA) standard tooth form, seating curve R = 0.5025·Dr + 0.0015 in = 1.696 on the pitch circle, working curve E = 1.3025·Dr + 0.0015 in = 4.336, straight yz and topping curve F (2.757 / 2.708 / 2.682) out to the turned OD; T12 / T18 / T24 PD 24.53 / 36.57 / 48.65, OD 27.5 / 39.8 / 52.0, bottom Ø (PD − Dr) 21.23 / 33.27 / 45.35 (`pd_transgear_removable_spec`)'
         - —
         - 'ch23 p.56 catalog shot (sprocket, not a spur gear: the chain rollers sit in the tooth pockets) + p.58-59 + video f_0215; supersedes the m2 spur-gear read (24T OD ≈ 51 in `v4_transgear_030` stays within 1 mm of the #25 T24 OD 52)'
         - standard + scaled
@@ -1624,67 +1624,67 @@ sections:
       - - Chain wheels
         - 'the two MOUNTED removable sprockets themselves (knob shaft T24, crankshaft T12): the #25 roller chain rides their teeth — that is how gear swaps change the platen ratio, and why the latch slackens the chain. Both sit in ONE band, rear face on the shaft''s seat face at z −154.3, front face −157.1, chain mid-plane −155.7'
         - —
-        - 'M6.8 supersedes the M4c "17T sprockets both ends": ch. 23 text + `v4_transgear_002/008/012` (chain visibly wraps the removable''s coarse teeth); ch30 p002 full-res: upper wrap tips Ø ≈ 53.6 ≈ T24 OD 52 at post-mirror (−65, ~248); crank wheel small ≈ Ø30 (`v2_gears_010`) ≈ T12 OD 28. `chain-sprocket.SLDPRT` retired from the assemblies'
+        - 'M6.8 supersedes the M4c "17T sprockets both ends": ch. 23 text + `v4_transgear_002/008/012` (chain visibly wraps the removable''s coarse teeth); ch30 p002 full-res: upper wrap tips Ø ≈ 53.6 ≈ T24 OD 52 at post-mirror (−65, ~248); crank wheel small ≈ Ø30 (`v2_gears_010`) ≈ T12 OD 28. `pd-chain-sprocket.SLDPRT` retired from the assemblies'
         - counted + scaled
         - med
       - - Drive chain (roller chain; paper-drive rework 2026-07-07)
-        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` through the native connected-linkage pattern): pitch-circle centres are knob T24 K (−43.788, 256.893) and crank T12 on the restored fixed axis (−129.336, 129.850); _chain.py solves the exact ANSI #25 link count and sag on the sprockets'' pitch circles. Link pin plane z −155.7 (`transgear_removable_spec.CHAIN_MID_Z`), the same on both shafts.'
+        - 'real roller chain (alternating `vn-chain-inner-link`/`vn-chain-outer-link` through the native connected-linkage pattern): pitch-circle centres are knob T24 K (−43.788, 256.893) and crank T12 on the restored fixed axis (−129.336, 129.850); _chain.py solves the exact ANSI #25 link count and sag on the sprockets'' pitch circles. Link pin plane z −155.7 (`pd_transgear_removable_spec.CHAIN_MID_Z`), the same on both shafts.'
         - —
         - 'ch30 p002/p005/p006 (taut run + visibly drooping slack run) + ch. 23 p.58-59 (chain wider than the wheel); crank centre from ch30 GT; knob centre K = stud S (0, 266.201) + the permanent 12T:120T mesh c-c 44.766 at −168° (CONTRACT-paper-drive axis points, round 10)'
         - scaled + derived
         - med
-      - - Third gear (12T DP38, integral to the knob shaft `transgear-knob-shaft`, MHA-078)
+      - - Third gear (12T DP38, integral to the knob shaft `pd-transgear-knob-shaft`, MHA-PD-008)
         - '12T DP 38 cut on the knob shaft itself (no separate gear part since the round-10 re-derivation): PD 8.021, OD 9.358, root 6.474, PA 14.5°, face 5.9 (z −148.1..−142.2) — meshes the 120T disc permanently at c-c 44.766 (44.116 + 0.65 gap-floor extension, backlash 0.181); knob axis K (−43.788, 256.893), −168° from the stud S (0, 266.201)'
         - —
-        - '4/4 video narration ("the third gear... has 12 teeth"); CONTRACT-paper-drive §1.1 (round 10, R9-17); `transgear_knob_shaft_spec`. Supersedes the M6.4 24T-DP30 estimate, which belonged to the refuted disc-meshes-rack topology (rework E7/E8)'
+        - '4/4 video narration ("the third gear... has 12 teeth"); CONTRACT-paper-drive §1.1 (round 10, R9-17); `pd_transgear_knob_shaft_spec`. Supersedes the M6.4 24T-DP30 estimate, which belonged to the refuted disc-meshes-rack topology (rework E7/E8)'
         - counted + derived
         - med
-      - - Feed pinion ("fifth gear"; part `transgear-feed-pinion`, MHA-110)
-        - '12T DP 30: PD 10.16, OD 11.853, face 13.75 (z −144.15..−130.4), cut on the rear end of one turned steel sleeve (OAL 27.35, R9-68) that runs on the MHA-179 pin''s Ø3.9; in front of the teeth the Ø10 seat shoulder locates the 120T disc on the Ø9 h6 boss, whose D-flat keys the brass hub MHA-159 (screwed to the disc by three #0-80 MHA-161), so sleeve, hub and disc turn as one; meshes the teeth-down rack with its axis 0.8 below the nominal pitch-line offset (gap-floor extension)'
+      - - Feed pinion ("fifth gear"; part `pd-transgear-feed-pinion`, MHA-PD-010)
+        - '12T DP 30: PD 10.16, OD 11.853, face 13.75 (z −144.15..−130.4), cut on the rear end of one turned steel sleeve (OAL 27.35, R9-68) that runs on the MHA-PD-023 pin''s Ø3.9; in front of the teeth the Ø10 seat shoulder locates the 120T disc on the Ø9 h6 boss, whose D-flat keys the brass hub MHA-PD-017 (screwed to the disc by three #0-80 MHA-VN-039), so sleeve, hub and disc turn as one; meshes the teeth-down rack with its axis 0.8 below the nominal pitch-line offset (gap-floor extension)'
         - —
         - '4/4 video narration ("Behind and attached to the fourth gear is the fifth gear. This gear has twelve teeth and engages the rack."); DP must match the rack (the ch23 scale anchor); user field report said 10T — the narrated 12T kept, discrepancy flagged in PR #196; sleeve construction CONTRACT-paper-drive §2.3 (R9-5 / R9-8)'
         - counted + derived
         - med
       - - Transgear hanger (round-10 re-derivation; supersedes the 2026-07-07 bar-back bracket and the pinion bar before it)
-        - 'the transgear cluster hangs from the steel arm `transgear-arm` (MHA-164, 7.9375 thick, 5/16 precision-ground flat stock, z −124.4..−116.46), which swings on the shoulder screw `transgear-pivot-screw` (MHA-168: #8-32 into the support bar''s blind tap at P (−58, 303.234), over the brass `transgear-pivot-spacer` MHA-167, 5.5 long, against the bar''s back face z −129.9). The plain pin `transgear-pin` (MHA-179) is pressed into the arm''s reamed hole at S (0, 266.201); the arm plate MHA-165 (two #8-32 oval-head screws MHA-166 into the arm''s through taps) carries the knob shaft''s Ø8.5 running bore at K (−43.788, 256.893). Pin and knob shaft ride the one arm, so the 12T:120T c-c 44.766 never changes; unlatching swings the WHOLE cluster away from the rack (v4_transgear 001 vs 011-013)'
+        - 'the transgear cluster hangs from the steel arm `pd-transgear-arm` (MHA-PD-018, 7.9375 thick, 5/16 precision-ground flat stock, z −124.4..−116.46), which swings on the shoulder screw `vn-transgear-pivot-screw` (MHA-VN-041: #8-32 into the support bar''s blind tap at P (−58, 303.234), over the brass `pd-transgear-pivot-spacer` MHA-PD-020, 5.5 long, against the bar''s back face z −129.9). The plain pin `pd-transgear-pin` (MHA-PD-023) is pressed into the arm''s reamed hole at S (0, 266.201); the arm plate MHA-PD-019 (two #8-32 oval-head screws MHA-VN-040 into the arm''s through taps) carries the knob shaft''s Ø8.5 running bore at K (−43.788, 256.893). Pin and knob shaft ride the one arm, so the 12T:120T c-c 44.766 never changes; unlatching swings the WHOLE cluster away from the rack (v4_transgear 001 vs 011-013)'
         - —
-        - 'CONTRACT-paper-drive §3 + §5 (round 10, rulings R9-5..R9-25); book p.62 top-down + p.63 back view; `transgear_arm_geometry`, `support_bar_spec`'
+        - 'CONTRACT-paper-drive §3 + §5 (round 10, rulings R9-5..R9-25); book p.62 top-down + p.63 back view; `pd_transgear_arm_geometry`, `pd_support_bar_spec`'
         - scaled + derived
         - med
-      - - A-frame → folded into `rocker-arm-support` (M6.5/M6.9, UNIFIED M6.12)
-        - 'M6.12: no longer a separate part — these are the SOUTH-upright + rail features of the single `rocker-arm-support` casting (build_rocker_arm_support.py), re-centred on machine x +72.9 and authored machine-handed in the frame assembly''s frame. The two south-flank hold-down hex bolts move to frame.SLDASM with the foot rail. Geometry below unchanged. The FRONT rocker support — the SOUTH upright of the portal frame (ch30 p008): tapered plate 18.5 thick (machine z −117.5..−99.0 — photo reads ~28-30 but the band is pinned by the parked measuring stick at z ≤ −118; the former ch25-handle z ≥ −98 pin is obsolete, the restored GT alignment-pinion handle sits at z −144 well clear of the plate), foot x −115..−45 on the base top (y 50.8), apex x −87..−59 at the ball-seat saddle y 228.6 (machine); full-width saddle z ±11.1 over the last 19.8 of rise; clevis ears (z ±(8.1..11.1), 20 tall, tops machine 248.6) flank the south pivot-ball mount''s Ø16 base (gap 16.2; ball r 9.5 centre 253.8 clears the ear inner faces; pivot shaft bottom 250.65 clears ear tops by 2.05); carries the portal-frame rails to the north frustum (faces −0.25): TOP RAIL 20 (machine x +62.9..+82.9) × 16 (y machine 212.6..228.6 = photo window top) to machine z +90.45, FOOT RAIL 30 (machine x +59.75..+89.75 — west face 0.25 east of the arbor-pedestal block) × 20 on the base top to machine z +81.35, bolted down by two hex bolts (M6.10): AF 12.7 × 5.5 heads + Ø7.8 × 32 shanks at machine (74.75, z −54/+36) through the rail''s Ø8.2 holes, 12 into the base''s through-holes (head corner 2.64 clear of the cylinder train''s 120T tips); M6.12: the part is authored MACHINE-handed with NO MIRROR_PLANE entry (it lives in the non-mirroring frame.SLDASM) — the real machine casts both uprights + rails in one piece, now modeled that way'
+      - - A-frame → folded into `fr-rocker-arm-support` (M6.5/M6.9, UNIFIED M6.12)
+        - 'M6.12: no longer a separate part — these are the SOUTH-upright + rail features of the single `fr-rocker-arm-support` casting (build_fr_rocker_arm_support.py), re-centred on machine x +72.9 and authored machine-handed in the frame assembly''s frame. The two south-flank hold-down hex bolts move to fr-frame.SLDASM with the foot rail. Geometry below unchanged. The FRONT rocker support — the SOUTH upright of the portal frame (ch30 p008): tapered plate 18.5 thick (machine z −117.5..−99.0 — photo reads ~28-30 but the band is pinned by the parked measuring stick at z ≤ −118; the former ch25-handle z ≥ −98 pin is obsolete, the restored GT alignment-pinion handle sits at z −144 well clear of the plate), foot x −115..−45 on the base top (y 50.8), apex x −87..−59 at the ball-seat saddle y 228.6 (machine); full-width saddle z ±11.1 over the last 19.8 of rise; clevis ears (z ±(8.1..11.1), 20 tall, tops machine 248.6) flank the south pivot-ball mount''s Ø16 base (gap 16.2; ball r 9.5 centre 253.8 clears the ear inner faces; pivot shaft bottom 250.65 clears ear tops by 2.05); carries the portal-frame rails to the north frustum (faces −0.25): TOP RAIL 20 (machine x +62.9..+82.9) × 16 (y machine 212.6..228.6 = photo window top) to machine z +90.45, FOOT RAIL 30 (machine x +59.75..+89.75 — west face 0.25 east of the arbor-pedestal block) × 20 on the base top to machine z +81.35, bolted down by two hex bolts (M6.10): AF 12.7 × 5.5 heads + Ø7.8 × 32 shanks at machine (74.75, z −54/+36) through the rail''s Ø8.2 holes, 12 into the base''s through-holes (head corner 2.64 clear of the cylinder train''s 120T tips); M6.12: the part is authored MACHINE-handed with NO MIRROR_PLANE entry (it lives in the non-mirroring fr-frame.SLDASM) — the real machine casts both uprights + rails in one piece, now modeled that way'
         - —
         - 'ch. 14 pp. 26–29 + ch. 30 front view: clevis grips the pivot ball at (−72, 252) — M6.5 apex crop; ch30 p008 (brightened) shows the full windowed frame; the M6.4 "ears grip the pinion bar" read is REFUTED (bar now floats)'
         - scaled
         - med
-      - - Transgear pin, bushings and ring (MHA-179..182, R9-68; supersede the MHA-082 stud, MHA-160 cap nut and MHA-178 shim)
-        - 'plain steel pin `transgear-pin` (MHA-179, Ø3.900 ground) pressed from the rear through the arm''s reamed hole at S, its domed head seated on the arm''s rear face −116.46; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `transgear-rear-bushing` (MHA-180, faced to fit, to −130.4); the steel feed sleeve MHA-110 (−130.4..−157.75), carrying the 120T disc on its Ø10 seat shoulder (−144.65..−147.65) and the brass hub MHA-159 on its Ø9 boss and D-flat; brass `transgear-front-bushing` (MHA-181, faced to fit, nose −157.75 to −162.78); the side-mount ring `transgear-retaining-ring` (MHA-182, McMaster 97431A260) in the pin''s groove, −163.08..−163.71. The front bushing sets the disc-to-12T air m 0.10-0.20, the rear bushing the cluster float 0.2-0.4 (model: cluster rearward)'
+      - - Transgear pin, bushings and ring (MHA-PD-023..025 and MHA-VN-047, R9-68; supersede the MHA-082 stud, MHA-160 cap nut and MHA-178 shim)
+        - 'plain steel pin `pd-transgear-pin` (MHA-PD-023, Ø3.900 ground) pressed from the rear through the arm''s reamed hole at S, its domed head seated on the arm''s rear face −116.46; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `pd-transgear-rear-bushing` (MHA-PD-024, faced to fit, to −130.4); the steel feed sleeve MHA-PD-010 (−130.4..−157.75), carrying the 120T disc on its Ø10 seat shoulder (−144.65..−147.65) and the brass hub MHA-PD-017 on its Ø9 boss and D-flat; brass `pd-transgear-front-bushing` (MHA-PD-025, faced to fit, nose −157.75 to −162.78); the side-mount ring `vn-transgear-retaining-ring` (MHA-VN-047, McMaster 97431A260) in the pin''s groove, −163.08..−163.71. The front bushing sets the disc-to-12T air m 0.10-0.20, the rear bushing the cluster float 0.2-0.4 (model: cluster rearward)'
         - —
-        - 'ruling R9-68 (rev 5, candidate B); `transgear_pin_spec`, `transgear_cluster_fit`, `transgear_rear_bushing_spec`, `transgear_front_bushing_spec`, `transgear_retaining_ring_spec`; ch23 p.59 page002_img04'
+        - 'ruling R9-68 (rev 5, candidate B); `pd_transgear_pin_spec`, `transgear_cluster_fit`, `pd_transgear_rear_bushing_spec`, `pd_transgear_front_bushing_spec`, `vn_transgear_retaining_ring_spec`; ch23 p.59 page002_img04'
         - derived
         - low
       - - Transgear latch (round 10, rulings 2 / 7 / R9-10 / R9-15)
-        - 'a 1/8 × 7/8 dowel `transgear-latch-pin` (MHA-169) pressed 8.50 into the arm''s square end face at T (50.642, 233.865) along the arm (z −120.43) stands 13.725 proud and engages the Ø5.4 hole of the latch hook MHA-127; the hook is riveted by two 1/16 × 3/16 aluminium rivets `latch-hook-rivet` (MHA-175, flap holes match-drilled through the hook at assembly) to the flap (x 58.5..60) of the 1.5 steel sheet bracket `latch-hook-bracket` (MHA-170), whose base (x 43..60, on the bar''s back face) is screwed by two #4-40 × 3/8 fillisters `latch-hook-bracket-screw` (MHA-171) into through taps at x 47.5 / 54.5, y 303.234. Flexing the strip +X releases the pin'
+        - 'a 1/8 × 7/8 dowel `vn-transgear-latch-pin` (MHA-VN-042) pressed 8.50 into the arm''s square end face at T (50.642, 233.865) along the arm (z −120.43) stands 13.725 proud and engages the Ø5.4 hole of the latch hook MHA-PD-014; the hook is riveted by two 1/16 × 3/16 aluminium rivets `vn-latch-hook-rivet` (MHA-VN-045, flap holes match-drilled through the hook at assembly) to the flap (x 58.5..60) of the 1.5 steel sheet bracket `pd-latch-hook-bracket` (MHA-PD-021), whose base (x 43..60, on the bar''s back face) is screwed by two #4-40 × 3/8 fillisters `vn-latch-hook-bracket-screw` (MHA-VN-043) into through taps at x 47.5 / 54.5, y 303.234. Flexing the strip +X releases the pin'
         - —
-        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released); CONTRACT-paper-drive §4 (round 10); `latch_hook_bracket_geometry`, `latch_hook_geometry`'
+        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released); CONTRACT-paper-drive §4 (round 10); `pd_latch_hook_bracket_geometry`, `pd_latch_hook_geometry`'
         - scaled + derived
         - med
-      - - Knob shaft (MHA-078, round 10)
-        - 'steel, on axis K (−43.788, 256.893), z −172..−101.26 (70.74): 1/4-20 stud end from the tip −172 to −154.6 (thumbnut MHA-126, seated on the collar''s pilot, faced 0.05–0.15 proud of the T24 front face, the T24 free under it); Ø6.35 plain core to the 12T front face −148.1 carrying the sliding brass drive collar `transgear-drive-collar` (MHA-177: Ø17.5 × 4 body −154.3..−150.3 = the T24 seat, Ø10 pilot inside the T24''s Ø10.3 bore, two 3/32 × 3/16 dowels MHA-155 pressed in its through holes 2.4 proud of its front face, pinned at assembly by the 1/16 spring pin MHA-154 through the core, lying in the collar''s rear slot); integral 12T DP38 −148.1..−142.2; Ø8.5 journal −142.2..−101.26 running in the arm plate''s bore behind the loose brass thrust ring MHA-156; the brass cup MHA-157 (Ø19 × 8.0 ring, −107.76..−99.76) on the journal''s rear end, pinned by the 1/16 × 5/8 spring pin MHA-183 match-drilled through cup and journal 3.0 behind its front face; no retaining screw or tap. T24 sprocket plate −157.1..−154.3, #25 chain plane −155.7'
+      - - Knob shaft (MHA-PD-008, round 10)
+        - 'steel, on axis K (−43.788, 256.893), z −172..−101.26 (70.74): 1/4-20 stud end from the tip −172 to −154.6 (thumbnut MHA-PD-013, seated on the collar''s pilot, faced 0.05–0.15 proud of the T24 front face, the T24 free under it); Ø6.35 plain core to the 12T front face −148.1 carrying the sliding brass drive collar `pd-transgear-drive-collar` (MHA-PD-022: Ø17.5 × 4 body −154.3..−150.3 = the T24 seat, Ø10 pilot inside the T24''s Ø10.3 bore, two 3/32 × 3/16 dowels MHA-VN-038 pressed in its through holes 2.4 proud of its front face, pinned at assembly by the 1/16 spring pin MHA-VN-037 through the core, lying in the collar''s rear slot); integral 12T DP38 −148.1..−142.2; Ø8.5 journal −142.2..−101.26 running in the arm plate''s bore behind the loose brass thrust ring MHA-PD-015; the brass cup MHA-PD-016 (Ø19 × 8.0 ring, −107.76..−99.76) on the journal''s rear end, pinned by the 1/16 × 5/8 spring pin MHA-VN-048 match-drilled through cup and journal 3.0 behind its front face; no retaining screw or tap. T24 sprocket plate −157.1..−154.3, #25 chain plane −155.7'
         - —
-        - '`v4_transgear_008/020` + ch. 23 topology; CONTRACT-paper-drive §1 (round 10, R9-6 / R9-17); the −155.7 chain plane both shafts share (`transgear_removable_spec`)'
+        - '`v4_transgear_008/020` + ch. 23 topology; CONTRACT-paper-drive §1 (round 10, R9-6 / R9-17); the −155.7 chain plane both shafts share (`pd_transgear_removable_spec`)'
         - scaled + derived
         - low/med
-      - - Latch hook (MHA-127, round 10, R9-10)
+      - - Latch hook (MHA-PD-014, round 10, R9-10)
         - '10 × 0.6 dead-soft bright low-carbon strip, flat in the machine plane x 57.9..58.5 (face toward +X, riveted to the bracket flap''s −X face), curved EDGEWISE to a template: two tangent arcs R850 / R490 from the square top cut at y 306.2, z −116.64 (the part origin) down to a R5 free end 99.9 below the cut (y 206.3); Ø5.4 hole over the latch pin at (y, z) (229.04, −120.4); two Ø1.65 rivet holes at y 303, 3.9 apart'
         - —
-        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released): a small curved leaf hanging from the bar at x ~ +52 in the video; CONTRACT-paper-drive §4.4 (`latch_hook_geometry`, PART_ORIGIN_MACHINE on the x 57.9 plane)'
+        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released): a small curved leaf hanging from the bar at x ~ +52 in the video; CONTRACT-paper-drive §4.4 (`pd_latch_hook_geometry`, PART_ORIGIN_MACHINE on the x 57.9 plane)'
         - scaled
         - low
-      - - Transgear thumbnut (MHA-126, round 10)
+      - - Transgear thumbnut (MHA-PD-013, round 10)
         - 'knurled brass nut, outermost on the knob shaft''s 1/4-20 stud in FRONT of the removable sprocket (z −173.2..−157.1): Ø20.5 × 8.7 straight-knurled head with a dished front face, Ø11 × 2.4 waist, Ø12.4 flange bearing on the T24''s front face only'
         - —
-        - 'ch23 p.58/59 (page002_img03/04) + video 4/4 "unscrew the nut that holds the other gear in place"; CONTRACT-paper-drive §1.6 (`build_transgear_thumbnut.py`)'
+        - 'ch23 p.58/59 (page002_img03/04) + video 4/4 "unscrew the nut that holds the other gear in place"; CONTRACT-paper-drive §1.6 (`build_pd_transgear_thumbnut.py`)'
         - scaled
         - med
   - prose: |2
@@ -1770,7 +1770,7 @@ sections:
       - - Hanger screw ×1 (M6.10)
         - 'McMaster 93075A194 hex-head #8-32 screw, driven from behind the wheel bar into the tapped pen-hanger strap. Hole station: wheel-bar local x −112, machine (x, y) = (−3, 575.7), hanger local x −6. The bar''s Ø4.572 close-clearance hole is centred 5.0 from the fixed free end (machine x −8), leaving 2.714 nominal end wall; the strap receiver remains #8-32.'
         - —
-        - 'p.60–63 (the strap is bolted to the bar); stock wrapper `cad/scripts/build_hanger_screw.py`; station and end wall from `cad/scripts/build_wheel_bar.py` / `cad/scripts/wheel_bar_geom.py`; receiver from `cad/scripts/build_pen_hanger.py`'
+        - 'p.60–63 (the strap is bolted to the bar); stock wrapper `cad/scripts/build_vn_hanger_screw.py`; station and end wall from `cad/scripts/build_mg_wheel_bar.py` / `cad/scripts/mg_wheel_bar_geom.py`; receiver from `cad/scripts/build_pn_pen_hanger.py`'
         - scaled + derived
         - low
       - - Pen marker
@@ -1788,7 +1788,7 @@ sections:
       book photos is a modern replacement designed/built by Mike Harland and Tom
       Wilson. Model the replacement (it is what the photos document).
 
-      Pen layout (machine coords, 2026-09 photo re-derive — build_pen_assembly):
+      Pen layout (machine coords, 2026-09 photo re-derive — build_pn_pen_assembly):
       pen rod vertical at x 3, z −157.0 band (rod z −159.5..−154.5), y 368..518,
       #47 wire hole at y 513 just above the hanger block top (511); the rod line
       sits 5.5 forward of the old −151.5 so the 45° block's paper-side corner
@@ -1846,19 +1846,19 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.381 × 6.35 17-7 PH stainless strip, Condition C (0.015 in, McMaster-Carr 2325K19 sheared 1/4 in wide; PR 859 ruling 4, 2026-09-25, supersedes the 0.5 × 6.0 C51000 of O1-b — stainless departs from the p.68 brass look for stress margin and corrosion resistance); foot screwed down 20.0 EAST of the pivot bore, outboard of the back strap, on a 9.5 square pad flush with the strip's aft edge (widening forward only, PR 859 option (iv)); R3.3 bend straight off the pad; straight blade leaning ~1.0° west of vertical (~9.2° in to the parked flank); crest R3.3 bearing on the east flank 23.0 up the strap, 5 below the arbor; 25° flick back east, 2.0 flat. Modelled installed (0.15 parked air); formed free with the crest preset ~2.6 into the flank (5.4° more bend) (`pinion_spring_geometry.py`, `pinion_spring_section.py`)
+        - 0.381 × 6.35 17-7 PH stainless strip, Condition C (0.015 in, McMaster-Carr 2325K19 sheared 1/4 in wide; PR 859 ruling 4, 2026-09-25, supersedes the 0.5 × 6.0 C51000 of O1-b — stainless departs from the p.68 brass look for stress margin and corrosion resistance); foot screwed down 20.0 EAST of the pivot bore, outboard of the back strap, on a 9.5 square pad flush with the strip's aft edge (widening forward only, PR 859 option (iv)); R3.3 bend straight off the pad; straight blade leaning ~1.0° west of vertical (~9.2° in to the parked flank); crest R3.3 bearing on the east flank 23.0 up the strap, 5 below the arbor; 25° flick back east, 2.0 flat. Modelled installed (0.15 parked air); formed free with the crest preset ~2.6 into the flank (5.4° more bend) (`dt_pinion_spring_geometry.py`, `dt_pinion_spring_section.py`)
         - —
-        - 'p.68–69 + v4_pinion_013/018/019: a brass-coloured leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). img01''s far-left black screw is on the DRUM side (east): the foot is outboard, not under the strap (the pre-2026-09-24 model read it as west). img04 puts the crest 5 below the arbor. The pad''s aft edge, flush with the strip''s, is set a 0.65 gage leaf off the back block (`SPRING_PAD_LEAF`), which stations the blade in from the strap''s inner face (`SPRING_BLADE_INSET`) (build_pinion_spring / build_drive_train SPRING_*)'
+        - 'p.68–69 + v4_pinion_013/018/019: a brass-coloured leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). img01''s far-left black screw is on the DRUM side (east): the foot is outboard, not under the strap (the pre-2026-09-24 model read it as west). img04 puts the crest 5 below the arbor. The pad''s aft edge, flush with the strip''s, is set a 0.65 gage leaf off the back block (`SPRING_PAD_LEAF`), which stations the blade in from the strap''s inner face (`SPRING_BLADE_INSET`) (build_dt_pinion_spring / build_dt_drive_train_assembly SPRING_*)'
         - scaled
         - med
       - - Swing straps ×2 (2026-09 re-derive)
         - 28.0 centre-to-centre × 15 wide × 9 thick (U28 2026-09-23, inside the ch25 page001_img01 photo band 7.6–9.4; the 1.59 worst-case web beside the Ø4 blind follower-stud seat is a NAMED book-fidelity exception to the 2.0 target, 1.5 floor held), R7.5 ends, plain (no cam relief — U12), parked near-vertical with the pivot blocks UNDER the drum; Ø8 arbor bore, Ø6.35 pivot bore
         - —
-        - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`pinion_bracket_geometry.py`, `pinion_pivot_block_spec.py` — U28 2026-09-23: 40 × 20.5 × 10.25 blocks laid out lift bore | screw | PIVOT bore | screw from the west end (page002_img07/08), lift bore 18.5 west of and 2.16 above the pivot bore, hold-down screws ±8.5 about the pivot)'
+        - 'ch25 p.68 (2026-09): the straps read ~28 × 15 and stand near-vertical — SUPERSEDES the 43 × 18 straps leaning 50° with the blocks 33 mm east (`dt_pinion_bracket_geometry.py`, `dt_pinion_pivot_block_spec.py` — U28 2026-09-23: 40 × 20.5 × 10.25 blocks laid out lift bore | screw | PIVOT bore | screw from the west end (page002_img07/08), lift bore 18.5 west of and 2.16 above the pivot bore, hold-down screws ±8.5 about the pivot)'
         - scaled
         - med
       - - Pinion grip head and crossrod (2026-09 re-derive)
-        - Integral MHA-102 turned head Ø15 × 11.5 (SR10.9 crown; rule 12 W6 was × 9 → 10.5, machinist review of 7f7fc1717 → 11.5 for a 2.30 worst-case crossrod web), neck Ø10.5 × 10.5 (shoulder 0.25 forward so every turned length prints .X), reamed Ø6.00 +0.10/0 for the separate MHA-058 Ø6 crossrod, bonded with Loctite 638, 65 overall (32 down / 33 up)
+        - Integral MHA-DT-022 turned head Ø15 × 11.5 (SR10.9 crown; rule 12 W6 was × 9 → 10.5, machinist review of 7f7fc1717 → 11.5 for a 2.30 worst-case crossrod web), neck Ø10.5 × 10.5 (shoulder 0.25 forward so every turned length prints .X), reamed Ø6.00 +0.10/0 for the separate MHA-DT-015 Ø6 crossrod, bonded with Loctite 638, 65 overall (32 down / 33 up)
         - —
         - 'ch25 p.68: a ~Ø15 ball on a ~65 rod. The one-piece arbor/head and separate crossrod are an approved photo-derived reconstruction choice, not proof of the historical joint detail. SUPERSEDES the Ø23 × 14 drum on an 85 rod and the unsupported socket / radial-retention-pin reconstruction.'
         - scaled
@@ -1888,7 +1888,7 @@ sections:
 
       The mechanism (32T zeroing drum + swing straps, pivot blocks, torque
       shaft, lift rod, lever, integral grip head and separate crossrod) is BACK in
-      `build_drive_train_assembly.py`, re-solved against the ch30 GT
+      `build_dt_drive_train_assembly.py`, re-solved against the ch30 GT
       triangulation, then re-closed vertically around the v2 post. The 2026-06-18
       removal used a superseded pre-correction drum model and argued it could not
       thread the 12.56 mm channel between the rocker-support frustum and the
@@ -1900,14 +1900,14 @@ sections:
       machine (−18.384, 90.518) = X_DRUM + (drum tip 31.100 + pinion tip 8.667 +
       2.2425 disengaged gap); drum z −70.388..+72.812 (face 143.2, spanning all 20
       stations), integral steel arbor/head root z −130.688..+95.562,
-      head/crossrod axis z −137.188, and separate MHA-058 crossrod at +65°.
+      head/crossrod axis z −137.188, and separate MHA-DT-015 crossrod at +65°.
       Straps: 15 wide × 9 thick with R7.5 ends, plain (no cam relief), pivot
       (−14.420, 62.8), bore-to-bore c2c 28.0, parked at an 8.139° lean; the swing
       rides the setup DOF (a freed operational DOF, its angle drive spec recorded
       in the DOF manifest; articulated by the mobility probe / motion drives).
       The bronze return spring (table row above) stands beside the back strap,
       foot on the base east of it, and presses the swing to the disengaged rest —
-      parked-pose clearances asserted in `build_drive_train_assembly`
+      parked-pose clearances asserted in `build_dt_drive_train_assembly`
       (`SPRING_*`). The engage path is the p.69 cam: the lift rod rides the
       blocks' other bores at (4.080, 64.960), and each strap tail carries a Ø4
       follower pin (table row above), bonded into its blind seat, that the
@@ -1957,7 +1957,7 @@ sections:
       - - eccentric-cam
         - none annotated; cam outline p.25 available
         - FOLDED INTO cylinder-gear (integral cam, dims preserved in
-          build_cylinder_gear.py); standalone part removed. p.25 outline
+          build_dt_cylinder_gear.py); standalone part removed. p.25 outline
           cross-check RESOLVED (2026-07-02) — the dashed outline is a teardrop
           TEMPLATE cam (Michelson 1898 closing note), lift ≈14.7, agreeing with
           the ch14 end-view ring travel within its weak scale; its ring bore
@@ -1969,15 +1969,15 @@ sections:
       - - summing-lever
         - none
         - UNVERIFIED — p.42–43 proportion check in M2
-      - - rocker-arm-support ×3 → `rocker-arm-support` ×1 (M6.12)
+      - - rocker-arm-support ×3 → `fr-rocker-arm-support` ×1 (M6.12)
         - none
-        - 'M6.3 refuted the legacy windowed square frame (184 wide); M6.9 PARTIALLY REINSTATED it — ch30 p008 (brightened) shows exactly that frame: north frustum + south upright + top/foot rails (ch. 14 layout table). The ×3 count stays refuted (ONE frame: two uprights; the legacy third instance at x ≈ 0 under the transgear is the pinion-bar/stud''s job). M6.12: the two-part split (rocker-arm-support frustum + a-frame upright) is unified into the single `rocker-arm-support` casting'
+        - 'M6.3 refuted the legacy windowed square frame (184 wide); M6.9 PARTIALLY REINSTATED it — ch30 p008 (brightened) shows exactly that frame: north frustum + south upright + top/foot rails (ch. 14 layout table). The ×3 count stays refuted (ONE frame: two uprights; the legacy third instance at x ≈ 0 under the transgear is the pinion-bar/stud''s job). M6.12: the two-part split (rocker-arm-support frustum + a-frame upright) is unified into the single `fr-rocker-arm-support` casting'
       - - oscilating-arms
         - 'ch.14 re-read: the "12.5 mm width" was a misread (callout is 2.5 mm plate thickness)'
         - SUPERSEDED — re-authored as rocker-arm with corrected dims (`build_rocker_arm.py`)
       - - tube-frame
         - 'ch.6: frame column height 107 cm — legacy file measured 1016 mm (40"), CONTRADICTS the book'
-        - 'RE-AUTHORED — `build_tube_frame.py`; 2026-08-02 rederive: COLUMN_LENGTH 989.9 → 1014.0 (top y 1064.8 — the columns run +28.6 proud of the new rail top 1036.2 through the Ø25.5 boss bores, reconciling the book''s 107 cm with the ch30 stub reads), each stub closed by an integral spherical dome cap r 12.7 × h 3.3 from y 1061.5 — plain capped tops, NO nut, NO thread (user-corrected: the polished tops in top.png/ch30 p002 are pressed-in turned caps; supersedes the old "no stub above" read). Source: ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive), measured/med. OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
+        - 'RE-AUTHORED — `build_fr_tube_frame.py`; 2026-08-02 rederive: COLUMN_LENGTH 989.9 → 1014.0 (top y 1064.8 — the columns run +28.6 proud of the new rail top 1036.2 through the Ø25.5 boss bores, reconciling the book''s 107 cm with the ch30 stub reads), each stub closed by an integral spherical dome cap r 12.7 × h 3.3 from y 1061.5 — plain capped tops, NO nut, NO thread (user-corrected: the polished tops in top.png/ch30 p002 are pressed-in turned caps; supersedes the old "no stub above" read). Source: ch30 px measurement anchored on column pitch + GT rescale + ch19 closeups (2026-08-02 rederive), measured/med. OD REDERIVED Ø25.4 (1") from the ch30 8-views (M6.11): 4 quarter views isolate single columns, apparent width = OD × scale (scale fit from the ±197/±112 stations + azimuth, R² 0.94–0.99, cross-checked by the 460 mm base ~1500 px) → 7 reads = Ø23.8 ± 1.0, rounded to 1" stock; SUPERSEDES legacy Ø1.375" (~45% oversize). Wall kept legacy 0.12" → Ø19.3 bore. M4 fluting retired (M6.8: plain reflective columns)'
   - prose: |2
 
       No legacy part contradicts a book annotation. Every part still gets re-authored
@@ -2142,7 +2142,7 @@ sections:
          to T120 is −0.090 and the turned band's radial −0.116 (a named
          exception, user 2026-09-30, #1154; +0.12 / +0.11 RSS, +0.311 /
          +0.251 on the nominal axes), so the pair is checked on a 0.10
-         feeler at fit-up with MHA-025 and T120 pushed together, before the
+         feeler at fit-up with MHA-DT-010 and T120 pushed together, before the
          free-running revolution; each cut answers its own reading: the band
          is turned down to Ø15.78 MIN (still in 16T:64T contact wherever its
          reading can fail) only if the band stops the feeler, the shoulder

@@ -1,5 +1,7 @@
 # Independent full committed-diff review: 184b6a76
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../../../subsystem-identities.md) for the canonical migration map.
+
 Verdict: **no outstanding actionable code or evidence-consistency findings in the reviewed diff**. Native validation and external review remain separate; this is not a full-build or manufacturing-acceptance verdict.
 
 PR #702 baseline: `55056d4990d38ebb461f343d3002fc90731b9e73`.

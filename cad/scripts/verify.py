@@ -21,7 +21,7 @@ is the single fully-safe entry point that runs every gate.
                       gear ratios == config is verified at the RELEASE preflight,
                       not on every build.
   kinematics          NEEDS SOLIDWORKS. Kinematic pen-driver fidelity (plan F5):
-                      open pen.SLDASM (first author the travel drive mate
+                      open pn-pen.SLDASM (first author the travel drive mate
                       transiently from the recorded DOF manifest and install
                       the F5 equation -- the shipped model has neither, its
                       travel is a live free DOF; discarded unsaved), sweep the CrankDeg
@@ -123,13 +123,13 @@ DANGLING_ENTITY_NOT_FOUND = 48  # What's Wrong: mate reference PID not found
 # The gear mates live in this sub-assembly's MateGroup. The top assembly
 # references it flexibly, so its own MateGroup has none -- they are verified
 # when this sub is verified, not duplicated at the top.
-GEAR_OWNER = "drive-train"
+GEAR_OWNER = "dt-drive-train"
 # The channel assembly carries the independent moving stations (CHANNELS of them).
 # These four stems are mated instances (one per channel), NOT pattern slaves -- the
 # isolation suite asserts CHANNELS of each, the structural precondition for the
 # channels articulating at independent harmonics (only grounded spring/bushing
 # structure is LocalLinearPattern'd; see build_channel_assembly.py).
-CHANNEL_OWNER = "channel"
+CHANNEL_OWNER = "ch-channel"
 # Physically-built channels. machine.yaml channels.active_count is a
 # BUILD-SPEED KNOB: it caps the per-channel mechanism to the first N during
 # debugging iterations (20 = the full machine, the default); the gates below
@@ -143,8 +143,8 @@ CHANNELS = _config.active_count()
 # equation before the sweep (discarded unsaved). It sweeps CrankDeg and proves
 # the pen tip traces truth_model.pen_y -- the computed-not-simulated summation,
 # with no force solver (cad/docs/motion-policy.md).
-MOTION_OWNER = "pen"
-PEN_MARKER_STEM = "pen-marker"  # the carriage tip whose Y traces the curve
+MOTION_OWNER = "pn-pen"
+PEN_MARKER_STEM = "pn-pen-marker"  # the carriage tip whose Y traces the curve
 # CrankDeg angles to sample; spans a full fundamental period (0..360) so both
 # stroke extremes (the square-wave preset peaks at 0 and 180) are exercised.
 _MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 360.0]
@@ -152,17 +152,17 @@ _MOTION_SWEEP_DEG = [0.0, 30.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0, 3
 # gate on the equation chain + doc-unit handling, not a numeric-precision race.
 _MOTION_TOL_MM = 1e-2
 _MOVING_CHANNEL_STEMS = (
-    "rocker-arm",
-    "connecting-rod",
-    "amplitude-bar",
-    "channel-lever",
+    "ch-rocker-arm",
+    "ch-connecting-rod",
+    "ch-amplitude-bar",
+    "ch-channel-lever",
 )
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
-_CRANK_GEAR_TOKENS = ("crank-pinion", "crank-drive-gear")
+_CRANK_GEAR_TOKENS = ("dt-crank-pinion", "dt-crank-drive-gear")
 # Paper-feed reduction gear mate (paper-drive): the 12T third gear driving the
 # 120T reducer disc (the disc part is named rack-pinion for historical reasons).
-_FEED_GEAR_TOKENS = ("rack-pinion",)
+_FEED_GEAR_TOKENS = ("pd-rack-pinion",)
 _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # Expected TOP-LEVEL component-count band per assembly. REFERENCE DATA ONLY -- the
 # live component-count gate was removed (every failure it ever raised was a stale
@@ -190,11 +190,11 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # (164, 77 pre-PR8 -> 81) and stay correct at N=3.
 _N_CH = _config.active_count()
 _COMPONENT_BAND = {
-    "frame": (16, 21),  # measured 18 (9 structure + 4 lag-screw hold-downs
+    "fr-frame": (16, 21),  # measured 18 (9 structure + 4 lag-screw hold-downs
     # + 4 #10-24 frame-side screws + 1 gooseneck set screw — 2026-08-02 top-frame
     # rederive; plain capped column stubs, NO column nuts)
-    "drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
-    "channel": (
+    "dt-drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
+    "ch-channel": (
         6 * _N_CH + 8 - 6,
         6 * _N_CH + 8 + 6,
     ),  # N=20 -> (122,134), expected 128
@@ -202,16 +202,16 @@ _COMPONENT_BAND = {
     # keepers +2 keeper foot screws nets +2)
     # The former monolithic output split by function (no per-channel parts here);
     # bands tightened to the measured green-build counts (verify:subsystems).
-    "summing": (7, 9),  # ch 18-19, measured 8 (knife-stay removed: never in
+    "sm-summing": (7, 9),  # ch 18-19, measured 8 (knife-stay removed: never in
     # the real device; 2026-08-02 rederive: -top-crossbar -gooseneck-clamp
     # +2 knife-hanger-studs nets zero)
-    "magnifier": (11, 13),  # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
-    "pen": (7, 9),  # ch 24, measured 8 (+pen-wire, 2026-07-04)
-    "paper-drive": (112, 120),  # ch 22-23-25, expected 116 (54 placed + 62-link
+    "mg-magnifier": (11, 13),  # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
+    "pn-pen": (7, 9),  # ch 24, measured 8 (+pen-wire, 2026-07-04)
+    "pd-paper-drive": (112, 120),  # ch 22-23-25, expected 116 (54 placed + 62-link
     # chain; the paper-drive rework replaced the two rails + pinion-bar topology
     # with one bar + two-piece clamps + the hanging-platen furniture and its
     # 22 lock-mated fillister screws; the 2026-07-23 refit resolves 62 links)
-    "harmonic-analyzer": (
+    "ha-harmonic-analyzer": (
         7,
         9,
     ),  # measured 8: 7 subassemblies + 1 loose part (measuring-stick)
@@ -403,7 +403,7 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
                 raise RuntimeError(
                     f"{GEAR_OWNER} has no gear mates -- the drive train is broken"
                 )
-            if name == "paper-drive":
+            if name == "pd-paper-drive":
                 # A missing/suppressed 12T:120T feed mesh must fail loud, not
                 # take the harmless no-gears path below (codex #196).
                 raise RuntimeError(
@@ -434,7 +434,7 @@ def assert_gear_ratios(adapter: Any, name: str) -> None:
             int(v) for v in _config.machine("gear_train", "crank_drive_ratio")
         )
         crank_expected = _canon_ratio(crank_num, crank_den)
-        if name == "paper-drive":
+        if name == "pd-paper-drive":
             # The single paper-feed reduction mesh (12T third gear : 120T disc);
             # paper-drive carries no crank/channel gear mates.
             if feed_links != [_FEED_GEAR_RATIO]:
@@ -528,7 +528,7 @@ def _producers(name: str) -> list[tuple[str, list[str], str]]:
     the build graph (NOT read back from the saved ledger), so a dep ADDED since the
     last build -- a new hold-down part, a post-assembly hook, a freshly-mapped config
     -- is still checked, exactly as ``doit`` would (Codex review). Dashed display name
-    -> underscored task stems (``frame`` -> ``assembly:frame``)."""
+    -> underscored task stems (``frame`` -> ``assembly:fr_frame``)."""
     from _buildgraph import references_of  # local: keep top-level import light
 
     dodo = _import_dodo()
@@ -838,14 +838,14 @@ def _run_soundness_battery(
     """Run the complete per-document soundness battery on the active assembly."""
     free_dof = _expected_free_dof(name)
     if free_dof:
-        insts = _required_free_instances(name) if name == "paper-drive" else ()
-        if name == "paper-drive" and not insts:
+        insts = _required_free_instances(name) if name == "pd-paper-drive" else ()
+        if name == "pd-paper-drive" and not insts:
             report.gate(
                 f"{name}:dof-free-necessity",
                 lambda: _fail(
-                    "free paper-drive but .paper-drive.dof.json records no "
+                    "free pd-paper-drive but .pd-paper-drive.dof.json records no "
                     "crank_spin instance -- stale/missing DOF manifest; refusing "
-                    "the weak stem fallback. Rebuild paper-drive to regenerate it."
+                    "the weak stem fallback. Rebuild pd-paper-drive to regenerate it."
                 ),
             )
         else:
@@ -881,7 +881,7 @@ def _run_soundness_battery(
             allowed_pairs=allowed_interference_pairs(name),
         ),
     )
-    if name in ("channel", "summing"):
+    if name in ("ch-channel", "sm-summing"):
         report.gate(
             f"{name}:spring-native-contacts",
             lambda: assert_assembly_spring_contacts(adapter, name),
@@ -967,22 +967,22 @@ async def _verify_static_one(
         # EXACT SET: no component outside the allowed coupled families may
         # read under-constrained (an unintended freedom fails here, the
         # replacement for the retired release park-closure proof).
-        # paper-drive alone has a SHARED stem (three transgear-removable siblings),
+        # pd-paper-drive alone has a SHARED stem (three vn-transgear-removable siblings),
         # so target the EXACT T12 crank instance from the recorded DOF manifest
         # (codex #189 :679); every other assembly keeps its unique stem families
         # (unchanged -- their DOF map to distinct part names).
-        insts = _required_free_instances(name) if name == "paper-drive" else ()
-        if name == "paper-drive" and not insts:
-            # A free paper-drive MUST have recorded its crank_spin instance in
-            # .paper-drive.dof.json. A missing/stale sidecar would silently fall
+        insts = _required_free_instances(name) if name == "pd-paper-drive" else ()
+        if name == "pd-paper-drive" and not insts:
+            # A free pd-paper-drive MUST have recorded its crank_spin instance in
+            # .pd-paper-drive.dof.json. A missing/stale sidecar would silently fall
             # back to the weak shared-stem check (which :679 showed passes even with
             # T12 pinned and a T24/T18 sibling loose). Fail loud instead (codex #189).
             report.gate(
                 f"{name}:dof-free-necessity",
                 lambda: _fail(
-                    "free paper-drive but .paper-drive.dof.json records no crank_spin "
+                    "free pd-paper-drive but .pd-paper-drive.dof.json records no crank_spin "
                     "instance -- stale/missing DOF manifest; refusing the weak stem "
-                    "fallback. Rebuild paper-drive to regenerate it."
+                    "fallback. Rebuild pd-paper-drive to regenerate it."
                 ),
             )
         else:
@@ -1018,7 +1018,7 @@ async def _verify_static_one(
             allowed_pairs=allowed_interference_pairs(name),
         ),
     )
-    if name in ("channel", "summing"):
+    if name in ("ch-channel", "sm-summing"):
         report.gate(
             f"{name}:spring-native-contacts",
             lambda: assert_assembly_spring_contacts(adapter, name),
@@ -1094,7 +1094,7 @@ async def _verify_static_one(
                 adapter.currentModel = None
                 return
             active = activated["model"]
-            if repaired_name in ("channel", "summing"):
+            if repaired_name in ("ch-channel", "sm-summing"):
                 report.gate(
                     f"{repaired_name}:auto-repair-invalidate-proof",
                     lambda n=repaired_name: _invalidate_massprops_proof(
@@ -1133,7 +1133,7 @@ async def _verify_static_one(
             )
             if len(report.failed) != failures_before_reconcile:
                 continue
-            if repaired_name in ("channel", "summing"):
+            if repaired_name in ("ch-channel", "sm-summing"):
                 report.gate(
                     f"{repaired_name}:auto-repair-persisted-spring-native-contacts",
                     lambda n=repaired_name: assert_assembly_spring_contacts(adapter, n),
@@ -1196,7 +1196,7 @@ def _tip_y_mm(adapter: Any, marker: str) -> float:
 async def _verify_motion_one(adapter: Any, report: Report) -> None:
     """Kinematic pen-driver fidelity (plan F5): sweep CrankDeg, prove the tip traces truth_model.
 
-    pen.SLDASM's pen-rod travel mate is equation-linked to a CrankDeg global
+    pn-pen.SLDASM's pen-rod travel mate is equation-linked to a CrankDeg global
     through the chained Fourier sum (authored + installed transiently here from
     the recorded DOF manifest; the shipped model leaves the travel a live free
     DOF).
@@ -1358,7 +1358,7 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     discarded without saving. The belt
     mate ratio is build-time-checked but the rack coefficient and the
     end-to-end train are only proven by driving (codex #189)."""
-    name = "paper-drive"
+    name = "pd-paper-drive"
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"motion:{name}:open", f"not built: {sldasm}"))
@@ -1401,11 +1401,11 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     The transient drive mate is discarded by closing the doc UNSAVED, so the
     shipped free model is untouched.
     """
-    import build_magnifier_assembly as _mag
-    from build_output_fixture import HOOK_ANCHOR_LOCAL
-    import lever_wire_geom as _wire
+    import build_mg_magnifier_assembly as _mag
+    from build_mg_output_fixture import HOOK_ANCHOR_LOCAL
+    import mg_lever_wire_geom as _wire
 
-    name = "magnifier"
+    name = "mg-magnifier"
     sldasm = OUT_SLDASM / f"{name}.SLDASM"
     if not sldasm.exists():
         report.failed.append((f"chain:{name}:open", f"not built: {sldasm}"))
@@ -1441,12 +1441,12 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         return rows, pos
 
     def _wheel_deg() -> float:
-        rows, _ = _xform("magnifying-wheel-1")
+        rows, _ = _xform("mg-magnifying-wheel-1")
         return math.degrees(math.atan2(rows[0][1], rows[0][0]))
 
     def _wire_state() -> tuple[float, float, list[float]]:
         """(centreline-to-axis distance, hook ball residual, hub-end pos)."""
-        rows, pos = _xform("lever-wire-1")
+        rows, pos = _xform("mg-lever-wire-1")
         u = rows[1]  # wire axis (+Y local = hub -> hook)
         # line-line distance to the wheel axis (direction Z at axis_xy)
         n = [u[1], -u[0], 0.0]  # u x z-hat
@@ -1454,7 +1454,7 @@ async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
         w = [pos[0] - axis_xy[0], pos[1] - axis_xy[1]]
         d_axis = abs(w[0] * n[0] + w[1] * n[1]) / n_len
         hook = [p + _wire.WIRE_LEN * ui for p, ui in zip(pos, u)]
-        frows, fpos = _xform("output-fixture-1")
+        frows, fpos = _xform("mg-output-fixture-1")
         anchor = [
             fpos[k]
             + HOOK_ANCHOR_LOCAL[0] * frows[0][k]
@@ -1660,9 +1660,9 @@ def verify_spring_base(report: Report) -> None:
     """Verify supplier-length semantics and loaded stock mounting envelopes."""
 
     def _channel_mounts() -> None:
-        import build_channel_assembly as channel
-        import channel_spring_installed_spec as spec
-        import channel_spring_stock_geom as stock
+        import build_ch_channel_assembly as channel
+        import vn_channel_spring_installed_spec as spec
+        import vn_channel_spring_stock_geom as stock
         import spring_mount_geom as mounts
 
         stations = sorted(
@@ -1693,7 +1693,7 @@ def verify_spring_base(report: Report) -> None:
             )
 
     def _counter_mount() -> None:
-        import build_summing_assembly as summing
+        import build_sm_summing_assembly as summing
         import spring_mount_geom as mounts
 
         pose = mounts.COUNTER_REFERENCE_POSE
@@ -1718,12 +1718,12 @@ def verify_base_footprint(report: Report) -> None:
     """
 
     def _mounts_on_plate() -> None:
-        import build_arbor_pedestal as arbor_post
-        import cone_pivot_screw_spec as pscrew
-        import cone_swing_platform_geometry as platform
-        import build_drive_train_assembly as train
-        import harmonic_base_spec as base
-        import swing_stop_screw_spec as sscrew
+        import build_dt_arbor_pedestal as arbor_post
+        import vn_cone_pivot_screw_spec as pscrew
+        import dt_cone_swing_platform_geometry as platform
+        import build_dt_drive_train_assembly as train
+        import fr_harmonic_base_spec as base
+        import vn_swing_stop_screw_spec as sscrew
 
         half_len = base.TOP_LENGTH / 2.0
         front_z, rear_z = base.TOP_FRONT_Z, base.TOP_REAR_Z
@@ -1751,21 +1751,21 @@ def verify_base_footprint(report: Report) -> None:
             ),
             # base-bolted statics; head/washer is each one's widest plan extent
             (
-                "cone-lock-knob",
+                "vn-cone-lock-knob",
                 train.KNOB_X,
                 train.KNOB_Z,
                 train.KNOB_HEAD_DIA / 2.0,
                 train.KNOB_HEAD_DIA / 2.0,
             ),
             (
-                "cone-pivot-screw",
+                "vn-cone-pivot-screw",
                 pv[0],
                 pv[2],
                 pscrew.HEAD_DIA / 2.0,
                 pscrew.HEAD_DIA / 2.0,
             ),
             (
-                "swing-stop-screw",
+                "vn-swing-stop-screw",
                 train.STOP_X,
                 train.STOP_Z,
                 sscrew.HEAD_DIA / 2.0,

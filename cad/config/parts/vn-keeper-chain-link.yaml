@@ -1,0 +1,12 @@
+vn-keeper-chain-link:
+  title: Brass Loop Link for Trade Size 3 Bead Chain
+  number: MHA-VN-036
+  stock_name: Loop Link, Brass, for Trade Size 3 Bead Chain
+  supplier: McMaster-Carr
+  supplier_skus: [3606T811]
+  material: Brass
+  material_specification: Brass, McMaster-Carr 3606T811
+  finish: unfinished
+  quantity: 1
+  tolerance_class: visual_noncritical
+  process: purchased

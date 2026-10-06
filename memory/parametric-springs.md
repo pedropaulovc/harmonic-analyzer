@@ -7,6 +7,9 @@ metadata:
   originSessionId: 045bacc1-f12e-48b0-b137-916b2b43a02d
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 A spring whose endpoints move is NOT a fixed-length solid. Modeling it as one rigid body and demanding it thread/fit at every assembly pose is a self-inflicted bug, NOT a physical constraint. When the harmonic-analyzer `channel-spring-installed` (a fixed-length "installed" body) interfered with tilted channel levers under the F3 amplitude drive — and overshot the summing plate (0.13 mm threading margin) when attached per-channel — the right reframe (user-prompted) is: the spring length is the wrong thing to hold constant.
 
 **Why:** every project that animates springs makes the spring length a parameter. The model here used a fixed body, valid only at the neutral lever tilt (cosmetic-only by accident).
@@ -17,7 +20,7 @@ A spring whose endpoints move is NOT a fixed-length solid. Modeling it as one ri
 3. **Motion force-springs + hidden/cosmetic geometry** — for dynamics, an Add-Spring force entity, body hidden/shown-at-rest only.
 4. Flexible subassembly; 5. cosmetic/suppress (the lazy version).
 
-For the channel bank: add a `free_length`/stretch param to `build_channel_spring_installed.py`, set it per channel from the lever-tip→plate distance the loop already computes, place each instance at its length inside the channel loop (replacing seed+pattern). Bushings stay patterned (length-independent). Relates to [[professionalize-plan-status]] F3 + the F5 computed-summation policy ([[harmonic-analyzer-project]]).
+For the channel bank: add a `free_length`/stretch param to `build_vn_channel_spring_installed.py`, set it per channel from the lever-tip→plate distance the loop already computes, place each instance at its length inside the channel loop (replacing seed+pattern). Bushings stay patterned (length-independent). Relates to [[professionalize-plan-status]] F3 + the F5 computed-summation policy ([[harmonic-analyzer-project]]).
 
 **DE-RISK PROTO RESULT (build_summation_proto.py, throwaway rig, 2026-06-15).** Tested whether to MATE each spring end-to-end (the proposed `summation` co-location reorg) vs keep it grounded-at-measured-length. Findings, each proven live in SW:
 - ✓ **Measured-length write works**: body = gap − top_lead − bottom_lead; with body 63.05 the two eyes land at EXACTLY the 74.15 eye-c2c (top [50,65.05,0], bottom [50,−9.1,0]). `build_spring(eye_axes=True)` now RETURNS the baked axis names (`bottom_lead_axis`/`top_eye_axis` = Axis1/Axis2).

@@ -24,7 +24,7 @@ const PINNED_RELEASE = {
 }
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const HELP = `Usage: npm run fetch-model -- [raw.glb] [--source-commit <40hex> --source-sha256 <approved64hex>]
-No path: select the harmonic-analyzer GLB from cad/out/gltf.
+No path: select ha-harmonic-analyzer.glb from cad/out/gltf.
 The current native source stays SHA-pinned. A different CAD release requires both
 explicit release commit and approved raw GLB SHA256; local bytes alone cannot
 establish their association. The exact CAD revision must be available locally.
@@ -91,9 +91,9 @@ async function pickSource(webRoot, explicit) {
     if (error.code !== 'ENOENT') throw error
     throw new Error(`${sourceDirectory} not found. Run the CAD export on the SolidWorks seat, or download a release bundle with gh release download and pass the raw .glb explicitly.`)
   }
-  const candidates = entries.filter(name => name.endsWith('.glb')).sort()
-  if (!candidates.length) throw new Error(`No .glb files in ${sourceDirectory}`)
-  return join(sourceDirectory, candidates.find(name => name.includes('harmonic-analyzer')) ?? candidates[0])
+  const basename = 'ha-harmonic-analyzer.glb'
+  if (!entries.includes(basename)) throw new Error(`No ${basename} in ${sourceDirectory}`)
+  return join(sourceDirectory, basename)
 }
 
 async function cacheRawSource(webRoot, bytes, sha256) {

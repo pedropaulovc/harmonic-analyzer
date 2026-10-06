@@ -1,0 +1,8 @@
+dt-arbor-pedestal:
+  number: MHA-DT-002
+  material_family: ferrous_noncritical
+  finish: BLACK JAPAN/ENAMEL; MASK BORE AND FOOT SEAT; OIL BARE MACHINED SURFACES
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "machined from solid stock or casting"

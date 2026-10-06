@@ -146,11 +146,11 @@ finite-difference on the exact kinematics):
 
 | feature | nominal | sensitivity | note |
 |---|---:|---:|---|
-| cam eccentricity `cylinder_gear_spec.ECCENTRICITY` | 8.64 | +11.57 \| +11.55 | the only dimension with a double-digit sensitivity |
-| rocker rod-pin radius `rocker_arm_spec.ROD_HOLE_X` | 133.07 | −0.75 \| −0.75 | |
-| channel-lever bar-pin arm `channel_lever_spec.BAR_PIN_X` | 127.0 | −0.79 \| −0.76 | |
-| channel-lever spring-hook arm `channel_lever_spec.LEVER_SPRING_X` | 175.05 | +0.57 \| +0.57 | set by the plumb spring axis (fulcrum 199.9 − anchor 24.85), not a round 7" |
-| summing-lever hole position `summing_lever_spec.HOLE_X` | 39.85 mm | +2.667 %/mm | moving the hole changes both the arm and the force direction — and takes the lever reach with it |
+| cam eccentricity `dt_cylinder_gear_spec.ECCENTRICITY` | 8.64 | +11.57 \| +11.55 | the only dimension with a double-digit sensitivity |
+| rocker rod-pin radius `ch_rocker_arm_spec.ROD_HOLE_X` | 133.07 | −0.75 \| −0.75 | |
+| channel-lever bar-pin arm `ch_channel_lever_spec.BAR_PIN_X` | 127.0 | −0.79 \| −0.76 | |
+| channel-lever spring-hook arm `ch_channel_lever_spec.LEVER_SPRING_X` | 175.05 | +0.57 \| +0.57 | set by the plumb spring axis (fulcrum 199.9 − anchor 24.85), not a round 7" |
+| summing-lever hole position `sm_summing_lever_spec.HOLE_X` | 39.85 mm | +2.667 %/mm | moving the hole changes both the arm and the force direction — and takes the lever reach with it |
 | channel spring rate | 0.175127 N/mm (catalog) | +1.00000 %/% | loaded numerator; the common stiffness denominator calibrates out |
 | channel initial tension | 1.77929 N (catalog) | 0.00000 %/N | with the axis plumb the pretension's geometric gain term vanishes; DC zeroing removes its offset |
 | rocker slide radius, rod length, cam OD roundness, gear runout | — | < 0.1 %/mm | DC or 2·i harmonic only; not gain |
@@ -165,7 +165,7 @@ lag are.
 
 The exact kinematics (eccentric + rod on the rocker's −X crank side + rocker pin on an arc + the
 rigid 801.95 mm bar whose notch-roof contact rides the R800 slide on the +X side + lever arc,
-exactly `build_channel_assembly._arc_geometry` / `solve_state`) are not a pure cosine. From the
+exactly `build_ch_channel_assembly._arc_geometry` / `solve_state`) are not a pure cosine. From the
 report (gain measured from the null station; the sign is the machine-hand convention — the lobe
 lifts the crank side, so a +X bar reads negative at the top of stroke):
 
@@ -177,7 +177,7 @@ lifts the crank side, so a +X bar reads negative at the top of stroke):
 | +10 | −1.011 | 2.5 % |
 
 Stations are non-negative: the built CAD keeps every bar on the lifting side of the pivot
-(`build_channel_assembly` rejects `amplitude_mm < 0`), so a signed input function is **lifted by a
+(`build_ch_channel_assembly` rejects `amplitude_mm < 0`), so a signed input function is **lifted by a
 constant** before analysis and the constant's lift vector ($20c$ at k = 0, $-c$ at odd k under
 the 20-element rule) is subtracted from the readings. The ledger's "opposite end = 180° phase reversal" is not a mode of the
 CAD as built and is not budgeted.
@@ -189,7 +189,7 @@ CAD as built and is not budgeted.
   $\theta_k$), so uncorrected it costs 0.1–0.2 % MAE and 1.3–1.5 % max on broad inputs and
   1.1 % MAE / 3.0 % max on the two-channel input — larger than every machining term combined.
 - **Null station −2.58 mm** (foot-axis x from the pivot): the notch roof touches the arc
-  3.175 mm from the foot axis (`amplitude_bar_spec.BAR_WIDTH/2`) and the arc's low point sits
+  3.175 mm from the foot axis (`ch_amplitude_bar_spec.BAR_WIDTH/2`) and the arc's low point sits
   8 mm above the pivot centreline, so a bar at the geometric zero still moves — 18 idle bars at
   "zero" add a coherent 2.9 %-of-full-scale error each (up to 24 % max on a two-channel input if
   it is ignored). The null station is on the side of the pivot the CAD cannot build, so it is
@@ -264,7 +264,7 @@ with no clearance scatter, so no linear allowable half-width exists for it.
 | cam phase | 0.25° | 0.038 | 0.21 | 0.23 | 0.33 | native `NotchPhase` dimension; the nominal 1.50° offset remains #749 |
 | mesh lag spread | 0.14° | 0.021 | 0.12 | 0.13 | 0.33 | derived from the 0.05–0.20 backlash band |
 | cone flat clock | 0.25° cone | 0.016 | 0.12 | 0.03 | 0.76° | native `BoreFlatClock` dimension; shaft flats share one clock, teeth indexed from each gear's flat in one setup; cam phase scales by T/120 |
-| cone flat play | 0.01–0.03 mm AF clearance | 0.070 | 0.36 | 0.49 | n/a | D-bore across-flat fit; phase = (clearance / lever) × T/120, the lever being the shortest flat half-chord MHA-014 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on the torque corner; minus the Ø9.525-land lag removed by the crank index; per-land residual and per-channel variation remain |
+| cone flat play | 0.01–0.03 mm AF clearance | 0.070 | 0.36 | 0.49 | n/a | D-bore across-flat fit; phase = (clearance / lever) × T/120, the lever being the shortest flat half-chord MHA-DT-004 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on the torque corner; minus the Ø9.525-land lag removed by the crank index; per-land residual and per-channel variation remain |
 | station setting (setup) | 0.25 mm | 0.051 | 0.30 | 0.53 | 0.24 | interpolate the released stick; zero/travel-stop errors are one-sided and their mean bias is recorded. Scored at each input's pen-forced scale |
 | **all combined** | | **0.158** | **0.81** | **1.54** | | targets 0.30 / 1.5 / 2.0 |
 
@@ -277,7 +277,7 @@ does not discharge the physical operating assumptions or the two waivers below.
   Use the spec sheet's `SET QC` procedure; if a batch cannot supply a matched set,
   select another batch rather than modifying the approved lever holes.
 - **The eccentricity limit is capability-driven, not accuracy-driven.** Accuracy alone allows
-  ±0.047 mm; the drawing's ±0.025 (`cylinder_gear_spec.DRAWING_NOTES`) is kept because an
+  ±0.047 mm; the drawing's ±0.025 (`dt_cylinder_gear_spec.DRAWING_NOTES`) is kept because an
   indicated offset in a 4-jaw reads to 0.01 mm and costs nothing extra. Relaxing to ±0.05 is a
   legitimate decision (it consumes 0.05 % MAE); `check:budget` pins the drawing note to the
   yaml so the two cannot silently diverge.
@@ -435,7 +435,7 @@ operator forms from step 1; the table is the only data the procedure needs beyon
 | station table check | one bar alone at each station, k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset, gain curvature | matches the `READOUT.md` table; idle bar reads ≈ 0.029; subtract the read-vs-set vector (20ℓ at k = 0, −ℓ at odd k) from every trial |
 | broad-input benchmark | Michelson's Gaussian ($e^{-(0.1i)^2}$) and half-range rectangle, corrected readout | everything | MAE ≈ 0.7 %, max ≈ 2 % of the greatest term — historical parity |
 | sparse-input stress | channels 1 and 20 alone | consistency without averaging | expected worst coefficient ≤ 2 % (p99 2.406 reported) |
-| pinion-spring bend coupon (before forming MHA-114) | cut a coupon from the 2325K19 roll along its 50 in length (bend line across the rolling direction, as the part is cut); bend it 90° and 25° over a 7/32 in (Ø5.56) drill-rod mandrel, R2.78, at or under the R2.8 the ±0.5 formed band accepts on both R3.3 bends; then form one leaf and measure its free preset | whether 17-7 PH Condition C takes the tightest radius the drawing accepts at 0.015 in — the R3.3 nominal is proxied from NASA SP-5089 Table XXXI (hardened STA sheet, 0.012–0.016 in, R 0.13 in), and Condition C has less elongation, so the coupon qualifies the band's low limit, not the nominal | no crack or orange peel on the outside of either bend under a 10× loupe; the free crest preset measures 2.55 ± 0.5 into the flank (the formed band whose every corner the preload and stress gates in `build_drive_train_assembly` walk); a crack moves both nominal radii up until the coupon passes at their low limit, and re-runs the corner gates |
+| pinion-spring bend coupon (before forming MHA-DT-024) | cut a coupon from the 2325K19 roll along its 50 in length (bend line across the rolling direction, as the part is cut); bend it 90° and 25° over a 7/32 in (Ø5.56) drill-rod mandrel, R2.78, at or under the R2.8 the ±0.5 formed band accepts on both R3.3 bends; then form one leaf and measure its free preset | whether 17-7 PH Condition C takes the tightest radius the drawing accepts at 0.015 in — the R3.3 nominal is proxied from NASA SP-5089 Table XXXI (hardened STA sheet, 0.012–0.016 in, R 0.13 in), and Condition C has less elongation, so the coupon qualifies the band's low limit, not the nominal | no crack or orange peel on the outside of either bend under a 10× loupe; the free crest preset measures 2.55 ± 0.5 into the flank (the formed band whose every corner the preload and stress gates in `build_dt_drive_train_assembly` walk); a crack moves both nominal radii up until the coupon passes at their low limit, and re-runs the corner gates |
 
 ## Fit classes (interfaces that must carry a rule)
 
@@ -543,7 +543,7 @@ are the concrete realizations of the classes above, being lifted into `tolerance
   within the 15 mm half-stroke. The sparse pair reaches only 13.705 mm at the
   built radius. These are local linearized values, not a force-driven motion
   simulation. **The minimum
-  pose is not CAD-gated**: `build_magnifier_assembly` builds and `verify:soundness` exercises
+  pose is not CAD-gated**: `build_mg_magnifier_assembly` builds and `verify:soundness` exercises
   only the as-built 165 mm placement; no clearance or articulation proof exists with the clamp
   face against the collar face (the vertical rod hangs 6 mm forward of the collar), yet every
   broad input is scored there. `check:budget` names the inputs that rely on it and fails
@@ -595,7 +595,7 @@ left "deferred":
   via STEP** (emitted by `SaveAs3` in `export_models.py`/`cut_release.py`) into **Fusion 360**
   (Makers SKU) → G-code; CAM cuts nominal, so the toleranced print carries fits/finish. **Caveat:** the
   neutral export writes one STEP per SLDPRT (active config), so a multi-config part like the 20-config
-  `cone-gear` needs a **per-config STEP export path added** before all 20 can be fed to CAM (see the
+  `dt-cone-gear` needs a **per-config STEP export path added** before all 20 can be fed to CAM (see the
   assessment §11). Authored after the §4 Findings close. Manual mill + lathe still make every one-off part.
 - **DXF — narrow role, NOT the primary CAM feed.** 2D only; used only for genuinely flat parts, 2.5D
   contour/indexed profiles (cam/gear-tooth flanks), and inspection-reference overlays — subordinate to

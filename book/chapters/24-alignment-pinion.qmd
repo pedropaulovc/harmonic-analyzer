@@ -15,18 +15,18 @@ The mechanism that sets the machine for sines or cosines, and the reason the con
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `alignment-pinion` | TODO | TODO | TODO |
-| `pinion-arbor` | TODO | TODO | TODO |
-| `pinion-bracket` | TODO | TODO | TODO |
-| `pinion-lever` | TODO | TODO | TODO |
-| `pinion-cam` | TODO | TODO | TODO |
-| `pinion-cam-pin` | TODO | TODO | TODO |
-| `pinion-lift-rod` | TODO | TODO | TODO |
-| `pinion-handle` | TODO | TODO | TODO |
-| `pinion-pivot-block` | TODO | TODO | TODO |
-| `pinion-pivot-shaft` | TODO | TODO | TODO |
-| `pinion-spring` | TODO | TODO | TODO |
-| `swing-stop-screw` | TODO | TODO | TODO |
+| `dt-alignment-pinion` | TODO | TODO | TODO |
+| `dt-pinion-arbor` | TODO | TODO | TODO |
+| `dt-pinion-bracket` | TODO | TODO | TODO |
+| `dt-pinion-lever` | TODO | TODO | TODO |
+| `dt-pinion-cam` | TODO | TODO | TODO |
+| `dt-pinion-cam-pin` | TODO | TODO | TODO |
+| `dt-pinion-lift-rod` | TODO | TODO | TODO |
+| `dt-pinion-handle` | TODO | TODO | TODO |
+| `dt-pinion-pivot-block` | TODO | TODO | TODO |
+| `dt-pinion-pivot-shaft` | TODO | TODO | TODO |
+| `dt-pinion-spring` | TODO | TODO | TODO |
+| `vn-swing-stop-screw` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 SolidWorks 2023+ exports glTF binary via plain `SaveAs3("<path>.glb", 0, silent)` — the
 format is inferred from the extension (no format enum; the adapter's `export_file`
 maps "glb"→41 but never passes it). Verified live on R2026x with `magnifier.SLDASM`

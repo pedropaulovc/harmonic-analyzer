@@ -15,13 +15,13 @@ Twenty springs pull on one end, one big spring on the other, and the whole thing
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `summing-lever` | TODO | TODO | TODO |
-| `knife-mount` ×2 | TODO | TODO | TODO |
-| `knife-hanger-stud` | TODO | TODO | TODO |
-| `boss-hook` | TODO | TODO | TODO |
-| `counter-spring` | TODO | TODO | TODO |
-| `fulcrum-keeper` | TODO | TODO | TODO |
-| `gooseneck` | TODO | TODO | TODO |
+| `sm-summing-lever` | TODO | TODO | TODO |
+| `sm-knife-mount` ×2 | TODO | TODO | TODO |
+| `vn-knife-hanger-stud` | TODO | TODO | TODO |
+| `vn-boss-hook` | TODO | TODO | TODO |
+| `vn-counter-spring` | TODO | TODO | TODO |
+| `ch-fulcrum-keeper` | TODO | TODO | TODO |
+| `sm-gooseneck` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

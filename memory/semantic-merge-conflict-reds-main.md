@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 During the 2026-07-21/22 drawing-batch merge campaign, merging **#359** (green
 on its own head, `gh pr merge --merge`) left **origin/main RED** on
 `check:recipe`. Root cause was a **semantic merge conflict**, invisible to git:

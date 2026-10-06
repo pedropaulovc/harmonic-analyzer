@@ -1,7 +1,7 @@
 """Import-time contracts for the cone tip block's hold-down stack in the drive train.
 
-The block (MHA-092) stands straight on the swing platform, held by one socket
-head cap screw (MHA-140) rising through the plate's counterbored hold-down
+The block (MHA-DT-021) stands straight on the swing platform, held by one socket
+head cap screw (MHA-VN-030) rising through the plate's counterbored hold-down
 hole into a blind tap in its foot (user ruling 2026-09-29).  The drive-train
 builder asserts, when it is imported, that the block, the platform, the post
 and the shaft agree and that every stack the hold-down fixes still closes at
@@ -15,12 +15,12 @@ import pytest
 
 
 def test_post_fillisters_engage_the_plate_tap_at_least_090d() -> None:
-    """I22: each MHA-142 seats on the post's counterbore floor and runs into
-    the MHA-091 tap by its cut length past the post's grip -- never proud of
+    """I22: each MHA-VN-031 seats on the post's counterbore floor and runs into
+    the MHA-DT-020 tap by its cut length past the post's grip -- never proud of
     the plate underside, and 0.90D of thread after the tap's edge break."""
-    import build_drive_train_assembly as bdt
-    import cone_swing_platform_spec as platform
-    import post_mount_screw_spec as screw
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_spec as platform
+    import vn_post_mount_screw_spec as screw
 
     assert bdt.POST_SCREW_SEAT == pytest.approx(screw.GRIP_MM)
     assert bdt.POST_SCREW_INTO_PLATE == pytest.approx(
@@ -37,8 +37,8 @@ def test_tip_block_stands_on_the_plate_at_its_print_worst() -> None:
     """The straight prism's whole foot is its plan section, and each side face
     keeps the containment floor plus the print-worst margin inside its own
     plate edge."""
-    import build_drive_train_assembly as bdt
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
 
     south, north, half = bdt.PLATFORM_RIDER_SPANS["tip block"]
     assert (south, north) == pytest.approx(
@@ -56,8 +56,8 @@ def test_block_plus_x_face_is_held_against_the_plates_west_edge() -> None:
     """Both riders take the plate's frame (ROT_Y_INCLINE), whose local +x is
     machine west, so the block's +X face -- where the width's band lands --
     must be checked against the plate's authored +x (west) edge."""
-    import build_drive_train_assembly as bdt
-    import cone_swing_platform_geometry as geometry
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_swing_platform_geometry as geometry
 
     for station in (
         bdt.TIP_BLOCK_STATION - bdt.TIP_BLOCK_Z / 2.0,
@@ -72,8 +72,8 @@ def test_block_plus_x_face_is_held_against_the_plates_west_edge() -> None:
 def test_block_width_needs_its_three_place_band_for_containment() -> None:
     """The width prints .XXX: at .XX its band on the +X face leaves less than
     the print-worst margin over the plate's narrow west edge."""
-    import build_drive_train_assembly as bdt
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
 
     assert block.BLOCK_WIDTH_PLACES == 3
     widened = dict(bdt.TIP_WORST_HALF_WIDTHS_MM)
@@ -86,8 +86,8 @@ def test_hold_down_hole_stands_under_the_block_foot_tap() -> None:
     """The plate's hole and the block's tap sit the same offset off the cone
     line and the adjuster axis, so in the machine the screw rises into the
     tap and the block body stands centred on the cone line."""
-    import build_drive_train_assembly as bdt
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
 
     assert bdt.PLAT_HOLDDOWN_LOCAL_X == pytest.approx(block.FOOT_TAP_OFFSET_X)
     assert bdt.PLAT_HOLDDOWN_LOCAL_X != 0.0  # a real, dimensionable station
@@ -106,7 +106,7 @@ def test_pinch_screw_head_faces_the_blocks_plus_x_clearance_face() -> None:
     """The fillister is authored head up (+Y); its placement must turn that
     onto the block's +X axis, the face whose near jaw is drilled clear, so
     the shank threads only into the far jaw."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     rows = bdt.ROT_PINCH_WEST
     assert rows[1] == pytest.approx(bdt.ROT_Y_INCLINE[0])
@@ -122,8 +122,8 @@ def test_pinch_screw_head_faces_the_blocks_plus_x_clearance_face() -> None:
 def test_pivot_head_keeps_its_air_to_the_block_north_face() -> None:
     """The pivot-screw head clears the block's north face by PIVOT_HEAD_AIR
     at the printed limits; with HoldDownZ at the .XX band it would not."""
-    import build_drive_train_assembly as bdt
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
 
     assert bdt.PIVOT_HEAD_WORST_GAP >= bdt.PIVOT_HEAD_AIR
     band = (
@@ -139,9 +139,9 @@ def test_adjuster_embed_stays_in_its_working_window() -> None:
     """The cup's seat moves with the tip's station and the north face's; both
     extremes, with the set end play, stay in the adjuster's 1.0D window.
     Sec4End at .XX (user ruling 2026-09-29) still closes; at .X it would not."""
-    import build_drive_train_assembly as bdt
-    import cone_gear_shaft_spec as shaft
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_gear_shaft_spec as shaft
+    import dt_cone_tip_block_spec as block
 
     assert shaft.DRAWING_PRECISION_BY_NAME["Sec4End"] == 2
     low, high = bdt.TIP_EMBED_WORST_MM
@@ -153,11 +153,11 @@ def test_adjuster_embed_stays_in_its_working_window() -> None:
 
 
 def test_stack_collar_never_touches_the_block() -> None:
-    """MHA-096 is locked on the shaft one feeler off T006 and must keep air to
+    """MHA-VN-016 is locked on the shaft one feeler off T006 and must keep air to
     the block's south face at the printed limits (user ruling 2026-09-29):
     the block's Depth at .XX would let the collar reach it."""
-    import build_drive_train_assembly as bdt
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
 
     assert block.DRAWING_PRECISION["BlockProfile"]["Depth"] == 3
     assert bdt.TIP_COLLAR_WORST_AIR >= 0.0
@@ -168,7 +168,7 @@ def test_stack_collar_never_touches_the_block() -> None:
 
 def _loosened(tight_mm: float) -> float:
     """How much a band grows when a +/-0.10 or .XXX grade falls back to .XX."""
-    import cone_tip_block_spec as block
+    import dt_cone_tip_block_spec as block
 
     return block.printed_band_mm(2) - tight_mm
 
@@ -177,9 +177,9 @@ def test_cone_boss_length_at_one_place_opens_the_embed_band() -> None:
     """ConeBossLen prints .XX (user ruling 2026-09-29): the shaft collar bears
     on the boss's north face, half its band off the post centre, and at .X
     the adjuster's shallow extreme leaves its window."""
-    import build_drive_train_assembly as bdt
-    import cone_pivot_post_spec as post
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_pivot_post_spec as post
+    import dt_cone_tip_block_spec as block
 
     assert post.DRAWING_PRECISION["ConeShaftBoss"]["ConeBossLen"] == 2
     grown = (block.printed_band_mm(1) - block.printed_band_mm(2)) / 2.0
@@ -190,7 +190,7 @@ def test_cone_boss_length_at_one_place_opens_the_embed_band() -> None:
 def test_post_mount_stations_need_their_explicit_band() -> None:
     """The platform's post-mount taps (+/-0.10) move the collar face; at .XX
     the adjuster's embed leaves its window."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     assert bdt.PLAT_POST_MOUNT_STATION_TOL_MM == pytest.approx(0.10)
     grown = _loosened(bdt.PLAT_POST_MOUNT_STATION_TOL_MM)
@@ -201,7 +201,7 @@ def test_post_mount_stations_need_their_explicit_band() -> None:
 def test_foot_tap_stations_need_their_explicit_band() -> None:
     """FootTapZ at .XX moves the north face past the pivot head's air;
     FootTapX at .XX moves the adjuster axis past the post's take-up."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     grown = _loosened(bdt.TIP_FOOT_TAP_STATION_TOL_MM)
     with pytest.raises(AssertionError, match="pivot-screw head"):
@@ -213,8 +213,8 @@ def test_foot_tap_stations_need_their_explicit_band() -> None:
 
 
 def test_passage_centre_needs_three_places_for_the_lateral_take_up() -> None:
-    import build_drive_train_assembly as bdt
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
 
     assert bdt.TIP_PASSAGE_CENTER_PLACES == 3
     grown = block.printed_band_mm(2) - block.printed_band_mm(3)
@@ -226,7 +226,7 @@ def test_passage_centre_needs_three_places_for_the_lateral_take_up() -> None:
 
 def test_axis_height_needs_its_explicit_band_for_the_cup() -> None:
     """AxisHeight +/-0.10: at .XX the tip could miss the cup's mouth."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     assert bdt.TIP_AXIS_HEIGHT_TOL_MM == pytest.approx(0.10)
     loose = bdt.TIP_VERTICAL_ERROR_MM + _loosened(bdt.TIP_AXIS_HEIGHT_TOL_MM)
@@ -236,8 +236,8 @@ def test_axis_height_needs_its_explicit_band_for_the_cup() -> None:
 def test_post_turn_takes_up_the_tip_lateral_error() -> None:
     """Turning the post on its screws covers the adjuster axis's lateral
     error; with HoldDownX at the .XX band it would not."""
-    import build_drive_train_assembly as bdt
-    import cone_tip_block_spec as block
+    import build_dt_drive_train_assembly as bdt
+    import dt_cone_tip_block_spec as block
 
     assert bdt.TIP_LATERAL_ERROR_MM <= bdt.TIP_LATERAL_CAPACITY_MM
     error = (
@@ -252,7 +252,7 @@ def test_post_turn_takes_up_the_tip_lateral_error() -> None:
 def test_tip_stays_inside_the_adjuster_cup_vertically() -> None:
     """Post journal height and block AxisHeight bands keep the stub inside the
     cup's mouth."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     assert bdt.TIP_VERTICAL_ERROR_MM <= bdt.TIP_CUP_CAPTURE_MM
 
@@ -260,7 +260,7 @@ def test_tip_stays_inside_the_adjuster_cup_vertically() -> None:
 def test_west_edge_is_proven_over_the_whole_swing() -> None:
     """Main, I31 item 8: the north-west edge keeps the arbor pedestals, the
     base lip and every other base seat clear from engaged to disengaged."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     assert bdt.SWING_ANGLES[0] == 0.0
     assert bdt.SWING_ANGLES[-1] == pytest.approx(bdt.DISENGAGE_DEG)
@@ -286,7 +286,7 @@ def test_swing_occupants_are_the_parts_standing_on_the_seats() -> None:
     checked by plan footprint; only the column tube, round in its socket, keeps
     a radius.  Every occupant clears the plate by SWING_SEAT_RUNNING_CLEARANCE
     over the whole swing, and each footprint covers the seats that hold it."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     assert not hasattr(bdt, "SWING_FEATURE_CLEARANCE")
     assert not hasattr(bdt, "SWING_SEAT_FLOORS")
@@ -315,7 +315,7 @@ def test_swing_occupants_are_the_parts_standing_on_the_seats() -> None:
 def test_pruned_swing_sweep_finds_the_every_sample_minimum() -> None:
     """The occupant sweep skips samples its motion bound rules out; it must
     report exactly the minimum a sweep of every sample finds."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     for occupant, (clear, swing) in bdt.SWING_OCCUPANT_CLEARANCE.items():
         if occupant in bdt.SWING_FOOTPRINTS:
@@ -336,7 +336,7 @@ def test_swing_sweep_catches_a_footprint_the_engaged_pose_misses() -> None:
     """Fail-first control: a synthetic footprint parked where the plate's
     corner arrives only at full disengage passes an engaged-only check and
     fails the swept one."""
-    import build_drive_train_assembly as bdt
+    import build_dt_drive_train_assembly as bdt
 
     engaged = bdt.plate_vertices_machine(0.0)
     swung = bdt.plate_vertices_machine(bdt.DISENGAGE_DEG)

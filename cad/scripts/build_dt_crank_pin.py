@@ -1,0 +1,207 @@
+r"""Build removable crank taper pin MHA-DT-009.
+
+The custom 1:48 pin secures separate hub MHA-DT-031 to crankshaft MHA-DT-011 and is
+removed to release the matched arm/hub assembly for gear service.  Its brass
+keeper ring passes through the small cross-hole near the big end.
+
+Layout: pin axis along +X from the origin (big end at x=0), profile revolved
+360 degrees about a centreline on the axis.
+
+Run (SolidWorks already open)::
+
+    uv run python cad\scripts\build_dt_crank_pin.py
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+
+from _common import (
+    SketchDims,
+    add_line_chain,
+    apply_material,
+    check,
+    drive_dimension,
+    ensure_fully_defined,
+    force_rebuild,
+    define_circle,
+    name_last_feature,
+    report_mass_properties,
+    run_build,
+    save_part_and_images,
+    set_global,
+    set_sketch_direct_db,
+    volume_check,
+)
+from _drawing_marks import (
+    apply_drawing_precision,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+)
+from _part_pmi import author_part_pmi
+from _saved_part_guard import require_saved_drawing_properties
+from dt_crank_pin_spec import (
+    RING_HOLE_DIA,
+    RING_HOLE_X,
+    BIG_END_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
+    DRAWING_NOTES,
+    END_VIEW_NOTE,
+    PIN_LENGTH,
+    SMALL_END_DIA,
+    SURFACE_FINISHES,
+)
+
+PART_NAME = "dt-crank-pin"
+MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
+
+
+async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+
+    check("create_part", await adapter.create_part())
+
+    # Editable knobs (Tools > Equations): length + the two end diameters. The mm
+    # suffix is load-bearing (INCH document; the equation manager reads bare
+    # numbers in document units).
+    await set_global(adapter, "PinLength", f"{PIN_LENGTH}mm")
+    await set_global(adapter, "RingHoleX", f"{RING_HOLE_X}mm")
+    await set_global(adapter, "RingHoleDia", f"{RING_HOLE_DIA}mm")
+    await set_global(adapter, "BigEndDia", f"{BIG_END_DIA}mm")
+    await set_global(adapter, "SmallEndDia", f"{SMALL_END_DIA}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    profile = SketchDims()
+    check("create_sketch profile", await adapter.create_sketch("Front"))
+    # Direct-to-DB: inferencing would snap the ~0.6 deg taper line to an
+    # auto "horizontal" relation, flattening the frustum into a cylinder.
+    set_sketch_direct_db(adapter, True)
+    centerline = check(
+        "add_centerline axis",
+        await adapter.add_centerline(0.0, 0.0, PIN_LENGTH, 0.0),
+    )
+    lines = await add_line_chain(
+        adapter,
+        [
+            (0.0, 0.0),
+            (0.0, BIG_END_DIA / 2.0),
+            (PIN_LENGTH, SMALL_END_DIA / 2.0),
+            (PIN_LENGTH, 0.0),
+        ],
+    )
+    set_sketch_direct_db(adapter, False)
+    big_end, _taper, small_end, _axis_closure = lines
+    # 8-DOF profile: the centerline merged into the (0, 0) /
+    # (PIN_LENGTH, 0) chain ends, so horizontal + a length dim on it keep
+    # the small end on the axis; the taper line rides its pinned
+    # neighbours (no h/v on it -- that is the whole point of the frustum).
+    check(
+        "anchor big end",
+        await adapter.add_sketch_constraint(f"{big_end}.start", "origin", "coincident"),
+    )
+    check(
+        "axis horizontal",
+        await adapter.add_sketch_constraint(centerline, None, "horizontal"),
+    )
+    # Record each manual dim into SketchDims as it is added (creation order):
+    # length, then big-end radius, then small-end radius -- three display dims.
+    check(
+        "pin length",
+        await adapter.add_sketch_dimension(centerline, None, "linear", PIN_LENGTH),
+    )
+    profile.record("Length", '"PinLength"')
+    for label, ent, radius, name, drive in (
+        ("big end", big_end, BIG_END_DIA / 2.0, "BigRadius", '"BigEndDia" / 2'),
+        ("small end", small_end, SMALL_END_DIA / 2.0, "SmallRadius", '"SmallEndDia" / 2'),
+    ):
+        check(
+            f"{label} vertical",
+            await adapter.add_sketch_constraint(ent, None, "vertical"),
+        )
+        check(
+            f"{label} radius",
+            await adapter.add_sketch_dimension(ent, None, "linear", radius),
+        )
+        profile.record(name, drive)
+    await ensure_fully_defined(adapter, "pin profile")
+    check("exit_sketch profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinProfile")
+    drive_jobs += profile.apply(adapter, "PinProfile")
+
+    check(
+        "revolve pin",
+        await adapter.create_revolve(RevolveParameters(angle=360.0)),
+    )
+    name_last_feature(adapter, "Pin")
+
+    # Conical frustum: V = pi*h/3 * (R1^2 + R1*R2 + R2^2).
+    r1, r2 = BIG_END_DIA / 2.0, SMALL_END_DIA / 2.0
+    v_pin = math.pi * PIN_LENGTH / 3.0 * (r1 * r1 + r1 * r2 + r2 * r2)
+    await volume_check(adapter, "pin", v_pin, 0.005 * v_pin)
+
+    # Keeper-ring cross-hole: a Front-plane circle at (RING_HOLE_X, 0) cut
+    # mid-plane along Z clean through the head (both directions, depth well
+    # past the big end). Removed ~ a cylinder through the local pin diameter.
+    ring_hole = SketchDims()
+    check("create_sketch ring hole", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, RING_HOLE_X, 0.0, RING_HOLE_DIA / 2.0, "ring hole", dims=ring_hole,
+        names=("RingHoleX", "RingHoleY", "RingHoleDia"),
+        drives=('"RingHoleX"', None, '"RingHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "ring hole sketch")
+    check("exit_sketch ring hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "RingHoleProfile")
+    drive_jobs += ring_hole.apply(adapter, "RingHoleProfile")
+    check(
+        "cut ring hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=2.0 * BIG_END_DIA, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "RingHole")
+    d_at_hole = BIG_END_DIA - (BIG_END_DIA - SMALL_END_DIA) * RING_HOLE_X / PIN_LENGTH
+    v_ring_hole = math.pi * (RING_HOLE_DIA / 2.0) ** 2 * d_at_hole
+    v_pin -= v_ring_hole
+    await volume_check(adapter, "pin with ring hole", v_pin, 0.1 * v_ring_hole)
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(adapter, "driven pin (equations neutral)", v_pin, 0.005 * v_pin)
+
+    await apply_material(adapter, MATERIAL)
+    await report_mass_properties(adapter)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "End View Note": END_VIEW_NOTE,
+        },
+    )
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number", "Material Specification", "Finish", "Quantity",
+            "Manufacturing Notes", "End View Note",
+        ),
+    )
+    return artefacts
+
+
+if __name__ == "__main__":
+    sys.exit(run_build(build))

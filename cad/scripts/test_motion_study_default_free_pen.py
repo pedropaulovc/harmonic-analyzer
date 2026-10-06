@@ -27,8 +27,8 @@ def _install_mate_scan(monkeypatch, names: list[str]) -> None:
         "_iter_mates",
         lambda *_args, **_kwargs: [_mate(name) for name in names],
     )
-    monkeypatch.setattr(springs, "_lone_real", lambda *_args: "pen-rod-1")
-    monkeypatch.setattr(springs, "_family", lambda _name: "pen-rod")
+    monkeypatch.setattr(springs, "_lone_real", lambda *_args: "pn-pen-rod-1")
+    monkeypatch.setattr(springs, "_family", lambda _name: "pn-pen-rod")
     monkeypatch.setattr(springs, "log", lambda *_args: None)
 
 

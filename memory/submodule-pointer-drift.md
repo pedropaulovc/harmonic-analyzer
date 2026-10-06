@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 2026-07-04, PR7: `part:cone_pivot_post` failed its crank-bore volume check
 (+1314 mm³ — the revolve ran as a BOSS, not a cut). Root cause: the
 `SolidworksMCP-python` submodule working tree sat on a local `personal`

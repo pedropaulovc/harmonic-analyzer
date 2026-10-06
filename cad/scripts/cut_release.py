@@ -16,7 +16,7 @@ What it does, in order:
      compact release tag (``v31`` -> ``v32``), and require
      ``cad/config/release.yaml`` to reserve that same CAD Revision.
   2. Pre-flight: tag must not already exist; the committed tree must be clean
-     (``--allow-dirty`` to override); harmonic-analyzer.SLDASM must be built.
+     (``--allow-dirty`` to override); ha-harmonic-analyzer.SLDASM must be built.
   3. Stage the bundle. This script opens NO SolidWorks document and needs NO
      seat: ``package_native.py`` (doit task ``package:release``, dispatchable to
      the farm) already ran every Pack-and-Go and left a PREPARED native tree
@@ -28,7 +28,7 @@ What it does, in order:
      validated and staged: AP214 STEP for every part, fine binary STL for every
      part/assembly plus distinct configurations, and the build-owned isometric
      PNG for every document. Also copies the millimetre
-     scene graph (``cad/out/boxes/harmonic-analyzer.json`` from export_models.py)
+     scene graph (``cad/out/boxes/ha-harmonic-analyzer.json`` from export_models.py)
      so the comparison gallery renders from the bundle with no SolidWorks.
      The independently produced feature bundles are checked for the same face
      labels and patch counts as the full STEPs, then copied intact under
@@ -96,7 +96,8 @@ import _telemetry
 import trim_renders
 
 REPO_ROOT = CAD_ROOT.parent
-TOP_ASSEMBLY = "harmonic-analyzer"
+PROJECT_SLUG = "harmonic-analyzer"
+TOP_ASSEMBLY = "ha-harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
 # Per-task build/verify logs teed by dodo.py:_run (part-*, assembly-*, verify-*,
 # check-*). Shipped as a SEPARATE GitHub-release LOGS asset (zipped together with
@@ -302,7 +303,7 @@ def _repo_slug() -> str:
     """``owner/repo`` from the origin remote, for building asset URLs."""
     url = _git("config", "--get", "remote.origin.url", check_rc=False)
     m = re.search(r"github\.com[:/](.+?)(?:\.git)?$", url or "")
-    return m.group(1) if m else "pedropaulovc/harmonic-analyzer"
+    return m.group(1) if m else f"pedropaulovc/{PROJECT_SLUG}"
 
 
 def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
@@ -653,7 +654,7 @@ def write_provenance(
     """
     diff = facts.get("diff") or {}
     prov = {
-        "schema": "harmonic-analyzer/provenance@1",
+        "schema": f"{PROJECT_SLUG}/provenance@1",
         "release": {
             "version": version,
             "previous": diff.get("prev"),
@@ -893,7 +894,7 @@ def bundle(
     package = load_native_package()
     revision = package["solidworks_revision"]
 
-    stage = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}"
+    stage = RELEASE_DIR / f"{PROJECT_SLUG}-{version}"
     if stage.exists():
         shutil.rmtree(stage)  # regenerate-don't-repair: stale staging never shipped
     stage.mkdir(parents=True)
@@ -955,7 +956,7 @@ def bundle(
     facts["provenance"] = write_provenance(stage, version, revision, facts)
 
     # 6. One zip of the whole stage.
-    zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}.zip"
+    zip_path = RELEASE_DIR / f"{PROJECT_SLUG}-{version}.zip"
     if zip_path.exists():
         zip_path.unlink()
     shutil.make_archive(str(zip_path.with_suffix("")), "zip", root_dir=str(stage))
@@ -1020,7 +1021,7 @@ def release_notes(version: str, facts: dict[str, Any]) -> str:
         f"analyzer.\n\n"
         f"The repository is source-of-truth (`doit` regenerates every "
         f"part). This release attaches a single **CAD bundle** "
-        f"`harmonic-analyzer-{version}.zip` so the model can be opened without "
+        f"`{PROJECT_SLUG}-{version}.zip` so the model can be opened without "
         f"rebuilding -- with or without SolidWorks:\n\n"
         f"- `solidworks/` -- native Pack-and-Go ({facts['native_documents']} referenced "
         f"documents, flattened): open `{TOP_ASSEMBLY}.SLDASM` as-is\n"
@@ -1100,7 +1101,7 @@ def _logs_asset(version: str, log_path: Path | None) -> Path | None:
 
     Gathers every per-task build log (``cad/out/logs/*.log``, teed by dodo.py's
     ``_run``) plus this run's ``*-release.log``. With 2+ logs they are packed into
-    ``<top>-<version>-logs.zip`` -- one tidy asset instead of a scatter of loose
+    ``<project>-<version>-logs.zip`` -- one tidy asset instead of a scatter of loose
     files; a lone log is attached as-is. Each build log reflects its task's MOST
     RECENT run (doit skips up-to-date tasks), so on an incremental release a log
     may predate this tag.
@@ -1114,7 +1115,7 @@ def _logs_asset(version: str, log_path: Path | None) -> Path | None:
     if len(logs) == 1:
         log(f"logs: 1 file -> attaching loose ({logs[0].name})")
         return logs[0]
-    zip_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-logs.zip"
+    zip_path = RELEASE_DIR / f"{PROJECT_SLUG}-{version}-logs.zip"
     if zip_path.exists():
         zip_path.unlink()
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -1221,7 +1222,7 @@ def _start_release_log(version: str) -> tuple[Path, Any]:
     stops at the ``gh release create`` that uploads it -- the publish tail and the
     final summary print after it are not in the asset (they go to the console).
     """
-    log_path = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}-release.log"
+    log_path = RELEASE_DIR / f"{PROJECT_SLUG}-{version}-release.log"
     fh = log_path.open("w", encoding="utf-8")
     saved_out, saved_err = sys.stdout, sys.stderr
     sys.stdout = _Tee(saved_out, fh)
@@ -1290,7 +1291,7 @@ def main() -> int:
                 traceback.print_exc()
                 return 1
 
-            release_root = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}"
+            release_root = RELEASE_DIR / f"{PROJECT_SLUG}-{version}"
             with tempfile.TemporaryDirectory(
                 dir=RELEASE_DIR, prefix=f".{version}-readme-images-"
             ) as temporary:
@@ -1320,7 +1321,7 @@ def main() -> int:
                                 f"release {version} was published at {url}, but could not "
                                 "install all generated README images and the revision bump; "
                                 "recover with `uv run python cad/scripts/trim_renders.py "
-                                f"--release-root cad/out/release/{TOP_ASSEMBLY}-{version}`, "
+                                f"--release-root cad/out/release/{PROJECT_SLUG}-{version}`, "
                                 f"set {RELEASE_VERSION_FILE} to "
                                 f"next_revision: {prepared.next_version}, and commit both "
                                 "in one generated-only follow-up PR before the next release. "

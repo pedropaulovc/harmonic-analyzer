@@ -23,7 +23,7 @@ _MATE_NAME = {
     10: "GEAR", 13: "RACKPINION", 16: "LOCK",
 }
 
-SUBS = ("channel", "drive-train", "output")
+SUBS = ("ch-channel", "dt-drive-train", "output")
 
 
 async def _open(adapter, name):

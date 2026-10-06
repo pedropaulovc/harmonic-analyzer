@@ -55,16 +55,16 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 
 | # | chapter | ends by making |
 |---|---|---|
-| 9 | Turning: facing, OD, shoulders | `crank-pin`, `pivot-shaft` blanks |
+| 9 | Turning: facing, OD, shoulders | `dt-crank-pin`, `ch-pivot-shaft` blanks |
 | 10 | Drilling, boring, reaming | `pivot-bushing` bore (Ø6.5 on Ø6.35, 0.15 mm clearance) |
 | 11 | Parting off to a length tolerance | the 19 `pivot-bushing` + 19 `lever-bushing` sets — **length sets the 7.0565 mm channel pitch** |
-| 12 | Slender work: steadies and followers | `cone-gear-shaft` (Ø1.5875 mm slender terminal land; mill four co-clocked gear-land flats, with the smallest continuing through the tip) |
-| 13 | Milling: squaring, profiling, edges | `rocker-arm` (R800 concave top edge as a 2D profile, ×20) |
-| 14 | Hole patterns and tapping | `rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_rocker_arm_support.py`), the 20 Ø2.0 spring holes |
-| 15 | Indexing and the dividing head | `cylinder-gear` 0.4 mm alignment notches, co-phased |
+| 12 | Slender work: steadies and followers | `dt-cone-gear-shaft` (Ø1.5875 mm slender terminal land; mill four co-clocked gear-land flats, with the smallest continuing through the tip) |
+| 13 | Milling: squaring, profiling, edges | `ch-rocker-arm` (R800 concave top edge as a 2D profile, ×20) |
+| 14 | Hole patterns and tapping | `fr-rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_fr_rocker_arm_support.py`), the 20 Ø2.0 spring holes |
+| 15 | Indexing and the dividing head | `dt-cylinder-gear` 0.4 mm alignment notches, co-phased |
 | 16 | **Making your own gear cutters** | Eureka-method form cutters for DP 49.82 — **off-the-shelf cutters for this pitch do not exist** |
-| 17 | **Cutting the gears** | first `cone-gear` (T120, the easy end) |
-| 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-014 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then lock the stack collar on a 0.45 mm feeler |
+| 17 | **Cutting the gears** | first `dt-cone-gear` (T120, the easy end) |
+| 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-DT-004 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then lock the stack collar on a 0.45 mm feeler |
 | 19 | Finishing | Draw filing, stoning, polishing, blacking; matching the original's finishes |
 
 ## Part IV — Making the parts
@@ -74,17 +74,17 @@ stock, setups, operations, inspection, and what went wrong the first time.
 
 | # | chapter | parts |
 |---|---|---|
-| 20 | Frame and base | `harmonic-base`, `tube-frame`, `top-frame`, `support-bar`, `rocker-arm-support`, feet |
-| 21 | The crank and drive train | `crank-arm`, `crank-handle`, `crank-pin`, `crankshaft`, `crank-drive-gear`, `crank-pinion` |
-| 22 | **The cone gear set** | `cone-gear` ×20 (T006–T120), `cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.621 mm minimum root-to-bore wall on its Ø1.5875 mm round bore. |
-| 23 | The cylinder gear set | `cylinder-gear` ×20 with integral eccentric cam and 0.4 mm index notch; `cylinder-gear-shaft`, `arbor-pedestal` |
-| 24 | The alignment pinion | `alignment-pinion`, `pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
-| 25 | A channel, twenty times | `connecting-rod`, `rocker-arm`, `amplitude-bar`, `channel-lever`, `pivot-bushing`, `lever-bushing`, springs. Batch strategy: how to make twenty identical things by hand without drift. |
-| 26 | The measuring stick | `measuring-stick` — hand-stamped divisions, and why the original's are uneven |
-| 27 | The summing lever and knife edge | `summing-lever`, `knife-mount`, `knife-hanger-stud`, `boss-hook`, `counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
-| 28 | The magnifier | `magnifying-lever`, `magnifying-wheel` (100 mm/20 mm coaxial, ×5), bracket, clamp, vertical rod, `lever-wire` |
-| 29 | The pen mechanism | `pen-frame`, `pen-v-block`, `pen-rod`, `pen-marker`, `pen-wire`, `output-fixture`. Note: the original was lost; this follows the 2013 reconstruction. |
-| 30 | The paper drive | `platen`, `platen-rack`, `platen-guide`, `platen-clip`, transgear train, `chain-sprocket` + roller chain, `transgear-arm` hanger, `latch-hook` + `latch-hook-bracket` |
+| 20 | Frame and base | `fr-harmonic-base`, `fr-tube-frame`, `fr-top-frame`, `pd-support-bar`, `fr-rocker-arm-support`, feet |
+| 21 | The crank and drive train | `dt-crank-arm`, `dt-crank-handle`, `dt-crank-pin`, `dt-crankshaft`, `dt-crank-drive-gear`, `dt-crank-pinion` |
+| 22 | **The cone gear set** | `dt-cone-gear` ×20 (T006–T120), `dt-cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.621 mm minimum root-to-bore wall on its Ø1.5875 mm round bore. |
+| 23 | The cylinder gear set | `dt-cylinder-gear` ×20 with integral eccentric cam and 0.4 mm index notch; `dt-cylinder-gear-shaft`, `dt-arbor-pedestal` |
+| 24 | The alignment pinion | `dt-alignment-pinion`, `dt-pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
+| 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm`, `ch-amplitude-bar`, `ch-channel-lever`, `pivot-bushing`, `lever-bushing`, springs. Batch strategy: how to make twenty identical things by hand without drift. |
+| 26 | The measuring stick | `ha-measuring-stick` — hand-stamped divisions, and why the original's are uneven |
+| 27 | The summing lever and knife edge | `sm-summing-lever`, `sm-knife-mount`, `vn-knife-hanger-stud`, `vn-boss-hook`, `vn-counter-spring`. The fabrication decision: cast, fabricate, or hog from solid. |
+| 28 | The magnifier | `mg-magnifying-lever`, `mg-magnifying-wheel` (100 mm/20 mm coaxial, ×5), bracket, clamp, vertical rod, `mg-lever-wire` |
+| 29 | The pen mechanism | `pn-pen-frame`, `pn-pen-v-block`, `pn-pen-rod`, `pn-pen-marker`, `pn-pen-wire`, `mg-output-fixture`. Note: the original was lost; this follows the 2013 reconstruction. |
+| 30 | The paper drive | `pd-platen`, `pd-platen-rack`, `pd-platen-guide`, `pd-platen-clip`, transgear train, `pd-chain-sprocket` + roller chain, `pd-transgear-arm` hanger, `pd-latch-hook` + `pd-latch-hook-bracket` |
 | 31 | Springs | 20 channel springs + the counter spring: winding your own, or specifying them for a spring house |
 | 32 | Fasteners and small parts | The screw families, period-appropriate heads, and what to substitute |
 
@@ -101,7 +101,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 
 | # | appendix | contains |
 |---|---|---|
-| A | Bill of materials | Every resolved part and quantity from `cad/out/harmonic-analyzer-bom.csv`, generated by the top-level CAD assembly build. |
+| A | Bill of materials | Every resolved part and quantity from `cad/out/ha-harmonic-analyzer-bom.csv`, generated by the top-level CAD assembly build. |
 | B | Drawing index | Every drawing sheet, cross-referenced to its chapter. Generated from the CAD build. |
 | C | Gear tables | Tooth counts, DP, PA, pitch/outside diameters, centre distances, cutter numbers, dividing-head plates and hole counts for every gear in the machine. |
 | D | Fits and tolerances | Every fit in the machine with the shop check that verifies it. From `cad/docs/tolerance-gdt-assessment.md`. |

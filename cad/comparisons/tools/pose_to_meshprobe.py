@@ -171,16 +171,16 @@ def load_pairs(path: Path) -> tuple[list[dict], str]:
     """Return ([{id, model, camera}], kind) from a manifest / deltas / bare-camera JSON."""
     doc = json.loads(path.read_text(encoding="utf-8"))
     if isinstance(doc, dict) and isinstance(doc.get("pairs"), list):
-        pairs = [dict(p, model=p.get("model", "harmonic_analyzer"))
+        pairs = [dict(p, model=p.get("model", "ha_harmonic_analyzer"))
                  for p in doc["pairs"] if p.get("camera")]
         return pairs, "manifest"
     if isinstance(doc, dict) and "camera" in doc:  # findings/<pair>_deltas.json
         pid = doc.get("pair") or path.stem
-        pair = {"id": pid, "model": "harmonic_analyzer", "camera": doc["camera"]}
+        pair = {"id": pid, "model": "ha_harmonic_analyzer", "camera": doc["camera"]}
         _enrich_from_manifest(pair)  # recover reference/model for canvas sizing
         return [pair], "deltas"
     if isinstance(doc, dict) and {"az_deg", "el_deg"} & doc.keys():  # bare camera dict
-        return [{"id": path.stem, "model": "harmonic_analyzer", "camera": doc}], "camera"
+        return [{"id": path.stem, "model": "ha_harmonic_analyzer", "camera": doc}], "camera"
     raise SystemExit(f"{path}: not a manifest, deltas, or camera JSON")
 
 
@@ -395,12 +395,22 @@ def resolve_glb(model: str, explicit: str | None, fetch: bool, tag: str | None) 
 
 
 def release_member(member: str, tag: str | None) -> Path:
-    """Extract one bundle member (e.g. gltf/<m>.glb, boxes/<m>.json) from the release."""
+    """Extract the actual old/new identity member and retain its cache basename."""
+    from release_diff import canonical_key, identity_inventory, load_identity_map
+
     tag = tag or _gh(["release", "view", "--json", "tagName", "-q", ".tagName"]).strip()
     cache = CAD_OUT / "release-cache" / tag
-    dest = cache / member
-    if dest.exists():
-        return dest
+    requested = Path(member)
+    mapping = load_identity_map()
+    logical = canonical_key(requested.stem, mapping)
+    cached = [
+        path for path in (cache / requested.parent).glob("*")
+        if path.is_file() and path.suffix.lower() == requested.suffix.lower()
+        and canonical_key(path.stem, mapping) == logical
+    ]
+    identity_inventory((path.stem for path in cached), mapping)
+    if cached:
+        return cached[0]
     cache.mkdir(parents=True, exist_ok=True)
     asset = _gh(["release", "view", tag, "--json", "assets",
                  "-q", '.assets[].name | select(endswith(".zip") and (contains("logs")|not))']).strip()
@@ -410,11 +420,21 @@ def release_member(member: str, tag: str | None) -> Path:
     if not bundle.exists():
         _gh(["release", "download", tag, "-p", asset, "--dir", str(cache), "--clobber"])
     with zipfile.ZipFile(bundle) as zf:
-        if member not in zf.namelist():
+        matches = [
+            name for name in zf.namelist()
+            if Path(name).parent.as_posix().lower() == requested.parent.as_posix().lower()
+            and Path(name).suffix.lower() == requested.suffix.lower()
+            and canonical_key(Path(name).stem, mapping) == logical
+        ]
+        identity_inventory((Path(name).stem for name in matches), mapping)
+        if not matches:
             raise SystemExit(
-                f"release {tag} bundles no {member} - GLB export landed after some tags "
-                f"(PR #339); tag {tag} predates it. Build locally (doit export) or pass --glb.")
-        zf.extract(member, cache)
+                f"release {tag} bundles no {member} identity member. "
+                f"Build locally (doit export) or pass --boxes/--glb.")
+        actual = matches[0]
+        dest = cache / actual
+        if not dest.exists():
+            zf.extract(actual, cache)
     return dest
 
 
@@ -578,6 +598,11 @@ def main() -> int:
         raise SystemExit("no matching pairs")
     print(f"# {len(pairs)} pair(s) from {kind}: {args.input}", file=sys.stderr)
 
+    # Resolve "latest" once so fetched boxes and GLBs come from the same tag.
+    release_tag = args.release_tag
+    if args.fetch_glb and not release_tag:
+        release_tag = _gh(["release", "view", "--json", "tagName", "-q", ".tagName"]).strip()
+
     bbox_cache: dict[str, tuple] = {}
     glb_cache: dict[str, tuple] = {}
     results, blocks = [], []
@@ -585,13 +610,13 @@ def main() -> int:
         model = pair["model"]
         if model not in bbox_cache:
             bbox_cache[model] = scene_bbox(model, args.boxes, args.glb, args.fetch_glb,
-                                           args.release_tag, args.unit_scale)
+                                           release_tag, args.unit_scale)
         w, h, src = canvas_for(pair, 1600, override)
         cvt = convert(pair, bbox_cache[model], w, h)
         cvt["canvas_source"] = src
         results.append(cvt)
         if args.format == "sh" and model not in glb_cache:
-            glb_cache[model] = resolve_glb(model, args.glb, args.fetch_glb, args.release_tag)
+            glb_cache[model] = resolve_glb(model, args.glb, args.fetch_glb, release_tag)
         if args.format == "sh" and not batch:
             glb, glb_src = glb_cache[model]
             blocks += emit_commands(mp, cvt, glb, glb_src, args.unit_scale,

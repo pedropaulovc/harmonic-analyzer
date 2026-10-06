@@ -72,7 +72,7 @@ part's `TOL_LIN_XX` / `TOL_LIN_XXX` / `TOL_ANG` / `TOL_SURFACE` custom
 properties from `cad/config/title_block.yaml`); the edge-break note; FINISH;
 MATERIAL; the ASME Y14.5-2018 interpretation note; DO NOT SCALE DRAWING; and
 the third-angle projection symbol. Right side: project title; PART name; DWG.
-NO. (`Number`, the MHA-### registry id); REV (the release tag); scale; UNIT;
+NO. (`Number`, the MHA-<subsystem>-### registry id (assembly 000; parts 001 onward)); REV (the release tag); scale; UNIT;
 copyright + CC BY-SA mark. The source part supplies the linked `$PRPSHEET`
 fields. `_common.part_properties` stamps `Number`, `Revision`, `Title`, and
 the `TOL_*` set. `_drawing_marks.apply_drawing_properties` stamps `Drawn By`

@@ -6,7 +6,7 @@ GEOMETRY ONLY, like ``cylinder_bank_layout``: no drawing notes, no drawing
 specs, no title-block reads. It reads the channel stations and nothing from
 the gear train, so the pivot parts never re-key on a cone or gear edit.
 
-The bank is a SOLID STACK: each MHA-071 arm's integral hub is one station
+The bank is a SOLID STACK: each MHA-CH-006 arm's integral hub is one station
 pitch long, and neighbouring hubs bear face on face. Reading 1 (user, #743
 Q4) retains it with no keeper:
 
@@ -14,7 +14,7 @@ Q4) retains it with no keeper:
   ear's inner face, and hub 19 bears on the shoulder. That ear is the bank's
   axial datum; the stack is pushed north against it.
 * The SOUTH bracket is feeler-set: one ROCKER_END_FEELER leaf between the
-  MHA-148 thrust washer on hub 0 and the south ear. That gap is the bank's
+  MHA-CH-009 thrust washer on hub 0 and the south ear. That gap is the bank's
   assembled end play E_r, and the shaft floats by the same E_r (the shoulder
   pulls the stack south until the washer meets the south ear).
 * Each hub's length is +0.05/0 on its print, and a fit-up acceptance on the
@@ -32,11 +32,11 @@ from __future__ import annotations
 import math
 
 import _config
-import amplitude_bar_spec as _bar
-import pivot_bracket_spec as _bracket
-import pivot_shaft_spec as _shaft
-import rocker_thrust_washer_spec as _washer
-from rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
+import ch_amplitude_bar_spec as _bar
+import ch_pivot_bracket_spec as _bracket
+import ch_pivot_shaft_spec as _shaft
+import ch_rocker_thrust_washer_spec as _washer
+from ch_rocker_arm_spec import HUB_LENGTH, HUB_LENGTH_BAND
 
 COUNT = 20  # the full bank (the brackets never follow active_count)
 
@@ -49,7 +49,7 @@ STATION_Z0 = _config.machine("channels", "station_z0_mm")  # channel 0 gear plan
 PITCH = _config.machine("channels", "station_pitch_mm")
 ARM_MID_DZ = 0.8  # arm/bar/lever mid-planes sit at z_j + 0.8
 if abs(HUB_LENGTH - PITCH) > 1e-6:
-    raise AssertionError("rocker_arm_spec.HUB_LENGTH must equal the station pitch")
+    raise AssertionError("ch_rocker_arm_spec.HUB_LENGTH must equal the station pitch")
 
 
 def hub_mid_z(j: int) -> float:

@@ -9,12 +9,12 @@ from __future__ import annotations
 import math
 
 import _config
-import amplitude_bar_spec
+import ch_amplitude_bar_spec
 import channel_frame_geom
-import channel_lever_spec
-import connecting_rod_spec
-import cylinder_gear_spec
-import rocker_arm_spec
+import ch_channel_lever_spec
+import ch_connecting_rod_spec
+import dt_cylinder_gear_spec
+import ch_rocker_arm_spec
 
 __all__ = ["ARC", "arc_geometry", "solve_state", "spring_hole_xy"]
 
@@ -23,27 +23,27 @@ _PIVOT = channel_frame_geom.ROCKER_PIVOT_XY
 _FULCRUM = channel_frame_geom.LEVER_FULCRUM_XY
 _RING_CENTER = (
     channel_frame_geom.CAM_SHAFT_XY[0]
-    + cylinder_gear_spec.ECCENTRICITY
+    + dt_cylinder_gear_spec.ECCENTRICITY
     * math.sin(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)),
     channel_frame_geom.CAM_SHAFT_XY[1]
-    + cylinder_gear_spec.ECCENTRICITY
+    + dt_cylinder_gear_spec.ECCENTRICITY
     * math.cos(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)),
 )
-_ROD_C2C = connecting_rod_spec.CENTER_DISTANCE
-_LEVER_DX = rocker_arm_spec.ROD_HOLE_X
-_LEVER_DY = rocker_arm_spec.ROD_HOLE_Y - rocker_arm_spec.PIVOT_MID_Y
+_ROD_C2C = ch_connecting_rod_spec.CENTER_DISTANCE
+_LEVER_DX = ch_rocker_arm_spec.ROD_HOLE_X
+_LEVER_DY = ch_rocker_arm_spec.ROD_HOLE_Y - ch_rocker_arm_spec.PIVOT_MID_Y
 _ARM_ROD_LEVER = math.hypot(_LEVER_DX, _LEVER_DY)
 _ARM_LEVER_BETA_DEG = math.degrees(math.atan2(_LEVER_DY, _LEVER_DX))
-_ARM_ARC_CENTER_LOCAL_Y = rocker_arm_spec.CENTER_Y
-_ARM_PIVOT_LOCAL_Y = rocker_arm_spec.PIVOT_MID_Y
-_ARM_TOP_RADIUS = rocker_arm_spec.CURVE_RADIUS
+_ARM_ARC_CENTER_LOCAL_Y = ch_rocker_arm_spec.CENTER_Y
+_ARM_PIVOT_LOCAL_Y = ch_rocker_arm_spec.PIVOT_MID_Y
+_ARM_TOP_RADIUS = ch_rocker_arm_spec.CURVE_RADIUS
 # TOP_PIN_Y is measured from the bar profile's bottom-origin foot axis.
-_BAR_TOP_TO_FOOT = amplitude_bar_spec.TOP_PIN_Y
-_CONTACT_OFF_X = amplitude_bar_spec.BAR_WIDTH / 2.0
-_CONTACT_OFF_Y = amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT - _config.fit(
+_BAR_TOP_TO_FOOT = ch_amplitude_bar_spec.TOP_PIN_Y
+_CONTACT_OFF_X = ch_amplitude_bar_spec.BAR_WIDTH / 2.0
+_CONTACT_OFF_Y = ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT - _config.fit(
     "cam_follower_contact", "contact_gap_mm"
 )
-_LEVER_BAR_PIN_X = channel_lever_spec.BAR_PIN_X
+_LEVER_BAR_PIN_X = ch_channel_lever_spec.BAR_PIN_X
 
 
 def arc_geometry() -> dict[str, float]:
@@ -156,8 +156,8 @@ def solve_state(amplitude: float = 0.0) -> dict[str, float]:
         "pin_y": ARC["pin_y"],
         "bar_tilt": -math.degrees(beta),
         "bar_bottom": fy,  # foot-axis Y
-        "bar_origin_x": fx + (amplitude_bar_spec.BAR_WIDTH / 2.0) * math.cos(beta),
-        "bar_origin_y": fy - (amplitude_bar_spec.BAR_WIDTH / 2.0) * math.sin(beta),
+        "bar_origin_x": fx + (ch_amplitude_bar_spec.BAR_WIDTH / 2.0) * math.cos(beta),
+        "bar_origin_y": fy - (ch_amplitude_bar_spec.BAR_WIDTH / 2.0) * math.sin(beta),
         "contact_y": contact_y,
         "bar_pin_y": ty,
         "lever_tilt": math.degrees(math.atan2(ty - _FULCRUM[1], _FULCRUM[0] - tx)),
@@ -169,9 +169,9 @@ def spring_hole_xy(amplitude: float = 0.0) -> tuple[float, float]:
     phi = math.radians(solve_state(amplitude)["lever_tilt"])
     return (
         channel_frame_geom.LEVER_FULCRUM_XY[0]
-        - channel_lever_spec.LEVER_SPRING_X * math.cos(phi),
+        - ch_channel_lever_spec.LEVER_SPRING_X * math.cos(phi),
         channel_frame_geom.LEVER_FULCRUM_XY[1]
-        + channel_lever_spec.LEVER_SPRING_X * math.sin(phi),
+        + ch_channel_lever_spec.LEVER_SPRING_X * math.sin(phi),
     )
 
 

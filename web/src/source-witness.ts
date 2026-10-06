@@ -36,8 +36,8 @@ export function validateNativeGeometryAssumptions(assumptions: readonly NativeGe
       if (!equalRecord(assumption[key], policy[key])) throw new Error(`Native geometry assumption has unapproved ${key}.`)
     }
     const pathPattern = policy.id === ROD_HEAD_FUNCTIONAL_EQUIVALENCE.id
-      ? /^harmonic-analyzer\/channel\/connecting-rod-(?:[1-9]|1[0-9]|20)$/
-      : /^harmonic-analyzer\/channel\/rocker-arm-(?:[1-9]|1[0-9]|20)$/
+      ? /^ha-harmonic-analyzer\/ch-channel\/ch-connecting-rod-(?:[1-9]|1[0-9]|20)$/
+      : /^ha-harmonic-analyzer\/ch-channel\/ch-rocker-arm-(?:[1-9]|1[0-9]|20)$/
     if (!Array.isArray(assumption.nativePartPaths) || !assumption.nativePartPaths.length || assumption.nativePartPaths.length > 20
       || new Set(assumption.nativePartPaths).size !== assumption.nativePartPaths.length
       || assumption.nativePartPaths.some((path: unknown) => typeof path !== 'string' || !pathPattern.test(path))) throw new Error(`Approved ${policy.id} permits only unique qualified paths in its declared native family, numbered 1..20.`)

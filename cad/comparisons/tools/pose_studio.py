@@ -429,7 +429,7 @@ class HACPoseProps(bpy.types.PropertyGroup):
 
     # create-new-pair fields
     new_id: bpy.props.StringProperty(name="New id", default="")
-    new_model: bpy.props.StringProperty(name="Model", default="harmonic_analyzer")
+    new_model: bpy.props.StringProperty(name="Model", default="ha_harmonic_analyzer")
     new_ref: bpy.props.StringProperty(name="Reference", subtype="FILE_PATH", default="")
 
 
@@ -886,7 +886,7 @@ class HAC_OT_new_pair(bpy.types.Operator):
             return {"CANCELLED"}
         manifest["pairs"].append({
             "id": new_id,
-            "model": props.new_model.strip() or "harmonic_analyzer",
+            "model": props.new_model.strip() or "ha_harmonic_analyzer",
             "reference": {"path": rel, "source": "book"},
             "camera": {"mode": "euler", "az_deg": 0.0, "el_deg": 0.0, "roll_deg": 0.0,
                        "zoom": 1.0, "target_mm": None,

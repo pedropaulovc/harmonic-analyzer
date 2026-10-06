@@ -1,3 +1,6 @@
+
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
 # Release/build perf: kill the COM-spine duplication (2026-06-25)
 
 Profiled the **v0.9.1 release logs** (attached as `harmonic-analyzer-v0.9.1-logs.zip`

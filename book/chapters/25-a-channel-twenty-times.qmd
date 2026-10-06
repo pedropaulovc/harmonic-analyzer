@@ -15,15 +15,15 @@ One channel is easy. Twenty identical channels is the actual project. This chapt
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `rocker-arm` ×20 | TODO | TODO | TODO |
-| `connecting-rod` ×20 | TODO | TODO | TODO |
-| `amplitude-bar` ×20 | TODO | TODO | TODO |
-| `channel-lever` ×20 | TODO | TODO | TODO |
+| `ch-rocker-arm` ×20 | TODO | TODO | TODO |
+| `ch-connecting-rod` ×20 | TODO | TODO | TODO |
+| `ch-amplitude-bar` ×20 | TODO | TODO | TODO |
+| `ch-channel-lever` ×20 | TODO | TODO | TODO |
 | `pivot-bushing` ×19 | TODO | TODO | TODO |
 | `lever-bushing` ×19 | TODO | TODO | TODO |
-| `pivot-shaft` | TODO | TODO | TODO |
-| `fulcrum-shaft` | TODO | TODO | TODO |
-| `spring-hook` | TODO | TODO | TODO |
+| `ch-pivot-shaft` | TODO | TODO | TODO |
+| `ch-fulcrum-shaft` | TODO | TODO | TODO |
+| `vn-spring-hook` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

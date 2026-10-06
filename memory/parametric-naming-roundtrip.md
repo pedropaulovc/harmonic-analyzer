@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Goal the user is driving toward: make fine GUI adjustments to parts and have them
 reflected back in the scripts. Chosen path (NOT authored-part tiers, NOT a
 feature-tree decompiler): keep scripts as source, but have each build script emit

@@ -12,7 +12,7 @@ Clean diagnostic (delete the cam mate first so the rod is fully free):
   T3  rod Axis1 <-> gear  Axis3   CROSS-sub re-add (sanity)         -> expect OK
 
 T1 OK + T2 FAIL == top-level mate between two parts inside one flexible sub is
-rejected; the rod<->rocker revolute must be authored INSIDE channel.SLDASM.
+rejected; the rod<->rocker revolute must be authored INSIDE ch-channel.SLDASM.
 
     C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\probe_axis_isolate.py
 """
@@ -30,9 +30,9 @@ from _common import (
 from _assembly import component_named_ref
 from build_motion_study import _iter_mates
 
-ROD = "channel-1/connecting-rod-1"
-ROCKER = "channel-1/rocker-arm-1"
-GEAR = "drive-train-1/cylinder-gear-1"
+ROD = "ch-channel-1/ch-connecting-rod-1"
+ROCKER = "ch-channel-1/ch-rocker-arm-1"
+GEAR = "dt-drive-train-1/dt-cylinder-gear-1"
 
 
 async def _raw(adapter, kind, ref_a, ref_b, alignment="closest"):
@@ -74,7 +74,7 @@ async def main():
     for _f, _m, name, mtype, parts, _v in _iter_mates(
             adapter, doc, read_values=False):
         joined = " ".join(parts)
-        if mtype == 0 and "connecting-rod-1" in joined and "cylinder-gear-1" in joined:
+        if mtype == 0 and "ch-connecting-rod-1" in joined and "dt-cylinder-gear-1" in joined:
             cam_name = name
             break
     log(f"  ch00 cam mate = {cam_name!r}")

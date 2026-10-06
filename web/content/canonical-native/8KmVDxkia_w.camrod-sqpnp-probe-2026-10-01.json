@@ -1,0 +1,449 @@
+{"identityDerivative":{"kind":"materialized-canonical-native-identity-derivative","originalSourceCommit":"bfde892a5","originalPath":"web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json","originalSha256":"5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321","mappingSchemaVersion":2,"mappingSha256":"1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd","originalNumericLexemeSha256":"b6cf3243d859e17c7f69f1b8dfd0419f73482230eb1d26cdf4f1c24f5983174c","measurementPreservation":"All original numeric JSON tokens retained byte-for-byte. Only identity/dependency strings translated; no geometric re-export or renderer/camera requalification.","archivedNativeBindings":[],"historicalSourceDependencies":{"web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json":"222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc","web/content/8KmVDxkia_w.observations.json":"3ac8e4df14487799637091859bdad58cc88a96c28a90c22ba1893772b5ee0f05"}},
+  "kind": "chosen-sparse-original-three-FIT-fixed-intrinsics-SQPNP-probe",
+  "status": "candidate-enumeration-only",
+  "sourceAcceptance": "unavailable",
+  "historicalPose": "unobserved",
+  "qualification": "Missing >=6FIT/2CHECK; this script does not call or relax fit_camera",
+  "chosenIntrinsics": {
+    "verticalFovDegrees": 30.0,
+    "principalPointViewportPixels": [
+      960.0,
+      540.0
+    ],
+    "viewportPixels": [
+      1920,
+      1080
+    ],
+    "distortion": "none",
+    "interpretation": "Chosen fixed square-pixel perspective intrinsics, not historical measurements"
+  },
+  "selection": "none; retain every returned pose; CHECK not evaluated",
+  "scope": "Original cam-rod100 only; no CAD/GLB/source/track edits or camera publication",
+  "exactInputs": [
+    {
+      "anchorId": "crank-axis-back",
+      "sourceDeclaration": {
+        "anchorId": "crank-axis-back",
+        "role": "fit",
+        "pixel": [
+          435,
+          654
+        ],
+        "status": "observed",
+        "method": "manual",
+        "uncertaintyPx": 5
+      },
+      "semanticNativeAnchor": {
+        "id": "crank-axis-back",
+        "kind": "physical-feature",
+        "partPath": "ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1",
+        "partLocalMetres": [
+          -5.2967940478154674e-08,
+          0.13680000785075952,
+          -1.8371918181214753e-08
+        ],
+        "description": "Back-facing exposed crankshaft/bearing centre on green support; shaft endpoint from GLB bounds.",
+        "correspondenceEvidence": "Actual t62/t100 back-facing source identifies this exposed named shaft/hinge feature. Back is CAD+Z; source-right is CAD+X. Mesh endpoint/head-face supplies optical feature point. These sparse closeup observations are NOT a solved camera/full mechanism claim."
+      },
+      "catalogueRestWorldMetres": [
+        -0.12873348594000714,
+        0.12980465938029523,
+        -0.04619999048030013
+      ],
+      "originalConditionalWorldMetres": null,
+      "actualRenderedWorldMetres": [
+        -0.12873348593999426,
+        0.12980464099999933,
+        -0.04619997391876968
+      ],
+      "worldCoordinateMethod": "actual-completed-draw-Float32-marker-geometry-vertex-transformed-by-sampled-matrixWorld"
+    },
+    {
+      "anchorId": "cylinder-axis-back",
+      "sourceDeclaration": {
+        "anchorId": "cylinder-axis-back",
+        "role": "fit",
+        "pixel": [
+          706,
+          859
+        ],
+        "status": "observed",
+        "method": "manual",
+        "uncertaintyPx": 5
+      },
+      "semanticNativeAnchor": {
+        "id": "cylinder-axis-back",
+        "kind": "physical-feature",
+        "partPath": "ha-harmonic-analyzer/dt-drive-train/dt-cylinder-gear-shaft-1",
+        "partLocalMetres": [
+          -4.039907297581635e-12,
+          0.1660546363143385,
+          -2.2309208827508975e-08
+        ],
+        "description": "Exposed back cylinder shaft/end-disc centre, invariant bearing axis.",
+        "correspondenceEvidence": "Actual t62/t100 back-facing source identifies this exposed named shaft/hinge feature. Back is CAD+Z; source-right is CAD+X. Mesh endpoint/head-face supplies optical feature point. These sparse closeup observations are NOT a solved camera/full mechanism claim."
+      },
+      "catalogueRestWorldMetres": [
+        -0.06039360165999999,
+        0.09051802005090809,
+        0.08453572548908594
+      ],
+      "originalConditionalWorldMetres": null,
+      "actualRenderedWorldMetres": [
+        -0.06039360165999999,
+        0.09051799773999988,
+        0.084535747725667
+      ],
+      "worldCoordinateMethod": "actual-completed-draw-Float32-marker-geometry-vertex-transformed-by-sampled-matrixWorld"
+    },
+    {
+      "anchorId": "rocker-shaft-back",
+      "sourceDeclaration": {
+        "anchorId": "rocker-shaft-back",
+        "role": "fit",
+        "pixel": [
+          1243,
+          237
+        ],
+        "status": "observed",
+        "method": "manual",
+        "uncertaintyPx": 5
+      },
+      "semanticNativeAnchor": {
+        "id": "rocker-shaft-back",
+        "kind": "physical-feature",
+        "partPath": "ha-harmonic-analyzer/ch-channel/ch-pivot-shaft-1",
+        "partLocalMetres": [
+          2.765655524039623e-09,
+          -2.0687840329713936e-11,
+          0.0015000000086296122
+        ],
+        "description": "Exposed back pivot shaft end centre; fixed rocker bank fulcrum.",
+        "correspondenceEvidence": "Actual t62/t100 back-facing source identifies this exposed named shaft/hinge feature. Back is CAD+Z; source-right is CAD+X. Mesh endpoint/head-face supplies optical feature point. These sparse closeup observations are NOT a solved camera/full mechanism claim."
+      },
+      "catalogueRestWorldMetres": [
+        0.0729,
+        0.2538000047,
+        0.0833893388
+      ],
+      "originalConditionalWorldMetres": null,
+      "actualRenderedWorldMetres": [
+        0.07289999999999996,
+        0.2538000047,
+        0.08338933880440891
+      ],
+      "worldCoordinateMethod": "actual-completed-draw-Float32-marker-geometry-vertex-transformed-by-sampled-matrixWorld"
+    }
+  ],
+  "lineage": {
+    "sourceImage": {
+      "frameIndex": 2398,
+      "sha256Bgr8": "12932c5a2a5ae8649357d7865da6fde3064d01757bba1bd231b4f4ce845f7686",
+      "pixelFormat": "bgr8",
+      "width": 1920,
+      "height": 1080,
+      "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725"
+    },
+    "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+    "nativeModelSha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+    "nativeDenominator": 435,
+    "observations": {
+      "path": "web/content/canonical-native/8KmVDxkia_w.observations.json",
+      "sha256": "18e076f5da9a4468b3eb39b8a74e9141f3dd272ceaca655d35b77a33b8d9a3ee"
+    },
+    "currentAuthoredTrack": {
+      "path": "web/content/8KmVDxkia_w.source-track.json",
+      "sha256": "534e838d04eab746987cf2690e9063852ee6d63ea9613678c0d6beb863323599"
+    },
+    "sceneCurrentSourceSha256": "7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b",
+    "worldReceiptBinding": "Atomic snapshot+renderedLandmarks wrapper; scene capture caches the actual Float32 rigid-marker geometry vertex transformed by sampled matrixWorld and enforces probe/draw freshness. Catalogue rest points are comparison-only, never solver inputs.",
+    "nativeCatalogue": {
+      "path": "web/.vite/verification-output/operation-witness/whole-coverage/native-catalogue.json",
+      "sha256": "7495447366baeccd12c687ae1248d3293b68abc0f8282d6748143e0374402024"
+    },
+    "actualWorldReceipt": {
+      "path": "web/.vite/verification-output/synthesis-camrod-native-world-receipt-2026-10-01.json",
+      "sha256": "83c3a1f00cc5414b3edaa2fd62e72de437f4d7adb756263139671abb0f57033c"
+    },
+    "timeSeconds": 100,
+    "decodedTimeSeconds": 100.01658333333333,
+    "sourceDrawRevision": 1,
+    "completeInput": {
+      "crankTurns": 0,
+      "amplitudes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -0.08
+      ],
+      "phases": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3.141592653589793
+      ],
+      "gearing": "small-large",
+      "magnification": 4.85205222755,
+      "setup": {
+        "counterHeightM": null,
+        "meanLineAngleRad": 0,
+        "platenOffsetM": 0,
+        "wireFixtureOffsetM": 0.015,
+        "coneSwingRad": 0,
+        "pinionCamRad": 0,
+        "heldChannelTurns": 0,
+        "driveCrankOffsetTurns": 0
+      }
+    },
+    "modelProvenance": {
+      "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945",
+      "expectedSha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+      "observedSha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+      "generator": "SOLIDWORKSGLTF",
+      "identity": "matched",
+      "url": "/harmonic-analyzer/models/ha-harmonic-analyzer.glb"
+    },
+    "originalLandmarks": [
+      {
+        "anchorId": "crank-axis-back",
+        "role": "fit",
+        "pixel": [
+          435,
+          654
+        ],
+        "status": "observed",
+        "method": "manual",
+        "uncertaintyPx": 5
+      },
+      {
+        "anchorId": "cylinder-axis-back",
+        "role": "fit",
+        "pixel": [
+          706,
+          859
+        ],
+        "status": "observed",
+        "method": "manual",
+        "uncertaintyPx": 5
+      },
+      {
+        "anchorId": "rocker-shaft-back",
+        "role": "fit",
+        "pixel": [
+          1243,
+          237
+        ],
+        "status": "observed",
+        "method": "manual",
+        "uncertaintyPx": 5
+      },
+      {
+        "anchorId": "pinion-pivot-back",
+        "role": "check",
+        "pixel": [
+          876,
+          1028
+        ],
+        "status": "observed",
+        "method": "manual",
+        "uncertaintyPx": 5
+      }
+    ],
+    "CHECKPolicy": "Original CHECK retained as declaration only; not projected, ranked or selected"
+  },
+  "openCVVersion": "5.0.0",
+  "returnedPoseCount": 2,
+  "solveReturnValue": 2,
+  "candidates": [
+    {
+      "candidateId": "sqpnp-000",
+      "selection": "unselected",
+      "openCVRotationVector": [
+        -1.0497311832192666,
+        -0.2976054292924687,
+        -1.7092273201770347
+      ],
+      "openCVTranslationMetres": [
+        -0.1832838080352182,
+        0.018511198674927207,
+        0.49508241503520817
+      ],
+      "rejectionReasons": [],
+      "camera": {
+        "positionMetres": [
+          -0.37466347915969567,
+          0.30801847821378503,
+          -0.20927042529746992
+        ],
+        "quaternion": [
+          0.5285551144817723,
+          0.7155356305175328,
+          -0.1245868738349978,
+          -0.43945006915810114
+        ],
+        "verticalFovDegrees": 30.0,
+        "principalPointViewportPixels": [
+          960.0,
+          540.0
+        ]
+      },
+      "properRotationDeterminant": 1.0000000000000009,
+      "quaternionNorm": 1.0,
+      "upWorld": [
+        0.6469006135620006,
+        0.4102152036463661,
+        -0.6428398578732327
+      ],
+      "forwardWorld": [
+        0.7605864233575974,
+        -0.28625446857829884,
+        0.5827234951699252
+      ],
+      "upWorldYAlignment": 0.4102152036463661,
+      "angularRollDegreesRelativeWorldY": 64.6509974559618,
+      "FITs": [
+        {
+          "anchorId": "crank-axis-back",
+          "projectedPixels": [
+            434.999999999961,
+            653.9999999998253
+          ],
+          "rawResidualPx": 1.7903486079804989e-10,
+          "positiveDepthMetres": 0.3330905045905961
+        },
+        {
+          "anchorId": "cylinder-axis-back",
+          "projectedPixels": [
+            705.9999999998372,
+            858.9999999998522
+          ],
+          "rawResidualPx": 2.1987822097024515e-10,
+          "positiveDepthMetres": 0.4724976465966139
+        },
+        {
+          "anchorId": "rocker-shaft-back",
+          "projectedPixels": [
+            1242.999999999689,
+            237.00000000013182
+          ],
+          "rawResidualPx": 3.378266362028777e-10,
+          "positiveDepthMetres": 0.5264707067954231
+        }
+      ],
+      "FITRawRmsPx": 2.546414142581475e-10,
+      "depthScope": "Only original three FIT points checked; complete visible geometry not yet GPU inspected",
+      "poseValidity": "physical-sparse-candidate"
+    },
+    {
+      "candidateId": "sqpnp-001",
+      "selection": "unselected",
+      "openCVRotationVector": [
+        -3.1086057294878016,
+        -0.06791984324028685,
+        -0.3719376897027581
+      ],
+      "openCVTranslationMetres": [
+        -0.02767719543219998,
+        0.17002975123682104,
+        0.591850767549224
+      ],
+      "rejectionReasons": [],
+      "camera": {
+        "positionMetres": [
+          -0.119936139775151,
+          0.1739581164103444,
+          0.5790659466866046
+        ],
+        "quaternion": [
+          -0.005039273586140318,
+          -0.11877097134333389,
+          0.021688863426512862,
+          0.9926719776900882
+        ],
+        "verticalFovDegrees": 30.0,
+        "principalPointViewportPixels": [
+          960.0,
+          540.0
+        ]
+      },
+      "properRotationDeterminant": 0.9999999999999997,
+      "quaternionNorm": 0.9999999999999999,
+      "upWorld": [
+        -0.04186281506551211,
+        0.9990083978499801,
+        -0.015156706106750349
+      ],
+      "forwardWorld": [
+        0.23601982226427734,
+        -0.004852676600750982,
+        -0.9717361241757699
+      ],
+      "upWorldYAlignment": 0.9990083978499801,
+      "angularRollDegreesRelativeWorldY": 2.5365915634618488,
+      "FITs": [
+        {
+          "anchorId": "crank-axis-back",
+          "projectedPixels": [
+            434.99999999999955,
+            654.0000000000017
+          ],
+          "rawResidualPx": 1.7648943294557312e-12,
+          "positiveDepthMetres": 0.6057313967270032
+        },
+        {
+          "anchorId": "cylinder-axis-back",
+          "projectedPixels": [
+            705.9999999999999,
+            858.9999999999957
+          ],
+          "rawResidualPx": 4.321595453972853e-12,
+          "positiveDepthMetres": 0.49501098600071136
+        },
+        {
+          "anchorId": "rocker-shaft-back",
+          "projectedPixels": [
+            1242.9999999999955,
+            236.99999999999773
+          ],
+          "rawResidualPx": 5.084229945850415e-12,
+          "positiveDepthMetres": 0.5267925703608354
+        }
+      ],
+      "FITRawRmsPx": 3.984989895605171e-12,
+      "depthScope": "Only original three FIT points checked; complete visible geometry not yet GPU inspected",
+      "poseValidity": "physical-sparse-candidate"
+    }
+  ]
+}

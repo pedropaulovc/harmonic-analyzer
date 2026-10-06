@@ -122,6 +122,9 @@ async def rack_pinion_mate(
 ) -> Any:
     """Rack-pinion mate coupling a linear rack to a rotating pinion.
 
+    ``rack_pinion`` is the adapter's mechanical mate kind, not a part identity;
+    subsystem prefixes belong to component references, never to this protocol key.
+
     ``rack_ref`` selects a linear rack edge/axis, ``pinion_ref`` the pinion's
     cylindrical face/axis. Set EITHER ``pinion_pitch_diameter`` (mm) OR
     ``rack_travel_per_revolution`` (mm) -- the adapter writes it into the mate

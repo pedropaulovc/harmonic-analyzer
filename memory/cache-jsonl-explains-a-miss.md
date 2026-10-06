@@ -6,6 +6,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 To answer "why did this task miss the cache?", **diff the `inputs` of two
 `restore_miss` events in `cad/out/reports/cache.jsonl`** — each event carries the
 task's FULL per-dep digest list (138 entries for an assembly), so comparing the
@@ -14,7 +17,7 @@ exactly.
 
 ```python
 evs = [e for e in map(json.loads, open("cad/out/reports/cache.jsonl"))
-       if e.get("label") == "assembly:paper_drive" and "inputs" in e]
+       if e.get("label") == "assembly:pd_paper_drive" and "inputs" in e]
 last = evs[-1]
 prev = next(e for e in reversed(evs[:-1]) if e["key"] != last["key"])
 a = {i["path"]: i["digest"] for i in prev["inputs"]}

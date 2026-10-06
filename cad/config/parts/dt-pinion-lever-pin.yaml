@@ -1,0 +1,10 @@
+dt-pinion-lever-pin:
+  title: Pinion Lever Cross Pin
+  number: MHA-DT-030
+  description: "PINION LEVER CROSS PIN"
+  material: AISI O1 drill rod, 1/16 in
+  material_specification: AISI O1 drill rod, 1/16 in
+  finish: bare steel; protect with ISO VG 32 machine-oil film
+  quantity: 1
+  tolerance_class: machined_block
+  process: "cut from drill rod; driven and peened at assembly"

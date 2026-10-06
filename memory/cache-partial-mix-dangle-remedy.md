@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 **Symptom** (fresh seat bootstrap, 2026-07-03): full `doit` fails at
 `assembly:harmonic_analyzer`'s deep-health gate with mate errors `[48]`
 (dangling) INSIDE cache-restored subassembly instances, e.g.

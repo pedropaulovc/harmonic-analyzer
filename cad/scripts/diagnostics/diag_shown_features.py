@@ -20,10 +20,10 @@ import _telemetry  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 PARTS = [
-    "amplitude-bar",
-    "channel-spring-installed",
+    "ch-amplitude-bar",
+    "vn-channel-spring-installed",
     "channel-spring",
-    "counter-spring",
+    "vn-counter-spring",
     "top-lever",
 ]
 

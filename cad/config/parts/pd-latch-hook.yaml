@@ -1,0 +1,10 @@
+pd-latch-hook:
+  title: Latch Hook
+  number: MHA-PD-014
+  # pd_latch_hook_spec.MATERIAL_TITLE: the title block's MATERIAL cell.
+  material: "Dead-soft steel strip 10 x 0.6"
+  material_specification: bright low-carbon steel strip 10 x 0.6, dead soft
+  finish: bright, as supplied; lightly oiled
+  quantity: 1
+  tolerance_class: plate_profile
+  process: "10 x 0.6 dead-soft strip: bend edgewise over a template of the inner edge, cut the top end square, radius the free end full round, drill all holes after bending"

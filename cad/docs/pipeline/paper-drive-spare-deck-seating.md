@@ -1,5 +1,7 @@
 # Paper-drive spare sprocket seating
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../subsystem-identities.md) for the canonical migration map.
+
 ## September 7 native counterexample and revised placement
 
 The first candidate at `e864524b2cc559a04ef90c4d8884771fb2ad2b34`

@@ -5,7 +5,7 @@
 
 Rules (all poses start status="rough"; the discrepancy loop refines them):
 - catalog keep=true entries:
-    class "machine" (or harmonic_analyzer tagged) -> model harmonic_analyzer
+    class "machine" (or ha_harmonic_analyzer tagged) -> model ha_harmonic_analyzer
     book sources (isolated studio shots)          -> model = first component part
     video sources (in-context close-ups)          -> enclosing subsystem assembly
   camera az/el from the curation view_guess.
@@ -33,6 +33,18 @@ CATALOG = REPO / "references" / "curation" / "stills_catalog.json"
 PHOTOS_MD = REPO / "references" / "photogrammetry" / "raw" / "README.md"
 MANIFEST = REPO / "cad" / "comparisons" / "manifest.json"
 
+IDENTITY_MAP = REPO / "cad" / "config" / "identity-migration-map.json"
+
+
+def catalog_identities() -> dict[str, str]:
+    """Translate provenance labels only where the sealed map assigns an owner."""
+    payload = json.loads(IDENTITY_MAP.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 2:
+        raise ValueError("catalog identity map requires schema_version 2")
+    return {row["old_underscore"]: row["new_underscore"]
+            for row in payload["identities"]}
+
+
 def part_stems() -> set[str]:
     return {
         f.stem.removeprefix("build_")
@@ -45,28 +57,28 @@ def part_stems() -> set[str]:
 
 # component label in the photo index -> focus part stems ("" label rows are skipped)
 PHOTO_FOCUS = {
-    "crank": ["crank_arm", "crank_handle", "crankshaft"],
-    "cone gear set": ["cone_gear"],
-    "cylinder gear set": ["cylinder_gear"],
-    "connecting rods / cross shafts": ["connecting_rod"],
-    "rocker arms (top comb)": ["rocker_arm"],
-    "amplitude bars": ["amplitude_bar"],
-    "measuring stick / cord hanger": ["measuring_stick"],
+    "crank": ["dt_crank_arm", "dt_crank_handle", "dt_crankshaft"],
+    "cone gear set": ["dt_cone_gear"],
+    "cylinder gear set": ["dt_cylinder_gear"],
+    "connecting rods / cross shafts": ["ch_connecting_rod"],
+    "rocker arms (top comb)": ["ch_rocker_arm"],
+    "amplitude bars": ["ch_amplitude_bar"],
+    "measuring stick / cord hanger": ["ha_measuring_stick"],
     "channel springs": ["channel_spring"],
-    "channel levers": ["channel_lever"],
-    "summing lever": ["summing_lever"],
-    "counter spring": ["counter_spring"],
-    "gooseneck guide tube": ["gooseneck"],
-    "magnifying lever": ["magnifying_lever"],
-    "magnifying wheel": ["magnifying_wheel"],
-    "platen + rack": ["platen", "platen_rack"],
-    "pen mechanism (modern)": ["pen_frame", "pen_marker"],
-    "translational gearing / chain": ["transgear_knob_shaft", "chain_sprocket"],
+    "channel levers": ["ch_channel_lever"],
+    "summing lever": ["sm_summing_lever"],
+    "counter spring": ["vn_counter_spring"],
+    "gooseneck guide tube": ["sm_gooseneck"],
+    "magnifying lever": ["mg_magnifying_lever"],
+    "magnifying wheel": ["mg_magnifying_wheel"],
+    "platen + rack": ["pd_platen", "pd_platen_rack"],
+    "pen mechanism (modern)": ["pn_pen_frame", "pn_pen_marker"],
+    "translational gearing / chain": ["pd_transgear_knob_shaft", "pd_chain_sprocket"],
     "pinion gear": ["pinion_drum"],
-    "tube frame columns": ["tube_frame"],
-    "top casting": ["top_frame"],
-    "base casting": ["harmonic_base"],
-    "rocker arm supports (a-frames)": ["a_frame", "rocker_arm_support"],
+    "tube frame columns": ["fr_tube_frame"],
+    "top casting": ["fr_top_frame"],
+    "base casting": ["fr_harmonic_base"],
+    "rocker arm supports (a-frames)": ["a_frame", "fr_rocker_arm_support"],
     # "nameplate" intentionally skipped: no CAD part
 }
 
@@ -142,17 +154,19 @@ def make_pair(pid: str, model: str, ref_path: str, source: str, camera: dict,
 
 def seed_from_catalog(parts: set[str]) -> list[dict]:
     entries = json.loads(CATALOG.read_text(encoding="utf-8"))["entries"]
+    identities = catalog_identities()
     pairs = []
     for e in entries:
         if not e.get("keep"):
             continue
-        comps = [c for c in e.get("components", [])]
+        raw_comps = e.get("components", [])
+        comps = [identities.get(c, c) for c in raw_comps]
         cls = e.get("class")
         if cls not in ("machine", "machine-detail", "mixed", "drawing"):
             continue
         frame: list[str] = []
-        if cls == "machine" or "harmonic_analyzer" in comps:
-            model = "harmonic_analyzer"
+        if cls == "machine" or "ha_harmonic_analyzer" in comps:
+            model = "ha_harmonic_analyzer"
         else:
             if not comps:
                 continue
@@ -164,7 +178,7 @@ def seed_from_catalog(parts: set[str]) -> list[dict]:
                 # In-context shot: the photo shows the component mounted in
                 # the complete machine -> render the full assembly with the
                 # camera framed on the tagged components.
-                model = "harmonic_analyzer"
+                model = "ha_harmonic_analyzer"
                 frame = comps
         vg = e.get("view_guess") or {}
         camera = {"az_deg": vg.get("az_deg", 15), "el_deg": vg.get("el_deg", 8)}
@@ -175,7 +189,11 @@ def seed_from_catalog(parts: set[str]) -> list[dict]:
         else:
             ref = e["path"]
             src = f"book {e['source']}"
-        pairs.append(make_pair(f"{model}--{e['id']}", model, ref, src, camera,
+        # Pair IDs name historical reference pictures, not current CAD artifacts.
+        pair_model = ("harmonic_analyzer" if model == "ha_harmonic_analyzer" else
+                      next(c for c in raw_comps if identities.get(c, c) == model))
+        pid = f"{pair_model}--{e['id']}"
+        pairs.append(make_pair(pid, model, ref, src, camera,
                                comps, e.get("notes", ""), frame=frame))
     return pairs
 
@@ -190,10 +208,10 @@ def seed_from_photos() -> list[dict]:
                 continue
             claimed.add(suffix)
             # The machine is photographed fully assembled in its case.
-            model = "harmonic_analyzer"
+            model = "ha_harmonic_analyzer"
             camera = view_to_euler(views.get(suffix, ""))
             pairs.append(make_pair(
-                f"{model}--photo-{suffix}", model, photo_path(suffix),
+                f"harmonic_analyzer--photo-{suffix}", model, photo_path(suffix),
                 f"photogrammetry {suffix} ({views.get(suffix, '?')})",
                 camera, focus, label, frame=focus,
             ))

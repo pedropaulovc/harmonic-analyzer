@@ -1,0 +1,8 @@
+ch-fulcrum-keeper:
+  number: MHA-CH-007
+  material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finished steel bar
+  finish: black oxide (Ø9.5 ball pressed bright after finish)
+  quantity: 2
+  tolerance_class: machined_block
+  process: "machined (steel)"

@@ -42,7 +42,7 @@ allocation_share:
   pair_p99_pct: 0.50
 
 # Inputs the budget is evaluated on (ordinates x_i in [0, 1] on 20 elements --
-# the built CAD keeps every bar on the lifting side, build_channel_assembly
+# the built CAD keeps every bar on the lifting side, build_ch_channel_assembly
 # rejects amplitude_mm < 0; a signed function is lifted by a constant before
 # analysis -- station d_i = x_i * amplitude.max_travel_mm, coefficient k read
 # at theta_k = k*pi/20).  See error_budget.py:reference_inputs.
@@ -85,7 +85,7 @@ reserved:
     # radius the reading falls short and the term grows by the shortfall.
     # The MINIMUM pose -- clamp face against the bracket collar face, 66 mm
     # from the knife -- is what every broad input is scored at, and the CAD
-    # builds only the as-built 165 mm pose (build_magnifier_assembly): no
+    # builds only the as-built 165 mm pose (build_mg_magnifier_assembly): no
     # clearance or articulation gate exercises the clamp, vertical rod and
     # wire there. That is an OPEN DESIGN ITEM (#748), not a budget
     # assumption: check:budget fails on it unless waived here, and the waiver
@@ -131,45 +131,45 @@ monte_carlo:
 critical_features:
   cam_eccentricity:
     tolerance: 0.025
-    nominal: cylinder_gear_spec.ECCENTRICITY
+    nominal: dt_cylinder_gear_spec.ECCENTRICITY
     quantity: gain
     class: channel
     holds: "offset-turn the cam in a 4-jaw, indicate the throw to 0.01"
   rocker_rod_pin_radius:
     tolerance: 0.10
-    nominal: rocker_arm_spec.ROD_HOLE_X
+    nominal: ch_rocker_arm_spec.ROD_HOLE_X
     quantity: gain
     class: channel
     holds: "rod-pin hole position from the pivot bore, DRO/CNC"
   lever_bar_pin_arm:
     tolerance: 0.10
-    nominal: channel_lever_spec.BAR_PIN_X
+    nominal: ch_channel_lever_spec.BAR_PIN_X
     quantity: gain
     class: channel
     holds: "bar-pin hole from the fulcrum bore, DRO/CNC"
   lever_spring_hook_arm:
     tolerance: 0.10
-    nominal: channel_lever_spec.LEVER_SPRING_X
+    nominal: ch_channel_lever_spec.LEVER_SPRING_X
     quantity: gain
     class: channel
     holds: "spring hole from the fulcrum bore, DRO/CNC"
   summing_hook_arm:
     tolerance: 0.15
-    nominal: summing_lever_spec.HOLE_X
+    nominal: sm_summing_lever_spec.HOLE_X
     quantity: gain
     class: channel
-    holds: "half of the 0.30 spring-hole pattern position zone (summing_lever_spec.GEOMETRIC_TOLERANCES_MM), normal to the knife line"
+    holds: "half of the 0.30 spring-hole pattern position zone (sm_summing_lever_spec.GEOMETRIC_TOLERANCES_MM), normal to the knife line"
   spring_rate:
     tolerance: 1.25
     unit: pct
-    nominal: channel_spring_installed_spec.SPRING_RATE_N_PER_MM
+    nominal: vn_channel_spring_installed_spec.SPRING_RATE_N_PER_MM
     quantity: gain
     class: channel
     holds: "MATCHED, not machined: measure every channel spring and bin the 20 within +/-1.25 % of their common mean; SET QC uses 60/80 mm inside-hook lengths (58/78 mm pin centres with diameter 2 mm pins); catalog rates scatter +/-10 %"
   spring_initial_tension:
     tolerance: 0.27
     unit: N
-    nominal: channel_spring_installed_spec.INITIAL_TENSION_N
+    nominal: vn_channel_spring_installed_spec.INITIAL_TENSION_N
     quantity: gain
     class: channel
     holds: "Catalog initial-tension variation is +/-0.06 lbf (0.267 N), bounded here by +/-0.27 N; SET QC records each force-curve intercept. Mean-line zero removes DC, not the small geometric gain contribution."
@@ -200,14 +200,14 @@ critical_features:
     nominal: null
     quantity: phase
     class: channel
-    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-014 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
+    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-DT-004 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
   cone_land_clock:
     tolerance: 1.0
     unit: deg
     nominal: null
     quantity: phase
     class: channel
-    holds: "MHA-014 note ALL FLATS PARALLEL. at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø1.588 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
+    holds: "MHA-DT-004 note ALL FLATS PARALLEL. at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø1.588 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
   station_setting:
     tolerance: 0.25
     nominal: null

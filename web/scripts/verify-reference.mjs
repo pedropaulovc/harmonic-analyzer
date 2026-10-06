@@ -37,13 +37,13 @@ export function nativeGeometryAssumptionErrors(assumptions) {
       if (!exactKeys(value, [...Object.keys(LOWER_ROCKER_SIDE_FACE_POLICY), 'nativePartPaths'])
         || Object.keys(LOWER_ROCKER_SIDE_FACE_POLICY).some(key => canonicalJson(value[key]) !== canonicalJson(LOWER_ROCKER_SIDE_FACE_POLICY[key]))
         || !Array.isArray(value.nativePartPaths) || !value.nativePartPaths.length || value.nativePartPaths.length > 20 || new Set(value.nativePartPaths).size !== value.nativePartPaths.length
-        || value.nativePartPaths.some(path => typeof path !== 'string' || !/^harmonic-analyzer\/channel\/rocker-arm-(?:[1-9]|1[0-9]|20)$/.test(path))) return ['Unapproved lower-rocker side-face feature scope, native path, authority or certification claim']
+        || value.nativePartPaths.some(path => typeof path !== 'string' || !/^ha-harmonic-analyzer\/ch-channel\/ch-rocker-arm-(?:[1-9]|1[0-9]|20)$/.test(path))) return ['Unapproved lower-rocker side-face feature scope, native path, authority or certification claim']
     } else if (!exactKeys(value, ['id', 'status', 'scope', 'nativePartPaths', 'authority', 'sourceCounterpart', 'interpretation'])
       || value.id !== 'rod-head-functional-equivalence' || value.status !== 'user-approved-pending-cad-match' || value.scope !== 'rod-head-topology-only'
       || value.authority !== ROD_HEAD_AUTHORITY || value.sourceCounterpart !== 'Filmed U-shaped connecting-rod junction/crosspiece'
       || value.interpretation !== 'Functional linkage mapping for animation only; not a current geometric-fidelity pass.'
       || !Array.isArray(value.nativePartPaths) || !value.nativePartPaths.length || value.nativePartPaths.length > 20 || new Set(value.nativePartPaths).size !== value.nativePartPaths.length
-      || value.nativePartPaths.some(path => typeof path !== 'string' || !/^harmonic-analyzer\/channel\/connecting-rod-(?:[1-9]|1[0-9]|20)$/.test(path))) return ['Unapproved native geometry assumption, path, topology scope, authority or fidelity claim']
+      || value.nativePartPaths.some(path => typeof path !== 'string' || !/^ha-harmonic-analyzer\/ch-channel\/ch-connecting-rod-(?:[1-9]|1[0-9]|20)$/.test(path))) return ['Unapproved native geometry assumption, path, topology scope, authority or fidelity claim']
   }
   return []
 }
@@ -53,7 +53,7 @@ export function nonIdentifiableFixedPartErrors(parts) {
   const errors = [], paths = new Set()
   for (const part of parts) {
     if (!exactKeys(part, ['nativePartPath', 'status', 'scope', 'rectSourcePixels', 'evidence', 'fixedNativeEvidence', 'authority', 'interpretation'])
-      || !text(part.nativePartPath) || !part.nativePartPath.startsWith('harmonic-analyzer/') || /[?*]/.test(part.nativePartPath)
+      || !text(part.nativePartPath) || !part.nativePartPath.startsWith('ha-harmonic-analyzer/') || /[?*]/.test(part.nativePartPath)
       || part.status !== 'user-approved-source-non-identifiable' || part.scope !== 'structural-fixed-part-only'
       || part.authority !== 'Allow explicitly unidentified fixed parts'
       || part.interpretation !== 'Rendered source-non-identifiable fixed part; not geometric-fidelity passed.'
@@ -315,7 +315,7 @@ export function visibilityProofErrors(proof, expected, anchors, landmarks, view 
   errors.push(...nonIdentifiableFixedPartErrors(proof.sourceNonIdentifiableFixedParts))
   const paths = new Set()
   for (const part of [...proof.sourceVisibleParts, ...proof.excludedParts]) {
-    if (!text(part?.partPath) || !part.partPath.startsWith('harmonic-analyzer/') || paths.has(part.partPath) || !text(part.evidence)) reject(`Invalid/duplicate native census path ${part?.partPath}`)
+    if (!text(part?.partPath) || !part.partPath.startsWith('ha-harmonic-analyzer/') || paths.has(part.partPath) || !text(part.evidence)) reject(`Invalid/duplicate native census path ${part?.partPath}`)
     paths.add(part?.partPath)
   }
   for (const part of proof.sourceNonIdentifiableFixedParts) {
@@ -485,7 +485,7 @@ export function nativeLineErrors(lines, image, view, overrides = []) {
   for (const line of lines) {
     const evidence = line?.measurementEvidence, local = line?.partLocalLineMetres, source = line?.sourceLinePixels
     const reject = detail => errors.push(`${line?.id ?? 'unknown'}: ${detail}`)
-    if (!text(line?.id) || ids.has(line.id) || !text(line.partPath) || !line.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(local) || local.length !== 2 || !local.every(point => vector(point, 3)) || distance(local[0], local[1]) <= 1e-9
+    if (!text(line?.id) || ids.has(line.id) || !text(line.partPath) || !line.partPath.startsWith('ha-harmonic-analyzer/') || !Array.isArray(local) || local.length !== 2 || !local.every(point => vector(point, 3)) || distance(local[0], local[1]) <= 1e-9
       || !Array.isArray(source) || source.length !== 2 || !source.every(point => inRect(point, rect)) || distance(source[0], source[1]) <= 1e-6 || !finite(line.uncertaintyPx) || line.uncertaintyPx < 0 || line.uncertaintyPx > PIXEL_LIMIT) { reject('Invalid/degenerate native geometry or actual source segment'); continue }
     ids.add(line.id)
     if (canonicalJson(evidence?.sourceImage) !== canonicalJson(image) || !text(evidence?.detector) || !text(evidence?.axisPerspectiveEvidence) || !finite(evidence?.axisPerspectiveBiasBoundPx) || evidence.axisPerspectiveBiasBoundPx < 0) { reject('Need current exposure, actual edge detector and conservative independently justified axis perspective bias'); continue }
@@ -663,10 +663,11 @@ export function inspectReference(data, expectedId, native = null) {
   summary.sourcePixelFormats = [...new Set([...images.keys()].map(key => key.split('/')[1]))].sort()
   const anchors = new Map()
   for (const anchor of data.anchors ?? []) {
+    if (anchor.partPath?.startsWith('archived-not-current:')) fail('archived-native-binding', `${anchor.id}: retained observations reference retired geometry and cannot certify a current native binding`)
     if (!text(anchor.id) || anchors.has(anchor.id) || !['physical-feature', 'section-center'].includes(anchor.kind) || !text(anchor.partPath) || !text(anchor.correspondenceEvidence) || !text(anchor.description)) fail('anchor-correspondence', `Invalid/duplicate anchor ${anchor.id}`)
     if (vector(anchor.partLocalMetres, 3) === vector(anchor.worldMetres, 3)) fail('anchor-point', `${anchor.id} needs exactly one finite local or world point`)
     // Fixed CAD-world points cannot serve as articulated moving-part observations.
-    if (anchor.worldMetres && !anchor.partPath?.startsWith('harmonic-analyzer/frame/')) fail('unarticulated-anchor', `${anchor.id}: moving part points must use partLocalMetres`)
+    if (anchor.worldMetres && !anchor.partPath?.startsWith('ha-harmonic-analyzer/fr-frame/')) fail('unarticulated-anchor', `${anchor.id}: moving part points must use partLocalMetres`)
     anchors.set(anchor.id, anchor)
   }
   const shots = new Map(), duration = source.durationSeconds
@@ -779,7 +780,7 @@ export function inspectReference(data, expectedId, native = null) {
       for (const error of nativeLineErrors(view.nativeLineChecks ?? [], frame.sourceImage, view, view.partOverrides ?? [])) fail('native-line-evidence', error, t, viewId)
       const contourIds = new Set()
       for (const contour of view.sourceContourChecks ?? []) {
-        if (!text(contour.id) || contourIds.has(contour.id) || !text(contour.partPath) || !contour.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(contour.sourceContourPixels) || contour.sourceContourPixels.length < 2 || !contour.sourceContourPixels.every(point => inRect(point, rect)) || contour.sourceContourPixels.every(point => canonicalJson(point) === canonicalJson(contour.sourceContourPixels[0])) || !finite(contour.uncertaintyPx) || contour.uncertaintyPx < 0 || contour.uncertaintyPx > PIXEL_LIMIT || canonicalJson(contour.measurementEvidence?.sourceImage) !== canonicalJson(frame.sourceImage) || !text(contour.measurementEvidence?.evidence)) fail('source-contour-evidence', 'Need a distinct nondegenerate actually measured current-source native contour inside ROI with bounded uncertainty', t, viewId)
+        if (!text(contour.id) || contourIds.has(contour.id) || !text(contour.partPath) || !contour.partPath.startsWith('ha-harmonic-analyzer/') || !Array.isArray(contour.sourceContourPixels) || contour.sourceContourPixels.length < 2 || !contour.sourceContourPixels.every(point => inRect(point, rect)) || contour.sourceContourPixels.every(point => canonicalJson(point) === canonicalJson(contour.sourceContourPixels[0])) || !finite(contour.uncertaintyPx) || contour.uncertaintyPx < 0 || contour.uncertaintyPx > PIXEL_LIMIT || canonicalJson(contour.measurementEvidence?.sourceImage) !== canonicalJson(frame.sourceImage) || !text(contour.measurementEvidence?.evidence)) fail('source-contour-evidence', 'Need a distinct nondegenerate actually measured current-source native contour inside ROI with bounded uncertainty', t, viewId)
         contourIds.add(contour.id)
       }
       const composite = view.composite ?? { mode: 'opaque' }
@@ -831,7 +832,7 @@ export async function loadReferences(webRoot, referenceRoot, { signal } = {}) {
   const records = [], failures = []
   for (const id of VIDEO_IDS) {
     try {
-      const data = JSON.parse(await readFile(resolve(webRoot, `content/${id}.observations.json`), 'utf8'))
+      const data = JSON.parse(await readFile(resolve(webRoot, `content/canonical-native/${id}.observations.json`), 'utf8'))
       const entry = metadata.find(item => item.id === id)
       if (!entry || entry.sha256 !== data.source?.sha256) throw new Error('Measured source identity differs from independent acquisition metadata')
       // Keep paths relocatable without requiring original /tmp directories.

@@ -25,14 +25,14 @@ import _telemetry  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 JOBS = {
-    "tube-frame": POLISHED_STEEL,
-    "platen": PANEL_BLACK,
-    "platen-clip": PANEL_BLACK,
-    "knife-mount": PANEL_BLACK,
-    "counter-spring": SPRING_BLACK,
+    "fr-tube-frame": POLISHED_STEEL,
+    "pd-platen": PANEL_BLACK,
+    "pd-platen-clip": PANEL_BLACK,
+    "sm-knife-mount": PANEL_BLACK,
+    "vn-counter-spring": SPRING_BLACK,
     "channel-spring": SPRING_BLACK,
-    "channel-spring-installed": SPRING_BLACK,
-    "crank-handle": STAINED_OAK,
+    "vn-channel-spring-installed": SPRING_BLACK,
+    "dt-crank-handle": STAINED_OAK,
 }
 
 

@@ -1,0 +1,9 @@
+pd-transgear-disc-hub:
+  title: Transgear Disc Hub
+  number: MHA-PD-017
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: bright machined, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned from bar (brass), left long: face, turn spigot, flange and hub, bore, face the spigot end and flange rear square to the bore in one setup; broach or shape the D-flat; drill the flange screw holes; seat the spigot on the sleeve step, face the hub front to fit behind the sleeve nose, then match-drill the oil hole"

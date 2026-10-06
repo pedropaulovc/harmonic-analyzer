@@ -2,7 +2,7 @@ export interface ModelRepresentation {
   schemaVersion: 1
   kind: 'lossless-web-model-representation'
   source: { sha256: string; sourceCommit: string }
-  representation: { path: 'models/harmonic-analyzer.glb'; sha256: string; byteLength: number; codec: 'EXT_meshopt_compression' }
+  representation: { path: 'models/ha-harmonic-analyzer.glb'; sha256: string; byteLength: number; codec: 'EXT_meshopt_compression' }
   pipeline: { version: 1; steps: ['exact-dedup', 'meshopt']; codecVersion: string }
   equivalence: { method: 'decoded-per-drawable-exact-v1'; semanticSha256: string; drawableCount: number }
 }

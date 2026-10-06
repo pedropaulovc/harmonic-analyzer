@@ -4,7 +4,7 @@ The layout audit (``_drawing_layout_check``) gives dimensions and GD&T symbols
 ``CollisionScope.NONE``: a GD&T symbol sits by design beside its own frame, and
 a dimension's box is only a nominal square around its text anchor.  So a
 feature-control frame parked on a neighbouring dimension's callout text reads
-clean.  It happened on MHA-062 (pc-r7 eye pass): the cylindricity frame sat
+clean.  It happened on MHA-DT-019 (pc-r7 eye pass): the cylindricity frame sat
 on the match-drill callout's "STRAPS" and "0.45", and the Ra 1.6 bar sat on the
 callout's shoulder.
 
@@ -47,7 +47,7 @@ Box = tuple[float, float, float, float]
 CLEAR_GAP_M = 0.002
 # A move lands this far past the gap, so the read-back that proves it clear at
 # CLEAR_GAP_M has room to settle.  Placed at exactly the gap, the #877 cold
-# build's MHA-062 callout read back a hair short and failed the proof (leaf
+# build's MHA-DT-019 callout read back a hair short and failed the proof (leaf
 # 20260927T150045Z-1-3febc7c2, swmaker000006); the same frame read 0.2 mm
 # apart between two seats (ymin 0.2148 vs 0.2150).
 PLACE_SETTLE_M = 0.0002
@@ -155,7 +155,7 @@ def sheet_region(adapter: Any) -> DrawableRegion:
     the early-bound document, and late binding auto-invokes a zero-argument
     method on attribute access: ``sheet.GetProperties`` is already the tuple,
     so calling it raised ``'tuple' object is not callable`` (pc-858x928, both
-    MHA-062 and MHA-060).  Bind the sheet like every other object here.
+    MHA-DT-019 and MHA-DT-017).  Bind the sheet like every other object here.
     """
     sheet = _sw_type_info.early_bound_or_flag(
         _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(),

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 There is now a **library** for driving the Makers/3DEXPERIENCE SolidWorks lifecycle
 in code, replacing the manual SW Rx / Platform-shortcut dance:
 `solidworks_mcp.adapters.sw_recovery` (in the submodule, merged as fork PR #92) +

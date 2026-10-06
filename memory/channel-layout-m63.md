@@ -7,6 +7,9 @@ metadata:
   originSessionId: 5e824fa0-7bda-4055-8655-aa59ed6f0ef9
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 M6.3 channel layout resolution (2026-06-10), authoritative in
 cad/DIMENSIONS.md ("Rocker pivot & supports layout" + "Channel & top-frame
 layout" tables):

@@ -8,10 +8,13 @@ metadata:
   modified: 2026-09-02T16:57:27.210Z
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Pedro's flow for validating manufacturing drawings: render the sheet PNG, then have
 Codex (gpt-5.6-sol, high) review the IMAGE with zero repo context as a senior
 machinist. 2026-09-02: the two review modes are explicit commands:
-`uv run cad/scripts/machinist_review.py crank_arm pivot_shaft` for named sheets,
+`uv run cad/scripts/machinist_review.py dt_crank_arm ch_pivot_shaft` for named sheets,
 or `uv run cad/scripts/machinist_review.py --all --jobs 4` for the whole fleet.
 Prompts live in `cad/scripts/prompts/`; reports go under
 `cad/out/reports/machinist-review/` (index.md + per-sheet json/md/events).

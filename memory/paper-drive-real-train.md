@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 # Paper-drive real train (2026-07-07, PR #196)
 
 The paper-drive was rebuilt against the primary references
@@ -53,6 +56,6 @@ rest-gap/NET-coupling topology or reuse superseded anchors (stud (0, 253.5),
 knob (65, 241.78), rails y 440/334, 96T disc).
 
 **How to apply:** when touching paper-drive geometry, derive from
-`build_paper_drive_assembly.py` constants (STUD_XY, KNOB_SHAFT_XY, DISC_Z0)
+`build_pd_paper_drive_assembly.py` constants (STUD_XY, KNOB_SHAFT_XY, DISC_Z0)
 and keep `_chain.KNOB_CENTRE` in lockstep. Related: [[belt-chain-feature]],
 [[paper-drive-kinematic-probe]], [[default-free-dof-park-drivers]].

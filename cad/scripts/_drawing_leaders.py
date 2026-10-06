@@ -2,8 +2,8 @@
 
 A leader that runs through a hole's centre, or across another annotation's
 leader, is a clarity defect a render shows but no dimension gate catches
-(eye pass of w15-301f4bf4e: MHA-020's hub-seat leader crossed R12.7 at the
-bore centre; on MHA-021 the tip diameter, bore diameter and bore finish
+(eye pass of w15-301f4bf4e: MHA-DT-006's hub-seat leader crossed R12.7 at the
+bore centre; on MHA-DT-007 the tip diameter, bore diameter and bore finish
 leaders met at the bore). This module reads each annotation's ink as sheet
 segments so a drawing can fail its build on such a crossing.
 
@@ -14,9 +14,9 @@ growing another.
 
 What a seat has shown, and what it has not yet:
 
-- Farm run w15-3d3a9d762 (20260925T193429474Z-35f59b07): drawing:crank_arm
+- Farm run w15-3d3a9d762 (20260925T193429474Z-35f59b07): drawing:dt_crank_arm
   (15d4e3b95dbf, seat pid 12100, "done in 22.0s") and
-  drawing:crank_drive_gear (d48669b89a14) built and passed
+  drawing:dt_crank_drive_gear (d48669b89a14) built and passed
   ``assert_leaders_clear``. So ``GetLineAtIndex2`` and
   ``GetLeaderPointsAtIndex`` returned ink for every named annotation (the
   no-ink branch fails loud).
@@ -28,16 +28,16 @@ What a seat has shown, and what it has not yet:
 - Farm run w15-8c4af0b9f (20260925T194809956Z-4929302b) is the proof. Every
   landing reads the feature's exact sheet radius, so the segments are sheet
   metres:
-  - drawing:crank_arm dffdcac16414, seat pid 7484: "crank arm hub seat:
+  - drawing:dt_crank_arm dffdcac16414, seat pid 7484: "crank arm hub seat:
     leaders clear {'HubSeatDia': '2 seg, lands 19.50 mm', 'BossRadius':
     '3 seg, lands 0.00 mm'}". Ø19.5 at 2:1 is a 19.50 mm sheet radius, and
     R12.7 ends at the bore centre.
-  - drawing:crank_drive_gear 1b05750e1716, seat pid 11608: "crank drive gear
+  - drawing:dt_crank_drive_gear 1b05750e1716, seat pid 11608: "crank drive gear
     bore: leaders clear {'OutsideDia': '2 seg, lands 48.86 mm', 'BoreDia':
     '3 seg, lands 7.14 mm', 'BoreFinish': '2 seg, lands 7.14 mm'}". These are
     HALF_OD and the bore's sheet radius at 3:2.
 - ``section_line_segments`` (GetSectionLineInfo2) is not seat-proven yet.
-  Its first leaf (drawing:crank_pinion 20260925T210727Z) showed the chain
+  Its first leaf (drawing:dt_crank_pinion 20260925T210727Z) showed the chain
   comes back in MODEL space and the arrows on the sheet. Until the chain was
   mapped through the view's model-to-view transform, every section chain
   was tested in model metres near the sheet origin, far from every leader,
@@ -137,7 +137,7 @@ def parse_section_line_info(
     points do not.
 
     The array mixes spaces: the chain points are MODEL coordinates and the
-    arrows are sheet coordinates (seat, drawing:crank_pinion leaf
+    arrows are sheet coordinates (seat, drawing:dt_crank_pinion leaf
     20260925T210727Z: chain x 0, y +/-0.0106 against arrows at y 0.120 on a
     3:1 view at (0.110, 0.150)). ``chain_to_sheet`` maps a chain point onto
     the sheet (``section_line_segments`` passes the view's model-to-view

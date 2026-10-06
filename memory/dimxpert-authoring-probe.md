@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Probed 2026-07-28 (R2026x SP3.0 Makers seat). Repros committed:
 `cad/scripts/diagnostics/probe_dimxpert_gtol.py` (Q1–Q5, full pass) and
 `probe_dimxpert_authoring.py` (staged: read / auto / datum / datum-nolength /
@@ -18,7 +21,7 @@ and [[drawing-spec-purity]].
 - Positive control: `AutoDimensionScheme` (default options) authors 3 features
   + 3 annotations on the MHA-082 stub. Its `False` retval is a SOFT signal
   (partial scheme), not failure — judge by created evidence. NOT licence-gated.
-  (R9-68 retired the stub; the probes now target `transgear-pin`, MHA-179.)
+  (R9-68 retired the stub; the probes now target `pd-transgear-pin`, MHA-PD-023.)
 - `InsertDatum` returns True in ~0.5 s (`Datum19@Plane1(A)`), with or without
   the official example's `DatumLength = 0.06`.
 - `InsertGtol` works, and needs NO preceding datum for form controls.

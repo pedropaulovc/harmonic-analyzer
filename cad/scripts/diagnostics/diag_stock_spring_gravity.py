@@ -33,43 +33,43 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 import dodo
 from _common import _early_bound, check, run_build
 import _telemetry
-import build_magnifier_assembly as m
-import counter_spring_spec
+import build_mg_magnifier_assembly as m
+import vn_counter_spring_spec
 import error_budget as eb
-import pen_wire_geom
+import pn_pen_wire_geom
 import spring_mount_geom as s
 
 ROOT = Path(__file__).resolve().parents[3]
 
 STEMS = (
-    "channel-spring-installed",
-    "counter-spring",
-    "spring-hook",
-    "boss-hook",
-    "summing-lever",
-    "gooseneck",
-    "magnifying-lever",
-    "magnifying-bracket",
-    "magnifying-clamp",
-    "magnifying-vertical-rod",
-    "output-fixture",
-    "thumb-screw",
-    "lever-wire",
-    "magnifying-wheel",
-    "pen-rod",
-    "pen-v-block",
-    "pen-marker",
-    "pen-frame",
-    "pen-set-screw",
-    "pen-wire",
+    "vn-channel-spring-installed",
+    "vn-counter-spring",
+    "vn-spring-hook",
+    "vn-boss-hook",
+    "sm-summing-lever",
+    "sm-gooseneck",
+    "mg-magnifying-lever",
+    "mg-magnifying-bracket",
+    "mg-magnifying-clamp",
+    "mg-magnifying-vertical-rod",
+    "mg-output-fixture",
+    "vn-thumb-screw",
+    "mg-lever-wire",
+    "mg-magnifying-wheel",
+    "pn-pen-rod",
+    "pn-pen-v-block",
+    "pn-pen-marker",
+    "pn-pen-frame",
+    "vn-pen-set-screw",
+    "pn-pen-wire",
 )
 PEN_STEMS = (
-    "pen-rod",
-    "pen-v-block",
-    "pen-marker",
-    "pen-frame",
-    "pen-set-screw",
-    "pen-wire",
+    "pn-pen-rod",
+    "pn-pen-v-block",
+    "pn-pen-marker",
+    "pn-pen-frame",
+    "vn-pen-set-screw",
+    "pn-pen-wire",
 )
 REPORT = ROOT / "cad/out/reports/stock-spring-gravity.json"
 
@@ -154,38 +154,38 @@ async def build(adapter):
                 }
             )
 
-        weight("summing-lever", (s.KNIFE[0], s.KNIFE[1], 0), m.IDENTITY)
-        weight("spring-hook", (*s.CHANNEL_ANCHOR_XY, 0), m.IDENTITY, 20)
-        weight("boss-hook", (*s.COUNTER_ANCHOR_XY, 0), m.IDENTITY)
+        weight("sm-summing-lever", (s.KNIFE[0], s.KNIFE[1], 0), m.IDENTITY)
+        weight("vn-spring-hook", (*s.CHANNEL_ANCHOR_XY, 0), m.IDENTITY, 20)
+        weight("vn-boss-hook", (*s.COUNTER_ANCHOR_XY, 0), m.IDENTITY)
         weight(
-            "magnifying-lever", (m.LEVER_X0, m.LEVER_ROD_Y, m.LEVER_ROD_Z), m.ROT_Y_180
+            "mg-magnifying-lever", (m.LEVER_X0, m.LEVER_ROD_Y, m.LEVER_ROD_Z), m.ROT_Y_180
         )
         weight(
-            "magnifying-bracket",
+            "mg-magnifying-bracket",
             (m.BRACKET_X, m.LEVER_ROD_Y, m.LEVER_ROD_Z),
             m.IDENTITY,
         )
-        weight("magnifying-clamp", m.CLAMP_POS, m.ROT_Y_POS90)
+        weight("mg-magnifying-clamp", m.CLAMP_POS, m.ROT_Y_POS90)
         rotation = m.compose_rows(m.rot_z_rows(-90), m.ROT_Y_180)
         weight(
-            "thumb-screw",
+            "vn-thumb-screw",
             (m.CLAMP_X, m.THUMB_SCREW_OUTER_FACE_Y, m.LEVER_ROD_Z),
             rotation,
         )
-        weight("magnifying-vertical-rod", (m.CLAMP_X, m.VROD_TOP_Y, m.VROD_Z), rotation)
-        weight("output-fixture", (m.CLAMP_X, m.FIXTURE_Y0, m.VROD_Z), m.IDENTITY)
+        weight("mg-magnifying-vertical-rod", (m.CLAMP_X, m.VROD_TOP_Y, m.VROD_Z), rotation)
+        weight("mg-output-fixture", (m.CLAMP_X, m.FIXTURE_Y0, m.VROD_Z), m.IDENTITY)
         positive = sum(max(0, row["gravity_torque_n_mm"]) for row in rows)
         negative = sum(min(0, row["gravity_torque_n_mm"]) for row in rows)
         hook = m.HUB_WIRE_START
         hook_radius = math.hypot(hook[0] - s.KNIFE[0], hook[1] - s.KNIFE_CONTACT_Y)
-        physical_ratio = (pen_wire_geom.RIM_DIA + pen_wire_geom.WIRE_DIA) / (
+        physical_ratio = (pn_pen_wire_geom.RIM_DIA + pn_pen_wire_geom.WIRE_DIA) / (
             m.HUB_DIA + m.HUB_WIRE_DIA
         )
         cad_ratio = eb.nominal().wheel_ratio
         ratio = max(physical_ratio, cad_ratio)
         pen_mass = sum(parts[stem]["mass_kg"] for stem in PEN_STEMS)
         pen_torque_bound = pen_mass * 9.80665 * ratio * hook_radius
-        wheel = parts["magnifying-wheel"]
+        wheel = parts["mg-magnifying-wheel"]
         wheel_ecc = math.hypot(wheel["com_mm"][0], wheel["com_mm"][2])
         wheel_bound = (
             wheel["mass_kg"]
@@ -203,9 +203,9 @@ async def build(adapter):
             s.COUNTER_ANCHOR_XY[1] - s.KNIFE_CONTACT_Y,
         )
         flexible_bound = 9.80665 * (
-            20 * parts["channel-spring-installed"]["mass_kg"] * channel_radius
-            + parts["counter-spring"]["mass_kg"] * counter_radius
-            + parts["lever-wire"]["mass_kg"] * hook_radius
+            20 * parts["vn-channel-spring-installed"]["mass_kg"] * channel_radius
+            + parts["vn-counter-spring"]["mass_kg"] * counter_radius
+            + parts["mg-lever-wire"]["mass_kg"] * hook_radius
         )
         arm = -s.COUNTER_REFERENCE_POSE.moment_arm_mm
         reference = s.counter_force_n(s.COUNTER_REFERENCE_POSE.length_mm)
@@ -215,8 +215,8 @@ async def build(adapter):
         )
         high = reference + (positive + wheel_bound + flexible_bound) / arm
         catalog = [
-            counter_spring_spec.INITIAL_TENSION_N,
-            counter_spring_spec.MAXIMUM_LOAD_N,
+            vn_counter_spring_spec.INITIAL_TENSION_N,
+            vn_counter_spring_spec.MAXIMUM_LOAD_N,
         ]
         within_catalog = catalog[0] <= low <= high <= catalog[1]
         report = {
@@ -224,12 +224,12 @@ async def build(adapter):
             "limitation": "Counter initial-tension tolerance unspecified; measured force-curve acceptance still needed. No tolerance bounds assumed.",
             "native_parts": parts,
             "rigid_parts": rows,
-            "fixed_parts_excluded_from_moving_torque": ["gooseneck"],
+            "fixed_parts_excluded_from_moving_torque": ["sm-gooseneck"],
             "pen_parts_one_each": PEN_STEMS,
             "flexible_part_counts": {
-                "channel-spring-installed": 20,
-                "counter-spring": 1,
-                "lever-wire": 1,
+                "vn-channel-spring-installed": 20,
+                "vn-counter-spring": 1,
+                "mg-lever-wire": 1,
             },
             "pen_mass_kg": pen_mass,
             "pen_gravity_torque_bound_n_mm": pen_torque_bound,

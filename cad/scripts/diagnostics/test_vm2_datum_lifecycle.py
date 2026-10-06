@@ -20,9 +20,9 @@ def probe(tmp_path, monkeypatch):
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "ROOT", tmp_path.resolve())
     monkeypatch.setitem(sys.modules, "_common", SimpleNamespace(_early_bound=lambda value, _kind: value))
-    monkeypatch.setitem(sys.modules, "pinion_lift_rod_spec", SimpleNamespace(ROD_DIA=6.35, __file__=__file__))
-    monkeypatch.setitem(sys.modules, "rack_pinion_spec", SimpleNamespace(BORE_DIA=5.0, __file__=__file__))
-    for stem in ("pinion-lift-rod", "rack-pinion"):
+    monkeypatch.setitem(sys.modules, "dt_pinion_lift_rod_spec", SimpleNamespace(ROD_DIA=6.35, __file__=__file__))
+    monkeypatch.setitem(sys.modules, "pd_rack_pinion_spec", SimpleNamespace(BORE_DIA=5.0, __file__=__file__))
+    for stem in ("dt-pinion-lift-rod", "pd-rack-pinion"):
         for folder, suffix in (("slddrw", "SLDDRW"), ("sldprt", "SLDPRT")):
             path = module.ROOT / f"cad/out/{folder}/{stem}.{suffix}"
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -37,7 +37,7 @@ def inputs(probe, path, **overrides):
 
 
 @pytest.mark.parametrize("stem, radius, limit", [
-    ("pinion-lift-rod", 0.003175, 0.00002), ("rack-pinion", 0.0025, 0.0001),
+    ("dt-pinion-lift-rod", 0.003175, 0.00002), ("pd-rack-pinion", 0.0025, 0.0001),
 ])
 def test_production_pins_own_outputs_spec_radius_and_unchanged_limit(probe, stem, radius, limit):
     original = probe.ROOT / f"cad/out/slddrw/{stem}.SLDDRW"
@@ -57,14 +57,14 @@ def test_production_pins_own_outputs_spec_radius_and_unchanged_limit(probe, stem
     ({"rack_dimension_location": "above"}, "layout must already come from its recipe"),
 ])
 def test_production_forbids_redraw_only_and_layout_changes(probe, options, message):
-    path = probe.ROOT / "cad/out/slddrw/rack-pinion.SLDDRW"
+    path = probe.ROOT / "cad/out/slddrw/pd-rack-pinion.SLDDRW"
     with pytest.raises(ValueError, match=message):
         inputs(probe, path, **options)
 
 
 @pytest.mark.parametrize("relative", [
-    "cad/out/reports/rack-pinion.SLDDRW", "cad/out/slddrw/another-part.SLDDRW",
-    "cad/out/slddrw/rack-pinion.json", "other-checkout/cad/out/slddrw/rack-pinion.SLDDRW",
+    "cad/out/reports/pd-rack-pinion.SLDDRW", "cad/out/slddrw/another-part.SLDDRW",
+    "cad/out/slddrw/rack-pinion.json", "other-checkout/cad/out/slddrw/pd-rack-pinion.SLDDRW",
 ])
 def test_production_rejects_nonexact_pipeline_drawing(probe, relative):
     path = probe.ROOT / relative
@@ -75,7 +75,7 @@ def test_production_rejects_nonexact_pipeline_drawing(probe, relative):
 
 
 def partial_witness(probe):
-    source = probe.ROOT / "cad/out/sldprt/rack-pinion.SLDPRT"
+    source = probe.ROOT / "cad/out/sldprt/pd-rack-pinion.SLDPRT"
     directory = probe.ROOT / "cad/out/reports/partial"
     directory.mkdir(parents=True)
     original = directory / "partial.SLDDRW"

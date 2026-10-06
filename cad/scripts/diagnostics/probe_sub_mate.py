@@ -69,7 +69,7 @@ async def main():
     cam_name = None
     for _f, _m, name, mtype, parts, _v in _iter_mates(adapter, top, read_values=False):
         joined = " ".join(parts)
-        if mtype == 0 and "connecting-rod-1" in joined and "cylinder-gear-1" in joined:
+        if mtype == 0 and "ch-connecting-rod-1" in joined and "dt-cylinder-gear-1" in joined:
             cam_name = name
             break
     log(f"  ch00 cam mate = {cam_name!r}")
@@ -78,7 +78,7 @@ async def main():
     log("  deleted cam -> rod fully free")
 
     # resolve the channel sub doc and retarget
-    ch_comp, _ = _find_one(adapter, "channel-1", toplevel=True)
+    ch_comp, _ = _find_one(adapter, "ch-channel-1", toplevel=True)
     ch_doc = adapter._attempt(lambda: ch_comp.GetModelDoc2(), default=None)
     if ch_doc is None:
         log("  channel-1 GetModelDoc2 -> None; abort")
@@ -91,9 +91,9 @@ async def main():
     sub_ok = False
     sub_nm = None
     for kind in ("coincident",):
-        ok, nm, err = await _raw(adapter, kind, ref("connecting-rod-1", "Axis2"),
-                                 ref("rocker-arm-1", "Axis2"))
-        log(f"  SUB {kind:11s} rod-1.Axis2 <-> rocker-1.Axis2 (in channel.SLDASM) "
+        ok, nm, err = await _raw(adapter, kind, ref("ch-connecting-rod-1", "Axis2"),
+                                 ref("ch-rocker-arm-1", "Axis2"))
+        log(f"  SUB {kind:11s} rod-1.Axis2 <-> rocker-1.Axis2 (in ch-channel.SLDASM) "
             f"-> {'OK' if ok else 'FAIL ' + str(err)}")
         sub_ok, sub_nm = ok, nm
 
@@ -102,8 +102,8 @@ async def main():
 
     # ---- re-add the cam at TOP (cross-sub) -> the closed four-bar ----
     ok, nm, err = await _raw(adapter, "coincident",
-                             ref("channel-1/connecting-rod-1", "Axis1"),
-                             ref("drive-train-1/cylinder-gear-1", "Axis3"))
+                             ref("ch-channel-1/ch-connecting-rod-1", "Axis1"),
+                             ref("dt-drive-train-1/dt-cylinder-gear-1", "Axis3"))
     log(f"  TOP cam ring<->lobe (cross-sub, closes 4-bar) -> "
         f"{'OK' if ok else 'FAIL ' + str(err)}")
     log(f"  RESULT: sub pin<->bore {'OK' if sub_ok else 'FAIL'}, "

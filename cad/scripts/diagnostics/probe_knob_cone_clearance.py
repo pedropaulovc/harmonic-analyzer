@@ -21,7 +21,7 @@ import _config  # noqa: E402
 from _common import _early_bound, _read_member, check, log, run_build  # noqa: E402
 from _assembly import place_component  # noqa: E402
 from _transforms import compose_rows, rot_z_rows  # noqa: E402
-import build_drive_train_assembly as dta  # noqa: E402
+import build_dt_drive_train_assembly as dta  # noqa: E402
 
 
 def _transform(rows: list[list[float]], position_mm: list[float]) -> list[float]:
@@ -91,7 +91,7 @@ async def build(adapter) -> dict[str, str]:
     ]
     gear = await place_component(
         adapter,
-        "cone-gear",
+        "dt-cone-gear",
         gear_position,
         [0.0, dta.INCLINE_DEG, 0.0],
         dta.ROT_Y_INCLINE,
@@ -113,7 +113,7 @@ async def build(adapter) -> dict[str, str]:
     knob_position = [knob_x, dta.Y_BASE_TOP + dta.PLAT_T, knob_z]
     knob = await place_component(
         adapter,
-        "cone-lock-knob",
+        "vn-cone-lock-knob",
         knob_position,
         [0.0, 0.0, 0.0],
         dta.IDENTITY,

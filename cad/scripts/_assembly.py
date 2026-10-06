@@ -60,6 +60,7 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
     """
     return {
         "Title": assembly_name,
+        "Number": assembly_contract(assembly_name).number,
         "Revision": _config.release_revision(),
         "Generator": f"harmonic-analyzer @ {_git_sha()}",
         "COPYRIGHT_YEAR": _git_commit_year(),
@@ -78,23 +79,33 @@ def assembly_title_properties(assembly_name: str) -> dict[str, str]:
 
 
 @_telemetry.traced("assembly.ensure_revision")
-def _ensure_assembly_revision(adapter: Any, model: Any = None) -> bool:
-    """Restamp an existing assembly with the current release Revision if stale."""
+def _ensure_assembly_identity(adapter: Any, asm_name: str, model: Any = None) -> bool:
+    """Restamp stale release Revision and frozen per-assembly Number."""
     target = adapter.currentModel if model is None else model
     expected = _config.release_revision()
     current = str(
         adapter._attempt(lambda: target.GetCustomInfoValue("", "Revision"), default="")
         or ""
     )
-    if current == expected:
-        return False
-    apply_custom_properties(adapter, {"Revision": expected}, model=target)
-    _telemetry.event(
-        "assembly.revision_restamped",
-        previous=current,
-        revision=expected,
+    revision_changed = current != expected
+    if revision_changed:
+        apply_custom_properties(adapter, {"Revision": expected}, model=target)
+        _telemetry.event(
+            "assembly.revision_restamped",
+            previous=current,
+            revision=expected,
+        )
+        log(f"assembly Revision {current!r} -> {expected}")
+
+    number = assembly_contract(asm_name).number
+    current_number = str(
+        adapter._attempt(lambda: target.GetCustomInfoValue("", "Number"), default="")
+        or ""
     )
-    log(f"assembly Revision {current!r} -> {expected}")
+    if current_number == number:
+        return revision_changed
+    apply_custom_properties(adapter, {"Number": number}, model=target)
+    log(f"assembly Number {current_number!r} -> {number!r}")
     return True
 
 
@@ -104,7 +115,7 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
 
     The drawing template's PART cell resolves the summary Title, and every
     sheet prints the slug (user ruling 2026-09-26).  Both save chokepoints call
-    this beside ``_ensure_assembly_revision``, so a refresh restamps a file
+    this beside ``_ensure_assembly_identity``, so a refresh restamps a file
     saved under an older title as surely as a full build stamps a new one.
     """
     target = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
@@ -125,7 +136,7 @@ def _ensure_assembly_title(adapter: Any, asm_name: str, model: Any = None) -> bo
 # (a coplanar single-plane stand-in). Whitelisted like link<->link contact in
 # check_no_interference. Defined here (not in _common) so it stays off every
 # part's recipe digest -- only the assemblies that read it rebuild on a change.
-_CHAIN_SPROCKET_PREFIXES = ("transgear-removable",)
+_CHAIN_SPROCKET_PREFIXES = ("pd-transgear-removable",)
 # Only the sprockets the roller chain actually WRAPS mesh it: the T12 crank wheel
 # and the T24 knob wheel. The loose T18 spare (same "transgear-removable" stem, a
 # different config) rests off the loop, so a chain-link overlap with IT is a real
@@ -2475,7 +2486,7 @@ async def save_assembly_and_images(
     assembly it describes is saved and fingerprinted; the previous manifest is
     retired with the previous mass-property proof, so a failed build never
     leaves a manifest beside an assembly it does not describe."""
-    if asm_name in ("channel", "summing") and native_contact_check is None:
+    if asm_name in ("ch-channel", "sm-summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
     # The drawings' views at 1:2 and smaller print this derived configuration
     # (gear teeth and screw threads suppressed); Default stays the solved,
@@ -2532,7 +2543,7 @@ async def save_assembly_and_images(
     # on-disk parts and a fresh open would report NeedsRebuild2 != 0. Runs after
     # the copy source is discarded so the reopen loads clean children from disk.
     await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
-    if asm_name in ("channel", "summing"):
+    if asm_name in ("ch-channel", "sm-summing"):
         if native_contact_check is None:
             raise ValueError(f"{asm_name} assembly requires native_contact_check")
         native_contact_check(adapter, asm_name)
@@ -2604,9 +2615,8 @@ def _save_new_assembly_as_copy(adapter: Any, asm_path: Any) -> None:
     ``SaveAs3``'s integer return is unreliable across late-bound COM, so success
     is gated on this call producing a new, non-empty target file.
     """
-    _ensure_assembly_revision(adapter)
-    # The PART cell prints the bare slug, the same convention as every part
-    # sheet (user ruling 2026-09-26); the MHA-A## number marks an assembly.
+    _ensure_assembly_identity(adapter, asm_path.stem)
+    # The PART cell prints the bare slug; the frozen 000 Number marks an assembly.
     _ensure_assembly_title(adapter, asm_path.stem)
     options = 1 | 2 | 8
     model = adapter.currentModel
@@ -3161,7 +3171,7 @@ def save_assembly_in_place(
       * ``save_file(PATH)`` -> SaveAs branch does ``CloseDoc(PATH)`` +
         ``os.remove(PATH)`` before ``SaveAs3``; when the active doc IS that path
         this disconnects the doc and deletes the file -- it destroyed
-        drive-train.SLDASM twice.
+        dt-drive-train.SLDASM twice.
       * ``save_file()`` (no path) -> ``Save3(1, None, None)``; ``None`` for the
         two [out] byref params fails the COM call, so it falls through to the
         blocking parameterless ``Save()`` "Component documents must be saved"
@@ -3184,7 +3194,7 @@ def save_assembly_in_place(
     ``repro_inplace_save.py`` (ret=True, err=0, warn=0, the active config persists
     on reopen).
 
-    ``geometry_changed``, a stale Revision or a stale summary Title gates the
+    ``geometry_changed``, a stale Number/Revision or a stale summary Title gates the
     bump. Every in-place
     ``Save3`` rewrites fresh save metadata -> a new md5, and the parent's doit dep
     is this file's md5. When neither changed, the save is skipped so a no-op
@@ -3193,15 +3203,15 @@ def save_assembly_in_place(
     ``Save3`` push the new geometry or metadata md5 to the parent.
     """
     asm = _early_bound(adapter.currentModel if model is None else model, "IModelDoc2")
-    revision_changed = _ensure_assembly_revision(adapter, asm)
+    identity_changed = _ensure_assembly_identity(adapter, asm_name, asm)
     title_changed = _ensure_assembly_title(adapter, asm_name, asm)
-    must_save = geometry_changed or revision_changed or title_changed
+    must_save = geometry_changed or identity_changed or title_changed
     sldasm = OUT_SLDASM / f"{asm_name}.SLDASM"
     if not must_save:
-        # No-op refresh: resolved geometry, Revision and Title are identical to
+        # No-op refresh: resolved geometry, Number, Revision and Title are identical to
         # the last save. Do NOT rewrite -- a fresh md5 would invalidate the parent.
         log(
-            f"{sldasm.name}: geometry, Revision and Title unchanged -- .SLDASM left "
+            f"{sldasm.name}: geometry, Number, Revision and Title unchanged -- .SLDASM left "
             "intact (no md5 bump)"
         )
         return False
@@ -3270,7 +3280,7 @@ async def refresh_assembly(
     caller escalates to a full from-scratch rebuild via the ``full`` escape
     (delete the target + ``doit assembly:<stem>``).
     """
-    if asm_name in ("channel", "summing") and native_contact_check is None:
+    if asm_name in ("ch-channel", "sm-summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
     asm_path = (OUT_SLDASM / f"{asm_name}.SLDASM").resolve()
     if not asm_path.exists():
@@ -3361,7 +3371,7 @@ async def refresh_assembly(
             f"refresh {asm_name}: saved artifact opened with "
             f"NeedsRebuild2={opened_rebuild_status}; forcing gates + clean re-save"
         )
-    if asm_name in ("channel", "summing"):
+    if asm_name in ("ch-channel", "sm-summing"):
         # Revoke the previous certificate before either the changed-save path or
         # the byte-stable no-op path attempts strict native certification.
         # Failure to remove it aborts before any save or reconciliation.
@@ -3406,7 +3416,7 @@ async def refresh_assembly(
     if saved:
         await reconcile_saved_rebuild_state(adapter, asm_name, asm_path)
 
-    if asm_name in ("channel", "summing"):
+    if asm_name in ("ch-channel", "sm-summing"):
         if native_contact_check is None:
             raise ValueError(f"{asm_name} assembly requires native_contact_check")
         native_contact_check(adapter, asm_name)

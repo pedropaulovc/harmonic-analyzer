@@ -5,11 +5,14 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 The display/placement layer on top of [[dimxpert-authoring-probe]] (authoring
 itself). All facts probe-verified on the MHA-082 stub, R2026x SP3.0 Makers
 seat; probes in `cad/scripts/diagnostics/probe_pmi_*.py` (worktree branch
 `dimxpert-pmi-migration`, PR #450). R9-68 retired the stub; the DimXpert
-probes now target `transgear-pin` (MHA-179).
+probes now target `pd-transgear-pin` (MHA-PD-023).
 
 **The legality rule (user-discovered, explains every symptom).** An FCF on a
 cylindrical face is only legal in the annotation view PERPENDICULAR to the

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 # Exact CAD identity in assembly cache keys
 
 Issue #301 closed the old “recipe ≠ PID identity” limitation without sacrificing
@@ -43,5 +46,5 @@ Fix in `dodo.py`:
 
 Regression coverage: `test_dodo_recipe.py` pins child-token deps, cache-key
 movement on identity change, token propagation, and assembly-drawing identity;
-`test_pen_assembly_drawing.py` now requires the exact assembly token and rejects a
+`test_pn_pen_assembly_drawing.py` now requires the exact assembly token and rejects a
 part token in its place.

@@ -14,7 +14,7 @@ from _common import (
 )
 from _assembly import whats_wrong
 
-ORDER = ["frame", "channel", "drive-train", "output", "harmonic-analyzer"]
+ORDER = ["fr-frame", "ch-channel", "dt-drive-train", "output", "ha-harmonic-analyzer"]
 
 
 async def main():

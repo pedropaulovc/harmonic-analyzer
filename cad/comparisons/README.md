@@ -28,6 +28,42 @@ submodule).
 | `scores.json` | regen | pair → RMS shape score (regression trend only; compare across commits, same engine) |
 | `findings/iter_NNN.json` | — | per-iteration vision findings |
 
+## Identity boundaries
+
+Current export and gallery inputs use canonical subsystem-prefixed stems.
+Historical released bundles remain unchanged: `release_diff.py` and
+`render_diff.py` pair their actual member names through the sealed schema-2
+[`identity-migration-map.json`](../config/identity-migration-map.json).
+Only the part stem is translated. For every non-default configuration the
+exporter appends `--` plus the sanitized configuration name; the entire suffix
+from the first `--` is retained, not just three-digit tooth counts. Thus
+`transgear-removable--t12` pairs with `pd-transgear-removable--t12`,
+`crank-handle-ferrule--installed` with
+`dt-crank-handle-ferrule--installed`, and `cone-gear--t006` with
+`dt-cone-gear--t006`. Generated `-stretchN` qualifiers are also retained, for
+example `channel-spring-installed-stretch07` becomes
+`vn-channel-spring-installed-stretch07`; an exporter `--configuration` takes
+precedence over that generated suffix rule. Geometry verdicts and red highlights
+remain per exact qualified mesh. The changed-part summary groups only trailing
+`--t<digits>` and `-stretch<digits>` variants by base stem; other configuration
+qualifiers, such as `--installed`, remain distinct summary entries.
+The map is an archive-input boundary, not an old-name alias for current files
+or commands.
+Scene and GLB readers resolve actual historical/current bundle members.
+With an explicit release tag, `pose_to_meshprobe.py` reuses an extracted
+mapped cache member without contacting GitHub. Ambiguous old/current copies
+are rejected rather than silently selected.
+
+Historical curation catalogs likewise remain immutable provenance.
+`seed_manifest.py` normalizes catalog components only when their
+`old_underscore` identity is assigned by that same sealed map, before selecting
+a studio part or the top assembly and emitting `focus`/`frame_components`.
+Unknown semantic or retired unmapped labels, such as `crank_pedestal`, remain
+unchanged; they require owner curation, not a guessed alias.
+The normal merge retains existing tuned pairs; `--reset`
+regenerates pairs using current identities. Explicit `PHOTO_FOCUS` mappings are
+unchanged.
+
 ## Workflow
 
 ```powershell
@@ -54,7 +90,7 @@ uv run cad/comparisons/tools/render_offline.py [--only id,..] [--stale-only]
 uv run cad/comparisons/tools/composite.py [--only id1,id2]
 
 # 4. selective model rebuild after fixing a part script (dependent assemblies refresh)
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit part:cone_gear
+C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit part:dt_cone_gear
 ```
 
 ## Interactive posing — Blender pose studio
@@ -110,7 +146,7 @@ metre-unit glTF `export_models.py` writes). Produce one either way:
 
 ```powershell
 # from the SolidWorks seat: open a .SLDASM and SaveAs3 it to .glb
-uv run python cad/scripts/export_glb.py <dir-with-the-assembly>/harmonic-analyzer.SLDASM
+uv run python cad/scripts/export_glb.py <dir-with-the-assembly>/ha-harmonic-analyzer.SLDASM
 # or add --fetch-glb below to pull gltf/<model>.glb from the latest release bundle
 ```
 

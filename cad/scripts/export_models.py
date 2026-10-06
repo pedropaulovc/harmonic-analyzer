@@ -50,7 +50,7 @@ export above can run on a SolidWorks farm worker that has no renderer:
 ``features.toml`` bound to those raw STEP bytes by ``export_features.write_manifest``.
 It never touches the global STEP/STL/PNG, colour, source-digest or release-neutral files:
 
-    uv run python cad\\scripts\\export_models.py --features rocker_arm pivot_shaft
+    uv run python cad\\scripts\\export_models.py --features ch_rocker_arm ch_pivot_shaft
 """
 
 from __future__ import annotations
@@ -118,7 +118,7 @@ SRC_DIGESTS = OUT_STL / "export-src.json"
 _EXPORTER_KEY = "__exporter__"
 NEUTRAL_MANIFEST = CAD_ROOT / "out" / "reports" / "release-neutral.json"
 NEUTRAL_SCHEMA = "harmonic-analyzer/release-neutral@3"
-TOP_ASSEMBLY = "harmonic-analyzer"
+TOP_ASSEMBLY = "ha-harmonic-analyzer"
 
 # Comparison gallery, produced separately from the exported STLs by
 # ``--comparisons``. The PEP-723 tools run without SolidWorks; render_offline
@@ -876,7 +876,7 @@ def _save_feature_step(doc: Any, stem: str, out: Path) -> None:
     names = name_feature_faces(doc, stem)
     _save_as(doc, out)
     faces = step_face_sets(out.read_text(encoding="latin-1"), names)
-    if stem == "rocker_arm" and len(faces["pivot_bore"]) != 2:
+    if stem == "ch_rocker_arm" and len(faces["pivot_bore"]) != 2:
         raise FeatureFaceError(
             f"{stem}.pivot_bore: expected exactly 2 STEP patches, "
             f"found {len(faces['pivot_bore'])}"

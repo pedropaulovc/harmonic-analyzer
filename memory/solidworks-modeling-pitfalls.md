@@ -7,6 +7,9 @@ metadata:
   originSessionId: 5e824fa0-7bda-4055-8655-aa59ed6f0ef9
 ---
 
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
+
+
 Live-verified SolidWorks 2026 COM facts (PyWin32Adapter, SolidworksMCP-python),
 discovered during harmonic-analyzer M6.4:
 
@@ -295,7 +298,7 @@ discovered during harmonic-analyzer M6.4:
 
 - **Feature-replay of an external part: a volume+bbox match is NECESSARY but
   NOT SUFFICIENT — a Z-MIRRORED build matches both yet is upside-down.**
-  Reproducing `rocker-arm-support.SLDPRT` (a Z-up trapezoid wedge), the
+  Reproducing `fr-rocker-arm-support.SLDPRT` (a Z-up trapezoid wedge), the
   Top-plane sketch maps sketch-y → **−Z**, so the trapezoid's wide foot must be
   drawn at sketch **+Y** to land at model Z=−88.9 (the real foot). Drawing it at
   −Y put the foot at +Z: every per-feature volume + the bbox matched the source
@@ -378,7 +381,7 @@ discovered during harmonic-analyzer M6.4:
   face object found by enumeration, never by coordinate.
 
 - **A point-to-origin distance dim LOCATING AN ARC CENTRE rejects ANY equation
-  binding** (SW 2026, live-bisected on `build_pinion_bracket.py`): the sketch is
+  binding** (SW 2026, live-bisected on `build_dt_pinion_bracket.py`): the sketch is
   fully defined and consistent, the equation's value equals the as-built dim
   (43 mm), `IEquationMgr.Add3` succeeds and the RHS evaluates — but the NEXT
   `ForceRebuild3` fails with only the **Equations folder** flagged in

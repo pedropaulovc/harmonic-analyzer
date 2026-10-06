@@ -1,5 +1,7 @@
 # Closed snapshot comparison: main550 and candidate64
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Comparison complete. Six operational DOF manifests match byte-for-byte, including all 70 drive specifications. Three of eight assembly fingerprints match. Five differ and remain unexplained; the retained evidence does not establish full geometry equivalence or identify a geometric defect.
 
 | Assembly | Geometry fingerprint | DOF manifest |

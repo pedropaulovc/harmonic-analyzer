@@ -1,0 +1,9 @@
+pd-transgear-knob-cup:
+  title: Transgear Knob Cup
+  number: MHA-PD-016
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: bright machined, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned from bar (brass): drill the bore, counterbore from the rear to the floor, face both ends"

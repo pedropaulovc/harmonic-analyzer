@@ -85,7 +85,7 @@ def test_wrong_pid_never_reaches_callback(native_doubles, monkeypatch):
 def test_parent_environment_rejects_before_seat_wrapper(monkeypatch, autostart):
     from diagnostics import probe_assembly_health_targets as probe
 
-    monkeypatch.setattr("sys.argv", ["probe_assembly_health_targets.py", "channel"])
+    monkeypatch.setattr("sys.argv", ["probe_assembly_health_targets.py", "ch-channel"])
     monkeypatch.delenv("HARMONIC_SW_AUTOSTART", raising=False)
     if autostart is not None:
         monkeypatch.setenv("HARMONIC_SW_AUTOSTART", autostart)

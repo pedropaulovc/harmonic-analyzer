@@ -29,10 +29,10 @@ from _assembly import (
     world_point,
 )
 
-# Distance drivers seed their side from summing's flip seeds
-# (cad/config/assemblies/summing.yaml), the assembly this probe mirrors.
-activate_assembly_contract("summing")
-from build_summing_lever import SPIN_REF_X as SL_SPIN_REF_X
+# Distance drivers seed their side from sm-summing's flip seeds
+# (cad/config/assemblies/sm-summing.yaml), the assembly this probe mirrors.
+activate_assembly_contract("sm-summing")
+from build_sm_summing_lever import SPIN_REF_X as SL_SPIN_REF_X
 
 KNIFE = (15.0, 990.0)
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
@@ -62,9 +62,9 @@ def _status(adapter, comp):
 
 async def build(adapter):
     check("create_assembly", await adapter.create_assembly())
-    km = await place_component(adapter, "knife-mount", [KNIFE[0], KNIFE[1], 0.0],
+    km = await place_component(adapter, "sm-knife-mount", [KNIFE[0], KNIFE[1], 0.0],
                                [0.0, 0.0, 0.0], IDENTITY)
-    sl = await place_component(adapter, "summing-lever", [KNIFE[0], KNIFE[1], 0.0],
+    sl = await place_component(adapter, "sm-summing-lever", [KNIFE[0], KNIFE[1], 0.0],
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     sl_o = _org(adapter, sl)
     log(f"after insert: summing-lever {_status(adapter, sl)}  org={sl_o}")
