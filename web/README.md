@@ -78,6 +78,36 @@ The video embeds use the official YouTube IFrame API. Downloaded source videos,
 reference screenshots and the GLB remain untracked; the site does not host or
 redistribute the footage.
 
+### Native calibration inventory
+
+`scripts/export-native-inventory.py` exports the approved raw GLB's unchanged
+native rest matrices under canonical qualified paths. It independently checks
+the release pair, v2 approval, sole identity map and canonical digest. The raw
+GLB and CAD tree remain read-only, including hard-linked output aliases.
+
+```sh
+# From the repository root; the approved raw GLB remains private.
+uv run --isolated --no-project python web/scripts/export-native-inventory.py \
+  --model /path/to/raw-native.glb \
+  --source-commit 81539e53f5146c06a77541415bd79da673806d96 \
+  --expected-model-sha256 60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c \
+  --output /tmp/v39-native-model-inventory.json
+npm --prefix web run test:inventory
+```
+
+The v39 artifact has 457 released descendant transforms: 450 mesh nodes and
+seven assembly transforms. Its mesh primitives produce 460 native drawables.
+The assembly root, camera and runtime-generated spare instances are not
+inventory rows. `fit-source.py` consumes the matrices as column-major
+part-local-metres to native-world-metres, and checks the original raw-model
+digest before using any landmark. This inventory does not supply source
+observations, camera calibration, motion evidence, historical bounds or
+source-fidelity qualification.
+
+The inventory tests are enrolled in `test:model`. They are web-only tooling,
+not CAD/doit tests; their independent transform and immutable-input controls
+run without SolidWorks, a GPU, source footage or the private GLB.
+
 ## Canonical identity evidence audit
 
 `content/canonical-native/manifest.json` seals 29 identity-only derivatives.
