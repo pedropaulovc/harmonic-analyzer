@@ -725,11 +725,17 @@ test('visible source motion cannot override the complete same-shot minimum playb
 
 test('render verification separates the real representation digest from pinned raw native identity', () => {
   const descriptor = {
-    schemaVersion: 1, kind: 'lossless-web-model-representation',
+    schemaVersion: 2, kind: 'lossless-web-model-representation',
     source: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT },
+    identity: { mapSha256: 'c'.repeat(64), canonicalSha256: 'd'.repeat(64), renamedNodes: 1, nodeCount: 2 },
     representation: { path: 'models/ha-harmonic-analyzer.glb', sha256: 'a'.repeat(64), byteLength: 4096, codec: 'EXT_meshopt_compression' },
-    pipeline: { version: 1, steps: ['exact-dedup', 'meshopt'], codecVersion: 'meshoptimizer@0.22.0' },
-    equivalence: { method: 'decoded-per-drawable-exact-v1', semanticSha256: 'b'.repeat(64), drawableCount: 435 },
+    pipeline: { version: 2, steps: ['native-identity-map', 'exact-dedup', 'meshopt'], codecVersion: 'meshoptimizer@0.22.0' },
+    equivalence: { method: 'decoded-per-drawable-exact-after-native-identity-v2', semanticSha256: 'b'.repeat(64), drawableCount: 435 },
+  }
+  const nativeIdentity = {
+    modelSha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT,
+    nativeIdentityMapSha256: descriptor.identity.mapSha256,
+    canonicalModelSha256: descriptor.identity.canonicalSha256,
   }
   const actual = {
     videoId: 'fixture', playerVideoId: 'fixture', modelState: 'ready', missingBindings: [],
@@ -740,7 +746,7 @@ test('render verification separates the real representation digest from pinned r
     },
     physics: { springForcesN: Array(20).fill(1), springLengthsM: Array(20).fill(0.1), equilibriumResidualNm: 0 },
   }
-  requireModel(actual, 'fixture', descriptor)
+  requireModel(actual, 'fixture', descriptor, nativeIdentity)
   for (const change of [
     { observedSha256: MODEL_SHA256 },
     { expectedSha256: MODEL_SHA256 },
@@ -749,8 +755,13 @@ test('render verification separates the real representation digest from pinned r
     { observedByteLength: 4095 },
     { expectedByteLength: 4095 },
     { identity: 'mismatched' },
-  ]) assert.throws(() => requireModel({ ...actual, modelProvenance: { ...actual.modelProvenance, ...change } }, 'fixture', descriptor), /identity mismatch/)
+  ]) assert.throws(() => requireModel({ ...actual, modelProvenance: { ...actual.modelProvenance, ...change } }, 'fixture', descriptor, nativeIdentity), /identity mismatch/)
   const unapprovedSource = structuredClone(descriptor)
   unapprovedSource.source.sha256 = 'c'.repeat(64)
-  assert.throws(() => requireModel(actual, 'fixture', unapprovedSource), /different native CAD source/)
+  assert.throws(() => requireModel(actual, 'fixture', unapprovedSource, nativeIdentity), /different native CAD source/)
+  for (const field of ['mapSha256', 'canonicalSha256']) {
+    const unapprovedIdentity = structuredClone(descriptor)
+    unapprovedIdentity.identity[field] = 'e'.repeat(64)
+    assert.throws(() => requireModel(actual, 'fixture', unapprovedIdentity, nativeIdentity), /identity|canonical|mapping|association|different native/i)
+  }
 })

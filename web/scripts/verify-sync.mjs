@@ -6,10 +6,11 @@ import { fileURLToPath } from 'node:url'
 import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, loadCanonicalObservations, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 import { assertNativeSourceAssociation, assertModelRepresentationBytes, REPRESENTATION_KIND } from '../model-representation.mjs'
+import { nativeProvenanceFromModule } from './fetch-model.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const STAGES = [50, 20, 10, 5]
-const NATIVE_MODEL_IDENTITY = { modelSha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT }
+const NATIVE_MODEL_IDENTITY = nativeProvenanceFromModule(await readFile(resolve(WEB_ROOT, 'src/mechanics-data.ts'), 'utf8'))
 let approvedModelRepresentation = null
 const VIDEO_SLUGS = ['intro-history', 'synthesis', 'analysis', 'operation', 'machine-spin', 'rocker-arms']
 const SOURCE_HASHES = [
@@ -327,15 +328,15 @@ async function staticSourceControls(record) {
 }
 
 async function snapshot(page) { return page.evaluate(() => window.harmonicAnalyzer.snapshot()) }
-export function requireModel(actual, id, representation = approvedModelRepresentation) {
+export function requireModel(actual, id, representation = approvedModelRepresentation, nativeIdentity = NATIVE_MODEL_IDENTITY) {
   assert(actual.videoId === id && actual.playerVideoId === id, 'Rendered route/player identity mismatch')
   assert(actual.modelState === 'ready' && !actual.missingBindings?.length, 'Full native model is unavailable or has unresolved bindings')
-  const approved = assertNativeSourceAssociation(representation, NATIVE_MODEL_IDENTITY)
+  const approved = assertNativeSourceAssociation(representation, nativeIdentity)
   const provenance = actual.modelProvenance
   assert(provenance?.identity === 'matched' && provenance.sourceSha256 === MODEL_SHA256 && provenance.sourceCommit === MODEL_COMMIT
     && provenance.representationKind === REPRESENTATION_KIND
     && provenance.expectedSha256 === approved.representation.sha256 && provenance.expectedByteLength === approved.representation.byteLength, 'Actual native source/compiled representation identity mismatch')
-  assertModelRepresentationBytes(approved, NATIVE_MODEL_IDENTITY, { sha256: provenance.observedSha256, byteLength: provenance.observedByteLength })
+  assertModelRepresentationBytes(approved, nativeIdentity, { sha256: provenance.observedSha256, byteLength: provenance.observedByteLength })
   assert(actual.physics?.springForcesN?.length === 20 && actual.physics.springForcesN.every(value => finite(value) && value >= 0) && actual.physics.springLengthsM?.length === 20 && actual.physics.springLengthsM.every(value => finite(value) && value > 0) && finite(actual.physics.equilibriumResidualNm), 'Actual native physical solve is unavailable')
 }
 async function openRoute(page, url, record, player) {

@@ -8,8 +8,8 @@ import { gunzip } from 'node:zlib'
 import { promisify } from 'node:util'
 
 export const VIDEO_IDS = Object.freeze(['NAsM30MAHLg', '8KmVDxkia_w', '6dW6VYXp9HM', 'jfH-NbsmvD4', 'XPQwKRt4Y2k', '4mBuyixt22U'])
-export const MODEL_SHA256 = '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d'
-export const MODEL_COMMIT = '1268c23d4a8fc741147c5e09d8d1e45247a71945'
+export const MODEL_SHA256 = '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c'
+export const MODEL_COMMIT = '81539e53f5146c06a77541415bd79da673806d96'
 export const PIXEL_LIMIT = 1920 * 0.02
 export const CLOCK_LIMIT = 0.5
 const EPSILON = 1e-6
