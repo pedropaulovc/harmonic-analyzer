@@ -19,8 +19,9 @@ npm --prefix web run dev
 
 The model is a generated artifact, absent from a fresh checkout. Use the exact
 raw CAD export identified by `src/mechanics-data.ts`; incompatible bytes are
-rejected. `fetch-model` validates the current raw pin, performs lossless exact
-deduplication and Meshopt compression, then publishes only the optimized GLB.
+rejected. `fetch-model` projects native identities through the authoritative CAD
+map, performs lossless exact deduplication and Meshopt compression, then publishes
+only the optimized GLB. The approved raw export remains unchanged.
 It also accepts `cad/out/gltf/ha-harmonic-analyzer.glb` when no path is supplied.
 The raw cache stays outside public assets under `web/.vite/model-source/`.
 Missing models and failed YouTube playback produce visible errors.
@@ -36,8 +37,9 @@ The release command reads that exact CAD revision, checks native rest geometry
 and compatibility with the website's fixed kinematics, magnifier and spring
 deformer mathematics, and stages new native metadata and the optimized asset.
 Compatible geometry, rest, spring and setup changes are supported; unsupported
-ratio, feed, pen-datum or spring-profile changes are refused with a named
-parameter, preserving the last working assets. Missing revisions are also refused.
+ratio, feed, native-rest association or spring-profile changes are refused with
+a named parameter, preserving the last working assets. Missing revisions are
+also refused.
 A current source commit does not approve arbitrary bytes.
 Existing source tracks are stale for a new raw model and reject source-following;
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
@@ -144,9 +146,11 @@ Byte-replay failures list every mismatching derivative path, rather than
 stopping at the first packet.
 
 These certificates establish identity/provenance preservation, **not** fresh
-geometry, source-camera or browser qualification. A real canonical CAD export,
-model re-pin, mechanics/magnifier regeneration and native/browser qualification
-are still required. There is no runtime old-to-new GLB alias.
+geometry, source-camera or browser qualification. The approved v39 raw export
+can supply canonical identities through the importer; a newer CAD export is not
+required for renaming. Mechanics/magnifier regeneration and native/browser
+qualification remain separate gates. There is no runtime old-to-new GLB alias,
+and projecting identities does not make historical observations current.
 
 ## Fidelity and verification
 

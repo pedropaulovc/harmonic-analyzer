@@ -15,20 +15,75 @@ function arrayLength(parameter, value, expected) {
   if (!Array.isArray(value) || value.length !== expected) incompatible(`${parameter}.length`, value?.length, expected)
 }
 
-function numericConstant(source, name) {
-  for (const statement of source.statements) {
-    if (!ts.isVariableStatement(statement)) continue
-    for (const declaration of statement.declarationList.declarations) {
-      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== name) continue
-      const value = declaration.initializer
-      if (value && ts.isNumericLiteral(value)) return Number(value.text)
-      if (value && ts.isPrefixUnaryExpression(value) && ts.isNumericLiteral(value.operand)) {
-        if (value.operator === ts.SyntaxKind.MinusToken) return -Number(value.operand.text)
-        if (value.operator === ts.SyntaxKind.PlusToken) return Number(value.operand.text)
-      }
+async function runtimeMagnifierRest(staged, webRoot) {
+  const text = await readFile(join(webRoot, 'src/magnifier.ts'), 'utf8')
+  const source = ts.createSourceFile('magnifier.ts', text, ts.ScriptTarget.Latest, true)
+  const imports = source.statements.filter(ts.isImportDeclaration)
+  const declaration = imports[0]
+  if (imports.length !== 1 || !ts.isStringLiteral(declaration.moduleSpecifier)
+    || declaration.moduleSpecifier.text !== './mechanics-data'
+    || declaration.importClause?.name
+    || !declaration.importClause?.namedBindings
+    || !ts.isNamedImports(declaration.importClause.namedBindings)
+    || declaration.importClause.namedBindings.elements.length !== 1
+    || declaration.importClause.namedBindings.elements[0].name.text !== 'MECHANISM_DATA') {
+    throw new Error('Cannot derive the actual magnifier runtime with staged native data. No live outputs replaced.')
+  }
+  const moduleText = `const MECHANISM_DATA = ${JSON.stringify(staged)};\n${text.slice(declaration.end)}`
+  const compiled = ts.transpileModule(moduleText, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
+  const runtime = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)
+  const pose = runtime.createMagnifierPose()
+  const geometry = staged.magnifier
+  const centre = geometry.wheelCentreMm.map(value => value / 1000)
+  const restHook = geometry.hookMm.map(value => value / 1000)
+  const knife = staged.summing.knifeMm.map(value => value / 1000)
+  const radius = geometry.hubPitchRadiusMm / 1000
+  const rimRadius = geometry.rimPitchRadiusMm / 1000
+  const contactZ = geometry.hubTangentMm[2] / 1000
+  // Independent coordinate control used by export-magnifier.py: solve the
+  // tangent perpendicularity by bisection, not the runtime's analytic acos.
+  function tangent(hook) {
+    let lo = -Math.PI / 2, hi = Math.PI / 2
+    for (let step = 0; step < 70; step++) {
+      const angle = (lo + hi) / 2
+      const dot = (hook[0] - centre[0]) * Math.cos(angle) + (hook[1] - centre[1]) * Math.sin(angle) - radius
+      if (dot > 0) hi = angle
+      else lo = angle
+    }
+    const angle = (lo + hi) / 2
+    const x = centre[0] + radius * Math.cos(angle)
+    const y = centre[1] + radius * Math.sin(angle)
+    return { angle, x, y, length: Math.hypot(hook[0] - x, hook[1] - y, hook[2] - contactZ) }
+  }
+  const rest = tangent(restHook)
+  const input = {
+    magnifierHookM: new Float64Array(3),
+    magnifierClampM: geometry.clampRestMm.map(value => value / 1000),
+    summingAngleRad: 0,
+  }
+  const dx = restHook[0] - knife[0], dy = restHook[1] - knife[1]
+  for (const angle of [-0.01, 0.01, 0]) {
+    input.summingAngleRad = angle
+    input.magnifierHookM[0] = knife[0] + dx * Math.cos(angle) - dy * Math.sin(angle)
+    input.magnifierHookM[1] = knife[1] + dx * Math.sin(angle) + dy * Math.cos(angle)
+    input.magnifierHookM[2] = restHook[2]
+    runtime.solveMagnifier(input, pose)
+    const control = tangent(input.magnifierHookM)
+    const wheelAngle = (control.length - rest.length) / radius + control.angle - rest.angle
+    const penTravel = -rimRadius * wheelAngle
+    const label = `magnifier wire constraint (summing ${angle} rad)`
+    equalNumber(`${label}.wheelAngleRad`, pose.wheelAngleRad, wheelAngle)
+    equalNumber(`${label}.penTravelM`, pose.penTravelM, penTravel)
+    equalNumber(`${label}.leverWireLengthM`, pose.leverWireLengthM, control.length)
+    equalNumber(`${label}.hubContactM[0]`, pose.hubContactM[0], control.x)
+    equalNumber(`${label}.hubContactM[1]`, pose.hubContactM[1], control.y)
+    equalNumber(`${label}.hubContactM[2]`, pose.hubContactM[2], contactZ)
+    for (let axis = 0; axis < 3; axis++) {
+      const expected = geometry.penRestMm[axis] / 1000 + (axis === 1 ? penTravel : 0)
+      equalNumber(`${label}.penM[${axis}]`, pose.penM[axis], expected, 0.002 / 1000)
     }
   }
-  throw new Error(`Cannot derive fixed ${name} from magnifier.ts; update the native math compatibility gate with the runtime change. No live outputs replaced.`)
+  return pose
 }
 
 function variableInitializer(scope, name) {
@@ -180,13 +235,12 @@ export async function assertRuntimeMathCompatibility(staged, current, webRoot) {
   for (let index = 0; index < bounds.length; index++) {
     equalNumber(`magnifier.clampRadiusBandMm[${index}]/summing.anchorArmMm`, staged.magnifier.clampRadiusBandMm[index] / staged.summing?.anchorArmMm, bounds[index])
   }
-  const magnifierText = await readFile(join(webRoot, 'src/magnifier.ts'), 'utf8')
-  const source = ts.createSourceFile('magnifier.ts', magnifierText, ts.ScriptTarget.Latest, true)
   arrayLength('magnifier.penRestMm', staged.magnifier.penRestMm, 3)
-  for (const [index, name] of ['PEN_X', 'PEN_Y', 'PEN_Z'].entries()) {
-    // Native GLB translations carry the same 0.002 mm rest-frame tolerance as
-    // export-mechanics.py; this is not a tolerance on ratios or decoded geometry.
-    equalNumber(`magnifier.penRestMm[${index}] (${name})`, staged.magnifier.penRestMm[index] / 1000, numericConstant(source, name), 0.002 / 1000)
+  const magnifierRest = await runtimeMagnifierRest(staged, webRoot)
+  for (let index = 0; index < 3; index++) {
+    // The exporter independently checks the raw nib against archived MARKER_POS.
+    // Exercise the actual staged solver, retaining the native 0.002 mm tolerance.
+    equalNumber(`magnifier.penRestMm[${index}] (runtime rest nib)`, staged.magnifier.penRestMm[index] / 1000, magnifierRest.penM[index], 0.002 / 1000)
   }
 
   await assertSpringCompatibility(staged, webRoot)

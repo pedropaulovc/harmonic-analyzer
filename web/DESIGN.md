@@ -56,39 +56,47 @@ is released with the viewer.
 
 ## Model delivery and release provenance
 
-`fetch-model.mjs` invokes `optimize-model.mjs`: exact buffer/accessor/mesh/image
-deduplication comes first, followed by Meshopt 0.22.0 compression. Quantization,
-simplification, node pruning, index reordering and instancing are excluded.
+`fetch-model.mjs` first projects native node names and declared identity fields
+through `cad/config/identity-migration-map.json`, preserving configuration and
+instance qualifiers. Raw release bytes remain immutable. An independent check
+rejects any other glTF JSON change or binary payload change.
+`optimize-model.mjs` then performs exact buffer/accessor/mesh/image deduplication
+and Meshopt 0.22.0 compression. Quantization, simplification, node pruning, index
+reordering and instancing are excluded.
 Image dependencies must be sealed in the GLB: embedded buffer-view and data-URI
 image bytes are preserved. External image URIs are rejected, including companion
 files, network URLs, `blob:` and `file:` references; optimization must not depend
 on ambient files or fetched image content.
-The optimizer fully decodes source and output and compares semantics bit-exactly
-per named drawable; compression and sharing must not change geometry, material,
-transform or component identity. This representation check is separate from
-geometry acceptance and measured source fidelity; neither is established by
-successful optimization.
+The optimizer fully decodes the canonical intermediate and output and compares
+semantics bit-exactly per named drawable; compression and sharing must not change
+geometry, material, transform or canonical component identity. These two checks
+are separate from geometry acceptance and measured source fidelity; neither is
+established by successful projection or optimization.
 
 Raw exports are cached as `.vite/model-source/<rawSHA>.glb`, outside `public/`.
 Only `public/models/ha-harmonic-analyzer.glb`, the optimized representation, is
 published. Both model files remain untracked. A fresh checkout without an asset
 must retain the supported missing-model UI.
 
-Tracked `content/model-representation.json` pins the raw native source commit
-and SHA-256 alongside the actual optimized SHA-256, byte count, semantic digest
-and codec. Its `pipeline.steps` is exactly `['exact-dedup', 'meshopt']`, in that
-order. The browser imports this record at build time, checks its raw association
-against `MECHANISM_DATA`, then hashes the fetched optimized bytes.
+Tracked `content/model-representation.json` uses schema and pipeline version 2.
+It pins the raw native source commit and SHA-256, authoritative identity-map
+SHA-256, canonical intermediate SHA-256, renamed-node and total-node counts,
+and actual optimized SHA-256, byte count, semantic digest and codec.
+Its `pipeline.steps` is exactly `['native-identity-map', 'exact-dedup', 'meshopt']`.
+The browser imports this record at build time, checks the raw, map and canonical
+associations against independently generated `MECHANISM_DATA`, then hashes the
+fetched optimized bytes. There is no runtime identity alias or version-1 shim.
 A public manifest is not a trust authority. Native observations and their model
 SHA remain tied to the raw export. Runtime `observedSha256` identifies the actual
 optimized bytes; explicit `sourceSha256` identifies the native association.
-These hashes must not be aliased or substituted for one another.
+Raw, canonical and optimized hashes must not be substituted for one another.
 
-For the current release, the single command
+For a release already pinned with matching canonical metadata, the command
 `npm --prefix web run fetch-model -- /path/to/raw.glb` validates the existing raw
-pin, optimizes and stages publication without changing native mathematical
-metadata or historical evidence. With no path, it uses the existing
-`cad/out/gltf/ha-harmonic-analyzer.glb` export.
+pin, projects and optimizes the model without rewriting historical evidence.
+Missing or mismatched projection provenance forces metadata regeneration and
+native compatibility checks, even when the raw release is unchanged.
+With no path, the command uses `cad/out/gltf/ha-harmonic-analyzer.glb`.
 
 A future actual CAD release requires both approved identifiers:
 
@@ -100,21 +108,29 @@ The commit is a full 40-hex CAD revision and the hash is the approved 64-hex raw
 release digest, not the optimized digest. Neither flag alone authorizes adoption,
 and naming the current source commit cannot approve arbitrary replacement bytes.
 The command archives the exact matching CAD revision for the parameterized
-`export-mechanics.py`, verifies the new raw export's native rest/mechanical
-compatibility, then stages native metadata and optimized publication. A missing
-commit, incompatible mathematics or a refused release preserves the last working
-assets. No invented release sidecar supplies approval or automatic fidelity.
+`export-mechanics.py`. Original module filenames are resolved through the CAD
+identity map without rewriting the archived source or installing module aliases.
+The exporter checks canonical native paths against that revision's rest geometry
+and mechanical parameters, then stages metadata and optimized publication.
+A missing commit, incompatible mathematics or a refused release preserves the
+last working assets. No invented release sidecar supplies approval or fidelity.
 
 Before publication, new-source adoption checks the archived CAD against the
 actual immutable exports/functions in `kinematics.ts`: channel count/order,
 physical tooth ratios, cone reduction, paper-chain/reducer/feed pitch and senses,
-and total signed feed. It also checks magnifier minimum/built/maximum ratios and
-the fixed `PEN_X`/`PEN_Y`/`PEN_Z` world datum from `magnifier.ts` with a 0.002 mm
-tolerance. Unsupported mathematical changes are refused with a named parameter
-before live assets are replaced. Geometry, rest, spring and setup data may change;
-proportional magnifier geometry is allowed when its ratios remain compatible.
-The same-current-release path skips native metadata regeneration and these
-new-source gates, leaving the four mechanics/math file hashes unchanged.
+and total signed feed. Magnifier minimum/built/maximum ratios remain checked.
+The nib rest is the raw marker-origin world datum `magnifier.penRestMm`, checked
+against the archived assembly's `MARKER_POS` within 0.002 mm. It is distinct from
+the rod-wire endpoint `penWireBottomMm`. Runtime uses that nib XYZ datum and adds
+only the signed global-Y hanging-run payout.
+The gate executes the staged magnifier solver at negative, positive and zero
+summing angles, comparing tangent/contact, free length, wheel angle, payout and
+nib translation with an independent bisection control. Unsupported mathematical
+changes are refused before live assets are replaced; the nib check retains its
+0.002 mm tolerance. Geometry, rest, spring and setup data may change; proportional
+magnifier geometry is allowed when its ratios remain compatible.
+Only an already matching raw, map and canonical association can skip native
+metadata regeneration; raw-release equality alone is insufficient.
 
 Spring compatibility is checked against the actual immutable `scene.ts` deformer
 and classifier expressions, extracted from its AST rather than a copied browser
@@ -147,10 +163,10 @@ old raw model are stale after adoption and must reject source-following.
 Compatible manual exploration is not recalibration; replacement needs new
 model-bound evidence before any source-fidelity acceptance claim.
 
-The magnifier exporter also requires an approved canonical CAD revision:
+The magnifier exporter also requires the approved raw model and exact CAD revision:
 
 ```sh
-python web/scripts/export-magnifier.py --source-commit <approved-canonical-commit>
+uv run --isolated --no-project --with-requirements web/scripts/requirements-model-export.txt python web/scripts/export-magnifier.py --source-commit <approved-full-commit> --model <approved-raw.glb> --expected-model-sha256 <approved-raw-sha256>
 ```
 
 ## Physical model
@@ -172,10 +188,28 @@ the film uses the same routing or that a fixture adjustment held other inputs fi
 Pen travel moves the native rod, v-block, frame, marker and set-screw together.
 The hanger and its screw remain fixed. Source-evidenced setup lifts and yaw use
 qualified rigid-part overrides; the pen wire remains a separately solved run.
-The platen carries its rack, paper, two clips, all twenty-two fillister screws,
-two guides and four guide locks as one 33-part group. The crank arm carries its
-anchor screw. These attachments follow the released assembly mates pinned to
-the native export; frame-mounted hardware remains fixed.
+The approved v39 platen carries its rack, paper, two clips, fourteen fillister
+screws (four clip and ten guide), eight separate low guide-lock screws, two
+guides and four guide locks as one 33-part group. Its eight lock screws are not
+additional fillisters. The 19-part crank rig includes the keeper chain and link,
+seat washer and two drive pins, bonded grip ferrule and butt cup, and anchor
+screw. These attachments follow the released assembly mates at
+`81539e53f5146c06a77541415bd79da673806d96`
+(`build_paper_drive_assembly.py:2185-2476`;
+`build_drive_train_assembly.py:5464-5501,5695-5745,5785-5795`).
+Canonical paths come only from the authoritative CAD identity map.
+
+The paper train has two distinct rigid rotating groups: nine knob/collar/shaft
+members rotate together about axis K, while six disc/feed/hub members (including
+three off-axis screws) rotate together about stud S. The Ry180 feed sleeve is
+locked to the disc and shares its world +Z spin, not its reversed local axis.
+The hanger, latch and pivot support remain fixed at their authored latched
+pose; the installed pivot disc spring is not a swept-wire deformer. All 68
+native chain links retain their released rest transforms and follow the
+source-derived planar display law. Source:
+`build_paper_drive_assembly.py:1936-2004,2478-2844` and `_chain.py:154-185`
+at the same approved commit. A platen datum reset translates the carriage
+without winding either gear group; frame-mounted hardware remains fixed.
 
 Interactive amplitude is a normalized CAD slide station, bounded by the native
 mechanism. The displayed millimetres are not a calibration of the video's

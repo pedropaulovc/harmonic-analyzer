@@ -52,6 +52,43 @@ def recipe_literal_constants(path: Path, names: tuple[str, ...]) -> dict:
     return values
 
 
+def pen_rest_datum(path: Path, block, marker) -> list[float]:
+    """Evaluate the archived nib-placement data and its pure transform only."""
+    constants = recipe_literal_constants(
+        path,
+        ("PAPER_FRONT_Z", "CLEARANCE", "PEN_ROD_X", "PEN_Z_MID",
+         "BLOCK_BOTTOM_Y", "BLOCK_YAW_DEG"),
+    )
+    namespace = {
+        **constants,
+        "math": math,
+        "BLOCK_DEPTH": block.BLOCK_DEPTH,
+        "BORE_X": block.BORE_X,
+        "GROOVE_DEPTH": block.GROOVE_DEPTH,
+        "BARREL_DIA": marker.BARREL_DIA,
+    }
+    names = {
+        "_C", "_S", "BLOCK_ROWS", "ROD_BORE_LOCAL", "VBLOCK_POS",
+        "MARKER_AXIS_LOCAL_Y", "MARKER_TIP_LOCAL_X", "MARKER_POS",
+    }
+    statements = []
+    found = set()
+    for node in ast.parse(path.read_text(), filename=str(path)).body:
+        if isinstance(node, ast.FunctionDef) and node.name == "_block_to_machine":
+            statements.append(node)
+            found.add(node.name)
+        elif isinstance(node, ast.Assign):
+            targets = {target.id for target in node.targets if isinstance(target, ast.Name)}
+            if targets & names:
+                statements.append(node)
+                found.update(targets)
+    if found != names | {"_block_to_machine"}:
+        raise ValueError(f"Missing released pen-placement contract in {path}")
+    exec(compile(ast.Module(body=statements, type_ignores=[]),
+                 str(path), "exec"), namespace)  # noqa: S102
+    return namespace["MARKER_POS"]
+
+
 def spring_deformation_contract(cad: Path, stock, counter) -> tuple[dict, dict]:
     """Read only the archived pure transition AST, never its COM imports.
 
@@ -245,7 +282,10 @@ def main() -> None:
             "mg_magnifying_clamp_geom",
             "mg_lever_wire_geom",
             "pn_pen_wire_geom",
+            "pn_pen_v_block_spec",
+            "pn_pen_marker_spec",
             "paper_drive_geom",
+            "pd_transgear_removable_spec",
             "spring_force_model",
             "pinion_rig_park_geometry",
             "dt_pinion_cam_geometry",
@@ -278,6 +318,7 @@ def main() -> None:
     lw = modules["mg_lever_wire_geom"]
     pw = modules["pn_pen_wire_geom"]
     paper = modules["paper_drive_geom"]
+    removable = modules["pd_transgear_removable_spec"]
     chain = modules["_chain"]
     installation = modules["dt_cone_pivot_post_installation"]
     magnifier_layout = magnifier_installation(
@@ -415,6 +456,14 @@ def main() -> None:
         [0.0, 0.0, 0.0],
         [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
     )
+    check(
+        "ha-harmonic-analyzer/pn-pen/pn-pen-marker-1",
+        [0.0, 0.0, 0.0],
+        pen_rest_datum(
+            identity_map.source_file(cad, "scripts/build_pn_pen_assembly.py"),
+            modules["pn_pen_v_block_spec"], modules["pn_pen_marker_spec"],
+        ),
+    )
     park = modules["pinion_rig_park_geometry"]
     cam = modules["dt_pinion_cam_geometry"]
     cone_line = modules["cone_line"]
@@ -423,8 +472,8 @@ def main() -> None:
     cone_pivot[1] = cone_line.Y_BASE_TOP
     hardware = platform.swing_hardware_geometry(
         (cone_pivot[0], cone_pivot[2]),
-        lock_collar_dia=modules["vn_cone_lock_knob_spec"].COLLAR_DIA,
-        stop_shank_dia=modules["vn_swing_stop_screw_spec"].SHANK_DIA,
+        lock_head_dia=modules["vn_cone_lock_knob_spec"].HEAD_DIA,
+        stop_contact_dia=modules["vn_swing_stop_screw_spec"].CONTACT_DIA,
     )
     pinion_z = nodes["ha-harmonic-analyzer/dt-drive-train/dt-pinion-pivot-shaft-1"][14] * 1000
     lift_z = nodes["ha-harmonic-analyzer/dt-drive-train/dt-pinion-lift-rod-1"][14] * 1000
@@ -484,15 +533,18 @@ def main() -> None:
     engage_cam = (lo + hi) / 2
 
     # Preserve the released chain equation for each actual removable-gear pair.
-    # Only its explicit wrap-radius input assignments differ; the 66 existing
-    # native links and 6.35 mm pitch stay fixed, with sag absorbing the change.
+    # Derive each source pitch circle while retaining the actual native chain.
+    # Swapping mounted wheels cannot replace its existing links; the unchanged
+    # archived closure bracket/assertions must solve that fixed standard length.
     chain_tree = ast.parse(Path(chain.__file__).read_text(), filename=chain.__file__)
     chain_paths = {}
-    for gearing, knob_radius, crank_radius in (
-        ("small-large", 24.0, 12.0),
-        ("medium-medium", 18.0, 18.0),
-        ("large-small", 12.0, 24.0),
+    for gearing, knob_config, crank_config in (
+        ("small-large", "T24", "T12"),
+        ("medium-medium", "T18", "T18"),
+        ("large-small", "T12", "T24"),
     ):
+        knob_radius = removable.pitch_dia(removable.TEETH[knob_config]) / 2.0
+        crank_radius = removable.pitch_dia(removable.TEETH[crank_config]) / 2.0
         tree = ast.parse(ast.unparse(chain_tree), filename=chain.__file__)
         for node in tree.body:
             if (
@@ -504,8 +556,10 @@ def main() -> None:
                     node.value = ast.Constant(knob_radius)
                 elif node.targets[0].id == "WRAP_R_B":
                     node.value = ast.Constant(crank_radius)
+                elif node.targets[0].id == "LINK_COUNT":
+                    node.value = ast.Constant(chain.LINK_COUNT)
         values = {"__name__": f"exported_chain_{gearing}"}
-        # Whole pinned-commit chain module with only WRAP_R_A/B constants replaced.
+        # Whole archived source with mounted pitch radii and actual native link count.
         exec(compile(ast.fix_missing_locations(tree), chain.__file__, "exec"), values)  # noqa: S102
         if values["LINK_COUNT"] != chain.LINK_COUNT:
             raise ValueError(
@@ -599,6 +653,7 @@ def main() -> None:
             "build_dt_drive_train_assembly.py",
             "build_pd_paper_drive_assembly.py",
             "build_mg_magnifier_assembly.py",
+            "build_pn_pen_assembly.py",
             "build_kinematic_probe.py",
             "build_dt_crank_pinion.py",
             "dt_crank_drive_gear_spec.py",
@@ -762,9 +817,8 @@ def main() -> None:
             "hubTangentMm": lw.WIRE_END,
             "wheelCentreMm": [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
             "penWireBottomMm": pw.WIRE_BOTTOM,
-            # magnifier.ts still fixes the nib datum. Expose the actual raw
-            # marker origin so the importer can reject a moved datum before
-            # publishing, without freezing other output geometry.
+            # The nib is the marker's native local origin. Its raw world datum
+            # passed the independent archived MARKER_POS rest check above.
             "penRestMm": [
                 value * 1000
                 for value in nodes["ha-harmonic-analyzer/pn-pen/pn-pen-marker-1"][12:15]

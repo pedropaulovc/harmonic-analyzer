@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Matrix4 } from 'three'
+import { createServer } from 'vite'
 import { authorizeSourceImport, importModel, parseImportOptions, publishPreparedModel } from './fetch-model.mjs'
 import { validateDecodedEquivalence } from './optimize-model.mjs'
 import { assertRuntimeMathCompatibility } from './native-math-compatibility.mjs'
@@ -234,6 +235,73 @@ test('a corrupt immutable raw cache is rejected rather than silently repaired or
   assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
 })
 
+test('the native nib datum follows signed pen travel without becoming the separate wire anchor', async t => {
+  const f = await fixture(t)
+  const native = mechanismData(await readFile(join(web, 'src/mechanics-data.ts'), 'utf8'))
+  const marker = native.renderFrames.worldMatrices['ha-harmonic-analyzer/pn-pen/pn-pen-marker-1']
+  // Synthetic datum translation, not replacement CAD geometry or source evidence.
+  // Moving all three axes exposes stale fixed coordinates even on an old release.
+  const offsetMm = [1.2, -2.3, 3.4]
+  const nibRestM = marker.slice(12, 15).map((value, axis) => value + offsetMm[axis] / 1000)
+  native.magnifier.penRestMm = nibRestM.map(value => value * 1000)
+  await writeFile(f.nativePath, `export const MECHANISM_DATA = ${JSON.stringify(native)} as const\n`)
+  await copyFile(process.env.MAGNIFIER_MODULE ?? join(web, 'src/magnifier.ts'), join(f.webRoot, 'src/magnifier.ts'))
+  const server = await createServer({
+    root: f.webRoot,
+    configFile: false,
+    server: { middlewareMode: true, hmr: false, watch: null },
+    appType: 'custom',
+  })
+  try {
+    const { createMagnifierPose, solveMagnifier } = await server.ssrLoadModule('/src/magnifier.ts')
+    const geometry = native.magnifier
+    const pose = createMagnifierPose()
+    const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} differs from ${expected}`)
+    const centre = geometry.wheelCentreMm.map(value => value / 1000)
+    const restHook = geometry.hookMm.map(value => value / 1000)
+    const knife = native.summing.knifeMm.map(value => value / 1000)
+    const hubRadius = geometry.hubPitchRadiusMm / 1000
+    const rimRadius = geometry.rimPitchRadiusMm / 1000
+    const windingLength = hook => {
+      const contact = pose.hubContactM
+      const freeLength = Math.hypot(hook[0] - contact[0], hook[1] - contact[1], hook[2] - contact[2])
+      const contactAzimuth = Math.atan2(contact[1] - centre[1], contact[0] - centre[0])
+      return freeLength + hubRadius * (contactAzimuth - pose.wheelAngleRad)
+    }
+    close(pose.penTravelM, 0)
+    for (let axis = 0; axis < 3; axis++) close(pose.penM[axis], nibRestM[axis])
+    const installedLength = windingLength(restHook)
+    const dx = restHook[0] - knife[0], dy = restHook[1] - knife[1]
+    for (const angle of [-0.01, 0.01, 0]) {
+      const hook = [
+        knife[0] + dx * Math.cos(angle) - dy * Math.sin(angle),
+        knife[1] + dx * Math.sin(angle) + dy * Math.cos(angle),
+        restHook[2],
+      ]
+      solveMagnifier({
+        magnifierHookM: hook,
+        magnifierClampM: geometry.clampRestMm.map(value => value / 1000),
+        summingAngleRad: angle,
+      }, pose)
+      // Check the physical constraints, not a copied analytic tangent formula.
+      const radialX = pose.hubContactM[0] - centre[0], radialY = pose.hubContactM[1] - centre[1]
+      close(Math.hypot(radialX, radialY), hubRadius)
+      close((hook[0] - pose.hubContactM[0]) * radialX + (hook[1] - pose.hubContactM[1]) * radialY, 0)
+      close(windingLength(hook), installedLength)
+      close(pose.penTravelM, -rimRadius * pose.wheelAngleRad)
+      if (angle !== 0) assert.ok(pose.wheelAngleRad * pose.penTravelM < 0)
+      for (let axis = 0; axis < 3; axis++) {
+        close(pose.penM[axis], nibRestM[axis] + (axis === 1 ? pose.penTravelM : 0))
+      }
+      close(pose.penWirePathM[4], geometry.penWireBottomMm[1] / 1000 + pose.penTravelM)
+      close(pose.penWirePathM[3], geometry.penWireBottomMm[0] / 1000)
+      close(pose.penWirePathM[5], centre[2])
+    }
+  } finally {
+    await server.close()
+  }
+})
+
 test('compatible future geometry publishes with source/config provenance changes and unchanged runtime mathematics', async t => {
   const f = await releaseFixture(t)
   const imported = await importModel(f)
@@ -269,6 +337,7 @@ test('compatible future geometry publishes with source/config provenance changes
   const compatible = structuredClone(native)
   compatible.magnifier.hubPitchRadiusMm += 0.1
   compatible.magnifier.wheelCentreMm[0] += 1
+  compatible.magnifier.penRestMm = compatible.magnifier.penRestMm.map((value, axis) => value + [-0.15, 1, 0.15][axis])
   compatible.channel.stationZ0Mm += 1
   compatible.magnifier.clampRadiusBandMm = compatible.magnifier.clampRadiusBandMm.map(radius => radius * 1.1)
   compatible.summing.anchorArmMm *= 1.1
@@ -297,7 +366,7 @@ test('compatible future geometry publishes with source/config provenance changes
     ['channelMeshes', data => { data.driveTrain.channelMeshes[1].ratio[0] += 6 }],
     ['clampRadiusBandMm', data => { data.magnifier.clampRadiusBandMm[2] += 1 }],
     ['clampRadiusBandMm', data => { data.summing.anchorArmMm += 1 }],
-    ['penRestMm', data => { data.magnifier.penRestMm[0] += 1 }],
+    ['penRestMm', data => { data.magnifier.penRestMm.pop() }],
     ['reducerRatio', data => { data.paperDrive.reducerRatio *= 2; data.paperDrive.feedPitchDiameterMm /= 2 }],
     ['fineTravelMmPerCrankRev', data => { data.paperDrive.fineTravelMmPerCrankRev *= 1.01 }],
     ['netTravelSense', data => { data.paperDrive.netTravelSense *= -1 }],
@@ -322,10 +391,25 @@ test('compatible future geometry publishes with source/config provenance changes
   }
 })
 
+test('a changed archived nib datum refuses raw geometry with stale pen rest frames before publication', async t => {
+  const f = await releaseFixture(t, {
+    path: 'cad/scripts/build_pn_pen_assembly.py',
+    from: 'PAPER_FRONT_Z = -143.25',
+    to: 'PAPER_FRONT_Z = -144.25',
+  })
+  await assert.rejects(importModel(f), /Source\/model rest-frame mismatch at ha-harmonic-analyzer\/pn-pen\/pn-pen-marker-1/)
+  assert.equal(await readFile(f.asset, 'utf8'), 'previous optimized artifact')
+  assert.equal(await readFile(f.descriptor, 'utf8'), 'previous approved descriptor')
+  assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
+  assert.deepEqual(await readFile(f.sourcePath), f.bytes)
+})
+
 test('staged fixed feed and spring-shape changes are refused before any live model, descriptor or native publication', async t => {
   for (const [name, path, from, to, parameter] of [
     ['reducer teeth', 'cad/scripts/pd_transgear_knob_shaft_spec.py', 'TEETH = 12', 'TEETH = 13', 'paperDrive.reducerRatio'],
-    ['rack pitch', 'cad/scripts/pd_transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 32.0', 'paperDrive.feedPitchDiameterMm'],
+    // DP29 preserves the source's root/wall/cutter limits; DP32 fails CAD
+    // manufacturing assertions before the intended runtime pitch guard.
+    ['rack pitch', 'cad/scripts/pd_transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 29.0', 'paperDrive.feedPitchDiameterMm'],
     ['signed feed', 'cad/scripts/build_kinematic_probe.py', 'FEED_SIGN = +1.0', 'FEED_SIGN = -1.0', 'paperDrive.rackFeedSense'],
     ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/vn_counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997', 'counter.deformation.coilEndInsetMm'],
     ['counter coil axial correction', 'cad/scripts/vn_counter_spring_stock_geom.py', 'return -coil_start_x_mm(length_mm) - WIRE_RADIUS_MM', 'return -coil_start_x_mm(length_mm) - 2.0 * WIRE_RADIUS_MM', 'counter.deformation.coilEndCorrectionMm'],

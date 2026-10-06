@@ -511,9 +511,12 @@ def anchor_motion(anchor):
     # A spin/swing binding alone does not prove that this point is off its axis.
     # Crank/cone also have compound platform motion: their unidentified centres
     # remain unknown, rather than being certified fixed or moving by prose.
-    if motion in (None, "crank", "cone-spin", "cylinder", "wheel", "paper-gear",
+    if motion in (None, "crank", "cone-spin", "cylinder", "wheel",
+                  "paper-knob", "paper-feed", "paper-sprocket",
                   "pinion-swing", "pinion-cam", "pinion-lever"):
         return None
+    if motion == "paper-fixed":
+        return "fixed"
     return "moving"
 
 
