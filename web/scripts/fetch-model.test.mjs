@@ -10,6 +10,7 @@ import { Matrix4 } from 'three'
 import { authorizeSourceImport, importModel, parseImportOptions, publishPreparedModel } from './fetch-model.mjs'
 import { validateDecodedEquivalence } from './optimize-model.mjs'
 import { assertRuntimeMathCompatibility } from './native-math-compatibility.mjs'
+import { projectNativeIdentity, NATIVE_IDENTITY_MAP_SHA256 } from './native-identity-map.mjs'
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const commit = 'a'.repeat(40)
@@ -20,7 +21,7 @@ function rawFixture(native = null) {
   const document = {
     asset: { version: '2.0', generator: 'Synthetic importer behavior fixture, not native CAD evidence' },
     scene: 0, scenes: [{ nodes: [0] }],
-    nodes: [{ name: 'ha-harmonic-analyzer', children: [1, 2] }, { name: 'part-1', mesh: 0 }, { name: 'part-2', mesh: 0, translation: [2, 0, 0] }],
+    nodes: [{ name: 'harmonic-analyzer', children: [1, 2] }, { name: 'measuring-stick-1', mesh: 0 }, { name: 'measuring-stick-stop-1', mesh: 0, translation: [2, 0, 0] }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0 }, mode: 4 }] }],
     buffers: [{ byteLength: geometry.length }],
     bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: geometry.length, target: 34962 }],
@@ -45,7 +46,7 @@ function rawFixture(native = null) {
     for (const path of Object.keys(matrices)) add(path)
     // A real geometry replacement with unchanged mechanism datums. It uses
     // the released native node frames, not a canned exporter response.
-    nodes[add('ha-harmonic-analyzer/fr-frame/replacement-panel-1')].mesh = 0
+    nodes[add('ha-harmonic-analyzer/fr-frame/fr-harmonic-base-1')].mesh = 0
     document.nodes = nodes
     document.scenes[0].nodes = [indexes.get('ha-harmonic-analyzer')]
   }
@@ -71,7 +72,8 @@ async function fixture(t) {
   await writeFile(sourcePath, bytes)
   const modelSha256 = digest(bytes)
   const nativePath = join(webRoot, 'src/mechanics-data.ts')
-  const nativeBytes = `// Synthetic native identity fixture; no mechanics calibration.\nexport const MECHANISM_DATA = ${JSON.stringify({ provenance: { sourceCommit: commit, modelSha256 } })} as const\n`
+  const projection = await projectNativeIdentity(bytes)
+  const nativeBytes = `// Synthetic native identity fixture; no mechanics calibration.\nexport const MECHANISM_DATA = ${JSON.stringify({ provenance: { sourceCommit: commit, modelSha256, nativeIdentityMapSha256: NATIVE_IDENTITY_MAP_SHA256, canonicalModelSha256: projection.identity.canonicalSha256 } })} as const\n`
   await writeFile(nativePath, nativeBytes)
   return { directory, webRoot, sourcePath, bytes, modelSha256, nativePath, nativeBytes }
 }
@@ -88,7 +90,8 @@ async function releaseFixture(t, editSource = null) {
   // geometry-provenance commit whose module identities predate this cutover.
   for (const directory of ['scripts', 'config']) await cp(join(repository, 'cad', directory), join(f.directory, 'cad', directory), { recursive: true, filter: path => !path.split(/[\\/]/).includes('__pycache__') })
   await mkdir(join(f.webRoot, 'scripts'))
-  for (const name of ['export-mechanics.py', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
+  for (const name of ['export-mechanics.py', 'native_identity_source.py', 'native-identity-map.mjs', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
+  await copyFile(join(web, 'model-representation.mjs'), join(f.webRoot, 'model-representation.mjs'))
   for (const name of ['kinematics.ts', 'magnifier.ts', 'scene.ts']) await copyFile(join(web, 'src', name), join(f.webRoot, 'src', name))
   if (editSource) {
     const path = join(f.directory, editSource.path)
@@ -115,7 +118,7 @@ async function releaseFixture(t, editSource = null) {
   return f
 }
 
-test('same-source import publishes exact decoded bytes and descriptor, caches raw, and never regenerates native seals', async t => {
+test('same-source import publishes exact canonical decoded bytes, caches immutable raw, and reuses matching metadata', async t => {
   const f = await fixture(t)
   const imported = await importModel(f)
   const optimized = await readFile(join(f.webRoot, 'public/models/ha-harmonic-analyzer.glb'))
@@ -130,7 +133,10 @@ test('same-source import publishes exact decoded bytes and descriptor, caches ra
   assert.equal(descriptor.representation.sha256, digest(optimized))
   assert.equal(descriptor.representation.byteLength, optimized.length)
   assert.notEqual(descriptor.representation.sha256, f.modelSha256)
-  const equivalence = await validateDecodedEquivalence(f.bytes, optimized)
+  const projection = await projectNativeIdentity(f.bytes)
+  assert.deepEqual(descriptor.identity, projection.identity)
+  await assert.rejects(validateDecodedEquivalence(f.bytes, optimized), /decoded equivalence failed for nodes/)
+  const equivalence = await validateDecodedEquivalence(projection.canonicalBytes, optimized)
   assert.equal(equivalence.passed, true)
   assert.equal(descriptor.equivalence.semanticSha256, equivalence.semanticDigest)
   assert.equal(descriptor.equivalence.drawableCount, 2)
@@ -148,6 +154,9 @@ test('current commit remains digest-pinned even when both identity options are e
   }
   // The historical release pairing is still fixed after another source becomes current.
   assert.throws(() => authorizeSourceImport({ sourceCommit: commit, modelSha256: wrong }, wrong, { sourceCommit: native.sourceCommit, sourceSha256: wrong }), /pinned/)
+  const approvedV39 = { sourceCommit: '81539e53f5146c06a77541415bd79da673806d96', sourceSha256: '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c' }
+  assert.throws(() => authorizeSourceImport({ sourceCommit: commit, modelSha256: wrong }, wrong, { ...approvedV39, sourceSha256: wrong }), /pinned/)
+  assert.equal(authorizeSourceImport({ sourceCommit: commit, modelSha256: wrong }, approvedV39.sourceSha256, approvedV39).sourceCommit, approvedV39.sourceCommit)
 })
 
 test('new release authority requires explicit commit and approved digest, not the computed hash alone', () => {
@@ -166,6 +175,11 @@ test('unavailable exact CAD archive preserves all previous live artifacts and na
   await writeFile(descriptor, 'previous approved descriptor')
   await mkdir(join(f.webRoot, 'scripts'))
   await copyFile(new URL('./export-mechanics.py', import.meta.url), join(f.webRoot, 'scripts/export-mechanics.py'))
+  await copyFile(new URL('./native_identity_source.py', import.meta.url), join(f.webRoot, 'scripts/native_identity_source.py'))
+  await copyFile(new URL('./native-identity-map.mjs', import.meta.url), join(f.webRoot, 'scripts/native-identity-map.mjs'))
+  await copyFile(new URL('../model-representation.mjs', import.meta.url), join(f.webRoot, 'model-representation.mjs'))
+  await mkdir(join(f.directory, 'cad/config'), { recursive: true })
+  await copyFile(join(repository, 'cad/config/identity-migration-map.json'), join(f.directory, 'cad/config/identity-migration-map.json'))
   await copyFile(new URL('./requirements-model-export.txt', import.meta.url), join(f.webRoot, 'scripts/requirements-model-export.txt'))
   await assert.rejects(importModel({ ...f, sourceCommit: 'b'.repeat(40), sourceSha256: f.modelSha256 }), /Cannot archive CAD source commit/)
   assert.equal(await readFile(asset, 'utf8'), 'previous optimized artifact')
@@ -231,10 +245,25 @@ test('compatible future geometry publishes with source/config provenance changes
   assert.equal(native.provenance.modelSha256, f.sourceSha256)
   assert.equal(descriptor.representation.sha256, digest(optimized))
   assert.equal(descriptor.source.sha256, native.provenance.modelSha256)
-  assert.equal((await validateDecodedEquivalence(f.bytes, optimized)).passed, true)
+  assert.equal(native.provenance.nativeIdentityMapSha256, descriptor.identity.mapSha256)
+  assert.equal(native.provenance.canonicalModelSha256, descriptor.identity.canonicalSha256)
+  assert.equal((await validateDecodedEquivalence((await projectNativeIdentity(f.bytes)).canonicalBytes, optimized)).passed, true)
   const previousSource = f.native.provenance.sourceFiles.find(file => file.path === 'cad/config/machine/gear_train.yaml')
   const newSource = native.provenance.sourceFiles.find(file => file.path === previousSource.path)
   assert.notEqual(newSource.sha256, previousSource.sha256)
+  // Same raw release must regenerate obsolete metadata, not retain a v1 seal.
+  const obsolete = structuredClone(native)
+  delete obsolete.provenance.nativeIdentityMapSha256
+  delete obsolete.provenance.canonicalModelSha256
+  await writeFile(f.nativePath, `export const MECHANISM_DATA = ${JSON.stringify(obsolete)} as const\n`)
+  const sameRelease = await importModel(f)
+  const regenerated = mechanismData(await readFile(f.nativePath, 'utf8'))
+  assert.equal(sameRelease.nativeMetadataRegenerated, true)
+  assert.equal(regenerated.provenance.sourceCommit, native.provenance.sourceCommit)
+  assert.equal(regenerated.provenance.modelSha256, native.provenance.modelSha256)
+  assert.equal(regenerated.provenance.nativeIdentityMapSha256, descriptor.identity.mapSha256)
+  assert.equal(regenerated.provenance.canonicalModelSha256, descriptor.identity.canonicalSha256)
+  assert.deepEqual(await readFile(f.sourcePath), f.bytes)
   // Exercise the uncertain fixed-math boundaries on actual exported metadata,
   // while allowing wheel dimensions/rest-frame geometry that the solver reads.
   const compatible = structuredClone(native)

@@ -5,8 +5,8 @@ Run from the repository root (use the approved release commit and raw digest):
   uv run --isolated --no-project --python 3.13 \\
     --with-requirements web/scripts/requirements-model-export.txt \\
     python web/scripts/export-mechanics.py --model /path/to/raw-native.glb \\
-    --source-commit 1268c23d4a8fc741147c5e09d8d1e45247a71945 \\
-    --expected-model-sha256 2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d
+    --source-commit 81539e53f5146c06a77541415bd79da673806d96 \\
+    --expected-model-sha256 60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c
 Only web output is written. CAD sources and the raw model are read-only. The GLB
 is not redistributed. CAD is archived from the exact supplied commit, never from
 the working tree. Analytic force seats and calibrated native render seats are
@@ -18,11 +18,9 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
-import importlib
 import io
 import json
 import math
-import re
 import struct
 import subprocess
 import sys
@@ -32,88 +30,13 @@ import types
 from dataclasses import asdict
 from pathlib import Path
 
-RELEASE_COMMIT = "1268c23d4a8fc741147c5e09d8d1e45247a71945"
-RELEASE_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
-
-
-def glb_nodes(path: Path) -> tuple[dict[str, list[float]], str]:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-        stream.seek(0)
-        magic, version, size = struct.unpack("<III", stream.read(12))
-        if magic != 0x46546C67 or version != 2 or size != path.stat().st_size:
-            raise ValueError("Not a complete GLB 2 file")
-        length, kind = struct.unpack("<II", stream.read(8))
-        if kind != 0x4E4F534A:
-            raise ValueError("The first GLB chunk must be JSON")
-        gltf = json.loads(stream.read(length))
-    identity = [
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-    ]
-    result: dict[str, list[float]] = {}
-
-    def multiply(a: list[float], b: list[float]) -> list[float]:
-        return [
-            sum(a[k * 4 + row] * b[col * 4 + k] for k in range(4))
-            for col in range(4)
-            for row in range(4)
-        ]
-
-    def visit(index: int, parent: list[float], prefix: str) -> None:
-        node = gltf["nodes"][index]
-        name = node.get("name", f"unnamed-{index}")
-        fullpath = f"{prefix}/{name}" if prefix else name
-        if "matrix" in node:
-            local = node["matrix"]
-        else:
-            x, y, z, w = node.get("rotation", [0.0, 0.0, 0.0, 1.0])
-            sx, sy, sz = node.get("scale", [1.0, 1.0, 1.0])
-            tx, ty, tz = node.get("translation", [0.0, 0.0, 0.0])
-            local = [
-                (1 - 2 * (y * y + z * z)) * sx,
-                2 * (x * y + z * w) * sx,
-                2 * (x * z - y * w) * sx,
-                0.0,
-                2 * (x * y - z * w) * sy,
-                (1 - 2 * (x * x + z * z)) * sy,
-                2 * (y * z + x * w) * sy,
-                0.0,
-                2 * (x * z + y * w) * sz,
-                2 * (y * z - x * w) * sz,
-                (1 - 2 * (x * x + y * y)) * sz,
-                0.0,
-                tx,
-                ty,
-                tz,
-                1.0,
-            ]
-        world = multiply(parent, local)
-        if fullpath in result:
-            raise ValueError(f"Duplicate qualified model path: {fullpath}")
-        result[fullpath] = world
-        for child in node.get("children", []):
-            visit(child, world, fullpath)
-
-    for root in gltf["scenes"][gltf.get("scene", 0)]["nodes"]:
-        visit(root, identity, "")
-    return result, digest.hexdigest()
+from native_identity_source import (
+    CadIdentityMap,
+    glb_nodes,
+    magnifier_installation,
+    project_model_paths,
+    validate_release_pair,
+)
 
 
 def recipe_literal_constants(path: Path, names: tuple[str, ...]) -> dict:
@@ -204,15 +127,10 @@ def main() -> None:
         default=Path(__file__).resolve().parents[1] / "src/mechanics-data.ts",
     )
     args = parser.parse_args()
-    if not re.fullmatch(r"[0-9a-f]{40}", args.source_commit):
-        parser.error("--source-commit must be exactly 40 lowercase hexadecimal characters")
-    if not re.fullmatch(r"[0-9a-f]{64}", args.expected_model_sha256):
-        parser.error("--expected-model-sha256 must be exactly 64 lowercase hexadecimal characters")
-    if args.source_commit == RELEASE_COMMIT and args.expected_model_sha256 != RELEASE_SHA256:
-        parser.error(
-            f"--source-commit {RELEASE_COMMIT} requires the existing raw model SHA256 "
-            f"{RELEASE_SHA256}; its native release pin cannot be replaced"
-        )
+    try:
+        validate_release_pair(args.source_commit, args.expected_model_sha256)
+    except ValueError as error:
+        parser.error(str(error))
     try:
         nodes, model_hash = glb_nodes(args.model)
     except (OSError, ValueError, struct.error) as error:
@@ -251,11 +169,17 @@ def main() -> None:
     if not (cad / "scripts").is_dir() or not (cad / "config").is_dir():
         snapshot.cleanup()
         parser.error(f"CAD source archive for {args.source_commit} lacks cad/scripts or cad/config")
+    try:
+        identity_map = CadIdentityMap(repo)
+        nodes, identity = project_model_paths(args.model, nodes, model_hash, identity_map)
+    except (OSError, ValueError) as error:
+        snapshot.cleanup()
+        parser.error(f"Cannot use the approved native identity projection: {error}")
     sys.path.insert(0, str(cad / "scripts"))
     # This released data table sits in a COM recipe whose unrelated imports
     # pull telemetry/Windows machinery. Evaluate its exact assignment AST only:
     # genuine supplier data, no substitute geometry and no COM function stubs.
-    thumb_path = cad / "scripts/diagnostics/diag_mcmaster_thumb.py"
+    thumb_path = identity_map.source_file(cad, "scripts/diagnostics/diag_mcmaster_thumb.py")
     thumb_tree = ast.parse(thumb_path.read_text(), filename=str(thumb_path))
     thumb_assignment = next(
         node
@@ -274,7 +198,7 @@ def main() -> None:
     )
     exec(thumb_code, thumb_module.__dict__)  # noqa: S102
     sys.modules[thumb_module.__name__] = thumb_module
-    fillister_path = cad / "scripts/diagnostics/diag_mcmaster_fillister.py"
+    fillister_path = identity_map.source_file(cad, "scripts/diagnostics/diag_mcmaster_fillister.py")
     fillister_tree = ast.parse(fillister_path.read_text(), filename=str(fillister_path))
     fillister_assignment = next(
         node
@@ -287,7 +211,7 @@ def main() -> None:
     )
     fillister_module = types.ModuleType("diagnostics.diag_mcmaster_fillister")
     fillister_module.__file__ = str(fillister_path)
-    cross_spec = importlib.import_module("vn_frame_cross_screw_spec")
+    cross_spec = identity_map.import_module(cad, "vn_frame_cross_screw_spec")
     for name in ("SHANK_DIA", "SHANK_LEN", "HEAD_H", "HEAD_DIA", "PITCH"):
         fillister_module.__dict__[name] = getattr(cross_spec, name)
     # Pinned-commit assignment AST; references the injected cross-screw constants.
@@ -299,7 +223,7 @@ def main() -> None:
     exec(fillister_code, fillister_module.__dict__)  # noqa: S102
     sys.modules[fillister_module.__name__] = fillister_module
     modules = {
-        name: importlib.import_module(name)
+        name: identity_map.import_module(cad, name)
         for name in (
             "_config",
             "channel_kinematics",
@@ -356,12 +280,19 @@ def main() -> None:
     paper = modules["paper_drive_geom"]
     chain = modules["_chain"]
     installation = modules["dt_cone_pivot_post_installation"]
+    magnifier_layout = magnifier_installation(
+        identity_map.source_file(cad, "scripts/build_mg_magnifier_assembly.py")
+    )
     feed_senses = recipe_literal_constants(
-        cad / "scripts/build_kinematic_probe.py", ("GEAR_SENSE", "FEED_SIGN")
+        identity_map.source_file(cad, "scripts/build_kinematic_probe.py"), ("GEAR_SENSE", "FEED_SIGN")
     )
     crank_teeth = [
-        recipe_literal_constants(cad / "scripts/build_dt_crank_pinion.py", ("TEETH",))["TEETH"],
-        recipe_literal_constants(cad / "scripts/dt_crank_drive_gear_spec.py", ("TEETH",))["TEETH"],
+        recipe_literal_constants(
+            identity_map.source_file(cad, "scripts/build_dt_crank_pinion.py"), ("TEETH",)
+        )["TEETH"],
+        recipe_literal_constants(
+            identity_map.source_file(cad, "scripts/dt_crank_drive_gear_spec.py"), ("TEETH",)
+        )["TEETH"],
     ]
     count = config.machine("channels", "count")
     if count != 20:
@@ -477,7 +408,7 @@ def main() -> None:
     check(
         "ha-harmonic-analyzer/mg-magnifier/mg-magnifying-lever-1",
         [mag.KNIFE_LOCAL_X, mag.KNIFE_LOCAL_Y, 0.0],
-        [*mount.KNIFE[:1], mount.KNIFE_CONTACT_Y, -128.3],
+        [*mount.KNIFE[:1], mount.KNIFE_CONTACT_Y, magnifier_layout["LEVER_ROD_Z"]],
     )
     check(
         "ha-harmonic-analyzer/mg-magnifier/mg-magnifying-wheel-1",
@@ -663,7 +594,7 @@ def main() -> None:
     )
     source_paths.extend(sorted((cad / "config").rglob("*.yaml")))
     source_paths.extend(
-        cad / "scripts" / name
+        identity_map.source_file(cad, "scripts/" + name)
         for name in (
             "build_dt_drive_train_assembly.py",
             "build_pd_paper_drive_assembly.py",
@@ -705,6 +636,8 @@ def main() -> None:
         "provenance": {
             "sourceCommit": args.source_commit,
             "modelSha256": model_hash,
+            "nativeIdentityMapSha256": identity["mapSha256"],
+            "canonicalModelSha256": identity["canonicalSha256"],
             "units": "CAD mm; exported pose uses metres/radians/newtons",
             "sourceFiles": sources,
             "restChecks": checks,
@@ -755,7 +688,7 @@ def main() -> None:
             "rateNPerMm": mount.CHANNEL_RATE_N_PER_MM,
             "initialTensionN": mount.CHANNEL_INITIAL_TENSION_N,
             "maximumForceN": float(
-                config.parts("vn-channel-spring-installed")["maximum_load_n"]
+                config.parts(identity_map.registry_name(cad, "vn-channel-spring-installed"))["maximum_load_n"]
             ),
         },
         "counter": {
@@ -792,31 +725,32 @@ def main() -> None:
             "clampRadiusBandMm": mag.clamp_radius_band(
                 modules["mg_magnifying_clamp_geom"].BLOCK_DEPTH
             ),
-            "clampRestMm": [lw.CLAMP_X, mount.KNIFE[1], -128.3],
+            "clampRestMm": [
+                lw.CLAMP_X, magnifier_layout["LEVER_ROD_Y"], magnifier_layout["LEVER_ROD_Z"]
+            ],
             "fixtureRestMm": [
                 lw.CLAMP_X,
-                lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE,
+                magnifier_layout["FIXTURE_Y0"],
                 lw.HOOK_Z
                 + modules["mg_magnifying_vertical_rod_spec"].ROD_DIA / 2
                 + lw.WIRE_DIA / 2
                 + lw.CLEARANCE,
             ],
-            # build_mg_magnifier_assembly:209 sets rod top at lever Y+5.
+            # Read the exact archived assembly's rod top and collar datums.
             # Full collar must remain on the straight rod, below the clamp.
             "fixtureOffsetRangeM": [
                 (
-                    mount.KNIFE[1]
-                    + 5.0
+                    magnifier_layout["VROD_TOP_Y"]
                     - modules["mg_magnifying_vertical_rod_spec"].ROD_LENGTH
                     + modules["mg_magnifying_vertical_rod_spec"].ROD_DIA / 2
-                    - (lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE)
+                    - magnifier_layout["FIXTURE_Y0"]
                 )
                 / 1000,
                 (
-                    mount.KNIFE[1]
+                    magnifier_layout["LEVER_ROD_Y"]
                     - modules["mg_magnifying_clamp_geom"].LEVER_BORE_Y
                     - modules["mg_output_fixture_spec"].COLLAR_HEIGHT
-                    - (lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE)
+                    - magnifier_layout["FIXTURE_Y0"]
                 )
                 / 1000,
             ],
@@ -933,6 +867,8 @@ def main() -> None:
                 "restChecks": len(checks),
                 "maximumRestErrorMm": data["provenance"]["maximumRestErrorMm"],
                 "modelSha256": model_hash,
+                "nativeIdentityMapSha256": identity["mapSha256"],
+                "canonicalModelSha256": identity["canonicalSha256"],
             }
         )
     )

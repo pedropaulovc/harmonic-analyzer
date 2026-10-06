@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } from './verify-sync.mjs'
 import { jsonDigest, loadCanonicalObservations, MODEL_SHA256, MODEL_COMMIT } from './verify-reference.mjs'
+import { NATIVE_IDENTITY_MAP_SHA256 } from '../model-representation.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
@@ -727,7 +728,7 @@ test('render verification separates the real representation digest from pinned r
   const descriptor = {
     schemaVersion: 2, kind: 'lossless-web-model-representation',
     source: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT },
-    identity: { mapSha256: 'c'.repeat(64), canonicalSha256: 'd'.repeat(64), renamedNodes: 1, nodeCount: 2 },
+    identity: { mapSha256: NATIVE_IDENTITY_MAP_SHA256, canonicalSha256: 'd'.repeat(64), renamedNodes: 1, nodeCount: 2 },
     representation: { path: 'models/ha-harmonic-analyzer.glb', sha256: 'a'.repeat(64), byteLength: 4096, codec: 'EXT_meshopt_compression' },
     pipeline: { version: 2, steps: ['native-identity-map', 'exact-dedup', 'meshopt'], codecVersion: 'meshoptimizer@0.22.0' },
     equivalence: { method: 'decoded-per-drawable-exact-after-native-identity-v2', semanticSha256: 'b'.repeat(64), drawableCount: 435 },

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Export magnifier source geometry and a nonzero coordinate-based control.
 
-Run from any directory: python web/scripts/export-magnifier.py --source-commit <approved-canonical-commit>
+Run with the approved raw model and its exact source identity:
+  python web/scripts/export-magnifier.py --source-commit <approved-release-commit> \\
+    --model /path/to/raw.glb --expected-model-sha256 <approved-raw-sha256>
 Only numeric JSON is emitted. CAD stays read-only; no COM, native build, source
 images, or generated GLB modifications. This is not the website acceptance gate.
 The control constructs a circle tangent by bisection of the perpendicularity
@@ -12,15 +14,23 @@ from __future__ import annotations
 
 import hashlib
 import argparse
-import importlib
 import io
 import json
 import math
 import subprocess
+import struct
 import sys
 import tarfile
 import tempfile
 from pathlib import Path
+
+from native_identity_source import (
+    CadIdentityMap,
+    glb_nodes,
+    magnifier_installation,
+    project_model_paths,
+    validate_release_pair,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -28,27 +38,58 @@ ROOT = Path(__file__).resolve().parents[2]
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-commit", required=True,
-                        help="Approved canonical CAD source commit")
+                        help="Approved exact CAD release source commit")
+    parser.add_argument("--model", type=Path, required=True)
+    parser.add_argument("--expected-model-sha256", required=True)
     args = parser.parse_args()
-    archive = subprocess.check_output(
-        ["git", "archive", args.source_commit, "cad/scripts", "cad/config"], cwd=ROOT
-    )
+    try:
+        validate_release_pair(args.source_commit, args.expected_model_sha256)
+        nodes, model_hash = glb_nodes(args.model)
+        if model_hash != args.expected_model_sha256:
+            raise ValueError(
+                f"Raw model SHA256 {model_hash} differs from --expected-model-sha256 "
+                f"{args.expected_model_sha256}; supply the approved original raw GLB"
+            )
+    except (OSError, ValueError, struct.error) as error:
+        parser.error(str(error))
+    try:
+        archive = subprocess.check_output(
+            ["git", "archive", args.source_commit, "cad/scripts", "cad/config"],
+            cwd=ROOT, stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as error:
+        parser.error(
+            f"Cannot archive CAD source commit {args.source_commit}: "
+            f"{error.stderr.decode('utf-8', errors='replace').strip()}. "
+            "Working-tree CAD is never used"
+        )
+    except OSError as error:
+        parser.error(f"Cannot archive CAD source commit {args.source_commit}: {error}")
     with tempfile.TemporaryDirectory(prefix="magnifier-source-") as temp:
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             tar.extractall(temp, filter="data")
-        scripts = Path(temp) / "cad/scripts"
+        cad = Path(temp) / "cad"
+        scripts = cad / "scripts"
+        try:
+            identity_map = CadIdentityMap(ROOT)
+            nodes, identity = project_model_paths(args.model, nodes, model_hash, identity_map)
+        except (OSError, ValueError) as error:
+            parser.error(f"Cannot use the approved native identity projection: {error}")
         sys.path.insert(0, str(scripts))
-        wire = importlib.import_module("mg_lever_wire_geom")
-        wheel = importlib.import_module("mg_magnifying_wheel_geom")
-        pen = importlib.import_module("pn_pen_wire_geom")
-        lever = importlib.import_module("mg_magnifying_lever_geom")
-        clamp = importlib.import_module("mg_magnifying_clamp_geom")
-        spring = importlib.import_module("spring_mount_geom")
+        wire = identity_map.import_module(cad, "mg_lever_wire_geom")
+        wheel = identity_map.import_module(cad, "mg_magnifying_wheel_geom")
+        pen = identity_map.import_module(cad, "pn_pen_wire_geom")
+        lever = identity_map.import_module(cad, "mg_magnifying_lever_geom")
+        clamp = identity_map.import_module(cad, "mg_magnifying_clamp_geom")
+        spring = identity_map.import_module(cad, "spring_mount_geom")
         cx, cy = wire.WHEEL_X, wire.WHEEL_BAR_Y
         radius = wheel.HUB_DIA / 2 + wire.WIRE_DIA / 2
-        vertical = importlib.import_module("mg_magnifying_vertical_rod_spec")
-        fixture = importlib.import_module("mg_output_fixture_spec")
+        vertical = identity_map.import_module(cad, "mg_magnifying_vertical_rod_spec")
+        fixture = identity_map.import_module(cad, "mg_output_fixture_spec")
         rim = wheel.RIM_OUTER_DIA / 2 + pen.WIRE_DIA / 2
+        installation = magnifier_installation(
+            identity_map.source_file(cad, "scripts/build_mg_magnifier_assembly.py")
+        )
 
         def tangent(
             hook: tuple[float, float, float],
@@ -111,18 +152,27 @@ def main() -> None:
             "mg_output_fixture_spec.py",
             "mg_magnifying_clamp_geom.py",
         )
+        source_paths = {
+            Path(module.__file__).resolve()
+            for module in sys.modules.values()
+            if getattr(module, "__file__", None)
+            and Path(module.__file__).resolve().is_relative_to(scripts)
+        }
+        source_paths.update(identity_map.source_file(cad, "scripts/" + name) for name in names)
+        source_paths.update((cad / "config").rglob("*.yaml"))
         print(
             json.dumps(
                 {
                     "sourceCommit": args.source_commit,
+                    "modelSha256": model_hash,
+                    "nativeIdentityMapSha256": identity["mapSha256"],
+                    "canonicalModelSha256": identity["canonicalSha256"],
                     "sourceFiles": [
                         {
-                            "path": "cad/scripts/" + name,
-                            "sha256": hashlib.sha256(
-                                (scripts / name).read_bytes()
-                            ).hexdigest(),
+                            "path": path.relative_to(Path(temp)).as_posix(),
+                            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                         }
-                        for name in names
+                        for path in sorted(source_paths)
                     ],
                     "units": "millimetres/radians",
                     "wireDiameterMm": wire.WIRE_DIA,
@@ -138,14 +188,19 @@ def main() -> None:
                         "physicalWireLengthMm": length0,
                         "visualWireLengthMm": wire.WIRE_LEN,
                         "penWireBottomMm": pen.WIRE_BOTTOM,
+                        "penRestMm": [
+                            value * 1000
+                            for value in nodes["ha-harmonic-analyzer/pn-pen/pn-pen-marker-1"][12:15]
+                        ],
                     },
                     "coordinateControls": controls,
-                    # Assembly-installed rest: LEVER_ROD_Y=979.7, VROD_TOP_Y=984.7,
-                    # FIXTURE_Y0=915.7. Full collar on the straight land at the low
-                    # end; collar top meets the clamp bottom at the high end.
+                    # The exact archived assembly supplies both rod-top and
+                    # collar datums; the full collar stays on the straight land.
                     "fixtureOffsetRangeMm": [
-                        984.7 - vertical.ROD_LENGTH + vertical.ROD_DIA / 2 - 915.7,
-                        979.7 - clamp.LEVER_BORE_Y - fixture.COLLAR_HEIGHT - 915.7,
+                        installation["VROD_TOP_Y"] - vertical.ROD_LENGTH
+                        + vertical.ROD_DIA / 2 - installation["FIXTURE_Y0"],
+                        installation["LEVER_ROD_Y"] - clamp.LEVER_BORE_Y
+                        - fixture.COLLAR_HEIGHT - installation["FIXTURE_Y0"],
                     ],
                     "limitations": [
                         "Installed taut no-slip guided-wrap branch; not a slip or unravelling dynamics model.",
