@@ -1,6 +1,6 @@
 r"""Purchased MHA-VN-049 transgear pivot spring: McMaster 9715K43.
 
-A curved disc spring for a 0.190 shaft (``transgear_pivot_spring_spec``); on
+A curved disc spring for a 0.190 shaft (``vn_transgear_pivot_spring_spec``); on
 the MHA-VN-041 pivot screw's shoulder, between its head and the MHA-PD-018 arm's
 spot-face floor, it preloads the arm onto the MHA-PD-020 spacer.  The stock
 recipe ``diagnostics/diag_build_9715K43.py`` models the catalogue sizes; no

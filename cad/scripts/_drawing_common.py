@@ -3218,11 +3218,11 @@ def _features_owning(
 
 
 def _drawing_component_name(adapter: Any, view: Any) -> str:
-    """Name of the model instance a drawing view shows, e.g. ``"tube-frame-2"``.
+    """Name of the model instance a drawing view shows, e.g. ``"fr-tube-frame-2"``.
 
     ``SelectByID2`` wants it as the middle qualifier of a model item's name, and
     it is NOT derivable from the part's file name: SolidWorks numbers one
-    instance per view (``tube-frame-1`` in the first view, ``-2`` in the
+    instance per view (``fr-tube-frame-1`` in the first view, ``-2`` in the
     second), so it is read back per view from
     ``IView::RootDrawingComponent2`` — ``InChildContext=False`` for this view's
     own root component — rather than guessed.
@@ -5606,8 +5606,8 @@ class BalloonAnchor:
 
     ``point_mm`` is in the part's own millimetres, so view scale, placement
     and explode distance do not move it. ``instance`` pins the instance it is
-    on by its full component path (``IComponent2.Name2``: ``cone-gear-2``, or
-    ``sub-1/cone-gear-2`` inside a sub-assembly); ``None`` means the
+    on by its full component path (``IComponent2.Name2``: ``dt-cone-gear-2``, or
+    ``sub-1/dt-cone-gear-2`` inside a sub-assembly); ``None`` means the
     lowest-named instance the view shows (:func:`_shown_instances`).
 
     ``point_mm=None`` walks the part's own body instead
@@ -5627,7 +5627,7 @@ class _ComponentLeaf:
     part under a hidden sub-assembly is not drawn, whatever its own flag says.
     ``path`` is the model component's full instance path
     (:func:`_component_path`), the identity every ownership check compares:
-    two sub-assemblies may each hold a ``cone-gear-1``, so the last path
+    two sub-assemblies may each hold a ``dt-cone-gear-1``, so the last path
     segment names no instance on its own.
     """
 
@@ -5639,7 +5639,7 @@ class _ComponentLeaf:
 
 
 def _instance_name(name: str) -> str:
-    """``drive-train-8/cone-gear-2@Drawing View1`` -> ``cone-gear-2``.
+    """``dt-drive-train-8/dt-cone-gear-2@Drawing View1`` -> ``dt-cone-gear-2``.
 
     For file-stem matching only: it drops the sub-assembly path, so it never
     decides which instance an entity belongs to (:func:`_component_path`).
@@ -5651,10 +5651,10 @@ def _component_path(adapter: Any, component: Any) -> str:
     """A model component's full instance path, ``IComponent2.Name2``.
 
     A drawing component's ``Name`` carries the view's root prefix
-    (``frame-4/tube-frame-cap-1``) while an edge's owning component reads
-    ``tube-frame-3`` (farm probe on the frame drawing): ``Name2`` of the
+    (``fr-frame-4/vn-tube-frame-cap-1``) while an edge's owning component reads
+    ``fr-tube-frame-3`` (farm probe on the frame drawing): ``Name2`` of the
     model component is the one string both sides share, and it keeps every
-    sub-assembly segment (``sub-1/cone-gear-1``).
+    sub-assembly segment (``sub-1/dt-cone-gear-1``).
     """
     if component is None:
         return ""
@@ -5781,7 +5781,7 @@ def isolate_drawing_view_components(
 
 
 def _natural_sort_key(name: str) -> tuple[tuple[int, int | str], ...]:
-    """``cone-gear-2`` before ``cone-gear-10``: digit runs compare as numbers."""
+    """``dt-cone-gear-2`` before ``dt-cone-gear-10``: digit runs compare as numbers."""
     return tuple(
         (0, int(part)) if part.isdigit() else (1, part.casefold())
         for part in re.split(r"(\d+)", name)
@@ -5829,7 +5829,7 @@ def _shown_instances(
 
 
 def _path_prefixes(path: str) -> list[str]:
-    """``sub-1/cone-gear-2`` -> ``["sub-1", "sub-1/cone-gear-2"]``."""
+    """``sub-1/dt-cone-gear-2`` -> ``["sub-1", "sub-1/dt-cone-gear-2"]``."""
     parts = path.split("/")
     return ["/".join(parts[: count + 1]) for count in range(len(parts))]
 

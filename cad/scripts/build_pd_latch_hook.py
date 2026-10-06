@@ -5,8 +5,8 @@ platen" (ch23 text; p.58 "latch" callout): a 10 x 0.6 dead-soft bright steel
 strip riveted at its square top end to the MHA-PD-021 bracket flap and curved
 EDGEWISE down past the swing arm, where the 1/8 latch pin's crowned tip drops
 into its Ø5.4 hole.  The operator releases the arm by flexing the strip +X.
-Geometry and frame: ``latch_hook_geometry`` (tangent R850 / R490 centreline,
-full-round free end); printed bands, walls and notes: ``latch_hook_spec``.
+Geometry and frame: ``pd_latch_hook_geometry`` (tangent R850 / R490 centreline,
+full-round free end); printed bands, walls and notes: ``pd_latch_hook_spec``.
 
 Layout (part frame, Front plane): origin at the centre of the square top cut;
 the strip runs toward local -X.  The profile is one closed sketch -- the top

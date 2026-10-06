@@ -1,7 +1,7 @@
 r"""Reproduction script: crank seat thrust washer (MHA-DT-036; ch. 23; 1 used).
 
 The turned steel washer on the crankshaft between the integral seat collar's
-rear face and the cone-pivot-post crank boss (``crank_seat_washer_spec``).
+rear face and the cone-pivot-post crank boss (``dt_crank_seat_washer_spec``).
 It goes on over the shaft's rear end, so its bore clears the outboard journal
 land; it is faced to fit the gap to the boss at assembly, and the model is
 the washer as fitted to parts at their nominals.

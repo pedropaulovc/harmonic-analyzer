@@ -1824,7 +1824,7 @@ def _data_literals(text: str) -> tuple[str, ...]:
 # which re-aggregates them transparently), so the dependency can be per-subsystem
 # / per-part rather than per-file:
 # ``config_files_of`` returns config-relative TOKENS: a concrete path
-# (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/cone-gear.yaml"``)
+# (``"channels.yaml"``, ``"machine/gear_train.yaml"``, ``"parts/dt-cone-gear.yaml"``)
 # or one of four dynamic tokens -- ``"machine/*"`` (whole machine family, for a
 # dynamic subsystem), ``"parts/*"`` (whole parts registry, for the dynamic part
 # name in ``_common.part_properties``), ``"title_block"`` (title_block.yaml,

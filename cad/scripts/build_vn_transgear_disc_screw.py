@@ -11,7 +11,7 @@ Geometry source: the vendor-model replica ``diagnostics/diag_build_91794A055``
 (replica-gated against the local-only harvest; no .SLDPRT committed), which
 draws the cut directly (``build_91794A055(cut_length=..., cut_end_break=...)``):
 the revolve profile ends the shank at the cut with the break in place of the
-factory tip chamfer, as MHA-VN-040's ``build_transgear_arm_plate_screw`` does.
+factory tip chamfer, as MHA-VN-040's ``build_vn_transgear_arm_plate_screw`` does.
 
 Frame: axis +Y, head up, the under-head bearing face at y = 0 (Top Plane);
 the cut end is at y = -LENGTH (= -CUT_LENGTH).  The assembly mates the Top

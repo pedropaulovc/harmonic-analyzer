@@ -86,8 +86,8 @@ class DrawingSpec:
     def source(self) -> Path:
         """The authoritative CAD model this drawing documents.
 
-        Build scripts emit dashed artefact names (``fulcrum_shaft`` ->
-        ``ch-fulcrum-shaft.SLDPRT``, ``pen`` -> ``pn-pen.SLDASM``), so the source stem
+        Build scripts emit dashed artefact names (``ch_fulcrum_shaft`` ->
+        ``ch-fulcrum-shaft.SLDPRT``, ``pn_pen`` -> ``pn-pen.SLDASM``), so the source stem
         is the dashed ``part``.
         """
         stem = self.part.replace("_", "-")

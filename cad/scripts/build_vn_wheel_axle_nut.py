@@ -8,7 +8,7 @@ running clearance, the repo convention).
 
 Layout: hexagon on the Top plane about the origin, extruded +Y NUT_H; the
 magnifier turns +Y to -Z like the axle. Vertices at exact (r/2, AF/2) so the
-flats stay axis-parallel for the polygon anchoring scheme (build_hex_bolt).
+flats stay axis-parallel for the polygon anchoring scheme (build_vn_hex_bolt).
 
 Run (SolidWorks already open)::
 

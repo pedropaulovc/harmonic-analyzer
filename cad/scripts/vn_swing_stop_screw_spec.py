@@ -6,7 +6,7 @@ check the harmonic base and the drive train read. The dims are the 90280A108
 row of the shared McMaster fillister table
 (``diagnostics/diag_mcmaster_fillister.py``, SolidWorks-free at import); the
 plate allowance is the title block's two-place linear tolerance. Consumers read
-them here, not from ``build_swing_stop_screw``, whose stock build recipe would
+them here, not from ``build_vn_swing_stop_screw``, whose stock build recipe would
 otherwise ride their cache keys (#880).
 
 The stop shares the foot screw's #4-40 x 3/8 SKU (user decision, 2026-09-29)

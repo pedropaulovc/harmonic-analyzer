@@ -25,7 +25,7 @@ MATERIAL = SPEC.material
 (SKU,) = SPEC.skus
 if SKU != SPECIFIED_SKU:
     raise ValueError(
-        f"lag-screw catalog row names {SKU}, but lag_screw_spec sizes the frame "
+        f"lag-screw catalog row names {SKU}, but vn_lag_screw_spec sizes the frame "
         f"and base seats for {SPECIFIED_SKU}; change both together"
     )
 # Each SKU's replay recipe.

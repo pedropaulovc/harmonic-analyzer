@@ -12,7 +12,7 @@ as ``ScrewAxis`` (Front ∩ Right).
 The bar's thickness, tap drill and tap countersinks belong to the support
 bar's slice; ``engagement_worst`` and ``tip_short_worst`` take them as
 arguments, so this module never retypes them.  The bracket sheet under the
-head and its stock band are the bracket's (``latch_hook_bracket_geometry``).
+head and its stock band are the bracket's (``pd_latch_hook_bracket_geometry``).
 """
 
 from __future__ import annotations

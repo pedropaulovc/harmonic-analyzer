@@ -7,20 +7,20 @@ Ruling R9-31: the eight platen-riding lock screws take a #4-40 button head
 so the heads clear the hanger arm; every other MHA-VN-006 station keeps the
 brass fillister.  The vendor dims are ``DIMS`` in
 ``diagnostics/diag_build_91255A108.py`` (SolidWorks-free at import).
-Consumers read them here, not from ``build_guide_lock_screw``, whose stock
+Consumers read them here, not from ``build_vn_guide_lock_screw``, whose stock
 build recipe would otherwise ride their cache keys (#880).
 
 Ruling R9-48: the 1/4 in screw held 1.26D in the guide's blind rear tap at
 the worst case.  The rear taps now run through the 10.00 guide and the screw
 is the 3/8 in length of the same series, so the worst case holds 2.02D
 (``ENGAGEMENT_WORST``) and the tip stays inside the guide
-(``build_platen_guide`` asserts the tip against the guide's shallowest seat).
+(``build_pd_platen_guide`` asserts the tip against the guide's shallowest seat).
 
 Ruling R9-49: the lock's hole positions and the guide's Ø0.20 tap
 position need hole-over-screw clearance; the #4 close Ø3.048 left too
 little.  The lock holes are 1/8 DRILL (Ø3.175), and at assembly each lock is
 pushed away from the bar until its holes bear on the screws before they are
-tightened (``paper_drive_assembly_steps`` "guide-locks-set").  Pushed so, a
+tightened (``pd_paper_drive_assembly_steps`` "guide-locks-set").  Pushed so, a
 lock stands between ``LOCK_SET_OFFSET`` beyond its model position at each
 hole, away from the bar.
 

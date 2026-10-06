@@ -12,7 +12,7 @@ coordinates from the plate's corner, authored on the part.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pd_guide_lock.py guide-lock
+    uv run python cad\scripts\draw_pd_guide_lock.py pd-guide-lock
 """
 
 from __future__ import annotations

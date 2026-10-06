@@ -9,7 +9,7 @@ turned to suit this bore.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_crank_handle_ferrule.py crank-handle-ferrule
+    uv run python cad\scripts\draw_dt_crank_handle_ferrule.py dt-crank-handle-ferrule
 """
 
 from __future__ import annotations

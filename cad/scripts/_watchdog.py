@@ -30,7 +30,7 @@ from the telemetry history (2026-07-18 audit of ~3 weeks of ``traces.jsonl``):
   record -- for ``HARMONIC_COM_OP_TIMEOUT`` seconds (default 900). The longest
   single COM operation ever observed is ~230 s (``verify.rebuild``), so 15 min
   is ~4x headroom; whole COM tasks legitimately run ~27 min
-  (``assembly:sm_summing``), which is why the timeout keys on per-op activity via
+  (``assembly:summing``), which is why the timeout keys on per-op activity via
   ``_telemetry.last_activity()``, never on process lifetime.
 * **HUNG WINDOW (log-only).** A SLDWORKS.exe top-level window fails
   ``IsHungAppWindow``. Deliberately NOT fatal: SolidWorks legitimately stops

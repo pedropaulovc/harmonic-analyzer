@@ -202,7 +202,7 @@ def _origin_xy(adapter: Any, name: str) -> tuple[float, float]:
 
 def _removables_by_role(adapter: Any) -> dict[str, str]:
     """Map T12/T24/T18 -> the instance name, matched by |origin - known centre|.
-    The three ``transgear-removable`` instances share a stem, so identify them by
+    The three ``pd-transgear-removable`` instances share a stem, so identify them by
     position: T12 at the crank centre, T24 at the knob shaft, T18 the loose spare."""
     known = {
         # Machine-handed anchors (#151): the T12 rides the crank at machine -X
@@ -243,7 +243,7 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     knob_shaft = _one(adapter, "pd-transgear-knob-shaft")
     feed_pinion = _one(adapter, "pd-transgear-feed-pinion")
     disc = _one(adapter, "pd-rack-pinion")
-    # The platen BODY exactly (platen-<n>), not a "platen-rack"/"platen-clip" sibling.
+    # The pd-platen BODY exactly (platen-<n>), not a "pd-platen-rack"/"pd-platen-clip" sibling.
     platen = next((n for n in component_names(adapter)
                    if n.rsplit("-", 1)[0] == "pd-platen"), "")
     if not platen:
@@ -414,7 +414,7 @@ async def build(adapter: Any) -> dict[str, str]:
         return result
     finally:
         # Discard the driven (dirty) model WITHOUT a save prompt, even if a motion
-        # assertion raised -- a failed probe must not leave paper-drive.SLDASM open,
+        # assertion raised -- a failed probe must not leave pd-paper-drive.SLDASM open,
         # dirty, or hang the COM session on a save modal (codex #189). Never saves.
         _discard_open_documents(adapter)
 

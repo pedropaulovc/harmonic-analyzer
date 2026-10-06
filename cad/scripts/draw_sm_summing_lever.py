@@ -16,7 +16,7 @@ anchor boss), and a 1:4 isometric.  The sheet runs at 1:2.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_sm_summing_lever.py summing-lever
+    uv run python cad\scripts\draw_sm_summing_lever.py sm-summing-lever
 """
 
 from __future__ import annotations

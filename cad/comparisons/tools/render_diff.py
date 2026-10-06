@@ -7,9 +7,10 @@ highlighted in red over an x-ray ghost of the unchanged body.
 
 Each side is a *source* -- either a published GitHub release (read over HTTP
 range requests, no full-asset download) or a local staged bundle directory
-(``<dir>/stl/*.STL`` + ``<dir>/boxes/ha-harmonic-analyzer.json``). The local form
-is what ``cut_release.py`` uses: the new release is still on disk and only the
-previous release is fetched from GitHub.
+(``<dir>/stl/*.STL`` + ``<dir>/boxes/<top-assembly>.json``). The top-assembly
+scene is resolved from the sealed identity map and the actual inventory on either
+side of the cutover. The local form is what ``cut_release.py`` uses: the new
+release is still on disk and only the previous release is fetched from GitHub.
 
 Pipeline:
   1. classify every scene-graph mesh -- equal signature (zip CRC32 / file
@@ -39,6 +40,7 @@ native driver serves it directly.
 import argparse
 import json
 import os
+import re
 import struct
 import sys
 import urllib.request
@@ -55,7 +57,7 @@ import numpy as np
 # VTK import cost -- they re-run this cheap env setup but never import pyvista.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from osmesa_win import enable_offscreen_gl
-from release_diff import IDENTITY_MAP, load_identity_map, paired_keys, split_mesh_key
+from release_diff import IDENTITY_MAP, identity_inventory, load_identity_map, paired_keys
 
 enable_offscreen_gl()
 
@@ -72,13 +74,24 @@ GHOST = (0.80, 0.80, 0.82)    # unchanged -> light grey
 
 
 def base_part(key):
-    """Strip the configured qualifier for the changed-part summary only."""
-    return split_mesh_key(key)[0]
+    """Group tooth/stretch variants for the summary, not mesh classification."""
+    return re.sub(r"(--t\d+|-stretch\d+)$", "", key)
 
 
 # --------------------------------------------------------------------------- #
 # sources
 # --------------------------------------------------------------------------- #
+def _scene_member(names, mapping):
+    """Resolve the historical/current top-assembly scene from actual members."""
+    scene_names = {
+        "boxes/harmonic-analyzer.json",
+        f"boxes/{mapping['harmonic-analyzer']}.json",
+    }
+    matches = [name for name in names if name.lower() in scene_names]
+    identity_inventory((Path(name).stem for name in matches), mapping)
+    return matches[0] if matches else None
+
+
 class ReleaseSource:
     """A published GitHub release zip, read incrementally over HTTP ranges."""
 
@@ -170,11 +183,12 @@ class ReleaseSource:
         dest.write_bytes(data)
         return dest
 
-    def scene(self):
-        rel = "boxes/ha-harmonic-analyzer.json"
+    def scene(self, mapping=None):
+        mapping = load_identity_map() if mapping is None else mapping
+        rel = _scene_member(self.cd, mapping)
+        if rel is None:
+            raise SystemExit(f"!! {self.tag} has no top-assembly boxes scene")
         e = self._entry(rel)
-        if e is None:
-            raise SystemExit(f"!! {self.tag} has no {rel} (pre-bundle release?)")
         dest = CACHE / self.tag / "scene.json"
         ent = e[1]
         lh = self._get(ent["lho"], ent["lho"] + 30 - 1)
@@ -215,10 +229,14 @@ class LocalSource:
     def stl(self, key):
         return self._path(key)
 
-    def scene(self):
-        scene = self.root / "boxes" / "ha-harmonic-analyzer.json"
-        if not scene.is_file():
-            raise SystemExit(f"!! no {scene.relative_to(self.root)} under {self.root}")
+    def scene(self, mapping=None):
+        mapping = load_identity_map() if mapping is None else mapping
+        names = [p.relative_to(self.root).as_posix()
+                 for p in (self.root / "boxes").glob("*") if p.is_file()]
+        rel = _scene_member(names, mapping)
+        if rel is None:
+            raise SystemExit(f"!! no top-assembly boxes scene under {self.root}")
+        scene = self.root / rel
         return json.loads(scene.read_text(encoding="utf-8"))
 
 
@@ -379,10 +397,10 @@ def main():
     old = make_source(old_rel, args.old_local)
     new = make_source(new_rel, args.new_local)
 
-    scene = new.scene()
+    mapping = load_identity_map(args.identity_map)
+    scene = new.scene(mapping)
     comps = scene["components"]
     keys = {(c.get("mesh") or c["part"]).lower() for c in comps}
-    mapping = load_identity_map(args.identity_map)
     old_keys, new_keys = old.mesh_keys(), new.mesh_keys()
     pairs = paired_keys(old_keys, new_keys, mapping)
     renamed = {k: v for k, v in pairs.items() if k != v}

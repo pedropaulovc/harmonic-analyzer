@@ -9,7 +9,7 @@ profile (rule 7: diameters on the side view).
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_arbor_collar.py pinion-arbor-collar
+    uv run python cad\scripts\draw_dt_pinion_arbor_collar.py dt-pinion-arbor-collar
 """
 
 from __future__ import annotations

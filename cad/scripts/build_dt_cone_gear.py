@@ -43,7 +43,7 @@ Prototype scope notes:
   for T024, 1/8" for T018, and 1/16" for T012 and T006 on the terminal land.
   Every land carries a flat, and every bore a matching flat, so each gear
   slides onto its land at the clock it is placed at and bears on its
-  neighbour (the solid stack, ``cone_gear_stack``).  The BoreProfile sketch
+  neighbour (the solid stack, ``dt_cone_gear_stack``).  The BoreProfile sketch
   is one D: an origin-centred arc with a DRIVING diameter linked to the
   configured ``BoreDia`` global, closed by a flat whose across-flat is
   linked to the configured ``BoreAF`` global.  A driven angular dimension,

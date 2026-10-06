@@ -21,7 +21,7 @@ the foot OUTBOARD only, to an 18 ledge (local z -20..-2) centred on one
 y = BORE_HEIGHT.
 The strap profile is a trapezoid + a full circle boss (its upper half
 proud of the trapezoid = the dome) -- no arcs, only proven primitives
-(see build_connecting_rod's head for the anchored-polygon pattern).
+(see build_ch_connecting_rod's head for the anchored-polygon pattern).
 
 Dimensions: cad/config/dimensions.yaml ch. 13 "Drive supports".
 

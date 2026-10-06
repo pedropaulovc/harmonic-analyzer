@@ -8,7 +8,7 @@ handled by the mechanism installation contracts.
 Top-face seats: the cone-swing pivot/stop taps, the pinion-rig block/foot
 taps, and (2026-09-02) the four blind #4-40 taps under the maker's nameplate's
 corner screws -- stations derived from the plate's own hole pattern through
-its mount transform (``nameplate_spec``), so the plate, the base and the
+its mount transform (``fr_nameplate_spec``), so the plate, the base and the
 frame's screws can never drift apart.
 
 Finishing (chamfer external, fillet internal; legacy 1/8-1/16 sizes): C3.18

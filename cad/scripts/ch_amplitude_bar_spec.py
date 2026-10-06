@@ -2,7 +2,7 @@ r"""Amplitude-bar dimensional contract -- the single source of truth shared by
 the part build (``build_ch_amplitude_bar.py``) and its manufacturing drawing
 (``draw_ch_amplitude_bar.py``).
 
-PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the pattern).
+PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the pattern).
 The nominal geometry MUST match the constants in build_ch_amplitude_bar.py.
 
 The bar is ~808 mm long but only 6.35 mm square, so the print shows a 1:4

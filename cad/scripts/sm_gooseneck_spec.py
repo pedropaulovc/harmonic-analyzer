@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the gooseneck post and its drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_gooseneck`` imports the marked-
-dimension NAME map + notes from here; ``draw_gooseneck`` keeps exactly
+PURE DATA, no SolidWorks/COM imports.  ``build_sm_gooseneck`` imports the marked-
+dimension NAME map + notes from here; ``draw_sm_gooseneck`` keeps exactly
 ``DRAWING_DIMENSIONS`` for its elevation-view import.
 """
 

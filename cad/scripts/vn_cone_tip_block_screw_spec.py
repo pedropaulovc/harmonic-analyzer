@@ -5,7 +5,7 @@ closure: the thread, shank and head dims the drive-train assembly reads to
 prove MHA-VN-030 is the screw the tip block and platform were sized for. The
 vendor dims are ``DIMS`` in ``diagnostics/diag_build_91251A108.py``
 (SolidWorks-free at import). Consumers read them here, not from
-``build_cone_tip_block_screw``, whose stock build recipe would otherwise ride
+``build_vn_cone_tip_block_screw``, whose stock build recipe would otherwise ride
 their cache keys (#880).
 """
 

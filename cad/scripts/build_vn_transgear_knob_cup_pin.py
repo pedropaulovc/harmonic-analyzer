@@ -1,7 +1,7 @@
 r"""Purchased MHA-VN-048 knob-cup pin: McMaster 98296A031.
 
 A 1/16 x 5/8 slotted spring pin to ASME B18.8.2
-(``transgear_knob_cup_pin_spec``): it is pressed through the MHA-PD-016 knob cup
+(``vn_transgear_knob_cup_pin_spec``): it is pressed through the MHA-PD-016 knob cup
 and the MHA-PD-008 knob shaft's journal, in a hole match-drilled through both at
 assembly, so the cup is pinned to the shaft as the rear stop of its end
 float.  The stock recipe ``diagnostics/diag_build_98296A031.py`` models it as

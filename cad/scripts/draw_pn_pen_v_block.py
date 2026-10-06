@@ -10,7 +10,7 @@ explicit 2:1 override so it stays clear of the title block.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pn_pen_v_block.py pen-v-block
+    uv run python cad\scripts\draw_pn_pen_v_block.py pn-pen-v-block
 """
 
 from __future__ import annotations

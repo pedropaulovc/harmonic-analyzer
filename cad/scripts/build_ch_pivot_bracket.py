@@ -16,7 +16,7 @@ INBOARD under the outer arms (the support leaves too little apex outboard
 of an ear for a 24.2 foot); inboard, the foot top (y 234.6) clears the arm
 bottoms (245.8) and the O10 hubs (248.8).
 
-Layout (part frame; the numbers live in ``pivot_bracket_spec``): seat face
+Layout (part frame; the numbers live in ``ch_pivot_bracket_spec``): seat face
 at y = 0; origin under the bore, on the seat plane. Foot FOOT_W along X by
 FOOT_H tall by FOOT_Z0..FOOT_Z1 along Z; ear EAR_W wide (X) by EAR_T thick
 (Z), centred on the origin: a block from the foot top to the bore height

@@ -3,7 +3,7 @@ r"""Reproduction script: transgear knob cup (MHA-PD-016; ch. 23; 1 used).
 The brass ring pinned on the knob shaft's rear journal by the MHA-VN-048 spring
 pin, pressed through a Ø1.6 hole match-drilled through cup and journal at
 assembly (not modelled); its front face runs behind the arm plate's rear
-boss, the rear stop of the knob's end float (``transgear_knob_cup_spec``).
+boss, the rear stop of the knob's end float (``pd_transgear_knob_cup_spec``).
 
 Layout: one turned half-profile on the Front plane, revolved about local +Y:
 the O.D. and the length are its driving dimensions.  The front face is the

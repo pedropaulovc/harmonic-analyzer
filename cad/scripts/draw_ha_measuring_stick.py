@@ -13,7 +13,7 @@ isometric drops to 1:2.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_ha_measuring_stick.py measuring-stick
+    uv run python cad\scripts\draw_ha_measuring_stick.py ha-measuring-stick
 """
 
 from __future__ import annotations

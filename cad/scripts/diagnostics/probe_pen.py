@@ -32,8 +32,8 @@ from _assembly import (
     world_point,
 )
 
-# Distance drivers seed their side from pen's flip seeds
-# (cad/config/assemblies/pen.yaml), the assembly this probe mirrors.
+# Distance drivers seed their side from pn-pen's flip seeds
+# (cad/config/assemblies/pn-pen.yaml), the assembly this probe mirrors.
 activate_assembly_contract("pn-pen")
 
 VBLOCK_POS = (-24.0, 390.0, -159.5)

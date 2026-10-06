@@ -3,10 +3,10 @@ r"""Reproduction script: transgear arm plate (MHA-PD-019; ch. 23; 1 used).
 The steel plate screwed across the MHA-PD-018 arm by two MHA-VN-040 oval-head
 screws: it carries the knob shaft's running bore on axis K, a front hub (the
 MHA-PD-015 thrust ring's seat) and a rear boss (the MHA-PD-016 cup runs behind it)
-(``transgear_arm_plate_geometry``; the sheet's contract is
-``transgear_arm_plate_spec``).
+(``pd_transgear_arm_plate_geometry``; the sheet's contract is
+``pd_transgear_arm_plate_spec``).
 
-Layout (part frame of ``transgear_arm_plate_geometry``: origin on K at the
+Layout (part frame of ``pd_transgear_arm_plate_geometry``: origin on K at the
 MOUNTING face, the Front Plane, which seats on the arm's rear face; +X/+Y the
 arm's axes; +Z to the rear):
 

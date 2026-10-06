@@ -168,7 +168,7 @@ def is_solid(x: float, y: float) -> bool:
 
     Mirrors the modeled cut: gap floor is the base-circle CHORD (between the
     two flank starts), flanks are the involute from ``Delta``/``Gamma-Delta``
-    (see build_cone_gear's profile derivation).
+    (see build_dt_cone_gear's profile derivation).
     """
     r = math.hypot(x, y)
     if r > RA_MM:

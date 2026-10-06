@@ -29,8 +29,8 @@ from _assembly import (
     world_point,
 )
 
-# Distance drivers seed their side from summing's flip seeds
-# (cad/config/assemblies/summing.yaml), the assembly this probe mirrors.
+# Distance drivers seed their side from sm-summing's flip seeds
+# (cad/config/assemblies/sm-summing.yaml), the assembly this probe mirrors.
 activate_assembly_contract("sm-summing")
 from build_sm_summing_lever import SPIN_REF_X as SL_SPIN_REF_X
 

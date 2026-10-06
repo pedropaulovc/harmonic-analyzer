@@ -42,7 +42,7 @@ rescaled onto the model column grid, and ch19 close-ups (webbing, hub, screw):
 Layout: plan profile in XZ, ring mid-plane extruded symmetrically in Y
 (rails y -18.25..+18.25 local). Sketches on the Top plane use the
 (x, y) -> (X, -Z) handedness; sketches on Right-plane offsets map
-(x, y) -> (Z, Y) (build_rocker_arm_support precedent; NEGATIVE-offset
+(x, y) -> (Z, Y) (build_fr_rocker_arm_support precedent; NEGATIVE-offset
 planes mirror sketch x -- see the gusset/pocket sites). Build order
 (ADDITIVE T-section -- the web/flange rings are extruded, not pocketed):
 web ring -> crossbar junction lands -> top-flange ring -> hub rib
@@ -545,7 +545,7 @@ def _qualify_machined_faces(adapter) -> None:
 
     ``_resolve_faces`` already proves each spec names exactly ONE face; the
     area proves it named the RIGHT one, so a station typo ships a build failure
-    instead of a roughness symbol on the wrong surface (build_harmonic_base's
+    instead of a roughness symbol on the wrong surface (build_fr_harmonic_base's
     _paint_machined_faces_black precedent). Expectations are the full analytic
     wall/annulus areas; the 5% band absorbs the cross-screw and set-screw tap
     windows that break into the bores (~1% each) and the C1 bore-top breaks.

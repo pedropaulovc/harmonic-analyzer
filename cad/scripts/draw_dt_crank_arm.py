@@ -13,7 +13,7 @@ arm/hub and seam-pin operations are stated on their receiving feature/note.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_crank_arm.py crank-arm
+    uv run python cad\scripts\draw_dt_crank_arm.py dt-crank-arm
 """
 
 from __future__ import annotations

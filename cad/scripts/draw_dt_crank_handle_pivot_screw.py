@@ -15,7 +15,7 @@ profile, so it sits on the profile's axis to its right and shows the slot.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_crank_handle_pivot_screw.py crank-handle-pivot-screw
+    uv run python cad\scripts\draw_dt_crank_handle_pivot_screw.py dt-crank-handle-pivot-screw
 """
 
 from __future__ import annotations

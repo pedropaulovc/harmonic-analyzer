@@ -1,7 +1,7 @@
 r"""Purchased MHA-VN-043 latch-hook bracket screw: McMaster 90280A108.
 
 The foot-screw SKU (#4-40 x 3/8 slotted narrow fillister, zinc plated) in
-its as-bought finish; ``latch_hook_bracket_screw_spec`` owns the joint.
+its as-bought finish; ``vn_latch_hook_bracket_screw_spec`` owns the joint.
 Frame: head up, under-head junction at y = 0, ``ScrewAxis`` = Front ∩ Right.
 
 Run (SolidWorks already open)::

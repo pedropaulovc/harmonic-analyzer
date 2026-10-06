@@ -9,7 +9,7 @@ The cut is the one modification, so the part owns its length: a hidden
 construction sketch whose single driving dimension is the cut length
 (under-head face to cut end), at its model-owned places, marked for the
 drawing.  It carries no band: no one length suits every in-band post and
-plate (``post_mount_screw_spec``'s U27 check), so the sheet prints it as a
+plate (``vn_post_mount_screw_spec``'s U27 check), so the sheet prints it as a
 reference and each screw is cut to its own hole at assembly.  The build
 proves the dimension and the solid's cut end agree.
 

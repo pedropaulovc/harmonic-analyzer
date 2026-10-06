@@ -3,7 +3,7 @@ the part build (``build_mg_magnifying_wheel.py``) and its manufacturing drawing
 (``draw_mg_magnifying_wheel.py``).
 
 PURE DATA, no SolidWorks/COM imports.  The wheel nominals live in the drawing-
-FREE ``magnifying_wheel_geom`` module (the assembly imports the hub + spoke
+FREE ``mg_magnifying_wheel_geom`` module (the assembly imports the hub + spoke
 axial); they are re-exported here for the drawing-side consumers and the offline
 lockstep test, which asserts the part marks and the drawing keeps EXACTLY
 ``DRAWING_DIMENSIONS``.

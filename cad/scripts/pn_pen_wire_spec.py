@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the pen wire and its drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_pen_wire`` imports the marked-
-dimension NAME map + notes from here; ``draw_pen_wire`` keeps exactly
+PURE DATA, no SolidWorks/COM imports.  ``build_pn_pen_wire`` imports the marked-
+dimension NAME map + notes from here; ``draw_pn_pen_wire`` keeps exactly
 ``DRAWING_DIMENSIONS`` for its single-view import.
 """
 

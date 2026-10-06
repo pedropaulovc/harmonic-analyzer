@@ -8,6 +8,6 @@ dt-cylinder-gear:
   # Gear+cam composite: this part absorbs the former standalone eccentric-cam
   # (MHA-029, removed). fit_class is the gear's primary interface (gear_mesh);
   # the integral cam OD is additionally a cam_follower_contact bearing surface
-  # for the connecting-rod strap (cam dims/provenance in build_cylinder_gear.py).
+  # for the connecting-rod strap (cam dims/provenance in build_dt_cylinder_gear.py).
   fit_class: gear_mesh
   process: "gear cutting (hob/shaper)"

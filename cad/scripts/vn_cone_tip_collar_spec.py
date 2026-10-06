@@ -10,7 +10,7 @@ replaces the turned brass tip bushing as MHA-VN-016.  At fit-up it is pushed
 against T006 over the 0.45 feeler (cone_stack_end_play.COLLAR_FEELER) and its
 set screw locked on the flat, so it retains the gear stack's float on the
 shaft.  It is not a thrust face for the tip block: the block and the cup
-adjuster only set the shaft's end play, and build_drive_train_assembly holds
+adjuster only set the shaft's end play, and build_dt_drive_train_assembly holds
 the collar clear of the block at print-worst.
 
 Catalogue: the McMaster product page https://www.mcmaster.com/9414T1/ (read in

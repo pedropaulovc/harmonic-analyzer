@@ -6,7 +6,7 @@ behind a crimp. Each dome has a side mouth on +Y narrower than a bead: the
 end bead snaps in as the wall flexes and cannot come back out, its rod riding
 a slot along the top to the tip hole. McMaster gives no dimensions or CAD,
 so the shape follows its 3606T811 photograph at the listed 9 mm length (see
-``keeper_chain_spec``). The axis is local X, the openings on +Y, and the origin at
+``vn_keeper_chain_spec``). The axis is local X, the openings on +Y, and the origin at
 mid-length.
 
 Recipe (only features this seat has built cleanly): a mid-plane tube, two

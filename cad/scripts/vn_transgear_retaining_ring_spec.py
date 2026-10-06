@@ -20,7 +20,7 @@ Thickness@Sketch4" 0.635.  Vendor truth: volume 13.3124 mm^3, area
 Pure data: the pin's groove, the fit module and the assembly read these;
 ``diag_build_97431A260`` replicates the vendor body.
 
-Part frame (``build_transgear_retaining_ring``): the ring's axis is +Z, its
+Part frame (``build_vn_transgear_retaining_ring``): the ring's axis is +Z, its
 rear face on the Front plane (z = 0) and its front face at z = THICKNESS;
 the open side (the gap that is pushed over the groove) faces +X, and the
 prongs' gripping circle Ø FREE_DIA is centred on the axis.  The replica

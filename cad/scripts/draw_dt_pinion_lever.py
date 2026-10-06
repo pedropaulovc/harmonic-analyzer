@@ -9,7 +9,7 @@ from the flat mouth face B.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_lever.py pinion-lever
+    uv run python cad\scripts\draw_dt_pinion_lever.py dt-pinion-lever
 """
 
 from __future__ import annotations

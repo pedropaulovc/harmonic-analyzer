@@ -34,7 +34,7 @@ pp. 2621-2623 (https://online.flippingbook.com/view/954046886/1316/ to
 so the part's volume check tests the tooth SHAPE, not merely that some cut
 happened.
 
-Part frame (``build_transgear_removable``): axis Z through the origin, plate
+Part frame (``build_pd_transgear_removable``): axis Z through the origin, plate
 z = 0..PLATE, drive-pin holes on local +/-Y, a TOOTH (not a gap) centred on
 local +X; the gaps are centred at ``pi / N + k * 2 pi / N``.
 """

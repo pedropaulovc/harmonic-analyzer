@@ -186,7 +186,7 @@ def _as_construction(adapter, entity_id: str) -> None:
 
     ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
     derived ISketchLine the entity registry binds -- rebind before the set
-    (build_crank_arm's helper).
+    (build_dt_crank_arm's helper).
     """
     segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
     segment.ConstructionGeometry = True

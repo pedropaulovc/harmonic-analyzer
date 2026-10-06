@@ -315,7 +315,7 @@ async def _dome(adapter, tag: str, u_end: float, sign: float) -> list[tuple[str,
     ``u_end`` (``sign`` -1 north, the crown toward -u; +1 south): radial base
     line on the end face, arc from the rim to the on-axis apex, on-axis close
     line doubling as the revolve axis edge. Constraint accounting as in
-    build_pinion_pivot_shaft's caps, on this plane's axes: base vertical +
+    build_dt_pinion_pivot_shaft's caps, on this plane's axes: base vertical +
     close horizontal (directions), rim reach (radius), height (apex), one
     station anchor (origin-coincident at the north end, a driven distance at
     the south end), arc radius (the outward lobe as drawn; the volume gate

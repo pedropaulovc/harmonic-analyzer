@@ -11,7 +11,7 @@ runs 1:4; the front elevation is also 1:4 and the pictorial isometric is 1:6.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_fr_harmonic_base.py harmonic-base
+    uv run python cad\scripts\draw_fr_harmonic_base.py fr-harmonic-base
 """
 
 from __future__ import annotations

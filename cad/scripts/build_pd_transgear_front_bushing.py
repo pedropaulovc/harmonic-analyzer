@@ -1,7 +1,7 @@
 r"""Reproduction script: transgear front bushing (MHA-PD-025; R9-68; 1 used).
 
 The turned brass ring on the MHA-PD-023 pin between the MHA-PD-010 sleeve's nose
-and the MHA-VN-047 retaining ring (``transgear_front_bushing_spec``).  It is
+and the MHA-VN-047 retaining ring (``pd_transgear_front_bushing_spec``).  It is
 faced to fit at assembly for m, and the model is the bushing as fitted to
 parts at their nominals.
 

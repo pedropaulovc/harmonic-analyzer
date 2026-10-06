@@ -3,8 +3,8 @@ r"""Pure-data dimensional contract shared by the cone swing platform and drawing
 PURE DATA, no SolidWorks/COM imports: plate stock, holes, the tip-block
 hold-down hole and the surface-finish controls.  The print-only data
 (marked-dimension names, decimal places, view captions) lives in
-``cone_swing_platform_drawing_spec`` and
-the plan outline in ``cone_swing_platform_geometry``, so the harmonic base and
+``dt_cone_swing_platform_drawing_spec`` and
+the plan outline in ``dt_cone_swing_platform_geometry``, so the harmonic base and
 the drive train, which read this module and the geometry, do not re-key when
 the print changes.
 """

@@ -11,7 +11,7 @@ section is dimensioned on a right end view.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_ch_channel_lever.py channel-lever
+    uv run python cad\scripts\draw_ch_channel_lever.py ch-channel-lever
 """
 
 from __future__ import annotations

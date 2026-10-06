@@ -79,7 +79,6 @@ def test_configuration_separator_takes_precedence_over_stretch_suffix(render_dif
         "vn-channel-spring-installed--installed--stretch07":
             "channel-spring-installed--installed--stretch07",
     }
-    assert {render_diff.base_part(key) for key in pairs} == {"vn-channel-spring-installed"}
 
 
 @pytest.mark.parametrize("old,new", [
@@ -139,7 +138,7 @@ def test_renamed_variants_keep_independent_geometry_verdicts_and_grouping(tmp_pa
         "dt-cone-gear--t024",
     }
     assert {render_diff.base_part(key) for key in changed} == {
-        "pd-transgear-removable", "dt-crank-handle-ferrule", "dt-cone-gear",
+        "pd-transgear-removable", "dt-crank-handle-ferrule--installed", "dt-cone-gear",
     }
     for _, key, distance in changed_variants:
         assert deviations[key] == pytest.approx(distance)

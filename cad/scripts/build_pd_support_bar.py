@@ -2,7 +2,7 @@ r"""Reproduction script: platen support bar (book ch. 21/22, pp. 50-55, 62-63).
 
 THE bar the platen rides on (book p.62 caption, singular): one rectangular
 steel bar clamped across the two front columns by the two-piece column
-clamps (build_column_clamp_front/back.py), carrying the hanging platen
+clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
 transgear hanger (pivot screw MHA-VN-041) and the latch-hook bracket.
 Cross-section 22 tall x 9 deep (ch22 back-side wear band + ch30 front
@@ -13,7 +13,7 @@ Holes (all along local Z, the machine front-back axis):
   the screw heads sit sub-flush in the BAR's front face so the refitted platen
   can slide across the east clamp, and thread into the back clamp arc.
 * the hanger's #8-32 blind pivot tap and the latch-hook bracket's two #4-40
-  through taps, all entering the back face (``support_bar_spec``).
+  through taps, all entering the back face (``pd_support_bar_spec``).
 
 The hanger holes make the bar x-ASYMMETRIC, so it is authored MACHINE-
 handed and placed on its exact machine transform.

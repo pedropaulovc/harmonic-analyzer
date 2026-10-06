@@ -1,6 +1,6 @@
 r"""Pure support-bar (MHA-PD-007) section and hanger-hole geometry.
 
-PURE DATA, no SolidWorks/COM imports: ``build_support_bar`` builds from it,
+PURE DATA, no SolidWorks/COM imports: ``build_pd_support_bar`` builds from it,
 and the hanger's pivot screw (MHA-VN-041) reads the pivot tap from it to judge
 its engagement without importing a COM build script.
 

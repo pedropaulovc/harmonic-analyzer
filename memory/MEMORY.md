@@ -1,5 +1,5 @@
 
-> Current part and assembly identities, registry paths and migrated filenames are defined in the [subsystem identity guide](../cad/docs/subsystem-identities.md). Dated summaries below retain their historical identifiers and evidence.
+> Current part and assembly identities, registry paths and migrated filenames are defined in the [subsystem identity guide](../cad/docs/subsystem-identities.md). Narrative references may use current names; dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values.
 
 # Memory index
 

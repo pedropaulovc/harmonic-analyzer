@@ -4,7 +4,7 @@ Three bright-steel sprockets -- 12 / 18 / 24 teeth -- of which two are mounted
 at a time to set the platen speed: one on the crank's seat collar, one on the
 knob shaft's, both in the ONE chain plane (the third is the loose spare). One
 part, three configurations (T12/T18/T24). Every number is
-``transgear_removable_spec``'s; this script only turns them into features.
+``pd_transgear_removable_spec``'s; this script only turns them into features.
 
 Tooth form (spec docstring): the ANSI B29.1 (ACA) #25 standard form -- the
 ``SEAT_CURVE_R`` seating arc centred on the pitch circle, the
@@ -26,7 +26,7 @@ at ``PIN_HOLE_ANGLES_DEG`` (local +/-Y). The bore/pin-hole web
 Named exception; the sheet states its printed worst case
 (``pd_transgear_removable_notes.BORE_PIN_WEB_NOTE``).
 
-Drawing marks (``draw_transgear_removable``): ``spec.DRAWING_DIMENSIONS`` at
+Drawing marks (``draw_pd_transgear_removable``): ``spec.DRAWING_DIMENSIONS`` at
 ``spec.DRAWING_PRECISION``, the plate thickness banded ``spec.PLATE_BAND``
 and each pin centre +/-``spec.DRIVE_PIN_OFFSET_TOL``; the outside diameter
 ``BlankDia`` is driven per configuration, so each configuration's view prints

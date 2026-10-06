@@ -40,8 +40,8 @@ from _assembly import (  # noqa: E402
     place_component,
 )
 
-# Distance drivers seed their side from drive-train's flip seeds
-# (cad/config/assemblies/drive-train.yaml), the assembly this probe mirrors.
+# Distance drivers seed their side from dt-drive-train's flip seeds
+# (cad/config/assemblies/dt-drive-train.yaml), the assembly this probe mirrors.
 activate_assembly_contract("dt-drive-train")
 from _assembly_postbuild import discard_open_documents  # noqa: E402
 from _common import _flag_only, check, log, run_build  # noqa: E402

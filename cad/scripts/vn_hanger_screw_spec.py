@@ -4,7 +4,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the head and shank dims the pen hanger, the wheel bar and the pen
 assembly read. The vendor dims are the named constants of
 ``diagnostics/diag_build_93075A194.py`` (SolidWorks-free at import). Consumers
-read them here, not from ``build_hanger_screw``, whose stock build recipe would
+read them here, not from ``build_vn_hanger_screw``, whose stock build recipe would
 otherwise ride their cache keys (#880).
 """
 

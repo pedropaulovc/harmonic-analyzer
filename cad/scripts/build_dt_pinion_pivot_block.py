@@ -13,7 +13,7 @@ photographed lift | screw | pivot | screw order.  Both bores run along Z,
 z 0..BLOCK_DEPTH.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 25". The nominal geometry lives in
-``pinion_pivot_block_spec`` -- the pure-data contract shared with the
+``dt_pinion_pivot_block_spec`` -- the pure-data contract shared with the
 manufacturing drawing (``draw_dt_pinion_pivot_block.py``).
 
 Run (SolidWorks already open)::

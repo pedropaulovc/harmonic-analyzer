@@ -3,7 +3,7 @@ r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 The hardened-steel bearing block that suspends the summing lever's knife edge from the
 top-frame casting's integral crossbar (hung by a 1/2-13 knife-hanger stud
 threaded into the block top). The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
-of its hexagonal pivot trunnions** (build_summing_lever ``_hex_collar``); each
+of its hexagonal pivot trunnions** (build_sm_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
 
 DESIGN (user direction, 2026-06-17, refs: ch30-p003, bore.png, ch18 p.43 photo):
@@ -29,7 +29,7 @@ block rises from below the bore up to just under the top-frame casting underside
 The tap-drill point breaks into the bore crown (accepted; see the notes).
 
 The named "knife axis" is the contact ridge line itself (part origin); the
-assembly mates the lever's knife ridge (``Axis3@summing-lever``) coincident to
+assembly mates the lever's knife ridge (``Axis3@sm-summing-lever``) coincident to
 it, so the lever rocks about the true knife edge (not the cylinder centre).
 
 Dimensions: cad/DIMENSIONS.md ch. 18. Bore/clearance: low confidence (tune vs
@@ -281,7 +281,7 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"stud tap volume {vol:.1f} != {expected:.1f}")
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The
-    # assembly mates Axis3@summing-lever (the hex ridge) coincident to it.
+    # assembly mates Axis3@sm-summing-lever (the hex ridge) coincident to it.
     await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "knife axis")
 
     # Apply the deferred drive equations after the whole model + a rebuild

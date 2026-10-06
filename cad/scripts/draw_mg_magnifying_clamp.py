@@ -8,7 +8,7 @@ lever bore; TOP: rod bore) with the depth added across the right-view section.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_mg_magnifying_clamp.py magnifying-clamp
+    uv run python cad\scripts\draw_mg_magnifying_clamp.py mg-magnifying-clamp
 """
 
 from __future__ import annotations

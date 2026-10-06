@@ -2,7 +2,7 @@ r"""MHA-PD-021 latch-hook bracket: the printed bands, the walls and the head
 clearance they hold, and the sheet's marked dimensions.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  Geometry and frame: ``latch_hook_bracket_geometry``.
+closure.  Geometry and frame: ``pd_latch_hook_bracket_geometry``.
 
 How the sheet locates things (holes drilled after bending, R9-10):
 

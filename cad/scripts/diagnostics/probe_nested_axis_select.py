@@ -5,7 +5,7 @@ ATTACHES to the already-open harmonic-analyzer session (does NOT CloseAllDocumen
 or reopen -- the 22 min reload is the whole thing we are avoiding). The failed
 build_motion_study run left the assembly open with the 3 subs flexible; the cam
 couplings + crank motor all failed with "Failed to select mate entity
-(AXIS at 'Axis1@ch-connecting-rod-1@ch-channel-1@harmonic-analyzer')". This probe:
+(AXIS at 'Axis1@connecting-rod-1@channel-1@harmonic-analyzer')". This probe:
 
   1. confirms the rod/crankshaft parts actually carry Axis1/Axis2 (enumerate the
      part doc's reference-axis features by name);
@@ -13,7 +13,7 @@ couplings + crank motor all failed with "Failed to select mate entity
      (if any) returns True;
   3. tries the GetCorrespondingEntity -> Select4 path as a fallback.
 
-    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\probe_nested_axis_select.py
+    C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diagnostics\probe_nested_axis_select.py
 """
 
 from __future__ import annotations

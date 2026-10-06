@@ -11,7 +11,7 @@ and hole; a 5:1 detail carries the crest.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_spring.py pinion-spring
+    uv run python cad\scripts\draw_dt_pinion_spring.py dt-pinion-spring
 """
 
 from __future__ import annotations

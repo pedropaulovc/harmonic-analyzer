@@ -13,7 +13,7 @@ end-on, and its axis is datum A.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pd_transgear_pivot_spacer.py transgear-pivot-spacer
+    uv run python cad\scripts\draw_pd_transgear_pivot_spacer.py pd-transgear-pivot-spacer
 """
 
 from __future__ import annotations

@@ -27,6 +27,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -121,28 +122,33 @@ def test_contract_schema_rejects_unknown_and_duplicate(tmp_path, monkeypatch):
     monkeypatch.setattr(_assembly_contract, "CONTRACT_DIR", tmp_path)
     _assembly_contract.assembly_contract.cache_clear()
     try:
-        (tmp_path / "bad-key.yaml").write_text(
-            "flip_invert: []\nallowed_free_stems: []\nrequired_free_stems: []\n"
-            "number: MHA-FR-000\n"
-            "free_dof: 0\nflip_seeds: []\n",
-            encoding="utf-8",
-        )
+        def write_contract(stem, **overrides):
+            values = {
+                "number": "MHA-FR-000",
+                "flip_invert": ["a"],
+                "allowed_free_stems": ["rotor"],
+                "required_free_stems": ["rotor"],
+                "free_dof": 1,
+            }
+            (tmp_path / f"{stem}.yaml").write_text(
+                yaml.safe_dump(values | overrides), encoding="utf-8"
+            )
+
+        write_contract("valid")
+        valid = _assembly_contract.assembly_contract("valid")
+        assert valid.number == "MHA-FR-000"
+        assert valid.flip_invert == frozenset({"a"})
+        assert valid.allowed_free_stems == ("rotor",)
+        assert valid.required_free_stems == ("rotor",)
+        assert valid.free_dof == 1
+
+        write_contract("bad-key", flip_seeds=[])
         with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("bad-key")
-        (tmp_path / "dupe.yaml").write_text(
-            "flip_invert: [a, a]\nallowed_free_stems: []\nrequired_free_stems: []\n"
-            "number: MHA-FR-000\n"
-            "free_dof: 0\n",
-            encoding="utf-8",
-        )
+        write_contract("dupe", flip_invert=["a", "a"])
         with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("dupe")
-        (tmp_path / "bool-dof.yaml").write_text(
-            "flip_invert: []\nallowed_free_stems: []\nrequired_free_stems: []\n"
-            "number: MHA-FR-000\n"
-            "free_dof: true\n",
-            encoding="utf-8",
-        )
+        write_contract("bool-dof", free_dof=True)
         with pytest.raises(ValueError):
             _assembly_contract.assembly_contract("bool-dof")
     finally:

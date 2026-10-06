@@ -2,7 +2,7 @@ r"""Channel-lever dimensional contract -- the single source of truth shared by
 the part build (``build_ch_channel_lever.py``) and its manufacturing drawing
 (``draw_ch_channel_lever.py``).
 
-PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the pattern).
+PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the pattern).
 The nominal geometry MUST match the constants in build_ch_channel_lever.py (the
 test cross-checks the load-bearing ones).
 """

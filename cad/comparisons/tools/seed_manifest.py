@@ -159,7 +159,8 @@ def seed_from_catalog(parts: set[str]) -> list[dict]:
     for e in entries:
         if not e.get("keep"):
             continue
-        comps = [identities.get(c, c) for c in e.get("components", [])]
+        raw_comps = e.get("components", [])
+        comps = [identities.get(c, c) for c in raw_comps]
         cls = e.get("class")
         if cls not in ("machine", "machine-detail", "mixed", "drawing"):
             continue
@@ -189,7 +190,9 @@ def seed_from_catalog(parts: set[str]) -> list[dict]:
             ref = e["path"]
             src = f"book {e['source']}"
         # Pair IDs name historical reference pictures, not current CAD artifacts.
-        pid = f"harmonic_analyzer--{e['id']}" if model == "ha_harmonic_analyzer" else f"{model}--{e['id']}"
+        pair_model = ("harmonic_analyzer" if model == "ha_harmonic_analyzer" else
+                      next(c for c in raw_comps if identities.get(c, c) == model))
+        pid = f"{pair_model}--{e['id']}"
         pairs.append(make_pair(pid, model, ref, src, camera,
                                comps, e.get("notes", ""), frame=frame))
     return pairs

@@ -31,12 +31,16 @@ tracked images.
 
 ## Drawing illustrations
 
-The part-sheet examples (`rocker-arm-support-drawing.png` and
-`pinion-arbor-drawing.png`) are copied from the matching full-sheet PNGs in the
+The part-sheet examples (`fr-rocker-arm-support-drawing.png` and
+`dt-pinion-arbor-drawing.png`) are copied from the matching full-sheet PNGs in the
 package's `png/` directory. The assembly examples are rendered from selected
 pages of its multi-sheet PDFs: zero-based PDF page 3 is drive-train assembly
-sheet 4, **Cone Set + Crank Exploded (MHA-DT-000)**; page 2 is frame assembly
-sheet 3, **Match-Fit and Assembly Sequence (MHA-FR-000)** (recipe `FITTING + ASSEMBLY`).
+sheet 4, **Cone Set + Crank Exploded**; page 2 is frame assembly
+sheet 3, **Match-Fit and Assembly Sequence** (recipe `FITTING + ASSEMBLY`).
+The tracked assembly examples are unchanged v39 images: their title blocks show
+**MHA-A03** and **MHA-A04**, respectively (now **MHA-DT-000** and **MHA-FR-000**).
+Renamed image paths do not indicate regenerated sheets; refresh them only from
+an actual published release.
 These are selected PDF pages, not the all-pages drawing contact previews. Keep
 the mappings in `trim_renders.py` so the README cannot silently retain a sheet
 from an older release.

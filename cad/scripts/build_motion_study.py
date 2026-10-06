@@ -104,7 +104,7 @@ MOVING_SUBS = (
     "mg-magnifier-1",
     "pn-pen-1",
     "pd-paper-drive-1",
-)  # frame-1 stays fixed
+)  # fr-frame-1 stays fixed
 FRAME_SUB = "fr-frame-1"
 
 CRANK_RPM = 20.0  # gentle: 1 rev / 3 s at 20 RPM
@@ -184,10 +184,10 @@ def _find_comps(adapter, needle, model=None, comps=None):
 def _part_family(name2):
     """Component Name2 -> exact part family.
 
-    ``"drive-train-1/cylinder-gear-1"`` -> ``"cylinder-gear"`` and
-    ``"drive-train-1/cylinder-gear-shaft-1"`` -> ``"cylinder-gear-shaft"`` --
+    ``"dt-drive-train-1/dt-cylinder-gear-1"`` -> ``"dt-cylinder-gear"`` and
+    ``"dt-drive-train-1/dt-cylinder-gear-shaft-1"`` -> ``"dt-cylinder-gear-shaft"`` --
     so a family match never confuses a part with another whose name it is a
-    prefix of (the substring ``"cylinder-gear"`` matched the shaft too).
+    prefix of (the substring ``"dt-cylinder-gear"`` matched the shaft too).
     """
     part = name2.split("/")[-1]
     return part.rsplit("-", 1)[0]
@@ -197,7 +197,7 @@ def _find_family(adapter, family, model=None, comps=None):
     """Components whose part family equals ``family`` EXACTLY (dispatch, name).
 
     Use this, not :func:`_find_comps`, whenever the needle is a prefix of a
-    longer real part name (``cylinder-gear`` vs ``cylinder-gear-shaft``). Pass
+    longer real part name (``dt-cylinder-gear`` vs ``dt-cylinder-gear-shaft``). Pass
     ``comps`` to reuse a single enumeration.
     """
     if comps is None:
@@ -300,7 +300,7 @@ def _iter_mates(adapter, model, read_values=True, progress_every=0):
 
 def _root_title(sub_name):
     """Sub instance name -> the doc-root part name it shows up as in its own
-    mate group ("drive-train-1" -> "drive-train")."""
+    mate group ("dt-drive-train-1" -> "dt-drive-train")."""
     return sub_name.rsplit("-", 1)[0]
 
 
@@ -320,7 +320,7 @@ def _lone_real(parts, root):
 
 
 def _family(part_name):
-    """ "rocker-arm-12" -> "rocker-arm" (strip the trailing instance suffix)."""
+    """ "ch-rocker-arm-12" -> "ch-rocker-arm" (strip the trailing instance suffix)."""
     return part_name.rsplit("-", 1)[0]
 
 
@@ -373,11 +373,11 @@ async def _flex_subs(adapter):
 # many instances is a pose driver; a per-instance-unique value is an axial hold.
 SUPPRESS_RECUR = 5  # a value seen in >= this many instances == pose/spin driver
 
-# The channel-1 mate-classify walk reads ~240 mates (~1-3 s each through the
+# The ch-channel-1 mate-classify walk reads ~240 mates (~1-3 s each through the
 # flexible sub) -- the dominant per-iteration cost (~500 s). The result is
-# DETERMINISTIC for a given channel.SLDASM, and the suppressible mate NAMES
-# (Distance17@channel-1 ...) are stable as long as the file is not rebuilt. Cache
-# the name list keyed on channel.SLDASM's mtime so repeat runs skip the walk and
+# DETERMINISTIC for a given ch-channel.SLDASM, and the suppressible mate NAMES
+# (Distance17@ch-channel-1 ...) are stable as long as the file is not rebuilt. Cache
+# the name list keyed on ch-channel.SLDASM's mtime so repeat runs skip the walk and
 # just re-apply the ~140 suppresses (~150 s). Set MOTION_NOCACHE=1 to force a
 # fresh walk (e.g. after the classifier logic changes). The cache is throwaway
 # build state -- it never touches artifact A.
@@ -466,15 +466,15 @@ async def _suppress_recurring(adapter, sub_name, families, label):
 
 
 async def _suppress_channel(adapter):
-    """ONE classify-once pass over channel-1's mate group -- replaces the
+    """ONE classify-once pass over ch-channel-1's mate group -- replaces the
     separate flexible-sub walks (rocker spin, lever spin, rod drivers, bar spin)
     with a single walk. The mate walk on a flexible sub is the dominant per-
     iteration cost (hundreds of seconds; one walk hit 635s), so collapsing the
     walks is a big iteration speedup with zero classification change. Two rules:
 
-      * connecting-rod single-part DISTANCE/ANGLE -> free the rod fully (the two
+      * ch-connecting-rod single-part DISTANCE/ANGLE -> free the rod fully (the two
         new revolutes define it).
-      * rocker-arm / channel-lever / amplitude-bar single-part DISTANCE with a
+      * ch-rocker-arm / ch-channel-lever / ch-amplitude-bar single-part DISTANCE with a
         value RECURRING across >= SUPPRESS_RECUR instances -> a pose/spin driver
         -> suppress; a per-instance-unique value -> an axial-Z station hold ->
         KEEP. All channels share one solved state (only Z varies), so each
@@ -509,7 +509,7 @@ async def _suppress_channel(adapter):
     root = _root_title(sub_name)
     targets = []
     recur = []  # (name, family, rounded_mm) for spin-vs-axial bucketing
-    log("  classify channel-1 mates (single pass) ...")
+    log("  classify ch-channel-1 mates (single pass) ...")
     for _f, mate, name, mtype, parts, _val in _iter_mates(
         adapter, model, read_values=False, progress_every=40
     ):
@@ -545,7 +545,7 @@ async def _do_suppress(adapter, sub_name, targets, label):
     # currentModel MUST stay the top assembly: suppress_mate(component=sub_name)
     # resolves the component against currentModel then retargets to its model doc
     # itself (GetModelDoc2). Switching currentModel to the sub doc here makes that
-    # component lookup fail ("Component not found: 'drive-train-1'").
+    # component lookup fail ("Component not found: 'dt-drive-train-1'").
     from solidworks_mcp.adapters.base import SuppressMateParameters
 
     log(f"  {label}: suppressing {len(targets)} mates in {sub_name}")
@@ -652,18 +652,18 @@ async def _suppress_drivers(adapter, level, dump=False):
 
     # channel: free the cam-follower chain. THREE families, three rules:
     #
-    #  * rocker-arm -> recurring-only: suppress the constant spin driver, KEEP
+    #  * ch-rocker-arm -> recurring-only: suppress the constant spin driver, KEEP
     #    the per-station axial-Z hold so each rocker stays at its channel station
     #    (the rocker pivot revolute is a real two-part mate, untouched).
     #
-    #  * channel-lever -> recurring-only: suppress the constant J4 spin driver so
+    #  * ch-channel-lever -> recurring-only: suppress the constant J4 spin driver so
     #    the lever is FREE to rotate about its fulcrum, KEEP its per-station
     #    axial-Z hold and its J4 fulcrum revolute. The lever is driven by the
     #    rocker THROUGH the amplitude bar (the real four-bar -- _add_foot_arc_
     #    joints), not a gear: the bar foot rides the rocker arc and its top swings
     #    on the lever pin, so the seesawing rocker drives the lever up/down.
     #
-    #  * amplitude-bar -> recurring-only: suppress the foot-X spin_driver so the
+    #  * ch-amplitude-bar -> recurring-only: suppress the foot-X spin_driver so the
     #    bar can SWING about its top pin (book ch.15/17 + user-confirmed: the bars
     #    are swinging couplers, NOT rigid with the lever -- keeping the spin_driver
     #    made the bar a rigid vertical stick; an earlier lock-to-lever made it
@@ -673,13 +673,13 @@ async def _suppress_drivers(adapter, level, dump=False):
     #    mates (R800 arc-centre + pivot radius), closing the four-bar. The
     #    coefficient = the foot's pivot radius (F6c: set per bar from its slide).
     #
-    #  * connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
+    #  * ch-connecting-rod -> suppress ALL of its drivers (ring-X/Y/Z AND the swing,
     #    which spin_driver implements as a DISTANCE mate). Artifact A pins the rod
     #    purely with these four drivers and deliberately omits the rod<->rocker
     #    and rod<->cam revolutes (build_ch_channel_assembly._pin_design_pose). The
     #    rod must be FULLY free so the two new revolutes can define it: the in-sub
     #    rod-pin<->rocker-bore coincident (_add_rod_rocker_revolutes, authored in
-    #    channel.SLDASM's own context) pins the pin to the rocker bore, and the
+    #    ch-channel.SLDASM's own context) pins the pin to the rocker bore, and the
     #    top-level cam ring<->lobe (_add_cam_couplings, cross-sub) pins the ring
     #    to the eccentric lobe; together they are the 1-DOF four-bar driven by the
     #    crank. (Earlier theory that a kept ring-Z over-constrains was WRONG --
@@ -699,9 +699,9 @@ async def _suppress_drivers(adapter, level, dump=False):
 def _entity_ref(name2, prefix, etype):
     """A depth-2-safe ``MateEntityRef`` for a named axis inside a nested part.
 
-    ``name2`` is the top-level component path ("channel-1/connecting-rod-1") and
+    ``name2`` is the top-level component path ("ch-channel-1/ch-connecting-rod-1") and
     ``prefix`` the part-local named feature ("Axis1"). The hand-built reversed
-    string ``Axis1@ch-connecting-rod-1@ch-channel-1@harmonic-analyzer`` resolves only
+    string ``Axis1@ch-connecting-rod-1@ch-channel-1@ha-harmonic-analyzer`` resolves only
     one level deep and returns False for a part nested in a flexible sub; the
     component+name ref maps the base IFeature through GetCorresponding instead
     (PR #64). ``GetCorresponding`` is depth-agnostic, so the assembly title is
@@ -721,8 +721,8 @@ def _by_z_rank(adapter, family, comps=None):
     monotonically in Z, so the i-th entry of two such lists is the same
     station -- robust pairing without trusting instance-suffix order (a rod's
     Z sits between its own gear and the next station's gear, so nearest-Z
-    pairing would mis-match). Exact-family match so ``cylinder-gear`` does not
-    also drag in ``cylinder-gear-shaft``. Pass ``comps`` to reuse one walk.
+    pairing would mis-match). Exact-family match so ``dt-cylinder-gear`` does not
+    also drag in ``dt-cylinder-gear-shaft``. Pass ``comps`` to reuse one walk.
     """
     hits = _find_family(adapter, family, comps=comps)
     return sorted(hits, key=lambda t: _comp_z_mm(adapter, t[0]))
@@ -836,7 +836,7 @@ async def _add_cam_couplings(adapter):
     """Per channel, at TOP level: rod ring-centre POINT on cam lobe Axis3 (cross-sub).
 
     A POINT-ON-AXIS coincident: the rod ring-centre RefPoint
-    (_add_ring_centre_point) on Axis3@cylinder-gear (the eccentric cam-lobe axis).
+    (_add_ring_centre_point) on Axis3@dt-cylinder-gear (the eccentric cam-lobe axis).
     This is 2 constraints (position only) -- it pins the ring to the orbiting lobe
     WITHOUT re-fixing the rod orientation that the rod<->rocker pin already fixes,
     so the 20 parallel four-bar loops are NOT over-constrained and Basic Motion

@@ -1,7 +1,7 @@
 """Pure-data drawing contract for the rocker-arm support.
 
-Split from ``rocker_arm_support_spec`` on purpose: that module is the WORLD
-PLACEMENT contract ``build_frame_assembly`` and ``build_harmonic_base`` import,
+Split from ``fr_rocker_arm_support_spec`` on purpose: that module is the WORLD
+PLACEMENT contract ``build_fr_frame_assembly`` and ``build_fr_harmonic_base`` import,
 so product-definition prose living there would send both down the ~500 s full
 rebuild on a finish edit (the codex #354 lesson for connecting-rod). This module
 is imported only by the part build (which authors the PMI) and its drawing.

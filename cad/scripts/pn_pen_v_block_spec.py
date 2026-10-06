@@ -9,10 +9,10 @@ rename or a nominal change is a single edit that reaches both scripts, so the
 part-side ``mark_dimensions_for_drawing`` set and the drawing-side ``keep`` maps
 cannot silently drift apart.
 
-Build-graph consequence (intended): both ``build_pen_v_block`` and
-``draw_pen_v_block`` import from THIS file, so ``module_deps_of`` folds it into
+Build-graph consequence (intended): both ``build_pn_pen_v_block`` and
+``draw_pn_pen_v_block`` import from THIS file, so ``module_deps_of`` folds it into
 BOTH recipe digests -- an edit here rebuilds the part AND the drawing.  The
-drawing does not import ``build_pen_v_block``, so a pure build-logic edit that
+drawing does not import ``build_pn_pen_v_block``, so a pure build-logic edit that
 leaves this spec (and the .SLDPRT geometry) untouched does not force a drawing
 rebuild; a geometry change still re-renders the drawing via its .SLDPRT
 ``file_dep``.

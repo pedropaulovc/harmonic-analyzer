@@ -1,8 +1,8 @@
 r"""Pure-data dimensional contract shared by the pen hanger and its drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_pen_hanger`` imports the marked-
-dimension NAME map + notes from here; ``draw_pen_hanger`` imports the same plus
-the strap/block geometry from ``build_pen_hanger`` for its view math, and keeps
+PURE DATA, no SolidWorks/COM imports.  ``build_pn_pen_hanger`` imports the marked-
+dimension NAME map + notes from here; ``draw_pn_pen_hanger`` imports the same plus
+the strap/block geometry from ``build_pn_pen_hanger`` for its view math, and keeps
 exactly ``DRAWING_DIMENSIONS`` across its per-view keep map.
 """
 

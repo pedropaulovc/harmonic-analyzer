@@ -464,7 +464,7 @@ def test_manufacturing_notes_do_not_restate_dimensions() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4
     assert max(len(line) for line in lines) <= 64
-    stripped = re.sub(r"MHA-[A-Z]{2}-\d+", "", spec.DRAWING_NOTES)
+    stripped = re.sub(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "", spec.DRAWING_NOTES)
     assert not any(character.isdigit() for character in stripped)
     for banned in ("DIA", "THRU", "DEEP", "C-C", "DATUM", "MACHINE", "Ra"):
         assert banned not in spec.DRAWING_NOTES

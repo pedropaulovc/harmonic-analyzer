@@ -9,7 +9,7 @@ view owns the M2.5 tapped hole (U28: the raised boss is gone).
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_cam.py pinion-cam
+    uv run python cad\scripts\draw_dt_pinion_cam.py dt-pinion-cam
 """
 
 from __future__ import annotations

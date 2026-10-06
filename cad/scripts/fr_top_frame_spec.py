@@ -1,9 +1,9 @@
 r"""Pure-data dimensional contract shared by the top-frame casting and drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_top_frame`` imports the marked-
+PURE DATA, no SolidWorks/COM imports.  ``build_fr_top_frame`` imports the marked-
 dimension NAME map, notes and the machined-surface geometry from here;
-``draw_top_frame`` keeps exactly ``DRAWING_DIMENSIONS`` and imports the rest of
-the casting's plan geometry from ``build_top_frame`` for its view math.
+``draw_fr_top_frame`` keeps exactly ``DRAWING_DIMENSIONS`` and imports the rest of
+the casting's plan geometry from ``build_fr_top_frame`` for its view math.
 
 2026-08-02 rederive (ch30 px measurement anchored on the 394x224 column pitch
 + GT bundle rescale + ch19 closeups): the ring absorbed the old top-crossbar
@@ -27,7 +27,7 @@ from fr_frame_attachment_spec import CAP_RECESS_DEPTH, COLUMN_SOCKET_DIAMETER
 # provenance-checked against the very face spec the casting authors -- see
 # ``_drawing_contract``'s drawing-surface-finish-provenance rule. Everything
 # else about the plan geometry stays in the build script.
-COLUMN_X = 197.0  # column stations (frame.SLDASM)
+COLUMN_X = 197.0  # column stations (fr-frame.SLDASM)
 FRONT_COLUMN_Z = FRAME_FRONT_COLUMN_Z  # -112
 REAR_COLUMN_Z = FRAME_REAR_COLUMN_Z  # +112
 RING_HEIGHT = 36.5  # rail band (ch30 p002 36.7 / p006 37.0 / ch19 img03 35.6)

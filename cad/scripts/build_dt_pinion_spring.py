@@ -27,7 +27,7 @@ screw pad (PAD_WIDTH x PAD_LEN) at the foot's free end, cut with the flat
 blank.
 
 The model is the INSTALLED, parked shape (O2); the maker forms the free shape,
-PRESET_DEG more bend (pinion_spring_geometry).
+PRESET_DEG more bend (dt_pinion_spring_geometry).
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 

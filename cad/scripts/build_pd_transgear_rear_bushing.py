@@ -1,7 +1,7 @@
 r"""Reproduction script: transgear rear bushing (MHA-PD-024; R9-68; 1 used).
 
 The turned brass ring on the MHA-PD-023 pin between the MHA-PD-018 arm's front
-face and the MHA-PD-010 sleeve's rear face (``transgear_rear_bushing_spec``).
+face and the MHA-PD-010 sleeve's rear face (``pd_transgear_rear_bushing_spec``).
 It is faced to fit at assembly for the cluster's float, and the model is the
 bushing as fitted to parts at their nominals.
 

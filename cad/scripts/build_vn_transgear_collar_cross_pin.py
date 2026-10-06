@@ -1,7 +1,7 @@
 r"""Purchased MHA-VN-037 drive-collar cross pin: McMaster 98296A026.
 
 A 1/16 x 9/16 slotted spring pin to ASME B18.8.2
-(``transgear_collar_cross_pin_spec``): it is sprung through the MHA-PD-008 knob
+(``vn_transgear_collar_cross_pin_spec``): it is sprung through the MHA-PD-008 knob
 shaft's core and lies in the MHA-PD-022 drive collar's rear slot, so collar and
 shaft turn as one.  The stock recipe ``diagnostics/diag_build_98296A026.py``
 models it as installed, a 1/16 tube with the catalog's 0.012 wall.

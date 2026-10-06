@@ -7,10 +7,10 @@ through the hub bore after removable taper pin MHA-DT-009 is removed.  The share
 8-mm face shift preserves the established bearing interfaces.  Behind the
 hub, an integral collar's front spigot seats the removable sprocket MHA-PD-009,
 driven by two MHA-VN-044 dowels pressed into blind reamed holes in its face
-(ch. 23; crankshaft_spec owns the seat).  Near
+(ch. 23; dt_crankshaft_spec owns the seat).  Near
 the far end, the 1/8 in
 straight-pin cross-hole keys the 16T pinion's hub boss to the shaft (ch12
-p.19 page002_img02; crank_pinion_spec owns the pin), its entry turned
+p.19 page002_img02; dt_crank_pinion_spec owns the pin), its entry turned
 PIN_CLOCKING_DEG from -X toward -Z about the shaft axis so it meets the
 pinion's own -X hole once the assembly seats the pinion rot_z(-seed).
 

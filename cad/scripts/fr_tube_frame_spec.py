@@ -1,8 +1,8 @@
 r"""Pure-data dimensional contract shared by the tube frame column and drawing.
 
-PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the reference
-split). ``build_tube_frame`` imports the tube nominals + the marked-dimension
-NAME map from here; ``draw_tube_frame`` imports the same nominals for its view
+PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the reference
+split). ``build_fr_tube_frame`` imports the tube nominals + the marked-dimension
+NAME map from here; ``draw_fr_tube_frame`` imports the same nominals for its view
 math and keeps exactly ``DRAWING_DIMENSIONS``.
 """
 

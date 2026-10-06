@@ -5,7 +5,7 @@ arm's front face (page001_img02). A straight TAIL_LEN tail lies on the face
 with its end trapped under the screw head, and the wire runs tangent off the
 tail into a closed LOOP_R loop turned 90 deg up off the face, like the
 photographed hook. The loop's hole axis runs across the arm width, and the
-keeper chain (MHA-VN-035) threads it. See ``crank_pin_eye_spec`` for the frame.
+keeper chain (MHA-VN-035) threads it. See ``dt_crank_pin_eye_spec`` for the frame.
 
 Modelled as a torus about an X-parallel axis LOOP_R along -Z from the origin
 (loop in the YZ plane, through the origin tangent to Y) plus a tail cylinder

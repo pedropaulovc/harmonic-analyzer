@@ -1,6 +1,6 @@
 r"""Reproduction script: latch-hook bracket (MHA-PD-021; ch. 23; 1 used).
 
-A 1.5 steel sheet bent into an L (``latch_hook_bracket_geometry``): the base
+A 1.5 steel sheet bent into an L (``pd_latch_hook_bracket_geometry``): the base
 lies on the support bar's back face under two #4-40 bracket screws
 (MHA-VN-043), and the flap stands rearward at the base's +X end with the latch
 hook strip (MHA-PD-014) riveted to its inside face.

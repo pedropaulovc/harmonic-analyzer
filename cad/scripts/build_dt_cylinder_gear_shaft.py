@@ -126,7 +126,7 @@ def _dome_end(adapter, y_mm: float, name: str) -> None:
 
 
 async def _dome_reference(adapter) -> list[tuple[str, str]]:
-    """The hidden DomeReference sketch (cylinder_gear_shaft_spec): one
+    """The hidden DomeReference sketch (dt_cylinder_gear_shaft_spec): one
     construction line along the axis over the north dome whose driving
     dimension IS the dome height, equation-bound to its global."""
     sketch = "DomeReference"

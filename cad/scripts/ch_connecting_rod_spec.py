@@ -2,7 +2,7 @@ r"""Connecting-rod dimensional contract -- the single source of truth shared by
 the part build (``build_ch_connecting_rod.py``) and its manufacturing drawing
 (``draw_ch_connecting_rod.py``).
 
-PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the pattern).
+PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the pattern).
 The nominal geometry here MUST match the constants in build_ch_connecting_rod.py
 (the test cross-checks the load-bearing ones); the marked-dimension -> kept map
 is the drift alarm the offline test enforces.

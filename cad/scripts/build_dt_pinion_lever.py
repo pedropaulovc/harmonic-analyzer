@@ -172,7 +172,7 @@ def _pin_hole_removed() -> float:
 
 def _as_construction(adapter: Any, entity_id: str) -> None:
     """Flag a registered sketch line as construction geometry (the
-    build_harmonic_base reference-sketch idiom)."""
+    build_fr_harmonic_base reference-sketch idiom)."""
     segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):

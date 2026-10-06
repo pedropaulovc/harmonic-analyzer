@@ -11,7 +11,7 @@ the FRONT view is the long side elevation and the RIGHT view is the circular end
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_mg_magnifying_vertical_rod.py magnifying-vertical-rod
+    uv run python cad\scripts\draw_mg_magnifying_vertical_rod.py mg-magnifying-vertical-rod
 """
 
 from __future__ import annotations

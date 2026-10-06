@@ -12,7 +12,7 @@ symbol); the top pin hole is dimensioned in the notes.  The sheet runs at 1:4.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_ch_amplitude_bar.py amplitude-bar
+    uv run python cad\scripts\draw_ch_amplitude_bar.py ch-amplitude-bar
 """
 
 from __future__ import annotations

@@ -20,13 +20,13 @@ its end wall at FLAT_END_STATION.  Datums: ``RearFace`` is the Front Plane
 (z 0), ``GearFace`` (the step face) an offset plane, ``Axis1`` the tooth
 pattern's Top × Right axis; the sheet's datum A is the bore.
 
-PURE DATA, no SolidWorks/COM imports: ``build_transgear_feed_pinion`` marks and
+PURE DATA, no SolidWorks/COM imports: ``build_pd_transgear_feed_pinion`` marks and
 tolerances exactly ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION``;
-``draw_transgear_feed_pinion`` keeps exactly the same names.  Nothing here
+``draw_pd_transgear_feed_pinion`` keeps exactly the same names.  Nothing here
 imports ``transgear_cluster_fit``, the hub's spec or a bushing spec (they
 import this; the hub's spec owns the hub-to-sleeve fits and the match-drilled
 oil hole's location); the hub's spigot comes from the joint's pure-data
-``transgear_disc_hub_geometry``.
+``pd_transgear_disc_hub_geometry``.
 """
 
 from __future__ import annotations

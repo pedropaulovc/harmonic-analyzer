@@ -3,10 +3,10 @@ r"""Reproduction script: transgear arm (MHA-PD-018; ch. 23; 1 used).
 The steel link of the paper-drive hanger: it swings on the MHA-VN-041 shoulder
 screw at the pivot P, carries the disc cluster's MHA-PD-023 pin at S, the
 MHA-PD-019 plate on two #8-32 taps between them, and the MHA-VN-042 latch pin in
-its square end (``transgear_arm_geometry``; the sheet's contract is
-``transgear_arm_spec``).
+its square end (``pd_transgear_arm_geometry``; the sheet's contract is
+``pd_transgear_arm_spec``).
 
-Layout (part frame of ``transgear_arm_geometry``: origin on P at the FRONT
+Layout (part frame of ``pd_transgear_arm_geometry``: origin on P at the FRONT
 face, +X to the square end, +Z to the rear face):
 
 * ``ArmOutline`` (Front plane): the R12.5 pivot round, the two straight edges

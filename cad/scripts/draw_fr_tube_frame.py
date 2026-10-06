@@ -12,7 +12,7 @@ length at 1:5; the end view carries a 2:1 override. The isometric is pictorial o
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_fr_tube_frame.py tube-frame
+    uv run python cad\scripts\draw_fr_tube_frame.py fr-tube-frame
 """
 
 from __future__ import annotations

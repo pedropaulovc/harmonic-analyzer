@@ -6,7 +6,7 @@ end view the stock diameter, and a 4:1 isometric sits clear of the title block.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_lever_pin.py pinion-lever-pin
+    uv run python cad\scripts\draw_dt_pinion_lever_pin.py dt-pinion-lever-pin
 """
 
 from __future__ import annotations

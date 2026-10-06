@@ -16,9 +16,9 @@ allows, with cutter inputs and derived diameters marked REF and the circular
 tooth thickness carrying its own functional limit; nothing here restates the
 title block.
 
-PURE DATA, no SolidWorks/COM imports: ``build_crank_pinion`` marks and
+PURE DATA, no SolidWorks/COM imports: ``build_dt_crank_pinion`` marks and
 tolerances exactly ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model,
-``draw_crank_pinion`` keeps exactly the same names, and the offline test
+``draw_dt_crank_pinion`` keeps exactly the same names, and the offline test
 (``test_dt_crank_pinion_drawing.py``) fails the moment one side drifts.
 """
 

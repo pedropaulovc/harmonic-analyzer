@@ -6,7 +6,7 @@ B18.6.3, CUT TO FIT at assembly (R9-44): each tip is cut flush with the
 MHA-PD-018 arm's front face and the cut edge broken.  With the B18.6.3 length
 band (+0/-0.03 in) no fixed-length screw gives 1.5D engagement in the arm's
 through tap and also keeps its tip out of the guide-lock sweep, so the screw
-is bought long and cut, as MHA-VN-031 is (``post_mount_screw_spec``: built at
+is bought long and cut, as MHA-VN-031 is (``vn_post_mount_screw_spec``: built at
 its supplied length, trimmed at a cut length, the cut end broken) with
 MHA-DT-032's flush tip (``build_dt_drive_train_assembly.HANDLE_SCREW_TIP_Z``).
 

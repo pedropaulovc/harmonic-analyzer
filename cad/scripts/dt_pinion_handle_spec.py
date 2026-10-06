@@ -1,6 +1,6 @@
 r"""Pure-data contract for the separate MHA-DT-015 pinion grip crossrod.
 
-The registry slug remains ``pinion-handle`` because this is the operator's grip
+The registry slug remains ``dt-pinion-handle`` because this is the operator's grip
 component, but it is only the cold-finished crossrod.  The turned head, neck,
 cross-hole, and arbor are one integral MHA-DT-022 part.
 """

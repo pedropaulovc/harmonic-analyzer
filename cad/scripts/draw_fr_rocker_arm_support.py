@@ -14,7 +14,7 @@ explicitly.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_fr_rocker_arm_support.py rocker-arm-support
+    uv run python cad\scripts\draw_fr_rocker_arm_support.py fr-rocker-arm-support
 """
 
 from __future__ import annotations

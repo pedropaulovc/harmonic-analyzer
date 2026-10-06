@@ -14,7 +14,7 @@ a solid circle only end-on.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pd_transgear_front_bushing.py transgear-front-bushing
+    uv run python cad\scripts\draw_pd_transgear_front_bushing.py pd-transgear-front-bushing
 """
 
 from __future__ import annotations

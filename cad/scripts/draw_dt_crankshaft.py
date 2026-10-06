@@ -17,7 +17,7 @@ as true circles and are located and called out in that view.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_crankshaft.py crankshaft
+    uv run python cad\scripts\draw_dt_crankshaft.py dt-crankshaft
 """
 
 from __future__ import annotations

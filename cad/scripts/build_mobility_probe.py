@@ -108,7 +108,7 @@ def _drivers_by_family(adapter: Any, model: Any, root: str) -> dict[str, list[st
     """Walk MODEL's mate group once and group the single-real-part DISTANCE/ANGLE
     driver mates by the family of the part they pin.
 
-    ``root`` is the sub's doc-root pseudo-part name (``"drive-train"``); a driver
+    ``root`` is the sub's doc-root pseudo-part name (``"dt-drive-train"``); a driver
     dim references that root plane plus exactly one real part, so ``_real_parts``
     leaving one name marks a driver and names the part it controls."""
     out: dict[str, list[str]] = {}

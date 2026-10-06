@@ -5,7 +5,7 @@ closure: the thread, the stud/head dims and the seat-fit check the harmonic
 base, the swing-platform geometry and the drive train read. The dims come from
 the constants of the 93585A190 replica recipe
 (``diagnostics/diag_build_93585A190.py``, SolidWorks-free at import).
-Consumers read them here, not from ``build_cone_lock_knob``, whose stock build
+Consumers read them here, not from ``build_vn_cone_lock_knob``, whose stock build
 recipe would otherwise ride their cache keys (#880).
 
 The high-profile head has no collar: its chamfered underside bears directly

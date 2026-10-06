@@ -31,7 +31,7 @@ from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
 MM_PER_IN = 25.4
 
-# Family alloy split (config-owned, cad/config/parts/cone-gear.yaml): the
+# Family alloy split (config-owned, cad/config/parts/dt-cone-gear.yaml): the
 # title-block material (C36000) covers T030-T120; the four tip gears are the
 # harder alloy below (dimensions.yaml ch.12 p.21).
 _MFG = _config.parts("dt-cone-gear")

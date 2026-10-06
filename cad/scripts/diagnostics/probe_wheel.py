@@ -25,8 +25,8 @@ from _assembly import (
     world_point,
 )
 
-# Distance drivers seed their side from magnifier's flip seeds
-# (cad/config/assemblies/magnifier.yaml), the assembly this probe mirrors.
+# Distance drivers seed their side from mg-magnifier's flip seeds
+# (cad/config/assemblies/mg-magnifier.yaml), the assembly this probe mirrors.
 activate_assembly_contract("mg-magnifier")
 
 WHEEL_X = 53.0

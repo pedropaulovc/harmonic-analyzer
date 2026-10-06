@@ -383,7 +383,7 @@
         "dt_crank_arm",
         "dt_crank_handle",
         "pd_chain_sprocket",
-        "dt_cone_pivot_post"
+        "crank_pedestal"
       ],
       "status": "aligned",
       "notes": "crank close-up from front (az~190): pedestal right, t120 cone end behind, chain up. Model crank parked with arm at 6 o'clock/handle toward viewer vs photo ~7:30 \u2014 free-DOF rest pose, not a geometry error.",
@@ -454,7 +454,7 @@
         "dy_px": 0
       },
       "component_focus": [
-        "dt_alignment_pinion",
+        "pinion_drum",
         "dt_cylinder_gear",
         "ch_connecting_rod",
         "dt_crank_arm"

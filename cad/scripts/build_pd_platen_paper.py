@@ -15,7 +15,7 @@ z-fight in the offline renders (the ch30 gallery views read as torn white
 shards where the black board and white sheet alternate per pixel).
 
 Layout: width along +X, height along +Y from the origin corner,
-thickness extruded +Z (same scheme as build_platen).
+thickness extruded +Z (same scheme as build_pd_platen).
 
 Run (SolidWorks already open)::
 

@@ -491,15 +491,14 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
     """Policy rule 2: every part number the sheet cites is a mate's, printed
     after that mate's name, and is the number the mate's own sheet carries."""
     name_by_number: dict[str, str] = {}
-    for stem, name, number in (
-        ("pd-transgear-feed-pinion", spec.SLEEVE_NAME, spec.SLEEVE_NUMBER),
-        ("vn-transgear-disc-screw", spec.SCREW_NAME, spec.SCREW_NUMBER),
-        ("pd-rack-pinion", spec.DISC_NAME, spec.DISC_NUMBER),
+    for stem, name in (
+        ("pd-transgear-feed-pinion", spec.SLEEVE_NAME),
+        ("vn-transgear-disc-screw", spec.SCREW_NAME),
+        ("pd-rack-pinion", spec.DISC_NAME),
     ):
-        assert _config.parts(stem)["number"] == number
-        name_by_number[number] = name
+        name_by_number[_config.parts(stem)["number"]] = name
     printed = " ".join(_sheet_text().split())
-    cited = re.findall(r"MHA-[A-Z]{2}-\d+", printed)
+    cited = re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", printed)
     assert set(cited) == set(name_by_number)
     for number, name in name_by_number.items():
         assert printed.count(f"{name} {number}") == printed.count(number), number

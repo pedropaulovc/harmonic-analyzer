@@ -5,7 +5,7 @@ grip carries a bright steel cup with the pivot screw's slotted head recessed
 inside it.  The body is epoxied into the MHA-DT-008 counterbore, face flush, and
 MHA-DT-032's head bears on the floor; user rulings 2026-09-30 (concept v4) made it
 a plain cup with a flat face; the handle's end round is turned on the oak only.
-Dimensions live in ``crank_handle_butt_cup_spec``.
+Dimensions live in ``dt_crank_handle_butt_cup_spec``.
 
 Layout: one revolve about local +X.  The cup's outer face is the origin
 plane (x=0); the body and floor run toward -X, into the handle, so in

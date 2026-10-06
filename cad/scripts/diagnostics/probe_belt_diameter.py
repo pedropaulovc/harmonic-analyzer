@@ -47,8 +47,8 @@ from _assembly import (  # noqa: E402
     place_component,
 )
 
-# Distance drivers seed their side from paper-drive's flip seeds
-# (cad/config/assemblies/paper-drive.yaml), the assembly this probe mirrors.
+# Distance drivers seed their side from pd-paper-drive's flip seeds
+# (cad/config/assemblies/pd-paper-drive.yaml), the assembly this probe mirrors.
 activate_assembly_contract("pd-paper-drive")
 from _transforms import IDENTITY, rot_z_rows  # noqa: E402
 from preflight_release import _discard_open_documents  # noqa: E402

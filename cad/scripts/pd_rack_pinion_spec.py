@@ -2,9 +2,9 @@ r"""MHA-PD-006 rack-pinion: the 120T brass reducer disc of the translational gea
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The disc is
 driven 12:120 by the knob shaft's 12T DP38 and screwed to the brass hub's
-flange (MHA-PD-017, ``transgear_disc_hub_spec``) by three #0-80 fillister
+flange (MHA-PD-017, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
 screws (MHA-VN-039, McMaster 91794A055; the joint is
-``transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
+``pd_transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
 Ø13.1 h6 spigot, which passes it and seats on the pinion sleeve's (MHA-PD-010)
 step face; its front face, clamped by the hub's flange, stands the spigot's
 length ahead of that step, and its rear face stands in air ahead of the
@@ -13,7 +13,7 @@ sleeve's 12T, radially clear of its tips (R9-68).
 Part frame: gear axis = Z through the origin; the Front plane (z = 0) is the
 disc's FRONT face, the one the hub flange's rear face seats on; the body runs
 z = 0..FACE_WIDTH, so local +Z is machine rearward.  The screw pattern's 0°
-is local +X, counter-clockwise seen from +Z (``transgear_disc_hub_geometry``).
+is local +X, counter-clockwise seen from +Z (``pd_transgear_disc_hub_geometry``).
 
 The #0-80 taps are TRANSFERRED at assembly (ruling R9-9): with the disc on
 the hub's spigot and the hub seated on the sleeve's step, each tap is spotted

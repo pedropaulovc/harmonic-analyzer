@@ -3,7 +3,7 @@ cut to fit.
 
 8-32 x 5/8 slotted 82 deg oval head, fully threaded, the length measured from
 the top of the bevel (contract §3.3); the SKU is [INFERENCE], not yet read
-live (``transgear_arm_plate_screw_spec``).  Two of them hold the arm plate
+live (``vn_transgear_arm_plate_screw_spec``).  Two of them hold the arm plate
 (MHA-PD-019) on the arm (MHA-PD-018): each head sits flush in one of the plate's
 82 deg countersinks and the shank runs through the plate's Ø4.5 clearance
 hole into the arm's #8-32 through tap.  At assembly each tip is cut flush
@@ -14,7 +14,7 @@ Modelling route: the shared oval recipe draws the cut directly
 (``build_91790A196(cut_length=..., cut_end_break=...)``): the revolve profile
 ends the shank at the cut with the break in place of the factory 0.7P tip
 chamfer, and the recipe's analytic revolved-volume check follows the cut.
-MHA-VN-031 (``build_post_mount_screw``) instead builds the supplied screw and
+MHA-VN-031 (``build_vn_post_mount_screw``) instead builds the supplied screw and
 trims it with a cut-extrude, a deburr revolve-cut, equation-driven reference
 sketches and B-rep rim reads, because its sheet dimensions the cut length
 and the break from model dimensions.  This sheet prints neither (the
@@ -22,7 +22,7 @@ installation note states the cut), so that machinery buys nothing here and
 every one of its COM calls would be unexercised native risk; the profile
 route adds no COM call to the stock build and leaves the supplied-screw
 catalog run unchanged.  The parameters ride ``StockComponent.parameters``
-to the registered recipe, as ``build_cone_tip_collar`` passes its seated cup.
+to the registered recipe, as ``build_vn_cone_tip_collar`` passes its seated cup.
 
 Geometry source: the live McMaster pages of the series, not a vendor model
 (``diagnostics/diag_mcmaster_oval.py``; no replica gate, no .SLDPRT

@@ -19,7 +19,7 @@ journal, whose own sketch plane is parallel to it.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_cone_pivot_post.py cone-pivot-post
+    uv run python cad\scripts\draw_dt_cone_pivot_post.py dt-cone-pivot-post
 """
 
 from __future__ import annotations

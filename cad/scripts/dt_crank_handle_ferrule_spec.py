@@ -67,7 +67,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 REFERENCE_DIMENSIONS = frozenset({"OuterDia"})
 
 # The mating part, quoted only to identify it (rule 6).  Written here rather
-# than read from _config.parts so crank-handle.yaml is not a rebuild input; the
+# than read from _config.parts so dt-crank-handle.yaml is not a rebuild input; the
 # offline test checks it against the registry.
 HANDLE_NUMBER = "MHA-DT-008"
 HANDLE_NAME = "CRANK HANDLE"

@@ -7,7 +7,7 @@ bore, which pilots on it, and its end seats on the sleeve's step face (the
 12T's tooth ends); the flange's rear face clamps the disc's front face, the
 spigot's length ahead of the step.  Three #0-80 fillister screws (MHA-VN-039)
 pass the flange's Ø1.7 holes on the Ø19 circle into the disc's taps
-(``transgear_disc_hub_geometry``; the taps are spotted through these holes at
+(``pd_transgear_disc_hub_geometry``; the taps are spotted through these holes at
 assembly, R9-9).  The bore is Ø9 H7 round over its whole length; the flat
 only drives, from the flange's rear face forward, and starts clear ahead of
 the sleeve flat's end wall.  Nothing fastens the hub axially: the spigot

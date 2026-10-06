@@ -19,7 +19,7 @@ runs 1:3.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_cone_swing_platform.py cone-swing-platform
+    uv run python cad\scripts\draw_dt_cone_swing_platform.py dt-cone-swing-platform
 """
 
 from __future__ import annotations

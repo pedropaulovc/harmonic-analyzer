@@ -425,7 +425,7 @@ def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
 # reusing the stem of a placed instance of the same part would hide them.
 UNPLACED = frozenset(
     {
-        "mg-magnifier/fixture-thumb-screw",  # build_magnifier_assembly omits it
+        "mg-magnifier/fixture-thumb-screw",  # build_mg_magnifier_assembly omits it
         "pn-pen/v-block-set-screw-on-rod",  # no set-screw part exists
     }
 )

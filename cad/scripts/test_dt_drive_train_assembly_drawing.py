@@ -125,7 +125,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.CRANK_WASHER_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
-    cited = set(re.findall(r"MHA-[A-Z]{2}-\d{3}", "\n".join(texts)))
+    cited = set(re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "\n".join(texts)))
     bom = set(drawing.BOM_PART_NUMBERS.values())
     assert cited <= bom | EXTERNAL_NUMBERS
 

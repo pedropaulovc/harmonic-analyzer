@@ -10,7 +10,7 @@ scripts, so the part-side ``mark_dimensions_for_drawing`` set and the
 drawing-side ``keep`` maps cannot silently drift apart.
 
 Build-graph consequence (intended): geometry lives in
-``pinion_bracket_geometry`` so the drive-train assembly can consume it without
+``dt_pinion_bracket_geometry`` so the drive-train assembly can consume it without
 also depending on this module's drawing-only annotation contract.
 
 The offline lockstep test (``test_dt_pinion_bracket_drawing.py``) asserts the part

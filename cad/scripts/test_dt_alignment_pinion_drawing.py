@@ -230,5 +230,5 @@ def test_no_note_line_carries_a_dimension() -> None:
     """Rule 6: once part numbers and the named retaining compound are set
     aside, no note line carries a digit (Codex P1 on #814)."""
     for line in spec.DRAWING_NOTES.splitlines():
-        text = re.sub(r"MHA-[A-Z]{2}-\d+", "", line).replace(spec.RETAINING_COMPOUND, "")
+        text = re.sub(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", "", line).replace(spec.RETAINING_COMPOUND, "")
         assert not re.search(r"\d", text), line

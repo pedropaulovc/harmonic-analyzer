@@ -6,7 +6,7 @@ closes the disc cluster's float.
 
 The body is the vendor replica (diagnostics/diag_build_97431A260), built
 about +Y at mid-thickness and turned so its axis is +Z with the rear face on
-the Front plane (the frame ``transgear_retaining_ring_spec`` states).
+the Front plane (the frame ``vn_transgear_retaining_ring_spec`` states).
 
 Run (SolidWorks already open)::
 

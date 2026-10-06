@@ -64,8 +64,8 @@ from _assembly import (  # noqa: E402
     world_point,
 )
 
-# Distance drivers seed their side from channel's flip seeds
-# (cad/config/assemblies/channel.yaml), the assembly this probe mirrors.
+# Distance drivers seed their side from ch-channel's flip seeds
+# (cad/config/assemblies/ch-channel.yaml), the assembly this probe mirrors.
 activate_assembly_contract("ch-channel")
 from _transforms import ROT_Y_180, compose_rows, euler_from_rows, rows_from_euler  # noqa: E402
 import _telemetry  # noqa: E402

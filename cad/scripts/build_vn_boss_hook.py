@@ -13,7 +13,7 @@ thread ends at y -27.84475 and the factory thread phase is preserved.
 The tracked diagnostic recipe is an exact geometric replay of the supplied
 vendor SLDPRT and stays in the vendor's own frame -- eye centre at the origin,
 eye plane in XY, shank axis along -Y, thread starting at y -8.79475.
-``build_summing_assembly`` positions it; nothing here moves it.
+``build_sm_summing_assembly`` positions it; nothing here moves it.
 
 Run (SolidWorks already open)::
 

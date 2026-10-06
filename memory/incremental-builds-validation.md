@@ -7,7 +7,7 @@ metadata:
   originSessionId: b8e105f4-aaf4-4af3-969f-59d752838e16
 ---
 
-> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
 
 PR #5 (branch `incremental-builds-doit`, worktree `C:\src\harmonic-analyzer-doit`) adds the `refresh_assembly` primitive (reopen + per-config `ForceRebuild3` + DOF/interference/health gates + in-place `Save3`, no re-insert/re-mate) + a `doit` part→assembly DAG (`dodo.py`/`_buildgraph.py`) replacing `build_all.py`.

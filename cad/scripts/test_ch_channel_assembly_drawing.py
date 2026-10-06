@@ -21,7 +21,6 @@ STEP_POINTER = re.compile(r"(MHA-[A-Z]{2}-000) STEP (\d+[A-Z]?)")
 # 20260926T112244Z-1-a884759d); #945 moves these into _drawing_common.
 NOTE_CHAR_WIDTH = 0.00276
 NOTE_LINE_PITCH = 0.0045
-FITUP_DRAWING_NUMBER = dt_drive_train_steps.DRAWING_NUMBER
 
 
 def _step_body(key: str) -> str:
@@ -60,10 +59,9 @@ def test_channel_assembly_keeps_registry_outputs_and_precomputed_placement() -> 
     assert drawing.ISO_CENTER == (0.225, 0.140)
 
 
-def test_the_step_registry_names_this_sheet_and_the_fitup_sheet() -> None:
+def test_step_numbers_follow_the_sequence_and_unknown_steps_are_refused() -> None:
     for index, key in enumerate(steps.SEQUENCE, start=1):
         assert steps.step_number(key) == index
-    assert steps.step_ref("south-bracket-feeler-set") == "MHA-CH-000 STEP 4"
     with pytest.raises(KeyError):
         steps.step_number("no-such-step")
 
@@ -79,9 +77,16 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
 
     bracket = _config.parts("ch-pivot-bracket")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
+    channel_number = assembly_contract("ch-channel").number
+    fitup_number = assembly_contract("dt-drive-train").number
+    frame_number = assembly_contract("fr-frame").number
+    north_ref = (
+        f"{fitup_number} STEP "
+        f"{dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY)}"
+    )
     sheets = {
-        steps.DRAWING_NUMBER: _sequence_steps(drawing.FITUP_STEPS),
-        FITUP_DRAWING_NUMBER: _sequence_steps(
+        channel_number: _sequence_steps(drawing.FITUP_STEPS),
+        fitup_number: _sequence_steps(
             "\n".join(
                 (
                     drive_train.CONE_CRANK_STEPS,
@@ -90,18 +95,13 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
                 )
             )
         ),
-        assembly_contract("fr-frame").number: _sequence_steps(
-            frame.ASSEMBLY_STEPS
-        ),
+        frame_number: _sequence_steps(frame.ASSEMBLY_STEPS),
     }
     # What each pointer's target must name, keyed by (citing sheet, pointer).
     expected = {
-        (steps.DRAWING_NUMBER, steps.NORTH_BRACKET_SET_REF): f"THE NORTH {bracket}",
-        (FITUP_DRAWING_NUMBER, "MHA-FR-000 STEP 8"): f"{support} ON DECK",
+        (channel_number, north_ref): f"THE NORTH {bracket}",
+        (fitup_number, f"{frame_number} STEP 8"): f"{support} ON DECK",
     }
-    assert steps.NORTH_BRACKET_SET_REF == dt_drive_train_steps.step_ref(
-        steps.NORTH_BRACKET_SET_KEY
-    )
     found = set()
     for sheet, bodies in sheets.items():
         for body in bodies.values():
@@ -111,13 +111,13 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
                 assert expected[(sheet, pointer.group(0))] in target, pointer.group(0)
     assert found == set(expected)
     north_label = str(dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY))
-    north = sheets[FITUP_DRAWING_NUMBER][north_label]
+    north = sheets[fitup_number][north_label]
     assert "EAR INNER FACE TO Y" in north and "DRO STILL ZEROED AS 9A" in north
     # Positive control: the step before it is the bank's end play, not the ear.
-    assert f"NORTH {bracket}" not in sheets[FITUP_DRAWING_NUMBER]["9F"]
+    assert f"NORTH {bracket}" not in sheets[fitup_number]["9F"]
     # It follows 9F, the bank's last sub-step, on the bank sheet: the rig's
     # first step comes after it.
-    labels = list(sheets[FITUP_DRAWING_NUMBER])
+    labels = list(sheets[fitup_number])
     assert labels.index(north_label) == labels.index("9F") + 1
     # The rig's first step is whichever key the registry puts right after the
     # north bracket, so reordering the rig's own steps cannot break this.

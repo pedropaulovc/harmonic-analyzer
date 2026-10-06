@@ -42,8 +42,8 @@ OUT = REPO / "cad" / "out"
 UNKNOWN = "unknown"
 
 
-# Hand-authored source citations live only here. Python line ranges retain
-# symbol/number anchors; YAML citations name scalar values by dotted key path.
+# Hand-authored source citations live only here. Python citations name line
+# ranges; YAML citations name scalar values by dotted key path.
 # The offline tripwire resolves every emitted YAML path, including registry ones.
 SOURCE_MAP = {
     "rocker_hole": (
@@ -55,7 +55,7 @@ SOURCE_MAP = {
         (("add_native_hole_callout", 'label="rod-pin hole"'),),
     ),
     "hole_callout": (
-        "harmonic-analyzer/cad/scripts/_drawing_common.py:1861-1876,1902,1950-1967",
+        "harmonic-analyzer/cad/scripts/_drawing_common.py:1860-1874,1901,1949-1966",
         (("dia_tolerance_mm",), ("AddHoleCallout2",), ("compose_hole_callout_prefix",)),
     ),
     "rocker_position": (

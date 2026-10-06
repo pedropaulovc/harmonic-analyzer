@@ -3,23 +3,23 @@ r"""Pure-data contract shared by the nameplate, its base seats and the frame.
 PURE DATA, no SolidWorks/COM imports. Three scripts read it and none may import the
 others:
 
-* ``build_nameplate`` -- the plate envelope and its four corner screw stations
+* ``build_fr_nameplate`` -- the plate envelope and its four corner screw stations
   (``SCREW_XY``, plate-local mm);
-* ``build_harmonic_base`` -- the SAME stations transformed into the machine
+* ``build_fr_harmonic_base`` -- the SAME stations transformed into the machine
   frame (``MOUNT_HOLE_XZ``), where it taps the four blind #4-40 seats the
-  plate's screws thread into. It must NOT import ``build_nameplate``:
+  plate's screws thread into. It must NOT import ``build_fr_nameplate``:
   ``_buildgraph.module_deps_of`` follows sibling ``build_*.py`` imports, so
   the base (the root of every assembly) would rebuild on each engraving edit;
-* ``build_frame_assembly`` -- the mount transform (``MOUNT_POS`` /
+* ``build_fr_frame_assembly`` -- the mount transform (``MOUNT_POS`` /
   ``MOUNT_EULER`` / ``MOUNT_ROWS``, formerly its own ``NAMEPLATE_*``) and the
-  screw stations it drops the four ``fillister-screw`` components onto.
+  screw stations it drops the four ``vn-fillister-screw`` components onto.
 
 Mount transform (book ch. 26 pp. 70-71; photogrammetry 195527397 / 195530756 /
 195532820; ch. 30 eight views): the 100 x 55 brass plate lies FLAT on the base
 deck, decorated side up, on the EAST (+X) face, centred front-back between the
 two east columns and read by an operator standing at that face.
 
-The part's decorated face is its FRONT face (+Z local; ``build_nameplate``
+The part's decorated face is its FRONT face (+Z local; ``build_fr_nameplate``
 extrudes the body in -Z so the engraving is frontmost and reads with no
 mirror). ``MOUNT_ROWS`` (euler [-90, 90, 0]) lays it flat on the EAST face:
 local +Z (decorated front) -> +Y so the engraving faces up; local +Y (text
@@ -35,7 +35,7 @@ minus the 7.0 lip), span x 159.25..214.25 -- east of the rocker-arm-support
 
 Row convention (``_transforms.rows_from_euler`` / ``assert_component_placed``):
 ``MOUNT_ROWS[i]`` is the machine image of local axis ``i``, so a plate-local
-point ``p`` lands at ``MOUNT_POS + sum(p[i] * MOUNT_ROWS[i])``. ``build_frame_assembly``
+point ``p`` lands at ``MOUNT_POS + sum(p[i] * MOUNT_ROWS[i])``. ``build_fr_frame_assembly``
 asserts the literal rows against ``rows_from_euler(MOUNT_EULER)`` at import.
 """
 
@@ -48,7 +48,7 @@ PLATE_THICKNESS = 1.5  # thin brass plate; p.71 edge read (low)
 
 # Four corner mounting screws (ch26 p.71 macro: one brass slotted round-head
 # screw per corner, heads riding the pinstripe corners) in the raised border
-# band. The screws are the shared #4-40 brass ``fillister-screw``; the plate
+# band. The screws are the shared #4-40 brass ``vn-fillister-screw``; the plate
 # carries #4 CLOSE clearance holes, the base the blind #4-40 taps.
 SCREW_INSET = 4.5
 SCREW_XY = (

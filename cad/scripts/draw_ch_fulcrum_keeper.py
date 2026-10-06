@@ -13,7 +13,7 @@ carries the width / shaft-axis-height / crown stack), and the isometric.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_ch_fulcrum_keeper.py fulcrum-keeper
+    uv run python cad\scripts\draw_ch_fulcrum_keeper.py ch-fulcrum-keeper
 """
 
 from __future__ import annotations

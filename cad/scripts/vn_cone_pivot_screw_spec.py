@@ -5,7 +5,7 @@ closure: the thread and the head/shoulder/thread dims the harmonic base, the
 drive train and the verify sweep read. The vendor dims are the named constants
 of ``diagnostics/diag_build_91829A560.py`` (SolidWorks-free at import),
 exported here through ``__all__``. Consumers read them here, not from
-``build_cone_pivot_screw``, whose stock build recipe would otherwise ride their
+``build_vn_cone_pivot_screw``, whose stock build recipe would otherwise ride their
 cache keys (#880).
 """
 

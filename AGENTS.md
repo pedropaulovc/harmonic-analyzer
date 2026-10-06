@@ -272,7 +272,6 @@ such build:
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `check:traveler_ch_rocker_arm`, `check:traveler_ch_pivot_shaft`, `check:traveler_dt_cone_pivot_post` | **no** | no (parallel; needs exported manifest + STEP) | no |
 | `check:features_bound` | **no** | no (release only; compares scoped/full STEP face labels and patch counts) | no |
-| `check:reference_catalog` | **no** | no (opt-in; outside build/release) | no (submitter-only) |
 | `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
@@ -286,13 +285,7 @@ the other's paths. The release-only `check:features_bound` compares the two
 sessions' face-label sets and patch counts per label, requires two rocker
 pivot-bore patches and reports both digests. It does not require byte equality:
 SolidWorks timestamps headers and renumbers entities. Release staging copies the
-verified scoped bundles under `features/`. `check:reference_catalog` is an
-opt-in offline audit, not part of `build` or `release`; run it explicitly when
-changing the catalog-seeding utility or `cad/config/identity-migration-map.json`.
-It reads `references/curation/stills_catalog.json` through
-`cad/comparisons/tools/test_seed_manifest.py` and `seed_manifest.py` and runs
-on the submitter. It requires the initialized `references` submodule; a missing
-catalog fails the named gate, with no skip or fallback. The three build/release
+verified scoped bundles under `features/`. The three build/release
 traveler checks use pinned prechips and `cad/process/`: exit 3 (bad input) fails;
 exit 2 (machining blockers) logs every `✗` as **warn** and passes; exit 4
 (required unknown) and 0 pass. This is not machining approval. See [feature
@@ -380,15 +373,8 @@ submodule is the comparison gallery:
   `export_models._gallery_inputs` (`REPO / pair["reference"]["path"]`). The
   `gallery` task invokes `export_models.py --comparisons`; it is Blender+GPU
   bound and deliberately NOT farm-dispatchable.
-- The separate opt-in `check:reference_catalog` is not a normal release or
-  gallery dependency. When explicitly run (for example, after changing the
-  catalog-seeding utility or identity map), it reads
-  `references/curation/stills_catalog.json` through
-  `cad/comparisons/tools/test_seed_manifest.py` and `seed_manifest.py`. It
-  requires the initialized `references` submodule; a missing catalog fails
-  the named gate, with no skip or fallback.
 
-Both readers run on the submitter and take no COM seat; only `gallery` is in
+The gallery runs on the submitter and takes no COM seat; it is in
 the normal release closure. No farm-dispatchable task's `file_dep` or action
 touches the submodule: the `REFERENCES_DIR` every build script imports is
 `cad/references` (`_common.py`), a tracked in-repo directory of vendored
@@ -417,10 +403,7 @@ declared. This does not claim dirty local inputs will be rebuilt from committed
 `HEAD`. `gallery` is in `release`'s closure, runs on the submitter, and reads
 manifest photographs. Thus farm preflight can pass and COM leaves can finish
 while `gallery` later fails on the submitter if `references` is uninitialized;
-initialize it before a release. `check:reference_catalog` is not a `build` or
-`release` dependency; when run explicitly, it requires the curation catalog and
-fails its named gate if that input is missing. Run
-`git submodule update --init references` before a release or this opt-in check.
+initialize it before a release with `git submodule update --init references`.
 
 ## The COM seat lock (do not break this)
 

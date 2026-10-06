@@ -7,10 +7,10 @@ hole, the gooseneck's arm end, the summing lever's tap stations, or a supplier
 end loop. This driver re-measures it with the same native predicates the gate
 uses, on the same three-part fixtures the retired in-build search used:
 
-* channel: ``channel-lever`` (at the station's solved tilt) + ``spring-hook``
+* channel: ``ch-channel-lever`` (at the station's solved tilt) + ``vn-spring-hook``
   + one ``9432K31`` length variant, per distinct calibrated amplitude;
-* counter: ``boss-hook`` + one ``1330K524`` at the preset's balance length +
-  ``gooseneck``, per preset (the gooseneck height is the measured output).
+* counter: ``vn-boss-hook`` + one ``1330K524`` at the preset's balance length +
+  ``sm-gooseneck``, per preset (the gooseneck height is the measured output).
 
 Each contact's native collision/clear boundary is located to 1e-6 mm, and the
 component is then seated ``springs.boolean_stability_mm`` past it, on the clear
@@ -188,7 +188,7 @@ async def _calibrate_channel(
             fixture = _early_bound(adapter.currentModel, "IModelDoc2")
             lever = await place_component(
                 adapter,
-                "channel-lever",
+                "ch-channel-lever",
                 [FULCRUM[0], FULCRUM[1], z_mid],
                 euler_from_rows(lever_rows),
                 lever_rows,
@@ -205,7 +205,7 @@ async def _calibrate_channel(
                         "ground": True,
                     },
                     {
-                        "part": "spring-hook",
+                        "part": "vn-spring-hook",
                         "position": [*spring_mounts.CHANNEL_ANCHOR_XY, z_mid],
                         "rotation": [0.0, 0.0, 0.0],
                         "rows": IDENTITY,
@@ -335,7 +335,7 @@ async def _calibrate_counter(
             adapter,
             [
                 {
-                    "part": "boss-hook",
+                    "part": "vn-boss-hook",
                     "position": [*spring_mounts.COUNTER_ANCHOR_XY, SUMMING_Z],
                     "rotation": [0.0, 0.0, 0.0],
                     "rows": IDENTITY,
@@ -349,7 +349,7 @@ async def _calibrate_counter(
                     "ground": True,
                 },
                 {
-                    "part": "gooseneck",
+                    "part": "sm-gooseneck",
                     "position": [spring_mounts.COLUMN_X, gooseneck_y, SUMMING_Z],
                     "rotation": [0.0, 180.0, 0.0],
                     "rows": ROT_Y_180,

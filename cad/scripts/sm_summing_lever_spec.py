@@ -60,7 +60,7 @@ SURFACE_FINISHES = (
     ),
 )
 
-# The 20 channel-spring lower anchors (McMaster 9489T111, part ``spring-hook``)
+# The 20 channel-spring lower anchors (McMaster 9489T111, part ``vn-spring-hook``)
 # thread DIRECTLY into the coefficient plate -- the plate is their nut, the
 # supplied one is discarded -- so each station is a through tap, not a bore:
 # one native seed + a linear pattern. The size is the anchor's own thread, so a
@@ -72,7 +72,7 @@ CHANNEL_Z0 = -67.1
 CHANNEL_PITCH = 7.0565
 HOLE_Z_OFFSET = 0.8
 
-# The counter-spring lower anchor (McMaster 9490T1, part ``boss-hook``) threads
+# The vn-counter-spring lower anchor (McMaster 9490T1, part ``vn-boss-hook``) threads
 # DIRECTLY through the summation-anchor boss on the same no-nut rule, authored
 # natively AFTER the structural ribs so none of them can refill it.
 COUNTER_HOLE_SPEC = HoleSpec("tapped", ANCHOR_9490T1.thread_size)

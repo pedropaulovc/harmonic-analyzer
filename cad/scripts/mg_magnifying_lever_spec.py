@@ -3,7 +3,7 @@ the part build (``build_mg_magnifying_lever.py``) and its manufacturing drawing
 (``draw_mg_magnifying_lever.py``).
 
 PURE DATA, no SolidWorks/COM imports.  The turned-rod nominals live in the
-drawing-FREE ``magnifying_lever_geom`` module so the assembly can import the
+drawing-FREE ``mg_magnifying_lever_geom`` module so the assembly can import the
 knife-axis station without pulling this drawing contract into its recipe
 closure; they are re-exported here unchanged for the drawing-side consumers and
 the offline lockstep test (``test_mg_magnifying_lever_drawing.py``), which asserts

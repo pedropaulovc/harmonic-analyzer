@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract for the cylinder gear and its drawing.
 
 The tooth system and ordinary blank, cam and notch geometry are shared by
-part and assembly recipes. Drawing prose lives in ``cylinder_gear_notes`` so
+part and assembly recipes. Drawing prose lives in ``dt_cylinder_gear_notes`` so
 wording changes do not invalidate the channel's geometry recipe.
 """
 

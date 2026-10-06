@@ -1,7 +1,7 @@
 r"""MHA-PD-014 latch-hook: printed dimensions, bands, walls and sheet notes.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  Geometry is ``latch_hook_geometry``'s; this module decides what the
+closure.  Geometry is ``pd_latch_hook_geometry``'s; this module decides what the
 sheet prints, at how many places, and proves the walls at the worst case of
 those printed bands.
 

@@ -1,6 +1,6 @@
 r"""Pure-data dimensional contract for the rocker pivot bracket (MHA-CH-008).
 
-PURE DATA, no SolidWorks/COM imports: ``build_pivot_bracket`` builds from it,
+PURE DATA, no SolidWorks/COM imports: ``build_ch_pivot_bracket`` builds from it,
 and ``rocker_bank_layout`` / the channel assembly read the ear and foot from
 it without importing a COM build script.
 

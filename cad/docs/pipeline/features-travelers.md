@@ -2,8 +2,8 @@
 
 ## Independent producers
 
-`package:features` is a scoped COM leaf for `rocker_arm`, `pivot_shaft` and
-`cone_pivot_post`. Its native dependency closure is those parts, not assemblies
+`package:features` is a scoped COM leaf for `ch_rocker_arm`, `ch_pivot_shaft` and
+`dt_cone_pivot_post`. Its native dependency closure is those parts, not assemblies
 or drawings. It writes only self-contained bundles:
 
 ```text
@@ -60,10 +60,10 @@ face of their parent feature. Rocker datum B is the +Z broad face and C is only
 the +X radial tip land; those domains are disjoint from the remaining faces.
 `construction` reads the notes used by the actual drawing and cites their
 declaration; `built_up_permitted` requires an explicit permission note included
-there. A process plan cannot approve its own assembled substitute. The offline
-source-map tripwire anchors each hand-authored Python range against its symbol
-or number and loads YAML to resolve every emitted key path, including dynamic
-part-registry and material-family citations.
+there. A process plan cannot approve its own assembled substitute. Offline
+citation checks load YAML to resolve every emitted key path, including dynamic
+part-registry and material-family citations. Python citations identify source
+line ranges but are not anchor-checked.
 
 ## Face identity and native hygiene
 
@@ -107,7 +107,7 @@ may over-rebuild, including after an edit irrelevant to a requirement.
 
 ## Local traveler gate
 
-The committed plans under `cad/process/{rocker_arm,pivot_shaft,cone_pivot_post}/`
+The committed plans under `cad/process/{ch_rocker_arm,ch_pivot_shaft,dt_cone_pivot_post}/`
 use the three shared inputs under `cad/process/shop/`. The rocker plan, policy
 and cutting data came from prechips `0dd7614`; the shaft and cone plans came
 from `55cae71`, with provenance headers. `shop/inventory.toml` mirrors prechips
@@ -117,14 +117,14 @@ proposals and inventory verification flags are preserved. They do not assert
 purchased tools, measured geometry or approved cutting data.
 
 ```text
-uv run python -m doit check:traveler_rocker_arm
-uv run python -m doit check:traveler_pivot_shaft
-uv run python -m doit check:traveler_cone_pivot_post
+uv run python -m doit check:traveler_ch_rocker_arm
+uv run python -m doit check:traveler_ch_pivot_shaft
+uv run python -m doit check:traveler_dt_cone_pivot_post
 ```
 
 Each build/release gate depends on `package:features`, its own bundle and plan,
 the shared shop inputs and locked consumer. It needs no full export/assembly
-closure. For `<stem>` in `rocker_arm`, `pivot_shaft`, `cone_pivot_post`, its stamp
+closure. For `<stem>` in `ch_rocker_arm`, `ch_pivot_shaft`, `dt_cone_pivot_post`, its stamp
 is `cad/out/reports/check-traveler_<stem>.ok`; it retains the consumer's
 `report.json`, printable `traveler.html` and setup images under
 `cad/out/reports/traveler_<stem>/`.

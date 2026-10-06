@@ -10,7 +10,7 @@ drawing's coordinate math; the marked-dimension map keeps the part marks and
 drawing keeps in lockstep (``test_dt_pinion_spring_drawing.py``).
 
 The build re-imports these primitives so the drawing and the drive-train
-assembly (which imports the derived geometry from ``pinion_spring_geometry``)
+assembly (which imports the derived geometry from ``dt_pinion_spring_geometry``)
 read one source of truth.
 """
 

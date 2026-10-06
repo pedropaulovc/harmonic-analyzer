@@ -7,7 +7,7 @@ block.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_pivot_shaft.py pinion-pivot-shaft
+    uv run python cad\scripts\draw_dt_pinion_pivot_shaft.py dt-pinion-pivot-shaft
 """
 
 from __future__ import annotations

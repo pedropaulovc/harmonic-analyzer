@@ -1421,7 +1421,7 @@ def rebuild_stale_configurations(adapter: Any, part_name: str) -> None:
     configuration stale.  Saved that way, an assembly placing it opens with
     NeedsRebuild2=1 and fails verify:soundness's saved-rebuild-clean, and the
     #267 reconcile re-saves only the assembly, never the child.  The pc-p1r
-    probe (dt-logs/pc-p1r/probe-saved-rebuild.jsonl) read MHA-DT-030's INSTALLED
+    probe (dt-logs/pc-p1r/probe-saved-rebuild.jsonl) read MHA-135's INSTALLED
     configuration stale in the saved part, and cone-gear's unplaced Default.
 
     Same shape as _assembly.rebuild_if_needed_before_save (1013334c3): every

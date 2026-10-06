@@ -843,9 +843,9 @@ def _run_soundness_battery(
             report.gate(
                 f"{name}:dof-free-necessity",
                 lambda: _fail(
-                    "free paper-drive but .paper-drive.dof.json records no "
+                    "free pd-paper-drive but .pd-paper-drive.dof.json records no "
                     "crank_spin instance -- stale/missing DOF manifest; refusing "
-                    "the weak stem fallback. Rebuild paper-drive to regenerate it."
+                    "the weak stem fallback. Rebuild pd-paper-drive to regenerate it."
                 ),
             )
         else:
@@ -967,22 +967,22 @@ async def _verify_static_one(
         # EXACT SET: no component outside the allowed coupled families may
         # read under-constrained (an unintended freedom fails here, the
         # replacement for the retired release park-closure proof).
-        # paper-drive alone has a SHARED stem (three transgear-removable siblings),
+        # pd-paper-drive alone has a SHARED stem (three vn-transgear-removable siblings),
         # so target the EXACT T12 crank instance from the recorded DOF manifest
         # (codex #189 :679); every other assembly keeps its unique stem families
         # (unchanged -- their DOF map to distinct part names).
         insts = _required_free_instances(name) if name == "pd-paper-drive" else ()
         if name == "pd-paper-drive" and not insts:
-            # A free paper-drive MUST have recorded its crank_spin instance in
-            # .paper-drive.dof.json. A missing/stale sidecar would silently fall
+            # A free pd-paper-drive MUST have recorded its crank_spin instance in
+            # .pd-paper-drive.dof.json. A missing/stale sidecar would silently fall
             # back to the weak shared-stem check (which :679 showed passes even with
             # T12 pinned and a T24/T18 sibling loose). Fail loud instead (codex #189).
             report.gate(
                 f"{name}:dof-free-necessity",
                 lambda: _fail(
-                    "free paper-drive but .paper-drive.dof.json records no crank_spin "
+                    "free pd-paper-drive but .pd-paper-drive.dof.json records no crank_spin "
                     "instance -- stale/missing DOF manifest; refusing the weak stem "
-                    "fallback. Rebuild paper-drive to regenerate it."
+                    "fallback. Rebuild pd-paper-drive to regenerate it."
                 ),
             )
         else:

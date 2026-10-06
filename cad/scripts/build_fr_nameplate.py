@@ -33,7 +33,7 @@ outer frame spans ``ENGRAVING_TARGET_WIDTH`` and centred on the plate centre, th
 cut both-directions to reach the field floor (so the lettering incises the sunk
 field and the pinstripe/frame incise the raised border).
 
-``test_nameplate_geometry`` guards the vendored DXF's integrity (header units,
+``test_fr_nameplate_geometry`` guards the vendored DXF's integrity (header units,
 entity population and artwork extent) -- the source of truth is now the file.
 
 Dimensions: cad/DIMENSIONS.md ch.26 -- 100 x 55 stated (high); thickness, corner
@@ -42,19 +42,19 @@ macro (low). The engraving geometry IS the traced photo (the DXF).
 
 Mounting (2026-09-02 re-derive off ch26 p.71 ``page001_img01``): FOUR brass
 slotted round-head screws, one per corner, heads riding the pinstripe corners
-in the border band. They are the shared #4-40 brass ``fillister-screw``
+in the border band. They are the shared #4-40 brass ``vn-fillister-screw``
 (``_fastener_catalog``; stock Ø2.8448 major diameter, Ø4.6482 head), so the plate carries
-four #4 CLOSE clearance holes (wizard Ø3.048, the build_guide_lock idiom) and
+four #4 CLOSE clearance holes (wizard Ø3.048, the build_pd_guide_lock idiom) and
 the harmonic base carries four blind #4-40 taps under them. The plate envelope,
-the screw stations and the mount transform live in ``nameplate_spec`` (pure
-data) so ``build_harmonic_base`` and ``build_frame_assembly`` derive the tap
+the screw stations and the mount transform live in ``fr_nameplate_spec`` (pure
+data) so ``build_fr_harmonic_base`` and ``build_fr_frame_assembly`` derive the tap
 positions and the screw drops from ONE source without importing this build.
 
 Layout: width along +X, height along +Y from the origin corner, decorated face on
 the Front plane at z = 0. The body extrudes in -Z (``reverse_direction``) so the
 decorated z=0 face is the EXPOSED FRONT face (outward normal +Z): the traced
 artwork, drawn to read from +Z, then reads correctly on the face you actually
-see, with no mirror. (build_platen is untextured and extrudes +Z; only this
+see, with no mirror. (build_pd_platen is untextured and extrudes +Z; only this
 engraved plate needs the decorated face frontmost.)
 
 Run (SolidWorks already open)::
@@ -301,7 +301,7 @@ async def build(adapter) -> dict[str, str]:
 
     # Traced-photo engraving, IMPORTED from the vendored DXF (was native line-loops).
     # The whole artwork -- lettering, scroll cartouche AND pinstripe frame -- comes
-    # from cad/references/nameplate-engraving.dxf as 112 closed-region ribbons (see
+    # from cad/references/fr-nameplate-engraving.dxf as 112 closed-region ribbons (see
     # the module docstring), inserted on the Front plane as one sketch and cut as one
     # feature. The artwork is traced to read from +Z; because the body extrudes -Z the
     # decorated z=0 face is the exposed front (outward normal +Z), so the import reads

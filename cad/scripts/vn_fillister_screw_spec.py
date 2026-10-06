@@ -5,7 +5,7 @@ closure: the thread and the head/shank dims the platen, its clip and guide,
 the guide lock, the harmonic base and the assemblies read. The vendor dims are
 the named constants of ``diagnostics/diag_build_90114A511.py``
 (SolidWorks-free at import). Consumers read them here, not from
-``build_fillister_screw``, whose stock build recipe would otherwise ride their
+``build_vn_fillister_screw``, whose stock build recipe would otherwise ride their
 cache keys (#880).
 """
 

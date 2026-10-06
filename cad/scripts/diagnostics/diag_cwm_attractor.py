@@ -73,8 +73,8 @@ from _assembly import (  # noqa: E402
     spin_driver,
 )
 
-# Distance drivers seed their side from channel's flip seeds
-# (cad/config/assemblies/channel.yaml), the assembly this probe mirrors.
+# Distance drivers seed their side from ch-channel's flip seeds
+# (cad/config/assemblies/ch-channel.yaml), the assembly this probe mirrors.
 activate_assembly_contract("ch-channel")
 from _assembly_postbuild import discard_open_documents  # noqa: E402
 from _common import _flag_only, check, log, run_build  # noqa: E402

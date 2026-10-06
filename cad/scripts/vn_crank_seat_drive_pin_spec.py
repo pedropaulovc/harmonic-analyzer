@@ -4,7 +4,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Two are pressed into the crankshaft collar's seat face (ch23 p.56:
 the removable sprocket's two holes drop over two pins standing out of the
 shaft's seat).  The stock recipe, the crankshaft and the drive train read the pin here;
-its diameter must be the seat interface's (``transgear_removable_spec``).
+its diameter must be the seat interface's (``pd_transgear_removable_spec``).
 
 Catalogue: 3/32 x 1/4 alloy-steel dowel, Round x Chamfer ends; the size row
 and the diameter tolerance are ``diagnostics.diag_mcmaster_dowel``'s.  No

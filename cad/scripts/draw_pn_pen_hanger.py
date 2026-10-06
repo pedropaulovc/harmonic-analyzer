@@ -13,7 +13,7 @@ the sole ortho view at 2:1 with an isometric to its right.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pn_pen_hanger.py pen-hanger
+    uv run python cad\scripts\draw_pn_pen_hanger.py pn-pen-hanger
 """
 
 from __future__ import annotations

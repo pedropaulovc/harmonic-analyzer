@@ -4,7 +4,7 @@ A made slotted shoulder screw turned from 3/8-in cold-finished rod.  The oak
 handle MHA-DT-008 spins on the Ø6 shoulder; the #8-32 thread screws into the
 crank arm MHA-DT-006's tapped through hole and the shoulder seats tight on the
 arm face.  Dimensions and the derived fit facts live in
-``crank_handle_pivot_screw_spec``.
+``dt_crank_handle_pivot_screw_spec``.
 
 Layout: one revolve about local +Z.  The slotted head face is at z=0; the head,
 shoulder and threaded section follow in +Z, the threaded section opening

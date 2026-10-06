@@ -107,7 +107,7 @@ def _recreate_belt_axis_members(adapter: Any, t12: str, t24: str) -> str | None:
         for comp in (t12, t24):
             adapter._attempt(lambda: model.ClearSelection2(True), default=None)
             sel = adapter._attempt(
-                lambda c=comp: ext.SelectByID2(f"Axis1@{c}@paper-drive", "AXIS",
+                lambda c=comp: ext.SelectByID2(f"Axis1@{c}@pd-paper-drive", "AXIS",
                                                0.0, 0.0, 0.0, False, 0,
                                                null_callout(), 0),
                 default=False)

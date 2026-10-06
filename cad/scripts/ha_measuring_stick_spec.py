@@ -2,9 +2,9 @@ r"""Pure-data dimensional contract shared by the measuring stick and drawing.
 
 PURE DATA, no SolidWorks/COM imports.  The engraved scale itself is NOT owned
 here: it lives in ``cad/config/machine/amplitude.yaml`` and is read through
-``measuring_stick_geom`` (re-exported below for the notes and the builder).
-``build_measuring_stick`` imports the marked-dimension NAME map + notes from here; ``draw_measuring_stick`` imports the
-bar's plan geometry from ``build_measuring_stick`` for its view math and keeps
+``ha_measuring_stick_geom`` (re-exported below for the notes and the builder).
+``build_ha_measuring_stick`` imports the marked-dimension NAME map + notes from here; ``draw_ha_measuring_stick`` imports the
+bar's plan geometry from ``build_ha_measuring_stick`` for its view math and keeps
 exactly ``DRAWING_DIMENSIONS``.
 """
 

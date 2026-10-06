@@ -1,10 +1,8 @@
 """Offline contracts for the paper-drive assembly and its drawing (MHA-PD-000)."""
 
-import ast
 import math
 import re
 from itertools import product
-from pathlib import Path
 
 import pytest
 
@@ -27,11 +25,11 @@ import pd_transgear_knob_cup_spec as cup
 import pd_transgear_knob_shaft_spec as knob_shaft
 import pd_transgear_rear_bushing_spec as rear_bushing
 import pd_transgear_removable_spec as sprocket
+from _assembly_contract import assembly_contract
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
-STEP_POINTER = re.compile(r"(MHA-[A-Z]{2}-000)\s+STEP\s+(\d+)")
 # Default-format note text, measured on r743-rocker-fix3's render (leaf
 # 20260926T112244Z-1-a884759d), as test_channel_assembly_drawing uses them;
 # #945 moves these into _drawing_common.
@@ -109,21 +107,6 @@ def _number(stem: str) -> str:
     return _config.parts(stem)["number"]
 
 
-def _literal_number(script: str, key: str) -> str:
-    """The drawing number a build script stamps into its Number property."""
-    path = Path(drawing.__file__).with_name(script)
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    values = {
-        node.values[index].value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Dict)
-        for index, item in enumerate(node.keys)
-        if isinstance(item, ast.Constant) and item.value == key
-    }
-    (value,) = values
-    return value
-
-
 def test_paper_drive_keeps_registry_outputs_and_names_its_sheets() -> None:
     spec = DRAWINGS_BY_NAME["pd_paper_drive_assembly"]
     assert spec.source_kind == "assembly"
@@ -137,11 +120,7 @@ def test_paper_drive_keeps_registry_outputs_and_names_its_sheets() -> None:
     assert len(set(drawing.SHEET_NAMES)) == len(drawing.SHEET_NAMES)
 
 
-def test_the_step_registry_names_this_sheet() -> None:
-    assert steps.DRAWING_NUMBER == _literal_number(
-        "build_pd_paper_drive_assembly.py", "Number"
-    )
-    assert steps.step_ref(steps.SEQUENCE[3]) == f"{steps.DRAWING_NUMBER} STEP 4"
+def test_an_unknown_step_is_refused() -> None:
     with pytest.raises(KeyError):
         steps.step_number("no-such-step")
 
@@ -165,7 +144,7 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
     )
     wanted = [str(dt_drive_train_steps.step_number(key)) for key in steps.CRANK_SIDE_KEYS]
     assert pointers == [
-        (dt_drive_train_steps.DRAWING_NUMBER, str(drive_train.SEQUENCE_SHEET), *wanted)
+        (assembly_contract("dt-drive-train").number, str(drive_train.SEQUENCE_SHEET), *wanted)
     ]
     assert steps.CRANK_SIDE_KEYS == ("crank-mesh-checked", "paper-drive-wheel")
     # The cone-and-crank steps are the note package_note_fields stacks on
@@ -545,8 +524,8 @@ def test_no_sheet_prints_a_forbidden_word() -> None:
 
 def test_no_retired_part_is_named_on_the_sheet() -> None:
     retired = {"MHA-079", "MHA-080", "MHA-108", "MHA-109"}
-    printed = set(re.findall(r"MHA-[A-Z]{2}-\d{3}", drawing.FITUP_STEPS))
-    assert not printed & retired
+    printed = set(re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", drawing.FITUP_STEPS))
+    assert not any(number in drawing.FITUP_STEPS for number in retired)
     assert printed <= set(drawing.BOM_PART_NUMBERS.values())
 
 

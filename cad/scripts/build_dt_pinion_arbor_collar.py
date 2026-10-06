@@ -5,7 +5,7 @@ flush pin end about 10 out (page001_img01, page002_img07).  User ruling R1a
 (2026-09-24): a plain turned steel collar, Ø15 x 20 with a drilled Ø8 bore,
 cross-pinned to MHA-DT-022 with the rig's 1/16 in slotted spring pin through a
 hole centred on its length.  It is a northward walk-out backstop behind the
-drum's bond; the gap stack lives in ``pinion_arbor_collar_spec``.
+drum's bond; the gap stack lives in ``dt_pinion_arbor_collar_spec``.
 
 Layout: bore axis Z through the origin, collar z 0..COLLAR_LEN; the pin hole
 runs along local Y at z PIN_HOLE_Z -- the arbor's crossrod axis, so the

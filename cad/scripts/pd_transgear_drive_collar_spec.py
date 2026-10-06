@@ -1,9 +1,9 @@
 r"""MHA-PD-022 transgear-drive-collar: the brass drive collar on the knob shaft.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  ``build_transgear_drive_collar`` marks and tolerances exactly
+closure.  ``build_pd_transgear_drive_collar`` marks and tolerances exactly
 ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model and
-``draw_transgear_drive_collar`` keeps exactly the same names.
+``draw_pd_transgear_drive_collar`` keeps exactly the same names.
 
 Contract §1.2 (round 10): a Ø17.5 × 4.000 brass collar reamed Ø6.350 to
 slide on the knob shaft's plain Ø6.35 core (MHA-PD-008).  It is set on the core

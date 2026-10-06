@@ -8,7 +8,7 @@ its station from the front face.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_lift_rod.py pinion-lift-rod
+    uv run python cad\scripts\draw_dt_pinion_lift_rod.py dt-pinion-lift-rod
 """
 
 from __future__ import annotations

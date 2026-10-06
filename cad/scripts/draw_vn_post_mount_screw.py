@@ -32,7 +32,7 @@ note; the spec's asserts still guard its value.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_vn_post_mount_screw.py post-mount-screw
+    uv run python cad\scripts\draw_vn_post_mount_screw.py vn-post-mount-screw
 """
 
 from __future__ import annotations

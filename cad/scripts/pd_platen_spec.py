@@ -2,7 +2,7 @@ r"""Platen plate nominals (book ch. 22, pp. 54-55).
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the plate envelope, the clip-screw receivers and the guide-screw
-counterbored through-holes. ``build_platen`` authors the part from these; the
+counterbored through-holes. ``build_pd_platen`` authors the part from these; the
 clip, the guide rails and the paper-drive assembly read them here instead of
 importing the builder, whose sketch recipe would otherwise ride their cache
 keys (#880).

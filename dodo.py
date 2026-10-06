@@ -1060,7 +1060,7 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
         ``_drawing_marks.apply_drawing_properties``);
         test_dodo_recipe.test_drawing_closures_read_no_foreign_dynamic_part_row
         fails loud on any new one.  A literal read of ANOTHER part's row
-        (``_config.parts("pivot-bracket")``) is its own concrete token;
+        (``_config.parts("ch-pivot-bracket")``) is its own concrete token;
       * any other caller (e.g. an offline check) -> the whole registry.
     """
     if kind in ("part", "drawing") and stem is not None:
@@ -1264,7 +1264,7 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
     retrievable one, which is the same lie as a field reported blank when no
     read could have answered it. ``_failure_artefact_hint`` sends the reader to
     THIS line, so it has to exist in both outcomes (measured on
-    ``part:vn_pen_set_screw``, gate build 2026-09-18).
+    ``part:pen_set_screw``, gate build 2026-09-18).
     """
     commit_gb = _sw_commit_gb()
     if commit_gb is not None:
@@ -1324,7 +1324,7 @@ def _failure_artefact_hint(log_blob: str | None) -> str:
     recipe called ``capture_com_failure`` leave artefacts, the worker's
     workspace is gone by now, and ``LeafResult`` carries no artefact count. An
     unconditional download instruction therefore sent operators to a prefix
-    with zero blobs (``part:vn_pen_set_screw``, gate build 2026-09-18) -- worse
+    with zero blobs (``part:pen_set_screw``, gate build 2026-09-18) -- worse
     than silence, because the pause before the failure implies something was
     captured. Probing the container from here is the wrong fix: it would put a
     network call on the path whose one job is to deliver the exit code.

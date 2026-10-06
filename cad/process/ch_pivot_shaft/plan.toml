@@ -410,8 +410,8 @@ length = "With spindle stopped, align outside caliper jaws axially at the dome b
 
 # ---------------------------------------------------------------- S3
 # After fit-up scribes the shaft at the south ear's outer face
-# (draw_channel_assembly.py:101-110). The consumer comment names a saw cut
-# (draw_channel_assembly.py:78-79); no saw is in the inventory, so the rev-3
+# (draw_ch_channel_assembly.py:101-110). The consumer comment names a saw cut
+# (draw_ch_channel_assembly.py:78-79); no saw is in the inventory, so the rev-3
 # route faces the excess off on the lathe.
 [[setups]]
 id = "S3"

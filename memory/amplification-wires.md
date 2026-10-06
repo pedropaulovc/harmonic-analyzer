@@ -7,7 +7,7 @@ metadata:
   originSessionId: ba03bcc4-d81e-4e71-bbc7-7926c9a87d29
 ---
 
-> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
 
 The harmonic analyzer's output amplification runs through TWO inextensible

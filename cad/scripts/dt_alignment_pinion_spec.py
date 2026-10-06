@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the alignment pinion and its drawin
 
 The long 32T brass drum pinion (ch.25) that engages the whole cylinder-gear
 train to zero the machine to sines or cosines. See the batch gear-drawing
-pattern in ``cylinder_gear_spec``.
+pattern in ``dt_cylinder_gear_spec``.
 """
 
 from __future__ import annotations

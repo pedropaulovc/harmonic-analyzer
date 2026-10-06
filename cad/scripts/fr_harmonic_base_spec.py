@@ -1,8 +1,8 @@
 r"""Dimensional contract shared by the harmonic base and its drawing.
 
-PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the reference
-split). ``build_harmonic_base`` imports the plate nominal geometry + the
-marked-dimension NAME map from here; ``draw_harmonic_base`` imports the same
+PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the reference
+split). ``build_fr_harmonic_base`` imports the plate nominal geometry + the
+marked-dimension NAME map from here; ``draw_fr_harmonic_base`` imports the same
 geometry for its view math and keeps exactly ``DRAWING_DIMENSIONS`` across its
 per-view ``keep`` maps, so the part-side marks and the drawing-side keeps cannot
 silently drift.

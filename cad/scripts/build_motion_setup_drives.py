@@ -98,7 +98,7 @@ def _part_driver_names(adapter: Any, root: str, part: str) -> list[str]:
     """Names of every single-real DISTANCE/ANGLE driver pinning EXACTLY ``part``.
 
     For p0 only ONE bar is driven, so its drivers are matched by full instance
-    name (``amplitude-bar-7``), not family -- the other 19 bars stay pinned.
+    name (``ch-amplitude-bar-7``), not family -- the other 19 bars stay pinned.
     """
     names: list[str] = []
     for _f, _m, name, mtype, parts, _v in _iter_mates(

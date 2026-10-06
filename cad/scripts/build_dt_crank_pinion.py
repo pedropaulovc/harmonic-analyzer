@@ -9,13 +9,13 @@ with a root-relieved floor; the crossed-mesh accommodation lives on the
 64T (see its docstring for the full rederivation). On its outboard face
 a plain hub boss at the tooth root (ch12 p.19 page002_img02 / img06)
 carries the 1/8 in retention pin that keys the pinion to the crankshaft
-through a match-drilled radial cross-hole (crank_pinion_spec).
+through a match-drilled radial cross-hole (dt_crank_pinion_spec).
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9. The 11.4 tooth length runs past the drive gear's 7.2113
 face; the south face stays against its restored MHA-DT-005 boss-side datum.
 The teeth run at full OD for the shoulder length and are turned down north of
-it, so the grown end passes under the inclined T120 (crank_pinion_spec).
+it, so the grown end passes under the inclined T120 (dt_crank_pinion_spec).
 
 Layout: gear axis = Z through the origin, teeth z = 0..FACE_WIDTH (turned to
 TURNED_DIA from SHOULDER_LENGTH), boss z = FACE_WIDTH..OVERALL_LENGTH, pin at

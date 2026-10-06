@@ -1,12 +1,12 @@
 r"""MHA-PD-018 transgear-arm: the drawing contract of the made steel arm.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  Every number is ``transgear_arm_geometry``'s (the numbers authority
+closure.  Every number is ``pd_transgear_arm_geometry``'s (the numbers authority
 the plate, the pivot hardware and the paper-drive assembly share); this
 module adds only what the sheet needs: the printed places of each marked
 dimension, the explicit model bands, and the printed callout text.
 
-Part frame (``transgear_arm_geometry``): origin on the pivot axis P on the
+Part frame (``pd_transgear_arm_geometry``): origin on the pivot axis P on the
 FRONT face; +X along the centreline to the square end; +Y toward the upper
 tangent edge; +Z through the thickness to the REAR face (z = THICKNESS).
 """

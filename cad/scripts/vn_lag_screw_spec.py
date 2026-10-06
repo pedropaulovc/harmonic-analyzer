@@ -6,7 +6,7 @@ PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure: the thread identity and the head/shank/bearing dims the frame
 assembly and the harmonic base's hold-down seats read. The vendor dims are the
 named constants of ``diagnostics/diag_build_92240A539.py`` (SolidWorks-free at
-import). Consumers read them here, not from ``build_lag_screw``, whose stock
+import). Consumers read them here, not from ``build_vn_lag_screw``, whose stock
 build recipe would otherwise ride their cache keys (#880).
 """
 

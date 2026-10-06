@@ -15,7 +15,7 @@ dimensioned from it, and the head land runs back from it.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pd_transgear_pin.py transgear-pin
+    uv run python cad\scripts\draw_pd_transgear_pin.py pd-transgear-pin
 """
 
 from __future__ import annotations

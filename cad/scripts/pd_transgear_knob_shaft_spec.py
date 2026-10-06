@@ -1,9 +1,9 @@
 r"""MHA-PD-008 transgear-knob-shaft: the steel knob shaft with its integral 12T.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  ``build_transgear_knob_shaft`` marks and tolerances exactly
+closure.  ``build_pd_transgear_knob_shaft`` marks and tolerances exactly
 ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model and
-``draw_transgear_knob_shaft`` keeps exactly the same names.
+``draw_pd_transgear_knob_shaft`` keeps exactly the same names.
 
 Contract §1.1 (round 10): one turned steel shaft, front to rear --
 

@@ -1,6 +1,6 @@
 r"""Purchased MHA-VN-044 crank-seat drive pin: McMaster 98381A434.
 
-A 3/32 x 1/4 alloy-steel dowel (``crank_seat_drive_pin_spec``).  Two are
+A 3/32 x 1/4 alloy-steel dowel (``vn_crank_seat_drive_pin_spec``).  Two are
 pressed into the crankshaft collar's seat face (ch23 p.56): the removable
 sprocket MHA-PD-009 drops its two Ø2.5 holes over them.  (The knob shaft takes
 the shorter MHA-VN-038 transgear-knob-drive-pin.)

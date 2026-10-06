@@ -3,7 +3,7 @@ the part build (``build_mg_magnifying_clamp.py``) and its manufacturing drawing
 (``draw_mg_magnifying_clamp.py``).
 
 PURE DATA, no SolidWorks/COM imports.  The block/bore nominals live in the
-drawing-FREE ``magnifying_clamp_geom`` module (the assembly imports them); they
+drawing-FREE ``mg_magnifying_clamp_geom`` module (the assembly imports them); they
 are re-exported here for the drawing-side consumers and the offline lockstep
 test, which asserts the part marks and the drawing keeps EXACTLY
 ``DRAWING_DIMENSIONS``.

@@ -16,8 +16,8 @@ Run (SolidWorks already open)::
 
     uv run python cad\scripts\refresh_assembly.py <stem>
 
-where ``<stem>`` is an assembly stem (``output``, ``drive_train``,
-``harmonic_analyzer``, ...); ``_`` and ``-`` are interchangeable.
+where ``<stem>`` is an assembly stem (``pd_paper_drive``, ``dt_drive_train``,
+``ha_harmonic_analyzer``, ...); ``_`` and ``-`` are interchangeable.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import sys
 from _common import run_build
 from _assembly import refresh_assembly
 
-USAGE = "usage: refresh_assembly.py <assembly-stem>  (e.g. paper-drive, drive-train)"
+USAGE = "usage: refresh_assembly.py <assembly-stem>  (e.g. pd-paper-drive, dt-drive-train)"
 
 
 def main() -> int:

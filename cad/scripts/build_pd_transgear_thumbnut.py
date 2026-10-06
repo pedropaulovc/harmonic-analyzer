@@ -2,9 +2,9 @@ r"""Reproduction script: transgear thumbnut (MHA-PD-013; ch. 23 pp. 58-59; 1 use
 
 The knurled brass nut on the knob shaft's 1/4-20 stud that clamps the
 removable chain wheel (T24) against the drive collar; its seat face bears on
-the wheel's front face only (``transgear_thumbnut_spec``).
+the wheel's front face only (``pd_transgear_thumbnut_spec``).
 
-Layout (part frame, ``transgear_thumbnut_spec``): axis local +Y (``Axis1``),
+Layout (part frame, ``pd_transgear_thumbnut_spec``): axis local +Y (``Axis1``),
 seat face on the Top Plane (y = 0), rim at y = OVERALL_LENGTH.
 
 * ``HeadProfile``: the knurled head as a plain Front-plane rectangle revolved

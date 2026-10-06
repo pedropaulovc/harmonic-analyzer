@@ -1342,7 +1342,7 @@ def record_drawing_display(adapter: Any, label: str) -> None:
     ``new_project_drawing`` fits the sheet to that window, so its pixel size is
     the one input a coordinate pick has that the model does not decide. Part
     builds record it (:func:`record_authoring_context`); drawings did not, so
-    when ``drawing:dt_pinion_arbor``'s journal pick missed on swmaker00000a@10 and
+    when ``drawing:pinion_arbor``'s journal pick missed on swmaker00000a@10 and
     hit on swmaker000004@4 with the same key, neither leaf said what window it
     picked in. Reads only; never raises.
     """
@@ -1730,7 +1730,7 @@ def _describe_rows(rows: list[dict[str, Any]]) -> str:
 def capture_rebuild_failure(adapter: Any, message: str) -> NoReturn:
     """Name the features behind a refused rebuild, capture the seat, then raise.
 
-    ``ForceRebuild3`` answers only "Failed to rebuild model".  part:dt_crank_pinion
+    ``ForceRebuild3`` answers only "Failed to rebuild model".  part:crank_pinion
     failed that way five times on four workers with nothing else in the log
     (#906, 2026-09-26), and the cause (a hub boss silently dropped, so the pin
     hole and two tooth cuts lost their geometry) was only found by a diagnostic

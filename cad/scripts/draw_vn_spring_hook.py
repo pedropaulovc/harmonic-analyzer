@@ -9,7 +9,7 @@ see ``spring_hook_spec`` for why the 1/16 in recess absorbs them.
 
 Run with SolidWorks open::
 
-    uv run python cad\\scripts\\draw_vn_spring_hook.py spring-hook
+    uv run python cad\\scripts\\draw_vn_spring_hook.py vn-spring-hook
 """
 
 from __future__ import annotations

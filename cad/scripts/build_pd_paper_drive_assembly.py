@@ -2973,7 +2973,7 @@ async def build(adapter) -> dict[str, str]:
     # (its drive spec recorded above, never authored), which drives the
     # chain-coupled knob cluster, the gear-mated disc + feed pinion, and the
     # rack-fed platen. Target the SPECIFIC T12 crank instance (not the shared
-    # ``transgear-removable`` stem: the T24 knob + T18 spare share it, so a
+    # ``pd-transgear-removable`` stem: the T24 knob + T18 spare share it, so a
     # stem check would pass even if T24 were free and the crank T12 pinned --
     # codex #189).
     assert_free_dof_necessity(adapter, 1, required_instances=(t12,))

@@ -10,7 +10,7 @@ of the wheel axis, so the hanging run is the vertical tangent off the rim's
 kinematic coupling stays a Motion-study scotch-yoke -- cad/docs/motion-policy.md);
 the run stands 0.25 off the rim surface so the interference gate reads zero.
 
-Endpoint derivation lives HERE; ``build_pen_assembly`` imports
+Endpoint derivation lives HERE; ``build_pn_pen_assembly`` imports
 ``WIRE_BOTTOM``/``WIRE_LEN`` and asserts them against its own layout anchors
 (pen-rod wire hole at machine y 513, wheel bar y 575.7), so a layout move
 fails loud instead of leaving a floating wire.

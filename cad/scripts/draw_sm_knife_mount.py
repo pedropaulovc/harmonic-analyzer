@@ -10,7 +10,7 @@ depth added across the right-view section.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_sm_knife_mount.py knife-mount
+    uv run python cad\scripts\draw_sm_knife_mount.py sm-knife-mount
 """
 
 from __future__ import annotations

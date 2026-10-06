@@ -9,10 +9,10 @@ this in ONE module means a rename or a nominal change is a single edit that reac
 both scripts, so the part-side ``mark_dimensions_for_drawing`` set and the
 drawing-side ``keep`` maps cannot silently drift apart.
 
-Build-graph consequence (intended): both ``build_crank_arm`` and ``draw_crank_arm``
+Build-graph consequence (intended): both ``build_dt_crank_arm`` and ``draw_dt_crank_arm``
 ``from dt_crank_arm_spec import ...``, so ``module_deps_of`` folds THIS file into BOTH
 recipe digests -- an edit here rebuilds the part AND the drawing (the coupling you
-want). But the drawing no longer imports ``build_crank_arm``, so a pure build-logic
+want). But the drawing no longer imports ``build_dt_crank_arm``, so a pure build-logic
 edit that leaves this spec (and the .SLDPRT geometry) untouched does NOT force a
 drawing rebuild; a geometry change still re-renders the drawing via its .SLDPRT
 ``file_dep``. The correct asymmetry -- part change => drawing rebuilds; drawing

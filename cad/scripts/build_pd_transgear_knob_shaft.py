@@ -5,7 +5,7 @@ the thumbnut runs on and its thread relief, the plain Ø6.35 core the brass
 drive collar (MHA-PD-022) slides on, the integral 12T DP38 pinion meshing the
 120T disc, and the Ø8.5 journal running in the arm plate's bore, carrying the
 MHA-PD-016 cup on its rear extension.  Every number and the part frame live in
-``transgear_knob_shaft_spec`` (contract §1.1, round 10; R9-70 K-1).
+``pd_transgear_knob_shaft_spec`` (contract §1.1, round 10; R9-70 K-1).
 
 Layout: axis local +Z (machine +Z, rearward), origin on the 12T's front face
 F (the Front Plane).
@@ -194,7 +194,7 @@ def cutter_arc_points(
 
 def _plane_normal(adapter: Any, name: str) -> tuple[float, float, float]:
     """A reference plane's unit normal in model coordinates (the third row of
-    ``IRefPlane::Transform``'s rotation; build_crankshaft's reader)."""
+    ``IRefPlane::Transform``'s rotation; build_dt_crankshaft's reader)."""
     feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
     plane = _early_bound(feature.GetSpecificFeature2(), "IRefPlane")
     data = [
@@ -222,7 +222,7 @@ async def _gap_plane(adapter: Any, name: str) -> None:
 
     ``InsertRefPlane`` has two angled solutions per magnitude; the first
     attempt is kept only if the gap's radial direction lies in it, else the
-    mirror is built and proven the same way (build_crankshaft's recipe)."""
+    mirror is built and proven the same way (build_dt_crankshaft's recipe)."""
     from solidworks_mcp.adapters.base import CreatePlaneParameters
 
     azimuth = math.radians(GAP_AZIMUTH_DEG)

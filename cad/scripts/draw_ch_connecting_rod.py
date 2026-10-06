@@ -10,7 +10,7 @@ sheet runs at 1:1 with a 1:2 isometric.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_ch_connecting_rod.py connecting-rod
+    uv run python cad\scripts\draw_ch_connecting_rod.py ch-connecting-rod
 """
 
 from __future__ import annotations

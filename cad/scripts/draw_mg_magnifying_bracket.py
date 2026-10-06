@@ -12,7 +12,7 @@ collar end as concentric circles (the bore takes the ASME centre mark).
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_mg_magnifying_bracket.py magnifying-bracket
+    uv run python cad\scripts\draw_mg_magnifying_bracket.py mg-magnifying-bracket
 """
 
 from __future__ import annotations

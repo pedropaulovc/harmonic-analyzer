@@ -10,4 +10,4 @@ vn-keeper-chain:
   quantity: 1
   tolerance_class: visual_noncritical
   process: purchased
-  # Cut to keeper_chain_spec.BEAD_COUNT beads; 3/32 in beads, 20 lbf.
+  # Cut to vn_keeper_chain_spec.BEAD_COUNT beads; 3/32 in beads, 20 lbf.

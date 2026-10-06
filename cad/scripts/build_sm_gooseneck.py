@@ -11,12 +11,12 @@ hanging straight down). (M6.8 ch30 8-view pass: 90 degrees, not the
 earlier 180 candy-cane -- user-confirmed against the ch. 19 photos; the
 ch30 plates crop below the bend.) Tension is set by sliding the tube
 through the top-frame casting's rail-hub bore, gripped by its 1/4-20
-square-head set screw (build_top_frame).
+square-head set screw (build_fr_top_frame).
 
 The post passes through the east rail's clearance bore and is clamped at
 the height needed to balance the channel springs. The historical reference
 position put its lower tip near machine Y880; the stock counter spring's
-installed geometry now owns that adjustment in ``build_summing_assembly``.
+installed geometry now owns that adjustment in ``build_sm_summing_assembly``.
 The horizontal arm retains the photographed 90-degree bend and axial screw.
 The 1330K524 double-loop eye needs its full axial wire band on the exposed
 shank; the assembly checks both end-face/head clearance and coil clearance.

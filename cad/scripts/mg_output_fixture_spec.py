@@ -1,7 +1,7 @@
 r"""Pure-data dimensional contract shared by the output fixture and its drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_output_fixture`` imports the
-marked-dimension NAME map + notes from here; ``draw_output_fixture`` imports the
+PURE DATA, no SolidWorks/COM imports.  ``build_mg_output_fixture`` imports the
+marked-dimension NAME map + notes from here; ``draw_mg_output_fixture`` imports the
 same collar nominals for its view math and keeps exactly ``DRAWING_DIMENSIONS``
 across its per-view ``keep`` maps, so the part-side marks and the drawing-side
 keeps cannot silently drift.

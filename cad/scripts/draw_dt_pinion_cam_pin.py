@@ -9,7 +9,7 @@ reference overall.  The end view projects to its left (third angle), and a
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_cam_pin.py pinion-cam-pin
+    uv run python cad\scripts\draw_dt_pinion_cam_pin.py dt-pinion-cam-pin
 """
 
 from __future__ import annotations

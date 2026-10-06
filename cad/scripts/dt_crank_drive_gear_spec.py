@@ -11,9 +11,9 @@ their own decimal places and bands; the tooth system a cut-gear print cannot
 express as dimensions stays in the gear-data block rule 6 allows, with every
 generating number marked REF.
 
-PURE DATA, no SolidWorks/COM imports: ``build_crank_drive_gear`` marks and
+PURE DATA, no SolidWorks/COM imports: ``build_dt_crank_drive_gear`` marks and
 tolerances exactly ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model,
-``draw_crank_drive_gear`` keeps exactly the same names, and the offline test
+``draw_dt_crank_drive_gear`` keeps exactly the same names, and the offline test
 (``test_dt_crank_drive_gear_drawing.py``) fails the moment one side drifts.
 """
 

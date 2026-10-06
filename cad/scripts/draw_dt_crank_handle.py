@@ -19,7 +19,7 @@ reamed bore.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_crank_handle.py crank-handle
+    uv run python cad\scripts\draw_dt_crank_handle.py dt-crank-handle
 """
 
 from __future__ import annotations

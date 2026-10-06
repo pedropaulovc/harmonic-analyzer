@@ -11,7 +11,7 @@ The wire axis is local +Y, so the FRONT view is the straight run reduced to fit
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_mg_lever_wire.py lever-wire
+    uv run python cad\scripts\draw_mg_lever_wire.py mg-lever-wire
 """
 
 from __future__ import annotations

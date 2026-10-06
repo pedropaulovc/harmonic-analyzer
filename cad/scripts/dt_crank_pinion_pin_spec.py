@@ -1,7 +1,7 @@
 r"""Crank pinion retention pin: the print's numbers, in one place.
 
 A plain straight pin (ch12 p.19) driven through the crank pinion's hub boss
-and the crankshaft, match-drilled at assembly (``crank_pinion_spec`` owns the
+and the crankshaft, match-drilled at assembly (``dt_crank_pinion_spec`` owns the
 hole: size, station, clocking). The pin is the hole's own drill size -- stock
 1/8 in drill rod, cut to the boss diameter and the ends faced -- so nothing
 here is a fit class: the match-drilled hole IS the fit, and the pinion's print

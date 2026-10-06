@@ -14,7 +14,7 @@ Projected top/front pairs stay aligned; removed and section views carry scales.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_fr_top_frame.py top-frame
+    uv run python cad\scripts\draw_fr_top_frame.py fr-top-frame
 """
 
 from __future__ import annotations

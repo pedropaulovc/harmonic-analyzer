@@ -14,7 +14,7 @@ never projects, and the recess is free adjustment room under any pose.
 
 The remaining engagement (``THREAD_ENGAGEMENT_MM``) is ~4.4 threads of #6-32
 against a 4.49 N spring, so the band is the title block's general 1-place row
-(as on the counter anchor, ``boss_hook_spec``): even at the long limit the end
+(as on the counter anchor, ``vn_boss_hook_spec``): even at the long limit the end
 stays 0.8 mm inside the plate, and at the short limit >2 threads remain.
 
 That short limit is what bounds the fitter: unscrewing trades engagement for

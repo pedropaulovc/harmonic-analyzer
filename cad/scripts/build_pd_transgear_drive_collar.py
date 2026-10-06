@@ -6,7 +6,7 @@ the front pilot and whose holes drop over two dowels pressed through the
 collar.  The pilot runs through the T24 and is the thumbnut's seat: supplied
 long and faced at assembly to stand 0.05..0.15 proud of the T24's front face,
 so the nut bears on the pilot and the T24 floats under it.  Dimensions and
-the derived fit facts live in ``transgear_drive_collar_spec``.
+the derived fit facts live in ``pd_transgear_drive_collar_spec``.
 
 Layout: axis local +Z (machine +Z, rearward), origin on the front (seat)
 face, the Front Plane; the body runs z 0..LENGTH, the pilot in front of it.

@@ -344,7 +344,7 @@ from ch_rocker_thrust_washer_spec import THICKNESS as _WASHER_THICK  # noqa: E40
 
 if abs(SOUTH_WASHER_Z[1] - SOUTH_WASHER_Z[0] - _WASHER_THICK) > 1e-9:
     raise AssertionError(
-        "south thrust washer is not rocker_thrust_washer_spec's thickness"
+        "south thrust washer is not ch_rocker_thrust_washer_spec's thickness"
     )
 if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
     raise AssertionError(

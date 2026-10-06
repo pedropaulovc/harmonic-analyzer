@@ -824,7 +824,7 @@ JOINTS: tuple[Joint, ...] = (
         lock=Lock.NONE,
         evidence=(
             "build_dt_drive_train_assembly.py post_screws placement + lock_mate 'clamped in the post "
-            "counterbore', cone-shaft revolute on 'journal axis@cone-pivot-post'; "
+            "counterbore', cone-shaft revolute on 'journal axis@dt-cone-pivot-post'; "
             "draw_dt_drive_train_assembly.py CONE_CRANK_STEPS 2 (post-and-tip-block) and 3 "
             "(tip-adjuster-set 'TIGHTEN BOTH MHA-VN-031'), 4 (crank-mesh-checked 'FIT MHA-DT-011 "
             "DIRECTLY IN THE MHA-DT-005 CRANK BORE'); vn_post_mount_screw_spec.THREAD; "
@@ -1548,7 +1548,7 @@ JOINTS: tuple[Joint, ...] = (
     ),
     # --- magnifier ---
     Joint(
-        id="mg-magnifier/vn-wheel-axle-nut",
+        id="mg-magnifier/wheel-axle-nut",
         assembly="mg_magnifier",
         member="vn_wheel_axle_nut",
         receiver="mg_wheel_axle",
@@ -1767,7 +1767,7 @@ JOINTS: tuple[Joint, ...] = (
         evidence=(
             "draw_pd_paper_drive_assembly._step_text 'hanger-pivoted' ('SEAT IT IN THE MHA-PD-007 BAR'S "
             "BLIND TAP WITH LOW-STRENGTH THREADLOCKER; THE ARM FALLS FREELY'); "
-            "build_pd_paper_drive_assembly.py 'transgear-pivot-screw' placement; "
+            "build_pd_paper_drive_assembly.py 'vn-transgear-pivot-screw' placement; "
             "pd_support_bar_spec.PIVOT_TAP_THREAD; transgear_hanger_joints.SPRING_ROOM_MIN/MAX, "
             "HANGER_SWING_MARGIN, LATCH_ARM_ANGLE_PLAY and PIVOT_ENGAGEMENT_WORST_D"
         ),
@@ -2002,7 +2002,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "pn-pen/v-block-set-screw-on-rod": Occurrence(
         "pn_pen", "pn_pen_v_block_spec.py", "SCREW_HOLE_DIA"
     ),
-    "mg-magnifier/vn-wheel-axle-nut": Occurrence(
+    "mg-magnifier/wheel-axle-nut": Occurrence(
         "mg_magnifier", "build_mg_magnifier_assembly.py", "wheel-axle nut locked to the axle"
     ),
     "mg-magnifier/clamp-thumb-screw": Occurrence(

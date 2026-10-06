@@ -2515,16 +2515,36 @@ def test_frozen_anchor_on_another_components_edge_fails(monkeypatch):
 
 
 def test_a_family_without_a_frozen_anchor_fails_before_any_balloon(monkeypatch):
+    items = (("dt-cone-gear", "1"), ("dt-crank-pinion", "2"))
     view = _exploded_view(_instances("dt-cone-gear-1", "dt-crank-pinion-1"), [])
-    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("dt-cone-gear-1")})
-    with pytest.raises(ValueError):
-        _balloon(
-            monkeypatch,
-            sheet,
-            view,
-            {"dt-cone-gear": _ANCHOR},
-            items=(("dt-cone-gear", "1"), ("dt-crank-pinion", "2")),
+    anchors = {
+        "dt-cone-gear": _ANCHOR,
+        "dt-crank-pinion": drawing_common.BalloonAnchor(point_mm=(4.0, 5.0, 6.0)),
+    }
+
+    def ready_sheet():
+        return _AnchorSheet(
+            {
+                (0.001, 0.002): _AnchorEdge("dt-cone-gear-1"),
+                (0.004, 0.005): _AnchorEdge(
+                    "dt-crank-pinion-1", ends=(0.004, 0.005, 0.006, 0.007, 0.008, 0.009)
+                ),
+            }
         )
+
+    valid = ready_sheet()
+    _balloon(monkeypatch, valid, view, anchors, items=items)
+    assert [
+        (landing.instance, landing.sheet_xy) for landing in valid.landings
+    ] == [
+        ("dt-cone-gear-1", (0.001, 0.002)),
+        ("dt-crank-pinion-1", (0.004, 0.005)),
+    ]
+
+    del anchors["dt-crank-pinion"]
+    sheet = ready_sheet()
+    with pytest.raises(ValueError):
+        _balloon(monkeypatch, sheet, view, anchors, items=items)
     assert sheet.hits == [] and sheet.balloons == []
 
 

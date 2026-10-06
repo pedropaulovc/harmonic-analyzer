@@ -2,7 +2,7 @@ r"""Rocker-arm dimensional contract -- the single source of truth shared by the
 part build (``build_ch_rocker_arm.py``) and its manufacturing drawing
 (``draw_ch_rocker_arm.py``).
 
-PURE DATA, no SolidWorks/COM imports (see ``crank_arm_spec`` for the pattern).
+PURE DATA, no SolidWorks/COM imports (see ``dt_crank_arm_spec`` for the pattern).
 Holds the nominal geometry (book ch. 14), the derived spans the drawing needs
 for its view math, and the marked-dimension -> kept-dimension NAME map. The
 part build marks EXACTLY ``DRAWING_DIMENSIONS``; the drawing keeps exactly their

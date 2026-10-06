@@ -16,7 +16,7 @@ foot reaches inboard to x = -23 with its on-face pad ending at x = -6.5;
 outboard of the pad the underside is relieved to y = 4.8 so the bracket
 clears the top-frame's 4.5-proud corner-boss land (0.3 margin). The ball is
 bored Ø6.5 so the shaft end (placed 2.25 outboard of the ball centre by
-build_channel_assembly) floats with the standard 0.15 diametral clearance.
+build_ch_channel_assembly) floats with the standard 0.15 diametral clearance.
 The ball ships as its own solid body inside the part (the released
 two-piece press-fit construction -- the pinion-handle cross-rod
 precedent): merging the Ø9.5 sphere into the bracket is impossible, the

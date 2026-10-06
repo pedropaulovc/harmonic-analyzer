@@ -3,7 +3,7 @@ part build (``build_sm_knife_mount.py``) and its manufacturing drawing
 (``draw_sm_knife_mount.py``).
 
 PURE DATA, no SolidWorks/COM imports.  Nothing else consumes this part's
-nominals (no assembly imports ``build_knife_mount``), so one ``_spec`` module is
+nominals (no assembly imports ``build_sm_knife_mount``), so one ``_spec`` module is
 right here.  The block/bore geometry is derived in the build from the summing-
 assembly layout; the fixed values are mirrored here for the drawing's view math,
 and the offline lockstep test asserts the part marks and the drawing keeps
@@ -14,7 +14,7 @@ NOTE on the "knife edge": this hardened-steel BEARING BLOCK (ch18 p.42,
 circular bore CLOSE around the mating hex trunnion (Ø12 over the 8.653 x 10.268
 hex), so only the trunnion's TOP VERTEX LINE nears the bore's upper inner wall
 -- the true knife-edge line contact.  The sharp ridge is on the LEVER trunnion
-(``build_summing_lever``), NOT on this part; this part's critical surface is the
+(``build_sm_summing_lever``), NOT on this part; this part's critical surface is the
 bore's upper inner wall, whose roundness/finish is called out in the notes.
 """
 

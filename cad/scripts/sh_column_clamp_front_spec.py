@@ -5,7 +5,7 @@ drawing (``draw_sh_column_clamp_front.py``).
 PURE DATA, no SolidWorks/COM imports (the ``<part>_spec.py`` split -- see
 ``dt_crank_arm_spec.py`` for the pattern rationale).  The geometry itself is cut by
 the SHARED semi-arc builder (``_clamp_arc.build_arc``), while the part-owned
-hole contract lives in ``column_clamp_front_geom`` for reuse without drawing
+hole contract lives in ``sh_column_clamp_front_geom`` for reuse without drawing
 dependencies.
 """
 

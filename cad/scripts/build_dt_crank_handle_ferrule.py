@@ -3,7 +3,7 @@ r"""Build MHA-DT-034, the brass ferrule at the crank end of the handle.
 User ruling 2026-09-29 (ch11 p.14/p.15 photographs): the bright ring between
 the crank arm and the ebonized grip is a separate brass ferrule, epoxied on
 the MHA-DT-008 tenon and seated on its shoulder; its outer end face runs against
-the arm.  Dimensions live in ``crank_handle_ferrule_spec``.
+the arm.  Dimensions live in ``dt_crank_handle_ferrule_spec``.
 
 Layout: one revolve about local +X, in the handle's own frame -- the
 arm-bearing face at x=0, the seat face at x=LENGTH -- so the drive train

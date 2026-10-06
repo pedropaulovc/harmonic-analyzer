@@ -1,6 +1,6 @@
 """Pure-data drawing contract for the amplitude bar: its surface finishes.
 
-Split from ``amplitude_bar_spec`` on purpose: the channel kinematics, the
+Split from ``ch_amplitude_bar_spec`` on purpose: the channel kinematics, the
 rocker-bank layout and the spring specs import the bar's geometry, so the
 finish controls (and the ``_gtol_spec``/``_surface_finish`` closure they pull
 in) living there would re-key the channel, magnifier and summing assemblies on

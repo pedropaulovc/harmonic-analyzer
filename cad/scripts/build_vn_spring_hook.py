@@ -17,7 +17,7 @@ survives.
 The tracked diagnostic recipe is an exact geometric replay of the supplied
 vendor SLDPRT and stays in the vendor's own frame -- eye centre at the origin,
 eye plane in XY, shank axis along -Y, threads starting at y -9.525.
-``build_channel_assembly`` positions it; nothing here moves it.
+``build_ch_channel_assembly`` positions it; nothing here moves it.
 
 Run (SolidWorks already open)::
 

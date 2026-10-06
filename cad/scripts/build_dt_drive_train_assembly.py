@@ -962,7 +962,7 @@ for _got, _want, _what in (
 ):
     _placed = tuple(g + o for g, o in zip(_got, CRANK_FRAME_ORIGIN))
     if max(abs(p - w) for p, w in zip(_placed, _want)) > 1e-9:
-        raise AssertionError(f"keeper_chain_spec {_what} {_placed} != placed {_want}")
+        raise AssertionError(f"vn_keeper_chain_spec {_what} {_placed} != placed {_want}")
 if min(vn_keeper_chain_spec.clearance_report().values()) < 0.0:
     raise AssertionError("keeper chain touches a part it must clear")
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
@@ -1838,12 +1838,12 @@ def pinion_pin_edge_stack(
     """W15's worst-case wall from the 16T pin hole to the shaft's north end.
 
     Each term comes from the source that owns it: the shaft printed at its
-    lower limit (crankshaft_spec), the seat gap opening from its nominal to the
+    lower limit (dt_crankshaft_spec), the seat gap opening from its nominal to the
     range's ceiling (the pinion, and its pin, move north), the boss mid-length
     the pin is laid out at moving north with a long face (W15's .X allowance,
     which the face's printed band sits inside) and a long overall length (its
     printed row), the laid-out station's allowance
-    (crank_pinion_spec), and the title block's drilled-hole oversize on the
+    (dt_crank_pinion_spec), and the title block's drilled-hole oversize on the
     pin's radius.
     """
     shaft_lower, _ = printed_deviations(
@@ -5213,7 +5213,7 @@ async def build(adapter) -> dict[str, str]:
         label="foot-screw (spring foot)",
     )
     # U34c: the south pedestal's MHA-VN-032 is the seed; the north one is its
-    # linear pattern instance below (pedestal-hold-down-screw-1 / -2).
+    # linear pattern instance below (vn-pedestal-hold-down-screw-1 / -2).
     sx, sz = _PEDESTAL_SCREW_XZ[0]
     pedestal_screw = await place_component(
         adapter,
@@ -6903,7 +6903,7 @@ async def build(adapter) -> dict[str, str]:
             f"a={LIFT_ROD_PARK_DEG:.2f})"
         ),
         verify=(lift_rod, lr_o),
-        free_dof_key="dt_pinion_cam",
+        free_dof_key="pinion_cam",
         # The rod origin sits on the spin axis: an off-axis witness pins the
         # branch (a +/-LEVER_TILT_DEG mirror would re-phase the cams).
         witness_local=[0.0, 5.0, 0.0],

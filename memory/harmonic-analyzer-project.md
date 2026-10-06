@@ -7,7 +7,7 @@ metadata:
   originSessionId: 5e824fa0-7bda-4055-8655-aa59ed6f0ef9
 ---
 
-> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
 
 Converting Michelson's 20-channel harmonic analyzer (book in `references/`, chapters 11–25 = one component each) into a full SolidWorks assembly, driven entirely through the SolidworksMCP-python fork (`C:\src\SolidworksMCP-python`). Approved plan: `C:\Users\pedro\.claude\plans\overall-goal-convert-the-jolly-eagle.md` (7 milestones, started 2026-06-09).

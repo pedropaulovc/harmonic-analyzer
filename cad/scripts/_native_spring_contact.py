@@ -533,7 +533,7 @@ def assert_assembly_spring_contacts(
                 label=f"channel {station:02d} upper native seat",
             )
             _telemetry.success(
-                f"ch_channel {station:02d} native contacts: lower {lower:.9g} mm, "
+                f"channel {station:02d} native contacts: lower {lower:.9g} mm, "
                 f"upper {upper:.9g} mm"
             )
         return

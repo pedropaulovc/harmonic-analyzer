@@ -11,7 +11,7 @@ The C45 cup bites the spotted steel arbor where an 18-8 (B80) cup would not.
 
 The part is the vendor replica (diagnostics/diag_build_91375A106). These are
 the few of its dimensions the layout reads, restated here so the pedestal
-parts never import a SolidWorks recipe; test_arbor_set_screw pins the two in
+parts never import a SolidWorks recipe; test_vn_arbor_set_screw pins the two in
 lockstep.
 """
 

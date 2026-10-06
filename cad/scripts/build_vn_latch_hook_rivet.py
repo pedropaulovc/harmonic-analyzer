@@ -1,6 +1,6 @@
 r"""Purchased MHA-VN-045 latch-hook rivet: McMaster 97482A015.
 
-A 1/16 x 3/16 1100-aluminium domed-head solid rivet (``latch_hook_rivet_spec``);
+A 1/16 x 3/16 1100-aluminium domed-head solid rivet (``vn_latch_hook_rivet_spec``);
 two join the latch hook's strip to the latch-hook bracket's flap.  The stock
 recipe ``diagnostics/diag_build_97482A015.py`` models the catalogue sizes;
 there is no vendor model, so its standalone run is catalog-only.

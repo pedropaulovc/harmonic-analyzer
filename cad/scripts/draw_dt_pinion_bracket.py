@@ -27,7 +27,7 @@ the isometric:
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_pinion_bracket.py pinion-bracket
+    uv run python cad\scripts\draw_dt_pinion_bracket.py dt-pinion-bracket
 """
 
 from __future__ import annotations

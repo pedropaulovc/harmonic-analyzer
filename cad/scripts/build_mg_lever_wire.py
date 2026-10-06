@@ -13,8 +13,8 @@ surface stands >= 0.25 off its neighbour so the interference gate reads zero
 (the binding pair is the axle flange's back-face edge vs the spoke fronts --
 see the HUB_END_Z note below).
 
-Endpoint derivation lives in the drawing-free ``lever_wire_geom`` module (the
-part's length is the distance between them); ``build_magnifier_assembly``
+Endpoint derivation lives in the drawing-free ``mg_lever_wire_geom`` module (the
+part's length is the distance between them); ``build_mg_magnifier_assembly``
 imports ``WIRE_START``/``WIRE_END``/``WIRE_LEN`` from THERE and asserts them
 against its own layout anchors, so a layout move fails loud instead of
 leaving a floating wire -- while this script's drawing-contract imports stay

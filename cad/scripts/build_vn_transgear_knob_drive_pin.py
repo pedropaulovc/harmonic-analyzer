@@ -1,6 +1,6 @@
 r"""Purchased MHA-VN-038 transgear knob drive pin: McMaster 98381A433.
 
-A 3/32 x 3/16 alloy-steel dowel (``transgear_knob_drive_pin_spec``).  Two are
+A 3/32 x 3/16 alloy-steel dowel (``vn_transgear_knob_drive_pin_spec``).  Two are
 pressed into holes reamed through the knob drive collar MHA-PD-022 (ch23
 p.56), set on a stop to their proud length: the removable sprocket MHA-PD-009
 drops its two Ø2.5 holes over them.  The stock

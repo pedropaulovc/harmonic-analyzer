@@ -7,7 +7,7 @@ metadata:
   originSessionId: 045bacc1-f12e-48b0-b137-916b2b43a02d
 ---
 
-> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
 
 **F5 pen driver — DE-RISKED (2026-06-16, throwaway `probe_pen_equation.py`).** The plan wants the pen-rod Y-travel mate equation-driven from a crank-angle global so the SW pose reproduces `truth_model.pen_y(θ) = magnify·Σ aⱼ·cos(j·θ+φⱼ)` (j=1..20) with NO force solver. Proven live on SW 2026:

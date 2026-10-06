@@ -16,7 +16,7 @@ authoritative: the sheet types no tolerance and no precision.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_cone_gear_shaft.py cone-gear-shaft
+    uv run python cad\scripts\draw_dt_cone_gear_shaft.py dt-cone-gear-shaft
 """
 
 from __future__ import annotations

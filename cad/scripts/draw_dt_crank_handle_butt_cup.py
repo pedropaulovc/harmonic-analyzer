@@ -11,7 +11,7 @@ the floor hole carries its drill callout.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_dt_crank_handle_butt_cup.py crank-handle-butt-cup
+    uv run python cad\scripts\draw_dt_crank_handle_butt_cup.py dt-crank-handle-butt-cup
 """
 
 from __future__ import annotations

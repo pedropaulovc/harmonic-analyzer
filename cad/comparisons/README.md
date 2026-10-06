@@ -44,17 +44,19 @@ from the first `--` is retained, not just three-digit tooth counts. Thus
 example `channel-spring-installed-stretch07` becomes
 `vn-channel-spring-installed-stretch07`; an exporter `--configuration` takes
 precedence over that generated suffix rule. Geometry verdicts and red highlights
-remain per exact qualified mesh; only the changed-part summary groups variants
-by base stem. The map is an archive-input boundary, not an old-name alias for
-current files or commands.
+remain per exact qualified mesh. The changed-part summary groups only trailing
+`--t<digits>` and `-stretch<digits>` variants by base stem; other configuration
+qualifiers, such as `--installed`, remain distinct summary entries.
+The map is an archive-input boundary, not an old-name alias for current files
+or commands.
 
 Historical curation catalogs likewise remain immutable provenance.
 `seed_manifest.py` normalizes catalog components only when their
 `old_underscore` identity is assigned by that same sealed map, before selecting
 a studio part or the top assembly and emitting `focus`/`frame_components`.
 Unknown semantic or retired unmapped labels, such as `crank_pedestal`, remain
-unchanged and generate an unresolved-label warning; they require owner curation,
-not a guessed alias. The normal merge retains existing tuned pairs; `--reset`
+unchanged; they require owner curation, not a guessed alias.
+The normal merge retains existing tuned pairs; `--reset`
 regenerates pairs using current identities. Explicit `PHOTO_FOCUS` mappings are
 unchanged.
 

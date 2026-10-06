@@ -13,7 +13,7 @@ circle only end-on.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pd_transgear_rear_bushing.py transgear-rear-bushing
+    uv run python cad\scripts\draw_pd_transgear_rear_bushing.py pd-transgear-rear-bushing
 """
 
 from __future__ import annotations

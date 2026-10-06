@@ -2,7 +2,7 @@ r"""Purchased MHA-VN-016 cone tip stack collar: McMaster 9414T1, black oxide.
 
 User ruling 2026-09-29: a stock set-screw shaft collar on the cone shaft's
 D-flat replaces the turned brass tip bushing as MHA-VN-016 (see
-``cone_tip_collar_spec`` for the fit-up and every catalogue number).
+``vn_cone_tip_collar_spec`` for the fit-up and every catalogue number).
 
 Geometry source: the catalogue, not a vendor model.  The McMaster product page
 for 9414T1 (read in a headless browser on 2026-09-29) gives the 1/16 in bore,

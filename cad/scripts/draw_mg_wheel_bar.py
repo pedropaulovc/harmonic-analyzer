@@ -9,7 +9,7 @@ section, the holes carry native callouts + location dimensions from the left end
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_mg_wheel_bar.py wheel-bar
+    uv run python cad\scripts\draw_mg_wheel_bar.py mg-wheel-bar
 """
 
 from __future__ import annotations

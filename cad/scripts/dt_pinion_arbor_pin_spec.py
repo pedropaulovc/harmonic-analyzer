@@ -2,11 +2,11 @@ r"""Pure data: MHA-DT-022's cross hole for the MHA-DT-033 collar's spring pin (R
 
 User ruling 2026-09-24: the collar is pinned to the arbor with the rig's one
 pin family, the ASME B18.8.2 1/16 x 1/2 slotted spring pin, in a hole drilled
-with the MHA-DT-030 1/16 drill (``pinion_strap_pin_spec``).  The hole is drilled
+with the MHA-DT-030 1/16 drill (``vn_pinion_strap_pin_spec``).  The hole is drilled
 at the bench at a .X station from the head rear face, on the crossrod's local
 axis so one V-block setup serves both cross holes.
 
-Kept apart from ``pinion_arbor_spec`` on purpose: the drive-train assembly
+Kept apart from ``dt_pinion_arbor_spec`` on purpose: the drive-train assembly
 imports that module for the pin STATION, and this one reads the strap-pin
 spec, which the assembly never does.  The part, its drawing and the collar
 spec read the hole from here.

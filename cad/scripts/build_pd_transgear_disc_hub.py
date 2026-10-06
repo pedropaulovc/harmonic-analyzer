@@ -6,8 +6,8 @@ The turned brass hub and flange whose bore slides on the pinion sleeve's
 step; the flange's rear face clamps the disc's front face and three #0-80
 fillister screws (MHA-VN-039) hold them.  Nothing fastens the hub to the
 sleeve: the spigot bears on the step and the MHA-PD-025 front bushing traps hub
-and disc forward; the D-flat drives (``transgear_disc_hub_spec``,
-``transgear_disc_hub_geometry``).
+and disc forward; the D-flat drives (``pd_transgear_disc_hub_spec``,
+``pd_transgear_disc_hub_geometry``).
 
 Layout (the spec's frame): the spigot, flange and hub body are one turned
 profile on the Top plane, (u, v) = model (X, -Z), revolved about the gear

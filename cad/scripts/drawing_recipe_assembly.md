@@ -34,7 +34,7 @@ async def build(adapter):
     return await build_simple_three_view_drawing(
         adapter,
         source=SOURCE,
-        spec=SPEC,
+        layout=SPEC.layout,
         outputs=OUTPUTS,
         sheet_scale=SHEET_SCALE,
         front_center=FRONT_CENTER,

@@ -1,8 +1,8 @@
 r"""Pure-data dimensional contract shared by the pen frame and its drawing.
 
-PURE DATA, no SolidWorks/COM imports.  ``build_pen_frame`` imports the marked-
-dimension NAME map + notes from here; ``draw_pen_frame`` keeps exactly
-``DRAWING_DIMENSIONS`` and imports the ring's envelope from ``build_pen_frame``
+PURE DATA, no SolidWorks/COM imports.  ``build_pn_pen_frame`` imports the marked-
+dimension NAME map + notes from here; ``draw_pn_pen_frame`` keeps exactly
+``DRAWING_DIMENSIONS`` and imports the ring's envelope from ``build_pn_pen_frame``
 for its view math.
 """
 

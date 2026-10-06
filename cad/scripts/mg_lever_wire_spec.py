@@ -2,15 +2,15 @@ r"""Lever-wire dimensional contract -- the single source of truth shared by the
 part build (``build_mg_lever_wire.py``) and its manufacturing drawing
 (``draw_mg_lever_wire.py``).
 
-PURE DATA, no SolidWorks/COM imports.  ``build_lever_wire`` imports this contract
+PURE DATA, no SolidWorks/COM imports.  ``build_mg_lever_wire`` imports this contract
 to stamp the print notes; the wire's COMPUTED endpoints/yoke
 (``WIRE_START``/``WIRE_END``/``WIRE_LEN``/``YOKE_POINT``) live in the
-drawing-free ``lever_wire_geom`` module, which the magnifier assembly and the
+drawing-free ``mg_lever_wire_geom`` module, which the magnifier assembly and the
 magnifying wheel import DIRECTLY -- so editing THESE print notes rebuilds only
 the lever-wire part + sheet, never the wheel or the assembly.  (The wire
 originally kept no geom split; codex #360 showed the note text leaking into
-both closures through the ``build_lever_wire`` import chain, so the solver
-moved wholesale into ``lever_wire_geom``.)
+both closures through the ``build_mg_lever_wire`` import chain, so the solver
+moved wholesale into ``mg_lever_wire_geom``.)
 
 The wire is a Ø0.8 drawn-steel cylinder ~353 long -- a thin silhouette with no
 flat face, no end-face big enough to pick and no selectable silhouette edge, so

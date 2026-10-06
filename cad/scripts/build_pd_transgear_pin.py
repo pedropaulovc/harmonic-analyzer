@@ -2,7 +2,7 @@ r"""Build MHA-PD-023, the transgear pin (R9-68).
 
 The plain steel pin the disc cluster runs on, pressed into the MHA-PD-018 arm
 from the rear.  Dimensions and the derived fit facts live in
-``transgear_pin_spec``.
+``pd_transgear_pin_spec``.
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the
 head's underside (the seat on the arm's rear face, the Front Plane).  From

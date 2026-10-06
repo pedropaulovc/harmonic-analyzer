@@ -12,7 +12,7 @@ plus a 1:2 isometric.  The sheet runs at 1:2.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_ch_rocker_arm.py rocker-arm
+    uv run python cad\scripts\draw_ch_rocker_arm.py ch-rocker-arm
 """
 
 from __future__ import annotations

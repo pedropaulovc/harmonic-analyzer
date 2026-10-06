@@ -7,7 +7,7 @@ metadata:
   originSessionId: 045bacc1-f12e-48b0-b137-916b2b43a02d
 ---
 
-> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+> Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
 
 A spring whose endpoints move is NOT a fixed-length solid. Modeling it as one rigid body and demanding it thread/fit at every assembly pose is a self-inflicted bug, NOT a physical constraint. When the harmonic-analyzer `channel-spring-installed` (a fixed-length "installed" body) interfered with tilted channel levers under the F3 amplitude drive — and overshot the summing plate (0.13 mm threading margin) when attached per-channel — the right reframe (user-prompted) is: the spring length is the wrong thing to hold constant.

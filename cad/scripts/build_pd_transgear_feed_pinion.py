@@ -7,7 +7,7 @@ PD 10.160, cut on the rear end of one turned steel sleeve (MHA-PD-010) that
 runs on the MHA-PD-023 pin's Ø3.9 shank. In front of the teeth the sleeve
 steps once to the Ø9 h6 boss the brass hub slides on and drives through by
 its D-flat; the hub's spigot seats on the step face and pilots the 120T
-disc, and the nose runs on the front bushing (transgear_feed_pinion_spec,
+disc, and the nose runs on the front bushing (pd_transgear_feed_pinion_spec,
 R9-68 rev 5).
 
 Layout: origin on the axis at the sleeve's rear face, +Z toward the machine

@@ -1,7 +1,7 @@
 r"""Reproduction script: crank pinion retention pin (book ch. 12 p. 19; 1 used).
 
 The plain straight pin driven radially through the crank pinion's hub boss and
-the crankshaft, so the pinion turns with the shaft. ``crank_pinion_spec`` owns
+the crankshaft, so the pinion turns with the shaft. ``dt_crank_pinion_spec`` owns
 the joint (drill size, station, clocking, the match-drill statement); this pin
 is that hole's own drill size, cut flush with the boss on both sides.
 

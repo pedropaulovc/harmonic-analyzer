@@ -1,13 +1,13 @@
 r"""MHA-PD-019 transgear-arm-plate: the drawing contract of the made steel plate.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  Every number is ``transgear_arm_plate_geometry``'s (the numbers
+closure.  Every number is ``pd_transgear_arm_plate_geometry``'s (the numbers
 authority the plate, its screws, the knob-shaft stack and the paper-drive
 assembly share); this module adds only what the sheet needs: the printed
 places of each marked dimension, the explicit model bands, the bore's and
 the thrust faces' finish and the printed callout text.
 
-Part frame (``transgear_arm_plate_geometry``): origin on the knob-shaft bore
+Part frame (``pd_transgear_arm_plate_geometry``): origin on the knob-shaft bore
 axis K on the MOUNTING face (the Front Plane, which seats on the MHA-PD-018
 arm's rear face); +X and +Y are the arm's axes, the long axis runs along -Y
 from the screws to the end round about K; +Z to the rear.  The over-arm

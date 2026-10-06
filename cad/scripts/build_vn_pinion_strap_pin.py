@@ -1,11 +1,11 @@
 r"""Purchased 1/16 spring pin: McMaster 98296A027 (MHA-VN-033; the parts registry holds the count).
 
-A 1/16 x 1/2 slotted spring pin to ASME B18.8.2 (pinion_strap_pin_spec): one
+A 1/16 x 1/2 slotted spring pin to ASME B18.8.2 (vn_pinion_strap_pin_spec): one
 runs through each MHA-DT-014 strap foot's cross hole and the MHA-DT-019 torque
 shaft, so strap, shaft and strap swing as one group.  The stock recipe models
 it as installed, a 1/16 tube with the catalog's 0.012 wall, axis along local
 X and centred on the origin: the MHA-DT-030 lever-pin layout.  It is the nominal
-1/2 length; pinion_strap_pin_spec proves the longest pin the length band
+1/2 length; vn_pinion_strap_pin_spec proves the longest pin the length band
 allows is still buried in the narrowest strap foot (PIN_BURIED_MARGIN).
 
 Run (SolidWorks already open)::

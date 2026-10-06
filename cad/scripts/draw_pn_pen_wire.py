@@ -11,7 +11,7 @@ the run is legible; the isometric matches.
 
 Run with SolidWorks open::
 
-    uv run python cad\scripts\draw_pn_pen_wire.py pen-wire
+    uv run python cad\scripts\draw_pn_pen_wire.py pn-pen-wire
 """
 
 from __future__ import annotations

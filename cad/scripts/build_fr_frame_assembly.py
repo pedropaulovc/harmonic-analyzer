@@ -60,8 +60,8 @@ flange depth -- the 27.45 cm pad is set by the column stations, not the ch. 6
 * fillister-screw x4 (2026-09-02 ch26 p.71 re-derive): the brass slotted
   round-head screws at the plate's four corners, heads seated on the
   decorated face, shanks down through the plate's #4 clearance holes into the
-  base's blind #4-40 taps (harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the same
-  nameplate_spec derivation). Same single-mate fix-all treatment.
+  base's blind #4-40 taps (fr_harmonic_base_fasteners NAMEPLATE_SCREW_XZ -- the same
+  fr_nameplate_spec derivation). Same single-mate fix-all treatment.
 
 Hold-down: four stock 1/4-20 UNC-2A hex-head screws install from the top,
 through the support foot's 5/16 clearance drills, into blind 1/4-20 UNC-2B

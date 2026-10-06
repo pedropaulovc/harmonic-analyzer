@@ -10,8 +10,8 @@ reduction wheel, driven 12:120 by the knob shaft's 12T DP38, slipped on the
 pinion sleeve's Ø9 boss and screwed to the brass hub's flange (MHA-PD-017)
 by three #0-80 fillister screws (MHA-VN-039).
 
-Every size is ``rack_pinion_spec``'s; the screw pattern is
-``transgear_disc_hub_geometry``'s (the one authority the flange shares).
+Every size is ``pd_rack_pinion_spec``'s; the screw pattern is
+``pd_transgear_disc_hub_geometry``'s (the one authority the flange shares).
 
 Layout (part frame): gear axis = Z through the origin; the Front plane is
 the disc's FRONT face (z = 0, the flange seat), the body runs z = 0..3 and

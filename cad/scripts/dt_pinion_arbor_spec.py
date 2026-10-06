@@ -6,7 +6,7 @@ joint detail.  The exact released external envelope is preserved while the
 former socket and unsupported radial retention pin are removed.
 
 The geometry -- envelope, drum station and journal-land stack -- lives in
-``pinion_arbor_geometry`` and is re-exported here; this module adds the
+``dt_pinion_arbor_geometry`` and is re-exported here; this module adds the
 drawing contract (marks, precision, finishes, notes).
 """
 

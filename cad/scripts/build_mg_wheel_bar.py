@@ -13,7 +13,7 @@ face on the front clamp arc's face at -129.9, the same two-piece clamp
 seat as build_pd_support_bar.py). 234 long: the clamped end runs 29 past
 the west column line (the support-bar idiom -- the clamp-screw stack
 bar -> front arc -> back arc needs bar over BOTH ear holes), the free
-end just past the hanger. Placed IDENTITY in build_magnifier_assembly at
+end just past the hanger. Placed IDENTITY in build_mg_magnifier_assembly at
 centre x +109 (machine = local + 109): span -8..+226, covering the wheel
 axle (+53) and the pen-hanger strap top with margin.
 
