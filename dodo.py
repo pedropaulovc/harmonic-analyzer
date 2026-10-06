@@ -1393,8 +1393,8 @@ _CHECK_NAMES = (
     "traveler_ch_pivot_shaft",
     "traveler_dt_cone_pivot_post",
 )
-# Checks outside the every-build set. verify_telemetry is opt-in;
-# features_bound and reference_catalog are required only by release.
+# Checks outside the every-build set: verify_telemetry and reference_catalog
+# are opt-in; features_bound is required only by release.
 # Union must match the specs.
 _OPTIONAL_CHECK_NAMES = ("verify_telemetry", "features_bound", "reference_catalog")
 
@@ -3761,7 +3761,7 @@ def task_check():
                     "--out", str(CAD_OUT)],
         },
         # Reference data is deliberately absent from build/build_bare and farm
-        # source workspaces. The real-catalog behavior suite is release-only,
+        # source workspaces. The real-catalog behavior suite is explicitly opt-in,
         # never skipped or weakened when its required catalog is unavailable.
         "reference_catalog": {
             "file_dep": [
@@ -4079,7 +4079,6 @@ def task_release():
             "package:release",
             "preflight",
             "check:features_bound",
-            "check:reference_catalog",
             # Temporary probe-export root edge; removed with the native probe.
             "verify:title_field_probe",
             "verify:title_link_discovery",

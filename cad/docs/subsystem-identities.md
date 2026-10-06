@@ -62,10 +62,11 @@ cache output. Older BOM paths in dated evidence remain historical provenance,
 not current output aliases.
 
 `check:reference_catalog` validates historical catalog entries against current
-model identities. It is a release prerequisite, not an every-build check:
-`build` and `build_bare` can leave the excluded `references` submodule
-uninitialized. The catalog check and release require that submodule and fail
-if its catalog is missing.
+model identities. Run it explicitly when changing the catalog seeding utility
+or its identity mapping. Like `check:verify_telemetry`, it is outside both the
+build and release closures. It requires an initialized `references` submodule
+and fails if its catalog is missing; normal release still needs the submodule
+for the gallery.
 
 Drawing callouts retain complete category-qualified Numbers and process
 information. Longer cross-part notes, such as the crankshaft's mating-part

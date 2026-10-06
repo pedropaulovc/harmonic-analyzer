@@ -270,25 +270,33 @@ such build:
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
 | `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
-| `check:traveler_rocker_arm`, `check:traveler_pivot_shaft`, `check:traveler_cone_pivot_post` | **no** | no (parallel; needs exported manifest + STEP) | no |
+| `check:traveler_ch_rocker_arm`, `check:traveler_ch_pivot_shaft`, `check:traveler_dt_cone_pivot_post` | **no** | no (parallel; needs exported manifest + STEP) | no |
 | `check:features_bound` | **no** | no (release only; compares scoped/full STEP face labels and patch counts) | no |
-| `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
+| `check:reference_catalog` | **no** | no (opt-in; outside build/release) | no (submitter-only) |
+| `gallery` | **no** (Blender + GPU) | no | no (submitter-only; no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
-`package:features` builds only `rocker_arm`, `pivot_shaft` and `cone_pivot_post`
-and writes `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`.
-The manifest's `step_sha256` binds the raw adjacent STEP; this self-contained
-bundle is the consumer artefact. Full `export` is independent; neither producer
-overwrites the other's paths. The release-only `check:features_bound` compares
-the two sessions' face-label sets and patch counts per label, requires two rocker
+`package:features` builds only `ch_rocker_arm`, `ch_pivot_shaft` and
+`dt_cone_pivot_post` and writes
+`cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`. The manifest's
+`step_sha256` binds the raw adjacent STEP; this self-contained bundle is the
+consumer artefact. Full `export` is independent; neither producer overwrites
+the other's paths. The release-only `check:features_bound` compares the two
+sessions' face-label sets and patch counts per label, requires two rocker
 pivot-bore patches and reports both digests. It does not require byte equality:
 SolidWorks timestamps headers and renumbers entities. Release staging copies the
-verified scoped bundles under `features/`.
-The three build/release traveler checks use pinned prechips and `cad/process/`:
-exit 3 (bad input) fails; exit 2 (machining blockers) logs every `✗` as **warn**
-and passes; exit 4 (required unknown) and 0 pass. This is not machining approval.
-See [feature exports and travelers](cad/docs/pipeline/features-travelers.md).
+verified scoped bundles under `features/`. `check:reference_catalog` is an
+opt-in offline audit, not part of `build` or `release`; run it explicitly when
+changing the catalog-seeding utility or `cad/config/identity-migration-map.json`.
+It reads `references/curation/stills_catalog.json` through
+`cad/comparisons/tools/test_seed_manifest.py` and `seed_manifest.py` and runs
+on the submitter. It requires the initialized `references` submodule; a missing
+catalog fails the named gate, with no skip or fallback. The three build/release
+traveler checks use pinned prechips and `cad/process/`: exit 3 (bad input) fails;
+exit 2 (machining blockers) logs every `✗` as **warn** and passes; exit 4
+(required unknown) and 0 pass. This is not machining approval. See [feature
+exports and travelers](cad/docs/pipeline/features-travelers.md).
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
@@ -363,38 +371,56 @@ selection.
   created, and repeat `clean -ffdx` cannot erase the environment running the
   build.
 
-**Why `references` qualifies.** The reference photographs are read only by the
-comparison gallery: `cad/comparisons/manifest.json` pairs point at
-`references/albert-michelsons-harmonic-analyzer/...`, and the only runtime
-reader is `export_models._gallery_inputs` (`REPO / pair["reference"]["path"]`),
-reachable solely from `refresh_comparison_gallery` — i.e. `export_models.py
---comparisons`, the `gallery` task, which is Blender+GPU-bound and deliberately
-NOT farm-dispatchable (see the table above and "Comparison gallery"). No
-farm-dispatchable task's `file_dep` or action touches the submodule: the
-`REFERENCES_DIR` every build script imports is `cad/references` (`_common.py`),
-a tracked in-repo directory of vendored DXF/vendor models, and `cut_release.py`
-only *string-matches* the `references/` prefix when it rewrites doc links (it
-reads no file there — and `release` runs on the submitter anyway).
+**Why `references` qualifies.** The release consumer of this excluded
+submodule is the comparison gallery:
 
-**If a future task starts needing it**, worker graph preparation fails when any
-admitted task's `file_dep` or target resolves under an excluded submodule,
-naming the task and path. Do not expect `git submodule status` to notice: it
-*requires* the excluded path to read `-`, so absence is exactly what it asserts.
-An **undeclared runtime read** (a path the task opens without declaring it as a
-`file_dep`) escapes that gate and surfaces inside the leaf as `Dependent file …
-does not exist` / `FileNotFoundError`. Fix it by making that task submitter-only
-like `gallery`, or by removing the exclusion — never by teaching the task to
-tolerate a missing reference.
+- The gallery reads reference photographs named by
+  `cad/comparisons/manifest.json` pairs (for example,
+  `references/albert-michelsons-harmonic-analyzer/...`) through
+  `export_models._gallery_inputs` (`REPO / pair["reference"]["path"]`). The
+  `gallery` task invokes `export_models.py --comparisons`; it is Blender+GPU
+  bound and deliberately NOT farm-dispatchable.
+- The separate opt-in `check:reference_catalog` is not a normal release or
+  gallery dependency. When explicitly run (for example, after changing the
+  catalog-seeding utility or identity map), it reads
+  `references/curation/stills_catalog.json` through
+  `cad/comparisons/tools/test_seed_manifest.py` and `seed_manifest.py`. It
+  requires the initialized `references` submodule; a missing catalog fails
+  the named gate, with no skip or fallback.
 
-**Excluded does not mean optional locally.** The submitter still computes the
-doit graph and cache keys from its local project inputs, so farm preflight
-requires those inputs and initialized non-excluded submodules to be clean. It
-allows an excluded submodule to stay uninitialized; it does not claim dirty
-local inputs will be rebuilt from committed `HEAD`. `gallery` runs on the
-submitter, reads the manifest photographs directly, and is in `release`'s
-closure, so a release without `references` cloned passes farm preflight, runs
-every COM leaf, and then fails in `export_models._gallery_input_digest`. Run
-`git submodule update --init references` before a release.
+Both readers run on the submitter and take no COM seat; only `gallery` is in
+the normal release closure. No farm-dispatchable task's `file_dep` or action
+touches the submodule: the `REFERENCES_DIR` every build script imports is
+`cad/references` (`_common.py`), a tracked in-repo directory of vendored
+DXF/vendor models, and `cut_release.py` only *string-matches* the `references/`
+prefix when it rewrites doc links (it reads no file there — `release` runs on
+the submitter anyway).
+
+**Excluded-submodule guard covers the exported task graph.** Farm graph export
+serializes the selected `build` and `release` closures and rejects any serialized
+task whose declared `file_dep` or target resolves under an excluded submodule,
+including a task whose action otherwise runs on the submitter. A task requiring
+a declared file under `references` must stay outside those closures (as this
+opt-in catalog check does) or `references` must no longer be excluded. Merely
+marking it submitter-only does not bypass this check. Keep runtime inputs
+declared; do not hide them by dropping `file_dep` or tolerate their absence.
+The gallery's existing submitter-side photo read is not a pattern for adding
+another undeclared reference input. Do not expect `git submodule status` to
+establish release readiness: workers require an excluded path to read `-`, so
+absence is exactly what that state asserts.
+
+**Excluded does not mean optional locally.** Farm preflight runs against the
+submitter checkout: it requires inputs and initialized non-excluded submodules
+to be clean, but permits excluded `references` to remain uninitialized there.
+Worker preparation then leaves that excluded submodule uninitialized as
+declared. This does not claim dirty local inputs will be rebuilt from committed
+`HEAD`. `gallery` is in `release`'s closure, runs on the submitter, and reads
+manifest photographs. Thus farm preflight can pass and COM leaves can finish
+while `gallery` later fails on the submitter if `references` is uninitialized;
+initialize it before a release. `check:reference_catalog` is not a `build` or
+`release` dependency; when run explicitly, it requires the curation catalog and
+fails its named gate if that input is missing. Run
+`git submodule update --init references` before a release or this opt-in check.
 
 ## The COM seat lock (do not break this)
 
@@ -678,7 +704,7 @@ fail a build):
 - **`doit cache_status`** — per part/assembly: HIT/MISS (a backend presence probe,
   no download) + key + the per-dep digests, so *any miss is explainable in one
   command*. Positional args after `--`: label substrings to filter
-  (`doit cache_status -- cone_gear`), `miss` (only misses), `all` (dump dep digests
+  (`doit cache_status -- dt_cone_gear`), `miss` (only misses), `all` (dump dep digests
   for every task, not just misses). A `DRIFT(...)` flag marks a task whose current
   key differs from the last key this seat published.
 - **`HARMONIC_CACHE_DEBUG=1`** — during a real build, logs every `(digest, relpath)`
