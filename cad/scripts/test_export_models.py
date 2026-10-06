@@ -974,7 +974,7 @@ def _gallery_fixture(tmp_path: Path, monkeypatch) -> dict:
             {
                 "unit": "mm",
                 "components": [
-                    {"part": "dt-cone-gear", "cfg": "t102", "mesh": "cone-gear--t102"},
+                    {"part": "dt-cone-gear", "cfg": "t102", "mesh": "dt-cone-gear--t102"},
                     {"part": "demo-part", "cfg": "", "mesh": "demo-part"},
                 ],
             }
@@ -1004,9 +1004,9 @@ def test_gallery_gate_rejects_inputs_exported_from_another_model(
     monkeypatch.setattr(
         export_models,
         "load_src_digests",
-        lambda: _Ledger({"cone-gear--t102": "0" * 32}),
+        lambda: _Ledger({"dt-cone-gear--t102": "0" * 32}),
     )
-    with pytest.raises(RuntimeError, match="cone-gear--t102: exported from"):
+    with pytest.raises(RuntimeError, match="dt-cone-gear--t102: exported from"):
         export_models.assert_gallery_inputs_current(manifest)
 
 
@@ -1038,5 +1038,5 @@ def test_gallery_gate_rejects_a_mesh_whose_source_is_gone(
     manifest = _gallery_fixture(tmp_path, monkeypatch)
     (tmp_path / "sldprt" / "dt-cone-gear.SLDPRT").unlink()
 
-    with pytest.raises(FileNotFoundError, match="is missing but cone-gear--t102"):
+    with pytest.raises(FileNotFoundError, match="is missing but dt-cone-gear--t102"):
         export_models.assert_gallery_inputs_current(manifest)

@@ -58,7 +58,7 @@ import numpy as np
 # VTK import cost -- they re-run this cheap env setup but never import pyvista.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from osmesa_win import enable_offscreen_gl
-from release_diff import IDENTITY_MAP, identity_inventory, load_identity_map, paired_keys
+from release_diff import IDENTITY_MAP, identity_inventory, load_identity_map, paired_keys, split_mesh_key
 
 enable_offscreen_gl()
 
@@ -76,7 +76,7 @@ GHOST = (0.80, 0.80, 0.82)    # unchanged -> light grey
 
 def base_part(key):
     """Strip the configured qualifier for the changed-part summary only."""
-    return re.sub(r"(--?t\d{3}|-stretch\d+)$", "", key)
+    return split_mesh_key(key)[0]
 
 
 def root_scene(scenes, provenance=None, expect_root=None):

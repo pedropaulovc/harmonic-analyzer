@@ -25,6 +25,7 @@ Usage:
 import argparse
 import json
 import re
+import warnings
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
@@ -32,6 +33,18 @@ SCRIPTS = REPO / "cad" / "scripts"
 CATALOG = REPO / "references" / "curation" / "stills_catalog.json"
 PHOTOS_MD = REPO / "references" / "photogrammetry" / "raw" / "README.md"
 MANIFEST = REPO / "cad" / "comparisons" / "manifest.json"
+
+IDENTITY_MAP = REPO / "cad" / "config" / "identity-migration-map.json"
+
+
+def catalog_identities() -> dict[str, str]:
+    """Translate provenance labels only where the sealed map assigns an owner."""
+    payload = json.loads(IDENTITY_MAP.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 2:
+        raise ValueError("catalog identity map requires schema_version 2")
+    return {row["old_underscore"]: row["new_underscore"]
+            for row in payload["identities"]}
+
 
 def part_stems() -> set[str]:
     return {
@@ -142,14 +155,25 @@ def make_pair(pid: str, model: str, ref_path: str, source: str, camera: dict,
 
 def seed_from_catalog(parts: set[str]) -> list[dict]:
     entries = json.loads(CATALOG.read_text(encoding="utf-8"))["entries"]
+    identities = catalog_identities()
+    current = set(identities.values())
     pairs = []
     for e in entries:
         if not e.get("keep"):
             continue
-        comps = [c for c in e.get("components", [])]
+        comps = [identities.get(c, c) for c in e.get("components", [])]
         cls = e.get("class")
         if cls not in ("machine", "machine-detail", "mixed", "drawing"):
             continue
+        unresolved = [c for c in comps if c not in current]
+        if unresolved:
+            # Semantic reference labels are provenance, not permission to
+            # guess a current CAD owner (e.g. retired crank_pedestal).
+            warnings.warn(
+                f"catalog {e['id']}: unresolved component labels {unresolved!r}; "
+                "preserved without assigning a CAD identity",
+                stacklevel=2,
+            )
         frame: list[str] = []
         if cls == "machine" or "ha_harmonic_analyzer" in comps:
             model = "ha_harmonic_analyzer"

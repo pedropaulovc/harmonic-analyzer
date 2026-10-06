@@ -263,7 +263,7 @@ async def export_gallery_and_bom(adapter) -> dict[str, str]:
 
     from solidworks_mcp.adapters.base import CreateBomParameters
 
-    bom_path = (OUT_PNG.parent / "harmonic-analyzer-bom.csv").resolve()
+    bom_path = (OUT_PNG.parent / "ha-harmonic-analyzer-bom.csv").resolve()
     data = check(
         "export_bom_csv",
         await adapter.export_bom_csv(

@@ -52,6 +52,20 @@ The Number must be category-qualified with a nonzero part sequence; the
 caller depends only on its own row.
 Assembly `000` Numbers are assembly references, not part Numbers.
 
+Assembly `allowed_free_stems` and `required_free_stems` lists use canonical
+registered part stems, including vendor families coupled to moving components.
+The material palette's `casting_green_parts` list uses those same canonical
+part identities; the domain grouping and operational DOF counts are unchanged.
+The top-level assembly build and refresh export the parts-only BOM to
+`cad/out/ha-harmonic-analyzer-bom.csv`, which is also the declared assembly
+cache output. Older BOM paths in dated evidence remain historical provenance,
+not current output aliases.
+
+Drawing callouts retain complete category-qualified Numbers and process
+information. Longer cross-part notes, such as the crankshaft's mating-part
+callout, must fit their existing reserved field by placement and wrapping;
+do not abbreviate Numbers or relax the field bounds.
+
 ## Historical evidence
 
 Dated reports, released packages, raw logs, source quotations and user-authored bench entries retain the identifiers, snapshot URLs and checksums they recorded. Read their identifiers through the table below when locating a current model. Current instructions, registry references, commands and asset links use canonical identities. A migration notice on a historical document does not change the evidence or certify it against the current model.

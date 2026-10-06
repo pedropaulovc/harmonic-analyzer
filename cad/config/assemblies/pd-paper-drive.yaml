@@ -29,25 +29,25 @@ flip_invert:
 allowed_free_stems:
   - vn-fillister-screw
   - pd-guide-lock
-  - guide-lock-screw  # MHA-VN-046 lock screws ride the platen (R9-31)
+  - vn-guide-lock-screw  # MHA-VN-046 lock screws ride the platen (R9-31)
   - pd-platen
   - pd-platen-clip
   - pd-platen-guide
   - pd-platen-paper
   - pd-platen-rack
   - pd-rack-pinion
-  - transgear-collar-cross-pin  # lock-mated to the drive collar
-  - transgear-disc-hub  # disc cluster: hub, screws and feed pinion lock to the disc
+  - vn-transgear-collar-cross-pin  # lock-mated to the drive collar
+  - pd-transgear-disc-hub  # disc cluster: hub, screws and feed pinion lock to the disc
   - vn-transgear-disc-screw
-  - transgear-drive-collar  # mated to the knob T24 (Axis1, RearFace, Right Plane)
+  - pd-transgear-drive-collar  # mated to the knob T24 (Axis1, RearFace, Right Plane)
   - pd-transgear-feed-pinion
-  - transgear-knob-cup  # knob stack: rides the knob shaft (lock-mated)
-  - transgear-knob-cup-pin  # pins the cup to the knob shaft's journal
-  - transgear-knob-drive-pin  # pair pressed in the drive collar
+  - pd-transgear-knob-cup  # knob stack: rides the knob shaft (lock-mated)
+  - vn-transgear-knob-cup-pin  # pins the cup to the knob shaft's journal
+  - vn-transgear-knob-drive-pin  # pair pressed in the drive collar
   - pd-transgear-knob-shaft
   - pd-transgear-knob-thrust-ring
   - pd-transgear-removable
-  - transgear-thumbnut  # rides the knob shaft (lock-mated)
+  - pd-transgear-thumbnut  # rides the knob shaft (lock-mated)
 # One freed DOF (the crank T12 spin). paper-drive is checked by INSTANCE, not
 # this stem (verify._required_free_instances) -- three transgear-removable
 # siblings share the stem, so a stem check passes even if T12 is pinned and

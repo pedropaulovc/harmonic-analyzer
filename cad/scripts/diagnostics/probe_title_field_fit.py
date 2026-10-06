@@ -17,12 +17,13 @@ printed-fit measure (rows included):
 * ``CASES`` x both templates: the v39 shape (positive control of the
   identity-shape gate), both 29-character slugs with their 10-character
   registry Numbers, cone-gear's 15-character configuration Number with its
-  slug, and an overlong negative that must breach its cells;
-* ``wrapped-landscape``: a 29-character Title forced to wrap -- a
-  drawing-owned note with the same link and a narrow wrap width, and the
-  template's own PART note given that wrap width on this drawing copy only --
-  to calibrate how SolidWorks reports a wrapped note (text items, display
-  data, extent, PDF rows);
+  slug, and an untouched overlong negative that must breach its cells and
+  actually wrap the owner-2 Title on multiple native/display/PDF rows;
+* ``wrapped-landscape``: historical capture key for a 29-character Title's
+  LineLength-only control. An exact-descriptor/font/style owner-1 note must
+  physically wrap in its auto box; the original owner-2 template must retain
+  its fixed box and one actual row. Its persisted narrow LineLength causes
+  only a wrap-width refusal and is explicitly NOT a physical template wrap;
 * ``configs-2sheet``: one scratch part whose configurations T006/T120 stamp
   their own Number over the file-level one, on a landscape sheet and a
   portrait sheet pasted from the portrait template (fr-frame-assembly's
@@ -42,6 +43,12 @@ captured, NOT that the Title reader passed. Both native enumeration paths
 (``IView.GetAnnotations`` and ``IView.GetNotes``) are logged before the
 contract runs. The full probe stops at the first failed legacy baseline,
 before creating qualified, overlong or wrapped cases.
+
+``probe_title_wrap_control.py`` is the independent two-part/two-view calibration:
+an untouched registry Title passes natively before the exact-style auto-box
+decoy and inert fixed-box width control, then an untouched overlong source
+must show a real physical template wrap. It has three dedicated outputs and
+does not claim the full matrix, portrait, or configuration controls.
 
 Delete this script and its dodo task once the proof is recorded.
 """
@@ -182,6 +189,10 @@ def _text_format(annotation: Any) -> dict[str, Any]:
     if raw is None:
         return {}
     text_format = _early_bound(raw, "ITextFormat")
+    return _text_format_values(text_format)
+
+
+def _text_format_values(text_format: Any) -> dict[str, Any]:
     return {
         name: _read(lambda n=name: _read_member(text_format, n))
         for name in (
@@ -202,7 +213,7 @@ def _text_format(annotation: Any) -> dict[str, Any]:
 def _note_record(adapter: Any, annotation: Any, note: Any, *, link: Any, text: Any) -> dict[str, Any]:
     """SDK getters only: unresolved PropertyLinkedText and evaluated GetText."""
     display, refused = annotation_display(adapter, annotation)
-    return {
+    record = {
         "note_interface": type(note).__name__,
         "link": link,
         "parsed_property": title_fields._linked_name(link) if isinstance(link, str) else None,
@@ -222,6 +233,9 @@ def _note_record(adapter: Any, annotation: Any, note: Any, *, link: Any, text: A
         "display_texts": display.get("texts", []),
         "display_refused": refused,
     }
+    if record["parsed_property"] in title_fields.TITLE_FIELD_PROPERTIES["Title"]:
+        record["wrap_diagnostics"] = _read(lambda: _wrap_state(annotation, note))
+    return record
 
 
 def _native_catalog(adapter: Any, sheet_view: Any, *, key: str, sheet: str) -> dict[str, Any]:
@@ -349,24 +363,102 @@ def _add_donor_sheet(
         _activate_probe_drawing(adapter, target, observations)
 
 
-def _insert_linked_note(draw: Any, link: str, xy: tuple[float, float], *, wrap: float | None) -> dict[str, Any]:
-    """A drawing-owned note carrying ``link`` -- the contract must ignore it --
-    optionally given a narrow wrap width."""
+def _insert_linked_note(draw: Any, link: str, xy: tuple[float, float]) -> dict[str, Any]:
+    """A drawing-owned link control which must never be taken as a source."""
     draw.ClearSelection2(True)
     raw = draw.InsertNote(link)
     if raw is None:
         return {"inserted": False}
     annotation = _early_bound(_early_bound(raw, "INote").GetAnnotation(), "IAnnotation")
     result: dict[str, Any] = {"inserted": True, "positioned": _read(lambda: annotation.SetPosition2(xy[0], xy[1], 0.0))}
-    if wrap is not None:
-        text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
-        text_format.LineLength = wrap
-        result["wrap_set"] = _read(lambda: annotation.SetTextFormat(0, False, text_format))
     return result
 
 
+def _paragraph_state(annotation: Any) -> list[dict[str, Any]]:
+    """Observe SDK paragraph/segment properties without committing changes.
+    GetParagraphs is documented as an array but the official VBA example
+    receives one IParagraphs object. Preserve that actual binding shape and
+    restore its paragraph selector; never call Set* or UpdateParagraph."""
+    raw = annotation.GetParagraphs()
+    if raw is None:
+        return []
+    entries = list(raw) if isinstance(raw, (tuple, list)) else [raw]
+    records = []
+    for index, entry in enumerate(entries):
+        record: dict[str, Any] = {"interface_index": index, "binding_shape": "array" if isinstance(raw, (tuple, list)) else "scalar"}
+        records.append(record)
+        try:
+            paragraphs = _early_bound(entry, "IParagraphs")
+            count = _read(lambda: paragraphs.Count)
+            original = _read(lambda: paragraphs.CurrentParagraph)
+            record.update({"count": count, "current_paragraph": original, "paragraphs": []})
+            if not isinstance(count, int) or not isinstance(original, int) or not 0 <= original < count:
+                record["read_error"] = "paragraph count/current selector is unreadable or unselected"
+                continue
+            try:
+                for paragraph_index in range(count):
+                    paragraphs.CurrentParagraph = paragraph_index
+                    segment_count = _read(paragraphs.GetTextSegmentCount)
+                    paragraph = {
+                        "index": paragraph_index,
+                        "text_with_wrap": _read(lambda: paragraphs.GetText(True)),
+                        "text_without_wrap": _read(lambda: paragraphs.GetText(False)),
+                        "indentation": _read(paragraphs.GetIndentation),
+                        "formatting": _read(paragraphs.GetFormatting),
+                        "segment_count": segment_count,
+                        "segments": [],
+                    }
+                    record["paragraphs"].append(paragraph)
+                    if isinstance(segment_count, int):
+                        for segment_index in range(segment_count):
+                            paragraph["segments"].append({
+                                "index": segment_index,
+                                "text": _read(lambda i=segment_index: paragraphs.GetTextSegmentText(i)),
+                                "format": _read(lambda i=segment_index: _text_format_values(
+                                    _early_bound(paragraphs.GetTextSegmentFormat(i), "ITextFormat")
+                                )),
+                            })
+            finally:
+                paragraphs.CurrentParagraph = original
+                record["current_paragraph_after"] = _read(lambda: paragraphs.CurrentParagraph)
+        except Exception as exc:  # noqa: BLE001 - raw refusal is diagnostic evidence
+            record["read_error"] = f"{type(exc).__name__}: {exc}"
+    return records
+
+
+def _display_state(annotation: Any) -> dict[str, Any]:
+    raw = annotation.GetDisplayData()
+    if raw is None:
+        return {"count": None, "items": []}
+    display = _early_bound(raw, "IDisplayData")
+    count = _read(display.GetTextCount)
+    items = [
+        {
+            "index": index,
+            "text": _read(lambda i=index: display.GetTextAtIndex(i)),
+            "position_offset": _read(lambda i=index: display.GetTextPositionAtIndex(i)),
+        }
+        for index in range(count)
+    ] if isinstance(count, int) else []
+    return {"count": count, "items": items}
+
+
+def _template_title(sheet_view: Any) -> tuple[Any, Any]:
+    found = []
+    for raw in sheet_view.GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.OwnerType) != 2 or int(annotation.GetType()) != _ANNOT_NOTE:
+            continue
+        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+        if title_fields._linked_name(str(note.PropertyLinkedText or "")) in title_fields.TITLE_FIELD_PROPERTIES["Title"]:
+            found.append((annotation, note))
+    if len(found) != 1:
+        raise RuntimeError(f"template control needs one native PART cell, found {len(found)}")
+    return found[0]
+
+
 def _wrap_state(annotation: Any, note: Any) -> dict[str, Any]:
-    return {
+    state = {
         "name": _read(annotation.GetName),
         "owner": _read(lambda: annotation.OwnerType),
         "link": _read(lambda: note.PropertyLinkedText),
@@ -377,41 +469,51 @@ def _wrap_state(annotation: Any, note: Any) -> dict[str, Any]:
         "justification": _read(note.GetTextJustification),
         "position": _read(annotation.GetPosition),
         "extent": _read(note.GetExtent),
+        "text_point": _read(note.GetTextPoint2),
+        "upper_right": _read(note.GetUpperRight),
+        "line_segment_count": _read(note.GetLineCount),
         "text_count": _read(note.GetTextCount),
         "display_count": _read(lambda: title_fields._display_count(annotation)),
         "use_doc_format": _read(lambda: annotation.GetUseDocTextFormat(0)),
         "text_format": _read(lambda: _text_format(annotation)),
     }
+    count = state["text_count"]
+    state["text_items_1_based"] = [
+        {"index": index, "text": _read(lambda i=index: note.GetTextAtIndex(i))}
+        for index in range(1, count + 1)
+    ] if isinstance(count, int) else []
+    state["display_data"] = _read(lambda: _display_state(annotation))
+    state["paragraphs"] = _read(lambda: _paragraph_state(annotation))
+    point, upper, extent = state["text_point"], state["upper_right"], state["extent"]
+    if (
+        isinstance(point, list) and len(point) == 3
+        and isinstance(upper, list) and len(upper) == 3
+        and isinstance(extent, list) and len(extent) >= 6
+        and all(isinstance(value, (int, float)) for value in [*point, *upper, *extent])
+    ):
+        state["box_width"] = upper[0] - point[0]
+        state["ink_width"] = extent[3] - extent[0]
+        # swTextJustification_e.swTextJustificationLeft = 1. A spare right
+        # edge in this actual left-aligned note distinguishes its fixed box.
+        state["fixed_box"] = state["justification"] == 1 and upper[0] - extent[3] > 0.0001
+    else:
+        state["fixed_box"] = None
+    return state
 
 
 def _wrap_template_title(
     adapter: Any, ddoc: Any, sheet_view: Any, observations: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Wrap the real scratch template cell without changing its font/style.
-
-    IAnnotation.SetTextFormat documents that embedded rich text blocks a
-    specific format change. Clear rich formatting with UseDoc=True/null,
-    then restore the original specific format with only LineLength changed.
-    No literal newline or drawing-owned replacement can stand in for this.
-    """
+    """Persist a LineLength-only control without changing the template style.
+    Its fixed-width note box is not settable through the documented SDK.
+    A one-row readback is explicitly classified as inert, never as a wrap."""
     result: dict[str, Any] = {}
     ddoc.EditTemplate()
     if bool(ddoc.GetEditSheet()):
         raise RuntimeError("EditTemplate left the drawing in sheet mode")
     result["template_mode"] = True
     try:
-        found = []
-        for raw in sheet_view.GetAnnotations() or ():
-            annotation = _early_bound(raw, "IAnnotation")
-            if int(annotation.OwnerType) != 2 or int(annotation.GetType()) != _ANNOT_NOTE:
-                continue
-            note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-            link = str(note.PropertyLinkedText or "")
-            if title_fields._linked_name(link) in title_fields.TITLE_FIELD_PROPERTIES["Title"]:
-                found.append((annotation, note))
-        if len(found) != 1:
-            raise RuntimeError(f"template wrap needs one native PART cell, found {len(found)}")
-        annotation, note = found[0]
+        annotation, note = _template_title(sheet_view)
         before = _wrap_state(annotation, note)
         result["before"] = before
         result["link"] = before["link"]
@@ -445,7 +547,7 @@ def _wrap_template_title(
                           drawing_state=_drawing_state(adapter, adapter.currentModel))
     for key in (
         "name", "owner", "text", "height", "height_points", "all_upper_case",
-        "justification", "position", "use_doc_format",
+        "justification", "position", "use_doc_format", "text_point", "upper_right", "box_width",
     ):
         if after[key] != before[key]:
             raise RuntimeError(f"template wrap changed {key}: {before[key]!r} -> {after[key]!r}")
@@ -459,10 +561,16 @@ def _wrap_template_title(
         raise RuntimeError(f"template wrap changed original font/style: {old_style!r} -> {new_style!r}")
     if after["text_format"].get("LineLength") != WRAP_M:
         raise RuntimeError("template PART wrap width did not persist")
-    if not isinstance(after["text_count"], int) or not isinstance(after["display_count"], int):
-        raise RuntimeError("template PART wrapped text/display counts were unreadable")
-    if after["text_count"] < 2 or after["display_count"] < 2:
-        raise RuntimeError("template PART still renders on one native row after the wrap mutation")
+    if not (
+        before.get("fixed_box") is True and after.get("fixed_box") is True
+        and before.get("box_width") == after.get("box_width")
+        and before["text_count"] == before["display_count"] == 1
+        and after["text_count"] == after["display_count"] == 1
+        and before["extent"] == after["extent"]
+    ):
+        raise RuntimeError("LineLength-only control did not preserve an observed one-row fixed template box")
+    result["inert_under_fixed_box"] = True
+    result["evidence_kind"] = "persisted-width-only; not a physical template wrap"
     return result
 
 
@@ -658,8 +766,63 @@ def _capture(
             {"kind": f.kind, "a": f.a, "extra": dict(f.extra), "text": f.format()} for f in find_title_field_misfits(dump)
         ]
         sheet["physical_rows"] = _physical_rows(pages[index], template, records)
+        decoy = _drawing_title_control(sheet)
+        if decoy is not None:
+            sheet["drawing_title_control_pdf"] = _note_pdf_rows(pages[index], decoy)
     _telemetry.info(f"title fit {key}: {json.dumps(capture['contract'], default=str)[:2000]}")
     return capture
+
+
+def _note_pdf_rows(page: Any, note: Mapping[str, Any]) -> dict[str, Any]:
+    """Measure the actual glyph baselines in an independently placed note's
+    native extent, not in the title-block cells or by text-object count."""
+    extent = note.get("extent")
+    if not isinstance(extent, list) or len(extent) < 6 or not all(
+        isinstance(value, (float, int)) for value in extent
+    ):
+        return {"native_extent": extent, "error": "native extent is unreadable"}
+    xmin, ymin, xmax, ymax = extent[0], extent[1], extent[3], extent[4]
+    clearance = TITLE_FIELD_CLEARANCE_M
+    pieces = []
+    glyphs = []
+    for span in page.spans:
+        inside = tuple(
+            glyph
+            for glyph in span.glyphs
+            if xmin - clearance <= (glyph.xmin + glyph.xmax) / 2 <= xmax + clearance
+            and ymin - clearance <= (glyph.ymin + glyph.ymax) / 2 <= ymax + clearance
+        )
+        if inside:
+            glyphs.extend(inside)
+            pieces.append({
+                "text": span.text,
+                "glyphs": [
+                    [glyph.char, glyph.xmin, glyph.ymin, glyph.xmax, glyph.ymax, glyph.baseline]
+                    for glyph in inside
+                ],
+            })
+    measured = Span(str(note.get("text") or ""), xmin, ymin, xmax, ymax, tuple(glyphs))
+    return {"native_extent": extent, "rows": measured.rows, "pieces": pieces}
+
+
+def _drawing_title_control(sheet: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    notes = [
+        note for note in sheet["notes"]
+        if note.get("owner") == 1
+        and note.get("parsed_property") in title_fields.TITLE_FIELD_PROPERTIES["Title"]
+    ]
+    return notes[0] if len(notes) == 1 else None
+
+
+def _template_title_catalog(sheet: Mapping[str, Any]) -> Mapping[str, Any]:
+    notes = [
+        note for note in sheet["notes"]
+        if note.get("owner") == 2
+        and note.get("parsed_property") in title_fields.TITLE_FIELD_PROPERTIES["Title"]
+    ]
+    if len(notes) != 1:
+        raise RuntimeError("native catalog does not contain exactly one template Title baseline")
+    return notes[0]
 
 
 def _physical_rows(page: Any, template: Any, records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -667,18 +830,33 @@ def _physical_rows(page: Any, template: Any, records: list[dict[str, Any]]) -> l
     spelling a run of it, wrapped remainders included -- and the distinct
     glyph baselines they stand on together (``Span.rows``' rule). A whole
     one-line print is one piece on one baseline; the wrapped case must read
-    two."""
+    multiple rows."""
     measured = []
     for record in records:
         text = record["text"]
-        pieces = [
-            span
-            for span in page.spans
-            if len(span.text) >= 3
-            and span.text in text
-            and span.xmin >= template.title_block_left_m
-            and span.ymax <= 0.066
-        ]
+        pieces = []
+        normalizations = []
+        for span in page.spans:
+            if span.xmin < template.title_block_left_m or span.ymax > 0.066:
+                continue
+            fragment = span.text
+            normalized = False
+            # Actual overlong PDFs emit one terminal U+FFFE at a source
+            # wrap-break hyphen. Match only that known source boundary; keep
+            # the raw text/glyphs below, and never substitute other characters.
+            if fragment.endswith("\ufffe") and fragment.count("\ufffe") == 1:
+                candidate = fragment.rstrip("\ufffe")
+                if candidate + "-" in text:
+                    fragment = candidate
+                    normalized = True
+            if len(fragment) >= 3 and fragment in text:
+                pieces.append(span)
+                if normalized:
+                    normalizations.append({
+                        "raw": span.text,
+                        "source_fragment": fragment,
+                        "rule": "single terminal U+FFFE stripped at an exact source hyphen boundary",
+                    })
         glyphs = tuple(glyph for span in pieces for glyph in span.glyphs)
         union = Span(text, 0.0, 0.0, 0.0, 0.0, glyphs)
         measured.append(
@@ -689,6 +867,7 @@ def _physical_rows(page: Any, template: Any, records: list[dict[str, Any]]) -> l
                     for span in pieces
                 ],
                 "rows": union.rows,
+                "normalizations": normalizations,
             }
         )
     return measured
@@ -701,7 +880,7 @@ def _single_sheet(
     layout: DrawingLayout,
     number: str,
     title: str,
-    mutate: Callable[[Any, Any, Any], dict[str, Any]] | None = None,
+    mutate: Callable[[Any, Any, Any, TitleSource], dict[str, Any]] | None = None,
     *,
     pdf_path: Path | None = None,
 ) -> dict[str, Any]:
@@ -711,10 +890,16 @@ def _single_sheet(
     view = place_view(adapter, str(part), "*Front", template.width_m * 0.3, template.height_m * 0.6)
     sheet_name = str(ddoc.GetSheetNames()[0])
     _link_property_view(adapter, ddoc, sheet_name, view)
-    extra = mutate(draw, ddoc, _sheet_views(ddoc)[sheet_name]) if mutate else {}
-    rebuild_drawing(adapter, label=f"title fit {key}")
     configuration = str(view.ReferencedConfiguration or "")
-    sources = {sheet_name: TitleSource(view.ReferencedDocument, configuration, number, title)}
+    source = TitleSource(view.ReferencedDocument, configuration, number, title)
+    source_before = title_fields._model_state(source.model)
+    extra = mutate(draw, ddoc, _sheet_views(ddoc)[sheet_name], source) if mutate else {}
+    rebuild_drawing(adapter, label=f"title fit {key}")
+    source_after = title_fields._model_state(source.model)
+    if source_after != source_before or str(view.ReferencedConfiguration or "") != configuration:
+        _telemetry.info(f"title fit {key}: construction source changed {source_before!r} -> {source_after!r}")
+        raise RuntimeError(f"title fit {key}: drawing construction changed its source/configuration state")
+    sources = {sheet_name: source}
     return _capture(adapter, key, draw, sources, {sheet_name: layout}, {"mutations": extra}, pdf_path=pdf_path)
 
 
@@ -781,7 +966,7 @@ def _configs_two_sheets(adapter: Any, part: Path, observations: list[dict[str, A
     # The drawing-owned control note lands on the active sheet: T006.
     if not ddoc.ActivateSheet(names[0]) or _active_sheet(ddoc) != names[0]:
         raise RuntimeError(f"configs-2sheet: {names[0]!r} is not the active sheet ({_active_sheet(ddoc)!r})")
-    control = _insert_linked_note(draw, '$PRPSHEET:"Number"', (0.05, 0.20), wrap=None)
+    control = _insert_linked_note(draw, '$PRPSHEET:"Number"', (0.05, 0.20))
     rebuild_drawing(adapter, label="title fit configs-2sheet")
     resolved = {
         name: TitleSource(view.ReferencedDocument, str(view.ReferencedConfiguration or ""), number, CONFIG_TITLE)
@@ -797,13 +982,87 @@ def _configs_two_sheets(adapter: Any, part: Path, observations: list[dict[str, A
 
 
 def _force_wraps(
-    adapter: Any, draw: Any, ddoc: Any, sheet_view: Any, observations: list[dict[str, Any]]
+    adapter: Any, draw: Any, ddoc: Any, sheet_view: Any, observations: list[dict[str, Any]], source: TitleSource
 ) -> dict[str, Any]:
-    decoy = _insert_linked_note(draw, '$PRPSHEET:"SW-Title"', (0.05, 0.20), wrap=WRAP_M)
-    _observe_construction(observations, "wrap.drawing-decoy", mutation=decoy)
+    """Observe a true native positive, then bisect identical text/font/style
+    under a drawing-owned auto box versus the template's original fixed box."""
+    annotation, note = _template_title(sheet_view)
+    template_original = _wrap_state(annotation, note)
+    sheet_name = _active_sheet(ddoc)
+    source_before = title_fields._model_state(source.model)
+    drawing_before = _drawing_state(adapter, draw)
+    baseline = {
+        "native_catalog": _native_catalog(adapter, sheet_view, key="wrapped-landscape.before", sheet=sheet_name),
+        "contract": _contract(ddoc, {sheet_name: source}, {sheet_name: DrawingLayout.LANDSCAPE}),
+        "source_model_state": list(source_before),
+        "drawing_state": drawing_before,
+        "template_title": template_original,
+    }
+    _observe_construction(observations, "wrap.native-positive-baseline", **baseline)
+    if (
+        baseline["contract"].get("breaches") != []
+        or "read_error" in baseline["contract"]
+        or "read_breaches" in baseline["contract"]
+    ):
+        raise RuntimeError("untouched registry Title did not pass the native positive baseline")
+    if title_fields._model_state(source.model) != source_before or _drawing_state(adapter, draw) != drawing_before:
+        raise RuntimeError("native positive baseline reads changed source/drawing state")
+    if (
+        template_original["text_count"] != 1 or template_original["display_count"] != 1
+        or template_original.get("fixed_box") is not True
+    ):
+        raise RuntimeError("native positive baseline did not observe a one-row fixed template Title")
+
+    # Use the original unresolved link, including its observed 15PT rich tag,
+    # and the same ITextFormat object values. No shorthand descriptor,
+    # smaller document font, literal newline, or fallback can be the control.
+    text_format = _early_bound(annotation.GetTextFormat(0), "ITextFormat")
+    draw.ClearSelection2(True)
+    raw = draw.InsertNote(str(template_original["link"]))
+    if raw is None:
+        raise RuntimeError("matched drawing-owned Title control insertion failed")
+    decoy_note = _early_bound(raw, "INote")
+    decoy_annotation = _early_bound(decoy_note.GetAnnotation(), "IAnnotation")
+    decoy = {"inserted": True, "before": _wrap_state(decoy_annotation, decoy_note)}
+    _observe_construction(observations, "wrap.drawing-decoy.before", state=decoy["before"])
+    decoy["positioned"] = _read(lambda: decoy_annotation.SetPosition2(0.05, 0.20, 0.0))
+    decoy["clear_set"] = _read(lambda: decoy_annotation.SetTextFormat(0, True, None))
+    _observe_construction(observations, "wrap.drawing-decoy.clear", returned=decoy["clear_set"],
+                          state=_wrap_state(decoy_annotation, decoy_note))
+    if not _is_true(decoy["positioned"]) or not _is_true(decoy["clear_set"]):
+        raise RuntimeError("matched drawing-owned Title position/rich-format clear failed")
+    text_format.LineLength = WRAP_M
+    decoy["wrap_set"] = _read(lambda: decoy_annotation.SetTextFormat(0, False, text_format))
+    _observe_construction(observations, "wrap.drawing-decoy.restore", returned=decoy["wrap_set"],
+                          state=_wrap_state(decoy_annotation, decoy_note))
+    if not _is_true(decoy["wrap_set"]):
+        raise RuntimeError("matched drawing-owned Title original-format copy was refused")
+    template_control = _wrap_template_title(adapter, ddoc, sheet_view, observations)
+    decoy["after"] = _wrap_state(decoy_annotation, decoy_note)
+    _observe_construction(observations, "wrap.drawing-decoy.after", state=decoy["after"])
+    if decoy["after"]["owner"] != 1:
+        raise RuntimeError("matched positive control is not drawing-owned")
+    for field in ("text", "height", "height_points", "all_upper_case", "justification", "use_doc_format"):
+        if decoy["after"][field] != template_original[field]:
+            raise RuntimeError(f"matched positive control changed original template {field}")
+    if title_fields._linked_name(str(decoy["after"]["link"])) != title_fields._linked_name(str(template_original["link"])):
+        raise RuntimeError("matched positive control changed the exact source-link descriptor")
+    expected_style = {key: value for key, value in template_original["text_format"].items() if key != "LineLength"}
+    actual_style = {key: value for key, value in decoy["after"]["text_format"].items() if key != "LineLength"}
+    if actual_style != expected_style or decoy["after"]["text_format"].get("LineLength") != WRAP_M:
+        raise RuntimeError("matched positive control did not preserve the original font/style and imposed width")
+    if not (
+        isinstance(decoy["after"]["text_count"], int) and decoy["after"]["text_count"] >= 2
+        and isinstance(decoy["after"]["display_count"], int) and decoy["after"]["display_count"] >= 2
+    ):
+        raise RuntimeError("matched drawing-owned positive control did not really wrap natively")
+    if title_fields._model_state(source.model) != source_before:
+        raise RuntimeError("wrap-control construction changed the source model's state")
     return {
+        "native_positive_baseline": baseline,
+        "template_original": template_original,
         "drawing_note": decoy,
-        "template_title": _wrap_template_title(adapter, ddoc, sheet_view, observations),
+        "template_title": template_control,
     }
 
 
@@ -865,6 +1124,140 @@ def _legacy_failures(capture: Mapping[str, Any]) -> list[str]:
     states = capture["observation_state"]
     if not all(state == states[0] for state in states[1:]):
         failures.append(f"{capture['key']}: native observations changed document state {states!r}")
+    return failures
+
+
+def _physical_wrap_failures(capture: Mapping[str, Any], baseline: Mapping[str, Any]) -> list[str]:
+    """An untouched overlong source must really wrap the original owner-2
+    template note, not merely persist an inert format width."""
+    failures: list[str] = []
+    name, sheet = _only_sheet(capture)
+    reading = _readings(capture, failures).get((name, "Title"))
+    expected = sheet["source"]["expected"]["Title"]
+    if reading is None or (
+        reading["expected"], reading["model_value"], reading["printed"]
+    ) != (expected, expected, expected):
+        failures.append(f"{capture['key']}: physical-wrap Title is not its exact source: {reading!r}")
+    if reading is None or not (
+        "multi-line" in reading["problem_kinds"] and "outside-cell" in reading["problem_kinds"]
+        and reading["text_count"] >= 2 and reading["display_count"] >= 2
+    ):
+        failures.append(f"{capture['key']}: no real native/display multiline outside-cell refusal: {reading!r}")
+    rows = next((row["rows"] for row in sheet["physical_rows"] if row["source"] == "Title"), None)
+    if not isinstance(rows, int) or rows < 2:
+        failures.append(f"{capture['key']}: real template negative has {rows!r} PDF baselines, not multiple")
+    notes = [
+        note for note in sheet["notes"]
+        if note.get("owner") == 2
+        and note.get("parsed_property") in title_fields.TITLE_FIELD_PROPERTIES["Title"]
+    ]
+    if len(notes) != 1:
+        failures.append(f"{capture['key']}: not exactly one physical template Title: {notes!r}")
+    else:
+        note = notes[0]
+        for field in (
+            "link", "height", "height_points", "all_upper_case", "justification",
+            "position", "use_doc_format", "text_format",
+        ):
+            if note.get(field) != baseline.get(field):
+                failures.append(
+                    f"{capture['key']}: untouched template {field}: {note.get(field)!r} != {baseline.get(field)!r}"
+                )
+    states = capture["observation_state"]
+    if not all(state == states[0] for state in states[1:]):
+        failures.append(f"{capture['key']}: physical-wrap reads changed document state {states!r}")
+    return failures
+
+
+def _wrapped_failures(wrapped: Mapping[str, Any]) -> list[str]:
+    """Prove the actual native baseline and matched auto-box positive, while
+    explicitly refusing to call an inert fixed-box width change a physical wrap."""
+    failures: list[str] = []
+
+    def need(ok: bool, message: str) -> None:
+        if not ok:
+            failures.append(message)
+
+    name, sheet = _only_sheet(wrapped)
+    mutation = wrapped["mutations"].get("template_title") or {}
+    need(
+        mutation.get("template_mode") is True and mutation.get("sheet_mode") is True
+        and _is_true(mutation.get("clear_set")) and _is_true(mutation.get("wrap_set"))
+        and mutation.get("inert_under_fixed_box") is True,
+        f"wrapped-landscape: not a strictly observed inert fixed-box control: {mutation!r}",
+    )
+    positive = wrapped["mutations"].get("native_positive_baseline") or {}
+    need(
+        positive.get("contract", {}).get("breaches") == []
+        and "read_error" not in positive.get("contract", {})
+        and "read_breaches" not in positive.get("contract", {}),
+        f"wrapped-landscape: original template did not pass the native positive baseline: {positive!r}",
+    )
+    readings = _readings(wrapped, failures)
+    reading = readings.get((name, "Title"))
+    kinds = None if reading is None else reading["problem_kinds"]
+    need(
+        kinds == ["wrap-width"] and reading["text_count"] == 1 and reading["display_count"] == 1,
+        f"wrapped-landscape Title: expected only wrap-width, with one actual native/display row: {reading!r}",
+    )
+    number = readings.get((name, "Number"))
+    need(number is not None and number["problem_kinds"] == [], f"wrapped-landscape Number: {number!r}")
+    fit = next((fit for fit in sheet["printed_fits"] if fit["source"] == "Title"), None)
+    need(
+        fit is not None and fit["printed"] is not None and fit["rows"] == 1,
+        f"wrapped-landscape Title: inert control is not printed whole on one PDF row: {fit!r}",
+    )
+    rows = next((row["rows"] for row in sheet["physical_rows"] if row["source"] == "Title"), None)
+    need(rows == 1, f"wrapped-landscape Title: inert control has {rows!r} physical baseline rows, not one")
+
+    decoy = _drawing_title_control(sheet)
+    need(decoy is not None, "wrapped-landscape: not exactly one drawing-owned Title positive control")
+    if decoy is not None:
+        baseline = mutation.get("before") or {}
+        need(
+            decoy.get("parsed_property") == title_fields._linked_name(str(baseline.get("link") or "")),
+            "wrapped-landscape: drawing-owned control uses a different source-link descriptor",
+        )
+        for field in ("text", "height", "height_points", "all_upper_case", "justification", "use_doc_format"):
+            need(
+                decoy.get(field) == baseline.get(field),
+                f"wrapped-landscape: drawing-owned control {field}: {decoy.get(field)!r} != {baseline.get(field)!r}",
+            )
+        native_style = {key: value for key, value in (decoy.get("text_format") or {}).items() if key != "LineLength"}
+        baseline_style = {key: value for key, value in (baseline.get("text_format") or {}).items() if key != "LineLength"}
+        need(
+            bool(native_style) and native_style == baseline_style,
+            f"wrapped-landscape: drawing-owned control font/style {native_style!r} != {baseline_style!r}",
+        )
+        need(
+            isinstance(decoy.get("text_count"), int) and decoy["text_count"] >= 2
+            and isinstance(decoy.get("display_count"), int) and decoy["display_count"] >= 2,
+            f"wrapped-landscape: drawing-owned positive control is not natively multiline: {decoy!r}",
+        )
+        printed = sheet.get("drawing_title_control_pdf") or {}
+        need(
+            isinstance(printed.get("rows"), int) and printed["rows"] >= 2,
+            f"wrapped-landscape: drawing-owned positive control has no multiple PDF baselines: {printed!r}",
+        )
+        extent = decoy.get("extent")
+        box = [extent[0], extent[1], extent[3], extent[4]] if isinstance(extent, list) and len(extent) >= 6 else None
+        cells = sheet["cells"].values()
+        need(
+            box is not None and all(
+                box[2] < cell[0] or box[0] > cell[2] or box[3] < cell[1] or box[1] > cell[3]
+                for cell in cells
+            ),
+            f"wrapped-landscape: drawing-owned control {box!r} overlaps an identity cell",
+        )
+        need(
+            reading is not None and reading["extent"] != box,
+            "wrapped-landscape: the Title reading took the drawing-owned control's extent",
+        )
+    states = wrapped["observation_state"]
+    need(
+        all(state == states[0] for state in states[1:]),
+        f"wrapped-landscape: native observations changed document state {states!r}",
+    )
     return failures
 
 
@@ -943,31 +1336,9 @@ def _check_controls(captures: list[Mapping[str, Any]]) -> list[str]:
             kinds = None if reading is None else reading["problem_kinds"]
             need(kinds is not None and "outside-cell" in kinds, f"{key} {source}: no outside-cell in {kinds!r}")
             need(f"title {source}" in misfits, f"{key} {source}: no PDF misfit in {sorted(misfits)!r}")
+        failures.extend(_physical_wrap_failures(capture, _template_title_catalog(control_sheet)))
 
-    # wrapped-landscape: the template PART note really took the narrow wrap.
-    wrapped = by_key["wrapped-landscape"]
-    name, sheet = _only_sheet(wrapped)
-    mutation = wrapped["mutations"].get("template_title") or {}
-    need(
-        mutation.get("template_mode") is True and mutation.get("sheet_mode") is True
-        and _is_true(mutation.get("clear_set")) and _is_true(mutation.get("wrap_set")),
-        f"wrapped-landscape: template mutation {mutation!r}",
-    )
-    reading = _readings(wrapped, failures).get((name, "Title"))
-    kinds = None if reading is None else reading["problem_kinds"]
-    need(kinds is not None and "wrap-width" in kinds, f"wrapped-landscape Title: no wrap-width in {kinds!r}")
-    need(
-        reading is not None and "multi-line" in reading["problem_kinds"]
-        and reading["text_count"] >= 2 and reading["display_count"] >= 2,
-        f"wrapped-landscape Title: no actual multiple native rows in {reading!r}",
-    )
-    fit = next((fit for fit in sheet["printed_fits"] if fit["source"] == "Title"), None)
-    need(
-        fit is not None and (fit["printed"] is None or fit["rows"] >= 2),
-        f"wrapped-landscape Title: PDF prints it whole on one row ({fit!r})",
-    )
-    rows = next((row["rows"] for row in sheet["physical_rows"] if row["source"] == "Title"), None)
-    need(isinstance(rows, int) and rows >= 2, f"wrapped-landscape Title: {rows!r} physical baseline rows, not multiple")
+    failures.extend(_wrapped_failures(by_key["wrapped-landscape"]))
 
     # configs-2sheet: per-sheet configuration Numbers, read without moving the
     # model, with T006 active and the portrait T120 sheet never activated.
@@ -1055,24 +1426,34 @@ async def probe(adapter: Any, *, legacy_only: bool = False) -> dict[str, str]:
             if failures:
                 report["control_failures"] = failures
                 raise RuntimeError("legacy baseline failed; no later cases run:\n" + "\n".join(failures))
+        # Exercise the mixed-sheet constructor before a wrapped-note failure
+        # can prevent its independent source/configuration control from running.
+        configs_part = await _scratch_part(
+            adapter, "configs", CONFIG_FILE_NUMBER, CONFIG_TITLE, {name: value for name, (_l, value) in CONFIGS.items()}
+        )
+        captures.append(_configs_two_sheets(adapter, configs_part, observations))
         parts = {}
         for case, (number, title) in CASES.items():
             if case == "control-v39":
                 continue
             parts[case] = await _scratch_part(adapter, case, number, title)
             for layout in LAYOUTS:
-                captures.append(_single_sheet(adapter, f"{case}-{layout.value}", parts[case], layout, number, title))
+                capture = _single_sheet(adapter, f"{case}-{layout.value}", parts[case], layout, number, title)
+                captures.append(capture)
+                if case == "overlong":
+                    control = next(item for item in captures if item["key"] == f"control-v39-{layout.value}")
+                    _name, control_sheet = _only_sheet(control)
+                    failures = _physical_wrap_failures(capture, _template_title_catalog(control_sheet))
+                    if failures:
+                        report["control_failures"] = failures
+                        raise RuntimeError("real template physical-wrap negative failed:\n" + "\n".join(failures))
         number, title = CASES[WRAPPED_CASE]
         captures.append(
             _single_sheet(
                 adapter, "wrapped-landscape", parts[WRAPPED_CASE], DrawingLayout.LANDSCAPE, number, title,
-                lambda draw, ddoc, sheet_view: _force_wraps(adapter, draw, ddoc, sheet_view, observations),
+                lambda draw, ddoc, sheet_view, source: _force_wraps(adapter, draw, ddoc, sheet_view, observations, source),
             )
         )
-        configs_part = await _scratch_part(
-            adapter, "configs", CONFIG_FILE_NUMBER, CONFIG_TITLE, {name: value for name, (_l, value) in CONFIGS.items()}
-        )
-        captures.append(_configs_two_sheets(adapter, configs_part, observations))
         discard_open_documents(adapter)
         report["control_failures"] = _check_controls(captures)
     except BaseException as exc:

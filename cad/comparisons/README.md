@@ -28,6 +28,36 @@ submodule).
 | `scores.json` | regen | pair → RMS shape score (regression trend only; compare across commits, same engine) |
 | `findings/iter_NNN.json` | — | per-iteration vision findings |
 
+## Identity boundaries
+
+Current export and gallery inputs use canonical subsystem-prefixed stems.
+Historical released bundles remain unchanged: `release_diff.py` and
+`render_diff.py` pair their actual member names through the sealed schema-2
+[`identity-migration-map.json`](../config/identity-migration-map.json).
+Only the part stem is translated. For every non-default configuration the
+exporter appends `--` plus the sanitized configuration name; the entire suffix
+from the first `--` is retained, not just three-digit tooth counts. Thus
+`transgear-removable--t12` pairs with `pd-transgear-removable--t12`,
+`crank-handle-ferrule--installed` with
+`dt-crank-handle-ferrule--installed`, and `cone-gear--t006` with
+`dt-cone-gear--t006`. Generated `-stretchN` qualifiers are also retained, for
+example `channel-spring-installed-stretch07` becomes
+`vn-channel-spring-installed-stretch07`; an exporter `--configuration` takes
+precedence over that generated suffix rule. Geometry verdicts and red highlights
+remain per exact qualified mesh; only the changed-part summary groups variants
+by base stem. The map is an archive-input boundary, not an old-name alias for
+current files or commands.
+
+Historical curation catalogs likewise remain immutable provenance.
+`seed_manifest.py` normalizes catalog components only when their
+`old_underscore` identity is assigned by that same sealed map, before selecting
+a studio part or the top assembly and emitting `focus`/`frame_components`.
+Unknown semantic or retired unmapped labels, such as `crank_pedestal`, remain
+unchanged and generate an unresolved-label warning; they require owner curation,
+not a guessed alias. The normal merge retains existing tuned pairs; `--reset`
+regenerates pairs using current identities. Explicit `PHOTO_FOCUS` mappings are
+unchanged.
+
 ## Workflow
 
 ```powershell

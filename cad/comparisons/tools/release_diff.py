@@ -65,12 +65,20 @@ def load_identity_map(path=IDENTITY_MAP):
     return mapping
 
 
+def split_mesh_key(key):
+    """Separate the exporter configuration, or a generated stretch qualifier."""
+    stem, separator, configuration = key.partition("--")
+    if separator:
+        return stem, separator + configuration
+    suffix = re.search(r"-stretch\d+$", key)
+    return (key[:suffix.start()], suffix.group()) if suffix else (key, "")
+
+
 def canonical_key(key, mapping):
-    """Translate an exact stem, preserving the complete configuration qualifier."""
-    key = key.lower()
-    suffix = re.search(r"(--?t\d{3}|-stretch\d+)$", key)
-    stem = key[:suffix.start()] if suffix else key
-    return mapping.get(stem, stem) + (suffix.group() if suffix else "")
+    """Translate only the stem, preserving the complete configuration qualifier."""
+    stem, suffix = split_mesh_key(key)
+    stem = stem.lower()
+    return mapping.get(stem, stem) + suffix
 
 
 def identity_inventory(keys, mapping):
