@@ -243,11 +243,11 @@ async def _drive_and_measure(adapter: Any) -> dict[str, str]:
     knob_shaft = _one(adapter, "pd-transgear-knob-shaft")
     feed_pinion = _one(adapter, "pd-transgear-feed-pinion")
     disc = _one(adapter, "pd-rack-pinion")
-    # The pd-platen BODY exactly (platen-<n>), not a "pd-platen-rack"/"pd-platen-clip" sibling.
+    # The pd-platen BODY exactly (pd-platen-<n>), not a "pd-platen-rack"/"pd-platen-clip" sibling.
     platen = next((n for n in component_names(adapter)
                    if n.rsplit("-", 1)[0] == "pd-platen"), "")
     if not platen:
-        raise RuntimeError("no platen-<n> body component found")
+        raise RuntimeError("no pd-platen-<n> body component found")
     log(
         f"parts: crank T12={t12}, knob T24={t24}, collar={collar}, "
         f"shaft={knob_shaft}, disc={disc}, feed={feed_pinion}, platen={platen}"

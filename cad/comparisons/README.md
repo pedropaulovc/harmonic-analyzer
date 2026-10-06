@@ -49,6 +49,10 @@ remain per exact qualified mesh. The changed-part summary groups only trailing
 qualifiers, such as `--installed`, remain distinct summary entries.
 The map is an archive-input boundary, not an old-name alias for current files
 or commands.
+Scene and GLB readers resolve actual historical/current bundle members.
+With an explicit release tag, `pose_to_meshprobe.py` reuses an extracted
+mapped cache member without contacting GitHub. Ambiguous old/current copies
+are rejected rather than silently selected.
 
 Historical curation catalogs likewise remain immutable provenance.
 `seed_manifest.py` normalizes catalog components only when their

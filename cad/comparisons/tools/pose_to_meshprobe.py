@@ -400,6 +400,17 @@ def release_member(member: str, tag: str | None) -> Path:
 
     tag = tag or _gh(["release", "view", "--json", "tagName", "-q", ".tagName"]).strip()
     cache = CAD_OUT / "release-cache" / tag
+    requested = Path(member)
+    mapping = load_identity_map()
+    logical = canonical_key(requested.stem, mapping)
+    cached = [
+        path for path in (cache / requested.parent).glob("*")
+        if path.is_file() and path.suffix.lower() == requested.suffix.lower()
+        and canonical_key(path.stem, mapping) == logical
+    ]
+    identity_inventory((path.stem for path in cached), mapping)
+    if cached:
+        return cached[0]
     cache.mkdir(parents=True, exist_ok=True)
     asset = _gh(["release", "view", tag, "--json", "assets",
                  "-q", '.assets[].name | select(endswith(".zip") and (contains("logs")|not))']).strip()
@@ -409,9 +420,6 @@ def release_member(member: str, tag: str | None) -> Path:
     if not bundle.exists():
         _gh(["release", "download", tag, "-p", asset, "--dir", str(cache), "--clobber"])
     with zipfile.ZipFile(bundle) as zf:
-        requested = Path(member)
-        mapping = load_identity_map()
-        logical = canonical_key(requested.stem, mapping)
         matches = [
             name for name in zf.namelist()
             if Path(name).parent.as_posix().lower() == requested.parent.as_posix().lower()

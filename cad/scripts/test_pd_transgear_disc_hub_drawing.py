@@ -24,6 +24,7 @@ import pd_paper_drive_assembly_steps as steps
 import transgear_cluster_fit as cluster_fit
 import pd_transgear_disc_hub_geometry as joint
 import pd_transgear_disc_hub_spec as spec
+from _assembly_contract import assembly_contract
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import Box, estimate_text_box
@@ -499,7 +500,9 @@ def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
         name_by_number[_config.parts(stem)["number"]] = name
     printed = " ".join(_sheet_text().split())
     cited = re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", printed)
-    assert set(cited) == set(name_by_number)
+    assert set(cited) == set(name_by_number) | {
+        assembly_contract("pd-paper-drive").number
+    }
     for number, name in name_by_number.items():
         assert printed.count(f"{name} {number}") == printed.count(number), number
 

@@ -83,12 +83,14 @@ def base_part(key):
 # --------------------------------------------------------------------------- #
 def _scene_member(names, mapping):
     """Resolve the historical/current top-assembly scene from actual members."""
+    top_assembly = mapping.get("harmonic-analyzer", "ha-harmonic-analyzer")
     scene_names = {
         "boxes/harmonic-analyzer.json",
-        f"boxes/{mapping['harmonic-analyzer']}.json",
+        f"boxes/{top_assembly}.json",
     }
     matches = [name for name in names if name.lower() in scene_names]
-    identity_inventory((Path(name).stem for name in matches), mapping)
+    identity_inventory((Path(name).stem for name in matches),
+                       {"harmonic-analyzer": top_assembly})
     return matches[0] if matches else None
 
 

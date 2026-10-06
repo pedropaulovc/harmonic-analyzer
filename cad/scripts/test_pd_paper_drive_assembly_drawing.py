@@ -526,7 +526,9 @@ def test_no_retired_part_is_named_on_the_sheet() -> None:
     retired = {"MHA-079", "MHA-080", "MHA-108", "MHA-109"}
     printed = set(re.findall(r"MHA-[A-Z]{2}-\d{3}(?:-T\d{3})?", drawing.FITUP_STEPS))
     assert not any(number in drawing.FITUP_STEPS for number in retired)
-    assert printed <= set(drawing.BOM_PART_NUMBERS.values())
+    assert printed <= set(drawing.BOM_PART_NUMBERS.values()) | {
+        assembly_contract("dt-drive-train").number
+    }
 
 
 def test_the_knob_stack_prints_front_to_rear() -> None:

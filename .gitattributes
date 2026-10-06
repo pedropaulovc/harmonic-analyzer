@@ -3,3 +3,4 @@ cad/comparisons/bench/machinist_review/baseline.txt -text
 cad/comparisons/bench/machinist_review/*.png -text
 web/content/canonical-native/** -text
 cad/config/identity-migration-map.json -text
+cad/references/fr-nameplate-engraving.dxf -text

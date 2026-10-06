@@ -386,8 +386,8 @@ the submitter anyway).
 serializes the selected `build` and `release` closures and rejects any serialized
 task whose declared `file_dep` or target resolves under an excluded submodule,
 including a task whose action otherwise runs on the submitter. A task requiring
-a declared file under `references` must stay outside those closures (as this
-opt-in catalog check does) or `references` must no longer be excluded. Merely
+a declared file under `references` must stay outside those closures or
+`references` must no longer be excluded. Merely
 marking it submitter-only does not bypass this check. Keep runtime inputs
 declared; do not hide them by dropping `file_dep` or tolerate their absence.
 The gallery's existing submitter-side photo read is not a pattern for adding
