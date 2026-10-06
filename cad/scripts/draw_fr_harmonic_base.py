@@ -178,17 +178,17 @@ HOLE_TABLE_ANCHOR = (0.018, 0.260)
 # Rule 6: one four-row matched-fit note retains the assigned tube, acceptance,
 # reference-only table diameter and match marks. The old six-row note did not
 # meet that rule, and the table-to-plan strip cannot hold its full four rows.
-# R9's native Century Gothic advances give a 68.93 mm maximum row: in the
-# right white field at x 347 mm it ends at 415.93 mm, 3.17 mm inside the frame.
-# Lead from its left side to A4 (rear-right), the nearest of the four sockets.
+# R9's native Century Gothic advances give a 71.47 mm maximum row: in the
+# right white field at x 344 mm it ends at 415.47 mm, 3.63 mm inside the frame.
+# Lead from its left side to A4 (upper-right on the plan), the nearest socket.
 # F4's tag moves below this band; the plan, table and transfer callouts stay put.
 SOCKET_FIT_NOTE = (
-    "4X ASSIGNED MHA-FR-003\n"
+    "4X FIT TO ASSIGNED MHA-FR-003\n"
     "TUBE: CLOSE HAND-SLIP;\n"
     "NO PERCEPTIBLE ROCK; RETAIN\n"
     "MATCH MARKS; TABLE <MOD-DIAM> REF."
 )
-SOCKET_FIT_NOTE_XY = (0.347, 0.228)
+SOCKET_FIT_NOTE_XY = (0.344, 0.228)
 SOCKET_FIT_STATION = max(COLUMN_SOCKET_XZ, key=lambda station: (station[0], -station[1]))
 # hb-render-6's sheet-2 notes at the default note height: 2.49 mm per
 # character and 4.6 mm per row, the text hanging from its top-left anchor.
