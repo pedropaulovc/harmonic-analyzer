@@ -356,7 +356,7 @@
     },
     {
       "path": "web/scripts/compact-source-common.py",
-      "sha256": "bb982f567ff742631b75f329b5114b09155dbb65c2169095db17ff20b56fc565",
+      "sha256": "8c4221d34c9e4f9d87bffdd00d9f43d4e29c42ea5b815b2b6010449b1c3af855",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -366,22 +366,22 @@
     },
     {
       "path": "web/scripts/export-magnifier.py",
-      "sha256": "2ca6968c0c6c6521812cfdb089575788992acbbb12afa06f827e9dcf9839bdbf",
+      "sha256": "6347f3c4d8361f583d9755cd36a58cd6111bb98343f6284c021abf9431a506af",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/export-mechanics.py",
-      "sha256": "7324a2a02913a769ac207fcc308462144df066e08e1f8f800485f8df7bd9269a",
+      "sha256": "8b1db738e5f8eb5c09d16432ecf428787ccc0cc8e3a9181d3595cef2f795d376",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/fetch-model.mjs",
-      "sha256": "f2397d8e7143f0ced5d1dafc75683ffe9b616f2d2787420be51f9b354094ccab",
+      "sha256": "a2bce4f78a0018d7ab6ae125f0b1319797ae96a9ba7a974aae5870c02d5d542a",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/fetch-model.test.mjs",
-      "sha256": "ed2d1413b42880d6b9d1afcb9dbe6614b1c0c9fdce8f6b6b869b7201dee18bb5",
+      "sha256": "464851a10f378201b5e8d4c8dde34fdc4886353b00eb11e8d700bf3bdeddc109",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -421,7 +421,7 @@
     },
     {
       "path": "web/scripts/model-representation.test.mjs",
-      "sha256": "a60437558b267eaba628a61679c2eab9e46904a9814f8b145a7cc1faf056d031",
+      "sha256": "4f57fd9d31a02336f7453c27930420523bd55f721a643edb0d566057b0eff712",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -431,7 +431,7 @@
     },
     {
       "path": "web/scripts/native-math-compatibility.mjs",
-      "sha256": "9a6a183c409d73a16d6be5eeaa5722f45c07883fbb6354c28289e818db561ac1",
+      "sha256": "2e56981a00c10b59a643385598a5967ae53c2ed26fb67e56d10ad69517e24af1",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -441,7 +441,7 @@
     },
     {
       "path": "web/scripts/optimize-model.mjs",
-      "sha256": "3bb48c0fe69a49de407e8ced9f7124e730468482626c9984a286902e670d71e1",
+      "sha256": "14dbe4c4604fd59888fe7a75242478f87a0078c253eb9bb6e8a25af3c0a811c5",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -466,7 +466,7 @@
     },
     {
       "path": "web/scripts/verify-reference.mjs",
-      "sha256": "3d09990dcb51c95c7c3e44a4a599b7bc49b22959111920b722b73e7889ec6972",
+      "sha256": "0e957f55b3567d654599d4d36248fffd8a7db43350121b044d3b54b10a310ebf",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -476,12 +476,12 @@
     },
     {
       "path": "web/scripts/verify-sync.mjs",
-      "sha256": "c891ebd4b1d32e288d5354285cd41c7cf8733edaf720f8ceb33712c0c7448d6f",
+      "sha256": "6d1708f972bed5f292c6274c20df84dfd476e30b0b4d6cc2ffed384fe4d0b476",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/verify-sync.test.mjs",
-      "sha256": "4400945bc2178c529375d18b7d8f9327e41b23085c0ee02161d305e4bd361527",
+      "sha256": "f241f1bad9275f46ded55cdf9c0139508bdb61626d3732c28fa927f62189f93b",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -491,7 +491,7 @@
     },
     {
       "path": "web/src/bindings.ts",
-      "sha256": "1228e3b388996ce52cdc3f2f95a85320a0164eed221659cad9bc06edf496d952",
+      "sha256": "3d0ad9851a712856762fcc9d8336617a98bf4bfea52f8672f4ea6e638cef7428",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -506,7 +506,7 @@
     },
     {
       "path": "web/src/magnifier.ts",
-      "sha256": "935abfe377c6acf3dbab380270e97567b7000b4947fcd82cd2e4684d7aa46015",
+      "sha256": "6fb1bc556641439245ccbbd2ce8cdaf79fc4486448009be5f3c5d1d5e9ae11dc",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -516,7 +516,7 @@
     },
     {
       "path": "web/src/mechanics-data.ts",
-      "sha256": "7d9f53258e226bd386dc2394132fcd237b5d110fc9cd88f475ac2501685a5553",
+      "sha256": "01eb219ef39839f3a1f408db50cb3ae3cef3d5c307e1a35c2b371375733ca5ca",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -526,7 +526,7 @@
     },
     {
       "path": "web/src/scene.ts",
-      "sha256": "bf228c4223b82729359cfd019c6ff6b68c7a70094d849673051d8495775a6039",
+      "sha256": "59a19f36616e76cece7623dfe4743621d9b556c785970597a3249efc63010e4e",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -561,7 +561,7 @@
     },
     {
       "path": "web/content/4mBuyixt22U.source-track.json",
-      "sha256": "601b4e4a87e5bef237c08d8b5a4c94c3781ff70ce8389e2ec9abe1b61d158f8e",
+      "sha256": "1afdd8d07d8620a4e8fb59fa9bded36c05bf2953f0c181aa38157ae5c1ec2481",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
@@ -586,12 +586,12 @@
     },
     {
       "path": "web/content/jfH-NbsmvD4.source-track.json",
-      "sha256": "6472c9d5d4518c3d598e31a8d582e2a1bec62f361d3f9f8176a8aa92065a3443",
+      "sha256": "ba3d9419fa6c3d0e8f523ceb68f658f326361b30307345dd172bc37a30e473fb",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/package.json",
-      "sha256": "a91fa4023b1c69d4a1b243b6364964859c038d8e8d317dcaa80b187ba70b51f0",
+      "sha256": "2ec6c4a136fd35dd5b19ee570b134fa44d364f5f23ae5c3f8d4a044609c5a9dc",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; not a claim of byte identity, geometric or GPU/source verification."
     },
     {
