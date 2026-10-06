@@ -35,11 +35,20 @@ undeclared. The report is written whatever happens; then every control
 (:func:`_check_controls`) must hold or the probe fails, its
 ``control_failures`` saying which.
 
+``--legacy-only`` is the smaller observational discovery route: one v39
+scratch part, one landscape view, :data:`DISCOVERY_REPORT` and
+:data:`DISCOVERY_PDF`. Success means a raw native catalog and PDF were
+captured, NOT that the Title reader passed. Both native enumeration paths
+(``IView.GetAnnotations`` and ``IView.GetNotes``) are logged before the
+contract runs. The full probe stops at the first failed legacy baseline,
+before creating qualified, overlong or wrapped cases.
+
 Delete this script and its dodo task once the proof is recorded.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -109,6 +118,8 @@ PDFS = {
     "wrapped-landscape": OUT / "wrapped-landscape.pdf",
     "configs-2sheet": OUT / "configs-2sheet.pdf",
 }
+DISCOVERY_REPORT = OUT / "title-link-discovery.json"
+DISCOVERY_PDF = OUT / "discovery" / "control-v39-landscape.pdf"
 _SW_CUSTOM_TEXT = 30  # swCustomInfoType_e.swCustomInfoText
 _SW_PROP_REPLACE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
 _ANNOT_NOTE = 6
@@ -149,39 +160,81 @@ def _text_format(annotation: Any) -> dict[str, Any]:
     }
 
 
-def _sheet_notes(adapter: Any, sheet_view: Any) -> list[dict[str, Any]]:
-    """Every note on the sheet (template- and drawing-owned), as SolidWorks
-    reports it."""
-    notes = []
-    for raw in sheet_view.GetAnnotations() or ():
-        annotation = _early_bound(raw, "IAnnotation")
-        if int(annotation.GetType()) != _ANNOT_NOTE:
+def _note_record(adapter: Any, annotation: Any, note: Any, *, link: Any, text: Any) -> dict[str, Any]:
+    """SDK getters only: unresolved PropertyLinkedText and evaluated GetText."""
+    display, refused = annotation_display(adapter, annotation)
+    return {
+        "note_interface": type(note).__name__,
+        "link": link,
+        "parsed_property": title_fields._linked_name(link) if isinstance(link, str) else None,
+        "text": text,
+        "all_upper_case": _read(lambda: note.AllUpperCase),
+        "extent": _read(note.GetExtent),
+        "position": _read(annotation.GetPosition),
+        "text_point": _read(note.GetTextPoint2),
+        "upper_right": _read(note.GetUpperRight),
+        "height": _read(note.GetHeight),
+        "height_points": _read(note.GetHeightInPoints),
+        "text_count": _read(note.GetTextCount),
+        "display_count": _read(lambda: title_fields._display_count(annotation)),
+        "justification": _read(note.GetTextJustification),
+        "use_doc_format": _read(lambda: annotation.GetUseDocTextFormat(0)),
+        "text_format": _read(lambda: _text_format(annotation)),
+        "display_texts": display.get("texts", []),
+        "display_refused": refused,
+    }
+
+
+def _native_catalog(adapter: Any, sheet_view: Any, *, key: str, sheet: str) -> dict[str, Any]:
+    """Observe both SDK enumeration paths without changing sheet/edit mode.
+
+    Keep every annotation type and every getter refusal, not just notes the
+    current link parser already recognizes. Each record reaches task.log
+    BEFORE the reader is called, so a fatal later control cannot hide it.
+    """
+    catalog: dict[str, Any] = {"annotations": [], "notes": []}
+    for method, collection, interface in (
+        ("GetAnnotations", "annotations", "IAnnotation"),
+        ("GetNotes", "notes", "INote"),
+    ):
+        path = f"IDrawingDoc.GetViews[sheet={sheet!r}][0].{method}()"
+        try:
+            entries = getattr(sheet_view, method)()
+        except Exception as exc:  # noqa: BLE001 - traversal refusal is evidence
+            catalog[f"{collection}_error"] = f"{type(exc).__name__}: {exc}"
+            _telemetry.info(f"title native catalog {key}: {path}: {catalog[f'{collection}_error']}")
             continue
-        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-        display, refused = annotation_display(adapter, annotation)
-        notes.append(
-            {
-                "owner": _read(lambda: annotation.OwnerType),
-                "name": _read(annotation.GetName),
-                "link": _read(lambda: note.PropertyLinkedText),
-                "text": _read(note.GetText),
-                "all_upper_case": _read(lambda: note.AllUpperCase),
-                "extent": _read(note.GetExtent),
-                "position": _read(annotation.GetPosition),
-                "text_point": _read(note.GetTextPoint2),
-                "upper_right": _read(note.GetUpperRight),
-                "height": _read(note.GetHeight),
-                "height_points": _read(note.GetHeightInPoints),
-                "text_count": _read(note.GetTextCount),
-                "display_count": _read(lambda: title_fields._display_count(annotation)),
-                "justification": _read(note.GetTextJustification),
-                "use_doc_format": _read(lambda: annotation.GetUseDocTextFormat(0)),
-                "text_format": _read(lambda: _text_format(annotation)),
-                "display_texts": display.get("texts", []),
-                "display_refused": refused,
-            }
-        )
-    return notes
+        for index, raw in enumerate(entries or ()):
+            record: dict[str, Any] = {"path": f"{path}[{index}]"}
+            try:
+                bound = _early_bound(raw, interface)
+                annotation = bound if interface == "IAnnotation" else _early_bound(bound.GetAnnotation(), "IAnnotation")
+                record.update(
+                    {
+                        "annotation_interface": type(annotation).__name__,
+                        "type": _read(annotation.GetType),
+                        "owner": _read(lambda: annotation.OwnerType),
+                        "name": _read(annotation.GetName),
+                    }
+                )
+                if interface == "INote" or record["type"] == _ANNOT_NOTE:
+                    note = bound if interface == "INote" else _early_bound(annotation.GetSpecificAnnotation(), "INote")
+                    record.update(
+                        {
+                            "note_interface": type(note).__name__,
+                            "link": _read(lambda: note.PropertyLinkedText),
+                            "text": _read(note.GetText),
+                        }
+                    )
+                    # Publish raw links/text before geometry/display reads too.
+                    _telemetry.info(f"title native raw note {key}: {json.dumps(record, default=str)}")
+                    record.update(_note_record(adapter, annotation, note, link=record["link"], text=record["text"]))
+            except Exception as exc:  # noqa: BLE001 - preserve partial raw record
+                record["read_error"] = f"{type(exc).__name__}: {exc}"
+            catalog[collection].append(record)
+            _telemetry.info(f"title native catalog {key}: {json.dumps(record, default=str)}")
+        _telemetry.info(f"title native catalog {key}: {path}: count={len(catalog[collection])}")
+    return catalog
 
 
 def _sheet_views(ddoc: Any) -> dict[str, Any]:
@@ -354,9 +407,10 @@ def _contract(ddoc: Any, sources: Mapping[str, TitleSource], layouts: Mapping[st
     except Exception as exc:  # noqa: BLE001 - the contract's own refusal is evidence
         result["read_error"] = f"{type(exc).__name__}: {exc}"
         return result
-    result["model_state_after"] = {
-        sheet: _read(lambda s=source: list(title_fields._model_state(s.model))) for sheet, source in sources.items()
-    }
+    finally:
+        result["model_state_after"] = {
+            sheet: _read(lambda s=source: list(title_fields._model_state(s.model))) for sheet, source in sources.items()
+        }
     result["readings"] = [
         {
             "sheet": r.sheet,
@@ -396,6 +450,8 @@ def _capture(
     sources: Mapping[str, TitleSource],
     layouts: Mapping[str, DrawingLayout],
     extra: Mapping[str, Any],
+    *,
+    pdf_path: Path | None = None,
 ) -> dict[str, Any]:
     ddoc = _early_bound(draw, "IDrawingDoc")
     sheet_names = [str(name) for name in ddoc.GetSheetNames() or ()]
@@ -406,22 +462,55 @@ def _capture(
     if active_before != sheet_names[0]:
         raise RuntimeError(f"title fit {key}: sheet {active_before!r} active after activating {sheet_names[0]!r}")
     views = _sheet_views(ddoc)
+    model = _early_bound(draw, "IModelDoc2")
+
+    def observation_state() -> dict[str, Any]:
+        return {
+            "active_sheet": _active_sheet(ddoc),
+            "sheet_mode": _read(ddoc.GetEditSheet),
+            "drawing_dirty": _read(model.GetSaveFlag),
+            "models": {
+                name: _read(lambda s=source: list(title_fields._model_state(s.model))) for name, source in sources.items()
+            },
+        }
+
+    state_before = observation_state()
+    sheets: dict[str, Any] = {}
+    for name in sheet_names:
+        catalog = _native_catalog(adapter, views[name], key=key, sheet=name)
+        sheet = _early_bound(ddoc.Sheet(name), "ISheet")
+        source = sources[name]
+        source_record = {
+            "custom_property_view": _read(lambda: sheet.CustomPropertyView),
+            "sheet_properties": _read(sheet.GetProperties2),
+            "model_path": _read(_early_bound(source.model, "IModelDoc2").GetPathName),
+            "configuration": source.configuration,
+            "expected": {prop: source.expected(prop) for prop in SOURCES},
+            "stored": {
+                prop: _read(lambda p=prop: title_fields.linked_property(source.model, source.configuration, p))
+                for prop in ("Number", "Title", "SW-Title")
+            },
+        }
+        _telemetry.info(f"title native source {key} {name}: {json.dumps(source_record, default=str)}")
+        sheets[name] = {
+            "layout": layouts[name].value,
+            "cells": {prop: list(box) for prop, box in DRAWING_TEMPLATES[layouts[name]].title_cells_m},
+            "source": source_record,
+            "native_catalog": catalog,
+            "notes": [record for record in catalog["annotations"] if record.get("type") == _ANNOT_NOTE],
+        }
+    state_after_catalog = observation_state()
     capture: dict[str, Any] = {
         "key": key,
         **extra,
-        "sheets": {
-            name: {
-                "layout": layouts[name].value,
-                "cells": {source: list(box) for source, box in DRAWING_TEMPLATES[layouts[name]].title_cells_m},
-                "notes": _sheet_notes(adapter, views[name]),
-            }
-            for name in sheet_names
-        },
+        "sheets": sheets,
         "contract": _contract(ddoc, sources, layouts),
     }
+    capture["observation_state"] = [state_before, state_after_catalog, observation_state()]
     # The sheet the contract read with active, before and after the reads.
     capture["active_sheet"] = [active_before, _active_sheet(ddoc)]
-    pdf = PDFS[key]
+    pdf = pdf_path if pdf_path is not None else PDFS[key]
+    pdf.parent.mkdir(parents=True, exist_ok=True)
     saved = save_drawing(adapter, str(SCRATCH / f"title-fit-{key}.SLDDRW"), pdf_path=str(pdf))
     if set(saved) != {"drawing", "pdf"}:
         raise RuntimeError(f"title fit {key}: save incomplete {saved!r}")
@@ -501,6 +590,8 @@ def _single_sheet(
     number: str,
     title: str,
     mutate: Callable[[Any, Any, Any], dict[str, Any]] | None = None,
+    *,
+    pdf_path: Path | None = None,
 ) -> dict[str, Any]:
     template = DRAWING_TEMPLATES[layout]
     draw, _sheet = new_project_drawing(adapter, layout=layout)
@@ -512,7 +603,7 @@ def _single_sheet(
     rebuild_drawing(adapter, label=f"title fit {key}")
     configuration = str(view.ReferencedConfiguration or "")
     sources = {sheet_name: TitleSource(view.ReferencedDocument, configuration, number, title)}
-    return _capture(adapter, key, draw, sources, {sheet_name: layout}, {"mutations": extra})
+    return _capture(adapter, key, draw, sources, {sheet_name: layout}, {"mutations": extra}, pdf_path=pdf_path)
 
 
 def _configs_two_sheets(adapter: Any, part: Path) -> dict[str, Any]:
@@ -596,6 +687,28 @@ def _is_true(value: Any) -> bool:
     return isinstance(value, (bool, int)) and bool(value)
 
 
+def _legacy_failures(capture: Mapping[str, Any]) -> list[str]:
+    """Require a working native/PDF baseline before interpreting later cases."""
+    failures: list[str] = []
+    name, sheet = _only_sheet(capture)
+    readings = _readings(capture, failures)
+    for source in SOURCES:
+        reading = readings.get((name, source))
+        kinds = None if reading is None else sorted(set(reading["problem_kinds"]))
+        if kinds != ["not-identity"]:
+            failures.append(f"{capture['key']} {source}: expected only not-identity, read {kinds!r}")
+    if sheet["printed_misfits"]:
+        failures.append(f"{capture['key']}: legacy PDF misfits {sheet['printed_misfits']!r}")
+    rows = {row["source"]: row["rows"] for row in sheet["physical_rows"]}
+    for source in SOURCES:
+        if rows.get(source) != 1:
+            failures.append(f"{capture['key']} {source}: legacy PDF physical rows {rows.get(source)!r}, not 1")
+    states = capture["observation_state"]
+    if not all(state == states[0] for state in states[1:]):
+        failures.append(f"{capture['key']}: native observations changed document state {states!r}")
+    return failures
+
+
 def _check_controls(captures: list[Mapping[str, Any]]) -> list[str]:
     """Every positive and negative control the captures must show; each
     failure says what was observed."""
@@ -610,12 +723,8 @@ def _check_controls(captures: list[Mapping[str, Any]]) -> list[str]:
     for layout in LAYOUTS:
         # control-v39: only its pre-cutover shapes breach -- nothing about fit.
         control = by_key[f"control-v39-{layout.value}"]
-        control_name, control_sheet = _only_sheet(control)
-        readings = _readings(control, failures)
-        for source in SOURCES:
-            reading = readings.get((control_name, source))
-            kinds = None if reading is None else sorted(set(reading["problem_kinds"]))
-            need(kinds == ["not-identity"], f"{control['key']} {source}: expected only not-identity, read {kinds!r}")
+        _control_name, control_sheet = _only_sheet(control)
+        failures.extend(_legacy_failures(control))
         for case in NORMAL_CASES:
             key = f"{case}-{layout.value}"
             capture = by_key[key]
@@ -731,18 +840,58 @@ def _check_controls(captures: list[Mapping[str, Any]]) -> list[str]:
     return failures
 
 
-async def probe(adapter: Any) -> dict[str, str]:
+async def probe(adapter: Any, *, legacy_only: bool = False) -> dict[str, str]:
     OUT.mkdir(parents=True, exist_ok=True)
+    report_path = DISCOVERY_REPORT if legacy_only else REPORT
     captures: list[dict[str, Any]] = []
     report: dict[str, Any] = {
+        "mode": "native-link-discovery" if legacy_only else "full-title-field-proof",
+        "success_means": "raw observations captured, not Title fit passed" if legacy_only else "all controls passed",
         "cases": {case: list(value) for case, value in CASES.items()},
         "configs": {name: [layout.value, value] for name, (layout, value) in CONFIGS.items()},
         "wrap_m": WRAP_M,
         "captures": captures,
     }
     try:
+        number, title = CASES["control-v39"]
+        legacy_part = await _scratch_part(adapter, "control-v39", number, title)
+        for layout in (DrawingLayout.LANDSCAPE,) if legacy_only else LAYOUTS:
+            capture = _single_sheet(
+                adapter,
+                f"control-v39-{layout.value}",
+                legacy_part,
+                layout,
+                number,
+                title,
+                pdf_path=DISCOVERY_PDF if legacy_only else None,
+            )
+            captures.append(capture)
+            failures = _legacy_failures(capture)
+            report["legacy_baseline_failures"] = failures
+            report["legacy_baseline_passed"] = not failures
+            if legacy_only:
+                catalogs = [sheet["native_catalog"] for sheet in capture["sheets"].values()]
+                if not all(
+                    any(
+                        isinstance(record.get("link"), str)
+                        and not record["link"].startswith("<error:")
+                        and isinstance(record.get("text"), str)
+                        and not record["text"].startswith("<error:")
+                        for collection in ("annotations", "notes")
+                        for record in catalog[collection]
+                    )
+                    for catalog in catalogs
+                ):
+                    raise RuntimeError("native link discovery captured no readable raw note link/text records")
+                discard_open_documents(adapter)
+                return {"report": str(report_path), "control-v39-landscape": str(DISCOVERY_PDF)}
+            if failures:
+                report["control_failures"] = failures
+                raise RuntimeError("legacy baseline failed; no later cases run:\n" + "\n".join(failures))
         parts = {}
         for case, (number, title) in CASES.items():
+            if case == "control-v39":
+                continue
             parts[case] = await _scratch_part(adapter, case, number, title)
             for layout in LAYOUTS:
                 captures.append(_single_sheet(adapter, f"{case}-{layout.value}", parts[case], layout, number, title))
@@ -763,14 +912,17 @@ async def probe(adapter: Any) -> dict[str, str]:
         raise
     finally:
         # Written whatever happened: a failed probe's evidence is the point.
-        REPORT.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
+        report_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     if report["control_failures"]:
         raise RuntimeError(
             f"title field probe: {len(report['control_failures'])} control(s) failed "
-            f"(see {REPORT}):\n" + "\n".join(report["control_failures"])
+            f"(see {report_path}):\n" + "\n".join(report["control_failures"])
         )
-    return {"report": str(REPORT), **{key: str(path) for key, path in PDFS.items()}}
+    return {"report": str(report_path), **{key: str(path) for key, path in PDFS.items()}}
 
 
 if __name__ == "__main__":
-    sys.exit(run_build(probe))
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--legacy-only", action="store_true", help="capture one landscape legacy catalog, not fit proof")
+    arguments = parser.parse_args()
+    sys.exit(run_build(lambda adapter: probe(adapter, legacy_only=arguments.legacy_only)))

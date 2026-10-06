@@ -2950,6 +2950,7 @@ def task_verify():
 
     # Temporary opt-in route-B probe; remove after native template evidence is captured.
     from diagnostics.probe_title_field_fit import PDFS, REPORT as probe_report
+    from diagnostics.probe_title_field_fit import DISCOVERY_PDF, DISCOVERY_REPORT
 
     probe = (SCRIPTS_DIR / "diagnostics" / "probe_title_field_fit.py").resolve()
     probe_outputs = [probe_report, *PDFS.values()]
@@ -2975,6 +2976,28 @@ def task_verify():
                     probe_deps,
                     probe_outputs,
                     "title-field-probe",
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
+    # Temporary one-view observation route; success is a catalog, not Title-fit proof.
+    discovery_outputs = [DISCOVERY_REPORT, DISCOVERY_PDF]
+    yield {
+        "name": "title_link_discovery",
+        "file_dep": probe_deps,
+        "targets": [str(path) for path in discovery_outputs],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "verify:title_link_discovery",
+                    [sys.executable, str(probe), "--legacy-only"],
+                    probe_deps,
+                    discovery_outputs,
+                    "title-link-discovery",
                 ],
             )
         ],
@@ -3932,6 +3955,7 @@ def task_release():
             "check:features_bound",
             # Temporary probe-export root edge; removed with the native probe.
             "verify:title_field_probe",
+            "verify:title_link_discovery",
             *(f"drawing:{s}" for s in _drawing_order()),
             *(f"verify:{s}" for s in _VERIFY_NAMES),
             *(f"check:{c}" for c in _CHECK_NAMES),

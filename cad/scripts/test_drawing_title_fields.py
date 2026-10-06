@@ -355,3 +355,23 @@ def test_a_read_that_moves_the_models_configuration_or_dirties_it_fails(change):
 def test_a_template_that_no_longer_links_one_note_per_cell_fails(notes):
     with pytest.raises(RuntimeError):
         _read(_SheetView("Sheet1", notes), _cone_gear())
+
+
+@pytest.mark.parametrize(
+    ("link", "owner"),
+    [
+        ('$PRPSHEET:"SW-Title"', 1),
+        ('$PRPSHEET:"SW-Title"', 0),
+        ('$PRP:"SW-Title"', 2),
+        ('$PRPVIEW:"SW-Title"', 2),
+    ],
+    ids=["drawing-owned", "view-owned", "drawing-property", "view-property"],
+)
+def test_only_a_template_owned_sheet_source_link_can_supply_the_title(link, owner):
+    """A matching displayed slug cannot prove where a note resolves its value."""
+    notes = [
+        _Note('$PRPSHEET:"Number"', "MHA-DT-003-T006", NUMBER_EXTENT),
+        _Note(link, "dt-cone-gear", TITLE_EXTENT, owner=owner),
+    ]
+    with pytest.raises(RuntimeError):
+        _read(_SheetView("Sheet1", notes), _cone_gear())
