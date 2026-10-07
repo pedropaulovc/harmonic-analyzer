@@ -22,9 +22,12 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     views = (
         drawing.PLAN_KEEP,
         drawing.ELEVATION_KEEP,
-        drawing.END_KEEP,
-        drawing.SECTION_KEEP,
+        drawing.SECTION_A_KEEP,
+        drawing.SECTION_B_KEEP,
+        drawing.SEAT_DIAMETER_TEXT,
     )
+    # The donor view only lends the seat diameters to the sections.
+    assert set(drawing.DONOR_KEEP) == set(drawing.SEAT_DIAMETER_TEXT)
     printed = [name for view in views for name in view]
     assert len(printed) == len(set(printed))
     assert set(printed) == set().union(*spec.DRAWING_DIMENSIONS.values())

@@ -107,8 +107,19 @@ if not (
 ):
     raise AssertionError("cone pin end leaves the base plate")
 
+# Layout datum: every transverse (X) location prints from the base's west
+# side face, a physical face the shop can square from, never from the post
+# axis. Stations (Y) print from foot B; heights from the base top.
+SIDE_W_X = -BASE_WIDTH / 2.0
+SEAT_AXIS_FROM_SIDE = -SIDE_W_X
+STOP_SIDE_OFFSET = (BASE_WIDTH - STOP_WIDTH) / 2.0
+SADDLE_SIDE_OFFSET = (BASE_WIDTH - SADDLE_WIDTH) / 2.0
+CRANK_PIN_WEST_FROM_SIDE = -CRANK_PIN_X - SIDE_W_X
+CRANK_PIN_EAST_FROM_SIDE = CRANK_PIN_X - SIDE_W_X
+CONE_PIN_ENTRY_FROM_SIDE = CONE_PIN_ENTRY_X - SIDE_W_X
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BaseProfile": {"BaseThick", "BaseLength", "SeatAxisHeight"},
+    "BaseProfile": {"BaseThick", "BaseLength"},
     "Base": {"BaseWidth"},
     "StopProfile": {"StopHeight", "StopThick"},
     "Stop": {"StopWidth"},
@@ -123,18 +134,34 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Saddles": {"SaddleWidth"},
     "BodySeatProfile": {"BodySeatDia"},
     "TailSeatProfile": {"TailSeatDia"},
-    "CrankPinProfile": {"CrankPinWestX", "CrankPinEastX", "CrankPinY", "CrankPinDia"},
+    "CrankPinProfile": {"CrankPinY", "CrankPinDia"},
     "CrankPins": {"CrankPinHeight"},
-    "ConePinStationReference": {"ConePinNearY", "ConePinFarY"},
-    "ConePinSectionReference": {"ConePinEntryX", "ConePinTilt", "ConePinHighEdge"},
+    "PlanReference": {
+        "ConePinNearY",
+        "ConePinFarY",
+        "StopSideX",
+        "SaddleSideX",
+        "CrankPinWestX",
+        "CrankPinEastX",
+    },
+    "ConePinSectionReference": {
+        "BodySeatAxisX",
+        "BodySeatAxisHeight",
+        "ConePinEntryX",
+        "ConePinTilt",
+        "ConePinHighEdge",
+    },
+    "TailSeatReference": {"TailSeatAxisX", "TailSeatAxisHeight"},
 }
-# One place for the plates and blocks: nothing locates on them closer than
-# the .X band. The body seat prints at the post body's own places
-# (MainBodyDia) and the crank pin station at the crank axis's (CrankAxisY).
-# The seat axis height, the tail seat, the cone pin stations and the pin
-# heights take two: the plan reads the pin heights to two places.
+# One place for the plates and blocks and the crank pins' transverse spots:
+# nothing locates on them closer than the .X band. The body seat prints at
+# the post body's own places (MainBodyDia) and the crank pin station at the
+# crank axis's (CrankAxisY). The seat axes, the tail seat, the cone pins'
+# stations and side offset and the pin heights take two: the pins set each
+# sleeve against the post lying in the seats, so seat axis and pin top share
+# one band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BaseProfile": {"BaseThick": 1, "BaseLength": 1, "SeatAxisHeight": 2},
+    "BaseProfile": {"BaseThick": 1, "BaseLength": 1},
     "Base": {"BaseWidth": 1},
     "StopProfile": {"StopHeight": 1, "StopThick": 1},
     "Stop": {"StopWidth": 1},
@@ -150,14 +177,26 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BodySeatProfile": {"BodySeatDia": post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]},
     "TailSeatProfile": {"TailSeatDia": 2},
     "CrankPinProfile": {
-        "CrankPinWestX": 1,
-        "CrankPinEastX": 1,
         "CrankPinY": post.DRAWING_PRECISION_BY_NAME["CrankAxisY"],
         "CrankPinDia": 1,
     },
     "CrankPins": {"CrankPinHeight": 2},
-    "ConePinStationReference": {"ConePinNearY": 2, "ConePinFarY": 2},
-    "ConePinSectionReference": {"ConePinEntryX": 2, "ConePinTilt": 2, "ConePinHighEdge": 2},
+    "PlanReference": {
+        "ConePinNearY": 2,
+        "ConePinFarY": 2,
+        "StopSideX": 1,
+        "SaddleSideX": 1,
+        "CrankPinWestX": 1,
+        "CrankPinEastX": 1,
+    },
+    "ConePinSectionReference": {
+        "BodySeatAxisX": 2,
+        "BodySeatAxisHeight": 2,
+        "ConePinEntryX": 2,
+        "ConePinTilt": 2,
+        "ConePinHighEdge": 2,
+    },
+    "TailSeatReference": {"TailSeatAxisX": 2, "TailSeatAxisHeight": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
@@ -166,17 +205,17 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked bond-cradle dimension needs authored places")
 
 # Construction-only sketches the part saves hidden; the drawing shows them in
-# the views that print their dimensions (_drawing_hidden_sketches).
-REFERENCE_SKETCHES = ("ConePinStationReference", "ConePinSectionReference")
-SECTION_REFERENCE_SKETCHES = ("ConePinSectionReference",)
+# the views that print their dimensions (_drawing_hidden_sketches). The two
+# section sketches lie in their cutting planes.
+REFERENCE_SKETCHES = ("PlanReference", "ConePinSectionReference", "TailSeatReference")
+SECTION_REFERENCE_SKETCHES = ("ConePinSectionReference", "TailSeatReference")
 
 SURFACE_FINISHES = ()
 BUILT_UP_PERMISSION_NOTE = "BASE, STOP AND SADDLES MAY BE SCREWED AND DOWELED BLOCKS."
 DRAWING_NOTES = "\n".join(
     (
         BUILT_UP_PERMISSION_NOTE,
-        "MACHINE BOTH SEATS AND THE STOP FACE AFTER DOWELING.",
-        "PINS: HARDENED DOWELS PRESSED INTO REAMED HOLES.",
+        "PINS: HARDENED DOWELS PRESSED INTO REAMED THROUGH HOLES; PIN ENDS STAY INSIDE THE BASE.",
         "PIN HEIGHTS FROM THE BASE TOP; CONE PINS AT THE HIGH EDGE.",
     )
 )
@@ -265,14 +304,14 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             ),
             "dia_nominal": (BODY_SEAT_DIA, ("BODY_SEAT_DIA", (_POST, "BLOCK_DIA"))),
             "height": (
-                limits(SEAT_AXIS_HEIGHT, DRAWING_PRECISION_BY_NAME["SeatAxisHeight"]),
+                limits(SEAT_AXIS_HEIGHT, DRAWING_PRECISION_BY_NAME["BodySeatAxisHeight"]),
                 ("SEAT_AXIS_HEIGHT", "BASE_TOP_Z"),
             ),
             "height_nominal": (SEAT_AXIS_HEIGHT, ("SEAT_AXIS_HEIGHT",)),
         },
         precision={
             "dia": DRAWING_PRECISION_BY_NAME["BodySeatDia"],
-            "height": DRAWING_PRECISION_BY_NAME["SeatAxisHeight"],
+            "height": DRAWING_PRECISION_BY_NAME["BodySeatAxisHeight"],
         },
     ),
     "tail_seat": ExportFeature(

@@ -10,9 +10,10 @@ profiles extruded mid-plane across X, so every height reads from the base
 top and every station from foot B. The two seats are mid-plane cuts on the
 post axis from planes square to it. The crank pins rise from a base-top
 plane; the cone pins run down the cone journal's tilt from the post's
-north-cap plane into the base. Two hidden reference sketches carry the cone
-pins' plan stations and their section-view tilt, hole position and gauge
-height for the drawing.
+north-cap plane into the base. Three hidden reference sketches carry what the
+drawing prints from the base's west side face, foot B and the base top: the
+plan layout, the cone pin's section (tilt, hole entry, gauge height, body
+seat axis) and the tail seat axis.
 
 Run (SolidWorks already open)::
 
@@ -49,7 +50,6 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -73,6 +73,7 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     BODY_SADDLE_Y,
     BODY_SEAT_DIA,
     CONE_PIN_AXIS,
+    CONE_PIN_ENTRY_FROM_SIDE,
     CONE_PIN_ENTRY_S,
     CONE_PIN_ENTRY_X,
     CONE_PIN_FAR_Y,
@@ -94,9 +95,12 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     PIN_DIA,
     PIN_RADIUS,
     REFERENCE_SKETCHES,
+    SADDLE_SIDE_OFFSET,
     SADDLE_WIDTH,
     SEAT_AXIS_HEIGHT,
     SEAT_OVERRUN,
+    SIDE_W_X,
+    STOP_SIDE_OFFSET,
     STOP_THICK,
     STOP_WIDTH,
     TAIL_SADDLE_THICK,
@@ -327,7 +331,7 @@ async def build(adapter: Any) -> dict[str, str]:
                     (_BASE_BOTTOM_U, BASE_END_Y + BASE_LENGTH),
                     (_BASE_TOP_U, BASE_END_Y + BASE_LENGTH),
                 ],
-                ["BaseThick", "BaseLength", "SeatAxisHeight", "BaseEndY"],
+                ["BaseThick", "BaseLength", "BaseTopZ", "BaseEndY"],
                 ['"BaseThick"', '"BaseLength"', '"SeatAxisHeight"', '"StopThick"'],
             )
         ],
@@ -430,9 +434,9 @@ async def build(adapter: Any) -> dict[str, str]:
     check("create sketch CrankPinProfile", await adapter.create_sketch("BaseTop"))
     for side, x in (("West", -CRANK_PIN_X), ("East", CRANK_PIN_X)):
         names = (
-            (f"CrankPin{side}X", "CrankPinY", "CrankPinDia")
+            (f"CrankPin{side}Offset", "CrankPinY", "CrankPinDia")
             if side == "West"
-            else (f"CrankPin{side}X", "CrankPinEastY", "CrankPinEastDia")
+            else (f"CrankPin{side}Offset", "CrankPinEastY", "CrankPinEastDia")
         )
         await define_circle(
             adapter,
@@ -514,11 +518,44 @@ async def build(adapter: Any) -> dict[str, str]:
     await volume_check(adapter, "cone pins", volume, 0.001 * volume)
     _require_one_solid_body(adapter, label="cone pins")
 
-    # 7. Hidden reference sketches for the drawing.
-    # Plan: the cone pin stations from foot B, on a construction line through
-    # both pin-top centres.
-    station = SketchDims()
-    check("create sketch ConePinStationReference", await adapter.create_sketch("Front"))
+    # 7. Hidden reference sketches for the drawing. Every transverse location
+    # prints from the base's west side face (SIDE_W_X), drawn as a
+    # construction line on that face in each sketch.
+    # Plan (Front: x = model X, y = model Y): the west side W from the base's
+    # end corner; the stop's and the body saddle's west edges; the crank pin
+    # centres; the cone pin stations from foot B on a line through both
+    # pin-top centres.
+    plan = SketchDims()
+    check("create sketch PlanReference", await adapter.create_sketch("Front"))
+    side = (
+        await add_line_chain(
+            adapter,
+            [(SIDE_W_X, BASE_END_Y), (SIDE_W_X, BASE_END_Y + BASE_LENGTH)],
+            close=False,
+        )
+    )[0]
+    stop_edge = (
+        await add_line_chain(
+            adapter,
+            [(SIDE_W_X + STOP_SIDE_OFFSET, 0.0), (SIDE_W_X + STOP_SIDE_OFFSET, BASE_END_Y)],
+            close=False,
+        )
+    )[0]
+    saddle_edge = (
+        await add_line_chain(
+            adapter,
+            [
+                (SIDE_W_X + SADDLE_SIDE_OFFSET, BODY_SADDLE_Y),
+                (SIDE_W_X + SADDLE_SIDE_OFFSET, BODY_SADDLE_Y + BODY_SADDLE_THICK),
+            ],
+            close=False,
+        )
+    )[0]
+    crank_line = (
+        await add_line_chain(
+            adapter, [(-CRANK_PIN_X, CRANK_PIN_Y), (CRANK_PIN_X, CRANK_PIN_Y)], close=False
+        )
+    )[0]
     station_line = (
         await add_line_chain(
             adapter,
@@ -526,24 +563,85 @@ async def build(adapter: Any) -> dict[str, str]:
             close=False,
         )
     )[0]
-    _as_construction(adapter, station_line)
+    for line in (side, stop_edge, saddle_edge, station_line):
+        _as_construction(adapter, line)
+        check(f"{line} vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
+    _as_construction(adapter, crank_line)
     check(
-        "station line vertical",
-        await adapter.add_sketch_constraint(station_line, None, "vertical"),
+        "crank pin line horizontal",
+        await adapter.add_sketch_constraint(crank_line, None, "horizontal"),
     )
+    corner = f"{side}.start"
+    await anchor_point_to_origin(adapter, corner, SIDE_W_X, BASE_END_Y, "base west corner")
+    plan.record("PlanSideX")
+    plan.record("PlanSideY")
+    await dimension_between(
+        adapter, corner, f"{side}.end", "vertical_distance", BASE_LENGTH, "base west side"
+    )
+    plan.record("PlanSideLength")
+    for line, offset, y0, length, name in (
+        (stop_edge, STOP_SIDE_OFFSET, 0.0, STOP_THICK, "Stop"),
+        (saddle_edge, SADDLE_SIDE_OFFSET, BODY_SADDLE_Y, BODY_SADDLE_THICK, "Saddle"),
+    ):
+        await dimension_between(
+            adapter, corner, f"{line}.start", "horizontal_distance", offset, f"{name.lower()} side"
+        )
+        plan.record(f"{name}SideX")
+        await dimension_between(
+            adapter, corner, f"{line}.start", "vertical_distance", y0 - BASE_END_Y, f"{name.lower()} edge start"
+        )
+        plan.record(f"{name}EdgeY")
+        await dimension_between(
+            adapter, f"{line}.start", f"{line}.end", "vertical_distance", length, f"{name.lower()} edge"
+        )
+        plan.record(f"{name}EdgeLength")
+    for point, x, name in (
+        (f"{crank_line}.start", -CRANK_PIN_X, "CrankPinWestX"),
+        (f"{crank_line}.end", CRANK_PIN_X, "CrankPinEastX"),
+    ):
+        await dimension_between(
+            adapter, corner, point, "horizontal_distance", x - SIDE_W_X, name
+        )
+        plan.record(name)
+    await dimension_between(
+        adapter, f"{crank_line}.start", "origin", "vertical_distance", CRANK_PIN_Y, "crank pin line"
+    )
+    plan.record("CrankPinLineY")
     await anchor_point_to_origin(
         adapter, f"{station_line}.start", CONE_PIN_TOP_X, CONE_PIN_NEAR_Y, "near cone pin"
     )
-    station.record("ConePinStationX")
-    station.record("ConePinNearY")
+    plan.record("ConePinStationX")
+    plan.record("ConePinNearY")
     await dimension_between(
         adapter, f"{station_line}.end", "origin", "vertical_distance", CONE_PIN_FAR_Y, "far cone pin"
     )
-    station.record("ConePinFarY")
-    await ensure_fully_defined(adapter, "ConePinStationReference")
-    check("exit sketch ConePinStationReference", await adapter.exit_sketch())
-    name_last_feature(adapter, "ConePinStationReference")
-    drive_jobs += station.apply(adapter, "ConePinStationReference")
+    plan.record("ConePinFarY")
+    await ensure_fully_defined(adapter, "PlanReference")
+    check("exit sketch PlanReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "PlanReference")
+    drive_jobs += plan.apply(adapter, "PlanReference")
+
+    async def _seat_axis_from_side(sketch_dims: SketchDims, which: str) -> str:
+        """The west side W on the section plane (x = model X, y = model -Z)
+        from the base top to its bottom, its top corner anchored to the seat
+        axis (the sketch origin): the seat axis prints from W and the base top."""
+        line = (
+            await add_line_chain(
+                adapter, [(SIDE_W_X, _BASE_TOP_U), (SIDE_W_X, _BASE_BOTTOM_U)], close=False
+            )
+        )[0]
+        _as_construction(adapter, line)
+        check(f"{which} side vertical", await adapter.add_sketch_constraint(line, None, "vertical"))
+        await anchor_point_to_origin(
+            adapter, f"{line}.start", SIDE_W_X, _BASE_TOP_U, f"{which} seat axis"
+        )
+        sketch_dims.record(f"{which}SeatAxisX")
+        sketch_dims.record(f"{which}SeatAxisHeight")
+        await dimension_between(
+            adapter, f"{line}.start", f"{line}.end", "vertical_distance", BASE_THICK, f"{which} side"
+        )
+        sketch_dims.record(f"{which}SideLength")
+        return f"{line}.start"
 
     # Section through the near cone pin (a Top-parallel plane: x = model X,
     # y = model -Z): gauge line A-E rising square from the hole's entry E on
@@ -562,12 +660,23 @@ async def build(adapter: Any) -> dict[str, str]:
         "create sketch ConePinSectionReference",
         await adapter.create_sketch("ConePinSectionPlane"),
     )
+    section_corner = await _seat_axis_from_side(section, "Body")
     gauge, pin_axis, top_radius = await add_line_chain(adapter, chain, close=False)
     for line in (gauge, pin_axis, top_radius):
         _as_construction(adapter, line)
     check("gauge line vertical", await adapter.add_sketch_constraint(gauge, None, "vertical"))
-    await anchor_point_to_origin(adapter, f"{gauge}.end", *entry, "cone pin hole entry")
+    await dimension_between(
+        adapter,
+        section_corner,
+        f"{gauge}.end",
+        "horizontal_distance",
+        CONE_PIN_ENTRY_FROM_SIDE,
+        "cone pin hole entry",
+    )
     section.record("ConePinEntryX")
+    await dimension_between(
+        adapter, f"{gauge}.end", "origin", "vertical_distance", -BASE_TOP_Z, "hole entry height"
+    )
     section.record("ConePinSectionZ")
     await dimension_between(
         adapter, f"{gauge}.start", f"{gauge}.end", "vertical_distance", _GAUGE_LINE, "gauge line"
@@ -596,6 +705,16 @@ async def build(adapter: Any) -> dict[str, str]:
     check("exit sketch ConePinSectionReference", await adapter.exit_sketch())
     name_last_feature(adapter, "ConePinSectionReference")
     drive_jobs += section.apply(adapter, "ConePinSectionReference")
+
+    # Section B-B through the tail saddle: the tail seat's axis from W and
+    # the base top, on the tail seat's own mid plane.
+    tail = SketchDims()
+    check("create sketch TailSeatReference", await adapter.create_sketch("TailSeatPlane"))
+    await _seat_axis_from_side(tail, "Tail")
+    await ensure_fully_defined(adapter, "TailSeatReference")
+    check("exit sketch TailSeatReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "TailSeatReference")
+    drive_jobs += tail.apply(adapter, "TailSeatReference")
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:
