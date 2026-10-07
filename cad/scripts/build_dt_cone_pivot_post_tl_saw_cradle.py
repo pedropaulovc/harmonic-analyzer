@@ -60,7 +60,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _hole_spec import blind_cut_dia_mm
-from _holes import wizard_holes
+from _holes import SharedCoordinate, wizard_holes
 from _saved_part_guard import require_saved_drawing_properties
 from dt_cone_pivot_post_tl_saw_cradle_spec import (
     BASE_HT,
@@ -399,8 +399,8 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "relief", V_RELIEVED, 0.005 * V_RELIEVED)
 
     # Cap-bridge stud taps: ONE native 3/8-16 feature, two through-all
-    # instances from the base top beside the saddles. The far stud's X
-    # station is the near one's baseline and stays unprinted.
+    # instances from the base top beside the saddles. The far stud shares the
+    # near one's X station by relation, so one printed "2X" StudX locates both.
     tap_drill = blind_cut_dia_mm(STUD_TAP_SPEC)
     taps = wizard_holes(
         adapter,
@@ -412,7 +412,7 @@ async def build(adapter) -> dict[str, str]:
         expect_dia_mm=tap_drill,
         placement_dims=[
             (("StudX", '"StudX"'), ("StudNearZ", '"StudNearZ"')),
-            (("StudFarX", '"StudX"'), ("StudFarZ", '"StudFarZ"')),
+            (SharedCoordinate(0), ("StudFarZ", '"StudFarZ"')),
         ],
     )
     drive_jobs += taps.placement_drive_jobs

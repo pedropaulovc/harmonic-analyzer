@@ -22,13 +22,14 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     import_cosmetic_threads,
     new_project_drawing,
@@ -146,12 +147,33 @@ RIGHT_KEEP = {
     "SeatBottomHt": (_right_x(0.0) + _GAP, _y(14.0)),
     "SeatDia": SEAT_DIA_XY,
 }
+# The far tap shares the near tap's X station by a model relation, so the one
+# printed station locates both.
+DIMENSION_PREFIXES = {"StudX": "2X "}
 # The tap callout leads from the far stud's drill rim to the clear sheet right
 # of the top view, below the right view's station stack; nothing it crosses
 # is a dimension or extension line.
 FAR_STUD_RIM = (_x(STUD_X + STUD_TAP_DRILL / 2.0), _top_y(STUD_Z[1]))
 # The callout's text is centred on its point; half its width clears the view.
 TAP_CALLOUT_XY = (_x(BASE_LENGTH) + 0.042, _top_y(STUD_Z[1]) + 0.004)
+
+
+def _set_dimension_prefixes(
+    adapter: Any, annotations: list[Any], prefixes: dict[str, str]
+) -> None:
+    """Write a native prefix on named imported dimensions and read it back."""
+    remaining = dict(prefixes)
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        prefix = remaining.pop(dimension_name(adapter, annotation), None)
+        if prefix is None:
+            continue
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        display.SetText(1, prefix)  # swDimensionTextPrefix
+        if str(display.GetText(1) or "") != prefix:
+            raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
+    if remaining:
+        raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -213,6 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the stud taps")
 

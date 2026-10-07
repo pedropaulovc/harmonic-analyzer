@@ -7,6 +7,11 @@ rests on the pad between the saddles. The cap-bridge clamp's two studs thread
 into the base, and the bandsaw vise grips the base. The bridge load runs down the
 cone sleeve onto the pad, never through the bonded joint.
 
+The cradle is one piece: a milled 1018 block whose seats are bored on one
+axis through both saddles and whose pad top is machined flush with the seat
+bottoms. The inventory's screwed and doweled saddles are not a permitted
+route.
+
 Frame: model axes are the inventory's saw-cradle frame (cone plan frame B6:
 post axis along -X, head top X0, cone cross-bore +Z up), re-based to a
 touchable corner and turned Y-up for ASME views. The mapping is
@@ -180,13 +185,11 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked saw-cradle dimension needs authored places")
 
 SURFACE_FINISHES = ()
-BUILT_UP_PERMISSION_NOTE = "BUILT-UP CONSTRUCTION IS PERMITTED."
 PAD_FLUSH_NOTE = "PAD TOP FLUSH WITH SEAT BOTTOMS."
 DRAWING_NOTES = "\n".join(
     (
         "BOTH SEATS ON ONE COMMON AXIS.",
         PAD_FLUSH_NOTE,
-        BUILT_UP_PERMISSION_NOTE,
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

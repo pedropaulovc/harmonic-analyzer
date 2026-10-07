@@ -48,10 +48,10 @@ def test_head_saddle_fits_between_the_head_shoulder_and_the_cone_boss() -> None:
     assert head[1] <= spec.HEAD_GAP_MIN
 
 
-def test_built_up_construction_is_explicitly_permitted_on_the_print() -> None:
-    manifest = export_features.requirement_manifest(STEM)
-    assert manifest["construction"] == "built_up_permitted"
-    assert spec.BUILT_UP_PERMISSION_NOTE in spec.DRAWING_NOTES.splitlines()
+def test_cradle_is_one_piece() -> None:
+    """No component definition exists for a built-up cradle, so the export
+    must not let prechips plan one."""
+    assert export_features.requirement_manifest(STEM)["construction"] == "one_piece"
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
