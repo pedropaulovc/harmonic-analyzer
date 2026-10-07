@@ -89,7 +89,7 @@ if PIN_LENGTH + _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[1]) >= REAM_DEPTH
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LandProfile": {"LandDia"},
     "FlatsProfile": {"FlatsAF"},
-    "Land": {"LandHeight"},
+    "Flats": {"LandHeight"},
     "NeckProfile": {"NeckDia"},
     "Neck": {"NeckLength"},
     "CollarProfile": {"CollarDia"},
@@ -102,7 +102,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LandProfile": {"LandDia": LAND_PLACES},
     "FlatsProfile": {"FlatsAF": FLATS_PLACES},
-    "Land": {"LandHeight": 3},
+    "Flats": {"LandHeight": 3},
     "NeckProfile": {"NeckDia": NECK_PLACES},
     "Neck": {"NeckLength": 2},
     "CollarProfile": {"CollarDia": 1},

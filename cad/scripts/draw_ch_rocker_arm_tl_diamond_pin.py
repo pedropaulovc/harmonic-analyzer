@@ -177,8 +177,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     moved = []
     kept_on_end = []
-    for source, annotations in ((donor, donor_annotations), (end, end_annotations)):
-        for annotation in annotations:
+    for source, source_annotations in ((donor, donor_annotations), (end, end_annotations)):
+        for annotation in source_annotations:
             name = dimension_name(adapter, annotation)
             if name in PROFILE_DIAMETER_XY:
                 moved.append(

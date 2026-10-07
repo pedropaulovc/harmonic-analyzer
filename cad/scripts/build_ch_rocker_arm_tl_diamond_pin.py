@@ -67,7 +67,7 @@ from ch_rocker_arm_tl_diamond_pin_spec import (
     NECK_DIA,
     NECK_LENGTH,
     OVERALL_LENGTH,
-    PIN_ENGAGEMENT,
+    PIN_LENGTH,
     REAM_BAND,
     REAM_DEPTH,
     REAM_DIA,
@@ -104,8 +104,7 @@ V_COLLAR = _area(COLLAR_DIA) * COLLAR_END
 V_SHANK = V_COLLAR + _area(SHANK_DIA) * (OVERALL_LENGTH - COLLAR_END)
 V_NECK = V_SHANK - (_area(COLLAR_DIA) - _area(NECK_DIA)) * NECK_LENGTH
 V_BODY = V_NECK - _area(REAM_DIA) * REAM_DEPTH
-V_LANDS = V_BODY + _area(LAND_DIA) * LAND_HEIGHT
-V_PIN = V_LANDS + _area(LAND_DIA) * PIN_ENGAGEMENT
+V_PIN = V_BODY + _area(LAND_DIA) * PIN_LENGTH
 V_TOTAL = V_PIN - 2.0 * _segment_area(LAND_DIA / 2.0, FLATS_AF / 2.0) * LAND_HEIGHT
 
 
@@ -117,9 +116,11 @@ def _require_bodies(adapter, count: int, *, label: str) -> None:
         raise RuntimeError(f"{label}: expected {count} solid bodies, found {len(bodies)}")
 
 
-async def _circle_sketch(adapter, label: str, dia: float, profile: str, name: str, drive: str):
+async def _circle_sketch(
+    adapter, label: str, dia: float, profile: str, name: str, drive: str, *, plane: str = "Front"
+):
     dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
+    check(f"create_sketch {label}", await adapter.create_sketch(plane))
     await define_circle(
         adapter,
         0.0,
@@ -202,7 +203,7 @@ async def _flats_sketch(adapter) -> list[tuple[str, str]]:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -284,39 +285,39 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "reamed body", V_BODY, 0.005 * V_BODY)
     _require_bodies(adapter, 1, label="body")
 
-    # The bonded gauge pin: its own solid, the lands -Z above the neck face.
-    drive_jobs += await _circle_sketch(
-        adapter, "lands", LAND_DIA, "LandProfile", "LandDia", '"LandDia"'
-    )
+    # The bonded gauge pin: ONE separate solid (merge off), sketched on a
+    # plane at the land tip and extruded +Z down into the ream by its length.
     check(
-        "extrude lands",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=LAND_HEIGHT, reverse_direction=True, merge_result=False)
+        "create_plane LandTipPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=-LAND_HEIGHT)
         ),
     )
-    name_last_feature(adapter, "Land")
-    drive_jobs.append((name_dimensions(adapter, "Land", ["LandHeight"])[0], '"LandHeight"'))
-    await volume_check(adapter, "lands", V_LANDS, 0.005 * V_LANDS)
-    _require_bodies(adapter, 2, label="body and lands")
-
+    name_last_feature(adapter, "LandTipPlane")
+    tip_dim = name_dimensions(adapter, "LandTipPlane", ["LandTipStation"])
+    drive_jobs.append((tip_dim[0], '"LandHeight"'))
     drive_jobs += await _circle_sketch(
-        adapter, "bonded pin", LAND_DIA, "PinProfile", "PinDia", '"LandDia"'
+        adapter, "lands", LAND_DIA, "LandProfile", "LandDia", '"LandDia"', plane="LandTipPlane"
     )
     check(
-        "extrude bonded pin",
-        await adapter.create_extrusion(ExtrusionParameters(depth=PIN_ENGAGEMENT)),
+        "extrude pin",
+        await adapter.create_extrusion(
+            ExtrusionParameters(depth=PIN_LENGTH, merge_result=False)
+        ),
     )
-    name_last_feature(adapter, "PinBonded")
-    name_dimensions(adapter, "PinBonded", ["PinEngagement"])
-    await volume_check(adapter, "bonded pin", V_PIN, 0.005 * V_PIN)
+    name_last_feature(adapter, "Pin")
+    name_dimensions(adapter, "Pin", ["PinLength"])
+    await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
     _require_bodies(adapter, 2, label="body and pin")
 
-    # The flats cut -Z (the cut default) from the neck face: only the pin's
-    # lands live there, so the body is untouched.
+    # The flats cut -Z (the cut default) from the neck face to the tip: only
+    # the pin's lands live there, so the body is untouched; a pin extruded the
+    # wrong way off its tip plane leaves nothing here and fails the volume.
+    # The cut's depth IS the printed land height.
     drive_jobs += await _flats_sketch(adapter)
     check("cut flats", await adapter.create_cut_extrude(ExtrusionParameters(depth=LAND_HEIGHT)))
     name_last_feature(adapter, "Flats")
-    drive_jobs.append((name_dimensions(adapter, "Flats", ["FlatsDepth"])[0], '"LandHeight"'))
+    drive_jobs.append((name_dimensions(adapter, "Flats", ["LandHeight"])[0], '"LandHeight"'))
     await volume_check(adapter, "diamond pin", V_TOTAL, 0.005 * V_TOTAL)
     _require_bodies(adapter, 2, label="diamond pin")
 
@@ -333,7 +334,7 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
     for feature, dimension, band in (
         ("LandProfile", "LandDia", LAND_BAND),
-        ("Land", "LandHeight", LAND_HEIGHT_BAND),
+        ("Flats", "LandHeight", LAND_HEIGHT_BAND),
         ("ShankProfile", "ShankDia", SHANK_BAND),
         ("ReamProfile", "ReamDia", REAM_BAND),
         ("Collar", "CollarEnd", COLLAR_END_BAND),
