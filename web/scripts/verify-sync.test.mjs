@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { runInNewContext } from 'node:vm'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } from './verify-sync.mjs'
+import { parseOptions, sourceCensus, finishVideo, seekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } from './verify-sync.mjs'
 import { jsonDigest, loadCanonicalObservations } from './verify-reference.mjs'
 import { NATIVE_IDENTITY_MAP_SHA256 } from '../model-representation.mjs'
 import { LIVE_MODEL_SOURCE } from './approved-model.mjs'
@@ -577,7 +577,7 @@ async function controlledEligibilityResponse(deriveNativeStagePixelRay) {
   const hit = { primitiveId: id, identity: row.identity, scope: 'artifact', runtimeInstance: null, triangleIndex: 0, indexOffset: 0,
     vertexIds: [0, 1, 2], materialUuid: 'material', distanceMetres: 1, barycentric: [1, 0, 0], worldPointMetres: [0, 0, -1], targetResidualMetres: 0, targetClassIncident: true }
   const cpu = { metadata, ray: deriveNativeStagePixelRay(draw, target.nativeStageBackingPixel), bufferReceipts, result: {
-    eligibility: 'eligible-cpu-exact-local-class', targetPrimitiveId: id, targetLocalCoordinate: target.exactLocalPosition, classVertexIds,
+    eligibility: 'eligible-cpu-exact-local-class', eligibilityScope: 'queried-ray-exact-vertex-identity', targetPrimitiveId: id, targetLocalCoordinate: target.exactLocalPosition, classVertexIds,
     geometricResidualToleranceMetres: 1e-7, firstHit: hit, coincidentClosestHits: [hit],
     scope: { primitiveCount: 1, artifactPrimitiveCount: 1, runtimeClonePrimitiveCount: 0, springPrimitiveCount: 0, drawSubmissionCount: 1, limitations: [], rayProofLimited: false },
     safety: { sourceQualification: 'not-performed', gpuSafety: 'unmeasured-independent-proof-required', worldCoordinatePrecision: 'float64-cpu-not-exact-gpu',
@@ -647,20 +647,37 @@ test('optional native eligibility cannot suppress pixel errors or qualify stale 
   } finally { await server.close() }
 })
 
-test('GPU source proof cannot substitute a stale physical attachment state while input and camera match', () => {
-  const fixture = measuredViewFixture()
-  assert.equal(measureFixture(fixture).measured.length, 4)
-  fixture.view.sourceAssembly = {
-    kind: 'source-assembly',
-    provenance: { kind: 'chosen-feasible', videoId: 'jfH-NbsmvD4', frameIndex: 30,
-      evidence: 'Independent actual source nut-release witness.', unobservedDegreesOfFreedom: ['thread phase'] },
-    retainingNut: { attachment: 'threaded', releaseTurns: 2 },
-  }
-  assert.throws(() => measureFixture(fixture))
-  fixture.capture.sourceLayout[0].sourceAssembly = structuredClone(fixture.view.sourceAssembly)
-  // Even identical stale camera/input/layout receipts cannot hide an operating
-  // state reported by the actual view while the requested nut is released.
-  assert.throws(() => measureFixture(fixture))
+test('GPU source proof cannot substitute a stale physical attachment state while input and camera match', async () => {
+  const { createServer } = await import('vite')
+  const { fileURLToPath } = await import('node:url')
+  const server = await createServer({ root: fileURLToPath(new URL('../', import.meta.url)), configFile: false,
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' })
+  try {
+    const { compileSourceAssemblyState } = await server.ssrLoadModule('/src/source-assembly.ts')
+    const fixture = measuredViewFixture(), operating = measureFixture(fixture)
+    const chosen = compileSourceAssemblyState({
+      kind: 'source-assembly',
+      provenance: { kind: 'chosen-feasible', videoId: 'jfH-NbsmvD4', frameIndex: 30,
+        evidence: 'Consumer constraint control, not a measured source nut-release trajectory.',
+        unobservedDegreesOfFreedom: ['thread phase'] },
+      retainingNut: { attachment: 'threaded', releaseTurns: 2 },
+    }).state
+    fixture.view.sourceAssembly = chosen
+    fixture.capture.sourceLayout[0].sourceAssembly = chosen
+    fixture.response.actual.views[0].sourceAssembly = chosen
+    // The exact compiler-admitted chosen fixture passes every measurement gate.
+    // Restore each boundary independently; a schema/baseline refusal cannot
+    // substitute for rejecting the requested-vs-rendered physical state.
+    assert.deepEqual(measureFixture(fixture), operating)
+    fixture.response.actual.views[0].sourceAssembly = { kind: 'operating' }
+    assert.throws(() => measureFixture(fixture))
+    fixture.response.actual.views[0].sourceAssembly = chosen
+    assert.deepEqual(measureFixture(fixture), operating)
+    fixture.capture.sourceLayout[0].sourceAssembly = { kind: 'operating' }
+    assert.throws(() => measureFixture(fixture))
+    fixture.capture.sourceLayout[0].sourceAssembly = chosen
+    assert.deepEqual(measureFixture(fixture), operating)
+  } finally { await server.close() }
 })
 
 test('schema template matching admits only independent seed and actual correlation provenance', () => {
@@ -757,6 +774,36 @@ test('playback chooses a complete required same-shot window instead of crossing 
   assert.equal(interval.endSeconds, 15)
   assert.equal(interval.availableSeconds, 6)
   assert.equal(playbackInterval({ track: { shots: shots.slice(0, 2), frames: frames.slice(0, 2) }, native: { durationSeconds: 15 } }), null)
+})
+
+test('paused manual setup admits a short complete operating exposure without granting playback coverage', () => {
+  const chosen = { ...frame(0.3), shotId: 'short', sourceImage: sourceImage(0, 'short-control'), views: [sourceView('main')] }
+  const record = {
+    track: { shots: [{ id: 'short', startSeconds: 0.25, endSeconds: 0.5, classification: 'machine' }], frames: [chosen] },
+    native: { durationSeconds: 4, pts: [0.3] },
+  }
+  assert.equal(playbackInterval(record), null)
+  assert.equal(manualInteractionFrame(record), chosen)
+  for (const mutate of [
+    sample => { sample.views = [] },
+    sample => { delete sample.views[0].camera },
+    sample => { delete sample.views[0].input },
+    sample => { sample.sourceSampleUnavailable = true },
+    sample => { sample.classification = 'non-machine' },
+    sample => { sample.decodedTimeSeconds = 0.5 },
+    sample => { sample.decodedTimeSeconds = 0.31 },
+    sample => { sample.timeSeconds = 0.800001 },
+    sample => { sample.sourceImage.frameIndex = 1 },
+    sample => { sample.views[0].sourceAssembly = {
+      kind: 'source-assembly', provenance: { kind: 'chosen-feasible', videoId: 'jfH-NbsmvD4', frameIndex: 0,
+        evidence: 'Consumer constraint control.', unobservedDegreesOfFreedom: ['thread phase'] },
+      retainingNut: { attachment: 'threaded', releaseTurns: 2 },
+    } },
+  ]) {
+    const incomplete = structuredClone(record)
+    mutate(incomplete.track.frames[0])
+    assert.equal(manualInteractionFrame(incomplete), null)
+  }
 })
 
 test('a passed summary cannot hide failed pixels or an unmeasured mandatory clock', () => {

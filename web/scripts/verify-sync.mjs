@@ -32,7 +32,7 @@ const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const delay = ms => new Promise(done => setTimeout(done, ms))
 const maximumField = (rows, field) => rows.reduce((maximum, row) => finite(row[field]) ? Math.max(maximum ?? 0, row[field]) : maximum, null)
 const HELP = `Usage: npm --prefix web run verify:sync -- [--stage 50|20|10|5] [--video <id|slug>] [--from seconds --to seconds | --times t,t,...] [--player local|youtube|both] [--headless|--headed] [--output directory]\nDefault: ALL SIX videos, final 5% of the 1920px frame width = 96px, timing <=0.5s, headless Chromium.\nStages 50/20/10/5 are ERROR tolerances (960/384/192/96px), never coverage fractions.\nPer-video and time-scoped runs measure available samples without an all-six preflight. A time-scoped report is partial, NEVER a whole-video stage pass. Stage 5 requires actual official YouTube playback/audio/compact checks; coarse stages default to byte-identical local original playback.\nRequires built dist, original MP4s in HARMONIC_REFERENCE_ROOT/videos (default web/.vite/reference-root), ffprobe/ffmpeg and Playwright Chromium. No attempt cap. Old certification code remains in git history; retained private diagnostic evidence is unchanged.\nExamples:\n  npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119\n  npm --prefix web run verify:sync -- --stage 20 --video machine-spin\n  npm --prefix web run verify:sync\n`
-const NATIVE_ELIGIBILITY_HELP = `\nOptional --native-eligibility requires --times t,t,... and collects the full current native primitive buffers once per requested required frame. It runs the tracked CPU first-surface guard and actual native target/depth and shader-feedback APIs, with an independent eligible/ineligible/unresolved report. Missing GPU bounds stay unresolved; eligibility NEVER changes source pixel errors, coverage, playback, or source acceptance. Only the last current native draw retains geometry; earlier simultaneous views stay unresolved. Default runs do not collect full native geometry.\nExample:\n  npm --prefix web run verify:sync -- --stage 50 --video intro-history --times 6.84 --native-eligibility\n`
+const NATIVE_ELIGIBILITY_HELP = `\nOptional --native-eligibility requires --times t,t,... and collects the full current native primitive buffers once per requested required frame. It runs the tracked CPU first-surface guard and actual native target/depth and shader-feedback APIs, with an independent eligible/ineligible/unresolved report. Missing GPU bounds stay unresolved; eligibility NEVER changes source pixel errors, coverage, playback, or source acceptance. Only the last current native draw retains geometry; earlier simultaneous views stay unresolved. Default runs report eligibility as not-collected without loading the opt-in consumers; fresh source authority and ordinary native geometry checks remain mandatory.\nExample:\n  npm --prefix web run verify:sync -- --stage 50 --video intro-history --times 6.84 --native-eligibility\n`
 
 // Native orbit normalization can perturb stored floats without moving the camera.
 // Compare physical pose, not JSON bytes; invalid poses must never pass either gate.
@@ -706,6 +706,24 @@ export function playbackInterval(record, minimumSeconds = 3) {
   return candidate
 }
 
+/** Paused manual controls need one complete operating exposure, not a playback window.
+ * The record has passed ordinary source/schema/assembly validation; review still
+ * requires the actual chosen pose, physical solve and decoded original clock. */
+export function manualInteractionFrame(record) {
+  const shots = new Map(record.track.shots.map(shot => [shot.id, shot]))
+  return record.track.frames.find(frame => {
+    if (!sourcePtsInShot(frame, shots.get(frame.shotId)) || frame.sourceSampleUnavailable === true
+      || !sourceNeedsMachine(frame, shots.get(frame.shotId)) || !finite(frame.timeSeconds)
+      || frame.decodedTimeSeconds < 0 || frame.decodedTimeSeconds >= record.native.durationSeconds
+      || Math.abs(frame.decodedTimeSeconds - frame.timeSeconds) > CLOCK_LIMIT
+      || !frame.views?.length || !frame.views.every(view => view.camera && view.input
+        && (view.sourceAssembly?.kind ?? 'operating') === 'operating')) return false
+    const index = nearestPtsIndex(record.native.pts, frame.decodedTimeSeconds)
+    return Math.abs(record.native.pts[index] - frame.decodedTimeSeconds) <= 0.001
+      && (!frame.sourceImage || frame.sourceImage.frameIndex === index)
+  }) ?? null
+}
+
 // Keep this browser-evaluated reader self-contained. Match renderViews' exact
 // native colour contribution gate: opaque views draw, crossfades draw only > 0.
 export function readPlaybackRenderState() {
@@ -913,8 +931,8 @@ async function interactionChecks(page, embed, record, outputDirectory) {
     Object.assign(evidence.predicates, Object.fromEntries(Object.entries(predicates).map(([name, passed]) => [name, passed ? 'passed' : 'failed'])))
   }
   try {
-    const frame = playbackInterval(record)?.frame
-    assert(frame, 'Manual interaction needs a complete chosen source-machine exposure')
+    const frame = manualInteractionFrame(record)
+    assert(frame, 'Manual interaction needs a complete chosen operating source-machine exposure')
     evidence.sourceSetup = await preparePausedSource(page, embed, record, [{ frame }])
     const reviewed = await review(page, embed, record, frame)
     evidence.sourceSeek = reviewed.seek
@@ -1014,13 +1032,16 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
   const seeds = sourceSeedIndex([...record.observations.frames, ...record.track.frames])
   const measuredFrames = new Map()
   let eligibilityModule, eligibilityModuleError
-  try { eligibilityModule = await loadCurrentNativeEligibilityModule() }
-  catch (error) { eligibilityModuleError = error.message }
+  if (options.nativeEligibility) {
+    try { eligibilityModule = await loadCurrentNativeEligibilityModule() }
+    catch (error) { eligibilityModuleError = error.message }
+  }
   for (const row of census.selected) {
     const sample = { timeSeconds: row.timeSeconds, reasons: row.reasons, diagnosticOnly: row.diagnosticOnly === true, required: row.required, sourceShotId: row.sourceShotId, sampleTimeSeconds: row.frame?.timeSeconds ?? null, sourceImageReplay: row.sourceImageReplay ?? null, status: 'unavailable', measurements: [], unavailable: [], excluded: [] }
     video.samples.push(sample)
     if (row.required) sample.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(row.frame,
-      eligibilityModuleError ?? 'The required current frame has not been reviewed', eligibilityModuleError ? 'module-seal-unavailable' : 'required-frame-not-reviewed')
+      options.nativeEligibility ? eligibilityModuleError ?? 'The required current frame has not been reviewed' : 'Optional current native eligibility collection was not requested',
+      options.nativeEligibility ? eligibilityModuleError ? 'module-seal-unavailable' : 'required-frame-not-reviewed' : 'opt-in-current-frame-collection-not-requested')
     if (!row.frame) { sample.unavailable.push({ reason: row.unavailableReason }); continue }
     const frame = row.frame
     try {
@@ -1045,15 +1066,16 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
         const maxClockSkewSeconds = clocks.length ? Math.max(...clocks) : null
         result = { measurements, unavailable, excluded, maxClockSkewSeconds, status: measurements.some(item => item.status === 'failed') || maxClockSkewSeconds !== null && maxClockSkewSeconds > CLOCK_LIMIT ? 'failed' : unavailable.length || !measurements.length || maxClockSkewSeconds === null ? 'unavailable' : 'passed' }
         // Qualification is an optional report, never a measurement or playback gate.
-        try {
-          if (eligibilityModule) {
-            response.nativeEligibilityEvidence = await collectCurrentNativeEligibilityEvidence(page, frame, response, eligibilityModule,
-              { collect: options.nativeEligibility })
-            result.nativeLandmarkEligibility = await joinCurrentNativeEligibilityReport(eligibilityModule.joinNativeLandmarkEligibility, frame, response)
-            result.nativeLandmarkEligibility.consumerSeals = eligibilityModule.seals
-          } else result.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(frame, eligibilityModuleError)
-        } catch (error) {
-          result.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(frame, error.message, 'native-evidence-collection-unavailable')
+        if (options.nativeEligibility) {
+          try {
+            if (eligibilityModule) {
+              response.nativeEligibilityEvidence = await collectCurrentNativeEligibilityEvidence(page, frame, response, eligibilityModule, { collect: true })
+              result.nativeLandmarkEligibility = await joinCurrentNativeEligibilityReport(eligibilityModule.joinNativeLandmarkEligibility, frame, response)
+              result.nativeLandmarkEligibility.consumerSeals = eligibilityModule.seals
+            } else result.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(frame, eligibilityModuleError)
+          } catch (error) {
+            result.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(frame, error.message, 'native-evidence-collection-unavailable')
+          }
         }
         measuredFrames.set(frame.timeSeconds, result)
       }
