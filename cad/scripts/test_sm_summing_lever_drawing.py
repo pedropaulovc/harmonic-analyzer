@@ -14,7 +14,6 @@ import draw_sm_summing_lever as drawing
 import sm_summing_lever_spec
 from _drawing_common import ViewEdge, ViewEdges, assert_dimension_measures
 from _part_pmi import _FaceGeometry
-from _surface_finish import surface_finish_by_key
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
@@ -40,6 +39,19 @@ def _line(start, end):
     return ViewEdge(object(), (start, end), None, None)
 
 
+def _pickup_geometry(face, spec):
+    return _FaceGeometry(
+        face=face,
+        identity=4001,
+        parameters=(
+            *spec.normal,
+            *(component * spec.offset_mm / 1000.0 for component in spec.normal),
+        ),
+        outward_normal=spec.normal,
+        box=(-0.1, -0.1, -0.1, 0.1, 0.1, 0.1),
+    )
+
+
 @pytest.mark.parametrize("sign", (-1, 1))
 def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside(sign) -> None:
     """Both finished length pickups use the actual end, never the inboard
@@ -63,15 +75,12 @@ def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside(sign) -> 
         )
 
 
-def test_datum_b_finish_consumer_rejects_flange_and_opposite_end(
+def test_datum_b_machining_witness_rejects_flange_and_opposite_end(
     identity, monkeypatch,
 ) -> None:
-    """The machining symbol must qualify B's physical +Z end face, not a
-    coincident projection or the previously mispicked inboard flange."""
+    """A nonnumeric linked instruction still needs B's actual +Z face,
+    not a coincident projection or the previously mispicked inboard flange."""
     z = sm_summing_lever_spec.PLATE_L / 2.0
-    control = surface_finish_by_key(
-        sm_summing_lever_spec.SURFACE_FINISHES, "plate_end_datum_b"
-    )
 
     def face_at(station, normal):
         face = object()
@@ -95,18 +104,91 @@ def test_datum_b_finish_consumer_rejects_flange_and_opposite_end(
         id(flange): flange_geometry,
         id(opposite): opposite_geometry,
     }
+    edges = {"plate_end_datum_b": SimpleNamespace(GetTwoAdjacentFaces2=lambda: (end,))}
+    for key, spec in drawing.MACHINED_PICKUP_FACES.items():
+        if key == "plate_end_datum_b":
+            continue
+        face = object()
+        geometries[id(face)] = _pickup_geometry(face, spec)
+        edges[key] = SimpleNamespace(GetTwoAdjacentFaces2=lambda face=face: (face,))
     monkeypatch.setattr("_part_pmi._face_geometry", lambda face: geometries[id(face)])
-    edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: (end,))
-    signatures = common._validate_surface_finish_control_face(
-        edge, entity_type="EDGE", control=control, label="datum B finish"
-    )
-    assert signatures[0]["geometry"].face is end
+    drawing._assert_machined_pickup_faces(edges)
     for wrong in (flange, opposite):
-        edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: (wrong,))
-        with pytest.raises(RuntimeError, match="does not touch controlled"):
-            common._validate_surface_finish_control_face(
-                edge, entity_type="EDGE", control=control, label="datum B finish"
-            )
+        edges["plate_end_datum_b"] = SimpleNamespace(GetTwoAdjacentFaces2=lambda: (wrong,))
+        with pytest.raises(RuntimeError, match="must touch exactly one specified"):
+            drawing._assert_machined_pickup_faces(edges)
+
+
+@pytest.mark.parametrize("numeric_field", (None, 1, 3, 4, 5, 6, 7, 8, 9, 10))
+def test_pickup_native_machining_pmi_refuses_unapproved_numeric_limits(
+    monkeypatch, numeric_field,
+) -> None:
+    """Exercise the actual part authoring consumer, not source wiring: new
+    machining PMI stays nonnumeric or fails before the model can be saved."""
+    import build_sm_summing_lever as part
+
+    symbols = []
+    verified = []
+    faces = {
+        key: SimpleNamespace(GetBox=lambda: (-0.1, -0.1, -0.1, 0.1, 0.1, 0.1))
+        for key in part.MACHINED_PICKUP_FACES
+    }
+
+    class Symbol:
+        def __init__(self, arguments):
+            self.arguments = arguments
+            self.text = {}
+            self.annotation = object()
+
+        def SetText(self, field, text):
+            self.text[field] = text
+            return True
+
+        def GetTextCount(self):
+            return len(self.text)
+
+        def GetSymbol(self):
+            return 1
+
+        def GetText(self, field):
+            return "3.2" if field == numeric_field else self.text.get(field, "")
+
+        def GetAnnotation(self):
+            return self.annotation
+
+        def IsAttached(self):
+            return True
+
+        def GetLeaderCount(self):
+            return 1
+
+    def insert(*arguments):
+        symbol = Symbol(arguments)
+        symbols.append(symbol)
+        return symbol
+
+    model = SimpleNamespace(
+        Extension=SimpleNamespace(InsertSurfaceFinishSymbol3=insert),
+        ClearSelection2=lambda _all: None,
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(part, "_resolve_faces", lambda _model, _requests: faces)
+    monkeypatch.setattr(part, "_select_face", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(part, "_name_annotation", lambda annotation, **_kwargs: annotation)
+    monkeypatch.setattr(
+        part, "_verify_attachment",
+        lambda _annotation, spec, *, label: verified.append((spec, label)),
+    )
+    adapter = SimpleNamespace(currentModel=model)
+    if numeric_field is not None:
+        with pytest.raises(RuntimeError, match="unexpected numeric surface specification"):
+            part._author_pickup_machining(adapter)
+        assert not verified
+        return
+    part._author_pickup_machining(adapter)
+    assert len(symbols) == len(verified) == len(part.MACHINED_PICKUP_FACES)
+    assert all(symbol.arguments[7:] == ("",) * 7 for symbol in symbols)
+    assert all(symbol.text == {2: "MACHINE"} for symbol in symbols)
 
 
 def _dimension(mm: float, attached: tuple[object, ...]):
@@ -274,6 +356,8 @@ def callout_scene(monkeypatch, tmp_path):
         registered_leaders=0,
         route_fixture="RD3",
         route_order="native",
+        pickup_faces={},
+        pickup_geometries={},
     )
 
     class Edge:
@@ -298,7 +382,7 @@ def callout_scene(monkeypatch, tmp_path):
             )
 
         def GetTwoAdjacentFaces2(self):
-            return ()
+            return scene.pickup_faces.get(self.name, ())
 
     class Display:
         def __init__(self, native_id, *, hole=True):
@@ -593,8 +677,6 @@ def callout_scene(monkeypatch, tmp_path):
             line("positive-ridge", (0, drawing.HEX_H / 2, z),
                  (0, drawing.HEX_H / 2, z + drawing.HEX_DEPTH)),
             line("end", (0, 15.24, z), (drawing.PLATE_W, 0, z)),
-            line("outer-end", (37.04, drawing.PLATE_T / 2, z),
-                 (drawing.PLATE_W, drawing.PLATE_T / 2, z)),
             line("opposite-end", (0, 15.24, -z), (drawing.PLATE_W, 0, -z)),
             line("free-plate-edge", (drawing.PLATE_W, drawing.PLATE_T / 2, -z),
                  (drawing.PLATE_W, drawing.PLATE_T / 2, z)),
@@ -608,6 +690,17 @@ def callout_scene(monkeypatch, tmp_path):
             scene.rims["middle"],
         ),
     )
+    for key, name in (
+        ("knife_edge_datum_a", "negative-ridge"),
+        ("plate_end_datum_b", "end"),
+        ("plate_opposite_end", "opposite-end"),
+        ("plate_free_edge", "free-plate-edge"),
+    ):
+        face = object()
+        scene.pickup_faces[name] = (face,)
+        scene.pickup_geometries[id(face)] = _pickup_geometry(
+            face, drawing.MACHINED_PICKUP_FACES[key]
+        )
 
     def fresh_annotation(name):
         original = scene.originals[name]
@@ -822,6 +915,10 @@ def callout_scene(monkeypatch, tmp_path):
     monkeypatch.setattr(common._sw_type_info, "early_bound", lambda value, _kind: value)
     monkeypatch.setattr(common._sw_type_info, "early_bound_or_flag",
                         lambda value, *_args: value)
+    monkeypatch.setattr(
+        "_part_pmi._face_geometry",
+        lambda face: scene.pickup_geometries[id(face)],
+    )
     monkeypatch.setattr(common, "null_callout", lambda: None)
     monkeypatch.setattr(common, "apply_custom_properties", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(common, "assert_asme_b_sheet", lambda *_args, **_kwargs: None)

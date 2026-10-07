@@ -34,6 +34,8 @@ from _drawing_common import (
     DrawingOutputs,
     ViewEdge,
     ViewEdges,
+    _surface_finish_entity_faces,
+    _surface_finish_face_signatures,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
@@ -53,6 +55,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from _part_pmi import _face_matches
 from sm_summing_lever_spec import (
     ANCHOR_H,
     ANCHOR_R,
@@ -66,6 +69,7 @@ from sm_summing_lever_spec import (
     HOLE_X,
     HOLE_Z_FIRST,
     HOLE_Z_LAST,
+    MACHINED_PICKUP_FACES,
     PLATE_L,
     PLATE_T,
     PLATE_W,
@@ -162,6 +166,34 @@ TOP_KEEP = {
     "AnchorOuterDia": (0.145, 0.175),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+
+
+def _assert_machined_pickup_faces(edges: dict[str, Any]) -> None:
+    """Witness the real source faces named by the model's machining instruction.
+
+    New pickup machining is nonnumeric: the linked Manufacturing Notes and
+    part-owned machining-required PMI own the process, not new drawing symbols
+    or a borrowed Ra grade. A linked instruction alone is not this witness.
+    """
+    if edges.keys() != MACHINED_PICKUP_FACES.keys():
+        raise RuntimeError("summing lever machining witness omitted a required pickup")
+    for key, edge in edges.items():
+        faces = _surface_finish_entity_faces(edge, entity_type="EDGE", label=key)
+        signatures = _surface_finish_face_signatures(faces)
+        matches = [
+            item for item in signatures
+            if _face_matches(item["geometry"], MACHINED_PICKUP_FACES[key])
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{key}: machining pickup edge must touch exactly one specified "
+                f"physical face, found {len(matches)}"
+            )
+        witness = matches[0]
+        _telemetry.info(
+            f"MACHINED_PICKUP_FACE {key}: normal={witness['normal']!r}; "
+            f"box_m={witness['box']!r}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -274,16 +306,6 @@ async def build(adapter: Any) -> dict[str, str]:
         label="knife-edge ridge finish",
         char_height=0.0025,
     )
-    add_surface_finish(
-        adapter,
-        top,
-        edge_entity=datum_ridge.edge,
-        leader_attach_xy=knife_edge_datum,
-        symbol_xy=(0.280, 0.190),
-        control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_datum_a"),
-        label="datum A knife-edge finish",
-        char_height=0.0025,
-    )
     # Land the position frame on the tap rim's 3-o'clock point, opposite the
     # hole callout, which SolidWorks lands up-left of the 12-o'clock pick. From
     # the 9-o'clock point, with the frame up-left, the two leaders met 0.6 mm
@@ -365,54 +387,21 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="plate +Z end face",
     )
-    # Qualify the same +Z plate/rib end as B and the start-Z basic, not the
-    # inboard rib flange. The opposite end and free +X plate edge are the
-    # other existing physical pickups for the imported plate length/width.
-    # Each native symbol consumes the part-owned face control; the shared
-    # helper checks that its exact selected edge touches that controlled face.
-    # The B datum still selects the rib's end edge at x=10. Its finish uses
-    # the outer plate segment of that SAME end face: this landing is right
-    # of the row-X extension, and the symbol below the start-Z overshoot.
-    # Running a leader from x=30 to the right crossed both dimension witnesses.
-    end_finish_edge = top_edges.exact_line_through(
-        (PLATE_W - 1.0, PLATE_T / 2.0, PLATE_L / 2.0),
-        label="outer +Z plate end edge",
-    )
-    add_surface_finish(
-        adapter,
-        top,
-        edge_entity=end_finish_edge.edge,
-        leader_attach_xy=_top_xy(PLATE_W - 1.0, -PLATE_L / 2.0),
-        symbol_xy=(0.315, 0.076),
-        control=surface_finish_by_key(SURFACE_FINISHES, "plate_end_datum_b"),
-        label="datum B plate/rib end finish",
-        char_height=0.0025,
-    )
+    # The part's nonnumeric machining instruction names the physical +Z B
+    # face, opposite length pickup and free +X width pickup. Retain native
+    # edges for the final face-qualification witness, without adding a new
+    # numeric grade or cluttering the dimension field with finish symbols.
     opposite_end = _end_face_edge(top_edges, x_mm=10.0, z_mm=-PLATE_L / 2.0)
-    add_surface_finish(
-        adapter,
-        top,
-        edge_entity=opposite_end.edge,
-        leader_attach_xy=_top_xy(30.0, PLATE_L / 2.0),
-        symbol_xy=(0.315, 0.177),
-        control=surface_finish_by_key(SURFACE_FINISHES, "plate_opposite_end"),
-        label="opposite plate/rib end finish",
-        char_height=0.0025,
-    )
     free_plate_edge = top_edges.exact_line_through(
         (PLATE_W, PLATE_T / 2.0, PLATE_L / 4.0),
         label="free +X plate edge",
     )
-    add_surface_finish(
-        adapter,
-        top,
-        edge_entity=free_plate_edge.edge,
-        leader_attach_xy=_top_xy(PLATE_W, -PLATE_L / 4.0),
-        symbol_xy=(0.333, 0.115),
-        control=surface_finish_by_key(SURFACE_FINISHES, "plate_free_edge"),
-        label="free plate edge finish",
-        char_height=0.0025,
-    )
+    machining_pickups = {
+        "knife_edge_datum_a": datum_ridge.edge,
+        "plate_end_datum_b": end_edge.edge,
+        "plate_opposite_end": opposite_end.edge,
+        "plate_free_edge": free_plate_edge.edge,
+    }
     seed_rim = top_edges.circle_at(
         (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
         HOLE_DIA / 2.0,
@@ -541,6 +530,7 @@ async def build(adapter: Any) -> dict[str, str]:
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=3,
         settled_checks=(
+            lambda: _assert_machined_pickup_faces(machining_pickups),
             lambda: assert_native_hole_callout_attachment(
                 adapter, top, anchor_callout, edge=anchor_rim.edge, label="anchor tap"
             ),

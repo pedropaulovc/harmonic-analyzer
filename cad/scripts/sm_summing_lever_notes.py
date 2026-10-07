@@ -33,8 +33,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # repeat those numbers. The boss HEIGHT is not a sketch dimension, so it is
 # stated here. Note 5 preserves both allowed routes and requires machining the
 # actual plate/rib ends (including B), the free plate edge and the knife edges.
-# Their physical surface-finish controls live in sm_summing_lever_spec and are
-# authored natively by the part build. Notes 6-7 retain the legacy no-nut/
+# Their nonnumeric physical-face requirements live in sm_summing_lever_spec and
+# are authored as machining-required native PMI by the part build. Notes 6-7
+# retain the legacy no-nut/
 # threadlocker instructions under the known #1189 retention/engagement HOLD;
 # they do not represent an accepted mechanical lock or a user waiver.
 DRAWING_NOTES = "\n".join(
