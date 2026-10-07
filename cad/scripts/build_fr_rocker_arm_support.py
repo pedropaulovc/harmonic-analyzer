@@ -405,7 +405,6 @@ def _witness_table_pickup_faces(adapter) -> None:
         "mounting_face": surface_finish_by_key(SURFACE_FINISHES, "mounting_face").face,
     }
     faces = _resolve_faces(model, requests)
-    selection = _early_bound(model.SelectionManager, "ISelectionMgr")
     extension = _early_bound(model.Extension, "IModelDocExtension")
     try:
         for key, face in faces.items():
@@ -413,6 +412,8 @@ def _witness_table_pickup_faces(adapter) -> None:
             if geometry is None or not _face_matches(geometry, requests[key]):
                 raise RuntimeError(f"{key}: postbuild physical face changed")
             _select_face(model, face, label=key)
+            # ISelectionMgr is invalidated by each clear/select; acquire AFTER it.
+            selection = _early_bound(model.SelectionManager, "ISelectionMgr")
             count = int(selection.GetSelectedObjectCount2(-1))
             entity_type = int(selection.GetSelectedObjectType3(1, -1)) if count else -1
             selected = selection.GetSelectedObject6(1, -1) if count == 1 else None

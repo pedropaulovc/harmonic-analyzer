@@ -188,6 +188,7 @@ class _PickupPlaneFace:
         context = self.context
         if context["failure"] == "refused":
             return False
+        context["selection_epoch"] += 1
         if context["failure"] == "empty_selection":
             context["selected"] = []
         elif context["failure"] == "wrong_face":
@@ -197,6 +198,29 @@ class _PickupPlaneFace:
         else:
             context["selected"] = [self]
         return True
+
+
+class _TransientPickupSelection:
+    """Native selection-manager handle invalidated by every clear or select."""
+
+    def __init__(self, context):
+        self.context = context
+        self.epoch = context["selection_epoch"]
+
+    def _selected(self):
+        if self.epoch != self.context["selection_epoch"]:
+            raise RuntimeError("stale ISelectionMgr invalidated by another selection")
+        return self.context["selected"]
+
+    def GetSelectedObjectCount2(self, _mark):
+        return len(self._selected())
+
+    def GetSelectedObjectType3(self, _index, _mark):
+        self._selected()
+        return 1 if self.context["failure"] == "edge_type" else 2
+
+    def GetSelectedObject6(self, index, _mark):
+        return self._selected()[index - 1]
 
 
 def _native_pickup_part(monkeypatch, *, failure=None):
@@ -211,7 +235,11 @@ def _native_pickup_part(monkeypatch, *, failure=None):
         return member(*args) if callable(member) else member
 
     monkeypatch.setattr(_part_pmi, "_com_invoke", invoke)
-    context = {"selected": [], "failure": failure}
+    context = {
+        "selected": [],
+        "failure": failure,
+        "selection_epoch": 0,
+    }
     # Construct the slant normal from the actual section segment's direction,
     # not from TABLE_PICKUP_FACES or its already-computed normal/offset.
     dy = 2 * section.HALF_Y
@@ -259,18 +287,18 @@ def _native_pickup_part(monkeypatch, *, failure=None):
     for index, face in enumerate(faces):
         face.next_face = faces[index + 1] if index + 1 < len(faces) else None
     body = SimpleNamespace(GetFirstFace=lambda: faces[0])
-    selection = SimpleNamespace(
-        GetSelectedObjectCount2=lambda _mark: len(context["selected"]),
-        GetSelectedObjectType3=lambda _index, _mark: 1 if failure == "edge_type" else 2,
-        GetSelectedObject6=lambda index, _mark: context["selected"][index - 1],
-    )
 
     def clear_selection(_all):
+        context["selection_epoch"] += 1
         context["selected"] = []
 
-    model = SimpleNamespace(
+    class NativeModel(SimpleNamespace):
+        @property
+        def SelectionManager(self):
+            return _TransientPickupSelection(context)
+
+    model = NativeModel(
         GetBodies2=lambda _kind, _hidden: (body,),
-        SelectionManager=selection,
         Extension=SimpleNamespace(GetPersistReference3=lambda face: face.reference),
         ClearSelection2=clear_selection,
     )
