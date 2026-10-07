@@ -98,8 +98,8 @@ SIDE_KEEP = {
     "ShoulderEnd": ((HEAD_TOP_X + SHOULDER_END_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((HEAD_TOP_X + TIP_X) / 2.0, _ROW_Y[2]),
     # Diameters on the profile beside their steps.
-    "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(HEAD_DIA / 2.0) + 0.022),
-    # Its six-line fit callout reads above it, right of the head's.
+    "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(HEAD_DIA / 2.0) + 0.042),
+    # Its six-line fit callout reads below its text, right of the head's.
     "ShoulderDia": (UNDERHEAD_X + 0.077, _sheet_y(SHOULDER_DIA / 2.0) + 0.037),
     "TipChamfer": (TIP_X + 0.010, SIDE_CENTER[1] - 0.018),
     # The slot shows as a notch in the head top; its depth reads beside it.
@@ -175,10 +175,15 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter,
         annotations,
-        {"ShoulderDia": SHOULDER_FIT_CALLOUT, "HeadDia": HEAD_FIT_CALLOUT},
-        location="above",
+        # The below lane: a leadered diameter renders no above-text
+        # (run 20261007T193228511Z printed neither fit callout).
+        {
+            "ShoulderDia": SHOULDER_FIT_CALLOUT,
+            "HeadDia": HEAD_FIT_CALLOUT,
+            "TipChamfer": CHAMFER_CALLOUT,
+        },
+        location="below",
     )
-    set_dimension_callouts(adapter, annotations, {"TipChamfer": CHAMFER_CALLOUT}, location="below")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the pivot-screw head-end view")
