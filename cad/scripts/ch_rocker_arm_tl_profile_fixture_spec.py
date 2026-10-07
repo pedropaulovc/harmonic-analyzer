@@ -158,6 +158,26 @@ if PAD_FLOOR_GAP_MIN < 0.1:
     )
 if PAD_ENGAGEMENT_MIN < 1.0:
     raise AssertionError("a pad can stand too shallow in its pocket to bond")
+# Every locating chain is held to a quarter of the rocker band it controls
+# (FixtureCAD/Main: 25 % of the parent band, the share chosen here).
+PARENT_BAND_SHARE = 0.25
+# The pad tops' PlateDrop sets no rocker band in Z: the profile is cut in plan,
+# and the strap's height over the plate is no rocker dimension. The rocker
+# band it reaches is the top edge (ch_rocker_arm_spec.TOP_EDGE_BAND), through
+# tilt: two neighbouring pads at opposite ends of the .XXX band tip the strap,
+# and the rod tip's plan shortening stays under its share of that band.
+_PAD_PITCH_MIN = min(
+    math.hypot(a[1] - b[1], a[2] - b[2])
+    for i, a in enumerate(PADS)
+    for b in PADS[i + 1 :]
+)
+PAD_TILT_SWING_MAX = rocker.ROD_TIP_X * (
+    1.0 - math.cos(math.atan(2.0 * _XXX / _PAD_PITCH_MIN))
+)
+if PAD_TILT_SWING_MAX > PARENT_BAND_SHARE * (
+    rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+):
+    raise AssertionError("pad-top disagreement can tilt the rod tip off its band")
 
 # Rail rests: inventory pockets (tag, west X, south Y, length X, width Y). Each
 # rest seats on its pocket floor; the per-blank shim stacks on top are loose.
@@ -191,6 +211,10 @@ RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
 # gauge stack STAND_DROP below the pad reference, in a counterbore round the
 # locating bore. +/-0.02 is shop-additions section 5's recommended relaxation
 # of the inventory's +/-0.005; the hub shim stack is cut to the measured stand.
+# StandDrop prints directly from the pad tops (no chain through the plate), and
+# its band reaches the hub only through that measured shim, a fit-up
+# adjustment: the guards below hold the shim stack non-negative over the whole
+# hub-length band and the strap clear of the stand.
 STAND_DROP = 2.328
 STAND_DROP_BAND = (0.02, -0.02)
 STAND_TOP_Z = PAD_TOP_Z - STAND_DROP
@@ -258,6 +282,36 @@ ROD_PIN_HOLE_DIA = 3.0
 ROD_PIN_HOLE_BAND = (0.010, 0.0)
 ROD_PIN_HOLE_DEPTH = 7.0
 ROD_PIN_HOLE_XY = (rocker.ROD_HOLE_X, rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y)
+# The diamond pin turns the arm about the locating bore, so the ream's X and Y
+# from the bore axis are its direct functional dimensions. At the schedule's
+# .XXX (+/-0.13 a coordinate) it could wander over a circle of 0.37, wider than
+# the rocker rod hole's own 0.20 position zone (ch_rocker_arm_spec
+# GEOMETRIC_TOLERANCES_MM) that it locates. Each coordinate takes its own band:
+# PARENT_BAND_SHARE (25 %) of the parent zone, so the band's worst corner stays
+# inside a quarter of that zone's radius, and the arm's turn from it swings the
+# rod tip under a quarter of the top-edge band. The features export carries X
+# as `station` and Y as `height`, both measured from the locating-bore centre
+# (`height_from = "locating_bore"`).
+ROD_PIN_XY_BAND = (0.015, -0.015)
+_ROD_HOLE_ZONE_RADIUS = (
+    float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"]) / 2.0
+)
+ROD_PIN_POSITION_ERROR_MAX = math.hypot(ROD_PIN_XY_BAND[0], ROD_PIN_XY_BAND[0])
+if ROD_PIN_POSITION_ERROR_MAX > PARENT_BAND_SHARE * _ROD_HOLE_ZONE_RADIUS:
+    raise AssertionError("the rod-pin ream can wander past its share of the rod-hole zone")
+ROD_PIN_TIP_SWING_MAX = (
+    ROD_PIN_POSITION_ERROR_MAX * rocker.ROD_TIP_X / math.hypot(*ROD_PIN_HOLE_XY)
+)
+if ROD_PIN_TIP_SWING_MAX > PARENT_BAND_SHARE * (
+    rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
+):
+    raise AssertionError("the rod-pin ream can swing the rod tip off its band")
+# The schedule's coordinates are typed text, not native dimensions, so the band
+# qualifies the printed three-place nominal, and the export carries exactly it.
+ROD_PIN_XY_NOMINAL = tuple(round(value, 3) for value in ROD_PIN_HOLE_XY)
+ROD_PIN_XY_PRINTED = tuple(
+    f"{value:.3f} \u00b1{ROD_PIN_XY_BAND[0]:.3f}" for value in ROD_PIN_XY_NOMINAL
+)
 
 # --- Hold-down and clamp-stud holes ------------------------------------------------
 # PM-30MV table: 14 mm T-slots on 63.5 centres. The 9/16 T-slot clamping kit's
@@ -439,8 +493,7 @@ FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
     (
         "P",
         "ROD PIN HOLE",
-        _mm(ROD_PIN_HOLE_XY[0]),
-        _mm(ROD_PIN_HOLE_XY[1]),
+        *ROD_PIN_XY_PRINTED,
         "-",
         "-",
         _mm(ROD_PIN_HOLE_DEPTH),
@@ -569,7 +622,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 contains_y_mm=ROD_PIN_HOLE_XY[1],
             ),
         ),
-        requirements=("dia",),
+        requirements=("dia", "station", "height"),
         fields={
             "at": (
                 [ROD_PIN_HOLE_XY[0], ROD_PIN_HOLE_XY[1], PLATE_TOP_Z],
@@ -581,6 +634,18 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                     ("ch_rocker_arm_spec", "PIVOT_MID_Y"),
                 ),
             ),
+            # X and Y of the ream from the locating-bore centre, as printed.
+            "station": (
+                limits(ROD_PIN_XY_NOMINAL[0], 3, ROD_PIN_XY_BAND),
+                ("ROD_PIN_HOLE_XY", "ROD_PIN_XY_BAND", "PARENT_BAND_SHARE"),
+            ),
+            "station_nominal": (ROD_PIN_XY_NOMINAL[0], ("ROD_PIN_HOLE_XY",)),
+            "height": (
+                limits(ROD_PIN_XY_NOMINAL[1], 3, ROD_PIN_XY_BAND),
+                ("ROD_PIN_HOLE_XY", "ROD_PIN_XY_BAND", "PARENT_BAND_SHARE"),
+            ),
+            "height_nominal": (ROD_PIN_XY_NOMINAL[1], ("ROD_PIN_HOLE_XY",)),
+            "height_from": ("locating_bore", ("ROD_PIN_HOLE_XY",)),
             "axis": _DOWN,
             "dia": (
                 limits(ROD_PIN_HOLE_DIA, 3, ROD_PIN_HOLE_BAND),
@@ -590,7 +655,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "depth": (limits(ROD_PIN_HOLE_DEPTH, 3), ("ROD_PIN_HOLE_DEPTH",)),
             "process": ("REAM", ("DIMENSION_CALLOUTS",)),
         },
-        precision={"dia": 3, "depth": 3},
+        precision={"dia": 3, "depth": 3, "station": 3, "height": 3},
     ),
     "pad_tops": ExportFeature(
         kind="face",

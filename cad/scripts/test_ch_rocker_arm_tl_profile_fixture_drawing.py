@@ -71,6 +71,19 @@ def test_exported_bands_are_the_printed_bands() -> None:
     stack = 2.0 * printed_band_mm(3)
     assert rests[0] <= spec.REST_HEIGHT - spec.REST_POCKET_DEPTH - stack
     assert rests[1] >= spec.REST_HEIGHT - spec.REST_POCKET_DEPTH + stack
+    # the rod-pin ream's coordinates from the bore print with their own band in
+    # the schedule, and that band is the exported one (X as station, Y as
+    # height, both from the locating bore)
+    row = next(row for row in spec.FEATURE_SCHEDULE if row[0] == "P")
+    hole = features["rod_pin_hole"]
+    assert hole["height_from"] == "locating_bore"
+    for key, nominal, printed in zip(("station", "height"), spec.ROD_PIN_HOLE_XY, row[2:4]):
+        value, plus = re.fullmatch(r"(-?\d+\.\d{3}) \u00b1(\d\.\d{3})", printed).groups()
+        assert float(value) == round(nominal, 3)
+        assert hole[key] == [round(nominal - float(plus), 3), round(nominal + float(plus), 3)]
+    # its worst corner stays inside a quarter of the rocker rod hole's zone
+    zone = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
+    assert float(plus) * 2**0.5 <= 0.25 * zone / 2.0
 
 
 def test_hub_stand_carries_the_hub_and_clears_the_strap() -> None:

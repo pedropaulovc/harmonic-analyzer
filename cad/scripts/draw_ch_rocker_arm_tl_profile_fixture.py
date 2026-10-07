@@ -189,7 +189,8 @@ PART_COLUMNS = (0.016, 0.036, 0.064, 0.117, 0.145, 0.176)
 
 # --- Sheet SCHEDULE -----------------------------------------------------------------
 FEATURE_SCHEDULE_TOP = 0.258
-FEATURE_COLUMNS = (0.016, 0.030, 0.072, 0.100, 0.128, 0.156, 0.184)
+# X and Y wide enough for the rod-pin row's banded coordinates.
+FEATURE_COLUMNS = (0.016, 0.030, 0.072, 0.108, 0.144, 0.172, 0.200)
 ISO_CENTER = (0.320, 0.185)
 ISO_SCALE = (1, 4)
 ISO_NOTE_XY = (0.272, 0.240)
