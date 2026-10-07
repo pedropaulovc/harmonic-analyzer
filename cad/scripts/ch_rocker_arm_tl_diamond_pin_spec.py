@@ -112,6 +112,11 @@ if (
     >= REAM_DEPTH - _GENERAL_1PL
 ):
     raise AssertionError("diamond pin can bottom in the reamed bore")
+# The bonded pin backs the 0.39 neck wall: at the worst-case projection its
+# shortest inserted length still runs past the deepest neck (.X) with margin.
+PIN_INSERTED_MIN = PIN_LENGTH - _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[0])
+if PIN_INSERTED_MIN < NECK_LENGTH + _GENERAL_1PL + 0.1:
+    raise AssertionError("bonded pin can stop short of the thin neck wall")
 # The overall length prints .X; the shank must still clear the bottom of the
 # profile fixture's 7.0-deep pin hole so the collar, not the shank end, seats.
 # Mirrors ch_rocker_arm_tl_profile_fixture_spec.ROD_PIN_HOLE_DEPTH (sibling
@@ -165,9 +170,9 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
         BUILT_UP_PERMISSION_NOTE,
-        "BODY LENGTHS RUN FROM THE NECK FACE; THE LOWER LENGTH IS THE BOUGHT PIN, SET BY ITS PROJECTION, CLEAR OF THE BORE BOTTOM; FLATS RUN THE FULL LAND LENGTH.",
+        "REAM THE BORE, THEN FINISH-TURN THE NECK IN THE SAME CHUCKING. BODY LENGTHS RUN FROM THE NECK FACE; THE LOWER LENGTH IS THE BOUGHT PIN, BONDED SET TO ITS PROJECTION, FILLING THE BORE THROUGH THE NECK, CLEAR OF THE BORE BOTTOM; FLATS RUN THE FULL LAND LENGTH.",
         # Named exception: MHA-CH-006-TL-03 neck wall (drawing-simplicity-policy.md, "Named exceptions").
-        f"NECK FACE IS A BACKSTOP JUST BELOW THE ROCKER ARM; NECK WALL TO BORE {NECK_WALL_MIN:.2f} MIN, COLLAR {COLLAR_WALL_MIN:.2f} MIN.",
+        f"ORIENTATION LOCATOR AND LIGHT STOP, HAND LOAD ONLY; NO CLAMPING OR CUTTING LOAD ON THE NECK. NECK FACE IS A BACKSTOP JUST BELOW THE ROCKER ARM; NECK WALL TO BORE {NECK_WALL_MIN:.2f} MIN, COLLAR {COLLAR_WALL_MIN:.2f} MIN.",
         "SHANK: CLOSE SLIP FIT, BONDED IN THE ROCKER ARM PROFILE FIXTURE PIN HOLE WITH THE"
         " FLATS SQUARE TO ITS PIVOT-TO-ROD-HOLE LINE.",
     )
