@@ -25,6 +25,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _section_axis import create_section_axis_centerline, position_section_caption
 from ch_rocker_arm_tl_diamond_pin_spec import (
+    DRAWING_REFERENCE_PRECISION,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     LAND_HEIGHT,
@@ -137,8 +138,8 @@ def _overall_reference(adapter: Any, section: Any, to_sheet) -> None:
             f"{label} measured {measured_mm:g}, expected {OVERALL_REF:g}"
         )
     set_reference_dimension(adapter, display.GetAnnotation(), label=label)
-    display.SetPrecision3(1, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != 1:
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError(f"{label} precision did not persist")
 
 

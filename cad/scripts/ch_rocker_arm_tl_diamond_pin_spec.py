@@ -40,7 +40,9 @@ PIN_LENGTH = 8.5  # snapped at about 9 and squared on the wheel
 # running clearance in the smallest hole the parent prints (#47 drilled,
 # title block DRILLED HOLES +0.10/0). The traveler reams it 2.000-2.010,
 # inside that band.
-_ROD_HOLE_MIN = _hole_spec.blind_cut_dia_mm(rocker.ROD_HOLE_SPEC)  # DRILLED HOLES minus is 0
+_ROD_HOLE_MIN = _hole_spec.blind_cut_dia_mm(
+    rocker.ROD_HOLE_SPEC
+)  # DRILLED HOLES minus is 0
 LAND_CLEARANCE_MIN = 0.005
 if LAND_DIA + LAND_BAND[0] > _ROD_HOLE_MIN - LAND_CLEARANCE_MIN:
     raise AssertionError("diamond-pin lands do not enter the smallest rod-pin hole")
@@ -57,13 +59,19 @@ COLLAR_DIA = 4.5
 # face B so the plate's pads and shimmed hub stand alone set Z: it is a
 # backstop, never a second Z support (FixtureCAD option b).
 COLLAR_END = 10.20
-COLLAR_END_BAND = (0.0, -0.5)  # .X: never above face B; lands keep half-strap engagement
+COLLAR_END_BAND = (
+    0.0,
+    -0.5,
+)  # .X: never above face B; lands keep half-strap engagement
 FACE_B_ABOVE_PLATE = 10.22175  # frame-A Z-4.77825 face B over the plate top Z-15
 if COLLAR_END + COLLAR_END_BAND[0] > FACE_B_ABOVE_PLATE:
     raise AssertionError("neck face can lift the arm off the profile-fixture pads")
 SHANK_DIA = 2.97
-SHANK_BAND = (0.02, -0.02)  # 2.95-2.99: bonded close slip fit in the plate's 3.000-3.010 ream
-OVERALL_LENGTH = COLLAR_END + 5.5  # shank stays clear of the 7.0 hole bottom at .X
+SHANK_BAND = (
+    0.02,
+    -0.02,
+)  # 2.95-2.99: bonded close slip fit in the plate's 3.000-3.010 ream
+OVERALL_LENGTH = COLLAR_END + 4.8  # shank clears the .X 7.0 hole bottom at every limit
 REAM_DIA = 2.0
 REAM_BAND = (0.010, 0.0)  # the shop's rod reamer, 2.000-2.010
 REAM_DEPTH = 8.0
@@ -72,24 +80,38 @@ REAM_DEPTH = 8.0
 # binding route) sets both sizes and the neck stays Ø3.0 for the S4 op 25/27
 # cutter clearance; the bonded pin fills the bore, so the section is solid in
 # service.
-RULE12_EXCEPTION = "neck wall over the bonded ream: shop-additions section 3 route, cutter clearance"
+RULE12_EXCEPTION = (
+    "neck wall over the bonded ream: shop-additions section 3 route, cutter clearance"
+)
 # Lands stand LAND_HEIGHT above the neck face: their tip stays under the
 # arm's upper strap face even with the neck face at its lowest.
 LAND_HEIGHT = 2.378
 LAND_HEIGHT_BAND = (0.10, -0.10)
 _NECK_DROP_MAX = FACE_B_ABOVE_PLATE - (COLLAR_END + COLLAR_END_BAND[1])
-if LAND_HEIGHT + LAND_HEIGHT_BAND[0] - (FACE_B_ABOVE_PLATE - COLLAR_END) > rocker.ARM_THICKNESS:
+if (
+    LAND_HEIGHT + LAND_HEIGHT_BAND[0] - (FACE_B_ABOVE_PLATE - COLLAR_END)
+    > rocker.ARM_THICKNESS
+):
     raise AssertionError("diamond-pin tip can stand above the rocker strap")
 if LAND_HEIGHT + LAND_HEIGHT_BAND[1] - _NECK_DROP_MAX < rocker.ARM_THICKNESS / 2.0:
     raise AssertionError("diamond-pin lands engage less than half the strap")
 PIN_ENGAGEMENT = PIN_LENGTH - LAND_HEIGHT
 _GENERAL_1PL = 0.8  # title block .X band (the pin length and ream depth print .X)
-if PIN_LENGTH + _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[1]) >= REAM_DEPTH - _GENERAL_1PL:
+if (
+    PIN_LENGTH + _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[1])
+    >= REAM_DEPTH - _GENERAL_1PL
+):
     raise AssertionError("diamond pin can bottom in the reamed bore")
 # The overall length prints .X; the shank must still clear the bottom of the
 # profile fixture's 7.0-deep pin hole so the collar, not the shank end, seats.
-_PLATE_HOLE_DEPTH = 7.0  # ch_rocker_arm_tl_profile_fixture_spec.ROD_PIN_HOLE_DEPTH
-if OVERALL_LENGTH + _GENERAL_1PL - (COLLAR_END + COLLAR_END_BAND[1]) >= _PLATE_HOLE_DEPTH:
+# Mirrors ch_rocker_arm_tl_profile_fixture_spec.ROD_PIN_HOLE_DEPTH (sibling
+# branch, not importable here); it prints .X, so its shallowest is 6.2.
+_PLATE_HOLE_DEPTH_MIN = 7.0 - _GENERAL_1PL
+SHANK_LENGTH_LIMITS = [
+    round(OVERALL_LENGTH - _GENERAL_1PL - (COLLAR_END + COLLAR_END_BAND[0]), 2),
+    round(OVERALL_LENGTH + _GENERAL_1PL - (COLLAR_END + COLLAR_END_BAND[1]), 2),
+]
+if SHANK_LENGTH_LIMITS[1] >= _PLATE_HOLE_DEPTH_MIN:
     raise AssertionError("diamond-pin shank can bottom in the profile-fixture hole")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -121,11 +143,14 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Ream": {"ReamDepth": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
-    name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked diamond-pin dimension needs authored places")
 
+DRAWING_REFERENCE_PRECISION = 1  # the (overall) reference prints .X
 SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
@@ -148,13 +173,22 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
-            "dia": (limits(LAND_DIA, LAND_PLACES, LAND_BAND), ("LAND_DIA", "LAND_BAND", _ROD)),
+            "dia": (
+                limits(LAND_DIA, LAND_PLACES, LAND_BAND),
+                ("LAND_DIA", "LAND_BAND", _ROD),
+            ),
             "dia_nominal": (LAND_DIA, ("LAND_DIA",)),
             # width = across the stoned flats (normals +-X, see "flat_pos"/"flat_neg")
             "width": (limits(FLATS_AF, FLATS_PLACES), ("FLATS_AF",)),
             "z_mm": ([-LAND_HEIGHT, 0.0], ("LAND_HEIGHT",)),
-            "height": (limits(LAND_HEIGHT, 3, LAND_HEIGHT_BAND),
-                       ("LAND_HEIGHT", "LAND_HEIGHT_BAND", ("ch_rocker_arm_spec", "ARM_THICKNESS"))),
+            "height": (
+                limits(LAND_HEIGHT, 3, LAND_HEIGHT_BAND),
+                (
+                    "LAND_HEIGHT",
+                    "LAND_HEIGHT_BAND",
+                    ("ch_rocker_arm_spec", "ARM_THICKNESS"),
+                ),
+            ),
         },
         precision={"width": FLATS_PLACES, "height": 3},
     ),
@@ -191,7 +225,10 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         requirements=("dia",),
         fields={
             "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": COLLAR_END}, ("COLLAR_END",)),
+            "plane": (
+                {"frame": "model", "axis": "z", "value": COLLAR_END},
+                ("COLLAR_END",),
+            ),
             "dia": (limits(COLLAR_DIA, 1), ("COLLAR_DIA",)),
         },
         precision={"dia": 1},
@@ -205,7 +242,11 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "axis": _AXIS,
             "dia": (limits(SHANK_DIA, 2, SHANK_BAND), ("SHANK_DIA", "SHANK_BAND")),
             "dia_nominal": (SHANK_DIA, ("SHANK_DIA",)),
-            "length": (limits(OVERALL_LENGTH - COLLAR_END, 2), ("OVERALL_LENGTH", "COLLAR_END")),
+            # Derived OverallLength - CollarEnd: stacked endpoint limits.
+            "length": (
+                SHANK_LENGTH_LIMITS,
+                ("OVERALL_LENGTH", "COLLAR_END", "COLLAR_END_BAND"),
+            ),
         },
         precision={"dia": 3, "length": 2},
     ),

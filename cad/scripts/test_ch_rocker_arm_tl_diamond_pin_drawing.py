@@ -60,7 +60,10 @@ def test_shank_slips_into_the_fixture_ream_with_a_bondable_gap() -> None:
 
 
 def test_construction_is_built_up_from_the_printed_note() -> None:
-    assert export_features.requirement_manifest(STEM)["construction"] == "built_up_permitted"
+    assert (
+        export_features.requirement_manifest(STEM)["construction"]
+        == "built_up_permitted"
+    )
     assert spec.BUILT_UP_PERMISSION_NOTE in spec.DRAWING_NOTES
 
 

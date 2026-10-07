@@ -99,7 +99,9 @@ def _area(dia: float) -> float:
 
 def _segment_area(radius: float, offset: float) -> float:
     """Area a flat at ``offset`` from the axis takes off a disc of ``radius``."""
-    return radius**2 * math.acos(offset / radius) - offset * math.sqrt(radius**2 - offset**2)
+    return radius**2 * math.acos(offset / radius) - offset * math.sqrt(
+        radius**2 - offset**2
+    )
 
 
 V_COLLAR = _area(COLLAR_DIA) * COLLAR_END
@@ -115,11 +117,20 @@ def _require_bodies(adapter, count: int, *, label: str) -> None:
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
     )
     if len(bodies) != count:
-        raise RuntimeError(f"{label}: expected {count} solid bodies, found {len(bodies)}")
+        raise RuntimeError(
+            f"{label}: expected {count} solid bodies, found {len(bodies)}"
+        )
 
 
 async def _circle_sketch(
-    adapter, label: str, dia: float, profile: str, name: str, drive: str, *, plane: str = "Front"
+    adapter,
+    label: str,
+    dia: float,
+    profile: str,
+    name: str,
+    drive: str,
+    *,
+    plane: str = "Front",
 ):
     dims = SketchDims()
     check(f"create_sketch {label}", await adapter.create_sketch(plane))
@@ -164,13 +175,21 @@ async def _flats_sketch(adapter) -> list[tuple[str, str]]:
                 await adapter.add_sketch_constraint(line, None, direction),
             )
         await dimension_between(
-            adapter, f"{first}.start", f"{first}.end", "horizontal_distance",
-            FLAT_REACH, f"flat {side} reach",
+            adapter,
+            f"{first}.start",
+            f"{first}.end",
+            "horizontal_distance",
+            FLAT_REACH,
+            f"flat {side} reach",
         )
         dims.record(f"FlatReach{side}")
         await dimension_between(
-            adapter, f"{flat}.start", f"{flat}.end", "vertical_distance",
-            FLAT_SPAN, f"flat {side} span",
+            adapter,
+            f"{flat}.start",
+            f"{flat}.end",
+            "vertical_distance",
+            FLAT_SPAN,
+            f"flat {side} span",
         )
         dims.record(f"FlatSpan{side}")
         flats.append(flat)
@@ -192,8 +211,12 @@ async def _flats_sketch(adapter) -> list[tuple[str, str]]:
         await adapter.add_sketch_constraint(f"{across}.start", flats[1], "midpoint"),
     )
     await dimension_between(
-        adapter, f"{across}.start", f"{across}.end", "horizontal_distance",
-        FLATS_AF, "across flats",
+        adapter,
+        f"{across}.start",
+        f"{across}.end",
+        "horizontal_distance",
+        FLATS_AF,
+        "across flats",
     )
     dims.record("FlatsAF", '"FlatsAF"')
     await anchor_point_to_origin(adapter, f"{across}.end", c, 0.0, "flats centre")
@@ -229,9 +252,14 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs = await _circle_sketch(
         adapter, "collar", COLLAR_DIA, "CollarProfile", "CollarDia", '"CollarDia"'
     )
-    check("extrude collar", await adapter.create_extrusion(ExtrusionParameters(depth=COLLAR_END)))
+    check(
+        "extrude collar",
+        await adapter.create_extrusion(ExtrusionParameters(depth=COLLAR_END)),
+    )
     name_last_feature(adapter, "Collar")
-    drive_jobs.append((name_dimensions(adapter, "Collar", ["CollarEnd"])[0], '"CollarEnd"'))
+    drive_jobs.append(
+        (name_dimensions(adapter, "Collar", ["CollarEnd"])[0], '"CollarEnd"')
+    )
     await volume_check(adapter, "collar", V_COLLAR, 0.005 * V_COLLAR)
 
     drive_jobs += await _circle_sketch(
@@ -252,12 +280,24 @@ async def build(adapter) -> dict[str, str]:
     neck = SketchDims()
     check("create_sketch neck", await adapter.create_sketch("Front"))
     await define_circle(
-        adapter, 0.0, 0.0, NECK_DIA / 2.0, "neck",
-        dims=neck, names=(None, None, "NeckDia"), drives=(None, None, '"NeckDia"'),
+        adapter,
+        0.0,
+        0.0,
+        NECK_DIA / 2.0,
+        "neck",
+        dims=neck,
+        names=(None, None, "NeckDia"),
+        drives=(None, None, '"NeckDia"'),
     )
     await define_circle(
-        adapter, 0.0, 0.0, NECK_RELIEF_DIA / 2.0, "neck relief",
-        dims=neck, names=(None, None, "NeckReliefDia"), drives=(None, None, None),
+        adapter,
+        0.0,
+        0.0,
+        NECK_RELIEF_DIA / 2.0,
+        "neck relief",
+        dims=neck,
+        names=(None, None, "NeckReliefDia"),
+        drives=(None, None, None),
     )
     await ensure_fully_defined(adapter, "neck sketch")
     check("exit_sketch neck", await adapter.exit_sketch())
@@ -270,7 +310,9 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Neck")
-    drive_jobs.append((name_dimensions(adapter, "Neck", ["NeckLength"])[0], '"NeckLength"'))
+    drive_jobs.append(
+        (name_dimensions(adapter, "Neck", ["NeckLength"])[0], '"NeckLength"')
+    )
     await volume_check(adapter, "neck", V_NECK, 0.005 * V_NECK)
 
     drive_jobs += await _circle_sketch(
@@ -283,7 +325,9 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Ream")
-    drive_jobs.append((name_dimensions(adapter, "Ream", ["ReamDepth"])[0], '"ReamDepth"'))
+    drive_jobs.append(
+        (name_dimensions(adapter, "Ream", ["ReamDepth"])[0], '"ReamDepth"')
+    )
     await volume_check(adapter, "reamed body", V_BODY, 0.005 * V_BODY)
     _require_bodies(adapter, 1, label="body")
 
@@ -292,14 +336,22 @@ async def build(adapter) -> dict[str, str]:
     check(
         "create_plane LandTipPlane",
         await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=-LAND_HEIGHT)
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=-LAND_HEIGHT
+            )
         ),
     )
     name_last_feature(adapter, "LandTipPlane")
     tip_dim = name_dimensions(adapter, "LandTipPlane", ["LandTipStation"])
     drive_jobs.append((tip_dim[0], '"LandHeight"'))
     drive_jobs += await _circle_sketch(
-        adapter, "lands", LAND_DIA, "LandProfile", "LandDia", '"LandDia"', plane="LandTipPlane"
+        adapter,
+        "lands",
+        LAND_DIA,
+        "LandProfile",
+        "LandDia",
+        '"LandDia"',
+        plane="LandTipPlane",
     )
     check(
         "extrude pin",
@@ -318,9 +370,14 @@ async def build(adapter) -> dict[str, str]:
     # wrong way off its tip plane leaves nothing here and fails the volume.
     # The cut's depth IS the printed land height.
     drive_jobs += await _flats_sketch(adapter)
-    check("cut flats", await adapter.create_cut_extrude(ExtrusionParameters(depth=LAND_HEIGHT)))
+    check(
+        "cut flats",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=LAND_HEIGHT)),
+    )
     name_last_feature(adapter, "Flats")
-    drive_jobs.append((name_dimensions(adapter, "Flats", ["LandHeight"])[0], '"LandHeight"'))
+    drive_jobs.append(
+        (name_dimensions(adapter, "Flats", ["LandHeight"])[0], '"LandHeight"')
+    )
     await volume_check(adapter, "diamond pin", V_TOTAL, 0.005 * V_TOTAL)
     _require_bodies(adapter, 2, label="diamond pin")
 
@@ -343,7 +400,9 @@ async def build(adapter) -> dict[str, str]:
         ("ReamProfile", "ReamDia", REAM_BAND),
         ("Collar", "CollarEnd", COLLAR_END_BAND),
     ):
-        set_dimension_bilateral_tolerance(adapter, feature, dimension, *deviations(band))
+        set_dimension_bilateral_tolerance(
+            adapter, feature, dimension, *deviations(band)
+        )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
