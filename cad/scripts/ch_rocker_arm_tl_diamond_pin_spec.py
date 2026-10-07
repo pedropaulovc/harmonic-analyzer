@@ -24,6 +24,7 @@ from __future__ import annotations
 import math
 
 import _hole_spec
+from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_spec as rocker
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
@@ -48,7 +49,10 @@ _ROD_HOLE_MIN = _hole_spec.blind_cut_dia_mm(
 LAND_CLEARANCE_MIN = 0.005
 if LAND_DIA + LAND_BAND[0] > _ROD_HOLE_MIN - LAND_CLEARANCE_MIN:
     raise AssertionError("diamond-pin lands do not enter the smallest rod-pin hole")
-if FLATS_AF + 0.13 >= LAND_DIA + LAND_BAND[1]:
+# The title block's general bands (.X: pin length, ream depth, collar; .XXX: flats).
+_GENERAL_1PL = printed_band_mm(1)
+_GENERAL_3PL = printed_band_mm(3)
+if FLATS_AF + _GENERAL_3PL >= LAND_DIA + LAND_BAND[1]:
     raise AssertionError("diamond-pin flats can vanish inside the general band")
 
 # --- Turned 4140 body: all axial sizes from the neck face. ---
@@ -57,7 +61,6 @@ NECK_PLACES = 1
 NECK_BAND = (0.0, -0.2)  # never over the cutter-clearance size; keeps a 0.4 bore wall
 NECK_LENGTH = 4.3  # .X keeps 0.77 of the 1.57 cutter clearance; collar stays below the S4 op 25/27 cutter tip
 COLLAR_DIA = 4.5
-_GENERAL_1PL_WALL = 0.8  # title block .X band on the collar diameter
 # The collar seats on the plate top. The neck face sits just under the arm's
 # face B so the plate's pads and shimmed hub stand alone set Z: it is a
 # backstop, never a second Z support (FixtureCAD option b).
@@ -86,12 +89,10 @@ NECK_WALL_MIN = (
     / 100.0
 )
 COLLAR_WALL_MIN = (
-    math.floor(
-        (COLLAR_DIA - _GENERAL_1PL_WALL - (REAM_DIA + REAM_BAND[0])) / 2.0 * 100.0
-    )
+    math.floor((COLLAR_DIA - _GENERAL_1PL - (REAM_DIA + REAM_BAND[0])) / 2.0 * 100.0)
     / 100.0
 )
-if NECK_WALL_MIN >= (COLLAR_DIA - _GENERAL_1PL_WALL - (REAM_DIA + REAM_BAND[0])) / 2.0:
+if NECK_WALL_MIN >= (COLLAR_DIA - _GENERAL_1PL - (REAM_DIA + REAM_BAND[0])) / 2.0:
     raise AssertionError("the neck is no longer the thinnest wall round the bore")
 # Lands stand LAND_HEIGHT above the neck face: their tip stays under the
 # arm's upper strap face even with the neck face at its lowest.
@@ -106,7 +107,6 @@ if (
 if LAND_HEIGHT + LAND_HEIGHT_BAND[1] - _NECK_DROP_MAX < rocker.ARM_THICKNESS / 2.0:
     raise AssertionError("diamond-pin lands engage less than half the strap")
 PIN_ENGAGEMENT = PIN_LENGTH - LAND_HEIGHT
-_GENERAL_1PL = 0.8  # title block .X band (the pin length and ream depth print .X)
 if (
     PIN_LENGTH + _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[1])
     >= REAM_DEPTH - _GENERAL_1PL
@@ -187,7 +187,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "lands": ExportFeature(
         kind="pin",
         faces=(CylinderFace(LAND_DIA, contains_z_mm=-1.0, tolerance_mm=0.003),),
-        requirements=("dia", "width", "height"),
+        requirements=("dia", "width", "height", "length"),
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
@@ -207,8 +207,14 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                     ("ch_rocker_arm_spec", "ARM_THICKNESS"),
                 ),
             ),
+            # The bought pin's total length: keeps it off the bore bottom and
+            # its inserted end past the thin neck.
+            "length": (
+                limits(PIN_LENGTH, 1),
+                ("PIN_LENGTH", "REAM_DEPTH", "NECK_LENGTH"),
+            ),
         },
-        precision={"width": FLATS_PLACES, "height": 3},
+        precision={"width": FLATS_PLACES, "height": 3, "length": 1},
     ),
     **{
         name: ExportFeature(
