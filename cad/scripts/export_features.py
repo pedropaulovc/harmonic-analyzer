@@ -32,10 +32,13 @@ import ch_pivot_shaft_spec as shaft
 import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_spec as rocker
 import rocker_bank_layout as bank
+from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, FaceSpec, PlanarFace, SphereFace
-from _printed_tolerance import printed_band_mm, printed_deviations
+from _printed_tolerance import printed_band_mm
 
-SUPPORTED_PARTS = ("ch_rocker_arm", "ch_pivot_shaft", "dt_cone_pivot_post")
+# Parts whose ``<stem>_spec.EXPORT_FEATURES`` declares every requirement feature.
+SPEC_DRIVEN_PARTS: tuple[str, ...] = ()
+SUPPORTED_PARTS = ("ch_rocker_arm", "ch_pivot_shaft", "dt_cone_pivot_post", *SPEC_DRIVEN_PARTS)
 REPO = Path(__file__).resolve().parents[2]
 CONFIG_DIR = REPO / "cad" / "config"
 OUT = REPO / "cad" / "out"
@@ -239,14 +242,41 @@ def _feature(
     return result
 
 
-def _band(model: float, places: int, band: tuple[float, float] | None = None) -> list[float]:
-    # An explicit native tolerance qualifies the exact source dimension.
-    # General grades qualify its printed nominal; use the source's Python
-    # formatting convention without inventing a SolidWorks rounding mode.
-    if band is not None:
-        return [round(model + band[1], 12), round(model + band[0], 12)]
-    low, high = printed_deviations(model, places)
-    return [round(model + low, 12), round(model + high, 12)]
+def _spec_module(stem: str) -> ModuleType:
+    return importlib.import_module(f"{stem}_spec")
+
+
+def _spec_cite(module: ModuleType, sources: tuple[str | tuple[str, str], ...]) -> list[str]:
+    citations: list[str] = []
+    for source in sources:
+        owner, name = (importlib.import_module(source[0]), source[1]) if isinstance(source, tuple) else (module, source)
+        citations += _cite(owner, name)
+    return list(dict.fromkeys(citations))
+
+
+def _spec_declarations(stem: str) -> dict[str, ExportFeature]:
+    declared = _spec_module(stem).EXPORT_FEATURES
+    if not declared or not all(isinstance(item, ExportFeature) for item in declared.values()):
+        raise TypeError(f"{stem}_spec.EXPORT_FEATURES must map names to ExportFeature")
+    return declared
+
+
+def _spec_features(stem: str) -> dict[str, dict[str, Any]]:
+    module = _spec_module(stem)
+    result = {}
+    for name, declared in _spec_declarations(stem).items():
+        feature = _feature(
+            module, declared.kind, list(declared.requirements),
+            {key: (value, ()) for key, (value, _sources) in declared.fields.items()},
+            precision=dict(declared.precision) or None,
+        )
+        for key, (_value, sources) in declared.fields.items():
+            feature["cite"][key] = _spec_cite(module, sources)
+        result[name] = feature
+    return result
+
+
+_band = limits
 
 
 def _drilled_band(model: float, places: int) -> list[float]:
@@ -326,6 +356,8 @@ def feature_selectors(stem: str) -> dict[str, tuple[FaceSpec, ...]]:
     Shaft crowns require the existing pure SphereFace vocabulary.
     """
     stem = _stem(stem)
+    if stem in SPEC_DRIVEN_PARTS:
+        return {name: declared.faces for name, declared in _spec_declarations(stem).items()}
     if stem == "ch_rocker_arm":
         top, tip, bottom = _rocker_points()
         right = (_plane_between(top, tip), _plane_between(tip, bottom))
@@ -673,6 +705,8 @@ def _notes_module(stem: str) -> ModuleType:
         return importlib.import_module(name)
     # These specs supply the native Manufacturing Notes property consumed by
     # the corresponding drawings' property-linked note.
+    if stem in SPEC_DRIVEN_PARTS:
+        return _spec_module(stem)
     return {"ch_pivot_shaft": shaft, "dt_cone_pivot_post": cone}[stem]
 
 
@@ -689,8 +723,11 @@ def requirement_manifest(stem: str) -> dict[str, Any]:
     """Pure drawing requirement data, before binding it to STEP face names."""
     stem = _stem(stem)
     dashed = stem.replace("_", "-")
-    module = {"ch_rocker_arm": rocker, "ch_pivot_shaft": shaft, "dt_cone_pivot_post": cone}[stem]
-    features = {"ch_rocker_arm": _rocker_features, "ch_pivot_shaft": _shaft_features, "dt_cone_pivot_post": _cone_features}[stem]()
+    if stem in SPEC_DRIVEN_PARTS:
+        module, features = _spec_module(stem), _spec_features(stem)
+    else:
+        module = {"ch_rocker_arm": rocker, "ch_pivot_shaft": shaft, "dt_cone_pivot_post": cone}[stem]
+        features = {"ch_rocker_arm": _rocker_features, "ch_pivot_shaft": _shaft_features, "dt_cone_pivot_post": _cone_features}[stem]()
     notes_module = _notes_module(stem)
     construction, construction_cite = _construction(notes_module)
     row = _config.parts(dashed)
