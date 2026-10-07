@@ -183,16 +183,43 @@ def _observe_note_placement(
             state[field] = value
         return value
 
-    def coordinates(values: Any) -> Any:
-        return None if values is None else tuple(float(v) for v in values)
+    def read_coordinates(field: str, getter: Any, *, count: int, member: str) -> None:
+        def measured() -> tuple[float, ...]:
+            values = getter()
+            state[f"{field}_raw"] = repr(values)
+            if values is None:
+                raise ValueError(f"{member} returned no coordinate array")
+            coordinates = tuple(float(v) for v in values)
+            if len(coordinates) != count:
+                raise ValueError(
+                    f"{member} returned {len(coordinates)} coordinates; expected {count}"
+                )
+            if not all(math.isfinite(v) for v in coordinates):
+                raise ValueError(f"{member} returned non-finite coordinates")
+            return coordinates
 
-    read_field("extent_m", lambda: coordinates(note.GetExtent()))
+        read_field(field, measured)
+
+    def document_visible() -> bool:
+        value = _early_bound(adapter.currentModel, "IModelDoc2").Visible
+        if type(value) is not bool:
+            state["document_visible_raw"] = repr(value)
+            raise ValueError("IModelDoc2.Visible did not return a boolean")
+        return value
+
+    # SDK: GetExtent has six doubles and is invalid for invisible documents.
+    visible = read_field("document_visible", document_visible)
+    if visible is True:
+        read_coordinates(
+            "extent_m", lambda: note.GetExtent(), count=6, member="INote.GetExtent"
+        )
+    elif visible is unavailable:
+        state["extent_m_error"] = (
+            "Unavailable: document visibility is unknown (see document_visible_error)"
+        )
+    else:
+        state["extent_m_error"] = "Unavailable: INote.GetExtent requires a visible document"
     read_field("locked", lambda: bool(note.LockPosition))
-    # INote.GetExtent is documented as invalid for an invisible document.
-    read_field(
-        "document_visible",
-        lambda: bool(_early_bound(adapter.currentModel, "IModelDoc2").Visible),
-    )
     annotation = read_field(
         "annotation",
         lambda: _early_bound(note.GetAnnotation(), "IAnnotation"),
@@ -204,7 +231,13 @@ def _observe_note_placement(
         for field in ("position_m", "owner_type", "owner_name", "attached_entity_count"):
             state[f"{field}_error"] = "Unavailable: annotation (see annotation_error)"
     else:
-        read_field("position_m", lambda: coordinates(annotation.GetPosition()))
+        # SDK: GetPosition has three doubles; an empty SafeArray is failure.
+        read_coordinates(
+            "position_m",
+            lambda: annotation.GetPosition(),
+            count=3,
+            member="IAnnotation.GetPosition",
+        )
         read_field(
             "attached_entity_count", lambda: int(annotation.GetAttachedEntityCount3())
         )

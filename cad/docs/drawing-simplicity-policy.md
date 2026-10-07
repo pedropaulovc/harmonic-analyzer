@@ -412,9 +412,14 @@ formatting, before/after caption centering, and before/after the existing final
 layout rebuild. Every note is observed after that rebuild before a border
 failure can stop at the first caption. `GetPosition` and `GetExtent` are both
 sheet-space metres;
-`GetPosition` is the note text box's upper-left origin, while the extent contains
-lower-left and upper-right corners. An invisible document makes `GetExtent`
-invalid. These records do not repair placement or waive the native border gates.
+`GetPosition` is the note text box's upper-left origin and requires three finite
+coordinates; the extent requires six finite coordinates for its lower-left and
+upper-right corners. Null/empty arrays, wrong counts and non-finite values are
+unavailable observations with named errors and raw returned-shape evidence, not
+usable coordinates. Document visibility is read first: an invisible document
+or an unreadable visibility precondition makes the diagnostic extent unavailable
+without calling `GetExtent`. These records do not repair placement or waive the
+native border gates.
 Each diagnostic read is isolated: an unavailable field carries a named
 `<field>_error` with the real exception or missing prerequisite, while readable
 fields remain recorded. Observations emit events/logs within the existing phase,
