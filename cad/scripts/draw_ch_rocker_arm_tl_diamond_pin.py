@@ -154,7 +154,8 @@ def _hatch_pin_apart(adapter: Any, section: Any) -> None:
             hatch.UseMaterialHatch = False
             hatch.Angle = angle
             # A longitudinally cut pin reads unhatched: spacing wider than the pin.
-            hatch.Scale2 = 100.0 if name == pin else 0.5
+            if name == pin:
+                hatch.Scale2 = 100.0
             after = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
             if abs(float(hatch.Angle) - angle) > 1e-6 or not str(hatch.Pattern):
                 raise RuntimeError(f"section hatch did not persist: {before} -> {after}")
