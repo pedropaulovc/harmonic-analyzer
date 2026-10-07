@@ -354,6 +354,14 @@ HOLD_DOWN_YS = (
 HOLD_DOWN_POINTS = tuple(
     (x, y) for y in HOLD_DOWN_YS for x in (-HOLD_DOWN_X, HOLD_DOWN_X)
 )
+# Locations (codex review of run 20261007T212104521Z: three places was
+# over-specified). Along the slots (X) the T-nuts slide, so X prints at one
+# place. Across them (Y) the table fixes the 63.5 pitch: opposite errors at
+# the two holes' band must stay inside both screws' radial clearance, which
+# rules out .X (1.6 against 1.59), so Y prints at two places.
+HOLD_DOWN_X_PLACES = 1
+HOLD_DOWN_Y_PLACES = 2
+_HOLD_DOWN_SCREW_MAJOR = THREAD_MAJOR_MM["1/2-13"]
 # 1/2-13 socket head cap screw, ASME B18.3: head 0.750 dia x 0.500 high.
 HOLD_DOWN_SCREW_HEAD_DIA = 0.750 * 25.4
 HOLD_DOWN_SCREW_HEAD_H = 0.500 * 25.4
@@ -394,6 +402,10 @@ if (
     < 1.5 * THREAD_MAJOR_MM[CLAMP_STUD_SPEC.size]
 ):
     raise AssertionError("clamp-stud thread engages under 1.5 diameters")
+if 2.0 * _XX > HOLD_DOWN_CLEARANCE_DIA - _HOLD_DOWN_SCREW_MAJOR:
+    raise AssertionError("hold-down screws can miss their T-slots at the Y band")
+# The studs only anchor strap clamps, which slide to the arm: one place.
+CLAMP_STUD_PLACES = 1
 if PLATE_THICK - CLAMP_STUD_SPEC.depth_mm - _XX < 3.0:
     raise AssertionError("clamp-stud tap drill breaks too near the plate underside")
 
@@ -424,9 +436,12 @@ _RECTS = [
 _ROUNDS = [
     (0.0, 0.0, (STAND_POCKET_DIA + _XXX) / 2.0),
     (*ROD_PIN_HOLE_XY, (ROD_PIN_HOLE_DIA + ROD_PIN_HOLE_BAND[0]) / 2.0),
-    *((x, y, (HOLD_DOWN_CBORE_DIA + _XX) / 2.0) for x, y in HOLD_DOWN_POINTS),
     *(
-        (x, y, THREAD_MAJOR_MM[CLAMP_STUD_SPEC.size] / 2.0)
+        (x, y, (HOLD_DOWN_CBORE_DIA + _XX) / 2.0 + math.hypot(_X, _XX))
+        for x, y in HOLD_DOWN_POINTS
+    ),
+    *(
+        (x, y, THREAD_MAJOR_MM[CLAMP_STUD_SPEC.size] / 2.0 + math.hypot(_X, _X))
         for x, y in CLAMP_STUD_POINTS
     ),
 ]
@@ -497,7 +512,7 @@ DIMENSION_CALLOUTS = {"LocatingBoreDia": "REAM", "RodPinHoleDia": "REAM"}
 
 # Schedules (sheets two and three): every pocket and hole is tagged on the
 # sheet-two plan and located here from the locating bore axis; every bonded part
-# is sized. Three places (the .XXX band) throughout.
+# is sized. Three places (the .XXX band) unless a row states its own places.
 SCHEDULE_PLACES = 3
 SECTION_LABEL = "D"
 DETAIL_LABEL = "E"
@@ -560,11 +575,27 @@ FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
         for tag, cx, cy, length, width in REST_POCKETS
     ),
     *(
-        (f"H{index}", "HOLD-DOWN", _mm(x), _mm(y), "-", "-", "THRU")
+        (
+            f"H{index}",
+            "HOLD-DOWN",
+            _mm(x, HOLD_DOWN_X_PLACES),
+            _mm(y, HOLD_DOWN_Y_PLACES),
+            "-",
+            "-",
+            "THRU",
+        )
         for index, (x, y) in enumerate(HOLD_DOWN_POINTS, start=1)
     ),
     *(
-        (f"S{index}", "STUD TAP", _mm(x), _mm(y), "-", "-", "-")
+        (
+            f"S{index}",
+            "STUD TAP",
+            _mm(x, CLAMP_STUD_PLACES),
+            _mm(y, CLAMP_STUD_PLACES),
+            "-",
+            "-",
+            "-",
+        )
         for index, (x, y) in enumerate(CLAMP_STUD_POINTS, start=1)
     ),
 )
@@ -614,7 +645,7 @@ DRAWING_NOTES = "\n".join(
     (
         BUILT_UP_PERMISSION_NOTE,
         "EACH PART CENTRED IN ITS POCKET; RAIL RESTS SEAT ON THEIR POCKET FLOORS.",
-        "PAD AND HUB STAND TOPS FLAT TO SEAT THE ARM; THEIR POCKET FLOORS CLEAR.",
+        "PAD AND HUB STAND TOPS AT THEIR PRINTED HEIGHTS; THEIR POCKET FLOORS CLEAR.",
         "PLAN LOCATIONS FROM BORE L AXIS: SEE TAGS AND SCHEDULES, SHEETS TWO AND THREE.",
     )
 )
