@@ -93,10 +93,44 @@ _FAILED_LEAF = dict(
 _REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV = "HARMONIC_TEST_REMOVE_FARM_LOG_LOCK"
 
 
+def _parallel_failed_log_case(name):
+    """One failed leaf fixture and its independently supplied reader content."""
+    task = f"part:{name}"
+    key = name * 64
+    attempt = 2 if name == "b" else 1
+    result = _leaf_result(
+        **_FAILED_LEAF,
+        worker_id=f"worker-{name}",
+        attempt=attempt,
+        log_blob=(
+            f"results/leaf/part__{name}/{key}/"
+            f"20261007T000000Z-{attempt}-fixture{name}/task.log"
+        ),
+    )
+    workflow_id = _farm.workflow_id(task, key, SHA, 900)
+    metadata = {
+        "task": task,
+        "workflow": workflow_id,
+        "worker": result.worker_id,
+        "attempt": str(result.attempt),
+        "log_blob": result.log_blob,
+    }
+    payload = [
+        f"execute {task} on {result.worker_id}",
+        f"{result.failure_category} exit {result.exit_code}: {result.failure_message}",
+    ]
+    diagnostics = [f"exact published blob read: {result.log_blob}"]
+    return task, key, workflow_id, result, metadata, payload, diagnostics
+
+
 def _emit_failed_log_in_process(
-    output_path: str, retrieval_barrier, begin_count, both_begun, name: str
-) -> None:
-    """Only temporary files and these spawned children participate in this probe."""
+    output_path, retrieval_barrier, leader_begun, follower_begun, leader_payload, name
+):
+    """Exercise run_leaf with a closed result boundary in an owned child."""
+    task, key, workflow_id, result, _metadata, payload, diagnostics = (
+        _parallel_failed_log_case(name)
+    )
+    removed_lock = os.environ.get(_REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV) == "1"
 
     def fetch(
         pool,
@@ -108,41 +142,59 @@ def _emit_failed_log_in_process(
         max_stdout_bytes=None,
     ):
         assert pool == Path(output_path).parent / "unused-pool"
-        assert args == (
-            "logs", f"leaf:{name}", "--log-blob", f"results/{name}/task.log"
-        )
+        assert args == ("logs", workflow_id, "--log-blob", result.log_blob)
         assert max_stdout_bytes == _farm.FAILED_LOG_MAX_BYTES
         retrieval_barrier.wait(timeout=10)
-        stderr.write(f"reader diagnostic for {name}\n".encode())
-        stdout.write(f"worker log for {name}\n".encode())
+        stderr.write(("\n".join(diagnostics) + "\n").encode())
+        stdout.write(("\n".join(payload) + "\n").encode())
         return subprocess.CompletedProcess(args, 0)
+
+    def await_checkpoint(event, checkpoint):
+        assert event.wait(timeout=2), f"controlled scheduler missed {checkpoint}"
 
     class CoordinatedOutput:
         def __init__(self, output):
             self.output = output
+            self.pending = ""
 
         def write(self, text):
-            written = self.output.write(text)
-            self.output.flush()
-            if text.startswith("--- begin failed farm task log:"):
-                with begin_count.get_lock():
-                    begin_count.value += 1
-                    position = begin_count.value
-                    if position == 2:
-                        both_begun.set()
-                if position == 1:
-                    both_begun.wait(timeout=2)
-            return written
+            # A print may write its content and newline separately. Schedule
+            # only after a complete logical line has reached the shared sink.
+            self.pending += text
+            while "\n" in self.pending:
+                line, self.pending = self.pending.split("\n", 1)
+                self.output.write(line + "\n")
+                self.output.flush()
+                if not removed_lock:
+                    continue
+                if line.startswith("--- begin failed farm task log:"):
+                    if name == "a":
+                        leader_begun.set()
+                        await_checkpoint(follower_begun, "follower frame begin")
+                    else:
+                        follower_begun.set()
+                        await_checkpoint(leader_payload, "leader payload")
+                elif name == "a" and line.startswith("[farm task="):
+                    leader_payload.set()
+            return len(text)
 
         def flush(self):
             self.output.flush()
 
-    if os.environ.get(_REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV) == "1":
+        def finish(self):
+            if self.pending:
+                self.output.write(self.pending)
+                self.pending = ""
+            self.output.flush()
+
+    if removed_lock:
         class NoOutputLock:
             def __init__(self, _path, *, timeout):
                 pass
 
             def __enter__(self):
+                if name == "b":
+                    await_checkpoint(leader_begun, "leader frame begin")
                 return self
 
             def __exit__(self, *_exc):
@@ -150,20 +202,25 @@ def _emit_failed_log_in_process(
 
         _farm.FileLock = NoOutputLock
 
+    async def closed_result(request, requested_workflow):
+        assert (request.task, request.cache_key, requested_workflow) == (
+            task, key, workflow_id
+        )
+        return result
+
+    os.environ["HARMONIC_FARM_COMMIT"] = SHA
+    os.environ["HARMONIC_FARM_LEAF_TIMEOUT_S"] = "900"
+    _farm._dispatch = closed_result
     _farm.pool_home = lambda: Path(output_path).parent / "unused-pool"
     _farm.run_pool_cli = fetch
-    result = _leaf_result(
-        **_FAILED_LEAF,
-        worker_id=f"worker-{name}",
-        attempt=2 if name == "b" else 1,
-        log_blob=f"results/{name}/task.log",
-    )
     with Path(output_path).open("a", encoding="utf-8", buffering=1) as output:
         previous = sys.stderr
-        sys.stderr = CoordinatedOutput(output)
+        coordinated = CoordinatedOutput(output)
+        sys.stderr = coordinated
         try:
-            _farm._emit_failed_task_log(f"part:{name}", f"leaf:{name}", result)
+            assert _farm.run_leaf(task, key) is result
         finally:
+            coordinated.finish()
             sys.stderr = previous
 
 
@@ -2382,6 +2439,304 @@ def test_reader_stderr_is_distinct_and_bounded_independently_of_worker_stdout(
     ]
 
 
+def _assert_failed_log_render_truncated(
+    output, warnings, task, workflow_id, failed, *, byte_limit, line_limit
+):
+    assert len(output.encode("utf-8", errors="replace")) <= byte_limit
+    assert len(output.splitlines()) <= line_limit
+    identity = _failed_log_identity(task, workflow_id, failed)
+    assert output.startswith(f"--- begin failed farm task log: {identity} ---\n")
+    assert output.endswith(f"--- end failed farm task log: {identity} ---\n")
+    assert any(
+        line.startswith(f"[farm log-reader {identity}] ")
+        and "truncated" in line
+        for line in output.splitlines()
+    ), "render truncation must be visible and attributed, not silently drop lines"
+    assert [fields for _message, fields in warnings] == [
+        _failed_log_fields(task, workflow_id, failed, "render_truncated")
+    ]
+    assert all("original farm failure is unchanged" in m for m, _fields in warnings)
+
+
+@pytest.mark.parametrize("separator", [b"\n", b"\r"], ids=["newline", "bare_cr"])
+def test_failed_log_render_budget_bounds_short_lines_with_long_identity_prefixes(
+    leaf_result_boundary, monkeypatch, capsys, separator
+):
+    _calls, resolve = leaf_result_boundary
+    task = "part:pen_rod"
+    workflow_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    failed = _leaf_result(
+        **_FAILED_LEAF,
+        worker_id="sw-" + "long-worker-label-" * 16 + "@7",
+        phase_ms={"execute": 77},
+    )
+    resolve(failed)
+    payload = (b"x" + separator) * 48 + b"unshown-worker-tail" + separator
+    byte_limit, line_limit = 4096, 64 * 1024
+    assert len(payload) < byte_limit
+    monkeypatch.setattr(_farm, "FAILED_LOG_MAX_BYTES", len(payload))
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_BYTES", byte_limit, raising=False)
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_LINES", line_limit, raising=False)
+    warnings = []
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: warnings.append((message, fields)),
+    )
+
+    def reader(_pool, *args, stdout, stderr, **options):
+        assert options["max_stdout_bytes"] == len(payload)
+        stdout.write(payload)
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(_farm, "run_pool_cli", reader)
+
+    assert _farm.run_leaf(task, "k" * 64) is failed
+
+    output = capsys.readouterr().err
+    _assert_failed_log_render_truncated(
+        output, warnings, task, workflow_id, failed,
+        byte_limit=byte_limit, line_limit=line_limit,
+    )
+    assert f"[farm {_failed_log_identity(task, workflow_id, failed)}] x\n" in output
+    assert "unshown-worker-tail" not in output
+    assert failed.phase_ms == {"execute": 77}
+
+
+def test_failed_log_render_line_work_limit_is_independent_of_byte_budget(
+    leaf_result_boundary, monkeypatch, capsys
+):
+    _calls, resolve = leaf_result_boundary
+    task = "part:pen_rod"
+    workflow_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    failed = _leaf_result(**_FAILED_LEAF, phase_ms={"execute": 78})
+    resolve(failed)
+    payload = b"".join(f"worker-line-{number}\r".encode() for number in range(20))
+    byte_limit, line_limit = 64 * 1024, 8
+    identity = _failed_log_identity(task, workflow_id, failed)
+    assert 22 * (len(identity.encode()) + 64) < byte_limit
+    monkeypatch.setattr(_farm, "FAILED_LOG_MAX_BYTES", len(payload))
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_BYTES", byte_limit, raising=False)
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_LINES", line_limit, raising=False)
+    warnings = []
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: warnings.append((message, fields)),
+    )
+    real_text_reader = _farm.TextIOWrapper
+    iterated_lines = []
+    read_sizes, readline_sizes = [], []
+
+    class CountedReader:
+        def __init__(self, *args, **options):
+            self.reader = real_text_reader(*args, **options)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            line = next(self.reader)
+            iterated_lines.append(line)
+            return line
+
+        def readline(self, size=-1):
+            readline_sizes.append(size)
+            line = self.reader.readline(size)
+            if line:
+                iterated_lines.append(line)
+            return line
+
+        def read(self, size=-1):
+            read_sizes.append(size)
+            return self.reader.read(size)
+
+        def detach(self):
+            return self.reader.detach()
+
+    monkeypatch.setattr(_farm, "TextIOWrapper", CountedReader)
+
+    def reader(_pool, *args, stdout, stderr, **_options):
+        stdout.write(payload)
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(_farm, "run_pool_cli", reader)
+
+    assert _farm.run_leaf(task, "k" * 64) is failed
+
+    output = capsys.readouterr().err
+    assert len(output.encode("utf-8")) < byte_limit
+    _assert_failed_log_render_truncated(
+        output, warnings, task, workflow_id, failed,
+        byte_limit=byte_limit, line_limit=line_limit,
+    )
+    assert f"[farm {identity}] worker-line-0\n" in output
+    assert "worker-line-19" not in output
+    assert len(iterated_lines) <= line_limit
+    assert len(iterated_lines) < 20, "line-work exhaustion must stop iteration"
+    assert all(0 < size <= byte_limit for size in readline_sizes)
+    assert read_sizes == [1], "exhausted line work permits only a bounded EOF probe"
+    assert failed.phase_ms == {"execute": 78}
+
+
+@pytest.mark.parametrize(
+    ("payload", "worker_id", "log_blob"),
+    [
+        (b"\xff" * 900 + b"\r\n", "sw-utf8@4", "results/utf8/task.log"),
+        (("界" * 900 + "\r").encode(), "sw-utf8@4", "results/utf8/task.log"),
+        (
+            b"x\r" * 12,
+            "sw-" + "界" * 80 + "@4",
+            "results/" + "é" * 30 + "/task.log",
+        ),
+    ],
+    ids=["replacement_bytes", "multibyte_payload", "multibyte_long_labels"],
+)
+def test_failed_log_render_budget_counts_replacement_and_multibyte_utf8_bytes(
+    leaf_result_boundary, monkeypatch, capsys, payload, worker_id, log_blob
+):
+    _calls, resolve = leaf_result_boundary
+    task = "part:pen_rod"
+    workflow_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    failed = _leaf_result(
+        **_FAILED_LEAF, worker_id=worker_id, log_blob=log_blob,
+        phase_ms={"execute": 79},
+    )
+    resolve(failed)
+    identity = _failed_log_identity(task, workflow_id, failed)
+    normalized = payload.decode("utf-8", errors="replace").replace("\r\n", "\n")
+    normalized = normalized.replace("\r", "\n")
+    unbounded_output = (
+        f"--- begin failed farm task log: {identity} ---\n"
+        + "".join(f"[farm {identity}] {line}\n" for line in normalized.splitlines())
+        + f"--- end failed farm task log: {identity} ---\n"
+    )
+    # A character-count implementation would accept this entire block. Its
+    # actual encoded output cannot fit, even though these fixtures are tiny.
+    byte_limit = len(unbounded_output) + 128
+    line_limit = 64 * 1024
+    assert len(unbounded_output) < byte_limit < len(unbounded_output.encode("utf-8"))
+    monkeypatch.setattr(_farm, "FAILED_LOG_MAX_BYTES", len(payload))
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_BYTES", byte_limit, raising=False)
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_LINES", line_limit, raising=False)
+    warnings = []
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: warnings.append((message, fields)),
+    )
+
+    def reader(_pool, *args, stdout, stderr, **_options):
+        stdout.write(payload)
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(_farm, "run_pool_cli", reader)
+
+    assert _farm.run_leaf(task, "k" * 64) is failed
+
+    _assert_failed_log_render_truncated(
+        capsys.readouterr().err, warnings, task, workflow_id, failed,
+        byte_limit=byte_limit, line_limit=line_limit,
+    )
+    assert failed.phase_ms == {"execute": 79}
+
+
+def test_failed_log_render_budget_is_shared_with_reader_diagnostics(
+    leaf_result_boundary, monkeypatch, capsys
+):
+    _calls, resolve = leaf_result_boundary
+    task = "part:pen_rod"
+    workflow_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    failed = _leaf_result(**_FAILED_LEAF, phase_ms={"execute": 80})
+    resolve(failed)
+    identity = _failed_log_identity(task, workflow_id, failed)
+    frames = (
+        f"--- begin failed farm task log: {identity} ---\n"
+        f"--- end failed farm task log: {identity} ---\n"
+    )
+    payload = b"worker\n" * 8
+    diagnostics = b"reader\n" * 8
+    rendered_payload = (f"[farm {identity}] worker\n" * 8).encode()
+    rendered_diagnostics = (f"[farm log-reader {identity}] reader\n" * 8).encode()
+    byte_limit, line_limit = 4096, 64 * 1024
+    frame_bytes = len(frames.encode())
+    assert frame_bytes + len(rendered_payload) < byte_limit
+    assert frame_bytes + len(rendered_diagnostics) < byte_limit
+    assert frame_bytes + len(rendered_payload) + len(rendered_diagnostics) > byte_limit
+    monkeypatch.setattr(_farm, "FAILED_LOG_MAX_BYTES", len(payload))
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_BYTES", byte_limit, raising=False)
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_LINES", line_limit, raising=False)
+    warnings = []
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: warnings.append((message, fields)),
+    )
+
+    def reader(_pool, *args, stdout, stderr, **_options):
+        stdout.write(payload)
+        stderr.write(diagnostics)
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(_farm, "run_pool_cli", reader)
+
+    assert _farm.run_leaf(task, "k" * 64) is failed
+
+    output = capsys.readouterr().err
+    _assert_failed_log_render_truncated(
+        output, warnings, task, workflow_id, failed,
+        byte_limit=byte_limit, line_limit=line_limit,
+    )
+    assert f"[farm {identity}] worker\n" in output
+    assert f"[farm log-reader {identity}] reader\n" in output
+    assert failed.phase_ms == {"execute": 80}
+
+
+def test_failed_log_render_budget_bounds_oversized_identity_frames(
+    leaf_result_boundary, monkeypatch, capsys
+):
+    _calls, resolve = leaf_result_boundary
+    task = "part:pen_rod"
+    workflow_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    failed = _leaf_result(
+        **_FAILED_LEAF, worker_id="sw-" + "界" * 400 + "@7",
+        phase_ms={"execute": 82},
+    )
+    resolve(failed)
+    byte_limit = 1024
+    identity = _failed_log_identity(task, workflow_id, failed)
+    assert len(identity.encode("utf-8")) > byte_limit
+    monkeypatch.setattr(_farm, "FAILED_LOG_RENDER_BYTES", byte_limit, raising=False)
+    monkeypatch.setattr(
+        _farm, "FAILED_LOG_RENDER_LINES", 64 * 1024, raising=False
+    )
+    warnings = []
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: warnings.append((message, fields)),
+    )
+
+    def reader(_pool, *args, stdout, stderr, **_options):
+        stdout.write(b"small-worker-payload\n")
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(_farm, "run_pool_cli", reader)
+
+    assert _farm.run_leaf(task, "k" * 64) is failed
+
+    output = capsys.readouterr().err
+    assert len(output.encode("utf-8", errors="replace")) <= byte_limit
+    assert output == "", "an attribution frame that cannot fit must not escape the cap"
+    assert [fields for _message, fields in warnings] == [
+        _failed_log_fields(task, workflow_id, failed, "render_truncated")
+    ]
+    assert "output is incomplete" in warnings[0][0]
+    assert "original farm failure is unchanged" in warnings[0][0]
+    assert failed.phase_ms == {"execute": 82}
+
+
+
 def test_worker_and_reader_lines_keep_full_identity_when_output_interleaves(
     tmp_path, monkeypatch
 ):
@@ -2727,8 +3082,481 @@ def test_bounded_log_retrieval_kills_only_its_direct_pool_child(
     assert [fields["reason"] for _message, fields in warnings] == ["retrieval_timeout"]
 
 
+def _retain_owned_reader_child(monkeypatch, script):
+    """Observe only the exact temporary Python reader and its parent threads."""
+    real_popen = subprocess.Popen
+    real_thread_start = threading.Thread.start
+    retained, killed, started_threads = [], [], []
+
+    def popen(argv, **options):
+        assert argv[:2] == [sys.executable, str(script)]
+        process = real_popen(argv, **options)
+        retained.append(process)
+        real_kill = process.kill
+
+        def kill():
+            killed.append(process)
+            return real_kill()
+
+        monkeypatch.setattr(process, "kill", kill)
+        return process
+
+    def start(thread, *args, **options):
+        started_threads.append(thread)
+        return real_thread_start(thread, *args, **options)
+
+    monkeypatch.setattr(_farm.subprocess, "Popen", popen)
+    monkeypatch.setattr(threading.Thread, "start", start)
+    return retained, killed, started_threads
+
+
+def _assert_owned_reader_reaped(observed, *, stopped):
+    retained, killed, started_threads = observed
+    assert len(retained) == 1
+    [process] = retained
+    assert process.returncode is not None, "the owned reader must be reaped"
+    assert process.stdout is not None and process.stdout.closed
+    assert process.stderr is not None and process.stderr.closed
+    assert killed == ([process] if stopped else [])
+    assert started_threads == [], "bounded reads must not start timer/drain threads"
+
+
+def test_failed_log_stderr_capture_overflow_stops_live_reader_and_preserves_failure(
+    leaf_result_boundary, tmp_path, monkeypatch, capsys
+):
+    _calls, resolve = leaf_result_boundary
+    task = "part:pen_rod"
+    workflow_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    failed = _leaf_result(**_FAILED_LEAF, phase_ms={"execute": 81})
+    resolve(failed)
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    script = pool / "farm.py"
+    started = tmp_path / "stderr-started.txt"
+    survived = tmp_path / "stderr-survived.txt"
+    limit = 64 * 1024
+    script.write_text(
+        "import sys, time\n"
+        "from pathlib import Path\n"
+        f"Path({str(started)!r}).write_text('started', encoding='utf-8')\n"
+        "sys.stdout.buffer.write(b'incomplete-worker-payload\\n')\n"
+        "sys.stdout.buffer.flush()\n"
+        f"sys.stderr.buffer.write(b'd' * {limit} + b'overflow-suffix-not-shown\\n')\n"
+        "sys.stderr.buffer.flush()\n"
+        "time.sleep(0.8)\n"
+        f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(_farm, "pool_home", lambda: pool)
+    monkeypatch.setattr(_farm, "_pool_python", lambda _pool: Path(sys.executable))
+    monkeypatch.setattr(_farm, "FAILED_LOG_DIAGNOSTIC_BYTES", limit)
+    monkeypatch.setattr(_farm, "FAILED_LOG_TIMEOUT_S", 5)
+    observed = _retain_owned_reader_child(monkeypatch, script)
+    capture_sizes, errors, warnings = [], [], []
+    monkeypatch.setattr(
+        _farm._telemetry,
+        "warn",
+        lambda message, **fields: warnings.append((message, fields)),
+    )
+
+    def reader(_pool, *args, interpreter, stdout, stderr, timeout_s, max_stdout_bytes):
+        assert args == ("logs", workflow_id, "--log-blob", failed.log_blob)
+        try:
+            return _farm._run_bounded_log_reader(
+                [str(interpreter), str(script), *args], dict(os.environ),
+                stdout, stderr, timeout_s, max_stdout_bytes,
+            )
+        except Exception as exc:
+            errors.append(exc)
+            raise
+        finally:
+            stdout.seek(0, os.SEEK_END)
+            stderr.seek(0, os.SEEK_END)
+            capture_sizes.append((stdout.tell(), stderr.tell()))
+
+    monkeypatch.setattr(_farm, "run_pool_cli", reader)
+
+    assert _farm.run_leaf(task, "k" * 64) is failed
+
+    [(stdout_bytes, stderr_bytes)] = capture_sizes
+    assert stderr_bytes <= limit, "stderr must be capped during capture, not just display"
+    assert stdout_bytes == len(b"incomplete-worker-payload\n")
+    assert started.read_text(encoding="utf-8") == "started"
+    assert not survived.exists(), "overflow must stop the reader before its delayed exit"
+    _assert_owned_reader_reaped(observed, stopped=True)
+    assert len(errors) == 1
+    assert type(errors[0]).__name__ == "_FailedLogDiagnosticsTooLarge"
+    truthful_message = (
+        "stderr capture limit exceeded; reader stopped; incomplete payload not shown"
+    )
+    assert truthful_message in str(errors[0])
+    assert [fields for _message, fields in warnings] == [
+        _failed_log_fields(task, workflow_id, failed, "diagnostic_truncated")
+    ]
+    assert truthful_message in warnings[0][0]
+    assert "original farm failure is unchanged" in warnings[0][0]
+    output = capsys.readouterr().err
+    identity = _failed_log_identity(task, workflow_id, failed)
+    assert not any(line.startswith(f"[farm {identity}] ") for line in output.splitlines())
+    assert "incomplete-worker-payload" not in output
+    assert "overflow-suffix-not-shown" not in output
+    assert f"[farm log-reader {identity}] " + "d" * stderr_bytes + "\n" in output
+    assert failed.phase_ms == {"execute": 81}
+
+
+@pytest.mark.parametrize(
+    "stderr_target", [None, subprocess.DEVNULL], ids=["discard", "devnull"]
+)
+def test_bounded_direct_reader_caps_discarded_stderr_and_stops_child(
+    tmp_path, monkeypatch, stderr_target
+):
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    script = pool / "farm.py"
+    survived = tmp_path / "discard-survived.txt"
+    script.write_text(
+        "import sys, time\n"
+        "from pathlib import Path\n"
+        "sys.stdout.buffer.write(b'partial\\n')\n"
+        "sys.stdout.buffer.flush()\n"
+        "sys.stderr.buffer.write(b'd' * 1024)\n"
+        "sys.stderr.buffer.flush()\n"
+        "time.sleep(0.8)\n"
+        f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(_farm, "FAILED_LOG_DIAGNOSTIC_BYTES", 256)
+    observed = _retain_owned_reader_child(monkeypatch, script)
+    payload = BytesIO()
+
+    with pytest.raises(
+        Exception,
+        match="stderr capture limit exceeded; reader stopped; incomplete payload not shown",
+    ) as failure:
+        _farm.run_pool_cli(
+            pool, "logs", "leaf:discard", "--log-blob", "results/discard/task.log",
+            interpreter=Path(sys.executable), stdout=payload, stderr=stderr_target,
+            timeout_s=5, max_stdout_bytes=1024,
+        )
+
+    assert type(failure.value).__name__ == "_FailedLogDiagnosticsTooLarge"
+    assert len(payload.getvalue()) <= 1024
+    assert not payload.closed
+    assert not survived.exists()
+    _assert_owned_reader_reaped(observed, stopped=True)
+
+
+@pytest.mark.parametrize("stay_alive", [False, True], ids=["success", "timeout"])
+def test_bounded_direct_reader_drains_concurrent_pipes_without_threads_or_deadlock(
+    tmp_path, monkeypatch, stay_alive
+):
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    script = pool / "farm.py"
+    written = tmp_path / "both-streams-written.txt"
+    survived = tmp_path / "concurrent-survived.txt"
+    stream_bytes = 128 * 1024
+    limit = 2 * stream_bytes
+    script.write_text(
+        "import sys, threading, time\n"
+        "from pathlib import Path\n"
+        "def write(stream, value):\n"
+        f"    stream.write(value * {stream_bytes})\n"
+        "    stream.flush()\n"
+        "writers = [\n"
+        "    threading.Thread(target=write, args=(sys.stdout.buffer, b'o')),\n"
+        "    threading.Thread(target=write, args=(sys.stderr.buffer, b'e')),\n"
+        "]\n"
+        "for writer in writers:\n"
+        "    writer.start()\n"
+        "for writer in writers:\n"
+        "    writer.join()\n"
+        f"Path({str(written)!r}).write_text('written', encoding='utf-8')\n"
+        + (
+            "time.sleep(2)\n"
+            f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n"
+            if stay_alive else ""
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(_farm, "FAILED_LOG_DIAGNOSTIC_BYTES", limit)
+    observed = _retain_owned_reader_child(monkeypatch, script)
+    payload = BytesIO()
+    # Both capture destinations are submitter-owned; neither is a pipe handed
+    # through to Popen. A real file also keeps the old baseline safe to exercise.
+    with (tmp_path / "reader-diagnostics.bin").open("w+b") as diagnostics:
+        options = dict(
+            interpreter=Path(sys.executable), stdout=payload, stderr=diagnostics,
+            timeout_s=1.5 if stay_alive else 5, max_stdout_bytes=limit,
+        )
+        if stay_alive:
+            with pytest.raises(subprocess.TimeoutExpired):
+                _farm.run_pool_cli(
+                    pool, "logs", "leaf:concurrent", "--log-blob",
+                    "results/concurrent/task.log", **options,
+                )
+        else:
+            completed = _farm.run_pool_cli(
+                pool, "logs", "leaf:concurrent", "--log-blob",
+                "results/concurrent/task.log", **options,
+            )
+            assert completed.returncode == 0
+        diagnostics.seek(0)
+        assert diagnostics.read() == b"e" * stream_bytes
+        assert not diagnostics.closed
+
+    assert payload.getvalue() == b"o" * stream_bytes
+    assert len(payload.getvalue()) <= limit
+    assert not payload.closed
+    assert written.read_text(encoding="utf-8") == "written", "both pipes must drain"
+    assert not survived.exists()
+    _assert_owned_reader_reaped(observed, stopped=stay_alive)
+
+
+def test_bounded_direct_reader_deadline_covers_child_after_both_pipes_close(
+    tmp_path, monkeypatch
+):
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    script = pool / "farm.py"
+    closed = tmp_path / "pipes-closed.txt"
+    survived = tmp_path / "closed-pipes-survived.txt"
+    script.write_text(
+        "import os, time\n"
+        "from pathlib import Path\n"
+        "os.close(1)\n"
+        "os.close(2)\n"
+        f"Path({str(closed)!r}).write_text('closed', encoding='utf-8')\n"
+        "time.sleep(2)\n"
+        f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    observed = _retain_owned_reader_child(monkeypatch, script)
+    payload = BytesIO()
+    with (tmp_path / "closed-pipes-diagnostics.bin").open("w+b") as diagnostics:
+        with pytest.raises(subprocess.TimeoutExpired):
+            _farm.run_pool_cli(
+                pool, "logs", "leaf:closed", "--log-blob", "results/closed/task.log",
+                interpreter=Path(sys.executable), stdout=payload, stderr=diagnostics,
+                timeout_s=1, max_stdout_bytes=1024,
+            )
+        diagnostics.seek(0)
+        assert diagnostics.read() == b""
+        assert not diagnostics.closed
+
+    assert closed.read_text(encoding="utf-8") == "closed"
+    assert not survived.exists()
+    assert payload.getvalue() == b""
+    assert not payload.closed
+    _assert_owned_reader_reaped(observed, stopped=True)
+
+
+@pytest.mark.parametrize("capture_stream", ["stdout", "stderr"])
+@pytest.mark.parametrize(
+    "failure_kind", ["write_error", "keyboard_interrupt", "cancelled"]
+)
+def test_bounded_direct_reader_capture_error_or_cancellation_reaps_owned_child(
+    tmp_path, monkeypatch, capture_stream, failure_kind
+):
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    script = pool / "farm.py"
+    survived = tmp_path / "capture-failure-survived.txt"
+    script.write_text(
+        "import sys, time\n"
+        "from pathlib import Path\n"
+        "sys.stdout.buffer.write(b'worker partial\\n')\n"
+        "sys.stdout.buffer.flush()\n"
+        "sys.stderr.buffer.write(b'reader partial\\n')\n"
+        "sys.stderr.buffer.flush()\n"
+        "time.sleep(2)\n"
+        f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    failure = {
+        "write_error": OSError("capture sink refused bytes"),
+        "keyboard_interrupt": KeyboardInterrupt("operator interrupted capture"),
+        "cancelled": asyncio.CancelledError("diagnostic read cancelled"),
+    }[failure_kind]
+
+    class FailedCapture(BytesIO):
+        def write(self, _data):
+            raise failure
+
+    payload = FailedCapture() if capture_stream == "stdout" else BytesIO()
+    diagnostics = FailedCapture() if capture_stream == "stderr" else BytesIO()
+    observed = _retain_owned_reader_child(monkeypatch, script)
+
+    with pytest.raises(type(failure)) as raised:
+        _farm.run_pool_cli(
+            pool, "logs", "leaf:capture-error", "--log-blob",
+            "results/capture-error/task.log", interpreter=Path(sys.executable),
+            stdout=payload, stderr=diagnostics, timeout_s=5,
+            max_stdout_bytes=1024,
+        )
+
+    assert raised.value is failure, "cleanup must preserve the original exception"
+    assert len(payload.getvalue()) <= 1024
+    assert len(diagnostics.getvalue()) <= _farm.FAILED_LOG_DIAGNOSTIC_BYTES
+    assert not payload.closed and not diagnostics.closed
+    assert not survived.exists()
+    _assert_owned_reader_reaped(observed, stopped=True)
+
+
+def test_bounded_direct_reader_initialization_cancellation_reaps_owned_child(
+    tmp_path, monkeypatch
+):
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    script = pool / "farm.py"
+    survived = tmp_path / "initialization-cancellation-survived.txt"
+    script.write_text(
+        "import time\n"
+        "from pathlib import Path\n"
+        "time.sleep(2)\n"
+        f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    observed = _retain_owned_reader_child(monkeypatch, script)
+    retained, _killed, _started_threads = observed
+    payload, diagnostics = BytesIO(), BytesIO()
+    failure = KeyboardInterrupt("operator interrupted owned reader initialization")
+    real_monotonic = time.monotonic
+    owner_thread = threading.get_ident()
+    interrupted = False
+
+    def interrupt_initialization():
+        nonlocal interrupted
+        if (
+            retained
+            and not interrupted
+            and threading.get_ident() == owner_thread
+        ):
+            interrupted = True
+            raise failure
+        return real_monotonic()
+
+    try:
+        with monkeypatch.context() as initialization:
+            initialization.setattr(time, "monotonic", interrupt_initialization)
+            with pytest.raises(KeyboardInterrupt) as raised:
+                _farm.run_pool_cli(
+                    pool, "logs", "leaf:initialization-cancellation", "--log-blob",
+                    "results/initialization-cancellation/task.log",
+                    interpreter=Path(sys.executable), stdout=payload,
+                    stderr=diagnostics, timeout_s=5, max_stdout_bytes=1024,
+                )
+        assert interrupted
+        assert raised.value is failure, "the original cancellation must propagate"
+        assert payload.getvalue() == diagnostics.getvalue() == b""
+        assert not payload.closed and not diagnostics.closed
+        assert not survived.exists()
+        # Observe production ownership cleanup BEFORE the baseline-safe reaper.
+        _assert_owned_reader_reaped(observed, stopped=True)
+    finally:
+        # The deliberately vulnerable before-fix control must not leak a child.
+        for process in retained:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+            for pipe in (process.stdout, process.stderr):
+                if pipe is not None and not pipe.closed:
+                    pipe.close()
+
+
+class _FailedLogFrameValidationError(ValueError):
+    def __init__(self, violations, content):
+        super().__init__(violations)
+        self.violations = violations
+        self.content = content
+
+
+def _consume_failed_log_frames(output, expected):
+    """Attribute complete worker/reader content only from indivisible frames."""
+    stack = []
+    counts = {owner: [0, 0] for owner in expected}
+    content = {
+        owner: {"payload": [], "diagnostics": []} for owner in expected
+    }
+    violations = []
+
+    def metadata(identity):
+        tokens = identity.split()
+        fields = dict(token.split("=", 1) for token in tokens)
+        if len(tokens) != len(fields) or set(fields) != {
+            "task", "workflow", "worker", "attempt", "log_blob"
+        }:
+            raise ValueError("malformed failed-log identity")
+        return fields
+
+    for line in output.splitlines():
+        kind = None
+        if line.startswith("--- begin failed farm task log: "):
+            kind = "begin"
+            identity = line.removeprefix("--- begin failed farm task log: ")
+        elif line.startswith("--- end failed farm task log: "):
+            kind = "end"
+            identity = line.removeprefix("--- end failed farm task log: ")
+        elif line.startswith("[farm log-reader "):
+            kind = "diagnostics"
+            identity, separator, body = line.removeprefix(
+                "[farm log-reader "
+            ).partition("] ")
+        elif line.startswith("[farm "):
+            kind = "payload"
+            identity, separator, body = line.removeprefix("[farm ").partition("] ")
+        else:
+            continue  # Other build/telemetry writers do not take the frame lock.
+        if kind in {"begin", "end"}:
+            if not identity.endswith(" ---"):
+                raise ValueError("incomplete failed-log delimiter")
+            identity = identity.removesuffix(" ---")
+        elif not separator:
+            raise ValueError("incomplete attributed failed-log line")
+        fields = metadata(identity)
+        owner = fields["task"]
+        if owner not in expected or fields != expected[owner]["metadata"]:
+            raise ValueError("wrong failed-log request/worker/attempt/blob attribution")
+        active = stack[-1] if stack else None
+        if kind == "begin":
+            counts[owner][0] += 1
+            if stack:
+                violations.append({
+                    "kind": "nested_frame",
+                    "active_owner": active,
+                    "observed_owner": owner,
+                })
+            stack.append(owner)
+        elif kind == "end":
+            counts[owner][1] += 1
+            if active != owner:
+                violations.append({
+                    "kind": "cross_owner_end",
+                    "active_owner": active,
+                    "observed_owner": owner,
+                })
+            if owner in stack:
+                stack.remove(owner)
+        else:
+            content[owner][kind].append(body)
+            if active != owner:
+                violations.append({
+                    "kind": "cross_owner_payload",
+                    "active_owner": active,
+                    "observed_owner": owner,
+                })
+    if stack:
+        violations.append({"kind": "incomplete_frame", "owners": tuple(stack)})
+    for owner, record in expected.items():
+        if counts[owner] != [1, 1] or content[owner] != record["content"]:
+            violations.append({"kind": "incomplete_content", "owner": owner})
+    if violations:
+        raise _FailedLogFrameValidationError(violations, content)
+    return content
+
+
 def _parallel_failed_log_capture(tmp_path, monkeypatch, *, remove_lock):
-    """Return a safe temp-file capture; the mutant removes only the output lock."""
+    """Capture only owned children; schedule a concrete unlocked-owner conflict."""
     output_path = tmp_path / "build-stderr.log"
     output_path.write_text("", encoding="utf-8")
     monkeypatch.setenv(
@@ -2740,65 +3568,80 @@ def _parallel_failed_log_capture(tmp_path, monkeypatch, *, remove_lock):
         monkeypatch.delenv(_REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV, raising=False)
     context = multiprocessing.get_context("spawn")
     retrieval_barrier = context.Barrier(2)
-    begin_count = context.Value("i", 0)
-    both_begun = context.Event()
+    leader_begun, follower_begun, leader_payload = [
+        context.Event() for _ in range(3)
+    ]
     processes = [
         context.Process(
             target=_emit_failed_log_in_process,
-            args=(str(output_path), retrieval_barrier, begin_count, both_begun, name),
+            args=(
+                str(output_path), retrieval_barrier, leader_begun,
+                follower_begun, leader_payload, name,
+            ),
         )
         for name in ("a", "b")
     ]
+    started = []
+    exitcodes = []
     try:
         for process in processes:
             process.start()
-        for process in processes:
+            started.append(process)
+        for process in started:
             process.join(timeout=15)
+        exitcodes = [process.exitcode for process in started]
     finally:
-        for process in processes:
+        for process in started:
             if process.is_alive():
                 process.terminate()
                 process.join(timeout=5)
-
-    assert [process.exitcode for process in processes] == [0, 0]
-    assert begin_count.value == 2
-    assert both_begun.is_set()
-
-    def block(name):
-        result = _leaf_result(
-            **_FAILED_LEAF, worker_id=f"worker-{name}",
-            attempt=2 if name == "b" else 1,
-            log_blob=f"results/{name}/task.log",
+            if process.is_alive():
+                process.kill()
+                process.join(timeout=5)
+            if not process.is_alive():
+                process.close()
+    assert exitcodes == [0, 0]
+    if remove_lock:
+        assert all(event.is_set() for event in (
+            leader_begun, follower_begun, leader_payload
+        )), "the controlled interleaving schedule did not complete"
+    expected = {}
+    for name in ("a", "b"):
+        task, _key, _workflow, _result, fields, payload, diagnostics = (
+            _parallel_failed_log_case(name)
         )
-        identity = _failed_log_identity(f"part:{name}", f"leaf:{name}", result)
-        return (
-            f"--- begin failed farm task log: {identity} ---\n"
-            f"[farm {identity}] worker log for {name}\n"
-            f"[farm log-reader {identity}] reader diagnostic for {name}\n"
-            f"--- end failed farm task log: {identity} ---\n"
-        )
-
-    return output_path.read_text(encoding="utf-8"), (
-        block("a") + block("b"), block("b") + block("a")
-    )
+        expected[task] = {
+            "metadata": fields,
+            "content": {"payload": payload, "diagnostics": diagnostics},
+        }
+    return output_path.read_text(encoding="utf-8"), expected
 
 
 def test_parallel_failed_leaf_logs_are_serialized_across_spawned_processes(
     tmp_path, monkeypatch
 ):
-    output, complete_blocks = _parallel_failed_log_capture(
+    output, expected = _parallel_failed_log_capture(
         tmp_path, monkeypatch, remove_lock=False
     )
-    assert output in complete_blocks
+    assert _consume_failed_log_frames(output, expected) == {
+        owner: record["content"] for owner, record in expected.items()
+    }
 
 
 def test_parallel_log_lock_negative_control_exposes_interleaved_blocks(
     tmp_path, monkeypatch
 ):
-    output, complete_blocks = _parallel_failed_log_capture(
+    output, expected = _parallel_failed_log_capture(
         tmp_path, monkeypatch, remove_lock=True
     )
-    assert output not in complete_blocks
-    lines = output.splitlines()
-    assert lines[0].startswith("--- begin failed farm task log:")
-    assert lines[1].startswith("--- begin failed farm task log:")
+    with pytest.raises(_FailedLogFrameValidationError) as refused:
+        _consume_failed_log_frames(output, expected)
+    assert refused.value.content == {
+        owner: record["content"] for owner, record in expected.items()
+    }, "lock removal must expose ownership conflicts, not lose the worker content"
+    assert any(
+        witness["kind"] in {"nested_frame", "cross_owner_payload"}
+        and {witness["active_owner"], witness["observed_owner"]} == set(expected)
+        for witness in refused.value.violations
+        if "active_owner" in witness
+    ), refused.value.violations

@@ -182,23 +182,41 @@ failure-artifact hint remains useful for captures; it is not a replacement
 for retrieving the failed execution's `task.log`.
 
 The reader uses the pool environment prepared by preflight, directly rather
-than through a second uv launcher. It has a 30-second deadline and stops when
-stdout exceeds 16 MiB, matching the current protocol-4 worker's published-log
-ceiling. Only a complete, nonempty, successful read within that ceiling is
-shown as worker payload. An absent blob, empty response, nonzero exit
-(including authentication or missing-blob errors), oversized log, timeout or
-output fault is a warning, never a successful log retrieval and never a
-replacement for the original leaf failure.
+than through a second uv launcher. One owner drains both stdout and stderr
+through nonblocking pipes under a 30-second deadline. Capture stops at 16 MiB
+of stdout (the current protocol-4 worker's published-log ceiling) or 64 KiB of
+stderr, whichever limit is exceeded first. Overflow or deadline expiry stops
+only the retained reader child, reaps it and closes both owned pipes; there
+is no timer or background drain thread to leave running. Only a complete,
+nonempty, successful read within both capture bounds is eligible as worker
+payload. Partial stdout from a stderr overflow is not recovered payload.
 
-Worker payload and the reader's stderr are separate: reader diagnostics have
-a `farm log-reader` prefix and are limited to their first 64 KiB, with a
-warning if truncated. Every displayed line names the task, workflow, worker,
-attempt and exact blob; UTF-8 errors are replaced and LF, CRLF and bare CR are
-normalized. Downloads can overlap, but a run-specific
-`HARMONIC_FARM_LOG_LOCK` serializes failed-log blocks across doit processes.
-The lock wait is bounded at 30 seconds; if it cannot be acquired, payload is
-not emitted unlocked. Other build output need not take this lock, so
-line-level attribution remains necessary.
+Console rendering has a separate total budget of 16 MiB of UTF-8 and 64 Ki
+lines per failed-log block. It counts the full attribution prefixes, UTF-8
+replacement encoding, normalized LF/CRLF/bare-CR line endings, reader
+diagnostics and frame delimiters, not just downloaded bytes. Lines are
+streamed, never assembled into an amplified all-lines string. Footer and
+attributed truncation-notice space are reserved before payload rendering.
+If attribution alone cannot fit, no frame or payload is emitted. Exhausting
+either rendered budget emits an explicit incomplete-output supplement,
+never a claim that the complete log was shown.
+
+Worker payload and the reader's stderr remain distinct: reader diagnostics
+have a `farm log-reader` prefix. Every displayed line names the task,
+workflow, worker, attempt and exact blob. Absent, empty, nonzero (including
+authentication/missing-blob errors), oversized, interrupted or output-faulted
+reads are warnings, never successful retrieval and never a replacement for
+the original leaf failure. A stderr prefix retained at its capture limit is
+diagnostic evidence only. Cancellation propagates after owned-child cleanup.
+Reader initialization, including deadline and pipe-state setup, runs inside
+that cleanup guard; cancellation there does not rely on `Popen.__exit__` to
+stop or reap a still-running child.
+
+Downloads can overlap, but a run-specific `HARMONIC_FARM_LOG_LOCK` serializes
+failed-log blocks across doit processes. The lock wait is bounded at 30
+seconds; if it cannot be acquired, payload is not emitted unlocked. Other
+build output need not take this lock, so line-level attribution remains
+necessary.
 
 Preflight's `logs --help` check proves only that the configured operator CLI
 supports exact selection. The current pool reader uses `DefaultAzureCredential`
