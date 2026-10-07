@@ -398,11 +398,11 @@ def _assert_attached_to(
     entity_type: str,
     what: str,
     label: str,
-    expected_leaders: int = 1,
+    expected_leaders: int | None = 1,
 ) -> None:
-    """Fail unless ``annotation`` is still attached, by ``expected_leaders``
-    live leaders, to exactly ``entity``, an ``entity_type`` (EDGE, FACE or
-    SILHOUETTE) entity.
+    """Fail unless ``annotation`` is attached to exactly ``entity`` of the
+    requested EDGE, FACE or SILHOUETTE type, with its required live leader
+    proof (exact registered count by default, rendered ink for hole callouts).
 
     The count, type and entity readbacks must agree on one entity of that
     type -- ``IGtol.IsAttached`` and ``ISFSymbol.IsAttached`` keep reading
@@ -412,6 +412,10 @@ def _assert_attached_to(
     (entities=0) on the #1105 platen_guide leaf.  A datum tag's triangle is
     not a leader (``GetLeaderCount`` reads 0 on every datum tag), so it
     passes ``expected_leaders=0``.
+    Native hole callouts pass ``None``: display dimensions do not support
+    SetLeader3 leaders, and their rendered leader ink is checked instead.
+    The annotation count is still read, but is not the dimension's rendered
+    leader authority. Generic symbols retain their exact-count requirement.
     """
     kind = entity_type.upper()
     if kind not in _ATTACHMENT_SELECT_TYPES:
@@ -428,12 +432,16 @@ def _assert_attached_to(
         and attached[0] is not None
     )
     same = one and _is_same_attachment(adapter, attached[0], entity, kind)
-    if not same or dangling or leaders != expected_leaders:
+    if not same or dangling or leaders < 0 or (
+        expected_leaders is not None and leaders != expected_leaders
+    ):
         raise RuntimeError(
             f"{what} lost its {kind.lower()} attachment ({label}): "
             f"entities={len(attached)}, count={count}, types={types}, "
             f"same_entity={same}, dangling={dangling}, leaders={leaders}"
         )
+    if expected_leaders is None:
+        _assert_native_hole_callout_leader(adapter, annotation, label=label)
 
 
 def _expected_pick(
@@ -1878,6 +1886,72 @@ def compose_hole_callout_prefix(process: str, existing: str) -> str:
     return process.rstrip() + separator + existing.lstrip()
 
 
+def _assert_native_hole_callout_leader(
+    adapter: Any, annotation: Any, *, label: str
+) -> None:
+    """Require one printable arrow joined to the native callout's leader ink.
+
+    GetLeaderCount reads zero on measured callouts despite visible leaders.
+    Display data is the rendered authority, as in the layout audit, but this
+    proof refuses every unreadable row rather than accepting a partial route.
+    One arrow is the explicit one-edge callout contract, not an API-wide rule.
+    """
+    if int(annotation.Visible) != 1:  # swAnnotationVisibilityState_e.swAnnotationVisible
+        raise RuntimeError(f"native hole callout is not visible ({label})")
+    display = annotation.GetSpecificAnnotation()
+    if display is None:
+        raise RuntimeError(f"native hole callout has no display dimension ({label})")
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "IsHoleCallout", "GetAnnotation", "GetDisplayData"
+    )
+    owner = display.GetAnnotation()
+    if not display.IsHoleCallout() or owner is None or int(
+        adapter.swApp.IsSame(owner, annotation)
+    ) != 1:
+        raise RuntimeError(f"native hole callout lost its annotation ownership ({label})")
+    data = display.GetDisplayData()
+    if data is None:
+        raise RuntimeError(f"native hole callout has no rendered data ({label})")
+    data = _sw_type_info.early_bound_or_flag(
+        data, "IDisplayData", "GetLineCount", "GetLineAtIndex2",
+        "GetArrowHeadCount", "GetArrowHeadAtIndex2",
+    )
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError(f"native hole callout has no single rendered arrow ({label})")
+    raw_arrow = data.GetArrowHeadAtIndex2(0)
+    if raw_arrow is None or len(raw_arrow) != 12:
+        raise RuntimeError(f"native hole callout has unreadable rendered arrow ({label})")
+    arrow = tuple(float(value) for value in raw_arrow)
+    if (
+        not all(math.isfinite(value) for value in arrow)
+        or arrow[8] == 10  # swArrowStyle_e.swNO_ARROWHEAD; zero is a valid open arrow.
+        or arrow[6] <= 0 or arrow[7] <= 0
+        or math.hypot(arrow[3], arrow[4]) == 0
+    ):
+        raise RuntimeError(f"native hole callout has no printable rendered arrow ({label})")
+    segments = []
+    count = int(data.GetLineCount())
+    if count <= 0:
+        raise RuntimeError(f"native hole callout has no rendered leader lines ({label})")
+    for index in range(count):
+        raw = data.GetLineAtIndex2(index)
+        if raw is None or len(raw) != 10:
+            raise RuntimeError(f"native hole callout has unreadable rendered leader ({label})")
+        values = tuple(float(value) for value in raw)
+        if not all(math.isfinite(value) for value in values):
+            raise RuntimeError(f"native hole callout has nonfinite rendered leader ({label})")
+        start, end = values[4:6], values[7:9]
+        if start != end:
+            segments.append((start, end))
+    # Arrow Z can differ from its line Z in native display data. Compare XY;
+    # the line may also extend beyond the arrow tip toward the hole centre.
+    if not any(
+        _segment_distance(arrow[:2], start, end) <= _SILHOUETTE_POINT_TOLERANCE_M
+        for start, end in segments
+    ):
+        raise RuntimeError(f"native hole callout has no connected rendered leader ({label})")
+
+
 @_telemetry.traced("drawing.hole_callout", label_param="label")
 def add_native_hole_callout(
     adapter: Any,
@@ -2024,6 +2098,7 @@ def add_native_hole_callout(
             current_annotation,
             "IAnnotation",
             "GetPosition",
+            "GetSpecificAnnotation",
             "GetAttachedEntities3",
             "GetAttachedEntityCount3",
             "GetAttachedEntityTypes",
@@ -2084,6 +2159,7 @@ def add_native_hole_callout(
             entity_type="EDGE",
             what="native hole callout",
             label=label,
+            expected_leaders=None,
         )
     return display
 
@@ -2144,6 +2220,7 @@ def assert_native_hole_callout_attachment(
     annotation = _sw_type_info.early_bound_or_flag(
         annotation,
         "IAnnotation",
+        "GetSpecificAnnotation",
         "GetAttachedEntities3",
         "GetAttachedEntityCount3",
         "GetAttachedEntityTypes",
@@ -2157,6 +2234,7 @@ def assert_native_hole_callout_attachment(
         entity_type="EDGE",
         what="native hole callout",
         label=label,
+        expected_leaders=None,
     )
 
 
