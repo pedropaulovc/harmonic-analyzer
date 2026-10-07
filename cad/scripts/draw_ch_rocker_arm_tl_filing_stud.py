@@ -13,7 +13,6 @@ from _drawing_common import (
     add_property_linked_note,
     add_view_centerline,
     assert_imported_precision,
-    curate_view_dimensions,
     dimension_name,
     finalize_drawing,
     new_project_drawing,
@@ -24,6 +23,7 @@ from _drawing_common import (
     stamp_drawing_summary,
     view_name,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from ch_rocker_arm_tl_filing_stud_spec import (
     DIMENSION_TEXT,

@@ -24,6 +24,7 @@ from _common import (
     _early_bound,
     anchor_point_to_origin,
     apply_material,
+    blank_sketch,
     check,
     define_circle,
     dimension_between,
@@ -150,8 +151,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Drawing-only reference: the overall length for stock cut-off, one
     # construction line on the axis in the Front plane (the profile view's
-    # plane), driven by the two end stations so no geometry moves. Fixtures
-    # never enter an assembly, so the sketch stays shown for the import.
+    # plane), driven by the two end stations so no geometry moves. The part
+    # saves it hidden; the drawing shows it per view to import the overall.
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
@@ -210,6 +211,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
+    blank_sketch(adapter, "StationReference")
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
     return artefacts
