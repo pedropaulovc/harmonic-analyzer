@@ -1904,6 +1904,11 @@ def add_native_hole_callout(
     instead silently does nothing: ``IDimensionTolerance::SetValues`` returns
     True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
     callout still prints the bare nominal.
+
+    ``edge=`` also requires the callout to remain attached to that native
+    edge after insertion rebuild. Coordinate-only callers retain their hit-test
+    contract. Recipes retaining an explicit edge must check the final print
+    with :func:`assert_native_hole_callout_attachment` in ``settled_checks``.
     """
     try:
         selected = _select_view_entity(
@@ -2012,6 +2017,19 @@ def add_native_hole_callout(
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_native_hole_callout")
     if edge is not None:
+        current_annotation = display.GetAnnotation()
+        if current_annotation is None:
+            raise RuntimeError(f"native hole callout has no annotation ({label})")
+        annotation = _sw_type_info.early_bound_or_flag(
+            current_annotation,
+            "IAnnotation",
+            "GetPosition",
+            "GetAttachedEntities3",
+            "GetAttachedEntityCount3",
+            "GetAttachedEntityTypes",
+            "GetLeaderCount",
+            "IsDangling",
+        )
         # Keep native attachment observations separate from successful
         # selection: AddHoleCallout2 can re-solve the annotation on insertion.
         # One aggregate record also retains the selected circle and current
@@ -2059,7 +2077,88 @@ def add_native_hole_callout(
                 f"hole callout {label}: native attachment: "
                 + json.dumps(attachment, default=str, sort_keys=True)
             )
+        _assert_attached_to(
+            adapter,
+            annotation,
+            edge,
+            entity_type="EDGE",
+            what="native hole callout",
+            label=label,
+        )
     return display
+
+
+def assert_native_hole_callout_attachment(
+    adapter: Any,
+    view: Any,
+    display: Any,
+    *,
+    edge: Any,
+    label: str,
+) -> None:
+    """Prove an explicit-edge callout from the current view's annotations.
+
+    Run in ``finalize_drawing``'s ``settled_checks`` after the last rebuild.
+    Re-enumerate the current sheet's views and the owning view's annotations:
+    a removed callout or view can leave its old COM handle readable. Native
+    ``IsSame == 1``, not Python wrapper identity, identifies both the view and
+    display dimension; attachment readbacks come from the live annotation,
+    never from the original handle's cached annotation.
+    """
+    current_views = [
+        candidate
+        for candidate in iter_views(adapter)
+        if int(adapter.swApp.IsSame(candidate, view)) == 1
+    ]
+    if len(current_views) != 1:
+        raise RuntimeError(
+            f"native hole callout lost its owning view ({label}): "
+            f"matching views={len(current_views)}"
+        )
+    current_view = _sw_type_info.early_bound_or_flag(
+        current_views[0], "IView", "GetAnnotations"
+    )
+    matches = []
+    for raw_annotation in current_view.GetAnnotations() or ():
+        annotation = _sw_type_info.early_bound_or_flag(
+            raw_annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
+        )
+        if int(annotation.GetType()) != _ANNOT_DIM:
+            continue
+        current_display = annotation.GetSpecificAnnotation()
+        if current_display is not None and int(
+            adapter.swApp.IsSame(current_display, display)
+        ) == 1:
+            matches.append((annotation, current_display))
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"native hole callout lost its current annotation ({label}): "
+            f"matching dimensions={len(matches)}"
+        )
+    annotation, current_display = matches[0]
+    current_display = _sw_type_info.early_bound_or_flag(
+        current_display, "IDisplayDimension", "IsHoleCallout"
+    )
+    if not current_display.IsHoleCallout():
+        raise RuntimeError(f"current annotation is not a native hole callout ({label})")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation,
+        "IAnnotation",
+        "GetAttachedEntities3",
+        "GetAttachedEntityCount3",
+        "GetAttachedEntityTypes",
+        "GetLeaderCount",
+        "IsDangling",
+    )
+    _assert_attached_to(
+        adapter,
+        annotation,
+        edge,
+        entity_type="EDGE",
+        what="native hole callout",
+        label=label,
+    )
+
 
 
 @_telemetry.traced("drawing.hole_callout_precision", label_param="label")

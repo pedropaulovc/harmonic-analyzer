@@ -41,6 +41,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     assert_dimension_measures,
+    assert_native_hole_callout_attachment,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -228,7 +229,7 @@ async def build(adapter: Any) -> dict[str, str]:
         selection="unique",
         adapter=adapter,
     )
-    add_native_hole_callout(
+    anchor_callout = add_native_hole_callout(
         adapter,
         top,
         edge=anchor_rim.edge,
@@ -445,7 +446,7 @@ async def build(adapter: Any) -> dict[str, str]:
         axis=(0.0, 1.0, 0.0),
         label="spring-hole middle rim",
     )
-    add_native_hole_callout(
+    middle_callout = add_native_hole_callout(
         adapter,
         top,
         edge=mid_rim.edge,
@@ -483,6 +484,14 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=3,
+        settled_checks=(
+            lambda: assert_native_hole_callout_attachment(
+                adapter, top, anchor_callout, edge=anchor_rim.edge, label="anchor tap"
+            ),
+            lambda: assert_native_hole_callout_attachment(
+                adapter, top, middle_callout, edge=mid_rim.edge, label="spring-hole middle"
+            ),
+        ),
     )
 
 

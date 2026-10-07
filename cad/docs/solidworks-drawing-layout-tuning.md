@@ -310,6 +310,24 @@ The canonical visible-entity example selects those entities through
 `IEntity::Select4` with `ISelectData.View`; `IDrawingDoc::AddHoleCallout2` then
 calls out the selected hole, not a typed replacement.
 
+Successful insertion is not proof of attachment: `AddHoleCallout2` can
+re-solve to a neighboring or coincident rim. On the explicit `edge=` path,
+`add_native_hole_callout` rereads the annotation after its rebuild and uses
+the canonical attachment guard to require one non-dangling edge attachment,
+one leader, and native `IsSame == 1` against the requested rim. Missing,
+extra, wrong-type, or different-native-identity attachments refuse the leaf;
+the diagnostic's `attached_same_requested_edge=false` is not success.
+Coordinate-only callouts keep their existing hit-test behavior.
+
+The summing-lever recipe retains both explicit-edge native callouts and runs
+`assert_native_hole_callout_attachment` through the finalizer's existing
+`settled_checks`, after the final rebuild and before SLDDRW save or PDF export.
+That check re-enumerates the current owning view and its current annotations,
+identifies the native view and display dimension with `IsSame`, and applies
+the same guard to the fresh annotation. A removed or reattached annotation
+cannot pass just because its old handle remains readable; fresh wrappers for
+the same native view, dimension, and rim can pass.
+
 The remote leaf's aggregate `drawing.hole_callout_attachment` observation
 records the selected circle and axis, adjacent feature ownership, actual
 `ModelToViewTransform`, selection point/view, attached entity count/types, and
