@@ -86,6 +86,7 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_dt_cone_pivot_post_tl_cap_jaw_button.py",
         "draw_ch_rocker_arm_tl_pivot_screw.py",
         "draw_ch_rocker_arm_tl_pivot_washer.py",
+        "draw_ch_rocker_arm_tl_profile_fixture.py",
         "draw_fr_top_frame.py",
         "draw_pd_transgear_removable.py",
         "draw_pd_transgear_knob_cup.py",

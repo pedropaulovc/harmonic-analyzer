@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-profile-fixture:
+  title: Rocker Arm Profile Fixture
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-02
+  material: A36, O1, 4140 STEEL
+  material_specification: "A36 steel plate 1 in; O1 precision flat stock 1/8 x 1/2 (McMaster-Carr 9516K45), 3/16 x 1/2, 3/16 x 1; 4140 prehard bar 1/2 in; Loctite EA 9462 epoxy"
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "mill plate, pockets and holes; ream locating bore and pin hole; lap pad and stand tops; bond parts top-down on a granite reference"
