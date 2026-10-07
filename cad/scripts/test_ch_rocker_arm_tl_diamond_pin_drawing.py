@@ -80,7 +80,7 @@ def test_notes_follow_the_simplicity_policy() -> None:
     # The only numbers a note may carry are the stated worst-case walls,
     # and it must never overstate the printed bands' worst case.
     stated = (
-        f"NECK WALL TO BORE {spec.NECK_WALL_MIN:.2f} MIN, "
+        f"REAMED BORE; WALL {spec.NECK_WALL_MIN:.2f} MIN, "
         f"COLLAR {spec.COLLAR_WALL_MIN:.2f} MIN."
     )
     assert stated in spec.DRAWING_NOTES
