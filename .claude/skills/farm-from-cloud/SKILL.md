@@ -90,15 +90,28 @@ ephemeral, so the credentials die with it and the next session repeats this step
 (cd ../solidworks-pool && timeout 60 uv run --frozen python farm.py workers)
 ```
 
-The NSG allows 7233 from the Internet, but the default cloud network policy
-sends all egress through a TLS-re-terminating proxy. As of 2026-10-07 the proxy
-reset the tunnel right after the ClientHello (`ws_closed_mid_exchange` in
-`curl -sS "$HTTPS_PROXY/__agentproxy/status"`), and `farm.py workers` hung.
-mTLS cannot work through a proxy that re-terminates TLS. The user has to change
-the environment's network access (allow the farm host or full access) and start
-a new session. Untested: whether either setting gives a pass-through tunnel.
+This does not work from an Anthropic-hosted cloud session, whatever the
+network access level. All egress goes through the agent proxy, and
+`/root/.ccr/README.md` lists "gRPC / HTTP/2-only APIs, ... client-mTLS, ...
+non-443 HTTPS ports" as not supported through it. The farm frontend is all
+three: Temporal gRPC with a client certificate on 7233. The access level
+(Trusted, Custom, Full) only chooses which hosts the proxy lets through. The
+host is already allowed: the proxy opens the tunnel, then resets it right after
+the ClientHello (`ws_closed_mid_exchange` in
+`curl -sS "$HTTPS_PROXY/__agentproxy/status"`, seen 2026-10-07 under two proxy
+instances, with and without the client cert), and `farm.py workers` hangs.
 
-## 6. Submit a test leaf (only once step 5 lists workers)
+What would work, none of it tried:
+- a self-hosted environment, whose egress leaves through your own network
+  (https://code.claude.com/docs/en/self-hosted-environments)
+- an HTTPS (443, no client cert) relay in front of the farm, which is a farm
+  architecture change
+
+Until then, submit from the Windows box. Steps 1-4 still give a cloud session
+farm credentials and Azure access (Key Vault, storage, Log Analytics over
+HTTPS) for read-only diagnostics.
+
+## 6. Submit a test leaf (only where step 5 lists workers)
 
 Use the supervised launcher with POSIX paths. `-LogDirectory` must sit outside
 every Git worktree, and HEAD must be pushed:
