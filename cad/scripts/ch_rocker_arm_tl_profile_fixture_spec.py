@@ -1,0 +1,544 @@
+r"""Pure-data contract for the rocker arm profile fixture (MHA-CH-006-TL-02).
+
+Shop fixture, not a machine part (cad/docs/subsystem-identities.md). The S3/S4
+rocker-arm profile setups (prechips rocker plan) seat the arm's lower strap
+face on twelve bonded pads, its lower hub face on a shim stack over a bonded
+hub stand, its pivot bore on the pivot screw's shoulder (reamed locating bore)
+and its rod hole on a bonded diamond pin (reamed pin hole). Four bonded rail
+rests carry the raw rail undersides on per-blank shim stacks. One is made.
+
+Construction (shop-additions r3 section 5): a milled steel plate; the pads and
+the hub stand are lapped on top and bonded top-down on one granite reference
+over gauge stacks, so their tops -- not the pocket floors -- set the heights.
+Nothing is hardened and nothing is ground (the shop has no surface grinder).
+
+Frame: rocker frame A of the prechips rocker inventory -- the pivot axis (the
+locating bore axis) at the origin, the arm's upper hub face at Z0, +X toward
+the rod end, +Z up out of the plate. Model coordinates ARE frame A, so prechips
+poses read straight off this part. Every plan location prints from the
+locating bore axis.
+"""
+
+from __future__ import annotations
+
+import math
+
+import _config
+import ch_rocker_arm_spec as rocker
+from _feature_requirements import ExportFeature, limits
+from _gtol_spec import CylinderFace, PlanarFace
+from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+
+_XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
+_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+
+# --- Heights (frame A Z) ------------------------------------------------------
+# The arm's lower strap face: the strap sits at the hub's mid-length, so its
+# lower face is half a hub plus half a strap below the upper hub face. Every pad
+# top lies on it, and every height below is built down from it.
+PAD_TOP_Z = -(rocker.HUB_LENGTH / 2.0 + rocker.ARM_THICKNESS / 2.0)
+PLATE_TOP_Z = -15.0
+PLATE_THICK = 25.4  # 1 in plate, as rolled
+PLATE_BOTTOM_Z = PLATE_TOP_Z - PLATE_THICK
+# Pad tops above the plate top: the gauge stack under the granite.
+PLATE_DROP = PAD_TOP_Z - PLATE_TOP_Z
+
+# --- Plate outline ----------------------------------------------------------------
+PLATE_WEST_X = -180.0
+PLATE_EAST_X = 180.0
+PLATE_SOUTH_Y = -70.0
+PLATE_NORTH_Y = 75.0
+PLATE_LENGTH = PLATE_EAST_X - PLATE_WEST_X
+PLATE_WIDTH = PLATE_NORTH_Y - PLATE_SOUTH_Y
+
+# --- Bonded-part fits -----------------------------------------------------------
+# Every pocket and every bonded part prints at three places, so each size moves
+# by the title block's .XXX band. A pocket clears its part by more than both
+# bands together, so the largest part always enters the smallest pocket with a
+# bond line left (the inventory's 0.05 a side cannot survive two .XXX bands).
+POCKET_SIDE_CLEARANCE = 0.14
+REST_CLEARANCE = 0.15
+BOND_LINE_MIN = 0.02
+for _gap in (POCKET_SIDE_CLEARANCE, REST_CLEARANCE):
+    if 2.0 * _gap - 2.0 * _XXX < BOND_LINE_MIN:
+        raise AssertionError("a bonded part can bind in its pocket at the .XXX bands")
+# Pocket corners are left to the cutter (any radius up to a full-round end),
+# so every bonded part ends short of its pocket's end radius: half the pocket
+# width plus this end gap, which survives both .XXX length bands.
+POCKET_END_GAP = 0.20
+if POCKET_END_GAP - _XXX < BOND_LINE_MIN:
+    raise AssertionError("a bonded part can reach its pocket's end radius")
+
+
+def _part_length(pocket_length: float, pocket_width: float) -> float:
+    return pocket_length - pocket_width - 2.0 * POCKET_END_GAP
+
+
+# Pads: inventory stations, +X side (tag, station west X, station length, pad
+# south Y, pad width). B pads mirror them about the pivot axis. Each pocket is
+# its station less a 1.1 mm wall at each end, so neighbouring pockets keep a
+# 2 mm wall at the .XXX band (rule 12 target). Each pad keeps the inventory's
+# Y edges and width, so the strap rests on the inventory's pad faces, but ends
+# clear of its pocket's end radius.
+# The pads under the strap's outer tip are narrower than the rule-12 floor:
+# they are precision flat stock lying inside the strap's support band and never
+# stand beside a cut, so the floor (a machined wall) does not apply to them.
+_RIGHT_STATIONS = (
+    ("1", 10.0, 20.0, -1.35, 3.3),
+    ("2", 30.0, 20.0, -0.35, 2.8),
+    ("3", 50.0, 20.0, 1.15, 2.3),
+    ("4", 70.0, 20.0, 3.05, 1.9),
+    ("5", 90.0, 20.0, 5.55, 1.4),
+    ("6", 110.0, 12.0, 7.25, 2.3),
+)
+POCKET_END_WALL = 1.1
+PAD_HEIGHT = 11.8
+PAD_POCKET_DEPTH = 2.0
+
+# (tag, centre X, centre Y, length X, width Y) per pocket and per pad.
+PAD_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
+    (
+        f"{side}{tag}",
+        sign * (x0 + length / 2.0),
+        y0 + width / 2.0,
+        length - 2.0 * POCKET_END_WALL,
+        width + 2.0 * POCKET_SIDE_CLEARANCE,
+    )
+    for side, sign in (("A", 1.0), ("B", -1.0))
+    for tag, x0, length, y0, width in _RIGHT_STATIONS
+)
+PADS: tuple[tuple[str, float, float, float, float], ...] = tuple(
+    (
+        tag,
+        cx,
+        cy,
+        _part_length(length, width),
+        width - 2.0 * POCKET_SIDE_CLEARANCE,
+    )
+    for tag, cx, cy, length, width in PAD_POCKETS
+)
+
+# Pad bottoms float above the pocket floors (the tops set the height): the
+# tallest pad in the shallowest pocket keeps clear of the floor, and the
+# shortest pad still stands well down into its pocket for the bond.
+PAD_FLOOR_GAP_MIN = (PLATE_DROP + PAD_POCKET_DEPTH - _XXX) - (PAD_HEIGHT + _XXX)
+PAD_ENGAGEMENT_MIN = (PAD_HEIGHT - _XXX) - PLATE_DROP
+if PAD_FLOOR_GAP_MIN < 0.1:
+    raise AssertionError("a pad can bottom in its pocket before its top reaches the reference")
+if PAD_ENGAGEMENT_MIN < 1.0:
+    raise AssertionError("a pad can stand too shallow in its pocket to bond")
+
+# Rail rests: inventory pockets (tag, west X, south Y, length X, width Y). Each
+# rest seats on its pocket floor; the per-blank shim stacks on top are loose.
+_REST_POCKETS = (
+    ("C1", 60.0, 32.2, 20.0, 4.3),
+    ("C2", -80.0, 32.2, 20.0, 4.3),
+    ("C3", 60.0, -27.5, 20.0, 5.0),
+    ("C4", -80.0, -27.5, 20.0, 5.0),
+)
+REST_HEIGHT = 4.0
+REST_POCKET_DEPTH = 1.0
+REST_TOP_Z = PLATE_TOP_Z - REST_POCKET_DEPTH + REST_HEIGHT
+REST_DROP = PAD_TOP_Z - REST_TOP_Z
+REST_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
+    (tag, x0 + length / 2.0, y0 + width / 2.0, length, width)
+    for tag, x0, y0, length, width in _REST_POCKETS
+)
+RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
+    (tag, cx, cy, _part_length(length, width), width - 2.0 * REST_CLEARANCE)
+    for tag, cx, cy, length, width in REST_POCKETS
+)
+
+# --- Hub stand (FixtureCAD ruling B) ---------------------------------------------
+# A relieved tube: its annulus carries the lower hub face through the hub shim
+# stack and its bore clears the pivot screw shoulder. It bonds top-down on a
+# gauge stack STAND_DROP below the pad reference, in a counterbore round the
+# locating bore. +/-0.02 is shop-additions section 5's recommended relaxation
+# of the inventory's +/-0.005; the hub shim stack is cut to the measured stand.
+STAND_DROP = 2.328
+STAND_DROP_BAND = (0.02, -0.02)
+STAND_TOP_Z = PAD_TOP_Z - STAND_DROP
+STAND_OD = 12.0
+STAND_BORE = 8.0
+STAND_HEIGHT = 9.5
+STAND_POCKET_DIA = 12.3
+STAND_POCKET_DEPTH = 2.0
+_HUB_STEP_MAX = (rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0] - rocker.ARM_THICKNESS) / 2.0
+# The hub shim stack never goes negative: the highest stand still sits below
+# the longest hub's lower face when the strap rests on the pads.
+HUB_SHIM_GAP_MIN = STAND_DROP + STAND_DROP_BAND[1] - _HUB_STEP_MAX
+if HUB_SHIM_GAP_MIN < 0.0:
+    raise AssertionError("the hub stand can lift the strap off the pads")
+# Where the stand annulus reaches past the hub it keeps 2 mm of air under the
+# strap's lower face (the pad plane).
+STRAP_AIR_MIN = STAND_DROP + STAND_DROP_BAND[1]
+if STRAP_AIR_MIN < 2.0:
+    raise AssertionError("the hub stand comes within 2 mm of the strap")
+if (STAND_POCKET_DIA - _XXX) - (STAND_OD + _XXX) < BOND_LINE_MIN:
+    raise AssertionError("the hub stand can bind in its counterbore")
+STAND_WALL_MIN = ((STAND_OD - _XXX) - (STAND_BORE + _XXX)) / 2.0
+if STAND_WALL_MIN < rocker.RULE12_WALL_FLOOR:
+    raise AssertionError("hub stand wall is below the rule-12 floor")
+if STAND_BORE + _XXX >= rocker.HUB_DIA:
+    raise AssertionError("the hub can drop into the stand bore")
+STAND_FLOOR_GAP_MIN = (
+    PLATE_DROP - (STAND_DROP + STAND_DROP_BAND[0]) + STAND_POCKET_DEPTH - _XXX
+) - (STAND_HEIGHT + _XXX)
+if STAND_FLOOR_GAP_MIN < 0.1:
+    raise AssertionError("the hub stand can bottom in its counterbore")
+
+# --- Locating bore and pivot tap (agreed with the MHA-CH-006-TL pivot screw) ------
+# Reamed H7 for the pivot screw's shoulder; the screw's #10-24 tail runs into
+# the tap below the bore floor (the inventory's M5 maps to #10-24 UNC-2B).
+LOCATING_BORE_DIA = rocker.PIVOT_HOLE_DIA
+LOCATING_BORE_BAND = (0.012, 0.0)
+LOCATING_BORE_DEPTH = 6.0  # from the plate top; floor at Z-21
+LOCATING_BORE_FLOOR_Z = PLATE_TOP_Z - LOCATING_BORE_DEPTH
+PIVOT_TAP_THREAD_DEPTH = 10.0  # full thread from the bore floor, to Z-31
+PIVOT_TAP_DRILL_DEPTH = 13.0
+PIVOT_TAP_SPEC = HoleSpec(
+    "tapped",
+    "#10-24",
+    end="blind",
+    depth_mm=PIVOT_TAP_DRILL_DEPTH,
+    overrides_mm={"ThreadDepth": PIVOT_TAP_THREAD_DEPTH},
+)
+PIVOT_TAP_DRILL_DIA = TAP_DRILL_MM[PIVOT_TAP_SPEC.size]
+if LOCATING_BORE_FLOOR_Z - PIVOT_TAP_DRILL_DEPTH - PLATE_BOTTOM_Z < 3.0:
+    raise AssertionError("pivot tap drill breaks too near the plate underside")
+
+# --- Rod-pin hole (agreed with the MHA-CH-006-TL diamond pin) ------------------------
+ROD_PIN_HOLE_DIA = 3.0
+ROD_PIN_HOLE_BAND = (0.010, 0.0)
+ROD_PIN_HOLE_DEPTH = 7.0
+ROD_PIN_HOLE_XY = (rocker.ROD_HOLE_X, rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y)
+
+# --- Hold-down and clamp-stud holes ------------------------------------------------
+# PM-30MV table: 14 mm T-slots on 63.5 centres. The 9/16 T-slot clamping kit's
+# T-nuts are tapped 1/2-13 (vendor interface, kept), so the hold-downs are
+# 1/2-13 socket head cap screws in counterbored clearance holes over the two
+# outer slots, at each end of the plate.
+HOLD_DOWN_SLOT_PITCH = 63.5
+HOLD_DOWN_X = 165.0
+_PLATE_MID_Y = (PLATE_NORTH_Y + PLATE_SOUTH_Y) / 2.0
+HOLD_DOWN_YS = (
+    _PLATE_MID_Y - HOLD_DOWN_SLOT_PITCH / 2.0,
+    _PLATE_MID_Y + HOLD_DOWN_SLOT_PITCH / 2.0,
+)
+HOLD_DOWN_POINTS = tuple((x, y) for y in HOLD_DOWN_YS for x in (-HOLD_DOWN_X, HOLD_DOWN_X))
+# 1/2-13 socket head cap screw, ASME B18.3: head 0.750 dia x 0.500 high.
+HOLD_DOWN_SCREW_HEAD_DIA = 0.750 * 25.4
+HOLD_DOWN_SCREW_HEAD_H = 0.500 * 25.4
+HOLD_DOWN_CLEARANCE_DIA = CLEARANCE_MM[("1/2", "normal")]
+HOLD_DOWN_CBORE_DIA = 20.64
+HOLD_DOWN_CBORE_DEPTH = 13.5
+HOLD_DOWN_HOLE_SPEC = HoleSpec(
+    "counterbore_socket",
+    "1/2",
+    overrides_mm={
+        "HoleDiameter": HOLD_DOWN_CLEARANCE_DIA,
+        "CounterBoreDiameter": HOLD_DOWN_CBORE_DIA,
+        "CounterBoreDepth": HOLD_DOWN_CBORE_DEPTH,
+    },
+)
+if HOLD_DOWN_CBORE_DEPTH - _XX - HOLD_DOWN_SCREW_HEAD_H < 0.1:
+    raise AssertionError("hold-down screw head can stand proud of the plate")
+if HOLD_DOWN_CBORE_DIA - _XX - HOLD_DOWN_SCREW_HEAD_DIA < 0.5:
+    raise AssertionError("hold-down counterbore does not clear the screw head")
+
+# Strap-clamp studs either side of the S3 clamp toes (inventory: 3/8-16 studs).
+CLAMP_STUD_SPEC = HoleSpec(
+    "tapped",
+    "3/8-16",
+    end="blind",
+    depth_mm=17.0,
+    overrides_mm={"ThreadDepth": 13.2},
+)
+CLAMP_STUD_POINTS = ((-70.0, -36.0), (70.0, -36.0), (-70.0, 45.0), (70.0, 45.0))
+CLAMP_STUD_DRILL_DIA = TAP_DRILL_MM[CLAMP_STUD_SPEC.size]
+
+
+# --- Rule 12: every machined wall keeps the floor --------------------------------
+def _rect_gap(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> float:
+    dx = abs(a[0] - b[0]) - (a[2] + b[2]) / 2.0
+    dy = abs(a[1] - b[1]) - (a[3] + b[3]) / 2.0
+    if dx > 0.0 and dy > 0.0:
+        return math.hypot(dx, dy)
+    return max(dx, dy)
+
+
+def _circle_rect_gap(cx: float, cy: float, r: float, rect: tuple[float, float, float, float]) -> float:
+    dx = max(abs(cx - rect[0]) - rect[2] / 2.0, 0.0)
+    dy = max(abs(cy - rect[1]) - rect[3] / 2.0, 0.0)
+    return math.hypot(dx, dy) - r
+
+
+_RECTS = [
+    (cx, cy, length + _XXX, width + _XXX)
+    for _tag, cx, cy, length, width in (*PAD_POCKETS, *REST_POCKETS)
+]
+_ROUNDS = [
+    (0.0, 0.0, (STAND_POCKET_DIA + _XXX) / 2.0),
+    (*ROD_PIN_HOLE_XY, (ROD_PIN_HOLE_DIA + ROD_PIN_HOLE_BAND[0]) / 2.0),
+    *((x, y, (HOLD_DOWN_CBORE_DIA + _XX) / 2.0) for x, y in HOLD_DOWN_POINTS),
+    *((x, y, THREAD_MAJOR_MM[CLAMP_STUD_SPEC.size] / 2.0) for x, y in CLAMP_STUD_POINTS),
+]
+_OUTLINE = (
+    (PLATE_WEST_X + PLATE_EAST_X) / 2.0,
+    _PLATE_MID_Y,
+    PLATE_LENGTH,
+    PLATE_WIDTH,
+)
+WALL_MIN = min(
+    *(_rect_gap(a, b) for i, a in enumerate(_RECTS) for b in _RECTS[i + 1 :]),
+    *(_circle_rect_gap(cx, cy, r, rect) for rect in _RECTS for cx, cy, r in _ROUNDS),
+    *(
+        math.hypot(a[0] - b[0], a[1] - b[1]) - a[2] - b[2]
+        for i, a in enumerate(_ROUNDS)
+        for b in _ROUNDS[i + 1 :]
+    ),
+    *(
+        min(
+            _OUTLINE[2] / 2.0 - abs(x - _OUTLINE[0]) - half,
+            _OUTLINE[3] / 2.0 - abs(y - _OUTLINE[1]) - half_w,
+        )
+        for x, y, half, half_w in (
+            *((cx, cy, length / 2.0, width / 2.0) for cx, cy, length, width in _RECTS),
+            *((cx, cy, r, r) for cx, cy, r in _ROUNDS),
+        )
+    ),
+)
+if WALL_MIN < 2.0:
+    raise AssertionError(f"a plate wall is {WALL_MIN:.2f} mm, below the rule-12 target")
+
+# --- Drawing ----------------------------------------------------------------------
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "PlateProfile": {"PlateLength", "PlateWidth", "PlateWestX", "PlateSouthY"},
+    "Plate": {"PlateThick", "PlateDrop"},
+    "Stand": {"StandDrop"},
+    "StandPocketProfile": {"StandPocketDia"},
+    "StandPocket": {"StandPocketDepth"},
+    "LocatingBoreProfile": {"LocatingBoreDia"},
+    "LocatingBore": {"LocatingBoreDepth"},
+    "RodPinHoleProfile": {"RodPinHoleDia"},
+}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PlateProfile": {"PlateLength": 1, "PlateWidth": 1, "PlateWestX": 1, "PlateSouthY": 1},
+    "Plate": {"PlateThick": 1, "PlateDrop": 3},
+    "Stand": {"StandDrop": 3},
+    "StandPocketProfile": {"StandPocketDia": 3},
+    "StandPocket": {"StandPocketDepth": 3},
+    "LocatingBoreProfile": {"LocatingBoreDia": 3},
+    "LocatingBore": {"LocatingBoreDepth": 2},
+    "RodPinHoleProfile": {"RodPinHoleDia": 3},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
+}
+if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
+    raise AssertionError("every marked profile-fixture dimension needs authored places")
+DIMENSION_CALLOUTS = {"LocatingBoreDia": "REAM", "RodPinHoleDia": "REAM"}
+
+# Schedules (sheets two and three): every pocket and hole is tagged on the
+# sheet-two plan and located here from the locating bore axis; every bonded part
+# is sized. Three places (the .XXX band) throughout.
+SCHEDULE_PLACES = 3
+SECTION_LABEL = "D"
+DETAIL_LABEL = "E"
+
+
+def _mm(value: float, places: int = SCHEDULE_PLACES) -> str:
+    return f"{value:.{places}f}"
+
+
+FEATURE_SCHEDULE_TITLE = "FEATURE SCHEDULE, FROM BORE L AXIS"
+FEATURE_SCHEDULE_HEADER = ("TAG", "FEATURE", "X", "Y", "LENGTH X", "WIDTH Y", "DEPTH")
+FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
+    ("L", "LOCATING BORE", _mm(0.0), _mm(0.0), "-", "-", f"SEE {SECTION_LABEL}-{SECTION_LABEL}"),
+    (
+        "P",
+        "ROD PIN HOLE",
+        _mm(ROD_PIN_HOLE_XY[0]),
+        _mm(ROD_PIN_HOLE_XY[1]),
+        "-",
+        "-",
+        _mm(ROD_PIN_HOLE_DEPTH),
+    ),
+    *(
+        (tag, "PAD POCKET", _mm(cx), _mm(cy), _mm(length), _mm(width), _mm(PAD_POCKET_DEPTH))
+        for tag, cx, cy, length, width in PAD_POCKETS
+    ),
+    *(
+        (tag, "REST POCKET", _mm(cx), _mm(cy), _mm(length), _mm(width), _mm(REST_POCKET_DEPTH))
+        for tag, cx, cy, length, width in REST_POCKETS
+    ),
+    *(
+        (f"H{index}", "HOLD-DOWN", _mm(x), _mm(y), "-", "-", "THRU")
+        for index, (x, y) in enumerate(HOLD_DOWN_POINTS, start=1)
+    ),
+    *(
+        (f"S{index}", "STUD TAP", _mm(x), _mm(y), "-", "-", "-")
+        for index, (x, y) in enumerate(CLAMP_STUD_POINTS, start=1)
+    ),
+)
+_PAD_STOCK = {3.3: "O1 FLAT 3/16 X 1/2"}
+PART_SCHEDULE_TITLE = "BONDED PART SCHEDULE"
+PART_SCHEDULE_HEADER = ("TAG", "PART", "STOCK", "LENGTH X", "WIDTH Y", "HEIGHT")
+PART_SCHEDULE: tuple[tuple[str, ...], ...] = (
+    *(
+        (
+            f"{a_tag}, {b_tag}",
+            "PAD",
+            _PAD_STOCK.get(round(width, 3), "O1 FLAT 1/8 X 1/2"),
+            _mm(length),
+            _mm(width),
+            _mm(PAD_HEIGHT),
+        )
+        for (a_tag, _ax, _ay, length, width), (b_tag, *_rest) in zip(PADS[:6], PADS[6:], strict=True)
+    ),
+    *(
+        (f"{a[0]}, {b[0]}", "RAIL REST", "O1 FLAT 3/16 X 1", _mm(a[3]), _mm(a[4]), _mm(REST_HEIGHT))
+        for a, b in ((RESTS[0], RESTS[1]), (RESTS[2], RESTS[3]))
+    ),
+    (
+        "L",
+        "HUB STAND",
+        "4140 HT BAR 1/2",
+        f"OD {_mm(STAND_OD)}",
+        f"BORE {_mm(STAND_BORE)}",
+        _mm(STAND_HEIGHT),
+    ),
+)
+
+SURFACE_FINISHES = ()
+BUILT_UP_PERMISSION_NOTE = (
+    "BUILT-UP PART: PADS, HUB STAND AND RAIL RESTS ARE BONDED INTO THEIR POCKETS."
+)
+DRAWING_NOTES = "\n".join(
+    (
+        BUILT_UP_PERMISSION_NOTE,
+        "PAD AND HUB STAND TOPS LAPPED. HEIGHTS ARE TO THE TOPS; POCKET FLOORS CLEAR.",
+        "PLAN LOCATIONS FROM BORE L AXIS: SEE TAGS AND SCHEDULES, SHEETS TWO AND THREE.",
+    )
+)
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:4"
+
+# --- Exported requirement features (prechips features.toml) ---------------------------
+_DOWN = ([0.0, 0.0, -1.0], ("__frame__",))
+_UP = ([0.0, 0.0, 1.0], ("__frame__",))
+_PAD_PLANE_SOURCES = (
+    "PAD_TOP_Z",
+    ("ch_rocker_arm_spec", "HUB_LENGTH"),
+    ("ch_rocker_arm_spec", "ARM_THICKNESS"),
+)
+EXPORT_FEATURES: dict[str, ExportFeature] = {
+    "locating_bore": ExportFeature(
+        kind="hole",
+        faces=(CylinderFace(LOCATING_BORE_DIA, contains_x_mm=0.0, contains_y_mm=0.0),),
+        requirements=("dia",),
+        fields={
+            "at": ([0.0, 0.0, PLATE_TOP_Z], ("PLATE_TOP_Z",)),
+            "axis": _DOWN,
+            "dia": (
+                limits(LOCATING_BORE_DIA, 3, LOCATING_BORE_BAND),
+                (
+                    "LOCATING_BORE_DIA",
+                    "LOCATING_BORE_BAND",
+                    ("ch_rocker_arm_spec", "PIVOT_HOLE_DIA"),
+                ),
+            ),
+            "dia_nominal": (LOCATING_BORE_DIA, ("LOCATING_BORE_DIA",)),
+            "depth": (limits(LOCATING_BORE_DEPTH, 2), ("LOCATING_BORE_DEPTH",)),
+            "process": ("REAM", ("DIMENSION_CALLOUTS",)),
+        },
+        precision={"dia": 3, "depth": 2},
+    ),
+    "rod_pin_hole": ExportFeature(
+        kind="hole",
+        faces=(
+            CylinderFace(
+                ROD_PIN_HOLE_DIA,
+                contains_x_mm=ROD_PIN_HOLE_XY[0],
+                contains_y_mm=ROD_PIN_HOLE_XY[1],
+            ),
+        ),
+        requirements=("dia",),
+        fields={
+            "at": (
+                [ROD_PIN_HOLE_XY[0], ROD_PIN_HOLE_XY[1], PLATE_TOP_Z],
+                (
+                    "ROD_PIN_HOLE_XY",
+                    "PLATE_TOP_Z",
+                    ("ch_rocker_arm_spec", "ROD_HOLE_X"),
+                    ("ch_rocker_arm_spec", "ROD_HOLE_Y"),
+                    ("ch_rocker_arm_spec", "PIVOT_MID_Y"),
+                ),
+            ),
+            "axis": _DOWN,
+            "dia": (
+                limits(ROD_PIN_HOLE_DIA, 3, ROD_PIN_HOLE_BAND),
+                ("ROD_PIN_HOLE_DIA", "ROD_PIN_HOLE_BAND"),
+            ),
+            "dia_nominal": (ROD_PIN_HOLE_DIA, ("ROD_PIN_HOLE_DIA",)),
+            "depth": (limits(ROD_PIN_HOLE_DEPTH, 3), ("ROD_PIN_HOLE_DEPTH",)),
+            "process": ("REAM", ("DIMENSION_CALLOUTS",)),
+        },
+        precision={"dia": 3, "depth": 3},
+    ),
+    "pad_tops": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, 1.0), PAD_TOP_Z),),
+        requirements=("height",),
+        fields={
+            "normal": _UP,
+            "plane": ({"frame": "model", "axis": "z", "value": PAD_TOP_Z}, _PAD_PLANE_SOURCES),
+            "height": (limits(PLATE_DROP, 3), ("PLATE_DROP", "PAD_TOP_Z", "PLATE_TOP_Z")),
+            "height_from": ("plate_top", ("PLATE_DROP",)),
+        },
+        precision={"height": 3},
+    ),
+    "stand_top": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, 1.0), STAND_TOP_Z),),
+        requirements=("height",),
+        fields={
+            "normal": _UP,
+            "plane": ({"frame": "model", "axis": "z", "value": STAND_TOP_Z}, ("STAND_TOP_Z",)),
+            "height": (
+                limits(STAND_DROP, 3, STAND_DROP_BAND),
+                ("STAND_DROP", "STAND_DROP_BAND", ("ch_rocker_arm_spec", "HUB_LENGTH_BAND")),
+            ),
+            "height_from": ("pad_tops", ("STAND_DROP",)),
+            "dia": (limits(STAND_OD, 3), ("STAND_OD",)),
+        },
+        precision={"height": 3, "dia": 3},
+    ),
+    "rail_rest_tops": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, 1.0), REST_TOP_Z),),
+        requirements=("height",),
+        fields={
+            "normal": _UP,
+            "plane": ({"frame": "model", "axis": "z", "value": REST_TOP_Z}, ("REST_TOP_Z",)),
+            # Not printed as one size: the rest height on its pocket depth,
+            # so the two printed .XXX bands stack (the shims on top absorb it).
+            "height": (
+                limits(REST_TOP_Z - PLATE_TOP_Z, 3, (2.0 * _XXX, -2.0 * _XXX)),
+                ("REST_HEIGHT", "REST_POCKET_DEPTH"),
+            ),
+            "height_from": ("plate_top", ("REST_TOP_Z",)),
+        },
+        precision={"height": 3},
+    ),
+    "plate_top": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, 1.0), PLATE_TOP_Z),),
+        requirements=("thickness",),
+        fields={
+            "normal": _UP,
+            "plane": ({"frame": "model", "axis": "z", "value": PLATE_TOP_Z}, ("PLATE_TOP_Z",)),
+            "thickness": (limits(PLATE_THICK, 1), ("PLATE_THICK",)),
+        },
+        precision={"thickness": 1},
+    ),
+}
