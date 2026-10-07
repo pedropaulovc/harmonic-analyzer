@@ -291,6 +291,36 @@ determine the selection vector" — project through `IView::ModelToViewTransform
 (get-only, `types/IView/ModelToViewTransform.md`), which is what
 `_drawing_common.model_point_in_view` wraps.
 
+**g2. An associative hole callout whose coordinate pick misses.**
+Don't: treat `SelectByID2(..., "EDGE", sheet_x, sheet_y, ...) == False` as
+proof of a broken Hole Wizard, a wrong view transform, or a particular pick
+aperture. The summing-lever farm leaf at 2026-10-07T06:45:40.734Z missed
+`Drawing View2` at `(0.197219, 0.130949)` after successful front/top imports;
+it recorded a ready seat and window size, but no native circle or transform.
+Those observations do not distinguish a geometric offset from a hit-test miss.
+Do: resolve the model-owned entry rim from the view's visible edges and pass
+`edge=` to `add_native_hole_callout`. For `CounterAnchorTap`, the builder authors
+the Hole Wizard at `(TIP_X, ANCHOR_H/2, 0)` mm with a +Y normal and the tap-drill
+radius from `COUNTER_HOLE_SPEC`; the drawing reuses that same rim for its checked
+X-location dimension. `ViewEdges.circle_at(selection="unique", adapter=...)`
+uses the existing centre/radius/axis limits, rejects missing or distinct
+ambiguous edges, and uses native `ISldWorks::IsSame` to count repeated wrappers
+for one edge only once. Existing nearest-mode consumers retain their behavior.
+The canonical visible-entity example selects those entities through
+`IEntity::Select4` with `ISelectData.View`; `IDrawingDoc::AddHoleCallout2` then
+calls out the selected hole, not a typed replacement.
+
+The remote leaf's aggregate `drawing.hole_callout_attachment` observation
+records the selected circle and axis, adjacent feature ownership, actual
+`ModelToViewTransform`, selection point/view, attached entity count/types, and
+native identity against the requested rim and the callout's sheet position
+after rebuild. Failed reads are
+named `<field>_error`, not reported as empty geometry. A failed entity selection
+records the wanted rim before raising; it never retries a coordinate or accepts
+the previous selection. These observations are diagnostic, not evidence that a
+new cutover has passed: require the actual remote callout's native attachment
+and a whole-sheet eye check before claiming the anchor callout is correct.
+
 **h. A datum tag that will not leave its attachment.**
 Don't: attach a datum tag to a bore by selecting the edge OBJECT
 (`add_datum_feature(entity=visible_circle_edge(...), shoulder=True)`) and then

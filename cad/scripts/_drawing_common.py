@@ -573,6 +573,18 @@ def describe_selected_entity(
             "view_outline",
             lambda: json.dumps([float(v) for v in bound_view.GetOutline()]),
         )
+        _probe(
+            bag,
+            "model_to_view_transform",
+            lambda: json.dumps(
+                [
+                    float(value)
+                    for value in _early_bound(
+                        bound_view.ModelToViewTransform, "IMathTransform"
+                    ).ArrayData
+                ]
+            ),
+        )
     selection_manager = _probe(
         bag,
         "selection_manager",
@@ -600,6 +612,20 @@ def describe_selected_entity(
                 ]
             ),
         )
+        _probe(
+            bag,
+            "selection_point_model_m",
+            lambda: json.dumps(
+                [float(value) for value in selection_manager.GetSelectionPoint2(count, -1)]
+            ),
+        )
+        _probe(
+            bag,
+            "selected_view_name",
+            lambda: view_name(
+                adapter, selection_manager.GetSelectedObjectsDrawingView2(count, -1)
+            ),
+        )
     kind = entity_type.upper()
     if kind == "SILHOUETTE":
         _probe(
@@ -620,14 +646,20 @@ def describe_selected_entity(
         if _probe(bag, "is_circle", lambda: bool(curve.IsCircle())):
             # CircleParams = (centre xyz, axis xyz, radius), metres -- ONE
             # property read, then sliced.
-            def circle_mm() -> str:
-                params = [float(v) for v in curve.CircleParams]
-                return json.dumps(
-                    [round(v * 1000.0, 4) for v in params[:3]]
-                    + [round(params[6] * 1000.0, 4)]
+            params = _probe(
+                bag, "circle_params", lambda: [float(v) for v in curve.CircleParams],
+                record=False,
+            )
+            if params is not None:
+                _probe(
+                    bag,
+                    "circle_mm",
+                    lambda: json.dumps(
+                        [round(v * 1000.0, 4) for v in params[:3]]
+                        + [round(params[6] * 1000.0, 4)]
+                    ),
                 )
-
-            _probe(bag, "circle_mm", circle_mm)
+                _probe(bag, "circle_axis", lambda: json.dumps(params[3:6]))
         elif _probe(bag, "is_line", lambda: bool(curve.IsLine())):
             _probe(
                 bag,
@@ -1873,9 +1905,22 @@ def add_native_hole_callout(
     True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
     callout still prints the bare nominal.
     """
-    selected = _select_view_entity(
-        adapter, view, "EDGE", edge_xy, label=label, entity=edge
-    )
+    try:
+        selected = _select_view_entity(
+            adapter, view, "EDGE", edge_xy, label=label, entity=edge
+        )
+    except Exception:
+        if edge is not None:
+            wanted = describe_selected_entity(
+                adapter, view, edge, entity_type="EDGE", requested_xy=edge_xy, label=label
+            )
+            with contextlib.suppress(Exception):
+                _telemetry.event("drawing.hole_callout_selection_failure", **wanted)
+                _telemetry.error(
+                    f"hole callout {label}: native edge selection failed: "
+                    + json.dumps(wanted, default=str, sort_keys=True)
+                )
+        raise
     # Snapshot what AddHoleCallout2 is about to be handed, BEFORE the call: the
     # API may clear the selection or invalidate the entity, and on a passing
     # leaf this line is the positive control the failing one is read against.
@@ -1966,6 +2011,54 @@ def add_native_hole_callout(
         _telemetry.debug(f"hole callout {label}: prefix {prefix!r}")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_native_hole_callout")
+    if edge is not None:
+        # Keep native attachment observations separate from successful
+        # selection: AddHoleCallout2 can re-solve the annotation on insertion.
+        # One aggregate record also retains the selected circle and current
+        # transform, so a remote leaf can prove (or disprove) source ownership.
+        attachment = dict(before)
+        attachment["requested_callout_xy"] = json.dumps(callout_xy)
+        _probe(
+            attachment,
+            "callout_position",
+            lambda: json.dumps([float(value) for value in annotation.GetPosition()]),
+        )
+        attached = _probe(
+            attachment,
+            "attached_entities",
+            lambda: tuple(annotation.GetAttachedEntities3() or ()),
+            record=False,
+        )
+        _probe(
+            attachment, "attached_count", lambda: int(annotation.GetAttachedEntityCount3())
+        )
+        _probe(
+            attachment,
+            "attached_types",
+            lambda: json.dumps(
+                [int(kind) for kind in (annotation.GetAttachedEntityTypes() or ())]
+            ),
+        )
+        _probe(attachment, "leaders", lambda: int(annotation.GetLeaderCount()))
+        _probe(attachment, "dangling", lambda: bool(annotation.IsDangling()))
+        if attached is not None:
+            attachment["attached_entities_count"] = len(attached)
+            _probe(
+                attachment,
+                "attached_same_requested_edge",
+                lambda: json.dumps(
+                    [
+                        _is_same_attachment(adapter, actual, edge, "EDGE")
+                        for actual in attached
+                    ]
+                ),
+            )
+        with contextlib.suppress(Exception):
+            _telemetry.event("drawing.hole_callout_attachment", **attachment)
+            _telemetry.info(
+                f"hole callout {label}: native attachment: "
+                + json.dumps(attachment, default=str, sort_keys=True)
+            )
     return display
 
 
@@ -4630,6 +4723,8 @@ class ViewEdges:
         label: str,
         center_tol_mm: float = 0.02,
         radius_tol_mm: float = 0.01,
+        selection: Literal["nearest", "unique"] = "nearest",
+        adapter: Any | None = None,
     ) -> ViewEdge:
         """The visible circular edge nearest ``center_mm``/``radius_mm``.
 
@@ -4638,9 +4733,20 @@ class ViewEdges:
         cannot be confused. Fails loud past the tolerances with the nearest
         candidate's numbers, so a moved feature is a build error, never a
         dimension quietly hung on the wrong rim.
+
+        ``selection="unique"`` requires exactly one distinct native edge
+        within those same limits; ``adapter`` supplies SolidWorks' IsSame
+        comparison so repeated wrappers for one edge are not ambiguity.
+        The default nearest mode retains the existing ranked-pick behavior.
         """
+        if selection not in ("nearest", "unique"):
+            raise ValueError(f"{label}: unknown circle selection mode {selection!r}")
+        if selection == "unique" and adapter is None:
+            raise ValueError(f"{label}: unique circle selection requires an adapter")
+        circles = self.circles
+        matches: list[ViewEdge] = []
         best = None
-        for item in self.circles:
+        for item in circles:
             cx, cy, cz, nx, ny, nz, r = item.circle
             center_error = sum(abs(a - b) for a, b in zip((cx, cy, cz), center_mm))
             radius_error = abs(r - radius_mm)
@@ -4648,13 +4754,42 @@ class ViewEdges:
             if axis is not None:
                 dot = nx * axis[0] + ny * axis[1] + nz * axis[2]
                 axis_error = 1.0 - abs(dot)
+            outside_limits = (
+                center_error > center_tol_mm
+                or radius_error > radius_tol_mm
+                or axis_error > 1e-6
+            )
             score = center_error + radius_error + axis_error
             if best is None or score < best[0]:
-                best = (score, center_error, radius_error, axis_error, item)
+                best = (score, center_error, radius_error, axis_error, item, outside_limits)
+            if selection == "unique" and not outside_limits:
+                matches.append(item)
         if best is None:
             raise RuntimeError(f"{label}: the {self.label!r} scan has no circular edge")
-        _score, center_error, radius_error, axis_error, item = best
-        if center_error > center_tol_mm or radius_error > radius_tol_mm or axis_error > 1e-6:
+        _score, center_error, radius_error, axis_error, item, outside_limits = best
+        if selection == "unique":
+            distinct: list[ViewEdge] = []
+            for candidate in matches:
+                if not any(
+                    candidate.edge is previous.edge
+                    or _is_same_attachment(adapter, candidate.edge, previous.edge, "EDGE")
+                    for previous in distinct
+                ):
+                    distinct.append(candidate)
+            _telemetry.annotate(
+                visible_circles=len(circles),
+                circle_candidates=len(matches),
+                distinct_circle_candidates=len(distinct),
+            )
+            if len(distinct) > 1:
+                raise RuntimeError(
+                    f"{label}: ambiguous visible circle at {center_mm} "
+                    f"r={radius_mm:g} mm in the {self.label!r} scan: "
+                    f"{len(distinct)} distinct native edges ({len(matches)} candidates)"
+                )
+            if distinct:
+                return distinct[0]
+        if outside_limits:
             raise RuntimeError(
                 f"{label}: no visible circle at {center_mm} r={radius_mm:g} mm in "
                 f"the {self.label!r} scan; nearest centre error {center_error:.4g} mm, "

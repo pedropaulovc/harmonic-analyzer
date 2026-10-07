@@ -107,3 +107,75 @@ def test_pitch_proof_rejects_an_equal_pitch_between_other_holes(identity) -> Non
             identity, _dimension(pitch, (seed, second)), expected_mm=8.43,
             label="spring-hole start Z", entities=(seed, second),
         )
+
+
+def _tap_rim(
+    *,
+    center=None,
+    radius=None,
+    axis=(0.0, 1.0, 0.0),
+    native_id=None,
+) -> ViewEdge:
+    """Geometry already read from a visible edge; wrappers may alias an edge."""
+    center = center or (drawing.TIP_X, drawing.ANCHOR_H / 2.0, 0.0)
+    radius = drawing.COUNTER_R if radius is None else radius
+    edge = SimpleNamespace(native_id=object() if native_id is None else native_id)
+    return ViewEdge(edge, None, (*center, *axis, radius), None)
+
+
+def _unique_anchor_rim(items) -> ViewEdge:
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(
+            IsSame=lambda first, second: int(first.native_id is second.native_id)
+        )
+    )
+    return ViewEdges(label="summing lever top", edges=tuple(items)).circle_at(
+        (drawing.TIP_X, drawing.ANCHOR_H / 2.0, 0.0),
+        drawing.COUNTER_R,
+        axis=(0.0, 1.0, 0.0),
+        label="counter-anchor tap rim",
+        selection="unique",
+        adapter=adapter,
+    )
+
+
+def test_anchor_rim_is_the_tap_entry_not_the_exit_boss_or_other_plane() -> None:
+    """The exit shares the sheet centre, but only the boss's +Y rim is the
+    Hole Wizard entry the drawing asks to annotate."""
+    entry = _tap_rim()
+    exit_rim = _tap_rim(center=(drawing.TIP_X, -drawing.ANCHOR_H / 2.0, 0.0))
+    boss = _tap_rim(radius=drawing.ANCHOR_R)
+    other_plane = _tap_rim(axis=(0.0, 0.0, 1.0))
+    for items in (
+        (exit_rim, boss, other_plane, entry),
+        (entry, other_plane, boss, exit_rim),
+    ):
+        assert _unique_anchor_rim(items) is entry
+    with pytest.raises(RuntimeError, match="no visible circle"):
+        _unique_anchor_rim((exit_rim, boss, other_plane))
+    with pytest.raises(RuntimeError, match="no circular edge"):
+        _unique_anchor_rim(())
+
+
+def test_anchor_rim_refuses_distinct_coincident_edges_in_either_order() -> None:
+    """Equal geometry is not native identity: an enumeration-order tie must
+    never choose which edge owns an associative hole callout."""
+    first, second = _tap_rim(), _tap_rim()
+    for items in ((first, second), (second, first)):
+        with pytest.raises(RuntimeError, match="2 distinct native edges"):
+            _unique_anchor_rim(items)
+    # Existing dimension consumers retain their explicit nearest contract.
+    edges = ViewEdges(label="plan", edges=(second, first))
+    assert edges.circle_at(
+        (drawing.TIP_X, drawing.ANCHOR_H / 2.0, 0.0),
+        drawing.COUNTER_R,
+        axis=(0.0, 1.0, 0.0),
+        label="legacy nearest rim",
+    ) is second
+
+
+def test_repeated_native_edge_wrappers_are_one_anchor_candidate() -> None:
+    native_id = object()
+    first, alias = _tap_rim(native_id=native_id), _tap_rim(native_id=native_id)
+    assert first.edge is not alias.edge
+    assert _unique_anchor_rim((first, alias, first)) is first
