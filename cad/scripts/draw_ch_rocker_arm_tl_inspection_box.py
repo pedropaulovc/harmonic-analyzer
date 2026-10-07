@@ -24,6 +24,7 @@ from _drawing_common import (
     import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -78,7 +79,35 @@ DIMENSION_CALLOUTS = {
     "WinLowFront": "2X",
     "BackW": "WINDOW THRU BACK WALL",
 }
-TAP_CALLOUT_XY = (0.125, 0.222)
+TAP_CALLOUT_XY = (0.148, 0.215)
+_THREAD_LABEL_LAYER = "INSPECTION-BOX-THREAD-LABEL-HIDDEN"
+
+
+def _hide_thread_labels(adapter: Any, view: Any) -> int:
+    """Hide the front view's cosmetic-thread label; the hole callout already
+    states the thread (draw_dt_cone_tip_block's hidden-layer recipe)."""
+    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
+    if manager.GetLayer(_THREAD_LABEL_LAYER) is None and int(
+        manager.AddLayer(_THREAD_LABEL_LAYER, "duplicate thread labels", 0, 0, 0)
+    ) != 1:
+        raise RuntimeError("failed to add the inspection-box thread-label layer")
+    layer = _early_bound(manager.GetLayer(_THREAD_LABEL_LAYER), "ILayer")
+    layer.Visible = False
+    if bool(layer.Visible) or bool(layer.Printable):
+        raise RuntimeError("inspection-box thread-label layer is not hidden")
+    hidden = 0
+    for raw in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.GetType()) != 1:  # swCosmeticThread
+            continue
+        annotation.Layer = _THREAD_LABEL_LAYER
+        if str(annotation.Layer or "") != _THREAD_LABEL_LAYER:
+            raise RuntimeError("front-view cosmetic thread refused the hidden layer")
+        hidden += 1
+    if not hidden:
+        raise RuntimeError("inspection box front view has no cosmetic thread label")
+    rebuild_drawing(adapter, label="hide front-view thread labels")
+    return hidden
 
 
 def _tap_edge(adapter: Any, view: Any) -> Any:
@@ -158,6 +187,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="C stop bar #8-32 taps",
         edge=_tap_edge(adapter, front),
     )
+    _hide_thread_labels(adapter, front)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # Precise shaded isometrics need the taps' cosmetic threads imported
