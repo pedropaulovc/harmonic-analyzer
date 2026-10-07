@@ -20,11 +20,13 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from ch_rocker_arm_tl_pivot_washer_spec import (
+    BORE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
 )
@@ -38,7 +40,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A Ø9 x 1.5 washer: 5:1 keeps the 1.5 edge legible.
+# A Ø10 x 1.5 washer: 5:1 keeps the 1.5 edge legible.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 FACE_CENTER = (0.130, 0.185)
@@ -102,6 +104,7 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    set_dimension_callouts(adapter, annotations, {"BoreDia": BORE_CALLOUT}, location="below")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the washer face view")

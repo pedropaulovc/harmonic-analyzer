@@ -24,6 +24,7 @@ import ch_rocker_arm_spec as rocker
 from _feature_requirements import ExportFeature, limits
 from _hole_spec import THREAD_MAJOR_MM
 from _gtol_spec import CylinderFace, PlanarFace
+from _printed_tolerance import printed_band_mm
 from _surface_finish import GROUND_UM, SurfaceFinishControl
 
 # --- stations (fixture frame, mm) -------------------------------------------
@@ -48,7 +49,9 @@ if THREAD_LENGTH - PLATE_FLOOR_GAP < ENGAGEMENT_MIN_D * THREAD_MODEL_DIA:
 TIP_CHAMFER = 0.5
 CHAMFER_CALLOUT = "X 45 DEG"
 SLOT_WIDTH = 1.0
-SLOT_DEPTH = 1.5
+# 1.2 deep (route said 1.5): the head and slot depth print at two places so
+# the worst head left behind the slot stays over the rule-12 floor.
+SLOT_DEPTH = 1.2
 
 UNDERHEAD_Z = WASHER_THICK
 HEAD_TOP_Z = UNDERHEAD_Z + HEAD_LENGTH
@@ -118,14 +121,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": HEAD_PLACES,
-        "HeadLength": 1,
+        "HeadLength": 2,
         "ShoulderDia": SHOULDER_PLACES,
         "ShoulderEnd": 1,
         "OverallLength": 1,
         "TipChamfer": 1,
     },
     "SlotProfile": {"SlotWidth": 1},
-    "DriverSlot": {"SlotDepth": 1},
+    "DriverSlot": {"SlotDepth": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
@@ -133,15 +136,21 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked pivot-screw dimension needs authored places")
 
-# Policy: no digits, no GD&T. The coaxiality requirement is the one-chucking
-# lapped route plus a recorded runout reading; the S4 pickup holds its limit.
+# Policy: no digits, no GD&T. The notes name the mates that set the two
+# lapped bands; the coaxiality requirement is stated by name, and the shop's
+# one-chucking lapping route (shop-additions.md section 2) delivers it.
 DRAWING_NOTES = "\n".join(
     (
-        "SHOULDER AND HEAD LAPPED IN ONE CHUCKING, BEFORE PARTING OFF.",
-        "MEASURE HEAD-TO-SHOULDER RUNOUT IN V-BLOCKS AND RECORD IT ON THE PART TAG.",
-        "DO NOT HEAT TREAT.",
+        "SHOULDER SLIDES IN THE ROCKER ARM PIVOT BORE AND THE PROFILE PLATE BORE.",
+        "HEAD SLIDES IN THE OUTLINE-TEMPLATE BUSH AND IS COAXIAL WITH THE SHOULDER.",
     )
 )
+# The head left behind the slot at worst case.
+_HEAD_BEHIND_SLOT_MIN = round(
+    HEAD_LENGTH - SLOT_DEPTH - 2.0 * printed_band_mm(2), 6
+)
+if _HEAD_BEHIND_SLOT_MIN < 1.5:
+    raise AssertionError("pivot-screw slot leaves under the rule-12 floor in the head")
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
@@ -183,10 +192,10 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("HEAD_DIA", "HEAD_BAND", "TEMPLATE_BUSH_BORE_LIMITS"),
             ),
             "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
-            "length": (limits(HEAD_LENGTH, 1), ("HEAD_LENGTH",)),
+            "length": (limits(HEAD_LENGTH, 2), ("HEAD_LENGTH",)),
             "process": ("lap", ("HEAD_BAND",)),
         },
-        precision={"dia": HEAD_PLACES, "length": 1},
+        precision={"dia": HEAD_PLACES, "length": 2},
     ),
     "underhead": ExportFeature(
         kind="face",

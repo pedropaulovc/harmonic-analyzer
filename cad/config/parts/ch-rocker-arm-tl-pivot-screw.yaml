@@ -4,7 +4,7 @@ ch-rocker-arm-tl-pivot-screw:
   number: MHA-CH-006-TL-06
   material: AISI 4140 pre-hardened steel
   material_specification: AISI 4140 pre-hardened steel rod, 7/16 in, about 32 HRC; no heat treatment
-  finish: shoulder and head lapped; protect with ISO VG 32 machine-oil film
+  finish: protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
   process: "turn, thread and ring-lap shoulder and head in one chucking from bar; part off, face head, slit slot"
