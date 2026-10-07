@@ -34,7 +34,8 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     BODY_SADDLE_THICK,
     BODY_SADDLE_Y,
     BODY_SEAT_CALLOUT,
-    CONE_PIN_NEAR_Y,
+    CONE_PIN_TOPS_NOTE,
+    CONE_PIN_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     SECTION_REFERENCE_SKETCHES,
@@ -60,8 +61,7 @@ VIEW_SCALE = (1, 1)
 ISO_SCALE = (1, 2)
 # Plan ("*Front", looking down -Z) and elevation ("*Right") are both turned
 # so the post axis (+Y) runs left to right from foot B; the elevation sits
-# under the plan, third-angle, with +Z up. Both sections are cut on the
-# elevation: A-A through the near cone pin looks back at the body saddle
+# elevation: A-A through both cone pins' axes looks back at the body saddle
 # (-Y), B-B between the crank pins and the tail saddle looks on to the tail
 # saddle (+Y), so each shows one seat alone, on a saddle face it does not cut.
 PLAN_CENTER = (0.115, 0.196)
@@ -98,8 +98,7 @@ PLAN_KEEP = {
     "CrankPinWestX": (-23.0, 144.0, 0.0),
     "CrankPinEastX": (-17.0, 152.0, 0.0),
     "BaseWidth": (0.0, 160.0, 0.0),
-    "ConePinNearY": (-48.0, 14.0, 0.0),
-    "ConePinFarY": (-56.0, 19.0, 0.0),
+    "ConePinY": (-48.0, 17.0, 0.0),
     "CrankPinY": (-64.0, 36.0, 0.0),
     "CrankPinDia": (-52.0, 100.0, 0.0),
 }
@@ -124,26 +123,29 @@ ELEVATION_KEEP = {
 }
 # Each seat's profile sketch is parallel to its section, so the section
 # imports its diameter. Each seat is a matched fit: its diameter prints as a
-# reference size with its callout (the spec's *_SEAT_CALLOUT) in the clear
-# above the section, and its leader drops through the seat to the arc, as
-# B-B's does (run-13 review: A-A's callout sat inside the saddle). A-A's
-# leader lands on the arc's +X side, clear of the cone pin's top on -X and of
-# the finish symbol's landing; its callout reads ABOVE the value, the 40.0
-# under it.
+# reference size with its callout (the spec's *_SEAT_CALLOUT) below it, in
+# the clear above the section, and its leader drops to the arc on the side
+# away from the post axis's dimensions, as B-B's does (run-13 review: A-A's
+# callout sat inside the saddle; run 14's callout above the value bent its
+# leader across the view). A-A's lands on the arc's +X side, clear of the
+# cone pins; the seat axis's 40.0 and the pin tops' relation stack under it.
 SECTION_A_KEEP = {
-    "BodySeatDia": (-8.0, CONE_PIN_NEAR_Y, 22.0),
-    "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
-    "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
-    # Under the base; the tilt reads below it.
-    "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, -48.0),
-    # Under the base, outside the acute wedge on the gauge line's +X side,
-    # 33 mm from the hole entry: the inclined pin-axis line and the 33.34
-    # stay clear of the text (run-13 review); the caption drops clear of it
-    # (CAPTION_DROP).
-    "ConePinTilt": (7.5, CONE_PIN_NEAR_Y, -61.0),
-    # Pin top from the post axis, along the pin: in the open seat on the
-    # line's -X side, above the saddle top.
-    "ConePinFromAxis": (-14.0, CONE_PIN_NEAR_Y, -6.0),
+    "BodySeatDia": (12.0, CONE_PIN_Y, 46.0),
+    "BodySeatAxisX": (-20.0, CONE_PIN_Y, 22.0),
+    "BodySeatAxisHeight": (-48.0, CONE_PIN_Y, -12.0),
+    # Under the base, one baseline row per hole off the west side: the
+    # nearer (west) hole on the upper row.
+    "ConePinEntryWestX": (-27.0, CONE_PIN_Y, -46.0),
+    "ConePinEntryEastX": (-20.0, CONE_PIN_Y, -54.0),
+    # Under the base, outside the acute wedge on the east gauge line's +X
+    # side, 33 mm from its hole entry: the inclined pin-axis line and the
+    # entry rows stay clear of the text (run-13 review); the caption drops
+    # clear of it (CAPTION_DROP).
+    "ConePinTilt": (15.0, CONE_PIN_Y, -61.0),
+    # The tops' plane from the post axis, along the pins: on the line's -X
+    # side, above the seat axis's 30.0 extension line (Z0) and under the
+    # 40.0, its callout reading below the value.
+    "ConePinFromAxis": (-14.0, CONE_PIN_Y, 10.5),
 }
 # B-B's callout reads below the value, above the finish symbol.
 SECTION_B_KEEP = {
@@ -155,9 +157,9 @@ DIMENSION_CALLOUTS = {
     "CrankPinDia": "4X DOWEL",
     "SaddleWidth": "2X",
     "SaddleSideX": "2X",
-    "ConePinEntryX": "2X",
     "ConePinTilt": "2X",
-    "ConePinFromAxis": "2X",
+    # One relation for both tops, and how far apart their errors may be.
+    "ConePinFromAxis": "2X {}WITHIN\n{}".format(*CONE_PIN_TOPS_NOTE.split("WITHIN ")),
     "CrankPinFromAxis": "2X",
 }
 
@@ -394,7 +396,7 @@ async def build(adapter: Any) -> dict[str, str]:
         section_a = _cut(
             adapter,
             elevation,
-            CONE_PIN_NEAR_Y,
+            CONE_PIN_Y,
             center=SECTION_A_CENTER,
             letter="A",
             x_right=False,
@@ -422,9 +424,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Matched-fit seats (policy rule 2): the diameter is a reference size; the
     # callout names the mate and states the acceptance.
     set_reference_dimensions(adapter, annotations, ("BodySeatDia", "TailSeatDia"))
-    set_dimension_callouts(
-        adapter, section_a_annotations, {"BodySeatDia": BODY_SEAT_CALLOUT}, location="above"
-    )
+    set_dimension_callouts(adapter, section_a_annotations, {"BodySeatDia": BODY_SEAT_CALLOUT})
     set_dimension_callouts(adapter, section_b_annotations, {"TailSeatDia": TAIL_SEAT_CALLOUT})
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.

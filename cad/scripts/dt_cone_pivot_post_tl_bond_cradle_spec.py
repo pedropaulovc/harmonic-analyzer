@@ -19,6 +19,7 @@ the post axis: a pin top sets a sleeve face against that axis.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import _config
 import dt_cone_pivot_post_spec as post
@@ -78,48 +79,78 @@ if abs(round(CRANK_PIN_HEIGHT, 2) - 8.62) > 1e-9:
     raise AssertionError("crank pin height left the plan's 8.62")
 
 # Cone pins: tilted with the cone journal, axis n = (sin i, 0, cos i), the
-# reverse of the post's north-cap normal. One either side of the journal
-# station; their square tops lie in the north-cap plane, CONE_BOSS_LENGTH / 2
-# below the journal centre along n. A pin reaches CONE_PIN_LENGTH from its
-# top down n, into the base.
-CONE_PIN_OFFSET = 5.0
-CONE_PIN_NEAR_Y = post.BORE_HEIGHT - CONE_PIN_OFFSET
-CONE_PIN_FAR_Y = post.BORE_HEIGHT + CONE_PIN_OFFSET
-CONE_PIN_LENGTH = 18.0
+# reverse of the post's north-cap normal. Both stand at the journal station,
+# one either side of the journal axis, CONE_PIN_SPREAD along u = (cos i, 0,
+# -sin i) (square to n in the post's mid-plane): each top centres on the
+# north cap's annulus between the bore and the boss rim, never on the
+# journal axis, where a top would sit over the bore (prechips CN-B5). The
+# square tops lie in the north-cap plane, CONE_BOSS_LENGTH / 2 below the
+# journal centre along n. Each pin is a stock dowel reaching its own length
+# from its top down n into the base: the east (+X) top stands lower, so it
+# takes the shorter one (prechips cone-pin-1 4x16, cone-pin-2 4x20).
+CONE_PIN_Y = post.BORE_HEIGHT
+CONE_PIN_SPREAD = 7.4
+if not post.BORE_DIA / 2.0 < CONE_PIN_SPREAD < post.CONE_BOSS_DIA / 2.0:
+    raise AssertionError("cone pin tops left the north cap's annulus")
 _INCLINE = math.radians(post.INCLINE_DEG)
 CONE_PIN_AXIS = (math.sin(_INCLINE), 0.0, math.cos(_INCLINE))
+CONE_PIN_ACROSS = (math.cos(_INCLINE), 0.0, -math.sin(_INCLINE))
 _NORTH_CAP = post.SURFACE_FINISHES[3].face
 if any(abs(a + c) > 1e-12 for a, c in zip(CONE_PIN_AXIS, _NORTH_CAP.normal, strict=True)):
     raise AssertionError("cone pin axis is not square to the post's north cap")
 CONE_PIN_TOP_S = -post.CONE_BOSS_LENGTH / 2.0
 if abs(-CONE_PIN_TOP_S - _NORTH_CAP.offset_mm) > 1e-9:
     raise AssertionError("cone pin tops left the post's north-cap plane")
-CONE_PIN_TOP_X = CONE_PIN_TOP_S * math.sin(_INCLINE)
-CONE_PIN_TOP_Z = CONE_PIN_TOP_S * math.cos(_INCLINE)
-CONE_PIN_BOTTOM_S = CONE_PIN_TOP_S - CONE_PIN_LENGTH
-# Where the pin axis enters the base top: the reamed hole's position.
-CONE_PIN_ENTRY_S = BASE_TOP_Z / math.cos(_INCLINE)
-CONE_PIN_ENTRY_X = CONE_PIN_ENTRY_S * math.sin(_INCLINE)
-# The high (-X) edge of the tilted top (the inventory's gauge station).
-CONE_PIN_HIGH_EDGE_X = CONE_PIN_TOP_X - PIN_RADIUS * math.cos(_INCLINE)
-CONE_PIN_HIGH_EDGE_Z = CONE_PIN_TOP_Z + PIN_RADIUS * math.sin(_INCLINE)
-CONE_PIN_HIGH_EDGE_HEIGHT = CONE_PIN_HIGH_EDGE_Z - BASE_TOP_Z
-CONE_PIN_CENTRE_HEIGHT = CONE_PIN_TOP_Z - BASE_TOP_Z
+
+
+@dataclass(frozen=True)
+class ConePin:
+    """One cone pin: ``side`` +1 east (+X), -1 west, of the journal axis."""
+
+    side: int
+    length: float
+
+    @property
+    def top_x(self) -> float:
+        return CONE_PIN_TOP_S * CONE_PIN_AXIS[0] + self.side * CONE_PIN_SPREAD * CONE_PIN_ACROSS[0]
+
+    @property
+    def top_z(self) -> float:
+        return CONE_PIN_TOP_S * CONE_PIN_AXIS[2] + self.side * CONE_PIN_SPREAD * CONE_PIN_ACROSS[2]
+
+    @property
+    def above_base(self) -> float:
+        """Axis length from the base top up to the pin top."""
+        return (self.top_z - BASE_TOP_Z) / CONE_PIN_AXIS[2]
+
+    @property
+    def entry_x(self) -> float:
+        """Where the axis enters the base top: the reamed hole's position."""
+        return self.top_x - self.above_base * CONE_PIN_AXIS[0]
+
+    @property
+    def bottom_z(self) -> float:
+        return self.top_z - self.length * CONE_PIN_AXIS[2]
+
+
+CONE_PIN_EAST = ConePin(side=1, length=16.0)
+CONE_PIN_WEST = ConePin(side=-1, length=20.0)
+CONE_PINS = {"east": CONE_PIN_EAST, "west": CONE_PIN_WEST}
 if (
-    abs(CONE_PIN_TOP_X + 4.552936) > 1e-5
-    or abs(CONE_PIN_TOP_Z + 20.506141) > 1e-5
-    or abs(round(CONE_PIN_HIGH_EDGE_HEIGHT, 2) - 9.93) > 1e-9
-    or abs(round(CONE_PIN_CENTRE_HEIGHT, 2) - 9.49) > 1e-9
+    abs(CONE_PIN_EAST.top_x - 2.671145) > 1e-5
+    or abs(CONE_PIN_EAST.top_z + 22.110089) > 1e-5
+    or abs(CONE_PIN_WEST.top_x + 11.777018) > 1e-5
+    or abs(CONE_PIN_WEST.top_z + 18.902193) > 1e-5
 ):
-    raise AssertionError("cone pin top left the inventory's tilted-top station")
-# The pin's bottom end stays inside the base plate.
-_BOTTOM_Z = CONE_PIN_BOTTOM_S * math.cos(_INCLINE)
+    raise AssertionError("cone pin tops left prechips CN-B5's stations")
+# Each pin's bottom end stays inside the base plate.
 _BOTTOM_HALF_DROP = PIN_RADIUS * math.sin(_INCLINE)
-if not (
-    BASE_TOP_Z - BASE_THICK < _BOTTOM_Z - _BOTTOM_HALF_DROP
-    and _BOTTOM_Z + _BOTTOM_HALF_DROP < BASE_TOP_Z
-):
-    raise AssertionError("cone pin end leaves the base plate")
+for _pin in CONE_PINS.values():
+    if not (
+        BASE_TOP_Z - BASE_THICK < _pin.bottom_z - _BOTTOM_HALF_DROP
+        and _pin.bottom_z + _BOTTOM_HALF_DROP < BASE_TOP_Z
+    ):
+        raise AssertionError("cone pin end leaves the base plate")
 
 # Each pin top sets a sleeve face against the POST AXIS, so it prints from
 # that axis as one relation: never a chain of a pin height and a seat-axis
@@ -127,12 +158,22 @@ if not (
 # of +/-0.51 (crank) and +/-0.255 (cone). The post axis is the line through
 # both seat axes, read over gauge rods bedded in the two seats (the matched
 # seats take the post's body and tail, so rods of those sizes bed as the post
-# does). A cone pin top prints along its own axis: the axis runs through the
-# post axis, so the distance is the north-cap plane's offset.
+# does). Both cone pin tops lie in one plane square to n, the north-cap
+# plane: they print along n from the post axis to that plane.
 CRANK_PIN_FROM_AXIS = -CRANK_PIN_TOP_Z
 CONE_PIN_FROM_AXIS = -CONE_PIN_TOP_S
-if abs(math.hypot(CONE_PIN_TOP_X, CONE_PIN_TOP_Z) - CONE_PIN_FROM_AXIS) > 1e-9:
-    raise AssertionError("cone pin axis no longer runs through the post axis")
+for _pin in CONE_PINS.values():
+    _along = _pin.top_x * CONE_PIN_AXIS[0] + _pin.top_z * CONE_PIN_AXIS[2]
+    if abs(-_along - CONE_PIN_FROM_AXIS) > 1e-9:
+        raise AssertionError("a cone pin top left the north-cap plane")
+# The two cone tops' errors along n must agree within CONE_PIN_TOPS_MATCH:
+# 0.03 over the 2 x CONE_PIN_SPREAD spacing rolls the post 0.12 deg, inside
+# the 0.13 deg the S6 crank-mouth roll check allows (prechips cone data). Two
+# independent +/-0.06 bands alone could roll it 0.46 deg.
+CONE_PIN_TOPS_MATCH = 0.03
+if math.degrees(math.atan(CONE_PIN_TOPS_MATCH / (2.0 * CONE_PIN_SPREAD))) >= 0.13:
+    raise AssertionError("cone pin tops' match no longer holds the S6 roll check")
+CONE_PIN_TOPS_NOTE = f"TOPS WITHIN {CONE_PIN_TOPS_MATCH:.2f} OF EACH OTHER"
 # Each relation's band is the fixture's share of the post band the pin sets:
 # AUTHOR'S CHOICE 25 %, rounded down to the hundredth, leaving 75 % to the
 # sleeve and the bond. The two shares sum to the band they replace, the
@@ -166,7 +207,7 @@ STOP_SIDE_OFFSET = (BASE_WIDTH - STOP_WIDTH) / 2.0
 SADDLE_SIDE_OFFSET = (BASE_WIDTH - SADDLE_WIDTH) / 2.0
 CRANK_PIN_WEST_FROM_SIDE = -CRANK_PIN_X - SIDE_W_X
 CRANK_PIN_EAST_FROM_SIDE = CRANK_PIN_X - SIDE_W_X
-CONE_PIN_ENTRY_FROM_SIDE = CONE_PIN_ENTRY_X - SIDE_W_X
+CONE_PIN_ENTRY_FROM_SIDE = {name: pin.entry_x - SIDE_W_X for name, pin in CONE_PINS.items()}
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BaseProfile": {"BaseThick", "BaseLength"},
@@ -187,8 +228,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CrankPinProfile": {"CrankPinY", "CrankPinDia"},
     "CrankPinReference": {"CrankPinFromAxis"},
     "PlanReference": {
-        "ConePinNearY",
-        "ConePinFarY",
+        "ConePinY",
         "StopSideX",
         "SaddleSideX",
         "CrankPinWestX",
@@ -197,7 +237,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ConePinSectionReference": {
         "BodySeatAxisX",
         "BodySeatAxisHeight",
-        "ConePinEntryX",
+        "ConePinEntryEastX",
+        "ConePinEntryWestX",
         "ConePinTilt",
         "ConePinFromAxis",
     },
@@ -208,7 +249,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # locates on them closer than the .X band. The seats are matched fits, so
 # their diameters are reference sizes at their mates' places: the post body's
 # own (MainBodyDia) and the tail bar's two.
-# The cone pins' stations and hole entry take two. The pin tops take two
+# The cone pins' station and hole entries take two. The pin tops take two
 # under their own bands (CRANK/CONE_PIN_FROM_AXIS_TOL). The cone pin tilt
 # prints to a tenth of a degree under the general angular band. The pin
 # diameter names the stock dowel; the press fit is the reamed hole's job
@@ -235,8 +276,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "CrankPinReference": {"CrankPinFromAxis": 2},
     "PlanReference": {
-        "ConePinNearY": 2,
-        "ConePinFarY": 2,
+        "ConePinY": 2,
         "StopSideX": 1,
         "SaddleSideX": 1,
         "CrankPinWestX": 1,
@@ -245,7 +285,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ConePinSectionReference": {
         "BodySeatAxisX": 1,
         "BodySeatAxisHeight": 1,
-        "ConePinEntryX": 2,
+        "ConePinEntryEastX": 2,
+        "ConePinEntryWestX": 2,
         "ConePinTilt": 1,
         "ConePinFromAxis": 2,
     },
@@ -259,8 +300,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 # Construction-only sketches the part saves hidden; the drawing shows them in
 # the views that print their dimensions (_drawing_hidden_sketches). The two
-# section sketches lie in their cutting planes: A-A through the near cone
-# pin, B-B between the crank pins and the tail saddle, so B-B looks on to the
+# section sketches lie in their cutting planes: A-A through both cone pins'
+# axes, B-B between the crank pins and the tail saddle, so B-B looks on to the
 # tail saddle's south face, uncut, and its seat arc is a model edge. The
 # crank pin's sketch lies on the post's mid-plane and draws the post axis
 # through both seats in the elevation.
@@ -338,18 +379,20 @@ def _crank_pin(x: float) -> ExportFeature:
     )
 
 
-def _cone_pin(y: float, y_name: str) -> ExportFeature:
+def _cone_pin(name: str) -> ExportFeature:
+    pin = CONE_PINS[name]
+    pin_name = f"CONE_PIN_{name.upper()}"
     return ExportFeature(
         kind="pin",
-        faces=(CylinderFace(PIN_DIA, contains_y_mm=y),),
-        requirements=("height", "station", "angle_deg"),
+        faces=(CylinderFace(PIN_DIA, contains_x_mm=pin.top_x, contains_y_mm=CONE_PIN_Y),),
+        requirements=("height", "station", "angle_deg", "note"),
         fields={
             "at": (
-                [CONE_PIN_TOP_X, y, CONE_PIN_TOP_Z],
-                ("CONE_PIN_TOP_X", y_name, "CONE_PIN_TOP_Z", (_POST, "CONE_BOSS_LENGTH")),
+                [pin.top_x, CONE_PIN_Y, pin.top_z],
+                (pin_name, "CONE_PIN_Y", "CONE_PIN_SPREAD", (_POST, "CONE_BOSS_LENGTH")),
             ),
             "axis": (list(CONE_PIN_AXIS), ("CONE_PIN_AXIS", (_POST, "INCLINE_DEG"))),
-            # Along the pin's own axis, which runs through the post axis.
+            # Along the pin's own axis, from the post axis to the tops' plane.
             "height": (
                 limits(
                     CONE_PIN_FROM_AXIS,
@@ -366,15 +409,16 @@ def _cone_pin(y: float, y_name: str) -> ExportFeature:
             "height_nominal": (CONE_PIN_FROM_AXIS, ("CONE_PIN_FROM_AXIS",)),
             "height_from": (_HEIGHT_FROM, ("CONE_PIN_FROM_AXIS", "SEAT_AXIS_HEIGHT")),
             "station": (
-                limits(y, DRAWING_PRECISION_BY_NAME["ConePinNearY"]),
-                (y_name, (_POST, "BORE_HEIGHT")),
+                limits(CONE_PIN_Y, DRAWING_PRECISION_BY_NAME["ConePinY"]),
+                ("CONE_PIN_Y", (_POST, "BORE_HEIGHT")),
             ),
             "angle_deg": (post.INCLINE_DEG, ((_POST, "INCLINE_DEG"),)),
             "dia_nominal": (PIN_DIA, ("PIN_DIA",)),
+            "note": (CONE_PIN_TOPS_NOTE, ("CONE_PIN_TOPS_NOTE", "CONE_PIN_TOPS_MATCH")),
         },
         precision={
             "height": DRAWING_PRECISION_BY_NAME["ConePinFromAxis"],
-            "station": DRAWING_PRECISION_BY_NAME["ConePinNearY"],
+            "station": DRAWING_PRECISION_BY_NAME["ConePinY"],
         },
     )
 
@@ -450,6 +494,6 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     ),
     "crank_pin_west": _crank_pin(-CRANK_PIN_X),
     "crank_pin_east": _crank_pin(CRANK_PIN_X),
-    "cone_pin_near": _cone_pin(CONE_PIN_NEAR_Y, "CONE_PIN_NEAR_Y"),
-    "cone_pin_far": _cone_pin(CONE_PIN_FAR_Y, "CONE_PIN_FAR_Y"),
+    "cone_pin_east": _cone_pin("east"),
+    "cone_pin_west": _cone_pin("west"),
 }

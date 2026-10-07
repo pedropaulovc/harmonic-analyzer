@@ -79,8 +79,8 @@ def test_pin_tops_print_from_the_post_axis_within_a_quarter_of_the_post_band() -
     for name, nominal, post_band in (
         ("crank_pin_west", post.CRANK_BOSS_NORTH_FACE, crank_band),
         ("crank_pin_east", post.CRANK_BOSS_NORTH_FACE, crank_band),
-        ("cone_pin_near", post.CONE_BOSS_LENGTH / 2.0, cone_band),
-        ("cone_pin_far", post.CONE_BOSS_LENGTH / 2.0, cone_band),
+        ("cone_pin_east", post.CONE_BOSS_LENGTH / 2.0, cone_band),
+        ("cone_pin_west", post.CONE_BOSS_LENGTH / 2.0, cone_band),
     ):
         pin = features[name]
         # One relation to the seat axis, no chain through the base top.
@@ -98,9 +98,10 @@ def test_crank_pins_carry_the_crank_sleeve_north_face() -> None:
         assert math.isclose(pin["at"][1], post.CRANK_BORE_HEIGHT)
 
 
-def test_cone_pin_tops_lie_in_the_north_cap_plane_square_to_the_journal() -> None:
+def test_cone_pin_tops_bear_on_the_north_cap_annulus_either_side_of_the_journal() -> None:
     cap = post.SURFACE_FINISHES[3].face
-    for name in ("cone_pin_near", "cone_pin_far"):
+    across = []
+    for name in ("cone_pin_east", "cone_pin_west"):
         pin = _features()[name]
         # Top centre on the cap plane, axis anti-parallel to the cap's normal.
         signed = sum(a * n for a, n in zip(pin["at"], cap.normal, strict=True))
@@ -109,4 +110,20 @@ def test_cone_pin_tops_lie_in_the_north_cap_plane_square_to_the_journal() -> Non
             math.isclose(a, -n, abs_tol=1e-12)
             for a, n in zip(pin["axis"], cap.normal, strict=True)
         )
-        assert abs(pin["at"][1] - post.BORE_HEIGHT) == spec.CONE_PIN_OFFSET
+        # Off the journal axis, onto the cap between the bore and the rim: a
+        # top on the axis would sit over the bore.
+        rel = (pin["at"][0], pin["at"][1] - post.BORE_HEIGHT, pin["at"][2])
+        along = sum(r * a for r, a in zip(rel, pin["axis"], strict=True))
+        radial = [r - along * a for r, a in zip(rel, pin["axis"], strict=True)]
+        assert post.BORE_DIA / 2.0 < math.hypot(*radial) < post.CONE_BOSS_DIA / 2.0
+        across.append(radial)
+    # Opposite sides, equally: the tops straddle the journal axis.
+    assert all(math.isclose(e, -w, abs_tol=1e-9) for e, w in zip(*across, strict=True))
+
+
+def test_cone_pin_tops_carry_their_mutual_match() -> None:
+    for name in ("cone_pin_east", "cone_pin_west"):
+        assert _features()[name]["note"] == spec.CONE_PIN_TOPS_NOTE
+    assert drawing.DIMENSION_CALLOUTS["ConePinFromAxis"].replace("\n", " ") == (
+        "2X " + spec.CONE_PIN_TOPS_NOTE
+    )
