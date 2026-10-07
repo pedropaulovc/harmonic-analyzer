@@ -489,63 +489,119 @@ def _emit_failed_task_log(task: str, wf_id: str, result: LeafResult) -> None:
                 )
             else:
                 pool = pool_home()
-                try:
-                    retrieved = run_pool_cli(
-                        pool,
-                        "logs",
-                        wf_id,
-                        "--log-blob",
-                        result.log_blob,
-                        interpreter=_pool_python(pool),
-                        stdout=payload,
-                        stderr=diagnostics,
-                        timeout_s=FAILED_LOG_TIMEOUT_S,
-                        max_stdout_bytes=FAILED_LOG_MAX_BYTES,
-                    )
-                except subprocess.TimeoutExpired:
-                    warnings.append(
-                        (
-                            "retrieval_timeout",
-                            f"task log retrieval timed out after {FAILED_LOG_TIMEOUT_S:g}s",
+                with _telemetry.span(
+                    "farm.log.retrieve",
+                    service=_telemetry.BUILD_INFRA_SERVICE,
+                    label=task,
+                    task=task,
+                    workflow_id=wf_id,
+                    worker=result.worker_id,
+                    attempt=result.attempt,
+                    log_blob=result.log_blob,
+                    leaf_state=result.state,
+                    timeout_s=FAILED_LOG_TIMEOUT_S,
+                ) as retrieval:
+                    outcome = "reader_error"
+                    failure: Exception | None = None
+                    try:
+                        retrieved = run_pool_cli(
+                            pool,
+                            "logs",
+                            wf_id,
+                            "--log-blob",
+                            result.log_blob,
+                            interpreter=_pool_python(pool),
+                            stdout=payload,
+                            stderr=diagnostics,
+                            timeout_s=FAILED_LOG_TIMEOUT_S,
+                            max_stdout_bytes=FAILED_LOG_MAX_BYTES,
                         )
-                    )
-                except _FailedLogDiagnosticsTooLarge as exc:
-                    warnings.append(("diagnostic_truncated", str(exc)))
-                except _FailedLogTooLarge as exc:
-                    warnings.append(("retrieval_too_large", str(exc)))
-                except OSError as exc:
-                    warnings.append(
-                        (
-                            "retrieval_start_error",
-                            f"task log retrieval could not start: {exc}",
-                        )
-                    )
-                else:
-                    if retrieved.returncode != 0:
+                    except subprocess.TimeoutExpired as exc:
+                        outcome = "timeout"
+                        failure = exc
                         warnings.append(
                             (
-                                "retrieval_exit",
-                                f"task log retrieval exited {retrieved.returncode}",
+                                "retrieval_timeout",
+                                f"task log retrieval timed out after {FAILED_LOG_TIMEOUT_S:g}s",
+                            )
+                        )
+                    except _FailedLogDiagnosticsTooLarge as exc:
+                        outcome = "stderr_overflow"
+                        failure = exc
+                        warnings.append(("diagnostic_truncated", str(exc)))
+                    except _FailedLogTooLarge as exc:
+                        outcome = "stdout_overflow"
+                        failure = exc
+                        warnings.append(("retrieval_too_large", str(exc)))
+                    except OSError as exc:
+                        failure = exc
+                        warnings.append(
+                            (
+                                "retrieval_start_error",
+                                f"task log retrieval could not start: {exc}",
                             )
                         )
                     else:
-                        payload.seek(0, os.SEEK_END)
-                        size = payload.tell()
-                        if size > FAILED_LOG_MAX_BYTES:
+                        retrieval.set_attribute("returncode", retrieved.returncode)
+                        if retrieved.returncode != 0:
+                            failure = subprocess.CalledProcessError(
+                                retrieved.returncode, retrieved.args
+                            )
                             warnings.append(
                                 (
-                                    "retrieval_too_large",
-                                    f"task log is {size} bytes, exceeding the "
-                                    f"{FAILED_LOG_MAX_BYTES}-byte output limit; "
-                                    "payload not shown",
+                                    "retrieval_exit",
+                                    f"task log retrieval exited {retrieved.returncode}",
                                 )
                             )
-                        elif size == 0:
-                            warnings.append(
-                                ("retrieval_empty", "task log retrieval returned no output")
-                            )
                         else:
-                            readable_payload = payload
+                            payload.seek(0, os.SEEK_END)
+                            size = payload.tell()
+                            if size > FAILED_LOG_MAX_BYTES:
+                                outcome = "stdout_overflow"
+                                failure = _FailedLogTooLarge(
+                                    f"task log is {size} bytes, exceeding the "
+                                    f"{FAILED_LOG_MAX_BYTES}-byte output limit; "
+                                    "payload not shown"
+                                )
+                                warnings.append(("retrieval_too_large", str(failure)))
+                            elif size == 0:
+                                outcome = "empty"
+                                failure = ValueError(
+                                    "task log retrieval returned no output"
+                                )
+                                warnings.append(("retrieval_empty", str(failure)))
+                            else:
+                                outcome = "success"
+                                readable_payload = payload
+                    finally:
+                        _telemetry.annotate(outcome=outcome)
+                        for stream, captured in (
+                            ("stdout", payload), ("stderr", diagnostics)
+                        ):
+                            try:
+                                captured.seek(0, os.SEEK_END)
+                                captured_bytes = captured.tell()
+                            except Exception as exc:
+                                # Accounting must not replace a reader failure
+                                # or invent a zero for unavailable evidence.
+                                _telemetry.event(
+                                    "farm.log.capture_count_unavailable",
+                                    stream=stream,
+                                    error=str(exc),
+                                )
+                            else:
+                                _telemetry.annotate(
+                                    **{f"{stream}_bytes": captured_bytes}
+                                )
+                        if failure is not None:
+                            # A caught diagnostic failure must not let span()
+                            # mark this reader operation OK on its clean exit.
+                            retrieval.record_exception(failure)
+                            retrieval.set_status(
+                                _telemetry.Status(
+                                    _telemetry.StatusCode.ERROR, str(failure)
+                                )
+                            )
 
         lock_path = _failed_log_lock_path()
         try:
