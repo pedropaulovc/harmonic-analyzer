@@ -52,7 +52,6 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     DETAIL_LABEL,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
     FEATURE_SCHEDULE,
     FEATURE_SCHEDULE_HEADER,
     FEATURE_SCHEDULE_TITLE,
@@ -60,6 +59,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     HOLD_DOWN_POINTS,
     LOCATING_BORE_DIA,
     LOCATING_BORE_FLOOR_Z,
+    MARKED_PRECISION_BY_NAME,
     PAD_POCKETS,
     PAD_TOP_Z,
     PART_SCHEDULE,
@@ -791,7 +791,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, MARKED_PRECISION_BY_NAME)
 
     plan_edges = scan_view_edges(plan, label="plan")
     hold_down = HOLD_DOWN_POINTS[1]
