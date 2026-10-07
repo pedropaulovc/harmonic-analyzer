@@ -152,9 +152,13 @@ def _hatch_pin_apart(adapter: Any, section: Any) -> None:
     for name, hatches in groups.items():
         angle = 3.0 * math.pi / 4.0 if name == pin else math.pi / 4.0
         for hatch in hatches:
+            before = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
+            hatch.UseMaterialHatch = False
             hatch.Angle = angle
+            hatch.Scale2 = 1.0
+            after = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
             if abs(float(hatch.Angle) - angle) > 1e-6 or not str(hatch.Pattern):
-                raise RuntimeError("section hatch pattern/angle did not persist")
+                raise RuntimeError(f"section hatch did not persist: {before} -> {after}")
     adapter.currentModel.EditRebuild3()
 
 
