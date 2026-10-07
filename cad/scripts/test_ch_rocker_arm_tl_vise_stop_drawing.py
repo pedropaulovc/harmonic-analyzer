@@ -63,22 +63,35 @@ def test_walls_meet_rule_12_at_worst_case() -> None:
     assert min(spec.WALLS.values()) >= spec.RULE12_WALL_TARGET
 
 
-def test_screw_never_bottoms_in_the_base_tap_and_prints_its_worst_engagement() -> None:
-    """Across the printed grip band the screw tip stops at least one pitch
-    short of the vendor tap's depth, and the sheet never states more full
-    thread than the longest grip leaves."""
+def test_screw_engagement_and_tip_clearance_hold_at_every_screw_and_grip_corner() -> None:
+    """Across the printed grip band and the bought screw's length band, the
+    full thread never falls under the ruled 2.7 MIN, the tip never comes
+    nearer the tap bottom than the printed clearance, and the sheet never
+    states more of either than the corners leave."""
     places = spec.DRAWING_PRECISION_BY_NAME["ScrewGrip"]
     band = float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
-    shortest_grip = spec.SCREW_GRIP - band
-    longest_grip = spec.SCREW_GRIP + band
-    assert spec.SCREW_LENGTH - shortest_grip <= spec.BASE_TAP_DEPTH - spec.SCREW_PITCH + 1e-9
-    worst = spec.SCREW_LENGTH - longest_grip - spec.SCREW_END_INCOMPLETE + 1e-9
-    assert 0.0 < spec.SCREW_ENGAGEMENT_PRINTED <= worst
-    assert spec.SCREW_ENGAGEMENT_PRINTED_D * spec.SCREW_MAJOR <= worst
+    engagements, clearances = [], []
+    for grip in (spec.SCREW_GRIP - band, spec.SCREW_GRIP + band):
+        for length in (spec.SCREW_LENGTH + d for d in spec.SCREW_LENGTH_BAND):
+            protrusion = length - grip
+            engagements.append(protrusion - spec.SCREW_END_INCOMPLETE)
+            clearances.append(spec.BASE_TAP_DEPTH - protrusion)
+    assert spec.SCREW_ENGAGEMENT_RULED <= spec.SCREW_ENGAGEMENT_PRINTED <= min(engagements) + 1e-9
+    assert spec.SCREW_ENGAGEMENT_PRINTED_D * spec.SCREW_MAJOR <= min(engagements) + 1e-9
+    assert 0.0 < spec.SCREW_TIP_CLEARANCE_PRINTED <= min(clearances) + 1e-9
     assert f"ENGAGEMENT {spec.SCREW_ENGAGEMENT_PRINTED:.1f} MIN" in spec.SCREW_HOLE_CALLOUT
-    tip_clear = spec.BASE_TAP_DEPTH - (spec.SCREW_LENGTH - shortest_grip) + 1e-9
-    assert 0.0 < spec.SCREW_TIP_CLEARANCE_PRINTED <= tip_clear
     assert f"TIP {spec.SCREW_TIP_CLEARANCE_PRINTED:.1f} MIN CLEAR" in spec.SCREW_HOLE_CALLOUT
+
+
+def test_screw_hole_exports_as_drilled_clearance_with_the_grip_band() -> None:
+    """The lug hole is a drilled clearance (the thread is the base's), and
+    the grip that sets the screw's engagement exports its printed band."""
+    features = _features()
+    assert "thread" not in features["screw_hole"]
+    assert features["screw_hole"]["process"] == "drill"
+    grip = features["screw_seat"]
+    assert grip["length"][0] < spec.SCREW_GRIP < grip["length"][1]
+    assert abs(spec.SEAT_X - grip["plane"]["value"] - grip["length_nominal"]) < 1e-9
 
 
 def test_magnetic_base_sits_behind_the_rear_jaw_below_its_top() -> None:

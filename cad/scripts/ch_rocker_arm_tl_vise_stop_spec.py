@@ -19,7 +19,7 @@ knob standing 18 further toward +Y; the M6 tap is at the face centre
 (Y20.5, Z-21.31705). A lug at the seat carries the screw; beyond it the arm
 is a flange over a full-width step that leaves the screw head and the hex
 key room, and the finger at the far end reaches -Y across the blank end.
-The nose pin, bonded flush with the finger's back face, ends at the blank's
+The nose pin, fixed flush with the finger's back face, ends at the blank's
 raw left end (setup X-170).
 
 One-piece rather than the inventory's built-up arm + finger: the arm's end
@@ -71,8 +71,10 @@ NOSE_FACE_X = BLANK_END_X_SETUP + JAW_HALF_WIDTH  # -90.6631
 NOSE_Z = NOSE_Z_SETUP - SETUP_Z_OF_JAW_TOP  # -0.31705
 
 # --- Bought items (not modelled) -------------------------------------------
-# Nose: hardened 6 x 8 dowel pin (ISO 8734, m6: 6.004..6.012), bonded in the
-# finger flush with its back face.
+# Nose: hardened 6 x 8 dowel pin (ISO 8734, m6: 6.004..6.012), fixed in the
+# finger flush with its back face. The part is built up from it; the sheet
+# states the installed result (rule 6: no method in the notes).
+BUILT_UP_PERMISSION_NOTE = "NOSE IS A BOUGHT DOWEL PIN, FIXED IMMOVABLE IN ITS HOLE."
 NOSE_PIN_DIA = 6.0
 NOSE_PIN_MAX = 6.012
 NOSE_PIN_LENGTH = 8.0
@@ -90,10 +92,15 @@ BASE_TAP_DEPTH = 6.0
 SCREW_THREAD = "M6"
 SCREW_MAJOR = 6.0
 SCREW_PITCH = 1.0
-# ISO 4762 M6 socket head cap screw: head dk 10, k 6; the chamfered end of
-# ISO 4753 leaves up to 2 P of incomplete thread (u <= 2P).
+# ISO 4762 M6 socket head cap screw: head dk 10 (10.22 max on a knurled
+# head), k 6; the bought length l = 16 is js15, 15.65..16.35 (ISO 4762
+# table, e.g. https://www.aramfix.com/content/files/i762caill/datasheet%20iso%204762.pdf).
+# The chamfered end of ISO 4753 leaves up to 2 P of incomplete thread
+# (u <= 2P).
 SCREW_LENGTH = 16.0
+SCREW_LENGTH_BAND = (0.35, -0.35)  # (upper, lower), ISO 4762 js15 at l = 16
 SCREW_HEAD_DIA = 10.0
+SCREW_HEAD_DIA_MAX = 10.22
 SCREW_HEAD_HEIGHT = 6.0
 SCREW_END_INCOMPLETE = 2.0 * SCREW_PITCH
 
@@ -109,28 +116,31 @@ FINGER_FRONT = SEAT_X - FINGER_FRONT_X  # 53.6631
 # The screw sits on the base's tap; the base stays 0.5 behind the rear jaw's
 # gripping plane (clear of the risers inside the jaws) and below the jaw top.
 SCREW_Y = 0.5 + BASE_SIZE / 2.0  # 20.5
-SCREW_FROM_REAR = 8.0
-SCREW_HEIGHT = 8.0
-ARM_WIDTH = 17.0
-REAR_Y = SCREW_Y + SCREW_FROM_REAR  # 28.5, the shared rear face
-ARM_INNER_Y = REAR_Y - ARM_WIDTH  # 11.5
+SCREW_FROM_REAR = 8.5
+SCREW_HEIGHT = 8.5
+ARM_WIDTH = 18.0
+REAR_Y = SCREW_Y + SCREW_FROM_REAR  # 29, the shared rear face
+ARM_INNER_Y = REAR_Y - ARM_WIDTH  # 11
 NOSE_FROM_REAR = REAR_Y - NOSE_Y  # 61
-NOSE_HEIGHT = 29.0  # nose axis above the shared bottom face (the lug's)
+NOSE_HEIGHT = 29.5  # nose axis above the shared bottom face (the lug's)
 BOTTOM_Z = NOSE_Z - NOSE_HEIGHT
 SCREW_Z = BOTTOM_Z + SCREW_HEIGHT
-ARM_HEIGHT = 28.0
+ARM_HEIGHT = 28.5
 ARM_TOP_Z = BOTTOM_Z + ARM_HEIGHT
-FINGER_HEIGHT = 36.0
+FINGER_HEIGHT = 36.5
 FINGER_TOP_Z = BOTTOM_Z + FINGER_HEIGHT
-FINGER_LENGTH = 68.0
+FINGER_LENGTH = 68.5
 FINGER_END_Y = REAR_Y - FINGER_LENGTH
 # Beyond the lug a full-width step clears the screw head and the hex key;
 # both its sizes print from the lug's seat and bottom faces.
 NOTCH_HEIGHT = 16.0
 NOTCH_TOP_Z = BOTTOM_Z + NOTCH_HEIGHT
-# Seat face to the lug's head-bearing face: printed at three places so its
-# band costs the screw's engagement only 0.26 (below).
-SCREW_GRIP = 11.15
+# Seat face to the lug's head-bearing face, printed at three places. With
+# the bought screw's length band, engagement plus tip clearance is fixed at
+# the tap depth less 2 P; the grip is centred to hold the ruled 2.7 MIN
+# engagement (short screw, longest grip) and leave the tip clear of the tap
+# bottom (long screw, shortest grip): asserted below.
+SCREW_GRIP = 10.80
 GRIP_FACE_X = SEAT_X - SCREW_GRIP
 
 BASE_ENVELOPE = (
@@ -148,8 +158,9 @@ if not BASE_ENVELOPE[2][0] > -JAW_HEIGHT:
 # Drilled holes: the title block's drilled band (+0.10/0).
 _DRILLED = _config.title_block("drilled_hole")
 DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))  # (upper, lower)
-# Nose pin bonded with a retaining compound (shop-additions r3 #3 route):
+# Nose pin fixed with a retaining compound (shop-additions r3 #3 route):
 # a drilled slip hole whose gap stays inside Loctite 638's 0.25 mm fill.
+# The sheet states the installed result, not the method.
 NOSE_HOLE_DIA = 6.10
 BOND_GAP_MAX = 0.25
 # ISO 273 medium clearance for the M6 screw (vendor thread kept).
@@ -164,6 +175,10 @@ _NOSE_R = (NOSE_HOLE_DIA + DRILLED_BAND[0]) / 2.0
 # The screw hole is drilled through the lug only (about 2 D), so no
 # deep-drilling wander is added.
 _SCREW_R = (SCREW_HOLE_DIA + DRILLED_BAND[0]) / 2.0
+# The head is not registered: it may sit off the hole's axis by the screw's
+# float in the largest hole, and the knurled head is up to 10.22.
+SCREW_FLOAT = _SCREW_R - SCREW_MAJOR / 2.0  # 0.35
+_HEAD_R = SCREW_FLOAT + SCREW_HEAD_DIA_MAX / 2.0
 WALLS = {
     "nose to finger top": (FINGER_HEIGHT - LINEAR_1PL) - (NOSE_HEIGHT + LINEAR_1PL) - _NOSE_R,
     "nose to finger bottom": (NOSE_HEIGHT - LINEAR_1PL) - (NOTCH_HEIGHT + LINEAR_1PL) - _NOSE_R,
@@ -172,28 +187,28 @@ WALLS = {
     "screw to bottom": SCREW_HEIGHT - LINEAR_1PL - _SCREW_R,
     "screw to arm inner face": (ARM_WIDTH - LINEAR_1PL) - (SCREW_FROM_REAR + LINEAR_1PL) - _SCREW_R,
     "flange over the step": (ARM_HEIGHT - LINEAR_1PL) - (NOTCH_HEIGHT + LINEAR_1PL),
-    # The Ø10 head's land on the lug's head-bearing face, to each of its
-    # three open edges (the fourth side meets the step's ceiling, which
+    # The floating head's land on the lug's head-bearing face, to each of
+    # its three open edges (the fourth side meets the step's ceiling, which
     # HEAD_CLEARANCE_MIN below keeps clear of the head).
-    "head land to rear face": SCREW_FROM_REAR - LINEAR_1PL - SCREW_HEAD_DIA / 2.0,
-    "head land to bottom": SCREW_HEIGHT - LINEAR_1PL - SCREW_HEAD_DIA / 2.0,
+    "head land to rear face": SCREW_FROM_REAR - LINEAR_1PL - _HEAD_R,
+    "head land to bottom": SCREW_HEIGHT - LINEAR_1PL - _HEAD_R,
     "head land to arm inner face": (ARM_WIDTH - LINEAR_1PL)
     - (SCREW_FROM_REAR + LINEAR_1PL)
-    - SCREW_HEAD_DIA / 2.0,
+    - _HEAD_R,
 }
 _thin = {name: round(wall, 3) for name, wall in WALLS.items() if wall < RULE12_WALL_TARGET}
 if _thin:
     raise AssertionError(f"vise stop walls under the rule-12 target: {_thin}")
 # The screw head clears the flange over the step at the worst case.
 HEAD_CLEARANCE_MIN = (
-    (NOTCH_HEIGHT - LINEAR_1PL) - (SCREW_HEIGHT + LINEAR_1PL) - SCREW_HEAD_DIA / 2.0
+    (NOTCH_HEIGHT - LINEAR_1PL) - (SCREW_HEIGHT + LINEAR_1PL) - _HEAD_R
 )
 if HEAD_CLEARANCE_MIN <= 0.0:
     raise AssertionError("screw head fouls the flange over the step")
 if GRIP_FACE_X - SCREW_HEAD_HEIGHT <= FINGER_FRONT_X:
     raise AssertionError("screw head fouls the finger")
 
-# The bonded nose: the loosest drilled hole on the smallest pin stays inside
+# The fixed nose: the loosest drilled hole on the smallest pin stays inside
 # the compound's gap; the tightest still slips over the largest pin.
 if NOSE_HOLE_DIA + DRILLED_BAND[0] - NOSE_PIN_DIA > BOND_GAP_MAX:
     raise AssertionError("nose bond gap exceeds the retaining compound's fill")
@@ -204,11 +219,17 @@ if NOSE_HOLE_DIA + DRILLED_BAND[1] <= NOSE_PIN_MAX:
 # On the shortest grip the tip stops at least 1 P short of the tap's thread
 # depth; on the longest, the full-thread overlap is what the protrusion
 # leaves after the screw end's incomplete thread.
-SCREW_PROTRUSION_MAX = round(SCREW_LENGTH - (SCREW_GRIP - LINEAR_3PL), 6)  # 4.98
-SCREW_PROTRUSION_MIN = round(SCREW_LENGTH - (SCREW_GRIP + LINEAR_3PL), 6)  # 4.72
-if SCREW_PROTRUSION_MAX > BASE_TAP_DEPTH - SCREW_PITCH + 1e-9:
-    raise AssertionError("M6 screw can reach the bottom of the base's tap")
+SCREW_PROTRUSION_MAX = round(
+    SCREW_LENGTH + SCREW_LENGTH_BAND[0] - (SCREW_GRIP - LINEAR_3PL), 6
+)  # 5.68: long screw, shortest grip
+SCREW_PROTRUSION_MIN = round(
+    SCREW_LENGTH + SCREW_LENGTH_BAND[1] - (SCREW_GRIP + LINEAR_3PL), 6
+)  # 4.72: short screw, longest grip
 SCREW_ENGAGEMENT_MIN = round(SCREW_PROTRUSION_MIN - SCREW_END_INCOMPLETE, 6)  # 2.72
+# Main's ruling (option A) holds the printed engagement at 2.7 MIN.
+SCREW_ENGAGEMENT_RULED = 2.7
+if SCREW_ENGAGEMENT_MIN < SCREW_ENGAGEMENT_RULED - 1e-9:
+    raise AssertionError("M6 screw engages under the ruled 2.7 MIN in the base")
 if SCREW_ENGAGEMENT_MIN <= 0.0:
     raise AssertionError("M6 screw engages no full thread in the base")
 # Under rule 12's 1.5 D: the base's 6 mm tap caps it. Named exception row
@@ -216,9 +237,14 @@ if SCREW_ENGAGEMENT_MIN <= 0.0:
 SCREW_ENGAGEMENT_MIN_D = SCREW_ENGAGEMENT_MIN / SCREW_MAJOR
 SCREW_ENGAGEMENT_PRINTED = math.floor(SCREW_ENGAGEMENT_MIN * 10.0 + 1e-9) / 10.0
 SCREW_ENGAGEMENT_PRINTED_D = math.floor(SCREW_ENGAGEMENT_MIN_D * 100.0 + 1e-9) / 100.0
-# The tip's clearance to the tap bottom at the shortest grip: the sheet
-# states it so the grip's three-place band reads as the bottoming limit.
-SCREW_TIP_CLEARANCE_MIN = round(BASE_TAP_DEPTH - SCREW_PROTRUSION_MAX, 6)  # 1.02
+# The long screw's tip clearance to the tap bottom at the shortest grip:
+# the sheet states it so the grip's three-place band reads as the bottoming
+# limit. Engagement plus this clearance is the tap depth less 2 P (4.0)
+# whatever the grip, so the 2.7 MIN engagement leaves at most 0.3 here.
+SCREW_TIP_CLEARANCE_MIN = round(BASE_TAP_DEPTH - SCREW_PROTRUSION_MAX, 6)  # 0.32
+SCREW_TIP_CLEARANCE_FLOOR = 0.3
+if SCREW_TIP_CLEARANCE_MIN < SCREW_TIP_CLEARANCE_FLOOR - 1e-9:
+    raise AssertionError("M6 screw tip can reach the bottom of the base's tap")
 SCREW_TIP_CLEARANCE_PRINTED = math.floor(SCREW_TIP_CLEARANCE_MIN * 10.0 + 1e-9) / 10.0
 
 # The nose disc lands on the raw end face, and every part of the stop stays
@@ -287,7 +313,7 @@ if DRAWING_PRECISION_BY_NAME["ScrewGrip"] != 3:
 SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
-        "BOND NOSE PIN WITH RETAINING COMPOUND.",
+        BUILT_UP_PERMISSION_NOTE,
         "HAND-SEATING LOAD ONLY, NO CUTTING LOAD.",
     )
 )
@@ -356,7 +382,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "dia_nominal": (NOSE_HOLE_DIA, ("NOSE_HOLE_DIA",)),
             "thru": (True, ("DRAWING_DIMENSIONS",)),
             "process": ("drill", ("DRILLED_BAND",)),
-            # The stop contact: the bonded pin's end, on the blank's raw left
+            # The stop contact: the fixed pin's end, on the blank's raw left
             # end (nominal; X zero is edge-found on the part afterwards).
             "end": (
                 [NOSE_FACE_X, NOSE_Y, NOSE_Z],
@@ -364,7 +390,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             ),
             "supply_length": (NOSE_PIN_LENGTH, ("NOSE_PIN_LENGTH",)),
             "note": (
-                "bought hardened 6 x 8 dowel pin bonded flush with the back face; its end is the blank-end stop",
+                "bought hardened 6 x 8 dowel pin fixed immovable, flush with the back face; "
+                "its end is the blank-end stop",
                 ("NOSE_PIN_DIA", "NOSE_PIN_LENGTH", "BOND_GAP_MAX"),
             ),
         },
@@ -381,22 +408,46 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "dia_nominal": (SCREW_HOLE_DIA, ("SCREW_HOLE_DIA",)),
             "thru": (True, ("DRAWING_DIMENSIONS",)),
             "process": ("drill", ("DRILLED_BAND",)),
-            "thread": (SCREW_THREAD, ("SCREW_THREAD",)),
             "note": (
-                "clearance through the lug for one M6 x 16 SHCS into the Kanetec "
-                "MB-PM's M6 x 6 tap (vendor thread kept); head on the lug face "
-                "11.150 from the seat; full-thread engagement 2.7 min (0.45D), "
-                "hand-seating load only",
+                f"drilled clearance through the lug for one M6 x {SCREW_LENGTH:g} SHCS (ISO 4762) "
+                f"into the M6 x {BASE_TAP_DEPTH:g} deep tap of a Kanetec MB-PM base; head on "
+                f"the lug face (screw_seat, {SCREW_GRIP:.3f} +-{LINEAR_3PL:g} from the seat); "
+                f"full-thread engagement {SCREW_ENGAGEMENT_PRINTED:.1f} min "
+                f"({SCREW_ENGAGEMENT_PRINTED_D:.2f}D); tip {SCREW_TIP_CLEARANCE_PRINTED:.1f} min "
+                "clear of the tap bottom; hand-seating load only",
                 (
                     "SCREW_THREAD",
                     "SCREW_LENGTH",
+                    "SCREW_LENGTH_BAND",
                     "BASE_SKU",
                     "BASE_TAP_DEPTH",
                     "SCREW_GRIP",
                     "SCREW_ENGAGEMENT_MIN",
+                    "SCREW_TIP_CLEARANCE_MIN",
                 ),
             ),
         },
         precision={"dia": 2},
+    ),
+    # The lug's head-bearing face: its printed three-place distance from the
+    # seat face (the screw grip) sets the screw's engagement and tip clearance.
+    "screw_seat": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((-1.0, 0.0, 0.0), -GRIP_FACE_X),),
+        requirements=("length",),
+        fields={
+            "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+            "plane": (
+                {"frame": "model", "axis": "x", "value": GRIP_FACE_X},
+                ("GRIP_FACE_X", "SEAT_X", "SCREW_GRIP"),
+            ),
+            "length": (limits(SCREW_GRIP, 3), ("SCREW_GRIP", "DRAWING_PRECISION")),
+            "length_nominal": (SCREW_GRIP, ("SCREW_GRIP",)),
+            "note": (
+                "lug face under the M6 SHCS head; length is the grip from the seat face",
+                ("SCREW_GRIP", "SEAT_X"),
+            ),
+        },
+        precision={"length": 3},
     ),
 }
