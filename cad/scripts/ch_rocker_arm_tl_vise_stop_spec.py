@@ -111,9 +111,9 @@ FINGER_FRONT = SEAT_X - FINGER_FRONT_X  # 53.6631
 SCREW_Y = 0.5 + BASE_SIZE / 2.0  # 20.5
 SCREW_FROM_REAR = 8.0
 SCREW_HEIGHT = 8.0
-ARM_WIDTH = 16.0
+ARM_WIDTH = 17.0
 REAR_Y = SCREW_Y + SCREW_FROM_REAR  # 28.5, the shared rear face
-ARM_INNER_Y = REAR_Y - ARM_WIDTH  # 12.5
+ARM_INNER_Y = REAR_Y - ARM_WIDTH  # 11.5
 NOSE_FROM_REAR = REAR_Y - NOSE_Y  # 61
 NOSE_HEIGHT = 29.0  # nose axis above the shared bottom face (the lug's)
 BOTTOM_Z = NOSE_Z - NOSE_HEIGHT
@@ -172,6 +172,14 @@ WALLS = {
     "screw to bottom": SCREW_HEIGHT - LINEAR_1PL - _SCREW_R,
     "screw to arm inner face": (ARM_WIDTH - LINEAR_1PL) - (SCREW_FROM_REAR + LINEAR_1PL) - _SCREW_R,
     "flange over the step": (ARM_HEIGHT - LINEAR_1PL) - (NOTCH_HEIGHT + LINEAR_1PL),
+    # The Ø10 head's land on the lug's head-bearing face, to each of its
+    # three open edges (the fourth side meets the step's ceiling, which
+    # HEAD_CLEARANCE_MIN below keeps clear of the head).
+    "head land to rear face": SCREW_FROM_REAR - LINEAR_1PL - SCREW_HEAD_DIA / 2.0,
+    "head land to bottom": SCREW_HEIGHT - LINEAR_1PL - SCREW_HEAD_DIA / 2.0,
+    "head land to arm inner face": (ARM_WIDTH - LINEAR_1PL)
+    - (SCREW_FROM_REAR + LINEAR_1PL)
+    - SCREW_HEAD_DIA / 2.0,
 }
 _thin = {name: round(wall, 3) for name, wall in WALLS.items() if wall < RULE12_WALL_TARGET}
 if _thin:
