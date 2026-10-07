@@ -1587,6 +1587,65 @@ def test_a_bent_leaders_own_elbow_and_tail_never_cross():
     assert find_leader_leader_crossings([elbow, tail]) == []
 
 
+@pytest.mark.parametrize(
+    ("label", "owner", "kind", "expected"),
+    [
+        ("RD1", "Drawing View5", "dim", True),
+        ("RD1", "Drawing View2", "dim", False),
+        ("RD2", "Drawing View2", "dim", True),
+        ("RD1", "Drawing View2", "note", False),
+        ("RD1", "", "dim", True),
+    ],
+)
+def test_leader_crossing_exemption_uses_label_and_owning_view(
+    label, owner, kind, expected
+):
+    # Transverse runs, not a shared elbow: only annotation identity can exempt
+    # this pair. Same-name callouts in different views are distinct; neither
+    # sharing a view alone nor sharing an annotation kind establishes identity.
+    plan = LeaderSegment(
+        "RD1", "dim", 0.170, 0.068, 0.0675, 0.100, owner="Drawing View2"
+    )
+    other = LeaderSegment(
+        label, kind, 0.0956, 0.1044, 0.070, 0.090, owner=owner
+    )
+    crossings = find_leader_leader_crossings([plan, other])
+    assert len(crossings) == int(expected)
+    if expected:
+        (crossing,) = crossings
+        assert crossing.a == plan
+        assert crossing.b == other
+        assert crossing.x == pytest.approx(0.0805, abs=5e-4)
+        assert crossing.y == pytest.approx(0.0959, abs=5e-4)
+
+
+def test_same_identity_with_default_owner_still_skips_self():
+    # Preserve the empty-owner convention for pure callers: equal labels with
+    # equal (even absent) owners still identify the same annotation.
+    a = LeaderSegment("RD1", "dim", 0.170, 0.068, 0.0675, 0.100)
+    b = LeaderSegment("RD1", "dim", 0.0956, 0.1044, 0.070, 0.090)
+    assert find_leader_leader_crossings([a, b]) == []
+
+
+def test_same_named_cross_view_leaders_reach_the_audit():
+    plan = LeaderSegment(
+        "RD1", "dim", 0.170, 0.068, 0.0675, 0.100, owner="Drawing View2"
+    )
+    foot = LeaderSegment(
+        "RD1", "dim", 0.0956, 0.1044, 0.070, 0.090, owner="Drawing View5"
+    )
+    overlaps, overflows, crossings = audit_layout(
+        [], DrawableRegion.whole_sheet(0.4318, 0.2794), leaders=[plan, foot]
+    )
+    assert overlaps == []
+    assert overflows == []
+    (crossing,) = crossings
+    assert isinstance(crossing, LeaderCrossing)
+    assert {crossing.a.owner, crossing.b.owner} == {
+        "Drawing View2", "Drawing View5"
+    }
+
+
 def test_two_leaders_landing_on_one_point_touch_but_do_not_cross():
     # Two arrows converging on a shared edge point is a STACKING question the
     # overlap audit owns. Reporting it here would be a false positive.
