@@ -3,8 +3,8 @@ ch-rocker-arm-tl-pivot-washer:
   # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-006-TL-07
   material: AISI O1 drill rod, 10 mm
-  material_specification: AISI O1 drill rod, 10 mm; torch hardened in oil and tempered, 55 HRC min by calibrated file
+  material_specification: AISI O1 drill rod, 10 mm, as supplied (annealed)
   finish: protect with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
-  process: "face and drill from stock rod, part off; harden and temper; lap both faces"
+  process: "face and drill from stock rod, part off"

@@ -1,6 +1,6 @@
 r"""Build the rocker arm's pivot-screw washer (MHA-CH-006-TL-07; shop fixture).
 
-A hardened, lapped O1 washer the pivot screw's head clamps onto the upper hub
+An as-supplied O1 drill-rod washer the pivot screw's head clamps onto the upper hub
 face (``ch_rocker_arm_tl_pivot_washer_spec``). Layout: two concentric Front
 plane circles extruded +Z by the thickness, so the hub face is Z0 in the
 inventory's fixture frame.

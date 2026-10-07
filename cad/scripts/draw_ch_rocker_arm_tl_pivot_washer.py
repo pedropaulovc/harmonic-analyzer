@@ -49,7 +49,8 @@ ISO_CENTER = (0.300, 0.175)
 ISO_NOTE_XY = (0.265, 0.235)
 FACE_KEEP = {
     "OuterDia": (0.185, 0.225),
-    "BoreDia": (0.185, 0.150),
+    # Collinear with OuterDia through the centre so the lines do not cross.
+    "BoreDia": (0.075, 0.145),
 }
 EDGE_KEEP = {
     "Thick": (0.175, 0.105),

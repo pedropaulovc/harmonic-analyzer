@@ -5,8 +5,8 @@ rocker arm's S4 profile hold the MHA-CH-006-TL-06 pivot screw's head clamps
 this washer onto the upper hub face, so the clamp load goes washer -> hub ->
 hub stand and the head never scuffs the hub.
 
-Route (shop-additions.md section 2): O1 drill rod, turned and drilled, torch
-hardened in oil and tempered, both faces lapped flat and parallel.
+Route (shop-additions.md section 2): O1 drill rod, drilled and parted off,
+used as supplied (annealed), faced both sides; it only clamps.
 
 Frame (the inventory's fixture frame, rocker-inv:1735-1751): origin on the
 pivot axis at the upper hub face, +Z up; the washer sits Z0..1.5.
@@ -58,7 +58,6 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 DRAWING_NOTES = "\n".join(
     (
-        "HARDEN AND TEMPER BEFORE LAPPING BOTH FACES FLAT AND PARALLEL.",
         "THIN WALL ACCEPTED: CLAMP WASHER ONLY, IT LOCATES NOTHING.",
     )
 )
@@ -90,7 +89,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
             "thickness": (limits(THICK, PLACES), ("THICK",)),
             "dia": (limits(OUTER_DIA, PLACES), ("OUTER_DIA", ("ch_rocker_arm_spec", "HUB_DIA"))),
-            "process": ("lap", ("DRAWING_NOTES",)),
+            "process": ("face", ("DRAWING_NOTES",)),
         },
         precision={"thickness": PLACES, "dia": PLACES},
     ),
@@ -102,7 +101,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "z", "value": THICK}, ("THICK",)),
             "thickness": (limits(THICK, PLACES), ("THICK",)),
-            "process": ("lap", ("DRAWING_NOTES",)),
+            "process": ("face", ("DRAWING_NOTES",)),
         },
         precision={"thickness": PLACES},
     ),

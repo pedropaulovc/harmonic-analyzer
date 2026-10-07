@@ -25,7 +25,7 @@ from _feature_requirements import ExportFeature, limits
 from _hole_spec import THREAD_MAJOR_MM
 from _gtol_spec import CylinderFace, PlanarFace
 from _printed_tolerance import printed_band_mm
-from _surface_finish import GROUND_UM, SurfaceFinishControl
+from _surface_finish import GROUND_UM, MACHINED_UM, SurfaceFinishControl
 
 # --- stations (fixture frame, mm) -------------------------------------------
 WASHER_THICK = 1.5  # the MHA-CH-006-TL-07 washer under the head
@@ -104,6 +104,12 @@ SURFACE_FINISHES = (
         GROUND_UM,
         CylinderFace(SHOULDER_DIA, contains_z_mm=(UNDERHEAD_Z + SHOULDER_END_Z) / 2.0),
     ),
+    # The head slides in the template bush: machined, not the reserved Ra 0.8.
+    SurfaceFinishControl(
+        "pivot_head",
+        MACHINED_UM,
+        CylinderFace(HEAD_DIA, contains_z_mm=(UNDERHEAD_Z + HEAD_TOP_Z) / 2.0),
+    ),
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
@@ -141,8 +147,9 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # one-chucking lapping route (shop-additions.md section 2) delivers it.
 DRAWING_NOTES = "\n".join(
     (
-        "SHOULDER SLIDES IN THE ROCKER ARM PIVOT BORE AND THE PROFILE PLATE BORE.",
-        "HEAD SLIDES IN THE OUTLINE-TEMPLATE BUSH AND IS COAXIAL WITH THE SHOULDER.",
+        "LIMITS ARE THE SLIDING FITS TO THE ROCKER ARM PIVOT BORE AND PROFILE",
+        "PLATE BORE (SHOULDER) AND THE OUTLINE-TEMPLATE BUSH (HEAD): EACH MUST",
+        "SLIDE FREELY WITHOUT SHAKE. HEAD COAXIAL WITH SHOULDER.",
     )
 )
 # The head left behind the slot at worst case.
