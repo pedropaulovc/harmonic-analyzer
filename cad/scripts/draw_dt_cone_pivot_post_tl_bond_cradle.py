@@ -75,10 +75,10 @@ CUT_FOOT_Z = -43.0
 CAPTION_DROP = 0.018
 # Seat finish symbols stand outboard of the seat on the model's +X side
 # (X, Z in mm), under the plan's dimensions and inside the sheet border;
-# their leaders land on the arc 25 degrees off its bottom, clear of the
-# saddle-top corner and the cone pin.
+# their leaders land on the arc 35 degrees off its bottom, clear of the
+# diameter leader, the saddle-top corner and the cone pin.
 SEAT_FINISH_SYMBOL = {"body_seat": (32.0, -6.0), "tail_seat": (24.0, 8.0)}
-SEAT_FINISH_LANDING_DEG = 25.0
+SEAT_FINISH_LANDING_DEG = 35.0
 
 # Dimension text positions as MODEL points (mm); each view projects its own
 # after it is placed and turned. Stations print from foot B, heights from
@@ -113,17 +113,18 @@ ELEVATION_KEEP = {
     # In the gap between the foot stop and the body saddle, outside the
     # silhouette and beside the saddle it measures.
     "BodySaddleHeight": (0.0, 5.0, -22.0),
-    "CrankPinHeight": (0.0, 82.0, -25.0),
+    # Above the silhouette, beside the crank pin on its foot-B side.
+    "CrankPinHeight": (0.0, 64.0, -4.0),
     "TailSaddleHeight": (0.0, 130.0, -22.0),
 }
 # Each seat's profile sketch is parallel to its section, so the section
-# imports its diameter. The text stands up and outboard of the axis, steep,
-# so the through-centre leader lands on the seat arc.
+# imports its diameter. The text stands just above the axis, so the
+# through-centre leader drops nearly plumb on to the seat bottom.
 SECTION_A_KEEP = {
-    # Up and outboard on the model's +X side, so the through-centre leader
-    # lands on the far (-X) side of the seat, clear of the cone pin top and
-    # of the finish symbol's landing.
-    "BodySeatDia": (23.0, CONE_PIN_NEAR_Y, 25.0),
+    # Right of the axis (model -X): the near-plumb leader lands just on the
+    # +X side of the seat bottom, clear of the cone pin top, and keeps off
+    # the seat-axis height's extension line.
+    "BodySeatDia": (-12.0, CONE_PIN_NEAR_Y, 28.0),
     "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
     # Under the base; the tilt reads below it.
