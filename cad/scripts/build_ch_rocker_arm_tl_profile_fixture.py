@@ -49,7 +49,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _holes import blind_hole_volume_mm3, wizard_holes
@@ -97,7 +96,6 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     ROD_PIN_HOLE_XY,
     STAND_BORE,
     STAND_DROP,
-    STAND_DROP_BAND,
     STAND_HEIGHT,
     STAND_OD,
     STAND_POCKET_DEPTH,
@@ -473,9 +471,6 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "RodPinHoleProfile", "RodPinHoleDia", *deviations(ROD_PIN_HOLE_BAND)
     )
-    if STAND_DROP_BAND[0] != -STAND_DROP_BAND[1]:
-        raise AssertionError("the hub stand drop band is symmetric by ruling B")
-    set_dimension_symmetric_tolerance(adapter, "Stand", "StandDrop", STAND_DROP_BAND[0])
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

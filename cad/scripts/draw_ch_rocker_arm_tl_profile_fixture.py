@@ -170,7 +170,9 @@ SECTION_KEEP_AT = {
 ELEVATION_CENTER = (PLAN_CENTER[0], 0.125)
 ELEVATION_KEEP_Z = {
     "PlateThick": ((PLATE_TOP_Z + PLATE_BOTTOM_Z) / 2.0, -0.012),
-    "RestTopHeight": (REST_TOP_Z + 10.0, -0.006),
+    # 6 mm out, its text's shelf still touched the inner border (codex review
+    # of run 20261007T205522920Z).
+    "RestTopHeight": (REST_TOP_Z + 10.0, -0.003),
     "PlateDrop": ((PAD_TOP_Z + PLATE_TOP_Z) / 2.0, 0.012),
 }
 # Detail E, model (x, y) mm about the bore axis.

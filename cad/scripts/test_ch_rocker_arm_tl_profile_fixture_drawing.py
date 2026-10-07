@@ -58,11 +58,11 @@ def test_exported_bands_are_the_printed_bands() -> None:
         ("rod_pin_hole", spec.ROD_PIN_HOLE_DIA, spec.ROD_PIN_HOLE_BAND),
     ):
         assert features[name]["dia"] == [round(nominal + band[1], 3), round(nominal + band[0], 3)]
-    stand = features["stand_top"]["height"]
-    assert stand == [
-        round(spec.STAND_DROP + spec.STAND_DROP_BAND[1], 3),
-        round(spec.STAND_DROP + spec.STAND_DROP_BAND[0], 3),
-    ]
+    # StandDrop prints at the general .XXX band, measured from the pad tops
+    stand = features["stand_top"]
+    band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["StandDrop"])
+    assert stand["height"] == [round(spec.STAND_DROP - band, 3), round(spec.STAND_DROP + band, 3)]
+    assert stand["height_from"] == "pad_tops"
     # the rest tops print once, as RestTopHeight at its authored places, and a
     # rest seated on its floor (two .XXX sizes stacked) stays inside that band
     band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["RestTopHeight"])
@@ -87,13 +87,15 @@ def test_exported_bands_are_the_printed_bands() -> None:
 
 
 def test_hub_stand_carries_the_hub_and_clears_the_strap() -> None:
-    # the highest stand stays under the longest hub's lower face ...
+    # the highest printed stand stays under the longest hub's lower face ...
     longest_step = (rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0] - rocker.ARM_THICKNESS) / 2.0
-    lowest_drop = spec.STAND_DROP + spec.STAND_DROP_BAND[1]
+    band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["StandDrop"])
+    lowest_drop = spec.STAND_DROP - band
     assert lowest_drop >= longest_step
     # ... and 2 mm under the strap where its annulus reaches past the hub
     assert lowest_drop >= 2.0
-    assert spec.STAND_BORE + 0.13 < rocker.HUB_DIA
+    # the drilled bore, at its largest, still holds the hub
+    assert spec.STAND_BORE + 0.10 < rocker.HUB_DIA
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:

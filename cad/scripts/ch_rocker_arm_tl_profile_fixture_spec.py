@@ -33,6 +33,8 @@ from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 
 _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
 _XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+_DRILLED_PLUS = float(_config.title_block("drilled_hole")["plus_mm"])
 
 # --- Heights (frame A Z) ------------------------------------------------------
 # The arm's lower strap face: the strap sits at the hub's mid-length, so its
@@ -54,10 +56,11 @@ PLATE_LENGTH = PLATE_EAST_X - PLATE_WEST_X
 PLATE_WIDTH = PLATE_NORTH_Y - PLATE_SOUTH_Y
 
 # --- Bonded-part fits -----------------------------------------------------------
-# Every pocket and every bonded part prints at three places, so each size moves
-# by the title block's .XXX band. A pocket clears its part by more than both
-# bands together, so the largest part always enters the smallest pocket with a
-# bond line left (the inventory's 0.05 a side cannot survive two .XXX bands).
+# Every pocket size and every bonded part's width and height print at three
+# places, so each moves by the title block's .XXX band (part lengths print at
+# one place, below). A pocket clears its part by more than both bands together,
+# so the largest part always enters the smallest pocket with a bond line left
+# (the inventory's 0.05 a side cannot survive two .XXX bands).
 POCKET_SIDE_CLEARANCE = 0.14
 REST_CLEARANCE = 0.15
 BOND_LINE_MIN = 0.02
@@ -65,15 +68,23 @@ for _gap in (POCKET_SIDE_CLEARANCE, REST_CLEARANCE):
     if 2.0 * _gap - 2.0 * _XXX < BOND_LINE_MIN:
         raise AssertionError("a bonded part can bind in its pocket at the .XXX bands")
 # Pocket corners are left to the cutter (any radius up to a full-round end),
-# so every bonded part ends short of its pocket's end radius: half the pocket
-# width plus this end gap, which survives both .XXX length bands.
-POCKET_END_GAP = 0.20
-if POCKET_END_GAP - _XXX < BOND_LINE_MIN:
-    raise AssertionError("a bonded part can reach its pocket's end radius")
+# so every bonded part ends short of its pocket's end radius. A part's length
+# locates nothing (each part is centred in its pocket), so it prints at one
+# place (codex review of run 20261007T205522920Z: .XXX lengths were
+# over-specified): the pocket's straight run less this end gap at each end,
+# rounded down to the tenth. The worst case is the longest part in the
+# shortest pocket with the widest end radius, and it still ends clear.
+POCKET_END_GAP = 0.55
+PART_LENGTH_PLACES = 1
 
 
 def _part_length(pocket_length: float, pocket_width: float) -> float:
-    return pocket_length - pocket_width - 2.0 * POCKET_END_GAP
+    room = pocket_length - pocket_width - 2.0 * POCKET_END_GAP
+    return math.floor(room * 10.0 + 1e-9) / 10.0
+
+
+def _end_gap_min(pocket_length: float, pocket_width: float, part_length: float) -> float:
+    return ((pocket_length - _XXX) - (pocket_width + _XXX) - (part_length + _X)) / 2.0
 
 
 # Pads: inventory stations, +X side (tag, station west X, station length, pad
@@ -204,31 +215,46 @@ RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     (tag, cx, cy, _part_length(length, width), width - 2.0 * REST_CLEARANCE)
     for tag, cx, cy, length, width in REST_POCKETS
 )
+PART_END_GAP_MIN = min(
+    _end_gap_min(pocket[3], pocket[4], part[3])
+    for pockets, parts in ((PAD_POCKETS, PADS), (REST_POCKETS, RESTS))
+    for pocket, part in zip(pockets, parts, strict=True)
+)
+if PART_END_GAP_MIN < BOND_LINE_MIN:
+    raise AssertionError("a bonded part can reach its pocket's end radius")
 
-# --- Hub stand (FixtureCAD ruling B) ---------------------------------------------
+# --- Hub stand (FixtureCAD ruling B, revised) --------------------------------------
 # A relieved tube: its annulus carries the lower hub face through the hub shim
 # stack and its bore clears the pivot screw shoulder. It bonds top-down on a
 # gauge stack STAND_DROP below the pad reference, in a counterbore round the
-# locating bore. +/-0.02 is shop-additions section 5's recommended relaxation
-# of the inventory's +/-0.005; the hub shim stack is cut to the measured stand.
-# StandDrop prints directly from the pad tops (no chain through the plate), and
-# its band reaches the hub only through that measured shim, a fit-up
-# adjustment: the guards below hold the shim stack non-negative over the whole
-# hub-length band and the strap clear of the stand.
-STAND_DROP = 2.328
-STAND_DROP_BAND = (0.02, -0.02)
+# locating bore. StandDrop prints directly from the pad tops (no chain through
+# the plate) at the general .XXX band: the hub shim stack is cut to the
+# measured stand, so the stand's band reaches the hub only through that fit-up
+# (the user's own justification for ruling B's +/-0.02, which was a relaxation
+# ceiling, not a functional need; FixtureCAD ruling after the codex review of
+# run 20261007T205522920Z flagged the 0.04 band as over-specified). The drop
+# is set so the shim stack stays non-negative over the whole band and the
+# hub-length band; the shop's shim assortment covers HUB_SHIM_GAP_MAX.
+STAND_DROP = 2.450
+STAND_DROP_BAND = (_XXX, -_XXX)  # the title block's .XXX, not printed explicitly
 STAND_TOP_Z = PAD_TOP_Z - STAND_DROP
 STAND_OD = 12.5
-STAND_BORE = 8.0
-STAND_HEIGHT = 9.2
+STAND_BORE = 8.0  # drilled: the title block's DRILLED HOLES band
+# The wider StandDrop band needs a 0.2 deeper counterbore and a 0.05 taller
+# stand to keep both the floor gap and the bond engagement below.
+STAND_HEIGHT = 9.25
 STAND_POCKET_DIA = 12.8
-STAND_POCKET_DEPTH = 2.0
+STAND_POCKET_DEPTH = 2.2
 _HUB_STEP_MAX = (
     rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0] - rocker.ARM_THICKNESS
+) / 2.0
+_HUB_STEP_MIN = (
+    rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[1] - rocker.ARM_THICKNESS
 ) / 2.0
 # The hub shim stack never goes negative: the highest stand still sits below
 # the longest hub's lower face when the strap rests on the pads.
 HUB_SHIM_GAP_MIN = STAND_DROP + STAND_DROP_BAND[1] - _HUB_STEP_MAX
+HUB_SHIM_GAP_MAX = STAND_DROP + STAND_DROP_BAND[0] - _HUB_STEP_MIN
 if HUB_SHIM_GAP_MIN < 0.0:
     raise AssertionError("the hub stand can lift the strap off the pads")
 # Where the stand annulus reaches past the hub it keeps 2 mm of air under the
@@ -238,10 +264,10 @@ if STRAP_AIR_MIN < 2.0:
     raise AssertionError("the hub stand comes within 2 mm of the strap")
 if (STAND_POCKET_DIA - _XXX) - (STAND_OD + _XXX) < BOND_LINE_MIN:
     raise AssertionError("the hub stand can bind in its counterbore")
-STAND_WALL_MIN = ((STAND_OD - _XXX) - (STAND_BORE + _XXX)) / 2.0
+STAND_WALL_MIN = ((STAND_OD - _XXX) - (STAND_BORE + _DRILLED_PLUS)) / 2.0
 if STAND_WALL_MIN < 2.0:
     raise AssertionError("hub stand wall is below the rule-12 target")
-if STAND_BORE + _XXX >= rocker.HUB_DIA:
+if STAND_BORE + _DRILLED_PLUS >= rocker.HUB_DIA:
     raise AssertionError("the hub can drop into the stand bore")
 # As the pads: clear of the counterbore floor at the worst printed PlateDrop,
 # StandDrop, depth and height (codex review of run 20261007T202010454Z: at
@@ -548,7 +574,7 @@ PART_SCHEDULE: tuple[tuple[str, ...], ...] = (
             f"{a_tag}, {b_tag}",
             "PAD",
             _PAD_STOCK.get(round(width, 3), "O1 FLAT 1/8 X 1/2"),
-            _mm(length),
+            _mm(length, PART_LENGTH_PLACES),
             _mm(width),
             _mm(PAD_HEIGHT),
         )
@@ -561,7 +587,7 @@ PART_SCHEDULE: tuple[tuple[str, ...], ...] = (
             f"{a[0]}, {b[0]}",
             "RAIL REST",
             "O1 FLAT 3/16 X 1",
-            _mm(a[3]),
+            _mm(a[3], PART_LENGTH_PLACES),
             _mm(a[4]),
             _mm(REST_HEIGHT),
         )
@@ -572,7 +598,7 @@ PART_SCHEDULE: tuple[tuple[str, ...], ...] = (
         "HUB STAND",
         "4140 HT BAR 1/2",
         f"OD {_mm(STAND_OD)}",
-        f"BORE {_mm(STAND_BORE)}",
+        f"DRILL \u00d8{STAND_BORE:.2f}",
         _mm(STAND_HEIGHT),
     ),
 )
@@ -694,12 +720,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("STAND_TOP_Z",),
             ),
             "height": (
-                limits(STAND_DROP, 3, STAND_DROP_BAND),
-                (
-                    "STAND_DROP",
-                    "STAND_DROP_BAND",
-                    ("ch_rocker_arm_spec", "HUB_LENGTH_BAND"),
-                ),
+                limits(STAND_DROP, 3),
+                ("STAND_DROP", ("ch_rocker_arm_spec", "HUB_LENGTH_BAND")),
             ),
             "height_from": ("pad_tops", ("STAND_DROP",)),
             "dia": (limits(STAND_OD, 3), ("STAND_OD",)),
