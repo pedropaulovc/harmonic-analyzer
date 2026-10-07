@@ -98,7 +98,11 @@ def _hide_thread_labels(adapter: Any, view: Any) -> int:
     hidden = 0
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
-        if int(annotation.GetType()) != 1:  # swCosmeticThread
+        kind = int(annotation.GetType())
+        # swCosmeticThread, or the thread's own "Tapped Hole" label note.
+        if kind != 1 and not (kind == 6 and "Tapped Hole" in str(
+            _early_bound(annotation.GetSpecificAnnotation(), "INote").GetText() or ""
+        )):
             continue
         annotation.Layer = _THREAD_LABEL_LAYER
         if str(annotation.Layer or "") != _THREAD_LABEL_LAYER:
@@ -187,12 +191,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="C stop bar #8-32 taps",
         edge=_tap_edge(adapter, front),
     )
-    _hide_thread_labels(adapter, front)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # Precise shaded isometrics need the taps' cosmetic threads imported
     # (draw_pn_pen_hanger); the label would otherwise appear at save.
     import_cosmetic_threads(adapter, iso)
+    _hide_thread_labels(adapter, front)
 
     return await finalize_drawing(
         adapter,
