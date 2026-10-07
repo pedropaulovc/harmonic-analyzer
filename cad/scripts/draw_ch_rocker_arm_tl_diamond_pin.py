@@ -141,9 +141,10 @@ def _hatch_pin_apart(adapter: Any, section: Any) -> None:
     for item in _early_bound(section, "IView").GetFaceHatches() or ():
         hatch = _early_bound(item, "IFaceHatch")
         body = _early_bound(_early_bound(hatch.Face, "IFace2").GetBody(), "IBody2")
-        name = str(body.Name)
+        # Section faces carry temporary bodies with no name: key by volume.
+        name = f"{float(body.GetMassProperties(1.0)[3]):.12g}"
         groups.setdefault(name, []).append(hatch)
-        volumes[name] = float(body.GetMassProperties(1.0)[3])
+        volumes[name] = float(name)
     if len(groups) != 2:
         raise RuntimeError(f"section A-A should cut two bodies, hatched {sorted(groups)}")
     pin = min(volumes, key=volumes.get)
