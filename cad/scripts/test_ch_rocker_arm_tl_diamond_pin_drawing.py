@@ -77,11 +77,16 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
 def test_notes_follow_the_simplicity_policy() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
-    # The only number a note may carry is the stated worst-case neck wall,
+    # The only numbers a note may carry are the stated worst-case walls,
     # and it must never overstate the printed bands' worst case.
-    stated = f"NECK WALL TO BORE {spec.NECK_WALL_MIN:.2f} MIN."
+    stated = (
+        f"NECK WALL TO BORE {spec.NECK_WALL_MIN:.2f} MIN, "
+        f"COLLAR {spec.COLLAR_WALL_MIN:.2f} MIN."
+    )
     assert stated in spec.DRAWING_NOTES
     assert not re.search(r"\d", spec.DRAWING_NOTES.replace(stated, ""))
-    worst = ((spec.NECK_DIA + spec.NECK_BAND[1]) - (spec.REAM_DIA + spec.REAM_BAND[0])) / 2.0
+    worst = (
+        (spec.NECK_DIA + spec.NECK_BAND[1]) - (spec.REAM_DIA + spec.REAM_BAND[0])
+    ) / 2.0
     assert spec.NECK_WALL_MIN <= worst
     assert "GROUND" not in spec.DRAWING_NOTES

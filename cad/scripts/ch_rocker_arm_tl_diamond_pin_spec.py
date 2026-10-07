@@ -85,6 +85,12 @@ NECK_WALL_MIN = (
     math.floor(((NECK_DIA + NECK_BAND[1]) - (REAM_DIA + REAM_BAND[0])) / 2.0 * 100.0)
     / 100.0
 )
+COLLAR_WALL_MIN = (
+    math.floor(
+        (COLLAR_DIA - _GENERAL_1PL_WALL - (REAM_DIA + REAM_BAND[0])) / 2.0 * 100.0
+    )
+    / 100.0
+)
 if NECK_WALL_MIN >= (COLLAR_DIA - _GENERAL_1PL_WALL - (REAM_DIA + REAM_BAND[0])) / 2.0:
     raise AssertionError("the neck is no longer the thinnest wall round the bore")
 # Lands stand LAND_HEIGHT above the neck face: their tip stays under the
@@ -161,7 +167,7 @@ DRAWING_NOTES = "\n".join(
         BUILT_UP_PERMISSION_NOTE,
         "BODY LENGTHS RUN FROM THE NECK FACE; THE LOWER LENGTH IS THE BOUGHT PIN, SET BY ITS PROJECTION, CLEAR OF THE BORE BOTTOM; FLATS RUN THE FULL LAND LENGTH.",
         # Named exception: MHA-CH-006-TL-03 neck wall (drawing-simplicity-policy.md, "Named exceptions").
-        f"NECK FACE IS A BACKSTOP JUST BELOW THE ROCKER ARM; NECK WALL TO BORE {NECK_WALL_MIN:.2f} MIN.",
+        f"NECK FACE IS A BACKSTOP JUST BELOW THE ROCKER ARM; NECK WALL TO BORE {NECK_WALL_MIN:.2f} MIN, COLLAR {COLLAR_WALL_MIN:.2f} MIN.",
         "SHANK: CLOSE SLIP FIT, BONDED IN THE ROCKER ARM PROFILE FIXTURE PIN HOLE WITH THE"
         " FLATS SQUARE TO ITS PIVOT-TO-ROD-HOLE LINE.",
     )
