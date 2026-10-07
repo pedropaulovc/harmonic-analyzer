@@ -34,6 +34,7 @@ from _drawing_common import (
     import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -46,6 +47,7 @@ from dt_cone_pivot_post_tl_saw_cradle_spec import (
     FOOT_SADDLE_X,
     HEAD_SADDLE_X,
     OVERALL_HT,
+    PAD_FIT_CALLOUT,
     PAD_X0,
     PAD_X1,
     PAD_Z0,
@@ -105,6 +107,10 @@ def _right_x(model_z: float) -> float:
 
 
 _FRONT_TOP = _y(OVERALL_HT)
+# The pad's reference height reads right of the front view, its value below
+# the underside's extension line so the fit callout under it clears the
+# dimension line, the notes and the seat diameter's text.
+PAD_HT_XY = (_x(BASE_LENGTH) + 0.0075, _y(0.0) - 0.006)
 # Stations above the front view, nearest first, each to a saddle top corner;
 # the heights stack left of the end face.
 FRONT_KEEP = {
@@ -118,6 +124,7 @@ FRONT_KEEP = {
         )
     )
 } | {
+    "PadHt": PAD_HT_XY,
     "BaseHt": (_x(0.0) - _GAP, _y(9.5)),
     "OverallHt": (_x(0.0) - _GAP - 1.2 * _ROW, _y(OVERALL_HT / 2.0)),
 }
@@ -152,7 +159,7 @@ TOP_KEEP = {
 # leaves the view past the base's lower-left corner, clear of every
 # location dimension.
 _SEAT_AXIS = (_right_x(SEAT_Z), _y(SEAT_CENTRE_Y))
-SEAT_DIA_XY = (_SEAT_AXIS[0] - 0.035, _SEAT_AXIS[1] - 0.033)
+SEAT_DIA_XY = (_SEAT_AXIS[0] - 0.030, _SEAT_AXIS[1] - 0.040)
 # The seat axis stands above the saddle tops, so the side-face stations stack
 # above it; the seat-bottom height stands right of the side face.
 _SEAT_AXIS_TOP = _y(SEAT_CENTRE_Y)
@@ -164,8 +171,11 @@ RIGHT_KEEP = {
     "SeatDia": SEAT_DIA_XY,
 }
 # The far tap shares the near tap's X station by a model relation, so the one
-# printed station locates both.
-DIMENSION_PREFIXES = {"StudX": "2X "}
+# printed station locates both. The pad top is a matched fit (policy rule 2):
+# its height is a reference size, and the callout names the mate and states
+# the acceptance.
+_PREFIX, _SUFFIX = 1, 2  # swDimensionTextPrefix, swDimensionTextSuffix
+DIMENSION_TEXT = {"StudX": {_PREFIX: "2X "}, "PadHt": {_PREFIX: "(", _SUFFIX: ")"}}
 # The tap callout leads from the far stud's drill rim to the clear sheet right
 # of the top view, below the right view's station stack; nothing it crosses
 # is a dimension or extension line.
@@ -174,22 +184,25 @@ FAR_STUD_RIM = (_x(STUD_X + STUD_TAP_DRILL / 2.0), _top_y(STUD_Z[1]))
 TAP_CALLOUT_XY = (_x(BASE_LENGTH) + 0.042, _top_y(STUD_Z[1]) + 0.004)
 
 
-def _set_dimension_prefixes(
-    adapter: Any, annotations: list[Any], prefixes: dict[str, str]
+def _set_dimension_text(
+    adapter: Any, annotations: list[Any], parts: dict[str, dict[int, str]]
 ) -> None:
-    """Write a native prefix on named imported dimensions and read it back."""
-    remaining = dict(prefixes)
+    """Write native prefix/suffix text on named imported dimensions and read
+    it back. (``set_reference_dimensions`` brackets diameters only: its prefix
+    carries the diameter glyph.)"""
+    remaining = dict(parts)
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
-        prefix = remaining.pop(dimension_name(adapter, annotation), None)
-        if prefix is None:
+        texts = remaining.pop(dimension_name(adapter, annotation), None)
+        if texts is None:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.SetText(1, prefix)  # swDimensionTextPrefix
-        if str(display.GetText(1) or "") != prefix:
-            raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
+        for part, text in texts.items():
+            display.SetText(part, text)
+            if str(display.GetText(part) or "") != text:
+                raise RuntimeError(f"dimension text {text!r} did not persist")
     if remaining:
-        raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+        raise RuntimeError(f"dimension text not applied: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -251,7 +264,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
+    set_dimension_callouts(adapter, annotations, {"PadHt": PAD_FIT_CALLOUT})
     if not auto_center_marks(adapter, top, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the stud taps")
 

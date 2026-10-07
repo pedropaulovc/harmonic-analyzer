@@ -16,9 +16,9 @@ runs from a touchable edge):
 * seats: one Right-plane circle cut through both saddles. A construction
   witness from its centre to its lowest point carries the seat-bottom
   height, so the print measures the touchable seat line, not the axis;
-* pad: a Top-plane land under the cone cap, up to the seat-bottom height,
-  added after the seat cut so the cut never grazes it; its ends stop short
-  of the bridge studs;
+* pad: a Top-plane land under the cone cap, left proud of the seat bottoms
+  as fitting stock (a matched fit to the post's cap), added after the seat
+  cut so the cut never grazes it; its ends stop short of the bridge studs;
 * relief: one Right-plane cut trims the saddles to the saddle width,
   measured from the base side face;
 * stud taps: one native 3/8-16 Hole Wizard feature through the base.
@@ -336,6 +336,7 @@ async def build(adapter) -> dict[str, str]:
         ("PadX1", PAD_X1),
         ("PadZ0", PAD_Z0),
         ("PadZ1", PAD_Z1),
+        ("PadHt", PAD_HT),
         ("StudX", STUD_X),
         ("StudNearZ", STUD_Z[0]),
         ("StudFarZ", STUD_Z[1]),
@@ -389,13 +390,12 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Seats")
     await volume_check(adapter, "seats", V_SEATED, 0.005 * V_SEATED)
 
-    # The pad rises from the underside plane; it is flush with the seat
-    # bottoms by construction (its height is driven by theirs) and the print
-    # states it in a note.
+    # The pad rises from the underside plane to its unfitted reference height;
+    # the print's callout fits it to the post's cap.
     drive_jobs += await _sketch_feature(adapter, "Top", "cap pad", _pad_profile, "PadProfile")
     check("extrude pad", await adapter.create_extrusion(ExtrusionParameters(depth=PAD_HT)))
     name_last_feature(adapter, "Pad")
-    drive_jobs.append((name_dimensions(adapter, "Pad", ["PadHt"])[0], '"SeatBottomHt"'))
+    drive_jobs.append((name_dimensions(adapter, "Pad", ["PadHt"])[0], '"PadHt"'))
     await volume_check(adapter, "pad", V_PADDED, 0.005 * V_PADDED)
 
     drive_jobs += await _sketch_feature(
