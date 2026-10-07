@@ -26,6 +26,7 @@ TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
     "#10-32": 4.0386,
     "1/4-20": 5.105,
     "5/16-18": 6.528,
+    "3/8-16": 7.938,  # 5/16 drill
     "1/2-13": 10.716,
     "9/16-12": 12.304,
 }
@@ -40,6 +41,7 @@ THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
     "#10-32": 4.826,
     "1/4-20": 6.350,
     "5/16-18": 7.938,
+    "3/8-16": 9.525,
     "1/2-13": 12.700,
     "9/16-12": 14.288,
 }
