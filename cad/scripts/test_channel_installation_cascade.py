@@ -124,6 +124,23 @@ def _reclose_plumb_rod(monkeypatch, ring_center: tuple[float, float]) -> None:
     )
 
 
+def _configured_solver_stations() -> list[float]:
+    """Use the CAD coefficient vector, named square fundamental and travel end.
+
+    The assembly rejects negative stations and check:config owns the upper
+    travel limit. Like verify_spring_base, exercise neutral, full scale and
+    configured coefficients; also retain the named square-preset fundamental.
+    """
+    return sorted(
+        {
+            0.0,
+            float(_config.machine("amplitude", "fundamental_station_mm")),
+            float(_config.machine("amplitude", "max_travel_mm")),
+            *_config.amplitudes(),
+        }
+    )
+
+
 @pytest.mark.parametrize(
     ("eccentricity", "face_width"),
     ((8.64, 3.0), (8.9, 2.6), (8.4, 3.4)),
@@ -164,9 +181,12 @@ def test_channel_and_cylinder_consume_the_same_evaluated_cam_dimensions(
     assert assembly.CAM_DZ == -(face_width + (7.0565 - face_width)) / 2.0
     assert assembly.RING_CENTER == kinematics._RING_CENTER == ring_center
 
-    neutral = kinematics.solve_state(0.0)
-    displaced = kinematics.solve_state(100.0)
-    for state in (neutral, displaced):
+    states = {
+        amplitude: kinematics.solve_state(amplitude)
+        for amplitude in _configured_solver_stations()
+    }
+    neutral = states[0.0]
+    for state in states.values():
         pin = (state["pin_x"], state["pin_y"])
         assert math.dist(pin, ring_center) == pytest.approx(assembly.ROD_C2C)
         assert math.dist(pin, assembly.PIVOT) == pytest.approx(
@@ -175,10 +195,10 @@ def test_channel_and_cylinder_consume_the_same_evaluated_cam_dimensions(
                 ch_rocker_arm_spec.ROD_HOLE_Y - ch_rocker_arm_spec.PIVOT_MID_Y,
             )
         )
-    assert displaced["lever_tilt"] != neutral["lever_tilt"]
+    assert states[max(states)]["lever_tilt"] != neutral["lever_tilt"]
     if eccentricity == 8.64 and face_width == 3.0:
-        assert neutral == channel_kinematics.solve_state(0.0)
-        assert displaced == channel_kinematics.solve_state(100.0)
+        for amplitude, state in states.items():
+            assert state == channel_kinematics.solve_state(amplitude)
 
 
 @pytest.mark.parametrize(
@@ -219,14 +239,19 @@ def test_pitch_does_not_change_channel_math_but_axis_and_phase_do(
     assert assembly.GEAR_PHASE_DEG == phase_deg
     assert assembly.RING_CENTER == kinematics._RING_CENTER == ring_center
     assert assembly.CAM_DZ == channel.CAM_DZ
+    states = {
+        amplitude: kinematics.solve_state(amplitude)
+        for amplitude in _configured_solver_stations()
+    }
     if not axis_shift and not phase_shift:
         assert ring_center == channel.RING_CENTER
-        assert kinematics.solve_state(100.0) == channel_kinematics.solve_state(100.0)
+        for amplitude, state in states.items():
+            assert state == channel_kinematics.solve_state(amplitude)
     else:
         # The +0.5 mm axis / +0.3 degree phase variant moves ring Y and phased X.
         # The plumb co-solve follows that X but holds pin Y at its level datum;
         # a floating-point inequality in pin Y would not witness actual motion.
-        neutral = kinematics.solve_state(0.0)
+        neutral = states[0.0]
         assert abs(ring_center[1] - channel.RING_CENTER[1]) > 0.1
         assert abs(neutral["pin_x"] - channel_kinematics.ARC["pin_x"]) > 1e-3
         assert neutral["pin_y"] == pytest.approx(
