@@ -65,7 +65,10 @@ AXIAL_XY = {
     "ReamDepth": (4.0, 0.032),
     "CollarEnd": (5.1, 0.042),
     "OverallLength": (8.0, 0.052),
-    "PinLength": (3.0, -0.052),  # below the view: a size of the bought pin, not a body station
+    "PinLength": (
+        3.0,
+        -0.052,
+    ),  # below the view: a size of the bought pin, not a body station
 }
 # Reference overall, land tip to shank end, on the top tier.
 OVERALL_REF_XY = (6.7, 0.082)
@@ -94,14 +97,17 @@ def _section_mapper(adapter: Any, section: Any):
 
     def sheet(z_mm: float) -> tuple[float, float]:
         point = _early_bound(
-            math_utility.CreatePoint(double_array([0.0, 0.0, z_mm / 1000.0])), "IMathPoint"
+            math_utility.CreatePoint(double_array([0.0, 0.0, z_mm / 1000.0])),
+            "IMathPoint",
         )
         data = _early_bound(point.MultiplyTransform(transform), "IMathPoint").ArrayData
         return float(data[0]), float(data[1])
 
     origin, far = sheet(0.0), sheet(OVERALL_LENGTH)
     if abs(far[1] - origin[1]) > 1e-4:
-        raise RuntimeError(f"section A-A does not lay the pin axis horizontally: {origin} {far}")
+        raise RuntimeError(
+            f"section A-A does not lay the pin axis horizontally: {origin} {far}"
+        )
 
     def to_sheet(station_mm: float, offset_m: float) -> tuple[float, float]:
         x, y = sheet(station_mm)
@@ -123,14 +129,17 @@ def _overall_reference(adapter: Any, section: Any, to_sheet) -> None:
         orientation="horizontal",
     )
     display = _early_bound(display, "IDisplayDimension")
-    measured_mm = abs(float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0)
+    measured_mm = abs(
+        float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
+    )
     if abs(measured_mm - OVERALL_REF) > 1e-3:
-        raise RuntimeError(f"{label} measured {measured_mm:g}, expected {OVERALL_REF:g}")
+        raise RuntimeError(
+            f"{label} measured {measured_mm:g}, expected {OVERALL_REF:g}"
+        )
     set_reference_dimension(adapter, display.GetAnnotation(), label=label)
     display.SetPrecision3(1, -1, -1, -1)
     if int(display.GetPrimaryPrecision2()) != 1:
         raise RuntimeError(f"{label} precision did not persist")
-
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -185,12 +194,18 @@ async def build(adapter: Any) -> dict[str, str]:
     moved = curate_view_dimensions(
         adapter,
         section,
-        keep={name: to_sheet(*xy) for name, xy in (*AXIAL_XY.items(), *DIAMETER_XY.items())},
+        keep={
+            name: to_sheet(*xy)
+            for name, xy in (*AXIAL_XY.items(), *DIAMETER_XY.items())
+        },
         view_label="longitudinal section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     kept_on_end = curate_view_dimensions(
-        adapter, end, keep=END_KEEP, view_label="land end view",
+        adapter,
+        end,
+        keep=END_KEEP,
+        view_label="land end view",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
 
@@ -200,7 +215,10 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _overall_reference(adapter, section, to_sheet)
     create_section_axis_centerline(
-        adapter, section, length_mm=OVERALL_LENGTH + LAND_HEIGHT, label="pin turning axis"
+        adapter,
+        section,
+        length_mm=OVERALL_LENGTH + LAND_HEIGHT,
+        label="pin turning axis",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.098)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
