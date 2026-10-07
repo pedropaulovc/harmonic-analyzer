@@ -67,8 +67,11 @@ HOLE_LIGAMENTS_MIN = {
 if min(HOLE_LIGAMENTS_MIN.values()) < 2.0:
     raise AssertionError(f"ledge screw-hole ligaments {HOLE_LIGAMENTS_MIN} under 2.0")
 # Each station floats on its own one-place band, so the pitch can close by
-# both; the two SHCS heads must still stand apart at that worst case.
-HEAD_GAP_MIN = _X2[0] - _X1[1] - plate.SCREW_HEAD_DIA_MAX
+# both; the two SHCS heads, each up to its B18.3 eccentricity off its shank
+# toward the other, must still stand apart at that worst case.
+HEAD_GAP_MIN = (
+    _X2[0] - _X1[1] - plate.SCREW_HEAD_DIA_MAX - 2.0 * plate.SCREW_HEAD_ECCENTRICITY_MAX
+)
 if HEAD_GAP_MIN < plate.SCREW_HEAD_GAP_MIN:
     raise AssertionError(f"ledge screw heads clear by only {HEAD_GAP_MIN:.2f} at worst-case pitch")
 

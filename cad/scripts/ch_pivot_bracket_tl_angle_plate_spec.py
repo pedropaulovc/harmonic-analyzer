@@ -59,7 +59,13 @@ TAP_SPEC = HoleSpec("tapped", SCREW_THREAD)
 LEDGE_CLEARANCE_SPEC = HoleSpec("drilled_number", "#5")
 SCREW_CLEARANCE = blind_cut_dia_mm(LEDGE_CLEARANCE_SPEC) - THREAD_MAJOR_MM[SCREW_THREAD]
 SCREW_HEAD_DIA_MAX = 7.925  # 0.312 in, ASME B18.3 #10 socket head cap screw
-SCREW_HEAD_GAP_MIN = 0.4  # worst-case daylight between the two heads
+# ASME B18.3 head-to-body concentricity: 2% of body diameter or 0.006 in TIR,
+# whichever is greater (0.006 in governs for #10; Unbrako engineering guide,
+# p. 9), so each head may sit up to half that off its shank axis.
+SCREW_HEAD_ECCENTRICITY_MAX = 0.006 * 25.4 / 2.0  # 0.0762
+# The heads only have to stand apart, never bear on each other; 0.3 is the
+# authored daylight margin over contact at the worst printed pitch.
+SCREW_HEAD_GAP_MIN = 0.3
 SCREW_HALF_PITCH = 5.0
 SCREW_BELOW_LEDGE_TOP = 8.0
 SCREW_Y = LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP  # 58.7
