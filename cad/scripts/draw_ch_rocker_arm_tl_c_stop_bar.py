@@ -50,10 +50,10 @@ ISO_CENTER = (0.330, 0.175)
 ISO_NOTE_XY = (0.295, 0.230)
 FRONT_KEEP = {
     "BarLength": (0.130, 0.215),
-    "BarHeight": (0.072, 0.170),
-    "HoleY": (0.095, 0.160),
+    "BarHeight": (0.062, 0.170),
+    "HoleY": (0.080, 0.163),
     "HoleLeftX": (0.115, 0.135),
-    "HoleRightX": (0.140, 0.122),
+    "HoleRightX": (0.148, 0.120),
 }
 RIGHT_KEEP = {"BarWidth": (0.230, 0.135)}
 CALLOUT_XY = (0.175, 0.205)
