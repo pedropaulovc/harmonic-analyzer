@@ -37,7 +37,7 @@ LAND_BAND = (0.0005, -0.0005)  # (upper, lower): the gauge pin's certificate
 LAND_PLACES = 4
 FLATS_AF = 1.76  # stoned; .XXX general keeps both flats inside the lands
 FLATS_PLACES = 3
-PIN_LENGTH = 8.5  # snapped at about 9 and squared on the wheel
+PIN_LENGTH = 8.0  # snapped at about 8.5 and squared on the wheel
 
 # The lands enter the rocker arm's rod-pin hole: the largest land keeps a
 # running clearance in the smallest hole the parent prints (#47 drilled,
@@ -67,8 +67,8 @@ COLLAR_DIA = 4.5
 COLLAR_END = 10.20
 COLLAR_END_BAND = (
     0.0,
-    -0.5,
-)  # .X: never above face B; lands keep half-strap engagement
+    -0.2,
+)  # never above face B; narrow enough for the tip window below
 FACE_B_ABOVE_PLATE = 10.22175  # frame-A Z-4.77825 face B over the plate top Z-15
 if COLLAR_END + COLLAR_END_BAND[0] > FACE_B_ABOVE_PLATE:
     raise AssertionError("neck face can lift the arm off the profile-fixture pads")
@@ -94,18 +94,32 @@ COLLAR_WALL_MIN = (
 )
 if NECK_WALL_MIN >= (COLLAR_DIA - _GENERAL_1PL - (REAM_DIA + REAM_BAND[0])) / 2.0:
     raise AssertionError("the neck is no longer the thinnest wall round the bore")
-# Lands stand LAND_HEIGHT above the neck face: their tip stays under the
-# arm's upper strap face even with the neck face at its lowest.
-LAND_HEIGHT = 2.378
+# Lands stand LAND_HEIGHT above the neck face, the tip's direct dimension.
+# The S4 op 10 outline template lies flat on the upper strap face over the rod
+# hole, so the tip must stay under the thinnest strap the parent accepts (it
+# prints STRAP 2.50 at .XX, ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION,
+# mirrored to keep that prose out of this part's import closure), and the
+# lands must still engage half the thickest strap.  Chain: tip above face B =
+# LAND_HEIGHT - (FACE_B_ABOVE_PLATE - COLLAR_END), every term at its limit.
+STRAP_PLACES = 2
+_STRAP_MIN = rocker.ARM_THICKNESS - printed_band_mm(STRAP_PLACES)
+_STRAP_MAX = rocker.ARM_THICKNESS + printed_band_mm(STRAP_PLACES)
+TIP_UNDER_STRAP_MARGIN = 0.05  # the template's blued face never rides the tip
+LAND_HEIGHT = 1.85
+LAND_HEIGHT_PLACES = 2
 LAND_HEIGHT_BAND = (0.10, -0.10)
-_NECK_DROP_MAX = FACE_B_ABOVE_PLATE - (COLLAR_END + COLLAR_END_BAND[1])
-if (
-    LAND_HEIGHT + LAND_HEIGHT_BAND[0] - (FACE_B_ABOVE_PLATE - COLLAR_END)
-    > rocker.ARM_THICKNESS
-):
-    raise AssertionError("diamond-pin tip can stand above the rocker strap")
-if LAND_HEIGHT + LAND_HEIGHT_BAND[1] - _NECK_DROP_MAX < rocker.ARM_THICKNESS / 2.0:
-    raise AssertionError("diamond-pin lands engage less than half the strap")
+TIP_ABOVE_FACE_B = (
+    LAND_HEIGHT
+    + LAND_HEIGHT_BAND[1]
+    - (FACE_B_ABOVE_PLATE - (COLLAR_END + COLLAR_END_BAND[1])),
+    LAND_HEIGHT
+    + LAND_HEIGHT_BAND[0]
+    - (FACE_B_ABOVE_PLATE - (COLLAR_END + COLLAR_END_BAND[0])),
+)
+if TIP_ABOVE_FACE_B[1] > _STRAP_MIN - TIP_UNDER_STRAP_MARGIN:
+    raise AssertionError("diamond-pin tip can stand above the thinnest rocker strap")
+if TIP_ABOVE_FACE_B[0] < _STRAP_MAX / 2.0:
+    raise AssertionError("diamond-pin lands engage less than half the thickest strap")
 PIN_ENGAGEMENT = PIN_LENGTH - LAND_HEIGHT
 if (
     PIN_LENGTH + _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[1])
@@ -146,7 +160,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LandProfile": {"LandDia": LAND_PLACES},
     "FlatsProfile": {"FlatsAF": FLATS_PLACES},
-    "Flats": {"LandHeight": 3},
+    "Flats": {"LandHeight": LAND_HEIGHT_PLACES},
     "NeckProfile": {"NeckDia": NECK_PLACES},
     "Neck": {"NeckLength": 1},
     "CollarProfile": {"CollarDia": 1},
@@ -202,10 +216,12 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "width": (limits(FLATS_AF, FLATS_PLACES), ("FLATS_AF",)),
             "z_mm": ([-LAND_HEIGHT, 0.0], ("LAND_HEIGHT",)),
             "height": (
-                limits(LAND_HEIGHT, 3, LAND_HEIGHT_BAND),
+                limits(LAND_HEIGHT, LAND_HEIGHT_PLACES, LAND_HEIGHT_BAND),
                 (
                     "LAND_HEIGHT",
                     "LAND_HEIGHT_BAND",
+                    "COLLAR_END_BAND",
+                    "FACE_B_ABOVE_PLATE",
                     ("ch_rocker_arm_spec", "ARM_THICKNESS"),
                 ),
             ),
@@ -216,7 +232,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("PIN_LENGTH", "REAM_DEPTH", "NECK_LENGTH"),
             ),
         },
-        precision={"width": FLATS_PLACES, "height": 3, "length": 1},
+        precision={"width": FLATS_PLACES, "height": LAND_HEIGHT_PLACES, "length": 1},
     ),
     **{
         name: ExportFeature(

@@ -90,3 +90,11 @@ def test_notes_follow_the_simplicity_policy() -> None:
     ) / 2.0
     assert spec.NECK_WALL_MIN <= worst
     assert "GROUND" not in spec.DRAWING_NOTES
+
+
+def test_tip_window_uses_the_parents_printed_strap_band() -> None:
+    import ch_rocker_arm_notes
+
+    # The mirrored places must track the parent print, or the tip guard
+    # judges a strap band the sheet never states.
+    assert spec.STRAP_PLACES == ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION
