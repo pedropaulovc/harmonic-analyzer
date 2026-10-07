@@ -14,13 +14,11 @@ from _drawing_common import (
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
     stamp_drawing_summary,
-    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _section_axis import create_section_axis_centerline, position_section_caption
@@ -31,8 +29,7 @@ from ch_rocker_arm_tl_diamond_pin_spec import (
     OVERALL_LENGTH,
 )
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import delete_view, iter_views, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_diamond_pin"]
 PART_STEM = SPEC.artifact_stem
@@ -52,12 +49,10 @@ ISO_SCALE = (4, 1)
 # section's axis lies horizontally; which end the lands fall on is read from
 # the view transform at run time, so every text position below is given in
 # (axial station from the neck face mm, sheet offset from the axis m).
-# The *Top donor gives the axial sizes (all from the neck face), the *Front
-# donor the body diameters; both are deleted. The end view keeps the lands.
+# Every body size imports straight onto the section (axial ones from the
+# neck face); the end view keeps the two pin sizes.
 SECTION_CENTER = (0.165, 0.175)
 END_CENTER = (0.335, 0.200)
-TOP_DONOR_CENTER = (0.060, 0.235)
-FRONT_DONOR_CENTER = (0.300, 0.250)
 ISO_CENTER = (0.330, 0.120)
 ISO_NOTE_XY = (0.300, 0.088)
 CAPTION_XY = (0.150, 0.122)
@@ -109,40 +104,6 @@ def _section_mapper(adapter: Any, section: Any):
     return to_sheet
 
 
-def _move_dimension(
-    adapter: Any,
-    annotation: Any,
-    target: Any,
-    text_xy: tuple[float, float],
-    *,
-    source_view: Any,
-) -> Any:
-    """Move a native model dimension and verify its new drawing-view owner."""
-    name = dimension_name(adapter, annotation)
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, source_view)):
-        raise RuntimeError(f"{name}: failed to activate source dimension view")
-    draw.ClearSelection2(True)
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    selection_name = str(display.GetNameForSelection() or "")
-    if not selection_name or not draw.Extension.SelectByID2(
-        selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
-    drawing.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    matches = [
-        _early_bound(item, "IAnnotation")
-        for item in (_early_bound(target, "IView").GetAnnotations() or ())
-        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"{name}: native dimension did not move into target view")
-    return matches[0]
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -186,35 +147,19 @@ async def build(adapter: Any) -> dict[str, str]:
         label="diamond-pin longitudinal section",
     )
     position_section_caption(adapter, section, CAPTION_XY, label="diamond pin")
-    top = place_view(adapter, str(SOURCE), "*Top", *TOP_DONOR_CENTER, scale=VIEW_SCALE)
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_DONOR_CENTER, scale=VIEW_SCALE)
     # finalize_drawing shades the pictorial isometric with edges.
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (end, section, top, front):
+    for view in (end, section):
         set_hidden_lines_removed(adapter, view)
 
     to_sheet = _section_mapper(adapter, section)
-    donors = (
-        (top, {name: (0.0, 0.0) for name in AXIAL_XY}, AXIAL_XY, "axial donor"),
-        (front, {name: (0.0, 0.0) for name in DIAMETER_XY}, DIAMETER_XY, "diameter donor"),
+    moved = curate_view_dimensions(
+        adapter,
+        section,
+        keep={name: to_sheet(*xy) for name, xy in (*AXIAL_XY.items(), *DIAMETER_XY.items())},
+        view_label="longitudinal section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    moved = []
-    for donor, keep, targets, label in donors:
-        for annotation in curate_view_dimensions(
-            adapter, donor, keep=keep, view_label=label,
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ):
-            name = dimension_name(adapter, annotation)
-            moved.append(
-                _move_dimension(
-                    adapter, annotation, section, to_sheet(*targets[name]), source_view=donor
-                )
-            )
-    for donor in (top, front):
-        donor_name = view_name(adapter, donor)
-        delete_view(adapter, donor)
-        if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
-            raise RuntimeError(f"failed to delete the empty donor view {donor_name}")
     kept_on_end = curate_view_dimensions(
         adapter, end, keep=END_KEEP, view_label="land end view",
         dimensions_by_feature=DRAWING_DIMENSIONS,
