@@ -379,9 +379,11 @@ dimensions own the ID, OD and thickness names and two-place display precision;
 the source build reads the nominal values back without modifying geometry.
 `drawing:vn_knife_hanger_washer` imports those dimensions into a compact
 top/front/isometric receipt sheet, displays them parenthesized with short
-diameter leaders, and reads the imported precision back. These are supplier
+diameter leaders, and reads the imported precision and native diametric state
+back without converting the model's diameters on the sheet. These are supplier
 nominal references, not production controls: general tolerances and edge-break
-instructions do not apply. Stock, supplier and SKU remain property-linked.
+instructions do not apply. Stock, supplier and SKU remain property-linked; the
+purchase identity is read from the statically named canonical part-registry row.
 
 Acceptance requires an unchanged native supplier solid, all three reference
 dimensions, linked MHA-VN-026 identity and purchase fields, and readable,

@@ -7,7 +7,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import _config
 import _telemetry
 from _common import _early_bound, check, run_build
 from _drawing_common import (
@@ -30,7 +29,6 @@ from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import fastener
 from _purchased_fastener_drawing import (
-    _PROPERTIES,
     _box,
     _fit_views,
     _literal_note,
@@ -43,6 +41,7 @@ from vn_knife_hanger_washer_spec import (
     DRAWING_PRECISION_BY_NAME,
     INNER_DIAMETER_DIM,
     OUTER_DIAMETER_DIM,
+    PART_REGISTRY,
     THICKNESS_DIM,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -58,6 +57,29 @@ OUTPUTS = DrawingOutputs(
     slddrw=SPEC.outputs["slddrw"],
     pdf=SPEC.outputs["pdf"],
     png=SPEC.outputs["png"],
+)
+
+# This consumer owns its required property set so source-stamping analysis can
+# resolve it locally, including the native template's linked tolerance cells.
+_REQUIRED_SOURCE_PROPERTIES = (
+    "Number",
+    "Revision",
+    "Title",
+    "Material",
+    "Stock Name",
+    "Supplier",
+    "Supplier SKUs",
+    "TOL_LIN_X",
+    "TOL_LIN_XX",
+    "TOL_LIN_XXX",
+    "TOL_ANG",
+    "TOL_SURFACE",
+    "TOL_HOLE_MINUS",
+    "TOL_HOLE_PLUS",
+    "TOL_EDGE_BREAK_R",
+    "TOL_CHAMFER_MAX",
+    "THREAD_TYPE",
+    "THREAD_CLASS",
 )
 
 # The washer has one useful circular view, one edge view that carries the
@@ -98,7 +120,6 @@ def _short_diametric_reference(adapter: Any, annotation: Any, *, label: str) -> 
     adapter._attempt(lambda: setattr(display, "DisplayAsLinear", False))
     if bool(adapter._attempt(lambda: display.DisplayAsLinear)):
         raise RuntimeError(f"{label} became a linear dimension")
-    adapter._attempt(lambda: setattr(display, "Diametric", True))
     if not bool(adapter._attempt(lambda: display.Diametric)):
         raise RuntimeError(f"{label} is not diametric")
     adapter._attempt(lambda: setattr(display, "ArrowSide", 1))
@@ -148,8 +169,12 @@ async def build(adapter: Any) -> dict[str, str]:
         model = _early_bound(adapter.currentModel, "IModelDoc2")
         if Path(model.GetPathName()).resolve() != source.resolve():
             raise RuntimeError(f"opened purchased part is not {source}")
-        properties = read_required_properties(model, _PROPERTIES, required=_PROPERTIES)
-        registry = _config.parts(stock.part_name)
+        properties = read_required_properties(
+            model,
+            _REQUIRED_SOURCE_PROPERTIES,
+            required=_REQUIRED_SOURCE_PROPERTIES,
+        )
+        registry = PART_REGISTRY
         finish = str(registry["finish"]).strip()
         if not finish:
             raise RuntimeError(f"{stock.part_name}: registered purchased finish is empty")

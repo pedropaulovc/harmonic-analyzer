@@ -20,7 +20,7 @@ def test_source_title_uses_saved_part_identity_not_display_title(
     would reject every correctly saved current-framework purchased washer.
     """
     stock = drawing.fastener(drawing.SPEC.artifact_stem)
-    registry = drawing._config.parts(stock.part_name)
+    registry = drawing.PART_REGISTRY
     source = tmp_path / f"{stock.part_name}.SLDPRT"
     source.touch()
     monkeypatch.setattr(

@@ -9,6 +9,11 @@ than by drawing-local nominal text.
 
 from __future__ import annotations
 
+import _config
+
+# A literal canonical row keeps the drawing's registry dependency cache-keyed.
+PART_REGISTRY = _config.parts("vn-knife-hanger-washer")
+
 
 OUTER_DIAMETER_DIM = "ReferenceOuterDiameter"
 INNER_DIAMETER_DIM = "ReferenceInnerDiameter"
