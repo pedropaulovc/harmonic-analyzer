@@ -234,18 +234,40 @@ def _install_watchdog_guard():
 _scratch_cleaned = False
 
 
+def _retire_scratch_facts():
+    """Detach only an existing store owned by this session's scratch."""
+    graph = sys.modules.get("_buildgraph")
+    if graph is None:
+        return
+    store = graph._FACTS
+    location = store._path
+    if location is None and store._entries is None:
+        # A cold store has no captured path. Use only the explicit override;
+        # cleanup must not activate a default/home-backed store.
+        setting = os.environ.get(graph._FACTS_ENV, "")
+        if setting and setting.lower() not in {"off", "0", "false", "no"}:
+            location = Path(setting)
+    if location is not None and location.resolve().is_relative_to(
+        Path(_scratch.name).resolve()
+    ):
+        store.close()
+
+
 def _cleanup_host_scratch():
-    """Close existing capture before removing scratch, including collection aborts."""
+    """Retire owned facts and capture before removing session scratch."""
     global _scratch_cleaned
     if _scratch_cleaned:
         return
     telemetry = sys.modules.get("_telemetry")
     try:
-        if telemetry is not None:
-            telemetry.shutdown()
+        _retire_scratch_facts()
     finally:
-        _scratch.cleanup()
-        _scratch_cleaned = True
+        try:
+            if telemetry is not None:
+                telemetry.shutdown()
+        finally:
+            _scratch.cleanup()
+            _scratch_cleaned = True
 
 
 def pytest_configure(config):
@@ -274,7 +296,7 @@ def pytest_collection_finish(session):
 
 @pytest.fixture(scope="session", autouse=True)
 def _host_safety_scratch():
-    """Own and remove the scratch used by collection and real JSONL exporters."""
+    """Own and retire collection's scratch stores and real JSONL exporters."""
     yield Path(_scratch.name)
     _cleanup_host_scratch()
 
