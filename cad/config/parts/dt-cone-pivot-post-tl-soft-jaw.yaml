@@ -1,0 +1,10 @@
+dt-cone-pivot-post-tl-soft-jaw:
+  title: Cone Post Vise Soft Jaw
+  # Shop fixture: the parent MHA-DT-005 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-DT-005-TL-04
+  material: 6061-T6 aluminium
+  material_specification: 6061-T6 aluminium flat bar, 1 x 3 in, ASTM B221
+  finish: as machined
+  quantity: 2
+  tolerance_class: machined_block
+  process: "saw from flat bar and mill six faces; spot the bolt holes through the vise's hardened jaw plate, drill and counterbore; bolt on and skim the gripping face in place"
