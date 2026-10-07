@@ -198,8 +198,12 @@ if receipt:
     child_environment = os.environ.copy()
     child_environment.pop("UV_STUB_CHAIN_RECEIPT")
     child_environment["UV_STUB_CHAIN_READY"] = receipt
+    # Native uv/venv preserves the launcher's inheritable named-job handle.
+    # Popen's default drops that keeper while leaving membership intact, hiding
+    # the live build from -Status/-Cancel once the launcher and relay have died.
     child = subprocess.Popen(
-        [sys.executable, __file__, *sys.argv[1:]], env=child_environment
+        [sys.executable, __file__, *sys.argv[1:]],
+        env=child_environment, close_fds=False,
     )
     target = None
     transferred = []
