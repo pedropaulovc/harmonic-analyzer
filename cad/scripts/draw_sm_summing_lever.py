@@ -122,17 +122,15 @@ def _top_xy(mx: float, mz: float) -> tuple[float, float]:
     )
 
 
-def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
-    """The one visible line of the +Z end face crossing model ``x_mm``.
+def _end_face_edge(edges: ViewEdges, *, x_mm: float, z_mm: float) -> ViewEdge:
+    """The one visible line of the actual plate/rib end crossing ``x_mm``.
 
-    In the plan the +Z end (bottom of the view) shows a single line at
-    z = PLATE_L/2: the edge rib's outer top edge, which covers the plate's own
-    end edge until the rib tapers below the plate near x = PLATE_W. The end
-    rib's inboard flange edge sits 5.08 mm up the sheet and the rib's underside
-    edge (y < 0) is hidden, so exactly one visible +y line at that z spans the
-    requested x; anything else is a changed model and fails loud.
+    At either z = +/-PLATE_L/2 the edge rib's outer top edge covers the plate's
+    own end edge until the rib tapers below the plate near x = PLATE_W. The
+    inboard flange is 5.08 mm nearer the centre and the underside (y < 0) is
+    hidden, so exactly one visible +y line at the requested end spans x;
+    anything else is a changed model and fails loud.
     """
-    z_mm = PLATE_L / 2.0
     matches = [
         item
         for item in edges.lines
@@ -142,7 +140,7 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
     ]
     if len(matches) != 1:
         raise RuntimeError(
-            f"summing lever +Z end face: expected one visible line at z={z_mm:g} "
+            f"summing lever plate/rib end face: expected one visible line at z={z_mm:g} "
             f"spanning x={x_mm:g} in the {edges.label!r} scan, found "
             f"{[item.line for item in matches]}"
         )
@@ -276,6 +274,16 @@ async def build(adapter: Any) -> dict[str, str]:
         label="knife-edge ridge finish",
         char_height=0.0025,
     )
+    add_surface_finish(
+        adapter,
+        top,
+        edge_entity=datum_ridge.edge,
+        leader_attach_xy=knife_edge_datum,
+        symbol_xy=(0.208, 0.1815),
+        control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_datum_a"),
+        label="datum A knife-edge finish",
+        char_height=0.0025,
+    )
     # Land the position frame on the tap rim's 3-o'clock point, opposite the
     # hole callout, which SolidWorks lands up-left of the 12-o'clock pick. From
     # the 9-o'clock point, with the frame up-left, the two leaders met 0.6 mm
@@ -348,7 +356,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # model positions (the hole wizard's seed at HOLE_Z_LAST, the pattern
     # marching -Z by CHANNEL_PITCH; build_summing_lever).
     plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
-    end_edge = _end_face_edge(top_edges, x_mm=10.0)
+    end_edge = _end_face_edge(top_edges, x_mm=10.0, z_mm=PLATE_L / 2.0)
     add_datum_feature(
         adapter,
         top,
@@ -356,6 +364,46 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(plate_end_edge[0] + 0.0062, plate_end_edge[1] - 0.0035),
         datum="B",
         label="plate +Z end face",
+    )
+    # Qualify the same +Z plate/rib end as B and the start-Z basic, not the
+    # inboard rib flange. The opposite end and free +X plate edge are the
+    # other existing physical pickups for the imported plate length/width.
+    # Each native symbol consumes the part-owned face control; the shared
+    # helper checks that its exact selected edge touches that controlled face.
+    add_surface_finish(
+        adapter,
+        top,
+        edge_entity=end_edge.edge,
+        leader_attach_xy=_top_xy(30.0, -PLATE_L / 2.0),
+        symbol_xy=(0.315, 0.085),
+        control=surface_finish_by_key(SURFACE_FINISHES, "plate_end_datum_b"),
+        label="datum B plate/rib end finish",
+        char_height=0.0025,
+    )
+    opposite_end = _end_face_edge(top_edges, x_mm=10.0, z_mm=-PLATE_L / 2.0)
+    add_surface_finish(
+        adapter,
+        top,
+        edge_entity=opposite_end.edge,
+        leader_attach_xy=_top_xy(30.0, PLATE_L / 2.0),
+        symbol_xy=(0.315, 0.177),
+        control=surface_finish_by_key(SURFACE_FINISHES, "plate_opposite_end"),
+        label="opposite plate/rib end finish",
+        char_height=0.0025,
+    )
+    free_plate_edge = top_edges.exact_line_through(
+        (PLATE_W, PLATE_T / 2.0, PLATE_L / 4.0),
+        label="free +X plate edge",
+    )
+    add_surface_finish(
+        adapter,
+        top,
+        edge_entity=free_plate_edge.edge,
+        leader_attach_xy=_top_xy(PLATE_W, -PLATE_L / 4.0),
+        symbol_xy=(0.333, 0.115),
+        control=surface_finish_by_key(SURFACE_FINISHES, "plate_free_edge"),
+        label="free plate edge finish",
+        char_height=0.0025,
     )
     seed_rim = top_edges.circle_at(
         (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
