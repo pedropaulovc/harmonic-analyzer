@@ -43,7 +43,10 @@ def test_rim_is_the_hub_filing_line() -> None:
 
 def test_stud_slips_into_the_smallest_pivot_bore_and_button_bore() -> None:
     body_high = _features(STUD)["locating_body"]["dia"][1]
-    assert rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1] - body_high >= stud.BODY_CLEARANCE_MIN
+    assert (
+        rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1] - body_high
+        >= stud.BODY_CLEARANCE_MIN
+    )
     assert _features(BUTTON)["bore"]["dia"][0] - body_high >= stud.BODY_CLEARANCE_MIN
 
 
@@ -60,13 +63,19 @@ def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
 
 def test_head_seat_lands_on_the_button_face_outside_its_bore() -> None:
     head = stud.HEAD_DIA
-    assert _features(BUTTON)["bore"]["dia"][1] < head < _features(BUTTON)["rim"]["dia"][0]
+    assert (
+        _features(BUTTON)["bore"]["dia"][1] < head < _features(BUTTON)["rim"]["dia"][0]
+    )
 
 
-@pytest.mark.parametrize("dashed", ["ch-rocker-arm-tl-filing-button", "ch-rocker-arm-tl-filing-stud"])
+@pytest.mark.parametrize(
+    "dashed", ["ch-rocker-arm-tl-filing-button", "ch-rocker-arm-tl-filing-stud"]
+)
 def test_number_is_the_parent_number_plus_a_tool_suffix(dashed: str) -> None:
     parent = _config.parts("ch-rocker-arm")["number"]
-    assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", _config.parts(dashed)["number"])
+    assert re.fullmatch(
+        re.escape(parent) + r"-TL-\d{2}", _config.parts(dashed)["number"]
+    )
 
 
 @pytest.mark.parametrize("notes", [button.DRAWING_NOTES, stud.DRAWING_NOTES])

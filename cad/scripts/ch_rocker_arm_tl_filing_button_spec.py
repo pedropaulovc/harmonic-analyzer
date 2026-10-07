@@ -18,6 +18,7 @@ from __future__ import annotations
 import ch_rocker_arm_spec as rocker
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 THICKNESS = 4.0
 THICKNESS_PLACES = 2
@@ -47,12 +48,16 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Disc": {"DiscThick": THICKNESS_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
-    name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked filing-button dimension needs authored places")
 
-SURFACE_FINISHES = ()
+# The bore locates on the stud: a machining-required symbol at the project's
+# machined grade (codex round 8); the hand-slide fit note governs its size.
+SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 # The blind reviewer sees only the sheet: each note states why a band is
 # tight. Hardness and the lapped surfaces live in the Finish field.
 DRAWING_NOTES = (
@@ -90,7 +95,10 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
-            "dia": (limits(BORE_DIA, BORE_PLACES, BORE_BAND), ("BORE_DIA", "BORE_BAND")),
+            "dia": (
+                limits(BORE_DIA, BORE_PLACES, BORE_BAND),
+                ("BORE_DIA", "BORE_BAND"),
+            ),
             "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
             "thru": (True, ("BORE_DIA",)),
             "process": ("lap", ("BORE_BAND",)),
@@ -115,7 +123,10 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         requirements=("thickness",),
         fields={
             "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
-            "plane": ({"frame": "model", "axis": "z", "value": THICKNESS}, ("THICKNESS",)),
+            "plane": (
+                {"frame": "model", "axis": "z", "value": THICKNESS},
+                ("THICKNESS",),
+            ),
             "thickness": (limits(THICKNESS, THICKNESS_PLACES), ("THICKNESS",)),
         },
         precision={"thickness": THICKNESS_PLACES},

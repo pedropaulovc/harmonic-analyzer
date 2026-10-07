@@ -106,7 +106,9 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_extrusion(ExtrusionParameters(depth=THICKNESS)),
     )
     name_last_feature(adapter, "Disc")
-    drive_jobs.append((name_dimensions(adapter, "Disc", ["DiscThick"])[0], '"DiscThick"'))
+    drive_jobs.append(
+        (name_dimensions(adapter, "Disc", ["DiscThick"])[0], '"DiscThick"')
+    )
     await volume_check(adapter, "button", V_DISC, 0.005 * V_DISC)
 
     await force_rebuild(adapter)

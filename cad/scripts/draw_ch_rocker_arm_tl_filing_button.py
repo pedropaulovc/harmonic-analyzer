@@ -11,6 +11,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
@@ -22,10 +23,12 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from ch_rocker_arm_tl_filing_button_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
+    SURFACE_FINISHES,
 )
 from draw_dt_cone_pivot_post_tl_cap_jaw_button import _move_dimension
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -119,6 +122,17 @@ async def build(adapter: Any) -> dict[str, str]:
         keep=EDGE_KEEP,
         view_label="edge view",
         dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # Lower right on the bore circle, clear of the bore dimension's leader.
+    bore_pick = (FACE_CENTER[0] + 0.0092, FACE_CENTER[1] - 0.0092)
+    add_surface_finish(
+        adapter,
+        face,
+        edge_xy=bore_pick,
+        symbol_xy=(0.150, 0.130),
+        leader_attach_xy=bore_pick,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
+        label="filing button bore finish",
     )
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the button face view")
