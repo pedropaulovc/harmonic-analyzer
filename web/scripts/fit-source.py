@@ -50,43 +50,6 @@ def fresh_contract():
     return module
 
 
-def check_namespace(path, *, historical_diagnostic=False, output=False, video_id=None):
-    """Diagnostics are temporary files, never a route into a published namespace."""
-    declared = Path(path).absolute()
-    path = declared.resolve()
-    web = Path(__file__).resolve().parents[1]
-    historical = (web / "content").resolve()
-    current = (web / "content/v39-source").resolve()
-    if declared != path and (
-        declared.is_relative_to(historical) or path.is_relative_to(historical)
-    ):
-        raise ValueError("Published observation namespaces cannot use filesystem aliases")
-    if path.is_relative_to(current):
-        if historical_diagnostic:
-            raise ValueError("Historical diagnostics cannot read or write current observations")
-        if path.parent != current or not path.name.endswith(".observations.json.gz"):
-            raise ValueError("Current observations use only direct .observations.json.gz namespace entries")
-        if video_id is not None and path != current / f"{video_id}.observations.json.gz":
-            raise ValueError("Current observations must use their registered video filename")
-    if (
-        path.is_relative_to(historical) and not path.is_relative_to(current)
-        and (output or not historical_diagnostic)
-    ):
-        raise ValueError("Historical content is immutable and requires explicit diagnostic input")
-    if not historical_diagnostic and declared.suffix != ".gz":
-        raise ValueError("Current observation input/output requires an explicit .gz path")
-    if historical_diagnostic and output:
-        private = web / ".vite/verification-output"
-        external_temp = not path.is_relative_to(web.parent) and any(
-            path.is_relative_to(Path(temp).resolve()) for temp in ("/tmp", "/var/tmp"))
-        private_escape = not path.is_relative_to(private) and any(
-            parent.name == "verification-output" and parent.parent.name == ".vite"
-            and parent.parent.parent.resolve() == web
-            for parent in declared.parents)
-        if private_escape or not (path.is_relative_to(private) or external_temp):
-            raise ValueError("Historical diagnostics require private .vite/verification-output or resolved output under /tmp or /var/tmp outside the checkout")
-
-
 def finite_vector(value, size, label):
     if (
         not isinstance(value, list)
@@ -1868,17 +1831,18 @@ def main():
         help="Run the old materialized-derivative diagnostic, never current publication",
     )
     args = parser.parse_args()
-    check_namespace(args.observations, historical_diagnostic=args.historical_diagnostic)
+    contract = fresh_contract()
+    contract.check_namespace(args.observations, historical_diagnostic=args.historical_diagnostic)
     observations = (
         common.read_observations(args.observations) if args.historical_diagnostic
-        else json.loads(fresh_contract().read_observation_bytes(args.observations))
+        else json.loads(contract.read_observation_bytes(args.observations))
     )
-    check_namespace(
+    contract.check_namespace(
         args.observations, historical_diagnostic=args.historical_diagnostic,
         video_id=observations["source"]["videoId"],
     )
     if args.output:
-        check_namespace(
+        contract.check_namespace(
             args.output, historical_diagnostic=args.historical_diagnostic,
             output=True, video_id=observations["source"]["videoId"],
         )
@@ -1892,7 +1856,7 @@ def main():
             common.write_observations(args.output, fitted)
         else:
             decoded = (json.dumps(fitted, indent=2) + "\n").encode("utf-8")
-            args.output.write_bytes(fresh_contract().encode_observation_bytes(decoded))
+            args.output.write_bytes(contract.encode_observation_bytes(decoded))
     summary = {
         key: value
         for key, value in report.items()

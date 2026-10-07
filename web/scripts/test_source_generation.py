@@ -1051,47 +1051,41 @@ class HistoricalObservationNamespaceTests(unittest.TestCase):
             def temporary_roots(value):
                 return temp_alias if str(value) in ('/tmp', '/var/tmp') else Path(value)
 
-            for filename in self.scripts:
-                module = load_script(filename, 'observation_namespace_' + filename)
-                with patch.object(module, '__file__', str(web / 'scripts' / filename)), \
-                        patch.object(module, 'Path', temporary_roots):
-                    for destination in (private / 'receipt.json', external / 'receipt.json',
-                                        external_alias / 'receipt.json'):
+            module = load_script('fresh-source-observations.py', 'observation_namespace')
+            with patch.object(module, 'WEB', web), \
+                    patch.object(module, 'Path', temporary_roots):
+                for destination in (private / 'receipt.json', external / 'receipt.json',
+                                    external_alias / 'receipt.json'):
+                    module.check_namespace(destination, historical_diagnostic=True, output=True)
+                for destination in (web / 'public/receipt.json', web / 'src/receipt.json',
+                                    web.parent / 'receipt.json', web.parent / 'cad/receipt.json',
+                                    checkout_alias / 'cad/receipt.json',
+                                    private_escape / 'receipt.json',
+                                    checkout_alias / 'web/.vite/verification-output/escape/receipt.json'):
+                    with self.subTest(destination=destination), self.assertRaises(ValueError):
                         module.check_namespace(destination, historical_diagnostic=True, output=True)
-                    for destination in (web / 'public/receipt.json', web / 'src/receipt.json',
-                                        web.parent / 'receipt.json', web.parent / 'cad/receipt.json',
-                                        checkout_alias / 'cad/receipt.json',
-                                        private_escape / 'receipt.json',
-                                        checkout_alias / 'web/.vite/verification-output/escape/receipt.json'):
-                        with self.subTest(script=filename, destination=destination), \
+                # The allowlist is output-only: historical diagnostic inputs
+                # remain readable, while current gzip rules stay intact.
+                module.check_namespace(web / 'content/original.json', historical_diagnostic=True)
+                module.check_namespace(web / 'public/original.json', historical_diagnostic=True)
+                module.check_namespace(web / 'public/current.json.gz', output=True)
+                with self.assertRaises(ValueError):
+                    module.check_namespace(external / 'current.json', output=True)
+                with self.assertRaises(ValueError):
+                    module.check_namespace(
+                        web / 'content/v39-source/NAsM30MAHLg.observations.json.gz',
+                        historical_diagnostic=True)
+
+                private_escape.unlink()
+                private.rmdir()
+                for target in (web / 'public', web / 'src', external):
+                    private.symlink_to(target, target_is_directory=True)
+                    for destination in (private / 'receipt.json',
+                                        checkout_alias / 'web/.vite/verification-output/receipt.json'):
+                        with self.subTest(target=target, destination=destination), \
                                 self.assertRaises(ValueError):
                             module.check_namespace(destination, historical_diagnostic=True, output=True)
-                    # The new allowlist is output-only: historical diagnostic
-                    # inputs remain readable, while current gzip rules stay intact.
-                    module.check_namespace(web / 'content/original.json', historical_diagnostic=True)
-                    module.check_namespace(web / 'public/original.json', historical_diagnostic=True)
-                    module.check_namespace(web / 'public/current.json.gz', output=True)
-                    with self.assertRaises(ValueError):
-                        module.check_namespace(external / 'current.json', output=True)
-                    with self.assertRaises(ValueError):
-                        module.check_namespace(
-                            web / 'content/v39-source/NAsM30MAHLg.observations.json.gz',
-                            historical_diagnostic=True)
-
-            private_escape.unlink()
-            private.rmdir()
-            for target in (web / 'public', web / 'src', external):
-                private.symlink_to(target, target_is_directory=True)
-                for filename in self.scripts:
-                    module = load_script(filename, 'observation_private_root_' + filename)
-                    with patch.object(module, '__file__', str(web / 'scripts' / filename)), \
-                            patch.object(module, 'Path', temporary_roots):
-                        for destination in (private / 'receipt.json',
-                                            checkout_alias / 'web/.vite/verification-output/receipt.json'):
-                            with self.subTest(script=filename, target=target, destination=destination), \
-                                    self.assertRaises(ValueError):
-                                module.check_namespace(destination, historical_diagnostic=True, output=True)
-                private.unlink()
+                    private.unlink()
 
 
 class HistoricalDiagnosticOutputBoundaryTests(unittest.TestCase):
