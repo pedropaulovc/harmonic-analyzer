@@ -82,7 +82,8 @@ PROFILE_DIAMETER_XY = {
     "TailDia": (SEAT_X - 0.060, PROFILE_CENTER[1] + 0.022),
     "HeadDia": (SEAT_X - 0.020, PROFILE_CENTER[1] + 0.024),
     "BodyDia": (SEAT_X + 0.008, PROFILE_CENTER[1] + 0.022),
-    "ThreadDia": (SEAT_X + 0.062, PROFILE_CENTER[1] + 0.034),
+    # Below the profile, under the 12.5 row: clear of the isometric.
+    "ThreadDia": (SEAT_X + 0.062, PROFILE_CENTER[1] - 0.060),
 }
 
 
