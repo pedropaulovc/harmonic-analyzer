@@ -22,15 +22,18 @@ from _gtol_spec import CylinderFace, PlanarFace
 THICKNESS = 4.0
 THICKNESS_PLACES = 2
 
-# The rim is the filing line: the button O.D. is the hub O.D., ring-lapped on
-# an arbor in its own bore to a band far inside the hub's printed band.
+# The rim is the filing line: the button O.D. is the hub O.D. Codex round 3
+# found the shop-additions 0.010 lapped band unsupported: the hub prints at
+# two places, so the three-place general band already holds the filed hub
+# far inside it; the two buttons matching is the real requirement (a note).
 OD = rocker.HUB_DIA
-OD_BAND = (0.005, -0.005)  # (upper, lower) deviations
 OD_PLACES = 3
+OD_BAND = (limits(OD, OD_PLACES)[1] - OD, limits(OD, OD_PLACES)[0] - OD)
 if not (-rocker.LINEAR_2PL <= OD_BAND[1] and OD_BAND[0] <= rocker.LINEAR_2PL):
     raise AssertionError("filing-button rim band leaves the hub O.D. band")
 
-# Barrel-lapped bore: a slip fit on the stud's lapped body.
+# Barrel-lapped bore: its limits give the stud body (stud spec) the slip
+# clearance that holds the rim concentric to the arm's pivot bore.
 BORE_DIA = 6.51
 BORE_BAND = (0.005, -0.005)
 BORE_PLACES = 3
@@ -54,8 +57,8 @@ SURFACE_FINISHES = ()
 # tight. Hardness and the lapped surfaces live in the Finish field.
 DRAWING_NOTES = (
     "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. ROUND AND TRUE TO BORE.\n"
-    "BOTH BUTTONS ONE SIZE: THE FILE RIDES BOTH RIMS, SO THE HUB FILES PARALLEL.\n"
-    "FIT EACH BORE TO THE FINISHED FILING STUD: SLIDES ON BY HAND WITHOUT SHAKE.\n"
+    "MAKE BOTH BUTTONS ONE SIZE: THE FILE RIDES BOTH RIMS, SO THE HUB FILES PARALLEL.\n"
+    "BORE LIMITS GIVE THE FILING STUD THE CLEARANCE THAT KEEPS THE RIM ON CENTRE.\n"
     "KEEP RIM CORNERS SHARP; STONE BURRS ONLY. THICKNESS LOCATES THE STACK."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
@@ -70,7 +73,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
             "dia": (
-                limits(OD, OD_PLACES, OD_BAND),
+                limits(OD, OD_PLACES),
                 ("OD", "OD_BAND", ("ch_rocker_arm_spec", "HUB_DIA")),
             ),
             "dia_nominal": (OD, ("OD", ("ch_rocker_arm_spec", "HUB_DIA"))),

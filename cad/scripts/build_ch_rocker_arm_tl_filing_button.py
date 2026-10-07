@@ -50,7 +50,6 @@ from ch_rocker_arm_tl_filing_button_spec import (
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     OD,
-    OD_BAND,
     THICKNESS,
 )
 
@@ -123,7 +122,6 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(adapter, "RingProfile", "DiscDia", *deviations(OD_BAND))
     set_dimension_bilateral_tolerance(adapter, "RingProfile", "BoreDia", *deviations(BORE_BAND))
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
