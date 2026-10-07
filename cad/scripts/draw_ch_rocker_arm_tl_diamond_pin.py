@@ -72,7 +72,7 @@ OVERALL_REF_XY = (6.7, 0.082)
 OVERALL_REF = OVERALL_LENGTH + LAND_HEIGHT
 DIAMETER_XY = {
     "NeckDia": (1.0, -0.026),
-    "CollarDia": (6.0, -0.038),
+    "CollarDia": (9.5, -0.038),
     "ReamDia": (8.6, -0.040),
     "ShankDia": (13.5, -0.026),
 }
