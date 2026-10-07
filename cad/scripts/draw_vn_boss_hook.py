@@ -17,20 +17,21 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_dimension_precision,
+    set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _stock_trim_drawing import TrimSheet
 from vn_boss_hook_spec import (
+    DRAWING_DIMENSIONS,
     FINISHED_OVERALL_MM,
     FINISHED_OVERALL_TOLERANCE_MM,
     CHAMFER_WIDTH_MM,
     CHAMFER_WIDTH_TOLERANCE_MM,
     CHAMFER_ANGLE_DEG,
     CHAMFER_ANGLE_TOLERANCE_DEG,
-    DIMENSION_PRECISION,
+    DRAWING_PRECISION_BY_NAME,
     DIMENSION_TOLERANCE_TYPES,
     TRIM,
 )
@@ -80,8 +81,23 @@ def _verify_controls(adapter: Any, annotations: list[Any]) -> None:
         annotations,
         expected=EXPECTED_CONTROLS,
         tolerance_types=DIMENSION_TOLERANCE_TYPES,
-        precision=DIMENSION_PRECISION,
+        precision=DRAWING_PRECISION_BY_NAME,
     )
+
+
+def _verify_manufacturing_note(note: Any, expected: str) -> None:
+    """Keep registry-owned process/joint instructions in the lower-left note cell."""
+    note = _early_bound(note, "INote")
+    actual = str(note.GetText()).replace("\r\n", "\n").strip()
+    expected = expected.replace("\r\n", "\n").strip()
+    if actual != expected:
+        raise RuntimeError("boss-hook manufacturing instructions did not resolve")
+    extent = tuple(float(value) for value in note.GetExtent())
+    if len(extent) != 6 or not all(map(math.isfinite, extent)):
+        raise RuntimeError("boss-hook manufacturing note has no finite native extent")
+    x0, y0, _z0, x1, y1, _z1 = extent
+    if not (0.015 <= x0 < x1 <= 0.225 and 0.063 <= y0 < y1 <= 0.085):
+        raise RuntimeError(f"boss-hook manufacturing note exceeds its cell: {extent}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -99,7 +115,9 @@ async def build(adapter: Any) -> dict[str, str]:
         "Manufacturing Notes",
         "Isometric View Note",
     )
-    read_required_properties(adapter.currentModel, required, required=required)
+    properties = read_required_properties(
+        adapter.currentModel, required, required=required
+    )
     draw, _sheet = new_project_drawing(
         adapter, property_view=SPEC.artifact_stem, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -123,25 +141,35 @@ async def build(adapter: Any) -> dict[str, str]:
     _early_bound(detail, "IView").UpdateViewDisplayGeometry()
     # The detail claims its manufacturing dimensions before the parent import.
     detail_annotations = curate_view_dimensions(
-        adapter, detail, keep=DETAIL_KEEP, view_label="cut end detail"
+        adapter,
+        detail,
+        keep=DETAIL_KEEP,
+        view_label="cut end detail",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="finished overall"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="finished overall",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     annotations = [*front_annotations, *detail_annotations]
-    set_dimension_precision(adapter, annotations, DIMENSION_PRECISION)
     _verify_controls(adapter, annotations)
-    add_property_linked_note(adapter, "Supplier", 0.016, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.060, char_height=0.003)
-    add_property_linked_note(adapter, "Stock Name", 0.016, 0.049, char_height=0.003)
+    add_property_linked_note(adapter, "Supplier", 0.016, 0.055, char_height=0.003)
+    add_property_linked_note(adapter, "Supplier SKUs", 0.080, 0.055, char_height=0.003)
+    add_property_linked_note(adapter, "Stock Name", 0.016, 0.044, char_height=0.003)
     add_property_linked_note(adapter, "Isometric View Note", 0.275, 0.163)
-    add_property_linked_note(
+    manufacturing_note = add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.083, char_height=0.003
     )
     for view in (front, detail):
-        set_hidden_lines_visible(adapter, view)
+        set_hidden_lines_removed(adapter, view)
     trim_drawing.position_detail_label(adapter, detail, SHEET)
     trim_drawing.position_parent_detail_letter(adapter, front, SHEET)
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError("rebuild boss-hook notes failed")
+    _verify_manufacturing_note(manufacturing_note, properties["Manufacturing Notes"])
     return await finalize_drawing(
         adapter,
         OUTPUTS,
