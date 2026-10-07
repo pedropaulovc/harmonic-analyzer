@@ -180,7 +180,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "lands": ExportFeature(
         kind="pin",
         faces=(CylinderFace(LAND_DIA, contains_z_mm=-1.0, tolerance_mm=0.003),),
-        requirements=("dia", "width"),
+        requirements=("dia", "width", "height"),
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
@@ -247,7 +247,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "shank": ExportFeature(
         kind="boss",
         faces=(CylinderFace(SHANK_DIA, tolerance_mm=0.003),),
-        requirements=("dia",),
+        requirements=("dia", "length"),
         fields={
             "at": ([0.0, 0.0, COLLAR_END], ("COLLAR_END",)),
             "axis": _AXIS,
