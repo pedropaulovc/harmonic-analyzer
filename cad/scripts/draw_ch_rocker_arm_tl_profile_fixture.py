@@ -21,7 +21,7 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     _select_view_entity,
@@ -79,7 +79,11 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     STAND_POCKET_DEPTH,
 )
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    auto_center_marks,
+    place_view,
+)
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_profile_fixture"]
 PART_STEM = SPEC.artifact_stem
@@ -100,11 +104,18 @@ PLAN_SCALE = (1, 2)
 # A1/B1 pads either side, so the pad tops, the hub stand and the bore stack
 # read together.
 SECTION_SPAN_X = (-32.0, 32.0)
-SECTION_CENTER = (0.300, 0.122)
+SECTION_CENTER = (0.300, 0.128)
+# Native view labels by their box's lower-left (sheet m). Left native, the
+# section label met the title block and the detail label fell 47 mm under its
+# circle onto section D-D (run 20261007T181225620Z; boxes 45.8 x 16.2 and
+# 31.5 x 16.2 mm). The section label sits centred under the cut, the detail
+# label right of its circle.
+SECTION_LABEL_LOWER_LEFT = (SECTION_CENTER[0] - 0.0229, 0.069)
 SECTION_SCALE = (2, 1)
 DETAIL_CENTER = (0.330, 0.212)
 DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 9.0
+DETAIL_LABEL_LOWER_LEFT = (0.362, 0.204)
 NOTES_XY = (0.016, 0.045)
 HOLD_DOWN_CALLOUT_XY = (0.226, 0.192)
 STUD_CALLOUT_XY = (0.228, 0.260)
@@ -112,7 +123,10 @@ STUD_CALLOUT_XY = (0.228, 0.260)
 # {name: ((x, y[, z]) model mm, (dx, dy) sheet m)}.
 PLAN_KEEP_AT = {
     "PlateLength": ((0.0, PLATE_NORTH_Y), (0.0, 0.009)),
-    "PlateWidth": ((PLATE_WEST_X, (PLATE_NORTH_Y + PLATE_SOUTH_Y) / 2.0), (-0.011, 0.0)),
+    "PlateWidth": (
+        (PLATE_WEST_X, (PLATE_NORTH_Y + PLATE_SOUTH_Y) / 2.0),
+        (-0.011, 0.0),
+    ),
     "PlateWestX": ((PLATE_WEST_X / 2.0, -12.0), (0.0, 0.0)),
     "PlateSouthY": ((-7.0, -45.0), (0.0, 0.0)),
     "RodPinHoleDia": (ROD_PIN_HOLE_XY, (0.045, 0.012)),
@@ -124,7 +138,10 @@ PLAN_KEEP_AT = {
 SECTION_KEEP_AT = {
     "StandDrop": ((-9.5, PAD_TOP_Z), (0.0, 0.010)),
     "StandPocketDepth": ((38.0, PLATE_TOP_Z - STAND_POCKET_DEPTH / 2.0), (0.0, 0.0)),
-    "LocatingBoreDepth": ((47.0, (PLATE_TOP_Z + LOCATING_BORE_FLOOR_Z) / 2.0), (0.0, 0.0)),
+    "LocatingBoreDepth": (
+        (47.0, (PLATE_TOP_Z + LOCATING_BORE_FLOOR_Z) / 2.0),
+        (0.0, 0.0),
+    ),
 }
 # Front elevation (*Bottom: model X right, Z up) projected under the plan at
 # its scale: plate thickness left of it, the pad-top drop right of it (sheet
@@ -224,10 +241,14 @@ def _orient_section(adapter: Any, view: Any) -> None:
         or vertical[1] <= 0.0
         or abs(vertical[0]) > 1e-8
     ):
-        raise RuntimeError(f"section D-D orientation did not persist: {horizontal=}, {vertical=}")
+        raise RuntimeError(
+            f"section D-D orientation did not persist: {horizontal=}, {vertical=}"
+        )
 
 
-def _center_on_outline(adapter: Any, view: Any, target: tuple[float, float], *, label: str) -> None:
+def _center_on_outline(
+    adapter: Any, view: Any, target: tuple[float, float], *, label: str
+) -> None:
     """Move ``view`` so its outline (its ink) is centred on ``target``."""
     view = _early_bound(view, "IView")
     for _attempt in range(3):
@@ -245,7 +266,9 @@ def _center_on_outline(adapter: Any, view: Any, target: tuple[float, float], *, 
 
 def _elevation(adapter: Any) -> Any:
     """The plate's front elevation at the plan's scale, model Z up."""
-    view = place_view(adapter, str(SOURCE), "*Bottom", *ELEVATION_CENTER, scale=PLAN_SCALE)
+    view = place_view(
+        adapter, str(SOURCE), "*Bottom", *ELEVATION_CENTER, scale=PLAN_SCALE
+    )
     origin, east, top = model_points_in_view(
         adapter,
         view,
@@ -276,9 +299,45 @@ def _elevation_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
     return keep
 
 
+def _position_view_label(
+    adapter: Any, view: Any, lower_left: tuple[float, float], *, label: str
+) -> None:
+    """Move a fresh view's one native label so its box's lower-left lands at
+    ``lower_left`` (draw_dt_cone_swing_platform._position_view_label): the
+    anchor is not the box corner, so shift it by the measured corner error.
+    The sheet scale is pinned first so finalization cannot move it after."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    if not sheet.SetScale(*SHEET_SCALES["PLAN"], False, False):
+        raise RuntimeError(f"cannot pin sheet scale before {label} placement")
+    notes = tuple(_read_member(view, "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
+    note = _early_bound(notes[0], "INote")
+    annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+    for _attempt in range(2):
+        extent = tuple(float(value) for value in note.GetExtent())
+        error = (lower_left[0] - extent[0], lower_left[1] - extent[1])
+        if max(abs(error[0]), abs(error[1])) < 0.0002:
+            break
+        anchor = tuple(
+            float(value) for value in _read_member(annotation, "GetPosition")
+        )
+        if not annotation.SetPosition2(anchor[0] + error[0], anchor[1] + error[1], 0.0):
+            raise RuntimeError(f"failed to position native {label}")
+        rebuild_drawing(adapter, label=label)
+    extent = tuple(float(value) for value in note.GetExtent())
+    if max(abs(lower_left[0] - extent[0]), abs(lower_left[1] - extent[1])) > 0.0005:
+        raise RuntimeError(
+            f"native {label} landed at {extent[:2]}, requested {lower_left}"
+        )
+
+
 def _section(adapter: Any, plan: Any) -> Any:
     line = [
-        model_point_in_view(adapter, plan, _mm_to_m((x, 0.0, PLATE_TOP_Z)), label="section D-D line")
+        model_point_in_view(
+            adapter, plan, _mm_to_m((x, 0.0, PLATE_TOP_Z)), label="section D-D line"
+        )
         for x in SECTION_SPAN_X
     ]
     view = create_section_view(
@@ -295,11 +354,14 @@ def _section(adapter: Any, plan: Any) -> Any:
     _orient_section(adapter, view)
     set_hidden_lines_removed(adapter, view)
     _center_on_outline(adapter, view, SECTION_CENTER, label="section D-D")
+    _position_view_label(
+        adapter, view, SECTION_LABEL_LOWER_LEFT, label="section D-D label"
+    )
     return view
 
 
 def _detail(adapter: Any, plan: Any) -> Any:
-    """Detail E: the bore, the hub stand and its counterbore at 4:1."""
+    """Detail E: the bore, the hub stand and its counterbore at 3:1."""
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
@@ -309,7 +371,10 @@ def _detail(adapter: Any, plan: Any) -> Any:
     center, rim = model_points_in_view(
         adapter,
         plan,
-        [_mm_to_m((0.0, 0.0, PLATE_TOP_Z)), _mm_to_m((DETAIL_RADIUS_MM, 0.0, PLATE_TOP_Z))],
+        [
+            _mm_to_m((0.0, 0.0, PLATE_TOP_Z)),
+            _mm_to_m((DETAIL_RADIUS_MM, 0.0, PLATE_TOP_Z)),
+        ],
         label="detail E circle",
     )
     sketch = _early_bound(_early_bound(plan, "IView").GetSketch(), "ISketch")
@@ -318,7 +383,8 @@ def _detail(adapter: Any, plan: Any) -> Any:
     points = []
     for x, y in (center, rim):
         point = _early_bound(
-            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])), "IMathPoint"
+            math_utility.CreatePoint(double_array([float(x), float(y), 0.0])),
+            "IMathPoint",
         )
         projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         points.append(tuple(float(value) for value in projected.ArrayData))
@@ -358,14 +424,22 @@ def _detail(adapter: Any, plan: Any) -> Any:
     # is placed through it (draw_dt_cone_swing_platform._create_detail_view).
     for attempt in range(3):
         projected = model_point_in_view(
-            adapter, detail, _mm_to_m((0.0, 0.0, PLATE_TOP_Z)), label=f"detail E centre {attempt}"
+            adapter,
+            detail,
+            _mm_to_m((0.0, 0.0, PLATE_TOP_Z)),
+            label=f"detail E centre {attempt}",
         )
         if math.dist(projected, DETAIL_CENTER) < 0.0005:
             break
         rebuild_drawing(adapter, label="settle detail E")
     else:
-        raise RuntimeError(f"detail E projects its centre to {projected!r}, not {DETAIL_CENTER!r}")
+        raise RuntimeError(
+            f"detail E projects its centre to {projected!r}, not {DETAIL_CENTER!r}"
+        )
     set_hidden_lines_removed(adapter, detail)
+    _position_view_label(
+        adapter, detail, DETAIL_LABEL_LOWER_LEFT, label="detail E label"
+    )
     return detail
 
 
@@ -395,21 +469,37 @@ def _tags(adapter: Any, view: Any) -> None:
     z = PLATE_TOP_Z
     targets: list[tuple[str, Any, tuple[float, float]]] = []
     for tag, cx, cy, _length, width in PAD_POCKETS:
-        edge = edges.exact_line_through((cx, cy + width / 2.0, z), label=f"pocket {tag}")
+        edge = edges.exact_line_through(
+            (cx, cy + width / 2.0, z), label=f"pocket {tag}"
+        )
         targets.append((tag, edge.edge, (cx, 17.0)))
     for tag, cx, cy, length, _width in REST_POCKETS:
         side = math.copysign(1.0, cx)
-        edge = edges.exact_line_through((cx + side * length / 2.0, cy, z), label=f"pocket {tag}")
+        edge = edges.exact_line_through(
+            (cx + side * length / 2.0, cy, z), label=f"pocket {tag}"
+        )
         targets.append((tag, edge.edge, (cx + side * 20.0, cy)))
     for index, (x, y) in enumerate(HOLD_DOWN_POINTS, start=1):
-        edge = edges.circle_at((x, y, z), HOLD_DOWN_CBORE_DIA / 2.0, axis=(0, 0, 1), label=f"H{index}")
+        edge = edges.circle_at(
+            (x, y, z), HOLD_DOWN_CBORE_DIA / 2.0, axis=(0, 0, 1), label=f"H{index}"
+        )
         targets.append(
-            (f"H{index}", edge.edge, (x - math.copysign(15.0, x), -50.0 if y < 0 else 55.0))
+            (
+                f"H{index}",
+                edge.edge,
+                (x - math.copysign(15.0, x), -50.0 if y < 0 else 55.0),
+            )
         )
     for index, (x, y) in enumerate(CLAMP_STUD_POINTS, start=1):
-        edge = edges.circle_at((x, y, z), CLAMP_STUD_DRILL_DIA / 2.0, axis=(0, 0, 1), label=f"S{index}")
+        edge = edges.circle_at(
+            (x, y, z), CLAMP_STUD_DRILL_DIA / 2.0, axis=(0, 0, 1), label=f"S{index}"
+        )
         targets.append(
-            (f"S{index}", edge.edge, (x + math.copysign(12.0, x), -46.0 if y < 0 else 55.0))
+            (
+                f"S{index}",
+                edge.edge,
+                (x + math.copysign(12.0, x), -46.0 if y < 0 else 55.0),
+            )
         )
     bore = edges.circle_at(
         (0.0, 0.0, PLATE_TOP_Z - STAND_POCKET_DEPTH),
@@ -418,7 +508,9 @@ def _tags(adapter: Any, view: Any) -> None:
         label="L",
     )
     targets.append(("L", bore.edge, (0.0, -16.0)))
-    pin = edges.circle_at((*ROD_PIN_HOLE_XY, z), ROD_PIN_HOLE_DIA / 2.0, axis=(0, 0, 1), label="P")
+    pin = edges.circle_at(
+        (*ROD_PIN_HOLE_XY, z), ROD_PIN_HOLE_DIA / 2.0, axis=(0, 0, 1), label="P"
+    )
     targets.append(("P", pin.edge, (140.0, 18.0)))
     sheet_xy = model_points_in_view(
         adapter,
@@ -471,7 +563,9 @@ async def build(adapter: Any) -> dict[str, str]:
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALES["PLAN"], layout=SPEC.layout
     )
-    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="profile fixture drawing package")
+    create_blank_drawing_sheets(
+        adapter, SHEET_NAMES, label="profile fixture drawing package"
+    )
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -504,7 +598,9 @@ async def build(adapter: Any) -> dict[str, str]:
     section_annotations = curate_view_dimensions(
         adapter,
         section,
-        keep=_keep(adapter, section, SECTION_KEEP_AT, _section_point, label="section keep"),
+        keep=_keep(
+            adapter, section, SECTION_KEEP_AT, _section_point, label="section keep"
+        ),
         view_label="section D-D",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
@@ -539,7 +635,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         plan,
         edge=plan_edges.circle_at(
-            (*hold_down, PLATE_TOP_Z), HOLD_DOWN_CBORE_DIA / 2.0, axis=(0, 0, 1), label="H2"
+            (*hold_down, PLATE_TOP_Z),
+            HOLD_DOWN_CBORE_DIA / 2.0,
+            axis=(0, 0, 1),
+            label="H2",
         ).edge,
         callout_xy=HOLD_DOWN_CALLOUT_XY,
         label="hold-down counterbore",
@@ -561,10 +660,16 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         edge=detail_edges.circle_at(
-            (0.0, 0.0, LOCATING_BORE_FLOOR_Z), PIVOT_TAP_DRILL_DIA / 2.0, axis=(0, 0, 1), label="pivot tap"
+            (0.0, 0.0, LOCATING_BORE_FLOOR_Z),
+            PIVOT_TAP_DRILL_DIA / 2.0,
+            axis=(0, 0, 1),
+            label="pivot tap",
         ).edge,
         callout_xy=model_point_in_view(
-            adapter, detail, _mm_to_m(_plan_point(PIVOT_CALLOUT_AT)), label="pivot tap callout"
+            adapter,
+            detail,
+            _mm_to_m(_plan_point(PIVOT_CALLOUT_AT)),
+            label="pivot tap callout",
         ),
         label="pivot screw tap",
         process="TAP",
@@ -612,7 +717,10 @@ async def build(adapter: Any) -> dict[str, str]:
     for index, sheet_name in enumerate(SHEET_NAMES, start=1):
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate sheet {sheet_name!r} for audit")
-        if add_note(adapter, f"SHEET {index} OF {len(SHEET_NAMES)}", *SHEET_COUNT_XY) is None:
+        if (
+            add_note(adapter, f"SHEET {index} OF {len(SHEET_NAMES)}", *SHEET_COUNT_XY)
+            is None
+        ):
             raise RuntimeError(f"failed to stamp sheet count on {sheet_name!r}")
         rebuild_drawing(adapter, label=f"profile fixture {sheet_name} layout")
         check_drawing_layout(adapter, layout=SPEC.layout, stem=sheet_name)
