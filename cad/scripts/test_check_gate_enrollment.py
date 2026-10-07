@@ -238,24 +238,43 @@ def test_every_maintained_test_has_a_current_disposition(pytestconfig):
     assert optional["cad/scripts/test_verify_telemetry.py"] == {"verify_telemetry"}
 
 
-def test_actual_root_collection_matches_configured_inventory(pytestconfig):
-    # The already-collected session is the witness. Never recursively run pytest
-    # from this gate, which would collect/execute the entire suite a second time.
+def _audit_session_collection(pytestconfig, root, inventory, witness_path):
+    """Return whether this already-collected session is a full-root witness."""
     session = pytestconfig.pluginmanager.get_plugin("session")
     assert session is not None, "pytest's collected session is unavailable"
-    inventory = _configured_inventory(pytestconfig, REPO_ROOT)
-    collected = {_relative(Path(item.path), REPO_ROOT) for item in session.items}
-    assert _relative(Path(__file__), REPO_ROOT) in collected
+    collected = {_relative(Path(item.path), root) for item in session.items}
+    witness = _relative(witness_path, root)
+    assert witness in collected, f"pytest did not collect its enrollment witness: {witness}"
     assert not collected - inventory, (
         f"pytest collected out-of-scope test paths: {sorted(collected - inventory)}"
     )
+    # Root arguments survive pytest's filtering hooks. Their remaining items
+    # cannot witness complete root collection, even if a filter happened to
+    # match everything. Order-only --ff/--nf and --collect-only do not filter.
+    filtered = any(
+        pytestconfig.getoption(option, default=None)
+        for option in ("keyword", "markexpr", "lf", "deselect", "ignore", "ignore_glob")
+    )
+    reporter = pytestconfig.pluginmanager.get_plugin("terminalreporter")
+    deselected = reporter is not None and bool(reporter.stats.get("deselected"))
+    if filtered or deselected or any("::" in arg for arg in pytestconfig.args):
+        return False
     selectors = {
-        _relative(Path(arg) if Path(arg).is_absolute() else REPO_ROOT / arg, REPO_ROOT)
+        _relative(Path(arg) if Path(arg).is_absolute() else root / arg, root)
         for arg in pytestconfig.args
-        if "::" not in arg
     }
-    if selectors in (set(ROOT_ANCHORS), {"."}):
-        _assert_root_collection(inventory, collected)
+    if selectors not in (set(ROOT_ANCHORS), {"."}):
+        return False
+    _assert_root_collection(inventory, collected)
+    return True
+
+
+def test_actual_root_collection_matches_configured_inventory(pytestconfig):
+    # Never recursively run pytest: the existing session is the collection
+    # witness, not proof that the collected tests have executed or passed.
+    inventory = _configured_inventory(pytestconfig, REPO_ROOT)
+    if not _audit_session_collection(pytestconfig, REPO_ROOT, inventory, Path(__file__)):
+        pytest.skip("full-root collection witness requires an unfiltered root selection")
 
 
 @pytest.fixture
@@ -488,3 +507,99 @@ def test_collected_root_witness_cannot_omit_a_root(inventory_tree, relative_root
     inventory = _configured_inventory(config, root)
     with pytest.raises(AssertionError, match=ROOT_ANCHORS[relative_root]):
         _assert_root_collection(inventory, inventory - {ROOT_ANCHORS[relative_root]})
+
+
+def _collected_session_config(root, collected, *, options=None, args=None, deselected=()):
+    session = SimpleNamespace(
+        items=[SimpleNamespace(path=root / relative) for relative in sorted(collected)]
+    )
+    plugins = {
+        "session": session,
+        "terminalreporter": SimpleNamespace(stats={"deselected": list(deselected)}),
+    }
+    options = options or {}
+    return SimpleNamespace(
+        args=list(ROOT_ANCHORS) if args is None else args,
+        getoption=lambda name, default=None: options.get(name, default),
+        pluginmanager=SimpleNamespace(get_plugin=plugins.get),
+    )
+
+
+@pytest.mark.parametrize("args", [list(ROOT_ANCHORS), ["."]])
+@pytest.mark.parametrize(("option", "value"), [
+    ("keyword", "enrollment"),
+    ("markexpr", "offline"),
+    ("lf", True),
+    ("deselect", ["tests/test_pytest_scope.py::test_pytest_reads_the_root_configuration"]),
+    ("ignore", ["tests/test_pytest_scope.py"]),
+    ("ignore_glob", ["tests/test_pytest_*.py"]),
+])
+def test_filtered_root_session_is_not_a_full_collection_witness(
+    inventory_tree, args, option, value
+):
+    root, config, _settings = inventory_tree
+    inventory = _configured_inventory(config, root)
+    missing = ROOT_ANCHORS["tests"]
+    collected = inventory - {missing}
+    witness = root / ROOT_ANCHORS["cad/scripts"]
+    selection = {option: value}
+    config = _collected_session_config(root, collected, options=selection, args=args)
+    assert _audit_session_collection(config, root, inventory, witness) is False
+    # Same incomplete session, but no intentional selection: the consumer must
+    # still refuse the named missing path, not silently lower root coverage.
+    selection.clear()
+    with pytest.raises(AssertionError, match=missing):
+        _audit_session_collection(config, root, inventory, witness)
+
+
+def test_recorded_deselection_without_selection_options_is_not_a_full_witness(inventory_tree):
+    root, config, _settings = inventory_tree
+    inventory = _configured_inventory(config, root)
+    missing = ROOT_ANCHORS["tests"]
+    config = _collected_session_config(
+        root, inventory - {missing}, deselected=[SimpleNamespace(path=root / missing)]
+    )
+    witness = root / ROOT_ANCHORS["cad/scripts"]
+    assert _audit_session_collection(config, root, inventory, witness) is False
+    config.pluginmanager.get_plugin("terminalreporter").stats["deselected"].clear()
+    with pytest.raises(AssertionError, match=missing):
+        _audit_session_collection(config, root, inventory, witness)
+
+
+@pytest.mark.parametrize("option", ["failedfirst", "newfirst", "collectonly"])
+def test_order_only_and_collection_only_modes_preserve_full_root_refusals(inventory_tree, option):
+    root, config, _settings = inventory_tree
+    inventory = _configured_inventory(config, root)
+    missing = ROOT_ANCHORS["tests"]
+    config = _collected_session_config(root, inventory - {missing}, options={option: True})
+    witness = root / ROOT_ANCHORS["cad/scripts"]
+    with pytest.raises(AssertionError, match=missing):
+        _audit_session_collection(config, root, inventory, witness)
+    config.pluginmanager.get_plugin("session").items.append(SimpleNamespace(path=root / missing))
+    assert _audit_session_collection(config, root, inventory, witness) is True
+
+
+@pytest.mark.parametrize("args", [
+    ["cad/scripts/test_check_gate_enrollment.py"],
+    [*ROOT_ANCHORS, "tests/test_pytest_scope.py::test_pytest_reads_the_root_configuration"],
+])
+def test_explicit_file_or_node_selection_is_not_a_full_root_witness(inventory_tree, args):
+    root, config, _settings = inventory_tree
+    inventory = _configured_inventory(config, root)
+    config = _collected_session_config(root, inventory - {ROOT_ANCHORS["tests"]}, args=args)
+    assert _audit_session_collection(
+        config, root, inventory, root / ROOT_ANCHORS["cad/scripts"]
+    ) is False
+
+
+def test_filtered_collection_still_refuses_out_of_scope_items(inventory_tree):
+    root, config, _settings = inventory_tree
+    inventory = _configured_inventory(config, root)
+    outside = "SolidworksMCP-python/tests/test_vendor.py"
+    config = _collected_session_config(
+        root, inventory | {outside}, options={"keyword": "enrollment"}
+    )
+    with pytest.raises(AssertionError, match=outside):
+        _audit_session_collection(
+            config, root, inventory, root / ROOT_ANCHORS["cad/scripts"]
+        )

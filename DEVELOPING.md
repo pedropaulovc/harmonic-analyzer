@@ -497,6 +497,9 @@ a concrete reason. There is no pending-triage exemption. Base serial belongs to
 contracts belong to `check:recipe`. Launcher, checkout/farm-mode, root-scope,
 doit-load and pose-conversion infrastructure tests remain explicit root-runner
 tests; a green CAD check is not evidence that those tests ran.
+The complete collection witness requires an unfiltered root invocation. File/node
+selection, `-k`, `-m`, last-failed, deselection and ignore options remain valid
+targeted runs, but skip that full-root witness rather than implying full coverage.
 
 Pytest check stamps depend on root `conftest.py`, pytest configuration/lockfile
 and the executed local source closure, including fixture/tooling/adapter helpers
