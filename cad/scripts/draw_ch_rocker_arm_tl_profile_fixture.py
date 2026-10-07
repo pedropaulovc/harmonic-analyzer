@@ -109,13 +109,13 @@ SECTION_CENTER = (0.300, 0.128)
 # section label met the title block and the detail label fell 47 mm under its
 # circle onto section D-D (run 20261007T181225620Z; boxes 45.8 x 16.2 and
 # 31.5 x 16.2 mm). The section label sits centred under the cut, the detail
-# label right of its circle.
+# label right of its view box (76 mm square at 3:1, run 20261007T181821050Z).
 SECTION_LABEL_LOWER_LEFT = (SECTION_CENTER[0] - 0.0229, 0.069)
 SECTION_SCALE = (2, 1)
 DETAIL_CENTER = (0.330, 0.212)
 DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 9.0
-DETAIL_LABEL_LOWER_LEFT = (0.362, 0.204)
+DETAIL_LABEL_LOWER_LEFT = (0.373, 0.204)
 NOTES_XY = (0.016, 0.045)
 HOLD_DOWN_CALLOUT_XY = (0.226, 0.192)
 STUD_CALLOUT_XY = (0.228, 0.260)
