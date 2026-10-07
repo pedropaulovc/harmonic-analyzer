@@ -15,7 +15,6 @@ from _drawing_common import (
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -154,17 +153,12 @@ def _hatch_pin_apart(adapter: Any, section: Any) -> None:
             before = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
             hatch.UseMaterialHatch = False
             hatch.Angle = angle
-            hatch.Scale2 = 0.5
+            # A longitudinally cut pin reads unhatched: spacing wider than the pin.
+            hatch.Scale2 = 100.0 if name == pin else 0.5
             after = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
             if abs(float(hatch.Angle) - angle) > 1e-6 or not str(hatch.Pattern):
                 raise RuntimeError(f"section hatch did not persist: {before} -> {after}")
     adapter.currentModel.EditRebuild3()
-
-
-def _pin_length_reference(adapter: Any, annotations: list[Any]) -> None:
-    """The bought pin's cut length is reference; the 2.378 projection controls."""
-    by_name = {dimension_name(adapter, a): a for a in annotations}
-    set_reference_dimension(adapter, by_name["PinLength"], label="gauge-pin cut length")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -233,7 +227,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _overall_reference(adapter, section, to_sheet)
-    _pin_length_reference(adapter, moved)
     _hatch_pin_apart(adapter, section)
     create_section_axis_centerline(
         adapter, section, length_mm=OVERALL_LENGTH + LAND_HEIGHT, label="pin turning axis"
