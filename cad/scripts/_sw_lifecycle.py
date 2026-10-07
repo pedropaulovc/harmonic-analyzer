@@ -31,12 +31,17 @@ Telemetry: every operation is a ``build-infra`` span (like the COM seat queue an
 the artefact cache), so a trace answers "did this build have to start or recover
 SolidWorks, and how long did it wait?" in one filter. ``sw.ensure_ready`` carries
 ``initial_state`` / ``action`` / ``final_state``; ``sw.start`` / ``sw.stop`` /
-``sw.wait_connected`` time the sub-steps.
+``sw.wait_connected`` time the sub-steps. Recovery spans carry ``recover.reason``
+and caller context, ``stop.ok``, and ``outcome``. Connect waits record transitions,
+per-state dwell, and one-shot no-process/sign-in stalls; swallowed recovery errors
+are explicitly recorded as ERROR spans.
 """
 
 from __future__ import annotations
 
+import math
 import os
+import time
 
 import _telemetry
 
@@ -61,11 +66,18 @@ _DEFAULT_CONNECT_TIMEOUT = 900.0
 # the second force_recover needed in both measured incidents.
 _READY_GRACE_FRACTION = 1.0 / 3.0
 # The one state value that means "ready to build". Callers compare the state
-# force_recover RETURNS against this rather than re-probing via is_connected():
+# force_recover RETURNS against this rather than re-probing via current_state():
 # force_recover returns "error" exactly when detect_state() raised, so a second
 # probe would re-raise that failure into the caller and abort the retry path.
 CONNECTED_STATE = "connected"
 _INFRA = _telemetry.BUILD_INFRA_SERVICE
+_WEDGE_STATE = "dotnet_splash_wedge"
+_NOT_RUNNING_STATE = "not_running"
+_POLL_S = 2.0  # Match sw_recovery.wait_until_connected's existing cadence.
+_NO_PROCESS_AFTER_S = 120.0
+_SIGNIN_TITLE_PREFIX = "Login | 3DEXPERIENCE ID"
+_monotonic = time.monotonic
+_sleep = time.sleep
 
 
 def _disabled() -> bool:
@@ -73,10 +85,29 @@ def _disabled() -> bool:
 
 
 def _connect_timeout() -> float:
-    try:
-        return float(os.environ.get(_CONNECT_TIMEOUT_ENV, _DEFAULT_CONNECT_TIMEOUT))
-    except ValueError:
+    """Reject deadlines that cannot be reached (NaN, infinity, non-positive)."""
+    raw = os.environ.get(_CONNECT_TIMEOUT_ENV, "").strip()
+    if not raw:
         return _DEFAULT_CONNECT_TIMEOUT
+    try:
+        value = float(raw)
+    except ValueError:
+        value = math.nan
+    if math.isfinite(value) and value > 0:
+        return value
+    _telemetry.warn(
+        f"[sw] ignoring {_CONNECT_TIMEOUT_ENV}={raw!r}: not a positive finite number "
+        f"of seconds; using {_DEFAULT_CONNECT_TIMEOUT:.0f} s"
+    )
+    return _DEFAULT_CONNECT_TIMEOUT
+
+
+def _mark_failed(span, exc: BaseException) -> None:
+    """Swallowing a best-effort failure must not make its span look successful."""
+    from opentelemetry.trace import Status, StatusCode
+
+    span.record_exception(exc)
+    span.set_status(Status(StatusCode.ERROR, f"{type(exc).__name__}: {exc}"))
 
 
 def ensure_ready() -> str:
@@ -128,20 +159,20 @@ def ensure_ready() -> str:
                 _telemetry.warn(f"[sw] still not connected after ensure_ready (state={final.value})")
             return final.value
         except Exception as exc:  # noqa: BLE001 - autostart must never harden into a new failure
+            _mark_failed(span, exc)
             _telemetry.error(f"[sw] ensure_ready failed ({exc}); proceeding to connect anyway",
                              exc_info=True)
             return "error"
 
 
-def is_connected() -> bool:
-    """True when SolidWorks is running and the connector reports loaded."""
+def current_state() -> str:
+    """The seat's state value now; a failed probe propagates."""
     from solidworks_mcp.adapters import sw_recovery
-    from solidworks_mcp.adapters.sw_recovery import SolidWorksState
 
-    return sw_recovery.detect_state() is SolidWorksState.CONNECTED
+    return str(sw_recovery.detect_state().value)
 
 
-def force_recover() -> str:
+def force_recover(reason: str, **context: object) -> str:
     """Unconditional kill → relaunch → wait-connected for the COM-failure retry path.
 
     Unlike :func:`ensure_ready`, does NOT trust ``detect_state()`` — a crashed
@@ -149,21 +180,35 @@ def force_recover() -> str:
     stop→start, and first clears the crash-report handler (``sldexitapp.exe``) so a
     crashed session's modal can't block the relaunch. Best-effort; returns the final
     state value.
+
+    The reason and caller context are recorded as ``recover.*`` attributes.
+    A recovery ending anywhere but connected is an ERROR span.
     """
+    from opentelemetry.trace import Status, StatusCode
     from solidworks_mcp.adapters import sw_recovery
 
     timeout = _connect_timeout()
-    with _telemetry.span("sw.force_recover", service=_INFRA) as span:
+    attributes = {f"recover.{key}": value for key, value in context.items()}
+    attributes["recover.reason"] = reason
+    with _telemetry.span("sw.force_recover", service=_INFRA, **attributes) as span:
         try:
             _kill_crash_handler()
-            with _telemetry.span("sw.stop", service=_INFRA):
+            with _telemetry.span("sw.stop", service=_INFRA) as stop:
                 _telemetry.event("sw.stop")
-                sw_recovery.stop_solidworks()
-            _start(sw_recovery, timeout)
-            final = sw_recovery.detect_state().value
+                stopped = bool(sw_recovery.stop_solidworks())
+                stop.set_attribute("stop.ok", stopped)
+            span.set_attribute("stop.ok", stopped)
+            outcome = _start(sw_recovery, timeout)
+            span.set_attribute("outcome", outcome)
+            final = str(sw_recovery.detect_state().value)
             span.set_attribute("final_state", final)
+            if final != CONNECTED_STATE:
+                span.set_status(
+                    Status(StatusCode.ERROR, f"recovery {outcome}, final_state={final}")
+                )
             return final
         except Exception as exc:  # noqa: BLE001 - recovery must not harden into a new failure
+            _mark_failed(span, exc)
             _telemetry.error(f"[sw] force_recover failed ({exc})", exc_info=True)
             return "error"
 
@@ -190,23 +235,25 @@ def wait_until_ready() -> str:
     with _telemetry.span("sw.wait_ready", service=_INFRA) as span:
         span.set_attribute("grace_s", grace)
         try:
-            _wait(sw_recovery, grace)
+            outcome = _wait(sw_recovery, grace)
+            if outcome != CONNECTED_STATE:
+                _telemetry.event("sw.grace_abandoned", grace_s=grace, reason=outcome)
         except Exception as exc:  # noqa: BLE001 - recovery must never fail the build
+            _mark_failed(span, exc)
             _telemetry.warn(f"[sw] wait_until_ready gave up after {grace:.0f}s ({exc})")
             # Abandoning the grace is a decision INSIDE this span, and the retry
             # that follows it will probably fail -- so the trace has to show when
             # the wait was given up on, not just that the span ran its length.
             _telemetry.event("sw.grace_abandoned", grace_s=grace, reason=str(exc))
-        final = _state_value(sw_recovery)
+        try:
+            final = str(sw_recovery.detect_state().value)
+        except Exception as exc:  # noqa: BLE001 - final probe is best-effort too
+            _mark_failed(span, exc)
+            final = "unknown"
         span.set_attribute("final_state", final)
         return final
 
 
-def _state_value(sw_recovery) -> str:
-    try:
-        return str(sw_recovery.detect_state().value)
-    except Exception:  # noqa: BLE001 - a state read must not fail the build
-        return "unknown"
 
 
 def _kill_crash_handler() -> None:
@@ -224,16 +271,114 @@ def _kill_crash_handler() -> None:
         pass
 
 
-def _wait(sw_recovery, timeout: float) -> None:
-    with _telemetry.span("sw.wait_connected", service=_INFRA):
-        sw_recovery.wait_until_connected(timeout=timeout)
+def _wait(sw_recovery, timeout: float) -> str:
+    with _telemetry.span("sw.wait_connected", service=_INFRA) as span:
+        return _poll_connected(sw_recovery, timeout, span, after_launch=False)
 
 
-def _start(sw_recovery, timeout: float) -> None:
-    with _telemetry.span("sw.start", service=_INFRA):
+def _start(sw_recovery, timeout: float) -> str:
+    """Launch and poll, or return immediately if the library refused to launch."""
+    with _telemetry.span("sw.start", service=_INFRA) as span:
         _telemetry.event("sw.start", via="connector-launch")
-        if sw_recovery.start_solidworks():
-            sw_recovery.wait_until_connected(timeout=timeout)
+        launched = bool(sw_recovery.start_solidworks())
+        span.set_attribute("start.launched", launched)
+        if not launched:
+            return "not_launched"
+        return _poll_connected(sw_recovery, timeout, span, after_launch=True)
+
+
+def _poll_connected(sw_recovery, timeout: float, span, *, after_launch: bool) -> str:
+    """Bound the existing two-second poll, naming transitions and dwell.
+
+    State reads propagate to the enclosing best-effort lifecycle handler. The
+    finally block retains elapsed time and the last known state's dwell even
+    when a read raises, rather than silently burning the rest of the budget.
+    """
+    started = _monotonic()
+    deadline = started + timeout
+    dwell: dict[str, float] = {}
+    state, since = "", started
+    stalls: set[str] = set()
+    outcome = "error"
+    try:
+        while True:
+            now = _monotonic()
+            current = str(sw_recovery.detect_state().value)
+            if current != state:
+                if state:
+                    dwell[state] = dwell.get(state, 0.0) + (now - since)
+                _telemetry.event("sw.state", state=current, elapsed_s=round(now - started, 1))
+                state, since = current, now
+            if current == CONNECTED_STATE:
+                outcome = "connected"
+                return outcome
+            if current == _WEDGE_STATE:
+                outcome = "wedge"
+                return outcome
+            _note_stalls(stalls, current, now - started, after_launch=after_launch)
+            if now >= deadline:
+                outcome = "timeout"
+                return outcome
+            _sleep(_POLL_S)
+    finally:
+        ended = _monotonic()
+        if state:
+            dwell[state] = dwell.get(state, 0.0) + (ended - since)
+        for name, seconds in dwell.items():
+            span.set_attribute(f"dwell.{name}_s", round(seconds, 1))
+        span.set_attribute("wait.outcome", outcome)
+        span.set_attribute("wait.s", round(ended - started, 1))
+
+
+def _note_stalls(stalls: set[str], state: str, elapsed: float, *, after_launch: bool) -> None:
+    if (
+        after_launch
+        and "no_process" not in stalls
+        and state == _NOT_RUNNING_STATE
+        and elapsed >= _NO_PROCESS_AFTER_S
+    ):
+        stalls.add("no_process")
+        _telemetry.event("sw.no_process", elapsed_s=round(elapsed, 1))
+    if "signin" in stalls:
+        return
+    title = _signin_window()
+    if title is not None:
+        stalls.add("signin")
+        _telemetry.event("sw.signin_window", title=title, elapsed_s=round(elapsed, 1))
+
+
+def _signin_window() -> str | None:
+    """Read visible sign-in titles with pointer-width HWND signatures."""
+    import ctypes
+    from ctypes import wintypes
+
+    found: list[str] = []
+    wanted = _SIGNIN_TITLE_PREFIX.casefold()
+    try:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        callback = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        user32.EnumWindows.argtypes = [callback, wintypes.LPARAM]
+        user32.EnumWindows.restype = wintypes.BOOL
+        user32.IsWindowVisible.argtypes = [wintypes.HWND]
+        user32.IsWindowVisible.restype = wintypes.BOOL
+        user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        user32.GetWindowTextW.restype = ctypes.c_int
+
+        def visit(hwnd, _parameter):
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            buffer = ctypes.create_unicode_buffer(512)
+            user32.GetWindowTextW(hwnd, buffer, len(buffer))
+            title = buffer.value.strip()
+            if not title.casefold().startswith(wanted):
+                return True
+            found.append(title)
+            return False
+
+        user32.EnumWindows(callback(visit), 0)
+    except Exception:  # noqa: BLE001 - an unreadable desktop cannot affect recovery
+        return None
+    return found[0] if found else None
 
 
 def _recover(sw_recovery, timeout: float) -> None:

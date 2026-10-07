@@ -42,17 +42,32 @@ assembly actions, drawings):
   Measured: `ensure_ready` fires exactly once across a multi-part build (~0.8s no-op
   when SW already up), vs ~0.76s × every task under the old per-`run_build` hook.
 - **Retry on a SolidWorks failure**: if a COM subprocess exits with a watchdog
-  crash/op-timeout code (86/87) or leaves SW not-`CONNECTED`, `_exec_com` retries up
-  to 3× with **1/2/4-min backoff**, calling `_sw_lifecycle.force_recover()` (kill→
-  relaunch) between attempts. An ordinary failure (gate assertion) with SW still
+  crash/op-timeout/modal/startup code (86/87/88/89) or leaves SW not-`CONNECTED`,
+  `_exec_com` retries up to 3× with **1/2/4-min backoff**, calling
+  `_sw_lifecycle.force_recover(reason, **context)` (kill→relaunch) between attempts.
+  With autostart disabled, no recovery runs; only exit 89 gets one same-seat retry.
+  An ordinary failure (gate assertion) with SW still
   healthy is NOT retried — it raises immediately. `force_recover` is unconditional
   (a crashed SW is a zombie that still reads `CONNECTED`, so it can't trust
   `detect_state`) and first `taskkill`s `sldexitapp.exe` (crash dialog).
 
 Opt out `HARMONIC_SW_AUTOSTART=0`; connect-wait `HARMONIC_SW_CONNECT_TIMEOUT`
-(default 300s). Every action is a `build-infra` span (`sw.ensure_ready`,
-`sw.force_recover`, `sw.start`/`sw.stop`/`sw.wait_connected`), so a trace answers
-"did this build have to start or recover SolidWorks?".
+(default 900s; positive finite overrides only). Every action is a `build-infra`
+span (`sw.ensure_ready`, `sw.force_recover`, `sw.start`/`sw.stop`/`sw.wait_connected`).
+Recovery records `recover.reason` and caller context (`recover.caller`, task label,
+exit code and attempt, or commit/budget for memory preflight), `stop.ok`,
+`start.launched`, `outcome` and `final_state`. Exit reasons are `watchdog_crash`,
+`watchdog_op_timeout`, `watchdog_modal`, `watchdog_seat_not_ready`; ordinary
+unhealthy exits name `seat_<state>`, and preflight names `memory`.
+Connect waits emit `sw.state` only at transitions, `dwell.<state>_s` and `wait.s`;
+`sw.no_process` and `sw.signin_window` are one-shot observations, never recovery
+decisions. Grace abandonment emits `sw.grace_abandoned`. A non-connected recovery
+or swallowed lifecycle exception marks its span ERROR; exceptions are recorded.
+The sign-in scan is read-only with pointer-width Win32 signatures.
+
+The telemetry port is covered by fake-clock/fake-seat tests, not new live-seat
+evidence. The live validation below is historical and does not validate the new
+sign-in scan on a session-1 desktop.
 
 **Validation state (be honest):** the full stop→start→wait cycle is LIVE-VALIDATED on
 this seat (stop ~1.5s, connector launch, ~135s to `CONNECTED_LOAD_STATUS=2`).

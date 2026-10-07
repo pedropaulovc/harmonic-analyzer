@@ -700,9 +700,11 @@ def test_exit_89_takes_the_recover_and_retry_path(monkeypatch):
         lambda *_a, **_kw: (calls.append("run"), 89 if len(calls) == 1 else 0)[1],
     )
     # SolidWorks still reads connected: only the exit code can say "retry".
-    monkeypatch.setattr(dodo._sw_lifecycle, "is_connected", lambda: True)
+    monkeypatch.setattr(dodo._sw_lifecycle, "current_state", lambda: "connected")
     monkeypatch.setattr(
-        dodo._sw_lifecycle, "force_recover", lambda: (calls.append("recover"), "connected")[1]
+        dodo._sw_lifecycle,
+        "force_recover",
+        lambda reason, **context: (calls.append("recover"), "connected")[1],
     )
 
     dodo._exec_com(["x"], "drawing:dt_crank_hub")
@@ -720,7 +722,9 @@ def _farm_leaf(monkeypatch, *codes: int) -> tuple[Any, list[str]]:
         dodo, "_run_subprocess", lambda *_a, **_kw: (calls.append("run"), next(answers))[1]
     )
     monkeypatch.setattr(
-        dodo._sw_lifecycle, "force_recover", lambda: pytest.fail("a farm leaf killed its seat")
+        dodo._sw_lifecycle,
+        "force_recover",
+        lambda reason, **context: pytest.fail("a farm leaf killed its seat"),
     )
     monkeypatch.setattr(
         dodo, "_fail_task", lambda _label, rc, **_kw: calls.append(f"fail {rc}")
