@@ -27,6 +27,7 @@ from _surface_finish import surface_finish_by_key
 from ch_rocker_arm_tl_filing_button_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    REFERENCE_CALLOUTS,
     REFERENCE_DIMENSIONS,
     SURFACE_FINISHES,
 )
@@ -140,12 +141,18 @@ async def build(adapter: Any) -> dict[str, str]:
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
             raise RuntimeError(f"expected one filing-button {name} reference dimension")
-        set_reference_dimension(
+        display = set_reference_dimension(
             adapter,
             matches[0],
             label=f"filing button {name}",
             diameter=name.endswith("Dia"),
         )
+        # Policy rules 2 and 6: the matched fit rides the callout.
+        for part, text in zip((3, 4), REFERENCE_CALLOUTS.get(name, ())):
+            if text:  # swDimensionTextCalloutAbove / CalloutBelow
+                display.SetText(part, text)
+                if str(display.GetText(part) or "") != text:
+                    raise RuntimeError(f"filing button {name} fit callout did not take")
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

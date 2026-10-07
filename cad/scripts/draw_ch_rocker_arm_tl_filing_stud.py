@@ -30,7 +30,7 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
-    REFERENCE_LABELS,
+    REFERENCE_CALLOUTS,
     TAIL_END,
     THREAD_END,
 )
@@ -60,7 +60,7 @@ PROFILE_CENTER = (0.170, 0.170)
 # The view centres on the model box (tail end to thread end).
 SEAT_X = PROFILE_CENTER[0] + (TAIL_END - THREAD_END) / 2.0 * _S
 DONOR_CENTER = (0.330, 0.100)
-ISO_CENTER = (0.330, 0.190)
+ISO_CENTER = (0.355, 0.195)  # clear of the two-line fit callout
 ISO_NOTE_XY = (0.295, 0.240)
 NOTES_XY = (0.020, 0.075)
 _ABOVE = PROFILE_CENTER[1] + 0.040
@@ -172,13 +172,12 @@ async def build(adapter: Any) -> dict[str, str]:
             label=f"filing stud {name}",
             diameter=name.endswith("Dia"),
         )
-        # Codex round 13 read the reference diameter as a separate plain
-        # shank: name it as the locating diameter the fit note governs.
-        label_text = REFERENCE_LABELS.get(name)
-        if label_text:
-            display.SetText(4, label_text)  # swDimensionTextCalloutBelow
-            if str(display.GetText(4) or "") != label_text:
-                raise RuntimeError(f"filing stud {name} label did not take")
+        # Policy rules 2 and 6: the matched fit rides the callout.
+        for part, text in zip((3, 4), REFERENCE_CALLOUTS.get(name, ())):
+            if text:  # swDimensionTextCalloutAbove / CalloutBelow
+                display.SetText(part, text)
+                if str(display.GetText(part) or "") != text:
+                    raise RuntimeError(f"filing stud {name} fit callout did not take")
     add_view_centerline(
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )

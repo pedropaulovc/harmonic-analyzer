@@ -90,7 +90,15 @@ V_TOTAL = (
 # larger diameters first on each side so each step is the next one's stock.
 _STEPS = (
     ("BodyProfile", "Body", "BodyDia", "BodyLength", BODY_DIA, BODY_LENGTH, False),
-    ("ThreadProfile", "Thread", "ThreadDia", "ThreadEnd", THREAD_MODEL_DIA, THREAD_END, False),
+    (
+        "ThreadProfile",
+        "Thread",
+        "ThreadDia",
+        "ThreadEnd",
+        THREAD_MODEL_DIA,
+        THREAD_END,
+        False,
+    ),
     ("HeadProfile", "Head", "HeadDia", "HeadLength", HEAD_DIA, HEAD_LENGTH, True),
     ("TailProfile", "Tail", "TailDia", "TailEnd", TAIL_DIA, TAIL_END, True),
 )
@@ -101,7 +109,9 @@ def _require_one_solid_body(adapter, *, label: str) -> None:
         _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
     )
     if len(bodies) != 1:
-        raise RuntimeError(f"{label}: expected exactly one solid body, found {len(bodies)}")
+        raise RuntimeError(
+            f"{label}: expected exactly one solid body, found {len(bodies)}"
+        )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -188,7 +198,9 @@ async def build(adapter) -> dict[str, str]:
     for dimension_name, expression in drive_jobs:
         await drive_dimension(adapter, dimension_name, expression)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven stud (equations neutral)", V_TOTAL, 0.005 * V_TOTAL)
+    await volume_check(
+        adapter, "driven stud (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
+    )
     _require_one_solid_body(adapter, label="driven stud")
 
     await apply_material(adapter, MATERIAL)

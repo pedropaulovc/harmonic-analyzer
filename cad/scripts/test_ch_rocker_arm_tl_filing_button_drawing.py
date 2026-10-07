@@ -43,16 +43,24 @@ def test_rim_is_the_hub_filing_line() -> None:
 
 def test_matched_fits_export_the_printed_reference_and_fit_note() -> None:
     """One fact, one source: the print shows the bore and locating diameter
-    as references governed by a fit note, so features.toml carries that
-    nominal and that note, never a tighter hidden band."""
-    for feature, nominal, notes in (
-        (_features(BUTTON)["bore"], button.BORE_DIA, button.DRAWING_NOTES),
-        (_features(STUD)["locating_body"], stud.BODY_DIA, stud.DRAWING_NOTES),
+    as references governed by a fit callout, so features.toml carries that
+    nominal and that callout text, never a tighter hidden band."""
+    for feature, nominal, callout in (
+        (
+            _features(BUTTON)["bore"],
+            button.BORE_DIA,
+            button.REFERENCE_CALLOUTS["BoreDia"],
+        ),
+        (
+            _features(STUD)["locating_body"],
+            stud.BODY_DIA,
+            stud.REFERENCE_CALLOUTS["BodyDia"],
+        ),
     ):
         assert "dia" not in feature
         assert feature["dia_nominal"] == nominal
         assert "WITHOUT SHAKE" in feature["note"]
-        assert feature["note"] in notes.replace("\n", " ")
+        assert feature["note"] == " ".join(part for part in callout if part)
 
 
 def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:

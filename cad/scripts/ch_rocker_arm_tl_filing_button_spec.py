@@ -36,15 +36,16 @@ _HUB_MIN, _HUB_MAX = limits(rocker.HUB_DIA, 2)
 if not (_HUB_MIN <= _OD_MIN and _OD_MAX <= _HUB_MAX):
     raise AssertionError("filing-button rim band leaves the hub's printed O.D. band")
 
-# The bore prints as a reference and its fit to the stud governs (the note).
+# The bore prints as a reference and its fit to the stud governs (callout).
 # BORE_BAND is the design intent of that fit for the stud's stack checks
 # only; features.toml carries what the print says, the nominal and the note.
 BORE_DIA = 6.51
 BORE_BAND = (0.005, -0.005)
 BORE_PLACES = 3
-BORE_FIT_NOTE = (
-    "FIT BORE TO THE FILING STUD LOCATING DIAMETER: SLIDES ON BY HAND WITHOUT SHAKE."
-)
+# Policy rules 2 and 6: the matched fit sits on the bore's callout, naming
+# the mate by Number with its acceptance (callout above, callout below).
+BORE_FIT_CALLOUT = ("", "SLIDES ON MHA-CH-006-TL-05 STUD BY HAND WITHOUT SHAKE")
+BORE_FIT_NOTE = " ".join(part for part in BORE_FIT_CALLOUT if part)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"DiscDia", "BoreDia"},
@@ -63,17 +64,17 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked filing-button dimension needs authored places")
 
 # The bore locates on the stud: a machining-required symbol at the project's
-# machined grade (codex round 8); the hand-slide fit note governs its size.
+# machined grade (codex round 8); the fit callout governs its size.
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
-# The blind reviewer sees only the sheet: each note states why a band is
-# tight. Hardness and the lapped surfaces live in the Finish field.
+# The blind reviewer sees only the sheet: each note states a function.
+# Hardness lives in the Finish field.
 DRAWING_NOTES = (
     "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. ROUND AND TRUE TO BORE.\n"
-    f"{BORE_FIT_NOTE}\n"
     "THICKNESS LOCATES THE STACK.\n"
     "KEEP RIM CORNERS SHARP; STONE BURRS ONLY."
 )
 REFERENCE_DIMENSIONS = frozenset({"BoreDia"})
+REFERENCE_CALLOUTS = {"BoreDia": BORE_FIT_CALLOUT}
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))

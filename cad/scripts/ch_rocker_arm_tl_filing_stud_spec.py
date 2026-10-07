@@ -104,28 +104,26 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked filing-stud dimension needs authored places")
 # The overall restates the two ends for stock cut-off.
-# Codex round 4: the locating diameter prints as a reference; the fit to its
-# three mating bores (hand slide, no shake) governs it. BODY_BAND is that
-# fit's design intent for the stack checks only; features.toml carries the
-# printed nominal and fit note.
+# The locating diameter prints as a reference; the fit callout on it
+# governs. BODY_BAND is that fit's design intent for the stack checks only;
+# features.toml carries the printed nominal and the callout text.
+# Policy rules 2 and 6: the matched fit sits on the locating diameter's
+# callout, naming each mate by Number with its acceptance (above, below).
+BODY_FIT_CALLOUT = (
+    "SLIDES IN MHA-CH-006 ROCKER ARM PIVOT BORE AND",
+    "MHA-CH-006-TL-04 BUTTONS BY HAND WITHOUT SHAKE",
+)
+BODY_FIT_NOTE = " ".join(part for part in BODY_FIT_CALLOUT if part)
 REFERENCE_DIMENSIONS = frozenset({"OverallLength", "BodyDia"})
-REFERENCE_LABELS = {"BodyDia": "LOCATING DIAMETER"}
+REFERENCE_CALLOUTS = {"BodyDia": BODY_FIT_CALLOUT}
 # The thread size prints as its designation, not as a plain diameter.
 DIMENSION_TEXT = {"ThreadDia": THREAD}
 
 SURFACE_FINISHES = ()
-BODY_FIT_NOTE = (
-    "FIT LOCATING DIAMETER TO THE ROCKER ARM PIVOT BORE AND BOTH FILING BUTTON "
-    "BORES: EACH SLIDES ON BY HAND WITHOUT SHAKE."
-)
 DRAWING_NOTES = (
-    "AXIAL SIZES FROM THE HEAD SEAT FACE; SEAT SQUARE TO THE LOCATING DIAMETER.\n"
-    "FIT LOCATING DIAMETER TO THE ROCKER ARM PIVOT BORE AND BOTH FILING BUTTON\n"
-    "BORES: EACH SLIDES ON BY HAND WITHOUT SHAKE. VISE TAIL IS HELD ONLY.\n"
-    "DO NOT HARDEN."
+    "AXIAL SIZES FROM THE HEAD SEAT FACE; SEAT SQUARE TO THE AXIS.\n"
+    "VISE TAIL IS HELD ONLY. DO NOT HARDEN."
 )
-if BODY_FIT_NOTE not in DRAWING_NOTES.replace("\n", " "):
-    raise AssertionError("the exported fit note must be the printed sentence")
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
