@@ -194,14 +194,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )
     # The sliding journal is a required machined surface (codex round 14):
-    # on its upper silhouette, under the 12.5 row, clear of the callouts below.
+    # on its upper silhouette, symbol left of the 12.5 extension line.
     body_pick = (SEAT_X + 0.006, PROFILE_CENTER[1] + BODY_DIA / 2.0 * _S)
     add_surface_finish(
         adapter,
         profile,
         edge_xy=body_pick,
         entity_type="SILHOUETTE",
-        symbol_xy=(SEAT_X + 0.014, PROFILE_CENTER[1] + 0.012),
+        symbol_xy=(SEAT_X + 0.003, PROFILE_CENTER[1] + 0.012),
         leader_attach_xy=body_pick,
         control=surface_finish_by_key(SURFACE_FINISHES, "locating_body"),
         label="filing stud locating diameter finish",
