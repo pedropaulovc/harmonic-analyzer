@@ -379,15 +379,18 @@ CLAMP_STUD_SPEC = HoleSpec(
     "tapped",
     "3/8-16",
     end="blind",
-    depth_mm=19.0,
-    overrides_mm={"ThreadDepth": 15.0},
+    depth_mm=21.0,
+    overrides_mm={"ThreadDepth": 17.0},
 )
 CLAMP_STUD_POINTS = ((-70.0, -36.0), (70.0, -36.0), (-70.0, 45.0), (70.0, 45.0))
 CLAMP_STUD_DRILL_DIA = TAP_DRILL_MM[CLAMP_STUD_SPEC.size]
-# Full thread at least 1.5 diameters deep at the .XX band, and the tap drill
-# stops well inside the plate.
+_CLAMP_STUD_PITCH = 25.4 / 16.0
+# Full thread at least 1.5 diameters deep at the .XX band even if the shop
+# counts one incomplete thread inside the printed depth (codex review of run
+# 20261007T211013161Z: 15.00 left 0.2 over 1.5 D at the band), and the tap
+# drill stops well inside the plate.
 if (
-    CLAMP_STUD_SPEC.overrides_mm["ThreadDepth"] - _XX
+    CLAMP_STUD_SPEC.overrides_mm["ThreadDepth"] - _XX - _CLAMP_STUD_PITCH
     < 1.5 * THREAD_MAJOR_MM[CLAMP_STUD_SPEC.size]
 ):
     raise AssertionError("clamp-stud thread engages under 1.5 diameters")
