@@ -152,9 +152,6 @@ def _hatch_pin_apart(adapter: Any, section: Any) -> None:
     for name, hatches in groups.items():
         angle = 3.0 * math.pi / 4.0 if name == pin else math.pi / 4.0
         for hatch in hatches:
-            hatch.UseMaterialHatch = False
-            hatch.Pattern = "ANSI31 (Iron BrickStone)"
-            hatch.Scale2 = 1.0
             hatch.Angle = angle
             if abs(float(hatch.Angle) - angle) > 1e-6 or not str(hatch.Pattern):
                 raise RuntimeError("section hatch pattern/angle did not persist")
