@@ -227,6 +227,14 @@ seconds; if it cannot be acquired, payload is not emitted unlocked. Other
 build output need not take this lock, so line-level attribution remains
 necessary.
 
+The hermetic spawned-process lock control checkpoints complete, flushed lines.
+Its shared capture mutex protects one append record at a time, never a whole
+frame or a checkpoint wait. The follower frame begins before the leader
+finishes, but its body waits for the leader's full stderr lifetime, including
+debug span output and stream/file cleanup. This preserves genuine nested/
+cross-owner evidence and both workers' payload/diagnostics without depending
+on concurrent Windows append handles.
+
 Preflight's `logs --help` check proves only that the configured operator CLI
 supports exact selection. The current pool reader uses `DefaultAzureCredential`
 and `SOLIDWORKS_POOL_CONFIG` (default `~/.solidworks-pool/config.json`), taking

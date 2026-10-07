@@ -124,7 +124,8 @@ def _parallel_failed_log_case(name):
 
 
 def _emit_failed_log_in_process(
-    output_path, retrieval_barrier, leader_begun, follower_begun, leader_payload, name
+    output_path, retrieval_barrier, capture_line_lock, leader_begun,
+    follower_begun, leader_finished, name
 ):
     """Exercise run_leaf with a closed result boundary in an owned child."""
     task, key, workflow_id, result, _metadata, payload, diagnostics = (
@@ -156,36 +157,43 @@ def _emit_failed_log_in_process(
         def __init__(self, output):
             self.output = output
             self.pending = ""
+            self.lock = threading.RLock()
 
         def write(self, text):
-            # A print may write its content and newline separately. Schedule
-            # only after a complete logical line has reached the shared sink.
-            self.pending += text
-            while "\n" in self.pending:
-                line, self.pending = self.pending.split("\n", 1)
-                self.output.write(line + "\n")
-                self.output.flush()
-                if not removed_lock:
-                    continue
-                if line.startswith("--- begin failed farm task log:"):
-                    if name == "a":
-                        leader_begun.set()
-                        await_checkpoint(follower_begun, "follower frame begin")
-                    else:
-                        follower_begun.set()
-                        await_checkpoint(leader_payload, "leader payload")
-                elif name == "a" and line.startswith("[farm task="):
-                    leader_payload.set()
-            return len(text)
+            with self.lock:
+                # A print may write its content and newline separately. Schedule
+                # only after a complete logical line reaches the shared sink.
+                self.pending += text
+                while "\n" in self.pending:
+                    line, self.pending = self.pending.split("\n", 1)
+                    # Windows append handles can race their EOF seek/write.
+                    # Protect records, never whole frames or checkpoint waits.
+                    with capture_line_lock:
+                        self.output.write(line + "\n")
+                        self.output.flush()
+                    if not removed_lock:
+                        continue
+                    if line.startswith("--- begin failed farm task log:"):
+                        if name == "a":
+                            leader_begun.set()
+                            await_checkpoint(follower_begun, "follower frame begin")
+                        else:
+                            follower_begun.set()
+                            # The frames already overlap. Wait for all leader
+                            # stderr, including its debug span completion.
+                            await_checkpoint(leader_finished, "leader capture completion")
+                return len(text)
 
         def flush(self):
-            self.output.flush()
+            with self.lock, capture_line_lock:
+                self.output.flush()
 
         def finish(self):
-            if self.pending:
-                self.output.write(self.pending)
-                self.pending = ""
-            self.output.flush()
+            with self.lock, capture_line_lock:
+                if self.pending:
+                    self.output.write(self.pending)
+                    self.pending = ""
+                self.output.flush()
 
     if removed_lock:
         class NoOutputLock:
@@ -220,8 +228,13 @@ def _emit_failed_log_in_process(
         try:
             assert _farm.run_leaf(task, key) is result
         finally:
-            coordinated.finish()
-            sys.stderr = previous
+            try:
+                coordinated.finish()
+            finally:
+                sys.stderr = previous
+    if removed_lock and name == "a":
+        # Signal only after span exports, stream restoration and file close.
+        leader_finished.set()
 
 
 def _refuse_local_build(dodo, monkeypatch, calls):
@@ -3808,15 +3821,16 @@ def _parallel_failed_log_capture(tmp_path, monkeypatch, *, remove_lock):
         monkeypatch.delenv(_REMOVE_FAILURE_LOG_LOCK_MUTANT_ENV, raising=False)
     context = multiprocessing.get_context("spawn")
     retrieval_barrier = context.Barrier(2)
-    leader_begun, follower_begun, leader_payload = [
+    capture_line_lock = context.Lock()
+    leader_begun, follower_begun, leader_finished = [
         context.Event() for _ in range(3)
     ]
     processes = [
         context.Process(
             target=_emit_failed_log_in_process,
             args=(
-                str(output_path), retrieval_barrier, leader_begun,
-                follower_begun, leader_payload, name,
+                str(output_path), retrieval_barrier, capture_line_lock,
+                leader_begun, follower_begun, leader_finished, name,
             ),
         )
         for name in ("a", "b")
@@ -3843,7 +3857,7 @@ def _parallel_failed_log_capture(tmp_path, monkeypatch, *, remove_lock):
     assert exitcodes == [0, 0]
     if remove_lock:
         assert all(event.is_set() for event in (
-            leader_begun, follower_begun, leader_payload
+            leader_begun, follower_begun, leader_finished
         )), "the controlled interleaving schedule did not complete"
     expected = {}
     for name in ("a", "b"):
@@ -3857,9 +3871,11 @@ def _parallel_failed_log_capture(tmp_path, monkeypatch, *, remove_lock):
     return output_path.read_text(encoding="utf-8"), expected
 
 
+@pytest.mark.parametrize("verbosity", ["warning", "debug"])
 def test_parallel_failed_leaf_logs_are_serialized_across_spawned_processes(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, verbosity
 ):
+    monkeypatch.setenv("HARMONIC_VERBOSITY", verbosity)
     output, expected = _parallel_failed_log_capture(
         tmp_path, monkeypatch, remove_lock=False
     )
@@ -3868,9 +3884,11 @@ def test_parallel_failed_leaf_logs_are_serialized_across_spawned_processes(
     }
 
 
+@pytest.mark.parametrize("verbosity", ["warning", "debug"])
 def test_parallel_log_lock_negative_control_exposes_interleaved_blocks(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, verbosity
 ):
+    monkeypatch.setenv("HARMONIC_VERBOSITY", verbosity)
     output, expected = _parallel_failed_log_capture(
         tmp_path, monkeypatch, remove_lock=True
     )
