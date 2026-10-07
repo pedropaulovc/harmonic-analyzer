@@ -218,6 +218,7 @@ def callout_scene(monkeypatch, tmp_path):
         events=[],
         boundaries=[],
         rebuilds=[],
+        registered_leaders=0,
     )
 
     class Edge:
@@ -249,6 +250,18 @@ def callout_scene(monkeypatch, tmp_path):
             self.native_id = native_id
             self.hole = hole
             self.annotation = None
+            # Native RD3 readback: stub, sloped run, horizontal shoulder.
+            self.lines = [
+                (0, 0, 0, 0, 0.0693, 0.20429, 0, 0.0707, 0.20571, 0),
+                (0, 0, 0, 0, 0.0707, 0.20571, 0, 0.08389, 0.2192, 0),
+                (0, 0, 0, 0, 0.08389, 0.2192, 0, 0.12252, 0.2192, 0),
+            ]
+            self.display_data = True
+            # Tip Z deliberately differs from line Z; the native joint is XY.
+            self.arrows = [
+                (0.0707, 0.20571, -0.0015875, 0.7, 0.7, 0,
+                 0.003556, 0.000762, 0, 0, 0, -1),
+            ]
 
         def IsHoleCallout(self):
             return self.hole
@@ -256,15 +269,26 @@ def callout_scene(monkeypatch, tmp_path):
         def GetAnnotation(self):
             return self.annotation
 
+        def GetDisplayData(self):
+            if not self.display_data:
+                return None
+            return SimpleNamespace(
+                GetLineCount=lambda: len(self.lines),
+                GetLineAtIndex2=lambda index: self.lines[index],
+                GetArrowHeadCount=lambda: len(self.arrows),
+                GetArrowHeadAtIndex2=lambda index: self.arrows[index],
+            )
+
     class Annotation:
         def __init__(self, display, edge, native_id):
             self.native_id = native_id
             self.display = display
+            self.Visible = 1  # swAnnotationVisible
             self.kind = 4  # swDisplayDimension
             self.entities = (edge,)
             self.count = 1
             self.types = (1,)  # swSelEDGES
-            self.leaders = 1
+            self.leaders = scene.registered_leaders
             self.dangling = False
             self.position = (0.0, 0.0, 0.0)
 
@@ -499,6 +523,10 @@ def callout_scene(monkeypatch, tmp_path):
                 top.annotations[top.annotations.index(original)] = current
             elif scene.insertion_fault == "missing_annotation":
                 display.annotation = None
+            elif scene.insertion_fault == "no_rendered_leader":
+                display.lines = []
+            elif scene.insertion_fault == "no_rendered_arrow":
+                display.arrows = []
             return
         if label != "finalize_drawing":
             return
@@ -546,9 +574,53 @@ def callout_scene(monkeypatch, tmp_path):
         elif fault == "extra_count":
             current.count = 2
         elif fault == "no_leader":
-            current.leaders = 0
-        elif fault == "extra_leader":
-            current.leaders = 2
+            current.display.lines = []
+        elif fault == "unreadable_leader":
+            current.display.display_data = False
+        elif fault == "malformed_leader":
+            current.display.lines = [(0, 0)]
+        elif fault == "nonfinite_leader":
+            current.display.lines = [(0, 0, 0, 0, float("nan"), 0, 0, 1, 1, 0)]
+        elif fault == "degenerate_leader":
+            current.display.lines = [(0, 0, 0, 0, 0.1, 0.2, 0, 0.1, 0.2, 0)]
+        elif fault == "hidden_callout":
+            current.Visible = 3  # swAnnotationHidden
+        elif fault == "half_hidden_callout":
+            current.Visible = 2  # swAnnotationHalfHidden
+        elif fault == "unknown_visibility":
+            current.Visible = 0  # swAnnotationVisibilityUnknown
+        elif fault == "partial_leader":
+            current.display.lines.append((0, 0))
+        elif fault == "no_arrow":
+            current.display.arrows = []
+        elif fault == "extra_arrow":
+            current.display.arrows *= 2
+        elif fault == "hidden_arrow":
+            arrow = list(current.display.arrows[0])
+            arrow[8] = 10  # swNO_ARROWHEAD
+            current.display.arrows = [arrow]
+        elif fault == "unreadable_arrow":
+            current.display.arrows = [(0, 0)]
+        elif fault == "nonfinite_arrow":
+            arrow = list(current.display.arrows[0])
+            arrow[0] = float("nan")
+            current.display.arrows = [arrow]
+        elif fault == "disconnected_arrow":
+            arrow = list(current.display.arrows[0])
+            arrow[0] += 0.050
+            current.display.arrows = [arrow]
+        elif fault == "zero_size_arrow":
+            arrow = list(current.display.arrows[0])
+            arrow[6] = 0
+            current.display.arrows = [arrow]
+        elif fault == "zero_direction_arrow":
+            arrow = list(current.display.arrows[0])
+            arrow[3:6] = [0, 0, 0]
+            current.display.arrows = [arrow]
+        elif fault == "wrong_annotation_owner":
+            current.display.annotation = live[other]
+        elif fault == "missing_annotation_owner":
+            current.display.annotation = None
         elif fault == "wrong_view":
             current_top.annotations.remove(current)
             scene.views[0].annotations.append(current)
@@ -637,7 +709,13 @@ def callout_scene(monkeypatch, tmp_path):
         "wrong_edge", "coincident_rim", "removed", "dangling",
         "missing_attachments", "null_attachment_array", "extra_attachments",
         "null_attachment", "wrong_type", "missing_types", "extra_types",
-        "zero_count", "extra_count", "no_leader", "extra_leader",
+        "zero_count", "extra_count", "no_leader", "unreadable_leader",
+        "malformed_leader", "nonfinite_leader", "degenerate_leader",
+        "partial_leader", "no_arrow", "extra_arrow", "hidden_arrow",
+        "unreadable_arrow", "nonfinite_arrow", "disconnected_arrow",
+        "zero_size_arrow", "zero_direction_arrow",
+        "hidden_callout", "half_hidden_callout", "unknown_visibility",
+        "wrong_annotation_owner", "missing_annotation_owner",
         "wrong_view", "missing_view", "replaced_view",
         "missing_display", "replaced_display", "wrong_annotation_type",
         "not_hole_callout", "duplicate_display", "duplicate_view",
@@ -669,14 +747,18 @@ def test_final_settling_refuses_current_callout_damage_before_persistence(
     assert scene.callouts[target].GetAnnotation() is original
     assert original.GetAttachedEntities3() == (scene.rims[target].edge,)
     assert original.GetAttachedEntityCount3() == 1
-    assert original.GetLeaderCount() == 1
+    assert original.GetLeaderCount() == 0
     assert not original.IsDangling()
     assert original in scene.top.GetAnnotations()
 
 
-def test_final_settling_accepts_fresh_native_aliases_before_save(callout_scene):
+@pytest.mark.parametrize("registered_leaders", [0, 1, 2])
+def test_final_settling_accepts_fresh_native_aliases_before_save(
+    callout_scene, registered_leaders
+):
     """Fresh edge, annotation, dimension and view wrappers retain native IDs."""
     scene = callout_scene
+    scene.registered_leaders = registered_leaders
     with pytest.raises(_PersistenceReached, match="save"):
         asyncio.run(drawing.build(scene.adapter))
     assert scene.boundaries == ["save"]
@@ -703,7 +785,10 @@ def test_final_settling_accepts_fresh_native_aliases_before_save(callout_scene):
 
 @pytest.mark.parametrize("target", ["anchor", "middle"])
 @pytest.mark.parametrize(
-    "fault", ["returned_wrong_edge", "rebuilt_wrong_edge", "missing_annotation"]
+    "fault", [
+        "returned_wrong_edge", "rebuilt_wrong_edge", "missing_annotation",
+        "no_rendered_leader", "no_rendered_arrow",
+    ]
 )
 def test_insertion_refuses_wrong_native_attachment_not_just_diagnostics(
     callout_scene, target, fault
@@ -715,7 +800,7 @@ def test_insertion_refuses_wrong_native_attachment_not_just_diagnostics(
         asyncio.run(drawing.build(scene.adapter))
     assert scene.boundaries == []
     assert not scene.settled  # insertion must fail before finalization
-    if fault != "missing_annotation":
+    if fault in {"returned_wrong_edge", "rebuilt_wrong_edge"}:
         reports = [
             fields for name, fields in scene.events
             if name == "drawing.hole_callout_attachment" and fields["label"] == label

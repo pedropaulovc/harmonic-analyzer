@@ -313,10 +313,24 @@ calls out the selected hole, not a typed replacement.
 Successful insertion is not proof of attachment: `AddHoleCallout2` can
 re-solve to a neighboring or coincident rim. On the explicit `edge=` path,
 `add_native_hole_callout` rereads the annotation after its rebuild and uses
-the canonical attachment guard to require one non-dangling edge attachment,
-one leader, and native `IsSame == 1` against the requested rim. Missing,
-extra, wrong-type, or different-native-identity attachments refuse the leaf;
-the diagnostic's `attached_same_requested_edge=false` is not success.
+the canonical attachment guard to require one non-dangling edge attachment
+and native `IsSame == 1` against the requested rim. Missing, extra, wrong-type,
+or different-native-identity attachments refuse the leaf; the diagnostic's
+`attached_same_requested_edge=false` is not success. Native hole callouts are
+display dimensions, not `SetLeader3` symbols: all five 2026-10-07 failing leaves
+reported intact association with `GetLeaderCount()==0`, matching the existing
+pen-rod RD3 rendered-leader observation. The callout-only guard instead requires
+reciprocal native display/annotation identity, annotation visibility state 1,
+finite readable `IDisplayDimension.GetDisplayData` lines, and one printable
+arrow joined to a nondegenerate line in sheet XY. One arrow is this explicit
+one-edge contract, not a universal native API guarantee; arrow Z can differ
+from line Z, and the line can continue past its tip. No-arrow style 10,
+zero-size/direction arrows, empty data and even partly unreadable routes refuse
+the leaf. The guard still reads the registered count; generic symbols keep
+their exact count and datum tags keep zero. `IAnnotation.Visible` cannot detect
+hidden layers or suppressed owning features: the final layout/DFM gates and
+whole-sheet inspection must still prove the callout actually prints, its arrow
+lands on the named hole, and its actual bent route is clear.
 Coordinate-only callouts keep their existing hit-test behavior.
 
 The summing-lever recipe retains both explicit-edge native callouts and runs
