@@ -50,7 +50,7 @@ if FLATS_AF + 0.13 >= LAND_DIA + LAND_BAND[1]:
 # --- Turned 4140 body: all axial sizes from the neck face. ---
 NECK_DIA = 3.0
 NECK_PLACES = 3
-NECK_LENGTH = 4.32  # collar stays below the S4 op 25/27 cutter tip
+NECK_LENGTH = 4.3  # .X keeps 0.77 of the 1.57 cutter clearance; collar stays below the S4 op 25/27 cutter tip
 COLLAR_DIA = 4.5
 # The collar seats on the plate top. The neck face sits just under the arm's
 # face B so the plate's pads and shimmed hub stand alone set Z: it is a
@@ -110,7 +110,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FlatsProfile": {"FlatsAF": FLATS_PLACES},
     "Flats": {"LandHeight": 3},
     "NeckProfile": {"NeckDia": NECK_PLACES},
-    "Neck": {"NeckLength": 2},
+    "Neck": {"NeckLength": 1},
     "CollarProfile": {"CollarDia": 1},
     "Collar": {"CollarEnd": 1},
     "ShankProfile": {"ShankDia": 2},
