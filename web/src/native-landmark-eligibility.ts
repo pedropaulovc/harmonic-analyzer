@@ -236,7 +236,9 @@ async function bufferReceiptReason(snapshot: CapturedSnapshot, receipts: readonl
     if (seen.has(key) || !buffer || buffer.constructor.name !== receipt.arrayType || buffer.byteLength !== receipt.byteLength
       || !/^[a-f0-9]{64}$/.test(receipt.sha256)) return 'invalid-or-duplicate-cpu-buffer-receipt'
     seen.add(key)
-    const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+    const bytes = buffer.buffer instanceof ArrayBuffer
+      ? new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+      : new Uint8Array(new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength))
     const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes))
     const actual = Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('')
     if (actual !== receipt.sha256) return 'cpu-buffer-sha256-mismatch'

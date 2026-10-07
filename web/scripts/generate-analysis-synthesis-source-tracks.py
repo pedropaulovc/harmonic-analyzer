@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Assemble current Analysis/Synthesis tracks; revalidate old receipts explicitly.
 
-Ordinary Generator and CLI execution use only strict fresh observations and the
-generic fresh assembler. Retained native calibration/camera/input branches below
+Ordinary Generator and CLI execution use only strict fresh observations from
+content/v39-source/<ID>.observations.json.gz and the generic fresh assembler.
+Retained native calibration/camera/input branches below
 belong solely to HistoricalReceiptRevalidator, whose receipts cannot publish.
 Its original byte pins and snapshot code remain historical diagnostics, never
 current model, camera, runtime coverage or GPU/source qualification.

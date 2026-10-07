@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Assemble Intro's compact track from strict current-source observations.
 
+Only content/v39-source/<ID>.observations.json.gz supplies fresh source bytes.
 Fresh views retain their exact source layouts, input/camera provenance and
 current native measurement bindings. No embedded old calibration is executed.
 Coverage is playback availability, never a GPU/source matching stage pass.

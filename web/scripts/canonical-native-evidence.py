@@ -49,6 +49,7 @@ FRESH_CONSUMER_INPUTS = (
     'web/src/native-target-shader-feedback.ts',
     'web/scripts/current-native-eligibility-report.mjs',
     'web/scripts/current-first-surface.py',
+    'web/scripts/canonical-native-evidence.py',
 )
 CURRENT_INVENTORY_PATH = 'web/content/v39-source/native-inventory.json'
 
@@ -586,10 +587,73 @@ def validate_current_inventory_registration(manifest):
         raise ValueError('Current source inventory cannot be CRLF-normalized consumer code')
 
 
+def compress_observations(names):
+    """Store current authored JSON bytes before consumer seals are refreshed.
+
+    The current inventory path defines the approved release authoring namespace.
+    Updating that existing contract enables the next release; archived namespaces
+    are not storage inputs. Schema and physical qualification remain with producers.
+    """
+    namespace = Path(CURRENT_INVENTORY_PATH).parent
+    pending = []
+    seen = set()
+    for name in names:
+        path = file_path(name)
+        match = re.fullmatch(r'([A-Za-z0-9_-]{11})\.observations\.json', path.name)
+        if (Path(name).parent != namespace or path.parent != ROOT / namespace
+                or path.name != Path(name).name or match is None):
+            raise ValueError(f'{name}: expected authored observations in {namespace}')
+        if path in seen:
+            raise ValueError(f'{name}: duplicate observation input')
+        seen.add(path)
+        target = path.with_name(path.name + '.gz')
+        if target.is_symlink():
+            raise ValueError(f'{name}: gzip destination must not be a symlink')
+        data = path.read_bytes()
+        document = validate_json(data, name)
+        require(document.get('kind'), 'current-source-observations', name + ' record kind')
+        source = document.get('source')
+        if not isinstance(source, dict):
+            raise ValueError(f'{name}: missing observation source identity')
+        require(source.get('videoId'), match[1], name + ' source video identity')
+        if 'identityDerivative' in document:
+            raise ValueError(f'{name}: historical identity derivatives are not authored observations')
+        pending.append((path, target, data, encode_observations(data)))
+    results = []
+    for path, target, data, encoded in pending:
+        target.write_bytes(encoded)
+        stored = target.read_bytes()
+        decoded = gzip.decompress(stored)
+        require(decoded, data, str(target) + ' exact decoded bytes')
+        require(stored[:10], b'\x1f\x8b\x08\x00\x00\x00\x00\x00\x02\xff',
+                str(target) + ' deterministic gzip header')
+        require(stored, encode_observations(decoded), str(target) + ' deterministic gzip stream')
+        results.append({
+            'sourcePath': path.relative_to(ROOT).as_posix(),
+            'path': target.relative_to(ROOT).as_posix(),
+            'contentEncoding': 'gzip',
+            'sha256': digest(stored),
+            'decodedSha256': digest(decoded),
+        })
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('generate', 'validate', 'check'))
+    parser.add_argument('command', choices=('generate', 'validate', 'check', 'compress-observations'))
+    parser.add_argument('paths', nargs='*', help='Repository-relative authored observation JSON paths')
     args = parser.parse_args()
+    if args.command == 'compress-observations':
+        if not args.paths:
+            parser.error('compress-observations requires explicit observation JSON paths')
+        print(json.dumps({
+            'command': args.command,
+            'observations': compress_observations(args.paths),
+            'scope': 'Exact-byte storage only; no schema, physical or geometry qualification.',
+        }, indent=2))
+        return
+    if args.paths:
+        parser.error(f'{args.command} does not accept observation paths')
     manifest = json.loads(file_path(MANIFEST).read_bytes())
     validate_current_inventory_registration(manifest)
     inputs = manifest['canonicalConsumerInputs']

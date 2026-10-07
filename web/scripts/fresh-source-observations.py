@@ -2,6 +2,9 @@
 
 The Node validator owns the shared authority/source boundary used by verify-sync.
 The inventory is an exact-byte sealed exporter result, never a second approval.
+Fresh observations are gzip-only and use the existing deterministic encoder.
+Stored gzip and decoded authored JSON have separate exact-byte hashes; decoding
+never reparses/reserializes JSON or falls back to a plain or archived record.
 Assembly metadata is compiled by the live TypeScript domain through Node, with
 the same source-witness and finite/gauge checks as runtime consumption. Neither
 this loader nor the physical change census certifies posed constraints from REST.
@@ -12,6 +15,8 @@ including target shader feedback, but not unrelated CLI/report-only modules.
 """
 from __future__ import annotations
 
+import gzip
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -24,10 +29,34 @@ EXECUTED_INPUTS = (
     "web/scripts/fresh-source-observations.schema.json", "web/scripts/source-observations.schema.json",
     "web/scripts/verify-reference.mjs", "web/scripts/fetch-model.mjs",
     "web/scripts/native-identity-map.mjs", "web/scripts/released-models.json",
+    "web/scripts/canonical-native-evidence.py",
     "web/src/source-witness.ts", "web/src/image-plane-homography.ts", "web/src/video-catalog.ts",
     "web/src/native-primitive-snapshot.ts", "web/src/source-assembly.ts",
     "web/src/native-target-shader-feedback.ts",
 )
+
+_ENCODER_SPEC = importlib.util.spec_from_file_location(
+    "current_observation_gzip_codec", Path(__file__).with_name("canonical-native-evidence.py"))
+_ENCODER = importlib.util.module_from_spec(_ENCODER_SPEC)
+_ENCODER_SPEC.loader.exec_module(_ENCODER)
+
+
+def decode_observation_bytes(raw: bytes) -> bytes:
+    """Decode only gzip storage, retaining every authored JSON byte."""
+    return gzip.decompress(raw)
+
+
+def encode_observation_bytes(decoded: bytes) -> bytes:
+    """Use the existing deterministic gzip codec without JSON reserialization."""
+    return _ENCODER.encode_observations(decoded)
+
+
+def read_observation_bytes(path) -> bytes:
+    """Read an explicit gzip observation path; plain files are not a fallback."""
+    path = Path(path)
+    if path.suffix != ".gz":
+        raise ValueError("Current observation storage requires an explicit .gz path")
+    return decode_observation_bytes(path.read_bytes())
 
 
 def _validate(data=None, inventory=None, video_id=None, operation="validate", web_root=None):
@@ -58,7 +87,7 @@ console.log(JSON.stringify(result));
 
 
 def load_observations(video_id, *, web_root=None):
-    """Load exactly the fresh namespace; missing files never borrow the archive."""
+    """Load only the fresh .observations.json.gz namespace; never plain/archive."""
     return _validate(video_id=video_id, operation="load", web_root=web_root)
 
 

@@ -8,15 +8,16 @@ import { createServer } from 'vite'
 const server = await createServer({
   root: fileURLToPath(new URL('../', import.meta.url)),
   configFile: false,
-  server: { middlewareMode: true, hmr: false, watch: null },
+  server: { middlewareMode: true, hmr: false, ws: false, watch: null },
   appType: 'custom',
 })
 after(async () => { await server.close() })
-let CompactVideoReference, createMechanismInput, MECHANISM_DATA, INPUT_FIELDS
+let CompactVideoReference, createMechanismInput, MECHANISM_DATA, INPUT_FIELDS, SOURCE_ASSEMBLY_DATUMS
 try {
   ;({ CompactVideoReference } = await server.ssrLoadModule(process.env.SOURCE_TRACK_MODULE ?? '/src/source-track.ts'))
   ;({ createMechanismInput, MECHANISM_DATA } = await server.ssrLoadModule('/src/mechanics.ts'))
   ;({ INPUT_FIELDS } = await server.ssrLoadModule('/src/source-witness.ts'))
+  ;({ SOURCE_ASSEMBLY_DATUMS } = await server.ssrLoadModule('/src/source-assembly.ts'))
 } catch (error) {
   await server.close()
   throw error
@@ -250,7 +251,20 @@ test('free rigid poses and attachment-domain changes step without synthesizing a
   const track = assemblyFixture()
   const first = assemblyState({ retainingNut: { attachment: 'held', pose: { positionMetres: [0.1, 0.2, 0.3], quaternion: [0, 0, 0, 1] } } })
   const next = assemblyState({ retainingNut: { attachment: 'held', pose: { positionMetres: [0.4, 0.5, 0.6], quaternion: [0, 1, 0, 0] } } })
-  const hanger = assemblyState({ hanger: { attachment: 'open', swingRad: 0.4, hookReleaseRad: 0.1 } })
+  const radius = SOURCE_ASSEMBLY_DATUMS.chainChordMetres / (2 * Math.sin(Math.PI / 68))
+  const hanger = assemblyState({
+    hanger: { attachment: 'open', swingRad: 0.4, hookReleaseRad: 0.1 },
+    chain: {
+      attachment: 'held-off-sprockets',
+      jointsMetres: Array.from({ length: 68 }, (_, j) => [
+        10 + radius * (Math.cos(2 * Math.PI * j / 68) - 1),
+        10 + radius * Math.sin(2 * Math.PI * j / 68),
+        10,
+      ]),
+      planeNormal: [0, 0, 1],
+      contacts: [{ kind: 'held', joint: 0, positionMetres: [10, 10, 10] }],
+    },
+  })
   viewAt(track, 0).sourceAssembly = first
   viewAt(track, 1).sourceAssembly = next
   viewAt(track, 2).sourceAssembly = hanger

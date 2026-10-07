@@ -2,16 +2,17 @@
 """Fit current actual-source observations to CAD landmarks, never fitting CHECK pixels.
 
 Requires numpy, scipy, opencv-python-headless (source-fit-requirements.txt).
-Example: python web/scripts/fit-source.py web/content/v39-source/XPQwKRt4Y2k.observations.json
-  --inventory /tmp/current-model-inventory.json --output /tmp/spin-fitted.json
-Ordinary input and output pass the shared current observation/inventory authority gate.
+Example: python web/scripts/fit-source.py web/content/v39-source/XPQwKRt4Y2k.observations.json.gz
+  --inventory /tmp/current-model-inventory.json --output /tmp/spin-fitted.observations.json.gz
+Ordinary inputs/outputs require explicit gzip paths and the shared current authority gate.
+Inventory remains ordinary JSON. New output JSON bytes use the shared deterministic codec.
 Inventory matrices are released native rest transforms, not solved moving-part geometry;
 chosen mechanism inputs do not turn rest-projected moving anchors into pose evidence.
 Only exact {kind: 'operating'} assembly descriptors are legal for REST projection.
 Posed/unknown assembly descriptors and runtime-instance anchors are explicitly refused;
 genuine supplied posed-view cameras use the shared validator instead.
 --historical-diagnostic explicitly selects old materialized derivative diagnostics;
-it cannot publish in either current or immutable historical content namespaces.
+private .json output is allowed, but never in current or immutable historical namespaces.
 Current CPU residuals are diagnostics, never camera-candidate or GPU/source acceptance gates.
 Native line CHECK scores add the unchanged final-source localization/raster bound
 once, plus explicitly certified independent geometry; no extra source raster allowance.
@@ -48,22 +49,29 @@ def fresh_contract():
 
 def check_namespace(path, *, historical_diagnostic=False, output=False, video_id=None):
     """Diagnostics are temporary files, never a route into a published namespace."""
-    path = Path(path).resolve()
+    declared = Path(path).absolute()
+    path = declared.resolve()
     web = Path(__file__).resolve().parents[1]
     historical = (web / "content").resolve()
     current = (web / "content/v39-source").resolve()
+    if declared != path and (
+        declared.is_relative_to(historical) or path.is_relative_to(historical)
+    ):
+        raise ValueError("Published observation namespaces cannot use filesystem aliases")
     if path.is_relative_to(current):
         if historical_diagnostic:
             raise ValueError("Historical diagnostics cannot read or write current observations")
-        if path.parent != current or not path.name.endswith(".observations.json"):
-            raise ValueError("Current observations use only direct .observations.json namespace entries")
-        if video_id is not None and path != current / f"{video_id}.observations.json":
+        if path.parent != current or not path.name.endswith(".observations.json.gz"):
+            raise ValueError("Current observations use only direct .observations.json.gz namespace entries")
+        if video_id is not None and path != current / f"{video_id}.observations.json.gz":
             raise ValueError("Current observations must use their registered video filename")
     if (
         path.is_relative_to(historical) and not path.is_relative_to(current)
         and (output or not historical_diagnostic)
     ):
         raise ValueError("Historical content is immutable and requires explicit diagnostic input")
+    if not historical_diagnostic and declared.suffix != ".gz":
+        raise ValueError("Current observation input/output requires an explicit .gz path")
 
 
 def finite_vector(value, size, label):
@@ -1834,9 +1842,9 @@ def run(observations, inventory, *, historical_diagnostic=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("observations", type=Path)
-    parser.add_argument("--inventory", type=Path, required=True)
-    parser.add_argument("--output", type=Path)
+    parser.add_argument("observations", type=Path, help="Explicit .gz observations; historical diagnostics use their original storage")
+    parser.add_argument("--inventory", type=Path, required=True, help="Actual native inventory, stored as ordinary JSON")
+    parser.add_argument("--output", type=Path, help="Gzip observations; private .json is permitted only with --historical-diagnostic")
     parser.add_argument("--require-complete", action="store_true")
     parser.add_argument(
         "--historical-diagnostic", action="store_true",
@@ -1844,7 +1852,10 @@ def main():
     )
     args = parser.parse_args()
     check_namespace(args.observations, historical_diagnostic=args.historical_diagnostic)
-    observations = common.read_observations(args.observations)
+    observations = (
+        common.read_observations(args.observations) if args.historical_diagnostic
+        else json.loads(fresh_contract().read_observation_bytes(args.observations))
+    )
     check_namespace(
         args.observations, historical_diagnostic=args.historical_diagnostic,
         video_id=observations["source"]["videoId"],
@@ -1854,12 +1865,17 @@ def main():
             args.output, historical_diagnostic=args.historical_diagnostic,
             output=True, video_id=observations["source"]["videoId"],
         )
+    require_rest_projection(observations)
     fitted, report = run(
         observations, json.loads(args.inventory.read_text()),
         historical_diagnostic=args.historical_diagnostic,
     )
     if args.output:
-        common.write_observations(args.output, fitted)
+        if args.historical_diagnostic:
+            common.write_observations(args.output, fitted)
+        else:
+            decoded = (json.dumps(fitted, indent=2) + "\n").encode("utf-8")
+            args.output.write_bytes(fresh_contract().encode_observation_bytes(decoded))
     summary = {
         key: value
         for key, value in report.items()

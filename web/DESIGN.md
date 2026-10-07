@@ -14,19 +14,40 @@ reference hashes. `youtube-player.ts` owns the visible official embed.
 `scene.ts` applies the physical pose to the lossless delivery representation of
 the full native GLB.
 
-Active observation, calibration and motion inputs live under
-`content/canonical-native/`. These identity-translated derivatives preserve the
-original numeric observations; originals under `content/` remain byte-exact
-archival evidence from `bfde892a5`. Fitting, observation and static-calibration
-commands refuse original observation files as current inputs.
-The six `*.observations.json.gz` files are standard gzip (level 9, `mtime=0`,
-no embedded filename). Their decoded JSON bytes are preserved exactly during the
-storage migration; all metadata, numeric spelling and FIT/CHECK evidence remain.
-Consumers select gzip without a deprecated plain canonical fallback and fail on
-corrupt gzip or invalid decoded JSON. Other canonical records, including preferred
-`*.track.json` inputs, stay plain JSON. Writers refuse plaintext canonical
-`*.observations.json` output; other numeric diagnostics and temporary JSON may
-remain plain.
+Current authored observations live at
+`content/v39-source/<videoId>.observations.json.gz`; generated browser tracks
+live at `content/<videoId>.source-track.json`. The approved target is CAD v39,
+raw SHA-256 `60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c`,
+source commit `81539e53f5146c06a77541415bd79da673806d96`.
+The six-video migration preserves source PTS, pixel measurements, source hashes,
+uncertainties and landmarks. Native identities, world coordinates, cameras and
+physical constraints must be recomputed for the target geometry. Inherited
+camera and mechanism seeds remain chosen/unobserved, including feasible hidden
+settings. Old projection/GPU evidence, identity-translated packets under
+`content/canonical-native/` and byte-exact originals from `bfde892a5` are
+historical provenance, not current geometry qualification.
+
+Current observations use exact-byte deterministic gzip (level 9, `mtime=0`,
+no embedded filename). `canonical-native-evidence.py compress-observations`
+accepts only the registered authored observation namespace, retains the source
+JSON and preserves decoded bytes and numeric spelling without reserialization.
+Consumers use gzip without a plain-loader fallback. Compression does not refit
+or qualify geometry. The repository-root command and pinned uv producer
+invocations are in [`README.md`](README.md).
+Regeneration runs canonical `generate`, the Intro, Analysis/Synthesis, Spin and
+Operation/Rocker producers, then canonical `generate` and `check` to bind outputs.
+Canonical replay audits identity preservation; it cannot promote historical
+evidence to current qualification. Operation/Rocker supports independent
+`--video jfH-NbsmvD4` or `--video 4mBuyixt22U`; the default prevalidates both
+videos before publishing either.
+
+Half-open cut routing may move an execution timestamp by one ULP without changing
+authored source numbers. The strict same-shot 0.5-second source-exposure
+requirement is unchanged. Nine actual independently decoded frames supply
+missing Operation fade exposures; existing samples and landmarks are preserved.
+Their measured source facts do not make inherited pose guesses observed.
+Complete approximate playback remains separate from source-fidelity acceptance.
+Current stages 50/20/10/5 are unmeasured, with no acceptance-attempt quota.
 
 The [manifest](content/canonical-native/manifest.json) seals stored-byte and
 original SHA-256 values, mapping revision/digest, numeric-token preservation and
@@ -101,15 +122,12 @@ reviewed, tracked representation record as their live approval authority.
 `approved-model.mjs` applies the same strict v2 validation for the Node verifiers
 and the Python producer gate; expected identity is never inferred from
 mechanics-data's own claim. Generated native provenance must independently match
-its raw, map and canonical fields. All six retained historical source packets
-identify the earlier raw export and are rejected against the approved v39 scene
-until fresh source qualification.
-Analysis/Synthesis repeat native association and calibration checks at build time.
-Analysis also revalidates its consumed retained numerical/camera data; Synthesis
-revalidates automatic-motion candidates and times, while its other framing and
-lineage fields remain construction-time data. The retained framing's old-model
-pins refuse current v39 generation. In-process model-label replacement cannot
-approve earlier native calibration.
+its raw, map and canonical fields. Retained historical source packets identify
+the earlier raw export and cannot qualify the approved v39 scene. Current
+tracks require regenerated model-bound inputs; compatibility alone supplies no
+source-fidelity qualification.
+Analysis/Synthesis repeat native and retained numerical checks at build time;
+in-process model-label replacement cannot approve earlier native calibration.
 The producer supplies its executed-module census to the shared live seal gate.
 Whole-pair construction and derivation finish before either output is published.
 

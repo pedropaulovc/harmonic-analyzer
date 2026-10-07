@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Assemble Spin's compact track from strict current-source observations.
 
+Only content/v39-source/<ID>.observations.json.gz supplies fresh source bytes.
 Fresh turntable/montage views carry their own measured source identity, current
 camera binding and honest chosen input provenance. Old camera rigs, numeric
 seeds, phase maps and photographic donors are not current generation inputs.

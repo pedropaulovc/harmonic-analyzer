@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Assemble Operation/Rocker from strict current-source observations only.
 
+Only content/v39-source/<ID>.observations.json.gz supplies fresh source bytes.
 No retained source seeds, old native calibration, camera donors or gap exposure
-substitutions participate. Both tracks are fully built and publication-validated
-before either output is written; a validation failure leaves both untouched.
+substitutions participate. Selected tracks are fully built and publication-validated
+before any output is written; a validation failure leaves all selected outputs untouched.
 """
 from __future__ import annotations
 
+import argparse
 import importlib.util
 from pathlib import Path
 
@@ -31,7 +33,12 @@ def rocker(data=None):
 
 
 def main():
-    tracks = [operation(), rocker()]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--video", choices=("jfH-NbsmvD4", "4mBuyixt22U"),
+                        help="Regenerate only this video; default validates the complete pair before publishing.")
+    args = parser.parse_args()
+    video_ids = (args.video,) if args.video else ("jfH-NbsmvD4", "4mBuyixt22U")
+    tracks = [Generator(video_id).build() for video_id in video_ids]
     outputs = [(track, *common.prepare_track(track)) for track in tracks]
     for track, path, contents in outputs:
         path.write_text(contents)

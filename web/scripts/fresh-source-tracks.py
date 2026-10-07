@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Assemble current-source tracks without retained native/camera calibration.
 
-Only strict content/v39-source observations qualify. The shared shot-aware
-selector retains decoded exposures, seconds, cuts, layouts and measured motion
-keys; views are copied intact rather than reconstructed from historical seeds.
-Build and publication independently re-read current authority and live seals.
+Only strict content/v39-source/<ID>.observations.json.gz observations qualify.
+The shared shot-aware selector retains decoded exposures, seconds, cuts, layouts
+and measured motion keys; views are copied intact rather than reconstructed from
+historical seeds. Build and publication independently re-read current authority,
+exact compressed/decoded byte seals and live code seals.
 """
 from __future__ import annotations
 

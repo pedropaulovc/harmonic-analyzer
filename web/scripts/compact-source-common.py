@@ -8,6 +8,9 @@ real renderer is compared with the retained source landmarks.
 Exact-image aliases may contribute original observed landmarks to a selected row,
 but never change its camera/input/timing. Identity/layout ambiguity is reported;
 conflicting corresponding source points fail closed rather than choosing a donor.
+
+Current publication binds content/v39-source/<ID>.observations.json.gz with
+independent exact compressed-byte and original decoded-JSON-byte SHA-256 seals.
 """
 from __future__ import annotations
 
@@ -177,7 +180,8 @@ def needs_machine(frame, data):
 def canonicalize_cut_clock(data):
     """Preserve cuts on their recorded native clock, not rounded decimal text."""
     if data.get("kind") == "current-source-observations":
-        # Fresh annotations carry the actual PTS clock. Do not infer it from fps.
+        # Fresh annotations carry actual PTS; only selection keys may equate
+        # adjacent floats at cuts. Never change evidence or infer it from fps.
         return
     fps_record = data["source"]["fps"]
     fps = fps_record["numerator"] / fps_record["denominator"]
@@ -372,6 +376,21 @@ def retain_exact_exposure_landmarks(selected, data):
     return output
 
 
+def within_half_open_shot(shot, time):
+    """Route adjacent-float cut representations without changing source clocks.
+
+    One representable step on either side is execution-key equivalence, not
+    boundary uncertainty or a source-sampling tolerance. Both shots therefore
+    assign the cut to the incoming shot, while real pre-cut exposures stay out.
+    """
+    start, end = shot["startSeconds"], shot["endSeconds"]
+    if math.nextafter(start, -math.inf) <= time <= math.nextafter(start, math.inf):
+        time = start
+    elif math.nextafter(end, -math.inf) <= time <= math.nextafter(end, math.inf):
+        time = end
+    return start <= time < end
+
+
 def selected_frames(data):
     """Keep seconds, exact changes, shot edges, and useful measured motion keys.
 
@@ -390,7 +409,7 @@ def selected_frames(data):
     for frame in frames:
         shot = shot_by_id[frame["shotId"]]
         pts = frame.get("decodedTimeSeconds")
-        if pts is not None and shot["startSeconds"] <= pts < shot["endSeconds"]:
+        if pts is not None and within_half_open_shot(shot, pts):
             by_shot[frame["shotId"]].append(frame)
         else:
             rejected.append({"shotId": frame["shotId"], "timeSeconds": frame["timeSeconds"], "decodedTimeSeconds": pts})
@@ -406,7 +425,7 @@ def selected_frames(data):
             required.update(shot["startSeconds"] + span * fraction for fraction in (0.25, 0.5, 0.75))
     output = {}
     for time in sorted(required):
-        shot = next(s for s in data["shots"] if s["startSeconds"] <= time < s["endSeconds"])
+        shot = next(s for s in data["shots"] if within_half_open_shot(s, time))
         pool = by_shot[shot["id"]]
         if not pool:
             # Explicitly unsupported source sampling, not a fabricated exposure.
@@ -678,9 +697,12 @@ def build_track(data, frame_views_callback, evidence_notes=None):
 def bind_source_record(track, data, producer_path, *, executed_inputs=()):
     """Publication is associated with exact fresh observations, never borrowed receipts."""
     video_id = data["source"]["videoId"]
-    path = WEB / "content/v39-source" / f"{video_id}.observations.json"
+    path = WEB / "content/v39-source" / f"{video_id}.observations.json.gz"
     raw = path.read_bytes()
-    current = fresh.validate_observations(json.loads(raw), video_id=video_id, web_root=WEB)
+    decoded = fresh.decode_observation_bytes(raw)
+    stored_sha256 = hashlib.sha256(raw).hexdigest()
+    decoded_sha256 = hashlib.sha256(decoded).hexdigest()
+    current = fresh.validate_observations(json.loads(decoded), video_id=video_id, web_root=WEB)
     if current != data:
         raise ValueError("Publication data differs from the actual fresh observation record")
     def relative(path):
@@ -689,7 +711,8 @@ def bind_source_record(track, data, producer_path, *, executed_inputs=()):
     track["sourceRecord"] = {
         "kind": "current-source-observations",
         "path": path.relative_to(WEB).as_posix(),
-        "sha256": hashlib.sha256(raw).hexdigest(),
+        "sha256": stored_sha256,
+        "decodedSha256": decoded_sha256,
         "producerPath": relative(producer_path),
         "executedInputs": sorted({relative(path) for path in executed_inputs}),
     }
@@ -699,16 +722,22 @@ def bind_source_record(track, data, producer_path, *, executed_inputs=()):
 def _validate_publication(track):
     record = track.get("sourceRecord")
     video_id = track.get("source", {}).get("videoId")
-    expected = f"content/v39-source/{video_id}.observations.json"
+    expected = f"content/v39-source/{video_id}.observations.json.gz"
     if (track.get("kind") != "compact-source-track" or not isinstance(record, dict)
             or record.get("kind") != "current-source-observations"
             or record.get("path") != expected or not isinstance(record.get("producerPath"), str)
-            or not isinstance(record.get("executedInputs"), list)):
+            or not isinstance(record.get("executedInputs"), list)
+            or any(not isinstance(record.get(key), str)
+                   or re.fullmatch(r"[0-9a-f]{64}", record[key]) is None
+                   for key in ("sha256", "decodedSha256"))):
         raise ValueError("Only an actual fresh observation assembly can publish a current source track")
     raw = (WEB / expected).read_bytes()
-    if hashlib.sha256(raw).hexdigest() != record.get("sha256"):
+    if hashlib.sha256(raw).hexdigest() != record["sha256"]:
         raise ValueError("Fresh source observations changed before publication")
-    data = fresh.validate_observations(json.loads(raw), video_id=video_id, web_root=WEB)
+    decoded = fresh.decode_observation_bytes(raw)
+    if hashlib.sha256(decoded).hexdigest() != record["decodedSha256"]:
+        raise ValueError("Fresh decoded source observations changed before publication")
+    data = fresh.validate_observations(json.loads(decoded), video_id=video_id, web_root=WEB)
     validate_current_generation_inputs(data, record["producerPath"],
                                        executed_inputs=record["executedInputs"])
     if any(track.get(key) != data.get(key) for key in ("source", "model", "nativeIdentity")):

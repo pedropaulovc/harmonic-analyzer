@@ -7,7 +7,7 @@ import { createServer } from 'vite'
 // Synthetic seam topology exercises the real consumer, not source/GPU qualification.
 const server = await createServer({
   root: fileURLToPath(new URL('../', import.meta.url)), configFile: false,
-  server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom',
+  server: { middlewareMode: true, hmr: false, watch: null, ws: false }, appType: 'custom',
 })
 after(async () => { await server.close() })
 let exactStoredF32Class, incidentOriginalTriangles, deriveNativeStagePixelRay, joinNativeLandmarkEligibility

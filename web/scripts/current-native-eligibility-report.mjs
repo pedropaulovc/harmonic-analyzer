@@ -40,7 +40,7 @@ export async function loadCurrentNativeEligibilityModule(webRoot = WEB_ROOT) {
   const logger = createLogger()
   logger.info = message => { process.stderr.write(`${message}\n`) }
   const server = await createServer({ root: webRoot, configFile: false, customLogger: logger,
-    server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' })
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' })
   try {
     const module = await server.ssrLoadModule('/src/native-landmark-eligibility.ts')
     const { NATIVE_RUNTIME_INSTANCES } = await server.ssrLoadModule('/src/source-assembly.ts')

@@ -2,12 +2,13 @@
 """Decode current actual-source frames and conservatively track identified physical features.
 
 python web/scripts/observe-source.py --source /private/source.mp4
-  --observations web/content/v39-source/XPQwKRt4Y2k.observations.json --output /tmp/observed.json
-  --inventory /tmp/current-model-inventory.json
-Ordinary inputs/outputs use the shared strict current observation and inventory authority.
+  --observations web/content/v39-source/XPQwKRt4Y2k.observations.json.gz
+  --output /tmp/observed.observations.json.gz --inventory /tmp/current-model-inventory.json
+Ordinary inputs/outputs require explicit gzip paths and the shared strict current authority.
+Inventory remains ordinary JSON. New output JSON bytes use the shared deterministic codec.
 Omitting --inventory loads the independently sealed current inventory.
---historical-diagnostic selects only the old materialized-derivative diagnostic; its
-temporary output cannot enter current or immutable historical content namespaces.
+--historical-diagnostic selects only the old materialized-derivative diagnostic;
+private .json output is allowed, but never in current or immutable historical namespaces.
 
 Only numeric observations are written. Never copies source frames/video into the repo.
 Content classification comes from the human-observed shot census, NOT guessed image labels.
@@ -49,22 +50,29 @@ def fresh_contract():
 
 
 def check_namespace(path, *, historical_diagnostic=False, output=False, video_id=None):
-    path = Path(path).resolve()
+    declared = Path(path).absolute()
+    path = declared.resolve()
     web = Path(__file__).resolve().parents[1]
     historical = (web / "content").resolve()
     current = (web / "content/v39-source").resolve()
+    if declared != path and (
+        declared.is_relative_to(historical) or path.is_relative_to(historical)
+    ):
+        raise ValueError("Published observation namespaces cannot use filesystem aliases")
     if path.is_relative_to(current):
         if historical_diagnostic:
             raise ValueError("Historical diagnostics cannot read or write current observations")
-        if path.parent != current or not path.name.endswith(".observations.json"):
-            raise ValueError("Current observations use only direct .observations.json namespace entries")
-        if video_id is not None and path != current / f"{video_id}.observations.json":
+        if path.parent != current or not path.name.endswith(".observations.json.gz"):
+            raise ValueError("Current observations use only direct .observations.json.gz namespace entries")
+        if video_id is not None and path != current / f"{video_id}.observations.json.gz":
             raise ValueError("Current observations must use their registered video filename")
     if (
         path.is_relative_to(historical) and not path.is_relative_to(current)
         and (output or not historical_diagnostic)
     ):
         raise ValueError("Historical content is immutable and requires explicit diagnostic input")
+    if not historical_diagnostic and declared.suffix != ".gz":
+        raise ValueError("Current observation input/output requires an explicit .gz path")
 
 
 def frame_time(index, fps, pts=None):
@@ -924,9 +932,9 @@ def _observe_current(data, cap, pts, inventory, contract, match_repeated_view):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--observations", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--inventory", type=Path, help="Actual current inventory; defaults to independently sealed authority")
+    parser.add_argument("--observations", type=Path, required=True, help="Explicit .gz observations; historical diagnostics use their original storage")
+    parser.add_argument("--output", type=Path, required=True, help="Gzip observations; private .json is permitted only with --historical-diagnostic")
+    parser.add_argument("--inventory", type=Path, help="Actual current inventory, stored as ordinary JSON; defaults to independently sealed authority")
     parser.add_argument(
         "--historical-diagnostic", action="store_true",
         help="Run the old materialized-derivative diagnostic, never current publication",
@@ -938,7 +946,10 @@ def main():
     )
     args = parser.parse_args()
     check_namespace(args.observations, historical_diagnostic=args.historical_diagnostic)
-    observations = common.read_observations(args.observations)
+    observations = (
+        common.read_observations(args.observations) if args.historical_diagnostic
+        else json.loads(fresh_contract().read_observation_bytes(args.observations))
+    )
     check_namespace(
         args.observations, historical_diagnostic=args.historical_diagnostic,
         video_id=observations["source"]["videoId"],
@@ -952,7 +963,11 @@ def main():
         observations, args.source, args.match_repeated_view,
         inventory=inventory, historical_diagnostic=args.historical_diagnostic,
     )
-    common.write_observations(args.output, output)
+    if args.historical_diagnostic:
+        common.write_observations(args.output, output)
+    else:
+        decoded = (json.dumps(output, indent=2) + "\n").encode("utf-8")
+        args.output.write_bytes(fresh_contract().encode_observation_bytes(decoded))
     print(
         json.dumps(
             {

@@ -10,7 +10,7 @@ import { createServer } from 'vite'
 // The generated tracked descriptor must exist before this suite is run.
 const server = await createServer({
   root: fileURLToPath(new URL('../', import.meta.url)), configFile: false,
-  server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom',
+  server: { middlewareMode: true, hmr: false, watch: null, ws: false }, appType: 'custom',
 })
 after(async () => { await server.close() })
 let loadMachine, MECHANISM_DATA

@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { gunzip } from 'node:zlib'
+import { promisify } from 'node:util'
 import { validateModelRepresentation, assertNativeSourceAssociation } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
 import { loadNativeIdentityMap } from './native-identity-map.mjs'
@@ -10,6 +12,7 @@ import { VIDEO_IDS, INPUT_FIELDS, completeInput, canonicalJson, sourceImageError
 export const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 export const FRESH_DIRECTORY = 'content/v39-source'
 export const INVENTORY_PATH = 'web/content/v39-source/native-inventory.json'
+const gunzipAsync = promisify(gunzip)
 const finite = value => typeof value === 'number' && Number.isFinite(value)
 const vector = (value, size) => Array.isArray(value) && value.length === size && value.every(finite)
 const text = value => typeof value === 'string' && Boolean(value.trim())
@@ -223,8 +226,9 @@ async function withCurrentRuntime(webRoot, consume) {
   const logger = createLogger()
   // stdout is the Python bridge's JSON channel; retain SSR diagnostics on stderr.
   logger.info = message => { process.stderr.write(`${message}\n`) }
+  // CPU compilation has no browser client and must not bind a websocket listener.
   const server = await createServer({ root: webRoot, configFile: false, customLogger: logger,
-    server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' })
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' })
   try { return await consume(server) }
   finally { await server.close() }
 }
@@ -457,9 +461,22 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
   return data
 }
 
-export async function loadCurrentObservations(webRoot, videoId) {
+async function readCurrentObservationBytes(webRoot, videoId) {
   assert(VIDEO_IDS.includes(videoId), 'Unknown current source video')
-  const data = JSON.parse(await readFile(resolve(webRoot, FRESH_DIRECTORY, `${videoId}.observations.json`), 'utf8'))
+  const stored = await readFile(resolve(webRoot, FRESH_DIRECTORY, `${videoId}.observations.json.gz`))
+  return { stored, decoded: await gunzipAsync(stored) }
+}
+
+/** Storage and authored-JSON identities are independent exact-byte hashes;
+ * decompression never parses/reserializes or borrows a plain/archive record. */
+export async function currentObservationByteHashes(webRoot, videoId) {
+  const { stored, decoded } = await readCurrentObservationBytes(webRoot, videoId)
+  return { sha256: digest(stored), decodedSha256: digest(decoded) }
+}
+
+export async function loadCurrentObservations(webRoot, videoId) {
+  const { decoded } = await readCurrentObservationBytes(webRoot, videoId)
+  const data = JSON.parse(decoded.toString('utf8'))
   return validateCurrentObservations(data, { webRoot, videoId })
 }
 
@@ -470,12 +487,13 @@ export async function validateCurrentTrackAssociation(track, observations, webRo
     && equal(track.source, observations.source) && equal(track.model, observations.model)
     && equal(track.nativeIdentity, observations.nativeIdentity), 'Compact track differs from current source/native authority')
   assert(record?.kind === 'current-source-observations'
-    && record.path === `${FRESH_DIRECTORY}/${id}.observations.json` && hash(record.sha256)
+    && record.path === `${FRESH_DIRECTORY}/${id}.observations.json.gz` && hash(record.sha256) && hash(record.decodedSha256)
     && text(record.producerPath) && Array.isArray(record.executedInputs) && record.executedInputs.every(text),
   'Compact track lacks its actual fresh observation record and producer execution declaration')
-  const raw = await readFile(resolve(webRoot, record.path))
-  assert(digest(raw) === record.sha256, 'Compact track fresh observation bytes changed')
-  assert(equal(observations, JSON.parse(raw)), 'Readback observation census differs from the exact fresh record bytes')
+  const { stored, decoded } = await readCurrentObservationBytes(webRoot, id)
+  assert(digest(stored) === record.sha256, 'Compact track compressed fresh observation bytes changed')
+  assert(digest(decoded) === record.decodedSha256, 'Compact track decoded fresh observation bytes changed')
+  assert(equal(observations, JSON.parse(decoded.toString('utf8'))), 'Readback observation census differs from the exact decoded fresh record bytes')
   rejectLegacy(observations)
   const authority = await loadCurrentAuthority(webRoot)
   requireCurrentIdentities(observations, authority, id)

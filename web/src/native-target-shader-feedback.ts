@@ -25,7 +25,9 @@ export interface NativeTargetControlledSubmission {
   targetRendererFrame: number | null
   rendererFrameAfter: number
   submittedAtPerformanceMs: number
+  /** CPU return of the supported render call, not a whole-scene GPU fence. */
   completed: boolean
+  completion: 'renderer-render-returned-not-full-scene-gpu-fence'
   targetNativeCallbackCount: number
   transformFeedbackSampled: boolean
   rasterizerDiscard: true
@@ -52,7 +54,7 @@ export interface NativeTargetShaderSeal {
   originalFragmentShaderSource: string
   derivedVertexShaderSource: string
   derivedFragmentShaderSource: string
-  feedbackProgramRelation: 'original-vertex-source-plus-feedback-with-nonexecuted-minimal-fragment'
+  feedbackProgramRelation: 'original-vertex-source-plus-clip-feedback-with-original-fragment-rasterizer-discard'
   declarationsInsertionOffset: number
   assignmentsInsertionOffset: number
   feedbackVaryings: readonly [string]
@@ -71,9 +73,16 @@ export interface NativeTargetUniformSeal {
     type: number
     size: number
     sampler: boolean | null
-    feedbackUse: 'not-evaluated' | 'copied' | 'inactive-nonexecuted' | 'unsupported-active-sampler'
+    feedbackUse: 'not-evaluated' | 'copied' | 'inactive-nonexecuted' | 'partial'
     readability: 'not-evaluated' | 'readable' | 'missing-location' | 'partial'
-    elements: { name: string; storage: 'Float32' | 'Int32' | 'Uint32'; rawHex: string | null; readability: 'readable' | 'missing-location' }[]
+    elements: {
+      name: string
+      storage: 'Float32' | 'Int32' | 'Uint32'
+      rawHex: string | null
+      readability: 'readable' | 'missing-location'
+      derivedLocation: 'not-evaluated' | 'active' | 'inactive'
+      feedbackUse: 'not-evaluated' | 'copied' | 'inactive-nonexecuted'
+    }[]
   }[]
 }
 export interface NativeTargetAttributeSeal {
@@ -138,7 +147,6 @@ export interface NativeTargetShaderFeedbackResult {
 }
 
 const CLIP_OUTPUT = 'ompTargetFeedbackClipPosition'
-const FEEDBACK_FRAGMENT_SOURCE = '#version 300 es\nprecision highp float;\nvoid main() {}\n'
 const MAX_TARGET_VERTICES = 4096
 const BYTE_ORDER = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1 ? 'little-endian' : 'big-endian'
 type UniformData = Float32Array | Int32Array | Uint32Array
@@ -308,7 +316,10 @@ function reflectUniforms(gl: WebGL2RenderingContext, program: WebGLProgram, seal
       const location = gl.getUniformLocation(program, name)
       if (location === null) {
         elements.push({ name, value: null })
-        seal.uniforms[i]!.elements.push({ name, storage: shape.storage, rawHex: null, readability: 'missing-location' })
+        seal.uniforms[i]!.elements.push({
+          name, storage: shape.storage, rawHex: null, readability: 'missing-location',
+          derivedLocation: 'not-evaluated', feedbackUse: 'not-evaluated',
+        })
         valuesComplete = false
         continue
       }
@@ -325,7 +336,7 @@ function reflectUniforms(gl: WebGL2RenderingContext, program: WebGLProgram, seal
       seal.uniforms[i]!.elements.push({
         name, storage: shape.storage,
         rawHex: rawHex(new Uint8Array(value.buffer, value.byteOffset, value.byteLength)),
-        readability: 'readable',
+        readability: 'readable', derivedLocation: 'not-evaluated', feedbackUse: 'not-evaluated',
       })
     }
     uniforms.push({ name: info.name, type: info.type, size: info.size, elements })
@@ -359,6 +370,11 @@ function uploadUniform(gl: WebGL2RenderingContext, type: number, location: WebGL
     case gl.FLOAT_MAT4x2: gl.uniformMatrix4x2fv(location, false, value as Float32Array); break
     case gl.FLOAT_MAT3x4: gl.uniformMatrix3x4fv(location, false, value as Float32Array); break
     case gl.FLOAT_MAT4x3: gl.uniformMatrix4x3fv(location, false, value as Float32Array); break
+    case gl.SAMPLER_2D: case gl.SAMPLER_3D: case gl.SAMPLER_CUBE:
+    case gl.SAMPLER_2D_SHADOW: case gl.SAMPLER_2D_ARRAY: case gl.SAMPLER_2D_ARRAY_SHADOW: case gl.SAMPLER_CUBE_SHADOW:
+    case gl.INT_SAMPLER_2D: case gl.INT_SAMPLER_3D: case gl.INT_SAMPLER_CUBE: case gl.INT_SAMPLER_2D_ARRAY:
+    case gl.UNSIGNED_INT_SAMPLER_2D: case gl.UNSIGNED_INT_SAMPLER_3D: case gl.UNSIGNED_INT_SAMPLER_CUBE: case gl.UNSIGNED_INT_SAMPLER_2D_ARRAY:
+    case 0x8d66: // Actual sealed SAMPLER_EXTERNAL_OES unit; no texture binding is changed.
     case gl.INT: case gl.BOOL: gl.uniform1iv(location, value as Int32Array); break
     case gl.INT_VEC2: case gl.BOOL_VEC2: gl.uniform2iv(location, value as Int32Array); break
     case gl.INT_VEC3: case gl.BOOL_VEC3: gl.uniform3iv(location, value as Int32Array); break
@@ -368,6 +384,49 @@ function uploadUniform(gl: WebGL2RenderingContext, type: number, location: WebGL
     case gl.UNSIGNED_INT_VEC3: gl.uniform3uiv(location, value as Uint32Array); break
     case gl.UNSIGNED_INT_VEC4: gl.uniform4uiv(location, value as Uint32Array); break
     default: throw new Error('Unsupported uniform upload; no omitted-uniform fallback is performed')
+  }
+}
+/** Copy only actual usable derived slots; preserve unreadable and optimized-out metadata. */
+function copyFeedbackUniforms(gl: WebGL2RenderingContext, program: WebGLProgram, uniforms: readonly ReflectedUniform[], seal: NativeTargetUniformSeal): void {
+  requireCondition(gl.getProgramParameter(program, gl.ACTIVE_UNIFORM_BLOCKS) === 0, 'Active feedback program uniform blocks cannot be copied')
+  const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number
+  const infos: WebGLActiveInfo[] = []
+  for (let i = 0; i < count; i++) {
+    const info = gl.getActiveUniform(program, i)
+    requireCondition(info && info.size > 0, 'Actual feedback program uniform reflection is unavailable')
+    requireCondition(uniforms.some(uniform => uniform.name === info.name), `Feedback program requires an unsealed original uniform: ${info.name}`)
+    infos.push(info)
+  }
+  for (let i = 0; i < uniforms.length; i++) {
+    const uniform = uniforms[i]!
+    const uniformSeal = seal.uniforms[i]!
+    const info = infos.find(value => value.name === uniform.name)
+    let copied = 0
+    let inactive = 0
+    for (let j = 0; j < uniform.elements.length; j++) {
+      const element = uniform.elements[j]!
+      const elementSeal = uniformSeal.elements[j]!
+      const location = gl.getUniformLocation(program, element.name)
+      elementSeal.derivedLocation = location === null ? 'inactive' : 'active'
+      if (location === null) {
+        elementSeal.feedbackUse = 'inactive-nonexecuted'
+        inactive++
+      } else {
+        requireCondition(info && info.type === uniform.type && info.size === uniform.size, `Feedback program requires an unsealed original uniform type or size: ${element.name}`)
+        requireCondition(element.value !== null, `Feedback program requires an unreadable original uniform: ${element.name}; no value is substituted`)
+        uploadUniform(gl, uniform.type, location, element.value)
+        elementSeal.feedbackUse = 'copied'
+        copied++
+      }
+      uniformSeal.feedbackUse = copied === uniform.elements.length ? 'copied'
+        : inactive === uniform.elements.length ? 'inactive-nonexecuted' : 'partial'
+    }
+  }
+  for (const name of ['modelViewMatrix', 'projectionMatrix']) {
+    const uniform = seal.uniforms.find(value => value.name === name)
+    requireCondition(uniform?.type === gl.FLOAT_MAT4 && uniform.size === 1
+      && uniform.elements.length === 1 && uniform.elements[0]!.derivedLocation === 'active'
+      && uniform.elements[0]!.feedbackUse === 'copied', `Required derived ${name} uniform is absent, inactive or unreadable; no value is reconstructed`)
   }
 }
 function attributeType(gl: WebGL2RenderingContext, attribute: THREE.BufferAttribute | THREE.InterleavedBufferAttribute): number {
@@ -531,14 +590,15 @@ function requireNoGlError(gl: WebGL2RenderingContext, stage: string): void {
  * Three r180 exposes currentProgram in renderer.properties; its shader objects remain
  * attached after deleteShader, so getShaderSource retrieves the actual compiled text.
  * The vertex copy adds exactly one vec4 output declaration and a final gl_Position copy.
- * A minimal fragment shader is linked but never executed under rasterizer discard.
+ * The exact original fragment source is linked unchanged; rasterizer discard prevents
+ * its execution while preserving the original vertex/fragment varying dependencies.
  * Full original uniform metadata and all readable values (including sampler units)
  * are sealed. Missing locations are explicitly unreadable with null bytes; they
- * are never filled from a material or CPU matrix. Only actually active feedback-
- * vertex uniforms with exact readable original values are copied. Inactive original
- * uniforms/attributes are labelled separately, never falsely described as copied.
- * Optimized-out required matrices, active vertex samplers, custom hooks, deformation
- * and ambiguous programs are unavailable, never reconstructed from a private formula.
+ * are never filled from a material or CPU matrix. Only actual usable derived slots
+ * with matching reflection and exact readable original values are copied, including
+ * sealed sampler units without changing native texture bindings. Optimized-out slots
+ * are labelled per element, never falsely described as copied. Required matrix slots,
+ * custom hooks, deformation and ambiguous programs remain strict and unavailable.
  *
  * Only a real POINTS transform-feedback draw plus finite GPU Float32 clip readback
  * produces measured. World positions are separately derived using actual Float64
@@ -575,8 +635,8 @@ function measureNativeTargetClipFeedback(request: NativeTargetShaderFeedbackRequ
     requireCondition(!('isShaderMaterial' in material && material.isShaderMaterial)
       && !('isRawShaderMaterial' in material && material.isRawShaderMaterial), 'Custom shader materials have no validated stock matrix-only law')
     const context = request.renderer.getContext()
-    requireCondition(typeof context.createTransformFeedback === 'function', 'Native renderer has no WebGL2 transform-feedback support')
-    gl = context as WebGL2RenderingContext
+    requireCondition('createTransformFeedback' in context && typeof context.createTransformFeedback === 'function', 'Native renderer has no WebGL2 transform-feedback support')
+    gl = context
     requireNoGlError(gl, 'entry (a pre-existing error is not ignored)')
     requireCondition(!gl.getParameter(gl.TRANSFORM_FEEDBACK_ACTIVE), 'An existing active or paused transform-feedback session cannot be disturbed')
     for (const target of [gl.ANY_SAMPLES_PASSED, gl.ANY_SAMPLES_PASSED_CONSERVATIVE, gl.TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN]) {
@@ -606,8 +666,8 @@ function measureNativeTargetClipFeedback(request: NativeTargetShaderFeedbackRequ
       programCacheKey: original.cacheKey, materialUuid: material.uuid, materialVersion: material.version,
       originalVertexShaderSource: vertexSource, originalFragmentShaderSource: fragmentSource,
       derivedVertexShaderSource: derived.source, declarationsInsertionOffset: derived.declarationsOffset,
-      derivedFragmentShaderSource: FEEDBACK_FRAGMENT_SOURCE,
-      feedbackProgramRelation: 'original-vertex-source-plus-feedback-with-nonexecuted-minimal-fragment',
+      derivedFragmentShaderSource: fragmentSource,
+      feedbackProgramRelation: 'original-vertex-source-plus-clip-feedback-with-original-fragment-rasterizer-discard',
       assignmentsInsertionOffset: derived.assignmentsOffset, feedbackVaryings: [CLIP_OUTPUT],
       comparisonLaw: 'matrix-only-on-decoded-float32-position',
     }
@@ -678,7 +738,7 @@ function measureNativeTargetClipFeedback(request: NativeTargetShaderFeedbackRequ
     program = gl.createProgram()
     requireCondition(program, 'Could not allocate a scoped feedback program')
     gl.attachShader(program, compile(gl.VERTEX_SHADER, derived.source))
-    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, FEEDBACK_FRAGMENT_SOURCE))
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource))
     gl.transformFeedbackVaryings(program, [CLIP_OUTPUT], gl.SEPARATE_ATTRIBS)
     gl.linkProgram(program)
     requireCondition(gl.getProgramParameter(program, gl.LINK_STATUS), `Derived feedback program link failed: ${gl.getProgramInfoLog(program) ?? 'no driver log'}`)
@@ -686,28 +746,7 @@ function measureNativeTargetClipFeedback(request: NativeTargetShaderFeedbackRequ
     const varying = gl.getTransformFeedbackVarying(program, 0)
     requireCondition(varying?.name === CLIP_OUTPUT && varying.type === gl.FLOAT_VEC4 && varying.size === 1, 'Derived clip transform-feedback output layout differs')
     gl.useProgram(program)
-    requireCondition(gl.getProgramParameter(program, gl.ACTIVE_UNIFORM_BLOCKS) === 0, 'Active feedback vertex uniform blocks cannot be copied')
-    const feedbackUniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS) as number
-    for (const uniform of result.currentUniformSeal.uniforms) uniform.feedbackUse = 'inactive-nonexecuted'
-    for (let i = 0; i < feedbackUniformCount; i++) {
-      const uniform = gl.getActiveUniform(program, i)
-      requireCondition(uniform, 'Actual feedback vertex uniform reflection is unavailable')
-      const sourceIndex = uniforms.findIndex(value => value.name === uniform.name)
-      const source = uniforms[sourceIndex]
-      requireCondition(source && source.type === uniform.type && source.size === uniform.size, `Feedback vertex program requires an unsealed original uniform: ${uniform.name}`)
-      const uniformSeal = result.currentUniformSeal.uniforms[sourceIndex]!
-      if (uniformShape(gl, uniform.type).sampler) {
-        uniformSeal.feedbackUse = 'unsupported-active-sampler'
-        throw new Error(`Active feedback vertex sampler is unsupported: ${uniform.name}; no texture binding is inferred or copied`)
-      }
-      for (const element of source.elements) {
-        const location = gl.getUniformLocation(program, element.name)
-        requireCondition(location, `Derived program omitted original uniform: ${element.name}`)
-        requireCondition(element.value !== null, `Feedback vertex program requires an unreadable original uniform: ${element.name}; no value is substituted`)
-        uploadUniform(gl, source.type, location, element.value)
-      }
-      uniformSeal.feedbackUse = 'copied'
-    }
+    copyFeedbackUniforms(gl, program, uniforms, result.currentUniformSeal)
     vertexArray = gl.createVertexArray()
     feedback = gl.createTransformFeedback()
     requireCondition(vertexArray && feedback, 'Could not allocate scoped feedback VAO/transform-feedback state')
@@ -759,7 +798,6 @@ function measureNativeTargetClipFeedback(request: NativeTargetShaderFeedbackRequ
     gl.getBufferSubData(gl.TRANSFORM_FEEDBACK_BUFFER, 0, clip)
     requireNoGlError(gl, 'GPU Float32 feedback readback')
     for (const value of clip) requireCondition(Number.isFinite(value), 'GPU clip output is nonfinite or was not written')
-    control.transformFeedbackSampled = true
     const diagnostic = deriveClipDiagnostics(clip, request.cpuWorldPositions, derivedDiagnostic)
     result.status = 'measured'
     result.reason = 'Actual current native gl_Position observed by target-only WebGL2 transform feedback; world diagnostics are separately derived in CPU Float64 and are not an independent global bound'
@@ -770,6 +808,7 @@ function measureNativeTargetClipFeedback(request: NativeTargetShaderFeedbackRequ
     result.perVertexClipDelta = diagnostic.perVertexClipDelta
     result.maxDerivedWorldDeltaMetres = diagnostic.maxDerivedWorldDeltaMetres
     result.perVertexDerivedWorldDeltaMetres = diagnostic.perVertexDerivedWorldDeltaMetres
+    control.transformFeedbackSampled = true
   } catch (error) {
     result.reason = error instanceof Error ? error.message : String(error)
   } finally {
@@ -799,16 +838,500 @@ function measureNativeTargetClipFeedback(request: NativeTargetShaderFeedbackRequ
       attempt(() => requireNoGlError(context, 'native GL state restoration and scoped resource cleanup'))
       if (failures.length > 0) {
         control.cleanup.failures.push(...failures)
-        result.status = 'unavailable'
+        control.transformFeedbackSampled = false
+        clearMeasurement(result)
         result.reason = `Feedback/cleanup could not preserve a valid native context: ${failures.join('; ')}`
-        result.observedClipPositions = null
-        result.cpuClipPositions = null
-        result.derivedWorldPositions = null
-        result.maxObservedClipDelta = null
-        result.perVertexClipDelta = null
-        result.maxDerivedWorldDeltaMetres = null
-        result.perVertexDerivedWorldDeltaMetres = null
       }
+    }
+  }
+  return result
+}
+
+interface ControlGlState {
+  parameters: Map<number, unknown>
+  capabilities: { capability: number; enabled: boolean }[]
+  drawBuffers: number[]
+  textures: { texture2D: WebGLTexture | null; textureCube: WebGLTexture | null; texture3D: WebGLTexture | null; textureArray: WebGLTexture | null; sampler: WebGLSampler | null }[]
+  uniformBuffers: { buffer: WebGLBuffer | null; start: number; size: number }[]
+  vertexValues: (Float32Array | Int32Array | Uint32Array)[]
+  pixelStore: { parameter: number; value: number | boolean }[]
+}
+
+/** Internal live handles and logical renderer state; never part of a serialized receipt. */
+export interface NativeDiagnosticRendererState {
+  rawControlGlState: ControlGlState
+  renderTarget: THREE.WebGLRenderTarget | null
+  activeCubeFace: number
+  activeMipmapLevel: number
+  viewport: THREE.Vector4
+  scissor: THREE.Vector4
+  scissorTest: boolean
+  clearColor: THREE.Color
+  clearAlpha: number
+}
+
+export function captureNativeDiagnosticRendererState(renderer: THREE.WebGLRenderer): NativeDiagnosticRendererState {
+  requireCondition(THREE.REVISION === '180', `Unsupported Three revision ${THREE.REVISION}; diagnostic state restoration was inspected for r180`)
+  // resetState cannot restore this constructor-only EXT_clip_control mode.
+  requireCondition(!renderer.capabilities.reversedDepthBuffer && !renderer.state.buffers.depth.getReversed(),
+    'Reversed native depth/clip-control mode cannot be preserved by r180 resetState')
+  const context = renderer.getContext()
+  requireCondition('createTransformFeedback' in context && typeof context.createTransformFeedback === 'function', 'Native diagnostic state requires WebGL2')
+  const gl = context
+  requireNoGlError(gl, 'diagnostic state entry (a pre-existing error is not ignored)')
+  const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram | null
+  requireCondition(program === null || gl.isProgram(program) && !gl.getProgramParameter(program, gl.DELETE_STATUS),
+    'Native diagnostic entry program is invalid or pending deletion')
+  return {
+    rawControlGlState: captureControlGlState(gl),
+    renderTarget: renderer.getRenderTarget(),
+    activeCubeFace: renderer.getActiveCubeFace(), activeMipmapLevel: renderer.getActiveMipmapLevel(),
+    viewport: renderer.getViewport(new THREE.Vector4()), scissor: renderer.getScissor(new THREE.Vector4()),
+    scissorTest: renderer.getScissorTest(),
+    clearColor: renderer.getClearColor(new THREE.Color()), clearAlpha: renderer.getClearAlpha(),
+  }
+}
+
+function nativeBlendEquation(gl: WebGL2RenderingContext, value: number): THREE.BlendingEquation {
+  switch (value) {
+    case gl.FUNC_ADD: return THREE.AddEquation
+    case gl.FUNC_SUBTRACT: return THREE.SubtractEquation
+    case gl.FUNC_REVERSE_SUBTRACT: return THREE.ReverseSubtractEquation
+    case gl.MIN: return THREE.MinEquation
+    case gl.MAX: return THREE.MaxEquation
+    default: throw new Error(`Unsupported saved native blend equation 0x${value.toString(16)}`)
+  }
+}
+
+function nativeBlendFactor(gl: WebGL2RenderingContext, value: number): THREE.BlendingSrcFactor {
+  switch (value) {
+    case gl.ZERO: return THREE.ZeroFactor
+    case gl.ONE: return THREE.OneFactor
+    case gl.SRC_COLOR: return THREE.SrcColorFactor
+    case gl.ONE_MINUS_SRC_COLOR: return THREE.OneMinusSrcColorFactor
+    case gl.DST_COLOR: return THREE.DstColorFactor
+    case gl.ONE_MINUS_DST_COLOR: return THREE.OneMinusDstColorFactor
+    case gl.SRC_ALPHA: return THREE.SrcAlphaFactor
+    case gl.ONE_MINUS_SRC_ALPHA: return THREE.OneMinusSrcAlphaFactor
+    case gl.DST_ALPHA: return THREE.DstAlphaFactor
+    case gl.ONE_MINUS_DST_ALPHA: return THREE.OneMinusDstAlphaFactor
+    case gl.SRC_ALPHA_SATURATE: return THREE.SrcAlphaSaturateFactor
+    case gl.CONSTANT_COLOR: return THREE.ConstantColorFactor
+    case gl.ONE_MINUS_CONSTANT_COLOR: return THREE.OneMinusConstantColorFactor
+    case gl.CONSTANT_ALPHA: return THREE.ConstantAlphaFactor
+    case gl.ONE_MINUS_CONSTANT_ALPHA: return THREE.OneMinusConstantAlphaFactor
+    default: throw new Error(`Unsupported saved native blend factor 0x${value.toString(16)}`)
+  }
+}
+
+/** Restore before disposing owned programs/VAOs. Every keeper is attempted on failure. */
+export function restoreNativeDiagnosticRendererState(renderer: THREE.WebGLRenderer, saved: NativeDiagnosticRendererState): string[] {
+  const failures: string[] = []
+  const attempt = (action: () => void) => {
+    try { action() } catch (error) { failures.push(error instanceof Error ? error.message : String(error)) }
+  }
+  let context: WebGL2RenderingContext | null = null
+  try { context = renderer.getContext() as WebGL2RenderingContext }
+  catch (error) { failures.push(error instanceof Error ? error.message : String(error)) }
+  attempt(() => renderer.resetState())
+  attempt(() => renderer.setRenderTarget(saved.renderTarget, saved.activeCubeFace, saved.activeMipmapLevel))
+  attempt(() => renderer.setViewport(saved.viewport))
+  attempt(() => renderer.setScissor(saved.scissor))
+  attempt(() => renderer.setScissorTest(saved.scissorTest))
+  attempt(() => renderer.setClearColor(saved.clearColor, saved.clearAlpha))
+  // Logical setters above populate caches from logical values, which need not
+  // equal the saved raw framebuffer/clear state. Invalidate those writes without
+  // clearing the now-restored logical render target or rewinding info.render.frame.
+  attempt(() => renderer.state.reset())
+  if (!context) return failures
+  const gl = context
+  const raw = saved.rawControlGlState
+  attempt(() => {
+    const number = (parameter: number) => raw.parameters.get(parameter) as number
+    const color = raw.parameters.get(gl.BLEND_COLOR) as ArrayLike<number>
+    // @types/three r180 still declares the old eight-argument setter. The installed
+    // r180 implementation has these exact ten arguments, including color/alpha.
+    const setBlending = renderer.state.setBlending as unknown as (
+      blending: THREE.Blending, equation: THREE.BlendingEquation, src: THREE.BlendingSrcFactor, dst: THREE.BlendingDstFactor,
+      equationAlpha: THREE.BlendingEquation, srcAlpha: THREE.BlendingSrcFactor, dstAlpha: THREE.BlendingDstFactor,
+      color: THREE.Color, alpha: number, premultipliedAlpha: boolean
+    ) => void
+    setBlending.call(renderer.state, THREE.CustomBlending,
+      nativeBlendEquation(gl, number(gl.BLEND_EQUATION_RGB)), nativeBlendFactor(gl, number(gl.BLEND_SRC_RGB)),
+      nativeBlendFactor(gl, number(gl.BLEND_DST_RGB)) as THREE.BlendingDstFactor,
+      nativeBlendEquation(gl, number(gl.BLEND_EQUATION_ALPHA)), nativeBlendFactor(gl, number(gl.BLEND_SRC_ALPHA)),
+      nativeBlendFactor(gl, number(gl.BLEND_DST_ALPHA)) as THREE.BlendingDstFactor,
+      new THREE.Color(color[0]!, color[1]!, color[2]!), color[3]!, false)
+    // Even disabled blending retains its saved equations/factors/color in GL.
+    // Prime them faithfully first so a later custom draw cannot skip blendColor.
+    if (!raw.capabilities.find(entry => entry.capability === gl.BLEND)!.enabled) renderer.state.setBlending(THREE.NoBlending)
+  })
+  // Unlike the dedicated blending boolean, the other capability caches reset to
+  // unknown. Seed exact values; viewport/scissor reset to concrete canvas bounds.
+  for (const entry of raw.capabilities) attempt(() => entry.enabled ? renderer.state.enable(entry.capability) : renderer.state.disable(entry.capability))
+  attempt(() => renderer.state.viewport(new THREE.Vector4().fromArray(raw.parameters.get(gl.VIEWPORT) as ArrayLike<number>)))
+  attempt(() => renderer.state.scissor(new THREE.Vector4().fromArray(raw.parameters.get(gl.SCISSOR_BOX) as ArrayLike<number>)))
+  restoreControlGlState(gl, raw, failures)
+  return failures
+}
+
+/** Snapshot the state touched by r180 render, its resetState, and our scoped raw TF. */
+function captureControlGlState(gl: WebGL2RenderingContext): ControlGlState {
+  const parameters = new Map<number, unknown>()
+  for (const parameter of [
+    gl.CURRENT_PROGRAM, gl.VERTEX_ARRAY_BINDING, gl.ARRAY_BUFFER_BINDING, gl.ELEMENT_ARRAY_BUFFER_BINDING,
+    gl.TRANSFORM_FEEDBACK_BINDING, gl.TRANSFORM_FEEDBACK_BUFFER_BINDING,
+    gl.COPY_READ_BUFFER_BINDING, gl.COPY_WRITE_BUFFER_BINDING, gl.PIXEL_PACK_BUFFER_BINDING,
+    gl.PIXEL_UNPACK_BUFFER_BINDING, gl.UNIFORM_BUFFER_BINDING, gl.RENDERBUFFER_BINDING,
+    gl.DRAW_FRAMEBUFFER_BINDING, gl.READ_FRAMEBUFFER_BINDING, gl.READ_BUFFER, gl.ACTIVE_TEXTURE,
+    gl.BLEND_EQUATION_RGB, gl.BLEND_EQUATION_ALPHA, gl.BLEND_SRC_RGB, gl.BLEND_DST_RGB,
+    gl.BLEND_SRC_ALPHA, gl.BLEND_DST_ALPHA, gl.BLEND_COLOR, gl.COLOR_WRITEMASK, gl.COLOR_CLEAR_VALUE,
+    gl.DEPTH_WRITEMASK, gl.DEPTH_FUNC, gl.DEPTH_RANGE, gl.DEPTH_CLEAR_VALUE,
+    gl.STENCIL_FUNC, gl.STENCIL_REF, gl.STENCIL_VALUE_MASK, gl.STENCIL_WRITEMASK,
+    gl.STENCIL_FAIL, gl.STENCIL_PASS_DEPTH_FAIL, gl.STENCIL_PASS_DEPTH_PASS,
+    gl.STENCIL_BACK_FUNC, gl.STENCIL_BACK_REF, gl.STENCIL_BACK_VALUE_MASK, gl.STENCIL_BACK_WRITEMASK,
+    gl.STENCIL_BACK_FAIL, gl.STENCIL_BACK_PASS_DEPTH_FAIL, gl.STENCIL_BACK_PASS_DEPTH_PASS, gl.STENCIL_CLEAR_VALUE,
+    gl.CULL_FACE_MODE, gl.FRONT_FACE, gl.POLYGON_OFFSET_FACTOR, gl.POLYGON_OFFSET_UNITS, gl.LINE_WIDTH,
+    gl.VIEWPORT, gl.SCISSOR_BOX, gl.SAMPLE_COVERAGE_VALUE, gl.SAMPLE_COVERAGE_INVERT,
+  ]) parameters.set(parameter, gl.getParameter(parameter))
+  const capabilities = [
+    gl.BLEND, gl.CULL_FACE, gl.DEPTH_TEST, gl.STENCIL_TEST, gl.SCISSOR_TEST, gl.POLYGON_OFFSET_FILL,
+    gl.SAMPLE_ALPHA_TO_COVERAGE, gl.SAMPLE_COVERAGE, gl.DITHER, gl.RASTERIZER_DISCARD,
+  ].map(capability => ({ capability, enabled: gl.isEnabled(capability) }))
+  const drawBuffers: number[] = []
+  const drawBufferCount = parameters.get(gl.DRAW_FRAMEBUFFER_BINDING) === null ? 1 : gl.getParameter(gl.MAX_DRAW_BUFFERS) as number
+  for (let index = 0; index < drawBufferCount; index++) drawBuffers.push(gl.getParameter(gl.DRAW_BUFFER0 + index) as number)
+  const uniformBuffers: ControlGlState['uniformBuffers'] = []
+  const uniformBufferCount = gl.getParameter(gl.MAX_UNIFORM_BUFFER_BINDINGS) as number
+  for (let index = 0; index < uniformBufferCount; index++) uniformBuffers.push({
+    buffer: gl.getIndexedParameter(gl.UNIFORM_BUFFER_BINDING, index) as WebGLBuffer | null,
+    start: gl.getIndexedParameter(gl.UNIFORM_BUFFER_START, index) as number,
+    size: gl.getIndexedParameter(gl.UNIFORM_BUFFER_SIZE, index) as number,
+  })
+  const vertexValues: ControlGlState['vertexValues'] = []
+  const attributeCount = gl.getParameter(gl.MAX_VERTEX_ATTRIBS) as number
+  for (let index = 0; index < attributeCount; index++) vertexValues.push(gl.getVertexAttrib(index, gl.CURRENT_VERTEX_ATTRIB) as Float32Array | Int32Array | Uint32Array)
+  const pixelStore = [
+    gl.PACK_ALIGNMENT, gl.PACK_ROW_LENGTH, gl.PACK_SKIP_PIXELS, gl.PACK_SKIP_ROWS,
+    gl.UNPACK_ALIGNMENT, gl.UNPACK_ROW_LENGTH, gl.UNPACK_IMAGE_HEIGHT, gl.UNPACK_SKIP_PIXELS,
+    gl.UNPACK_SKIP_ROWS, gl.UNPACK_SKIP_IMAGES, gl.UNPACK_FLIP_Y_WEBGL,
+    gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, gl.UNPACK_COLORSPACE_CONVERSION_WEBGL,
+  ].map(parameter => ({ parameter, value: gl.getParameter(parameter) as number | boolean }))
+  const textures: ControlGlState['textures'] = []
+  const activeTexture = parameters.get(gl.ACTIVE_TEXTURE) as number
+  try {
+    const unitCount = gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS) as number
+    for (let unit = 0; unit < unitCount; unit++) {
+      gl.activeTexture(gl.TEXTURE0 + unit)
+      textures.push({
+        texture2D: gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null,
+        textureCube: gl.getParameter(gl.TEXTURE_BINDING_CUBE_MAP) as WebGLTexture | null,
+        texture3D: gl.getParameter(gl.TEXTURE_BINDING_3D) as WebGLTexture | null,
+        textureArray: gl.getParameter(gl.TEXTURE_BINDING_2D_ARRAY) as WebGLTexture | null,
+        sampler: gl.getParameter(gl.SAMPLER_BINDING) as WebGLSampler | null,
+      })
+    }
+  } finally {
+    gl.activeTexture(activeTexture)
+  }
+  requireNoGlError(gl, 'control state capture')
+  return { parameters, capabilities, drawBuffers, textures, uniformBuffers, vertexValues, pixelStore }
+}
+
+function restoreControlGlState(gl: WebGL2RenderingContext, saved: ControlGlState, failures: string[]): void {
+  const attempt = (action: () => void) => {
+    try { action() } catch (error) { failures.push(error instanceof Error ? error.message : String(error)) }
+  }
+  const number = (parameter: number) => saved.parameters.get(parameter) as number
+  const vector = (parameter: number) => saved.parameters.get(parameter) as ArrayLike<number>
+  attempt(() => gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, saved.parameters.get(gl.DRAW_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null))
+  attempt(() => gl.bindFramebuffer(gl.READ_FRAMEBUFFER, saved.parameters.get(gl.READ_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null))
+  attempt(() => gl.drawBuffers(saved.drawBuffers))
+  attempt(() => gl.readBuffer(number(gl.READ_BUFFER)))
+  attempt(() => gl.bindRenderbuffer(gl.RENDERBUFFER, saved.parameters.get(gl.RENDERBUFFER_BINDING) as WebGLRenderbuffer | null))
+  attempt(() => gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, saved.parameters.get(gl.TRANSFORM_FEEDBACK_BINDING) as WebGLTransformFeedback | null))
+  attempt(() => gl.bindVertexArray(saved.parameters.get(gl.VERTEX_ARRAY_BINDING) as WebGLVertexArrayObject | null))
+  for (let index = 0; index < saved.uniformBuffers.length; index++) {
+    const entry = saved.uniformBuffers[index]!
+    attempt(() => {
+      if (entry.buffer && entry.size > 0) gl.bindBufferRange(gl.UNIFORM_BUFFER, index, entry.buffer, entry.start, entry.size)
+      else gl.bindBufferBase(gl.UNIFORM_BUFFER, index, entry.buffer)
+    })
+  }
+  for (const [target, binding] of [
+    [gl.ARRAY_BUFFER, gl.ARRAY_BUFFER_BINDING], [gl.ELEMENT_ARRAY_BUFFER, gl.ELEMENT_ARRAY_BUFFER_BINDING],
+    [gl.TRANSFORM_FEEDBACK_BUFFER, gl.TRANSFORM_FEEDBACK_BUFFER_BINDING],
+    [gl.COPY_READ_BUFFER, gl.COPY_READ_BUFFER_BINDING], [gl.COPY_WRITE_BUFFER, gl.COPY_WRITE_BUFFER_BINDING],
+    [gl.PIXEL_PACK_BUFFER, gl.PIXEL_PACK_BUFFER_BINDING], [gl.PIXEL_UNPACK_BUFFER, gl.PIXEL_UNPACK_BUFFER_BINDING],
+    [gl.UNIFORM_BUFFER, gl.UNIFORM_BUFFER_BINDING],
+  ]) attempt(() => gl.bindBuffer(target!, saved.parameters.get(binding!) as WebGLBuffer | null))
+  attempt(() => gl.useProgram(saved.parameters.get(gl.CURRENT_PROGRAM) as WebGLProgram | null))
+  for (let unit = 0; unit < saved.textures.length; unit++) {
+    const texture = saved.textures[unit]!
+    attempt(() => gl.activeTexture(gl.TEXTURE0 + unit))
+    attempt(() => gl.bindTexture(gl.TEXTURE_2D, texture.texture2D))
+    attempt(() => gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture.textureCube))
+    attempt(() => gl.bindTexture(gl.TEXTURE_3D, texture.texture3D))
+    attempt(() => gl.bindTexture(gl.TEXTURE_2D_ARRAY, texture.textureArray))
+    attempt(() => gl.bindSampler(unit, texture.sampler))
+  }
+  attempt(() => gl.activeTexture(number(gl.ACTIVE_TEXTURE)))
+  for (let index = 0; index < saved.vertexValues.length; index++) {
+    const value = saved.vertexValues[index]!
+    attempt(() => {
+      if (value instanceof Int32Array) gl.vertexAttribI4iv(index, value)
+      else if (value instanceof Uint32Array) gl.vertexAttribI4uiv(index, value)
+      else gl.vertexAttrib4fv(index, value)
+    })
+  }
+  for (const entry of saved.pixelStore) attempt(() => gl.pixelStorei(entry.parameter, entry.value))
+  attempt(() => gl.blendEquationSeparate(number(gl.BLEND_EQUATION_RGB), number(gl.BLEND_EQUATION_ALPHA)))
+  attempt(() => gl.blendFuncSeparate(number(gl.BLEND_SRC_RGB), number(gl.BLEND_DST_RGB), number(gl.BLEND_SRC_ALPHA), number(gl.BLEND_DST_ALPHA)))
+  attempt(() => { const v = vector(gl.BLEND_COLOR); gl.blendColor(v[0]!, v[1]!, v[2]!, v[3]!) })
+  attempt(() => { const v = vector(gl.COLOR_WRITEMASK); gl.colorMask(Boolean(v[0]), Boolean(v[1]), Boolean(v[2]), Boolean(v[3])) })
+  attempt(() => { const v = vector(gl.COLOR_CLEAR_VALUE); gl.clearColor(v[0]!, v[1]!, v[2]!, v[3]!) })
+  attempt(() => gl.depthMask(saved.parameters.get(gl.DEPTH_WRITEMASK) as boolean))
+  attempt(() => gl.depthFunc(number(gl.DEPTH_FUNC)))
+  attempt(() => { const v = vector(gl.DEPTH_RANGE); gl.depthRange(v[0]!, v[1]!) })
+  attempt(() => gl.clearDepth(number(gl.DEPTH_CLEAR_VALUE)))
+  for (const [face, func, ref, mask, writeMask, fail, depthFail, pass] of [
+    [gl.FRONT, gl.STENCIL_FUNC, gl.STENCIL_REF, gl.STENCIL_VALUE_MASK, gl.STENCIL_WRITEMASK, gl.STENCIL_FAIL, gl.STENCIL_PASS_DEPTH_FAIL, gl.STENCIL_PASS_DEPTH_PASS],
+    [gl.BACK, gl.STENCIL_BACK_FUNC, gl.STENCIL_BACK_REF, gl.STENCIL_BACK_VALUE_MASK, gl.STENCIL_BACK_WRITEMASK, gl.STENCIL_BACK_FAIL, gl.STENCIL_BACK_PASS_DEPTH_FAIL, gl.STENCIL_BACK_PASS_DEPTH_PASS],
+  ]) {
+    attempt(() => gl.stencilFuncSeparate(face!, number(func!), number(ref!), number(mask!)))
+    attempt(() => gl.stencilMaskSeparate(face!, number(writeMask!)))
+    attempt(() => gl.stencilOpSeparate(face!, number(fail!), number(depthFail!), number(pass!)))
+  }
+  attempt(() => gl.clearStencil(number(gl.STENCIL_CLEAR_VALUE)))
+  attempt(() => gl.cullFace(number(gl.CULL_FACE_MODE)))
+  attempt(() => gl.frontFace(number(gl.FRONT_FACE)))
+  attempt(() => gl.polygonOffset(number(gl.POLYGON_OFFSET_FACTOR), number(gl.POLYGON_OFFSET_UNITS)))
+  attempt(() => gl.lineWidth(number(gl.LINE_WIDTH)))
+  attempt(() => { const v = vector(gl.VIEWPORT); gl.viewport(v[0]!, v[1]!, v[2]!, v[3]!) })
+  attempt(() => { const v = vector(gl.SCISSOR_BOX); gl.scissor(v[0]!, v[1]!, v[2]!, v[3]!) })
+  attempt(() => gl.sampleCoverage(number(gl.SAMPLE_COVERAGE_VALUE), saved.parameters.get(gl.SAMPLE_COVERAGE_INVERT) as boolean))
+  for (const entry of saved.capabilities) attempt(() => entry.enabled ? gl.enable(entry.capability) : gl.disable(entry.capability))
+  attempt(() => requireNoGlError(gl, 'controlled native submission state restoration'))
+}
+
+function validateControlRequest(request: NativeTargetShaderFeedbackRequest): THREE.Material {
+  requireCondition(THREE.REVISION === '180', `Unsupported Three revision ${THREE.REVISION}; native control was inspected for r180`)
+  requireCondition(request.scene instanceof THREE.Scene && request.camera instanceof THREE.PerspectiveCamera, 'Native control requires the actual Scene and current perspective camera')
+  requireCondition(request.object instanceof THREE.Mesh, 'Requested triangle control requires an actual native Mesh')
+  requireCondition(!('isInstancedMesh' in request.object && request.object.isInstancedMesh)
+    && !('isSkinnedMesh' in request.object && request.object.isSkinnedMesh)
+    && !('isBatchedMesh' in request.object && request.object.isBatchedMesh), 'Instanced, skinned or batched native objects are unsupported')
+  let inScene = false
+  for (let node: THREE.Object3D | null = request.object; node; node = node.parent) {
+    requireCondition(node.visible, 'Native target has an invisible ancestor')
+    if (node === request.scene) { inScene = true; break }
+  }
+  requireCondition(inScene && request.object.layers.test(request.camera.layers), 'Native target is not in the actual Scene/current camera layer')
+  requireCondition(request.scene.overrideMaterial === null && !request.renderer.shadowMap.enabled
+    && !request.renderer.xr.isPresenting, 'Override material, enabled shadow passes and presenting XR are unsupported by non-colour native control')
+  // r180 resetState disables reversed depth/EXT_clip_control; it cannot re-enable
+  // that constructor-only renderer mode through a supported public API.
+  requireCondition(!request.renderer.capabilities.reversedDepthBuffer && !request.camera.reversedDepth,
+    'Reversed native depth/clip-control mode cannot be preserved by r180 resetState')
+  requireCondition(request.renderer.getRenderTarget() === null, 'Native control requires the current default colour framebuffer; offscreen resolve/mipmap side effects are unsupported')
+  request.scene.traverseVisible(node => {
+    if (!('material' in node)) return
+    const material = node.material as THREE.Material | THREE.Material[]
+    for (const entry of Array.isArray(material) ? material : [material]) {
+      requireCondition(!entry.visible || !('transmission' in entry) || entry.transmission === 0, 'A native transmission pass would clear a framebuffer despite rasterizer discard')
+    }
+  })
+  const geometry = request.object.geometry
+  requireCondition(Object.values(geometry.morphAttributes).every(attributes => !attributes || attributes.length === 0), 'Native morph attributes are unsupported')
+  const material = request.object.material
+  requireCondition(!Array.isArray(material), 'Multi-material native targets are unsupported')
+  requireCondition(material.visible && !('wireframe' in material && material.wireframe), 'Requested target is not an active native filled-triangle material')
+  requireCondition(material.onBeforeCompile === THREE.Material.prototype.onBeforeCompile
+    && material.customProgramCacheKey === THREE.Material.prototype.customProgramCacheKey, 'Custom native shader hooks, including springs, have no matrix-only comparison law')
+  requireCondition(!('isShaderMaterial' in material && material.isShaderMaterial)
+    && !('isRawShaderMaterial' in material && material.isRawShaderMaterial), 'Custom shader materials have no validated stock matrix-only law')
+  requireCondition(request.targetPrimitiveId.length > 0 && typeof request.beforeSample === 'function', 'Native target identity or Scene seal check is absent')
+  requireCondition(Number.isSafeInteger(request.controlSubmissionRevision) && request.controlSubmissionRevision > 0, 'Native control revision must be a positive safe integer')
+  const association = request.associatedColourDraw
+  requireCondition(association && Number.isSafeInteger(association.drawRevision) && association.drawRevision > 0
+    && Number.isSafeInteger(association.contextRevision) && association.contextRevision >= 0 && association.viewId.length > 0
+    && (association.timeSeconds === null || Number.isFinite(association.timeSeconds)), 'Original colour association tuple is invalid')
+  const count = request.targetVertexIndices.length
+  requireCondition(count > 0 && count <= MAX_TARGET_VERTICES, `Target coordinate class must contain 1..${MAX_TARGET_VERTICES} vertices`)
+  requireCondition(request.cpuWorldPositions instanceof Float64Array && request.cpuWorldPositions.length === count * 3
+    && request.cpuWorldPositions.every(Number.isFinite), 'Pre-lease Float64 xyz reference rows must match the complete target class and be finite')
+  const position = geometry.getAttribute('position')
+  requireCondition(position && position.array instanceof Float32Array && position.itemSize === 3 && !position.normalized, 'Target requires actual decoded, nonnormalized Float32 xyz POSITION')
+  const stride = position instanceof THREE.InterleavedBufferAttribute ? position.data.stride : position.itemSize
+  const attributeOffset = position instanceof THREE.InterleavedBufferAttribute ? position.offset : 0
+  requireCondition(Number.isSafeInteger(stride) && stride >= position.itemSize && Number.isSafeInteger(attributeOffset)
+    && attributeOffset >= 0 && attributeOffset + position.itemSize <= stride, 'Invalid actual decoded POSITION layout')
+  const bits = new Uint32Array(position.array.buffer, position.array.byteOffset, position.array.length)
+  const seen = new Set<number>()
+  for (const index of request.targetVertexIndices) {
+    requireCondition(Number.isSafeInteger(index) && index >= 0 && index < position.count && !seen.has(index), 'Target indices must be unique actual decoded vertex indices within POSITION')
+    seen.add(index)
+    for (let axis = 0; axis < 3; axis++) {
+      const offset = index * stride + attributeOffset + axis
+      const firstOffset = request.targetVertexIndices[0]! * stride + attributeOffset + axis
+      requireCondition(Number.isFinite(position.array[offset]) && bits[offset] === bits[firstOffset], 'Target rows are not one exact finite Float32 coordinate class')
+    }
+  }
+  const offset = request.requestedTriangleIndexOffset
+  const total = geometry.index?.count ?? position.count
+  const range = geometry.drawRange
+  requireCondition(Number.isSafeInteger(range.start) && range.start >= 0 && range.start % 3 === 0
+    && (range.count === Infinity || Number.isSafeInteger(range.count) && range.count >= 0 && range.count % 3 === 0), 'Native triangle draw range is invalid or unaligned')
+  requireCondition(Number.isSafeInteger(offset) && offset >= range.start && offset % 3 === 0
+    && offset + 3 <= Math.min(total, range.start + range.count), 'Requested triangle is outside the active native draw range')
+  for (const group of geometry.groups) requireCondition(Number.isSafeInteger(group.start) && group.start >= 0 && group.start % 3 === 0
+    && Number.isSafeInteger(group.count) && group.count >= 0 && group.count % 3 === 0, 'Native geometry group is invalid or unaligned')
+  let triangleContainsTarget = false
+  for (let corner = 0; corner < 3; corner++) {
+    const index = geometry.index ? geometry.index.getX(offset + corner) : offset + corner
+    requireCondition(Number.isSafeInteger(index) && index >= 0 && index < position.count, 'Requested triangle has an invalid decoded vertex index')
+    if (seen.has(index)) triangleContainsTarget = true
+  }
+  requireCondition(triangleContainsTarget, 'Requested active triangle does not contain the selected coordinate class')
+  for (const matrix of [request.object.matrixWorld, request.camera.matrixWorld, request.camera.matrixWorldInverse,
+    request.camera.projectionMatrix, request.camera.projectionMatrixInverse]) {
+    const determinant = matrix.determinant()
+    requireCondition(matrix.elements.every(Number.isFinite) && Number.isFinite(determinant) && determinant !== 0,
+      'Native control camera/object matrix is nonfinite or singular')
+  }
+  const world = request.object.matrixWorld.elements
+  requireCondition(world[3] === 0 && world[7] === 0 && world[11] === 0 && world[15] === 1, 'Current native world matrix is not affine')
+  return material
+}
+
+function clearMeasurement(result: NativeTargetShaderFeedbackResult): void {
+  result.status = 'unavailable'
+  result.observedClipPositions = null
+  result.cpuClipPositions = null
+  result.derivedWorldPositions = null
+  result.maxObservedClipDelta = null
+  result.perVertexClipDelta = null
+  result.maxDerivedWorldDeltaMetres = null
+  result.perVertexDerivedWorldDeltaMetres = null
+  result.derivedDiagnostic = null
+}
+
+/**
+ * Supported full render of the SAME actual Scene/current camera under rasterizer
+ * discard. Its fresh control frame is not a new colour receipt or source epoch.
+ * Target feedback is synchronous in the native onAfterRender, before a later mesh
+ * can overwrite uniforms in a shared original program. Scene-owned seals see the
+ * original callback/background/autoClear references, not our temporary scope.
+ */
+export function measureNativeTargetShaderFeedback(request: NativeTargetShaderFeedbackRequest): NativeTargetShaderFeedbackResult {
+  let result = unavailable('Controlled native submission did not execute')
+  let control: NativeTargetControlledSubmission | null = null
+  let saved: NativeDiagnosticRendererState | null = null
+  let gl: WebGL2RenderingContext | null = null
+  let scope: { callback: NativeObject['onAfterRender']; background: THREE.Scene['background']; autoClear: boolean } | null = null
+  let sampleAttempted = false
+  let failure: string | null = null
+  try {
+    const material = validateControlRequest(request)
+    request.beforeSample()
+    const context = request.renderer.getContext()
+    requireCondition('createTransformFeedback' in context && typeof context.createTransformFeedback === 'function', 'Native renderer has no WebGL2 transform-feedback support')
+    gl = context
+    requireNoGlError(gl, 'control entry (a pre-existing error is not ignored)')
+    requireCondition(!gl.getParameter(gl.TRANSFORM_FEEDBACK_ACTIVE), 'An existing active or paused transform-feedback session cannot be disturbed')
+    for (const target of [gl.ANY_SAMPLES_PASSED, gl.ANY_SAMPLES_PASSED_CONSERVATIVE, gl.TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN]) {
+      requireCondition(gl.getQuery(target, gl.CURRENT_QUERY) === null, 'An existing GPU query would be contaminated by native control')
+    }
+    const timer = gl.getExtension('EXT_disjoint_timer_query_webgl2') as { TIME_ELAPSED_EXT: number } | null
+    requireCondition(!timer || gl.getQuery(timer.TIME_ELAPSED_EXT, gl.CURRENT_QUERY) === null, 'An existing GPU timer query would be contaminated by native control')
+    saved = captureNativeDiagnosticRendererState(request.renderer)
+    scope = {
+      callback: request.object.onAfterRender, background: request.scene.background, autoClear: request.renderer.autoClear,
+    }
+    const original = scope
+    const camera = {
+      matrixWorld: Array.from(request.camera.matrixWorld.elements),
+      matrixWorldInverse: Array.from(request.camera.matrixWorldInverse.elements),
+      projectionMatrix: Array.from(request.camera.projectionMatrix.elements),
+    }
+    const restoreScope = () => {
+      request.object.onAfterRender = original.callback
+      request.scene.background = original.background
+      request.renderer.autoClear = original.autoClear
+    }
+    const callback: NativeObject['onAfterRender'] = function (this: NativeObject, renderer, scene, currentCamera, geometry, currentMaterial, group) {
+      const receipt = control!
+      receipt.targetNativeCallbackCount++
+      restoreScope()
+      try {
+        if (!sampleAttempted) {
+          sampleAttempted = true
+          requireCondition(this === request.object && renderer === request.renderer && scene === request.scene
+            && currentCamera === request.camera && geometry === request.object.geometry && currentMaterial === material,
+          'Native callback object/renderer/Scene/camera/geometry/material does not match the requested current target')
+          // r180 uses null for a single-material draw, even if geometry.groups is nonempty.
+          requireCondition(group === null, 'Single-material native target callback has an unexpected active group')
+          requireCondition(gl!.isEnabled(gl!.RASTERIZER_DISCARD) && request.renderer.info.render.frame > receipt.rendererFrameBefore,
+            'Target native submission has no fresh rasterizer-discard renderer frame')
+          receipt.targetRendererFrame = request.renderer.info.render.frame
+          receipt.targetNativeSubmission = { objectUuid: this.uuid, geometryUuid: geometry.uuid, materialUuid: currentMaterial.uuid, group: null }
+          for (const [name, expected] of Object.entries(camera)) requireCondition(request.camera[name as keyof typeof camera].elements.every((value, index) => Object.is(value, expected[index])), 'Current native camera changed during control submission')
+          request.beforeSample()
+          result = measureNativeTargetClipFeedback(request, receipt)
+        }
+      } catch (error) {
+        failure ??= error instanceof Error ? error.message : String(error)
+      } finally {
+        // Preserve the original callback on every native invocation, including negatives.
+        try { original.callback.call(this, renderer, scene, currentCamera, geometry, currentMaterial, group) }
+        catch (error) { failure ??= error instanceof Error ? error.message : String(error) }
+        request.object.onAfterRender = callback
+        request.scene.background = null
+        request.renderer.autoClear = false
+      }
+    }
+    control = {
+      method: 'current-native-rasterizer-discard-target-control-submission', revision: request.controlSubmissionRevision,
+      rendererFrameBefore: request.renderer.info.render.frame, targetRendererFrame: null,
+      rendererFrameAfter: request.renderer.info.render.frame, submittedAtPerformanceMs: performance.now(),
+      completed: false, targetNativeCallbackCount: 0, transformFeedbackSampled: false, rasterizerDiscard: true, colourRasterized: false,
+      completion: 'renderer-render-returned-not-full-scene-gpu-fence',
+      associatedColourDraw: { ...request.associatedColourDraw }, camera, targetNativeSubmission: null,
+      cleanup: { status: 'restored', failures: [] },
+    }
+    request.object.onAfterRender = callback
+    request.scene.background = null
+    request.renderer.autoClear = false
+    gl.enable(gl.RASTERIZER_DISCARD)
+    requireNoGlError(gl, 'native rasterizer-discard control setup')
+    request.renderer.render(request.scene, request.camera)
+    control.completed = true
+    requireNoGlError(gl, 'supported full native control render')
+    requireCondition(!failure, failure ?? 'Native callback failed')
+    requireCondition(sampleAttempted && control.targetNativeSubmission !== null, 'Requested target was not submitted by the supported current native render')
+  } catch (error) {
+    result.reason = error instanceof Error ? error.message : String(error)
+    clearMeasurement(result)
+  } finally {
+    const failures = control?.cleanup.failures ?? []
+    const attempt = (action: () => void) => {
+      try { action() } catch (error) { failures.push(error instanceof Error ? error.message : String(error)) }
+    }
+    if (scope) {
+      const original = scope
+      attempt(() => { request.object.onAfterRender = original.callback })
+      attempt(() => { request.scene.background = original.background })
+      attempt(() => { request.renderer.autoClear = original.autoClear })
+    }
+    if (saved) failures.push(...restoreNativeDiagnosticRendererState(request.renderer, saved))
+    if (control) {
+      control.rendererFrameAfter = request.renderer.info.render.frame
+      control.cleanup.status = failures.length === 0 ? 'restored' : 'failed'
+      result.controlledSubmission = control
+    }
+    if (failures.length > 0) {
+      clearMeasurement(result)
+      result.reason = `Controlled submission cleanup failed: ${failures.join('; ')}`
     }
   }
   return result

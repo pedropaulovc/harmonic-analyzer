@@ -39,7 +39,7 @@ test('canonical observation loading rejects missing, corrupt or invalid gzip wit
   }
 })
 
-test('current census refuses missing fresh records despite an intact historical sibling before MP4 work', async t => {
+test('current census refuses missing fresh gzip despite historical and plain current siblings before MP4 work', async t => {
   const root = await mkdtemp(join(tmpdir(), 'fresh-source-missing-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const id = 'NAsM30MAHLg', content = join(root, 'content', 'canonical-native')
@@ -48,7 +48,12 @@ test('current census refuses missing fresh records despite an intact historical 
     schemaVersion: 1, identityDerivative: { kind: 'materialized-canonical-native-identity-derivative' },
     source: { videoId: id }, frames: [{ timeSeconds: 0 }],
   })))
-  const expectedPath = join(root, 'content', 'v39-source', `${id}.observations.json`)
+  const current = join(root, 'content', 'v39-source')
+  await mkdir(current, { recursive: true })
+  await writeFile(join(current, `${id}.observations.json`), JSON.stringify({
+    schemaVersion: 1, kind: 'current-source-observations', source: { videoId: id }, frames: [],
+  }))
+  const expectedPath = join(current, `${id}.observations.json.gz`)
   await assert.rejects(loadCurrentObservations(root, id), error => error.code === 'ENOENT' && error.path === expectedPath)
   await assert.rejects(loadRecord(id, join(root, 'absent-mp4-root'), undefined, { webRoot: root }),
     error => error.code === 'ENOENT' && error.path === expectedPath)
@@ -59,11 +64,11 @@ test('a canonical derivative header in the fresh namespace cannot start MP4 prob
   t.after(() => rm(root, { recursive: true, force: true }))
   const id = '6dW6VYXp9HM', content = join(root, 'content', 'v39-source')
   await mkdir(content, { recursive: true })
-  await writeFile(join(content, `${id}.observations.json`), JSON.stringify({
+  await writeFile(join(content, `${id}.observations.json.gz`), gzipSync(JSON.stringify({
     schemaVersion: 1, kind: 'current-source-observations',
     identityDerivative: { kind: 'materialized-canonical-native-identity-derivative' },
     source: { videoId: id },
-  }))
+  })))
   await assert.rejects(loadRecord(id, join(root, 'absent-mp4-root'), undefined, { webRoot: root }),
     error => error.code === 'historical-source-evidence' && error.field === 'identityDerivative')
 })
@@ -504,7 +509,7 @@ test('optional native eligibility cannot suppress pixel errors or qualify stale 
   const { createServer } = await import('vite')
   const { fileURLToPath } = await import('node:url')
   const server = await createServer({ root: fileURLToPath(new URL('../', import.meta.url)), configFile: false,
-    server: { middlewareMode: true, hmr: false, watch: null }, appType: 'custom' })
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null }, appType: 'custom' })
   try {
     const { joinNativeLandmarkEligibility, deriveNativeStagePixelRay } = await server.ssrLoadModule('/src/native-landmark-eligibility.ts')
     const fixture = measuredViewFixture()

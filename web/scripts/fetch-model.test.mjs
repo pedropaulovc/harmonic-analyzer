@@ -276,7 +276,7 @@ test('the native nib datum follows signed pen travel without becoming the separa
   const server = await createServer({
     root: f.webRoot,
     configFile: false,
-    server: { middlewareMode: true, hmr: false, watch: null },
+    server: { middlewareMode: true, hmr: false, watch: null, ws: false },
     appType: 'custom',
   })
   try {

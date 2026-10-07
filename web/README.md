@@ -48,11 +48,13 @@ Existing source tracks are stale for a new raw model and reject source-following
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
 representation and provenance contract.
 
-The current imported model is the approved **v39** release. All six retained
-source tracks still identify the earlier raw model and are rejected for
-source-following against v39. Original-video playback and manual exploration
-remain separate from that guard. Fresh v39 source captures and qualification are
-required; no v39 source-following or footage-fidelity pass is claimed.
+The current imported model is the approved **v39** release: raw SHA-256
+`60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c`,
+source commit `81539e53f5146c06a77541415bd79da673806d96`.
+The six-video migration preserves original source measurements and rebuilds
+release-specific tracks from `content/v39-source/`. Old model-bound tracks
+remain incompatible; approximate current tracks do not establish source fidelity.
+Current stages 50/20/10/5 are unmeasured.
 
 Playback can start while the model or source track loads. Source-following starts
 automatically when both are ready; pausing retains manual exploration. Status
@@ -230,8 +232,9 @@ simulate tooth collisions, friction or inertia. The amplitude controls show CAD
 station millimetres; calibration to the video's engraved measuring sticks is
 not established.
 
-The source evidence described below belongs to the earlier model. Its measured
-results and chosen settings do not qualify the current v39 scene.
+Historical projection and GPU evidence described below belongs to the earlier
+model. Its measured results and chosen settings do not qualify the v39 scene;
+source-only measurements remain authoritative during the incremental migration.
 
 Source-following tracks combine source cameras with complete feasible physical
 inputs. Hidden settings may be chosen and are labelled unobserved, not recovered
@@ -410,11 +413,52 @@ Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
 pixel format. Formats never alias each other; sampling diagnostics list
 supported formats and any unsupported source declarations.
 
-Source generators and active loaders use the identity-translated observations,
-seed states, calibration and motion packets under `content/canonical-native/`.
-The originals under `content/` remain byte-exact archival evidence from
-`bfde892a5`; fitting, observation and static-calibration commands refuse those
-original observation files as current inputs.
+Current authored inputs are `content/v39-source/<videoId>.observations.json.gz`;
+browser outputs are `content/<videoId>.source-track.json`. Preserve source PTS,
+pixels, hashes, uncertainties and landmarks. For each CAD release, recompute
+native identities, world coordinates, cameras and physical constraints against
+the approved geometry. Inherited pose seeds remain chosen/unobserved.
+The identity-translated packets under `content/canonical-native/` and byte-exact
+originals under `content/` from `bfde892a5` remain historical lineage, including
+their old projection/GPU proof; they do not qualify current geometry.
+
+From the repository root, store an authored input without reserializing JSON:
+
+```sh
+uv run --isolated --no-project python web/scripts/canonical-native-evidence.py compress-observations web/content/v39-source/<ID>.observations.json
+```
+
+The command retains the source file and writes exact-byte deterministic gzip
+(level 9, `mtime=0`, no filename). Only the registered authored observation
+namespace is accepted. Compression preserves numeric spelling and supplies no
+geometry or fidelity qualification.
+
+After authoring stops, regenerate in this order using the pinned source-fit
+requirements for the four producers:
+
+```sh
+uv run --isolated --no-project python web/scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-intro-source-track.py
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-analysis-synthesis-source-tracks.py
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-spin.py
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-operation-rocker.py
+uv run --isolated --no-project python web/scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project python web/scripts/canonical-native-evidence.py check
+```
+
+The first canonical generation refreshes input seals; the final generate/check
+binds the produced tracks. Canonical replay remains an identity audit.
+Operation/Rocker accepts `--video jfH-NbsmvD4` or `--video 4mBuyixt22U` for
+independent publication; its default prevalidates the pair before publishing
+either. Analysis/Synthesis retains its independent `--video` selection.
+
+One-ULP routing at half-open cuts is execution-only: authored source numbers
+remain unchanged, and the strict same-shot 0.5-second source-exposure requirement
+still applies. Nine actual independently decoded frames fill genuinely missing
+Operation fade exposures while preserving existing samples and landmarks.
+Inherited camera/mechanism guesses remain chosen/unobserved. Complete playable
+approximate tracks do not imply a source-fidelity pass; stages 50/20/10/5 remain
+unmeasured, with no acceptance-attempt quota.
 
 The [derivative manifest](content/canonical-native/manifest.json) records each
 derivative and original SHA-256, mapping revision and digest, preserved numeric
@@ -442,9 +486,9 @@ reads. They leave original packets and receipt seals untouched and replay only
 original evidence; they do not approve the current scene, math, model or GPU.
 Original private capture paths and observation hashes remain provenance links,
 not regeneration dependencies; no source video or screenshots are included.
-Capture-bound renderer and model hashes remain strict. Canonical farm GLB
-export, metadata re-export and current-renderer recapture/requalification are
-still required before claiming current-model source fidelity.
+Capture-bound renderer and model hashes remain strict. Current-renderer
+recapture and source requalification against the approved v39 native geometry
+are required before claiming current-model source fidelity.
 Lossless delivery optimization keeps the native raw hash authoritative; it does
 not recalibrate observations or establish geometry/source fidelity acceptance.
 

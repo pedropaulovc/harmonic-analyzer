@@ -10,7 +10,7 @@ import { createMechanismInput, createMechanismPose, solveMechanism, MECHANISM_DA
 import { PAPER_FEED_MULTIPLIER } from './kinematics'
 import { captureNativePrimitives, diagnosticNativePrimitiveMetadata, inspectNativeTargetSurfaceTarget, nativeCaptureModels, nativeInputSnapshot, prepareNativeTargetSurfaceAssociation, sealNativeDrawState, nativeRenderSubmissions, trackNativePrimitiveSubmissions, unavailableNativePrimitiveSnapshot, type NativeCaptureModel, type NativeDrawStateToken, type NativeInputSnapshot, type NativeObject, type NativePrimitiveDraw, type NativePrimitiveModelSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmission, type NativePrimitiveSubmissionMetadata, type NativeSpringEvaluator, type NativeTargetSurfaceAssociation, type NativeTargetSurfaceInspection, type NativeTargetSurfacePass, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
 import { NATIVE_RUNTIME_INSTANCES, OPERATING_SOURCE_ASSEMBLY, type SourceAssemblyState } from './source-assembly'
-import { measureNativeTargetShaderFeedback, type NativeTargetShaderFeedbackResult } from './native-target-shader-feedback'
+import { captureNativeDiagnosticRendererState, restoreNativeDiagnosticRendererState, measureNativeTargetShaderFeedback, type NativeDiagnosticRendererState, type NativeTargetShaderFeedbackResult } from './native-target-shader-feedback'
 
 export type Point3 = readonly [number, number, number]
 export type Quaternion4 = readonly [number, number, number, number]
@@ -2182,6 +2182,17 @@ void main() {
           sourceProof: false, sourceAcceptance: false, numericVertexResidualBoundMetres: null, gpuPositionRoundingBoundMetres: null, eligibility: 'unresolved' }
         let pass: NativeTargetSurfacePass | null = null
         let target: THREE.WebGLRenderTarget | null = null
+        let savedState: NativeDiagnosticRendererState | null = null
+        let result: NativeTargetSurfaceReadback | null = null
+        const failures: string[] = []
+        const attempt = (action: () => void) => {
+          try { action() } catch (error) { failures.push(error instanceof Error ? error.message : String(error)) }
+        }
+        const unavailable = (reason: string): NativeTargetSurfaceReadback => ({
+          ...qualification, status: 'unavailable', reason, request: structuredClone(request),
+          model: null, machineRevision: null, inventoryRevision: null, input: null, draw: null, census: null,
+          runtimeInstanceDeclarations: null, target: null, nativeStage: null, association: null,
+        })
         try {
           const current = requireCurrentDraw()
           const draw = current.draw
@@ -2194,24 +2205,21 @@ void main() {
           if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= width || y >= height
             || x + 0.5 < viewport[0]! || x + 0.5 >= viewport[0]! + viewport[2]! || y + 0.5 < viewport[1]! || y + 0.5 >= viewport[1]! + viewport[3]!
             || draw.scissorTest && (x + 0.5 < scissor[0]! || x + 0.5 >= scissor[0]! + scissor[2]! || y + 0.5 < scissor[1]! || y + 0.5 >= scissor[1]! + scissor[3]!)) throw new Error('Requested native-stage pixel is outside this completed native viewport/scissor support')
-          if (scene.overrideMaterial || renderer.shadowMap.enabled) throw new Error('Native target-surface association does not support an override material or enabled shadow pass')
+          if (scene.overrideMaterial || renderer.shadowMap.enabled || renderer.xr.isPresenting) throw new Error('Native target-surface association does not support an override material, enabled shadow pass or presenting XR')
+          // Request/header/depth-law/capacity preflight remains entirely before
+          // renderer state capture or any diagnostic render-target mutation.
           pass = prepareNativeTargetSurfaceAssociation(current.model, draw, current.token, request)
-          target = new THREE.WebGLRenderTarget(width, height, { depthBuffer: true, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, type: THREE.UnsignedByteType, samples: 0 })
-          target.viewport.fromArray(viewport)
-          target.scissor.fromArray(scissor)
-          target.scissorTest = draw.scissorTest
-          const savedTarget = renderer.getRenderTarget()
-          const savedViewport = renderer.getViewport(new THREE.Vector4())
-          const savedScissor = renderer.getScissor(new THREE.Vector4())
-          const savedScissorTest = renderer.getScissorTest()
           const savedBackground = scene.background
           const savedLayers = camera.layers.mask
           const savedAutoClear = renderer.autoClear
-          const clearColour = renderer.getClearColor(new THREE.Color())
-          const clearAlpha = renderer.getClearAlpha()
           const previousDiagnostic = diagnosticDraw
           const pixel = new Uint8Array(4)
           try {
+            savedState = captureNativeDiagnosticRendererState(renderer)
+            target = new THREE.WebGLRenderTarget(width, height, { depthBuffer: true, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, type: THREE.UnsignedByteType, samples: 0 })
+            target.viewport.fromArray(viewport)
+            target.scissor.fromArray(scissor)
+            target.scissorTest = draw.scissorTest
             for (const entry of pass.entries) entry.object.material = entry.diagnosticMaterial
             pass.target.object.geometry = pass.target.diagnosticGeometry
             scene.background = null
@@ -2226,20 +2234,19 @@ void main() {
             renderer.render(scene, camera)
             renderer.readRenderTargetPixels(target, x, y, 1, 1, pixel)
           } finally {
-            for (const entry of pass.entries) entry.object.material = entry.originalMaterial
-            pass.target.object.geometry = pass.target.originalGeometry
-            scene.background = savedBackground
-            camera.layers.mask = savedLayers
-            diagnosticDraw = previousDiagnostic
-            renderer.autoClear = savedAutoClear
-            renderer.setClearColor(clearColour, clearAlpha)
-            renderer.setRenderTarget(savedTarget)
-            renderer.setViewport(savedViewport)
-            renderer.setScissor(savedScissor)
-            renderer.setScissorTest(savedScissorTest)
+            for (const entry of pass.entries) attempt(() => { entry.object.material = entry.originalMaterial })
+            attempt(() => { pass!.target.object.geometry = pass!.target.originalGeometry })
+            attempt(() => { scene.background = savedBackground })
+            attempt(() => { camera.layers.mask = savedLayers })
+            attempt(() => { diagnosticDraw = previousDiagnostic })
+            attempt(() => { renderer.autoClear = savedAutoClear })
+            // Restore the original live program/VAO and coherent renderer caches
+            // BEFORE owned diagnostic materials, geometry or target are disposed.
+            if (savedState) failures.push(...restoreNativeDiagnosticRendererState(renderer, savedState))
           }
+          if (failures.length > 0) throw new Error(`Native target-surface cleanup failed: ${failures.join('; ')}`)
           if (!current.token.matches() || requireCurrentDraw() !== current) throw new Error('The native model/draw changed during target-surface association')
-          return { ...qualification, status: 'readback', reason: null, request: structuredClone(pass.request),
+          result = { ...qualification, status: 'readback', reason: null, request: structuredClone(pass.request),
             model: pass.model, machineRevision: pass.machineRevision, inventoryRevision: pass.inventoryRevision, input: pass.input, draw: pass.draw,
             census: pass.census, runtimeInstanceDeclarations: pass.runtimeInstanceDeclarations,
             target: { record: pass.target.record, primitiveId: pass.target.primitiveId, canonicalPrimitiveId: pass.target.canonicalPrimitiveId,
@@ -2247,12 +2254,19 @@ void main() {
             nativeStage: { width, height, viewportBackingPixels: [...viewport], scissorBackingPixels: [...scissor], scissorTest: draw.scissorTest, pixelCentreBacking: [x + 0.5, y + 0.5] },
             association: pass.decodePixel(pixel) }
         } catch (error) {
-          return { ...qualification, status: 'unavailable', reason: error instanceof Error ? error.message : String(error), request: structuredClone(request),
-            model: null, machineRevision: null, inventoryRevision: null, input: null, draw: null, census: null, runtimeInstanceDeclarations: null, target: null, nativeStage: null, association: null }
+          result = unavailable(error instanceof Error ? error.message : String(error))
         } finally {
-          target?.dispose()
-          pass?.dispose()
+          if (target) attempt(() => target!.dispose())
+          if (pass) attempt(() => pass!.dispose())
+          if (savedState) attempt(() => {
+            if (gl.isContextLost()) throw new Error('WebGL context was lost during native target-surface resource disposal')
+            const error = gl.getError()
+            if (error !== gl.NO_ERROR) throw new Error(`WebGL error 0x${error.toString(16)} during native target-surface resource disposal`)
+          })
+          // No readback escapes until BOTH restoration and owned disposal finish.
+          if (failures.length > 0) result = unavailable(`Native target-surface cleanup failed: ${failures.join('; ')}`)
         }
+        return result!
       },
     }
   })
@@ -2452,6 +2466,17 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   const local = new THREE.Matrix4()
   const origin = new THREE.Vector3()
   const restAnchor = new THREE.Vector3()
+  const nativeRootWorld = root?.matrixWorld.clone()
+  const currentWorldToNative = new THREE.Matrix4()
+  const nativeToCurrentWorld = new THREE.Matrix4()
+  const channelSpringAttachments: { spring: RestPart; lever: RestPart; hook: RestPart }[] = []
+  for (const spring of driven) {
+    if (spring.binding!.motion !== 'channel-spring') continue
+    const station = spring.station + 1
+    const lever = parts.get(`ha-harmonic-analyzer/ch-channel/ch-channel-lever-${station}`)
+    const hook = parts.get(`ha-harmonic-analyzer/ch-channel/vn-spring-hook-${station}`)
+    if (lever && hook) channelSpringAttachments.push({ spring, lever, hook })
+  }
   const knife = new THREE.Vector3().fromArray(MECHANISM_DATA.summing.knifeMm).multiplyScalar(0.001)
   const crankPart = parts.get('ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1')
   const conePart = parts.get('ha-harmonic-analyzer/dt-drive-train/dt-cone-gear-shaft-1')
@@ -2716,6 +2741,27 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       local.decompose(part.node.position, part.node.quaternion, part.node.scale)
     }
     root!.updateMatrixWorld(true)
+    let springsRefreshed = false
+    for (const { spring, lever, hook } of channelSpringAttachments) {
+      // Visibility alone never changes the NORMAL spring law. Only an actual
+      // lever pose override in this simultaneous world pass moves its eye.
+      if (lever.overrideEpoch !== overrideEpoch) continue
+      if (!springsRefreshed) {
+        currentWorldToNative.copy(root!.matrixWorld).invert().premultiply(nativeRootWorld!)
+        nativeToCurrentWorld.copy(nativeRootWorld!).invert().premultiply(root!.matrixWorld)
+        springsRefreshed = true
+      }
+      a.setFromMatrixPosition(hook.node.matrixWorld).applyMatrix4(currentWorldToNative)
+      pivot.set(0.17505, 0, 0).applyMatrix4(lever.node.matrixWorld).applyMatrix4(currentWorldToNative)
+      axis.subVectors(pivot, a).normalize()
+      // The same loaded-seat offsets and catalog inside-hook length used by
+      // channelMoment; the existing native mesh/deformer remains the only curve.
+      a.addScaledVector(axis, MECHANISM_DATA.spring.lowerSeatOffsetMm / 1000)
+      pivot.addScaledVector(axis, -MECHANISM_DATA.spring.upperSeatDropMm / 1000)
+      spring.spring!.length.value = a.distanceTo(pivot) + MECHANISM_DATA.spring.insideDiameterMm / 1000
+      placeSpring(spring, a, pivot, 1, nativeToCurrentWorld)
+    }
+    if (springsRefreshed) root!.updateMatrixWorld(true)
     if (options.nativePrimitiveSnapshots) {
       snapshotSolvedInputKey = JSON.stringify(nativeInputSnapshot(input))
       snapshotUpdateVerified = true
@@ -2731,14 +2777,18 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     return part.finalWorld
   }
 
-  function placeSpring(part: RestPart, lower: THREE.Vector3, upper: THREE.Vector3, clocking: number) {
+  function placeSpring(part: RestPart, lower: THREE.Vector3, upper: THREE.Vector3, clocking: number, worldFromNative?: THREE.Matrix4) {
     origin.addVectors(lower, upper).multiplyScalar(0.5)
     axis.subVectors(upper, lower).normalize()
     // spring_mount_geom.SpringPose.rotation_rows: local+X along loaded eyes,
     // local+Y along ±worldZ and local+Z perpendicular, preserving hook clocking.
     desired.makeBasis(axis, b.set(0, 0, clocking), c.set(clocking * axis.y, -clocking * axis.x, 0))
     desired.setPosition(origin)
-    setWorld(part, desired)
+    if (worldFromNative) {
+      desired.premultiply(worldFromNative)
+      local.copy(part.node.parent!.matrixWorld).invert().multiply(desired)
+      local.decompose(part.node.position, part.node.quaternion, part.node.scale)
+    } else setWorld(part, desired)
   }
 
   function alignWire(part: RestPart, endpoints: ArrayLike<number>, from: number, to: number) {
