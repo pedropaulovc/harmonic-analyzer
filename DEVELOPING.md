@@ -46,8 +46,11 @@ explicit way to stop a run, `-Cancel` (see
   any uncommitted change, untracked file or moved submodule in `-Worktree`
   (`Worktree has uncommitted changes; …`, listing the paths) rather than
   silently leave it out of the build.
-- **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
-  Azure credentials for the cache (`az login`; `off` is refused).
+- **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`,
+  whose `logs --help` advertises `--log-blob`, and Azure credentials for the
+  cache (`off` is refused). Exact failed-log reads separately need Blob GET
+  permission on the pool config's `results_account` / `results` container;
+  a compatible CLI or successful cache read does not prove that permission.
 - **A log directory outside every Git worktree.** It holds the run records, the
   logs, the build snapshots, the shared environments and each run's outputs. A
   snapshot inside some worktree would show up there as an untracked nested
@@ -167,6 +170,76 @@ untracked files and a new commit with an identical tree never count. When a
 leaf then reports `cache_missing`, or succeeds without its key, every tracked
 difference is reported the same way, since each is a lead; without any, the
 failure names its other likely causes instead.
+
+### Exact failed-worker logs
+
+After a leaf returns a failed result, the submitter reads the exact
+`LeafResult.log_blob` with the current pool CLI:
+`farm.py logs <workflow-id> --log-blob <returned-results-path>`. It never asks
+for the workflow's latest log: a later execution can have the same workflow
+ID and attempt number but a different execution-specific blob. The existing
+failure-artifact hint remains useful for captures; it is not a replacement
+for retrieving the failed execution's `task.log`.
+
+The reader uses the pool environment prepared by preflight, directly rather
+than through a second uv launcher. It has a 30-second deadline and stops when
+stdout exceeds 16 MiB, matching the current protocol-4 worker's published-log
+ceiling. Only a complete, nonempty, successful read within that ceiling is
+shown as worker payload. An absent blob, empty response, nonzero exit
+(including authentication or missing-blob errors), oversized log, timeout or
+output fault is a warning, never a successful log retrieval and never a
+replacement for the original leaf failure.
+
+Worker payload and the reader's stderr are separate: reader diagnostics have
+a `farm log-reader` prefix and are limited to their first 64 KiB, with a
+warning if truncated. Every displayed line names the task, workflow, worker,
+attempt and exact blob; UTF-8 errors are replaced and LF, CRLF and bare CR are
+normalized. Downloads can overlap, but a run-specific
+`HARMONIC_FARM_LOG_LOCK` serializes failed-log blocks across doit processes.
+The lock wait is bounded at 30 seconds; if it cannot be acquired, payload is
+not emitted unlocked. Other build output need not take this lock, so
+line-level attribution remains necessary.
+
+Preflight's `logs --help` check proves only that the configured operator CLI
+supports exact selection. The current pool reader uses `DefaultAzureCredential`
+and `SOLIDWORKS_POOL_CONFIG` (default `~/.solidworks-pool/config.json`), taking
+the storage endpoint from `results_account`; it does not use
+`HARMONIC_CACHE_ACCOUNT`. Managed identity and the CLI credential path remain
+available under the current pool/SDK credential defaults. This submitter does
+not replace them or force a different principal. The Temporal mTLS/JWT config
+is not Azure data-plane permission, and ARM Owner is not proof of Blob GET.
+
+To prove permission, the operator must read an actual published
+`LeafResult.log_blob` through the current pool CLI under the intended identity.
+Require exit 0 and nonempty payload, and retain the exact workflow/blob,
+payload hash and principal evidence. No such read is inferred from CLI help,
+protocol reports, source RBAC declarations or a previous deployment. Without
+an actual read, operator Blob GET capability is **unverified**, not success.
+To exercise this submitter's bounds as well, use
+`run_pool_cli(..., interpreter=_pool_python(pool),
+timeout_s=FAILED_LOG_TIMEOUT_S, max_stdout_bytes=FAILED_LOG_MAX_BYTES)` with
+separate binary stdout/stderr spools. This probe submits, launches and cancels
+nothing.
+
+**Exercised scope, 2026-10-07:** the operator read one exact published failure
+through the pool checkout at `7bc9b3a650ebbf700c939d104defd4c333bfd3ce` with
+its current `DefaultAzureCredential` path. The exact selection was:
+
+```text
+workflow: leaf:part:vn_transgear_pivot_screw:0720a3770ed390adf25dd8540ae53280375f572968129c3e59ef10166bfd17d1:5400s
+log_blob: results/leaf/part__vn_transgear_pivot_screw/0720a3770ed390adf25dd8540ae53280375f572968129c3e59ef10166bfd17d1/20261007T113034Z-1-d66d8b6e/task.log
+```
+
+The parent-owned frozen pool CLI read exited 0 in about 2.6 seconds under a
+300-second outer deadline. Its nonempty payload retained source preparation
+for `a798764ef51e`, environment `e9ab489999f1` / Python 3.14.7, and the original
+`create_part` / NewPart failure before geometry and resulting task error,
+attributed by the parent to worker 10. No submission was made by the read.
+This establishes that operator process's GET capability for **that one blob**,
+not blanket results permission, the fleet's managed-identity permissions,
+native geometry correctness, the 35-failure replay, or this new submitter's
+30-second/16-MiB reader path. Those remain separate evidence obligations.
+
 
 ### Supervised farm releases
 
