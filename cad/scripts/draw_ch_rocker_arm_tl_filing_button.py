@@ -46,7 +46,9 @@ ISO_NOTE_XY = (0.275, 0.240)
 NOTES_XY = (0.020, 0.075)
 FACE_KEEP = {
     "DiscDia": (0.060, 0.240),
-    "BoreDia": (0.150, 0.240),
+    # Lower right, so its leader stays on the far side of the centre from
+    # the O.D.'s and the two dimension lines never cross.
+    "BoreDia": (0.165, 0.115),
 }
 EDGE_KEEP = {
     "DiscThick": (0.200, 0.235),
