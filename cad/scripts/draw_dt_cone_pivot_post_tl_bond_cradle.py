@@ -74,9 +74,10 @@ CUT_FOOT_Z = -43.0
 # The section captions drop clear of the tilt under A-A.
 CAPTION_DROP = 0.018
 # Seat finish symbols stand outboard of the seat on the model's +X side
-# (X, Z in mm), inside the sheet border; their leaders land on the arc 25
-# degrees off its bottom, clear of the saddle-top corner and the cone pin.
-SEAT_FINISH_SYMBOL = {"body_seat": (32.0, 0.0), "tail_seat": (24.0, 8.0)}
+# (X, Z in mm), under the plan's dimensions and inside the sheet border;
+# their leaders land on the arc 25 degrees off its bottom, clear of the
+# saddle-top corner and the cone pin.
+SEAT_FINISH_SYMBOL = {"body_seat": (32.0, -6.0), "tail_seat": (24.0, 8.0)}
 SEAT_FINISH_LANDING_DEG = 25.0
 
 # Dimension text positions as MODEL points (mm); each view projects its own

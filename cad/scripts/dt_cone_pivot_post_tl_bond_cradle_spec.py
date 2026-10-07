@@ -154,10 +154,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "TailSeatReference": {"TailSeatAxisX", "TailSeatAxisHeight"},
 }
-# One place for the plates and blocks, the crank pins' transverse spots and
-# the seats' centring and axis heights: nothing locates on them closer than
-# the .X band. The body seat prints at the post body's own places
-# (MainBodyDia) and the crank pin station at the crank axis's (CrankAxisY).
+# One place for the plates and blocks, the crank pins' spots (they carry a
+# sleeve face, not a bore) and the seats' centring and axis heights: nothing
+# locates on them closer than the .X band. The body seat prints at the post
+# body's own places (MainBodyDia).
 # The tail seat, the cone pins' stations, hole entry and the pin heights take
 # two: the pins set each sleeve against the post. The cone pin tilt prints to
 # a tenth of a degree under the general angular band. The pin diameter names
@@ -180,7 +180,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BodySeatProfile": {"BodySeatDia": post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]},
     "TailSeatProfile": {"TailSeatDia": 2},
     "CrankPinProfile": {
-        "CrankPinY": post.DRAWING_PRECISION_BY_NAME["CrankAxisY"],
+        "CrankPinY": 1,
         "CrankPinDia": 1,
     },
     "CrankPins": {"CrankPinHeight": 2},
@@ -229,7 +229,7 @@ DRAWING_NOTES = "\n".join(
         BUILT_UP_PERMISSION_NOTE,
         "PINS ARE STOCK HARDENED DOWELS; PIN ENDS STAY INSIDE THE BASE.",
         "REAM PIN HOLES THRU FOR A PRESS FIT; A PRESSED PIN MUST NOT TURN.",
-        "PIN HEIGHTS FROM THE BASE TOP; CONE PINS AT THE HIGH EDGE.",
+        "STATIONS FROM STOP FACE, HEIGHTS FROM BASE TOP; CONE PINS AT HIGH EDGE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
