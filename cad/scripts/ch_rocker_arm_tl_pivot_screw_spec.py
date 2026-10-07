@@ -163,6 +163,11 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
 _ROCKER = "ch_rocker_arm_spec"
+# Head-to-shoulder runout (TIR), exported for prechips, not printed: the
+# route (shop-additions.md section 2) laps head and shoulder in one chucking,
+# goal 0.003, measured in V-blocks and recorded.
+HEAD_TO_SHOULDER_TIR_MAX = 0.01
+
 EXPORT_FEATURES: dict[str, ExportFeature] = {
     "shoulder": ExportFeature(
         kind="boss",
@@ -191,7 +196,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "head": ExportFeature(
         kind="boss",
         faces=(CylinderFace(HEAD_DIA),),
-        requirements=("dia",),
+        requirements=("dia", "coaxiality_dia"),
         fields={
             "at": ([0.0, 0.0, UNDERHEAD_Z], ("UNDERHEAD_Z",)),
             "axis": _AXIS,
@@ -202,8 +207,14 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
             "length": (limits(HEAD_LENGTH, 1), ("HEAD_LENGTH",)),
             "process": ("lap", ("HEAD_BAND",)),
+            "coaxial_to": ("shoulder", ("SHOULDER_DIA",)),
+            "coaxiality_dia": (
+                HEAD_TO_SHOULDER_TIR_MAX,
+                ("HEAD_TO_SHOULDER_TIR_MAX",),
+            ),
+            "note": ("goal 0.003 TIR, measured and recorded", ("HEAD_TO_SHOULDER_TIR_MAX",)),
         },
-        precision={"dia": HEAD_PLACES, "length": 1},
+        precision={"dia": HEAD_PLACES, "length": 1, "coaxiality_dia": 2},
     ),
     "underhead": ExportFeature(
         kind="face",
