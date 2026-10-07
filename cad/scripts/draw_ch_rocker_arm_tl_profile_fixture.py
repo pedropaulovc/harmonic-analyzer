@@ -119,7 +119,9 @@ DETAIL_RADIUS_MM = 9.0
 DETAIL_LABEL_LOWER_LEFT = (0.373, 0.204)
 NOTES_XY = (0.016, 0.045)
 HOLD_DOWN_CALLOUT_XY = (0.226, 0.192)
-STUD_CALLOUT_XY = (0.228, 0.260)
+# Right of the plate's east end: at x 228 its shoulder ran 15 mm along the
+# PlateLength dimension line (run 20261007T185353671Z).
+STUD_CALLOUT_XY = (0.250, 0.260)
 # Sheet offsets (m) of each kept dimension from a projected model point (mm):
 # {name: ((x, y[, z]) model mm, (dx, dy) sheet m)}.
 PLAN_KEEP_AT = {
