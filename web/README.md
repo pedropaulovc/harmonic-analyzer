@@ -422,8 +422,11 @@ failure is one terminal verification prerequisite with acquired-resource cleanup
 not repeated per-video launch attempts. Missing originals remain per-video failures.
 Verification-only publications use detached banks: ordinary playback and trusted
 manual/layout intent resume the real frame rather than inheriting a diagnostic
-candidate. Pending or expired publications refuse instead of rolling back newer
-state. See [`DESIGN.md`](DESIGN.md#browser-verification) for ownership and unexercised
+candidate. Scoped diagnostic APIs expose guarded methods and detached data, not
+live mutable model/viewer handles. Pending or expired publications refuse instead
+of rolling back newer state. Failed restoration invalidates source/physics/draw
+claims while independent cleanup still runs. See
+[`DESIGN.md`](DESIGN.md#browser-verification) for ownership and unexercised
 failure-path limits; diagnostic controls never qualify source fidelity.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.

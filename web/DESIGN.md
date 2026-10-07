@@ -548,17 +548,31 @@ including capture-phase camera input and before compact resize or mode guards.
 The initiating slider value is not overwritten by a saved HUD refresh.
 
 Stale operations and callback results reject without replacing the newer owner.
+The guarded context exposes no live viewer, machine, input or provenance handles.
+Serialized snapshots and native target callback records are detached data; retaining
+one cannot mutate a newer source owner after the scoped method expires.
 Transactions expire on synchronous throws as well as asynchronous completion.
 Returning an outer callback with a publication still pending refuses immediately:
 it does not drain work that may depend on the outer result, and late cleanup cannot
 restore over a later lease. Between publications, input, completed draw, camera,
 canvas and probes again describe the same real frame under the same lease resources.
+Publication probes return to null/null; only outer release restores the exact saved
+normal probe identities.
 Receipts distinguish `superseded` with a refusal reason from exact unchanged-state
 `restored`; original callback causes and independent resource-cleanup failures stay
 visible. New-owner rendering/errors remain on the ordinary fail-closed path, not
-diagnostic-cleanup aggregation. Positive boundary controls and a real resource
-cleanup refusal do not prove every solver/draw restoration failure or a naturally
-occurring new-owner exception; those unexercised failure paths remain explicit limits.
+diagnostic-cleanup aggregation. A failed frame restoration clears advertised source,
+physics, layout and draw receipts, disables native capture and refreshes the HUD
+without overwriting a superseding input event. Independent resource cleanup still
+runs. Locally created nested cleanup aggregates retain the original callback cause
+and first error rather than hiding it inside another wrapper.
+Exact `restored` status requires every required frame restoration to succeed.
+A frame-restoration failure stays latched for the lease even if a later draw succeeds;
+a separate resource-cleanup refusal may retain honest successfully restored frame flags.
+Actual native context loss and a real descriptor cleanup refusal exercise these
+paths; they do not prove every solver/draw restoration failure or a naturally
+occurring new-owner exception. An oversized RTX 3090 viewport clamped its backing
+buffer and did not reproduce the alleged capacity-error trigger.
 
 The verifier validates original-source authority before lazy shared GPU startup.
 Shared readiness requires acquisition of server, browser, context and page, not

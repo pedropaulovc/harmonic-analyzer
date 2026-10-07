@@ -567,7 +567,7 @@
     },
     {
       "path": "web/src/main.ts",
-      "sha256": "4b710e50735d26711d0547678efa4d760ce08c541ab5d478d679baa3773d38ab",
+      "sha256": "ded34a530e4948ead5839400fce1c882ce0a1a9ff7d27af40a804b0632807629",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {

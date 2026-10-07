@@ -116,10 +116,6 @@ interface NativeDiagnosticPublication {
   snapshot(): NativeDiagnosticPublicationSnapshot
 }
 interface NativeDiagnosticContext {
-  readonly viewer: Viewer
-  readonly machine: Machine
-  readonly input: MechanismInput
-  readonly provenance: Machine['provenance']
   readonly metadata: { sourceProof: false; sourceAcceptance: false; method: 'current-native-scoped-diagnostic-lease' }
   snapshot(): unknown
   nativePrimitiveSnapshot(): NativePrimitiveSnapshot
@@ -471,7 +467,7 @@ function beforeView(_view: SourceView, index: number): void {
   if (sample) applyView(sample)
 }
 
-function updateHud(): void {
+function updateHud(inputMode: 'sync' | 'preserve' = 'sync'): void {
   const time = player?.getTime() ?? 0
   const chosen = mode === 'exploring' ? undefined : primaryView()
   const context = mode === 'exploring'
@@ -502,26 +498,28 @@ function updateHud(): void {
   if (playbackStatus.textContent !== announcedStatus) playbackStatus.textContent = announcedStatus
   const clock = ` · ${time.toFixed(1)} s`
   if (playbackClock.textContent !== clock) playbackClock.textContent = clock
-  crank.value = String(input.crankTurns)
-  element<HTMLOutputElement>('#crank-value').value = valueLabel('crankTurns', `${input.crankTurns.toFixed(3)} turns`)
-  gearing.value = input.gearing
-  magnification.value = String(input.magnification)
-  fixture.value = String(input.setup.wireFixtureOffsetM)
-  cone.value = String(input.setup.coneSwingRad)
-  pinion.value = String(input.setup.pinionCamRad)
-  platen.value = String(input.setup.platenOffsetM)
-  element<HTMLOutputElement>('#magnification-value').value = valueLabel('magnification', `${input.magnification.toFixed(3)}×`)
-  element<HTMLOutputElement>('#fixture-value').value = valueLabel('setup.wireFixtureOffsetM', `${(input.setup.wireFixtureOffsetM * 1000).toFixed(1)} mm`)
-  element<HTMLOutputElement>('#cone-value').value = valueLabel('setup.coneSwingRad', `${(input.setup.coneSwingRad * 180 / Math.PI).toFixed(2)}°`)
-  element<HTMLOutputElement>('#pinion-value').value = valueLabel('setup.pinionCamRad', `${(input.setup.pinionCamRad * 180 / Math.PI).toFixed(1)}°`)
-  element<HTMLOutputElement>('#platen-value').value = valueLabel('setup.platenOffsetM', `${(input.setup.platenOffsetM * 1000).toFixed(1)} mm`)
-  for (let i = 0; i < channelInputs.length; i++) {
-    const controls = channelInputs[i]!
-    controls.amplitude.value = String(input.amplitudes[i]!)
-    controls.phase.value = String(input.phases[i]! * 180 / Math.PI)
-    markControl(controls.amplitude, `amplitudes[${i}]`)
-    markControl(controls.phase, `phases[${i}]`)
-    controls.value.value = `${valueLabel(`amplitudes[${i}]`, `${(input.amplitudes[i]! * MECHANISM_DATA.channel.maximumStationMm).toFixed(1)} mm`)} · ${valueLabel(`phases[${i}]`, `${(input.phases[i]! * 180 / Math.PI).toFixed(0)}°`)}`
+  if (inputMode === 'sync') {
+    crank.value = String(input.crankTurns)
+    element<HTMLOutputElement>('#crank-value').value = valueLabel('crankTurns', `${input.crankTurns.toFixed(3)} turns`)
+    gearing.value = input.gearing
+    magnification.value = String(input.magnification)
+    fixture.value = String(input.setup.wireFixtureOffsetM)
+    cone.value = String(input.setup.coneSwingRad)
+    pinion.value = String(input.setup.pinionCamRad)
+    platen.value = String(input.setup.platenOffsetM)
+    element<HTMLOutputElement>('#magnification-value').value = valueLabel('magnification', `${input.magnification.toFixed(3)}×`)
+    element<HTMLOutputElement>('#fixture-value').value = valueLabel('setup.wireFixtureOffsetM', `${(input.setup.wireFixtureOffsetM * 1000).toFixed(1)} mm`)
+    element<HTMLOutputElement>('#cone-value').value = valueLabel('setup.coneSwingRad', `${(input.setup.coneSwingRad * 180 / Math.PI).toFixed(2)}°`)
+    element<HTMLOutputElement>('#pinion-value').value = valueLabel('setup.pinionCamRad', `${(input.setup.pinionCamRad * 180 / Math.PI).toFixed(1)}°`)
+    element<HTMLOutputElement>('#platen-value').value = valueLabel('setup.platenOffsetM', `${(input.setup.platenOffsetM * 1000).toFixed(1)} mm`)
+    for (let i = 0; i < channelInputs.length; i++) {
+      const controls = channelInputs[i]!
+      controls.amplitude.value = String(input.amplitudes[i]!)
+      controls.phase.value = String(input.phases[i]! * 180 / Math.PI)
+      markControl(controls.amplitude, `amplitudes[${i}]`)
+      markControl(controls.phase, `phases[${i}]`)
+      controls.value.value = `${valueLabel(`amplitudes[${i}]`, `${(input.amplitudes[i]! * MECHANISM_DATA.channel.maximumStationMm).toFixed(1)} mm`)} · ${valueLabel(`phases[${i}]`, `${(input.phases[i]! * 180 / Math.PI).toFixed(0)}°`)}`
+    }
   }
   if (!machine || machine.availability !== 'available' || physicsState !== 'available') {
     forceReadout.value = modelState === 'ready' ? 'Mechanical state rejected; last rendered geometry retained.' : 'No compatible CAD mechanical state available.'
@@ -884,64 +882,95 @@ if (verificationEnabled) {
       let contextLive = true
       let sourceResumed = false
       let restored = false
+      let frameRestorationFailed = false
       let pendingPublicationRefused = false
       const cleanupErrors: unknown[] = []
-      const restore = (action: () => void) => { try { action() } catch (error) { cleanupErrors.push(error) } }
+      const restore = (action: () => void, errors = cleanupErrors) => { try { action() } catch (error) { errors.push(error) } }
+      let cleanupAggregates: WeakSet<AggregateError> | undefined
       const throwCleanupFailures = (errors: unknown[], failed: boolean, original: unknown) => {
         if (!errors.length) return
-        if (failed) throw new AggregateError([original, ...errors], 'Native diagnostic callback and cleanup both failed', { cause: original })
-        if (errors.length === 1) throw errors[0]
-        throw new AggregateError(errors, 'Native diagnostic cleanup failed')
+        if (!failed && errors.length === 1) throw errors[0]
+        // Only unwrap our own cleanup aggregate, never a caller's AggregateError.
+        // A publication and outer-frame failure must retain the original callback
+        // as the first error and cause rather than burying it in another wrapper.
+        const nested = failed && original instanceof AggregateError && cleanupAggregates?.has(original) ? original : null
+        const aggregate = new AggregateError(failed ? nested ? [...nested.errors, ...errors] : [original, ...errors] : errors,
+          failed ? 'Native diagnostic callback and cleanup both failed' : 'Native diagnostic cleanup failed',
+          { cause: failed ? nested ? nested.cause : original : errors[0] })
+        cleanupAggregates ??= new WeakSet<AggregateError>()
+        cleanupAggregates.add(aggregate)
+        throw aggregate
       }
       const restoreFrame = (frame: NativeDiagnosticFrame) => {
-        mode = frame.mode
-        referenceState = frame.referenceState
-        activeViews = frame.views
-        modelTime = frame.modelTime
-        manualMotion = frame.manualMotion
-        explorationOrigin = frame.explorationOrigin
-        diagnosticReference = frame.diagnosticReference
-        diagnosticMachine = frame.diagnosticMachine
-        copyInput(frame.input)
-        updateMachine(frame.machineInput, frame.assembly)
-        viewer.setInteraction(mode === 'exploring' ? 'exploring' : 'following-video')
-        viewer.controls.enabled = frame.controlsEnabled
-        viewer.controls.enableDamping = false
-        viewer.controls.autoRotate = false
-        viewer.applyCamera(frame.camera)
-        // Ownership restores exact solved bits, not normalized authored bits.
-        viewer.camera.position.fromArray(frame.camera.positionMetres)
-        viewer.camera.quaternion.fromArray(frame.camera.quaternion)
-        viewer.camera.up.copy(frame.cameraUp)
-        viewer.camera.near = frame.cameraNear
-        viewer.camera.far = frame.cameraFar
-        viewer.camera.layers.mask = frame.cameraLayers
-        viewer.camera.scale.copy(frame.cameraScale)
-        viewer.camera.zoom = frame.cameraZoom
-        viewer.camera.focus = frame.cameraFocus
-        viewer.camera.filmGauge = frame.cameraFilmGauge
-        viewer.camera.filmOffset = frame.cameraFilmOffset
-        viewer.camera.aspect = frame.cameraAspect
-        viewer.camera.view = frame.cameraView ? { ...frame.cameraView } : null
-        viewer.camera.updateProjectionMatrix()
-        viewer.camera.updateMatrixWorld(true)
-        viewer.controls.target.copy(frame.controlsTarget)
-        if (frame.mode !== 'exploring' && frame.views.length) drawSourceViews(frame.views, frame.modelTime)
-        else if (frame.mode !== 'exploring' && frame.referenceState === 'no-machine') viewer.renderViews([], undefined, frame.modelTime)
-        else viewer.render(frame.assembly.state)
-        sourceDrawRevision = frame.sourceDrawRevision
-        sourceDrawTimeSeconds = frame.sourceDrawTimeSeconds
-        sourceDrawLayout = frame.sourceDrawLayout
-        mechanismDraws.clear()
-        for (const [id, draw] of frame.draws) mechanismDraws.set(id, draw)
-        physicsState = frame.physicsState
-        manualRevision = frame.manualRevision
-        paintRevision = 'clean'
-        viewer.controls.enableDamping = frame.enableDamping
-        viewer.controls.autoRotate = frame.autoRotate
-        notice(sourceError, frame.sourceNotice)
-        notice(physicsError, frame.physicsNotice)
-        manualRunButton.textContent = manualMotion === 'turning' ? 'Stop crank' : 'Turn crank'
+        try {
+          mode = frame.mode
+          referenceState = frame.referenceState
+          activeViews = frame.views
+          modelTime = frame.modelTime
+          manualMotion = frame.manualMotion
+          explorationOrigin = frame.explorationOrigin
+          diagnosticReference = frame.diagnosticReference
+          diagnosticMachine = frame.diagnosticMachine
+          copyInput(frame.input)
+          updateMachine(frame.machineInput, frame.assembly)
+          viewer.setInteraction(mode === 'exploring' ? 'exploring' : 'following-video')
+          viewer.controls.enabled = frame.controlsEnabled
+          viewer.controls.enableDamping = false
+          viewer.controls.autoRotate = false
+          viewer.applyCamera(frame.camera)
+          // Ownership restores exact solved bits, not normalized authored bits.
+          viewer.camera.position.fromArray(frame.camera.positionMetres)
+          viewer.camera.quaternion.fromArray(frame.camera.quaternion)
+          viewer.camera.up.copy(frame.cameraUp)
+          viewer.camera.near = frame.cameraNear
+          viewer.camera.far = frame.cameraFar
+          viewer.camera.layers.mask = frame.cameraLayers
+          viewer.camera.scale.copy(frame.cameraScale)
+          viewer.camera.zoom = frame.cameraZoom
+          viewer.camera.focus = frame.cameraFocus
+          viewer.camera.filmGauge = frame.cameraFilmGauge
+          viewer.camera.filmOffset = frame.cameraFilmOffset
+          viewer.camera.aspect = frame.cameraAspect
+          viewer.camera.view = frame.cameraView ? { ...frame.cameraView } : null
+          viewer.camera.updateProjectionMatrix()
+          viewer.camera.updateMatrixWorld(true)
+          viewer.controls.target.copy(frame.controlsTarget)
+          if (frame.mode !== 'exploring' && frame.views.length) drawSourceViews(frame.views, frame.modelTime)
+          else if (frame.mode !== 'exploring' && frame.referenceState === 'no-machine') viewer.renderViews([], undefined, frame.modelTime)
+          else viewer.render(frame.assembly.state)
+          sourceDrawRevision = frame.sourceDrawRevision
+          sourceDrawTimeSeconds = frame.sourceDrawTimeSeconds
+          sourceDrawLayout = frame.sourceDrawLayout
+          mechanismDraws.clear()
+          for (const [id, draw] of frame.draws) mechanismDraws.set(id, draw)
+          physicsState = frame.physicsState
+          manualRevision = frame.manualRevision
+          paintRevision = 'clean'
+          notice(sourceError, frame.sourceNotice)
+          notice(physicsError, frame.physicsNotice)
+        } catch (error) {
+          // A diagnostic candidate may already occupy the canvas. Even a
+          // preflight capacity refusal cannot certify the saved normal frame.
+          frameRestorationFailed = true
+          referenceState = 'unavailable'
+          physicsState = 'unavailable'
+          activeViews = []
+          sourceDrawLayout = []
+          mechanismDraws.clear()
+          manualMotion = 'idle'
+          manualRevision = 'clean'
+          paintRevision = 'pending'
+          const message = error instanceof Error ? error.message : String(error)
+          notice(sourceError, `Native frame restoration failed: ${message}`)
+          notice(physicsError, message)
+          // Keep a superseding input event's DOM value for its action consumer.
+          updateHud('preserve')
+          throw error
+        } finally {
+          restore(() => { viewer.controls.enableDamping = frame.enableDamping })
+          restore(() => { viewer.controls.autoRotate = frame.autoRotate })
+          manualRunButton.textContent = manualMotion === 'turning' ? 'Stop crank' : 'Turn crank'
+        }
       }
       const resumeSource = () => {
         if (sourceResumed) return
@@ -982,15 +1011,25 @@ if (verificationEnabled) {
       let callbackError: unknown
       try {
         const result = await run({
-          viewer, machine: actualMachine, input, provenance: actualMachine.provenance,
           metadata: { sourceProof: false, sourceAcceptance: false, method: 'current-native-scoped-diagnostic-lease' },
-          snapshot() { requireLease(); return { ...bridge.snapshot(), sourceProof: false, sourceAcceptance: false } },
+          snapshot() { requireLease(); return structuredClone({ ...bridge.snapshot(), sourceProof: false, sourceAcceptance: false }) },
           nativePrimitiveSnapshot() { requireLease(); return unavailableNativePrimitiveSnapshot('Native capture is suspended during diagnostic-only rendering', 'stale') },
           readNativeDrawMetadata() { requireLease(); return viewerLease.readNativeDrawMetadata() },
-          readNativeTargetSurfaceAssociation(request) { requireLease(); return viewerLease.readNativeTargetSurfaceAssociation(request) },
+          readNativeTargetSurfaceAssociation(request) {
+            requireLease()
+            const result = viewerLease.readNativeTargetSurfaceAssociation(request)
+            // Target records are owned except for filtered live draw callbacks.
+            if (result.target) result.target.record.renderSubmissions = structuredClone(result.target.record.renderSubmissions)
+            return result
+          },
           readRegisteredNativeLandmarkAnchors() { requireLease(); return viewerLease.readRegisteredNativeLandmarkAnchors() },
           resolveNativeStagePixelFromSourcePixel(viewId, sourcePixels) { requireLease(); return viewerLease.resolveNativeStagePixelFromSourcePixel(viewId, sourcePixels) },
-          measureNativeTargetShaderFeedback(request) { requireLease(); return viewerLease.measureNativeTargetShaderFeedback(request) },
+          measureNativeTargetShaderFeedback(request) {
+            requireLease()
+            const result = viewerLease.measureNativeTargetShaderFeedback(request)
+            if (result.target) result.target.record.renderSubmissions = structuredClone(result.target.record.renderSubmissions)
+            return result
+          },
           async withPublicationSamples(samples, anchors, callback) {
             requireLease()
             if (!actualReference || publicationActive || typeof callback !== 'function') throw new Error('Diagnostic publication requires the same loaded source reference and a single callback')
@@ -1028,13 +1067,13 @@ if (verificationEnabled) {
                 // Local context expiry, not a global active flag, prevents a
                 // late callback from restoring over another owner or lease.
                 if (contextLive && !sourceResumed && ownsSourceState()) {
-                  viewer.setLandmarkProbe(publicationState.diagnosticReference === actualReference
-                    ? actualMachine.createLandmarkProbe(actualReference.data.anchors) : null)
-                  viewer.setPartVisibilityProbe(null)
-                  restoreFrame(publicationState)
+                  // beginNativeDiagnosticViewerLease owns the saved outer
+                  // probes. Between publications its exact state is null/null.
+                  restore(() => { viewer.setLandmarkProbe(null) }, errors)
+                  restore(() => { viewer.setPartVisibilityProbe(null) }, errors)
+                  restore(() => { restoreFrame(publicationState) }, errors)
                 }
-              } catch (error) { errors.push(error) }
-              finally { publicationActive = false }
+              } finally { publicationActive = false }
               throwCleanupFailures(errors, publicationFailed, publicationError)
             }
           },
@@ -1059,11 +1098,11 @@ if (verificationEnabled) {
           // New-owner draws/errors use the normal tick, never cleanup.
           configureLandmarkProbe()
           lastNativeDiagnosticRestoration = {
-            status: cleanupErrors.length || pendingPublicationRefused ? 'failed' : owned && restored ? 'restored' : 'superseded', sourceProof: false, sourceAcceptance: false,
-            inputRestored: owned && equalRecord(serializeInput(input), serializeInput(saved.input)),
-            cameraRestored: owned && equalRecord(cameraRecord(), saved.camera),
-            assemblyRestored: owned && equalRecord(currentAssembly.state, saved.assembly.state),
-            layoutRestored: owned && equalRecord(captureSourceLayout(activeViews), saved.layout), paintRevision,
+            status: cleanupErrors.length || frameRestorationFailed || pendingPublicationRefused ? 'failed' : owned && restored ? 'restored' : 'superseded', sourceProof: false, sourceAcceptance: false,
+            inputRestored: owned && restored && !frameRestorationFailed && equalRecord(serializeInput(input), serializeInput(saved.input)),
+            cameraRestored: owned && restored && !frameRestorationFailed && equalRecord(cameraRecord(), saved.camera),
+            assemblyRestored: owned && restored && !frameRestorationFailed && equalRecord(currentAssembly.state, saved.assembly.state),
+            layoutRestored: owned && restored && !frameRestorationFailed && equalRecord(captureSourceLayout(activeViews), saved.layout), paintRevision,
             refusalReason: nativeDiagnosticRefusal,
           }
           throwCleanupFailures(cleanupErrors, callbackFailed, callbackError)
@@ -1078,7 +1117,7 @@ if (verificationEnabled) {
         videoTime: player?.getTime() ?? null, modelTime, referenceState, modelState, missingBindings: machine?.missing ?? [],
         modelProvenance: machine?.provenance ?? null, camera: cameraRecord(), input: serializeInput(input),
         diagnosticLease: { active: nativeDiagnosticLeaseActive, restoration: lastNativeDiagnosticRestoration },
-        sourceDrawRevision, sourceDrawTimeSeconds, diagnosticCapture: diagnosticReference !== null && diagnosticReference === reference && diagnosticMachine === machine && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? 'paused-reference-review' : 'disabled',
+        sourceDrawRevision, sourceDrawTimeSeconds, diagnosticCapture: physicsState === 'available' && paintRevision === 'clean' && referenceState !== 'unavailable' && diagnosticReference !== null && diagnosticReference === reference && diagnosticMachine === machine && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? 'paused-reference-review' : 'disabled',
         sourceFollowing: reference ? { kind: reference.kind, stageLadder: SOURCE_STAGE_PERCENTAGES, finalTolerancePx: LANDMARK_LIMIT_PX, stages: reference.stageStatus, stageEvidence: 'unmeasured: no independently bound rendered report loaded', sourceMeasurements: reference.data.sourceMeasurements ?? null } : null,
         imagePlaneWarp: chosen ? chosen.authoredImagePlaneWarp : null,
         resolvedImagePlaneWarp: chosen?.imagePlaneWarp ?? null,
