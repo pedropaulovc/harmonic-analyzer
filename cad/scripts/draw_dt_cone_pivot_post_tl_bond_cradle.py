@@ -66,9 +66,12 @@ ISO_SCALE = (1, 2)
 # saddle (+Y), so each shows one seat alone, on a saddle face it does not cut.
 PLAN_CENTER = (0.115, 0.196)
 ELEVATION_CENTER = (0.115, 0.096)
-SECTION_A_CENTER = (0.252, 0.130)
+# A-A stands right enough that its seat callout fits between the plan's 80.0
+# and the post axis; the isometric stands left enough that B-B's fits between
+# it and the border (run-16 audit; run-15 review).
+SECTION_A_CENTER = (0.265, 0.130)
 SECTION_B_CENTER = (0.372, 0.130)
-ISO_CENTER = (0.360, 0.228)
+ISO_CENTER = (0.352, 0.228)
 ISO_NOTE_XY = (0.232, 0.250)
 NOTES_XY = (0.020, 0.062)
 # Cutting lines run from just above the saddle tops to just below the base.
@@ -124,14 +127,17 @@ ELEVATION_KEEP = {
 # Each seat's profile sketch is parallel to its section, so the section
 # imports its diameter. Each seat is a matched fit: its diameter prints as a
 # reference size with its narrow callout (the spec's *_SEAT_CALLOUT) below
-# it, in the clear above the section on the seat's +X side, away from the
-# seat axis's 40.0 off the west side, so the leader drops to the arc's +X
-# side without crossing that dimension (run-13 review: A-A's callout sat
-# inside the saddle; run 14's callout above the value bent its leader across
-# the view; run 15's crossed the 40.0s). A-A's block stands right of the
-# plan's 80.0, B-B's right of the isometric.
+# it. The leader joins the shoulder at the end nearer the seat axis and runs
+# through the axis, so each block stands wholly on the seat's +X side, clear
+# of the axis, with the 40.0 to the axis off the west side: the leader then
+# neither crosses that dimension nor runs along its axis extension line
+# (run-13 review: A-A's callout sat inside the saddle; run 14's callout above
+# the value bent its leader across the view; run 15's crossed the 40.0s; run
+# 16's shoulder crossed A-A's axis extension). A-A's block stands above the
+# plan's 80.0 text and right of its dimension line, B-B's right of the
+# isometric.
 SECTION_A_KEEP = {
-    "BodySeatDia": (17.0, CONE_PIN_Y, 42.0),
+    "BodySeatDia": (25.0, CONE_PIN_Y, 63.0),
     "BodySeatAxisX": (-20.0, CONE_PIN_Y, 26.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_Y, -12.0),
     # Under the base, one baseline row per hole off the west side: the
@@ -150,7 +156,7 @@ SECTION_A_KEEP = {
 }
 # B-B's callout reads below the value, above the finish symbol.
 SECTION_B_KEEP = {
-    "TailSeatDia": (17.0, TAIL_SECTION_Y, 42.0),
+    "TailSeatDia": (25.0, TAIL_SECTION_Y, 52.0),
     "TailSeatAxisX": (-20.0, TAIL_SECTION_Y, 12.0),
     "TailSeatAxisHeight": (-48.0, TAIL_SECTION_Y, -12.0),
 }
