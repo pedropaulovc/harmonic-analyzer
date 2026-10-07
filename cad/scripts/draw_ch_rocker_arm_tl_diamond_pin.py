@@ -170,8 +170,8 @@ def _pin_end_station(adapter: Any, section: Any, to_sheet, annotations: list[Any
     display = add_edge_dimension(
         adapter,
         section,
-        p0=to_sheet(0.0, 0.0075),
-        p1=to_sheet(PIN_ENGAGEMENT, 0.002),
+        p0=to_sheet(0.0, 0.0078),
+        p1=to_sheet(PIN_ENGAGEMENT, 0.003),
         text_xy=to_sheet(*PIN_END_XY),
         label=label,
         orientation="horizontal",
