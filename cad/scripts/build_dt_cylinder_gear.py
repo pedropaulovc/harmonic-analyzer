@@ -113,18 +113,21 @@ from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
 from involute_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
+from cylinder_cam_spec import (
+    CAM_THICKNESS,
+    ECCENTRICITY,
+    FACE_WIDTH,
+    OVERALL_THICKNESS,
+)
 from dt_cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
     CAM_DIA as CAM_DIAMETER,
     CAM_DIA_BAND,
     CAM_PHASE_TOLERANCE_DEG,
-    CAM_THICKNESS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    ECCENTRICITY,
     ECCENTRICITY_TOLERANCE_MM,
-    FACE_WIDTH,
     FACE_WIDTH_TOLERANCE_MM,
     NOTCH_CENTER_X,
     NOTCH_DEPTH,
@@ -135,7 +138,6 @@ from dt_cylinder_gear_spec import (
     NOTCH_WIDTH,
     NOTCH_WIDTH_BAND,
     OUTSIDE_DIA,
-    OVERALL_THICKNESS,
     OVERALL_THICKNESS_BAND,
     SURFACE_FINISHES,
     TEETH,
@@ -146,7 +148,7 @@ import _telemetry
 PART_NAME = "dt-cylinder-gear"
 MATERIAL = "Brass"  # ch. 13 text p.22: polished brass
 
-# Shared geometry lives in dt_cylinder_gear_spec; assemblies consume it directly.
+# Blank/cam scalars live in cylinder_cam_spec; tooth and print data in dt_cylinder_gear_spec.
 NOTCH_CLEARANCE = 1.5  # kerf overshoot past the OD so the cut always opens (geom)
 
 BORE_RADIUS = BORE_DIAMETER / 2.0

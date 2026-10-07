@@ -1654,6 +1654,37 @@ def test_specialized_helper_blast_radius_is_narrow():
     assert 0 < len(feat_users) <= 8, feat_users
 
 
+def test_channel_cam_closure_excludes_tooth_geometry_but_keeps_placement_config():
+    """The rod placement needs cam dimensions, not the cylinder's tooth system."""
+    unrelated = {
+        "dt_cylinder_gear_spec",
+        "dt_cylinder_gear_notes",
+        "build_dt_cylinder_gear",
+        "build_dt_cone_gear",
+        "_gear",
+        "involute_gear",
+    }
+    for name in ("build_ch_channel_assembly.py", "channel_kinematics.py"):
+        closure = _helper_names(name)
+        assert "cylinder_cam_spec" in closure, (name, closure)
+        assert closure.isdisjoint(unrelated), (name, closure)
+        # Axis height and home phase really do affect the placed cam centre.
+        assert "machine/gear_train.yaml" in config_files_of(SCRIPTS_DIR / name)
+    assert module_deps_of(SCRIPTS_DIR / "cylinder_cam_spec.py") == []
+    assert config_files_of(SCRIPTS_DIR / "cylinder_cam_spec.py") == frozenset()
+
+    cylinder = _helper_names("build_dt_cylinder_gear.py")
+    assert {
+        "cylinder_cam_spec",
+        "dt_cylinder_gear_spec",
+        "_gear",
+        "involute_gear",
+    } <= cylinder
+    assert "machine/gear_train.yaml" in config_files_of(
+        SCRIPTS_DIR / "build_dt_cylinder_gear.py"
+    )
+
+
 def test_data_deps_of_nameplate_lists_engraving_dxf():
     """The nameplate build's imported DXF is a data dependency of the part."""
     deps = data_deps_of(SCRIPTS_DIR / "build_fr_nameplate.py")

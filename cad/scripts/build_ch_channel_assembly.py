@@ -185,9 +185,9 @@ from build_ch_fulcrum_keeper import (
     CBORE_DEPTH_MM as KEEPER_CBORE_DEPTH,
     FOOT_H as KEEPER_FOOT_H,
 )
-from dt_cylinder_gear_spec import CAM_THICKNESS as CYL_CAM_THICKNESS
-from dt_cylinder_gear_spec import FACE_WIDTH as CYL_FACE_WIDTH
-from dt_cylinder_gear_spec import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
+from cylinder_cam_spec import CAM_THICKNESS as CYL_CAM_THICKNESS
+from cylinder_cam_spec import FACE_WIDTH as CYL_FACE_WIDTH
+from cylinder_cam_spec import ECCENTRICITY as CAM_ECC  # cam lobe throw (mm):
 
 # imported, NOT copied, so the rod ring stays concentric with the cam when the
 # throw is rescaled. A stale 5.08 hardcode (the pre-re-anchor throw) survived the

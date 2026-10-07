@@ -49,6 +49,7 @@ import ch_channel_lever_spec
 import vn_channel_spring_installed_spec
 import ch_connecting_rod_spec
 import vn_counter_spring_spec
+import cylinder_cam_spec
 import dt_cylinder_gear_spec
 import dt_cone_gear_spec
 import cone_shaft_land_bands
@@ -126,7 +127,7 @@ def nominal() -> Nominal:
         mg_magnifying_clamp_geom.BLOCK_DEPTH
     )
     return Nominal(
-        ecc=dt_cylinder_gear_spec.ECCENTRICITY,
+        ecc=cylinder_cam_spec.ECCENTRICITY,
         rod=ch_connecting_rod_spec.CENTER_DISTANCE,
         pin_x=ch_rocker_arm_spec.ROD_HOLE_X,
         pin_y=ch_rocker_arm_spec.ROD_HOLE_Y - ch_rocker_arm_spec.PIVOT_MID_Y,

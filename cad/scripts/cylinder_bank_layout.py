@@ -53,11 +53,9 @@ from dt_cylinder_end_disc_spec import (
     WASHER_THICK,
     WASHER_THICK_TOLERANCE_MM,
 )
+from cylinder_cam_spec import CAM_THICKNESS, FACE_WIDTH, OVERALL_THICKNESS
 from dt_cylinder_gear_spec import (
-    CAM_THICKNESS,
-    FACE_WIDTH,
     FACE_WIDTH_TOLERANCE_MM,
-    OVERALL_THICKNESS,
     OVERALL_THICKNESS_BAND,
 )
 

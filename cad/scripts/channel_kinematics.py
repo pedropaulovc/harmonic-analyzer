@@ -13,7 +13,7 @@ import ch_amplitude_bar_spec
 import channel_frame_geom
 import ch_channel_lever_spec
 import ch_connecting_rod_spec
-import dt_cylinder_gear_spec
+import cylinder_cam_spec
 import ch_rocker_arm_spec
 
 __all__ = ["ARC", "arc_geometry", "solve_state", "spring_hole_xy"]
@@ -23,10 +23,10 @@ _PIVOT = channel_frame_geom.ROCKER_PIVOT_XY
 _FULCRUM = channel_frame_geom.LEVER_FULCRUM_XY
 _RING_CENTER = (
     channel_frame_geom.CAM_SHAFT_XY[0]
-    + dt_cylinder_gear_spec.ECCENTRICITY
+    + cylinder_cam_spec.ECCENTRICITY
     * math.sin(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)),
     channel_frame_geom.CAM_SHAFT_XY[1]
-    + dt_cylinder_gear_spec.ECCENTRICITY
+    + cylinder_cam_spec.ECCENTRICITY
     * math.cos(math.radians(channel_frame_geom.CYLINDER_LOCK_PHASE_DEG)),
 )
 _ROD_C2C = ch_connecting_rod_spec.CENTER_DISTANCE

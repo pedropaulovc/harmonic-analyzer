@@ -40,17 +40,19 @@ from _gear_drawing_entities import visible_circle_edge
 from _part_pmi import _face_geometry, _face_matches
 from _surface_finish import surface_finish_by_key
 from dt_cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
+from cylinder_cam_spec import (
+    CAM_THICKNESS,
+    ECCENTRICITY,
+    FACE_WIDTH,
+    OVERALL_THICKNESS,
+)
 from dt_cylinder_gear_spec import (
     BORE_DIA,
     CAM_DIA,
-    CAM_THICKNESS,
     DRAWING_PRECISION_BY_NAME,
     DRAWING_REFERENCE_PRECISION,
-    ECCENTRICITY,
-    FACE_WIDTH,
     NOTCH_CENTER_X,
     NOTCH_FLOOR_RADIUS,
-    OVERALL_THICKNESS,
     SURFACE_FINISHES,
     TIP_RADIUS,
 )

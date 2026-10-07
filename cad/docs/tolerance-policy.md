@@ -146,7 +146,7 @@ finite-difference on the exact kinematics):
 
 | feature | nominal | sensitivity | note |
 |---|---:|---:|---|
-| cam eccentricity `dt_cylinder_gear_spec.ECCENTRICITY` | 8.64 | +11.57 \| +11.55 | the only dimension with a double-digit sensitivity |
+| cam eccentricity `cylinder_cam_spec.ECCENTRICITY` | 8.64 | +11.57 \| +11.55 | the only dimension with a double-digit sensitivity |
 | rocker rod-pin radius `ch_rocker_arm_spec.ROD_HOLE_X` | 133.07 | −0.75 \| −0.75 | |
 | channel-lever bar-pin arm `ch_channel_lever_spec.BAR_PIN_X` | 127.0 | −0.79 \| −0.76 | |
 | channel-lever spring-hook arm `ch_channel_lever_spec.LEVER_SPRING_X` | 175.05 | +0.57 \| +0.57 | set by the plumb spring axis (fulcrum 199.9 − anchor 24.85), not a round 7" |
@@ -160,6 +160,31 @@ $\sin(i\theta_k)=\pm1$. Gear tooth errors convert at the *driven* gear's radius 
 flank error on any cone gear is 0.02/30.6 rad = 0.04° of the cylinder gear), so tooth
 accuracy is not a phase driver; cam-lobe-to-notch registration and one-directional backlash
 lag are.
+
+The cylinder builder, drawing, channel assembly and offline channel kinematics
+share the gear-free `cylinder_cam_spec` leaf for eccentricity, blank face width,
+overall stacking thickness and derived cam thickness. Tooth calculations and
+manufacturing bands remain in `dt_cylinder_gear_spec`; channel recipes do not
+need that module or the gear-profile helpers just to place the rod ring.
+`channel_frame_geom` still reads `gear_train.drive_axis_y_mm` and
+`gear_train.cylinder_lock_phase_deg` for the drum axis and home phase. Because
+configuration dependencies are whole-file tokens, `machine/gear_train.yaml`
+remains a legitimate channel recipe input: a diametral-pitch-only YAML edit
+still conservatively invalidates it. This leaf cutover does not assert native
+unchanged-output or whole-file configuration isolation.
+
+The live web mechanics exporter (`web/scripts/export-mechanics.py`) evaluates
+explicit `--source-commit` archives of `cad/scripts` and `cad/config`, never
+working-tree CAD. For current/future archives it must read shared cam scalars
+from `cylinder_cam_spec`; tooth count (`TEETH`) remains in
+`dt_cylinder_gear_spec`. The protected
+`1268c23d4a8fc741147c5e09d8d1e45247a71945` archive with raw digest
+`2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d`
+must use a separately bounded historical reader of the old scalar API. Only that
+exact commit/digest pair may select the historical reader; missing current leaf
+data must not fall back to old gear-spec attributes. Updating exporter code
+requires updating its current consumer-hash registration; that is not a
+historical-seal or model/source-pin update and does not certify native output.
 
 ### The nominal design has a residual before any tolerance
 

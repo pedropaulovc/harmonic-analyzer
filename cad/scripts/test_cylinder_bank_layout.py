@@ -11,6 +11,7 @@ import dt_arbor_pedestal_spec
 import _config
 import ch_connecting_rod_spec as rod
 import cylinder_bank_layout as bank
+import cylinder_cam_spec as cam
 import dt_cylinder_gear_spec as gear
 from _buildgraph import module_deps_of
 
@@ -20,11 +21,11 @@ MM_PER_IN = 25.4
 def test_gear_overall_thickness_is_the_station_pitch() -> None:
     # Free 6.5 mm gears on a 7.06 mm pitch left 0.56 mm of air per station:
     # nothing but the CAD ladder held the stations apart.
-    assert gear.OVERALL_THICKNESS == pytest.approx(
+    assert cam.OVERALL_THICKNESS == pytest.approx(
         _config.machine("channels", "station_pitch_mm"), abs=1e-9
     )
-    assert gear.CAM_THICKNESS == pytest.approx(gear.OVERALL_THICKNESS - gear.FACE_WIDTH)
-    assert 0.0 <= bank.BANK_PITCH - gear.OVERALL_THICKNESS <= 0.001
+    assert cam.CAM_THICKNESS == pytest.approx(cam.OVERALL_THICKNESS - cam.FACE_WIDTH)
+    assert 0.0 <= bank.BANK_PITCH - cam.OVERALL_THICKNESS <= 0.001
 
 
 def test_gear_and_stack_bands_are_centred() -> None:
@@ -75,7 +76,7 @@ def test_end_play_uses_the_rig_feeler_rule() -> None:
 
 def test_g0_to_g19_band_is_capped_by_the_stack_acceptance() -> None:
     assert bank.G0_FRONT_FROM_G19_BACK == pytest.approx(
-        -(19 * bank.BANK_PITCH + gear.FACE_WIDTH)
+        -(19 * bank.BANK_PITCH + cam.FACE_WIDTH)
     )
     # Gears 1-19 against L20 +/-0.20: 19 x 0.025 is capped at 0.20 + 0.025.
     assert bank.G0_G19_BAND == pytest.approx((-0.275, 0.275))
@@ -112,7 +113,7 @@ def test_a_closed_slot_always_holds_the_whole_ring() -> None:
 def test_each_gear_is_accepted_on_its_print_band() -> None:
     upper, lower = gear.OVERALL_THICKNESS_BAND
     assert bank.GEAR_THICKNESS_ACCEPT == pytest.approx(
-        (gear.OVERALL_THICKNESS + lower, gear.OVERALL_THICKNESS + upper)
+        (cam.OVERALL_THICKNESS + lower, cam.OVERALL_THICKNESS + upper)
     )
     # Four places print the band exactly; three would move a limit inward.
     places = gear.DRAWING_PRECISION_BY_NAME["OverallThickness"]
@@ -121,7 +122,7 @@ def test_each_gear_is_accepted_on_its_print_band() -> None:
 
 
 def test_ring_faces_stay_on_flat_web_through_the_whole_stroke() -> None:
-    ring_reach = rod.RING_OUTER_RADIUS + gear.ECCENTRICITY
+    ring_reach = rod.RING_OUTER_RADIUS + cam.ECCENTRICITY
     root_radius = gear.TIP_RADIUS - gear.WHOLE_DEPTH
     assert root_radius - ring_reach >= 0.5
 
@@ -129,12 +130,12 @@ def test_ring_faces_stay_on_flat_web_through_the_whole_stroke() -> None:
 def test_stations_close_up_against_the_datum() -> None:
     assert bank.BACK_STRAP_INNER_Z - bank.G19_BACK_FACE_Z == pytest.approx(1.5)
     assert bank.G0_CAM_FACE_Z == pytest.approx(
-        bank.station_z(0) - gear.FACE_WIDTH / 2.0 - gear.CAM_THICKNESS
+        bank.station_z(0) - cam.FACE_WIDTH / 2.0 - cam.CAM_THICKNESS
     )
     assert bank.FRONT_WASHER_Z[0] - bank.FRONT_STRAP_INNER_Z == pytest.approx(
         bank.BANK_END_FEELER
     )
-    assert bank.CAM_MID_DZ == pytest.approx(-gear.OVERALL_THICKNESS / 2.0)
+    assert bank.CAM_MID_DZ == pytest.approx(-cam.OVERALL_THICKNESS / 2.0)
 
 
 def test_layout_stays_geometry_only() -> None:
