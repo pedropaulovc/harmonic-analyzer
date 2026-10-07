@@ -41,12 +41,13 @@ BASE_HT = 19.0
 
 # --- Saddles: two blocks on the base, bored together for the post body --------
 OVERALL_HT = 39.0
-HEAD_SADDLE_X = (26.0, 40.0)
+HEAD_SADDLE_X = (26.5, 39.5)
 FOOT_SADDLE_X = (64.0, 78.0)
 SADDLE_Z = (26.0, 74.0)
 # The head saddle sits on the body between the head shoulder and the cone
-# boss; .XX stations keep its widest print inside the narrowest gap (below).
-SADDLE_X_PLACES = 2
+# boss; it is narrowed from the inventory's 14 so its widest .X print still
+# fits the narrowest gap the post's print allows (below).
+SADDLE_X_PLACES = 1
 
 # The cone axis crosses the post axis BORE_HEIGHT above foot B; B6 X0 is the
 # head top, BLOCK_HEIGHT above the foot.
@@ -69,7 +70,7 @@ SEAT_Z = POST_AXIS_Z
 
 # --- North-cap pad -------------------------------------------------------------
 # The cone boss is BLOCK_DIA long (post.CONE_BOSS_LENGTH), so its cap lies in
-# the body's tangent plane: the pad top is lapped flush with the seat bottoms.
+# the body's tangent plane: the pad top is flush with the seat bottoms.
 # The pad is a land across the cone axis, trimmed to the saddles' width by the
 # same cut, so its two X faces locate it; it leaves a quarter-inch cutter
 # room on either side.
@@ -93,13 +94,13 @@ STUD_MIN_ENGAGEMENT_D = 1.5
 # --- Print-worst checks ----------------------------------------------------------
 WALL_FLOOR_MM = post.WEB_FLOOR_MM
 _ROW1 = printed_band_mm(1)
-_ROW2 = printed_band_mm(2)
 
 # The head saddle lands on the body between the head shoulder and the cone
 # boss. Its widest print fits the narrowest gap the post's print allows: the
 # shoulder sits HeadHt below the top, which is MainBodyHt above the foot; the
 # cone axis sits within its own band above the foot; the boss radius is .X.
-HEAD_SADDLE_WIDTH_MAX = (HEAD_SADDLE_X[1] + _ROW2) - (HEAD_SADDLE_X[0] - _ROW2)
+_SADDLE_ROW = printed_band_mm(SADDLE_X_PLACES)
+HEAD_SADDLE_WIDTH_MAX = (HEAD_SADDLE_X[1] + _SADDLE_ROW) - (HEAD_SADDLE_X[0] - _SADDLE_ROW)
 HEAD_GAP_MIN = (
     (post.HEAD_BASE_Y - post.BORE_HEIGHT)
     - printed_band_mm(post.DRAWING_PRECISION_BY_NAME["HeadHt"])
@@ -180,10 +181,11 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 SURFACE_FINISHES = ()
 BUILT_UP_PERMISSION_NOTE = "BUILT-UP CONSTRUCTION IS PERMITTED."
+PAD_FLUSH_NOTE = "PAD TOP FLUSH WITH SEAT BOTTOMS."
 DRAWING_NOTES = "\n".join(
     (
-        "BORE BOTH SEATS TOGETHER IN ONE SETTING.",
-        "PAD TOP LAPPED FLUSH WITH SEAT BOTTOMS.",
+        "BOTH SEATS ON ONE COMMON AXIS.",
+        PAD_FLUSH_NOTE,
         BUILT_UP_PERMISSION_NOTE,
     )
 )
@@ -207,7 +209,7 @@ def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
             ),
             "nominal_dia": (SEAT_DIA, ("SEAT_DIA",)),
             "length": (
-                [x_span[1] - x_span[0] - 2.0 * _ROW2, x_span[1] - x_span[0] + 2.0 * _ROW2],
+                [x_span[1] - x_span[0] - 2.0 * _SADDLE_ROW, x_span[1] - x_span[0] + 2.0 * _SADDLE_ROW],
                 (name,),
             ),
             "height": (
@@ -267,8 +269,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             ),
             "station": (limits(PAD_X, 1), ("PAD_X", (_POST, "BORE_HEIGHT"))),
             "station_nominal": (PAD_X, ("PAD_X",)),
-            "process": ("lap", ("DRAWING_NOTES",)),
-            "note": ("PAD TOP LAPPED FLUSH WITH SEAT BOTTOMS.", ("DRAWING_NOTES",)),
+            "process": ("mill", ("DRAWING_NOTES",)),
+            "note": (PAD_FLUSH_NOTE, ("DRAWING_NOTES",)),
         },
         precision={"height": 1, "width": 1, "length": 1, "station": 1},
     ),

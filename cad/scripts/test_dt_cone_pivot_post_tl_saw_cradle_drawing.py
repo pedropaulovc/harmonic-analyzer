@@ -40,7 +40,7 @@ def test_pad_top_shares_the_printed_seat_bottom_band() -> None:
     features = _features()
     assert features["cap_pad"]["height"] == features["head_seat"]["height"]
     assert features["cap_pad"]["height"] == features["foot_seat"]["height"]
-    assert features["cap_pad"]["process"] == "lap"
+    assert features["cap_pad"]["note"] in spec.DRAWING_NOTES.splitlines()
 
 
 def test_head_saddle_fits_between_the_head_shoulder_and_the_cone_boss() -> None:
@@ -64,5 +64,5 @@ def test_notes_follow_the_simplicity_policy() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
     assert not re.search(r"\d", spec.DRAWING_NOTES)
-    assert any("LAPPED" in line for line in lines)
+    # the shop has no grinder
     assert not re.search(r"\bGROUND\b|\bGRIND", spec.DRAWING_NOTES)

@@ -7,4 +7,4 @@ dt-cone-pivot-post-tl-saw-cradle:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "mill base and saddles; bore both seats together; drill and tap stud holes; lap pad flush with seat bottoms"
+  process: "mill base and saddles; bore both seats on one axis; mill pad flush with seat bottoms; drill and tap stud holes"

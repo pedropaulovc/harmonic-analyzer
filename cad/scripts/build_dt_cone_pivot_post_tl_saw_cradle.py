@@ -1,6 +1,6 @@
 r"""Build the cone pivot post's saw cradle (MHA-DT-005-TL-02; shop fixture).
 
-A 1018 block the bandsaw vise grips: two saddles bored together carry the
+A 1018 block the bandsaw vise grips: two saddles bored on one axis carry the
 post body, a pad between them carries the cone sleeve's north cap, and two
 3/8-16 taps take the cap-bridge studs
 (``dt_cone_pivot_post_tl_saw_cradle_spec``). One is made.

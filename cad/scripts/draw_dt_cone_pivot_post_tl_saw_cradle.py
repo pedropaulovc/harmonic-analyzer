@@ -49,6 +49,7 @@ from dt_cone_pivot_post_tl_saw_cradle_spec import (
     PAD_X1,
     SADDLE_Z,
     SEAT_CENTRE_Y,
+    SEAT_Z,
     STUD_TAP_DRILL,
     STUD_X,
     STUD_Z,
@@ -129,6 +130,12 @@ TOP_KEEP = {
     "StudFarZ": (_x(0.0) - _GAP - 1.2 * _ROW, _top_y(STUD_Z[1] / 2.0)),
     "BaseWidth": (_x(0.0) - _GAP - 2.4 * _ROW, TOP_CENTER[1]),
 }
+# A diameter leader runs radially from its text: below-left of the seat axis,
+# steeper than the saddle-top chord, it lands on the visible seat arc and
+# leaves the view past the base's lower-left corner, clear of every
+# location dimension.
+_SEAT_AXIS = (_right_x(SEAT_Z), _y(SEAT_CENTRE_Y))
+SEAT_DIA_XY = (_SEAT_AXIS[0] - 0.035, _SEAT_AXIS[1] - 0.033)
 # The seat axis stands above the saddle tops, so the side-face stations stack
 # above it; the seat-bottom height stands right of the side face.
 _SEAT_AXIS_TOP = _y(SEAT_CENTRE_Y)
@@ -137,13 +144,14 @@ RIGHT_KEEP = {
     "SeatZ": (_right_x(BASE_WIDTH / 4.0), _SEAT_AXIS_TOP + _GAP + _ROW),
     "SaddleZ1": (_right_x(SADDLE_Z[1] / 2.0), _SEAT_AXIS_TOP + _GAP + 2 * _ROW),
     "SeatBottomHt": (_right_x(0.0) + _GAP, _y(14.0)),
-    "SeatDia": (_right_x(BASE_WIDTH) - 0.010, _SEAT_AXIS_TOP + _GAP),
+    "SeatDia": SEAT_DIA_XY,
 }
 # The tap callout leads from the far stud's drill rim to the clear sheet right
 # of the top view, below the right view's station stack; nothing it crosses
 # is a dimension or extension line.
 FAR_STUD_RIM = (_x(STUD_X + STUD_TAP_DRILL / 2.0), _top_y(STUD_Z[1]))
-TAP_CALLOUT_XY = (_x(BASE_LENGTH) + 0.014, _top_y(STUD_Z[1]) + 0.004)
+# The callout's text is centred on its point; half its width clears the view.
+TAP_CALLOUT_XY = (_x(BASE_LENGTH) + 0.042, _top_y(STUD_Z[1]) + 0.004)
 
 
 async def build(adapter: Any) -> dict[str, str]:
