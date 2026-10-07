@@ -762,6 +762,27 @@ async def build(adapter: Any) -> dict[str, str]:
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     set_hidden_lines_removed(adapter, iso)
     _delete_thread_callouts(adapter, iso, label="isometric")
+    stray = {
+        name: texts
+        for name, view in (
+            ("plan", plan),
+            ("section D-D", section),
+            ("detail E", detail),
+            ("elevation", elevation),
+            ("TAGS plan", tag_plan),
+            ("isometric", iso),
+        )
+        if (
+            texts := [
+                text
+                for found in (_early_bound(view, "IView").GetNotes() or ())
+                if "Tapped Hole"
+                in (text := str(_early_bound(found, "INote").GetText() or ""))
+            ]
+        )
+    }
+    if stray:
+        raise RuntimeError(f"model thread callouts came back: {stray!r}")
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("failed to return to the SCHEDULE sheet")
     _schedule(
