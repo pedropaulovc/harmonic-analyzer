@@ -19,6 +19,18 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
+WEB = Path(__file__).resolve().parents[1]
+
+
+def private_output(path):
+    output = Path(path).resolve()
+    external_temp = not output.is_relative_to(WEB.resolve()) and any(
+        output.is_relative_to(Path(temp)) for temp in ("/tmp", "/var/tmp"))
+    if output.is_relative_to((WEB / "content").resolve()) or not (
+            output.is_relative_to((WEB / ".vite/verification-output").resolve()) or external_temp):
+        raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals")
+    return output
+
 
 def camera_parameters(camera, height):
     world_to_cv = (
@@ -294,9 +306,10 @@ def main():
     args = parser.parse_args()
     if args.observations.resolve() != historical.resolve():
         parser.error("--observations must select the original canonical-native historical derivative")
-    output = args.output.resolve()
-    if output.is_relative_to((Path(__file__).resolve().parents[1] / "content").resolve()):
-        parser.error("Historical diagnostics cannot write published content or canonical originals")
+    try:
+        output = private_output(args.output)
+    except ValueError as error:
+        parser.error(str(error))
     packet = run(args.evidence, args.frames, args.inventory, historical_diagnostic=args.historical_diagnostic)
     spec = importlib.util.spec_from_file_location("static_output_common", Path(__file__).with_name("compact-source-common.py"))
     common = importlib.util.module_from_spec(spec)

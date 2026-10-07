@@ -356,7 +356,8 @@ export async function joinNativeLandmarkEligibility(input: NativeLandmarkEligibi
       || capture.presentation !== metadata.draw.presentation || capture.sourceOpacity !== metadata.draw.sourceOpacity
       || !sameEvidence(capture.sourceAssembly, metadata.draw.sourceAssembly) || !sameEvidence(capture.sourceLayout, metadata.draw.sourceLayout)
       || !sameEvidence(capture.resolvedImagePlaneWarp, metadata.draw.imagePlaneWarp)
-      || !sameEvidence(capture.nativeViewportBackingPixels, metadata.draw.viewportBackingPixels.slice(2))) {
+      || !sameEvidence(capture.nativeViewportBackingPixels,
+        metadata.draw.imagePlaneWarp ? metadata.draw.viewportBackingPixels.slice(2) : null)) {
       return finish('unresolved', 'projection-current-draw-identity-mismatch')
     }
     if (marker.state === 'unresolved') return finish('unresolved', 'depth-off-projection-unresolved')

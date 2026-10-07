@@ -18,6 +18,16 @@ spec.loader.exec_module(common)
 BASE = WEB / "content/canonical-native/analysis-recovery-calibration-evidence"
 
 
+def private_output(path):
+    output = Path(path).resolve()
+    external_temp = not output.is_relative_to(WEB.resolve()) and any(
+        output.is_relative_to(Path(temp)) for temp in ("/tmp", "/var/tmp"))
+    if output.is_relative_to((WEB / "content").resolve()) or not (
+            output.is_relative_to((WEB / ".vite/verification-output").resolve()) or external_temp):
+        raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals")
+    return output
+
+
 def load(path):
     return json.loads(path.read_text())
 
@@ -125,9 +135,10 @@ def main():
     parser.add_argument("--historical-diagnostic", action="store_true", required=True)
     parser.add_argument("--output", type=Path, default=WEB / ".vite/verification-output/compact-source-refinement/analysis-bank-source-controls.json")
     args = parser.parse_args()
-    output = args.output.resolve()
-    if output.is_relative_to((WEB / "content").resolve()):
-        parser.error("Historical diagnostics cannot write published content or canonical originals")
+    try:
+        output = private_output(args.output)
+    except ValueError as error:
+        parser.error(str(error))
     packet = build_packet(historical_diagnostic=args.historical_diagnostic)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(packet,separators=(",",":"),allow_nan=False)+"\n")

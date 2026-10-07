@@ -204,6 +204,11 @@ Analysis/Synthesis historical replay uses
 or published as a current source track. Historical lineage never supplies
 current eligibility.
 
+Historical source diagnostics write only to resolved
+`web/.vite/verification-output` or external `/tmp` and `/var/tmp` destinations.
+Public assets, other repository destinations and symlink escapes are refused
+before generation. Their receipts remain non-publishable historical evidence.
+
 Compression reduces current storage, not Git ancestry. Oversized historical
 blobs remain unless history is explicitly rewritten.
 
@@ -408,6 +413,12 @@ Diagnostic landmark receipts also retain the actual native marker's world
 coordinates from the same completed view draw. Stale, unresolved or
 GPU-deformed coordinates remain unavailable; world coordinates are not
 source-pixel measurements or camera qualification.
+
+Optional native eligibility requires `nativeViewportBackingPixels: null` for
+unwarped captures and current native backing dimensions for warped captures.
+A refused diagnostic lease preserves its original unavailable reason and partial
+snapshot/capture evidence; unrelated cleanup failures still propagate. Neither
+collection nor a successful metadata join qualifies source fidelity or GPU bounds.
 
 Paused interaction verification exercises a bounded crank turn and an actual
 camera orbit, preserving before/after native pixels, camera poses and media

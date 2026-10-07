@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import tempfile
 import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -992,6 +993,57 @@ class ObservationStorageBoundaryTests(unittest.TestCase):
             self.assertFalse(path.exists())
 
 
+
+
+class HistoricalDiagnosticOutputBoundaryTests(unittest.TestCase):
+    scripts = ('NAsM30MAHLg-calibrate-static.py',
+               'generate-analysis-bank-source-controls.py')
+
+    def test_clis_refuse_published_repository_and_symlink_outputs_before_write(self):
+        with tempfile.TemporaryDirectory(dir=HERE.parent / 'public') as published, \
+                tempfile.TemporaryDirectory(dir=HERE) as tracked, \
+                tempfile.TemporaryDirectory() as temporary:
+            public_path = Path(published) / 'receipt.json'
+            tracked_path = Path(tracked) / 'receipt.json'
+            escape = Path(temporary) / 'escape'
+            escape.symlink_to(Path(published), target_is_directory=True)
+            for filename in self.scripts:
+                for destination in (public_path, tracked_path, escape / 'receipt.json'):
+                    with self.subTest(script=filename, destination=destination):
+                        destination.write_bytes(b'original destination must survive')
+                        result = subprocess.run(
+                            [sys.executable, str(HERE / filename),
+                             '--historical-diagnostic', '--output', str(destination)],
+                            text=True, capture_output=True)
+                        self.assertEqual(result.returncode, 2, result.stderr)
+                        self.assertIn('Historical diagnostics require private', result.stderr)
+                        self.assertEqual(destination.read_bytes(),
+                                         b'original destination must survive')
+                        destination.unlink()
+
+    def test_analysis_cli_writes_original_historical_diagnostic_to_external_temporary_output(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / 'diagnostic/receipt.json'
+            result = subprocess.run(
+                [sys.executable, str(HERE / 'generate-analysis-bank-source-controls.py'),
+                 '--historical-diagnostic', '--output', str(destination)],
+                text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            packet = json.loads(destination.read_text())
+            self.assertEqual(packet['kind'], 'historical-source-track-receipt')
+            self.assertIs(packet['historicalDiagnostic'], True)
+            self.assertIs(packet['publishable'], False)
+            self.assertIs(packet['productionIntegrated'], False)
+            original = common.load_historical_observations('6dW6VYXp9HM')
+            self.assertEqual(packet['source'], original['source'])
+            self.assertEqual(packet['model'], original['model'])
+            ledger = json.loads((HERE.parent / 'content/canonical-native/'
+                                 'analysis-recovery-calibration-evidence/'
+                                 'augmented-face-frozen-check/interior-cap-check-ledger.json').read_text())
+            self.assertEqual(packet['sourceMeasurementCounts']['independentMeasuredChecks'],
+                             ledger['counts']['measured'])
+            self.assertEqual(packet['sourceMeasurementCounts']['unresolvedChecksPreserved'],
+                             ledger['counts']['unresolved'])
 
 
 class HistoricalReceiptBoundaryTests(unittest.TestCase):

@@ -4,7 +4,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } from './verify-sync.mjs'
+import { runInNewContext } from 'node:vm'
+import { parseOptions, sourceCensus, finishVideo, seekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } from './verify-sync.mjs'
 import { jsonDigest, loadCanonicalObservations } from './verify-reference.mjs'
 import { NATIVE_IDENTITY_MAP_SHA256 } from '../model-representation.mjs'
 import { LIVE_MODEL_SOURCE } from './approved-model.mjs'
@@ -244,6 +245,100 @@ test('a new seek cannot pass merely because a later media clock equals the targe
   assert.equal(seekSettlement(observed, 1, 0.02).done, true)
 })
 
+// Stateful native-media boundary control: seeking changes the actual fixture
+// clock and emits observed seeking/seeked events; no browser/GPU claim.
+function pausedSourceFixture({ ended = true, reportedState, seekMode = 'settled' } = {}) {
+  class NativeVideo extends EventTarget {
+    constructor() {
+      super()
+      Object.assign(this, { duration: 2.1, paused: true, ended, seeking: false, readyState: 4,
+        videoWidth: 1920, videoHeight: 1080, volume: 1, muted: false, error: null, isConnected: true })
+      this.time = ended ? this.duration : 1
+      this.seekRequests = []
+    }
+    get currentTime() { return this.time }
+    set currentTime(time) {
+      this.seekRequests.push(time)
+      if (seekMode !== 'stale-clock') this.time = time
+      this.ended = this.time >= this.duration
+      this.seeking = true
+      this.dispatchEvent(new Event('seeking'))
+      this.seeking = false
+      this.dispatchEvent(new Event('seeked'))
+    }
+  }
+  const video = new NativeVideo(), selector = '#original'
+  const window = { harmonicAnalyzer: { snapshot: () => ({ playerState: reportedState ?? (video.ended ? 'ended' : video.paused ? 'paused' : 'playing') }) } }
+  const globals = { window, document: { querySelector: query => query === selector ? video : null }, HTMLVideoElement: NativeVideo }
+  const evaluate = async (fn, arg) => runInNewContext(`(${fn.toString()})(arg)`, { ...globals, arg })
+  const page = {
+    evaluate,
+    waitForFunction: async fn => { if (!await evaluate(fn)) throw new Error('Pause barrier requires an actually paused player') },
+    locator: () => ({ click: async () => { video.paused = true } }),
+  }
+  const record = { native, track: { shots: observations.shots } }
+  return { video, page, embed: { frame: page, selector }, record }
+}
+
+test('ended setup seeks the first selected nonterminal exposure before satisfying the strict pause barrier', async () => {
+  const fixture = pausedSourceFixture()
+  const rows = [{ frame: null }, { frame: frame(2.1) }, { frame: frame(0.5) }, { frame: frame(1) }, { frame: frame(0) }]
+  const recovery = await preparePausedSource(fixture.page, fixture.embed, fixture.record, rows)
+  assert.equal(recovery.kind, 'ended-original-native-source-setup-seek')
+  assert.equal(recovery.proof, 'native-seeking-then-seeked-after-command')
+  assert.deepEqual(Array.from(recovery.events), ['seeking', 'seeked'])
+  assert.equal(recovery.targetSourcePtsSeconds, 1)
+  assert.equal(recovery.preMediaTime, 2.1)
+  assert.equal(recovery.settledMediaTime, 1)
+  assert.equal(fixture.video.currentTime, 1)
+  assert.equal(fixture.video.ended, false)
+  assert.deepEqual(fixture.video.seekRequests, [1])
+})
+
+test('already paused source setup preserves its actual clock without introducing a seek', async () => {
+  const fixture = pausedSourceFixture({ ended: false })
+  assert.equal(await preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(0) }]), null)
+  assert.equal(fixture.video.currentTime, 1)
+  assert.deepEqual(fixture.video.seekRequests, [])
+})
+
+test('ended setup cannot invent zero, use a terminal exposure or cross the source shot boundary', async () => {
+  for (const rows of [
+    [],
+    [{ frame: null }],
+    [{ frame: frame(2.1) }],
+    [{ frame: { ...frame(1), decodedTimeSeconds: 2.1 } }],
+    [{ frame: { ...frame(1), shotId: 'another-shot' } }],
+  ]) {
+    const fixture = pausedSourceFixture()
+    await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, rows), /no selected nonterminal/)
+    assert.deepEqual(fixture.video.seekRequests, [])
+  }
+  const fixture = pausedSourceFixture()
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(0.5) }]))
+  assert.deepEqual(fixture.video.seekRequests, [])
+})
+
+test('ended source recovery refuses unavailable media and does not alias unknown or ended state to paused', async () => {
+  for (const reportedState of ['unknown', 'unavailable', 'ended']) {
+    const fixture = pausedSourceFixture({ ended: false, reportedState })
+    await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /actually paused|actually stopped/)
+  }
+  const fixture = pausedSourceFixture()
+  fixture.video.error = { message: 'source decode failed' }
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /no decoded source content/)
+  assert.deepEqual(fixture.video.seekRequests, [])
+})
+
+test('native seek events with a stale actual clock cannot recover an ended source', async t => {
+  const fixture = pausedSourceFixture({ seekMode: 'stale-clock' })
+  let reads = 0
+  t.mock.method(Date, 'now', () => reads++ === 0 ? 0 : 20_000)
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /never decoded\/settled/)
+  assert.equal(fixture.video.currentTime, 2.1)
+  assert.equal(fixture.video.ended, true)
+})
+
 test('moving CHECKs from one shot cannot certify another internally moving shot', () => {
   const video = videoFixture()
   video.samples[0].sourceShotId = 'moving-a'
@@ -474,7 +569,7 @@ async function controlledEligibilityResponse(deriveNativeStagePixelRay) {
   const target = { primitiveId: id, exactLocalPosition: [0, 0, 0], nativeStageBackingPixel: [50, 50] }
   const anchor = { id: 'apex', partPath: 'native/controlled', partLocalMetres: [0, 0, 0] }
   const capture = { method: 'gpu-readback', visibilityMode: 'depth-off-landmark-projection', status: 'captured', viewId: 'controlled', timeSeconds: 1,
-    presentation: 'native', sourceOpacity: 1, sourceAssembly: draw.sourceAssembly, sourceLayout: [], resolvedImagePlaneWarp: null, nativeViewportBackingPixels: [101, 101],
+    presentation: 'native', sourceOpacity: 1, sourceAssembly: draw.sourceAssembly, sourceLayout: [], resolvedImagePlaneWarp: null, nativeViewportBackingPixels: null,
     landmarks: [{ id: 'apex', partPath: anchor.partPath, runtimeTemplatePartPath: null, state: 'rendered', worldMetres: [0, 0, -1],
       sourcePixels: [960, 540], canvasPixels: [50.5, 50.5], uncertaintySourcePixels: 0.5, uncertaintyCanvasPixels: 0.5 }] }
   const bufferReceipts = Object.entries(buffers).map(([name, array]) => ({ primitiveId: id, name, arrayType: array.constructor.name, byteLength: array.byteLength,
@@ -887,6 +982,81 @@ test('a bad diagnostic image does not erase an unrelated admitted pixel countere
   assert.equal(video.coverage.complete, true)
   assert.equal(video.diagnosticLandmarks.failed, 1)
   assert.equal(video.stageMeasurement.status, 'failed')
+})
+
+function playbackDrawFixture() {
+  const views = [0, 0.7, 0.3].map((opacity, index) => ({
+    ...sourceView(`view-${index}`), input: { crankTurns: index },
+    composite: { mode: 'crossfade', groupId: 'fade', imageLayerId: `image-${index}`, opacity },
+    resolvedImagePlaneWarp: null,
+  }))
+  const sourceLayout = views.map(view => ({ viewId: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, resolvedImagePlaneWarp: null }))
+  for (const view of views) view.sourceLayout = sourceLayout
+  return {
+    actual: { modelTime: 12, sourceDrawRevision: 42, views },
+    receipts: views.map(view => ({ viewId: view.id, mechanism: {
+      viewId: view.id, method: 'actual-native-mechanism-solve', status: 'rendered',
+      timeSeconds: 12, sourceDrawRevision: 42, channelAnglesRad: Array(20).fill(0),
+      input: structuredClone(view.input), sourceLayout: structuredClone(sourceLayout), resolvedImagePlaneWarp: null,
+    } })),
+  }
+}
+
+test('an undrawn zero-opacity crossfade receipt cannot invalidate current contributing native draws', () => {
+  const rendered = playbackDrawFixture()
+  Object.assign(rendered.receipts[0].mechanism, { status: 'stale', timeSeconds: 11, sourceDrawRevision: 41 })
+  assert.equal(requirePlaybackDraw(rendered), 42)
+  rendered.receipts.shift()
+  assert.equal(requirePlaybackDraw(rendered), 42)
+})
+
+test('every positive contribution retains current pose, clock, revision and source-layout associations', () => {
+  for (const index of [1, 2]) {
+    for (const mutate of [
+      rendered => { rendered.receipts.splice(index, 1) },
+      rendered => { rendered.receipts[index].mechanism.status = 'stale' },
+      rendered => { rendered.receipts[index].mechanism.status = 'solved-for-draw' },
+      rendered => { rendered.receipts[index].mechanism.method = 'media-model-time-alias' },
+      rendered => { rendered.receipts[index].mechanism.viewId = 'different-view' },
+      rendered => { rendered.receipts[index].mechanism.timeSeconds = 11 },
+      rendered => { rendered.receipts[index].mechanism.sourceDrawRevision = 41 },
+      rendered => { for (const receipt of rendered.receipts) receipt.mechanism.sourceDrawRevision = 41 },
+      rendered => { rendered.receipts[index].mechanism.input.crankTurns += 1 },
+      rendered => { rendered.receipts[index].mechanism.sourceLayout = [] },
+      rendered => { rendered.receipts[index].mechanism.resolvedImagePlaneWarp = { changed: true } },
+      rendered => { rendered.receipts[index].mechanism.channelAnglesRad[0] = NaN },
+    ]) {
+      const rendered = playbackDrawFixture()
+      mutate(rendered)
+      assert.throws(() => requirePlaybackDraw(rendered), /completed actual native|stale\/different physical input/)
+    }
+  }
+})
+
+test('positive opacity has no epsilon exemption and opaque views still require a completed draw', () => {
+  for (const composite of [
+    { mode: 'crossfade', groupId: 'fade', imageLayerId: 'tiny', opacity: Number.MIN_VALUE },
+    { mode: 'opaque', opacity: 0 },
+    undefined,
+  ]) {
+    const rendered = playbackDrawFixture()
+    rendered.actual.views[0].composite = composite
+    rendered.receipts[0].mechanism.status = 'stale'
+    assert.throws(() => requirePlaybackDraw(rendered), /completed actual native/)
+  }
+})
+
+test('all-zero or missing native views cannot certify playback even with current-looking receipts', () => {
+  for (const receiptState of ['rendered', 'stale', 'missing']) {
+    const rendered = playbackDrawFixture()
+    for (const view of rendered.actual.views) view.composite.opacity = 0
+    if (receiptState === 'missing') rendered.receipts = []
+    else for (const receipt of rendered.receipts) receipt.mechanism.status = receiptState
+    assert.throws(() => requirePlaybackDraw(rendered), /at least one contributing completed native/)
+  }
+  const rendered = playbackDrawFixture()
+  rendered.actual.views = []
+  assert.throws(() => requirePlaybackDraw(rendered), /at least one contributing completed native/)
 })
 
 function playbackMotionFixture() {

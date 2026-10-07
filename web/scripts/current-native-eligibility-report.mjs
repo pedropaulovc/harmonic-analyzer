@@ -80,30 +80,31 @@ export async function collectCurrentNativeEligibilityEvidence(page, frame, respo
       const api = window.harmonicAnalyzer
       // This is the only normal snapshot call. In-lease snapshots are stale.
       const captures = viewIds.map(viewId => ({ viewId, capture: api.renderedLandmarks(viewId), mechanism: api.renderedMechanism(viewId) }))
-      const state = { snapshot: api.nativePrimitiveSnapshot(), captures, currentMetadata: null, registeredAnchors: [], context: null, reason: null }
+      const state = { snapshot: api.nativePrimitiveSnapshot(), captures, currentMetadata: null, registeredAnchors: [], context: null, reason: null, leaseStatus: 'pending' }
       let ready, failed
       const started = new Promise((resolve, reject) => { ready = resolve; failed = reject })
       state.lease = api.withNativeDiagnosticLease(async context => {
         state.context = context
         state.currentMetadata = context.readNativeDrawMetadata()
         state.registeredAnchors = context.readRegisteredNativeLandmarkAnchors()
+        state.leaseStatus = 'held'
         await new Promise(resolve => { state.release = resolve; ready() })
       })
       state.lease.catch(failed)
-      try { await started } catch (error) { state.reason = error.message }
+      try { await started } catch (error) { state.leaseStatus = 'refused'; state.leaseError = error; state.reason = error.message }
       return state
     }, frame.views.map(view => view.id))
     const header = await handle.evaluate(state => ({
       snapshot: { ...state.snapshot, buffers: null }, currentMetadata: state.currentMetadata,
-      registeredAnchors: state.registeredAnchors, captures: state.captures, reason: state.reason,
+      registeredAnchors: state.registeredAnchors, captures: state.captures, reason: state.reason, leaseStatus: state.leaseStatus,
       files: Object.entries(state.snapshot.buffers ?? {}).flatMap(([primitiveId, buffers]) => Object.entries(buffers).map(([name, array]) => ({
         primitiveId, name, arrayType: array.constructor.name, byteLength: array.byteLength,
       }))),
     }))
-    const evidence = { snapshot: header.snapshot.status === 'captured' ? null : header.snapshot, currentMetadata: header.currentMetadata, registeredAnchors: header.registeredAnchors, captures: header.captures,
-      queries: [], collection: { status: 'collected', reason: header.reason, snapshotStatus: header.snapshot.status,
+    const evidence = { snapshot: header.snapshot.status === 'captured' && header.leaseStatus !== 'refused' ? null : header.snapshot, currentMetadata: header.currentMetadata, registeredAnchors: header.registeredAnchors, captures: header.captures,
+      queries: [], collection: { status: header.leaseStatus === 'refused' ? 'unavailable' : 'collected', reason: header.reason, snapshotStatus: header.snapshot.status,
         currentNativeDrawOnly: true, bufferCount: header.files.length, byteLength: 0, bufferReceipts: [] } }
-    if (header.snapshot.status !== 'captured' || header.reason) return evidence
+    if (header.snapshot.status !== 'captured' || header.leaseStatus === 'refused') return evidence
     const snapshot = { ...header.snapshot, buffers: {} }, files = []
     for (let index = 0; index < header.files.length; index++) {
       const descriptor = header.files[index], Type = ARRAY_TYPES[descriptor.arrayType]
@@ -221,7 +222,16 @@ export async function collectCurrentNativeEligibilityEvidence(page, frame, respo
     return evidence
   } finally {
     if (handle) {
-      try { await handle.evaluate(async state => { state.release?.(); await state.lease }) }
+      try {
+        await handle.evaluate(async state => {
+          state.release?.()
+          try { await state.lease } catch (error) {
+            // Only the already-recorded collection refusal is redundant here.
+            // New restoration failures still invalidate a successful collection.
+            if (state.leaseStatus !== 'refused' || error !== state.leaseError) throw error
+          }
+        })
+      }
       finally { await handle.dispose(); await rm(directory, { recursive: true, force: true }) }
     } else await rm(directory, { recursive: true, force: true })
   }

@@ -89,7 +89,7 @@ function fixture() {
   const projection = { metadata, anchor: { id: 'apex', partPath: 'native/marker', partLocalMetres: [0, 0, 0] }, capture: {
     method: 'gpu-readback', visibilityMode: 'depth-off-landmark-projection', status: 'captured', sourceOpacity: 1, viewId: 'measured',
     timeSeconds: 1, presentation: 'native', resolvedImagePlaneWarp: null, sourceAssembly: { kind: 'operating' }, sourceLayout: [],
-    nativeViewportBackingPixels: [101, 101], destinationCellSourcePixels: [1920 / 101, 1080 / 101], landmarks: [{ id: 'apex',
+    nativeViewportBackingPixels: null, destinationCellSourcePixels: [1920 / 101, 1080 / 101], landmarks: [{ id: 'apex',
       partPath: 'native/marker', runtimeTemplatePartPath: null, state: 'rendered', worldMetres: [0, 0, -1], worldReason: null,
       sourcePixels: [960, 540], canvasPixels: [50.5, 50.5], uncertaintySourcePixels: 0.4, uncertaintyCanvasPixels: 0.5, reason: null }] } }
   const target = { primitiveId: id, exactLocalPosition: [0, 0, 0], nativeStageBackingPixel: [50, 50] }
@@ -166,6 +166,51 @@ test('positive current CPU/class/GPU association remains unresolved without an i
   assert.equal(result.measurements.projection, input.projection)
   assert.deepEqual(result.measurements.projection.capture.landmarks[0].sourcePixels, [960, 540])
   assert.equal(result.measurements.projection.capture.landmarks[0].uncertaintySourcePixels, 0.4)
+})
+
+test('producer-shaped unwarped and warped captures reach CPU/GPU association without granting source qualification', async () => {
+  for (const presentation of ['native', 'horizontal-mirror']) {
+    for (const warped of [false, true]) {
+      const input = fixture(), draw = input.currentMetadata.draw, capture = input.projection.capture
+      draw.presentation = capture.presentation = presentation
+      if (warped) {
+        draw.imagePlaneWarp = { kind: 'homography', unwarpedViewportPixels: [100.25, 100.75],
+          renderToSourcePixels: [1, 0, 0, 0, 1, 0, 0, 0, 1] }
+        capture.resolvedImagePlaneWarp = structuredClone(draw.imagePlaneWarp)
+        capture.nativeViewportBackingPixels = draw.imagePlaneWarp.unwarpedViewportPixels.map(Math.ceil)
+      }
+      const result = await joinNativeLandmarkEligibility(input)
+      assert.equal(result.state, 'unresolved')
+      assert.deepEqual(result.reasons, ['independent-gpu-rounding-bound-not-supplied', 'independent-gpu-vertex-residual-bound-not-supplied'])
+      assert.equal(result.cpuGeometricResidualMetres, 0)
+      assert.equal(result.sourceProof, false)
+      assert.equal(result.sourceAcceptance, false)
+      assert.equal(result.measurements.projection, input.projection)
+    }
+  }
+})
+
+test('mismatched or absent viewport backing and image-plane identity fail closed before CPU/GPU association', async () => {
+  for (const warped of [false, true]) {
+    for (const backing of warped ? [[100, 101], [101, 100], null, undefined] : [[101, 101], undefined]) {
+      const input = fixture(), draw = input.currentMetadata.draw, capture = input.projection.capture
+      if (warped) {
+        draw.imagePlaneWarp = { kind: 'homography', unwarpedViewportPixels: [100.25, 100.75],
+          renderToSourcePixels: [1, 0, 0, 0, 1, 0, 0, 0, 1] }
+        capture.resolvedImagePlaneWarp = structuredClone(draw.imagePlaneWarp)
+      }
+      capture.nativeViewportBackingPixels = backing
+      const result = await joinNativeLandmarkEligibility(input)
+      assert.equal(result.state, 'unresolved')
+      assert.deepEqual(result.reasons, ['projection-current-draw-identity-mismatch'])
+      assert.equal(result.cpuGeometricResidualMetres, null)
+      assert.equal(result.measurements.projection, input.projection)
+    }
+  }
+  const input = fixture()
+  input.projection.capture.resolvedImagePlaneWarp = { kind: 'homography', unwarpedViewportPixels: [101, 101],
+    renderToSourcePixels: [1, 0, 0, 0, 1, 0, 0, 0, 1] }
+  assert.deepEqual((await joinNativeLandmarkEligibility(input)).reasons, ['projection-current-draw-identity-mismatch'])
 })
 
 test('bounded consumer control accepts every incident class triangle, not only the requested triangle, and keeps the 1e-7 budget', async () => {

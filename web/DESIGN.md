@@ -519,6 +519,12 @@ not two aliases of an application clock. Seeking, buffering or unavailable media
 cannot provide timing evidence. Check deterministic seek/follow behavior and
 pause/manual/resume transitions against the actual rendered scene.
 
+Playback receipts cover every source view that contributes native colour and
+require at least one current completed draw. A zero-opacity crossfade layer has
+no draw receipt; any positive opacity still requires fresh pose, clock and shared
+revision evidence. Failed playback remains failed even if a later real native
+seek establishes the strictly paused state needed for independent measurements.
+
 Paused exploration must permit orbit, pan, zoom and mechanism operation without
 advancing the source video. Compact mode retains the same visible usable player
 at least 200 by 200 pixels, with advancing audio and working pause/resume controls.
