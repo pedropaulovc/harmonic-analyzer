@@ -4,7 +4,7 @@ ch-rocker-arm-tl-c-stop-bar:
   number: MHA-CH-006-TL-09
   material: AISI O1 tool steel
   material_specification: AISI O1 precision-ground flat stock, 1/2 x 1/2 in (Abrams 102060)
-  finish: hardened and tempered to 58-62 HRC (torch heat, oil quench)
+  finish: hardened and tempered to 58-62 HRC
   quantity: 1
   tolerance_class: machined_block
   process: "saw and mill to length; drill and counterbore; break edges; harden and temper; lap top and bottom"
