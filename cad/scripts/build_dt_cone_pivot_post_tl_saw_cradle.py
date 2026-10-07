@@ -16,10 +16,11 @@ runs from a touchable edge):
 * seats: one Right-plane circle cut through both saddles. A construction
   witness from its centre to its lowest point carries the seat-bottom
   height, so the print measures the touchable seat line, not the axis;
-* pad: a Front-plane land under the cone axis, up to the seat-bottom height,
-  added after the seat cut so the cut never grazes it;
-* relief: one Right-plane cut trims the saddles and the pad to the saddle
-  width, measured from the base side face;
+* pad: a Top-plane land under the cone cap, up to the seat-bottom height,
+  added after the seat cut so the cut never grazes it; its ends stop short
+  of the bridge studs;
+* relief: one Right-plane cut trims the saddles to the saddle width,
+  measured from the base side face;
 * stud taps: one native 3/8-16 Hole Wizard feature through the base.
 
 Run (SolidWorks already open)::
@@ -76,6 +77,8 @@ from dt_cone_pivot_post_tl_saw_cradle_spec import (
     PAD_HT,
     PAD_X0,
     PAD_X1,
+    PAD_Z0,
+    PAD_Z1,
     SADDLE_Z,
     SEAT_BOTTOM_Y,
     SEAT_CENTRE_Y,
@@ -103,7 +106,7 @@ _RELIEF_OVERRUN = 5.0
 _RELIEF_TOP = OVERALL_HT + 6.0
 
 _SADDLE_LENGTH = (HEAD_SADDLE_X[1] - HEAD_SADDLE_X[0]) + (FOOT_SADDLE_X[1] - FOOT_SADDLE_X[0])
-_PAD_WIDTH = PAD_X1 - PAD_X0
+_PAD_AREA = (PAD_X1 - PAD_X0) * (PAD_Z1 - PAD_Z0)
 _TRIMMED_Z = BASE_WIDTH - (SADDLE_Z[1] - SADDLE_Z[0])
 V_BASE = BASE_LENGTH * BASE_WIDTH * BASE_HT
 V_SADDLES = V_BASE + _SADDLE_LENGTH * (OVERALL_HT - BASE_HT) * BASE_WIDTH
@@ -117,11 +120,10 @@ def _seat_segment_area() -> float:
 
 
 V_SEATED = V_SADDLES - _seat_segment_area() * _SADDLE_LENGTH
-V_PADDED = V_SEATED + _PAD_WIDTH * (PAD_HT - BASE_HT) * BASE_WIDTH
-# The seats lie inside the saddle width, so the relief never reaches them.
-V_RELIEVED = V_PADDED - _TRIMMED_Z * (
-    _SADDLE_LENGTH * (OVERALL_HT - BASE_HT) + _PAD_WIDTH * (PAD_HT - BASE_HT)
-)
+V_PADDED = V_SEATED + _PAD_AREA * (PAD_HT - BASE_HT)
+# The seats and the pad lie inside the saddle width, so the relief never
+# reaches them.
+V_RELIEVED = V_PADDED - _TRIMMED_Z * _SADDLE_LENGTH * (OVERALL_HT - BASE_HT)
 
 
 def _require_one_solid_body(adapter, *, label: str) -> None:
@@ -208,25 +210,30 @@ async def _saddle_profile(adapter, dims: SketchDims) -> None:
 
 
 async def _pad_profile(adapter, dims: SketchDims) -> None:
-    """The cap pad land on the underside line (Front sketch = model XY)."""
+    """The cap pad's plan (Top sketch (u, v) = model (X, -Z)).
+
+    Lines run from the near-end, head-side corner, so ``lines[0].start`` is
+    (PadX0, PadZ0), ``lines[1].start`` (PadX1, PadZ0) and ``lines[3].start``
+    (PadX0, PadZ1): every station runs from the origin corner, the X stations
+    to the end nearer the view's top edge and the Z stations to the head side.
+    """
     pad = await _rectangle(
         adapter,
-        [(PAD_X0, 0.0), (PAD_X1, 0.0), (PAD_X1, PAD_HT), (PAD_X0, PAD_HT)],
+        [(PAD_X0, -PAD_Z0), (PAD_X1, -PAD_Z0), (PAD_X1, -PAD_Z1), (PAD_X0, -PAD_Z1)],
         "cap pad",
     )
-    await _dimension(adapter, dims, f"{pad[3]}.start", "horizontal_distance",
+    await _dimension(adapter, dims, f"{pad[0]}.start", "horizontal_distance",
                      PAD_X0, "PadX0", '"PadX0"')
-    # Flush with the seat bottoms by construction; the print states it.
-    await _dimension(adapter, dims, f"{pad[3]}.start", "vertical_distance",
-                     PAD_HT, "PadHt", '"SeatBottomHt"')
-    await _dimension(adapter, dims, f"{pad[2]}.start", "horizontal_distance",
+    await _dimension(adapter, dims, f"{pad[0]}.start", "vertical_distance",
+                     PAD_Z0, "PadZ0", '"PadZ0"')
+    await _dimension(adapter, dims, f"{pad[1]}.start", "horizontal_distance",
                      PAD_X1, "PadX1", '"PadX1"')
-    await _relate(adapter, f"{pad[0]}.start", "origin", "horizontal_points",
-                  "cap pad on the underside line")
+    await _dimension(adapter, dims, f"{pad[3]}.start", "vertical_distance",
+                     PAD_Z1, "PadZ1", '"PadZ1"')
 
 
 async def _relief_profile(adapter, dims: SketchDims) -> None:
-    """Trim the saddles and pad to the saddle width (Right sketch (u, v) =
+    """Trim the saddles to the saddle width (Right sketch (u, v) =
     model (-Z, Y)), measured to the base-top corners from the origin corner."""
     near = await _rectangle(
         adapter,
@@ -327,6 +334,8 @@ async def build(adapter) -> dict[str, str]:
         ("SeatDia", SEAT_DIA),
         ("PadX0", PAD_X0),
         ("PadX1", PAD_X1),
+        ("PadZ0", PAD_Z0),
+        ("PadZ1", PAD_Z1),
         ("StudX", STUD_X),
         ("StudNearZ", STUD_Z[0]),
         ("StudFarZ", STUD_Z[1]),
@@ -380,10 +389,13 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "Seats")
     await volume_check(adapter, "seats", V_SEATED, 0.005 * V_SEATED)
 
-    drive_jobs += await _sketch_feature(adapter, "Front", "cap pad", _pad_profile, "PadProfile")
-    check("extrude pad", await adapter.create_extrusion(ExtrusionParameters(depth=BASE_WIDTH)))
+    # The pad rises from the underside plane; it is flush with the seat
+    # bottoms by construction (its height is driven by theirs) and the print
+    # states it in a note.
+    drive_jobs += await _sketch_feature(adapter, "Top", "cap pad", _pad_profile, "PadProfile")
+    check("extrude pad", await adapter.create_extrusion(ExtrusionParameters(depth=PAD_HT)))
     name_last_feature(adapter, "Pad")
-    drive_jobs.append((name_dimensions(adapter, "Pad", ["PadDepth"])[0], '"BaseWidth"'))
+    drive_jobs.append((name_dimensions(adapter, "Pad", ["PadHt"])[0], '"SeatBottomHt"'))
     await volume_check(adapter, "pad", V_PADDED, 0.005 * V_PADDED)
 
     drive_jobs += await _sketch_feature(

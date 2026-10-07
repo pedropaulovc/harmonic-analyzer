@@ -48,6 +48,17 @@ def test_head_saddle_fits_between_the_head_shoulder_and_the_cone_boss() -> None:
     assert head[1] <= spec.HEAD_GAP_MIN
 
 
+def test_bridge_studs_clear_the_pad_at_print_worst() -> None:
+    """A drawing-compliant pad never fouls a bridge stud's thread: the pad's
+    longest print against each stud's one-place station band."""
+    features = _features()
+    pad_half = features["cap_pad"]["length"][1] / 2.0
+    stud_r = spec.THREAD_MAJOR_MM[spec.STUD_THREAD] / 2.0
+    for name in ("stud_tap_near", "stud_tap_far"):
+        offset = abs(features[name]["at"][2] - features["cap_pad"]["at"][2]) - 0.8
+        assert offset - pad_half - stud_r >= spec.WALL_FLOOR_MM
+
+
 def test_cradle_is_one_piece() -> None:
     """No component definition exists for a built-up cradle, so the export
     must not let prechips plan one."""

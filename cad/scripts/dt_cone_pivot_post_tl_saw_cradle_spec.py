@@ -76,14 +76,18 @@ SEAT_Z = POST_AXIS_Z
 # --- North-cap pad -------------------------------------------------------------
 # The cone boss is BLOCK_DIA long (post.CONE_BOSS_LENGTH), so its cap lies in
 # the body's tangent plane: the pad top is flush with the seat bottoms.
-# The pad is a land across the cone axis, trimmed to the saddles' width by the
-# same cut, so its two X faces locate it; it leaves a quarter-inch cutter
-# room on either side.
+# The pad is a land on the cone axis under the cap. Its X faces leave a
+# quarter-inch cutter room to either saddle; its Z ends stop short of the
+# bridge studs, and its length covers the largest printed cap at the post's
+# worst float in the seat (checked below).
 PAD_WIDTH = 8.0
+PAD_LENGTH = 28.0
 PAD_X = CONE_AXIS_X
 PAD_X0 = PAD_X - PAD_WIDTH / 2.0
 PAD_X1 = PAD_X + PAD_WIDTH / 2.0
 PAD_Z = POST_AXIS_Z
+PAD_Z0 = PAD_Z - PAD_LENGTH / 2.0
+PAD_Z1 = PAD_Z + PAD_LENGTH / 2.0
 PAD_HT = SEAT_BOTTOM_Y
 if abs(post.CONE_BOSS_LENGTH - post.BLOCK_DIA) > 1e-9:
     raise AssertionError("the cone cap no longer lies in the post body's tangent plane")
@@ -148,6 +152,47 @@ STUD_BODY_CLEARANCE_WORST = (
 if STUD_BODY_CLEARANCE_WORST <= 0.0:
     raise AssertionError("a bridge stud can touch the post body")
 
+
+def _stud_raised_clearance_worst() -> float:
+    """Narrowest gap from a bridge stud's thread to the saddles or the pad.
+
+    Each gap is measured in plan (X, Z) from the stud axis to the raised
+    block's nearest face; both the stud station and the face take their
+    one-place band, so each axis gap shrinks by two bands.
+    """
+    raised = (
+        (HEAD_SADDLE_X, SADDLE_Z),
+        (FOOT_SADDLE_X, SADDLE_Z),
+        ((PAD_X0, PAD_X1), (PAD_Z0, PAD_Z1)),
+    )
+    worst = math.inf
+    for z in STUD_Z:
+        for (x0, x1), (z0, z1) in raised:
+            dx = max(x0 - STUD_X, 0.0, STUD_X - x1)
+            dz = max(z0 - z, 0.0, z - z1)
+            dx = max(dx - 2.0 * _ROW1, 0.0) if dx > 0.0 else 0.0
+            dz = max(dz - 2.0 * _ROW1, 0.0) if dz > 0.0 else 0.0
+            worst = min(worst, math.hypot(dx, dz) - THREAD_MAJOR_MM[STUD_THREAD] / 2.0)
+    return worst
+
+
+STUD_RAISED_CLEARANCE_WORST = _stud_raised_clearance_worst()
+if STUD_RAISED_CLEARANCE_WORST < WALL_FLOOR_MM:
+    raise AssertionError(
+        f"a bridge stud stands {STUD_RAISED_CLEARANCE_WORST:.3f} from a saddle or the pad"
+    )
+
+# The pad still carries the whole cap with the post at its worst float: the
+# largest printed boss at the seat's widest float about the pad's narrowest
+# print.
+_CAP_RADIUS_MAX = limits(post.CONE_BOSS_DIA, post.DRAWING_PRECISION_BY_NAME["ConeBossDia"])[1] / 2.0
+_POST_FLOAT_MAX = (limits(SEAT_DIA, SEAT_PLACES)[1] - limits(post.BLOCK_DIA, 1)[0]) / 2.0
+PAD_CAP_COVER_WORST = (
+    (PAD_LENGTH / 2.0 - 2.0 * _ROW1) - (_CAP_RADIUS_MAX + _POST_FLOAT_MAX + _ROW1)
+)
+if PAD_CAP_COVER_WORST < 0.0:
+    raise AssertionError("the cone cap can overhang the pad")
+
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BaseProfile": {"BaseLength", "BaseWidth"},
     "Base": {"BaseHt"},
@@ -158,7 +203,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FootSaddleX1",
         "OverallHt",
     },
-    "PadProfile": {"PadX0", "PadX1"},
+    "PadProfile": {"PadX0", "PadX1", "PadZ0", "PadZ1"},
     "ReliefProfile": {"SaddleZ0", "SaddleZ1"},
     "SeatProfile": {"SeatZ", "SeatBottomHt", "SeatDia"},
     "StudTaps": {"StudX", "StudNearZ", "StudFarZ"},
@@ -173,7 +218,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FootSaddleX1": SADDLE_X_PLACES,
         "OverallHt": 1,
     },
-    "PadProfile": {"PadX0": 1, "PadX1": 1},
+    "PadProfile": {"PadX0": 1, "PadX1": 1, "PadZ0": 1, "PadZ1": 1},
     "ReliefProfile": {"SaddleZ0": 1, "SaddleZ1": 1},
     "SeatProfile": {"SeatZ": 1, "SeatBottomHt": 1, "SeatDia": SEAT_PLACES},
     "StudTaps": {"StudX": 1, "StudNearZ": 1, "StudFarZ": 1},
@@ -267,8 +312,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             ),
             "width_nominal": (PAD_WIDTH, ("PAD_WIDTH",)),
             "length": (
-                [SADDLE_Z[1] - SADDLE_Z[0] - 2.0 * _ROW1, SADDLE_Z[1] - SADDLE_Z[0] + 2.0 * _ROW1],
-                ("SADDLE_Z",),
+                [PAD_LENGTH - 2.0 * _ROW1, PAD_LENGTH + 2.0 * _ROW1],
+                ("PAD_Z0", "PAD_Z1"),
             ),
             "station": (limits(PAD_X, 1), ("PAD_X", (_POST, "BORE_HEIGHT"))),
             "station_nominal": (PAD_X, ("PAD_X",)),

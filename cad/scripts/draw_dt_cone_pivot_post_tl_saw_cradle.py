@@ -48,6 +48,8 @@ from dt_cone_pivot_post_tl_saw_cradle_spec import (
     OVERALL_HT,
     PAD_X0,
     PAD_X1,
+    PAD_Z0,
+    PAD_Z1,
     SADDLE_Z,
     SEAT_CENTRE_Y,
     SEAT_Z,
@@ -65,7 +67,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 95 x 100 x 39 block: 1:2 leaves room for the six stacked stations above
+# A 95 x 100 x 39 block: 1:2 leaves room for the stacked stations above
 # the front view and keeps the right view clear of the title block.
 SHEET_SCALE = (1.0, 2.0)
 VIEW_SCALE = (1, 2)
@@ -103,16 +105,14 @@ def _right_x(model_z: float) -> float:
 
 
 _FRONT_TOP = _y(OVERALL_HT)
-# Stations above the front view, nearest first, each to a saddle or pad top
-# corner; the heights stack left of the end face.
+# Stations above the front view, nearest first, each to a saddle top corner;
+# the heights stack left of the end face.
 FRONT_KEEP = {
     name: (_x(station / 2.0), _FRONT_TOP + _GAP + index * _ROW)
     for index, (name, station) in enumerate(
         (
             ("HeadSaddleX0", HEAD_SADDLE_X[0]),
             ("HeadSaddleX1", HEAD_SADDLE_X[1]),
-            ("PadX0", PAD_X0),
-            ("PadX1", PAD_X1),
             ("FootSaddleX0", FOOT_SADDLE_X[0]),
             ("FootSaddleX1", FOOT_SADDLE_X[1]),
         )
@@ -122,14 +122,30 @@ FRONT_KEEP = {
     "OverallHt": (_x(0.0) - _GAP - 1.2 * _ROW, _y(OVERALL_HT / 2.0)),
 }
 _TOP_TOP = _top_y(0.0)
+# The pad's plan and the stud stations share the end-face baseline above the
+# view and the side-face baseline left of it, shortest nearest, leaving the
+# view's right side clear for the tap callout.
 TOP_KEEP = {
-    "StudX": (_x(STUD_X / 2.0), _TOP_TOP + _GAP),
-    "BaseLength": (_x(BASE_LENGTH / 2.0), _TOP_TOP + _GAP + _ROW),
-    # The across-base stations share the side-face baseline left of the view,
-    # leaving its right side clear for the tap callout.
-    "StudNearZ": (_x(0.0) - _GAP, _top_y(STUD_Z[0] / 2.0)),
-    "StudFarZ": (_x(0.0) - _GAP - 1.2 * _ROW, _top_y(STUD_Z[1] / 2.0)),
-    "BaseWidth": (_x(0.0) - _GAP - 2.4 * _ROW, TOP_CENTER[1]),
+    name: (_x(station / 2.0), _TOP_TOP + _GAP + index * _ROW)
+    for index, (name, station) in enumerate(
+        (
+            ("PadX0", PAD_X0),
+            ("StudX", STUD_X),
+            ("PadX1", PAD_X1),
+            ("BaseLength", BASE_LENGTH),
+        )
+    )
+} | {
+    name: (_x(0.0) - _GAP - 1.2 * index * _ROW, _top_y(station / 2.0))
+    for index, (name, station) in enumerate(
+        (
+            ("StudNearZ", STUD_Z[0]),
+            ("PadZ0", PAD_Z0),
+            ("PadZ1", PAD_Z1),
+            ("StudFarZ", STUD_Z[1]),
+            ("BaseWidth", BASE_WIDTH),
+        )
+    )
 }
 # A diameter leader runs radially from its text: below-left of the seat axis,
 # steeper than the saddle-top chord, it lands on the visible seat arc and
