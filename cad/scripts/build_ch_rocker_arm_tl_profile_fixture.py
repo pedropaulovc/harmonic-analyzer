@@ -247,18 +247,28 @@ def _require_rest_tops(adapter) -> None:
 # read back from the built faces, so neither table can publish a number the
 # CAD does not hold (codex review of PR 1252: schedule cells were only
 # formatted spec values). Faces are flat and sharp-cornered, so IFace2.GetBox
-# is the face itself; 0.0005 mm is half the finest printed place.
+# is the face itself; hole axes come from the exact ISurface.CylinderParams.
+# 0.0005 mm is half the finest printed place.
 _SCHEDULE_READBACK_TOL_MM = 0.0005
 
 
-def _horizontal_face_boxes(adapter) -> list[tuple[float, ...]]:
-    boxes = []
+def _schedule_faces(adapter) -> tuple[list[tuple[float, ...]], list[tuple[float, float, float]]]:
+    """The model's horizontal flat-face boxes and its vertical cylinders
+    (axis x, axis y, radius), all in mm."""
+    boxes, cylinders = [], []
     for body in _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ():
-        for face in _early_bound(body, "IBody2").GetFaces() or ():
-            box = tuple(float(value) * 1000.0 for value in _early_bound(face, "IFace2").GetBox())
+        for raw_face in _early_bound(body, "IBody2").GetFaces() or ():
+            face = _early_bound(raw_face, "IFace2")
+            surface = _early_bound(face.GetSurface(), "ISurface")
+            if surface.IsCylinder():
+                params = tuple(float(value) for value in surface.CylinderParams)
+                if abs(abs(params[5]) - 1.0) < 1e-9:
+                    cylinders.append((params[0] * 1000.0, params[1] * 1000.0, params[6] * 1000.0))
+                continue
+            box = tuple(float(value) * 1000.0 for value in face.GetBox())
             if abs(box[5] - box[2]) < 1e-6:
                 boxes.append(box)
-    return boxes
+    return boxes, cylinders
 
 
 def _require_face(boxes, label: str, z: float, cx: float, cy: float, length: float, width: float) -> None:
@@ -270,19 +280,31 @@ def _require_face(boxes, label: str, z: float, cx: float, cy: float, length: flo
         raise RuntimeError(f"{label}: no flat face {want} in the model, as the schedule prints")
 
 
-def _require_schedules(adapter) -> None:
-    """Every pocket row (centre, length, width, depth) and every bonded-part
-    row (length, width, height, centred in its pocket) of the printed
-    schedules is a face of the built model."""
-    boxes = _horizontal_face_boxes(adapter)
+def _require_hole(cylinders, label: str, cx: float, cy: float, dia: float) -> None:
+    want = (cx, cy, dia / 2.0)
+    if not any(
+        all(abs(a - b) <= _SCHEDULE_READBACK_TOL_MM for a, b in zip(cylinder, want, strict=True))
+        for cylinder in cylinders
+    ):
+        raise RuntimeError(f"{label}: no vertical bore {want} in the model, as the schedule prints")
+
+
+def _require_schedules(adapter, hole_dias: dict[str, float]) -> None:
+    """Every row of the printed schedules is geometry of the built model:
+    pocket floors (centre, length, width, depth), hole axes (centre, at the
+    cut diameter ``hole_dias`` gives per feature), and bonded-part tops and
+    undersides (length, width, height, centred in their pockets)."""
+    boxes, cylinders = _schedule_faces(adapter)
     pockets = {}
     for tag, feature, x, y, length, width, depth in FEATURE_SCHEDULE:
+        # A coordinate may carry its band ("133.067 ±0.015"): read the nominal.
+        cx, cy = (float(value.split()[0]) for value in (x, y))
         if not feature.endswith("POCKET"):
+            _require_hole(cylinders, f"{tag} {feature.lower()}", cx, cy, hole_dias[feature])
             continue
-        cx, cy, length_mm, width_mm = (float(value) for value in (x, y, length, width))
         pockets[tag] = (cx, cy)
         floor = PLATE_TOP_Z - float(depth)
-        _require_face(boxes, f"{tag} pocket floor", floor, cx, cy, length_mm, width_mm)
+        _require_face(boxes, f"{tag} pocket floor", floor, cx, cy, float(length), float(width))
     for tags, part, _stock, length, width, height in PART_SCHEDULE:
         if part == "HUB STAND":
             od = float(length.removeprefix("OD "))
@@ -408,7 +430,10 @@ async def build(adapter) -> dict[str, str]:
     removed = _circle_area(ROD_PIN_HOLE_DIA) * ROD_PIN_HOLE_DEPTH
     volume = await volume_check(adapter, "rod pin hole", volume - removed, 0.01 * removed)
 
-    # Native Hole Wizard holes, all cut before any bonded body exists.
+    # Native Hole Wizard holes, all cut before any bonded body exists. Every
+    # placement point is dimensioned to the origin (the scheduled centres), so
+    # the saved CAD carries them as driving dimensions (codex review of PR
+    # 1252); the pivot tap sits on the origin by a coincident relation.
     hold_down = wizard_holes(
         adapter,
         HOLD_DOWN_HOLE_SPEC,
@@ -417,6 +442,10 @@ async def build(adapter) -> dict[str, str]:
         "hold-down counterbores (1/2 socket head)",
         name="HoldDownHoles",
         expect_dia_mm=HOLD_DOWN_CLEARANCE_DIA,
+        placement_dims=[
+            ((f"HoldDown{index}X", None), (f"HoldDown{index}Y", None))
+            for index in range(1, len(HOLD_DOWN_POINTS) + 1)
+        ],
     )
     removed = len(HOLD_DOWN_POINTS) * (
         _circle_area(hold_down.cbore_dia_mm or HOLD_DOWN_CBORE_DIA) * HOLD_DOWN_CBORE_DEPTH
@@ -431,6 +460,10 @@ async def build(adapter) -> dict[str, str]:
         (0.0, 0.0, 1.0),
         "strap-clamp stud taps (3/8-16)",
         name="ClampStudTaps",
+        placement_dims=[
+            ((f"ClampStud{index}X", None), (f"ClampStud{index}Y", None))
+            for index in range(1, len(CLAMP_STUD_POINTS) + 1)
+        ],
     )
     removed = len(CLAMP_STUD_POINTS) * blind_hole_volume_mm3(
         studs.hole_dia_mm, CLAMP_STUD_SPEC.depth_mm
@@ -445,6 +478,7 @@ async def build(adapter) -> dict[str, str]:
         "pivot screw tap (#10-24)",
         name="PivotScrewTap",
         expect_dia_mm=PIVOT_TAP_DRILL_DIA,
+        placement_dims=[((None, None), (None, None))],
     )
     removed = blind_hole_volume_mm3(pivot_tap.hole_dia_mm, PIVOT_TAP_SPEC.depth_mm)
     volume = await volume_check(adapter, "pivot screw tap", volume - removed, 0.03 * removed)
@@ -519,7 +553,15 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "rebuilt fixture", volume, 0.001 * plate_volume)
     _require_bodies(adapter, BODY_COUNT, label="rebuilt fixture")
-    _require_schedules(adapter)
+    _require_schedules(
+        adapter,
+        {
+            "LOCATING BORE": LOCATING_BORE_DIA,
+            "ROD PIN HOLE": ROD_PIN_HOLE_DIA,
+            "HOLD-DOWN": hold_down.hole_dia_mm,
+            "STUD TAP": studs.hole_dia_mm,
+        },
+    )
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

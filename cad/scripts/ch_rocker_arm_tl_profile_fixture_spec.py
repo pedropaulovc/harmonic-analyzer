@@ -324,7 +324,12 @@ if (
 ROD_PIN_HOLE_DIA = 3.0
 ROD_PIN_HOLE_BAND = (0.010, 0.0)
 ROD_PIN_HOLE_DEPTH = 7.0
-ROD_PIN_HOLE_XY = (rocker.ROD_HOLE_X, rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y)
+# The rocker's rod hole from the pivot, at the schedule's three places: the
+# model, the print and the export carry one value (the rounding moves it under
+# 0.0005, against its +/-0.015 band).
+ROD_PIN_HOLE_XY = tuple(
+    round(value, 3) for value in (rocker.ROD_HOLE_X, rocker.ROD_HOLE_Y - rocker.PIVOT_MID_Y)
+)
 # The diamond pin turns the arm about the locating bore, so the ream's X and Y
 # from the bore axis are its direct functional dimensions. At the schedule's
 # .XXX (+/-0.13 a coordinate) it could wander over a circle of 0.37, wider than
@@ -349,11 +354,8 @@ if ROD_PIN_TIP_SWING_MAX > PARENT_BAND_SHARE * (
     rocker.TOP_EDGE_BAND[0] - rocker.TOP_EDGE_BAND[1]
 ):
     raise AssertionError("the rod-pin ream can swing the rod tip off its band")
-# The schedule's coordinates are typed text, not native dimensions, so the band
-# qualifies the printed three-place nominal, and the export carries exactly it.
-ROD_PIN_XY_NOMINAL = tuple(round(value, 3) for value in ROD_PIN_HOLE_XY)
 ROD_PIN_XY_PRINTED = tuple(
-    f"{value:.3f} \u00b1{ROD_PIN_XY_BAND[0]:.3f}" for value in ROD_PIN_XY_NOMINAL
+    f"{value:.3f} \u00b1{ROD_PIN_XY_BAND[0]:.3f}" for value in ROD_PIN_HOLE_XY
 )
 
 # --- Hold-down and clamp-stud holes ------------------------------------------------
@@ -724,15 +726,15 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             ),
             # X and Y of the ream from the locating-bore centre, as printed.
             "station": (
-                limits(ROD_PIN_XY_NOMINAL[0], 3, ROD_PIN_XY_BAND),
+                limits(ROD_PIN_HOLE_XY[0], 3, ROD_PIN_XY_BAND),
                 ("ROD_PIN_HOLE_XY", "ROD_PIN_XY_BAND", "PARENT_BAND_SHARE"),
             ),
-            "station_nominal": (ROD_PIN_XY_NOMINAL[0], ("ROD_PIN_HOLE_XY",)),
+            "station_nominal": (ROD_PIN_HOLE_XY[0], ("ROD_PIN_HOLE_XY",)),
             "height": (
-                limits(ROD_PIN_XY_NOMINAL[1], 3, ROD_PIN_XY_BAND),
+                limits(ROD_PIN_HOLE_XY[1], 3, ROD_PIN_XY_BAND),
                 ("ROD_PIN_HOLE_XY", "ROD_PIN_XY_BAND", "PARENT_BAND_SHARE"),
             ),
-            "height_nominal": (ROD_PIN_XY_NOMINAL[1], ("ROD_PIN_HOLE_XY",)),
+            "height_nominal": (ROD_PIN_HOLE_XY[1], ("ROD_PIN_HOLE_XY",)),
             "height_from": ("locating_bore", ("ROD_PIN_HOLE_XY",)),
             "axis": _DOWN,
             "dia": (
