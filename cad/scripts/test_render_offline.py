@@ -6,8 +6,11 @@ import importlib.metadata
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
+import sysconfig
+import venv
 from pathlib import Path
 
 import pytest
@@ -215,7 +218,7 @@ def test_stale_only_refreshes_align_without_launching_blender(
 
 
 def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
-    """The renderer's freshness gate must work in the env uv ACTUALLY gives it.
+    """The renderer's freshness gate must work in a real Pillow-only environment.
 
     `render_offline.py` carries PEP 723 metadata (`dependencies = ["pillow"]`), so
     `export_models` launching it with `uv run` gets an ephemeral pillow-only env --
@@ -223,9 +226,9 @@ def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
     which remote-cache RESTORE order makes meaningless) rejected current STLs and
     failed two v36 release attempts, while passing every in-venv test.
 
-    So drive `_stale` through `uv run --no-project --with pillow`, reproducing that
-    isolation, on an output written BEFORE its source -- exactly what a restore
-    leaves behind.
+    Drive `_stale` through uv in a fresh pip-free venv containing only the installed
+    Pillow artifact, with an empty private uv cache and no dependency resolution.
+    The output predates its source -- exactly what a restore leaves behind.
     """
     stl = tmp_path / "cone-gear--t102.STL"
     stl.write_bytes(b"solid restored\n")
@@ -234,15 +237,67 @@ def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
     os.utime(stl, (1_600_000_000, 1_600_000_000))
     assert stl.stat().st_mtime < src.stat().st_mtime
 
+    # Reuse only Pillow's declared installed artifact, never the project venv or
+    # an opportunistically warm uv cache. Native libraries and dist-info travel
+    # with the package; unsupported/escaping RECORD entries fail before launch.
+    pillow = importlib.metadata.distribution("pillow")
+    files = pillow.files
+    assert files, "installed Pillow has no RECORD file inventory"
+    metadata_roots = {
+        entry.parts[0]
+        for entry in files
+        if len(entry.parts) >= 2
+        and entry.parts[0].lower().startswith("pillow-")
+        and entry.parts[0].lower().endswith(".dist-info")
+    }
+    assert len(metadata_roots) == 1, "unsupported Pillow metadata layout"
+    installed_site = Path(pillow.locate_file("")).resolve()
+    isolated = tmp_path / "pillow-only environment"
+    venv.EnvBuilder(with_pip=False, system_site_packages=False).create(isolated)
+    site_packages = Path(sysconfig.get_path(
+        "purelib", scheme="venv",
+        vars={"base": str(isolated), "platbase": str(isolated)},
+    ))
+    assert site_packages.resolve().is_relative_to(isolated.resolve())
+    for entry in files:
+        relative = Path(str(entry))
+        assert (
+            relative.parts and not relative.is_absolute() and not relative.drive
+            and ".." not in relative.parts
+        ), f"escaping Pillow RECORD entry: {entry}"
+        assert (
+            relative.parts[0] == "PIL"
+            or relative.parts[0].lower() == "pillow.libs"
+            or relative.parts[0] in metadata_roots
+        ), f"unsupported Pillow artifact: {entry}"
+        source = Path(pillow.locate_file(entry))
+        assert source.resolve() == installed_site / relative, (
+            f"linked or escaping Pillow artifact: {entry}"
+        )
+        assert source.is_file(), f"missing Pillow artifact: {entry}"
+        target = site_packages / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+    python = isolated / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    uv_cache = tmp_path / "empty uv cache"
+    uv_cache.mkdir()
+
     driver = tmp_path / "drive.py"
     driver.write_text(
-        "import importlib.util, sys\n"
+        "import importlib.metadata, importlib.util, sys\n"
+        "from pathlib import Path\n"
+        f"assert Path(sys.prefix).resolve() == Path({str(isolated)!r}).resolve()\n"
+        "assert {d.metadata['Name'].lower() for d in "
+        "importlib.metadata.distributions()} == {'pillow'}\n"
+        "import PIL\n"
+        "assert Path(PIL.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())\n"
         "assert importlib.util.find_spec('solidworks_mcp') is None\n"
         f"spec = importlib.util.spec_from_file_location('ro', r'{MODULE_PATH}')\n"
         "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
         "assert 'dodo' not in sys.modules and 'export_models' not in sys.modules\n"
         f"m._stale(__import__('pathlib').Path(r'{stl}'), "
         f"__import__('pathlib').Path(r'{src}'), 'restored.STL')\n"
+        "assert 'dodo' not in sys.modules and 'export_models' not in sys.modules\n"
         "print('CURRENT')\n",
         encoding="utf-8",
     )
@@ -252,15 +307,16 @@ def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
     child_env.update(
         UV_OFFLINE="1", UV_PYTHON_DOWNLOADS="never", PYTHONNOUSERSITE="1",
         HARMONIC_TELEMETRY_DIR=str(tmp_path / "child telemetry"),
+        UV_CACHE_DIR=str(uv_cache), VIRTUAL_ENV=str(isolated),
         OTEL_EXPORTER_OTLP_ENDPOINT="",
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="",
         OTEL_EXPORTER_OTLP_LOGS_ENDPOINT="",
     )
-    pillow = f"pillow=={importlib.metadata.version('pillow')}"
+    # --active uses the owned local artifact without asking uv to resolve/install.
     process = subprocess.Popen(
         [
-            "uv", "run", "--no-project", "--no-config",
-            "--python", sys._base_executable, "--with", pillow, str(driver),
+            "uv", "run", "--no-project", "--no-config", "--active", "--no-sync",
+            "--python", str(python), str(driver),
         ],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         cwd=tmp_path, env=child_env,
