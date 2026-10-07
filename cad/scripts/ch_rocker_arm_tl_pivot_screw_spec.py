@@ -163,58 +163,49 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
 _ROCKER = "ch_rocker_arm_spec"
-# Head-to-shoulder runout (TIR), exported for prechips, not printed: the
-# route (shop-additions.md section 2) laps head and shoulder in one chucking,
-# goal 0.003, measured in V-blocks and recorded.
-HEAD_TO_SHOULDER_TIR_MAX = 0.01
+# One fact, one source: the print states a match fit and bracketed starting
+# sizes, so features.toml carries the printed fit sentences and reference
+# diameters. SHOULDER_BAND / HEAD_BAND above stay design intent for the
+# stack checks only and do not feed the export.
+SHOULDER_FIT_NOTE = (
+    "MATCH-FIT: LAP THE SHOULDER TO SLIDE FREELY WITHOUT SHAKE IN THE ROCKER"
+    " ARM PIVOT BORE AND THE PROFILE PLATE BORE"
+)
+HEAD_COAXIAL_NOTE = "HEAD COAXIAL WITH SHOULDER"
+if any(n not in " ".join(DRAWING_NOTES.splitlines()) for n in (SHOULDER_FIT_NOTE, HEAD_COAXIAL_NOTE)):
+    raise AssertionError("exported fit notes must be the printed sentences")
 
 EXPORT_FEATURES: dict[str, ExportFeature] = {
     "shoulder": ExportFeature(
         kind="boss",
         faces=(SURFACE_FINISHES[0].face,),
-        requirements=("dia", "finish_ra"),
+        requirements=("note", "finish_ra"),
         fields={
             "at": ([0.0, 0.0, SHOULDER_END_Z], ("SHOULDER_END_Z",)),
             "axis": _AXIS,
-            "dia": (
-                limits(SHOULDER_DIA, SHOULDER_PLACES, SHOULDER_BAND),
-                (
-                    "SHOULDER_DIA",
-                    "SHOULDER_BAND",
-                    (_ROCKER, "PIVOT_HOLE_DIA"),
-                    (_ROCKER, "PIVOT_HOLE_BAND"),
-                    "PLATE_BORE_LIMITS",
-                ),
-            ),
             "dia_nominal": (SHOULDER_DIA, ("SHOULDER_DIA",)),
             "length": (SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
             "finish_ra": (GROUND_UM, ("SURFACE_FINISHES",)),
-            "process": ("lap", ("SHOULDER_BAND",)),
+            "process": ("lap", ("DRAWING_NOTES",)),
+            "note": (SHOULDER_FIT_NOTE, ("SHOULDER_FIT_NOTE", "DRAWING_NOTES")),
         },
-        precision={"dia": SHOULDER_PLACES, "finish_ra": 1},
+        precision={"finish_ra": 1},
     ),
     "head": ExportFeature(
         kind="boss",
         faces=(CylinderFace(HEAD_DIA),),
-        requirements=("dia", "coaxiality_dia"),
+        requirements=("note", "finish_ra"),
         fields={
             "at": ([0.0, 0.0, UNDERHEAD_Z], ("UNDERHEAD_Z",)),
             "axis": _AXIS,
-            "dia": (
-                limits(HEAD_DIA, HEAD_PLACES, HEAD_BAND),
-                ("HEAD_DIA", "HEAD_BAND", "TEMPLATE_BUSH_BORE_LIMITS"),
-            ),
             "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
             "length": (limits(HEAD_LENGTH, 1), ("HEAD_LENGTH",)),
-            "process": ("lap", ("HEAD_BAND",)),
-            "coaxial_to": ("shoulder", ("SHOULDER_DIA",)),
-            "coaxiality_dia": (
-                HEAD_TO_SHOULDER_TIR_MAX,
-                ("HEAD_TO_SHOULDER_TIR_MAX",),
-            ),
-            "note": ("goal 0.003 TIR, measured and recorded", ("HEAD_TO_SHOULDER_TIR_MAX",)),
+            "finish_ra": (MACHINED_UM, ("SURFACE_FINISHES",)),
+            "process": ("lap", ("DRAWING_NOTES",)),
+            "coaxial_to": ("shoulder", ("DRAWING_NOTES",)),
+            "note": (HEAD_COAXIAL_NOTE, ("HEAD_COAXIAL_NOTE", "DRAWING_NOTES")),
         },
-        precision={"dia": HEAD_PLACES, "length": 1, "coaxiality_dia": 2},
+        precision={"length": 1, "finish_ra": 1},
     ),
     "underhead": ExportFeature(
         kind="face",

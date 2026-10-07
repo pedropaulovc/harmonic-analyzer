@@ -31,25 +31,36 @@ def test_every_marked_dimension_prints_once() -> None:
         assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
 
 
+def _band(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
+    return (round(nominal + band[1], 6), round(nominal + band[0], 6))
+
+
+SHOULDER = _band(screw.SHOULDER_DIA, screw.SHOULDER_BAND)
+HEAD = _band(screw.HEAD_DIA, screw.HEAD_BAND)
+
+
 def test_shoulder_slides_into_every_bore_a_the_rocker_allows() -> None:
-    shoulder = _features(SCREW)["shoulder"]["dia"]
     smallest_bore_a = rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1]
     largest_bore_a = rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[0]
-    assert round(smallest_bore_a - shoulder[1], 6) >= screw.LOCATING_CLEARANCE_MIN
+    assert round(smallest_bore_a - SHOULDER[1], 6) >= screw.LOCATING_CLEARANCE_MIN
     # The inventory's worst float in A: 0.045.
-    assert round(largest_bore_a - shoulder[0], 6) <= 0.045
+    assert round(largest_bore_a - SHOULDER[0], 6) <= 0.045
 
 
 def test_shoulder_fits_the_plate_bore_and_head_the_template_bush() -> None:
-    features = _features(SCREW)
-    assert round(screw.PLATE_BORE_LIMITS[0] - features["shoulder"]["dia"][1], 6) >= 0.010
-    assert features["head"]["dia"][1] <= screw.TEMPLATE_BUSH_BORE_LIMITS[0]
+    assert round(screw.PLATE_BORE_LIMITS[0] - SHOULDER[1], 6) >= 0.010
+    assert HEAD[1] <= screw.TEMPLATE_BUSH_BORE_LIMITS[0]
 
 
-def test_exported_locating_bands_are_the_printed_bands() -> None:
+def test_match_fit_diameters_export_what_the_print_says() -> None:
+    # One fact, one source: no hidden band behind a printed match fit.
     features = _features(SCREW)
-    assert features["shoulder"]["dia"] == [6.485, 6.49]
-    assert features["head"]["dia"] == [7.995, 8.0]
+    for key, nominal in (("shoulder", screw.SHOULDER_DIA), ("head", screw.HEAD_DIA)):
+        assert "dia" not in features[key]
+        assert features[key]["dia_nominal"] == nominal
+        assert "note" in features[key]["requirements"]
+    assert features["head"]["coaxial_to"] == "shoulder"
+    assert features["head"]["note"] in screw.DRAWING_NOTES
 
 
 def test_thread_engages_one_and_a_half_diameters_in_the_plate() -> None:
@@ -59,10 +70,8 @@ def test_thread_engages_one_and_a_half_diameters_in_the_plate() -> None:
 
 def test_washer_passes_the_shoulder_and_carries_the_head() -> None:
     bore = _features(WASHER)["bore"]["dia"]
-    shoulder = _features(SCREW)["shoulder"]["dia"]
-    head = _features(SCREW)["head"]["dia"]
-    assert bore[0] > shoulder[1]
-    assert bore[1] < head[0]
+    assert bore[0] > SHOULDER[1]
+    assert bore[1] < HEAD[0]
     assert washer.THICK == screw.UNDERHEAD_Z
 
 
