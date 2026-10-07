@@ -22,26 +22,28 @@ from _drawing_common import (
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimensions,
     stamp_drawing_summary,
     visible_view_entities,
 )
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
-from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_pmi import _face_geometry, _face_matches
 from _surface_finish import surface_finish_by_key
 from dt_cone_pivot_post_tl_bond_cradle_spec import (
     BODY_SADDLE_THICK,
     BODY_SADDLE_Y,
+    BODY_SEAT_CALLOUT,
     CONE_PIN_NEAR_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     SECTION_REFERENCE_SKETCHES,
     SURFACE_FINISHES,
     TAIL_SADDLE_Y,
+    TAIL_SEAT_CALLOUT,
     TAIL_SECTION_Y,
 )
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_pivot_post_tl_bond_cradle"]
 PART_STEM = SPEC.artifact_stem
@@ -114,19 +116,22 @@ ELEVATION_KEEP = {
     # In the gap between the foot stop and the body saddle, outside the
     # silhouette and beside the saddle it measures.
     "BodySaddleHeight": (0.0, 5.0, -22.0),
-    # Above the silhouette, beside the crank pin on its foot-B side.
-    "CrankPinHeight": (0.0, 64.0, -4.0),
+    # Pin tops from the post axis (the reference sketch's line at Z0): the
+    # dimension stands beside the crank pin on its foot-B side, its upper
+    # extension on the axis line, its lower on the pins' top edge.
+    "CrankPinFromAxis": (0.0, 62.0, -8.0),
     "TailSaddleHeight": (0.0, 130.0, -22.0),
 }
 # Each seat's profile sketch is parallel to its section, so the section
-# imports its diameter.
+# imports its diameter. Each seat is a matched fit: its diameter prints as a
+# reference size with its callout (the spec's *_SEAT_CALLOUT) in the clear
+# above the section, and its leader drops through the seat to the arc, as
+# B-B's does (run-13 review: A-A's callout sat inside the saddle). A-A's
+# leader lands on the arc's +X side, clear of the cone pin's top on -X and of
+# the finish symbol's landing; its callout reads ABOVE the value, the 40.0
+# under it.
 SECTION_A_KEEP = {
-    # Outside the part, above the saddle top on the -X side, between the
-    # 30.0's axis extension line and the saddle: the near-side leader meets
-    # the seat's circle 70 degrees off its bottom, and a short arc extension
-    # carries the seat up to it from the saddle-top corner (run-13 review:
-    # the callout sat inside the saddle).
-    "BodySeatDia": (-28.0, CONE_PIN_NEAR_Y, -10.0),
+    "BodySeatDia": (-8.0, CONE_PIN_NEAR_Y, 22.0),
     "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
     # Under the base; the tilt reads below it.
@@ -136,10 +141,13 @@ SECTION_A_KEEP = {
     # stay clear of the text (run-13 review); the caption drops clear of it
     # (CAPTION_DROP).
     "ConePinTilt": (7.5, CONE_PIN_NEAR_Y, -61.0),
-    "ConePinHighEdge": (-58.0, CONE_PIN_NEAR_Y, -25.0),
+    # Pin top from the post axis, along the pin: in the open seat on the
+    # line's -X side, above the saddle top.
+    "ConePinFromAxis": (-14.0, CONE_PIN_NEAR_Y, -6.0),
 }
+# B-B's callout reads below the value, above the finish symbol.
 SECTION_B_KEEP = {
-    "TailSeatDia": (12.0, TAIL_SECTION_Y, 28.0),
+    "TailSeatDia": (22.0, TAIL_SECTION_Y, 36.0),
     "TailSeatAxisX": (-20.0, TAIL_SECTION_Y, 12.0),
     "TailSeatAxisHeight": (-48.0, TAIL_SECTION_Y, -12.0),
 }
@@ -149,7 +157,8 @@ DIMENSION_CALLOUTS = {
     "SaddleSideX": "2X",
     "ConePinEntryX": "2X",
     "ConePinTilt": "2X",
-    "ConePinHighEdge": "2X",
+    "ConePinFromAxis": "2X",
+    "CrankPinFromAxis": "2X",
 }
 
 
@@ -300,21 +309,6 @@ def _seat_finish(adapter: Any, view: Any, key: str, face_y: float, *, label: str
     )
 
 
-def _seat_diameter_near_side(adapter: Any, annotations: list[Any], name: str) -> None:
-    """One arrow on the seat arc nearest the text; no line through the centre.
-
-    The default diameter leader ran from the text through the seat centre to
-    the far side, across the seat-axis dimensions that start there (run-9 to
-    12 sheets); the shared near-side style stops it at the arc it measures.
-    """
-    for raw in annotations:
-        annotation = _early_bound(raw, "IAnnotation")
-        if dimension_name(adapter, annotation) == name:
-            set_near_side_diameter(annotation, name)
-            return
-    raise RuntimeError(f"no imported {name} to give a near-side leader")
-
-
 def _lower_caption(adapter: Any, view: Any, drop: float) -> None:
     """Move a section's native caption down the sheet by ``drop`` metres,
     keeping its linked fields (``draw_fr_top_frame._position_view_caption``)."""
@@ -425,7 +419,13 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_b_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _seat_diameter_near_side(adapter, section_a_annotations, "BodySeatDia")
+    # Matched-fit seats (policy rule 2): the diameter is a reference size; the
+    # callout names the mate and states the acceptance.
+    set_reference_dimensions(adapter, annotations, ("BodySeatDia", "TailSeatDia"))
+    set_dimension_callouts(
+        adapter, section_a_annotations, {"BodySeatDia": BODY_SEAT_CALLOUT}, location="above"
+    )
+    set_dimension_callouts(adapter, section_b_annotations, {"TailSeatDia": TAIL_SEAT_CALLOUT})
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

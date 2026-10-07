@@ -10,10 +10,12 @@ profiles extruded mid-plane across X, so every height reads from the base
 top and every station from foot B. The two seats are mid-plane cuts on the
 post axis from planes square to it. The crank pins rise from a base-top
 plane; the cone pins run down the cone journal's tilt from the post's
-north-cap plane into the base. Three hidden reference sketches carry what the
-drawing prints from the base's west side face, foot B and the base top: the
-plan layout, the cone pin's section (tilt, hole entry, gauge height, body
-seat axis) and the tail seat axis.
+north-cap plane into the base. Four hidden reference sketches carry what the
+drawing prints from the base's west side face, foot B, the base top and the
+post axis: the plan layout, the crank pin tops from the post axis, the cone
+pin's section (tilt, hole entry, pin top from the post axis, body seat axis)
+and the tail seat axis. Each pin top's relation to the post axis carries its
+own band (the spec's *_PIN_FROM_AXIS_TOL).
 
 Run (SolidWorks already open)::
 
@@ -57,6 +59,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
 )
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -77,14 +80,15 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     CONE_PIN_ENTRY_S,
     CONE_PIN_ENTRY_X,
     CONE_PIN_FAR_Y,
-    CONE_PIN_HIGH_EDGE_HEIGHT,
-    CONE_PIN_HIGH_EDGE_X,
-    CONE_PIN_HIGH_EDGE_Z,
+    CONE_PIN_FROM_AXIS,
+    CONE_PIN_FROM_AXIS_TOL,
     CONE_PIN_LENGTH,
     CONE_PIN_NEAR_Y,
     CONE_PIN_TOP_S,
     CONE_PIN_TOP_X,
     CONE_PIN_TOP_Z,
+    CRANK_PIN_FROM_AXIS,
+    CRANK_PIN_FROM_AXIS_TOL,
     CRANK_PIN_HEIGHT,
     CRANK_PIN_X,
     CRANK_PIN_Y,
@@ -623,6 +627,42 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "PlanReference")
     drive_jobs += plan.apply(adapter, "PlanReference")
 
+    # Crank pin tops from the post axis (Right: u = model -Z, v = model Y):
+    # the axis from foot B to the crank station, then square down to the
+    # pins' top plane, one relation the elevation prints.
+    crank_ref = SketchDims()
+    check("create sketch CrankPinReference", await adapter.create_sketch("Right"))
+    axis_line, crank_drop = await add_line_chain(
+        adapter,
+        [(0.0, 0.0), (0.0, CRANK_PIN_Y), (CRANK_PIN_FROM_AXIS, CRANK_PIN_Y)],
+        close=False,
+    )
+    for line in (axis_line, crank_drop):
+        _as_construction(adapter, line)
+    await anchor_point_to_origin(adapter, f"{axis_line}.start", 0.0, 0.0, "post axis at foot B")
+    check("post axis vertical", await adapter.add_sketch_constraint(axis_line, None, "vertical"))
+    await dimension_between(
+        adapter, f"{axis_line}.start", f"{axis_line}.end", "vertical_distance", CRANK_PIN_Y, "crank station"
+    )
+    crank_ref.record("CrankAxisY")
+    check(
+        "crank pin drop horizontal",
+        await adapter.add_sketch_constraint(crank_drop, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{crank_drop}.start",
+        f"{crank_drop}.end",
+        "horizontal_distance",
+        CRANK_PIN_FROM_AXIS,
+        "crank pin top from axis",
+    )
+    crank_ref.record("CrankPinFromAxis")
+    await ensure_fully_defined(adapter, "CrankPinReference")
+    check("exit sketch CrankPinReference", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrankPinReference")
+    drive_jobs += crank_ref.apply(adapter, "CrankPinReference")
+
     async def _seat_axis_from_side(sketch_dims: SketchDims, which: str) -> str:
         """The west side W on the section plane (x = model X, y = model -Z)
         from the base top to its bottom, its top corner anchored to the seat
@@ -648,7 +688,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # Section through the near cone pin (a Top-parallel plane: x = model X,
     # y = model -Z): gauge line A-E dropping square from the hole's entry E on
     # the base top through the base, pin axis E-T at the journal tilt to the
-    # top centre T, and the top's radius T-H out to its high (-X) edge H. The
+    # top centre T, and on from T to the post axis O (the sketch origin): the
+    # pin axis runs through O, so O-T is the pin top from the post axis. The
     # tilt reads between the gauge line and the pin axis carried back through
     # E, under the base, clear of the seat.
     await _offset_plane(adapter, "ConePinSectionPlane", "Top Plane", CONE_PIN_NEAR_Y)
@@ -657,7 +698,7 @@ async def build(adapter: Any) -> dict[str, str]:
         (CONE_PIN_ENTRY_X, -BASE_TOP_Z + _GAUGE_LINE),
         entry,
         (CONE_PIN_TOP_X, -CONE_PIN_TOP_Z),
-        (CONE_PIN_HIGH_EDGE_X, -CONE_PIN_HIGH_EDGE_Z),
+        (0.0, 0.0),
     ]
     section = SketchDims()
     check(
@@ -665,8 +706,8 @@ async def build(adapter: Any) -> dict[str, str]:
         await adapter.create_sketch("ConePinSectionPlane"),
     )
     section_corner = await _seat_axis_from_side(section, "Body")
-    gauge, pin_axis, top_radius = await add_line_chain(adapter, chain, close=False)
-    for line in (gauge, pin_axis, top_radius):
+    gauge, pin_axis, to_axis = await add_line_chain(adapter, chain, close=False)
+    for line in (gauge, pin_axis, to_axis):
         _as_construction(adapter, line)
     check("gauge line vertical", await adapter.add_sketch_constraint(gauge, None, "vertical"))
     await dimension_between(
@@ -688,23 +729,16 @@ async def build(adapter: Any) -> dict[str, str]:
     section.record("ConePinGaugeLine")
     _add_driving_tilt(adapter, gauge, pin_axis, entry, label="cone pin tilt")
     section.record("ConePinTilt")
-    check(
-        "pin top square to its axis",
-        await adapter.add_sketch_constraint(pin_axis, top_radius, "perpendicular"),
-    )
-    await dimension_between(
-        adapter, f"{top_radius}.start", f"{top_radius}.end", "distance", PIN_RADIUS, "pin top radius"
-    )
-    section.record("ConePinTopRadius")
+    await anchor_point_to_origin(adapter, f"{to_axis}.end", 0.0, 0.0, "cone pin top to post axis")
     await dimension_between(
         adapter,
-        f"{gauge}.end",
-        f"{top_radius}.end",
-        "vertical_distance",
-        CONE_PIN_HIGH_EDGE_HEIGHT,
-        "cone pin high edge",
+        f"{to_axis}.start",
+        f"{to_axis}.end",
+        "distance",
+        CONE_PIN_FROM_AXIS,
+        "cone pin top from axis",
     )
-    section.record("ConePinHighEdge")
+    section.record("ConePinFromAxis")
     await ensure_fully_defined(adapter, "ConePinSectionReference")
     check("exit sketch ConePinSectionReference", await adapter.exit_sketch())
     name_last_feature(adapter, "ConePinSectionReference")
@@ -732,6 +766,14 @@ async def build(adapter: Any) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
+    # The pin tops' own bands, the fixture's share of the post bands they set
+    # (derivation in the spec's *_PIN_FROM_AXIS_TOL).
+    set_dimension_symmetric_tolerance(
+        adapter, "CrankPinReference", "CrankPinFromAxis", CRANK_PIN_FROM_AXIS_TOL
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "ConePinSectionReference", "ConePinFromAxis", CONE_PIN_FROM_AXIS_TOL
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

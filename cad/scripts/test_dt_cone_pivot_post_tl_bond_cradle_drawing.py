@@ -55,15 +55,47 @@ def test_seats_take_the_post_body_and_its_raw_tail_on_one_axis() -> None:
     assert spec.BLOCK_TOP_Z > -spec.TAIL_SEAT_DIA / 2.0 > spec.BASE_TOP_Z
 
 
+def test_seats_are_matched_fits_without_a_hidden_diameter_band() -> None:
+    features = _features()
+    for key, callout in (
+        ("body_seat", drawing.BODY_SEAT_CALLOUT),
+        ("tail_seat", drawing.TAIL_SEAT_CALLOUT),
+    ):
+        seat = features[key]
+        # The callout prints as the exported fit note; no diameter limits
+        # ride behind the reference size.
+        assert "dia" not in seat
+        assert "note" in seat["requirements"]
+        assert seat["note"] == callout
+        flat = " ".join(callout.split())
+        assert f"{spec.POST_NUMBER} CONE PIVOT POST" in flat
+        assert "WITHOUT SHAKE" in flat
+
+
+def test_pin_tops_print_from_the_post_axis_within_a_quarter_of_the_post_band() -> None:
+    features = _features()
+    crank_band = 0.51  # CrankBossStartZ at .XX
+    cone_band = 0.51 / 2.0  # the north cap: half the .XX ConeBossLen
+    for name, nominal, post_band in (
+        ("crank_pin_west", post.CRANK_BOSS_NORTH_FACE, crank_band),
+        ("crank_pin_east", post.CRANK_BOSS_NORTH_FACE, crank_band),
+        ("cone_pin_near", post.CONE_BOSS_LENGTH / 2.0, cone_band),
+        ("cone_pin_far", post.CONE_BOSS_LENGTH / 2.0, cone_band),
+    ):
+        pin = features[name]
+        # One relation to the seat axis, no chain through the base top.
+        assert pin["height_from"] == "body_seat"
+        low, high = pin["height"]
+        assert math.isclose(pin["height_nominal"], nominal)
+        assert math.isclose((low + high) / 2.0, nominal)
+        assert 0.0 < (high - low) / 2.0 <= 0.25 * post_band + 1e-12
+
+
 def test_crank_pins_carry_the_crank_sleeve_north_face() -> None:
     for name in ("crank_pin_west", "crank_pin_east"):
         pin = _features()[name]
-        top = pin["at"][2]
-        assert math.isclose(top, -post.CRANK_BOSS_NORTH_FACE)
+        assert math.isclose(pin["at"][2], -post.CRANK_BOSS_NORTH_FACE)
         assert math.isclose(pin["at"][1], post.CRANK_BORE_HEIGHT)
-        assert round(top - spec.BASE_TOP_Z, 2) == 8.62
-        low, high = pin["height"]
-        assert low <= top - spec.BASE_TOP_Z <= high
 
 
 def test_cone_pin_tops_lie_in_the_north_cap_plane_square_to_the_journal() -> None:
@@ -78,21 +110,3 @@ def test_cone_pin_tops_lie_in_the_north_cap_plane_square_to_the_journal() -> Non
             for a, n in zip(pin["axis"], cap.normal, strict=True)
         )
         assert abs(pin["at"][1] - post.BORE_HEIGHT) == spec.CONE_PIN_OFFSET
-        # The gauge reads the high (-X) edge.
-        assert round(pin["height_nominal"], 2) == 9.93
-        assert round(spec.CONE_PIN_CENTRE_HEIGHT, 2) == 9.49
-
-
-def test_exported_pin_heights_are_the_printed_bands() -> None:
-    features = _features()
-    for name, nominal, places in (
-        ("crank_pin_east", spec.CRANK_PIN_HEIGHT, spec.DRAWING_PRECISION_BY_NAME["CrankPinHeight"]),
-        (
-            "cone_pin_near",
-            spec.CONE_PIN_HIGH_EDGE_HEIGHT,
-            spec.DRAWING_PRECISION_BY_NAME["ConePinHighEdge"],
-        ),
-    ):
-        low, high = features[name]["height"]
-        assert low < round(nominal, places) < high
-        assert features[name]["precision"]["height"] == places

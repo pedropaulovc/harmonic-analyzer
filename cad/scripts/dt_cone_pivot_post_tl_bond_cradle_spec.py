@@ -11,17 +11,20 @@ Frame: the cone pivot post's model frame R0, unchanged (make-data section 1.2:
 the cradle frame IS the post frame, so a prechips pose of the post in the
 cradle is the identity). Post axis +Y through X0 Z0 with foot B, the
 foot-stop face, at Y0; crank socket axis +Z (up). The base top is at Z -30
-and the base bottom at Z -40. Every height prints from the base top and every
-station along the post from foot B.
+and the base bottom at Z -40. Block heights and the seat axes print from the
+base top, every station along the post from foot B, and every pin top from
+the post axis: a pin top sets a sleeve face against that axis.
 """
 
 from __future__ import annotations
 
 import math
 
+import _config
 import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
+from _printed_tolerance import printed_band_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 
 # Base plate, foot stop and the two saddles (inventory cone-bond-cradle rows).
@@ -41,12 +44,22 @@ TAIL_SADDLE_Y = 100.0
 TAIL_SADDLE_THICK = 20.0
 
 # Seats: on the post axis, SEAT_AXIS_HEIGHT above the base top. The body seat
-# is the post's turned body; the tail seat carries the raw bar the tail is
-# left at (cone-plan stock component "body", dia_mm 44.45).
+# takes the post's turned body; the tail seat the raw bar the tail is left at
+# (cone-plan stock component "body", dia_mm 44.45). Both are MATCHED FITS
+# (policy rule 2): the body prints at .X (+/-0.8) on the post and the bar
+# carries mill tolerance, so no printed seat band can take the actual post
+# without either rejecting it or letting it shake, and with it the axis the
+# pins work from. Each seat is bored to suit its identified mate; the
+# diameter is a reference size and the callout's acceptance defines the fit.
 SEAT_AXIS_HEIGHT = -BASE_TOP_Z
 BODY_SEAT_DIA = post.BLOCK_DIA
 TAIL_SEAT_DIA = 44.45
+POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
+BODY_SEAT_CALLOUT = f"BORE TO SUIT\n{POST_NUMBER} CONE\nPIVOT POST BODY:\nBEDS WITHOUT SHAKE"
+TAIL_SEAT_CALLOUT = f"BORE TO SUIT\n{POST_NUMBER} CONE\nPIVOT POST TAIL:\nBEDS WITHOUT SHAKE"
 SEAT_OVERRUN = 1.0  # each seat cut runs past both saddle faces
+# The bed under a NOMINAL body; a matched seat moves it with the body, never
+# the axis.
 BED_HEIGHT = BASE_THICK + SEAT_AXIS_HEIGHT - BODY_SEAT_DIA / 2.0
 if abs(BED_HEIGHT - 18.9945) > 1e-9:
     raise AssertionError("body seat bed height left the inventory's 18.9945")
@@ -87,7 +100,7 @@ CONE_PIN_BOTTOM_S = CONE_PIN_TOP_S - CONE_PIN_LENGTH
 # Where the pin axis enters the base top: the reamed hole's position.
 CONE_PIN_ENTRY_S = BASE_TOP_Z / math.cos(_INCLINE)
 CONE_PIN_ENTRY_X = CONE_PIN_ENTRY_S * math.sin(_INCLINE)
-# The high (-X) edge of the tilted top, where the height gauge reads it.
+# The high (-X) edge of the tilted top (the inventory's gauge station).
 CONE_PIN_HIGH_EDGE_X = CONE_PIN_TOP_X - PIN_RADIUS * math.cos(_INCLINE)
 CONE_PIN_HIGH_EDGE_Z = CONE_PIN_TOP_Z + PIN_RADIUS * math.sin(_INCLINE)
 CONE_PIN_HIGH_EDGE_HEIGHT = CONE_PIN_HIGH_EDGE_Z - BASE_TOP_Z
@@ -108,9 +121,45 @@ if not (
 ):
     raise AssertionError("cone pin end leaves the base plate")
 
+# Each pin top sets a sleeve face against the POST AXIS, so it prints from
+# that axis as one relation: never a chain of a pin height and a seat-axis
+# height through the base top, which stacks +/-0.51 and +/-0.8 against bands
+# of +/-0.51 (crank) and +/-0.255 (cone). The post axis is the line through
+# both seat axes, read over gauge rods bedded in the two seats (the matched
+# seats take the post's body and tail, so rods of those sizes bed as the post
+# does). A cone pin top prints along its own axis: the axis runs through the
+# post axis, so the distance is the north-cap plane's offset.
+CRANK_PIN_FROM_AXIS = -CRANK_PIN_TOP_Z
+CONE_PIN_FROM_AXIS = -CONE_PIN_TOP_S
+if abs(math.hypot(CONE_PIN_TOP_X, CONE_PIN_TOP_Z) - CONE_PIN_FROM_AXIS) > 1e-9:
+    raise AssertionError("cone pin axis no longer runs through the post axis")
+# Each relation's band is the fixture's share of the post band the pin sets:
+# AUTHOR'S CHOICE 25 %, rounded down to the hundredth, leaving 75 % to the
+# sleeve and the bond. The two shares sum to the band they replace, the
+# transfer rule of MH 27th p.987 ("Transfer of Tolerances"). MH 27th p.678's
+# gagemakers tolerance (5 % of the workpiece tolerance, ANSI B4.4M) is for
+# fixed limit gages, not a fixture that sets a part, so it does not apply.
+FIXTURE_SHARE = 0.25
+
+
+def _fixture_band(post_band_mm: float) -> float:
+    return math.floor(FIXTURE_SHARE * post_band_mm * 100.0 + 1e-9) / 100.0
+
+
+# The crank sleeve's north face is the post's CrankBossStartZ station.
+CRANK_POST_BAND = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["CrankBossStartZ"])
+CRANK_PIN_FROM_AXIS_TOL = _fixture_band(CRANK_POST_BAND)
+# The north cap is ConeBossLen / 2 off the post centre and takes half its
+# band (the post's ruling behind TIP_EMBED_WORST_MM).
+CONE_POST_BAND = printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
+CONE_PIN_FROM_AXIS_TOL = _fixture_band(CONE_POST_BAND)
+if (CRANK_PIN_FROM_AXIS_TOL, CONE_PIN_FROM_AXIS_TOL) != (0.12, 0.06):
+    raise AssertionError("a pin relation's fixture share left the post band it sets")
+
 # Layout datum: every transverse (X) location prints from the base's west
 # side face, a physical face the shop can square from, never from the post
-# axis. Stations (Y) print from foot B; heights from the base top.
+# axis. Stations (Y) print from foot B; heights from the base top; pin tops
+# from the post axis.
 SIDE_W_X = -BASE_WIDTH / 2.0
 SEAT_AXIS_FROM_SIDE = -SIDE_W_X
 STOP_SIDE_OFFSET = (BASE_WIDTH - STOP_WIDTH) / 2.0
@@ -136,7 +185,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BodySeatProfile": {"BodySeatDia"},
     "TailSeatProfile": {"TailSeatDia"},
     "CrankPinProfile": {"CrankPinY", "CrankPinDia"},
-    "CrankPins": {"CrankPinHeight"},
+    "CrankPinReference": {"CrankPinFromAxis"},
     "PlanReference": {
         "ConePinNearY",
         "ConePinFarY",
@@ -150,19 +199,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "BodySeatAxisHeight",
         "ConePinEntryX",
         "ConePinTilt",
-        "ConePinHighEdge",
+        "ConePinFromAxis",
     },
     "TailSeatReference": {"TailSeatAxisX", "TailSeatAxisHeight"},
 }
 # One place for the plates and blocks, the crank pins' spots (they carry a
 # sleeve face, not a bore) and the seats' centring and axis heights: nothing
-# locates on them closer than the .X band. The body seat prints at the post
-# body's own places (MainBodyDia).
-# The tail seat, the cone pins' stations, hole entry and the pin heights take
-# two: the pins set each sleeve against the post. The cone pin tilt prints to
-# a tenth of a degree under the general angular band. The pin diameter names
-# the stock dowel; the press fit is the reamed hole's job (DRAWING_NOTES),
-# not a printed limit.
+# locates on them closer than the .X band. The seats are matched fits, so
+# their diameters are reference sizes at their mates' places: the post body's
+# own (MainBodyDia) and the tail bar's two.
+# The cone pins' stations and hole entry take two. The pin tops take two
+# under their own bands (CRANK/CONE_PIN_FROM_AXIS_TOL). The cone pin tilt
+# prints to a tenth of a degree under the general angular band. The pin
+# diameter names the stock dowel; the press fit is the reamed hole's job
+# (DRAWING_NOTES), not a printed limit.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BaseProfile": {"BaseThick": 1, "BaseLength": 1},
     "Base": {"BaseWidth": 1},
@@ -183,7 +233,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "CrankPinY": 1,
         "CrankPinDia": 1,
     },
-    "CrankPins": {"CrankPinHeight": 2},
+    "CrankPinReference": {"CrankPinFromAxis": 2},
     "PlanReference": {
         "ConePinNearY": 2,
         "ConePinFarY": 2,
@@ -197,7 +247,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BodySeatAxisHeight": 1,
         "ConePinEntryX": 2,
         "ConePinTilt": 1,
-        "ConePinHighEdge": 2,
+        "ConePinFromAxis": 2,
     },
     "TailSeatReference": {"TailSeatAxisX": 1, "TailSeatAxisHeight": 1},
 }
@@ -211,9 +261,16 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # the views that print their dimensions (_drawing_hidden_sketches). The two
 # section sketches lie in their cutting planes: A-A through the near cone
 # pin, B-B between the crank pins and the tail saddle, so B-B looks on to the
-# tail saddle's south face, uncut, and its seat arc is a model edge.
+# tail saddle's south face, uncut, and its seat arc is a model edge. The
+# crank pin's sketch lies on the post's mid-plane and draws the post axis
+# through both seats in the elevation.
 TAIL_SECTION_Y = (CRANK_PIN_Y + TAIL_SADDLE_Y) / 2.0
-REFERENCE_SKETCHES = ("PlanReference", "ConePinSectionReference", "TailSeatReference")
+REFERENCE_SKETCHES = (
+    "PlanReference",
+    "CrankPinReference",
+    "ConePinSectionReference",
+    "TailSeatReference",
+)
 SECTION_REFERENCE_SKETCHES = ("ConePinSectionReference", "TailSeatReference")
 
 # The seats MUST be cut (the title block's surface row is CAST/MACHINED, not
@@ -229,7 +286,7 @@ DRAWING_NOTES = "\n".join(
         BUILT_UP_PERMISSION_NOTE,
         "PINS ARE STOCK HARDENED DOWELS; PIN ENDS STAY INSIDE THE BASE.",
         "REAM PIN HOLES THRU FOR A PRESS FIT; A PRESSED PIN MUST NOT TURN.",
-        "STATIONS FROM STOP FACE, HEIGHTS FROM BASE TOP; CONE PINS AT HIGH EDGE.",
+        "STATIONS FROM STOP FACE, HEIGHTS FROM BASE TOP, PIN TOPS FROM AXIS OF SEATED RODS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
@@ -237,6 +294,9 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 _POST = "dt_cone_pivot_post_spec"
 _UP = ([0.0, 0.0, 1.0], ("__frame__",))
 _POST_AXIS = ([0.0, 1.0, 0.0], ("__frame__",))
+# Pin tops print from the post axis: the body seat's axis (the tail seat's
+# is the same line).
+_HEIGHT_FROM = "body_seat"
 
 
 def _crank_pin(x: float) -> ExportFeature:
@@ -251,10 +311,20 @@ def _crank_pin(x: float) -> ExportFeature:
             "at": ([x, CRANK_PIN_Y, CRANK_PIN_TOP_Z], ("CRANK_PIN_X", "CRANK_PIN_Y", "CRANK_PIN_TOP_Z")),
             "axis": _UP,
             "height": (
-                limits(CRANK_PIN_HEIGHT, DRAWING_PRECISION_BY_NAME["CrankPinHeight"]),
-                ("CRANK_PIN_HEIGHT", (_POST, "CRANK_BOSS_NORTH_FACE"), "BASE_TOP_Z"),
+                limits(
+                    CRANK_PIN_FROM_AXIS,
+                    DRAWING_PRECISION_BY_NAME["CrankPinFromAxis"],
+                    (CRANK_PIN_FROM_AXIS_TOL, -CRANK_PIN_FROM_AXIS_TOL),
+                ),
+                (
+                    "CRANK_PIN_FROM_AXIS",
+                    (_POST, "CRANK_BOSS_NORTH_FACE"),
+                    "CRANK_PIN_FROM_AXIS_TOL",
+                    (_POST, "DRAWING_PRECISION"),
+                ),
             ),
-            "height_nominal": (CRANK_PIN_HEIGHT, ("CRANK_PIN_HEIGHT",)),
+            "height_nominal": (CRANK_PIN_FROM_AXIS, ("CRANK_PIN_FROM_AXIS",)),
+            "height_from": (_HEIGHT_FROM, ("CRANK_PIN_FROM_AXIS", "SEAT_AXIS_HEIGHT")),
             "station": (
                 limits(CRANK_PIN_Y, DRAWING_PRECISION_BY_NAME["CrankPinY"]),
                 ("CRANK_PIN_Y", (_POST, "CRANK_BORE_HEIGHT")),
@@ -262,7 +332,7 @@ def _crank_pin(x: float) -> ExportFeature:
             "dia_nominal": (PIN_DIA, ("PIN_DIA",)),
         },
         precision={
-            "height": DRAWING_PRECISION_BY_NAME["CrankPinHeight"],
+            "height": DRAWING_PRECISION_BY_NAME["CrankPinFromAxis"],
             "station": DRAWING_PRECISION_BY_NAME["CrankPinY"],
         },
     )
@@ -279,16 +349,22 @@ def _cone_pin(y: float, y_name: str) -> ExportFeature:
                 ("CONE_PIN_TOP_X", y_name, "CONE_PIN_TOP_Z", (_POST, "CONE_BOSS_LENGTH")),
             ),
             "axis": (list(CONE_PIN_AXIS), ("CONE_PIN_AXIS", (_POST, "INCLINE_DEG"))),
+            # Along the pin's own axis, which runs through the post axis.
             "height": (
-                limits(CONE_PIN_HIGH_EDGE_HEIGHT, DRAWING_PRECISION_BY_NAME["ConePinHighEdge"]),
+                limits(
+                    CONE_PIN_FROM_AXIS,
+                    DRAWING_PRECISION_BY_NAME["ConePinFromAxis"],
+                    (CONE_PIN_FROM_AXIS_TOL, -CONE_PIN_FROM_AXIS_TOL),
+                ),
                 (
-                    "CONE_PIN_HIGH_EDGE_HEIGHT",
+                    "CONE_PIN_FROM_AXIS",
                     (_POST, "CONE_BOSS_LENGTH"),
-                    (_POST, "INCLINE_DEG"),
-                    "BASE_TOP_Z",
+                    "CONE_PIN_FROM_AXIS_TOL",
+                    (_POST, "DRAWING_PRECISION"),
                 ),
             ),
-            "height_nominal": (CONE_PIN_HIGH_EDGE_HEIGHT, ("CONE_PIN_HIGH_EDGE_HEIGHT",)),
+            "height_nominal": (CONE_PIN_FROM_AXIS, ("CONE_PIN_FROM_AXIS",)),
+            "height_from": (_HEIGHT_FROM, ("CONE_PIN_FROM_AXIS", "SEAT_AXIS_HEIGHT")),
             "station": (
                 limits(y, DRAWING_PRECISION_BY_NAME["ConePinNearY"]),
                 (y_name, (_POST, "BORE_HEIGHT")),
@@ -297,7 +373,7 @@ def _cone_pin(y: float, y_name: str) -> ExportFeature:
             "dia_nominal": (PIN_DIA, ("PIN_DIA",)),
         },
         precision={
-            "height": DRAWING_PRECISION_BY_NAME["ConePinHighEdge"],
+            "height": DRAWING_PRECISION_BY_NAME["ConePinFromAxis"],
             "station": DRAWING_PRECISION_BY_NAME["ConePinNearY"],
         },
     )
@@ -307,15 +383,12 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "body_seat": ExportFeature(
         kind="seat",
         faces=(CylinderFace(BODY_SEAT_DIA),),
-        requirements=("dia", "height"),
+        requirements=("note", "height"),
         fields={
             "at": ([0.0, BODY_SADDLE_Y, 0.0], ("BODY_SADDLE_Y", "__frame__")),
             "axis": _POST_AXIS,
-            "dia": (
-                limits(BODY_SEAT_DIA, DRAWING_PRECISION_BY_NAME["BodySeatDia"]),
-                ("BODY_SEAT_DIA", (_POST, "BLOCK_DIA")),
-            ),
             "dia_nominal": (BODY_SEAT_DIA, ("BODY_SEAT_DIA", (_POST, "BLOCK_DIA"))),
+            "note": (BODY_SEAT_CALLOUT, ("BODY_SEAT_CALLOUT", "POST_NUMBER")),
             "height": (
                 limits(SEAT_AXIS_HEIGHT, DRAWING_PRECISION_BY_NAME["BodySeatAxisHeight"]),
                 ("SEAT_AXIS_HEIGHT", "BASE_TOP_Z"),
@@ -323,24 +396,27 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "height_nominal": (SEAT_AXIS_HEIGHT, ("SEAT_AXIS_HEIGHT",)),
         },
         precision={
-            "dia": DRAWING_PRECISION_BY_NAME["BodySeatDia"],
             "height": DRAWING_PRECISION_BY_NAME["BodySeatAxisHeight"],
         },
     ),
     "tail_seat": ExportFeature(
         kind="seat",
         faces=(CylinderFace(TAIL_SEAT_DIA),),
-        requirements=("dia",),
+        requirements=("note", "height"),
         fields={
             "at": ([0.0, TAIL_SADDLE_Y, 0.0], ("TAIL_SADDLE_Y", "__frame__")),
             "axis": _POST_AXIS,
-            "dia": (
-                limits(TAIL_SEAT_DIA, DRAWING_PRECISION_BY_NAME["TailSeatDia"]),
-                ("TAIL_SEAT_DIA",),
-            ),
             "dia_nominal": (TAIL_SEAT_DIA, ("TAIL_SEAT_DIA",)),
+            "note": (TAIL_SEAT_CALLOUT, ("TAIL_SEAT_CALLOUT", "POST_NUMBER")),
+            "height": (
+                limits(SEAT_AXIS_HEIGHT, DRAWING_PRECISION_BY_NAME["TailSeatAxisHeight"]),
+                ("SEAT_AXIS_HEIGHT", "BASE_TOP_Z"),
+            ),
+            "height_nominal": (SEAT_AXIS_HEIGHT, ("SEAT_AXIS_HEIGHT",)),
         },
-        precision={"dia": DRAWING_PRECISION_BY_NAME["TailSeatDia"]},
+        precision={
+            "height": DRAWING_PRECISION_BY_NAME["TailSeatAxisHeight"],
+        },
     ),
     "foot_stop": ExportFeature(
         kind="face",
