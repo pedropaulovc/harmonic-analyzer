@@ -384,6 +384,10 @@ back without converting the model's diameters on the sheet. These are supplier
 nominal references, not production controls: general tolerances and edge-break
 instructions do not apply. Stock, supplier and SKU remain property-linked; the
 purchase identity is read from the statically named canonical part-registry row.
+The finalizer's settled check reads those same three imported dimensions after
+the last rebuild, before save/export. Changed native values, reference text,
+precision or diameter presentation refuse the drawing; the check never rewrites
+the settled state to make it pass.
 
 Acceptance requires an unchanged native supplier solid, all three reference
 dimensions, linked MHA-VN-026 identity and purchase fields, and readable,

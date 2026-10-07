@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from pathlib import Path
 from typing import Any
 
 import _telemetry
-from _common import _early_bound, check, run_build
+from _common import _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
@@ -134,6 +135,49 @@ def _short_diametric_reference(adapter: Any, annotation: Any, *, label: str) -> 
     display.LeaderVisibility = _LEADER_LINE_NONE
     if int(display.LeaderVisibility) != _LEADER_LINE_NONE:
         raise RuntimeError(f"{label} retained its dimension leader line")
+
+
+def _reference_display(adapter: Any, annotation: Any, name: str) -> Any:
+    display = annotation.GetSpecificAnnotation()
+    if display is None:
+        raise RuntimeError(f"{name}: washer reference has no display dimension")
+    return _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "GetDimension2", "GetText", "GetPrimaryPrecision2"
+    )
+
+
+def _reference_value(display: Any, name: str) -> float:
+    dimension = display.GetDimension2(0)
+    if dimension is None:
+        raise RuntimeError(f"{name}: washer reference has no native model dimension")
+    dimension = _early_bound(dimension, "IDimension")
+    return float(_read_member(dimension, "SystemValue"))
+
+
+def _assert_settled_references(
+    adapter: Any, references: tuple[tuple[Any, str, float], ...]
+) -> None:
+    """Refuse changed receiving dimensions after the final settling rebuild."""
+    names = [dimension_name(adapter, annotation) for annotation, _, _ in references]
+    if len(names) != 3 or set(names) != set(DRAWING_PRECISION_BY_NAME):
+        raise RuntimeError(f"settled washer reference dimensions changed: {names!r}")
+    for annotation, name, expected_value in references:
+        if dimension_name(adapter, annotation) != name:
+            raise RuntimeError(f"{name}: settled washer reference identity changed")
+        display = _reference_display(adapter, annotation, name)
+        actual_value = _reference_value(display, name)
+        if not math.isclose(actual_value, expected_value, rel_tol=0.0, abs_tol=1e-9):
+            raise RuntimeError(f"{name}: settled washer reference value changed")
+        diameter = name in {OUTER_DIAMETER_DIM, INNER_DIAMETER_DIM}
+        prefix = "(<MOD-DIAM>" if diameter else "("
+        if (str(display.GetText(1) or ""), str(display.GetText(2) or "")) != (
+            prefix, ")"
+        ):
+            raise RuntimeError(f"{name}: settled washer reference text changed")
+        if display.GetPrimaryPrecision2() != DRAWING_PRECISION_BY_NAME[name]:
+            raise RuntimeError(f"{name}: settled washer reference precision changed")
+        if diameter and (not bool(display.Diametric) or bool(display.DisplayAsLinear)):
+            raise RuntimeError(f"{name}: settled washer reference is not diametric")
 
 
 def _center_caption(adapter: Any, text: str, x: float, y: float) -> Any:
@@ -323,6 +367,12 @@ async def build(adapter: Any) -> dict[str, str]:
         else:
             raise RuntimeError(f"unexpected washer reference dimension {name!r}")
     assert_imported_precision(adapter, imported, DRAWING_PRECISION_BY_NAME)
+    reference_state = []
+    for annotation in imported:
+        name = dimension_name(adapter, annotation)
+        display = _reference_display(adapter, annotation, name)
+        reference_state.append((annotation, name, _reference_value(display, name)))
+    references = tuple(reference_state)
     set_hidden_lines_removed(adapter, top_view)
     set_hidden_lines_removed(adapter, front_view)
 
@@ -400,6 +450,7 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         pdf_title=title,
         scale=scale,
+        settled_checks=(lambda: _assert_settled_references(adapter, references),),
     )
 
 
