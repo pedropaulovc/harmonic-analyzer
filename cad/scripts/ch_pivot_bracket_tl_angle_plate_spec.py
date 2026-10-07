@@ -78,11 +78,23 @@ for _y, _spec in ((SCREW_Y, TAP_SPEC), (STUD_Y, STUD_SPEC)):
     _r = (blind_cut_dia_mm(_spec) + drilled_oversize_mm()) / 2.0
     if not BASE_THICK + 2.0 <= _y - _r and _y + _r <= PLATE_HEIGHT - 2.0:
         raise AssertionError("an upright hole leaves under 2.0 of wall")
+# The through taps get the upright's full thickness: at least one and a half
+# major diameters of full thread for the #10 screws.
+if UPRIGHT_THICK < 1.5 * THREAD_MAJOR_MM[SCREW_THREAD]:
+    raise AssertionError("the upright is too thin for the ledge screws' thread")
 
+# The bought envelope prints as reference: its four section sizes in the side
+# view, its length under the face. The tap stations are reference too: the
+# spots taken through the seated ledge govern them.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "PlateProfile": {"Width", "Height", "BaseThick", "UprightThick"},
+    "Plate": {"Length"},
     "LedgeTaps": {"Tap1X", "Tap2X", "Tap1Y"},
     "StudHoles": {"Stud1X", "Stud2X", "Stud1Y"},
 }
+REFERENCE_DIMENSIONS = (
+    DRAWING_DIMENSIONS["PlateProfile"] | DRAWING_DIMENSIONS["Plate"] | DRAWING_DIMENSIONS["LedgeTaps"]
+)
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     feature: dict.fromkeys(names, STATION_PLACES) for feature, names in DRAWING_DIMENSIONS.items()
 }
@@ -93,12 +105,11 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked angle-plate dimension needs authored places")
 
 SURFACE_FINISHES = ()
-# The front face seats the bracket: the holes must leave it flat.
 DRAWING_NOTES = "\n".join(
     (
-        "BOUGHT ANGLE PLATE: ADD THE FOUR HOLES ONLY.",
-        "SPOT THE TAPS THROUGH THE LEDGE HOLES, LEDGE IN PLACE.",
-        "STONE THE FRONT FACE FLAT OVER EVERY HOLE BURR.",
+        "BOUGHT ANGLE PLATE: ADD THE FOUR HOLES ONLY. SIZES IN ( ) ARE REFERENCE.",
+        "CLAMP THE PIVOT BRACKET LEDGE OVER THE TAP LOCATIONS AND SPOT",
+        "THE TAPS THROUGH ITS HOLES: THE SPOTS GOVERN THE TAPS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"

@@ -5,9 +5,10 @@ envelope (its slots are omitted), with the four holes the shop adds to the
 upright: two #10-24 tapped through holes for the ledge screws and two letter-X
 clearance holes for the bridge studs (``ch_pivot_bracket_tl_angle_plate_spec``).
 
-Layout: the base and the upright are Front-plane rectangles from the
-plate's left end on the table plane, each extruded -Z (behind the upright's
-front face, which is Z0); the holes are drilled from that front face.
+Layout: the bought envelope is ONE L profile on the Right plane (sketch
+u = -z, v = y; the upright's front face at u 0, the table plane at v 0),
+extruded +X from the plate's left end, so its four section sizes print
+together in the side view; the holes are drilled from the front face (Z0).
 
 Run (SolidWorks already open)::
 
@@ -76,52 +77,47 @@ _SAVED_DRAWING_PROPERTIES = (
 
 TAP_DRILL = blind_cut_dia_mm(TAP_SPEC)
 STUD_DRILL = blind_cut_dia_mm(STUD_SPEC)
-V_BASE = PLATE_LENGTH * BASE_THICK * PLATE_WIDTH
-V_PLATE = V_BASE + PLATE_LENGTH * (PLATE_HEIGHT - BASE_THICK) * UPRIGHT_THICK
+V_PLATE = PLATE_LENGTH * (PLATE_WIDTH * BASE_THICK + UPRIGHT_THICK * (PLATE_HEIGHT - BASE_THICK))
 V_TAPPED = V_PLATE - len(TAP_X) * math.pi * (TAP_DRILL / 2.0) ** 2 * UPRIGHT_THICK
 V_TOTAL = V_TAPPED - len(STUD_X) * math.pi * (STUD_DRILL / 2.0) ** 2 * UPRIGHT_THICK
 # Tight enough that a missing or mis-sized hole (>= 140 mm^3) fails.
 _V_TOL = 40.0
 
 
-async def _box_behind_front(
-    adapter,
-    corner: tuple[float, float],
-    size: tuple[float, float],
-    depth: float,
-    *,
-    names: tuple[str, ...],
-    drives: tuple[str, ...],
-    profile: str,
-    feature: str,
-    depth_name: str,
-    depth_drive: str,
-) -> list[tuple[str, str]]:
-    """A Front-plane rectangle from ``corner`` extruded ``depth`` along -Z."""
+async def _plate_envelope(adapter) -> list[tuple[str, str]]:
+    """The bought plate: an L section on the Right plane, extruded +X.
+
+    The chain runs base end, underside, front face, upright top, so the two
+    inner edges close it and the four printed sizes are the outer ones; the
+    anchor is the front face's foot on the table (the origin)."""
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
-    x0, y0 = corner
-    w, h = size
     dims = SketchDims()
-    check(f"create_sketch {profile}", await adapter.create_sketch("Front"))
-    rect = [(x0, y0), (x0 + w, y0), (x0 + w, y0 + h), (x0, y0 + h)]
-    lines = await add_line_chain(adapter, rect)
+    check("create_sketch PlateProfile", await adapter.create_sketch("Right"))
+    section = [
+        (PLATE_WIDTH, BASE_THICK),
+        (PLATE_WIDTH, 0.0),
+        (0.0, 0.0),
+        (0.0, PLATE_HEIGHT),
+        (UPRIGHT_THICK, PLATE_HEIGHT),
+        (UPRIGHT_THICK, BASE_THICK),
+    ]
+    lines = await add_line_chain(adapter, section)
     await define_rectilinear_chain(
-        adapter, lines, rect, label=profile, dims=dims,
-        names=list(names), drives=list(drives),
+        adapter, lines, section, anchor=2, label="PlateProfile", dims=dims,
+        names=["BaseThick", "Width", "Height", "UprightThick"],
+        drives=['"BaseThick"', '"PlateWidth"', '"PlateHeight"', '"UprightThick"'],
     )
-    await ensure_fully_defined(adapter, profile)
-    check(f"exit_sketch {profile}", await adapter.exit_sketch())
-    name_last_feature(adapter, profile)
-    jobs = dims.apply(adapter, profile)
+    await ensure_fully_defined(adapter, "PlateProfile")
+    check("exit_sketch PlateProfile", await adapter.exit_sketch())
+    name_last_feature(adapter, "PlateProfile")
+    jobs = dims.apply(adapter, "PlateProfile")
     check(
-        f"extrude {feature}",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=depth, reverse_direction=True)
-        ),
+        "extrude Plate",
+        await adapter.create_extrusion(ExtrusionParameters(depth=PLATE_LENGTH)),
     )
-    name_last_feature(adapter, feature)
-    jobs.append((name_dimensions(adapter, feature, [depth_name])[0], depth_drive))
+    name_last_feature(adapter, "Plate")
+    jobs.append((name_dimensions(adapter, "Plate", ["Length"])[0], '"PlateLength"'))
     return jobs
 
 
@@ -142,22 +138,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "StudX2", f"{STUD_X[1]}mm")
     await set_global(adapter, "StudY", f"{STUD_Y}mm")
 
-    # Bought envelope: the base under the table-plane origin, then the
-    # upright standing on it, flush with the base's front edge.
-    drive_jobs = await _box_behind_front(
-        adapter, (0.0, 0.0), (PLATE_LENGTH, BASE_THICK), PLATE_WIDTH,
-        names=("BaseLength", "BaseThick"), drives=('"PlateLength"', '"BaseThick"'),
-        profile="BaseProfile", feature="Base",
-        depth_name="BaseWidth", depth_drive='"PlateWidth"',
-    )
-    await volume_check(adapter, "base", V_BASE, _V_TOL)
-    drive_jobs += await _box_behind_front(
-        adapter, (0.0, BASE_THICK), (PLATE_LENGTH, PLATE_HEIGHT - BASE_THICK), UPRIGHT_THICK,
-        names=("UprightLength", "UprightHeight", "UprightBase"),
-        drives=('"PlateLength"', '"PlateHeight" - "BaseThick"', '"BaseThick"'),
-        profile="UprightProfile", feature="Upright",
-        depth_name="UprightThick", depth_drive='"UprightThick"',
-    )
+    drive_jobs = await _plate_envelope(adapter)
     await volume_check(adapter, "bought plate", V_PLATE, _V_TOL)
 
     # The shop's four holes, each pair ONE native wizard feature drilled

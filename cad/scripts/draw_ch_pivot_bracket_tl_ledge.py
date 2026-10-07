@@ -170,8 +170,8 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    # Places and bands (the lapped height, the hole stations) are authored on
-    # the part; the sheet only proves the import kept them.
+    # Places are authored on the part; the sheet only proves the import kept
+    # them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
 

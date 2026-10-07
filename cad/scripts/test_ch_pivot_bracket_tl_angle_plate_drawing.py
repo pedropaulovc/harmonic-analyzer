@@ -18,7 +18,8 @@ def _features() -> dict:
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.FRONT_KEEP) == marked
+    assert set(drawing.FRONT_KEEP) | set(drawing.SIDE_KEEP) == marked
+    assert not set(drawing.FRONT_KEEP) & set(drawing.SIDE_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
 
 

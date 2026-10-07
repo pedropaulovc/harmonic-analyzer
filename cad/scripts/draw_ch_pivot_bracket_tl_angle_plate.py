@@ -1,11 +1,14 @@
 r"""Create the rework drawing for the pivot bracket's angle plate (MHA-CH-008-TL-02).
 
-The plate is bought; the sheet dimensions only the four holes the shop adds
-to its upright. The front view (the upright's front face, 1:1) carries every
-station: each hole X from the plate's left end and each row's height from
-the base underside (the table plane), so no station chains through another.
-Each hole pair takes one native callout; the iso rides top-right at 1:2.
-No datums (policy rule 3).
+The plate is bought; the sheet controls only the four holes the shop adds to
+its upright and prints the bought envelope as reference. The front view (the
+upright's front face, 1:1) carries every station: each hole X from the
+plate's left end and each row's height from the base underside (the table
+plane), so no station chains through another; the tap stations are reference
+because the spots taken through the seated ledge govern them. The side view
+(1:2) carries the section's reference sizes. Each hole pair takes one native
+callout above the face; the iso rides top-right at 1:2. No datums (policy
+rule 3).
 
 Run with SolidWorks open::
 
@@ -36,10 +39,14 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm, drill_process
 from ch_pivot_bracket_tl_angle_plate_spec import (
+    BASE_THICK,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     PLATE_HEIGHT,
     PLATE_LENGTH,
+    PLATE_WIDTH,
+    REFERENCE_DIMENSIONS,
+    UPRIGHT_THICK,
     SCREW_Y,
     STUD_SPEC,
     STUD_X,
@@ -47,7 +54,7 @@ from ch_pivot_bracket_tl_angle_plate_spec import (
     TAP_SPEC,
     TAP_X,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import add_note, auto_center_marks, place_view
 
 SPEC = DRAWINGS_BY_NAME["ch_pivot_bracket_tl_angle_plate"]
 PART_STEM = SPEC.artifact_stem
@@ -59,13 +66,19 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
+SIDE_SCALE = (1, 2)
 ISO_SCALE = (1, 2)
 # Front: the 127 x 88.9 upright face at 1:1, x 0.0615..0.1885 and
-# y 0.1205..0.2094; the callouts stand right of it, the iso top-right.
+# y 0.1205..0.2094; both callouts stand above it. Side (Right view, 1:2):
+# the 101.6 x 88.9 section, front face on its left, x 0.2196..0.2704 and
+# y 0.1178..0.1622, its caption above it; the iso rides top-right.
 FRONT_CENTER = (0.125, 0.165)
-ISO_CENTER = (0.355, 0.200)
-ISO_NOTE_XY = (0.320, 0.140)
-NOTES_XY = (0.020, 0.060)
+SIDE_CENTER = (0.245, 0.140)
+SIDE_CAPTION = "RIGHT VIEW SCALE 1:2"
+SIDE_CAPTION_XY = (0.218, 0.186)
+ISO_CENTER = (0.355, 0.205)
+ISO_NOTE_XY = (0.320, 0.150)
+NOTES_XY = (0.020, 0.062)
 
 
 def _sheet_x(model_x_mm: float) -> float:
@@ -78,45 +91,71 @@ def _sheet_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - PLATE_HEIGHT / 2.0) * SHEET_SCALE[0] / 1000.0
 
 
+def _side_x(u_mm: float) -> float:
+    """Sheet X of a section point u (= -model Z) in the 1:2 side view."""
+    return SIDE_CENTER[0] + (u_mm - PLATE_WIDTH / 2.0) * SIDE_SCALE[0] / SIDE_SCALE[1] / 1000.0
+
+
+def _side_y(model_y_mm: float) -> float:
+    """Sheet Y of a model-Y point in the 1:2 side view."""
+    return SIDE_CENTER[1] + (model_y_mm - PLATE_HEIGHT / 2.0) * SIDE_SCALE[0] / SIDE_SCALE[1] / 1000.0
+
+
+
 LEFT_EDGE_X = _sheet_x(0.0)
 TAP_R_SHEET = blind_cut_dia_mm(TAP_SPEC) * SHEET_SCALE[0] / 2000.0
 STUD_R_SHEET = blind_cut_dia_mm(STUD_SPEC) * SHEET_SCALE[0] / 2000.0
 
-# Four X stations stack below the face from its left end, nearest first;
-# the two row heights stand left of it from the base underside.
+# Four X stations stack below the face from its left end, nearest first, the
+# plate's reference length under them; the two row heights stand left of it
+# from the base underside.
 FRONT_KEEP = {
     "Stud1X": (_sheet_x(STUD_X[0] / 2.0), 0.108),
     "Tap1X": (_sheet_x(TAP_X[0] / 2.0), 0.100),
     "Tap2X": (_sheet_x(TAP_X[1] / 2.0), 0.092),
     "Stud2X": (_sheet_x(STUD_X[1] / 2.0), 0.084),
+    "Length": (FRONT_CENTER[0], 0.076),
     "Tap1Y": (LEFT_EDGE_X - 0.012, _sheet_y(SCREW_Y / 2.0)),
     "Stud1Y": (LEFT_EDGE_X - 0.024, _sheet_y(STUD_Y / 2.0)),
 }
-# Each pair stands on the one row height the part prints.
-DIMENSION_PREFIXES = {"Tap1Y": "2X ", "Stud1Y": "2X "}
-# Both leaders enter their pair's right-hand hole from its upper right and
-# cross only the plate's right end.
-TAP_CALLOUT_XY = (0.205, 0.180)
-STUD_CALLOUT_XY = (0.205, 0.225)
-STUD_CALLOUT_PROCESS = drill_process(STUD_SPEC)
+# The section's reference sizes: width under it, the height left of its front
+# face, the base thickness right of the base end, the upright's over its top.
+SIDE_KEEP = {
+    "Width": (SIDE_CENTER[0], _side_y(0.0) - 0.013),
+    "Height": (_side_x(0.0) - 0.012, SIDE_CENTER[1]),
+    "BaseThick": (_side_x(PLATE_WIDTH) + 0.010, _side_y(BASE_THICK / 2.0)),
+    "UprightThick": (_side_x(UPRIGHT_THICK / 2.0), _side_y(PLATE_HEIGHT) + 0.010),
+}
+# Each pair stands on the one row height the part prints; reference sizes
+# take ASME parentheses (inside the pair count on the tap row).
+DIMENSION_TEXT = {
+    name: ("(", ")") for name in REFERENCE_DIMENSIONS
+} | {"Tap1Y": ("2X (", ")"), "Stud1Y": ("2X ", "")}
+# Both callouts stand above the face, clear of its silhouette; each leader
+# enters its pair's right-hand hole from the upper right.
+TAP_CALLOUT_XY = (0.215, 0.218)
+STUD_CALLOUT_XY = (0.215, 0.240)
+STUD_CALLOUT_PROCESS = f"LETTER {drill_process(STUD_SPEC)}"
 
 
-def _set_dimension_prefixes(
-    adapter: Any, annotations: list[Any], prefixes: dict[str, str]
+def _set_dimension_text(
+    adapter: Any, annotations: list[Any], texts: dict[str, tuple[str, str]]
 ) -> None:
-    """Write a native prefix on named imported dimensions and read it back."""
-    remaining = dict(prefixes)
+    """Write a native prefix/suffix on named imported dimensions; read back."""
+    remaining = dict(texts)
     for raw in annotations:
         annotation = _early_bound(raw, "IAnnotation")
-        prefix = remaining.pop(dimension_name(adapter, annotation), None)
-        if prefix is None:
+        text = remaining.pop(dimension_name(adapter, annotation), None)
+        if text is None:
             continue
         display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.SetText(1, prefix)  # swDimensionTextPrefix
-        if str(display.GetText(1) or "") != prefix:
-            raise RuntimeError(f"dimension prefix {prefix!r} did not persist")
+        display.SetText(1, text[0])  # swDimensionTextPrefix
+        display.SetText(2, text[1])  # swDimensionTextSuffix
+        got = (str(display.GetText(1) or ""), str(display.GetText(2) or ""))
+        if got != text:
+            raise RuntimeError(f"dimension text {text!r} did not persist: {got!r}")
     if remaining:
-        raise RuntimeError(f"dimension prefixes not applied: {sorted(remaining)}")
+        raise RuntimeError(f"dimension texts not applied: {sorted(remaining)}")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -152,24 +191,36 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
     # finalize_drawing shades the pictorial isometric with edges. Every
     # tapped-hole drawing first gives its iso local HLR settings: left on the
     # sheet default, run 40a02dfa read its cosmetic threads back draft quality.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    for view in (front, iso):
+    for view in (front, side, iso):
         set_hidden_lines_removed(adapter, view)
 
-    annotations = curate_view_dimensions(
-        adapter,
-        front,
-        keep=FRONT_KEEP,
-        view_label="upright face",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    # Places and the station bands are authored on the part; the sheet only
-    # proves the import kept them.
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            front,
+            keep=FRONT_KEEP,
+            view_label="upright face",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            side,
+            keep=SIDE_KEEP,
+            view_label="plate section",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    # Places are authored on the part; the sheet only proves the import kept
+    # them, then marks the reference sizes and the pair counts.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    _set_dimension_prefixes(adapter, annotations, DIMENSION_PREFIXES)
+    _set_dimension_text(adapter, annotations, DIMENSION_TEXT)
+    if add_note(adapter, SIDE_CAPTION, *SIDE_CAPTION_XY) is None:
+        raise RuntimeError("failed to caption the right view")
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the upright face")
