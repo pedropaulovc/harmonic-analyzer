@@ -40,7 +40,7 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     TAIL_SADDLE_Y,
     TAIL_SECTION_Y,
 )
-from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_pivot_post_tl_bond_cradle"]
 PART_STEM = SPEC.artifact_stem
@@ -118,15 +118,16 @@ ELEVATION_KEEP = {
     "TailSaddleHeight": (0.0, 130.0, -22.0),
 }
 # Each seat's profile sketch is parallel to its section, so the section
-# imports its diameter. B-B's text stands just above the axis, so the
+# imports its diameter. The text stands just above the axis, so the
 # through-centre leader drops nearly plumb on to the seat bottom.
 SECTION_A_KEEP = {
-    # Inside the seat, under the axis, on the ray to the arc 18 degrees off
-    # its bottom on the +X side: the leader stops at the arc
-    # (_seat_diameter_to_arc), clear of the axis dimensions, the cone pin
-    # top and the finish leader.
-    "BodySeatDia": (3.4, CONE_PIN_NEAR_Y, -10.5),
-    "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
+    # Right of and above the axis (model -X): the leader drops through the
+    # centre on to the +X side of the seat bottom, clear of the cone pin top
+    # and the finish leader. The seat-axis dimensions keep out of its path:
+    # the 40.0 runs inside the seat under the axis, the 30.0's extension
+    # line leaves the axis on the leader's far side.
+    "BodySeatDia": (-8.0, CONE_PIN_NEAR_Y, 28.0),
+    "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, -8.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
     # Under the base; the tilt reads below it.
     "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, -48.0),
@@ -299,26 +300,6 @@ def _seat_finish(adapter: Any, view: Any, key: str, face_y: float, *, label: str
     )
 
 
-def _seat_diameter_to_arc(adapter: Any, annotations: list[Any], name: str) -> None:
-    """Stop a seat diameter's leader at the arc it measures.
-
-    The default "extend to the opposite side" ran the leader from the text
-    through the seat centre, across the seat-axis dimensions that start
-    there (run-9/10 reviews); draw_dt_arbor_pedestal's crown radius fix.
-    """
-    for raw in annotations:
-        annotation = _early_bound(raw, "IAnnotation")
-        if dimension_name(adapter, annotation) != name:
-            continue
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.ArcExtensionLineOrOppositeSide = False
-        if bool(display.ArcExtensionLineOrOppositeSide):
-            raise RuntimeError(f"{name} leader did not stop at its seat arc")
-        return
-    raise RuntimeError(f"no imported {name} to stop at its seat arc")
-
-
-
 def _lower_caption(adapter: Any, view: Any, drop: float) -> None:
     """Move a section's native caption down the sheet by ``drop`` metres,
     keeping its linked fields (``draw_fr_top_frame._position_view_caption``)."""
@@ -429,7 +410,6 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_b_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _seat_diameter_to_arc(adapter, section_a_annotations, "BodySeatDia")
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
