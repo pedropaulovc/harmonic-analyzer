@@ -21,6 +21,7 @@ from _drawing_common import (
     assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
+    import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -126,7 +127,7 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=VIEW_SCALE)
     # finalize_drawing shades the pictorial isometric with edges.
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 3))
     for view in (left, front, back):
         set_hidden_lines_removed(adapter, view)
 
@@ -159,6 +160,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
+    # Precise shaded isometrics need the taps' cosmetic threads imported
+    # (draw_pn_pen_hanger); the label would otherwise appear at save.
+    import_cosmetic_threads(adapter, iso)
 
     return await finalize_drawing(
         adapter,
