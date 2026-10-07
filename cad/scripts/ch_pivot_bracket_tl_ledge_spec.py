@@ -30,9 +30,9 @@ from _printed_tolerance import drilled_oversize_mm
 
 # As thick as the foot's depth off the upright and as tall as the gap from the
 # 1-2-3 block to the foot's free end. Wider than the 16 foot it carries so its
-# two screw holes keep the rule-12 2.0 walls at general tolerance; its ends
-# stay clear of the bridge's stud nuts.
-LEDGE_WIDTH = 22.0
+# two screw holes, spread for head clearance, keep the rule-12 2.0 walls at
+# general tolerance; its ends stay clear of the bridge's stud nuts.
+LEDGE_WIDTH = 22.6
 LEDGE_THICK = bracket.FOOT_H  # 6.0
 LEDGE_HEIGHT = round(plate.LEDGE_TOP_Y - plate.BLOCK_HEIGHT, 6)  # 15.9
 SIZE_PLACES = 1
@@ -46,8 +46,8 @@ if limits(LEDGE_WIDTH, SIZE_PLACES)[1] / 2.0 >= plate.STUD_HALF_PITCH - plate.ST
 # walls, all at the general one-place tolerance.
 CLEARANCE_SPEC = plate.LEDGE_CLEARANCE_SPEC
 HOLE_X = (
-    LEDGE_WIDTH / 2.0 - plate.SCREW_HALF_PITCH,
-    LEDGE_WIDTH / 2.0 + plate.SCREW_HALF_PITCH,
+    round(LEDGE_WIDTH / 2.0 - plate.SCREW_HALF_PITCH, 6),
+    round(LEDGE_WIDTH / 2.0 + plate.SCREW_HALF_PITCH, 6),
 )
 HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 7.9
 HOLE_X_PLACES = 1
@@ -66,6 +66,11 @@ HOLE_LIGAMENTS_MIN = {
 }
 if min(HOLE_LIGAMENTS_MIN.values()) < 2.0:
     raise AssertionError(f"ledge screw-hole ligaments {HOLE_LIGAMENTS_MIN} under 2.0")
+# Each station floats on its own one-place band, so the pitch can close by
+# both; the two SHCS heads must still stand apart at that worst case.
+HEAD_GAP_MIN = _X2[0] - _X1[1] - plate.SCREW_HEAD_DIA_MAX
+if HEAD_GAP_MIN < plate.SCREW_HEAD_GAP_MIN:
+    raise AssertionError(f"ledge screw heads clear by only {HEAD_GAP_MIN:.2f} at worst-case pitch")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LedgeProfile": {"Width", "Height"},
