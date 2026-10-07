@@ -72,6 +72,16 @@ def check_namespace(path, *, historical_diagnostic=False, output=False, video_id
         raise ValueError("Historical content is immutable and requires explicit diagnostic input")
     if not historical_diagnostic and declared.suffix != ".gz":
         raise ValueError("Current observation input/output requires an explicit .gz path")
+    if historical_diagnostic and output:
+        private = web / ".vite/verification-output"
+        external_temp = not path.is_relative_to(web.parent) and any(
+            path.is_relative_to(Path(temp).resolve()) for temp in ("/tmp", "/var/tmp"))
+        private_escape = not path.is_relative_to(private) and any(
+            parent.name == "verification-output" and parent.parent.name == ".vite"
+            and parent.parent.parent.resolve() == web
+            for parent in declared.parents)
+        if private_escape or not (path.is_relative_to(private) or external_temp):
+            raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output")
 
 
 def finite_vector(value, size, label):

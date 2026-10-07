@@ -10,6 +10,7 @@ import { nativeProvenanceFromModule } from './fetch-model.mjs'
 import { APPROVED_MODEL_REPRESENTATION, LIVE_MODEL_SOURCE } from './approved-model.mjs'
 import { loadCurrentObservations, validateCurrentTrackAssociation, currentSourceAssemblyChangeTimes, normalizeCurrentTrackAssemblies, currentSourceLayoutForViews as sourceLayoutForViews } from './fresh-source-observations.mjs'
 import { loadCurrentNativeEligibilityModule, collectCurrentNativeEligibilityEvidence, joinCurrentNativeEligibilityReport, unavailableCurrentNativeEligibilityReport } from './current-native-eligibility-report.mjs'
+import { writeJsonReport } from './json-report-writer.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const STAGES = [50, 20, 10, 5]
@@ -724,6 +725,49 @@ export function requirePlaybackDraw({ actual, receipts }) {
   return actual.sourceDrawRevision
 }
 
+/** Use the provider's visible accessible control, not a desktop-only chrome bar. */
+export async function playOfficialNativeControl(embed) {
+  const before = await media(embed)
+  assert(before.present && before.paused && !before.ended && !before.error && !before.adShowing, 'Official native play control requires a paused/cued original, not playing/ended/ad/error media')
+  // Hover reveals auto-hidden desktop chrome without toggling media. Responsive
+  // embeds instead expose a central "Play video" button, even with no bottom bar.
+  const player = embed.frame.locator('#movie_player')
+  await player.scrollIntoViewIfNeeded()
+  const bounds = await player.boundingBox()
+  assert(bounds && bounds.width > 0 && bounds.height > 0, 'Official original player has no visible hover area')
+  // Responsive overlay buttons may cover the player container; moving the real
+  // pointer reveals controls without requiring that container to receive hits.
+  await embed.frame.page().mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+  const controls = embed.frame.getByRole('button', { name: /^play(?: video)?(?: \([^)]+\))?$/i })
+  const deadline = performance.now() + 20_000
+  do {
+    for (let index = 0; index < await controls.count(); index++) {
+      const control = controls.nth(index)
+      const target = await control.evaluate(button => {
+        const bounds = button.getBoundingClientRect()
+        const x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2
+        if (button.disabled || button.getAttribute('aria-disabled') === 'true'
+          || bounds.width <= 0 || bounds.height <= 0 || bounds.left < 0 || bounds.top < 0
+          || bounds.right > innerWidth || bounds.bottom > innerHeight) return null
+        for (let node = button; node instanceof Element; node = node.parentElement) {
+          const style = getComputedStyle(node)
+          if (style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) === 0) return null
+        }
+        const hit = document.elementFromPoint(x, y)
+        if (!hit || !button.contains(hit)) return null
+        return { name: button.getAttribute('aria-label') ?? button.textContent?.trim(), width: bounds.width, height: bounds.height }
+      })
+      if (!target) continue
+      // Playwright performs a real pointer click with its own actionability
+      // checks. No provider API, DOM click, or forced hidden target can pass.
+      await control.click({ timeout: 5_000 })
+      return { ...target, proof: 'visible-in-frame-provider-accessible-button-native-pointer-click' }
+    }
+    await delay(100)
+  } while (performance.now() < deadline)
+  throw new Error('Official original player has no visible usable native Play/Play video control')
+}
+
 async function playbackChecks(page, embed, record, report, outputDirectory) {
   const playback = { status: 'unavailable', selectedInterval: null, clocks: [] }
   report.playback[embed.player] = playback
@@ -778,17 +822,11 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
   await page.locator('#minimize-player').click()
   const rect = await page.locator('#video-player').boundingBox()
   assert(rect && rect.width >= 200 && rect.height >= 200, 'Compact original player must remain at least200x200')
-  const activeControls = await embed.frame.evaluate(selector => {
-    const video = document.querySelector(selector)
-    if (selector.includes('html5-main-video')) {
-      const control = document.querySelector('.ytp-play-button'), bar = document.querySelector('.ytp-chrome-bottom'), bounds = control?.getBoundingClientRect()
-      return { controls: !!control && !!bar && bounds?.width > 0 && bounds?.height > 0 }
-    }
-    return { controls: video?.controls === true }
-  }, embed.selector)
+  const activeControls = embed.player === 'youtube'
+    ? { controls: true, providerControl: await playOfficialNativeControl(embed) }
+    : await embed.frame.evaluate(selector => ({ controls: document.querySelector(selector)?.controls === true }), embed.selector)
   assert(activeControls.controls, 'Compact original player has no usable native playback controls')
-  if (embed.player === 'youtube') await embed.frame.locator('.ytp-play-button').click()
-  else {
+  if (embed.player !== 'youtube') {
     const video = page.locator(embed.selector)
     await video.hover()
     // Chromium owns this button in a closed user-agent shadow tree. Its actual
@@ -953,8 +991,8 @@ async function interactionChecks(page, embed, record, outputDirectory) {
     try { await page.screenshot({ path: resolve(outputDirectory, failureScreenshot) }); evidence.screenshots.failure = failureScreenshot }
     catch (captureError) { evidence.failureScreenshotError = captureError.message }
     evidence.report = `${id}-manual-interaction-failed.json`
-    try { await writeFile(resolve(outputDirectory, evidence.report), `${JSON.stringify(evidence, null, 2)}\n`) }
-    catch (captureError) { evidence.reportWriteError = captureError.message }
+    try { await writeJsonReport(resolve(outputDirectory, evidence.report), evidence) }
+    catch (captureError) { evidence.reportWriteError = captureError.message; console.error(`Interaction failure report ${record.id}:`, captureError) }
     error.interaction = evidence
     throw error
   }
@@ -1166,23 +1204,29 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
         if (unmeasured.length) video.failures.push({ code: 'unmeasured-census', reason: `${unmeasured.length} selected mandatory samples were not measured` })
       }
       if (video.status !== 'passed') report.failures.push({ videoId: id, status: video.status, reasons: video.failures, unavailableSamples: video.coverage?.unavailableRequiredSamples ?? null })
-      await writeFile(resolve(outputDirectory, `${id}.json`), `${JSON.stringify(video, null, 2)}\n`)
+      await writeJsonReport(resolve(outputDirectory, `${id}.json`), video)
       console.log(JSON.stringify({ videoId: id, stage: options.stage, status: video.status, coverage: video.coverage, maxErrorPx: video.maxErrorPx, unavailableReasons: video.unavailableReasons.length }))
     }
     if (report.browserLog.some(item => item.type === 'pageerror')) report.failures.push({ code: 'unhandled-browser-error', reasons: report.browserLog })
     report.status = options.scoped ? 'partial' : report.videos.length === options.videos.length && report.videos.every(video => video.status === 'passed') && !report.failures.length ? 'passed' : report.videos.some(video => video.status === 'failed' || video.stageMeasurement?.status === 'failed') ? 'failed' : 'unavailable'
-  } catch (error) { report.failures.push({ code: 'verification-prerequisite', reason: error.message }) }
+  } catch (error) {
+    report.failures.push({ code: 'verification-prerequisite', reason: error.message })
+    console.error(`Verification failed; preserving measured evidence in ${outputDirectory}:`, error)
+  }
   finally {
-    for (const [name, value] of [['page', page], ['context', context], ['browser', browser], ['server', server]]) try { await value?.close() } catch (error) { report.failures.push({ code: `${name}-cleanup`, reason: error.message }) }
+    for (const [name, value] of [['page', page], ['context', context], ['browser', browser], ['server', server]]) try { await value?.close() } catch (error) {
+      report.failures.push({ code: `${name}-cleanup`, reason: error.message })
+      console.error(`Verification ${name} cleanup failed (${outputDirectory}):`, error)
+    }
     process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt)
     report.finishedAt = new Date().toISOString()
     if (report.status === 'passed' && report.failures.length) report.status = 'failed'
-    const path = resolve(outputDirectory, 'report.json'); await writeFile(path, `${JSON.stringify(report, null, 2)}\n`)
+    const path = resolve(outputDirectory, 'report.json'); await writeJsonReport(path, report)
     console.log(JSON.stringify({ status: report.status, scope: report.scope, stage: report.stage, tolerancePx: report.limits.sourceLandmarkPx, videoCount: report.videos.length, report: path }, null, 2))
   }
   return report.status === 'passed' ? 0 : 1
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { process.exitCode = await verifySync() }
-  catch (error) { console.error(error.message); process.exitCode = 1 }
+  catch (error) { console.error('Fatal verification error:', error); process.exitCode = 1 }
 }

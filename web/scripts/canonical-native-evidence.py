@@ -48,6 +48,7 @@ FRESH_CONSUMER_INPUTS = (
     'web/src/native-landmark-eligibility.ts',
     'web/src/native-target-shader-feedback.ts',
     'web/scripts/current-native-eligibility-report.mjs',
+    'web/scripts/json-report-writer.mjs',
     'web/scripts/current-first-surface.py',
     'web/scripts/canonical-native-evidence.py',
 )

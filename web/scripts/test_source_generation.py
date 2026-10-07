@@ -995,6 +995,105 @@ class ObservationStorageBoundaryTests(unittest.TestCase):
 
 
 
+class HistoricalObservationNamespaceTests(unittest.TestCase):
+    scripts = ('observe-source.py', 'fit-source.py')
+
+    def test_clis_refuse_checkout_outputs_without_consuming_runtime_inputs_or_overwriting(self):
+        original = common.load_historical_observations('NAsM30MAHLg')
+        with tempfile.TemporaryDirectory() as temporary, \
+                tempfile.TemporaryDirectory(dir=HERE.parent / 'public') as public, \
+                tempfile.TemporaryDirectory(dir=HERE.parent / 'src') as source, \
+                tempfile.TemporaryDirectory(dir=HERE.parent.parent / 'cad') as cad, \
+                tempfile.TemporaryDirectory(dir=HERE.parent.parent) as checkout:
+            root = Path(temporary)
+            observations = root / 'historical.json'
+            observations.write_text(json.dumps(original))
+            alias = root / 'checkout-alias'
+            alias.symlink_to(HERE.parent.parent, target_is_directory=True)
+            destinations = (Path(public) / 'receipt.json', Path(source) / 'receipt.json',
+                            Path(checkout) / 'receipt.json', Path(cad) / 'receipt.json',
+                            alias / Path(checkout).name / 'receipt.json')
+            for filename in self.scripts:
+                arguments = (
+                    ['--observations', str(observations), '--source', str(root / 'missing.mp4')]
+                    if filename == 'observe-source.py'
+                    else [str(observations), '--inventory', str(root / 'missing.json')]
+                )
+                for destination in destinations:
+                    with self.subTest(script=filename, destination=destination):
+                        destination.write_bytes(b'original receipt must survive')
+                        result = subprocess.run(
+                            [sys.executable, str(HERE / filename), *arguments,
+                             '--historical-diagnostic', '--output', str(destination)],
+                            capture_output=True, text=True)
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertIn('require private .vite/verification-output', result.stderr)
+                        self.assertNotIn('FileNotFoundError', result.stderr)
+                        self.assertEqual(destination.read_bytes(), b'original receipt must survive')
+
+    def test_historical_outputs_use_resolved_temp_roots_excluding_the_whole_checkout(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            web = root / 'checkout/web'
+            private = web / '.vite/verification-output'
+            private.mkdir(parents=True)
+            external = root / 'external'
+            external.mkdir()
+            checkout_alias = root / 'checkout-alias'
+            checkout_alias.symlink_to(web.parent, target_is_directory=True)
+            temp_alias = root / 'temp-alias'
+            temp_alias.symlink_to(root, target_is_directory=True)
+            external_alias = root / 'external-alias'
+            external_alias.symlink_to(external, target_is_directory=True)
+            private_escape = private / 'escape'
+            private_escape.symlink_to(external, target_is_directory=True)
+
+            def temporary_roots(value):
+                return temp_alias if str(value) in ('/tmp', '/var/tmp') else Path(value)
+
+            for filename in self.scripts:
+                module = load_script(filename, 'observation_namespace_' + filename)
+                with patch.object(module, '__file__', str(web / 'scripts' / filename)), \
+                        patch.object(module, 'Path', temporary_roots):
+                    for destination in (private / 'receipt.json', external / 'receipt.json',
+                                        external_alias / 'receipt.json'):
+                        module.check_namespace(destination, historical_diagnostic=True, output=True)
+                    for destination in (web / 'public/receipt.json', web / 'src/receipt.json',
+                                        web.parent / 'receipt.json', web.parent / 'cad/receipt.json',
+                                        checkout_alias / 'cad/receipt.json',
+                                        private_escape / 'receipt.json',
+                                        checkout_alias / 'web/.vite/verification-output/escape/receipt.json'):
+                        with self.subTest(script=filename, destination=destination), \
+                                self.assertRaises(ValueError):
+                            module.check_namespace(destination, historical_diagnostic=True, output=True)
+                    # The new allowlist is output-only: historical diagnostic
+                    # inputs remain readable, while current gzip rules stay intact.
+                    module.check_namespace(web / 'content/original.json', historical_diagnostic=True)
+                    module.check_namespace(web / 'public/original.json', historical_diagnostic=True)
+                    module.check_namespace(web / 'public/current.json.gz', output=True)
+                    with self.assertRaises(ValueError):
+                        module.check_namespace(external / 'current.json', output=True)
+                    with self.assertRaises(ValueError):
+                        module.check_namespace(
+                            web / 'content/v39-source/NAsM30MAHLg.observations.json.gz',
+                            historical_diagnostic=True)
+
+            private_escape.unlink()
+            private.rmdir()
+            for target in (web / 'public', web / 'src', external):
+                private.symlink_to(target, target_is_directory=True)
+                for filename in self.scripts:
+                    module = load_script(filename, 'observation_private_root_' + filename)
+                    with patch.object(module, '__file__', str(web / 'scripts' / filename)), \
+                            patch.object(module, 'Path', temporary_roots):
+                        for destination in (private / 'receipt.json',
+                                            checkout_alias / 'web/.vite/verification-output/receipt.json'):
+                            with self.subTest(script=filename, target=target, destination=destination), \
+                                    self.assertRaises(ValueError):
+                                module.check_namespace(destination, historical_diagnostic=True, output=True)
+                private.unlink()
+
+
 class HistoricalDiagnosticOutputBoundaryTests(unittest.TestCase):
     scripts = ('NAsM30MAHLg-calibrate-static.py',
                'generate-analysis-bank-source-controls.py',

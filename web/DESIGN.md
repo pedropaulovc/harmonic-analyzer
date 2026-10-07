@@ -53,7 +53,8 @@ requirement is unchanged. Nine actual independently decoded frames supply
 missing Operation fade exposures; existing samples and landmarks are preserved.
 Their measured source facts do not make inherited pose guesses observed.
 Complete approximate playback remains separate from source-fidelity acceptance.
-Current stages 50/20/10/5 are unmeasured, with no acceptance-attempt quota.
+Each 50/20/10/5 stage requires complete fresh source measurements; a partial run
+cannot qualify the current release. There is no acceptance-attempt quota.
 
 The [manifest](content/canonical-native/manifest.json) seals stored-byte and
 original SHA-256 values, mapping revision/digest, numeric-token preservation and
@@ -63,6 +64,8 @@ remain immutable historical provenance, not current lookups. Nine snapshots seal
 original capture inputs; three others seal prior identity-migrated producer
 inputs at an explicit commit/path origin. Historical required producer records
 retain those hashes even when the live hardware classifier changes.
+The registered native inventory is also exact-byte authority; its web-scoped
+`-text` attribute prevents checkout newline conversion from changing that seal.
 Independent normalized current-consumer seals detect live drift. Ordinary source
 production requires the approved live source tuple and sealed live code, scene
 and native mathematics; archived inputs cannot satisfy that requirement.
@@ -508,6 +511,9 @@ lighting changes must not change those surface owners or hide native geometry.
 Per-video verification is incremental and repeatable, without an acceptance-run
 quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.
 A coarse demo or a passing subset does not establish final acceptance.
+Per-video and aggregate reports stream their complete existing JSON evidence
+with bounded serialization memory and atomic publication. Invalid values or
+failed writes remain failures and cannot replace a previous complete report.
 On a failed stage, refine the worst source-visible discrepancy, rerun the affected
 shot, then rerun the collection. Escalate actual missing geometry outside approved
 exceptions rather than hiding it with a camera warp or an occlusion claim.
@@ -524,10 +530,15 @@ require at least one current completed draw. A zero-opacity crossfade layer has
 no draw receipt; any positive opacity still requires fresh pose, clock and shared
 revision evidence. Failed playback remains failed even if a later real native
 seek establishes the strictly paused state needed for independent measurements.
+After seeking away from actual EOF, the local player publishes the settled native
+state on `seeked`; a paused getter and the HUD must agree, without aliasing ended.
 
 Paused exploration must permit orbit, pan, zoom and mechanism operation without
 advancing the source video. Compact mode retains the same visible usable player
 at least 200 by 200 pixels, with advancing audio and working pause/resume controls.
+Official-player checks use visible provider-accessible Play controls in both
+responsive and desktop layouts, not an assumed desktop chrome bar. A real native
+pointer click must still produce audible, advancing, synchronized playback.
 Verify all six routes. Present the working implementation in a headed browser;
 headless Playwright with screenshots or recordings is for automated checks.
 

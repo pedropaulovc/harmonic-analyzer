@@ -96,6 +96,11 @@ export function createSourceVideoPlayer(container: HTMLElement, videoId: string,
     media.addEventListener('waiting', () => { if (!media.paused) publish('buffering') })
     media.addEventListener('pause', () => { playRequest++; if (!media.ended) publish('paused') })
     media.addEventListener('ended', () => publish('ended'))
+    media.addEventListener('seeked', () => {
+      if (destroyed || !ready || media.seeking || state === 'error') return
+      // Seeking away from EOF need not emit pause again; publish the settled native state.
+      publish(media.ended ? 'ended' : media.paused ? 'paused' : media.readyState < media.HAVE_FUTURE_DATA ? 'buffering' : 'playing')
+    })
     media.addEventListener('error', () => fail(`Original reference video load failed (${media.error?.message ?? 'media unavailable'}).`))
     if (options.signal?.aborted) abort()
     else options.signal?.addEventListener('abort', abort, { once: true })

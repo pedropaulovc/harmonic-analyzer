@@ -2477,6 +2477,9 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     const hook = parts.get(`ha-harmonic-analyzer/ch-channel/vn-spring-hook-${station}`)
     if (lever && hook) channelSpringAttachments.push({ spring, lever, hook })
   }
+  // cad/scripts/channel_lever_spec.py:LEVER_SPRING_X, exported as the
+  // lever-local +X eye reach in mm; also feeds channelMoment's springHoleM.
+  const leverSpringArmM = MECHANISM_DATA.channel.leverSpringArmMm / 1000
   const knife = new THREE.Vector3().fromArray(MECHANISM_DATA.summing.knifeMm).multiplyScalar(0.001)
   const crankPart = parts.get('ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1')
   const conePart = parts.get('ha-harmonic-analyzer/dt-drive-train/dt-cone-gear-shaft-1')
@@ -2752,7 +2755,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
         springsRefreshed = true
       }
       a.setFromMatrixPosition(hook.node.matrixWorld).applyMatrix4(currentWorldToNative)
-      pivot.set(0.17505, 0, 0).applyMatrix4(lever.node.matrixWorld).applyMatrix4(currentWorldToNative)
+      pivot.set(leverSpringArmM, 0, 0).applyMatrix4(lever.node.matrixWorld).applyMatrix4(currentWorldToNative)
       axis.subVectors(pivot, a).normalize()
       // The same loaded-seat offsets and catalog inside-hook length used by
       // channelMoment; the existing native mesh/deformer remains the only curve.

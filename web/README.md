@@ -59,7 +59,7 @@ Further reuse requires exact exposure provenance and the same physical feature
 under a current native association; an unchanged anchor ID alone is insufficient.
 Old model-bound tracks remain incompatible, and approximate current tracks do
 not establish source fidelity.
-Current stages 50/20/10/5 are unmeasured.
+No complete current-release source-fidelity acceptance has been established.
 
 Playback can start while the model or source track loads. Source-following starts
 automatically when both are ready; pausing retains manual exploration. Status
@@ -495,8 +495,9 @@ remain unchanged, and the strict same-shot 0.5-second source-exposure requiremen
 still applies. Nine actual independently decoded frames fill genuinely missing
 Operation fade exposures while preserving existing samples and landmarks.
 Inherited camera/mechanism guesses remain chosen/unobserved. Complete playable
-approximate tracks do not imply a source-fidelity pass; stages 50/20/10/5 remain
-unmeasured, with no acceptance-attempt quota.
+approximate tracks do not imply a source-fidelity pass. Fresh rendered reports
+must distinguish measured failures, unavailable coverage and unmeasured stages;
+there is no acceptance-attempt quota.
 
 The [derivative manifest](content/canonical-native/manifest.json) records each
 derivative and original SHA-256, mapping revision and digest, preserved numeric
