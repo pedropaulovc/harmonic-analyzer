@@ -119,76 +119,150 @@ def test_datum_b_machining_witness_rejects_flange_and_opposite_end(
             drawing._assert_machined_pickup_faces(edges)
 
 
-@pytest.mark.parametrize("numeric_field", (None, 1, 3, 4, 5, 6, 7, 8, 9, 10))
-def test_pickup_native_machining_pmi_refuses_unapproved_numeric_limits(
-    monkeypatch, numeric_field,
+@pytest.mark.parametrize(
+    "fault",
+    (None, "property", "missing_property", "geometry", "count", "type",
+     "missing_selected", "wrong_selected", "indeterminate", "reference"),
+)
+def test_pickup_native_witness_refuses_unqualified_physical_faces(
+    monkeypatch, fault,
 ) -> None:
-    """Exercise the actual part authoring consumer, not source wiring: new
-    machining PMI stays nonnumeric or fails before the model can be saved."""
+    """Process-only machining uses actual native faces, not numeric symbols.
+
+    Reject an altered plane, an unproved selection, or a face without a native
+    persistent reference before the model-owned requirement can be saved.
+    """
     import build_sm_summing_lever as part
 
-    symbols = []
-    verified = []
-    faces = {
-        key: SimpleNamespace(GetBox=lambda: (-0.1, -0.1, -0.1, 0.1, 0.1, 0.1))
-        for key in part.MACHINED_PICKUP_FACES
+    selected = [None]
+    generation = [0]
+    selections = []
+    cleared = []
+    events = []
+
+    class Face:
+        def __init__(self, key):
+            self.key = key
+
+        def Select4(self, _append, _callout):
+            generation[0] += 1
+            selections.append((self.key, self))
+            selected[0] = (
+                None if fault == "missing_selected"
+                else object() if fault == "wrong_selected"
+                else self
+            )
+            return True
+
+    class SelectionManager:
+        def __init__(self):
+            self.generation = generation[0]
+
+        def require_current(self):
+            if self.generation != generation[0]:
+                raise RuntimeError("selection manager invalidated by native reselection")
+
+        def GetSelectedObjectCount2(self, _mark):
+            self.require_current()
+            return 2 if fault == "count" else 1
+
+        def GetSelectedObjectType3(self, _index, _mark):
+            self.require_current()
+            return 1 if fault == "type" else 2
+
+        def GetSelectedObject6(self, _index, _mark):
+            self.require_current()
+            return selected[0]
+
+    class Model(SimpleNamespace):
+        @property
+        def SelectionManager(self):
+            return SelectionManager()
+
+    def clear(all_selections):
+        cleared.append(all_selections)
+        generation[0] += 1
+        selected[0] = None
+
+    faces = {key: Face(key) for key in part.MACHINED_PICKUP_FACES}
+    geometries = {
+        id(faces[key]): _pickup_geometry(faces[key], spec)
+        for key, spec in part.MACHINED_PICKUP_FACES.items()
     }
 
-    class Symbol:
-        def __init__(self, arguments):
-            self.arguments = arguments
-            self.text = {}
-            self.annotation = object()
+    def same(left, right):
+        return -1 if fault == "indeterminate" else int(left is right)
 
-        def SetText(self, field, text):
-            self.text[field] = text
-            return True
-
-        def GetTextCount(self):
-            return len(self.text)
-
-        def GetSymbol(self):
-            return 1
-
-        def GetText(self, field):
-            return "3.2" if field == numeric_field else self.text.get(field, "")
-
-        def GetAnnotation(self):
-            return self.annotation
-
-        def IsAttached(self):
-            return True
-
-        def GetLeaderCount(self):
-            return 1
-
-    def insert(*arguments):
-        symbol = Symbol(arguments)
-        symbols.append(symbol)
-        return symbol
-
-    model = SimpleNamespace(
-        Extension=SimpleNamespace(InsertSurfaceFinishSymbol3=insert),
-        ClearSelection2=lambda _all: None,
+    process = (
+        "" if fault == "missing_property"
+        else "MACHINE KNIFE EDGES ONLY" if fault == "property"
+        else part.PICKUP_PROCESS
+    )
+    model = Model(
+        GetCustomInfoValue=lambda _configuration, name: (
+            process if name == part.PICKUP_PROCESS_PROPERTY else ""
+        ),
+        Extension=SimpleNamespace(
+            GetPersistReference3=lambda _face: () if fault == "reference" else (1, 2, 3),
+        ),
+        ClearSelection2=clear,
     )
     monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr("_part_pmi._early_bound", lambda value, _kind: value)
+    monkeypatch.setattr("_part_pmi.null_callout", lambda: None)
     monkeypatch.setattr(part, "_resolve_faces", lambda _model, _requests: faces)
-    monkeypatch.setattr(part, "_select_face", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(part, "_name_annotation", lambda annotation, **_kwargs: annotation)
     monkeypatch.setattr(
-        part, "_verify_attachment",
-        lambda _annotation, spec, *, label: verified.append((spec, label)),
+        part, "_face_geometry",
+        lambda face: None if fault == "geometry" else geometries[id(face)],
     )
-    adapter = SimpleNamespace(currentModel=model)
-    if numeric_field is not None:
-        with pytest.raises(RuntimeError, match="unexpected numeric surface specification"):
-            part._author_pickup_machining(adapter)
-        assert not verified
+    monkeypatch.setattr(part._telemetry, "event",
+                        lambda name, **fields: events.append((name, fields)))
+    monkeypatch.setattr(part._telemetry, "info", lambda _message: None)
+    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=same))
+    if fault is not None:
+        with pytest.raises(
+            RuntimeError, match="pickup-process property|physical pickup face|selection mismatch|reference"
+        ):
+            part._witness_pickup_faces(adapter)
+        assert cleared and cleared[-1] is True
+        assert selected[0] is None
+        assert not events
         return
-    part._author_pickup_machining(adapter)
-    assert len(symbols) == len(verified) == len(part.MACHINED_PICKUP_FACES)
-    assert all(symbol.arguments[7:] == ("",) * 7 for symbol in symbols)
-    assert all(symbol.text == {2: "MACHINE"} for symbol in symbols)
+    part._witness_pickup_faces(adapter)
+    assert cleared and cleared[-1] is True
+    assert selected[0] is None
+    assert dict(selections) == faces
+    assert {fields["key"] for _name, fields in events} == faces.keys()
+    assert all(
+        name == "summing_lever.machined_pickup_face"
+        and fields["selected_count"] == fields["same_selected"] == 1
+        and fields["selected_type"] == 2
+        and fields["persistent_reference"] == "010203"
+        and fields["process_property"] == part.PICKUP_PROCESS_PROPERTY
+        and fields["process_requirement"] == part.PICKUP_PROCESS
+        for name, fields in events
+    )
+
+
+@pytest.mark.parametrize("fault", (None, "typed_text", "wrong_property", "stale_process"))
+def test_pickup_process_note_requires_native_source_link_and_resolved_requirement(
+    monkeypatch, fault,
+) -> None:
+    linked = drawing.property_link("Manufacturing Notes")
+    resolved = drawing.DRAWING_NOTES
+    if fault == "typed_text":
+        linked = resolved
+    elif fault == "wrong_property":
+        linked = drawing.property_link("Isometric View Note")
+    elif fault == "stale_process":
+        resolved = "5. CAST PART; MACHINE KNIFE EDGES AND TAP SPRING ANCHOR SEATS ONLY."
+    note = SimpleNamespace(PropertyLinkedText=linked, GetText=lambda: resolved)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    if fault is not None:
+        with pytest.raises(RuntimeError, match="process note"):
+            drawing._assert_pickup_process_note(note)
+        return
+    drawing._assert_pickup_process_note(note)
 
 
 def _dimension(mm: float, attached: tuple[object, ...]):
@@ -906,11 +980,24 @@ def callout_scene(monkeypatch, tmp_path):
     for name in (
         "stamp_drawing_summary", "set_hidden_lines_removed", "curate_view_dimensions",
         "add_datum_feature", "add_surface_finish", "add_feature_control_frame",
-        "set_basic_dimension", "add_property_linked_note",
+        "set_basic_dimension",
     ):
         monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "add_property_linked_note",
+        lambda _adapter, name, *_args, **_kwargs: SimpleNamespace(
+            PropertyLinkedText=drawing.property_link(name),
+            GetText=lambda: drawing.DRAWING_NOTES,
+        ),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     for module in (drawing, common):
-        monkeypatch.setattr(module, "read_required_properties", lambda *_args, **_kwargs: {})
+        monkeypatch.setattr(
+            module, "read_required_properties",
+            lambda *_args, **_kwargs: {
+                drawing.PICKUP_PROCESS_PROPERTY: drawing.PICKUP_PROCESS,
+            },
+        )
     monkeypatch.setattr(common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(common._sw_type_info, "early_bound", lambda value, _kind: value)
     monkeypatch.setattr(common._sw_type_info, "early_bound_or_flag",

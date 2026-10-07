@@ -29,7 +29,7 @@ from sm_summing_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _hole_spec import blind_cut_dia_mm
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     ViewEdge,
@@ -47,6 +47,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
+    property_link,
     read_required_properties,
     scan_view_edges,
     set_basic_dimension,
@@ -56,6 +57,7 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from _part_pmi import _face_matches
+from sm_summing_lever_notes import DRAWING_NOTES, PICKUP_PROCESS, PICKUP_PROCESS_PROPERTY
 from sm_summing_lever_spec import (
     ANCHOR_H,
     ANCHOR_R,
@@ -168,13 +170,33 @@ TOP_KEEP = {
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
 
+@_telemetry.traced("drawing.summing_pickup_process")
+def _assert_pickup_process_note(note: Any) -> None:
+    """Read back the actual model-owned process, not a typed drawing substitute."""
+    native_note = _early_bound(note, "INote")
+    linked = str(native_note.PropertyLinkedText or "")
+    resolved = str(native_note.GetText() or "").replace("\r", "")
+    if linked != property_link("Manufacturing Notes"):
+        raise RuntimeError(f"pickup process note lost its native model link: {linked!r}")
+    if resolved != DRAWING_NOTES:
+        raise RuntimeError(
+            f"pickup process note does not resolve this part's requirement: {resolved!r}"
+        )
+    _telemetry.event(
+        "drawing.summing_pickup_process",
+        property_name="Manufacturing Notes",
+        property_link=linked,
+        resolved_text=resolved,
+    )
+
+
 @_telemetry.traced("drawing.machined_pickup_faces")
 def _assert_machined_pickup_faces(edges: dict[str, Any]) -> None:
     """Witness the real source faces named by the model's machining instruction.
 
-    New pickup machining is nonnumeric: the linked Manufacturing Notes and
-    part-owned machining-required PMI own the process, not new drawing symbols
-    or a borrowed Ra grade. A linked instruction alone is not this witness.
+    New pickup machining is nonnumeric: the linked Manufacturing Notes own
+    the process and the part build qualifies its physical faces, not new
+    drawing symbols or a borrowed Ra grade. Linked text alone is not this witness.
     """
     if edges.keys() != MACHINED_PICKUP_FACES.keys():
         raise RuntimeError("summing lever machining witness omitted a required pickup")
@@ -202,7 +224,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open summing-lever source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -213,6 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            PICKUP_PROCESS_PROPERTY,
         ),
         required=(
             "Number",
@@ -221,8 +244,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            PICKUP_PROCESS_PROPERTY,
         ),
     )
+    if properties.get(PICKUP_PROCESS_PROPERTY, "").replace("\r", "") != PICKUP_PROCESS:
+        raise RuntimeError(
+            f"source pickup-process property {PICKUP_PROCESS_PROPERTY!r} "
+            "does not match this part's requirement"
+        )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -519,7 +548,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.120)
+    process_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.120
+    )
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.185)
 
     return await finalize_drawing(
@@ -532,6 +563,7 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_redundant_notes=3,
         settled_checks=(
             lambda: _assert_machined_pickup_faces(machining_pickups),
+            lambda: _assert_pickup_process_note(process_note),
             lambda: assert_native_hole_callout_attachment(
                 adapter, top, anchor_callout, edge=anchor_rim.edge, label="anchor tap"
             ),
