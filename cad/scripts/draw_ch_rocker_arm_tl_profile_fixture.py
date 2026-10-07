@@ -118,7 +118,10 @@ DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 9.0
 DETAIL_LABEL_LOWER_LEFT = (0.373, 0.204)
 NOTES_XY = (0.016, 0.045)
-HOLD_DOWN_CALLOUT_XY = (0.226, 0.192)
+# Under the plan's east half, above the elevation: on the plate it sat on H2's
+# counterbore ring and crowded the plate edge (codex review of run
+# 20261007T190010219Z). Text about 81 x 10 mm, centred here.
+HOLD_DOWN_CALLOUT_XY = (0.168, 0.152)
 # Right of the plate's east end: at x 228 its shoulder ran 15 mm along the
 # PlateLength dimension line (run 20261007T185353671Z).
 STUD_CALLOUT_XY = (0.250, 0.260)
@@ -130,8 +133,11 @@ PLAN_KEEP_AT = {
         (PLATE_WEST_X, (PLATE_NORTH_Y + PLATE_SOUTH_Y) / 2.0),
         (-0.011, 0.0),
     ),
-    "PlateWestX": ((PLATE_WEST_X / 2.0, -12.0), (0.0, 0.0)),
-    "PlateSouthY": ((-7.0, -45.0), (0.0, 0.0)),
+    # The bore's location dimensions sit outside the plate (codex review of run
+    # 20261007T190010219Z): from the west end under the plan, and from the south
+    # edge right of the plate's east end.
+    "PlateWestX": ((PLATE_WEST_X / 2.0, PLATE_SOUTH_Y), (0.0, -0.008)),
+    "PlateSouthY": ((PLATE_EAST_X, PLATE_SOUTH_Y / 2.0), (0.008, 0.0)),
     "RodPinHoleDia": (ROD_PIN_HOLE_XY, (0.045, 0.012)),
 }
 # Section D-D, model (x, z) mm: the plate-top baseline ladder (counterbore and
@@ -149,8 +155,9 @@ SECTION_KEEP_AT = {
 # Front elevation (*Bottom: model X right, Z up) projected under the plan at
 # its scale: plate thickness left of it, the pad-top drop right of it (sheet
 # offsets from the plate ends). A turned end view printed an empty rotation
-# label over itself (run 20261007T180611940Z).
-ELEVATION_CENTER = (PLAN_CENTER[0], 0.150)
+# label over itself (run 20261007T180611940Z). Low enough to leave the
+# PlateWestX dimension and the hold-down callout room under the plan.
+ELEVATION_CENTER = (PLAN_CENTER[0], 0.125)
 ELEVATION_KEEP_Z = {
     "PlateThick": ((PLATE_TOP_Z + PLATE_BOTTOM_Z) / 2.0, -0.012),
     "PlateDrop": ((PAD_TOP_Z + PLATE_TOP_Z) / 2.0, 0.012),
@@ -302,12 +309,13 @@ def _elevation_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
     return keep
 
 
-def _delete_thread_callouts(adapter: Any, view: Any) -> None:
-    """Delete the model's cosmetic-thread callout notes from the TAGS plan
-    (as ``delete_unnamed_imports`` deletes automatic ones): the tags name each
-    hole and detail E carries the pivot tap's callout, yet the model's
-    "#10-24 Tapped Hole" note sat over tags A1-A3 (run 20261007T182242302Z).
-    A hidden layer does not do: the layout audit boxes hidden-layer notes too
+def _delete_thread_callouts(adapter: Any, view: Any, *, label: str) -> None:
+    """Delete the model's cosmetic-thread callout notes from ``view`` (as
+    ``delete_unnamed_imports`` deletes automatic ones): detail E carries the
+    pivot tap's one callout, yet the model's "#10-24 Tapped Hole" note sat
+    over the TAGS plan's tags A1-A3 (run 20261007T182242302Z) and printed
+    again on the plan and the isometric (run 20261007T190010219Z). A hidden
+    layer does not do: the layout audit boxes hidden-layer notes too
     (run 20261007T182758889Z)."""
     draw = adapter.currentModel
     deleted = 0
@@ -323,19 +331,19 @@ def _delete_thread_callouts(adapter: Any, view: Any) -> None:
         callout = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
         draw.ClearSelection2(True)
         if not callout.Select2(False, 0):
-            raise RuntimeError("failed to select a TAGS thread callout")
+            raise RuntimeError(f"failed to select a {label} thread callout")
         draw.EditDelete()
         deleted += 1
     draw.ClearSelection2(True)
     if not deleted:
-        raise RuntimeError("TAGS plan has no cosmetic-thread callout to delete")
-    rebuild_drawing(adapter, label="delete TAGS thread callouts")
+        raise RuntimeError(f"{label} has no cosmetic-thread callout to delete")
+    rebuild_drawing(adapter, label=f"delete {label} thread callouts")
     left = [
         str(_early_bound(found, "INote").GetText() or "")
         for found in (_early_bound(view, "IView").GetNotes() or ())
     ]
     if any("Tapped Hole" in text for text in left):
-        raise RuntimeError(f"TAGS plan still carries a thread callout: {left!r}")
+        raise RuntimeError(f"{label} still carries a thread callout: {left!r}")
 
 
 def _position_view_label(
@@ -623,6 +631,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate the PLAN sheet")
     plan = place_view(adapter, str(SOURCE), "*Front", *PLAN_CENTER, scale=PLAN_SCALE)
     set_hidden_lines_removed(adapter, plan)
+    _delete_thread_callouts(adapter, plan, label="plan")
     section = _section(adapter, plan)
     detail = _detail(adapter, plan)
     elevation = _elevation(adapter)
@@ -724,7 +733,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate the TAGS sheet")
     tag_plan = place_view(adapter, str(SOURCE), "*Front", *TAG_CENTER, scale=TAG_SCALE)
     set_hidden_lines_removed(adapter, tag_plan)
-    _delete_thread_callouts(adapter, tag_plan)
+    _delete_thread_callouts(adapter, tag_plan, label="TAGS plan")
     _tags(adapter, tag_plan)
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to return to the TAGS sheet")
@@ -745,6 +754,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # threads off (run 20261007T183332487Z; the inspection box's d7ad8b4c4).
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     set_hidden_lines_removed(adapter, iso)
+    _delete_thread_callouts(adapter, iso, label="isometric")
     if not ddoc.ActivateSheet(SHEET_NAMES[2]):
         raise RuntimeError("failed to return to the SCHEDULE sheet")
     _schedule(
