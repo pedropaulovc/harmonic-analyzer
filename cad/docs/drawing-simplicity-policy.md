@@ -371,6 +371,28 @@ tagged emitter for every row, printing the shortfall it names.
 | MHA-PD-020 transgear pivot spacer, brass ring Ø8.600 ±0.13 over the Ø4.900 ±0.13 bore on the MHA-VN-041 shoulder (the sheet states the wall as a MIN) | Bore-to-O.D. wall 1.85 nominal, 1.72 at the worst case of the printed bands (O.D. −0.13, bore +0.13), under the 2.0 target; floor 1.5 | the O.D. is held down by the swept clearance to the arm's lock stations (0.14 worst at Ø8.6 with the ring floating on the shoulder, R9-61), and the bore runs on the Ø4.7625 shoulder of the stock pivot screw; the ring only spaces the arm off the bar's back face | User, ruling 8, 2026-09-30 |
 | MHA-VN-041 transgear pivot screw (McMaster 91829A205, 3/16 × 1/2 slotted shoulder screw, #8-32 thread) through MHA-PD-020 and MHA-PD-018 into the #8-32 blind tap of the MHA-PD-007 support bar (its sheet's installation line states it) | #8-32 thread engagement 0.72D nominal (2.997 of full thread: the 4.7625 thread less the vendor's 1.765 neck and ramp), 0.52D minimum at the worst case (2.203 = 0.529D after the 1 P first thread, printed floored), under the 1.5D rule | the joint carries only the shoulder's seating preload, and the arm runs on the shoulder, not the thread; every Ø3/16 McMaster shoulder option has the same thread, and a bigger shoulder changes the photographed head. The installation line sets it with low-strength threadlocker | User, ruling 11, 2026-09-30; re-stated by R9-7 (coordinator, 2026-09-30) after the vendor model showed the thread-relief neck ruling 11's 0.94D left out |
 
+## Purchased washer receiving reference
+
+`part:vn_knife_hanger_washer` retains the McMaster-Carr 90126A211 supplier
+geometry and purchase identity (MHA-VN-026). Its native annulus and extrusion
+dimensions own the ID, OD and thickness names and two-place display precision;
+the source build reads the nominal values back without modifying geometry.
+`drawing:vn_knife_hanger_washer` imports those dimensions into a compact
+top/front/isometric receipt sheet, displays them parenthesized with short
+diameter leaders, and reads the imported precision back. These are supplier
+nominal references, not production controls: general tolerances and edge-break
+instructions do not apply. Stock, supplier and SKU remain property-linked.
+
+Acceptance requires an unchanged native supplier solid, all three reference
+dimensions, linked MHA-VN-026 identity and purchase fields, and readable,
+contained views, captions, dimensions and notes on the exported sheet.
+Run the registered part/drawing farm targets together, inspect the full-size
+sheet, then run
+`uv run cad/scripts/machinist_review.py vn_knife_hanger_washer --reviewer codex`.
+Offline
+specification-purity and purchased-drawing contracts supplement, but never
+replace, native and visual acceptance.
+
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
