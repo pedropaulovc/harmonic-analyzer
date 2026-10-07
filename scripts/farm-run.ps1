@@ -905,11 +905,13 @@ function Get-ProcessTable {
             $ticks = $process.StartTime.ToUniversalTime().Ticks
             $created = [System.DateTime]::new($ticks - ($ticks % 10), [System.DateTimeKind]::Utc)
             $parent = 0
-            $stat = "/proc/$($process.Id)/stat"
-            if (Test-Path -LiteralPath $stat -PathType Leaf) {
-                # pid (comm) state ppid ...; comm may hold spaces and parentheses.
-                $text = [System.IO.File]::ReadAllText($stat)
-                $parent = [int]$text.Substring($text.LastIndexOf(')') + 2).Split(' ')[1]
+            $stat = Read-ProcStat -Id $process.Id
+            if ($null -ne $stat) {
+                if ($stat.State -eq 'Z') {
+                    # Exited; only its parent's wait is still owed.
+                    continue
+                }
+                $parent = $stat.ParentProcessId
             }
             elseif ($null -ne $process.Parent) {
                 $parent = $process.Parent.Id
@@ -926,6 +928,50 @@ function Get-ProcessTable {
         }
     }
     return @($table)
+}
+
+function Read-ProcStat {
+    param([Parameter(Mandatory)][int]$Id)
+
+    # /proc/<pid>/stat is `pid (comm) state ppid ...`, and comm may hold spaces
+    # and parentheses. $null without /proc (Windows, macOS) or once it is gone.
+    try {
+        $text = [System.IO.File]::ReadAllText("/proc/$Id/stat")
+    }
+    catch {
+        return $null
+    }
+    $fields = $text.Substring($text.LastIndexOf(')') + 2).Split(' ')
+    return [pscustomobject]@{ State = $fields[0]; ParentProcessId = [int]$fields[1] }
+}
+
+function Wait-ProcessExit {
+    param(
+        [Parameter(Mandatory)][System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory)][int]$Milliseconds
+    )
+
+    if ($IsWindows) {
+        return $Process.WaitForExit($Milliseconds)
+    }
+    # A killed process stays a zombie until its parent -- hub, a shell, or a
+    # dead launcher's reaper -- waits for it, and .NET counts a zombie that is
+    # not its own child as running. It has exited all the same: it can start
+    # nothing and dispatch nothing.
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        if ($Process.HasExited) {
+            return $true
+        }
+        $stat = Read-ProcStat -Id $Process.Id
+        if ($null -eq $stat -or $stat.State -eq 'Z') {
+            return $true
+        }
+        if ($timer.ElapsedMilliseconds -ge $Milliseconds) {
+            return $false
+        }
+        Start-Sleep -Milliseconds 50
+    }
 }
 
 function Get-RunJobMembers {
@@ -1410,7 +1456,7 @@ function Stop-RunProcesses {
         $deadline = [System.Diagnostics.Stopwatch]::StartNew()
         foreach ($holder in $stopping) {
             $left = [math]::Max(0, $script:StopWaitSeconds * 1000 - $deadline.ElapsedMilliseconds)
-            if ($holder.WaitForExit([int]$left)) {
+            if (Wait-ProcessExit -Process $holder -Milliseconds ([int]$left)) {
                 continue
             }
             # It may still dispatch: no .done, snapshot kept, retry -Cancel.
