@@ -56,14 +56,14 @@ ISO_CENTER = (0.370, 0.175)
 ISO_NOTE_XY = (0.335, 0.240)
 # Left-side view: the front face is on the view's right, the base at its foot.
 LEFT_KEEP = {
-    "WinLowFront": (0.095, 0.212),
+    "WinLowFront": (0.100, 0.238),
     "WinLowW": (0.085, 0.224),
     "WinLowH": (0.118, 0.159),
     "WinLowBase": (0.032, 0.150),
     "WinUpBase": (0.020, 0.160),
 }
 FRONT_KEEP = {
-    "TapY": (0.128, 0.128),
+    "TapY": (0.212, 0.140),
     "TapLeftX": (0.150, 0.118),
     "TapRightX": (0.165, 0.106),
 }
@@ -192,7 +192,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="C stop bar #8-32 taps",
         edge=_tap_edge(adapter, front),
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.088)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
     # Precise shaded isometrics need the taps' cosmetic threads imported
     # (draw_pn_pen_hanger); the label would otherwise appear at save.
