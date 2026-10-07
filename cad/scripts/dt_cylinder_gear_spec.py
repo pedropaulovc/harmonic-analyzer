@@ -1,8 +1,8 @@
 r"""Pure-data dimensional contract for the cylinder gear and its drawing.
 
-The tooth system and ordinary blank, cam and notch geometry are shared by
-part and assembly recipes. Drawing prose lives in ``dt_cylinder_gear_notes`` so
-wording changes do not invalidate the channel's geometry recipe.
+The tooth system, manufacturing bands, cam diameter and notch geometry live
+here. Shared blank/cam placement scalars live in ``cylinder_cam_spec``.
+Drawing prose lives in ``dt_cylinder_gear_notes``.
 """
 
 from __future__ import annotations
@@ -32,24 +32,16 @@ BORE_DIAMETRAL_CLEARANCE_MM = (0.030, 0.070)  # (minimum, maximum), matched fit
 # Representative finished geometry at the midpoint of the matched running fit.
 # Manufacturing still matches every bore to the actual finished arbor.
 BORE_DIA = arbor.SHAFT_DIA + sum(BORE_DIAMETRAL_CLEARANCE_MM) / 2.0
-FACE_WIDTH = 3.0
-# Face width controls mesh engagement across the mating cone-gear family.
 FACE_WIDTH_TOLERANCE_MM = 0.05
 CAM_DIA = 30.6  # integral eccentric cam disc
 CAM_DIA_BAND = (0.0, -0.05)  # (upper, lower) deviations
-# Solid stack (#743): the overall thickness, cam face to back face, IS the
-# channel station pitch (machine channels.station_pitch_mm, pinned by
-# test_cylinder_bank_layout), so neighbouring gears bear cam face on back face
-# and set the stations the way the rocker hubs do (ch_rocker_arm_spec.HUB_LENGTH).
+# Overall thickness is owned by cylinder_cam_spec.
 # The band is centred (user ruling L20 d', #743): the same 0.05 wide as the
 # one-sided +0.05/0 it replaces, so no harder to make, but 20 in-band gears
 # now stack about nominal and the 20-gear acceptance
 # (cylinder_bank_layout.STACK_L20_ACCEPT) passes first time. A long stack is
 # re-faced at fit-up; a short one gets its thinnest gear remade.
-OVERALL_THICKNESS = 7.0565
 OVERALL_THICKNESS_BAND = (0.025, -0.025)  # (upper, lower) deviations
-CAM_THICKNESS = OVERALL_THICKNESS - FACE_WIDTH  # reference: the closed rod slot
-ECCENTRICITY = 8.64  # cam axis offset from the bore axis
 ECCENTRICITY_TOLERANCE_MM = 0.025
 SET_ECCENTRICITY_RANGE_MM = 0.025
 # Cam-lobe direction vs the alignment-notch centreline (the channel's phase

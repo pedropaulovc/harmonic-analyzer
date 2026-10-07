@@ -131,7 +131,7 @@ monte_carlo:
 critical_features:
   cam_eccentricity:
     tolerance: 0.025
-    nominal: dt_cylinder_gear_spec.ECCENTRICITY
+    nominal: cylinder_cam_spec.ECCENTRICITY
     quantity: gain
     class: channel
     holds: "offset-turn the cam in a 4-jaw, indicate the throw to 0.01"

@@ -514,7 +514,7 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     import fr_harmonic_base_spec as base
     from build_dt_cylinder_end_disc import DISC_DIA
     from ch_connecting_rod_spec import RING_OUTER_RADIUS
-    from dt_cylinder_gear_spec import ECCENTRICITY
+    from cylinder_cam_spec import ECCENTRICITY
 
     assert math.isclose(
         RIG.BACK_STOP_Z,
