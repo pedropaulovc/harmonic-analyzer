@@ -106,6 +106,7 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     TAIL_SADDLE_THICK,
     TAIL_SADDLE_Y,
     TAIL_SEAT_DIA,
+    TAIL_SECTION_Y,
 )
 
 PART_NAME = "dt-cone-pivot-post-tl-bond-cradle"
@@ -706,10 +707,11 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "ConePinSectionReference")
     drive_jobs += section.apply(adapter, "ConePinSectionReference")
 
-    # Section B-B through the tail saddle: the tail seat's axis from W and
-    # the base top, on the tail seat's own mid plane.
+    # Section B-B between the crank pins and the tail saddle, looking on to
+    # the saddle's south face: the tail seat's axis from W and the base top.
+    await _offset_plane(adapter, "TailSectionPlane", "Top Plane", TAIL_SECTION_Y)
     tail = SketchDims()
-    check("create sketch TailSeatReference", await adapter.create_sketch("TailSeatPlane"))
+    check("create sketch TailSeatReference", await adapter.create_sketch("TailSectionPlane"))
     await _seat_axis_from_side(tail, "Tail")
     await ensure_fully_defined(adapter, "TailSeatReference")
     check("exit sketch TailSeatReference", await adapter.exit_sketch())
@@ -747,6 +749,7 @@ async def build(adapter: Any) -> dict[str, str]:
             ("BaseTop", "PLANE"),
             ("ConePinNormal", "PLANE"),
             ("ConePinSectionPlane", "PLANE"),
+            ("TailSectionPlane", "PLANE"),
             ("post axis", "AXIS"),
         ),
     )

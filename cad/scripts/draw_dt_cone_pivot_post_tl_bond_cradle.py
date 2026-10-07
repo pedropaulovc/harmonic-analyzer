@@ -12,6 +12,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_surface_finish,
     assert_imported_precision,
     create_section_view,
     finalize_drawing,
@@ -22,16 +23,22 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_pmi import _face_geometry, _face_matches
+from _surface_finish import surface_finish_by_key
 from dt_cone_pivot_post_tl_bond_cradle_spec import (
+    BODY_SADDLE_THICK,
+    BODY_SADDLE_Y,
     CONE_PIN_NEAR_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     SECTION_REFERENCE_SKETCHES,
-    TAIL_SADDLE_THICK,
+    SURFACE_FINISHES,
     TAIL_SADDLE_Y,
+    TAIL_SECTION_Y,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
 
@@ -52,18 +59,24 @@ ISO_SCALE = (1, 2)
 # so the post axis (+Y) runs left to right from foot B; the elevation sits
 # under the plan, third-angle, with +Z up. Both sections are cut on the
 # elevation: A-A through the near cone pin looks back at the body saddle
-# (-Y), B-B through the tail saddle looks on to the tail (+Y), so each shows
-# one seat alone.
+# (-Y), B-B between the crank pins and the tail saddle looks on to the tail
+# saddle (+Y), so each shows one seat alone, on a saddle face it does not cut.
 PLAN_CENTER = (0.115, 0.190)
 ELEVATION_CENTER = (0.115, 0.100)
 SECTION_A_CENTER = (0.252, 0.130)
 SECTION_B_CENTER = (0.372, 0.130)
 ISO_CENTER = (0.360, 0.228)
 ISO_NOTE_XY = (0.215, 0.230)
-TAIL_SECTION_Y = TAIL_SADDLE_Y + TAIL_SADDLE_THICK / 2.0
 # Cutting lines run from just above the saddle tops to just below the base.
 CUT_TOP_Z = -9.0
 CUT_FOOT_Z = -43.0
+# The section captions drop clear of the hole-entry dimension under A-A.
+CAPTION_DROP = 0.008
+# Seat finish symbols stand outboard of the seat on the model's +X side
+# (X, Z in mm); their leaders land on the arc 40 degrees off its bottom,
+# away from the diameter leader and the cone pin.
+SEAT_FINISH_SYMBOL = (32.0, 0.0)
+SEAT_FINISH_LANDING_DEG = 40.0
 
 # Dimension text positions as MODEL points (mm); each view projects its own
 # after it is placed and turned. Stations print from foot B, heights from
@@ -93,7 +106,9 @@ ELEVATION_KEEP = {
     "TailSaddleThick": (0.0, 110.0, 6.0),
     "BodySaddleY": (0.0, 5.0, 16.0),
     "TailSaddleY": (0.0, 50.0, 16.0),
-    "BodySaddleHeight": (0.0, 46.0, -22.0),
+    # In the gap between the foot stop and the body saddle, outside the
+    # silhouette and beside the saddle it measures.
+    "BodySaddleHeight": (0.0, 5.0, -22.0),
     "CrankPinHeight": (0.0, 82.0, -25.0),
     "TailSaddleHeight": (0.0, 130.0, -22.0),
 }
@@ -101,15 +116,16 @@ ELEVATION_KEEP = {
 # imports its diameter. The text stands up and outboard of the axis, steep,
 # so the through-centre leader lands on the seat arc.
 SECTION_A_KEEP = {
-    "BodySeatDia": (10.0, CONE_PIN_NEAR_Y, 25.0),
+    # Just right of the axis (model -X), so the through-centre leader lands
+    # left of the seat bottom, clear of the cone pin and the tilt text.
+    "BodySeatDia": (-8.0, CONE_PIN_NEAR_Y, 30.0),
     "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
-    # Above the base, between the seat-axis 40.0 and the tilt, clear of the
-    # section caption under the view.
-    "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, 4.0),
-    # On the bisector of the gauge line and the pin axis, so the angle reads
-    # the acute tilt.
-    "ConePinTilt": (-4.2, CONE_PIN_NEAR_Y, -8.0),
+    # Under the base; the caption drops clear of it (CAPTION_DROP).
+    "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, -48.0),
+    # On the bisector of the gauge line and the pin axis, 16 mm from the
+    # hole entry, so the angle reads the acute tilt above the pin top.
+    "ConePinTilt": (-4.9, CONE_PIN_NEAR_Y, -14.1),
     "ConePinHighEdge": (-58.0, CONE_PIN_NEAR_Y, -25.0),
 }
 SECTION_B_KEEP = {
@@ -229,6 +245,76 @@ def _curate(adapter: Any, view: Any, points: dict[str, tuple[float, float, float
     )
 
 
+def _seat_finish(adapter: Any, view: Any, key: str, face_y: float, *, label: str) -> Any:
+    """Hang a seat's finish symbol on its arc in a section.
+
+    Each section looks on to a saddle face it does not cut, so the seat's
+    arc there is a model edge of the seat face; the seat's straight edges
+    along the post run end-on and drop out by their equal X.
+    """
+    control = surface_finish_by_key(SURFACE_FINISHES, key)
+    arcs = []
+    for raw in visible_view_entities(view, 1, label=f"{label} seat edges"):
+        edge = _early_bound(raw, "IEdge")
+        start, end = edge.GetStartVertex(), edge.GetEndVertex()
+        if start is None or end is None:
+            continue
+        p0 = _early_bound(start, "IVertex").GetPoint()
+        p1 = _early_bound(end, "IVertex").GetPoint()
+        if abs(float(p0[0]) - float(p1[0])) * 1000.0 < 1.0:
+            continue
+        for face in edge.GetTwoAdjacentFaces2() or ():
+            geometry = None if face is None else _face_geometry(face)
+            if geometry is not None and _face_matches(geometry, control.face):
+                arcs.append(raw)
+                break
+    if len(arcs) != 1:
+        raise RuntimeError(f"{label}: expected one visible {key} arc, found {len(arcs)}")
+    radius = control.face.diameter_mm / 2.0
+    angle = math.radians(SEAT_FINISH_LANDING_DEG)
+    return add_surface_finish(
+        adapter,
+        view,
+        symbol_xy=_sheet(adapter, view, (SEAT_FINISH_SYMBOL[0], face_y, SEAT_FINISH_SYMBOL[1]), f"{label} finish symbol"),
+        control=control,
+        label=f"{label} {key} finish",
+        char_height=0.0025,
+        entity=arcs[0],
+        leader_attach_xy=_sheet(
+            adapter,
+            view,
+            (radius * math.sin(angle), face_y, -radius * math.cos(angle)),
+            f"{label} finish landing",
+        ),
+    )
+
+
+def _lower_caption(adapter: Any, view: Any, drop: float) -> None:
+    """Move a section's native caption down the sheet by ``drop`` metres,
+    keeping its linked fields (``draw_fr_top_frame._position_view_caption``)."""
+    view = _early_bound(view, "IView")
+    captions = []
+    for raw_note in view.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
+            captions.append((note, linked_text))
+    if len(captions) != 1:
+        raise RuntimeError(f"expected one native linked view caption, found {len(captions)}")
+    note, linked_text = captions[0]
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    x, y = (float(value) for value in tuple(annotation.GetPosition())[:2])
+    target = (x, y - drop)
+    if not annotation.SetPosition2(*target, 0.0):
+        raise RuntimeError("failed to position native view caption")
+    rebuild_drawing(adapter, label="lower section caption")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if math.dist(position[:2], target) > 1e-6:
+        raise RuntimeError("native view caption position did not persist")
+    if str(note.PropertyLinkedText or "") != linked_text:
+        raise RuntimeError("view caption lost its native view-label fields")
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -316,6 +402,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    for view, key, face_y, label in (
+        (section_a, "body_seat", BODY_SADDLE_Y + BODY_SADDLE_THICK, "section A-A"),
+        (section_b, "tail_seat", TAIL_SADDLE_Y, "section B-B"),
+    ):
+        _seat_finish(adapter, view, key, face_y, label=label)
+        _lower_caption(adapter, view, CAPTION_DROP)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

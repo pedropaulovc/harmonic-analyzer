@@ -22,6 +22,7 @@ import math
 import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
+from _surface_finish import SEAT_UM, SurfaceFinishControl
 
 # Base plate, foot stop and the two saddles (inventory cone-bond-cradle rows).
 BASE_WIDTH = 80.0
@@ -208,11 +209,20 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 # Construction-only sketches the part saves hidden; the drawing shows them in
 # the views that print their dimensions (_drawing_hidden_sketches). The two
-# section sketches lie in their cutting planes.
+# section sketches lie in their cutting planes: A-A through the near cone
+# pin, B-B between the crank pins and the tail saddle, so B-B looks on to the
+# tail saddle's south face, uncut, and its seat arc is a model edge.
+TAIL_SECTION_Y = (CRANK_PIN_Y + TAIL_SADDLE_Y) / 2.0
 REFERENCE_SKETCHES = ("PlanReference", "ConePinSectionReference", "TailSeatReference")
 SECTION_REFERENCE_SKETCHES = ("ConePinSectionReference", "TailSeatReference")
 
-SURFACE_FINISHES = ()
+# The seats MUST be cut (the title block's surface row is CAST/MACHINED, not
+# a grade): the post lies in them. Nothing runs on them, so they take the
+# static seat grade.
+SURFACE_FINISHES = (
+    SurfaceFinishControl("body_seat", SEAT_UM, CylinderFace(BODY_SEAT_DIA)),
+    SurfaceFinishControl("tail_seat", SEAT_UM, CylinderFace(TAIL_SEAT_DIA)),
+)
 BUILT_UP_PERMISSION_NOTE = "BASE, STOP AND SADDLES MAY BE SCREWED AND DOWELED BLOCKS."
 DRAWING_NOTES = "\n".join(
     (
