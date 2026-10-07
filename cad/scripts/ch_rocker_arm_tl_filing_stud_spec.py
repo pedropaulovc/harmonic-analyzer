@@ -38,7 +38,9 @@ if button.BORE_DIA + button.BORE_BAND[1] - _BODY_MAX < BODY_CLEARANCE_MIN:
 # face and outside the button bore.
 HEAD_DIA = 9.0
 HEAD_LENGTH = 3.0
-if not (button.BORE_DIA + button.BORE_BAND[0] < HEAD_DIA < button.OD + button.OD_BAND[1]):
+if not (
+    button.BORE_DIA + button.BORE_BAND[0] < HEAD_DIA < button.OD + button.OD_BAND[1]
+):
     raise AssertionError("filing-stud head does not land on the button face")
 
 # Axial sizes from the seat face (X0), the one datum the stack reads from.
@@ -93,7 +95,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StationReference": {"OverallLength": AXIAL_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
-    name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked filing-stud dimension needs authored places")
@@ -102,6 +106,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # three mating bores (hand slide, no shake) governs it, and BODY_BAND stays
 # the exported design intent of that fit.
 REFERENCE_DIMENSIONS = frozenset({"OverallLength", "BodyDia"})
+REFERENCE_LABELS = {"BodyDia": "LOCATING DIAMETER"}
 # The thread size prints as its designation, not as a plain diameter.
 DIMENSION_TEXT = {"ThreadDia": THREAD}
 
@@ -125,8 +130,12 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "axis": _AXIS,
             "dia": (
                 limits(BODY_DIA, BODY_PLACES, BODY_BAND),
-                ("BODY_DIA", "BODY_BAND", ("ch_rocker_arm_spec", "PIVOT_HOLE_DIA"),
-                 ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND")),
+                (
+                    "BODY_DIA",
+                    "BODY_BAND",
+                    ("ch_rocker_arm_spec", "PIVOT_HOLE_DIA"),
+                    ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"),
+                ),
             ),
             "dia_nominal": (BODY_DIA, ("BODY_DIA",)),
             "length": (

@@ -30,6 +30,7 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     REFERENCE_DIMENSIONS,
+    REFERENCE_LABELS,
     TAIL_END,
     THREAD_END,
 )
@@ -165,12 +166,19 @@ async def build(adapter: Any) -> dict[str, str]:
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
             raise RuntimeError(f"expected one filing-stud {name} reference dimension")
-        set_reference_dimension(
+        display = set_reference_dimension(
             adapter,
             matches[0],
             label=f"filing stud {name}",
             diameter=name.endswith("Dia"),
         )
+        # Codex round 13 read the reference diameter as a separate plain
+        # shank: name it as the locating diameter the fit note governs.
+        label_text = REFERENCE_LABELS.get(name)
+        if label_text:
+            display.SetText(4, label_text)  # swDimensionTextCalloutBelow
+            if str(display.GetText(4) or "") != label_text:
+                raise RuntimeError(f"filing stud {name} label did not take")
     add_view_centerline(
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )
