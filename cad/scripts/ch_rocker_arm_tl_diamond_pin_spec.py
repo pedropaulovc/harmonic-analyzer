@@ -217,7 +217,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("COLLAR_END", "COLLAR_END_BAND", "FACE_B_ABOVE_PLATE"),
             ),
         },
-        precision={"height": 2},
+        precision={"height": 1},
     ),
     "collar_seat": ExportFeature(
         kind="face",
@@ -248,6 +248,6 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("OVERALL_LENGTH", "COLLAR_END", "COLLAR_END_BAND"),
             ),
         },
-        precision={"dia": 3, "length": 2},
+        precision={"dia": 2, "length": 1},
     ),
 }

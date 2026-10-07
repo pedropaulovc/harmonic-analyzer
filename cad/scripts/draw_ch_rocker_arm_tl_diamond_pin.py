@@ -130,6 +130,11 @@ def _overall_reference(adapter: Any, section: Any, to_sheet) -> None:
         orientation="horizontal",
     )
     display = _early_bound(display, "IDisplayDimension")
+    dimension_type = int(display.Type2)
+    if dimension_type not in (2, 11):  # swLinearDimension, swHorLinearDimension
+        raise RuntimeError(
+            f"{label}: expected a linear dimension, got type {dimension_type}"
+        )
     measured_mm = abs(
         float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0
     )
