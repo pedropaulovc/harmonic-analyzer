@@ -63,7 +63,7 @@ LEFT_KEEP = {
     "WinUpBase": (0.020, 0.160),
 }
 FRONT_KEEP = {
-    "TapY": (0.128, 0.152),
+    "TapY": (0.207, 0.132),
     "TapLeftX": (0.150, 0.118),
     "TapRightX": (0.165, 0.106),
 }
