@@ -102,7 +102,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "cap_face": ExportFeature(
         kind="face",
         faces=(PlanarFace((1.0, 0.0, 0.0), FACE_THICK),),
-        requirements=("thickness",),
+        requirements=("thickness", "dia"),
         fields={
             "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "x", "value": FACE_THICK}, ("FACE_THICK",)),
@@ -112,6 +112,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 limits(FACE_DIA, FACE_PLACES),
                 ("FACE_DIA", ("dt_cone_pivot_post_spec", "CONE_BOSS_DIA")),
             ),
+            "dia_nominal": (FACE_DIA, ("FACE_DIA",)),
         },
         precision={"thickness": 1, "dia": FACE_PLACES},
     ),
