@@ -17,6 +17,7 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
     visible_component_entities,
@@ -57,6 +58,8 @@ FRONT_KEEP = {
 }
 RIGHT_KEEP = {"BarWidth": (0.230, 0.135)}
 CALLOUT_XY = (0.175, 0.205)
+# Mating acceptance sits on the feature it governs, not in the notes.
+DIMENSION_CALLOUTS = {"HoleRightX": "2X, MATCH BOX TAPS"}
 
 
 def _counterbore_edge(adapter: Any, view: Any) -> Any:
@@ -124,6 +127,7 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

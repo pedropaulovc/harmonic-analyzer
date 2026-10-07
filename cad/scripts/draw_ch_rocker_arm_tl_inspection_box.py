@@ -84,7 +84,7 @@ TAP_CALLOUT_XY = (0.148, 0.215)
 _THREAD_LABEL_LAYER = "INSPECTION-BOX-THREAD-LABEL-HIDDEN"
 
 
-def _hide_thread_labels(adapter: Any, view: Any) -> int:
+def _hide_thread_labels(adapter: Any, view: Any, *, required: bool = True) -> int:
     """Hide the front view's cosmetic-thread label; the hole callout already
     states the thread (draw_dt_cone_tip_block's hidden-layer recipe)."""
     manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
@@ -109,7 +109,7 @@ def _hide_thread_labels(adapter: Any, view: Any) -> int:
         if str(annotation.Layer or "") != _THREAD_LABEL_LAYER:
             raise RuntimeError("front-view cosmetic thread refused the hidden layer")
         hidden += 1
-    if not hidden:
+    if required and not hidden:
         raise RuntimeError("inspection box front view has no cosmetic thread label")
     rebuild_drawing(adapter, label="hide front-view thread labels")
     return hidden
@@ -199,6 +199,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # (draw_pn_pen_hanger); the label would otherwise appear at save.
     import_cosmetic_threads(adapter, iso)
     _hide_thread_labels(adapter, front)
+    # The import also materialises the iso's own tapped-hole note.
+    _hide_thread_labels(adapter, iso, required=False)
 
     return await finalize_drawing(
         adapter,
