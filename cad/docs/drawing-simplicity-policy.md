@@ -135,8 +135,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    cannot be read off the views, the fix is a view (a section for an
    internal web), not a note. Coating application, masking, and oiling
    belong to the Finish field under rule 1, not this block. Notes that live
-   in `<part>_notes.py` stay there (they are out of the part's rebuild
-   closure by design).
+   in `<part>_notes.py` stay there. Drawing-only note helpers do not enter a
+   part's rebuild closure unless its builder imports them. When a builder
+   stamps notes into a saved model property, that helper is a part recipe
+   input: a note edit must rebuild or restore the part under the changed key
+   before a property-linked drawing can print it.
 7. **Views follow the machinist, not the modeller.**
    - Every drawing package includes a standard isometric projection for
      pictorial clarity. It is **Shaded With Edges** with precision geometry

@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import math
+import re
 import sys
 import textwrap
 from datetime import UTC, datetime
@@ -123,6 +124,7 @@ SHEET_NAMES = (
     "ASSEMBLY SEQUENCE CONT. + FIT",
     "CHECKS + SETUP",
     "FULL-DETAIL SIDE VIEW",
+    "ASSEMBLY SEQUENCE CONTINUATIONS + CRANK FIT",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -147,9 +149,10 @@ CHECKS_SHEET = 9
 # Every view at 1:2 or smaller prints the teeth/thread-free "Default
 # Simplified" configuration (the assembly view policy in _drawing_common); the
 # user asked for the ENTIRE drive train at 1:2 or larger with every modeled
-# tooth and thread, so the package closes on it (appended: no cited sheet
-# number moves).
+# tooth and thread, so sheet 10 carries it. Continuations are appended after
+# that sheet: no existing sheet number or pointer moves.
 FULL_DETAIL_SHEET = 10
+CONTINUATION_SHEET = 11
 
 ASSEMBLED_SCALE = (1.0, 3.0)
 ASSEMBLED_ISO_SCALE = (1.0, 3.0)
@@ -230,10 +233,12 @@ VIEW_CAPTION_GAP = 0.004
 ASSEMBLED_ISO_TOP = 0.2117
 GENERAL_NOTES_ISO_GAP = VIEW_CAPTION_GAP
 
-# --- sheet 2: BOM in two columns + reference isometric -----------------------
+# --- sheet 2: two BOM pieces + reference isometric below the first ------------
+# Give full canonical Numbers their own width; keep the native-proven
+# description width and the document's legible table font unchanged.
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.022,
+    "part": 0.048,
     "description": 0.118,
     "quantity": 0.012,
 }
@@ -247,16 +252,11 @@ BOM_SECOND_COLUMN_X = BOM_ANCHOR[0] + BOM_COLUMN_WIDTH + 0.008
 BOM_ROW_HEIGHT = 0.006
 BOM_HEIGHT_TOLERANCE = 1e-6
 BOM_SHEET_CLEARANCE = 0.003
-# The second column's right edge; the strip between it and the right note
-# field's edge is empty from the column tops down to the title block.
-BOM_RIGHT_EDGE = BOM_SECOND_COLUMN_X + BOM_COLUMN_WIDTH
-# The MHA-DT-003 station pointer lives here, not in its BOM cell: on the grouped
-# 20-configuration row SolidWorks kept a written description only up to its
-# second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005). Four
-# short lines, so the centred caption fits the strip right of the BOM: its
-# widest, "BALLOONS ON SHEETS 3-5", is ~54 mm at the 2.47 mm a character the
-# two-line caption printed (st19 dt-02).
-BOM_REFERENCE_CAPTION = (
+# The two 190 mm pieces end at x=406 mm. Their old right-hand reference strip
+# is now table space; the reference view and station pointer sit below piece 1.
+# The grouped cone-gear description cannot reliably carry the station pointer
+# (farm leaf 20260923T040258Z-1-0726d474). Keep it as a separate, full note.
+BOM_REFERENCE_NOTES = (
     "REFERENCE 1:8\n"
     f"BALLOONS ON SHEETS {min(CLUSTER_SHEETS.values())}-{max(CLUSTER_SHEETS.values())}\n"
     "MHA-DT-003 CONE GEAR\n"
@@ -307,35 +307,34 @@ NOTE_LINE_PITCH = 0.004525
 # ~47 lines fit the full left column, ~24 the right one above the 1:8 reference
 # view that every sheet needs for its title-block property links
 # (finalize_drawing refuses a sheet without a view: r8, leaf
-# 20260923T214354Z-1-4126331f). Sheet 6 carries steps 1-7 alone on the left, its
-# right field kept free for D1 (#957); the general notes sit on sheet 1 under its
-# heading; the bank's steps 8-10 fill sheet 7's left field; the rig's steps
-# continue on sheet 8 beside the station table (Main, B1 re-ruling 2026-09-26).
+# 20260923T214354Z-1-4126331f). Sheet 6 carries steps 1-5 on the left, its
+# right field kept free for D1 (#957). Step 10 uses sheet 7's right field.
+# Sheet 8 carries the first rig steps and station table; the final crank/rig
+# steps and washer fit are on the appended continuation sheet.
 # package_note_fields lists every field and its blocks.
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 # A 1:8 reference view's outline is ~49 mm tall (its ink ~31 mm square inside
 # it, st19 dt-02); this half-extent budgets it both ways.
 REFERENCE_ISO_HALF_OUTLINE = 0.0247
-# The BOM sheet's reference view stands in the empty strip right of the
-# second column, its caption seated over the title block. Under the first
-# column it was placed for 20 rows; at 27 (MHA-DT-036/MHA-VN-044 added) the
-# column's bottom row ran through it (st19 dt-02), and that field has no
-# room left for the view and its caption under a taller column. The strip is
-# empty up to the column tops, so the view rides BOM_REFERENCE_ISO_SLACK
-# higher than the caption needs: dt-02's caption put the outline 25.2 mm under
-# its centre, past the budget, and bom_reference_iso_violations refuses a
-# caption that would reach the title block.
-BOM_REFERENCE_ISO_SLACK = 0.008
-BOM_REFERENCE_ISO_CENTER = (
-    (BOM_RIGHT_EDGE + NOTE_FIELD_RIGHT[2]) / 2.0,
-    DRAWING_TEMPLATES[SPEC.layout].title_block_top_m
-    + BOM_SHEET_CLEARANCE
-    + len(BOM_REFERENCE_CAPTION.splitlines()) * NOTE_LINE_PITCH
-    + VIEW_CAPTION_GAP
-    + BOM_REFERENCE_ISO_SLACK
-    + REFERENCE_ISO_HALF_OUTLINE,
+# With 27 data rows the first piece ends near y=80 mm (the historical header
+# measured 10.2 mm). The 1:8 reference view is wholly below that piece; its
+# complete metadata, including scale, sits beside it rather than over the
+# lower-left sheet number. The native table budget reserves this field.
+BOM_REFERENCE_FIELD = (
+    BOM_ANCHOR[0],
+    0.077,
+    BOM_ANCHOR[0] + BOM_COLUMN_WIDTH,
+    0.0127 + BOM_SHEET_CLEARANCE,
 )
+BOM_REFERENCE_ISO_CENTER = (0.060, 0.0515)
+BOM_REFERENCE_VIEW_FIELD = (
+    BOM_REFERENCE_FIELD[0],
+    BOM_REFERENCE_FIELD[1],
+    0.094,
+    SHEET_NUMBER_XY[1],
+)
+BOM_REFERENCE_NOTE_FIELD = (0.100, 0.072, BOM_REFERENCE_FIELD[2], 0.040)
 
 # --- sheet 10: the whole drive train, full detail ----------------------------
 # The view (outline only) must fit between the one-line heading and the title
@@ -486,6 +485,70 @@ BOM_NORMALIZED_ALIASES = {
 # every quoted fit/process is the wording already printed on that part's sheet.
 # "[PENDING ...]" marks a joint whose hardware or ruling has not landed; the
 # package is not released while any remains.
+_STEP_LINE_WIDTH = 70
+
+
+def _note_text(rows: Sequence[str], *, heading: bool = True) -> str:
+    """Reflow whole steps; retain headings, lettered heads and deeper sublists."""
+    paragraphs: list[tuple[str, str, str]] = []
+    hang: str | None = None
+    for row in rows:
+        for source in row.splitlines():
+            body = source.lstrip()
+            indent = source[: len(source) - len(body)]
+            head, separator, _rest = body.partition(". ")
+            numbered = bool(separator) and (
+                head.isdigit()
+                or (head[:-1].isdigit() and head[-1:].isalpha())
+                or head in ("A", "B", "C")
+            )
+            if numbered:
+                hang = indent + " " * (len(head) + 2)
+                paragraphs.append((indent, hang, body))
+            elif not paragraphs and heading:
+                paragraphs.append((indent, indent, body))
+            elif hang is not None:
+                if len(indent) <= len(hang):
+                    first, continuation, previous = paragraphs[-1]
+                    if continuation == hang and not previous.endswith(":"):
+                        paragraphs[-1] = (first, continuation, f"{previous} {body}")
+                    else:
+                        paragraphs.append((hang, hang, body))
+                else:
+                    paragraphs.append((indent, indent, body))
+            elif len(paragraphs) > int(heading):
+                first, continuation, previous = paragraphs[-1]
+                if continuation == indent and not previous.endswith((".", ":")):
+                    paragraphs[-1] = (first, continuation, f"{previous} {body}")
+                else:
+                    paragraphs.append((indent, indent, body))
+            else:
+                paragraphs.append((indent, indent, body))
+    # A page number must not become a spurious step head on a hanging line.
+    # NBSP is only a wrapping token; every printed space remains ordinary.
+    return "\n".join(
+        line.replace("\u00a0", " ")
+        for first, continuation, body in paragraphs
+        for line in textwrap.wrap(
+            re.sub(r"\b(SHEETS?) (?=\d)", r"\1" + "\u00a0", body),
+            width=_STEP_LINE_WIDTH,
+            initial_indent=first,
+            subsequent_indent=continuation,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+    )
+
+
+def _split_sequence_notes(text: str, key: str, heading: str) -> tuple[str, str]:
+    """Move a whole numbered step and its successors to a continuation field."""
+    head = f"{steps.step_number(key)}. "
+    first, separator, rest = text.partition("\n" + head)
+    if not separator:
+        raise ValueError(f"assembly sequence has no head for {key!r}")
+    return first, f"{heading}\n{head}{rest}"
+
+
 ASSEMBLED_HEADING = (
     f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHEET} FOR SETUP.\n"
     "VIEWS 1:2 AND SMALLER OMIT GEAR TEETH AND SCREW THREADS;\n"
@@ -493,7 +556,7 @@ ASSEMBLED_HEADING = (
 )
 
 
-CONE_CRANK_STEPS = "\n".join(
+CONE_CRANK_STEPS = _note_text(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
         # Slide the one flat of every gear onto the shaft and close the
@@ -549,7 +612,7 @@ CONE_CRANK_STEPS = "\n".join(
         # MHA-DT-036 is faced to fit at assembly; it goes on from the rear end
         # before the journal enters the bore, and MHA-DT-010's pin is
         # match-drilled, so the gap is taken in a trial fit before either
-        # (CRANK_WASHER_FIT_NOTES, sheet 8).
+        # (CRANK_WASHER_FIT_NOTES, on the continuation sheet).
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
         # are feeler-checked against T120 before the pin is drilled.  The
         # pair may rub on T120 until that check closes, so the seat and the
@@ -558,7 +621,7 @@ CONE_CRANK_STEPS = "\n".join(
         # short; the step carries on after it.
         "4. PRESS 2X MHA-VN-044 TO THE MHA-DT-011 COLLAR HOLE FLOORS. FIT MHA-DT-011 IN",
         "   THE MHA-DT-005 CRANK BORE; SLIDE MHA-DT-010 ON UNPINNED, TOOTH IN GAP",
-        f"   WITH MHA-DT-007. FIT MHA-DT-036 PER SHEET {FIT_SHEET}. WITH MHA-DT-036 SEATED,",
+        f"   WITH MHA-DT-007. FIT MHA-DT-036 PER SHEET {CONTINUATION_SHEET}. WITH MHA-DT-036 SEATED,",
         f"   SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
         "   TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
@@ -588,7 +651,7 @@ CONE_CRANK_STEPS = "\n".join(
     )
 )
 
-BANK_STEPS = "\n".join(
+BANK_STEPS = _note_text(
     (
         "ASSEMBLY SEQUENCE - CYLINDER BANK",
         # U34c (user/Main 2026-09-23, rev 3 H1, foot 28): pedestals inboard,
@@ -683,8 +746,6 @@ BANK_STEPS = "\n".join(
 )
 
 RIG_SEQUENCE_HEADING = "ASSEMBLY SEQUENCE CONT. - PINION RIG"
-# A printed step line, at the 70 characters a half-sheet field holds.
-_STEP_LINE_WIDTH = 70
 
 # The rig's own assembly steps are pinion_rig_fitup's (Codex #858,
 # PRRT_kwDOPHDy386mTbPB): each part step, SHAFT DRILL SET, RIG SET and
@@ -714,32 +775,11 @@ SPRING_EAST_WEST = (
 
 
 def _numbered_step(key: str, text: str) -> str:
-    """``text`` headed by ``key``'s registry number, re-wrapped to the field
-    and hung under the head.  A line after a colon, and an indented line,
-    keep their own break and indent; every other break is a soft wrap."""
+    """Print a complete step with its registry head and retained sublist depth."""
     head = f"{steps.step_number(key)}. "
     hang = " " * len(head)
-    paragraphs: list[tuple[str, str]] = []
-    for source in text.split("\n"):
-        body = source.lstrip()
-        indent = source[: len(source) - len(body)]
-        if paragraphs and not indent and not paragraphs[-1][0]:
-            if not paragraphs[-1][1].endswith(":"):
-                paragraphs[-1] = ("", f"{paragraphs[-1][1]} {body}")
-                continue
-        paragraphs.append((indent, body))
-    lines: list[str] = []
-    for indent, body in paragraphs:
-        lead = hang + indent
-        lines += textwrap.wrap(
-            body,
-            width=_STEP_LINE_WIDTH,
-            initial_indent=lead if lines else head,
-            subsequent_indent=lead,
-            break_long_words=False,
-            break_on_hyphens=False,
-        )
-    return "\n".join(lines)
+    first, *rest = text.splitlines()
+    return _note_text((head + first, *(hang + source for source in rest)), heading=False)
 
 
 def rig_steps(*, pivot_blocks: int, cams: int, slotted: int) -> str:
@@ -819,7 +859,7 @@ RING_ON_CAM_PERCENT = math.floor(
     100.0 * (rod.RING_THICKNESS - bank.RING_OVERHANG_MAX) / rod.RING_THICKNESS
 )
 
-CHECKS = "\n".join(
+CHECKS = _note_text(
     (
         "ASSEMBLY-ONLY FUNCTIONAL CHECKS",
         "1. CRANK TURNS FREELY THROUGH FULL TURNS; ONE CRANK TURN TURNS THE",
@@ -849,7 +889,7 @@ CHECKS = "\n".join(
     )
 )
 
-SETUP_NOTES = "\n".join(
+SETUP_NOTES = _note_text(
     (
         "SAVED POSE AND FREE MOTIONS",
         "SAVED DEFAULT: CONE SET ENGAGED, MHA-DT-001 PARKED CLEAR, CAMS",
@@ -859,7 +899,7 @@ SETUP_NOTES = "\n".join(
     )
 )
 
-INTERFACE_NOTES = "\n".join(
+INTERFACE_NOTES = _note_text(
     (
         "EXTERNAL INTERFACES - NOT BOM ITEMS",
         "BASE MHA-FR-001 (FRAME ASSEMBLY MHA-FR-000) RECEIVES MHA-VN-014, MHA-VN-013,",
@@ -871,7 +911,7 @@ INTERFACE_NOTES = "\n".join(
 
 # Main ruling 2026-09-23 on the Fable C6 finding; ISO VG 32 matches the
 # fleet's finish notes.
-CONSUMABLES_NOTES = "\n".join(
+CONSUMABLES_NOTES = _note_text(
     (
         "GENERAL ASSEMBLY NOTES",
         "OIL THE MHA-DT-012/MHA-DT-013 JOURNALS AND ALL PIVOTS WITH ISO VG 32",
@@ -880,7 +920,7 @@ CONSUMABLES_NOTES = "\n".join(
     )
 )
 
-FIT_PLACEHOLDER = "\n".join(
+FIT_PLACEHOLDER = _note_text(
     (
         # U31 (pivot): the bored spacing fixes the mesh; check 2 proves it.
         # The rest of the old placeholder is owned elsewhere now: each cone
@@ -888,7 +928,8 @@ FIT_PLACEHOLDER = "\n".join(
         # by the rig-located step and check 7, the taper pin by step 6.
         "16T:64T CENTRE DISTANCE FIXED BY MHA-DT-005 BORE SPACING; VERIFY NO",
         "BINDING THROUGH ONE CRANK TURN (CHECK 2).",
-    )
+    ),
+    heading=False,
 )
 
 # User ruling 2026-09-30 (MHA-DT-036 floor 0.5): MHA-DT-036 goes on from the rear
@@ -898,7 +939,7 @@ FIT_PLACEHOLDER = "\n".join(
 # and the parts refitted.  Seated, the washer leaves the feeler as the end
 # play, and the recess lands in the window the 16T boss was sized for.
 _RECESS_MID = (PINION_RECESS_MIN + PINION_RECESS_MAX) / 2.0
-CRANK_WASHER_FIT_NOTES = "\n".join(
+CRANK_WASHER_FIT_NOTES = _note_text(
     (
         f"MHA-DT-036 THRUST WASHER FIT (STEP {steps.step_number('crank-mesh-checked')})",
         "A. TRIAL FIT WITHOUT MHA-DT-036, MHA-DT-010 UNPINNED ON THE "
@@ -913,6 +954,17 @@ CRANK_WASHER_FIT_NOTES = "\n".join(
         f"   {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-DT-010 NORTH FACE, "
         f"END PLAY {PINION_SEAT_FEELER:.2f}.",
     )
+)
+
+CONE_CRANK_PRIMARY, CONE_CRANK_CONTINUED = _split_sequence_notes(
+    CONE_CRANK_STEPS,
+    "crank-hub-fitted",
+    "ASSEMBLY SEQUENCE CONT. - CRANK",
+)
+BANK_PRIMARY, BANK_CONTINUED = _split_sequence_notes(
+    BANK_STEPS,
+    NORTH_BRACKET_SET_KEY,
+    "ASSEMBLY SEQUENCE CONT. - NORTH BRACKET",
 )
 
 
@@ -1190,36 +1242,18 @@ def bom_extent_violations(
         )
     if bottom < clearance:
         violations.append(f"bottom edge {bottom * 1000:.3f} mm is off the sheet")
+    ref_left, ref_top, ref_right, _ref_bottom = BOM_REFERENCE_FIELD
+    if left < ref_right and right > ref_left and bottom < ref_top:
+        violations.append(
+            f"bottom edge {bottom * 1000:.3f} mm enters the BOM reference field "
+            f"(top {ref_top * 1000:.3f} mm)"
+        )
     return violations
 
 
 def bom_reference_iso_violations(outline: tuple[float, ...]) -> list[str]:
-    """Name every way the BOM sheet's reference view, with its caption under
-    it, leaves the strip right of the BOM's second column."""
-    left, bottom, right, _top = outline
-    clearance = BOM_SHEET_CLEARANCE
-    violations = []
-    # The outline already pads the ink (~8 mm on dt-02), so meeting the column
-    # is the limit.
-    if left < BOM_RIGHT_EDGE:
-        violations.append(
-            f"left edge {left * 1000:.3f} mm enters the BOM's second column "
-            f"({BOM_RIGHT_EDGE * 1000:.3f} mm)"
-        )
-    field_right = NOTE_FIELD_RIGHT[2]
-    if right > field_right:
-        violations.append(
-            f"right edge {right * 1000:.3f} mm passes {field_right * 1000:.3f} mm"
-        )
-    caption_lines = len(BOM_REFERENCE_CAPTION.splitlines())
-    caption_bottom = bottom - VIEW_CAPTION_GAP - caption_lines * NOTE_LINE_PITCH
-    floor = DRAWING_TEMPLATES[SPEC.layout].title_block_top_m + clearance
-    if caption_bottom < floor - BOM_HEIGHT_TOLERANCE:
-        violations.append(
-            f"caption bottom {caption_bottom * 1000:.3f} mm enters the title block "
-            f"(floor {floor * 1000:.3f} mm)"
-        )
-    return violations
+    """Hold the reference view below BOM piece 1 and above the sheet number."""
+    return note_field_violations(tuple(outline), BOM_REFERENCE_VIEW_FIELD)
 
 
 def instance_counts(instances: Sequence[Instance]) -> dict[str, int]:
@@ -1311,6 +1345,15 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
     """
     heading_lines = len(heading_text(1, ASSEMBLED_HEADING).splitlines())
     cone_gears = facts.count("dt-cone-gear")
+    rig_primary, rig_continued = _split_sequence_notes(
+        rig_steps(
+            pivot_blocks=facts.count("dt-pinion-pivot-block"),
+            cams=facts.count("dt-pinion-cam"),
+            slotted=facts.count("vn-slotted-screw"),
+        ),
+        "rig-set",
+        RIG_SEQUENCE_HEADING,
+    )
     return (
         NoteField(
             1,
@@ -1328,7 +1371,9 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 (
                     "cone and crank sequence",
-                    CONE_CRANK_STEPS.format(cone_gears=cone_gears),
+                    CONE_CRANK_PRIMARY.format(cone_gears=cone_gears)
+                    + f"\nCONT. STEP {steps.step_number('crank-hub-fitted')}: "
+                    f"SHEET {CONTINUATION_SHEET}.",
                 ),
             ),
         ),
@@ -1339,9 +1384,17 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 (
                     "cylinder bank sequence",
-                    BANK_STEPS.format(cylinder_gears=facts.count("dt-cylinder-gear")),
+                    BANK_PRIMARY.format(cylinder_gears=facts.count("dt-cylinder-gear"))
+                    + f"\nCONT. STEP {steps.step_number(NORTH_BRACKET_SET_KEY)}: "
+                    "RIGHT FIELD.",
                 ),
             ),
+        ),
+        NoteField(
+            BANK_SHEET,
+            f"sheet {BANK_SHEET} right note field",
+            ISO_RIGHT_FIELD,
+            (("north bracket sequence", BANK_CONTINUED),),
         ),
         NoteField(
             FIT_SHEET,
@@ -1350,11 +1403,9 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 (
                     "pinion rig sequence",
-                    rig_steps(
-                        pivot_blocks=facts.count("dt-pinion-pivot-block"),
-                        cams=facts.count("dt-pinion-cam"),
-                        slotted=facts.count("vn-slotted-screw"),
-                    ),
+                    rig_primary
+                    + f"\nCONT. STEP {steps.step_number('rig-set')}: "
+                    f"SHEET {CONTINUATION_SHEET}.",
                 ),
             ),
         ),
@@ -1365,7 +1416,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 ("cone station table", station_table_text(facts.cone_rows())),
                 ("fit placeholder", FIT_PLACEHOLDER),
-                ("crank washer fit", CRANK_WASHER_FIT_NOTES),
+                ("crank fit pointer", f"MHA-DT-036 THRUST WASHER FIT: SHEET {CONTINUATION_SHEET}."),
             ),
         ),
         NoteField(
@@ -1389,6 +1440,21 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
                     ),
                 ),
             ),
+        ),
+        NoteField(
+            CONTINUATION_SHEET,
+            f"sheet {CONTINUATION_SHEET} left note field",
+            NOTE_FIELD_LEFT,
+            (
+                ("crank sequence continuation", CONE_CRANK_CONTINUED),
+                ("pinion rig sequence continuation", rig_continued),
+            ),
+        ),
+        NoteField(
+            CONTINUATION_SHEET,
+            f"sheet {CONTINUATION_SHEET} right note field",
+            ISO_RIGHT_FIELD,
+            (("crank washer fit", CRANK_WASHER_FIT_NOTES),),
         ),
     )
 
@@ -2453,12 +2519,14 @@ def _insert_bom(adapter: Any, view: Any, facts: SourceFacts) -> tuple[str, dict[
     bom_name = _bom_feature_name(table)
     _split_bom(adapter, table, data_rows=len(facts.components), header_count=header_count)
     _heading(adapter, 2)
-    _caption_under(
+    findings = _stack_note_field(
         adapter,
-        view,
-        BOM_REFERENCE_CAPTION,
-        label="BOM reference caption",
+        (("BOM reference and station pointer", BOM_REFERENCE_NOTES),),
+        BOM_REFERENCE_NOTE_FIELD,
+        label="BOM reference notes",
     )
+    if findings:
+        raise RuntimeError("drive-train BOM reference notes: " + "; ".join(findings))
     return bom_name, dict(items)
 
 
@@ -2618,6 +2686,15 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     return _stack_sheet_note_fields(adapter, facts, CHECKS_SHEET)
 
 
+def _place_continuation_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
+    _activate_sheet(adapter, SHEET_NAMES[CONTINUATION_SHEET - 1])
+    _heading(adapter, CONTINUATION_SHEET)
+    _reference_iso(
+        adapter, caption="FINISHED ASSEMBLY 1:8", label="continuation reference isometric"
+    )
+    return _stack_sheet_note_fields(adapter, facts, CONTINUATION_SHEET)
+
+
 def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
     """The whole drive train, side-on, every modeled tooth and thread.
 
@@ -2717,6 +2794,8 @@ def _place_package(
     step("checks sheet")
     full_detail = _place_full_detail_sheet(adapter)
     step("full-detail sheet")
+    findings += _place_continuation_sheet(adapter, facts)
+    step("continuation sheet")
     cluster_views = {}
     for cluster in CLUSTER_SHEETS:
         cluster_views[cluster] = _place_cluster_view(adapter, cluster)

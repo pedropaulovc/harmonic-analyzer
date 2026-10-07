@@ -77,7 +77,8 @@ def gear_data(teeth: int) -> str:
         ("TOOTH FORM", spec.TOOTH_FORM),
         (
             "MATES WITH",
-            f"CYLINDER GEAR {CYLINDER_MATE_NUMBER}, 120T, FULL STANDARD THICKNESS",
+            f"CYLINDER GEAR {CYLINDER_MATE_NUMBER}, 120T,\n"
+            "  FULL STANDARD THICKNESS",
         ),
         # The drive-train cone is backed off its drum on inclined axes, so the
         # 120T tips never reach the reference-centre-distance depth; the cone

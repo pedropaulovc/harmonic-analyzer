@@ -1,4 +1,4 @@
-r"""Create the four-sheet paper-drive assembly drawing (MHA-PD-000).
+r"""Create the five-sheet paper-drive assembly drawing (MHA-PD-000).
 
 Sheet 1 keeps the Front/Right/Isometric views of the whole paper drive and
 balloons the chain and the spare sprocket on the isometric. Sheet 2 carries
@@ -6,10 +6,10 @@ the bill of materials, a ballooned isometric of the transgear (the hanger,
 the latch, the disc cluster and the knob stack) and a ballooned right view of
 the parts that isometric hides. Sheet 3 balloons the bar, its clamps and the
 platen group on the builder's exploded isometric (PAPER_DRIVE_EXPLODED) and
-prints their steps. Sheet 4 prints the transgear's assembly steps and the
-chain fit-up (CONTRACT-paper-drive.md §13.2). Every step is numbered by
-``paper_drive_assembly_steps``; every value comes from the spec that owns it,
-or from that module for the values only the procedure owns.
+prints their steps. Sheet 4 prints the transgear's assembly steps; sheet 5
+prints the chain fit-up (CONTRACT-paper-drive.md §13.2). Every step is numbered
+by ``pd_paper_drive_assembly_steps``; every value comes from the spec that owns
+it, or from that module for the values only the procedure owns.
 """
 
 from __future__ import annotations
@@ -109,6 +109,7 @@ SHEET_NAMES = (
     "BILL OF MATERIALS",
     "PLATEN AND SUPPORT",
     "ASSEMBLY AND FIT-UP",
+    "CHAIN FIT-UP",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the paper-drive sheet coordinates are landscape")
@@ -215,27 +216,29 @@ PLATEN_NOTE_XY = (0.018, 0.262)
 PLATEN_NOTE_RIGHT = 0.222
 EXPLODED_RING_LIMITS = (PLATEN_NOTE_RIGHT + 0.003, 0.069, 0.418, 0.267)
 
-# --- sheet 4: the steps in two columns, a small reference view ---------------
+# --- sheets 4 and 5: ordered steps in two columns, same note-field budgets ----
 FITUP_SCALE = (1.0, 10.0)
 FITUP_REFERENCE_CENTER = (0.100, 0.045)
 FITUP_LINE_WIDTH = 68  # characters; default-format note text
 # Each column's top-left corner, then its right limit and lowest y: the left
-# column stops above the reference view; the right column stops above the
-# title block (top 0.066).
+# column stops above sheet 4's reference view; the right column stops above
+# the title block (top 0.066). Sheet 5 retains the same field clearances.
 FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262))
 FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
-# The platen's steps, its locks included, fill sheet 3; the transgear opens
-# sheet 4; the hook step, then the chain fit-up (§13.2) under its own
-# heading, fill its second column.
+# The platen's steps fill sheet 3. Sheet 4 splits the transgear before the
+# knob stack, keeping the mesh-and-hook operations together. The chain fit-up
+# (§13.2) continues on sheet 5, split before the collar is pinned.
 FITUP_FIRST_COLUMN_KEY = "latch-pin-pressed"
-FITUP_SECOND_COLUMN_KEY = "hook-set-and-riveted"
+FITUP_SECOND_COLUMN_KEY = "collar-pins-pressed"
 FITUP_CHAIN_KEY = "fitup-pose-set"
+CHAIN_SECOND_COLUMN_KEY = "collar-pinned"
 
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: TRANSGEAR_VIEW_SCALE,
     SHEET_NAMES[2]: EXPLODED_SCALE,
     SHEET_NAMES[3]: FITUP_SCALE,
+    SHEET_NAMES[4]: FITUP_SCALE,
 }
 
 # --- BOM identities ------------------------------------------------------------
@@ -1132,25 +1135,33 @@ def _step_text() -> dict[str, str]:
 
 
 def _step_column(heading: str, keys: tuple[str, ...], text: dict[str, str]) -> str:
-    lines = textwrap.wrap(heading, width=FITUP_LINE_WIDTH)
+    lines = textwrap.wrap(
+        heading,
+        width=FITUP_LINE_WIDTH,
+        break_on_hyphens=False,
+        break_long_words=False,
+    )
     for key in keys:
         lines += textwrap.wrap(
             text[key],
             width=FITUP_LINE_WIDTH,
             initial_indent=f"{steps.step_number(key)}. ",
             subsequent_indent="   ",
+            break_on_hyphens=False,
+            break_long_words=False,
         )
     return "\n".join(lines)
 
 
-def _step_columns() -> tuple[str, str, str]:
-    """Sheet 3's platen-and-support steps, then sheet 4's two columns."""
+def _step_columns() -> tuple[str, tuple[str, str], tuple[str, str]]:
+    """Sheet 3's platen steps, then the two columns on sheets 4 and 5."""
     text = _step_text()
     if set(text) != set(steps.SEQUENCE):
         raise AssertionError("paper-drive step text must cover exactly the sequence")
     first = steps.step_number(FITUP_FIRST_COLUMN_KEY) - 1
     second = steps.step_number(FITUP_SECOND_COLUMN_KEY) - 1
     chain_start = steps.step_number(FITUP_CHAIN_KEY) - 1
+    chain_second = steps.step_number(CHAIN_SECOND_COLUMN_KEY) - 1
     return (
         _step_column(
             f"PLATEN AND SUPPORT; STEP {steps.step_number(FITUP_FIRST_COLUMN_KEY)} "
@@ -1158,25 +1169,39 @@ def _step_columns() -> tuple[str, str, str]:
             steps.SEQUENCE[:first],
             text,
         ),
-        _step_column("THE TRANSGEAR", steps.SEQUENCE[first:second], text),
-        "\n".join(
-            (
-                _step_column("", steps.SEQUENCE[second:chain_start], text),
-                _step_column(
-                    f"CHAIN FIT-UP, CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
-                    steps.SEQUENCE[chain_start:],
-                    text,
-                ),
-            )
+        (
+            _step_column("THE TRANSGEAR", steps.SEQUENCE[first:second], text),
+            "\n".join(
+                (
+                    _step_column(
+                        "THE TRANSGEAR, CONTINUED",
+                        steps.SEQUENCE[second:chain_start],
+                        text,
+                    ),
+                    "",
+                    f"CHAIN FIT-UP: SHEET {SHEET_NAMES.index('CHAIN FIT-UP') + 1}, "
+                    f"STEP {steps.step_number(FITUP_CHAIN_KEY)} ON",
+                )
+            ),
+        ),
+        (
+            _step_column(
+                "CHAIN FIT-UP, TRANSGEAR DONE PER SHEET "
+                f"{SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}; "
+                f"CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
+                steps.SEQUENCE[chain_start:chain_second],
+                text,
+            ),
+            _step_column(
+                "CHAIN FIT-UP, CONTINUED", steps.SEQUENCE[chain_second:], text
+            ),
         ),
     )
 
 
-PLATEN_STEPS, *_FITUP = _step_columns()
-# Sheet 4's two columns, left to right.
-FITUP_COLUMNS: tuple[str, str] = (_FITUP[0], _FITUP[1])
-FITUP_STEPS = "\n".join((PLATEN_STEPS, *FITUP_COLUMNS))
-FITUP_NOTES = FITUP_COLUMNS
+PLATEN_STEPS, FITUP_NOTES, CHAIN_NOTES = _step_columns()
+# Each sheet's columns read left to right; sheet 5 continues sheet 4.
+FITUP_STEPS = "\n".join((PLATEN_STEPS, *FITUP_NOTES, *CHAIN_NOTES))
 # The exploded view's caption at each scale it may take.
 EXPLODED_CAPTIONS = {
     scale: f"PLATEN AND SUPPORT EXPLODED {_scale_text(scale)}; "
@@ -1205,7 +1230,8 @@ ASSEMBLED_CAPTIONS = {
 }
 TRANSGEAR_CAPTION = (
     f"TRANSGEAR {TRANSGEAR_VIEW_SCALE[0]:g}:{TRANSGEAR_VIEW_SCALE[1]:g}; "
-    f"ASSEMBLY AND FIT-UP: SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}"
+    f"ASSEMBLY AND FIT-UP: SHEETS {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} "
+    f"AND {SHEET_NAMES.index('CHAIN FIT-UP') + 1}"
 )
 # The inner view's caption at each scale it may take.
 INNER_CAPTIONS = {
@@ -1220,6 +1246,7 @@ FITUP_REFERENCE_CAPTION = (
 SHEET_TEXTS = (
     PLATEN_STEPS,
     *FITUP_NOTES,
+    *CHAIN_NOTES,
     *EXPLODED_CAPTIONS.values(),
     *ASSEMBLED_CAPTIONS.values(),
     TRANSGEAR_CAPTION,
@@ -1780,23 +1807,29 @@ def _place_exploded_sheet(adapter: Any, table: Any, items: dict[str, str]) -> li
     return landings
 
 
-def _place_fitup_sheet(adapter: Any) -> None:
-    _activate_sheet(adapter, SHEET_NAMES[3])
-    view = place_view(
-        adapter, str(SOURCE), "*Isometric", *FITUP_REFERENCE_CENTER, scale=FITUP_SCALE
-    )
-    apply_view_configuration(adapter, view, label="fit-up reference isometric")
-    for index, (text, xy) in enumerate(zip(FITUP_NOTES, FITUP_NOTE_XY, strict=True)):
-        _place_sheet_note(
-            adapter, SHEET_NAMES[3], text, xy, label=f"fit-up note {index + 1}"
+def _place_fitup_sheets(adapter: Any) -> None:
+    for sheet_name, notes in (
+        (SHEET_NAMES[3], FITUP_NOTES),
+        (SHEET_NAMES[4], CHAIN_NOTES),
+    ):
+        _activate_sheet(adapter, sheet_name)
+        view = place_view(
+            adapter, str(SOURCE), "*Isometric", *FITUP_REFERENCE_CENTER, scale=FITUP_SCALE
         )
-    _place_sheet_note(
-        adapter,
-        SHEET_NAMES[3],
-        FITUP_REFERENCE_CAPTION,
-        (FITUP_REFERENCE_CENTER[0] - 0.040, FITUP_NOTE_LIMITS[0][1] - 0.002),
-        label="fit-up reference caption",
-    )
+        apply_view_configuration(
+            adapter, view, label=f"{sheet_name} reference isometric"
+        )
+        _place_sheet_note(
+            adapter,
+            sheet_name,
+            FITUP_REFERENCE_CAPTION,
+            (FITUP_REFERENCE_CENTER[0] - 0.040, FITUP_NOTE_LIMITS[0][1] - 0.002),
+            label=f"{sheet_name} reference caption",
+        )
+        for index, (text, xy) in enumerate(zip(notes, FITUP_NOTE_XY, strict=True)):
+            _place_sheet_note(
+                adapter, sheet_name, text, xy, label=f"{sheet_name} note {index + 1}"
+            )
 
 
 @_telemetry.traced("drawing.paper_drive_assembly")
@@ -1835,7 +1868,7 @@ async def build(adapter: Any) -> dict[str, str]:
     landings, table, items = _place_bom_sheet(adapter, counts)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
     landings += _place_exploded_sheet(adapter, table, items)
-    _place_fitup_sheet(adapter)
+    _place_fitup_sheets(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 
     return await finalize_drawing(

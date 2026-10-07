@@ -126,11 +126,12 @@ def test_an_unknown_step_is_refused() -> None:
 
 
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:
-    printed = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_STEPS)]
+    printed = [
+        int(n)
+        for text in (drawing.PLATEN_STEPS, *drawing.FITUP_NOTES, *drawing.CHAIN_NOTES)
+        for n in STEP_HEAD.findall(text)
+    ]
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
-    # The hook step opens the second column, the chain fit-up under it.
-    second = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_COLUMNS[1])]
-    assert second[0] == steps.step_number(drawing.FITUP_SECOND_COLUMN_KEY)
 
 
 def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> None:
@@ -140,7 +141,7 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
 
     pointers = re.findall(
         r"(MHA-[A-Z]{2}-000) SHEET (\d+), STEPS (\d+) AND (\d+)",
-        drawing.FITUP_COLUMNS[1].replace("\n", " "),
+        drawing.CHAIN_NOTES[0].replace("\n", " "),
     )
     wanted = [str(dt_drive_train_steps.step_number(key)) for key in steps.CRANK_SIDE_KEYS]
     assert pointers == [
@@ -153,14 +154,25 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
     assert set(wanted) <= printed
     fitup_ref = steps.step_number(drawing.FITUP_CHAIN_KEY)
     assert f"STEP {fitup_ref}" in _step_body("fitup-accepted")
-    heading = drawing.FITUP_COLUMNS[1].index("CHAIN FIT-UP")
-    assert drawing.FITUP_COLUMNS[1].index(f"\n{fitup_ref}. ") > heading
+    heading = drawing.CHAIN_NOTES[0].index("CHAIN FIT-UP")
+    assert drawing.CHAIN_NOTES[0].index(f"\n{fitup_ref}. ") > heading
 
 
 def test_the_steps_fit_their_fields() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
     fields = (
-        *zip(drawing.FITUP_NOTES, drawing.FITUP_NOTE_XY, drawing.FITUP_NOTE_LIMITS),
+        *zip(
+            drawing.FITUP_NOTES,
+            drawing.FITUP_NOTE_XY,
+            drawing.FITUP_NOTE_LIMITS,
+            strict=True,
+        ),
+        *zip(
+            drawing.CHAIN_NOTES,
+            drawing.FITUP_NOTE_XY,
+            drawing.FITUP_NOTE_LIMITS,
+            strict=True,
+        ),
         (
             drawing.PLATEN_STEPS,
             drawing.PLATEN_NOTE_XY,

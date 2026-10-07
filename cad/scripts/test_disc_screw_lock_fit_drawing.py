@@ -133,7 +133,11 @@ def test_a_float_window_the_rails_cannot_reach_is_refused(monkeypatch) -> None:
         _exec_fresh(build_pd_platen_guide)
 
 
-def test_both_fit_ups_are_one_line_a06_steps_in_order() -> None:
+def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> None:
+    """Facing/cutting limits and checks belong to one ordered assembly step,
+    regardless of how many physical text lines the print needs."""
+    import re
+
     import draw_pd_paper_drive_assembly as drawing
 
     seq = steps.SEQUENCE
@@ -145,12 +149,36 @@ def test_both_fit_ups_are_one_line_a06_steps_in_order() -> None:
         < seq.index("disc-screws-cut")
         < seq.index("disc-cluster-hung")
     )
-    text = drawing._step_text()
-    assert guide.LOCK_GAP_FIT_TEXT in text["lock-seats-faced"]
-    assert "STOP AND REPORT" in text["lock-seats-faced"]
-    cut = text["disc-screws-cut"]
-    assert screw.TIP_BELOW_REAR_FACE_TEXT in cut and screw.CUT_END_BREAK_TEXT in cut
-    column = drawing.FITUP_STEPS.splitlines()
-    for key in ("lock-seats-faced", "disc-screws-cut"):
-        (line,) = [ln for ln in column if ln.startswith(f"{steps.step_number(key)}. ")]
-        assert line.endswith(text[key]), line
+    printed = "\n".join(
+        (drawing.PLATEN_STEPS, *drawing.FITUP_NOTES, *drawing.CHAIN_NOTES)
+    )
+
+    def printed_step(key: str) -> str:
+        match = re.search(
+            rf"^{steps.step_number(key)}\. (.*?)(?=^\d+\. |\Z)",
+            printed,
+            re.MULTILINE | re.DOTALL,
+        )
+        assert match is not None, key
+        return " ".join(match.group(1).split())
+
+    lock_step = printed_step("lock-seats-faced")
+    float_window = re.search(
+        r"\bFACE LOCK SEATS TO (\d+(?:\.\d+)?)-(\d+(?:\.\d+)?) PLATEN FLOAT\b",
+        lock_step,
+    )
+    assert float_window is not None
+    assert tuple(map(float, float_window.groups())) == guide.LOCK_GAP_FIT
+    assert re.search(r"\bELSE\b.*\bSTOP\b.*\bREPORT\b", lock_step)
+
+    cut_step = printed_step("disc-screws-cut")
+    assert drawing.BOM_PART_NUMBERS["vn-transgear-disc-screw"] in cut_step
+    tip_window = re.search(
+        r"\bCUT\b.*\bTIPS (\d+(?:\.\d+)?)-(\d+(?:\.\d+)?) BELOW DISC REAR FACE\b",
+        cut_step,
+    )
+    assert tip_window is not None
+    assert tuple(map(float, tip_window.groups())) == screw.TIP_BELOW_REAR_FACE
+    cut_break = re.search(r"\bBREAK (\d+(?:\.\d+)?) MAX\b", cut_step)
+    assert cut_break is not None
+    assert float(cut_break.group(1)) == screw.CUT_END_BREAK_MAX

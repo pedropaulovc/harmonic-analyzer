@@ -180,7 +180,8 @@ END_KEEP = {
 SIDE_KEEP = {
     "HubDia": (HUB_FRONT_X - 0.014, AXIS_Y),
     "SpigotDia": (SPIGOT_END_X + 0.040, AXIS_Y - 0.003),
-    "FlangeDia": (SPIGOT_END_X + 0.077, AXIS_Y),
+    # Clear the spigot's whole fit-callout box, not just its dimension line.
+    "FlangeDia": (SPIGOT_END_X + 0.083, AXIS_Y),
     "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.008),
     "SpigotLength": (SPIGOT_END_X + 0.012, AXIS_Y + _FLANGE_R + 0.008),
     "HubLength": (SPIGOT_END_X + 0.040, AXIS_Y + _FLANGE_R + 0.024),

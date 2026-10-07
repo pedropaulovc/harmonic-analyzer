@@ -61,6 +61,28 @@ information; do not abbreviate Numbers in cross-part callouts.
 Per-configuration Gear Data and linked Manufacturing or Installation Notes
 retain their complete mate identifiers.
 
+## Drawing package layout
+
+Wrap complete category-qualified Numbers and sheet references as indivisible
+units; restore ordinary spaces in printed text. A continuation must not look
+like a new numbered assembly step.
+
+The package recipes own sheet counts and locations:
+
+- [`draw_dt_drive_train_assembly.py`](../scripts/draw_dt_drive_train_assembly.py)
+  retains sheets 1–10 and appends sheet 11 for assembly continuations and the
+  MHA-DT-036 washer fit. Its local BOM uses a 48 mm Number column and a 118 mm
+  description column in two 190 mm pieces. The reference isometric and scale
+  metadata occupy separate fields below the first piece.
+- [`draw_pd_paper_drive_assembly.py`](../scripts/draw_pd_paper_drive_assembly.py)
+  retains sheets 1–4 and appends sheet 5 for chain fit-up. Every instruction
+  sheet has a reference model view for title-block property links.
+
+Earlier selected-image page indices remain unchanged. Native note extents,
+table growth and view outlines still determine containment; offline wrapping
+budgets do not replace the native audit or complete-package visual review.
+
+
 ## Historical evidence
 
 Dated reports, released packages, raw logs, source quotations and user-authored bench entries retain the identifiers, snapshot URLs and checksums they recorded. Read their identifiers through the table below when locating a current model. Current instructions, registry references, commands and asset links use canonical identities. A migration notice on a historical document does not change the evidence or certify it against the current model.
