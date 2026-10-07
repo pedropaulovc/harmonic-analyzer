@@ -214,7 +214,7 @@ NOTE_ROW_M = 0.0046
 # cut to three rows (hb-render-4 eye pass), is centred in the gap between the
 # front view and the spring block, about 10 mm clear of each.
 PEDESTAL_CALLOUT_XY = (0.200, 0.252)
-BLOCK_CALLOUT_XY = (0.262, 0.252)
+BLOCK_CALLOUT_XY = (0.272, 0.252)
 SPRING_CALLOUT_XY = (0.315, 0.1448)
 CROSS_TAP_CALLOUT_XY = (0.285, 0.120)
 # The holes-sheet plan's view label, top-left corner. Centred over the plan it

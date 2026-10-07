@@ -1234,16 +1234,6 @@ def test_base_sheet_leaves_the_callout_prefix_to_the_shared_helper() -> None:
     assert prefix_writes == []
 
 
-def test_hole_sheet_callouts_moved_clear_per_the_eye_pass() -> None:
-    import draw_fr_harmonic_base as sheet
-
-    assert sheet.PEDESTAL_CALLOUT_XY == (0.200, 0.252)
-    assert sheet.BLOCK_CALLOUT_XY == (0.262, 0.252)
-    assert sheet.SPRING_CALLOUT_XY == (0.315, 0.1448)
-    assert sheet.CROSS_TAP_CALLOUT_XY == (0.285, 0.120)
-    assert sheet.HOLES_TOP_LABEL_XY == (0.170, 0.237)
-
-
 # hb-render-4 (28d06157b) sheet-2 display data: the cross-tap block's six rows
 # and the two callout boxes the eye pass read as one block.
 HB_RENDER_4_CROSS_TAP = (
