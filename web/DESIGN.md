@@ -137,6 +137,11 @@ or optimization.
 The command archives the exact matching CAD revision for the parameterized
 `export-mechanics.py`. Original module filenames are resolved through the CAD
 identity map without rewriting the archived source or installing module aliases.
+Archived-source provenance uses POSIX repository-relative paths on every host.
+Both exporters disable Git's `core.autocrlf` for the archive command so native
+Windows configuration cannot alter the released source bytes. Imported-source
+census and telemetry ownership use the resolved snapshot root, including when
+the temporary directory is reached through a symlink or junction.
 The exporter checks canonical native paths against that revision's rest geometry
 and mechanical parameters, then stages metadata and optimized publication.
 Telemetry providers loaded from that temporary archive are flushed and closed

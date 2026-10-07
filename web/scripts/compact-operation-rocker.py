@@ -28,7 +28,7 @@ WEB = common.WEB
 
 def input_record(path, role, raw=None):
     path = path.resolve()
-    return {"path": str(path.relative_to(WEB.parent)), "role": role,
+    return {"path": path.relative_to(WEB.parent).as_posix(), "role": role,
             "sha256": hashlib.sha256(path.read_bytes() if raw is None else raw).hexdigest(),
             "requiredForRegeneration": True, "usage": "current-regeneration-input"}
 

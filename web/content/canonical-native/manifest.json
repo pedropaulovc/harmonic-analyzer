@@ -403,7 +403,7 @@
     },
     {
       "path": "web/scripts/compact-operation-rocker.py",
-      "sha256": "7b9c611cb3a70b93c03414facddf26f388ef6045e3fb2497a2702c37b6a97a7c",
+      "sha256": "ada1a2608988e5d81bddcfad6728ee44cb8fd24caf79094140e722f4cae2e929",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -418,12 +418,12 @@
     },
     {
       "path": "web/scripts/export-magnifier.py",
-      "sha256": "6347f3c4d8361f583d9755cd36a58cd6111bb98343f6284c021abf9431a506af",
+      "sha256": "383b8376019b500436dfc74f73bda7aa5585e189efb61ba3067025abd4019c9a",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/export-mechanics.py",
-      "sha256": "71a0cbeb813474a19509d4294d3be121bcb1fa8b794c63032ac6cfca6194988d",
+      "sha256": "b2c6fef5927c977b8a83937b251325669293eaa10803fb352f787b9665073db8",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {

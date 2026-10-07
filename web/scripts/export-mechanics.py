@@ -182,7 +182,7 @@ def main() -> None:
     # Only pure scripts/configuration enter the temporary snapshot.
     try:
         archive = subprocess.check_output(
-            ["git", "archive", args.source_commit, "cad/scripts", "cad/config"],
+            ["git", "-c", "core.autocrlf=false", "archive", args.source_commit, "cad/scripts", "cad/config"],
             cwd=repo,
             stderr=subprocess.PIPE,
         )
@@ -195,7 +195,7 @@ def main() -> None:
     except OSError as error:
         parser.error(f"Cannot archive CAD source commit {args.source_commit} from {repo}: {error}")
     snapshot = tempfile.TemporaryDirectory(prefix="harmonic-mechanics-source-")
-    snapshot_root = Path(snapshot.name)
+    snapshot_root = Path(snapshot.name).resolve()
     try:
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             tar.extractall(snapshot_root, filter="data")
@@ -220,7 +220,7 @@ def main() -> None:
             # Only its owner may close them, before the snapshot is removed.
             telemetry = sys.modules.get("_telemetry")
             telemetry_path = getattr(telemetry, "__file__", None)
-            if telemetry_path and Path(telemetry_path).resolve().is_relative_to(snapshot_root.resolve()):
+            if telemetry_path and Path(telemetry_path).resolve().is_relative_to(snapshot_root):
                 telemetry.shutdown()
         finally:
             snapshot.cleanup()
@@ -725,7 +725,7 @@ def export_snapshot(
     )
     sources = []
     for path in sorted(set(source_paths)):
-        relative = str(path.relative_to(snapshot_root))
+        relative = path.relative_to(snapshot_root).as_posix()
         release = path.read_bytes()
         working_path = repo / relative
         working_matches = working_path.exists() and working_path.read_bytes() == release

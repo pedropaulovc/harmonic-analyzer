@@ -54,7 +54,7 @@ def main() -> None:
         parser.error(str(error))
     try:
         archive = subprocess.check_output(
-            ["git", "archive", args.source_commit, "cad/scripts", "cad/config"],
+            ["git", "-c", "core.autocrlf=false", "archive", args.source_commit, "cad/scripts", "cad/config"],
             cwd=ROOT, stderr=subprocess.PIPE,
         )
     except subprocess.CalledProcessError as error:
@@ -66,9 +66,10 @@ def main() -> None:
     except OSError as error:
         parser.error(f"Cannot archive CAD source commit {args.source_commit}: {error}")
     with tempfile.TemporaryDirectory(prefix="magnifier-source-") as temp:
+        snapshot_root = Path(temp).resolve()
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-            tar.extractall(temp, filter="data")
-        cad = Path(temp) / "cad"
+            tar.extractall(snapshot_root, filter="data")
+        cad = snapshot_root / "cad"
         scripts = cad / "scripts"
         try:
             identity_map = CadIdentityMap(ROOT)
@@ -169,7 +170,7 @@ def main() -> None:
                     "canonicalModelSha256": identity["canonicalSha256"],
                     "sourceFiles": [
                         {
-                            "path": path.relative_to(Path(temp)).as_posix(),
+                            "path": path.relative_to(snapshot_root).as_posix(),
                             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                         }
                         for path in sorted(source_paths)
