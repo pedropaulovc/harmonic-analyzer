@@ -59,9 +59,12 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     OVERALL_LENGTH,
     TAIL_DIA,
     TAIL_END,
+    THREAD,
     THREAD_END,
+    THREAD_MINOR_DIA,
     THREAD_MODEL_DIA,
 )
+from solidworks_mcp.adapters.base import AddThreadParameters
 
 PART_NAME = "ch-rocker-arm-tl-filing-stud"
 MATERIAL = "Alloy Steel"  # the registry row names the 4140 HT rod
@@ -145,6 +148,21 @@ async def build(adapter) -> dict[str, str]:
         )
     await volume_check(adapter, "stud", V_TOTAL, 0.005 * V_TOTAL)
     _require_one_solid_body(adapter, label="stud")
+
+    # Conventional thread depiction (codex round 5): a cosmetic thread on the
+    # threaded end's edge, at the 1/4-20 external minor diameter, running back
+    # to the locating diameter's shoulder.
+    thread = await adapter.add_thread(
+        AddThreadParameters(
+            edge_point=[THREAD_END, THREAD_MODEL_DIA / 2.0, 0.0],
+            standard="none",
+            diameter=THREAD_MINOR_DIA,
+            end_type="blind",
+            depth=THREAD_END - BODY_LENGTH,
+            note=THREAD,
+        )
+    )
+    check("cosmetic thread", thread)
 
     # Drawing-only reference: the overall length for stock cut-off, one
     # construction line on the axis in the Front plane (the profile view's

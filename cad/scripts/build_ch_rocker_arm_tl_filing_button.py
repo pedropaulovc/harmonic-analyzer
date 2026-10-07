@@ -38,12 +38,9 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_filing_button_spec import (
-    BORE_BAND,
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -122,7 +119,6 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(adapter, "RingProfile", "BoreDia", *deviations(BORE_BAND))
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

@@ -56,6 +56,7 @@ TAIL_DIA = 8.0  # stout in the vise; clear of the thread and body sizes
 # inventory's M6 maps to 1/4-20 UNC; an external thread is class 2A.
 THREAD = "1/4-20 UNC-2A"
 THREAD_MODEL_DIA = 6.35
+THREAD_MINOR_DIA = 4.98  # 1/4-20 external minor, for the cosmetic thread
 
 _BUTTON_MIN, _BUTTON_MAX = limits(button.THICKNESS, button.THICKNESS_PLACES)
 _STACK_MIN = 2.0 * _BUTTON_MIN + rocker.HUB_LENGTH
