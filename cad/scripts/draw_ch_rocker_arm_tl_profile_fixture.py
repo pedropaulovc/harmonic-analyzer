@@ -73,6 +73,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     PLATE_TOP_Z,
     PLATE_WEST_X,
     REST_POCKETS,
+    REST_TOP_Z,
     ROD_PIN_HOLE_DIA,
     ROD_PIN_HOLE_XY,
     SECTION_LABEL,
@@ -117,6 +118,10 @@ DETAIL_CENTER = (0.330, 0.212)
 DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 9.0
 DETAIL_LABEL_LOWER_LEFT = (0.373, 0.204)
+# The plan's circle letter, sheet offset (m) from the bore centre: straight
+# above, between the D-D arrows. SolidWorks set it east of the circle, across
+# the 70.0 PlateSouthY extension line (codex review of run 20261007T193019830Z).
+DETAIL_LETTER_OFFSET = (0.0, 0.009)
 NOTES_XY = (0.016, 0.045)
 # Under the plan's east half, above the elevation: on the plate it sat on H2's
 # counterbore ring and crowded the plate edge (codex review of run
@@ -156,10 +161,14 @@ SECTION_KEEP_AT = {
 # its scale: plate thickness left of it, the pad-top drop right of it (sheet
 # offsets from the plate ends). A turned end view printed an empty rotation
 # label over itself (run 20261007T180611940Z). Low enough to leave the
-# PlateWestX dimension and the hold-down callout room under the plan.
+# PlateWestX dimension and the hold-down callout room under the plan. The
+# rail-rest tops chain on the plate thickness from the plate face, their text
+# above the arrowheads of a height too short to hold it (codex review of run
+# 20261007T193019830Z: the rest tops had no printed elevation).
 ELEVATION_CENTER = (PLAN_CENTER[0], 0.125)
 ELEVATION_KEEP_Z = {
     "PlateThick": ((PLATE_TOP_Z + PLATE_BOTTOM_Z) / 2.0, -0.012),
+    "RestTopHeight": (REST_TOP_Z + 10.0, -0.012),
     "PlateDrop": ((PAD_TOP_Z + PLATE_TOP_Z) / 2.0, 0.012),
 }
 # Detail E, model (x, y) mm about the bore axis.
@@ -349,6 +358,34 @@ def _delete_thread_callouts(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"{label} still carries a thread callout: {left!r}")
 
 
+# The pivot tap starts on the reamed bore's floor (the Hole Wizard seats it at
+# LOCATING_BORE_FLOOR_Z), so both callout depths run from there. Detail E looks
+# down from the plate face, which read as the origin and left 4 of the 10 mm
+# of full thread (codex review of run 20261007T193019830Z): the callout says so.
+PIVOT_TAP_DEPTH_ORIGIN = "DEPTHS FROM BORE FLOOR"
+
+
+def _locate_pivot_tap_depths(display: Any) -> None:
+    """Add the depth-origin row under the pivot tap's native callout.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the native size and depth rows stay
+    untouched, so their Hole Wizard variables stay associative
+    (draw_fr_harmonic_base._set_cross_tap_callout_text)."""
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    _telemetry.info(f"pivot tap callout definitions before: {definitions!r}")
+    below = definitions[8].rstrip()
+    updated = f"{below}\n{PIVOT_TAP_DEPTH_ORIGIN}" if below else PIVOT_TAP_DEPTH_ORIGIN
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            "pivot tap depth origin or untouched native definitions did not persist: "
+            f"{[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
+
+
 def _position_view_label(
     adapter: Any, view: Any, lower_left: tuple[float, float], *, label: str
 ) -> None:
@@ -493,7 +530,27 @@ def _detail(adapter: Any, plan: Any) -> Any:
     _position_view_label(
         adapter, detail, DETAIL_LABEL_LOWER_LEFT, label="detail E label"
     )
+    _place_detail_letter(
+        adapter,
+        plan,
+        (center[0] + DETAIL_LETTER_OFFSET[0], center[1] + DETAIL_LETTER_OFFSET[1]),
+    )
     return detail
+
+
+def _place_detail_letter(adapter: Any, plan: Any, xy: tuple[float, float]) -> None:
+    """Stand the plan's circle letter at ``xy`` (draw_dt_cone_gear_shaft)."""
+    circles = tuple(_read_member(_early_bound(plan, "IView"), "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(f"expected one detail circle on the plan, found {len(circles)}")
+    circle = _early_bound(circles[0], "IDetailCircle")
+    before = tuple(float(value) for value in circle.GetLabelPosition())
+    circle.SetLabelPosition(float(xy[0]), float(xy[1]))
+    rebuild_drawing(adapter, label="place detail E letter")
+    actual = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(actual) != 2 or math.dist(actual, xy) > 1e-8:
+        raise RuntimeError(f"detail E letter position did not persist: {actual}")
+    _telemetry.info(f"detail E letter {before} -> {actual}")
 
 
 def _tag(
@@ -711,7 +768,7 @@ async def build(adapter: Any) -> dict[str, str]:
         process="TAP",
     )
     detail_edges = scan_view_edges(detail, label="detail E")
-    add_native_hole_callout(
+    pivot_callout = add_native_hole_callout(
         adapter,
         detail,
         edge=detail_edges.circle_at(
@@ -729,6 +786,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="pivot screw tap",
         process="TAP",
     )
+    _locate_pivot_tap_depths(pivot_callout)
     if not auto_center_marks(adapter, plan, holes=True, size=0.0025):
         raise RuntimeError("failed to add center marks to the plan")
     if not ddoc.ActivateSheet(SHEET_NAMES[0]):

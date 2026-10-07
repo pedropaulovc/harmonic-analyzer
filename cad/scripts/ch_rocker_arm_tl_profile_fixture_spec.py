@@ -10,7 +10,9 @@ rests carry the raw rail undersides on per-blank shim stacks. One is made.
 Construction (shop-additions r3 section 5): a milled steel plate; the pads and
 the hub stand are lapped on top and bonded top-down on one granite reference
 over gauge stacks, so their tops -- not the pocket floors -- set the heights.
-Nothing is hardened and nothing is ground (the shop has no surface grinder).
+The rail rests seat on their pocket floors. The print states only the results
+(the route stays here and in the part's process); nothing is hardened and
+nothing is ground (the shop has no surface grinder).
 
 Frame: rocker frame A of the prechips rocker inventory -- the pivot axis (the
 locating bore axis) at the origin, the arm's upper hub face at Z0, +X toward
@@ -166,8 +168,13 @@ _REST_POCKETS = (
 )
 REST_HEIGHT = 4.0
 REST_POCKET_DEPTH = 1.0
-REST_TOP_Z = PLATE_TOP_Z - REST_POCKET_DEPTH + REST_HEIGHT
-REST_DROP = PAD_TOP_Z - REST_TOP_Z
+# The rest tops above the plate top print at two places: a rest seated on its
+# floor stacks its .XXX height on its pocket's .XXX depth, and that stack sits
+# inside the .XX band, so the three sizes never disagree.
+REST_TOP_HEIGHT = REST_HEIGHT - REST_POCKET_DEPTH
+REST_TOP_Z = PLATE_TOP_Z + REST_TOP_HEIGHT
+if 2.0 * _XXX > _XX:
+    raise AssertionError("a seated rail rest can miss its printed top height")
 REST_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     (tag, x0 + length / 2.0, y0 + width / 2.0, length, width)
     for tag, x0, y0, length, width in _REST_POCKETS
@@ -364,6 +371,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PlateProfile": {"PlateLength", "PlateWidth", "PlateWestX", "PlateSouthY"},
     "Plate": {"PlateThick", "PlateDrop"},
     "Stand": {"StandDrop"},
+    "Rests": {"RestTopHeight"},
     "StandPocketProfile": {"StandPocketDia"},
     "StandPocket": {"StandPocketDepth"},
     "LocatingBoreProfile": {"LocatingBoreDia"},
@@ -379,6 +387,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "Plate": {"PlateThick": 1, "PlateDrop": 3},
     "Stand": {"StandDrop": 3},
+    "Rests": {"RestTopHeight": 2},
     "StandPocketProfile": {"StandPocketDia": 3},
     "StandPocket": {"StandPocketDepth": 3},
     "LocatingBoreProfile": {"LocatingBoreDia": 3},
@@ -505,8 +514,8 @@ BUILT_UP_PERMISSION_NOTE = (
 DRAWING_NOTES = "\n".join(
     (
         BUILT_UP_PERMISSION_NOTE,
-        "BOND EACH PART CENTRED IN ITS POCKET, TOP DOWN; POCKET FLOORS CLEAR.",
-        "PAD AND HUB STAND TOPS LAPPED FLAT TO SEAT THE ARM. TOPS SET AS DIMENSIONED.",
+        "EACH PART CENTRED IN ITS POCKET; RAIL RESTS SEAT ON THEIR POCKET FLOORS.",
+        "PAD AND HUB STAND POCKET FLOORS CLEAR; PAD AND STAND TOPS FLAT TO SEAT THE ARM.",
         "PLAN LOCATIONS FROM BORE L AXIS: SEE TAGS AND SCHEDULES, SHEETS TWO AND THREE.",
     )
 )
@@ -625,15 +634,13 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 {"frame": "model", "axis": "z", "value": REST_TOP_Z},
                 ("REST_TOP_Z",),
             ),
-            # Not printed as one size: the rest height on its pocket depth,
-            # so the two printed .XXX bands stack (the shims on top absorb it).
             "height": (
-                limits(REST_TOP_Z - PLATE_TOP_Z, 3, (2.0 * _XXX, -2.0 * _XXX)),
-                ("REST_HEIGHT", "REST_POCKET_DEPTH"),
+                limits(REST_TOP_HEIGHT, 2),
+                ("REST_TOP_HEIGHT", "REST_HEIGHT", "REST_POCKET_DEPTH"),
             ),
-            "height_from": ("plate_top", ("REST_TOP_Z",)),
+            "height_from": ("plate_top", ("REST_TOP_HEIGHT",)),
         },
-        precision={"height": 3},
+        precision={"height": 2},
     ),
     "plate_top": ExportFeature(
         kind="face",

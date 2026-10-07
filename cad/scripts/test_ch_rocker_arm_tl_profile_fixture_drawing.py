@@ -11,12 +11,14 @@ import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_profile_fixture_spec as spec
 import draw_ch_rocker_arm_tl_profile_fixture as drawing
 import export_features
+from _printed_tolerance import printed_band_mm
 
 STEM = "ch_rocker_arm_tl_profile_fixture"
 # Agreed with the MHA-CH-006-TL pivot screw and diamond pin (their specs live
-# on sibling branches): the screw's ground shoulder and the pin's shank.
+# on sibling branches): the screw's ground shoulder and the pin's shank, a
+# bonded slip fit (Ø2.97 ±0.02, MHA-CH-006-TL-03).
 PIVOT_SCREW_SHOULDER = (6.485, 6.490)
-DIAMOND_PIN_SHANK = (2.990, 2.998)
+DIAMOND_PIN_SHANK = (2.950, 2.990)
 
 
 def _features() -> dict:
@@ -61,6 +63,14 @@ def test_exported_bands_are_the_printed_bands() -> None:
         round(spec.STAND_DROP + spec.STAND_DROP_BAND[1], 3),
         round(spec.STAND_DROP + spec.STAND_DROP_BAND[0], 3),
     ]
+    # the rest tops print once, as RestTopHeight at its authored places, and a
+    # rest seated on its floor (two .XXX sizes stacked) stays inside that band
+    band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["RestTopHeight"])
+    rests = features["rail_rest_tops"]["height"]
+    assert rests == [round(spec.REST_TOP_HEIGHT - band, 3), round(spec.REST_TOP_HEIGHT + band, 3)]
+    stack = 2.0 * printed_band_mm(3)
+    assert rests[0] <= spec.REST_HEIGHT - spec.REST_POCKET_DEPTH - stack
+    assert rests[1] >= spec.REST_HEIGHT - spec.REST_POCKET_DEPTH + stack
 
 
 def test_hub_stand_carries_the_hub_and_clears_the_strap() -> None:
