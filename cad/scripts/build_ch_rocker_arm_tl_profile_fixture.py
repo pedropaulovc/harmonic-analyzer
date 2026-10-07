@@ -60,6 +60,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    FEATURE_SCHEDULE,
     HOLD_DOWN_CBORE_DEPTH,
     HOLD_DOWN_CBORE_DIA,
     HOLD_DOWN_CLEARANCE_DIA,
@@ -75,6 +76,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     PAD_POCKETS,
     PAD_TOP_Z,
     PADS,
+    PART_SCHEDULE,
     PIVOT_TAP_DRILL_DIA,
     PIVOT_TAP_SPEC,
     PLATE_DROP,
@@ -100,6 +102,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     STAND_OD,
     STAND_POCKET_DEPTH,
     STAND_POCKET_DIA,
+    STAND_TOP_Z,
 )
 
 PART_NAME = "ch-rocker-arm-tl-profile-fixture"
@@ -238,6 +241,60 @@ def _require_rest_tops(adapter) -> None:
                 f"rest {tag}: expected one body from Z{floor:g} to Z{REST_TOP_Z:g}; "
                 f"bodies over it {over}"
             )
+
+
+# The schedules print sizes the model has to carry: every printed value is
+# read back from the built faces, so neither table can publish a number the
+# CAD does not hold (codex review of PR 1252: schedule cells were only
+# formatted spec values). Faces are flat and sharp-cornered, so IFace2.GetBox
+# is the face itself; 0.0005 mm is half the finest printed place.
+_SCHEDULE_READBACK_TOL_MM = 0.0005
+
+
+def _horizontal_face_boxes(adapter) -> list[tuple[float, ...]]:
+    boxes = []
+    for body in _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ():
+        for face in _early_bound(body, "IBody2").GetFaces() or ():
+            box = tuple(float(value) * 1000.0 for value in _early_bound(face, "IFace2").GetBox())
+            if abs(box[5] - box[2]) < 1e-6:
+                boxes.append(box)
+    return boxes
+
+
+def _require_face(boxes, label: str, z: float, cx: float, cy: float, length: float, width: float) -> None:
+    want = (cx - length / 2.0, cy - width / 2.0, z, cx + length / 2.0, cy + width / 2.0, z)
+    if not any(
+        all(abs(a - b) <= _SCHEDULE_READBACK_TOL_MM for a, b in zip(box, want, strict=True))
+        for box in boxes
+    ):
+        raise RuntimeError(f"{label}: no flat face {want} in the model, as the schedule prints")
+
+
+def _require_schedules(adapter) -> None:
+    """Every pocket row (centre, length, width, depth) and every bonded-part
+    row (length, width, height, centred in its pocket) of the printed
+    schedules is a face of the built model."""
+    boxes = _horizontal_face_boxes(adapter)
+    pockets = {}
+    for tag, feature, x, y, length, width, depth in FEATURE_SCHEDULE:
+        if not feature.endswith("POCKET"):
+            continue
+        cx, cy, length_mm, width_mm = (float(value) for value in (x, y, length, width))
+        pockets[tag] = (cx, cy)
+        floor = PLATE_TOP_Z - float(depth)
+        _require_face(boxes, f"{tag} pocket floor", floor, cx, cy, length_mm, width_mm)
+    for tags, part, _stock, length, width, height in PART_SCHEDULE:
+        if part == "HUB STAND":
+            od = float(length.removeprefix("OD "))
+            for z, end in ((STAND_TOP_Z, "top"), (STAND_TOP_Z - float(height), "foot")):
+                _require_face(boxes, f"hub stand {end}", z, 0.0, 0.0, od, od)
+            continue
+        top = PAD_TOP_Z if part == "PAD" else REST_TOP_Z
+        for tag in tags.split(", "):
+            for z, end in ((top, "top"), (top - float(height), "underside")):
+                _require_face(
+                    boxes, f"{part.lower()} {tag} {end}", z, *pockets[tag], float(length), float(width)
+                )
 
 
 async def build(adapter) -> dict[str, str]:
@@ -462,6 +519,7 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "rebuilt fixture", volume, 0.001 * plate_volume)
     _require_bodies(adapter, BODY_COUNT, label="rebuilt fixture")
+    _require_schedules(adapter)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
