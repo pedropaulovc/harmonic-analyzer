@@ -29,6 +29,7 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    record_model_item_import,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -253,6 +254,7 @@ async def build(adapter: Any) -> dict[str, str]:
         keep=FRONT_KEEP,
         view_label="lever front",
         dimensions_by_feature=DRAWING_DIMENSIONS,
+        import_observer=record_model_item_import,
     )
     top_annotations = curate_view_dimensions(
         adapter,
@@ -260,13 +262,13 @@ async def build(adapter: Any) -> dict[str, str]:
         keep=TOP_KEEP,
         view_label="lever top",
         dimensions_by_feature=DRAWING_DIMENSIONS,
+        import_observer=record_model_item_import,
     )
-    # The grip and pin-hole stations live in reference sketches the part saves
-    # hidden (#880).  The detail is created and dimensioned while the part
-    # shows them, and the side view shows them too, because the detail's items
-    # select through it: with only the part showing them, pc-p1r's import
-    # delivered neither station.  The side view prints the same two lines the
-    # detail does, along the hub's silhouette.
+    # Preserve the part/base visibility state used by the earlier station
+    # imports.  The 67fdc9c65b65 leaf returned none of ALL five detail
+    # dimensions despite both stations reading shown, so visibility alone
+    # does not establish the cause.  Observe the actual selection/source and
+    # annotation ownership, with front/top imports as same-leaf controls.
     with part_sketches_shown(
         adapter,
         source_model,
@@ -282,6 +284,7 @@ async def build(adapter: Any) -> dict[str, str]:
             keep=DETAIL_KEEP,
             view_label="hub detail",
             dimensions_by_feature=DRAWING_DIMENSIONS,
+            import_observer=record_model_item_import,
         )
     annotations = [*front_annotations, *top_annotations, *detail_annotations]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)

@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -218,6 +218,7 @@ def curate_view_dimensions(
     keep: dict[str, tuple[float, float]],
     view_label: str,
     dimensions_by_feature: Mapping[str, Iterable[str]],
+    import_observer: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> list[Any]:
     """``_drawing_common.curate_view_dimensions``, targeted form, for a view
     whose part may hide the sketches that own ``keep``.
@@ -228,12 +229,36 @@ def curate_view_dimensions(
     - every sketch shown here must own a dimension that survived;
     - inside ``part_sketches_shown``, every sketch that block showed and this
       view dimensions is recorded as dimensioned.
+
+    ``import_observer`` observes the selected-view/source ownership at the
+    native import boundary.  It does not change hidden-sketch handling or the
+    requirement that every kept dimension be delivered and visible.
     """
     if not keep:
         return []
     features = _dc._features_owning(dimensions_by_feature, keep, view_label=view_label)
     hidden = _show_hidden_owners(adapter, view, features, view_label=view_label)
-    named = _dc.insert_feature_dimensions(adapter, view, features)
+    if import_observer is None:
+        named = _dc.insert_feature_dimensions(adapter, view, features)
+    else:
+        requested = tuple(
+            (feature, name)
+            for feature in features
+            for name in sorted(dimensions_by_feature[feature])
+            if name in keep
+        )
+        named = _dc.insert_feature_dimensions(
+            adapter,
+            view,
+            features,
+            observer=lambda observation: import_observer(
+                {
+                    **observation,
+                    "caller": view_label,
+                    "requested_dimensions": requested,
+                }
+            ),
+        )
     annotations = [annotation for _, annotation in named]
     extra = tuple(sorted({name for name, _ in named if name and name not in keep}))
     unnamed = sum(1 for name, _ in named if not name)
