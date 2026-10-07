@@ -14,7 +14,6 @@ from _drawing_common import (
     add_property_linked_note,
     assert_imported_precision,
     create_section_view,
-    dimension_name,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -23,7 +22,6 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
-    view_name,
 )
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -35,12 +33,7 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     TAIL_SADDLE_THICK,
     TAIL_SADDLE_Y,
 )
-from solidworks_mcp.adapters.pywin32_adapter import null_callout
-from solidworks_mcp.adapters.solidworks.drawing import (
-    delete_view,
-    iter_views,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_pivot_post_tl_bond_cradle"]
 PART_STEM = SPEC.artifact_stem
@@ -60,12 +53,11 @@ ISO_SCALE = (1, 2)
 # under the plan, third-angle, with +Z up. Both sections are cut on the
 # elevation: A-A through the near cone pin looks back at the body saddle
 # (-Y), B-B through the tail saddle looks on to the tail (+Y), so each shows
-# one seat alone. A throwaway end view ("*Top") donates both seat diameters.
+# one seat alone.
 PLAN_CENTER = (0.115, 0.190)
 ELEVATION_CENTER = (0.115, 0.100)
 SECTION_A_CENTER = (0.252, 0.130)
 SECTION_B_CENTER = (0.372, 0.130)
-DONOR_CENTER = (0.300, 0.230)
 ISO_CENTER = (0.360, 0.228)
 ISO_NOTE_XY = (0.215, 0.230)
 TAIL_SECTION_Y = TAIL_SADDLE_Y + TAIL_SADDLE_THICK / 2.0
@@ -103,11 +95,11 @@ ELEVATION_KEEP = {
     "CrankPinHeight": (0.0, 82.0, -25.0),
     "TailSaddleHeight": (0.0, 130.0, -22.0),
 }
-DONOR_KEEP = {
-    "BodySeatDia": (10.0, 122.0, 25.0),
-    "TailSeatDia": (24.0, 122.0, 30.0),
-}
+# Each seat's profile sketch is parallel to its section, so the section
+# imports its diameter. The text stands up and outboard of the axis, steep,
+# so the through-centre leader lands on the seat arc.
 SECTION_A_KEEP = {
+    "BodySeatDia": (10.0, CONE_PIN_NEAR_Y, 25.0),
     "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
     "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, -50.0),
@@ -117,14 +109,9 @@ SECTION_A_KEEP = {
     "ConePinHighEdge": (-58.0, CONE_PIN_NEAR_Y, -25.0),
 }
 SECTION_B_KEEP = {
+    "TailSeatDia": (12.0, TAIL_SECTION_Y, 28.0),
     "TailSeatAxisX": (-20.0, TAIL_SECTION_Y, 12.0),
     "TailSeatAxisHeight": (-48.0, TAIL_SECTION_Y, -12.0),
-}
-# Each seat diameter's text stands up and outboard of its axis, steep, so its
-# through-centre leader lands on the seat arc.
-SEAT_DIAMETER_TEXT = {
-    "BodySeatDia": (10.0, CONE_PIN_NEAR_Y, 25.0),
-    "TailSeatDia": (12.0, TAIL_SECTION_Y, 28.0),
 }
 DIMENSION_CALLOUTS = {
     "CrankPinDia": "4X DOWEL, REAM THRU",
@@ -238,41 +225,6 @@ def _curate(adapter: Any, view: Any, points: dict[str, tuple[float, float, float
     )
 
 
-def _move_dimension(
-    adapter: Any,
-    annotation: Any,
-    target: Any,
-    text_xy: tuple[float, float],
-    *,
-    source_view: Any,
-) -> Any:
-    """Move a native model dimension and verify its new drawing-view owner
-    (``draw_dt_cone_pivot_post_tl_cap_jaw_button._move_dimension``)."""
-    name = dimension_name(adapter, annotation)
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, source_view)):
-        raise RuntimeError(f"{name}: failed to activate source dimension view")
-    draw.ClearSelection2(True)
-    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-    selection_name = str(display.GetNameForSelection() or "")
-    if not selection_name or not draw.Extension.SelectByID2(
-        selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
-    ):
-        raise RuntimeError(f"failed to select model dimension {name}: {selection_name!r}")
-    drawing.DragModelDimension(view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0)
-    draw.ClearSelection2(True)
-    draw.EditRebuild3()
-    matches = [
-        _early_bound(item, "IAnnotation")
-        for item in (_early_bound(target, "IView").GetAnnotations() or ())
-        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
-    ]
-    if len(matches) != 1:
-        raise RuntimeError(f"{name}: native dimension did not move into target view")
-    return matches[0]
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -307,19 +259,16 @@ async def build(adapter: Any) -> dict[str, str]:
 
     plan = place_view(adapter, str(SOURCE), "*Front", *PLAN_CENTER, scale=VIEW_SCALE)
     elevation = place_view(adapter, str(SOURCE), "*Right", *ELEVATION_CENTER, scale=VIEW_SCALE)
-    donor = place_view(adapter, str(SOURCE), "*Top", *DONOR_CENTER, scale=VIEW_SCALE)
     # finalize_drawing shades the pictorial isometric with edges.
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     _turn(adapter, plan, (0.0, 1.0, 0.0), 0.0, label="plan")
     _turn(adapter, elevation, (0.0, 1.0, 0.0), 0.0, label="elevation")
     _require_up(adapter, elevation, label="elevation")
-    _turn(adapter, donor, (0.0, 0.0, 1.0), math.pi / 2.0, label="seat donor")
-    for view in (plan, elevation, donor):
+    for view in (plan, elevation):
         set_hidden_lines_removed(adapter, view)
 
     plan_annotations = _curate(adapter, plan, PLAN_KEEP, "plan")
     elevation_annotations = _curate(adapter, elevation, ELEVATION_KEEP, "elevation")
-    donor_annotations = _curate(adapter, donor, DONOR_KEEP, "seat donor")
 
     # Each section's reference sketch (seat axis from the west side; the cone
     # pin's tilt, hole position and gauge height) lies in its cutting plane
@@ -353,31 +302,11 @@ async def build(adapter: Any) -> dict[str, str]:
         section_a_annotations = _curate(adapter, section_a, SECTION_A_KEEP, "section A-A")
         section_b_annotations = _curate(adapter, section_b, SECTION_B_KEEP, "section B-B")
 
-    targets = {"BodySeatDia": section_a, "TailSeatDia": section_b}
-    diameters = []
-    for annotation in donor_annotations:
-        name = dimension_name(adapter, annotation)
-        target = targets[name]
-        diameters.append(
-            _move_dimension(
-                adapter,
-                annotation,
-                target,
-                _sheet(adapter, target, SEAT_DIAMETER_TEXT[name], f"{name} text"),
-                source_view=donor,
-            )
-        )
-    donor_name = view_name(adapter, donor)
-    delete_view(adapter, donor)
-    if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
-        raise RuntimeError("failed to delete the empty seat-diameter donor view")
-
     annotations = [
         *plan_annotations,
         *elevation_annotations,
         *section_a_annotations,
         *section_b_annotations,
-        *diameters,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Places (and so each dimension's tolerance) are authored on the part; the
