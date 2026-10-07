@@ -65,6 +65,7 @@ import sys
 
 from _common import (
     CASTING_GREEN,
+    _early_bound,
     IN,
     SketchDims,
     add_line_chain,
@@ -96,8 +97,15 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _part_pmi import author_part_pmi
+from _part_pmi import (
+    _name_annotation,
+    _resolve_faces,
+    _select_face,
+    _verify_attachment,
+    author_part_pmi,
+)
 from _saved_part_guard import require_saved_drawing_properties
+from _gtol_spec import pmi_annotation_name
 from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -112,6 +120,7 @@ from sm_summing_lever_spec import (
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    MACHINED_PICKUP_FACES,
     SURFACE_FINISHES,
 )
 
@@ -746,6 +755,61 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
 
 
+def _author_pickup_machining(adapter) -> None:
+    """Own machining-required PMI on real pickup faces without inventing Ra.
+
+    Reuse the existing part-PMI resolver, selection, naming and attachment
+    guards. InsertSurfaceFinishSymbol3 accepts empty roughness fields; every
+    numeric field must read back blank. The supplied nominal solid is unchanged.
+    """
+    model = adapter.currentModel
+    faces = _resolve_faces(model, MACHINED_PICKUP_FACES)
+    for key, face_spec in MACHINED_PICKUP_FACES.items():
+        face = faces[key]
+        label = f"machining:{key}"
+        _select_face(model, face, label=label)
+        box = tuple(face.GetBox() or ())
+        if len(box) != 6:
+            raise RuntimeError(f"{label}: physical pickup face has no bounding box")
+        symbol = model.Extension.InsertSurfaceFinishSymbol3(
+            1,  # installed R2026x swSFMachining_Req, as in author_part_pmi
+            1,  # swLeaderStyle_e.swSTRAIGHT
+            box[3] + 0.01,
+            box[4] + 0.01,
+            box[5] + 0.01,
+            0,  # swSFLaySym_e.swSFNone
+            1,  # swArrowStyle_e.swCLOSED_ARROWHEAD
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+        )
+        if symbol is None:
+            raise RuntimeError(f"{label}: InsertSurfaceFinishSymbol3 failed")
+        symbol = _early_bound(symbol, "ISFSymbol")
+        if not symbol.SetText(2, "MACHINE") or int(symbol.GetTextCount()) < 1:
+            raise RuntimeError(f"{label}: machining process text did not persist")
+        if int(symbol.GetSymbol()) != 1 or str(symbol.GetText(2) or "").strip() != "MACHINE":
+            raise RuntimeError(f"{label}: machining-required process did not persist")
+        # Material-removal allowance, sampling length and every roughness field:
+        # the user approved machining, not any new numeric manufacturing limit.
+        for field in (1, 3, 4, 5, 6, 7, 8, 9, 10):
+            if str(symbol.GetText(field) or "").strip():
+                raise RuntimeError(f"{label}: unexpected numeric surface specification")
+        annotation = _name_annotation(
+            symbol.GetAnnotation(),
+            name=pmi_annotation_name(label),
+            label=label,
+        )
+        _verify_attachment(annotation, face_spec, label=label)
+        if not bool(symbol.IsAttached()) or int(symbol.GetLeaderCount()) != 1:
+            raise RuntimeError(f"{label}: machining-required PMI lost its face leader")
+    model.ClearSelection2(True)
+
+
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
@@ -866,6 +930,7 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    _author_pickup_machining(adapter)
     apply_drawing_properties(
         adapter,
         PART_NAME,

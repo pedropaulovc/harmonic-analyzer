@@ -22,7 +22,7 @@ from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
 from _gtol_spec import PlanarFace
-from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
@@ -50,13 +50,10 @@ KNIFE_FACE_NORMAL = (
 )
 KNIFE_FACE_OFFSET = KNIFE_FACE_NORMAL[1] * HEX_H / 2.0
 
-# Both knife ridges are machined: datum A uses the -Z ridge, while the two
-# X-location basics use the +Z ridge. The plate's real +/-Z end faces supply
-# its overall length; the +Z plate/rib end also owns datum B and the start-Z
-# basic. The free +X plate edge is the remaining physical width pickup.
-# These are finish requirements on the existing nominal solid, not stock
-# allowances, added faces, or a moved datum. Routine stationary pickups use
-# the existing SEAT grade; the knife-edge requirement is unchanged.
+# Keep the existing numeric knife-edge finish unchanged. The user's additional
+# process ruling requires machined pickups, not a new roughness grade. The
+# legacy "MACHINE KNIFE EDGES" instruction covers both functional ridges, but
+# does not establish a new numeric Ra for the opposite ridge.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "knife_edge_ridge",
@@ -67,31 +64,29 @@ SURFACE_FINISHES = (
             contains_z_mm=(PLATE_L + HEX_DEPTH) / 2.0,
         ),
     ),
-    SurfaceFinishControl(
-        "knife_edge_datum_a",
-        MACHINED_UM,
-        PlanarFace(
-            KNIFE_FACE_NORMAL,
-            KNIFE_FACE_OFFSET,
-            contains_z_mm=-(PLATE_L + HEX_DEPTH) / 2.0,
-        ),
-    ),
-    SurfaceFinishControl(
-        "plate_end_datum_b",
-        SEAT_UM,
-        PlanarFace((0.0, 0.0, 1.0), PLATE_L / 2.0, contains_x_mm=10.0),
-    ),
-    SurfaceFinishControl(
-        "plate_opposite_end",
-        SEAT_UM,
-        PlanarFace((0.0, 0.0, -1.0), PLATE_L / 2.0, contains_x_mm=10.0),
-    ),
-    SurfaceFinishControl(
-        "plate_free_edge",
-        SEAT_UM,
-        PlanarFace((1.0, 0.0, 0.0), PLATE_W, contains_z_mm=PLATE_L / 4.0),
-    ),
 )
+
+# Nonnumeric machining requirements on the existing nominal solid. Datum A
+# uses the -Z knife ridge; the X-location basics use the existing +Z ridge.
+# The real +/-Z plate/rib ends supply overall length, and +Z also owns B and
+# start-Z. The free +X plate edge is the remaining physical width pickup.
+# No stock allowance, added face, moved datum, or new dimension/Ra is implied.
+MACHINED_PICKUP_FACES: dict[str, PlanarFace] = {
+    "knife_edge_datum_a": PlanarFace(
+        KNIFE_FACE_NORMAL,
+        KNIFE_FACE_OFFSET,
+        contains_z_mm=-(PLATE_L + HEX_DEPTH) / 2.0,
+    ),
+    "plate_end_datum_b": PlanarFace(
+        (0.0, 0.0, 1.0), PLATE_L / 2.0, contains_x_mm=10.0
+    ),
+    "plate_opposite_end": PlanarFace(
+        (0.0, 0.0, -1.0), PLATE_L / 2.0, contains_x_mm=10.0
+    ),
+    "plate_free_edge": PlanarFace(
+        (1.0, 0.0, 0.0), PLATE_W, contains_z_mm=PLATE_L / 4.0
+    ),
+}
 
 # The 20 channel-spring lower anchors (McMaster 9489T111, part ``vn-spring-hook``)
 # thread DIRECTLY into the coefficient plate -- the plate is their nut, the
