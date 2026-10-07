@@ -63,6 +63,8 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
+
 from _common import (
     CASTING_GREEN,
     _early_bound,
@@ -755,6 +757,7 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
 
 
+@_telemetry.traced("pmi.pickup_machining")
 def _author_pickup_machining(adapter) -> None:
     """Own machining-required PMI on real pickup faces without inventing Ra.
 
