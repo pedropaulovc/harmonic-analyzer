@@ -3240,8 +3240,8 @@ def _drawing_component_name(adapter: Any, view: Any) -> str:
 def _model_item_paths(adapter: Any, view: Any) -> tuple[tuple[str, str], ...]:
     """The ``@component@view`` qualifiers a model item of ``view`` answers to.
 
-    A projected view answers to its own name.  A DERIVED view does not.  On
-    top_frame's Section View A-A, every combination of
+    A projected view can answer to its own name.  A derived view may require
+    its base view's qualifier.  On top-frame's Section View A-A, every form of
     ``"CapRecessProfile@fr-top-frame-7@Section View A-A"`` with SKETCH,
     BODYFEATURE, "" and SOLIDBODY refuses -- for instance suffixes 1..20
     (``RootDrawingComponent2(True)`` reads 'top-frame-16', which refuses too)
@@ -3286,7 +3286,7 @@ def _select_model_feature(
     resolves NEITHER here, so both are tried and the winner is returned.
 
     ``paths`` are :func:`_model_item_paths`' qualifiers, the view's own first
-    and then its base views' -- a derived view answers to none of its own.
+    and then its base views', as measured for top-frame's section.
     """
     draw = adapter.currentModel
     for component, in_view in paths:
@@ -3310,9 +3310,232 @@ def _select_model_feature(
     )
 
 
+def _model_item_read(operation: Callable[[], Any]) -> Any:
+    try:
+        return operation()
+    except Exception as exc:  # diagnostic failure, not an empty observation
+        return {"read_error": f"{type(exc).__name__}: {exc}"}
+
+
+def _model_item_feature_identity(raw: Any) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    feature = _early_bound(raw, "IFeature")
+    return {
+        "name": feature.Name,
+        "id": int(feature.GetID()),
+        "type": str(feature.GetTypeName2()),
+    }
+
+
+def _model_item_dimension_identity(raw: Any) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    dimension = _early_bound(raw, "IDimension")
+    return {
+        "full_name": dimension.FullName,
+        "feature_owner": _model_item_feature_identity(dimension.GetFeatureOwner()),
+    }
+
+
+def _model_item_annotation_identity(raw: Any) -> dict[str, Any]:
+    annotation = _early_bound(raw, "IAnnotation")
+    kind = int(annotation.GetType())
+    owner_type = int(annotation.OwnerType)
+    record = {
+        "name": annotation.GetName(),
+        "type": kind,
+        "visible": int(annotation.Visible),
+        "owner_type": owner_type,
+    }
+    if owner_type == 0:  # swAnnotationOwner_DrawingView
+        owner = annotation.Owner
+        record["owner_view"] = (
+            _early_bound(owner, "IView").GetName2() if owner is not None else None
+        )
+    if kind == 4:  # swDisplayDimension
+        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+        record["dimension"] = _model_item_dimension_identity(display.GetDimension2(0))
+    return record
+
+
+def _model_item_view_identity(raw: Any) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    view = _early_bound(raw, "IView")
+    record = {
+        "name": _model_item_read(view.GetName2),
+        "configuration": _model_item_read(lambda: view.ReferencedConfiguration),
+    }
+    referenced = _model_item_read(lambda: view.ReferencedDocument)
+    # The SDK documents an empty reference for section views, not a part.
+    if referenced is None or isinstance(referenced, (str, dict)):
+        record["source_document"] = referenced
+    else:
+        model = _model_item_read(lambda: _early_bound(referenced, "IModelDoc2"))
+        if isinstance(model, dict):
+            record["source_document"] = model
+        else:
+            record["source_document"] = _model_item_read(model.GetPathName)
+            record["source_type"] = _model_item_read(lambda: int(model.GetType()))
+    return record
+
+
+def record_model_item_import(observation: Mapping[str, Any]) -> None:
+    """Read-only observer for a caller's native import, including empty returns.
+
+    Inspect only the requested selections and the target/base-view chain.
+    Failed diagnostic reads are explicit, never evidence of an empty census.
+    This does not alter selections, import options, or the caller's refusal.
+    """
+    adapter = observation["adapter"]
+    view = _early_bound(observation["view"], "IView")
+    phase = observation["phase"]
+    requested = observation["requested_dimensions"]
+    limit = len(requested) + 1  # the requested ink plus a native view label
+    report: dict[str, Any] = {
+        "caller": observation["caller"],
+        "phase": phase,
+        "requested_view": observation["view_name"],
+        "features": list(observation["features"]),
+        "qualifiers": list(observation["paths"]),
+        "selected_paths": list(observation.get("types", ())),
+    }
+
+    measure = _model_item_read
+
+    drawing = _early_bound(adapter.currentModel, "IDrawingDoc")
+    report["active_view"] = measure(
+        lambda: _model_item_view_identity(drawing.ActiveDrawingView)
+    )
+    manager = _early_bound(adapter.currentModel.SelectionManager, "ISelectionMgr")
+    count = measure(lambda: int(manager.GetSelectedObjectCount2(-1)))
+    report["selection_count"] = count
+    if type(count) is int:
+        selections = []
+        for index in range(1, min(count, len(observation["features"]) + 1) + 1):
+            kind = measure(lambda i=index: int(manager.GetSelectedObjectType3(i, -1)))
+            item = {
+                "index": index,
+                "type": kind,
+                "view": measure(
+                    lambda i=index: _model_item_view_identity(
+                        manager.GetSelectedObjectsDrawingView2(i, -1)
+                    )
+                ),
+            }
+            if kind in (9, 22):  # swSelSKETCHES, swSelBODYFEATURES return IFeature
+                item["feature"] = measure(
+                    lambda i=index: _model_item_feature_identity(
+                        manager.GetSelectedObject6(i, -1)
+                    )
+                )
+            elif kind == 12:  # swSelDRAWINGVIEWS returns IView
+                item["selected_view"] = measure(
+                    lambda i=index: _model_item_view_identity(
+                        manager.GetSelectedObject6(i, -1)
+                    )
+                )
+            selections.append(item)
+        report["selections"] = selections
+        report["uninspected_selections"] = count - len(selections)
+
+    if phase != "view_selected":
+        states = []
+        seen: set[str] = set()
+        current = view
+        while current is not None:
+            name = measure(current.GetName2)
+            if not isinstance(name, str):
+                report["view_name_read"] = name
+                break
+            if name in seen:
+                break
+            seen.add(name)
+            state = {"view": measure(lambda v=current: _model_item_view_identity(v))}
+            annotations = measure(lambda v=current: tuple(v.GetAnnotations() or ()))
+            if isinstance(annotations, tuple):
+                state["annotation_count"] = len(annotations)
+                state["annotations"] = [
+                    measure(lambda a=a: _model_item_annotation_identity(a))
+                    for a in annotations[:limit]
+                ]
+                state["uninspected_annotations"] = max(0, len(annotations) - limit)
+            else:
+                state["annotations"] = annotations
+            states.append(state)
+            base = measure(current.GetBaseView)
+            if isinstance(base, dict):
+                report["base_view_read"] = base
+                break
+            current = _early_bound(base, "IView") if base is not None else None
+        report["view_annotations"] = states
+
+    if phase == "before":
+        referenced = measure(lambda: view.ReferencedDocument)
+        if isinstance(referenced, dict):
+            report["source_document_read"] = referenced
+        elif referenced is not None and not isinstance(referenced, str):
+            model = measure(lambda: _early_bound(referenced, "IModelDoc2"))
+            if isinstance(model, dict):
+                report["source_model_read"] = model
+            else:
+                doc_type = measure(lambda: int(model.GetType()))
+                report["source_type_read"] = doc_type
+                if doc_type == 1:  # swDocPART
+                    part = measure(lambda: _early_bound(referenced, "IPartDoc"))
+                    if isinstance(part, dict):
+                        report["source_features_read"] = part
+                    else:
+                        report["source_features"] = {
+                            feature: measure(
+                                lambda f=feature: _model_item_feature_identity(
+                                    part.FeatureByName(f)
+                                )
+                            )
+                            for feature in observation["features"]
+                        }
+                        report["source_dimensions"] = {
+                            f"{name}@{feature}": measure(
+                                lambda f=feature, n=name: _model_item_dimension_identity(
+                                    model.Parameter(f"{n}@{f}")
+                                )
+                            )
+                            for feature, name in requested
+                        }
+    if phase == "after":
+        result = observation["result"]
+        report["native_result_type"] = type(result).__name__
+        report["native_exception"] = observation["native_exception"]
+        if result is None or isinstance(result, str):
+            report["native_result_value"] = result
+        else:
+            report["native_result_count"] = measure(lambda: len(result))
+            report["native_annotations"] = measure(
+                lambda: [
+                    measure(lambda a=a: _model_item_annotation_identity(a))
+                    for a in result[:limit]
+                ]
+            )
+        report["native_arguments"] = observation["native_arguments"]
+    data = json.dumps(report, sort_keys=True)
+    _telemetry.event(
+        "drawing.model_item_import_observation",
+        caller=observation["caller"],
+        phase=phase,
+        requested_view=observation["view_name"],
+        observation=data,
+    )
+    _telemetry.info(f"model-item import observation: {data}")
+
+
 @_telemetry.traced("drawing.targeted_model_items")
 def insert_feature_dimensions(
-    adapter: Any, view: Any, features: Sequence[str]
+    adapter: Any,
+    view: Any,
+    features: Sequence[str],
+    *,
+    observer: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> list[tuple[str, Any]]:
     """Import only ``features``' marked dimensions into ``view``.
 
@@ -3338,6 +3561,11 @@ def insert_feature_dimensions(
     every name to log what arrived, so handing them back spares the caller a
     second ``IDimension::Name`` walk over the same annotations.  An annotation
     that is not a model dimension pairs with ``""``.
+
+    ``observer`` receives read-only context while the native selection still
+    exists: after selecting the view, before import, and after the native
+    return (or exception).  It is opt-in for a failing caller and its positive
+    controls; ordinary imports incur no additional native diagnostic reads.
     """
     draw = adapter.currentModel
     ddoc = _early_bound(
@@ -3352,19 +3580,74 @@ def insert_feature_dimensions(
     ):
         raise RuntimeError(f"failed to select drawing view {name!r}")
     paths = _model_item_paths(adapter, view)
+
+    def observe(phase: str, **details: Any) -> None:
+        if observer is None:
+            return
+        try:
+            observer(
+                {
+                    "adapter": adapter,
+                    "view": view,
+                    "view_name": name,
+                    "features": features,
+                    "paths": paths,
+                    "phase": phase,
+                    **details,
+                }
+            )
+        except Exception as exc:  # telemetry must not replace native acceptance
+            _telemetry.event(
+                "drawing.model_item_import_observer_failed",
+                requested_view=name,
+                phase=phase,
+                read_error=f"{type(exc).__name__}: {exc}",
+                native_result_type=type(details.get("result")).__name__,
+                native_exception=repr(details.get("native_exception")),
+            )
+            _telemetry.warn(
+                f"model-item import observer {name} ({phase}) failed: "
+                f"{type(exc).__name__}: {exc}; "
+                f"native_exception={details.get('native_exception')!r}"
+            )
+
+    observe("view_selected")
     types = [
         _select_model_feature(adapter, feature, paths=paths)
         for feature in features
     ]
-    result = adapter._attempt(
-        lambda: ddoc.InsertModelAnnotations3(
-            1,  # swImportModelItemsFromSelectedFeature
-            _INSERT_DIMS_MARKED | _INSERT_HOLE_WIZARD_LOCATION_DIMS,
-            False,
-            True,
-            True,
-            False,
-        )
+    native_arguments = (
+        1,  # swImportModelItemsFromSelectedFeature
+        _INSERT_DIMS_MARKED | _INSERT_HOLE_WIZARD_LOCATION_DIMS,
+        False,
+        True,
+        True,
+        False,
+    )
+    native_exception = None
+
+    def import_items() -> Any:
+        nonlocal native_exception
+        try:
+            return ddoc.InsertModelAnnotations3(*native_arguments)
+        except Exception as exc:
+            native_exception = {
+                "type": type(exc).__name__,
+                "message": str(exc),
+                "hresult": getattr(exc, "hresult", None),
+                "excepinfo": repr(getattr(exc, "excepinfo", None)),
+                "args": repr(exc.args),
+            }
+            raise  # preserve _attempt's existing exception/null policy
+
+    observe("before", types=types)
+    result = adapter._attempt(import_items)
+    observe(
+        "after",
+        types=types,
+        result=result,
+        native_exception=native_exception,
+        native_arguments=native_arguments,
     )
     draw.ClearSelection2(True)
     if not result or isinstance(result, str):

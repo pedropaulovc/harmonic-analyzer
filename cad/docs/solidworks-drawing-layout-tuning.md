@@ -379,6 +379,30 @@ acceptable where no second line runs inside the hit radius of the pick, and
 `draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
 
+**l. A targeted detail import returns no model dimensions.**
+Don't: infer a hidden-sketch or projection limitation from an empty curated
+set. On the pinion engage lever, the 67fdc9c65b65 farm leaf imported front
+and top dimensions in the same clean SolidWorks process, then delivered none
+of BoreDepth, EndWall, GripFromB, PinHoleDia and PinHoleFromB to its hub detail.
+Both station sketches read shown in memory and the restored part SHA-256
+remained `bd3d98505471…`. The former import log omitted the empty-return path;
+it did not distinguish a native exception, lost target-view selection, or
+annotations owned by the base view.
+Do: observe the unchanged native call in the actual farm leaf.
+`draw_dt_pinion_lever` passes `record_model_item_import` through the hidden-owner
+curator for its front/top positive controls and its detail. The
+`drawing.model_item_import_observation` events and task-log JSON record the
+selected/active view before feature appends and immediately before/after the
+import, per-view source path/configuration, selected and source feature IDs,
+exact source dimension names/owners, native return kind/count or COM exception,
+and native annotation identities/ownership in only the target/base-view chain.
+Diagnostic reads that fail are labelled `read_error`, not empty. Samples are
+bounded by the requested selection/ink count and disclose uninspected items.
+No import retry, option change, model mutation, or missing-dimension exemption
+is made. A fix needs that native ownership evidence first; completion still
+requires all five actual dimensions in the detail, restored source visibility
+and unchanged SHA-256, followed by inspection of the parent-produced sheet.
+
 ## The sheet-split rule
 
 When two views' callouts are squeezed together, the fix is a NEW SHEET, not a
