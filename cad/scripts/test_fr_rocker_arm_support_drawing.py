@@ -12,6 +12,7 @@ from unittest.mock import Mock
 
 import pytest
 import _config
+import _common
 import _drawing_common
 import _part_pmi
 import _section_axis
@@ -1519,27 +1520,40 @@ class _DocumentHoleMarkPreference:
         self.writes = []
 
     def GetUserPreferenceToggle(self, preference, option):
-        assert (preference, option) == (101, 0)  # fixture ID, not a native constant
+        assert (preference, option) == (308, 0)  # independently witnessed swconst member
         return self.enabled
 
     def SetUserPreferenceToggle(self, preference, option, value):
-        assert (preference, option) == (101, 0)
+        assert (preference, option) == (308, 0)
         self.writes.append(value)
         if self.persists:
             self.enabled = value
         return self.enabled  # OFF is false, not an operation failure.
 
 
+def _sparse_preference_adapter(monkeypatch):
+    """Reproduce the actual absent makepy member and incomplete adapter table."""
+    monkeypatch.setitem(
+        sys.modules, "win32com.client", SimpleNamespace(constants=SimpleNamespace())
+    )
+    adapter = SimpleNamespace(
+        swApp=object(),  # No application preference setter is available.
+        constants={"swDocPART": 1, "swDocASSEMBLY": 2, "swDocDRAWING": 3},
+    )
+    assert _common._preference_id(
+        adapter, "swDetailingAutoInsertCenterMarksForHoles"
+    ) is None
+    return adapter
+
+
 @pytest.mark.parametrize("persists", (True, False))
-def test_automatic_hole_marks_change_only_document_preference_with_readback(
+def test_automatic_hole_marks_use_document_preference_with_sparse_python_constants(
     monkeypatch, persists
 ):
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
-    monkeypatch.setattr(drawing, "_preference_id", lambda _adapter, _name: 101)
     extension = _DocumentHoleMarkPreference(persists=persists)
     model = SimpleNamespace(Extension=extension)
-    # No application setter is available: a document-only operation must not need it.
-    adapter = SimpleNamespace(swApp=object())
+    adapter = _sparse_preference_adapter(monkeypatch)
     if persists:
         drawing._disable_automatic_hole_center_marks(adapter, model)
         assert extension.enabled is False
@@ -1550,10 +1564,24 @@ def test_automatic_hole_marks_change_only_document_preference_with_readback(
     assert extension.writes == [False]
 
 
-def test_automatic_hole_marks_refuse_unresolved_native_preference(monkeypatch):
-    monkeypatch.setattr(drawing, "_preference_id", lambda _adapter, _name: None)
-    with pytest.raises(RuntimeError, match="cannot resolve native drawing preference"):
-        drawing._disable_automatic_hole_center_marks(object(), object())
+@pytest.mark.parametrize(
+    "failed_method", ("GetUserPreferenceToggle", "SetUserPreferenceToggle")
+)
+def test_automatic_hole_marks_propagate_native_preference_failure(
+    monkeypatch, failed_method
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    adapter = _sparse_preference_adapter(monkeypatch)
+    extension = _DocumentHoleMarkPreference()
+
+    def native_failure(*_args):
+        raise RuntimeError("native preference access failed")
+
+    monkeypatch.setattr(extension, failed_method, native_failure)
+    with pytest.raises(RuntimeError, match="native preference access failed"):
+        drawing._disable_automatic_hole_center_marks(
+            adapter, SimpleNamespace(Extension=extension)
+        )
 
 
 def test_center_mark_census_reads_annotations_and_retains_duplicate_locations(

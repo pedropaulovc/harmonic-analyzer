@@ -33,7 +33,7 @@ from typing import Any
 
 import _config
 import _telemetry
-from _common import CAD_ROOT, _early_bound, _preference_id, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_edge_dimension,
@@ -118,6 +118,12 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)
+
+# swUserPreferenceToggle_e.swDetailingAutoInsertCenterMarksForHoles.
+# Installed swconst 34.3.0.150; metadata-only reflection on 2026-10-07.
+# SHA256 7F07CA30C4DB22B6D835494D86F5A0D10E8FDEAB9308C9C90132E70C7F4E21B3.
+# Python's sparse constants tables do not expose this native member.
+_SW_AUTO_HOLE_CENTER_MARKS = 308
 
 # Sheet layout (meters). A 177.8 mm casting with four views needs a 1:2 ASME B
 # sheet. Section A-A replaces the side view, exposing the opposed pocket floors
@@ -544,9 +550,7 @@ def _position_bottom_hole_tags(
 def _disable_automatic_hole_center_marks(adapter: Any, model: Any) -> None:
     """Let the recipe's explicit inserts, not template defaults, own the marks."""
     name = "swDetailingAutoInsertCenterMarksForHoles"
-    preference = _preference_id(adapter, name)
-    if preference is None:
-        raise RuntimeError(f"cannot resolve native drawing preference {name}")
+    preference = _SW_AUTO_HOLE_CENTER_MARKS
     extension = _early_bound(model.Extension, "IModelDocExtension")
     before = bool(extension.GetUserPreferenceToggle(preference, 0))
     # The setter's documented return is the toggled state, not success.
