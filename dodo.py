@@ -65,6 +65,7 @@ build_or_refresh takes the FULL branch when the target is absent)::
 from __future__ import annotations
 
 import contextlib
+import fnmatch
 import hashlib
 import math
 import os
@@ -75,6 +76,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 from pathlib import Path
 from typing import Any
 import yaml as _yaml
@@ -101,6 +103,7 @@ for _stream in (sys.stdout, sys.stderr):
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 
 import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
+import _buildgraph  # noqa: E402  (shared syntax resolver, check-only source scope)
 import _doit_load  # noqa: E402  (one graph/import span, shared by both CLI entries)
 
 _DOIT_LOAD = _doit_load.LoadStamp(_DOIT_LOAD_STARTED_NS)
@@ -2974,6 +2977,147 @@ def task_verify():
     }
 
 
+def _maintained_test_inventory() -> list[str]:
+    """Configured maintained pytest filenames, including nested modules.
+
+    Paths, not basenames, identify tests. This manifest complements file_dep:
+    a removed file otherwise disappears from the newly generated dependency set.
+    """
+    with (REPO_ROOT / "pyproject.toml").open("rb") as stream:
+        options = tomllib.load(stream)["tool"]["pytest"]["ini_options"]
+    roots = options["testpaths"]
+    allowed = {"cad/scripts", "cad/comparisons/tools", "tests"}
+    if not roots or any(root not in allowed for root in roots):
+        raise ValueError(f"unsupported maintained pytest roots: {roots}")
+    patterns = options.get("python_files", ["test_*.py", "*_test.py"])
+    excluded = options["norecursedirs"]
+    result: set[str] = set()
+    for relative_root in roots:
+        root = REPO_ROOT / relative_root
+        files = {
+            path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+            for path in root.rglob("*.py")
+            if any(fnmatch.fnmatch(path.name, pattern) for pattern in patterns)
+            and not any(
+                fnmatch.fnmatch(part, pattern)
+                for part in path.relative_to(root).parts[:-1]
+                for pattern in excluded
+            )
+        }
+        if not files:
+            raise ValueError(f"maintained pytest root has no tests: {relative_root}")
+        result.update(files)
+    return sorted(result)
+
+
+def _check_scanned_sources() -> list[Path]:
+    """Actual recursive fallback-name scan scopes, excluding generated wrappers.
+
+    Wrappers remain executable adapter dependencies; they are not call sites.
+    Binding/inert checks also scan top-level scripts and diagnostics, subsets of
+    this scope. Keep additions/removals in the stamp's filename manifest.
+    """
+    excluded = {"_generated", ".venv", "__pycache__"}
+    return sorted(
+        {
+            path.resolve()
+            for root in (SCRIPTS_DIR, REPO_ROOT / "SolidworksMCP-python" / "src")
+            for path in root.rglob("*.py")
+            if not excluded.intersection(path.relative_to(root).parts)
+        }
+    )
+
+
+def _recipe_runtime_inputs() -> tuple[list[Path], list[Path]]:
+    """Sources loaded by filename and archived receipts read by recipe tests."""
+    sources = [
+        SCRIPTS_DIR / "diagnostics" / name
+        for name in (
+            "probe_vm2_rack_finish_attachment.py",
+            "probe_vm2_datum_ownership.py",
+            "probe_vm2_datum_attachment.py",
+            "probe_vm2_datum_lifecycle.py",
+            "analyze_vm2_datum_clearance.py",
+        )
+    ]
+    sources.append(REPO_ROOT / "cad/comparisons/tools/seed_manifest.py")
+    receipt_root = REPO_ROOT / "cad/docs/pipeline/evidence/vm2-datum-placement/probes"
+    receipts = [
+        receipt_root / directory / "receipt.json"
+        for directory in (
+            "rack-source-save-full",
+            "rack-source-save-precision",
+            "rack-source-save-callout",
+            "rack-native-lifecycle-original",
+            "rack-native-lifecycle-above",
+            "rack-production-lifecycle-33696944",
+            "rod-production-lifecycle-33696944",
+        )
+    ]
+    return sources, receipts
+
+
+def _check_source_modules() -> dict[str, Path]:
+    """Check-only import scope: fixtures/tooling and installed adapter sources.
+
+    No geometry exclusions apply here. Resolve syntax with _buildgraph's existing
+    resolver without changing any part/assembly recipe or COM digest.
+    """
+    modules: dict[str, Path] = {}
+    for path in sorted(REPO_ROOT.glob("*.py")):
+        modules[path.stem] = path.resolve()
+    for root in (
+        SCRIPTS_DIR,
+        REPO_ROOT / "cad/comparisons/tools",
+        REPO_ROOT / "SolidworksMCP-python/src",
+    ):
+        for path in sorted(root.rglob("*.py")):
+            relative = path.relative_to(root)
+            if {"__pycache__", ".venv"}.intersection(relative.parts):
+                continue
+            parts = (
+                relative.parent.parts
+                if path.name == "__init__.py"
+                else relative.with_suffix("").parts
+            )
+            if not parts:
+                continue
+            name = ".".join(parts)
+            # Script and comparison roots are on sys.path. They may also be
+            # imported through the repository's namespace packages.
+            modules[name] = path.resolve()
+            if root.is_relative_to(REPO_ROOT / "cad"):
+                qualified = ".".join(root.relative_to(REPO_ROOT).parts)
+                modules[f"{qualified}.{name}"] = path.resolve()
+    return modules
+
+
+def _pytest_source_deps(
+    entries: list[Path], modules: dict[str, Path] | None = None
+) -> list[str]:
+    """Executed local pytest source closure, including inert fixture helpers."""
+    modules = _check_source_modules() if modules is None else modules
+    names_by_path: dict[Path, str] = {}
+    for name, path in modules.items():
+        names_by_path.setdefault(path, name)
+    pending = {path.resolve() for path in entries}
+    seen: set[Path] = set()
+    while pending:
+        path = pending.pop()
+        if path in seen:
+            continue
+        seen.add(path)
+        # Missing explicit inputs stay in file_dep so doit refuses the gate,
+        # rather than silently reducing the set through an existence glob.
+        if not path.is_file():
+            continue
+        imports = _buildgraph._imports_from_syntax(
+            path, modules, names_by_path.get(path)
+        )
+        pending.update(modules[name] for name in imports if modules[name] not in seen)
+    return sorted(str(path) for path in seen)
+
+
 def task_check():
     """SolidWorks-FREE checks -- no COM, so they run in parallel under ``-n N``.
 
@@ -3055,7 +3199,6 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
-        SCRIPTS_DIR / "test_vn_knife_hanger_washer_drawing.py",
         # The keeper chain's rest-pose solve: whole pitches, clearances, and a
         # length that lets the taper pin come fully out.
         SCRIPTS_DIR / "test_vn_keeper_chain.py",
@@ -3182,6 +3325,34 @@ def task_check():
         # The threaded-joint retention audit's logic, and the joint table's
         # coverage of every threaded part the assemblies reference.
         SCRIPTS_DIR / "test_joint_retention.py",
+        # Maintained offline contracts must run on required builds, including
+        # filename-loaded diagnostic harnesses and the comparison seed tool.
+        SCRIPTS_DIR / "test_assembly_save.py",
+        SCRIPTS_DIR / "test_channel_installation_cascade.py",
+        SCRIPTS_DIR / "test_diag_dump_part.py",
+        SCRIPTS_DIR / "test_face_identity_diff.py",
+        SCRIPTS_DIR / "test_frame_fastener_fit.py",
+        SCRIPTS_DIR / "test_gear.py",
+        SCRIPTS_DIR / "test_hole_spec.py",
+        SCRIPTS_DIR / "test_holes_face_selection.py",
+        SCRIPTS_DIR / "test_layout_geometry.py",
+        SCRIPTS_DIR / "test_machinist_review_eval.py",
+        SCRIPTS_DIR / "test_magnifier_drawing_metadata.py",
+        SCRIPTS_DIR / "test_motion_study_default_free_pen.py",
+        SCRIPTS_DIR / "test_named_views.py",
+        SCRIPTS_DIR / "test_or_flag_fallback_names.py",
+        SCRIPTS_DIR / "test_owned_assembly_health_session.py",
+        SCRIPTS_DIR / "test_pd_platen_refit.py",
+        SCRIPTS_DIR / "test_stock_spring_mounts.py",
+        SCRIPTS_DIR / "test_summing_hanger_stack.py",
+        SCRIPTS_DIR / "test_targeted_model_items.py",
+        SCRIPTS_DIR / "test_vm2_rack_source_save.py",
+        SCRIPTS_DIR / "diagnostics/test_vm2_rack_finish_attachment.py",
+        SCRIPTS_DIR / "diagnostics/test_vm2_datum_probe.py",
+        SCRIPTS_DIR / "diagnostics/test_vm2_datum_ownership.py",
+        SCRIPTS_DIR / "diagnostics/test_vm2_datum_lifecycle.py",
+        SCRIPTS_DIR / "diagnostics/test_vm2_datum_clearance.py",
+        REPO_ROOT / "cad/comparisons/tools/test_seed_manifest.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -3214,6 +3385,22 @@ def task_check():
         *(str(_resolved(path)) for path in SCRIPTS_DIR.glob("*.py")),
         *(str(_resolved(path)) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
     }
+    scanned_sources = _check_scanned_sources()
+    runtime_sources, runtime_receipts = _recipe_runtime_inputs()
+    check_modules = _check_source_modules()
+    # conftest activates refusal transports and retires an existing syntax-facts
+    # store through runtime module lookups, which are not syntax imports.
+    pytest_fixture_deps = _pytest_source_deps(
+        [
+            REPO_ROOT / "conftest.py",
+            SCRIPTS_DIR / "_buildgraph.py",
+            SCRIPTS_DIR / "_watchdog.py",
+            SCRIPTS_DIR / "_telemetry.py",
+            SUBMODULE_SRC / "adapters/sw_recovery.py",
+            SUBMODULE_SRC / "adapters/sw_install.py",
+        ],
+        check_modules,
+    )
     recipe_test_deps = sorted(
         {
             *(str(path.resolve()) for path in recipe_tests),
@@ -3221,6 +3408,10 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
+            *(str(path) for path in scanned_sources),
+            *_pytest_source_deps(runtime_sources, check_modules),
+            *(dep for path in runtime_sources for dep in _config_deps(path)),
+            *(str(path.resolve()) for path in runtime_receipts),
             # module_deps_of only walks cad/scripts; comparison tests import
             # sibling tools (and load render_diff via importlib) outside it.
             *(
@@ -3328,6 +3519,7 @@ def task_check():
                 str((SCRIPTS_DIR / "test_dxf_text.py").resolve()),
                 *module_deps_of(SCRIPTS_DIR / "test_dxf_text.py"),
                 *_config_deps(SCRIPTS_DIR / "test_dxf_text.py"),
+                str((REPO_ROOT / "cad/references/base-serial.dxf").resolve()),
                 str(
                     (
                         REPO_ROOT
@@ -3337,7 +3529,11 @@ def task_check():
                     ).resolve()
                 ),
             ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_dxf_text.py")],
+            "cmd": [
+                *pytest_cmd,
+                str(SCRIPTS_DIR / "test_dxf_text.py"),
+                str(SCRIPTS_DIR / "test_base_serial.py"),
+            ],
         },
         "recipe": {
             # _CONFIG_YAMLS: the metadata-ownership contracts read part rows via
@@ -3355,19 +3551,23 @@ def task_check():
                 ),
             ],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
-            # file_dep sees additions and edits, but a source file DELETED from
-            # the submodule just drops out of the list -- doit never compares it
-            # -- so the stamp stayed green (codex #1101). The manifest of paths
-            # makes a removal or rename re-run the adapter contract too.
-            "uptodate": [
-                config_changed(
-                    {
-                        "submodule_sources": [
-                            _rel_tag(path) for path in adapter_contract_deps
-                        ]
-                    }
-                )
-            ],
+            # file_dep cannot compare files removed from the regenerated list.
+            # Track every runtime filename inventory consumed by recipe checks.
+            "source_manifest": {
+                "submodule_sources": [_rel_tag(path) for path in adapter_contract_deps],
+                "maintained_tests": _maintained_test_inventory(),
+                "scanned_sources": [
+                    path.relative_to(REPO_ROOT.resolve()).as_posix()
+                    for path in scanned_sources
+                ],
+                # seed_manifest.part_stems reads filename membership, not the
+                # narrower production part_scripts classification.
+                "part_scripts": sorted(
+                    path.resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+                    for path in SCRIPTS_DIR.glob("build_*.py")
+                    if not path.stem.endswith("_assembly") and path.stem != "build_all"
+                ),
+            },
         },
         "cache": {
             # The artefact-cache provenance/observability unit tests (issue #73):
@@ -3680,11 +3880,30 @@ def task_check():
                 *_config_deps(entry),
             )
         }
+        uptodate = spec.get("uptodate", [])
+        if spec["cmd"][1:3] == ["-m", "pytest"]:
+            pytest_sources = [
+                Path(arg) for arg in spec["cmd"][3:] if arg.endswith(".py")
+            ]
+            executed.update(pytest_fixture_deps)
+            executed.update(_pytest_source_deps(pytest_sources, check_modules))
+            executed.update(
+                str((REPO_ROOT / name).resolve())
+                for name in ("pyproject.toml", "uv.lock")
+            )
+            uptodate = [
+                config_changed(
+                    {
+                        **spec.get("source_manifest", {}),
+                        "executed_sources": sorted(_rel_tag(path) for path in executed),
+                    }
+                )
+            ]
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
             "task_dep": spec.get("task_dep", []),
-            "uptodate": spec.get("uptodate", []),
+            "uptodate": uptodate,
             "targets": [stamp, *spec.get("targets", [])],
             "actions": [
                 (_run_stamped, [

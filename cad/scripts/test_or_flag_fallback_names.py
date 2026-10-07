@@ -75,9 +75,13 @@ def _iter_call_sites() -> tuple[list[tuple[Path, int, str, list[str]]], int]:
     sites: list[tuple[Path, int, str, list[str]]] = []
     skipped = 0
     for root in SCAN_ROOTS:
-        for path in sorted(root.rglob("*.py")):
-            if EXCLUDE_PARTS.intersection(path.parts):
-                continue
+        source_paths = [
+            path for path in sorted(root.rglob("*.py"))
+            if not EXCLUDE_PARTS.intersection(path.parts)
+        ]
+        assert source_paths, f"or_flag scan root has no Python sources: {root}"
+        root_start = len(sites)
+        for path in source_paths:
             try:
                 tree = ast.parse(path.read_text(encoding="utf-8"))
             except SyntaxError:
@@ -97,7 +101,48 @@ def _iter_call_sites() -> tuple[list[tuple[Path, int, str, list[str]]], int]:
                 if not names:
                     continue  # nothing to flag, nothing to check
                 sites.append((path, node.lineno, interface, names))  # type: ignore[arg-type]
+        assert len(sites) > root_start, (
+            f"or_flag scan root has no literal call sites: {root}"
+        )
     return sites, skipped
+
+
+def test_scanner_keeps_nested_sources_in_each_root(tmp_path, monkeypatch):
+    roots = [tmp_path / "scripts", tmp_path / "adapter"]
+    for root in roots:
+        (root / "nested").mkdir(parents=True)
+        (root / "nested" / "calls.py").write_text(
+            'early_bound_or_flag(obj, "IFace2", "GetBody")\n', encoding="utf-8"
+        )
+        (root / "_generated").mkdir()
+        (root / "_generated" / "wrapper.py").write_text(
+            'early_bound_or_flag(obj, "IWrong", "Missing")\n', encoding="utf-8"
+        )
+    monkeypatch.setattr(sys.modules[__name__], "SCAN_ROOTS", tuple(roots))
+    sites, skipped = _iter_call_sites()
+    assert {(path.relative_to(tmp_path).as_posix(), interface, tuple(names))
+            for path, _line, interface, names in sites} == {
+        ("scripts/nested/calls.py", "IFace2", ("GetBody",)),
+        ("adapter/nested/calls.py", "IFace2", ("GetBody",)),
+    }
+    assert skipped == 0
+
+
+@pytest.mark.parametrize("empty_index", [0, 1])
+def test_scanner_refuses_empty_root_even_when_other_root_has_sites(
+    tmp_path, monkeypatch, empty_index
+):
+    roots = [tmp_path / "scripts", tmp_path / "adapter"]
+    for root in roots:
+        root.mkdir()
+    populated = roots[1 - empty_index]
+    (populated / "calls.py").write_text(
+        '_early_bound(obj, "IFace2", "GetBody")\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(sys.modules[__name__], "SCAN_ROOTS", tuple(roots))
+    with pytest.raises(AssertionError, match="scan root has no Python sources") as error:
+        _iter_call_sites()
+    assert str(roots[empty_index]) in str(error.value)
 
 
 def _declared_names(interface: str) -> frozenset[str] | None:

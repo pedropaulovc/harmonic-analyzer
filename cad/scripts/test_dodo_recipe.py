@@ -2245,29 +2245,6 @@ def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
         )
 
 
-def test_deleting_a_submodule_source_reruns_check_recipe(tmp_path):
-    """check:recipe runs the adapter contract against the vendored package, so a
-    submodule bump must re-run it. file_dep catches an edited or added module,
-    but a DELETED one just leaves the dep list -- doit never compares it -- so
-    the gate also carries the manifest of source paths (codex #1101)."""
-    dodo = _load_dodo()
-    src = _redirect_submodule(dodo, tmp_path)
-    (src / "adapter.py").write_text("A = 1\n")
-    (src / "headers.py").write_text("H = 1\n")
-
-    def recipe_is_current(saved: dict) -> tuple[bool, dict]:
-        task = next(t for t in dodo.task_check() if t["name"] == "recipe")
-        (checker,) = task["uptodate"]
-        current = checker(None, saved)
-        return current, {"_config_changed": checker.config_digest}
-
-    _, saved = recipe_is_current({})
-    assert recipe_is_current(saved)[0], "an unchanged tree must stay up to date"
-
-    (src / "headers.py").unlink()
-    assert not recipe_is_current(saved)[0], "a deleted source must re-run the gate"
-
-
 def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
     """A PART-RELEVANT submodule source change -- a committed pin bump OR a dirty
     local edit -- flips every part's COM cache key; a no-op recompute leaves it stable
@@ -2453,71 +2430,6 @@ def test_submodule_digest_is_location_independent(tmp_path):
     assert digest_under(tmp_path / "A") == digest_under(tmp_path / "B"), (
         "identical submodule content must hash equally across checkout roots"
     )
-
-
-def test_recipe_gate_enrolls_component_pattern_contract_once():
-    dodo = _load_dodo()
-    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-    contract = str(dodo.SCRIPTS_DIR / "test_component_patterns.py")
-    assert recipe["actions"][0][1][0].count(contract) == 1
-    assert recipe["file_dep"].count(contract) == 1
-    assert str(dodo.SCRIPTS_DIR / "_assembly_patterns.py") in recipe["file_dep"]
-
-
-def test_recipe_gate_tracks_sources_imported_by_its_tests():
-    """Editing code exercised by the drawing tests must stale the
-    ``check:recipe`` stamp even when the test files themselves are unchanged."""
-    dodo = _load_dodo()
-    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-    deps = {Path(path).name for path in recipe["file_dep"]}
-    assert {
-        "_holes.py",
-        "build_pd_platen_guide.py",
-        "test_pen_summing_drawing_batch_contract.py",
-    } <= deps
-    assert {
-        str(template.path.resolve()) for template in dodo.DRAWING_TEMPLATES.values()
-    } <= set(recipe["file_dep"])
-    pytest_command = recipe["actions"][0][1][0]
-    assert {
-        "test_drawing_marks.py",
-        "test_cone_drawing_batch_contract.py",
-        "test_fastener_catalog.py",
-        "test_drawing_specification_purity.py",
-        "test_drawing_surface_finish_validation.py",
-        "test_gtol_spec.py",
-        "test_part_owned_geometric_tolerances.py",
-        "test_probe_surface_finish_pmi_telemetry.py",
-        "test_surface_finish.py",
-        "test_surface_finish_ownership_a.py",
-        "test_pose_manifest.py",
-        "test_render_offline.py",
-    } <= {Path(argument).name for argument in pytest_command}
-
-    assert {
-        "composite.py",
-        "pose_manifest.py",
-        "render_offline.py",
-    } <= deps
-
-    command = recipe["actions"][0][1][0]
-    assert any(
-        Path(argument).name == "test_pen_summing_drawing_batch_contract.py"
-        for argument in command
-    ), "the pen/summing metadata contract must execute under check:recipe"
-
-
-def test_recipe_gate_tracks_machinist_prompt_and_schema_contract() -> None:
-    """Runtime-read review inputs must invalidate the offline contract stamp."""
-    dodo = _load_dodo()
-    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-    prompt_dir = (dodo.SCRIPTS_DIR / "prompts").resolve()
-    expected = {
-        str(prompt_dir / "machinist_review_part.md"),
-        str(prompt_dir / "machinist_review_assembly.md"),
-        str(prompt_dir / "machinist_review_schema.json"),
-    }
-    assert expected <= set(recipe["file_dep"])
 
 
 def test_submodule_digest_is_checkout_eol_independent(tmp_path):
@@ -2824,50 +2736,455 @@ def test_title_block_geometry_readers_keep_the_title_block_without_stamping(
     assert dodo._expand_title_block_token("assembly", channel) == []
 
 
-def test_check_gates_depend_on_everything_they_execute():
-    """Every ``check:*`` stamp must go stale when code or config it EXECUTES
-    changes, or the gate reports green without running.
+_RECIPE_DYNAMIC_SOURCES = (
+    "cad/scripts/diagnostics/probe_vm2_rack_finish_attachment.py",
+    "cad/scripts/diagnostics/probe_vm2_datum_ownership.py",
+    "cad/scripts/diagnostics/probe_vm2_datum_attachment.py",
+    "cad/scripts/diagnostics/probe_vm2_datum_lifecycle.py",
+    "cad/scripts/diagnostics/analyze_vm2_datum_clearance.py",
+    "cad/comparisons/tools/seed_manifest.py",
+)
+_RECIPE_RECEIPTS = tuple(
+    f"cad/docs/pipeline/evidence/vm2-datum-placement/probes/{name}/receipt.json"
+    for name in (
+        "rack-source-save-full",
+        "rack-source-save-precision",
+        "rack-source-save-callout",
+        "rack-native-lifecycle-original",
+        "rack-native-lifecycle-above",
+        "rack-production-lifecycle-33696944",
+        "rod-production-lifecycle-33696944",
+    )
+)
+_RECIPE_REVIEW_INPUTS = (
+    "cad/scripts/prompts/machinist_review_part.md",
+    "cad/scripts/prompts/machinist_review_assembly.md",
+    "cad/scripts/prompts/machinist_review_schema.json",
+    "cad/docs/drawing-simplicity-policy.md",
+)
 
-    For each gate, the entry points are the ``.py`` arguments of its command
-    (``verify.py`` for math/config, the pytest files otherwise). Their local
-    import closure (``module_deps_of``, which follows lazy function-local
-    imports too) and the config files that closure reads (``_config_deps``,
-    conservative whole-config on any unclassified use) must all be declared
-    ``file_dep``s. ``check:math`` missed ``build_sm_summing_assembly.py`` and
-    ``sm_gooseneck_geom.py``: a gooseneck edit left the stamp green (2026-09-23),
-    and only an unrelated config change later re-ran it -- red.
 
-    Not covered by this derivation, so still hand-listed where a gate needs
-    them: modules ``module_deps_of`` excludes by design (``_buildgraph``,
-    ``_telemetry``, ``_watchdog``, ``test_*`` helpers), ``dodo.py`` itself
-    (outside ``cad/scripts``, loaded via ``spec_from_file_location``), other
-    ``importlib``/``runpy`` loads, and data files read at run time.
+def _scratch_write(root, relative, content):
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def _scratch_module(path):
+    """Actually execute an owned source, including filename-loaded helpers."""
+    spec = importlib.util.spec_from_file_location("_enrollment_scratch", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _SavedCheck:
+    """Real Task/Dependency/config_changed state and a harmless stamped action."""
+
+    def __init__(self, dodo, root):
+        self.dodo = dodo
+        self.root = root
+        self.records = []
+        self.dependencies = self._open_dependencies()
+
+    def _open_dependencies(self):
+        from doit.dependency import Dependency, JsonDB
+
+        return Dependency(
+            JsonDB, str(self.root / "saved-checks.json"),
+            checker_cls=self.dodo.ContentChecker,
+        )
+
+    def task(self, name="recipe", omit=None):
+        from doit.task import dict_to_task
+
+        self.dodo._buildgraph.clear_import_caches()
+        produced = next(task for task in self.dodo.task_check() if task["name"] == name)
+        if omit is not None:
+            produced["file_dep"] = [
+                path for path in produced["file_dep"] if Path(path) != omit
+            ]
+        produced["name"] = f"check:{name}"
+        return dict_to_task(produced)
+
+    def status(self, name="recipe", omit=None):
+        task = self.task(name, omit)
+        status = self.dependencies.get_status(task, {task.name: task}, get_log=True)
+        return task, status
+
+    def run_if_needed(self, name="recipe", omit=None):
+        from doit.task import Stream
+
+        task, status = self.status(name, omit)
+        assert status.status != "error", status.error_reason
+        if status.status == "run":
+            assert task.execute(Stream(0)) is None
+            task.save_extra_values()
+            self.dependencies.save_success(task)
+            self.dependencies.close()
+            self.dependencies = self._open_dependencies()
+        return status.status
+
+    def assert_invalidated(self, path, name="recipe", omit=None):
+        _task, status = self.status(name, omit)
+        assert status.status == "run", (
+            f"editing exercised input {path} left check:{name}'s saved stamp "
+            f"{status.status}: {status.reasons}"
+        )
+
+    def record(self, cmd, label, **kwargs):
+        """Execute known scratch collaborators, never a pytest/COM subprocess."""
+        from fnmatch import fnmatchcase
+        import json
+        import tomllib
+
+        for name in (
+            "_enrollment_source",
+            "_enrollment_fixture_entry",
+            "_enrollment_fixture_leaf",
+            "_enrollment_dynamic_leaf",
+        ):
+            sys.modules.pop(name, None)
+        fixture = _scratch_module(self.root / "conftest.py").FIXTURE_VALUE
+        entry = _scratch_module(self.root / "cad/scripts/_enrollment_source.py").VALUE
+        observed = {
+            "fixture": fixture,
+            "entry": entry,
+            "configuration": (self.root / "pyproject.toml").read_text(encoding="utf-8"),
+            "lock": (self.root / "uv.lock").read_text(encoding="utf-8"),
+        }
+        if kwargs["task"] == "check:recipe":
+            observed["dynamic"] = tuple(
+                _scratch_module(self.root / path).VALUE
+                for path in _RECIPE_DYNAMIC_SOURCES
+            )
+            observed["receipts"] = tuple(
+                json.loads((self.root / path).read_text(encoding="utf-8"))
+                for path in _RECIPE_RECEIPTS
+            )
+            observed["review"] = tuple(
+                (self.root / path).read_text(encoding="utf-8")
+                for path in _RECIPE_REVIEW_INPUTS
+            )
+            with (self.root / "pyproject.toml").open("rb") as stream:
+                settings = tomllib.load(stream)["tool"]["pytest"]["ini_options"]
+            maintained = []
+            for relative_root in settings["testpaths"]:
+                for current, directories, files in os.walk(self.root / relative_root):
+                    base = Path(current)
+                    directories[:] = [
+                        name for name in directories
+                        if not any(
+                            fnmatchcase(name, pattern)
+                            for pattern in settings["norecursedirs"]
+                        )
+                    ]
+                    maintained.extend(
+                        (base / name).relative_to(self.root).as_posix()
+                        for name in files
+                        if any(
+                            fnmatchcase(name, pattern)
+                            for pattern in settings["python_files"]
+                        )
+                    )
+            observed["maintained"] = tuple(sorted(maintained))
+            observed["scanned"] = tuple(sorted(
+                (
+                    path.relative_to(self.root).as_posix(),
+                    path.read_text(encoding="utf-8"),
+                )
+                for directory in (
+                    self.root / "cad/scripts",
+                    self.root / "SolidworksMCP-python/src",
+                )
+                for path in directory.rglob("*.py")
+                if not {"_generated", ".venv", "__pycache__"}.intersection(
+                    path.relative_to(directory).parts
+                )
+            ))
+            observed["parts"] = tuple(sorted(
+                path.name for path in (self.root / "cad/scripts").glob("build_*.py")
+                if not path.stem.endswith("_assembly") and path.stem != "build_all"
+            ))
+        self.records.append(observed)
+
+
+@pytest.fixture(scope="module")
+def check_parser_layout():
+    """Fixed production command/scan sources needed before task generation.
+
+    This is layout bootstrap, not the expected dependency oracle. The saved
+    action below independently imports/reads its own exercised collaborators.
     """
     dodo = _load_dodo()
-    gaps: dict[str, list[str]] = {}
-    for task in dodo.task_check():
-        declared = {str(Path(dep).resolve()) for dep in task["file_dep"]}
-        command = task["actions"][0][1][0]
-        entries = [Path(arg) for arg in command if str(arg).endswith(".py")]
-        assert entries, f"check:{task['name']} runs no .py entry point: {command}"
-        executed = {
-            path
-            for entry in entries
-            for path in (
-                str(entry.resolve()),
-                *dodo.module_deps_of(entry),
-                *dodo._config_deps(entry),
-            )
+    dodo._buildgraph.clear_import_caches()
+    try:
+        entries = {
+            Path(arg).resolve().relative_to(REPO_ROOT).as_posix()
+            for task in dodo.task_check()
+            for arg in task["actions"][0][1][0]
+            if str(arg).endswith(".py")
         }
-        missing = sorted(executed - declared)
-        if missing:
-            gaps[task["name"]] = [
-                str(Path(path).relative_to(REPO_ROOT)) for path in missing
-            ]
-    assert not gaps, "check:* gates execute undeclared inputs (stale-green): " + "; ".join(
-        f"check:{name} misses {len(paths)}: {', '.join(paths)}"
-        for name, paths in sorted(gaps.items())
+        entries.update(
+            path.relative_to(REPO_ROOT).as_posix()
+            for path in dodo.SCRIPTS_DIR.glob("build_*_assembly.py")
+        )
+        # The budget gate parses its model as well as its pytest entry point.
+        entries.add("cad/scripts/error_budget.py")
+        return tuple(sorted(entries))
+    finally:
+        dodo._buildgraph.clear_import_caches()
+
+
+@pytest.fixture
+def saved_check(tmp_path, monkeypatch, request, check_parser_layout):
+    from doit.dependency import Dependency, JsonDB
+
+    # dodo installs process-wide doit patches. Preserve the pre-fixture transports
+    # so this behavioral witness does not change another test's collaborators.
+    monkeypatch.setattr(Dependency, "save_success", Dependency.save_success)
+    monkeypatch.setattr(JsonDB, "dump", JsonDB.dump)
+    dodo = _load_dodo()
+    witness = None
+
+    def cleanup():
+        try:
+            if witness is not None:
+                witness.dependencies.close()
+        finally:
+            # Registered before roots or parser fixtures change: failed setup
+            # must not lend a scratch module map to later real recipe checks.
+            dodo._buildgraph.clear_import_caches()
+            for name in (
+                "_enrollment_source", "_enrollment_fixture_entry",
+                "_enrollment_fixture_leaf", "_enrollment_dynamic_leaf",
+            ):
+                sys.modules.pop(name, None)
+
+    request.addfinalizer(cleanup)
+    root = tmp_path / "checkout"
+    scripts = root / "cad/scripts"
+    submodule = root / "SolidworksMCP-python/src/solidworks_mcp"
+    scripts.mkdir(parents=True)
+    submodule.mkdir(parents=True)
+    for relative in check_parser_layout:
+        _scratch_write(root, relative, "pass\n")
+    monkeypatch.setattr(dodo, "REPO_ROOT", root)
+    monkeypatch.setattr(dodo, "SCRIPTS_DIR", scripts)
+    monkeypatch.setattr(dodo, "CONFIG_DIR", root / "cad/config")
+    monkeypatch.setattr(dodo, "CAD_OUT", root / "cad/out")
+    monkeypatch.setattr(dodo, "REPORTS", root / "cad/out/reports")
+    monkeypatch.setattr(dodo, "SUBMODULE_SRC", submodule)
+    monkeypatch.setattr(dodo, "VERIFY_PY", scripts / "verify.py")
+    monkeypatch.setattr(dodo, "DRAWING_TEMPLATES", {})
+    monkeypatch.setattr(dodo, "_CONFIG_YAMLS", [])
+    monkeypatch.setattr(dodo._buildgraph, "SCRIPTS_DIR", scripts)
+    monkeypatch.setattr(dodo._buildgraph, "CONFIG_DIR", root / "cad/config")
+    # Unrelated exported-CAD specs are generated, never executed in this witness.
+    monkeypatch.setattr(dodo, "_export_requirement_deps", lambda: [])
+    monkeypatch.setattr(dodo, "_feature_export_outputs", lambda: [])
+    monkeypatch.setattr(dodo.subprocess, "check_output", lambda *args, **kwargs: b"")
+    monkeypatch.syspath_prepend(str(root))
+    monkeypatch.syspath_prepend(str(scripts))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    for name in (
+        "_enrollment_source", "_enrollment_fixture_entry",
+        "_enrollment_fixture_leaf", "_enrollment_dynamic_leaf",
+    ):
+        monkeypatch.delitem(sys.modules, name, raising=False)
+    _scratch_write(root, "pyproject.toml", (
+        "[tool.pytest.ini_options]\n"
+        'testpaths = ["cad/scripts", "cad/comparisons/tools", "tests"]\n'
+        'python_files = ["test_*.py", "*_test.py"]\n'
+        'norecursedirs = [".*", "build", "references", "SolidworksMCP-python"]\n'
+    ))
+    _scratch_write(root, "uv.lock", 'version = 1\n')
+    _scratch_write(root, "conftest.py", (
+        "from _enrollment_fixture_entry import VALUE\n"
+        'FIXTURE_VALUE = (VALUE, "initial")\n'
+    ))
+    _scratch_write(root, "_enrollment_fixture_entry.py", (
+        "from _enrollment_fixture_leaf import VALUE as LEAF\n"
+        'VALUE = (LEAF, "initial")\n'
+    ))
+    _scratch_write(root, "_enrollment_fixture_leaf.py", 'VALUE = "initial"\n')
+    _scratch_write(root, "_enrollment_dynamic_leaf.py", 'VALUE = "initial"\n')
+    _scratch_write(root, "cad/scripts/_enrollment_source.py", 'VALUE = "initial"\n')
+    for relative in (
+        "cad/scripts/test_dodo_recipe.py",
+        "cad/scripts/test_buildgraph.py",
+        "cad/scripts/test_dxf_text.py",
+        "cad/comparisons/tools/test_seed_manifest.py",
+        "tests/test_scratch_root.py",
+    ):
+        _scratch_write(root, relative, (
+            "from _enrollment_source import VALUE\n"
+            "def test_scratch(): assert VALUE\n"
+        ))
+    for relative in _RECIPE_DYNAMIC_SOURCES:
+        _scratch_write(root, relative, (
+            "from _enrollment_dynamic_leaf import VALUE as LEAF\n"
+            'VALUE = (LEAF, "initial")\n'
+        ))
+    for relative in _RECIPE_RECEIPTS:
+        _scratch_write(root, relative, '{"value": "initial"}\n')
+    for relative in _RECIPE_REVIEW_INPUTS:
+        _scratch_write(root, relative, '{"value": "initial"}\n')
+    _scratch_write(
+        root, "SolidworksMCP-python/src/solidworks_mcp/adapter.py", 'VALUE = "initial"\n'
     )
+    _scratch_write(root, "cad/scripts/build_scratch_part.py", 'VALUE = "initial"\n')
+    _scratch_write(root, "cad/scripts/nested/_scratch_scanned.py", 'VALUE = "initial"\n')
+    # Fill non-executed fixed data/helper fixtures only after every source the
+    # generator parses is present. Expected exercised inputs are specified and
+    # executed independently above, not inferred from this dependency list.
+    dodo._buildgraph.clear_import_caches()
+    for task in dodo.task_check():
+        if task["actions"][0][1][0][1:3] != ["-m", "pytest"]:
+            continue
+        for dependency in task["file_dep"]:
+            path = Path(dependency)
+            assert path.is_relative_to(root), f"scratch gate escaped its roots: {path}"
+            if not path.exists():
+                _scratch_write(root, path.relative_to(root), 'VALUE = "placeholder"\n')
+    witness = _SavedCheck(dodo, root)
+    monkeypatch.setattr(dodo, "_run", witness.record)
+    yield witness
+
+
+def _edit_exercised_input(path):
+    original = path.read_text(encoding="utf-8")
+    assert "initial" in original, f"missing scratch mutation sentinel: {path}"
+    stamp = path.stat()
+    path.write_text(original.replace("initial", "changed-and-longer"), encoding="utf-8")
+    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns + 1_000_000_000))
+
+
+@pytest.mark.parametrize("gate", ["graph", "numerals", "recipe"])
+@pytest.mark.parametrize("relative", [
+    "cad/scripts/_enrollment_source.py",
+    "conftest.py",
+    "_enrollment_fixture_entry.py",
+    "_enrollment_fixture_leaf.py",
+])
+def test_saved_pytest_check_stamp_tracks_executed_fixture_closure(saved_check, gate, relative):
+    witness = saved_check
+    assert witness.run_if_needed(gate) == "run"
+    before = witness.records[-1]
+    assert witness.run_if_needed(gate) == "up-to-date"
+    assert len(witness.records) == 1, "an unchanged gate must reuse its saved stamp"
+    path = witness.root / relative
+    _edit_exercised_input(path)
+    witness.assert_invalidated(path, gate)
+    assert witness.run_if_needed(gate) == "run"
+    assert witness.records[-1] != before, f"scratch action did not exercise {path}"
+    assert witness.run_if_needed(gate) == "up-to-date"
+
+
+@pytest.mark.parametrize("relative", [
+    *_RECIPE_DYNAMIC_SOURCES,
+    "_enrollment_dynamic_leaf.py",
+    *_RECIPE_RECEIPTS,
+    *_RECIPE_REVIEW_INPUTS,
+    "cad/scripts/nested/_scratch_scanned.py",
+    "cad/scripts/build_scratch_part.py",
+    "SolidworksMCP-python/src/solidworks_mcp/adapter.py",
+])
+def test_saved_recipe_stamp_tracks_filename_loads_and_runtime_reads(saved_check, relative):
+    witness = saved_check
+    assert witness.run_if_needed() == "run"
+    before = witness.records[-1]
+    assert witness.run_if_needed() == "up-to-date"
+    path = witness.root / relative
+    _edit_exercised_input(path)
+    witness.assert_invalidated(path)
+    assert witness.run_if_needed() == "run"
+    assert witness.records[-1] != before, f"scratch action did not exercise {path}"
+
+
+@pytest.mark.parametrize("relative", _RECIPE_RECEIPTS)
+def test_missing_runtime_receipt_refuses_a_saved_recipe_stamp(saved_check, relative):
+    witness = saved_check
+    assert witness.run_if_needed() == "run"
+    assert witness.run_if_needed() == "up-to-date"
+    path = witness.root / relative
+    path.unlink()
+    _task, status = witness.status()
+    assert status.status == "error", f"missing runtime receipt stayed green: {path}"
+    assert str(path) in status.error_reason
+    assert len(witness.records) == 1, "a missing receipt must refuse before the action"
+
+
+@pytest.mark.parametrize(("relative", "added"), [
+    ("tests/nested/test_inventory.py", "tests/nested/test_added.py"),
+    ("cad/scripts/nested/_scratch_scanned.py", "cad/scripts/nested/_added_scan.py"),
+    ("cad/scripts/build_scratch_part.py", "cad/scripts/build_added_part.py"),
+    (
+        "SolidworksMCP-python/src/solidworks_mcp/adapter.py",
+        "SolidworksMCP-python/src/solidworks_mcp/added.py",
+    ),
+])
+@pytest.mark.parametrize("mutation", ["add", "remove", "move"])
+def test_saved_recipe_stamp_tracks_inventory_changes(saved_check, relative, added, mutation):
+    witness = saved_check
+    path = witness.root / relative
+    if not path.exists():
+        _scratch_write(witness.root, relative, 'VALUE = "initial"\n')
+    assert witness.run_if_needed() == "run"
+    before = witness.records[-1]
+    saved = witness.dependencies.get_values("check:recipe")["_config_changed"]
+    assert witness.run_if_needed() == "up-to-date"
+    if mutation == "add":
+        _scratch_write(witness.root, added, 'VALUE = "added"\n')
+    elif mutation == "remove":
+        path.unlink()
+    else:
+        target = witness.root / added
+        target.parent.mkdir(parents=True, exist_ok=True)
+        path.rename(target)
+    witness.assert_invalidated(path)
+    task, _status = witness.status()
+    assert task.uptodate[0][0].config_digest != saved, (
+        f"{mutation} of {relative} failed to change the saved inventory configuration"
+    )
+    assert witness.run_if_needed() == "run"
+    assert witness.records[-1] != before
+    assert witness.run_if_needed() == "up-to-date"
+
+
+def test_independent_saved_stamp_control_detects_an_omitted_fixture_dependency(saved_check):
+    witness = saved_check
+    omitted = witness.root / "_enrollment_fixture_leaf.py"
+    assert witness.run_if_needed(omit=omitted) == "run"
+    assert witness.run_if_needed(omit=omitted) == "up-to-date"
+    _edit_exercised_input(omitted)
+    # Neither the import graph nor the declared list is the expected oracle:
+    # the action has actually read this leaf. Removing its dep must make the
+    # independent saved-stamp assertion fail with the exercised path.
+    with pytest.raises(AssertionError, match=re.escape(str(omitted))):
+        witness.assert_invalidated(omitted, omit=omitted)
+    assert witness.run_if_needed(omit=omitted) == "up-to-date"
+    assert len(witness.records) == 1
+
+
+@pytest.mark.parametrize("gate", ["graph", "numerals", "recipe"])
+@pytest.mark.parametrize("relative", ["pyproject.toml", "uv.lock"])
+def test_saved_pytest_stamp_tracks_loaded_configuration(saved_check, gate, relative):
+    witness = saved_check
+    assert witness.run_if_needed(gate) == "run"
+    before = witness.records[-1]
+    assert witness.run_if_needed(gate) == "up-to-date"
+    path = witness.root / relative
+    stamp = path.stat()
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write('\nconfiguration_witness = "changed"\n')
+    os.utime(path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns + 1_000_000_000))
+    witness.assert_invalidated(path, gate)
+    assert witness.run_if_needed(gate) == "run"
+    assert witness.records[-1] != before
+    assert witness.run_if_needed(gate) == "up-to-date"
 
 
 def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
