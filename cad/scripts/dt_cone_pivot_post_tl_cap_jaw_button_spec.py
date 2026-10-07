@@ -12,6 +12,7 @@ Frame: the button axis is model +X, the jaw face at X0 and the spigot end at
 
 from __future__ import annotations
 
+import _config
 import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
@@ -33,6 +34,11 @@ _BORE_MIN = post.BORE_DIA + post.RUNNING_BORE_BAND[1]
 SPIGOT_HAND_CLEARANCE_MIN = 0.05
 if SPIGOT_DIA + SPIGOT_BAND[0] > _BORE_MIN - SPIGOT_HAND_CLEARANCE_MIN:
     raise AssertionError("cap jaw-button spigot does not drop into the smallest journal bore")
+
+# The band's reason belongs on its callout (policy rule 2): it names the mate
+# and states the acceptance, so the 0.05 band is not read as unjustified.
+POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
+SPIGOT_CALLOUT = f"ENTERS {POST_NUMBER}\nCONE PIVOT POST\nJOURNAL BORE BY HAND"
 
 # The shoulder bears on the cap annulus only: the face, at its largest and
 # shifted by the spigot's largest float, stays inside the cone boss.
@@ -61,8 +67,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked jaw-button dimension needs authored places")
 
 SURFACE_FINISHES = ()
-# No general note: the spigot band alone sets the hand clearance in the
-# post's journal bore (asserted above), so the print carries no fit note.
+# No general note: the spigot's fit acceptance sits on its own callout.
 DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 
@@ -71,7 +76,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "spigot": ExportFeature(
         kind="boss",
         faces=(CylinderFace(SPIGOT_DIA),),
-        requirements=("dia",),
+        requirements=("dia", "note"),
         fields={
             "at": ([FACE_THICK, 0.0, 0.0], ("FACE_THICK",)),
             "axis": _AXIS,
@@ -81,6 +86,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                  ("dt_cone_pivot_post_spec", "RUNNING_BORE_BAND")),
             ),
             "dia_nominal": (SPIGOT_DIA, ("SPIGOT_DIA",)),
+            "note": (SPIGOT_CALLOUT, ("SPIGOT_CALLOUT", "POST_NUMBER")),
         },
         precision={"dia": 2},
     ),
