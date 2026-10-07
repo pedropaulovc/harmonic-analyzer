@@ -11,8 +11,11 @@ chosen mechanism inputs do not turn rest-projected moving anchors into pose evid
 Only exact {kind: 'operating'} assembly descriptors are legal for REST projection.
 Posed/unknown assembly descriptors and runtime-instance anchors are explicitly refused;
 genuine supplied posed-view cameras use the shared validator instead.
---historical-diagnostic explicitly selects old materialized derivative diagnostics;
-private .json output is allowed, but never in current or immutable historical namespaces.
+--historical-diagnostic explicitly selects old materialized derivative diagnostics.
+It allows private .json output only under web/.vite/verification-output or at
+resolved paths under /tmp or /var/tmp outside the whole checkout. Symlink
+escapes from the private output directory are rejected; current outputs and
+immutable historical namespaces remain off-limits.
 Current CPU residuals are diagnostics, never camera-candidate or GPU/source acceptance gates.
 Native line CHECK scores add the unchanged final-source localization/raster bound
 once, plus explicitly certified independent geometry; no extra source raster allowance.
@@ -81,7 +84,7 @@ def check_namespace(path, *, historical_diagnostic=False, output=False, video_id
             and parent.parent.parent.resolve() == web
             for parent in declared.parents)
         if private_escape or not (path.is_relative_to(private) or external_temp):
-            raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output")
+            raise ValueError("Historical diagnostics require private .vite/verification-output or resolved output under /tmp or /var/tmp outside the checkout")
 
 
 def finite_vector(value, size, label):
@@ -1858,7 +1861,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("observations", type=Path, help="Explicit .gz observations; historical diagnostics use their original storage")
     parser.add_argument("--inventory", type=Path, required=True, help="Actual native inventory, stored as ordinary JSON")
-    parser.add_argument("--output", type=Path, help="Gzip observations; private .json is permitted only with --historical-diagnostic")
+    parser.add_argument("--output", type=Path, help="Gzip observations; --historical-diagnostic permits private .json only under web/.vite/verification-output or resolved /tmp or /var/tmp outside the checkout")
     parser.add_argument("--require-complete", action="store_true")
     parser.add_argument(
         "--historical-diagnostic", action="store_true",

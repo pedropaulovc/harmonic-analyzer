@@ -7,8 +7,11 @@ python web/scripts/observe-source.py --source /private/source.mp4
 Ordinary inputs/outputs require explicit gzip paths and the shared strict current authority.
 Inventory remains ordinary JSON. New output JSON bytes use the shared deterministic codec.
 Omitting --inventory loads the independently sealed current inventory.
---historical-diagnostic selects only the old materialized-derivative diagnostic;
-private .json output is allowed, but never in current or immutable historical namespaces.
+--historical-diagnostic selects only the old materialized-derivative diagnostic.
+It allows private .json output only under web/.vite/verification-output or at
+resolved paths under /tmp or /var/tmp outside the whole checkout. Symlink
+escapes from the private output directory are rejected; current outputs and
+immutable historical namespaces remain off-limits.
 
 Only numeric observations are written. Never copies source frames/video into the repo.
 Content classification comes from the human-observed shot census, NOT guessed image labels.
@@ -82,7 +85,7 @@ def check_namespace(path, *, historical_diagnostic=False, output=False, video_id
             and parent.parent.parent.resolve() == web
             for parent in declared.parents)
         if private_escape or not (path.is_relative_to(private) or external_temp):
-            raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output")
+            raise ValueError("Historical diagnostics require private .vite/verification-output or resolved output under /tmp or /var/tmp outside the checkout")
 
 
 def frame_time(index, fps, pts=None):
@@ -949,7 +952,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--observations", type=Path, required=True, help="Explicit .gz observations; historical diagnostics use their original storage")
-    parser.add_argument("--output", type=Path, required=True, help="Gzip observations; private .json is permitted only with --historical-diagnostic")
+    parser.add_argument("--output", type=Path, required=True, help="Gzip observations; --historical-diagnostic permits private .json only under web/.vite/verification-output or resolved /tmp or /var/tmp outside the checkout")
     parser.add_argument("--inventory", type=Path, help="Actual current inventory, stored as ordinary JSON; defaults to independently sealed authority")
     parser.add_argument(
         "--historical-diagnostic", action="store_true",

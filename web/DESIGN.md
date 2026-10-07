@@ -514,6 +514,8 @@ A coarse demo or a passing subset does not establish final acceptance.
 Per-video and aggregate reports stream their complete existing JSON evidence
 with bounded serialization memory and atomic publication. Invalid values or
 failed writes remain failures and cannot replace a previous complete report.
+Saved failure reasons retain the actual serialization or filesystem cause and
+any temporary-file cleanup failure, alongside the output-path context.
 On a failed stage, refine the worst source-visible discrepancy, rerun the affected
 shot, then rerun the collection. Escalate actual missing geometry outside approved
 exceptions rather than hiding it with a camera warp or an occlusion claim.
@@ -531,13 +533,17 @@ no draw receipt; any positive opacity still requires fresh pose, clock and share
 revision evidence. Failed playback remains failed even if a later real native
 seek establishes the strictly paused state needed for independent measurements.
 After seeking away from actual EOF, the local player publishes the settled native
-state on `seeked`; a paused getter and the HUD must agree, without aliasing ended.
+state on `seeked` only when it changes; a paused getter and the HUD must agree,
+without aliasing ended. Unchanged paused scrubs must not interrupt ongoing manual
+crank motion through a redundant state callback.
 
 Paused exploration must permit orbit, pan, zoom and mechanism operation without
 advancing the source video. Compact mode retains the same visible usable player
 at least 200 by 200 pixels, with advancing audio and working pause/resume controls.
-Official-player checks use visible provider-accessible Play controls in both
-responsive and desktop layouts, not an assumed desktop chrome bar. A real native
+Official-player checks use visible provider-accessible Play controls in the
+layout actually served, not an assumed desktop chrome bar. Compact receipts
+retain the clicked control's accessible name, dimensions and native-pointer proof;
+this does not establish coverage of another provider layout. A real native
 pointer click must still produce audible, advancing, synchronized playback.
 Verify all six routes. Present the working implementation in a headed browser;
 headless Playwright with screenshots or recordings is for automated checks.

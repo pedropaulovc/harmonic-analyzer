@@ -98,8 +98,9 @@ export function createSourceVideoPlayer(container: HTMLElement, videoId: string,
     media.addEventListener('ended', () => publish('ended'))
     media.addEventListener('seeked', () => {
       if (destroyed || !ready || media.seeking || state === 'error') return
-      // Seeking away from EOF need not emit pause again; publish the settled native state.
-      publish(media.ended ? 'ended' : media.paused ? 'paused' : media.readyState < media.HAVE_FUTURE_DATA ? 'buffering' : 'playing')
+      // Publish EOF recovery and other transitions, not unchanged paused scrubs.
+      const next = media.ended ? 'ended' : media.paused ? 'paused' : media.readyState < media.HAVE_FUTURE_DATA ? 'buffering' : 'playing'
+      if (next !== state) publish(next)
     })
     media.addEventListener('error', () => fail(`Original reference video load failed (${media.error?.message ?? 'media unavailable'}).`))
     if (options.signal?.aborted) abort()

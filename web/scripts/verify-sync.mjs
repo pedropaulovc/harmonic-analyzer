@@ -823,10 +823,10 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
   const rect = await page.locator('#video-player').boundingBox()
   assert(rect && rect.width >= 200 && rect.height >= 200, 'Compact original player must remain at least200x200')
   const activeControls = embed.player === 'youtube'
-    ? { controls: true, providerControl: await playOfficialNativeControl(embed) }
+    ? { providerControl: await playOfficialNativeControl(embed) }
     : await embed.frame.evaluate(selector => ({ controls: document.querySelector(selector)?.controls === true }), embed.selector)
-  assert(activeControls.controls, 'Compact original player has no usable native playback controls')
   if (embed.player !== 'youtube') {
+    assert(activeControls.controls, 'Compact original player has no usable native playback controls')
     const video = page.locator(embed.selector)
     await video.hover()
     // Chromium owns this button in a closed user-agent shadow tree. Its actual
@@ -868,7 +868,7 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
   const compactScreenshot = `${record.id}-${embed.player}-compact.png`
   await page.screenshot({ path: resolve(outputDirectory, compactScreenshot) })
   await page.locator('#minimize-player').click()
-  Object.assign(playback, { status: 'passed', clockProof: 'Completed actual-native-geometry-render receipts, actual original media before/after brackets, and actual canvas screenshots; expensive landmark probes remain paused-review-only.', audio: { muted: started.muted, volume: started.volume, proof: 'Actual decoded original HTMLMediaElement playback; audio track retained in unchanged source bytes, not acoustic loopback' }, advancedSeconds: ended.mediaTime - started.mediaTime, clocks, maxClockSkewSeconds: Math.max(...clocks.map(item => item.clockSkewSeconds)), compact: { width: rect.width, height: rect.height, controls: activeControls.controls, screenshot: compactScreenshot } })
+  Object.assign(playback, { status: 'passed', clockProof: 'Completed actual-native-geometry-render receipts, actual original media before/after brackets, and actual canvas screenshots; expensive landmark probes remain paused-review-only.', audio: { muted: started.muted, volume: started.volume, proof: 'Actual decoded original HTMLMediaElement playback; audio track retained in unchanged source bytes, not acoustic loopback' }, advancedSeconds: ended.mediaTime - started.mediaTime, clocks, maxClockSkewSeconds: Math.max(...clocks.map(item => item.clockSkewSeconds)), compact: { width: rect.width, height: rect.height, ...activeControls, screenshot: compactScreenshot } })
 }
 
 async function interactionChecks(page, embed, record, outputDirectory) {

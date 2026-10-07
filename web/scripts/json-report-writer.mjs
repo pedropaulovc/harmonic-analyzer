@@ -99,9 +99,12 @@ export async function writeJsonReport(path, report) {
     await pipeline(Readable.from(jsonChunks(report), { objectMode: false }), destination)
     await rename(temporary, path)
   } catch (error) {
-    let cause = error
+    let cause = error, detail = error instanceof Error ? error.message : String(error)
     try { if (created) await rm(temporary, { force: true }) }
-    catch (cleanupError) { cause = new AggregateError([error, cleanupError], 'Report write and temporary-file cleanup failed', { cause: error }) }
-    throw new Error(`Unable to write complete JSON report ${path}`, { cause })
+    catch (cleanupError) {
+      detail += `; temporary-file cleanup failed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`
+      cause = new AggregateError([error, cleanupError], `Report write and temporary-file cleanup failed: ${detail}`, { cause: error })
+    }
+    throw new Error(`Unable to write complete JSON report ${path}: ${detail}`, { cause })
   }
 }
