@@ -6,6 +6,8 @@ import type {
 
 /** Geometry, GPU arithmetic and source/raster uncertainty remain separate budgets. */
 export const NATIVE_LANDMARK_GEOMETRIC_TOLERANCE_METRES = 1e-7
+/** Classifies one pixel-centre query, never a native landmark's general visibility or validity. */
+export const NATIVE_LANDMARK_ELIGIBILITY_SCOPE = 'selected-native-stage-pixel-exact-vertex-identity' as const
 export type NativeLandmarkPoint = readonly [number, number, number]
 export type NativeLandmarkPixel = readonly [number, number]
 type CapturedSnapshot = Extract<NativePrimitiveSnapshot, { status: 'captured' }>
@@ -88,12 +90,14 @@ export interface NativeCpuSurfaceHit extends NativeIncidentTriangle {
   distanceMetres: number
   barycentric: NativeLandmarkPoint
   worldPointMetres: NativeLandmarkPoint
+  /** Distance from this queried ray's first-hit point to the exact class, not vertex arithmetic error. */
   targetResidualMetres: number
   targetClassIncident: boolean
 }
 
 /** Shape emitted by CurrentFirstSurface.guard; the envelope below binds its otherwise unbound draw. */
 export interface NativeCpuSurfaceGuardResult {
+  eligibilityScope: 'queried-ray-exact-vertex-identity'
   eligibility: 'eligible-cpu-exact-local-class' | 'ineligible-first-surface' | 'ambiguous-coincident-first-surfaces' | 'no-positive-surface'
   targetPrimitiveId: string
   targetLocalCoordinate: NativeLandmarkPoint
@@ -289,15 +293,17 @@ export interface NativeLandmarkEligibilityInput {
 
 export interface NativeLandmarkEligibilityResult {
   method: 'current-exact-native-landmark-evidence-join'
+  eligibilityScope: typeof NATIVE_LANDMARK_ELIGIBILITY_SCOPE
   state: 'eligible' | 'ineligible' | 'unresolved'
   reasons: readonly string[]
-  qualification: 'current-vertex-eligibility-only-not-source-acceptance'
+  qualification: 'selected-pixel-exact-vertex-identity-not-general-landmark-validity-or-source-acceptance'
   sourceProof: false
   sourceAcceptance: false
   geometricResidualToleranceMetres: 1e-7
   target: NativeLandmarkEligibilityInput['target']
   classVertexIds: readonly number[]
   incidentTriangles: readonly NativeIncidentTriangle[]
+  /** Selected pixel-centre hit-to-class distance; a miss does not invalidate the native anchor. */
   cpuGeometricResidualMetres: number | null
   gpuRoundingBoundMetres: number | null
   numericVertexResidualBoundMetres: number | null
@@ -311,14 +317,14 @@ export interface NativeLandmarkEligibilityResult {
   }
 }
 
-/** Verification consumer only. This never installs a playback/per-exposure certificate gate. */
+/** Selected-pixel verification consumer only; never a general landmark-visibility or playback gate. */
 export async function joinNativeLandmarkEligibility(input: NativeLandmarkEligibilityInput): Promise<NativeLandmarkEligibilityResult> {
   let classVertexIds: number[] = [], incidentTriangles: NativeIncidentTriangle[] = []
   let cpuGeometricResidualMetres: number | null = null
   let gpuRoundingBoundMetres: number | null = null, numericVertexResidualBoundMetres: number | null = null
   const finish = (state: NativeLandmarkEligibilityResult['state'], ...reasons: string[]): NativeLandmarkEligibilityResult => ({
-    method: 'current-exact-native-landmark-evidence-join', state, reasons,
-    qualification: 'current-vertex-eligibility-only-not-source-acceptance', sourceProof: false, sourceAcceptance: false,
+    method: 'current-exact-native-landmark-evidence-join', eligibilityScope: NATIVE_LANDMARK_ELIGIBILITY_SCOPE, state, reasons,
+    qualification: 'selected-pixel-exact-vertex-identity-not-general-landmark-validity-or-source-acceptance', sourceProof: false, sourceAcceptance: false,
     geometricResidualToleranceMetres: 1e-7, target: input.target, classVertexIds, incidentTriangles, cpuGeometricResidualMetres,
     gpuRoundingBoundMetres, numericVertexResidualBoundMetres,
     combinedGpuVertexBoundMetres: gpuRoundingBoundMetres === null || numericVertexResidualBoundMetres === null
@@ -377,6 +383,9 @@ export async function joinNativeLandmarkEligibility(input: NativeLandmarkEligibi
     const receiptReason = await bufferReceiptReason(snapshot, cpu.bufferReceipts)
     if (receiptReason) return finish('unresolved', receiptReason)
     const guard = cpu.result, scope = guard.scope
+    if (guard.eligibilityScope !== 'queried-ray-exact-vertex-identity') {
+      return finish('unresolved', 'missing-or-unsupported-cpu-query-eligibility-scope')
+    }
     if (!['eligible-cpu-exact-local-class', 'ineligible-first-surface', 'ambiguous-coincident-first-surfaces', 'no-positive-surface'].includes(guard.eligibility)) {
       return finish('unresolved', 'unsupported-cpu-first-surface-result-mode')
     }
@@ -422,7 +431,7 @@ export async function joinNativeLandmarkEligibility(input: NativeLandmarkEligibi
       maximumResidual = Math.max(maximumResidual, actualResidual)
       if (hit.primitiveId !== row.id) cpuNegative = 'cpu-occluded-by-other-native-primitive'
       else if (!incident) cpuNegative = 'cpu-first-surface-is-adjacent-nonclass-triangle'
-      else if (actualResidual > NATIVE_LANDMARK_GEOMETRIC_TOLERANCE_METRES) cpuNegative = 'cpu-first-surface-exceeds-geometric-residual'
+      else if (actualResidual > NATIVE_LANDMARK_GEOMETRIC_TOLERANCE_METRES) cpuNegative = 'cpu-selected-pixel-first-surface-exceeds-exact-vertex-residual'
     }
     cpuGeometricResidualMetres = guard.coincidentClosestHits.length ? maximumResidual : null
     if ((guard.eligibility === 'eligible-cpu-exact-local-class') !== (cpuNegative === null)) {

@@ -122,6 +122,7 @@ class SurfaceControls(unittest.TestCase):
                 self.assertTrue(result['firstHit']['targetClassIncident'])
                 self.assertEqual(result['firstHit']['targetResidualMetres'], distance)
                 self.assertEqual(result['eligibility'], expected)
+                self.assertEqual(result['eligibilityScope'], GUARD.ELIGIBILITY_SCOPE)
                 self.assertEqual(result['geometricResidualToleranceMetres'], 1e-7)
                 self.assertIsNone(result['safety']['gpuRoundingBoundMetres'])
                 self.assertEqual(result['safety']['sourceQualification'], 'not-performed')
@@ -270,6 +271,7 @@ class SnapshotRefusalControls(unittest.TestCase):
         bad['queryId'] = 'view/not-stored'
         self.fixture.request['queries'].append(bad)
         result = helper.batch(self.fixture.request)
+        self.assertEqual(result['eligibilityScope'], GUARD.ELIGIBILITY_SCOPE)
         self.assertEqual(result['results'][0]['result']['eligibility'], 'eligible-cpu-exact-local-class')
         self.assertIsNone(result['results'][1]['result'])
         self.assertIn('No exact stored', result['results'][1]['error'])

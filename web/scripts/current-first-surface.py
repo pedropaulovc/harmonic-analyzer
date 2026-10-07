@@ -23,14 +23,18 @@ an exported current draw, not continued freshness after the live lease expires.
 One read-only full-scope load serves the entire batch. stdout is one strict JSON
 object; a bad header/batch exits nonzero with a diagnostic only on stderr. An
 invalid individual query has result:null and error:string, without erasing valid
-siblings. Results retain the original guard schema; the envelope retains actual
-metadata/context, every validated buffer receipt, and each normalized ray.
+siblings. Results explicitly classify queried-ray exact-vertex identity only;
+the envelope retains actual metadata/context, every validated buffer receipt,
+and each normalized ray. This is not general native-landmark visibility/validity.
 
 Coordinates use exact numeric stored Float32 equality (including signed-zero
 seam rows); queries are never cast to Float32 and vertices are never welded.
 Near/far are positive distances along the normalized actual current camera ray,
-not camera Z. The independent residual boundary remains 1e-7 metres. The guard's
-CPU enum cannot certify GPU rounding, raster visibility or source qualification;
+not camera Z. The independent residual boundary remains 1e-7 metres.
+The residual is the queried first-hit point's distance to the exact vertex class,
+not vertex-coordinate arithmetic error. A pixel-centre ray can miss a visible
+vertex by more than this bound; its rejection does not invalidate that anchor.
+The guard's CPU enum cannot certify GPU rounding, raster visibility or source qualification;
 unsupported raster modes explicitly limit its ray proof.
 """
 import argparse
@@ -44,6 +48,7 @@ import sys
 import numpy as np
 
 RESIDUAL_M = 1e-7
+ELIGIBILITY_SCOPE = 'queried-ray-exact-vertex-identity'
 GPU_REQUIRED = 'independent-gpu-rounding-raster-and-first-surface-proof-required'
 SAFETY = {'sourceQualification': 'not-performed',
           'gpuSafety': 'unmeasured-independent-proof-required',
@@ -547,7 +552,7 @@ class CurrentFirstSurface:
             hit['targetClassIncident'] = hit['primitiveId'] == primitive_id and bool(class_set.intersection(hit['vertexIds']))
         accepted = [h['targetClassIncident'] and h['targetResidualMetres'] <= RESIDUAL_M for h in hits]
         eligibility = 'no-positive-surface' if not hits else ('eligible-cpu-exact-local-class' if all(accepted) else ('ambiguous-coincident-first-surfaces' if any(accepted) else 'ineligible-first-surface'))
-        return {'eligibility':eligibility, 'targetPrimitiveId':primitive_id, 'targetLocalCoordinate':list(local_coordinate), 'classVertexIds':ids.tolist(), 'geometricResidualToleranceMetres':RESIDUAL_M, 'firstHit':hits[0] if hits else None, 'coincidentClosestHits':hits, 'scope':{'primitiveCount':len(self.parts), 'artifactPrimitiveCount':sum(p[0]['scope']=='artifact' for p in self.parts.values()), 'runtimeClonePrimitiveCount':sum(p[0]['scope']=='runtime-clone' for p in self.parts.values()), 'springPrimitiveCount':sum(p[0]['deformation']['kind']=='native-stock-spring' for p in self.parts.values()), 'drawSubmissionCount':len(self.draws), 'limitations':self.limitations, 'rayProofLimited':bool(self.limitations)}, 'safety':{'sourceQualification':'not-performed', 'gpuSafety':'unmeasured-independent-proof-required', 'worldCoordinatePrecision':'float64-cpu-not-exact-gpu', 'gpuRoundingBoundMetres':None, 'rasterFirstSurfaceCertificate':False, 'genericApproval':False}}
+        return {'eligibilityScope':ELIGIBILITY_SCOPE, 'eligibility':eligibility, 'targetPrimitiveId':primitive_id, 'targetLocalCoordinate':list(local_coordinate), 'classVertexIds':ids.tolist(), 'geometricResidualToleranceMetres':RESIDUAL_M, 'firstHit':hits[0] if hits else None, 'coincidentClosestHits':hits, 'scope':{'primitiveCount':len(self.parts), 'artifactPrimitiveCount':sum(p[0]['scope']=='artifact' for p in self.parts.values()), 'runtimeClonePrimitiveCount':sum(p[0]['scope']=='runtime-clone' for p in self.parts.values()), 'springPrimitiveCount':sum(p[0]['deformation']['kind']=='native-stock-spring' for p in self.parts.values()), 'drawSubmissionCount':len(self.draws), 'limitations':self.limitations, 'rayProofLimited':bool(self.limitations)}, 'safety':{'sourceQualification':'not-performed', 'gpuSafety':'unmeasured-independent-proof-required', 'worldCoordinatePrecision':'float64-cpu-not-exact-gpu', 'gpuRoundingBoundMetres':None, 'rasterFirstSurfaceCertificate':False, 'genericApproval':False}}
 
     def batch(self, request):
         _require(request['headerSha256'] == self.header_sha256, 'Query batch header SHA256 mismatch')
@@ -584,7 +589,7 @@ class CurrentFirstSurface:
             except (KeyError, TypeError, ValueError, OverflowError) as error:
                 entry['error'] = str(error)
             results.append(entry)
-        return {'schemaVersion': 1, 'method': 'current-native-cpu-first-surface-batch',
+        return {'schemaVersion': 1, 'method': 'current-native-cpu-first-surface-batch', 'eligibilityScope': ELIGIBILITY_SCOPE,
                 'headerSha256': self.header_sha256, 'metadata': metadata,
                 'manifest': self.manifest, 'context': self.context,
                 'scopeAuthority': self.scope_authority,

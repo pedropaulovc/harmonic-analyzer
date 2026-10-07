@@ -17,6 +17,8 @@ const PRODUCER_PATHS = [
 ]
 const CHUNK_BYTES = 1024 * 1024
 const ARRAY_TYPES = { Float32Array, Uint32Array, Float64Array }
+const ELIGIBILITY_SCOPE = 'selected-native-stage-pixel-exact-vertex-identity'
+const QUALIFICATION = 'selected-pixel-exact-vertex-identity-not-general-landmark-validity-or-source-acceptance'
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 
 /** Execute the enrolled current typed consumer, without a listening Vite server. */
@@ -140,7 +142,7 @@ export async function collectCurrentNativeEligibilityEvidence(page, frame, respo
       const viewId = observed.viewId ?? 'main', queryId = `${viewId}/${observed.anchorId}`
       const anchorRows = evidence.registeredAnchors.filter(anchor => anchor.id === observed.anchorId)
       const anchor = anchorRows.length === 1 ? anchorRows[0] : null
-      const query = { queryId, viewId, anchorId: observed.anchorId, anchor, target: null, cpu: null, gpu: null, shaderFeedback: null, mapping: null, reasons: [] }
+      const query = { queryId, eligibilityScope: ELIGIBILITY_SCOPE, viewId, anchorId: observed.anchorId, anchor, target: null, cpu: null, gpu: null, shaderFeedback: null, mapping: null, reasons: [] }
       evidence.queries.push(query)
       if (evidence.currentMetadata?.status !== 'current-diagnostic-submission' || evidence.currentMetadata.draw.viewId !== viewId) {
         query.reasons.push('Only the last current native draw retains geometry; earlier simultaneous views cannot reuse its camera/context'); continue
@@ -210,6 +212,7 @@ export async function collectCurrentNativeEligibilityEvidence(page, frame, respo
       try {
         const batch = await cpuBatch(headerPath, queriesPath, webRoot)
         if (batch.schemaVersion !== 1 || batch.method !== 'current-native-cpu-first-surface-batch' || batch.headerSha256 !== headerSha256) throw new Error('Unsupported or differently bound actual CPU first-surface batch result')
+        if (batch.eligibilityScope !== 'queried-ray-exact-vertex-identity') throw new Error('Actual CPU first-surface batch has no supported queried-ray eligibility scope')
         for (const query of cpuQueries) {
           const results = batch.results.filter(result => result.queryId === query.queryId)
           if (results.length === 1 && results[0].result) query.cpu = { metadata: batch.metadata, ray: query.ray, bufferReceipts: batch.bufferReceipts, result: results[0].result }
@@ -254,11 +257,11 @@ export async function joinCurrentNativeEligibilityReport(joinNativeLandmarkEligi
     landmarks.push({ viewId, anchorId: observed.anchorId, role: observed.role, ...result,
       collection: evidence?.collection ?? { status: 'not-collected', reason: 'native-evidence-producer-unavailable' },
       registeredAnchor: anchor, projection: entry?.capture ?? null, stagePointMapping: query?.mapping ?? null,
-      stagePointMeaning: 'Chosen query from executed image support, not an independently measured native GPU centroid',
+      stagePointMeaning: 'Selected pixel-centre query from executed image support, not general native-anchor visibility/validity or an independently measured native GPU centroid',
       shaderFeedback: query?.shaderFeedback ?? null, collectionReasons: query?.reasons ?? [],
     })
   }
-  return { method: 'optional-current-native-landmark-eligibility-report', gating: false,
+  return { method: 'optional-current-native-landmark-eligibility-report', eligibilityScope: ELIGIBILITY_SCOPE, qualification: QUALIFICATION, gating: false,
     state: landmarks.length && landmarks.every(item => item.state === 'eligible') ? 'eligible'
       : landmarks.some(item => item.state === 'ineligible') ? 'ineligible' : 'unresolved',
     sourceProof: false, sourceAcceptance: false, currentMetadata: evidence?.currentMetadata ?? null, landmarks,
@@ -267,9 +270,9 @@ export async function joinCurrentNativeEligibilityReport(joinNativeLandmarkEligi
 
 /** A loader/capture refusal stays visible without becoming pixel unavailability. */
 export function unavailableCurrentNativeEligibilityReport(frame, reason, collectionReason = 'module-seal-unavailable') {
-  return { method: 'optional-current-native-landmark-eligibility-report', gating: false,
+  return { method: 'optional-current-native-landmark-eligibility-report', eligibilityScope: ELIGIBILITY_SCOPE, qualification: QUALIFICATION, gating: false,
     state: 'unresolved', sourceProof: false, sourceAcceptance: false,
     landmarks: (frame?.landmarks ?? []).map(observed => ({ viewId: observed.viewId ?? 'main', anchorId: observed.anchorId,
-      role: observed.role, state: 'unresolved', reasons: [reason], collection: { status: 'not-collected', reason: collectionReason } })),
+      role: observed.role, eligibilityScope: ELIGIBILITY_SCOPE, qualification: QUALIFICATION, state: 'unresolved', reasons: [reason], collection: { status: 'not-collected', reason: collectionReason } })),
     reasons: [reason] }
 }

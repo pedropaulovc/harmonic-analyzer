@@ -10,9 +10,9 @@ const server = await createServer({
   server: { middlewareMode: true, hmr: false, watch: null, ws: false }, appType: 'custom',
 })
 after(async () => { await server.close() })
-let exactStoredF32Class, incidentOriginalTriangles, deriveNativeStagePixelRay, joinNativeLandmarkEligibility
+let exactStoredF32Class, incidentOriginalTriangles, deriveNativeStagePixelRay, joinNativeLandmarkEligibility, NATIVE_LANDMARK_ELIGIBILITY_SCOPE
 try {
-  ;({ exactStoredF32Class, incidentOriginalTriangles, deriveNativeStagePixelRay, joinNativeLandmarkEligibility } = await server.ssrLoadModule(
+  ;({ exactStoredF32Class, incidentOriginalTriangles, deriveNativeStagePixelRay, joinNativeLandmarkEligibility, NATIVE_LANDMARK_ELIGIBILITY_SCOPE } = await server.ssrLoadModule(
     process.env.NATIVE_LANDMARK_ELIGIBILITY_MODULE ?? '/src/native-landmark-eligibility.ts',
   ))
 } catch (error) { await server.close(); throw error }
@@ -81,7 +81,7 @@ function fixture() {
     vertexIds: [31, 63, 32], materialUuid: 'material', distanceMetres: 1, barycentric: [1, 0, 0], worldPointMetres: [0, 0, -1],
     targetResidualMetres: 0, targetClassIncident: true }
   const bufferReceipts = receipts(id, buffers)
-  const result = { eligibility: 'eligible-cpu-exact-local-class', targetPrimitiveId: id, targetLocalCoordinate: [0, 0, 0], classVertexIds,
+  const result = { eligibilityScope: 'queried-ray-exact-vertex-identity', eligibility: 'eligible-cpu-exact-local-class', targetPrimitiveId: id, targetLocalCoordinate: [0, 0, 0], classVertexIds,
     geometricResidualToleranceMetres: 1e-7, firstHit: hit, coincidentClosestHits: [hit], scope: { primitiveCount: 1,
       artifactPrimitiveCount: 1, runtimeClonePrimitiveCount: 0, springPrimitiveCount: 0, drawSubmissionCount: 1, limitations: [], rayProofLimited: false },
     safety: { sourceQualification: 'not-performed', gpuSafety: 'unmeasured-independent-proof-required', worldCoordinatePrecision: 'float64-cpu-not-exact-gpu',
@@ -218,6 +218,7 @@ test('bounded consumer control accepts every incident class triangle, not only t
   input.independentGpuProof = boundedProof(input)
   let result = await joinNativeLandmarkEligibility(input)
   assert.equal(result.state, 'eligible')
+  assert.equal(result.eligibilityScope, NATIVE_LANDMARK_ELIGIBILITY_SCOPE)
   assert.equal(result.combinedGpuVertexBoundMetres, 5e-8)
   assert.equal(result.sourceAcceptance, false)
   input.independentGpuProof = boundedProof(input, 1e-7, 0)
@@ -324,6 +325,21 @@ test('missing unwarped pixel authority and foreign-camera rays remain unresolved
   result = await joinNativeLandmarkEligibility(foreignRay)
   assert.equal(result.state, 'unresolved')
   assert.deepEqual(result.reasons, ['cpu-ray-is-not-the-current-unwarped-native-stage-pixel'])
+})
+
+test('general landmark claims or absent CPU query scope cannot join otherwise positive exact-class evidence', async () => {
+  const positive = fixture()
+  positive.independentGpuProof = boundedProof(positive)
+  assert.equal((await joinNativeLandmarkEligibility(positive)).state, 'eligible')
+  for (const scope of [undefined, 'general-native-landmark-validity']) {
+    const input = fixture()
+    input.cpu.result.eligibilityScope = scope
+    const result = await joinNativeLandmarkEligibility(input)
+    assert.equal(result.state, 'unresolved')
+    assert.deepEqual(result.reasons, ['missing-or-unsupported-cpu-query-eligibility-scope'])
+    assert.equal(result.eligibilityScope, NATIVE_LANDMARK_ELIGIBILITY_SCOPE)
+    assert.equal(result.measurements.projection, input.projection)
+  }
 })
 
 test('stale GPU readback refuses even a known CPU occluder instead of joining obsolete surface evidence', async () => {

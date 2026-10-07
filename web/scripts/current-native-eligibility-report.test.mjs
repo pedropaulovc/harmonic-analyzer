@@ -2,8 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { createContext, runInContext } from 'node:vm'
+import { fileURLToPath } from 'node:url'
 
-const { collectCurrentNativeEligibilityEvidence } = await import(
+const { collectCurrentNativeEligibilityEvidence, joinCurrentNativeEligibilityReport, unavailableCurrentNativeEligibilityReport } = await import(
   process.env.CURRENT_NATIVE_ELIGIBILITY_REPORT_MODULE ?? './current-native-eligibility-report.mjs'
 )
 
@@ -80,4 +81,26 @@ test('new lease restoration errors remain failures rather than collected evidenc
   await assert.rejects(collect(fixture), failure => failure === error)
   assert.equal(fixture.counters.released, 1)
   assert.equal(fixture.counters.disposed, 1)
+})
+
+test('uncollected and refused landmark queries retain selected-pixel scope without claiming anchor invalidity', async () => {
+  const { createServer } = await import('vite')
+  const server = await createServer({ root: fileURLToPath(new URL('../', import.meta.url)), configFile: false,
+    server: { middlewareMode: true, hmr: false, watch: null, ws: false }, appType: 'custom' })
+  try {
+    const { joinNativeLandmarkEligibility, NATIVE_LANDMARK_ELIGIBILITY_SCOPE } = await server.ssrLoadModule('/src/native-landmark-eligibility.ts')
+    const frame = { landmarks: [{ anchorId: 'uncollected-anchor', viewId: 'main', role: 'check' }] }
+    const uncollected = await joinCurrentNativeEligibilityReport(joinNativeLandmarkEligibility, frame, null)
+    const refused = unavailableCurrentNativeEligibilityReport(frame, 'No current native draw')
+    for (const report of [uncollected, refused]) {
+      assert.equal(report.state, 'unresolved')
+      assert.equal(report.eligibilityScope, NATIVE_LANDMARK_ELIGIBILITY_SCOPE)
+      assert.equal(report.landmarks[0].eligibilityScope, NATIVE_LANDMARK_ELIGIBILITY_SCOPE)
+      assert.equal(report.sourceProof, false)
+      assert.equal(report.sourceAcceptance, false)
+      assert.equal(report.gating, false)
+    }
+    assert.deepEqual(uncollected.landmarks[0].reasons, ['missing-unique-native-target-or-unwarped-stage-pixel-authority'])
+    assert.deepEqual(refused.landmarks[0].reasons, ['No current native draw'])
+  } finally { await server.close() }
 })
