@@ -125,12 +125,15 @@ SIDE_KEEP = {
     "NoseHeight": (_SIDE_LEFT - 0.024, _side(0.0, (BOTTOM_Z + NOSE_Z) / 2.0)[1]),
     "ScrewHeight": (_SIDE_RIGHT + 0.012, _side(0.0, (BOTTOM_Z + SCREW_Z) / 2.0)[1]),
     "ArmHeight": (_SIDE_RIGHT + 0.024, _side(0.0, (BOTTOM_Z + ARM_TOP_Z) / 2.0)[1]),
-    "NoseHoleDia": (_side(NOSE_Y, 0.0)[0] - 0.004, _SIDE_TOP + 0.016),
+    "NoseHoleDia": (_side(NOSE_Y, 0.0)[0] - 0.011, _SIDE_TOP + 0.034),
     "ScrewHoleDia": (_SIDE_RIGHT + 0.040, _side(0.0, SCREW_Z)[1] + 0.030),
 }
-# The bought nose pin reads above its hole's size, the drilling below.
-CALLOUTS_ABOVE = {"NoseHoleDia": NOSE_PIN_CALLOUT}
-CALLOUTS_BELOW = {"NoseHoleDia": "DRILL THRU", "ScrewHoleDia": SCREW_HOLE_CALLOUT}
+# The drilling and the bought nose pin it takes read under the hole's size,
+# standing high enough above the section for the three callout lines.
+CALLOUTS_BELOW = {
+    "NoseHoleDia": f"DRILL THRU\n{NOSE_PIN_CALLOUT}",
+    "ScrewHoleDia": SCREW_HOLE_CALLOUT,
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -201,7 +204,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) and the drilled-hole band are
     # authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the drilled holes")
