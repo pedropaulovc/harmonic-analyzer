@@ -560,10 +560,14 @@ def _detail(adapter: Any, plan: Any) -> Any:
     if detail is None:
         raise RuntimeError("CreateDetailViewAt4 returned no view for detail E")
     rebuild_drawing(adapter, label="create detail E")
-    _center_on_outline(adapter, detail, DETAIL_CENTER, label="detail E")
-    # A fresh detail view's projection lags its ink; settle it before anything
-    # is placed through it (draw_dt_cone_swing_platform._create_detail_view).
-    for attempt in range(3):
+    # Centre the view on the bore axis it is cut about (its circle's centre),
+    # not on its outline: on swmaker000004 the outline-centred view put the
+    # bore 5 mm low on the sheet and three rebuilds never moved it (run
+    # 20261007T233527878Z). A fresh detail view's projection also lags its
+    # ink, so each move is re-projected after a rebuild
+    # (draw_dt_cone_swing_platform._create_detail_view).
+    view = _early_bound(detail, "IView")
+    for attempt in range(4):
         projected = model_point_in_view(
             adapter,
             detail,
@@ -572,6 +576,10 @@ def _detail(adapter: Any, plan: Any) -> Any:
         )
         if math.dist(projected, DETAIL_CENTER) < 0.0005:
             break
+        position = tuple(float(value) for value in view.Position)
+        moved = [position[axis] + DETAIL_CENTER[axis] - projected[axis] for axis in range(2)]
+        if not view.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to position detail E")
         rebuild_drawing(adapter, label="settle detail E")
     else:
         raise RuntimeError(
