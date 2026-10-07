@@ -25,6 +25,11 @@ Pinned here:
 * a seat without the member, or whose first answer is unintelligible, is
   released at once rather than polled for a minute.
 
+Every case refuses an unexpected watchdog hard exit, including ordinary fake
+seats whose deadlines should disarm. Real timers and explicit race threads are
+cancelled/released and joined before any patch is undone. If teardown cannot
+quiesce a thread within its bound, it fails with the inert exit still installed.
+
 The seat line, the watchdog hand-off and the per-poll heartbeat are pinned in
 ``test_failure_forensics.py``, next to the missing-property capture.
 
@@ -57,6 +62,7 @@ import _watchdog  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _PID = 7204
+_REAL_TIMER = threading.Timer
 
 
 class _ComError(Exception):
@@ -114,6 +120,58 @@ class _Adapter:
             return fn()
         except Exception:
             return default
+
+
+@pytest.fixture
+def exit_boundary():
+    return SimpleNamespace(threads=[], releases=[], refused=[], attempted=[])
+
+
+@pytest.fixture
+def monkeypatch(exit_boundary):
+    """Keep the exit guard underneath case-specific mocks until ALL workers stop.
+
+    This local version owns the complete patch stack, so a failed bounded join
+    cannot restore either a case's exit mock or the underlying real hard exit.
+    It also tracks real timers used by ordinary gate cases and the kill-switch
+    release timer; manual-timer race cases register their workers separately.
+    """
+    patches = pytest.MonkeyPatch()
+
+    def refuse_exit(code: int) -> None:
+        exit_boundary.refused.append(code)
+        raise AssertionError(f"offline startup test refused hard exit {code}")
+
+    def tracked_timer(*args, **kwargs):
+        timer = _REAL_TIMER(*args, **kwargs)
+        exit_boundary.threads.append(timer)
+        return timer
+
+    # Fake underneath the refusal first: removing the guard must fail safely,
+    # even though the production alias captured os._exit at module import.
+    patches.setattr(_watchdog, "_hard_exit", exit_boundary.attempted.append)
+    patches.setattr(_watchdog, "_hard_exit", refuse_exit)
+    patches.setattr(threading, "Timer", tracked_timer)
+    yield patches
+
+    for thread in exit_boundary.threads:
+        if isinstance(thread, _REAL_TIMER):
+            thread.cancel()
+    for event in exit_boundary.releases:
+        event.set()
+    join_until = time.monotonic() + _watchdog._FIRED_EXIT_GRACE_S + 5
+    for thread in exit_boundary.threads:
+        if thread.ident is not None:
+            thread.join(max(0, join_until - time.monotonic()))
+    pending = [thread.name for thread in exit_boundary.threads if thread.is_alive()]
+    assert not pending, f"exit guard retained: startup workers still running: {pending}"
+    patches.undo()
+    assert not exit_boundary.refused, (
+        f"unexpected startup hard exits refused: {exit_boundary.refused}"
+    )
+    assert not exit_boundary.attempted, (
+        f"startup exit refusal bypassed: {exit_boundary.attempted}"
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -406,27 +464,19 @@ def manual_timer(monkeypatch):
 
 
 @pytest.fixture
-def gate_threads(monkeypatch):
-    """The threads a deadline test starts, released and joined at teardown
-    BEFORE monkeypatch puts the real ``os._exit`` back: a callback or gate
-    still running then would call it and kill the whole run. Every such thread
-    ends within the (patched, short) exit grace once its events are set."""
+def gate_threads(monkeypatch, exit_boundary):
+    """Register race workers with the same teardown that owns the exit guard."""
     monkeypatch.setattr(_watchdog, "_FIRED_EXIT_GRACE_S", 1.0)
-    threads: list[threading.Thread] = []
-    releases: list[threading.Event] = []
 
     def start(target) -> threading.Thread:
         thread = threading.Thread(target=target, daemon=True)
-        threads.append(thread)
+        exit_boundary.threads.append(thread)
         thread.start()
         return thread
 
-    yield SimpleNamespace(start=start, release_at_teardown=releases.append)
-    for event in releases:
-        event.set()
-    for thread in threads:
-        thread.join(_watchdog._FIRED_EXIT_GRACE_S + 5)
-    assert not any(thread.is_alive() for thread in threads)
+    return SimpleNamespace(
+        start=start, release_at_teardown=exit_boundary.releases.append
+    )
 
 
 def _gate_deadline():
@@ -448,6 +498,29 @@ def _leave(gate, gate_threads) -> tuple[threading.Thread, list[object]]:
             left.append(exc.code)
 
     return gate_threads.start(_exit_gate), left
+
+
+def test_an_unexpected_deadline_exit_is_refused_before_the_process_boundary(
+    monkeypatch, manual_timer, exit_boundary
+):
+    """Exercise the deadline consumer with the fixture's inert boundary already
+    installed, never by calling or temporarily restoring the real ``os._exit``."""
+    monkeypatch.setattr(_watchdog, "_abort", lambda *_a, **_f: None)
+    gate = _gate_deadline()
+    gate.__enter__()
+    (timer,) = manual_timer
+
+    try:
+        with pytest.raises(AssertionError, match="refused hard exit 89"):
+            timer.fire()
+    finally:
+        with pytest.raises(SystemExit) as caught:
+            gate.__exit__(None, None, None)
+
+    assert caught.value.code == 89
+    assert exit_boundary.refused == [89]
+    assert exit_boundary.attempted == []
+    exit_boundary.refused.clear()  # This case deliberately exercised the refusal.
 
 
 def test_a_deadline_that_fires_first_holds_the_gate_until_the_exit(
