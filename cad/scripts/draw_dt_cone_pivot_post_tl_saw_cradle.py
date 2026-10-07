@@ -123,9 +123,11 @@ _TOP_TOP = _top_y(0.0)
 TOP_KEEP = {
     "StudX": (_x(STUD_X / 2.0), _TOP_TOP + _GAP),
     "BaseLength": (_x(BASE_LENGTH / 2.0), _TOP_TOP + _GAP + _ROW),
+    # The across-base stations share the side-face baseline left of the view,
+    # leaving its right side clear for the tap callout.
     "StudNearZ": (_x(0.0) - _GAP, _top_y(STUD_Z[0] / 2.0)),
     "StudFarZ": (_x(0.0) - _GAP - 1.2 * _ROW, _top_y(STUD_Z[1] / 2.0)),
-    "BaseWidth": (_x(BASE_LENGTH) + _GAP, TOP_CENTER[1]),
+    "BaseWidth": (_x(0.0) - _GAP - 2.4 * _ROW, TOP_CENTER[1]),
 }
 # The seat axis stands above the saddle tops, so the side-face stations stack
 # above it; the seat-bottom height stands right of the side face.
@@ -137,10 +139,11 @@ RIGHT_KEEP = {
     "SeatBottomHt": (_right_x(0.0) + _GAP, _y(14.0)),
     "SeatDia": (_right_x(BASE_WIDTH) - 0.010, _SEAT_AXIS_TOP + _GAP),
 }
-# The tap callout leads from the near stud's drill rim to the clear sheet
-# right of the top view's station stack.
-NEAR_STUD_RIM = (_x(STUD_X + STUD_TAP_DRILL / 2.0), _top_y(STUD_Z[0]))
-TAP_CALLOUT_XY = (_x(BASE_LENGTH) + 0.012, _TOP_TOP + 0.004)
+# The tap callout leads from the far stud's drill rim to the clear sheet right
+# of the top view, below the right view's station stack; nothing it crosses
+# is a dimension or extension line.
+FAR_STUD_RIM = (_x(STUD_X + STUD_TAP_DRILL / 2.0), _top_y(STUD_Z[1]))
+TAP_CALLOUT_XY = (_x(BASE_LENGTH) + 0.014, _top_y(STUD_Z[1]) + 0.004)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -208,7 +211,7 @@ async def build(adapter: Any) -> dict[str, str]:
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=NEAR_STUD_RIM,
+        edge_xy=FAR_STUD_RIM,
         callout_xy=TAP_CALLOUT_XY,
         label="cap-bridge stud taps",
         process="TAP",
