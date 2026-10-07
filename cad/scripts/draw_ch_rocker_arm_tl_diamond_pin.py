@@ -132,39 +132,6 @@ def _overall_reference(adapter: Any, section: Any, to_sheet) -> None:
         raise RuntimeError(f"{label} precision did not persist")
 
 
-def _hatch_pin_apart(adapter: Any, section: Any) -> None:
-    """Cross the bonded gauge pin's hatch against the body's in section A-A."""
-    import math
-
-
-    groups: dict[str, list[Any]] = {}
-    volumes: dict[str, float] = {}
-    for item in _early_bound(section, "IView").GetFaceHatches() or ():
-        hatch = _early_bound(item, "IFaceHatch")
-        body = _early_bound(_early_bound(hatch.Face, "IFace2").GetBody(), "IBody2")
-        # Section faces carry temporary bodies with no name: key by volume.
-        name = f"{float(body.GetMassProperties(1.0)[3]):.12g}"
-        groups.setdefault(name, []).append(hatch)
-        volumes[name] = float(name)
-    if len(groups) != 2:
-        raise RuntimeError(f"section A-A should cut two bodies, hatched {sorted(groups)}")
-    pin = min(volumes, key=volumes.get)
-    for name, hatches in groups.items():
-        angle = 3.0 * math.pi / 4.0 if name == pin else math.pi / 4.0
-        for hatch in hatches:
-            before = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
-            hatch.UseMaterialHatch = False
-            hatch.Angle = angle
-            # A longitudinally cut pin reads unhatched: spacing wider than the pin.
-            if name == pin:
-                hatch.Scale2 = 100.0
-            print(f"hatch {name}: {before} -> {(hatch.Scale2, hatch.Angle)}", flush=True)
-            after = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
-            if abs(float(hatch.Angle) - angle) > 1e-6 or not str(hatch.Pattern):
-                raise RuntimeError(f"section hatch did not persist: {before} -> {after}")
-    adapter.currentModel.EditRebuild3()
-    adapter.currentModel.GraphicsRedraw2()
-
 
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
@@ -232,7 +199,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _overall_reference(adapter, section, to_sheet)
-    _hatch_pin_apart(adapter, section)
     create_section_axis_centerline(
         adapter, section, length_mm=OVERALL_LENGTH + LAND_HEIGHT, label="pin turning axis"
     )
