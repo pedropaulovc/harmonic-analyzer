@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ from unittest.mock import Mock
 import pytest
 import _config
 import _drawing_common
+from _hole_spec import blind_cut_dia_mm
 
 import draw_fr_rocker_arm_support as drawing
 import build_fr_rocker_arm_support as support
@@ -898,27 +900,52 @@ def test_view_b_arrow_looks_down_on_the_rail_from_above_the_front_view() -> None
     assert abs(tip_xy[0] - drawing.FRONT_CENTER[0]) > 0.015
 
 
-def _circle_edge(x_mm: float, y_mm: float, radius_mm: float):
+def _circle_edge(
+    x_mm: float,
+    y_mm: float,
+    radius_mm: float,
+    *,
+    z_mm: float = 0.0,
+    axis: tuple[float, float, float] = (0.0, 1.0, 0.0),
+    feature_name: str = "BracketSeats",
+    feature_type: str = "HoleWzd",
+    native_identity=None,
+):
     curve = SimpleNamespace(
+        IsLine=lambda: False,
         IsCircle=lambda: True,
-        CircleParams=(x_mm / 1000, y_mm / 1000, 0.0, 0.0, 1.0, 0.0, radius_mm / 1000),
+        CircleParams=(x_mm / 1000, y_mm / 1000, z_mm / 1000, *axis, radius_mm / 1000),
     )
-    return SimpleNamespace(GetCurve=lambda: curve, name=(x_mm, y_mm, radius_mm))
+    owners = tuple(
+        SimpleNamespace(
+            GetFeature=lambda name=name, kind=kind: SimpleNamespace(
+                Name=name, GetTypeName2=lambda: kind
+            )
+        )
+        for name, kind in ((feature_name, feature_type), ("Wall", "Extrusion"))
+    )
+    return SimpleNamespace(
+        GetCurve=lambda: curve,
+        GetTwoAdjacentFaces2=lambda: owners,
+        native_identity=object() if native_identity is None else native_identity,
+    )
 
 
-def test_seat_entry_edge_is_the_east_seats_rim_on_the_rail_top(monkeypatch) -> None:
-    """The edge comes from the part through the typed seat cylinder: the one
-    drill-diameter circle of the east seat on the rail top, never the rim
-    where the drill point starts."""
-    from _hole_spec import blind_cut_dia_mm
+def _patch_seat_rims(monkeypatch, part_entry, visible_edges):
+    """Expose independent part topology and current cropped-view topology.
 
+    Binding and the component bridge are offline seams; the real shared scan,
+    full-circle filtering and native-identity uniqueness logic still run.
+    """
     radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
-    east = max(seats.SEAT_LOCAL_X)
-    entry = _circle_edge(east, support.HALF_Y, radius)
     face = SimpleNamespace(
         GetEdges=lambda: (
-            _circle_edge(east, support.HALF_Y - seats.SEAT_DRILL_DEPTH, radius),
-            entry,
+            _circle_edge(
+                drawing.SEAT_CALLOUT_X_MM,
+                support.HALF_Y - seats.SEAT_DRILL_DEPTH,
+                radius,
+            ),
+            part_entry,
             SimpleNamespace(GetCurve=lambda: SimpleNamespace(IsCircle=lambda: False)),
         )
     )
@@ -928,13 +955,192 @@ def test_seat_entry_edge_is_the_east_seats_rim_on_the_rail_top(monkeypatch) -> N
         requested.update(requests)
         return {"seat": face}
 
+    component = object()
+    view = SimpleNamespace(
+        ReferencedDocument=object(),
+        GetVisibleComponents=lambda: (component,),
+        GetVisibleEntities2=lambda selected_component, kind: (
+            visible_edges if selected_component is component and kind == 1 else ()
+        ),
+    )
+    adapter = SimpleNamespace(
+        swApp=SimpleNamespace(
+            IsSame=lambda first, second: int(
+                getattr(first, "native_identity", first)
+                is getattr(second, "native_identity", second)
+            )
+        )
+    )
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _name: obj)
     monkeypatch.setattr(drawing, "_resolve_faces", resolve)
-    view = SimpleNamespace(ReferencedDocument=object())
-    assert drawing._seat_entry_edge(view) is entry
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "VIEW B")
+    monkeypatch.setattr(
+        _drawing_common,
+        "visible_component_entities",
+        lambda native_view, native_component, kind: native_view.GetVisibleEntities2(
+            native_component, kind
+        ),
+    )
+    events = []
+    monkeypatch.setattr(
+        drawing._telemetry, "event", lambda name, **fields: events.append((name, fields))
+    )
+    return adapter, view, requested, events
+
+
+def test_seat_entry_edge_is_the_unique_visible_east_rim_after_the_crop(monkeypatch) -> None:
+    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
+    east = drawing.SEAT_CALLOUT_X_MM
+    entry = _circle_edge(east, support.HALF_Y, radius)
+    other_station = sorted(set(seats.SEAT_LOCAL_X))[-2]
+    others = (
+        _circle_edge(other_station, support.HALF_Y, radius),
+        _circle_edge(east, support.HALF_Y - seats.SEAT_DRILL_DEPTH, radius),
+        _circle_edge(east, support.HALF_Y, radius, z_mm=0.5),
+        _circle_edge(east, support.HALF_Y, radius, axis=(0.0, 0.0, 1.0)),
+        _circle_edge(east, support.HALF_Y, radius + 0.1),
+    )
+    adapter, view, requested, events = _patch_seat_rims(
+        monkeypatch, entry, (*others, entry)
+    )
+    assert drawing._seat_entry_edge(adapter, view) is entry
     (spec,) = requested.values()
     assert spec.diameter_mm == pytest.approx(2 * radius)
     assert spec.contains_x_mm == east
+    name, witness = events[-1]
+    assert name == "drawing.rocker_support_seat_rim"
+    assert witness["part_visible_is_same"] == 1
+    assert json.loads(witness["visible_circle_mm"]) == pytest.approx(
+        [east, support.HALF_Y, 0.0, radius]
+    )
+    assert json.loads(witness["visible_circle_axis"]) == [0.0, 1.0, 0.0]
+
+
+def test_seat_entry_edge_uses_current_view_identity_not_same_curve_part_identity(
+    monkeypatch,
+) -> None:
+    """Model a part-only handle separately from the current view's native edge.
+
+    This is a consumer visibility/identity regression, not a claimed native
+    explanation of worker15's swap: that log did not describe the attached edge.
+    """
+    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
+    part_entry = _circle_edge(drawing.SEAT_CALLOUT_X_MM, support.HALF_Y, radius)
+    visible_entry = _circle_edge(drawing.SEAT_CALLOUT_X_MM, support.HALF_Y, radius)
+    adapter, view, _requested, events = _patch_seat_rims(
+        monkeypatch, part_entry, (visible_entry,)
+    )
+    assert drawing._seat_entry_edge(adapter, view) is visible_entry
+    _name, witness = events[-1]
+    assert witness["part_visible_is_same"] == 0
+    assert witness["part_circle_mm"] == witness["visible_circle_mm"]
+    assert witness["part_adjacent_features"] == witness["visible_adjacent_features"]
+
+
+@pytest.mark.parametrize("wrong", ("missing", "station", "depth", "z", "axis", "radius"))
+def test_seat_entry_edge_refuses_part_only_rim_when_the_crop_has_no_exact_rim(
+    monkeypatch, wrong
+) -> None:
+    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
+    east = drawing.SEAT_CALLOUT_X_MM
+    part_entry = _circle_edge(east, support.HALF_Y, radius)
+    candidates = {
+        "missing": (),
+        "station": (_circle_edge(sorted(set(seats.SEAT_LOCAL_X))[-2], support.HALF_Y, radius),),
+        "depth": (_circle_edge(east, support.HALF_Y - seats.SEAT_DRILL_DEPTH, radius),),
+        "z": (_circle_edge(east, support.HALF_Y, radius, z_mm=0.5),),
+        "axis": (_circle_edge(east, support.HALF_Y, radius, axis=(0.0, 0.0, 1.0)),),
+        "radius": (_circle_edge(east, support.HALF_Y, radius + 0.1),),
+    }
+    adapter, view, _requested, _events = _patch_seat_rims(
+        monkeypatch, part_entry, candidates[wrong]
+    )
+    with pytest.raises(RuntimeError, match="no circular edge|no visible circle"):
+        drawing._seat_entry_edge(adapter, view)
+
+
+def test_seat_entry_edge_refuses_distinct_native_rims_on_the_same_curve(monkeypatch) -> None:
+    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
+    entry = _circle_edge(drawing.SEAT_CALLOUT_X_MM, support.HALF_Y, radius)
+    twin = _circle_edge(drawing.SEAT_CALLOUT_X_MM, support.HALF_Y, radius)
+    adapter, view, _requested, _events = _patch_seat_rims(
+        monkeypatch, entry, (entry, twin)
+    )
+    with pytest.raises(RuntimeError, match="ambiguous visible circle"):
+        drawing._seat_entry_edge(adapter, view)
+
+
+def test_seat_entry_edge_accepts_duplicate_wrappers_only_for_one_native_rim(
+    monkeypatch,
+) -> None:
+    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
+    entry = _circle_edge(drawing.SEAT_CALLOUT_X_MM, support.HALF_Y, radius)
+    wrapper = _circle_edge(
+        drawing.SEAT_CALLOUT_X_MM,
+        support.HALF_Y,
+        radius,
+        native_identity=entry.native_identity,
+    )
+    adapter, view, _requested, _events = _patch_seat_rims(
+        monkeypatch, entry, (entry, wrapper)
+    )
+    assert drawing._seat_entry_edge(adapter, view) is entry
+
+
+@pytest.mark.parametrize(
+    ("feature_name", "feature_type"),
+    (("BracketSeats", "Cut"), ("OtherSeats", "HoleWzd")),
+)
+def test_seat_entry_edge_refuses_same_curve_without_bracket_seat_ownership(
+    monkeypatch, feature_name, feature_type
+) -> None:
+    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
+    part_entry = _circle_edge(drawing.SEAT_CALLOUT_X_MM, support.HALF_Y, radius)
+    other = _circle_edge(
+        drawing.SEAT_CALLOUT_X_MM,
+        support.HALF_Y,
+        radius,
+        feature_name=feature_name,
+        feature_type=feature_type,
+    )
+    adapter, view, _requested, _events = _patch_seat_rims(
+        monkeypatch, part_entry, (other,)
+    )
+    with pytest.raises(RuntimeError, match="not owned by BracketSeats"):
+        drawing._seat_entry_edge(adapter, view)
+
+
+def test_current_visible_seat_target_still_refuses_one_live_wrong_edge(monkeypatch) -> None:
+    """Preserve worker15's REAL failure family: one EDGE, no dangling flag.
+
+    The attachment is independently supplied as the neighbouring seat; it is
+    not an echo of the selector or a fabricated native success observation.
+    """
+    radius = blind_cut_dia_mm(seats.SEAT_SPEC) / 2
+    entry = _circle_edge(drawing.SEAT_CALLOUT_X_MM, support.HALF_Y, radius)
+    neighbour = _circle_edge(sorted(set(seats.SEAT_LOCAL_X))[-2], support.HALF_Y, radius)
+    adapter, view, _requested, _events = _patch_seat_rims(
+        monkeypatch, entry, (entry, neighbour)
+    )
+    target = drawing._seat_entry_edge(adapter, view)
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: (neighbour,),
+        GetAttachedEntityCount3=lambda: 1,
+        GetAttachedEntityTypes=lambda: (1,),
+        GetLeaderCount=lambda: 0,
+        IsDangling=lambda: False,
+    )
+    with pytest.raises(RuntimeError, match="same_entity=False"):
+        _drawing_common._assert_attached_to(
+            adapter,
+            annotation,
+            target,
+            entity_type="EDGE",
+            what="native hole callout",
+            label="rocker-bracket transfer seats",
+            expected_leaders=None,
+        )
 
 
 # r743-p1s-A: VIEW B's GetOutline right after its crop, which had not
