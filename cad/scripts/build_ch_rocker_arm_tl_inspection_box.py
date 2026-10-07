@@ -48,7 +48,7 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from _holes import blind_hole_volume_mm3, wizard_holes
-from _gear import _blank_ref_plane
+from _visibility import blank_reference_geometry
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_inspection_box_spec import (
     BACK_WINDOW,
@@ -187,7 +187,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "BackWallPlane")
-    _blank_ref_plane(adapter, "BackWallPlane")
+    blank_reference_geometry(adapter, (("BackWallPlane", "PLANE"),))
     check("create_sketch back window", await adapter.create_sketch("BackWallPlane"))
     await _chain(
         adapter, _rectangle(BACK_WINDOW_X0, BACK_WINDOW_Y0, BACK_WINDOW, BACK_WINDOW),
