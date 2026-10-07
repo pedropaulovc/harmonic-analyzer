@@ -614,7 +614,11 @@ test('missing actual pixels or native bodies and unrendered or masked GPU points
     fixture => { fixture.anchors.get('anchor-3').partPath = null },
     fixture => { fixture.capture.landmarks[3].state = 'unavailable' },
     fixture => { fixture.capture.landmarks[3].sourcePixels = [1921, 800] },
-    fixture => { fixture.capture.sourceLayout.push({ viewId: 'inset', rectSourcePixels: [850, 750, 200, 200], composite: { mode: 'opaque' } }) },
+    fixture => {
+      const inset = { ...sourceView('inset'), rectSourcePixels: [850, 750, 200, 200], sourceAssembly: { kind: 'operating' } }
+      fixture.frame.views.push(inset)
+      fixture.capture.sourceLayout.push({ viewId: inset.id, rectSourcePixels: inset.rectSourcePixels, presentation: inset.presentation, composite: { mode: 'opaque' }, resolvedImagePlaneWarp: null, sourceAssembly: inset.sourceAssembly })
+    },
   ]) {
     const fixture = measuredViewFixture()
     fixture.observations[3].method = 'unsupported-source-technique'

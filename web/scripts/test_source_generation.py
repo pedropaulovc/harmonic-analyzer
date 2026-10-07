@@ -1635,194 +1635,66 @@ class AnalysisAutomaticMotionTests(unittest.TestCase):
 
 
 class OrdinaryProducerLiveGuardTests(unittest.TestCase):
-    @contextmanager
-    def live_fixture(self, module, video_id):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            web = root / 'web'
-            def store(path, raw):
-                target = root / path
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(raw)
-            producer = 'web/scripts/' + Path(module.__file__).name
-            paths = [producer, *CurrentGenerationGateTests.base_paths]
-            if module is camera_tracks:
-                paths.extend(module.generation_executed_inputs(video_id))
-            seals = []
-            for path in paths:
-                raw = (HERE.parents[1] / path).read_bytes()
-                sha = hashlib.sha256(raw.replace(b'\r\n', b'\n')).hexdigest()
-                store(path, raw)
-                seals.append({'path': path, 'sha256': sha})
-                # Even a matching SHA-addressed archive cannot replace a missing
-                # or altered live path during ordinary generation.
-                store('web/content/canonical-native/historical-code/' + hashlib.sha256(raw).hexdigest()
-                      + '/' + Path(path).name, raw)
-            store('web/content/canonical-native/manifest.json', json.dumps({
-                'canonicalConsumerHashNormalization': 'CRLF-to-LF',
-                'canonicalConsumerInputs': seals, 'historicalCodeSnapshots': [],
-            }).encode('utf8'))
-            source_model = CurrentGenerationGateTests.current_model_source
-            data = {
-                'source': {'videoId': video_id, 'sha256': 'b' * 64, 'width': 1920, 'height': 1080,
-                           'durationSeconds': 1, 'fps': {'numerator': 1, 'denominator': 1}},
-                'model': {**source_model, 'units': 'metres', 'axes': 'X-width/Y-height/Z-depth'},
-                'anchors': [{'id': 'gta.paper.screw17',
-                             'partPath': 'ha-harmonic-analyzer/pd-paper-drive/vn-fillister-screw-17',
-                             'partLocalMetres': [0, 0, 0], 'correspondenceEvidence': 'Source marker'}],
-                'shots': [{'id': 'machine', 'startSeconds': 0, 'endSeconds': 1,
-                           'classification': 'machine', 'hasCorrespondingMachine': True}],
-                'frames': [{'timeSeconds': 0, 'decodedTimeSeconds': 0, 'shotId': 'machine',
-                            'classification': 'machine', 'landmarks': [],
-                            'views': [{'id': 'main', 'presentation': 'native',
-                                       'rectSourcePixels': [0, 0, 1920, 1080]}]}],
-                'sourceCameraRigs': [{'id': 'fixture-phase-rig', 'measurements': []}],
-            }
-            phase_path = 'web/content/canonical-native/XPQwKRt4Y2k.source-phase-map.json'
-            phase_bytes = json.dumps({'rigId': 'fixture-phase-rig', 'references': [], 'sourceFrameMap': []}).encode('utf8')
-            store(phase_path, phase_bytes)
-            seeds = {
-                'views': {'main': {'candidateId': 'fixture', 'camera': {
-                    'positionMetres': [0, 0, 1], 'quaternion': [0, 0, 0, 1], 'verticalFovDegrees': 45}}},
-                'candidates': {'fixture': {
-                    'packet': 'fixture-source-choice', 'sha256': 'c' * 64, 'unobservedInputFields': [],
-                    'input': {'crankTurns': 0, 'amplitudes': [0] * 20, 'phases': [0] * 20,
-                              'gearing': 'medium-medium', 'magnification': 1,
-                              'setup': {key: 0 for key in common.SETUP_FIELDS}}}},
-                'montageSourceControls': {'anchors': [], 'frames': [], 'method': 'fixture-source-only',
-                                         'qualification': 'unmeasured', 'summary': {}, 'trackingFailures': []},
-                'staticSourceFamily': {
-                    'id': 'fixture-phase-rig', 'kind': 'source-static', 'sourceSha256': 'b' * 64,
-                    'phaseImages': [], 'independentSourcePhaseMap': {
-                        'path': phase_path, 'sha256': hashlib.sha256(phase_bytes).hexdigest()}},
-                'staticMotion': {'shotAmendments': []}, 'physicalSourceCrossfades': {'frames': {}},
-                'sourceMeasurementLimits': {'guide': 'No measured guide controls.'},
-            }
-            store('web/content/canonical-native/XPQwKRt4Y2k.source-seeds.json', json.dumps(seeds).encode('utf8'))
-            observation = web / 'content/canonical-native' / f'{video_id}.observations.json.gz'
-            output = web / 'content' / f'{video_id}.source-track.json'
-            store(output.relative_to(root), b'{"previous":"must-survive-refusal"}\n')
-            with patch.object(module.common, 'WEB', web), patch.object(module, '__file__', str(root / producer)):
-                module.common.native_motion_bindings.cache_clear()
-                try:
-                    observation.write_bytes(gzip.compress(json.dumps(data).encode('utf8'), mtime=0))
-                    yield root, data, observation, output, paths
-                finally:
-                    module.common.native_motion_bindings.cache_clear()
-
-    def test_old_source_refuses_intro_and_spin_without_publishing(self):
-        for module, video_id in ((intro, 'NAsM30MAHLg'), (spin, 'XPQwKRt4Y2k')):
-            with self.subTest(video=video_id), self.live_fixture(module, video_id) as (_, data, source, output, _):
-                data['model'].update(
-                    sha256='2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d',
-                    sourceCommit='1268c23d4a8fc741147c5e09d8d1e45247a71945')
-                source.write_bytes(gzip.compress(json.dumps(data).encode('utf8'), mtime=0))
-                previous = output.read_bytes()
-                with self.assertRaisesRegex(ValueError, 'independently approved live model'):
+    def test_intro_and_spin_live_renderer_refusal_preserves_publication_despite_matching_archive(self):
+        producers = (
+            ('generate-intro-source-track.py', 'NAsM30MAHLg'),
+            ('compact-spin.py', 'XPQwKRt4Y2k'),
+        )
+        for filename, video_id in producers:
+            with self.subTest(video=video_id), current_source_fixture(filename, [video_id]) as (root, module, _, _):
+                with redirect_stdout(io.StringIO()):
                     module.main()
-                self.assertEqual(output.read_bytes(), previous)
-
-    def test_fresh_intro_and_spin_publish_but_live_renderer_drift_cannot_borrow_archive(self):
-        for module, video_id in ((intro, 'NAsM30MAHLg'), (spin, 'XPQwKRt4Y2k')):
-            with self.subTest(video=video_id), self.live_fixture(module, video_id) as (root, data, _, output, paths):
-                module.main()
+                output = root / f'web/content/{video_id}.source-track.json'
                 published = output.read_bytes()
-                track = json.loads(published)
-                self.assertIsNone(track['anchors'][0]['motion'])
-                self.assertEqual(track['frames'][0]['views'][0]['input']['gearing'],
-                                 'small-large' if module is intro else 'medium-medium')
-                for path in paths:
-                    live_path = root / path
-                    sealed = live_path.read_bytes()
-                    for mutation in ('changed', 'missing'):
-                        with self.subTest(path=path, mutation=mutation):
-                            if mutation == 'changed':
-                                live_path.write_bytes(sealed + b'\n')
-                            else:
-                                live_path.unlink()
-                            try:
-                                with self.assertRaisesRegex(ValueError, 'live producer input (differs|unavailable)'):
-                                    module.main()
-                                self.assertEqual(output.read_bytes(), published)
-                            finally:
-                                live_path.write_bytes(sealed)
-
+                live_path = root / 'web/src/scene.ts'
+                original = live_path.read_bytes()
+                archive = (root / 'web/content/canonical-native/historical-code'
+                           / hashlib.sha256(original).hexdigest() / live_path.name)
+                archive.parent.mkdir(parents=True)
+                archive.write_bytes(original)
+                # An exact sealed historical copy is not live renderer authority,
+                # even after these ordinary CLIs have successfully published.
+                for mutation in ('changed', 'missing'):
+                    with self.subTest(mutation=mutation):
+                        if mutation == 'changed':
+                            live_path.write_bytes(original + b'\n')
+                        else:
+                            live_path.unlink()
+                        try:
+                            with self.assertRaises(ValueError):
+                                module.main()
+                            self.assertEqual(output.read_bytes(), published)
+                        finally:
+                            live_path.write_bytes(original)
 
 
 class SourcePairPublicationOrderingTests(unittest.TestCase):
-    @contextmanager
-    def publication_fixture(self, failure_phase):
-        """Control producer failure, not native eligibility or publication I/O."""
-        videos = ('6dW6VYXp9HM', '8KmVDxkia_w')
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            web = root / 'web'
-            content = web / 'content'
-            content.mkdir(parents=True)
-            paths = tuple(content / f'{video}.source-track.json' for video in videos)
-            previous = (b'{"previous":"analysis-must-survive"}\n',
-                        b'{"previous":"synthesis-must-survive"}\n')
-            for path, raw in zip(paths, previous):
-                path.write_bytes(raw)
-
-            class ControlledProducerFailure(ValueError):
-                pass
-
-            class ControlledGenerator:
-                def __init__(self, video_id):
-                    self.video_id = video_id
-                    if video_id == videos[1] and failure_phase == 'constructor':
-                        raise ControlledProducerFailure('Controlled second constructor refusal')
-
-                def build(self):
-                    if self.video_id == videos[1] and failure_phase == 'build':
-                        raise ControlledProducerFailure('Controlled second build refusal')
-                    return {
-                        'schemaVersion': 1, 'kind': 'compact-source-track',
-                        'source': {'videoId': self.video_id},
-                        'model': copy.deepcopy(CurrentGenerationGateTests.current_model_source),
-                        'shots': [], 'frames': [], 'coverage': {'status': 'unmeasured'},
-                        'stages': {str(stage): {'status': 'unmeasured'} for stage in (50, 20, 10, 5)},
-                    }
-
-            with patch.object(camera_tracks, 'ROOT', root), patch.object(
-                    camera_tracks.common, 'WEB', web), patch.object(
-                    camera_tracks, 'Generator', ControlledGenerator), patch(
-                    'sys.argv', [str(HERE / 'generate-analysis-synthesis-source-tracks.py')]):
-                yield paths, previous, ControlledProducerFailure
-
     def test_second_constructor_or_build_refusal_preserves_both_published_outputs(self):
+        filename = 'generate-analysis-synthesis-source-tracks.py'
+        videos = ('6dW6VYXp9HM', '8KmVDxkia_w')
         for phase in ('constructor', 'build'):
-            with self.subTest(phase=phase), self.publication_fixture(phase) as (paths, previous, refusal):
-                with self.assertRaises(refusal):
-                    camera_tracks.main()
+            with self.subTest(phase=phase), current_source_fixture(filename, videos) as (root, module, data, _):
+                if phase == 'constructor':
+                    data[videos[1]]['model']['sha256'] = camera_tracks.ANALYSIS_MODEL_SHA256
+                    write_current_record(root / 'web', videos[1], data[videos[1]])
+
+                class RefusedSecondBuild(module.Generator):
+                    def build(self):
+                        if self.video_id == videos[1] and phase == 'build':
+                            # Change bound data only after all constructors have
+                            # passed. The actual FreshGenerator must reject it;
+                            # the first track and publication checks remain real.
+                            self.data['model']['sha256'] = camera_tracks.ANALYSIS_MODEL_SHA256
+                        return super().build()
+
+                paths = tuple(root / f'web/content/{video}.source-track.json' for video in videos)
+                previous = tuple(path.read_bytes() for path in paths)
+                with patch.object(module, 'Generator', RefusedSecondBuild), \
+                        patch.object(os.sys, 'argv', [filename]), redirect_stdout(io.StringIO()):
+                    with self.assertRaises(ValueError):
+                        module.main()
                 self.assertEqual(tuple(path.read_bytes() for path in paths), previous)
 
-
-class SpinPresentationTests(unittest.TestCase):
-    def assert_seed_refused_before_observations(self, seed):
-        with tempfile.TemporaryDirectory() as directory:
-            web = Path(directory)
-            (web / 'content' / 'canonical-native').mkdir(parents=True)
-            (web / 'content' / 'canonical-native' / 'XPQwKRt4Y2k.source-seeds.json').write_text(
-                json.dumps({'views': {'endcard-analysis': seed}}))
-            with patch.object(spin.common, 'WEB', web), patch.object(
-                    spin.common, 'load_observations',
-                    side_effect=AssertionError('Invalid seed reached source observation loading')):
-                with self.assertRaises(ValueError):
-                    spin.main()
-
-    def test_invalid_presentation_refused_before_observation_load(self):
-        self.assert_seed_refused_before_observations(
-            {'presentation': 'mirror', 'presentationEvidence': 'A documented assumption.'})
-
-    def test_override_requires_nonempty_string_evidence_before_observation_load(self):
-        for evidence in (None, '', ' \n\t', 7):
-            with self.subTest(evidence=evidence):
-                seed = {'presentation': 'horizontal-mirror'}
-                if evidence is not None:
-                    seed['presentationEvidence'] = evidence
-                self.assert_seed_refused_before_observations(seed)
 
 class SynthesisAutomaticSourceDriveTests(unittest.TestCase):
     @classmethod

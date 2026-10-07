@@ -61,6 +61,17 @@ automatically when both are ready; pausing retains manual exploration. Status
 announcements exclude the running clock. Force readouts are physical calculations,
 not source measurements.
 
+Restore uses the actual paused player clock. Chromium may truncate
+`currentTime` to microseconds, placing it just before an authored cut even
+when the requested seek is at that cut. Compare restored states at the same
+actual media time; do not round source timestamps or interpolate across cuts.
+
+Migration cameras must also be checked against the posed full assembly.
+The Intro pen-macro seed was outside the pen frame but looked through the
+platen; reversing that chosen camera made the frame visible without hiding
+geometry. Visibility is a playback prerequisite, not evidence of a source
+pixel fit.
+
 Routes accept a slug or the corresponding YouTube ID:
 
 | Page | Query |
