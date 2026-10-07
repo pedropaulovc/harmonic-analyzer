@@ -121,19 +121,21 @@ ELEVATION_KEEP = {
 # Each seat's profile sketch is parallel to its section, so the section
 # imports its diameter.
 SECTION_A_KEEP = {
-    # In the saddle under the seat's +X flank, inside the real arc's span:
-    # the near-side leader rises a few mm to the arc, clear of the cone pin,
-    # the finish leader above it and the 9.93 extension line on the -X side.
-    "BodySeatDia": (11.4, CONE_PIN_NEAR_Y, -24.5),
+    # Outside the part, above the saddle top on the -X side, between the
+    # 30.0's axis extension line and the saddle: the near-side leader meets
+    # the seat's circle 70 degrees off its bottom, and a short arc extension
+    # carries the seat up to it from the saddle-top corner (run-13 review:
+    # the callout sat inside the saddle).
+    "BodySeatDia": (-28.0, CONE_PIN_NEAR_Y, -10.0),
     "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
     # Under the base; the tilt reads below it.
     "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, -48.0),
-    # Under the base, on the bisector of the gauge line and the pin axis
-    # carried back through the hole entry, 30 mm from it: the acute tilt
-    # reads outside the part, clear of the seat, the pins and the entry
-    # dimension; the caption drops clear of it (CAPTION_DROP).
-    "ConePinTilt": (-9.9, CONE_PIN_NEAR_Y, -60.0),
+    # Under the base, outside the acute wedge on the gauge line's +X side,
+    # 33 mm from the hole entry: the inclined pin-axis line and the 33.34
+    # stay clear of the text (run-13 review); the caption drops clear of it
+    # (CAPTION_DROP).
+    "ConePinTilt": (7.5, CONE_PIN_NEAR_Y, -61.0),
     "ConePinHighEdge": (-58.0, CONE_PIN_NEAR_Y, -25.0),
 }
 SECTION_B_KEEP = {
@@ -311,7 +313,6 @@ def _seat_diameter_near_side(adapter: Any, annotations: list[Any], name: str) ->
             set_near_side_diameter(annotation, name)
             return
     raise RuntimeError(f"no imported {name} to give a near-side leader")
-
 
 
 def _lower_caption(adapter: Any, view: Any, drop: float) -> None:
