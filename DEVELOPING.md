@@ -191,6 +191,15 @@ is no timer or background drain thread to leave running. Only a complete,
 nonempty, successful read within both capture bounds is eligible as worker
 payload. Partial stdout from a stderr overflow is not recovered payload.
 
+The actual read has a `farm.log.retrieve` child span under `farm.run` on the
+`build-infra` resource. It records the exact task/workflow/worker/attempt/blob,
+reader outcome and bytes retained in each capture spool, not attempted output.
+Timeouts, capture overflows, reader errors and empty output mark that child
+ERROR with its own exception/cause even though diagnostics are supplemental.
+A readable log can have a successful retrieval span while its original leaf
+remains failed. An unavailable byte count is recorded as an event, not zero.
+Output locking and console rendering remain outside this reader span.
+
 Console rendering has a separate total budget of 16 MiB of UTF-8 and 64 Ki
 lines per failed-log block. It counts the full attribution prefixes, UTF-8
 replacement encoding, normalized LF/CRLF/bare-CR line endings, reader
