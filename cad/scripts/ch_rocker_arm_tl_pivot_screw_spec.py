@@ -169,6 +169,10 @@ DRAWING_NOTES = "\n".join(
     (
         "BRACKETED DIAMETERS ARE THE STARTING SIZE FOR THE MATCH-FIT.",
         f"{HEAD_COAXIAL_NOTE}.",
+        # Worst case at the general bands the projection loses its 1.5D full
+        # thread; the plate's tapped depth caps the length, and the screw
+        # carries only washer clamp load (the shoulder locates).
+        "SHORT THREAD ENGAGEMENT ACCEPTED: THE THREAD ONLY CLAMPS THE WASHER.",
     )
 )
 # The head left behind the slot at worst case.
