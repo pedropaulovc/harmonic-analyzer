@@ -60,6 +60,7 @@ EDGE_KEEP = {
     "DiscThick": (0.200, 0.235),
 }
 
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -126,7 +127,10 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one filing-button {name} reference dimension")
         set_reference_dimension(
-            adapter, matches[0], label=f"filing button {name}", diameter=name.endswith("Dia")
+            adapter,
+            matches[0],
+            label=f"filing button {name}",
+            diameter=name.endswith("Dia"),
         )
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.

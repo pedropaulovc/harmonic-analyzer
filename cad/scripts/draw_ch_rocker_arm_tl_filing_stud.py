@@ -118,7 +118,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     donor = place_view(adapter, str(SOURCE), "*Right", *DONOR_CENTER, scale=VIEW_SCALE)
-    profile = place_view(adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=VIEW_SCALE)
+    profile = place_view(
+        adapter, str(SOURCE), "*Front", *PROFILE_CENTER, scale=VIEW_SCALE
+    )
     # finalize_drawing shades the pictorial isometric with edges.
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (donor, profile):
@@ -163,7 +165,10 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one filing-stud {name} reference dimension")
         set_reference_dimension(
-            adapter, matches[0], label=f"filing stud {name}", diameter=name.endswith("Dia")
+            adapter,
+            matches[0],
+            label=f"filing stud {name}",
+            diameter=name.endswith("Dia"),
         )
     add_view_centerline(
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
