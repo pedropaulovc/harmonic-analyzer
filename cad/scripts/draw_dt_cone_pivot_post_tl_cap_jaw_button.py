@@ -46,7 +46,7 @@ VIEW_SCALE = (4, 1)
 # (machinist review round 1). The end view only donates the sketch
 # diameters and is deleted.
 PROFILE_CENTER = (0.140, 0.175)
-DONOR_CENTER = (0.040, 0.175)
+DONOR_CENTER = (0.055, 0.175)
 ISO_CENTER = (0.300, 0.175)
 ISO_NOTE_XY = (0.265, 0.235)
 PROFILE_KEEP = {
