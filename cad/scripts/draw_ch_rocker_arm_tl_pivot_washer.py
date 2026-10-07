@@ -24,13 +24,18 @@ from _drawing_common import (
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
+from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from ch_rocker_arm_tl_pivot_washer_spec import (
     BORE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    auto_center_marks,
+    dimension_name,
+    place_view,
+)
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_pivot_washer"]
 PART_STEM = SPEC.artifact_stem
@@ -49,7 +54,8 @@ ISO_CENTER = (0.300, 0.175)
 ISO_NOTE_XY = (0.265, 0.235)
 FACE_KEEP = {
     "OuterDia": (0.185, 0.225),
-    # Collinear with OuterDia through the centre so the lines do not cross.
+    # Near-side style below: one arrow each, on separate rays, nothing
+    # drawn through the centre.
     "BoreDia": (0.075, 0.145),
 }
 EDGE_KEEP = {
@@ -105,6 +111,11 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    for name in ("OuterDia", "BoreDia"):
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
+        set_near_side_diameter(matches[0], f"pivot-washer {name}")
     set_dimension_callouts(adapter, annotations, {"BoreDia": BORE_CALLOUT}, location="below")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
