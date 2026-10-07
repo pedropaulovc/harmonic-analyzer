@@ -24,14 +24,17 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
 
 
 def test_exported_stations_are_the_printed_general_bands() -> None:
-    """Every station prints at one place, so prechips sees the title block's
-    .X band the shop is held to, not a tighter one."""
+    """The stud stations print toleranced at one place, so prechips sees the
+    title block's .X band; the reference tap stations export no band at all,
+    only their nominals under the spot note that governs them."""
     features = _features()
     places = spec.DRAWING_PRECISION_BY_NAME
     for side, x in zip(("left", "right"), spec.TAP_X, strict=True):
         tap = features[f"ledge_tap_{side}"]
-        assert tap["station"] == limits(x, places["Tap1X"])
-        assert tap["height"] == limits(spec.SCREW_Y, places["Tap1Y"])
+        assert sorted(tap["requirements"]) == ["note", "thread"]
+        assert "station" not in tap and "height" not in tap
+        assert (tap["station_nominal"], tap["height_nominal"]) == (x, spec.SCREW_Y)
+        assert tap["note"] == " ".join(spec.DRAWING_NOTES.splitlines()[1:])
     for side, x in zip(("left", "right"), spec.STUD_X, strict=True):
         stud = features[f"stud_hole_{side}"]
         assert stud["station"] == limits(x, places["Stud1X"])

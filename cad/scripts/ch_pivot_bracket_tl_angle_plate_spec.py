@@ -106,11 +106,17 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked angle-plate dimension needs authored places")
 
 SURFACE_FINISHES = ()
+# The spot note governs the taps (their printed stations are reference); the
+# taps' exported note is this same sentence.
+_TAP_SPOT_LINES = (
+    "CLAMP THE PIVOT BRACKET LEDGE OVER THE TAP LOCATIONS AND SPOT",
+    "THE TAPS THROUGH ITS HOLES: THE SPOTS GOVERN THE TAPS.",
+)
+TAP_SPOT_NOTE = " ".join(_TAP_SPOT_LINES)
 DRAWING_NOTES = "\n".join(
     (
         "BOUGHT ANGLE PLATE: ADD THE FOUR HOLES ONLY. SIZES IN ( ) ARE REFERENCE.",
-        "CLAMP THE PIVOT BRACKET LEDGE OVER THE TAP LOCATIONS AND SPOT",
-        "THE TAPS THROUGH ITS HOLES: THE SPOTS GOVERN THE TAPS.",
+        *_TAP_SPOT_LINES,
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
@@ -161,27 +167,24 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         },
     ),
 }
+# The taps carry only their thread and the governing spot note: their printed
+# stations are reference, so they export as nominals with no band.
 for _side, _x in (("left", TAP_X[0]), ("right", TAP_X[1])):
     EXPORT_FEATURES[f"ledge_tap_{_side}"] = ExportFeature(
         kind="hole",
         faces=(CylinderFace(_TAP_DRILL, contains_x_mm=_x),),
-        requirements=("station", "height"),
+        requirements=("thread", "note"),
         fields={
             "at": ([_x, SCREW_Y, 0.0], ("TAP_X", "SCREW_Y")),
             "axis": _INTO_PLATE,
             "thread": (f"{SCREW_THREAD} UNC-{TAP_SPEC.thread_class}", ("TAP_SPEC", "SCREW_THREAD")),
             "tap_drill_mm": (_TAP_DRILL, ("TAP_SPEC",)),
             "thru": (True, ("TAP_SPEC",)),
-            "station": (_station(_x), ("TAP_X", "STATION_PLACES")),
             "station_nominal": (_x, ("TAP_X",)),
-            "height": (
-                _station(SCREW_Y),
-                ("SCREW_Y", "STATION_PLACES", ("ch_pivot_bracket_spec", "FOOT_LEN")),
-            ),
             "height_nominal": (SCREW_Y, ("SCREW_Y",)),
             "height_from": ("table_face", ("__frame__",)),
+            "note": (TAP_SPOT_NOTE, ("TAP_SPOT_NOTE", "LEDGE_CLEARANCE_SPEC")),
         },
-        precision={"station": STATION_PLACES, "height": STATION_PLACES},
     )
 for _side, _x in (("left", STUD_X[0]), ("right", STUD_X[1])):
     EXPORT_FEATURES[f"stud_hole_{_side}"] = ExportFeature(
