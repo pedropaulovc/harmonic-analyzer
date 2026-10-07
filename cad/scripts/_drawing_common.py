@@ -47,7 +47,12 @@ from _drawing_layout_check import (
     format_findings,
 )
 from _drawing_layout_audit import annotation_display, run_layout_audit
-from _layout_audit import display_box, estimated_text_runs, line_segment
+from _layout_audit import (
+    SHOULDER_Y_TOL_M,
+    display_box,
+    estimated_text_runs,
+    line_segment,
+)
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
@@ -398,11 +403,11 @@ def _assert_attached_to(
     entity_type: str,
     what: str,
     label: str,
-    expected_leaders: int = 1,
+    expected_leaders: int | None = 1,
 ) -> None:
-    """Fail unless ``annotation`` is still attached, by ``expected_leaders``
-    live leaders, to exactly ``entity``, an ``entity_type`` (EDGE, FACE or
-    SILHOUETTE) entity.
+    """Fail unless ``annotation`` is attached to exactly ``entity`` of the
+    requested EDGE, FACE or SILHOUETTE type, with its required live leader
+    proof (exact registered count by default, rendered ink for hole callouts).
 
     The count, type and entity readbacks must agree on one entity of that
     type -- ``IGtol.IsAttached`` and ``ISFSymbol.IsAttached`` keep reading
@@ -412,6 +417,10 @@ def _assert_attached_to(
     (entities=0) on the #1105 platen_guide leaf.  A datum tag's triangle is
     not a leader (``GetLeaderCount`` reads 0 on every datum tag), so it
     passes ``expected_leaders=0``.
+    Native hole callouts pass ``None``: display dimensions do not support
+    SetLeader3 leaders, and their rendered leader ink is checked instead.
+    The annotation count is still read, but is not the dimension's rendered
+    leader authority. Generic symbols retain their exact-count requirement.
     """
     kind = entity_type.upper()
     if kind not in _ATTACHMENT_SELECT_TYPES:
@@ -428,12 +437,16 @@ def _assert_attached_to(
         and attached[0] is not None
     )
     same = one and _is_same_attachment(adapter, attached[0], entity, kind)
-    if not same or dangling or leaders != expected_leaders:
+    if not same or dangling or leaders < 0 or (
+        expected_leaders is not None and leaders != expected_leaders
+    ):
         raise RuntimeError(
             f"{what} lost its {kind.lower()} attachment ({label}): "
             f"entities={len(attached)}, count={count}, types={types}, "
             f"same_entity={same}, dangling={dangling}, leaders={leaders}"
         )
+    if expected_leaders is None:
+        _assert_native_hole_callout_leader(adapter, annotation, label=label)
 
 
 def _expected_pick(
@@ -573,6 +586,18 @@ def describe_selected_entity(
             "view_outline",
             lambda: json.dumps([float(v) for v in bound_view.GetOutline()]),
         )
+        _probe(
+            bag,
+            "model_to_view_transform",
+            lambda: json.dumps(
+                [
+                    float(value)
+                    for value in _early_bound(
+                        bound_view.ModelToViewTransform, "IMathTransform"
+                    ).ArrayData
+                ]
+            ),
+        )
     selection_manager = _probe(
         bag,
         "selection_manager",
@@ -600,6 +625,20 @@ def describe_selected_entity(
                 ]
             ),
         )
+        _probe(
+            bag,
+            "selection_point_model_m",
+            lambda: json.dumps(
+                [float(value) for value in selection_manager.GetSelectionPoint2(count, -1)]
+            ),
+        )
+        _probe(
+            bag,
+            "selected_view_name",
+            lambda: view_name(
+                adapter, selection_manager.GetSelectedObjectsDrawingView2(count, -1)
+            ),
+        )
     kind = entity_type.upper()
     if kind == "SILHOUETTE":
         _probe(
@@ -620,14 +659,20 @@ def describe_selected_entity(
         if _probe(bag, "is_circle", lambda: bool(curve.IsCircle())):
             # CircleParams = (centre xyz, axis xyz, radius), metres -- ONE
             # property read, then sliced.
-            def circle_mm() -> str:
-                params = [float(v) for v in curve.CircleParams]
-                return json.dumps(
-                    [round(v * 1000.0, 4) for v in params[:3]]
-                    + [round(params[6] * 1000.0, 4)]
+            params = _probe(
+                bag, "circle_params", lambda: [float(v) for v in curve.CircleParams],
+                record=False,
+            )
+            if params is not None:
+                _probe(
+                    bag,
+                    "circle_mm",
+                    lambda: json.dumps(
+                        [round(v * 1000.0, 4) for v in params[:3]]
+                        + [round(params[6] * 1000.0, 4)]
+                    ),
                 )
-
-            _probe(bag, "circle_mm", circle_mm)
+                _probe(bag, "circle_axis", lambda: json.dumps(params[3:6]))
         elif _probe(bag, "is_line", lambda: bool(curve.IsLine())):
             _probe(
                 bag,
@@ -1846,6 +1891,128 @@ def compose_hole_callout_prefix(process: str, existing: str) -> str:
     return process.rstrip() + separator + existing.lstrip()
 
 
+def _assert_native_hole_callout_leader(
+    adapter: Any, annotation: Any, *, label: str
+) -> None:
+    """Require a complete printable arrow-to-text route in native callout ink.
+
+    GetLeaderCount reads zero on measured callouts despite visible leaders.
+    Display data is the rendered authority, as in the layout audit, but this
+    proof refuses every unreadable row rather than accepting a partial route.
+    One arrow is the explicit one-edge callout contract, not an API-wide rule.
+    """
+    if int(annotation.Visible) != 1:  # swAnnotationVisibilityState_e.swAnnotationVisible
+        raise RuntimeError(f"native hole callout is not visible ({label})")
+    display = annotation.GetSpecificAnnotation()
+    if display is None:
+        raise RuntimeError(f"native hole callout has no display dimension ({label})")
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "IsHoleCallout", "GetAnnotation", "GetDisplayData"
+    )
+    owner = display.GetAnnotation()
+    if not display.IsHoleCallout() or owner is None or int(
+        adapter.swApp.IsSame(owner, annotation)
+    ) != 1:
+        raise RuntimeError(f"native hole callout lost its annotation ownership ({label})")
+    data = display.GetDisplayData()
+    if data is None:
+        raise RuntimeError(f"native hole callout has no rendered data ({label})")
+    data = _sw_type_info.early_bound_or_flag(
+        data, "IDisplayData", "GetLineCount", "GetLineAtIndex2",
+        "GetArrowHeadCount", "GetArrowHeadAtIndex2",
+        "GetTextCount", "GetTextAtIndex", "GetTextPositionAtIndex",
+    )
+    if int(data.GetArrowHeadCount()) != 1:
+        raise RuntimeError(f"native hole callout has no single rendered arrow ({label})")
+    raw_arrow = data.GetArrowHeadAtIndex2(0)
+    if raw_arrow is None or len(raw_arrow) != 12:
+        raise RuntimeError(f"native hole callout has unreadable rendered arrow ({label})")
+    arrow = tuple(float(value) for value in raw_arrow)
+    if (
+        not all(math.isfinite(value) for value in arrow)
+        or arrow[8] == 10  # swArrowStyle_e.swNO_ARROWHEAD; zero is a valid open arrow.
+        or arrow[6] <= 0 or arrow[7] <= 0
+        or math.hypot(arrow[3], arrow[4]) == 0
+    ):
+        raise RuntimeError(f"native hole callout has no printable rendered arrow ({label})")
+    segments = []
+    count = int(data.GetLineCount())
+    if count <= 0:
+        raise RuntimeError(f"native hole callout has no rendered leader lines ({label})")
+    for index in range(count):
+        raw = data.GetLineAtIndex2(index)
+        if raw is None or len(raw) != 10:
+            raise RuntimeError(f"native hole callout has unreadable rendered leader ({label})")
+        values = tuple(float(value) for value in raw)
+        if not all(math.isfinite(value) for value in values):
+            raise RuntimeError(f"native hole callout has nonfinite rendered leader ({label})")
+        start, end = values[4:6], values[7:9]
+        if start != end:
+            segments.append((start, end))
+    # Arrow Z can differ from its line Z in native display data. Compare XY;
+    # the line may also extend beyond the arrow tip toward the hole centre.
+    tolerance = _SILHOUETTE_POINT_TOLERANCE_M
+    connected = {
+        index for index, (start, end) in enumerate(segments)
+        if _segment_distance(arrow[:2], start, end) <= tolerance
+    }
+    if not connected:
+        raise RuntimeError(f"native hole callout has no connected rendered leader ({label})")
+    pending = list(connected)
+    while pending:
+        a, b = segments[pending.pop()]
+        for index, (start, end) in enumerate(segments):
+            if index not in connected and min(
+                _segment_distance(start, a, b),
+                _segment_distance(end, a, b),
+                _segment_distance(a, start, end),
+                _segment_distance(b, start, end),
+            ) <= tolerance:
+                connected.add(index)
+                pending.append(index)
+    # A readable arrow stub is not a complete callout: its component must
+    # reach the shoulder under the current rendered text. Reuse the layout
+    # audit's lowest-text-baseline convention, adding actual X coverage.
+    # Unrelated display strokes need not belong to this component.
+    text_positions = []
+    text_count = int(data.GetTextCount())
+    for index in range(text_count):
+        text = data.GetTextAtIndex(index)
+        if type(text) is not str:
+            raise RuntimeError(f"native hole callout has unreadable rendered text ({label})")
+        if not text.strip():
+            continue
+        raw_position = data.GetTextPositionAtIndex(index)
+        if raw_position is None or len(raw_position) != 3:
+            raise RuntimeError(f"native hole callout has unreadable text position ({label})")
+        position = tuple(float(value) for value in raw_position)
+        if not all(math.isfinite(value) for value in position):
+            raise RuntimeError(f"native hole callout has nonfinite text position ({label})")
+        text_positions.append(position)
+    if not text_positions:
+        raise RuntimeError(f"native hole callout has no rendered text ({label})")
+    # Text offsets are sheet-compatible on the calibrated drawing display
+    # data (CSP_DRILL); do not add the annotation's position a second time.
+    baseline = min(position[1] for position in text_positions)
+    shoulders = {
+        index for index, (start, end) in enumerate(segments)
+        if abs(end[1] - start[1]) <= tolerance
+        and max(abs(start[1] - baseline), abs(end[1] - baseline)) < SHOULDER_Y_TOL_M
+        and any(
+            abs(position[1] - baseline) < SHOULDER_Y_TOL_M
+            and min(start[0], end[0]) - tolerance <= position[0]
+            <= max(start[0], end[0]) + tolerance
+            for position in text_positions
+        )
+    }
+    if connected.isdisjoint(shoulders):
+        raise RuntimeError(
+            f"native hole callout has incomplete rendered leader route ({label}): "
+            f"arrow_component={sorted(connected)}, text_shoulders={sorted(shoulders)}, "
+            f"segments={len(segments)}, text_baseline={baseline:.9g}"
+        )
+
+
 @_telemetry.traced("drawing.hole_callout", label_param="label")
 def add_native_hole_callout(
     adapter: Any,
@@ -1872,10 +2039,28 @@ def add_native_hole_callout(
     instead silently does nothing: ``IDimensionTolerance::SetValues`` returns
     True and stores the value -- ``GetMaxValue2`` reads it right back -- and the
     callout still prints the bare nominal.
+
+    ``edge=`` also requires the callout to remain attached to that native
+    edge after insertion rebuild. Coordinate-only callers retain their hit-test
+    contract. Recipes retaining an explicit edge must check the final print
+    with :func:`assert_native_hole_callout_attachment` in ``settled_checks``.
     """
-    selected = _select_view_entity(
-        adapter, view, "EDGE", edge_xy, label=label, entity=edge
-    )
+    try:
+        selected = _select_view_entity(
+            adapter, view, "EDGE", edge_xy, label=label, entity=edge
+        )
+    except Exception:
+        if edge is not None:
+            wanted = describe_selected_entity(
+                adapter, view, edge, entity_type="EDGE", requested_xy=edge_xy, label=label
+            )
+            with contextlib.suppress(Exception):
+                _telemetry.event("drawing.hole_callout_selection_failure", **wanted)
+                _telemetry.error(
+                    f"hole callout {label}: native edge selection failed: "
+                    + json.dumps(wanted, default=str, sort_keys=True)
+                )
+        raise
     # Snapshot what AddHoleCallout2 is about to be handed, BEFORE the call: the
     # API may clear the selection or invalidate the entity, and on a passing
     # leaf this line is the positive control the failing one is read against.
@@ -1966,7 +2151,153 @@ def add_native_hole_callout(
         _telemetry.debug(f"hole callout {label}: prefix {prefix!r}")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_native_hole_callout")
+    if edge is not None:
+        current_annotation = display.GetAnnotation()
+        if current_annotation is None:
+            raise RuntimeError(f"native hole callout has no annotation ({label})")
+        annotation = _sw_type_info.early_bound_or_flag(
+            current_annotation,
+            "IAnnotation",
+            "GetPosition",
+            "GetSpecificAnnotation",
+            "GetAttachedEntities3",
+            "GetAttachedEntityCount3",
+            "GetAttachedEntityTypes",
+            "GetLeaderCount",
+            "IsDangling",
+        )
+        # Keep native attachment observations separate from successful
+        # selection: AddHoleCallout2 can re-solve the annotation on insertion.
+        # One aggregate record also retains the selected circle and current
+        # transform, so a remote leaf can prove (or disprove) source ownership.
+        attachment = dict(before)
+        attachment["requested_callout_xy"] = json.dumps(callout_xy)
+        _probe(
+            attachment,
+            "callout_position",
+            lambda: json.dumps([float(value) for value in annotation.GetPosition()]),
+        )
+        attached = _probe(
+            attachment,
+            "attached_entities",
+            lambda: tuple(annotation.GetAttachedEntities3() or ()),
+            record=False,
+        )
+        _probe(
+            attachment, "attached_count", lambda: int(annotation.GetAttachedEntityCount3())
+        )
+        _probe(
+            attachment,
+            "attached_types",
+            lambda: json.dumps(
+                [int(kind) for kind in (annotation.GetAttachedEntityTypes() or ())]
+            ),
+        )
+        _probe(attachment, "leaders", lambda: int(annotation.GetLeaderCount()))
+        _probe(attachment, "dangling", lambda: bool(annotation.IsDangling()))
+        if attached is not None:
+            attachment["attached_entities_count"] = len(attached)
+            _probe(
+                attachment,
+                "attached_same_requested_edge",
+                lambda: json.dumps(
+                    [
+                        _is_same_attachment(adapter, actual, edge, "EDGE")
+                        for actual in attached
+                    ]
+                ),
+            )
+        with contextlib.suppress(Exception):
+            _telemetry.event("drawing.hole_callout_attachment", **attachment)
+            _telemetry.info(
+                f"hole callout {label}: native attachment: "
+                + json.dumps(attachment, default=str, sort_keys=True)
+            )
+        _assert_attached_to(
+            adapter,
+            annotation,
+            edge,
+            entity_type="EDGE",
+            what="native hole callout",
+            label=label,
+            expected_leaders=None,
+        )
     return display
+
+
+def assert_native_hole_callout_attachment(
+    adapter: Any,
+    view: Any,
+    display: Any,
+    *,
+    edge: Any,
+    label: str,
+) -> None:
+    """Prove an explicit-edge callout from the current view's annotations.
+
+    Run in ``finalize_drawing``'s ``settled_checks`` after the last rebuild.
+    Re-enumerate the current sheet's views and the owning view's annotations:
+    a removed callout or view can leave its old COM handle readable. Native
+    ``IsSame == 1``, not Python wrapper identity, identifies both the view and
+    display dimension; attachment readbacks come from the live annotation,
+    never from the original handle's cached annotation.
+    """
+    current_views = [
+        candidate
+        for candidate in iter_views(adapter)
+        if int(adapter.swApp.IsSame(candidate, view)) == 1
+    ]
+    if len(current_views) != 1:
+        raise RuntimeError(
+            f"native hole callout lost its owning view ({label}): "
+            f"matching views={len(current_views)}"
+        )
+    current_view = _sw_type_info.early_bound_or_flag(
+        current_views[0], "IView", "GetAnnotations"
+    )
+    matches = []
+    for raw_annotation in current_view.GetAnnotations() or ():
+        annotation = _sw_type_info.early_bound_or_flag(
+            raw_annotation, "IAnnotation", "GetType", "GetSpecificAnnotation"
+        )
+        if int(annotation.GetType()) != _ANNOT_DIM:
+            continue
+        current_display = annotation.GetSpecificAnnotation()
+        if current_display is not None and int(
+            adapter.swApp.IsSame(current_display, display)
+        ) == 1:
+            matches.append((annotation, current_display))
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"native hole callout lost its current annotation ({label}): "
+            f"matching dimensions={len(matches)}"
+        )
+    annotation, current_display = matches[0]
+    current_display = _sw_type_info.early_bound_or_flag(
+        current_display, "IDisplayDimension", "IsHoleCallout"
+    )
+    if not current_display.IsHoleCallout():
+        raise RuntimeError(f"current annotation is not a native hole callout ({label})")
+    annotation = _sw_type_info.early_bound_or_flag(
+        annotation,
+        "IAnnotation",
+        "GetSpecificAnnotation",
+        "GetAttachedEntities3",
+        "GetAttachedEntityCount3",
+        "GetAttachedEntityTypes",
+        "GetLeaderCount",
+        "IsDangling",
+    )
+    _assert_attached_to(
+        adapter,
+        annotation,
+        edge,
+        entity_type="EDGE",
+        what="native hole callout",
+        label=label,
+        expected_leaders=None,
+    )
+
 
 
 @_telemetry.traced("drawing.hole_callout_precision", label_param="label")
@@ -4630,6 +4961,8 @@ class ViewEdges:
         label: str,
         center_tol_mm: float = 0.02,
         radius_tol_mm: float = 0.01,
+        selection: Literal["nearest", "unique"] = "nearest",
+        adapter: Any | None = None,
     ) -> ViewEdge:
         """The visible circular edge nearest ``center_mm``/``radius_mm``.
 
@@ -4638,9 +4971,20 @@ class ViewEdges:
         cannot be confused. Fails loud past the tolerances with the nearest
         candidate's numbers, so a moved feature is a build error, never a
         dimension quietly hung on the wrong rim.
+
+        ``selection="unique"`` requires exactly one distinct native edge
+        within those same limits; ``adapter`` supplies SolidWorks' IsSame
+        comparison so repeated wrappers for one edge are not ambiguity.
+        The default nearest mode retains the existing ranked-pick behavior.
         """
+        if selection not in ("nearest", "unique"):
+            raise ValueError(f"{label}: unknown circle selection mode {selection!r}")
+        if selection == "unique" and adapter is None:
+            raise ValueError(f"{label}: unique circle selection requires an adapter")
+        circles = self.circles
+        matches: list[ViewEdge] = []
         best = None
-        for item in self.circles:
+        for item in circles:
             cx, cy, cz, nx, ny, nz, r = item.circle
             center_error = sum(abs(a - b) for a, b in zip((cx, cy, cz), center_mm))
             radius_error = abs(r - radius_mm)
@@ -4648,13 +4992,42 @@ class ViewEdges:
             if axis is not None:
                 dot = nx * axis[0] + ny * axis[1] + nz * axis[2]
                 axis_error = 1.0 - abs(dot)
+            outside_limits = (
+                center_error > center_tol_mm
+                or radius_error > radius_tol_mm
+                or axis_error > 1e-6
+            )
             score = center_error + radius_error + axis_error
             if best is None or score < best[0]:
-                best = (score, center_error, radius_error, axis_error, item)
+                best = (score, center_error, radius_error, axis_error, item, outside_limits)
+            if selection == "unique" and not outside_limits:
+                matches.append(item)
         if best is None:
             raise RuntimeError(f"{label}: the {self.label!r} scan has no circular edge")
-        _score, center_error, radius_error, axis_error, item = best
-        if center_error > center_tol_mm or radius_error > radius_tol_mm or axis_error > 1e-6:
+        _score, center_error, radius_error, axis_error, item, outside_limits = best
+        if selection == "unique":
+            distinct: list[ViewEdge] = []
+            for candidate in matches:
+                if not any(
+                    candidate.edge is previous.edge
+                    or _is_same_attachment(adapter, candidate.edge, previous.edge, "EDGE")
+                    for previous in distinct
+                ):
+                    distinct.append(candidate)
+            _telemetry.annotate(
+                visible_circles=len(circles),
+                circle_candidates=len(matches),
+                distinct_circle_candidates=len(distinct),
+            )
+            if len(distinct) > 1:
+                raise RuntimeError(
+                    f"{label}: ambiguous visible circle at {center_mm} "
+                    f"r={radius_mm:g} mm in the {self.label!r} scan: "
+                    f"{len(distinct)} distinct native edges ({len(matches)} candidates)"
+                )
+            if distinct:
+                return distinct[0]
+        if outside_limits:
             raise RuntimeError(
                 f"{label}: no visible circle at {center_mm} r={radius_mm:g} mm in "
                 f"the {self.label!r} scan; nearest centre error {center_error:.4g} mm, "

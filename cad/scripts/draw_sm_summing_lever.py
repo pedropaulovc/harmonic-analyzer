@@ -41,6 +41,7 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     assert_dimension_measures,
+    assert_native_hole_callout_attachment,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -215,14 +216,23 @@ async def build(adapter: Any) -> dict[str, str]:
     curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
     curate_view_dimensions(adapter, top, keep=TOP_KEEP, view_label="top")
 
-    # Counter-anchor tap native callout (thread + depth) in the top plan.  Pick
-    # a point on the hole rim (not its centre) so SolidWorks catches the
-    # circular edge.
-    anchor_tap_edge = _top_xy(TIP_X, COUNTER_R)
-    add_native_hole_callout(
+    # The Hole Wizard owns this rim: centre on the boss's +Y face, axis +Y,
+    # radius from COUNTER_HOLE_SPEC's tap drill. Reuse the same visible-edge
+    # scan and rim as the checked X-location dimension below; do not ask the
+    # seat's graphics aperture to guess which edge a sheet point means.
+    top_edges = scan_view_edges(top, label="summing lever top plan")
+    anchor_rim = top_edges.circle_at(
+        (TIP_X, ANCHOR_H / 2.0, 0.0),
+        COUNTER_R,
+        axis=(0.0, 1.0, 0.0),
+        label="counter-anchor tap rim",
+        selection="unique",
+        adapter=adapter,
+    )
+    anchor_callout = add_native_hole_callout(
         adapter,
         top,
-        edge_xy=anchor_tap_edge,
+        edge=anchor_rim.edge,
         callout_xy=(0.145, 0.155),
         label="anchor tap",
     )
@@ -232,10 +242,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # reverses model Z on the sheet: the positive sheet offset selects the -Z
     # ridge, while the negative offset selects the part-owned +Z finish face.
     # Keep datum and finish on opposite ridges so their leaders stay distinct.
-    # One sweep of the plan's visible edges serves every named pick below.
+    # The same visible-edge scan serves every named pick below.
     # The ridge is the hexagon's top vertex line, y = HEX_H/2 (vertex-up
     # sketch centred on the pivot axis, build_summing_lever._hex_collar).
-    top_edges = scan_view_edges(top, label="summing lever top plan")
     knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
     datum_ridge = top_edges.exact_line_through(
         (0.0, HEX_H / 2.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0)),
@@ -300,12 +309,6 @@ async def build(adapter: Any) -> dict[str, str]:
     dim_ridge = top_edges.exact_line_through(
         (0.0, HEX_H / 2.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH),
         label="+Z knife-edge ridge",
-    )
-    anchor_rim = top_edges.circle_at(
-        (TIP_X, ANCHOR_H / 2.0, 0.0),
-        COUNTER_R,
-        axis=(0.0, 1.0, 0.0),
-        label="counter-anchor tap rim",
     )
     anchor_location = add_edge_dimension(
         adapter,
@@ -443,7 +446,7 @@ async def build(adapter: Any) -> dict[str, str]:
         axis=(0.0, 1.0, 0.0),
         label="spring-hole middle rim",
     )
-    add_native_hole_callout(
+    middle_callout = add_native_hole_callout(
         adapter,
         top,
         edge=mid_rim.edge,
@@ -481,6 +484,14 @@ async def build(adapter: Any) -> dict[str, str]:
         layout=SPEC.layout,
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=3,
+        settled_checks=(
+            lambda: assert_native_hole_callout_attachment(
+                adapter, top, anchor_callout, edge=anchor_rim.edge, label="anchor tap"
+            ),
+            lambda: assert_native_hole_callout_attachment(
+                adapter, top, middle_callout, edge=mid_rim.edge, label="spring-hole middle"
+            ),
+        ),
     )
 
 

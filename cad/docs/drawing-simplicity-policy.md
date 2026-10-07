@@ -213,6 +213,13 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      tap-drill depth too when it governs machinability; never let a modeled
      minor-diameter continuation, merged opposing holes, or a default
      through-thread callout imply usable thread where none is required.
+     The rocker-arm support's `BracketSeats` callout retains the unique visible
+     Hole Wizard entry rim in cropped VIEW B as its explicit native target.
+     The recipe matches the full model centre, circle axis and drill radius,
+     rejects ambiguous or hidden candidates, and checks that same edge again
+     after the final drawing rebuild. A part-face rim is a comparison witness,
+     not a fallback; neither matching geometry nor a non-dangling EDGE count
+     substitutes for native entity identity.
 8. **Layout is contained, balanced, and uses the better sheet orientation.**
    The inner drawing border is a hard boundary: every view, dimension,
    extension line, leader, callout, note, balloon, and table stays wholly

@@ -20,6 +20,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import sys
 from typing import Any
@@ -35,6 +36,7 @@ from _drawing_common import (
     add_native_hole_callout,
     add_surface_finish,
     assert_imported_precision,
+    assert_native_hole_callout_attachment,
     create_section_view,
     create_view_theoretical_datum,
     curate_view_dimensions,
@@ -46,6 +48,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    scan_view_edges,
     set_dimension_callouts,
     set_dimension_precision,
     set_hidden_lines_removed,
@@ -78,7 +81,6 @@ from rocker_bracket_seat_layout import (
     RAIL_DEPTH_PLACES,
     SEAT_LOCAL_X,
     SEAT_SPEC,
-    WINDOW_TOP_Y,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -264,34 +266,82 @@ def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
     )
 
 
-def _seat_entry_edge(view: Any) -> Any:
-    """The east seat's entry rim on the rail top, as a part edge.
+def _seat_entry_edge(adapter: Any, view: Any) -> Any:
+    """The east seat's unique visible Hole Wizard entry rim in cropped VIEW B.
 
-    Resolved through the part's typed seat cylinder rather than a sheet pick:
-    the four seats pair up a few millimetres apart on a 1:2 sheet. It is the
-    drill-diameter circle on the top face, not the one where the drill point
-    starts.
+    A rim found only in ReferencedDocument is not proof that the drawing view
+    owns or displays it. Scan after the crop and arrow rebuild, and identify
+    the full model circle, not just its top-face height and drill diameter.
+    The selected view edge remains the explicit native attachment target.
     """
+    # Retain the old part-face pick as a native comparison witness, not as a
+    # fallback. A same-curve drawing edge is not assumed to be the same entity.
     model = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
     diameter = blind_cut_dia_mm(SEAT_SPEC)
     face = _resolve_faces(
         model, {"seat": CylinderFace(diameter, contains_x_mm=SEAT_CALLOUT_X_MM)}
     )["seat"]
-    matches = []
+    part_rims = []
     for raw in _early_bound(face, "IFace2").GetEdges() or ():
         edge = _early_bound(raw, "IEdge")
         curve = _early_bound(edge.GetCurve(), "ICurve")
         if not curve.IsCircle():
             continue
-        _x, centre_y, _z, *_axis, radius = (float(v) for v in curve.CircleParams)
-        if abs(radius - diameter / 2000.0) > 1e-7:
-            continue
-        if abs(centre_y - HALF_Y / 1000.0) > 1e-7:
-            continue
-        matches.append(edge)
-    if len(matches) != 1:
-        raise RuntimeError(f"expected one east-seat entry rim, found {len(matches)}")
-    return matches[0]
+        params = tuple(float(value) for value in curve.CircleParams)
+        if (
+            abs(params[6] - diameter / 2000.0) <= 1e-7
+            and abs(params[1] - HALF_Y / 1000.0) <= 1e-7
+        ):
+            part_rims.append(
+                (
+                    edge,
+                    (
+                        *(value * 1000.0 for value in params[:3]),
+                        *params[3:6],
+                        params[6] * 1000.0,
+                    ),
+                )
+            )
+    if len(part_rims) != 1:
+        raise RuntimeError(f"expected one east-seat part entry rim, found {len(part_rims)}")
+    part_edge, part_circle = part_rims[0]
+    item = scan_view_edges(view, label="VIEW B bracket-seat rims").circle_at(
+        (SEAT_CALLOUT_X_MM, HALF_Y, 0.0),
+        diameter / 2.0,
+        axis=(0.0, 1.0, 0.0),
+        label="east bracket-seat entry rim",
+        center_tol_mm=1e-4,
+        radius_tol_mm=1e-4,
+        selection="unique",
+        adapter=adapter,
+    )
+    witness = {
+        "view_name": view_name(adapter, view),
+        "part_visible_is_same": int(adapter.swApp.IsSame(part_edge, item.edge)),
+    }
+    for source, edge, circle in (
+        ("part", part_edge, part_circle),
+        ("visible", item.edge, item.circle),
+    ):
+        owners = []
+        for face in edge.GetTwoAdjacentFaces2() or ():
+            if face is None:
+                continue
+            feature = _early_bound(face, "IFace2").GetFeature()
+            if feature is not None:
+                feature = _early_bound(feature, "IFeature")
+                owners.append((str(feature.Name), str(feature.GetTypeName2())))
+        witness[f"{source}_circle_mm"] = json.dumps((*circle[:3], circle[6]))
+        witness[f"{source}_circle_axis"] = json.dumps(circle[3:6])
+        witness[f"{source}_adjacent_features"] = json.dumps(owners)
+        if source == "visible" and ("BracketSeats", "HoleWzd") not in owners:
+            raise RuntimeError(
+                f"east bracket-seat entry rim is not owned by BracketSeats(HoleWzd): "
+                f"{owners!r}"
+            )
+    _telemetry.event("drawing.rocker_support_seat_rim", **witness)
+    _telemetry.info("VIEW B bracket-seat rim witness: " + json.dumps(witness, sort_keys=True))
+    return item.edge
 
 
 def _crop_view_b_to_rail(adapter: Any, view: Any) -> None:
@@ -793,10 +843,11 @@ async def build(adapter: Any) -> dict[str, str]:
     if add_note(adapter, VIEW_B_CAPTION, *VIEW_B_CAPTION_XY) is None:
         raise RuntimeError("failed to caption VIEW B")
     _add_view_b_arrow(adapter, front)
-    add_native_hole_callout(
+    seat_edge = _seat_entry_edge(adapter, view_b)
+    seat_callout = add_native_hole_callout(
         adapter,
         view_b,
-        edge=_seat_entry_edge(view_b),
+        edge=seat_edge,
         callout_xy=SEAT_CALLOUT_XY,
         label="rocker-bracket transfer seats",
         process=SEAT_CALLOUT_PROCESS,
@@ -824,6 +875,15 @@ async def build(adapter: Any) -> dict[str, str]:
         # (r743-p1s-B: VIEW B's import brought none).
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=1,
+        settled_checks=(
+            lambda: assert_native_hole_callout_attachment(
+                adapter,
+                view_b,
+                seat_callout,
+                edge=seat_edge,
+                label="rocker-bracket transfer seats",
+            ),
+        ),
     )
 
 

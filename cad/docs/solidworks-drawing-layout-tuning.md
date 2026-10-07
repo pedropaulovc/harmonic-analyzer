@@ -291,6 +291,79 @@ determine the selection vector" — project through `IView::ModelToViewTransform
 (get-only, `types/IView/ModelToViewTransform.md`), which is what
 `_drawing_common.model_point_in_view` wraps.
 
+**g2. An associative hole callout whose coordinate pick misses.**
+Don't: treat `SelectByID2(..., "EDGE", sheet_x, sheet_y, ...) == False` as
+proof of a broken Hole Wizard, a wrong view transform, or a particular pick
+aperture. The summing-lever farm leaf at 2026-10-07T06:45:40.734Z missed
+`Drawing View2` at `(0.197219, 0.130949)` after successful front/top imports;
+it recorded a ready seat and window size, but no native circle or transform.
+Those observations do not distinguish a geometric offset from a hit-test miss.
+Do: resolve the model-owned entry rim from the view's visible edges and pass
+`edge=` to `add_native_hole_callout`. For `CounterAnchorTap`, the builder authors
+the Hole Wizard at `(TIP_X, ANCHOR_H/2, 0)` mm with a +Y normal and the tap-drill
+radius from `COUNTER_HOLE_SPEC`; the drawing reuses that same rim for its checked
+X-location dimension. `ViewEdges.circle_at(selection="unique", adapter=...)`
+uses the existing centre/radius/axis limits, rejects missing or distinct
+ambiguous edges, and uses native `ISldWorks::IsSame` to count repeated wrappers
+for one edge only once. Existing nearest-mode consumers retain their behavior.
+The canonical visible-entity example selects those entities through
+`IEntity::Select4` with `ISelectData.View`; `IDrawingDoc::AddHoleCallout2` then
+calls out the selected hole, not a typed replacement.
+
+Successful insertion is not proof of attachment: `AddHoleCallout2` can
+re-solve to a neighboring or coincident rim. On the explicit `edge=` path,
+`add_native_hole_callout` rereads the annotation after its rebuild and uses
+the canonical attachment guard to require one non-dangling edge attachment
+and native `IsSame == 1` against the requested rim. Missing, extra, wrong-type,
+or different-native-identity attachments refuse the leaf; the diagnostic's
+`attached_same_requested_edge=false` is not success. Native hole callouts are
+display dimensions, not `SetLeader3` symbols: all five 2026-10-07 failing leaves
+reported intact association with `GetLeaderCount()==0`, matching the existing
+pen-rod RD3 rendered-leader observation. The callout-only guard instead requires
+reciprocal native display/annotation identity, annotation visibility state 1,
+finite readable `IDisplayDimension.GetDisplayData` lines, and one printable
+arrow with a complete connected route to the rendered text's shoulder in XY.
+An arrow stub plus a disconnected shoulder cannot pass. Segment order and
+endpoint direction are irrelevant; endpoint-to-segment joins also cover
+T-junctions and a line continuing past its arrow tip. The component must reach
+a horizontal shoulder at the lowest nonblank text baseline and covering a
+current text X anchor, not merely a far-away line at the same Y. Unrelated
+display strokes need not join the leader; every returned line still must be
+readable and finite. Joins retain the existing 0.01 mm XY tolerance and text
+baseline matching retains the layout audit's 0.3 mm tolerance. Text positions
+are display-origin offsets in the API contract; the calibrated drawing display
+data (including CSP_DRILL) is sheet-compatible, so no annotation origin is
+added. A failed route reports its arrow-component and text-shoulder indices.
+One arrow is this explicit one-edge contract, not a universal native API
+guarantee; arrow Z can differ from line Z. No-arrow style 10, zero-size/direction
+arrows, empty data and even partly unreadable routes refuse the leaf. The guard
+still reads the registered count; generic symbols keep
+their exact count and datum tags keep zero. `IAnnotation.Visible` cannot detect
+hidden layers or suppressed owning features: the final layout/DFM gates and
+whole-sheet inspection must still prove the callout actually prints, its arrow
+lands on the named hole, and its actual bent route is clear.
+Coordinate-only callouts keep their existing hit-test behavior.
+
+The summing-lever recipe retains both explicit-edge native callouts and runs
+`assert_native_hole_callout_attachment` through the finalizer's existing
+`settled_checks`, after the final rebuild and before SLDDRW save or PDF export.
+That check re-enumerates the current owning view and its current annotations,
+identifies the native view and display dimension with `IsSame`, and applies
+the same guard to the fresh annotation. A removed or reattached annotation
+cannot pass just because its old handle remains readable; fresh wrappers for
+the same native view, dimension, and rim can pass.
+
+The remote leaf's aggregate `drawing.hole_callout_attachment` observation
+records the selected circle and axis, adjacent feature ownership, actual
+`ModelToViewTransform`, selection point/view, attached entity count/types, and
+native identity against the requested rim and the callout's sheet position
+after rebuild. Failed reads are
+named `<field>_error`, not reported as empty geometry. A failed entity selection
+records the wanted rim before raising; it never retries a coordinate or accepts
+the previous selection. These observations are diagnostic, not evidence that a
+new cutover has passed: require the actual remote callout's native attachment
+and a whole-sheet eye check before claiming the anchor callout is correct.
+
 **h. A datum tag that will not leave its attachment.**
 Don't: attach a datum tag to a bore by selecting the edge OBJECT
 (`add_datum_feature(entity=visible_circle_edge(...), shoulder=True)`) and then
