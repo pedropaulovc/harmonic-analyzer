@@ -76,6 +76,9 @@ def test_screw_never_bottoms_in_the_base_tap_and_prints_its_worst_engagement() -
     assert 0.0 < spec.SCREW_ENGAGEMENT_PRINTED <= worst
     assert spec.SCREW_ENGAGEMENT_PRINTED_D * spec.SCREW_MAJOR <= worst
     assert f"ENGAGEMENT {spec.SCREW_ENGAGEMENT_PRINTED:.1f} MIN" in spec.SCREW_HOLE_CALLOUT
+    tip_clear = spec.BASE_TAP_DEPTH - (spec.SCREW_LENGTH - shortest_grip) + 1e-9
+    assert 0.0 < spec.SCREW_TIP_CLEARANCE_PRINTED <= tip_clear
+    assert f"TIP {spec.SCREW_TIP_CLEARANCE_PRINTED:.1f} MIN CLEAR" in spec.SCREW_HOLE_CALLOUT
 
 
 def test_magnetic_base_sits_behind_the_rear_jaw_below_its_top() -> None:

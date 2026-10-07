@@ -135,7 +135,7 @@ SIDE_KEEP = {
     "ScrewHeight": (_SIDE_RIGHT + 0.012, _side(0.0, (BOTTOM_Z + SCREW_Z) / 2.0)[1]),
     "ArmHeight": (_SIDE_RIGHT + 0.024, _side(0.0, (BOTTOM_Z + ARM_TOP_Z) / 2.0)[1]),
     "NoseHoleDia": (_side(NOSE_Y, 0.0)[0] - 0.011, _SIDE_TOP + 0.034),
-    "ScrewHoleDia": (_SIDE_RIGHT + 0.056, _SIDE_TOP + 0.030),
+    "ScrewHoleDia": (_SIDE_RIGHT + 0.058, _SIDE_TOP + 0.036),
 }
 # The drilling and the bought nose pin it takes read under the hole's size,
 # standing high enough above the section for the three callout lines.

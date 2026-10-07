@@ -208,6 +208,10 @@ if SCREW_ENGAGEMENT_MIN <= 0.0:
 SCREW_ENGAGEMENT_MIN_D = SCREW_ENGAGEMENT_MIN / SCREW_MAJOR
 SCREW_ENGAGEMENT_PRINTED = math.floor(SCREW_ENGAGEMENT_MIN * 10.0 + 1e-9) / 10.0
 SCREW_ENGAGEMENT_PRINTED_D = math.floor(SCREW_ENGAGEMENT_MIN_D * 100.0 + 1e-9) / 100.0
+# The tip's clearance to the tap bottom at the shortest grip: the sheet
+# states it so the grip's three-place band reads as the bottoming limit.
+SCREW_TIP_CLEARANCE_MIN = round(BASE_TAP_DEPTH - SCREW_PROTRUSION_MAX, 6)  # 1.02
+SCREW_TIP_CLEARANCE_PRINTED = math.floor(SCREW_TIP_CLEARANCE_MIN * 10.0 + 1e-9) / 10.0
 
 # The nose disc lands on the raw end face, and every part of the stop stays
 # below the blank top and outside it in X.
@@ -292,8 +296,9 @@ NOSE_PIN_CALLOUT = "\n".join(
 SCREW_HOLE_CALLOUT = "\n".join(
     (
         f"DRILL THRU FOR {SCREW_THREAD} X {SCREW_LENGTH:g} SHCS",
-        f"INTO {BASE_SKU} {SCREW_THREAD} TAP",
+        f"INTO {BASE_SKU} {SCREW_THREAD} X {BASE_TAP_DEPTH:g} DEEP TAP",
         f"ENGAGEMENT {SCREW_ENGAGEMENT_PRINTED:.1f} MIN ({SCREW_ENGAGEMENT_PRINTED_D:.2f}D)",
+        f"TIP {SCREW_TIP_CLEARANCE_PRINTED:.1f} MIN CLEAR OF TAP BOTTOM",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
