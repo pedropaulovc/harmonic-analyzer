@@ -16,11 +16,13 @@ import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
 
-# Face (the jaw-to-cap spacer) and spigot (the centring stub).
+# Face (the jaw-to-cap spacer) and spigot (the centring stub). Both axial
+# sizes print from the faced jaw face: the shoulder and the overall length.
 FACE_DIA = 16.0
 FACE_THICK = 3.0
 SPIGOT_DIA = 12.2
 SPIGOT_LENGTH = 2.0
+OVERALL_LENGTH = FACE_THICK + SPIGOT_LENGTH
 
 # The spigot drops into the post's journal bore by hand: its largest size stays
 # a hand clearance under the smallest bore the post's running band allows. Its
@@ -44,13 +46,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FaceProfile": {"FaceDia"},
     "Face": {"FaceThick"},
     "SpigotProfile": {"SpigotDia"},
-    "Spigot": {"SpigotLength"},
+    "Spigot": {"OverallLength"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FaceProfile": {"FaceDia": FACE_PLACES},
     "Face": {"FaceThick": 1},
     "SpigotProfile": {"SpigotDia": 2},
-    "Spigot": {"SpigotLength": 1},
+    "Spigot": {"OverallLength": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
@@ -77,9 +79,23 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                  ("dt_cone_pivot_post_spec", "RUNNING_BORE_BAND")),
             ),
             "dia_nominal": (SPIGOT_DIA, ("SPIGOT_DIA",)),
-            "length": (limits(SPIGOT_LENGTH, 1), ("SPIGOT_LENGTH",)),
         },
-        precision={"dia": 2, "length": 1},
+        precision={"dia": 2},
+    ),
+    "spigot_end": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((1.0, 0.0, 0.0), OVERALL_LENGTH),),
+        requirements=("length",),
+        fields={
+            "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
+            "plane": (
+                {"frame": "model", "axis": "x", "value": OVERALL_LENGTH},
+                ("OVERALL_LENGTH",),
+            ),
+            "length": (limits(OVERALL_LENGTH, 1), ("OVERALL_LENGTH",)),
+            "length_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
+        },
+        precision={"length": 1},
     ),
     "cap_face": ExportFeature(
         kind="face",

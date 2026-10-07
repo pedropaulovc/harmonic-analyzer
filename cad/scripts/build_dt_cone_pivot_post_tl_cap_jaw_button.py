@@ -6,8 +6,8 @@ mouth and the shoulder carries the jaw load onto the cap
 (``dt_cone_pivot_post_tl_cap_jaw_button_spec``). Two are made.
 
 Layout: the jaw-face disc is a Right-plane circle extruded +X by its
-thickness; the spigot is a second Right-plane circle extruded +X from the
-shoulder.
+thickness; the spigot is a second Right-plane circle extruded +X by the
+overall length, so both axial sizes measure from the faced jaw face.
 
 Run (SolidWorks already open)::
 
@@ -27,7 +27,6 @@ from _common import (
     define_circle,
     drive_dimension,
     ensure_fully_defined,
-    extrude_at_offset,
     force_rebuild,
     name_dimensions,
     name_last_feature,
@@ -53,6 +52,7 @@ from dt_cone_pivot_post_tl_cap_jaw_button_spec import (
     FACE_DIA,
     FACE_THICK,
     ISOMETRIC_VIEW_NOTE,
+    OVERALL_LENGTH,
     SPIGOT_BAND,
     SPIGOT_DIA,
     SPIGOT_LENGTH,
@@ -91,7 +91,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "FaceDia", f"{FACE_DIA}mm")
     await set_global(adapter, "FaceThick", f"{FACE_THICK}mm")
     await set_global(adapter, "SpigotDia", f"{SPIGOT_DIA}mm")
-    await set_global(adapter, "SpigotLength", f"{SPIGOT_LENGTH}mm")
+    await set_global(adapter, "OverallLength", f"{OVERALL_LENGTH}mm")
 
     face = SketchDims()
     check("create_sketch face", await adapter.create_sketch("Right"))
@@ -133,10 +133,13 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch spigot", await adapter.exit_sketch())
     name_last_feature(adapter, "SpigotProfile")
     drive_jobs += spigot.apply(adapter, "SpigotProfile")
-    extrude_at_offset(adapter, SPIGOT_LENGTH, FACE_THICK)
+    check(
+        "extrude spigot",
+        await adapter.create_extrusion(ExtrusionParameters(depth=OVERALL_LENGTH)),
+    )
     name_last_feature(adapter, "Spigot")
-    spigot_length = name_dimensions(adapter, "Spigot", ["SpigotLength"])[0]
-    drive_jobs.append((spigot_length, '"SpigotLength"'))
+    spigot_length = name_dimensions(adapter, "Spigot", ["OverallLength"])[0]
+    drive_jobs.append((spigot_length, '"OverallLength"'))
     await volume_check(adapter, "button", V_TOTAL, 0.005 * V_TOTAL)
     _require_one_solid_body(adapter, label="button")
 

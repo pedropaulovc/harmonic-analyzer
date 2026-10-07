@@ -13,8 +13,10 @@ import export_features
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.PROFILE_KEEP) | set(drawing.END_KEEP) == marked
-    assert not set(drawing.PROFILE_KEEP) & set(drawing.END_KEEP)
+    assert set(drawing.PROFILE_KEEP) | set(drawing.DONOR_KEEP) == marked
+    assert not set(drawing.PROFILE_KEEP) & set(drawing.DONOR_KEEP)
+    # every donated diameter lands on the profile
+    assert set(drawing.PROFILE_DIAMETER_XY) == set(drawing.DONOR_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
 
 
