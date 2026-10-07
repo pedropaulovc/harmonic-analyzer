@@ -171,6 +171,61 @@ def _plane_normal(adapter: Any, name: str) -> tuple[float, float, float]:
     return (data[6], data[7], data[8])
 
 
+def _add_driving_tilt(
+    adapter: Any,
+    gauge_line: str,
+    pin_line: str,
+    vertex: tuple[float, float],
+    *,
+    label: str,
+) -> None:
+    """Author the acute tilt between the gauge line and the pin axis as DRIVING.
+
+    Both lines are selected as segments: the adapter's angular route (one
+    segment plus its vertex) never yields an angular control (the post's
+    ``_add_driving_plan_incline``, ``diag_mcmaster_lib``). The text point
+    sits on the bisector of the two rays from ``vertex`` -- up (sketch -y)
+    and up the pin (sin i, -cos i) -- inside the acute wedge, passed with
+    sketch y in both the y and the -z slots so it lands there whether
+    SOLIDWORKS reads it in sketch or in model space.
+    """
+    from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+    from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
+
+    text_radius_mm = 8.0
+    half = math.radians(INCLINE_DEG / 2.0)
+    text_x = (vertex[0] + text_radius_mm * math.sin(half)) / 1000.0
+    text_y = (vertex[1] - text_radius_mm * math.cos(half)) / 1000.0
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    _select_sketch_entities(adapter, [gauge_line, pin_line], 0)
+    extension = _sw_type_info.early_bound_or_flag(
+        model.Extension, "IModelDocExtension", "AddSpecificDimension"
+    )
+    display, status = extension.AddSpecificDimension(
+        text_x,
+        text_y,
+        -text_y,
+        3,  # swDimensionType_e.swAngularDimension
+        0,
+    )
+    model.ClearSelection2(True)
+    if display is None:
+        raise RuntimeError(f"{label}: AddSpecificDimension(angular) failed ({status})")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    actual = math.degrees(abs(float(dimension.SystemValue)))
+    if abs(actual - INCLINE_DEG) > 1e-6:
+        raise RuntimeError(
+            f"{label}: angular dimension measured {actual:.6f} deg, "
+            f"expected {INCLINE_DEG:.6f} deg"
+        )
+    dimension.DrivenState = 2  # swDimensionDrivenState_e.swDimensionDriving
+    if int(dimension.DrivenState) != 2:
+        raise RuntimeError(f"{label}: angular dimension did not become driving")
+
+
+
 def _as_construction(adapter: Any, entity_id: str) -> None:
     """Flag a registered sketch line as construction geometry.
 
@@ -518,10 +573,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, f"{gauge}.start", f"{gauge}.end", "vertical_distance", _GAUGE_LINE, "gauge line"
     )
     section.record("ConePinGaugeLine")
-    check(
-        "cone pin tilt",
-        await adapter.add_sketch_dimension(gauge, pin_axis, "angular", INCLINE_DEG),
-    )
+    _add_driving_tilt(adapter, gauge, pin_axis, entry, label="cone pin tilt")
     section.record("ConePinTilt")
     check(
         "pin top square to its axis",
