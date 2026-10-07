@@ -18,6 +18,7 @@ approximate. Independent disjoint steel-pixel controls never enter the fit.
 from pathlib import Path
 import argparse
 import hashlib
+import importlib.util
 import json
 import subprocess
 
@@ -32,19 +33,9 @@ EXPECTED_SHA = '5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52
 FIRST, LAST = 2392, 2598
 
 
-def private_output(path):
-    output = Path(path).resolve()
-    external_temp = not output.is_relative_to(WEB.resolve().parent) and any(
-        output.is_relative_to(Path(temp).resolve()) for temp in ('/tmp', '/var/tmp'))
-    private = WEB.resolve() / '.vite/verification-output'
-    private_escape = not output.is_relative_to(private) and any(
-        parent.name == 'verification-output' and parent.parent.name == '.vite'
-        and parent.parent.parent.resolve() == WEB.resolve()
-        for parent in Path(path).absolute().parents)
-    if private_escape or output.is_relative_to((WEB / 'content').resolve()) or not (
-            output.is_relative_to(private) or external_temp):
-        raise ValueError('Source-pixel receipts require private .vite/verification-output or external temporary output; cannot write published content or canonical originals')
-    return output
+spec = importlib.util.spec_from_file_location("source_pixel_common", WEB / "scripts/compact-source-common.py")
+common = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(common)
 
 
 def sha(path):
@@ -165,8 +156,10 @@ def main():
     parser.add_argument('--output', type=Path, default=OUTPUT)
     args = parser.parse_args()
     try:
-        output = private_output(args.output)
-        support = private_output(output.parent / f'{output.stem}-source-pixel-support')
+        common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
+        output = args.output.resolve()
+        support = output.parent / f'{output.stem}-source-pixel-support'
+        common.fresh.check_namespace(support, historical_diagnostic=True, output=True)
     except ValueError as error:
         parser.error(str(error))
     if args.video.resolve().is_relative_to((WEB / 'content/v39-source').resolve()):

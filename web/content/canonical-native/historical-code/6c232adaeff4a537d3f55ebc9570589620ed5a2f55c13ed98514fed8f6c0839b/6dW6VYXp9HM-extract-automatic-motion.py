@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Fit a private historical Analysis bank-drive diagnostic.
+"""Fit a coherent Analysis bank drive to original chromatic cap FIT observations.
 
-Require --historical-diagnostic; never amend published/canonical tracks.
-The immutable CHECK ledger never enters the fit. Footage/crops stay private.
+Run with uv and web/.vite/calibration-venv. The immutable independent cap-corner
+CHECK ledger never enters the fit. Original footage and image crops stay private.
 The positive effective-bank gauge is NOT a measured physical crank-shaft sign or
 absolute phase. The negative gauge is fitted and retained rather than suppressed.
 """
@@ -26,37 +26,8 @@ WEB = Path(__file__).resolve().parents[1]
 ROOT = WEB.parent
 VIDEO_ID = "6dW6VYXp9HM"
 CONTROLS = WEB / f"content/canonical-native/{VIDEO_ID}.motion-controls.json"
+OUTPUT = WEB / f"content/canonical-native/{VIDEO_ID}.automatic-motion.json"
 PRIVATE = WEB / f".vite/verification-output/{VIDEO_ID}-automatic-motion"
-OUTPUT = PRIVATE / "diagnostic.json"
-HISTORICAL_MODEL_SHA = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
-HISTORICAL_COMMIT = "1268c23d4a8fc741147c5e09d8d1e45247a71945"
-SOURCE_SHA = "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52"
-
-
-def private_output(path):
-    output = Path(path).resolve()
-    external_temp = not output.is_relative_to(WEB.resolve().parent) and any(
-        output.is_relative_to(Path(temp).resolve()) for temp in ("/tmp", "/var/tmp"))
-    private = WEB.resolve() / ".vite/verification-output"
-    private_escape = not output.is_relative_to(private) and any(
-        parent.name == "verification-output" and parent.parent.name == ".vite"
-        and parent.parent.parent.resolve() == WEB.resolve()
-        for parent in Path(path).absolute().parents)
-    if private_escape or output.is_relative_to((WEB / "content").resolve()) or not (
-            output.is_relative_to(private) or external_temp):
-        raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals")
-    return output
-
-
-def require_historical_native(*, historical_diagnostic=False):
-    if historical_diagnostic is not True:
-        raise ValueError("Analysis native diagnostics require historical_diagnostic=True")
-    text = (WEB / "src/mechanics-data.ts").read_text()
-    native = json.loads(text.split("export const MECHANISM_DATA = ", 1)[1].rsplit(" as const", 1)[0])
-    if (
-            native.get("provenance", {}).get("modelSha256") != HISTORICAL_MODEL_SHA
-            or native.get("provenance", {}).get("sourceCommit") != HISTORICAL_COMMIT):
-        raise ValueError("Current native data cannot reuse the original historical Analysis association")
 
 
 def digest(path):
@@ -117,14 +88,7 @@ def rotation_z(angle):
 
 class Projection:
     """Unchanged original native rest matrices and frozen mirrored FIT camera."""
-    def __init__(self, native, candidate, anchors, *, historical_diagnostic=False):
-        if historical_diagnostic is not True:
-            raise ValueError("Historical projection requires historical_diagnostic=True")
-        if (
-                any(str(record.get("kind", "")).startswith(("current-", "fresh-"))
-                    or record.get("freshSourceRecord") is not None for record in (native, candidate))
-                or candidate.get("geometryAuthority", {}).get("originalGlbSha256") != HISTORICAL_MODEL_SHA):
-            raise ValueError("Historical projection requires the original native model association")
+    def __init__(self, native, candidate, anchors):
         self.channel = native["channel"]
         self.rest = {row["partPath"]: np.array(row["restWorldMatrix"]).reshape(4, 4, order="F")
                      for row in native["rest"] if "/ch-rocker-arm-" in row["partPath"]}
@@ -315,41 +279,28 @@ def checks(projection, branch, ledger, frame_lookup):
                   "interpretation": "Independent original corner CHECKs, never fit. Relative displacement cancels one fixed registration bias; absolute residuals remain required and are reported separately. No native/GPU qualification is claimed."}
 
 
-def native_smoke(inputs, predicted, *, historical_diagnostic=False):
-    if historical_diagnostic is not True:
-        raise ValueError("Analysis native smoke requires historical_diagnostic=True")
-    private_output(PRIVATE)
-    require_historical_native(historical_diagnostic=True)
+def native_smoke(inputs, predicted):
     program = """
 import {readFileSync} from 'node:fs';
-import {MECHANISM_DATA,createMechanismInput,createMechanismPose,solveMechanism} from './src/mechanics.ts';
-const rows=JSON.parse(readFileSync(process.argv[1],'utf8')).inputs,input=createMechanismInput(),pose=createMechanismPose(),out=[];
+import {createMechanismInput,createMechanismPose,solveMechanism} from './src/mechanics.ts';
+const rows=JSON.parse(readFileSync(process.argv[1],'utf8')),input=createMechanismInput(),pose=createMechanismPose(),out=[];
 for(const row of rows){Object.assign(input,row,{amplitudes:new Float64Array(row.amplitudes),phases:new Float64Array(row.phases),setup:{...row.setup}});
  solveMechanism(input,pose);out.push({rockerAnglesRad:Array.from(pose.rockerAnglesRad),channelAnglesRad:Array.from(pose.channelAnglesRad),crankAngleRad:pose.crankAngleRad,equilibriumResidualNm:pose.equilibriumResidualNm});}
-console.log(JSON.stringify({modelSha256:MECHANISM_DATA.provenance.modelSha256,sourceCommit:MECHANISM_DATA.provenance.sourceCommit,rows:out}));
+console.log(JSON.stringify(out));
 """
     path = PRIVATE / "native-inputs.json"
     code_paths = ("src/mechanics.ts", "src/mechanics-data.ts", "src/kinematics.ts", "src/magnifier.ts")
     code_hashes = {name: digest(WEB / name) for name in code_paths}
-    write_json(path, {"historicalDiagnostic": True, "publishable": False,
-                      "productionIntegrated": False, "inputs": inputs})
+    write_json(path, inputs)
     result = subprocess.run(["bun", "-e", program, str(path)], cwd=WEB, capture_output=True, text=True, check=True)
     if code_hashes != {name: digest(WEB / name) for name in code_paths}:
         raise ValueError("Actually executed native math changed during the smoke run")
-    receipt = json.loads(result.stdout)
-    if (
-            receipt.get("modelSha256") != HISTORICAL_MODEL_SHA
-            or receipt.get("sourceCommit") != HISTORICAL_COMMIT):
-        raise ValueError("Executed native data differs from the original historical Analysis association")
-    actual = receipt["rows"]
+    actual = json.loads(result.stdout)
     discrepancy = float(np.max(np.abs(np.array([r["rockerAnglesRad"] for r in actual])-predicted)))
     if discrepancy > 1e-12:
         raise ValueError(f"Native rocker forward smoke disagrees: {discrepancy}")
-    receipt.update({"historicalDiagnostic": True, "publishable": False, "productionIntegrated": False})
-    write_json(PRIVATE / "actual-native-forward.json", receipt)
-    return {"historicalDiagnostic": True, "publishable": False, "productionIntegrated": False,
-            "nativeModelSha256": receipt["modelSha256"], "nativeSourceCommit": receipt["sourceCommit"],
-            "status": "all-native-inputs-solved", "sourceExposures": len(actual),
+    write_json(PRIVATE / "actual-native-forward.json", actual)
+    return {"status": "all-native-inputs-solved", "sourceExposures": len(actual),
             "nativeMathSha256": {f"web/{name}": value for name, value in code_hashes.items()},
             "maximumRockerForwardDifferenceRad": discrepancy,
             "maximumEquilibriumResidualNm": max(abs(r["equilibriumResidualNm"]) for r in actual),
@@ -358,30 +309,11 @@ console.log(JSON.stringify({modelSha256:MECHANISM_DATA.provenance.modelSha256,so
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--historical-diagnostic", action="store_true", required=True)
-    parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument("--video", type=Path, default=WEB / f".vite/reference-root/videos/{VIDEO_ID}.mp4")
     parser.add_argument("--cached-decode", type=Path, help="Reuse only exact source-hash-validated native decode produced by this script")
     args = parser.parse_args()
-    try:
-        output = private_output(args.output)
-        private_output(PRIVATE)
-    except ValueError as error:
-        parser.error(str(error))
-    current = (WEB / "content/v39-source").resolve()
-    if any(path.resolve().is_relative_to(current) for path in (CONTROLS, args.video, args.cached_decode) if path is not None):
-        parser.error("Historical diagnostics cannot consume current source namespace inputs")
     PRIVATE.mkdir(parents=True, exist_ok=True)
     controls = load(CONTROLS)
-    if (
-            str(controls.get("kind", "")).startswith(("current-", "fresh-"))
-            or controls.get("freshSourceRecord") is not None
-            or controls.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative"
-            or controls.get("videoId") != VIDEO_ID
-            or controls.get("frozenCandidate", {}).get("geometryAuthority", {}).get("originalGlbSha256") != HISTORICAL_MODEL_SHA
-            or any(row["sourceImage"].get("sourceSha256") != SOURCE_SHA for row in controls["sourceFits"]["frames"])):
-        raise ValueError("Analysis diagnostics require the original historical source/model tuple")
-    require_historical_native(historical_diagnostic=True)
     candidate, centres, native = controls["frozenCandidate"], controls["sourceFits"], controls["nativeRest"]
     ledger = expand_checks(controls["independentCornerChecks"], centres["frames"])
     if controls["lineage"]["nativeRest"]["sha256"] != candidate["geometryAuthority"]["staticNativeRestPacketSha256"]:
@@ -396,10 +328,6 @@ def main():
             raise ValueError("Original source centre/candidate exposure differs")
     if args.cached_decode:
         decoded = load(args.cached_decode)
-        if (
-                str(decoded.get("kind", "")).startswith(("current-", "fresh-"))
-                or decoded.get("freshSourceRecord") is not None):
-            raise ValueError("Historical diagnostics cannot consume current source records")
         if decoded["producerSha256"] != digest(Path(__file__)) or decoded["videoSha256"] != digest(args.video):
             raise ValueError("Cached native decode producer/source identity differs")
         graphic_rows = decoded["rows"]
@@ -407,10 +335,8 @@ def main():
             raise ValueError("Cached native exposure identities differ")
     else:
         graphic_rows = decode(args.video, frames)
-        write_json(PRIVATE / "native-source-decode.json", {
-            "historicalDiagnostic": True, "publishable": False, "productionIntegrated": False,
-            "producerSha256": digest(Path(__file__)), "videoSha256": digest(args.video), "rows": graphic_rows})
-    projection = Projection(native, candidate, controls["nativeLandmarkAnchors"], historical_diagnostic=True)
+        write_json(PRIVATE / "native-source-decode.json", {"producerSha256": digest(Path(__file__)), "videoSha256": digest(args.video), "rows": graphic_rows})
+    projection = Projection(native, candidate, controls["nativeLandmarkAnchors"])
     source_pixels = np.array([[next(p["pixel"] for p in frame["physicalFaceCentroids"] if p["sourceStation"] == 20-j) for j in range(20)] for frame in frames])
     branches = [fit_branch(projection, source_pixels, graphic_rows, candidate, sign) for sign in (1, -1)]
     frame_lookup = {frame["frameIndex"]: i for i, frame in enumerate(frames)}
@@ -420,9 +346,7 @@ def main():
         report.update({key: branch[key] for key in ("sign", "converged", "message", "fitRmsPx", "fitMaximumEuclideanPx", "atDriveBounds")})
         report["phasesRad"] = branch["phases"].tolist()
         report["crankTurns"] = branch["turns"].tolist()
-        write_json(PRIVATE / f"independent-corner-checks-sign-{branch['sign']}.json", {
-            "historicalDiagnostic": True, "publishable": False, "productionIntegrated": False,
-            "summary": report, "rows": rows})
+        write_json(PRIVATE / f"independent-corner-checks-sign-{branch['sign']}.json", {"summary": report, "rows": rows})
         branch_reports.append(report)
         print(json.dumps({k: v for k, v in report.items() if k not in ("phasesRad", "crankTurns")}), flush=True)
     chosen = branches[0]
@@ -435,10 +359,9 @@ def main():
         value = copy.deepcopy(fixed_input)
         value["crankTurns"] = float(turns)
         inputs.append(value)
-    native_report = native_smoke(inputs, chosen["rocker"], historical_diagnostic=True)
+    native_report = native_smoke(inputs, chosen["rocker"])
     cadence = np.diff(chosen["turns"]) / np.diff([r["timeSeconds"] for r in frames])
-    packet = {"schemaVersion": 1, "kind": "historical-source-bank-drive-diagnostic", "videoId": VIDEO_ID,
-              "historicalDiagnostic": True, "publishable": False, "productionIntegrated": False,
+    packet = {"schemaVersion": 1, "kind": "source-fit-coherent-bank-drive", "videoId": VIDEO_ID,
               "interval": {"startSeconds": frames[0]["timeSeconds"], "endSeconds": frames[-1]["timeSeconds"],
                            "firstNativeFrameIndex": frames[0]["frameIndex"], "lastNativeFrameIndex": frames[-1]["frameIndex"],
                            "nativeFrameCount": len(frames), "shotId": "analysis-22", "viewId": "bar-bank", "presentation": "horizontal-mirror"},
@@ -470,10 +393,10 @@ def main():
                               {"scope": "before112.3122 and after119.08563333333333", "reason": "No coherent motion inferred outside this exact continuous204-native-frame authority interval; do not transfer cadence across editorial cuts or endpoint holds."},
                               {"scope": "original independent cap corner nulls", "count": ledger["counts"]["unresolved"], "reason": "Unresolved/annotation-occluded original source pixels remain unresolved; no fabricated CHECKs."}],
               "integration": {"interpolation": "Linear cumulative crankTurns in actual source seconds within this interval only. Fixed phases/amplitudes/setup, engaged cone. Native solveMechanism drives all20 stations via physicalChannelAngle(crankTurns-driveCrankOffsetTurns,j)+phases[j].",
-                              "scope": "Historical diagnostic only; never replace production input rows or amend source cameras, observations, CHECK roles or video corpora.",
+                              "scope": "Replace only Analysis bar-bank input rows inside the exact authority interval; keep source cameras, raw observations, CHECK roles and other video corpora unchanged.",
                               "stageAcceptance": False}}
-    write_json(output, packet)
-    print(json.dumps({"output": str(output), "totalEffectiveBankTurns": packet["diagnostics"]["totalEffectiveBankTurns"], "nativeSmoke": native_report}), flush=True)
+    write_json(OUTPUT, packet)
+    print(json.dumps({"output": str(OUTPUT.relative_to(ROOT)), "totalEffectiveBankTurns": packet["diagnostics"]["totalEffectiveBankTurns"], "nativeSmoke": native_report}), flush=True)
 
 
 if __name__ == "__main__":

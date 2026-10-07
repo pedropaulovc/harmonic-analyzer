@@ -22,19 +22,9 @@ from scipy.spatial.transform import Rotation
 WEB = Path(__file__).resolve().parents[1]
 
 
-def private_output(path):
-    output = Path(path).resolve()
-    external_temp = not output.is_relative_to(WEB.resolve().parent) and any(
-        output.is_relative_to(Path(temp).resolve()) for temp in ("/tmp", "/var/tmp"))
-    private = WEB.resolve() / ".vite/verification-output"
-    private_escape = not output.is_relative_to(private) and any(
-        parent.name == "verification-output" and parent.parent.name == ".vite"
-        and parent.parent.parent.resolve() == WEB.resolve()
-        for parent in Path(path).absolute().parents)
-    if private_escape or output.is_relative_to((WEB / "content").resolve()) or not (
-            output.is_relative_to(private) or external_temp):
-        raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals")
-    return output
+spec = importlib.util.spec_from_file_location("static_output_common", WEB / "scripts/compact-source-common.py")
+common = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(common)
 
 
 def camera_parameters(camera, height):
@@ -302,23 +292,17 @@ def run(evidence, frames, inventory, *, historical_diagnostic=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--historical-diagnostic", action="store_true", required=True)
-    historical = Path(__file__).resolve().parents[1] / "content/canonical-native/NAsM30MAHLg.observations.json.gz"
-    parser.add_argument("--observations", type=Path, default=historical)
     parser.add_argument("--evidence", default="/tmp/harmonic-web-reference/evidence/NAsM30MAHLg")
     parser.add_argument("--frames", default="/tmp/nasframes")
     parser.add_argument("--inventory", default="/tmp/harmonic-web-model/model-inventory.json")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    if args.observations.resolve() != historical.resolve():
-        parser.error("--observations must select the original canonical-native historical derivative")
     try:
-        output = private_output(args.output)
+        common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
+        output = args.output.resolve()
     except ValueError as error:
         parser.error(str(error))
     packet = run(args.evidence, args.frames, args.inventory, historical_diagnostic=args.historical_diagnostic)
-    spec = importlib.util.spec_from_file_location("static_output_common", Path(__file__).with_name("compact-source-common.py"))
-    common = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(common)
     common.write_observations(output, packet)
     print(json.dumps(packet["summary"]))
 

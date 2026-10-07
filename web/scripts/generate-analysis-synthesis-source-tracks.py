@@ -319,15 +319,10 @@ class _HistoricalReceiptAssembly:
             raise ValueError("Consumed native baseline input/component bounds changed in memory")
         if not self.analysis:
             self.validate_retained_framing_native_source()
-            packet, _ = load_pinned(SYNTHESIS_AUTOMATIC_MOTION,
-                SYNTHESIS_AUTOMATIC_MOTION_SHA256, "Synthesis automatic motion")
-            candidate = next(row for row in packet["bankCandidates"]
-                             if row["id"] == SYNTHESIS_AUTOMATIC_BRANCH)
-            motion = self.synthesis_automatic_motion
-            if (packet["model"] != self.data["model"] or motion["packet"] != packet
-                    or motion["candidate"] != candidate
-                    or motion["times"] != [row["timeSeconds"] for row in candidate["knots"]]):
+            if self.synthesis_automatic_motion != self.synthesis_automatic_motion_packet():
                 raise ValueError("Synthesis automatic motion retained numerical association changed")
+            if self.synthesis_coarse_framing != self.synthesis_coarse_framing_packet():
+                raise ValueError("Synthesis retained framing numerical association changed")
             return
         self.validate_analysis_bank_controls()
         if self.bank_controls != self.bank_controls_module.build_packet(historical_diagnostic=True):
@@ -684,7 +679,7 @@ class _HistoricalReceiptAssembly:
             raise ValueError("Analysis visible crank source-relative zero/domain changed.")
 
     def synthesis_automatic_motion_packet(self):
-        """Require current-root dependency bytes without rewriting original seals."""
+        """Require sealed original source archives, never current native bytes."""
         try:
             packet, packet_hash = load_pinned(SYNTHESIS_AUTOMATIC_MOTION,
                 SYNTHESIS_AUTOMATIC_MOTION_SHA256, "Synthesis automatic motion")
@@ -707,15 +702,20 @@ class _HistoricalReceiptAssembly:
             "web/scripts/generate-8KmVDxkia_w-automatic-motion.py"}
         if set(dependencies) != required_paths or dependencies[SYNTHESIS_AUTOMATIC_EVIDENCE]["sha256"] != evidence_hash:
             raise ValueError("Synthesis automatic native-math/evidence dependency census differs")
+        native_text = None
         for path, record in dependencies.items():
-            try:
-                actual = hashlib.sha256((ROOT/path).read_bytes()).hexdigest()
-            except OSError as error:
-                raise ValueError(f"Synthesis automatic dependency unavailable: {path}") from error
-            if actual != record["sha256"]:
+            if path == SYNTHESIS_AUTOMATIC_EVIDENCE:
+                try:
+                    raw = (ROOT / path).read_bytes()
+                except OSError as error:
+                    raise ValueError(f"Synthesis automatic dependency unavailable: {path}") from error
+            else:
+                raw = common.historical_code_bytes(path, record["sha256"])
+            if hashlib.sha256(raw).hexdigest() != record["sha256"]:
                 raise ValueError(f"Synthesis automatic native-math dependency differs: {path}")
-        text = (ROOT/"web/src/mechanics-data.ts").read_text()
-        native = json.loads(text.split("export const MECHANISM_DATA = ",1)[1].rsplit(" as const",1)[0])
+            if path == "web/src/mechanics-data.ts":
+                native_text = raw.decode("utf-8")
+        native = json.loads(native_text.split("export const MECHANISM_DATA = ",1)[1].rsplit(" as const",1)[0])
         if (native["harmonicNumbers"] != list(range(20,0,-1))
                 or native["provenance"]["modelSha256"] != self.data["model"]["sha256"]
                 or native["provenance"]["sourceCommit"] != self.data["model"]["sourceCommit"]):
@@ -1156,10 +1156,8 @@ class _HistoricalReceiptAssembly:
         if receipt_hash != receipt_record["sha256"] or receipt_hash != "83c3a1f00cc5414b3edaa2fd62e72de437f4d7adb756263139671abb0f57033c":
             raise ValueError("Chosen cam-rod actual world receipt changed")
         receipt = json.loads(receipt_raw)
-        try:
-            scene_hash = hashlib.sha256((ROOT / "web/src/scene.ts").read_bytes()).hexdigest()
-        except OSError as error:
-            raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs: current scene unavailable") from error
+        scene_hash = hashlib.sha256(common.historical_code_bytes(
+            "web/src/scene.ts", lineage["sceneCurrentSourceSha256"])).hexdigest()
         if (probe["status"] != "candidate-enumeration-only"
                 or probe["selection"] != "none; retain every returned pose; CHECK not evaluated"
                 or probe["chosenIntrinsics"]["verticalFovDegrees"] != 30

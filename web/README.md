@@ -184,25 +184,24 @@ The manifest explicitly declares `canonicalConsumerHashNormalization` as
 the normalized text, not checkout byte identity. Original evidence, historical
 snapshots, mapping bytes and derivative dependency pins are never normalized.
 
-Ordinary producers for all six videos validate the trusted tracked representation
-through the same strict v2 `approved-model.mjs` loader used by offline verifiers.
-They compare observations with its approved raw tuple before derivation or
-publication, and check normalized live approval, producer, classifier, scene and
-native-math inputs against current-consumer seals. Producers declare the additional
-modules they execute; Analysis seals the bank-controls module's actual loaded
-path. Synthesis checks both primary and secondary observations. Construction and
-build recheck native model associations and retained calibration. Analysis also
-rechecks consumed numerical inputs, motion indexes and held-camera/bank data.
-Synthesis rechecks automatic-motion candidates and times; its additional framing
-cameras and lineage hashes are construction-time data. Its old-model framing
-pins still refuse v39 generation. A new model label
-cannot approve old native readbacks. The pair is constructed and built before
-either output is prepared or published. Changed or missing live inputs refuse
-even when a matching historical snapshot exists.
-Analysis/Synthesis historical replay uses
-`HistoricalReceiptRevalidator.revalidate_receipt()`. Its receipt cannot be built
-or published as a current source track. Historical lineage never supplies
-current eligibility.
+Ordinary producers for all six videos read only strict
+`content/v39-source/<ID>.observations.json.gz` records. They validate the current
+tracked representation authority, original MP4 identity, native inventory/map
+association, exact camera/source exposure bindings and complete chosen physical
+inputs. Construction, build and publication re-read the relevant live seals and
+the compressed/decoded observation byte seals; a historical snapshot cannot
+replace a missing or changed live input. Pair CLIs build and prepare both tracks
+before publishing either output.
+
+Analysis/Synthesis historical replay is separate:
+`HistoricalReceiptRevalidator.revalidate_receipt()` checks immutable historical
+packets and sealed producer/math snapshots. Its non-publishable receipt is not a
+current source track and cannot grant current eligibility. The original-native
+Analysis bank extraction, visible-crank gauge, Synthesis automatic-motion and
+Spin mechanics CLI implementations are retired from `scripts/`: their required
+historical native tuple is not the current live tuple. Original producer source
+remains in the SHA-addressed `content/canonical-native/historical-code` archive,
+not as an executable current-native replay or fallback.
 
 For current observations, an omitted landmark `viewId` belongs to `main`.
 Present landmark and unavailable-row scope IDs must be strings; explicit `null`
@@ -217,10 +216,11 @@ before generation. Their receipts remain non-publishable historical evidence.
 Temporary roots are resolved before comparison, including platform symlinks.
 The entire checkout remains excluded from external temporary permission even
 when the checkout itself is under `/tmp`; private-root symlink escapes are refused.
-The observer and fitter share `check_namespace()` from
-`fresh-source-observations.py`. Each CLI loads that local module once for its
-namespace guards and observation codecs; historical snapshots are not live
-fallbacks for this policy.
+The observer, fitter and remaining historical diagnostic CLIs share
+`check_namespace()` from `fresh-source-observations.py`. The historical CLIs use
+their already-loaded `common.fresh` policy. Declared content aliases are refused
+even when they resolve to external temporary files; historical snapshots are not
+live policy fallbacks.
 
 Compression reduces current storage, not Git ancestry. Oversized historical
 blobs remain unless history is explicitly rewritten.
@@ -308,24 +308,26 @@ or replace the video ID with `8KmVDxkia_w` for Synthesis.
 Omitting `--video` still validates and prepares both Analysis/Synthesis outputs
 before publishing either.
 
-Analysis has bounded cumulative source-drive authority for the visible crank
-(79.8130667..86.6866 seconds) and mirrored bank (112.3122..119.0856333 seconds).
-The authoritative packets are
+Immutable historical Analysis packets retain bounded cumulative source-drive
+evidence for the visible crank (79.8130667..86.6866 seconds) and mirrored bank
+(112.3122..119.0856333 seconds):
 [`6dW6VYXp9HM.visible-crank-motion.json`](content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json),
 [`6dW6VYXp9HM.visible-crank-gauge.json`](content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json),
 [`6dW6VYXp9HM.automatic-motion.json`](content/canonical-native/6dW6VYXp9HM.automatic-motion.json)
 and [`6dW6VYXp9HM.motion-controls.json`](content/canonical-native/6dW6VYXp9HM.motion-controls.json).
 They separate observed relative motion from chosen native sign/home and hidden
-setup. Same-shot margins hold the nearest new input through the real cut;
-other shots, views and presentations retain their existing paths.
-[`DESIGN.md`](DESIGN.md#bounded-analysis-motion-authority) describes the gauges,
-source-specific producers and limits. These drives remain chosen approximations;
-source camera and geometry fidelity are unaccepted.
+setup. Historical receipt revalidation retains same-shot margin holds and
+original gauges; ordinary current playback instead consumes the fresh records
+above. [`DESIGN.md`](DESIGN.md#bounded-analysis-motion-authority) describes the
+historical evidence and private source-only flow. These historical drives remain
+chosen approximations; source camera and geometry fidelity are unaccepted.
 
-Synthesis's rocker-bank interval **105.980875..124.4159583 seconds** uses
-[automatic-motion inputs](content/canonical-native/8KmVDxkia_w.automatic-motion.json) and
-[source evidence](content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json), produced by
-[`generate-8KmVDxkia_w-automatic-motion.py`](scripts/generate-8KmVDxkia_w-automatic-motion.py).
+Synthesis's immutable historical rocker-bank interval **105.980875..124.4159583 seconds**
+is retained in [automatic-motion inputs](content/canonical-native/8KmVDxkia_w.automatic-motion.json)
+and [source evidence](content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json).
+Their original producer bytes are archived for lineage, not a current-native
+canonical regeneration command. Historical receipt revalidation consumes these
+packets; ordinary current track generation consumes only fresh current records.
 The source's 4× label describes published-video playback: mean cadence is
 1.559234652 turns/s, with unsigned cumulative drive of 28.744620749 turns across
 410 native knots. `bank-direction-+1` is an explicitly chosen physical direction,
@@ -444,6 +446,17 @@ unwarped captures and current native backing dimensions for warped captures.
 A refused diagnostic lease preserves its original unavailable reason and partial
 snapshot/capture evidence; unrelated cleanup failures still propagate. Neither
 collection nor a successful metadata join qualifies source fidelity or GPU bounds.
+The optional classification is scoped to
+`selected-native-stage-pixel-exact-vertex-identity`, not general native-anchor
+visibility or validity. A quantized pixel-centre ray can hit an incident native
+triangle while exceeding the unchanged 1e-7 m distance to its exact stored vertex
+class; tiny nonzero pixel-centre offsets can still pass. The scoped refusal
+`cpu-selected-pixel-first-surface-exceeds-exact-vertex-residual` retains the raw
+projection and pixel-centre offset. CPU evidence reports
+`queried-ray-exact-vertex-identity`; absent or different scope refuses. No pixel
+offset enlarges the physical tolerance and no vertex ray substitutes for the
+selected pixel ray. Source/GPU approval remains independent and unresolved when
+unavailable; corpus-wide practical reachability has not been measured.
 
 Paused interaction verification exercises a bounded crank turn and an actual
 camera orbit, preserving before/after native pixels, camera poses and media
@@ -522,23 +535,22 @@ original lineage only. They do not qualify the current renderer or CAD.
 Analysis's native forward-smoke, visible-crank winding proof and extraction-lineage
 code seals verify their original historical producers, not today's native math.
 Missing, unreadable or modified historical snapshots reject with `ValueError`.
-Synthesis's automatic-motion `generationDependencies`, by contrast, require exact
-current bytes at the intended generation root, including all three native-math
-files and the motion producer script. Its cam-rod `sceneCurrentSourceSha256` also
-checks that root's actual `web/src/scene.ts`: even cosmetic byte changes require
-new bound GPU evidence. These gates do not use historical snapshots or the
-manifest's normalized consumer seals as substitutes for current source.
-`web/.gitattributes` fixes those five live source inputs and the three current
-raw-hashed regeneration inputs (the Operation producer, shared source reader and
-native bindings) to LF on checkout, including with `core.autocrlf=true`.
-Producer and consumer hashes still use exact bytes. This source-authority
-contract is separate from the normalized identity-audit inputs listed in the
-manifest. Historical code, original packets and geometry remain
-exact-byte evidence.
-Historical behavioral fixtures scope the exact archived scene and all four
-producer/math sources to those intended source paths, for both byte and text
-reads. They leave original packets and receipt seals untouched and replay only
-original evidence; they do not approve the current scene, math, model or GPU.
+Synthesis's historical automatic-motion `generationDependencies` now read every
+non-content producer/math input only from its exact sealed historical-code
+archive. Native-data text comes from those same original archived bytes, never
+the live current tuple. The content evidence dependency remains the original
+pinned packet at the intended evidence root. The cam-rod
+`sceneCurrentSourceSha256` retains its original field name and digest but checks
+the corresponding sealed historical scene archive. Missing or modified archives
+refuse even when matching bytes exist at nominal live source paths; there is no
+live-file or replay-root fallback.
+
+The ordinary current producer remains fresh-only and separately checks its live
+authority and observation byte seals. Whole historical receipt revalidation
+uses the real archive route without overriding byte/text reads. It preserves
+original packet and receipt seals and cannot approve current scene, math,
+model, GPU or source fidelity. Historical code, original packets and geometry
+remain exact-byte evidence.
 Original private capture paths and observation hashes remain provenance links,
 not regeneration dependencies; no source video or screenshots are included.
 Capture-bound renderer and model hashes remain strict. Current-renderer

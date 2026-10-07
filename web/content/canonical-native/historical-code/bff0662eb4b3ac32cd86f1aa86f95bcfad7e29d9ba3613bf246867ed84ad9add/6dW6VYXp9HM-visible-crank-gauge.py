@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Produce a private historical visible-crank projection-gauge diagnostic.
+"""Produce a CHOSEN integration gauge from actual native crank point projection.
 
-Require --historical-diagnostic. The original raw native model/source association
-must match the executed native data; current model pins are not historical proof.
-The compressed public model is never an input. No published/canonical output.
+uv run --no-project --python web/.vite/calibration-venv/bin/python \
+    web/scripts/6dW6VYXp9HM-visible-crank-gauge.py
 
-Source winding/tempo remain measured in the separate original crank packet.
-Native sign/offset are chosen under the existing unqualified analysis16 camera,
-not measured historical shaft sign/home, camera calibration or geometry approval.
-Source images and full numerical execution receipts stay private.
+The default model is the immutable raw cache at
+web/.vite/model-source/<MECHANISM_DATA.provenance.modelSha256>.glb.
+For an original raw GLB elsewhere, append --model /path/to/raw-native.glb.
+The compressed public model is never an input to this gauge.
+
+Source winding/tempo remain measured in the separate visible-crank packet. Native
+sign and first-phase offset here are chosen under the EXISTING unqualified main
+analysis16 camera; they are not historical shaft sign/home or camera calibration.
+Actual native mechanics, released rest matrices and Three projection establish
+which choice projects clockwise. Source images and full numerical execution
+receipts stay private. The generic generator reads only the numeric gauge JSON.
 """
 from __future__ import annotations
 
@@ -30,11 +36,8 @@ VIDEO_ID = "6dW6VYXp9HM"
 SOURCE = WEB / f"content/canonical-native/{VIDEO_ID}.visible-crank-motion.json"
 CONTROLS = WEB / f"content/canonical-native/{VIDEO_ID}.motion-controls.json"
 NATIVE_DATA = WEB / "src/mechanics-data.ts"
+OUTPUT = WEB / f"content/canonical-native/{VIDEO_ID}.visible-crank-gauge.json"
 PRIVATE = WEB / f".vite/verification-output/{VIDEO_ID}-visible-crank-gauge"
-OUTPUT = PRIVATE / "diagnostic.json"
-HISTORICAL_MODEL_SHA = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
-HISTORICAL_COMMIT = "1268c23d4a8fc741147c5e09d8d1e45247a71945"
-SOURCE_SHA = "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52"
 CAMERA = {
     "positionMetres": [-0.5447613584304803, 0.16357081791578632, -0.07001628230473755],
     "quaternion": [-0.056508222022049706, -0.7048452460249034, -0.056508222022049706, 0.7048452460249035],
@@ -66,36 +69,8 @@ for(const turns of req.turns){
   equilibriumResidualNm:pose.equilibriumResidualNm});
 }
 console.log(JSON.stringify({modelSha256:MECHANISM_DATA.provenance.modelSha256,
- sourceCommit:MECHANISM_DATA.provenance.sourceCommit,
  pivotMetres:pivot.toArray(),restHandleOriginMetres:rest.toArray(),axis:axis.toArray(),rows}));
 """
-
-
-def private_output(path):
-    output = Path(path).resolve()
-    external_temp = not output.is_relative_to(WEB.resolve().parent) and any(
-        output.is_relative_to(Path(temp).resolve()) for temp in ("/tmp", "/var/tmp"))
-    private = WEB.resolve() / ".vite/verification-output"
-    private_escape = not output.is_relative_to(private) and any(
-        parent.name == "verification-output" and parent.parent.name == ".vite"
-        and parent.parent.parent.resolve() == WEB.resolve()
-        for parent in Path(path).absolute().parents)
-    if private_escape or output.is_relative_to((WEB / "content").resolve()) or not (
-            output.is_relative_to(private) or external_temp):
-        raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals")
-    return output
-
-
-def require_historical_native(*, historical_diagnostic=False):
-    if historical_diagnostic is not True:
-        raise ValueError("Crank native diagnostics require historical_diagnostic=True")
-    text = NATIVE_DATA.read_text()
-    native = json.loads(text.split("export const MECHANISM_DATA = ", 1)[1].rsplit(" as const", 1)[0])
-    if (
-            native.get("provenance", {}).get("modelSha256") != HISTORICAL_MODEL_SHA
-            or native.get("provenance", {}).get("sourceCommit") != HISTORICAL_COMMIT):
-        raise ValueError("Current native data cannot reuse the original historical crank association")
-    return native
 
 
 def digest(path):
@@ -107,23 +82,12 @@ def save(path, value):
     path.write_text(json.dumps(value, separators=(",", ":"), allow_nan=False) + "\n")
 
 
-def execute(name, turns, base_input, offset, *, historical_diagnostic=False):
-    if historical_diagnostic is not True:
-        raise ValueError("Crank native execution requires historical_diagnostic=True")
-    private_output(PRIVATE)
-    request = private_output(PRIVATE / f"{name}-request.json")
-    receipt = private_output(PRIVATE / f"{name}-actual-native.json")
-    require_historical_native(historical_diagnostic=True)
-    save(request, {"historicalDiagnostic": True, "publishable": False, "productionIntegrated": False,
-                   "camera": CAMERA, "turns": turns, "baseInput": base_input, "driveOffset": offset})
+def execute(name, turns, base_input, offset):
+    request = PRIVATE / f"{name}-request.json"
+    save(request, {"camera": CAMERA, "turns": turns, "baseInput": base_input, "driveOffset": offset})
     run = subprocess.run(["bun", "-e", NATIVE_PROGRAM, str(request)], cwd=WEB, capture_output=True, text=True, check=True)
     actual = json.loads(run.stdout)
-    if (
-            actual.get("modelSha256") != HISTORICAL_MODEL_SHA
-            or actual.get("sourceCommit") != HISTORICAL_COMMIT):
-        raise ValueError("Executed native data differs from the original historical crank association")
-    actual.update({"historicalDiagnostic": True, "publishable": False, "productionIntegrated": False})
-    save(receipt, actual)
+    save(PRIVATE / f"{name}-actual-native.json", actual)
     return actual
 
 
@@ -144,8 +108,6 @@ def signed_area(points):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--historical-diagnostic", action="store_true", required=True)
-    parser.add_argument("--output", type=Path, default=OUTPUT)
     parser.add_argument(
         "--model",
         type=Path,
@@ -153,18 +115,11 @@ def main():
     )
     args = parser.parse_args()
     try:
-        output = private_output(args.output)
-        private_output(PRIVATE)
-    except ValueError as error:
-        parser.error(str(error))
-    current = (WEB / "content/v39-source").resolve()
-    if any(path.resolve().is_relative_to(current) for path in (SOURCE, CONTROLS, args.model) if path is not None):
-        parser.error("Historical diagnostics cannot consume current source namespace inputs")
-    try:
-        native = require_historical_native(historical_diagnostic=True)
+        text = NATIVE_DATA.read_text()
+        native = json.loads(text.split("export const MECHANISM_DATA = ", 1)[1].rsplit(" as const", 1)[0])
+        native_model_sha256 = native["provenance"]["modelSha256"]
     except (OSError, ValueError, IndexError, KeyError) as error:
-        parser.error(str(error))
-    native_model_sha256 = native["provenance"]["modelSha256"]
+        parser.error(f"Cannot read current native raw model pin from {NATIVE_DATA}: {error}")
     model = args.model if args.model is not None else WEB / ".vite/model-source" / f"{native_model_sha256}.glb"
     model_label = f"raw-model/{native_model_sha256}.glb"
     try:
@@ -179,7 +134,7 @@ def main():
         )
     if model_sha256 != native_model_sha256:
         parser.error(
-            f"Raw model SHA256 {model_sha256} differs from the original historical native pin "
+            f"Raw model SHA256 {model_sha256} differs from the current native pin "
             f"{native_model_sha256}; supply the original raw GLB, not the compressed public asset"
         )
     dependencies = {str(path.relative_to(ROOT)): path for path in (Path(__file__), SOURCE, CONTROLS)}
@@ -189,16 +144,6 @@ def main():
     before[model_label] = model_sha256
     source = json.loads(SOURCE.read_text())
     controls = json.loads(CONTROLS.read_text())
-    if (
-            any(str(record.get("kind", "")).startswith(("current-", "fresh-"))
-                or record.get("freshSourceRecord") is not None
-                or record.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative"
-                for record in (source, controls))
-            or source.get("source", {}).get("videoId") != VIDEO_ID
-            or source.get("source", {}).get("sha256") != SOURCE_SHA
-            or controls.get("videoId") != VIDEO_ID
-            or any(row["sourceImage"].get("sourceSha256") != SOURCE_SHA for row in controls["sourceFits"]["frames"])):
-        raise ValueError("Crank diagnostics require the original historical source/model tuple")
     if model_sha256 != controls["frozenCandidate"]["geometryAuthority"]["originalGlbSha256"]:
         parser.error("Source static/native association and actual raw model identity differ")
     if source["authority"]["selectedNativeSign"] is not None or source["authority"]["absoluteNativeHomeTurns"] is not None:
@@ -207,7 +152,7 @@ def main():
     if base_input["crankTurns"] != 0 or base_input["setup"]["coneSwingRad"] != 0 or base_input["setup"]["driveCrankOffsetTurns"] != 0:
         raise ValueError("Original chosen-feasible fixture no longer has zero engaged drive")
     PRIVATE.mkdir(parents=True, exist_ok=True)
-    orbit = execute("orbit-positive-control", [i / 360 for i in range(361)], base_input, 0, historical_diagnostic=True)
+    orbit = execute("orbit-positive-control", [i / 360 for i in range(361)], base_input, 0)
     if orbit["modelSha256"] != before[model_label]:
         raise ValueError("Executed native data and actual raw model identity differ")
     points = np.array([row["pixel"] for row in orbit["rows"][:-1]])
@@ -239,13 +184,13 @@ def main():
     expected = source_phase + relative * 2 * math.pi
     alternatives = []
     for sign in (1, -1):
-        actual = execute(f"source-sign-{sign}", (sign * relative + offset).tolist(), base_input, offset, historical_diagnostic=True)
+        actual = execute(f"source-sign-{sign}", (sign * relative + offset).tolist(), base_input, offset)
         pixels = np.array([row["pixel"] for row in actual["rows"]])
         normalized = (pixels - centre) @ rotation / radii
         phase = np.unwrap(np.arctan2(normalized[:, 1], normalized[:, 0]))
         phase += 2 * math.pi * round((source_phase - phase[0]) / (2 * math.pi))
         errors = np.array([math.remainder(value - target, 2 * math.pi) for value, target in zip(phase, expected)])
-        cycle = execute(f"winding-sign-{sign}", [offset + sign * i / 360 for i in range(361)], base_input, offset, historical_diagnostic=True)
+        cycle = execute(f"winding-sign-{sign}", [offset + sign * i / 360 for i in range(361)], base_input, offset)
         cycle_pixels = np.array([row["pixel"] for row in cycle["rows"][:-1]])
         area = signed_area(cycle_pixels)
         alternatives.append({"nativeSign": sign, "shotLocalOffsetTurns": offset,
@@ -263,8 +208,7 @@ def main():
     if before != after:
         raise ValueError("Actually executed native/projection/source/producer dependency changed")
     packet = {
-        "schemaVersion": 1, "kind": "historical-visible-crank-projection-gauge-diagnostic", "videoId": VIDEO_ID,
-        "historicalDiagnostic": True, "publishable": False, "productionIntegrated": False,
+        "schemaVersion": 1, "kind": "chosen-visible-crank-projection-gauge", "videoId": VIDEO_ID,
         "sourceMotion": {"path": str(SOURCE.relative_to(ROOT)), "sha256": before[str(SOURCE.relative_to(ROOT))]},
         "chosenInputSource": {"path": str(CONTROLS.relative_to(ROOT)), "sha256": before[str(CONTROLS.relative_to(ROOT))],
                               "jsonPointer": "/frozenCandidate/frames/0/chosenInput", "historicalSetupRecovered": False},
@@ -292,10 +236,10 @@ def main():
                           "sourcePhase": "Within-cycle source phase/local speed remain approximate affine-ellipse observations; full source windings/cycle periods are measured. Source bottom-hold noise is not physical instantaneous angular speed."},
         "integration": {"formula": "crankTurns = -relativeCrankTurns + chosenShotLocalOffsetTurns",
                         "bankLag": "Set fixed driveCrankOffsetTurns to the same chosen offset, retaining initial chosen bank pose. Other chosen-feasible amplitudes/phases/setup stay fixed and explicitly unobserved.",
-                        "scope": "Historical diagnostic for analysis-16/main/native only; never production-integrated or transferred across shots."},
+                        "scope": "analysis-16/main/native only. Hold first/last chosen input over same-shot margins; no extrapolated cadence, artificial cuts or cross-shot phase transfer."},
     }
-    save(output, packet)
-    print(json.dumps({"output": str(output), "chosenGauge": packet["chosenGauge"],
+    save(OUTPUT, packet)
+    print(json.dumps({"output": str(OUTPUT.relative_to(ROOT)), "chosenGauge": packet["chosenGauge"],
                       "positiveControls": alternatives, "modelSha256": packet["modelSha256"]}))
 
 

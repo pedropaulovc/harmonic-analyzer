@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Produce private historical Synthesis bank/crank diagnostics.
+"""Produce source-timed Synthesis bank alternatives and distinct exposed crank drive.
 
-Require --historical-diagnostic; outputs cannot amend published/canonical tracks.
-The original source/model association must match the native numerical inputs.
+uv run --python web/.vite/calibration-venv/bin/python --no-project \
+  web/scripts/generate-8KmVDxkia_w-automatic-motion.py
 
 The high20 explanatory tube is explicitly annotation evidence. Its extrema time
 an unsigned crank-equivalent advance. Far-H20 gray-metal CHECK exposures are
@@ -25,24 +25,7 @@ EVIDENCE = WEB/'content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.j
 DATA = WEB/'src/mechanics-data.ts'
 KINEMATICS = WEB/'src/kinematics.ts'
 MECHANICS = WEB/'src/mechanics.ts'
-HISTORICAL_MODEL_SHA = '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d'
-HISTORICAL_COMMIT = '1268c23d4a8fc741147c5e09d8d1e45247a71945'
-SOURCE_SHA = 'a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725'
 
-
-def private_output(path):
-    output = Path(path).resolve()
-    private = WEB.resolve() / '.vite/verification-output'
-    external_temp = not output.is_relative_to(WEB.resolve().parent) and any(
-        output.is_relative_to(Path(temp).resolve()) for temp in ('/tmp', '/var/tmp'))
-    private_escape = not output.is_relative_to(private) and any(
-        parent.name == 'verification-output' and parent.parent.name == '.vite'
-        and parent.parent.parent.resolve() == WEB.resolve()
-        for parent in Path(path).absolute().parents)
-    if private_escape or output.is_relative_to((WEB / 'content').resolve()) or not (
-            output.is_relative_to(private) or external_temp):
-        raise ValueError('Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals')
-    return output
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -58,23 +41,11 @@ def summarize(values):
             'max':float(np.max(values))}
 
 
-def build_packet(*, historical_diagnostic=False):
-    if historical_diagnostic is not True:
-        raise ValueError('Synthesis motion requires historical_diagnostic=True')
-    if EVIDENCE.resolve().is_relative_to((WEB / 'content/v39-source').resolve()):
-        raise ValueError('Historical diagnostics cannot consume current source namespace inputs')
+def build_packet():
     evidence = json.loads(EVIDENCE.read_text())
     source = evidence['source']
-    if (
-            str(evidence.get('kind', '')).startswith(('current-', 'fresh-'))
-            or evidence.get('freshSourceRecord') is not None
-            or evidence.get('identityDerivative', {}).get('kind') != 'materialized-canonical-native-identity-derivative'
-            or source.get('videoId') != '8KmVDxkia_w'
-            or source.get('sha256') != SOURCE_SHA
-            or source.get('fps') != {'numerator':24000,'denominator':1001}
-            or evidence.get('model', {}).get('sha256') != HISTORICAL_MODEL_SHA
-            or evidence.get('model', {}).get('sourceCommit') != HISTORICAL_COMMIT):
-        raise ValueError('Synthesis diagnostics require the original historical source/model tuple')
+    if source['videoId'] != '8KmVDxkia_w' or source['fps'] != {'numerator':24000,'denominator':1001}:
+        raise ValueError('Synthesis native source identity/clock differs')
     for group in ('annotations','physicalMetalFIT','physicalMetalCHECK'):
         for row in evidence[group]:
             image = row['sourceImage']
@@ -101,10 +72,6 @@ def build_packet(*, historical_diagnostic=False):
         raise ValueError('Source annotations must have unique increasing native exposures')
     text = DATA.read_text()
     data = json.loads(text.split('export const MECHANISM_DATA = ',1)[1].rsplit(' as const',1)[0])
-    if (
-            data.get('provenance', {}).get('modelSha256') != HISTORICAL_MODEL_SHA
-            or data.get('provenance', {}).get('sourceCommit') != HISTORICAL_COMMIT):
-        raise ValueError('Current native data cannot reuse the original historical Synthesis association')
     channel = data['channel']
 
     def rocker(theta):
@@ -241,8 +208,6 @@ def build_packet(*, historical_diagnostic=False):
     held_tt = np.array([source_time(row)-crank_reference for row in crank_check])
     crank_errors = slope*held_tt+intercept-crank_angles(crank_check)
     return {'schemaVersion':1,'videoId':'8KmVDxkia_w','source':source,'model':evidence['model'],
-        'kind':'historical-source-motion-diagnostic','historicalDiagnostic':True,
-        'publishable':False,'productionIntegrated':False,
         'generationDependencies':{str(path.relative_to(WEB.parent)):{'sha256':digest(path)}
             for path in (EVIDENCE,DATA,KINEMATICS,MECHANICS,Path(__file__))},
         'bankInterval':evidence['interval'],'bankCandidates':bank_candidates,
@@ -276,17 +241,12 @@ def build_packet(*, historical_diagnostic=False):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--historical-diagnostic',action='store_true',required=True)
-    parser.add_argument('--output',type=Path,default=WEB/'.vite/verification-output/8KmVDxkia_w-automatic-motion/diagnostic.json')
+    parser.add_argument('--output',type=Path,default=WEB/'content/canonical-native/8KmVDxkia_w.automatic-motion.json')
     args=parser.parse_args()
-    try:
-        output=private_output(args.output)
-    except ValueError as error:
-        parser.error(str(error))
-    packet=build_packet(historical_diagnostic=True)
-    output.parent.mkdir(parents=True,exist_ok=True)
-    output.write_text(json.dumps(packet,indent=2)+'\n')
-    print(json.dumps({'output':str(output),'bankMeasurement':packet['bankMeasurement'],
+    packet=build_packet()
+    args.output.parent.mkdir(parents=True,exist_ok=True)
+    args.output.write_text(json.dumps(packet,indent=2)+'\n')
+    print(json.dumps({'output':str(args.output),'bankMeasurement':packet['bankMeasurement'],
         'controls':[{ 'directionBranch':candidate['directionBranch'],
             **{key:value['absoluteResidualPx'] for key,value in candidate['independentControls'].items()}}
             for candidate in packet['bankCandidates']], 'lowerCrank':packet['lowerCrank']},indent=2))
