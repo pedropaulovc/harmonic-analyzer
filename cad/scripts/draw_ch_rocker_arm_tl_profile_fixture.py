@@ -346,9 +346,22 @@ def _delete_thread_callouts(adapter: Any, view: Any, *, label: str) -> None:
             raise RuntimeError(f"failed to select a {label} thread callout")
         draw.EditDelete()
         deleted += 1
+    # A view can list the callout note without its cosmetic-thread annotation
+    # (the isometric in run 20261007T200633943Z): delete such notes directly.
+    for raw_note in _early_bound(view, "IView").GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        if "Tapped Hole" not in str(note.GetText() or ""):
+            continue
+        callout = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
+        draw.ClearSelection2(True)
+        if not callout.Select2(False, 0):
+            raise RuntimeError(f"failed to select a {label} thread callout note")
+        draw.EditDelete()
+        deleted += 1
     draw.ClearSelection2(True)
     if not deleted:
         return
+    _telemetry.info(f"{label}: deleted {deleted} model thread callout(s)")
     rebuild_drawing(adapter, label=f"delete {label} thread callouts")
     left = [
         str(_early_bound(found, "INote").GetText() or "")
