@@ -517,13 +517,19 @@ def _compact_span(span: ReadableSpan) -> str:
 
 
 def _telemetry_dir() -> Path | None:
-    """``cad/out/reports/telemetry`` if it can be created, else ``None``.
+    """``HARMONIC_TELEMETRY_DIR`` or the usual ``cad/out/reports/telemetry``.
 
     Best-effort, exactly like the cache ``.jsonl`` log: telemetry capture must
-    never be the reason a build fails.
+    never be the reason a build fails. An override keeps real capture in an
+    isolated caller-owned directory without changing providers or exporters.
     """
     try:
-        out = Path(__file__).resolve().parents[1] / "out" / "reports" / "telemetry"
+        override = os.environ.get("HARMONIC_TELEMETRY_DIR")
+        out = (
+            Path(override)
+            if override
+            else Path(__file__).resolve().parents[1] / "out" / "reports" / "telemetry"
+        )
         out.mkdir(parents=True, exist_ok=True)
         return out
     except Exception:  # noqa: BLE001 - capture is best-effort, never fatal
@@ -927,8 +933,8 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     """Wire up the trace + log providers. Idempotent; safe to call from import.
 
     ``console`` toggles the human-readable stderr stream (and the compact span
-    tracer). File capture under ``cad/out/reports/telemetry`` is always attempted
-    (best-effort).
+    tracer). File capture under ``HARMONIC_TELEMETRY_DIR`` (by default
+    ``cad/out/reports/telemetry``) is always attempted (best-effort).
     """
     global _configured
     if _configured and not force:

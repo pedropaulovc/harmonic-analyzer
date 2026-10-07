@@ -1,12 +1,41 @@
-"""Suite-wide test isolation for the whole repository (``cad/scripts`` and ``tests``)."""
+"""Contain known host hazards in trusted repository tests, not a sandbox.
+
+This does not contain plugins loaded before this file, arbitrary native/network
+operations, or the vendored suite. ``NOSW_GUARD=0`` deliberately opts out of
+the SolidWorks/process-exit refusals; it is not a safe-default test run.
+"""
 
 import os
 import subprocess
+import sys
 import tempfile
 import traceback
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 
 import pytest
+
+# Apply before any product import/default capture, including pytest_configure's
+# adapter imports. Never inherit an operator's live farm/cache/exporter settings.
+_scratch = tempfile.TemporaryDirectory(prefix="harmonic-tests-")
+_INERT_ENVIRONMENT = {
+    "HARMONIC_BUILDGRAPH_CACHE": str(Path(_scratch.name) / "buildgraph"),
+    "HARMONIC_REMOTE_CACHE_MODE": "off",
+    "HARMONIC_EXECUTOR": "local",
+    "HARMONIC_SW_AUTOSTART": "0",
+    "HARMONIC_COM_LOCK": str(Path(_scratch.name) / "com-seat.lock"),
+    "HARMONIC_CACHE_SAS": "",
+    "SOLIDWORKS_POOL_CONFIG": str(Path(_scratch.name) / "no-farm-credentials.json"),
+    "HARMONIC_FARM_COMMIT": "",
+    "HARMONIC_FARM_REQUESTS": "",
+    "HARMONIC_FARM_RUN": "",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "",
+    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT": "",
+    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "",
+    "HARMONIC_TELEMETRY_DIR": str(Path(_scratch.name) / "telemetry"),
+}
+os.environ.update(_INERT_ENVIRONMENT)
+
 
 # A test process never starts (or kills) SolidWorks. On amet a start takes the
 # licence farm worker w6 shares; on a worker it takes the seat from the build.
@@ -25,7 +54,7 @@ _refused: list[str] = []
 
 
 class SolidWorksLaunchBlocked(RuntimeError):
-    """A test tried to start or kill SolidWorks."""
+    """A test tried to start, attach to, kill SolidWorks, or hard-exit Python."""
 
 
 def _guard_disabled() -> bool:
@@ -90,18 +119,21 @@ def _install_launch_guard():
     os.system = guarded_system
 
 
-# COM activation and the SolidworksMCP launch entry points. The process guard
-# above cannot see these: ``SldWorks.Application``'s LocalServer32 is
-# SLDWORKS.exe itself, so a Dispatch starts SolidWorks without any Popen, and
-# ``sw_recovery``'s connector launch only reaches Popen after a registry walk
-# a test can fake. Each is replaced for the whole session, collection included.
+# COM activation/active-instance attachment and SolidworksMCP lifecycle entry
+# points bypass Popen. Attaching can mutate the user's live seat just as starting
+# one can steal it, so both are refused for SolidWorks only, collection included.
 _COM_ACTIVATORS = {
-    "win32com.client": ("Dispatch", "DispatchEx", "GetObject"),
+    "win32com.client": ("Dispatch", "DispatchEx", "GetObject", "GetActiveObject"),
     "win32com.client.dynamic": ("Dispatch", "DumbDispatch"),
     "win32com.client.gencache": ("EnsureDispatch",),
-    "pythoncom": ("CoCreateInstance", "CoCreateInstanceEx"),
-    "comtypes": ("CoCreateInstance",),
-    "comtypes.client": ("CreateObject", "CoGetObject"),
+    "pythoncom": (
+        "CoCreateInstance",
+        "CoCreateInstanceEx",
+        "GetActiveObject",
+        "Connect",
+    ),
+    "comtypes": ("CoCreateInstance", "GetActiveObject"),
+    "comtypes.client": ("CreateObject", "CoGetObject", "GetActiveObject"),
 }
 _LAUNCH_ENTRY_POINTS = {
     "solidworks_mcp.adapters.sw_recovery": (
@@ -180,31 +212,85 @@ def _install_activation_guard():
             setattr(module, attribute, _refuse_launch(module_name, attribute))
 
 
+def _refuse_watchdog_exit(code):
+    _refuse("_watchdog._hard_exit", f"exit {code}")
+
+
+def _install_watchdog_guard():
+    import importlib
+
+    # The graph normally adds this script directory. Install before collection
+    # even when a root-only selection never imports dodo.
+    scripts = str(Path(__file__).resolve().parent / "cad" / "scripts")
+    sys.path.insert(0, scripts)
+    try:
+        watchdog = importlib.import_module("_watchdog")
+    finally:
+        sys.path.remove(scripts)
+    watchdog._hard_exit = _refuse_watchdog_exit
+    return watchdog
+
+
+_scratch_cleaned = False
+
+
+def _cleanup_host_scratch():
+    """Close existing capture before removing scratch, including collection aborts."""
+    global _scratch_cleaned
+    if _scratch_cleaned:
+        return
+    telemetry = sys.modules.get("_telemetry")
+    try:
+        if telemetry is not None:
+            telemetry.shutdown()
+    finally:
+        _scratch.cleanup()
+        _scratch_cleaned = True
+
+
 def pytest_configure(config):
-    """Isolate the test session from the machine it runs on.
+    """Install process/COM/exit refusals before collecting product modules.
 
-    Point the machine-wide build-graph syntax-facts store at a throwaway
-    directory. ``_buildgraph`` persists parse results in ``%LOCALAPPDATA%`` so
-    real graph loads skip re-parsing unchanged sources. A test may patch
-    analyzer internals; were its results saved to the real store they would be
-    served, under a genuine content key, to every later build on this machine.
-    Tests therefore never read or write the real store. An explicit setting
-    (``off`` or a path) is respected.
-
-    Refuse every SolidWorks start from this process: ``subprocess`` argv naming
-    ``os.startfile``, a ``.lnk`` or a SolidWorks/3DEXPERIENCE launcher image
-    (``tasklist`` still reads the process table), in-process ``os.startfile``,
-    and ``os.system``; COM activation of ``SldWorks.Application``; and the
-    SolidworksMCP start/stop/launch entry points. A refusal raises with the
-    caller's stack and fails the test even if the code under test swallowed it.
+    Real telemetry and build-graph storage use session scratch. Even explicit
+    inherited cache paths and signal-specific exporters have already been
+    displaced by the collection-time environment above.
     """
-    if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
-        os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
-            prefix="buildgraph-facts-"
-        )
+    # Also clean up when collection aborts before session fixtures can run.
+    config.add_cleanup(_cleanup_host_scratch)
     if not _guard_disabled():
         _install_launch_guard()
+        _install_watchdog_guard()
         _install_activation_guard()
+
+
+def pytest_collection_finish(session):
+    if _refused:
+        attempts = "\n".join(_refused)
+        _refused.clear()
+        raise pytest.UsageError(
+            f"SolidWorks/process-exit attempt(s) refused during collection:\n{attempts}"
+        )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _host_safety_scratch():
+    """Own and remove the scratch used by collection and real JSONL exporters."""
+    yield Path(_scratch.name)
+    _cleanup_host_scratch()
+
+
+@pytest.fixture(autouse=True)
+def _known_host_environment(_host_safety_scratch):
+    """Reapply the baseline; behavioral tests can explicitly override it."""
+    patches = pytest.MonkeyPatch()
+    for name, value in _INERT_ENVIRONMENT.items():
+        patches.setenv(name, value)
+    if not _guard_disabled():
+        patches.setattr(sys.modules["_watchdog"], "_hard_exit", _refuse_watchdog_exit)
+    try:
+        yield
+    finally:
+        patches.undo()
 
 
 @pytest.fixture
@@ -216,8 +302,8 @@ def solidworks_launch_refusals():
 
 
 @pytest.fixture(autouse=True)
-def _no_swallowed_solidworks_launch():
-    """Fail a test whose code caught a refused launch instead of surfacing it."""
+def _no_swallowed_solidworks_launch(_known_host_environment):
+    """Fail even when product code or a watchdog thread swallowed a refusal."""
     _refused.clear()
     yield
     if _refused:
@@ -226,13 +312,3 @@ def _no_swallowed_solidworks_launch():
         pytest.fail(f"SolidWorks launch attempt(s) refused:\n{attempts}", pytrace=False)
 
 
-@pytest.fixture(autouse=True)
-def _solidworks_autostart_off(monkeypatch):
-    """Keep dodo's autostart and recovery paths off unless a test opts in.
-
-    ``HARMONIC_SW_AUTOSTART`` defaults to on, so a test that reaches
-    ``dodo._sw_ensure_once`` or ``dodo._exec_com`` without patching them would
-    otherwise try to start or recover SolidWorks. A test that exercises that
-    logic sets the variable itself and patches the lifecycle calls it reaches.
-    """
-    monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
