@@ -25,16 +25,16 @@ from __future__ import annotations
 
 import math
 
-import _config
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 import ch_rocker_arm_spec as rocker
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
 from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 
-_XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
-_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
-_X = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
-_DRILLED_PLUS = float(_config.title_block("drilled_hole")["plus_mm"])
+_XXX = printed_band_mm(3)
+_XX = printed_band_mm(2)
+_X = printed_band_mm(1)
+_DRILLED_PLUS = drilled_oversize_mm()
 
 # --- Heights (frame A Z) ------------------------------------------------------
 # The arm's lower strap face: the strap sits at the hub's mid-length, so its
