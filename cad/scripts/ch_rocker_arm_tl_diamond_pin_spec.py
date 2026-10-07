@@ -268,4 +268,41 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         },
         precision={"dia": 2, "length": 1},
     ),
+    # The neck whose wall is the named exception, and the ream's open length
+    # below the bonded pin (the pin fills the bore through the neck).
+    "neck": ExportFeature(
+        kind="boss",
+        faces=(
+            CylinderFace(NECK_DIA, contains_z_mm=NECK_LENGTH / 2.0, tolerance_mm=0.003),
+        ),
+        requirements=("dia", "length"),
+        fields={
+            "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+            "axis": _AXIS,
+            "dia": (
+                limits(NECK_DIA, NECK_PLACES, NECK_BAND),
+                ("NECK_DIA", "NECK_BAND"),
+            ),
+            "length": (limits(NECK_LENGTH, 1), ("NECK_LENGTH",)),
+        },
+        precision={"dia": NECK_PLACES, "length": 1},
+    ),
+    "ream": ExportFeature(
+        kind="hole",
+        faces=(
+            CylinderFace(
+                REAM_DIA,
+                contains_z_mm=(PIN_ENGAGEMENT + REAM_DEPTH) / 2.0,
+                tolerance_mm=0.003,
+            ),
+        ),
+        requirements=("dia", "depth"),
+        fields={
+            "at": ([0.0, 0.0, 0.0], ("__frame__",)),
+            "axis": _AXIS,
+            "dia": (limits(REAM_DIA, 3, REAM_BAND), ("REAM_DIA", "REAM_BAND")),
+            "depth": (limits(REAM_DEPTH, 1), ("REAM_DEPTH",)),
+        },
+        precision={"dia": 3, "depth": 1},
+    ),
 }
