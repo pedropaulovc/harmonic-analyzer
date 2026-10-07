@@ -46,6 +46,8 @@ SPEC_DRIVEN_PARTS: tuple[str, ...] = (
     "ch_pivot_bracket_tl_ledge",
     "ch_pivot_bracket_tl_angle_plate",
     "dt_cone_pivot_post_tl_saw_cradle",
+    "ch_rocker_arm_tl_pivot_screw",
+    "ch_rocker_arm_tl_pivot_washer",
 )
 SUPPORTED_PARTS = ("ch_rocker_arm", "ch_pivot_shaft", "dt_cone_pivot_post", *SPEC_DRIVEN_PARTS)
 REPO = Path(__file__).resolve().parents[2]
