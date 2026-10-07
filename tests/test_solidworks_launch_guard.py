@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -470,3 +471,97 @@ def test_scratch_cleanup_still_removes_files_when_capture_shutdown_raises(
     safety._cleanup_host_scratch()
 
     assert events == ["shutdown", "cleanup"]
+
+
+@pytest.fixture
+def fact_exit_callbacks(monkeypatch):
+    """Record only exit registration; real owned-store I/O remains exercised."""
+    import _buildgraph as graph
+
+    callbacks = []
+
+    def register(callback):
+        callbacks.append(callback)
+        return callback
+
+    def unregister(callback):
+        callbacks[:] = [registered for registered in callbacks if registered != callback]
+
+    monkeypatch.setattr(graph.atexit, "register", register)
+    monkeypatch.setattr(graph.atexit, "unregister", unregister)
+    return graph, callbacks
+
+
+@pytest.mark.parametrize("populated", [False, True], ids=["cold-store", "dirty-store"])
+def test_root_cleanup_retires_owned_facts_before_capture_and_delayed_save(
+    monkeypatch, tmp_path, fact_exit_callbacks, populated
+):
+    graph, callbacks = fact_exit_callbacks
+    scratch = tempfile.TemporaryDirectory(dir=tmp_path, prefix="owned-facts-")
+    root = Path(scratch.name)
+    monkeypatch.setenv(graph._FACTS_ENV, str(root / "buildgraph"))
+    store = graph._FactStore()
+    monkeypatch.setattr(graph, "_FACTS", store)
+    monkeypatch.setattr(safety, "_scratch", scratch)
+    monkeypatch.setattr(safety, "_scratch_cleaned", False)
+    if populated:
+        store.put(b"before", ("cached",))
+        store.save()
+        store.put(b"before-delete", ("new fact",))
+    pending = tuple(callbacks)
+
+    def shutdown():
+        assert not callbacks, "owned facts must detach before exporter shutdown"
+        if populated:
+            files = list((root / "buildgraph").glob("*.pickle"))
+            assert len(files) == 1, "dirty owned facts must flush before deletion"
+            assert store._read(files[0])[b"before-delete"] == ("new fact",)
+        # A late teardown analyzer still works, without rearming persistence.
+        store.put(b"during-shutdown", ("memory only",))
+
+    monkeypatch.setitem(sys.modules, "_telemetry", SimpleNamespace(shutdown=shutdown))
+    try:
+        safety._cleanup_host_scratch()
+        store.put(b"after-cleanup", ("memory only",))
+        for callback in pending:
+            callback()
+        store.save()
+        assert not callbacks, "a retired store must never register another writer"
+        assert not root.exists(), "a delayed fact writer recreated session scratch"
+        assert store.get(b"after-cleanup") == (True, ("memory only",))
+    finally:
+        store.close()
+        scratch.cleanup()
+
+
+def test_root_cleanup_leaves_an_outside_store_persistent(
+    monkeypatch, tmp_path, fact_exit_callbacks
+):
+    graph, callbacks = fact_exit_callbacks
+    outside = tmp_path / "standalone-facts"
+    monkeypatch.setenv(graph._FACTS_ENV, str(outside))
+    store = graph._FactStore()
+    store.put(b"before", ("standalone",))
+    monkeypatch.setattr(graph, "_FACTS", store)
+    scratch = tempfile.TemporaryDirectory(dir=tmp_path, prefix="owned-facts-")
+    root = Path(scratch.name)
+    # The captured store path, not the current override, determines ownership.
+    monkeypatch.setenv(graph._FACTS_ENV, str(root / "buildgraph"))
+    monkeypatch.setattr(safety, "_scratch", scratch)
+    monkeypatch.setattr(safety, "_scratch_cleaned", False)
+    monkeypatch.setitem(sys.modules, "_telemetry", SimpleNamespace(shutdown=lambda: None))
+    try:
+        safety._cleanup_host_scratch()
+        store.put(b"after", ("still persistent",))
+        assert callbacks, "root cleanup retired an unrelated standalone store"
+        for callback in tuple(callbacks):
+            callback()
+        monkeypatch.setenv(graph._FACTS_ENV, str(outside))
+        reader = graph._FactStore()
+        assert reader.get(b"before") == (True, ("standalone",))
+        assert reader.get(b"after") == (True, ("still persistent",))
+        assert list(outside.glob("*.pickle")), "ordinary persistence was disabled"
+        assert not root.exists()
+    finally:
+        store.close()
+        scratch.cleanup()

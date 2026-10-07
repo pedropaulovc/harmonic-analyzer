@@ -2911,8 +2911,35 @@ class _SavedCheck:
         self.records.append(observed)
 
 
+@pytest.fixture(scope="module")
+def check_parser_layout():
+    """Fixed production command/scan sources needed before task generation.
+
+    This is layout bootstrap, not the expected dependency oracle. The saved
+    action below independently imports/reads its own exercised collaborators.
+    """
+    dodo = _load_dodo()
+    dodo._buildgraph.clear_import_caches()
+    try:
+        entries = {
+            Path(arg).resolve().relative_to(REPO_ROOT).as_posix()
+            for task in dodo.task_check()
+            for arg in task["actions"][0][1][0]
+            if str(arg).endswith(".py")
+        }
+        entries.update(
+            path.relative_to(REPO_ROOT).as_posix()
+            for path in dodo.SCRIPTS_DIR.glob("build_*_assembly.py")
+        )
+        # The budget gate parses its model as well as its pytest entry point.
+        entries.add("cad/scripts/error_budget.py")
+        return tuple(sorted(entries))
+    finally:
+        dodo._buildgraph.clear_import_caches()
+
+
 @pytest.fixture
-def saved_check(tmp_path, monkeypatch):
+def saved_check(tmp_path, monkeypatch, request, check_parser_layout):
     from doit.dependency import Dependency, JsonDB
 
     # dodo installs process-wide doit patches. Preserve the pre-fixture transports
@@ -2920,17 +2947,37 @@ def saved_check(tmp_path, monkeypatch):
     monkeypatch.setattr(Dependency, "save_success", Dependency.save_success)
     monkeypatch.setattr(JsonDB, "dump", JsonDB.dump)
     dodo = _load_dodo()
+    witness = None
+
+    def cleanup():
+        try:
+            if witness is not None:
+                witness.dependencies.close()
+        finally:
+            # Registered before roots or parser fixtures change: failed setup
+            # must not lend a scratch module map to later real recipe checks.
+            dodo._buildgraph.clear_import_caches()
+            for name in (
+                "_enrollment_source", "_enrollment_fixture_entry",
+                "_enrollment_fixture_leaf", "_enrollment_dynamic_leaf",
+            ):
+                sys.modules.pop(name, None)
+
+    request.addfinalizer(cleanup)
     root = tmp_path / "checkout"
     scripts = root / "cad/scripts"
     submodule = root / "SolidworksMCP-python/src/solidworks_mcp"
     scripts.mkdir(parents=True)
     submodule.mkdir(parents=True)
+    for relative in check_parser_layout:
+        _scratch_write(root, relative, "pass\n")
     monkeypatch.setattr(dodo, "REPO_ROOT", root)
     monkeypatch.setattr(dodo, "SCRIPTS_DIR", scripts)
     monkeypatch.setattr(dodo, "CONFIG_DIR", root / "cad/config")
     monkeypatch.setattr(dodo, "CAD_OUT", root / "cad/out")
     monkeypatch.setattr(dodo, "REPORTS", root / "cad/out/reports")
     monkeypatch.setattr(dodo, "SUBMODULE_SRC", submodule)
+    monkeypatch.setattr(dodo, "VERIFY_PY", scripts / "verify.py")
     monkeypatch.setattr(dodo, "DRAWING_TEMPLATES", {})
     monkeypatch.setattr(dodo, "_CONFIG_YAMLS", [])
     monkeypatch.setattr(dodo._buildgraph, "SCRIPTS_DIR", scripts)
@@ -2990,9 +3037,9 @@ def saved_check(tmp_path, monkeypatch):
     )
     _scratch_write(root, "cad/scripts/build_scratch_part.py", 'VALUE = "initial"\n')
     _scratch_write(root, "cad/scripts/nested/_scratch_scanned.py", 'VALUE = "initial"\n')
-    # Populate fixed production-spec placeholders only inside this owned tree.
-    # Their contents are not the expected dependency oracle: the action above
-    # independently imports/reads each behaviorally exercised input.
+    # Fill non-executed fixed data/helper fixtures only after every source the
+    # generator parses is present. Expected exercised inputs are specified and
+    # executed independently above, not inferred from this dependency list.
     dodo._buildgraph.clear_import_caches()
     for task in dodo.task_check():
         if task["actions"][0][1][0][1:3] != ["-m", "pytest"]:
@@ -3004,16 +3051,7 @@ def saved_check(tmp_path, monkeypatch):
                 _scratch_write(root, path.relative_to(root), 'VALUE = "placeholder"\n')
     witness = _SavedCheck(dodo, root)
     monkeypatch.setattr(dodo, "_run", witness.record)
-    try:
-        yield witness
-    finally:
-        witness.dependencies.close()
-        dodo._buildgraph.clear_import_caches()
-        for name in (
-            "_enrollment_source", "_enrollment_fixture_entry",
-            "_enrollment_fixture_leaf", "_enrollment_dynamic_leaf",
-        ):
-            sys.modules.pop(name, None)
+    yield witness
 
 
 def _edit_exercised_input(path):

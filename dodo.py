@@ -3388,11 +3388,12 @@ def task_check():
     scanned_sources = _check_scanned_sources()
     runtime_sources, runtime_receipts = _recipe_runtime_inputs()
     check_modules = _check_source_modules()
-    # conftest installs these runtime-imported refusal transports before pytest
-    # collects modules. String-driven activation tables are not syntax imports.
+    # conftest activates refusal transports and retires an existing syntax-facts
+    # store through runtime module lookups, which are not syntax imports.
     pytest_fixture_deps = _pytest_source_deps(
         [
             REPO_ROOT / "conftest.py",
+            SCRIPTS_DIR / "_buildgraph.py",
             SCRIPTS_DIR / "_watchdog.py",
             SCRIPTS_DIR / "_telemetry.py",
             SUBMODULE_SRC / "adapters/sw_recovery.py",
