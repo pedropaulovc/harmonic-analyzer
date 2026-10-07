@@ -109,6 +109,8 @@ CAP_OFFSET_MAX = max(
 # AUTHOR'S CHOICE: half a millimetre of fitting stock over the highest cap.
 PAD_FIT_STOCK_MIN = 0.5
 PAD_HT = 30.0
+# The pad is milled down to its fit; the callout, not the method, is printed.
+PAD_PROCESS = "mill"
 # The unfitted top stands above the highest compliant cap: the seats bored
 # high within their band, the cap at its farthest from the seat line.
 PAD_FIT_STOCK_WORST = PAD_HT - (SEAT_BOTTOM_Y + printed_band_mm(1) + CAP_OFFSET_MAX)
@@ -270,7 +272,7 @@ def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
     return ExportFeature(
         kind="hole",
         faces=(CylinderFace(SEAT_DIA, contains_x_mm=sum(x_span) / 2.0),),
-        requirements=("dia", "length", "height", "process"),
+        requirements=("dia", "height", "process"),
         fields={
             "at": ([x_span[0], SEAT_CENTRE_Y, SEAT_Z], (name, "SEAT_CENTRE_Y", "SEAT_Z")),
             "axis": _X_AXIS,
@@ -279,10 +281,8 @@ def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
                 ("SEAT_DIA", "BODY_DIA_MAX", (_POST, "BLOCK_DIA")),
             ),
             "nominal_dia": (SEAT_DIA, ("SEAT_DIA",)),
-            "length": (
-                [x_span[1] - x_span[0] - 2.0 * _SADDLE_ROW, x_span[1] - x_span[0] + 2.0 * _SADDLE_ROW],
-                (name,),
-            ),
+            # Reference only: the print gives the saddle's two faces as
+            # stations (the *_saddle_x0/x1 features), not a length.
             "length_nominal": (x_span[1] - x_span[0], (name,)),
             "height": (
                 limits(SEAT_BOTTOM_Y, 1),
@@ -292,7 +292,7 @@ def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
             "thru": (True, (name,)),
             "process": ("bore", ("DRAWING_NOTES",)),
         },
-        precision={"dia": SEAT_PLACES, "length": SADDLE_X_PLACES, "height": 1},
+        precision={"dia": SEAT_PLACES, "height": 1},
     )
 
 
@@ -317,13 +317,47 @@ def _stud(z: float) -> ExportFeature:
     )
 
 
+def _x_face(x: float, outward: float, name: str, places: int) -> ExportFeature:
+    """A printed X station: one end face of a saddle or the pad, from the
+    base end face (model X0)."""
+    return ExportFeature(
+        kind="face",
+        faces=(PlanarFace((outward, 0.0, 0.0), outward * x),),
+        requirements=("station",),
+        fields={
+            "normal": ([outward, 0.0, 0.0], ("__frame__",)),
+            "plane": ({"frame": "model", "axis": "x", "value": x}, (name,)),
+            "station": (limits(x, places), (name,)),
+            "station_nominal": (x, (name,)),
+        },
+        precision={"station": places},
+    )
+
+
+def _z_face(z: float, outward: float, name: str) -> ExportFeature:
+    """A printed Z station: one side face of the pad, from the base side face."""
+    return ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, outward), outward * z),),
+        requirements=("height",),
+        fields={
+            "normal": ([0.0, 0.0, outward], ("__frame__",)),
+            "plane": ({"frame": "model", "axis": "z", "value": z}, (name,)),
+            "height": (limits(z, 1), (name,)),
+            "height_nominal": (z, (name,)),
+            "height_from": _FROM_SIDE,
+        },
+        precision={"height": 1},
+    )
+
+
 EXPORT_FEATURES: dict[str, ExportFeature] = {
     "head_seat": _seat(HEAD_SADDLE_X, "HEAD_SADDLE_X"),
     "foot_seat": _seat(FOOT_SADDLE_X, "FOOT_SADDLE_X"),
     "cap_pad": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 1.0, 0.0), PAD_HT),),
-        requirements=("note", "width", "length", "station", "process"),
+        requirements=("note", "process"),
         fields={
             "at": ([PAD_X, PAD_HT, PAD_Z], ("PAD_X", "PAD_HT", "PAD_Z")),
             "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
@@ -334,23 +368,22 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 PAD_HT,
                 ("PAD_HT", "PAD_FIT_STOCK_MIN", (_POST, "BLOCK_DIA"), (_POST, "CONE_BOSS_LENGTH")),
             ),
-            "width": (
-                [PAD_WIDTH - 2.0 * _ROW1, PAD_WIDTH + 2.0 * _ROW1],
-                ("PAD_X0", "PAD_X1"),
-            ),
-            "width_nominal": (PAD_WIDTH, ("PAD_WIDTH",)),
-            "length": (
-                [PAD_LENGTH - 2.0 * _ROW1, PAD_LENGTH + 2.0 * _ROW1],
-                ("PAD_Z0", "PAD_Z1"),
-            ),
-            "length_nominal": (PAD_LENGTH, ("PAD_LENGTH",)),
-            "station": (limits(PAD_X, 1), ("PAD_X", (_POST, "BORE_HEIGHT"))),
-            "station_nominal": (PAD_X, ("PAD_X",)),
-            "process": ("mill", ("DRAWING_NOTES",)),
+            # Reference sizes only: the print gives the pad's four faces as
+            # stations (the pad_x0/x1/z0/z1 features).
+            "width_nominal": (PAD_WIDTH, ("PAD_X0", "PAD_X1")),
+            "length_nominal": (PAD_LENGTH, ("PAD_Z0", "PAD_Z1")),
+            "process": (PAD_PROCESS, ("PAD_PROCESS", "PAD_FIT_CALLOUT")),
             "note": (PAD_FIT_CALLOUT, ("PAD_FIT_CALLOUT", "POST_NUMBER")),
         },
-        precision={"width": 1, "length": 1, "station": 1},
     ),
+    "head_saddle_x0": _x_face(HEAD_SADDLE_X[0], -1.0, "HEAD_SADDLE_X", SADDLE_X_PLACES),
+    "head_saddle_x1": _x_face(HEAD_SADDLE_X[1], 1.0, "HEAD_SADDLE_X", SADDLE_X_PLACES),
+    "foot_saddle_x0": _x_face(FOOT_SADDLE_X[0], -1.0, "FOOT_SADDLE_X", SADDLE_X_PLACES),
+    "foot_saddle_x1": _x_face(FOOT_SADDLE_X[1], 1.0, "FOOT_SADDLE_X", SADDLE_X_PLACES),
+    "pad_x0": _x_face(PAD_X0, -1.0, "PAD_X0", 1),
+    "pad_x1": _x_face(PAD_X1, 1.0, "PAD_X1", 1),
+    "pad_z0": _z_face(PAD_Z0, -1.0, "PAD_Z0"),
+    "pad_z1": _z_face(PAD_Z1, 1.0, "PAD_Z1"),
     "underside": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
