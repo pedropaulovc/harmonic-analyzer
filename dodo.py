@@ -3016,6 +3016,7 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
+        SCRIPTS_DIR / "test_vn_knife_hanger_washer_drawing.py",
         # The keeper chain's rest-pose solve: whole pitches, clearances, and a
         # length that lets the taper pin come fully out.
         SCRIPTS_DIR / "test_vn_keeper_chain.py",
