@@ -116,15 +116,21 @@ PLAN_KEEP_AT = {
     "PlateSouthY": ((-7.0, -45.0), (0.0, 0.0)),
     "RodPinHoleDia": (ROD_PIN_HOLE_XY, (0.045, 0.012)),
 }
-# Section D-D, model (x, z) mm: PlateThick left of the cut, the plate-top
-# baseline ladder (counterbore and bore depths) and the pad-top drop right of
-# it, the stand drop above the stand.
+# Section D-D, model (x, z) mm: the plate-top baseline ladder (counterbore and
+# bore depths) right of the cut, the stand drop above the stand. A cut-only
+# section has no plate face edges, so the plate's own heights go on the end
+# elevation (run 20261007T175439611Z: PlateThick/PlateDrop not importable).
 SECTION_KEEP_AT = {
-    "PlateThick": ((SECTION_SPAN_X[0], (PLATE_TOP_Z + PLATE_BOTTOM_Z) / 2.0), (-0.012, 0.0)),
     "StandDrop": ((-9.5, PAD_TOP_Z), (0.0, 0.010)),
     "StandPocketDepth": ((38.0, PLATE_TOP_Z - STAND_POCKET_DEPTH / 2.0), (0.0, 0.0)),
     "LocatingBoreDepth": ((47.0, (PLATE_TOP_Z + LOCATING_BORE_FLOOR_Z) / 2.0), (0.0, 0.0)),
-    "PlateDrop": ((56.0, (PAD_TOP_Z + PLATE_TOP_Z) / 2.0), (0.0, 0.0)),
+}
+# End elevation (*Right, turned Z up) at the plan's scale: plate thickness on
+# its left, the pad-top drop on its right (sheet offsets from the plate ends).
+ELEVATION_CENTER = (0.300, 0.100)
+ELEVATION_KEEP_Z = {
+    "PlateThick": ((PLATE_TOP_Z + PLATE_BOTTOM_Z) / 2.0, -0.012),
+    "PlateDrop": ((PAD_TOP_Z + PLATE_TOP_Z) / 2.0, 0.012),
 }
 # Detail E, model (x, y) mm about the bore axis.
 DETAIL_KEEP_AT = {
@@ -232,6 +238,47 @@ def _center_on_outline(adapter: Any, view: Any, target: tuple[float, float], *, 
             raise RuntimeError(f"failed to position {label}")
         rebuild_drawing(adapter, label=f"center {label}")
     raise RuntimeError(f"{label} outline did not settle on {target!r}")
+
+
+def _elevation(adapter: Any) -> Any:
+    """The plate's east end view at the plan's scale, turned so model Z is up."""
+    view = place_view(adapter, str(SOURCE), "*Right", *ELEVATION_CENTER, scale=PLAN_SCALE)
+    native = _early_bound(view, "IView")
+
+    def up() -> tuple[float, float]:
+        origin, top = model_points_in_view(
+            adapter, native, [(0.0, 0.0, 0.0), (0.0, 0.0, 0.001)], label="elevation orientation"
+        )
+        return (top[0] - origin[0], top[1] - origin[1])
+
+    vertical = up()
+    native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(vertical[1], vertical[0])
+    rebuild_drawing(adapter, label="end elevation angle")
+    vertical = up()
+    if vertical[1] <= 0.0 or abs(vertical[0]) > 1e-8:
+        raise RuntimeError(f"end elevation did not turn model Z up: {vertical=}")
+    set_hidden_lines_removed(adapter, view)
+    _center_on_outline(adapter, view, ELEVATION_CENTER, label="end elevation")
+    return view
+
+
+def _elevation_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
+    """Each plate height beside the plate end its sheet offset points to."""
+    names = list(ELEVATION_KEEP_Z)
+    points = [
+        _mm_to_m((PLATE_WEST_X, y, ELEVATION_KEEP_Z[name][0]))
+        for name in names
+        for y in (PLATE_SOUTH_Y, PLATE_NORTH_Y)
+    ]
+    projected = model_points_in_view(adapter, view, points, label="elevation keep")
+    keep = {}
+    for index, name in enumerate(names):
+        ends = projected[2 * index : 2 * index + 2]
+        offset = ELEVATION_KEEP_Z[name][1]
+        x = (min if offset < 0 else max)(end[0] for end in ends) + offset
+        keep[name] = (x, ends[0][1])
+    return keep
+
 
 
 def _section(adapter: Any, plan: Any) -> Any:
@@ -450,6 +497,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_removed(adapter, plan)
     section = _section(adapter, plan)
     detail = _detail(adapter, plan)
+    elevation = _elevation(adapter)
 
     plan_annotations = curate_view_dimensions(
         adapter,
@@ -472,7 +520,19 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="detail E",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*plan_annotations, *section_annotations, *detail_annotations]
+    elevation_annotations = curate_view_dimensions(
+        adapter,
+        elevation,
+        keep=_elevation_keep(adapter, elevation),
+        view_label="end elevation",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    annotations = [
+        *plan_annotations,
+        *section_annotations,
+        *detail_annotations,
+        *elevation_annotations,
+    ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.

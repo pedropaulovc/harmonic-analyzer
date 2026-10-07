@@ -25,7 +25,12 @@ def _features() -> dict:
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    views = (drawing.PLAN_KEEP_AT, drawing.SECTION_KEEP_AT, drawing.DETAIL_KEEP_AT)
+    views = (
+        drawing.PLAN_KEEP_AT,
+        drawing.SECTION_KEEP_AT,
+        drawing.DETAIL_KEEP_AT,
+        drawing.ELEVATION_KEEP_Z,
+    )
     assert sum(len(view) for view in views) == len(marked)
     assert set().union(*views) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
