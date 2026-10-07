@@ -72,6 +72,7 @@ from ch_rocker_arm_tl_diamond_pin_spec import (
     REAM_BAND,
     REAM_DEPTH,
     REAM_DIA,
+    NECK_BAND,
     SHANK_BAND,
     SHANK_DIA,
 )
@@ -338,6 +339,7 @@ async def build(adapter) -> dict[str, str]:
         ("LandProfile", "LandDia", LAND_BAND),
         ("Flats", "LandHeight", LAND_HEIGHT_BAND),
         ("ShankProfile", "ShankDia", SHANK_BAND),
+        ("NeckProfile", "NeckDia", NECK_BAND),
         ("ReamProfile", "ReamDia", REAM_BAND),
         ("Collar", "CollarEnd", COLLAR_END_BAND),
     ):

@@ -132,6 +132,29 @@ def _overall_reference(adapter: Any, section: Any, to_sheet) -> None:
         raise RuntimeError(f"{label} precision did not persist")
 
 
+def _hatch_pin_apart(adapter: Any, section: Any) -> None:
+    """Cross the bonded gauge pin's hatch against the body's in section A-A."""
+    import math
+
+    groups: dict[str, list[Any]] = {}
+    volumes: dict[str, float] = {}
+    for item in _early_bound(section, "IView").GetFaceHatches() or ():
+        hatch = _early_bound(item, "IFaceHatch")
+        body = _early_bound(_early_bound(hatch.Face, "IFace2").GetBody(), "IBody2")
+        name = str(body.Name)
+        groups.setdefault(name, []).append(hatch)
+        volumes[name] = float(body.GetMassProperties(1.0)[3])
+    if len(groups) != 2:
+        raise RuntimeError(f"section A-A should cut two bodies, hatched {sorted(groups)}")
+    pin = min(volumes, key=volumes.get)
+    for hatch in groups[pin]:
+        hatch.UseMaterialHatch = False
+        hatch.Angle = 3.0 * math.pi / 4.0
+        if abs(float(hatch.Angle) - 3.0 * math.pi / 4.0) > 1e-6:
+            raise RuntimeError("gauge-pin hatch angle did not persist")
+    adapter.currentModel.EditRebuild3()
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -198,6 +221,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _overall_reference(adapter, section, to_sheet)
+    _hatch_pin_apart(adapter, section)
     create_section_axis_centerline(
         adapter, section, length_mm=OVERALL_LENGTH + LAND_HEIGHT, label="pin turning axis"
     )
