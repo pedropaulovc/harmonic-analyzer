@@ -478,8 +478,14 @@ def _mm(value: float, places: int = SCHEDULE_PLACES) -> str:
     return f"{value:.{places}f}"
 
 
-FEATURE_SCHEDULE_TITLE = "FEATURE SCHEDULE, FROM BORE L AXIS"
-FEATURE_SCHEDULE_HEADER = ("TAG", "FEATURE", "X", "Y", "LENGTH X", "WIDTH Y", "DEPTH")
+# Every row locates its feature's centre, and the axes read as the TAGS plan
+# is drawn (codex review of run 20261007T204247920Z).
+FEATURE_SCHEDULE_TITLE = (
+    "FEATURE SCHEDULE: CENTRES FROM BORE L AXIS, +X RIGHT AND +Y UP AS ON SHEET 2"
+)
+FEATURE_SCHEDULE_HEADER = (
+    "TAG", "FEATURE", "CENTRE X", "CENTRE Y", "LENGTH X", "WIDTH Y", "DEPTH"
+)
 FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
     (
         "L",
@@ -496,7 +502,9 @@ FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
         *ROD_PIN_XY_PRINTED,
         "-",
         "-",
-        _mm(ROD_PIN_HOLE_DEPTH),
+        # The pin seats on its collar, not the hole floor: the depth only
+        # clears the shank, so it prints at one place (.X).
+        _mm(ROD_PIN_HOLE_DEPTH, 1),
     ),
     *(
         (
@@ -652,10 +660,10 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("ROD_PIN_HOLE_DIA", "ROD_PIN_HOLE_BAND"),
             ),
             "dia_nominal": (ROD_PIN_HOLE_DIA, ("ROD_PIN_HOLE_DIA",)),
-            "depth": (limits(ROD_PIN_HOLE_DEPTH, 3), ("ROD_PIN_HOLE_DEPTH",)),
+            "depth": (limits(ROD_PIN_HOLE_DEPTH, 1), ("ROD_PIN_HOLE_DEPTH",)),
             "process": ("REAM", ("DIMENSION_CALLOUTS",)),
         },
-        precision={"dia": 3, "depth": 3, "station": 3, "height": 3},
+        precision={"dia": 3, "depth": 1, "station": 3, "height": 3},
     ),
     "pad_tops": ExportFeature(
         kind="face",

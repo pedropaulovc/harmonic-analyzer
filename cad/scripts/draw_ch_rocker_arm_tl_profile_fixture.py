@@ -374,6 +374,39 @@ def _delete_thread_callouts(adapter: Any, view: Any, *, label: str) -> None:
         raise RuntimeError(f"{label} still carries a thread callout: {left!r}")
 
 
+SECTION_THREAD_LAYER = "PROFILE-FIXTURE-SECTION-THREADS-HIDDEN"
+
+
+def _hide_section_threads(adapter: Any, view: Any) -> None:
+    """Move section D-D's cosmetic-thread ink to a hidden, non-printing layer
+    (as draw_dt_cone_tip_block does): the pivot tap's thread drew as dashed
+    lines beside the cut drill, read as hidden geometry in a section (codex
+    review of run 20261007T204247920Z). Detail E's callout defines the tap."""
+    draw = adapter.currentModel
+    manager = _early_bound(draw.GetLayerManager(), "ILayerMgr")
+    if manager.GetLayer(SECTION_THREAD_LAYER) is None and int(
+        manager.AddLayer(SECTION_THREAD_LAYER, "section D-D thread ink hidden", 0, 0, 0)
+    ) != 1:
+        raise RuntimeError("failed to add the section thread layer")
+    layer = _early_bound(manager.GetLayer(SECTION_THREAD_LAYER), "ILayer")
+    layer.Visible = False
+    if bool(layer.Visible) or bool(layer.Printable):
+        raise RuntimeError("the section thread layer is not hidden")
+    hidden = 0
+    for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw_annotation, "IAnnotation")
+        if int(annotation.GetType()) != 1:  # swCosmeticThread
+            continue
+        annotation.Layer = SECTION_THREAD_LAYER
+        if str(annotation.Layer or "") != SECTION_THREAD_LAYER:
+            raise RuntimeError("a section D-D cosmetic thread refused the hidden layer")
+        hidden += 1
+    if not hidden:
+        raise RuntimeError("section D-D has no cosmetic thread to hide")
+    _telemetry.info(f"section D-D: hid {hidden} cosmetic thread(s)")
+    rebuild_drawing(adapter, label="hide section D-D cosmetic threads")
+
+
 # The pivot tap starts on the reamed bore's floor (the Hole Wizard seats it at
 # LOCATING_BORE_FLOOR_Z), so both callout depths run from there. Detail E looks
 # down from the plate face, which read as the origin and left 4 of the 10 mm
@@ -459,6 +492,7 @@ def _section(adapter: Any, plan: Any) -> Any:
     set_hidden_lines_removed(adapter, view)
     _center_on_outline(adapter, view, SECTION_CENTER, label="section D-D")
     _delete_thread_callouts(adapter, view, label="section D-D")
+    _hide_section_threads(adapter, view)
     _position_view_label(
         adapter, view, SECTION_LABEL_LOWER_LEFT, label="section D-D label"
     )
