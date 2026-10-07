@@ -39,6 +39,8 @@ from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from ch_rocker_arm_tl_pivot_screw_spec import (
+    HEAD_FIT_CALLOUT,
+    SHOULDER_FIT_CALLOUT,
     CHAMFER_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -97,7 +99,8 @@ SIDE_KEEP = {
     "OverallLength": ((HEAD_TOP_X + TIP_X) / 2.0, _ROW_Y[2]),
     # Diameters on the profile beside their steps.
     "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(HEAD_DIA / 2.0) + 0.022),
-    "ShoulderDia": (UNDERHEAD_X + 0.030, _sheet_y(SHOULDER_DIA / 2.0) + 0.030),
+    # Its six-line fit callout reads above it, right of the head's.
+    "ShoulderDia": (UNDERHEAD_X + 0.077, _sheet_y(SHOULDER_DIA / 2.0) + 0.037),
     "TipChamfer": (TIP_X + 0.010, SIDE_CENTER[1] - 0.018),
     # The slot shows as a notch in the head top; its depth reads beside it.
     "SlotDepth": (HEAD_TOP_X - 0.012, SIDE_CENTER[1] + 0.024),
@@ -108,7 +111,7 @@ END_KEEP = {
 THREAD_PICK = ((SHOULDER_END_X + TIP_X) / 2.0, _sheet_y(THREAD_MODEL_DIA / 2.0))
 THREAD_NOTE_XY = (TIP_X + 0.012, SIDE_CENTER[1] + 0.034)
 FINISH_PICK = (SHOULDER_END_X - 0.030, _sheet_y(SHOULDER_DIA / 2.0))
-FINISH_SYMBOL = (SHOULDER_END_X - 0.020, SIDE_CENTER[1] + 0.030)
+FINISH_SYMBOL = (SHOULDER_END_X - 0.045, SIDE_CENTER[1] + 0.030)
 HEAD_FINISH_PICK = ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(-HEAD_DIA / 2.0))
 HEAD_FINISH_SYMBOL = ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(-HEAD_DIA / 2.0) - 0.014)
 CENTERLINE_PICK = (SHOULDER_END_X - 0.050, SIDE_CENTER[1] + 0.003)
@@ -169,6 +172,12 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     ]
     set_reference_dimensions(adapter, annotations, ("ShoulderDia", "HeadDia"))
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        {"ShoulderDia": SHOULDER_FIT_CALLOUT, "HeadDia": HEAD_FIT_CALLOUT},
+        location="above",
+    )
     set_dimension_callouts(adapter, annotations, {"TipChamfer": CHAMFER_CALLOUT}, location="below")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):

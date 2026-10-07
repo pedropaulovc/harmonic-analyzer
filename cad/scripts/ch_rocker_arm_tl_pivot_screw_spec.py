@@ -142,15 +142,33 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked pivot-screw dimension needs authored places")
 
-# Policy: no digits, no GD&T. The notes name the mates that set the two
-# lapped bands; the coaxiality requirement is stated by name, and the shop's
-# one-chucking lapping route (shop-additions.md section 2) delivers it.
+# Policy rule 2/6: a matched fit sits ON the feature callout, naming each
+# mate by name and Number and the acceptance; the general notes carry no
+# digits. The outline-template bush has no Number yet, so it is named only.
+ROCKER_NUMBER = "MHA-CH-006"
+PROFILE_PLATE_NUMBER = "MHA-CH-006-TL-02"
+SHOULDER_FIT_CALLOUT = "\n".join(
+    (
+        "MATCH-FIT: SLIDES",
+        "FREELY WITHOUT SHAKE IN",
+        f"ROCKER ARM {ROCKER_NUMBER}",
+        "PIVOT BORE AND PROFILE",
+        f"PLATE {PROFILE_PLATE_NUMBER}",
+        "LOCATING BORE",
+    )
+)
+HEAD_FIT_CALLOUT = "\n".join(
+    (
+        "MATCH-FIT: SLIDES",
+        "FREELY WITHOUT SHAKE IN",
+        "OUTLINE-TEMPLATE BUSH",
+    )
+)
+HEAD_COAXIAL_NOTE = "HEAD COAXIAL WITH SHOULDER"
 DRAWING_NOTES = "\n".join(
     (
-        "MATCH-FIT: LAP THE SHOULDER TO SLIDE FREELY WITHOUT SHAKE IN THE ROCKER",
-        "ARM PIVOT BORE AND THE PROFILE PLATE BORE, AND THE HEAD LIKEWISE IN THE",
-        "OUTLINE-TEMPLATE BUSH. BRACKETED DIAMETERS ARE THE STARTING SIZE ONLY.",
-        "HEAD COAXIAL WITH SHOULDER.",
+        "BRACKETED DIAMETERS ARE THE STARTING SIZE FOR THE MATCH-FIT.",
+        f"{HEAD_COAXIAL_NOTE}.",
     )
 )
 # The head left behind the slot at worst case.
@@ -163,17 +181,9 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 
 _AXIS = ([0.0, 0.0, 1.0], ("__frame__",))
 _ROCKER = "ch_rocker_arm_spec"
-# One fact, one source: the print states a match fit and bracketed starting
-# sizes, so features.toml carries the printed fit sentences and reference
-# diameters. SHOULDER_BAND / HEAD_BAND above stay design intent for the
-# stack checks only and do not feed the export.
-SHOULDER_FIT_NOTE = (
-    "MATCH-FIT: LAP THE SHOULDER TO SLIDE FREELY WITHOUT SHAKE IN THE ROCKER"
-    " ARM PIVOT BORE AND THE PROFILE PLATE BORE"
-)
-HEAD_COAXIAL_NOTE = "HEAD COAXIAL WITH SHOULDER"
-if any(n not in " ".join(DRAWING_NOTES.splitlines()) for n in (SHOULDER_FIT_NOTE, HEAD_COAXIAL_NOTE)):
-    raise AssertionError("exported fit notes must be the printed sentences")
+# One fact, one source: features.toml carries what the print says -- the
+# bracketed reference diameters and each feature's printed fit callout.
+# SHOULDER_BAND / HEAD_BAND stay design intent for the stack checks only.
 
 EXPORT_FEATURES: dict[str, ExportFeature] = {
     "shoulder": ExportFeature(
@@ -186,8 +196,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "dia_nominal": (SHOULDER_DIA, ("SHOULDER_DIA",)),
             "length": (SHOULDER_LENGTH, ("SHOULDER_LENGTH",)),
             "finish_ra": (GROUND_UM, ("SURFACE_FINISHES",)),
-            "process": ("lap", ("DRAWING_NOTES",)),
-            "note": (SHOULDER_FIT_NOTE, ("SHOULDER_FIT_NOTE", "DRAWING_NOTES")),
+            "process": ("lap", ("SURFACE_FINISHES",)),
+            "note": (" ".join(SHOULDER_FIT_CALLOUT.splitlines()), ("SHOULDER_FIT_CALLOUT",)),
         },
         precision={"finish_ra": 1},
     ),
@@ -201,9 +211,9 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
             "length": (limits(HEAD_LENGTH, 1), ("HEAD_LENGTH",)),
             "finish_ra": (MACHINED_UM, ("SURFACE_FINISHES",)),
-            "process": ("lap", ("DRAWING_NOTES",)),
+            "process": ("lap", ("SURFACE_FINISHES",)),
             "coaxial_to": ("shoulder", ("DRAWING_NOTES",)),
-            "note": (HEAD_COAXIAL_NOTE, ("HEAD_COAXIAL_NOTE", "DRAWING_NOTES")),
+            "note": (" ".join(HEAD_FIT_CALLOUT.splitlines()), ("HEAD_FIT_CALLOUT",)),
         },
         precision={"length": 1, "finish_ra": 1},
     ),

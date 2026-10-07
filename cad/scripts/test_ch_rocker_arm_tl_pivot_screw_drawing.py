@@ -60,7 +60,13 @@ def test_match_fit_diameters_export_what_the_print_says() -> None:
         assert features[key]["dia_nominal"] == nominal
         assert "note" in features[key]["requirements"]
     assert features["head"]["coaxial_to"] == "shoulder"
-    assert features["head"]["note"] in screw.DRAWING_NOTES
+    assert features["shoulder"]["note"] == " ".join(screw.SHOULDER_FIT_CALLOUT.splitlines())
+    assert features["head"]["note"] == " ".join(screw.HEAD_FIT_CALLOUT.splitlines())
+
+
+def test_fit_callout_names_the_rocker_by_its_registered_number() -> None:
+    # The profile plate's config lives on its sibling branch (TL-02).
+    assert _config.parts("ch-rocker-arm")["number"] == screw.ROCKER_NUMBER
 
 
 def test_thread_engages_one_and_a_half_diameters_in_the_plate() -> None:
