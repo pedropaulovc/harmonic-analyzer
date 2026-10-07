@@ -5,9 +5,10 @@ its upright and prints the bought envelope as reference. The front view (the
 upright's front face, 1:1) carries every station: each hole X from the
 plate's left end and each row's height from the base underside (the table
 plane), so no station chains through another; the tap stations are reference
-because the spots taken through the seated ledge govern them. The side view
-(1:2) carries the section's reference sizes. Each hole pair takes one native
-callout above the face; the iso rides top-right at 1:2. No datums (policy
+because the spots taken through the seated ledge govern them. The right view
+(1:1, projected straight across) carries the section's reference sizes. Each
+hole pair takes one native callout above the face; the iso rides top-right at
+1:3. No datums (policy
 rule 3).
 
 Run with SolidWorks open::
@@ -66,18 +67,18 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_SCALE = (1.0, 1.0)
 VIEW_SCALE = (1, 1)
-SIDE_SCALE = (1, 2)
-ISO_SCALE = (1, 2)
+ISO_SCALE = (1, 3)
 # Front: the 127 x 88.9 upright face at 1:1, x 0.0615..0.1885 and
-# y 0.1205..0.2094; both callouts stand above it. Side (Right view, 1:2):
-# the 101.6 x 88.9 section, front face on its left, x 0.2196..0.2704 and
-# y 0.1178..0.1622, its caption above it; the iso rides top-right.
+# y 0.1205..0.2094; both callouts stand above it. Right view: the 101.6 x
+# 88.9 section at 1:1 on the face's centre height, so every horizontal edge
+# projects straight across (front face on its left, x 0.2242..0.3258), its
+# caption under it; the iso rides top-right at 1:3.
 FRONT_CENTER = (0.125, 0.165)
-SIDE_CENTER = (0.245, 0.140)
-SIDE_CAPTION = "RIGHT VIEW SCALE 1:2"
-SIDE_CAPTION_XY = (0.218, 0.186)
-ISO_CENTER = (0.355, 0.205)
-ISO_NOTE_XY = (0.320, 0.150)
+SIDE_CENTER = (0.275, FRONT_CENTER[1])
+SIDE_CAPTION = "RIGHT VIEW"
+SIDE_CAPTION_XY = (0.258, 0.095)
+ISO_CENTER = (0.380, 0.215)
+ISO_NOTE_XY = (0.350, 0.168)
 NOTES_XY = (0.020, 0.062)
 
 
@@ -92,14 +93,13 @@ def _sheet_y(model_y_mm: float) -> float:
 
 
 def _side_x(u_mm: float) -> float:
-    """Sheet X of a section point u (= -model Z) in the 1:2 side view."""
-    return SIDE_CENTER[0] + (u_mm - PLATE_WIDTH / 2.0) * SIDE_SCALE[0] / SIDE_SCALE[1] / 1000.0
+    """Sheet X of a section point u (= -model Z) in the 1:1 right view."""
+    return SIDE_CENTER[0] + (u_mm - PLATE_WIDTH / 2.0) * SHEET_SCALE[0] / 1000.0
 
 
 def _side_y(model_y_mm: float) -> float:
-    """Sheet Y of a model-Y point in the 1:2 side view."""
-    return SIDE_CENTER[1] + (model_y_mm - PLATE_HEIGHT / 2.0) * SIDE_SCALE[0] / SIDE_SCALE[1] / 1000.0
-
+    """Sheet Y of a model-Y point in the right view (the front view's)."""
+    return _sheet_y(model_y_mm)
 
 
 LEFT_EDGE_X = _sheet_x(0.0)
@@ -131,10 +131,11 @@ SIDE_KEEP = {
 DIMENSION_TEXT = {
     name: ("(", ")") for name in REFERENCE_DIMENSIONS
 } | {"Tap1Y": ("2X (", ")"), "Stud1Y": ("2X ", "")}
-# Both callouts stand above the face, clear of its silhouette; each leader
-# enters its pair's right-hand hole from the upper right.
-TAP_CALLOUT_XY = (0.215, 0.218)
-STUD_CALLOUT_XY = (0.215, 0.240)
+# Both callouts stand above the face, clear of its silhouette and of the
+# right view's top dimension; the tap leader comes down between the stud
+# holes, the stud leader straight onto its hole.
+TAP_CALLOUT_XY = (0.100, 0.230)
+STUD_CALLOUT_XY = (0.170, 0.250)
 STUD_CALLOUT_PROCESS = f"LETTER {drill_process(STUD_SPEC)}"
 
 
@@ -191,7 +192,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
     # finalize_drawing shades the pictorial isometric with edges. Every
     # tapped-hole drawing first gives its iso local HLR settings: left on the
     # sheet default, run 40a02dfa read its cosmetic threads back draft quality.

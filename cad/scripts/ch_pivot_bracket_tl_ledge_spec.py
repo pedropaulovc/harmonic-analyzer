@@ -43,14 +43,14 @@ if limits(LEDGE_WIDTH, SIZE_PLACES)[1] / 2.0 >= plate.STUD_HALF_PITCH - plate.ST
 
 # Two #5 screw holes, 8.0 under the top, on the upright's tap pitch. The taps
 # are spotted through these holes, so their stations only have to keep the
-# walls: two places along the ledge (the right wall stacks the width), one up.
+# walls, all at the general one-place tolerance.
 CLEARANCE_SPEC = plate.LEDGE_CLEARANCE_SPEC
 HOLE_X = (
     LEDGE_WIDTH / 2.0 - plate.SCREW_HALF_PITCH,
     LEDGE_WIDTH / 2.0 + plate.SCREW_HALF_PITCH,
 )
 HOLE_Y = round(plate.SCREW_Y - plate.BLOCK_HEIGHT, 6)  # 7.9
-HOLE_X_PLACES = 2
+HOLE_X_PLACES = 1
 HOLE_Y_PLACES = 1
 HOLE_DIA = blind_cut_dia_mm(CLEARANCE_SPEC)
 _HOLE_R_MAX = (HOLE_DIA + drilled_oversize_mm()) / 2.0

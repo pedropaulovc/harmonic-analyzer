@@ -48,7 +48,8 @@ BLOCK_HEIGHT = 50.8
 LEDGE_TOP_Y = PLATE_HEIGHT + PART_PROUD - bracket.FOOT_LEN  # 66.7
 
 # Ledge screws: two #10-24 x 5/8 SHCS (shop-to-shop UNC, fastener policy) at
-# 8.0 under the ledge top, 10.0 apart about the plate centre. The taps are
+# 8.0 under the ledge top, 9.0 apart about the plate centre (the ledge's
+# narrowest web at general tolerance; the heads still clear). The taps are
 # spotted through the ledge's own holes with the ledge standing on its block,
 # so the screw fit never depends on either part's printed hole stations:
 # those ride the title block's general tolerance.
@@ -56,7 +57,7 @@ SCREW_THREAD = "#10-24"
 TAP_SPEC = HoleSpec("tapped", SCREW_THREAD)
 LEDGE_CLEARANCE_SPEC = HoleSpec("drilled_number", "#5")
 SCREW_CLEARANCE = blind_cut_dia_mm(LEDGE_CLEARANCE_SPEC) - THREAD_MAJOR_MM[SCREW_THREAD]
-SCREW_HALF_PITCH = 5.0
+SCREW_HALF_PITCH = 4.5
 SCREW_BELOW_LEDGE_TOP = 8.0
 SCREW_Y = LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP  # 58.7
 TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
@@ -112,7 +113,7 @@ DRAWING_NOTES = "\n".join(
         "THE TAPS THROUGH ITS HOLES: THE SPOTS GOVERN THE TAPS.",
     )
 )
-ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
+ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 
 
 def _station(value: float) -> list[float]:
