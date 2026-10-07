@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 import importlib.util
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -52,6 +54,12 @@ def test_path_fallback_accepts_unversioned_blender(monkeypatch) -> None:
     monkeypatch.delenv("HARMONIC_BLENDER", raising=False)
     monkeypatch.setattr(renderer.glob, "glob", lambda _pattern: [])
     monkeypatch.setattr(renderer.shutil, "which", lambda _name: executable)
+
+    def fake_blender_version(path):
+        assert path == executable
+        return None
+
+    monkeypatch.setattr(renderer, "_blender_version", fake_blender_version)
 
     assert renderer.resolve_blender() == executable
 
@@ -229,6 +237,7 @@ def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
     driver = tmp_path / "drive.py"
     driver.write_text(
         "import importlib.util, sys\n"
+        "assert importlib.util.find_spec('solidworks_mcp') is None\n"
         f"spec = importlib.util.spec_from_file_location('ro', r'{MODULE_PATH}')\n"
         "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
         "assert 'dodo' not in sys.modules and 'export_models' not in sys.modules\n"
@@ -237,10 +246,38 @@ def test_stale_gate_holds_in_the_renderer_isolated_env(tmp_path: Path) -> None:
         "print('CURRENT')\n",
         encoding="utf-8",
     )
-    done = subprocess.run(
-        ["uv", "run", "--no-project", "--with", "pillow", str(driver)],
-        capture_output=True, text=True, cwd=REPO_ROOT, timeout=180,
+    child_env = os.environ.copy()
+    for name in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT"):
+        child_env.pop(name, None)
+    child_env.update(
+        UV_OFFLINE="1", UV_PYTHON_DOWNLOADS="never", PYTHONNOUSERSITE="1",
+        HARMONIC_TELEMETRY_DIR=str(tmp_path / "child telemetry"),
+        OTEL_EXPORTER_OTLP_ENDPOINT="",
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="",
+        OTEL_EXPORTER_OTLP_LOGS_ENDPOINT="",
     )
+    pillow = f"pillow=={importlib.metadata.version('pillow')}"
+    process = subprocess.Popen(
+        [
+            "uv", "run", "--no-project", "--no-config",
+            "--python", sys._base_executable, "--with", pillow, str(driver),
+        ],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        cwd=tmp_path, env=child_env,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=180)
+        done = subprocess.CompletedProcess(
+            process.args, process.returncode, stdout, stderr
+        )
+    finally:
+        try:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=60)
+        finally:
+            process.stdout.close()
+            process.stderr.close()
     assert done.returncode == 0, done.stdout + done.stderr
     assert "CURRENT" in done.stdout
 

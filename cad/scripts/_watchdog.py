@@ -99,8 +99,10 @@ class SeatNotReady(SystemExit):
         self.code = EXIT_SEAT_NOT_READY
 
 
-# Swapped by the offline gate: the real one ends the process.
-_hard_exit: Callable[[int], None] = os._exit
+# Late-bound so a transport replacement also protects already-created watchdogs.
+def _hard_exit(code: int) -> None:
+    os._exit(code)
+
 
 # How long a block that found its deadline fired waits for the timer's own
 # exit (its abort record flushes first) before exiting from the block's thread
@@ -403,7 +405,7 @@ class Watchdog:
         dialog_probe: Callable[[], tuple[int, str] | None] = _seat_modal_dialog,
         modal_confirm_ticks: int = _MODAL_CONFIRM_TICKS,
         activity: Callable[[], float] = _telemetry.last_activity,
-        exit_fn: Callable[[int], None] = os._exit,
+        exit_fn: Callable[[int], None] | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.op_timeout = op_timeout
@@ -416,7 +418,7 @@ class Watchdog:
         self._modal_ticks = 0
         self._modal_hwnd: int | None = None
         self._activity = activity
-        self._exit = exit_fn
+        self._exit = exit_fn if exit_fn is not None else lambda code: _hard_exit(code)
         self._clock = clock
         self._stop = threading.Event()
         self._last_hung_warn = -float("inf")

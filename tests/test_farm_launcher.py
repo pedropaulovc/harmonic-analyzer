@@ -175,11 +175,78 @@ if sys.argv[1] == "sync":
             )
             + "\\n"
         )
-    time.sleep(float(os.environ.get("UV_STUB_SYNC_DELAY", "0")))
+    rendezvous = os.environ.get("UV_STUB_SYNC_RENDEZVOUS")
     (Path(os.environ["VIRTUAL_ENV"]) / "synced.txt").write_text(
         str(os.getpid()), encoding="utf-8"
     )
+    if rendezvous:
+        ready = Path(rendezvous)
+        (ready / Path(os.environ["VIRTUAL_ENV"]).name).touch()
+        deadline = time.monotonic() + float(os.environ["UV_STUB_SYNC_GUARD"])
+        while len(list(ready.iterdir())) != 2:
+            if time.monotonic() >= deadline:
+                raise SystemExit(
+                    f"sync rendezvous expired; staged: {[p.name for p in ready.iterdir()]}"
+                )
+            time.sleep(0.05)
     raise SystemExit(int(os.environ.get("UV_STUB_SYNC_EXIT", "0")))
+
+receipt = os.environ.get("UV_STUB_CHAIN_RECEIPT")
+if receipt:
+    import _winapi
+
+    child_environment = os.environ.copy()
+    child_environment.pop("UV_STUB_CHAIN_RECEIPT")
+    child_environment["UV_STUB_CHAIN_READY"] = receipt
+    child = subprocess.Popen(
+        [sys.executable, __file__, *sys.argv[1:]], env=child_environment
+    )
+    target = None
+    transferred = []
+    try:
+        target = _winapi.OpenProcess(
+            _winapi.PROCESS_DUP_HANDLE, False, int(os.environ["UV_STUB_HANDLE_TARGET"])
+        )
+        for handle in (_winapi.GetCurrentProcess(), child._handle):
+            transferred.append(_winapi.DuplicateHandle(
+                _winapi.GetCurrentProcess(), handle, target,
+                0, False, _winapi.DUPLICATE_SAME_ACCESS,
+            ))
+        pending = Path(receipt + ".tmp")
+        pending.write_text(json.dumps({
+            "shim_pid": os.getpid(), "shim_handle": transferred[0],
+            "build_pid": child.pid, "build_handle": transferred[1],
+        }), encoding="utf-8")
+        pending.replace(receipt)
+    except BaseException:
+        if target is not None:
+            for handle in transferred:
+                local = _winapi.DuplicateHandle(
+                    target, handle, _winapi.GetCurrentProcess(), 0, False,
+                    _winapi.DUPLICATE_SAME_ACCESS | _winapi.DUPLICATE_CLOSE_SOURCE,
+                )
+                _winapi.CloseHandle(local)
+        if child.poll() is None:
+            child.kill()
+        child.wait(timeout=float(os.environ["UV_STUB_RELEASE_GUARD"]))
+        raise
+    finally:
+        if target is not None:
+            _winapi.CloseHandle(target)
+    try:
+        raise SystemExit(child.wait(timeout=float(os.environ["UV_STUB_RELEASE_GUARD"])))
+    finally:
+        if child.poll() is None:
+            child.kill()
+        child.wait(timeout=float(os.environ["UV_STUB_RELEASE_GUARD"]))
+
+chain_ready = os.environ.get("UV_STUB_CHAIN_READY")
+if chain_ready:
+    deadline = time.monotonic() + float(os.environ["UV_STUB_RELEASE_GUARD"])
+    while not Path(chain_ready).exists():
+        if time.monotonic() >= deadline:
+            raise SystemExit("owned handle handoff did not arrive")
+        time.sleep(0.05)
 
 blocked = os.environ.get("UV_STUB_BLOCK_OUTPUTS")
 if blocked:
@@ -404,6 +471,57 @@ def _wait_for(
     )
 
 
+def _reap_owned_process(process: subprocess.Popen[str]) -> None:
+    """Bound cleanup to this retained Popen, never an observed process ID."""
+    try:
+        if any(
+            stream is not None and stream.closed
+            for stream in (process.stdin, process.stdout, process.stderr)
+        ):
+            process.wait(timeout=HANG_GUARD_S)
+        else:
+            process.communicate(timeout=HANG_GUARD_S)
+    except subprocess.TimeoutExpired:
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=HANG_GUARD_S)
+    finally:
+        for stream in (process.stdin, process.stdout, process.stderr):
+            if stream is not None:
+                stream.close()
+
+
+def _stop_owned_handle(handle: int, what: str) -> None:
+    """Stop only a kernel object handed off by the fixture that created it."""
+    import _winapi
+
+    if _winapi.WaitForSingleObject(handle, 0) == _winapi.WAIT_TIMEOUT:
+        try:
+            _winapi.TerminateProcess(handle, 1)
+        except OSError:
+            if _winapi.WaitForSingleObject(handle, 0) != _winapi.WAIT_OBJECT_0:
+                raise
+    assert (
+        _winapi.WaitForSingleObject(handle, HANG_GUARD_S * 1000)
+        == _winapi.WAIT_OBJECT_0
+    ), f"owned {what} did not exit"
+
+
+def _reap_owned_handles(handles: list[tuple[int, str]]) -> None:
+    """Reap every handed-off child even if another child's cleanup fails."""
+    import _winapi
+
+    failures = []
+    for handle, what in handles:
+        try:
+            _stop_owned_handle(handle, what)
+        except (OSError, AssertionError) as error:
+            failures.append(f"{what}: {error}")
+        finally:
+            _winapi.CloseHandle(handle)
+    assert not failures, "; ".join(failures)
+
+
 def _observe_held_launch(
     process: subprocess.Popen[str],
     fixture: dict[str, object],
@@ -477,10 +595,10 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
             process, fixture, release
         )
     finally:
-        release.touch()
-        if process.poll() is None:
-            process.kill()
-            process.communicate()
+        try:
+            release.touch()
+        finally:
+            _reap_owned_process(process)
 
     assert process.returncode == 0, (stdout, stderr)
     assert stderr == ""
@@ -569,10 +687,10 @@ def _held_launch(
             process, fixture, release, while_held
         )
     finally:
-        release.touch()
-        if process.poll() is None:
-            process.kill()
-            process.communicate()
+        try:
+            release.touch()
+        finally:
+            _reap_owned_process(process)
     assert process.returncode == 0, (stdout, stderr)
     return process, running, _record(Path(running["done"]))
 
@@ -671,37 +789,71 @@ def test_launches_share_one_environment_synced_once(tmp_path: Path) -> None:
     assert invocation["environment_synced"] is True
 
 
+@pytest.mark.parametrize("warm", [False, True], ids=["cold-publication-race", "warm-reuse"])
 def test_concurrent_launches_publish_one_environment_and_both_build(
-    tmp_path: Path,
+    tmp_path: Path, warm: bool
 ) -> None:
-    """Two launchers creating the same environment each sync privately; one
-    publishes, the other adopts it, and neither touches the other's sync."""
+    """Cold entrants sync privately before either publishes; warm entrants reuse
+    the complete environment without syncing. Both real CLI racers must build."""
     fixture = _launcher_fixture(tmp_path)
+    if warm:
+        seed = _run_launcher(
+            fixture, _command(fixture, "part:pen_rod"), fixture["environment"]
+        )
+        assert seed.returncode == 0, (seed.stdout, seed.stderr)
+        published = json.loads(seed.stdout.splitlines()[-1])
+        assert published["environment_reused"] is False
+    rendezvous = tmp_path / "cold sync rendezvous"
+    if not warm:
+        rendezvous.mkdir()
     processes = []
     invocations = []
-    for index in range(2):
-        environment = dict(fixture["environment"])
-        environment["UV_STUB_SYNC_DELAY"] = "3"
-        invocations.append(tmp_path / f"uv invocation {index}.json")
-        environment["UV_STUB_INVOCATION"] = str(invocations[-1])
-        processes.append(
-            subprocess.Popen(
-                _command(fixture, "part:pen_rod", tag=f"racer{index}"),
-                env=environment,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+    try:
+        for index in range(2):
+            environment = dict(fixture["environment"])
+            if not warm:
+                environment["UV_STUB_SYNC_RENDEZVOUS"] = str(rendezvous)
+                environment["UV_STUB_SYNC_GUARD"] = str(HANG_GUARD_S // 2)
+            invocations.append(tmp_path / f"uv invocation {index}.json")
+            environment["UV_STUB_INVOCATION"] = str(invocations[-1])
+            processes.append(
+                subprocess.Popen(
+                    _command(fixture, "part:pen_rod", tag=f"racer{index}"),
+                    env=environment,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
             )
-        )
-    results = [process.communicate(timeout=HANG_GUARD_S) for process in processes]
+        results = [process.communicate(timeout=HANG_GUARD_S) for process in processes]
+    finally:
+        failures = []
+        for process in processes:
+            try:
+                _reap_owned_process(process)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                failures.append(f"owned racer {process.pid}: {error}")
+        assert not failures, "; ".join(failures)
 
     for process, (stdout, stderr) in zip(processes, results):
         assert process.returncode == 0, (stdout, stderr)
     finished = [json.loads(stdout.splitlines()[-1]) for stdout, _ in results]
     assert finished[0]["environment"] == finished[1]["environment"]
-    assert sorted(f["environment_reused"] for f in finished) == [False, True]
-    syncs = Path(fixture["syncs"]).read_text(encoding="utf-8").splitlines()
-    assert len({json.loads(line)["VIRTUAL_ENV"] for line in syncs}) == 2, syncs
+    syncs = [
+        json.loads(line)
+        for line in Path(fixture["syncs"]).read_text(encoding="utf-8").splitlines()
+    ]
+    if warm:
+        assert [f["environment_reused"] for f in finished] == [True, True]
+        assert finished[0]["environment"] == published["environment"]
+        assert len(syncs) == 1, syncs
+    else:
+        assert sorted(f["environment_reused"] for f in finished) == [False, True]
+        assert len(syncs) == 2, syncs
+        assert len({sync["VIRTUAL_ENV"] for sync in syncs}) == 2, syncs
+        assert sorted(p.name for p in rendezvous.iterdir()) == sorted(
+            Path(sync["VIRTUAL_ENV"]).name for sync in syncs
+        )
     for invocation in invocations:
         built = json.loads(invocation.read_text(encoding="utf-8"))
         assert Path(built["environment"]["VIRTUAL_ENV"]) == Path(
@@ -1138,12 +1290,19 @@ def _start_held(
                 return record
         return None
 
-    record = _wait_for(process, running, f"{tag} build output", log_directory)
-    assert record is not None and process.poll() is None, (
-        process.poll(),
-        _observed(log_directory),
-    )
-    return process, release, record
+    try:
+        record = _wait_for(process, running, f"{tag} build output", log_directory)
+        assert record is not None and process.poll() is None, (
+            process.poll(),
+            _observed(log_directory),
+        )
+        return process, release, record
+    except BaseException:
+        try:
+            release.touch()
+        finally:
+            _reap_owned_process(process)
+        raise
 
 
 def _stub_pid(fixture: dict[str, object]) -> int:
@@ -1629,29 +1788,64 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     log_directory = Path(fixture["log_directory"])
     log_directory.mkdir()
     extra = [] if names is None else [str(log_directory / names)]
+    sleeper = f"__import__('time').sleep({HANG_GUARD_S * 2})"
+    receipt = tmp_path / "owned orphan.json"
     started = time.time()
-    parent = subprocess.run(
+    parent = subprocess.Popen(
         [
             sys.executable,
             "-c",
-            "import subprocess, sys; "
-            f"print(subprocess.Popen([sys.executable, '-c', {SLEEPER!r}, *{extra!r}], "
-            "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
-            "stderr=subprocess.DEVNULL).pid)",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=HANG_GUARD_S,
+            f"""import _winapi, json, subprocess, sys
+from pathlib import Path
+child = subprocess.Popen(
+    [sys.executable, "-c", {sleeper!r}, *{extra!r}],
+    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+)
+target = None
+handle = None
+try:
+    target = _winapi.OpenProcess(_winapi.PROCESS_DUP_HANDLE, False, int(sys.argv[1]))
+    handle = _winapi.DuplicateHandle(
+        _winapi.GetCurrentProcess(), child._handle, target,
+        0, False, _winapi.DUPLICATE_SAME_ACCESS,
     )
-    child = int(parent.stdout)
+    receipt = Path(sys.argv[2])
+    pending = receipt.with_suffix(".tmp")
+    pending.write_text(json.dumps({{"pid": child.pid, "handle": handle}}), encoding="utf-8")
+    pending.replace(receipt)
+except BaseException:
+    if handle is not None:
+        local = _winapi.DuplicateHandle(
+            target, handle, _winapi.GetCurrentProcess(), 0, False,
+            _winapi.DUPLICATE_SAME_ACCESS | _winapi.DUPLICATE_CLOSE_SOURCE,
+        )
+        _winapi.CloseHandle(local)
+    if child.poll() is None:
+        child.kill()
+    child.wait(timeout={HANG_GUARD_S})
+    raise
+finally:
+    if target is not None:
+        _winapi.CloseHandle(target)
+""",
+            str(os.getpid()),
+            str(receipt),
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
     try:
+        assert parent.wait(timeout=HANG_GUARD_S) == 0
+        owned = _record(receipt)
+        child = int(owned["pid"])
         _write_run_record(
             fixture,
             pid=_dead_parent_pid(child),
             tag="reused",
             workflow=LEAF_NUT,
-            argv=["uv", "-c", recorded_code],
+            argv=["uv", "-c", sleeper if recorded_code == SLEEPER else recorded_code],
             hexdigit="7",
             started=started,
         )
@@ -1661,9 +1855,11 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
             fixture["environment"],
         )
     finally:
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(child)], capture_output=True
-        )
+        try:
+            _reap_owned_process(parent)
+        finally:
+            if receipt.exists():
+                _reap_owned_handles([(int(_record(receipt)["handle"]), "orphan")])
 
     assert status.returncode == 0, status.stderr
     report = json.loads(status.stdout)
@@ -1682,6 +1878,7 @@ def _dead_parent_pid(child: int) -> int:
         check=True,
         capture_output=True,
         text=True,
+        timeout=HANG_GUARD_S,
     )
     parent = int(listed.stdout)
     assert not _process_alive(parent)
@@ -1695,6 +1892,8 @@ def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
     (checked: killing uv leaves both python.exe processes running), so once the
     launcher and then uv are gone, no scan from the launcher reaches the build,
     which keeps dispatching. The run's job still holds it."""
+    import _winapi
+
     fixture = _launcher_fixture(tmp_path)
     Path(fixture["farm_state"]).write_text(
         json.dumps(
@@ -1702,36 +1901,38 @@ def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
         ),
         encoding="utf-8",
     )
-    process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "chain")
-    build = int(_record(Path(fixture["invocation"]))["pid"])
-    # launcher -> uv.cmd's cmd.exe -> venv python.exe -> build. The venv
-    # launcher takes its child down with it; cmd.exe, like uv.exe, does not.
-    shim = int(
-        subprocess.run(
-            [
-                "pwsh",
-                "-NoProfile",
-                "-Command",
-                "(Get-CimInstance Win32_Process -Filter "
-                f"'ProcessId={_record(Path(fixture['invocation']))['ppid']}').ParentProcessId",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
+    # Use a real fixture-owned uv relay: unlike a Windows venv launcher, killing
+    # base Python does not kill its build child. Its Popen handle and its own
+    # self handle are duplicated into pytest before any build output appears.
+    tools = Path(fixture["tools"])
+    (tools / "uv.cmd").write_text(
+        f'@echo off\r\n"{sys._base_executable}" "{tools / "uv_stub.py"}" %*\r\n'
+        'exit /b %ERRORLEVEL%\r\n',
+        encoding="utf-8",
     )
+    receipt = tmp_path / "owned chain.json"
+    process = None
+    release = tmp_path / "release chain"
     try:
+        process, release, running = _start_held(
+            tmp_path, fixture, DISPATCH_LINES, "chain",
+            {
+                "UV_STUB_CHAIN_RECEIPT": str(receipt),
+                "UV_STUB_HANDLE_TARGET": str(os.getpid()),
+            },
+        )
+        owned = _record(receipt)
+        build = int(owned["build_pid"])
+        assert _stub_pid(fixture) == build
         process.kill()
         process.wait(timeout=HANG_GUARD_S)
         process.stdout.close()
         process.stderr.close()
-        # The uv between them dies too (os.kill is TerminateProcess here).
-        os.kill(shim, 9)
-        deadline = time.monotonic() + 10
-        while _process_alive(shim) and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert not _process_alive(shim)
-        assert _process_alive(build)
+        _stop_owned_handle(int(owned["shim_handle"]), "uv relay")
+        assert (
+            _winapi.WaitForSingleObject(int(owned["build_handle"]), 0)
+            == _winapi.WAIT_TIMEOUT
+        ), "killing the fixture uv relay killed its build child"
 
         status = _run_launcher(
             fixture,
@@ -1743,9 +1944,24 @@ def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
             _tracking(fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "chain"),
             fixture["environment"],
         )
-        survived = _process_alive(build)
+        survived = (
+            _winapi.WaitForSingleObject(int(owned["build_handle"]), 0)
+            == _winapi.WAIT_TIMEOUT
+        )
     finally:
-        release.touch()
+        try:
+            release.touch()
+        finally:
+            try:
+                if receipt.exists():
+                    owned = _record(receipt)
+                    _reap_owned_handles([
+                        (int(owned["shim_handle"]), "uv relay"),
+                        (int(owned["build_handle"]), "build"),
+                    ])
+            finally:
+                if process is not None:
+                    _reap_owned_process(process)
 
     assert status.returncode == 0, status.stderr
     assert build in json.loads(status.stdout)["launcher"]["orphaned_processes"]

@@ -18,7 +18,10 @@ worker blocks the agent from removing the source root).
 
 from __future__ import annotations
 
+import importlib.util
+import os
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -266,28 +269,115 @@ def test_watchdog_self_logs_do_not_reset_the_idle_clock() -> None:
     assert _telemetry.last_activity() > 0.0
 
 
+def test_default_exit_transport_is_late_bound_after_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Install a harmless transport BEFORE loading a fresh module. Regressions
+    # that capture os._exit in a default/alias still cannot end this process.
+    early_exits: list[int] = []
+    later_exits: list[int] = []
+    guarded_exits: list[int] = []
+    monkeypatch.setattr(os, "_exit", early_exits.append)
+    spec = importlib.util.spec_from_file_location(
+        "_watchdog_transport_test", _watchdog.__file__
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "_abort", lambda *_args, **_fields: None)
+    dog = module.Watchdog(
+        op_timeout=1,
+        crash_pids=lambda: set(),
+        hung_probe=lambda: False,
+        dialog_probe=lambda: None,
+        activity=lambda: 0,
+        clock=lambda: 10,
+    )
+
+    monkeypatch.setattr(os, "_exit", later_exits.append)
+    assert dog.tick() == "timeout"
+    assert early_exits == []
+    assert later_exits == [EXIT_OP_TIMEOUT]
+
+    # The suite's narrower module-boundary guard also reaches a dog that
+    # predates its installation, without replacing os._exit process-wide.
+    monkeypatch.setattr(module, "_hard_exit", guarded_exits.append)
+    assert dog.tick() == "timeout"
+    assert guarded_exits == [EXIT_OP_TIMEOUT]
+    assert later_exits == [EXIT_OP_TIMEOUT]
+
+
+@pytest.fixture
+def owned_watchdogs(monkeypatch: pytest.MonkeyPatch):
+    """Run genuine watchdog loops with fake probes and retain only our threads."""
+    dogs: list[Watchdog] = []
+    threads = []
+    exits: list[int] = []
+    real_thread = _watchdog.threading.Thread
+    ticked = _watchdog.threading.Event()
+
+    def healthy_window():
+        ticked.set()
+        return False
+
+    def make_watchdog(**kwargs):
+        dog = Watchdog(
+            **kwargs,
+            crash_pids=lambda: set(),
+            hung_probe=healthy_window,
+            dialog_probe=lambda: None,
+            activity=time.monotonic,
+            exit_fn=exits.append,
+        )
+        dogs.append(dog)
+        return dog
+
+    def owned_thread(*args, **kwargs):
+        thread = real_thread(*args, **kwargs)
+        threads.append(thread)
+        return thread
+
+    monkeypatch.setattr(_watchdog, "Watchdog", make_watchdog)
+    monkeypatch.setattr(_watchdog.threading, "Thread", owned_thread)
+    monkeypatch.setenv("HARMONIC_COM_POLL_INTERVAL", "0.001")
+    try:
+        yield ticked
+    finally:
+        for dog in dogs:
+            dog.stop()
+        for thread in threads:
+            if thread.ident is not None:
+                thread.join(timeout=2)
+        assert not [thread.name for thread in threads if thread.is_alive()]
+        assert exits == [], f"healthy fake watchdogs attempted exit: {exits}"
+
+
 def test_env_kill_switch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HARMONIC_COM_WATCHDOG", "0")
     assert _watchdog.start() is None
 
 
-def test_start_stop_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_stop_idempotent(
+    monkeypatch: pytest.MonkeyPatch, owned_watchdogs
+) -> None:
     monkeypatch.delenv("HARMONIC_COM_WATCHDOG", raising=False)
     monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "900")
-    # The check:* gates are pure-python and must pass off-Windows too, where the
-    # real platform gate would return None (codex #344) -- force it open; the
-    # Win32 probes inside are themselves guarded no-ops off-Windows.
+    # Exercise the Windows lifecycle with explicitly fake health/modal/activity
+    # and exit callbacks, never the live Win32 probes.
     monkeypatch.setattr(_watchdog, "_WINDOWS", True)
     first = _watchdog.start()
     try:
         assert first is not None
+        assert owned_watchdogs.wait(timeout=2), "owned watchdog never polled"
         assert _watchdog.start() is first
     finally:
         _watchdog.stop()
     assert _watchdog._active is None
 
 
-def test_start_logs_the_armed_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_logs_the_armed_configuration(
+    monkeypatch: pytest.MonkeyPatch, owned_watchdogs
+) -> None:
     monkeypatch.delenv("HARMONIC_COM_WATCHDOG", raising=False)
     monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "900")
     monkeypatch.setattr(_watchdog, "_WINDOWS", True)
@@ -295,6 +385,7 @@ def test_start_logs_the_armed_configuration(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(_watchdog, "_info", lambda msg, **f: infos.append(msg))
     try:
         assert _watchdog.start() is not None
+        assert owned_watchdogs.wait(timeout=2), "owned watchdog never polled"
     finally:
         _watchdog.stop()
     assert any(

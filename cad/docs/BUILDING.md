@@ -56,11 +56,18 @@ glance:
 | `verify_soundness:<stem>` / `verify:kinematics` | yes | local seat or farm leaf | DOF/interference/health gates per (sub)assembly · motion-study pen sweep |
 | `verify:soundness` | no (aggregator) | local | fans out to the `verify_soundness:<stem>` leaves; drives no COM itself |
 | `preflight` / `export` / `package:release` | yes | local seat or farm leaf | release preflight (gear ratios) · neutral STEP/STL/glTF + scene-graph export · Pack-and-Go |
-| `check:math` / `check:config` / `check:graph` / `check:undefined_names` / `check:nameplate` / `check:numerals` / `check:recipe` / `check:cache` / `check:partiso` / `check:inert` / `check:budget` / `check:joint_retention` | **no** | local only | Fourier math · config audit · undefined-name lint · pure-python unit tests · threaded-joint retention audit (report only) |
+| `check:math` / `check:config` / `check:graph` / `check:undefined_names` / `check:nameplate` / `check:numerals` / `check:recipe` / `check:cache` / `check:telemetry` / `check:watchdog` / `check:freshness` / `check:flagonly` / `check:partiso` / `check:inert` / `check:budget` / `check:joint_retention` | **no** | local only | Fourier math · config audit · undefined-name lint · pure-python unit tests · threaded-joint retention audit (report only) |
 | `gallery` | **no** (Blender + GPU) | local only | refresh the photo-vs-CAD comparison gallery; no farm worker has Blender |
 | `release` | meta | local (publishes) | stages, diffs, tags and publishes; its COM half is the separate `package:release` leaf |
 | **`build`** | yes | either executor | **every** part + assembly + **every** gate — the one fully-safe entry |
 | `build_bare` | yes | either executor | parts + assemblies only — a quick rebuild |
+
+Required checks are selected by `dodo._CHECK_NAMES`, not by every `check:*` name:
+`check:verify_telemetry` remains opt-in and `check:features_bound` release-only.
+Default root pytest collection also includes explicitly justified root-runner
+infrastructure tests that CAD gates do not run. Enrollment, archived-receipt
+dependencies, filename-manifest invalidation and pre-import host containment are
+documented in [maintained tests and offline gate stamps](../../DEVELOPING.md#maintained-tests-and-offline-gate-stamps).
 
 These examples run on a **local seat**. For the farm, replace
 `uv run python -m doit` with `build.py --executor farm` and follow
