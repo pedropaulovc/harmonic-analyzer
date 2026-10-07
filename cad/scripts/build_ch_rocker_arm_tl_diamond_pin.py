@@ -246,6 +246,7 @@ async def build(adapter) -> dict[str, str]:
         ("LandDia", LAND_DIA),
         ("LandHeight", LAND_HEIGHT),
         ("FlatsAF", FLATS_AF),
+        ("PinLength", PIN_LENGTH),
     ):
         await set_global(adapter, knob, f"{value}mm")
 
@@ -360,7 +361,9 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "Pin")
-    name_dimensions(adapter, "Pin", ["PinLength"])
+    drive_jobs.append(
+        (name_dimensions(adapter, "Pin", ["PinLength"])[0], '"PinLength"')
+    )
     await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
     _require_bodies(adapter, 2, label="body and pin")
     blank_reference_geometry(adapter, (("LandTipPlane", "PLANE"),))
