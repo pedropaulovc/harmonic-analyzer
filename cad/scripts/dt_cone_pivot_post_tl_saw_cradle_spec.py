@@ -8,9 +8,11 @@ into the base, and the bandsaw vise grips the base. The bridge load runs down th
 cone sleeve onto the pad, never through the bonded joint.
 
 The cradle is one piece: a milled 1018 block whose seats are bored on one
-axis through both saddles and whose pad top is machined flush with the seat
-bottoms. The inventory's screwed and doweled saddles are not a permitted
-route.
+axis through both saddles. The pad top is a matched fit: it is left proud
+and milled down to suit the identified post until its cap bears with the
+body seated, because the post prints its body diameter and cap-to-cap boss
+length independently. The inventory's screwed and doweled saddles are not a
+permitted route.
 
 Frame: model axes are the inventory's saw-cradle frame (cone plan frame B6:
 post axis along -X, head top X0, cone cross-bore +Z up), re-based to a
@@ -20,14 +22,16 @@ touchable corner and turned Y-up for ASME views. The mapping is
     model Y = B6 Z + 49     (the base underside, B6 Z-49)
     model Z = 50 - B6 Y     (the base side face at B6 Y+50)
 
-so a nominal post's axis lies on model Y49, Z50, the seat bottoms and pad top
-on model Y27.9945, and the cone axis at model X50.632.
+so a nominal post's axis lies on model Y49, Z50, the seat bottoms on model
+Y27.9945, and the cone axis at model X50.632. Z stations and Z heights run
+from the base side face (model Z0).
 """
 
 from __future__ import annotations
 
 import math
 
+import _config
 import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
@@ -62,8 +66,7 @@ POST_AXIS_Z = B6_Y_AT_SIDE
 # --- Seats -------------------------------------------------------------------
 # The post body prints at .X. A seat at least as large as the largest body
 # lets every body bottom on the seat's lowest line, which stays where a nominal
-# body's underside is: flush with the pad top under the cap. A smaller seat
-# would carry a large body on its lips and lift the cap off the pad.
+# body's underside is. A smaller seat would carry a large body on its lips.
 SEAT_PLACES = 1
 BODY_DIA_MAX = limits(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1]
 SEAT_DIA = 43.6
@@ -74,8 +77,14 @@ SEAT_CENTRE_Y = SEAT_BOTTOM_Y + SEAT_DIA / 2.0
 SEAT_Z = POST_AXIS_Z
 
 # --- North-cap pad -------------------------------------------------------------
-# The cone boss is BLOCK_DIA long (post.CONE_BOSS_LENGTH), so its cap lies in
-# the body's tangent plane: the pad top is flush with the seat bottoms.
+# The cone boss is BLOCK_DIA long (post.CONE_BOSS_LENGTH), so a nominal cap lies
+# in the body's tangent plane. The post prints the body diameter at .X and the
+# boss length at .XX independently, so with the body seated a compliant cap
+# stands anywhere within CAP_OFFSET_MAX of the seat bottoms: no printed pad
+# height carries every post. The pad is a MATCHED FIT (policy rule 2): the
+# model leaves it proud of every compliant cap over the seat-bottom band, its
+# height prints as a reference size, and the callout names the mate and the
+# acceptance.
 # The pad is a land on the cone axis under the cap. Its X faces leave a
 # quarter-inch cutter room to either saddle; its Z ends stop short of the
 # bridge studs, and its length covers the largest printed cap at the post's
@@ -88,7 +97,23 @@ PAD_X1 = PAD_X + PAD_WIDTH / 2.0
 PAD_Z = POST_AXIS_Z
 PAD_Z0 = PAD_Z - PAD_LENGTH / 2.0
 PAD_Z1 = PAD_Z + PAD_LENGTH / 2.0
-PAD_HT = SEAT_BOTTOM_Y
+POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
+# Narrow lines, so the block stands in the gap between the front and right views.
+PAD_FIT_CALLOUT = f"FIT TO SUIT\n{POST_NUMBER}\nCONE PIVOT\nPOST: CAP\nBEARS WITH\nBODY SEATED"
+_BODY_BAND = limits(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])
+_BOSS_BAND = limits(post.CONE_BOSS_LENGTH, post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+# The cap face stands body/2 - boss/2 above the seat line of a seated body.
+CAP_OFFSET_MAX = max(
+    (_BODY_BAND[1] - _BOSS_BAND[0]) / 2.0, (_BOSS_BAND[1] - _BODY_BAND[0]) / 2.0
+)
+# AUTHOR'S CHOICE: half a millimetre of fitting stock over the highest cap.
+PAD_FIT_STOCK_MIN = 0.5
+PAD_HT = 30.0
+# The unfitted top stands above the highest compliant cap: the seats bored
+# high within their band, the cap at its farthest from the seat line.
+PAD_FIT_STOCK_WORST = PAD_HT - (SEAT_BOTTOM_Y + printed_band_mm(1) + CAP_OFFSET_MAX)
+if PAD_FIT_STOCK_WORST < PAD_FIT_STOCK_MIN:
+    raise AssertionError("a compliant cap can stand above the unfitted pad")
 if abs(post.CONE_BOSS_LENGTH - post.BLOCK_DIA) > 1e-9:
     raise AssertionError("the cone cap no longer lies in the post body's tangent plane")
 
@@ -203,6 +228,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FootSaddleX1",
         "OverallHt",
     },
+    "Pad": {"PadHt"},
     "PadProfile": {"PadX0", "PadX1", "PadZ0", "PadZ1"},
     "ReliefProfile": {"SaddleZ0", "SaddleZ1"},
     "SeatProfile": {"SeatZ", "SeatBottomHt", "SeatDia"},
@@ -218,6 +244,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FootSaddleX1": SADDLE_X_PLACES,
         "OverallHt": 1,
     },
+    "Pad": {"PadHt": 1},
     "PadProfile": {"PadX0": 1, "PadX1": 1, "PadZ0": 1, "PadZ1": 1},
     "ReliefProfile": {"SaddleZ0": 1, "SaddleZ1": 1},
     "SeatProfile": {"SeatZ": 1, "SeatBottomHt": 1, "SeatDia": SEAT_PLACES},
@@ -230,24 +257,20 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked saw-cradle dimension needs authored places")
 
 SURFACE_FINISHES = ()
-PAD_FLUSH_NOTE = "PAD TOP FLUSH WITH SEAT BOTTOMS."
-DRAWING_NOTES = "\n".join(
-    (
-        "BOTH SEATS ON ONE COMMON AXIS.",
-        PAD_FLUSH_NOTE,
-    )
-)
+DRAWING_NOTES = "BOTH SEATS ON ONE COMMON AXIS."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
 _POST = "dt_cone_pivot_post_spec"
 _X_AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
+# Z heights (the stud stations across the base) run from the base side face.
+_FROM_SIDE = ("side_face", ("__frame__",))
 
 
 def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
     return ExportFeature(
         kind="hole",
         faces=(CylinderFace(SEAT_DIA, contains_x_mm=sum(x_span) / 2.0),),
-        requirements=("dia", "at", "process"),
+        requirements=("dia", "length", "height", "process"),
         fields={
             "at": ([x_span[0], SEAT_CENTRE_Y, SEAT_Z], (name, "SEAT_CENTRE_Y", "SEAT_Z")),
             "axis": _X_AXIS,
@@ -260,6 +283,7 @@ def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
                 [x_span[1] - x_span[0] - 2.0 * _SADDLE_ROW, x_span[1] - x_span[0] + 2.0 * _SADDLE_ROW],
                 (name,),
             ),
+            "length_nominal": (x_span[1] - x_span[0], (name,)),
             "height": (
                 limits(SEAT_BOTTOM_Y, 1),
                 ("SEAT_BOTTOM_Y", (_POST, "BLOCK_DIA")),
@@ -276,7 +300,7 @@ def _stud(z: float) -> ExportFeature:
     return ExportFeature(
         kind="hole",
         faces=(CylinderFace(STUD_TAP_DRILL, contains_z_mm=z),),
-        requirements=("thread", "at"),
+        requirements=("thread", "station", "height"),
         fields={
             "at": ([STUD_X, BASE_HT, z], ("STUD_X", "BASE_HT", "STUD_Z")),
             "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
@@ -285,8 +309,11 @@ def _stud(z: float) -> ExportFeature:
             "thru": (True, ("STUD_TAP_SPEC",)),
             "station": (limits(STUD_X, 1), ("STUD_X",)),
             "station_nominal": (STUD_X, ("STUD_X",)),
+            "height": (limits(z, 1), ("STUD_Z",)),
+            "height_nominal": (z, ("STUD_Z",)),
+            "height_from": _FROM_SIDE,
         },
-        precision={"station": 1},
+        precision={"station": 1, "height": 1},
     )
 
 
@@ -296,16 +323,17 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "cap_pad": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 1.0, 0.0), PAD_HT),),
-        requirements=("height", "width", "process"),
+        requirements=("note", "width", "length", "station", "process"),
         fields={
             "at": ([PAD_X, PAD_HT, PAD_Z], ("PAD_X", "PAD_HT", "PAD_Z")),
             "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "y", "value": PAD_HT}, ("PAD_HT",)),
-            "height": (
-                limits(SEAT_BOTTOM_Y, 1),
-                ("PAD_HT", "SEAT_BOTTOM_Y", (_POST, "BLOCK_DIA"), (_POST, "CONE_BOSS_LENGTH")),
+            # A matched fit: the reference height is the unfitted stock, and
+            # the callout's acceptance, not a band, defines the fitted top.
+            "height_nominal": (
+                PAD_HT,
+                ("PAD_HT", "PAD_FIT_STOCK_MIN", (_POST, "BLOCK_DIA"), (_POST, "CONE_BOSS_LENGTH")),
             ),
-            "height_nominal": (PAD_HT, ("PAD_HT",)),
             "width": (
                 [PAD_WIDTH - 2.0 * _ROW1, PAD_WIDTH + 2.0 * _ROW1],
                 ("PAD_X0", "PAD_X1"),
@@ -315,12 +343,13 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 [PAD_LENGTH - 2.0 * _ROW1, PAD_LENGTH + 2.0 * _ROW1],
                 ("PAD_Z0", "PAD_Z1"),
             ),
+            "length_nominal": (PAD_LENGTH, ("PAD_LENGTH",)),
             "station": (limits(PAD_X, 1), ("PAD_X", (_POST, "BORE_HEIGHT"))),
             "station_nominal": (PAD_X, ("PAD_X",)),
             "process": ("mill", ("DRAWING_NOTES",)),
-            "note": (PAD_FLUSH_NOTE, ("DRAWING_NOTES",)),
+            "note": (PAD_FIT_CALLOUT, ("PAD_FIT_CALLOUT", "POST_NUMBER")),
         },
-        precision={"height": 1, "width": 1, "length": 1, "station": 1},
+        precision={"width": 1, "length": 1, "station": 1},
     ),
     "underside": ExportFeature(
         kind="face",
@@ -333,6 +362,15 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "height_nominal": (OVERALL_HT, ("OVERALL_HT",)),
         },
         precision={"height": 1},
+    ),
+    "side_face": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
+        requirements=("plane",),
+        fields={
+            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+            "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
+        },
     ),
     "stud_tap_near": _stud(STUD_Z[0]),
     "stud_tap_far": _stud(STUD_Z[1]),
