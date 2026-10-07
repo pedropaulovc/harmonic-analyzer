@@ -84,13 +84,19 @@ POCKET_END_GAP = 0.55
 PART_LENGTH_PLACES = 1
 
 
-def _part_length(pocket_length: float, pocket_width: float) -> float:
-    room = pocket_length - pocket_width - 2.0 * POCKET_END_GAP
+def _part_length(pocket_length: float, pocket_width: float, length_band: float = _XXX) -> float:
+    """``length_band``: the pocket length's printed band; a looser one than
+    the .XXX the end gap was sized for shortens the part by the difference."""
+    room = pocket_length - pocket_width - 2.0 * POCKET_END_GAP - (length_band - _XXX)
     return math.floor(room * 10.0 + 1e-9) / 10.0
 
 
-def _end_gap_min(pocket_length: float, pocket_width: float, part_length: float) -> float:
-    return round(((pocket_length - _XXX) - (pocket_width + _XXX) - (part_length + _X)) / 2.0, 9)
+def _end_gap_min(
+    pocket_length: float, pocket_width: float, part_length: float, length_band: float = _XXX
+) -> float:
+    return round(
+        ((pocket_length - length_band) - (pocket_width + _XXX) - (part_length + _X)) / 2.0, 9
+    )
 
 
 # Pads: inventory stations, +X side (tag, station west X, station length, pad
@@ -217,14 +223,29 @@ REST_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     (tag, x0 + length / 2.0, y0 + width / 2.0, length, width)
     for tag, x0, y0, length, width in _REST_POCKETS
 )
+# A rest pocket's length neither locates its centred rest nor neighbours a
+# web, so it prints at one place (codex review of run
+# 20261007T232215823Z: 20.000 was over-specified); its rest is shortened by
+# the wider band so it still ends clear. The pad pockets keep .XXX lengths:
+# their 2 mm webs need them.
+REST_POCKET_LENGTH_PLACES = 1
+_REST_POCKET_LENGTH_BAND = printed_band_mm(REST_POCKET_LENGTH_PLACES)
 RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
-    (tag, cx, cy, _part_length(length, width), width - 2.0 * REST_CLEARANCE)
+    (
+        tag,
+        cx,
+        cy,
+        _part_length(length, width, _REST_POCKET_LENGTH_BAND),
+        width - 2.0 * REST_CLEARANCE,
+    )
     for tag, cx, cy, length, width in REST_POCKETS
 )
 PART_END_GAP_MIN = min(
-    _end_gap_min(pocket[3], pocket[4], part[3])
-    for pockets, parts in ((PAD_POCKETS, PADS), (REST_POCKETS, RESTS))
-    for pocket, part in zip(pockets, parts, strict=True)
+    *(_end_gap_min(pocket[3], pocket[4], part[3]) for pocket, part in zip(PAD_POCKETS, PADS, strict=True)),
+    *(
+        _end_gap_min(pocket[3], pocket[4], part[3], _REST_POCKET_LENGTH_BAND)
+        for pocket, part in zip(REST_POCKETS, RESTS, strict=True)
+    ),
 )
 if PART_END_GAP_MIN < BOND_LINE_MIN:
     raise AssertionError("a bonded part can reach its pocket's end radius")
@@ -472,8 +493,11 @@ def _circle_rect_gap(
 
 
 _RECTS = [
-    (cx, cy, length + _XXX, width + _XXX)
-    for _tag, cx, cy, length, width in (*PAD_POCKETS, *REST_POCKETS)
+    *((cx, cy, length + _XXX, width + _XXX) for _tag, cx, cy, length, width in PAD_POCKETS),
+    *(
+        (cx, cy, length + _REST_POCKET_LENGTH_BAND, width + _XXX)
+        for _tag, cx, cy, length, width in REST_POCKETS
+    ),
 ]
 _ROUNDS = [
     (0.0, 0.0, (STAND_POCKET_DIA + _XXX) / 2.0),
@@ -632,7 +656,7 @@ FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
             "REST POCKET",
             _mm(cx),
             _mm(cy),
-            _mm(length),
+            _mm(length, REST_POCKET_LENGTH_PLACES),
             _mm(width),
             _mm(REST_POCKET_DEPTH),
         )
