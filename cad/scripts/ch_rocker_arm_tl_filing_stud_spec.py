@@ -103,7 +103,8 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # three mating bores (hand slide, no shake) governs it, and BODY_BAND stays
 # the exported design intent of that fit.
 REFERENCE_DIMENSIONS = frozenset({"OverallLength", "BodyDia"})
-DIMENSION_TEXT = {"ThreadDia": THREAD}
+# The thread runs the whole small step, seat-face stations 12.5 to 24.0.
+DIMENSION_TEXT = {"ThreadDia": f"{THREAD} FULL LENGTH OF STEP"}
 
 SURFACE_FINISHES = ()
 DRAWING_NOTES = (
