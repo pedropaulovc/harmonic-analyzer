@@ -338,7 +338,7 @@ test('assembly source witnesses cannot be borrowed into another footage identity
   assert.throws(() => new CompactVideoReference(track, video), /witness must belong to this footage/)
 })
 
-test('diagnostic publication restores a held normal publication and pending transaction after async success or failure', async () => {
+test('detached diagnostic publication preserves held live banks and a pending transaction after async success or failure', async () => {
   for (const failure of [false, true]) {
     const reference = new CompactVideoReference(fixture(), video)
     const published = reference.at(0)
@@ -353,10 +353,10 @@ test('diagnostic publication restores a held normal publication and pending tran
       capability = state
       assert.equal(state.sourceProof, false)
       assert.equal(state.sourceAcceptance, false)
-      const prepared = reference.prepareAt(0.5)
+      const prepared = state.reference.prepareAt(0.5)
       closeNumber(prepared.views[0].input.crankTurns, 0.09)
       assert.equal(state.snapshot().publishedSample.state, 'unavailable')
-      reference.commitPrepared()
+      state.reference.commitPrepared()
       const receipt = state.snapshot()
       assert.equal(receipt.prepareCount, 1)
       assert.equal(receipt.commitCount, 1)
@@ -365,8 +365,8 @@ test('diagnostic publication restores a held normal publication and pending tran
       closeNumber(state.snapshot().publishedSample.views[0].input.crankTurns, 0.09)
       await Promise.resolve()
       if (failure) {
-        assert.throws(() => reference.prepareAt(NaN), /finite/)
-        assert.throws(() => reference.commitPrepared(), /No successfully prepared/)
+        assert.throws(() => state.reference.prepareAt(NaN), /finite/)
+        assert.throws(() => state.reference.commitPrepared(), /No successfully prepared/)
         throw new Error('Diagnostic transaction control failure.')
       }
       return 'diagnostic-only'
@@ -377,6 +377,31 @@ test('diagnostic publication restores a held normal publication and pending tran
     assert.deepEqual(pending, pendingBefore)
     assert.equal(reference.commitPrepared(), pending)
     assert.throws(() => capability.snapshot(), /no longer active/)
+    assert.throws(() => capability.reference.prepareAt(0), /no longer active/)
+    assert.throws(() => capability.reference.commitPrepared(), /no longer active/)
     closeNumber(reference.at(0.5).views[0].input.crankTurns, 0.05)
   }
+})
+
+test('live consumers and overlapping detached publications never consume or invalidate each other’s banks', async () => {
+  const reference = new CompactVideoReference(fixture(), video)
+  const diagnostic = structuredClone(reference.at(0))
+  diagnostic.views[0].input.crankTurns = 0.09
+  await reference.withDiagnosticSamples([diagnostic], async first => {
+    const held = first.reference.prepareAt(0.5)
+    closeNumber(held.views[0].input.crankTurns, 0.09)
+    const live = reference.prepareAt(0.25)
+    await reference.withDiagnosticSamples([diagnostic], async second => {
+      second.reference.prepareAt(0.75)
+      closeNumber(second.reference.commitPrepared().views[0].input.crankTurns, 0.09)
+      assert.equal(reference.commitPrepared(), live)
+      closeNumber(live.views[0].input.crankTurns, 0.025)
+      assert.equal(first.reference.commitPrepared(), held)
+      assert.throws(() => second.reference.prepareAt(NaN), /finite/)
+      assert.throws(() => second.reference.commitPrepared(), /No successfully prepared/)
+      closeNumber(reference.at(0.5).views[0].input.crankTurns, 0.05)
+      closeNumber(first.snapshot().publishedSample.views[0].input.crankTurns, 0.09)
+    })
+    closeNumber(first.snapshot().publishedSample.views[0].input.crankTurns, 0.09)
+  })
 })

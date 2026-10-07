@@ -1132,7 +1132,8 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
   const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sourceSha256: LIVE_MODEL_SOURCE.sha256, sourceCommit: LIVE_MODEL_SOURCE.sourceCommit, sourceIntegrity: 'unmeasured', representation: null, representationIntegrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Every integer second, authored/visible change and actual source view remains mandatory; missing/failed required measurements never pass. Extra interior observations are diagnostic: missing/inadmissible oracles do not add certification prerequisites, but independently admitted measured pixel counterexamples still fail the stage. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
   const abort = new AbortController(), interrupt = () => abort.abort(new Error('Verification interrupted'))
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
-  let server, browser, context, page
+  let server, browser, context, page, browserAbortClose, closeBrowserOnAbort
+  let runtimeReady = false
   try {
     const referenceRoot = resolve(process.env.HARMONIC_REFERENCE_ROOT ?? resolve(WEB_ROOT, '.vite/reference-root'))
     report.builtAssets = await distManifest(resolve(WEB_ROOT, 'dist'))
@@ -1146,25 +1147,38 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
     for (const id of options.videos) {
       const video = { videoId: id, status: 'unavailable', failures: [], samples: [], playback: {}, source: null, coverage: null, maxErrorPx: null, unavailableReasons: [] }
       report.videos.push(video)
-      let census
+      let census, initializingRuntime = false
       try {
         if (abort.signal.aborted) throw abort.signal.reason
         const record = await loadRecord(id, referenceRoot, abort.signal)
-        // Invalid/missing current source authority must fail before starting GPU work.
-        if (!browser) {
+        video.source = { sha256: record.native.observedSha256, width: record.native.width, height: record.native.height, fps: record.native.fps, durationSeconds: record.native.durationSeconds, nativeFrameCount: record.native.nativeFrameCount, trackDigest: record.digest, nativeGeometryAssumptions: record.track.nativeGeometryAssumptions ?? record.observations.nativeGeometryAssumptions ?? [], geometricExceptionsInterpretation: 'Narrow retained source/native exceptions remain uncertified, never whole-view or landmark waivers.' }
+        // Source failures remain per-video and fail before GPU work. Shared startup
+        // failures are terminal: partial resources stay owned by the outer cleanup.
+        if (!runtimeReady) {
+          initializingRuntime = true
           server = await serveDist(resolve(WEB_ROOT, 'dist'), { referenceRoot, requests: report.serverRequests, signal: abort.signal, base: process.env.SIMULATOR_BASE })
           report.baseUrl = server.url
           const { chromium } = await import('playwright')
           const softwareGl = process.env.HARMONIC_SOFTWARE_GL === '1'
           report.rendererChoice = softwareGl ? 'explicit-swiftshader' : 'native-browser-default'
           browser = await chromium.launch({ executablePath: process.env.HARMONIC_CHROME ?? '/usr/bin/google-chrome', headless: !options.headed, args: [...(softwareGl ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : []), '--no-sandbox', '--disable-dev-shm-usage'], timeout: 30_000 })
-          abort.signal.addEventListener('abort', () => void browser.close(), { once: true })
+          const ownedBrowser = browser
+          closeBrowserOnAbort = () => {
+            browserAbortClose = ownedBrowser.close().catch(error => {
+              report.failures.push({ code: 'browser-cleanup', reason: error.message, stack: error.stack })
+              console.error(`Verification browser abort cleanup failed (${outputDirectory}):`, error)
+            })
+          }
+          abort.signal.addEventListener('abort', closeBrowserOnAbort, { once: true })
+          if (abort.signal.aborted) { closeBrowserOnAbort(); throw abort.signal.reason }
           context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 }); context.setDefaultTimeout(20_000)
           page = await context.newPage()
           page.on('pageerror', error => report.browserLog.push({ type: 'pageerror', reason: error.message }))
           report.browserVersion = browser.version()
+          if (abort.signal.aborted) throw abort.signal.reason
+          runtimeReady = true
+          initializingRuntime = false
         }
-        video.source = { sha256: record.native.observedSha256, width: record.native.width, height: record.native.height, fps: record.native.fps, durationSeconds: record.native.durationSeconds, nativeFrameCount: record.native.nativeFrameCount, trackDigest: record.digest, nativeGeometryAssumptions: record.track.nativeGeometryAssumptions ?? record.observations.nativeGeometryAssumptions ?? [], geometricExceptionsInterpretation: 'Narrow retained source/native exceptions remain uncertified, never whole-view or landmark waivers.' }
         const staticControls = await staticSourceControls(record)
         video.source.staticMotionDiagnostics = staticControls.diagnostics
         video.shots = record.track.shots.map(shot => ({ id: shot.id, internalMechanismMotion: shot.internalMechanismMotion ?? 'unknown', internalMotionEvidence: shot.internalMotionEvidence ?? null, sourceStaticControls: staticControls.shots.get(shot.id) ?? null }))
@@ -1197,7 +1211,10 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
           catch (error) { if (video.playback.youtube) Object.assign(video.playback.youtube, { status: 'failed', reason: error.message }); video.failures.push({ code: 'youtube-playback', reason: error.message }) }
         }
         finishVideo(video, census, options)
-      } catch (error) { video.failures.push({ code: 'video-prerequisite', reason: error.message }); video.unavailableReasons.push({ reason: error.message }) }
+      } catch (error) {
+        if (initializingRuntime) throw error
+        video.failures.push({ code: 'video-prerequisite', reason: error.message }); video.unavailableReasons.push({ reason: error.message })
+      }
       if (census) {
         const measuredTimes = new Set(video.samples.filter(sample => !sample.diagnosticOnly).map(sample => sample.timeSeconds.toFixed(6)))
         const unmeasured = census.selected.filter(row => !row.diagnosticOnly && !measuredTimes.has(row.timeSeconds.toFixed(6)))
@@ -1210,12 +1227,14 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
     if (report.browserLog.some(item => item.type === 'pageerror')) report.failures.push({ code: 'unhandled-browser-error', reasons: report.browserLog })
     report.status = options.scoped ? 'partial' : report.videos.length === options.videos.length && report.videos.every(video => video.status === 'passed') && !report.failures.length ? 'passed' : report.videos.some(video => video.status === 'failed' || video.stageMeasurement?.status === 'failed') ? 'failed' : 'unavailable'
   } catch (error) {
-    report.failures.push({ code: 'verification-prerequisite', reason: error.message })
+    report.failures.push({ code: 'verification-prerequisite', reason: error.message, stack: error.stack })
     console.error(`Verification failed; preserving measured evidence in ${outputDirectory}:`, error)
   }
   finally {
+    if (closeBrowserOnAbort) abort.signal.removeEventListener('abort', closeBrowserOnAbort)
+    await browserAbortClose
     for (const [name, value] of [['page', page], ['context', context], ['browser', browser], ['server', server]]) try { await value?.close() } catch (error) {
-      report.failures.push({ code: `${name}-cleanup`, reason: error.message })
+      report.failures.push({ code: `${name}-cleanup`, reason: error.message, stack: error.stack })
       console.error(`Verification ${name} cleanup failed (${outputDirectory}):`, error)
     }
     process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt)

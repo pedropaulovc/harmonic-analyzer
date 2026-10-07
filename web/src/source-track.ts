@@ -138,7 +138,6 @@ interface CompiledTrackView {
   inputChangesToNext: boolean
   phaseDeltasToNext: Float64Array | null
   cameraInterpolatesToNext: boolean
-  inputValidated: boolean
 }
 interface CompiledTrackFrame {
   observation: CompactSourceFrame
@@ -155,6 +154,20 @@ interface TrackBuffer {
   views: Map<string, PlaybackView>
 }
 
+interface PublicationBanks {
+  buffers: [TrackBuffer, TrackBuffer]
+  publishedIndex: 0 | 1
+  preparedIndex: 0 | 1 | null
+  inputValidated: WeakSet<CompiledTrackView>
+  diagnostic: DiagnosticSourceLease | null
+}
+
+export interface SourcePublicationReference {
+  readonly approximationMessage: string
+  prepareAt(timeSeconds: number): SourceSample
+  commitPrepared(): SourceSample
+}
+
 export interface DiagnosticSourcePublicationSnapshot {
   /** Actual method-entry attempts, including rejected calls; the bank records publication. */
   prepareCount: number
@@ -168,6 +181,8 @@ export interface DiagnosticSourcePublicationState {
   readonly sourceAcceptance: false
   readonly prepareAtImplementation: string
   readonly commitPreparedImplementation: string
+  /** Detached banks using the same production preparation/commit implementation. */
+  readonly reference: SourcePublicationReference
   snapshot(): DiagnosticSourcePublicationSnapshot
 }
 interface DiagnosticSourceLease {
@@ -193,10 +208,7 @@ export class CompactVideoReference {
   readonly approximationMessage: string
   readonly stageStatus = UNMEASURED_STAGES
   private readonly frames: CompiledTrackFrame[]
-  private readonly buffers: [TrackBuffer, TrackBuffer] = [buffer(), buffer()]
-  private publishedIndex: 0 | 1 = 0
-  private preparedIndex: 0 | 1 | null = null
-  private diagnosticLease: DiagnosticSourceLease | null = null
+  private readonly publication: PublicationBanks = { buffers: [buffer(), buffer()], publishedIndex: 0, preparedIndex: null, inputValidated: new WeakSet(), diagnostic: null }
   private readonly qa = new Quaternion()
   private readonly qb = new Quaternion()
   private readonly qi = new Quaternion()
@@ -284,7 +296,7 @@ export class CompactVideoReference {
         if (view.cameraContinuityFamily !== undefined && !view.cameraContinuityFamily.trim()) throw new Error(`${label}: camera continuity family is empty.`)
         if (view.cameraInterpolation !== undefined && (typeof view.cameraInterpolation !== 'string' || !['continuous-shot', 'held'].includes(view.cameraInterpolation))) throw new Error(`${label}: unknown camera interpolation policy.`)
         if (view.cameraInterpolation === 'continuous-shot' && (typeof view.cameraInterpolationEvidence !== 'string' || !view.cameraInterpolationEvidence.trim())) throw new Error(`${label}: continuous-shot camera interpolation needs explicit evidence.`)
-        return { observation: view, input, sourceAssembly, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false, inputValidated: false }
+        return { observation: view, input, sourceAssembly, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false }
       })
       return { observation: frame, required, layout, views, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available: pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null)) }
     })
@@ -339,11 +351,15 @@ export class CompactVideoReference {
   }
 
   prepareAt(timeSeconds: number): SourceSample {
-    const diagnostic = this.diagnosticLease
+    return this.prepareAtIn(timeSeconds, this.publication)
+  }
+
+  private prepareAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample {
+    const diagnostic = publication.diagnostic
     if (diagnostic) diagnostic.prepareCount++
-    this.preparedIndex = null
-    const nextIndex = this.publishedIndex === 0 ? 1 : 0
-    const { sample, views: pool } = this.buffers[nextIndex]
+    publication.preparedIndex = null
+    const nextIndex = publication.publishedIndex === 0 ? 1 : 0
+    const { sample, views: pool } = publication.buffers[nextIndex]
     const t = Math.max(0, Math.min(this.data.source.durationSeconds, finite(timeSeconds, 'Playback time')))
     const index = this.indexAt(t)
     const from = this.frames[index]!
@@ -381,9 +397,9 @@ export class CompactVideoReference {
           solveSourceInput(out.input, EMPTY_CONSTRAINTS, this.pose)
         } else {
           copyInput(out.input, a.input!)
-          if (!a.inputValidated) {
+          if (!publication.inputValidated.has(a)) {
             solveSourceInput(out.input, EMPTY_CONSTRAINTS, this.pose)
-            a.inputValidated = true
+            publication.inputValidated.add(a)
           }
         }
         // No declared feasible assembly interpolation API: hold the exact source exposure.
@@ -437,16 +453,20 @@ export class CompactVideoReference {
       sample.unobservedInputFields = held.unobservedInputFields
       sample.nativeGeometryAssumptions = held.nativeGeometryAssumptions
     }
-    this.preparedIndex = nextIndex
+    publication.preparedIndex = nextIndex
     return sample
   }
 
   commitPrepared(): SourceSample {
-    if (this.diagnosticLease) this.diagnosticLease.commitCount++
-    if (this.preparedIndex === null) throw new Error('No successfully prepared compact source sample is available.')
-    this.publishedIndex = this.preparedIndex
-    this.preparedIndex = null
-    return this.buffers[this.publishedIndex].sample
+    return this.commitPreparedIn(this.publication)
+  }
+
+  private commitPreparedIn(publication: PublicationBanks): SourceSample {
+    if (publication.diagnostic) publication.diagnostic.commitCount++
+    if (publication.preparedIndex === null) throw new Error('No successfully prepared compact source sample is available.')
+    publication.publishedIndex = publication.preparedIndex
+    publication.preparedIndex = null
+    return publication.buffers[publication.publishedIndex].sample
   }
 
   at(timeSeconds: number): SourceSample {
@@ -455,11 +475,12 @@ export class CompactVideoReference {
   }
 
   /**
-   * Diagnostic-only materialization through this instance's real publication transaction.
-   * Main owns the gated render lease; no source track or acceptance state is replaced.
+   * Diagnostic-only materialization in detached banks. Compiled observations are
+   * shared read-only; pools and feasibility-validation caches belong to each
+   * publication. Preparation is synchronous, so solver/quaternion scratch never
+   * escapes a call or crosses an asynchronous callback boundary.
    */
   async withDiagnosticSamples<T>(samples: readonly SourceSample[], run: (state: DiagnosticSourcePublicationState) => T | Promise<T>): Promise<T> {
-    if (this.diagnosticLease) throw new Error('A diagnostic source publication lease is already active.')
     if (!Array.isArray(samples) || !samples.length) throw new Error('Diagnostic source publication requires exposure samples.')
     let previous = -Infinity
     const ownedSamples = samples.map((sample) => {
@@ -468,44 +489,35 @@ export class CompactVideoReference {
       previous = time
       return structuredClone(sample)
     })
-    const temporary: [TrackBuffer, TrackBuffer] = [buffer(), buffer()]
-    const original: [TrackBuffer, TrackBuffer] = [this.buffers[0], this.buffers[1]]
-    const originalPublishedIndex = this.publishedIndex
-    const originalPreparedIndex = this.preparedIndex
-    const originalInputValidation = this.frames.map((frame) => frame.views.map((view) => view.inputValidated))
     const lease: DiagnosticSourceLease = { samples: ownedSamples, prepareCount: 0, commitCount: 0 }
+    const publication: PublicationBanks = { buffers: [buffer(), buffer()], publishedIndex: 0, preparedIndex: null, inputValidated: new WeakSet(), diagnostic: lease }
+    let active = true
+    const requirePublication = () => { if (!active) throw new Error('The diagnostic source publication lease is no longer active.') }
+    const scopedReference: SourcePublicationReference = Object.freeze({
+      approximationMessage: this.approximationMessage,
+      prepareAt: (timeSeconds: number) => { requirePublication(); return this.prepareAtIn(timeSeconds, publication) },
+      commitPrepared: () => { requirePublication(); return this.commitPreparedIn(publication) },
+    })
     const state: DiagnosticSourcePublicationState = Object.freeze({
       sourceProof: false,
       sourceAcceptance: false,
-      prepareAtImplementation: this.prepareAt.toString(),
-      commitPreparedImplementation: this.commitPrepared.toString(),
+      reference: scopedReference,
+      prepareAtImplementation: this.prepareAtIn.toString(),
+      commitPreparedImplementation: this.commitPreparedIn.toString(),
       snapshot: (): DiagnosticSourcePublicationSnapshot => {
-        if (this.diagnosticLease !== lease) throw new Error('The diagnostic source publication lease is no longer active.')
+        requirePublication()
         return {
           prepareCount: lease.prepareCount,
           commitCount: lease.commitCount,
-          publishedBank: this.publishedIndex,
-          publishedSample: structuredClone(this.buffers[this.publishedIndex].sample),
+          publishedBank: publication.publishedIndex,
+          publishedSample: structuredClone(publication.buffers[publication.publishedIndex].sample),
         }
       },
     })
-    this.buffers[0] = temporary[0]
-    this.buffers[1] = temporary[1]
-    this.publishedIndex = 0
-    this.preparedIndex = null
-    this.diagnosticLease = lease
     try {
       return await run(state)
     } finally {
-      this.buffers[0] = original[0]
-      this.buffers[1] = original[1]
-      this.publishedIndex = originalPublishedIndex
-      this.preparedIndex = originalPreparedIndex
-      for (let frameIndex = 0; frameIndex < this.frames.length; frameIndex++) {
-        const views = this.frames[frameIndex]!.views
-        for (let viewIndex = 0; viewIndex < views.length; viewIndex++) views[viewIndex]!.inputValidated = originalInputValidation[frameIndex]![viewIndex]!
-      }
-      this.diagnosticLease = null
+      active = false
     }
   }
 }

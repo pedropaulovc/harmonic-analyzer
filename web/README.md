@@ -416,6 +416,15 @@ The verifier serves `dist/`, exercises the original media, and reports per-video
 coverage, rendered landmark errors and timing. Incremental runs are repeatable;
 there is no acceptance-attempt quota. The default final target is 5% of each
 source frame's width, with clock skew no greater than 0.5 seconds.
+Original-source authority is validated before lazy shared browser startup. Shared
+startup becomes ready only after server, browser, context and page acquisition;
+failure is one terminal verification prerequisite with acquired-resource cleanup,
+not repeated per-video launch attempts. Missing originals remain per-video failures.
+Verification-only publications use detached banks: ordinary playback and trusted
+manual/layout intent resume the real frame rather than inheriting a diagnostic
+candidate. Pending or expired publications refuse instead of rolling back newer
+state. See [`DESIGN.md`](DESIGN.md#browser-verification) for ownership and unexercised
+failure-path limits; diagnostic controls never qualify source fidelity.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.
 Diagnostic landmark receipts also retain the actual native marker's world

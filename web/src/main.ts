@@ -4,7 +4,7 @@ import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, physicalChannelAngle, squareW
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
 import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT_PX, type PlaybackView, type ReferenceState, type SourceSample } from './timeline'
-import type { CompactVideoReference, DiagnosticSourcePublicationState } from './source-track'
+import type { CompactVideoReference, DiagnosticSourcePublicationState, SourcePublicationReference } from './source-track'
 import { createSourceVideoPlayer } from './source-player'
 import { INPUT_FIELDS, equalRecord, type InputField } from './source-witness'
 import { unavailableNativePrimitiveSnapshot, type NativeInputSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmissionMetadata, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
@@ -78,8 +78,11 @@ let referenceState: ReferenceState = 'unavailable'
 let modelState: 'loading' | 'ready' | 'unavailable' = 'loading'
 let nativeDiagnosticLeaseActive = false
 let nativeDiagnosticRefusal: string | null = null
+let resumeNativeDiagnosticSource: (() => void) | null = null
 function invalidateNativeDiagnosticLease(reason: string): void {
-  if (nativeDiagnosticLeaseActive) nativeDiagnosticRefusal ??= reason
+  if (!nativeDiagnosticLeaseActive || nativeDiagnosticRefusal !== null) return
+  nativeDiagnosticRefusal = reason
+  resumeNativeDiagnosticSource?.()
 }
 interface NativeDiagnosticRestoration {
   status: 'restored' | 'superseded' | 'failed'
@@ -154,6 +157,45 @@ interface MechanismDraw {
   penTravelM: number
   effectiveBankDriveTurns: number
 }
+
+interface NativeDiagnosticFrame {
+  input: MechanismInput
+  machineInput: MechanismInput
+  camera: CameraRecord
+  assembly: CompiledSourceAssembly
+  views: readonly PlaybackView[]
+  layout: readonly CapturedSourceLayoutEntry[]
+  mode: 'following-video' | 'exploring' | 'reference-review'
+  referenceState: ReferenceState
+  modelTime: number
+  sourceDrawTimeSeconds: number
+  sourceDrawRevision: number
+  sourceDrawLayout: readonly SourceLayoutEntry[]
+  manualMotion: 'idle' | 'turning'
+  manualRevision: 'pending' | 'clean'
+  explorationOrigin: 'interactive-default' | 'chosen-feasible-reconstruction'
+  diagnosticReference: CompactVideoReference | null
+  diagnosticMachine: Machine | null
+  physicsState: 'available' | 'unavailable'
+  sourceNotice: string
+  physicsNotice: string
+  draws: Map<string, MechanismDraw>
+  controlsTarget: Viewer['controls']['target']
+  controlsEnabled: boolean
+  enableDamping: boolean
+  autoRotate: boolean
+  cameraUp: Viewer['camera']['up']
+  cameraNear: number
+  cameraFar: number
+  cameraLayers: number
+  cameraScale: Viewer['camera']['scale']
+  cameraZoom: number
+  cameraFocus: number
+  cameraFilmGauge: number
+  cameraFilmOffset: number
+  cameraAspect: number
+  cameraView: Viewer['camera']['view']
+}
 const mechanismDraws = new Map<string, MechanismDraw>()
 let sourceDrawTimeSeconds = 0
 let sourceDrawRevision = 0
@@ -187,7 +229,7 @@ function cameraRecord(): CameraRecord {
 }
 
 function configureLandmarkProbe(): void {
-  if (nativeDiagnosticLeaseActive) return
+  if (nativeDiagnosticLeaseActive && nativeDiagnosticRefusal === null) return
   const enabled = verificationEnabled && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused'
     && reference !== null && machine?.availability === 'available'
   if (enabled ? diagnosticReference === reference && diagnosticMachine === machine : diagnosticReference === null && diagnosticMachine === null) return
@@ -389,19 +431,19 @@ function sourceCapture<T extends {
 }
 
 
-function renderSource(timeSeconds: number): void {
+function renderSource(timeSeconds: number, sourceReference: SourcePublicationReference | null = reference): void {
   configureLandmarkProbe()
-  if (!reference || !machine || machine.availability !== 'available') {
+  if (!sourceReference || !machine || machine.availability !== 'available') {
     referenceState = 'unavailable'
     renderPending()
     return
   }
-  const prepared = reference.prepareAt(timeSeconds)
+  const prepared = sourceReference.prepareAt(timeSeconds)
   if (prepared.state !== 'unavailable') {
     validateSourceViews(prepared.views)
     viewer.preflightViews(prepared.views)
   }
-  const sample = reference.commitPrepared()
+  const sample = sourceReference.commitPrepared()
   referenceState = sample.state
   activeViews = sample.views
   if (sample.state === 'unavailable') {
@@ -421,7 +463,7 @@ function renderSource(timeSeconds: number): void {
   }
   modelTime = timeSeconds
   notice(physicsError, '')
-  notice(sourceError, reference.approximationMessage)
+  notice(sourceError, sourceReference.approximationMessage)
 }
 
 function beforeView(_view: SourceView, index: number): void {
@@ -498,8 +540,8 @@ function updateHud(): void {
 }
 
 function editMechanism(action: () => void): void {
-  if (mode !== 'exploring' || modelState !== 'ready') return
   invalidateNativeDiagnosticLease('Manual mechanism input changed')
+  if (mode !== 'exploring' || modelState !== 'ready') return
   action()
   manualRevision = 'pending'
   updateHud()
@@ -634,6 +676,7 @@ async function selectVideo(next: Video): Promise<void> {
 }
 
 function selectRoute(): void {
+  invalidateNativeDiagnosticLease('The selected native/source route changed')
   try { void selectVideo(resolveVideo(location.search)) }
   catch (error) {
     selectionAbort?.abort()
@@ -652,6 +695,7 @@ function selectRoute(): void {
 }
 
 async function fetchMachine(): Promise<void> {
+  invalidateNativeDiagnosticLease('The native model is being reloaded')
   modelState = 'loading'
   physicsState = 'unavailable'
   loading.hidden = false
@@ -684,7 +728,7 @@ function tick(now: number): void {
   requestAnimationFrame(tick)
   const elapsed = Math.min((now - lastTick) / 1000, 0.25)
   lastTick = now
-  if (nativeDiagnosticLeaseActive) return
+  if (nativeDiagnosticLeaseActive && nativeDiagnosticRefusal === null) return
   try {
     if (mode === 'following-video' && player) {
       renderSource(player.getTime())
@@ -750,8 +794,8 @@ cone.addEventListener('input', () => editMechanism(() => {
 pinion.addEventListener('input', () => editMechanism(() => { input.setup.pinionCamRad = Number(pinion.value) }))
 platen.addEventListener('input', () => editMechanism(() => { input.setup.platenOffsetM = Number(platen.value) }))
 manualRunButton.addEventListener('click', () => {
-  if (mode !== 'exploring') return
   invalidateNativeDiagnosticLease('Manual crank motion changed')
+  if (mode !== 'exploring') return
   manualMotion = manualMotion === 'idle' ? 'turning' : 'idle'
   manualRunButton.textContent = manualMotion === 'turning' ? 'Stop crank' : 'Turn crank'
 })
@@ -768,8 +812,8 @@ pauseButton.addEventListener('click', () => {
   else player?.play()
 })
 followButton.addEventListener('click', () => {
-  if (!player) return
   invalidateNativeDiagnosticLease('Source-following was requested')
+  if (!player) return
   try {
     renderSource(player.getTime())
     if (referenceState === 'unavailable') return
@@ -778,11 +822,12 @@ followButton.addEventListener('click', () => {
   } catch (error) { notice(physicsError, error instanceof Error ? error.message : String(error)) }
 })
 fitButton.addEventListener('click', () => {
-  if (mode !== 'exploring') return
   invalidateNativeDiagnosticLease('Manual camera fitting was requested')
+  if (mode !== 'exploring') return
   viewer.fitView()
 })
 compactButton.addEventListener('click', () => {
+  invalidateNativeDiagnosticLease('The player layout changed')
   playerSize = playerSize === 'expanded' ? 'compact' : 'expanded'
   videoDock.dataset.size = playerSize
   workspace.dataset.playerSize = playerSize
@@ -790,13 +835,12 @@ compactButton.addEventListener('click', () => {
   compactButton.setAttribute('aria-expanded', String(playerSize === 'expanded'))
   viewer.resize()
   paintRevision = 'pending'
-  invalidateNativeDiagnosticLease('The player layout changed')
 })
 retryModel.addEventListener('click', () => { void fetchMachine() })
 window.addEventListener('popstate', selectRoute)
 for (const type of ['pointerdown', 'wheel'] as const) canvas.addEventListener(type, (event) => {
-  if (event.isTrusted && mode === 'exploring') invalidateNativeDiagnosticLease('Manual camera interaction began')
-})
+  if (event.isTrusted) invalidateNativeDiagnosticLease('Manual camera interaction began')
+}, { capture: true })
 
 if (verificationEnabled) {
   const bridge = {
@@ -809,19 +853,23 @@ if (verificationEnabled) {
       const actualPlayer = player
       const actualPlaybackState = actualPlayer?.getState()
       const actualSourceTime = actualPlayer?.getTime()
-      const saved = {
+      const captureFrame = (): NativeDiagnosticFrame => ({
         input: structuredClone(input), machineInput: structuredClone(actualMachine.input), camera: cameraRecord(), assembly: currentAssembly,
-        views: activeViews, layout: captureSourceLayout(activeViews), mode, referenceState, modelTime, sourceDrawTimeSeconds, sourceDrawRevision, sourceDrawLayout,
-        manualMotion, manualRevision, explorationOrigin, diagnosticReference, diagnosticMachine,
+        // Saved ownership is a whole frame, never live pooled PlaybackViews.
+        views: structuredClone(activeViews), layout: captureSourceLayout(activeViews), mode, referenceState, modelTime, sourceDrawTimeSeconds, sourceDrawRevision, sourceDrawLayout,
+        manualMotion, manualRevision, explorationOrigin, diagnosticReference, diagnosticMachine, physicsState,
+        sourceNotice: sourceError.textContent ?? '', physicsNotice: physicsError.textContent ?? '',
         draws: new Map([...mechanismDraws].map(([id, draw]) => [id, structuredClone(draw)])),
         controlsTarget: viewer.controls.target.clone(), controlsEnabled: viewer.controls.enabled,
         enableDamping: viewer.controls.enableDamping, autoRotate: viewer.controls.autoRotate,
-        canvasStyle: canvas.style.cssText, pixelRatio: viewer.renderer.getPixelRatio(),
-        sceneBackground: viewer.scene.background, sceneEnvironment: viewer.scene.environment,
         cameraUp: viewer.camera.up.clone(), cameraNear: viewer.camera.near, cameraFar: viewer.camera.far, cameraLayers: viewer.camera.layers.mask,
         cameraScale: viewer.camera.scale.clone(), cameraZoom: viewer.camera.zoom, cameraFocus: viewer.camera.focus,
         cameraFilmGauge: viewer.camera.filmGauge, cameraFilmOffset: viewer.camera.filmOffset, cameraAspect: viewer.camera.aspect,
         cameraView: viewer.camera.view ? { ...viewer.camera.view } : null,
+      })
+      const saved = {
+        ...captureFrame(), canvasStyle: canvas.style.cssText, pixelRatio: viewer.renderer.getPixelRatio(),
+        sceneBackground: viewer.scene.background, sceneEnvironment: viewer.scene.environment,
       }
       const rendererMethods = ['render', 'clear', 'setRenderTarget', 'readRenderTargetPixels'] as const
       const originals = rendererMethods.map(key => ({ key, value: viewer.renderer[key] }))
@@ -834,26 +882,104 @@ if (verificationEnabled) {
       lastNativeDiagnosticRestoration = null
       let publicationActive = false
       let contextLive = true
-      const ownsSourceState = () => {
-        if (machine !== actualMachine || reference !== actualReference || player !== actualPlayer) {
-          nativeDiagnosticRefusal ??= 'The selected native/source context changed'
-        } else if (actualPlayer?.getState() !== actualPlaybackState || actualPlayer?.getTime() !== actualSourceTime) {
-          nativeDiagnosticRefusal ??= 'The actual source playback state or clock changed'
-        }
-        return nativeDiagnosticRefusal === null
-      }
+      let sourceResumed = false
+      let restored = false
+      let pendingPublicationRefused = false
+      const cleanupErrors: unknown[] = []
+      const restore = (action: () => void) => { try { action() } catch (error) { cleanupErrors.push(error) } }
       const throwCleanupFailures = (errors: unknown[], failed: boolean, original: unknown) => {
         if (!errors.length) return
         if (failed) throw new AggregateError([original, ...errors], 'Native diagnostic callback and cleanup both failed', { cause: original })
         if (errors.length === 1) throw errors[0]
         throw new AggregateError(errors, 'Native diagnostic cleanup failed')
       }
-      let callbackFailed = false
-      let callbackError: unknown
+      const restoreFrame = (frame: NativeDiagnosticFrame) => {
+        mode = frame.mode
+        referenceState = frame.referenceState
+        activeViews = frame.views
+        modelTime = frame.modelTime
+        manualMotion = frame.manualMotion
+        explorationOrigin = frame.explorationOrigin
+        diagnosticReference = frame.diagnosticReference
+        diagnosticMachine = frame.diagnosticMachine
+        copyInput(frame.input)
+        updateMachine(frame.machineInput, frame.assembly)
+        viewer.setInteraction(mode === 'exploring' ? 'exploring' : 'following-video')
+        viewer.controls.enabled = frame.controlsEnabled
+        viewer.controls.enableDamping = false
+        viewer.controls.autoRotate = false
+        viewer.applyCamera(frame.camera)
+        // Ownership restores exact solved bits, not normalized authored bits.
+        viewer.camera.position.fromArray(frame.camera.positionMetres)
+        viewer.camera.quaternion.fromArray(frame.camera.quaternion)
+        viewer.camera.up.copy(frame.cameraUp)
+        viewer.camera.near = frame.cameraNear
+        viewer.camera.far = frame.cameraFar
+        viewer.camera.layers.mask = frame.cameraLayers
+        viewer.camera.scale.copy(frame.cameraScale)
+        viewer.camera.zoom = frame.cameraZoom
+        viewer.camera.focus = frame.cameraFocus
+        viewer.camera.filmGauge = frame.cameraFilmGauge
+        viewer.camera.filmOffset = frame.cameraFilmOffset
+        viewer.camera.aspect = frame.cameraAspect
+        viewer.camera.view = frame.cameraView ? { ...frame.cameraView } : null
+        viewer.camera.updateProjectionMatrix()
+        viewer.camera.updateMatrixWorld(true)
+        viewer.controls.target.copy(frame.controlsTarget)
+        if (frame.mode !== 'exploring' && frame.views.length) drawSourceViews(frame.views, frame.modelTime)
+        else if (frame.mode !== 'exploring' && frame.referenceState === 'no-machine') viewer.renderViews([], undefined, frame.modelTime)
+        else viewer.render(frame.assembly.state)
+        sourceDrawRevision = frame.sourceDrawRevision
+        sourceDrawTimeSeconds = frame.sourceDrawTimeSeconds
+        sourceDrawLayout = frame.sourceDrawLayout
+        mechanismDraws.clear()
+        for (const [id, draw] of frame.draws) mechanismDraws.set(id, draw)
+        physicsState = frame.physicsState
+        manualRevision = frame.manualRevision
+        paintRevision = 'clean'
+        viewer.controls.enableDamping = frame.enableDamping
+        viewer.controls.autoRotate = frame.autoRotate
+        notice(sourceError, frame.sourceNotice)
+        notice(physicsError, frame.physicsNotice)
+        manualRunButton.textContent = manualMotion === 'turning' ? 'Stop crank' : 'Turn crank'
+      }
+      const resumeSource = () => {
+        if (sourceResumed) return
+        sourceResumed = true
+        // Reestablish the real frame/resources synchronously before ordinary
+        // intent; no action consumer can start from a diagnostic candidate.
+        for (const { key, value } of originals) restore(() => { Object.defineProperty(viewer.renderer, key, { configurable: true, writable: true, value }) })
+        for (const { key, value } of glOriginals) restore(() => { Object.defineProperty(gl, key, { configurable: true, writable: true, value }) })
+        restore(() => { canvas.style.cssText = saved.canvasStyle })
+        restore(() => { viewer.renderer.setPixelRatio(saved.pixelRatio); viewer.resize() })
+        viewer.scene.background = saved.sceneBackground
+        viewer.scene.environment = saved.sceneEnvironment
+        restore(() => { viewerLease.restoreProbes() })
+        if (machine === actualMachine && reference === actualReference && player === actualPlayer) restore(() => {
+          restoreFrame(saved)
+          restored = true
+        })
+        restore(() => { viewerLease.release() })
+        lastTick = performance.now()
+        updateControlState()
+        // The initiating input event already changed its DOM value. Refreshing
+        // the HUD here would replace that intent before the action reads it.
+      }
+      resumeNativeDiagnosticSource = resumeSource
+      const ownsSourceState = () => {
+        if (machine !== actualMachine || reference !== actualReference || player !== actualPlayer) {
+          invalidateNativeDiagnosticLease('The selected native/source context changed')
+        } else if (actualPlayer?.getState() !== actualPlaybackState || actualPlayer?.getTime() !== actualSourceTime) {
+          invalidateNativeDiagnosticLease('The actual source playback state or clock changed')
+        }
+        return nativeDiagnosticRefusal === null
+      }
       const requireLease = () => {
         if (!contextLive || !nativeDiagnosticLeaseActive) throw new Error('The native diagnostic lease expired')
         if (!ownsSourceState()) throw new Error(`The native diagnostic lease was superseded: ${nativeDiagnosticRefusal}`)
       }
+      let callbackFailed = false
+      let callbackError: unknown
       try {
         const result = await run({
           viewer, machine: actualMachine, input, provenance: actualMachine.provenance,
@@ -869,28 +995,28 @@ if (verificationEnabled) {
             requireLease()
             if (!actualReference || publicationActive || typeof callback !== 'function') throw new Error('Diagnostic publication requires the same loaded source reference and a single callback')
             publicationActive = true
-            const publicationState = { mode, referenceState, activeViews, modelTime, sourceDrawRevision, sourceDrawTimeSeconds, sourceDrawLayout,
-              input: structuredClone(input), machineInput: structuredClone(actualMachine.input), assembly: currentAssembly, camera: cameraRecord() }
+            const publicationState = captureFrame()
             let publicationFailed = false
             let publicationError: unknown
             try {
               viewer.setLandmarkProbe(actualMachine.createLandmarkProbe(anchors))
-              return await actualReference.withDiagnosticSamples(samples, (state: DiagnosticSourcePublicationState) => {
+              return await actualReference.withDiagnosticSamples(samples, async (state: DiagnosticSourcePublicationState) => {
                 let active = true
                 const requireTransaction = () => { requireLease(); if (!active) throw new Error('The diagnostic publication transaction has expired') }
                 const transaction: NativeDiagnosticPublication = {
                   implementation: { renderSourceText: renderSource.toString(), prepareAtText: state.prepareAtImplementation, commitPreparedText: state.commitPreparedImplementation },
-                  renderSource(timeSeconds) { requireTransaction(); renderSource(timeSeconds) },
+                  renderSource(timeSeconds) { requireTransaction(); renderSource(timeSeconds, state.reference) },
                   snapshot() {
                     requireTransaction()
                     return { ...state.snapshot(), sourceProof: false, sourceAcceptance: false, activeViews: structuredClone(activeViews),
                       referenceState, modelTime, sourceDrawRevision, paintRevision, externalInput: structuredClone(serializeInput(input)) }
                   },
                 }
-                return Promise.resolve(callback(transaction)).then((value) => {
+                try {
+                  const value = await callback(transaction)
                   requireTransaction()
                   return value
-                }).finally(() => { active = false })
+                } finally { active = false }
               })
             } catch (error) {
               publicationFailed = true
@@ -899,19 +1025,13 @@ if (verificationEnabled) {
             } finally {
               const errors: unknown[] = []
               try {
-                // A newer playback/route/manual owner must never receive this
-                // transaction's former source state, even before outer cleanup.
-                if (contextLive && nativeDiagnosticLeaseActive && ownsSourceState()) {
-                  mode = publicationState.mode
-                  referenceState = publicationState.referenceState
-                  activeViews = publicationState.activeViews
-                  modelTime = publicationState.modelTime
-                  sourceDrawRevision = publicationState.sourceDrawRevision
-                  sourceDrawTimeSeconds = publicationState.sourceDrawTimeSeconds
-                  sourceDrawLayout = publicationState.sourceDrawLayout
-                  copyInput(publicationState.input)
-                  updateMachine(publicationState.machineInput, publicationState.assembly)
-                  viewer.applyCamera(publicationState.camera)
+                // Local context expiry, not a global active flag, prevents a
+                // late callback from restoring over another owner or lease.
+                if (contextLive && !sourceResumed && ownsSourceState()) {
+                  viewer.setLandmarkProbe(publicationState.diagnosticReference === actualReference
+                    ? actualMachine.createLandmarkProbe(actualReference.data.anchors) : null)
+                  viewer.setPartVisibilityProbe(null)
+                  restoreFrame(publicationState)
                 }
               } catch (error) { errors.push(error) }
               finally { publicationActive = false }
@@ -919,6 +1039,10 @@ if (verificationEnabled) {
             }
           },
         })
+        if (publicationActive) {
+          pendingPublicationRefused = true
+          throw new Error('The native diagnostic lease callback returned with a publication still pending; await withPublicationSamples before returning')
+        }
         requireLease()
         return result
       } catch (error) {
@@ -928,104 +1052,21 @@ if (verificationEnabled) {
       } finally {
         contextLive = false
         const owned = ownsSourceState()
-        const errors: unknown[] = []
-        const restore = (action: () => void) => { try { action() } catch (error) { errors.push(error) } }
-        const currentCamera = owned ? saved.camera : cameraRecord()
-        const currentTarget = viewer.controls.target.clone()
-        const currentControlsEnabled = viewer.controls.enabled
-        let restored = false
-        try {
-          // Resource ownership is unconditional; source-state ownership is not.
-          for (const { key, value } of originals) restore(() => { Object.defineProperty(viewer.renderer, key, { configurable: true, writable: true, value }) })
-          for (const { key, value } of glOriginals) restore(() => { Object.defineProperty(gl, key, { configurable: true, writable: true, value }) })
-          restore(() => { canvas.style.cssText = saved.canvasStyle })
-          restore(() => { viewer.renderer.setPixelRatio(saved.pixelRatio); viewer.resize() })
-          viewer.scene.background = saved.sceneBackground
-          viewer.scene.environment = saved.sceneEnvironment
-          restore(() => { viewerLease.restoreProbes() })
-          if (owned) restore(() => {
-            mode = saved.mode
-            referenceState = saved.referenceState
-            activeViews = saved.views
-            modelTime = saved.modelTime
-            manualMotion = saved.manualMotion
-            explorationOrigin = saved.explorationOrigin
-            diagnosticReference = saved.diagnosticReference
-            diagnosticMachine = saved.diagnosticMachine
-            copyInput(saved.input)
-            updateMachine(saved.machineInput, saved.assembly)
-          })
-          restore(() => {
-            viewer.camera.up.copy(saved.cameraUp)
-            viewer.camera.near = saved.cameraNear
-            viewer.camera.far = saved.cameraFar
-            viewer.camera.layers.mask = saved.cameraLayers
-            viewer.setInteraction(mode === 'exploring' ? 'exploring' : 'following-video')
-            viewer.controls.target.copy(owned ? saved.controlsTarget : currentTarget)
-            viewer.controls.enabled = owned ? saved.controlsEnabled : currentControlsEnabled
-            viewer.controls.enableDamping = false
-            viewer.controls.autoRotate = false
-            viewer.applyCamera(currentCamera)
-            // applyCamera rebases controls and normalizes an authored quaternion.
-            // A restoration receipt instead owns exact already-solved camera bits.
-            viewer.camera.position.fromArray(currentCamera.positionMetres)
-            viewer.camera.quaternion.fromArray(currentCamera.quaternion)
-            viewer.camera.up.copy(saved.cameraUp)
-            viewer.camera.scale.copy(saved.cameraScale)
-            viewer.camera.zoom = saved.cameraZoom
-            viewer.camera.focus = saved.cameraFocus
-            viewer.camera.filmGauge = saved.cameraFilmGauge
-            viewer.camera.filmOffset = saved.cameraFilmOffset
-            if (owned) viewer.camera.aspect = saved.cameraAspect
-            viewer.camera.view = saved.cameraView ? { ...saved.cameraView } : null
-            viewer.camera.updateProjectionMatrix()
-            viewer.camera.updateMatrixWorld(true)
-            viewer.controls.target.copy(owned ? saved.controlsTarget : currentTarget)
-          })
-          if (owned) restore(() => {
-            if (saved.mode !== 'exploring' && saved.views.length) drawSourceViews(saved.views, saved.modelTime)
-            else if (saved.mode !== 'exploring' && saved.referenceState === 'no-machine') viewer.renderViews([], undefined, saved.modelTime)
-            else viewer.render(saved.assembly.state)
-            sourceDrawRevision = saved.sourceDrawRevision
-            sourceDrawTimeSeconds = saved.sourceDrawTimeSeconds
-            sourceDrawLayout = saved.sourceDrawLayout
-            mechanismDraws.clear()
-            for (const [id, draw] of saved.draws) mechanismDraws.set(id, draw)
-            manualRevision = saved.manualRevision
-            paintRevision = 'clean'
-            restored = true
-          })
-          else paintRevision = 'pending'
-          viewer.controls.enableDamping = saved.enableDamping
-          viewer.controls.autoRotate = saved.autoRotate
-        } finally {
-          restore(() => { viewerLease.release() })
+        try { resumeSource() } finally {
+          resumeNativeDiagnosticSource = null
           nativeDiagnosticLeaseActive = false
           lastTick = performance.now()
-          if (!owned) restore(() => {
-            // Source-track temporary banks have now unwound. Draw only the
-            // latest real route/playback/manual state, never a saved exposure.
-            configureLandmarkProbe()
-            if (player && (player.getState() === 'playing' || player.getState() === 'buffering')) {
-              renderSource(player.getTime())
-              if (referenceState !== 'unavailable') following()
-            } else if (mode === 'exploring') {
-              updateMachine(input)
-              manualRevision = 'clean'
-              renderPending()
-            } else if (activeViews.length) drawSourceViews(activeViews, modelTime)
-            updateControlState()
-            updateHud()
-          })
+          // New-owner draws/errors use the normal tick, never cleanup.
+          configureLandmarkProbe()
           lastNativeDiagnosticRestoration = {
-            status: errors.length ? 'failed' : restored ? 'restored' : 'superseded', sourceProof: false, sourceAcceptance: false,
+            status: cleanupErrors.length || pendingPublicationRefused ? 'failed' : owned && restored ? 'restored' : 'superseded', sourceProof: false, sourceAcceptance: false,
             inputRestored: owned && equalRecord(serializeInput(input), serializeInput(saved.input)),
             cameraRestored: owned && equalRecord(cameraRecord(), saved.camera),
-            assemblyRestored: owned && currentAssembly === saved.assembly,
+            assemblyRestored: owned && equalRecord(currentAssembly.state, saved.assembly.state),
             layoutRestored: owned && equalRecord(captureSourceLayout(activeViews), saved.layout), paintRevision,
             refusalReason: nativeDiagnosticRefusal,
           }
-          throwCleanupFailures(errors, callbackFailed, callbackError)
+          throwCleanupFailures(cleanupErrors, callbackFailed, callbackError)
         }
       }
     },
@@ -1080,6 +1121,7 @@ if (verificationEnabled) {
     pauseVideo() { player?.pause(); return this.snapshot() },
     playVideo() { player?.play(); return this.snapshot() },
     async reviewReferenceFrame(timeSeconds: number, sourceTimeSeconds = timeSeconds) {
+      invalidateNativeDiagnosticLease('A native reference review was requested')
       const nativePlayer = player
       if (nativePlayer?.getState() !== 'paused') throw new Error('Pause the actual source video before reviewing a reference frame.')
       if (!reference) throw new Error('Source observations are unavailable.')
@@ -1095,7 +1137,6 @@ if (verificationEnabled) {
         quaternion: [...sourceCamera.quaternion],
         verticalFovDegrees: sourceCamera.verticalFovDegrees,
       }
-      invalidateNativeDiagnosticLease('A native reference review was requested')
       const prepared = reference.prepareAt(timeSeconds)
       validateSourceViews(prepared.views)
       viewer.preflightViews(prepared.views)
@@ -1141,9 +1182,9 @@ if (verificationEnabled) {
       }
     },
     endReferenceReview() {
+      invalidateNativeDiagnosticLease('Manual exploration was requested')
       if (player?.getState() !== 'paused') throw new Error('Pause the actual source video before entering manual exploration.')
       if (referenceSeek === 'seeking') throw new Error('Wait for the active native reference seek before entering manual exploration.')
-      invalidateNativeDiagnosticLease('Manual exploration was requested')
       explore()
       return this.snapshot()
     },

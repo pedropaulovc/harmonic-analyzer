@@ -539,11 +539,36 @@ without aliasing ended. Unchanged paused scrubs must not interrupt ongoing manua
 crank motion through a redundant state callback.
 
 Verification-only native diagnostic leases own the paused selected source state.
-Real playback/clock, route, layout or manual changes supersede that ownership:
-stale operations and callback results reject, renderer/probe resources are
-released, and the latest actual state is redrawn rather than overwritten by the
-old paused snapshot. Receipts distinguish `superseded` with a refusal reason
-from exact unchanged-state `restored`; callback and cleanup failures stay visible.
+Diagnostic publications use detached playback banks and validation caches, sharing
+only immutable compiled observations and synchronous production preparation math;
+ordinary follow, review and media callbacks never read candidate publication banks.
+Real playback/clock, route, layout or manual intent supersedes lease ownership.
+Before that intent is consumed, the real frame and renderer/probe resources resume,
+including capture-phase camera input and before compact resize or mode guards.
+The initiating slider value is not overwritten by a saved HUD refresh.
+
+Stale operations and callback results reject without replacing the newer owner.
+Transactions expire on synchronous throws as well as asynchronous completion.
+Returning an outer callback with a publication still pending refuses immediately:
+it does not drain work that may depend on the outer result, and late cleanup cannot
+restore over a later lease. Between publications, input, completed draw, camera,
+canvas and probes again describe the same real frame under the same lease resources.
+Receipts distinguish `superseded` with a refusal reason from exact unchanged-state
+`restored`; original callback causes and independent resource-cleanup failures stay
+visible. New-owner rendering/errors remain on the ordinary fail-closed path, not
+diagnostic-cleanup aggregation. Positive boundary controls and a real resource
+cleanup refusal do not prove every solver/draw restoration failure or a naturally
+occurring new-owner exception; those unexercised failure paths remain explicit limits.
+
+The verifier validates original-source authority before lazy shared GPU startup.
+Shared readiness requires acquisition of server, browser, context and page, not
+merely a truthy browser. A shared startup failure is one terminal verification
+prerequisite, retaining the validated source identity and original stack while
+closing acquired resources; it is not retried for each video. Missing originals
+remain per-video prerequisites without starting GPU/server work. Successful
+empty-census startup controls establish resource ownership only, not playback,
+source measurement or fidelity. Uninduced context/page and startup-cleanup failures
+remain static-only coverage.
 
 Paused exploration must permit orbit, pan, zoom and mechanism operation without
 advancing the source video. Compact mode retains the same visible usable player
