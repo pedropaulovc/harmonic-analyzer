@@ -4,7 +4,7 @@ ch-rocker-arm-tl-filing-stud:
   number: MHA-CH-006-TL-05
   material: 4140 steel, HRC 32
   material_specification: 4140 pre-hardened rod, 7/16 in, HRC 32 (McMaster 6818T119)
-  finish: as machined; locating diameter lapped
+  finish: as machined
   quantity: 1
   tolerance_class: machined_block
   process: "turn head seat, body and thread in one chucking; ring-lap body; die-cut thread; part off"

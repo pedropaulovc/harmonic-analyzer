@@ -99,14 +99,17 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked filing-stud dimension needs authored places")
 # The overall restates the two ends for stock cut-off; the thread size
 # prints as its designation, not as a plain diameter.
-REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
+# Codex round 4: the locating diameter prints as a reference; the fit to its
+# three mating bores (hand slide, no shake) governs it, and BODY_BAND stays
+# the exported design intent of that fit.
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "BodyDia"})
 DIMENSION_TEXT = {"ThreadDia": THREAD}
 
 SURFACE_FINISHES = ()
 DRAWING_NOTES = (
     "AXIAL SIZES FROM THE HEAD SEAT FACE; SEAT SQUARE TO THE LOCATING DIAMETER.\n"
-    "LOCATING DIAMETER CENTRES THE ROCKER ARM PIVOT BORE AND BOTH FILING BUTTONS:\n"
-    "EACH SLIDES ON BY HAND WITHOUT SHAKE. VISE TAIL IS HELD ONLY.\n"
+    "FIT LOCATING DIAMETER TO THE ROCKER ARM PIVOT BORE AND BOTH FILING BUTTON\n"
+    "BORES: EACH SLIDES ON BY HAND WITHOUT SHAKE. VISE TAIL IS HELD ONLY.\n"
     "DO NOT HARDEN."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

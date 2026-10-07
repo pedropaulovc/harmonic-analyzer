@@ -25,7 +25,7 @@ THICKNESS_PLACES = 2
 # The rim is the filing line: the button O.D. is the hub O.D. Codex round 3
 # found the shop-additions 0.010 lapped band unsupported: the hub prints at
 # two places, so the three-place general band already holds the filed hub
-# far inside it; the two buttons matching is the real requirement (a note).
+# far inside it, and a hub taper inside that band is harmless.
 OD = rocker.HUB_DIA
 OD_PLACES = 3
 OD_BAND = (limits(OD, OD_PLACES)[1] - OD, limits(OD, OD_PLACES)[0] - OD)
@@ -57,7 +57,6 @@ SURFACE_FINISHES = ()
 # tight. Hardness and the lapped surfaces live in the Finish field.
 DRAWING_NOTES = (
     "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. ROUND AND TRUE TO BORE.\n"
-    "MAKE BOTH BUTTONS ONE SIZE: THE FILE RIDES BOTH RIMS, SO THE HUB FILES PARALLEL.\n"
     "BORE LIMITS GIVE THE FILING STUD THE CLEARANCE THAT KEEPS THE RIM ON CENTRE.\n"
     "KEEP RIM CORNERS SHARP; STONE BURRS ONLY. THICKNESS LOCATES THE STACK."
 )

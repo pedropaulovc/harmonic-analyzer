@@ -16,7 +16,10 @@ from _drawing_common import (
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    dimension_name,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
+    view_name,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -24,7 +27,8 @@ from ch_rocker_arm_tl_filing_button_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from draw_dt_cone_pivot_post_tl_cap_jaw_button import _move_dimension
+from solidworks_mcp.adapters.solidworks.drawing import delete_view, iter_views, place_view
 
 SPEC = DRAWINGS_BY_NAME["ch_rocker_arm_tl_filing_button"]
 PART_STEM = SPEC.artifact_stem
@@ -46,9 +50,14 @@ ISO_NOTE_XY = (0.275, 0.240)
 NOTES_XY = (0.020, 0.075)
 FACE_KEEP = {
     "DiscDia": (0.060, 0.240),
-    # Lower right, so its leader stays on the far side of the centre from
-    # the O.D.'s and the two dimension lines never cross.
     "BoreDia": (0.165, 0.115),
+}
+# Rule (b): the face view only donates the diameters; they move onto the
+# edge view beside the faces (bore shown hidden), O.D. left and bore right
+# so the two dimension lines stay apart, and the face view is deleted.
+EDGE_DIAMETER_XY = {
+    "DiscDia": (0.165, 0.180),
+    "BoreDia": (0.235, 0.180),
 }
 EDGE_KEEP = {
     "DiscThick": (0.200, 0.235),
@@ -90,17 +99,32 @@ async def build(adapter: Any) -> dict[str, str]:
     edge = place_view(adapter, str(SOURCE), "*Right", *EDGE_CENTER, scale=VIEW_SCALE)
     # finalize_drawing shades the pictorial isometric with edges.
     place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    for view in (face, edge):
-        set_hidden_lines_removed(adapter, view)
+    set_hidden_lines_removed(adapter, face)
+    set_hidden_lines_visible(adapter, edge)
 
-    annotations = [
-        *curate_view_dimensions(
+    donated = curate_view_dimensions(
+        adapter,
+        face,
+        keep=FACE_KEEP,
+        view_label="face view",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    diameters = [
+        _move_dimension(
             adapter,
-            face,
-            keep=FACE_KEEP,
-            view_label="face view",
-            dimensions_by_feature=DRAWING_DIMENSIONS,
-        ),
+            annotation,
+            edge,
+            EDGE_DIAMETER_XY[dimension_name(adapter, annotation)],
+            source_view=face,
+        )
+        for annotation in donated
+    ]
+    face_name = view_name(adapter, face)
+    delete_view(adapter, face)
+    if any(view_name(adapter, view) == face_name for view in iter_views(adapter)):
+        raise RuntimeError("failed to delete the diameter donor face view")
+    annotations = [
+        *diameters,
         *curate_view_dimensions(
             adapter,
             edge,
@@ -112,8 +136,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    if not auto_center_marks(adapter, face, holes=True, size=0.0025):
-        raise RuntimeError("failed to add the center mark to the button face view")
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
