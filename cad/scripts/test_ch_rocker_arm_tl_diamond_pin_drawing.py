@@ -20,14 +20,12 @@ def _features() -> dict:
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    views = (drawing.PROFILE_KEEP, drawing.END_KEEP, drawing.DONOR_KEEP)
+    views = (drawing.AXIAL_XY, drawing.DIAMETER_XY, drawing.END_KEEP)
     assert set().union(*map(set, views)) == marked
     assert sum(len(view) for view in views) == len(marked)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    # every turned diameter lands on the profile; only the pin sizes stay on the end view
-    assert set(drawing.PROFILE_DIAMETER_XY) == (
-        set(drawing.END_KEEP) | set(drawing.DONOR_KEEP)
-    ) - {"LandDia", "FlatsAF"}
+    # every body size lands on the section; only the pin sizes stay on the end view
+    assert set(drawing.END_KEEP) == {"LandDia", "FlatsAF"}
 
 
 def test_lands_enter_every_rod_pin_hole_the_rocker_prints() -> None:

@@ -85,6 +85,11 @@ PIN_ENGAGEMENT = PIN_LENGTH - LAND_HEIGHT
 _GENERAL_1PL = 0.8  # title block .X band (the pin length and ream depth print .X)
 if PIN_LENGTH + _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[1]) >= REAM_DEPTH - _GENERAL_1PL:
     raise AssertionError("diamond pin can bottom in the reamed bore")
+# The overall length prints .X; the shank must still clear the bottom of the
+# profile fixture's 7.0-deep pin hole so the collar, not the shank end, seats.
+_PLATE_HOLE_DEPTH = 7.0  # ch_rocker_arm_tl_profile_fixture_spec.ROD_PIN_HOLE_DEPTH
+if OVERALL_LENGTH + _GENERAL_1PL - (COLLAR_END + COLLAR_END_BAND[1]) >= _PLATE_HOLE_DEPTH:
+    raise AssertionError("diamond-pin shank can bottom in the profile-fixture hole")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LandProfile": {"LandDia"},
@@ -108,7 +113,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CollarProfile": {"CollarDia": 1},
     "Collar": {"CollarEnd": 2},
     "ShankProfile": {"ShankDia": 3},
-    "Shank": {"OverallLength": 2},
+    "Shank": {"OverallLength": 1},
     "ReamProfile": {"ReamDia": 3},
     "Ream": {"ReamDepth": 1},
 }
@@ -122,8 +127,10 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
         BUILT_UP_PERMISSION_NOTE,
-        "FLATS LAPPED ON A STONE; ROUND LANDS ARE UNTOUCHED GAUGE SURFACE.",
-        "SET THE FLATS SQUARE TO THE PIVOT-TO-ROD-HOLE LINE BEFORE CURE.",
+        "ROUND LANDS ARE UNTOUCHED GAUGE SURFACE; THE BORE BOTTOM MAY BE A DRILL POINT.",
+        "THE NECK FACE IS A BACKSTOP JUST CLEAR OF THE ARM; THE THIN NECK WALL IS ACCEPTED.",
+        "SHANK IS A BONDED SLIP FIT IN THE PROFILE FIXTURE; BOND IT WITH THE FLATS"
+        " SQUARE TO THE FIXTURE'S PIVOT-TO-ROD-HOLE LINE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

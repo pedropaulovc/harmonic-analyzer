@@ -2,7 +2,7 @@ ch-rocker-arm-tl-diamond-pin:
   title: Rocker Rod Diamond Pin
   # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-006-TL-03
-  material: 4140 HT steel body; bought tool-steel gauge pin lands
+  material: 4140 HT body; bought gauge pin
   material_specification: "body 4140 HT round bar, 7/16 in (McMaster 6818T119); lands Vermont Gage Class X 0.0782 in plus gauge pin; Loctite 638"
   finish: as machined
   quantity: 1
