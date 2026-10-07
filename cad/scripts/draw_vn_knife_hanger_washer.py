@@ -47,6 +47,7 @@ from vn_knife_hanger_washer_spec import (
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
+    dimension_full_name,
     iter_views,
     place_view,
     view_name,
@@ -101,6 +102,10 @@ _TOP_KEEP = {
 _FRONT_KEEP = {THICKNESS_DIM: (0.180, 0.115)}
 
 _LEADER_LINE_NONE = 3  # swLeaderLineVisibility_e.swLeaderLineNone
+_DISPLAY_DIMENSION_ANNOTATION = 4  # swAnnotationType_e.swDisplayDimension
+_ANNOTATION_VISIBLE = 1  # swAnnotationVisibilityState_e.swAnnotationVisible
+_DIAMETER_DIMENSION = 6  # swDimensionType_e.swDiameterDimension
+_LINEAR_DIMENSIONS = {2, 11, 12}  # swLinear / swHorLinear / swVertLinearDimension
 
 
 def _short_diametric_reference(adapter: Any, annotation: Any, *, label: str) -> None:
@@ -154,17 +159,65 @@ def _reference_value(display: Any, name: str) -> float:
     return float(_read_member(dimension, "SystemValue"))
 
 
+def _assert_reference_kind(display: Any, name: str) -> None:
+    kind = int(display.Type2)
+    if name in {OUTER_DIAMETER_DIM, INNER_DIAMETER_DIM}:
+        if (
+            kind != _DIAMETER_DIMENSION
+            or not bool(display.Diametric)
+            or bool(display.DisplayAsLinear)
+        ):
+            raise RuntimeError(f"{name}: settled washer reference is not diametric")
+    elif name == THICKNESS_DIM:
+        if kind not in _LINEAR_DIMENSIONS or bool(display.Diametric):
+            raise RuntimeError(f"{name}: settled washer reference is not linear")
+    else:
+        raise RuntimeError(f"unexpected settled washer reference {name!r}")
+
+
 def _assert_settled_references(
-    adapter: Any, references: tuple[tuple[Any, str, float], ...]
+    adapter: Any,
+    references: tuple[tuple[str, str, dict[str, tuple[str, float]]], ...],
 ) -> None:
-    """Refuse changed receiving dimensions after the final settling rebuild."""
-    names = [dimension_name(adapter, annotation) for annotation, _, _ in references]
-    if len(names) != 3 or set(names) != set(DRAWING_PRECISION_BY_NAME):
-        raise RuntimeError(f"settled washer reference dimensions changed: {names!r}")
-    for annotation, name, expected_value in references:
-        if dimension_name(adapter, annotation) != name:
-            raise RuntimeError(f"{name}: settled washer reference identity changed")
-        display = _reference_display(adapter, annotation, name)
+    """Check current owned-view references, not stale captured COM handles."""
+    views = {}
+    for view in iter_views(adapter):
+        name = view_name(adapter, view)
+        if not name or name in views:
+            raise RuntimeError("settled washer reference view identities changed")
+        views[name] = view
+    current = []
+    for native_view_name, orientation, expected in references:
+        view = views.get(native_view_name)
+        if view is None or view.GetOrientationName() != orientation:
+            raise RuntimeError("settled washer reference owned view changed")
+        if Path(view.GetReferencedModelName()).resolve() != SPEC.source.resolve():
+            raise RuntimeError("settled washer reference view source changed")
+        present = {}
+        for raw_annotation in view.GetAnnotations() or ():
+            annotation = _early_bound(raw_annotation, "IAnnotation")
+            if annotation.GetType() != _DISPLAY_DIMENSION_ANNOTATION:
+                continue
+            identity = dimension_full_name(adapter, annotation)
+            if not identity or identity in present:
+                raise RuntimeError("settled washer reference census has invalid identities")
+            present[identity] = annotation
+        if set(present) != set(expected):
+            raise RuntimeError("settled washer reference owned-view census changed")
+        for identity, (name, expected_value) in expected.items():
+            annotation = present[identity]
+            if dimension_name(adapter, annotation) != name:
+                raise RuntimeError(f"{name}: settled washer reference identity changed")
+            if int(annotation.Visible) != _ANNOTATION_VISIBLE:
+                raise RuntimeError(f"{name}: settled washer reference is not visible")
+            display = _reference_display(adapter, annotation, name)
+            _assert_reference_kind(display, name)
+            current.append((display, name, expected_value))
+    if len(current) != 3 or {name for _, name, _ in current} != set(DRAWING_PRECISION_BY_NAME):
+        raise RuntimeError("settled washer reference dimensions changed")
+    # Prove EVERY current dimension's native kind before treating any value as
+    # a length. The following checks only read the settled, visible instances.
+    for display, name, expected_value in current:
         actual_value = _reference_value(display, name)
         if not math.isclose(actual_value, expected_value, rel_tol=0.0, abs_tol=1e-9):
             raise RuntimeError(f"{name}: settled washer reference value changed")
@@ -176,8 +229,6 @@ def _assert_settled_references(
             raise RuntimeError(f"{name}: settled washer reference text changed")
         if display.GetPrimaryPrecision2() != DRAWING_PRECISION_BY_NAME[name]:
             raise RuntimeError(f"{name}: settled washer reference precision changed")
-        if diameter and (not bool(display.Diametric) or bool(display.DisplayAsLinear)):
-            raise RuntimeError(f"{name}: settled washer reference is not diametric")
 
 
 def _center_caption(adapter: Any, text: str, x: float, y: float) -> Any:
@@ -368,10 +419,19 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"unexpected washer reference dimension {name!r}")
     assert_imported_precision(adapter, imported, DRAWING_PRECISION_BY_NAME)
     reference_state = []
-    for annotation in imported:
-        name = dimension_name(adapter, annotation)
-        display = _reference_display(adapter, annotation, name)
-        reference_state.append((annotation, name, _reference_value(display, name)))
+    for view, orientation, view_annotations in (
+        (top_view, "*Top", top_annotations), (front_view, "*Front", front_annotations)
+    ):
+        expected = {}
+        for annotation in view_annotations:
+            name = dimension_name(adapter, annotation)
+            identity = dimension_full_name(adapter, annotation)
+            if not identity or identity in expected:
+                raise RuntimeError("washer reference import has invalid native identities")
+            display = _reference_display(adapter, annotation, name)
+            _assert_reference_kind(display, name)
+            expected[identity] = (name, _reference_value(display, name))
+        reference_state.append((view_name(adapter, view), orientation, expected))
     references = tuple(reference_state)
     set_hidden_lines_removed(adapter, top_view)
     set_hidden_lines_removed(adapter, front_view)

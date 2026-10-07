@@ -384,10 +384,14 @@ back without converting the model's diameters on the sheet. These are supplier
 nominal references, not production controls: general tolerances and edge-break
 instructions do not apply. Stock, supplier and SKU remain property-linked; the
 purchase identity is read from the statically named canonical part-registry row.
-The finalizer's settled check reads those same three imported dimensions after
-the last rebuild, before save/export. Changed native values, reference text,
-precision or diameter presentation refuse the drawing; the check never rewrites
-the settled state to make it pass.
+After the last rebuild and before save/export, the finalizer's settled check
+enumerates the current dimensions only in the owned TOP/FRONT views. Native
+view names and full model-dimension identities establish presence; stale COM
+handles are not evidence. Every reference must be individually visible and
+retain its view role, source, native kind and presentation: ID/OD are diameter
+dimensions, thickness is a non-diametric linear dimension. All three kinds are
+checked before reading their values as lengths. Changed values, reference text
+or precision also refuse the drawing; no check rewrites state to make it pass.
 
 Acceptance requires an unchanged native supplier solid, all three reference
 dimensions, linked MHA-VN-026 identity and purchase fields, and readable,

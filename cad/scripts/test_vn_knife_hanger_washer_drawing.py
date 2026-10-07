@@ -72,7 +72,13 @@ def test_source_title_uses_saved_part_identity_not_display_title(
 
 
 @pytest.mark.parametrize(
-    "fault", [None, "value", "prefix", "suffix", "precision", "diametric", "linear"]
+    "fault", [
+        None, "value", "prefix", "suffix", "precision", "diametric", "linear",
+        "diameter_kind", "thickness_kind", "thickness_doubled", "thickness_diametric",
+        "removed", "replaced", "hidden", "wrong_view", "rewrapped",
+        "removed_view", "view_rewrapped", "half_hidden",
+        "horizontal_thickness", "vertical_thickness",
+    ]
 )
 def test_final_settling_refuses_changed_receiving_dimensions_before_save(
     monkeypatch, tmp_path, fault
@@ -103,15 +109,22 @@ def test_final_settling_refuses_changed_receiving_dimensions_before_save(
     }
 
     class Display:
-        def __init__(self, value):
-            self.model = SimpleNamespace(SystemValue=value)
+        def __init__(self, value, name):
+            feature = "WasherBody" if name == drawing.THICKNESS_DIM else "AnnulusProfile"
+            self.model = SimpleNamespace(
+                SystemValue=value, FullName=f"{name}@{feature}@{source.name}"
+            )
             self.text = {}
             self.precision = 2
-            self.Diametric = True
+            self.Diametric = name != drawing.THICKNESS_DIM
+            self.Type2 = 6 if self.Diametric else 2  # native diameter / linear
             self.DisplayAsLinear = False
             self.second_arrow = False
 
         def GetDimension2(self, _index):
+            return self.model
+
+        def GetDimension(self):
             return self.model
 
         def SetText(self, index, text):
@@ -135,8 +148,15 @@ def test_final_settling_refuses_changed_receiving_dimensions_before_save(
         def SetBrokenLeader2(self, _use_doc, _style):
             return 0
 
+    def annotation(name, value):
+        display = Display(value, name)
+        return SimpleNamespace(
+            name=name, Visible=1, GetType=lambda: 4,
+            GetSpecificAnnotation=lambda: display,
+        )
+
     annotations = [
-        SimpleNamespace(name=name, GetSpecificAnnotation=lambda d=Display(value): d)
+        annotation(name, value)
         for name, value in (
             (drawing.OUTER_DIAMETER_DIM, 0.0269748),
             (drawing.INNER_DIAMETER_DIM, 0.0134874),
@@ -165,6 +185,9 @@ def test_final_settling_refuses_changed_receiving_dimensions_before_save(
             GetOutline=lambda x=x, y=y: (x - 0.005, y - 0.005, x + 0.005, y + 0.005),
             UpdateViewDisplayGeometry=lambda: None,
         ))
+    current_annotations = [annotations[:2], annotations[2:], []]
+    for view, owned in zip(views, current_annotations, strict=True):
+        view.GetAnnotations = lambda owned=owned: owned
     sheet = SimpleNamespace(
         GetProperties2=lambda: (0, 0, 1, 1, False, 0.4318, 0.2794, False),
         SetProperties2=lambda *_args: None,
@@ -226,6 +249,7 @@ def test_final_settling_refuses_changed_receiving_dimensions_before_save(
         monkeypatch.setattr(module, "view_name", lambda _adapter, view: view.GetOrientationName())
     monkeypatch.setattr(drawing._sw_type_info, "early_bound_or_flag",
                         lambda value, *_args: value)
+    monkeypatch.setattr(drawing._sw_type_info, "flagged", lambda value, *_args: value)
     monkeypatch.setattr(common, "apply_custom_properties", lambda *_args, **_kw: None)
     monkeypatch.setattr(common, "set_high_quality_shaded_with_edges", lambda *_args, **_kw: None)
 
@@ -245,6 +269,39 @@ def test_final_settling_refuses_changed_receiving_dimensions_before_save(
             display.Diametric = False
         elif fault == "linear":
             display.DisplayAsLinear = True
+        elif fault == "diameter_kind":
+            display.Type2 = 3  # swAngularDimension
+        elif fault == "thickness_kind":
+            annotations[2].GetSpecificAnnotation().Type2 = 3
+        elif fault == "thickness_doubled":
+            annotations[2].GetSpecificAnnotation().Type2 = 15  # swDiametricLinearDimension
+        elif fault == "thickness_diametric":
+            annotations[2].GetSpecificAnnotation().Diametric = True
+        elif fault == "removed":
+            current_annotations[0].pop(0)  # original COM-like handle stays readable
+        elif fault == "replaced":
+            replacement = annotation(drawing.OUTER_DIAMETER_DIM, display.model.SystemValue)
+            replacement.GetSpecificAnnotation().text = dict(display.text)
+            replacement.GetSpecificAnnotation().text[2] = ""
+            current_annotations[0][0] = replacement
+        elif fault == "hidden":
+            current_annotations[0][0].Visible = 3  # swAnnotationHidden
+        elif fault == "wrong_view":
+            current_annotations[1].append(current_annotations[0].pop(0))
+        elif fault == "rewrapped":
+            # Fresh wrappers for the SAME native dimensions are not a failure.
+            for owned in current_annotations:
+                owned[:] = [SimpleNamespace(**vars(item)) for item in owned]
+        elif fault == "horizontal_thickness":
+            annotations[2].GetSpecificAnnotation().Type2 = 11  # swHorLinearDimension
+        elif fault == "vertical_thickness":
+            annotations[2].GetSpecificAnnotation().Type2 = 12  # swVertLinearDimension
+        elif fault == "removed_view":
+            views.pop(0)  # old view and annotation handles remain readable
+        elif fault == "view_rewrapped":
+            views[:] = [SimpleNamespace(**vars(view)) for view in views]
+        elif fault == "half_hidden":
+            current_annotations[0][0].Visible = 2  # swAnnotationHalfHidden
 
     monkeypatch.setattr(common, "rebuild_drawing", settle)
     persisted = []
@@ -259,7 +316,9 @@ def test_final_settling_refuses_changed_receiving_dimensions_before_save(
     monkeypatch.setattr(common, "save_drawing", save)
     monkeypatch.setattr(common, "render_pdf_png",
                         lambda *_args, **_kwargs: persisted.append("export"))
-    if fault is None:
+    if fault in {
+        None, "rewrapped", "view_rewrapped", "horizontal_thickness", "vertical_thickness"
+    }:
         with pytest.raises(SaveReached):
             asyncio.run(drawing.build(adapter))
         assert persisted == ["save"]
