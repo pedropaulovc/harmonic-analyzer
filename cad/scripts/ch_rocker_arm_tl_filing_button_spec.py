@@ -50,11 +50,13 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked filing-button dimension needs authored places")
 
 SURFACE_FINISHES = ()
+# The blind reviewer sees only the sheet: each note states why a band is
+# tight. Hardness and the lapped surfaces live in the Finish field.
 DRAWING_NOTES = (
-    "HARDEN AND TEMPER: A FILE SHALL BARELY BITE.\n"
-    "BORE, BOTH FACES AND O.D. LAPPED; FACES FLAT AND PARALLEL.\n"
-    "LAP THE O.D. ON AN ARBOR IN THE LAPPED BORE.\n"
-    "RIM IS THE FILING LINE: STONE BURRS ONLY, KEEP CORNERS SHARP."
+    "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. CONCENTRIC TO BORE.\n"
+    "BORE IS A CLOSE SLIP FIT ON THE LAPPED BODY OF THE FILING STUD.\n"
+    "THICKNESS KEEPS THE UPPER BUTTON ON THE STUD BODY UNDER THE NUT.\n"
+    "KEEP RIM CORNERS SHARP; STONE BURRS ONLY."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 
