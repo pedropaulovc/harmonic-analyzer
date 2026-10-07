@@ -519,9 +519,10 @@ if (incomingId) {
                     time = math.nextafter(shot['endSeconds'], -math.inf)
                     frame = next(frame for frame in record['frames']
                                  if frame['timeSeconds'] == time and frame['shotId'] == shot_id)
-                    if not any(row['timeSeconds'] == time for row in track['frames']):
-                        track['frames'].append(copy.deepcopy(frame))
-                        track['frames'].sort(key=lambda row: row['timeSeconds'])
+                    endpoint = next(row for row in track['frames'] if row['timeSeconds'] == time)
+                    self.assertEqual(endpoint['shotId'], shot_id)
+                    self.assertEqual(endpoint['decodedTimeSeconds'], frame['decodedTimeSeconds'])
+                    self.assertEqual(endpoint['sourceImage'], frame['sourceImage'])
                     incoming_id = next(row['id'] for row in record['shots']
                                        if row['startSeconds'] == shot['endSeconds'])
                 else:
@@ -1129,6 +1130,36 @@ class HalfOpenCutSelectionTests(unittest.TestCase):
         self.assertEqual(rows[cut]['decodedTimeSeconds'], cut)
         self.assertEqual(data['frames'], original['frames'])
         self.assertEqual(data['shots'], original['shots'])
+
+    def test_extra_outgoing_predecessor_survives_a_nearby_incoming_cut_key(self):
+        cut = 4.25
+        before = math.nextafter(cut, -math.inf)
+        # Only the incoming cut is required. The predecessor must survive the
+        # separate sparse-extra endpoint pass, not an authored coverage request.
+        data = self.fixture(cut, cut, cut)
+        data['frames'][1]['timeSeconds'] = before
+        data['frames'][1]['decodedTimeSeconds'] = before
+        original = copy.deepcopy(data)
+        rows = {row['timeSeconds']: row for row in common.selected_frames(data)}
+        self.assertEqual(rows[before], original['frames'][1])
+        self.assertEqual(rows[cut]['shotId'], 'incoming')
+        self.assertEqual(rows[cut]['decodedTimeSeconds'], cut)
+        self.assertEqual(rows[cut]['sourceImage'], original['frames'][3]['sourceImage'])
+        self.assertEqual(data['frames'], original['frames'])
+        self.assertEqual(data['coverage'], original['coverage'])
+
+    def test_nearby_extra_within_the_same_shot_keeps_existing_sampling(self):
+        cut = 4.25
+        extra = math.nextafter(5.0, math.inf)
+        data = self.fixture(cut, cut, cut)
+        data['frames'][-1]['timeSeconds'] = extra
+        data['frames'][-1]['decodedTimeSeconds'] = 5.0
+        source = copy.deepcopy(data['frames'][-1])
+        rows = {row['timeSeconds']: row for row in common.selected_frames(data)}
+        self.assertNotIn(extra, rows)
+        self.assertEqual(rows[5.0]['shotId'], 'incoming')
+        self.assertEqual(rows[5.0]['decodedTimeSeconds'], source['decodedTimeSeconds'])
+        self.assertEqual(rows[5.0]['sourceImage'], source['sourceImage'])
 
     def test_pre_cut_native_pts_cannot_supply_a_derived_incoming_request(self):
         cut = 4.25

@@ -331,6 +331,12 @@ Reuse the existing official player, native scene, physical solver and camera/inp
 interpolation. Author compact per-video shot tracks with camera keys, complete
 feasible physical inputs, discrete setup changes and source view layouts.
 Cuts switch atomically; interpolation is confined to compatible continuous shots.
+
+Decoded exposures retain strict half-open shot ownership. Sparse endpoint
+sampling deduplicates nearby keys only within the same shot: an incoming cut key
+must not suppress the real final outgoing exposure, even when their clocks are
+adjacent floating-point values. Source timestamps are never rounded to merge them.
+
 Unobserved inputs may be chosen feasibly and must remain labelled as chosen,
 not historically recovered. No second solver, proxy geometry, fake visibility
 certificates or arbitrary individual-part adjustments are permitted.

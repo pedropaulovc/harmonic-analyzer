@@ -491,7 +491,9 @@ def selected_frames(data):
                         if old and point.get("pixel") and math.dist(old, point["pixel"]) > 35:
                             add = True
             if add:
-                if not any(abs(existing - time) < 1e-6 for existing in output):
+                # A nearby incoming cut key cannot replace an outgoing exposure.
+                if not any(row["shotId"] == frame["shotId"] and abs(existing - time) < 1e-6
+                           for existing, row in output.items()):
                     output[time] = frame
                 previous = frame
     return retain_exact_exposure_landmarks([output[t] for t in sorted(output)], data)
