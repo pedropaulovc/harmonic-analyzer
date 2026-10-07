@@ -2681,7 +2681,10 @@ def test_abandoning_the_grace_is_recorded_on_the_span(monkeypatch):
         raise RuntimeError("connector never answered")
 
     monkeypatch.setattr(lifecycle, "_wait", blow_up)
-    monkeypatch.setattr(lifecycle, "_state_value", lambda _r: "starting")
+    from solidworks_mcp.adapters import sw_recovery
+    from solidworks_mcp.adapters.sw_recovery import SolidWorksState
+
+    monkeypatch.setattr(sw_recovery, "detect_state", lambda: SolidWorksState.STARTING)
     monkeypatch.setattr(
         lifecycle._telemetry,
         "event",

@@ -39,7 +39,6 @@ are explicitly recorded as ERROR spans.
 
 from __future__ import annotations
 
-import math
 import os
 import time
 
@@ -85,21 +84,14 @@ def _disabled() -> bool:
 
 
 def _connect_timeout() -> float:
-    """Reject deadlines that cannot be reached (NaN, infinity, non-positive)."""
+    """Keep the library's raw float override semantics; only invalid text falls back."""
     raw = os.environ.get(_CONNECT_TIMEOUT_ENV, "").strip()
     if not raw:
         return _DEFAULT_CONNECT_TIMEOUT
     try:
-        value = float(raw)
+        return float(raw)
     except ValueError:
-        value = math.nan
-    if math.isfinite(value) and value > 0:
-        return value
-    _telemetry.warn(
-        f"[sw] ignoring {_CONNECT_TIMEOUT_ENV}={raw!r}: not a positive finite number "
-        f"of seconds; using {_DEFAULT_CONNECT_TIMEOUT:.0f} s"
-    )
-    return _DEFAULT_CONNECT_TIMEOUT
+        return _DEFAULT_CONNECT_TIMEOUT
 
 
 def _mark_failed(span, exc: BaseException) -> None:
@@ -192,7 +184,9 @@ def force_recover(reason: str, **context: object) -> str:
     attributes["recover.reason"] = reason
     with _telemetry.span("sw.force_recover", service=_INFRA, **attributes) as span:
         try:
-            _kill_crash_handler()
+            cleanup_error = _kill_crash_handler()
+            if cleanup_error is not None:
+                _mark_failed(span, cleanup_error)
             with _telemetry.span("sw.stop", service=_INFRA) as stop:
                 _telemetry.event("sw.stop")
                 stopped = bool(sw_recovery.stop_solidworks())
@@ -256,7 +250,7 @@ def wait_until_ready() -> str:
 
 
 
-def _kill_crash_handler() -> None:
+def _kill_crash_handler() -> Exception | None:
     """Best-effort taskkill of ``sldexitapp.exe`` (SolidWorks' crash-report dialog),
     so a crashed session doesn't leave a modal that blocks the relaunch."""
     import subprocess
@@ -267,8 +261,9 @@ def _kill_crash_handler() -> None:
             capture_output=True, timeout=15,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-    except (OSError, subprocess.SubprocessError):
-        pass
+    except (OSError, subprocess.SubprocessError) as exc:
+        return exc
+    return None
 
 
 def _wait(sw_recovery, timeout: float) -> str:
@@ -301,25 +296,27 @@ def _poll_connected(sw_recovery, timeout: float, span, *, after_launch: bool) ->
     stalls: set[str] = set()
     outcome = "error"
     try:
-        while True:
-            now = _monotonic()
+        while _monotonic() < deadline:
             current = str(sw_recovery.detect_state().value)
+            now = _monotonic()
             if current != state:
                 if state:
                     dwell[state] = dwell.get(state, 0.0) + (now - since)
                 _telemetry.event("sw.state", state=current, elapsed_s=round(now - started, 1))
-                state, since = current, now
+                state, since = current, now if state else started
             if current == CONNECTED_STATE:
                 outcome = "connected"
                 return outcome
             if current == _WEDGE_STATE:
                 outcome = "wedge"
                 return outcome
-            _note_stalls(stalls, current, now - started, after_launch=after_launch)
-            if now >= deadline:
+            _note_stalls(stalls, current, now - started, span, after_launch=after_launch)
+            if _monotonic() >= deadline:
                 outcome = "timeout"
                 return outcome
             _sleep(_POLL_S)
+        outcome = "timeout"
+        return outcome
     finally:
         ended = _monotonic()
         if state:
@@ -330,7 +327,7 @@ def _poll_connected(sw_recovery, timeout: float, span, *, after_launch: bool) ->
         span.set_attribute("wait.s", round(ended - started, 1))
 
 
-def _note_stalls(stalls: set[str], state: str, elapsed: float, *, after_launch: bool) -> None:
+def _note_stalls(stalls: set[str], state: str, elapsed: float, span, *, after_launch: bool) -> None:
     if (
         after_launch
         and "no_process" not in stalls
@@ -341,18 +338,26 @@ def _note_stalls(stalls: set[str], state: str, elapsed: float, *, after_launch: 
         _telemetry.event("sw.no_process", elapsed_s=round(elapsed, 1))
     if "signin" in stalls:
         return
-    title = _signin_window()
+    try:
+        title = _signin_window()
+    except Exception as exc:  # noqa: BLE001 - desktop observation cannot affect recovery
+        if "signin_error" not in stalls:
+            stalls.add("signin_error")
+            _mark_failed(span, exc)
+            _telemetry.event("sw.signin_observation_error", error=str(exc), elapsed_s=round(elapsed, 1))
+        return
     if title is not None:
         stalls.add("signin")
         _telemetry.event("sw.signin_window", title=title, elapsed_s=round(elapsed, 1))
 
 
 def _signin_window() -> str | None:
-    """Read visible sign-in titles with pointer-width HWND signatures."""
+    """Return a matching title or successful absence; raise on an unreadable desktop."""
     import ctypes
     from ctypes import wintypes
 
     found: list[str] = []
+    errors: list[Exception] = []
     wanted = _SIGNIN_TITLE_PREFIX.casefold()
     try:
         user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -365,19 +370,32 @@ def _signin_window() -> str | None:
         user32.GetWindowTextW.restype = ctypes.c_int
 
         def visit(hwnd, _parameter):
-            if not user32.IsWindowVisible(hwnd):
-                return True
-            buffer = ctypes.create_unicode_buffer(512)
-            user32.GetWindowTextW(hwnd, buffer, len(buffer))
-            title = buffer.value.strip()
-            if not title.casefold().startswith(wanted):
-                return True
-            found.append(title)
-            return False
+            try:
+                if not user32.IsWindowVisible(hwnd):
+                    return True
+                buffer = ctypes.create_unicode_buffer(512)
+                ctypes.set_last_error(0)
+                copied = user32.GetWindowTextW(hwnd, buffer, len(buffer))
+                error = ctypes.get_last_error()
+                if copied == 0 and error:
+                    raise OSError(error, "GetWindowTextW failed")
+                title = buffer.value.strip()
+                if not title.casefold().startswith(wanted):
+                    return True
+                found.append(title)
+                return False
+            except Exception as exc:  # noqa: BLE001 - never unwind through a native callback
+                errors.append(exc)
+                return False
 
-        user32.EnumWindows(callback(visit), 0)
-    except Exception:  # noqa: BLE001 - an unreadable desktop cannot affect recovery
-        return None
+        ctypes.set_last_error(0)
+        enumerated = user32.EnumWindows(callback(visit), 0)
+        if errors:
+            raise errors[0]
+        if not enumerated and not found:
+            raise OSError(ctypes.get_last_error(), "EnumWindows failed")
+    except AttributeError as exc:
+        raise RuntimeError("Win32 sign-in observation unavailable") from exc
     return found[0] if found else None
 
 

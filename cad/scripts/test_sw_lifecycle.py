@@ -90,6 +90,7 @@ def seat(monkeypatch):
         clock[0] += seconds
 
     monkeypatch.setattr(lifecycle, "_sleep", sleep)
+    crash_handler_cleanup = lifecycle._kill_crash_handler
     monkeypatch.setattr(lifecycle, "_kill_crash_handler", lambda: calls.append("crash_handler"))
     signin_scan = lifecycle._signin_window
     monkeypatch.setattr(lifecycle, "_signin_window", lambda: None)
@@ -98,7 +99,7 @@ def seat(monkeypatch):
     return SimpleNamespace(
         lifecycle=lifecycle, recovery=recovery, clock=clock, spans=spans,
         events=events, calls=calls, warnings=warnings,
-        signin_scan=signin_scan,
+        signin_scan=signin_scan, crash_handler_cleanup=crash_handler_cleanup,
         span=lambda name: next(s for s in spans if s.name == name),
     )
 
@@ -297,12 +298,27 @@ def test_current_state_returns_value_and_propagates_probe_failure(seat):
         seat.lifecycle.current_state()
 
 
-@pytest.mark.parametrize("raw", ["nan", "inf", "-inf", "0", "-5", "banana"])
-def test_malformed_timeout_warns_and_falls_back(seat, monkeypatch, raw):
+@pytest.mark.parametrize("raw", ["0", "-5", "nan", "-inf"])
+def test_raw_timeout_skips_polling_without_warning(seat, monkeypatch, raw):
     monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", raw)
+    seat.recovery.detect_state = lambda: fail("must not poll")
+    assert seat.lifecycle._wait(seat.recovery, seat.lifecycle._connect_timeout()) == "timeout"
+    assert seat.clock[0] == 0.0
+    assert seat.warnings == []
+
+
+def test_infinite_timeout_keeps_polling_until_connected(seat, monkeypatch):
+    monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", "inf")
+    seat.recovery.detect_state = lambda: State.STARTING if seat.clock[0] < 1000 else State.CONNECTED
+    assert seat.lifecycle._wait(seat.recovery, seat.lifecycle._connect_timeout()) == "connected"
+    assert seat.clock[0] == 1000.0
+    assert seat.warnings == []
+
+
+def test_nonnumeric_timeout_keeps_existing_fallback(seat, monkeypatch):
+    monkeypatch.setenv("HARMONIC_SW_CONNECT_TIMEOUT", "banana")
     assert seat.lifecycle._connect_timeout() == 900.0
-    assert len(seat.warnings) == 1
-    assert "HARMONIC_SW_CONNECT_TIMEOUT" in seat.warnings[0]
+    assert seat.warnings == []
 
 
 @pytest.mark.parametrize("raw,expected", [("450", 450.0), (" 2.5 ", 2.5), ("", 900.0)])
@@ -349,3 +365,172 @@ def test_pointer_width_scan_is_skipped_off_windows(monkeypatch):
     for platform, skipped in (("win32", False), ("linux", True), ("darwin", True)):
         monkeypatch.setattr(sys, "platform", platform)
         assert eval(mark.args[0], {"sys": sys}) is skipped
+
+
+@pytest.mark.parametrize("slow_phase", ["state", "observation"])
+def test_slow_probe_crossing_deadline_never_sleeps_or_reprobes(seat, monkeypatch, slow_phase):
+    reads = []
+
+    def detect():
+        reads.append(seat.clock[0])
+        if slow_phase == "state":
+            seat.clock[0] += 5
+        return State.STARTING
+
+    def observe():
+        if slow_phase == "observation":
+            seat.clock[0] += 5
+        return None
+
+    seat.recovery.detect_state = detect
+    monkeypatch.setattr(seat.lifecycle, "_signin_window", observe)
+    monkeypatch.setattr(seat.lifecycle, "_sleep", lambda *_a: fail("must not sleep"))
+    assert seat.lifecycle._wait(seat.recovery, 3) == "timeout"
+    assert reads == [0.0]
+    assert seat.span("sw.wait_connected").attributes["wait.s"] == 5.0
+    assert seat.span("sw.wait_connected").attributes["dwell.starting_s"] == 5.0
+
+
+def test_deadline_prevents_probe_at_boundary(seat):
+    reads = []
+    seat.recovery.detect_state = lambda: reads.append(seat.clock[0]) or State.STARTING
+    assert seat.lifecycle._wait(seat.recovery, 2) == "timeout"
+    assert reads == [0.0]
+
+
+@pytest.mark.parametrize("failure", ["oserror", "subprocess", "timeout"])
+def test_crash_cleanup_errors_are_recorded_without_blocking_recovery(seat, monkeypatch, failure):
+    import subprocess
+
+    error = (
+        OSError("cleanup failed") if failure == "oserror"
+        else subprocess.SubprocessError("cleanup failed") if failure == "subprocess"
+        else subprocess.TimeoutExpired(["taskkill"], 15)
+    )
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append((command, kwargs))
+        raise error
+
+    # Patch beneath the real helper before restoring it: no taskkill can execute.
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(seat.lifecycle, "_kill_crash_handler", seat.crash_handler_cleanup)
+    assert seat.lifecycle.force_recover("manual") == "connected"
+    assert seat.calls == ["stop", "start"]
+    assert commands == [(
+        ["taskkill", "/F", "/IM", "sldexitapp.exe"],
+        {"capture_output": True, "timeout": 15,
+         "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)},
+    )]
+    assert_error(seat.span("sw.force_recover"), str(error))
+    assert seat.span("sw.force_recover").attributes["outcome"] == "connected"
+
+
+def install_native_scan(monkeypatch, scenario):
+    """A complete fake Win32 surface, including thread-local last-error semantics."""
+    import ctypes
+
+    last_error = [0]
+    visited = []
+
+    def text(hwnd, buffer, size):
+        if scenario == "title_error":
+            last_error[0] = 5
+            return 0
+        buffer.value = "Login | 3DEXPERIENCE ID" if scenario == "match" else ""
+        return len(buffer.value)
+
+    def enumerate_windows(callback, parameter):
+        if scenario == "enum_error":
+            last_error[0] = 5
+            return False
+        if scenario == "empty":
+            return True
+        visited.append(0x2_0000_0020)
+        return bool(callback(visited[-1], parameter))
+
+    user32 = SimpleNamespace(
+        EnumWindows=enumerate_windows,
+        IsWindowVisible=lambda hwnd: True,
+        GetWindowTextW=text,
+    )
+
+    def dll(*_a, **_kw):
+        if scenario == "unavailable":
+            raise OSError("desktop unavailable")
+        return user32
+
+    monkeypatch.setattr(ctypes, "WinDLL", dll, raising=False)
+    monkeypatch.setattr(ctypes, "WINFUNCTYPE", lambda *_a: lambda fn: fn, raising=False)
+    monkeypatch.setattr(ctypes, "set_last_error", lambda value: last_error.__setitem__(0, value), raising=False)
+    monkeypatch.setattr(ctypes, "get_last_error", lambda: last_error[0], raising=False)
+    return visited
+
+
+@pytest.mark.parametrize("scenario,error", [
+    ("enum_error", "EnumWindows failed"),
+    ("empty", None),
+    ("match", None),
+    ("title_empty", None),
+    ("title_error", "GetWindowTextW failed"),
+    ("unavailable", "desktop unavailable"),
+])
+def test_native_scan_distinguishes_success_match_and_errors(seat, monkeypatch, scenario, error):
+    visited = install_native_scan(monkeypatch, scenario)
+    if error:
+        with pytest.raises(OSError, match=error):
+            seat.signin_scan()
+    else:
+        assert seat.signin_scan() == ("Login | 3DEXPERIENCE ID" if scenario == "match" else None)
+    assert bool(visited) == (scenario in ("match", "title_empty", "title_error"))
+
+
+@pytest.mark.parametrize("scenario", ["enum_error", "title_error", "unavailable"])
+def test_observation_error_is_recorded_but_does_not_change_recovery(seat, monkeypatch, scenario):
+    install_native_scan(monkeypatch, scenario)
+    monkeypatch.setattr(seat.lifecycle, "_signin_window", seat.signin_scan)
+    seat.recovery.detect_state = lambda: State.STARTING if seat.clock[0] < 4 else State.CONNECTED
+    assert seat.lifecycle.force_recover("manual") == "connected"
+    assert seat.calls == ["crash_handler", "stop", "start"]
+    start = seat.span("sw.start")
+    assert start.status.status_code is StatusCode.ERROR
+    assert len(start.exceptions) == 1
+    assert start.attributes["wait.outcome"] == "connected"
+    assert len([kw for name, kw in seat.events if name == "sw.signin_observation_error"]) == 1
+    assert not [kw for name, kw in seat.events if name == "sw.signin_window"]
+
+
+def test_swallowed_cleanup_error_exports_error_and_exception(seat, monkeypatch):
+    sdk_trace = pytest.importorskip("opentelemetry.sdk.trace")
+    sdk_export = pytest.importorskip("opentelemetry.sdk.trace.export")
+    memory_export = pytest.importorskip("opentelemetry.sdk.trace.export.in_memory_span_exporter")
+    import subprocess
+
+    exporter = memory_export.InMemorySpanExporter()
+    provider = sdk_trace.TracerProvider()
+    provider.add_span_processor(sdk_export.SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer(__name__)
+
+    @contextlib.contextmanager
+    def span(name, service=None, **attributes):
+        with tracer.start_as_current_span(name, attributes=attributes) as recorded:
+            yield recorded
+
+    def run(*_a, **_kw):
+        raise OSError("cleanup exported failure")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(seat.lifecycle, "_kill_crash_handler", seat.crash_handler_cleanup)
+    monkeypatch.setattr(seat.lifecycle._telemetry, "span", span)
+    try:
+        assert seat.lifecycle.force_recover("manual") == "connected"
+        recover = next(s for s in exporter.get_finished_spans() if s.name == "sw.force_recover")
+        assert recover.status.status_code is StatusCode.ERROR
+        assert recover.attributes["final_state"] == "connected"
+        assert recover.attributes["outcome"] == "connected"
+        exception = next(event for event in recover.events if event.name == "exception")
+        assert exception.attributes["exception.message"] == "cleanup exported failure"
+        assert exception.attributes["exception.type"].endswith("OSError")
+    finally:
+        provider.shutdown()

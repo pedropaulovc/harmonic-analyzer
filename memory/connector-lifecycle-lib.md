@@ -52,7 +52,8 @@ assembly actions, drawings):
   `detect_state`) and first `taskkill`s `sldexitapp.exe` (crash dialog).
 
 Opt out `HARMONIC_SW_AUTOSTART=0`; connect-wait `HARMONIC_SW_CONNECT_TIMEOUT`
-(default 900s; positive finite overrides only). Every action is a `build-infra`
+(default 900s; raw float overrides retain their existing semantics, with
+nonnumeric values falling back to the default). Every action is a `build-infra`
 span (`sw.ensure_ready`, `sw.force_recover`, `sw.start`/`sw.stop`/`sw.wait_connected`).
 Recovery records `recover.reason` and caller context (`recover.caller`, task label,
 exit code and attempt, or commit/budget for memory preflight), `stop.ok`,
@@ -61,9 +62,13 @@ exit code and attempt, or commit/budget for memory preflight), `stop.ok`,
 unhealthy exits name `seat_<state>`, and preflight names `memory`.
 Connect waits emit `sw.state` only at transitions, `dwell.<state>_s` and `wait.s`;
 `sw.no_process` and `sw.signin_window` are one-shot observations, never recovery
-decisions. Grace abandonment emits `sw.grace_abandoned`. A non-connected recovery
-or swallowed lifecycle exception marks its span ERROR; exceptions are recorded.
-The sign-in scan is read-only with pointer-width Win32 signatures.
+decisions. Native observer failure/unavailability emits one
+`sw.signin_observation_error` per wait and marks the polling span ERROR, distinctly
+from a successful scan with no match, without affecting recovery decisions. Grace
+abandonment emits `sw.grace_abandoned`. A non-connected recovery or swallowed
+lifecycle recovery exception, including crash-handler cleanup, marks its span
+ERROR; exceptions are recorded. The sign-in scan is read-only with pointer-width
+Win32 signatures.
 
 The telemetry port is covered by fake-clock/fake-seat tests, not new live-seat
 evidence. The live validation below is historical and does not validate the new
