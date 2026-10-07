@@ -49,7 +49,7 @@ BODY_LENGTH = 13.0
 BODY_LENGTH_PLACES = 2
 THREAD_END = 24.0  # seat face to the threaded end
 TAIL_END = 45.0  # seat face to the vise end: head plus a forty-two vise tail
-TAIL_DIA = 6.4
+TAIL_DIA = 8.0  # stout in the vise; clear of the thread and body sizes
 # HA fastener policy (memory/fastener-policy-us-customary.md): the
 # inventory's M6 maps to 1/4-20 UNC; an external thread is class 2A.
 THREAD = "1/4-20 UNC-2A"
