@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-vise-stop:
+  title: Rocker Vise Blank-End Stop
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-01
+  material: AISI 1018 cold-finished steel
+  material_specification: AISI 1018 cold-finished steel flat bar, 1 x 2-1/2 in, ASTM A108
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "mill block from flat bar, mill arm, drill holes, bond nose pin"
