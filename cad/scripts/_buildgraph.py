@@ -1217,7 +1217,19 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
     Absolute and package-relative imports are supported; site/external packages
     cannot enter the closure because no filesystem/import-system lookup occurs.
     """
-    mods = _local_modules()
+    return _imports_from_syntax(
+        path, _local_modules(), _module_by_path().get(_resolved(path))
+    )
+
+
+def _imports_from_syntax(
+    path: Path, mods: dict[str, Path], current_module: str | None
+) -> frozenset[str]:
+    """Resolve shared syntax facts against a caller's local source scope.
+
+    Geometry uses its recipe-only map; pytest checks also execute tooling and
+    fixture modules. Keeping the resolver shared does not widen any CAD recipe.
+    """
     found: set[str] = set()
 
     def resolve(name: str) -> str | None:
@@ -1240,7 +1252,8 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
                 found.add(parent)
             parent = parent.rpartition(".")[0]
 
-    current_module = _module_by_path().get(_resolved(path))
+    # Relative imports are anchored by the caller's module map, not by the
+    # geometry-only map.
     syntax = _module_syntax(read_source(path))
     for name, _asname in syntax.imports:
         add(name)

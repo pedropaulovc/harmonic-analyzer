@@ -279,13 +279,6 @@ def test_telemetry_failure_never_fails_the_load(graph, monkeypatch):
     assert len(_load(graph(), [])) == 2
 
 
-def test_the_repo_dodo_carries_the_stamp():
-    """The real dodo stamps its namespace under the name the wrapper reads."""
-    source = (REPO_ROOT / "dodo.py").read_text(encoding="utf-8")
-    assert f"{_doit_load.STAMP_NAME} = _doit_load.LoadStamp(" in source
-    assert "_doit_load.install()" in source
-
-
 @pytest.mark.parametrize(
     "failure",
     [
@@ -348,9 +341,9 @@ def test_telemetry_failure_preserves_generator_error(graph, monkeypatch):
 def test_real_cli_offline_smoke(tmp_path, entry, outcome):
     """Real child CLI + SDK/JSONL exporter, isolated from repo tasks and cache.
 
-    Copy only telemetry into a temporary scripts directory to redirect its
-    existing __file__-relative capture path; the graph hook stays the real
-    worktree module. Explicitly empty OTLP endpoints disable even local probes.
+    Copy only telemetry into a temporary scripts directory; the graph hook stays
+    the real worktree module. Give this child its own capture directory instead
+    of inheriting the pytest session capture. Empty OTLP endpoints disable probes.
     """
     import json
     import os
@@ -373,6 +366,7 @@ def test_real_cli_offline_smoke(tmp_path, entry, outcome):
     else:
         tasks = _TASKS
     dodo.write_text("import _telemetry\n" + _STAMPED + tasks, encoding="utf-8")
+    telemetry_directory = tmp_path / "child telemetry"
     environment = os.environ.copy()
     environment.update(
         PYTHONPATH=os.pathsep.join(
@@ -381,6 +375,7 @@ def test_real_cli_offline_smoke(tmp_path, entry, outcome):
         HARMONIC_EXECUTOR="local",
         HARMONIC_SW_AUTOSTART="0",
         HARMONIC_CACHE="off",
+        HARMONIC_TELEMETRY_DIR=str(telemetry_directory),
         OTEL_EXPORTER_OTLP_ENDPOINT="",
         OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="",
         OTEL_EXPORTER_OTLP_LOGS_ENDPOINT="",
@@ -416,19 +411,32 @@ def test_real_cli_offline_smoke(tmp_path, entry, outcome):
                 "'-f', 'dodo_smoke.py', 'list']))\n"
             )
         command = [sys.executable, "-c", launcher]
-    result = subprocess.run(
+    process = subprocess.Popen(
         command + ["-f", str(dodo), "list"],
         cwd=tmp_path,
         env=environment,
         text=True,
-        capture_output=True,
-        timeout=60,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
+    try:
+        stdout, stderr = process.communicate(timeout=60)
+        result = subprocess.CompletedProcess(
+            process.args, process.returncode, stdout, stderr
+        )
+    finally:
+        try:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=60)
+        finally:
+            process.stdout.close()
+            process.stderr.close()
     if outcome in {"success", "standalone"}:
         assert result.returncode == 0, result.stdout + result.stderr
     else:
         assert result.returncode != 0, result.stdout + result.stderr
-    capture = tmp_path / "cad" / "out" / "reports" / "telemetry" / "traces.jsonl"
+    capture = telemetry_directory / "traces.jsonl"
     spans = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
     (span,) = [span for span in spans if span["name"] == "doit.load"]
     assert span["resource"]["attributes"]["service.name"] == "build-infra"

@@ -480,6 +480,44 @@ identifier, a checkout at any commit other than the recorded one or a different
 cache environment, or a `status` call that failed on authentication, network or
 CLI error. An auth or network failure is never a `NOT_FOUND`.
 
+## Maintained tests and offline gate stamps
+
+Run `uv run --frozen python -m pytest` from the repository root. `pyproject.toml`
+limits default collection to `cad/scripts`, `cad/comparisons/tools` and `tests`,
+recursively using pytest's filename/exclusion settings. Do not collect the
+`SolidworksMCP-python` suite from this checkout.
+
+Root collection and build enrollment are separate contracts. The required
+`dodo._CHECK_NAMES` gates run on build and release; `check:verify_telemetry` is
+opt-in, and `check:features_bound` is release-only. The enrollment audit uses
+repository-relative paths, not basenames, and requires a disposition for every
+maintained test: required gate, explicit opt-in/release-only, or root runner with
+a concrete reason. There is no pending-triage exemption. Base serial belongs to
+`check:numerals`; the offline diagnostic/archived-receipt and comparison seed
+contracts belong to `check:recipe`. Launcher, checkout/farm-mode, root-scope,
+doit-load and pose-conversion infrastructure tests remain explicit root-runner
+tests; a green CAD check is not evidence that those tests ran.
+
+Pytest check stamps depend on root `conftest.py`, pytest configuration/lockfile
+and the executed local source closure, including fixture/tooling/adapter helpers
+excluded from geometry recipes. Runtime-loaded diagnostics, seven exact archived
+VM2 receipts, the identity map and recursive fallback-name scan inputs are
+explicit recipe inputs; missing receipts fail rather than disappearing through
+a glob. The existing `config_changed` checker also records deterministic path
+inventories for maintained tests, scanned sources, seed part filenames and
+executed sources, so additions, removals and renames invalidate saved stamps.
+These check-only inputs do not widen COM recipes or digest tiers.
+
+Root `conftest.py` establishes scratch cache/telemetry output and inert farm,
+autostart and exporter settings before product imports. Refusing tripwires
+cover SolidWorks launches/active-instance attachment and watchdog hard exits,
+including swallowed attempts. Tests exercise dangerous branches with injected
+transports and clean up only fixture-owned native process handles. The telemetry
+output override is `HARMONIC_TELEMETRY_DIR`; isolated CLI children set their own
+directory. `NOSW_GUARD=0` deliberately disables refusals and is not safe-default
+evidence. This policy contains known hazards in trusted tests, not arbitrary
+plugins, native code or the vendored suite.
+
 ## Remote build-artifact cache
 
 Every task that opens SolidWorks is cached: `part:<stem>`, `assembly:<stem>`,

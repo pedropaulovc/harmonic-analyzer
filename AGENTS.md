@@ -126,6 +126,9 @@ git submodule update --init --recursive
    SolidWorks, which takes the licence farm worker w6 shares. A bare `pytest` or
    `pytest .` at the root skips it (`testpaths`/`norecursedirs` in
    `pyproject.toml`); run it on a farm worker or in its own CI.
+   Root collection is separate from required build-gate enrollment; root-runner
+   reasons and pre-import host containment are described in
+   [maintained tests and offline gate stamps](DEVELOPING.md#maintained-tests-and-offline-gate-stamps).
 
 ## Minimum merge gate (every PR)
 

@@ -55,6 +55,8 @@ try:
     for _name in _OTLP_ENV_NAMES:
         os.environ.pop(_name, None)
     os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+    os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = ""
+    os.environ["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] = ""
     import _telemetry  # noqa: E402
 finally:
     for _name in _OTLP_ENV_NAMES:
@@ -85,6 +87,8 @@ def deterministic_otlp_environment(monkeypatch):
     for name in _OTLP_ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "")
     yield
 
     monkeypatch.undo()
@@ -94,6 +98,8 @@ def deterministic_otlp_environment(monkeypatch):
         for name in _OTLP_ENV_NAMES:
             os.environ.pop(name, None)
         os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+        os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = ""
+        os.environ["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] = ""
         _telemetry.configure(force=True)
     finally:
         for name in _OTLP_ENV_NAMES:
@@ -1240,7 +1246,42 @@ w.close()
 """
 
 
-def test_concurrent_appends_never_splice_a_record(tmp_path):
+@pytest.fixture
+def append_worker_process(tmp_path):
+    """Retain and reap only the writer children created by these stress tests."""
+    processes = []
+
+    def start(argv):
+        environment = os.environ.copy()
+        environment.update(
+            HARMONIC_TELEMETRY_DIR=str(tmp_path / f"worker telemetry {len(processes)}"),
+            OTEL_EXPORTER_OTLP_ENDPOINT="",
+            OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="",
+            OTEL_EXPORTER_OTLP_LOGS_ENDPOINT="",
+        )
+        process = subprocess.Popen(argv, env=environment)
+        processes.append(process)
+        return process
+
+    try:
+        yield start
+    finally:
+        failures = []
+        for process in processes:
+            try:
+                if process.poll() is None:
+                    process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                failures.append(f"owned writer {process.pid}: {error}")
+        assert not failures, "; ".join(failures)
+
+
+def test_concurrent_appends_never_splice_a_record(tmp_path, append_worker_process):
     """8 processes x 250 oversized records land as 2000 intact, unique JSON lines."""
     workers, per_worker, pad = 8, 250, 20_000  # pad >> the 8 KB default buffer
     target = tmp_path / "traces.jsonl"
@@ -1249,7 +1290,7 @@ def test_concurrent_appends_never_splice_a_record(tmp_path):
     scripts_dir = str(Path(__file__).resolve().parent)
 
     procs = [
-        subprocess.Popen(
+        append_worker_process(
             [
                 sys.executable,
                 str(script),
@@ -1340,7 +1381,9 @@ f.close()
         "means anything on Windows."
     ),
 )
-def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
+def test_buffered_appends_do_corrupt_under_the_same_stress(
+    tmp_path, append_worker_process
+):
     """Opt-in repro for WHY the atomic writer exists. NOT a gating test.
 
     This asserts that a race *reproduces*, which is inherently nondeterministic:
@@ -1375,7 +1418,7 @@ def test_buffered_appends_do_corrupt_under_the_same_stress(tmp_path):
     script.write_text(_BUFFERED_WORKER, encoding="utf-8")
 
     procs = [
-        subprocess.Popen(
+        append_worker_process(
             [
                 sys.executable,
                 str(script),
