@@ -128,7 +128,9 @@ FINGER_END_Y = REAR_Y - FINGER_LENGTH
 # both its sizes print from the lug's seat and bottom faces.
 NOTCH_HEIGHT = 16.0
 NOTCH_TOP_Z = BOTTOM_Z + NOTCH_HEIGHT
-SCREW_GRIP = 11.8  # seat face to the lug's head-bearing face
+# Seat face to the lug's head-bearing face: printed at three places so its
+# band costs the screw's engagement only 0.26 (below).
+SCREW_GRIP = 11.15
 GRIP_FACE_X = SEAT_X - SCREW_GRIP
 
 BASE_ENVELOPE = (
@@ -154,6 +156,7 @@ BOND_GAP_MAX = 0.25
 SCREW_HOLE_DIA = 6.60
 
 LINEAR_1PL = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+LINEAR_3PL = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
 RULE12_WALL_TARGET = 2.0
 
 # --- Rule 12 at the printed worst case ---------------------------------------
@@ -193,11 +196,11 @@ if NOSE_HOLE_DIA + DRILLED_BAND[1] <= NOSE_PIN_MAX:
 # On the shortest grip the tip stops at least 1 P short of the tap's thread
 # depth; on the longest, the full-thread overlap is what the protrusion
 # leaves after the screw end's incomplete thread.
-SCREW_PROTRUSION_MAX = round(SCREW_LENGTH - (SCREW_GRIP - LINEAR_1PL), 6)  # 5.0
-SCREW_PROTRUSION_MIN = round(SCREW_LENGTH - (SCREW_GRIP + LINEAR_1PL), 6)  # 3.4
+SCREW_PROTRUSION_MAX = round(SCREW_LENGTH - (SCREW_GRIP - LINEAR_3PL), 6)  # 4.98
+SCREW_PROTRUSION_MIN = round(SCREW_LENGTH - (SCREW_GRIP + LINEAR_3PL), 6)  # 4.72
 if SCREW_PROTRUSION_MAX > BASE_TAP_DEPTH - SCREW_PITCH + 1e-9:
     raise AssertionError("M6 screw can reach the bottom of the base's tap")
-SCREW_ENGAGEMENT_MIN = round(SCREW_PROTRUSION_MIN - SCREW_END_INCOMPLETE, 6)  # 1.4
+SCREW_ENGAGEMENT_MIN = round(SCREW_PROTRUSION_MIN - SCREW_END_INCOMPLETE, 6)  # 2.72
 if SCREW_ENGAGEMENT_MIN <= 0.0:
     raise AssertionError("M6 screw engages no full thread in the base")
 # Under rule 12's 1.5 D: the base's 6 mm tap caps it. Named exception row
@@ -251,21 +254,23 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Block": {"OverallLength": 1},
     "ArmCutProfile": {"ArmHeight": 1, "ArmWidth": 1},
     "ArmCut": {"FingerFront": 1},
-    "NotchProfile": {"ScrewGrip": 1, "NotchHeight": 1},
+    "NotchProfile": {"ScrewGrip": 3, "NotchHeight": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked vise-stop dimension needs authored places")
-# The walls and screw engagement above assume one-place sizes; a precision
-# edit re-proves them.
+# The walls above assume one-place sizes and the screw's engagement a
+# three-place grip; a precision edit re-proves them.
 if any(
     places != 1
     for name, places in DRAWING_PRECISION_BY_NAME.items()
-    if name not in ("NoseHoleDia", "ScrewHoleDia")
+    if name not in ("NoseHoleDia", "ScrewHoleDia", "ScrewGrip")
 ):
     raise AssertionError("vise-stop wall proof assumes one-place positions and sizes")
+if DRAWING_PRECISION_BY_NAME["ScrewGrip"] != 3:
+    raise AssertionError("the screw's engagement proof assumes a three-place grip")
 
 SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
@@ -367,7 +372,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "note": (
                 "clearance through the lug for one M6 x 16 SHCS into the Kanetec "
                 "MB-PM's M6 x 6 tap (vendor thread kept); head on the lug face "
-                "11.8 from the seat; full-thread engagement 1.4 min (0.23D), "
+                "11.150 from the seat; full-thread engagement 2.7 min (0.45D), "
                 "hand-seating load only",
                 (
                     "SCREW_THREAD",

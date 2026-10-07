@@ -67,9 +67,11 @@ def test_screw_never_bottoms_in_the_base_tap_and_prints_its_worst_engagement() -
     """Across the printed grip band the screw tip stops at least one pitch
     short of the vendor tap's depth, and the sheet never states more full
     thread than the longest grip leaves."""
-    shortest_grip = spec.SCREW_GRIP - spec.LINEAR_1PL
-    longest_grip = spec.SCREW_GRIP + spec.LINEAR_1PL
-    assert spec.SCREW_LENGTH - shortest_grip <= spec.BASE_TAP_DEPTH - spec.SCREW_PITCH
+    places = spec.DRAWING_PRECISION_BY_NAME["ScrewGrip"]
+    band = float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+    shortest_grip = spec.SCREW_GRIP - band
+    longest_grip = spec.SCREW_GRIP + band
+    assert spec.SCREW_LENGTH - shortest_grip <= spec.BASE_TAP_DEPTH - spec.SCREW_PITCH + 1e-9
     worst = spec.SCREW_LENGTH - longest_grip - spec.SCREW_END_INCOMPLETE + 1e-9
     assert 0.0 < spec.SCREW_ENGAGEMENT_PRINTED <= worst
     assert spec.SCREW_ENGAGEMENT_PRINTED_D * spec.SCREW_MAJOR <= worst
