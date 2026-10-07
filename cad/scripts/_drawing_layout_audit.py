@@ -15,6 +15,8 @@ by the sheet's own view):
   annotation on a layer that does not print is left out of the audit and
   counted per sheet in the report's summary (``hidden_layer``);
 * every view's outline and orientation;
+* actual document lineweight metrics/category enums and bounded drawing-component
+  default/override readbacks, as evidence only (not model-ink classification);
 * section lines (``IDrSection`` line, arrows, label origins, text height) and
   detail circles (``IView::GetDetailCircleInfo2``);
 * tables, boxed from anchor + row/column spans (as ``_drawing_common`` does);
@@ -33,6 +35,7 @@ building seat saw, whether the leaf was built or restored.
 from __future__ import annotations
 
 import json
+import math
 import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -153,6 +156,26 @@ class _Reader:
             return None
         finally:
             self._spent(_accessor(fn), started)
+
+    def witness(self, fn: Callable[[], Any], *, name: str) -> tuple[Any, str | None]:
+        """Evidence-only read: preserve a refusal's cause without changing gates.
+
+        Unlike ``need``, these new diagnostics do not supply ink or geometry to
+        the classifier. Their cost joins the existing collector aggregation;
+        unreadability is serialized beside the evidence, not as a new finding.
+        """
+        started = time.perf_counter()
+        try:
+            value = fn()
+        except Exception as exc:
+            cause = f"exception:{type(exc).__name__}"
+            hresult = getattr(exc, "hresult", None)
+            if type(hresult) is int:
+                cause += f":hresult={hresult}"
+            return None, cause
+        finally:
+            self._spent(name, started)
+        return (None, "missing") if value is None else (value, None)
 
     def first(self, fns: list[Callable[[], Any]], *, name: str) -> Any:
         """The first of some ARRAY-returning overloads that answers (a scalar 0
