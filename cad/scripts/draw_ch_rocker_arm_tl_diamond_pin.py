@@ -15,6 +15,7 @@ from _drawing_common import (
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -29,6 +30,7 @@ from ch_rocker_arm_tl_diamond_pin_spec import (
     DRAWING_PRECISION_BY_NAME,
     LAND_HEIGHT,
     OVERALL_LENGTH,
+    PIN_ENGAGEMENT,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -65,10 +67,12 @@ AXIAL_XY = {
     "ReamDepth": (4.0, 0.032),
     "CollarEnd": (5.1, 0.042),
     "OverallLength": (8.0, 0.052),
-    "PinLength": (2.0, 0.062),
+    "PinLength": (2.0, 0.072),
 }
+# The pin's buried end, from the neck face like every other station.
+PIN_END_XY = (3.0, 0.062)
 # Reference overall, land tip to shank end, on the top tier.
-OVERALL_REF_XY = (6.7, 0.072)
+OVERALL_REF_XY = (6.7, 0.082)
 OVERALL_REF = OVERALL_LENGTH + LAND_HEIGHT
 DIAMETER_XY = {
     "NeckDia": (1.0, -0.026),
@@ -148,12 +152,37 @@ def _hatch_pin_apart(adapter: Any, section: Any) -> None:
     if len(groups) != 2:
         raise RuntimeError(f"section A-A should cut two bodies, hatched {sorted(groups)}")
     pin = min(volumes, key=volumes.get)
-    for hatch in groups[pin]:
-        hatch.UseMaterialHatch = False
-        hatch.Angle = 3.0 * math.pi / 4.0
-        if abs(float(hatch.Angle) - 3.0 * math.pi / 4.0) > 1e-6:
-            raise RuntimeError("gauge-pin hatch angle did not persist")
+    for name, hatches in groups.items():
+        angle = 3.0 * math.pi / 4.0 if name == pin else math.pi / 4.0
+        for hatch in hatches:
+            hatch.UseMaterialHatch = False
+            hatch.Pattern = "ANSI31 (Iron BrickStone)"
+            hatch.Scale2 = 1.0
+            hatch.Angle = angle
+            if abs(float(hatch.Angle) - angle) > 1e-6 or not str(hatch.Pattern):
+                raise RuntimeError("section hatch pattern/angle did not persist")
     adapter.currentModel.EditRebuild3()
+
+
+def _pin_end_station(adapter: Any, section: Any, to_sheet, annotations: list[Any]) -> None:
+    """Locate the pin's buried end from the neck face; the cut length is reference."""
+    label = "diamond-pin buried end station"
+    display = add_edge_dimension(
+        adapter,
+        section,
+        p0=to_sheet(0.0, 0.0075),
+        p1=to_sheet(PIN_ENGAGEMENT, 0.002),
+        text_xy=to_sheet(*PIN_END_XY),
+        label=label,
+        orientation="horizontal",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    measured_mm = abs(float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0)
+    if abs(measured_mm - PIN_ENGAGEMENT) > 1e-3:
+        raise RuntimeError(f"{label} measured {measured_mm:g}, expected {PIN_ENGAGEMENT:g}")
+    display.SetPrecision3(1, -1, -1, -1)
+    by_name = {dimension_name(adapter, a): a for a in annotations}
+    set_reference_dimension(adapter, by_name["PinLength"], label="gauge-pin cut length")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -222,6 +251,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     _overall_reference(adapter, section, to_sheet)
+    _pin_end_station(adapter, section, to_sheet, moved)
     _hatch_pin_apart(adapter, section)
     create_section_axis_centerline(
         adapter, section, length_mm=OVERALL_LENGTH + LAND_HEIGHT, label="pin turning axis"
