@@ -114,7 +114,7 @@ def _crank_step_body() -> str:
     lines = assembly.CONE_CRANK_STEPS.splitlines()
     start = next(i for i, line in enumerate(lines) if line.startswith(f"{number}. "))
     end = next(i for i, line in enumerate(lines) if line.startswith(f"{number + 1}. "))
-    return " ".join(line.strip() for line in lines[start:end])
+    return " ".join(" ".join(lines[start:end]).split())
 
 
 def test_the_fit_is_taken_before_the_washer_goes_on_and_the_pin_is_drilled() -> None:
@@ -125,10 +125,8 @@ def test_the_fit_is_taken_before_the_washer_goes_on_and_the_pin_is_drilled() -> 
     import draw_dt_drive_train_assembly as assembly
 
     body = _crank_step_body()
-    assert body.index(f"PER SHEET {assembly.FIT_SHEET}") < body.index("MATCH-DRILL")
-    fit = " ".join(
-        line.strip() for line in assembly.CRANK_WASHER_FIT_NOTES.splitlines()
-    )
+    assert body.index(f"PER SHEET {assembly.CONTINUATION_SHEET}") < body.index("MATCH-DRILL")
+    fit = " ".join(assembly.CRANK_WASHER_FIT_NOTES.split())
     assert f"STEP {steps.step_number('crank-mesh-checked')}" in fit
     order = ("WITHOUT MHA-DT-036", "MEASURE", "FACE MHA-DT-036", "FROM THE REAR", "SEATED")
     positions = [fit.index(phrase) for phrase in order]

@@ -183,13 +183,15 @@ HOLE_TABLE_ANCHOR = (0.018, 0.260)
 # not text-editable, so the note marks their diameter as reference.
 SOCKET_FIT_NOTE = (
     "4X: FIT TO ASSIGNED\n"
-    "MHA-FR-003 TUBE: CLOSE\n"
-    "HAND-SLIP, NO\n"
+    "MHA-FR-003 TUBE:\n"
+    "CLOSE HAND-SLIP, NO\n"
     "PERCEPTIBLE ROCK.\n"
     "TABLE <MOD-DIAM> REF.\n"
     "RETAIN MATCH MARKS."
 )
-SOCKET_FIT_NOTE_XY = (0.1665, 0.2262)
+# Reflow the full tube ID without shrinking text; the hb-render-6 width model
+# leaves 6.4 mm to the table and 6.54 mm to the plan's west edge.
+SOCKET_FIT_NOTE_XY = (0.1690, 0.2262)
 SOCKET_FIT_STATION = min(COLUMN_SOCKET_XZ)
 # hb-render-6's sheet-2 notes at the default note height: 2.49 mm per
 # character and 4.6 mm per row, the text hanging from its top-left anchor.
@@ -212,7 +214,7 @@ NOTE_ROW_M = 0.0046
 # cut to three rows (hb-render-4 eye pass), is centred in the gap between the
 # front view and the spring block, about 10 mm clear of each.
 PEDESTAL_CALLOUT_XY = (0.200, 0.252)
-BLOCK_CALLOUT_XY = (0.262, 0.252)
+BLOCK_CALLOUT_XY = (0.272, 0.252)
 SPRING_CALLOUT_XY = (0.315, 0.1448)
 CROSS_TAP_CALLOUT_XY = (0.285, 0.120)
 # The holes-sheet plan's view label, top-left corner. Centred over the plan it

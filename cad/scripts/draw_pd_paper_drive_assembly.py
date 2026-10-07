@@ -1,15 +1,15 @@
-r"""Create the four-sheet paper-drive assembly drawing (MHA-PD-000).
+r"""Create the six-sheet paper-drive assembly drawing (MHA-PD-000).
 
 Sheet 1 keeps the Front/Right/Isometric views of the whole paper drive and
 balloons the chain and the spare sprocket on the isometric. Sheet 2 carries
-the bill of materials, a ballooned isometric of the transgear (the hanger,
-the latch, the disc cluster and the knob stack) and a ballooned right view of
-the parts that isometric hides. Sheet 3 balloons the bar, its clamps and the
-platen group on the builder's exploded isometric (PAPER_DRIVE_EXPLODED) and
-prints their steps. Sheet 4 prints the transgear's assembly steps and the
-chain fit-up (CONTRACT-paper-drive.md §13.2). Every step is numbered by
-``paper_drive_assembly_steps``; every value comes from the spec that owns it,
-or from that module for the values only the procedure owns.
+a ballooned isometric of the transgear (the hanger, the latch, the disc cluster
+and the knob stack) and a ballooned right view of its hidden parts. Sheet 3
+balloons the bar, its clamps and the platen group on PAPER_DRIVE_EXPLODED and
+prints their steps. Sheet 4 prints the transgear's assembly steps; sheet 5
+prints the chain fit-up (CONTRACT-paper-drive.md §13.2). Sheet 6 carries the
+complete native BOM, split horizontally into two pieces at measured row
+heights, and an assembly reference. Every step is numbered by
+``pd_paper_drive_assembly_steps``; values retain their owning specs.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ from _drawing_common import (
     view_configuration,
 )
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
-from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _drawing_registry import DRAWINGS_BY_NAME, DRAWING_TEMPLATES, DrawingLayout
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
     add_note,
@@ -106,9 +106,11 @@ PNG = OUTPUTS.png
 
 SHEET_NAMES = (
     "ASSEMBLED VIEWS",
-    "BILL OF MATERIALS",
+    "TRANSGEAR VIEWS",
     "PLATEN AND SUPPORT",
     "ASSEMBLY AND FIT-UP",
+    "CHAIN FIT-UP",
+    "BILL OF MATERIALS",
 )
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the paper-drive sheet coordinates are landscape")
@@ -135,22 +137,31 @@ ISO_SCALE_LADDER = (ASSEMBLED_SCALE, (1.0, 5.0))
 ISO_RING_LIMITS = (0.235, 0.069, 0.418, 0.267)
 ASSEMBLED_CAPTION_XY = (0.018, 0.120)
 
-# --- sheet 2: BOM left, ballooned transgear isometric right ------------------
-# The drive-train BOM's column widths (MHA-DT-000), on the same template: its
-# 118 mm description column held 41 characters on one line, and a wrapped
-# description read 10.195 mm for two lines there (5.1 a line).  At its 6.0
-# row the 44 rows here (MHA-VN-049 added, R9-71) ran past the inner border at
-# the sheet's foot, so the rows close to 5.5: the table ends 0.0200 up,
-# 7.3 mm clear of the 0.0127 border.
+# --- sheet 6: full qualified Numbers and two native BOM pieces ---------------
+# f353's 22 mm Number column wrapped the identities: the native audit measured
+# the unsplit table 437.2384 mm high, not the requested rows' nominal height.
+# Use the drive-train's proven column widths without changing table text size;
+# choose the split only after text, widths and row heights have rebuilt.
 BOM_COLUMN_WIDTHS = {
     "item": 0.012,
-    "part": 0.022,
+    "part": 0.048,
     "description": 0.118,
     "quantity": 0.012,
 }
 BOM_DESCRIPTION_MAX_CHARS = 41
 BOM_ROW_HEIGHT = 0.0055
 BOM_ANCHOR = (0.018, 0.262)
+BOM_SECOND_ANCHOR = (
+    BOM_ANCHOR[0] + sum(BOM_COLUMN_WIDTHS.values()) + 0.008,
+    BOM_ANCHOR[1],
+)
+BOM_REFERENCE_SCALE = (1.0, 10.0)
+BOM_REFERENCE_CENTER = (0.060, 0.065)
+BOM_REFERENCE_LIMITS = (0.018, 0.028, 0.095, 0.104)
+BOM_REFERENCE_CAPTION_XY = (0.100, 0.088)
+BOM_REFERENCE_CAPTION = (
+    "REFERENCE 1:10\nBALLOONS: SHEETS 1-3\nASSEMBLY: SHEETS 3-5"
+)
 # The ASME B landscape sheet's inner border, bottom edge, and the clearance
 # the BOM keeps above it.
 SHEET_INNER_BORDER_BOTTOM = 0.0127
@@ -182,13 +193,9 @@ if any(
     )
 # Where the inner view lands before inner_view_shift centres it.
 INNER_VIEW_START = (0.230, 0.190)
-# Sheet-2 balloon rings: left of them the BOM's right edge plus the clearance
-# the drive-train BOM keeps (MHA-DT-000), right the drive-train ring region's
-# right edge on the same template, top the BOM's top, bottom over the
-# transgear caption. _spread_balloons puts each circle CENTRE BALLOON_MARGIN
-# outside its view, so the ink reaches one 10 mm balloon's radius further.
-BOM_RIGHT = BOM_ANCHOR[0] + sum(BOM_COLUMN_WIDTHS.values())
-SHEET_TWO_RING_LIMITS = (BOM_RIGHT + 0.003, 0.090, 0.415, BOM_ANCHOR[1])
+# Sheet 2 retains the established model fields when the BOM moves to sheet 6.
+# Its balloon circles still clear the drawing border and caption fields.
+SHEET_TWO_RING_LIMITS = (0.185, 0.090, 0.415, 0.262)
 BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 SHEET_TWO_RING_GAP = 0.004
 INNER_CAPTION_GAP = 0.002
@@ -215,27 +222,30 @@ PLATEN_NOTE_XY = (0.018, 0.262)
 PLATEN_NOTE_RIGHT = 0.222
 EXPLODED_RING_LIMITS = (PLATEN_NOTE_RIGHT + 0.003, 0.069, 0.418, 0.267)
 
-# --- sheet 4: the steps in two columns, a small reference view ---------------
+# --- sheets 4 and 5: ordered steps in two columns, same note-field budgets ----
 FITUP_SCALE = (1.0, 10.0)
 FITUP_REFERENCE_CENTER = (0.100, 0.045)
 FITUP_LINE_WIDTH = 68  # characters; default-format note text
 # Each column's top-left corner, then its right limit and lowest y: the left
-# column stops above the reference view; the right column stops above the
-# title block (top 0.066).
+# column stops above sheet 4's reference view; the right column stops above
+# the title block (top 0.066). Sheet 5 retains the same field clearances.
 FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262))
 FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
-# The platen's steps, its locks included, fill sheet 3; the transgear opens
-# sheet 4; the hook step, then the chain fit-up (§13.2) under its own
-# heading, fill its second column.
+# The platen's steps fill sheet 3. Sheet 4 splits the transgear before the
+# knob stack, keeping the mesh-and-hook operations together. The chain fit-up
+# (§13.2) continues on sheet 5, split before the collar is pinned.
 FITUP_FIRST_COLUMN_KEY = "latch-pin-pressed"
-FITUP_SECOND_COLUMN_KEY = "hook-set-and-riveted"
+FITUP_SECOND_COLUMN_KEY = "collar-pins-pressed"
 FITUP_CHAIN_KEY = "fitup-pose-set"
+CHAIN_SECOND_COLUMN_KEY = "collar-pinned"
 
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: TRANSGEAR_VIEW_SCALE,
     SHEET_NAMES[2]: EXPLODED_SCALE,
     SHEET_NAMES[3]: FITUP_SCALE,
+    SHEET_NAMES[4]: FITUP_SCALE,
+    SHEET_NAMES[5]: BOM_REFERENCE_SCALE,
 }
 
 # --- BOM identities ------------------------------------------------------------
@@ -1132,25 +1142,33 @@ def _step_text() -> dict[str, str]:
 
 
 def _step_column(heading: str, keys: tuple[str, ...], text: dict[str, str]) -> str:
-    lines = textwrap.wrap(heading, width=FITUP_LINE_WIDTH)
+    lines = textwrap.wrap(
+        heading,
+        width=FITUP_LINE_WIDTH,
+        break_on_hyphens=False,
+        break_long_words=False,
+    )
     for key in keys:
         lines += textwrap.wrap(
             text[key],
             width=FITUP_LINE_WIDTH,
             initial_indent=f"{steps.step_number(key)}. ",
             subsequent_indent="   ",
+            break_on_hyphens=False,
+            break_long_words=False,
         )
     return "\n".join(lines)
 
 
-def _step_columns() -> tuple[str, str, str]:
-    """Sheet 3's platen-and-support steps, then sheet 4's two columns."""
+def _step_columns() -> tuple[str, tuple[str, str], tuple[str, str]]:
+    """Sheet 3's platen steps, then the two columns on sheets 4 and 5."""
     text = _step_text()
     if set(text) != set(steps.SEQUENCE):
         raise AssertionError("paper-drive step text must cover exactly the sequence")
     first = steps.step_number(FITUP_FIRST_COLUMN_KEY) - 1
     second = steps.step_number(FITUP_SECOND_COLUMN_KEY) - 1
     chain_start = steps.step_number(FITUP_CHAIN_KEY) - 1
+    chain_second = steps.step_number(CHAIN_SECOND_COLUMN_KEY) - 1
     return (
         _step_column(
             f"PLATEN AND SUPPORT; STEP {steps.step_number(FITUP_FIRST_COLUMN_KEY)} "
@@ -1158,25 +1176,39 @@ def _step_columns() -> tuple[str, str, str]:
             steps.SEQUENCE[:first],
             text,
         ),
-        _step_column("THE TRANSGEAR", steps.SEQUENCE[first:second], text),
-        "\n".join(
-            (
-                _step_column("", steps.SEQUENCE[second:chain_start], text),
-                _step_column(
-                    f"CHAIN FIT-UP, CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
-                    steps.SEQUENCE[chain_start:],
-                    text,
-                ),
-            )
+        (
+            _step_column("THE TRANSGEAR", steps.SEQUENCE[first:second], text),
+            "\n".join(
+                (
+                    _step_column(
+                        "THE TRANSGEAR, CONTINUED",
+                        steps.SEQUENCE[second:chain_start],
+                        text,
+                    ),
+                    "",
+                    f"CHAIN FIT-UP: SHEET {SHEET_NAMES.index('CHAIN FIT-UP') + 1}, "
+                    f"STEP {steps.step_number(FITUP_CHAIN_KEY)} ON",
+                )
+            ),
+        ),
+        (
+            _step_column(
+                "CHAIN FIT-UP, TRANSGEAR DONE PER SHEET "
+                f"{SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}; "
+                f"CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
+                steps.SEQUENCE[chain_start:chain_second],
+                text,
+            ),
+            _step_column(
+                "CHAIN FIT-UP, CONTINUED", steps.SEQUENCE[chain_second:], text
+            ),
         ),
     )
 
 
-PLATEN_STEPS, *_FITUP = _step_columns()
-# Sheet 4's two columns, left to right.
-FITUP_COLUMNS: tuple[str, str] = (_FITUP[0], _FITUP[1])
-FITUP_STEPS = "\n".join((PLATEN_STEPS, *FITUP_COLUMNS))
-FITUP_NOTES = FITUP_COLUMNS
+PLATEN_STEPS, FITUP_NOTES, CHAIN_NOTES = _step_columns()
+# Each sheet's columns read left to right; sheet 5 continues sheet 4.
+FITUP_STEPS = "\n".join((PLATEN_STEPS, *FITUP_NOTES, *CHAIN_NOTES))
 # The exploded view's caption at each scale it may take.
 EXPLODED_CAPTIONS = {
     scale: f"PLATEN AND SUPPORT EXPLODED {_scale_text(scale)}; "
@@ -1197,7 +1229,7 @@ ASSEMBLED_CAPTIONS = {
             "THE BASE DECK IS THE T18 SPARE, STORED LOOSE; THE T24 IS ON THE "
             "KNOB, THE T12 ON THE CRANK. PLATEN AND SUPPORT ITEMS: SHEET "
             f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR ITEMS: SHEET "
-            f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
+            f"{SHEET_NAMES.index('TRANSGEAR VIEWS') + 1}.",
             width=FITUP_LINE_WIDTH,
         )
     )
@@ -1205,7 +1237,9 @@ ASSEMBLED_CAPTIONS = {
 }
 TRANSGEAR_CAPTION = (
     f"TRANSGEAR {TRANSGEAR_VIEW_SCALE[0]:g}:{TRANSGEAR_VIEW_SCALE[1]:g}; "
-    f"ASSEMBLY AND FIT-UP: SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}"
+    f"ASSEMBLY AND FIT-UP: SHEETS {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1} "
+    f"AND {SHEET_NAMES.index('CHAIN FIT-UP') + 1}; "
+    f"BOM: SHEET {SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
 )
 # The inner view's caption at each scale it may take.
 INNER_CAPTIONS = {
@@ -1220,11 +1254,13 @@ FITUP_REFERENCE_CAPTION = (
 SHEET_TEXTS = (
     PLATEN_STEPS,
     *FITUP_NOTES,
+    *CHAIN_NOTES,
     *EXPLODED_CAPTIONS.values(),
     *ASSEMBLED_CAPTIONS.values(),
     TRANSGEAR_CAPTION,
     *INNER_CAPTIONS.values(),
     FITUP_REFERENCE_CAPTION,
+    BOM_REFERENCE_CAPTION,
 )
 
 
@@ -1300,6 +1336,10 @@ def _create_sheets(adapter: Any) -> None:
         numerator, denominator = SHEET_SCALES[name]
         if not sheet.SetScale(float(numerator), float(denominator), False, False):
             raise RuntimeError(f"failed to set paper-drive sheet scale: {name}")
+        _place_sheet_note(
+            adapter, name, f"SHEET {SHEET_NAMES.index(name) + 1} OF {len(SHEET_NAMES)}",
+            (0.018, 0.020), label="sheet number",
+        )
 
 
 def _validate_bom(
@@ -1342,8 +1382,6 @@ def _validate_bom(
     ):
         if abs(float(table.SetColumnWidth(column, width, 0)) - width) > 1e-6:
             raise RuntimeError(f"paper-drive BOM column {column} width did not persist")
-    for row in range(rows):
-        table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
 
     actual: dict[str, tuple[int, str, str, str]] = {}
     for row_index, row in enumerate(contents[1:], start=1):
@@ -1381,6 +1419,8 @@ def _validate_bom(
                 f"paper-drive BOM quantity for {stem!r} is {quantity!r}, "
                 f"model has {counts[stem]}"
             )
+    for row in range(rows):
+        table.SetRowHeight(row, BOM_ROW_HEIGHT, 0)
     if not adapter.currentModel.EditRebuild3():
         raise RuntimeError("paper-drive BOM rebuild failed")
     for stem, (row_index, *_rest) in actual.items():
@@ -1390,6 +1430,123 @@ def _validate_bom(
                 f"paper-drive BOM part number for {stem!r} reads {applied!r}"
             )
     return tuple((stem, actual[stem][1]) for stem in BOM_PART_NUMBERS)
+
+
+def bom_extent_violations(
+    anchor: tuple[float, float], width: float, height: float
+) -> list[str]:
+    """Contain a measured native piece clear of border, title and reference."""
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    left, top = anchor
+    right, bottom = left + width, top - height
+    border = SHEET_INNER_BORDER_BOTTOM + BOM_BORDER_CLEARANCE
+    tolerance = 1e-9  # floating-point arithmetic, not a paper-clearance allowance
+    findings = []
+    if left < border - tolerance or right > template.width_m - border + tolerance:
+        findings.append("table crosses the inner side border")
+    if top > template.height_m - border + tolerance or bottom < border - tolerance:
+        findings.append("table crosses the inner top or bottom border")
+    if (
+        right > template.title_block_left_m
+        and bottom < template.title_block_top_m + BOM_BORDER_CLEARANCE - tolerance
+    ):
+        findings.append("table enters the title block")
+    if left < BOM_ANCHOR[0] + sum(BOM_COLUMN_WIDTHS.values()) and (
+        bottom < BOM_REFERENCE_LIMITS[3] + BOM_BORDER_CLEARANCE - tolerance
+    ):
+        findings.append("table enters the assembly reference field")
+    return findings
+
+
+def bom_split_row(row_heights: Sequence[float], header_count: int) -> int:
+    """Choose a horizontal split using every rebuilt row, including headers."""
+    if header_count < 1 or len(row_heights) - header_count < 2:
+        raise ValueError("paper-drive BOM needs a header and two data rows")
+    if any(not math.isfinite(height) or height <= 0 for height in row_heights):
+        raise ValueError("paper-drive BOM row heights are unreadable")
+    width = sum(BOM_COLUMN_WIDTHS.values())
+    header_height = sum(row_heights[:header_count])
+    candidates = []
+    for split_after in range(header_count, len(row_heights) - 1):
+        first_height = sum(row_heights[:split_after + 1])
+        second_height = header_height + sum(row_heights[split_after + 1:])
+        if not bom_extent_violations(BOM_ANCHOR, width, first_height) and not (
+            bom_extent_violations(BOM_SECOND_ANCHOR, width, second_height)
+        ):
+            candidates.append((abs(first_height - second_height), split_after))
+    if not candidates:
+        raise RuntimeError(
+            "complete paper-drive BOM does not fit its two native fields: "
+            f"rebuilt rows {tuple(height * 1000 for height in row_heights)!r} mm"
+        )
+    return min(candidates)[1]
+
+
+def _assert_bom_pieces(
+    pieces: Sequence[Any], *, header_count: int, total_rows: int
+) -> None:
+    """Read split ranges and physical extents; every logical data row survives."""
+    membership: Counter[int] = Counter()
+    findings = []
+    for index, raw in enumerate(pieces):
+        piece = _early_bound(raw, "ITableAnnotation")
+        info = tuple(piece.GetSplitInformation(0, 0, 0, 0))
+        if len(info) != 5:
+            raise RuntimeError(f"paper-drive BOM split information unreadable: {info!r}")
+        direction, _index, count, start, end = (int(value) for value in info)
+        if direction != 1 or not (0 <= start <= end < total_rows):
+            raise RuntimeError(f"paper-drive BOM split range invalid: {info!r}")
+        membership.update(range(max(start, header_count), end + 1))
+        rows = sorted({*range(header_count), *range(start, end + 1)})
+        height = sum(float(piece.GetRowHeight(row)) for row in rows)
+        width = sum(
+            float(piece.GetColumnWidth(column))
+            for column in range(int(piece.ColumnCount))
+        )
+        annotation = _early_bound(piece.GetAnnotation(), "IAnnotation")
+        position = tuple(float(value) for value in annotation.GetPosition())
+        if len(position) != 3:
+            raise RuntimeError(f"paper-drive BOM position unreadable: {position!r}")
+        violations = bom_extent_violations((position[0], position[1]), width, height)
+        expected_anchor = (BOM_ANCHOR, BOM_SECOND_ANCHOR)[index]
+        if any(
+            abs(position[axis] - expected_anchor[axis]) > 1e-6
+            for axis in range(2)
+        ):
+            violations.append("table moved outside its assigned column")
+        if abs(width - sum(BOM_COLUMN_WIDTHS.values())) > 1e-6:
+            violations.append("table column widths changed after splitting")
+        _telemetry.event(
+            "drawing.bom_piece", piece=index + 1, split_count=count, split_range=(start, end),
+            anchor_mm=(position[0] * 1000, position[1] * 1000),
+            width_mm=width * 1000, height_mm=height * 1000,
+            violations=tuple(violations),
+        )
+        findings.extend(violations)
+    if membership != Counter(range(header_count, total_rows)):
+        findings.append("split pieces omit or repeat logical data rows")
+    if findings:
+        raise RuntimeError("paper-drive BOM split: " + "; ".join(findings))
+
+
+def _split_bom(adapter: Any, table: Any) -> tuple[Any, Any]:
+    """Keep one native logical parts list, displayed as two complete pieces."""
+    table = _early_bound(table, "ITableAnnotation")
+    header_count = int(table.GetHeaderCount())
+    total_rows = int(table.RowCount)
+    heights = tuple(float(table.GetRowHeight(row)) for row in range(total_rows))
+    split_after = bom_split_row(heights, header_count)
+    second = table.Split(2, split_after)  # swTableSplit_AfterRow
+    if second is None:
+        raise RuntimeError(f"paper-drive BOM split after row {split_after} failed")
+    second = _early_bound(second, "ITableAnnotation")
+    annotation = _early_bound(second.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition(*BOM_SECOND_ANCHOR, 0.0):
+        raise RuntimeError("paper-drive BOM second piece refused its position")
+    rebuild_drawing(adapter, label="paper-drive BOM split")
+    pieces = (table, second)
+    _assert_bom_pieces(pieces, header_count=header_count, total_rows=total_rows)
+    return pieces
 
 
 def _isolate_instances(
@@ -1607,26 +1764,32 @@ def _balloon_collar_on_its_rear_rim(
 
 def _place_bom_sheet(
     adapter: Any, counts: Counter[str]
-) -> tuple[list[Any], Any, dict[str, str]]:
+) -> tuple[list[Any], Any, dict[str, str], tuple[Any, Any]]:
     """BOM of the whole drive; the transgear isometric and the inner view
-    between them balloon every transgear family once. Returns the landings,
-    the BOM table and its (stem: item) numbers."""
-    _activate_sheet(adapter, SHEET_NAMES[1])
-    label = "transgear isometric"
-    view = place_view(
-        adapter,
-        str(SOURCE),
-        "*Isometric",
-        *TRANSGEAR_VIEW_CENTER,
-        scale=TRANSGEAR_VIEW_SCALE,
+    between them balloon every transgear family once. Returns landings,
+    the logical table, its (stem: item) numbers and the two native pieces."""
+    _activate_sheet(adapter, SHEET_NAMES[5])
+    reference = place_view(
+        adapter, str(SOURCE), "*Isometric", *BOM_REFERENCE_CENTER,
+        scale=BOM_REFERENCE_SCALE,
     )
-    set_high_quality_shaded_with_edges(adapter, view, label=label)
-    apply_view_configuration(adapter, view, label=label)
-    # The BOM binds while every component shows; the isolation below only
-    # hides components in this view, and the second read proves the rows held.
+    set_high_quality_shaded_with_edges(adapter, reference, label="BOM reference")
+    apply_view_configuration(adapter, reference, label="BOM reference")
+    outline = _view_outline(reference)
+    if not (
+        BOM_REFERENCE_LIMITS[0] <= outline[0] < outline[2] <= BOM_REFERENCE_LIMITS[2]
+        and BOM_REFERENCE_LIMITS[1] <= outline[1] < outline[3] <= BOM_REFERENCE_LIMITS[3]
+    ):
+        raise RuntimeError(f"paper-drive BOM reference leaves its field: {outline!r}")
+    _place_sheet_note(
+        adapter, SHEET_NAMES[5], BOM_REFERENCE_CAPTION, BOM_REFERENCE_CAPTION_XY,
+        label="BOM reference caption",
+    )
+    # Insert the complete model's BOM on its own sheet; view-only isolation
+    # on sheet 2 cannot alter this reference or the logical parts list.
     table = insert_bom_table(
         adapter,
-        view,
+        reference,
         anchor_xy=BOM_ANCHOR,
         expected_components=tuple(BOM_PART_NUMBERS),
         descriptions=BOM_DESCRIPTIONS,
@@ -1635,6 +1798,15 @@ def _place_bom_sheet(
         label="paper-drive",
     )
     items = dict(_validate_bom(adapter, table, counts))
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    label = "transgear isometric"
+    view = place_view(
+        adapter, str(SOURCE), "*Isometric", *TRANSGEAR_VIEW_CENTER,
+        scale=TRANSGEAR_VIEW_SCALE,
+    )
+    set_high_quality_shaded_with_edges(adapter, view, label=label)
+    apply_view_configuration(adapter, view, label=label)
+    _link_view_to_bom(view, table, label=label)
     _isolate_instances(adapter, view, TRANSGEAR_INSTANCES, label=label)
     inner_label = "transgear inner view"
     placed = INNER_SCALE_LADDER[0]
@@ -1653,9 +1825,11 @@ def _place_bom_sheet(
         raise RuntimeError(
             "paper-drive BOM items moved when the transgear views were isolated"
         )
-    # Both rings fit before any balloon exists; only the inner view moves,
-    # the BOM's own view stays where the table was inserted. Every ladder
-    # scale keeps the configuration just applied (INNER_SCALE_LADDER).
+    _activate_sheet(adapter, SHEET_NAMES[5])
+    pieces = _split_bom(adapter, table)
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    # Both rings fit before any balloon exists; only the inner view moves.
+    # Every ladder scale keeps the configuration just applied.
     iso_outline = _view_outline(view)
     scale = inner_view_scale(iso_outline, _view_outline(inner), placed)
     if scale != placed:
@@ -1715,7 +1889,7 @@ def _place_bom_sheet(
         ),
         label="inner-parts caption",
     )
-    return landings, table, items
+    return landings, table, items, pieces
 
 
 def _balloon_assembled_sheet(
@@ -1780,23 +1954,29 @@ def _place_exploded_sheet(adapter: Any, table: Any, items: dict[str, str]) -> li
     return landings
 
 
-def _place_fitup_sheet(adapter: Any) -> None:
-    _activate_sheet(adapter, SHEET_NAMES[3])
-    view = place_view(
-        adapter, str(SOURCE), "*Isometric", *FITUP_REFERENCE_CENTER, scale=FITUP_SCALE
-    )
-    apply_view_configuration(adapter, view, label="fit-up reference isometric")
-    for index, (text, xy) in enumerate(zip(FITUP_NOTES, FITUP_NOTE_XY, strict=True)):
-        _place_sheet_note(
-            adapter, SHEET_NAMES[3], text, xy, label=f"fit-up note {index + 1}"
+def _place_fitup_sheets(adapter: Any) -> None:
+    for sheet_name, notes in (
+        (SHEET_NAMES[3], FITUP_NOTES),
+        (SHEET_NAMES[4], CHAIN_NOTES),
+    ):
+        _activate_sheet(adapter, sheet_name)
+        view = place_view(
+            adapter, str(SOURCE), "*Isometric", *FITUP_REFERENCE_CENTER, scale=FITUP_SCALE
         )
-    _place_sheet_note(
-        adapter,
-        SHEET_NAMES[3],
-        FITUP_REFERENCE_CAPTION,
-        (FITUP_REFERENCE_CENTER[0] - 0.040, FITUP_NOTE_LIMITS[0][1] - 0.002),
-        label="fit-up reference caption",
-    )
+        apply_view_configuration(
+            adapter, view, label=f"{sheet_name} reference isometric"
+        )
+        _place_sheet_note(
+            adapter,
+            sheet_name,
+            FITUP_REFERENCE_CAPTION,
+            (FITUP_REFERENCE_CENTER[0] - 0.040, FITUP_NOTE_LIMITS[0][1] - 0.002),
+            label=f"{sheet_name} reference caption",
+        )
+        for index, (text, xy) in enumerate(zip(notes, FITUP_NOTE_XY, strict=True)):
+            _place_sheet_note(
+                adapter, sheet_name, text, xy, label=f"{sheet_name} note {index + 1}"
+            )
 
 
 @_telemetry.traced("drawing.paper_drive_assembly")
@@ -1832,10 +2012,10 @@ async def build(adapter: Any) -> dict[str, str]:
     _validate_persisted_explode(adapter.currentModel)
     _create_sheets(adapter)
     iso = _place_assembled_sheet(adapter)
-    landings, table, items = _place_bom_sheet(adapter, counts)
+    landings, table, items, pieces = _place_bom_sheet(adapter, counts)
     landings += _balloon_assembled_sheet(adapter, iso, table, items)
     landings += _place_exploded_sheet(adapter, table, items)
-    _place_fitup_sheet(adapter)
+    _place_fitup_sheets(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 
     return await finalize_drawing(
@@ -1847,7 +2027,13 @@ async def build(adapter: Any) -> dict[str, str]:
         expected_sheet_names=SHEET_NAMES,
         sheet_layouts=SHEET_LAYOUTS,
         sheet_scales=SHEET_SCALES,
-        settled_checks=(lambda: assert_balloon_landings(adapter, landings),),
+        settled_checks=(
+            lambda: assert_balloon_landings(adapter, landings),
+            lambda: _assert_bom_pieces(
+                pieces, header_count=int(table.GetHeaderCount()),
+                total_rows=len(BOM_PART_NUMBERS) + 1,
+            ),
+        ),
     )
 
 

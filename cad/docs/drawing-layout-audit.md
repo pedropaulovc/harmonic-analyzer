@@ -32,6 +32,14 @@ The eye pass then found, on MHA-092: "20.8"/"8.42" printed as "20.88.42";
 view's edge. On MHA-035 sheet 2 it found the datum-origin X axis through the
 MHA-114 callout, and the MHA-004 leader through "TOP VIEW SCALE 1:4".
 
+The 2026-10-07 native harmonic-base build measured a 4.5 mm overlap between
+the complete MHA-DT-002 and MHA-DT-018 transfer callouts, with the pedestal
+leader crossing the block text. The release repair moves only the block
+callout 10 mm right; replay of the recorded extents leaves 5.5 mm between
+the callouts with all collision guards retained. Native regeneration remains
+the acceptance gate. [#1231](https://github.com/pedropaulovc/harmonic-analyzer/issues/1231)
+tracks measured lane allocation for the longer-term fix.
+
 ## Where it runs
 
 `finalize_drawing` calls `run_layout_audit` after the PDF and PNG exports, with

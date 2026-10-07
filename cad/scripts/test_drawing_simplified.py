@@ -665,6 +665,7 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         "_place_bank_sheet": sheet(drawing.BANK_SHEET),
         "_place_fit_sheet": sheet(drawing.FIT_SHEET),
         "_place_checks_sheet": sheet(drawing.CHECKS_SHEET),
+        "_place_continuation_sheet": sheet(drawing.CONTINUATION_SHEET),
         "_place_full_detail_sheet": full_detail,
         "assert_full_detail_view": idle,
         "_final_balloon_uncross": idle,

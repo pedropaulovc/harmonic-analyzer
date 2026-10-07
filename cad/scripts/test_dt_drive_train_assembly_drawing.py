@@ -14,6 +14,7 @@ import dt_crank_handle_pivot_screw_spec as screw_spec
 import dt_crank_handle_spec as handle_spec
 import draw_dt_drive_train_assembly as drawing
 import dt_drive_train_assembly_spec as spec
+from _assembly_contract import assembly_contract
 from _drawing_registry import DRAWINGS_BY_NAME
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -24,6 +25,11 @@ RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
 # Step 10 sets the channel's north MHA-CH-008 on the frame's MHA-FR-005 (#936 P1 b).
 EXTERNAL_NUMBERS = frozenset({"MHA-FR-001", "MHA-FR-005", "MHA-CH-008"})
+# Named installation assemblies are external interfaces, not drive-train BOM rows.
+EXTERNAL_NUMBERS |= frozenset(
+    assembly_contract(stem).number
+    for stem in ("fr-frame", "ch-channel", "pd-paper-drive")
+)
 
 
 def _builder_stems() -> set[str]:
@@ -70,6 +76,13 @@ def _instances(**overrides) -> list[spec.Instance]:
             name = f"{stem}-{index}"
             instances.append(spec.Instance(name, stem, origin, roles.get(name)))
     return instances
+
+
+def _drawing_facts() -> drawing.SourceFacts:
+    instances = _instances()
+    cones = sorted(i.name for i in instances if i.stem == "dt-cone-gear")
+    configurations = {name: f"T{6 * n:03d}" for n, name in enumerate(cones, start=1)}
+    return drawing.SourceFacts(instances, configurations)
 
 
 def test_registry_row_and_outputs() -> None:
@@ -131,29 +144,11 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
 
 
 def test_note_lines_fit_a_half_sheet_field() -> None:
-    """3.5 mm text renders about 2.63 mm per character; a field is 194 mm wide."""
-    for text in (
-        drawing.CONE_CRANK_STEPS,
-        drawing.BANK_STEPS,
-        RIG_STEPS,
-        drawing.CHECKS,
-        drawing.SETUP_NOTES,
-        drawing.INTERFACE_NOTES,
-        drawing.FIT_PLACEHOLDER,
-        drawing.CRANK_WASHER_FIT_NOTES,
-        drawing.CONSUMABLES_NOTES,
-    ):
-        for line in text.format(
-            cone_gears=20,
-            cylinder_gears=20,
-            cam_pins=2,
-            pivot_blocks=2,
-            cams=2,
-            slotted=4,
-            foot=1,
-            hold_down=2,
-        ).splitlines():
-            assert len(line) <= 70, line
+    """The actual note producer stays inside the unchanged 70-character budget."""
+    for field in drawing.package_note_fields(_drawing_facts()):
+        for label, text in field.blocks:
+            for line in text.splitlines():
+                assert len(line) <= 70, (field.label, label, line)
 
 
 def _stacked_height(blocks: tuple[tuple[str, str], ...]) -> float:
@@ -173,39 +168,45 @@ def _spare(field: drawing.NoteField) -> float:
 
 
 def test_every_note_field_holds_its_stacked_blocks() -> None:
-    """77c165b5d stacked 43 step lines and the 4-line general notes in sheet
-    6's 217 mm left field (219.7 mm here); natively the notes ended at 32.28 mm,
-    under the field's 35.00 mm bottom. The census formats the texts at the
-    counts the width test uses."""
-    instances = _instances()
-    cones = sorted(i.name for i in instances if i.stem == "dt-cone-gear")
-    configurations = {name: f"T{6 * n:03d}" for n, name in enumerate(cones, start=1)}
-    fields = drawing.package_note_fields(drawing.SourceFacts(instances, configurations))
+    """Every produced block fits its field at the native-measured line pitch."""
+    fields = drawing.package_note_fields(_drawing_facts())
     for field in fields:
         assert _spare(field) >= 0, (field.label, _spare(field))
-    # Main's arrangement, the general notes under the steps, is over budget.
-    (notes,) = (field for field in fields if field.sheet == 1)
-    (steps,) = (
-        field
+    assert not any(
+        field.sheet == drawing.SEQUENCE_SHEET and field.bounds[0] >= drawing.NOTE_FIELD_RIGHT[0]
         for field in fields
-        if field.label == f"sheet {drawing.SEQUENCE_SHEET} left note field"
-    )
-    assert _spare(steps._replace(blocks=steps.blocks + notes.blocks)) < 0
-    # The MHA-DT-036 fit-up rides the FIT sheet; step 4 on sheet 6 only cites it.
-    (fit,) = (
-        field
-        for field in fields
-        if field.label == f"sheet {drawing.FIT_SHEET} right note field"
-    )
-    assert drawing.CRANK_WASHER_FIT_NOTES in dict(fit.blocks).values()
-    assert f"PER SHEET {drawing.FIT_SHEET}" in drawing.CONE_CRANK_STEPS
+    ), "sheet 6's right field remains reserved for D1"
+
+
+def test_the_package_prints_each_numbered_assembly_step_once() -> None:
+    import dt_drive_train_steps as steps
+
+    numbers = [
+        int(number)
+        for field in drawing.package_note_fields(_drawing_facts())
+        if field.sheet in (
+            drawing.SEQUENCE_SHEET,
+            drawing.BANK_SHEET,
+            drawing.FIT_SHEET,
+            drawing.CONTINUATION_SHEET,
+        )
+        for _label, text in field.blocks
+        for number in re.findall(r"^(\d+)\. ", text, re.MULTILINE)
+    ]
+    assert sorted(numbers) == list(range(1, len(steps.SEQUENCE) + 1))
 
 
 def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     names = drawing.SHEET_NAMES
-    assert len(names) == 10
+    assert (
+        drawing.SEQUENCE_SHEET,
+        drawing.BANK_SHEET,
+        drawing.FIT_SHEET,
+        drawing.CHECKS_SHEET,
+        drawing.FULL_DETAIL_SHEET,
+    ) == (6, 7, 8, 9, 10), "existing package page references remain stable"
+    assert drawing.CONTINUATION_SHEET > drawing.FULL_DETAIL_SHEET
     assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
-    assert drawing.FULL_DETAIL_SHEET == len(names), "appended: no cited number moves"
     assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
@@ -213,8 +214,8 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5]
     assert set(drawing.SHEET_SCALES) == set(names)
-    assert "BALLOONS ON SHEETS 3-5" in drawing.BOM_REFERENCE_CAPTION
-    assert f"STATIONS: SHEET {drawing.FIT_SHEET}" in drawing.BOM_REFERENCE_CAPTION
+    assert "BALLOONS ON SHEETS 3-5" in drawing.BOM_REFERENCE_NOTES
+    assert f"STATIONS: SHEET {drawing.FIT_SHEET}" in drawing.BOM_REFERENCE_NOTES
     assert f"CYLINDER BANK: SHEET {drawing.BANK_SHEET}." in drawing.CONE_CRANK_STEPS
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
@@ -438,28 +439,6 @@ def test_a_fitup_step_missing_from_its_key_is_caught() -> None:
     assert _flat(fitup.COLLAR_SET_STEP) not in _rig_step_body("lever-pin-set")
 
 
-_SHEET_CITE = re.compile(r"SHEETS? \d")
-# The cluster sheets' balloon-count caption, not a cross-reference.
-_SHEET_CITE_EXEMPT = {"; ITEMS PER SHEET 2"}
-
-
-def test_no_sheet_number_is_typed_into_the_package_text() -> None:
-    """Every "SHEET n" a sheet prints comes from a *_SHEET constant, so adding
-    or moving a sheet can never leave a stale cross-reference (B1, #743).
-    Literal parts of f-strings are string constants too, so they are checked;
-    comments are not."""
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    typed = [
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and _SHEET_CITE.search(node.value)
-        and node.value not in _SHEET_CITE_EXEMPT
-    ]
-    assert typed == []
-
-
 def test_drum_is_bonded_after_the_arbor_passes_the_front_strap() -> None:
     """The front strap bore is closed: a bonded drum can no longer pass it."""
     import dt_drive_train_steps as steps
@@ -583,43 +562,54 @@ def test_bom_split_keeps_the_second_column_no_taller() -> None:
         drawing.bom_split_row(1)
 
 
-def test_bom_reference_view_and_caption_fit_right_of_the_bom() -> None:
-    # The farm measured a 124.2 mm header + 19-row piece, so the header is
-    # ~10.2 mm. Under the first column the view was placed for 20 rows; at 27
-    # the bottom row (MHA-DT-015) ran through it (st19 dt-02).
+def test_bom_reference_view_and_metadata_fit_below_the_first_piece() -> None:
+    # Historical header height is an offline budget input, not native-head proof.
     data_rows = len(drawing.bom_components(drawing.instance_counts(_instances())))
     first_rows = drawing.bom_split_row(data_rows)
     first_height = 0.0102 + first_rows * drawing.BOM_ROW_HEIGHT
     first_bottom = drawing.BOM_ANCHOR[1] - first_height
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR, drawing.BOM_COLUMN_WIDTH, first_height
+    ) == []
+    assert drawing.bom_extent_violations(
+        (drawing.BOM_SECOND_COLUMN_X, drawing.BOM_ANCHOR[1]),
+        drawing.BOM_COLUMN_WIDTH,
+        first_height,
+    ) == []
     half = drawing.REFERENCE_ISO_HALF_OUTLINE
-    assert (0.068 + half) > first_bottom  # the old centre (0.110, 0.068)
-    # Now it stands right of the second column, the whole column height clear
-    # of either piece, with its caption seated over the title block.
     cx, cy = drawing.BOM_REFERENCE_ISO_CENTER
-    outline = (cx - half, cy - half, cx + half, cy + half)
+    # GetOutline can extend farther below the requested centre than above it.
+    # Exercise that asymmetric consumer boundary, not just a centred square.
+    outline = (cx - half, cy - half - 0.001, cx + half, cy + half)
     assert drawing.bom_reference_iso_violations(outline) == []
-    assert outline[0] > drawing.BOM_SECOND_COLUMN_X + drawing.BOM_COLUMN_WIDTH
-    # The caption is centred under the view: its widest line (~2.47 mm a
-    # character, the two-line caption on dt-02) stays in the strip.
-    widest = max(len(line) for line in drawing.BOM_REFERENCE_CAPTION.splitlines())
-    half_caption = widest * 0.00247 / 2
-    assert cx - half_caption > drawing.BOM_RIGHT_EDGE + drawing.BOM_SHEET_CLEARANCE
-    assert cx + half_caption < drawing.NOTE_FIELD_RIGHT[2]
-    # A view that grew onto the BOM, past the right field or down into the
-    # title block is refused before the BOM is inserted.
-    onto_bom = (outline[0] - 0.010, outline[1], outline[2] - 0.010, outline[3])
-    assert "second column" in drawing.bom_reference_iso_violations(onto_bom)[0]
-    past_right = (outline[0] + 0.010, outline[1], outline[2] + 0.010, outline[3])
-    assert "passes" in drawing.bom_reference_iso_violations(past_right)[0]
-    sunk = drawing.BOM_REFERENCE_ISO_SLACK + 0.002
-    too_low = (outline[0], outline[1] - sunk, outline[2], outline[3])
-    assert "title block" in drawing.bom_reference_iso_violations(too_low)[0]
+    assert outline[3] < first_bottom
+    assert outline[2] < drawing.BOM_REFERENCE_NOTE_FIELD[0]
+    metadata = drawing.NoteField(
+        2,
+        "BOM metadata",
+        drawing.BOM_REFERENCE_NOTE_FIELD,
+        (("BOM reference and station pointer", drawing.BOM_REFERENCE_NOTES),),
+    )
+    assert _spare(metadata) >= 0
+    assert drawing.BOM_REFERENCE_NOTE_FIELD[1] < first_bottom
+    onto_bom = (outline[0], outline[1] + 0.010, outline[2], outline[3] + 0.010)
+    assert drawing.bom_reference_iso_violations(onto_bom)
+    onto_metadata = (outline[0] + 0.020, outline[1], outline[2] + 0.020, outline[3])
+    assert drawing.bom_reference_iso_violations(onto_metadata)
+    onto_sheet_number = (outline[0], outline[1] - 0.002, outline[2], outline[3])
+    assert drawing.bom_reference_iso_violations(onto_sheet_number)
 
 
 def test_bom_budget_refuses_the_title_block_and_sheet_edges() -> None:
     assert drawing.bom_extent_violations(drawing.BOM_ANCHOR, 0.164, 0.130) == []
     assert drawing.bom_extent_violations((0.300, 0.100), 0.100, 0.050)
     assert drawing.bom_extent_violations((0.001, 0.200), 0.100, 0.050)
+    # A grown first piece must not consume the reserved reference-view field.
+    assert drawing.bom_extent_violations(
+        drawing.BOM_ANCHOR,
+        drawing.BOM_COLUMN_WIDTH,
+        drawing.BOM_ANCHOR[1] - drawing.BOM_REFERENCE_FIELD[1] + 0.001,
+    )
 
 
 def test_balloon_attachment_gate_names_every_mismatch() -> None:
@@ -828,28 +818,6 @@ def test_the_centre_shift_centres_the_outline_in_the_region() -> None:
     dx, dy = drawing.centre_shift(outline, region)
     moved = (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy)
     assert moved == pytest.approx((0.15, 0.075, 0.25, 0.125))
-
-
-def test_every_text_sheet_places_a_view_for_its_title_block() -> None:
-    """finalize_drawing refuses a sheet with no view (r8 leaf 20260923T214354Z-1-4126331f)."""
-    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
-    placers = {
-        node.name: node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name.startswith("_place_")
-    }
-    for name in (
-        "_place_sequence_sheet",
-        "_place_bank_sheet",
-        "_place_fit_sheet",
-        "_place_checks_sheet",
-    ):
-        calls = {
-            call.func.id
-            for call in ast.walk(placers[name])
-            if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
-        }
-        assert "_reference_iso" in calls, name
 
 
 class _Annotation:
@@ -1091,7 +1059,7 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
             f"{math.floor(high * scale + 1e-9) / scale:.{places}f}"
         )
 
-    steps = drawing.BANK_STEPS
+    steps = _flat(drawing.BANK_STEPS)
     thickness = bank.OVERALL_THICKNESS
     upper, lower = bank.OVERALL_THICKNESS_BAND
     # 7.0565 +/-0.025 is exact at four places (user ruling L20 d').

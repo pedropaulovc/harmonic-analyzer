@@ -126,11 +126,12 @@ def test_an_unknown_step_is_refused() -> None:
 
 
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:
-    printed = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_STEPS)]
+    printed = [
+        int(n)
+        for text in (drawing.PLATEN_STEPS, *drawing.FITUP_NOTES, *drawing.CHAIN_NOTES)
+        for n in STEP_HEAD.findall(text)
+    ]
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
-    # The hook step opens the second column, the chain fit-up under it.
-    second = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_COLUMNS[1])]
-    assert second[0] == steps.step_number(drawing.FITUP_SECOND_COLUMN_KEY)
 
 
 def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> None:
@@ -140,7 +141,7 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
 
     pointers = re.findall(
         r"(MHA-[A-Z]{2}-000) SHEET (\d+), STEPS (\d+) AND (\d+)",
-        drawing.FITUP_COLUMNS[1].replace("\n", " "),
+        drawing.CHAIN_NOTES[0].replace("\n", " "),
     )
     wanted = [str(dt_drive_train_steps.step_number(key)) for key in steps.CRANK_SIDE_KEYS]
     assert pointers == [
@@ -153,14 +154,25 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
     assert set(wanted) <= printed
     fitup_ref = steps.step_number(drawing.FITUP_CHAIN_KEY)
     assert f"STEP {fitup_ref}" in _step_body("fitup-accepted")
-    heading = drawing.FITUP_COLUMNS[1].index("CHAIN FIT-UP")
-    assert drawing.FITUP_COLUMNS[1].index(f"\n{fitup_ref}. ") > heading
+    heading = drawing.CHAIN_NOTES[0].index("CHAIN FIT-UP")
+    assert drawing.CHAIN_NOTES[0].index(f"\n{fitup_ref}. ") > heading
 
 
 def test_the_steps_fit_their_fields() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
     fields = (
-        *zip(drawing.FITUP_NOTES, drawing.FITUP_NOTE_XY, drawing.FITUP_NOTE_LIMITS),
+        *zip(
+            drawing.FITUP_NOTES,
+            drawing.FITUP_NOTE_XY,
+            drawing.FITUP_NOTE_LIMITS,
+            strict=True,
+        ),
+        *zip(
+            drawing.CHAIN_NOTES,
+            drawing.FITUP_NOTE_XY,
+            drawing.FITUP_NOTE_LIMITS,
+            strict=True,
+        ),
         (
             drawing.PLATEN_STEPS,
             drawing.PLATEN_NOTE_XY,
@@ -183,24 +195,28 @@ def test_the_steps_fit_their_fields() -> None:
     assert drawing.EXPLODED_CAPTION_XY[1] - NOTE_LINE_PITCH > template.title_block_top_m
 
 
-def test_the_bom_fits_left_of_the_title_block_and_inside_the_border() -> None:
-    """Machinist review of 6c385465d: item 41 sat below the inner border; the
-    old check stopped at the sheet's edge."""
+def test_a_bom_that_cannot_fit_all_rows_is_refused_not_truncated() -> None:
+    # f353's native 437.2384 mm table cannot fit these two fields even split.
+    heights = (0.0102, *(0.01016758 for _ in range(42)))
+    with pytest.raises(RuntimeError, match="complete paper-drive BOM does not fit"):
+        drawing.bom_split_row(heights, 1)
+
+
+def test_native_bom_containment_keeps_the_reference_title_and_border_clear() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    left, top = drawing.BOM_ANCHOR
     width = sum(drawing.BOM_COLUMN_WIDTHS.values())
-    # A description past the measured one-line length wraps to a second line.
-    wrapped = sum(
-        len(text) > drawing.BOM_DESCRIPTION_MAX_CHARS
-        for text in drawing.BOM_DESCRIPTIONS.values()
+    left, top = drawing.BOM_ANCHOR
+    ref_floor = drawing.BOM_REFERENCE_LIMITS[3] + drawing.BOM_BORDER_CLEARANCE
+    assert drawing.bom_extent_violations((left, top), width, top - ref_floor) == []
+    assert drawing.bom_extent_violations((left, top), width, top - ref_floor + 0.001)
+    right, top = drawing.BOM_SECOND_ANCHOR
+    title_floor = template.title_block_top_m + drawing.BOM_BORDER_CLEARANCE
+    assert drawing.bom_extent_violations((right, top), width, top - title_floor) == []
+    assert drawing.bom_extent_violations((right, top), width, top - title_floor + 0.001)
+    border = drawing.SHEET_INNER_BORDER_BOTTOM + drawing.BOM_BORDER_CLEARANCE
+    assert drawing.bom_extent_violations(
+        (template.width_m - border - width + 0.001, top), width, 0.1
     )
-    assert wrapped <= len(drawing.GROUPED_DESCRIPTION_STEMS)
-    height = (len(drawing.BOM_PART_NUMBERS) + 1 + wrapped) * drawing.BOM_ROW_HEIGHT
-    assert left + width < template.title_block_left_m
-    assert top - height >= (
-        drawing.SHEET_INNER_BORDER_BOTTOM + drawing.BOM_BORDER_CLEARANCE
-    )
-    assert top < template.height_m - 0.003
 
 
 def test_bom_rows_are_exactly_the_round10_families() -> None:
@@ -482,7 +498,7 @@ def test_the_024e240b3_layout_is_refused_naming_each_overflow() -> None:
         drawing.inner_view_scale(_iso_outline(0.355), INNER_OUTLINE_AT_2_3, (2.0, 3.0))
 
 
-def test_both_rings_fit_between_the_bom_and_the_sheet_edge_with_margin() -> None:
+def test_both_model_rings_fit_inside_their_reserved_sheet_two_fields() -> None:
     iso = _iso_outline(drawing.TRANSGEAR_VIEW_CENTER[0])
     scale = drawing.inner_view_scale(iso, INNER_OUTLINE_AT_2_3, (2.0, 3.0))
     assert scale == (1.0, 2.0)
@@ -491,9 +507,8 @@ def test_both_rings_fit_between_the_bom_and_the_sheet_edge_with_margin() -> None
     reach = drawing.BALLOON_RING_REACH
     iso_left, iso_right = iso[0] - reach, iso[2] + reach
     left, right = inner[0] + dx - reach, inner[2] + dx + reach
-    assert drawing.BOM_RIGHT == pytest.approx(0.182)
     assert iso_right <= 0.415 - 0.002
-    assert left >= drawing.BOM_RIGHT + 0.003 + 0.0015
+    assert left >= drawing.SHEET_TWO_RING_LIMITS[0] + 0.0015
     assert right <= iso_left - drawing.SHEET_TWO_RING_GAP - 0.0015
     # Level with the isometric.
     assert (inner[1] + inner[3]) / 2.0 + dy == pytest.approx((iso[1] + iso[3]) / 2.0)

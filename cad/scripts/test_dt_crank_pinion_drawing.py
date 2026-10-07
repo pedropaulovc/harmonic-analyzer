@@ -191,13 +191,11 @@ def _assert_four_fact_note(note: str, mate_number: str) -> None:
 def test_both_sheets_carry_the_same_four_fact_pin_hole_note() -> None:
     # Machinist review of 4d4e038e3: the shaft's bare transfer note gave no
     # size, process or fit, and the pinion's four-line trim had dropped the
-    # fit's acceptance. One source (pin_hole_note) now prints on both sheets;
-    # only the opening pair names the other part and where the hole runs.
+    # fit's acceptance. Both sheets carry all four facts; line breaks may differ
+    # to fit their independent note fields.
     _assert_four_fact_note(drawing.PIN_HOLE_NOTE, spec.CRANKSHAFT_NUMBER)
     _assert_four_fact_note(spec.CRANKSHAFT_PIN_HOLE_PROCESS, spec.PINION_NUMBER)
     pinion = drawing.PIN_HOLE_NOTE.split("\n")
-    shaft = spec.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n")
-    assert pinion[2:] == shaft[2:] == list(spec.PIN_FIT_LINES)
     assert drawing.PIN_HOLE_NOTE == spec.PIN_HOLE_PROCESS
     crankshaft_drawing = Path(drawing.__file__).with_name("draw_dt_crankshaft.py").read_text(
         encoding="utf-8"

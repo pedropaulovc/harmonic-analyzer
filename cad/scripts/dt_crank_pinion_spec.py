@@ -368,10 +368,10 @@ BORE_FIT_CALLOUT = "\n".join(
     )
 )
 # One matched-fit note, printed on BOTH sheets (machinist review of 4d4e038e3):
-# a sheet stands alone, so each carries all four facts -- match drill at
-# assembly, ream to fit the named pin, the fit's acceptance, flush -- and only
-# the opening pair differs: the other part, and where on this one the hole
-# runs.  Four lines, no dimensions (rule 6); MHA-DT-000 step 4 reads the shaft's.
+# a sheet stands alone, so each carries all four facts --
+# match drill at assembly, ream to fit the named pin, the fit's acceptance,
+# flush -- with the other part and where on this one the hole runs.
+# Four lines, no dimensions (rule 6); MHA-DT-000 step 4 reads the shaft's.
 PIN_FIT_LINES = (
     f"REAM TO FIT PIN {PIN_NUMBER}, LIGHT HAMMER FIT",
     "NOT REMOVABLE BY HAND, FLUSH BOTH SIDES",
@@ -383,7 +383,11 @@ def pin_hole_note(mate_number: str, where: str) -> str:
 
 
 PIN_HOLE_PROCESS = pin_hole_note(CRANKSHAFT_NUMBER, "AT BOSS MID-LENGTH")
-CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(PINION_NUMBER, "AT ITS BOSS MID-LENGTH")
+# The shaft's narrower field needs the reaming instruction split before the
+# pin identity, without changing any process words or the four-line height.
+CRANKSHAFT_PIN_HOLE_PROCESS = pin_hole_note(
+    PINION_NUMBER, "AT ITS BOSS MID-LENGTH"
+).replace("\nREAM TO FIT PIN ", " REAM TO FIT\nPIN ")
 
 # One roughness, on the one surface whose function depends on it: the bore is
 # a size-toleranced fit onto the crankshaft, and a fit lives on the peaks as

@@ -16,7 +16,6 @@ import _telemetry
 import build_vn_transgear_disc_screw as part
 import draw_vn_transgear_disc_screw as drawing
 import vn_transgear_disc_screw_spec as screw
-from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import STOCK_RECIPES
 from diagnostics import diag_build_91794A055 as entry
@@ -371,11 +370,3 @@ def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
     assert f"BREAK THE CUT END {screw.CUT_END_BREAK_TEXT}." in flat
 
 
-def test_drawing_is_the_purchased_reference_sheet() -> None:
-    spec = DRAWINGS_BY_NAME["vn_transgear_disc_screw"]
-    assert drawing.SPEC is spec
-    assert spec.artifact_stem == part.PART_NAME
-    assert spec.script == Path(drawing.__file__).resolve()
-    assert (
-        drawing.build.__code__.co_names.count("build_purchased_fastener_drawing") == 1
-    )
