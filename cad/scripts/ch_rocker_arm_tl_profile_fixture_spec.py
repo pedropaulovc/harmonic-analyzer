@@ -330,6 +330,12 @@ if STAND_ENGAGEMENT_MIN < 1.0:
 LOCATING_BORE_DIA = rocker.PIVOT_HOLE_DIA
 LOCATING_BORE_BAND = (0.012, 0.0)
 LOCATING_BORE_DEPTH = 6.0  # from the plate top; floor at Z-21
+# The bore depth sets where the pivot screw's thread starts in the tap, so it
+# prints at .XXX (FixtureCAD ruling B): at the .XX band the TL-06 pivot screw
+# could not reach 1.5D full thread at worst case. The pivot screw's spec
+# imports both names.
+LOCATING_BORE_DEPTH_PLACES = 3
+LOCATING_BORE_DEPTH_BAND = printed_band_mm(LOCATING_BORE_DEPTH_PLACES)
 LOCATING_BORE_FLOOR_Z = PLATE_TOP_Z - LOCATING_BORE_DEPTH
 PIVOT_TAP_THREAD_DEPTH = 10.0  # full thread from the bore floor, to Z-31
 PIVOT_TAP_DRILL_DEPTH = 13.0
@@ -355,7 +361,8 @@ def _blind_drill_floor_wall(depth_max: float, drill_dia: float) -> float:
 
 if (
     _blind_drill_floor_wall(
-        LOCATING_BORE_DEPTH + _XX + PIVOT_TAP_DRILL_DEPTH + _XX, PIVOT_TAP_DRILL_DIA
+        LOCATING_BORE_DEPTH + LOCATING_BORE_DEPTH_BAND + PIVOT_TAP_DRILL_DEPTH + _XX,
+        PIVOT_TAP_DRILL_DIA,
     )
     < 2.0
 ):
@@ -564,7 +571,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StandPocketProfile": {"StandPocketDia": 3},
     "StandPocket": {"StandPocketDepth": 3},
     "LocatingBoreProfile": {"LocatingBoreDia": 3},
-    "LocatingBore": {"LocatingBoreDepth": 2},
+    "LocatingBore": {"LocatingBoreDepth": LOCATING_BORE_DEPTH_PLACES},
     "RodPinHoleProfile": {"RodPinHoleDia": 3, "RodPinHoleX": 3, "RodPinHoleY": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -764,10 +771,13 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ),
             ),
             "dia_nominal": (LOCATING_BORE_DIA, ("LOCATING_BORE_DIA",)),
-            "depth": (limits(LOCATING_BORE_DEPTH, 2), ("LOCATING_BORE_DEPTH",)),
+            "depth": (
+                limits(LOCATING_BORE_DEPTH, LOCATING_BORE_DEPTH_PLACES),
+                ("LOCATING_BORE_DEPTH", "LOCATING_BORE_DEPTH_PLACES"),
+            ),
             "process": ("REAM", ("DIMENSION_CALLOUTS",)),
         },
-        precision={"dia": 3, "depth": 2},
+        precision={"dia": 3, "depth": LOCATING_BORE_DEPTH_PLACES},
     ),
     "rod_pin_hole": ExportFeature(
         kind="hole",
