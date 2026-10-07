@@ -322,11 +322,22 @@ reported intact association with `GetLeaderCount()==0`, matching the existing
 pen-rod RD3 rendered-leader observation. The callout-only guard instead requires
 reciprocal native display/annotation identity, annotation visibility state 1,
 finite readable `IDisplayDimension.GetDisplayData` lines, and one printable
-arrow joined to a nondegenerate line in sheet XY. One arrow is this explicit
-one-edge contract, not a universal native API guarantee; arrow Z can differ
-from line Z, and the line can continue past its tip. No-arrow style 10,
-zero-size/direction arrows, empty data and even partly unreadable routes refuse
-the leaf. The guard still reads the registered count; generic symbols keep
+arrow with a complete connected route to the rendered text's shoulder in XY.
+An arrow stub plus a disconnected shoulder cannot pass. Segment order and
+endpoint direction are irrelevant; endpoint-to-segment joins also cover
+T-junctions and a line continuing past its arrow tip. The component must reach
+a horizontal shoulder at the lowest nonblank text baseline and covering a
+current text X anchor, not merely a far-away line at the same Y. Unrelated
+display strokes need not join the leader; every returned line still must be
+readable and finite. Joins retain the existing 0.01 mm XY tolerance and text
+baseline matching retains the layout audit's 0.3 mm tolerance. Text positions
+are display-origin offsets in the API contract; the calibrated drawing display
+data (including CSP_DRILL) is sheet-compatible, so no annotation origin is
+added. A failed route reports its arrow-component and text-shoulder indices.
+One arrow is this explicit one-edge contract, not a universal native API
+guarantee; arrow Z can differ from line Z. No-arrow style 10, zero-size/direction
+arrows, empty data and even partly unreadable routes refuse the leaf. The guard
+still reads the registered count; generic symbols keep
 their exact count and datum tags keep zero. `IAnnotation.Visible` cannot detect
 hidden layers or suppressed owning features: the final layout/DFM gates and
 whole-sheet inspection must still prove the callout actually prints, its arrow
