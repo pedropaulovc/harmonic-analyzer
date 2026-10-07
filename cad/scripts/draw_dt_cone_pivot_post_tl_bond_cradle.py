@@ -123,15 +123,16 @@ ELEVATION_KEEP = {
 }
 # Each seat's profile sketch is parallel to its section, so the section
 # imports its diameter. Each seat is a matched fit: its diameter prints as a
-# reference size with its callout (the spec's *_SEAT_CALLOUT) below it, in
-# the clear above the section, and its leader drops to the arc on the side
-# away from the post axis's dimensions, as B-B's does (run-13 review: A-A's
-# callout sat inside the saddle; run 14's callout above the value bent its
-# leader across the view). A-A's lands on the arc's +X side, clear of the
-# cone pins; the seat axis's 40.0 and the pin tops' relation stack under it.
+# reference size with its narrow callout (the spec's *_SEAT_CALLOUT) below
+# it, in the clear above the section on the seat's +X side, away from the
+# seat axis's 40.0 off the west side, so the leader drops to the arc's +X
+# side without crossing that dimension (run-13 review: A-A's callout sat
+# inside the saddle; run 14's callout above the value bent its leader across
+# the view; run 15's crossed the 40.0s). A-A's block stands right of the
+# plan's 80.0, B-B's right of the isometric.
 SECTION_A_KEEP = {
-    "BodySeatDia": (12.0, CONE_PIN_Y, 46.0),
-    "BodySeatAxisX": (-20.0, CONE_PIN_Y, 22.0),
+    "BodySeatDia": (17.0, CONE_PIN_Y, 42.0),
+    "BodySeatAxisX": (-20.0, CONE_PIN_Y, 26.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_Y, -12.0),
     # Under the base, one baseline row per hole off the west side: the
     # nearer (west) hole on the upper row.
@@ -143,13 +144,13 @@ SECTION_A_KEEP = {
     # clear of it (CAPTION_DROP).
     "ConePinTilt": (15.0, CONE_PIN_Y, -61.0),
     # The tops' plane from the post axis, along the pins: on the line's -X
-    # side, above the seat axis's 30.0 extension line (Z0) and under the
-    # 40.0, its callout reading below the value.
-    "ConePinFromAxis": (-14.0, CONE_PIN_Y, 10.5),
+    # side, above the seat axis's 30.0 extension line (Z0), under the 40.0
+    # and clear of the seat's leader, its callout reading below the value.
+    "ConePinFromAxis": (-22.0, CONE_PIN_Y, 10.0),
 }
 # B-B's callout reads below the value, above the finish symbol.
 SECTION_B_KEEP = {
-    "TailSeatDia": (22.0, TAIL_SECTION_Y, 36.0),
+    "TailSeatDia": (17.0, TAIL_SECTION_Y, 42.0),
     "TailSeatAxisX": (-20.0, TAIL_SECTION_Y, 12.0),
     "TailSeatAxisHeight": (-48.0, TAIL_SECTION_Y, -12.0),
 }

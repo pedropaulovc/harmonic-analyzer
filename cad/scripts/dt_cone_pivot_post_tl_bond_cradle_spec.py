@@ -56,8 +56,10 @@ SEAT_AXIS_HEIGHT = -BASE_TOP_Z
 BODY_SEAT_DIA = post.BLOCK_DIA
 TAIL_SEAT_DIA = 44.45
 POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
-BODY_SEAT_CALLOUT = f"BORE TO SUIT\n{POST_NUMBER} CONE\nPIVOT POST BODY:\nBEDS WITHOUT SHAKE"
-TAIL_SEAT_CALLOUT = f"BORE TO SUIT\n{POST_NUMBER} CONE\nPIVOT POST TAIL:\nBEDS WITHOUT SHAKE"
+# Callout lines stay narrow (run-15 review: wider blocks ran into the plan's
+# 80.0 and the isometric).
+BODY_SEAT_CALLOUT = f"BORE TO SUIT\n{POST_NUMBER}\nCONE PIVOT\nPOST BODY:\nBEDS WITHOUT\nSHAKE"
+TAIL_SEAT_CALLOUT = f"BORE TO SUIT\n{POST_NUMBER}\nCONE PIVOT\nPOST TAIL:\nBEDS WITHOUT\nSHAKE"
 SEAT_OVERRUN = 1.0  # each seat cut runs past both saddle faces
 # The bed under a NOMINAL body; a matched seat moves it with the body, never
 # the axis.
@@ -327,7 +329,8 @@ DRAWING_NOTES = "\n".join(
         BUILT_UP_PERMISSION_NOTE,
         "PINS ARE STOCK HARDENED DOWELS; PIN ENDS STAY INSIDE THE BASE.",
         "REAM PIN HOLES THRU FOR A PRESS FIT; A PRESSED PIN MUST NOT TURN.",
-        "STATIONS FROM STOP FACE, HEIGHTS FROM BASE TOP, PIN TOPS FROM AXIS OF SEATED RODS.",
+        # Short enough to stop clear of the title block (run-15 review).
+        "STATIONS FROM STOP, HEIGHTS FROM BASE, PIN TOPS FROM AXIS OF SEATED RODS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
