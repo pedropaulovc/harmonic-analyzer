@@ -502,6 +502,7 @@ def test_retention_pin_note_clears_the_profile_and_title_block() -> None:
     assert field_y1 < 0.2667
     assert field_x0 < x0 and right < field_x1
     assert y0 <= field_y1
+    assert bottom > field_y0
     # Every diameter under the note's span keeps its text below the note.
     for name, (dx, dy) in drawing.DIAMETER_POSITIONS.items():
         if dx > x0 - 0.030:

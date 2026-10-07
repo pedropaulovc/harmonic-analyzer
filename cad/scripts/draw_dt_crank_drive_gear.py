@@ -124,13 +124,17 @@ FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.005
 # tips). Its ink stands 3.9 mm tall ("Ø65.21 ±0.1", same run).
 TIP_DIA_TEXT_HALF_HEIGHT = 0.002
 TIP_DIA_TEXT_GAP = 0.004
+# The full mate Number makes the AF block 70.8 mm wide at the calibrated
+# dimension font. This lane leaves over 3 mm beyond the padded front-view
+# clearance guard and over 14 mm to the padded section, without moving its
+# model anchors or the chamfer below it.
 FRONT_KEEP = {
     "OutsideDia": (
         FRONT_CENTER[0] - 0.035,
         GEAR_DATA_BOTTOM - TIP_DIA_TEXT_GAP - TIP_DIA_TEXT_HALF_HEIGHT,
     ),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
-    "BoreAF": (FRONT_CENTER[0] + 0.090, FRONT_CENTER[1] + 0.028),
+    "BoreAF": (FRONT_CENTER[0] + 0.094, FRONT_CENTER[1] + 0.028),
 }
 # Longitudinal centre section A-A instead of a plain side view: the south
 # bore chamfer is internal, and a targeted import delivers the chamfer's

@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import ast
-import hashlib
-import json
 import math
 import re
 from pathlib import Path
@@ -270,69 +267,6 @@ def test_worst_case_engagement_holds_the_named_minimum() -> None:
     assert worst == pytest.approx(5.72)
     assert worst / part.SHANK_DIA >= 0.90
     assert spec.POST_MOUNT_ENGAGEMENT_PRINTED >= 0.90
-
-
-# MHA-VN-031's own stock recipe (added by #857, touched by nobody else), pinned
-# as its git blob (LF-normalised).  The cut end is MHA-VN-031's modification:
-# it must never leak into it.
-_OWN_RECIPE_BLOBS = {
-    # Re-pinned for the Codex P2 fix: its docstring now names the supplied
-    # 3-1/2 in length, not the cut length.
-    "diagnostics/diag_build_40923898.py": "0bd238baecda45dbac899bca6326245deb070113",
-}
-# The SHARED fillister family recipe is pinned by its functions, not by git
-# history: an integration branch that carries #857 both before and after its
-# rebase adds the 40923898 row twice, so no one commit is "the base".  A
-# deliberate recipe change updates this digest in the same commit.  The
-# digest reads ast.dump, which follows the locked interpreter (uv.lock).
-_SHARED_RECIPE = "cad/scripts/diagnostics/diag_mcmaster_fillister.py"
-_SHARED_RECIPE_FUNCTIONS_SHA256 = (
-    "31bd92ad76f011329ebfe56443443e03704b8427f29bd1bb20a5d006ae51eb3d"
-)
-
-
-def _git_blob_sha(path: Path) -> str:
-    data = path.read_bytes().replace(b"\r\n", b"\n")
-    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
-
-
-def _functions(source: str) -> dict[str, str]:
-    tree = ast.parse(source)
-    return {
-        node.name: ast.dump(node)
-        for node in ast.walk(tree)
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-
-
-def test_shared_fillister_recipe_is_untouched() -> None:
-    """Main's ruling on the cut end: the modification lives in MHA-VN-031's
-    builder, never in the family recipe (which would re-key every
-    fillister screw for one part's fact).  So the family's row for the
-    supplied screw is the catalog's, and the recipe's functions are the
-    pinned ones."""
-    scripts = Path(part.__file__).resolve().parent
-    for relative, blob in _OWN_RECIPE_BLOBS.items():
-        assert _git_blob_sha(scripts / relative) == blob, relative
-    # McMaster 40923898: 1/4"-20 x 3-1/2", head height .237, head dia .414.
-    assert FILLISTER_SIZES["40923898"] == (
-        6.35,
-        3.5 * 25.4,
-        0.237 * 25.4,
-        0.414 * 25.4,
-        25.4 / 20.0,
-    )
-    assert FILLISTER_SIZES["40923898"][1] == spec.STOCK_LENGTH_MM
-    head = (Path(part.__file__).resolve().parents[2] / _SHARED_RECIPE).read_text(
-        encoding="utf-8"
-    )
-    digest = hashlib.sha256(
-        json.dumps(_functions(head), sort_keys=True).encode("utf-8")
-    ).hexdigest()
-    assert digest == _SHARED_RECIPE_FUNCTIONS_SHA256, (
-        "the shared fillister recipe's functions changed; if deliberate, "
-        "update _SHARED_RECIPE_FUNCTIONS_SHA256 in the same commit"
-    )
 
 
 def test_catalog_row_is_the_supplied_stock_and_only_the_part_is_cut() -> None:

@@ -67,6 +67,11 @@ Wrap complete category-qualified Numbers and sheet references as indivisible
 units; restore ordinary spaces in printed text. A continuation must not look
 like a new numbered assembly step.
 
+Compact part-note fields retain complete Numbers, fit limits, setup conditions
+and operation counts when instructions are rewrapped or shortened. Include the
+full mating Number in a dimension callout's clearance envelope; reposition
+the callout within its existing field when wrapping alone is insufficient.
+
 The package recipes own sheet counts and locations:
 
 - [`draw_dt_drive_train_assembly.py`](../scripts/draw_dt_drive_train_assembly.py)
