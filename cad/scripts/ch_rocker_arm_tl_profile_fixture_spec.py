@@ -300,8 +300,25 @@ PIVOT_TAP_SPEC = HoleSpec(
     overrides_mm={"ThreadDepth": PIVOT_TAP_THREAD_DEPTH},
 )
 PIVOT_TAP_DRILL_DIA = TAP_DRILL_MM[PIVOT_TAP_SPEC.size]
-if LOCATING_BORE_FLOOR_Z - PIVOT_TAP_DRILL_DEPTH - PLATE_BOTTOM_Z < 3.0:
-    raise AssertionError("pivot tap drill breaks too near the plate underside")
+# The 118-degree point a blind drill leaves below its printed depth.
+_DRILL_POINT_HALF_ANGLE = math.radians(59.0)
+
+
+def _blind_drill_floor_wall(depth_max: float, drill_dia: float) -> float:
+    """Steel left under a blind drill's point: the thinnest printed plate
+    (.X) less the deepest printed depth and the point (codex review of run
+    20261007T215120209Z: the stud guard ignored both)."""
+    point = drill_dia / 2.0 / math.tan(_DRILL_POINT_HALF_ANGLE)
+    return (PLATE_THICK - _X) - depth_max - point
+
+
+if (
+    _blind_drill_floor_wall(
+        LOCATING_BORE_DEPTH + _XX + PIVOT_TAP_DRILL_DEPTH + _XX, PIVOT_TAP_DRILL_DIA
+    )
+    < 2.0
+):
+    raise AssertionError("pivot tap drill point leaves under the rule-12 floor wall")
 
 # --- Rod-pin hole (agreed with the MHA-CH-006-TL diamond pin) ------------------------
 ROD_PIN_HOLE_DIA = 3.0
@@ -387,8 +404,8 @@ CLAMP_STUD_SPEC = HoleSpec(
     "tapped",
     "3/8-16",
     end="blind",
-    depth_mm=21.0,
-    overrides_mm={"ThreadDepth": 17.0},
+    depth_mm=19.5,
+    overrides_mm={"ThreadDepth": 16.5},
 )
 CLAMP_STUD_POINTS = ((-70.0, -36.0), (70.0, -36.0), (-70.0, 45.0), (70.0, 45.0))
 CLAMP_STUD_DRILL_DIA = TAP_DRILL_MM[CLAMP_STUD_SPEC.size]
@@ -406,8 +423,11 @@ if 2.0 * _XX > HOLD_DOWN_CLEARANCE_DIA - _HOLD_DOWN_SCREW_MAJOR:
     raise AssertionError("hold-down screws can miss their T-slots at the Y band")
 # The studs only anchor strap clamps, which slide to the arm: one place.
 CLAMP_STUD_PLACES = 1
-if PLATE_THICK - CLAMP_STUD_SPEC.depth_mm - _XX < 3.0:
-    raise AssertionError("clamp-stud tap drill breaks too near the plate underside")
+# Deeper would break the floor wall (run 20261007T215120209Z's 21.0 drill
+# left about 0.7 under its point on the thinnest plate); 16.5 of thread still
+# clears 1.5 D above, and the tap keeps 3.0 of lead.
+if _blind_drill_floor_wall(CLAMP_STUD_SPEC.depth_mm + _XX, CLAMP_STUD_DRILL_DIA) < 2.0:
+    raise AssertionError("clamp-stud drill point leaves under the rule-12 floor wall")
 
 
 # --- Rule 12: every machined wall keeps the floor --------------------------------
