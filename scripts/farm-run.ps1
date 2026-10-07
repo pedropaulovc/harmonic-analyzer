@@ -602,8 +602,27 @@ function Test-LauncherAlive {
     }
     # The launcher started before it wrote started_at; a process with this PID
     # created at or after it is an unrelated process that reused it.
+    return Test-StartedBeforeRecord -Created $holder.CreationDate -Record $Record
+}
+
+function Test-StartedBeforeRecord {
+    param(
+        [Parameter(Mandatory)][datetime]$Created,
+        [Parameter(Mandatory)]$Record
+    )
+
+    # Whether a process created at $Created predates the record's started_at,
+    # as its launcher must. Windows dates a process to the microsecond. Linux
+    # dates it to the clock tick (10 ms at the usual 100 Hz), rounded down, so
+    # a process started just after started_at can read as just before it;
+    # the launcher writes started_at only after pwsh has started and run git,
+    # hundreds of milliseconds later, so a 50 ms margin keeps it and refuses
+    # such a PID reuse.
     $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
-    return $holder.CreationDate.ToUniversalTime() -lt $startedAt
+    if (-not $IsWindows) {
+        $startedAt = $startedAt.AddMilliseconds(-50)
+    }
+    return $Created.ToUniversalTime() -lt $startedAt
 }
 
 function Read-SharedText {
@@ -997,7 +1016,7 @@ function Get-RunProcessTree {
         $byParent[$parent].Add($process)
     }
     $holder = $all | Where-Object { [int]$_.ProcessId -eq $launcherId } | Select-Object -First 1
-    $isLauncher = $null -ne $holder -and $holder.CreationDate.ToUniversalTime() -lt $startedAt
+    $isLauncher = $null -ne $holder -and (Test-StartedBeforeRecord -Created $holder.CreationDate -Record $Record)
     $queue = [System.Collections.Generic.Queue[object]]::new()
     foreach ($entry in $Stopped.GetEnumerator()) {
         foreach ($child in @($byParent[[int]$entry.Key])) {
@@ -1060,7 +1079,12 @@ function Get-RunProcessTree {
     # the run's by construction, so no command-line or creation-time check. A
     # record from before run jobs has none; the scan above still covers it.
     if ($Record['job']) {
-        $members = [System.Collections.Generic.HashSet[int]]::new([int[]](Get-RunJobMembers -Job $Record['job']))
+        # Added one by one: a function's empty or single-item result reaches
+        # here unrolled, and HashSet's constructor cannot take that.
+        $members = [System.Collections.Generic.HashSet[int]]::new()
+        foreach ($member in @(Get-RunJobMembers -Job $Record['job'])) {
+            [void]$members.Add([int]$member)
+        }
         foreach ($process in $all) {
             $processId = [int]$process.ProcessId
             if ($members.Contains($processId) -and $seen.Add($processId)) {
