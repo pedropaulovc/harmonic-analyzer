@@ -593,6 +593,8 @@ def callout_scene(monkeypatch, tmp_path):
             line("positive-ridge", (0, drawing.HEX_H / 2, z),
                  (0, drawing.HEX_H / 2, z + drawing.HEX_DEPTH)),
             line("end", (0, 15.24, z), (drawing.PLATE_W, 0, z)),
+            line("outer-end", (37.04, drawing.PLATE_T / 2, z),
+                 (drawing.PLATE_W, drawing.PLATE_T / 2, z)),
             line("opposite-end", (0, 15.24, -z), (drawing.PLATE_W, 0, -z)),
             line("free-plate-edge", (drawing.PLATE_W, drawing.PLATE_T / 2, -z),
                  (drawing.PLATE_W, drawing.PLATE_T / 2, z)),
