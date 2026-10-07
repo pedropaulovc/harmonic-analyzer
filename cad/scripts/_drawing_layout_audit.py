@@ -91,6 +91,16 @@ _COMPONENT_LINEFONT_OPTIONS = (
     ("swDrawingComponentLineFontSpeedpak", 5),
 )
 
+# Official swDrawingViewTypes_e; a readback outside this declaration is unknown.
+_DRAWING_VIEW_TYPES = {
+    1: "swDrawingSheet", 2: "swDrawingSectionView", 3: "swDrawingDetailView",
+    4: "swDrawingProjectedView", 5: "swDrawingAuxiliaryView", 6: "swDrawingStandardView",
+    7: "swDrawingNamedView", 8: "swDrawingRelativeView", 9: "swDrawingDetachedView",
+    10: "swDrawingAlternatePositionView",
+}
+_MAX_COMPONENTS_PER_CONTEXT = 512
+_MAX_COMPONENT_DEPTH = 32
+
 # swUserPreference* literal IDs read from installed swconst 34.3.0.150,
 # SHA256 7F07CA30C4DB22B6D835494D86F5A0D10E8FDEAB9308C9C90132E70C7F4E21B3.
 # The official preference enum pages list names, but omit these numeric IDs.
@@ -226,12 +236,16 @@ class _Reader:
         finally:
             self._spent(_accessor(fn), started)
 
-    def witness(self, fn: Callable[[], Any], *, name: str) -> tuple[Any, str | None]:
+    def witness(
+        self, fn: Callable[[], Any], *, name: str, allow_none: bool = False,
+    ) -> tuple[Any, str | None]:
         """Evidence-only read: preserve a refusal's cause without changing gates.
 
         Unlike ``need``, these new diagnostics do not supply ink or geometry to
         the classifier. Their cost joins the existing collector aggregation;
         unreadability is serialized beside the evidence, not as a new finding.
+        ``allow_none`` is only for a getter whose successful null is meaningful,
+        such as a view with no base; it does not turn an exception into null.
         """
         started = time.perf_counter()
         try:
@@ -244,7 +258,7 @@ class _Reader:
             return None, cause
         finally:
             self._spent(name, started)
-        return (None, "missing") if value is None else (value, None)
+        return (None, "missing") if value is None and not allow_none else (value, None)
 
     def first(self, fns: list[Callable[[], Any]], *, name: str) -> Any:
         """The first of some ARRAY-returning overloads that answers (a scalar 0
@@ -366,11 +380,15 @@ def _witness_scalar(
     return result
 
 
-def _witness_bind(reader: _Reader, fn: Callable[[], Any], interface: str, source: str) -> tuple[Any, str | None]:
-    raw, cause = reader.witness(fn, name=source)
-    if cause is not None:
+def _witness_bind(
+    reader: _Reader, fn: Callable[[], Any], interface: str, source: str, *,
+    allow_none: bool = False,
+) -> tuple[Any, str | None]:
+    raw, cause = reader.witness(fn, name=source, allow_none=allow_none)
+    if cause is not None or raw is None:
         return None, cause
-    return reader.witness(lambda: _early_bound(raw, interface), name=f"bind {interface}")
+    bound, cause = reader.witness(lambda: _early_bound(raw, interface), name=f"bind {interface}")
+    return bound, f"bind {interface}:{cause}" if cause is not None else None
 
 
 def _preference_witness(
@@ -454,13 +472,59 @@ def _document_lineweights(reader: _Reader) -> dict[str, Any]:
 
 
 def _component_lineweights(reader: _Reader, view: Any) -> dict[str, Any]:
-    """Read the getter-returned tree, with explicit context and incompleteness."""
-    source = "IView.RootDrawingComponent2(InChildContext=True)"
-    root, cause = _witness_bind(reader, lambda: view.RootDrawingComponent2(True), "IDrawingComponent", source)
+    """Keep two native root contexts and the immediate base distinct."""
     result: dict[str, Any] = {
-        "status": "read", "source": source, "in_child_context": True,
-        "max_components": 512, "max_depth": 32, "components": [],
-        "coverage": "getter-returned root; section temporary context requested; nonsection parent-view semantics; not exhaustive current projected-view override proof",
+        "schema": 2, "status": "read",
+        "max_components_per_view": 2 * _MAX_COMPONENTS_PER_CONTEXT,
+        "contexts": {
+            "current": _component_tree_lineweights(reader, view, in_child_context=False),
+            "child": _component_tree_lineweights(reader, view, in_child_context=True),
+        },
+        "base_view": _base_view_description(reader, view),
+        "coverage": "separate getter contexts and immediate base only; no effective width or PDF/model ownership proof",
+    }
+    if _has_unreadable(result):
+        result["status"] = "unreadable"
+    return result
+
+
+def _base_view_description(reader: _Reader, view: Any) -> dict[str, Any]:
+    """Describe only the immediate base; its native name need not be unique."""
+    source = "IView.GetBaseView()"
+    base, cause = _witness_bind(reader, lambda: view.GetBaseView(), "IView", source, allow_none=True)
+    if cause is not None:
+        return _unreadable(source, cause)
+    if base is None:
+        return {"status": "read", "source": source, "value": None}
+    name = _witness_value(reader, lambda: base.GetName2(), source="IView.GetName2()", kind="text")
+    if name["status"] == "read" and not name["value"]:
+        name.update(status="unreadable", cause="empty-view-name")
+    result = {
+        "status": "read", "source": source, "name": name,
+        "type": _witness_value(reader, lambda: base.Type, source="IView.Type", kind="integer", enum=_DRAWING_VIEW_TYPES),
+        "coverage": "immediate returned base description; section names are not unique; no view/override identity proof",
+    }
+    if _has_unreadable(result):
+        result["status"] = "unreadable"
+    return result
+
+
+def _component_tree_lineweights(
+    reader: _Reader, view: Any, *, in_child_context: bool,
+) -> dict[str, Any]:
+    """Read one bounded getter-returned tree; never merge equal native names."""
+    source = f"IView.RootDrawingComponent2(InChildContext={in_child_context})"
+    root, cause = _witness_bind(
+        reader, lambda: view.RootDrawingComponent2(in_child_context), "IDrawingComponent", source,
+    )
+    result: dict[str, Any] = {
+        "status": "read", "source": source, "in_child_context": in_child_context,
+        "max_components": _MAX_COMPONENTS_PER_CONTEXT, "max_depth": _MAX_COMPONENT_DEPTH, "components": [],
+        "coverage": (
+            "section temporary context requested; nonsection parent-view semantics; not exhaustive current-view override proof"
+            if in_child_context else
+            "current-view context requested by existing source convention; not effective width or PDF/model ownership proof"
+        ),
     }
     if cause is not None:
         result.update(status="unreadable", cause=cause)
