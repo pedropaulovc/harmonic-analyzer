@@ -55,8 +55,8 @@ def test_exported_bolt_stations_are_the_printed_stations_from_one_end() -> None:
         round(spec.BOLT_LEFT_X - 0.51, 2),
         round(spec.BOLT_LEFT_X + 0.51, 2),
     ]
-    # Symmetric pattern: each hole stands the same reading from its own end.
-    assert spec.PLATE_LENGTH - spec.BOLT_RIGHT_X == pytest.approx(spec.BOLT_LEFT_X)
+    # Symmetric pattern about the plate centre, as the vise's plate is drilled.
+    assert spec.BOLT_LEFT_X + spec.BOLT_RIGHT_X == pytest.approx(spec.PLATE_LENGTH)
     for side in ("left", "right"):
         assert features[f"bolt_{side}"]["height"] == [
             round(spec.BOLT_HEIGHT - 0.51, 2),

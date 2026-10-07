@@ -32,21 +32,23 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 MM_PER_IN = 25.4
 
-# Plate: the hardened plate's length, the jaw height above the vise bed, and
-# the finished thickness after the gripping face is skimmed in place.
-PLATE_LENGTH = 158.67
+# Plate: the hardened plate's length (6.247 in read, printed to one place),
+# the jaw height above the vise bed, and the finished thickness after the
+# gripping face is skimmed in place (one place: the vise clamps across it and
+# nothing locates on it).
+PLATE_LENGTH = 158.7
 PLATE_HEIGHT = 63.5
-PLATE_THICK = 19.05
-# Bolt holes: an example reading of the hardened plate's two holes (+-50.8
-# about the plate centre, symmetric), spotted through it. Each stands its
-# two-place reading from its own end; both print from the left end.
+PLATE_THICK = 19.1
+# Bolt holes: an example reading of the hardened plate's two holes, +-50.8
+# about the plate centre, spotted through it; both stations print from the
+# left end at the two places they were read to.
 # 7/16 drill through, 11/16 end-mill counterbore from the gripping face to the
 # hardened plate's counterbore depth plus 1.25, so the vise's own screws reach
 # the same thread.
-BOLT_END_OFFSET = 28.54
+BOLT_HALF_SPACING = 50.8
 BOLT_HEIGHT = 22.5
-BOLT_LEFT_X = BOLT_END_OFFSET
-BOLT_RIGHT_X = round(PLATE_LENGTH - BOLT_END_OFFSET, 2)
+BOLT_LEFT_X = round(PLATE_LENGTH / 2.0 - BOLT_HALF_SPACING, 2)
+BOLT_RIGHT_X = round(PLATE_LENGTH / 2.0 + BOLT_HALF_SPACING, 2)
 BOLT_XS = (BOLT_LEFT_X, BOLT_RIGHT_X)
 BOLT_HOLE_DIA = 7.0 / 16.0 * MM_PER_IN
 CBORE_DIA = 11.0 / 16.0 * MM_PER_IN
@@ -63,9 +65,9 @@ BOLT_HOLE_SPEC = HoleSpec(
 
 # Places select the title block's general bands; nothing on the plate is a
 # fit. The checks below prove those bands hold the S11 hold.
-LENGTH_PLACES = 2
+LENGTH_PLACES = 1
 HEIGHT_PLACES = 1
-THICK_PLACES = 2
+THICK_PLACES = 1
 BOLT_PLACES = 2
 
 # The vise's own M10 x 1.5 socket head jaw screws (ISO 4762: head 16.0

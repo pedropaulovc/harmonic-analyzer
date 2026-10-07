@@ -56,8 +56,8 @@ VIEW_SCALE = (1, 1)
 ISO_SCALE = (1, 2)
 FRONT_CENTER = (0.150, 0.150)
 TOP_CENTER = (0.150, 0.215)
-ISO_CENTER = (0.345, 0.185)
-ISO_NOTE_XY = (0.300, 0.240)
+ISO_CENTER = (0.360, 0.190)
+ISO_NOTE_XY = (0.315, 0.245)
 NOTES_XY = (0.020, 0.070)
 
 
@@ -82,14 +82,15 @@ FRONT_KEEP = {
     "PlateHeight": (0.033, FRONT_CENTER[1]),
 }
 TOP_KEEP = {"PlateThick": (0.250, TOP_CENTER[1])}
-# The leader enters the right counterbore from its lower-right quadrant and
-# the text stands right of the plate, under the isometric.
+# The leader leaves the right counterbore from its upper-right quadrant and the
+# text stands right of the plate's upper half, above the length's extension
+# line and below the plan's thickness, short of the isometric.
 _CBORE_R = CBORE_DIA / 2.0
 HOLE_CALLOUT_EDGE_XY = (
     _sheet_x(BOLT_RIGHT_X + 0.6 * _CBORE_R),
-    _sheet_y(BOLT_HEIGHT - 0.8 * _CBORE_R),
+    _sheet_y(BOLT_HEIGHT + 0.8 * _CBORE_R),
 )
-HOLE_CALLOUT_XY = (0.245, 0.105)
+HOLE_CALLOUT_XY = (0.272, 0.168)
 HOLE_CALLOUT_PROCESS = "7/16 DRILL"
 
 
