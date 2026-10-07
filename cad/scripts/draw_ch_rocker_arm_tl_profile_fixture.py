@@ -309,14 +309,18 @@ def _elevation_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
     return keep
 
 
-def _delete_thread_callouts(adapter: Any, view: Any, *, label: str) -> None:
+def _delete_thread_callouts(
+    adapter: Any, view: Any, *, label: str, required: bool = True
+) -> None:
     """Delete the model's cosmetic-thread callout notes from ``view`` (as
     ``delete_unnamed_imports`` deletes automatic ones): detail E carries the
     pivot tap's one callout, yet the model's "#10-24 Tapped Hole" note sat
     over the TAGS plan's tags A1-A3 (run 20261007T182242302Z) and printed
     again on the plan and the isometric (run 20261007T190010219Z). A hidden
     layer does not do: the layout audit boxes hidden-layer notes too
-    (run 20261007T182758889Z)."""
+    (run 20261007T182758889Z). Deleted from the plan, it reappears on the
+    next view cut from it (section D-D, run 20261007T191627896Z), so the
+    derived views are swept too, where it may or may not land."""
     draw = adapter.currentModel
     deleted = 0
     for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
@@ -336,7 +340,9 @@ def _delete_thread_callouts(adapter: Any, view: Any, *, label: str) -> None:
         deleted += 1
     draw.ClearSelection2(True)
     if not deleted:
-        raise RuntimeError(f"{label} has no cosmetic-thread callout to delete")
+        if required:
+            raise RuntimeError(f"{label} has no cosmetic-thread callout to delete")
+        return
     rebuild_drawing(adapter, label=f"delete {label} thread callouts")
     left = [
         str(_early_bound(found, "INote").GetText() or "")
@@ -359,7 +365,8 @@ def _position_view_label(
         raise RuntimeError(f"cannot pin sheet scale before {label} placement")
     notes = tuple(_read_member(view, "GetNotes") or ())
     if len(notes) != 1:
-        raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
+        texts = [str(_early_bound(found, "INote").GetText() or "") for found in notes]
+        raise RuntimeError(f"expected one native {label}, found notes {texts!r}")
     note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
     for _attempt in range(2):
@@ -401,6 +408,7 @@ def _section(adapter: Any, plan: Any) -> Any:
     _orient_section(adapter, view)
     set_hidden_lines_removed(adapter, view)
     _center_on_outline(adapter, view, SECTION_CENTER, label="section D-D")
+    _delete_thread_callouts(adapter, view, label="section D-D", required=False)
     _position_view_label(
         adapter, view, SECTION_LABEL_LOWER_LEFT, label="section D-D label"
     )
@@ -484,6 +492,7 @@ def _detail(adapter: Any, plan: Any) -> Any:
             f"detail E projects its centre to {projected!r}, not {DETAIL_CENTER!r}"
         )
     set_hidden_lines_removed(adapter, detail)
+    _delete_thread_callouts(adapter, detail, label="detail E", required=False)
     _position_view_label(
         adapter, detail, DETAIL_LABEL_LOWER_LEFT, label="detail E label"
     )
