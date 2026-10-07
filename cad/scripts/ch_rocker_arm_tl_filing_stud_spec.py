@@ -21,6 +21,7 @@ import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_filing_button_spec as button
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
+from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # Lapped body: slips into the smallest pivot bore the arm's reamed band
 # allows and into the smallest lapped button bore.
@@ -119,10 +120,13 @@ REFERENCE_CALLOUTS = {"BodyDia": BODY_FIT_CALLOUT}
 # The thread size prints as its designation, not as a plain diameter.
 DIMENSION_TEXT = {"ThreadDia": THREAD}
 
-SURFACE_FINISHES = ()
+# The sliding journal is a required machined surface at the project grade;
+# the fit callout governs its size.
+SURFACE_FINISHES = (
+    SurfaceFinishControl("locating_body", MACHINED_UM, CylinderFace(BODY_DIA)),
+)
 DRAWING_NOTES = (
-    "AXIAL SIZES FROM THE HEAD SEAT FACE; SEAT SQUARE TO THE AXIS.\n"
-    "VISE TAIL IS HELD ONLY. DO NOT HARDEN."
+    "AXIAL SIZES FROM THE HEAD SEAT FACE.\nVISE TAIL IS HELD ONLY. DO NOT HARDEN."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 

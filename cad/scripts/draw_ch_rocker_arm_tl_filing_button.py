@@ -57,7 +57,9 @@ ISO_NOTE_XY = (0.275, 0.240)
 NOTES_XY = (0.020, 0.075)
 FACE_KEEP = {
     "DiscDia": (0.165, 0.115),  # donor spot only
-    "BoreDia": (0.060, 0.240),
+    # Centred over the face view so the whole fit callout sits inside the
+    # border (codex: at x 0.060 its opening words left the sheet).
+    "BoreDia": (0.115, 0.240),
 }
 EDGE_XY = {"DiscDia": (0.165, 0.180)}
 EDGE_KEEP = {

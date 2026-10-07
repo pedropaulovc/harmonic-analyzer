@@ -9,6 +9,7 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
+    add_surface_finish,
     DrawingOutputs,
     add_property_linked_note,
     add_view_centerline,
@@ -25,7 +26,10 @@ from _drawing_common import (
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _surface_finish import surface_finish_by_key
 from ch_rocker_arm_tl_filing_stud_spec import (
+    BODY_DIA,
+    SURFACE_FINISHES,
     DIMENSION_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -69,7 +73,9 @@ PROFILE_KEEP = {
     "TailEnd": (SEAT_X - TAIL_END / 2.0 * _S, _ABOVE),
     "ThreadEnd": (SEAT_X + THREAD_END / 2.0 * _S, _ABOVE),
     "HeadLength": (SEAT_X - 0.012, _BELOW),
-    "BodyLength": (SEAT_X + 0.016, _BELOW),
+    # Above the body, under the end-station row: the space below carries
+    # the locating diameter's fit callout, whose leader must cross nothing.
+    "BodyLength": (SEAT_X + 0.016, PROFILE_CENTER[1] + 0.022),
     # The reference overall, one row above the two end stations.
     "OverallLength": (PROFILE_CENTER[0], _ABOVE + 0.018),
 }
@@ -82,9 +88,10 @@ DONOR_KEEP = {
 PROFILE_DIAMETER_XY = {
     "TailDia": (SEAT_X - 0.060, PROFILE_CENTER[1] + 0.022),
     "HeadDia": (SEAT_X - 0.020, PROFILE_CENTER[1] + 0.024),
-    "BodyDia": (SEAT_X + 0.008, PROFILE_CENTER[1] + 0.022),
-    # Below the profile, under the 12.5 row: clear of the isometric.
-    "ThreadDia": (SEAT_X + 0.062, PROFILE_CENTER[1] - 0.060),
+    # Below right: the leader drops straight to the body's lower arrow.
+    "BodyDia": (SEAT_X + 0.074, PROFILE_CENTER[1] - 0.050),
+    # Above right, beyond the thread end's extension line.
+    "ThreadDia": (SEAT_X + 0.075, PROFILE_CENTER[1] + 0.034),
 }
 
 
@@ -180,6 +187,20 @@ async def build(adapter: Any) -> dict[str, str]:
                     raise RuntimeError(f"filing stud {name} fit callout did not take")
     add_view_centerline(
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
+    )
+    # The sliding journal is a required machined surface (codex round 14):
+    # on its lower silhouette, right of the fit callout's leader.
+    body_pick = (SEAT_X + 0.021, PROFILE_CENTER[1] - BODY_DIA / 2.0 * _S)
+    add_surface_finish(
+        adapter,
+        profile,
+        edge_xy=body_pick,
+        entity_type="SILHOUETTE",
+        symbol_xy=(SEAT_X + 0.040, PROFILE_CENTER[1] - 0.024),
+        leader_attach_xy=body_pick,
+        control=surface_finish_by_key(SURFACE_FINISHES, "locating_body"),
+        label="filing stud locating diameter finish",
+        char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
