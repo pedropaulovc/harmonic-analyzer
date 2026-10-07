@@ -23,7 +23,7 @@ import socket
 import subprocess
 import sys
 import tempfile
-import threading
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -57,6 +57,9 @@ FAILED_LOG_LOCK_TIMEOUT_S = 30.0
 # Match the current pool worker's published task.log ceiling, not an SDK chunk size.
 FAILED_LOG_MAX_BYTES = 16 * 1024 * 1024
 FAILED_LOG_DIAGNOSTIC_BYTES = 64 * 1024
+# Raw captures and attributed console rendering have independent budgets.
+FAILED_LOG_RENDER_BYTES = 16 * 1024 * 1024
+FAILED_LOG_RENDER_LINES = 64 * 1024
 FAILED_LOG_LOCK_ENV = "HARMONIC_FARM_LOG_LOCK"
 
 
@@ -212,6 +215,10 @@ class _FailedLogTooLarge(Exception):
     """The exact log reader exceeded the submitter's payload ceiling."""
 
 
+class _FailedLogDiagnosticsTooLarge(Exception):
+    """Reader stderr exceeded its bounded capture, invalidating the read."""
+
+
 def _run_bounded_log_reader(
     argv: list[str],
     env: dict[str, str],
@@ -220,68 +227,150 @@ def _run_bounded_log_reader(
     timeout_s: float,
     max_bytes: int,
 ) -> subprocess.CompletedProcess:
-    """Bound the reader's lifetime and spool growth while draining raw stdout."""
+    """Drain both owned pipes with one deadline and bounded spool growth.
+
+    Python 3.12+ supports nonblocking pipes on Windows as well as POSIX. One
+    owner pumps both streams: no reader thread or timer can race process
+    teardown, leave a blocked join, or fill the other pipe while it waits.
+    """
 
     with subprocess.Popen(
         argv,
         cwd=REPO_ROOT,
         env=env,
         stdout=subprocess.PIPE,
-        stderr=stderr,
+        stderr=subprocess.PIPE,
         bufsize=0,
     ) as process:
-        assert process.stdout is not None
-        timed_out = threading.Event()
-
-        def expire() -> None:
+        try:
+            assert process.stdout is not None and process.stderr is not None
+            deadline = time.monotonic() + timeout_s
+            diagnostic_spool = (
+                stderr if stderr is not None and not isinstance(stderr, int) else None
+            )
+            streams = (
+                (process.stdout, spool, max_bytes),
+                (process.stderr, diagnostic_spool, FAILED_LOG_DIAGNOSTIC_BYTES),
+            )
+            captured = [0, 0]
+            opened = [True, True]
+            for pipe, _destination, _limit in streams:
+                os.set_blocking(pipe.fileno(), False)
+            while any(opened):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(argv, timeout_s)
+                progressed = False
+                for index, (pipe, destination, limit) in enumerate(streams):
+                    if not opened[index]:
+                        continue
+                    try:
+                        chunk = os.read(
+                            pipe.fileno(), min(64 * 1024, limit - captured[index] + 1)
+                        )
+                    except BlockingIOError:
+                        continue
+                    progressed = True
+                    if not chunk:
+                        opened[index] = False
+                        continue
+                    allowed = min(len(chunk), limit - captured[index])
+                    if destination is not None and allowed:
+                        destination.write(chunk[:allowed])
+                    captured[index] += len(chunk)
+                    if captured[index] > limit:
+                        if index == 1:
+                            raise _FailedLogDiagnosticsTooLarge(
+                                "log reader stderr capture limit exceeded; reader "
+                                "stopped; incomplete payload not shown "
+                                f"(limit {limit} bytes)"
+                            )
+                        raise _FailedLogTooLarge(
+                            f"task log exceeded the {limit}-byte output limit; "
+                            "reader stopped and payload not shown"
+                        )
+                if not progressed:
+                    time.sleep(min(0.01, max(0.0, deadline - time.monotonic())))
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(argv, timeout_s)
+            return subprocess.CompletedProcess(argv, process.wait(timeout=remaining))
+        finally:
+            # Only this retained Popen child is stopped; cancellation propagates
+            # after its pipes are closed and it is reaped by this owner.
             if process.poll() is None:
-                timed_out.set()
                 try:
                     process.kill()
-                except OSError:
+                except ProcessLookupError:
                     pass
-
-        timer = threading.Timer(timeout_s, expire)
-        timer.daemon = True
-        timer.start()
-        written = 0
-        try:
-            while chunk := process.stdout.read(
-                min(64 * 1024, max_bytes - written + 1)
-            ):
-                if timed_out.is_set():
-                    raise subprocess.TimeoutExpired(argv, timeout_s)
-                written += len(chunk)
-                if written > max_bytes:
-                    raise _FailedLogTooLarge(
-                        f"task log exceeded the {max_bytes}-byte output limit; "
-                        "reader stopped and payload not shown"
-                    )
-                spool.write(chunk)
-            returncode = process.wait()
-            if timed_out.is_set():
-                raise subprocess.TimeoutExpired(argv, timeout_s)
-            return subprocess.CompletedProcess(argv, returncode)
-        finally:
-            timer.cancel()
-            if process.poll() is None:
-                process.kill()
             process.wait()
-            timer.join()
 
 
-def _write_spooled_utf8(spool: BinaryIO, line_prefix: str) -> int:
-    """Write normalized, attributed UTF-8 lines without taking spool ownership."""
+class _FailedLogRenderTooLarge(Exception):
+    """Attributed rendering exhausted its byte or line-work budget."""
 
+
+@dataclass
+class _LogRenderBudget:
+    remaining_bytes: int
+    remaining_lines: int
+
+    def consume(self, byte_count: int, line_count: int = 1) -> None:
+        if byte_count > self.remaining_bytes or line_count > self.remaining_lines:
+            raise _FailedLogRenderTooLarge
+        self.remaining_bytes -= byte_count
+        self.remaining_lines -= line_count
+
+
+def _rendered_line_count(text: str) -> int:
+    return text.count("\n") + text.count("\r") - text.count("\r\n")
+
+
+def _write_rendered_line(text: str, budget: _LogRenderBudget) -> None:
+    budget.consume(
+        len(text.encode("utf-8", errors="replace")),
+        _rendered_line_count(text),
+    )
+    sys.stderr.write(text)
+
+
+def _write_spooled_utf8(
+    spool: BinaryIO,
+    line_prefix: str,
+    *,
+    _budget: _LogRenderBudget | None = None,
+) -> int:
+    """Stream normalized lines within the attributed UTF-8/work budget."""
+
+    budget = _budget or _LogRenderBudget(
+        FAILED_LOG_RENDER_BYTES, FAILED_LOG_RENDER_LINES
+    )
+    prefix_bytes = len(line_prefix.encode("utf-8", errors="replace"))
+    prefix_lines = _rendered_line_count(line_prefix)
     spool.seek(0)
     reader = TextIOWrapper(spool, encoding="utf-8", errors="replace", newline=None)
     written_chars = 0
     try:
-        for line in reader:
-            written_chars += len(line)
-            sys.stderr.write(
-                line_prefix + line + ("" if line.endswith("\n") else "\n")
+        while True:
+            if (
+                budget.remaining_bytes <= prefix_bytes
+                or budget.remaining_lines <= prefix_lines
+            ):
+                # A one-character EOF probe avoids walking the remaining
+                # lines after the work budget is exhausted.
+                if reader.read(1):
+                    raise _FailedLogRenderTooLarge
+                break
+            line = reader.readline(budget.remaining_bytes - prefix_bytes + 1)
+            if not line:
+                break
+            ending = "" if line.endswith("\n") else "\n"
+            budget.consume(
+                prefix_bytes + len(line.encode("utf-8", errors="replace")) + len(ending),
+                prefix_lines + 1,
             )
+            sys.stderr.write(line_prefix + line + ending)
+            written_chars += len(line)
     finally:
         reader.detach()
     sys.stderr.flush()
@@ -309,37 +398,70 @@ def _write_failed_task_log_block(
         "worker_id": result.worker_id,
         "attempt": result.attempt,
     }
-    sys.stderr.write(f"--- begin failed farm task log: {identity} ---\n")
-    sys.stderr.flush()
-    if payload is not None:
-        _write_spooled_utf8(payload, f"[farm {identity}] ")
-    if diagnostics is not None:
-        diagnostics.seek(0, os.SEEK_END)
-        size = diagnostics.tell()
-        if size:
-            # Bound reader output independently of the published worker log.
-            diagnostics.seek(0)
-            with tempfile.SpooledTemporaryFile(
-                max_size=FAILED_LOG_DIAGNOSTIC_BYTES
-            ) as bounded:
-                bounded.write(diagnostics.read(FAILED_LOG_DIAGNOSTIC_BYTES))
-                _write_spooled_utf8(bounded, f"[farm log-reader {identity}] ")
-            if size > FAILED_LOG_DIAGNOSTIC_BYTES:
-                warnings.append(
-                    (
-                        "diagnostic_truncated",
-                        f"log reader diagnostics exceeded "
-                        f"{FAILED_LOG_DIAGNOSTIC_BYTES} bytes; only the prefix is shown",
+    beginning = f"--- begin failed farm task log: {identity} ---\n"
+    ending = f"--- end failed farm task log: {identity} ---\n"
+    truncated_notice = (
+        f"[farm log-reader {identity}] failed task log output truncated at its "
+        "rendered UTF-8 byte/line budget; the original farm failure is unchanged\n"
+    )
+    reserved_bytes = len((ending + truncated_notice).encode("utf-8", errors="replace"))
+    reserved_lines = _rendered_line_count(ending) + _rendered_line_count(truncated_notice)
+    budget = _LogRenderBudget(
+        FAILED_LOG_RENDER_BYTES - reserved_bytes,
+        FAILED_LOG_RENDER_LINES - reserved_lines,
+    )
+    truncated = False
+    began = False
+    try:
+        _write_rendered_line(beginning, budget)
+        began = True
+        sys.stderr.flush()
+        if payload is not None:
+            _write_spooled_utf8(payload, f"[farm {identity}] ", _budget=budget)
+        if diagnostics is not None:
+            diagnostics.seek(0, os.SEEK_END)
+            size = diagnostics.tell()
+            if size:
+                diagnostics.seek(0)
+                with tempfile.SpooledTemporaryFile(
+                    max_size=FAILED_LOG_DIAGNOSTIC_BYTES
+                ) as bounded:
+                    bounded.write(diagnostics.read(FAILED_LOG_DIAGNOSTIC_BYTES))
+                    _write_spooled_utf8(
+                        bounded, f"[farm log-reader {identity}] ", _budget=budget
                     )
-                )
+                if size > FAILED_LOG_DIAGNOSTIC_BYTES:
+                    warnings.append(
+                        (
+                            "diagnostic_truncated",
+                            f"log reader diagnostics exceeded "
+                            f"{FAILED_LOG_DIAGNOSTIC_BYTES} bytes; only the prefix is shown",
+                        )
+                    )
+    except _FailedLogRenderTooLarge:
+        truncated = True
+        warnings.append(
+            (
+                "render_truncated",
+                f"failed task log output exceeded its {FAILED_LOG_RENDER_BYTES}-byte / "
+                f"{FAILED_LOG_RENDER_LINES}-line rendered budget; output is incomplete",
+            )
+        )
+    if began:
+        budget.remaining_bytes += reserved_bytes
+        budget.remaining_lines += reserved_lines
+        if truncated:
+            _write_rendered_line(truncated_notice, budget)
+        _write_rendered_line(ending, budget)
+        sys.stderr.flush()
     for reason, message in warnings:
         _telemetry.warn(
             f"{message}; the original farm failure is unchanged",
             reason=reason,
             **fields,
         )
-    sys.stderr.write(f"--- end failed farm task log: {identity} ---\n")
-    sys.stderr.flush()
+    # Structured supplements use the existing logger outside the bounded
+    # retrieved-log frame. Oversized attribution emits only this supplement.
 
 
 def _emit_failed_task_log(task: str, wf_id: str, result: LeafResult) -> None:
@@ -387,6 +509,8 @@ def _emit_failed_task_log(task: str, wf_id: str, result: LeafResult) -> None:
                             f"task log retrieval timed out after {FAILED_LOG_TIMEOUT_S:g}s",
                         )
                     )
+                except _FailedLogDiagnosticsTooLarge as exc:
+                    warnings.append(("diagnostic_truncated", str(exc)))
                 except _FailedLogTooLarge as exc:
                     warnings.append(("retrieval_too_large", str(exc)))
                 except OSError as exc:
