@@ -401,6 +401,35 @@ test('F5: shaft-linked pin, gear and cap families are finite; held pin needs act
   }
 })
 
+test('F5: held pin clearance uses the displaced current hub under a moved normal baseline', () => {
+  const f = fixture({ crankTurns: .23, root: movedRoot() })
+  const installedHub = f.matrices.get(HUB), installedPin = f.matrices.get(PIN)
+  const heldHub = installedHub.clone()
+  heldHub.setPosition(position(installedHub).addScaledVector(axis(installedHub, 1), -.12))
+  const carrier = { attachment: 'held', pose: pose(heldHub) }
+  const pinInHub = heldHub.clone().multiply(installedHub.clone().invert()).multiply(installedPin)
+  // This pin keeps its installed hub-relative pose, but both bodies have left
+  // the fixed shaft and normal hub location. A held label cannot certify it.
+  reject({ crank: crank(f, carrier, { attachment: 'held', pose: pose(pinInHub) }) }, f, /hub/i)
+  const clearPin = pinInHub.clone()
+  clearPin.setPosition(position(pinInHub).addScaledVector(axis(pinInHub, 0), -.06))
+  const result = solve({ crank: crank(f, carrier, { attachment: 'held', pose: pose(clearPin) }) }, f)
+  const pinInCurrentHub = result.matrix(HUB).invert().multiply(result.matrix(PIN))
+  const corners = [0, 1, 2, 3, 4, 5, 6, 7].map(i => point(pinInCurrentHub,
+    [i & 1 ? .044999998062849045 : 0, i & 2 ? .002968749962747097 : -.002968749962747097,
+      i & 4 ? .002968749962747097 : -.002968749962747097]))
+  // Independently observe a separating native barrel face, rather than merely
+  // asserting that a chosen pose did not throw or echo back an override.
+  assert.ok(Math.max(...corners.map(p => p.x)) < -.011125000193715096
+    || Math.min(...corners.map(p => p.x)) > .011125000193715096
+    || Math.max(...corners.map(p => p.y)) < 0
+    || Math.min(...corners.map(p => p.y)) > .025200000032782555
+    || Math.max(...corners.map(p => p.z)) < -.011125000193715096
+    || Math.min(...corners.map(p => p.z)) > .011125000193715096,
+  'The whole finite held pin clears the actual displaced hub barrel')
+  near(position(result.matrix(HUB)).distanceTo(position(installedHub)), .12)
+})
+
 test('F5: rod withdrawal ends at the actual current fixed guide, not a rest length', () => {
   for (const guideShift of [0, -.002]) {
     const f = fixture({ root: movedRoot() })

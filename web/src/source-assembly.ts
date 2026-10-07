@@ -2348,8 +2348,8 @@ function validateNativeServiceContacts(state: Exclude<SourceAssemblyState, { kin
   if (state.crank) {
     // A held label is a claim of actual release, not a bypass at installed pose.
     if (state.crank.pin.attachment === 'held') {
-      currentPosedMatrix(PIN, out, body)
-      if (!nativeContactBoxesSeparated(body, NATIVE_CONTACT_PIN_BOUNDS, baseline(out, HUB), NATIVE_CONTACT_CARRIER_BOUNDS[0]!)) throw new Error('Held tapered pin must actually clear the current native hub barrel.')
+      currentPosedMatrix(PIN, out, body); currentPosedMatrix(HUB, out, retainer)
+      if (!nativeContactBoxesSeparated(body, NATIVE_CONTACT_PIN_BOUNDS, retainer, NATIVE_CONTACT_CARRIER_BOUNDS[0]!)) throw new Error('Held tapered pin must actually clear the current native hub barrel.')
       currentPosedMatrix(NATIVE_CONTACT_SHAFT, out, fixed)
       if (!nativeContactBoxesSeparated(body, NATIVE_CONTACT_PIN_BOUNDS, fixed, NATIVE_CONTACT_SHAFT_BOUNDS)) throw new Error('Held tapered pin must actually clear the current native crankshaft.')
     }
