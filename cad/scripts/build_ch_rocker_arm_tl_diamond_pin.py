@@ -42,6 +42,7 @@ from _common import (
     set_global,
     volume_check,
 )
+from _visibility import blank_reference_geometry
 from _drawing_marks import (
     apply_drawing_precision,
     apply_drawing_properties,
@@ -309,6 +310,7 @@ async def build(adapter) -> dict[str, str]:
     name_dimensions(adapter, "Pin", ["PinLength"])
     await volume_check(adapter, "pin", V_PIN, 0.005 * V_PIN)
     _require_bodies(adapter, 2, label="body and pin")
+    blank_reference_geometry(adapter, (("LandTipPlane", "PLANE"),))
 
     # The flats cut -Z (the cut default) from the neck face to the tip: only
     # the pin's lands live there, so the body is untouched; a pin extruded the
