@@ -278,8 +278,10 @@ no `.done`.
   `HARMONIC_FARM_RUN=<run-id>` variable the launcher sets before its first
   child (recorded as `"job": "environ:HARMONIC_FARM_RUN=<run-id>"`): every
   descendant inherits it, Python subprocesses of the build included, and
-  `-Cancel` finds them through `/proc/<pid>/environ`. macOS has no `/proc`, so
-  there it falls back to the parent chain. A record from a launcher that predates
+  `-Cancel` finds them through `/proc/<pid>/environ`. macOS has no `/proc`:
+  there `-Cancel` of a dead launcher stops what the parent chain still reaches,
+  then reports that it cannot list re-parented descendants and leaves the run
+  retryable rather than marking it cancelled. A record from a launcher that predates
   run jobs falls back to the parent chain (a process under a dead
   launcher's PID counts only if its command line names the run: the recorded
   build command, the run's snapshot — git worktree add/remove, submodule

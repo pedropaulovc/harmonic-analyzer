@@ -1526,6 +1526,22 @@ function Invoke-RunCancel {
         if ($killed.Count -gt 0) {
             Write-RunEvent -RunId $runId -Text "stopped launcher pid $($record['pid']) and its processes: $($killed -join ',')"
         }
+        $environJob = [string]$record['job']
+        $unlistable = $environJob.StartsWith('environ:', [System.StringComparison]::Ordinal) -and
+            -not (Test-Path -LiteralPath '/proc' -PathType Container)
+        if ($launcherWas -eq 'launcher-died' -and $unlistable) {
+            # Without /proc (macOS) nothing names the run's members, and a
+            # dead launcher's descendants were re-parented out of the scan
+            # above, so one may still be running and dispatching. Say so and
+            # leave the run retryable; `ps -E` is no substitute, since it
+            # prints arguments and environment in one field and a process
+            # merely naming the marker would match.
+            $errors.Add(
+                "cannot list this run's processes without /proc: descendants of the dead launcher may still " +
+                "be running; stop any process with $($environJob.Substring('environ:'.Length)) in its " +
+                "environment, then retry -Cancel"
+            )
+        }
     }
     # From here no process of this run can send a start; one already sent may
     # still be committing on the farm (see the not-found pass below).
