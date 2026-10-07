@@ -204,10 +204,17 @@ Analysis/Synthesis historical replay uses
 or published as a current source track. Historical lineage never supplies
 current eligibility.
 
+For current observations, an omitted landmark `viewId` belongs to `main`.
+Fitting and observer availability apply that default at the consumer boundary;
+they do not rewrite the original source measurements or explicit view scopes.
+
 Historical source diagnostics write only to resolved
 `web/.vite/verification-output` or external `/tmp` and `/var/tmp` destinations.
 Public assets, other repository destinations and symlink escapes are refused
 before generation. Their receipts remain non-publishable historical evidence.
+Temporary roots are resolved before comparison, including platform symlinks.
+The entire checkout remains excluded from external temporary permission even
+when the checkout itself is under `/tmp`; private-root symlink escapes are refused.
 
 Compression reduces current storage, not Git ancestry. Oversized historical
 blobs remain unless history is explicitly rewritten.

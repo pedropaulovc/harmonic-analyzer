@@ -997,33 +997,119 @@ class ObservationStorageBoundaryTests(unittest.TestCase):
 
 class HistoricalDiagnosticOutputBoundaryTests(unittest.TestCase):
     scripts = ('NAsM30MAHLg-calibrate-static.py',
-               'generate-analysis-bank-source-controls.py')
+               'generate-analysis-bank-source-controls.py',
+               'generate-8KmVDxkia_w-automatic-motion.py',
+               'generate-spin-source-controls.py',
+               '6dW6VYXp9HM-extract-automatic-motion.py',
+               '6dW6VYXp9HM-visible-crank-extract.py',
+               '6dW6VYXp9HM-visible-crank-gauge.py',
+               'XPQwKRt4Y2k-mechanics.py')
 
     def test_clis_refuse_published_repository_and_symlink_outputs_before_write(self):
+        public = HERE.parent / 'public'
+        if not public.exists():
+            public.mkdir()
+            self.addCleanup(public.rmdir)
         with tempfile.TemporaryDirectory(dir=HERE.parent / 'public') as published, \
                 tempfile.TemporaryDirectory(dir=HERE) as tracked, \
+                tempfile.TemporaryDirectory(dir=HERE.parent.parent) as repository, \
                 tempfile.TemporaryDirectory() as temporary:
             public_path = Path(published) / 'receipt.json'
             tracked_path = Path(tracked) / 'receipt.json'
             escape = Path(temporary) / 'escape'
             escape.symlink_to(Path(published), target_is_directory=True)
             for filename in self.scripts:
-                for destination in (public_path, tracked_path, escape / 'receipt.json'):
+                diagnostic = ([] if filename == '6dW6VYXp9HM-visible-crank-extract.py'
+                              else ['--historical-diagnostic'])
+                if filename == 'XPQwKRt4Y2k-mechanics.py':
+                    for option in ('--registration', '--pixels', '--inventory', '--hashes'):
+                        diagnostic.extend((option, str(Path(temporary) / 'missing-input.json')))
+                for destination in (public_path, tracked_path,
+                                    Path(repository) / 'receipt.json',
+                                    escape / 'receipt.json'):
                     with self.subTest(script=filename, destination=destination):
                         destination.write_bytes(b'original destination must survive')
                         result = subprocess.run(
-                            [sys.executable, str(HERE / filename),
-                             '--historical-diagnostic', '--output', str(destination)],
+                            [sys.executable, str(HERE / filename), *diagnostic,
+                             '--output', str(destination)],
                             text=True, capture_output=True)
                         self.assertEqual(result.returncode, 2, result.stderr)
-                        self.assertIn('Historical diagnostics require private', result.stderr)
+                        self.assertIn('require private .vite/verification-output', result.stderr)
                         self.assertEqual(destination.read_bytes(),
                                          b'original destination must survive')
                         destination.unlink()
 
+    def test_guards_allow_resolved_temporary_roots_but_refuse_repository_and_private_escapes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            web = root / 'checkout/web'
+            private = web / '.vite/verification-output'
+            private.mkdir(parents=True)
+            checkout_alias = root / 'checkout-alias'
+            checkout_alias.symlink_to(web.parent, target_is_directory=True)
+            aliased_private = checkout_alias / 'web/.vite/verification-output'
+            external = root / 'external'
+            external.mkdir()
+            aliases = {}
+            for name, allowed in (('tmp', '/tmp'), ('var-tmp', '/var/tmp')):
+                alias = root / name
+                alias.symlink_to(external, target_is_directory=True)
+                aliases[allowed] = alias
+
+            def temporary_roots(value):
+                return aliases.get(str(value), Path(value))
+
+            escape = private / 'escape'
+            escape.symlink_to(external, target_is_directory=True)
+            public_escape = external / 'public'
+            public_escape.symlink_to(web / 'public', target_is_directory=True)
+            for filename in self.scripts:
+                module = load_script(filename, 'historical_boundary_' + filename)
+                with self.subTest(script=filename), patch.object(module, 'WEB', web), \
+                        patch.object(module, 'Path', temporary_roots):
+                    for alias in aliases.values():
+                        destination = alias / 'receipt.json'
+                        self.assertEqual(module.private_output(destination),
+                                         external / 'receipt.json')
+                    self.assertEqual(module.private_output(private / 'receipt.json'),
+                                     private / 'receipt.json')
+                    for destination in (web / 'public/receipt.json',
+                                        web / 'src/receipt.json',
+                                        web / 'content/receipt.json',
+                                        web.parent / 'cad/receipt.json',
+                                        web.parent / 'receipt.json',
+                                        root / 'outside-allowed-roots/receipt.json',
+                                        public_escape / 'receipt.json',
+                                        aliased_private / 'escape/receipt.json',
+                                        escape / 'receipt.json'):
+                        with self.subTest(destination=destination), self.assertRaises(ValueError):
+                            module.private_output(destination)
+
+            # The whole allowed private root must not be redirectable to a
+            # forbidden repository directory or even to an external temp.
+            escape.unlink()
+            private.rmdir()
+            for target in (web / 'public', web / 'src', external):
+                private.symlink_to(target, target_is_directory=True)
+                for filename in self.scripts:
+                    module = load_script(filename, 'historical_root_escape_' + filename)
+                    with patch.object(module, 'WEB', web), \
+                            patch.object(module, 'Path', temporary_roots):
+                        for destination in (private / 'receipt.json',
+                                            aliased_private / 'receipt.json'):
+                            with self.subTest(script=filename, target=target,
+                                              destination=destination), \
+                                    self.assertRaises(ValueError):
+                                module.private_output(destination)
+                private.unlink()
+
     def test_analysis_cli_writes_original_historical_diagnostic_to_external_temporary_output(self):
         with tempfile.TemporaryDirectory() as temporary:
-            destination = Path(temporary) / 'diagnostic/receipt.json'
+            target = Path(temporary) / 'diagnostic'
+            target.mkdir()
+            alias = Path(temporary) / 'temporary-alias'
+            alias.symlink_to(target, target_is_directory=True)
+            destination = alias / 'receipt.json'
             result = subprocess.run(
                 [sys.executable, str(HERE / 'generate-analysis-bank-source-controls.py'),
                  '--historical-diagnostic', '--output', str(destination)],

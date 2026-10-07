@@ -1592,7 +1592,12 @@ def _run_computation(observations, inventory):
                     "pixel": [landmark["pixel"][0] - x, landmark["pixel"][1] - y],
                 }
                 for landmark in frame["landmarks"]
-                if landmark.get("viewId") == view["id"]
+                if (
+                    "main"
+                    if observations.get("kind") == "current-source-observations"
+                    and landmark.get("viewId") is None
+                    else landmark.get("viewId")
+                ) == view["id"]
             ]
             if presentation == "horizontal-mirror":
                 for landmark in landmarks:

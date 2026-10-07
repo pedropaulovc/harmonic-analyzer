@@ -392,17 +392,17 @@
     },
     {
       "path": "web/scripts/6dW6VYXp9HM-extract-automatic-motion.py",
-      "sha256": "676fd85e53a695226e6ec484ef28181675a4c6cf3100dd9446e1a8f6c091732c",
+      "sha256": "5c11c283554d57acae259ff0c49f57cb035ec6a99a4b7abcd7158a4bc1ec9ff3",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/6dW6VYXp9HM-visible-crank-extract.py",
-      "sha256": "b95864236225cdddb1e02546a78dcdf22a956f1b67c0ce2f4533b82631e30c44",
+      "sha256": "a8bb80dfe5730fec12c39a0fe1eba351dbb05e8d56b852948e22d810849863da",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/6dW6VYXp9HM-visible-crank-gauge.py",
-      "sha256": "3b8bf7ddabc9470653aa4599d6773f73d44d45c88bd703324c0682d4324843ad",
+      "sha256": "3d9101742ffaf00eb141b9ac7ea8adf2d2c912383a44792e82bdd3c055c6b2c1",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -442,17 +442,17 @@
     },
     {
       "path": "web/scripts/fit-source.py",
-      "sha256": "b5b0d22f54fec86b0fb85a9a652078f592cb0d840d5c81965d177c0ad3076228",
+      "sha256": "defdb317a69a19ab8a6ee2846c0f597ad0e859979b531de1c6199d003f38cc15",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/generate-8KmVDxkia_w-automatic-motion.py",
-      "sha256": "eafdc57b60a9b336e94ee8e169cf8b31b72b734e64319b8b2a05c15cf4bfbb4a",
+      "sha256": "518bc358e801e01d141198e35c36afa4038ac0aa308ad0528a43113a8f538653",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
       "path": "web/scripts/generate-analysis-bank-source-controls.py",
-      "sha256": "89c98434cbaa426f506b1910a3594ed5a86bffaf586336c9e0b5a95b954cb612",
+      "sha256": "85baa17434a23fa20a728706520a63f06a2a5624be68a38422ec217a9daf76bc",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -467,7 +467,7 @@
     },
     {
       "path": "web/scripts/generate-spin-source-controls.py",
-      "sha256": "0d4719cc8ee2be8ed26ae830b29ee7def28427b50b53359653afd473a1793587",
+      "sha256": "d45e03df5db2403acd65596df31cab8b05554b969789cd12395c919fea346131",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -482,7 +482,7 @@
     },
     {
       "path": "web/scripts/NAsM30MAHLg-calibrate-static.py",
-      "sha256": "41f41107cb84d854f2e63a7c82d9e66272a0affab3ab2ea0c4d1c6737729ce0e",
+      "sha256": "1232673401aa9d89c9811d3b390a19938cbaf1601be3c68a561649efb860591d",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -492,7 +492,7 @@
     },
     {
       "path": "web/scripts/observe-source.py",
-      "sha256": "78777083b6de30c737f5088ecc0f1c27d076135ed9763aab2e1500f143ddde5c",
+      "sha256": "17573041ffec9be44abf566bf7f2a4d7ff78fb4935adab8e3d9278ed8cea28b5",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -517,7 +517,7 @@
     },
     {
       "path": "web/scripts/test_source_generation.py",
-      "sha256": "95ea56fe32a2a298670b6dddd70d696aff59a70b9e1f482d117130c15c6e4f77",
+      "sha256": "668fab92f5eb7e38853b02488a2c9114e35bfa63a3818c69396bc9bbd0183187",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -542,7 +542,7 @@
     },
     {
       "path": "web/scripts/XPQwKRt4Y2k-mechanics.py",
-      "sha256": "b88076f59e77f60b210f99dd0e692a50b066ded0e5fb81000190f7e8985f5bdd",
+      "sha256": "79900cf98f611308afabade94ee9059c2fd310226ec40fb56de1ea2d7797f40b",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -647,7 +647,7 @@
     },
     {
       "path": "web/package.json",
-      "sha256": "723991178c49cf86e4cadb8e475648e8f9f6c9350c966fae93c96f6ec75f02fc",
+      "sha256": "8c6f4ee2f4c213633bd63d2ea44a8ac4bcdb3510608cb68d76948355945a4754",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {

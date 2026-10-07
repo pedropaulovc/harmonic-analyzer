@@ -32,10 +32,14 @@ SOURCE_SHA = 'a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725'
 
 def private_output(path):
     output = Path(path).resolve()
-    private = (WEB / '.vite/verification-output').resolve()
-    external_temp = not output.is_relative_to(WEB.resolve()) and any(
-        output.is_relative_to(Path(temp)) for temp in ('/tmp', '/var/tmp'))
-    if output.is_relative_to((WEB / 'content').resolve()) or not (
+    private = WEB.resolve() / '.vite/verification-output'
+    external_temp = not output.is_relative_to(WEB.resolve().parent) and any(
+        output.is_relative_to(Path(temp).resolve()) for temp in ('/tmp', '/var/tmp'))
+    private_escape = not output.is_relative_to(private) and any(
+        parent.name == 'verification-output' and parent.parent.name == '.vite'
+        and parent.parent.parent.resolve() == WEB.resolve()
+        for parent in Path(path).absolute().parents)
+    if private_escape or output.is_relative_to((WEB / 'content').resolve()) or not (
             output.is_relative_to(private) or external_temp):
         raise ValueError('Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals')
     return output

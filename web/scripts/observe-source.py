@@ -893,7 +893,13 @@ def _observe_current(data, cap, pts, inventory, contract, match_repeated_view):
                 view.pop("cameraMeasurement", None)
                 view.setdefault("unavailable", []).append({"reason": "Tracked source pixels require a new current camera fit"})
         required = needs_machine(frame, shot)
-        observed = {(item.get("viewId"), item["anchorId"]) for item in frame["landmarks"]}
+        observed = {
+            (
+                item.get("viewId") if item.get("viewId") is not None else "main",
+                item["anchorId"],
+            )
+            for item in frame["landmarks"]
+        }
         if required:
             for view in frame["views"]:
                 for anchor in data["anchors"]:

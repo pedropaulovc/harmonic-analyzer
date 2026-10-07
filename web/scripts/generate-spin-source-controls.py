@@ -20,6 +20,21 @@ observe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(observe)
 
 
+def private_output(path):
+    output = Path(path).resolve()
+    external_temp = not output.is_relative_to(WEB.resolve().parent) and any(
+        output.is_relative_to(Path(temp).resolve()) for temp in ("/tmp", "/var/tmp"))
+    private = WEB.resolve() / ".vite/verification-output"
+    private_escape = not output.is_relative_to(private) and any(
+        parent.name == "verification-output" and parent.parent.name == ".vite"
+        and parent.parent.parent.resolve() == WEB.resolve()
+        for parent in Path(path).absolute().parents)
+    if private_escape or output.is_relative_to((WEB / "content").resolve()) or not (
+            output.is_relative_to(private) or external_temp):
+        raise ValueError("Historical diagnostics require private .vite/verification-output or external temporary output; cannot write published content or canonical originals")
+    return output
+
+
 def build_packet(reference_root, *, historical_diagnostic=False):
     if historical_diagnostic is not True:
         raise ValueError("Spin controls require historical_diagnostic=True")
@@ -110,9 +125,10 @@ def main():
     parser.add_argument("--reference-root", type=Path, default=Path(os.environ.get("HARMONIC_REFERENCE_ROOT", WEB / ".vite" / "reference-root")))
     parser.add_argument("--output", type=Path, default=WEB / ".vite" / "verification-output" / "compact-track-refinement" / "spin-montage-source-controls.json")
     args = parser.parse_args()
-    output = args.output.resolve()
-    if output.is_relative_to((WEB / "content").resolve()):
-        parser.error("Historical diagnostics cannot write published content or canonical originals")
+    try:
+        output = private_output(args.output)
+    except ValueError as error:
+        parser.error(str(error))
     packet = build_packet(args.reference_root, historical_diagnostic=args.historical_diagnostic)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(packet, separators=(",", ":"), allow_nan=False) + "\n")
