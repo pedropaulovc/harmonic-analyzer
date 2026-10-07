@@ -124,7 +124,7 @@ _SAVED_DRAWING_PROPERTIES = (
 _BASE_TOP_U = -BASE_TOP_Z
 _BASE_BOTTOM_U = -BASE_TOP_Z + BASE_THICK
 _BLOCK_TOP_U = -BLOCK_TOP_Z
-# The gauge line of the section reference rises this far above the base top.
+# The gauge line of the section reference drops this far below the base top.
 _GAUGE_LINE = 12.0
 
 
@@ -189,18 +189,19 @@ def _add_driving_tilt(
     Both lines are selected as segments: the adapter's angular route (one
     segment plus its vertex) never yields an angular control (the post's
     ``_add_driving_plan_incline``, ``diag_mcmaster_lib``). The text point
-    sits on the bisector of the two rays from ``vertex`` -- up (sketch -y)
-    and up the pin (sin i, -cos i) -- inside the acute wedge, passed with
-    sketch y in both the y and the -z slots so it lands there whether
-    SOLIDWORKS reads it in sketch or in model space.
+    sits on the bisector of the two rays from ``vertex`` -- down the gauge
+    line (sketch +y) and back down the pin axis (-sin i, cos i) -- inside
+    the acute wedge under the base, passed with sketch y in both the y and
+    the -z slots so it lands there whether SOLIDWORKS reads it in sketch or
+    in model space.
     """
     from solidworks_mcp.adapters import sw_type_info as _sw_type_info
     from solidworks_mcp.adapters.solidworks.sketch import _select_sketch_entities
 
     text_radius_mm = 8.0
     half = math.radians(INCLINE_DEG / 2.0)
-    text_x = (vertex[0] + text_radius_mm * math.sin(half)) / 1000.0
-    text_y = (vertex[1] - text_radius_mm * math.cos(half)) / 1000.0
+    text_x = (vertex[0] - text_radius_mm * math.sin(half)) / 1000.0
+    text_y = (vertex[1] + text_radius_mm * math.cos(half)) / 1000.0
     model = adapter.currentModel
     model.ClearSelection2(True)
     _select_sketch_entities(adapter, [gauge_line, pin_line], 0)
@@ -523,7 +524,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # prints from the base's west side face (SIDE_W_X), drawn as a
     # construction line on that face in each sketch.
     # Plan (Front: x = model X, y = model Y): the west side W from the base's
-    # end corner; the stop's and the body saddle's west edges; the crank pin
+    # end corner; the stop's and the tail saddle's west edges; the crank pin
     # centres; the cone pin stations from foot B on a line through both
     # pin-top centres.
     plan = SketchDims()
@@ -546,8 +547,8 @@ async def build(adapter: Any) -> dict[str, str]:
         await add_line_chain(
             adapter,
             [
-                (SIDE_W_X + SADDLE_SIDE_OFFSET, BODY_SADDLE_Y),
-                (SIDE_W_X + SADDLE_SIDE_OFFSET, BODY_SADDLE_Y + BODY_SADDLE_THICK),
+                (SIDE_W_X + SADDLE_SIDE_OFFSET, TAIL_SADDLE_Y),
+                (SIDE_W_X + SADDLE_SIDE_OFFSET, TAIL_SADDLE_Y + TAIL_SADDLE_THICK),
             ],
             close=False,
         )
@@ -582,7 +583,7 @@ async def build(adapter: Any) -> dict[str, str]:
     plan.record("PlanSideLength")
     for line, offset, y0, length, name in (
         (stop_edge, STOP_SIDE_OFFSET, 0.0, STOP_THICK, "Stop"),
-        (saddle_edge, SADDLE_SIDE_OFFSET, BODY_SADDLE_Y, BODY_SADDLE_THICK, "Saddle"),
+        (saddle_edge, SADDLE_SIDE_OFFSET, TAIL_SADDLE_Y, TAIL_SADDLE_THICK, "Saddle"),
     ):
         await dimension_between(
             adapter, corner, f"{line}.start", "horizontal_distance", offset, f"{name.lower()} side"
@@ -645,13 +646,15 @@ async def build(adapter: Any) -> dict[str, str]:
         return f"{line}.start"
 
     # Section through the near cone pin (a Top-parallel plane: x = model X,
-    # y = model -Z): gauge line A-E rising square from the hole's entry E on
-    # the base top, pin axis E-T at the journal tilt to the top centre T,
-    # and the top's radius T-H out to its high (-X) edge H.
+    # y = model -Z): gauge line A-E dropping square from the hole's entry E on
+    # the base top through the base, pin axis E-T at the journal tilt to the
+    # top centre T, and the top's radius T-H out to its high (-X) edge H. The
+    # tilt reads between the gauge line and the pin axis carried back through
+    # E, under the base, clear of the seat.
     await _offset_plane(adapter, "ConePinSectionPlane", "Top Plane", CONE_PIN_NEAR_Y)
     entry = (CONE_PIN_ENTRY_X, -BASE_TOP_Z)
     chain = [
-        (CONE_PIN_ENTRY_X, -BASE_TOP_Z - _GAUGE_LINE),
+        (CONE_PIN_ENTRY_X, -BASE_TOP_Z + _GAUGE_LINE),
         entry,
         (CONE_PIN_TOP_X, -CONE_PIN_TOP_Z),
         (CONE_PIN_HIGH_EDGE_X, -CONE_PIN_HIGH_EDGE_Z),

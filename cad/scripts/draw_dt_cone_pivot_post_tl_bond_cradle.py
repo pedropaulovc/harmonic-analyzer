@@ -61,22 +61,23 @@ ISO_SCALE = (1, 2)
 # elevation: A-A through the near cone pin looks back at the body saddle
 # (-Y), B-B between the crank pins and the tail saddle looks on to the tail
 # saddle (+Y), so each shows one seat alone, on a saddle face it does not cut.
-PLAN_CENTER = (0.115, 0.190)
-ELEVATION_CENTER = (0.115, 0.100)
+PLAN_CENTER = (0.115, 0.196)
+ELEVATION_CENTER = (0.115, 0.096)
 SECTION_A_CENTER = (0.252, 0.130)
 SECTION_B_CENTER = (0.372, 0.130)
 ISO_CENTER = (0.360, 0.228)
-ISO_NOTE_XY = (0.215, 0.230)
+ISO_NOTE_XY = (0.232, 0.250)
+NOTES_XY = (0.020, 0.062)
 # Cutting lines run from just above the saddle tops to just below the base.
 CUT_TOP_Z = -9.0
 CUT_FOOT_Z = -43.0
-# The section captions drop clear of the hole-entry dimension under A-A.
-CAPTION_DROP = 0.008
+# The section captions drop clear of the tilt under A-A.
+CAPTION_DROP = 0.018
 # Seat finish symbols stand outboard of the seat on the model's +X side
-# (X, Z in mm); their leaders land on the arc 40 degrees off its bottom,
-# away from the diameter leader and the cone pin.
-SEAT_FINISH_SYMBOL = (32.0, 0.0)
-SEAT_FINISH_LANDING_DEG = 40.0
+# (X, Z in mm), inside the sheet border; their leaders land on the arc 25
+# degrees off its bottom, clear of the saddle-top corner and the cone pin.
+SEAT_FINISH_SYMBOL = {"body_seat": (32.0, 0.0), "tail_seat": (24.0, 8.0)}
+SEAT_FINISH_LANDING_DEG = 25.0
 
 # Dimension text positions as MODEL points (mm); each view projects its own
 # after it is placed and turned. Stations print from foot B, heights from
@@ -85,13 +86,14 @@ SEAT_FINISH_LANDING_DEG = 40.0
 PLAN_KEEP = {
     "StopWidth": (0.0, -30.0, 0.0),
     "StopSideX": (-28.0, -21.0, 0.0),
-    "SaddleSideX": (-35.0, 5.0, 0.0),
-    # The saddle width, crank pin spots and base width stack as baselines off
-    # the west edge, outside the base's right end.
-    "SaddleWidth": (0.0, 128.0, 0.0),
-    "CrankPinWestX": (-23.0, 136.0, 0.0),
-    "CrankPinEastX": (-17.0, 144.0, 0.0),
-    "BaseWidth": (0.0, 152.0, 0.0),
+    # The tail saddle's side offset, the saddle width, crank pin spots and
+    # base width stack as baselines off the west edge, outside the base's
+    # right end.
+    "SaddleSideX": (-35.0, 128.0, 0.0),
+    "SaddleWidth": (0.0, 136.0, 0.0),
+    "CrankPinWestX": (-23.0, 144.0, 0.0),
+    "CrankPinEastX": (-17.0, 152.0, 0.0),
+    "BaseWidth": (0.0, 160.0, 0.0),
     "ConePinNearY": (-48.0, 14.0, 0.0),
     "ConePinFarY": (-56.0, 19.0, 0.0),
     "CrankPinY": (-64.0, 36.0, 0.0),
@@ -104,8 +106,9 @@ ELEVATION_KEEP = {
     "StopThick": (0.0, -6.0, 6.0),
     "BodySaddleThick": (0.0, 15.0, 6.0),
     "TailSaddleThick": (0.0, 110.0, 6.0),
-    "BodySaddleY": (0.0, 5.0, 16.0),
-    "TailSaddleY": (0.0, 50.0, 16.0),
+    # The saddle stations stack as baselines off foot B, one row each.
+    "BodySaddleY": (0.0, 5.0, 15.0),
+    "TailSaddleY": (0.0, 50.0, 24.0),
     # In the gap between the foot stop and the body saddle, outside the
     # silhouette and beside the saddle it measures.
     "BodySaddleHeight": (0.0, 5.0, -22.0),
@@ -116,16 +119,19 @@ ELEVATION_KEEP = {
 # imports its diameter. The text stands up and outboard of the axis, steep,
 # so the through-centre leader lands on the seat arc.
 SECTION_A_KEEP = {
-    # Just right of the axis (model -X), so the through-centre leader lands
-    # left of the seat bottom, clear of the cone pin and the tilt text.
-    "BodySeatDia": (-8.0, CONE_PIN_NEAR_Y, 30.0),
+    # Up and outboard on the model's +X side, so the through-centre leader
+    # lands on the far (-X) side of the seat, clear of the cone pin top and
+    # of the finish symbol's landing.
+    "BodySeatDia": (23.0, CONE_PIN_NEAR_Y, 25.0),
     "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
-    # Under the base; the caption drops clear of it (CAPTION_DROP).
+    # Under the base; the tilt reads below it.
     "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, -48.0),
-    # On the bisector of the gauge line and the pin axis, 16 mm from the
-    # hole entry, so the angle reads the acute tilt above the pin top.
-    "ConePinTilt": (-4.9, CONE_PIN_NEAR_Y, -14.1),
+    # Under the base, on the bisector of the gauge line and the pin axis
+    # carried back through the hole entry, 30 mm from it: the acute tilt
+    # reads outside the part, clear of the seat, the pins and the entry
+    # dimension; the caption drops clear of it (CAPTION_DROP).
+    "ConePinTilt": (-9.9, CONE_PIN_NEAR_Y, -60.0),
     "ConePinHighEdge": (-58.0, CONE_PIN_NEAR_Y, -25.0),
 }
 SECTION_B_KEEP = {
@@ -272,10 +278,11 @@ def _seat_finish(adapter: Any, view: Any, key: str, face_y: float, *, label: str
         raise RuntimeError(f"{label}: expected one visible {key} arc, found {len(arcs)}")
     radius = control.face.diameter_mm / 2.0
     angle = math.radians(SEAT_FINISH_LANDING_DEG)
+    symbol_x, symbol_z = SEAT_FINISH_SYMBOL[key]
     return add_surface_finish(
         adapter,
         view,
-        symbol_xy=_sheet(adapter, view, (SEAT_FINISH_SYMBOL[0], face_y, SEAT_FINISH_SYMBOL[1]), f"{label} finish symbol"),
+        symbol_xy=_sheet(adapter, view, (symbol_x, face_y, symbol_z), f"{label} finish symbol"),
         control=control,
         label=f"{label} {key} finish",
         char_height=0.0025,
@@ -408,7 +415,7 @@ async def build(adapter: Any) -> dict[str, str]:
     ):
         _seat_finish(adapter, view, key, face_y, label=label)
         _lower_caption(adapter, view, CAPTION_DROP)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

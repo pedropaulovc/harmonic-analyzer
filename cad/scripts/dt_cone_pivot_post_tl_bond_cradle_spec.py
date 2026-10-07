@@ -155,14 +155,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "TailSeatReference": {"TailSeatAxisX", "TailSeatAxisHeight"},
 }
 # One place for the plates and blocks, the crank pins' transverse spots and
-# the seats' centring across the base: nothing locates on them closer than
+# the seats' centring and axis heights: nothing locates on them closer than
 # the .X band. The body seat prints at the post body's own places
 # (MainBodyDia) and the crank pin station at the crank axis's (CrankAxisY).
-# The seat axis heights, the tail seat, the cone pins' stations and side
-# offset and the pin heights take two: the pins set each sleeve against the
-# post lying in the seats, so seat axis height and pin top share one band.
-# The pin diameter names the stock dowel; the press fit is the reamed hole's
-# job (DRAWING_NOTES), not a printed limit.
+# The tail seat, the cone pins' stations, hole entry and the pin heights take
+# two: the pins set each sleeve against the post. The cone pin tilt prints to
+# a tenth of a degree under the general angular band. The pin diameter names
+# the stock dowel; the press fit is the reamed hole's job (DRAWING_NOTES),
+# not a printed limit.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BaseProfile": {"BaseThick": 1, "BaseLength": 1},
     "Base": {"BaseWidth": 1},
@@ -194,12 +194,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "ConePinSectionReference": {
         "BodySeatAxisX": 1,
-        "BodySeatAxisHeight": 2,
+        "BodySeatAxisHeight": 1,
         "ConePinEntryX": 2,
-        "ConePinTilt": 2,
+        "ConePinTilt": 1,
         "ConePinHighEdge": 2,
     },
-    "TailSeatReference": {"TailSeatAxisX": 1, "TailSeatAxisHeight": 2},
+    "TailSeatReference": {"TailSeatAxisX": 1, "TailSeatAxisHeight": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
