@@ -279,7 +279,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         edge_entity=datum_ridge.edge,
         leader_attach_xy=knife_edge_datum,
-        symbol_xy=(0.208, 0.1815),
+        symbol_xy=(0.280, 0.190),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_datum_a"),
         label="datum A knife-edge finish",
         char_height=0.0025,
@@ -370,12 +370,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # other existing physical pickups for the imported plate length/width.
     # Each native symbol consumes the part-owned face control; the shared
     # helper checks that its exact selected edge touches that controlled face.
+    # The B datum still selects the rib's end edge at x=10. Its finish uses
+    # the outer plate segment of that SAME end face: this landing is right
+    # of the row-X extension, and the symbol below the start-Z overshoot.
+    # Running a leader from x=30 to the right crossed both dimension witnesses.
+    end_finish_edge = top_edges.exact_line_through(
+        (PLATE_W - 1.0, PLATE_T / 2.0, PLATE_L / 2.0),
+        label="outer +Z plate end edge",
+    )
     add_surface_finish(
         adapter,
         top,
-        edge_entity=end_edge.edge,
-        leader_attach_xy=_top_xy(30.0, -PLATE_L / 2.0),
-        symbol_xy=(0.315, 0.085),
+        edge_entity=end_finish_edge.edge,
+        leader_attach_xy=_top_xy(PLATE_W - 1.0, -PLATE_L / 2.0),
+        symbol_xy=(0.315, 0.076),
         control=surface_finish_by_key(SURFACE_FINISHES, "plate_end_datum_b"),
         label="datum B plate/rib end finish",
         char_height=0.0025,
