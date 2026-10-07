@@ -521,6 +521,10 @@ directory. `NOSW_GUARD=0` deliberately disables refusals and is not safe-default
 evidence. This policy contains known hazards in trusted tests, not arbitrary
 plugins, native code or the vendored suite.
 
+Session cleanup flushes and retires only its owned syntax-facts store, unregisters
+its delayed writer, then closes telemetry before deleting scratch. Stores outside
+session scratch retain ordinary standalone persistence.
+
 ## Remote build-artifact cache
 
 Every task that opens SolidWorks is cached: `part:<stem>`, `assembly:<stem>`,

@@ -1067,6 +1067,22 @@ class _FactStore:
             with contextlib.suppress(OSError, UnboundLocalError):
                 os.unlink(temporary)
 
+    def close(self) -> None:
+        """Flush once and retire this store's persistence transport.
+
+        An owned temporary store must not recreate its directory at atexit.
+        Retained references can still use its in-memory facts; new stores keep
+        the normal on-exit persistence contract.
+        """
+        try:
+            self.save()
+        finally:
+            self._path = None
+            self._dirty = False
+            if self._entries is None:
+                self._entries = {}
+            atexit.unregister(self.save)
+
 
 _FACTS = _FactStore()
 
