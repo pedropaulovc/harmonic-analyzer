@@ -94,7 +94,7 @@ _RIGHT_STATIONS = (
     ("6", 110.0, 12.0, 7.25, 2.3),
 )
 POCKET_END_WALL = 1.25
-PAD_HEIGHT = 11.8
+PAD_HEIGHT = 11.6
 PAD_POCKET_DEPTH = 2.0
 PAD_OUTLINE_MARGIN = 6.0
 
@@ -147,10 +147,11 @@ if PAD_OUTLINE_MARGIN_MIN < PAD_OUTLINE_MARGIN:
     )
 
 # Pad bottoms float above the pocket floors (the tops set the height): the
-# tallest pad in the shallowest pocket keeps clear of the floor, and the
-# shortest pad still stands well down into its pocket for the bond.
-PAD_FLOOR_GAP_MIN = (PLATE_DROP + PAD_POCKET_DEPTH - _XXX) - (PAD_HEIGHT + _XXX)
-PAD_ENGAGEMENT_MIN = (PAD_HEIGHT - _XXX) - PLATE_DROP
+# tallest pad in the shallowest pocket under the shortest printed PlateDrop
+# keeps clear of the floor, and the shortest pad under the longest PlateDrop
+# still stands well down into its pocket for the bond.
+PAD_FLOOR_GAP_MIN = (PLATE_DROP - _XXX + PAD_POCKET_DEPTH - _XXX) - (PAD_HEIGHT + _XXX)
+PAD_ENGAGEMENT_MIN = (PAD_HEIGHT - _XXX) - (PLATE_DROP + _XXX)
 if PAD_FLOOR_GAP_MIN < 0.1:
     raise AssertionError(
         "a pad can bottom in its pocket before its top reaches the reference"
@@ -195,7 +196,7 @@ STAND_DROP_BAND = (0.02, -0.02)
 STAND_TOP_Z = PAD_TOP_Z - STAND_DROP
 STAND_OD = 12.5
 STAND_BORE = 8.0
-STAND_HEIGHT = 9.5
+STAND_HEIGHT = 9.2
 STAND_POCKET_DIA = 12.8
 STAND_POCKET_DEPTH = 2.0
 _HUB_STEP_MAX = (
@@ -218,11 +219,19 @@ if STAND_WALL_MIN < 2.0:
     raise AssertionError("hub stand wall is below the rule-12 target")
 if STAND_BORE + _XXX >= rocker.HUB_DIA:
     raise AssertionError("the hub can drop into the stand bore")
+# As the pads: clear of the counterbore floor at the worst printed PlateDrop,
+# StandDrop, depth and height (codex review of run 20261007T202010454Z: at
+# 9.5 high it could bottom by 0.016), and still well down into it for the bond.
 STAND_FLOOR_GAP_MIN = (
-    PLATE_DROP - (STAND_DROP + STAND_DROP_BAND[0]) + STAND_POCKET_DEPTH - _XXX
+    (PLATE_DROP - _XXX) - (STAND_DROP + STAND_DROP_BAND[0]) + STAND_POCKET_DEPTH - _XXX
 ) - (STAND_HEIGHT + _XXX)
+STAND_ENGAGEMENT_MIN = (STAND_HEIGHT - _XXX) - (
+    (PLATE_DROP + _XXX) - (STAND_DROP + STAND_DROP_BAND[1])
+)
 if STAND_FLOOR_GAP_MIN < 0.1:
     raise AssertionError("the hub stand can bottom in its counterbore")
+if STAND_ENGAGEMENT_MIN < 1.0:
+    raise AssertionError("the hub stand can stand too shallow in its counterbore to bond")
 
 # --- Locating bore and pivot tap (agreed with the MHA-CH-006-TL pivot screw) ------
 # Reamed H7 for the pivot screw's shoulder; the screw's #10-24 tail runs into

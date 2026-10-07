@@ -162,13 +162,15 @@ SECTION_KEEP_AT = {
 # offsets from the plate ends). A turned end view printed an empty rotation
 # label over itself (run 20261007T180611940Z). Low enough to leave the
 # PlateWestX dimension and the hold-down callout room under the plan. The
-# rail-rest tops chain on the plate thickness from the plate face, their text
-# above the arrowheads of a height too short to hold it (codex review of run
-# 20261007T193019830Z: the rest tops had no printed elevation).
+# rail-rest top height stands between the plate thickness and the plate end,
+# its text above the arrowheads of a height too short to hold it (codex review
+# of run 20261007T193019830Z: the rest tops had no printed elevation); chained
+# on the plate thickness its leader text crossed the left border (run
+# 20261007T202010454Z).
 ELEVATION_CENTER = (PLAN_CENTER[0], 0.125)
 ELEVATION_KEEP_Z = {
     "PlateThick": ((PLATE_TOP_Z + PLATE_BOTTOM_Z) / 2.0, -0.012),
-    "RestTopHeight": (REST_TOP_Z + 10.0, -0.012),
+    "RestTopHeight": (REST_TOP_Z + 10.0, -0.006),
     "PlateDrop": ((PAD_TOP_Z + PLATE_TOP_Z) / 2.0, 0.012),
 }
 # Detail E, model (x, y) mm about the bore axis.
