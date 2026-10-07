@@ -1,0 +1,10 @@
+dt-cone-pivot-post-tl-cap-jaw-button:
+  title: Cone Post Cap Jaw Button
+  # Shop fixture: the parent MHA-DT-005 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-DT-005-TL-03
+  material: 6061-T6 aluminium
+  material_specification: 6061-T6 aluminium round bar, 3/4 in, ASTM B211
+  finish: as machined
+  quantity: 2
+  tolerance_class: machined_block
+  process: "turn face, spigot and shoulder from bar; part off and face"
