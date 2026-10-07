@@ -135,7 +135,6 @@ def _overall_reference(adapter: Any, section: Any, to_sheet) -> None:
 
 def _hatch_pin_apart(adapter: Any, section: Any) -> None:
     """Cross the bonded gauge pin's hatch against the body's in section A-A."""
-    import math
 
     groups: dict[str, list[Any]] = {}
     volumes: dict[str, float] = {}
@@ -150,12 +149,12 @@ def _hatch_pin_apart(adapter: Any, section: Any) -> None:
         raise RuntimeError(f"section A-A should cut two bodies, hatched {sorted(groups)}")
     pin = min(volumes, key=volumes.get)
     for name, hatches in groups.items():
-        angle = 3.0 * math.pi / 4.0 if name == pin else math.pi / 4.0
+        angle = 135.0 if name == pin else 45.0  # degrees on the sheet
         for hatch in hatches:
             before = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
             hatch.UseMaterialHatch = False
             hatch.Angle = angle
-            hatch.Scale2 = 1.0
+            hatch.Scale2 = 0.5
             after = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
             if abs(float(hatch.Angle) - angle) > 1e-6 or not str(hatch.Pattern):
                 raise RuntimeError(f"section hatch did not persist: {before} -> {after}")
