@@ -49,9 +49,9 @@ if THREAD_LENGTH - PLATE_FLOOR_GAP < ENGAGEMENT_MIN_D * THREAD_MODEL_DIA:
 TIP_CHAMFER = 0.5
 CHAMFER_CALLOUT = "X 45 DEG"
 SLOT_WIDTH = 1.0
-# 1.1 deep (route said 1.5): the slot depth prints at two places so
+# 0.9 deep (route said 1.5): at the one-place general band
 # the worst head left behind the slot stays over the rule-12 floor.
-SLOT_DEPTH = 1.1
+SLOT_DEPTH = 0.9
 
 UNDERHEAD_Z = WASHER_THICK
 HEAD_TOP_Z = UNDERHEAD_Z + HEAD_LENGTH
@@ -134,7 +134,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TipChamfer": 1,
     },
     "SlotProfile": {"SlotWidth": 1},
-    "DriverSlot": {"SlotDepth": 2},
+    "DriverSlot": {"SlotDepth": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
@@ -173,7 +173,7 @@ DRAWING_NOTES = "\n".join(
 )
 # The head left behind the slot at worst case.
 _HEAD_BEHIND_SLOT_MIN = round(
-    HEAD_LENGTH - printed_band_mm(1) - SLOT_DEPTH - printed_band_mm(2), 6
+    HEAD_LENGTH - SLOT_DEPTH - 2.0 * printed_band_mm(1), 6
 )
 if _HEAD_BEHIND_SLOT_MIN < 1.5:
     raise AssertionError("pivot-screw slot leaves under the rule-12 floor in the head")
