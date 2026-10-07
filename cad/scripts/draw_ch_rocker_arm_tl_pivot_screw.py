@@ -191,6 +191,16 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
         char_height=0.0025,
     )
+    add_surface_finish(
+        adapter,
+        side,
+        edge_xy=HEAD_FINISH_PICK,
+        symbol_xy=HEAD_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "pivot_head"),
+        label="pivot-screw head finish",
+        entity_type="SILHOUETTE",
+        char_height=0.0025,
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
