@@ -11,6 +11,8 @@ from _drawing_registry import DrawingLayout
 
 
 class _Model:
+    Visible = True
+
     def __init__(self, path: Path) -> None:
         self._path = path
 
@@ -70,12 +72,17 @@ class _View:
 
 
 class _Note:
+    OwnerType = 1  # swAnnotationOwner_DrawingSheet
+    Owner = SimpleNamespace(GetName=lambda: "Sheet1")
+    LockPosition = False
+
     def __init__(
         self, linked_text: str, resolved_text: str, x: float, y: float
     ) -> None:
         self.PropertyLinkedText = linked_text
         self._resolved_text = resolved_text
         self._extent = (x, y - 0.0005, 0.0, x + 0.001, y + 0.0005, 0.0)
+        self._position = (x, y, 0.0)
 
     def GetText(self) -> str:
         return self._resolved_text
@@ -86,7 +93,15 @@ class _Note:
     def GetAnnotation(self):
         return self
 
+    def GetPosition(self):
+        return self._position
+
+    @staticmethod
+    def GetAttachedEntityCount3() -> int:
+        return 0
+
     def SetPosition(self, x: float, y: float, _z: float) -> bool:
+        self._position = (x, y, _z)
         width = self._extent[3] - self._extent[0]
         self._extent = (x, y - 0.0005, 0.0, x + width, y + 0.0005, 0.0)
         return True

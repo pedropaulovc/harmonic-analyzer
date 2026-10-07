@@ -403,6 +403,33 @@ Offline
 specification-purity and purchased-drawing contracts supplement, but never
 replace, native and visual acceptance.
 
+Shared purchased-note placement records `drawing.purchased_note_placement`
+observations in the trace and JSON-bearing `purchased note placement:` task-log
+lines. They retain the requested position and native setter result, annotation
+`GetPosition`, note `GetExtent`, owner type/name, attachment count, position lock
+and document visibility after the adapter's insertion/initial move and
+formatting, before/after caption centering, and before/after the existing final
+layout rebuild. Every note is observed after that rebuild before a border
+failure can stop at the first caption. `GetPosition` and `GetExtent` are both
+sheet-space metres;
+`GetPosition` is the note text box's upper-left origin and requires three finite
+coordinates; the extent requires six finite coordinates for its lower-left and
+upper-right corners. Null/empty arrays, wrong counts and non-finite values are
+unavailable observations with named errors and raw returned-shape evidence, not
+usable coordinates. Document visibility is read first: an invisible document
+or an unreadable visibility precondition makes the diagnostic extent unavailable
+without calling `GetExtent`. These records do not repair placement or waive the
+native border gates.
+Each diagnostic read is isolated: an unavailable field carries a named
+`<field>_error` with the real exception or missing prerequisite, while readable
+fields remain recorded. Observations emit events/logs within the existing phase,
+not per-note spans. Original insertion, move and rebuild failures, and the
+fresh extent measurements used for centering and border gates, remain uncaught.
+Native acceptance must compare the requested origin and visible sheet extent
+after rebuild, confirm the actual owner/attachment, and inspect the exported
+sheet. A successful `SetPosition` return, a mocked movement, or migrating the
+obsolete setter to `SetPosition2` alone is not proof that the caption moved.
+
 ## The gate
 
 `uv run cad/scripts/machinist_review.py <name>... --reviewer <claude|codex>` (or
