@@ -3120,6 +3120,246 @@ def _assert_owned_reader_reaped(observed, *, stopped):
     assert killed == ([process] if stopped else [])
     assert started_threads == [], "bounded reads must not start timer/drain threads"
 
+@pytest.fixture
+def failed_log_jsonl(tmp_path, monkeypatch):
+    """Use the real SDK/JSONL exporter without replacing global OTel providers."""
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+    telemetry = _farm._telemetry
+    path = tmp_path / "traces.jsonl"
+    processor = SimpleSpanProcessor(
+        telemetry._JsonlSpanExporter(
+            out=telemetry._jsonl_stream(path),
+            formatter=lambda span: span.to_json(indent=None) + "\n",
+        )
+    )
+    # As in test_telemetry.capture, auxiliary resources share these processors.
+    # Scope the registries instead of clearing the caller's providers or adding
+    # a permanent processor to its primary provider. Logs stay offline too.
+    monkeypatch.setattr(telemetry, "_service_name", telemetry._DEFAULT_SERVICE_NAME)
+    monkeypatch.setattr(telemetry, "_span_processors", [processor])
+    monkeypatch.setattr(telemetry, "_aux_providers", {})
+    monkeypatch.setattr(telemetry, "_log_processors", [])
+    monkeypatch.setattr(telemetry, "_aux_logger_providers", {})
+    try:
+        # Resource detectors initialize before owned-reader thread observation.
+        telemetry.get_tracer(service=telemetry.BUILD_INFRA_SERVICE)
+        telemetry._logger_provider_for_service(telemetry.BUILD_INFRA_SERVICE)
+        yield path
+    finally:
+        processor.shutdown()
+
+
+@pytest.mark.parametrize(
+    "reader_case",
+    ["success", "timeout", "stdout_overflow", "stderr_overflow", "nonzero", "empty"],
+)
+def test_failed_log_reader_exports_real_jsonl_child_span(
+    failed_log_jsonl, tmp_path, monkeypatch, capsys, reader_case
+):
+    task, key, workflow_id, failed, _metadata, _payload, _diagnostics = (
+        _parallel_failed_log_case("b")
+    )
+    original_fields = dict(vars(failed))
+    dispatches = []
+
+    async def closed_result(request, requested_workflow):
+        dispatches.append((request, requested_workflow))
+        return failed
+
+    monkeypatch.setenv("HARMONIC_FARM_COMMIT", SHA)
+    monkeypatch.setenv("HARMONIC_FARM_LEAF_TIMEOUT_S", "900")
+    monkeypatch.setenv(
+        _farm.FAILED_LOG_LOCK_ENV, str(tmp_path / "farm-build-output.lock")
+    )
+    monkeypatch.setattr(_farm, "_dispatch", closed_result)
+    pool = tmp_path / "pool"
+    pool.mkdir()
+    script = pool / "farm.py"
+    survived = tmp_path / "reader-survived.txt"
+    stdout_limit, stderr_limit = 16 * 1024 * 1024, 64 * 1024
+    assert _farm.FAILED_LOG_MAX_BYTES == stdout_limit
+    assert _farm.FAILED_LOG_DIAGNOSTIC_BYTES == stderr_limit
+    payload = b"worker:\xc3\xa9\r\nsecond worker line\n"
+    diagnostic = b"reader:\xc3\xa9\r\nexact-reader-only\n"
+    if reader_case == "stdout_overflow":
+        payload = b"x" * stdout_limit + b"overflow-suffix-not-shown\n"
+    elif reader_case == "stderr_overflow":
+        diagnostic = b"d" * stderr_limit + b"overflow-suffix-not-shown\n"
+    elif reader_case == "empty":
+        payload = b""
+    payload_path, diagnostic_path = tmp_path / "worker.bin", tmp_path / "reader.bin"
+    payload_path.write_bytes(payload)
+    diagnostic_path.write_bytes(diagnostic)
+    stopped = reader_case in {"timeout", "stdout_overflow", "stderr_overflow"}
+    # Write the short stream first so both real spools have independently
+    # attributable content before an overflow stops the other stream.
+    streams = [
+        ("stdout", str(payload_path)), ("stderr", str(diagnostic_path))
+    ]
+    if reader_case != "stderr_overflow":
+        streams.reverse()
+    script.write_text(
+        "import os, sys, time\n"
+        "from pathlib import Path\n"
+        f"assert sys.argv[1:] == {['logs', workflow_id, '--log-blob', failed.log_blob]!r}\n"
+        f"for name, path in {streams!r}:\n"
+        "    stream = getattr(sys, name).buffer\n"
+        "    stream.write(Path(path).read_bytes())\n"
+        "    stream.flush()\n"
+        + (
+            "os.close(1)\n"
+            "os.close(2)\n"
+            if reader_case == "timeout" else ""
+        )
+        + (
+            "time.sleep(6)\n"
+            f"Path({str(survived)!r}).write_text('survived', encoding='utf-8')\n"
+            if stopped else ""
+        )
+        + f"raise SystemExit({19 if reader_case == 'nonzero' else 0})\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(_farm, "pool_home", lambda: pool)
+    monkeypatch.setattr(_farm, "_pool_python", lambda _pool: Path(sys.executable))
+    timeout = 1.5 if reader_case == "timeout" else 5
+    monkeypatch.setattr(_farm, "FAILED_LOG_TIMEOUT_S", timeout)
+    real_reader = _farm._run_bounded_log_reader
+    capture_sizes, capture_streams, completed, errors = [], [], [], []
+
+    def observe_reader(argv, env, stdout, stderr, timeout_s, max_bytes):
+        assert argv == [
+            sys.executable, str(script), "logs", workflow_id, "--log-blob",
+            failed.log_blob,
+        ]
+        assert timeout_s == timeout and max_bytes == stdout_limit
+        try:
+            result = real_reader(argv, env, stdout, stderr, timeout_s, max_bytes)
+            completed.append(result)
+            return result
+        except Exception as exc:
+            errors.append(exc)
+            raise
+        finally:
+            stdout.seek(0, os.SEEK_END)
+            stderr.seek(0, os.SEEK_END)
+            capture_sizes.append((stdout.tell(), stderr.tell()))
+            capture_streams.append((stdout, stderr))
+
+    monkeypatch.setattr(_farm, "_run_bounded_log_reader", observe_reader)
+    observed = _retain_owned_reader_child(monkeypatch, script)
+    retained, _killed, _started_threads = observed
+    try:
+        assert _farm.run_leaf(task, key) is failed
+        assert vars(failed) == original_fields
+        assert failed.state == "failed" and failed.exit_code == 87
+        [(request, requested_workflow)] = dispatches
+        assert (request.task, request.cache_key, request.commit, requested_workflow) == (
+            task, key, SHA, workflow_id
+        )
+        _assert_owned_reader_reaped(observed, stopped=stopped)
+        assert not survived.exists()
+        [(stdout_bytes, stderr_bytes)] = capture_sizes
+        assert stdout_bytes == min(len(payload), stdout_limit)
+        assert stderr_bytes == min(len(diagnostic), stderr_limit)
+        assert all(stream.closed for pair in capture_streams for stream in pair)
+
+        spans = [
+            json.loads(line)
+            for line in failed_log_jsonl.read_text(encoding="utf-8").splitlines()
+        ]
+        (parent,) = [span for span in spans if span["name"] == f"farm.run {task}"]
+        # This is the before-fix regression: the real exported child is absent,
+        # although the exact failed result and bounded reader already exist.
+        (child,) = [span for span in spans if span["name"] == "farm.log.retrieve"]
+        for span in (parent, child):
+            resource = span["resource"]["attributes"]
+            assert resource["service.name"] == "build-infra"
+            assert resource["service.namespace"] == "harmonic-analyzer"
+        assert child["context"]["trace_id"] == parent["context"]["trace_id"]
+        # SDK JSONL names the OTLP parentSpanId field parent_id.
+        assert child["parent_id"] == parent["context"]["span_id"]
+        assert child["context"]["span_id"] != parent["context"]["span_id"]
+        assert parent["start_time"] <= child["start_time"] < child["end_time"]
+        assert child["end_time"] <= parent["end_time"]
+        assert parent["attributes"]["state"] == "failed"
+        assert parent["attributes"]["worker"] == failed.worker_id
+        assert parent["attributes"]["attempt"] == failed.attempt
+        attributes = child["attributes"]
+        expected_outcome = "reader_error" if reader_case == "nonzero" else reader_case
+        assert {
+            name: attributes[name]
+            for name in (
+                "label", "task", "workflow_id", "worker", "attempt", "log_blob",
+                "leaf_state", "timeout_s", "outcome", "stdout_bytes", "stderr_bytes",
+            )
+        } == dict(
+            label=task, task=task, workflow_id=workflow_id, worker=failed.worker_id,
+            attempt=failed.attempt, log_blob=failed.log_blob, leaf_state="failed",
+            timeout_s=timeout, outcome=expected_outcome,
+            stdout_bytes=stdout_bytes, stderr_bytes=stderr_bytes,
+        )
+        if completed:
+            assert len(completed) == 1 and errors == []
+            assert attributes["returncode"] == completed[0].returncode
+        else:
+            assert "returncode" not in attributes
+
+        if reader_case == "success":
+            assert child["status"]["status_code"] == "OK"
+            assert child["events"] == []
+            assert "error.type" not in attributes and "error.message" not in attributes
+        else:
+            assert child["status"]["status_code"] == "ERROR"
+            (event,) = [event for event in child["events"] if event["name"] == "exception"]
+            cause = event["attributes"]
+            if errors:
+                (error,) = errors
+                expected_type = f"{type(error).__module__}.{type(error).__qualname__}"
+                assert cause["exception.type"] == expected_type
+                assert cause["exception.message"] == str(error)
+                assert "_run_bounded_log_reader" in cause["exception.stacktrace"]
+            elif reader_case == "nonzero":
+                actual = completed[0]
+                assert actual.returncode == 19
+                error = subprocess.CalledProcessError(actual.returncode, actual.args)
+                assert cause["exception.type"] == "subprocess.CalledProcessError"
+                assert cause["exception.message"] == str(error)
+            else:
+                assert reader_case == "empty" and completed[0].returncode == 0
+                assert cause["exception.type"] == "ValueError"
+                assert "no output" in cause["exception.message"]
+            assert attributes["error.type"] == cause["exception.type"]
+            assert attributes["error.message"] == cause["exception.message"][:2048]
+            assert child["status"]["description"] == cause["exception.message"]
+            assert cause["exception.message"] != failed.failure_message
+            assert cause["exception.stacktrace"]
+
+        output = capsys.readouterr().err
+        identity = _failed_log_identity(task, workflow_id, failed)
+        worker_prefix, reader_prefix = f"[farm {identity}] ", f"[farm log-reader {identity}] "
+        if reader_case == "success":
+            assert worker_prefix + "worker:\u00e9\n" in output
+            assert worker_prefix + "second worker line\n" in output
+        else:
+            assert not any(line.startswith(worker_prefix) for line in output.splitlines())
+        if reader_case != "stderr_overflow":
+            assert reader_prefix + "reader:\u00e9\n" in output
+            assert reader_prefix + "exact-reader-only\n" in output
+        assert worker_prefix + "reader:\u00e9" not in output
+        assert reader_prefix + "worker:\u00e9" not in output
+        assert "overflow-suffix-not-shown" not in output
+    finally:
+        # A missing span or an earlier assertion must never leak the owned child.
+        for process in retained:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=5)
+            for pipe in (process.stdout, process.stderr):
+                if pipe is not None and not pipe.closed:
+                    pipe.close()
+
+
 
 def test_failed_log_stderr_capture_overflow_stops_live_reader_and_preserves_failure(
     leaf_result_boundary, tmp_path, monkeypatch, capsys
