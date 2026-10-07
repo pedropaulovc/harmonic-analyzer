@@ -768,6 +768,15 @@ def test_report_mode_writes_every_finding_and_dump_before_an_enforced_kind_raise
     import json
 
     sheet = _holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)
+    sheet["native_lineweights"] = {"schema": 1, "status": "unreadable", "cause": "fixture-native-read"}
+    sheet["views"][0]["native_lineweights"] = {
+        "schema": 2, "status": "unreadable", "max_components_per_view": 1024,
+        "contexts": {
+            "current": {"status": "read", "in_child_context": False, "components": []},
+            "child": {"status": "unreadable", "in_child_context": True, "cause": "fixture-root-read", "components": []},
+        },
+        "base_view": {"status": "read", "source": "IView.GetBaseView()", "value": None},
+    }
     live = _patch_collect(monkeypatch, [sheet])
     report = tmp_path / "reports" / "fixture.json"
     with pytest.raises(RuntimeError, match=r"report mode.*\n.*\[leader-through-text\]"):
@@ -2512,6 +2521,431 @@ def test_the_report_keeps_a_stroke_count_not_every_stroke():
     [sheet] = report["sheets"]
     assert sheet["ink"]["stroke_count"] == 2 and "strokes" not in sheet["ink"]
     assert "strokes" in dump["ink"]  # the audited dump is untouched
+
+
+class _NativeWeightComponent:
+    """Properties/methods follow the installed IDrawingComponent declaration."""
+
+    def __init__(self, *, defaults=True, children=(), pair=(1, 0.0), style=0):
+        self.defaults = defaults
+        self.children = children
+        self.pair = pair
+        self.style = style
+        self.thickness_calls = []
+        self.children_calls = 0
+
+    @property
+    def Name(self):
+        return "same-name"
+
+    @property
+    def UseDocumentDefaults(self):
+        return self.defaults
+
+    def GetChildrenCount(self):
+        return len(self.children)
+
+    def GetChildren(self):
+        self.children_calls += 1
+        return self.children
+
+    def GetLineStyle(self, _option):
+        return self.style
+
+    def GetLineThickness(self, option):
+        self.thickness_calls.append(option)
+        return self.pair
+
+
+class _NativeWeightView:
+    """Parameterized root getter and nullable immediate base follow IView."""
+
+    def __init__(self, *, current, child, base=None, name="base-view", view_type=7):
+        self.roots = {False: current, True: child}
+        self.base = base
+        self.name = name
+        self.view_type = view_type
+
+    def RootDrawingComponent2(self, in_child_context):
+        if type(in_child_context) is not bool:
+            raise TypeError("the native parameter requires BOOL")
+        root = self.roots[in_child_context]
+        if isinstance(root, Exception):
+            raise root
+        return root
+
+    def GetBaseView(self):
+        if isinstance(self.base, Exception):
+            raise self.base
+        return self.base
+
+    def GetName2(self):
+        if isinstance(self.name, Exception):
+            raise self.name
+        return self.name
+
+    @property
+    def Type(self):
+        return self.view_type
+
+
+def _native_weight_contexts(monkeypatch, view):
+    import _drawing_layout_audit as live
+
+    monkeypatch.setattr(live, "_early_bound", lambda obj, _interface: obj)
+    reader = live._Reader(adapter=None)
+    result = live._component_lineweights(reader, view)
+    assert reader.take_errors() == {}  # diagnostics do not alter old gates
+    return live, reader, result
+
+
+def _native_weight_tree(monkeypatch, root):
+    live, reader, result = _native_weight_contexts(
+        monkeypatch, _NativeWeightView(current=root, child=_NativeWeightComponent()),
+    )
+    return live, reader, result["contexts"]["current"]
+
+
+def test_native_lineweight_contexts_keep_distinct_same_name_roots_and_immediate_base(monkeypatch):
+    current = _NativeWeightComponent(defaults=False, pair=(1, 0.0))
+    child = _NativeWeightComponent(defaults=False, pair=(10, 0.00042))
+    base = _NativeWeightView(
+        current=None, child=None, base=RuntimeError("do not walk ancestors"),
+        name="same-name", view_type=2,
+    )
+    _live, _reader, result = _native_weight_contexts(
+        monkeypatch, _NativeWeightView(current=current, child=child, base=base),
+    )
+    assert result["schema"] == 2 and result["status"] == "read"
+    assert set(result["contexts"]) == {"current", "child"}
+    current_tree, child_tree = (result["contexts"][key] for key in ("current", "child"))
+    assert current_tree["in_child_context"] is False
+    assert child_tree["in_child_context"] is True
+    assert current_tree["components"][0]["name"]["value"] == child_tree["components"][0]["name"]["value"]
+    current_font = current_tree["components"][0]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    child_font = child_tree["components"][0]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    assert current_font["weight"]["enum"] == "swLW_NORMAL"
+    assert current_font["custom_thickness"]["status"] == "inactive"
+    assert child_font["weight"]["enum"] == "swLW_CUSTOM"
+    assert child_font["custom_thickness"]["value"] == 0.00042
+    assert result["base_view"]["name"]["value"] == "same-name"
+    assert result["base_view"]["type"]["enum"] == "swDrawingSectionView"
+    assert "not unique" in result["base_view"]["coverage"]
+
+
+def test_native_lineweight_null_base_is_read_but_getter_exception_is_unreadable(monkeypatch):
+    roots = {"current": _NativeWeightComponent(), "child": _NativeWeightComponent()}
+    _live, reader, result = _native_weight_contexts(monkeypatch, _NativeWeightView(**roots))
+    assert result["status"] == "read"
+    assert result["base_view"] == {"status": "read", "source": "IView.GetBaseView()", "value": None}
+    assert reader.cost["IView.GetBaseView()"][0] == 1
+    _live, reader, failed = _native_weight_contexts(
+        monkeypatch, _NativeWeightView(**roots, base=RuntimeError("getter refused")),
+    )
+    assert failed["status"] == failed["base_view"]["status"] == "unreadable"
+    assert failed["base_view"]["cause"] == "exception:RuntimeError"
+    assert "value" not in failed["base_view"]
+    assert all(tree["status"] == "read" for tree in failed["contexts"].values())
+    assert reader.cost["IView.GetBaseView()"][0] == 1
+
+
+@pytest.mark.parametrize("binding", [None, ValueError("binding refused")])
+def test_native_lineweight_base_binding_failure_is_not_a_successful_null(monkeypatch, binding):
+    import _drawing_layout_audit as live
+
+    def bind(obj, interface):
+        if interface == "IView":
+            if isinstance(binding, Exception):
+                raise binding
+            return binding
+        return obj
+
+    monkeypatch.setattr(live, "_early_bound", bind)
+    base = _NativeWeightView(current=None, child=None)
+    view = _NativeWeightView(current=_NativeWeightComponent(), child=_NativeWeightComponent(), base=base)
+    reader = live._Reader(adapter=None)
+    result = live._component_lineweights(reader, view)
+    assert result["status"] == result["base_view"]["status"] == "unreadable"
+    assert result["base_view"]["cause"].startswith("bind IView:")
+    assert "value" not in result["base_view"]
+    assert reader.cost["bind IView"][0] == 1
+    assert reader.take_errors() == {}
+
+
+def test_native_lineweight_nullable_witness_does_not_change_ordinary_none_guarantees():
+    import _drawing_layout_audit as live
+
+    reader = live._Reader(adapter=None)
+    assert reader.witness(lambda: None, name="required-witness") == (None, "missing")
+    assert reader.witness(lambda: None, name="nullable-witness", allow_none=True) == (None, None)
+    assert reader.need(lambda: None, 0, name="required-geometry") == 0
+    assert reader.take_errors() == {"required-geometry": 1}
+
+
+@pytest.mark.parametrize("name, view_type", [
+    (None, 7), ("", 7), (RuntimeError("name refused"), 7),
+    ("section", True), ("section", 99), ("section", lambda: 2),
+])
+def test_native_lineweight_unreadable_base_description_does_not_invent_identity(monkeypatch, name, view_type):
+    base = _NativeWeightView(current=None, child=None, name=name, view_type=view_type)
+    _live, _reader, result = _native_weight_contexts(
+        monkeypatch, _NativeWeightView(current=_NativeWeightComponent(), child=_NativeWeightComponent(), base=base),
+    )
+    description = result["base_view"]
+    assert result["status"] == description["status"] == "unreadable"
+    assert any(description[key]["status"] == "unreadable" for key in ("name", "type"))
+    assert all(tree["status"] == "read" for tree in result["contexts"].values())
+    assert "value" not in description  # never serialize a COM object as identity
+
+
+@pytest.mark.parametrize("root", [None, RuntimeError("root refused")])
+@pytest.mark.parametrize("failed_context", ["current", "child"])
+def test_native_lineweight_failed_root_context_does_not_borrow_the_other(monkeypatch, root, failed_context):
+    roots = {"current": _NativeWeightComponent(), "child": _NativeWeightComponent()}
+    roots[failed_context] = root
+    _live, _reader, result = _native_weight_contexts(monkeypatch, _NativeWeightView(**roots))
+    assert result["status"] == "unreadable"
+    failed = result["contexts"][failed_context]
+    assert failed["status"] == "unreadable" and failed["components"] == []
+    assert "cause" in failed
+    other = "child" if failed_context == "current" else "current"
+    assert result["contexts"][other]["status"] == "read"
+    assert len(result["contexts"][other]["components"]) == 1
+
+
+def test_native_lineweight_two_complete_contexts_share_only_a_total_limit_not_records(monkeypatch):
+    def full_tree():
+        return _NativeWeightComponent(children=tuple(_NativeWeightComponent() for _ in range(511)))
+
+    _live, _reader, result = _native_weight_contexts(
+        monkeypatch, _NativeWeightView(current=full_tree(), child=full_tree()),
+    )
+    assert result["status"] == "read" and result["max_components_per_view"] == 1024
+    assert [len(tree["components"]) for tree in result["contexts"].values()] == [512, 512]
+    assert sum(len(tree["components"]) for tree in result["contexts"].values()) == result["max_components_per_view"]
+    for tree in result["contexts"].values():
+        assert tree["max_components"] == 512 and tree["max_depth"] == 32
+        assert tree["components"][-1]["path"] == [510]
+
+
+def test_native_lineweight_limited_child_context_does_not_truncate_current_context(monkeypatch):
+    current = _NativeWeightComponent(children=(_NativeWeightComponent(),))
+    child = _NativeWeightComponent(children=tuple(_NativeWeightComponent() for _ in range(512)))
+    _live, _reader, result = _native_weight_contexts(
+        monkeypatch, _NativeWeightView(current=current, child=child),
+    )
+    assert result["status"] == "unreadable"
+    assert result["contexts"]["current"]["status"] == "read"
+    assert len(result["contexts"]["current"]["components"]) == 2
+    assert result["contexts"]["child"]["components"][0]["children"]["cause"] == "component-limit"
+    assert child.children_calls == 0
+
+
+@pytest.mark.parametrize("failed_context", ["current", "child"])
+def test_native_lineweight_depth_limit_is_explicit_in_either_context(monkeypatch, failed_context):
+    cycle = _NativeWeightComponent()
+    cycle.children = (cycle,)
+    roots = {"current": _NativeWeightComponent(), "child": _NativeWeightComponent()}
+    roots[failed_context] = cycle
+    _live, _reader, result = _native_weight_contexts(monkeypatch, _NativeWeightView(**roots))
+    assert result["status"] == "unreadable"
+    limited = result["contexts"][failed_context]
+    assert len(limited["components"]) == 33
+    assert limited["components"][-1]["children"]["cause"] == "depth-limit"
+    other = "child" if failed_context == "current" else "current"
+    assert result["contexts"][other]["status"] == "read"
+
+
+@pytest.mark.parametrize("style, pair", [(7, (1, 0.0)), (0, (-1, 0.0)), (0, (9, 0.0))])
+def test_native_lineweight_context_unknown_settings_remain_unreadable(monkeypatch, style, pair):
+    current = _NativeWeightComponent(defaults=False, pair=pair, style=style)
+    _live, _reader, result = _native_weight_contexts(
+        monkeypatch, _NativeWeightView(current=current, child=_NativeWeightComponent()),
+    )
+    assert result["status"] == result["contexts"]["current"]["status"] == "unreadable"
+    font = result["contexts"]["current"]["components"][0]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    assert any(font[key]["status"] == "unreadable" for key in ("style", "weight"))
+    assert font["custom_thickness"]["status"] == "inactive"
+    assert result["contexts"]["child"]["status"] == "read"
+
+
+def test_native_lineweight_tree_keeps_actual_overrides_and_same_name_instances(monkeypatch):
+    nested = _NativeWeightComponent(defaults=False, pair=(10, 0.00042))
+    selected = _NativeWeightComponent(defaults=False, pair=(1, 0.0))
+    root = _NativeWeightComponent(children=(_NativeWeightComponent(children=(nested,)), selected))
+    _live, reader, result = _native_weight_tree(monkeypatch, root)
+    assert result["status"] == "read"
+    assert [record["path"] for record in result["components"]] == [[], [0], [0, 0], [1]]
+    assert root.thickness_calls == []
+    custom = result["components"][2]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    assert custom["weight"]["value"] == 10
+    assert custom["custom_thickness"]["value"] == 0.00042
+    assert custom["custom_thickness"]["unit"] == "m"
+    normal = result["components"][3]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    assert normal["weight"]["enum"] == "swLW_NORMAL"
+    assert normal["custom_thickness"]["status"] == "inactive"
+    assert normal["custom_thickness"]["value"] == 0.0  # not inferred metric width
+    assert nested.thickness_calls == selected.thickness_calls == [1, 2, 3, 4, 5]
+    assert reader.cost["IDrawingComponent.GetLineThickness"][0] == 10  # no tuple-slot pseudo-COM calls
+
+
+@pytest.mark.parametrize("pair", [1, (1,), (True, 0.0), (10, float("nan")), (9, 0.0), (99, 0.0)])
+def test_native_lineweight_tuple_and_enum_refusals_are_explicit(monkeypatch, pair):
+    _live, _reader, result = _native_weight_tree(monkeypatch, _NativeWeightComponent(defaults=False, pair=pair))
+    assert result["status"] == "unreadable"
+    fields = result["components"][0]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    assert fields["weight"]["status"] == "unreadable" or fields["custom_thickness"]["status"] == "unreadable"
+
+
+def test_native_lineweight_method_shaped_defaults_flag_and_missing_root_stay_unknown(monkeypatch):
+    class WrongDefaults(_NativeWeightComponent):
+        def UseDocumentDefaults(self):
+            return True
+
+    _live, _reader, result = _native_weight_tree(monkeypatch, WrongDefaults())
+    assert result["status"] == "unreadable"
+    assert result["components"][0]["use_document_defaults"]["cause"] == "invalid-bool:method"
+    assert "swDrawingComponentLineFontVisible" in result["components"][0]["line_fonts"]
+    _live, _reader, missing = _native_weight_tree(monkeypatch, None)
+    assert missing["status"] == "unreadable" and missing["cause"] == "missing"
+    assert missing["components"] == []
+
+
+@pytest.mark.parametrize("count, children", [(False, ()), (1, None), (2, (_NativeWeightComponent(),)), (1, object())])
+def test_native_lineweight_child_refusals_preserve_incompleteness(monkeypatch, count, children):
+    class RefusingChildren(_NativeWeightComponent):
+        def GetChildrenCount(self):
+            return count
+
+        def GetChildren(self):
+            return children
+
+    _live, _reader, result = _native_weight_tree(monkeypatch, RefusingChildren())
+    assert result["status"] == "unreadable"
+    assert result["components"][0]["children"]["status"] == "unreadable"
+    assert "cause" in result["components"][0]["children"]
+
+
+def test_native_lineweight_bounds_are_unknown_not_silent_truncation(monkeypatch):
+    root = _NativeWeightComponent(children=tuple(_NativeWeightComponent() for _ in range(512)))
+    _live, _reader, result = _native_weight_tree(monkeypatch, root)
+    assert result["status"] == "unreadable"
+    assert result["components"][0]["children"]["cause"] == "component-limit"
+    assert root.children_calls == 0  # do not materialize an over-budget native array
+    cycle = _NativeWeightComponent()
+    cycle.children = (cycle,)
+    _live, _reader, result = _native_weight_tree(monkeypatch, cycle)
+    assert len(result["components"]) == 33
+    assert result["components"][-1]["children"]["cause"] == "depth-limit"
+    assert result["status"] == "unreadable"
+
+
+def test_native_lineweight_document_reads_actual_metrics_and_documented_scopes(monkeypatch):
+    import _drawing_layout_audit as live
+
+    monkeypatch.setattr(live, "_early_bound", lambda obj, _interface: obj)
+
+    class Extension:
+        def __init__(self):
+            self.calls = []
+
+        def GetUserPreferenceDouble(self, pref, scope):
+            self.calls.append(("double", pref, scope))
+            if pref == 89:
+                return 0.00042
+            return {48: 0.00013, 49: 0.00018, 50: 0.00035, 51: 0.0005,
+                    52: 0.0007, 53: 0.001, 54: 0.0014, 55: 0.002}[pref]
+
+        def GetUserPreferenceInteger(self, pref, scope):
+            self.calls.append(("integer", pref, scope))
+            if pref == 53:
+                return 10
+            return 1 if pref in (55, 69, 73, 67, 400, 61, 558, 357, 63, 517) else 0
+
+        def GetUserPreferenceToggle(self, pref, scope):
+            self.calls.append(("toggle", pref, scope))
+            assert pref == 551
+            return scope == 206
+
+    extension = Extension()
+
+    class Model:
+        @property
+        def Extension(self):
+            return extension
+
+    adapter = type("Adapter", (), {"currentModel": Model()})()
+    reader = live._Reader(adapter)
+    result = live._document_lineweights(reader)
+    assert result["metrics"]["swLW_THIN"]["value"] == 0.00013
+    assert result["metrics"]["swLW_NORMAL"]["value"] == 0.00018
+    assert result["metrics"]["swLW_THICK"]["unit"] == "m"
+    assert result["categories"]["visible_edges"]["custom_thickness"]["value"] == 0.00042
+    dimensions = result["dimensions"]
+    assert set(dimensions) == {row[0] for row in live._DIMENSION_LINEFONT_SCOPES}
+    assert {scope for kind, pref, scope in extension.calls if kind == "toggle"} == {201, 202, 204, 206, 207, 209}
+    assert dimensions["swDetailingLinearDimension"]["extension_same_as_leader"]["value"] is True
+    assert dimensions["swDetailingDiameterDimension"]["extension"]["weight"]["value"] == 1
+    assert dimensions["swDetailingHoleDimension"]["extension"]["status"] == "unreadable"
+    assert ("integer", 356, 0) in extension.calls and ("integer", 357, 0) in extension.calls
+    assert all(scope != 200 for _kind, _pref, scope in extension.calls)
+    assert reader.take_errors() == {}
+
+
+@pytest.mark.parametrize("value", [None, False, 0.0, -0.1, float("nan"), float("inf"), lambda: 0.00018])
+def test_native_lineweight_invalid_metric_never_becomes_a_default(value):
+    import _drawing_layout_audit as live
+
+    reader = live._Reader(adapter=None)
+    evidence = live._witness_value(reader, lambda: value, source="IModelDocExtension.GetUserPreferenceDouble", kind="m")
+    assert evidence["status"] == "unreadable" and "value" not in evidence
+    assert reader.take_errors() == {}
+
+
+def test_native_annotation_weight_provenance_keeps_fallback_geometry_not_unused_enums(monkeypatch):
+    import _drawing_layout_audit as live
+
+    monkeypatch.setattr(live, "_early_bound", lambda obj, _interface: obj)
+
+    class Display:
+        def __init__(self, *, fallback=False, empty=False):
+            self.fallback = fallback
+            self.empty = empty
+            self.calls = []
+
+        def GetLineCount(self):
+            return 0 if self.empty else 1
+
+        def GetLineAtIndex3(self, index):
+            self.calls.append(("third", index))
+            if self.fallback:
+                raise RuntimeError("getter refused")
+            return (0.0, 0.0, 4.0, 0.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0)
+
+        def GetLineAtIndex2(self, index):
+            self.calls.append(("second", index))
+            return (0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0)
+
+        def __getattr__(self, name):
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    reader = live._Reader(adapter=None)
+    display = Display()
+    dump = live._dump_display(reader, display)
+    [entry] = dump["lineweight_evidence"]["bins"]
+    assert entry["weight"]["enum"] == "swLW_THIN" and entry["style"]["enum"] == "swLineCENTER"
+    assert display.calls == [("third", 0)]
+    fallback = Display(fallback=True)
+    dump = live._dump_display(reader, fallback)
+    assert dump["lines"] == [[0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0]]
+    assert dump["lineweight_evidence"]["status"] == "unreadable"
+    assert dump["lineweight_evidence"]["bins"] == []
+    assert dump["lineweight_evidence"]["read_errors"]["GetLineAtIndex2:unused-style-weight-slots"] == 1
+    assert fallback.calls == [("third", 0), ("second", 0)]
+    assert reader.take_errors() == {}  # old successful-fallback gating remains unchanged
+    assert live._dump_display(reader, Display(empty=True)) == {}
 
 
 def test_a_page_the_size_of_another_sheet_fails_loud(monkeypatch):

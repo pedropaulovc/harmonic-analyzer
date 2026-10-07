@@ -66,6 +66,115 @@ fails the drawing in every mode, because a silently skipped sheet would
 under-count the fleet report: the dumped sheets must be exactly
 `GetSheetNames`, one PDF page each.
 
+### Native lineweight evidence
+
+Document snapshot schema 1 retains `sheets[].native_lineweights`: values read from
+the open drawing's `IModelDoc2.Extension`, once per collection, not inferred
+from its template or application preferences. `metrics` associates
+`swLW_THIN`, `swLW_NORMAL`, and `swLW_THICK` through `swLW_THICK6` with their
+actual document doubles in metres. `categories` records selected style and
+weight enums for visible, hidden, tangent, cosmetic-thread, hatch, SpeedPak,
+section cutting-line and emphasized section-outline categories, plus note
+leaders. `dimensions` reads leader/dimension settings in each documented
+subtype scope, 201–209; it does not infer subtype values from umbrella scope
+200. Extension-line settings and `extension_same_as_leader` are captured for
+angle, arc-length, diameter, linear, ordinate and angular-running scopes.
+Chamfer, hole and radius extension preferences are explicitly unreadable /
+not captured because their subtype documentation supplies no such pairing;
+that is not a claim that these annotations contain no extension geometry.
+
+Each scalar includes `status`, its actual `value`, named `enum` where
+applicable, and getter/argument `source`; thickness doubles have `unit: "m"`.
+Custom thickness is read only when the actual category weight is
+`swLW_CUSTOM`. An inactive custom field is not a default thickness. Refused,
+missing, malformed, non-finite, non-positive metric and unknown-enum reads
+are `unreadable` with a cause, never replaced by README/template values.
+Layer, None and Number weight enums remain explicitly unresolved.
+Document category settings are selected defaults, not proof of an individual
+annotation's effective width; the extension same-as-leader flag can make its
+selected extension settings inactive.
+
+View context schema 2 retains `views[].native_lineweights.contexts.current`
+from `RootDrawingComponent2(False)` and `.contexts.child` from
+`RootDrawingComponent2(True)`, alongside `IView.EmphasizeOutline`. The False
+context follows the existing current-view convention in
+`_drawing_common._drawing_component_name`; True requests a section view's
+temporary root and has the documented nonsection parent-view semantics.
+Both getter-returned trees remain separately tagged by argument and source,
+even if their native names agree. Neither context establishes effective
+width, exhaustive current-view overrides or PDF/model ownership.
+
+`base_view` describes only the immediate `GetBaseView()` result. A successful
+null is `status: "read", value: null`; getter or binding failures are
+`unreadable` with their own cause, never a fabricated absent base. A returned
+base keeps its native `GetName2()` name and `Type` enum. Section-view names
+are not unique, so this is a description, not a unique view/override identity.
+No ancestor chain is traversed. These reads join the collector's existing
+resource/time aggregation; nullable evidence does not change ordinary
+required-read handling.
+
+Components retain child-index `path`, native `Name` and
+`UseDocumentDefaults`; equal names are not deduplicated within or between
+contexts. When document defaults are disabled or their flag is unreadable,
+each of the five documented component line-font selectors retains selected
+style, weight enum and the native out-thickness readback. Non-custom
+out-thickness is inactive raw evidence, not a metric width. Each context is
+bounded to 512 records and child-index depth 32, at most 1024 records per
+view. A bound, failed child count, array/count mismatch or unreadable child
+marks the affected branch, context and view snapshot unreadable without
+borrowing the other context. No truncated tree proves absence of overrides.
+No model document, part geometry, component setters or selections are used.
+
+For represented annotation lines, `display.lineweight_evidence` aggregates
+the style/weight enum pair actually returned by the existing
+`IDisplayData.GetLineAtIndex3` reads (at most 128 bins). Its ten-double row has
+style and weight in slots 2 and 3. The existing `GetLineAtIndex2` fallback
+keeps its geometry, but its unused style/weight slots are explicitly
+unreadable, not Thin evidence. The original empty-display return and
+template-owner exclusion remain intact. Empty annotation display is
+explicitly marked unreadable on the annotation record.
+
+The binding contracts are read-only: Extension is a `VT_DISPATCH` property;
+document Integer/Double/Toggle getters are methods taking two `VT_I4`
+arguments and returning `VT_I4`/`VT_R8`/`VT_BOOL`. `RootDrawingComponent2` is a
+parameterized property exposed by pywin32 as a method with a `VT_BOOL`
+argument and `VT_DISPATCH` return. `GetBaseView()` is a no-argument
+`VT_DISPATCH` method; its documented null means no parent. `GetName2()` is a
+no-argument `VT_BSTR` method, not a property or unique section-view key.
+`IView.Type` is a read-only `VT_I4` property associated with
+`swDrawingViewTypes_e`. Component Name/defaults are `VT_BSTR`/`VT_BOOL`
+properties; children/count/style are methods.
+`GetLineThickness(option)` returns the pywin32 pair
+`(VT_I4 weight enum, VT_BYREF|VT_R8 out Thickness)`, not scalar metres.
+Preference IDs come from installed swconst enum declarations
+34.3.0.150 (SHA256
+`7F07CA30C4DB22B6D835494D86F5A0D10E8FDEAB9308C9C90132E70C7F4E21B3`),
+not from assumed default widths. See official
+[Line Thickness](https://help.solidworks.com/2026/English/api/swconst/DP_LineThickness.htm),
+[Line Font](https://help.solidworks.com/2026/English/api/swconst/DP_LineFont.htm),
+[API units](https://help.solidworks.com/2026/English/api/sldworksapiprogguide/Overview/Units.htm?id=72ba6b89ef7149da98fe606db8cc97ce),
+and [RootDrawingComponent2](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IView~RootDrawingComponent2.html).
+The official [base-view example](https://help.solidworks.com/2026/english/api/sldworksapi/Get_Base_Views_Example_VB.htm)
+documents the null return; [GetName2](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IView~GetName2.html)
+documents non-unique section names.
+
+These fields are diagnostic only: existing `read_errors`, findings,
+dump/report/document schemas and model-ink thresholds are unchanged.
+The new view-context schema replaces the single-root witness; older cached
+single-root reports are not adapted into measured contexts or authority.
+Calls join the existing collector
+cost aggregation, without per-component trace events. `report_sheet` retains
+the fields unchanged while still reducing raw PDF strokes to a count.
+Older cached reports without these fields are unmeasured, not implicit
+Thin/Normal/default values. The calibration summary projects its established
+fields; inspect the new raw report for this witness rather than assuming
+`layout_calibration` exposes it.
+Before any classifier migration, two real MHA-SM003/MHA-FR005 pilot leaves
+must pair these native category/override readbacks with exact PDF hashes
+and raw strokes, including unmistakable model contours and known
+annotation/centermark/hatch negative controls. Width-bin membership alone
+is not semantic classification or native acceptance.
+
 ## What it checks
 
 **The PDF says where; COM says what.** Each `IDisplayData` text item is
@@ -219,6 +328,14 @@ design:
   printed model strokes, and the model-vertex round trip missed by 86 to
   460 mm. Every 0.25 mm stroke fell inside exactly one view outline. So the
   audit takes model edges from the PDF, and neither API is read.
+* The successful MHA-FR-005 native-origin control at `11f2ba2a1` uses the
+  physical finished-face model corner, the current `ModelToViewTransform`
+  sheet XY, sheet Z=0 and the current `ModelToSketchTransform`. After
+  rebuild, read the actual attached point back through the inverse transform
+  and compare it with the current finished-face planes. `View.Position` and
+  the requested point are not proof of the attached origin; hole-table cells
+  are not rewritten to hide an offset. This is an origin-placement control,
+  not PDF model-ink ownership evidence.
 
 `diagnostics/layout_calibration.py --pdf-dir` replays layout reports and prints, per
 annotation kind, the match rate and the COM-vs-ink offsets, per view the

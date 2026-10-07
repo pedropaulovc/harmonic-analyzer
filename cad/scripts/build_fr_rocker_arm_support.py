@@ -76,9 +76,11 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 
+import _telemetry
 from _common import (
     CASTING_GREEN,
     SketchDims,
@@ -111,10 +113,23 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
 )
 from _hole_spec import blind_cut_dia_mm
-from _part_pmi import author_part_pmi
-from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
+from _part_pmi import (
+    _face_geometry,
+    _face_matches,
+    _resolve_faces,
+    _select_face,
+    author_part_pmi,
+)
+from _surface_finish import surface_finish_by_key
+from fr_rocker_arm_support_drawing_spec import (
+    SURFACE_FINISHES,
+    TABLE_PICKUP_FACES,
+    TABLE_PICKUP_PROCESS,
+    TABLE_PICKUP_PROCESS_PROPERTY,
+)
 from fr_rocker_arm_support_section_spec import (
     BIG,
+    BOSS_DEPTH,
     FOOT_THICKNESS,
     HALF_Y,
     NARROW,
@@ -141,7 +156,6 @@ MATERIAL = "Gray Cast Iron"
 # fr_rocker_arm_support_section_spec's (pure data, so the base, frame, drive
 # train and drawing spec read them without importing this COM script). On the
 # Right plane: sketch-x -> model Z (taper), sketch-y -> model Y (height).
-BOSS_DEPTH = 177.8  # mid-plane extrude along X (X ±88.9)
 
 CAV = 63.5  # 127 mm square half (Cut-Extrude2)
 # The window: 165.1 wide (X ±BIG), its bottom edge FOOT_THICKNESS over the foot
@@ -380,6 +394,60 @@ def _cut_through_all(
     if not feat:
         raise RuntimeError(f"FeatureCut4 on {sketch_name} failed")
     return feat
+
+
+@_telemetry.traced("part.rocker_support_pickup_faces")
+def _witness_table_pickup_faces(adapter) -> None:
+    """Prove the machining requirement names actual, unique postbuild faces."""
+    model = adapter.currentModel
+    requests = {
+        **TABLE_PICKUP_FACES,
+        "mounting_face": surface_finish_by_key(SURFACE_FINISHES, "mounting_face").face,
+    }
+    faces = _resolve_faces(model, requests)
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    try:
+        for key, face in faces.items():
+            geometry = _face_geometry(face)
+            if geometry is None or not _face_matches(geometry, requests[key]):
+                raise RuntimeError(f"{key}: postbuild physical face changed")
+            _select_face(model, face, label=key)
+            # ISelectionMgr is invalidated by each clear/select; acquire AFTER it.
+            selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+            count = int(selection.GetSelectedObjectCount2(-1))
+            entity_type = int(selection.GetSelectedObjectType3(1, -1)) if count else -1
+            selected = selection.GetSelectedObject6(1, -1) if count == 1 else None
+            same = (
+                int(adapter.swApp.IsSame(face, selected))
+                if selected is not None
+                else -1
+            )
+            if count != 1 or entity_type != 2 or same != 1:  # FACE, swObjectSame
+                raise RuntimeError(
+                    f"{key}: native pickup-face selection mismatch: "
+                    f"count={count}, type={entity_type}, same={same}"
+                )
+            reference = bytes(extension.GetPersistReference3(face) or ())
+            if not reference:
+                raise RuntimeError(f"{key}: native face has no persistent reference")
+            feature = _early_bound(face.GetFeature(), "IFeature")
+            witness = {
+                "key": key,
+                "selected_count": count,
+                "selected_type": entity_type,
+                "same_selected": same,
+                "persistent_reference": reference.hex(),
+                "surface_identity": geometry.identity,
+                "plane_parameters_si": json.dumps(geometry.parameters),
+                "outward_normal": json.dumps(geometry.outward_normal),
+                "box_mm": json.dumps([value * 1000.0 for value in geometry.box]),
+                "feature_name": str(feature.Name),
+                "feature_type": str(feature.GetTypeName2()),
+            }
+            _telemetry.event("rocker_support.table_pickup_face", **witness)
+            _telemetry.info("table-pickup physical face: " + json.dumps(witness))
+    finally:
+        model.ClearSelection2(True)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -658,7 +726,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, CASTING_GREEN
     )  # green-painted casting, like the base/top-frame
     await report_mass_properties(adapter)
-    apply_drawing_properties(adapter, PART_NAME)
+    _witness_table_pickup_faces(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        extra={TABLE_PICKUP_PROCESS_PROPERTY: TABLE_PICKUP_PROCESS},
+    )
     return await save_part_and_images(adapter, PART_NAME)
 
 

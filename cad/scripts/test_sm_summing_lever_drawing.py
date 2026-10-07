@@ -13,6 +13,7 @@ import _drawing_common as common
 import draw_sm_summing_lever as drawing
 import sm_summing_lever_spec
 from _drawing_common import ViewEdge, ViewEdges, assert_dimension_measures
+from _part_pmi import _FaceGeometry
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
@@ -38,22 +39,230 @@ def _line(start, end):
     return ViewEdge(object(), (start, end), None, None)
 
 
-def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside() -> None:
-    """Datum B and the start-Z BASIC hang on the +Z END face: the rib flange
-    5.08 mm inboard reads 3.35 for 8.43 (#1105), and the rib's underside edge
-    shares the end plane but is hidden under the plate."""
-    z = sm_summing_lever_spec.PLATE_L / 2.0
+def _pickup_geometry(face, spec):
+    return _FaceGeometry(
+        face=face,
+        identity=4001,
+        parameters=(
+            *spec.normal,
+            *(component * spec.offset_mm / 1000.0 for component in spec.normal),
+        ),
+        outward_normal=spec.normal,
+        box=(-0.1, -0.1, -0.1, 0.1, 0.1, 0.1),
+    )
+
+
+@pytest.mark.parametrize("sign", (-1, 1))
+def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside(sign) -> None:
+    """Both finished length pickups use the actual end, never the inboard
+    flange; B and the start-Z BASIC still use the existing +Z end."""
+    z = sign * sm_summing_lever_spec.PLATE_L / 2.0
     top = _line((0.0, 15.24, z), (sm_summing_lever_spec.PLATE_W, 0.0, z))
-    flange = _line((0.0, 15.24, z - sm_summing_lever_spec.PLATE_T), (44.45, 0.0, z - 5.08))
+    inboard = z - sign * sm_summing_lever_spec.PLATE_T
+    flange = _line((0.0, 15.24, inboard), (44.45, 0.0, inboard))
     underside = _line((sm_summing_lever_spec.PLATE_W, 0.0, z), (0.0, -15.24, z))
     plate_end = _line((37.04, 2.54, z), (sm_summing_lever_spec.PLATE_W, 2.54, z))
-    edges = ViewEdges(label="plan", edges=(flange, underside, plate_end, top))
-    assert drawing._end_face_edge(edges, x_mm=10.0) is top
+    opposite = _line((0.0, 15.24, -z), (sm_summing_lever_spec.PLATE_W, 0.0, -z))
+    edges = ViewEdges(label="plan", edges=(flange, underside, plate_end, opposite, top))
+    assert drawing._end_face_edge(edges, x_mm=10.0, z_mm=z) is top
     # The plate's own end edge only shows past the rib taper: two lines there.
     with pytest.raises(RuntimeError, match="expected one visible line"):
-        drawing._end_face_edge(edges, x_mm=40.0)
+        drawing._end_face_edge(edges, x_mm=40.0, z_mm=z)
     with pytest.raises(RuntimeError, match="expected one visible line"):
-        drawing._end_face_edge(ViewEdges(label="plan", edges=(flange, underside)), x_mm=10.0)
+        drawing._end_face_edge(
+            ViewEdges(label="plan", edges=(flange, underside, opposite)),
+            x_mm=10.0, z_mm=z,
+        )
+
+
+def test_datum_b_machining_witness_rejects_flange_and_opposite_end(
+    identity, monkeypatch,
+) -> None:
+    """A nonnumeric linked instruction still needs B's actual +Z face,
+    not a coincident projection or the previously mispicked inboard flange."""
+    z = sm_summing_lever_spec.PLATE_L / 2.0
+
+    def face_at(station, normal):
+        face = object()
+        geometry = _FaceGeometry(
+            face=face,
+            identity=4001,
+            parameters=(*normal, 0.0, 0.0, station / 1000.0),
+            outward_normal=normal,
+            box=(0.0, -0.01524, station / 1000.0,
+                 sm_summing_lever_spec.PLATE_W / 1000.0, 0.01524, station / 1000.0),
+        )
+        return face, geometry
+
+    end, end_geometry = face_at(z, (0.0, 0.0, 1.0))
+    flange, flange_geometry = face_at(
+        z - sm_summing_lever_spec.PLATE_T, (0.0, 0.0, 1.0)
+    )
+    opposite, opposite_geometry = face_at(-z, (0.0, 0.0, -1.0))
+    geometries = {
+        id(end): end_geometry,
+        id(flange): flange_geometry,
+        id(opposite): opposite_geometry,
+    }
+    edges = {"plate_end_datum_b": SimpleNamespace(GetTwoAdjacentFaces2=lambda: (end,))}
+    for key, spec in drawing.MACHINED_PICKUP_FACES.items():
+        if key == "plate_end_datum_b":
+            continue
+        face = object()
+        geometries[id(face)] = _pickup_geometry(face, spec)
+        edges[key] = SimpleNamespace(GetTwoAdjacentFaces2=lambda face=face: (face,))
+    monkeypatch.setattr("_part_pmi._face_geometry", lambda face: geometries[id(face)])
+    drawing._assert_machined_pickup_faces(edges)
+    for wrong in (flange, opposite):
+        edges["plate_end_datum_b"] = SimpleNamespace(GetTwoAdjacentFaces2=lambda: (wrong,))
+        with pytest.raises(RuntimeError, match="must touch exactly one specified"):
+            drawing._assert_machined_pickup_faces(edges)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    (None, "property", "missing_property", "geometry", "count", "type",
+     "missing_selected", "wrong_selected", "indeterminate", "reference"),
+)
+def test_pickup_native_witness_refuses_unqualified_physical_faces(
+    monkeypatch, fault,
+) -> None:
+    """Process-only machining uses actual native faces, not numeric symbols.
+
+    Reject an altered plane, an unproved selection, or a face without a native
+    persistent reference before the model-owned requirement can be saved.
+    """
+    import build_sm_summing_lever as part
+
+    selected = [None]
+    generation = [0]
+    selections = []
+    cleared = []
+    events = []
+
+    class Face:
+        def __init__(self, key):
+            self.key = key
+
+        def Select4(self, _append, _callout):
+            generation[0] += 1
+            selections.append((self.key, self))
+            selected[0] = (
+                None if fault == "missing_selected"
+                else object() if fault == "wrong_selected"
+                else self
+            )
+            return True
+
+    class SelectionManager:
+        def __init__(self):
+            self.generation = generation[0]
+
+        def require_current(self):
+            if self.generation != generation[0]:
+                raise RuntimeError("selection manager invalidated by native reselection")
+
+        def GetSelectedObjectCount2(self, _mark):
+            self.require_current()
+            return 2 if fault == "count" else 1
+
+        def GetSelectedObjectType3(self, _index, _mark):
+            self.require_current()
+            return 1 if fault == "type" else 2
+
+        def GetSelectedObject6(self, _index, _mark):
+            self.require_current()
+            return selected[0]
+
+    class Model(SimpleNamespace):
+        @property
+        def SelectionManager(self):
+            return SelectionManager()
+
+    def clear(all_selections):
+        cleared.append(all_selections)
+        generation[0] += 1
+        selected[0] = None
+
+    faces = {key: Face(key) for key in part.MACHINED_PICKUP_FACES}
+    geometries = {
+        id(faces[key]): _pickup_geometry(faces[key], spec)
+        for key, spec in part.MACHINED_PICKUP_FACES.items()
+    }
+
+    def same(left, right):
+        return -1 if fault == "indeterminate" else int(left is right)
+
+    process = (
+        "" if fault == "missing_property"
+        else "MACHINE KNIFE EDGES ONLY" if fault == "property"
+        else part.PICKUP_PROCESS
+    )
+    model = Model(
+        GetCustomInfoValue=lambda _configuration, name: (
+            process if name == part.PICKUP_PROCESS_PROPERTY else ""
+        ),
+        Extension=SimpleNamespace(
+            GetPersistReference3=lambda _face: () if fault == "reference" else (1, 2, 3),
+        ),
+        ClearSelection2=clear,
+    )
+    monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr("_part_pmi._early_bound", lambda value, _kind: value)
+    monkeypatch.setattr("_part_pmi.null_callout", lambda: None)
+    monkeypatch.setattr(part, "_resolve_faces", lambda _model, _requests: faces)
+    monkeypatch.setattr(
+        part, "_face_geometry",
+        lambda face: None if fault == "geometry" else geometries[id(face)],
+    )
+    monkeypatch.setattr(part._telemetry, "event",
+                        lambda name, **fields: events.append((name, fields)))
+    monkeypatch.setattr(part._telemetry, "info", lambda _message: None)
+    adapter = SimpleNamespace(currentModel=model, swApp=SimpleNamespace(IsSame=same))
+    if fault is not None:
+        with pytest.raises(
+            RuntimeError, match="pickup-process property|physical pickup face|selection mismatch|reference"
+        ):
+            part._witness_pickup_faces(adapter)
+        assert cleared and cleared[-1] is True
+        assert selected[0] is None
+        assert not events
+        return
+    part._witness_pickup_faces(adapter)
+    assert cleared and cleared[-1] is True
+    assert selected[0] is None
+    assert dict(selections) == faces
+    assert {fields["key"] for _name, fields in events} == faces.keys()
+    assert all(
+        name == "summing_lever.machined_pickup_face"
+        and fields["selected_count"] == fields["same_selected"] == 1
+        and fields["selected_type"] == 2
+        and fields["persistent_reference"] == "010203"
+        and fields["process_property"] == part.PICKUP_PROCESS_PROPERTY
+        and fields["process_requirement"] == part.PICKUP_PROCESS
+        for name, fields in events
+    )
+
+
+@pytest.mark.parametrize("fault", (None, "typed_text", "wrong_property", "stale_process"))
+def test_pickup_process_note_requires_native_source_link_and_resolved_requirement(
+    monkeypatch, fault,
+) -> None:
+    linked = drawing.property_link("Manufacturing Notes")
+    resolved = drawing.DRAWING_NOTES
+    if fault == "typed_text":
+        linked = resolved
+    elif fault == "wrong_property":
+        linked = drawing.property_link("Isometric View Note")
+    elif fault == "stale_process":
+        resolved = "5. CAST PART; MACHINE KNIFE EDGES AND TAP SPRING ANCHOR SEATS ONLY."
+    note = SimpleNamespace(PropertyLinkedText=linked, GetText=lambda: resolved)
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    if fault is not None:
+        with pytest.raises(RuntimeError, match="process note"):
+            drawing._assert_pickup_process_note(note)
+        return
+    drawing._assert_pickup_process_note(note)
 
 
 def _dimension(mm: float, attached: tuple[object, ...]):
@@ -221,6 +430,8 @@ def callout_scene(monkeypatch, tmp_path):
         registered_leaders=0,
         route_fixture="RD3",
         route_order="native",
+        pickup_faces={},
+        pickup_geometries={},
     )
 
     class Edge:
@@ -245,7 +456,7 @@ def callout_scene(monkeypatch, tmp_path):
             )
 
         def GetTwoAdjacentFaces2(self):
-            return ()
+            return scene.pickup_faces.get(self.name, ())
 
     class Display:
         def __init__(self, native_id, *, hole=True):
@@ -540,6 +751,9 @@ def callout_scene(monkeypatch, tmp_path):
             line("positive-ridge", (0, drawing.HEX_H / 2, z),
                  (0, drawing.HEX_H / 2, z + drawing.HEX_DEPTH)),
             line("end", (0, 15.24, z), (drawing.PLATE_W, 0, z)),
+            line("opposite-end", (0, 15.24, -z), (drawing.PLATE_W, 0, -z)),
+            line("free-plate-edge", (drawing.PLATE_W, drawing.PLATE_T / 2, -z),
+                 (drawing.PLATE_W, drawing.PLATE_T / 2, z)),
             circle("seed", (drawing.HOLE_X, drawing.PLATE_T / 2, drawing.HOLE_Z_LAST),
                    drawing.HOLE_DIA / 2),
             circle(
@@ -550,6 +764,17 @@ def callout_scene(monkeypatch, tmp_path):
             scene.rims["middle"],
         ),
     )
+    for key, name in (
+        ("knife_edge_datum_a", "negative-ridge"),
+        ("plate_end_datum_b", "end"),
+        ("plate_opposite_end", "opposite-end"),
+        ("plate_free_edge", "free-plate-edge"),
+    ):
+        face = object()
+        scene.pickup_faces[name] = (face,)
+        scene.pickup_geometries[id(face)] = _pickup_geometry(
+            face, drawing.MACHINED_PICKUP_FACES[key]
+        )
 
     def fresh_annotation(name):
         original = scene.originals[name]
@@ -755,15 +980,32 @@ def callout_scene(monkeypatch, tmp_path):
     for name in (
         "stamp_drawing_summary", "set_hidden_lines_removed", "curate_view_dimensions",
         "add_datum_feature", "add_surface_finish", "add_feature_control_frame",
-        "set_basic_dimension", "add_property_linked_note",
+        "set_basic_dimension",
     ):
         monkeypatch.setattr(drawing, name, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        drawing, "add_property_linked_note",
+        lambda _adapter, name, *_args, **_kwargs: SimpleNamespace(
+            PropertyLinkedText=drawing.property_link(name),
+            GetText=lambda: drawing.DRAWING_NOTES,
+        ),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     for module in (drawing, common):
-        monkeypatch.setattr(module, "read_required_properties", lambda *_args, **_kwargs: {})
+        monkeypatch.setattr(
+            module, "read_required_properties",
+            lambda *_args, **_kwargs: {
+                drawing.PICKUP_PROCESS_PROPERTY: drawing.PICKUP_PROCESS,
+            },
+        )
     monkeypatch.setattr(common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(common._sw_type_info, "early_bound", lambda value, _kind: value)
     monkeypatch.setattr(common._sw_type_info, "early_bound_or_flag",
                         lambda value, *_args: value)
+    monkeypatch.setattr(
+        "_part_pmi._face_geometry",
+        lambda face: scene.pickup_geometries[id(face)],
+    )
     monkeypatch.setattr(common, "null_callout", lambda: None)
     monkeypatch.setattr(common, "apply_custom_properties", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(common, "assert_asme_b_sheet", lambda *_args, **_kwargs: None)

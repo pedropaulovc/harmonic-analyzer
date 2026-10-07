@@ -12,6 +12,11 @@ carrying the rocker brackets' four #8-32 seats (#743), transferred from the set
 brackets at assembly. The sheet runs 1:2, with each view's scale pinned
 explicitly.
 
+The casting's mounting face, bottom-view left end and lower tapered side are
+machined before locating or inspecting the foot holes. Their existing planes
+define the unchanged theoretical table corner, extended past the rim chamfers;
+the instruction is a source-model property, not a new Ra or dimensional band.
+
 Run with SolidWorks open::
 
     uv run python cad\scripts\draw_fr_rocker_arm_support.py fr-rocker-arm-support
@@ -34,6 +39,7 @@ from _drawing_common import (
     add_edge_dimension,
     add_leader_note,
     add_native_hole_callout,
+    add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
     assert_native_hole_callout_attachment,
@@ -46,25 +52,28 @@ from _drawing_common import (
     insert_hole_table,
     model_point_in_view,
     new_project_drawing,
+    property_link,
     read_required_properties,
     rebuild_drawing,
     scan_view_edges,
     set_dimension_callouts,
     set_dimension_precision,
+    set_hole_callout_precision,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
     stamp_drawing_summary,
     view_name,
     visible_component_entities,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gtol_spec import CylinderFace
 from _hole_spec import blind_cut_dia_mm
-from _part_pmi import _resolve_faces
+from _part_pmi import _face_geometry, _resolve_faces
+from _section_axis import position_section_caption
 from _surface_finish import surface_finish_by_key
 from build_fr_rocker_arm_support import (
     BIG,
-    BOSS_DEPTH,
     CAV,
     CHAMFER,
     DRAWING_DIMENSIONS,
@@ -75,7 +84,13 @@ from build_fr_rocker_arm_support import (
     WEB,
     WIDE,
 )
-from fr_rocker_arm_support_drawing_spec import SURFACE_FINISHES
+from fr_rocker_arm_support_drawing_spec import (
+    SURFACE_FINISHES,
+    TABLE_PICKUP_FACES,
+    TABLE_PICKUP_PROCESS,
+    TABLE_PICKUP_PROCESS_PROPERTY,
+)
+from fr_rocker_arm_support_section_spec import BOSS_DEPTH
 from rocker_bracket_seat_layout import (
     RAIL_DEPTH,
     RAIL_DEPTH_PLACES,
@@ -103,6 +118,12 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 SHEET_SCALE = (1.0, 2.0)
+
+# swUserPreferenceToggle_e.swDetailingAutoInsertCenterMarksForHoles.
+# Installed swconst 34.3.0.150; metadata-only reflection on 2026-10-07.
+# SHA256 7F07CA30C4DB22B6D835494D86F5A0D10E8FDEAB9308C9C90132E70C7F4E21B3.
+# Python's sparse constants tables do not expose this native member.
+_SW_AUTO_HOLE_CENTER_MARKS = 308
 
 # Sheet layout (meters). A 177.8 mm casting with four views needs a 1:2 ASME B
 # sheet. Section A-A replaces the side view, exposing the opposed pocket floors
@@ -176,6 +197,9 @@ def imported_precision() -> dict[str, int]:
 SEAT_CALLOUT_PROCESS = (
     f"TRANSFER FROM {_config.parts('ch-pivot-bracket')['number']}\nAT ASSEMBLY;\n"
 )
+# The seat stack specifies .X drill/thread depths. Change only those native
+# length variables; the tap-drill diameter keeps its two-place display.
+SEAT_CALLOUT_PRECISION = {"hw-tapdrldepth": 1, "hw-threaddepth": 1}
 SEAT_CALLOUT_X_MM = max(SEAT_LOCAL_X)
 # The seats are drilled from the rail top, which no principal view shows, so
 # they get VIEW B (Main's ruling): a partial top view of the rail strip,
@@ -238,17 +262,34 @@ RIGHT_KEEP = {
     "RimChamferSize": (0.165, 0.200),
     "RailDepth": RAIL_TEXT_XY,
 }
+# Pilot 829e6f8e5 put the native label at y=128.485 mm, only 1.40 mm below
+# the foot-span arrow. Move its linked fields down 2.985 mm, still above VIEW B.
+SECTION_CAPTION_XY = (RIGHT_CENTER[0], 0.1255)
 
 # Top-left anchor; the native four-row table grows down and right while
 # remaining clear of the isometric and title block.
 HOLE_TABLE_ANCHOR = (0.270, 0.130)
 HOLE_TABLE_DATUM_XZ_MM = (-BOSS_DEPTH / 2.0, -WIDE)
+TABLE_PICKUP_CORNER_M = (
+    HOLE_TABLE_DATUM_XZ_MM[0] / 1000.0,
+    -HALF_Y / 1000.0,
+    HOLE_TABLE_DATUM_XZ_MM[1] / 1000.0,
+)
+# Pilot b801's native note extended up to y=49.152 mm through the datum X
+# leader at y=45.630 mm. Move the unchanged note below that leader, in the
+# blank lane left of the title block; retain its font and property linkage.
+TABLE_PICKUP_NOTE_XY = (0.025, 0.041)
 # Native hole tags land up-right of their holes. At the bottom view's right
 # end that printed A3 and A4 across the pocket's hidden end lines (fix3
 # render), so both move to the mirror spot left of their holes: twice the
 # 4.6 mm hole-to-tag gap plus the 5.8 mm tag width, measured on A4 there.
 RIGHT_END_HOLE_TAGS = ("A3", "A4")
 HOLE_TAG_MIRROR_SHIFT = -0.0150
+# A1/A3's native boxes reached y=70.598 mm and crossed the hidden rail edge
+# at y=70.0085 mm in pilot 829e6f8e5. Shift only that lower row down 3 mm.
+LOWER_ROW_HOLE_TAGS = ("A1", "A3")
+LOWER_ROW_HOLE_TAG_SHIFT = -0.003
+BOTTOM_HOLE_TAGS = ("A1", "A2", "A3", "A4")
 EXPECTED_HOLE_TABLE_LOCATIONS_MM = (
     (149.22, 49.21),
     (28.58, 49.21),
@@ -266,6 +307,7 @@ def _bottom_sheet_xy(hole_xz: tuple[float, float]) -> tuple[float, float]:
     )
 
 
+@_telemetry.traced("drawing.rocker_support_seat_rim")
 def _seat_entry_edge(adapter: Any, view: Any) -> Any:
     """The east seat's unique visible Hole Wizard entry rim in cropped VIEW B.
 
@@ -467,23 +509,35 @@ def _add_view_b_arrow(adapter: Any, front: Any) -> None:
         raise RuntimeError("view B arrow tip moved when its letter was sized")
 
 
-def _mirror_right_end_hole_tags(view: Any) -> dict[str, tuple[float, float]]:
-    """Shift the right-end hole tags left of their holes; return old -> new x."""
-    moved: dict[str, tuple[float, float]] = {}
+@_telemetry.traced("drawing.support_hole_tags")
+def _position_bottom_hole_tags(
+    view: Any,
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """Retain the right-end mirror and clear the lower tags' actual line clash."""
+    moved: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+    seen: set[str] = set()
     for raw in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw, "IAnnotation")
         if int(annotation.GetType()) != 6:  # swNote
             continue
         note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
         tag = str(note.GetText()).strip()
-        if tag not in RIGHT_END_HOLE_TAGS:
+        if tag not in BOTTOM_HOLE_TAGS:
             continue
-        if tag in moved:
+        if tag in seen:
             raise RuntimeError(f"duplicate bottom-view hole tag {tag}")
+        seen.add(tag)
         x, y = (float(value) for value in annotation.GetPosition()[:2])
-        if x < BOTTOM_CENTER[0]:
+        if tag in RIGHT_END_HOLE_TAGS and x < BOTTOM_CENTER[0]:
             raise RuntimeError(f"hole tag {tag} is not at the right end: x={x:.4f}")
-        target = (x + HOLE_TAG_MIRROR_SHIFT, y)
+        if tag in LOWER_ROW_HOLE_TAGS and y >= BOTTOM_CENTER[1]:
+            raise RuntimeError(f"hole tag {tag} is not in the lower row: y={y:.4f}")
+        target = (
+            x + (HOLE_TAG_MIRROR_SHIFT if tag in RIGHT_END_HOLE_TAGS else 0.0),
+            y + (LOWER_ROW_HOLE_TAG_SHIFT if tag in LOWER_ROW_HOLE_TAGS else 0.0),
+        )
+        if target == (x, y):
+            continue
         if not annotation.SetPosition2(*target, 0.0):
             raise RuntimeError(f"failed to move hole tag {tag}")
         after = tuple(float(value) for value in annotation.GetPosition()[:2])
@@ -491,14 +545,72 @@ def _mirror_right_end_hole_tags(view: Any) -> dict[str, tuple[float, float]]:
             raise RuntimeError(f"hole tag {tag} landed at {after!r}, not {target!r}")
         if str(note.GetText()).strip() != tag:
             raise RuntimeError(f"moving hole tag {tag} changed its text")
-        moved[tag] = (x, after[0])
-    if set(moved) != set(RIGHT_END_HOLE_TAGS):
+        moved[tag] = ((x, y), after)
+    if seen != set(BOTTOM_HOLE_TAGS):
         raise RuntimeError(
-            f"bottom-view hole tags {sorted(set(RIGHT_END_HOLE_TAGS) - set(moved))} "
-            "not found"
+            f"bottom-view hole tags {sorted(set(BOTTOM_HOLE_TAGS) - seen)} not found"
         )
-    _telemetry.info(f"bottom-view hole tags moved left of their holes: {moved}")
+    _telemetry.info(f"bottom-view hole tags repositioned: {moved}")
     return moved
+
+
+@_telemetry.traced("drawing.support_auto_center_marks")
+def _disable_automatic_hole_center_marks(adapter: Any, model: Any) -> None:
+    """Let the recipe's explicit inserts, not template defaults, own the marks."""
+    name = "swDetailingAutoInsertCenterMarksForHoles"
+    preference = _SW_AUTO_HOLE_CENTER_MARKS
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    before = bool(extension.GetUserPreferenceToggle(preference, 0))
+    # The setter's documented return is the toggled state, not success.
+    extension.SetUserPreferenceToggle(preference, 0, False)
+    after = extension.GetUserPreferenceToggle(preference, 0)
+    if after is not False:
+        raise RuntimeError(f"automatic hole center marks remain enabled: {after!r}")
+    _telemetry.event(
+        "drawing.support_auto_center_marks",
+        preference_name=name,
+        preference_id=preference,
+        before=before,
+        after=after,
+    )
+    _telemetry.info(
+        f"automatic hole center marks: preference={preference}, "
+        f"before={before}, after={after}"
+    )
+
+
+def _center_mark_census(view: Any) -> list[dict[str, Any]]:
+    """Read modern centre-mark annotations; the legacy feature count is not one."""
+    marks = []
+    for raw in _early_bound(view, "IView").GetAnnotations() or ():
+        annotation = _early_bound(raw, "IAnnotation")
+        if int(annotation.GetType()) == 13:  # swCenterMarkSym
+            marks.append(
+                {
+                    "name": str(annotation.GetName()),
+                    "position": tuple(float(value) for value in annotation.GetPosition()),
+                }
+            )
+    return marks
+
+
+@_telemetry.traced("drawing.support_center_marks", label_param="label")
+def _add_support_center_marks(adapter: Any, view: Any, *, label: str) -> None:
+    """Insert the wanted marks and retain a before/after native census witness."""
+    before = _center_mark_census(view)
+    if not auto_center_marks(adapter, view, holes=True, size=0.0025):
+        raise RuntimeError(f"failed to add ASME center marks to {label}")
+    after = _center_mark_census(view)
+    witness = {
+        "view_name": view_name(adapter, view),
+        "label": label,
+        "before_count": len(before),
+        "after_count": len(after),
+        "before_annotations": json.dumps(before),
+        "after_annotations": json.dumps(after),
+    }
+    _telemetry.event("drawing.support_center_marks", **witness)
+    _telemetry.info("support center-mark census: " + json.dumps(witness, sort_keys=True))
 
 
 def _bottom_datum_axes(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -612,12 +724,340 @@ def _create_view_centerline(
     return centerline
 
 
+@_telemetry.traced("drawing.support_table_pickup_note")
+def _assert_table_pickup_note(note: Any) -> None:
+    """Keep the machining instruction linked to this part's actual definition."""
+    native_note = _early_bound(note, "INote")
+    linked = str(native_note.PropertyLinkedText or "")
+    resolved = str(native_note.GetText() or "").replace("\r", "")
+    if linked != property_link(TABLE_PICKUP_PROCESS_PROPERTY):
+        raise RuntimeError(f"table-pickup process note lost its native link: {linked!r}")
+    if resolved != TABLE_PICKUP_PROCESS:
+        raise RuntimeError(
+            "table-pickup process note does not resolve this part's requirement: "
+            f"{resolved!r}"
+        )
+    if (
+        int(native_note.GetTextJustification()) != 1
+        or int(native_note.GetTextVerticalJustification()) != 0
+    ):
+        raise RuntimeError("table-pickup process note lost its left/top alignment")
+    extent = json.dumps([float(value) for value in native_note.GetExtent()])
+    _telemetry.event(
+        "drawing.support_table_pickup_note",
+        property_name=TABLE_PICKUP_PROCESS_PROPERTY,
+        linked_text=linked,
+        resolved_text=resolved,
+        native_extent=extent,
+    )
+    _telemetry.info(
+        f"table-pickup process note: linked={linked!r}, resolved={resolved!r}, "
+        f"native_extent={extent}"
+    )
+
+
+@_telemetry.traced("drawing.support_table_datum")
+def _create_table_pickup_datum(adapter: Any, view: Any) -> Any:
+    """Project the unchanged physical corner into this CURRENT view's sketch."""
+    sheet_xy = model_point_in_view(
+        adapter, view, TABLE_PICKUP_CORNER_M, label="support physical table corner"
+    )
+    if not all(math.isfinite(value) for value in sheet_xy):
+        raise RuntimeError("support table corner has nonfinite sheet coordinates")
+    native_view = _early_bound(view, "IView")
+    raw_sketch = native_view.GetSketch()
+    if raw_sketch is None:
+        raise RuntimeError("support table corner has no current view sketch")
+    sketch = _early_bound(raw_sketch, "ISketch")
+    raw_transform = sketch.ModelToSketchTransform
+    if raw_transform is None:
+        raise RuntimeError("support table corner has no model-to-sketch transform")
+    transform = _early_bound(raw_transform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    # ModelToView's third coordinate is depth, not drawing-sketch height.
+    raw_point = utility.CreatePoint(double_array([*sheet_xy, 0.0]))
+    if raw_point is None:
+        raise RuntimeError("failed to create support table corner sheet point")
+    raw_projected = _early_bound(raw_point, "IMathPoint").MultiplyTransform(transform)
+    if raw_projected is None:
+        raise RuntimeError("failed to project support table corner into view sketch")
+    coordinates = tuple(
+        float(value) for value in _early_bound(raw_projected, "IMathPoint").ArrayData
+    )
+    if (
+        len(coordinates) != 3
+        or not all(math.isfinite(value) for value in coordinates)
+        or coordinates[2] != 0.0
+    ):
+        raise RuntimeError(f"support table corner has invalid sketch coordinates: {coordinates}")
+    return create_view_theoretical_datum(
+        adapter,
+        view,
+        point_xy=coordinates[:2],
+        label="rocker-arm-support lower-left theoretical corner",
+    )
+
+
+@_telemetry.traced("drawing.support_hole_table_readback")
+def _witness_support_hole_table(
+    adapter: Any, view: Any, table: Any, datum_point: Any, datum_axes: tuple[Any, Any]
+) -> dict[str, Any]:
+    """Keep native, unrounded geometry and cell text for the 0.01 mm hold.
+
+    The public hole-table API exposes cell text, not unrounded row locations.
+    Datum axis points describe its SYMBOL, not a declared numeric origin.
+    Record those alongside the actual points, planes, rims and frame matrices;
+    do not round, transform, repair or rewrite any of them.
+    """
+    native_view = _early_bound(view, "IView")
+    part = _early_bound(native_view.ReferencedDocument, "IModelDoc2")
+    part_extension = _early_bound(part.Extension, "IModelDocExtension")
+
+    def transform_data(raw: Any) -> tuple[float, ...]:
+        return tuple(
+            float(value) for value in _early_bound(raw, "IMathTransform").ArrayData
+        )
+
+    def point_data(raw: Any) -> dict[str, Any]:
+        point = _early_bound(raw, "ISketchPoint")
+        sketch = _early_bound(point.GetSketch(), "ISketch")
+        return {
+            "xyz_si": (float(point.X), float(point.Y), float(point.Z)),
+            "model_to_sketch_transform": transform_data(sketch.ModelToSketchTransform),
+        }
+
+    def edge_data(raw: Any) -> dict[str, Any]:
+        edge = _early_bound(raw, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        record: dict[str, Any] = {
+            "is_circle": bool(curve.IsCircle()),
+            "is_line": bool(curve.IsLine()),
+        }
+        if record["is_circle"]:
+            record["circle_parameters_si"] = tuple(
+                float(value) for value in curve.CircleParams
+            )
+        elif record["is_line"]:
+            record["line_parameters_si"] = tuple(
+                float(value) for value in curve.LineParams
+            )
+        owners = []
+        for raw_face in edge.GetTwoAdjacentFaces2() or ():
+            if raw_face is not None:
+                feature = _early_bound(raw_face, "IFace2").GetFeature()
+                if feature is not None:
+                    feature = _early_bound(feature, "IFeature")
+                    owners.append((str(feature.Name), str(feature.GetTypeName2())))
+        record["adjacent_features"] = owners
+        return record
+
+    requests = {
+        **TABLE_PICKUP_FACES,
+        "mounting_face": surface_finish_by_key(SURFACE_FINISHES, "mounting_face").face,
+        **{
+            f"foot_{index}": CylinderFace(
+                HOLE_DIA, contains_x_mm=x, contains_z_mm=z
+            )
+            for index, (x, z) in enumerate(HOLES)
+        },
+    }
+    resolved = _resolve_faces(part, requests)
+    native_faces = {}
+    for key, raw_face in resolved.items():
+        face = _early_bound(raw_face, "IFace2")
+        geometry = _face_geometry(face)
+        if geometry is None:
+            raise RuntimeError(f"{key}: table readback has no native surface")
+        reference = bytes(part_extension.GetPersistReference3(face) or ())
+        if not reference:
+            raise RuntimeError(f"{key}: table readback has no native face reference")
+        record = {
+            "surface_identity": geometry.identity,
+            "surface_parameters_si": geometry.parameters,
+            "outward_normal": geometry.outward_normal,
+            "box_si": geometry.box,
+            "persistent_reference": reference.hex(),
+        }
+        if key.startswith("foot_"):
+            record["rim_edges"] = [
+                edge_data(edge) for edge in face.GetEdges() or ()
+            ]
+        native_faces[key] = record
+
+    visible_rims = []
+    for edge in visible_view_entities(native_view, 1, label="support table foot rims"):
+        record = edge_data(edge)
+        if record["is_circle"] and (
+            "FootClearanceHoles", "HoleWzd"
+        ) in record["adjacent_features"]:
+            visible_rims.append(record)
+
+    native_table = _early_bound(table, "ITableAnnotation")
+    feature = _early_bound(
+        _early_bound(table, "IHoleTableAnnotation").HoleTable, "IHoleTable"
+    )
+    origin = _early_bound(feature.DatumOrigin, "IDatumOrigin")
+    annotation = _early_bound(origin.GetAnnotation(), "IAnnotation")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    attached_types = tuple(
+        int(value) for value in annotation.GetAttachedEntityTypes() or ()
+    )
+    attachment_records = []
+    for index, entity in enumerate(attached):
+        kind = attached_types[index] if index < len(attached_types) else None
+        record = {"type": kind, "is_none": entity is None}
+        if entity is not None:
+            record["same_created_point"] = int(adapter.swApp.IsSame(datum_point, entity))
+            if kind == 11:  # swSelSKETCHPOINTS
+                record["point"] = point_data(entity)
+            elif kind == 3:  # swSelVERTICES
+                record["vertex_xyz_si"] = tuple(
+                    float(value) for value in _early_bound(entity, "IVertex").GetPoint()
+                )
+            elif kind == 1:  # swSelEDGES
+                record["edge"] = edge_data(entity)
+        attachment_records.append(record)
+
+    rows, columns = int(native_table.RowCount), int(native_table.ColumnCount)
+    witness = {
+        "view_name": view_name(adapter, view),
+        "view_model_to_view_transform": transform_data(native_view.ModelToViewTransform),
+        "created_point": point_data(datum_point),
+        "origin_declared_attachment_count": int(annotation.GetAttachedEntityCount3()),
+        "origin_attachment_types": attached_types,
+        "origin_attachments": attachment_records,
+        "origin_is_dangling": bool(annotation.IsDangling()),
+        "datum_symbol_position_si": tuple(
+            float(value) for value in annotation.GetPosition()
+        ),
+        "datum_symbol_axis_points_sheet_si": tuple(
+            float(value) for value in origin.GetAxisPoints2()
+        ),
+        "datum_labels": (str(origin.XLabel), str(origin.YLabel)),
+        "initial_datum_axis_edges": [edge_data(edge) for edge in datum_axes],
+        "location_precision": int(feature.GetHoleLocationPrecision()),
+        "location_uses_doc_precision": bool(feature.GetHoleLocationUseDocPrecision()),
+        "tag_update_enabled": bool(feature.EnableUpdate),
+        "cell_text2": [
+            [native_table.Text2(row, column, False) for column in range(columns)]
+            for row in range(rows)
+        ],
+        "cell_displayed_text2": [
+            [
+                native_table.DisplayedText2(row, column, False)
+                for column in range(columns)
+            ]
+            for row in range(rows)
+        ],
+        "native_part_faces": native_faces,
+        "current_view_foot_rims": visible_rims,
+    }
+    encoded = json.dumps(witness, sort_keys=True)
+    _telemetry.event("drawing.support_hole_table_readback", native_readback=encoded)
+    _telemetry.info("support hole-table native readback: " + encoded)
+    if (
+        witness["origin_declared_attachment_count"] != 1
+        or len(attached) != 1
+        or attached_types != (11,)
+        or attached[0] is None
+        or witness["origin_is_dangling"]
+        or attachment_records[0].get("same_created_point") != 1
+    ):
+        raise RuntimeError("support table origin lost its single native point attachment")
+    actual_point = _early_bound(attached[0], "ISketchPoint")
+    actual_sketch = _early_bound(actual_point.GetSketch(), "ISketch")
+    current_sketch = native_view.GetSketch()
+    same_sketch = (
+        int(adapter.swApp.IsSame(actual_sketch, current_sketch))
+        if current_sketch is not None else -1
+    )
+    if same_sketch != 1:
+        raise RuntimeError("support table origin point belongs to a different view sketch")
+    raw_transform = actual_sketch.ModelToSketchTransform
+    if raw_transform is None:
+        raise RuntimeError("support table origin has no current sketch transform")
+    inverse = _early_bound(raw_transform, "IMathTransform").Inverse()
+    if inverse is None:
+        raise RuntimeError("support table origin sketch transform has no inverse")
+    actual_xyz = tuple(float(value) for value in (actual_point.X, actual_point.Y, actual_point.Z))
+    if not all(math.isfinite(value) for value in actual_xyz) or actual_xyz[2] != 0.0:
+        raise RuntimeError(f"support table origin has invalid sketch point: {actual_xyz}")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    raw_point = utility.CreatePoint(double_array(actual_xyz))
+    if raw_point is None:
+        raise RuntimeError("failed to create support table origin math point")
+    raw_sheet_point = _early_bound(raw_point, "IMathPoint").MultiplyTransform(inverse)
+    if raw_sheet_point is None:
+        raise RuntimeError("failed to recover support table origin sheet point")
+    actual_sheet = tuple(
+        float(value) for value in _early_bound(raw_sheet_point, "IMathPoint").ArrayData
+    )
+    if len(actual_sheet) != 3 or not all(math.isfinite(value) for value in actual_sheet):
+        raise RuntimeError(f"support table origin has invalid sheet point: {actual_sheet}")
+    expected_sheet = model_point_in_view(
+        adapter, native_view, TABLE_PICKUP_CORNER_M,
+        label="settled support physical table corner",
+    )
+    comparisons = []
+    for key in ("table_pickup_end", "table_pickup_taper", "mounting_face"):
+        parameters = native_faces[key]["surface_parameters_si"]
+        if len(parameters) != 6 or not all(math.isfinite(value) for value in parameters):
+            raise RuntimeError(f"{key}: invalid native pickup plane parameters")
+        normal, anchor = parameters[:3], parameters[3:]
+        physical = sum(a * b for a, b in zip(normal, TABLE_PICKUP_CORNER_M))
+        measured = sum(a * b for a, b in zip(normal, anchor))
+        comparisons.append({
+            "label": key, "physical": physical, "measured": measured,
+            "error_si": measured - physical,
+        })
+    for axis, physical, measured in zip(("sheet_x", "sheet_y"), expected_sheet, actual_sheet):
+        comparisons.append({
+            "label": axis, "physical": physical, "measured": measured,
+            "error_si": measured - physical,
+        })
+    witness.update({
+        "physical_corner_model_m": TABLE_PICKUP_CORNER_M,
+        "actual_origin_sheet_m": actual_sheet,
+        "physical_corner_sheet_xy": expected_sheet,
+        "same_view_sketch": same_sketch,
+        "physical_origin_comparisons": comparisons,
+    })
+    proof = json.dumps({
+        key: witness[key] for key in (
+            "physical_corner_model_m", "actual_origin_sheet_m",
+            "physical_corner_sheet_xy", "same_view_sketch",
+            "physical_origin_comparisons",
+        )
+    }, sort_keys=True)
+    _telemetry.event("drawing.support_table_datum_invariant", native_readback=proof)
+    _telemetry.info("support table physical-origin invariant: " + proof)
+    for comparison in comparisons:
+        physical, measured = comparison["physical"], comparison["measured"]
+        # Arithmetic equivalence only: no absolute metre/mm acceptance band.
+        if (
+            not math.isfinite(physical) or not math.isfinite(measured)
+            or physical == 0.0 or measured == 0.0
+            or (
+                comparison["label"].startswith("sheet_")
+                and (physical <= 0.0 or measured <= 0.0)
+            )
+            or not math.isclose(
+                physical, measured, rel_tol=32 * sys.float_info.epsilon, abs_tol=0.0
+            )
+        ):
+            raise RuntimeError(
+                "support table physical-origin invariant failed: "
+                f"{comparison['label']} {physical!r} != {measured!r}"
+            )
+    return witness
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open rocker-arm-support source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -626,17 +1066,22 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            TABLE_PICKUP_PROCESS_PROPERTY,
         ),
         required=(
             "Number",
             "Material Specification",
             "Finish",
             "Quantity",
+            TABLE_PICKUP_PROCESS_PROPERTY,
         ),
     )
+    if properties[TABLE_PICKUP_PROCESS_PROPERTY].replace("\r", "") != TABLE_PICKUP_PROCESS:
+        raise RuntimeError("source support has a different table-pickup process definition")
     drawing_model, sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
+    _disable_automatic_hole_center_marks(adapter, drawing_model)
     stamp_drawing_summary(
         adapter,
         drawing_model,
@@ -780,8 +1225,7 @@ async def build(adapter: Any) -> dict[str, str]:
             f"section foot dimension measured {measured * 1000.0:.6f} mm"
         )
     foot_dimension.SetPrecision3(DIMENSION_PRECISION["FootThickness"], -1, -1, -1)
-    if not auto_center_marks(adapter, bottom, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to bottom view")
+    _add_support_center_marks(adapter, bottom, label="bottom view")
 
     # The mounting face is the trapezoid's visible bottom edge in section A-A.
     # Keep the symbol near the foot while clearing the 63.5 width dimension.
@@ -799,20 +1243,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     datum_axes = _bottom_datum_axes(adapter, bottom)
-    datum_point = create_view_theoretical_datum(
-        adapter,
-        bottom,
-        point_xy=(
-            HOLE_TABLE_DATUM_XZ_MM[0] / 1000.0,
-            HOLE_TABLE_DATUM_XZ_MM[1] / 1000.0,
-        ),
-        label="rocker-arm-support lower-left theoretical corner",
-    )
+    datum_point = _create_table_pickup_datum(adapter, bottom)
     # No position frame on this part (simplicity policy rule 3/4), so the hole
     # coordinates are ordinary two-place dimensions under the title block's
     # ±0.51 — NOT basic: a basic dimension is toleranced only by the frame it
     # feeds, and without one it has no tolerance at all.
-    insert_hole_table(
+    hole_table = insert_hole_table(
         adapter,
         bottom,
         datum_xy=(
@@ -827,7 +1263,7 @@ async def build(adapter: Any) -> dict[str, str]:
         basic_locations=False,
         label="rocker-arm-support",
     )
-    _mirror_right_end_hole_tags(bottom)
+    _position_bottom_hole_tags(bottom)
     # The drawing-sketch datum and hole table leave the bottom view's HLV edge
     # set stale, so restore its complete projected edge set before export.
     set_hidden_lines_visible(adapter, bottom)
@@ -838,8 +1274,7 @@ async def build(adapter: Any) -> dict[str, str]:
     view_b = place_view(adapter, str(SOURCE), "*Top", *VIEW_B_CENTER, scale=(1, 2))
     set_hidden_lines_removed(adapter, view_b)
     _crop_view_b_to_rail(adapter, view_b)
-    if not auto_center_marks(adapter, view_b, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center marks to VIEW B")
+    _add_support_center_marks(adapter, view_b, label="VIEW B")
     if add_note(adapter, VIEW_B_CAPTION, *VIEW_B_CAPTION_XY) is None:
         raise RuntimeError("failed to caption VIEW B")
     _add_view_b_arrow(adapter, front)
@@ -852,6 +1287,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rocker-bracket transfer seats",
         process=SEAT_CALLOUT_PROCESS,
     )
+    set_hole_callout_precision(
+        seat_callout, SEAT_CALLOUT_PRECISION, label="rocker-bracket transfer seats"
+    )
 
     # Materialize the iso's cosmetic threads before the strict final note
     # cleanup, so BracketSeats' descriptive label exists when it is counted
@@ -862,6 +1300,22 @@ async def build(adapter: Any) -> dict[str, str]:
     # finalize removed exactly the iso's one.
     import_cosmetic_threads(adapter, iso)
     import_cosmetic_threads(adapter, view_b)
+    position_section_caption(
+        adapter, right, SECTION_CAPTION_XY, label="rocker-arm support"
+    )
+    with _telemetry.span("drawing.support_pickup_note_position"):
+        pickup_note = _early_bound(
+            add_property_linked_note(
+                adapter,
+                TABLE_PICKUP_PROCESS_PROPERTY,
+                *TABLE_PICKUP_NOTE_XY,
+                char_height=0.0035,
+            ),
+            "INote",
+        )
+        # Native void setters; the settled witness reads them back.
+        pickup_note.SetTextJustification(1)  # swTextJustificationLeft
+        pickup_note.SetTextVerticalJustification(0)  # swTextAlignmentTop
 
     return await finalize_drawing(
         adapter,
@@ -882,6 +1336,10 @@ async def build(adapter: Any) -> dict[str, str]:
                 seat_callout,
                 edge=seat_edge,
                 label="rocker-bracket transfer seats",
+            ),
+            lambda: _assert_table_pickup_note(pickup_note),
+            lambda: _witness_support_hole_table(
+                adapter, bottom, hole_table, datum_point, datum_axes
             ),
         ),
     )

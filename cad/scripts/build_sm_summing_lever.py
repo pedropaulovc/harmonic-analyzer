@@ -60,11 +60,15 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 
+import _telemetry
+
 from _common import (
     CASTING_GREEN,
+    _early_bound,
     IN,
     SketchDims,
     add_line_chain,
@@ -96,12 +100,20 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
 )
-from _part_pmi import author_part_pmi
+from _part_pmi import (
+    _face_geometry,
+    _face_matches,
+    _resolve_faces,
+    _select_face,
+    author_part_pmi,
+)
 from _saved_part_guard import require_saved_drawing_properties
 from sm_summing_lever_notes import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
+    PICKUP_PROCESS,
+    PICKUP_PROCESS_PROPERTY,
 )
 from sm_summing_lever_spec import (
     ANCHOR_H,
@@ -112,6 +124,7 @@ from sm_summing_lever_spec import (
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_OFFSET,
+    MACHINED_PICKUP_FACES,
     SURFACE_FINISHES,
 )
 
@@ -746,6 +759,63 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
 
 
+@_telemetry.traced("part.summing_pickup_faces")
+def _witness_pickup_faces(adapter) -> None:
+    """Qualify the model-owned machining instruction against actual native faces.
+
+    Machining is a nonnumeric process property also linked through Manufacturing
+    Notes, not an additional SurfaceFinish grade or a process-only symbol.
+    Reuse the exact-one part-PMI resolver and native face selection convention.
+    """
+    model = adapter.currentModel
+    faces = _resolve_faces(model, MACHINED_PICKUP_FACES)
+    extension = _early_bound(model.Extension, "IModelDocExtension")
+    try:
+        process = str(model.GetCustomInfoValue("", PICKUP_PROCESS_PROPERTY) or "").replace("\r", "")
+        if process != PICKUP_PROCESS:
+            raise RuntimeError(
+                f"native pickup-process property {PICKUP_PROCESS_PROPERTY!r} "
+                f"does not match this part's requirement: {process!r}"
+            )
+        for key, face_spec in MACHINED_PICKUP_FACES.items():
+            face = faces[key]
+            geometry = _face_geometry(face)
+            if geometry is None or not _face_matches(geometry, face_spec):
+                raise RuntimeError(f"{key}: postbuild physical pickup face changed")
+            _select_face(model, face, label=key)
+            # SelectionManager is transient across ClearSelection2/Select4.
+            selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+            count = int(selection.GetSelectedObjectCount2(-1))
+            entity_type = int(selection.GetSelectedObjectType3(1, -1)) if count else -1
+            selected = selection.GetSelectedObject6(1, -1) if count == 1 else None
+            same = int(adapter.swApp.IsSame(face, selected)) if selected is not None else -1
+            if count != 1 or entity_type != 2 or same != 1:  # FACE, swObjectSame
+                raise RuntimeError(
+                    f"{key}: native pickup-face selection mismatch: "
+                    f"count={count}, type={entity_type}, same={same}"
+                )
+            reference = bytes(extension.GetPersistReference3(face) or ())
+            if not reference:
+                raise RuntimeError(f"{key}: native pickup face has no persistent reference")
+            witness = {
+                "key": key,
+                "process_property": PICKUP_PROCESS_PROPERTY,
+                "process_requirement": process,
+                "selected_count": count,
+                "selected_type": entity_type,
+                "same_selected": same,
+                "persistent_reference": reference.hex(),
+                "surface_identity": geometry.identity,
+                "plane_parameters_si": json.dumps(geometry.parameters),
+                "outward_normal": json.dumps(geometry.outward_normal),
+                "box_mm": json.dumps([value * 1000.0 for value in geometry.box]),
+            }
+            _telemetry.event("summing_lever.machined_pickup_face", **witness)
+            _telemetry.info("machined-pickup physical face: " + json.dumps(witness))
+    finally:
+        model.ClearSelection2(True)
+
+
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
@@ -872,8 +942,10 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            PICKUP_PROCESS_PROPERTY: PICKUP_PROCESS,
         },
     )
+    _witness_pickup_faces(adapter)
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
         adapter,
@@ -884,6 +956,7 @@ async def build(adapter) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            PICKUP_PROCESS_PROPERTY,
         ),
     )
     return artefacts

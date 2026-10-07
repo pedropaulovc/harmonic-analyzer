@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
 import _config
+import _common
 import _drawing_common
+import _part_pmi
+import _section_axis
 from _hole_spec import blind_cut_dia_mm
 
 import draw_fr_rocker_arm_support as drawing
@@ -75,7 +80,7 @@ def test_pocket_and_cavity_reliefs_are_distinct() -> None:
     assert all(abs(edge[2]) > support.WEB for edge in support.POCKET_FILLET_EDGES)
 
 
-def test_no_process_callout_on_the_sheet() -> None:
+def test_pockets_have_no_unapproved_machining_callout() -> None:
     # "Machine both pockets" dictates method (ASME Y14.5 1.4(e)); the section's
     # web dimension defines what the pockets leave, so no callout exists.
     assert not hasattr(support, "WEB_CALLOUT")
@@ -84,9 +89,10 @@ def test_no_process_callout_on_the_sheet() -> None:
     assert "Web Callout" not in source
 
 
-def test_support_finish_masks_only_the_machined_mounting_face() -> None:
+def test_support_finish_masks_mounting_and_machined_table_pickup_faces() -> None:
     assert _config.parts(support.PART_NAME)["finish"] == (
-        "GREEN ENAMEL; MASK MOUNTING FACE; LIGHT OIL BARE MACHINED SURFACES"
+        "GREEN ENAMEL; MASK MOUNTING AND TABLE PICKUP FACES; "
+        "LIGHT OIL BARE MACHINED SURFACES"
     )
     assert support.HOLE_SPEC.kind == "drilled_fractional"
     assert support.HOLE_SPEC.size == "5/16"
@@ -97,10 +103,9 @@ def test_support_finish_masks_only_the_machined_mounting_face() -> None:
 
 
 def test_mounting_face_carries_the_seat_finish_symbol_not_a_note() -> None:
-    # The foot seats on harmonic-base: the one face that MUST be cut on a part
-    # the title block otherwise leaves CAST/MACHINED. It is the -Y face at
-    # y = -HALF_Y (PlanarFace offsets run along the outward normal, so +HALF_Y),
-    # and the drawing places the symbol, not a text callout.
+    # The existing mounting face is still the only numeric finish requirement.
+    # The newly-required table pickups carry machining but no invented Ra.
+    # The mounting face is -Y at y=-HALF_Y, with offset +HALF_Y along its normal.
     (control,) = drawing_spec.SURFACE_FINISHES
     assert control.key == "mounting_face"
     assert control.roughness_um == 3.2
@@ -113,6 +118,1059 @@ def test_mounting_face_carries_the_seat_finish_symbol_not_a_note() -> None:
     assert "add_attached_note" not in source
 
 
+def test_finished_pickup_faces_meet_the_unchanged_theoretical_table_corner():
+    corner = (-section.BOSS_DEPTH / 2, -section.HALF_Y, -section.WIDE)
+    assert corner == (-88.9, -88.9, -31.75)
+    assert drawing.HOLE_TABLE_DATUM_XZ_MM == (corner[0], corner[2])
+    assert set(drawing_spec.TABLE_PICKUP_FACES) == {
+        "table_pickup_end", "table_pickup_taper"
+    }
+    for face in drawing_spec.TABLE_PICKUP_FACES.values():
+        assert math.dist(face.normal, (0, 0, 0)) == pytest.approx(1)
+        assert sum(n * p for n, p in zip(face.normal, corner)) == pytest.approx(
+            face.offset_mm
+        )
+    taper = drawing_spec.TABLE_PICKUP_FACES["table_pickup_taper"]
+    assert taper.normal[1] > 0
+    assert taper.normal[2] < -0.99
+    top_of_taper = (0, section.HALF_Y, -section.NARROW)
+    assert sum(n * p for n, p in zip(taper.normal, top_of_taper)) == pytest.approx(
+        taper.offset_mm
+    )
+    # Machining is newly required, but the existing mounting grade is the ONLY Ra.
+    assert [control.roughness_um for control in drawing_spec.SURFACE_FINISHES] == [3.2]
+    assert "Ra" not in drawing_spec.TABLE_PICKUP_PROCESS
+    assert _config.parts(support.PART_NAME)["process"] == (
+        "casting; machine mounting and hole-table pickup faces "
+        "before hole location or inspection"
+    )
+
+
+class _PickupPlaneFace:
+    def __init__(self, context, name, normal, point_mm, reference):
+        self.context = context
+        self.name = name
+        self.normal = normal
+        self.point_mm = point_mm
+        self.surface = SimpleNamespace(
+            Identity=4001,
+            PlaneParams=(*normal, *(value / 1000 for value in point_mm)),
+        )
+        self.FaceInSurfaceSense = False
+        self.reference = reference
+        self.next_face = None
+
+    def GetSurface(self):
+        return self.surface
+
+    def GetBox(self):
+        low_x, high_x = -section.BOSS_DEPTH / 2, section.BOSS_DEPTH / 2
+        low_y, high_y = -section.HALF_Y, section.HALF_Y
+        low_z, high_z = -section.WIDE, section.WIDE
+        if self.normal[0]:
+            low_x = high_x = self.point_mm[0]
+        elif self.normal == (0, -1, 0):
+            low_y = high_y = self.point_mm[1]
+        else:
+            sign = 1 if self.normal[2] > 0 else -1
+            low_z, high_z = sorted((sign * section.WIDE, sign * section.NARROW))
+        return tuple(
+            value / 1000 for value in (low_x, low_y, low_z, high_x, high_y, high_z)
+        )
+
+    def GetNextFace(self):
+        return self.next_face
+
+    def GetFeature(self):
+        return SimpleNamespace(Name="Wall", GetTypeName2=lambda: "Boss")
+
+    def Select4(self, _append, _callout):
+        context = self.context
+        if context["failure"] == "refused":
+            return False
+        context["selection_epoch"] += 1
+        if context["failure"] == "empty_selection":
+            context["selected"] = []
+        elif context["failure"] == "wrong_face":
+            context["selected"] = [context["opposite_end"]]
+        elif context["failure"] == "multiple":
+            context["selected"] = [self, context["opposite_end"]]
+        else:
+            context["selected"] = [self]
+        return True
+
+
+class _TransientPickupSelection:
+    """Native selection-manager handle invalidated by every clear or select."""
+
+    def __init__(self, context):
+        self.context = context
+        self.epoch = context["selection_epoch"]
+
+    def _selected(self):
+        if self.epoch != self.context["selection_epoch"]:
+            raise RuntimeError("stale ISelectionMgr invalidated by another selection")
+        return self.context["selected"]
+
+    def GetSelectedObjectCount2(self, _mark):
+        return len(self._selected())
+
+    def GetSelectedObjectType3(self, _index, _mark):
+        self._selected()
+        return 1 if self.context["failure"] == "edge_type" else 2
+
+    def GetSelectedObject6(self, index, _mark):
+        return self._selected()[index - 1]
+
+
+def _native_pickup_part(monkeypatch, *, failure=None):
+    """Drive the real resolver with independent trapezoid-plane native seams."""
+    monkeypatch.setattr(_part_pmi, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(_part_pmi, "_bind", lambda obj, _name: obj)
+    monkeypatch.setattr(_part_pmi, "null_callout", lambda: None)
+    monkeypatch.setattr(support, "_early_bound", lambda obj, _name: obj)
+
+    def invoke(obj, _interface, name, *args):
+        member = getattr(obj, name)
+        return member(*args) if callable(member) else member
+
+    monkeypatch.setattr(_part_pmi, "_com_invoke", invoke)
+    context = {
+        "selected": [],
+        "failure": failure,
+        "selection_epoch": 0,
+    }
+    # Construct the slant normal from the actual section segment's direction,
+    # not from TABLE_PICKUP_FACES or its already-computed normal/offset.
+    dy = 2 * section.HALF_Y
+    dz = section.WIDE - section.NARROW
+    length = math.hypot(dy, dz)
+    end = _PickupPlaneFace(
+        context, "end", (-1, 0, 0), (-section.BOSS_DEPTH / 2, 0, 0), b"\x01"
+    )
+    opposite_end = _PickupPlaneFace(
+        context, "opposite_end", (1, 0, 0), (section.BOSS_DEPTH / 2, 0, 0), b"\x02"
+    )
+    taper = _PickupPlaneFace(
+        context,
+        "taper",
+        (0, dz / length, -dy / length),
+        (0, -section.HALF_Y, -section.WIDE),
+        b"\x03",
+    )
+    opposite_taper = _PickupPlaneFace(
+        context,
+        "opposite_taper",
+        (0, dz / length, dy / length),
+        (0, -section.HALF_Y, section.WIDE),
+        b"\x04",
+    )
+    mounting = _PickupPlaneFace(
+        context, "mounting", (0, -1, 0), (0, -section.HALF_Y, 0), b"\x06"
+    )
+    faces = [end, opposite_end, taper, opposite_taper, mounting]
+    context["opposite_end"] = opposite_end
+    if failure == "missing_taper":
+        faces.remove(taper)
+    elif failure == "ambiguous_end":
+        faces.append(
+            _PickupPlaneFace(
+                context,
+                "split_end",
+                (-1, 0, 0),
+                (-section.BOSS_DEPTH / 2, 0, 0),
+                b"\x05",
+            )
+        )
+    elif failure == "missing_reference":
+        end.reference = b""
+    for index, face in enumerate(faces):
+        face.next_face = faces[index + 1] if index + 1 < len(faces) else None
+    body = SimpleNamespace(GetFirstFace=lambda: faces[0])
+
+    def clear_selection(_all):
+        context["selection_epoch"] += 1
+        context["selected"] = []
+
+    class NativeModel(SimpleNamespace):
+        @property
+        def SelectionManager(self):
+            return _TransientPickupSelection(context)
+
+    model = NativeModel(
+        GetBodies2=lambda _kind, _hidden: (body,),
+        Extension=SimpleNamespace(GetPersistReference3=lambda face: face.reference),
+        ClearSelection2=clear_selection,
+    )
+    adapter = SimpleNamespace(
+        currentModel=model,
+        swApp=SimpleNamespace(IsSame=lambda left, right: int(left is right)),
+    )
+    return adapter, context
+
+
+def test_pickup_witness_resolves_real_planes_and_records_exact_selected_faces(
+    monkeypatch,
+):
+    adapter, context = _native_pickup_part(monkeypatch)
+    events = []
+    monkeypatch.setattr(
+        support._telemetry, "event", lambda name, **fields: events.append((name, fields))
+    )
+    support._witness_table_pickup_faces(adapter)
+    witnesses = {
+        fields["key"]: fields
+        for name, fields in events
+        if name == "rocker_support.table_pickup_face"
+    }
+    assert set(witnesses) == {
+        "table_pickup_end", "table_pickup_taper", "mounting_face"
+    }
+    assert witnesses["table_pickup_end"]["persistent_reference"] == "01"
+    assert witnesses["table_pickup_taper"]["persistent_reference"] == "03"
+    assert witnesses["mounting_face"]["persistent_reference"] == "06"
+    for fields in witnesses.values():
+        assert (fields["selected_count"], fields["selected_type"]) == (1, 2)
+        assert fields["same_selected"] == 1
+        assert fields["surface_identity"] == 4001
+    assert json.loads(witnesses["table_pickup_taper"]["outward_normal"])[1] > 0
+    assert context["selected"] == []
+
+
+@pytest.mark.parametrize(
+    "failure, message",
+    (
+        ("missing_taper", "matched 0 faces"),
+        ("ambiguous_end", "matched 2 faces"),
+        ("refused", "face selection failed"),
+        ("empty_selection", "count=0"),
+        ("multiple", "count=2"),
+        ("edge_type", "type=1"),
+        ("wrong_face", "same=0"),
+        ("missing_reference", "no persistent reference"),
+    ),
+)
+def test_pickup_witness_refuses_missing_ambiguous_or_wrong_native_faces(
+    monkeypatch, failure, message
+):
+    adapter, context = _native_pickup_part(monkeypatch, failure=failure)
+    with pytest.raises(RuntimeError, match=message):
+        support._witness_table_pickup_faces(adapter)
+    assert context["selected"] == []
+
+
+@pytest.mark.parametrize("failure", (None, "link", "text", "alignment"))
+def test_table_pickup_note_requires_native_link_and_current_resolved_process(
+    monkeypatch, failure
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    note = SimpleNamespace(
+        PropertyLinkedText='$PRPSHEET:"Table Pickup Process"',
+        GetText=lambda: drawing_spec.TABLE_PICKUP_PROCESS.replace("\n", "\r\n"),
+        GetTextJustification=lambda: 1,
+        GetTextVerticalJustification=lambda: 0,
+        GetExtent=lambda: (0.025, 0.031, 0, 0.178, 0.049, 0),
+    )
+    if failure == "link":
+        note.PropertyLinkedText = "MACHINE SOME FACES"
+        message = "lost its native link"
+    elif failure == "text":
+        note.GetText = lambda: "CASTING; USE AS-CAST PICKUP FACES"
+        message = "does not resolve this part"
+    elif failure == "alignment":
+        note.GetTextJustification = lambda: 2
+        message = "lost its left/top alignment"
+    if failure:
+        with pytest.raises(RuntimeError, match=message):
+            drawing._assert_table_pickup_note(note)
+    else:
+        drawing._assert_table_pickup_note(note)
+
+
+@pytest.mark.parametrize("failure", (None, "wrong_face"))
+def test_pickup_native_reads_have_one_batch_phase_and_propagate_error(monkeypatch, failure):
+    adapter, _context = _native_pickup_part(monkeypatch, failure=failure)
+    active, roots = [], []
+
+    @contextlib.contextmanager
+    def capture_span(name, **_fields):
+        record = {"name": name, "failed": False}
+        if not active:
+            roots.append(record)
+        active.append(record)
+        try:
+            yield None
+        except BaseException:
+            record["failed"] = True
+            raise
+        finally:
+            active.pop()
+
+    monkeypatch.setattr(support._telemetry, "span", capture_span)
+    reference = adapter.currentModel.Extension.GetPersistReference3
+
+    def read_reference(face):
+        assert active, "native reference read outside a phase"
+        return reference(face)
+
+    adapter.currentModel.Extension.GetPersistReference3 = read_reference
+    if failure:
+        with pytest.raises(RuntimeError, match="same=0"):
+            support._witness_table_pickup_faces(adapter)
+    else:
+        support._witness_table_pickup_faces(adapter)
+    assert len(roots) == 1
+    assert roots[0]["failed"] is bool(failure)
+    assert active == []
+
+
+class _FootRimEdge:
+    def __init__(self, face, y_mm):
+        self.face = face
+        self.curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            IsLine=lambda: False,
+            CircleParams=(
+                face.x_mm / 1000, y_mm / 1000, face.z_mm / 1000,
+                0, 1, 0, support.HOLE_DIA / 2000,
+            ),
+        )
+
+    def GetCurve(self):
+        return self.curve
+
+    def GetTwoAdjacentFaces2(self):
+        return (self.face,)
+
+
+class _FootCylinderFace:
+    def __init__(self, x_mm, z_mm, reference):
+        self.x_mm, self.z_mm = x_mm, z_mm
+        self.reference = reference
+        self.next_face = None
+        self.surface = SimpleNamespace(
+            Identity=4002,
+            CylinderParams=(
+                x_mm / 1000, -section.HALF_Y / 1000, z_mm / 1000,
+                0, 1, 0, support.HOLE_DIA / 2000,
+            ),
+        )
+        self.rims = (
+            _FootRimEdge(self, -section.HALF_Y),
+            _FootRimEdge(self, -section.BIG),
+        )
+
+    def GetSurface(self):
+        return self.surface
+
+    def GetBox(self):
+        radius = support.HOLE_DIA / 2
+        return tuple(
+            value / 1000
+            for value in (
+                self.x_mm - radius, -section.HALF_Y, self.z_mm - radius,
+                self.x_mm + radius, -section.BIG, self.z_mm + radius,
+            )
+        )
+
+    def GetNextFace(self):
+        return self.next_face
+
+    def GetFeature(self):
+        return SimpleNamespace(Name="FootClearanceHoles", GetTypeName2=lambda: "HoleWzd")
+
+    def GetEdges(self):
+        return self.rims
+
+
+class _NativeDatumTransform:
+    """Independent native row-vector rotation, scale and translation."""
+
+    def __init__(self, rotation, translation, scale, context, name):
+        self._data = (*rotation, *translation, scale, 0, 0, 0)
+        self.context, self.name = context, name
+
+    @property
+    def ArrayData(self):
+        if self.context["native_failure"] == f"{self.name}_read_error":
+            raise self.context["native_error"]
+        return self._data
+
+    def apply(self, xyz):
+        rotation, translation, scale = self._data[:9], self._data[9:12], self._data[12]
+        return tuple(
+            scale * sum(xyz[row] * rotation[3 * row + column] for row in range(3))
+            + translation[column]
+            for column in range(3)
+        )
+
+    def Inverse(self):
+        if self.context["native_failure"] == "inverse_error":
+            raise self.context["native_error"]
+        if self.context["native_failure"] == "inverse_null":
+            return None
+        rotation, translation, scale = self._data[:9], self._data[9:12], self._data[12]
+        transpose = tuple(rotation[3 * column + row] for row in range(3) for column in range(3))
+        inverse_translation = tuple(
+            -sum(translation[row] * transpose[3 * row + column] for row in range(3)) / scale
+            for column in range(3)
+        )
+        return _NativeDatumTransform(
+            transpose, inverse_translation, 1 / scale, self.context, "inverse"
+        )
+
+
+class _NativeDatumMathPoint:
+    def __init__(self, xyz, context):
+        self.xyz, self.context = tuple(xyz), context
+
+    @property
+    def ArrayData(self):
+        failure = self.context["native_failure"]
+        if failure == "math_data_error":
+            raise self.context["native_error"]
+        if failure == "math_data_null":
+            return None
+        if failure == "math_data_short":
+            return self.xyz[:1]
+        if failure == "math_data_nonfinite":
+            return (math.nan, *self.xyz[1:])
+        return self.xyz
+
+    def MultiplyTransform(self, transform):
+        failure = self.context["native_failure"]
+        if failure == "multiply_error":
+            raise self.context["native_error"]
+        if failure == "multiply_null":
+            return None
+        if transform is None:
+            raise RuntimeError("native math transform is null")
+        return _NativeDatumMathPoint(transform.apply(self.xyz), self.context)
+
+
+class _NativeDatumMathUtility:
+    def __init__(self, context):
+        self.context = context
+
+    def CreatePoint(self, xyz):
+        failure = self.context["native_failure"]
+        if failure == "math_point_error":
+            raise self.context["native_error"]
+        if failure == "math_point_null":
+            return None
+        return _NativeDatumMathPoint(xyz, self.context)
+
+
+class _ReadOnlyDatumPoint:
+    """Retain independent native coordinates and sketch identity without setters."""
+
+    def __init__(self, xyz, sketch, context):
+        self._xyz, self.sketch, self.context = tuple(xyz), sketch, context
+
+    @property
+    def X(self):
+        if self.context["native_failure"] == "point_read_error":
+            raise self.context["native_error"]
+        return self._xyz[0]
+
+    @property
+    def Y(self):
+        return self._xyz[1]
+
+    @property
+    def Z(self):
+        return self._xyz[2]
+
+    def GetSketch(self):
+        if self.context["native_failure"] == "point_sketch_error":
+            raise self.context["native_error"]
+        return self.sketch
+
+
+def _native_table_readback_fixture(
+    monkeypatch, *, fail_cell=False, frame="pilot", datum_xy=None,
+    pickup_failure=None, create_point=True, printed_discrepancy=False,
+):
+    adapter, context = _native_pickup_part(monkeypatch, failure=pickup_failure)
+    part = adapter.currentModel
+    context.update(
+        native_failure=None, native_error=RuntimeError("independent native read failed"),
+        readbacks=[], proofs=[], part=part,
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(_drawing_common, "double_array", tuple)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+
+    def invoke(obj, _interface, name, *args):
+        member = getattr(obj, name)
+        return member(*args) if callable(member) else member
+
+    monkeypatch.setattr(_drawing_common, "_com_invoke", invoke)
+    monkeypatch.setattr(
+        _drawing_common, "visible_component_entities",
+        lambda view, component, kind: view.GetVisibleEntities2(component, kind),
+    )
+
+    def record_event(name, **fields):
+        if name == "drawing.support_hole_table_readback":
+            context["readbacks"].append(json.loads(fields["native_readback"]))
+        elif name == "drawing.support_table_datum_invariant":
+            context["proofs"].append(json.loads(fields["native_readback"]))
+
+    monkeypatch.setattr(drawing._telemetry, "event", record_event)
+    body = part.GetBodies2(0, False)[0]
+    face = body.GetFirstFace()
+    context["pickup_planes"] = {}
+    while face is not None:
+        context["pickup_planes"][face.name] = face
+        last_face = face
+        face = face.next_face
+    holes = [
+        _FootCylinderFace(x, z, bytes([20 + index]))
+        for index, (x, z) in enumerate(support.HOLES)
+    ]
+    for hole in holes:
+        last_face.next_face = hole
+        last_face = hole
+
+    if frame == "pilot":
+        # Captured M/S mismatch, not a simulated sketch-point snap.
+        view_angle, view_scale = 0.0, 0.5
+        view_origin = (0.105, 0.07500446230558304, -1.5853294083847855e-20)
+        sketch_angle, sketch_scale, sketch_origin = 0.0, 2.0, (-0.21, -0.15, 0.0)
+    elif frame == "rotated":
+        view_angle, view_scale = 0.37, 0.8
+        view_origin = (0.24, 0.19, -0.022)
+        sketch_angle, sketch_scale, sketch_origin = -0.61, 1.25, (-0.20, 0.071, 0.0)
+    elif frame == "depth_tilt":
+        view_angle, view_scale = 0.0, 0.75
+        view_origin = (0.18, 0.16, 0.03)
+        sketch_angle, sketch_scale, sketch_origin = 0.41, 1.5, (-0.07, -0.08, 0.0)
+    else:
+        assert frame == "unit"
+        view_angle, view_scale = 0.0, 1.0
+        view_origin = (0.105, 0.075, 0.0)
+        sketch_angle, sketch_scale, sketch_origin = 0.0, 1.0, (-0.105, -0.075, 0.0)
+    c, s = math.cos(view_angle), math.sin(view_angle)
+    view_rotation = (c, s, 0, 0, 0, -1, -s, c, 0)
+    c, s = math.cos(sketch_angle), math.sin(sketch_angle)
+    if frame == "depth_tilt":
+        sketch_rotation = (1, 0, 0, 0, c, s, 0, -s, c)
+        sheet_y = view_origin[1] + view_scale * (-section.WIDE / 1000)
+        sketch_origin = (*sketch_origin[:2], -sketch_scale * (sheet_y * s))
+    else:
+        sketch_rotation = (c, s, 0, -s, c, 0, 0, 0, 1)
+    view_transform = _NativeDatumTransform(
+        view_rotation, view_origin, view_scale, context, "view_transform"
+    )
+    sketch_transform = _NativeDatumTransform(
+        sketch_rotation, sketch_origin, sketch_scale, context, "sketch_transform"
+    )
+    class NativeSketch(SimpleNamespace):
+        @property
+        def ModelToSketchTransform(self):
+            if context["native_failure"] == "sketch_frame_error":
+                raise context["native_error"]
+            return self.transform
+
+        @ModelToSketchTransform.setter
+        def ModelToSketchTransform(self, value):
+            self.transform = value
+
+    class NativeView(SimpleNamespace):
+        @property
+        def ModelToViewTransform(self):
+            if context["native_failure"] == "view_frame_error":
+                raise context["native_error"]
+            return self.transform
+
+        @ModelToViewTransform.setter
+        def ModelToViewTransform(self, value):
+            self.transform = value
+
+        def GetSketch(self):
+            if context["native_failure"] == "view_sketch_error":
+                raise context["native_error"]
+            return context["current_sketch"]
+
+    sketch = NativeSketch(transform=sketch_transform)
+    component = object()
+    view = NativeView(
+        ReferencedDocument=part, transform=view_transform,
+        GetVisibleComponents=lambda: (component,),
+        GetVisibleEntities2=lambda selected_component, kind: (
+            tuple(hole.rims[0] for hole in holes)
+            if selected_component is component and kind == 1 else ()
+        ),
+    )
+    context.update(
+        current_sketch=sketch, view_origin=view_origin, view_angle=view_angle,
+        view_scale=view_scale, sketch=sketch,
+    )
+    monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "BottomNative")
+    monkeypatch.setattr(_drawing_common, "view_name", lambda _adapter, _view: "BottomNative")
+
+    class NativeSketchManager:
+        AddToDB = False
+        DisplayWhenAdded = False
+
+        def CreatePoint(self, x, y, z):
+            if context["native_failure"] == "sketch_point_error":
+                raise context["native_error"]
+            if context["native_failure"] == "sketch_point_null":
+                return None
+            return _ReadOnlyDatumPoint((x, y, z), context["active_sketch"], context)
+
+    def activate_view(name):
+        if name != "BottomNative":
+            return False
+        context["active_sketch"] = view.GetSketch()
+        return True
+
+    adapter.currentModel = SimpleNamespace(
+        ActivateView=activate_view, SketchManager=NativeSketchManager(),
+        ClearSelection2=lambda _all: None, EditRebuild3=lambda: True,
+    )
+    utility = _NativeDatumMathUtility(context)
+
+    def get_math_utility():
+        if context["native_failure"] == "utility_error":
+            raise context["native_error"]
+        return utility
+
+    adapter.swApp.GetMathUtility = get_math_utility
+    if not create_point:
+        point = None
+    elif datum_xy is None:
+        point = drawing._create_table_pickup_datum(adapter, view)
+    else:
+        point = _drawing_common.create_view_theoretical_datum(
+            adapter, view, point_xy=datum_xy, label="hypothetical native input"
+        )
+    context.update(attachments=(point,), attachment_types=(11,), attachment_count=1, dangling=False)
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: context["attachments"],
+        GetAttachedEntityTypes=lambda: context["attachment_types"],
+        GetAttachedEntityCount3=lambda: context["attachment_count"],
+        IsDangling=lambda: context["dangling"],
+        GetPosition=lambda: (0.06055, 0.05912, 0),
+    )
+    origin = SimpleNamespace(
+        GetAnnotation=lambda: annotation,
+        GetAxisPoints2=lambda: (
+            0.06055, 0.05912, 0.06555, 0.05912,
+            0.06055, 0.05912, 0.06055, 0.06412,
+        ),
+        XLabel="X", YLabel="Y",
+    )
+    rows = [
+        ["TAG", "X LOC", "Y LOC", "SIZE"],
+        ["A1", "28.58", "14.29", "5/16"],
+        ["A2", "28.58", "49.21", "5/16"],
+        ["A3", "149.22", "14.29", "5/16"],
+        ["A4", "149.22", "49.21", "5/16"],
+    ]
+    if printed_discrepancy:
+        for row, y in zip(rows[1:], ("14.30", "49.22", "14.30", "49.22")):
+            row[2] = y
+
+    def cell_text(row, column, _hidden):
+        if fail_cell:
+            raise RuntimeError("native cell read failed")
+        return rows[row][column]
+
+    table = SimpleNamespace(
+        RowCount=5, ColumnCount=4, Text2=cell_text, DisplayedText2=cell_text,
+        HoleTable=SimpleNamespace(
+            DatumOrigin=origin,
+            GetHoleLocationPrecision=lambda: 2,
+            GetHoleLocationUseDocPrecision=lambda: False,
+            EnableUpdate=True,
+        ),
+    )
+    axes = tuple(
+        SimpleNamespace(
+            GetCurve=lambda params=params: SimpleNamespace(
+                IsCircle=lambda: False, IsLine=lambda: True, LineParams=params
+            ),
+            GetTwoAdjacentFaces2=lambda: (),
+        )
+        for params in (
+            (0, -0.0889, -0.03048, 1, 0, 0),
+            (-0.08763, -0.0889, 0, 0, 0, 1),
+        )
+    )
+    context.update(rows=rows, holes=holes)
+    return adapter, view, table, point, axes, context
+
+
+def _physical_corner_sheet_oracle(context):
+    """Compute the physical bottom projection from independent frame inputs."""
+    x, z = -section.BOSS_DEPTH / 2000, -section.WIDE / 1000
+    c, s = math.cos(context["view_angle"]), math.sin(context["view_angle"])
+    tx, ty, _tz = context["view_origin"]
+    scale = context["view_scale"]
+    return (tx + scale * (c * x - s * z), ty + scale * (s * x + c * z))
+
+
+@pytest.mark.parametrize("frame", ("pilot", "rotated", "depth_tilt"))
+def test_table_pickup_datum_composes_current_independent_native_frames(monkeypatch, frame):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, frame=frame
+    )
+    corner = (-section.BOSS_DEPTH / 2000, -section.HALF_Y / 1000, -section.WIDE / 1000)
+    expected_sheet = _physical_corner_sheet_oracle(context)
+    assert drawing.TABLE_PICKUP_CORNER_M == corner == (-0.0889, -0.0889, -0.03175)
+    assert drawing.HOLE_TABLE_DATUM_XZ_MM == (-88.9, -31.75)
+    assert set(support.HOLES) == {
+        (-60.32, -17.46), (-60.32, 17.46), (60.32, -17.46), (60.32, 17.46)
+    }
+    assert set(drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM) == {
+        (28.58, 14.29), (28.58, 49.21), (149.22, 14.29), (149.22, 49.21)
+    }
+    projected = _drawing_common.model_point_in_view(
+        adapter, view, corner, label="independent consumer corner"
+    )
+    assert projected == pytest.approx(expected_sheet, rel=32 * sys.float_info.epsilon, abs=0)
+    sketch_transform = point.GetSketch().ModelToSketchTransform
+    expected_sketch = sketch_transform.apply((*expected_sheet, 0.0))
+    assert (point.X, point.Y, point.Z) == pytest.approx(
+        expected_sketch, rel=32 * sys.float_info.epsilon, abs=0
+    )
+    assert point.Z == 0
+    assert point.GetSketch() is view.GetSketch()
+    witness = drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    assert witness["physical_corner_model_m"] == corner
+    assert witness["actual_origin_sheet_m"][:2] == pytest.approx(
+        expected_sheet, rel=32 * sys.float_info.epsilon, abs=0
+    )
+    assert witness["physical_corner_sheet_xy"] == pytest.approx(
+        expected_sheet, rel=32 * sys.float_info.epsilon, abs=0
+    )
+    assert witness["same_view_sketch"] == 1
+    comparisons = {item["label"]: item for item in witness["physical_origin_comparisons"]}
+    assert set(comparisons) == {
+        "table_pickup_end", "table_pickup_taper", "mounting_face", "sheet_x", "sheet_y"
+    }
+    for item in comparisons.values():
+        assert item["measured"] == pytest.approx(
+            item["physical"], rel=32 * sys.float_info.epsilon, abs=0
+        )
+    assert witness["cell_text2"] == context["rows"] == witness["cell_displayed_text2"]
+    assert context["selected"] == []
+    assert adapter.currentModel.SketchManager.AddToDB is False
+    assert adapter.currentModel.SketchManager.DisplayWhenAdded is False
+    native_depth = view.ModelToViewTransform.apply(corner)[2]
+    assert native_depth != 0
+    if frame == "depth_tilt":
+        # This independent sketch plane contains the flattened target. Carrying
+        # native view depth into S instead changes its XY, not just discarded Z.
+        depth_carried = sketch_transform.apply((*expected_sheet, native_depth))
+        assert depth_carried[:2] != pytest.approx(expected_sketch[:2])
+        assert witness["actual_origin_sheet_m"][2] == pytest.approx(0, abs=1e-15)
+    if frame == "pilot":
+        assert (point.Y - corner[2]) * 1000 == pytest.approx(0.0089246111664, abs=1e-10)
+
+
+def test_old_direct_table_point_refuses_captured_native_frame_mismatch(monkeypatch):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, datum_xy=(-0.0889, -0.03175)
+    )
+    retained = (point.X, point.Y, point.Z)
+    with pytest.raises(RuntimeError, match="physical-origin invariant failed: sheet_y"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    raw, proof = context["readbacks"][-1], context["proofs"][-1]
+    assert raw["created_point"]["xyz_si"] == list(retained)
+    assert raw["origin_attachments"][0]["point"]["xyz_si"] == list(retained)
+    assert proof["actual_origin_sheet_m"][:2] == pytest.approx((0.06055, 0.059125))
+    assert proof["physical_corner_sheet_xy"] == pytest.approx(
+        _physical_corner_sheet_oracle(context), rel=32 * sys.float_info.epsilon, abs=0
+    )
+    mismatch_mm = (
+        proof["physical_corner_sheet_xy"][1] - proof["actual_origin_sheet_m"][1]
+    ) / context["view_scale"] * 1000
+    assert mismatch_mm == pytest.approx(0.0089246111664, abs=1e-10)
+    assert (point.X, point.Y, point.Z) == retained
+
+
+@pytest.mark.parametrize(
+    "failure",
+    (
+        "wrong_point", "wrong_sketch", "null_attachment", "missing_attachment",
+        "multiple", "declared_count", "wrong_type", "missing_type", "extra_type",
+        "dangling", "identity_status",
+    ),
+)
+def test_settled_table_origin_refuses_wrong_native_attachment(monkeypatch, failure):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(monkeypatch)
+    retained = (point.X, point.Y, point.Z)
+    if failure == "wrong_point":
+        context["attachments"] = (_ReadOnlyDatumPoint(retained, point.GetSketch(), context),)
+    elif failure == "wrong_sketch":
+        point.sketch = SimpleNamespace(ModelToSketchTransform=point.sketch.ModelToSketchTransform)
+    elif failure == "null_attachment":
+        context["attachments"] = (None,)
+    elif failure == "missing_attachment":
+        context.update(attachments=(), attachment_types=(), attachment_count=0)
+    elif failure == "multiple":
+        context.update(attachments=(point, point), attachment_types=(11, 11), attachment_count=2)
+    elif failure == "declared_count":
+        context["attachment_count"] = 2
+    elif failure == "wrong_type":
+        context.update(attachments=(context["holes"][0].rims[0],), attachment_types=(1,))
+    elif failure == "missing_type":
+        context["attachment_types"] = ()
+    elif failure == "extra_type":
+        context["attachment_types"] = (11, 11)
+    elif failure == "dangling":
+        context["dangling"] = True
+    else:
+        adapter.swApp.IsSame = lambda left, right: 2 if left is right else 0
+    message = (
+        "different view sketch" if failure == "wrong_sketch"
+        else "lost its single native point attachment"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    raw = context["readbacks"][-1]
+    assert raw["created_point"]["xyz_si"] == list(retained)
+    assert raw["origin_attachment_types"] == list(context["attachment_types"])
+    assert raw["origin_declared_attachment_count"] == context["attachment_count"]
+    assert raw["origin_is_dangling"] is context["dangling"]
+    if failure == "wrong_point":
+        assert raw["origin_attachments"][0]["same_created_point"] == 0
+        assert raw["origin_attachments"][0]["point"]["xyz_si"] == list(retained)
+    if failure == "wrong_type":
+        assert raw["origin_attachments"][0]["edge"]["is_circle"] is True
+    assert (point.X, point.Y, point.Z) == retained
+
+
+@pytest.mark.parametrize("changed_frame", ("model_to_view", "model_to_sketch"))
+def test_settled_table_origin_refuses_later_native_transform_drift(monkeypatch, changed_frame):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, frame="rotated"
+    )
+    retained = (point.X, point.Y, point.Z)
+    transform = (
+        view.ModelToViewTransform if changed_frame == "model_to_view"
+        else point.GetSketch().ModelToSketchTransform
+    )
+    data = transform.ArrayData
+    moved = _NativeDatumTransform(
+        data[:9], (data[9] + 2e-6, data[10], data[11]), data[12], context, transform.name
+    )
+    if changed_frame == "model_to_view":
+        view.ModelToViewTransform = moved
+    else:
+        point.GetSketch().ModelToSketchTransform = moved
+    with pytest.raises(RuntimeError, match="physical-origin invariant failed: sheet_"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    raw, proof = context["readbacks"][-1], context["proofs"][-1]
+    assert raw["created_point"]["xyz_si"] == list(retained)
+    assert any(
+        item["error_si"] != 0 for item in proof["physical_origin_comparisons"]
+        if item["label"].startswith("sheet_")
+    )
+    assert (point.X, point.Y, point.Z) == retained
+
+
+@pytest.mark.parametrize("failure", ("missing_taper", "ambiguous_end"))
+def test_settled_table_origin_requires_uniquely_resolved_native_planes(monkeypatch, failure):
+    adapter, view, table, point, axes, _context = _native_table_readback_fixture(
+        monkeypatch, pickup_failure=failure
+    )
+    with pytest.raises(RuntimeError, match="matched [02] faces"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+
+
+@pytest.mark.parametrize(
+    "plane, label",
+    (("end", "table_pickup_end"), ("taper", "table_pickup_taper"), ("mounting", "mounting_face")),
+)
+def test_settled_table_origin_refuses_corner_off_actual_native_plane(monkeypatch, plane, label):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(monkeypatch)
+    face = context["pickup_planes"][plane]
+    params = face.surface.PlaneParams
+    # Remain within the resolver's face-picking tolerance while moving the
+    # actual native plane: a plausible match is not physical incidence.
+    displaced = (*params[:3], *(p + n * 1e-7 for p, n in zip(params[3:], params[:3])))
+    face.surface.PlaneParams = displaced
+    retained = (point.X, point.Y, point.Z)
+    with pytest.raises(RuntimeError, match=f"physical-origin invariant failed: {label}"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    raw, proof = context["readbacks"][-1], context["proofs"][-1]
+    assert raw["native_part_faces"][label]["surface_parameters_si"] == list(displaced)
+    comparison = next(item for item in proof["physical_origin_comparisons"] if item["label"] == label)
+    assert abs(comparison["error_si"]) > 5e-8
+    assert raw["created_point"]["xyz_si"] == list(retained)
+    assert (point.X, point.Y, point.Z) == retained
+
+
+@pytest.mark.parametrize(
+    "stage, failure",
+    (
+        *((stage, failure) for stage in ("creation", "settled") for failure in (
+            "math_point_null", "multiply_null", "math_data_null", "math_data_short",
+            "math_data_nonfinite", "utility_null", "view_transform_null",
+            "view_sketch_null", "sketch_transform_null",
+        )),
+        ("creation", "sketch_point_null"),
+        ("settled", "inverse_null"),
+        ("settled", "point_sketch_null"),
+        ("settled", "created_point_null"),
+        ("settled", "part_null"),
+        ("settled", "part_extension_null"),
+        ("settled", "part_bodies_null"),
+        ("settled", "plane_surface_null"),
+        ("settled", "table_feature_null"),
+        ("settled", "origin_null"),
+        ("settled", "annotation_null"),
+        ("settled", "point_nonfinite"),
+        ("settled", "point_depth"),
+    ),
+)
+def test_table_pickup_native_nulls_and_invalid_values_refuse(monkeypatch, stage, failure):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, create_point=stage == "settled"
+    )
+    context["native_failure"] = failure
+    if failure == "utility_null":
+        adapter.swApp.GetMathUtility = lambda: None
+    elif failure == "view_transform_null":
+        view.ModelToViewTransform = None
+    elif failure == "view_sketch_null":
+        context["current_sketch"] = None
+    elif failure == "sketch_transform_null":
+        context["sketch"].ModelToSketchTransform = None
+    elif failure == "point_sketch_null":
+        point.sketch = None
+    elif failure == "created_point_null":
+        point = None
+    elif failure == "part_null":
+        view.ReferencedDocument = None
+    elif failure == "part_extension_null":
+        context["part"].Extension = None
+    elif failure == "part_bodies_null":
+        context["part"].GetBodies2 = lambda _kind, _hidden: None
+    elif failure == "plane_surface_null":
+        context["pickup_planes"]["taper"].GetSurface = lambda: None
+    elif failure == "table_feature_null":
+        table.HoleTable = None
+    elif failure == "origin_null":
+        table.HoleTable.DatumOrigin = None
+    elif failure == "annotation_null":
+        table.HoleTable.DatumOrigin.GetAnnotation = lambda: None
+    elif failure == "point_nonfinite":
+        point._xyz = (math.nan, point.Y, point.Z)
+    elif failure == "point_depth":
+        point._xyz = (point.X, point.Y, 1e-5)
+    # Native missing members can raise at the read seam rather than a later
+    # invariant. None of those failures may produce an accepted table.
+    with pytest.raises((RuntimeError, AttributeError, TypeError)):
+        if stage == "creation":
+            drawing._create_table_pickup_datum(adapter, view)
+        else:
+            drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    if failure == "point_depth":
+        assert context["readbacks"][-1]["created_point"]["xyz_si"][2] == 1e-5
+        assert point.Z == 1e-5
+
+
+@pytest.mark.parametrize(
+    "stage, failure",
+    (
+        *((stage, failure) for stage in ("creation", "settled") for failure in (
+            "math_point_error", "multiply_error", "math_data_error",
+            "utility_error", "view_frame_error", "sketch_frame_error", "view_sketch_error",
+        )),
+        ("creation", "sketch_point_error"),
+        ("settled", "view_transform_read_error"),
+        ("settled", "sketch_transform_read_error"),
+        ("settled", "inverse_error"),
+        ("settled", "point_read_error"),
+        ("settled", "point_sketch_error"),
+        ("settled", "plane_read_error"),
+    ),
+)
+def test_table_pickup_native_math_and_getter_errors_propagate(monkeypatch, stage, failure):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, create_point=stage == "settled"
+    )
+    context["native_failure"] = failure
+    if failure == "plane_read_error":
+        def failed_surface():
+            raise context["native_error"]
+
+        context["pickup_planes"]["taper"].GetSurface = failed_surface
+    with pytest.raises(RuntimeError) as caught:
+        if stage == "creation":
+            drawing._create_table_pickup_datum(adapter, view)
+        else:
+            drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    assert caught.value is context["native_error"]
+
+
+def test_native_table_readback_preserves_raw_offset_and_printed_discrepancy(monkeypatch):
+    """Hypothetical drift is captured, not evidence of the actual pilot's cause."""
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, frame="unit", datum_xy=(-0.0889, -0.03176), printed_discrepancy=True
+    )
+    with pytest.raises(RuntimeError, match="physical-origin invariant failed: sheet_y"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    witness = context["readbacks"][-1]
+    assert witness["created_point"]["xyz_si"] == [-0.0889, -0.03176, 0]
+    assert point.Y != drawing.HOLE_TABLE_DATUM_XZ_MM[1] / 1000
+    assert witness["origin_attachments"][0]["same_created_point"] == 1
+    assert witness["cell_text2"] == witness["cell_displayed_text2"]
+    assert [row[2] for row in witness["cell_displayed_text2"][1:]] == [
+        "14.30", "49.22", "14.30", "49.22"
+    ]
+    assert set(witness["native_part_faces"]) == {
+        "table_pickup_end", "table_pickup_taper", "mounting_face",
+        "foot_0", "foot_1", "foot_2", "foot_3",
+    }
+    for index, (x, z) in enumerate(support.HOLES):
+        rims = witness["native_part_faces"][f"foot_{index}"]["rim_edges"]
+        assert len(rims) == 2
+        assert rims[0]["circle_parameters_si"][:3] == pytest.approx(
+            (x / 1000, -section.HALF_Y / 1000, z / 1000)
+        )
+    assert len(witness["current_view_foot_rims"]) == 4
+    assert witness["view_model_to_view_transform"][9:13] == [0.105, 0.075, 0, 1.0]
+    assert witness["initial_datum_axis_edges"][0]["line_parameters_si"][2] == -0.03048
+    assert context["selected"] == []
+    assert (point.X, point.Y, point.Z) == (-0.0889, -0.03176, 0)
+
+
+def test_native_table_readback_error_propagates_in_the_batch_phase(monkeypatch):
+    adapter, view, table, point, axes, _context = _native_table_readback_fixture(
+        monkeypatch, fail_cell=True
+    )
+    active, roots = [], []
+
+    @contextlib.contextmanager
+    def capture_span(name, **_fields):
+        record = {"name": name, "failed": False}
+        if not active:
+            roots.append(record)
+        active.append(record)
+        try:
+            yield None
+        except BaseException:
+            record["failed"] = True
+            raise
+        finally:
+            active.pop()
+
+    monkeypatch.setattr(drawing._telemetry, "span", capture_span)
+    with pytest.raises(RuntimeError, match="native cell read failed"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    assert len(roots) == 1
+    assert roots[0]["failed"] is True
+    assert active == []
+
+
 def test_native_hole_table_covers_every_foot_hole() -> None:
     expected_holes = {
         (60.32, 17.46),
@@ -122,7 +1180,7 @@ def test_native_hole_table_covers_every_foot_hole() -> None:
     }
     assert set(support.HOLES) == expected_holes
     assert drawing.HOLE_TABLE_DATUM_XZ_MM == (
-        -support.BOSS_DEPTH / 2.0,
+        -section.BOSS_DEPTH / 2.0,
         -support.WIDE,
     )
     x_centres = {x for x, _ in expected_holes}
@@ -131,7 +1189,7 @@ def test_native_hole_table_covers_every_foot_hole() -> None:
     assert round(max(y_centres) - min(y_centres), 2) == 34.92
     expected_locations = {
         (
-            round(x + support.BOSS_DEPTH / 2.0, 2),
+            round(x + section.BOSS_DEPTH / 2.0, 2),
             round(z + support.WIDE, 2),
         )
         for x, z in expected_holes
@@ -139,11 +1197,11 @@ def test_native_hole_table_covers_every_foot_hole() -> None:
     assert set(drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM) == expected_locations
     xs = {x for x, _ in expected_locations}
     ys = {y for _, y in expected_locations}
-    assert round(min(xs) + max(xs), 2) == support.BOSS_DEPTH
+    assert round(min(xs) + max(xs), 2) == section.BOSS_DEPTH
     assert round(min(ys) + max(ys), 2) == 2.0 * support.WIDE
     points = {drawing._bottom_sheet_xy(hole) for hole in expected_holes}
     assert len(points) == 4
-    half_w = support.BOSS_DEPTH / 2.0 * drawing.VIEW_SCALE / 1000.0
+    half_w = section.BOSS_DEPTH / 2.0 * drawing.VIEW_SCALE / 1000.0
     half_h = support.WIDE * drawing.VIEW_SCALE / 1000.0
     for x, y in points:
         assert abs(x - drawing.BOTTOM_CENTER[0]) <= half_w
@@ -676,7 +1734,7 @@ def test_foot_thickness_text_sits_above_its_extension_lines() -> None:
     lowest_local_y = (foot[1] - drawing.RIGHT_CENTER[1]) / scale
     wall_x = drawing.RIGHT_CENTER[0] - support._wall_half_z_at(lowest_local_y) * scale
     assert foot[2] < wall_x - 0.002
-    front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    front_right = drawing.FRONT_CENTER[0] + section.BOSS_DEPTH / 2 * scale
     assert foot[0] > front_right + 0.003
 
 
@@ -742,7 +1800,7 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
     )
     assert 25.0 < angle < 65.0
     label = _text_box("R12.7\n4X", text_xy)
-    front_right = drawing.FRONT_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    front_right = drawing.FRONT_CENTER[0] + section.BOSS_DEPTH / 2 * scale
     assert label[0] > front_right + 0.003
     for other in (
         _text_box("16.9", drawing.RIGHT_KEEP["TopSpan"]),
@@ -755,43 +1813,55 @@ def test_cavity_radius_callout_sits_on_its_corner_bisector_outside_the_view() ->
 
 def _fake_note_annotation(text: str, x: float, y: float, *, kind: int = 6):
     state = {"position": (x, y, 0.0)}
+    moves = []
     note = SimpleNamespace(GetText=lambda: text)
 
     def set_position(new_x, new_y, new_z):
+        moves.append((new_x, new_y, new_z))
         state["position"] = (new_x, new_y, new_z)
         return True
 
     return SimpleNamespace(
         GetType=lambda: kind,
+        GetName=lambda: text,
         GetSpecificAnnotation=lambda: note,
         GetPosition=lambda: state["position"],
         SetPosition2=set_position,
+        moves=moves,
     )
 
 
-def test_right_end_hole_tags_move_left_of_their_holes(monkeypatch) -> None:
-    """A3 and A4 printed across the pocket's hidden end lines (fix3 render).
-    They take the mirror spot left of their holes; A1 and A2 stay put."""
+def test_bottom_hole_tags_keep_right_mirrors_and_clear_lower_hidden_line(monkeypatch):
+    """Keep the established right mirrors; only A1/A3 move down from the pilot."""
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
     tags = {
         name: _fake_note_annotation(name, x, y)
         for name, x, y in (
-            ("A1", 0.0796, 0.0661),
-            ("A2", 0.0796, 0.0878),
-            ("A3", 0.1397, 0.0661),
-            ("A4", 0.1397, 0.0878),
+            ("A1", 0.0790716, 0.0705061),
+            ("A2", 0.0790716, 0.0879661),
+            ("A3", 0.1393916, 0.0705061),
+            ("A4", 0.1393916, 0.0879661),
         )
     }
     dimension = _fake_note_annotation("A4", 0.2, 0.1, kind=1)
     view = SimpleNamespace(GetAnnotations=lambda: (*tags.values(), dimension))
-    moved = drawing._mirror_right_end_hole_tags(view)
-    assert set(moved) == {"A3", "A4"}
-    for name in ("A3", "A4"):
-        assert tags[name].GetPosition()[0] == pytest.approx(
-            0.1397 + drawing.HOLE_TAG_MIRROR_SHIFT
-        )
-    assert tags["A1"].GetPosition()[0] == 0.0796
-    assert dimension.GetPosition()[0] == 0.2
+    moved = drawing._position_bottom_hole_tags(view)
+    assert set(moved) == {"A1", "A3", "A4"}
+    assert tags["A1"].GetPosition() == pytest.approx((0.0790716, 0.0675061, 0))
+    assert tags["A2"].GetPosition() == pytest.approx((0.0790716, 0.0879661, 0))
+    assert tags["A3"].GetPosition() == pytest.approx((0.1243916, 0.0675061, 0))
+    assert tags["A4"].GetPosition() == pytest.approx((0.1243916, 0.0879661, 0))
+    assert tags["A2"].moves == []
+    assert dimension.moves == []
+
+    # Native pilot 829e6f8e5: the unchanged hidden line is y70.0085 mm;
+    # both lower tag extents topped at70.5976 mm relative to y70.5061.
+    # Those old boxes cross it; translated boxes must leave >2 mm of air.
+    hidden_line_y, old_box_top, old_anchor_y = 0.0700085, 0.0705976, 0.0705061
+    assert 0.0663084 < hidden_line_y < old_box_top
+    for name in ("A1", "A3"):
+        new_top = old_box_top + tags[name].GetPosition()[1] - old_anchor_y
+        assert hidden_line_y - new_top > 0.002
 
     # Measured on A4 in the fix3 render: the tag's left edge 4.6 mm right of
     # its hole centre, 5.8 mm wide. The shift mirrors it about the hole.
@@ -808,18 +1878,280 @@ def test_right_end_hole_tags_move_left_of_their_holes(monkeypatch) -> None:
     assert hole_x - moved_right == pytest.approx(0.0046, abs=0.0005)
 
 
-def test_right_end_hole_tag_mover_fails_loud(monkeypatch) -> None:
+def test_bottom_hole_tag_positioner_fails_loud(monkeypatch) -> None:
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
     only_a3 = SimpleNamespace(
         GetAnnotations=lambda: (_fake_note_annotation("A3", 0.1397, 0.0661),)
     )
     with pytest.raises(RuntimeError, match="A4"):
-        drawing._mirror_right_end_hole_tags(only_a3)
+        drawing._position_bottom_hole_tags(only_a3)
     left_a4 = SimpleNamespace(
         GetAnnotations=lambda: (_fake_note_annotation("A4", 0.0796, 0.0878),)
     )
     with pytest.raises(RuntimeError, match="not at the right end"):
-        drawing._mirror_right_end_hole_tags(left_a4)
+        drawing._position_bottom_hole_tags(left_a4)
+
+
+@pytest.mark.parametrize("failure", ("duplicate", "wrong_row", "refused", "snapped"))
+def test_bottom_hole_tags_reject_ambiguous_or_unsettled_positions(monkeypatch, failure):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    tags = [
+        _fake_note_annotation(name, x, y)
+        for name, x, y in (
+            ("A1", 0.0790716, 0.0705061),
+            ("A2", 0.0790716, 0.0879661),
+            ("A3", 0.1393916, 0.0705061),
+            ("A4", 0.1393916, 0.0879661),
+        )
+    ]
+    if failure == "duplicate":
+        tags.append(_fake_note_annotation("A1", 0.0790716, 0.0705061))
+        message = "duplicate bottom-view hole tag"
+    elif failure == "wrong_row":
+        tags[0] = _fake_note_annotation("A1", 0.0790716, 0.0879661)
+        message = "not in the lower row"
+    elif failure == "refused":
+        tags[0].SetPosition2 = lambda *_args: False
+        message = "failed to move hole tag"
+    else:
+        tags[0].SetPosition2 = lambda *_args: True
+        message = "landed at .* not"
+    with pytest.raises(RuntimeError, match=message):
+        drawing._position_bottom_hole_tags(
+            SimpleNamespace(GetAnnotations=lambda: tags)
+        )
+
+
+class _NativeCalloutLength:
+    """A native length token with an independently retained model value."""
+
+    def __init__(self, name, value_mm, *, persists=True):
+        self._oleobj_ = SimpleNamespace(VariableName=name)
+        self.value_mm = value_mm
+        self._precision = 2
+        self.persists = persists
+
+    @property
+    def Precision(self):
+        return self._precision
+
+    @Precision.setter
+    def Precision(self, value):
+        if self.persists:
+            self._precision = value
+
+
+def _native_seat_callout(monkeypatch, *, depths_persist=True):
+    # Bind only the native seams; exercise the existing precision helper itself.
+    monkeypatch.setitem(
+        sys.modules,
+        "win32com.client.dynamic",
+        SimpleNamespace(Dispatch=lambda raw: raw),
+    )
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _name: obj)
+    lengths = [
+        _NativeCalloutLength("hw-tapdrldia", 3.454),
+        _NativeCalloutLength("hw-tapdrldepth", 18.0, persists=depths_persist),
+        _NativeCalloutLength("hw-threaddepth", 14.7, persists=depths_persist),
+    ]
+    thread = SimpleNamespace(
+        _oleobj_=SimpleNamespace(VariableName="hw-threadsize"),
+        native_text="native thread designation",
+    )
+    variables = [*lengths, thread]
+    return SimpleNamespace(GetHoleCalloutVariables=lambda: variables), lengths, thread
+
+
+def test_native_seat_depth_precision_preserves_diameter_thread_and_model_values(
+    monkeypatch,
+):
+    display, lengths, thread = _native_seat_callout(monkeypatch)
+    values_before = [length.value_mm for length in lengths]
+    drawing.set_hole_callout_precision(
+        display, drawing.SEAT_CALLOUT_PRECISION, label="rocker-bracket transfer seats"
+    )
+    assert [length.Precision for length in lengths] == [2, 1, 1]
+    assert [length.value_mm for length in lengths] == values_before
+    assert thread.native_text == "native thread designation"
+    assert [
+        f"{length.value_mm:.{length.Precision}f}" for length in lengths
+    ] == ["3.45", "18.0", "14.7"]
+
+
+@pytest.mark.parametrize("failure", ("missing_thread_depth", "ignored_precision"))
+def test_native_seat_depth_precision_refuses_missing_or_ignored_variables(
+    monkeypatch, failure
+):
+    display, lengths, thread = _native_seat_callout(
+        monkeypatch, depths_persist=failure != "ignored_precision"
+    )
+    if failure == "missing_thread_depth":
+        display.GetHoleCalloutVariables = lambda: (*lengths[:2], thread)
+        message = "no native variables.*hw-threaddepth"
+    else:
+        message = "hw-tapdrldepth precision did not persist"
+    with pytest.raises(RuntimeError, match=message):
+        drawing.set_hole_callout_precision(
+            display, drawing.SEAT_CALLOUT_PRECISION, label="rocker-bracket transfer seats"
+        )
+
+
+def _native_section_caption(monkeypatch):
+    monkeypatch.setattr(_section_axis, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(_section_axis, "rebuild_drawing", lambda *_args, **_kwargs: None)
+    annotation = _fake_note_annotation("SECTION A-A", 0.205, 0.128485)
+    note = SimpleNamespace(
+        PropertyLinkedText="SECTION <VLLABEL>",
+        GetAnnotation=lambda: annotation,
+        GetText=lambda: "SECTION A-A",
+        font_sizes=(0.00635, 0.0035),
+    )
+    return SimpleNamespace(GetNotes=lambda: (note,)), note, annotation
+
+
+def test_section_caption_moves_as_native_linked_text_without_font_change(monkeypatch):
+    view, note, annotation = _native_section_caption(monkeypatch)
+    drawing.position_section_caption(
+        object(), view, drawing.SECTION_CAPTION_XY, label="rocker-arm support"
+    )
+    assert annotation.GetPosition() == pytest.approx((0.205, 0.1255, 0))
+    assert note.PropertyLinkedText == "SECTION <VLLABEL>"
+    assert note.font_sizes == (0.00635, 0.0035)
+
+    # Translate the saved native extent, not the padded VIEW B GetOutline.
+    # Neither assertion is a claim about the still-unrendered candidate.
+    delta_y = annotation.GetPosition()[1] - 0.128485
+    extent_bottom, extent_top = 0.1206373 + delta_y, 0.1287389 + delta_y
+    foot_span_arrow_low = 0.1298
+    crop_ink_top = (
+        drawing.VIEW_B_CENTER[1]
+        + drawing.VIEW_B_CROP_HALF_Z_MM * drawing.VIEW_SCALE / 1000
+    )
+    assert foot_span_arrow_low - extent_top > 0.002
+    assert extent_bottom - crop_ink_top > 0.003
+
+
+@pytest.mark.parametrize(
+    "failure", ("unlinked", "ambiguous", "refused", "snapped", "lost_native_fields")
+)
+def test_section_caption_refuses_ambiguous_or_unsettled_native_label(
+    monkeypatch, failure
+):
+    view, note, annotation = _native_section_caption(monkeypatch)
+    if failure == "unlinked":
+        note.PropertyLinkedText = "SECTION A-A"
+        message = "expected one native linked"
+    elif failure == "ambiguous":
+        second_note = SimpleNamespace(PropertyLinkedText="SECTION <VLLABEL>")
+        view.GetNotes = lambda: (note, second_note)
+        message = "expected one native linked"
+    elif failure == "refused":
+        annotation.SetPosition2 = lambda *_args: False
+        message = "failed to position"
+    elif failure == "snapped":
+        annotation.SetPosition2 = lambda *_args: True
+        message = "position did not persist"
+    else:
+        def lose_native_fields(*_args, **_kwargs):
+            note.PropertyLinkedText = "SECTION A-A"
+
+        monkeypatch.setattr(_section_axis, "rebuild_drawing", lose_native_fields)
+        message = "lost its native fields"
+    with pytest.raises(RuntimeError, match=message):
+        drawing.position_section_caption(
+            object(), view, drawing.SECTION_CAPTION_XY, label="rocker-arm support"
+        )
+
+
+class _DocumentHoleMarkPreference:
+    def __init__(self, *, persists=True):
+        self.enabled = True
+        self.persists = persists
+        self.writes = []
+
+    def GetUserPreferenceToggle(self, preference, option):
+        assert (preference, option) == (308, 0)  # independently witnessed swconst member
+        return self.enabled
+
+    def SetUserPreferenceToggle(self, preference, option, value):
+        assert (preference, option) == (308, 0)
+        self.writes.append(value)
+        if self.persists:
+            self.enabled = value
+        return self.enabled  # OFF is false, not an operation failure.
+
+
+def _sparse_preference_adapter(monkeypatch):
+    """Reproduce the actual absent makepy member and incomplete adapter table."""
+    monkeypatch.setitem(
+        sys.modules, "win32com.client", SimpleNamespace(constants=SimpleNamespace())
+    )
+    adapter = SimpleNamespace(
+        swApp=object(),  # No application preference setter is available.
+        constants={"swDocPART": 1, "swDocASSEMBLY": 2, "swDocDRAWING": 3},
+    )
+    assert _common._preference_id(
+        adapter, "swDetailingAutoInsertCenterMarksForHoles"
+    ) is None
+    return adapter
+
+
+@pytest.mark.parametrize("persists", (True, False))
+def test_automatic_hole_marks_use_document_preference_with_sparse_python_constants(
+    monkeypatch, persists
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    extension = _DocumentHoleMarkPreference(persists=persists)
+    model = SimpleNamespace(Extension=extension)
+    adapter = _sparse_preference_adapter(monkeypatch)
+    if persists:
+        drawing._disable_automatic_hole_center_marks(adapter, model)
+        assert extension.enabled is False
+    else:
+        with pytest.raises(RuntimeError, match="remain enabled"):
+            drawing._disable_automatic_hole_center_marks(adapter, model)
+        assert extension.enabled is True
+    assert extension.writes == [False]
+
+
+@pytest.mark.parametrize(
+    "failed_method", ("GetUserPreferenceToggle", "SetUserPreferenceToggle")
+)
+def test_automatic_hole_marks_propagate_native_preference_failure(
+    monkeypatch, failed_method
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    adapter = _sparse_preference_adapter(monkeypatch)
+    extension = _DocumentHoleMarkPreference()
+
+    def native_failure(*_args):
+        raise RuntimeError("native preference access failed")
+
+    monkeypatch.setattr(extension, failed_method, native_failure)
+    with pytest.raises(RuntimeError, match="native preference access failed"):
+        drawing._disable_automatic_hole_center_marks(
+            adapter, SimpleNamespace(Extension=extension)
+        )
+
+
+def test_center_mark_census_reads_annotations_and_retains_duplicate_locations(
+    monkeypatch,
+):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
+    marks = [
+        _fake_note_annotation("CenterMark347", 0.0735367, 0.0647781, kind=13),
+        _fake_note_annotation("CenterMark352", 0.0735367, 0.0647781, kind=13),
+    ]
+    note = _fake_note_annotation("A1", 0.0790716, 0.0705061)
+    centerline = _fake_note_annotation("CenterLine", 0.08, 0.07, kind=15)
+    view = SimpleNamespace(GetAnnotations=lambda: (*marks, note, centerline))
+    census = drawing._center_mark_census(view)
+    assert census == [
+        {"name": "CenterMark347", "position": (0.0735367, 0.0647781, 0)},
+        {"name": "CenterMark352", "position": (0.0735367, 0.0647781, 0)},
+    ]
+    # These are two actual annotation records, not a geometry-deduplicated count.
+    assert len(census) == 2
 
 
 def test_seats_print_as_one_native_callout_with_only_the_transfer_as_text() -> None:
@@ -838,11 +2170,45 @@ def test_seats_print_as_one_native_callout_with_only_the_transfer_as_text() -> N
     assert drawing.SEAT_CALLOUT_X_MM == max(seats.SEAT_LOCAL_X)
 
 
-# Measured on the fix4 render (leaf 20260926T141000Z-1-f32d205b), sheet metres.
-SECTION_CAPTION_BOTTOM = 0.1211  # "SECTION A-A" under the section
+# Use the saved pilot's native caption extent relative to its native anchor,
+# translated to the recipe's current target. This is a layout prediction,
+# not proof of the next rendered caption or the padded view outline.
+SECTION_CAPTION_BOTTOM = drawing.SECTION_CAPTION_XY[1] + (0.1206373 - 0.128485)
+# Other ink landmarks below were measured on the fix4 render
+# (leaf20260926T141000Z-1-f32d205b), in sheet metres.
 HOLE_TABLE_BOTTOM = 0.0967
 TITLE_BLOCK_TOP, TITLE_BLOCK_LEFT = 0.0649, 0.2183
 DEPTH_DIM_LINE_Y = 0.2549  # the 177.8 above the front view
+
+
+def test_pickup_process_note_clears_native_datum_axes_in_the_footer_lane():
+    """Translate actual b801 ink; the new native saved layout remains a gate."""
+    x, y = drawing.TABLE_PICKUP_NOTE_XY
+    native_anchor = (0.025, 0.049)
+    native_extent = (
+        0.024796006688963146, 0.031042367892976597,
+        0.17777451505016723, 0.04915197324414716,
+    )
+    left, bottom, right, top = (
+        native_extent[0] + x - native_anchor[0],
+        native_extent[1] + y - native_anchor[1],
+        native_extent[2] + x - native_anchor[0],
+        native_extent[3] + y - native_anchor[1],
+    )
+    # Native datum GetAxisPoints2 exposes drawing-space symbol endpoints, not
+    # its numeric origin. Both actual leader axes remain above the entire note.
+    datum_axes = (
+        ((0.06055, 0.04563), (0.076601, 0.04563)),
+        ((0.047055, 0.059125), (0.047055, 0.075176)),
+    )
+    assert top < min(point[1] for axis in datum_axes for point in axis) - 0.003
+    assert left > 0.0127
+    assert bottom > 0.0127
+    assert right < TITLE_BLOCK_LEFT - 0.003
+    bottom_view_low = (
+        drawing.BOTTOM_CENTER[1] - section.WIDE * drawing.VIEW_SCALE / 1000
+    )
+    assert top < bottom_view_low - 0.003
 
 
 def test_view_b_is_a_cropped_rail_strip_in_the_band_below_the_section() -> None:
@@ -850,9 +2216,9 @@ def test_view_b_is_a_cropped_rail_strip_in_the_band_below_the_section() -> None:
     circle to carry the callout, in a relocated partial top view (VIEW B) of
     the rail strip, below Section A-A and right of the bottom view."""
     scale = drawing.VIEW_SCALE / 1000
-    bottom_right = drawing.BOTTOM_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    bottom_right = drawing.BOTTOM_CENTER[0] + section.BOSS_DEPTH / 2 * scale
     x, y = drawing.VIEW_B_CENTER
-    half_len = support.BOSS_DEPTH / 2 * scale
+    half_len = section.BOSS_DEPTH / 2 * scale
     half_crop = drawing.VIEW_B_CROP_HALF_Z_MM * scale
     # The crop keeps the whole rail top (its half-width) and stays clear of
     # the foot holes seen through the cavity: a fence through them left half
@@ -882,7 +2248,7 @@ def test_seat_callout_text_sits_between_the_hole_table_and_the_title_block() -> 
     assert y - half_h > TITLE_BLOCK_TOP + 0.002
     view_b_bottom = drawing.VIEW_B_CENTER[1] - drawing.VIEW_B_CROP_HALF_Z_MM * scale
     assert y + half_h < view_b_bottom - 0.003
-    assert x - width > drawing.BOTTOM_CENTER[0] + support.BOSS_DEPTH / 2 * scale
+    assert x - width > drawing.BOTTOM_CENTER[0] + section.BOSS_DEPTH / 2 * scale
     assert x + width < 0.415  # the right border
 
 
@@ -891,7 +2257,7 @@ def test_view_b_arrow_looks_down_on_the_rail_from_above_the_front_view() -> None
     text_xy, tip_xy = drawing.VIEW_B_ARROW
     front_top = drawing.FRONT_CENTER[1] + support.HALF_Y * scale
     assert tip_xy[1] == pytest.approx(front_top)
-    assert abs(tip_xy[0] - drawing.FRONT_CENTER[0]) < support.BOSS_DEPTH / 2 * scale
+    assert abs(tip_xy[0] - drawing.FRONT_CENTER[0]) < section.BOSS_DEPTH / 2 * scale
     # The letter stands square above its tip, under the 177.8 dimension line.
     assert text_xy[1] - drawing.VIEW_LETTER_HEIGHT > tip_xy[1] + 0.004
     assert text_xy[1] < DEPTH_DIM_LINE_Y - 0.002
@@ -1168,7 +2534,7 @@ class _CropSeat:
         self.rebuilds = []
         self.origin = origin
         self.end_run = (
-            support.BOSS_DEPTH / 2 * drawing.VIEW_SCALE / 1000
+            section.BOSS_DEPTH / 2 * drawing.VIEW_SCALE / 1000
             if end_run is None
             else end_run
         )
@@ -1223,7 +2589,7 @@ class _CropSeat:
         # *Top at 1:2: model +X runs along the sheet from the part origin.
         del label
         return (
-            self.origin[0] + xyz[0] / (support.BOSS_DEPTH / 2000) * self.end_run,
+            self.origin[0] + xyz[0] / (section.BOSS_DEPTH / 2000) * self.end_run,
             self.origin[1],
         )
 
@@ -1263,8 +2629,8 @@ def test_view_b_crop_fence_is_the_rail_strip_across_the_whole_rail(monkeypatch) 
     scale = drawing.VIEW_SCALE / 1000
     x1, y1, _z1, x2, y2, _z2 = seat.rectangle
     cx, cy = drawing.VIEW_B_CENTER
-    assert min(x1, x2) < cx - support.BOSS_DEPTH / 2 * scale
-    assert max(x1, x2) > cx + support.BOSS_DEPTH / 2 * scale
+    assert min(x1, x2) < cx - section.BOSS_DEPTH / 2 * scale
+    assert max(x1, x2) > cx + section.BOSS_DEPTH / 2 * scale
     assert (min(y1, y2), max(y1, y2)) == pytest.approx(
         (
             cy - drawing.VIEW_B_CROP_HALF_Z_MM * scale,
@@ -1309,7 +2675,7 @@ def test_view_b_fence_follows_the_part_origin_it_measured(monkeypatch) -> None:
         # The part landed off VIEW_B_CENTER.
         ((drawing.VIEW_B_CENTER[0] + 0.003, drawing.VIEW_B_CENTER[1]), None),
         # The view came out 1:1, not 1:2.
-        (drawing.VIEW_B_CENTER, support.BOSS_DEPTH / 2 / 1000),
+        (drawing.VIEW_B_CENTER, section.BOSS_DEPTH / 2 / 1000),
     ),
 )
 def test_view_b_refuses_a_misplaced_or_misscaled_view(

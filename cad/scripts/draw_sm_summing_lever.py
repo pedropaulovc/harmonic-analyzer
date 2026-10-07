@@ -29,11 +29,13 @@ from sm_summing_lever_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
 from _hole_spec import blind_cut_dia_mm
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     ViewEdge,
     ViewEdges,
+    _surface_finish_entity_faces,
+    _surface_finish_face_signatures,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
@@ -45,6 +47,7 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
+    property_link,
     read_required_properties,
     scan_view_edges,
     set_basic_dimension,
@@ -53,6 +56,8 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from _part_pmi import _face_matches
+from sm_summing_lever_notes import DRAWING_NOTES, PICKUP_PROCESS, PICKUP_PROCESS_PROPERTY
 from sm_summing_lever_spec import (
     ANCHOR_H,
     ANCHOR_R,
@@ -66,6 +71,7 @@ from sm_summing_lever_spec import (
     HOLE_X,
     HOLE_Z_FIRST,
     HOLE_Z_LAST,
+    MACHINED_PICKUP_FACES,
     PLATE_L,
     PLATE_T,
     PLATE_W,
@@ -122,17 +128,15 @@ def _top_xy(mx: float, mz: float) -> tuple[float, float]:
     )
 
 
-def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
-    """The one visible line of the +Z end face crossing model ``x_mm``.
+def _end_face_edge(edges: ViewEdges, *, x_mm: float, z_mm: float) -> ViewEdge:
+    """The one visible line of the actual plate/rib end crossing ``x_mm``.
 
-    In the plan the +Z end (bottom of the view) shows a single line at
-    z = PLATE_L/2: the edge rib's outer top edge, which covers the plate's own
-    end edge until the rib tapers below the plate near x = PLATE_W. The end
-    rib's inboard flange edge sits 5.08 mm up the sheet and the rib's underside
-    edge (y < 0) is hidden, so exactly one visible +y line at that z spans the
-    requested x; anything else is a changed model and fails loud.
+    At either z = +/-PLATE_L/2 the edge rib's outer top edge covers the plate's
+    own end edge until the rib tapers below the plate near x = PLATE_W. The
+    inboard flange is 5.08 mm nearer the centre and the underside (y < 0) is
+    hidden, so exactly one visible +y line at the requested end spans x;
+    anything else is a changed model and fails loud.
     """
-    z_mm = PLATE_L / 2.0
     matches = [
         item
         for item in edges.lines
@@ -142,7 +146,7 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
     ]
     if len(matches) != 1:
         raise RuntimeError(
-            f"summing lever +Z end face: expected one visible line at z={z_mm:g} "
+            f"summing lever plate/rib end face: expected one visible line at z={z_mm:g} "
             f"spanning x={x_mm:g} in the {edges.label!r} scan, found "
             f"{[item.line for item in matches]}"
         )
@@ -166,12 +170,61 @@ TOP_KEEP = {
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
 
+@_telemetry.traced("drawing.summing_pickup_process")
+def _assert_pickup_process_note(note: Any) -> None:
+    """Read back the actual model-owned process, not a typed drawing substitute."""
+    native_note = _early_bound(note, "INote")
+    linked = str(native_note.PropertyLinkedText or "")
+    resolved = str(native_note.GetText() or "").replace("\r", "")
+    if linked != property_link("Manufacturing Notes"):
+        raise RuntimeError(f"pickup process note lost its native model link: {linked!r}")
+    if resolved != DRAWING_NOTES:
+        raise RuntimeError(
+            f"pickup process note does not resolve this part's requirement: {resolved!r}"
+        )
+    _telemetry.event(
+        "drawing.summing_pickup_process",
+        property_name="Manufacturing Notes",
+        property_link=linked,
+        resolved_text=resolved,
+    )
+
+
+@_telemetry.traced("drawing.machined_pickup_faces")
+def _assert_machined_pickup_faces(edges: dict[str, Any]) -> None:
+    """Witness the real source faces named by the model's machining instruction.
+
+    New pickup machining is nonnumeric: the linked Manufacturing Notes own
+    the process and the part build qualifies its physical faces, not new
+    drawing symbols or a borrowed Ra grade. Linked text alone is not this witness.
+    """
+    if edges.keys() != MACHINED_PICKUP_FACES.keys():
+        raise RuntimeError("summing lever machining witness omitted a required pickup")
+    for key, edge in edges.items():
+        faces = _surface_finish_entity_faces(edge, entity_type="EDGE", label=key)
+        signatures = _surface_finish_face_signatures(faces)
+        matches = [
+            item for item in signatures
+            if _face_matches(item["geometry"], MACHINED_PICKUP_FACES[key])
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{key}: machining pickup edge must touch exactly one specified "
+                f"physical face, found {len(matches)}"
+            )
+        witness = matches[0]
+        _telemetry.info(
+            f"MACHINED_PICKUP_FACE {key}: normal={witness['normal']!r}; "
+            f"box_m={witness['box']!r}"
+        )
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open summing-lever source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -182,6 +235,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            PICKUP_PROCESS_PROPERTY,
         ),
         required=(
             "Number",
@@ -190,8 +244,14 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            PICKUP_PROCESS_PROPERTY,
         ),
     )
+    if properties.get(PICKUP_PROCESS_PROPERTY, "").replace("\r", "") != PICKUP_PROCESS:
+        raise RuntimeError(
+            f"source pickup-process property {PICKUP_PROCESS_PROPERTY!r} "
+            "does not match this part's requirement"
+        )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -348,7 +408,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # model positions (the hole wizard's seed at HOLE_Z_LAST, the pattern
     # marching -Z by CHANNEL_PITCH; build_summing_lever).
     plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
-    end_edge = _end_face_edge(top_edges, x_mm=10.0)
+    end_edge = _end_face_edge(top_edges, x_mm=10.0, z_mm=PLATE_L / 2.0)
     add_datum_feature(
         adapter,
         top,
@@ -357,6 +417,21 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="plate +Z end face",
     )
+    # The part's nonnumeric machining instruction names the physical +Z B
+    # face, opposite length pickup and free +X width pickup. Retain native
+    # edges for the final face-qualification witness, without adding a new
+    # numeric grade or cluttering the dimension field with finish symbols.
+    opposite_end = _end_face_edge(top_edges, x_mm=10.0, z_mm=-PLATE_L / 2.0)
+    free_plate_edge = top_edges.exact_line_through(
+        (PLATE_W, PLATE_T / 2.0, PLATE_L / 4.0),
+        label="free +X plate edge",
+    )
+    machining_pickups = {
+        "knife_edge_datum_a": datum_ridge.edge,
+        "plate_end_datum_b": end_edge.edge,
+        "plate_opposite_end": opposite_end.edge,
+        "plate_free_edge": free_plate_edge.edge,
+    }
     seed_rim = top_edges.circle_at(
         (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
         HOLE_DIA / 2.0,
@@ -473,7 +548,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole pattern position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.120)
+    process_note = add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.020, 0.120
+    )
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.185)
 
     return await finalize_drawing(
@@ -485,6 +562,8 @@ async def build(adapter: Any) -> dict[str, str]:
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=3,
         settled_checks=(
+            lambda: _assert_machined_pickup_faces(machining_pickups),
+            lambda: _assert_pickup_process_note(process_note),
             lambda: assert_native_hole_callout_attachment(
                 adapter, top, anchor_callout, edge=anchor_rim.edge, label="anchor tap"
             ),

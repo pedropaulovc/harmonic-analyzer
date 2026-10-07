@@ -3,12 +3,14 @@ the part build (``build_sm_summing_lever.py``) and its manufacturing drawing
 (``draw_sm_summing_lever.py``).
 
 PURE DATA, no SolidWorks/COM imports (``stock_anchor_geom`` is pure geometry).
-A large green-iron casting: a coefficients plate carrying the 20 channel-spring
-anchor taps on the +X arm, a solid pivot cylinder with hex knife-edge
-trunnions, and a curved summation arm ending in the tapped counter-spring
-anchor boss on the -X arm.  Both anchors are purchased eyebolts that thread
-straight into those taps -- the lever IS their nut -- so this module owns the
-two thread identities and the boss height, and no plain anchor bore exists.
+A ferrous casting or a part machined from solid stock: a coefficients plate
+carrying the 20 channel-spring anchor taps on the +X arm, a solid pivot cylinder
+with hex knife-edge trunnions, and a curved summation arm ending in the tapped
+counter-spring anchor boss on the -X arm. Both anchors are purchased eyebolts
+that thread straight into those taps; this module owns the two thread identities
+and the boss height, and no plain anchor bore exists. Mechanical retention and
+full-thread engagement remain on HOLD under #1189; the legacy no-nut/
+threadlocker instructions are not an accepted retention disposition.
 Values MUST match build_sm_summing_lever.py.
 """
 
@@ -48,6 +50,10 @@ KNIFE_FACE_NORMAL = (
 )
 KNIFE_FACE_OFFSET = KNIFE_FACE_NORMAL[1] * HEX_H / 2.0
 
+# Keep the existing numeric knife-edge finish unchanged. The user's additional
+# process ruling requires machined pickups, not a new roughness grade. The
+# legacy "MACHINE KNIFE EDGES" instruction covers both functional ridges, but
+# does not establish a new numeric Ra for the opposite ridge.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "knife_edge_ridge",
@@ -59,6 +65,28 @@ SURFACE_FINISHES = (
         ),
     ),
 )
+
+# Nonnumeric machining requirements on the existing nominal solid. Datum A
+# uses the -Z knife ridge; the X-location basics use the existing +Z ridge.
+# The real +/-Z plate/rib ends supply overall length, and +Z also owns B and
+# start-Z. The free +X plate edge is the remaining physical width pickup.
+# No stock allowance, added face, moved datum, or new dimension/Ra is implied.
+MACHINED_PICKUP_FACES: dict[str, PlanarFace] = {
+    "knife_edge_datum_a": PlanarFace(
+        KNIFE_FACE_NORMAL,
+        KNIFE_FACE_OFFSET,
+        contains_z_mm=-(PLATE_L + HEX_DEPTH) / 2.0,
+    ),
+    "plate_end_datum_b": PlanarFace(
+        (0.0, 0.0, 1.0), PLATE_L / 2.0, contains_x_mm=10.0
+    ),
+    "plate_opposite_end": PlanarFace(
+        (0.0, 0.0, -1.0), PLATE_L / 2.0, contains_x_mm=10.0
+    ),
+    "plate_free_edge": PlanarFace(
+        (1.0, 0.0, 0.0), PLATE_W, contains_z_mm=PLATE_L / 4.0
+    ),
+}
 
 # The 20 channel-spring lower anchors (McMaster 9489T111, part ``vn-spring-hook``)
 # thread DIRECTLY into the coefficient plate -- the plate is their nut, the
