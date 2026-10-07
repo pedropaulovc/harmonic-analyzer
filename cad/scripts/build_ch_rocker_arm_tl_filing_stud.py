@@ -22,9 +22,11 @@ import sys
 from _common import (
     SketchDims,
     _early_bound,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -34,6 +36,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -55,6 +58,7 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     HEAD_DIA,
     HEAD_LENGTH,
     ISOMETRIC_VIEW_NOTE,
+    OVERALL_LENGTH,
     TAIL_DIA,
     TAIL_END,
     THREAD_END,
@@ -143,6 +147,44 @@ async def build(adapter) -> dict[str, str]:
         )
     await volume_check(adapter, "stud", V_TOTAL, 0.005 * V_TOTAL)
     _require_one_solid_body(adapter, label="stud")
+
+    # Drawing-only reference: the overall length for stock cut-off, one
+    # construction line on the axis in the Front plane (the profile view's
+    # plane), driven by the two end stations so no geometry moves. Fixtures
+    # never enter an assembly, so the sketch stays shown for the import.
+    stations = SketchDims()
+    check("create_sketch station reference", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    overall_line = check(
+        "overall reference line",
+        await adapter.add_line(-TAIL_END, 0.0, THREAD_END, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[overall_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("overall reference line did not take construction flag")
+    check(
+        "overall reference horizontal",
+        await adapter.add_sketch_constraint(overall_line, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{overall_line}.start", -TAIL_END, 0.0, "overall reference vise end"
+    )
+    stations.record("OverallStartX", '"TailEnd"')
+    await dimension_between(
+        adapter,
+        f"{overall_line}.start",
+        f"{overall_line}.end",
+        "horizontal_distance",
+        OVERALL_LENGTH,
+        "overall length reference",
+    )
+    stations.record("OverallLength", '"TailEnd" + "ThreadEnd"')
+    await ensure_fully_defined(adapter, "station reference sketch")
+    check("exit_sketch station reference", await adapter.exit_sketch())
+    name_last_feature(adapter, "StationReference")
+    drive_jobs += stations.apply(adapter, "StationReference")
 
     await force_rebuild(adapter)
     for dimension_name, expression in drive_jobs:

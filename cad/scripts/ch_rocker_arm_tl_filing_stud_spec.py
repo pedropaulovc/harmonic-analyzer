@@ -41,14 +41,16 @@ HEAD_LENGTH = 3.0
 if not (button.BORE_DIA + button.BORE_BAND[0] < HEAD_DIA < button.OD + button.OD_BAND[1]):
     raise AssertionError("filing-stud head does not land on the button face")
 
-# Axial sizes from the seat face (X0). The body stops short of the stack
-# (button, hub, button) so the nut bears on the upper button, yet engages
-# the upper button's bore.
+# Axial sizes from the seat face (X0), the one datum the stack reads from.
+# The body carries the lower button and the whole hub at every printed
+# button thickness and hub length, and stops short of the stack top so the
+# nut bears on the upper button (which then centres on the thread crests:
+# its float is far inside the hub's printed O.D. band).
 AXIAL_PLACES = 1
-BODY_LENGTH = 13.0
-BODY_LENGTH_PLACES = 2
+BODY_LENGTH = 12.5
 THREAD_END = 24.0  # seat face to the threaded end
 TAIL_END = 45.0  # seat face to the vise end: head plus a forty-two vise tail
+OVERALL_LENGTH = TAIL_END + THREAD_END  # printed as a reference for cut-off
 TAIL_DIA = 8.0  # stout in the vise; clear of the thread and body sizes
 # HA fastener policy (memory/fastener-policy-us-customary.md): the
 # inventory's M6 maps to 1/4-20 UNC; an external thread is class 2A.
@@ -58,13 +60,12 @@ THREAD_MODEL_DIA = 6.35
 _BUTTON_MIN, _BUTTON_MAX = limits(button.THICKNESS, button.THICKNESS_PLACES)
 _STACK_MIN = 2.0 * _BUTTON_MIN + rocker.HUB_LENGTH
 _STACK_MAX = 2.0 * _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
-_STACK_UNDER_UPPER_MAX = _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
-UPPER_BUTTON_ENGAGEMENT_MIN = 0.5
-_BODY_LEN_MIN, _BODY_LEN_MAX = limits(BODY_LENGTH, BODY_LENGTH_PLACES)
+_HUB_TOP_MAX = _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
+_BODY_LEN_MIN, _BODY_LEN_MAX = limits(BODY_LENGTH, AXIAL_PLACES)
 if _BODY_LEN_MAX >= _STACK_MIN:
     raise AssertionError("filing-stud body can stand proud of the button stack")
-if _BODY_LEN_MIN - _STACK_UNDER_UPPER_MAX < UPPER_BUTTON_ENGAGEMENT_MIN:
-    raise AssertionError("filing-stud body misses the upper button bore")
+if _BODY_LEN_MIN <= _HUB_TOP_MAX:
+    raise AssertionError("filing-stud body does not reach through the hub")
 NUT_THICKNESS = 5.56  # bought 1/4-20 hex nut, 7/32 in
 if limits(THREAD_END, AXIAL_PLACES)[0] - _STACK_MAX < NUT_THICKNESS:
     raise AssertionError("filing-stud thread is too short for the nut")
@@ -78,6 +79,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Body": {"BodyLength"},
     "ThreadProfile": {"ThreadDia"},
     "Thread": {"ThreadEnd"},
+    "StationReference": {"OverallLength"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": 1},
@@ -85,22 +87,26 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "TailProfile": {"TailDia": 1},
     "Tail": {"TailEnd": AXIAL_PLACES},
     "BodyProfile": {"BodyDia": BODY_PLACES},
-    "Body": {"BodyLength": BODY_LENGTH_PLACES},
+    "Body": {"BodyLength": AXIAL_PLACES},
     "ThreadProfile": {"ThreadDia": 2},
     "Thread": {"ThreadEnd": AXIAL_PLACES},
+    "StationReference": {"OverallLength": AXIAL_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked filing-stud dimension needs authored places")
-# The thread size prints as its designation, not as a plain diameter.
+# The overall restates the two ends for stock cut-off; the thread size
+# prints as its designation, not as a plain diameter.
+REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
 DIMENSION_TEXT = {"ThreadDia": THREAD}
 
 SURFACE_FINISHES = ()
 DRAWING_NOTES = (
-    "TURN HEAD SEAT, BODY AND THREAD IN ONE CHUCKING; SEAT SQUARE TO AXIS.\n"
-    "BODY LAPPED: SLIP FIT IN THE ROCKER ARM PIVOT BORE.\n"
+    "AXIAL SIZES FROM THE HEAD SEAT FACE; SEAT SQUARE TO THE BODY AXIS.\n"
+    "BODY IS A CLOSE SLIP FIT IN THE ROCKER ARM PIVOT BORE AND THE FILING\n"
+    "BUTTON BORES: IT CENTRES THE BUTTON RIMS THAT SET THE FILED HUB.\n"
     "DO NOT HARDEN."
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
@@ -121,11 +127,11 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             ),
             "dia_nominal": (BODY_DIA, ("BODY_DIA",)),
             "length": (
-                limits(BODY_LENGTH, BODY_LENGTH_PLACES),
+                limits(BODY_LENGTH, AXIAL_PLACES),
                 ("BODY_LENGTH", ("ch_rocker_arm_spec", "HUB_LENGTH")),
             ),
         },
-        precision={"dia": BODY_PLACES, "length": BODY_LENGTH_PLACES},
+        precision={"dia": BODY_PLACES, "length": AXIAL_PLACES},
     ),
     "button_seat": ExportFeature(
         kind="face",

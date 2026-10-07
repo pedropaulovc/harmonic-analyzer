@@ -19,6 +19,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_dimension_text,
+    set_reference_dimension,
     set_hidden_lines_removed,
     stamp_drawing_summary,
     view_name,
@@ -28,6 +29,7 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     DIMENSION_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    REFERENCE_DIMENSIONS,
     TAIL_END,
     THREAD_END,
 )
@@ -63,6 +65,8 @@ PROFILE_KEEP = {
     "ThreadEnd": (SEAT_X + THREAD_END / 2.0 * _S, _ABOVE),
     "HeadLength": (SEAT_X - 0.012, _BELOW),
     "BodyLength": (SEAT_X + 0.016, _BELOW),
+    # The reference overall, one row above the two end stations.
+    "OverallLength": (PROFILE_CENTER[0], _ABOVE + 0.018),
 }
 DONOR_KEEP = {
     "TailDia": (0.300, 0.060),
@@ -150,6 +154,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_text(adapter, annotations, DIMENSION_TEXT)
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [a for a in annotations if dimension_name(adapter, a) == name]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one filing-stud {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"filing stud {name}")
     add_view_centerline(
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )

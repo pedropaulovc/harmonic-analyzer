@@ -47,15 +47,15 @@ def test_stud_slips_into_the_smallest_pivot_bore_and_button_bore() -> None:
     assert _features(BUTTON)["bore"]["dia"][0] - body_high >= stud.BODY_CLEARANCE_MIN
 
 
-def test_body_stays_inside_the_stack_yet_reaches_the_upper_button() -> None:
-    """At every printed button thickness and hub length the nut lands on the
-    upper button (body short of the stack top) and the body still enters that
-    button's bore."""
+def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
+    """At every printed button thickness and hub length the whole hub sits on
+    the lapped body, and the nut lands on the upper button (body short of the
+    stack top)."""
     body_low, body_high = _features(STUD)["locating_body"]["length"]
     thick_low, thick_high = _features(BUTTON)["hub_seat_face"]["thickness"]
     hub_high = rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
     assert body_high < 2 * thick_low + rocker.HUB_LENGTH
-    assert body_low - (thick_high + hub_high) >= stud.UPPER_BUTTON_ENGAGEMENT_MIN
+    assert body_low > thick_high + hub_high
 
 
 def test_head_seat_lands_on_the_button_face_outside_its_bore() -> None:
