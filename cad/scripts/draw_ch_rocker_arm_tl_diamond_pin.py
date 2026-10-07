@@ -56,7 +56,7 @@ ISO_SCALE = (4, 1)
 # neck face); the end view keeps the two pin sizes.
 SECTION_CENTER = (0.165, 0.175)
 END_CENTER = (0.335, 0.200)
-ISO_CENTER = (0.330, 0.120)
+ISO_CENTER = (0.330, 0.130)  # caption clears the notes
 ISO_NOTE_XY = (0.335, 0.088)
 CAPTION_XY = (0.255, 0.122)
 CUT_HALF = 0.020  # past the O4.5 collar's 13.5 mm sheet radius
