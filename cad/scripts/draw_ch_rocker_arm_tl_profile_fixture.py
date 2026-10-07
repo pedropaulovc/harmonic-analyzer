@@ -67,6 +67,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     PART_SCHEDULE_TITLE,
     PIVOT_TAP_DRILL_DIA,
     PLATE_BOTTOM_Z,
+    PLATE_EAST_X,
     PLATE_NORTH_Y,
     PLATE_SOUTH_Y,
     PLATE_TOP_Z,
@@ -93,20 +94,20 @@ SHEET_SCALES = {"PLAN": (1.0, 2.0), "TAGS": (1.0, 1.0), "SCHEDULE": (1.0, 4.0)}
 SHEET_COUNT_XY = (0.383, 0.262)
 
 # --- Sheet PLAN -------------------------------------------------------------------
-PLAN_CENTER = (0.125, 0.205)
+PLAN_CENTER = (0.120, 0.212)
 PLAN_SCALE = (1, 2)
 # Section D-D: a removed section along the bore axis (model Y 0) spanning the
 # A1/B1 pads either side, so the pad tops, the hub stand and the bore stack
 # read together.
 SECTION_SPAN_X = (-32.0, 32.0)
-SECTION_CENTER = (0.100, 0.105)
+SECTION_CENTER = (0.300, 0.122)
 SECTION_SCALE = (2, 1)
-DETAIL_CENTER = (0.320, 0.205)
-DETAIL_SCALE = (4, 1)
+DETAIL_CENTER = (0.330, 0.212)
+DETAIL_SCALE = (3, 1)
 DETAIL_RADIUS_MM = 9.0
 NOTES_XY = (0.016, 0.045)
-HOLD_DOWN_CALLOUT_XY = (0.232, 0.182)
-STUD_CALLOUT_XY = (0.240, 0.152)
+HOLD_DOWN_CALLOUT_XY = (0.226, 0.192)
+STUD_CALLOUT_XY = (0.228, 0.260)
 # Sheet offsets (m) of each kept dimension from a projected model point (mm):
 # {name: ((x, y[, z]) model mm, (dx, dy) sheet m)}.
 PLAN_KEEP_AT = {
@@ -125,9 +126,11 @@ SECTION_KEEP_AT = {
     "StandPocketDepth": ((38.0, PLATE_TOP_Z - STAND_POCKET_DEPTH / 2.0), (0.0, 0.0)),
     "LocatingBoreDepth": ((47.0, (PLATE_TOP_Z + LOCATING_BORE_FLOOR_Z) / 2.0), (0.0, 0.0)),
 }
-# End elevation (*Right, turned Z up) at the plan's scale: plate thickness on
-# its left, the pad-top drop on its right (sheet offsets from the plate ends).
-ELEVATION_CENTER = (0.300, 0.100)
+# Front elevation (*Bottom: model X right, Z up) projected under the plan at
+# its scale: plate thickness left of it, the pad-top drop right of it (sheet
+# offsets from the plate ends). A turned end view printed an empty rotation
+# label over itself (run 20261007T180611940Z).
+ELEVATION_CENTER = (PLAN_CENTER[0], 0.150)
 ELEVATION_KEEP_Z = {
     "PlateThick": ((PLATE_TOP_Z + PLATE_BOTTOM_Z) / 2.0, -0.012),
     "PlateDrop": ((PAD_TOP_Z + PLATE_TOP_Z) / 2.0, 0.012),
@@ -241,24 +244,17 @@ def _center_on_outline(adapter: Any, view: Any, target: tuple[float, float], *, 
 
 
 def _elevation(adapter: Any) -> Any:
-    """The plate's east end view at the plan's scale, turned so model Z is up."""
-    view = place_view(adapter, str(SOURCE), "*Right", *ELEVATION_CENTER, scale=PLAN_SCALE)
-    native = _early_bound(view, "IView")
-
-    def up() -> tuple[float, float]:
-        origin, top = model_points_in_view(
-            adapter, native, [(0.0, 0.0, 0.0), (0.0, 0.0, 0.001)], label="elevation orientation"
-        )
-        return (top[0] - origin[0], top[1] - origin[1])
-
-    vertical = up()
-    native.Angle = float(native.Angle) + math.pi / 2.0 - math.atan2(vertical[1], vertical[0])
-    rebuild_drawing(adapter, label="end elevation angle")
-    vertical = up()
-    if vertical[1] <= 0.0 or abs(vertical[0]) > 1e-8:
-        raise RuntimeError(f"end elevation did not turn model Z up: {vertical=}")
+    """The plate's front elevation at the plan's scale, model Z up."""
+    view = place_view(adapter, str(SOURCE), "*Bottom", *ELEVATION_CENTER, scale=PLAN_SCALE)
+    origin, east, top = model_points_in_view(
+        adapter,
+        view,
+        [(0.0, 0.0, 0.0), (0.001, 0.0, 0.0), (0.0, 0.0, 0.001)],
+        label="elevation orientation",
+    )
+    if not (east[0] > origin[0] and top[1] > origin[1]):
+        raise RuntimeError(f"*Bottom is not X right, Z up: {origin=}, {east=}, {top=}")
     set_hidden_lines_removed(adapter, view)
-    _center_on_outline(adapter, view, ELEVATION_CENTER, label="end elevation")
     return view
 
 
@@ -266,9 +262,9 @@ def _elevation_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
     """Each plate height beside the plate end its sheet offset points to."""
     names = list(ELEVATION_KEEP_Z)
     points = [
-        _mm_to_m((PLATE_WEST_X, y, ELEVATION_KEEP_Z[name][0]))
+        _mm_to_m((x, PLATE_SOUTH_Y, ELEVATION_KEEP_Z[name][0]))
         for name in names
-        for y in (PLATE_SOUTH_Y, PLATE_NORTH_Y)
+        for x in (PLATE_WEST_X, PLATE_EAST_X)
     ]
     projected = model_points_in_view(adapter, view, points, label="elevation keep")
     keep = {}
@@ -278,7 +274,6 @@ def _elevation_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
         x = (min if offset < 0 else max)(end[0] for end in ends) + offset
         keep[name] = (x, ends[0][1])
     return keep
-
 
 
 def _section(adapter: Any, plan: Any) -> Any:
@@ -550,12 +545,12 @@ async def build(adapter: Any) -> dict[str, str]:
         label="hold-down counterbore",
         process="DRILL, C'BORE",
     )
-    stud = CLAMP_STUD_POINTS[1]
+    stud = CLAMP_STUD_POINTS[3]
     add_native_hole_callout(
         adapter,
         plan,
         edge=plan_edges.circle_at(
-            (*stud, PLATE_TOP_Z), CLAMP_STUD_DRILL_DIA / 2.0, axis=(0, 0, 1), label="S2"
+            (*stud, PLATE_TOP_Z), CLAMP_STUD_DRILL_DIA / 2.0, axis=(0, 0, 1), label="S4"
         ).edge,
         callout_xy=STUD_CALLOUT_XY,
         label="clamp stud tap",
