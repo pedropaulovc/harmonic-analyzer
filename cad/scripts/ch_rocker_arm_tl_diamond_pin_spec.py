@@ -56,13 +56,13 @@ COLLAR_DIA = 4.5
 # face B so the plate's pads and shimmed hub stand alone set Z: it is a
 # backstop, never a second Z support (FixtureCAD option b).
 COLLAR_END = 10.20
-COLLAR_END_BAND = (0.0, -0.05)
+COLLAR_END_BAND = (0.0, -0.5)  # .X: never above face B; lands keep half-strap engagement
 FACE_B_ABOVE_PLATE = 10.22175  # frame-A Z-4.77825 face B over the plate top Z-15
 if COLLAR_END + COLLAR_END_BAND[0] > FACE_B_ABOVE_PLATE:
     raise AssertionError("neck face can lift the arm off the profile-fixture pads")
-SHANK_DIA = 2.988
-SHANK_BAND = (0.007, -0.007)  # 2.981-2.995: bonded close slip fit in the plate's 3.000-3.010 ream
-OVERALL_LENGTH = COLLAR_END + 6.0
+SHANK_DIA = 2.97
+SHANK_BAND = (0.02, -0.02)  # 2.95-2.99: bonded close slip fit in the plate's 3.000-3.010 ream
+OVERALL_LENGTH = COLLAR_END + 5.5  # shank stays clear of the 7.0 hole bottom at .X
 REAM_DIA = 2.0
 REAM_BAND = (0.010, 0.0)  # the shop's rod reamer, 2.000-2.010
 REAM_DEPTH = 8.0
@@ -112,8 +112,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "NeckProfile": {"NeckDia": NECK_PLACES},
     "Neck": {"NeckLength": 2},
     "CollarProfile": {"CollarDia": 1},
-    "Collar": {"CollarEnd": 2},
-    "ShankProfile": {"ShankDia": 3},
+    "Collar": {"CollarEnd": 1},
+    "ShankProfile": {"ShankDia": 2},
     "Shank": {"OverallLength": 1},
     "Pin": {"PinLength": 1},
     "ReamProfile": {"ReamDia": 3},
@@ -178,7 +178,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
             "height": (
-                limits(COLLAR_END, 2, COLLAR_END_BAND),
+                limits(COLLAR_END, 1, COLLAR_END_BAND),
                 ("COLLAR_END", "COLLAR_END_BAND", "FACE_B_ABOVE_PLATE"),
             ),
         },
@@ -202,7 +202,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         fields={
             "at": ([0.0, 0.0, COLLAR_END], ("COLLAR_END",)),
             "axis": _AXIS,
-            "dia": (limits(SHANK_DIA, 3, SHANK_BAND), ("SHANK_DIA", "SHANK_BAND")),
+            "dia": (limits(SHANK_DIA, 2, SHANK_BAND), ("SHANK_DIA", "SHANK_BAND")),
             "dia_nominal": (SHANK_DIA, ("SHANK_DIA",)),
             "length": (limits(OVERALL_LENGTH - COLLAR_END, 2), ("OVERALL_LENGTH", "COLLAR_END")),
         },

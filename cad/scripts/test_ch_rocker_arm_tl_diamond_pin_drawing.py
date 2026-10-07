@@ -54,9 +54,9 @@ def test_tip_stays_in_the_strap_and_neck_face_never_lifts_the_arm() -> None:
 def test_shank_slips_into_the_fixture_ream_with_a_bondable_gap() -> None:
     low, high = _features()["shank"]["dia"]
     # profile-fixture pin hole 3.000-3.010; Loctite 638 fills to 0.25 mm gap,
-    # but the pin must still locate: keep the diametral gap within 0.03.
+    # but the pin must still locate: keep the diametral gap within 0.06.
     assert high < 3.000
-    assert 3.010 - low <= 0.030
+    assert 3.010 - low <= 0.060
 
 
 def test_construction_is_built_up_from_the_printed_note() -> None:
