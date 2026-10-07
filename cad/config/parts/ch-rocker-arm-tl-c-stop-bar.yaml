@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-c-stop-bar:
+  title: Rocker Inspection C Stop Bar
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-09
+  material: AISI O1 tool steel
+  material_specification: AISI O1 precision-ground flat stock, 1/2 x 1/2 in (Abrams 102060)
+  finish: torch-hardened in oil, tempered twice; top and bottom lapped
+  quantity: 1
+  tolerance_class: machined_block
+  process: "saw and mill to length; drill and counterbore; break edges; harden and temper; lap top and bottom"
