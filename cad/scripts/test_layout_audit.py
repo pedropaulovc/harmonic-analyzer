@@ -768,6 +768,8 @@ def test_report_mode_writes_every_finding_and_dump_before_an_enforced_kind_raise
     import json
 
     sheet = _holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)
+    sheet["native_lineweights"] = {"schema": 1, "status": "unreadable", "cause": "fixture-native-read"}
+    sheet["views"][0]["native_lineweights"] = {"status": "unreadable", "cause": "fixture-root-read"}
     live = _patch_collect(monkeypatch, [sheet])
     report = tmp_path / "reports" / "fixture.json"
     with pytest.raises(RuntimeError, match=r"report mode.*\n.*\[leader-through-text\]"):
@@ -2512,6 +2514,236 @@ def test_the_report_keeps_a_stroke_count_not_every_stroke():
     [sheet] = report["sheets"]
     assert sheet["ink"]["stroke_count"] == 2 and "strokes" not in sheet["ink"]
     assert "strokes" in dump["ink"]  # the audited dump is untouched
+
+
+class _NativeWeightComponent:
+    """Properties/methods follow the installed IDrawingComponent declaration."""
+
+    def __init__(self, *, defaults=True, children=(), pair=(1, 0.0)):
+        self.defaults = defaults
+        self.children = children
+        self.pair = pair
+        self.thickness_calls = []
+        self.children_calls = 0
+
+    @property
+    def Name(self):
+        return "same-name"
+
+    @property
+    def UseDocumentDefaults(self):
+        return self.defaults
+
+    def GetChildrenCount(self):
+        return len(self.children)
+
+    def GetChildren(self):
+        self.children_calls += 1
+        return self.children
+
+    def GetLineStyle(self, _option):
+        return 0
+
+    def GetLineThickness(self, option):
+        self.thickness_calls.append(option)
+        return self.pair
+
+
+def _native_weight_tree(monkeypatch, root):
+    import _drawing_layout_audit as live
+
+    monkeypatch.setattr(live, "_early_bound", lambda obj, _interface: obj)
+    contexts = []
+
+    class View:
+        def RootDrawingComponent2(self, in_child_context):
+            contexts.append(in_child_context)
+            return root
+
+    reader = live._Reader(adapter=None)
+    result = live._component_lineweights(reader, View())
+    assert contexts == [True]
+    assert reader.take_errors() == {}  # new diagnostics do not alter old gates
+    return live, reader, result
+
+
+def test_native_lineweight_tree_keeps_actual_overrides_and_same_name_instances(monkeypatch):
+    nested = _NativeWeightComponent(defaults=False, pair=(10, 0.00042))
+    selected = _NativeWeightComponent(defaults=False, pair=(1, 0.0))
+    root = _NativeWeightComponent(children=(_NativeWeightComponent(children=(nested,)), selected))
+    _live, reader, result = _native_weight_tree(monkeypatch, root)
+    assert result["status"] == "read"
+    assert [record["path"] for record in result["components"]] == [[], [0], [0, 0], [1]]
+    assert root.thickness_calls == []
+    custom = result["components"][2]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    assert custom["weight"]["value"] == 10
+    assert custom["custom_thickness"]["value"] == 0.00042
+    assert custom["custom_thickness"]["unit"] == "m"
+    normal = result["components"][3]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    assert normal["weight"]["enum"] == "swLW_NORMAL"
+    assert normal["custom_thickness"]["status"] == "inactive"
+    assert normal["custom_thickness"]["value"] == 0.0  # not inferred metric width
+    assert nested.thickness_calls == selected.thickness_calls == [1, 2, 3, 4, 5]
+    assert reader.cost["IDrawingComponent.GetLineThickness"][0] == 10  # no tuple-slot pseudo-COM calls
+
+
+@pytest.mark.parametrize("pair", [1, (1,), (True, 0.0), (10, float("nan")), (9, 0.0), (99, 0.0)])
+def test_native_lineweight_tuple_and_enum_refusals_are_explicit(monkeypatch, pair):
+    _live, _reader, result = _native_weight_tree(monkeypatch, _NativeWeightComponent(defaults=False, pair=pair))
+    assert result["status"] == "unreadable"
+    fields = result["components"][0]["line_fonts"]["swDrawingComponentLineFontVisible"]
+    assert fields["weight"]["status"] == "unreadable" or fields["custom_thickness"]["status"] == "unreadable"
+
+
+def test_native_lineweight_method_shaped_defaults_flag_and_missing_root_stay_unknown(monkeypatch):
+    class WrongDefaults(_NativeWeightComponent):
+        def UseDocumentDefaults(self):
+            return True
+
+    _live, _reader, result = _native_weight_tree(monkeypatch, WrongDefaults())
+    assert result["status"] == "unreadable"
+    assert result["components"][0]["use_document_defaults"]["cause"] == "invalid-bool:method"
+    assert "swDrawingComponentLineFontVisible" in result["components"][0]["line_fonts"]
+    _live, _reader, missing = _native_weight_tree(monkeypatch, None)
+    assert missing["status"] == "unreadable" and missing["cause"] == "missing"
+    assert missing["components"] == []
+
+
+@pytest.mark.parametrize("count, children", [(False, ()), (1, None), (2, (_NativeWeightComponent(),)), (1, object())])
+def test_native_lineweight_child_refusals_preserve_incompleteness(monkeypatch, count, children):
+    class RefusingChildren(_NativeWeightComponent):
+        def GetChildrenCount(self):
+            return count
+
+        def GetChildren(self):
+            return children
+
+    _live, _reader, result = _native_weight_tree(monkeypatch, RefusingChildren())
+    assert result["status"] == "unreadable"
+    assert result["components"][0]["children"]["status"] == "unreadable"
+    assert "cause" in result["components"][0]["children"]
+
+
+def test_native_lineweight_bounds_are_unknown_not_silent_truncation(monkeypatch):
+    root = _NativeWeightComponent(children=tuple(_NativeWeightComponent() for _ in range(512)))
+    _live, _reader, result = _native_weight_tree(monkeypatch, root)
+    assert result["status"] == "unreadable"
+    assert result["components"][0]["children"]["cause"] == "component-limit"
+    assert root.children_calls == 0  # do not materialize an over-budget native array
+    cycle = _NativeWeightComponent()
+    cycle.children = (cycle,)
+    _live, _reader, result = _native_weight_tree(monkeypatch, cycle)
+    assert len(result["components"]) == 33
+    assert result["components"][-1]["children"]["cause"] == "depth-limit"
+    assert result["status"] == "unreadable"
+
+
+def test_native_lineweight_document_reads_actual_metrics_and_documented_scopes(monkeypatch):
+    import _drawing_layout_audit as live
+
+    monkeypatch.setattr(live, "_early_bound", lambda obj, _interface: obj)
+
+    class Extension:
+        def __init__(self):
+            self.calls = []
+
+        def GetUserPreferenceDouble(self, pref, scope):
+            self.calls.append(("double", pref, scope))
+            if pref == 89:
+                return 0.00042
+            return {48: 0.00013, 49: 0.00018, 50: 0.00035, 51: 0.0005,
+                    52: 0.0007, 53: 0.001, 54: 0.0014, 55: 0.002}[pref]
+
+        def GetUserPreferenceInteger(self, pref, scope):
+            self.calls.append(("integer", pref, scope))
+            if pref == 53:
+                return 10
+            return 1 if pref in (55, 69, 73, 67, 400, 61, 558, 357, 63, 517) else 0
+
+        def GetUserPreferenceToggle(self, pref, scope):
+            self.calls.append(("toggle", pref, scope))
+            assert pref == 551
+            return scope == 206
+
+    extension = Extension()
+
+    class Model:
+        @property
+        def Extension(self):
+            return extension
+
+    adapter = type("Adapter", (), {"currentModel": Model()})()
+    reader = live._Reader(adapter)
+    result = live._document_lineweights(reader)
+    assert result["metrics"]["swLW_THIN"]["value"] == 0.00013
+    assert result["metrics"]["swLW_NORMAL"]["value"] == 0.00018
+    assert result["metrics"]["swLW_THICK"]["unit"] == "m"
+    assert result["categories"]["visible_edges"]["custom_thickness"]["value"] == 0.00042
+    dimensions = result["dimensions"]
+    assert set(dimensions) == {row[0] for row in live._DIMENSION_LINEFONT_SCOPES}
+    assert {scope for kind, pref, scope in extension.calls if kind == "toggle"} == {201, 202, 204, 206, 207, 209}
+    assert dimensions["swDetailingLinearDimension"]["extension_same_as_leader"]["value"] is True
+    assert dimensions["swDetailingDiameterDimension"]["extension"]["weight"]["value"] == 1
+    assert dimensions["swDetailingHoleDimension"]["extension"]["status"] == "unreadable"
+    assert ("integer", 356, 0) in extension.calls and ("integer", 357, 0) in extension.calls
+    assert all(scope != 200 for _kind, _pref, scope in extension.calls)
+    assert reader.take_errors() == {}
+
+
+@pytest.mark.parametrize("value", [None, False, 0.0, -0.1, float("nan"), float("inf"), lambda: 0.00018])
+def test_native_lineweight_invalid_metric_never_becomes_a_default(value):
+    import _drawing_layout_audit as live
+
+    reader = live._Reader(adapter=None)
+    evidence = live._witness_value(reader, lambda: value, source="IModelDocExtension.GetUserPreferenceDouble", kind="m")
+    assert evidence["status"] == "unreadable" and "value" not in evidence
+    assert reader.take_errors() == {}
+
+
+def test_native_annotation_weight_provenance_keeps_fallback_geometry_not_unused_enums(monkeypatch):
+    import _drawing_layout_audit as live
+
+    monkeypatch.setattr(live, "_early_bound", lambda obj, _interface: obj)
+
+    class Display:
+        def __init__(self, *, fallback=False, empty=False):
+            self.fallback = fallback
+            self.empty = empty
+            self.calls = []
+
+        def GetLineCount(self):
+            return 0 if self.empty else 1
+
+        def GetLineAtIndex3(self, index):
+            self.calls.append(("third", index))
+            if self.fallback:
+                raise RuntimeError("getter refused")
+            return (0.0, 0.0, 4.0, 0.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0)
+
+        def GetLineAtIndex2(self, index):
+            self.calls.append(("second", index))
+            return (0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0)
+
+        def __getattr__(self, name):
+            if name.endswith("Count"):
+                return lambda: 0
+            raise AttributeError(name)
+
+    reader = live._Reader(adapter=None)
+    display = Display()
+    dump = live._dump_display(reader, display)
+    [entry] = dump["lineweight_evidence"]["bins"]
+    assert entry["weight"]["enum"] == "swLW_THIN" and entry["style"]["enum"] == "swLineCENTER"
+    assert display.calls == [("third", 0)]
+    fallback = Display(fallback=True)
+    dump = live._dump_display(reader, fallback)
+    assert dump["lines"] == [[0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.0, 0.2, 0.1, 0.0]]
+    assert dump["lineweight_evidence"]["status"] == "unreadable"
+    assert dump["lineweight_evidence"]["bins"] == []
+    assert dump["lineweight_evidence"]["read_errors"]["GetLineAtIndex2:unused-style-weight-slots"] == 1
+    assert fallback.calls == [("third", 0), ("second", 0)]
+    assert reader.take_errors() == {}  # old successful-fallback gating remains unchanged
+    assert live._dump_display(reader, Display(empty=True)) == {}
 
 
 def test_a_page_the_size_of_another_sheet_fails_loud(monkeypatch):

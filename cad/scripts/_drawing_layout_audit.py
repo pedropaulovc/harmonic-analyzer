@@ -70,6 +70,75 @@ PAGE_SIZE_TOL_M = 0.0005
 # swZoneMargin_e
 _ZONE_MARGINS = {"top": 0, "bottom": 1, "right": 2, "left": 3}
 
+# Official swLineWeights_e / swLineStyles_e / swDrawingComponentLineFontOption_e.
+# These identify actual readbacks; none is a physical-width acceptance threshold.
+_LINE_WEIGHTS = {
+    -1: "swLW_NONE", 0: "swLW_THIN", 1: "swLW_NORMAL", 2: "swLW_THICK",
+    3: "swLW_THICK2", 4: "swLW_THICK3", 5: "swLW_THICK4",
+    6: "swLW_THICK5", 7: "swLW_THICK6", 8: "swLW_NUMBER",
+    9: "swLW_LAYER", 10: "swLW_CUSTOM",
+}
+_LINE_STYLES = {
+    0: "swLineCONTINUOUS", 1: "swLineHIDDEN", 2: "swLinePHANTOM",
+    3: "swLineCHAIN", 4: "swLineCENTER", 5: "swLineSTITCH",
+    6: "swLineCHAINTHICK", 7: "swLineDEFAULT",
+}
+_COMPONENT_LINEFONT_OPTIONS = (
+    ("swDrawingComponentLineFontVisible", 1),
+    ("swDrawingComponentLineFontHidden", 2),
+    ("swDrawingComponentLineFontTangent", 3),
+    ("swDrawingComponentLineFontHatch", 4),
+    ("swDrawingComponentLineFontSpeedpak", 5),
+)
+
+# swUserPreference* literal IDs read from installed swconst 34.3.0.150,
+# SHA256 7F07CA30C4DB22B6D835494D86F5A0D10E8FDEAB9308C9C90132E70C7F4E21B3.
+# The official preference enum pages list names, but omit these numeric IDs.
+_DOCUMENT_WEIGHT_PREFS = (
+    (0, "swPageSetupPrinterThinLineWeight", 48),
+    (1, "swPageSetupPrinterNormalLineWeight", 49),
+    (2, "swPageSetupPrinterThickLineWeight", 50),
+    (3, "swPageSetupPrinterThick2LineWeight", 51),
+    (4, "swPageSetupPrinterThick3LineWeight", 52),
+    (5, "swPageSetupPrinterThick4LineWeight", 53),
+    (6, "swPageSetupPrinterThick5LineWeight", 54),
+    (7, "swPageSetupPrinterThick6LineWeight", 55),
+)
+_DOCUMENT_LINEFONT_PREFS = (
+    # category, style preference, weight preference, custom preference
+    ("visible_edges", ("swLineFontVisibleEdgesStyle", 54), ("swLineFontVisibleEdgesThickness", 53), ("swLineFontVisibleEdgesThicknessCustom", 89)),
+    ("hidden_edges", ("swLineFontHiddenEdgesStyle", 56), ("swLineFontHiddenEdgesThickness", 55), ("swLineFontHiddenEdgesThicknessCustom", 90)),
+    ("tangent_edges", ("swLineFontTangentEdgesStyle", 70), ("swLineFontTangentEdgesThickness", 69), ("swLineFontTangentEdgesThicknessCustom", 97)),
+    ("cosmetic_threads", ("swLineFontCosmeticThreadStyle", 74), ("swLineFontCosmeticThreadThickness", 73), ("swLineFontCosmeticThreadThicknessCustom", 99)),
+    ("hatch", ("swLineFontCrosshatchStyle", 68), ("swLineFontCrosshatchThickness", 67), ("swLineFontCrosshatchThicknessCustom", 96)),
+    ("speedpak_edges", ("swLineFontSpeedPakDrawingsModelEdgesStyle", 401), ("swLineFontSpeedPakDrawingsModelEdgesThickness", 400), ("swLineFontSpeedPakDrawingsModelEdgesThicknessCustom", 122)),
+    ("section_cutting_lines", ("swLineFontSectionLineStyle", 62), ("swLineFontSectionLineThickness", 61), ("swLineFontSectionLineThicknessCustom", 93)),
+    ("emphasized_section_outline", ("swLineFontEmphasizedSectionOutlineStyle", 557), ("swLineFontEmphasizedSectionThickness", 558), ("swLineFontEmphasizedSectionThicknessCustom", 205)),
+)
+_DIMENSION_LINEFONT_SCOPES = (
+    # scope, actual option ID, documented extension-line preference pairing
+    ("swDetailingAngleDimension", 201, True),
+    ("swDetailingArcLengthDimension", 202, True),
+    ("swDetailingChamferDimension", 203, False),
+    ("swDetailingDiameterDimension", 204, True),
+    ("swDetailingHoleDimension", 205, False),
+    ("swDetailingLinearDimension", 206, True),
+    ("swDetailingOrdinateDimension", 207, True),
+    ("swDetailingRadiusDimension", 208, False),
+    ("swDetailingAngularRunningDimension", 209, True),
+)
+_EXTENSION_LINEFONT_PREFS = (
+    ("swDimensionsExtensionLineStyle", 516),
+    ("swDimensionsExtensionLineStyleThickness", 517),
+    ("swDimensionsExtensionLineStyleThicknessCustom", 188),
+)
+_EXTENSION_SAME_AS_LEADER_PREF = ("swDimensionsExtensionLineStyleSameAsLeader", 551)
+_NOTE_LINEFONT_PREFS = (
+    ("swDetailingNoteLeaderLineStyle", 356),
+    ("swDetailingNoteLeaderLineThickness", 357),
+    ("swDetailingNoteLeaderLineThicknessCustom", 110),
+)
+
 _DISPLAY_PRIMITIVES = (
     ("lines", "GetLineCount", ("GetLineAtIndex3", "GetLineAtIndex2")),
     ("arcs", "GetArcCount", ("GetArcAtIndex2",)),
@@ -251,25 +320,339 @@ def _accessor(fn: Callable[[], Any]) -> str:
     return fn.__code__.co_names[-1] if fn.__code__.co_names else "?"
 
 
+def _unreadable(source: str, cause: str) -> dict[str, Any]:
+    return {"status": "unreadable", "source": source, "cause": cause}
+
+
+def _witness_value(
+    reader: _Reader, fn: Callable[[], Any], *, source: str, kind: str,
+    enum: Mapping[int, str] | None = None,
+) -> dict[str, Any]:
+    """Serialize only a validated native scalar, never a COM object's repr."""
+    value, cause = reader.witness(fn, name=source.split("(")[0])
+    if cause is not None:
+        return _unreadable(source, cause)
+    return _witness_scalar(value, source=source, kind=kind, enum=enum)
+
+
+def _witness_scalar(
+    value: Any, *, source: str, kind: str, enum: Mapping[int, str] | None = None,
+) -> dict[str, Any]:
+    """Validate already-read tuple slots without inventing extra COM calls."""
+    valid = False
+    if kind == "integer":
+        valid = type(value) is int and -(2**31) <= value < 2**31
+    elif kind == "count":
+        valid = type(value) is int and 0 <= value < 2**31
+    elif kind == "bool":
+        valid = type(value) is bool
+    elif kind == "text":
+        valid = type(value) is str and len(value) <= 1024
+    elif kind == "m":
+        valid = type(value) is float and math.isfinite(value) and value > 0
+    if not valid:
+        return _unreadable(source, f"invalid-{kind}:{type(value).__name__}")
+    result: dict[str, Any] = {"status": "read", "source": source, "value": value}
+    if kind == "m":
+        result["unit"] = "m"
+    if enum is not None:
+        result["enum"] = enum.get(value)
+        if result["enum"] is None:
+            result.update(status="unreadable", cause="unknown-enum")
+        elif enum is _LINE_WEIGHTS and value in (-1, 8, 9):
+            result.update(status="unreadable", cause="unresolved-nonmetric-weight-enum")
+        elif enum is _LINE_STYLES and value == 7:
+            result.update(status="unreadable", cause="unresolved-default-style-enum")
+    return result
+
+
+def _witness_bind(reader: _Reader, fn: Callable[[], Any], interface: str, source: str) -> tuple[Any, str | None]:
+    raw, cause = reader.witness(fn, name=source)
+    if cause is not None:
+        return None, cause
+    return reader.witness(lambda: _early_bound(raw, interface), name=f"bind {interface}")
+
+
+def _preference_witness(
+    reader: _Reader, extension: Any, method: str, pref: tuple[str, int],
+    scope: tuple[str, int], *, kind: str, enum: Mapping[int, str] | None = None,
+) -> dict[str, Any]:
+    source = f"IModelDocExtension.{method}({pref[0]}={pref[1]},{scope[0]}={scope[1]})"
+    return _witness_value(
+        reader, lambda: getattr(extension, method)(pref[1], scope[1]),
+        source=source, kind=kind, enum=enum,
+    )
+
+
+def _document_linefont(
+    reader: _Reader, extension: Any, style: tuple[str, int], weight: tuple[str, int],
+    custom: tuple[str, int], scope: tuple[str, int],
+) -> dict[str, Any]:
+    result = {
+        "scope": {"enum": scope[0], "value": scope[1]},
+        "style": _preference_witness(reader, extension, "GetUserPreferenceInteger", style, scope, kind="integer", enum=_LINE_STYLES),
+        "weight": _preference_witness(reader, extension, "GetUserPreferenceInteger", weight, scope, kind="integer", enum=_LINE_WEIGHTS),
+        "authority": "selected-document-category; not individual annotation or PDF ownership",
+    }
+    custom_source = f"IModelDocExtension.GetUserPreferenceDouble({custom[0]}={custom[1]},{scope[0]}={scope[1]})"
+    if result["weight"]["status"] != "read":
+        result["custom_thickness"] = _unreadable(custom_source, "weight-unreadable; custom-getter-not-invoked")
+    elif result["weight"]["value"] == 10:
+        result["custom_thickness"] = _preference_witness(reader, extension, "GetUserPreferenceDouble", custom, scope, kind="m")
+    else:
+        result["custom_thickness"] = {"status": "inactive", "source": custom_source, "cause": "not-custom"}
+    return result
+
+
+def _document_lineweights(reader: _Reader) -> dict[str, Any]:
+    """Snapshot document values once; never substitute template or seat defaults."""
+    source = "IModelDoc2.Extension"
+    model, cause = _witness_bind(reader, lambda: reader.adapter.currentModel, "IModelDoc2", "adapter.currentModel")
+    if cause is not None:
+        return {"schema": 1, **_unreadable(source, cause)}
+    extension, cause = _witness_bind(reader, lambda: model.Extension, "IModelDocExtension", source)
+    if cause is not None:
+        return {"schema": 1, **_unreadable(source, cause)}
+    scope = ("swDetailingNoOptionSpecified", 0)
+    metrics = {}
+    for weight, pref_name, pref in _DOCUMENT_WEIGHT_PREFS:
+        metric = _preference_witness(reader, extension, "GetUserPreferenceDouble", (pref_name, pref), scope, kind="m")
+        metric["weight"] = {"enum": _LINE_WEIGHTS[weight], "value": weight}
+        metrics[_LINE_WEIGHTS[weight]] = metric
+    categories = {
+        name: _document_linefont(reader, extension, style, weight, custom, scope)
+        for name, style, weight, custom in _DOCUMENT_LINEFONT_PREFS
+    }
+    dimensions = {}
+    for scope_name, option, has_extension in _DIMENSION_LINEFONT_SCOPES:
+        scoped = (scope_name, option)
+        dimension = {
+            "leader": _document_linefont(
+                reader, extension, ("swLineFontDimensionsStyle", 64),
+                ("swLineFontDimensionsThickness", 63), ("swLineFontDimensionsThicknessCustom", 94), scoped,
+            ),
+        }
+        if has_extension:
+            dimension["extension"] = _document_linefont(reader, extension, *_EXTENSION_LINEFONT_PREFS, scoped)
+            dimension["extension_same_as_leader"] = _preference_witness(
+                reader, extension, "GetUserPreferenceToggle", _EXTENSION_SAME_AS_LEADER_PREF, scoped, kind="bool",
+            )
+        else:
+            dimension["extension"] = {
+                "status": "unreadable", "cause": "not-captured; extension-linefont-pairing-not-documented-for-scope",
+            }
+        dimensions[scope_name] = dimension
+    categories["note_leaders"] = _document_linefont(reader, extension, *_NOTE_LINEFONT_PREFS, scope)
+    result = {
+        "schema": 1, "status": "read", "source": source,
+        "metrics": metrics, "categories": categories, "dimensions": dimensions,
+        "coverage": "named selected document categories/scopes only; consult per-view components and annotation display evidence",
+    }
+    if _has_unreadable(result):
+        result["status"] = "unreadable"
+    return result
+
+
+def _component_lineweights(reader: _Reader, view: Any) -> dict[str, Any]:
+    """Read the actual view-context tree, with explicit incompleteness at bounds."""
+    source = "IView.RootDrawingComponent2(InChildContext=True)"
+    root, cause = _witness_bind(reader, lambda: view.RootDrawingComponent2(True), "IDrawingComponent", source)
+    result: dict[str, Any] = {
+        "status": "read", "source": source, "in_child_context": True,
+        "max_components": 512, "max_depth": 32, "components": [],
+    }
+    if cause is not None:
+        result.update(status="unreadable", cause=cause)
+        return result
+    # Index paths preserve distinct instances even when their names coincide.
+    pending = [(root, [])]
+    records = result["components"]
+    while pending:
+        component, path = pending.pop()
+        record: dict[str, Any] = {
+            "path": path,
+            "name": _witness_value(reader, lambda: component.Name, source="IDrawingComponent.Name", kind="text"),
+            "use_document_defaults": _witness_value(
+                reader, lambda: component.UseDocumentDefaults,
+                source="IDrawingComponent.UseDocumentDefaults", kind="bool",
+            ),
+        }
+        records.append(record)
+        defaults = record["use_document_defaults"]
+        if defaults.get("value") is True:
+            record["line_fonts"] = {"status": "inactive", "cause": "use-document-defaults"}
+        else:
+            record["line_fonts"] = {
+                name: _component_linefont(reader, component, name, option)
+                for name, option in _COMPONENT_LINEFONT_OPTIONS
+            }
+        count = _witness_value(
+            reader, lambda: component.GetChildrenCount(), source="IDrawingComponent.GetChildrenCount()", kind="count",
+        )
+        record["children"] = count
+        if count["status"] != "read":
+            result["status"] = "unreadable"
+            continue
+        remaining = result["max_components"] - len(records) - len(pending)
+        if count["value"] > remaining or (count["value"] and len(path) >= result["max_depth"]):
+            record["children"] = {
+                **count, "status": "unreadable",
+                "cause": "component-limit" if count["value"] > remaining else "depth-limit",
+            }
+            result["status"] = "unreadable"
+            continue
+        if not count["value"]:
+            continue
+        children, cause = reader.witness(lambda: component.GetChildren(), name="IDrawingComponent.GetChildren")
+        if cause is None and type(children) not in (tuple, list):
+            cause = f"invalid-array:{type(children).__name__}"
+        if cause is None and len(children) != count["value"]:
+            cause = "child-count-mismatch"
+        if cause is not None:
+            record["children"] = _unreadable("IDrawingComponent.GetChildren()", cause)
+            result["status"] = "unreadable"
+            continue
+        for index in range(len(children) - 1, -1, -1):
+            child, cause = _witness_bind(
+                reader, lambda i=index: children[i], "IDrawingComponent", "IDrawingComponent.GetChildren[]",
+            )
+            if cause is not None:
+                record["children"].update(status="unreadable", cause=f"child-{index}:{cause}")
+                result["status"] = "unreadable"
+            else:
+                pending.append((child, [*path, index]))
+    if any(_has_unreadable(record) for record in records):
+        result["status"] = "unreadable"
+    return result
+
+
+def _has_unreadable(value: Any) -> bool:
+    if type(value) is dict:
+        return value.get("status") == "unreadable" or any(_has_unreadable(item) for item in value.values())
+    if type(value) is list:
+        return any(_has_unreadable(item) for item in value)
+    return False
+
+
+def _component_linefont(reader: _Reader, component: Any, name: str, option: int) -> dict[str, Any]:
+    args = f"{name}={option}"
+    source = f"IDrawingComponent.GetLineThickness({args})"
+    pair, cause = reader.witness(lambda: component.GetLineThickness(option), name="IDrawingComponent.GetLineThickness")
+    # gen_py returns (VT_I4 retval, VT_BYREF|VT_R8 out Thickness), not metres alone.
+    if cause is None and (type(pair) not in (tuple, list) or len(pair) != 2):
+        cause = "invalid-retval-out-thickness-pair"
+    if cause is not None:
+        weight = _unreadable(source, cause)
+        thickness = _unreadable(source, cause)
+    else:
+        weight = _witness_scalar(pair[0], source=source, kind="integer", enum=_LINE_WEIGHTS)
+        if weight.get("value") == 10:
+            thickness = _witness_scalar(pair[1], source=source, kind="m")
+        else:
+            # The out double has authority only for swLW_CUSTOM. Preserve a
+            # finite scalar as raw readback, without treating it as a width.
+            thickness = {"status": "inactive", "source": source, "cause": "not-custom"}
+            if type(pair[1]) is float and math.isfinite(pair[1]):
+                thickness.update(value=pair[1], unit="m")
+            else:
+                thickness = _unreadable(source, f"invalid-out-thickness:{type(pair[1]).__name__}")
+    return {
+        "option": {"enum": name, "value": option},
+        "style": _witness_value(
+            reader, lambda: component.GetLineStyle(option),
+            source=f"IDrawingComponent.GetLineStyle({args})", kind="integer", enum=_LINE_STYLES,
+        ),
+        "weight": weight, "custom_thickness": thickness,
+        "authority": "selected-component-settings; consult-use_document_defaults",
+    }
+
+
+def _lineweight_error(evidence: dict[str, Any], cause: str) -> None:
+    evidence["status"] = "unreadable"
+    errors = evidence["read_errors"]
+    errors[cause] = errors.get(cause, 0) + 1
+
+
+def _display_read(data: Any, getter: str, args: tuple[int, ...], evidence: dict[str, Any]) -> Any:
+    """Observe the existing display read; no additional native calls or fallback."""
+    try:
+        raw = getattr(data, getter)(*args)
+    except Exception as exc:
+        _lineweight_error(evidence, f"{getter}:exception:{type(exc).__name__}")
+        raise
+    if getter == "GetLineCount":
+        if type(raw) is not int or raw < 0:
+            _lineweight_error(evidence, f"{getter}:invalid-count")
+        return raw
+    if not raw:
+        _lineweight_error(evidence, f"{getter}:missing-or-empty")
+        return raw
+    if getter == "GetLineAtIndex2":
+        _lineweight_error(evidence, "GetLineAtIndex2:unused-style-weight-slots")
+        return raw
+    if type(raw) not in (tuple, list) or len(raw) != 10:
+        _lineweight_error(evidence, "GetLineAtIndex3:invalid-ten-double-row")
+        return raw
+    values = raw[2:4]
+    if any(
+        not (
+            type(value) is int and -(2**31) <= value < 2**31
+            or type(value) is float and math.isfinite(value) and value.is_integer() and -(2**31) <= value < 2**31
+        )
+        for value in values
+    ):
+        _lineweight_error(evidence, "GetLineAtIndex3:nonintegral-style-weight")
+        return raw
+    style, weight = (int(value) for value in values)
+    key = f"{style}:{weight}"
+    bins = evidence["bins"]
+    if key not in bins:
+        if len(bins) >= 128:
+            _lineweight_error(evidence, "annotation-bin-limit")
+            return raw
+        bins[key] = {
+            "style": _witness_scalar(style, source="IDisplayData.GetLineAtIndex3[2]", kind="integer", enum=_LINE_STYLES),
+            "weight": _witness_scalar(weight, source="IDisplayData.GetLineAtIndex3[3]", kind="integer", enum=_LINE_WEIGHTS),
+            "count": 0,
+        }
+    bins[key]["count"] += 1
+    if _has_unreadable(bins[key]):
+        evidence["status"] = "unreadable"
+    return raw
+
+
 def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
     data = reader.bind(data, "IDisplayData")
     if data is None:
         return {}
     out: dict[str, Any] = {}
+    lineweights: dict[str, Any] = {
+        "status": "read", "source": "IDisplayData.GetLineAtIndex3",
+        "bins": {}, "read_errors": {}, "max_bins": 128,
+        "coverage": "rendered-annotation-lines; not PDF stroke ownership",
+    }
     # A count is required like the rows it guards: a getter answering None
     # instead of raising would otherwise read as zero primitives, and their
     # ink would drop out of the audit with com-read-errors still clean.
     for key, count_name, getters in _DISPLAY_PRIMITIVES:
-        count = int(reader.need(lambda c=count_name: getattr(data, c)(), 0, name=count_name) or 0)
+        count = int(reader.need(
+            lambda c=count_name: _display_read(data, c, (), lineweights) if c == "GetLineCount" else getattr(data, c)(),
+            0, name=count_name,
+        ) or 0)
         rows = []
         for index in range(count):
             raw = reader.first(
-                [lambda g=getter, i=index: getattr(data, g)(i) for getter in getters], name="/".join(getters)
+                [
+                    lambda g=getter, i=index: _display_read(data, g, (i,), lineweights)
+                    if g.startswith("GetLineAtIndex") else getattr(data, g)(i)
+                    for getter in getters
+                ], name="/".join(getters)
             )
             if raw:
                 rows.append(_round(raw))
         if rows:
             out[key] = rows
+    lineweights["bins"] = list(lineweights["bins"].values())
     texts = []
     for index in range(int(reader.need(lambda: data.GetTextCount(), 0) or 0)):
         texts.append(
@@ -291,6 +674,10 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
             texts[-1]["w"] = round(float(width), 7)
     if texts:
         out["texts"] = texts
+    # annotation_display callers truth-test this dict before using display_box;
+    # diagnostics alone must not turn an absent display into rendered data.
+    if out:
+        out["lineweight_evidence"] = lineweights
     return out
 
 
@@ -338,6 +725,8 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
     if leaders:
         record["leaders"] = leaders
     record["display"] = _dump_display(reader, reader.need(lambda: annotation.GetDisplayData()))
+    if not record["display"]:
+        record["lineweight_evidence"] = _unreadable("IAnnotation.GetDisplayData", "no-rendered-display")
     specific = (
         reader.need(lambda: annotation.GetSpecificAnnotation())
         if kind in (_ANNOT_NOTE, _ANNOT_DIM, _ANNOT_DATUM_ORIGIN)
@@ -440,6 +829,13 @@ def _dump_view(
         "scale": _round(reader.call(lambda: view.ScaleRatio, ())),
         "display_mode": int(reader.call(lambda: view.GetDisplayMode2(), -1)),
     }
+    native_lineweights = _component_lineweights(reader, view)
+    native_lineweights["emphasize_outline"] = _witness_value(
+        reader, lambda: view.EmphasizeOutline, source="IView.EmphasizeOutline", kind="bool",
+    )
+    if _has_unreadable(native_lineweights):
+        native_lineweights["status"] = "unreadable"
+    record["native_lineweights"] = native_lineweights
     record["annotations"] = [
         item
         for item in (
@@ -519,6 +915,7 @@ def _collect_com(
             f"layout audit: {len(page_of)} sheet(s) but {len(pages)} page(s) in {pdf.name}"
         )
     rows = ddoc.GetViews() or ()
+    native_lineweights = _document_lineweights(reader)
     dumps = []
     for index, row in enumerate(rows):
         entries = list(row or ())
@@ -529,6 +926,7 @@ def _collect_com(
                 reader, ddoc, entries, index=index, stem=stem, pdf=pdf, pages=pages, page_of=page_of,
                 sheet_layouts=sheet_layouts, is_pictorial=is_pictorial,
             )
+            dump["native_lineweights"] = native_lineweights
         except Exception as exc:
             raise _collector_fault(stem, dumps, reader, exc) from exc
         dumps.append(dump)

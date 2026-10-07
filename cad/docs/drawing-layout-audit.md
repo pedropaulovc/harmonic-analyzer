@@ -66,6 +66,88 @@ fails the drawing in every mode, because a silently skipped sheet would
 under-count the fleet report: the dumped sheets must be exactly
 `GetSheetNames`, one PDF page each.
 
+### Native lineweight evidence (diagnostic snapshot schema 1)
+
+New collector reports retain `sheets[].native_lineweights`: values read from
+the open drawing's `IModelDoc2.Extension`, once per collection, not inferred
+from its template or application preferences. `metrics` associates
+`swLW_THIN`, `swLW_NORMAL`, and `swLW_THICK` through `swLW_THICK6` with their
+actual document doubles in metres. `categories` records selected style and
+weight enums for visible, hidden, tangent, cosmetic-thread, hatch, SpeedPak,
+section cutting-line and emphasized section-outline categories, plus note
+leaders. `dimensions` reads leader/dimension settings in each documented
+subtype scope, 201–209; it does not infer subtype values from umbrella scope
+200. Extension-line settings and `extension_same_as_leader` are captured for
+angle, arc-length, diameter, linear, ordinate and angular-running scopes.
+Chamfer, hole and radius extension preferences are explicitly unreadable /
+not captured because their subtype documentation supplies no such pairing;
+that is not a claim that these annotations contain no extension geometry.
+
+Each scalar includes `status`, its actual `value`, named `enum` where
+applicable, and getter/argument `source`; thickness doubles have `unit: "m"`.
+Custom thickness is read only when the actual category weight is
+`swLW_CUSTOM`. An inactive custom field is not a default thickness. Refused,
+missing, malformed, non-finite, non-positive metric and unknown-enum reads
+are `unreadable` with a cause, never replaced by README/template values.
+Layer, None and Number weight enums remain explicitly unresolved.
+Document category settings are selected defaults, not proof of an individual
+annotation's effective width; the extension same-as-leader flag can make its
+selected extension settings inactive.
+
+Each `views[].native_lineweights` records `IView.EmphasizeOutline` and the
+actual drawing-component tree obtained with `RootDrawingComponent2(True)`.
+The argument is explicit: the section view's temporary root is requested,
+not a substituted parent root. Components retain child-index `path`, native
+`Name` and `UseDocumentDefaults`; equal names are not deduplicated.
+When document defaults are disabled or their flag is unreadable, each of the
+five documented component line-font selectors retains selected style,
+weight enum and the native out-thickness readback. Non-custom out-thickness
+is inactive raw evidence, not a metric width. The tree is bounded to 512
+records and depth 32 per view; a bound, failed child count, array/count
+mismatch or unreadable child marks the affected branch and snapshot
+unreadable. No truncated tree proves absence of overrides. No model document,
+part geometry or component setters are used.
+
+For represented annotation lines, `display.lineweight_evidence` aggregates
+the style/weight enum pair actually returned by the existing
+`IDisplayData.GetLineAtIndex3` reads (at most 128 bins). Its ten-double row has
+style and weight in slots 2 and 3. The existing `GetLineAtIndex2` fallback
+keeps its geometry, but its unused style/weight slots are explicitly
+unreadable, not Thin evidence. The original empty-display return and
+template-owner exclusion remain intact. Empty annotation display is
+explicitly marked unreadable on the annotation record.
+
+The binding contracts are read-only: Extension is a `VT_DISPATCH` property;
+document Integer/Double/Toggle getters are methods taking two `VT_I4`
+arguments and returning `VT_I4`/`VT_R8`/`VT_BOOL`. `RootDrawingComponent2` is a
+parameterized property exposed by pywin32 as a method with a `VT_BOOL`
+argument and `VT_DISPATCH` return. Component Name/defaults are
+`VT_BSTR`/`VT_BOOL` properties; children/count/style are methods.
+`GetLineThickness(option)` returns the pywin32 pair
+`(VT_I4 weight enum, VT_BYREF|VT_R8 out Thickness)`, not scalar metres.
+Preference IDs come from installed swconst enum declarations
+34.3.0.150 (SHA256
+`7F07CA30C4DB22B6D835494D86F5A0D10E8FDEAB9308C9C90132E70C7F4E21B3`),
+not from assumed default widths. See official
+[Line Thickness](https://help.solidworks.com/2026/English/api/swconst/DP_LineThickness.htm),
+[Line Font](https://help.solidworks.com/2026/English/api/swconst/DP_LineFont.htm),
+[API units](https://help.solidworks.com/2026/English/api/sldworksapiprogguide/Overview/Units.htm?id=72ba6b89ef7149da98fe606db8cc97ce),
+and [RootDrawingComponent2](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IView~RootDrawingComponent2.html).
+
+These fields are diagnostic only: existing `read_errors`, findings, schema
+and model-ink thresholds are unchanged. Calls join the existing collector
+cost aggregation, without per-component trace events. `report_sheet` retains
+the fields unchanged while still reducing raw PDF strokes to a count.
+Older cached reports without these fields are unmeasured, not implicit
+Thin/Normal/default values. The calibration summary projects its established
+fields; inspect the new raw report for this witness rather than assuming
+`layout_calibration` exposes it.
+Before any classifier migration, two real MHA-SM003/MHA-FR005 pilot leaves
+must pair these native category/override readbacks with exact PDF hashes
+and raw strokes, including unmistakable model contours and known
+annotation/centermark/hatch negative controls. Width-bin membership alone
+is not semantic classification or native acceptance.
+
 ## What it checks
 
 **The PDF says where; COM says what.** Each `IDisplayData` text item is
