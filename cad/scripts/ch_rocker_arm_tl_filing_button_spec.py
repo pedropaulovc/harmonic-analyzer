@@ -29,15 +29,22 @@ THICKNESS_PLACES = 2
 # far inside it, and a hub taper inside that band is harmless.
 OD = rocker.HUB_DIA
 OD_PLACES = 3
-OD_BAND = (limits(OD, OD_PLACES)[1] - OD, limits(OD, OD_PLACES)[0] - OD)
-if not (-rocker.LINEAR_2PL <= OD_BAND[1] and OD_BAND[0] <= rocker.LINEAR_2PL):
-    raise AssertionError("filing-button rim band leaves the hub O.D. band")
+# A button O.D. of HUB_DIA at the three-place band files the hub to about
+# 10.07-10.33, inside the hub's printed two-place O9.69-10.71.
+_OD_MIN, _OD_MAX = limits(OD, OD_PLACES)
+_HUB_MIN, _HUB_MAX = limits(rocker.HUB_DIA, 2)
+if not (_HUB_MIN <= _OD_MIN and _OD_MAX <= _HUB_MAX):
+    raise AssertionError("filing-button rim band leaves the hub's printed O.D. band")
 
-# Barrel-lapped bore: its limits give the stud body (stud spec) the slip
-# clearance that holds the rim concentric to the arm's pivot bore.
+# The bore prints as a reference and its fit to the stud governs (the note).
+# BORE_BAND is the design intent of that fit for the stud's stack checks
+# only; features.toml carries what the print says, the nominal and the note.
 BORE_DIA = 6.51
 BORE_BAND = (0.005, -0.005)
 BORE_PLACES = 3
+BORE_FIT_NOTE = (
+    "FIT BORE TO THE FILING STUD LOCATING DIAMETER: SLIDES ON BY HAND WITHOUT SHAKE."
+)
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "RingProfile": {"DiscDia", "BoreDia"},
@@ -62,12 +69,10 @@ SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_
 # tight. Hardness and the lapped surfaces live in the Finish field.
 DRAWING_NOTES = (
     "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. ROUND AND TRUE TO BORE.\n"
-    "FIT BORE TO THE FILING STUD LOCATING DIAMETER: SLIDES ON BY HAND WITHOUT SHAKE.\n"
+    f"{BORE_FIT_NOTE}\n"
     "THICKNESS LOCATES THE STACK.\n"
     "KEEP RIM CORNERS SHARP; STONE BURRS ONLY."
 )
-# Codex round 5: the bore prints as a reference; its fit to the stud governs,
-# and BORE_BAND stays the exported design intent of that fit.
 REFERENCE_DIMENSIONS = frozenset({"BoreDia"})
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 
@@ -82,7 +87,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "axis": _AXIS,
             "dia": (
                 limits(OD, OD_PLACES),
-                ("OD", "OD_BAND", ("ch_rocker_arm_spec", "HUB_DIA")),
+                ("OD", "OD_PLACES", ("ch_rocker_arm_spec", "HUB_DIA")),
             ),
             "dia_nominal": (OD, ("OD", ("ch_rocker_arm_spec", "HUB_DIA"))),
         },
@@ -91,19 +96,14 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "bore": ExportFeature(
         kind="hole",
         faces=(CylinderFace(BORE_DIA),),
-        requirements=("dia", "thru"),
+        requirements=("note", "thru"),
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
-            "dia": (
-                limits(BORE_DIA, BORE_PLACES, BORE_BAND),
-                ("BORE_DIA", "BORE_BAND"),
-            ),
-            "nominal_dia": (BORE_DIA, ("BORE_DIA",)),
+            "dia_nominal": (BORE_DIA, ("BORE_DIA",)),
             "thru": (True, ("BORE_DIA",)),
-            "process": ("lap", ("BORE_BAND",)),
+            "note": (BORE_FIT_NOTE, ("BORE_FIT_NOTE",)),
         },
-        precision={"dia": BORE_PLACES},
     ),
     "hub_seat_face": ExportFeature(
         kind="face",

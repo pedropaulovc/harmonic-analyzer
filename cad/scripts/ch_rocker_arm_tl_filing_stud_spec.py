@@ -39,7 +39,9 @@ if button.BORE_DIA + button.BORE_BAND[1] - _BODY_MAX < BODY_CLEARANCE_MIN:
 HEAD_DIA = 9.0
 HEAD_LENGTH = 3.0
 if not (
-    button.BORE_DIA + button.BORE_BAND[0] < HEAD_DIA < button.OD + button.OD_BAND[1]
+    button.BORE_DIA + button.BORE_BAND[0]
+    < HEAD_DIA
+    < limits(button.OD, button.OD_PLACES)[0]
 ):
     raise AssertionError("filing-stud head does not land on the button face")
 
@@ -103,20 +105,27 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked filing-stud dimension needs authored places")
 # The overall restates the two ends for stock cut-off.
 # Codex round 4: the locating diameter prints as a reference; the fit to its
-# three mating bores (hand slide, no shake) governs it, and BODY_BAND stays
-# the exported design intent of that fit.
+# three mating bores (hand slide, no shake) governs it. BODY_BAND is that
+# fit's design intent for the stack checks only; features.toml carries the
+# printed nominal and fit note.
 REFERENCE_DIMENSIONS = frozenset({"OverallLength", "BodyDia"})
 REFERENCE_LABELS = {"BodyDia": "LOCATING DIAMETER"}
 # The thread size prints as its designation, not as a plain diameter.
 DIMENSION_TEXT = {"ThreadDia": THREAD}
 
 SURFACE_FINISHES = ()
+BODY_FIT_NOTE = (
+    "FIT LOCATING DIAMETER TO THE ROCKER ARM PIVOT BORE AND BOTH FILING BUTTON "
+    "BORES: EACH SLIDES ON BY HAND WITHOUT SHAKE."
+)
 DRAWING_NOTES = (
     "AXIAL SIZES FROM THE HEAD SEAT FACE; SEAT SQUARE TO THE LOCATING DIAMETER.\n"
     "FIT LOCATING DIAMETER TO THE ROCKER ARM PIVOT BORE AND BOTH FILING BUTTON\n"
     "BORES: EACH SLIDES ON BY HAND WITHOUT SHAKE. VISE TAIL IS HELD ONLY.\n"
     "DO NOT HARDEN."
 )
+if BODY_FIT_NOTE not in DRAWING_NOTES.replace("\n", " "):
+    raise AssertionError("the exported fit note must be the printed sentence")
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
@@ -124,26 +133,25 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "locating_body": ExportFeature(
         kind="boss",
         faces=(CylinderFace(BODY_DIA),),
-        requirements=("dia", "length"),
+        requirements=("note", "length"),
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
-            "dia": (
-                limits(BODY_DIA, BODY_PLACES, BODY_BAND),
+            "dia_nominal": (BODY_DIA, ("BODY_DIA",)),
+            "note": (
+                BODY_FIT_NOTE,
                 (
-                    "BODY_DIA",
-                    "BODY_BAND",
+                    "BODY_FIT_NOTE",
                     ("ch_rocker_arm_spec", "PIVOT_HOLE_DIA"),
                     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"),
                 ),
             ),
-            "dia_nominal": (BODY_DIA, ("BODY_DIA",)),
             "length": (
                 limits(BODY_LENGTH, AXIAL_PLACES),
                 ("BODY_LENGTH", ("ch_rocker_arm_spec", "HUB_LENGTH")),
             ),
         },
-        precision={"dia": BODY_PLACES, "length": AXIAL_PLACES},
+        precision={"length": AXIAL_PLACES},
     ),
     "button_seat": ExportFeature(
         kind="face",

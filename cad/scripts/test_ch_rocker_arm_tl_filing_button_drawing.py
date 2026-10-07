@@ -41,13 +41,18 @@ def test_rim_is_the_hub_filing_line() -> None:
     assert low < rocker.HUB_DIA < high
 
 
-def test_stud_slips_into_the_smallest_pivot_bore_and_button_bore() -> None:
-    body_high = _features(STUD)["locating_body"]["dia"][1]
-    assert (
-        rocker.PIVOT_HOLE_DIA + rocker.PIVOT_HOLE_BAND[1] - body_high
-        >= stud.BODY_CLEARANCE_MIN
-    )
-    assert _features(BUTTON)["bore"]["dia"][0] - body_high >= stud.BODY_CLEARANCE_MIN
+def test_matched_fits_export_the_printed_reference_and_fit_note() -> None:
+    """One fact, one source: the print shows the bore and locating diameter
+    as references governed by a fit note, so features.toml carries that
+    nominal and that note, never a tighter hidden band."""
+    for feature, nominal, notes in (
+        (_features(BUTTON)["bore"], button.BORE_DIA, button.DRAWING_NOTES),
+        (_features(STUD)["locating_body"], stud.BODY_DIA, stud.DRAWING_NOTES),
+    ):
+        assert "dia" not in feature
+        assert feature["dia_nominal"] == nominal
+        assert "WITHOUT SHAKE" in feature["note"]
+        assert feature["note"] in notes.replace("\n", " ")
 
 
 def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
@@ -63,9 +68,8 @@ def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
 
 def test_head_seat_lands_on_the_button_face_outside_its_bore() -> None:
     head = stud.HEAD_DIA
-    assert (
-        _features(BUTTON)["bore"]["dia"][1] < head < _features(BUTTON)["rim"]["dia"][0]
-    )
+    bore_high = button.BORE_DIA + button.BORE_BAND[0]
+    assert bore_high < head < _features(BUTTON)["rim"]["dia"][0]
 
 
 @pytest.mark.parametrize(
