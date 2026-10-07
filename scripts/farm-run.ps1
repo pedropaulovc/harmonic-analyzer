@@ -963,7 +963,13 @@ function Wait-ProcessExit {
         if ($Process.HasExited) {
             return $true
         }
-        $stat = Read-ProcStat -Id $Process.Id
+        try {
+            $stat = Read-ProcStat -Id $Process.Id
+        }
+        catch {
+            # A truncated read proves nothing either way: keep waiting.
+            $stat = [pscustomobject]@{ State = '?'; ParentProcessId = 0 }
+        }
         if ($null -eq $stat -or $stat.State -eq 'Z') {
             return $true
         }

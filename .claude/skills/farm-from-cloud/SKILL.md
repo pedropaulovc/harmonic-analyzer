@@ -54,7 +54,8 @@ URL and code. Expect subscription `Pay-As-You-Go Dev/Test`.
 
 `farm.py credentials issue` overwrites `~/.solidworks-pool/*` (or
 `$SOLIDWORKS_POOL_CONFIG`'s directory) unconditionally. Abort if it exists. Use
-a new submitter name per session (`ccr-<user>-<yyyymmdd>`). Issuing signs a new
+a new submitter name per session (`ccr-<user>-<yyyymmdd>`, `<user>` from the
+signed-in Azure account). Issuing signs a new
 cert and token; it revokes nothing.
 
 ## 4. Issue credentials through the Key Vault firewall
@@ -67,13 +68,18 @@ exit, even on failure. Firewall changes take ~20-40 s to apply.
 
 ```bash
 set -u; V=kvsw5qnlwu2vtr6gs; R=160.79.106.0/24
-test ! -e ~/.solidworks-pool || { echo "credentials exist - abort"; exit 1; }
+# farm.py writes beside $SOLIDWORKS_POOL_CONFIG, else into ~/.solidworks-pool.
+D=$(dirname "${SOLIDWORKS_POOL_CONFIG:-$HOME/.solidworks-pool/config.json}")
+for f in config.json ca.pem client.pem client-key.pem token.jwt; do
+  test ! -e "$D/$f" || { echo "credentials exist: $D/$f - abort"; exit 1; }
+done
+U=$(az ad signed-in-user show --query userPrincipalName -o tsv | cut -d@ -f1 | cut -d'#' -f1 | tr -c 'A-Za-z0-9._\n-' '-')
 trap 'az keyvault network-rule remove -n $V --ip-address $R -o none;
       az keyvault show -n $V --query properties.networkAcls.ipRules[].value -o tsv' EXIT
 az keyvault network-rule add -n $V --ip-address $R -o none
 cd ../solidworks-pool
 for i in 1 2 3 4 5 6; do sleep 20
-  uv run --frozen python farm.py credentials issue --name ccr-pedro-$(date +%Y%m%d) \
+  uv run --frozen python farm.py credentials issue --name "ccr-$U-$(date +%Y%m%d)" \
     --server farm-solidworks-07aba226.westus.cloudapp.azure.com:7233 \
     --results-account stswboot5qnlwu2vtr6gs --screens-account stswscreens5qnlwu2vtr6gs \
     --logs-workspace 58e8feaa-03c0-479c-afe9-5544b60b387d \
