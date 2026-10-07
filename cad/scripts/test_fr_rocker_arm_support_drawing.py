@@ -483,65 +483,277 @@ class _FootCylinderFace:
         return self.rims
 
 
+class _NativeDatumTransform:
+    """Independent native row-vector rotation, scale and translation."""
+
+    def __init__(self, rotation, translation, scale, context, name):
+        self._data = (*rotation, *translation, scale, 0, 0, 0)
+        self.context, self.name = context, name
+
+    @property
+    def ArrayData(self):
+        if self.context["native_failure"] == f"{self.name}_read_error":
+            raise self.context["native_error"]
+        return self._data
+
+    def apply(self, xyz):
+        rotation, translation, scale = self._data[:9], self._data[9:12], self._data[12]
+        return tuple(
+            scale * sum(xyz[row] * rotation[3 * row + column] for row in range(3))
+            + translation[column]
+            for column in range(3)
+        )
+
+    def Inverse(self):
+        if self.context["native_failure"] == "inverse_error":
+            raise self.context["native_error"]
+        if self.context["native_failure"] == "inverse_null":
+            return None
+        rotation, translation, scale = self._data[:9], self._data[9:12], self._data[12]
+        transpose = tuple(rotation[3 * column + row] for row in range(3) for column in range(3))
+        inverse_translation = tuple(
+            -sum(translation[row] * transpose[3 * row + column] for row in range(3)) / scale
+            for column in range(3)
+        )
+        return _NativeDatumTransform(
+            transpose, inverse_translation, 1 / scale, self.context, "inverse"
+        )
+
+
+class _NativeDatumMathPoint:
+    def __init__(self, xyz, context):
+        self.xyz, self.context = tuple(xyz), context
+
+    @property
+    def ArrayData(self):
+        failure = self.context["native_failure"]
+        if failure == "math_data_error":
+            raise self.context["native_error"]
+        if failure == "math_data_null":
+            return None
+        if failure == "math_data_short":
+            return self.xyz[:1]
+        if failure == "math_data_nonfinite":
+            return (math.nan, *self.xyz[1:])
+        return self.xyz
+
+    def MultiplyTransform(self, transform):
+        failure = self.context["native_failure"]
+        if failure == "multiply_error":
+            raise self.context["native_error"]
+        if failure == "multiply_null":
+            return None
+        if transform is None:
+            raise RuntimeError("native math transform is null")
+        return _NativeDatumMathPoint(transform.apply(self.xyz), self.context)
+
+
+class _NativeDatumMathUtility:
+    def __init__(self, context):
+        self.context = context
+
+    def CreatePoint(self, xyz):
+        failure = self.context["native_failure"]
+        if failure == "math_point_error":
+            raise self.context["native_error"]
+        if failure == "math_point_null":
+            return None
+        return _NativeDatumMathPoint(xyz, self.context)
+
+
 class _ReadOnlyDatumPoint:
-    """Independent simulated native datum drift; no correction setter exists."""
+    """Retain independent native coordinates and sketch identity without setters."""
+
+    def __init__(self, xyz, sketch, context):
+        self._xyz, self.sketch, self.context = tuple(xyz), sketch, context
 
     @property
     def X(self):
-        return -0.0889
+        if self.context["native_failure"] == "point_read_error":
+            raise self.context["native_error"]
+        return self._xyz[0]
 
     @property
     def Y(self):
-        return -0.03176
+        return self._xyz[1]
 
     @property
     def Z(self):
-        return 0.0
+        return self._xyz[2]
 
     def GetSketch(self):
-        identity = (1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
-        return SimpleNamespace(ModelToSketchTransform=SimpleNamespace(ArrayData=identity))
+        if self.context["native_failure"] == "point_sketch_error":
+            raise self.context["native_error"]
+        return self.sketch
 
 
-def _native_table_readback_fixture(monkeypatch, *, fail_cell=False):
-    adapter, context = _native_pickup_part(monkeypatch)
+def _native_table_readback_fixture(
+    monkeypatch, *, fail_cell=False, frame="pilot", datum_xy=None,
+    pickup_failure=None, create_point=True, printed_discrepancy=False,
+):
+    adapter, context = _native_pickup_part(monkeypatch, failure=pickup_failure)
+    part = adapter.currentModel
+    context.update(
+        native_failure=None, native_error=RuntimeError("independent native read failed"),
+        readbacks=[], proofs=[], part=part,
+    )
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, _name: obj)
     monkeypatch.setattr(_drawing_common, "_early_bound", lambda obj, _name: obj)
+    monkeypatch.setattr(_drawing_common, "double_array", tuple)
+    monkeypatch.setattr(drawing, "double_array", tuple)
+
+    def invoke(obj, _interface, name, *args):
+        member = getattr(obj, name)
+        return member(*args) if callable(member) else member
+
+    monkeypatch.setattr(_drawing_common, "_com_invoke", invoke)
     monkeypatch.setattr(
         _drawing_common, "visible_component_entities",
         lambda view, component, kind: view.GetVisibleEntities2(component, kind),
     )
-    body = adapter.currentModel.GetBodies2(0, False)[0]
+
+    def record_event(name, **fields):
+        if name == "drawing.support_hole_table_readback":
+            context["readbacks"].append(json.loads(fields["native_readback"]))
+        elif name == "drawing.support_table_datum_invariant":
+            context["proofs"].append(json.loads(fields["native_readback"]))
+
+    monkeypatch.setattr(drawing._telemetry, "event", record_event)
+    body = part.GetBodies2(0, False)[0]
     face = body.GetFirstFace()
-    while face.next_face is not None:
+    context["pickup_planes"] = {}
+    while face is not None:
+        context["pickup_planes"][face.name] = face
+        last_face = face
         face = face.next_face
     holes = [
         _FootCylinderFace(x, z, bytes([20 + index]))
         for index, (x, z) in enumerate(support.HOLES)
     ]
     for hole in holes:
-        face.next_face = hole
-        face = hole
-    transform = (
-        1, 0, 0, 0, 0, 1, 0, -1, 0, 0.105, 0.075, 0, 0.5, 0, 0, 0
+        last_face.next_face = hole
+        last_face = hole
+
+    if frame == "pilot":
+        # Captured M/S mismatch, not a simulated sketch-point snap.
+        view_angle, view_scale = 0.0, 0.5
+        view_origin = (0.105, 0.07500446230558304, -1.5853294083847855e-20)
+        sketch_angle, sketch_scale, sketch_origin = 0.0, 2.0, (-0.21, -0.15, 0.0)
+    elif frame == "rotated":
+        view_angle, view_scale = 0.37, 0.8
+        view_origin = (0.24, 0.19, -0.022)
+        sketch_angle, sketch_scale, sketch_origin = -0.61, 1.25, (-0.20, 0.071, 0.0)
+    elif frame == "depth_tilt":
+        view_angle, view_scale = 0.0, 0.75
+        view_origin = (0.18, 0.16, 0.03)
+        sketch_angle, sketch_scale, sketch_origin = 0.41, 1.5, (-0.07, -0.08, 0.0)
+    else:
+        assert frame == "unit"
+        view_angle, view_scale = 0.0, 1.0
+        view_origin = (0.105, 0.075, 0.0)
+        sketch_angle, sketch_scale, sketch_origin = 0.0, 1.0, (-0.105, -0.075, 0.0)
+    c, s = math.cos(view_angle), math.sin(view_angle)
+    view_rotation = (c, s, 0, 0, 0, -1, -s, c, 0)
+    c, s = math.cos(sketch_angle), math.sin(sketch_angle)
+    if frame == "depth_tilt":
+        sketch_rotation = (1, 0, 0, 0, c, s, 0, -s, c)
+        sheet_y = view_origin[1] + view_scale * (-section.WIDE / 1000)
+        sketch_origin = (*sketch_origin[:2], -sketch_scale * (sheet_y * s))
+    else:
+        sketch_rotation = (c, s, 0, -s, c, 0, 0, 0, 1)
+    view_transform = _NativeDatumTransform(
+        view_rotation, view_origin, view_scale, context, "view_transform"
     )
+    sketch_transform = _NativeDatumTransform(
+        sketch_rotation, sketch_origin, sketch_scale, context, "sketch_transform"
+    )
+    class NativeSketch(SimpleNamespace):
+        @property
+        def ModelToSketchTransform(self):
+            if context["native_failure"] == "sketch_frame_error":
+                raise context["native_error"]
+            return self.transform
+
+        @ModelToSketchTransform.setter
+        def ModelToSketchTransform(self, value):
+            self.transform = value
+
+    class NativeView(SimpleNamespace):
+        @property
+        def ModelToViewTransform(self):
+            if context["native_failure"] == "view_frame_error":
+                raise context["native_error"]
+            return self.transform
+
+        @ModelToViewTransform.setter
+        def ModelToViewTransform(self, value):
+            self.transform = value
+
+        def GetSketch(self):
+            if context["native_failure"] == "view_sketch_error":
+                raise context["native_error"]
+            return context["current_sketch"]
+
+    sketch = NativeSketch(transform=sketch_transform)
     component = object()
-    view = SimpleNamespace(
-        ReferencedDocument=adapter.currentModel,
-        ModelToViewTransform=SimpleNamespace(ArrayData=transform),
+    view = NativeView(
+        ReferencedDocument=part, transform=view_transform,
         GetVisibleComponents=lambda: (component,),
         GetVisibleEntities2=lambda selected_component, kind: (
             tuple(hole.rims[0] for hole in holes)
             if selected_component is component and kind == 1 else ()
         ),
     )
+    context.update(
+        current_sketch=sketch, view_origin=view_origin, view_angle=view_angle,
+        view_scale=view_scale, sketch=sketch,
+    )
     monkeypatch.setattr(drawing, "view_name", lambda _adapter, _view: "BottomNative")
-    point = _ReadOnlyDatumPoint()
+    monkeypatch.setattr(_drawing_common, "view_name", lambda _adapter, _view: "BottomNative")
+
+    class NativeSketchManager:
+        AddToDB = False
+        DisplayWhenAdded = False
+
+        def CreatePoint(self, x, y, z):
+            if context["native_failure"] == "sketch_point_error":
+                raise context["native_error"]
+            if context["native_failure"] == "sketch_point_null":
+                return None
+            return _ReadOnlyDatumPoint((x, y, z), context["active_sketch"], context)
+
+    def activate_view(name):
+        if name != "BottomNative":
+            return False
+        context["active_sketch"] = view.GetSketch()
+        return True
+
+    adapter.currentModel = SimpleNamespace(
+        ActivateView=activate_view, SketchManager=NativeSketchManager(),
+        ClearSelection2=lambda _all: None, EditRebuild3=lambda: True,
+    )
+    utility = _NativeDatumMathUtility(context)
+
+    def get_math_utility():
+        if context["native_failure"] == "utility_error":
+            raise context["native_error"]
+        return utility
+
+    adapter.swApp.GetMathUtility = get_math_utility
+    if not create_point:
+        point = None
+    elif datum_xy is None:
+        point = drawing._create_table_pickup_datum(adapter, view)
+    else:
+        point = _drawing_common.create_view_theoretical_datum(
+            adapter, view, point_xy=datum_xy, label="hypothetical native input"
+        )
+    context.update(attachments=(point,), attachment_types=(11,), attachment_count=1, dangling=False)
     annotation = SimpleNamespace(
-        GetAttachedEntities3=lambda: (point,),
-        GetAttachedEntityTypes=lambda: (11,),
-        GetAttachedEntityCount3=lambda: 1,
-        IsDangling=lambda: False,
+        GetAttachedEntities3=lambda: context["attachments"],
+        GetAttachedEntityTypes=lambda: context["attachment_types"],
+        GetAttachedEntityCount3=lambda: context["attachment_count"],
+        IsDangling=lambda: context["dangling"],
         GetPosition=lambda: (0.06055, 0.05912, 0),
     )
     origin = SimpleNamespace(
@@ -554,11 +766,14 @@ def _native_table_readback_fixture(monkeypatch, *, fail_cell=False):
     )
     rows = [
         ["TAG", "X LOC", "Y LOC", "SIZE"],
-        ["A1", "28.58", "14.30", "5/16"],
-        ["A2", "28.58", "49.22", "5/16"],
-        ["A3", "149.22", "14.30", "5/16"],
-        ["A4", "149.22", "49.22", "5/16"],
+        ["A1", "28.58", "14.29", "5/16"],
+        ["A2", "28.58", "49.21", "5/16"],
+        ["A3", "149.22", "14.29", "5/16"],
+        ["A4", "149.22", "49.21", "5/16"],
     ]
+    if printed_discrepancy:
+        for row, y in zip(rows[1:], ("14.30", "49.22", "14.30", "49.22")):
+            row[2] = y
 
     def cell_text(row, column, _hidden):
         if fail_cell:
@@ -566,9 +781,7 @@ def _native_table_readback_fixture(monkeypatch, *, fail_cell=False):
         return rows[row][column]
 
     table = SimpleNamespace(
-        RowCount=5, ColumnCount=4,
-        Text2=cell_text,
-        DisplayedText2=cell_text,
+        RowCount=5, ColumnCount=4, Text2=cell_text, DisplayedText2=cell_text,
         HoleTable=SimpleNamespace(
             DatumOrigin=origin,
             GetHoleLocationPrecision=lambda: 2,
@@ -588,14 +801,325 @@ def _native_table_readback_fixture(monkeypatch, *, fail_cell=False):
             (-0.08763, -0.0889, 0, 0, 0, 1),
         )
     )
+    context.update(rows=rows, holes=holes)
     return adapter, view, table, point, axes, context
+
+
+def _physical_corner_sheet_oracle(context):
+    """Compute the physical bottom projection from independent frame inputs."""
+    x, z = -section.BOSS_DEPTH / 2000, -section.WIDE / 1000
+    c, s = math.cos(context["view_angle"]), math.sin(context["view_angle"])
+    tx, ty, _tz = context["view_origin"]
+    scale = context["view_scale"]
+    return (tx + scale * (c * x - s * z), ty + scale * (s * x + c * z))
+
+
+@pytest.mark.parametrize("frame", ("pilot", "rotated", "depth_tilt"))
+def test_table_pickup_datum_composes_current_independent_native_frames(monkeypatch, frame):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, frame=frame
+    )
+    corner = (-section.BOSS_DEPTH / 2000, -section.HALF_Y / 1000, -section.WIDE / 1000)
+    expected_sheet = _physical_corner_sheet_oracle(context)
+    assert drawing.TABLE_PICKUP_CORNER_M == corner == (-0.0889, -0.0889, -0.03175)
+    assert drawing.HOLE_TABLE_DATUM_XZ_MM == (-88.9, -31.75)
+    assert set(support.HOLES) == {
+        (-60.32, -17.46), (-60.32, 17.46), (60.32, -17.46), (60.32, 17.46)
+    }
+    assert set(drawing.EXPECTED_HOLE_TABLE_LOCATIONS_MM) == {
+        (28.58, 14.29), (28.58, 49.21), (149.22, 14.29), (149.22, 49.21)
+    }
+    projected = _drawing_common.model_point_in_view(
+        adapter, view, corner, label="independent consumer corner"
+    )
+    assert projected == pytest.approx(expected_sheet, rel=32 * sys.float_info.epsilon, abs=0)
+    sketch_transform = point.GetSketch().ModelToSketchTransform
+    expected_sketch = sketch_transform.apply((*expected_sheet, 0.0))
+    assert (point.X, point.Y, point.Z) == pytest.approx(
+        expected_sketch, rel=32 * sys.float_info.epsilon, abs=0
+    )
+    assert point.Z == 0
+    assert point.GetSketch() is view.GetSketch()
+    witness = drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    assert witness["physical_corner_model_m"] == corner
+    assert witness["actual_origin_sheet_m"][:2] == pytest.approx(
+        expected_sheet, rel=32 * sys.float_info.epsilon, abs=0
+    )
+    assert witness["physical_corner_sheet_xy"] == pytest.approx(
+        expected_sheet, rel=32 * sys.float_info.epsilon, abs=0
+    )
+    assert witness["same_view_sketch"] == 1
+    comparisons = {item["label"]: item for item in witness["physical_origin_comparisons"]}
+    assert set(comparisons) == {
+        "table_pickup_end", "table_pickup_taper", "mounting_face", "sheet_x", "sheet_y"
+    }
+    for item in comparisons.values():
+        assert item["measured"] == pytest.approx(
+            item["physical"], rel=32 * sys.float_info.epsilon, abs=0
+        )
+    assert witness["cell_text2"] == context["rows"] == witness["cell_displayed_text2"]
+    assert context["selected"] == []
+    assert adapter.currentModel.SketchManager.AddToDB is False
+    assert adapter.currentModel.SketchManager.DisplayWhenAdded is False
+    native_depth = view.ModelToViewTransform.apply(corner)[2]
+    assert native_depth != 0
+    if frame == "depth_tilt":
+        # This independent sketch plane contains the flattened target. Carrying
+        # native view depth into S instead changes its XY, not just discarded Z.
+        depth_carried = sketch_transform.apply((*expected_sheet, native_depth))
+        assert depth_carried[:2] != pytest.approx(expected_sketch[:2])
+        assert witness["actual_origin_sheet_m"][2] == pytest.approx(0, abs=1e-15)
+    if frame == "pilot":
+        assert (point.Y - corner[2]) * 1000 == pytest.approx(0.0089246111664, abs=1e-10)
+
+
+def test_old_direct_table_point_refuses_captured_native_frame_mismatch(monkeypatch):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, datum_xy=(-0.0889, -0.03175)
+    )
+    retained = (point.X, point.Y, point.Z)
+    with pytest.raises(RuntimeError, match="physical-origin invariant failed: sheet_y"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    raw, proof = context["readbacks"][-1], context["proofs"][-1]
+    assert raw["created_point"]["xyz_si"] == list(retained)
+    assert raw["origin_attachments"][0]["point"]["xyz_si"] == list(retained)
+    assert proof["actual_origin_sheet_m"][:2] == pytest.approx((0.06055, 0.059125))
+    assert proof["physical_corner_sheet_xy"] == pytest.approx(
+        _physical_corner_sheet_oracle(context), rel=32 * sys.float_info.epsilon, abs=0
+    )
+    mismatch_mm = (
+        proof["physical_corner_sheet_xy"][1] - proof["actual_origin_sheet_m"][1]
+    ) / context["view_scale"] * 1000
+    assert mismatch_mm == pytest.approx(0.0089246111664, abs=1e-10)
+    assert (point.X, point.Y, point.Z) == retained
+
+
+@pytest.mark.parametrize(
+    "failure",
+    (
+        "wrong_point", "wrong_sketch", "null_attachment", "missing_attachment",
+        "multiple", "declared_count", "wrong_type", "missing_type", "extra_type",
+        "dangling", "identity_status",
+    ),
+)
+def test_settled_table_origin_refuses_wrong_native_attachment(monkeypatch, failure):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(monkeypatch)
+    retained = (point.X, point.Y, point.Z)
+    if failure == "wrong_point":
+        context["attachments"] = (_ReadOnlyDatumPoint(retained, point.GetSketch(), context),)
+    elif failure == "wrong_sketch":
+        point.sketch = SimpleNamespace(ModelToSketchTransform=point.sketch.ModelToSketchTransform)
+    elif failure == "null_attachment":
+        context["attachments"] = (None,)
+    elif failure == "missing_attachment":
+        context.update(attachments=(), attachment_types=(), attachment_count=0)
+    elif failure == "multiple":
+        context.update(attachments=(point, point), attachment_types=(11, 11), attachment_count=2)
+    elif failure == "declared_count":
+        context["attachment_count"] = 2
+    elif failure == "wrong_type":
+        context.update(attachments=(context["holes"][0].rims[0],), attachment_types=(1,))
+    elif failure == "missing_type":
+        context["attachment_types"] = ()
+    elif failure == "extra_type":
+        context["attachment_types"] = (11, 11)
+    elif failure == "dangling":
+        context["dangling"] = True
+    else:
+        adapter.swApp.IsSame = lambda left, right: 2 if left is right else 0
+    message = (
+        "different view sketch" if failure == "wrong_sketch"
+        else "lost its single native point attachment"
+    )
+    with pytest.raises(RuntimeError, match=message):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    raw = context["readbacks"][-1]
+    assert raw["created_point"]["xyz_si"] == list(retained)
+    assert raw["origin_attachment_types"] == list(context["attachment_types"])
+    assert raw["origin_declared_attachment_count"] == context["attachment_count"]
+    assert raw["origin_is_dangling"] is context["dangling"]
+    if failure == "wrong_point":
+        assert raw["origin_attachments"][0]["same_created_point"] == 0
+        assert raw["origin_attachments"][0]["point"]["xyz_si"] == list(retained)
+    if failure == "wrong_type":
+        assert raw["origin_attachments"][0]["edge"]["is_circle"] is True
+    assert (point.X, point.Y, point.Z) == retained
+
+
+@pytest.mark.parametrize("changed_frame", ("model_to_view", "model_to_sketch"))
+def test_settled_table_origin_refuses_later_native_transform_drift(monkeypatch, changed_frame):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, frame="rotated"
+    )
+    retained = (point.X, point.Y, point.Z)
+    transform = (
+        view.ModelToViewTransform if changed_frame == "model_to_view"
+        else point.GetSketch().ModelToSketchTransform
+    )
+    data = transform.ArrayData
+    moved = _NativeDatumTransform(
+        data[:9], (data[9] + 2e-6, data[10], data[11]), data[12], context, transform.name
+    )
+    if changed_frame == "model_to_view":
+        view.ModelToViewTransform = moved
+    else:
+        point.GetSketch().ModelToSketchTransform = moved
+    with pytest.raises(RuntimeError, match="physical-origin invariant failed: sheet_"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    raw, proof = context["readbacks"][-1], context["proofs"][-1]
+    assert raw["created_point"]["xyz_si"] == list(retained)
+    assert any(
+        item["error_si"] != 0 for item in proof["physical_origin_comparisons"]
+        if item["label"].startswith("sheet_")
+    )
+    assert (point.X, point.Y, point.Z) == retained
+
+
+@pytest.mark.parametrize("failure", ("missing_taper", "ambiguous_end"))
+def test_settled_table_origin_requires_uniquely_resolved_native_planes(monkeypatch, failure):
+    adapter, view, table, point, axes, _context = _native_table_readback_fixture(
+        monkeypatch, pickup_failure=failure
+    )
+    with pytest.raises(RuntimeError, match="matched [02] faces"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+
+
+@pytest.mark.parametrize(
+    "plane, label",
+    (("end", "table_pickup_end"), ("taper", "table_pickup_taper"), ("mounting", "mounting_face")),
+)
+def test_settled_table_origin_refuses_corner_off_actual_native_plane(monkeypatch, plane, label):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(monkeypatch)
+    face = context["pickup_planes"][plane]
+    params = face.surface.PlaneParams
+    # Remain within the resolver's face-picking tolerance while moving the
+    # actual native plane: a plausible match is not physical incidence.
+    displaced = (*params[:3], *(p + n * 1e-7 for p, n in zip(params[3:], params[:3])))
+    face.surface.PlaneParams = displaced
+    retained = (point.X, point.Y, point.Z)
+    with pytest.raises(RuntimeError, match=f"physical-origin invariant failed: {label}"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    raw, proof = context["readbacks"][-1], context["proofs"][-1]
+    assert raw["native_part_faces"][label]["surface_parameters_si"] == list(displaced)
+    comparison = next(item for item in proof["physical_origin_comparisons"] if item["label"] == label)
+    assert abs(comparison["error_si"]) > 5e-8
+    assert raw["created_point"]["xyz_si"] == list(retained)
+    assert (point.X, point.Y, point.Z) == retained
+
+
+@pytest.mark.parametrize(
+    "stage, failure",
+    (
+        *((stage, failure) for stage in ("creation", "settled") for failure in (
+            "math_point_null", "multiply_null", "math_data_null", "math_data_short",
+            "math_data_nonfinite", "utility_null", "view_transform_null",
+            "view_sketch_null", "sketch_transform_null",
+        )),
+        ("creation", "sketch_point_null"),
+        ("settled", "inverse_null"),
+        ("settled", "point_sketch_null"),
+        ("settled", "created_point_null"),
+        ("settled", "part_null"),
+        ("settled", "part_extension_null"),
+        ("settled", "part_bodies_null"),
+        ("settled", "plane_surface_null"),
+        ("settled", "table_feature_null"),
+        ("settled", "origin_null"),
+        ("settled", "annotation_null"),
+        ("settled", "point_nonfinite"),
+        ("settled", "point_depth"),
+    ),
+)
+def test_table_pickup_native_nulls_and_invalid_values_refuse(monkeypatch, stage, failure):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, create_point=stage == "settled"
+    )
+    context["native_failure"] = failure
+    if failure == "utility_null":
+        adapter.swApp.GetMathUtility = lambda: None
+    elif failure == "view_transform_null":
+        view.ModelToViewTransform = None
+    elif failure == "view_sketch_null":
+        context["current_sketch"] = None
+    elif failure == "sketch_transform_null":
+        context["sketch"].ModelToSketchTransform = None
+    elif failure == "point_sketch_null":
+        point.sketch = None
+    elif failure == "created_point_null":
+        point = None
+    elif failure == "part_null":
+        view.ReferencedDocument = None
+    elif failure == "part_extension_null":
+        context["part"].Extension = None
+    elif failure == "part_bodies_null":
+        context["part"].GetBodies2 = lambda _kind, _hidden: None
+    elif failure == "plane_surface_null":
+        context["pickup_planes"]["taper"].GetSurface = lambda: None
+    elif failure == "table_feature_null":
+        table.HoleTable = None
+    elif failure == "origin_null":
+        table.HoleTable.DatumOrigin = None
+    elif failure == "annotation_null":
+        table.HoleTable.DatumOrigin.GetAnnotation = lambda: None
+    elif failure == "point_nonfinite":
+        point._xyz = (math.nan, point.Y, point.Z)
+    elif failure == "point_depth":
+        point._xyz = (point.X, point.Y, 1e-5)
+    # Native missing members can raise at the read seam rather than a later
+    # invariant. None of those failures may produce an accepted table.
+    with pytest.raises((RuntimeError, AttributeError, TypeError)):
+        if stage == "creation":
+            drawing._create_table_pickup_datum(adapter, view)
+        else:
+            drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    if failure == "point_depth":
+        assert context["readbacks"][-1]["created_point"]["xyz_si"][2] == 1e-5
+        assert point.Z == 1e-5
+
+
+@pytest.mark.parametrize(
+    "stage, failure",
+    (
+        *((stage, failure) for stage in ("creation", "settled") for failure in (
+            "math_point_error", "multiply_error", "math_data_error",
+            "utility_error", "view_frame_error", "sketch_frame_error", "view_sketch_error",
+        )),
+        ("creation", "sketch_point_error"),
+        ("settled", "view_transform_read_error"),
+        ("settled", "sketch_transform_read_error"),
+        ("settled", "inverse_error"),
+        ("settled", "point_read_error"),
+        ("settled", "point_sketch_error"),
+        ("settled", "plane_read_error"),
+    ),
+)
+def test_table_pickup_native_math_and_getter_errors_propagate(monkeypatch, stage, failure):
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, create_point=stage == "settled"
+    )
+    context["native_failure"] = failure
+    if failure == "plane_read_error":
+        def failed_surface():
+            raise context["native_error"]
+
+        context["pickup_planes"]["taper"].GetSurface = failed_surface
+    with pytest.raises(RuntimeError) as caught:
+        if stage == "creation":
+            drawing._create_table_pickup_datum(adapter, view)
+        else:
+            drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    assert caught.value is context["native_error"]
 
 
 def test_native_table_readback_preserves_raw_offset_and_printed_discrepancy(monkeypatch):
     """Hypothetical drift is captured, not evidence of the actual pilot's cause."""
-    adapter, view, table, point, axes, context = _native_table_readback_fixture(monkeypatch)
-    witness = drawing._witness_support_hole_table(adapter, view, table, point, axes)
-    assert witness["created_point"]["xyz_si"] == (-0.0889, -0.03176, 0)
+    adapter, view, table, point, axes, context = _native_table_readback_fixture(
+        monkeypatch, frame="unit", datum_xy=(-0.0889, -0.03176), printed_discrepancy=True
+    )
+    with pytest.raises(RuntimeError, match="physical-origin invariant failed: sheet_y"):
+        drawing._witness_support_hole_table(adapter, view, table, point, axes)
+    witness = context["readbacks"][-1]
+    assert witness["created_point"]["xyz_si"] == [-0.0889, -0.03176, 0]
     assert point.Y != drawing.HOLE_TABLE_DATUM_XZ_MM[1] / 1000
     assert witness["origin_attachments"][0]["same_created_point"] == 1
     assert witness["cell_text2"] == witness["cell_displayed_text2"]
@@ -613,9 +1137,7 @@ def test_native_table_readback_preserves_raw_offset_and_printed_discrepancy(monk
             (x / 1000, -section.HALF_Y / 1000, z / 1000)
         )
     assert len(witness["current_view_foot_rims"]) == 4
-    assert witness["view_model_to_view_transform"][9:13] == (
-        0.105, 0.075, 0, 0.5
-    )
+    assert witness["view_model_to_view_transform"][9:13] == [0.105, 0.075, 0, 1.0]
     assert witness["initial_datum_axis_edges"][0]["line_parameters_si"][2] == -0.03048
     assert context["selected"] == []
     assert (point.X, point.Y, point.Z) == (-0.0889, -0.03176, 0)
@@ -1659,20 +2181,34 @@ TITLE_BLOCK_TOP, TITLE_BLOCK_LEFT = 0.0649, 0.2183
 DEPTH_DIM_LINE_Y = 0.2549  # the 177.8 above the front view
 
 
-def test_pickup_process_note_has_space_below_the_uncropped_bottom_view():
-    """Left/top-aligned standard text has a lane; actual saved ink remains a gate."""
+def test_pickup_process_note_clears_native_datum_axes_in_the_footer_lane():
+    """Translate actual b801 ink; the new native saved layout remains a gate."""
     x, y = drawing.TABLE_PICKUP_NOTE_XY
-    lines = drawing_spec.TABLE_PICKUP_PROCESS.splitlines()
-    assert 1 < len(lines) <= 4
-    right = x + max(map(len, lines)) * NOTE_CHAR_WIDTH
-    bottom = y - len(lines) * NOTE_LINE_PITCH
+    native_anchor = (0.025, 0.049)
+    native_extent = (
+        0.024796006688963146, 0.031042367892976597,
+        0.17777451505016723, 0.04915197324414716,
+    )
+    left, bottom, right, top = (
+        native_extent[0] + x - native_anchor[0],
+        native_extent[1] + y - native_anchor[1],
+        native_extent[2] + x - native_anchor[0],
+        native_extent[3] + y - native_anchor[1],
+    )
+    # Native datum GetAxisPoints2 exposes drawing-space symbol endpoints, not
+    # its numeric origin. Both actual leader axes remain above the entire note.
+    datum_axes = (
+        ((0.06055, 0.04563), (0.076601, 0.04563)),
+        ((0.047055, 0.059125), (0.047055, 0.075176)),
+    )
+    assert top < min(point[1] for axis in datum_axes for point in axis) - 0.003
+    assert left > 0.0127
+    assert bottom > 0.0127
+    assert right < TITLE_BLOCK_LEFT - 0.003
     bottom_view_low = (
         drawing.BOTTOM_CENTER[1] - section.WIDE * drawing.VIEW_SCALE / 1000
     )
-    assert x > 0.010
-    assert right < TITLE_BLOCK_LEFT - 0.003
-    assert bottom > 0.010
-    assert y < bottom_view_low - 0.003
+    assert top < bottom_view_low - 0.003
 
 
 def test_view_b_is_a_cropped_rail_strip_in_the_band_below_the_section() -> None:

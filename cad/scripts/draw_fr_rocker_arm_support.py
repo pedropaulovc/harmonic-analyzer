@@ -270,7 +270,15 @@ SECTION_CAPTION_XY = (RIGHT_CENTER[0], 0.1255)
 # remaining clear of the isometric and title block.
 HOLE_TABLE_ANCHOR = (0.270, 0.130)
 HOLE_TABLE_DATUM_XZ_MM = (-BOSS_DEPTH / 2.0, -WIDE)
-TABLE_PICKUP_NOTE_XY = (0.025, 0.049)
+TABLE_PICKUP_CORNER_M = (
+    HOLE_TABLE_DATUM_XZ_MM[0] / 1000.0,
+    -HALF_Y / 1000.0,
+    HOLE_TABLE_DATUM_XZ_MM[1] / 1000.0,
+)
+# Pilot b801's native note extended up to y=49.152 mm through the datum X
+# leader at y=45.630 mm. Move the unchanged note below that leader, in the
+# blank lane left of the title block; retain its font and property linkage.
+TABLE_PICKUP_NOTE_XY = (0.025, 0.041)
 # Native hole tags land up-right of their holes. At the bottom view's right
 # end that printed A3 and A4 across the pocket's hidden end lines (fix3
 # render), so both move to the mirror spot left of their holes: twice the
@@ -748,6 +756,48 @@ def _assert_table_pickup_note(note: Any) -> None:
     )
 
 
+@_telemetry.traced("drawing.support_table_datum")
+def _create_table_pickup_datum(adapter: Any, view: Any) -> Any:
+    """Project the unchanged physical corner into this CURRENT view's sketch."""
+    sheet_xy = model_point_in_view(
+        adapter, view, TABLE_PICKUP_CORNER_M, label="support physical table corner"
+    )
+    if not all(math.isfinite(value) for value in sheet_xy):
+        raise RuntimeError("support table corner has nonfinite sheet coordinates")
+    native_view = _early_bound(view, "IView")
+    raw_sketch = native_view.GetSketch()
+    if raw_sketch is None:
+        raise RuntimeError("support table corner has no current view sketch")
+    sketch = _early_bound(raw_sketch, "ISketch")
+    raw_transform = sketch.ModelToSketchTransform
+    if raw_transform is None:
+        raise RuntimeError("support table corner has no model-to-sketch transform")
+    transform = _early_bound(raw_transform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    # ModelToView's third coordinate is depth, not drawing-sketch height.
+    raw_point = utility.CreatePoint(double_array([*sheet_xy, 0.0]))
+    if raw_point is None:
+        raise RuntimeError("failed to create support table corner sheet point")
+    raw_projected = _early_bound(raw_point, "IMathPoint").MultiplyTransform(transform)
+    if raw_projected is None:
+        raise RuntimeError("failed to project support table corner into view sketch")
+    coordinates = tuple(
+        float(value) for value in _early_bound(raw_projected, "IMathPoint").ArrayData
+    )
+    if (
+        len(coordinates) != 3
+        or not all(math.isfinite(value) for value in coordinates)
+        or coordinates[2] != 0.0
+    ):
+        raise RuntimeError(f"support table corner has invalid sketch coordinates: {coordinates}")
+    return create_view_theoretical_datum(
+        adapter,
+        view,
+        point_xy=coordinates[:2],
+        label="rocker-arm-support lower-left theoretical corner",
+    )
+
+
 @_telemetry.traced("drawing.support_hole_table_readback")
 def _witness_support_hole_table(
     adapter: Any, view: Any, table: Any, datum_point: Any, datum_axes: tuple[Any, Any]
@@ -905,6 +955,100 @@ def _witness_support_hole_table(
     encoded = json.dumps(witness, sort_keys=True)
     _telemetry.event("drawing.support_hole_table_readback", native_readback=encoded)
     _telemetry.info("support hole-table native readback: " + encoded)
+    if (
+        witness["origin_declared_attachment_count"] != 1
+        or len(attached) != 1
+        or attached_types != (11,)
+        or attached[0] is None
+        or witness["origin_is_dangling"]
+        or attachment_records[0].get("same_created_point") != 1
+    ):
+        raise RuntimeError("support table origin lost its single native point attachment")
+    actual_point = _early_bound(attached[0], "ISketchPoint")
+    actual_sketch = _early_bound(actual_point.GetSketch(), "ISketch")
+    current_sketch = native_view.GetSketch()
+    same_sketch = (
+        int(adapter.swApp.IsSame(actual_sketch, current_sketch))
+        if current_sketch is not None else -1
+    )
+    if same_sketch != 1:
+        raise RuntimeError("support table origin point belongs to a different view sketch")
+    raw_transform = actual_sketch.ModelToSketchTransform
+    if raw_transform is None:
+        raise RuntimeError("support table origin has no current sketch transform")
+    inverse = _early_bound(raw_transform, "IMathTransform").Inverse()
+    if inverse is None:
+        raise RuntimeError("support table origin sketch transform has no inverse")
+    actual_xyz = tuple(float(value) for value in (actual_point.X, actual_point.Y, actual_point.Z))
+    if not all(math.isfinite(value) for value in actual_xyz) or actual_xyz[2] != 0.0:
+        raise RuntimeError(f"support table origin has invalid sketch point: {actual_xyz}")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    raw_point = utility.CreatePoint(double_array(actual_xyz))
+    if raw_point is None:
+        raise RuntimeError("failed to create support table origin math point")
+    raw_sheet_point = _early_bound(raw_point, "IMathPoint").MultiplyTransform(inverse)
+    if raw_sheet_point is None:
+        raise RuntimeError("failed to recover support table origin sheet point")
+    actual_sheet = tuple(
+        float(value) for value in _early_bound(raw_sheet_point, "IMathPoint").ArrayData
+    )
+    if len(actual_sheet) != 3 or not all(math.isfinite(value) for value in actual_sheet):
+        raise RuntimeError(f"support table origin has invalid sheet point: {actual_sheet}")
+    expected_sheet = model_point_in_view(
+        adapter, native_view, TABLE_PICKUP_CORNER_M,
+        label="settled support physical table corner",
+    )
+    comparisons = []
+    for key in ("table_pickup_end", "table_pickup_taper", "mounting_face"):
+        parameters = native_faces[key]["surface_parameters_si"]
+        if len(parameters) != 6 or not all(math.isfinite(value) for value in parameters):
+            raise RuntimeError(f"{key}: invalid native pickup plane parameters")
+        normal, anchor = parameters[:3], parameters[3:]
+        physical = sum(a * b for a, b in zip(normal, TABLE_PICKUP_CORNER_M))
+        measured = sum(a * b for a, b in zip(normal, anchor))
+        comparisons.append({
+            "label": key, "physical": physical, "measured": measured,
+            "error_si": measured - physical,
+        })
+    for axis, physical, measured in zip(("sheet_x", "sheet_y"), expected_sheet, actual_sheet):
+        comparisons.append({
+            "label": axis, "physical": physical, "measured": measured,
+            "error_si": measured - physical,
+        })
+    witness.update({
+        "physical_corner_model_m": TABLE_PICKUP_CORNER_M,
+        "actual_origin_sheet_m": actual_sheet,
+        "physical_corner_sheet_xy": expected_sheet,
+        "same_view_sketch": same_sketch,
+        "physical_origin_comparisons": comparisons,
+    })
+    proof = json.dumps({
+        key: witness[key] for key in (
+            "physical_corner_model_m", "actual_origin_sheet_m",
+            "physical_corner_sheet_xy", "same_view_sketch",
+            "physical_origin_comparisons",
+        )
+    }, sort_keys=True)
+    _telemetry.event("drawing.support_table_datum_invariant", native_readback=proof)
+    _telemetry.info("support table physical-origin invariant: " + proof)
+    for comparison in comparisons:
+        physical, measured = comparison["physical"], comparison["measured"]
+        # Arithmetic equivalence only: no absolute metre/mm acceptance band.
+        if (
+            not math.isfinite(physical) or not math.isfinite(measured)
+            or physical == 0.0 or measured == 0.0
+            or (
+                comparison["label"].startswith("sheet_")
+                and (physical <= 0.0 or measured <= 0.0)
+            )
+            or not math.isclose(
+                physical, measured, rel_tol=32 * sys.float_info.epsilon, abs_tol=0.0
+            )
+        ):
+            raise RuntimeError(
+                "support table physical-origin invariant failed: "
+                f"{comparison['label']} {physical!r} != {measured!r}"
+            )
     return witness
 
 
@@ -1099,15 +1243,7 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     datum_axes = _bottom_datum_axes(adapter, bottom)
-    datum_point = create_view_theoretical_datum(
-        adapter,
-        bottom,
-        point_xy=(
-            HOLE_TABLE_DATUM_XZ_MM[0] / 1000.0,
-            HOLE_TABLE_DATUM_XZ_MM[1] / 1000.0,
-        ),
-        label="rocker-arm-support lower-left theoretical corner",
-    )
+    datum_point = _create_table_pickup_datum(adapter, bottom)
     # No position frame on this part (simplicity policy rule 3/4), so the hole
     # coordinates are ordinary two-place dimensions under the title block's
     # ±0.51 — NOT basic: a basic dimension is toleranced only by the frame it
