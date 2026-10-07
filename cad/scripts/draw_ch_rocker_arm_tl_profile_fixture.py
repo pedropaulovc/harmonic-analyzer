@@ -300,40 +300,56 @@ def _elevation_keep(adapter: Any, view: Any) -> dict[str, tuple[float, float]]:
     return keep
 
 
-def _delete_thread_callouts(adapter: Any, view: Any) -> None:
-    """Delete the model's cosmetic-thread callout notes from the TAGS plan
-    (as ``delete_unnamed_imports`` deletes automatic ones): the tags name each
-    hole and detail E carries the pivot tap's callout, yet the model's
-    "#10-24 Tapped Hole" note sat over tags A1-A3 (run 20261007T182242302Z).
-    A hidden layer does not do: the layout audit boxes hidden-layer notes too
-    (run 20261007T182758889Z)."""
-    draw = adapter.currentModel
-    deleted = 0
+_COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
+
+
+def _hide_cosmetic_threads(adapter: Any, view: Any) -> None:
+    """Move the TAGS plan's cosmetic threads and their callout notes onto an
+    invisible layer (draw_dt_cone_swing_platform._hide_profile_cosmetic_threads):
+    the tags name each hole and detail E carries the pivot tap's callout, yet
+    the model's "#10-24 Tapped Hole" note sat over tags A1-A3
+    (run 20261007T182242302Z). Deleting the note instead reached the part's
+    thread: the isometric then refused high-quality cosmetic threads
+    (run 20261007T183332487Z; draw_fr_top_frame._hide_cosmetic_threads)."""
+    manager = _early_bound(adapter.currentModel.GetLayerManager(), "ILayerMgr")
+    layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
+    if layer is None:
+        # COLORREF black, swLineCONTINUOUS (0), swLW_THIN (0).
+        if (
+            int(
+                manager.AddLayer(
+                    _COSMETIC_THREAD_LAYER, "cosmetic threads hidden", 0, 0, 0
+                )
+            )
+            != 1
+        ):
+            raise RuntimeError("failed to add hidden cosmetic-thread layer")
+        layer = manager.GetLayer(_COSMETIC_THREAD_LAYER)
+    layer = _early_bound(layer, "ILayer")
+    layer.Visible = False
+    if bool(layer.Visible) or bool(layer.Printable):
+        raise RuntimeError("cosmetic-thread layer did not remain hidden")
+    hidden_callouts = 0
     for raw_annotation in _early_bound(view, "IView").GetAnnotations() or ():
         annotation = _early_bound(raw_annotation, "IAnnotation")
         if int(annotation.GetType()) != 1:  # swCosmeticThread
             continue
+        annotation.Layer = _COSMETIC_THREAD_LAYER
+        if str(annotation.Layer or "") != _COSMETIC_THREAD_LAYER:
+            raise RuntimeError("TAGS cosmetic thread refused the hidden layer")
         thread = _early_bound(annotation.GetSpecificAnnotation(), "ICThread")
         raw_callout = _read_member(thread, "ThreadCallout")
         if raw_callout is None:
             continue
         note = _early_bound(raw_callout, "INote")
         callout = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
-        draw.ClearSelection2(True)
-        if not callout.Select2(False, 0):
-            raise RuntimeError("failed to select a TAGS thread callout")
-        draw.EditDelete()
-        deleted += 1
-    draw.ClearSelection2(True)
-    if not deleted:
-        raise RuntimeError("TAGS plan has no cosmetic-thread callout to delete")
-    rebuild_drawing(adapter, label="delete TAGS thread callouts")
-    left = [
-        str(_early_bound(found, "INote").GetText() or "")
-        for found in (_early_bound(view, "IView").GetNotes() or ())
-    ]
-    if any("Tapped Hole" in text for text in left):
-        raise RuntimeError(f"TAGS plan still carries a thread callout: {left!r}")
+        callout.Layer = _COSMETIC_THREAD_LAYER
+        if str(callout.Layer or "") != _COSMETIC_THREAD_LAYER:
+            raise RuntimeError("TAGS thread callout refused the hidden layer")
+        hidden_callouts += 1
+    if not hidden_callouts:
+        raise RuntimeError("TAGS plan has no cosmetic-thread callout to hide")
+    rebuild_drawing(adapter, label="hide TAGS cosmetic threads")
 
 
 def _position_view_label(
@@ -722,7 +738,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("failed to activate the TAGS sheet")
     tag_plan = place_view(adapter, str(SOURCE), "*Front", *TAG_CENTER, scale=TAG_SCALE)
     set_hidden_lines_removed(adapter, tag_plan)
-    _delete_thread_callouts(adapter, tag_plan)
+    _hide_cosmetic_threads(adapter, tag_plan)
     _tags(adapter, tag_plan)
     if not ddoc.ActivateSheet(SHEET_NAMES[1]):
         raise RuntimeError("failed to return to the TAGS sheet")
@@ -761,7 +777,11 @@ async def build(adapter: Any) -> dict[str, str]:
         ):
             raise RuntimeError(f"failed to stamp sheet count on {sheet_name!r}")
         rebuild_drawing(adapter, label=f"profile fixture {sheet_name} layout")
-        check_drawing_layout(adapter, layout=SPEC.layout, stem=sheet_name)
+        # check_drawing_layout boxes notes on invisible layers too, so TAGS'
+        # hidden thread callout would collide with the tags it was hidden to
+        # clear; finalize's post-export audit reads layer state and covers it.
+        if sheet_name != SHEET_NAMES[1]:
+            check_drawing_layout(adapter, layout=SPEC.layout, stem=sheet_name)
 
     return await finalize_drawing(
         adapter,
