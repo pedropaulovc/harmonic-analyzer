@@ -78,7 +78,7 @@ DIMENSION_CALLOUTS = {
     "WinLowFront": "2X",
     "BackW": "WINDOW THRU BACK WALL",
 }
-TAP_CALLOUT_XY = (0.200, 0.215)
+TAP_CALLOUT_XY = (0.200, 0.112)
 
 
 def _tap_edge(adapter: Any, view: Any) -> Any:
