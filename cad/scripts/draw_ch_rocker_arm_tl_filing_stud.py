@@ -15,7 +15,6 @@ from _drawing_common import (
     assert_imported_precision,
     dimension_name,
     finalize_drawing,
-    import_cosmetic_threads,
     new_project_drawing,
     read_required_properties,
     set_dimension_text,
@@ -149,9 +148,6 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         for annotation in donor_annotations
     ]
-    seeds, instances = import_cosmetic_threads(adapter, profile)
-    if instances == 0:
-        raise RuntimeError("filing-stud profile shows no cosmetic thread")
     donor_name = view_name(adapter, donor)
     delete_view(adapter, donor)
     if any(view_name(adapter, view) == donor_name for view in iter_views(adapter)):
