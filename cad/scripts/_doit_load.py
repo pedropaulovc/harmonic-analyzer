@@ -190,6 +190,10 @@ def record(started_ns, *, command, targets, task_names, error=None) -> None:
             else:
                 span.record_exception(error)
                 span.set_status(Status(StatusCode.ERROR, f"{type(error).__name__}: {error}"))
+                # Like _telemetry._exit_span's manually marked ERROR path:
+                # exception events/status descriptions alone lose their cause
+                # in App Insights. Reuse its bounded exported attributes.
+                telemetry._fill_error_cause(span, span.status.description)
         finally:
             span.end(end_time=time.time_ns())
     except Exception:  # noqa: BLE001 - telemetry never fails the graph load

@@ -1081,8 +1081,10 @@ scripts that `from _common import log, check` are instrumented unchanged.
       `python -m doit` and `build.py`. It carries `doit.command`, `doit.targets`
       and the distinct `doit.tasks` count; a single target that names a task
       also carries `label`. An injected `TRACEPARENT` keeps it in the farm leaf's
-      trace. Import/generator failures record ERROR and the original exception
-      (without a task count); telemetry remains best-effort. The import watch
+      trace. Import/generator failures record ERROR, the original exception and
+      the telemetry spine's bounded `error.type`/`error.message` cause attributes
+      so App Insights dependencies retain the diagnostic (without a task count);
+      telemetry remains best-effort. The import watch
       releases its `sys.monitoring` tool on return or unwind, and a cached dodo
       namespace consumes its stamp only once, so repeated loads never report
       a stale import interval. No task recipe or CAD dependency changes.

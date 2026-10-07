@@ -339,7 +339,8 @@ def test_telemetry_failure_preserves_generator_error(graph, monkeypatch):
 
 
 @pytest.mark.parametrize("entry", ["doit", "build"])
-def test_real_cli_offline_smoke(tmp_path, entry):
+@pytest.mark.parametrize("outcome", ["success", "import", "generator", "long_import"])
+def test_real_cli_offline_smoke(tmp_path, entry, outcome):
     """Real child CLI + SDK/JSONL exporter, isolated from repo tasks and cache.
 
     Copy only telemetry into a temporary scripts directory to redirect its
@@ -357,7 +358,16 @@ def test_real_cli_offline_smoke(tmp_path, entry):
         encoding="utf-8",
     )
     dodo = tmp_path / "dodo_smoke.py"
-    dodo.write_text("import _telemetry\n" + _STAMPED + _TASKS, encoding="utf-8")
+    message = "bad graph" if outcome == "generator" else "bad import"
+    if outcome == "long_import":
+        message = "x" * 3000
+    if outcome in {"import", "long_import"}:
+        tasks = f"raise RuntimeError({message!r})\n"
+    elif outcome == "generator":
+        tasks = f"def task_boom():\n    raise RuntimeError({message!r})\n"
+    else:
+        tasks = _TASKS
+    dodo.write_text("import _telemetry\n" + _STAMPED + tasks, encoding="utf-8")
     environment = os.environ.copy()
     environment.update(
         PYTHONPATH=os.pathsep.join(
@@ -383,14 +393,28 @@ def test_real_cli_offline_smoke(tmp_path, entry):
         capture_output=True,
         timeout=60,
     )
-    assert result.returncode == 0, result.stdout + result.stderr
+    if outcome == "success":
+        assert result.returncode == 0, result.stdout + result.stderr
+    else:
+        assert result.returncode != 0, result.stdout + result.stderr
     capture = tmp_path / "cad" / "out" / "reports" / "telemetry" / "traces.jsonl"
     spans = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
     (span,) = [span for span in spans if span["name"] == "doit.load"]
     assert span["resource"]["attributes"]["service.name"] == "build-infra"
-    assert span["attributes"]["doit.command"] == "list"
-    assert span["attributes"]["doit.tasks"] == 2
-    assert span["status"]["status_code"] == "OK"
+    attributes = span["attributes"]
+    if outcome == "success":
+        assert attributes["doit.command"] == "list"
+        assert attributes["doit.tasks"] == 2
+        assert span["status"]["status_code"] == "OK"
+        assert "error.type" not in attributes and "error.message" not in attributes
+    else:
+        assert attributes["doit.command"] == (
+            "import" if outcome in {"import", "long_import"} else "list"
+        )
+        assert span["status"]["status_code"] == "ERROR"
+        assert attributes["error.type"] == "RuntimeError"
+        assert attributes["error.message"] == message[:2048]
+        assert "doit.tasks" not in attributes and "label" not in attributes
 
 
 def test_status_failure_still_ends_span(graph, monkeypatch):
