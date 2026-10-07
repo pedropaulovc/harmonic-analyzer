@@ -19,7 +19,8 @@ summing lever's #10-24 tapped boss with no nut. The remaining supplier geometry
 and stock identity are unchanged. The part's Manufacturing Notes property
 includes the registry-owned installation instructions; the custom sheet links
 that property and verifies its resolved text and measured lower-left note cell
-before export.
+before export. The trim and deburr are defined only by those native dimensions,
+not repeated as fabrication instructions or a typed angle in the note block.
 
 ## Why
 

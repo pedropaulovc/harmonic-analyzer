@@ -208,17 +208,16 @@ def test_drawing_accepts_native_controls_and_rejects_lost_control(monkeypatch, f
 )
 def test_custom_drawing_consumes_source_instructions_in_measured_cell(monkeypatch, fault):
     instructions = (
-        "Registry-owned post-purchase instructions.\n"
-        "Restore the dimensioned deburr.\n"
         "Registry-owned direct-joint instructions.\n"
-        "Orient and secure the eye.\n"
+        "Orient the eye.\n"
+        "Secure the joint.\n"
         "Purchased geometry remains reference."
     )
     text = instructions.replace("\n", "\r\n")
     if fault == "unresolved":
         text = ""
     elif fault == "different":
-        text = text.replace("Restore", "Omit")
+        text = text.replace("Secure", "Omit")
     extent = [0.016, 0.065, 0.0, 0.210, 0.084, 0.0]
     if fault == "overflow":
         extent[1] = 0.060
