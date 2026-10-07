@@ -180,8 +180,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # finalize_drawing shades the pictorial isometric with edges.
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     # The taps are fully stated by their callout and the seats show in the
-    # right view, so no view needs hidden lines.
-    for view in (front, top, right):
+    # right view, so no view needs hidden lines. The iso takes HLR first too,
+    # as on the pen hanger: on the bare iso finalize_drawing's shaded-with-
+    # edges readback kept its high-quality cosmetic-thread flag False.
+    for view in (front, top, right, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = []
