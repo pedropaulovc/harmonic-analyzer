@@ -168,6 +168,7 @@ TOP_KEEP = {
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 
 
+@_telemetry.traced("drawing.machined_pickup_faces")
 def _assert_machined_pickup_faces(edges: dict[str, Any]) -> None:
     """Witness the real source faces named by the model's machining instruction.
 
