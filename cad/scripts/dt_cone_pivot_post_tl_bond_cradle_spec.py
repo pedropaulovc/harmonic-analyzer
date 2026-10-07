@@ -171,11 +171,16 @@ for _pin in CONE_PINS.values():
 # The two cone tops' errors along n must agree within CONE_PIN_TOPS_MATCH:
 # 0.03 over the 2 x CONE_PIN_SPREAD spacing rolls the post 0.12 deg, inside
 # the 0.13 deg the S6 crank-mouth roll check allows (prechips cone data). Two
-# independent +/-0.06 bands alone could roll it 0.46 deg.
+# independent +/-0.06 bands alone could roll it 0.46 deg. The note names the
+# mate whose cone boss face bears on both tops, so the match reads as that
+# fit's acceptance (policy rule 2; run-17 review asked for its function).
 CONE_PIN_TOPS_MATCH = 0.03
 if math.degrees(math.atan(CONE_PIN_TOPS_MATCH / (2.0 * CONE_PIN_SPREAD))) >= 0.13:
     raise AssertionError("cone pin tops' match no longer holds the S6 roll check")
-CONE_PIN_TOPS_NOTE = f"TOPS WITHIN {CONE_PIN_TOPS_MATCH:.2f} OF EACH OTHER"
+CONE_PIN_TOPS_NOTE = (
+    f"TOPS WITHIN {CONE_PIN_TOPS_MATCH:.2f} OF EACH OTHER: "
+    f"BOSS OF {POST_NUMBER} BEARS ON BOTH"
+)
 # Each relation's band is the fixture's share of the post band the pin sets:
 # AUTHOR'S CHOICE 25 %, rounded down to the hundredth, leaving 75 % to the
 # sleeve and the bond. The two shares sum to the band they replace, the

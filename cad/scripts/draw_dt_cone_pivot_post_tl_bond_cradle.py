@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+import textwrap
 from typing import Any
 
 import _telemetry
@@ -67,11 +68,14 @@ ISO_SCALE = (1, 2)
 PLAN_CENTER = (0.115, 0.196)
 ELEVATION_CENTER = (0.115, 0.096)
 # A-A stands right enough that its seat callout fits between the plan's 80.0
-# and the post axis; the isometric stands left enough that B-B's fits between
-# it and the border (run-16 audit; run-15 review).
+# and the post axis (run-16 audit; run-15 review). B-B and the isometric
+# stand left enough that B-B's seat-axis height prints outboard of its +X
+# side, away from A-A's (run-17 review: the two 30.0s crowded each other
+# between the sections), and B-B's seat callout fits between the isometric
+# and the border.
 SECTION_A_CENTER = (0.265, 0.130)
-SECTION_B_CENTER = (0.372, 0.130)
-ISO_CENTER = (0.352, 0.228)
+SECTION_B_CENTER = (0.366, 0.130)
+ISO_CENTER = (0.345, 0.228)
 ISO_NOTE_XY = (0.232, 0.250)
 NOTES_XY = (0.020, 0.062)
 # Cutting lines run from just above the saddle tops to just below the base.
@@ -82,8 +86,9 @@ CAPTION_DROP = 0.018
 # Seat finish symbols stand outboard of the seat on the model's +X side
 # (X, Z in mm), under the plan's dimensions and inside the sheet border;
 # their leaders land on the arc 38 degrees off its bottom, clear of the
-# diameter leader, the saddle-top corner and the cone pin.
-SEAT_FINISH_SYMBOL = {"body_seat": (32.0, -6.0), "tail_seat": (24.0, 8.0)}
+# diameter leader, the saddle-top corner and the cone pin. B-B's stands
+# under its seat axis's extension line to the +X side 30.0.
+SEAT_FINISH_SYMBOL = {"body_seat": (32.0, -6.0), "tail_seat": (22.0, -9.0)}
 SEAT_FINISH_LANDING_DEG = 38.0
 
 # Dimension text positions as MODEL points (mm); each view projects its own
@@ -138,7 +143,8 @@ ELEVATION_KEEP = {
 # isometric.
 SECTION_A_KEEP = {
     "BodySeatDia": (25.0, CONE_PIN_Y, 63.0),
-    "BodySeatAxisX": (-20.0, CONE_PIN_Y, 26.0),
+    # High enough to clear the pin tops' relation under it.
+    "BodySeatAxisX": (-20.0, CONE_PIN_Y, 50.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_Y, -12.0),
     # Under the base, one baseline row per hole off the west side: the
     # nearer (west) hole on the upper row.
@@ -150,23 +156,29 @@ SECTION_A_KEEP = {
     # clear of it (CAPTION_DROP).
     "ConePinTilt": (15.0, CONE_PIN_Y, -61.0),
     # The tops' plane from the post axis, along the pins: on the line's -X
-    # side, above the seat axis's 30.0 extension line (Z0), under the 40.0
-    # and clear of the seat's leader, its callout reading below the value.
-    "ConePinFromAxis": (-22.0, CONE_PIN_Y, 10.0),
+    # side between the seat axis's extension line and the west side's, above
+    # the rising extension line from the axis, under the 40.0 and clear of
+    # the seat's leader, its narrow callout reading below the value (run 17:
+    # one wide line ran over both extension lines and the seat's leader).
+    "ConePinFromAxis": (-20.0, CONE_PIN_Y, 26.0),
 }
-# B-B's callout reads below the value, above the finish symbol.
+# B-B's callout reads below the value, above the finish symbol; its seat-axis
+# height stands outboard of its +X side, below the finish symbol.
 SECTION_B_KEEP = {
     "TailSeatDia": (25.0, TAIL_SECTION_Y, 52.0),
     "TailSeatAxisX": (-20.0, TAIL_SECTION_Y, 12.0),
-    "TailSeatAxisHeight": (-48.0, TAIL_SECTION_Y, -12.0),
+    "TailSeatAxisHeight": (44.0, TAIL_SECTION_Y, -20.0),
 }
 DIMENSION_CALLOUTS = {
     "CrankPinDia": "4X DOWEL",
     "SaddleWidth": "2X",
     "SaddleSideX": "2X",
     "ConePinTilt": "2X",
-    # One relation for both tops, and how far apart their errors may be.
-    "ConePinFromAxis": "2X {}WITHIN\n{}".format(*CONE_PIN_TOPS_NOTE.split("WITHIN ")),
+    # One relation for both tops, how far apart their errors may be and the
+    # mate that needs it, wrapped to fit between the axis and the west side.
+    "ConePinFromAxis": "\n".join(
+        textwrap.wrap("2X " + CONE_PIN_TOPS_NOTE, 14, break_on_hyphens=False)
+    ),
     "CrankPinFromAxis": "2X",
 }
 
