@@ -153,10 +153,12 @@ def _hatch_pin_apart(adapter: Any, section: Any) -> None:
             before = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
             hatch.UseMaterialHatch = False
             hatch.Angle = angle
-            # The bonded gauge pin reads as a separate piece: solid fill.
+            # A longitudinally cut pin reads unhatched: spacing wider than the pin.
             if name == pin:
-                hatch.SolidFill = True
-            print(f"hatch {name}: {before} -> {(hatch.SolidFill, hatch.Angle)}", flush=True)
+                hatch.Scale2 = 100.0
+            else:
+                hatch.Scale2 = 2.0
+            print(f"hatch {name}: {before} -> {(hatch.Scale2, hatch.Angle)}", flush=True)
             after = (hatch.UseMaterialHatch, hatch.Pattern, hatch.PatternId, hatch.Angle)
             if abs(float(hatch.Angle) - angle) > 1e-6 or not str(hatch.Pattern):
                 raise RuntimeError(f"section hatch did not persist: {before} -> {after}")
