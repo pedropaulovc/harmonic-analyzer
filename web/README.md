@@ -217,6 +217,10 @@ before generation. Their receipts remain non-publishable historical evidence.
 Temporary roots are resolved before comparison, including platform symlinks.
 The entire checkout remains excluded from external temporary permission even
 when the checkout itself is under `/tmp`; private-root symlink escapes are refused.
+The observer and fitter share `check_namespace()` from
+`fresh-source-observations.py`. Each CLI loads that local module once for its
+namespace guards and observation codecs; historical snapshots are not live
+fallbacks for this policy.
 
 Compression reduces current storage, not Git ancestry. Oversized historical
 blobs remain unless history is explicitly rewritten.

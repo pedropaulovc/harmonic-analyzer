@@ -344,6 +344,11 @@ Unobserved inputs may be chosen feasibly and must remain labelled as chosen,
 not historically recovered. No second solver, proxy geometry, fake visibility
 certificates or arbitrary individual-part adjustments are permitted.
 
+Held crank-pin clearance uses the hub's current posed matrix, including held
+carrier displacement and axial travel, rather than its baseline matrix.
+Shaft clearance remains a separate check. This validation neither moves authored
+parts nor relaxes contact tolerances.
+
 Chosen source-informed camera framing is held unless both endpoints explicitly
 declare `cameraInterpolation: 'continuous-shot'` with nonblank
 `cameraInterpolationEvidence`. `held` at either endpoint vetoes blending,
