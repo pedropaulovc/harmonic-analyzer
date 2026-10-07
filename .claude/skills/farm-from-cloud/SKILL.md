@@ -33,8 +33,9 @@ mkdir -p /opt/pwsh && tar xzf /tmp/pwsh.tgz -C /opt/pwsh && ln -sf /opt/pwsh/pws
 (cd ../solidworks-pool && uv sync --frozen)
 ```
 
-`farm-run.ps1` does NOT run on Linux even with pwsh: it relies on Windows job
-objects and CIM process queries. pwsh is only useful for the repo's other scripts.
+`farm-run.ps1` runs under pwsh on Linux. Its run job there is the
+`HARMONIC_FARM_RUN` environment marker in `/proc/<pid>/environ`, not a Windows
+job object (DEVELOPING.md, `-Cancel`).
 
 ## 2. Azure login (device code, MFA tenant)
 
@@ -99,15 +100,19 @@ a new session. Untested: whether either setting gives a pass-through tunnel.
 
 ## 6. Submit a test leaf (only once step 5 lists workers)
 
-`farm-run.ps1` is Windows-only, so from Linux the only path is a direct
-`build.py --executor farm`, which AGENTS.md reserves for humans. Get the user's
-explicit OK first. Build a pushed commit, never edit the worktree mid-run, and
-use a cheap leaf:
+Use the supervised launcher with POSIX paths. `-LogDirectory` must sit outside
+every Git worktree, and HEAD must be pushed:
 
 ```bash
-uv sync && uv run python build.py --executor farm --leaf-timeout 90 part:pn_pen_rod
+pwsh -NoProfile -NonInteractive -File scripts/farm-run.ps1 \
+  -Worktree "$PWD" -PoolHome /home/user/solidworks-pool \
+  -LogDirectory /home/user/farm-runs -Targets part:pn_pen_rod -LeafTimeout 90 -Tag smoke
+pwsh -NoProfile -File scripts/farm-run.ps1 -Watch -LogDirectory /home/user/farm-runs -Tag smoke
 ```
 
-A cache hit dispatches nothing and proves nothing. Check `cad/out/reports/cache.jsonl`
-and look for a `Farm workflow requested` line, then follow it with
-`farm.py watch <workflow-id>`.
+Cloud sessions have no `hub`, which AGENTS.md requires for agent launches
+(no finite local timer). Ask the user how to supervise before launching. Bash
+background jobs are capped at 2 h, so they only suit a single leaf.
+
+A cache hit dispatches nothing and proves nothing. Check `-Status` for
+`counts.requested` > 0 and follow the leaf with `farm.py watch <workflow-id>`.

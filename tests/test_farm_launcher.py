@@ -1,4 +1,4 @@
-"""Windows contract tests for the tracked, supervised farm launcher."""
+"""Contract tests for the tracked, supervised farm launcher (Windows and POSIX)."""
 
 import json
 import os
@@ -13,9 +13,9 @@ from typing import TypeVar
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    sys.platform != "win32", reason="scripts/farm-run.ps1 is a Windows launcher"
-)
+WINDOWS = sys.platform == "win32"
+windows_only = pytest.mark.skipif(not WINDOWS, reason="Windows process semantics")
+posix_only = pytest.mark.skipif(WINDOWS, reason="POSIX process semantics")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = REPO_ROOT / "scripts" / "farm-run.ps1"
@@ -24,7 +24,7 @@ LAUNCHER = REPO_ROOT / "scripts" / "farm-run.ps1"
 # it is waiting for (the launcher exits, a record appears, a line reaches the
 # log); this ceiling only stops a broken launcher from hanging the suite, and its
 # expiry reports what was observed. The spawn chain (pwsh -> git -> cmd ->
-# python) takes 0.3-3 s idle but 10-45 s on a saturated host (a bare
+# python on Windows, sh in place of cmd on POSIX) takes 0.3-3 s idle but 10-45 s on a saturated host (a bare
 # `pwsh -NoProfile -Command 'exit 0'` measured 9.6 s there), so any tight
 # wall-clock budget fails healthy runs.
 HANG_GUARD_S = 300
@@ -196,8 +196,9 @@ def record(**late):
         json.dumps(
             {
                 "pid": os.getpid(),
-                # The venv python.exe that started this interpreter; its
-                # parent is the uv.cmd shim's cmd.exe.
+                # Windows: the venv python.exe that started this interpreter,
+                # whose parent is the uv.cmd shim's cmd.exe. POSIX: the uv
+                # shim's sh itself.
                 "ppid": os.getppid(),
                 "argv": sys.argv[1:],
                 "cwd": str(cwd),
@@ -264,12 +265,9 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
 """,
         encoding="utf-8",
     )
-    (tools / "uv.cmd").write_text(
-        f'@echo off\r\n"{sys.executable}" "{stub}" %*\r\nexit /b %ERRORLEVEL%\r\n',
-        encoding="utf-8",
-    )
+    _write_shim(tools, "uv", [sys.executable, str(stub)])
 
-    pwsh = shutil.which("pwsh.exe")
+    pwsh = shutil.which("pwsh")
     if pwsh is None:
         pytest.skip("PowerShell 7.3+ is not installed")
 
@@ -304,6 +302,28 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
         "farm_state": farm_state,
         "farm_cancels": farm_cancels,
     }
+
+
+def _write_shim(tools: Path, name: str, command: list[str]) -> Path:
+    """A ``name`` on PATH that runs ``command`` plus its arguments and returns
+    its exit code, as a child rather than an exec: the launcher sees the same
+    shim process between it and the command on both platforms."""
+    if WINDOWS:
+        shim = tools / f"{name}.cmd"
+        quoted = " ".join(f'"{part}"' for part in command)
+        shim.write_text(
+            f"@echo off\r\n{quoted} %*\r\nexit /b %ERRORLEVEL%\r\n", encoding="utf-8"
+        )
+        return shim
+    shim = tools / name
+    quoted = " ".join("'" + part.replace("'", "'\\''") + "'" for part in command)
+    shim.write_text(f'#!/bin/sh\n{quoted} "$@"\nexit $?\n', encoding="utf-8")
+    shim.chmod(0o755)
+    return shim
+
+
+def _shim(tools: Path, name: str) -> Path:
+    return tools / (f"{name}.cmd" if WINDOWS else name)
 
 
 def _command(
@@ -854,6 +874,7 @@ def test_log_directory_inside_any_git_worktree_is_refused(tmp_path: Path) -> Non
     assert not Path(fixture["log_directory"]).exists()
 
 
+@windows_only
 def test_record_read_waits_out_a_transient_sharing_violation(tmp_path: Path) -> None:
     import ctypes
     from ctypes import wintypes
@@ -944,13 +965,10 @@ def test_wrapper_failure_after_startup_writes_a_failed_terminal_record(
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
     tools = Path(fixture["tools"])
-    (tools / "uv.cmd").unlink()
-    git_executable = shutil.which("git.exe") or shutil.which("git")
+    _shim(tools, "uv").unlink()
+    git_executable = shutil.which("git")
     assert git_executable is not None
-    (tools / "git.cmd").write_text(
-        f'@echo off\r\n"{git_executable}" %*\r\nexit /b %ERRORLEVEL%\r\n',
-        encoding="utf-8",
-    )
+    _write_shim(tools, "git", [git_executable])
     environment = dict(fixture["environment"])
     environment["PATH"] = str(tools)
 
@@ -1085,6 +1103,13 @@ def _tracking(fixture: dict[str, object], *args: str) -> list[str]:
 
 
 def _process_alive(pid: int) -> bool:
+    if not WINDOWS:
+        # A zombie has exited; only its parent's wait is still owed.
+        try:
+            stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return False
+        return stat[stat.rindex(")") + 2] != "Z"
     import ctypes
     from ctypes import wintypes
 
@@ -1376,9 +1401,11 @@ def _write_run_record(
     argv: list[str],
     hexdigit: str,
     started: float | None = None,
+    job: str | None = None,
 ) -> Path:
     """A run record as the launcher writes one, waiting on ``workflow``, whose
-    launcher is ``pid``; started at ``started`` (epoch seconds), else now."""
+    launcher is ``pid``; started at ``started`` (epoch seconds), else now.
+    ``job="environ"`` records the POSIX run job, as a launcher there does."""
     started = time.time() if started is None else started
     log_directory = Path(fixture["log_directory"])
     log_directory.mkdir(exist_ok=True)
@@ -1410,6 +1437,8 @@ def _write_run_record(
         "outputs": str(log_directory / f"{run_id}.out"),
         "environment": str(log_directory / "envs" / tag),
     }
+    if job == "environ":
+        record["job"] = f"environ:HARMONIC_FARM_RUN={run_id}"
     path = log_directory / f"{run_id}.run.json"
     path.write_text(json.dumps(record), encoding="utf-8")
     return path
@@ -1620,6 +1649,7 @@ SLEEPER = "__import__('time').sleep(120)"
     ],
     ids=["build", "snapshot", "staging", "other"],
 )
+@windows_only
 def test_an_orphan_must_name_the_run_on_its_command_line(
     tmp_path: Path, recorded_code: str, names: str | None, orphaned: bool
 ) -> None:
@@ -1661,9 +1691,7 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
             fixture["environment"],
         )
     finally:
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(child)], capture_output=True
-        )
+        _kill(child)
 
     assert status.returncode == 0, status.stderr
     report = json.loads(status.stdout)
@@ -1671,21 +1699,102 @@ def test_an_orphan_must_name_the_run_on_its_command_line(
     assert (child in report["launcher"]["orphaned_processes"]) is orphaned
 
 
-def _dead_parent_pid(child: int) -> int:
+def _kill(pid: int) -> None:
+    if WINDOWS:
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+        return
+    try:
+        os.kill(pid, 9)
+    except ProcessLookupError:
+        pass
+
+
+def _parent_pid(pid: int) -> int:
+    if not WINDOWS:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        return int(stat[stat.rindex(")") + 2 :].split()[1])
     listed = subprocess.run(
         [
-            "pwsh.exe",
+            "pwsh",
             "-NoProfile",
             "-Command",
-            f"(Get-CimInstance Win32_Process -Filter 'ProcessId={child}').ParentProcessId",
+            f"(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').ParentProcessId",
         ],
         check=True,
         capture_output=True,
         text=True,
     )
-    parent = int(listed.stdout)
+    return int(listed.stdout)
+
+
+def _dead_parent_pid(child: int) -> int:
+    parent = _parent_pid(child)
     assert not _process_alive(parent)
     return parent
+
+
+@posix_only
+@pytest.mark.parametrize(
+    ("carries", "orphaned"),
+    [("this run", True), ("another run", False), (None, False)],
+    ids=["this-run", "other-run", "unmarked"],
+)
+def test_an_orphan_is_the_runs_when_it_carries_the_run_in_its_environment(
+    tmp_path: Path, carries: str | None, orphaned: bool
+) -> None:
+    """POSIX re-parents an orphan to init, so a dead launcher's PID names none
+    of its children; the run's job is HARMONIC_FARM_RUN=<run-id>, which every
+    descendant inherits."""
+    fixture = _launcher_fixture(tmp_path)
+    started = time.time()
+    exited = subprocess.Popen([sys.executable, "-c", "pass"])
+    exited.wait(timeout=HANG_GUARD_S)
+    path = _write_run_record(
+        fixture,
+        pid=exited.pid,
+        tag="orphan",
+        workflow=LEAF_NUT,
+        argv=["uv", "-c", SLEEPER],
+        hexdigit="7",
+        started=started,
+        job="environ",
+    )
+    run_id = _record(path)["run_id"]
+    environment = {k: v for k, v in os.environ.items() if k != "HARMONIC_FARM_RUN"}
+    if carries is not None:
+        environment["HARMONIC_FARM_RUN"] = (
+            run_id if carries == "this run" else run_id[:-1] + "8"
+        )
+    # The parent exits at once: the sleeper is an orphan whatever it carries.
+    parent = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import subprocess, sys; "
+            "print(subprocess.Popen([sys.executable, '-c', '__import__(\"time\").sleep(121)'], "
+            "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
+            "stderr=subprocess.DEVNULL).pid)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=HANG_GUARD_S,
+        env=environment,
+    )
+    child = int(parent.stdout)
+    try:
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-Tag", "orphan"),
+            fixture["environment"],
+        )
+    finally:
+        _kill(child)
+
+    assert status.returncode == 0, status.stderr
+    report = json.loads(status.stdout)
+    assert report["state"] == "launcher-died"
+    assert (child in report["launcher"]["orphaned_processes"]) is orphaned
 
 
 def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
@@ -1704,28 +1813,17 @@ def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
     )
     process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "chain")
     build = int(_record(Path(fixture["invocation"]))["pid"])
-    # launcher -> uv.cmd's cmd.exe -> venv python.exe -> build. The venv
-    # launcher takes its child down with it; cmd.exe, like uv.exe, does not.
-    shim = int(
-        subprocess.run(
-            [
-                "pwsh",
-                "-NoProfile",
-                "-Command",
-                "(Get-CimInstance Win32_Process -Filter "
-                f"'ProcessId={_record(Path(fixture['invocation']))['ppid']}').ParentProcessId",
-            ],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-    )
+    # Windows: launcher -> uv.cmd's cmd.exe -> venv python.exe -> build. The
+    # venv launcher takes its child down with it; cmd.exe, like uv.exe, does
+    # not. POSIX: launcher -> the uv shim's sh -> build.
+    recorded_parent = int(_record(Path(fixture["invocation"]))["ppid"])
+    shim = _parent_pid(recorded_parent) if WINDOWS else recorded_parent
     try:
         process.kill()
         process.wait(timeout=HANG_GUARD_S)
         process.stdout.close()
         process.stderr.close()
-        # The uv between them dies too (os.kill is TerminateProcess here).
+        # The uv between them dies too (os.kill is TerminateProcess on Windows).
         os.kill(shim, 9)
         deadline = time.monotonic() + 10
         while _process_alive(shim) and time.monotonic() < deadline:

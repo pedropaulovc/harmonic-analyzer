@@ -156,12 +156,19 @@ function Test-PathWithin {
     $rootPath = [System.IO.Path]::TrimEndingDirectorySeparator(
         [System.IO.Path]::GetFullPath($Root)
     )
-    if ($candidatePath.Equals($rootPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    # Windows and macOS file systems ignore case by default; Linux ones do not.
+    $comparison = if ($IsLinux) {
+        [System.StringComparison]::Ordinal
+    }
+    else {
+        [System.StringComparison]::OrdinalIgnoreCase
+    }
+    if ($candidatePath.Equals($rootPath, $comparison)) {
         return $true
     }
     return $candidatePath.StartsWith(
         $rootPath + [System.IO.Path]::DirectorySeparatorChar,
-        [System.StringComparison]::OrdinalIgnoreCase
+        $comparison
     )
 }
 
@@ -412,7 +419,7 @@ function Complete-Snapshot {
         $result['snapshot_removed'] = $true
         return $result
     }
-    $snapshotOutputs = Join-Path $SnapshotPath 'cad\out'
+    $snapshotOutputs = Join-Path (Join-Path $SnapshotPath 'cad') 'out'
     if (Test-Path -LiteralPath $snapshotOutputs -PathType Container) {
         try {
             [System.IO.Directory]::Move($snapshotOutputs, $OutputsPath)
@@ -454,7 +461,7 @@ function Get-UnfinishedRunOutputs {
     if (Test-Path -LiteralPath $Record['outputs'] -PathType Container) {
         return $Record['outputs']
     }
-    return Join-Path $Record['snapshot'] 'cad\out'
+    return Join-Path (Join-Path $Record['snapshot'] 'cad') 'out'
 }
 
 function Complete-AbandonedRun {
@@ -588,9 +595,7 @@ function Select-RunRecordPath {
 function Test-LauncherAlive {
     param([Parameter(Mandatory)]$Record)
 
-    # CIM reports CreationDate even for a protected process, where
-    # Process.StartTime throws; Get-RunProcessTree reads the same field.
-    $holder = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId=$([int]$Record['pid'])" -ErrorAction SilentlyContinue
+    $holder = Get-ProcessTable -Id ([int]$Record['pid']) | Select-Object -First 1
     if ($null -eq $holder -or $null -eq $holder.CreationDate) {
         # Gone, or its identity cannot be read: not confirmed as the launcher.
         return $false
@@ -839,6 +844,112 @@ function Invoke-FarmCli {
     }
 }
 
+function Get-ProcessTable {
+    param([int]$Id)
+
+    # Every process, or the one with -Id, as ProcessId, ParentProcessId,
+    # CreationDate (UTC) and CommandLine; a process whose start time cannot be
+    # read is left out, since every caller compares creation times.
+    if ($IsWindows) {
+        # CIM reports CreationDate even for a protected process, where
+        # Process.StartTime throws.
+        $query = @{
+            ClassName = 'Win32_Process'
+            Property = @('ProcessId', 'ParentProcessId', 'CreationDate', 'CommandLine')
+            ErrorAction = 'SilentlyContinue'
+        }
+        if ($PSBoundParameters.ContainsKey('Id')) {
+            $query['Filter'] = "ProcessId=$Id"
+        }
+        return @(Get-CimInstance @query |
+                Where-Object { $null -ne $_.CreationDate } |
+                ForEach-Object {
+                    [pscustomobject]@{
+                        ProcessId = [int]$_.ProcessId
+                        ParentProcessId = [int]$_.ParentProcessId
+                        CreationDate = $_.CreationDate.ToUniversalTime()
+                        CommandLine = [string]$_.CommandLine
+                    }
+                })
+    }
+    $processes = if ($PSBoundParameters.ContainsKey('Id')) {
+        @(Get-Process -Id $Id -ErrorAction SilentlyContinue)
+    }
+    else {
+        @(Get-Process)
+    }
+    $table = [System.Collections.Generic.List[object]]::new()
+    foreach ($process in $processes) {
+        try {
+            # Truncated to the microsecond, as CIM dates a process on Windows,
+            # so Stop-RunProcesses compares both the same way.
+            $ticks = $process.StartTime.ToUniversalTime().Ticks
+            $created = [System.DateTime]::new($ticks - ($ticks % 10), [System.DateTimeKind]::Utc)
+            $parent = 0
+            $stat = "/proc/$($process.Id)/stat"
+            if (Test-Path -LiteralPath $stat -PathType Leaf) {
+                # pid (comm) state ppid ...; comm may hold spaces and parentheses.
+                $text = [System.IO.File]::ReadAllText($stat)
+                $parent = [int]$text.Substring($text.LastIndexOf(')') + 2).Split(' ')[1]
+            }
+            elseif ($null -ne $process.Parent) {
+                $parent = $process.Parent.Id
+            }
+            $table.Add([pscustomobject]@{
+                    ProcessId = $process.Id
+                    ParentProcessId = $parent
+                    CreationDate = $created
+                    CommandLine = [string]$process.CommandLine
+                })
+        }
+        catch {
+            # Exited mid-scan, or not ours to read.
+        }
+    }
+    return @($table)
+}
+
+function Get-RunJobMembers {
+    param([Parameter(Mandatory)][string]$Job)
+
+    # The live members of the run's job (`job` in the run record). On Windows
+    # it is a named job object. POSIX has no equivalent that outlives the
+    # parent chain -- an orphan is re-parented to init or a subreaper -- so
+    # there the job is the HARMONIC_FARM_RUN=<run-id> variable the launcher
+    # sets before it starts anything: every descendant inherits it, Python
+    # subprocesses of the build included, whichever ancestor died.
+    if ($Job.StartsWith('environ:', [System.StringComparison]::Ordinal)) {
+        $marker = $Job.Substring('environ:'.Length)
+        $members = [System.Collections.Generic.List[int]]::new()
+        if (-not (Test-Path -LiteralPath '/proc' -PathType Container)) {
+            # No /proc (macOS): the parent-chain scan is all there is.
+            return [int[]]@()
+        }
+        foreach ($entry in [System.IO.Directory]::EnumerateDirectories('/proc')) {
+            $name = [System.IO.Path]::GetFileName($entry)
+            if ($name -notmatch '\A\d+\z') {
+                continue
+            }
+            try {
+                $variables = [System.IO.File]::ReadAllText("$entry/environ").Split([char]0)
+            }
+            catch {
+                # Exited, or another user's process.
+                continue
+            }
+            if ($variables -ccontains $marker) {
+                $members.Add([int]$name)
+            }
+        }
+        return [int[]]@($members)
+    }
+    if (-not $IsWindows) {
+        # A Windows job recorded by a launcher on another machine.
+        return [int[]]@()
+    }
+    return [int[]][FarmRunJob]::Members($Job)
+}
+
 function Get-RunProcesses {
     param([Parameter(Mandatory)]$Record)
 
@@ -861,8 +972,7 @@ function Get-RunProcessTree {
     $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
     # A process CIM cannot date (a protected one) can be proven neither the
     # launcher nor the run's, and every check below compares creation times.
-    $all = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ParentProcessId, CreationDate, CommandLine |
-            Where-Object { $null -ne $_.CreationDate })
+    $all = Get-ProcessTable
     # With the launcher gone, its PID says nothing about who a process belongs
     # to: a direct child must also name this run on its command line -- the
     # recorded build command, or, for the preparation and cleanup commands
@@ -950,7 +1060,7 @@ function Get-RunProcessTree {
     # the run's by construction, so no command-line or creation-time check. A
     # record from before run jobs has none; the scan above still covers it.
     if ($Record['job']) {
-        $members = [System.Collections.Generic.HashSet[int]]::new([int[]][FarmRunJob]::Members($Record['job']))
+        $members = [System.Collections.Generic.HashSet[int]]::new([int[]](Get-RunJobMembers -Job $Record['job']))
         foreach ($process in $all) {
             $processId = [int]$process.ProcessId
             if ($members.Contains($processId) -and $seen.Add($processId)) {
@@ -1092,6 +1202,7 @@ $script:StopWaitSeconds = 60
 # is inheritable, so uv, the venv python and the build each hold one. A
 # Python subprocess of the build does not (subprocess passes only its std
 # handles); it stays a member, and is found while the build still runs.
+if ($IsWindows) {
 Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;
@@ -1177,6 +1288,7 @@ public static class FarmRunJob {
     }
 }
 '@
+}
 
 function Stop-RunProcesses {
     param(
@@ -1754,7 +1866,7 @@ try {
         outputs = $outputsPath
         environment = $environmentPath
         requests = [System.IO.Path]::GetFullPath($requestsPath)
-        job = "Local\harmonic-farm-run-$runId"
+        job = if ($IsWindows) { "Local\harmonic-farm-run-$runId" } else { "environ:HARMONIC_FARM_RUN=$runId" }
     }
     Write-JsonAtomic -Path $recordPath -Value $runRecord
     $startupRecordWritten = $true
@@ -1786,7 +1898,10 @@ try {
     # start, belongs to the job whatever dies in between, so -Cancel finds a
     # build whose uv died with the launcher. The handle lives as long as this
     # process; the job outlives it while any member runs.
-    [void][FarmRunJob]::Join($runRecord['job'])
+    # On POSIX the job is HARMONIC_FARM_RUN below, set before any child.
+    if ($IsWindows) {
+        [void][FarmRunJob]::Join($runRecord['job'])
+    }
     $env:SOLIDWORKS_POOL_HOME = $resolvedPoolHome
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
     $env:PYTHONUNBUFFERED = '1'
@@ -1876,7 +1991,7 @@ try {
 }
 catch {
     # Never let cleanup cost the terminal record.
-    $strandedOutputs = Join-Path $snapshotPath 'cad\out'
+    $strandedOutputs = Join-Path (Join-Path $snapshotPath 'cad') 'out'
     $preserved = Test-Path -LiteralPath $outputsPath
     $stranded = (-not $preserved) -and (Test-Path -LiteralPath $strandedOutputs)
     $cleanup = [ordered]@{

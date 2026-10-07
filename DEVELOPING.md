@@ -182,7 +182,8 @@ the gallery and publish in the owning worktree without local COM redispatch.
 
 ### Starting one under the supervisor
 
-Start it with `hub` `op: "start"`, never with Bash. `persist: true` is what lets
+The launcher runs under PowerShell 7.3+ on Windows, Linux and macOS (use
+`pwsh` and POSIX paths off Windows). Start it with `hub` `op: "start"`, never with Bash. `persist: true` is what lets
 the run survive the launching agent's turn and a session handoff; `detached`
 would lose live monitoring, so it is not used.
 
@@ -272,7 +273,13 @@ no `.done`.
   not take its python with it, and a build whose launcher and uv are both gone
   has no parent chain back to the run. The job's name lives while a process
   holds a handle to it; the launcher's handle is inheritable, so uv, the venv
-  python and the build each hold one. A record from a launcher that predates
+  python and the build each hold one. On Linux and macOS there is no job
+  object, and an orphan is re-parented to init, so the job is the
+  `HARMONIC_FARM_RUN=<run-id>` variable the launcher sets before its first
+  child (recorded as `"job": "environ:HARMONIC_FARM_RUN=<run-id>"`): every
+  descendant inherits it, Python subprocesses of the build included, and
+  `-Cancel` finds them through `/proc/<pid>/environ`. macOS has no `/proc`, so
+  there it falls back to the parent chain. A record from a launcher that predates
   run jobs falls back to the parent chain (a process under a dead
   launcher's PID counts only if its command line names the run: the recorded
   build command, the run's snapshot — git worktree add/remove, submodule
@@ -366,6 +373,8 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
   "job": "Local\\harmonic-farm-run-20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516"
 }
 ```
+
+On Linux and macOS, `job` is `environ:HARMONIC_FARM_RUN=<run-id>` (see `-Cancel`).
 
 Validation failures happen *before* that record: they print a diagnostic and
 exit nonzero without claiming a build started. Once the startup record exists,
