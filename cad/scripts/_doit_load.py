@@ -26,27 +26,55 @@ import functools
 import inspect
 import sys
 import time
+import weakref
 
 from doit.cmd_base import DodoTaskLoader
 
 STAMP_NAME = "_DOIT_LOAD"
 _TOOL_NAME = "harmonic-doit-load"
+_SETUP_CODE = DodoTaskLoader.setup.__code__
 
 
 class LoadStamp:
-    """One graph load's start, taken once: a cached ``dodo`` module that doit
-    loads again in the same process never reports a load from its stale import.
-    Taking it also ends any :func:`watch_import` on the module."""
+    """An import start owned by the public loader that is importing dodo.
+
+    Standalone imports have no loader owner: their successful return discards
+    the import start, and a later cached-module load starts at task generation.
+    Every stamp is consumed once, without retaining a frame or its loader."""
 
     def __init__(self, started_ns: int) -> None:
         self._started_ns: int | None = started_ns
         self._unwatch = None
+        self._taken = False
+        self._owner = None
+        frame = inspect.currentframe()
+        try:
+            while frame is not None:
+                if frame.f_code is _SETUP_CODE:
+                    owner = frame.f_locals.get("self")
+                    if isinstance(owner, DodoTaskLoader):
+                        self._owner = weakref.ref(owner)
+                    break
+                frame = frame.f_back
+        finally:
+            del frame
 
-    def take(self) -> int | None:
+    def imported(self) -> None:
+        if self._owner is None:
+            self._started_ns = None
+
+    def take(self, loader=None) -> int | None:
         started, self._started_ns = self._started_ns, None
         unwatch, self._unwatch = self._unwatch, None
         if unwatch is not None:
             unwatch()
+        if self._taken:
+            return None
+        self._taken = True
+        if loader is not None and (
+            self._owner is None or self._owner() is not loader
+        ):
+            return time.time_ns()
         return started
 
 
@@ -109,6 +137,7 @@ def watch_import(stamp: LoadStamp) -> None:
         )
 
     def imported(_code, _offset, _value) -> None:
+        stamp.imported()
         unwatch()
 
     try:
@@ -136,7 +165,7 @@ def install() -> None:
         stamp = getattr(self, "namespace", {}).get(STAMP_NAME)
         if not hasattr(stamp, "take"):
             return original(self, cmd, pos_args)
-        started = stamp.take()
+        started = stamp.take(self)
         command = cmd.get_name() if hasattr(cmd, "get_name") else str(cmd)
         targets = list(pos_args or ())
         try:

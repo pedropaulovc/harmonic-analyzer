@@ -1085,9 +1085,12 @@ scripts that `from _common import log, check` are instrumented unchanged.
       the telemetry spine's bounded `error.type`/`error.message` cause attributes
       so App Insights dependencies retain the diagnostic (without a task count);
       telemetry remains best-effort. The import watch
-      releases its `sys.monitoring` tool on return or unwind, and a cached dodo
-      namespace consumes its stamp only once, so repeated loads never report
-      a stale import interval. No task recipe or CAD dependency changes.
+      releases its `sys.monitoring` tool on return or unwind. The import start
+      belongs weakly to the active `DodoTaskLoader.setup` loader; a standalone
+      import discards that start on return, so its first later cached graph load
+      starts at task generation, not at the earlier import. Each namespace
+      consumes its stamp only once: no duplicate stale import intervals or
+      retained loaders/frames. No task recipe or CAD dependency changes.
       Logs follow their span: the logging bridge (`_ResourceRoutedLoggingHandler`)
       files a record under the resource of the span it is written under (a
       `[cache]` line inside `cache.probe` lands on `build-infra`, beside its span),

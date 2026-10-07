@@ -104,13 +104,15 @@ def _load(dodo, targets, command_name="run"):
 def test_graph_load_is_one_back_dated_build_infra_span(graph, monkeypatch):
     spans, services = _fake_telemetry(monkeypatch)
 
-    tasks = _load(graph(), ["one"])
+    dodo = graph()
+    tasks = _load(dodo, ["one"])
 
     assert [t.name for t in tasks] == ["one", "two"]
     (span,) = spans
     assert span.name == "doit.load"
     assert services == ["build-infra"]
     assert span.start_time <= span.end_time
+    assert span.start_time == sys.modules[dodo.stem]._started
     assert span.attributes["doit.command"] == "run"
     assert span.attributes["doit.targets"] == "one"
     assert span.attributes["doit.tasks"] == 2
@@ -216,6 +218,7 @@ def test_an_import_without_a_load_releases_the_import_watch(graph, monkeypatch):
     spec.loader.exec_module(module)
 
     assert _watch_tools() == []
+    assert module._DOIT_LOAD._started_ns is None
 
 
 def test_install_is_idempotent(graph, monkeypatch):
@@ -339,7 +342,9 @@ def test_telemetry_failure_preserves_generator_error(graph, monkeypatch):
 
 
 @pytest.mark.parametrize("entry", ["doit", "build"])
-@pytest.mark.parametrize("outcome", ["success", "import", "generator", "long_import"])
+@pytest.mark.parametrize(
+    "outcome", ["success", "import", "generator", "long_import", "standalone"]
+)
 def test_real_cli_offline_smoke(tmp_path, entry, outcome):
     """Real child CLI + SDK/JSONL exporter, isolated from repo tasks and cache.
 
@@ -385,6 +390,32 @@ def test_real_cli_offline_smoke(tmp_path, entry, outcome):
         if entry == "doit"
         else [sys.executable, str(REPO_ROOT / "build.py"), "--executor", "local"]
     )
+    if outcome == "standalone":
+        # Exercise the actual CLI in-process after a normal import has populated
+        # sys.modules. A deterministic one-hour gap is injected only into the
+        # graph hook's clock; the real SDK exports the resulting timestamps.
+        launcher = (
+            "import importlib, json, runpy, sys, time, types\n"
+            "before_import = time.time_ns()\n"
+            "importlib.import_module('dodo_smoke')\n"
+            "import _doit_load\n"
+            "boundary = (before_import // 10**9 + 3600) * 10**9\n"
+            "clock = iter([boundary, boundary + 10**9])\n"
+            "_doit_load.time = types.SimpleNamespace(time_ns=lambda: next(clock))\n"
+            "print(json.dumps({'graph_boundary': boundary}))\n"
+        )
+        if entry == "doit":
+            launcher += (
+                "sys.argv = ['doit', '-f', 'dodo_smoke.py', 'list']\n"
+                "runpy.run_module('doit', run_name='__main__', alter_sys=False)\n"
+            )
+        else:
+            launcher += (
+                "import build\n"
+                "raise SystemExit(build.main(['--executor', 'local', "
+                "'-f', 'dodo_smoke.py', 'list']))\n"
+            )
+        command = [sys.executable, "-c", launcher]
     result = subprocess.run(
         command + ["-f", str(dodo), "list"],
         cwd=tmp_path,
@@ -393,7 +424,7 @@ def test_real_cli_offline_smoke(tmp_path, entry, outcome):
         capture_output=True,
         timeout=60,
     )
-    if outcome == "success":
+    if outcome in {"success", "standalone"}:
         assert result.returncode == 0, result.stdout + result.stderr
     else:
         assert result.returncode != 0, result.stdout + result.stderr
@@ -402,7 +433,7 @@ def test_real_cli_offline_smoke(tmp_path, entry, outcome):
     (span,) = [span for span in spans if span["name"] == "doit.load"]
     assert span["resource"]["attributes"]["service.name"] == "build-infra"
     attributes = span["attributes"]
-    if outcome == "success":
+    if outcome in {"success", "standalone"}:
         assert attributes["doit.command"] == "list"
         assert attributes["doit.tasks"] == 2
         assert span["status"]["status_code"] == "OK"
@@ -415,6 +446,15 @@ def test_real_cli_offline_smoke(tmp_path, entry, outcome):
         assert attributes["error.type"] == "RuntimeError"
         assert attributes["error.message"] == message[:2048]
         assert "doit.tasks" not in attributes and "label" not in attributes
+    if outcome == "standalone":
+        from datetime import datetime, timedelta, timezone
+
+        boundary = json.loads(result.stdout.splitlines()[0])["graph_boundary"]
+        expected_start = datetime.fromtimestamp(boundary // 10**9, timezone.utc)
+        exported_start = datetime.fromisoformat(span["start_time"])
+        exported_end = datetime.fromisoformat(span["end_time"])
+        assert exported_start == expected_start
+        assert exported_end - exported_start == timedelta(seconds=1)
 
 
 def test_status_failure_still_ends_span(graph, monkeypatch):
