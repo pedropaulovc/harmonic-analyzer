@@ -46,7 +46,7 @@ needs:
 NOTE: the worked numbers in this docstring (incline 21.1 deg, radius step
 2.54, z-pitch 7.5, seat 6.5839, DP 30, 50.8 radii) illustrate the METHOD
 at the retired DP-30 geometry. The live values are computed from config
-at OD 62.2 / DP 49.82 (incline 12.5188 deg, step 1.5295, seat 6.889, 64T
+at OD 62.2 / DP 49.82 (incline 12.5182 deg, step 1.5295, seat 6.889, 64T
 crank pair at DP 25.7311); the alignment pinion is RESTORED (ch30 GT) at the
 level-inboard placement (see the constants block).
 
@@ -69,15 +69,15 @@ tan(i), so the cone's drum-side generator runs PARALLEL to the drum
 axis -- the p.18 seam.
 
 The engagement is intentionally PARTIAL ("oblique angle ... partial
-engagement, distinct wear", ch. 12): the contact tooth crosses the
-3 mm drum face obliquely, penetration varying +-1.5*tan(i) = 0.58
-about its centre value; X_PITCH backs the cone off so the DEEPEST
-crossing point stays clear of the DP 30 working depth (edge slack
-checker-arbitrated, see PEN_EDGE_SLACK) -> tip interleave 0.00..1.14
-across each drum face, identical at ALL 20 stations (zero drift, T006
-included). Stub-gap caps hold without any per-gear relief: the drum
-tips dive at most 0.24 into a cone gap vs the shallowest (T006) stub
-cap 0.88. The 16T crank pinion mesh is DIFFERENT (2026-07-14 rederive): on its
+engagement, distinct wear", ch. 12): at the live DP 49.82 the contact tooth
+crosses the 3 mm drum face obliquely, penetration varying
++-1.5*tan(i) = 0.333 mm about PEN_MID = 0.137 mm.  X_PITCH backs the
+standard tips off to interleave -0.196..+0.470 mm across each drum face,
+identical at all 20 stations (zero drift, T006 included).  The 0.55 mm
+edge slack retains the historical checker-arbitrated standard-tip pose;
+the U42 long-addendum teeth and gap floors are instead budgeted against
+this pose by test_dt_cone_gear_mesh_design.
+The 16T crank pinion mesh is DIFFERENT (2026-07-14 rederive): on its
 near-VERTICAL line of centres (the crank sits above the 64T, ch30 GT)
 the radial interleave is ~constant across the face -- the crossing
 manifests as LATERAL flank misregistration instead, which no radial
@@ -331,17 +331,17 @@ GEAR64_CENTRE_REFERENCE_FACE = 10.0
 from dt_crank_pinion_spec import FACE_WIDTH as PINION_FACE  # noqa: E402
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
-# contact azimuth. The oblique crossing dives (DRUM_FACE/2)*tan(i) past
-# the mid-face penetration, so the mid value is capped at working depth
-# minus the dive minus the edge slack -> tip interleave 0.00..1.14.
-# Slack 0.55 is checker-arbitrated: the oblique crossing distorts the
-# flank match beyond plain backlash math, worst at the smallest gears
-# (their engagement arc spans a large azimuth, where the off-centre
-# teeth barely drift out of the drum band) -- 0.15 left <=0.06 mm^3
-# flank slivers at the five smallest stations, 0.35 still skinned the
-# last four.
-# DRUM_TIP_X, PEN_EDGE_SLACK, PEN_MID and X_PITCH (the mesh anchor above)
-# come from cone_line, with cone_seat(j).
+# contact azimuth. The live oblique crossing dives (DRUM_FACE/2)*tan(i)
+# = 0.333 mm past PEN_MID = 0.137 mm: working depth minus the dive minus
+# the 0.55 mm edge slack gives standard-tip interleave -0.196..+0.470 mm
+# across each drum face (test_dt_cone_gear_mesh_design checks the deep edge).
+# The slack was checker-arbitrated on the historical standard-tip geometry:
+# 0.15 left <=0.06 mm^3 flank slivers at the five smallest stations;
+# 0.35 still skinned the last four. These are historical trial slacks,
+# not the live interleave or the U42 printed-tooth clearance budget.
+# The printed deepened teeth are budgeted against this retained pose by
+# test_dt_cone_gear_mesh_design. DRUM_TIP_X, PEN_EDGE_SLACK, PEN_MID and
+# X_PITCH come from cone_line, with cone_seat(j).
 
 # Cone shaft: pivot end at seat station -28.25 from the T120 centre
 # (25 journal + half of the first 6.5 face -- build_dt_cone_gear_shaft.py).

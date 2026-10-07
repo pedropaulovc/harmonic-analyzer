@@ -1,6 +1,6 @@
 """Re-derive the deepened cone/drum mesh (U38 option 1b) from its printed values.
 
-``cone_gear_spec.DEEPENED_MESH_MM`` prints each gear's tip diameter and thick
+``dt_cone_gear_spec.DEEPENED_MESH_MM`` prints each gear's tip diameter and thick
 tooth limit.  These tests rebuild the planar involute mesh at the deep edge of
 each drum face -- the slice that carries the load -- from the assembly pose and
 the printed bands, and check the design rules the table was sized to:
@@ -192,7 +192,7 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
     assert worst["tip_land"] >= LAND_MIN, worst
     assert worst["drum_floor"] >= DRUM_FLOOR_MIN, worst
     # The drum tip still clears the (risen) chord floor with every runout
-    # closing; +0.030 at T006 is the tightest running clearance.
+    # closing; +0.045 mm at T006 is the tightest modelled-floor clearance.
     assert worst["cone_floor"] > 0.0, worst
     low, high = spec.BACKLASH_ACCEPTANCE_MM
     assert low == spec.MESH_BACKLASH_MIN_MM
@@ -270,7 +270,7 @@ def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
     modelled = 2.0 * spec.floor_radius_mm(teeth)
     assert modelled - 0.001 < minimum <= modelled
     if teeth in spec.DIPPED_FLOOR_MIN_MM:
-        assert clearance > 0.04  # +0.045 at T006, +0.076 at T012
+        assert clearance > 0.04  # +0.045 at T006, +0.145 at T012
         return
     if spec.floor_tmin(teeth) == 0.0:
         assert clearance >= 0.10
