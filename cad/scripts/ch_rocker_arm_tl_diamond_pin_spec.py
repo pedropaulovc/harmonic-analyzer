@@ -21,6 +21,8 @@ the round lands bear tangentially (+-Y). S3/S4 pose this frame at frame-A
 
 from __future__ import annotations
 
+import math
+
 import _hole_spec
 import ch_rocker_arm_spec as rocker
 from _feature_requirements import ExportFeature, limits
@@ -55,6 +57,7 @@ NECK_PLACES = 1
 NECK_BAND = (0.0, -0.2)  # never over the cutter-clearance size; keeps a 0.4 bore wall
 NECK_LENGTH = 4.3  # .X keeps 0.77 of the 1.57 cutter clearance; collar stays below the S4 op 25/27 cutter tip
 COLLAR_DIA = 4.5
+_GENERAL_1PL_WALL = 0.8  # title block .X band on the collar diameter
 # The collar seats on the plate top. The neck face sits just under the arm's
 # face B so the plate's pads and shimmed hub stand alone set Z: it is a
 # backstop, never a second Z support (FixtureCAD option b).
@@ -75,14 +78,15 @@ OVERALL_LENGTH = COLLAR_END + 4.8  # shank clears the .X 7.0 hole bottom at ever
 REAM_DIA = 2.0
 REAM_BAND = (0.010, 0.0)  # the shop's rod reamer, 2.000-2.010
 REAM_DEPTH = 8.0
-# Rule-12 exception (FixtureCAD ruling): the Ø3.0 neck around the Ø2.0 ream
-# leaves a 0.5 wall, under the 1.5 floor. shop-additions section 3 (Pedro's
-# binding route) sets both sizes and the neck stays Ø3.0 for the S4 op 25/27
-# cutter clearance; the bonded pin fills the bore, so the section is solid in
-# service.
-RULE12_EXCEPTION = (
-    "neck wall over the bonded ream: shop-additions section 3 route, cutter clearance"
+# Named wall shortfall (drawing-simplicity-policy.md "Named exceptions",
+# MHA-CH-006-TL-03 row): the neck over the reamed bore is the thinnest wall,
+# stated on the sheet as a MIN, rounded down.
+NECK_WALL_MIN = (
+    math.floor(((NECK_DIA + NECK_BAND[1]) - (REAM_DIA + REAM_BAND[0])) / 2.0 * 100.0)
+    / 100.0
 )
+if NECK_WALL_MIN >= (COLLAR_DIA - _GENERAL_1PL_WALL - (REAM_DIA + REAM_BAND[0])) / 2.0:
+    raise AssertionError("the neck is no longer the thinnest wall round the bore")
 # Lands stand LAND_HEIGHT above the neck face: their tip stays under the
 # arm's upper strap face even with the neck face at its lowest.
 LAND_HEIGHT = 2.378
@@ -156,7 +160,8 @@ DRAWING_NOTES = "\n".join(
     (
         BUILT_UP_PERMISSION_NOTE,
         "BODY LENGTHS RUN FROM THE NECK FACE; THE LOWER LENGTH IS THE BOUGHT PIN, SET BY ITS PROJECTION, CLEAR OF THE BORE BOTTOM; FLATS RUN THE FULL LAND LENGTH.",
-        "NECK FACE IS A BACKSTOP JUST BELOW THE ROCKER ARM; THIN WALLS ROUND THE BORE ACCEPTED.",
+        # Named exception: MHA-CH-006-TL-03 neck wall (drawing-simplicity-policy.md, "Named exceptions").
+        f"NECK FACE IS A BACKSTOP JUST BELOW THE ROCKER ARM; NECK WALL TO BORE {NECK_WALL_MIN:.2f} MIN.",
         "SHANK: CLOSE SLIP FIT, BONDED IN THE ROCKER ARM PROFILE FIXTURE PIN HOLE WITH THE"
         " FLATS SQUARE TO ITS PIVOT-TO-ROD-HOLE LINE.",
     )
