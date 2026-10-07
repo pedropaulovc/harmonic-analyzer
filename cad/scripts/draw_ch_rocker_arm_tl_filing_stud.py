@@ -162,7 +162,9 @@ async def build(adapter: Any) -> dict[str, str]:
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
             raise RuntimeError(f"expected one filing-stud {name} reference dimension")
-        set_reference_dimension(adapter, matches[0], label=f"filing stud {name}")
+        set_reference_dimension(
+            adapter, matches[0], label=f"filing stud {name}", diameter=name.endswith("Dia")
+        )
     add_view_centerline(
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )

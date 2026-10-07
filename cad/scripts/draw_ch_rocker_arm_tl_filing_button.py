@@ -125,7 +125,9 @@ async def build(adapter: Any) -> dict[str, str]:
         matches = [a for a in annotations if dimension_name(adapter, a) == name]
         if len(matches) != 1:
             raise RuntimeError(f"expected one filing-button {name} reference dimension")
-        set_reference_dimension(adapter, matches[0], label=f"filing button {name}")
+        set_reference_dimension(
+            adapter, matches[0], label=f"filing button {name}", diameter=name.endswith("Dia")
+        )
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
