@@ -212,6 +212,130 @@ def test_refresh_dof_gate_can_reuse_an_already_resolved_model(
     assert rebuilds == []
 
 
+@pytest.mark.parametrize(
+    "asm_name", ["ch-channel", "ch_channel", "ch_channel.SLDASM"]
+)
+def test_refresh_dof_gate_matches_canonical_artifact_identity(
+    tmp_path, monkeypatch, asm_name
+) -> None:
+    import _assembly
+
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    (tmp_path / ".ch-channel.dof.json").write_text(
+        json.dumps(
+            {
+                "stem": "ch-channel",
+                "specs": [
+                    {"verify": ["ch-rocker-arm-1", []]},
+                    {"verify": ["ch-rocker-arm-1", []]},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls = []
+    monkeypatch.setattr(
+        _assembly,
+        "assert_free_dof_necessity",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+    allowed = ("ch-rocker-arm",)
+    contract_names = []
+
+    def allowed_stems(name):
+        contract_names.append(name)
+        return allowed
+
+    monkeypatch.setattr(_assembly, "allowed_free_stems", allowed_stems)
+    adapter = object()
+
+    assert_manifest_dof_state(adapter, asm_name, resolve=False)
+
+    assert contract_names == ["ch-channel"]
+    assert calls == [
+        (
+            (adapter, 2),
+            {
+                "resolve": False,
+                "required_instances": ("ch-rocker-arm-1",),
+                "allowed_stems": allowed,
+            },
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        {"stem": "dt-drive-train"},
+        {"stem": "channel"},
+        {"stem": "ch_channel"},
+        {"stem": ""},
+        {"stem": None},
+        {"stem": 42},
+        {},
+    ],
+)
+def test_refresh_dof_gate_refuses_wrong_or_missing_manifest_identity(
+    tmp_path, monkeypatch, identity
+) -> None:
+    import _assembly
+
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    path = tmp_path / ".ch-channel.dof.json"
+    # A valid channel witness cannot authorize a manifest naming another assembly.
+    contents = json.dumps(
+        {**identity, "specs": [{"verify": ["ch-rocker-arm-1", []]}]}
+    )
+    path.write_text(contents, encoding="utf-8")
+    monkeypatch.setattr(
+        _assembly,
+        "assert_free_dof_necessity",
+        lambda *_args, **_kwargs: pytest.fail("untrusted manifest reached DOF gate"),
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "allowed_free_stems",
+        lambda *_args: pytest.fail("untrusted manifest reached family contract"),
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "assert_components_fully_defined",
+        lambda *_args, **_kwargs: pytest.fail("invalid manifest used missing fallback"),
+    )
+
+    with pytest.raises(RuntimeError, match="expected 'ch-channel'"):
+        assert_manifest_dof_state(object(), "ch_channel.SLDASM", resolve=False)
+
+    assert path.read_text(encoding="utf-8") == contents
+
+
+@pytest.mark.parametrize("resolve", [True, False])
+def test_refresh_dof_gate_without_manifest_keeps_strict_gate(
+    tmp_path, monkeypatch, resolve
+) -> None:
+    import _assembly
+
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    calls = []
+    monkeypatch.setattr(
+        _assembly,
+        "assert_components_fully_defined",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "assert_free_dof_necessity",
+        lambda *_args, **_kwargs: pytest.fail("missing manifest reached free-DOF gate"),
+    )
+    adapter = object()
+
+    assert_manifest_dof_state(adapter, "ch-channel", resolve=resolve)
+
+    assert calls == [((adapter,), {"resolve": resolve})]
+    assert not (tmp_path / ".ch-channel.dof.json").exists()
+
+
 def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) -> None:
     import _assembly
 

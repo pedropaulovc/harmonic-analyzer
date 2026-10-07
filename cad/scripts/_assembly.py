@@ -1709,11 +1709,14 @@ def assert_manifest_dof_state(
     """Apply the refresh DOF gate that matches the assembly's saved contract.
 
     A non-empty DOF manifest means the assembly intentionally ships with those
-    operational freedoms. Prove their exact recorded witness instances remain
-    under-constrained; assemblies without a manifest retain the strict 0-DOF gate.
-    The exhaustive coupled-family check remains in ``verify:soundness``.
+    operational freedoms. Its identity must match the canonical dashed native
+    artifact stem before any recorded witness is trusted. Prove the exact witness
+    instances remain under-constrained; assemblies without a manifest retain the
+    strict 0-DOF gate. The exhaustive coupled-family check remains in
+    ``verify:soundness``.
     ``resolve=False`` reuses a model the caller has already deep-rebuilt.
     """
+    asm_name = asm_name.removesuffix(".SLDASM").replace("_", "-")
     path = dof_manifest_path(asm_name)
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -1722,7 +1725,14 @@ def assert_manifest_dof_state(
         return
     except (OSError, ValueError, TypeError) as exc:
         raise RuntimeError(f"invalid free-DOF manifest {path}: {exc}") from exc
-    specs = payload.get("specs") if isinstance(payload, dict) else None
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"free-DOF manifest {path} must contain a JSON object")
+    if payload.get("stem") != asm_name:
+        raise RuntimeError(
+            f"free-DOF manifest {path} names stem {payload.get('stem')!r}, "
+            f"expected {asm_name!r}"
+        )
+    specs = payload.get("specs")
     if not isinstance(specs, list) or not specs:
         raise RuntimeError(f"free-DOF manifest {path} has no specs")
     instances: list[str] = []
@@ -3270,8 +3280,9 @@ async def refresh_assembly(
     refresh raise, naming the config + the broken feature/mate. Then the
     rest/export pose is re-activated and, when the refresh actually changed
     the resolved geometry (mass-properties fingerprint moved, or a mate was
-    auto-repaired), the standard broad gates run: ``assert_components_fully_defined``
-    (free DOF), ``check_no_interference`` (overlaps), ``assert_model_healthy``
+    auto-repaired), the standard broad gates run: ``assert_manifest_dof_state``
+    (identity-checked saved free DOFs, or strict 0 DOF without a manifest),
+    ``check_no_interference`` (overlaps), ``assert_model_healthy``
     (deep mate health). Any gate raises a ``RuntimeError`` naming the culprit.
     Channel and summing assemblies additionally run strict static native spring
     contact after their final reconciliation on every refresh, even when the
