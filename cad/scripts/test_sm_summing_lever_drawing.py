@@ -13,6 +13,8 @@ import _drawing_common as common
 import draw_sm_summing_lever as drawing
 import sm_summing_lever_spec
 from _drawing_common import ViewEdge, ViewEdges, assert_dimension_measures
+from _part_pmi import _FaceGeometry
+from _surface_finish import surface_finish_by_key
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
@@ -38,22 +40,73 @@ def _line(start, end):
     return ViewEdge(object(), (start, end), None, None)
 
 
-def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside() -> None:
-    """Datum B and the start-Z BASIC hang on the +Z END face: the rib flange
-    5.08 mm inboard reads 3.35 for 8.43 (#1105), and the rib's underside edge
-    shares the end plane but is hidden under the plate."""
-    z = sm_summing_lever_spec.PLATE_L / 2.0
+@pytest.mark.parametrize("sign", (-1, 1))
+def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside(sign) -> None:
+    """Both finished length pickups use the actual end, never the inboard
+    flange; B and the start-Z BASIC still use the existing +Z end."""
+    z = sign * sm_summing_lever_spec.PLATE_L / 2.0
     top = _line((0.0, 15.24, z), (sm_summing_lever_spec.PLATE_W, 0.0, z))
-    flange = _line((0.0, 15.24, z - sm_summing_lever_spec.PLATE_T), (44.45, 0.0, z - 5.08))
+    inboard = z - sign * sm_summing_lever_spec.PLATE_T
+    flange = _line((0.0, 15.24, inboard), (44.45, 0.0, inboard))
     underside = _line((sm_summing_lever_spec.PLATE_W, 0.0, z), (0.0, -15.24, z))
     plate_end = _line((37.04, 2.54, z), (sm_summing_lever_spec.PLATE_W, 2.54, z))
-    edges = ViewEdges(label="plan", edges=(flange, underside, plate_end, top))
-    assert drawing._end_face_edge(edges, x_mm=10.0) is top
+    opposite = _line((0.0, 15.24, -z), (sm_summing_lever_spec.PLATE_W, 0.0, -z))
+    edges = ViewEdges(label="plan", edges=(flange, underside, plate_end, opposite, top))
+    assert drawing._end_face_edge(edges, x_mm=10.0, z_mm=z) is top
     # The plate's own end edge only shows past the rib taper: two lines there.
     with pytest.raises(RuntimeError, match="expected one visible line"):
-        drawing._end_face_edge(edges, x_mm=40.0)
+        drawing._end_face_edge(edges, x_mm=40.0, z_mm=z)
     with pytest.raises(RuntimeError, match="expected one visible line"):
-        drawing._end_face_edge(ViewEdges(label="plan", edges=(flange, underside)), x_mm=10.0)
+        drawing._end_face_edge(
+            ViewEdges(label="plan", edges=(flange, underside, opposite)),
+            x_mm=10.0, z_mm=z,
+        )
+
+
+def test_datum_b_finish_consumer_rejects_flange_and_opposite_end(
+    identity, monkeypatch,
+) -> None:
+    """The machining symbol must qualify B's physical +Z end face, not a
+    coincident projection or the previously mispicked inboard flange."""
+    z = sm_summing_lever_spec.PLATE_L / 2.0
+    control = surface_finish_by_key(
+        sm_summing_lever_spec.SURFACE_FINISHES, "plate_end_datum_b"
+    )
+
+    def face_at(station, normal):
+        face = object()
+        geometry = _FaceGeometry(
+            face=face,
+            identity=4001,
+            parameters=(*normal, 0.0, 0.0, station / 1000.0),
+            outward_normal=normal,
+            box=(0.0, -0.01524, station / 1000.0,
+                 sm_summing_lever_spec.PLATE_W / 1000.0, 0.01524, station / 1000.0),
+        )
+        return face, geometry
+
+    end, end_geometry = face_at(z, (0.0, 0.0, 1.0))
+    flange, flange_geometry = face_at(
+        z - sm_summing_lever_spec.PLATE_T, (0.0, 0.0, 1.0)
+    )
+    opposite, opposite_geometry = face_at(-z, (0.0, 0.0, -1.0))
+    geometries = {
+        id(end): end_geometry,
+        id(flange): flange_geometry,
+        id(opposite): opposite_geometry,
+    }
+    monkeypatch.setattr("_part_pmi._face_geometry", lambda face: geometries[id(face)])
+    edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: (end,))
+    signatures = common._validate_surface_finish_control_face(
+        edge, entity_type="EDGE", control=control, label="datum B finish"
+    )
+    assert signatures[0]["geometry"].face is end
+    for wrong in (flange, opposite):
+        edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: (wrong,))
+        with pytest.raises(RuntimeError, match="does not touch controlled"):
+            common._validate_surface_finish_control_face(
+                edge, entity_type="EDGE", control=control, label="datum B finish"
+            )
 
 
 def _dimension(mm: float, attached: tuple[object, ...]):
@@ -540,6 +593,9 @@ def callout_scene(monkeypatch, tmp_path):
             line("positive-ridge", (0, drawing.HEX_H / 2, z),
                  (0, drawing.HEX_H / 2, z + drawing.HEX_DEPTH)),
             line("end", (0, 15.24, z), (drawing.PLATE_W, 0, z)),
+            line("opposite-end", (0, 15.24, -z), (drawing.PLATE_W, 0, -z)),
+            line("free-plate-edge", (drawing.PLATE_W, drawing.PLATE_T / 2, -z),
+                 (drawing.PLATE_W, drawing.PLATE_T / 2, z)),
             circle("seed", (drawing.HOLE_X, drawing.PLATE_T / 2, drawing.HOLE_Z_LAST),
                    drawing.HOLE_DIA / 2),
             circle(

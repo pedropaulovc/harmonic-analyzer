@@ -3,12 +3,14 @@ the part build (``build_sm_summing_lever.py``) and its manufacturing drawing
 (``draw_sm_summing_lever.py``).
 
 PURE DATA, no SolidWorks/COM imports (``stock_anchor_geom`` is pure geometry).
-A large green-iron casting: a coefficients plate carrying the 20 channel-spring
-anchor taps on the +X arm, a solid pivot cylinder with hex knife-edge
-trunnions, and a curved summation arm ending in the tapped counter-spring
-anchor boss on the -X arm.  Both anchors are purchased eyebolts that thread
-straight into those taps -- the lever IS their nut -- so this module owns the
-two thread identities and the boss height, and no plain anchor bore exists.
+A ferrous casting or a part machined from solid stock: a coefficients plate
+carrying the 20 channel-spring anchor taps on the +X arm, a solid pivot cylinder
+with hex knife-edge trunnions, and a curved summation arm ending in the tapped
+counter-spring anchor boss on the -X arm. Both anchors are purchased eyebolts
+that thread straight into those taps; this module owns the two thread identities
+and the boss height, and no plain anchor bore exists. Mechanical retention and
+full-thread engagement remain on HOLD under #1189; the legacy no-nut/
+threadlocker instructions are not an accepted retention disposition.
 Values MUST match build_sm_summing_lever.py.
 """
 
@@ -20,7 +22,7 @@ from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 
 from _gtol_spec import PlanarFace
-from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 MM_PER_IN = 25.4
 
@@ -48,6 +50,13 @@ KNIFE_FACE_NORMAL = (
 )
 KNIFE_FACE_OFFSET = KNIFE_FACE_NORMAL[1] * HEX_H / 2.0
 
+# Both knife ridges are machined: datum A uses the -Z ridge, while the two
+# X-location basics use the +Z ridge. The plate's real +/-Z end faces supply
+# its overall length; the +Z plate/rib end also owns datum B and the start-Z
+# basic. The free +X plate edge is the remaining physical width pickup.
+# These are finish requirements on the existing nominal solid, not stock
+# allowances, added faces, or a moved datum. Routine stationary pickups use
+# the existing SEAT grade; the knife-edge requirement is unchanged.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "knife_edge_ridge",
@@ -57,6 +66,30 @@ SURFACE_FINISHES = (
             KNIFE_FACE_OFFSET,
             contains_z_mm=(PLATE_L + HEX_DEPTH) / 2.0,
         ),
+    ),
+    SurfaceFinishControl(
+        "knife_edge_datum_a",
+        MACHINED_UM,
+        PlanarFace(
+            KNIFE_FACE_NORMAL,
+            KNIFE_FACE_OFFSET,
+            contains_z_mm=-(PLATE_L + HEX_DEPTH) / 2.0,
+        ),
+    ),
+    SurfaceFinishControl(
+        "plate_end_datum_b",
+        SEAT_UM,
+        PlanarFace((0.0, 0.0, 1.0), PLATE_L / 2.0, contains_x_mm=10.0),
+    ),
+    SurfaceFinishControl(
+        "plate_opposite_end",
+        SEAT_UM,
+        PlanarFace((0.0, 0.0, -1.0), PLATE_L / 2.0, contains_x_mm=10.0),
+    ),
+    SurfaceFinishControl(
+        "plate_free_edge",
+        SEAT_UM,
+        PlanarFace((1.0, 0.0, 0.0), PLATE_W, contains_z_mm=PLATE_L / 4.0),
     ),
 )
 

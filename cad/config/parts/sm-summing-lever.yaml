@@ -1,7 +1,7 @@
 sm-summing-lever:
   number: MHA-SM-003
   material_family: ferrous_noncritical
-  finish: green enamel; knife edges machined, spring-anchor seats tapped
+  finish: green enamel; mask machined knife edges/plate ends/free plate edge and tapped seats
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"

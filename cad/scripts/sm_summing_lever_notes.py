@@ -30,14 +30,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The anchor-tap pattern (count, size, row X, start offset, spacing) and the
 # counter-anchor tap size/location are dimensioned NATIVELY on the sheet (basic
 # coordinates + position frames + Hole Wizard callouts); the notes must not
-# repeat those numbers.  The boss HEIGHT is not a sketch dimension, so it is
-# stated here -- it is the engagement the purchased counter anchor's shank is
-# cut to.  Note 5 lists the machined features explicitly -- the sheet also
-# carries the 20X controlled anchor-tap pattern, so "only knife edges and
-# anchor bore" would contradict it (codex #354).  Notes 6-7 carry the no-nut
-# rule: both lower spring anchors are purchased eyebolts that thread straight
-# into this casting, so the casting is their nut and the eye clocking and
-# threadlocker are the print's business, not an assembly aside.
+# repeat those numbers. The boss HEIGHT is not a sketch dimension, so it is
+# stated here. Note 5 preserves both allowed routes and requires machining the
+# actual plate/rib ends (including B), the free plate edge and the knife edges.
+# Their physical surface-finish controls live in sm_summing_lever_spec and are
+# authored natively by the part build. Notes 6-7 retain the legacy no-nut/
+# threadlocker instructions under the known #1189 retention/engagement HOLD;
+# they do not represent an accepted mechanical lock or a user waiver.
 DRAWING_NOTES = "\n".join(
     (
         f"1. HEX TRUNNIONS {HEX_W:.2f} W x {HEX_H:.2f} HIGH,",
@@ -46,10 +45,11 @@ DRAWING_NOTES = "\n".join(
         f"2. COEFFICIENT PLATE {PLATE_T:.2f} THICK.",
         f"3. PIVOT {PLATE_L:.2f} LONG; NO BORE.",
         f"4. ANCHOR BOSS {ANCHOR_H:.2f} HIGH.",
-        "5. CAST PART: UNDIMENSIONED CONTOURS",
-        "   PER SUPPLIED MODEL/PATTERN.",
-        "   MACHINE KNIFE EDGES AND TAP",
-        "   SPRING ANCHOR SEATS ONLY.",
+        "5. CAST OR MACHINE FROM SOLID;",
+        "   CONTOURS PER SUPPLIED MODEL/PATTERN.",
+        "   MACHINE KNIFE EDGES, BOTH PLATE",
+        "   ENDS (INCLUDING B), AND FREE PLATE",
+        "   EDGE; TAP SPRING ANCHOR SEATS.",
         "6. PURCHASED SPRING EYEBOLTS THREAD",
         "   DIRECTLY INTO THIS PART; NO NUTS.",
         "   TAP FULL DEPTH THROUGH PLATE",
