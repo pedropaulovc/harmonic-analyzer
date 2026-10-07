@@ -79,8 +79,9 @@ test('invalid report values and output failures cannot replace a complete report
     assert.deepEqual(await readdir(root), ['report.json'])
   }
   const nestedPath = join(path, 'nested.json')
+  const nestedCode = process.platform === 'win32' ? 'ENOENT' : 'ENOTDIR'
   await assert.rejects(writeJsonReport(nestedPath, { status: 'unavailable' }), error => {
-    assert.equal(error.cause?.code, 'ENOTDIR')
+    assert.equal(error.cause?.code, nestedCode)
     failures.push({ code: 'verification-prerequisite', reason: error.message })
     return true
   })
@@ -93,7 +94,7 @@ test('invalid report values and output failures cannot replace a complete report
     assert.match(saved.failures[index].reason, underlyingMessage)
   }
   assert.ok(saved.failures.at(-1).reason.includes(nestedPath))
-  assert.match(saved.failures.at(-1).reason, /ENOTDIR/)
+  assert.match(saved.failures.at(-1).reason, new RegExp(`\\b${nestedCode}\\b`))
   assert.ok(saved.videos[0].interaction.reportWriteError.includes(path))
   assert.match(saved.videos[0].interaction.reportWriteError, /capture unavailable/)
   assert.deepEqual((await readdir(root)).sort(), ['failure.json', 'report.json'])

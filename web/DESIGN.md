@@ -512,8 +512,9 @@ Per-video verification is incremental and repeatable, without an acceptance-run
 quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.
 A coarse demo or a passing subset does not establish final acceptance.
 Per-video and aggregate reports stream their complete existing JSON evidence
-with bounded serialization memory and atomic publication. Invalid values or
-failed writes remain failures and cannot replace a previous complete report.
+with bounded serialization memory and atomic publication. Ordinary serialization
+or I/O failures before publication preserve the previous complete report; no
+fsync or power-loss durability guarantee is made.
 Saved failure reasons retain the actual serialization or filesystem cause and
 any temporary-file cleanup failure, alongside the output-path context.
 On a failed stage, refine the worst source-visible discrepancy, rerun the affected
@@ -536,6 +537,13 @@ After seeking away from actual EOF, the local player publishes the settled nativ
 state on `seeked` only when it changes; a paused getter and the HUD must agree,
 without aliasing ended. Unchanged paused scrubs must not interrupt ongoing manual
 crank motion through a redundant state callback.
+
+Verification-only native diagnostic leases own the paused selected source state.
+Real playback/clock, route, layout or manual changes supersede that ownership:
+stale operations and callback results reject, renderer/probe resources are
+released, and the latest actual state is redrawn rather than overwritten by the
+old paused snapshot. Receipts distinguish `superseded` with a refusal reason
+from exact unchanged-state `restored`; callback and cleanup failures stay visible.
 
 Paused exploration must permit orbit, pan, zoom and mechanism operation without
 advancing the source video. Compact mode retains the same visible usable player

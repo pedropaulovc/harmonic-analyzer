@@ -87,8 +87,9 @@ function* jsonChunks(report) {
  * Publish the complete existing pretty-JSON shape with stream backpressure.
  * Extra serialization memory is bounded by one scalar, one 64Ki-character
  * chunk, traversal depth/object keys and the stream buffers, not output size.
- * The measured report itself remains caller-owned and resident. Failed writes
- * leave any previous complete report intact, never a truncated final JSON.
+ * The measured report itself remains caller-owned and resident. Ordinary
+ * serialization/I/O failures before atomic publication preserve the prior report.
+ * This is not an fsync or power-loss durability guarantee.
  */
 export async function writeJsonReport(path, report) {
   const temporary = `${path}.${randomUUID()}.tmp`

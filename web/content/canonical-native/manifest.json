@@ -567,7 +567,7 @@
     },
     {
       "path": "web/src/main.ts",
-      "sha256": "4035c862f831176a9157c97d7cdb4381bbf2f4a0a7625f11c98f7b4e135a7689",
+      "sha256": "50463d0a7eb5dbe67c97b95653155ff4450048fa0fcb6c5d2ea3dcc4a4eb5265",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
@@ -717,7 +717,7 @@
     },
     {
       "path": "web/scripts/json-report-writer.mjs",
-      "sha256": "eb7aa7652e7da7a06061c99b58a0221bbff4d3848f18ead78755147dff413404",
+      "sha256": "42855cff6ea05e56d47bda3ed6e7915dff77a9a78d1ee047ce050ec66490b7aa",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     }
   ]
