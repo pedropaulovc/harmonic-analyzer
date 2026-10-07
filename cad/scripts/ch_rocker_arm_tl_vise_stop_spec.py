@@ -100,7 +100,6 @@ BOND_GAP_MAX = 0.25
 SCREW_HOLE_DIA = 6.60
 
 LINEAR_1PL = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
-LINEAR_2PL = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
 RULE12_WALL_TARGET = 2.0
 # Realistic wander of a 6.6 drill run ~10 D through the full length (author's
 # allowance for rule 12's deep-drilling term).
@@ -129,7 +128,7 @@ if NOSE_HOLE_DIA + DRILLED_BAND[1] <= NOSE_PIN_MAX:
     raise AssertionError("nose pin does not slip into the smallest drilled hole")
 
 # Engagement in the base's back tap at the longest printed grip (rule 12: 1.5 D).
-SCREW_ENGAGEMENT_MIN = SCREW_LENGTH - (OVERALL_LENGTH + LINEAR_2PL)
+SCREW_ENGAGEMENT_MIN = SCREW_LENGTH - (OVERALL_LENGTH + LINEAR_1PL)
 if SCREW_ENGAGEMENT_MIN < 1.5 * SCREW_MAJOR:
     raise AssertionError("M6 screw engages under 1.5 D in the magnetic base")
 
@@ -172,30 +171,41 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ScrewFromRear": 1,
         "ScrewHoleDia": 2,
     },
-    "Block": {"OverallLength": 2},
+    "Block": {"OverallLength": 1},
     "ArmCutProfile": {"ArmHeight": 1, "ArmWidth": 1},
-    "ArmCut": {"FingerFront": 2},
+    "ArmCut": {"FingerFront": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked vise-stop dimension needs authored places")
-# The walls above assume these places; a precision edit re-proves them.
+# The walls and screw engagement above assume one-place sizes; a precision
+# edit re-proves them.
 if any(
-    DRAWING_PRECISION_BY_NAME[name] != 1
-    for name in ("FingerHeight", "FingerLength", "NoseHeight", "NoseFromRear",
-                 "ScrewHeight", "ScrewFromRear", "ArmHeight", "ArmWidth")
+    places != 1
+    for name, places in DRAWING_PRECISION_BY_NAME.items()
+    if name not in ("NoseHoleDia", "ScrewHoleDia")
 ):
     raise AssertionError("vise-stop wall proof assumes one-place positions and sizes")
 
 SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
-        "BOND HARDENED DOWEL PIN NOSE WITH RETAINING COMPOUND, FLUSH WITH BACK FACE.",
-        "MOUNT TO MAGNETIC BASE WITH ONE SOCKET HEAD CAP SCREW THROUGH THE ARM.",
+        "BOND NOSE PIN WITH RETAINING COMPOUND.",
+        "MOUNT TO MAGNETIC BASE WITH ONE SOCKET HEAD CAP SCREW.",
     )
 )
+# The bought nose pin and its seating ride the hole's callout (rule 6: the
+# note carries no numbers); the projection is reference, set by the pin.
+NOSE_PROJECTION = NOSE_PIN_LENGTH - FINGER_THICK
+NOSE_PIN_CALLOUT = "\n".join(
+    (
+        f"NOSE: Ø{NOSE_PIN_DIA:g} x {NOSE_PIN_LENGTH:g} ISO 8734 DOWEL PIN",
+        f"FLUSH AT BACK FACE, ({NOSE_PROJECTION:.1f}) PROUD",
+    )
+)
+SCREW_HOLE_CALLOUT = f"DRILL THRU FOR {SCREW_THREAD} SHCS"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
 
 _PLUS_X = ([1.0, 0.0, 0.0], ("__frame__",))
@@ -207,14 +217,14 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         fields={
             "normal": _PLUS_X,
             "plane": ({"frame": "model", "axis": "x", "value": SEAT_X}, ("SEAT_X", "BASE_DEPTH")),
-            "length": (limits(OVERALL_LENGTH, 2), ("OVERALL_LENGTH",)),
+            "length": (limits(OVERALL_LENGTH, 1), ("OVERALL_LENGTH",)),
             "length_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
             "note": (
                 "clamped to the magnetic base's back face by one M6 SHCS",
                 ("BASE_DEPTH", "SCREW_THREAD"),
             ),
         },
-        precision={"length": 2},
+        precision={"length": 1},
     ),
     "finger_front": ExportFeature(
         kind="face",
@@ -226,10 +236,10 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 {"frame": "model", "axis": "x", "value": FINGER_FRONT_X},
                 ("FINGER_FRONT_X", "NOSE_FACE_X", "NOSE_PIN_LENGTH", "FINGER_THICK"),
             ),
-            "length": (limits(FINGER_FRONT, 2), ("FINGER_FRONT",)),
+            "length": (limits(FINGER_FRONT, 1), ("FINGER_FRONT",)),
             "length_nominal": (FINGER_FRONT, ("FINGER_FRONT",)),
         },
-        precision={"length": 2},
+        precision={"length": 1},
     ),
     "nose_hole": ExportFeature(
         kind="hole",

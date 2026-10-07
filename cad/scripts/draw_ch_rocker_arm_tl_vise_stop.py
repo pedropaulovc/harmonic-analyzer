@@ -44,6 +44,7 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     BOTTOM_Z,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    NOSE_PIN_CALLOUT,
     FINGER_END_Y,
     FINGER_FRONT_X,
     FINGER_TOP_Z,
@@ -52,6 +53,7 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     REAR_Y,
     SCREW_Y,
     SCREW_Z,
+    SCREW_HOLE_CALLOUT,
     SEAT_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -75,7 +77,7 @@ PLAN_CENTER = (ELEVATION_CENTER[0], 0.215)
 SIDE_CENTER = (0.290, ELEVATION_CENTER[1])
 ISO_CENTER = (0.335, 0.220)
 NOTES_XY = (0.020, 0.050)
-ISO_NOTE_XY = (0.375, 0.176)
+ISO_NOTE_XY = (0.300, 0.192)
 # The *Right view turned so model +Z runs up the sheet (and +Y to the right).
 SIDE_VIEW_ANGLE = -math.pi / 2.0
 
@@ -124,9 +126,11 @@ SIDE_KEEP = {
     "ScrewHeight": (_SIDE_RIGHT + 0.012, _side(0.0, (BOTTOM_Z + SCREW_Z) / 2.0)[1]),
     "ArmHeight": (_SIDE_RIGHT + 0.024, _side(0.0, (BOTTOM_Z + ARM_TOP_Z) / 2.0)[1]),
     "NoseHoleDia": (_side(NOSE_Y, 0.0)[0] - 0.004, _SIDE_TOP + 0.016),
-    "ScrewHoleDia": (_SIDE_RIGHT + 0.038, _side(0.0, SCREW_Z)[1] + 0.016),
+    "ScrewHoleDia": (_SIDE_RIGHT + 0.040, _side(0.0, SCREW_Z)[1] + 0.030),
 }
-CALLOUTS_BELOW = {"NoseHoleDia": "DRILL THRU", "ScrewHoleDia": "DRILL THRU"}
+# The bought nose pin reads above its hole's size, the drilling below.
+CALLOUTS_ABOVE = {"NoseHoleDia": NOSE_PIN_CALLOUT}
+CALLOUTS_BELOW = {"NoseHoleDia": "DRILL THRU", "ScrewHoleDia": SCREW_HOLE_CALLOUT}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -197,6 +201,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) and the drilled-hole band are
     # authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     if not auto_center_marks(adapter, side, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the drilled holes")
