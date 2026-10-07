@@ -12,7 +12,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
-    add_view_centerline,
     assert_imported_precision,
     create_section_view,
     finalize_drawing,
@@ -26,8 +25,6 @@ from _drawing_common import (
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
 from _drawing_registry import DRAWINGS_BY_NAME
 from dt_cone_pivot_post_tl_bond_cradle_spec import (
-    BODY_SADDLE_Y,
-    BODY_SEAT_DIA,
     CONE_PIN_NEAR_Y,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -248,15 +245,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # The post axis on the plan, through the body seat's lowest line.
-    add_view_centerline(
-        adapter,
-        plan,
-        face_xy=_sheet(
-            adapter, plan, (0.0, BODY_SADDLE_Y + 5.0, -BODY_SEAT_DIA / 2.0), "plan seat"
-        ),
-        label="post axis",
-    )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
