@@ -26,6 +26,7 @@ import math
 import _hole_spec
 from _printed_tolerance import printed_band_mm
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_tl_profile_fixture_spec as plate
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
 
@@ -77,6 +78,8 @@ SHANK_BAND = (
     0.02,
     -0.02,
 )  # 2.95-2.99: bonded close slip fit in the plate's 3.000-3.010 ream
+if SHANK_DIA + SHANK_BAND[0] >= plate.ROD_PIN_HOLE_DIA + plate.ROD_PIN_HOLE_BAND[1]:
+    raise AssertionError("diamond-pin shank no longer slips into the profile-fixture ream")
 OVERALL_LENGTH = COLLAR_END + 4.8  # shank clears the .X 7.0 hole bottom at every limit
 REAM_DIA = 2.0
 REAM_BAND = (0.010, 0.0)  # the shop's rod reamer, 2.000-2.010
@@ -118,10 +121,9 @@ PIN_INSERTED_MIN = PIN_LENGTH - _GENERAL_1PL - (LAND_HEIGHT + LAND_HEIGHT_BAND[0
 if PIN_INSERTED_MIN < NECK_LENGTH + _GENERAL_1PL + 0.1:
     raise AssertionError("bonded pin can stop short of the thin neck wall")
 # The overall length prints .X; the shank must still clear the bottom of the
-# profile fixture's 7.0-deep pin hole so the collar, not the shank end, seats.
-# Mirrors ch_rocker_arm_tl_profile_fixture_spec.ROD_PIN_HOLE_DEPTH (sibling
-# branch, not importable here); it prints .X, so its shallowest is 6.2.
-_PLATE_HOLE_DEPTH_MIN = 7.0 - _GENERAL_1PL
+# profile fixture's pin hole so the collar, not the shank end, seats. The hole
+# depth prints .X there too.
+_PLATE_HOLE_DEPTH_MIN = plate.ROD_PIN_HOLE_DEPTH - _GENERAL_1PL
 SHANK_LENGTH_LIMITS = [
     round(OVERALL_LENGTH - _GENERAL_1PL - (COLLAR_END + COLLAR_END_BAND[0]), 2),
     round(OVERALL_LENGTH + _GENERAL_1PL - (COLLAR_END + COLLAR_END_BAND[1]), 2),
