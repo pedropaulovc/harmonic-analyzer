@@ -59,9 +59,32 @@ def test_bond_gap_holds_on_every_pin_and_hole_the_bands_allow() -> None:
     assert smallest_hole > spec.NOSE_PIN_MAX
 
 
-def test_walls_and_screw_engagement_meet_rule_12_at_worst_case() -> None:
+def test_walls_meet_rule_12_at_worst_case() -> None:
     assert min(spec.WALLS.values()) >= spec.RULE12_WALL_TARGET
-    assert spec.SCREW_ENGAGEMENT_MIN >= 1.5 * spec.SCREW_MAJOR
+
+
+def test_screw_never_bottoms_in_the_base_tap_and_prints_its_worst_engagement() -> None:
+    """Across the printed grip band the screw tip stops at least one pitch
+    short of the vendor tap's depth, and the sheet never states more full
+    thread than the longest grip leaves."""
+    shortest_grip = spec.SCREW_GRIP - spec.LINEAR_1PL
+    longest_grip = spec.SCREW_GRIP + spec.LINEAR_1PL
+    assert spec.SCREW_LENGTH - shortest_grip <= spec.BASE_TAP_DEPTH - spec.SCREW_PITCH
+    worst = spec.SCREW_LENGTH - longest_grip - spec.SCREW_END_INCOMPLETE + 1e-9
+    assert 0.0 < spec.SCREW_ENGAGEMENT_PRINTED <= worst
+    assert spec.SCREW_ENGAGEMENT_PRINTED_D * spec.SCREW_MAJOR <= worst
+    assert f"ENGAGEMENT {spec.SCREW_ENGAGEMENT_PRINTED:.1f} MIN" in spec.SCREW_HOLE_CALLOUT
+
+
+def test_magnetic_base_sits_behind_the_rear_jaw_below_its_top() -> None:
+    """The base's envelope clears the rear jaw's gripping plane (the blank,
+    risers and parallels lie in front of it), stays under the jaw top and
+    above the bed slideway, and carries the screw on its tap."""
+    (x_lo, x_hi), (y_lo, y_hi), (z_lo, z_hi) = spec.BASE_ENVELOPE
+    assert (x_lo, x_hi) == (spec.SEAT_X, 0.0)
+    assert y_lo > 0.0 and z_hi < 0.0 and z_lo > -spec.JAW_HEIGHT
+    assert (y_lo + y_hi) / 2.0 == spec.SCREW_Y
+    assert (z_lo + z_hi) / 2.0 == spec.SCREW_Z
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:

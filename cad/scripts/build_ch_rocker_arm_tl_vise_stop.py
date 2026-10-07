@@ -1,15 +1,19 @@
 r"""Build the rocker arm's vise blank-end stop (MHA-CH-006-TL-01; shop fixture).
 
-A one-piece 1018 steel L in the inventory's fixture frame
-(``ch_rocker_arm_tl_vise_stop_spec``): an arm screwed to a magnetic base on
-the vise's fixed jaw, and a finger at its far end that carries the bonded
-hardened nose pin against the blank's raw left end.
+A one-piece 6061-T6 aluminium L in the inventory's fixture frame
+(``ch_rocker_arm_tl_vise_stop_spec``): a lug screwed to a Kanetec MB-PM
+magnetic base on the vise's fixed jaw, an arm, and a finger at its far end
+that carries the bonded hardened nose pin against the blank's raw left end.
 
 Layout: the finger's cross-section (with both drilled holes) is a Right-plane
-sketch (sketch x = -Z, y = Y) extruded -X from the seat face (X-30) by the
-overall length, so both holes run the full block. A sketch ON the seat face
-then cuts the waste around the arm back to the finger's front face, so the
-overall length and the finger-front station both measure from the seat face.
+sketch (sketch x = -Z, y = Y) extruded -X from the seat face (X-40) by the
+overall length. A sketch ON the seat face then cuts the waste around the arm
+back to the finger's front face, so the overall length and the finger-front
+station both measure from the seat face. Last, a Top-plane sketch cuts the
+full-width step under the arm from the lug's head-bearing face to the back,
+which leaves the screw hole in the lug alone; the step's length and height
+are dimensioned from the seat face's bottom corner (a construction line on
+the seat face).
 
 Run (SolidWorks already open)::
 
@@ -24,12 +28,14 @@ from typing import Any
 
 from _common import (
     SketchDims,
+    _feature_by_name,
     _display_dimensions,
     _dim_value_mm,
     _early_bound,
-    _feature_by_name,
     _rename_dimensions,
     add_line_chain,
+    anchor_point_to_origin,
+    anchor_point_to_point,
     apply_material,
     check,
     define_rectilinear_chain,
@@ -44,6 +50,7 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
+    set_sketch_direct_db,
     volume_check,
 )
 from _drawing_marks import (
@@ -61,6 +68,7 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     ARM_INNER_Y,
     ARM_TOP_Z,
     ARM_WIDTH,
+    BACK_X,
     BOTTOM_Z,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -70,6 +78,7 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     FINGER_FRONT,
     FINGER_HEIGHT,
     FINGER_LENGTH,
+    FINGER_THICK,
     FINGER_TOP_Z,
     ISOMETRIC_VIEW_NOTE,
     NOSE_FROM_REAR,
@@ -77,9 +86,12 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     NOSE_HOLE_DIA,
     NOSE_Y,
     NOSE_Z,
+    NOTCH_HEIGHT,
+    NOTCH_TOP_Z,
     OVERALL_LENGTH,
     REAR_Y,
     SCREW_FROM_REAR,
+    SCREW_GRIP,
     SCREW_HEIGHT,
     SCREW_HOLE_DIA,
     SCREW_Y,
@@ -88,7 +100,7 @@ from ch_rocker_arm_tl_vise_stop_spec import (
 )
 
 PART_NAME = "ch-rocker-arm-tl-vise-stop"
-MATERIAL = "Plain Carbon Steel"  # AISI 1018 bar
+MATERIAL = "6061 Alloy"  # the registry row names the 6061-T6 bar
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
     "Material Specification",
@@ -103,7 +115,15 @@ _A_SCREW = math.pi * (SCREW_HOLE_DIA / 2.0) ** 2
 V_BLOCK = (FINGER_HEIGHT * FINGER_LENGTH - _A_NOSE - _A_SCREW) * OVERALL_LENGTH
 # The waste around the arm holds the nose hole (Y-32.5 is off the arm).
 V_WASTE = (FINGER_HEIGHT * FINGER_LENGTH - ARM_WIDTH * ARM_HEIGHT - _A_NOSE) * FINGER_FRONT
-V_TOTAL = V_BLOCK - V_WASTE
+V_ARM = V_BLOCK - V_WASTE
+# The step takes the arm's lower strip (with the screw hole) back to the
+# finger, and the finger's lower strip: the screw hole stays in the lug only.
+V_STEP = (ARM_WIDTH * NOTCH_HEIGHT - _A_SCREW) * (FINGER_FRONT - SCREW_GRIP) + (
+    FINGER_LENGTH * NOTCH_HEIGHT - _A_SCREW
+) * FINGER_THICK
+V_TOTAL = V_ARM - V_STEP
+# The step's sketch overshoots the open back and bottom faces by this much.
+_STEP_OVERSHOOT = 2.0
 
 
 def _require_one_solid_body(adapter: Any, *, label: str) -> None:
@@ -184,32 +204,21 @@ async def _hole_circle(
     dims.record(names[2], f'"{names[2]}"')
 
 
-def _open_seat_face_sketch(adapter: Any) -> tuple[Any, bool]:
-    """Open a sketch ON the seat face; return a model (Y, Z) -> sketch map.
+def _active_sketch_map(
+    adapter: Any, active: Any, origin_xyz: tuple[float, float, float], axes: tuple[int, int]
+) -> tuple[Any, bool]:
+    """Map two model axes of the active sketch's plane to sketch (u, v).
 
-    The face's sketch axes are SolidWorks' choice, so the map is read from
+    The plane's sketch axes are SolidWorks' choice, so the map is read from
     ``ModelToSketchTransform`` (the transgear-arm end-face precedent) and
     snapped to its exact axis permutation, so axis-parallel model edges stay
-    exactly axis-parallel in the sketch. Also returns whether the sketch
-    normal points OUT of the seat face (+X).
+    exactly axis-parallel in the sketch. ``axes`` names the in-plane model
+    axes (0 X, 1 Y, 2 Z) in the order ``to_uv`` takes them; also returns
+    whether the sketch normal points along the remaining model axis's +.
     """
     import pythoncom
     from win32com.client import VARIANT
 
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    face = find_planar_face(model, (1.0, 0.0, 0.0), [[SEAT_X, SCREW_Y, BOTTOM_Z + 1.0]])
-    model.ClearSelection2(True)
-    if not _early_bound(face, "IEntity").Select2(False, 0):
-        raise RuntimeError("seat face Select2 failed")
-    adapter.currentSketchManager = model.SketchManager
-    adapter._reset_sketch_entity_registry()
-    model.SketchManager.InsertSketch(True)
-    active = adapter.currentModel.GetActiveSketch2()
-    if active is None:
-        raise RuntimeError("no active sketch on the seat face")
-    adapter.currentSketch = active
-    adapter._sketch_count += 1
-    adapter._last_sketch_name = str(active.Name)
     sketch = _early_bound(active, "ISketch")
     math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     xform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
@@ -223,25 +232,197 @@ def _open_seat_face_sketch(adapter: Any) -> tuple[Any, bool]:
         )
         return tuple(c * 1000.0 for c in mapped.ArrayData)
 
-    origin = to_sketch((SEAT_X, 0.0, 0.0))
+    def step(axis: int) -> tuple[float, float, float]:
+        point = list(origin_xyz)
+        point[axis] += 1.0
+        return (point[0], point[1], point[2])
+
+    normal_axis = ({0, 1, 2} - set(axes)).pop()
+    origin = to_sketch(origin_xyz)
     if abs(origin[2]) > 1e-4:
-        raise RuntimeError(f"seat-face sketch plane is {origin[2]:g} mm off X{SEAT_X:g}")
-    along_y = [b - a for a, b in zip(origin, to_sketch((SEAT_X, 1.0, 0.0)), strict=True)]
-    along_z = [b - a for a, b in zip(origin, to_sketch((SEAT_X, 0.0, 1.0)), strict=True)]
-    out = to_sketch((SEAT_X + 1.0, 0.0, 0.0))[2] - origin[2]
-    for vector, label in ((along_y, "Y"), (along_z, "Z")):
+        raise RuntimeError(f"sketch plane is {origin[2]:g} mm off {origin_xyz}")
+    along = [
+        [b - a for a, b in zip(origin, to_sketch(step(axis)), strict=True)] for axis in axes
+    ]
+    out = to_sketch(step(normal_axis))[2] - origin[2]
+    for vector, axis in zip(along, axes, strict=True):
         if any(abs(abs(c) - round(abs(c))) > 1e-6 for c in vector) or abs(vector[2]) > 1e-6:
-            raise RuntimeError(f"seat-face sketch axes are not a model-axis permutation ({label})")
+            raise RuntimeError(f"sketch axes are not a model-axis permutation ({'XYZ'[axis]})")
     if abs(abs(out) - 1.0) > 1e-6:
-        raise RuntimeError(f"seat-face sketch normal is not along X ({out:g})")
-    uy, vy = round(along_y[0]), round(along_y[1])
-    uz, vz = round(along_z[0]), round(along_z[1])
+        raise RuntimeError(f"sketch normal is not along {'XYZ'[normal_axis]} ({out:g})")
+    ua, va = round(along[0][0]), round(along[0][1])
+    ub, vb = round(along[1][0]), round(along[1][1])
     u0, v0 = round(origin[0], 9), round(origin[1], 9)
 
-    def to_uv(y: float, z: float) -> tuple[float, float]:
-        return (u0 + uy * y + uz * z, v0 + vy * y + vz * z)
+    def to_uv(a: float, b: float) -> tuple[float, float]:
+        return (u0 + ua * a + ub * b, v0 + va * a + vb * b)
 
     return to_uv, out > 0.0
+
+
+def _activate_sketch(adapter: Any, model: Any, label: str) -> Any:
+    """Register the just-inserted sketch with the adapter; return it."""
+    active = adapter.currentModel.GetActiveSketch2()
+    if active is None:
+        raise RuntimeError(f"no active sketch on {label}")
+    adapter.currentSketchManager = model.SketchManager
+    adapter.currentSketch = active
+    adapter._sketch_count += 1
+    adapter._last_sketch_name = str(active.Name)
+    return active
+
+
+def _open_seat_face_sketch(adapter: Any) -> tuple[Any, bool]:
+    """Open a sketch ON the seat face; return a model (Y, Z) -> sketch map
+    and whether the sketch normal points OUT of the seat face (+X)."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    face = find_planar_face(model, (1.0, 0.0, 0.0), [[SEAT_X, SCREW_Y, BOTTOM_Z + 1.0]])
+    model.ClearSelection2(True)
+    if not _early_bound(face, "IEntity").Select2(False, 0):
+        raise RuntimeError("seat face Select2 failed")
+    adapter.currentSketchManager = model.SketchManager
+    adapter._reset_sketch_entity_registry()
+    model.SketchManager.InsertSketch(True)
+    active = _activate_sketch(adapter, model, "the seat face")
+    return _active_sketch_map(adapter, active, (SEAT_X, 0.0, 0.0), (1, 2))
+
+
+def _cut_through_all_both(adapter: Any, sketch_name: str) -> None:
+    """Through-All-Both ``FeatureCut4`` on the named sketch (the 27-param
+    SW 2026 form, falling back to the 26-param one; the
+    build_fr_rocker_arm_support precedent)."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    feature_manager = _early_bound(model.FeatureManager, "IFeatureManager")
+    model.ClearSelection2(True)
+    if not _feature_by_name(adapter, sketch_name).Select2(False, 0):
+        raise RuntimeError(f"cannot select sketch {sketch_name!r}")
+    through = adapter.constants.get("swEndCondThroughAll", 1)
+    args = (
+        False,  # Sd: both directions
+        False,  # Flip side to cut
+        False,  # Dir
+        through,
+        through,
+        0.0,
+        0.0,
+        False,
+        False,
+        False,
+        False,
+        0.0,
+        0.0,
+        False,
+        False,
+        False,
+        False,
+        False,  # NormalCut
+        False,  # UseFeatScope
+        True,  # UseAutoSelect
+        False,
+        False,
+        False,
+        adapter.constants.get("swStartSketchPlane", 0),
+        0.0,
+        False,
+        False,
+    )
+    feature = adapter._attempt(lambda: feature_manager.FeatureCut4(*args), default=None)
+    if not feature:
+        feature = adapter._attempt(lambda: feature_manager.FeatureCut4(*args[:-1]), default=None)
+    model.ClearSelection2(True)
+    if not feature:
+        raise RuntimeError(f"FeatureCut4 through-all-both on {sketch_name} failed")
+
+
+async def _step_cut(adapter: Any) -> list[tuple[str, str]]:
+    """Cut the full-width step under the arm, from the lug's head-bearing
+    face back past the finger; return its drive jobs.
+
+    Top-plane sketch (model X and Z): a construction line on the seat face's
+    edge, anchored to the origin, carries the step's two printed sizes to the
+    rectangle's corner on the lug: its length from the seat face (the screw
+    grip) and its height above the lug's bottom face.
+    """
+    check("create_sketch step", await adapter.create_sketch("Top"))
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = model.GetActiveSketch2()
+    if active is None:
+        raise RuntimeError("no active Top-plane sketch for the step")
+    to_uv, _normal = _active_sketch_map(adapter, active, (0.0, 0.0, 0.0), (0, 2))
+    dims = SketchDims()
+
+    seat_bottom = to_uv(SEAT_X, BOTTOM_Z)
+    seat_top = to_uv(SEAT_X, ARM_TOP_Z)
+    corner_x, corner_z = SEAT_X - SCREW_GRIP, NOTCH_TOP_Z
+    back_x, low_z = BACK_X - _STEP_OVERSHOOT, BOTTOM_Z - _STEP_OVERSHOOT
+    outline_xz = [(corner_x, corner_z), (back_x, corner_z), (back_x, low_z), (corner_x, low_z)]
+    outline = [to_uv(x, z) for x, z in outline_xz]
+    # Direct to the database: no inference snaps the corner onto the finger's
+    # section, which crosses this plane.
+    set_sketch_direct_db(adapter, True)
+    try:
+        seat_line = check(
+            "add_centerline seat edge", await adapter.add_centerline(*seat_bottom, *seat_top)
+        )
+        edges = await add_line_chain(adapter, outline)
+    finally:
+        set_sketch_direct_db(adapter, False)
+    check(
+        "seat edge vertical" if seat_bottom[0] == seat_top[0] else "seat edge horizontal",
+        await adapter.add_sketch_constraint(
+            seat_line, None, "vertical" if seat_bottom[0] == seat_top[0] else "horizontal"
+        ),
+    )
+    await anchor_point_to_origin(adapter, f"{seat_line}.start", *seat_bottom, "seat edge anchor")
+    for value in seat_bottom:
+        if abs(value) > 1e-9:
+            dims.record(None)
+    await dimension_between(
+        adapter,
+        f"{seat_line}.start",
+        f"{seat_line}.end",
+        "vertical_distance" if seat_bottom[0] == seat_top[0] else "horizontal_distance",
+        ARM_HEIGHT,
+        "seat edge length",
+    )
+    dims.record(None)
+
+    for index, edge in enumerate(edges):
+        (u1, v1), (u2, v2) = outline[index], outline[(index + 1) % 4]
+        relation = "horizontal" if v1 == v2 else "vertical"
+        if relation == "vertical" and u1 != u2:
+            raise RuntimeError("step outline is not axis-parallel in the sketch")
+        check(f"step {relation} {edge}", await adapter.add_sketch_constraint(edge, None, relation))
+    for index in (0, 1):
+        (u1, v1), (u2, v2) = outline[index], outline[index + 1]
+        kind = "horizontal_distance" if v1 == v2 else "vertical_distance"
+        await dimension_between(
+            adapter,
+            f"{edges[index]}.start",
+            f"{edges[index]}.end",
+            kind,
+            abs(u2 - u1) if v1 == v2 else abs(v2 - v1),
+            f"step side {index}",
+        )
+        dims.record(None)
+    # The corner on the lug, from the seat edge's bottom: the screw grip
+    # along X, then the step height along Z.
+    grip_uv = (outline[0][0] - seat_bottom[0], outline[0][1] - seat_bottom[1])
+    await anchor_point_to_point(
+        adapter, f"{seat_line}.start", f"{edges[0]}.start", *grip_uv, "step corner"
+    )
+    # anchor_point_to_point emits the sketch-horizontal span first.
+    sketch_u_is_model_x = to_uv(1.0, 0.0)[0] != to_uv(0.0, 0.0)[0]
+    names = ("ScrewGrip", "NotchHeight") if sketch_u_is_model_x else ("NotchHeight", "ScrewGrip")
+    for name in names:
+        dims.record(name, f'"{name}"')
+    await ensure_fully_defined(adapter, "step sketch")
+    check("exit_sketch step", await adapter.exit_sketch())
+    name_last_feature(adapter, "NotchProfile")
+    jobs = dims.apply(adapter, "NotchProfile")
+    _cut_through_all_both(adapter, "NotchProfile")
+    name_last_feature(adapter, "NotchCut")
+    return jobs
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -264,6 +445,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ("FingerFront", FINGER_FRONT),
         ("ArmHeight", ARM_HEIGHT),
         ("ArmWidth", ARM_WIDTH),
+        ("ScrewGrip", SCREW_GRIP),
+        ("NotchHeight", NOTCH_HEIGHT),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -315,7 +498,7 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "BlockProfile")
     drive_jobs = block.apply(adapter, "BlockProfile")
 
-    # -X from the seat face (X-30) through the overall length.
+    # -X from the seat face (X-40) through the overall length.
     extrude_at_offset(adapter, OVERALL_LENGTH, -SEAT_X, flip=True)
     name_last_feature(adapter, "Block")
     drive_jobs.append(
@@ -366,6 +549,11 @@ async def build(adapter: Any) -> dict[str, str]:
     drive_jobs.append(
         (name_dimensions(adapter, "ArmCut", ["FingerFront"])[0], '"FingerFront"')
     )
+    await volume_check(adapter, "arm", V_ARM, 0.005 * V_ARM)
+    _require_one_solid_body(adapter, label="arm")
+
+    # --- The step under the arm, from the lug's head face to the back -------
+    drive_jobs += await _step_cut(adapter)
     await volume_check(adapter, "vise stop", V_TOTAL, 0.005 * V_TOTAL)
     _require_one_solid_body(adapter, label="vise stop")
 

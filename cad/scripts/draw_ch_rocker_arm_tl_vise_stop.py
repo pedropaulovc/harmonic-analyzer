@@ -1,14 +1,16 @@
 r"""Create the drawing for the rocker arm's vise blank-end stop (MHA-CH-006-TL-01).
 
-Third-angle at 3:2, the latch-hook-bracket layout for a Z-up part:
+Third-angle at 1:1, the latch-hook-bracket layout for a Z-up part:
 
-* the elevation is ``*Bottom`` (looking +Y, X right, Z up): the arm with the
-  taller finger at its left end; it carries the two axial sizes, both from
-  the seat face (the face clamped to the magnetic base);
+* the elevation is ``*Bottom`` (looking +Y, X right, Z up): the lug at the
+  seat face, the arm over the step and the taller finger at its left end; it
+  carries the axial sizes and the step's height, all from the seat face and
+  the lug's bottom face (the seat face is the one clamped to the magnetic
+  base);
 * the plan above it is ``*Front`` (looking -Z, X right, Y up): the L itself,
   the finger reaching across the blank end;
 * the side view to the elevation's right is ``*Right`` (looking -X onto the
-  seat face) turned a quarter turn so Z runs up: the finger section, the arm
+  seat face) turned a quarter turn so Z runs up: the finger section, the lug
   section and both drilled holes, every size and position from the shared
   rear and bottom faces.
 
@@ -50,7 +52,9 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     FINGER_TOP_Z,
     NOSE_Y,
     NOSE_Z,
+    NOTCH_TOP_Z,
     REAR_Y,
+    SCREW_GRIP,
     SCREW_Y,
     SCREW_Z,
     SCREW_HOLE_CALLOUT,
@@ -66,18 +70,18 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 69 x 59 x 24 L: 3:2 stacks the plan over the elevation above the title
-# block, with the side view and its dimensions to the elevation's right.
-SHEET_SCALE = (3.0, 2.0)
-VIEW_SCALE = (3, 2)
-ISO_SCALE = (1, 1)
+# A 68 x 59 x 36 L: 1:1 stacks the plan over the elevation above the notes,
+# with the side view and its dimensions to the elevation's right.
+SHEET_SCALE = (1.0, 1.0)
+VIEW_SCALE = (1, 1)
+ISO_SCALE = (1, 2)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet metres per model mm
-ELEVATION_CENTER = (0.115, 0.118)
-PLAN_CENTER = (ELEVATION_CENTER[0], 0.215)
-SIDE_CENTER = (0.290, ELEVATION_CENTER[1])
-ISO_CENTER = (0.335, 0.220)
+ELEVATION_CENTER = (0.115, 0.115)
+PLAN_CENTER = (ELEVATION_CENTER[0], 0.210)
+SIDE_CENTER = (0.270, 0.125)
+ISO_CENTER = (0.378, 0.238)
 NOTES_XY = (0.020, 0.050)
-ISO_NOTE_XY = (0.300, 0.192)
+ISO_NOTE_XY = (0.345, 0.208)
 # The *Right view turned so model +Z runs up the sheet (and +Y to the right).
 SIDE_VIEW_ANGLE = -math.pi / 2.0
 
@@ -103,18 +107,23 @@ def _side(y_mm: float, z_mm: float) -> tuple[float, float]:
     )
 
 
+_ELEVATION_LEFT, _ELEVATION_BOTTOM = _elevation(BACK_X, BOTTOM_Z)
 _ELEVATION_TOP = _elevation(0.0, FINGER_TOP_Z)[1]
 _SIDE_LEFT, _SIDE_BOTTOM = _side(FINGER_END_Y, BOTTOM_Z)
 _SIDE_RIGHT, _SIDE_TOP = _side(REAR_Y, FINGER_TOP_Z)
 
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
-# position. Both axial sizes stack above the elevation, from the seat face.
+# position. Both axial sizes stack above the elevation, from the seat face;
+# the step's length (the screw grip) stands below it and its height to its
+# left, both from the lug's seat-bottom corner.
 # On the side view the Y runs stand below (finger, nose) and above (arm,
 # screw) the section, the heights to its left (finger, nose) and right
 # (arm, screw), each hole size beside its own hole.
 ELEVATION_KEEP = {
     "FingerFront": (_elevation((SEAT_X + FINGER_FRONT_X) / 2.0, 0.0)[0], _ELEVATION_TOP + 0.010),
     "OverallLength": (_elevation(_XC, 0.0)[0], _ELEVATION_TOP + 0.022),
+    "ScrewGrip": (_elevation(SEAT_X - SCREW_GRIP / 2.0, 0.0)[0], _ELEVATION_BOTTOM - 0.010),
+    "NotchHeight": (_ELEVATION_LEFT - 0.012, _elevation(0.0, (BOTTOM_Z + NOTCH_TOP_Z) / 2.0)[1]),
 }
 SIDE_KEEP = {
     "FingerLength": (SIDE_CENTER[0], _SIDE_BOTTOM - 0.012),
@@ -126,7 +135,7 @@ SIDE_KEEP = {
     "ScrewHeight": (_SIDE_RIGHT + 0.012, _side(0.0, (BOTTOM_Z + SCREW_Z) / 2.0)[1]),
     "ArmHeight": (_SIDE_RIGHT + 0.024, _side(0.0, (BOTTOM_Z + ARM_TOP_Z) / 2.0)[1]),
     "NoseHoleDia": (_side(NOSE_Y, 0.0)[0] - 0.011, _SIDE_TOP + 0.034),
-    "ScrewHoleDia": (_SIDE_RIGHT + 0.040, _side(0.0, SCREW_Z)[1] + 0.030),
+    "ScrewHoleDia": (_SIDE_RIGHT + 0.056, _SIDE_TOP + 0.030),
 }
 # The drilling and the bought nose pin it takes read under the hole's size,
 # standing high enough above the section for the three callout lines.
@@ -162,7 +171,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Vise Blank-End Stop Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker arm vise blank-end stop; milled steel L; MHA-CH-006-TL-01",
+            3: "rocker arm vise blank-end stop; milled aluminium L; MHA-CH-006-TL-01",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
