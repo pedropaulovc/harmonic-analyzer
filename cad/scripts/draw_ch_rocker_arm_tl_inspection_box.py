@@ -63,7 +63,7 @@ LEFT_KEEP = {
     "WinUpBase": (0.020, 0.160),
 }
 FRONT_KEEP = {
-    "TapY": (0.126, 0.140),
+    "TapY": (0.128, 0.152),
     "TapLeftX": (0.150, 0.118),
     "TapRightX": (0.165, 0.106),
 }
@@ -75,8 +75,8 @@ BACK_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "WinLowW": "2X",
-    "WinLowH": "2X WINDOWS THRU LEFT WALL",
-    "WinLowFront": "2X",
+    "WinLowH": "2X",
+    "WinLowFront": "2X WINDOWS THRU LEFT WALL",
     "BackW": "WINDOW THRU BACK WALL",
     "TapLeftX": "TAPS IN FRONT FACE",
 }
@@ -191,7 +191,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=TAP_CALLOUT_XY,
         label="C stop bar #8-32 taps",
         edge=_tap_edge(adapter, front),
-        process="DRILL",
+        process="#29 DRILL, THEN TAP",
     )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.088)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
