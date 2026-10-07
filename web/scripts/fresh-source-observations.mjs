@@ -72,7 +72,7 @@ export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
   }
   // These are renderer-created bodies sharing one decoded native template, not
   // invented released inventory/REST rows. Execute the sole creation ledger.
-  const runtimeInstances = await withCurrentRuntime(webRoot, async server => {
+  const { runtimeInstances, videos } = await withCurrentRuntime(webRoot, async server => {
     const { NATIVE_RUNTIME_INSTANCES } = await server.ssrLoadModule('/src/source-assembly.ts')
     assert(NATIVE_RUNTIME_INSTANCES && equal(Object.keys(NATIVE_RUNTIME_INSTANCES).sort(), ['crankMedium', 'upperMedium']),
       'Current runtime instance creation ledger must declare exactly its two genuine roles')
@@ -87,13 +87,19 @@ export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
       templates.add(row.templatePartPath)
     }
     assert(templates.size === 1, 'Current runtime instances must share the one genuine released template')
-    return instances
+    // The executed catalog is a separate original-source oracle, not supplied by the annotation.
+    const { VIDEOS } = await server.ssrLoadModule('/src/video-catalog.ts')
+    assert(Array.isArray(VIDEOS), 'Original-source catalog is missing its exported video census')
+    const videos = new Map()
+    for (const video of VIDEOS) {
+      assert(video && VIDEO_IDS.includes(video.id) && !videos.has(video.id)
+        && finite(video.durationSeconds) && video.durationSeconds > 0 && hash(video.sourceSha256),
+      'Original-source catalog has an invalid or duplicate source tuple')
+      videos.set(video.id, { durationSeconds: video.durationSeconds, sha256: video.sourceSha256 })
+    }
+    assert(videos.size === VIDEO_IDS.length && VIDEO_IDS.every(id => videos.has(id)), 'Original-source catalog census differs')
+    return { runtimeInstances: instances, videos }
   })
-  // The catalog is a separate original-source oracle, not supplied by the annotation.
-  const catalog = await readFile(resolve(webRoot, 'src/video-catalog.ts'), 'utf8')
-  const videos = new Map([...catalog.matchAll(/id: '([^']+)'[^\n]*durationSeconds: ([0-9.]+), sourceSha256: '([a-f0-9]{64})'/g)]
-    .map(match => [match[1], { durationSeconds: Number(match[2]), sha256: match[3] }]))
-  assert(videos.size === VIDEO_IDS.length && VIDEO_IDS.every(id => videos.has(id)), 'Original-source catalog census differs')
   return { approved, inventory, inventorySha256: seal.sha256, paths, runtimeInstances, videos }
 }
 
@@ -376,12 +382,12 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
   const anchors = validateCurrentAnchors(data, authority)
   const shots = new Map(); let end = 0
   for (const shot of data.shots) {
-    assert(text(shot.id) && !shots.has(shot.id) && finite(shot.startSeconds) && Math.abs(shot.startSeconds - end) <= 1e-6
+    assert(text(shot.id) && !shots.has(shot.id) && finite(shot.startSeconds) && shot.startSeconds === end
       && finite(shot.endSeconds) && shot.endSeconds > shot.startSeconds && CLASSIFICATIONS.includes(shot.classification)
       && text(shot.reason) && (shot.hasCorrespondingMachine === undefined || typeof shot.hasCorrespondingMachine === 'boolean'), 'Current source shots must form a complete ordered half-open census')
     shots.set(shot.id, shot); end = shot.endSeconds
   }
-  assert(Math.abs(end - source.durationSeconds) <= 1e-6, 'Current source shot census does not reach source end')
+  assert(end === source.durationSeconds, 'Current source shot census does not reach source end')
   const coverage = data.coverage
   assert(['complete', 'blocked'].includes(coverage?.status) && Array.isArray(coverage.blockers)
     && coverage.requiredEveryIntegerSecond === true

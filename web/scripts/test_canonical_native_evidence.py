@@ -61,9 +61,10 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertNotEqual(evidence.digest(lf), evidence.digest(crlf))
 
     def test_current_inventory_authority_keeps_its_exact_byte_seal_across_text_eol_changes(self):
-        inventory_path = 'web/content/v39-source/native-inventory.json'
-        expected_sha = 'd1a26ddf98c4671b0f14b8d4a4b163a844e06e8eb27c825739ed7f2f36242476'
-        actual = (Path(__file__).resolve().parents[2] / inventory_path).read_bytes()
+        source = Path(__file__).resolve().parents[2]
+        registration = json.loads((source / evidence.MANIFEST).read_bytes())['currentSourceInventory']
+        inventory_path, expected_sha = registration['path'], registration['sha256']
+        actual = (source / inventory_path).read_bytes()
         self.assertEqual(evidence.digest(actual), expected_sha)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -77,7 +78,7 @@ class NativeEvidenceTests(unittest.TestCase):
             with patch.object(evidence, 'ROOT', root):
                 evidence.validate_current_inventory_registration(manifest)
                 path.write_bytes(actual.replace(b'\n', b'\r\n'))
-                with self.assertRaises(ValueError):
+                with self.assertRaisesRegex(ValueError, 'exact current source inventory bytes'):
                     evidence.validate_current_inventory_registration(manifest)
                 self.assertEqual(manifest['currentSourceInventory']['sha256'], expected_sha)
 
