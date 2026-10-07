@@ -153,13 +153,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "TailSeatReference": {"TailSeatAxisX", "TailSeatAxisHeight"},
 }
-# One place for the plates and blocks and the crank pins' transverse spots:
-# nothing locates on them closer than the .X band. The body seat prints at
-# the post body's own places (MainBodyDia) and the crank pin station at the
-# crank axis's (CrankAxisY). The seat axes, the tail seat, the cone pins'
-# stations and side offset and the pin heights take two: the pins set each
-# sleeve against the post lying in the seats, so seat axis and pin top share
-# one band.
+# One place for the plates and blocks, the crank pins' transverse spots and
+# the seats' centring across the base: nothing locates on them closer than
+# the .X band. The body seat prints at the post body's own places
+# (MainBodyDia) and the crank pin station at the crank axis's (CrankAxisY).
+# The seat axis heights, the tail seat, the cone pins' stations and side
+# offset and the pin heights take two: the pins set each sleeve against the
+# post lying in the seats, so seat axis height and pin top share one band.
+# The pin diameter names the stock dowel; the press fit is the reamed hole's
+# job (DRAWING_NOTES), not a printed limit.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BaseProfile": {"BaseThick": 1, "BaseLength": 1},
     "Base": {"BaseWidth": 1},
@@ -190,13 +192,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "CrankPinEastX": 1,
     },
     "ConePinSectionReference": {
-        "BodySeatAxisX": 2,
+        "BodySeatAxisX": 1,
         "BodySeatAxisHeight": 2,
         "ConePinEntryX": 2,
         "ConePinTilt": 2,
         "ConePinHighEdge": 2,
     },
-    "TailSeatReference": {"TailSeatAxisX": 2, "TailSeatAxisHeight": 2},
+    "TailSeatReference": {"TailSeatAxisX": 1, "TailSeatAxisHeight": 2},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
@@ -215,7 +217,8 @@ BUILT_UP_PERMISSION_NOTE = "BASE, STOP AND SADDLES MAY BE SCREWED AND DOWELED BL
 DRAWING_NOTES = "\n".join(
     (
         BUILT_UP_PERMISSION_NOTE,
-        "PINS: HARDENED DOWELS PRESSED INTO REAMED THROUGH HOLES; PIN ENDS STAY INSIDE THE BASE.",
+        "PINS ARE STOCK HARDENED DOWELS; PIN ENDS STAY INSIDE THE BASE.",
+        "REAM PIN HOLES THRU FOR A PRESS FIT; A PRESSED PIN MUST NOT TURN.",
         "PIN HEIGHTS FROM THE BASE TOP; CONE PINS AT THE HIGH EDGE.",
     )
 )

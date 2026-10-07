@@ -73,10 +73,12 @@ PLAN_KEEP = {
     "StopWidth": (0.0, -30.0, 0.0),
     "StopSideX": (-28.0, -21.0, 0.0),
     "SaddleSideX": (-35.0, 5.0, 0.0),
+    # The saddle width, crank pin spots and base width stack as baselines off
+    # the west edge, outside the base's right end.
     "SaddleWidth": (0.0, 128.0, 0.0),
-    "BaseWidth": (0.0, 137.0, 0.0),
-    "CrankPinWestX": (-23.0, 82.0, 0.0),
-    "CrankPinEastX": (-17.0, 90.0, 0.0),
+    "CrankPinWestX": (-23.0, 136.0, 0.0),
+    "CrankPinEastX": (-17.0, 144.0, 0.0),
+    "BaseWidth": (0.0, 152.0, 0.0),
     "ConePinNearY": (-48.0, 14.0, 0.0),
     "ConePinFarY": (-56.0, 19.0, 0.0),
     "CrankPinY": (-64.0, 36.0, 0.0),
@@ -102,7 +104,9 @@ SECTION_A_KEEP = {
     "BodySeatDia": (10.0, CONE_PIN_NEAR_Y, 25.0),
     "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
-    "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, -50.0),
+    # Above the base, between the seat-axis 40.0 and the tilt, clear of the
+    # section caption under the view.
+    "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, 4.0),
     # On the bisector of the gauge line and the pin axis, so the angle reads
     # the acute tilt.
     "ConePinTilt": (-4.2, CONE_PIN_NEAR_Y, -8.0),
@@ -114,7 +118,7 @@ SECTION_B_KEEP = {
     "TailSeatAxisHeight": (-48.0, TAIL_SECTION_Y, -12.0),
 }
 DIMENSION_CALLOUTS = {
-    "CrankPinDia": "4X DOWEL, REAM THRU",
+    "CrankPinDia": "4X DOWEL",
     "SaddleWidth": "2X",
     "SaddleSideX": "2X",
     "ConePinEntryX": "2X",
