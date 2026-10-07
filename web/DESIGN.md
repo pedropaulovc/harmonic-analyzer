@@ -19,9 +19,12 @@ Current authored observations live at
 live at `content/<videoId>.source-track.json`. The approved target is CAD v39,
 raw SHA-256 `60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c`,
 source commit `81539e53f5146c06a77541415bd79da673806d96`.
-The six-video migration preserves source PTS, pixel measurements, source hashes,
-uncertainties and landmarks. Native identities, world coordinates, cameras and
-physical constraints must be recomputed for the target geometry. Inherited
+The original six corpora remain archived and hash-sealed, including measurements
+not represented in current v39 records. Those records reuse a subset; migration
+preserves that subset's source PTS, pixels, hashes, uncertainties and landmarks.
+Further reuse requires exact exposure identity and a semantic current-feature
+association, not just an unchanged anchor ID. Native identities, world coordinates,
+cameras and physical constraints must be recomputed for the target geometry. Inherited
 camera and mechanism seeds remain chosen/unobserved, including feasible hidden
 settings. Old projection/GPU evidence, identity-translated packets under
 `content/canonical-native/` and byte-exact originals from `bfde892a5` are
@@ -41,8 +44,11 @@ evidence to current qualification. Operation/Rocker supports independent
 `--video jfH-NbsmvD4` or `--video 4mBuyixt22U`; the default prevalidates both
 videos before publishing either.
 
-Half-open cut routing may move an execution timestamp by one ULP without changing
-authored source numbers. The strict same-shot 0.5-second source-exposure
+Half-open cut routing may admit a derived execution key one ULP from a cut only
+when an actual source-owned exposure, shot, classification and views match.
+Actual decoded PTS and exact authored requested clocks retain strict ownership;
+neither is rounded into another shot. Authored source numbers remain unchanged.
+The strict same-shot 0.5-second source-exposure
 requirement is unchanged. Nine actual independently decoded frames supply
 missing Operation fade exposures; existing samples and landmarks are preserved.
 Their measured source facts do not make inherited pose guesses observed.

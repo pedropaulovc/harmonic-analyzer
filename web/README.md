@@ -51,9 +51,14 @@ representation and provenance contract.
 The current imported model is the approved **v39** release: raw SHA-256
 `60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c`,
 source commit `81539e53f5146c06a77541415bd79da673806d96`.
-The six-video migration preserves original source measurements and rebuilds
-release-specific tracks from `content/v39-source/`. Old model-bound tracks
-remain incompatible; approximate current tracks do not establish source fidelity.
+The original six source corpora remain archived and hash-sealed. Current v39
+records reuse a subset of their measurements, not every historical landmark row.
+Migrating those current records preserves their source pixels, PTS, hashes and
+uncertainties while rebuilding release-specific tracks from `content/v39-source/`.
+Further reuse requires exact exposure provenance and the same physical feature
+under a current native association; an unchanged anchor ID alone is insufficient.
+Old model-bound tracks remain incompatible, and approximate current tracks do
+not establish source fidelity.
 Current stages 50/20/10/5 are unmeasured.
 
 Playback can start while the model or source track loads. Source-following starts
@@ -245,7 +250,9 @@ not established.
 
 Historical projection and GPU evidence described below belongs to the earlier
 model. Its measured results and chosen settings do not qualify the v39 scene;
-source-only measurements remain authoritative during the incremental migration.
+source-only measurements remain archival evidence. Promotion into a current
+record additionally requires exact exposure and current-feature correspondence;
+archival completeness does not imply every measurement is reused in v39.
 
 Source-following tracks combine source cameras with complete feasible physical
 inputs. Hidden settings may be chosen and are labelled unobserved, not recovered

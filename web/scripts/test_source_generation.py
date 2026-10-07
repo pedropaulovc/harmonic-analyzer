@@ -11,6 +11,7 @@ import re
 import os
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -348,6 +349,195 @@ class FreshCurrentGenerationTests(unittest.TestCase):
                 self.assertEqual(first_detail['views'][0]['cameraMeasurement']['sourceImage'], first_detail['sourceImage'])
                 self.assertEqual(published['stages'], {str(stage): {'status': 'unmeasured'} for stage in (50, 20, 10, 5)})
 
+    def test_compiled_anchor_motion_extends_only_the_closed_capture_contract(self):
+        video_id = 'NAsM30MAHLg'
+        with current_source_fixture('generate-intro-source-track.py', [video_id]) as (root, module, data, _):
+            # The native association is minimal; retain the real catalog duration
+            # and complete feasible exposure census required by the producer.
+            track = module.Generator(video_id, data=data[video_id]).build()
+            program = r"""
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const { root, track } = JSON.parse(readFileSync(0, 'utf8'));
+const fresh = await import(root + '/scripts/fresh-source-observations.mjs');
+const observations = await fresh.loadCurrentObservations(root, track.source.videoId);
+await fresh.validateCurrentTrackAssociation(track, observations, root);
+for (const motion of ['fixed', 'moving', null, undefined]) {
+  const candidate = structuredClone(track);
+  if (motion === undefined) delete candidate.anchors[0].motion;
+  else candidate.anchors[0].motion = motion;
+  await fresh.validateCurrentTrackAssociation(candidate, observations, root);
+}
+for (const motion of ['frozen', false, 0, {}, []]) {
+  const candidate = structuredClone(track);
+  candidate.anchors[0].motion = motion;
+  await assert.rejects(fresh.validateCurrentTrackAssociation(candidate, observations, root),
+    /invalid playback motion/);
+}
+for (const change of [
+  { untrustedExtension: true }, { partLocalMetres: null },
+  { worldMetres: [0, 0, 0] }, { correspondenceEvidence: '' },
+]) {
+  const candidate = structuredClone(track);
+  Object.assign(candidate.anchors[0], change);
+  await assert.rejects(fresh.validateCurrentTrackAssociation(candidate, observations, root),
+    /closed actual native feature association/);
+}
+for (const change of [
+  { partPath: null }, { partPath: 'ha-harmonic-analyzer/fr-frame/unknown-native-1' },
+  { runtimeTemplatePartPath: observations.anchors[0].partPath },
+]) {
+  const candidate = structuredClone(track);
+  Object.assign(candidate.anchors[0], change);
+  await assert.rejects(fresh.validateCurrentTrackAssociation(candidate, observations, root),
+    /unknown runtime instance\/alias or mislabels/);
+}
+for (const change of [{ motion: 'fixed' }, { untrustedExtension: true }, { partLocalMetres: null }]) {
+  const capture = structuredClone(observations);
+  Object.assign(capture.anchors[0], change);
+  await assert.rejects(fresh.validateCurrentObservations(capture, { webRoot: root }),
+    /closed actual native feature association/);
+}
+"""
+            result = subprocess.run(
+                ['node', '--input-type=module', '--eval', program],
+                input=json.dumps({'root': str(root / 'web'), 'track': track}),
+                capture_output=True, text=True, cwd=root, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_readback_routes_only_adjacent_cut_clocks_to_the_incoming_shot(self):
+        video_id = 'NAsM30MAHLg'
+        with current_source_fixture('generate-intro-source-track.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            cut = record['shots'][1]['startSeconds']
+            before = math.nextafter(cut, -math.inf)
+            after = math.nextafter(cut, math.inf)
+            two_before = math.nextafter(before, -math.inf)
+            incoming = next(frame for frame in record['frames'] if frame['timeSeconds'] == cut)
+            program = r"""
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const { root, track, cut, before, after, twoBefore } = JSON.parse(readFileSync(0, 'utf8'));
+const fresh = await import(root + '/scripts/fresh-source-observations.mjs');
+const observations = await fresh.loadCurrentObservations(root, track.source.videoId);
+const index = track.frames.findIndex(frame => frame.timeSeconds === cut);
+await fresh.validateCurrentTrackAssociation(track, observations, root);
+for (const time of [before, cut, after]) {
+  const candidate = structuredClone(track);
+  candidate.frames[index].timeSeconds = time;
+  await fresh.validateCurrentTrackAssociation(candidate, observations, root);
+  assert.equal(candidate.frames[index].timeSeconds, time);
+  assert.equal(candidate.frames[index].decodedTimeSeconds, track.frames[index].decodedTimeSeconds);
+}
+for (const time of [twoBefore, cut - 0.125]) {
+  const candidate = structuredClone(track);
+  candidate.frames[index].timeSeconds = time;
+  await assert.rejects(fresh.validateCurrentTrackAssociation(candidate, observations, root),
+    /stale requested\/decoded source clock or classification/);
+}
+for (const time of [twoBefore, cut - 0.125]) {
+  const candidate = structuredClone(track);
+  candidate.frames[index].decodedTimeSeconds = time;
+  await assert.rejects(fresh.validateCurrentTrackAssociation(candidate, observations, root),
+    /stale requested\/decoded source clock or classification/);
+}
+const outgoing = structuredClone(track);
+outgoing.frames[index].timeSeconds = before;
+outgoing.frames[index].shotId = observations.shots[0].id;
+await assert.rejects(fresh.validateCurrentTrackAssociation(outgoing, observations, root),
+  /stale requested\/decoded source clock or classification/);
+// Authored exposures retain strict ownership: the exact predecessor of an
+// outgoing end is still valid capture evidence, not a compiled execution key.
+const outgoingCapture = structuredClone(observations);
+outgoingCapture.frames.find(frame => frame.timeSeconds === 1).decodedTimeSeconds = before;
+await fresh.validateCurrentObservations(outgoingCapture, { webRoot: root });
+const capture = structuredClone(observations);
+capture.frames.find(frame => frame.timeSeconds === cut).decodedTimeSeconds = twoBefore;
+await assert.rejects(fresh.validateCurrentObservations(capture, { webRoot: root }),
+  /current requested\/decoded clock or shot classification differs/);
+"""
+            for decoded in (cut, after):
+                with self.subTest(decoded=decoded):
+                    incoming['decodedTimeSeconds'] = decoded
+                    write_current_record(root / 'web', video_id, record)
+                    track = module.Generator(video_id, data=record).build()
+                    result = subprocess.run(
+                        ['node', '--input-type=module', '--eval', program],
+                        input=json.dumps({'root': str(root / 'web'), 'track': track,
+                                          'cut': cut, 'before': before, 'after': after,
+                                          'twoBefore': two_before}),
+                        capture_output=True, text=True, cwd=root, check=False)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_actual_analysis_and_rocker_cut_packets_preserve_source_ownership(self):
+        cases = (
+            ('generate-analysis-synthesis-source-tracks.py', '6dW6VYXp9HM', 'Generator', 'analysis-37'),
+            ('compact-operation-rocker.py', '4mBuyixt22U', 'rocker', 'overlay-2'),
+        )
+        program = r"""
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const { root, track, time, shotId, incomingId, twoBefore, precut } = JSON.parse(readFileSync(0, 'utf8'));
+const fresh = await import(root + '/scripts/fresh-source-observations.mjs');
+const observations = await fresh.loadCurrentObservations(root, track.source.videoId);
+const frame = track.frames.find(frame => frame.timeSeconds === time);
+assert.equal(frame.shotId, shotId);
+await fresh.validateCurrentTrackAssociation(track, observations, root);
+assert.equal(frame.timeSeconds, time);
+if (incomingId) {
+  // The genuine authored outgoing predecessor is not an incoming alias.
+  const borrowed = structuredClone(track);
+  borrowed.frames.find(frame => frame.timeSeconds === time).shotId = incomingId;
+  await assert.rejects(fresh.validateCurrentTrackAssociation(borrowed, observations, root),
+    /stale requested\/decoded source clock or classification/);
+} else {
+  const shot = observations.shots.find(shot => shot.id === shotId);
+  assert.ok(frame.decodedTimeSeconds >= shot.startSeconds && frame.decodedTimeSeconds < shot.endSeconds);
+  const gap = structuredClone(track);
+  gap.frames.find(frame => frame.timeSeconds === time).timeSeconds = twoBefore;
+  await assert.rejects(fresh.validateCurrentTrackAssociation(gap, observations, root),
+    /stale requested\/decoded source clock or classification/);
+  const borrowed = structuredClone(track);
+  const target = borrowed.frames.find(frame => frame.timeSeconds === time);
+  Object.assign(target, { decodedTimeSeconds: precut.decodedTimeSeconds,
+    sourceImage: precut.sourceImage, views: precut.views, landmarks: precut.landmarks });
+  await assert.rejects(fresh.validateCurrentTrackAssociation(borrowed, observations, root),
+    /stale requested\/decoded source clock or classification/);
+}
+"""
+        for filename, video_id, entrypoint, shot_id in cases:
+            with self.subTest(video=video_id), current_source_fixture(filename, [video_id]) as (root, module, _, _):
+                # Keep the original authored gzip bytes and authority tuple exact.
+                relative = f'content/v39-source/{video_id}.observations.json.gz'
+                original = (HERE.parent / relative).read_bytes()
+                (root / 'web' / relative).write_bytes(original)
+                record = json.loads(gzip.decompress(original))
+                track = ordinary_build(module, video_id, entrypoint, record)
+                shot = next(shot for shot in record['shots'] if shot['id'] == shot_id)
+                incoming_id, two_before, precut = None, None, None
+                if video_id == '6dW6VYXp9HM':
+                    time = math.nextafter(shot['endSeconds'], -math.inf)
+                    frame = next(frame for frame in record['frames']
+                                 if frame['timeSeconds'] == time and frame['shotId'] == shot_id)
+                    if not any(row['timeSeconds'] == time for row in track['frames']):
+                        track['frames'].append(copy.deepcopy(frame))
+                        track['frames'].sort(key=lambda row: row['timeSeconds'])
+                    incoming_id = next(row['id'] for row in record['shots']
+                                       if row['startSeconds'] == shot['endSeconds'])
+                else:
+                    time = math.nextafter(shot['startSeconds'], -math.inf)
+                    two_before = math.nextafter(time, -math.inf)
+                    precut = max((frame for frame in record['frames']
+                                  if frame['decodedTimeSeconds'] < shot['startSeconds']),
+                                 key=lambda frame: frame['decodedTimeSeconds'])
+                result = subprocess.run(
+                    ['node', '--input-type=module', '--eval', program],
+                    input=json.dumps({'root': str(root / 'web'), 'track': track,
+                                      'time': time, 'shotId': shot_id, 'incomingId': incoming_id,
+                                      'twoBefore': two_before, 'precut': precut}),
+                    capture_output=True, text=True, cwd=root, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_missing_fresh_record_and_old_headers_never_read_old_calibration(self):
         for filename, video_id, entrypoint in CURRENT_PRODUCERS:
             for mutation in ('missing', 'archive-kind', 'old-model'):
@@ -459,15 +649,44 @@ class FreshCurrentGenerationTests(unittest.TestCase):
             with self.assertRaises(gzip.BadGzipFile):
                 module.common.prepare_track(resealed)
 
-    def test_publication_metadata_cannot_drop_the_executed_assembler_seal(self):
+    def test_publication_cannot_omit_changed_missing_or_unsealed_actual_inputs(self):
         video_id = 'NAsM30MAHLg'
         with current_source_fixture('generate-intro-source-track.py', [video_id]) as (root, module, data, _):
             track = module.Generator(video_id, data=data[video_id]).build()
-            track['sourceRecord']['executedInputs'].remove('web/scripts/fresh-source-tracks.py')
-            path = root / 'web/scripts/fresh-source-tracks.py'
-            path.write_bytes(path.read_bytes() + b'\n')
-            with self.assertRaises(ValueError):
-                module.common.prepare_track(track)
+            module.common.write_track(track)
+            output = root / f'web/content/{video_id}.source-track.json'
+            published = output.read_bytes()
+            inputs = set(track['sourceRecord']['executedInputs']) | set(CURRENT_BASE_PATHS)
+            inputs.add(track['sourceRecord']['producerPath'])
+            # The identity-map payload has its own canonical exact-byte identity,
+            # not a CRLF-normalized executed-code seal.
+            inputs.discard('cad/config/identity-migration-map.json')
+            manifest_path = root / 'web/content/canonical-native/manifest.json'
+            manifest_bytes = manifest_path.read_bytes()
+            for relative in sorted(inputs):
+                path = root / relative
+                original = path.read_bytes()
+                candidate = copy.deepcopy(track)
+                candidate['sourceRecord']['executedInputs'] = [
+                    name for name in candidate['sourceRecord']['executedInputs'] if name != relative]
+                for mutation in ('changed', 'missing', 'unsealed'):
+                    with self.subTest(path=relative, mutation=mutation):
+                        try:
+                            if mutation == 'changed':
+                                path.write_bytes(original + b'\n')
+                            elif mutation == 'missing':
+                                path.unlink()
+                            else:
+                                manifest = json.loads(manifest_bytes)
+                                manifest['canonicalConsumerInputs'] = [
+                                    row for row in manifest['canonicalConsumerInputs'] if row['path'] != relative]
+                                manifest_path.write_text(json.dumps(manifest))
+                            with self.assertRaises(ValueError):
+                                module.common.write_track(candidate)
+                            self.assertEqual(output.read_bytes(), published)
+                        finally:
+                            path.write_bytes(original)
+                            manifest_path.write_bytes(manifest_bytes)
 
     def test_complete_unsolved_input_and_conflicting_exact_exposure_layout_refuse(self):
         video_id = 'XPQwKRt4Y2k'
@@ -859,22 +1078,21 @@ class HalfOpenCutSelectionTests(unittest.TestCase):
             'frames': [
                 frame('outgoing', 0, 0, 0),
                 frame('outgoing', cut - 0.125, cut - 0.125, 1),
-                # A mislabeled ending-shot exposure at the cut must be excluded,
-                # even when its PTS is the adjacent float below the boundary.
+                # A genuinely incoming decoded exposure cannot be relabeled as
+                # outgoing just because its authored request precedes the cut.
                 frame('outgoing', cut - 0.01, decoded, 2),
                 frame('incoming', cut + 0.01, decoded, 3),
                 frame('incoming', cut + 1, cut + 1, 4)],
         }
 
-    def test_adjacent_float_cut_requests_and_pts_use_incoming_shot_without_mutation(self):
+    def test_adjacent_derived_requests_use_only_strict_incoming_exposures(self):
         cuts = (96.721625, 193.568375, 338.8385, 532.532,
                 628.628, 773.898125, 967.591625)
         for cut in cuts:
             for request_direction in (-math.inf, math.inf):
-                for pts_direction in (-math.inf, math.inf):
-                    with self.subTest(cut=cut, request=request_direction, pts=pts_direction):
+                for decoded in (cut, math.nextafter(cut, math.inf)):
+                    with self.subTest(cut=cut, request=request_direction, pts=decoded):
                         requested = math.nextafter(cut, request_direction)
-                        decoded = math.nextafter(cut, pts_direction)
                         data = self.fixture(cut, requested, decoded)
                         original = copy.deepcopy(data)
                         rows = {row['timeSeconds']: row for row in common.selected_frames(data)}
@@ -897,6 +1115,35 @@ class HalfOpenCutSelectionTests(unittest.TestCase):
                         self.assertEqual(data['samplingDiagnostics']['excludedCrossCutObservations'],
                                          [{'shotId': 'outgoing', 'timeSeconds': cut - 0.01,
                                            'decodedTimeSeconds': decoded}])
+
+    def test_exact_authored_predecessor_keeps_its_outgoing_exposure(self):
+        cut = 4.25
+        before = math.nextafter(cut, -math.inf)
+        data = self.fixture(cut, before, cut)
+        data['frames'][1]['timeSeconds'] = before
+        data['frames'][1]['decodedTimeSeconds'] = before
+        original = copy.deepcopy(data)
+        rows = {row['timeSeconds']: row for row in common.selected_frames(data)}
+        self.assertEqual(rows[before], original['frames'][1])
+        self.assertEqual(rows[cut]['shotId'], 'incoming')
+        self.assertEqual(rows[cut]['decodedTimeSeconds'], cut)
+        self.assertEqual(data['frames'], original['frames'])
+        self.assertEqual(data['shots'], original['shots'])
+
+    def test_pre_cut_native_pts_cannot_supply_a_derived_incoming_request(self):
+        cut = 4.25
+        before = math.nextafter(cut, -math.inf)
+        data = self.fixture(cut, before, before)
+        rows = {row['timeSeconds']: row for row in common.selected_frames(data)}
+        for time in (cut, before):
+            self.assertEqual(rows[time]['shotId'], 'incoming')
+            self.assertTrue(rows[time]['sourceSampleUnavailable'])
+            self.assertIsNone(rows[time]['decodedTimeSeconds'])
+        self.assertEqual(rows[cut - 0.01]['shotId'], 'outgoing')
+        self.assertEqual(rows[cut - 0.01]['decodedTimeSeconds'], before)
+        self.assertEqual(data['samplingDiagnostics']['excludedCrossCutObservations'],
+                         [{'shotId': 'incoming', 'timeSeconds': cut + 0.01,
+                           'decodedTimeSeconds': before}])
 
     def test_two_float_steps_before_cut_remains_an_outgoing_exposure(self):
         cut = 4.25

@@ -26,6 +26,8 @@ const FRESH_SCHEMA = JSON.parse(await readFile(
   resolve(WEB_ROOT, 'scripts/fresh-source-observations.schema.json'), 'utf8'))
 const CURRENT_VIEW_FIELDS = new Set(Object.keys(FRESH_SCHEMA.$defs.view.properties))
 const CURRENT_ANCHOR_FIELDS = new Set(Object.keys(FRESH_SCHEMA.$defs.anchor.properties))
+const CURRENT_TRACK_ANCHOR_FIELDS = new Set([...CURRENT_ANCHOR_FIELDS, 'motion'])
+const CUT_CLOCK_BITS = new DataView(new ArrayBuffer(8))
 
 function rejectLegacy(value) {
   if (!value || typeof value !== 'object') return
@@ -95,11 +97,11 @@ export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
   return { approved, inventory, inventorySha256: seal.sha256, paths, runtimeInstances, videos }
 }
 
-function validateCurrentAnchors(data, authority) {
+function validateCurrentAnchors(data, authority, fields = CURRENT_ANCHOR_FIELDS) {
   assert(Array.isArray(data.anchors), 'Current native anchor census is missing')
   const anchors = new Map()
   for (const anchor of data.anchors) {
-    assert(anchor && Object.keys(anchor).every(key => CURRENT_ANCHOR_FIELDS.has(key))
+    assert(anchor && Object.keys(anchor).every(key => fields.has(key))
       && text(anchor.id) && !anchors.has(anchor.id) && ['section-center', 'physical-feature'].includes(anchor.kind)
       && text(anchor.description) && text(anchor.correspondenceEvidence)
       && (Object.hasOwn(anchor, 'worldMetres') !== Object.hasOwn(anchor, 'partLocalMetres'))
@@ -116,6 +118,39 @@ function validateCurrentAnchors(data, authority) {
     anchors.set(anchor.id, anchor)
   }
   return anchors
+}
+
+function validateCurrentTrackAnchors(data, authority) {
+  const anchors = validateCurrentAnchors(data, authority, CURRENT_TRACK_ANCHOR_FIELDS)
+  // ReferenceAnchor's playback metadata extends capture evidence only with this
+  // closed enum. Unknown motion stays null/absent; it is not inferred native proof.
+  for (const anchor of anchors.values()) {
+    assert(anchor.motion === undefined || anchor.motion === null
+      || anchor.motion === 'fixed' || anchor.motion === 'moving',
+    'Current compiled anchor has invalid playback motion')
+  }
+  return anchors
+}
+
+function sameCutRepresentation(time, boundary) {
+  if (time === boundary) return true
+  if (boundary === 0) return Math.abs(time) === Number.MIN_VALUE
+  CUT_CLOCK_BITS.setFloat64(0, boundary)
+  const boundaryBits = CUT_CLOCK_BITS.getBigUint64(0)
+  CUT_CLOCK_BITS.setFloat64(0, time)
+  const difference = CUT_CLOCK_BITS.getBigUint64(0) - boundaryBits
+  return difference === 1n || difference === -1n
+}
+
+function withinHalfOpenShot(shot, time) {
+  const start = shot.startSeconds, end = shot.endSeconds
+  if (!finite(start) || !finite(end) || !finite(time)) return false
+  // Match compact-source-common.py's execution-only nextafter routing exactly.
+  // Neither authored requested time nor decoded PTS is changed, and two ULPs
+  // or a genuine cross-cut gap cannot borrow the incoming shot's exposure.
+  if (sameCutRepresentation(time, start)) time = start
+  else if (sameCutRepresentation(time, end)) time = end
+  return time >= start && time < end
 }
 
 function unavailable(value) {
@@ -498,7 +533,7 @@ export async function validateCurrentTrackAssociation(track, observations, webRo
   const authority = await loadCurrentAuthority(webRoot)
   requireCurrentIdentities(observations, authority, id)
   validateCurrentAnchors(observations, authority)
-  validateCurrentAnchors(track, authority)
+  validateCurrentTrackAnchors(track, authority)
   // Direct association callers must also execute the physical domain compiler;
   // an exact source-record hash is not validation of its authored assembly state.
   await currentSourceAssemblyChangeTimes(observations, { webRoot })
@@ -523,17 +558,24 @@ common.validate_current_generation_seals(record["producerPath"],executed_inputs=
   let previous = -1
   for (const frame of track.frames) {
     const shot = observations.shots.find(shot => shot.id === frame.shotId)
+    const candidates = observations.frames.filter(row => equal(row.sourceImage, frame.sourceImage)
+      && row.decodedTimeSeconds === frame.decodedTimeSeconds && row.shotId === frame.shotId)
+    const matchingCapture = shot && candidates.some(row => row.classification === frame.classification
+      && equal(row.views, frame.views) && row.timeSeconds >= shot.startSeconds && row.timeSeconds < shot.endSeconds
+      && row.decodedTimeSeconds >= shot.startSeconds && row.decodedTimeSeconds < shot.endSeconds)
+    const authoredClock = matchingCapture && candidates.some(row => row.timeSeconds === frame.timeSeconds
+      && row.classification === frame.classification && equal(row.views, frame.views))
     assert(finite(frame.timeSeconds) && frame.timeSeconds > previous && frame.timeSeconds >= 0
       && frame.timeSeconds < observations.source.durationSeconds && finite(frame.decodedTimeSeconds)
       && Math.abs(frame.timeSeconds - frame.decodedTimeSeconds) <= 0.5 && shot
-      && frame.timeSeconds >= shot.startSeconds && frame.timeSeconds < shot.endSeconds
+      && matchingCapture
+      && (authoredClock ? frame.timeSeconds >= shot.startSeconds && frame.timeSeconds < shot.endSeconds
+        : withinHalfOpenShot(shot, frame.timeSeconds))
       && frame.decodedTimeSeconds >= shot.startSeconds && frame.decodedTimeSeconds < shot.endSeconds
       && frame.classification === shot.classification
       && (frame.sourceMachineRequirement === undefined || frame.sourceMachineRequirement === 'required'),
     `Compact sample ${frame.timeSeconds}s has a stale requested/decoded source clock or classification`)
     previous = frame.timeSeconds
-    const candidates = observations.frames.filter(row => equal(row.sourceImage, frame.sourceImage)
-      && row.decodedTimeSeconds === frame.decodedTimeSeconds && row.shotId === frame.shotId)
     assert(candidates.length > 0 && candidates.some(row => equal(row.views, frame.views))
       && candidates.every(row => equal(currentSourceLayoutForViews(row.views), currentSourceLayoutForViews(frame.views))
         && row.sourceMachineRequirement === frame.sourceMachineRequirement),

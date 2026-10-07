@@ -377,11 +377,12 @@ def retain_exact_exposure_landmarks(selected, data):
 
 
 def within_half_open_shot(shot, time):
-    """Route adjacent-float cut representations without changing source clocks.
+    """Route only derived requested cut keys without changing source clocks.
 
     One representable step on either side is execution-key equivalence, not
-    boundary uncertainty or a source-sampling tolerance. Both shots therefore
-    assign the cut to the incoming shot, while real pre-cut exposures stay out.
+    boundary uncertainty or a source-sampling tolerance. Actual decoded PTS
+    retain strict half-open ownership, and exact authored requested keys take
+    precedence over this derived-key routing.
     """
     start, end = shot["startSeconds"], shot["endSeconds"]
     if math.nextafter(start, -math.inf) <= time <= math.nextafter(start, math.inf):
@@ -405,12 +406,18 @@ def selected_frames(data):
     duration = data["source"]["durationSeconds"]
     shot_by_id = {s["id"]: s for s in data["shots"]}
     by_shot = {s["id"]: [] for s in data["shots"]}
+    authored_shots = {}
     rejected = []
     for frame in frames:
         shot = shot_by_id[frame["shotId"]]
         pts = frame.get("decodedTimeSeconds")
-        if pts is not None and within_half_open_shot(shot, pts):
+        if pts is not None and shot["startSeconds"] <= pts < shot["endSeconds"]:
             by_shot[frame["shotId"]].append(frame)
+            time = frame["timeSeconds"]
+            if shot["startSeconds"] <= time < shot["endSeconds"]:
+                owner = authored_shots.setdefault(time, shot)
+                if owner["id"] != shot["id"]:
+                    raise ValueError("Exact authored source clock has ambiguous shot ownership")
         else:
             rejected.append({"shotId": frame["shotId"], "timeSeconds": frame["timeSeconds"], "decodedTimeSeconds": pts})
     data.setdefault("samplingDiagnostics", {})["excludedCrossCutObservations"] = rejected
@@ -425,7 +432,9 @@ def selected_frames(data):
             required.update(shot["startSeconds"] + span * fraction for fraction in (0.25, 0.5, 0.75))
     output = {}
     for time in sorted(required):
-        shot = next(s for s in data["shots"] if within_half_open_shot(s, time))
+        shot = authored_shots.get(time)
+        if shot is None:
+            shot = next(s for s in data["shots"] if within_half_open_shot(s, time))
         pool = by_shot[shot["id"]]
         if not pool:
             # Explicitly unsupported source sampling, not a fabricated exposure.
