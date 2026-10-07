@@ -33,6 +33,7 @@ from _purchased_fastener_drawing import (
     _box,
     _fit_views,
     _literal_note,
+    _observe_note_placement,
     _purchased_title_block,
     _rebuild,
     _inside,
@@ -233,10 +234,22 @@ def _assert_settled_references(
 
 def _center_caption(adapter: Any, text: str, x: float, y: float) -> Any:
     note = _literal_note(adapter, text, x, y)
+    _observe_note_placement(
+        adapter, note, text, phase="before_center", requested_xy=(x, y)
+    )
     bounds = _box(note.GetExtent(), label=text, kind="note")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
     centered_x = 2.0 * x - (bounds[0] + bounds[2]) / 2.0
-    if not annotation.SetPosition(centered_x, y, 0.0):
+    moved = annotation.SetPosition(centered_x, y, 0.0)
+    _observe_note_placement(
+        adapter,
+        note,
+        text,
+        phase="centered",
+        requested_xy=(centered_x, y),
+        move_result=moved,
+    )
+    if not moved:
         raise RuntimeError(f"failed to center washer view caption {text!r}")
     return note
 
@@ -455,7 +468,14 @@ async def build(adapter: Any) -> dict[str, str]:
         notes.append((linked, properties[name]))
         linked_notes.append((linked, property_link(name), properties[name]))
 
+    for note, expected_text in notes:
+        _observe_note_placement(
+            adapter, note, expected_text, phase="before_rebuild"
+        )
     _rebuild(draw, phase="washer linked notes and native references")
+    # Capture every caption before a failed border gate can stop the audit.
+    for note, expected_text in notes:
+        _observe_note_placement(adapter, note, expected_text, phase="after_rebuild")
     for note, linked_text, resolved_text in title_block_notes:
         if note.PropertyLinkedText != linked_text or note.GetText() != resolved_text:
             raise RuntimeError(

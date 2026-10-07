@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 from typing import Any, Literal
@@ -159,6 +160,80 @@ def _fit_views(draw: Any, views: list[Any], cells: tuple) -> tuple[int, int]:
     )
 
 
+def _observe_note_placement(
+    adapter: Any,
+    note: Any,
+    text: str,
+    *,
+    phase: str,
+    requested_xy: tuple[float, float] | None = None,
+    move_result: bool | None = None,
+) -> None:
+    """Record partial native state; observation failures never repair or gate."""
+    state: dict[str, Any] = {"note_text": text, "phase": phase}
+    unavailable = object()
+
+    def read_field(field: str, getter: Any, *, record: bool = True) -> Any:
+        try:
+            value = getter()
+        except Exception as exc:
+            state[f"{field}_error"] = f"{type(exc).__name__}: {exc}"
+            return unavailable
+        if record:
+            state[field] = value
+        return value
+
+    def coordinates(values: Any) -> Any:
+        return None if values is None else tuple(float(v) for v in values)
+
+    read_field("extent_m", lambda: coordinates(note.GetExtent()))
+    read_field("locked", lambda: bool(note.LockPosition))
+    # INote.GetExtent is documented as invalid for an invisible document.
+    read_field(
+        "document_visible",
+        lambda: bool(_early_bound(adapter.currentModel, "IModelDoc2").Visible),
+    )
+    annotation = read_field(
+        "annotation",
+        lambda: _early_bound(note.GetAnnotation(), "IAnnotation"),
+        record=False,
+    )
+    if annotation is None or annotation is unavailable:
+        if annotation is None:
+            state["annotation_error"] = "Unavailable: INote.GetAnnotation returned None"
+        for field in ("position_m", "owner_type", "owner_name", "attached_entity_count"):
+            state[f"{field}_error"] = "Unavailable: annotation (see annotation_error)"
+    else:
+        read_field("position_m", lambda: coordinates(annotation.GetPosition()))
+        read_field(
+            "attached_entity_count", lambda: int(annotation.GetAttachedEntityCount3())
+        )
+        owner_type = read_field("owner_type", lambda: int(annotation.OwnerType))
+        owner = read_field("owner", lambda: annotation.Owner, record=False)
+        if owner is unavailable:
+            state["owner_name_error"] = "Unavailable: owner (see owner_error)"
+        elif owner is None:
+            state["owner_name"] = None
+        elif owner_type is unavailable:
+            state["owner_name_error"] = "Unavailable: owner_type (see owner_type_error)"
+        elif owner_type == 0:  # swAnnotationOwner_DrawingView
+            read_field("owner_name", lambda: _early_bound(owner, "IView").GetName2())
+        elif owner_type in (1, 2):  # DrawingSheet / DrawingTemplate
+            read_field("owner_name", lambda: _early_bound(owner, "ISheet").GetName())
+        else:
+            state["owner_name_error"] = (
+                f"Unavailable: owner type {owner_type} is not a drawing view/sheet"
+            )
+    if requested_xy is not None:
+        state["requested_position_m"] = (*requested_xy, 0.0)
+    if move_result is not None:
+        state["set_position_result"] = move_result
+    _telemetry.event("drawing.purchased_note_placement", **state)
+    _telemetry.info(
+        "purchased note placement: " + json.dumps(state, sort_keys=True), **state
+    )
+
+
 @_telemetry.traced("drawing.purchased_note")
 def _literal_note(adapter: Any, text: str, x: float, y: float) -> Any:
     note = add_note(adapter, text, x, y)
@@ -166,13 +241,24 @@ def _literal_note(adapter: Any, text: str, x: float, y: float) -> Any:
         raise RuntimeError(f"failed to insert purchased drawing note {text!r}")
     note = _early_bound(note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    # The shared adapter has already issued its first SetPosition on return.
+    _observe_note_placement(
+        adapter, note, text, phase="adapter_positioned", requested_xy=(x, y)
+    )
     text_format = annotation.GetTextFormat(0)
     if text_format is None:
         raise RuntimeError(f"purchased drawing note has no text format: {text!r}")
     text_format.CharHeight = 0.003
     if not annotation.SetTextFormat(0, False, text_format):
         raise RuntimeError(f"failed to size purchased drawing note {text!r}")
-    if not annotation.SetPosition(x, y, 0.0):
+    _observe_note_placement(
+        adapter, note, text, phase="formatted", requested_xy=(x, y)
+    )
+    moved = annotation.SetPosition(x, y, 0.0)
+    _observe_note_placement(
+        adapter, note, text, phase="positioned", requested_xy=(x, y), move_result=moved
+    )
+    if not moved:
         raise RuntimeError(f"failed to position purchased drawing note {text!r}")
     return note
 
@@ -416,10 +502,26 @@ async def _build_reference_sheet(
                 else cell[1] - 0.006
             )
             note = _literal_note(adapter, label, center[0], label_y)
+            _observe_note_placement(
+                adapter,
+                note,
+                label,
+                phase="before_center",
+                requested_xy=(center[0], label_y),
+            )
             bounds = _box(note.GetExtent(), label=label, kind="note")
             annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
             x = 2 * center[0] - (bounds[0] + bounds[2]) / 2
-            if not annotation.SetPosition(x, label_y, 0.0):
+            moved = annotation.SetPosition(x, label_y, 0.0)
+            _observe_note_placement(
+                adapter,
+                note,
+                label,
+                phase="centered",
+                requested_xy=(x, label_y),
+                move_result=moved,
+            )
+            if not moved:
                 raise RuntimeError(f"{label}: failed to center view caption")
             notes.append(
                 (
@@ -485,7 +587,14 @@ async def _build_reference_sheet(
                 note = _literal_note(adapter, text, x, 0.140)
                 notes.append((note, text, text, (x - 0.003, 0.079, x + 0.195, 0.141)))
     with _telemetry.span("drawing.purchased_native_contract"):
+        for note, linked_text, _resolved_text, _cell in notes:
+            _observe_note_placement(
+                adapter, note, linked_text, phase="before_rebuild"
+            )
         _rebuild(draw, phase="linked notes and final layout")
+        # Capture every note before an existing gate can reject the first one.
+        for note, linked_text, _resolved_text, _cell in notes:
+            _observe_note_placement(adapter, note, linked_text, phase="after_rebuild")
         for note, linked_text, resolved_text in title_block_notes:
             if (
                 note.PropertyLinkedText != linked_text
