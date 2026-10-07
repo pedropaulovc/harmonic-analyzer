@@ -49,9 +49,9 @@ if THREAD_LENGTH - PLATE_FLOOR_GAP < ENGAGEMENT_MIN_D * THREAD_MODEL_DIA:
 TIP_CHAMFER = 0.5
 CHAMFER_CALLOUT = "X 45 DEG"
 SLOT_WIDTH = 1.0
-# 1.2 deep (route said 1.5): the head and slot depth print at two places so
+# 1.1 deep (route said 1.5): the slot depth prints at two places so
 # the worst head left behind the slot stays over the rule-12 floor.
-SLOT_DEPTH = 1.2
+SLOT_DEPTH = 1.1
 
 UNDERHEAD_Z = WASHER_THICK
 HEAD_TOP_Z = UNDERHEAD_Z + HEAD_LENGTH
@@ -127,7 +127,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": HEAD_PLACES,
-        "HeadLength": 2,
+        "HeadLength": 1,
         "ShoulderDia": SHOULDER_PLACES,
         "ShoulderEnd": 1,
         "OverallLength": 1,
@@ -149,13 +149,13 @@ DRAWING_NOTES = "\n".join(
     (
         "MATCH-FIT: LAP THE SHOULDER TO SLIDE FREELY WITHOUT SHAKE IN THE ROCKER",
         "ARM PIVOT BORE AND THE PROFILE PLATE BORE, AND THE HEAD LIKEWISE IN THE",
-        "OUTLINE-TEMPLATE BUSH. THE FIT IS THE ACCEPTANCE; PRINTED LIMITS ARE THE",
-        "STARTING TARGET. HEAD COAXIAL WITH SHOULDER.",
+        "OUTLINE-TEMPLATE BUSH. BRACKETED DIAMETERS ARE THE STARTING SIZE ONLY.",
+        "HEAD COAXIAL WITH SHOULDER.",
     )
 )
 # The head left behind the slot at worst case.
 _HEAD_BEHIND_SLOT_MIN = round(
-    HEAD_LENGTH - SLOT_DEPTH - 2.0 * printed_band_mm(2), 6
+    HEAD_LENGTH - printed_band_mm(1) - SLOT_DEPTH - printed_band_mm(2), 6
 )
 if _HEAD_BEHIND_SLOT_MIN < 1.5:
     raise AssertionError("pivot-screw slot leaves under the rule-12 floor in the head")
@@ -200,10 +200,10 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("HEAD_DIA", "HEAD_BAND", "TEMPLATE_BUSH_BORE_LIMITS"),
             ),
             "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
-            "length": (limits(HEAD_LENGTH, 2), ("HEAD_LENGTH",)),
+            "length": (limits(HEAD_LENGTH, 1), ("HEAD_LENGTH",)),
             "process": ("lap", ("HEAD_BAND",)),
         },
-        precision={"dia": HEAD_PLACES, "length": 2},
+        precision={"dia": HEAD_PLACES, "length": 1},
     ),
     "underhead": ExportFeature(
         kind="face",

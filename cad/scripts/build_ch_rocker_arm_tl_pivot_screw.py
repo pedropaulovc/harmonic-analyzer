@@ -44,9 +44,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
 )
-from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
@@ -54,13 +52,11 @@ from ch_rocker_arm_tl_pivot_screw_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    HEAD_BAND,
     HEAD_DIA,
     HEAD_LENGTH,
     HEAD_TOP_Z,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
-    SHOULDER_BAND,
     SHOULDER_DIA,
     SHOULDER_END_STATION,
     SHOULDER_LENGTH,
@@ -272,12 +268,7 @@ async def build(adapter) -> dict[str, str]:
     if len(bodies) != 1:
         raise RuntimeError(f"pivot screw: expected one solid body, found {len(bodies)}")
 
-    # Model-owned bands: the two lapped locating diameters.
-    set_dimension_bilateral_tolerance(
-        adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_BAND)
-    )
-    set_dimension_bilateral_tolerance(adapter, "ScrewProfile", "HeadDia", *deviations(HEAD_BAND))
-
+    # The lapped diameters are match-fitted (drawing notes): no model band.
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
