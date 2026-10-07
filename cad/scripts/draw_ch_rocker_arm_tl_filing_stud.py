@@ -9,9 +9,9 @@ from typing import Any
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
-    add_surface_finish,
     DrawingOutputs,
     add_property_linked_note,
+    add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
     dimension_name,
@@ -29,12 +29,13 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from ch_rocker_arm_tl_filing_stud_spec import (
     BODY_DIA,
-    SURFACE_FINISHES,
+    BODY_LENGTH,
     DIMENSION_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    REFERENCE_DIMENSIONS,
     REFERENCE_CALLOUTS,
+    REFERENCE_DIMENSIONS,
+    SURFACE_FINISHES,
     TAIL_END,
     THREAD_END,
 )
@@ -88,10 +89,14 @@ DONOR_KEEP = {
 PROFILE_DIAMETER_XY = {
     "TailDia": (SEAT_X - 0.060, PROFILE_CENTER[1] + 0.022),
     "HeadDia": (SEAT_X - 0.020, PROFILE_CENTER[1] + 0.024),
-    # Below right: the leader drops straight to the body's lower arrow.
-    "BodyDia": (SEAT_X + 0.074, PROFILE_CENTER[1] - 0.050),
-    # Above right, beyond the thread end's extension line.
-    "ThreadDia": (SEAT_X + 0.075, PROFILE_CENTER[1] + 0.034),
+    # Each diameter's dimension line stands inside its own step (codex round
+    # 15): the fit callout on the journal (seat to 12.5), the thread on the
+    # threaded tip (12.5 to 24.0), both below so no leader crosses a row.
+    "BodyDia": (SEAT_X + BODY_LENGTH / 2.0 * _S, PROFILE_CENTER[1] - 0.065),
+    "ThreadDia": (
+        SEAT_X + (BODY_LENGTH + THREAD_END) / 2.0 * _S,
+        PROFILE_CENTER[1] - 0.030,
+    ),
 }
 
 
@@ -189,14 +194,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )
     # The sliding journal is a required machined surface (codex round 14):
-    # on its lower silhouette, right of the fit callout's leader.
-    body_pick = (SEAT_X + 0.021, PROFILE_CENTER[1] - BODY_DIA / 2.0 * _S)
+    # on its upper silhouette, under the 12.5 row, clear of the callouts below.
+    body_pick = (SEAT_X + 0.006, PROFILE_CENTER[1] + BODY_DIA / 2.0 * _S)
     add_surface_finish(
         adapter,
         profile,
         edge_xy=body_pick,
         entity_type="SILHOUETTE",
-        symbol_xy=(SEAT_X + 0.040, PROFILE_CENTER[1] - 0.024),
+        symbol_xy=(SEAT_X + 0.014, PROFILE_CENTER[1] + 0.012),
         leader_attach_xy=body_pick,
         control=surface_finish_by_key(SURFACE_FINISHES, "locating_body"),
         label="filing stud locating diameter finish",
