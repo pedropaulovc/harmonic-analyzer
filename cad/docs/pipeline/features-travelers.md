@@ -2,9 +2,13 @@
 
 ## Independent producers
 
-`package:features` is a scoped COM leaf for `ch_rocker_arm`, `ch_pivot_shaft` and
-`dt_cone_pivot_post`. Its native dependency closure is those parts, not assemblies
-or drawings. It writes only self-contained bundles:
+`package:features` is a scoped COM leaf for `ch_rocker_arm`, `ch_pivot_shaft`,
+`dt_cone_pivot_post` and every spec-driven shop fixture in
+`export_features.SPEC_DRIVEN_PARTS` (`export_features.SUPPORTED_PARTS` is the
+whole list). Its native dependency closure is those parts, not assemblies or
+drawings. Only the three machine parts have committed process plans and
+traveler checks; fixture bundles feed prechips' fixture travelers directly.
+It writes only self-contained bundles:
 
 ```text
 cad/out/features/<underscore-stem>/

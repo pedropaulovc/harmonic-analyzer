@@ -61,7 +61,9 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked jaw-button dimension needs authored places")
 
 SURFACE_FINISHES = ()
-DRAWING_NOTES = "SPIGOT SHALL DROP INTO THE CONE POST JOURNAL BORE BY HAND."
+# No general note: the spigot band alone sets the hand clearance in the
+# post's journal bore (asserted above), so the print carries no fit note.
+DRAWING_NOTES = ""
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))

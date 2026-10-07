@@ -107,7 +107,6 @@ async def build(adapter: Any) -> dict[str, str]:
         "Material Specification",
         "Finish",
         "Quantity",
-        "Manufacturing Notes",
         "Isometric View Note",
     )
     read_required_properties(
@@ -171,7 +170,6 @@ async def build(adapter: Any) -> dict[str, str]:
     add_view_centerline(
         adapter, profile, face_xy=PROFILE_CENTER, label="button turning axis"
     )
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(

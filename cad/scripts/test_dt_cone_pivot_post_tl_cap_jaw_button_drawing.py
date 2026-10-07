@@ -53,9 +53,3 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("dt-cone-pivot-post")["number"]
     number = _config.parts("dt-cone-pivot-post-tl-cap-jaw-button")["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-
-
-def test_notes_follow_the_simplicity_policy() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert 1 <= len(lines) <= 4
-    assert not re.search(r"\d", spec.DRAWING_NOTES)
