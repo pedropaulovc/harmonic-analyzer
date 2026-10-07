@@ -26,6 +26,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_hidden_sketches import curate_view_dimensions, part_sketches_shown
+from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _part_pmi import _face_geometry, _face_matches
 from _surface_finish import surface_finish_by_key
@@ -40,7 +41,7 @@ from dt_cone_pivot_post_tl_bond_cradle_spec import (
     TAIL_SADDLE_Y,
     TAIL_SECTION_Y,
 )
-from solidworks_mcp.adapters.solidworks.drawing import place_view
+from solidworks_mcp.adapters.solidworks.drawing import dimension_name, place_view
 
 SPEC = DRAWINGS_BY_NAME["dt_cone_pivot_post_tl_bond_cradle"]
 PART_STEM = SPEC.artifact_stem
@@ -118,16 +119,13 @@ ELEVATION_KEEP = {
     "TailSaddleHeight": (0.0, 130.0, -22.0),
 }
 # Each seat's profile sketch is parallel to its section, so the section
-# imports its diameter. The text stands just above the axis, so the
-# through-centre leader drops nearly plumb on to the seat bottom.
+# imports its diameter.
 SECTION_A_KEEP = {
-    # Right of and above the axis (model -X): the leader drops through the
-    # centre on to the +X side of the seat bottom, clear of the cone pin top
-    # and the finish leader. The seat-axis dimensions keep out of its path:
-    # the 40.0 runs inside the seat under the axis, the 30.0's extension
-    # line leaves the axis on the leader's far side.
-    "BodySeatDia": (-8.0, CONE_PIN_NEAR_Y, 28.0),
-    "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, -8.0),
+    # In the saddle under the seat's +X flank, inside the real arc's span:
+    # the near-side leader rises a few mm to the arc, clear of the cone pin,
+    # the finish leader above it and the 9.93 extension line on the -X side.
+    "BodySeatDia": (11.4, CONE_PIN_NEAR_Y, -24.5),
+    "BodySeatAxisX": (-20.0, CONE_PIN_NEAR_Y, 12.0),
     "BodySeatAxisHeight": (-48.0, CONE_PIN_NEAR_Y, -12.0),
     # Under the base; the tilt reads below it.
     "ConePinEntryX": (-28.0, CONE_PIN_NEAR_Y, -48.0),
@@ -300,6 +298,22 @@ def _seat_finish(adapter: Any, view: Any, key: str, face_y: float, *, label: str
     )
 
 
+def _seat_diameter_near_side(adapter: Any, annotations: list[Any], name: str) -> None:
+    """One arrow on the seat arc nearest the text; no line through the centre.
+
+    The default diameter leader ran from the text through the seat centre to
+    the far side, across the seat-axis dimensions that start there (run-9 to
+    12 sheets); the shared near-side style stops it at the arc it measures.
+    """
+    for raw in annotations:
+        annotation = _early_bound(raw, "IAnnotation")
+        if dimension_name(adapter, annotation) == name:
+            set_near_side_diameter(annotation, name)
+            return
+    raise RuntimeError(f"no imported {name} to give a near-side leader")
+
+
+
 def _lower_caption(adapter: Any, view: Any, drop: float) -> None:
     """Move a section's native caption down the sheet by ``drop`` metres,
     keeping its linked fields (``draw_fr_top_frame._position_view_caption``)."""
@@ -410,6 +424,7 @@ async def build(adapter: Any) -> dict[str, str]:
         *section_b_annotations,
     ]
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    _seat_diameter_near_side(adapter, section_a_annotations, "BodySeatDia")
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
