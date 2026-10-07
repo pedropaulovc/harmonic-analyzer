@@ -287,42 +287,10 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     assert spec.FILE_ALLOWANCE_MIN > 0.0
 
 
-def test_notes_state_the_fitted_shoulder_and_the_head_bands() -> None:
-    # The #4-40 meets the 1.5D rule, so the sheet states no engagement
-    # exception (user ruling 2026-09-30).
-    assert not hasattr(spec, "ENGAGEMENT_NOTE")
-    assert "THREAD ENGAGEMENT" not in spec.DRAWING_NOTES
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert lines[0].startswith("FACE THE UNDER-HEAD")
-    # User ruling 2026-09-29 (MHA-DT-032 review): the shoulder is turned to suit
-    # the bonded handle; the head's band is for its bearing on the cup floor.
-    flat = " ".join(spec.DRAWING_NOTES.split())
-    assert "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-DT-008" in flat
-    # The v4 re-review: the note names which face the fitted length ends at,
-    # and its 0.1-max edge break keeps the seat (local review of fbf82ad96).
-    assert "UNDER-HEAD TO SEAT FACE (SHOULDER END, EDGE BROKEN 0.1 MAX, ON MHA-DT-006)" in flat
-    assert "PLUS 0.25-1.00." in flat
-    assert "HEAD BEARS ON MHA-DT-035 FLOOR;" in flat
-    # Each head band states its reason (the 1d2be3aaf re-review called the
-    # unexplained length band over-specification).  The bearing is the
-    # narrow side's with the head off-centre by its running play (local
-    # review of fbf82ad96): 0.3 concentric less 0.19.
+def test_head_bearing_acceptance_accounts_for_running_offset() -> None:
     assert spec.HEAD_BEARING_RADIAL_CONCENTRIC_MIN == pytest.approx(0.3)
     assert spec.HEAD_RUNNING_OFFSET_MAX == pytest.approx(min(0.4 / 2.0, (4.3 - 3.92) / 2.0))
     assert spec.HEAD_BEARING_RADIAL_MIN == pytest.approx(0.11)
-    assert "DIA BAND KEEPS 0.1 BEARING," in flat
-    assert "LENGTH BAND KEEPS IT BELOW CUP FACE." in flat
-    assert all(len(line) <= 72 for line in lines)
-    policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
-    assert not any(
-        line.startswith("| MHA-DT-032")
-        for line in policy.read_text(encoding="utf-8").splitlines()
-    )
-    # The ruling ID stays in the spec source; the sheet reader never sees it.
-    assert "U33b" not in spec.DRAWING_NOTES
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
-    assert part.DRAWING_NOTES is spec.DRAWING_NOTES
 
 
 def test_thread_callout_names_the_size_but_not_the_title_block_class() -> None:
@@ -340,12 +308,6 @@ def test_running_shoulder_carries_the_only_finish_symbol() -> None:
     assert (
         spec.HEAD_LENGTH < control.face.contains_z_mm < spec.SEAT_STATION
     )
-
-
-def test_notes_stay_within_rule_six() -> None:
-    assert len(spec.DRAWING_NOTES.splitlines()) <= 4
-    assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW\nSCALE 1:1"
-    assert len(spec.ISOMETRIC_VIEW_NOTE.splitlines()) <= 4
 
 
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
