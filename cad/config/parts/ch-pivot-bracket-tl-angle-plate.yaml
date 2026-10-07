@@ -1,0 +1,11 @@
+ch-pivot-bracket-tl-angle-plate:
+  title: Pivot Bracket Angle Plate
+  # Shop fixture: the parent MHA-CH-008 Number plus -TL-nn (subsystem-identities.md).
+  # A bought plate reworked in the shop: the model is its bought envelope.
+  number: MHA-CH-008-TL-02
+  material: Gray Cast Iron
+  material_specification: bought 4 x 5 x 3-1/2 in machined cast-iron angle plate, slotted faces (gray cast iron)
+  finish: as bought
+  quantity: 1
+  tolerance_class: machined_block
+  process: "rework bought angle plate: drill and tap two #10-24 through and drill two letter X through the upright"
