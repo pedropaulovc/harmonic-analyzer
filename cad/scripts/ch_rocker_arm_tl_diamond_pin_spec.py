@@ -60,8 +60,8 @@ COLLAR_END_BAND = (0.0, -0.05)
 FACE_B_ABOVE_PLATE = 10.22175  # frame-A Z-4.77825 face B over the plate top Z-15
 if COLLAR_END + COLLAR_END_BAND[0] > FACE_B_ABOVE_PLATE:
     raise AssertionError("neck face can lift the arm off the profile-fixture pads")
-SHANK_DIA = 2.994
-SHANK_BAND = (0.004, -0.004)  # 2.990-2.998: bonded slip fit in the plate's 3.0 H7 ream
+SHANK_DIA = 2.988
+SHANK_BAND = (0.007, -0.007)  # 2.981-2.995: bonded close slip fit in the plate's 3.000-3.010 ream
 OVERALL_LENGTH = COLLAR_END + 6.0
 REAM_DIA = 2.0
 REAM_BAND = (0.010, 0.0)  # the shop's rod reamer, 2.000-2.010
@@ -101,6 +101,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Collar": {"CollarEnd"},
     "ShankProfile": {"ShankDia"},
     "Shank": {"OverallLength"},
+    "Pin": {"PinLength"},
     "ReamProfile": {"ReamDia"},
     "Ream": {"ReamDepth"},
 }
@@ -114,6 +115,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Collar": {"CollarEnd": 2},
     "ShankProfile": {"ShankDia": 3},
     "Shank": {"OverallLength": 1},
+    "Pin": {"PinLength": 1},
     "ReamProfile": {"ReamDia": 3},
     "Ream": {"ReamDepth": 1},
 }
@@ -127,7 +129,7 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
         BUILT_UP_PERMISSION_NOTE,
-        "ROUND LANDS ARE UNTOUCHED GAUGE SURFACE; BORE BOTTOM MAY BE A DRILL POINT.",
+        "FLATS RUN THE FULL LAND LENGTH; ROUND LANDS UNTOUCHED; BORE BOTTOM MAY BE A DRILL POINT.",
         "NECK FACE IS A BACKSTOP JUST BELOW THE ROCKER ARM; THIN WALLS ROUND THE BORE ACCEPTED.",
         "SHANK: CLOSE SLIP FIT, BONDED IN THE ROCKER ARM PROFILE FIXTURE PIN HOLE WITH THE"
         " FLATS SQUARE TO ITS PIVOT-TO-ROD-HOLE LINE.",

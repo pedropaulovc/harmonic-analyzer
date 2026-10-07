@@ -51,8 +51,12 @@ def test_tip_stays_in_the_strap_and_neck_face_never_lifts_the_arm() -> None:
     assert height[0] - (spec.FACE_B_ABOVE_PLATE - neck[0]) >= rocker.ARM_THICKNESS / 2.0
 
 
-def test_shank_is_the_bonded_slip_fit_band() -> None:
-    assert _features()["shank"]["dia"] == [2.990, 2.998]
+def test_shank_slips_into_the_fixture_ream_with_a_bondable_gap() -> None:
+    low, high = _features()["shank"]["dia"]
+    # profile-fixture pin hole 3.000-3.010; Loctite 638 fills to 0.25 mm gap,
+    # but the pin must still locate: keep the diametral gap within 0.03.
+    assert high < 3.000
+    assert 3.010 - low <= 0.030
 
 
 def test_construction_is_built_up_from_the_printed_note() -> None:

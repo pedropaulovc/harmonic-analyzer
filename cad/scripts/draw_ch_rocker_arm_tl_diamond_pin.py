@@ -55,7 +55,7 @@ SECTION_CENTER = (0.165, 0.175)
 END_CENTER = (0.335, 0.200)
 ISO_CENTER = (0.330, 0.120)
 ISO_NOTE_XY = (0.300, 0.088)
-CAPTION_XY = (0.150, 0.122)
+CAPTION_XY = (0.255, 0.122)
 CUT_HALF = 0.020  # past the O4.5 collar's 13.5 mm sheet radius
 AXIAL_XY = {
     "LandHeight": (-3.6, 0.016),
@@ -63,11 +63,12 @@ AXIAL_XY = {
     "ReamDepth": (4.0, 0.032),
     "CollarEnd": (5.1, 0.042),
     "OverallLength": (8.0, 0.052),
+    "PinLength": (2.0, 0.062),
 }
 DIAMETER_XY = {
     "NeckDia": (1.0, -0.026),
     "CollarDia": (6.0, -0.038),
-    "ReamDia": (8.6, -0.050),
+    "ReamDia": (8.6, -0.040),
     "ShankDia": (13.5, -0.026),
 }
 END_KEEP = {
