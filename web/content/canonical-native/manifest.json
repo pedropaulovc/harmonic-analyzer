@@ -423,7 +423,7 @@
     },
     {
       "path": "web/scripts/export-mechanics.py",
-      "sha256": "f453d431dc8c8202fba6e2775ca966d753a4144e5c57e94ba40fad11edf5ac65",
+      "sha256": "71a0cbeb813474a19509d4294d3be121bcb1fa8b794c63032ac6cfca6194988d",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {

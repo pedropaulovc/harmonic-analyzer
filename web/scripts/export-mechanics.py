@@ -212,6 +212,25 @@ def main() -> None:
     except (OSError, ValueError) as error:
         snapshot.cleanup()
         parser.error(f"Cannot use the approved native identity projection: {error}")
+    try:
+        export_snapshot(args, repo, cad, identity_map, nodes, identity, model_hash)
+    finally:
+        try:
+            # Imports may configure telemetry with files inside this archive.
+            # Only its owner may close them, before the snapshot is removed.
+            telemetry = sys.modules.get("_telemetry")
+            telemetry_path = getattr(telemetry, "__file__", None)
+            if telemetry_path and Path(telemetry_path).resolve().is_relative_to(snapshot_root.resolve()):
+                telemetry.shutdown()
+        finally:
+            snapshot.cleanup()
+
+
+def export_snapshot(
+    args: argparse.Namespace, repo: Path, cad: Path, identity_map: CadIdentityMap,
+    nodes: dict, identity: dict, model_hash: str,
+) -> None:
+    snapshot_root = cad.parent
     sys.path.insert(0, str(cad / "scripts"))
     # This released data table sits in a COM recipe whose unrelated imports
     # pull telemetry/Windows machinery. Evaluate its exact assignment AST only:
@@ -970,7 +989,6 @@ def main() -> None:
             }
         )
     )
-    snapshot.cleanup()
 
 
 if __name__ == "__main__":

@@ -139,6 +139,9 @@ The command archives the exact matching CAD revision for the parameterized
 identity map without rewriting the archived source or installing module aliases.
 The exporter checks canonical native paths against that revision's rest geometry
 and mechanical parameters, then stages metadata and optimized publication.
+Telemetry providers loaded from that temporary archive are flushed and closed
+before it is removed, including after failed imports or metadata writes. Cleanup
+errors remain visible; unrelated process handlers are left untouched.
 A missing commit, incompatible mathematics or a refused release preserves the
 last working assets. No invented release sidecar supplies approval or fidelity.
 
