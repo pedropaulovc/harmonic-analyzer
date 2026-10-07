@@ -19,7 +19,7 @@ from _gtol_spec import CylinderFace, PlanarFace
 
 # Face (the jaw-to-cap spacer) and spigot (the centring stub). Both axial
 # sizes print from the faced jaw face: the shoulder and the overall length.
-FACE_DIA = 16.0
+FACE_DIA = 15.0
 FACE_THICK = 3.0
 SPIGOT_DIA = 12.2
 SPIGOT_LENGTH = 2.0
@@ -41,12 +41,19 @@ POST_NUMBER = _config.parts("dt-cone-pivot-post")["number"]
 SPIGOT_CALLOUT = f"ENTERS {POST_NUMBER}\nCONE PIVOT POST\nJOURNAL BORE BY HAND"
 
 # The shoulder bears on the cap annulus only: the face, at its largest and
-# shifted by the spigot's largest float, stays inside the cone boss.
+# shifted by the spigot's largest float, stays inside the smallest cone boss
+# the post's print accepts; at its smallest and shifted the other way it still
+# covers the bore edge, so the shoulder always lands on the annulus.
 FACE_PLACES = 1
-_FACE_MAX = limits(FACE_DIA, FACE_PLACES)[1]
+_FACE_MIN, _FACE_MAX = limits(FACE_DIA, FACE_PLACES)
 _FLOAT_MAX = (post.BORE_DIA + post.RUNNING_BORE_BAND[0]) - (SPIGOT_DIA + SPIGOT_BAND[1])
-if _FACE_MAX / 2.0 + _FLOAT_MAX / 2.0 >= post.CONE_BOSS_DIA / 2.0:
+CONE_BOSS_MIN = limits(
+    post.CONE_BOSS_DIA, post.DRAWING_PRECISION["ConeBossProfile"]["ConeBossDia"]
+)[0]
+if _FACE_MAX / 2.0 + _FLOAT_MAX / 2.0 >= CONE_BOSS_MIN / 2.0:
     raise AssertionError("cap jaw-button face can overhang the cone boss cap")
+if _FACE_MIN / 2.0 - _FLOAT_MAX / 2.0 <= (post.BORE_DIA + post.RUNNING_BORE_BAND[0]) / 2.0:
+    raise AssertionError("cap jaw-button shoulder can miss the cap annulus")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FaceProfile": {"FaceDia"},
