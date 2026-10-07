@@ -46,8 +46,11 @@ explicit way to stop a run, `-Cancel` (see
   any uncommitted change, untracked file or moved submodule in `-Worktree`
   (`Worktree has uncommitted changes; …`, listing the paths) rather than
   silently leave it out of the build.
-- **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
-  Azure credentials for the cache (`az login`; `off` is refused).
+- **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`,
+  whose `logs --help` advertises `--log-blob`, and Azure credentials for the
+  cache (`off` is refused). Exact failed-log reads separately need Blob GET
+  permission on the pool config's `results_account` / `results` container;
+  a compatible CLI or successful cache read does not prove that permission.
 - **A log directory outside every Git worktree.** It holds the run records, the
   logs, the build snapshots, the shared environments and each run's outputs. A
   snapshot inside some worktree would show up there as an untracked nested
@@ -167,6 +170,111 @@ untracked files and a new commit with an identical tree never count. When a
 leaf then reports `cache_missing`, or succeeds without its key, every tracked
 difference is reported the same way, since each is a lead; without any, the
 failure names its other likely causes instead.
+
+### Exact failed-worker logs
+
+After a leaf returns a failed result, the submitter reads the exact
+`LeafResult.log_blob` with the current pool CLI:
+`farm.py logs <workflow-id> --log-blob <returned-results-path>`. It never asks
+for the workflow's latest log: a later execution can have the same workflow
+ID and attempt number but a different execution-specific blob. The existing
+failure-artifact hint remains useful for captures; it is not a replacement
+for retrieving the failed execution's `task.log`.
+
+The reader uses the pool environment prepared by preflight, directly rather
+than through a second uv launcher. One owner drains both stdout and stderr
+through nonblocking pipes under a 30-second deadline. Capture stops at 16 MiB
+of stdout (the current protocol-4 worker's published-log ceiling) or 64 KiB of
+stderr, whichever limit is exceeded first. Overflow or deadline expiry stops
+only the retained reader child, reaps it and closes both owned pipes; there
+is no timer or background drain thread to leave running. Only a complete,
+nonempty, successful read within both capture bounds is eligible as worker
+payload. Partial stdout from a stderr overflow is not recovered payload.
+
+The actual read has a `farm.log.retrieve` child span under `farm.run` on the
+`build-infra` resource. It records the exact task/workflow/worker/attempt/blob,
+reader outcome and bytes retained in each capture spool, not attempted output.
+Timeouts, capture overflows, reader errors and empty output mark that child
+ERROR with its own exception/cause even though diagnostics are supplemental.
+A readable log can have a successful retrieval span while its original leaf
+remains failed. An unavailable byte count is recorded as an event, not zero.
+Output locking and console rendering remain outside this reader span.
+
+Console rendering has a separate total budget of 16 MiB of UTF-8 and 64 Ki
+lines per failed-log block. It counts the full attribution prefixes, UTF-8
+replacement encoding, normalized LF/CRLF/bare-CR line endings, reader
+diagnostics and frame delimiters, not just downloaded bytes. Lines are
+streamed, never assembled into an amplified all-lines string. Footer and
+attributed truncation-notice space are reserved before payload rendering.
+If attribution alone cannot fit, no frame or payload is emitted. Exhausting
+either rendered budget emits an explicit incomplete-output supplement,
+never a claim that the complete log was shown.
+
+Worker payload and the reader's stderr remain distinct: reader diagnostics
+have a `farm log-reader` prefix. Every displayed line names the task,
+workflow, worker, attempt and exact blob. Absent, empty, nonzero (including
+authentication/missing-blob errors), oversized, interrupted or output-faulted
+reads are warnings, never successful retrieval and never a replacement for
+the original leaf failure. A stderr prefix retained at its capture limit is
+diagnostic evidence only. Cancellation propagates after owned-child cleanup.
+Reader initialization, including deadline and pipe-state setup, runs inside
+that cleanup guard; cancellation there does not rely on `Popen.__exit__` to
+stop or reap a still-running child.
+
+Downloads can overlap, but a run-specific `HARMONIC_FARM_LOG_LOCK` serializes
+failed-log blocks across doit processes. The lock wait is bounded at 30
+seconds; if it cannot be acquired, payload is not emitted unlocked. Other
+build output need not take this lock, so line-level attribution remains
+necessary.
+
+The hermetic spawned-process lock control checkpoints complete, flushed lines.
+Its shared capture mutex protects one append record at a time, never a whole
+frame or a checkpoint wait. The follower frame begins before the leader
+finishes, but its body waits for the leader's full stderr lifetime, including
+debug span output and stream/file cleanup. This preserves genuine nested/
+cross-owner evidence and both workers' payload/diagnostics without depending
+on concurrent Windows append handles.
+
+Preflight's `logs --help` check proves only that the configured operator CLI
+supports exact selection. The current pool reader uses `DefaultAzureCredential`
+and `SOLIDWORKS_POOL_CONFIG` (default `~/.solidworks-pool/config.json`), taking
+the storage endpoint from `results_account`; it does not use
+`HARMONIC_CACHE_ACCOUNT`. Managed identity and the CLI credential path remain
+available under the current pool/SDK credential defaults. This submitter does
+not replace them or force a different principal. The Temporal mTLS/JWT config
+is not Azure data-plane permission, and ARM Owner is not proof of Blob GET.
+
+To prove permission, the operator must read an actual published
+`LeafResult.log_blob` through the current pool CLI under the intended identity.
+Require exit 0 and nonempty payload, and retain the exact workflow/blob,
+payload hash and principal evidence. No such read is inferred from CLI help,
+protocol reports, source RBAC declarations or a previous deployment. Without
+an actual read, operator Blob GET capability is **unverified**, not success.
+To exercise this submitter's bounds as well, use
+`run_pool_cli(..., interpreter=_pool_python(pool),
+timeout_s=FAILED_LOG_TIMEOUT_S, max_stdout_bytes=FAILED_LOG_MAX_BYTES)` with
+separate binary stdout/stderr spools. This probe submits, launches and cancels
+nothing.
+
+**Exercised scope, 2026-10-07:** the operator read one exact published failure
+through the pool checkout at `7bc9b3a650ebbf700c939d104defd4c333bfd3ce` with
+its current `DefaultAzureCredential` path. The exact selection was:
+
+```text
+workflow: leaf:part:vn_transgear_pivot_screw:0720a3770ed390adf25dd8540ae53280375f572968129c3e59ef10166bfd17d1:5400s
+log_blob: results/leaf/part__vn_transgear_pivot_screw/0720a3770ed390adf25dd8540ae53280375f572968129c3e59ef10166bfd17d1/20261007T113034Z-1-d66d8b6e/task.log
+```
+
+The parent-owned frozen pool CLI read exited 0 in about 2.6 seconds under a
+300-second outer deadline. Its nonempty payload retained source preparation
+for `a798764ef51e`, environment `e9ab489999f1` / Python 3.14.7, and the original
+`create_part` / NewPart failure before geometry and resulting task error,
+attributed by the parent to worker 10. No submission was made by the read.
+This establishes that operator process's GET capability for **that one blob**,
+not blanket results permission, the fleet's managed-identity permissions,
+native geometry correctness, the 35-failure replay, or this new submitter's
+30-second/16-MiB reader path. Those remain separate evidence obligations.
+
 
 ### Supervised farm releases
 
