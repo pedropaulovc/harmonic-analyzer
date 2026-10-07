@@ -152,9 +152,12 @@ async def build(adapter: Any) -> dict[str, str]:
     # Explicit per-view scale: a view placed without one can silently
     # auto-scale, which shifts every coordinate-based pick on it.
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    # finalize_drawing shades the pictorial isometric with edges.
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    set_hidden_lines_removed(adapter, front)
+    # finalize_drawing shades the pictorial isometric with edges. Every
+    # tapped-hole drawing first gives its iso local HLR settings: left on the
+    # sheet default, run 40a02dfa read its cosmetic threads back draft quality.
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    for view in (front, iso):
+        set_hidden_lines_removed(adapter, view)
 
     annotations = curate_view_dimensions(
         adapter,

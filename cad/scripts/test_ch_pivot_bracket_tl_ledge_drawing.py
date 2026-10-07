@@ -32,40 +32,23 @@ def test_ledge_top_meets_the_bracket_foot_free_end() -> None:
     assert abs(plate.BLOCK_HEIGHT + top - foot_end) < 1e-9
 
 
-def test_printed_height_band_holds_the_top_parallel_to_the_table() -> None:
-    low, high = _features()["foot_rest"]["height"]
-    assert high - low <= spec.TOP_PARALLEL + 1e-9
-
-
 def test_ledge_carries_the_whole_foot_and_clears_the_stud_nuts() -> None:
     low, high = _features()["foot_rest"]["width"]
     assert low >= bracket.FOOT_W
     assert high / 2.0 < plate.STUD_HALF_PITCH - plate.STUD_NUT_DIA / 2.0
 
 
-def _pitch(left: list[float], right: list[float]) -> tuple[float, float]:
-    return right[0] - left[1], right[1] - left[0]
-
-
-def test_screws_pass_both_parts_at_their_worst_stations() -> None:
-    """Each #10 screw sits in a plate tap and passes a ledge hole. Along the
-    ledge it floats, so each screw takes half the worst pitch mismatch; across
-    it the block fixes the ledge, so the heights' errors add. Both together
-    stay inside the screw's radial clearance in the smallest ledge hole."""
+def test_ledge_holes_sit_on_the_plate_taps_on_their_block() -> None:
+    """The taps are spotted through the ledge holes with the ledge on its
+    block, so both parts' nominal stations must already coincide there."""
     holes = _features()
     taps = export_features.requirement_manifest("ch_pivot_bracket_tl_angle_plate")["features"]
-    ledge_lo, ledge_hi = _pitch(
-        holes["screw_hole_left"]["station"], holes["screw_hole_right"]["station"]
-    )
-    plate_lo, plate_hi = _pitch(
-        taps["ledge_tap_left"]["station"], taps["ledge_tap_right"]["station"]
-    )
-    along = max(ledge_hi - plate_lo, plate_hi - ledge_lo) / 2.0
-    hole_y = holes["screw_hole_left"]["height"]
-    tap_y = [y - plate.BLOCK_HEIGHT for y in taps["ledge_tap_left"]["height"]]
-    across = max(tap_y[1] - hole_y[0], hole_y[1] - tap_y[0])
-    radial = (holes["screw_hole_left"]["dia"][0] - THREAD_MAJOR_MM[plate.SCREW_THREAD]) / 2.0
-    assert (along**2 + across**2) ** 0.5 <= radial
+    ledge_left = (plate.PLATE_LENGTH - spec.LEDGE_WIDTH) / 2.0
+    for side in ("left", "right"):
+        hole, tap = holes[f"screw_hole_{side}"], taps[f"ledge_tap_{side}"]
+        assert abs(ledge_left + hole["station_nominal"] - tap["station_nominal"]) < 1e-9
+        assert abs(plate.BLOCK_HEIGHT + hole["height_nominal"] - tap["height_nominal"]) < 1e-9
+    assert holes["screw_hole_left"]["dia"][0] > THREAD_MAJOR_MM[plate.SCREW_THREAD]
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:

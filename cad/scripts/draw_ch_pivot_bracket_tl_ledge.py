@@ -56,7 +56,7 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 ISO_SCALE = (2, 1)
-# Front: the 20 x 15.9 face at 4:1 is 80 x 63.6 mm, x 0.095..0.175 and
+# Front: the 22 x 15.9 face at 4:1 is 88 x 63.6 mm, x 0.091..0.179 and
 # y 0.118..0.182. Third angle: the edge view stands right of it, past the
 # hole callout; the iso rides top-right.
 FRONT_CENTER = (0.135, 0.150)
@@ -87,8 +87,8 @@ FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], 0.088),
     "Hole2X": (_sheet_x(HOLE_X[1] / 2.0), 0.097),
     "Hole1X": (_sheet_x(HOLE_X[0] / 2.0), 0.106),
-    "Height": (0.068, FRONT_CENTER[1]),
-    "Hole1Y": (0.081, _sheet_y(HOLE_Y / 2.0)),
+    "Height": (0.058, FRONT_CENTER[1]),
+    "Hole1Y": (0.075, _sheet_y(HOLE_Y / 2.0)),
 }
 RIGHT_KEEP = {"Thick": (RIGHT_CENTER[0], 0.198)}
 # Both holes stand on the one Y station the part prints (Hole1Y).

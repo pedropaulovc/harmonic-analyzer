@@ -22,19 +22,19 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
 
 
-def test_exported_station_bands_are_the_printed_bands() -> None:
+def test_exported_stations_are_the_printed_general_bands() -> None:
+    """Every station prints at one place, so prechips sees the title block's
+    .X band the shop is held to, not a tighter one."""
     features = _features()
+    places = spec.DRAWING_PRECISION_BY_NAME
     for side, x in zip(("left", "right"), spec.TAP_X, strict=True):
         tap = features[f"ledge_tap_{side}"]
-        assert tap["station"] == limits(x, 2, (spec.LOCATION_BAND, -spec.LOCATION_BAND))
-        assert tap["height"] == limits(
-            spec.SCREW_Y, 2, (spec.LOCATION_BAND, -spec.LOCATION_BAND)
-        )
+        assert tap["station"] == limits(x, places["Tap1X"])
+        assert tap["height"] == limits(spec.SCREW_Y, places["Tap1Y"])
     for side, x in zip(("left", "right"), spec.STUD_X, strict=True):
         stud = features[f"stud_hole_{side}"]
-        assert stud["station"] == limits(x, 2, (spec.LOCATION_BAND, -spec.LOCATION_BAND))
-        # the stud row's height rides the title block's one-place band
-        assert stud["height"] == limits(spec.STUD_Y, 1)
+        assert stud["station"] == limits(x, places["Stud1X"])
+        assert stud["height"] == limits(spec.STUD_Y, places["Stud1Y"])
 
 
 def test_bracket_seat_lies_on_the_upright_face_above_the_ledge() -> None:

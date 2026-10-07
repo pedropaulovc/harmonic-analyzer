@@ -48,13 +48,15 @@ BLOCK_HEIGHT = 50.8
 LEDGE_TOP_Y = PLATE_HEIGHT + PART_PROUD - bracket.FOOT_LEN  # 66.7
 
 # Ledge screws: two #10-24 x 5/8 SHCS (shop-to-shop UNC, fastener policy) at
-# 8.0 under the ledge top, 8.0 apart about the plate centre. The ledge rests
-# on the block, not on these holes, so they are dimensioned from the table
-# plane the block stands on: no bought-plate height enters the screw fit.
+# 8.0 under the ledge top, 10.0 apart about the plate centre. The taps are
+# spotted through the ledge's own holes with the ledge standing on its block,
+# so the screw fit never depends on either part's printed hole stations:
+# those ride the title block's general tolerance.
 SCREW_THREAD = "#10-24"
 TAP_SPEC = HoleSpec("tapped", SCREW_THREAD)
 LEDGE_CLEARANCE_SPEC = HoleSpec("drilled_number", "#5")
-SCREW_HALF_PITCH = 4.0
+SCREW_CLEARANCE = blind_cut_dia_mm(LEDGE_CLEARANCE_SPEC) - THREAD_MAJOR_MM[SCREW_THREAD]
+SCREW_HALF_PITCH = 5.0
 SCREW_BELOW_LEDGE_TOP = 8.0
 SCREW_Y = LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP  # 58.7
 TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
@@ -68,19 +70,9 @@ STUD_Y = PLATE_HEIGHT - 14.0  # 74.9
 STUD_X = (CENTRE_X - STUD_HALF_PITCH, CENTRE_X + STUD_HALF_PITCH)
 STUD_NUT_DIA = 16.5  # 3/8-16 hex nut envelope (inventory bridge row)
 
-# One DRO band on every hole station the screws or studs fit through. Each
-# #10 screw is fixed in an upright tap and passes a ledge hole. Along X the
-# ledge floats, so each screw sees half the pitch mismatch (2 x band); across
-# it the block fixes the ledge, so the tap's and the hole's heights add
-# (2 x band). Both together stay inside the screw's radial clearance in the
-# smallest ledge hole. The studs float in both the upright and the bridge.
-LOCATION_BAND = 0.05
-LOCATION_PLACES = 2
-SCREW_CLEARANCE = blind_cut_dia_mm(LEDGE_CLEARANCE_SPEC) - THREAD_MAJOR_MM[SCREW_THREAD]
-if 2.0 * 2.0**0.5 * LOCATION_BAND > SCREW_CLEARANCE / 2.0:
-    raise AssertionError("ledge-screw station band exceeds the #10 screw's clearance")
-if 4.0 * LOCATION_BAND > blind_cut_dia_mm(STUD_SPEC) - STUD_DIA:
-    raise AssertionError("stud station band exceeds the 3/8 stud's clearance")
+# Every station rides the title block's one-place band: the taps are spotted
+# from the ledge and the studs float in both the upright and the bridge.
+STATION_PLACES = 1
 # Every hole lies in the upright, clear of the base and of the top edge.
 for _y, _spec in ((SCREW_Y, TAP_SPEC), (STUD_Y, STUD_SPEC)):
     _r = (blind_cut_dia_mm(_spec) + drilled_oversize_mm()) / 2.0
@@ -92,13 +84,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StudHoles": {"Stud1X", "Stud2X", "Stud1Y"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "LedgeTaps": {"Tap1X": LOCATION_PLACES, "Tap2X": LOCATION_PLACES, "Tap1Y": LOCATION_PLACES},
-    "StudHoles": {"Stud1X": LOCATION_PLACES, "Stud2X": LOCATION_PLACES, "Stud1Y": 1},
-}
-# Native symmetric bands (the stud height rides the title block's .X).
-BANDED_DIMENSIONS: dict[str, set[str]] = {
-    "LedgeTaps": {"Tap1X", "Tap2X", "Tap1Y"},
-    "StudHoles": {"Stud1X", "Stud2X"},
+    feature: dict.fromkeys(names, STATION_PLACES) for feature, names in DRAWING_DIMENSIONS.items()
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
@@ -111,14 +97,15 @@ SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
         "BOUGHT ANGLE PLATE: ADD THE FOUR HOLES ONLY.",
+        "SPOT THE TAPS THROUGH THE LEDGE HOLES, LEDGE IN PLACE.",
         "STONE THE FRONT FACE FLAT OVER EVERY HOLE BURR.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 
 
-def _station(value: float, places: int, banded: bool) -> list[float]:
-    return limits(value, places, (LOCATION_BAND, -LOCATION_BAND) if banded else None)
+def _station(value: float) -> list[float]:
+    return limits(value, STATION_PLACES)
 
 
 # Hole stations: ``station`` is the model X from the plate's left end, ``height``
@@ -173,19 +160,16 @@ for _side, _x in (("left", TAP_X[0]), ("right", TAP_X[1])):
             "thread": (f"{SCREW_THREAD} UNC-{TAP_SPEC.thread_class}", ("TAP_SPEC", "SCREW_THREAD")),
             "tap_drill_mm": (_TAP_DRILL, ("TAP_SPEC",)),
             "thru": (True, ("TAP_SPEC",)),
-            "station": (
-                _station(_x, LOCATION_PLACES, True),
-                ("TAP_X", "LOCATION_BAND", "SCREW_CLEARANCE"),
-            ),
+            "station": (_station(_x), ("TAP_X", "STATION_PLACES")),
             "station_nominal": (_x, ("TAP_X",)),
             "height": (
-                _station(SCREW_Y, LOCATION_PLACES, True),
-                ("SCREW_Y", "LOCATION_BAND", "SCREW_CLEARANCE", ("ch_pivot_bracket_spec", "FOOT_LEN")),
+                _station(SCREW_Y),
+                ("SCREW_Y", "STATION_PLACES", ("ch_pivot_bracket_spec", "FOOT_LEN")),
             ),
             "height_nominal": (SCREW_Y, ("SCREW_Y",)),
             "height_from": ("table_face", ("__frame__",)),
         },
-        precision={"station": LOCATION_PLACES, "height": LOCATION_PLACES},
+        precision={"station": STATION_PLACES, "height": STATION_PLACES},
     )
 for _side, _x in (("left", STUD_X[0]), ("right", STUD_X[1])):
     EXPORT_FEATURES[f"stud_hole_{_side}"] = ExportFeature(
@@ -199,11 +183,11 @@ for _side, _x in (("left", STUD_X[0]), ("right", STUD_X[1])):
             "dia": (limits(_STUD_DRILL, 2, _DRILLED), ("STUD_SPEC", "STUD_DIA")),
             "nominal_dia": (_STUD_DRILL, ("STUD_SPEC",)),
             "thru": (True, ("STUD_SPEC",)),
-            "station": (_station(_x, LOCATION_PLACES, True), ("STUD_X", "LOCATION_BAND")),
+            "station": (_station(_x), ("STUD_X", "STATION_PLACES")),
             "station_nominal": (_x, ("STUD_X",)),
-            "height": (_station(STUD_Y, 1, False), ("STUD_Y",)),
+            "height": (_station(STUD_Y), ("STUD_Y", "STATION_PLACES")),
             "height_nominal": (STUD_Y, ("STUD_Y",)),
             "height_from": ("table_face", ("__frame__",)),
         },
-        precision={"dia": 2, "station": LOCATION_PLACES, "height": 1},
+        precision={"dia": 2, "station": STATION_PLACES, "height": STATION_PLACES},
     )

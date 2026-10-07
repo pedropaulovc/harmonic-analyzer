@@ -7,4 +7,4 @@ ch-pivot-bracket-tl-ledge:
   finish: as machined
   quantity: 1
   tolerance_class: machined_block
-  process: "mill block from flat bar; lap top and bottom faces to height; drill two #5 through"
+  process: "mill block from flat bar; drill two #5 through"

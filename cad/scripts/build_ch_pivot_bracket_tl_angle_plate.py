@@ -41,19 +41,16 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_symmetric_tolerance,
 )
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from _saved_part_guard import require_saved_drawing_properties
 from ch_pivot_bracket_tl_angle_plate_spec import (
-    BANDED_DIMENSIONS,
     BASE_THICK,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
-    LOCATION_BAND,
     PLATE_HEIGHT,
     PLATE_LENGTH,
     PLATE_WIDTH,
@@ -205,11 +202,6 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    for feature_name, dimension_names in BANDED_DIMENSIONS.items():
-        for dimension_name in sorted(dimension_names):
-            set_dimension_symmetric_tolerance(
-                adapter, feature_name, dimension_name, LOCATION_BAND
-            )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

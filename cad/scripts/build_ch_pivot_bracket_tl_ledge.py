@@ -41,10 +41,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
 from _holes import wizard_holes
 from _saved_part_guard import require_saved_drawing_properties
 from ch_pivot_bracket_tl_ledge_spec import (
@@ -52,16 +49,13 @@ from ch_pivot_bracket_tl_ledge_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    HEIGHT_BAND,
     HOLE_DIA,
-    HOLE_LOCATION_DIMENSIONS,
     HOLE_X,
     HOLE_Y,
     ISOMETRIC_VIEW_NOTE,
     LEDGE_HEIGHT,
     LEDGE_THICK,
     LEDGE_WIDTH,
-    LOCATION_BAND,
 )
 
 PART_NAME = "ch-pivot-bracket-tl-ledge"
@@ -151,13 +145,6 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "LedgeProfile", "Height", *deviations(HEIGHT_BAND)
-    )
-    for dimension_name in sorted(HOLE_LOCATION_DIMENSIONS):
-        set_dimension_symmetric_tolerance(
-            adapter, "ScrewHoles", dimension_name, LOCATION_BAND
-        )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
