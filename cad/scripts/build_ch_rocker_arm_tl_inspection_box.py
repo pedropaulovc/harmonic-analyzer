@@ -48,7 +48,7 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from _holes import blind_hole_volume_mm3, wizard_holes
-from build_fr_rocker_arm_support import _cut_through_all
+from _gear import _blank_ref_plane
 from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_inspection_box_spec import (
     BACK_WINDOW,
@@ -87,9 +87,7 @@ _SAVED_DRAWING_PROPERTIES = (
 V_TUBE = BOX * (BOX * BOX - CORE * CORE)
 V_CLAMP_WINDOWS = 2.0 * WINDOW_W * WINDOW_H * WALL
 V_BACK_WINDOW = BACK_WINDOW * BACK_WINDOW * WALL
-# The back-window cut starts inside the core and runs out through the back
-# wall, so it removes only the back wall whatever the wall's measured size.
-_BACK_CUT_START = BOX - WALL - 1.0
+_BACK_PLANE_Z = BOX - WALL / 2.0
 
 
 def _rectangle(x0: float, y0: float, w: float, h: float) -> list[tuple[float, float]]:
@@ -112,7 +110,7 @@ async def _chain(adapter, points, label, dims, names, drives) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -180,7 +178,17 @@ async def build(adapter) -> dict[str, str]:
 
     # --- Access window through the back wall -------------------------------
     back = SketchDims()
-    check("create_sketch back window", await adapter.create_sketch("Front"))
+    # Sketched on a plane mid-way through the back wall and cut both ways
+    # by more than the wall, so only the back wall opens.
+    check(
+        "create_plane BackWallPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=-_BACK_PLANE_Z)
+        ),
+    )
+    name_last_feature(adapter, "BackWallPlane")
+    _blank_ref_plane(adapter, "BackWallPlane")
+    check("create_sketch back window", await adapter.create_sketch("BackWallPlane"))
     await _chain(
         adapter, _rectangle(BACK_WINDOW_X0, BACK_WINDOW_Y0, BACK_WINDOW, BACK_WINDOW),
         "back window", back,
@@ -191,15 +199,11 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch back window", await adapter.exit_sketch())
     name_last_feature(adapter, "BackWindowProfile")
     drive_jobs += back.apply(adapter, "BackWindowProfile")
-    # Through All -Z, started inside the core: the rocker support's WindowCut2
-    # start-offset pair, so only the back wall opens.
-    _cut_through_all(
-        adapter,
-        "BackWindowProfile",
-        both=False,
-        reverse_dir=True,
-        start_offset_mm=_BACK_CUT_START,
-        flip_start=False,
+    check(
+        "cut back window",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=WALL + 2.0, both_directions=True)
+        ),
     )
     name_last_feature(adapter, "BackWindow")
     volume = await volume_check(
