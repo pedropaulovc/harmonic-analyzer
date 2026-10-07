@@ -57,9 +57,9 @@ FRONT_KEEP = {
     "HoleRightX": (0.148, 0.120),
 }
 RIGHT_KEEP = {"BarWidth": (0.230, 0.135)}
-CALLOUT_XY = (0.175, 0.205)
+CALLOUT_XY = (0.200, 0.150)
 # Mating acceptance sits on the feature it governs, not in the notes.
-DIMENSION_CALLOUTS = {"HoleRightX": "2X, MATCH BOX TAPS"}
+DIMENSION_CALLOUTS = {"HoleY": "2X; SCREWS ENTER MHA-CH-006-TL-08 TAPS FREELY"}
 
 
 def _counterbore_edge(adapter: Any, view: Any) -> Any:
