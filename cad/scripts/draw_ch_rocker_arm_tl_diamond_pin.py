@@ -11,6 +11,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
+    add_edge_dimension,
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
@@ -18,6 +19,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -65,6 +67,9 @@ AXIAL_XY = {
     "OverallLength": (8.0, 0.052),
     "PinLength": (2.0, 0.062),
 }
+# Reference overall, land tip to shank end, on the top tier.
+OVERALL_REF_XY = (6.7, 0.072)
+OVERALL_REF = OVERALL_LENGTH + LAND_HEIGHT
 DIAMETER_XY = {
     "NeckDia": (1.0, -0.026),
     "CollarDia": (6.0, -0.038),
@@ -103,6 +108,28 @@ def _section_mapper(adapter: Any, section: Any):
         return x, y + offset_m
 
     return to_sheet
+
+
+def _overall_reference(adapter: Any, section: Any, to_sheet) -> None:
+    """(18.1) land tip to shank end, so the assembled length reads at a glance."""
+    label = "diamond-pin overall length reference"
+    display = add_edge_dimension(
+        adapter,
+        section,
+        p0=to_sheet(-LAND_HEIGHT, 0.002),
+        p1=to_sheet(OVERALL_LENGTH, 0.002),
+        text_xy=to_sheet(*OVERALL_REF_XY),
+        label=label,
+        orientation="horizontal",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    measured_mm = abs(float(_early_bound(display.GetDimension2(0), "IDimension").SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL_REF) > 1e-3:
+        raise RuntimeError(f"{label} measured {measured_mm:g}, expected {OVERALL_REF:g}")
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+    display.SetPrecision3(1, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != 1:
+        raise RuntimeError(f"{label} precision did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -170,6 +197,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _overall_reference(adapter, section, to_sheet)
     create_section_axis_centerline(
         adapter, section, length_mm=OVERALL_LENGTH + LAND_HEIGHT, label="pin turning axis"
     )
