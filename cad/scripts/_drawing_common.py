@@ -47,7 +47,12 @@ from _drawing_layout_check import (
     format_findings,
 )
 from _drawing_layout_audit import annotation_display, run_layout_audit
-from _layout_audit import display_box, estimated_text_runs, line_segment
+from _layout_audit import (
+    SHOULDER_Y_TOL_M,
+    display_box,
+    estimated_text_runs,
+    line_segment,
+)
 from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout, layout_report_path
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import (
@@ -1889,7 +1894,7 @@ def compose_hole_callout_prefix(process: str, existing: str) -> str:
 def _assert_native_hole_callout_leader(
     adapter: Any, annotation: Any, *, label: str
 ) -> None:
-    """Require one printable arrow joined to the native callout's leader ink.
+    """Require a complete printable arrow-to-text route in native callout ink.
 
     GetLeaderCount reads zero on measured callouts despite visible leaders.
     Display data is the rendered authority, as in the layout audit, but this
@@ -1915,6 +1920,7 @@ def _assert_native_hole_callout_leader(
     data = _sw_type_info.early_bound_or_flag(
         data, "IDisplayData", "GetLineCount", "GetLineAtIndex2",
         "GetArrowHeadCount", "GetArrowHeadAtIndex2",
+        "GetTextCount", "GetTextAtIndex", "GetTextPositionAtIndex",
     )
     if int(data.GetArrowHeadCount()) != 1:
         raise RuntimeError(f"native hole callout has no single rendered arrow ({label})")
@@ -1945,11 +1951,66 @@ def _assert_native_hole_callout_leader(
             segments.append((start, end))
     # Arrow Z can differ from its line Z in native display data. Compare XY;
     # the line may also extend beyond the arrow tip toward the hole centre.
-    if not any(
-        _segment_distance(arrow[:2], start, end) <= _SILHOUETTE_POINT_TOLERANCE_M
-        for start, end in segments
-    ):
+    tolerance = _SILHOUETTE_POINT_TOLERANCE_M
+    connected = {
+        index for index, (start, end) in enumerate(segments)
+        if _segment_distance(arrow[:2], start, end) <= tolerance
+    }
+    if not connected:
         raise RuntimeError(f"native hole callout has no connected rendered leader ({label})")
+    pending = list(connected)
+    while pending:
+        a, b = segments[pending.pop()]
+        for index, (start, end) in enumerate(segments):
+            if index not in connected and min(
+                _segment_distance(start, a, b),
+                _segment_distance(end, a, b),
+                _segment_distance(a, start, end),
+                _segment_distance(b, start, end),
+            ) <= tolerance:
+                connected.add(index)
+                pending.append(index)
+    # A readable arrow stub is not a complete callout: its component must
+    # reach the shoulder under the current rendered text. Reuse the layout
+    # audit's lowest-text-baseline convention, adding actual X coverage.
+    # Unrelated display strokes need not belong to this component.
+    text_positions = []
+    text_count = int(data.GetTextCount())
+    for index in range(text_count):
+        text = data.GetTextAtIndex(index)
+        if type(text) is not str:
+            raise RuntimeError(f"native hole callout has unreadable rendered text ({label})")
+        if not text.strip():
+            continue
+        raw_position = data.GetTextPositionAtIndex(index)
+        if raw_position is None or len(raw_position) != 3:
+            raise RuntimeError(f"native hole callout has unreadable text position ({label})")
+        position = tuple(float(value) for value in raw_position)
+        if not all(math.isfinite(value) for value in position):
+            raise RuntimeError(f"native hole callout has nonfinite text position ({label})")
+        text_positions.append(position)
+    if not text_positions:
+        raise RuntimeError(f"native hole callout has no rendered text ({label})")
+    # Text offsets are sheet-compatible on the calibrated drawing display
+    # data (CSP_DRILL); do not add the annotation's position a second time.
+    baseline = min(position[1] for position in text_positions)
+    shoulders = {
+        index for index, (start, end) in enumerate(segments)
+        if abs(end[1] - start[1]) <= tolerance
+        and max(abs(start[1] - baseline), abs(end[1] - baseline)) < SHOULDER_Y_TOL_M
+        and any(
+            abs(position[1] - baseline) < SHOULDER_Y_TOL_M
+            and min(start[0], end[0]) - tolerance <= position[0]
+            <= max(start[0], end[0]) + tolerance
+            for position in text_positions
+        )
+    }
+    if connected.isdisjoint(shoulders):
+        raise RuntimeError(
+            f"native hole callout has incomplete rendered leader route ({label}): "
+            f"arrow_component={sorted(connected)}, text_shoulders={sorted(shoulders)}, "
+            f"segments={len(segments)}, text_baseline={baseline:.9g}"
+        )
 
 
 @_telemetry.traced("drawing.hole_callout", label_param="label")

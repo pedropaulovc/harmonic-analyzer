@@ -219,6 +219,8 @@ def callout_scene(monkeypatch, tmp_path):
         boundaries=[],
         rebuilds=[],
         registered_leaders=0,
+        route_fixture="RD3",
+        route_order="native",
     )
 
     class Edge:
@@ -262,6 +264,55 @@ def callout_scene(monkeypatch, tmp_path):
                 (0.0707, 0.20571, -0.0015875, 0.7, 0.7, 0,
                  0.003556, 0.000762, 0, 0, 0, -1),
             ]
+            self.texts = [("DRILL", (0.104, 0.2192, 0))]
+            if scene.route_fixture == "CSP_DRILL":
+                # Measured CSP_DRILL ink and text, test_layout_audit.py:1047-1064.
+                self.lines = [
+                    (0, 0, 0, 0, 0.1773666, 0.1360656, 0, 0.1884146, 0.1041951, 0),
+                    (0, 0, 0, 0, 0.1762602, 0.1392573, 0, 0.1773666, 0.1360656, 0),
+                    (0, 0, 0, 0, 0.1884146, 0.1041951, 0, 0.2399979, 0.1041951, 0),
+                ]
+                self.arrows = [
+                    (0.1773666, 0.1360656, -0.0015875, 0.3275313, -0.9448403, 0,
+                     0.003556, 0.000762, 0, 0, 0, -1),
+                ]
+                self.texts = [
+                    ("DRILL ", (0.1900021, 0.1042486, 0)),
+                    ("<MOD-DIAM>", (0.2029618, 0.1041951, 0)),
+                    (" 6.76 THRU ALL", (0.2082403, 0.1042486, 0)),
+                ]
+            if scene.route_order in {
+                "near_baseline", "near_baseline_reversed",
+                "baseline_boundary", "baseline_boundary_reversed",
+            }:
+                margin = 0.000003 if scene.route_order.startswith("near_") else 0.000001
+                shift = common.SHOULDER_Y_TOL_M - margin
+                self.lines = [
+                    (*line[:5], line[5] + shift, line[6], line[7],
+                     line[8] + shift, line[9])
+                    for line in self.lines
+                ]
+                shoulder = self.lines[2]
+                self.lines[2] = (*shoulder[:8], shoulder[8] + 0.000002, shoulder[9])
+                arrow = self.arrows[0]
+                self.arrows = [(*arrow[:1], arrow[1] + shift, *arrow[2:])]
+            if scene.route_order in {
+                "reversed", "near_baseline_reversed", "baseline_boundary_reversed",
+            }:
+                self.lines = [
+                    (*line[:4], *line[7:10], *line[4:7])
+                    for line in reversed(self.lines)
+                ]
+            elif scene.route_order == "shuffled":
+                self.lines = [self.lines[2], self.lines[0], self.lines[1]]
+            elif scene.route_order == "t_join":
+                shoulder = self.lines[2]
+                self.lines[2] = (
+                    *shoulder[:4], shoulder[4] - 0.005, *shoulder[5:],
+                )
+            elif scene.route_order == "separate_stroke":
+                # The route proof must not assume all display ink is leader.
+                self.lines.append((0, 0, 0, 0, 0.01, 0.25, 0, 0.04, 0.25, 0))
 
         def IsHoleCallout(self):
             return self.hole
@@ -277,6 +328,9 @@ def callout_scene(monkeypatch, tmp_path):
                 GetLineAtIndex2=lambda index: self.lines[index],
                 GetArrowHeadCount=lambda: len(self.arrows),
                 GetArrowHeadAtIndex2=lambda index: self.arrows[index],
+                GetTextCount=lambda: len(self.texts),
+                GetTextAtIndex=lambda index: self.texts[index][0],
+                GetTextPositionAtIndex=lambda index: self.texts[index][1],
             )
 
     class Annotation:
@@ -591,6 +645,29 @@ def callout_scene(monkeypatch, tmp_path):
             current.Visible = 0  # swAnnotationVisibilityUnknown
         elif fault == "partial_leader":
             current.display.lines.append((0, 0))
+        elif fault in {"missing_connector", "same_baseline_far_stub"}:
+            # Retain the healthy arrow stub AND text shoulder, not the slope.
+            stub_index = 0 if scene.route_fixture == "RD3" else 1
+            current.display.lines = [
+                current.display.lines[stub_index], current.display.lines[2],
+            ]
+            if fault == "same_baseline_far_stub":
+                x, y = current.display.arrows[0][:2]
+                baseline = min(position[1] for _text, position in current.display.texts)
+                current.display.lines.extend([
+                    (0, 0, 0, 0, x, y, 0, x, baseline, 0),
+                    (0, 0, 0, 0, x - 0.005, baseline, 0, x, baseline, 0),
+                ])
+        elif fault == "missing_text":
+            current.display.texts = []
+        elif fault == "blank_text":
+            current.display.texts = [(" ", (0.104, 0.2192, 0))]
+        elif fault == "unreadable_text":
+            current.display.texts = [(None, (0.104, 0.2192, 0))]
+        elif fault == "unreadable_text_position":
+            current.display.texts = [("DRILL", (0.104, 0.2192))]
+        elif fault == "nonfinite_text_position":
+            current.display.texts = [("DRILL", (float("nan"), 0.2192, 0))]
         elif fault == "no_arrow":
             current.display.arrows = []
         elif fault == "extra_arrow":
@@ -712,6 +789,8 @@ def callout_scene(monkeypatch, tmp_path):
         "zero_count", "extra_count", "no_leader", "unreadable_leader",
         "malformed_leader", "nonfinite_leader", "degenerate_leader",
         "partial_leader", "no_arrow", "extra_arrow", "hidden_arrow",
+        "missing_text", "blank_text", "unreadable_text",
+        "unreadable_text_position", "nonfinite_text_position",
         "unreadable_arrow", "nonfinite_arrow", "disconnected_arrow",
         "zero_size_arrow", "zero_direction_arrow",
         "hidden_callout", "half_hidden_callout", "unknown_visibility",
@@ -752,13 +831,20 @@ def test_final_settling_refuses_current_callout_damage_before_persistence(
     assert original in scene.top.GetAnnotations()
 
 
+@pytest.mark.parametrize("route_fixture", ["RD3", "CSP_DRILL"])
+@pytest.mark.parametrize(
+    "route_order",
+    ["native", "reversed", "shuffled", "t_join", "separate_stroke",
+     "near_baseline", "near_baseline_reversed"],
+)
 @pytest.mark.parametrize("registered_leaders", [0, 1, 2])
 def test_final_settling_accepts_fresh_native_aliases_before_save(
-    callout_scene, registered_leaders
+    callout_scene, registered_leaders, route_fixture, route_order
 ):
     """Fresh edge, annotation, dimension and view wrappers retain native IDs."""
     scene = callout_scene
     scene.registered_leaders = registered_leaders
+    scene.route_fixture, scene.route_order = route_fixture, route_order
     with pytest.raises(_PersistenceReached, match="save"):
         asyncio.run(drawing.build(scene.adapter))
     assert scene.boundaries == ["save"]
@@ -781,6 +867,40 @@ def test_final_settling_accepts_fresh_native_aliases_before_save(
     for kind in ("edge", "display", "view"):
         assert any(first is not second and first.native_id[0] == kind and result == 1 and settled
                    for first, second, result, settled in scene.comparisons)
+
+
+@pytest.mark.parametrize("target", ["anchor", "middle"])
+@pytest.mark.parametrize("route_fixture", ["RD3", "CSP_DRILL"])
+@pytest.mark.parametrize("fault", ["missing_connector", "same_baseline_far_stub"])
+def test_complete_callout_route_must_reach_current_text_before_save(
+    callout_scene, target, route_fixture, fault
+):
+    """A stub at the arrow cannot substitute for the missing route to text."""
+    scene = callout_scene
+    scene.target, scene.route_fixture, scene.fault = target, route_fixture, fault
+    with pytest.raises(RuntimeError, match="incomplete rendered leader route") as info:
+        asyncio.run(drawing.build(scene.adapter))
+    assert scene.boundaries == []
+    assert scene.settled
+    assert "arrow_component=" in str(info.value)
+    assert "text_shoulders=" in str(info.value)
+    # These old handles still look healthy; only the current rendered route
+    # lost its connector at the final settling boundary.
+    assert len(scene.originals[target].display.lines) == 3
+
+
+@pytest.mark.parametrize("route_fixture", ["RD3", "CSP_DRILL"])
+@pytest.mark.parametrize("route_order", ["baseline_boundary", "baseline_boundary_reversed"])
+def test_text_shoulder_baseline_refusal_is_endpoint_direction_independent(
+    callout_scene, route_fixture, route_order
+):
+    """One shoulder endpoint inside the baseline band cannot hide the other."""
+    scene = callout_scene
+    scene.route_fixture, scene.route_order = route_fixture, route_order
+    with pytest.raises(RuntimeError, match="incomplete rendered leader route"):
+        asyncio.run(drawing.build(scene.adapter))
+    assert scene.boundaries == []
+    assert not scene.settled  # the same physical damaged route fails on insertion
 
 
 @pytest.mark.parametrize("target", ["anchor", "middle"])
