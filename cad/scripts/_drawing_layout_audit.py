@@ -454,12 +454,13 @@ def _document_lineweights(reader: _Reader) -> dict[str, Any]:
 
 
 def _component_lineweights(reader: _Reader, view: Any) -> dict[str, Any]:
-    """Read the actual view-context tree, with explicit incompleteness at bounds."""
+    """Read the getter-returned tree, with explicit context and incompleteness."""
     source = "IView.RootDrawingComponent2(InChildContext=True)"
     root, cause = _witness_bind(reader, lambda: view.RootDrawingComponent2(True), "IDrawingComponent", source)
     result: dict[str, Any] = {
         "status": "read", "source": source, "in_child_context": True,
         "max_components": 512, "max_depth": 32, "components": [],
+        "coverage": "getter-returned root; section temporary context requested; nonsection parent-view semantics; not exhaustive current projected-view override proof",
     }
     if cause is not None:
         result.update(status="unreadable", cause=cause)
