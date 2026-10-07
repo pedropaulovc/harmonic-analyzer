@@ -156,6 +156,12 @@ function withinHalfOpenShot(shot, time) {
 function unavailable(value) {
   return Array.isArray(value) && value.length > 0 && value.every(row => row && text(row.reason))
 }
+function requireOptionalViewIds(rows, label) {
+  if (rows === undefined) return
+  assert(Array.isArray(rows) && rows.every(row => row
+    && (!Object.hasOwn(row, 'viewId') || typeof row.viewId === 'string')),
+  `${label}: present current observation viewId must be a string`)
+}
 function requireCamera(camera, label) {
   assert(vector(camera?.positionMetres, 3) && vector(camera.quaternion, 4)
     && Math.abs(Math.hypot(...camera.quaternion) - 1) <= 0.002
@@ -395,11 +401,14 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
     assert(!sourceImageError(frame.sourceImage, source)
       && (frame.decodedFrameIndex === undefined || frame.decodedFrameIndex === frame.sourceImage.frameIndex), `${label}: missing or invalid actual source image identity`)
     assert(Array.isArray(frame.views) && Array.isArray(frame.landmarks), `${label}: current view/landmark census missing`)
+    requireOptionalViewIds(frame.landmarks, `${label}/landmarks`)
+    requireOptionalViewIds(frame.unavailable, `${label}/unavailable`)
     const viewIds = new Set()
     for (const view of frame.views) {
       const viewLabel = `${label}/${view.id}`, rect = view.rectSourcePixels
       assert(view && typeof view === 'object' && !Array.isArray(view)
         && Object.keys(view).every(key => CURRENT_VIEW_FIELDS.has(key)), `${viewLabel}: unknown current view field`)
+      requireOptionalViewIds(view.unavailable, `${viewLabel}/unavailable`)
       assert(text(view.id) && !viewIds.has(view.id) && vector(rect, 4) && rect[0] >= 0 && rect[1] >= 0
         && rect[2] > 0 && rect[3] > 0 && rect[0] + rect[2] <= source.width && rect[1] + rect[3] <= source.height
         && ['native', 'horizontal-mirror'].includes(view.presentation), `${viewLabel}: invalid source layout`)

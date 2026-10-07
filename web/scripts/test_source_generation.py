@@ -1103,6 +1103,39 @@ class HistoricalDiagnosticOutputBoundaryTests(unittest.TestCase):
                                 module.private_output(destination)
                 private.unlink()
 
+    def test_guards_refuse_checkout_inside_resolved_temporary_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            web = root / 'checkout/web'
+            external = root / 'external'
+            for directory in (web / 'src', web / 'public', web / 'content',
+                              web.parent / 'cad', external):
+                directory.mkdir(parents=True, exist_ok=True)
+            aliases = {}
+            for name, allowed in (('tmp', '/tmp'), ('var-tmp', '/var/tmp')):
+                alias = root / name
+                alias.symlink_to(root, target_is_directory=True)
+                aliases[allowed] = alias
+
+            def temporary_roots(value):
+                # Normalize the real symlink targets here so this case isolates
+                # checkout exclusion, not the separate temp-root normalization.
+                return aliases[str(value)].resolve() if str(value) in aliases else Path(value)
+
+            for filename in self.scripts:
+                module = load_script(filename, 'historical_contained_checkout_' + filename)
+                with self.subTest(script=filename), patch.object(module, 'WEB', web), \
+                        patch.object(module, 'Path', temporary_roots):
+                    self.assertEqual(module.private_output(external / 'receipt.json'),
+                                     external / 'receipt.json')
+                    for destination in (web.parent / 'receipt.json',
+                                        web.parent / 'cad/receipt.json',
+                                        web / 'src/receipt.json',
+                                        web / 'public/receipt.json',
+                                        web / 'content/receipt.json'):
+                        with self.subTest(destination=destination), self.assertRaises(ValueError):
+                            module.private_output(destination)
+
     def test_analysis_cli_writes_original_historical_diagnostic_to_external_temporary_output(self):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / 'diagnostic'

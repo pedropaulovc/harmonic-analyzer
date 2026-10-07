@@ -895,7 +895,7 @@ def _observe_current(data, cap, pts, inventory, contract, match_repeated_view):
         required = needs_machine(frame, shot)
         observed = {
             (
-                item.get("viewId") if item.get("viewId") is not None else "main",
+                item.get("viewId", "main"),
                 item["anchorId"],
             )
             for item in frame["landmarks"]

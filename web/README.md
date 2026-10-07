@@ -205,6 +205,8 @@ or published as a current source track. Historical lineage never supplies
 current eligibility.
 
 For current observations, an omitted landmark `viewId` belongs to `main`.
+Present landmark and unavailable-row scope IDs must be strings; explicit `null`
+is not an omitted scope and is refused by the runtime contract.
 Fitting and observer availability apply that default at the consumer boundary;
 they do not rewrite the original source measurements or explicit view scopes.
 

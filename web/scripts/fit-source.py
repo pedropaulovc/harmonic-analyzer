@@ -1593,9 +1593,8 @@ def _run_computation(observations, inventory):
                 }
                 for landmark in frame["landmarks"]
                 if (
-                    "main"
+                    landmark.get("viewId", "main")
                     if observations.get("kind") == "current-source-observations"
-                    and landmark.get("viewId") is None
                     else landmark.get("viewId")
                 ) == view["id"]
             ]

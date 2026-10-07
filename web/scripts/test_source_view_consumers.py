@@ -3,6 +3,7 @@ import copy
 import hashlib
 import importlib.util
 from pathlib import Path
+import subprocess
 import unittest
 
 import numpy as np
@@ -79,6 +80,57 @@ class ConsumerOnlyContract:
 
 
 class SourceViewConsumerTests(unittest.TestCase):
+    def test_runtime_optional_view_scope_boundary_preserves_raw_records(self):
+        # Actual sealed records retain every native/source guard; only private scope
+        # mutations exercise optional IDs. No synthetic record is fidelity evidence.
+        subprocess.run(["node", "--input-type=module", "-e", r"""
+import assert from 'node:assert/strict'
+import {loadCurrentObservations, validateCurrentObservations, WEB_ROOT} from './scripts/fresh-source-observations.mjs'
+import {VIDEO_IDS} from './scripts/verify-reference.mjs'
+const original = await loadCurrentObservations(WEB_ROOT, VIDEO_IDS[0])
+const scope = original.frames.find(frame => frame.landmarks.length).landmarks[0].viewId
+for (const frame of original.frames) {
+  for (const view of frame.views) if (view.id === scope) view.id = 'main'
+  for (const point of frame.landmarks) if (point.viewId === scope) point.viewId = 'main'
+}
+for (const absent of [false, true]) {
+  const data = structuredClone(original)
+  if (absent) for (const frame of data.frames) for (const point of frame.landmarks) {
+    if (point.viewId === 'main') delete point.viewId
+  }
+  const frame = data.frames.find(frame => frame.views.length)
+  for (const owner of [frame, frame.views[0]]) {
+    owner.unavailable = [...(owner.unavailable ?? []),
+      {reason:'Private absent-scope boundary control'},
+      {reason:'Private explicit-scope boundary control', viewId:'main'},
+      {reason:'Private other-scope boundary control', viewId:scope},
+      {reason:'Schema permits empty unavailable scope', viewId:''}]
+  }
+  const raw = JSON.stringify(data)
+  assert.equal(await validateCurrentObservations(data), data)
+  assert.equal(JSON.stringify(data), raw, 'Validation rewrote authored associations')
+}
+for (const kind of ['landmark', 'frame-unavailable', 'view-unavailable']) {
+  for (const value of kind === 'landmark' ? [null, 7, false, {}, [], '', ' '] : [null, 7, false, {}, []]) {
+    const data = structuredClone(original)
+    if (kind === 'landmark') {
+      for (const frame of data.frames) for (const point of frame.landmarks) {
+        if (point.viewId === 'main') point.viewId = value
+      }
+    } else {
+      const frame = data.frames.find(frame => frame.views.length)
+      const owner = kind === 'frame-unavailable' ? frame : frame.views[0]
+      owner.unavailable = [...(owner.unavailable ?? []),
+        {reason:'Private invalid-scope boundary control', viewId:value}]
+    }
+    const raw = JSON.stringify(data)
+    await assert.rejects(validateCurrentObservations(data), /viewId|source landmark/,
+      `${kind} accepted invalid viewId ${JSON.stringify(value)}`)
+    assert.equal(JSON.stringify(data), raw, 'Rejected input was rewritten')
+  }
+}
+"""], cwd=HERE.parent, check=True)
+
     def test_actual_numeric_fit_scopes_pixels_without_rewriting_measurements(self):
         for scope, target in [('missing', 'main'), ('main', 'main'), ('other', 'other')]:
             with self.subTest(scope=scope):
