@@ -95,9 +95,11 @@ annotation's effective width; the extension same-as-leader flag can make its
 selected extension settings inactive.
 
 Each `views[].native_lineweights` records `IView.EmphasizeOutline` and the
-actual drawing-component tree obtained with `RootDrawingComponent2(True)`.
-The argument is explicit: the section view's temporary root is requested,
-not a substituted parent root. Components retain child-index `path`, native
+getter-returned drawing-component tree obtained with
+`RootDrawingComponent2(True)`. The argument explicitly requests the section
+view's temporary root; the documented nonsection behavior returns its
+parent-view root. This is not exhaustive proof of current projected-view
+overrides or their absence. Components retain child-index `path`, native
 `Name` and `UseDocumentDefaults`; equal names are not deduplicated.
 When document defaults are disabled or their flag is unreadable, each of the
 five documented component line-font selectors retains selected style,
