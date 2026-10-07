@@ -41,7 +41,7 @@ function serialize(json, binary = null) {
     binary = Buffer.alloc(36)
     ;[0, 0, 0, 1, 0, 0, 0, 1, 0].forEach((value, index) => binary.writeFloatLE(value, index * 4))
   }
-  const text = Buffer.from(JSON.stringify(json)), length = align4(text.length), binLength = align4(binary.length)
+  const text = Buffer.from(typeof json === 'string' ? json : JSON.stringify(json)), length = align4(text.length), binLength = align4(binary.length)
   const bytes = Buffer.alloc(28 + length + binLength)
   bytes.writeUInt32LE(0x46546c67, 0); bytes.writeUInt32LE(2, 4); bytes.writeUInt32LE(bytes.length, 8)
   bytes.writeUInt32LE(length, 12); bytes.writeUInt32LE(0x4e4f534a, 16)
@@ -98,6 +98,42 @@ test('projection preserves qualified native paths, raw bytes and all non-identit
   assert.deepEqual(repeated.canonicalBytes, canonicalBytes)
   assert.equal(repeated.identity.renamedNodes, 0)
   assert.deepEqual(repeated.paths, paths.map(path => ({ source: path.canonical, canonical: path.canonical })))
+})
+
+test('renamed transforms retain JSON signed zero and parsed numeric semantics', async () => {
+  // Author the numeric token directly: JSON.stringify(-0) would erase the
+  // behavior under test before the production projector ever sees the source.
+  const sourceFor = coordinate => serialize(`{
+      "asset":{"version":"2.0"},
+      "scene":0,"scenes":[{"nodes":[0]}],
+      "buffers":[{"byteLength":36}],
+      "nodes":[{"name":"harmonic-analyzer","translation":[${coordinate},2,3],
+        "extras":{"negativeZero":-0,"-0":"literal -0, quoted \\"-0\\", slash \\\\",
+          "large":9007199254740993,"representable":9007199254740994,
+          "nested":[null,true,{"value":-0}]}}]
+    }`)
+  for (const coordinate of ['1', '-0']) {
+    const raw = sourceFor(coordinate)
+    const before = parse(raw)
+    const { canonicalBytes, identity } = await projectNativeIdentity(raw)
+    const after = parse(canonicalBytes)
+    assert.equal(after.json.nodes[0].name, 'ha-harmonic-analyzer')
+    assert.equal(identity.renamedNodes, 1)
+    assert.equal(Object.is(after.json.nodes[0].translation[0], -0), coordinate === '-0')
+    assert.equal(Object.is(after.json.nodes[0].extras.negativeZero, -0), true)
+    assert.equal(Object.is(after.json.nodes[0].extras.nested[2].value, -0), true)
+    assert.deepEqual(after.json.nodes[0].extras, before.json.nodes[0].extras)
+    assert.deepEqual(after.binary, before.binary)
+    const proof = await validateNativeIdentityProjection(raw, canonicalBytes)
+    assert.deepEqual(proof.identity, identity)
+    assert.deepEqual((await projectNativeIdentity(canonicalBytes)).canonicalBytes, canonicalBytes)
+    // The independent oracle must still reject losing the sign, rather than
+    // treating -0 and +0 as interchangeable to make projection pass.
+    if (coordinate === '-0') {
+      const positiveZero = await projectNativeIdentity(sourceFor('0'))
+      await assert.rejects(validateNativeIdentityProjection(raw, positiveZero.canonicalBytes), /unauthorized glTF semantic change/)
+    }
+  }
 })
 
 test('unknown identities, wrong assembly contexts, malformed qualifiers, collisions and mixed epochs refuse', async () => {

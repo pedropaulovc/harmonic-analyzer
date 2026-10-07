@@ -184,8 +184,17 @@ function decodeJson(bytes) {
   try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) }
   catch (error) { fail(`invalid GLB JSON: ${error.message}`) }
 }
+// This input is a parsed JSON tree, not arbitrary JavaScript values. Preserve
+// signed zero while retaining JSON.stringify's escaping and Number semantics;
+// JSON.parse has already rounded any unrepresentable source numeric lexemes.
+function stringifyJson(value) {
+  if (Object.is(value, -0)) return '-0'
+  if (Array.isArray(value)) return `[${value.map(stringifyJson).join(',')}]`
+  if (isRecord(value)) return `{${Object.entries(value).map(([key, item]) => `${JSON.stringify(key)}:${stringifyJson(item)}`).join(',')}}`
+  return JSON.stringify(value)
+}
 function prefixBytes(json, trailingLength) {
-  const text = Buffer.from(JSON.stringify(json)), jsonLength = align4(text.length)
+  const text = Buffer.from(stringifyJson(json)), jsonLength = align4(text.length)
   const prefix = Buffer.alloc(20 + jsonLength, 0x20)
   prefix.writeUInt32LE(0x46546c67, 0); prefix.writeUInt32LE(2, 4)
   prefix.writeUInt32LE(prefix.length + trailingLength, 8)

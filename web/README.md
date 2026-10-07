@@ -41,6 +41,9 @@ ratio, feed, native-rest association or spring-profile changes are refused with
 a named parameter, preserving the last working assets. Missing revisions are
 also refused.
 A current source commit does not approve arbitrary bytes.
+Native identity projection preserves parsed JSON numeric semantics, including
+signed zero, and leaves binary geometry untouched. It does not preserve the
+original JSON number spelling or integers beyond JavaScript's exact range.
 Existing source tracks are stale for a new raw model and reject source-following;
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
 representation and provenance contract.
