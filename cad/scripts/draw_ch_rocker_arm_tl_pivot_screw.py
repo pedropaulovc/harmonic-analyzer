@@ -177,6 +177,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="pivot-screw thread callout",
+        entity_type="SILHOUETTE",
     )
     add_surface_finish(
         adapter,
