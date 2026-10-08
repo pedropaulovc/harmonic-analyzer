@@ -13,20 +13,22 @@ metadata:
 The paper-drive was rebuilt against the primary references
 ([[paper-drive-rework]] is the evidence dossier). Durable facts:
 
-- **Topology (final):** crank T12 —chain→ knob T24 —lock→ 12T DP38 third gear
-  —gear 12:120→ 120T DP38 reducer disc —lock→ 12T DP30 feed pinion
-  —rack-pinion π·10.16/rev→ teeth-down rack —lock→ platen. Net 1.596
-  mm/crank-rev (T12/T24 mounted). The disc NEVER meshes the rack (the old
+- **Topology (final; inch standard since 2026-10):** crank T12 —chain→ knob T24
+  —lock→ 12T 40DP third gear —gear 12:120→ 120T 40DP reducer disc —lock→ 12T
+  32DP feed pinion —rack-pinion π·9.525/rev→ teeth-down 32DP rack —lock→ platen,
+  all PA20. Net 1.496 mm/crank-rev (T12/T24 mounted); the 2026-07 DP38/DP30
+  PA14.5 train gave 1.596. The disc NEVER meshes the rack (the old
   96T-DP30 `rack-pinion` role was refuted by the rack/disc pitch ratio ≈1.27
   on ch30 p002 and the 4/4 narration).
 - **Appendix C #8 CLOSED:** the "one arm, two centre distances" riddle
   (66.05 rest vs 51.0 engaged) was an artefact of the wrong topology. The
-  latch arm pivots ON the stud; its single c2c 44.766 IS the permanent
+  latch arm pivots ON the stud; its single c2c (44.766 at DP38; now set by the
+  40DP mesh) IS the permanent
   12T:120T mesh. Unlatching tilts the WHOLE cluster away from the rack
   (v4_transgear 001 vs 011-013). Don't resurrect the 66.05 figure.
 - **Small-pinion gap-floor rule (`_gear.build_fixed_gear`):** the recipe cuts
   tooth gaps only down to the BASE circle, so any pinion under ~63T (PA
-  14.5°) has its gap floor ABOVE where the mate's tips reach at nominal
+  14.5°, the 2026-07 standard; the threshold is lower at PA 20°) has its gap floor ABOVE where the mate's tips reach at nominal
   centres → extend centres like the drive-train's checker-arbitrated slacks
   (12:120 mesh +0.65; feed-pinion/rack axis 0.8 below nominal). Also a 12T
   gear's base/root sits under a 3/8" bore's wall → both 12T gears bore Ø5 on

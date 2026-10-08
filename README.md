@@ -148,8 +148,10 @@ found three parts carrying essentially all of the risk:
   sits on a hex trunnion cantilevered 21.7 mm off an organic cast lever.
 - A Ø0.79 × 34 mm journal in steel, 43:1 slenderness. Whip city.
 
-There is also one settled finding that shapes the entire build: off-the-shelf
-involute cutters for this gear train's pitch do not exist. You make your own.
+There is also one settled finding that shapes the entire build: the replica cuts
+standard 48DP 20° inch teeth, so stock involute cutters make every gear except
+the six-tooth cone, whose cutter you make. The reasons are in
+[`cad/docs/gear-standard.md`](cad/docs/gear-standard.md).
 
 ## Build the model yourself
 
