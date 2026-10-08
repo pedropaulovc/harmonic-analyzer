@@ -1,27 +1,34 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "lossless-web-model-representation",
   "source": {
-    "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
-    "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+    "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+    "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+  },
+  "identity": {
+    "mapSha256": "1ee9084204cab7025783c5bf0fa98e040cfaa3e4e8200f0d61e58e8dd32c3bfd",
+    "canonicalSha256": "efe5b43447e914b7b938a3cf2e3234610ceba0e28a0cc6ef615b3c0574c33c89",
+    "renamedNodes": 458,
+    "nodeCount": 459
   },
   "representation": {
     "path": "models/ha-harmonic-analyzer.glb",
-    "sha256": "ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719",
-    "byteLength": 38975844,
+    "sha256": "941b6193698091781f133642bdc2a7411a18c2cfcb5252646a79b9bd57c6a805",
+    "byteLength": 41072516,
     "codec": "EXT_meshopt_compression"
   },
   "pipeline": {
-    "version": 1,
+    "version": 2,
     "steps": [
+      "native-identity-map",
       "exact-dedup",
       "meshopt"
     ],
     "codecVersion": "meshoptimizer@0.22.0"
   },
   "equivalence": {
-    "method": "decoded-per-drawable-exact-v1",
-    "semanticSha256": "b60baed017b499c6d48e8b5aeab3c2c19f2ad256c26c0bd8e17cb094b3b4a093",
-    "drawableCount": 433
+    "method": "decoded-per-drawable-exact-after-native-identity-v2",
+    "semanticSha256": "624551251d9160287ef926b9e624e66aede8e12e5267f7235714c96bcc539759",
+    "drawableCount": 460
   }
 }
