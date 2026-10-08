@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ppe-harmonic-analyzer-com",
+  "name": "harmonicanalyzer-com-ppe",
   "account_id": "c8769c20b85cd2857afe22ef2f9a0a21",
   "main": "worker.mjs",
   "compatibility_date": "2026-10-08",

@@ -5,8 +5,8 @@
 import { readFile, appendFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
-export const PPE = Object.freeze({ account: 'c8769c20b85cd2857afe22ef2f9a0a21', worker: 'ppe-harmonic-analyzer-com', subdomain: 'harmonicanalyzer-com-ppe' });
-export const PROD = Object.freeze({ account: '6b2522c874d4613dc2bf47bd2ce521a2', worker: 'harmonic-analyzer-com-prod', subdomain: 'harmonicanalyzer-com-prod' });
+export const PPE = Object.freeze({ account: 'c8769c20b85cd2857afe22ef2f9a0a21', worker: 'harmonicanalyzer-com-ppe', subdomain: 'harmonicanalyzer-com-ppe' });
+export const PROD = Object.freeze({ account: '6b2522c874d4613dc2bf47bd2ce521a2', worker: 'harmonicanalyzer-com-prod', subdomain: 'harmonicanalyzer-com-prod' });
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 export function guardIdentity(identity, env = process.env) {
   for (const [key, expected] of [['CLOUDFLARE_ACCOUNT_ID', identity.account], ['CLOUDFLARE_WORKER_NAME', identity.worker], ['CLOUDFLARE_WORKERS_SUBDOMAIN', identity.subdomain]]) {

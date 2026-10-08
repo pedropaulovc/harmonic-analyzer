@@ -711,19 +711,18 @@ deployment identity, reporting and cleanup regression tests gate native builds.
 
 | Deployment | Account name / workers.dev subdomain | Account ID | Worker | Native deploy command |
 |---|---|---|---|---|
-| Production (`main` only) | `harmonicanalyzer-com-prod` | `6b2522c874d4613dc2bf47bd2ce521a2` | `harmonic-analyzer-com-prod` | `npm run deploy` |
-| PPE (branch previews, all PR base branches) | `harmonicanalyzer-com-ppe` | `c8769c20b85cd2857afe22ef2f9a0a21` | `ppe-harmonic-analyzer-com` | `npm run deploy:preview` |
+| Production (`main` only) | `harmonicanalyzer-com-prod` | `6b2522c874d4613dc2bf47bd2ce521a2` | `harmonicanalyzer-com-prod` | `npm run deploy` |
+| PPE (branch previews, all PR base branches) | `harmonicanalyzer-com-ppe` | `c8769c20b85cd2857afe22ef2f9a0a21` | `harmonicanalyzer-com-ppe` | `npm run deploy:preview` |
 
-Account names and account subdomains omit the hyphen between `harmonic` and
-`analyzer`; Worker service names and account IDs are unchanged. Production's
-origin is `https://harmonic-analyzer-com-prod.harmonicanalyzer-com-prod.workers.dev`.
+Worker service names match their account names and account subdomains; account
+IDs are unchanged. Production's origin is
+`https://harmonicanalyzer-com-prod.harmonicanalyzer-com-prod.workers.dev`.
 The PPE service origin is
-`https://ppe-harmonic-analyzer-com.harmonicanalyzer-com-ppe.workers.dev`;
+`https://harmonicanalyzer-com-ppe.harmonicanalyzer-com-ppe.workers.dev`;
 branch Preview API URLs use
-`https://<preview-slug>-ppe-harmonic-analyzer-com.harmonicanalyzer-com-ppe.workers.dev`.
+`https://<preview-slug>-harmonicanalyzer-com-ppe.harmonicanalyzer-com-ppe.workers.dev`.
 GitHub's `production` and `web-preview` environment variables
-`CLOUDFLARE_WORKERS_SUBDOMAIN` must match the respective account subdomains above,
-not the Worker service names.
+`CLOUDFLARE_WORKERS_SUBDOMAIN` must match the respective account subdomains above.
 
 PPE uses `wrangler preview --config wrangler.ppe.jsonc --name "$WORKERS_CI_BRANCH"`
 for both its default branch and non-production branch build command. It never
