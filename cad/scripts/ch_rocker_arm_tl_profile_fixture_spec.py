@@ -29,7 +29,7 @@ from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_notes as rocker_notes
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_spec import ConeFace, CylinderFace, PlanarFace
 from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 
 _XXX = printed_band_mm(3)
@@ -42,11 +42,14 @@ _DRILLED_PLUS = drilled_oversize_mm()
 # lower face is half a hub plus half a strap below the upper hub face. Every pad
 # top lies on it, and every height below is built down from it.
 PAD_TOP_Z = -(rocker.HUB_LENGTH / 2.0 + rocker.ARM_THICKNESS / 2.0)
-PLATE_TOP_Z = -15.0
+# Pad tops above the plate top: the gauge stack under the granite. It prints
+# at three places, and the model carries exactly the printed value (FixtureCAD
+# one-fact ruling: a band qualifies the model nominal, so the nominal must be
+# the printed one), which leaves the plate top within 0.0005 of Z-15.
+PLATE_DROP = round(PAD_TOP_Z + 15.0, 3)
+PLATE_TOP_Z = PAD_TOP_Z - PLATE_DROP
 PLATE_THICK = 25.4  # 1 in plate, as rolled
 PLATE_BOTTOM_Z = PLATE_TOP_Z - PLATE_THICK
-# Pad tops above the plate top: the gauge stack under the granite.
-PLATE_DROP = PAD_TOP_Z - PLATE_TOP_Z
 
 # --- Plate outline ----------------------------------------------------------------
 PLATE_WEST_X = -180.0
@@ -101,8 +104,12 @@ def _end_gap_min(
 
 # Pads: inventory stations, +X side (tag, station west X, station length, pad
 # south Y, pad width). B pads mirror them about the pivot axis. Each pocket is
-# its station less an end wall at each end, so neighbouring pockets keep a 2 mm
-# web at the worst case of their .XXX sizes and locations (rule 12 target).
+# its station less an end wall at each end. A pocket's length locates nothing
+# (each pad is centred in it), so it prints at one place (codex review of run
+# 20261008T010334394Z: 17.500 was over-specified); the end walls are sized so
+# neighbouring pockets keep a 2 mm web at the worst case of those .X lengths
+# and their .XXX locations (rule 12 target), and each pad is shortened by the
+# wider band so it still ends clear.
 # Each pad stands at least PAD_OUTLINE_MARGIN inside the arm's finished outline
 # (the inventory's "~6 mm inside, outside the end mills' swept bands") and is
 # at least 2 mm wide at the .XXX band. The inventory's 20 mm pads lost width to
@@ -116,19 +123,22 @@ _RIGHT_STATIONS = (
     ("5", 90.0, 20.0, 5.17, 2.15),
     ("6", 110.0, 12.0, 7.25, 2.3),
 )
-POCKET_END_WALL = 1.25
+PAD_POCKET_LENGTH_PLACES = 1
+_PAD_POCKET_LENGTH_BAND = printed_band_mm(PAD_POCKET_LENGTH_PLACES)
+POCKET_END_WALL = 1.55
 PAD_HEIGHT = 11.6
 PAD_POCKET_DEPTH = 2.0
 PAD_OUTLINE_MARGIN = 6.0
 
-# (tag, centre X, centre Y, length X, width Y) per pocket and per pad.
+# (tag, centre X, centre Y, length X, width Y) per pocket and per pad, each at
+# the places it prints (the model carries the printed nominal).
 PAD_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     (
         f"{side}{tag}",
-        sign * (x0 + length / 2.0),
-        y0 + width / 2.0,
-        length - 2.0 * POCKET_END_WALL,
-        width + 2.0 * POCKET_SIDE_CLEARANCE,
+        round(sign * (x0 + length / 2.0), 3),
+        round(y0 + width / 2.0, 3),
+        round(length - 2.0 * POCKET_END_WALL, 3),
+        round(width + 2.0 * POCKET_SIDE_CLEARANCE, 3),
     )
     for side, sign in (("A", 1.0), ("B", -1.0))
     for tag, x0, length, y0, width in _RIGHT_STATIONS
@@ -138,15 +148,16 @@ PADS: tuple[tuple[str, float, float, float, float], ...] = tuple(
         tag,
         cx,
         cy,
-        _part_length(length, width),
-        width - 2.0 * POCKET_SIDE_CLEARANCE,
+        _part_length(length, width, _PAD_POCKET_LENGTH_BAND),
+        round(width - 2.0 * POCKET_SIDE_CLEARANCE, 3),
     )
     for tag, cx, cy, length, width in PAD_POCKETS
 )
 if min(width for *_head, width in PADS) - _XXX < 2.0:
     raise AssertionError("a pad is under 2 mm wide at the .XXX band (rule 12 target)")
-# Web between neighbouring pockets: both length bands and both location bands.
-if 2.0 * POCKET_END_WALL - 3.0 * _XXX < 2.0:
+# Web between neighbouring pockets: half of each pocket's length band at the
+# shared end, and both location bands.
+if 2.0 * POCKET_END_WALL - _PAD_POCKET_LENGTH_BAND - 2.0 * _XXX < 2.0:
     raise AssertionError("a web between pad pockets is under 2 mm at the worst case")
 
 
@@ -220,15 +231,14 @@ REST_TOP_Z = PLATE_TOP_Z + REST_TOP_HEIGHT
 if 2.0 * _XXX > _XX:
     raise AssertionError("a seated rail rest can miss its printed top height")
 REST_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
-    (tag, x0 + length / 2.0, y0 + width / 2.0, length, width)
+    (tag, round(x0 + length / 2.0, 3), round(y0 + width / 2.0, 3), length, width)
     for tag, x0, y0, length, width in _REST_POCKETS
 )
 # A rest pocket's length neither locates its centred rest nor neighbours a
 # web, so it prints at one place (codex review of run
-# 20261007T232215823Z: 20.000 was over-specified); its rest is shortened by
-# the wider band so it still ends clear. The pad pockets keep .XXX lengths:
-# their 2 mm webs need them.
-REST_POCKET_LENGTH_PLACES = 1
+# 20261007T232215823Z: 20.000 was over-specified), as the pad pockets' do;
+# its rest is shortened by the wider band so it still ends clear.
+REST_POCKET_LENGTH_PLACES = PAD_POCKET_LENGTH_PLACES
 _REST_POCKET_LENGTH_BAND = printed_band_mm(REST_POCKET_LENGTH_PLACES)
 RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     (
@@ -236,12 +246,15 @@ RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
         cx,
         cy,
         _part_length(length, width, _REST_POCKET_LENGTH_BAND),
-        width - 2.0 * REST_CLEARANCE,
+        round(width - 2.0 * REST_CLEARANCE, 3),
     )
     for tag, cx, cy, length, width in REST_POCKETS
 )
 PART_END_GAP_MIN = min(
-    *(_end_gap_min(pocket[3], pocket[4], part[3]) for pocket, part in zip(PAD_POCKETS, PADS, strict=True)),
+    *(
+        _end_gap_min(pocket[3], pocket[4], part[3], _PAD_POCKET_LENGTH_BAND)
+        for pocket, part in zip(PAD_POCKETS, PADS, strict=True)
+    ),
     *(
         _end_gap_min(pocket[3], pocket[4], part[3], _REST_POCKET_LENGTH_BAND)
         for pocket, part in zip(REST_POCKETS, RESTS, strict=True)
@@ -432,7 +445,10 @@ _HOLD_DOWN_SCREW_MAJOR = THREAD_MAJOR_MM["1/2-13"]
 # 1/2-13 socket head cap screw, ASME B18.3: head 0.750 dia x 0.500 high.
 HOLD_DOWN_SCREW_HEAD_DIA = 0.750 * 25.4
 HOLD_DOWN_SCREW_HEAD_H = 0.500 * 25.4
-HOLD_DOWN_CLEARANCE_DIA = CLEARANCE_MM[("1/2", "normal")]
+# The callout prints the clearance at two places, and the model cuts exactly
+# that value (FixtureCAD one-fact ruling: the drilled band qualifies the model
+# nominal), 0.002 over the 1/2 normal-fit table value.
+HOLD_DOWN_CLEARANCE_DIA = round(CLEARANCE_MM[("1/2", "normal")], 2)
 HOLD_DOWN_CBORE_DIA = 20.64
 HOLD_DOWN_CBORE_DEPTH = 13.5
 HOLD_DOWN_HOLE_SPEC = HoleSpec(
@@ -558,6 +574,35 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "LocatingBore": {"LocatingBoreDepth"},
     "RodPinHoleProfile": {"RodPinHoleDia"},
 }
+# Places that only the schedules state (policy rule 2: the model owns every
+# scheduled driving dimension's places; cross-vendor review of PR 1252).
+# The pin seats on its collar, not the hole floor: the depth only clears the
+# shank, so it prints at one place. The hub stand bore is drilled: two places,
+# the title block's DRILLED HOLES band.
+ROD_PIN_HOLE_DEPTH_PLACES = 1
+STAND_BORE_PLACES = 2
+SCHEDULE_PLACES = 3
+
+
+def pocket_dimension_names(tag: str) -> tuple[str, ...]:
+    """Centre X, centre Y, length X and width Y of a scheduled pocket."""
+    return tuple(f"{tag}Pocket{axis}" for axis in ("X", "Y", "Length", "Width"))
+
+
+def part_dimension_names(tag: str, part: str) -> tuple[str, str]:
+    """Length X and width Y of a bonded part (sketched by its corner)."""
+    return (f"{tag}{part}Length", f"{tag}{part}Width")
+
+
+HOLD_DOWN_NAMES = tuple(
+    (f"HoldDown{index}X", f"HoldDown{index}Y") for index in range(1, len(HOLD_DOWN_POINTS) + 1)
+)
+CLAMP_STUD_NAMES = tuple(
+    (f"ClampStud{index}X", f"ClampStud{index}Y") for index in range(1, len(CLAMP_STUD_POINTS) + 1)
+)
+_POCKET_PLACES = (SCHEDULE_PLACES, SCHEDULE_PLACES, PAD_POCKET_LENGTH_PLACES, SCHEDULE_PLACES)
+_REST_POCKET_PLACES = (SCHEDULE_PLACES, SCHEDULE_PLACES, REST_POCKET_LENGTH_PLACES, SCHEDULE_PLACES)
+_PART_PLACES = (PART_LENGTH_PLACES, SCHEDULE_PLACES)
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
         "PlateLength": 1,
@@ -566,59 +611,116 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PlateSouthY": 1,
     },
     "Plate": {"PlateThick": 1, "PlateDrop": 3},
-    "Stand": {"StandDrop": 3},
-    "Rests": {"RestTopHeight": 2},
+    "StandProfile": {"StandOD": SCHEDULE_PLACES, "StandBore": STAND_BORE_PLACES},
+    "Stand": {"StandHeight": SCHEDULE_PLACES, "StandDrop": 3},
+    "Rests": {"RestHeight": SCHEDULE_PLACES, "RestTopHeight": 2},
     "StandPocketProfile": {"StandPocketDia": 3},
     "StandPocket": {"StandPocketDepth": 3},
     "LocatingBoreProfile": {"LocatingBoreDia": 3},
     "LocatingBore": {"LocatingBoreDepth": LOCATING_BORE_DEPTH_PLACES},
     "RodPinHoleProfile": {"RodPinHoleDia": 3, "RodPinHoleX": 3, "RodPinHoleY": 3},
+    "RodPinHole": {"RodPinHoleDepth": ROD_PIN_HOLE_DEPTH_PLACES},
+    "PadPocketProfile": {
+        name: places
+        for tag, *_size in PAD_POCKETS
+        for name, places in zip(pocket_dimension_names(tag), _POCKET_PLACES, strict=True)
+    },
+    "PadPockets": {"PadPocketDepth": SCHEDULE_PLACES},
+    "RestPocketProfile": {
+        name: places
+        for tag, *_size in REST_POCKETS
+        for name, places in zip(pocket_dimension_names(tag), _REST_POCKET_PLACES, strict=True)
+    },
+    "RestPockets": {"RestPocketDepth": SCHEDULE_PLACES},
+    "HoldDownHoles": {
+        name: places
+        for names in HOLD_DOWN_NAMES
+        for name, places in zip(names, (HOLD_DOWN_X_PLACES, HOLD_DOWN_Y_PLACES), strict=True)
+    },
+    "ClampStudTaps": {name: CLAMP_STUD_PLACES for names in CLAMP_STUD_NAMES for name in names},
+    "PadProfile": {
+        name: places
+        for tag, *_size in PADS
+        for name, places in zip(part_dimension_names(tag, "Pad"), _PART_PLACES, strict=True)
+    },
+    "Pads": {"PadHeight": SCHEDULE_PLACES},
+    "RestProfile": {
+        name: places
+        for tag, *_size in RESTS
+        for name, places in zip(part_dimension_names(tag, "Rest"), _PART_PLACES, strict=True)
+    },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
+if len(DRAWING_PRECISION_BY_NAME) != sum(len(names) for names in DRAWING_PRECISION.values()):
+    raise AssertionError("a profile-fixture dimension name is authored on two features")
+_FEATURE_OF = {
+    name: feature for feature, dimensions in DRAWING_PRECISION.items() for name in dimensions
+}
 _MARKED = set().union(*DRAWING_DIMENSIONS.values())
 # What the sheet imports, and must read back at the authored places.
 MARKED_PRECISION_BY_NAME: dict[str, int] = {
     name: places for name, places in DRAWING_PRECISION_BY_NAME.items() if name in _MARKED
 }
-# A schedule cell that carries its own band is a model dimension too (policy
-# rule 2: the model owns the band and its places; cross-vendor review of PR
-# 1252). The build tolerances it natively and proves the printed cell is the
-# model's value, places and band; the sheet prints it in the schedule, not as
-# a marked dimension. Row tag -> (X cell, Y cell) as (feature, dimension).
-SCHEDULE_CELL_DIMENSIONS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
-    "P": (("RodPinHoleProfile", "RodPinHoleX"), ("RodPinHoleProfile", "RodPinHoleY")),
-}
 if ROD_PIN_XY_BAND[1] != -ROD_PIN_XY_BAND[0]:
     raise AssertionError("the rod-pin coordinates print a symmetric band")
+# The rod-pin coordinates carry their own band as a native model tolerance.
 EXPLICIT_SYMMETRIC_TOLERANCES_MM: dict[tuple[str, str], float] = {
-    cell: ROD_PIN_XY_BAND[0] for cell in SCHEDULE_CELL_DIMENSIONS["P"]
+    ("RodPinHoleProfile", name): ROD_PIN_XY_BAND[0] for name in ("RodPinHoleX", "RodPinHoleY")
 }
-if set(DRAWING_PRECISION_BY_NAME) != _MARKED | {
-    name for cells in SCHEDULE_CELL_DIMENSIONS.values() for _feature, name in cells
-}:
-    raise AssertionError(
-        "every marked or scheduled profile-fixture dimension needs authored places"
-    )
 DIMENSION_CALLOUTS = {"LocatingBoreDia": "REAM", "RodPinHoleDia": "REAM"}
 
 # Schedules (sheets two and three): every pocket and hole is tagged on the
 # sheet-two plan and located here from the locating bore axis; every bonded part
-# is sized. Three places (the .XXX band) unless a row states its own places.
-SCHEDULE_PLACES = 3
+# is sized. Every number in a schedule is a model dimension (policy rule 2):
+# SCHEDULE_CELL_DIMENSIONS maps each (schedule, row tag, column) to the
+# (feature, dimension) pairs that own it, and the cell prints their value at
+# their authored places (a row of two mirrored parts has one owner in each
+# part's sketch). The build reads every owner back and proves the printed cell
+# is its value, places and band. A location prints signed, as the TAGS plan is
+# drawn; its sketch dimension holds the distance, the sketch the side.
 SECTION_LABEL = "D"
 DETAIL_LABEL = "E"
+SCHEDULE_CELL_DIMENSIONS: dict[tuple[str, str, str], tuple[tuple[str, str], ...]] = {
+    ("FEATURE", "P", "CENTRE X"): (("RodPinHoleProfile", "RodPinHoleX"),),
+    ("FEATURE", "P", "CENTRE Y"): (("RodPinHoleProfile", "RodPinHoleY"),),
+}
 
 
-def _mm(value: float, places: int = SCHEDULE_PLACES) -> str:
-    return f"{value:.{places}f}"
+def _cell(schedule: str, tag: str, column: str, value: float, *names: str) -> str:
+    """Record ``names`` as the owners of one schedule cell and print ``value``
+    at their authored places."""
+    places = {DRAWING_PRECISION_BY_NAME[name] for name in names}
+    if len(places) != 1:
+        raise AssertionError(f"{tag} {column}: its owners author different places")
+    SCHEDULE_CELL_DIMENSIONS[(schedule, tag, column)] = tuple(
+        (_FEATURE_OF[name], name) for name in names
+    )
+    return f"{value:.{places.pop()}f}"
+
+
+def _pocket_row(
+    tag: str, feature: str, centre: tuple[float, float], size: tuple[float, float],
+    depth: float, depth_name: str,
+) -> tuple[str, ...]:
+    x_name, y_name, length_name, width_name = pocket_dimension_names(tag)
+    return (
+        tag,
+        feature,
+        _cell("FEATURE", tag, "CENTRE X", centre[0], x_name),
+        _cell("FEATURE", tag, "CENTRE Y", centre[1], y_name),
+        _cell("FEATURE", tag, "LENGTH X", size[0], length_name),
+        _cell("FEATURE", tag, "WIDTH Y", size[1], width_name),
+        _cell("FEATURE", tag, "DEPTH", depth, depth_name),
+    )
 
 
 # Every row locates its feature's centre, and the axes read as the TAGS plan
-# is drawn (codex review of run 20261007T204247920Z).
+# is drawn (codex review of run 20261007T204247920Z). Bore L is the origin
+# itself, so its row prints no location.
 FEATURE_SCHEDULE_TITLE = (
     "FEATURE SCHEDULE: CENTRES FROM BORE L AXIS, +X RIGHT AND +Y UP AS ON SHEET 2"
 )
@@ -626,46 +728,22 @@ FEATURE_SCHEDULE_HEADER = (
     "TAG", "FEATURE", "CENTRE X", "CENTRE Y", "LENGTH X", "WIDTH Y", "DEPTH"
 )
 FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
-    (
-        "L",
-        "LOCATING BORE",
-        _mm(0.0),
-        _mm(0.0),
-        "-",
-        "-",
-        f"SEE {SECTION_LABEL}-{SECTION_LABEL}",
-    ),
+    ("L", "LOCATING BORE", "-", "-", "-", "-", f"SEE {SECTION_LABEL}-{SECTION_LABEL}"),
     (
         "P",
         "ROD PIN HOLE",
         *ROD_PIN_XY_PRINTED,
         "-",
         "-",
-        # The pin seats on its collar, not the hole floor: the depth only
-        # clears the shank, so it prints at one place (.X).
-        _mm(ROD_PIN_HOLE_DEPTH, 1),
+        _cell("FEATURE", "P", "DEPTH", ROD_PIN_HOLE_DEPTH, "RodPinHoleDepth"),
     ),
     *(
-        (
-            tag,
-            "PAD POCKET",
-            _mm(cx),
-            _mm(cy),
-            _mm(length),
-            _mm(width),
-            _mm(PAD_POCKET_DEPTH),
-        )
+        _pocket_row(tag, "PAD POCKET", (cx, cy), (length, width), PAD_POCKET_DEPTH, "PadPocketDepth")
         for tag, cx, cy, length, width in PAD_POCKETS
     ),
     *(
-        (
-            tag,
-            "REST POCKET",
-            _mm(cx),
-            _mm(cy),
-            _mm(length, REST_POCKET_LENGTH_PLACES),
-            _mm(width),
-            _mm(REST_POCKET_DEPTH),
+        _pocket_row(
+            tag, "REST POCKET", (cx, cy), (length, width), REST_POCKET_DEPTH, "RestPocketDepth"
         )
         for tag, cx, cy, length, width in REST_POCKETS
     ),
@@ -673,64 +751,96 @@ FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
         (
             f"H{index}",
             "HOLD-DOWN",
-            _mm(x, HOLD_DOWN_X_PLACES),
-            _mm(y, HOLD_DOWN_Y_PLACES),
+            _cell("FEATURE", f"H{index}", "CENTRE X", x, x_name),
+            _cell("FEATURE", f"H{index}", "CENTRE Y", y, y_name),
             "-",
             "-",
             "THRU",
         )
-        for index, (x, y) in enumerate(HOLD_DOWN_POINTS, start=1)
+        for index, ((x, y), (x_name, y_name)) in enumerate(
+            zip(HOLD_DOWN_POINTS, HOLD_DOWN_NAMES, strict=True), start=1
+        )
     ),
     *(
         (
             f"S{index}",
             "STUD TAP",
-            _mm(x, CLAMP_STUD_PLACES),
-            _mm(y, CLAMP_STUD_PLACES),
+            _cell("FEATURE", f"S{index}", "CENTRE X", x, x_name),
+            _cell("FEATURE", f"S{index}", "CENTRE Y", y, y_name),
             "-",
             "-",
             "-",
         )
-        for index, (x, y) in enumerate(CLAMP_STUD_POINTS, start=1)
+        for index, ((x, y), (x_name, y_name)) in enumerate(
+            zip(CLAMP_STUD_POINTS, CLAMP_STUD_NAMES, strict=True), start=1
+        )
     ),
 )
 _PAD_STOCK = {3.3: "O1 FLAT 3/16 X 1/2"}
 PART_SCHEDULE_TITLE = "BONDED PART SCHEDULE, SIZES BEFORE BONDING"
 PART_SCHEDULE_HEADER = ("TAG", "PART", "STOCK", "LENGTH X", "WIDTH Y", "HEIGHT")
+
+
+def _part_row(
+    a: tuple, b: tuple, part: str, label: str, stock: str, height: float, height_name: str
+) -> tuple[str, ...]:
+    """One row for a mirrored pair of bonded parts: both sketches own its sizes."""
+    tag = f"{a[0]}, {b[0]}"
+    if a[3:] != b[3:]:
+        raise AssertionError(f"{tag}: mirrored parts differ in size")
+    a_length, a_width = part_dimension_names(a[0], part)
+    b_length, b_width = part_dimension_names(b[0], part)
+    return (
+        tag,
+        label,
+        stock,
+        _cell("PART", tag, "LENGTH X", a[3], a_length, b_length),
+        _cell("PART", tag, "WIDTH Y", a[4], a_width, b_width),
+        _cell("PART", tag, "HEIGHT", height, height_name),
+    )
+
+
 PART_SCHEDULE: tuple[tuple[str, ...], ...] = (
     *(
-        (
-            f"{a_tag}, {b_tag}",
-            "PAD",
-            _PAD_STOCK.get(round(width, 3), "O1 FLAT 1/8 X 1/2"),
-            _mm(length, PART_LENGTH_PLACES),
-            _mm(width),
-            _mm(PAD_HEIGHT),
+        _part_row(
+            a, b, "Pad", "PAD", _PAD_STOCK.get(round(a[4], 3), "O1 FLAT 1/8 X 1/2"),
+            PAD_HEIGHT, "PadHeight",
         )
-        for (a_tag, _ax, _ay, length, width), (b_tag, *_rest) in zip(
-            PADS[:6], PADS[6:], strict=True
-        )
+        for a, b in zip(PADS[:6], PADS[6:], strict=True)
     ),
     *(
-        (
-            f"{a[0]}, {b[0]}",
-            "RAIL REST",
-            "O1 FLAT 3/16 X 1",
-            _mm(a[3], PART_LENGTH_PLACES),
-            _mm(a[4]),
-            _mm(REST_HEIGHT),
-        )
+        _part_row(a, b, "Rest", "RAIL REST", "O1 FLAT 3/16 X 1", REST_HEIGHT, "RestHeight")
         for a, b in ((RESTS[0], RESTS[1]), (RESTS[2], RESTS[3]))
     ),
     (
         "L",
         "HUB STAND",
         "4140 HT BAR 1/2",
-        f"OD {_mm(STAND_OD)}",
-        f"DRILL \u00d8{STAND_BORE:.2f}",
-        _mm(STAND_HEIGHT),
+        f"OD {_cell('PART', 'L', 'LENGTH X', STAND_OD, 'StandOD')}",
+        f"DRILL \u00d8{_cell('PART', 'L', 'WIDTH Y', STAND_BORE, 'StandBore')}",
+        _cell("PART", "L", "HEIGHT", STAND_HEIGHT, "StandHeight"),
     ),
 )
+# Every number in a dimension column has its owners.
+_DIMENSION_COLUMNS = {"CENTRE X", "CENTRE Y", "LENGTH X", "WIDTH Y", "DEPTH", "HEIGHT"}
+for _schedule, _header, _rows in (
+    ("FEATURE", FEATURE_SCHEDULE_HEADER, FEATURE_SCHEDULE),
+    ("PART", PART_SCHEDULE_HEADER, PART_SCHEDULE),
+):
+    for _row in _rows:
+        for _column, _text in zip(_header, _row, strict=True):
+            _owned = (_schedule, _row[0], _column) in SCHEDULE_CELL_DIMENSIONS
+            if _column in _DIMENSION_COLUMNS and any(c.isdigit() for c in _text) != _owned:
+                raise AssertionError(f"{_schedule} {_row[0]} {_column}: {_text!r} has no model owner")
+SCHEDULED_DIMENSIONS = {
+    name for owners in SCHEDULE_CELL_DIMENSIONS.values() for _feature, name in owners
+}
+if set(DRAWING_PRECISION_BY_NAME) != _MARKED | SCHEDULED_DIMENSIONS:
+    raise AssertionError(
+        "every marked or scheduled profile-fixture dimension needs authored places"
+    )
+if _MARKED & SCHEDULED_DIMENSIONS:
+    raise AssertionError("a profile-fixture dimension prints both marked and scheduled")
 
 SURFACE_FINISHES = ()
 BUILT_UP_PERMISSION_NOTE = (
@@ -754,11 +864,216 @@ _PAD_PLANE_SOURCES = (
     ("ch_rocker_arm_spec", "HUB_LENGTH"),
     ("ch_rocker_arm_spec", "ARM_THICKNESS"),
 )
+_FROM_BORE = ("locating_bore", ("LOCATING_BORE_DIA",))
+DRILLED_BAND = (drilled_oversize_mm(), 0.0)  # the title block's DRILLED HOLES
+_DRILL_POINT_HALF_ANGLE_DEG = math.degrees(_DRILL_POINT_HALF_ANGLE)
+
+
+def _plan_location(
+    x: float, y: float, x_places: int, y_places: int, sources: tuple[str, ...]
+) -> dict:
+    """A scheduled centre: X as ``station`` and Y as ``height``, both from the
+    locating-bore axis, at their printed places."""
+    return {
+        "station": (limits(x, x_places), sources),
+        "station_nominal": (x, sources),
+        "height": (limits(y, y_places), sources),
+        "height_nominal": (y, sources),
+        "height_from": _FROM_BORE,
+    }
+
+
+def _pocket(
+    row: tuple[str, float, float, float, float], rows: str, faces: tuple, depth: float,
+    depth_source: str, length_places: int,
+) -> ExportFeature:
+    """One feature-schedule pocket row: its centre, size and depth."""
+    _tag, cx, cy, length, width = row
+    floor_z = PLATE_TOP_Z - depth
+    return ExportFeature(
+        kind="pocket",
+        faces=faces,
+        requirements=("station", "height", "length", "width", "depth"),
+        fields={
+            "at": ([cx, cy, PLATE_TOP_Z], (rows, "PLATE_TOP_Z")),
+            "axis": _DOWN,
+            **_plan_location(cx, cy, SCHEDULE_PLACES, SCHEDULE_PLACES, (rows,)),
+            "length": (limits(length, length_places), (rows,)),
+            "length_nominal": (length, (rows,)),
+            "width": (limits(width, SCHEDULE_PLACES), (rows,)),
+            "width_nominal": (width, (rows,)),
+            "depth": (limits(depth, SCHEDULE_PLACES), (depth_source,)),
+            "depth_ref": (depth, (depth_source,)),
+            "plane": ({"frame": "model", "axis": "z", "value": floor_z}, ("PLATE_TOP_Z", depth_source)),
+        },
+        precision={
+            "station": SCHEDULE_PLACES,
+            "height": SCHEDULE_PLACES,
+            "length": length_places,
+            "width": SCHEDULE_PLACES,
+            "depth": SCHEDULE_PLACES,
+        },
+    )
+
+
+def _bonded_part(
+    row: tuple[str, float, float, float, float], rows: str, top_z: float, height: float,
+    height_source: str,
+) -> ExportFeature:
+    """One bonded part's sizes before bonding (part schedule), claiming its
+    outward end face, which no other part or pocket shares."""
+    _tag, cx, cy, length, width = row
+    side = 1.0 if cx > 0.0 else -1.0
+    return ExportFeature(
+        kind="boss",
+        faces=(PlanarFace((side, 0.0, 0.0), abs(cx) + length / 2.0, contains_z_mm=top_z - 1.0),),
+        requirements=("length", "width", "height"),
+        fields={
+            "at": ([cx, cy, top_z], (rows, height_source)),
+            "axis": _UP,
+            "length": (limits(length, PART_LENGTH_PLACES), (rows, "PART_LENGTH_PLACES")),
+            "length_nominal": (length, (rows,)),
+            "width": (limits(width, SCHEDULE_PLACES), (rows,)),
+            "width_nominal": (width, (rows,)),
+            "height": (limits(height, SCHEDULE_PLACES), (height_source,)),
+            "height_nominal": (height, (height_source,)),
+        },
+        precision={"length": PART_LENGTH_PLACES, "width": SCHEDULE_PLACES, "height": SCHEDULE_PLACES},
+    )
+
+
+def _plate_face(normal: tuple[float, float, float], offset: float, key: str, value: float,
+                source: str) -> ExportFeature:
+    """A plate end or side printed from the locating-bore axis."""
+    return ExportFeature(
+        kind="face",
+        faces=(PlanarFace(normal, offset),),
+        requirements=(key,),
+        fields={
+            "normal": (list(normal), ("__frame__",)),
+            "plane": (
+                {"frame": "model", "axis": "x" if normal[0] else "y", "value": value}, (source,)
+            ),
+            key: (limits(value, 1), (source,)),
+            f"{key}_nominal": (value, (source,)),
+            **({"height_from": _FROM_BORE} if key == "height" else {}),
+        },
+        precision={key: 1},
+    )
+
+
+def _hold_down(index: int, x: float, y: float) -> dict[str, ExportFeature]:
+    """Hold-down row H<index>: the clearance hole at its scheduled centre and
+    the counterbore the 4X callout prints over it."""
+    name = f"hold_down_h{index}"
+    spec = ("HOLD_DOWN_HOLE_SPEC",)
+    return {
+        name: ExportFeature(
+            kind="hole",
+            faces=(CylinderFace(HOLD_DOWN_CLEARANCE_DIA, contains_x_mm=x, contains_y_mm=y),),
+            requirements=("station", "height", "dia", "thru"),
+            fields={
+                "at": ([x, y, PLATE_TOP_Z], ("HOLD_DOWN_POINTS", "PLATE_TOP_Z")),
+                "axis": _DOWN,
+                **_plan_location(
+                    x, y, HOLD_DOWN_X_PLACES, HOLD_DOWN_Y_PLACES,
+                    ("HOLD_DOWN_POINTS", "HOLD_DOWN_X_PLACES", "HOLD_DOWN_Y_PLACES"),
+                ),
+                "dia": (
+                    limits(HOLD_DOWN_CLEARANCE_DIA, 2, DRILLED_BAND),
+                    ("HOLD_DOWN_CLEARANCE_DIA", "DRILLED_BAND", *spec),
+                ),
+                "dia_nominal": (HOLD_DOWN_CLEARANCE_DIA, ("HOLD_DOWN_CLEARANCE_DIA",)),
+                "thru": (True, spec),
+                "hole_spec": ("1/2 SHCS COUNTERBORE", spec),
+            },
+            precision={"station": HOLD_DOWN_X_PLACES, "height": HOLD_DOWN_Y_PLACES, "dia": 2},
+        ),
+        f"{name}_counterbore": ExportFeature(
+            kind="counterbore",
+            faces=(CylinderFace(HOLD_DOWN_CBORE_DIA, contains_x_mm=x, contains_y_mm=y),),
+            requirements=("dia", "depth"),
+            fields={
+                "parent": (name, spec),
+                "dia": (limits(HOLD_DOWN_CBORE_DIA, 2), ("HOLD_DOWN_CBORE_DIA", *spec)),
+                "dia_nominal": (HOLD_DOWN_CBORE_DIA, ("HOLD_DOWN_CBORE_DIA",)),
+                "depth": (limits(HOLD_DOWN_CBORE_DEPTH, 2), ("HOLD_DOWN_CBORE_DEPTH", *spec)),
+                "depth_ref": (HOLD_DOWN_CBORE_DEPTH, ("HOLD_DOWN_CBORE_DEPTH",)),
+            },
+            precision={"dia": 2, "depth": 2},
+        ),
+    }
+
+
+def _drill_dia(drill_dia: float, spec_name: str) -> dict:
+    """The tap drill Ø its callout prints (two places), banded by the title
+    block's DRILLED HOLES row about that printed value."""
+    printed = round(drill_dia, 2)
+    return {
+        "dia": (limits(printed, 2, DRILLED_BAND), (spec_name, "DRILLED_BAND")),
+        "dia_nominal": (printed, (spec_name,)),
+    }
+
+
+def _tap(spec: HoleSpec, spec_name: str, drill_dia: float, at: list[float], places: tuple[int, int] | None,
+         sources: tuple[str, ...], *, drill_band: bool) -> ExportFeature:
+    """A blind tapped hole: its thread and full-thread depth (two places, as
+    the callout prints), on the drilled cylinder (matched at the true drill
+    size, kept as ``tap_drill_mm``). ``drill_band`` adds the printed drill Ø
+    here when its own drill-point cone cannot carry it."""
+    thread_depth = spec.overrides_mm["ThreadDepth"]
+    location = {} if places is None else _plan_location(at[0], at[1], *places, sources)
+    dia = _drill_dia(drill_dia, spec_name) if drill_band else {}
+    return ExportFeature(
+        kind="hole",
+        faces=(CylinderFace(drill_dia, contains_x_mm=at[0], contains_y_mm=at[1]),),
+        requirements=(*(("station", "height") if location else ()), *dia, "thread", "depth"),
+        fields={
+            "at": (at, (*sources, "PLATE_TOP_Z")),
+            "axis": _DOWN,
+            **location,
+            **dia,
+            "thread": (f"{spec.size} UNC-{spec.thread_class}", (spec_name,)),
+            "depth": (limits(thread_depth, 2), (spec_name,)),
+            "depth_ref": (thread_depth, (spec_name,)),
+            "tap_drill_mm": (drill_dia, (spec_name,)),
+            "thru": (False, (spec_name,)),
+        },
+        precision={
+            **({"station": places[0], "height": places[1]} if location else {}),
+            **({"dia": 2} if dia else {}),
+            "depth": 2,
+        },
+    )
+
+
+def _tap_drill(
+    spec: HoleSpec, spec_name: str, stations: tuple[float, ...], *, parent: str | None,
+    drill_dia: float | None,
+) -> ExportFeature:
+    """The drill a tap callout prints, on its drill-point cones: its depth and,
+    for one tap (``parent``), its printed Ø (two places)."""
+    dia = {} if drill_dia is None else _drill_dia(drill_dia, spec_name)
+    return ExportFeature(
+        kind="hole",
+        faces=tuple(ConeFace(_DRILL_POINT_HALF_ANGLE_DEG, contains_x_mm=x) for x in stations),
+        requirements=(*dia, "depth"),
+        fields={
+            **({} if parent is None else {"parent": (parent, (spec_name,))}),
+            **dia,
+            "depth": (limits(spec.depth_mm, 2), (spec_name,)),
+            "depth_ref": (spec.depth_mm, (spec_name,)),
+            "thru": (False, (spec_name,)),
+        },
+        precision={**({"dia": 2} if dia else {}), "depth": 2},
+    )
+
+
 EXPORT_FEATURES: dict[str, ExportFeature] = {
     "locating_bore": ExportFeature(
         kind="hole",
         faces=(CylinderFace(LOCATING_BORE_DIA, contains_x_mm=0.0, contains_y_mm=0.0),),
-        requirements=("dia",),
+        requirements=("dia", "depth"),
         fields={
             "at": ([0.0, 0.0, PLATE_TOP_Z], ("PLATE_TOP_Z",)),
             "axis": _DOWN,
@@ -775,6 +1090,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 limits(LOCATING_BORE_DEPTH, LOCATING_BORE_DEPTH_PLACES),
                 ("LOCATING_BORE_DEPTH", "LOCATING_BORE_DEPTH_PLACES"),
             ),
+            "depth_ref": (LOCATING_BORE_DEPTH, ("LOCATING_BORE_DEPTH",)),
             "process": ("REAM", ("DIMENSION_CALLOUTS",)),
         },
         precision={"dia": 3, "depth": LOCATING_BORE_DEPTH_PLACES},
@@ -788,7 +1104,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 contains_y_mm=ROD_PIN_HOLE_XY[1],
             ),
         ),
-        requirements=("dia", "station", "height"),
+        requirements=("dia", "station", "height", "depth"),
         fields={
             "at": (
                 [ROD_PIN_HOLE_XY[0], ROD_PIN_HOLE_XY[1], PLATE_TOP_Z],
@@ -818,10 +1134,14 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("ROD_PIN_HOLE_DIA", "ROD_PIN_HOLE_BAND"),
             ),
             "dia_nominal": (ROD_PIN_HOLE_DIA, ("ROD_PIN_HOLE_DIA",)),
-            "depth": (limits(ROD_PIN_HOLE_DEPTH, 1), ("ROD_PIN_HOLE_DEPTH",)),
+            "depth": (
+                limits(ROD_PIN_HOLE_DEPTH, ROD_PIN_HOLE_DEPTH_PLACES),
+                ("ROD_PIN_HOLE_DEPTH", "ROD_PIN_HOLE_DEPTH_PLACES"),
+            ),
+            "depth_ref": (ROD_PIN_HOLE_DEPTH, ("ROD_PIN_HOLE_DEPTH",)),
             "process": ("REAM", ("DIMENSION_CALLOUTS",)),
         },
-        precision={"dia": 3, "depth": 1, "station": 3, "height": 3},
+        precision={"dia": 3, "depth": ROD_PIN_HOLE_DEPTH_PLACES, "station": 3, "height": 3},
     ),
     "pad_tops": ExportFeature(
         kind="face",
@@ -838,13 +1158,14 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("PLATE_DROP", "PAD_TOP_Z", "PLATE_TOP_Z"),
             ),
             "height_from": ("plate_top", ("PLATE_DROP",)),
+            "height_nominal": (PLATE_DROP, ("PLATE_DROP",)),
         },
         precision={"height": 3},
     ),
     "stand_top": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 0.0, 1.0), STAND_TOP_Z),),
-        requirements=("height",),
+        requirements=("height", "dia"),
         fields={
             "normal": _UP,
             "plane": (
@@ -861,7 +1182,9 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ),
             ),
             "height_from": ("pad_tops", ("STAND_DROP",)),
-            "dia": (limits(STAND_OD, 3), ("STAND_OD",)),
+            "height_nominal": (STAND_DROP, ("STAND_DROP",)),
+            "dia": (limits(STAND_OD, SCHEDULE_PLACES), ("STAND_OD",)),
+            "dia_nominal": (STAND_OD, ("STAND_OD",)),
         },
         precision={"height": 3, "dia": 3},
     ),
@@ -880,6 +1203,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("REST_TOP_HEIGHT", "REST_HEIGHT", "REST_POCKET_DEPTH"),
             ),
             "height_from": ("plate_top", ("REST_TOP_HEIGHT",)),
+            "height_nominal": (REST_TOP_HEIGHT, ("REST_TOP_HEIGHT",)),
         },
         precision={"height": 2},
     ),
@@ -894,7 +1218,123 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("PLATE_TOP_Z",),
             ),
             "thickness": (limits(PLATE_THICK, 1), ("PLATE_THICK",)),
+            "thickness_nominal": (PLATE_THICK, ("PLATE_THICK",)),
         },
         precision={"thickness": 1},
+    ),
+    "plate_outline": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((1.0, 0.0, 0.0), PLATE_EAST_X), PlanarFace((0.0, 1.0, 0.0), PLATE_NORTH_Y)),
+        requirements=("length", "width"),
+        fields={
+            "length": (limits(PLATE_LENGTH, 1), ("PLATE_LENGTH",)),
+            "length_nominal": (PLATE_LENGTH, ("PLATE_LENGTH",)),
+            "width": (limits(PLATE_WIDTH, 1), ("PLATE_WIDTH",)),
+            "width_nominal": (PLATE_WIDTH, ("PLATE_WIDTH",)),
+        },
+        precision={"length": 1, "width": 1},
+    ),
+    "plate_west_end": _plate_face((-1.0, 0.0, 0.0), -PLATE_WEST_X, "station", PLATE_WEST_X, "PLATE_WEST_X"),
+    "plate_south_side": _plate_face(
+        (0.0, -1.0, 0.0), -PLATE_SOUTH_Y, "height", PLATE_SOUTH_Y, "PLATE_SOUTH_Y"
+    ),
+    "stand_pocket": ExportFeature(
+        kind="counterbore",
+        faces=(CylinderFace(STAND_POCKET_DIA, contains_x_mm=0.0, contains_y_mm=0.0),),
+        requirements=("dia", "depth"),
+        fields={
+            "at": ([0.0, 0.0, PLATE_TOP_Z], ("PLATE_TOP_Z",)),
+            "axis": _DOWN,
+            "dia": (limits(STAND_POCKET_DIA, 3), ("STAND_POCKET_DIA",)),
+            "dia_nominal": (STAND_POCKET_DIA, ("STAND_POCKET_DIA",)),
+            "depth": (limits(STAND_POCKET_DEPTH, 3), ("STAND_POCKET_DEPTH",)),
+            "depth_ref": (STAND_POCKET_DEPTH, ("STAND_POCKET_DEPTH",)),
+        },
+        precision={"dia": 3, "depth": 3},
+    ),
+    # The hub stand's drilled bore and its overall height (part schedule),
+    # the height measured down from its top.
+    "stand_bore": ExportFeature(
+        kind="hole",
+        faces=(CylinderFace(STAND_BORE, contains_x_mm=0.0, contains_y_mm=0.0),),
+        requirements=("dia", "thru"),
+        fields={
+            "at": ([0.0, 0.0, STAND_TOP_Z], ("STAND_TOP_Z",)),
+            "axis": _DOWN,
+            "dia": (limits(STAND_BORE, STAND_BORE_PLACES, DRILLED_BAND), ("STAND_BORE", "DRILLED_BAND")),
+            "dia_nominal": (STAND_BORE, ("STAND_BORE",)),
+            "thru": (True, ("STAND_BORE",)),
+        },
+        precision={"dia": STAND_BORE_PLACES},
+    ),
+    "stand_foot": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, -1.0), STAND_HEIGHT - STAND_TOP_Z, contains_x_mm=0.0),),
+        requirements=("height",),
+        fields={
+            "normal": _DOWN,
+            "plane": (
+                {"frame": "model", "axis": "z", "value": STAND_TOP_Z - STAND_HEIGHT},
+                ("STAND_TOP_Z", "STAND_HEIGHT"),
+            ),
+            "height": (limits(STAND_HEIGHT, SCHEDULE_PLACES), ("STAND_HEIGHT",)),
+            "height_nominal": (STAND_HEIGHT, ("STAND_HEIGHT",)),
+            "height_from": ("stand_top", ("STAND_HEIGHT",)),
+        },
+        precision={"height": SCHEDULE_PLACES},
+    ),
+    **{
+        f"pad_pocket_{row[0].lower()}": _pocket(
+            row, "PAD_POCKETS",
+            (PlanarFace((0.0, 0.0, 1.0), PLATE_TOP_Z - PAD_POCKET_DEPTH, contains_x_mm=row[1]),),
+            PAD_POCKET_DEPTH, "PAD_POCKET_DEPTH", PAD_POCKET_LENGTH_PLACES,
+        )
+        for row in PAD_POCKETS
+    },
+    # C1 and C3 share their X, so each rest pocket claims its two long walls.
+    **{
+        f"rest_pocket_{row[0].lower()}": _pocket(
+            row, "REST_POCKETS",
+            (
+                PlanarFace((0.0, -1.0, 0.0), -(row[2] + row[4] / 2.0), contains_x_mm=row[1]),
+                PlanarFace((0.0, 1.0, 0.0), row[2] - row[4] / 2.0, contains_x_mm=row[1]),
+            ),
+            REST_POCKET_DEPTH, "REST_POCKET_DEPTH", REST_POCKET_LENGTH_PLACES,
+        )
+        for row in REST_POCKETS
+    },
+    **{f"pad_{row[0].lower()}": _bonded_part(row, "PADS", PAD_TOP_Z, PAD_HEIGHT, "PAD_HEIGHT") for row in PADS},
+    **{
+        f"rest_{row[0].lower()}": _bonded_part(row, "RESTS", REST_TOP_Z, REST_HEIGHT, "REST_HEIGHT")
+        for row in RESTS
+    },
+    **{
+        key: feature
+        for index, (x, y) in enumerate(HOLD_DOWN_POINTS, start=1)
+        for key, feature in _hold_down(index, x, y).items()
+    },
+    **{
+        f"stud_tap_s{index}": _tap(
+            CLAMP_STUD_SPEC, "CLAMP_STUD_SPEC", CLAMP_STUD_DRILL_DIA, [x, y, PLATE_TOP_Z],
+            (CLAMP_STUD_PLACES, CLAMP_STUD_PLACES), ("CLAMP_STUD_POINTS", "CLAMP_STUD_PLACES"),
+            drill_band=True,
+        )
+        for index, (x, y) in enumerate(CLAMP_STUD_POINTS, start=1)
+    },
+    # S1/S3 and S2/S4 share a station, and a cone selector takes no Y, so one
+    # feature carries the four drill-point cones and the printed drill depth;
+    # each tap carries its own printed drill Ø on its drilled cylinder.
+    "stud_tap_drills": _tap_drill(
+        CLAMP_STUD_SPEC, "CLAMP_STUD_SPEC", tuple(sorted({x for x, _y in CLAMP_STUD_POINTS})),
+        parent=None, drill_dia=None,
+    ),
+    # The pivot tap's depths run from the locating-bore floor, as printed.
+    "pivot_tap": _tap(
+        PIVOT_TAP_SPEC, "PIVOT_TAP_SPEC", PIVOT_TAP_DRILL_DIA, [0.0, 0.0, LOCATING_BORE_FLOOR_Z],
+        None, ("LOCATING_BORE_FLOOR_Z",), drill_band=False,
+    ),
+    "pivot_tap_drill": _tap_drill(
+        PIVOT_TAP_SPEC, "PIVOT_TAP_SPEC", (0.0,), parent="pivot_tap",
+        drill_dia=PIVOT_TAP_DRILL_DIA,
     ),
 }
