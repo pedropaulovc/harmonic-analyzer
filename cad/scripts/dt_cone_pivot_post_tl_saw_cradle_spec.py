@@ -36,7 +36,7 @@ import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, TAP_DRILL_MM, HoleSpec
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 # --- Frame (B6 -> model) -------------------------------------------------------
 B6_X_AT_END = 2.0
@@ -127,8 +127,8 @@ STUD_TAP_DRILL = TAP_DRILL_MM[STUD_THREAD]
 # drilled-hole band qualifies that printed value.
 STUD_DRILL_PLACES = 2
 STUD_DRILL_PRINTED = round(STUD_TAP_DRILL, STUD_DRILL_PLACES)
-_DRILLED = _config.title_block("drilled_hole")
-DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))
+# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
+DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 STUD_X = CONE_AXIS_X
 STUD_Z = (POST_AXIS_Z - 30.0, POST_AXIS_Z + 30.0)
 STUD_MIN_ENGAGEMENT_D = 1.5
