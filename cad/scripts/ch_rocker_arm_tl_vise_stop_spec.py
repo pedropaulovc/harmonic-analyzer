@@ -36,10 +36,10 @@ from __future__ import annotations
 
 import math
 
-import _config
 import ch_rocker_arm_spec as parent
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 # --- The setup the stop serves -----------------------------------------------
 # The prechips rocker route (fixture-cad rocker-plan.toml) is the one that
@@ -158,8 +158,7 @@ if not BASE_ENVELOPE[2][0] > -JAW_HEIGHT:
     raise AssertionError("magnetic base hangs below the jaw's bed slideway")
 
 # Drilled holes: the title block's drilled band (+0.10/0).
-_DRILLED = _config.title_block("drilled_hole")
-DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))  # (upper, lower)
+DRILLED_BAND = (drilled_oversize_mm(), 0.0)  # (upper, lower)
 # Nose pin fixed with a retaining compound (shop-additions r3 #3 route):
 # a drilled slip hole whose gap stays inside Loctite 638's 0.25 mm fill.
 # The sheet states the installed result, not the method.
@@ -168,8 +167,8 @@ BOND_GAP_MAX = 0.25
 # ISO 273 medium clearance for the M6 screw (vendor thread kept).
 SCREW_HOLE_DIA = 6.60
 
-LINEAR_1PL = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
-LINEAR_3PL = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
+LINEAR_1PL = printed_band_mm(1)
+LINEAR_3PL = printed_band_mm(3)
 RULE12_WALL_TARGET = 2.0
 
 # --- Rule 12 at the printed worst case ---------------------------------------
@@ -301,6 +300,26 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked vise-stop dimension needs authored places")
+# Each marked dimension's model value: the build drives its global with it
+# and the sheet prints it at its places.
+DRAWING_MODEL_MM: dict[str, float] = {
+    "FingerHeight": FINGER_HEIGHT,
+    "FingerLength": FINGER_LENGTH,
+    "NoseHeight": NOSE_HEIGHT,
+    "NoseFromRear": NOSE_FROM_REAR,
+    "NoseHoleDia": NOSE_HOLE_DIA,
+    "ScrewHeight": SCREW_HEIGHT,
+    "ScrewFromRear": SCREW_FROM_REAR,
+    "ScrewHoleDia": SCREW_HOLE_DIA,
+    "OverallLength": OVERALL_LENGTH,
+    "FingerFront": FINGER_FRONT,
+    "ArmHeight": ARM_HEIGHT,
+    "ArmWidth": ARM_WIDTH,
+    "ScrewGrip": SCREW_GRIP,
+    "NotchHeight": NOTCH_HEIGHT,
+}
+if set(DRAWING_MODEL_MM) != set(DRAWING_PRECISION_BY_NAME):
+    raise AssertionError("every marked vise-stop dimension needs a model value")
 # The walls above assume one-place sizes and the screw's engagement a
 # three-place grip; a precision edit re-proves them.
 if any(
@@ -370,19 +389,28 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             ),
             "length": (limits(FINGER_FRONT, 1), ("FINGER_FRONT",)),
             "length_nominal": (FINGER_FRONT, ("FINGER_FRONT",)),
+            "note": ("length from seat_face", ("FINGER_FRONT", "SEAT_X")),
         },
         precision={"length": 1},
     ),
     "nose_hole": ExportFeature(
         kind="hole",
         faces=(CylinderFace(NOSE_HOLE_DIA),),
-        requirements=("dia", "at", "end"),
+        requirements=("dia", "at", "end", "station", "height"),
         fields={
             "at": ([FINGER_FRONT_X, NOSE_Y, NOSE_Z], ("FINGER_FRONT_X", "NOSE_Y", "NOSE_Z")),
             "axis": _PLUS_X,
             "dia": (limits(NOSE_HOLE_DIA, 2, DRILLED_BAND), ("NOSE_HOLE_DIA", "DRILLED_BAND")),
             "dia_nominal": (NOSE_HOLE_DIA, ("NOSE_HOLE_DIA",)),
             "thru": (True, ("DRAWING_DIMENSIONS",)),
+            # Printed NoseFromRear / NoseHeight, from the rear and bottom faces
+            # (the schema's only reference field is height_from; the note
+            # names the station's).
+            "station": (limits(NOSE_FROM_REAR, 1), ("NOSE_FROM_REAR", "REAR_Y", "NOSE_Y")),
+            "station_nominal": (NOSE_FROM_REAR, ("NOSE_FROM_REAR",)),
+            "height": (limits(NOSE_HEIGHT, 1), ("NOSE_HEIGHT",)),
+            "height_nominal": (NOSE_HEIGHT, ("NOSE_HEIGHT",)),
+            "height_from": ("bottom_face", ("__frame__",)),
             "process": ("drill", ("DRILLED_BAND",)),
             # The stop contact: the fixed pin's end, on the blank's raw left
             # end (nominal; X zero is edge-found on the part afterwards).
@@ -393,22 +421,28 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "supply_length": (NOSE_PIN_LENGTH, ("NOSE_PIN_LENGTH",)),
             "note": (
                 "bought hardened 6 x 8 dowel pin fixed immovable, flush with the back face; "
-                "its end is the blank-end stop",
+                "its end is the blank-end stop; station from rear_face, height from bottom_face",
                 ("NOSE_PIN_DIA", "NOSE_PIN_LENGTH", "BOND_GAP_MAX"),
             ),
         },
-        precision={"dia": 2},
+        precision={"dia": 2, "station": 1, "height": 1},
     ),
     "screw_hole": ExportFeature(
         kind="hole",
         faces=(CylinderFace(SCREW_HOLE_DIA),),
-        requirements=("dia", "at"),
+        requirements=("dia", "at", "station", "height"),
         fields={
             "at": ([SEAT_X, SCREW_Y, SCREW_Z], ("SEAT_X", "SCREW_Y", "SCREW_Z")),
             "axis": ([-1.0, 0.0, 0.0], ("__frame__",)),
             "dia": (limits(SCREW_HOLE_DIA, 2, DRILLED_BAND), ("SCREW_HOLE_DIA", "DRILLED_BAND")),
             "dia_nominal": (SCREW_HOLE_DIA, ("SCREW_HOLE_DIA",)),
             "thru": (True, ("DRAWING_DIMENSIONS",)),
+            # Printed ScrewFromRear / ScrewHeight, from the rear and bottom faces.
+            "station": (limits(SCREW_FROM_REAR, 1), ("SCREW_FROM_REAR",)),
+            "station_nominal": (SCREW_FROM_REAR, ("SCREW_FROM_REAR",)),
+            "height": (limits(SCREW_HEIGHT, 1), ("SCREW_HEIGHT",)),
+            "height_nominal": (SCREW_HEIGHT, ("SCREW_HEIGHT",)),
+            "height_from": ("bottom_face", ("__frame__",)),
             "process": ("drill", ("DRILLED_BAND",)),
             "note": (
                 f"drilled clearance through the lug for one M6 x {SCREW_LENGTH:g} SHCS (ISO 4762) "
@@ -416,7 +450,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 f"the lug face (screw_seat, {SCREW_GRIP:.3f} +-{LINEAR_3PL:g} from the seat); "
                 f"full-thread engagement {SCREW_ENGAGEMENT_PRINTED:.1f} min "
                 f"({SCREW_ENGAGEMENT_PRINTED_D:.2f}D); tip {SCREW_TIP_CLEARANCE_PRINTED:.1f} min "
-                "clear of the tap bottom; hand-seating load only",
+                "clear of the tap bottom; hand-seating load only; station from rear_face, "
+                "height from bottom_face",
                 (
                     "SCREW_THREAD",
                     "SCREW_LENGTH",
@@ -429,7 +464,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ),
             ),
         },
-        precision={"dia": 2},
+        precision={"dia": 2, "station": 1, "height": 1},
     ),
     # The lug's head-bearing face: its printed three-place distance from the
     # seat face (the screw grip) sets the screw's engagement and tip clearance.
@@ -452,4 +487,89 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         },
         precision={"length": 3},
     ),
+    # The printed heights and widths' reference faces: the lug's bottom and
+    # the shared rear face.
+    "bottom_face": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, -1.0), -BOTTOM_Z),),
+        requirements=(),
+        fields={
+            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+            "plane": ({"frame": "model", "axis": "z", "value": BOTTOM_Z}, ("BOTTOM_Z", "NOSE_HEIGHT")),
+        },
+    ),
+    "rear_face": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 1.0, 0.0), REAR_Y),),
+        requirements=(),
+        fields={
+            "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+            "plane": ({"frame": "model", "axis": "y", "value": REAR_Y}, ("REAR_Y", "SCREW_FROM_REAR")),
+        },
+    ),
 }
+
+
+def _sized_face(
+    normal: tuple[float, float, float], axis: str, value: float, field: str, size: float,
+    size_name: str, reference: str, contains_x: float | None = None,
+) -> ExportFeature:
+    """A planar face whose printed one-place size from ``reference`` is ``size``."""
+    offset = value if sum(normal) > 0.0 else -value
+    return ExportFeature(
+        kind="face",
+        faces=(PlanarFace(normal, offset, contains_x_mm=contains_x),),
+        requirements=(field,),
+        fields={
+            "normal": (list(normal), ("__frame__",)),
+            "plane": ({"frame": "model", "axis": axis, "value": value}, (size_name,)),
+            field: (limits(size, 1), (size_name,)),
+            f"{field}_nominal": (size, (size_name,)),
+            **(
+                {"height_from": (reference, ("__frame__",))}
+                if field == "height"
+                else {"note": (f"{field} from {reference}", (size_name,))}
+            ),
+        },
+        precision={field: 1},
+    )
+
+
+EXPORT_FEATURES |= {
+    "finger_top": _sized_face(
+        (0.0, 0.0, 1.0), "z", FINGER_TOP_Z, "height", FINGER_HEIGHT, "FINGER_HEIGHT", "bottom_face"
+    ),
+    "finger_end": _sized_face(
+        (0.0, -1.0, 0.0), "y", FINGER_END_Y, "length", FINGER_LENGTH, "FINGER_LENGTH", "rear_face"
+    ),
+    "arm_top": _sized_face((0.0, 0.0, 1.0), "z", ARM_TOP_Z, "height", ARM_HEIGHT, "ARM_HEIGHT", "bottom_face"),
+    "arm_inner_face": _sized_face(
+        (0.0, -1.0, 0.0), "y", ARM_INNER_Y, "width", ARM_WIDTH, "ARM_WIDTH", "rear_face"
+    ),
+    # The step's ceiling under the arm (station inside the arm span, should
+    # the finger's underside bind as a separate coplanar face).
+    "notch_ceiling": _sized_face(
+        (0.0, 0.0, -1.0), "z", NOTCH_TOP_Z, "height", NOTCH_HEIGHT, "NOTCH_HEIGHT", "bottom_face",
+        contains_x=(GRIP_FACE_X + FINGER_FRONT_X) / 2.0,
+    ),
+}
+
+# Every printed toleranced dimension's exported owner: (feature, field).
+DIMENSION_OWNERS: dict[str, tuple[str, str]] = {
+    "OverallLength": ("seat_face", "length"),
+    "FingerFront": ("finger_front", "length"),
+    "ScrewGrip": ("screw_seat", "length"),
+    "NoseHoleDia": ("nose_hole", "dia"),
+    "ScrewHoleDia": ("screw_hole", "dia"),
+    "FingerHeight": ("finger_top", "height"),
+    "FingerLength": ("finger_end", "length"),
+    "NoseHeight": ("nose_hole", "height"),
+    "NoseFromRear": ("nose_hole", "station"),
+    "ScrewHeight": ("screw_hole", "height"),
+    "ScrewFromRear": ("screw_hole", "station"),
+    "ArmHeight": ("arm_top", "height"),
+    "ArmWidth": ("arm_inner_face", "width"),
+    "NotchHeight": ("notch_ceiling", "height"),
+}
+if set(DIMENSION_OWNERS) != set(DRAWING_PRECISION_BY_NAME):
+    raise AssertionError("every printed vise-stop dimension needs an exported owner")

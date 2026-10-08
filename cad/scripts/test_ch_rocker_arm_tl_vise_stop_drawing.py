@@ -9,6 +9,7 @@ import ch_rocker_arm_spec as arm
 import ch_rocker_arm_tl_vise_stop_spec as spec
 import draw_ch_rocker_arm_tl_vise_stop as drawing
 import export_features
+from _printed_tolerance import printed_band_mm
 
 STEM = "ch_rocker_arm_tl_vise_stop"
 
@@ -22,6 +23,30 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(drawing.ELEVATION_KEEP) | set(drawing.SIDE_KEEP) == marked
     assert not set(drawing.ELEVATION_KEEP) & set(drawing.SIDE_KEEP)
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+
+
+def test_every_printed_dimension_exports_its_printed_band() -> None:
+    """Each printed toleranced dimension has one exported owner whose band is
+    exactly the sheet's (the model value rounded to its places, then the
+    drilled band for the holes or the title block's general band), with its
+    nominal inside, and two dimensions never share an owner."""
+    features = _features()
+    owners = spec.DIMENSION_OWNERS
+    assert set(owners) == set(spec.DRAWING_PRECISION_BY_NAME)
+    assert len(set(owners.values())) == len(owners)
+    for name, (feature, field) in owners.items():
+        places = spec.DRAWING_PRECISION_BY_NAME[name]
+        printed = round(spec.DRAWING_MODEL_MM[name], places)
+        lower, upper = (
+            (spec.DRILLED_BAND[1], spec.DRILLED_BAND[0])
+            if name.endswith("HoleDia")
+            else (-printed_band_mm(places), printed_band_mm(places))
+        )
+        exported = features[feature]
+        assert field in exported["requirements"], name
+        assert exported[field] == [round(printed + lower, 12), round(printed + upper, 12)], name
+        nominal = exported[f"{field}_nominal"]
+        assert exported[field][0] <= nominal <= exported[field][1], name
 
 
 def test_nose_stops_the_blank_on_stock_outboard_of_the_finished_arm() -> None:
@@ -75,7 +100,7 @@ def test_screw_engagement_and_tip_clearance_hold_at_every_screw_and_grip_corner(
     nearer the tap bottom than the printed clearance, and the sheet never
     states more of either than the corners leave."""
     places = spec.DRAWING_PRECISION_BY_NAME["ScrewGrip"]
-    band = float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+    band = printed_band_mm(places)
     engagements, clearances = [], []
     for grip in (spec.SCREW_GRIP - band, spec.SCREW_GRIP + band):
         for length in (spec.SCREW_LENGTH + d for d in spec.SCREW_LENGTH_BAND):

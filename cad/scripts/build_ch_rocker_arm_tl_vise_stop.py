@@ -71,6 +71,7 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     BACK_X,
     BOTTOM_Z,
     DRAWING_DIMENSIONS,
+    DRAWING_MODEL_MM,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     DRILLED_BAND,
@@ -81,8 +82,6 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     FINGER_THICK,
     FINGER_TOP_Z,
     ISOMETRIC_VIEW_NOTE,
-    NOSE_FROM_REAR,
-    NOSE_HEIGHT,
     NOSE_HOLE_DIA,
     NOSE_Y,
     NOSE_Z,
@@ -90,9 +89,7 @@ from ch_rocker_arm_tl_vise_stop_spec import (
     NOTCH_TOP_Z,
     OVERALL_LENGTH,
     REAR_Y,
-    SCREW_FROM_REAR,
     SCREW_GRIP,
-    SCREW_HEIGHT,
     SCREW_HOLE_DIA,
     SCREW_Y,
     SCREW_Z,
@@ -432,22 +429,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # The mm suffix is load-bearing: the equation manager reads bare numbers
     # in document units.
-    for name, value in (
-        ("FingerHeight", FINGER_HEIGHT),
-        ("FingerLength", FINGER_LENGTH),
-        ("NoseHeight", NOSE_HEIGHT),
-        ("NoseFromRear", NOSE_FROM_REAR),
-        ("NoseHoleDia", NOSE_HOLE_DIA),
-        ("ScrewHeight", SCREW_HEIGHT),
-        ("ScrewFromRear", SCREW_FROM_REAR),
-        ("ScrewHoleDia", SCREW_HOLE_DIA),
-        ("OverallLength", OVERALL_LENGTH),
-        ("FingerFront", FINGER_FRONT),
-        ("ArmHeight", ARM_HEIGHT),
-        ("ArmWidth", ARM_WIDTH),
-        ("ScrewGrip", SCREW_GRIP),
-        ("NotchHeight", NOTCH_HEIGHT),
-    ):
+    for name, value in DRAWING_MODEL_MM.items():
         await set_global(adapter, name, f"{value}mm")
 
     # --- Finger section with both holes (Right plane: sketch x = -Z, y = Y) ---
