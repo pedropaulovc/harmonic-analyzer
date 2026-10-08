@@ -205,10 +205,17 @@ def test_every_printed_band_has_a_requirement_owner() -> None:
 
 def test_hole_callout_bands_are_the_printed_bands() -> None:
     """The hole callouts print at two places; their exported bands are about
-    those printed values."""
+    those printed values. A drilled Ø (clearance or tap drill) carries the
+    title block's DRILLED HOLES band; the tap drills print 7.94 and 3.80 while
+    the taps keep their true drill size as tap_drill_mm."""
     features = _features()
-    for name, key in (
+    drilled = (
         *((f"hold_down_h{i}", "dia") for i in range(1, 5)),
+        *((f"stud_tap_s{i}", "dia") for i in range(1, 5)),
+        ("pivot_tap_drill", "dia"),
+    )
+    for name, key in (
+        *drilled,
         *((f"hold_down_h{i}_counterbore", key) for i in range(1, 5) for key in ("dia", "depth")),
         *((f"stud_tap_s{i}", "depth") for i in range(1, 5)),
         ("stud_tap_drills", "depth"),
@@ -218,9 +225,26 @@ def test_hole_callout_bands_are_the_printed_bands() -> None:
         feature = features[name]
         nominal = _nominal(feature, key)
         assert nominal == round(nominal, 2), (name, key)
-        band = spec.DRILLED_BAND if (name.startswith("hold_down") and key == "dia" and "counterbore" not in name) else None
+        band = spec.DRILLED_BAND if (name, key) in drilled else None
         assert feature[key] == limits(nominal, 2, band), (name, key)
         assert key in feature["requirements"], (name, key)
+    assert features["stud_tap_s1"]["dia_nominal"] == 7.94
+    assert features["stud_tap_s1"]["tap_drill_mm"] == spec.CLAMP_STUD_DRILL_DIA
+    assert features["pivot_tap_drill"]["dia_nominal"] == 3.80
+    assert features["pivot_tap"]["tap_drill_mm"] == spec.PIVOT_TAP_DRILL_DIA
+
+
+def test_every_exported_nominal_lies_in_its_band() -> None:
+    """prechips refuses a nominal outside its requirement band: every
+    exported nominal is the printed value, inside the printed band."""
+    for name, feature in _features().items():
+        for field, nominal in feature.items():
+            key = field.removesuffix("_nominal") if field.endswith("_nominal") else None
+            key = field.removeprefix("nominal_") if field.startswith("nominal_") else key
+            if key is None or key not in feature:
+                continue
+            low, high = feature[key]
+            assert low <= nominal <= high, (name, field, nominal, feature[key])
 
 
 def test_exported_bands_are_the_printed_bands() -> None:
