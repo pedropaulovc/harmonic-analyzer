@@ -33,6 +33,7 @@ from ch_rocker_arm_tl_filing_stud_spec import (
     DIMENSION_TEXT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    HEAD_LENGTH,
     REFERENCE_CALLOUTS,
     REFERENCE_DIMENSIONS,
     SURFACE_FINISHES,
@@ -59,8 +60,8 @@ SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
 # One turned profile (axis horizontal, thread right) carries every size: the
-# axial sizes from the seat face, each diameter beside its own step. The end
-# view only donates the sketch diameters and is deleted.
+# axial sizes as one baseline from the faced tip, each diameter beside its
+# own step. The end view only donates the sketch diameters and is deleted.
 PROFILE_CENTER = (0.170, 0.170)
 # The view centres on the model box (tail end to thread end).
 SEAT_X = PROFILE_CENTER[0] + (TAIL_END - THREAD_END) / 2.0 * _S
@@ -68,17 +69,24 @@ DONOR_CENTER = (0.330, 0.100)
 ISO_CENTER = (0.355, 0.195)  # clear of the two-line fit callout
 ISO_NOTE_XY = (0.295, 0.240)
 NOTES_XY = (0.020, 0.075)
-_ABOVE = PROFILE_CENTER[1] + 0.040
-_BELOW = PROFILE_CENTER[1] - 0.040
+_TIP_X = SEAT_X + THREAD_END * _S
+_ROW = 0.012
+
+
+def _row(station_x_mm: float, row: int) -> tuple[float, float]:
+    """Text over the middle of a tip-to-station span, rows stacked upward."""
+    return (
+        (_TIP_X + SEAT_X + station_x_mm * _S) / 2.0,
+        PROFILE_CENTER[1] + 0.022 + row * _ROW,
+    )
+
+
+# Shortest span lowest so no extension line crosses another row's text.
 PROFILE_KEEP = {
-    "TailEnd": (SEAT_X - TAIL_END / 2.0 * _S, _ABOVE),
-    "ThreadEnd": (SEAT_X + THREAD_END / 2.0 * _S, _ABOVE),
-    "HeadLength": (SEAT_X - 0.012, _BELOW),
-    # Above the body, under the end-station row: the space below carries
-    # the locating diameter's fit callout, whose leader must cross nothing.
-    "BodyLength": (SEAT_X + 0.016, PROFILE_CENTER[1] + 0.022),
-    # The reference overall, one row above the two end stations.
-    "OverallLength": (PROFILE_CENTER[0], _ABOVE + 0.018),
+    "ThreadStartStation": _row(BODY_LENGTH, 0),
+    "SeatStation": _row(0.0, 1),
+    "HeadBackStation": _row(-HEAD_LENGTH, 2),
+    "TailEndStation": _row(-TAIL_END, 3),
 }
 DONOR_KEEP = {
     "TailDia": (0.300, 0.060),
@@ -194,14 +202,14 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, profile, face_xy=PROFILE_CENTER, label="stud turning axis"
     )
     # The sliding journal is a required machined surface (codex round 14):
-    # on its upper silhouette, symbol left of the 12.5 extension line.
+    # on its upper silhouette, symbol between the seat and thread-start lines.
     body_pick = (SEAT_X + 0.006, PROFILE_CENTER[1] + BODY_DIA / 2.0 * _S)
     add_surface_finish(
         adapter,
         profile,
         edge_xy=body_pick,
         entity_type="SILHOUETTE",
-        symbol_xy=(SEAT_X + 0.003, PROFILE_CENTER[1] + 0.012),
+        symbol_xy=(SEAT_X + 0.008, PROFILE_CENTER[1] + 0.012),
         leader_attach_xy=body_pick,
         control=surface_finish_by_key(SURFACE_FINISHES, "locating_body"),
         label="filing stud locating diameter finish",
