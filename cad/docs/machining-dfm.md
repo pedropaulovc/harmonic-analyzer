@@ -222,8 +222,10 @@ wire-EDM and hobbing stay outsource alternates.
 
 ## Cutter plan
 
-Every gear is cut with a stock involute form cutter from the eight-cutter set for its pitch,
-indexed on the dividing head, except the T006 cone. The cutter numbers follow the Brown & Sharpe
+Every cut gear uses a stock involute form cutter from the eight-cutter set for its pitch,
+indexed on the dividing head, except the T006 cone. Three sets cover the machine: 48DP (cones,
+cylinder gears, alignment drum and paper reducer), 24DP (crank pair) and 32DP (feed pinion); the
+rack is bought. The cutter numbers follow the Brown & Sharpe
 ranges (#1 135 teeth to a rack, #2 55–134, #3 35–54, #4 26–34, #5 21–25, #6 17–20, #7 14–16,
 #8 12–13), which date to the period catalogues
 ([Brown & Sharpe 1904](https://archive.org/details/BrownAndSharpeMachineryAndTools1904Catalogue))
@@ -310,8 +312,8 @@ for the lead depend on the head and the table screw: `TODO(cut it first)`.
 
 | part | teeth | pitch | cutter | index per tooth (40:1) |
 |---|--:|---|:--:|---|
-| `pd-rack-pinion` (reducer disc) | 120 | 40DP PA20 | #2 | 5 on 15 |
-| `pd-transgear-knob-shaft` integral pinion | 12 | 40DP PA20 | #8 | 3 turns + 5 on 15 |
+| `pd-rack-pinion` (reducer disc) | 120 | 48DP PA20 | #2 (cone set) | 5 on 15 |
+| `pd-transgear-knob-shaft` integral pinion | 12 | 48DP PA20 | #8 (cone set) | 3 turns + 5 on 15 |
 | `pd-transgear-feed-pinion` | 12 | 32DP PA20 | #8 | 3 turns + 5 on 15 |
 | `pd-platen-rack` | rack, pitch 2.4936 mm | 32DP PA20 | none: bought as stock rack | none |
 

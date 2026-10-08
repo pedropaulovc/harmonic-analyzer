@@ -11,7 +11,7 @@ involute cutter instead of making cutters for an odd pitch.
 |---|---|---|
 | Cone and cylinder train | `dt-cone-gear` T006–T120, `dt-cylinder-gear` ×20 (120T), `dt-alignment-pinion` (32T) | 48DP, PA20, spur |
 | Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, right-hand helix 13.0011°) | normal 24DP, normal PA20 |
-| Paper-drive reducer | `pd-rack-pinion` (120T disc), `pd-transgear-knob-shaft` (integral 12T) | 40DP, PA20 |
+| Paper-drive reducer | `pd-rack-pinion` (120T disc), `pd-transgear-knob-shaft` (integral 12T) | 48DP, PA20 (same cutter set as the cones) |
 | Paper feed | `pd-transgear-feed-pinion` (12T), `pd-platen-rack` | 32DP, PA20 |
 | Chain | crank and knob sprockets, 68 links | ANSI #25 |
 
@@ -184,9 +184,12 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   4.732 mm together, the cone pivot post grows from 86 to 94.732 mm (head 26.6 mm),
   the swing platform grows 4 mm longer with no relief pocket under the 64T, and
   the post mounting screw becomes a 4 in 1/4-20 (MSC 40923906) cut to 94.9 mm.
-- Paper drive: the reducer disc shrinks 5% (OD 77.47 mm) and the reducer centre
-  moves from 44.77 to 42.22 mm. The 32DP feed pinion and rack shorten the paper
-  advance from 1.596 to 1.496 mm per crank turn (−6.25%). The chain is 68 links
+- Paper drive: the reducer keeps its 12:120 counts, which fit the photographed
+  1898 disc best, but is cut at 48DP with the cone cutters. The disc shrinks from
+  OD 81.55 mm to about 64.6 mm, about 21% smaller. The change is deliberate: one
+  48DP cutter set then serves the cones, the cylinder gears and the reducer. The
+  32DP feed pinion and the purchased 32DP rack shorten the paper advance from
+  1.596 to 1.496 mm per crank turn (−6.25%). The chain is 68 links
   of ANSI #25.
 - Tooth form: a 20° tooth has a smaller base circle (0.940 of pitch diameter,
   against 0.968 at 14.5°), so its flanks are more curved and its tip narrower.

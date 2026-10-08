@@ -25,7 +25,7 @@ On conflict, the book wins over any derivative file.
 - **Cone incline 13.0011°**, derived from exact tracking `sin i = 3m / 7.0565`: each 6-tooth
   step adds 3m of pitch radius per 7.0565 mm channel pitch, with the 48DP module
   `m = 25.4 / 48` mm.
-- **Gear standard: 48DP / 20° train, normal 24DP / 20° crank pair, 40DP and 32DP / 20° paper
+- **Gear standard: 48DP / 20° train, normal 24DP / 20° crank pair, 48DP and 32DP / 20° paper
   drive.** A deliberate anachronism. The original's pitch and pressure angle are not recorded;
   the earlier DP 49.82 was back-calculated from a scaled photo and the 14.5° was assumed. See
   [`gear-standard.md`](./gear-standard.md).

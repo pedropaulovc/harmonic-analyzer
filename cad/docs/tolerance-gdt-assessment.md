@@ -165,10 +165,10 @@ tolerance.**
      20-pair train and the 32T alignment pinion share it by construction);
    - **crossed crank pair — normal 24DP / 20° PA** (`gear_train.yaml crank_drive_normal_module_mm`),
      a straight 16T pinion driving a right-hand 13.0011° helical 64T;
-   - **paper-drive reducer — 40DP / 20°** (`pd_rack_pinion_spec.py`, 120T disc and the shifted 12T
-     knob pinion);
-   - **paper feed — 32DP / 20°** (`pd_transgear_feed_pinion_spec.py`, shifted 12T pinion and the
-     platen rack, which must *not* couple to the train DP or the rack silently interferes).
+   - **paper-drive reducer — 48DP / 20°** (`pd_rack_pinion_spec.py`, 120T disc and the 12T knob
+     pinion; same pitch and cutters as the cone train, but a separate meshing pair);
+   - **paper feed — 32DP / 20°** (`pd_transgear_feed_pinion_spec.py`, 12T pinion and the
+     purchased platen rack, which must *not* couple to the train DP or the rack silently interferes).
 
    The reasons for this standard, and the DP 49.82 / 14.5° values it replaced, are in
    [`gear-standard.md`](./gear-standard.md).
@@ -345,7 +345,7 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 | **Rocker arms** `ch-rocker-arm`, `fr-rocker-arm-support` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
 | **Amplitude bars** `ch-amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |
 | **Drive train** `crankshaft`, `dt-crank-pin`, `dt-crank-drive-gear`, `dt-crank-pinion`, `dt-crank-arm`, `dt-crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
-| **Paper drive** `pd-rack-pinion`, `pd-platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | reducer **40DP / 20°**, feed pinion and rack **32DP / 20°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
+| **Paper drive** `pd-rack-pinion`, `pd-platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | reducer **48DP / 20°**, feed pinion and rack **32DP / 20°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
 | **Magnifier & pen** `mg-magnifying-wheel`, `mg-magnifying-lever`, `mg-magnifying-bracket/clamp`, `mg-magnifying-vertical-rod`, pen parts | **T2** | wheel/lever bores `precision` + runout on the wheel; linkage pivots squareness. Amplifies output, so play here is visible — but downstream of the sum. |
 | **Frame** `fr-harmonic-base`, `fr-top-frame` (one casting: ring + integral crossbar + gooseneck hub — absorbed the former `top-crossbar` and `gooseneck-clamp`, 2026-08-02), pedestals, clamps, columns, `gooseneck` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
 | **Springs** `vn-channel-spring-installed`, `vn-counter-spring` | **T2** | **match rate + free length across the 20 channels** (consistency, not absolute rate); counter spring is the **coarse tare** — leave loose. |
