@@ -240,7 +240,7 @@ export class CompactVideoReference {
     const measurementBlockers = data.sourceMeasurements?.blockers ?? []
     const measurementPreview = measurementBlockers.slice(0, 2).map((reason) => reason.length > 220 ? `${reason.slice(0, 217)}...` : reason).join(' ')
     const measurementStatus = data.sourceMeasurements?.status ?? 'unmeasured'
-    this.approximationMessage = `Approximate source-following; chosen feasible inputs, not recovered history. Rendered stages 50% / 20% / 10% / 5%: unmeasured; measurement report required.${data.coverage.status === 'blocked' ? ` Runtime coverage incomplete: ${this.coverageMessage}` : ''} Source measurements ${measurementStatus}${measurementBlockers.length ? `: ${measurementBlockers.length} issues. ${measurementPreview} Full details remain in the source track/report.` : '.'}`
+    this.approximationMessage = `Approximate source-following; chosen feasible inputs, not recovered history. Rendered stage 50%: unmeasured; measurement report required.${data.coverage.status === 'blocked' ? ` Runtime coverage incomplete: ${this.coverageMessage}` : ''} Source measurements ${measurementStatus}${measurementBlockers.length ? `: ${measurementBlockers.length} issues. ${measurementPreview} Full details remain in the source track/report.` : '.'}`
     const shotMap = new Map(data.shots.map((shot) => [shot.id, shot]))
     if (shotMap.size !== data.shots.length) throw new Error('Compact source shot IDs must be unique.')
     for (let i = 0; i < data.shots.length; i++) {

@@ -437,9 +437,19 @@ async function openRoute(page, url, record, player) {
   assert(selectors.length === 6 && new Set(selectors).size === 6, 'All six retained direct video routes must remain available')
   if (player === 'local') {
     await page.locator('#video-player video').waitFor({ state: 'visible', timeout: 30_000 })
-    const src = await page.locator('#video-player video').getAttribute('src')
-    assert(new URL(src, route).pathname === `${new URL(url).pathname}reference-media/${record.id}.mp4`, 'Local player is not using the retained original MP4 route')
-    return { route: route.href, frame: page, selector: '#video-player video', player }
+    const src = await page.locator('#video-player video').getAttribute('src'), sourceUrl = new URL(src, route).href
+    assert(new URL(sourceUrl).pathname === `${new URL(url).pathname}reference-media/${record.id}.mp4`, 'Local player is not using the retained original MP4 route')
+    const response = await page.request.get(new URL(`reference-media/${record.id}.access.json`, url).href)
+    assert(response.ok(), 'Original native presentation index is unavailable')
+    const originalAccess = await response.json()
+    assert(originalAccess.schemaVersion === 1 && originalAccess.kind === 'original-h264-idr-access-index'
+      && originalAccess.source?.videoId === record.id && originalAccess.source.sha256 === record.native.observedSha256
+      && Number.isSafeInteger(originalAccess.source.bytes) && originalAccess.source.bytes > 0
+      && Array.isArray(originalAccess.timeBase) && originalAccess.timeBase.length === 2
+      && originalAccess.timeBase.every(value => Number.isSafeInteger(value) && value > 0)
+      && Array.isArray(originalAccess.pts) && originalAccess.pts.length === record.native.nativeFrameCount,
+    'Original presentation index is not bound to the measured unchanged source')
+    return { route: route.href, frame: page, selector: '#video-player video', player, sourceUrl, originalAccess }
   }
   const iframe = page.locator('#video-player iframe')
   await iframe.waitFor({ state: 'visible', timeout: 30_000 })
@@ -452,7 +462,7 @@ async function openRoute(page, url, record, player) {
 async function media(embed) {
   return embed.frame.evaluate(selector => {
     const video = document.querySelector(selector), player = document.querySelector('#movie_player')
-    return { present: video instanceof HTMLVideoElement, paused: video?.paused, seeking: video?.seeking, ended: video?.ended, mediaTime: video?.currentTime, duration: video?.duration, muted: video?.muted, volume: video?.volume, readyState: video?.readyState, width: video?.videoWidth, height: video?.videoHeight, adShowing: !!player?.classList.contains('ad-showing'), error: video?.error?.message ?? document.querySelector('.ytp-error-content-wrap')?.textContent?.trim() ?? null }
+    return { present: video instanceof HTMLVideoElement, paused: video?.paused, seeking: video?.seeking, ended: video?.ended, mediaTime: video?.currentTime, currentSrc: video?.currentSrc, src: video?.src, duration: video?.duration, muted: video?.muted, volume: video?.volume, readyState: video?.readyState, width: video?.videoWidth, height: video?.videoHeight, adShowing: !!player?.classList.contains('ad-showing'), error: video?.error?.message ?? document.querySelector('.ytp-error-content-wrap')?.textContent?.trim() ?? null }
   }, embed.selector)
 }
 function requireMedia(actual, record) {
@@ -476,33 +486,83 @@ export function seekSettlement(observed, target, tolerance) {
   if (lastSeeking >= 0) return { done: settled && onTarget(observed.events[lastSeeking].mediaTime) && observed.events.slice(lastSeeking + 1).some(event => event.type === 'seeked'), proof: 'native-seeking-then-seeked-after-command' }
   return { done: settled && observed.pre.paused && !observed.pre.seeking && observed.pre.readyState >= 2 && onTarget(observed.pre.mediaTime), proof: 'already-decoded-same-time-no-op' }
 }
-async function observedSeek(embed, target, command, fps) {
+
+function originalExposure(embed, frame) {
+  const index = embed.originalAccess, frameIndex = frame.sourceImage?.frameIndex
+  assert(Number.isSafeInteger(frameIndex) && frameIndex >= 0 && index?.source?.sha256 === frame.sourceImage.sourceSha256
+    && Number.isSafeInteger(index.pts[frameIndex]) && Array.isArray(index.timeBase) && index.timeBase.length === 2
+    && index.timeBase.every(value => Number.isSafeInteger(value) && value > 0) && typeof embed.sourceUrl === 'string',
+  'Selected source image has no bound integer original presentation index')
+  const expected = { frameIndex, pts: index.pts[frameIndex], timeBase: index.timeBase, sourceUrl: embed.sourceUrl }
+  assert(Math.abs(expected.pts * expected.timeBase[0] / expected.timeBase[1] - frame.decodedTimeSeconds) <= 0.001,
+    'Source image integer original PTS differs from the declared decoded exposure')
+  return expected
+}
+
+function originalPresentationMatches(presentation, expected) {
+  return presentation && presentation.frameIndex === expected.frameIndex && presentation.pts === expected.pts
+    && Array.isArray(presentation.timeBase) && presentation.timeBase.length === 2
+    && presentation.timeBase.every((value, index) => value === expected.timeBase[index])
+    && Number.isSafeInteger(presentation.presentedFrames) && presentation.presentedFrames > 0
+    && finite(presentation.presentationTime) && presentation.presentationTime >= 0
+    && finite(presentation.currentTime) && finite(presentation.mediaTime)
+    && Math.abs(presentation.mediaTime - expected.pts * expected.timeBase[0] / expected.timeBase[1]) <= 1e-6
+}
+
+/** Original seeks land at an IDR, then present the exact owned source exposure. */
+export function originalSeekSettlement(observed, expected) {
+  if (!observed?.sameElement) return { fatal: 'Observed original media element was replaced/detached' }
+  if (observed.now.error || observed.events.some(event => event.type === 'error')) return { fatal: 'Actual original media failed during seek' }
+  if (observed.pre.currentSrc !== expected.sourceUrl || observed.pre.src !== expected.sourceUrl
+    || observed.now.currentSrc !== expected.sourceUrl || observed.now.src !== expected.sourceUrl) return { fatal: 'Observed original media URL changed during seek' }
+  const owned = state => originalPresentationMatches(state.presentation, expected) && state.seekState === 'idle'
+    && state.paused && !state.seeking && state.readyState >= 2
+    && finite(state.mediaTime) && Math.abs(state.mediaTime - state.presentation.mediaTime) <= CLOCK_LIMIT
+  const lastSeeking = observed.events.findLastIndex(event => event.type === 'seeking')
+  if (lastSeeking >= 0) return {
+    done: !!owned(observed.now) && observed.events.slice(lastSeeking + 1).some(event => event.type === 'seeked')
+      && (!observed.pre.presentation || observed.now.presentation.presentedFrames > observed.pre.presentation.presentedFrames),
+    proof: 'verified-idr-seek-then-owned-original-presentation',
+  }
+  return { done: !!owned(observed.now) && !!owned(observed.pre), proof: 'already-owned-same-original-exposure-no-op' }
+}
+async function observedSeek(embed, target, command, fps, frame) {
   assert(finite(target), 'Source sample PTS is unavailable')
+  const expected = embed.player === 'local' ? originalExposure(embed, frame) : null
   await embed.frame.evaluate(selector => {
     const video = document.querySelector(selector)
     if (!(video instanceof HTMLVideoElement)) throw new Error('Actual original media element is unavailable')
     window.__harmonicCompactSeek?.detach()
-    const read = () => ({ mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, readyState: video.readyState, error: video.error?.message ?? null })
+    const read = () => {
+      const actual = video.paused && !video.seeking ? window.harmonicAnalyzer?.snapshot() : null
+      return { mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, readyState: video.readyState, error: video.error?.message ?? null,
+        currentSrc: video.currentSrc, src: video.src, presentation: actual?.sourcePresentation ?? null, seekState: actual?.sourceSeek?.state ?? null }
+    }
     const events = [], pre = read(), types = ['seeking', 'seeked', 'error']
     const record = event => events.push({ type: event.type, ...read() })
     for (const type of types) video.addEventListener(type, record)
     window.__harmonicCompactSeek = { video, pre, events, read, detach() { for (const type of types) video.removeEventListener(type, record); delete window.__harmonicCompactSeek } }
   }, embed.selector)
+  let observed = null
   try {
     await command()
     const deadline = Date.now() + 15_000
     for (;;) {
-      const observed = await embed.frame.evaluate(selector => {
+      observed = await embed.frame.evaluate(selector => {
         const observer = window.__harmonicCompactSeek
         if (!observer) return null
         return { sameElement: observer.video === document.querySelector(selector) && observer.video.isConnected, pre: observer.pre, events: observer.events.slice(), now: observer.read() }
       }, embed.selector)
-      const verdict = seekSettlement(observed, target, 0.5 / fps + 0.005)
+      const verdict = expected ? originalSeekSettlement(observed, expected) : seekSettlement(observed, target, 0.5 / fps + 0.005)
       assert(!verdict.fatal, verdict.fatal)
-      if (verdict.done) return { proof: verdict.proof, targetSourcePtsSeconds: target, preMediaTime: observed.pre.mediaTime, settledMediaTime: observed.now.mediaTime, events: observed.events.map(event => event.type) }
+      if (verdict.done) return { proof: verdict.proof, targetSourcePtsSeconds: target, originalExposure: expected,
+        presentation: observed.now.presentation, preMediaTime: observed.pre.mediaTime, settledMediaTime: observed.now.mediaTime, events: observed.events.map(event => event.type) }
       assert(Date.now() < deadline, `Actual original video never decoded/settled the commanded source PTS ${target}s`)
       await delay(50)
     }
+  } catch (error) {
+    error.sourceSeekFailure = { expectedOriginalExposure: expected, targetSourcePtsSeconds: target, observed }
+    throw error
   } finally { await embed.frame.evaluate(() => window.__harmonicCompactSeek?.detach()).catch(() => {}) }
 }
 /** Recover an ended original through a real selected source seek, never an ended-as-paused alias. */
@@ -520,11 +580,13 @@ export async function preparePausedSource(page, embed, record, rows) {
       return Math.abs(record.native.pts[index] - frame.decodedTimeSeconds) <= 0.001
     })?.frame
     assert(frame, 'Ended source setup has no selected nonterminal native source exposure')
-    const seek = await observedSeek(embed, frame.decodedTimeSeconds, () => embed.frame.evaluate(({ selector, timeSeconds }) => {
-      const video = document.querySelector(selector)
-      if (!(video instanceof HTMLVideoElement)) throw new Error('Actual original media element is unavailable')
-      video.currentTime = timeSeconds
-    }, { selector: embed.selector, timeSeconds: frame.decodedTimeSeconds }), record.native.fps)
+    const seek = await observedSeek(embed, frame.decodedTimeSeconds, () => embed.player === 'local'
+      ? page.evaluate(timeSeconds => window.harmonicAnalyzer.seekVideo(timeSeconds), frame.decodedTimeSeconds)
+      : embed.frame.evaluate(({ selector, timeSeconds }) => {
+        const video = document.querySelector(selector)
+        if (!(video instanceof HTMLVideoElement)) throw new Error('Actual original media element is unavailable')
+        video.currentTime = timeSeconds
+      }, { selector: embed.selector, timeSeconds: frame.decodedTimeSeconds }), record.native.fps, frame)
     recovery = { kind: 'ended-original-native-source-setup-seek', sampleTimeSeconds: frame.timeSeconds, ...seek }
   }
   await pause(page, embed)
@@ -534,8 +596,11 @@ export async function preparePausedSource(page, embed, record, rows) {
 
 
 /** The pose-selection key is not a substitute for the owned original exposure or native clock. */
-function requireOwnedSourceExposure(actual, frame) {
+function requireOwnedSourceExposure(actual, native, frame, expected) {
   const presentation = actual.sourcePresentation, timeBase = presentation?.timeBase
+  assert(expected && originalPresentationMatches(presentation, expected)
+    && native.currentSrc === expected.sourceUrl && native.src === expected.sourceUrl,
+  'Source sample lacks its bound owned original presentation or source URL')
   assert(presentation && Number.isSafeInteger(presentation.frameIndex)
     && presentation.frameIndex === frame.sourceImage?.frameIndex
     && Number.isSafeInteger(presentation.pts) && Array.isArray(timeBase) && timeBase.length === 2
@@ -554,7 +619,7 @@ function requireOwnedSourceExposure(actual, frame) {
 }
 
 /** Preserve observed timing counterexamples even when the native model state is stale. */
-export function requirePausedReview(actual, native, frame, required = true) {
+export function requirePausedReview(actual, native, frame, required, player, expected) {
   assert(actual.mode === 'reference-review' && actual.playerState === 'paused' && native.paused && !native.seeking, 'Source review did not hold a decoded paused original frame')
   const clockSkewSeconds = Math.abs(actual.modelTime - native.mediaTime)
   try {
@@ -562,7 +627,8 @@ export function requirePausedReview(actual, native, frame, required = true) {
     assert((required ? ['approximate'] : ['hold-last-readable', 'approximate']).includes(actual.referenceState)
       && finite(actual.modelTime) && finite(actual.sourceSampleTimeSeconds),
     'Source sample has no current native draw or legitimate held-readable state')
-    requireOwnedSourceExposure(actual, frame)
+    assert(player === 'local' || player === 'youtube', 'Source review lacks an explicit local/original or official-player transport')
+    if (player === 'local') requireOwnedSourceExposure(actual, native, frame, expected)
   } catch (error) {
     if (finite(clockSkewSeconds)) Object.assign(error, { clockSkewSeconds, nativeMediaTime: native.mediaTime })
     throw error
@@ -574,11 +640,12 @@ async function review(page, embed, record, frame, required = true) {
   const shot = record.track.shots.find(shot => shot.id === frame.shotId)
   assert(sourcePtsInShot(frame, shot), 'Observed source PTS lies outside its own half-open source shot; adjacent-shot images/cameras cannot pass')
   const before = await media(embed)
-  const seek = await observedSeek(embed, frame.decodedTimeSeconds, () => page.evaluate(async sample => window.harmonicAnalyzer.reviewReferenceFrame(sample.timeSeconds, sample.decodedTimeSeconds), { timeSeconds: frame.timeSeconds, decodedTimeSeconds: frame.decodedTimeSeconds }), record.native.fps)
-  const actual = await snapshot(page), native = await media(embed)
+  const seek = await observedSeek(embed, frame.decodedTimeSeconds, () => page.evaluate(async sample => window.harmonicAnalyzer.reviewReferenceFrame(sample.timeSeconds, sample.decodedTimeSeconds), { timeSeconds: frame.timeSeconds, decodedTimeSeconds: frame.decodedTimeSeconds }), record.native.fps, frame)
+  const actual = await snapshot(page), native = await media(embed), expected = embed.player === 'local' ? originalExposure(embed, frame) : null
   requireModel(actual, record.id); requireMedia(native, record)
-  requirePausedReview(actual, native, frame, required)
-  assert(Math.abs(native.mediaTime - frame.decodedTimeSeconds) <= 0.5 / record.native.fps + 0.005 && Math.abs(native.mediaTime - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Actual original media is not on the observed source exposure within the0.5s timing bound')
+  requirePausedReview(actual, native, frame, required, embed.player, expected)
+  const exposureClockLimit = embed.player === 'local' ? CLOCK_LIMIT : 0.5 / record.native.fps + 0.005
+  assert(Math.abs(native.mediaTime - frame.decodedTimeSeconds) <= exposureClockLimit && Math.abs(native.mediaTime - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Actual original media is not on the observed source exposure within the0.5s timing bound')
   const expectedIndex = nearestPtsIndex(record.native.pts, frame.decodedTimeSeconds)
   assert(Math.abs(record.native.pts[expectedIndex] - frame.decodedTimeSeconds) <= 0.001 && Math.abs(frame.decodedTimeSeconds - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Authored sample is not a retained native source PTS within0.5s')
   if (frame.sourceImage) assert(frame.sourceImage.frameIndex === expectedIndex, 'Source image frame index differs from declared native PTS')
@@ -586,7 +653,7 @@ async function review(page, embed, record, frame, required = true) {
     const canvas = document.querySelector('#stage')
     return { captures: ids.map(viewId => ({ viewId, capture: window.harmonicAnalyzer.renderedLandmarks(viewId), mechanism: window.harmonicAnalyzer.renderedMechanism(viewId) })), canvas: { tag: canvas?.tagName, width: canvas?.width, height: canvas?.height, clientWidth: canvas?.clientWidth, clientHeight: canvas?.clientHeight, devicePixelRatio: window.devicePixelRatio } }
   }, (frame.views ?? []).map(view => view.id))
-  return { actual, native, seek, beforeMediaTime: before.mediaTime, ...rendered }
+  return { player: embed.player, originalExposure: expected, actual, native, seek, beforeMediaTime: before.mediaTime, ...rendered }
 }
 export function sourceSeedIndex(frames) {
   const seeds = new Map()
@@ -662,7 +729,8 @@ export function measureView(view, response, frame, observations, tolerancePx, an
   assert(!zeroOpacitySourceView(view) && !fullyCoveringSourceView(frame, view), 'Noncontributing physical ROI is not a source-pose measurement')
   const entry = response.captures.find(item => item.viewId === view.id), capture = entry?.capture, mechanism = entry?.mechanism
   const rendered = response.actual.views?.find(item => item.id === view.id)
-  requireOwnedSourceExposure(response.actual, frame)
+  assert(response.player === 'local' || response.player === 'youtube', 'Source measurement lacks an explicit local/original or official-player transport')
+  if (response.player === 'local') requireOwnedSourceExposure(response.actual, response.native, frame, response.originalExposure)
   assert(capture?.method === 'gpu-readback' && capture.status === 'captured' && capture.visibilityMode === 'depth-off-landmark-projection' && capture.viewId === view.id && finite(capture.timeSeconds) && capture.timeSeconds === response.actual.modelTime, 'Missing/stale actual GPU landmark readback')
   assert(mechanism?.method === 'actual-native-mechanism-solve' && mechanism.status === 'rendered' && mechanism.viewId === view.id && mechanism.timeSeconds === capture.timeSeconds && Number.isInteger(mechanism.sourceDrawRevision) && mechanism.sourceDrawRevision > 0 && mechanism.sourceDrawRevision === response.actual.sourceDrawRevision && mechanism.channelAnglesRad?.length === 20 && mechanism.channelAnglesRad.every(finite), 'Missing/stale native full physical solve')
   assert(rendered && jsonDigest(mechanism.input) === jsonDigest(rendered.input) && jsonDigest(mechanism.sourceLayout) === jsonDigest(capture.sourceLayout) && jsonDigest(mechanism.resolvedImagePlaneWarp) === jsonDigest(capture.resolvedImagePlaneWarp), 'Readback and native input/layout/warp do not belong to the same rendered source view')
@@ -934,6 +1002,27 @@ export async function playOfficialNativeControl(embed) {
   throw new Error('Official original player has no visible usable native Play/Play video control')
 }
 
+/** Click the app's visible original-byte control; native timelines bypass safe ownership. */
+async function playLocalOriginalControl(embed) {
+  const before = await media(embed)
+  assert(before.present && before.paused && !before.ended && !before.error, 'Local original play control requires paused decoded media')
+  const control = embed.frame.locator('#source-play')
+  const target = await control.evaluate(button => {
+    const bounds = button.getBoundingClientRect(), x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2
+    if (button.disabled || bounds.width <= 0 || bounds.height <= 0 || bounds.left < 0 || bounds.top < 0
+      || bounds.right > innerWidth || bounds.bottom > innerHeight) return null
+    for (let node = button; node instanceof Element; node = node.parentElement) {
+      const style = getComputedStyle(node)
+      if (style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) === 0) return null
+    }
+    const hit = document.elementFromPoint(x, y)
+    return hit && button.contains(hit) ? { x, y, width: bounds.width, height: bounds.height } : null
+  })
+  assert(target, 'Compact original player has no visible usable app-owned play control')
+  await control.click({ timeout: 5_000 })
+  return { ...target, proof: 'visible-app-owned-original-play-button-native-pointer-click' }
+}
+
 export async function waitCompactNativeProgress(embed, startedMedia) {
   await embed.frame.waitForFunction(({ selector, startedTime, minimumAdvanceSeconds }) => {
     const video = document.querySelector(selector)
@@ -998,41 +1087,11 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
   await page.locator('#minimize-player').click()
   const rect = await page.locator('#video-player').boundingBox()
   assert(rect && rect.width >= 200 && rect.height >= 200, 'Compact original player must remain at least200x200')
+  playback.compactControlAttempt = { rect, beforeMedia: await media(embed), transport: embed.player }
   const activeControls = embed.player === 'youtube'
     ? { providerControl: await playOfficialNativeControl(embed) }
-    : await embed.frame.evaluate(selector => ({ controls: document.querySelector(selector)?.controls === true }), embed.selector)
-  if (embed.player !== 'youtube') {
-    assert(activeControls.controls, 'Compact original player has no usable native playback controls')
-    const video = page.locator(embed.selector)
-    await video.hover()
-    // Chromium owns this button in a closed user-agent shadow tree. Its actual
-    // box, not the video's bottom-left corner, is the native mouse hit target.
-    const session = await page.context().newCDPSession(page)
-    try {
-      const { result } = await session.send('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(embed.selector)})` })
-      assert(result.objectId, 'Compact original media element is unavailable')
-      const { node } = await session.send('DOM.describeNode', { objectId: result.objectId, depth: -1, pierce: true })
-      const findPlayButton = node => {
-        const attributes = node.attributes ?? []
-        if (attributes.some((value, index) => index % 2 === 1 && value === '-webkit-media-controls-play-button')) return node
-        for (const child of [...(node.shadowRoots ?? []), ...(node.children ?? [])]) {
-          const button = findPlayButton(child)
-          if (button) return button
-        }
-        return null
-      }
-      const button = findPlayButton(node)
-      assert(button, 'Compact original player has no native play button')
-      const { model } = await session.send('DOM.getBoxModel', { backendNodeId: button.backendNodeId })
-      const quad = model.border
-      const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4, y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4
-      assert(model.width > 0 && model.height > 0 && x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height, 'Compact native play button has no visible in-player hit target')
-      activeControls.nativeControl = { proof: 'actual-native-user-agent-play-button-pointer', x, y, width: model.width, height: model.height }
-      await page.mouse.click(x, y)
-    } finally {
-      await session.detach()
-    }
-  }
+    : { originalControl: await playLocalOriginalControl(embed) }
+  playback.compactControlAttempt.activeControls = activeControls
   await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().playerState === 'playing', undefined, { timeout: 20_000 })
   const compactStarted = await media(embed); requireMedia(compactStarted, record)
   let compactProgressError = null
@@ -1104,7 +1163,17 @@ async function interactionChecks(page, embed, record, outputDirectory) {
   try {
     const frame = manualInteractionFrame(record)
     assert(frame, 'Manual interaction needs a complete chosen operating source-machine exposure')
+    await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
     evidence.sourceSetup = await preparePausedSource(page, embed, record, [{ frame }])
+    if (embed.player === 'local') {
+      await page.locator('#source-seek-time').fill(String(frame.decodedTimeSeconds))
+      evidence.sourceSeekControl = { selector: '#source-seek', requestedOriginalTimeSeconds: frame.decodedTimeSeconds,
+        beforeMedia: await media(embed), beforePresentation: (await snapshot(page)).sourcePresentation }
+      await observedSeek(embed, frame.decodedTimeSeconds, () => page.locator('#source-seek').click(), record.native.fps, frame)
+      evidence.sourceSeekControl.afterMedia = await media(embed)
+      evidence.sourceSeekControl.presentation = (await snapshot(page)).sourcePresentation
+      evidence.sourceSeekControl.proof = 'visible-app-owned-original-seek-button-native-pointer-click'
+    }
     const reviewed = await review(page, embed, record, frame)
     evidence.sourceSeek = reviewed.seek
     await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
@@ -1165,6 +1234,7 @@ async function interactionChecks(page, embed, record, outputDirectory) {
     return { ...evidence, status: 'passed', crankTurnsBefore: evidence.before.input.crankTurns, crankTurnsAfter: after.input.crankTurns, orbitCameraBefore: after.camera, orbitCameraAfter: orbit.camera, screenshot }
   } catch (error) {
     evidence.status = 'failed'; evidence.reason = error.message
+    if (error.sourceSeekFailure) evidence.sourceSeekFailure = error.sourceSeekFailure
     evidence.exerciseState = exerciseState
     // Unattempted setup failures have a failure state, not an after-crank result.
     // Once keyboard exercise starts, preserve its actual outcome and predicates.
@@ -1264,6 +1334,7 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
       }
     } catch (error) {
       if (finite(error.clockSkewSeconds)) Object.assign(sample, { maxClockSkewSeconds: error.clockSkewSeconds, nativeMediaTime: error.nativeMediaTime })
+      if (error.sourceSeekFailure) sample.sourceSeekFailure = error.sourceSeekFailure
       if (finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds > CLOCK_LIMIT) sample.status = 'failed'
       sample.unavailable.push({ reason: error.message })
     }

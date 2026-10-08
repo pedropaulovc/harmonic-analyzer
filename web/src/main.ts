@@ -325,6 +325,18 @@ function updateControlState(): void {
     sourceVolume.value = String(local.getAudio().volume)
     sourceMute.setAttribute('aria-pressed', String(local.getMuted()))
     sourceMute.textContent = local.getMuted() ? 'Unmute' : 'Mute'
+    if (manualSourceSeek !== 'idle' || referenceSeek !== 'idle' || local.getSeekState() !== 'idle') {
+      sourceSeekStatus.textContent = 'Seeking original exposure from a verified IDR…'
+    } else if (local.getState() === 'paused') {
+      const presented = local.getPresentation()
+      if (presented) {
+        sourceSeekStatus.textContent = `Paused original frame ${presented.frameIndex} · ${presented.mediaTime.toFixed(6)} s.`
+      } else if (sourceControls.dataset.state !== 'error') {
+        sourceSeekStatus.textContent = 'Paused original exposure ownership is unavailable.'
+      }
+    } else if (sourceControls.dataset.state !== 'error') {
+      sourceSeekStatus.textContent = 'Pause to choose an original exposure.'
+    }
   }
 }
 

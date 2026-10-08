@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { runInNewContext } from 'node:vm'
-const { parseOptions, sourceCensus, finishVideo, seekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } = await import(process.env.VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
+const { parseOptions, sourceCensus, finishVideo, seekSettlement, originalSeekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } = await import(process.env.VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
 import { jsonDigest, loadCanonicalObservations } from './verify-reference.mjs'
 import { sourceVisibilityError } from '../source-visibility.mjs'
 import { nativeLineEndpointId, fixedNativeLinePart } from '../native-line-checks.mjs'
@@ -247,30 +247,127 @@ test('a new seek cannot pass merely because a later media clock equals the targe
   assert.equal(seekSettlement(observed, 1, 0.02).done, true)
 })
 
+const fixtureSourceUrl = 'https://fixture.invalid/reference-media/original.mp4'
+// Pure contract controls, not browser playback, GPU readbacks or source evidence.
+function originalSeekFixture() {
+  const expected = { frameIndex: 6114, pts: 6120114, timeBase: [1, 30000], sourceUrl: fixtureSourceUrl }
+  const receipt = presentedFrames => ({ frameIndex: expected.frameIndex, pts: expected.pts, timeBase: [...expected.timeBase],
+    mediaTime: 204.0038, currentTime: 203.972307, presentedFrames, presentationTime: 12 })
+  const read = presentedFrames => ({ mediaTime: 203.972307, paused: true, seeking: false, readyState: 4, error: null,
+    currentSrc: fixtureSourceUrl, src: fixtureSourceUrl, seekState: 'idle', presentation: receipt(presentedFrames) })
+  const pre = read(1)
+  Object.assign(pre.presentation, { frameIndex: 6000, pts: 6000000, mediaTime: 200 })
+  return { expected, observed: { sameElement: true, pre, now: read(105),
+    events: [{ type: 'seeking', mediaTime: 200.5003 }, { type: 'seeked', mediaTime: 200.5003 }] } }
+}
+
+test('native original settlement uses a fresh exact receipt rather than the IDR event clock', () => {
+  const { expected, observed } = originalSeekFixture()
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+  observed.pre.presentation = null
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+  observed.now.mediaTime = 204.0038 - 0.5
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+  observed.now.presentation.presentationTime = 0
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+})
+
+test('native original settlement refuses unowned clocks, invalid receipts and unsettled media', () => {
+  const mutations = [
+    value => { value.now.mediaTime = 204.0038; value.now.presentation = null },
+    value => { value.now.presentation.presentedFrames = 1 },
+    value => { value.now.presentation.frameIndex++ },
+    value => { value.now.presentation.pts++ },
+    value => { value.now.presentation.frameIndex = 6114.5 },
+    value => { value.now.presentation.pts = 6120114.5 },
+    value => { value.now.presentation.timeBase = [2, 60000] },
+    value => { value.now.presentation.mediaTime += 0.00001 },
+    value => { value.now.currentSrc = 'https://fixture.invalid/other.mp4' },
+    value => { value.now.src = 'https://fixture.invalid/other.mp4' },
+    value => { value.now.seekState = 'seeking' },
+    value => { value.now.seeking = true },
+    value => { value.now.paused = false },
+    value => { value.now.readyState = 1 },
+    value => { value.events.reverse() },
+    value => { value.events = [] },
+    value => { value.now.mediaTime = 204.0038 - 0.50001 },
+  ]
+  for (const invalid of [null, undefined, NaN, Infinity, -1, 0]) {
+    mutations.push(value => { value.now.presentation.presentedFrames = invalid })
+    if (invalid !== 0) mutations.push(value => { value.now.presentation.presentationTime = invalid })
+  }
+  mutations.push(value => { value.now.presentation.presentedFrames = 1.5 })
+  for (const mutate of mutations) {
+    const { expected, observed } = originalSeekFixture()
+    mutate(observed)
+    assert.notEqual(originalSeekSettlement(observed, expected).done, true)
+  }
+  for (const key of ['frameIndex', 'pts', 'timeBase', 'sourceUrl']) {
+    const { expected, observed } = originalSeekFixture()
+    expected[key] = key === 'timeBase' ? [1, 3000] : key === 'sourceUrl' ? `${fixtureSourceUrl}?wrong` : expected[key] + 1
+    assert.notEqual(originalSeekSettlement(observed, expected).done, true)
+  }
+})
+
+test('native no-op requires already settled exact preownership and preserves fatal media failures', () => {
+  const { expected, observed } = originalSeekFixture()
+  observed.pre = structuredClone(observed.now)
+  observed.events = []
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+  observed.pre.presentation.frameIndex++
+  assert.notEqual(originalSeekSettlement(observed, expected).done, true)
+  observed.sameElement = false
+  assert.ok(originalSeekSettlement(observed, expected).fatal)
+  observed.sameElement = true
+  observed.now.error = 'decode failed'
+  assert.ok(originalSeekSettlement(observed, expected).fatal)
+  observed.now.error = null
+  observed.events = [{ type: 'error' }]
+  assert.ok(originalSeekSettlement(observed, expected).fatal)
+})
+
 // Stateful native-media boundary control: seeking changes the actual fixture
 // clock and emits observed seeking/seeked events; no browser/GPU claim.
+const pausedSourceFrame = time => ({ ...frame(time), sourceImage: { frameIndex: native.pts.indexOf(time), sourceSha256: '1'.repeat(64) } })
 function pausedSourceFixture({ ended = true, reportedState, seekMode = 'settled' } = {}) {
   class NativeVideo extends EventTarget {
     constructor() {
       super()
       Object.assign(this, { duration: 2.1, paused: true, ended, seeking: false, readyState: 4,
-        videoWidth: 1920, videoHeight: 1080, volume: 1, muted: false, error: null, isConnected: true })
+        videoWidth: 1920, videoHeight: 1080, volume: 1, muted: false, error: null, isConnected: true,
+        currentSrc: fixtureSourceUrl, src: fixtureSourceUrl })
       this.time = ended ? this.duration : 1
       this.seekRequests = []
     }
     get currentTime() { return this.time }
-    set currentTime(time) {
+    set currentTime(_time) { throw new Error('Local setup must use the app-owned seekVideo command') }
+    seekFromApp(time) {
       this.seekRequests.push(time)
-      if (seekMode !== 'stale-clock') this.time = time
-      this.ended = this.time >= this.duration
       this.seeking = true
       this.dispatchEvent(new Event('seeking'))
+      if (seekMode !== 'stale-clock') this.time = time
+      this.ended = this.time >= this.duration
       this.seeking = false
       this.dispatchEvent(new Event('seeked'))
     }
   }
   const video = new NativeVideo(), selector = '#original'
-  const window = { harmonicAnalyzer: { snapshot: () => ({ playerState: reportedState ?? (video.ended ? 'ended' : video.paused ? 'paused' : 'playing') }) } }
+  let presentation = null, seekState = 'idle', presentedFrames = 1
+  const snapshot = () => ({ playerState: reportedState ?? (video.ended ? 'ended' : video.paused ? 'paused' : 'playing'),
+    sourcePresentation: presentation, sourceSeek: { state: seekState } })
+  const window = { harmonicAnalyzer: {
+    snapshot,
+    seekVideo: async timeSeconds => {
+      const frameIndex = native.pts.indexOf(timeSeconds)
+      assert.notEqual(frameIndex, -1, 'Fixture seek must select an indexed original exposure')
+      seekState = 'seeking'
+      video.seekFromApp(timeSeconds)
+      presentation = { frameIndex, pts: frameIndex * 30, timeBase: [1, 30], mediaTime: timeSeconds,
+        currentTime: video.currentTime, presentedFrames: ++presentedFrames, presentationTime: 12 }
+      seekState = 'idle'
+      return { presentation, snapshot: snapshot() }
+    },
+  } }
   const globals = { window, document: { querySelector: query => query === selector ? video : null }, HTMLVideoElement: NativeVideo }
   const evaluate = async (fn, arg) => runInNewContext(`(${fn.toString()})(arg)`, { ...globals, arg })
   const page = {
@@ -278,16 +375,18 @@ function pausedSourceFixture({ ended = true, reportedState, seekMode = 'settled'
     waitForFunction: async fn => { if (!await evaluate(fn)) throw new Error('Pause barrier requires an actually paused player') },
     locator: () => ({ click: async () => { video.paused = true } }),
   }
-  const record = { native, track: { shots: observations.shots } }
-  return { video, page, embed: { frame: page, selector }, record }
+  const record = { id: 'fixture-original', native: { ...native, observedSha256: '1'.repeat(64) }, track: { shots: observations.shots } }
+  const originalAccess = { schemaVersion: 1, kind: 'original-h264-idr-access-index',
+    source: { videoId: record.id, sha256: '1'.repeat(64), bytes: 100 }, timeBase: [1, 30], pts: [0, 30, 60], idrPts: [0] }
+  return { video, page, embed: { frame: page, selector, player: 'local', originalAccess, sourceUrl: fixtureSourceUrl }, record }
 }
 
 test('ended setup seeks the first selected nonterminal exposure before satisfying the strict pause barrier', async () => {
   const fixture = pausedSourceFixture()
-  const rows = [{ frame: null }, { frame: frame(2.1) }, { frame: frame(0.5) }, { frame: frame(1) }, { frame: frame(0) }]
+  const rows = [{ frame: null }, { frame: pausedSourceFrame(2.1) }, { frame: pausedSourceFrame(0.5) }, { frame: pausedSourceFrame(1) }, { frame: pausedSourceFrame(0) }]
   const recovery = await preparePausedSource(fixture.page, fixture.embed, fixture.record, rows)
   assert.equal(recovery.kind, 'ended-original-native-source-setup-seek')
-  assert.equal(recovery.proof, 'native-seeking-then-seeked-after-command')
+  assert.ok(recovery.proof, 'The app-owned native seek must return settlement evidence')
   assert.deepEqual(Array.from(recovery.events), ['seeking', 'seeked'])
   assert.equal(recovery.targetSourcePtsSeconds, 1)
   assert.equal(recovery.preMediaTime, 2.1)
@@ -299,7 +398,7 @@ test('ended setup seeks the first selected nonterminal exposure before satisfyin
 
 test('already paused source setup preserves its actual clock without introducing a seek', async () => {
   const fixture = pausedSourceFixture({ ended: false })
-  assert.equal(await preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(0) }]), null)
+  assert.equal(await preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(0) }]), null)
   assert.equal(fixture.video.currentTime, 1)
   assert.deepEqual(fixture.video.seekRequests, [])
 })
@@ -308,27 +407,27 @@ test('ended setup cannot invent zero, use a terminal exposure or cross the sourc
   for (const rows of [
     [],
     [{ frame: null }],
-    [{ frame: frame(2.1) }],
-    [{ frame: { ...frame(1), decodedTimeSeconds: 2.1 } }],
-    [{ frame: { ...frame(1), shotId: 'another-shot' } }],
+    [{ frame: pausedSourceFrame(2.1) }],
+    [{ frame: { ...pausedSourceFrame(1), decodedTimeSeconds: 2.1 } }],
+    [{ frame: { ...pausedSourceFrame(1), shotId: 'another-shot' } }],
   ]) {
     const fixture = pausedSourceFixture()
     await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, rows), /no selected nonterminal/)
     assert.deepEqual(fixture.video.seekRequests, [])
   }
   const fixture = pausedSourceFixture()
-  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(0.5) }]))
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(0.5) }]))
   assert.deepEqual(fixture.video.seekRequests, [])
 })
 
 test('ended source recovery refuses unavailable media and does not alias unknown or ended state to paused', async () => {
   for (const reportedState of ['unknown', 'unavailable', 'ended']) {
     const fixture = pausedSourceFixture({ ended: false, reportedState })
-    await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /actually paused|actually stopped/)
+    await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(1) }]), /actually paused|actually stopped/)
   }
   const fixture = pausedSourceFixture()
   fixture.video.error = { message: 'source decode failed' }
-  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /no decoded source content/)
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(1) }]), /no decoded source content/)
   assert.deepEqual(fixture.video.seekRequests, [])
 })
 
@@ -336,7 +435,7 @@ test('native seek events with a stale actual clock cannot recover an ended sourc
   const fixture = pausedSourceFixture({ seekMode: 'stale-clock' })
   let reads = 0
   t.mock.method(Date, 'now', () => reads++ === 0 ? 0 : 20_000)
-  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /never decoded\/settled/)
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(1) }]), /never decoded\/settled/)
   assert.equal(fixture.video.currentTime, 2.1)
   assert.equal(fixture.video.ended, true)
 })
@@ -525,9 +624,41 @@ function measuredViewFixture() {
   const layout = [{ viewId: 'main', rectSourcePixels: view.rectSourcePixels, presentation: 'native', composite: { mode: 'opaque' }, resolvedImagePlaneWarp: null, sourceAssembly: { kind: 'operating' } }]
   const capture = { method: 'gpu-readback', status: 'captured', visibilityMode: 'depth-off-landmark-projection', viewId: 'main', timeSeconds: 1, sourceLayout: layout, resolvedImagePlaneWarp: null, landmarks: observations.map(observed => ({ id: observed.anchorId, state: 'rendered', sourcePixels: observed.pixel, canvasPixels: observed.pixel, uncertaintySourcePixels: 0.5 })) }
   const mechanism = { method: 'actual-native-mechanism-solve', status: 'rendered', viewId: 'main', timeSeconds: 1, sourceDrawRevision: 1, channelAnglesRad: Array(20).fill(0), input: view.input, sourceLayout: layout, resolvedImagePlaneWarp: null }
-  const response = { captures: [{ viewId: 'main', capture, mechanism }], actual: { modelTime: 1, sourceSampleTimeSeconds: 1, sourceDrawRevision: 1, sourcePresentation: { frameIndex: 30, pts: 30, timeBase: [1, 30], mediaTime: 1, currentTime: 1, presentedFrames: 1 }, views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: 1 }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
+  const originalExposure = { frameIndex: 30, pts: 30, timeBase: [1, 30], sourceUrl: fixtureSourceUrl }
+  const response = { player: 'local', originalExposure, captures: [{ viewId: 'main', capture, mechanism }], actual: { modelTime: 1, sourceSampleTimeSeconds: 1, sourceDrawRevision: 1, sourcePresentation: { frameIndex: 30, pts: 30, timeBase: [1, 30], mediaTime: 1, currentTime: 1, presentedFrames: 1, presentationTime: 12 }, views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: 1, currentSrc: fixtureSourceUrl, src: fixtureSourceUrl, paused: true, seeking: false, readyState: 4, error: null }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
   return { view, frame, observations, anchors, response, capture, seeds: new Map() }
 }
+
+test('explicit YouTube review and rendered capture use real clocks without a native frame receipt', () => {
+  const fixture = measuredViewFixture(), actual = fixture.response.actual
+  Object.assign(fixture.response, { player: 'youtube', originalExposure: null })
+  Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'approximate', sourcePresentation: null })
+  requirePausedReview(actual, fixture.response.native, fixture.frame, true, 'youtube', null)
+  assert.ok(measureFixture(fixture).measured.every(point => point.status === 'passed'))
+  fixture.response.native.mediaTime += 0.50001
+  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, 'youtube', null), /clock exceeds/)
+  assert.throws(() => measureFixture(fixture), /clock|timing/)
+})
+
+test('missing or unknown player transport and missing local ownership never fall back to YouTube', () => {
+  for (const player of [undefined, null, 'unknown']) {
+    const fixture = measuredViewFixture(), actual = fixture.response.actual
+    Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'approximate' })
+    fixture.response.player = player
+    assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, player, fixture.response.originalExposure))
+    assert.throws(() => measureFixture(fixture))
+  }
+  for (const mutation of ['expectation', 'receipt', 'image', 'url']) {
+    const fixture = measuredViewFixture(), actual = fixture.response.actual
+    Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'approximate' })
+    if (mutation === 'expectation') fixture.response.originalExposure = null
+    if (mutation === 'receipt') actual.sourcePresentation = null
+    if (mutation === 'image') fixture.frame.sourceImage.frameIndex++
+    if (mutation === 'url') fixture.response.native.currentSrc = `${fixtureSourceUrl}?wrong`
+    assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, 'local', fixture.response.originalExposure))
+    assert.throws(() => measureFixture(fixture))
+  }
+})
 const measureFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 96, fixture.anchors, fixture.seeds)
 
 // One synthetic triangle and independently PROVIDED bounds, not real GPU/source evidence.
@@ -961,7 +1092,7 @@ test('stale paused model clocks are retained before reference-state and nominal-
     const actual = { mode: 'reference-review', playerState: 'paused', modelTime: 1, referenceState: 'unavailable' }
     const native = { paused: true, seeking: false, mediaTime: 2 }
     let failure
-    try { requirePausedReview(actual, native, { timeSeconds: 2 }, required) }
+    try { requirePausedReview(actual, native, { timeSeconds: 2 }, required, 'youtube', null) }
     catch (error) { failure = error }
     assert.match(failure.message, /clock exceeds/)
     assert.equal(failure.clockSkewSeconds, 1)
@@ -1005,7 +1136,7 @@ test('unknown and within-bound mandatory clocks do not fabricate timing countere
 test('paused review retains within-bound skew on stale-state errors without inventing unknown clocks', () => {
   for (const modelTime of [1.5, 2, undefined, NaN, Infinity]) {
     const actual = { mode: 'reference-review', playerState: 'paused', modelTime, referenceState: 'unavailable' }
-    assert.throws(() => requirePausedReview(actual, { paused: true, seeking: false, mediaTime: 2 }, { timeSeconds: 2 }), error => {
+    assert.throws(() => requirePausedReview(actual, { paused: true, seeking: false, mediaTime: 2 }, { timeSeconds: 2 }, true, 'youtube', null), error => {
       assert.match(error.message, /no current native draw/)
       assert.equal(Object.hasOwn(error, 'clockSkewSeconds'), Number.isFinite(modelTime))
       if (Number.isFinite(modelTime)) assert.equal(error.clockSkewSeconds, Math.abs(modelTime - 2))
@@ -1235,7 +1366,7 @@ test('qualified backgrounds leave only readable foreground required while preser
   assert.equal(row.sourceViewMappings[0].qualifiedExcluded, true)
   assert.deepEqual(row.qualifiedExcludedViews.map(view => view.viewId), ['background'])
   requireSourceViews(row)
-  assert.throws(() => measureView(track.frames[0].views[0], {}, track.frames[0], [], 960, new Map()), /not a source-pose measurement/)
+  assert.throws(() => measureView(track.frames[0].views[0], { player: 'local', originalExposure: null }, track.frames[0], [], 960, new Map()), /not a source-pose measurement/)
 })
 
 test('original/current union refuses missing readable views, misbound qualification, partial ROI and admitted readable support', () => {
@@ -1453,7 +1584,7 @@ test('owned source exposure selects the authored pose while retaining the distin
   actual.sourcePresentation.currentTime = 0.995
   Object.assign(fixture.response.native, { paused: true, seeking: false, mediaTime: 0.995 })
   fixture.capture.timeSeconds = fixture.response.captures[0].mechanism.timeSeconds = 0.995
-  requirePausedReview(actual, fixture.response.native, fixture.frame)
+  requirePausedReview(actual, fixture.response.native, fixture.frame, true, fixture.response.player, fixture.response.originalExposure)
   const result = measureFixture(fixture)
   assert.ok(result.measured.every(item => item.status === 'passed' && item.captureTimeSeconds === 0.995))
   assert.equal(result.clockSkewSeconds, 0)
@@ -1478,10 +1609,10 @@ test('all-qualified hold admits only a real decoded clock receipt, never a requi
   const fixture = measuredViewFixture(), actual = fixture.response.actual
   Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'hold-last-readable' })
   Object.assign(fixture.response.native, { paused: true, seeking: false })
-  requirePausedReview(actual, fixture.response.native, fixture.frame, false)
-  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true), /no current native draw/)
+  requirePausedReview(actual, fixture.response.native, fixture.frame, false, fixture.response.player, fixture.response.originalExposure)
+  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, fixture.response.player, fixture.response.originalExposure), /no current native draw/)
   fixture.response.native.mediaTime += 0.50001
-  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, false), /clock exceeds/)
+  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, false, fixture.response.player, fixture.response.originalExposure), /clock exceeds/)
 })
 
 test('a supported source line outside the actual finite native segment remains a measured failure', () => {
@@ -1623,7 +1754,7 @@ test('actual Rocker24318 to24323 retain sharp outgoing main while only exactly z
     assert.equal(row.noncontributingZeroOpacityViews.length, 7)
     assert.deepEqual(row.qualifiedExcludedViews, [])
     requireSourceViews(row)
-    assert.throws(() => measureView(row.frame.views[1], {}, row.frame, [], 960, new Map()), /Noncontributing physical ROI/)
+    assert.throws(() => measureView(row.frame.views[1], { player: 'local', originalExposure: null }, row.frame, [], 960, new Map()), /Noncontributing physical ROI/)
   }
   const tiny = structuredClone(authored)
   tiny.frames[0].views[1].composite.opacity = Number.MIN_VALUE
@@ -1647,12 +1778,13 @@ test('admitted mid-interval errors use the owned integer-PTS selection without a
   Object.assign(fixture.frame, { decodedTimeSeconds: 1.01, measuredInterpolation: true, interpolationInterval: [0, 2] })
   Object.assign(actual, { modelTime: 1.009, sourceSampleTimeSeconds: 1.01, mode: 'reference-review', playerState: 'paused', referenceState: 'approximate' })
   Object.assign(actual.sourcePresentation, { pts: 3030, timeBase: [1, 3000], mediaTime: 1.01, currentTime: 1.009 })
+  Object.assign(fixture.response.originalExposure, { pts: 3030, timeBase: [1, 3000] })
   actual.views[0].sourceSampling = { selection: 'continuous', fromTimeSeconds: 0, toTimeSeconds: 2, mix: 1.01 / 2 }
   Object.assign(fixture.response.native, { mediaTime: 1.009, paused: true, seeking: false })
   fixture.capture.timeSeconds = fixture.response.captures[0].mechanism.timeSeconds = 1.009
   fixture.capture.landmarks[0].sourcePixels = [fixture.capture.landmarks[0].sourcePixels[0] + 1000, fixture.capture.landmarks[0].sourcePixels[1]]
   fixture.capture.landmarks[0].canvasPixels = [...fixture.capture.landmarks[0].sourcePixels]
-  requirePausedReview(actual, fixture.response.native, fixture.frame)
+  requirePausedReview(actual, fixture.response.native, fixture.frame, true, fixture.response.player, fixture.response.originalExposure)
   const measured = measureFixture(fixture).measured.find(point => point.anchorId === 'anchor-0')
   assert.equal(measured.status, 'failed', 'A genuine admitted counterexample is not discarded for nominal-versus-PTS offset')
   assert.equal(measured.captureTimeSeconds, 1.009)

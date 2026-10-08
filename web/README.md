@@ -66,10 +66,15 @@ automatically when both are ready; pausing retains manual exploration. Status
 announcements exclude the running clock. Force readouts are physical calculations,
 not source measurements.
 
-Restore uses the actual paused player clock. Chromium may truncate
-`currentTime` to microseconds, placing it just before an authored cut even
-when the requested seek is at that cut. Compare restored states at the same
-actual media time; do not round source timestamps or interpolate across cuts.
+The public YouTube player keeps its existing playback and Restore clock contract.
+The private local-original player uses visible app-owned play/pause, mute, volume,
+scrub and exact-time seek controls. Its safe seek starts at an IDR verified from
+the unchanged H264 access units and presents the requested original exposure;
+it does not re-encode media or expose an unsafe browser-native timeline.
+Local source selection and Restore bind the owned integer PTS/time base and
+`requestVideoFrameCallback` frame to the retained authored sample. Native
+`currentTime` remains the real model/draw timing clock, not an exact frame ID.
+Do not round source timestamps, replace the clock with PTS, or interpolate cuts.
 
 Migration cameras must also be checked against the posed full assembly.
 The Intro pen-macro seed was outside the pen frame but looked through the
@@ -486,6 +491,34 @@ skew 0.012847 seconds. These separate receipts are under
 the frozen scientific report or clear unexercised collection failures.
 Restore equality binds camera, input and assembly to the measured native clock;
 `currentTime` alone does not identify the exact presented decoded frame.
+
+The first ordinary collector for the next integration, frozen at
+`53863496a52d87a02a10a2beb8006cd039a97954`, scoped Operation to 204 seconds
+and remained **partial/unavailable**, exit 1: **0 of 1** selected required
+samples measured, out of **1019** required collection samples. Its old seek
+observer expected `seeking`/`seeked` at the target, whereas the safe player
+actually seeks to a verified IDR and then presents the target. Compact discovery
+also mistook `media.controls === false` for missing controls despite the visible
+app-owned original-media controls. Six preceding ordinary playback draw/clock
+brackets passed with observed skew zero; they do not clear those failures.
+
+A separate single real pointer seek on the same frozen ordinary build presented
+Operation frame **6114**, integer PTS **6120114 / 30000**, at rVFC time
+**204.0038 seconds**. Native `seeking`/`seeked` occurred at IDR time **200.5003**;
+the actual paused model/draw/media clock was **203.985846**, not rewritten to PTS.
+Unchanged full `measureView` admitted six independently measured main-view
+CHECKs, maximum **81.56609 px**, with native/model skew zero. Four old FITs were
+excluded for missing edge provenance, and fixed/moving classification remained
+unavailable; this is not a required-sample or source-fidelity pass. The unchanged
+half-frame timing assertion passed on that packet. Its one offline invocation
+on an older genuine raw receipt threw at **0.031493 seconds** of PTS/clock
+difference, but that older receipt lacks the real URL/epoch and DOM-canvas fields
+needed for full ordinary-consumer qualification. Both outcomes remain separate.
+Immutable receipts are under
+`web/.vite/stage50-refinement-20261008/`; the new collector must bind owned
+original frame identity separately from the unchanged 0.5-second clock limit,
+and exercise the actual visible app controls without weakening source floors.
+
 
 Original-source authority is validated before lazy shared browser startup. Shared
 startup becomes ready only after server, browser, context and page acquisition;
