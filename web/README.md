@@ -835,19 +835,22 @@ Missing or wrong bytes fail the build. It neither imports a different CAD model
 nor regenerates tracked provenance/native metadata.
 
 After Vite builds, every runtime file larger than 25 MiB (including the model
-and large source-track JavaScript modules) is split into ordered **24 MiB**
-pieces under `dist/deployment-assets/<original-sha256>/`. The generated, ignored
-`.vite/deployment-assets.json` is bundled into `worker.mjs`; it records each
-original URL, content type, length and SHA-256 plus ordered chunk paths, lengths
-and digests. The build checks every piece and the exact reconstructed original
-SHA-256 before permitting deployment. There is no compression, reduced dataset,
-regenerated model, dropped runtime asset, or source-loader change.
+and large source-track JavaScript modules) gets a lossless gzip representation
+and an identity fallback. Each representation is split into ordered **24 MiB**
+pieces under `dist/deployment-assets/`. The generated, ignored
+`.vite/deployment-assets.json` records original URLs, decoded lengths and
+SHA-256 values, plus each representation's encoded length, digest and ordered
+pieces. The build verifies the pieces, reconstructed representations and exact
+decoded original bytes before deployment. Geometry and source datasets stay
+unchanged.
 
-For original chunked-asset URLs, the Worker supports GET/HEAD and sequentially
-streams pieces from its own `ASSETS` binding through a fixed-length stream.
-It never buffers the full model or large playback module. Initial missing chunks
-return 502; later missing/short chunks error the response stream rather than
-silently completing a truncated 200. The model loader still verifies the
+For original chunked-asset URLs, the Worker negotiates gzip from
+`Accept-Encoding` and otherwise serves identity. GET/HEAD responses include the
+selected representation's length and ETag, `Vary: Accept-Encoding`, and
+`Content-Encoding: gzip` when selected. It sequentially streams immutable pieces
+through a fixed-length stream, without runtime compression or a full-file buffer.
+Initial missing chunks return 502; later missing/short chunks error the response
+stream rather than silently completing a truncated 200. The model loader verifies the
 original compiled SHA-256 and length before parsing. Ordinary files pass through
 to `ASSETS` unchanged, including their native conditional-request behavior.
 Each immutable `ASSETS` piece is requested with `Accept-Encoding: identity` and
@@ -865,8 +868,8 @@ without body bytes. Header/status refusals include actual response status,
 visible length, encoding and expected length.
 Chunked routes also honor strong/weak `If-None-Match` and `*` with a 304 before
 fetching any pieces, so cache revalidation does not redownload the full asset.
-Reconstructed routes send `Cache-Control: no-transform` to prevent Cloudflare
-from recompressing the assembled response. A native headed-browser control found
+Reconstructed routes retain `Cache-Control: no-transform` so Cloudflare does
+not recompress either the precompressed gzip or identity response. A native headed-browser control found
 that default `Content-Encoding: zstd` failed partway through the 45,568,082-byte
 playback module, while an identity-encoding override completed the exact full
 module with HTTP/3 unchanged. The response's Content-Length had been removed
@@ -913,6 +916,34 @@ Exact geometry sharing reduces duplicate buffers; Meshopt reduces transfer
 bytes, not the instance-expanded triangle count. No frame-rate improvement is
 established. Fidelity verification still uses all twenty channels and the full
 geometry; it must not substitute reduced geometry.
+
+### Runtime performance checks
+
+Normal source polling reuses a completed draw only when the media clock,
+presented native exposure, source/model identity and draw revision are unchanged.
+Pending paint, seeks and explicit diagnostic publications still draw. HUD fields
+are written only when their displayed values change. The manual crank retains
+elapsed-time motion; idle exploration already renders on demand.
+
+`scripts/measure-performance.js` records three cold-cache navigations, resource
+bytes, and five-second idle/manual-crank CPU and WebGL draw-call windows. Use
+native Windows Chrome to avoid WSL rendering overhead:
+
+```powershell
+playwright-cli -s=performance open http://localhost:4178/harmonic-analyzer/ --browser=chrome --headed
+playwright-cli -s=performance run-code --filename=web/scripts/measure-performance.js
+playwright-cli -s=performance close
+```
+
+Run `npm --prefix web run build` and `npm --prefix web run preview -- --host
+0.0.0.0 --port 4178` first. A plain build needs the approved model staged through
+the normal model workflow; `build:deploy` acquires it automatically. Compare the
+same browser, viewport, pixel ratio and throttling conditions. Draw calls measure
+submission work, not GPU elapsed time. Localhost timings do not establish hosted
+load time or real-user Core Web Vitals.
+
+CPU polling/HUD regressions: `node --test web/scripts/main-scheduling.test.mjs`.
+Encoded delivery regressions: `node --test web/scripts/deployment-transport.test.mjs`.
 
 The source-v37 measurements and verification results below are preserved from
 that snapshot. Use the [subsystem identity guide](../cad/docs/subsystem-identities.md)
