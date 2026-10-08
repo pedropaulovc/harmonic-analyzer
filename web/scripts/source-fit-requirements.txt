@@ -1,3 +1,4 @@
 numpy>=2.0
 scipy>=1.15
 opencv-python-headless>=4.12
+av>=16.0

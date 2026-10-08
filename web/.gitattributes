@@ -6,5 +6,7 @@ src/kinematics.ts text eol=lf
 src/scene.ts text eol=lf
 scripts/generate-8KmVDxkia_w-automatic-motion.py text eol=lf
 scripts/compact-operation-rocker.py text eol=lf
+# The registered source inventory is exact-byte data authority, not normalized code.
+content/v39-source/native-inventory.json -text
 scripts/compact-source-common.py text eol=lf
 src/bindings.ts text eol=lf

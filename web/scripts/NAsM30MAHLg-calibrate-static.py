@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Track independently measured Intro rigid features in retained lossless source frames.
 
-This produces private candidate evidence, not GPU acceptance. Source frames and
-framehash-all.txt must already exist; the helper never decodes or redistributes
-video. Run with uv run --no-project --python <venv>/bin/python <this> --output
-/tmp/.../codex-static-result.json. Full mechanism input deliberately stays null.
+This produces nonpublishable historical diagnostic evidence, not GPU acceptance.
+Source frames and framehash-all.txt must already exist; the helper never decodes
+or redistributes video. Require --historical-diagnostic and --output /tmp/...json.
+Full mechanism input deliberately stays null.
 """
 
 import argparse
@@ -18,6 +18,13 @@ import cv2
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
+
+WEB = Path(__file__).resolve().parents[1]
+
+
+spec = importlib.util.spec_from_file_location("static_output_common", WEB / "scripts/compact-source-common.py")
+common = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(common)
 
 
 def camera_parameters(camera, height):
@@ -132,28 +139,28 @@ def fit_candidate(frame, points, initial, fit_source):
     return camera
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--observations", default="web/content/canonical-native/NAsM30MAHLg.observations.json.gz"
-    )
-    parser.add_argument(
-        "--evidence", default="/tmp/harmonic-web-reference/evidence/NAsM30MAHLg"
-    )
-    parser.add_argument("--frames", default="/tmp/nasframes")
-    parser.add_argument(
-        "--inventory", default="/tmp/harmonic-web-model/model-inventory.json"
-    )
-    parser.add_argument("--output", required=True)
-    args = parser.parse_args()
-    evidence = Path(args.evidence)
+def run(evidence, frames, inventory, *, historical_diagnostic=False):
+    if historical_diagnostic is not True:
+        raise ValueError("Static calibration requires historical_diagnostic=True")
+    current = Path(__file__).resolve().parents[1] / "content/v39-source"
+    if any(Path(path).resolve().is_relative_to(current.resolve()) for path in (evidence, frames, inventory)):
+        raise ValueError("Historical diagnostics cannot consume current source namespace inputs")
+    evidence = Path(evidence)
     fit_path = Path(__file__).with_name("fit-source.py")
     spec = importlib.util.spec_from_file_location("intro_fit_source", fit_path)
     fit_source = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fit_source)
-    obs = fit_source.common.read_observations(args.observations)
-    if obs.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
-        parser.error("--observations must select a materialized canonical-native derivative, not archived original evidence")
+    obs = fit_source.common.load_historical_observations("NAsM30MAHLg")
+    if (
+        obs.get("kind") == "current-source-observations"
+        or obs.get("freshSourceRecord") is not None
+        or obs.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative"
+        or obs.get("model", {}).get("sha256") != "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
+        or obs.get("model", {}).get("sourceCommit") != "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        or obs.get("source", {}).get("videoId") != "NAsM30MAHLg"
+        or obs.get("source", {}).get("sha256") != "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d"
+    ):
+        raise ValueError("Static diagnostics require the original historical source/model tuple")
     candidate = json.loads((evidence / "codex-fixed-fit-result.json").read_text())
     seeds = candidate["candidateFrame"]["landmarks"]
     anchors = candidate["candidateAnchors"]
@@ -161,10 +168,10 @@ def main():
         anchor["id"] for anchor in anchors if anchor["kind"] == "physical-feature"
     }
     seeds = [seed for seed in seeds if seed["anchorId"] in physical_ids]
-    inv = json.loads(Path(args.inventory).read_text())
+    inv = json.loads(Path(inventory).read_text())
     points = fit_source.world_points({**obs, "anchors": anchors}, inv)
     initial = camera_parameters(candidate["cameras"][0], 1080)
-    source_bgr = cv2.imread(str(Path(args.frames) / "00809.png"))
+    source_bgr = cv2.imread(str(Path(frames) / "00809.png"))
     if source_bgr is None:
         raise ValueError("Missing retained t27 lossless source")
     source = cv2.cvtColor(source_bgr, cv2.COLOR_BGR2GRAY)
@@ -189,7 +196,7 @@ def main():
             continue
         idx = frame["decodedFrameIndex"]
         if idx not in cache:
-            target_bgr = cv2.imread(str(Path(args.frames) / f"{idx:05d}.png"))
+            target_bgr = cv2.imread(str(Path(frames) / f"{idx:05d}.png"))
             if target_bgr is None:
                 cache[idx] = None
             else:
@@ -268,16 +275,36 @@ def main():
         "gpuAcceptedViewSamples": 0,
         "fullMechanismInputsAssigned": 0,
     }
-    fit_source.common.write_observations(
-        Path(args.output),
-        {
-            "anchors": anchors,
-            "frames": output,
-            "missing": missing,
-            "summary": summary,
-        },
-    )
-    print(json.dumps(summary))
+    return {
+        "kind": "historical-source-track-receipt",
+        "historicalDiagnostic": True,
+        "publishable": False,
+        "productionIntegrated": False,
+        "source": obs["source"],
+        "model": obs["model"],
+        "anchors": anchors,
+        "frames": output,
+        "missing": missing,
+        "summary": summary,
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--historical-diagnostic", action="store_true", required=True)
+    parser.add_argument("--evidence", default="/tmp/harmonic-web-reference/evidence/NAsM30MAHLg")
+    parser.add_argument("--frames", default="/tmp/nasframes")
+    parser.add_argument("--inventory", default="/tmp/harmonic-web-model/model-inventory.json")
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
+        output = args.output.resolve()
+    except ValueError as error:
+        parser.error(str(error))
+    packet = run(args.evidence, args.frames, args.inventory, historical_diagnostic=args.historical_diagnostic)
+    common.write_observations(output, packet)
+    print(json.dumps(packet["summary"]))
 
 
 if __name__ == "__main__":

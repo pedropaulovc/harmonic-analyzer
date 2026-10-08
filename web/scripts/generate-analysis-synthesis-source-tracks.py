@@ -1,42 +1,12 @@
 #!/usr/bin/env python3
-"""Regenerate compact Analysis/Synthesis playback candidates from retained evidence.
+"""Assemble current Analysis/Synthesis tracks; revalidate old receipts explicitly.
 
-Run from any directory with the tracked web/content calibration evidence:
-  python web/scripts/generate-analysis-synthesis-source-tracks.py
-This retains numeric evidence and applies one conditional source-FIT cumulative
-bank drive only to Analysis analysis-22/bar-bank/horizontal-mirror. Its twenty
-phases/amplitudes/setup stay fixed; its endpoint is chosen-held to the same shot's
-end, not extrapolated or re-zeroed. Analysis analysis-16/main/native separately
-uses observed visible-crank relative cycles, approximate within-cycle phase and
-an explicitly chosen native sign/home under its unchanged existing camera.
-Its fixed chosen setup and first/last inputs hold over same-shot margins.
-Other Analysis inputs retain inverse-root continuation. It loads no CAD/model/
-browser and does not qualify cameras, recover physical shaft sign/home or
-historical settings, or measure any matching stage.
-Original frozen root choices/costs remain immutable historical diagnostics;
-alternative rod projections are predictions, never source observations.
-Synthesis presenter-to-spin retains one actual machine image with openly chosen
-principal-point/focal framing keys, not a second body or a measured camera fit.
-Synthesis cone-overview retains a two-FIT chosen perspective-camera similarity.
-Cam-rod uses a root-selected upright three-original-FIT fixed-intrinsics SQPNP
-physical pose; former similarities are historical/unaccepted evidence only.
-Independent qualification remains missing; CHECKs never enter camera objectives.
-The cam-rod receipt's exact scene-source seal is intentional: stale calibration
-still refuses current regeneration after a renderer change. Historical replay
-tests supply the original sealed scene bytes, never fresh renderer acceptance.
-The pinned historical receipt records actual raw native model observations.
-Fresh GPU evidence requires new receipt/probe/code pins and a deliberate producer update.
-Synthesis wheel-macro uses only its original wheel-centre FIT and actual GPU
-centre for a chosen principal-point translation; its hanger CHECK stays held out.
-Analysis's stationary full-front shot holds its original frame428 CPU FIT camera
-as a declared same-shot transfer. Independent focal/distance fit gauges are not
-a physical trajectory; seed CPU diagnostics do not qualify held exposures/GPU.
-Synthesis rocker-bank uses separately pinned source-timed cumulative drive for
-all20 stations, with explicit chosen +sense/common-upper phase and same-shot
-unmeasured endpoint holds. Other shots retain their previous candidate inputs.
-Ordinary CLI and imported Generator generation require every source/native input
-to match the independently approved live source and current sealed code before
-derivation. HistoricalReceiptRevalidator is receipt-only, never publication.
+Ordinary Generator and CLI execution use only strict fresh observations from
+content/v39-source/<ID>.observations.json.gz and the generic fresh assembler.
+Retained native calibration/camera/input branches below
+belong solely to HistoricalReceiptRevalidator, whose receipts cannot publish.
+Its original byte pins and snapshot code remain historical diagnostics, never
+current model, camera, runtime coverage or GPU/source qualification.
 """
 from __future__ import annotations
 import argparse
@@ -47,12 +17,14 @@ import importlib.util
 import json
 import math
 from pathlib import Path
+import tempfile
 
 WEB = Path(__file__).resolve().parents[1]
 ROOT = WEB.parent
-spec = importlib.util.spec_from_file_location("compact_source_common", WEB / "scripts/compact-source-common.py")
-common = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(common)
+spec = importlib.util.spec_from_file_location("analysis_synthesis_fresh", WEB / "scripts/fresh-source-tracks.py")
+fresh = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(fresh)
+common = fresh.common
 ANALYSIS = "web/content/canonical-native/analysis-recovery-calibration-evidence/four-seed-source-fit-census"
 CALIBRATION = "web/content/canonical-native/analysis-synthesis.frozen-generation-evidence.json"
 CALIBRATION_SHA256 = "17ee12cb004eacb839b6f54deca609c66568c66574348361f88da9eca37e8d96"
@@ -83,6 +55,14 @@ SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "4536dd456352d23817eed6ee93790c0a626028167
 SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
 ANALYSIS_BANK_CONTROLS = "web/scripts/generate-analysis-bank-source-controls.py"
 SYNTHESIS_OBSERVATIONS = "web/content/canonical-native/8KmVDxkia_w.observations.json.gz"
+HISTORICAL_SOURCE_INPUTS = {
+    "web/content/canonical-native/6dW6VYXp9HM.observations.json.gz": "36e56a7e852ee52a752f8dc9476e2d68c04db0486231655fcb220fc231ad15ec",
+    SYNTHESIS_OBSERVATIONS: "37fd89414b70d39e53aafad2e388a4caf1f4093685b6789ca8d6ddefb3be5234",
+    "web/content/canonical-native/8KmVDxkia_w.track.json": "a9c444cdad3cbe026239d719b9787834e6a1b7410fac2aa5fbbd0f0497b258a2",
+}
+HISTORICAL_COMMON_SHA256 = "bb982f567ff742631b75f329b5114b09155dbb65c2169095db17ff20b56fc565"
+HISTORICAL_BINDINGS_SHA256 = "1228e3b388996ce52cdc3f2f95a85320a0164eed221659cad9bc06edf496d952"
+FRAMING_EXECUTION_COUNTERS = ("eligibleViewCount", "appliedViewCount", "appliedSeedExposureCount")
 
 
 def load(path):
@@ -147,31 +127,22 @@ def look_camera(target, yaw, elevation, span, aspect):
             "verticalFovDegrees": fov}
 
 
-def load_generation_observations(video_id):
-    data = common.load_observations(video_id, prefer_track=video_id != "6dW6VYXp9HM")
+def load_historical_generation_observations(video_id):
+    if video_id not in ("6dW6VYXp9HM", "8KmVDxkia_w"):
+        raise ValueError("Unknown historical Analysis/Synthesis video")
+    paths = (("web/content/canonical-native/6dW6VYXp9HM.observations.json.gz",)
+             if video_id == "6dW6VYXp9HM" else (
+                 "web/content/canonical-native/8KmVDxkia_w.track.json", SYNTHESIS_OBSERVATIONS))
+    for path in paths:
+        if hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != HISTORICAL_SOURCE_INPUTS[path]:
+            raise ValueError(f"Historical original source observations changed: {path}")
+    data = common.load_historical_observations(video_id, prefer_track=video_id != "6dW6VYXp9HM")
     framing = load(SYNTHESIS_OBSERVATIONS) if video_id == "8KmVDxkia_w" else None
     return data, framing
 
 
-def generation_executed_inputs(video_id):
-    return (ANALYSIS_BANK_CONTROLS,) if video_id == "6dW6VYXp9HM" else ()
-
-
-def validate_generation_inputs(video_id, data, framing, *, executed_inputs):
-    if data["source"]["videoId"] != video_id:
-        raise ValueError("Current generation source video identity differs")
-    common.validate_current_generation_inputs(
-        data, Path(__file__),
-        additional_observations=(framing,) if video_id == "8KmVDxkia_w" else (),
-        executed_inputs=executed_inputs)
-
-
-class Generator:
-    def __init__(self, video_id):
-        data, framing = load_generation_observations(video_id)
-        validate_generation_inputs(
-            video_id, data, framing, executed_inputs=generation_executed_inputs(video_id))
-        self._initialize(video_id, data, framing)
+class _HistoricalReceiptAssembly:
+    """Retained calibration branches, unreachable through ordinary Generator."""
 
     def _initialize(self, video_id, data, framing):
         self.video_id = video_id
@@ -199,6 +170,9 @@ class Generator:
                 for f in (0.25,0.5,0.75)]
         self.synthesis_automatic_motion = (
             self.synthesis_automatic_motion_packet() if video_id == "8KmVDxkia_w" else None)
+        if self.synthesis_automatic_motion:
+            # Register validated native exposure keys once, not during authority rechecks.
+            self.data.setdefault("compactChangeTimesSeconds", []).extend(self.synthesis_automatic_motion["times"])
         self.bank_controls = None
         self.bank_controls_module = None
         self.analysis_snapshots, self.analysis_continuity = None, None
@@ -212,7 +186,7 @@ class Generator:
             # exposure/station/CHECK guards, but never read private evidence.
             for name in ("centres","ledger","bankReport"):
                 self.calibration_input(name)
-            self.bank_controls = self.bank_controls_module.build_packet()
+            self.bank_controls = self.bank_controls_module.build_packet(historical_diagnostic=True)
             self.validate_analysis_bank_controls()
             self.data["anchors"].extend(copy.deepcopy(self.bank_controls["anchors"]))
             controls = {row["sourceImage"]["frameIndex"]: row for row in self.bank_controls["frames"]}
@@ -349,18 +323,24 @@ class Generator:
             raise ValueError("Consumed native baseline input/component bounds changed in memory")
         if not self.analysis:
             self.validate_retained_framing_native_source()
-            packet, _ = load_pinned(SYNTHESIS_AUTOMATIC_MOTION,
-                SYNTHESIS_AUTOMATIC_MOTION_SHA256, "Synthesis automatic motion")
-            candidate = next(row for row in packet["bankCandidates"]
-                             if row["id"] == SYNTHESIS_AUTOMATIC_BRANCH)
-            motion = self.synthesis_automatic_motion
-            if (packet["model"] != self.data["model"] or motion["packet"] != packet
-                    or motion["candidate"] != candidate
-                    or motion["times"] != [row["timeSeconds"] for row in candidate["knots"]]):
+            if self.synthesis_automatic_motion != self.synthesis_automatic_motion_packet():
                 raise ValueError("Synthesis automatic motion retained numerical association changed")
+            expected_framing = self.synthesis_coarse_framing_packet()
+            # Application counts describe this replay, not retained numerical authority.
+            retained_framing = {
+                **self.synthesis_coarse_framing,
+                "shots": {shot: {name: value for name, value in key.items()
+                                 if name not in FRAMING_EXECUTION_COUNTERS}
+                          for shot, key in self.synthesis_coarse_framing["shots"].items()}}
+            expected_framing["shots"] = {
+                shot: {name: value for name, value in key.items()
+                       if name not in FRAMING_EXECUTION_COUNTERS}
+                for shot, key in expected_framing["shots"].items()}
+            if retained_framing != expected_framing:
+                raise ValueError("Synthesis retained framing numerical association changed")
             return
         self.validate_analysis_bank_controls()
-        if self.bank_controls != self.bank_controls_module.build_packet():
+        if self.bank_controls != self.bank_controls_module.build_packet(historical_diagnostic=True):
             raise ValueError("Analysis bank controls retained numerical inputs changed in memory")
         anchors = {anchor["id"]: anchor for anchor in self.data["anchors"]}
         rows = {}
@@ -714,7 +694,7 @@ class Generator:
             raise ValueError("Analysis visible crank source-relative zero/domain changed.")
 
     def synthesis_automatic_motion_packet(self):
-        """Require current-root dependency bytes without rewriting original seals."""
+        """Require sealed original source archives, never current native bytes."""
         try:
             packet, packet_hash = load_pinned(SYNTHESIS_AUTOMATIC_MOTION,
                 SYNTHESIS_AUTOMATIC_MOTION_SHA256, "Synthesis automatic motion")
@@ -737,15 +717,20 @@ class Generator:
             "web/scripts/generate-8KmVDxkia_w-automatic-motion.py"}
         if set(dependencies) != required_paths or dependencies[SYNTHESIS_AUTOMATIC_EVIDENCE]["sha256"] != evidence_hash:
             raise ValueError("Synthesis automatic native-math/evidence dependency census differs")
+        native_text = None
         for path, record in dependencies.items():
-            try:
-                actual = hashlib.sha256((ROOT/path).read_bytes()).hexdigest()
-            except OSError as error:
-                raise ValueError(f"Synthesis automatic dependency unavailable: {path}") from error
-            if actual != record["sha256"]:
+            if path == SYNTHESIS_AUTOMATIC_EVIDENCE:
+                try:
+                    raw = (ROOT / path).read_bytes()
+                except OSError as error:
+                    raise ValueError(f"Synthesis automatic dependency unavailable: {path}") from error
+            else:
+                raw = common.historical_code_bytes(path, record["sha256"])
+            if hashlib.sha256(raw).hexdigest() != record["sha256"]:
                 raise ValueError(f"Synthesis automatic native-math dependency differs: {path}")
-        text = (ROOT/"web/src/mechanics-data.ts").read_text()
-        native = json.loads(text.split("export const MECHANISM_DATA = ",1)[1].rsplit(" as const",1)[0])
+            if path == "web/src/mechanics-data.ts":
+                native_text = raw.decode("utf-8")
+        native = json.loads(native_text.split("export const MECHANISM_DATA = ",1)[1].rsplit(" as const",1)[0])
         if (native["harmonicNumbers"] != list(range(20,0,-1))
                 or native["provenance"]["modelSha256"] != self.data["model"]["sha256"]
                 or native["provenance"]["sourceCommit"] != self.data["model"]["sourceCommit"]):
@@ -825,10 +810,6 @@ class Generator:
                 or abs(times[0]-interval["startSeconds"])>1e-9
                 or abs(times[-1]-interval["endSeconds"])>1e-9 or knots[0]["crankTurns"] != 0):
             raise ValueError("Synthesis automatic complete410-knot source cadence is required")
-        # Native source rows already exist. Requiring their exact identity above
-        # lets common retain keys without borrowing neighbouring source images,
-        # cameras, layouts or CHECK pixels. No annotation becomes a landmark.
-        self.data.setdefault("compactChangeTimesSeconds",[]).extend(times)
         return {"packet":packet, "candidate":candidate, "times":times,
                 "packetSha256":packet_hash, "evidenceSha256":evidence_hash}
 
@@ -1186,10 +1167,8 @@ class Generator:
         if receipt_hash != receipt_record["sha256"] or receipt_hash != "83c3a1f00cc5414b3edaa2fd62e72de437f4d7adb756263139671abb0f57033c":
             raise ValueError("Chosen cam-rod actual world receipt changed")
         receipt = json.loads(receipt_raw)
-        try:
-            scene_hash = hashlib.sha256((ROOT / "web/src/scene.ts").read_bytes()).hexdigest()
-        except OSError as error:
-            raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs: current scene unavailable") from error
+        scene_hash = hashlib.sha256(common.historical_code_bytes(
+            "web/src/scene.ts", lineage["sceneCurrentSourceSha256"])).hexdigest()
         if (probe["status"] != "candidate-enumeration-only"
                 or probe["selection"] != "none; retain every returned pose; CHECK not evaluated"
                 or probe["chosenIntrinsics"]["verticalFovDegrees"] != 30
@@ -1749,17 +1728,17 @@ class Generator:
         return output
 
     def build(self):
-        executed = ((Path(self.bank_controls_module.__file__),) if self.analysis else ())
-        validate_generation_inputs(
-            self.video_id, self.data, self.framing_observations, executed_inputs=executed)
-        self.validate_retained_inputs()
-        return self._build()
+        raise ValueError("Historical receipt revalidation cannot build an ordinary source track")
 
     def _build(self):
         if self.analysis_held_camera:
             self.analysis_held_camera["application"]["appliedViewCount"] = 0
             self.analysis_held_camera["application"]["appliedExposures"] = []
-        track = common.build_track(self.data,self.views,[
+        if self.synthesis_coarse_framing:
+            for key in (*self.synthesis_coarse_framing["shots"].values(), self.synthesis_wheel_framing):
+                for name in FRAMING_EXECUTION_COUNTERS:
+                    key[name] = 0
+        track = self._historical_common.build_track(self.data,self.views,[
             "Regenerate with python web/scripts/generate-analysis-synthesis-source-tracks.py; all active inputs are pinned tracked web/content calibration evidence, renderer binding metadata and source declarations. Ignored paths are historical provenance only; source/model hashes remain unchanged.",
             "All50/20/10/5% width stages remain unmeasured. CPU camera rejection at2% is not a blanket removal of a coarser candidate. No GPU/model/browser execution or historical source recovery.",
             "Camera/input/layout assumptions are declared per view. All retained source shots and integer/change/layout keys remain required, including nested endcards; source copyrighted artwork is not reconstructed."])
@@ -1958,21 +1937,53 @@ class Generator:
             raise ValueError("Chosen camera permission has no eligible generated main/whole framing views.")
 
 
-class HistoricalReceiptRevalidator(Generator):
-    """Replay original sealed receipts without authorizing current generation."""
+class HistoricalReceiptRevalidator(_HistoricalReceiptAssembly):
+    """Replay independently pinned old originals, never authorize generation."""
 
     def __init__(self, video_id):
-        data, framing = load_generation_observations(video_id)
+        data, framing = load_historical_generation_observations(video_id)
         self._initialize(video_id, data, framing)
-
-    def build(self):
-        raise ValueError("Historical receipt revalidation cannot build an ordinary source track")
+        self._initialized_observations = copy.deepcopy(self.data)
+        self._initialized_framing = copy.deepcopy(self.framing_observations)
 
     def revalidate_receipt(self):
+        # Read original seals independently of current consumer approvals.
+        load_historical_generation_observations(self.video_id)
+        if (self.data != self._initialized_observations
+                or self.framing_observations != self._initialized_framing
+                or self.data["source"]["videoId"] != self.video_id):
+            raise ValueError("Historical original source observations changed in memory")
         self.validate_retained_inputs()
-        receipt = self._build()
+        raw = common.historical_code_bytes("web/scripts/compact-source-common.py", HISTORICAL_COMMON_SHA256)
+        bindings = common.historical_code_bytes("web/src/bindings.ts", HISTORICAL_BINDINGS_SHA256)
+        # The sealed selector's binding parser runs against sealed old bytes in
+        # its original filesystem layout, never today's live binding table.
+        with tempfile.TemporaryDirectory(prefix="historical-source-receipt-") as directory:
+            web = Path(directory) / "web"
+            (web / "src").mkdir(parents=True)
+            (web / "src/bindings.ts").write_bytes(bindings)
+            spec = importlib.util.spec_from_loader("historical_receipt_common", loader=None)
+            historical = importlib.util.module_from_spec(spec)
+            historical.__file__ = str(web / "scripts/compact-source-common.py")
+            exec(compile(raw, historical.__file__, "exec"), historical.__dict__)
+            self._historical_common = historical
+            original_data, original_shots = self.data, self.shots
+            self.data = copy.deepcopy(original_data)
+            self.shots = {shot["id"]: shot for shot in self.data["shots"]}
+            try:
+                receipt = self._build()
+            finally:
+                self.data, self.shots = original_data, original_shots
+                del self._historical_common
         receipt["kind"] = "historical-source-track-receipt"
         return receipt
+
+
+class Generator(fresh.FreshGenerator):
+    """Strict ordinary API: no historical calibration branch or fallback."""
+
+    def _producer_path(self):
+        return Path(__file__)
 
 
 def main():

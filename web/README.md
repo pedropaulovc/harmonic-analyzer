@@ -48,16 +48,34 @@ Existing source tracks are stale for a new raw model and reject source-following
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
 representation and provenance contract.
 
-The current imported model is the approved **v39** release. All six retained
-source tracks still identify the earlier raw model and are rejected for
-source-following against v39. Original-video playback and manual exploration
-remain separate from that guard. Fresh v39 source captures and qualification are
-required; no v39 source-following or footage-fidelity pass is claimed.
+The current imported model is the approved **v39** release: raw SHA-256
+`60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c`,
+source commit `81539e53f5146c06a77541415bd79da673806d96`.
+The original six source corpora remain archived and hash-sealed. Current v39
+records reuse a subset of their measurements, not every historical landmark row.
+Migrating those current records preserves their source pixels, PTS, hashes and
+uncertainties while rebuilding release-specific tracks from `content/v39-source/`.
+Further reuse requires exact exposure provenance and the same physical feature
+under a current native association; an unchanged anchor ID alone is insufficient.
+Old model-bound tracks remain incompatible, and approximate current tracks do
+not establish source fidelity.
+No complete current-release source-fidelity acceptance has been established.
 
 Playback can start while the model or source track loads. Source-following starts
 automatically when both are ready; pausing retains manual exploration. Status
 announcements exclude the running clock. Force readouts are physical calculations,
 not source measurements.
+
+Restore uses the actual paused player clock. Chromium may truncate
+`currentTime` to microseconds, placing it just before an authored cut even
+when the requested seek is at that cut. Compare restored states at the same
+actual media time; do not round source timestamps or interpolate across cuts.
+
+Migration cameras must also be checked against the posed full assembly.
+The Intro pen-macro seed was outside the pen frame but looked through the
+platen; reversing that chosen camera made the frame visible without hiding
+geometry. Visibility is a playback prerequisite, not evidence of a source
+pixel fit.
 
 Routes accept a slug or the corresponding YouTube ID:
 
@@ -77,6 +95,42 @@ are not acceptance prerequisites.
 The video embeds use the official YouTube IFrame API. Downloaded source videos,
 reference screenshots and the GLB remain untracked; the site does not host or
 redistribute the footage.
+
+### Native calibration inventory
+
+`scripts/export-native-inventory.py` exports the approved raw GLB's unchanged
+native rest matrices under canonical qualified paths. It independently checks
+the release pair, v2 approval, sole identity map and canonical digest. The raw
+GLB and CAD tree remain read-only, including hard-linked output aliases.
+Publication replaces the destination entry atomically, preserving any other
+hard-link or symlink targets and the previous inventory if writing fails.
+The bytes used for the mesh census are digest-bound to the transform input.
+
+```sh
+# From the repository root; the approved raw GLB remains private.
+uv run --isolated --no-project python web/scripts/export-native-inventory.py \
+  --model /path/to/raw-native.glb \
+  --source-commit 81539e53f5146c06a77541415bd79da673806d96 \
+  --expected-model-sha256 60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c \
+  --output /tmp/v39-native-model-inventory.json
+npm --prefix web run test:inventory
+```
+
+The v39 artifact has 457 released descendant transforms: 450 mesh nodes and
+seven assembly transforms. Its mesh primitives produce 460 native drawables.
+The assembly root, camera and runtime-generated spare instances are not
+inventory rows. `fit-source.py` consumes the matrices as column-major
+part-local-metres to native-world-metres, and checks the original raw-model
+digest before using any landmark. This inventory does not supply source
+observations, camera calibration, motion evidence, historical bounds or
+source-fidelity qualification.
+General affine matrices remain unchanged. The v39 rest matrices are rigid within
+1e-6 orthogonality/determinant tolerance; rotational overrides in the fitter
+assume rigid rest transforms and are not qualified for scaled or sheared inputs.
+
+The inventory tests are enrolled in `test:model`. They are web-only tooling,
+not CAD/doit tests; their independent transform and immutable-input controls
+run without SolidWorks, a GPU, source footage or the private GLB.
 
 ## Canonical identity evidence audit
 
@@ -130,25 +184,53 @@ The manifest explicitly declares `canonicalConsumerHashNormalization` as
 the normalized text, not checkout byte identity. Original evidence, historical
 snapshots, mapping bytes and derivative dependency pins are never normalized.
 
-Ordinary producers for all six videos validate the trusted tracked representation
-through the same strict v2 `approved-model.mjs` loader used by offline verifiers.
-They compare observations with its approved raw tuple before derivation or
-publication, and check normalized live approval, producer, classifier, scene and
-native-math inputs against current-consumer seals. Producers declare the additional
-modules they execute; Analysis seals the bank-controls module's actual loaded
-path. Synthesis checks both primary and secondary observations. Construction and
-build recheck native model associations and retained calibration. Analysis also
-rechecks consumed numerical inputs, motion indexes and held-camera/bank data.
-Synthesis rechecks automatic-motion candidates and times; its additional framing
-cameras and lineage hashes are construction-time data. Its old-model framing
-pins still refuse v39 generation. A new model label
-cannot approve old native readbacks. The pair is constructed and built before
-either output is prepared or published. Changed or missing live inputs refuse
-even when a matching historical snapshot exists.
-Analysis/Synthesis historical replay uses
-`HistoricalReceiptRevalidator.revalidate_receipt()`. Its receipt cannot be built
-or published as a current source track. Historical lineage never supplies
-current eligibility.
+Direct Node track-association readbacks invoke the same standard-library
+publication-seal checker through `uv run --isolated --no-project python`, not an
+ambient `python3` executable or a separate interpreter configuration. Exact
+record bytes, current native/assembly authority and live generation seals
+remain required.
+
+Ordinary producers for all six videos read only strict
+`content/v39-source/<ID>.observations.json.gz` records. They validate the current
+tracked representation authority, original MP4 identity, native inventory/map
+association, exact camera/source exposure bindings and complete chosen physical
+inputs. Construction, build and publication re-read the relevant live seals and
+the compressed/decoded observation byte seals; a historical snapshot cannot
+replace a missing or changed live input. Pair CLIs build and prepare both tracks
+before publishing either output.
+
+Analysis/Synthesis historical replay is separate:
+`HistoricalReceiptRevalidator.revalidate_receipt()` checks immutable historical
+packets and sealed producer/math snapshots. Its non-publishable receipt is not a
+current source track and cannot grant current eligibility.
+The same revalidator can replay repeatedly: retained camera/input numbers remain
+sealed, while framing application counts describe each individual replay rather
+than accumulating across receipts. Validation does not append native exposure
+keys to the initialized observations.
+The original-native Analysis bank extraction, visible-crank gauge, Synthesis automatic-motion and
+Spin mechanics CLI implementations are retired from `scripts/`: their required
+historical native tuple is not the current live tuple. Original producer source
+remains in the SHA-addressed `content/canonical-native/historical-code` archive,
+not as an executable current-native replay or fallback.
+
+For current observations, an omitted landmark `viewId` belongs to `main`.
+Present landmark and unavailable-row scope IDs must be strings; explicit `null`
+is not an omitted scope and is refused by the runtime contract.
+Fitting and observer availability apply that default at the consumer boundary;
+they do not rewrite the original source measurements or explicit view scopes.
+
+Historical source diagnostics write only to resolved
+`web/.vite/verification-output` or external `/tmp` and `/var/tmp` destinations.
+Public assets, other repository destinations and symlink escapes are refused
+before generation. Their receipts remain non-publishable historical evidence.
+Temporary roots are resolved before comparison, including platform symlinks.
+The entire checkout remains excluded from external temporary permission even
+when the checkout itself is under `/tmp`; private-root symlink escapes are refused.
+The observer, fitter and remaining historical diagnostic CLIs share
+`check_namespace()` from `fresh-source-observations.py`. The historical CLIs use
+their already-loaded `common.fresh` policy. Declared content aliases are refused
+even when they resolve to external temporary files; historical snapshots are not
+live policy fallbacks.
 
 Compression reduces current storage, not Git ancestry. Oversized historical
 blobs remain unless history is explicitly rewritten.
@@ -194,8 +276,11 @@ simulate tooth collisions, friction or inertia. The amplitude controls show CAD
 station millimetres; calibration to the video's engraved measuring sticks is
 not established.
 
-The source evidence described below belongs to the earlier model. Its measured
-results and chosen settings do not qualify the current v39 scene.
+Historical projection and GPU evidence described below belongs to the earlier
+model. Its measured results and chosen settings do not qualify the v39 scene;
+source-only measurements remain archival evidence. Promotion into a current
+record additionally requires exact exposure and current-feature correspondence;
+archival completeness does not imply every measurement is reused in v39.
 
 Source-following tracks combine source cameras with complete feasible physical
 inputs. Hidden settings may be chosen and are labelled unobserved, not recovered
@@ -211,7 +296,7 @@ Synthesis's existing front-camera position/rotation stay fixed while its chosen
 principal-point/FOV keys reframe the single machine image. Cuts, layout and
 discrete mechanical changes still hold the decoded exposure. This is unmeasured
 source-informed framing, not recovered camera history or a fidelity pass.
-The final **5% / 0.5-second** limits and other videos' policies remain unchanged.
+The current **50% / 0.5-second** target and other videos' policies remain unchanged.
 
 The optional `content/canonical-native/<videoId>.chosen-camera-continuity.json` permission packet
 pins source SHA, shot bounds, native coverage and unmeasured main/whole framing
@@ -233,24 +318,26 @@ or replace the video ID with `8KmVDxkia_w` for Synthesis.
 Omitting `--video` still validates and prepares both Analysis/Synthesis outputs
 before publishing either.
 
-Analysis has bounded cumulative source-drive authority for the visible crank
-(79.8130667..86.6866 seconds) and mirrored bank (112.3122..119.0856333 seconds).
-The authoritative packets are
+Immutable historical Analysis packets retain bounded cumulative source-drive
+evidence for the visible crank (79.8130667..86.6866 seconds) and mirrored bank
+(112.3122..119.0856333 seconds):
 [`6dW6VYXp9HM.visible-crank-motion.json`](content/canonical-native/6dW6VYXp9HM.visible-crank-motion.json),
 [`6dW6VYXp9HM.visible-crank-gauge.json`](content/canonical-native/6dW6VYXp9HM.visible-crank-gauge.json),
 [`6dW6VYXp9HM.automatic-motion.json`](content/canonical-native/6dW6VYXp9HM.automatic-motion.json)
 and [`6dW6VYXp9HM.motion-controls.json`](content/canonical-native/6dW6VYXp9HM.motion-controls.json).
 They separate observed relative motion from chosen native sign/home and hidden
-setup. Same-shot margins hold the nearest new input through the real cut;
-other shots, views and presentations retain their existing paths.
-[`DESIGN.md`](DESIGN.md#bounded-analysis-motion-authority) describes the gauges,
-source-specific producers and limits. These drives remain chosen approximations;
-source camera and geometry fidelity are unaccepted.
+setup. Historical receipt revalidation retains same-shot margin holds and
+original gauges; ordinary current playback instead consumes the fresh records
+above. [`DESIGN.md`](DESIGN.md#bounded-analysis-motion-authority) describes the
+historical evidence and private source-only flow. These historical drives remain
+chosen approximations; source camera and geometry fidelity are unaccepted.
 
-Synthesis's rocker-bank interval **105.980875..124.4159583 seconds** uses
-[automatic-motion inputs](content/canonical-native/8KmVDxkia_w.automatic-motion.json) and
-[source evidence](content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json), produced by
-[`generate-8KmVDxkia_w-automatic-motion.py`](scripts/generate-8KmVDxkia_w-automatic-motion.py).
+Synthesis's immutable historical rocker-bank interval **105.980875..124.4159583 seconds**
+is retained in [automatic-motion inputs](content/canonical-native/8KmVDxkia_w.automatic-motion.json)
+and [source evidence](content/canonical-native/8KmVDxkia_w.automatic-motion-evidence.json).
+Their original producer bytes are archived for lineage, not a current-native
+canonical regeneration command. Historical receipt revalidation consumes these
+packets; ordinary current track generation consumes only fresh current records.
 The source's 4× label describes published-video playback: mean cadence is
 1.559234652 turns/s, with unsigned cumulative drive of 28.744620749 turns across
 410 native knots. `bank-direction-+1` is an explicitly chosen physical direction,
@@ -301,40 +388,28 @@ a complete feasible reconstruction, with the user's approval. They are listed
 as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
 identifiable-feature and timing checks retain their requirements.
 
-The iterative plan is **50% → 20% → 10% → 5% of source frame width**, across
-all six videos at each stage. These are maximum landmark errors, not fractions
-of coverage. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels.
-The final tolerance is 5%; timing remains within 0.5 seconds throughout.
+The current plan is **50% of source frame width across all six videos**, followed
+by a working browser demo. This is a maximum scored landmark error, not a fraction
+of coverage. At 1920 pixels wide the limit is 960 pixels; timing remains within
+0.5 seconds. The 20%, 10% and 5% refinement stages are outside the current request.
 
-First demonstrate working coarse camera/mechanism tracking across the collection
-in the browser, then refine the largest visible discrepancies. Verify every
-integer second and visible change using distributed fixed and moving landmarks,
-actual rendered pixels and visual overlays. Close-ups, insets and montages remain
-required. Report uncertainty, exceptions and unavailable measurements explicitly.
-Coarse playback is not final footage acceptance.
+Complete coarse camera/mechanism matching across the collection, then demonstrate
+the implementation. Verify every integer second and visible change using
+distributed fixed and moving landmarks, actual rendered pixels and visual
+overlays. Close-ups, insets and montages remain required. Report uncertainty,
+exceptions and unavailable measurements explicitly. A passing subset or missing
+source CHECK pixels is not an all-six stage-50 pass.
 
 ```sh
 npm --prefix web run build
 npm --prefix web run preview
 
-# Incremental coarse collection, then refinements:
-export HARMONIC_REFERENCE_ROOT="$PWD/web/.vite/reference-root"
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 20
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 10
+# Current all-six coarse collection; no video/time scope or optional eligibility:
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --player local
 
-# Scoped measurements do not claim a whole-video pass:
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119
-
-# Headless bounded Analysis03 demonstration; not a fidelity acceptance pass:
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --from 5.9 --to 7.1 --player local --headless
-
-# Final all-video acceptance, including the official player:
-HARMONIC_HEADLESS=1 npm --prefix web run build && HARMONIC_HEADLESS=1 npm --prefix web run verify:sync
-
-# Local demonstration of the unchanged private original footage:
+# After the all-six coarse pass, demonstrate the unchanged private original footage:
 npm --prefix web run preview:reference -- --port 5967
-# http://127.0.0.1:5967/harmonic-analyzer/?video=machine-spin&referenceMedia=1
+# http://127.0.0.1:5967/harmonic-analyzer/?referenceMedia=1
 ```
 
 `HARMONIC_REFERENCE_ROOT` defaults to durable ignored `web/.vite/reference-root`.
@@ -342,15 +417,111 @@ It must contain the six original MP4s under `videos/`. `preview:reference` serve
 them locally with range support without copying footage into publication assets.
 Default public playback remains the official YouTube embed.
 The verifier serves `dist/`, exercises the original media, and reports per-video
-coverage, rendered landmark errors and timing. Incremental runs are repeatable;
-there is no acceptance-attempt quota. The default final target is 5% of each
-source frame's width, with clock skew no greater than 0.5 seconds.
+coverage, rendered landmark errors and timing. The current collection command
+must explicitly select stage 50 because the CLI retains its existing finer-stage
+options/default; those are not queued deliverables. Clock skew remains at most
+0.5 seconds, and manual operation, native media audio state and compact playback
+remain required. No audible-speaker observation is implied by media-state checks.
+
+**Measured checkpoint (2026-10-08 UTC).** The unscoped all-six
+`--stage 50 --player local` run at `4cfeaee9373d6e78305e39390f2cc608c12f9aaa`
+finished **unavailable**, exit 1, with the actual RTX 3090/D3D12 renderer on
+every route. It selected every mandatory census key, but selection is not
+independent landmark coverage:
+
+| Video | Required samples containing measurements / required | Passed required samples | Maximum measured error (px) | Maximum measured clock skew (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Intro/history | 1 / 1212 | 0 | 453.373 | 0.018600 |
+| Synthesis | 11 / 629 | 9 | 384.221 | 0.041708 |
+| Analysis | 91 / 365 | 78 | 289.864 | 0.016684 |
+| Operation | 2 / 1019 | 2 | 50.874 | 0.450450 |
+| Machine spin | 2 / 186 | 2 | 73.752 | 0.437938 |
+| Rocker arms | 1015 / 1153 | 984 | 32.765 | 0.020834 |
+
+The error maxima include admitted mandatory and diagnostic measurements; they
+do not bound unmeasured frames. A sample containing FIT pixels can still lack
+independent CHECKs. All six stage summaries remain unmeasured, not accepted.
+The run retained missing/unsupported source checks, two Analysis spring-bound
+refusals at 113.8137 and 119.08563333333333 seconds, compact-playback failures,
+and Analysis/Spin manual-setup decode errors before any crank/orbit exercise.
+The original compact-failure predicate values were not saved; subsequent
+diagnostic receipts retain actual media/render values before the unchanged
+0.3-second advancement and 0.5-second clock assertions.
+
+A separate fresh-page headless smoke at the same checkpoint passed on all six
+pages: real paused crank/orbit/pan/zoom, clock-bound Restore of camera/input/
+assembly, visible 222×200 original-media native controls, unmuted volume 1,
+and advancing current native draws. Its maximum observed playback skew was
+0.013994 seconds. Intro also recovered the actual EOF HUD and preserved ongoing
+manual crank motion through a paused native seek. These bounded positives do
+not clear the collection failures, certify missing intervals, demonstrate speaker
+output, or exercise the official provider in this round.
+Private source/data/dist seals, complete reports and screenshots are retained in
+`web/.vite/complete1227-stage50-20261007/`; they are not publication assets.
+Later code/seal changes do not relabel this frozen report as newer-head scoring.
+
+After the repeatability correction and consumer-seal refresh,
+`3cfa8f6dd7848020d85079124eb6517d5a1da74e` passed a separately bound fresh
+six-page runtime smoke, with maximum observed playback skew 0.015018 seconds.
+All observation, track and compiled-dist bytes exactly matched the frozen
+checkpoint. A single changed-diagnostic Synthesis arm at 284 seconds retained
+the actual compact failure: 0.227414 seconds of native progress after 600 ms,
+below the unchanged 0.3-second minimum. Media was unpaused, unmuted at volume 1,
+readyState 4 without an error; source following and the 0.009989-second model
+skew passed their existing predicates. That time-scoped diagnostic is not an
+acceptance run; its short-window failure and the original collection failures
+remain failures despite the longer bounded runtime positives.
+
+The bounded native-progress correction replaces the fixed 600 ms observation
+with a wait for the same 0.3 seconds of actual source progress, using the existing
+20-second timeout. Unmuted positive-volume media, the actual native button,
+source following, at most 0.5 seconds of clock skew and a new current native draw
+remain required; timeout/error receipts retain their real predicate values.
+The changed Synthesis 284-second arm passed with 0.312458 seconds of source
+progress and 0.010537 seconds of clock skew. A real original-media pause before
+the boundary advanced only 0.000037 seconds and was refused by the 20-second
+guard. A fresh six-page compact/manual/Restore smoke passed with maximum observed
+skew 0.012847 seconds. These separate receipts are under
+`web/.vite/complete1227-stage50-20261007/native-progress/`; they do not rewrite
+the frozen scientific report or clear unexercised collection failures.
+Restore equality binds camera, input and assembly to the measured native clock;
+`currentTime` alone does not identify the exact presented decoded frame.
+
+Original-source authority is validated before lazy shared browser startup. Shared
+startup becomes ready only after server, browser, context and page acquisition;
+failure is one terminal verification prerequisite with acquired-resource cleanup,
+not repeated per-video launch attempts. Missing originals remain per-video failures.
+Verification-only publications use detached banks: ordinary playback and trusted
+manual/layout intent resume the real frame rather than inheriting a diagnostic
+candidate. Scoped diagnostic APIs expose guarded methods and detached data, not
+live mutable model/viewer handles. Pending or expired publications refuse instead
+of rolling back newer state. Failed restoration invalidates source/physics/draw
+claims while independent cleanup still runs. See
+[`DESIGN.md`](DESIGN.md#browser-verification) for ownership and unexercised
+failure-path limits; diagnostic controls never qualify source fidelity.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.
 Diagnostic landmark receipts also retain the actual native marker's world
 coordinates from the same completed view draw. Stale, unresolved or
 GPU-deformed coordinates remain unavailable; world coordinates are not
 source-pixel measurements or camera qualification.
+
+Optional native eligibility requires `nativeViewportBackingPixels: null` for
+unwarped captures and current native backing dimensions for warped captures.
+A refused diagnostic lease preserves its original unavailable reason and partial
+snapshot/capture evidence; unrelated cleanup failures still propagate. Neither
+collection nor a successful metadata join qualifies source fidelity or GPU bounds.
+The optional classification is scoped to
+`selected-native-stage-pixel-exact-vertex-identity`, not general native-anchor
+visibility or validity. A quantized pixel-centre ray can hit an incident native
+triangle while exceeding the unchanged 1e-7 m distance to its exact stored vertex
+class; tiny nonzero pixel-centre offsets can still pass. The scoped refusal
+`cpu-selected-pixel-first-surface-exceeds-exact-vertex-residual` retains the raw
+projection and pixel-centre offset. CPU evidence reports
+`queried-ray-exact-vertex-identity`; absent or different scope refuses. No pixel
+offset enlarges the physical tolerance and no vertex ray substitutes for the
+selected pixel ray. Source/GPU approval remains independent and unresolved when
+unavailable; corpus-wide practical reachability has not been measured.
 
 Paused interaction verification exercises a bounded crank turn and an actual
 camera orbit, preserving before/after native pixels, camera poses and media
@@ -367,6 +538,24 @@ not FFmpeg's version-dependent implicit gray conversion. The schema defines the
 byte profile; unsupported source formats are refused and existing hashes stay
 unchanged.
 
+The pixel observer uses that same native Y raster for both gray identity and
+NCC/LK measurements, selected by the declared pixel format rather than video ID.
+Source clocks use native integer PTS with the rational stream time base, not
+microsecond-rounded display timestamps at half-open cuts. Install its locked
+web tooling group from the repository root. With `HARMONIC_REFERENCE_ROOT`
+pointing to the unchanged original reference root, a private observation run is:
+
+```sh
+uv sync --group web
+uv run --group web python web/scripts/observe-source.py \
+  --source "$HARMONIC_REFERENCE_ROOT/videos/4mBuyixt22U.mp4" \
+  --observations web/content/v39-source/4mBuyixt22U.observations.json.gz \
+  --output web/.vite/verification-output/rocker-observed.observations.json.gz
+```
+
+Successful decoding/emission does not certify missing independent measurements
+or promote unavailable source coverage to passed.
+
 Compact selection preserves original landmark observations across nominal and
 decoded-time aliases only when source frame, hashes, PTS and view layout match.
 It does not interpolate source pixels or change the selected camera and input.
@@ -374,11 +563,53 @@ Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
 pixel format. Formats never alias each other; sampling diagnostics list
 supported formats and any unsupported source declarations.
 
-Source generators and active loaders use the identity-translated observations,
-seed states, calibration and motion packets under `content/canonical-native/`.
-The originals under `content/` remain byte-exact archival evidence from
-`bfde892a5`; fitting, observation and static-calibration commands refuse those
-original observation files as current inputs.
+Current authored inputs are `content/v39-source/<videoId>.observations.json.gz`;
+browser outputs are `content/<videoId>.source-track.json`. Preserve source PTS,
+pixels, hashes, uncertainties and landmarks. For each CAD release, recompute
+native identities, world coordinates, cameras and physical constraints against
+the approved geometry. Inherited pose seeds remain chosen/unobserved.
+The identity-translated packets under `content/canonical-native/` and byte-exact
+originals under `content/` from `bfde892a5` remain historical lineage, including
+their old projection/GPU proof; they do not qualify current geometry.
+
+From the repository root, store an authored input without reserializing JSON:
+
+```sh
+uv run --isolated --no-project python web/scripts/canonical-native-evidence.py compress-observations web/content/v39-source/<ID>.observations.json
+```
+
+The command retains the source file and writes exact-byte deterministic gzip
+(level 9, `mtime=0`, no filename). Only the registered authored observation
+namespace is accepted. Compression preserves numeric spelling and supplies no
+geometry or fidelity qualification.
+
+After authoring stops, regenerate in this order using the pinned source-fit
+requirements for the four producers:
+
+```sh
+uv run --isolated --no-project python web/scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-intro-source-track.py
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/generate-analysis-synthesis-source-tracks.py
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-spin.py
+uv run --isolated --no-project --python 3.13 --with-requirements web/scripts/source-fit-requirements.txt python web/scripts/compact-operation-rocker.py
+uv run --isolated --no-project python web/scripts/canonical-native-evidence.py generate
+uv run --isolated --no-project python web/scripts/canonical-native-evidence.py check
+```
+
+The first canonical generation refreshes input seals; the final generate/check
+binds the produced tracks. Canonical replay remains an identity audit.
+Operation/Rocker accepts `--video jfH-NbsmvD4` or `--video 4mBuyixt22U` for
+independent publication; its default prevalidates the pair before publishing
+either. Analysis/Synthesis retains its independent `--video` selection.
+
+One-ULP routing at half-open cuts is execution-only: authored source numbers
+remain unchanged, and the strict same-shot 0.5-second source-exposure requirement
+still applies. Nine actual independently decoded frames fill genuinely missing
+Operation fade exposures while preserving existing samples and landmarks.
+Inherited camera/mechanism guesses remain chosen/unobserved. Complete playable
+approximate tracks do not imply a source-fidelity pass. Fresh rendered reports
+must distinguish measured failures, unavailable coverage and unmeasured stages;
+there is no acceptance-attempt quota.
 
 The [derivative manifest](content/canonical-native/manifest.json) records each
 derivative and original SHA-256, mapping revision and digest, preserved numeric
@@ -387,28 +618,27 @@ original lineage only. They do not qualify the current renderer or CAD.
 Analysis's native forward-smoke, visible-crank winding proof and extraction-lineage
 code seals verify their original historical producers, not today's native math.
 Missing, unreadable or modified historical snapshots reject with `ValueError`.
-Synthesis's automatic-motion `generationDependencies`, by contrast, require exact
-current bytes at the intended generation root, including all three native-math
-files and the motion producer script. Its cam-rod `sceneCurrentSourceSha256` also
-checks that root's actual `web/src/scene.ts`: even cosmetic byte changes require
-new bound GPU evidence. These gates do not use historical snapshots or the
-manifest's normalized consumer seals as substitutes for current source.
-`web/.gitattributes` fixes those five live source inputs and the three current
-raw-hashed regeneration inputs (the Operation producer, shared source reader and
-native bindings) to LF on checkout, including with `core.autocrlf=true`.
-Producer and consumer hashes still use exact bytes. This source-authority
-contract is separate from the normalized identity-audit inputs listed in the
-manifest. Historical code, original packets and geometry remain
-exact-byte evidence.
-Historical behavioral fixtures scope the exact archived scene and all four
-producer/math sources to those intended source paths, for both byte and text
-reads. They leave original packets and receipt seals untouched and replay only
-original evidence; they do not approve the current scene, math, model or GPU.
+Synthesis's historical automatic-motion `generationDependencies` now read every
+non-content producer/math input only from its exact sealed historical-code
+archive. Native-data text comes from those same original archived bytes, never
+the live current tuple. The content evidence dependency remains the original
+pinned packet at the intended evidence root. The cam-rod
+`sceneCurrentSourceSha256` retains its original field name and digest but checks
+the corresponding sealed historical scene archive. Missing or modified archives
+refuse even when matching bytes exist at nominal live source paths; there is no
+live-file or replay-root fallback.
+
+The ordinary current producer remains fresh-only and separately checks its live
+authority and observation byte seals. Whole historical receipt revalidation
+uses the real archive route without overriding byte/text reads. It preserves
+original packet and receipt seals and cannot approve current scene, math,
+model, GPU or source fidelity. Historical code, original packets and geometry
+remain exact-byte evidence.
 Original private capture paths and observation hashes remain provenance links,
 not regeneration dependencies; no source video or screenshots are included.
-Capture-bound renderer and model hashes remain strict. Canonical farm GLB
-export, metadata re-export and current-renderer recapture/requalification are
-still required before claiming current-model source fidelity.
+Capture-bound renderer and model hashes remain strict. Current-renderer
+recapture and source requalification against the approved v39 native geometry
+are required before claiming current-model source fidelity.
 Lossless delivery optimization keeps the native raw hash authoritative; it does
 not recalibrate observations or establish geometry/source fidelity acceptance.
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Track independently measured Spin montage pixels in the actual retained source.
 
-This prepares private numerical observations; it never changes production tracks,
-loads a native model, fits a camera, or runs a GPU/browser. Original FIT/CHECK roles
-and uncertainties are retained. Failed source tracks stay unavailable.
+This prepares nonpublishable historical diagnostic observations; it never changes
+production tracks, loads a native model, fits a camera, or runs a GPU/browser.
+Require --historical-diagnostic. Original FIT/CHECK roles and uncertainties remain.
 """
 import argparse
 import hashlib
@@ -20,18 +20,27 @@ observe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(observe)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--reference-root", type=Path, default=Path(os.environ.get("HARMONIC_REFERENCE_ROOT", WEB / ".vite" / "reference-root")))
-    parser.add_argument("--output", type=Path, default=WEB / ".vite" / "verification-output" / "compact-track-refinement" / "spin-montage-source-controls.json")
-    args = parser.parse_args()
-    source = observe.common.load_observations("XPQwKRt4Y2k")
-    compact = json.loads((WEB / "content" / "XPQwKRt4Y2k.source-track.json").read_text())
+def build_packet(reference_root, *, historical_diagnostic=False):
+    if historical_diagnostic is not True:
+        raise ValueError("Spin controls require historical_diagnostic=True")
+    source = observe.common.load_historical_observations("XPQwKRt4Y2k")
+    compact = observe.common.load_historical_observations("XPQwKRt4Y2k", prefer_track=True)
+    for record in (source, compact):
+        if (
+            record.get("kind") == "current-source-observations"
+            or record.get("freshSourceRecord") is not None
+            or record.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative"
+            or record.get("model", {}).get("sha256") != "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
+            or record.get("model", {}).get("sourceCommit") != "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            or record.get("source", {}).get("videoId") != "XPQwKRt4Y2k"
+            or record.get("source", {}).get("sha256") != "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+        ):
+            raise ValueError("Spin diagnostics require the original historical source/model tuple")
     catalog = source["sourceMeasurements"]["endcardViewCatalog"]
     fps = source["source"]["fps"]["numerator"] / source["source"]["fps"]["denominator"]
     seed_index = 3452
     seed_pts = seed_index / fps
-    cap = cv2.VideoCapture(str(args.reference_root / "videos" / "XPQwKRt4Y2k.mp4"))
+    cap = cv2.VideoCapture(str(Path(reference_root) / "videos" / "XPQwKRt4Y2k.mp4"))
     cap.set(cv2.CAP_PROP_POS_FRAMES, seed_index)
     ok, image = cap.read()
     if not ok:
@@ -62,7 +71,7 @@ def main():
                               "status": "observed", "method": "manual", "uncertaintyPx": point["uncertaintyPx"]})
     seed = {"timeSeconds": seed_pts, "decodedTimeSeconds": seed_pts, "landmarks": landmarks, "views": views}
     kinds = {anchor["id"]: anchor["kind"] for anchor in anchors}
-    desired = {frame["sourceImage"]["frameIndex"] for frame in compact["frames"] if frame.get("sourceImage") and 141.558083 <= frame["decodedTimeSeconds"] < 169.41925}
+    desired = {frame["sourceImage"]["frameIndex"] for frame in observe.common.selected_frames(compact) if frame.get("sourceImage") and 141.558083 <= frame["decodedTimeSeconds"] < 169.41925}
     desired.add(seed_index)
     backward, backward_failures = observe.track_direction(cap, seed_index, min(desired), seed, kinds, fps)
     forward, forward_failures = observe.track_direction(cap, seed_index, max(desired), seed, kinds, fps)
@@ -80,7 +89,9 @@ def main():
                        "landmarks": points,
                        "unavailable": [{"anchorId": anchor["id"], "reason": "Source-only optical flow/patch control did not retain this independently measured feature."} for anchor in anchors if not any(point["anchorId"] == anchor["id"] for point in points)]})
     cap.release()
-    packet = {"schemaVersion": 1, "videoId": source["source"]["videoId"], "sourceSha256": source["source"]["sha256"],
+    packet = {"schemaVersion": 1, "kind": "historical-source-track-receipt",
+              "historicalDiagnostic": True, "publishable": False,
+              "videoId": source["source"]["videoId"], "sourceSha256": source["source"]["sha256"],
               "productionIntegrated": False, "sourceSeed": {"frameIndex": seed_index, "decodedTimeSeconds": seed_pts, "sha256Bgr8": seed_hash},
               "method": "Existing observe-source.py track_direction: original source images only, physical manual seed, forward/backward optical flow plus independent source-patch correlation, per-view source rectangle; no native projection in measurements. Alias selection uses exact sourceImage frame/hash.",
               "qualification": "Conditional source-only feature tracking, not semantic body/material proof, native raster measurement, or stage acceptance. FIT/CHECK roles unchanged; failures remain unavailable.",
@@ -90,9 +101,24 @@ def main():
                           "trackedObservations": sum(len(frame["landmarks"]) for frame in frames),
                           "independentCheckObservations": sum(point["role"] == "check" for frame in frames for point in frame["landmarks"]),
                           "unavailableObservations": sum(len(frame["unavailable"]) for frame in frames)}}
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(packet, separators=(",", ":"), allow_nan=False) + "\n")
-    print(json.dumps({"output": str(args.output), **packet["summary"]}))
+    return packet
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--historical-diagnostic", action="store_true", required=True)
+    parser.add_argument("--reference-root", type=Path, default=Path(os.environ.get("HARMONIC_REFERENCE_ROOT", WEB / ".vite" / "reference-root")))
+    parser.add_argument("--output", type=Path, default=WEB / ".vite" / "verification-output" / "compact-track-refinement" / "spin-montage-source-controls.json")
+    args = parser.parse_args()
+    try:
+        observe.common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
+        output = args.output.resolve()
+    except ValueError as error:
+        parser.error(str(error))
+    packet = build_packet(args.reference_root, historical_diagnostic=args.historical_diagnostic)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(packet, separators=(",", ":"), allow_nan=False) + "\n")
+    print(json.dumps({"output": str(output), **packet["summary"]}))
 
 
 if __name__ == "__main__":

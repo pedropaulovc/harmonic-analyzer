@@ -1,6 +1,8 @@
 import { Quaternion } from 'three'
 import { createMechanismInput, createMechanismPose, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { assertSourceCompositeWeights, type CameraRecord, type ImagePlaneWarp, type SourceComposite, type SourceLayoutEntry } from './scene'
+import { compileSourceAssemblyState } from './source-assembly'
+import type { SourceAssemblyState } from './source-assembly'
 import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
 import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIdentity, NativeModelIdentity, SourceShot, ReferenceState, SourceSample } from './timeline'
 import type { Video } from './video-catalog'
@@ -34,6 +36,8 @@ export interface CompactSourceView {
   presentation: 'native' | 'horizontal-mirror'
   camera: CameraRecord | null
   input: SerializedInput | null
+  /** Separate physical attachment/display state; omitted means the normal operating assembly. */
+  sourceAssembly?: SourceAssemblyState
   provenance: { kind: 'chosen-feasible'; evidence: string; unobservedInputFields: InputField[] }
   cameraProvenance?: { kind: 'source-fit' | 'source-transfer' | 'source-informed-framing'; evidence: string; family: string }
   cameraContinuityFamily?: string
@@ -129,11 +133,11 @@ function requireCamera(camera: CameraRecord, label: string): void {
 interface CompiledTrackView {
   observation: CompactSourceView
   input: MechanismInput | null
+  sourceAssembly: SourceAssemblyState
   unobservedInputFields: InputField[]
   inputChangesToNext: boolean
   phaseDeltasToNext: Float64Array | null
   cameraInterpolatesToNext: boolean
-  inputValidated: boolean
 }
 interface CompiledTrackFrame {
   observation: CompactSourceFrame
@@ -148,6 +152,43 @@ interface CompiledTrackFrame {
 interface TrackBuffer {
   sample: SourceSample
   views: Map<string, PlaybackView>
+}
+
+interface PublicationBanks {
+  buffers: [TrackBuffer, TrackBuffer]
+  publishedIndex: 0 | 1
+  preparedIndex: 0 | 1 | null
+  inputValidated: WeakSet<CompiledTrackView>
+  diagnostic: DiagnosticSourceLease | null
+}
+
+export interface SourcePublicationReference {
+  readonly approximationMessage: string
+  prepareAt(timeSeconds: number): SourceSample
+  commitPrepared(): SourceSample
+}
+
+export interface DiagnosticSourcePublicationSnapshot {
+  /** Actual method-entry attempts, including rejected calls; the bank records publication. */
+  prepareCount: number
+  commitCount: number
+  publishedBank: 0 | 1
+  /** Owned copy of the actual published diagnostic bank, never a live buffer. */
+  publishedSample: SourceSample
+}
+export interface DiagnosticSourcePublicationState {
+  readonly sourceProof: false
+  readonly sourceAcceptance: false
+  readonly prepareAtImplementation: string
+  readonly commitPreparedImplementation: string
+  /** Detached banks using the same production preparation/commit implementation. */
+  readonly reference: SourcePublicationReference
+  snapshot(): DiagnosticSourcePublicationSnapshot
+}
+interface DiagnosticSourceLease {
+  samples: readonly SourceSample[]
+  prepareCount: number
+  commitCount: number
 }
 
 function buffer(): TrackBuffer {
@@ -167,9 +208,7 @@ export class CompactVideoReference {
   readonly approximationMessage: string
   readonly stageStatus = UNMEASURED_STAGES
   private readonly frames: CompiledTrackFrame[]
-  private readonly buffers: [TrackBuffer, TrackBuffer] = [buffer(), buffer()]
-  private publishedIndex: 0 | 1 = 0
-  private preparedIndex: 0 | 1 | null = null
+  private readonly publication: PublicationBanks = { buffers: [buffer(), buffer()], publishedIndex: 0, preparedIndex: null, inputValidated: new WeakSet(), diagnostic: null }
   private readonly qa = new Quaternion()
   private readonly qb = new Quaternion()
   private readonly qi = new Quaternion()
@@ -234,6 +273,13 @@ export class CompactVideoReference {
       }
       const views = frame.views.map((view) => {
         const label = `${video.id}@${t}s/${view.id}`
+        let sourceAssembly: SourceAssemblyState
+        try {
+          sourceAssembly = compileSourceAssemblyState(view.sourceAssembly).state
+          if (sourceAssembly.kind === 'source-assembly' && sourceAssembly.provenance.videoId !== data.source.videoId) throw new Error('Source assembly witness must belong to this footage.')
+        } catch (error) {
+          throw new Error(`${video.id}@${t}s/${view.id}: ${error instanceof Error ? error.message : String(error)}`)
+        }
         if (view.sourceViewIds !== undefined || view.sourceViewMappingEvidence !== undefined) {
           if (!Array.isArray(view.sourceViewIds) || !view.sourceViewIds.length
             || view.sourceViewIds.some((id) => typeof id !== 'string' || !id.trim())
@@ -250,7 +296,7 @@ export class CompactVideoReference {
         if (view.cameraContinuityFamily !== undefined && !view.cameraContinuityFamily.trim()) throw new Error(`${label}: camera continuity family is empty.`)
         if (view.cameraInterpolation !== undefined && (typeof view.cameraInterpolation !== 'string' || !['continuous-shot', 'held'].includes(view.cameraInterpolation))) throw new Error(`${label}: unknown camera interpolation policy.`)
         if (view.cameraInterpolation === 'continuous-shot' && (typeof view.cameraInterpolationEvidence !== 'string' || !view.cameraInterpolationEvidence.trim())) throw new Error(`${label}: continuous-shot camera interpolation needs explicit evidence.`)
-        return { observation: view, input, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false, inputValidated: false }
+        return { observation: view, input, sourceAssembly, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false }
       })
       return { observation: frame, required, layout, views, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available: pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null)) }
     })
@@ -305,9 +351,15 @@ export class CompactVideoReference {
   }
 
   prepareAt(timeSeconds: number): SourceSample {
-    this.preparedIndex = null
-    const nextIndex = this.publishedIndex === 0 ? 1 : 0
-    const { sample, views: pool } = this.buffers[nextIndex]
+    return this.prepareAtIn(timeSeconds, this.publication)
+  }
+
+  private prepareAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample {
+    const diagnostic = publication.diagnostic
+    if (diagnostic) diagnostic.prepareCount++
+    publication.preparedIndex = null
+    const nextIndex = publication.publishedIndex === 0 ? 1 : 0
+    const { sample, views: pool } = publication.buffers[nextIndex]
     const t = Math.max(0, Math.min(this.data.source.durationSeconds, finite(timeSeconds, 'Playback time')))
     const index = this.indexAt(t)
     const from = this.frames[index]!
@@ -331,6 +383,7 @@ export class CompactVideoReference {
           out = {
             id: a.observation.id, camera: { positionMetres: [0, 0, 0], quaternion: [0, 0, 0, 1], verticalFovDegrees: 45, principalPointViewportPixels: [0, 0] },
             rectSourcePixels: [0, 0, SOURCE_WIDTH, SOURCE_HEIGHT], presentation: 'native', input: createMechanismInput(),
+            sourceAssembly: a.sourceAssembly,
             mechanicalProvenance: 'chosen', unobservedInputFields: [],
             sourceSampling: { fromTimeSeconds: 0, toTimeSeconds: 0, mix: 0, selection: 'decoded-exposure', cameraSelection: 'decoded-exposure' },
             authoredImagePlaneWarp: null, sourceLayout: [], nativeGeometryAssumptions: [],
@@ -344,11 +397,14 @@ export class CompactVideoReference {
           solveSourceInput(out.input, EMPTY_CONSTRAINTS, this.pose)
         } else {
           copyInput(out.input, a.input!)
-          if (!a.inputValidated) {
+          if (!publication.inputValidated.has(a)) {
             solveSourceInput(out.input, EMPTY_CONSTRAINTS, this.pose)
-            a.inputValidated = true
+            publication.inputValidated.add(a)
           }
         }
+        // No declared feasible assembly interpolation API: hold the exact source exposure.
+        // Machine.update solves this descriptor against its freshly normal-solved baseline.
+        out.sourceAssembly = a.sourceAssembly
         out.rectSourcePixels = a.observation.rectSourcePixels
         out.presentation = a.observation.presentation
         out.composite = a.observation.composite ?? OPAQUE_COMPOSITE
@@ -380,19 +436,88 @@ export class CompactVideoReference {
         for (const field of a.unobservedInputFields) if (!sample.unobservedInputFields.includes(field)) sample.unobservedInputFields.push(field)
       }
     }
-    this.preparedIndex = nextIndex
+    if (diagnostic) {
+      let lo = 0
+      let hi = diagnostic.samples.length
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1
+        if (diagnostic.samples[mid]!.timeSeconds <= t) lo = mid + 1
+        else hi = mid
+      }
+      if (lo === 0) throw new Error('No diagnostic source exposure is available at this playback time.')
+      const held = structuredClone(diagnostic.samples[lo - 1]!)
+      sample.state = held.state
+      sample.reason = held.reason
+      sample.views = held.views
+      sample.mechanicalProvenance = held.mechanicalProvenance
+      sample.unobservedInputFields = held.unobservedInputFields
+      sample.nativeGeometryAssumptions = held.nativeGeometryAssumptions
+    }
+    publication.preparedIndex = nextIndex
     return sample
   }
 
   commitPrepared(): SourceSample {
-    if (this.preparedIndex === null) throw new Error('No successfully prepared compact source sample is available.')
-    this.publishedIndex = this.preparedIndex
-    this.preparedIndex = null
-    return this.buffers[this.publishedIndex].sample
+    return this.commitPreparedIn(this.publication)
+  }
+
+  private commitPreparedIn(publication: PublicationBanks): SourceSample {
+    if (publication.diagnostic) publication.diagnostic.commitCount++
+    if (publication.preparedIndex === null) throw new Error('No successfully prepared compact source sample is available.')
+    publication.publishedIndex = publication.preparedIndex
+    publication.preparedIndex = null
+    return publication.buffers[publication.publishedIndex].sample
   }
 
   at(timeSeconds: number): SourceSample {
     this.prepareAt(timeSeconds)
     return this.commitPrepared()
+  }
+
+  /**
+   * Diagnostic-only materialization in detached banks. Compiled observations are
+   * shared read-only; pools and feasibility-validation caches belong to each
+   * publication. Preparation is synchronous, so solver/quaternion scratch never
+   * escapes a call or crosses an asynchronous callback boundary.
+   */
+  async withDiagnosticSamples<T>(samples: readonly SourceSample[], run: (state: DiagnosticSourcePublicationState) => T | Promise<T>): Promise<T> {
+    if (!Array.isArray(samples) || !samples.length) throw new Error('Diagnostic source publication requires exposure samples.')
+    let previous = -Infinity
+    const ownedSamples = samples.map((sample) => {
+      const time = finite(sample.timeSeconds, 'Diagnostic source exposure time')
+      if (time < 0 || time > this.data.source.durationSeconds || time <= previous) throw new Error('Diagnostic source exposures must be ordered within the current footage.')
+      previous = time
+      return structuredClone(sample)
+    })
+    const lease: DiagnosticSourceLease = { samples: ownedSamples, prepareCount: 0, commitCount: 0 }
+    const publication: PublicationBanks = { buffers: [buffer(), buffer()], publishedIndex: 0, preparedIndex: null, inputValidated: new WeakSet(), diagnostic: lease }
+    let active = true
+    const requirePublication = () => { if (!active) throw new Error('The diagnostic source publication lease is no longer active.') }
+    const scopedReference: SourcePublicationReference = Object.freeze({
+      approximationMessage: this.approximationMessage,
+      prepareAt: (timeSeconds: number) => { requirePublication(); return this.prepareAtIn(timeSeconds, publication) },
+      commitPrepared: () => { requirePublication(); return this.commitPreparedIn(publication) },
+    })
+    const state: DiagnosticSourcePublicationState = Object.freeze({
+      sourceProof: false,
+      sourceAcceptance: false,
+      reference: scopedReference,
+      prepareAtImplementation: this.prepareAtIn.toString(),
+      commitPreparedImplementation: this.commitPreparedIn.toString(),
+      snapshot: (): DiagnosticSourcePublicationSnapshot => {
+        requirePublication()
+        return {
+          prepareCount: lease.prepareCount,
+          commitCount: lease.commitCount,
+          publishedBank: publication.publishedIndex,
+          publishedSample: structuredClone(publication.buffers[publication.publishedIndex].sample),
+        }
+      },
+    })
+    try {
+      return await run(state)
+    } finally {
+      active = false
+    }
   }
 }

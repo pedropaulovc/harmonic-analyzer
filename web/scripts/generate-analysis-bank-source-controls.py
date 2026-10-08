@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Prepare an OFFLINE Analysis landmark amendment; never modify production tracks.
+"""Prepare a nonpublishable historical Analysis diagnostic receipt.
 
-python web/scripts/generate-analysis-bank-source-controls.py
-The parent may merge this packet only after releasing its production measurement
-freeze. Source pixels/uncertainties are copied, never projected or interpolated.
+Run with --historical-diagnostic. Source pixels/uncertainties are copied, never
+projected or interpolated. This packet cannot amend current production tracks.
 """
 import copy
+import argparse
 import importlib.util
 import json
 from pathlib import Path
@@ -22,8 +22,20 @@ def load(path):
     return json.loads(path.read_text())
 
 
-def build_packet():
-    source = common.load_observations("6dW6VYXp9HM")
+def build_packet(*, historical_diagnostic=False):
+    if historical_diagnostic is not True:
+        raise ValueError("Analysis bank controls require historical_diagnostic=True")
+    source = common.load_historical_observations("6dW6VYXp9HM")
+    if (
+        source.get("kind") == "current-source-observations"
+        or source.get("freshSourceRecord") is not None
+        or source.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative"
+        or source.get("model", {}).get("sha256") != "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
+        or source.get("model", {}).get("sourceCommit") != "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        or source.get("source", {}).get("videoId") != "6dW6VYXp9HM"
+        or source.get("source", {}).get("sha256") != "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52"
+    ):
+        raise ValueError("Analysis bank diagnostics require the original historical source/model tuple")
     candidate = load(BASE / "four-seed-source-fit-census/candidate.json")
     request = load(BASE / "four-seed-source-fit-census/all204-cpu-forward-request.json")
     centres = load(BASE / "fit-centres204.json")
@@ -92,25 +104,38 @@ def build_packet():
         else:
             row["unavailable"].append({"anchorId":anchor_id,"viewId":"bar-bank","role":"check","status":"unresolved",
                 "pixel":None,"uncertaintyPx":None,"reason":original["reason"]})
-    return {"schemaVersion":1,"kind":"offline-source-landmark-amendment","videoId":"6dW6VYXp9HM",
+    return {"schemaVersion":1,"kind":"historical-source-track-receipt","historicalDiagnostic":True,
+        "publishable":False,"productionIntegrated":False,"videoId":"6dW6VYXp9HM",
         "source":source["source"],"model":source["model"],"anchors":list(anchors.values()),"frames":list(rows.values()),
         "sourceMeasurementCounts":{"sourceExposures":len(rows),"independentMeasuredChecks":ledger["counts"]["measured"],
             "unresolvedChecksPreserved":ledger["counts"]["unresolved"],"fitCentroids":sum(sum(p["role"] == "fit" for p in row["landmarks"]) for row in rows.values())},
         "stages":{str(stage):{"status":"unmeasured"} for stage in (50,20,10,5)},
         "evidence":{"checkLedger":".playwright-cli/analysis-recovery/augmented-face-frozen-check/interior-cap-check-ledger.json",
             "sourcePacketSha256":ledger["sourcePacketSha256"],"sourceProvenance":report["sourceProvenance"],
-            "notes":["Production tracks/generators untouched during parent measurement freeze.",
+            "notes":["Historical diagnostic only; never merge into current production tracks.",
                 "No old CPU projected/world coordinates, residuals, predictions or GPU claims copied as measured source pixels.",
-                "Merge exact native exposure rows; preserve204 source regimes and include their times as compact useful keys.",
+                "Exact historical native exposure rows preserve204 source regimes and their times.",
                 "For integer-second controls, copy only when sourceImage/frameIndex/hash matches. Analysis117 authored source row is frame3506 at116.983533333s; its CHECKs exist in this packet. Never interpolate CHECK pixels.",
                 "Schema image-edge names source threshold/segmentation localization; unchanged original centroid/threshold recipes and exact exposure evidence remain on each point. FIT centroids remain proxies, not CHECK vertices.",
                 "Known CHECK nulls remain unresolved. No source motion/control coverage outside112.3122..119.085633333s inferred."]}}
 
 
-if __name__ == "__main__":
-    packet = build_packet()
-    output = WEB / ".vite/verification-output/compact-source-refinement/analysis-bank-source-controls.json"
-    output.parent.mkdir(parents=True,exist_ok=True)
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--historical-diagnostic", action="store_true", required=True)
+    parser.add_argument("--output", type=Path, default=WEB / ".vite/verification-output/compact-source-refinement/analysis-bank-source-controls.json")
+    args = parser.parse_args()
+    try:
+        common.fresh.check_namespace(args.output, historical_diagnostic=True, output=True)
+        output = args.output.resolve()
+    except ValueError as error:
+        parser.error(str(error))
+    packet = build_packet(historical_diagnostic=args.historical_diagnostic)
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(packet,separators=(",",":"),allow_nan=False)+"\n")
-    print(output.relative_to(ROOT))
+    print(output)
     print(json.dumps(packet["sourceMeasurementCounts"]))
+
+
+if __name__ == "__main__":
+    main()

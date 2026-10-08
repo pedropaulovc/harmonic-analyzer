@@ -1013,6 +1013,10 @@ export async function verifyFrameImages(sourcePath, data, { signal, timeoutMs = 
 
 /** Reproject native geometry and independently replay actual phase/period source pixels. */
 export async function verifySharedRigs(webRoot, data, native, { signal, sourcePath } = {}) {
+  if (data?.kind === 'current-source-observations'
+    || data?.identityDerivative?.kind !== 'materialized-canonical-native-identity-derivative') {
+    throw new Error('Shared-rig revalidation is an explicit historical diagnostic, not current source calibration')
+  }
   if (!text(sourcePath) || await sha256File(sourcePath) !== data.source.sha256) throw new Error('Actual original MP4 is required for independent rig phase/period pixel replay')
   const directory = await mkdtemp(join(tmpdir(), 'harmonic-verify-rig-'))
   try {
@@ -1023,6 +1027,7 @@ os.environ["OPENBLAS_NUM_THREADS"]="2";os.environ["OMP_NUM_THREADS"]="2"
 spec=importlib.util.spec_from_file_location("source_fit",sys.argv[1])
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 data=json.load(open(sys.argv[2]));inventory=json.load(open(sys.argv[3]))
+if sys.argv[6] != "--historical-diagnostic" or data.get("identityDerivative",{}).get("kind") != "materialized-canonical-native-identity-derivative": raise ValueError("Explicit historical diagnostic derivative required")
 if inventory.get("sha256") != data["model"]["sha256"]: raise ValueError("Native inventory model SHA256 mismatch")
 for rig in data["sourceCameraRigs"]:
  if rig["independentLoopEvidence"]["decodedNativeFrameCount"] != int(sys.argv[4]): raise ValueError("Stale independent native frame census")
@@ -1094,7 +1099,7 @@ for state in states:
  pixelProof[state["id"]]={"sourceFrameCount":len(registrations),"referencePhaseCount":71,"sourceNativeFrameInterval":[state["start"],state["stop"]],"recipe":"Actual original native BGR -> OpenCV gray -> 480x270 INTER_AREA; every machine ROI pixel; exhaustive 71 references; mean/L2-normalised brightness","minimumNcc":min(row["ncc"] for row in registrations),"minimumSecondBestMargin":min(row["margin"] for row in registrations),"periodPixelComparison":{"nativeOffset142MedianMAD":period,"adjacentOffsetMedianMAD":adjacent,"adjacentPhaseControlNativeOffsetFrames":state["adjacent"],"nativePairCount":len(state["period"]),"adjacentPairCount":len(state["adjacentPeriod"]),"recipe":"Entire actual 480x270 quarter-gray frame absolute-difference means; median over every pair in the reported native interval"}}
 print(json.dumps({"rigs":{key:rig["proof"] for key,rig in rigs.items()},"sourcePixelRegistration":pixelProof}))
 `
-    const { stdout } = await runTool('python3', ['-c', code, resolve(webRoot, 'scripts/fit-source.py'), packet, resolve(process.env.HARMONIC_MODEL_INVENTORY ?? '/tmp/harmonic-web-model/model-inventory.json'), String(native.nativeFrameCount), sourcePath], { signal, timeoutMs: 180_000 })
+    const { stdout } = await runTool('python3', ['-c', code, resolve(webRoot, 'scripts/fit-source.py'), packet, resolve(process.env.HARMONIC_MODEL_INVENTORY ?? '/tmp/harmonic-web-model/model-inventory.json'), String(native.nativeFrameCount), sourcePath, '--historical-diagnostic'], { signal, timeoutMs: 180_000 })
     return { method: 'independent-native-inventory-global-reprojection-and-actual-source-pixel-registration', ...JSON.parse(stdout.toString()), originalSourceSha256: data.source.sha256, actualGpuAcceptance: false }
   } finally { await rm(directory, { recursive: true, force: true }) }
 }

@@ -1,0 +1,380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Independently measured current-model source observations",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "source", "model", "nativeIdentity", "anchors", "shots", "frames", "coverage"],
+  "not": {"anyOf": [{"required": ["identityDerivative"]}, {"required": ["sourceCameraRigs"]}]},
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "current-source-observations"},
+    "source": {"allOf": [{"$ref": "source-observations.schema.json#/properties/source"}, {"properties": {"width": {"const": 1920}, "height": {"const": 1080}, "fps": {"type": "object", "required": ["numerator", "denominator"], "properties": {"numerator": {"type": "integer", "minimum": 1}, "denominator": {"type": "integer", "minimum": 1}}}}}]},
+    "model": {"$ref": "source-observations.schema.json#/properties/model"},
+    "nativeIdentity": {"$ref": "#/$defs/nativeIdentity"},
+    "anchors": {"type": "array", "items": {"$ref": "#/$defs/anchor"}},
+    "shots": {"$ref": "source-observations.schema.json#/properties/shots"},
+    "frames": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/frame"}},
+    "coverage": {"$ref": "source-observations.schema.json#/properties/coverage"},
+    "nativeGeometryAssumptions": {"$ref": "source-observations.schema.json#/$defs/nativeGeometryAssumptions"},
+    "fitReport": {"type": "object"},
+    "tracking": {"type": "object"},
+    "sourceViewReacquisition": {"type": "object"}
+  },
+  "$defs": {
+    "anchor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "partPath", "description", "correspondenceEvidence"],
+      "properties": {
+        "id": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "kind": {"enum": ["section-center", "physical-feature"]},
+        "partPath": {"$ref": "source-observations.schema.json#/$defs/nativePartPath"},
+        "runtimeTemplatePartPath": {"$ref": "source-observations.schema.json#/$defs/nativePartPath"},
+        "partLocalMetres": {"$ref": "source-observations.schema.json#/$defs/xyz"},
+        "worldMetres": {"$ref": "source-observations.schema.json#/$defs/xyz"},
+        "description": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "correspondenceEvidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}
+      },
+      "oneOf": [{"required": ["partLocalMetres"], "not": {"required": ["worldMetres"]}}, {"required": ["worldMetres"], "not": {"required": ["partLocalMetres"]}}],
+      "dependentRequired": {"runtimeTemplatePartPath": ["partLocalMetres"]},
+      "description": "Released anchors use the exact sealed raw inventory. Runtime-template anchors require explicit template and native-local coordinates; exact instance/template membership comes only from the executed sole runtime creation ledger. No instance REST row or worldMetres substitute is inferred."
+    },
+    "assemblyVector3": {
+      "type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}
+    },
+    "assemblyQuaternion": {
+      "type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"},
+      "description": "Finite unit quaternion; the actual source-assembly compiler enforces norm tolerance 1e-8, without normalizing a malformed authored pose."
+    },
+    "assemblyRigidPose": {
+      "type": "object", "additionalProperties": false,
+      "required": ["positionMetres", "quaternion"],
+      "properties": {
+        "positionMetres": {"$ref": "#/$defs/assemblyVector3"},
+        "quaternion": {"$ref": "#/$defs/assemblyQuaternion"}
+      }
+    },
+    "assemblyProvenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "videoId", "frameIndex", "evidence", "unobservedDegreesOfFreedom"],
+      "properties": {
+        "kind": {"const": "chosen-feasible"},
+        "videoId": {"const": "jfH-NbsmvD4"},
+        "frameIndex": {"type": "integer", "minimum": 0, "maximum": 21189},
+        "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "unobservedDegreesOfFreedom": {"type": "array", "minItems": 1, "items": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}}
+      },
+      "description": "Actual original Operation support witness, not necessarily the current exposure. Unknown DOFs and every rigid gauge remain explicitly chosen-feasible; an inventory REST matrix is not posed constraint proof."
+    },
+    "assemblyAxial": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["attachment"], "properties": {"attachment": {"const": "installed"}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "travelMetres"], "properties": {"attachment": {"enum": ["withdrawing", "inserting"]}, "travelMetres": {"type": "number", "minimum": 0}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "pose"], "properties": {"attachment": {"const": "held"}, "pose": {"$ref": "#/$defs/assemblyRigidPose"}}}
+      ]
+    },
+    "assemblyCrank": {
+      "type": "object", "additionalProperties": false, "required": ["pin", "carrier"],
+      "properties": {
+        "pin": {"$ref": "#/$defs/assemblyAxial", "properties": {"travelMetres": {"maximum": 0.04355}}},
+        "carrier": {"$ref": "#/$defs/assemblyAxial", "properties": {"travelMetres": {"maximum": 0.0272}}},
+        "keeper": {
+          "type": "object", "additionalProperties": false, "required": ["retainedAnchor", "loopPose", "connectorPose"],
+          "properties": {"retainedAnchor": {"enum": ["eye", "ring"]}, "loopPose": {"$ref": "#/$defs/assemblyRigidPose"}, "connectorPose": {"$ref": "#/$defs/assemblyRigidPose"}}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"pin": {"properties": {"attachment": {"const": "installed"}}}, "carrier": {"properties": {"attachment": {"const": "installed"}}}}},
+          "then": {"not": {"required": ["keeper"]}},
+          "else": {"required": ["keeper"]}
+        },
+        {
+          "if": {"properties": {"carrier": {"properties": {"attachment": {"enum": ["withdrawing", "inserting", "held"]}}}}},
+          "then": {"properties": {"pin": {"anyOf": [{"properties": {"attachment": {"const": "held"}}}, {"properties": {"attachment": {"enum": ["withdrawing", "inserting"]}, "travelMetres": {"minimum": 0.04055}}}]}}}
+        }
+      ],
+      "description": "Service pin must be held or clear the actual 40.55mm interference distance before carrier withdrawal. Explicit keeper gauges and their retained native eye/ring anchor occur exactly when either attachment is not installed. Per-member travel caps mirror the authoritative finite service families, not arbitrary detached poses."
+    },
+    "assemblyRetainingNut": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "releaseTurns"], "properties": {"attachment": {"const": "threaded"}, "releaseTurns": {"type": "number", "minimum": 0, "maximum": 11.163466181519038, "description": "Actual MHA-078 last-full-thread release distance divided by the MHA-126 1/4-20 pitch; not retaining-nut body length."}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "pose"], "properties": {"attachment": {"const": "held"}, "pose": {"$ref": "#/$defs/assemblyRigidPose"}}}
+      ]
+    },
+    "assemblyHanger": {
+      "type": "object", "additionalProperties": false, "required": ["attachment", "swingRad", "hookReleaseRad"],
+      "properties": {
+        "attachment": {"enum": ["latched", "unlatched", "open", "returning"]},
+        "swingRad": {"type": "number", "minimum": -3.141592653589793, "maximum": 3.141592653589793, "description": "Chosen finite display gauge, not a sourced physical free-swing stop."},
+        "hookReleaseRad": {"type": "number", "minimum": 0, "maximum": 1.5707963267948966, "description": "Positive sourced hook root-hinge release gauge."}
+      },
+      "allOf": [
+        {"if": {"properties": {"attachment": {"const": "latched"}}}, "then": {"properties": {"swingRad": {"const": 0}, "hookReleaseRad": {"const": 0}}}},
+        {"if": {"properties": {"attachment": {"enum": ["unlatched", "open", "returning"]}}}, "then": {"not": {"properties": {"swingRad": {"const": 0}, "hookReleaseRad": {"const": 0}}}}}
+      ]
+    },
+    "assemblyGearId": {"enum": ["T24", "T12", "T18-upper", "T18-crank"]},
+    "assemblyGearAttachment": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "phaseRad"], "properties": {"attachment": {"enum": ["upper", "crank"]}, "phaseRad": {"type": "number"}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "phaseRad", "travelMetres"], "properties": {"attachment": {"enum": ["upper-withdrawing", "upper-inserting"]}, "phaseRad": {"type": "number"}, "travelMetres": {"type": "number", "minimum": 0, "maximum": 0.0177}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "phaseRad", "travelMetres"], "properties": {"attachment": {"enum": ["crank-withdrawing", "crank-inserting"]}, "phaseRad": {"type": "number"}, "travelMetres": {"type": "number", "minimum": 0, "maximum": 0.0307}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "pose"], "properties": {"attachment": {"enum": ["held", "stored"]}, "pose": {"$ref": "#/$defs/assemblyRigidPose"}}}
+      ]
+    },
+    "assemblyGearMembers": {
+      "type": "object", "additionalProperties": false, "required": ["T24", "T12", "T18-upper", "T18-crank"],
+      "properties": {
+        "T24": {"$ref": "#/$defs/assemblyGearAttachment"}, "T12": {"$ref": "#/$defs/assemblyGearAttachment"},
+        "T18-upper": {"$ref": "#/$defs/assemblyGearAttachment"}, "T18-crank": {"$ref": "#/$defs/assemblyGearAttachment"}
+      }
+    },
+    "assemblyGears": {
+      "type": "object", "additionalProperties": false, "required": ["members"],
+      "properties": {"members": {"$ref": "#/$defs/assemblyGearMembers"}},
+      "description": "All four genuine native wheels must be accounted for. Compiler checks unique shaft occupancy and the independently stated retaining-nut release."
+    },
+    "assemblyChainContact": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["kind", "joint", "positionMetres"], "properties": {"kind": {"const": "held"}, "joint": {"type": "integer", "minimum": 0, "maximum": 67}, "positionMetres": {"$ref": "#/$defs/assemblyVector3"}}},
+        {
+          "type": "object", "additionalProperties": false, "required": ["kind", "joint", "gear", "tooth"],
+          "properties": {"kind": {"const": "sprocket"}, "joint": {"type": "integer", "minimum": 0, "maximum": 67}, "gear": {"$ref": "#/$defs/assemblyGearId"}, "tooth": {"type": "integer", "minimum": 0, "maximum": 23}},
+          "allOf": [
+            {"if": {"properties": {"gear": {"const": "T12"}}}, "then": {"properties": {"tooth": {"maximum": 11}}}},
+            {"if": {"properties": {"gear": {"enum": ["T18-upper", "T18-crank"]}}}, "then": {"properties": {"tooth": {"maximum": 17}}}}
+          ]
+        }
+      ]
+    },
+    "assemblyChain": {
+      "type": "object", "additionalProperties": false, "required": ["attachment", "jointsMetres", "planeNormal", "contacts"],
+      "properties": {
+        "attachment": {"enum": ["slack-on-sprockets", "held-off-sprockets", "reinstalling"]},
+        "jointsMetres": {"type": "array", "minItems": 68, "maxItems": 68, "items": {"$ref": "#/$defs/assemblyVector3"}},
+        "planeNormal": {"$ref": "#/$defs/assemblyVector3"},
+        "contacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/assemblyChainContact"}}
+      },
+      "description": "Compiler enforces unit hinge normal, planar closed native 68-link connectivity, each actual 6.35mm chord within 1e-7m and attachment/contact topology. Runtime normal-solve contact matrices, not REST inventory, validate posed contacts."
+    },
+    "assemblyStopCentre": {
+      "type": "number", "minimum": 0.006000001664460358, "maximum": 0.19400000131577188,
+      "description": "Authoritative finite native stop-centre bounds, retaining both ends of the actual stop on the 200 mm rule."
+    },
+    "assemblyBarFootStation": {
+      "type": "number", "minimum": -0.15, "maximum": 0.15,
+      "description": "Broad finite native foot-station authoring gauge. The actual compiler/normal solver owns tighter baseline-dependent contacts and nonpenetration."
+    },
+    "assemblyManualBars": {
+      "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["station", "barFootStationMetres"],
+        "properties": {"station": {"type": "integer", "minimum": 1, "maximum": 20}, "barFootStationMetres": {"$ref": "#/$defs/assemblyBarFootStation"}}
+      },
+      "description": "Explicit retained native setup while another station is measured. The actual compiler enforces unique stations, disjoint tool/manual stations and owned station ordering without rewriting authored observations."
+    },
+    "assemblyMeasuringTool": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false, "required": ["attachment", "stickPose", "stopAtStickMetres"],
+          "properties": {"attachment": {"enum": ["held", "withdrawn"]}, "stickPose": {"$ref": "#/$defs/assemblyRigidPose"}, "stopAtStickMetres": {"$ref": "#/$defs/assemblyStopCentre"}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["attachment", "station", "stopAtStickMetres"],
+          "properties": {"attachment": {"enum": ["on-rocker", "bar-at-tool-end"]}, "station": {"type": "integer", "minimum": 1, "maximum": 20}, "stopAtStickMetres": {"$ref": "#/$defs/assemblyStopCentre"}}
+        },
+        {
+          "type": "object", "additionalProperties": false, "required": ["attachment", "station", "stopAtStickMetres", "barFootStationMetres"],
+          "properties": {"attachment": {"const": "bar-setting"}, "station": {"type": "integer", "minimum": 1, "maximum": 20}, "stopAtStickMetres": {"$ref": "#/$defs/assemblyStopCentre"}, "barFootStationMetres": {"$ref": "#/$defs/assemblyBarFootStation"}}
+        }
+      ],
+      "description": "Closed finite native contact families, without authored calibration or orientation aliases. The actual normal-solved domain owns native foot/roof, loop, tool-end contact and nonpenetration constraints; the foot-station range is only its broad finite authoring gauge."
+    },
+    "assemblyPenFrame": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["attachment"], "properties": {"attachment": {"const": "v-block"}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "travelMetres"], "properties": {"attachment": {"const": "inserting"}, "travelMetres": {"type": "number", "minimum": 0, "maximum": 0.036}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "pose"], "properties": {"attachment": {"const": "held"}, "pose": {"$ref": "#/$defs/assemblyRigidPose"}}}
+      ]
+    },
+    "assemblyPenMarker": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["attachment"], "properties": {"attachment": {"const": "frame"}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "travelMetres"], "properties": {"attachment": {"const": "inserting"}, "travelMetres": {"type": "number", "minimum": 0, "maximum": 0.10999999940395355}}},
+        {"type": "object", "additionalProperties": false, "required": ["attachment", "pose"], "properties": {"attachment": {"const": "held"}, "pose": {"$ref": "#/$defs/assemblyRigidPose"}}}
+      ]
+    },
+    "assemblyPen": {
+      "type": "object", "additionalProperties": false, "required": ["rod", "yawDeltaRad", "vBlock", "frame", "marker", "wire"],
+      "properties": {
+        "rod": {"$ref": "#/$defs/assemblyAxial", "properties": {"travelMetres": {"maximum": 0.15000000596046448}}},
+        "yawDeltaRad": {"type": "number", "minimum": -3.141592653589793, "maximum": 3.141592653589793},
+        "vBlock": {"oneOf": [
+          {"type": "object", "additionalProperties": false, "required": ["attachment"], "properties": {"attachment": {"const": "rod"}}},
+          {"type": "object", "additionalProperties": false, "required": ["attachment", "pose"], "properties": {"attachment": {"const": "held"}, "pose": {"$ref": "#/$defs/assemblyRigidPose"}}}
+        ]},
+        "frame": {"$ref": "#/$defs/assemblyPenFrame"},
+        "marker": {"$ref": "#/$defs/assemblyPenMarker"},
+        "wire": {"oneOf": [
+          {"type": "object", "additionalProperties": false, "required": ["attachment"], "properties": {"attachment": {"const": "connected"}}},
+          {"type": "object", "additionalProperties": false, "required": ["attachment", "pose"], "properties": {"attachment": {"const": "released"}, "pose": {"$ref": "#/$defs/assemblyRigidPose"}}}
+        ]}
+      },
+      "allOf": [
+        {"if": {"properties": {"vBlock": {"properties": {"attachment": {"const": "held"}}}}}, "then": {"properties": {"yawDeltaRad": {"const": 0}}}},
+        {"if": {"properties": {"rod": {"properties": {"attachment": {"enum": ["withdrawing", "inserting", "held"]}}}}}, "then": {"properties": {"wire": {"properties": {"attachment": {"const": "released"}}}}}}
+      ],
+      "description": "Rod wire tie must release before withdrawal; a held V block cannot carry an ignored rod yaw. Relative native rod-centre yaw is physical state, not a camera/image-plane correction."
+    },
+    "assemblyFourGearPoses": {
+      "type": "object", "additionalProperties": false, "required": ["T24", "T12", "T18-upper", "T18-crank"],
+      "properties": {"T24": {"$ref": "#/$defs/assemblyRigidPose"}, "T12": {"$ref": "#/$defs/assemblyRigidPose"}, "T18-upper": {"$ref": "#/$defs/assemblyRigidPose"}, "T18-crank": {"$ref": "#/$defs/assemblyRigidPose"}}
+    },
+    "assemblyPhotograph": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["pair", "displayPose"], "properties": {"pair": {"enum": ["T24-T12", "T18-T18", "T12-T24"]}, "displayPose": {"$ref": "#/$defs/assemblyRigidPose"}}},
+        {"type": "object", "additionalProperties": false, "required": ["pair", "displayPose", "fourGearPoses"], "properties": {"pair": {"const": "four-gears"}, "displayPose": {"$ref": "#/$defs/assemblyRigidPose"}, "fourGearPoses": {"$ref": "#/$defs/assemblyFourGearPoses"}}}
+      ]
+    },
+    "sourceAssembly": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["kind"], "properties": {"kind": {"const": "operating"}}},
+        {
+          "type": "object", "additionalProperties": false, "required": ["kind", "provenance"],
+          "properties": {
+            "kind": {"const": "source-assembly"}, "provenance": {"$ref": "#/$defs/assemblyProvenance"},
+            "crank": {"$ref": "#/$defs/assemblyCrank"}, "retainingNut": {"$ref": "#/$defs/assemblyRetainingNut"},
+            "hanger": {"$ref": "#/$defs/assemblyHanger"}, "chain": {"$ref": "#/$defs/assemblyChain"},
+            "gears": {"$ref": "#/$defs/assemblyGears"}, "measuringTool": {"$ref": "#/$defs/assemblyMeasuringTool"},
+            "manualBars": {"$ref": "#/$defs/assemblyManualBars"},
+            "pen": {"$ref": "#/$defs/assemblyPen"}, "photograph": {"$ref": "#/$defs/assemblyPhotograph"}
+          },
+          "anyOf": [{"required": ["crank"]}, {"required": ["retainingNut"]}, {"required": ["hanger"]}, {"required": ["chain"]}, {"required": ["gears"]}, {"required": ["measuringTool"]}, {"required": ["manualBars"]}, {"required": ["pen"]}, {"required": ["photograph"]}],
+          "dependentRequired": {"gears": ["retainingNut"]},
+          "allOf": [{"if": {"required": ["photograph"]}, "then": {"not": {"anyOf": [{"required": ["crank"]}, {"required": ["retainingNut"]}, {"required": ["hanger"]}, {"required": ["chain"]}, {"required": ["gears"]}, {"required": ["measuringTool"]}, {"required": ["manualBars"]}, {"required": ["pen"]}]}}}]
+        }
+      ],
+      "description": "Separate from complete input51. Absent means operating; explicit null, aliases, arbitrary overrides and unknown domain fields are forbidden. Every authored value executes compileSourceAssemblyState, not a shape-only acceptance gate. Posed native constraints require the normal-solved runtime and actual sampler."
+    },
+    "camera": {
+      "type": ["object", "null"],
+      "required": ["positionMetres", "quaternion", "verticalFovDegrees"],
+      "properties": {
+        "positionMetres": {"$ref": "source-observations.schema.json#/$defs/xyz"},
+        "quaternion": {"$ref": "source-observations.schema.json#/$defs/xyzw"},
+        "verticalFovDegrees": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 179},
+        "principalPointViewportPixels": {"$ref": "source-observations.schema.json#/$defs/pixelPair"}
+      },
+      "description": "Current camera candidate. Fresh numeric CPU residuals may accompany it, but are neither a loading gate nor a stage pass."
+    },
+    "warpMeasurement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "unwarpedViewportPixels", "cornersSourcePixels", "sourceImage", "referenceSourceImage", "cornerMeasurementEvidence", "correspondences"],
+      "properties": {
+        "kind": {"const": "homography"},
+        "unwarpedViewportPixels": {"$ref": "source-observations.schema.json#/$defs/warpViewport"},
+        "cornersSourcePixels": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "source-observations.schema.json#/$defs/pixelPair"}},
+        "sourceImage": {"$ref": "source-observations.schema.json#/$defs/sourceImage"},
+        "referenceSourceImage": {"$ref": "source-observations.schema.json#/$defs/sourceImage"},
+        "cornerMeasurementEvidence": {"$ref": "source-observations.schema.json#/$defs/warpMeasurementEvidence"},
+        "correspondences": {
+          "type": "array", "minItems": 2,
+          "contains": {"required": ["role"], "properties": {"role": {"const": "check"}}}, "minContains": 2,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "role", "referencePixelSource", "pixelSource", "method", "uncertaintyPx", "measurementEvidence"],
+            "properties": {
+              "id": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+              "role": {"enum": ["fit", "check"]},
+              "referencePixelSource": {"$ref": "source-observations.schema.json#/$defs/pixelPair"},
+              "pixelSource": {"$ref": "source-observations.schema.json#/$defs/pixelPair"},
+              "method": {"enum": ["manual", "optical-flow", "image-edge", "template-match"]},
+              "uncertaintyPx": {"type": "number", "minimum": 0},
+              "measurementEvidence": {"$ref": "source-observations.schema.json#/$defs/warpMeasurementEvidence"}
+            }
+          }
+        }
+      },
+      "description": "Independent source-image geometry only. Stage residuals use the 50/20/10/5 contract, never the historical 2% acceptance limit."
+    },
+    "nativeIdentity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mapSha256", "canonicalSha256", "inventorySha256"],
+      "properties": {
+        "mapSha256": {"$ref": "source-observations.schema.json#/$defs/hash"},
+        "canonicalSha256": {"$ref": "source-observations.schema.json#/$defs/hash"},
+        "inventorySha256": {"$ref": "source-observations.schema.json#/$defs/hash"}
+      }
+    },
+    "unavailable": {
+      "type": "array", "items": {"type": "object", "required": ["reason"], "properties": {"anchorId": {"type": "string"}, "viewId": {"type": "string"}, "reason": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}}}
+    },
+    "cameraMeasurement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["model", "nativeIdentity", "sourceImage", "evidence"],
+      "properties": {
+        "model": {"$ref": "source-observations.schema.json#/properties/model"},
+        "nativeIdentity": {"$ref": "#/$defs/nativeIdentity"},
+        "sourceImage": {"$ref": "source-observations.schema.json#/$defs/sourceImage"},
+        "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}
+      }
+    },
+    "view": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "rectSourcePixels", "presentation", "camera", "input", "provenance", "cameraProvenance", "cameraContinuityFamily"],
+      "dependentRequired": {"sourceViewIds": ["sourceViewMappingEvidence"], "sourceViewMappingEvidence": ["sourceViewIds"]},
+      "properties": {
+        "id": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "sourceViewIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}},
+        "sourceViewMappingEvidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "rectSourcePixels": {"$ref": "source-observations.schema.json#/$defs/xyzw"},
+        "presentation": {"enum": ["native", "horizontal-mirror"]},
+        "camera": {"$ref": "#/$defs/camera"},
+        "input": {"oneOf": [{"type": "null"}, {"$ref": "source-observations.schema.json#/$defs/mechanismInput"}]},
+        "sourceAssembly": {"$ref": "#/$defs/sourceAssembly"},
+        "provenance": {"type": "object", "required": ["kind", "evidence", "unobservedInputFields"], "additionalProperties": false, "properties": {"kind": {"const": "chosen-feasible"}, "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}, "unobservedInputFields": {"type": "array", "uniqueItems": true, "items": {"$ref": "source-observations.schema.json#/$defs/inputField"}}}},
+        "cameraProvenance": {"type": "object", "required": ["kind", "family", "evidence"], "additionalProperties": false, "properties": {"kind": {"enum": ["source-fit", "source-transfer", "source-informed-framing"]}, "family": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}, "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}}},
+        "cameraContinuityFamily": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "cameraMeasurement": {"$ref": "#/$defs/cameraMeasurement"},
+        "sourceFramingMeasurement": {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "currentBoundsMetres", "sourceFramingTargetViewportPixels", "gaugesUnobserved", "evidence", "currentEnvelopeReference"],
+          "properties": {
+            "kind": {"const": "source-informed-current-native-envelope"},
+            "currentBoundsMetres": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "source-observations.schema.json#/$defs/xyz"}},
+            "sourceFramingTargetViewportPixels": {"$ref": "source-observations.schema.json#/$defs/xyzw"},
+            "gaugesUnobserved": {"type": "array", "items": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}},
+            "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+            "currentEnvelopeReference": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}
+          },
+          "description": "Retained source-informed camera framing metadata only. A native envelope or REST reference is not an observed posed assembly or physical constraint proof."
+        },
+        "cameraFit": {"$ref": "source-observations.schema.json#/$defs/cameraFit"},
+        "cameraInterpolation": {"enum": ["held", "continuous-shot"]},
+        "cameraInterpolationEvidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "composite": {"$ref": "source-observations.schema.json#/$defs/sourceComposite"},
+        "compositeEvidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "imagePlaneWarp": {"$ref": "source-observations.schema.json#/$defs/resolvedImagePlaneWarp"},
+        "imagePlaneWarpMeasurement": {"$ref": "#/$defs/warpMeasurement"},
+        "nativeLineChecks": {"type": "array", "items": {"$ref": "source-observations.schema.json#/$defs/nativeLineCheck"}},
+        "unavailable": {"$ref": "#/$defs/unavailable"}
+      },
+      "allOf": [{"if": {"properties": {"camera": {"type": "object"}}}, "then": {"required": ["cameraMeasurement"]}}, {"if": {"properties": {"cameraInterpolation": {"const": "continuous-shot"}}, "required": ["cameraInterpolation"]}, "then": {"required": ["cameraInterpolationEvidence"]}}, {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}]
+    },
+    "frame": {
+      "type": "object",
+      "required": ["timeSeconds", "decodedTimeSeconds", "shotId", "classification", "sourceImage", "landmarks", "views"],
+      "properties": {
+        "timeSeconds": {"type": "number", "minimum": 0},
+        "decodedTimeSeconds": {"type": "number", "minimum": 0},
+        "decodedFrameIndex": {"type": "integer", "minimum": 0},
+        "shotId": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
+        "classification": {"$ref": "source-observations.schema.json#/$defs/classification"},
+        "sourceMachineRequirement": {"const": "required"},
+        "sourceImage": {"$ref": "source-observations.schema.json#/$defs/sourceImage"},
+        "landmarks": {"type": "array", "items": {"$ref": "source-observations.schema.json#/$defs/landmark"}},
+        "views": {"type": "array", "items": {"$ref": "#/$defs/view"}},
+        "unavailable": {"$ref": "#/$defs/unavailable"}
+      }
+    }
+  }
+}

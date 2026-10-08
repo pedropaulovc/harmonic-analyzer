@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
-"""Fit genuinely observed source pixels to CAD landmarks; never use check pixels to fit.
+"""Fit current actual-source observations to CAD landmarks, never fitting CHECK pixels.
 
 Requires numpy, scipy, opencv-python-headless (source-fit-requirements.txt).
-Example: python web/scripts/fit-source.py web/content/canonical-native/XPQwKRt4Y2k.observations.json.gz
-  --inventory /tmp/harmonic-web-model/model-inventory.json --output /tmp/spin-fitted.json
-The inventory supplies named part-local-to-world matrices. Output is numeric data only.
-Exit 0 means measured CPU candidates pass, NOT GPU/source acceptance or video coverage.
+Example: python web/scripts/fit-source.py web/content/v39-source/XPQwKRt4Y2k.observations.json.gz
+  --inventory /tmp/current-model-inventory.json --output /tmp/spin-fitted.observations.json.gz
+Ordinary inputs/outputs require explicit gzip paths and the shared current authority gate.
+Inventory remains ordinary JSON. New output JSON bytes use the shared deterministic codec.
+Inventory matrices are released native rest transforms, not solved moving-part geometry;
+chosen mechanism inputs do not turn rest-projected moving anchors into pose evidence.
+Only exact {kind: 'operating'} assembly descriptors are legal for REST projection.
+Posed/unknown assembly descriptors and runtime-instance anchors are explicitly refused;
+genuine supplied posed-view cameras use the shared validator instead.
+--historical-diagnostic explicitly selects old materialized derivative diagnostics.
+It allows private .json output only under web/.vite/verification-output or at
+resolved paths under /tmp or /var/tmp outside the whole checkout. Symlink
+escapes from the private output directory are rejected; current outputs and
+immutable historical namespaces remain off-limits.
+Current CPU residuals are diagnostics, never camera-candidate or GPU/source acceptance gates.
 Native line CHECK scores add the unchanged final-source localization/raster bound
 once, plus explicitly certified independent geometry; no extra source raster allowance.
-Image-plane homographies are unsupported here and fail closed without adapting observations.
+CPU homography residuals are unsupported: bound current cameras remain candidates,
+but an unsolved warped view stays unavailable; observations are never unwarped to fit.
 --require-complete additionally fails on missing camera/mechanism evidence.
 """
 
@@ -27,6 +39,15 @@ from scipy.spatial.transform import Rotation
 SPEC = importlib.util.spec_from_file_location("compact_source_common", Path(__file__).with_name("compact-source-common.py"))
 common = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(common)
+
+
+def fresh_contract():
+    spec = importlib.util.spec_from_file_location(
+        "fresh_source_observations", Path(__file__).with_name("fresh-source-observations.py")
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def finite_vector(value, size, label):
@@ -97,7 +118,33 @@ def validate_input(value, label):
         finite_vector([setup["counterHeightM"]], 1, f"{label}/setup.counterHeightM")
 
 
+def require_rest_projection(observations):
+    """Allow only ordinary operating state; never pose geometry from runtime templates."""
+    for frame in observations.get("frames", []):
+        for view in frame.get("views", []):
+            if "sourceAssembly" in view and (
+                not isinstance(view["sourceAssembly"], dict)
+                or view["sourceAssembly"] != {"kind": "operating"}
+            ):
+                raise ValueError(
+                    f"{frame.get('timeSeconds')}/{view.get('id')}: REST-only fitting refuses "
+                    "unsupported/posed sourceAssembly projection; only exact operating state "
+                    "is supported here. Use actual solved runtime geometry for posed views. "
+                    "Supplied current camera candidates are not modified or reprojected."
+                )
+    for anchor in observations.get("anchors", []):
+        if (
+            "runtimeTemplatePartPath" in anchor
+            or "@" in anchor.get("partPath", "")
+        ):
+            raise ValueError(
+                f"{anchor.get('id')}: REST-only fitting refuses runtime-instance anchor "
+                "projection; runtimeTemplatePartPath is not a posed transform."
+            )
+
+
 def world_points(observations, inventory):
+    require_rest_projection(observations)
     if observations["model"]["sha256"] != inventory["sha256"]:
         raise ValueError("Model hash differs from landmark inventory")
     parts = {item["path"]: item for item in inventory["inventory"]}
@@ -1194,8 +1241,17 @@ def resolve_camera_contexts(observations, contexts, points, inventory=None):
     """Resolve a closed graph of camera evidence before formatting source coordinates."""
     source = observations["source"]
     threshold = source["width"] * 0.02
-    rigs = prepare_camera_rigs(observations, points)
-    native_lines = prepare_native_line_checks(observations, contexts, inventory)
+    current = observations.get("kind") == "current-source-observations"
+    rigs = {} if current else prepare_camera_rigs(observations, points)
+    cpu_contexts = {
+        key: context for key, context in contexts.items()
+        if not current or (
+            context[1].get("imagePlaneWarp") is None
+            and context[1].get("resolvedImagePlaneWarp") is None
+            and context[0].get("imagePlaneWarp") is None
+        )
+    }
+    native_lines = prepare_native_line_checks(observations, cpu_contexts, inventory)
     resolved, active = {}, set()
 
     def rig_reference(reference):
@@ -1220,11 +1276,36 @@ def resolve_camera_contexts(observations, contexts, points, inventory=None):
         context = contexts[key]
         frame, view, landmarks, posed_points = context
         width, height = view["rectSourcePixels"][2:]
-        evidence = view.get(
-            "cameraEvidence", frame.get("cameraEvidence", {"kind": "direct-fit"})
-        )
-        kind = evidence.get("kind")
-        if kind == "direct-fit":
+        if current:
+            provenance = view["cameraProvenance"]
+            supplied_camera = view.get("camera")
+            if key not in native_lines:
+                result = (
+                    copy.deepcopy(supplied_camera),
+                    "CPU image-plane homography residuals are unsupported for this current view",
+                )
+            elif supplied_camera is not None:
+                result = evaluate_bound_camera(
+                    camera_cv_parameters(supplied_camera, width, height),
+                    context,
+                    threshold,
+                    provenance["evidence"],
+                    native_lines=native_lines[key],
+                )
+                if result[1]:
+                    result = (copy.deepcopy(supplied_camera), result[1])
+                else:
+                    result = ({**copy.deepcopy(supplied_camera), **result[0]}, None)
+                    for field in ("positionMetres", "quaternion", "verticalFovDegrees"):
+                        result[0][field] = copy.deepcopy(supplied_camera[field])
+            else:
+                result = None
+        else:
+            evidence = view.get(
+                "cameraEvidence", frame.get("cameraEvidence", {"kind": "direct-fit"})
+            )
+            kind = evidence.get("kind")
+        if (current and result is None) or (not current and kind == "direct-fit"):
             result = fit_camera(
                 {
                     "landmarks": landmarks,
@@ -1253,6 +1334,8 @@ def resolve_camera_contexts(observations, contexts, points, inventory=None):
                 )
                 if any(item["status"] != "passed" for item in line_errors):
                     result[0]["status"] = "failed"
+        elif current:
+            pass
         elif kind == "shared-rigid-sequence":
             if view.get("cameraFit") or frame.get("cameraFit"):
                 raise ValueError("Derived cameras cannot also specify cameraFit")
@@ -1436,8 +1519,10 @@ def resolve_camera_contexts(observations, contexts, points, inventory=None):
     return resolved
 
 
-def run(observations, inventory):
-    validate(observations)
+def _run_computation(observations, inventory):
+    """Shared numeric computation; current callers supply only temporary legacy state."""
+    if observations.get("kind") != "current-source-observations":
+        validate(observations)
     points = world_points(observations, inventory)
     fitted = copy.deepcopy(observations)
     shots = {shot["id"]: shot for shot in observations["shots"]}
@@ -1448,6 +1533,12 @@ def run(observations, inventory):
         frame["camera"] = None
         shot = shots[frame["shotId"]]
         if not needs_machine(frame, shot):
+            continue
+        if observations.get("kind") == "current-source-observations" and not frame["views"]:
+            missing.append({
+                "timeSeconds": frame["timeSeconds"], "viewId": None,
+                "reason": "Current source viewport layout remains unavailable",
+            })
             continue
         targets = frame.get("views") or [
             {
@@ -1477,7 +1568,11 @@ def run(observations, inventory):
                     "pixel": [landmark["pixel"][0] - x, landmark["pixel"][1] - y],
                 }
                 for landmark in frame["landmarks"]
-                if landmark.get("viewId") == view["id"]
+                if (
+                    landmark.get("viewId", "main")
+                    if observations.get("kind") == "current-source-observations"
+                    else landmark.get("viewId")
+                ) == view["id"]
             ]
             if presentation == "horizontal-mirror":
                 for landmark in landmarks:
@@ -1613,8 +1708,13 @@ def run(observations, inventory):
     mechanism_missing = [
         view
         for view in required_frames
-        if view["mechanicalState"]["status"] != "observed"
-        or view["mechanicalState"].get("visiblePoseCompleteness") == "partial"
+        if (
+            observations.get("kind") != "current-source-observations"
+            and (
+                view["mechanicalState"]["status"] != "observed"
+                or view["mechanicalState"].get("visiblePoseCompleteness") == "partial"
+            )
+        )
         or view["mechanicalState"].get("input") is None
     ]
     no_machine_source = not required_frames and all(
@@ -1649,22 +1749,114 @@ def run(observations, inventory):
     return fitted, report
 
 
+def run(observations, inventory, *, historical_diagnostic=False):
+    """Validate authority before computing; never materialize a fake derivative identity."""
+    require_rest_projection(observations)
+    if historical_diagnostic:
+        if observations.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
+            raise ValueError("Historical diagnostics require a materialized canonical-native derivative")
+        if observations.get("kind") == "current-source-observations":
+            raise ValueError("Current observations cannot enter the historical diagnostic path")
+        fitted, report = _run_computation(observations, inventory)
+        report["historicalDiagnostic"] = True
+        return fitted, report
+    if inventory is None:
+        raise ValueError("Current camera fitting requires the actual registered native inventory")
+    contract = fresh_contract()
+    contract.validate_observations(observations, inventory=inventory)
+    adapted = copy.deepcopy(observations)
+    for frame in adapted["frames"]:
+        frame["mechanicalState"] = {"status": "unobservable", "input": None}
+        for view in frame["views"]:
+            if view["camera"] is None:
+                view.pop("cameraMeasurement", None)
+            view["mechanicalState"] = {
+                "status": "chosen-feasible" if view["input"] is not None else "unobservable",
+                "input": copy.deepcopy(view["input"]),
+            }
+    fitted, report = _run_computation(adapted, inventory)
+    blockers = fitted["coverage"]["blockers"]
+    for frame in fitted["frames"]:
+        frame.pop("mechanicalState")
+        frame.pop("camera", None)
+        frame.pop("cameraUnobservableReason", None)
+        for view in frame["views"]:
+            view.pop("mechanicalState")
+            reason = view.pop("cameraUnobservableReason", None)
+            if view["camera"] is not None and "cameraMeasurement" not in view:
+                view["cameraMeasurement"] = {
+                    "model": copy.deepcopy(fitted["model"]),
+                    "nativeIdentity": copy.deepcopy(fitted["nativeIdentity"]),
+                    "sourceImage": copy.deepcopy(frame["sourceImage"]),
+                    "evidence": "Current CAD/source FIT-only camera solution, checked against disjoint actual-source CHECK pixels.",
+                }
+                view["cameraProvenance"] = {
+                    **view["cameraProvenance"],
+                    "kind": "source-fit",
+                    "evidence": (
+                        view["cameraProvenance"]["evidence"]
+                        + " Current camera solved from this exposure's FIT pixels only; "
+                        "CHECK residuals are diagnostics, not stage qualification."
+                    ),
+                }
+            if view["camera"] is None:
+                view.pop("cameraMeasurement", None)
+                reason = reason or "No solved current source camera"
+            else:
+                # Missing residual evidence does not invalidate a bound current camera candidate.
+                reason = None
+            if view["input"] is None:
+                reason = "; ".join(filter(None, (reason, "No current complete mechanism input")))
+            if reason:
+                view.setdefault("unavailable", []).append({"reason": reason})
+                blocker = f"{frame['timeSeconds']}/{view['id']}: {reason}"
+                if blocker not in blockers:
+                    blockers.append(blocker)
+    fitted["coverage"]["status"] = report["coverageStatus"] = (
+        "blocked" if blockers else observations["coverage"]["status"]
+    )
+    report["coverageBlockers"] = blockers
+    contract.validate_observations(fitted, inventory=inventory)
+    return fitted, report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("observations", type=Path)
-    parser.add_argument("--inventory", type=Path, required=True)
-    parser.add_argument("--output", type=Path)
+    parser.add_argument("observations", type=Path, help="Explicit .gz observations; historical diagnostics use their original storage")
+    parser.add_argument("--inventory", type=Path, required=True, help="Actual native inventory, stored as ordinary JSON")
+    parser.add_argument("--output", type=Path, help="Gzip observations; --historical-diagnostic permits private .json only under web/.vite/verification-output or resolved /tmp or /var/tmp outside the checkout")
     parser.add_argument("--require-complete", action="store_true")
+    parser.add_argument(
+        "--historical-diagnostic", action="store_true",
+        help="Run the old materialized-derivative diagnostic, never current publication",
+    )
     args = parser.parse_args()
-    observations = common.read_observations(args.observations)
-    if observations.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
-        parser.error("--observations must select a materialized canonical-native derivative, not archived original evidence")
-    fitted, report = run(
-        observations,
-        json.loads(args.inventory.read_text()),
+    contract = fresh_contract()
+    contract.check_namespace(args.observations, historical_diagnostic=args.historical_diagnostic)
+    observations = (
+        common.read_observations(args.observations) if args.historical_diagnostic
+        else json.loads(contract.read_observation_bytes(args.observations))
+    )
+    contract.check_namespace(
+        args.observations, historical_diagnostic=args.historical_diagnostic,
+        video_id=observations["source"]["videoId"],
     )
     if args.output:
-        common.write_observations(args.output, fitted)
+        contract.check_namespace(
+            args.output, historical_diagnostic=args.historical_diagnostic,
+            output=True, video_id=observations["source"]["videoId"],
+        )
+    require_rest_projection(observations)
+    fitted, report = run(
+        observations, json.loads(args.inventory.read_text()),
+        historical_diagnostic=args.historical_diagnostic,
+    )
+    if args.output:
+        if args.historical_diagnostic:
+            common.write_observations(args.output, fitted)
+        else:
+            decoded = (json.dumps(fitted, indent=2) + "\n").encode("utf-8")
+            args.output.write_bytes(contract.encode_observation_bytes(decoded))
     summary = {
         key: value
         for key, value in report.items()
@@ -1690,10 +1882,12 @@ def main():
     summary["missingCameraEvidenceCount"] = len(report["missingCameraEvidence"])
     print(json.dumps(summary, indent=2))
     if (
-        (not report["measuredFitCount"] and not report["noCorrespondingMachineSource"])
-        or report["failedFitTimes"]
-        or (args.require_complete and report["coverageStatus"] != "complete")
-    ):
+        args.historical_diagnostic
+        and (
+            (not report["measuredFitCount"] and not report["noCorrespondingMachineSource"])
+            or report["failedFitTimes"]
+        )
+    ) or (args.require_complete and report["coverageStatus"] != "complete"):
         raise SystemExit(1)
 
 

@@ -29,6 +29,27 @@ MAPPING = {'schema_version': 2, 'identities': [
 ], 'variants': []}
 
 
+def enroll_current_fixture(root, manifest):
+    """Keep archived-payload fixtures under the real independent current seals."""
+    source = Path(__file__).resolve().parents[2]
+    inventory_path = evidence.CURRENT_INVENTORY_PATH
+    inventory = (source / inventory_path).read_bytes()
+    target = root / inventory_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(inventory)
+    manifest['currentSourceInventory'] = {'path': inventory_path, 'sha256': evidence.digest(inventory)}
+    inputs = manifest.setdefault('canonicalConsumerInputs', [])
+    enrolled = {row['path'] for row in inputs}
+    for path in evidence.FRESH_CONSUMER_INPUTS:
+        if path in enrolled:
+            continue
+        raw = (source / path).read_bytes()
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
+        inputs.append({'path': path, 'sha256': evidence.consumer_digest(raw), 'scope': evidence.SCOPE})
+
+
 class NativeEvidenceTests(unittest.TestCase):
     def test_current_text_seals_ignore_checkout_eol_but_detect_content_changes(self):
         lf = b'{"nativePartPath":"ha-harmonic-analyzer/fr-frame/fr-tube-frame-3",\n"n":1.2300e-09}\n'
@@ -38,6 +59,43 @@ class NativeEvidenceTests(unittest.TestCase):
         self.assertNotEqual(evidence.consumer_digest(crlf), evidence.consumer_digest(changed))
         # The checkout exception must never weaken exact evidence certificates.
         self.assertNotEqual(evidence.digest(lf), evidence.digest(crlf))
+
+    def test_current_inventory_authority_keeps_its_exact_byte_seal_across_text_eol_changes(self):
+        source = Path(__file__).resolve().parents[2]
+        registration = json.loads((source / evidence.MANIFEST).read_bytes())['currentSourceInventory']
+        inventory_path, expected_sha = registration['path'], registration['sha256']
+        actual = (source / inventory_path).read_bytes()
+        self.assertEqual(evidence.digest(actual), expected_sha)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / inventory_path
+            path.parent.mkdir(parents=True)
+            path.write_bytes(actual)
+            manifest = {
+                'currentSourceInventory': {'path': inventory_path, 'sha256': expected_sha},
+                'canonicalConsumerInputs': [],
+            }
+            with patch.object(evidence, 'ROOT', root):
+                evidence.validate_current_inventory_registration(manifest)
+                path.write_bytes(actual.replace(b'\n', b'\r\n'))
+                with self.assertRaisesRegex(ValueError, 'exact current source inventory bytes'):
+                    evidence.validate_current_inventory_registration(manifest)
+                self.assertEqual(manifest['currentSourceInventory']['sha256'], expected_sha)
+
+    def test_actual_inventory_cannot_be_enrolled_as_normalized_current_code(self):
+        inventory_path = 'web/content/v39-source/native-inventory.json'
+        actual = (Path(__file__).resolve().parents[2] / inventory_path).read_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / inventory_path
+            path.parent.mkdir(parents=True)
+            path.write_bytes(actual)
+            manifest = {
+                'currentSourceInventory': {'path': inventory_path, 'sha256': evidence.digest(actual)},
+                'canonicalConsumerInputs': [{'path': inventory_path}],
+            }
+            with patch.object(evidence, 'ROOT', root), self.assertRaises(ValueError):
+                evidence.validate_current_inventory_registration(manifest)
 
     def test_direct_nested_and_mesh_instance_suffixes(self):
         translate = evidence.native_mapper(MAPPING, set())
@@ -127,6 +185,7 @@ class NativeEvidenceTests(unittest.TestCase):
                              'originalNumericLexemeSha256': evidence.numbers(raw),
                              'archivedNativeBindings': []})
             manifest = {'mappingSchemaVersion': 2, 'derivatives': rows, 'historicalCodeSnapshots': []}
+            enroll_current_fixture(root, manifest)
             (root / evidence.MANIFEST).write_text(json.dumps(manifest), encoding='utf8')
             (root / evidence.MAP).parent.mkdir(parents=True, exist_ok=True)
             (root / evidence.MAP).write_text(json.dumps(MAPPING), encoding='utf8')
@@ -213,6 +272,7 @@ class CanonicalObservationCodecTests(unittest.TestCase):
             stored = root / row['path']
             stored.parent.mkdir(parents=True)
             (root / row['originalPath']).write_bytes(raw)
+            enroll_current_fixture(root, manifest)
             (root / evidence.MANIFEST).write_text(json.dumps(manifest), encoding='utf8')
             (root / evidence.MAP).parent.mkdir(parents=True)
             (root / evidence.MAP).write_bytes(mapping_bytes)
@@ -492,6 +552,7 @@ class HistoricalTrackLineageTests(unittest.TestCase):
             store(original, raw)
             store(track_name, json.dumps(track).encode('utf8'))
             store(evidence.MAP, json.dumps(MAPPING).encode('utf8'))
+            enroll_current_fixture(root, manifest)
             store(evidence.MANIFEST, json.dumps(manifest).encode('utf8'))
             seeds = {
                 'historicalReportInputs': [],
@@ -582,35 +643,6 @@ class HistoricalTrackLineageTests(unittest.TestCase):
                                 json.dumps(track).encode('utf8'), track_name, changed_manifest, {}, {})
                     finally:
                         snapshot.write_bytes(original_bytes)
-
-    def test_fresh_producer_uses_live_approval_and_seals_never_archived_fallback(self):
-        with self.lineage_fixture() as (root, data, live_model, track_name, output):
-            captured = (root / track_name).read_bytes()
-            with self.assertRaisesRegex(ValueError, 'independently approved live model'):
-                rocker.rocker()
-            fresh = copy.deepcopy(data)
-            fresh['model'] = {**data['model'], **live_model}
-            (root / output).write_bytes(evidence.encode_observations(json.dumps(fresh).encode('utf8')))
-            regenerated = rocker.rocker()
-            self.assertEqual(regenerated['model'], fresh['model'])
-            self.assertEqual(regenerated['anchors'], [{**fresh['anchors'][0], 'motion': None}])
-            self.assertEqual(regenerated['frames'][0]['views'][0]['input']['crankTurns'], 0)
-            self.assertEqual((root / track_name).read_bytes(), captured)
-            manifest = json.loads((root / evidence.MANIFEST).read_bytes())
-            for path in (seal['path'] for seal in manifest['canonicalConsumerInputs']):
-                live_path = root / path
-                current = live_path.read_bytes()
-                for mutation in ('changed', 'missing'):
-                    with self.subTest(path=path, mutation=mutation):
-                        if mutation == 'changed':
-                            live_path.write_bytes(current + b'\n')
-                        else:
-                            live_path.unlink()
-                        try:
-                            with self.assertRaisesRegex(ValueError, 'live producer input (differs|unavailable)'):
-                                rocker.rocker()
-                        finally:
-                            live_path.write_bytes(current)
 
     def test_duplicate_historical_usage_and_origin_authorities_refuse(self):
         with self.lineage_fixture() as (root, _, _, track_name, _):
