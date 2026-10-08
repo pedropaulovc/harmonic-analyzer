@@ -196,8 +196,12 @@ before publishing either output.
 Analysis/Synthesis historical replay is separate:
 `HistoricalReceiptRevalidator.revalidate_receipt()` checks immutable historical
 packets and sealed producer/math snapshots. Its non-publishable receipt is not a
-current source track and cannot grant current eligibility. The original-native
-Analysis bank extraction, visible-crank gauge, Synthesis automatic-motion and
+current source track and cannot grant current eligibility.
+The same revalidator can replay repeatedly: retained camera/input numbers remain
+sealed, while framing application counts describe each individual replay rather
+than accumulating across receipts. Validation does not append native exposure
+keys to the initialized observations.
+The original-native Analysis bank extraction, visible-crank gauge, Synthesis automatic-motion and
 Spin mechanics CLI implementations are retired from `scripts/`: their required
 historical native tuple is not the current live tuple. Original producer source
 remains in the SHA-addressed `content/canonical-native/historical-code` archive,
@@ -286,7 +290,7 @@ Synthesis's existing front-camera position/rotation stay fixed while its chosen
 principal-point/FOV keys reframe the single machine image. Cuts, layout and
 discrete mechanical changes still hold the decoded exposure. This is unmeasured
 source-informed framing, not recovered camera history or a fidelity pass.
-The final **5% / 0.5-second** limits and other videos' policies remain unchanged.
+The current **50% / 0.5-second** target and other videos' policies remain unchanged.
 
 The optional `content/canonical-native/<videoId>.chosen-camera-continuity.json` permission packet
 pins source SHA, shot bounds, native coverage and unmeasured main/whole framing
@@ -378,40 +382,29 @@ a complete feasible reconstruction, with the user's approval. They are listed
 as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
 identifiable-feature and timing checks retain their requirements.
 
-The iterative plan is **50% → 20% → 10% → 5% of source frame width**, across
-all six videos at each stage. These are maximum landmark errors, not fractions
-of coverage. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels.
-The final tolerance is 5%; timing remains within 0.5 seconds throughout.
+The current plan is **50% of source frame width across all six videos**, followed
+by a working browser demo. This is a maximum scored landmark error, not a fraction
+of coverage. At 1920 pixels wide the limit is 960 pixels; timing remains within
+0.5 seconds. The 20%, 10% and 5% refinement stages are outside the current request.
 
-First demonstrate working coarse camera/mechanism tracking across the collection
-in the browser, then refine the largest visible discrepancies. Verify every
-integer second and visible change using distributed fixed and moving landmarks,
-actual rendered pixels and visual overlays. Close-ups, insets and montages remain
-required. Report uncertainty, exceptions and unavailable measurements explicitly.
-Coarse playback is not final footage acceptance.
+Complete coarse camera/mechanism matching across the collection, then demonstrate
+the implementation. Verify every integer second and visible change using
+distributed fixed and moving landmarks, actual rendered pixels and visual
+overlays. Close-ups, insets and montages remain required. Report uncertainty,
+exceptions and unavailable measurements explicitly. A passing subset or missing
+source CHECK pixels is not an all-six stage-50 pass.
 
 ```sh
 npm --prefix web run build
 npm --prefix web run preview
 
-# Incremental coarse collection, then refinements:
-export HARMONIC_REFERENCE_ROOT="$PWD/web/.vite/reference-root"
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 20
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 10
+# Current all-six coarse collection; no video/time scope or optional eligibility:
+export HARMONIC_REFERENCE_ROOT="/home/pedro/src/wt-website-scaffolding/web/.vite/reference-root"
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --player local
 
-# Scoped measurements do not claim a whole-video pass:
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119
-
-# Headless bounded Analysis03 demonstration; not a fidelity acceptance pass:
-HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --from 5.9 --to 7.1 --player local --headless
-
-# Final all-video acceptance, including the official player:
-HARMONIC_HEADLESS=1 npm --prefix web run build && HARMONIC_HEADLESS=1 npm --prefix web run verify:sync
-
-# Local demonstration of the unchanged private original footage:
+# After the all-six coarse pass, demonstrate the unchanged private original footage:
 npm --prefix web run preview:reference -- --port 5967
-# http://127.0.0.1:5967/harmonic-analyzer/?video=machine-spin&referenceMedia=1
+# http://127.0.0.1:5967/harmonic-analyzer/?referenceMedia=1
 ```
 
 `HARMONIC_REFERENCE_ROOT` defaults to durable ignored `web/.vite/reference-root`.
@@ -419,9 +412,49 @@ It must contain the six original MP4s under `videos/`. `preview:reference` serve
 them locally with range support without copying footage into publication assets.
 Default public playback remains the official YouTube embed.
 The verifier serves `dist/`, exercises the original media, and reports per-video
-coverage, rendered landmark errors and timing. Incremental runs are repeatable;
-there is no acceptance-attempt quota. The default final target is 5% of each
-source frame's width, with clock skew no greater than 0.5 seconds.
+coverage, rendered landmark errors and timing. The current collection command
+must explicitly select stage 50 because the CLI retains its existing finer-stage
+options/default; those are not queued deliverables. Clock skew remains at most
+0.5 seconds, and manual operation, native media audio state and compact playback
+remain required. No audible-speaker observation is implied by media-state checks.
+
+**Measured checkpoint (2026-10-08 UTC).** The unscoped all-six
+`--stage 50 --player local` run at `4cfeaee9373d6e78305e39390f2cc608c12f9aaa`
+finished **unavailable**, exit 1, with the actual RTX 3090/D3D12 renderer on
+every route. It selected every mandatory census key, but selection is not
+independent landmark coverage:
+
+| Video | Required samples containing measurements / required | Passed required samples | Maximum measured error (px) | Maximum measured clock skew (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Intro/history | 1 / 1212 | 0 | 453.373 | 0.018600 |
+| Synthesis | 11 / 629 | 9 | 384.221 | 0.041708 |
+| Analysis | 91 / 365 | 78 | 289.864 | 0.016684 |
+| Operation | 2 / 1019 | 2 | 50.874 | 0.450450 |
+| Machine spin | 2 / 186 | 2 | 73.752 | 0.437938 |
+| Rocker arms | 1015 / 1153 | 984 | 32.765 | 0.020834 |
+
+The error maxima include admitted mandatory and diagnostic measurements; they
+do not bound unmeasured frames. A sample containing FIT pixels can still lack
+independent CHECKs. All six stage summaries remain unmeasured, not accepted.
+The run retained missing/unsupported source checks, two Analysis spring-bound
+refusals at 113.8137 and 119.08563333333333 seconds, compact-playback failures,
+and Analysis/Spin manual-setup decode errors before any crank/orbit exercise.
+The original compact-failure predicate values were not saved; subsequent
+diagnostic receipts retain actual media/render values before the unchanged
+0.3-second advancement and 0.5-second clock assertions.
+
+A separate fresh-page headless smoke at the same checkpoint passed on all six
+pages: real paused crank/orbit/pan/zoom, clock-bound Restore of camera/input/
+assembly, visible 222×200 original-media native controls, unmuted volume 1,
+and advancing current native draws. Its maximum observed playback skew was
+0.013994 seconds. Intro also recovered the actual EOF HUD and preserved ongoing
+manual crank motion through a paused native seek. These bounded positives do
+not clear the collection failures, certify missing intervals, demonstrate speaker
+output, or exercise the official provider in this round.
+Private source/data/dist seals, complete reports and screenshots are retained in
+`web/.vite/complete1227-stage50-20261007/`; they are not publication assets.
+Later code/seal changes do not relabel this frozen report as newer-head scoring.
+
 Original-source authority is validated before lazy shared browser startup. Shared
 startup becomes ready only after server, browser, context and page acquisition;
 failure is one terminal verification prerequisite with acquired-resource cleanup,

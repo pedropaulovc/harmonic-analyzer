@@ -312,21 +312,22 @@ reports and visibility bindings retain the exact records. Neither declaration
 establishes whole-part correspondence or makes unavailable source data matched.
 Original hole contours remain diagnostics, not fabricated source pixels, native
 holes or textures. Native inventory integrity, all other features, pose and
-motion remain required. The staged image tolerances below replace the former
+motion remain required. The coarse image tolerance below replaces the former
 38.4-source-pixel limit; timing remains bounded by 0.5 seconds.
 
-## Iterative synchronization plan
+## Coarse synchronization and demo plan
 
-The approved sequence is **50% → 20% → 10% → 5% of source frame width**.
-These are maximum landmark-position errors, not percentages of videos covered.
-At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
-The final target is 5%; video/model timing stays within 0.5 seconds at every stage.
+The current approved target is **50% of source frame width across all six videos**.
+This is a maximum scored landmark-position error, not a percentage of coverage.
+At 1920 pixels wide the limit is 960 pixels; video/model timing stays within
+0.5 seconds. The 20%, 10% and 5% refinement stages are outside the current request.
 
-Start with working approximate camera and mechanism tracking across **all six**
-videos, then present an actual browser demo before refining to 20%, 10%
-and 5%. Complete one coarse pass across the collection rather than perfecting
-one video while the others remain unavailable. Each stage reports its measured
-coverage, maximum errors and unresolved intervals; unmeasured is not passed.
+Complete one coarse camera/mechanism matching pass across **all six** videos,
+then present the working implementation in an actual browser demo. Do not
+perfect one video while the others remain unavailable. Report measured coverage,
+maximum errors and unresolved intervals; unmeasured or a passing subset is not
+an all-six stage-50 pass. Manual operation, original-media audio state and visible
+compact playback retain their existing requirements.
 
 ### Runtime tracks
 
@@ -375,8 +376,8 @@ agree when both fields are present. Native PTS must match index/FPS within
 Mechanical provenance remains chosen and stages remain unmeasured. Neither this
 interpolation nor the scoped headless Analysis **5.9..7.1-second** and Synthesis
 **25.98..26.54-second** demonstrations establish recovered camera/mechanical pose,
-historical camera motion or a fidelity pass. All six videos retain the final
-**5% / 0.5-second** acceptance limits; other videos' framing policies are unchanged.
+historical camera motion or a fidelity pass. All six videos retain the current
+**50% / 0.5-second** target; other videos' framing policies are unchanged.
 
 Eight focused `node:test` cases load the real modules through Vite SSR
 (`npm --prefix web run test:playback`). An optional `SOURCE_TRACK_MODULE`
@@ -501,7 +502,7 @@ presenter-to-spin edit moves one machine image; it uses one native view with
 source-informed principal-point/FOV keys. Its coarse framing remains unmeasured.
 Actors and formula graphics stay in the original player.
 
-### Measurement and refinement
+### Coarse measurement
 
 Use original hashed footage and timestamped source observations. Evaluate every
 integer second and visible camera/mechanism change. Additional intermediate probes
@@ -525,18 +526,34 @@ replace actual source/render inspection. Use the depth-tested native part-ID
 capture to distinguish genuinely occluding components from dark metallic surfaces;
 lighting changes must not change those surface owners or hide native geometry.
 
-Per-video verification is incremental and repeatable, without an acceptance-run
-quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.
-A coarse demo or a passing subset does not establish final acceptance.
+Per-video diagnostics remain incremental and repeatable, without an acceptance-run
+quota. The current collection gate is all six pages at **50% / 0.5 seconds**,
+followed by the browser demo; no finer-stage certification is queued.
 Per-video and aggregate reports stream their complete existing JSON evidence
 with bounded serialization memory and atomic publication. Ordinary serialization
 or I/O failures before publication preserve the previous complete report; no
 fsync or power-loss durability guarantee is made.
 Saved failure reasons retain the actual serialization or filesystem cause and
 any temporary-file cleanup failure, alongside the output-path context.
-On a failed stage, refine the worst source-visible discrepancy, rerun the affected
-shot, then rerun the collection. Escalate actual missing geometry outside approved
-exceptions rather than hiding it with a camera warp or an occlusion claim.
+On a failed coarse pass, correct the worst source-visible discrepancy and measure
+the affected shot before rerunning the collection. Escalate actual missing
+geometry outside approved exceptions rather than hiding it with a camera warp
+or an occlusion claim.
+
+The actual unscoped stage-50/local checkpoint `4cfeaee9373d6e78305e39390f2cc608c12f9aaa`
+selected all mandatory keys but remained unavailable: only 1122 of 4564 required
+samples contained any measurements, and 1075 passed their full required-sample
+checks. The [README results table](README.md#fidelity-and-verification) retains
+per-video coverage and measured pixel/clock maxima; sparse measured maxima are
+not whole-video bounds. Independent CHECK gaps, actual Analysis spring-bound
+refusals, strict compact-playback failures and Analysis/Spin native decode errors
+remain in the original reports. A separate fresh-page original-media smoke
+passed bounded manual/Restore/compact controls on all six pages, without clearing
+those collection failures or granting footage acceptance. No optional native
+eligibility, finer stage or per-drawable certification was run for this checkpoint.
+After a source correction, preserve the frozen measured head and compare exact
+track/observation/dist bytes separately; new-head runtime proof is a new receipt,
+not a renamed old measurement.
 
 ### Browser verification
 

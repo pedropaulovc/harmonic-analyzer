@@ -1263,6 +1263,47 @@ class HistoricalDiagnosticOutputBoundaryTests(unittest.TestCase):
 
 
 class HistoricalReceiptBoundaryTests(unittest.TestCase):
+    def test_synthesis_receipt_reuses_instance_without_changing_retained_numbers_or_counts(self):
+        generator = historical_synthesis_generator()
+        original = copy.deepcopy(generator.data)
+        framing = copy.deepcopy(generator.framing_observations)
+        first = generator.revalidate_receipt()
+        for key in first['evidence']['synthesisCoarseFraming']['shots'].values():
+            self.assertGreater(key['eligibleViewCount'], 0)
+            self.assertEqual(key['appliedViewCount'], key['eligibleViewCount'])
+            self.assertGreater(key['appliedSeedExposureCount'], 0)
+        self.assertGreater(first['evidence']['synthesisWheelFraming']['appliedViewCount'], 0)
+        second = generator.revalidate_receipt()
+        # Full equality includes every retained camera/input and per-replay count,
+        # not just the receipt label or a fresh-instance reconstruction.
+        self.assertEqual(first, second)
+        self.assertEqual(generator.data, original)
+        self.assertEqual(generator.framing_observations, framing)
+        with self.assertRaisesRegex(ValueError, 'cannot build an ordinary source track'):
+            generator.build()
+
+    def test_reused_synthesis_receipt_still_refuses_retained_framing_numeric_mutation(self):
+        generator = historical_synthesis_generator()
+        generator.revalidate_receipt()
+        original = copy.deepcopy(generator.synthesis_coarse_framing)
+        for mutation in ('cone-fov', 'cam-position', 'focal-scale', 'native-fit', 'source-clock'):
+            with self.subTest(mutation=mutation):
+                generator.synthesis_coarse_framing = copy.deepcopy(original)
+                cone = generator.synthesis_coarse_framing['shots']['cone-overview']
+                cam = generator.synthesis_coarse_framing['shots']['cam-rod']
+                if mutation == 'cone-fov':
+                    cone['chosenCamera']['verticalFovDegrees'] += 0.01
+                elif mutation == 'cam-position':
+                    cam['chosenCamera']['positionMetres'][0] += 0.001
+                elif mutation == 'focal-scale':
+                    cone['positiveFocalScale'] += 0.01
+                elif mutation == 'native-fit':
+                    cone['objectiveFITs'][0]['nativePixels'][0] += 1
+                else:
+                    cone['decodedTimeSeconds'] += 0.001
+                with self.assertRaisesRegex(ValueError, 'Synthesis retained framing numerical association changed'):
+                    generator.revalidate_receipt()
+
     def test_both_receipt_routes_recheck_archive_math_after_a_successful_receipt(self):
         path = 'web/src/mechanics.ts'
         for video_id, mutation in (('6dW6VYXp9HM', 'missing'), ('8KmVDxkia_w', 'changed')):

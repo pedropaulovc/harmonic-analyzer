@@ -869,6 +869,7 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
       const quad = model.border
       const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4, y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4
       assert(model.width > 0 && model.height > 0 && x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height, 'Compact native play button has no visible in-player hit target')
+      activeControls.nativeControl = { proof: 'actual-native-user-agent-play-button-pointer', x, y, width: model.width, height: model.height }
       await page.mouse.click(x, y)
     } finally {
       await session.detach()
@@ -880,6 +881,15 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
   const compactPlayed = await media(embed)
   const compactRender = await readRenderState()
   const compactState = compactRender.actual
+  playback.compactAttempt = {
+    rect, activeControls, startedMedia: compactStarted, playedMedia: compactPlayed, rendered: compactRender,
+    predicates: {
+      mediaUnpaused: !compactPlayed.paused, mediaUnmuted: !compactPlayed.muted,
+      positiveVolume: compactPlayed.volume > 0, advancedSeconds: compactPlayed.mediaTime - compactStarted.mediaTime,
+      minimumAdvanceSeconds: 0.3, followingSource: compactState.mode === 'following-video',
+      clockSkewSeconds: Math.abs(compactState.modelTime - compactPlayed.mediaTime), maximumClockSkewSeconds: CLOCK_LIMIT,
+    },
+  }
   assert(!compactPlayed.paused && !compactPlayed.muted && compactPlayed.volume > 0 && compactPlayed.mediaTime - compactStarted.mediaTime >= 0.3 && compactState.mode === 'following-video' && Math.abs(compactState.modelTime - compactPlayed.mediaTime) <= CLOCK_LIMIT, 'Compact native controls did not actually play original audio/video with synchronized model')
   assert(requirePlaybackDraw(compactRender) > clocks.at(-1).sourceDrawRevision, 'Compact playback has no new completed native geometry render receipt')
   await pause(page, embed)

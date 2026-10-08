@@ -62,6 +62,7 @@ HISTORICAL_SOURCE_INPUTS = {
 }
 HISTORICAL_COMMON_SHA256 = "bb982f567ff742631b75f329b5114b09155dbb65c2169095db17ff20b56fc565"
 HISTORICAL_BINDINGS_SHA256 = "1228e3b388996ce52cdc3f2f95a85320a0164eed221659cad9bc06edf496d952"
+FRAMING_EXECUTION_COUNTERS = ("eligibleViewCount", "appliedViewCount", "appliedSeedExposureCount")
 
 
 def load(path):
@@ -169,6 +170,9 @@ class _HistoricalReceiptAssembly:
                 for f in (0.25,0.5,0.75)]
         self.synthesis_automatic_motion = (
             self.synthesis_automatic_motion_packet() if video_id == "8KmVDxkia_w" else None)
+        if self.synthesis_automatic_motion:
+            # Register validated native exposure keys once, not during authority rechecks.
+            self.data.setdefault("compactChangeTimesSeconds", []).extend(self.synthesis_automatic_motion["times"])
         self.bank_controls = None
         self.bank_controls_module = None
         self.analysis_snapshots, self.analysis_continuity = None, None
@@ -321,7 +325,18 @@ class _HistoricalReceiptAssembly:
             self.validate_retained_framing_native_source()
             if self.synthesis_automatic_motion != self.synthesis_automatic_motion_packet():
                 raise ValueError("Synthesis automatic motion retained numerical association changed")
-            if self.synthesis_coarse_framing != self.synthesis_coarse_framing_packet():
+            expected_framing = self.synthesis_coarse_framing_packet()
+            # Application counts describe this replay, not retained numerical authority.
+            retained_framing = {
+                **self.synthesis_coarse_framing,
+                "shots": {shot: {name: value for name, value in key.items()
+                                 if name not in FRAMING_EXECUTION_COUNTERS}
+                          for shot, key in self.synthesis_coarse_framing["shots"].items()}}
+            expected_framing["shots"] = {
+                shot: {name: value for name, value in key.items()
+                       if name not in FRAMING_EXECUTION_COUNTERS}
+                for shot, key in expected_framing["shots"].items()}
+            if retained_framing != expected_framing:
                 raise ValueError("Synthesis retained framing numerical association changed")
             return
         self.validate_analysis_bank_controls()
@@ -795,10 +810,6 @@ class _HistoricalReceiptAssembly:
                 or abs(times[0]-interval["startSeconds"])>1e-9
                 or abs(times[-1]-interval["endSeconds"])>1e-9 or knots[0]["crankTurns"] != 0):
             raise ValueError("Synthesis automatic complete410-knot source cadence is required")
-        # Native source rows already exist. Requiring their exact identity above
-        # lets common retain keys without borrowing neighbouring source images,
-        # cameras, layouts or CHECK pixels. No annotation becomes a landmark.
-        self.data.setdefault("compactChangeTimesSeconds",[]).extend(times)
         return {"packet":packet, "candidate":candidate, "times":times,
                 "packetSha256":packet_hash, "evidenceSha256":evidence_hash}
 
@@ -1723,6 +1734,10 @@ class _HistoricalReceiptAssembly:
         if self.analysis_held_camera:
             self.analysis_held_camera["application"]["appliedViewCount"] = 0
             self.analysis_held_camera["application"]["appliedExposures"] = []
+        if self.synthesis_coarse_framing:
+            for key in (*self.synthesis_coarse_framing["shots"].values(), self.synthesis_wheel_framing):
+                for name in FRAMING_EXECUTION_COUNTERS:
+                    key[name] = 0
         track = self._historical_common.build_track(self.data,self.views,[
             "Regenerate with python web/scripts/generate-analysis-synthesis-source-tracks.py; all active inputs are pinned tracked web/content calibration evidence, renderer binding metadata and source declarations. Ignored paths are historical provenance only; source/model hashes remain unchanged.",
             "All50/20/10/5% width stages remain unmeasured. CPU camera rejection at2% is not a blanket removal of a coarser candidate. No GPU/model/browser execution or historical source recovery.",
