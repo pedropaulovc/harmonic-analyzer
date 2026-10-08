@@ -435,6 +435,7 @@ book/*.epub
 web/node_modules/
 web/dist/
 web/.vite/
+web/.wrangler/
 web/public/models/
 
 # Campaign binaries: renders, video cuts and page exports are regenerated from
