@@ -55,6 +55,7 @@ from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from pd_rack_pinion_spec import MESH_PINION_SHIFT, MODULE_MM, PRESSURE_ANGLE_DEG
 from pd_transgear_arm_plate_geometry import HUB_TO_BOSS as PLATE_HUB_TO_BOSS
 from pd_transgear_arm_plate_geometry import HUB_TO_BOSS_BAND as PLATE_HUB_TO_BOSS_BAND
 from pd_transgear_knob_thrust_ring_spec import LENGTH as RING_LENGTH
@@ -64,22 +65,20 @@ MM_PER_IN = 25.4
 WALL_FLOOR = 2.0
 ENGAGEMENT_FLOOR_D = 1.5
 
-# --- The integral 12T DP38 pinion (meshes the 120T disc MHA-PD-006) -------------
+# --- Integral shifted m0.75 PA20 pinion (120T disc MHA-PD-006) ----------------
 TEETH = 12
-DIAMETRAL_PITCH = 38.0  # the 120T disc's pitch
-PRESSURE_ANGLE_DEG = 14.5
+DIAMETRAL_PITCH = MM_PER_IN / MODULE_MM
+PROFILE_SHIFT = MESH_PINION_SHIFT
+DEDENDUM_FACTOR = 1.25
 # R9-17: F moved 0.1 rearward to -148.1; the rear tooth ends (-142.2, the
 # thrust ring's seat) stay put.
 FACE_WIDTH = 5.9
 FACE_WIDTH_PLACES = 3  # 12T rear face -> F: the chain-plane stack (contract §13)
-MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN  # 8.021
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN  # 9.358
+PITCH_DIA = TEETH * MODULE_MM
+OUTSIDE_DIA = (TEETH + 2.0 + 2.0 * PROFILE_SHIFT) * MODULE_MM
 OUTSIDE_DIA_PLACES = 2
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
-# The root-relieved gap floor _gear.build_fixed_gear cuts: the standard
-# 1.157/P dedendum below the pitch circle.
-ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 6.474
+ROOT_DIA = (TEETH - 2.0 * DEDENDUM_FACTOR + 2.0 * PROFILE_SHIFT) * MODULE_MM
+WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
 # The seed gap _gear.cut_tooth_gap cuts is centred half a pitch CCW of local
 # +X (tooth 0 is centred on +X); the pattern repeats it every 30 degrees.
 GAP_AZIMUTH_DEG = 180.0 / TEETH

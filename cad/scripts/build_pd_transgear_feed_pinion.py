@@ -95,6 +95,7 @@ from pd_transgear_feed_pinion_spec import (
     OUTSIDE_DIA_DEVIATIONS,
     OVERALL_LENGTH,
     PRESSURE_ANGLE_DEG,
+    PROFILE_SHIFT,
     ROOT_DIA,
     ROOT_DIA_DEVIATIONS,
     ROOT_DIA_MIN,
@@ -298,7 +299,7 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("FaceWidth", FACE_WIDTH),
         ("OutsideDia", OUTSIDE_DIA),
-        ("RootDia", ROOT_DIA),
+        ("RootDia", ROOT_DIA_MIN),
         ("BoreDia", BORE_DIA),
         ("BossDia", BOSS_DIA),
         ("FlatToAxis", FLAT_TO_AXIS),
@@ -327,6 +328,7 @@ async def build(adapter) -> dict[str, str]:
         pa_deg=PRESSURE_ANGLE_DEG,
         root_relief=True,
         dedendum=DEDENDUM_FACTOR,
+        profile_shift=PROFILE_SHIFT,
     )
     volume = disc.volume
     # The tooth pattern's Top x Right axis is the part's first reference axis:
@@ -372,7 +374,7 @@ async def build(adapter) -> dict[str, str]:
     )
     root_ref = check(
         "root-diameter witness",
-        await adapter.add_line(0.0, ROOT_DIA / 2.0, -FACE_WIDTH, ROOT_DIA / 2.0),
+        await adapter.add_line(0.0, ROOT_DIA_MIN / 2.0, -FACE_WIDTH, ROOT_DIA_MIN / 2.0),
     )
     bore_ref = check(
         "bore-diameter witness",
@@ -617,7 +619,7 @@ async def build(adapter) -> dict[str, str]:
     _single_limit(
         adapter,
         "RootDia",
-        ROOT_DIA,
+        ROOT_DIA_MIN,
         ROOT_DIA_DEVIATIONS,
         ROOT_DIA_TOL_TYPE,
         f"{ROOT_DIA_MIN:.2f} MIN",

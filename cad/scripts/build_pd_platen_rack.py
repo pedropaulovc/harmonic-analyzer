@@ -1,26 +1,16 @@
 r"""Reproduction script: platen rack bar (book ch. 22 pp. 54-55, teeth ch. 23).
 
-The brass rack soft-soldered along the platen's back bottom edge, teeth-down,
-the crests protruding ~2 below the platen's bottom edge (ch22 back photo),
-driven by the 12T DP 30 feed pinion (build_pd_transgear_feed_pinion.py, the
-"fifth gear" of the 4/4 video). The tooth pitch was resolved during M4 gear
-prep (DIMENSIONS.md ch. 23: rack pitch measured as DP 30 on
-`v4_transgear_028/030` -- it is the scale anchor for the whole chapter). The
-12-tall band fits below the platen's bottom guide rail (paper-drive rework
-E3); the assembly mounts it rotated 180 about Z so the +Y-authored teeth
-point down.
+Metric PA20 rack prototype using the SDP/SI A1B12MY08A300 tooth system and
+12.7-high × 6.3-wide section, cut to 269.64 mm. The assembly mounts it
+rotated 180 about Z so the +Y-authored teeth point down. It meshes the
+shifted m0.8 12T feed pinion (build_pd_transgear_feed_pinion.py).
 
-Rack tooth form: straight-flanked trapezoid (the involute rack profile is
-exactly straight at the 14.5 deg pressure angle). With the pitch line at
-PITCH_LINE_Y, gap half-width is p/4 at the pitch line and flares at 14.5 deg:
-root (dedendum 1.157/DP below) half-width 0.412, cut overshoot to y = 13
-(past the bar top at 12, so the cut opens cleanly) half-width 1.143. The
-teeth crest at the bar top = pitch line + addendum (1/DP).
+Rack tooth form: straight-flanked trapezoid at PA20. At PITCH_LINE_Y=11.9,
+gap half-width is p/4; it flares toward the crest at y=12.7. The root lies
+1.25 module below the pitch line; the cut overshoots the crest by 1 mm.
+Gap count and first-gap position derive from the live pitch and bar length.
 
-101 gaps at p = pi/30 in = 2.660 mm fill the resized 269.64 mm bar (first
-gap centre at 1.33 mm; the count is derived from the live bar length).
-
-Layout: bar x = 0..269.64, y = 0..12, z = 0..6; teeth cut into the top edge.
+Layout: bar x = 0..269.64, y = 0..12.7, z = 0..6.3.
 
 Run (SolidWorks already open)::
 
@@ -56,35 +46,31 @@ from _drawing_simplified import save_simplified_part
 PART_NAME = "pd-platen-rack"
 MATERIAL = "Brass"  # ch. 22/23 photos: brass
 
-# The platen recording rack-pinion is its OWN gear pair — ch23 measured it as DP 30
-# ("the scale anchor of the chapter") — independent of the cone/cylinder drive train.
-# It MUST match the pinion (build_pd_rack_pinion via _gear.build_fixed_gear, default
-# dp=30) and the output assembly's PINION_PD_R (/30.0). Do NOT couple this to
-# machine.yaml gear_train.diametral_pitch: the value-preserving _config migration
-# (2bc0b10) tied them while both were 30, then the OD-62.2 re-anchor moved the train
-# DP to 49.82 — silently shrinking the rack pitch to 1.60 mm against the DP-30 pinion
-# (2.66 mm) so the mesh interfered (output interference gate, 8 hits ≤ 1.93 mm³).
-DP = 30.0  # 1/in, DIMENSIONS.md ch23 (med — scale anchor of the chapter)
-PA_DEG = 14.5  # period-typical, same as the gear train
-BAR_LENGTH = 269.64  # ch30-p002 Pose Studio: equals resized platen width
-BAR_HEIGHT = 12.0  # exposed band below the bottom guide rail (rework E3, low)
-BAR_THICKNESS = 6.0  # DIMENSIONS.md ch22: edge-on photo (low)
+# SDP/SI A1B12MY08A300 metric PA20 rack, cut to the platen length.
+# Keep this gear pair independent of the cone/cylinder drive train.
+CATALOG_SKU = "A1B12MY08A300"
+MODULE_MM = 0.8
+DP = IN / MODULE_MM
+PA_DEG = 20.0
+BAR_LENGTH = 269.64
+BAR_HEIGHT = 12.7
+BAR_THICKNESS = 6.3
+PITCH_LINE_Y = 11.9
+PITCH_HEIGHT = PITCH_LINE_Y
 
-PITCH = math.pi / DP * IN  # 2.660 mm
-ADDENDUM = 1.0 / DP * IN  # 0.847 mm
-DEDENDUM = 1.157 / DP * IN  # 0.980 mm -- 14.5 deg full-depth standard
-
-PITCH_LINE_Y = BAR_HEIGHT - ADDENDUM  # 11.153 -- teeth crest at the bar top
-ROOT_Y = PITCH_LINE_Y - DEDENDUM  # 28.174
+PITCH = math.pi * MODULE_MM
+ADDENDUM = MODULE_MM
+DEDENDUM = 1.25 * MODULE_MM
+ROOT_Y = PITCH_LINE_Y - DEDENDUM
 CUT_TOP_Y = BAR_HEIGHT + 1.0  # opens past the top edge
 TAN_PA = math.tan(math.radians(PA_DEG))
 
 GAP_COUNT = int(BAR_LENGTH / PITCH)
-FIRST_GAP_X = PITCH / 2.0  # 1.33 -- first gap centred half a pitch in
+FIRST_GAP_X = PITCH / 2.0
 
 
 def half_width(y: float) -> float:
-    """Gap half-width (mm) at height y: p/4 at the pitch line, 14.5 deg flanks."""
+    """Gap half-width (mm) at height y: p/4 at the pitch line, PA20 flanks."""
     return PITCH / 4.0 + (y - PITCH_LINE_Y) * TAN_PA
 
 

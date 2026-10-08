@@ -88,6 +88,7 @@ from pd_transgear_knob_shaft_spec import (
     CUTTER_RUNOUT_PLACES,
     CUTTER_RUNOUT_PREFIX,
     CUTTER_RUNOUT_TOL_TYPE,
+    DEDENDUM_FACTOR,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -105,6 +106,7 @@ from pd_transgear_knob_shaft_spec import (
     PINION_REAR_Z,
     PLAIN_CORE,
     PRESSURE_ANGLE_DEG,
+    PROFILE_SHIFT,
     REAR_END_Z,
     RELIEF_DIA,
     ROOT_DIA,
@@ -655,6 +657,8 @@ async def build(adapter) -> dict[str, str]:
         dp=DIAMETRAL_PITCH,
         pa_deg=PRESSURE_ANGLE_DEG,
         root_relief=True,
+        dedendum=DEDENDUM_FACTOR,
+        profile_shift=PROFILE_SHIFT,
     )
     volume = disc.volume
     # The tooth pattern's Top x Right axis is the part's first reference axis:

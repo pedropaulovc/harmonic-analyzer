@@ -26,6 +26,8 @@ bolt-circle position.
 
 from __future__ import annotations
 
+import math
+
 from _fit_limits import deviations
 from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -48,22 +50,43 @@ MM_PER_IN = 25.4
 
 # --- gear ----------------------------------------------------------------------
 TEETH = 120
-DIAMETRAL_PITCH = 38.0  # disc OD ~82 at 120T (build_pd_rack_pinion.py)
-PRESSURE_ANGLE_DEG = 14.5
-MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
+MODULE_MM = 0.75
+DIAMETRAL_PITCH = MM_PER_IN / MODULE_MM
+PRESSURE_ANGLE_DEG = 20.0
+PROFILE_SHIFT = 0.0
+DEDENDUM_FACTOR = 1.25
+PITCH_DIA = TEETH * MODULE_MM
+OUTSIDE_DIA = (TEETH + 2.0) * MODULE_MM
+ROOT_DIA = (TEETH - 2.0 * DEDENDUM_FACTOR) * MODULE_MM
+WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
 
-# The permanent mesh with the knob shaft's 12T DP38: the standard centre
-# distance plus the contract's 0.65 extension (backlash), unchanged.
+# Authoritative mesh controls; importing the knob spec here would cycle through
+# the arm plate geometry. MESH_BACKLASH is radial centre extension, not tooth
+# thinning or circumferential backlash.
 MESH_PINION_TEETH = 12
-CENTRE_DISTANCE = 44.766
-CENTRE_EXTENSION = CENTRE_DISTANCE - (
-    (TEETH + MESH_PINION_TEETH) / (2.0 * DIAMETRAL_PITCH) * MM_PER_IN
+MESH_PINION_SHIFT = 1.0 - 6.0 * math.sin(math.radians(PRESSURE_ANGLE_DEG)) ** 2
+MESH_BACKLASH = 0.12
+_PA = math.radians(PRESSURE_ANGLE_DEG)
+_INV_WORKING_PA = (
+    math.tan(_PA) - _PA
+    + 2.0 * (PROFILE_SHIFT + MESH_PINION_SHIFT) * math.tan(_PA)
+    / (TEETH + MESH_PINION_TEETH)
 )
-if not 0.6 < CENTRE_EXTENSION < 0.7:
-    raise AssertionError(f"12:120 centre extension moved: {CENTRE_EXTENSION:.3f}")
+# Invert inv(alpha_w) = tan(alpha_w) - alpha_w on its monotonic branch.
+_LOW, _HIGH = _PA, math.pi / 2.0
+for _ in range(64):
+    _MID = (_LOW + _HIGH) / 2.0
+    if math.tan(_MID) - _MID < _INV_WORKING_PA:
+        _LOW = _MID
+    else:
+        _HIGH = _MID
+MESH_WORKING_PRESSURE_ANGLE_DEG = math.degrees((_LOW + _HIGH) / 2.0)
+ZERO_BACKLASH_CENTRE_DISTANCE = (
+    MODULE_MM * (TEETH + MESH_PINION_TEETH) / 2.0
+    * math.cos(_PA) / math.cos(math.radians(MESH_WORKING_PRESSURE_ANGLE_DEG))
+)
+CENTRE_DISTANCE = ZERO_BACKLASH_CENTRE_DISTANCE + MESH_BACKLASH
+CENTRE_EXTENSION = CENTRE_DISTANCE - MODULE_MM * (TEETH + MESH_PINION_TEETH) / 2.0
 
 # --- disc body -----------------------------------------------------------------
 FACE_WIDTH = 3.0

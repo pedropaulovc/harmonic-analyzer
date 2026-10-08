@@ -55,34 +55,25 @@ RACK_NUMBER = "MHA-PD-005"
 if pd_rack_pinion_spec.HUB_NUMBER != HUB_NUMBER:
     raise AssertionError("the disc's fit note names another hub than this sheet")
 
-# --- 12T DP30 feed pinion ------------------------------------------------------
+# --- Shifted m0.8 PA20 feed pinion ---------------------------------------------
 TEETH = 12
-DIAMETRAL_PITCH = 30.0  # meshes the DP30 platen rack (the ch. 23 scale anchor)
-PRESSURE_ANGLE_DEG = 14.5
-MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN  # 10.160
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN  # 11.853
-# Printed .XXX with its own +0/-0.10.  Functional reason for the band inside
-# the .XXX row: the row's +0.13 on the diameter would take half the 0.133
-# standard tip clearance (0.157/P) to the rack's roots, so the tip may only
-# shrink.
+MODULE_MM = 0.8
+DIAMETRAL_PITCH = MM_PER_IN / MODULE_MM
+PRESSURE_ANGLE_DEG = 20.0
+PROFILE_SHIFT = pd_rack_pinion_spec.MESH_PINION_SHIFT
+PITCH_DIA = TEETH * MODULE_MM
+OUTSIDE_DIA = (TEETH + 2.0 + 2.0 * PROFILE_SHIFT) * MODULE_MM
+# Tooth tips may only shrink from the basic shifted profile.
 OUTSIDE_DIA_BAND = (0.0, -0.10)  # (upper, lower)
-# Root at the 1.25/P full-depth dedendum (contract §2.3, root 8.043); the
-# model cuts exactly this floor (``_gear.build_fixed_gear`` dedendum 1.25).
+# Standard full-depth cutter displaced radially by PROFILE_SHIFT * MODULE_MM.
 DEDENDUM_FACTOR = 1.25
-ROOT_DIA = (TEETH - 2.0 * DEDENDUM_FACTOR) / DIAMETRAL_PITCH * MM_PER_IN  # 8.0433
+ROOT_DIA = (TEETH - 2.0 * DEDENDUM_FACTOR + 2.0 * PROFILE_SHIFT) * MODULE_MM
 WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
-# The root prints as a single MIN limit, the floor of the cutter's depth, so
-# the wall under it holds whatever deeper-rooted cutter the shop uses above
-# it.  swTolMIN prints the dimension's NOMINAL followed by "MIN", so the
-# nominal rounds to the floor at the places it prints.
+# The root's single MIN witness uses the conservative floor at its printed
+# precision; the actual gear root remains ROOT_DIA.
 ROOT_DIA_PLACES = 2
-ROOT_DIA_MIN = math.floor(ROOT_DIA * 10**ROOT_DIA_PLACES) / 10**ROOT_DIA_PLACES  # 8.04
+ROOT_DIA_MIN = math.floor(ROOT_DIA * 10**ROOT_DIA_PLACES) / 10**ROOT_DIA_PLACES
 ROOT_DIA_TOL_TYPE = 5  # swTolType_e.swTolMIN (offline API docs, enums/swTolType_e)
-if round(ROOT_DIA, ROOT_DIA_PLACES) != ROOT_DIA_MIN:
-    raise AssertionError(
-        f"root Ø{ROOT_DIA:.4f} does not print as its {ROOT_DIA_MIN} MIN"
-    )
 
 # --- axial stations from the rear face (z 0) -----------------------------------
 # OVERALL_LENGTH and FLAT_END_STATION print ±0.05 (R9-5; the knob chain and
@@ -362,8 +353,8 @@ BORE_DEVIATIONS = deviations(BORE_DIA_BAND)
 BOSS_DIA_DEVIATIONS = deviations(BOSS_DIA_BAND)
 FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 OUTSIDE_DIA_DEVIATIONS = deviations(OUTSIDE_DIA_BAND)
-# swTolMIN records the floor as its lower deviation from the model nominal.
-ROOT_DIA_DEVIATIONS = (ROOT_DIA_MIN - ROOT_DIA, 0.0)
+# The MIN witness is at ROOT_DIA_MIN; record the exact model root above it.
+ROOT_DIA_DEVIATIONS = (0.0, ROOT_DIA - ROOT_DIA_MIN)
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:

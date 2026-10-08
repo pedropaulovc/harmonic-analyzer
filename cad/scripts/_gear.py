@@ -108,7 +108,14 @@ async def cut_tooth_gap(
     theta_u = facts["ThetaU"] + eps + rho
     th_l, th_u = fmt(theta_l), fmt(theta_u)
     rc = fmt(R_CLEAR_IN)
-    u = f"({fmt(facts['Tmax'])} * t)"
+    tmin = (
+        math.sqrt((root_r_in / facts["Rb"]) ** 2 - 1.0)
+        if root_r_in is not None and root_r_in > facts["Rb"] else 0.0
+    )
+    u = (
+        f"({fmt(tmin)} + {fmt(facts['Tmax'] - tmin)} * t)"
+        if tmin else f"({fmt(facts['Tmax'])} * t)"
+    )
     # NB the lower flank is the MIRRORED involute (its y is negated relative
     # to the upper's form), so an azimuth offset enters its phase with the
     # OPPOSITE sign: azimuth(t=0) = -(phase(0)). Lower lands at Delta-eps+rho,
@@ -117,6 +124,10 @@ async def cut_tooth_gap(
     ph_up = f"({u} + {fmt(facts['Gamma'] - facts['Delta'] + eps + rho)})"
     a1 = facts["Delta"] - eps + rho
     a2 = facts["Gamma"] - facts["Delta"] + eps + rho
+    if tmin:
+        inv_root = tmin - math.atan(tmin)
+        a1 -= inv_root
+        a2 += inv_root
     check("create_sketch gap", await adapter.create_sketch("Front"))
     gap_curves = [
         await equation_curve(
@@ -156,6 +167,14 @@ async def cut_tooth_gap(
             "base chord A2->A1",
             f"{rb} * ((1 - t) * {fmt(math.cos(a2))} + t * {fmt(math.cos(a1))})",
             f"{rb} * ((1 - t) * {fmt(math.sin(a2))} + t * {fmt(math.sin(a1))})",
+        ))
+    elif tmin:
+        rr = fmt(root_r_in)
+        gap_curves.append(await equation_curve(
+            adapter,
+            "root arc A2->A1",
+            f"{rr} * cos({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
+            f"{rr} * sin({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
         ))
     else:
         rr = fmt(root_r_in)
@@ -254,9 +273,16 @@ def gap_area_in_disc_ext(
     eps = widen_rad
     th_l, th_u = f["ThetaL"] - eps, f["ThetaU"] + eps
     a1, a2 = delta - eps, gamma - delta + eps
+    tmin = (
+        math.sqrt((root_r_in / rb) ** 2 - 1.0)
+        if root_r_in is not None and root_r_in > rb else 0.0
+    )
+    inv_root = tmin - math.atan(tmin)
+    a1 -= inv_root
+    a2 += inv_root
     pts: list[tuple[float, float]] = []
     for i in range(samples + 1):  # lower flank (mirrored involute, -eps)
-        t = tmax * i / samples
+        t = tmin + (tmax - tmin) * i / samples
         ph = t - delta + eps  # mirror flips the offset sign; azimuth(0) = a1
         pts.append((
             rb * (math.cos(ph) + t * math.sin(ph)),
@@ -266,7 +292,7 @@ def gap_area_in_disc_ext(
         th = th_l + (th_u - th_l) * i / samples
         pts.append((ra * math.cos(th), ra * math.sin(th)))
     for i in range(1, samples + 1):  # upper flank, reversed (+eps)
-        t = tmax * (samples - i) / samples
+        t = tmin + (tmax - tmin) * (samples - i) / samples
         ph = t - delta + gamma + eps
         pts.append((
             rb * (math.cos(ph) + t * math.sin(ph)),
@@ -458,6 +484,7 @@ async def build_fixed_gear(
     depth_dp: float | None = None,
     long_addendum_mm: float = 0.0,
     dedendum: float = 1.157,
+    profile_shift: float = 0.0,
 ) -> ToothedDisc:
     """Build a toothed disc on the active new part.
 
@@ -490,14 +517,24 @@ async def build_fixed_gear(
     ``dedendum`` is the root-relief depth below the pitch circle in units of
     1/depth_dp: the standard 1.157, or 1.25 for a pinion whose drawing
     floors its root at the 1.25/P full-depth form (the feed-pinion sleeve).
+    ``profile_shift`` displaces the basic rack cutter by x/depth_dp: it raises
+    tip and root radii by that amount and thickens each tooth at the pitch
+    circle by 2*x*tan(pa_deg)/depth_dp. This is a shifted involute, not merely
+    a larger blank. Callers use root_relief=True for the shifted root arc.
     """
     depth_dp = dp if depth_dp is None else depth_dp
-    addendum_extra_in = 1.0 / depth_dp - 1.0 / dp + long_addendum_mm / IN
+    shift_in = profile_shift / depth_dp
+    addendum_extra_in = (
+        1.0 / depth_dp - 1.0 / dp + long_addendum_mm / IN + shift_in
+    )
     facts = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     ra_mm = facts["Ra"] * IN
     pitch_r_in = teeth / dp / 2.0
-    widen_rad = (backlash_mm / 2.0) / (pitch_r_in * IN)
-    root_r_in = (pitch_r_in - dedendum / depth_dp) if root_relief else None
+    thickness_extra_in = 2.0 * shift_in * math.tan(math.radians(pa_deg))
+    widen_rad = (backlash_mm / IN - thickness_extra_in) / (2.0 * pitch_r_in)
+    root_r_in = (
+        pitch_r_in - dedendum / depth_dp + shift_in
+    ) if root_relief else None
     if helix_deg and root_r_in is None:
         raise ValueError("helix_deg requires root_relief=True (additive tooth "
                          "area algebra assumes the root-arc floor)")

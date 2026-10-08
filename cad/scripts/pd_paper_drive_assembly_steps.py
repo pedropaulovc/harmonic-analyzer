@@ -130,13 +130,11 @@ BAR_TOP_ABOVE_DECK = 266.934
 # the feed mesh at its 0.55 centre extension (contact ratio 1.25).
 RACK_CREST_DROP = 2.25
 RACK_CREST_TOL = 0.05
-# R9-62a: the feed pinion's mesh in the rack, set before the hook is
-# match-drilled: the platen's shake along the rack with the knob held, i.e. the
-# backlash at the pitch line, 2 * e * tan(pressure angle) for a centre
-# extension e over the standard centres. The band's ends are checked below
-# against the form-cut 12T's interference (feed_mesh_penetration) and the 1.1
-# contact-ratio rule at the printed smallest tip (feed_mesh_contact_ratio).
-MESH_BACKLASH_RANGE = (0.28, 0.32)
+# The shifted module-0.8 pinion's platen shake at the rack pitch line.
+# Extension includes x*m before adding the backlash allowance; both band
+# ends are checked against the modeled radial-root/involute flank and the
+# contact-ratio floor at the smallest printed tip.
+MESH_BACKLASH_RANGE = (0.10, 0.14)
 MESH_CONTACT_RATIO_FLOOR = 1.1
 # The rack's addendum and the pinion's flank, in the pinion's frame.
 _PHI = math.radians(feed_pinion.PRESSURE_ANGLE_DEG)
@@ -150,7 +148,9 @@ _INTERFERENCE_TOL = 1e-5  # mm: the sweep's sampling floor
 
 def mesh_extension(backlash: float) -> float:
     """The feed pinion's centre extension that gives ``backlash``."""
-    return backlash / (2.0 * math.tan(_PHI))
+    return feed_pinion.PROFILE_SHIFT * feed_pinion.MODULE_MM + backlash / (
+        2.0 * math.tan(_PHI)
+    )
 
 
 def feed_mesh_contact_ratio(
@@ -164,11 +164,10 @@ def feed_mesh_contact_ratio(
 
 
 def feed_mesh_penetration(extension: float, samples: int = 20001) -> float:
-    """Deepest reach (mm, > 0 interferes) of the rack into the MHA-PD-010 12T at
-    centre ``extension``, the rack pushed to flank contact.  The 12T is form
-    cut (R9-67): involute above the base circle, radial below it to the 1.25/P
-    root (the model's flank).  The rack's tip corners are what reach the
-    radial flank, so they are rolled through three pitches of mesh."""
+    """Deepest reach (mm, > 0 interferes) of the rack into the shifted 12T at
+    centre ``extension``, the rack pushed to flank contact. The modeled flank
+    is involute above the base circle and radial down to its shifted root.
+    Rack tip corners are rolled through three pitches of mesh."""
     roll = np.linspace(-1.5, 1.5, samples) * _TOOTH_ANGLE / 2.0
     cos, sin = np.cos(roll), np.sin(roll)
     tip_r = feed_pinion.OUTSIDE_DIA / 2.0
@@ -180,8 +179,10 @@ def feed_mesh_penetration(extension: float, samples: int = 20001) -> float:
     worst = -math.inf
     for tooth in (-1, 0, 1):
         for side in (-1.0, 1.0):
-            # Half the backlash, extension * tan(PA), takes the rack to contact.
-            x = -_PITCH_R * roll + extension * math.tan(_PHI)
+            # Half the running backlash takes the rack to flank contact.
+            x = -_PITCH_R * roll + (
+                extension - feed_pinion.PROFILE_SHIFT * feed_pinion.MODULE_MM
+            ) * math.tan(_PHI)
             x = x + tooth * pitch + side * corner_half
             y = _PITCH_R + extension - _RACK_ADDENDUM
             px, py = cos * x + sin * y, -sin * x + cos * y
@@ -189,6 +190,7 @@ def feed_mesh_penetration(extension: float, samples: int = 20001) -> float:
             pressure = np.arccos(_BASE_R / np.maximum(radius, _BASE_R))
             half = (
                 _TOOTH_ANGLE / 4.0
+                + 2.0 * feed_pinion.PROFILE_SHIFT * math.tan(_PHI) / feed_pinion.TEETH
                 + math.tan(_PHI)
                 - _PHI
                 - (np.tan(pressure) - pressure)

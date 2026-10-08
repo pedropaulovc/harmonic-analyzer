@@ -28,6 +28,7 @@ import math
 from fractions import Fraction
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
+from pd_transgear_hanger_layout import PLATE_SCREW_MID_STATION
 
 MM_PER_IN = 25.4
 # The assembly's anchor for the arm: its front face on the spacer.
@@ -100,7 +101,7 @@ PIN_BORE_DIA_MAX = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[0], 6)
 PIN_BORE_DIA_MIN = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[1], 6)
 # --- Plate taps: 2 x #8-32 THROUGH on the centreline, countersunk both ends -
 PLATE_SCREW_PITCH = 15.0
-PLATE_SCREW_MID_STATION = 33.542  # the plate's centreline (MHA-PD-019)
+# The plate's centreline follows the shifted reducer's bore datum.
 PLATE_TAP_STATIONS = (
     PLATE_SCREW_MID_STATION - PLATE_SCREW_PITCH / 2.0,
     PLATE_SCREW_MID_STATION + PLATE_SCREW_PITCH / 2.0,
