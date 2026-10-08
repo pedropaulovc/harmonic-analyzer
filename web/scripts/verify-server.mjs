@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import { sha256File, VIDEO_IDS } from './verify-reference.mjs'
+import { originalAccessIndex, sameOriginalFile } from './native-access-index.mjs'
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.mp4': 'video/mp4', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' }
 
@@ -40,6 +41,15 @@ export async function serveDist(distRoot, { base, requests = [], signal, referen
   const index = await readFile(join(root, 'index.html'), 'utf8')
   const basePath = buildBase(index, base)
   const sockets = new Set()
+  // The compressed original scan finishes before listen(), never inside an HTTP request.
+  const access = new Map()
+  if (referenceRoot) for (const id of VIDEO_IDS) {
+    const path = resolve(referenceRoot, 'videos', `${id}.mp4`)
+    try {
+      const prepared = await originalAccessIndex(path, id, { signal })
+      access.set(id, { ...prepared, body: JSON.stringify(prepared.index) })
+    } catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
   const server = createServer(async (request, response) => {
     let pathname = '', path
     try {
@@ -47,6 +57,17 @@ export async function serveDist(distRoot, { base, requests = [], signal, referen
       if (pathname !== basePath.slice(0, -1) && !pathname.startsWith(basePath)) { response.writeHead(404); response.end('Not under the built simulator base'); return }
       if (pathname === basePath.slice(0, -1)) { response.writeHead(308, { location: `${basePath}${new URL(request.url, 'http://localhost').search}` }); response.end(); return }
       const relative = pathname.slice(basePath.length) || 'index.html'
+      const indexRequest = /^reference-media\/([A-Za-z0-9_-]+)\.access.json$/.exec(relative)
+      if (indexRequest) {
+        const prepared = access.get(indexRequest[1])
+        if (!prepared) { response.writeHead(404); response.end('Original safe-access index unavailable'); return }
+        const current = await stat(resolve(referenceRoot, 'videos', `${indexRequest[1]}.mp4`))
+        if (!sameOriginalFile(prepared.identity, current)) { response.writeHead(409); response.end('Original media changed after indexing'); return }
+        response.writeHead(200, { 'content-type': MIME['.json'], 'cache-control': 'no-cache', 'content-length': Buffer.byteLength(prepared.body) })
+        requests.push({ url: request.url, status: 200, path: relative, bytes: Buffer.byteLength(prepared.body) })
+        response.end(request.method === 'HEAD' ? undefined : prepared.body)
+        return
+      }
       const media = /^reference-media\/([A-Za-z0-9_-]+)\.mp4$/.exec(relative)
       if (media) {
         if (!referenceRoot || !VIDEO_IDS.includes(media[1])) { response.writeHead(404); response.end('Original reference media unavailable'); return }
@@ -57,6 +78,7 @@ export async function serveDist(distRoot, { base, requests = [], signal, referen
       }
       const info = await stat(path)
       if (!info.isFile()) { response.writeHead(404); response.end(); return }
+      if (media && !sameOriginalFile(access.get(media[1])?.identity ?? {}, info)) { response.writeHead(409); response.end('Original media changed after indexing'); return }
       const headers = { 'content-type': MIME[extname(path)] ?? 'application/octet-stream', 'cache-control': 'no-cache', 'accept-ranges': 'bytes', 'referrer-policy': 'strict-origin-when-cross-origin' }
       let start = 0, end = info.size - 1, status = 200
       if (request.headers.range) {

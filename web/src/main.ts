@@ -5,7 +5,7 @@ import { VIDEOS, resolveVideo, type Video } from './video-catalog'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
 import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT_PX, type PlaybackView, type ReferenceState, type SourceSample } from './timeline'
 import type { CompactVideoReference, DiagnosticSourcePublicationState, SourcePublicationReference } from './source-track'
-import { createSourceVideoPlayer } from './source-player'
+import { buildOriginalPresentationSamples, createSourceVideoPlayer, isSourceVideoPlayer } from './source-player'
 import { INPUT_FIELDS, equalRecord, type InputField } from './source-witness'
 import { unavailableNativePrimitiveSnapshot, type NativeInputSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmissionMetadata, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
 import { compileSourceAssemblyState, createSourceAssemblyBuffer, OPERATING_SOURCE_ASSEMBLY, solveSourceAssembly, type CompiledSourceAssembly, type SourceAssemblyBuffer, type SourceAssemblyState } from './source-assembly'
@@ -36,6 +36,15 @@ const pauseButton = element<HTMLButtonElement>('#pause-video')
 const followButton = element<HTMLButtonElement>('#follow-video')
 const fitButton = element<HTMLButtonElement>('#fit-view')
 const compactButton = element<HTMLButtonElement>('#minimize-player')
+const sourceControls = element('#source-controls')
+const sourcePlay = element<HTMLButtonElement>('#source-play')
+const sourceMute = element<HTMLButtonElement>('#source-mute')
+const sourceVolume = element<HTMLInputElement>('#source-volume')
+const sourceScrub = element<HTMLInputElement>('#source-scrub')
+const sourceScrubTime = element<HTMLOutputElement>('#source-scrub-time')
+const sourceSeekStatus = element('#source-seek-status')
+const sourceSeekTime = element<HTMLInputElement>('#source-seek-time')
+const sourceSeekButton = element<HTMLButtonElement>('#source-seek')
 const driveControls = element<HTMLFieldSetElement>('#drive-controls')
 const channelFieldset = element<HTMLFieldSetElement>('#channel-fieldset')
 const crank = element<HTMLInputElement>('#crank')
@@ -68,12 +77,14 @@ const assemblyOverrides: PartOverrideProvider = baseline => {
 }
 let machine: Machine | null = null
 let reference: CompactVideoReference | null = null
+let presentedSampleTimes = new Map<number, number>()
 let player: VideoPlayer | null = null
 let video: Video | null = null
 let selectionAbort: AbortController | null = null
 let playbackState: PlaybackState = 'unstarted'
 let mode: 'following-video' | 'exploring' | 'reference-review' = 'exploring'
-let referenceSeek: 'idle' | 'seeking' = 'idle'
+let referenceSeek: 'idle' | 'seeking' | 'preroll' = 'idle'
+let manualSourceSeek: 'idle' | 'seeking' = 'idle'
 let referenceState: ReferenceState = 'unavailable'
 let modelState: 'loading' | 'ready' | 'unavailable' = 'loading'
 let nativeDiagnosticLeaseActive = false
@@ -106,6 +117,7 @@ interface NativeDiagnosticPublicationSnapshot {
   activeViews: readonly PlaybackView[]
   referenceState: ReferenceState
   modelTime: number
+  sourceSampleTimeSeconds: number
   sourceDrawRevision: number
   paintRevision: 'clean' | 'pending'
   externalInput: NativeInputSnapshot
@@ -127,7 +139,10 @@ interface NativeDiagnosticContext {
   withPublicationSamples<T>(samples: readonly SourceSample[], anchors: readonly LandmarkAnchor[], run: (transaction: NativeDiagnosticPublication) => T | Promise<T>): Promise<T>
 }
 let modelTime = 0
+// Authored selection key, never a replacement for real native/model/draw clocks.
+let sourceSampleTimeSeconds = 0
 let manualMotion: 'idle' | 'turning' = 'idle'
+let manualSceneOwnership: 'initial' | 'owned' = 'initial'
 let manualRevision: 'pending' | 'clean' = 'pending'
 let paintRevision: 'pending' | 'clean' = 'pending'
 let physicsState: 'available' | 'unavailable' = 'unavailable'
@@ -147,6 +162,7 @@ interface MechanismDraw {
   imagePlaneWarp: PlaybackView['authoredImagePlaneWarp']
   resolvedImagePlaneWarp: NonNullable<PlaybackView['imagePlaneWarp']> | null
   sourceAssembly: SourceAssemblyState
+  effectiveSourceOverridePartPaths: string[]
   sourceLayout: readonly SourceLayoutEntry[]
   channelAnglesRad: Float64Array
   platenTravelM: number
@@ -164,10 +180,12 @@ interface NativeDiagnosticFrame {
   mode: 'following-video' | 'exploring' | 'reference-review'
   referenceState: ReferenceState
   modelTime: number
+  sourceSampleTimeSeconds: number
   sourceDrawTimeSeconds: number
   sourceDrawRevision: number
   sourceDrawLayout: readonly SourceLayoutEntry[]
   manualMotion: 'idle' | 'turning'
+  manualSceneOwnership: 'initial' | 'owned'
   manualRevision: 'pending' | 'clean'
   explorationOrigin: 'interactive-default' | 'chosen-feasible-reconstruction'
   diagnosticReference: CompactVideoReference | null
@@ -227,7 +245,7 @@ function cameraRecord(): CameraRecord {
 function configureLandmarkProbe(): void {
   if (nativeDiagnosticLeaseActive && nativeDiagnosticRefusal === null) return
   const enabled = verificationEnabled && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused'
-    && reference !== null && machine?.availability === 'available'
+    && referenceState === 'approximate' && reference !== null && machine?.availability === 'available'
   if (enabled ? diagnosticReference === reference && diagnosticMachine === machine : diagnosticReference === null && diagnosticMachine === null) return
   viewer.setLandmarkProbe(null)
   viewer.setPartVisibilityProbe(null)
@@ -236,13 +254,13 @@ function configureLandmarkProbe(): void {
   if (!enabled || !reference || machine?.availability !== 'available') return
   diagnosticReference = reference
   diagnosticMachine = machine
-  viewer.setLandmarkProbe(machine.createLandmarkProbe(reference.data.anchors))
+  viewer.setLandmarkProbe(machine.createLandmarkProbe(reference.landmarkProbeAnchors))
 }
 
 function renderPending(): void {
   if (paintRevision === 'clean') return
   paintRevision = 'clean'
-  if (mode !== 'exploring' && referenceState === 'no-machine') drawSourceViews([], modelTime)
+  if (mode !== 'exploring' && referenceState === 'hold-last-readable' && activeViews.length) drawSourceViews(activeViews, modelTime)
   else viewer.render(currentAssembly.state)
 }
 
@@ -270,7 +288,9 @@ function primaryView(): PlaybackView | undefined {
 }
 
 function currentInputMeaning(drawViewId?: string) {
+  if (mode === 'reference-review' && referenceSeek !== 'idle') return 'retained-displayed-input-during-original-seek-not-current-source-match'
   if (mode === 'exploring') return 'manual-physical-input'
+  if (referenceState === 'hold-last-readable') return 'held-readable-approximation-not-current-source-match'
   if (!primaryView() || drawViewId === EXPLORING_VIEW_ID) return 'unverified-retained-physical-input'
   return 'chosen-feasible-approximation'
 }
@@ -288,9 +308,56 @@ function updateControlState(): void {
   driveControls.disabled = !editable
   channelFieldset.disabled = !editable
   fitButton.disabled = modelState !== 'ready' || mode !== 'exploring'
-  followButton.disabled = modelState !== 'ready' || !reference
+  followButton.disabled = modelState !== 'ready' || !reference || referenceSeek !== 'idle' || manualSourceSeek !== 'idle'
   pauseButton.disabled = !player
   pauseButton.textContent = playbackState === 'playing' || playbackState === 'buffering' ? 'Pause & explore' : 'Play video'
+  const local = player && isSourceVideoPlayer(player) ? player : null
+  sourceControls.hidden = local === null
+  sourcePlay.disabled = !local
+  sourcePlay.textContent = pauseButton.textContent
+  sourceScrub.disabled = !local || mode !== 'exploring' || !['paused', 'ended'].includes(local.getState()) || manualSourceSeek !== 'idle' || referenceSeek !== 'idle'
+  sourceSeekTime.disabled = sourceScrub.disabled
+  sourceSeekButton.disabled = sourceScrub.disabled
+  if (local) {
+    sourceScrub.max = String(videoContainer.querySelector('video')?.duration ?? 1)
+    sourceSeekTime.max = sourceScrub.max
+    sourceVolume.value = String(local.getAudio().volume)
+    sourceMute.setAttribute('aria-pressed', String(local.getMuted()))
+    sourceMute.textContent = local.getMuted() ? 'Unmute' : 'Mute'
+  }
+}
+
+async function seekOriginalManually(timeSeconds: number) {
+  invalidateNativeDiagnosticLease('A manual original source seek was requested')
+  const nativePlayer = player
+  if (!nativePlayer || !isSourceVideoPlayer(nativePlayer)) throw new Error('Safe original-byte manual seeking requires the local original source adapter.')
+  if (mode !== 'exploring' || !['paused', 'ended'].includes(nativePlayer.getState())) throw new Error('Pause in manual exploration before seeking the original source.')
+  if (manualSourceSeek !== 'idle') throw new Error('An original manual seek is already active.')
+  manualSourceSeek = 'seeking'
+  sourceControls.dataset.state = 'loading'
+  sourceControls.setAttribute('aria-busy', 'true')
+  sourceSeekStatus.textContent = 'Seeking original exposure from a verified IDR…'
+  updateControlState()
+  try {
+    const presented = await nativePlayer.seek(timeSeconds, 'manual')
+    if (player !== nativePlayer) throw new Error('The source changed during manual seeking.')
+    sourceControls.dataset.state = 'success'
+    sourceSeekStatus.textContent = `Paused original frame ${presented.frameIndex} · ${presented.mediaTime.toFixed(6)} s.`
+    return presented
+  } catch (error) {
+    if (player === nativePlayer) {
+      sourceControls.dataset.state = 'error'
+      sourceSeekStatus.textContent = error instanceof Error ? error.message : String(error)
+      notice(videoError, sourceSeekStatus.textContent)
+    }
+    throw error
+  } finally {
+    if (player === nativePlayer) {
+      manualSourceSeek = 'idle'
+      sourceControls.setAttribute('aria-busy', 'false')
+      updateControlState()
+    }
+  }
 }
 
 function validateSourceViews(views: readonly PlaybackView[]): void {
@@ -321,9 +388,10 @@ function explore(): void {
     updateMachine(input, compileSourceAssemblyState(chosen.sourceAssembly))
     viewer.applyCamera(chosen.camera)
     explorationOrigin = 'chosen-feasible-reconstruction'
-  } else if (machine?.availability === 'available') updateMachine(input, OPERATING_SOURCE_ASSEMBLY)
+  } else if (machine?.availability === 'available') updateMachine(input, currentAssembly)
   activeViews = []
   mode = 'exploring'
+  manualSceneOwnership = 'owned'
   configureLandmarkProbe()
   manualMotion = 'idle'
   manualRunButton.textContent = 'Turn crank'
@@ -360,7 +428,7 @@ function applyView(view: PlaybackView): void {
     draw = { status: 'solved-for-draw', viewId: view.id, timeSeconds: sourceDrawTimeSeconds, sourceDrawRevision,
       input: createMechanismInput(), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, nativeGeometryAssumptions: view.nativeGeometryAssumptions,
       imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceAssembly: currentAssembly.state, sourceLayout: sourceDrawLayout,
-      channelAnglesRad: new Float64Array(20), platenTravelM: 0, penTravelM: 0, effectiveBankDriveTurns: 0 }
+      effectiveSourceOverridePartPaths: [], channelAnglesRad: new Float64Array(20), platenTravelM: 0, penTravelM: 0, effectiveBankDriveTurns: 0 }
     mechanismDraws.set(view.id, draw)
   }
   draw.status = 'solved-for-draw'
@@ -373,6 +441,8 @@ function applyView(view: PlaybackView): void {
   draw.imagePlaneWarp = view.authoredImagePlaneWarp
   draw.resolvedImagePlaneWarp = view.imagePlaneWarp ?? null
   draw.sourceAssembly = currentAssembly.state
+  draw.effectiveSourceOverridePartPaths.length = 0
+  if (currentAssembly.state.kind !== 'operating' && assemblyBuffer) for (const override of assemblyBuffer.overrides) draw.effectiveSourceOverridePartPaths.push(override.partPath)
   draw.sourceLayout = sourceDrawLayout
   draw.channelAnglesRad.set(machine.pose.channelAnglesRad)
   draw.platenTravelM = machine.pose.platenTravelM
@@ -393,14 +463,14 @@ function drawSourceViews(views: readonly PlaybackView[], timeSeconds: number): v
 
 function renderedMechanism(viewId: string) {
   const draw = mechanismDraws.get(viewId)
-  if (!draw) return { status: 'unavailable' as const, viewId, imagePlaneWarp: null, resolvedImagePlaneWarp: null, sourceAssembly: null, sourceLayout: [] }
+  if (!draw) return { status: 'unavailable' as const, viewId, imagePlaneWarp: null, resolvedImagePlaneWarp: null, sourceAssembly: null, effectiveSourceOverridePartPaths: [], sourceLayout: [] }
   return {
-    status: mode === 'exploring' || referenceState === 'unavailable' || draw.timeSeconds !== modelTime ? 'stale' as const : draw.status,
+    status: mode === 'exploring' || referenceState !== 'approximate' || draw.timeSeconds !== modelTime ? 'stale' as const : draw.status,
     viewId, timeSeconds: draw.timeSeconds, sourceDrawRevision: draw.sourceDrawRevision,
     method: 'actual-native-mechanism-solve' as const, input: serializeInput(draw.input),
     mechanicalProvenance: draw.mechanicalProvenance, unobservedInputFields: draw.unobservedInputFields,
     nativeGeometryAssumptions: draw.nativeGeometryAssumptions,
-    imagePlaneWarp: draw.imagePlaneWarp, resolvedImagePlaneWarp: draw.resolvedImagePlaneWarp, sourceAssembly: draw.sourceAssembly, sourceLayout: draw.sourceLayout,
+    imagePlaneWarp: draw.imagePlaneWarp, resolvedImagePlaneWarp: draw.resolvedImagePlaneWarp, sourceAssembly: draw.sourceAssembly, effectiveSourceOverridePartPaths: draw.effectiveSourceOverridePartPaths.slice(), sourceLayout: draw.sourceLayout,
     channelAnglesRad: Array.from(draw.channelAnglesRad), platenTravelM: draw.platenTravelM, penTravelM: draw.penTravelM, effectiveBankDriveTurns: draw.effectiveBankDriveTurns,
   }
 }
@@ -421,42 +491,91 @@ function sourceCapture<T extends {
   return {
     ...capture,
     status: capture.status === 'captured' && (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') ? 'unavailable' as const
-      : capture.status === 'captured' && (!bound || referenceState === 'unavailable' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status,
+      : capture.status === 'captured' && (!bound || referenceState !== 'approximate' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status,
     imagePlaneWarp: bound ? draw.imagePlaneWarp : null,
   }
 }
 
 
-function renderSource(timeSeconds: number, sourceReference: SourcePublicationReference | null = reference): void {
+function renderSource(timeSeconds: number, sourceReference: SourcePublicationReference | null = reference, sourceExposureTimeSeconds = timeSeconds): void {
   configureLandmarkProbe()
   if (!sourceReference || !machine || machine.availability !== 'available') {
     referenceState = 'unavailable'
     renderPending()
     return
   }
-  const prepared = sourceReference.prepareAt(timeSeconds)
+  if (sourceReference === reference && player && isSourceVideoPlayer(player) && player.getSeekState() === 'idle') {
+    const presented = player.getPresentation()
+    if (!presented) {
+      referenceState = 'unavailable'
+      throw new Error('The original video has no current owned presented exposure. Complete a safe seek or real playback before restoring its pose.')
+    }
+    sourceExposureTimeSeconds = presentedSampleTimes.get(presented.frameIndex)
+      ?? presented.pts * presented.timeBase[0] / presented.timeBase[1]
+  }
+  let prepared = sourceReference.prepareAt(sourceExposureTimeSeconds)
+  if (prepared.state === 'hold-last-readable') {
+    // Pooled publication banks are reused. Own the DISPLAYED readable views once
+    // at hold entry, never adopt the excluded exposure's camera/input/assembly.
+    let heldViews = activeViews.length && referenceState !== 'hold-last-readable' ? structuredClone(activeViews) : activeViews
+    if (!heldViews.length && (mode !== 'exploring' || manualSceneOwnership === 'initial')) {
+      const readable = sourceReference.prepareLastReadableAt(sourceExposureTimeSeconds) ?? sourceReference.prepareInitialReadable()
+      if (readable) {
+        validateSourceViews(readable.views)
+        viewer.preflightViews(readable.views)
+        const preceding = sourceReference.commitPrepared()
+        heldViews = structuredClone(preceding.views)
+        activeViews = heldViews
+        const chosen = primaryView()
+        if (chosen) copyInput(chosen.input)
+        drawSourceViews(heldViews, preceding.timeSeconds)
+      }
+      prepared = sourceReference.prepareAt(sourceExposureTimeSeconds)
+    }
+    if (referenceState !== 'hold-last-readable') {
+      // Keep the actual held geometry/camera/layout, not the outgoing fade-to-zero.
+      // Opaque holding is deliberately NOT a current-source pixel match.
+      for (const view of heldViews) view.composite = { mode: 'opaque' }
+      const heldLayout = captureSourceLayout(heldViews)
+      for (const view of heldViews) view.sourceLayout = heldLayout
+    }
+    const hold = sourceReference.commitPrepared()
+    sourceSampleTimeSeconds = hold.timeSeconds
+    referenceState = hold.state
+    activeViews = heldViews
+    configureLandmarkProbe()
+    if (heldViews.length) drawSourceViews(heldViews, timeSeconds)
+    else {
+      // No preceding readable exposure exists: keep the genuine displayed manual
+      // scene, never blank the canvas or fabricate a source pose.
+      sourceDrawTimeSeconds = timeSeconds
+      sourceDrawRevision++
+      sourceDrawLayout = []
+      viewer.render(currentAssembly.state)
+    }
+    modelTime = timeSeconds
+    paintRevision = 'clean'
+    notice(sourceError, hold.reason)
+    return
+  }
   if (prepared.state !== 'unavailable') {
     validateSourceViews(prepared.views)
     viewer.preflightViews(prepared.views)
   }
   const sample = sourceReference.commitPrepared()
+  sourceSampleTimeSeconds = sample.timeSeconds
   referenceState = sample.state
   activeViews = sample.views
+  configureLandmarkProbe()
   if (sample.state === 'unavailable') {
     notice(sourceError, sample.reason)
     renderPending()
     return
   }
-  if (sample.views.length === 0) {
-    if (currentAssembly.state.kind !== 'operating') updateMachine(input, OPERATING_SOURCE_ASSEMBLY)
-    drawSourceViews(sample.views, timeSeconds)
-    paintRevision = 'clean'
-  } else {
-    const chosen = primaryView()
-    if (chosen) copyInput(chosen.input)
-    drawSourceViews(sample.views, timeSeconds)
-    paintRevision = 'clean'
-  }
+  const chosen = primaryView()
+  if (chosen) copyInput(chosen.input)
+  drawSourceViews(sample.views, timeSeconds)
+  paintRevision = 'clean'
   modelTime = timeSeconds
   notice(physicsError, '')
   notice(sourceError, sourceReference.approximationMessage)
@@ -469,11 +588,16 @@ function beforeView(_view: SourceView, index: number): void {
 
 function updateHud(inputMode: 'sync' | 'preserve' = 'sync'): void {
   const time = player?.getTime() ?? 0
+  if (player && isSourceVideoPlayer(player) && manualSourceSeek === 'idle' && document.activeElement !== sourceScrub) {
+    sourceScrub.value = String(time)
+    sourceScrubTime.value = `${time.toFixed(3)} s`
+  }
   const chosen = mode === 'exploring' ? undefined : primaryView()
   const context = mode === 'exploring'
     ? explorationOrigin === 'chosen-feasible-reconstruction' ? 'Manual exploration from chosen feasible reconstruction (not recovered history)' : 'Manual exploration'
-    : referenceState === 'approximate' ? 'Approximate source-following; chosen inputs, not recovered history or a final matched result'
-      : referenceState === 'no-machine' ? 'No corresponding machine in this source interval' : 'Source pose unavailable'
+    : mode === 'reference-review' && referenceSeek !== 'idle' ? 'Seeking original exposure; retaining the displayed model until real native presentation'
+      : referenceState === 'approximate' ? 'Approximate source-following; chosen inputs, not recovered history or a final matched result'
+      : referenceState === 'hold-last-readable' ? 'Holding the last readable approximation; no current-source match' : 'Source pose unavailable'
   const hidden = chosen?.unobservedInputFields ?? []
   const valueLabel = (field: InputField, value: string): string => `${value}${hidden.includes(field) ? ' · chosen, not measured' : mode !== 'exploring' && !chosen ? ' · not source-measured' : ''}`
   const markControl = (control: HTMLInputElement | HTMLSelectElement, field: InputField): void => {
@@ -541,6 +665,7 @@ function editMechanism(action: () => void): void {
   invalidateNativeDiagnosticLease('Manual mechanism input changed')
   if (mode !== 'exploring' || modelState !== 'ready') return
   action()
+  manualSceneOwnership = 'owned'
   manualRevision = 'pending'
   updateHud()
 }
@@ -598,6 +723,7 @@ function buildVideoNavigation(): void {
 }
 
 async function selectVideo(next: Video): Promise<void> {
+  const localOriginal = new URLSearchParams(location.search).get('referenceMedia') === '1'
   invalidateNativeDiagnosticLease('The selected native/source context changed')
   selectionAbort?.abort()
   const selection = new AbortController()
@@ -605,18 +731,27 @@ async function selectVideo(next: Video): Promise<void> {
   player?.destroy()
   player = null
   reference = null
+  presentedSampleTimes.clear()
   activeViews = []
   explorationOrigin = 'interactive-default'
   currentAssembly = OPERATING_SOURCE_ASSEMBLY
   configureLandmarkProbe()
   referenceSeek = 'idle'
+  manualSourceSeek = 'idle'
+  sourceControls.dataset.state = 'idle'
+  sourceControls.setAttribute('aria-busy', 'false')
+  sourceSeekStatus.textContent = 'Pause to choose an original exposure.'
+  sourceScrub.value = '0'
+  sourceScrubTime.value = '0.000 s'
   video = next
   videoContainer.replaceChildren()
   playbackState = 'unstarted'
   referenceState = 'unavailable'
   modelTime = 0
+  sourceSampleTimeSeconds = 0
   copyInput(createMechanismInput())
   manualRevision = 'pending'
+  manualSceneOwnership = 'initial'
   mode = 'exploring'
   viewer.setInteraction('exploring')
   if (initialCamera) viewer.applyCamera(initialCamera)
@@ -635,6 +770,7 @@ async function selectVideo(next: Video): Promise<void> {
   updateControlState()
   const sourcePromise = loadReference(next).then((loaded) => {
     if (selection.signal.aborted) return
+    if (localOriginal) presentedSampleTimes = buildOriginalPresentationSamples(loaded.data.frames)
     reference = loaded
     if (loaded.data.coverage.status === 'blocked') notice(sourceError, `Source coverage is not complete: ${loaded.coverageMessage}`)
     configureLandmarkProbe()
@@ -642,19 +778,22 @@ async function selectVideo(next: Video): Promise<void> {
     if (!selection.signal.aborted) notice(sourceError, error instanceof Error ? error.message : String(error))
   })
   try {
-    const createPlayer = new URLSearchParams(location.search).get('referenceMedia') === '1' ? createSourceVideoPlayer : createVideoPlayer
+    const createPlayer = localOriginal ? createSourceVideoPlayer : createVideoPlayer
     const created = await createPlayer(videoContainer, next.id, (state) => {
       if (selection.signal.aborted) return
       if (playbackState !== state) invalidateNativeDiagnosticLease(`Source playback changed from ${playbackState} to ${state}`)
       playbackState = state
       if (state === 'playing') {
         notice(videoError, '')
-        if (mode === 'reference-review' && referenceSeek === 'seeking') player?.pause()
+        if (player && isSourceVideoPlayer(player) && player.getSeekIntent() === 'manual') {
+          // Real decoder playback owns only the source clock; manual inputs/camera stay manual.
+        } else if (mode === 'reference-review' && referenceSeek === 'seeking') player?.pause()
+        else if (mode === 'reference-review' && referenceSeek === 'preroll') { /* Genuine native preroll owns decoding; retain the displayed model, not a stale sync claim. */ }
         else {
           try { renderSource(player?.getTime() ?? 0); if (referenceState !== 'unavailable') following() }
           catch (error) { notice(physicsError, error instanceof Error ? error.message : String(error)) }
         }
-      } else if ((state === 'paused' || state === 'ended') && mode !== 'reference-review') {
+      } else if ((state === 'paused' || state === 'ended') && mode === 'following-video') {
         explore()
       }
       updateControlState()
@@ -728,6 +867,8 @@ function tick(now: number): void {
   lastTick = now
   if (nativeDiagnosticLeaseActive && nativeDiagnosticRefusal === null) return
   try {
+    if (mode === 'exploring' && manualSourceSeek === 'idle' && player && isSourceVideoPlayer(player)
+      && player.getSeekState() === 'idle' && player.getState() === 'playing') retryFollowing()
     if (mode === 'following-video' && player) {
       renderSource(player.getTime())
     } else if (mode === 'exploring') {
@@ -742,6 +883,8 @@ function tick(now: number): void {
       }
       if (paintRevision === 'pending') renderPending()
       else if (viewer.controls.enableDamping || viewer.controls.autoRotate) viewer.controls.update()
+    } else if (mode === 'reference-review' && referenceSeek === 'preroll') {
+      // Do not block native frame-presentation callbacks with unrelated CAD draws.
     } else if (paintRevision === 'pending') {
       if (activeViews.length) drawSourceViews(activeViews, modelTime)
       else renderPending()
@@ -765,6 +908,7 @@ function tick(now: number): void {
 
 const viewer = createViewer(canvas, () => { paintRevision = 'pending' }, verificationEnabled)
 new ResizeObserver(() => { paintRevision = 'pending' }).observe(canvas.parentElement!)
+canvas.addEventListener('pointerdown', () => { if (mode === 'exploring') manualSceneOwnership = 'owned' })
 buildVideoNavigation()
 buildChannelControls()
 magnification.min = String(MAGNIFIER_RATIO_MIN)
@@ -794,6 +938,7 @@ platen.addEventListener('input', () => editMechanism(() => { input.setup.platenO
 manualRunButton.addEventListener('click', () => {
   invalidateNativeDiagnosticLease('Manual crank motion changed')
   if (mode !== 'exploring') return
+  manualSceneOwnership = 'owned'
   manualMotion = manualMotion === 'idle' ? 'turning' : 'idle'
   manualRunButton.textContent = manualMotion === 'turning' ? 'Stop crank' : 'Turn crank'
 })
@@ -805,6 +950,13 @@ element<HTMLButtonElement>('#odd-coefficients').addEventListener('click', () => 
   const coefficients = squareWave(6)
   for (let i = 0; i < 20; i++) input.amplitudes[i] = coefficients[MECHANISM_DATA.harmonicNumbers[i]! - 1]! / 10
 }))
+sourcePlay.addEventListener('click', () => pauseButton.click())
+sourceScrub.addEventListener('input', () => { sourceScrubTime.value = `${Number(sourceScrub.value).toFixed(3)} s` })
+sourceSeekButton.addEventListener('click', () => { void seekOriginalManually(Number(sourceSeekTime.value)).catch(() => { /* The transaction displays its bounded refusal. */ }) })
+sourceSeekTime.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); sourceSeekButton.click() } })
+sourceScrub.addEventListener('change', () => { void seekOriginalManually(Number(sourceScrub.value)).catch(() => { /* The transaction displays its bounded refusal. */ }) })
+sourceVolume.addEventListener('input', () => { if (player && isSourceVideoPlayer(player)) { player.setVolume(Number(sourceVolume.value)); updateControlState() } })
+sourceMute.addEventListener('click', () => { if (player && isSourceVideoPlayer(player)) { player.setMuted(!player.getMuted()); updateControlState() } })
 pauseButton.addEventListener('click', () => {
   if (player?.getState() === 'playing' || player?.getState() === 'buffering') player.pause()
   else player?.play()
@@ -822,6 +974,7 @@ followButton.addEventListener('click', () => {
 fitButton.addEventListener('click', () => {
   invalidateNativeDiagnosticLease('Manual camera fitting was requested')
   if (mode !== 'exploring') return
+  manualSceneOwnership = 'owned'
   viewer.fitView()
 })
 compactButton.addEventListener('click', () => {
@@ -854,8 +1007,8 @@ if (verificationEnabled) {
       const captureFrame = (): NativeDiagnosticFrame => ({
         input: structuredClone(input), machineInput: structuredClone(actualMachine.input), camera: cameraRecord(), assembly: currentAssembly,
         // Saved ownership is a whole frame, never live pooled PlaybackViews.
-        views: structuredClone(activeViews), layout: captureSourceLayout(activeViews), mode, referenceState, modelTime, sourceDrawTimeSeconds, sourceDrawRevision, sourceDrawLayout,
-        manualMotion, manualRevision, explorationOrigin, diagnosticReference, diagnosticMachine, physicsState,
+        views: structuredClone(activeViews), layout: captureSourceLayout(activeViews), mode, referenceState, modelTime, sourceSampleTimeSeconds, sourceDrawTimeSeconds, sourceDrawRevision, sourceDrawLayout,
+        manualMotion, manualRevision, manualSceneOwnership, explorationOrigin, diagnosticReference, diagnosticMachine, physicsState,
         sourceNotice: sourceError.textContent ?? '', physicsNotice: physicsError.textContent ?? '',
         draws: new Map([...mechanismDraws].map(([id, draw]) => [id, structuredClone(draw)])),
         controlsTarget: viewer.controls.target.clone(), controlsEnabled: viewer.controls.enabled,
@@ -907,7 +1060,9 @@ if (verificationEnabled) {
           referenceState = frame.referenceState
           activeViews = frame.views
           modelTime = frame.modelTime
+          sourceSampleTimeSeconds = frame.sourceSampleTimeSeconds
           manualMotion = frame.manualMotion
+          manualSceneOwnership = frame.manualSceneOwnership
           explorationOrigin = frame.explorationOrigin
           diagnosticReference = frame.diagnosticReference
           diagnosticMachine = frame.diagnosticMachine
@@ -936,7 +1091,6 @@ if (verificationEnabled) {
           viewer.camera.updateMatrixWorld(true)
           viewer.controls.target.copy(frame.controlsTarget)
           if (frame.mode !== 'exploring' && frame.views.length) drawSourceViews(frame.views, frame.modelTime)
-          else if (frame.mode !== 'exploring' && frame.referenceState === 'no-machine') viewer.renderViews([], undefined, frame.modelTime)
           else viewer.render(frame.assembly.state)
           sourceDrawRevision = frame.sourceDrawRevision
           sourceDrawTimeSeconds = frame.sourceDrawTimeSeconds
@@ -1048,7 +1202,7 @@ if (verificationEnabled) {
                   snapshot() {
                     requireTransaction()
                     return { ...state.snapshot(), sourceProof: false, sourceAcceptance: false, activeViews: structuredClone(activeViews),
-                      referenceState, modelTime, sourceDrawRevision, paintRevision, externalInput: structuredClone(serializeInput(input)) }
+                      referenceState, modelTime, sourceSampleTimeSeconds, sourceDrawRevision, paintRevision, externalInput: structuredClone(serializeInput(input)) }
                   },
                 }
                 try {
@@ -1114,10 +1268,12 @@ if (verificationEnabled) {
       const sourceLayout = verificationEnabled ? captureSourceLayout(activeViews) : chosen?.sourceLayout ?? []
       return {
         videoId: video?.id ?? null, playerVideoId: player?.getVideoId() ?? null, mode, playerState: player?.getState() ?? playbackState,
-        videoTime: player?.getTime() ?? null, modelTime, referenceState, modelState, missingBindings: machine?.missing ?? [],
+        videoTime: player?.getTime() ?? null, modelTime, sourceSampleTimeSeconds, referenceState, modelState, missingBindings: machine?.missing ?? [],
+        sourcePresentation: player && isSourceVideoPlayer(player) ? player.getPresentation() : null,
+        sourceSeek: player && isSourceVideoPlayer(player) ? { state: player.getSeekState(), intent: player.getSeekIntent() } : null,
         modelProvenance: machine?.provenance ?? null, camera: cameraRecord(), input: serializeInput(input),
         diagnosticLease: { active: nativeDiagnosticLeaseActive, restoration: lastNativeDiagnosticRestoration },
-        sourceDrawRevision, sourceDrawTimeSeconds, diagnosticCapture: physicsState === 'available' && paintRevision === 'clean' && referenceState !== 'unavailable' && diagnosticReference !== null && diagnosticReference === reference && diagnosticMachine === machine && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? 'paused-reference-review' : 'disabled',
+        sourceDrawRevision, sourceDrawTimeSeconds, diagnosticCapture: physicsState === 'available' && paintRevision === 'clean' && referenceState === 'approximate' && diagnosticReference !== null && diagnosticReference === reference && diagnosticMachine === machine && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? 'paused-reference-review' : 'disabled',
         sourceFollowing: reference ? { kind: reference.kind, stageLadder: SOURCE_STAGE_PERCENTAGES, finalTolerancePx: LANDMARK_LIMIT_PX, stages: reference.stageStatus, stageEvidence: 'unmeasured: no independently bound rendered report loaded', sourceMeasurements: reference.data.sourceMeasurements ?? null } : null,
         imagePlaneWarp: chosen ? chosen.authoredImagePlaneWarp : null,
         resolvedImagePlaneWarp: chosen?.imagePlaneWarp ?? null,
@@ -1142,15 +1298,15 @@ if (verificationEnabled) {
       else capture = machine.nativePrimitiveSnapshot(viewer, viewId)
       const draw = capture.status === 'captured' ? capture.manifest.draw : null
       const sourceBound = draw !== null && mode !== 'exploring' && primaryView() !== undefined
-        && draw.viewId !== EXPLORING_VIEW_ID && referenceState !== 'unavailable' && draw.timeSeconds === modelTime
+        && draw.viewId !== EXPLORING_VIEW_ID && referenceState === 'approximate' && draw.timeSeconds === modelTime
         && activeViews.some(view => view.id === draw.viewId && (view.composite?.mode !== 'crossfade' || view.composite.opacity > 0)
           && equalRecord(view.sourceAssembly ?? OPERATING_SOURCE_ASSEMBLY.state, draw.sourceAssembly))
       return { ...capture, context: {
         videoId: video?.id ?? null, playerVideoId: player?.getVideoId() ?? null, mode,
         playerState: player?.getState() ?? playbackState, videoTimeSeconds: player?.getTime() ?? null,
-        modelTimeSeconds: modelTime, sourceDrawRevision, sourceDrawTimeSeconds, referenceState,
+        modelTimeSeconds: modelTime, sourceSampleTimeSeconds, sourceDrawRevision, sourceDrawTimeSeconds, referenceState,
         inputMeaning: currentInputMeaning(draw?.viewId),
-        sourceFollowing: mode === 'exploring' ? 'disabled-manual-mode' : sourceBound ? 'chosen-feasible-not-source-qualified' : 'unavailable',
+        sourceFollowing: mode === 'exploring' ? 'disabled-manual-mode' : referenceState === 'hold-last-readable' ? 'held-readable-not-current-source-qualified' : sourceBound ? 'chosen-feasible-not-source-qualified' : 'unavailable',
         nativeDrawViewId: draw?.viewId ?? null, nativeGeometryIssues: capture.manifest?.issues ?? null,
         sourceAssembly: draw?.sourceAssembly ?? null,
         manualMotion, referenceSeek, physicsState, modelState,
@@ -1159,13 +1315,17 @@ if (verificationEnabled) {
     compactData() { return reference?.data ?? null },
     pauseVideo() { player?.pause(); return this.snapshot() },
     playVideo() { player?.play(); return this.snapshot() },
+    async seekVideo(timeSeconds: number) {
+      const presented = await seekOriginalManually(timeSeconds)
+      return { presentation: presented, snapshot: this.snapshot() }
+    },
     async reviewReferenceFrame(timeSeconds: number, sourceTimeSeconds = timeSeconds) {
       invalidateNativeDiagnosticLease('A native reference review was requested')
       const nativePlayer = player
       if (nativePlayer?.getState() !== 'paused') throw new Error('Pause the actual source video before reviewing a reference frame.')
       if (!reference) throw new Error('Source observations are unavailable.')
       if (physicsState !== 'available') throw new Error('Restore a valid mechanical setup before reviewing a source frame.')
-      if (referenceSeek === 'seeking') throw new Error('A native reference seek is already active.')
+      if (referenceSeek !== 'idle') throw new Error('A native reference seek is already active.')
       if (!Number.isFinite(timeSeconds) || timeSeconds < 0) throw new Error('Reference time must be finite and nonnegative.')
       if (!Number.isFinite(sourceTimeSeconds) || sourceTimeSeconds < 0 || Math.abs(sourceTimeSeconds - timeSeconds) > 0.5) throw new Error('Decoded source review time must be within 0.5s of its model sample.')
       if (reference.getState(timeSeconds) === 'unavailable') throw new Error('The requested source frame has no available corresponding camera and feasible pose.')
@@ -1183,23 +1343,32 @@ if (verificationEnabled) {
       const previousAssembly = currentAssembly
       try {
         mode = 'reference-review'
-        referenceSeek = 'seeking'
+        referenceSeek = isSourceVideoPlayer(nativePlayer) ? 'preroll' : 'seeking'
         viewer.setInteraction('following-video')
         updateControlState()
         const sourceMedia = videoContainer.querySelector('video')
         const seekTime = sourceMedia && sourceTimeSeconds >= sourceMedia.duration && sourceTimeSeconds - sourceMedia.duration <= 0.5 ? Math.max(0, sourceMedia.duration - 1e-6) : sourceTimeSeconds
-        nativePlayer.seek(seekTime)
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 40))
-        const deadline = performance.now() + 20_000
-        while (nativePlayer.getState() !== 'paused' || Math.abs(nativePlayer.getTime() - seekTime) > 0.002 || sourceMedia && (sourceMedia.seeking || sourceMedia.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)) {
-          if (nativePlayer !== player) throw new Error('The source video changed during reference review.')
-          if (nativePlayer.getState() === 'error' || nativePlayer.getState() === 'ended') throw new Error('The actual source video cannot display the requested reference time.')
-          if (performance.now() >= deadline) throw new Error('The actual source video did not settle at the requested paused reference time.')
+        if (isSourceVideoPlayer(nativePlayer)) {
+          await nativePlayer.seek(seekTime, 'reference-review')
+        } else {
+          nativePlayer.seek(seekTime)
           await new Promise<void>((resolve) => window.setTimeout(resolve, 40))
+          const deadline = performance.now() + 20_000
+          while (nativePlayer.getState() !== 'paused' || Math.abs(nativePlayer.getTime() - seekTime) > 0.002 || sourceMedia && (sourceMedia.seeking || sourceMedia.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)) {
+            if (nativePlayer !== player) throw new Error('The source video changed during reference review.')
+            if (nativePlayer.getState() === 'error' || nativePlayer.getState() === 'ended') throw new Error('The actual source video cannot display the requested reference time.')
+            if (performance.now() >= deadline) throw new Error('The actual source video did not settle at the requested paused reference time.')
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 40))
+          }
         }
         if (nativePlayer !== player) throw new Error('The source video changed during reference review.')
         referenceSeek = 'idle'
-        renderSource(timeSeconds)
+        const presented = isSourceVideoPlayer(nativePlayer) ? nativePlayer.getPresentation() : null
+        if (isSourceVideoPlayer(nativePlayer) && !presented) throw new Error('The actual original source presentation was superseded before drawing.')
+        // Select pose/readability from the verified original exposure, but draw
+        // and model clocks remain the real paused media clock, never target time.
+        renderSource(isSourceVideoPlayer(nativePlayer) ? nativePlayer.getTime() : timeSeconds, reference,
+          presented ? presented.pts * presented.timeBase[0] / presented.timeBase[1] : timeSeconds)
         if (referenceState === 'unavailable') throw new Error('The requested source frame has no available corresponding camera and feasible pose.')
         return this.snapshot()
       } catch (error) {
@@ -1223,21 +1392,24 @@ if (verificationEnabled) {
     endReferenceReview() {
       invalidateNativeDiagnosticLease('Manual exploration was requested')
       if (player?.getState() !== 'paused') throw new Error('Pause the actual source video before entering manual exploration.')
-      if (referenceSeek === 'seeking') throw new Error('Wait for the active native reference seek before entering manual exploration.')
+      if (referenceSeek !== 'idle') throw new Error('Wait for the active native reference seek before entering manual exploration.')
       explore()
       return this.snapshot()
     },
     renderedLandmarks(viewId: string) {
-      if (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') return null
+      if (mode !== 'reference-review' || referenceSeek !== 'idle' || referenceState !== 'approximate' || player?.getState() !== 'paused') return null
       const capture = viewer.readRenderedLandmarks(viewId)
       return capture ? sourceCapture(capture) : null
     },
     renderedPartVisibility(viewId: string) {
-      const capture = sourceCapture(viewer.readRenderedPartVisibility(viewId))
+      const native = viewer.readRenderedPartVisibility(viewId)
+      const capture = referenceState === 'hold-last-readable'
+        ? { ...native, sourceProof: false as const, sourceAcceptance: false as const, sourceFollowing: 'held-readable-not-current-source-qualified' as const }
+        : sourceCapture(native)
       return mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? capture : { ...capture, status: 'unavailable' as const, parts: [] }
     },
     enablePartVisibility() {
-      if (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') throw new Error('Pause and review an actual source frame before enabling native visibility capture.')
+      if (mode !== 'reference-review' || referenceSeek !== 'idle' || !['approximate', 'hold-last-readable'].includes(referenceState) || player?.getState() !== 'paused') throw new Error('Pause and review an actual source frame or explicitly held readable native pose before enabling native visibility capture.')
       configureLandmarkProbe()
       if (machine?.availability !== 'available') throw new Error('A compatible native mechanism is required.')
       viewer.setPartVisibilityProbe(machine.createPartVisibilityProbe())
