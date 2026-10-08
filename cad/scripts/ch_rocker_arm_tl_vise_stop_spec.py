@@ -72,9 +72,11 @@ NOSE_Z = NOSE_Z_SETUP - SETUP_Z_OF_JAW_TOP  # -0.31705
 
 # --- Bought items (not modelled) -------------------------------------------
 # Nose: hardened 6 x 8 dowel pin (ISO 8734, m6: 6.004..6.012), fixed in the
-# finger flush with its back face. The part is built up from it; the sheet
-# states the installed result (rule 6: no method in the notes).
-BUILT_UP_PERMISSION_NOTE = "NOSE IS A BOUGHT DOWEL PIN, FIXED IMMOVABLE IN ITS HOLE."
+# finger flush with its back face. The sheet states the installed result
+# (rule 6: no method in the notes). The block itself stays one piece: an
+# ordinary note, not BUILT_UP_PERMISSION_NOTE, so construction exports
+# one_piece and no built-up arm or finger is accepted.
+NOSE_INSTALLED_NOTE = "NOSE IS A BOUGHT DOWEL PIN, FIXED IMMOVABLE IN ITS HOLE."
 NOSE_PIN_DIA = 6.0
 NOSE_PIN_MAX = 6.012
 NOSE_PIN_LENGTH = 8.0
@@ -313,7 +315,7 @@ if DRAWING_PRECISION_BY_NAME["ScrewGrip"] != 3:
 SURFACE_FINISHES = ()
 DRAWING_NOTES = "\n".join(
     (
-        BUILT_UP_PERMISSION_NOTE,
+        NOSE_INSTALLED_NOTE,
         "HAND-SEATING LOAD ONLY, NO CUTTING LOAD.",
     )
 )
