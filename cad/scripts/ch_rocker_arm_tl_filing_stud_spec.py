@@ -86,7 +86,6 @@ if _SEAT_MIN - _STACK_MAX < NUT_THICKNESS:
 # half pitches) at the shortest printed thread, and a worst-case collar of
 # two millimetres between the seat and back-face stations.
 _THREAD_PITCH = 25.4 / 20.0
-_THREAD_MAJOR = 6.35
 if _START_MIN - 1.5 * _THREAD_PITCH < 1.5 * THREAD_MODEL_DIA:
     raise AssertionError(
         "filing-stud thread lacks one and a half diameters of full thread"
