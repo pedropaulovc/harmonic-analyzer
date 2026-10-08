@@ -122,7 +122,8 @@ END_KEEP = {
 OVERALL_PICKS = ((HEAD_TOP_X, _sheet_y(3.0)), (TIP_X, _sheet_y(1.0)))
 OVERALL_TEXT_XY = ((HEAD_TOP_X + TIP_X) / 2.0, SIDE_CENTER[1] - 0.079)
 THREAD_PICK = ((SHOULDER_END_X + TIP_X) / 2.0, _sheet_y(THREAD_MODEL_DIA / 2.0))
-THREAD_NOTE_XY = (TIP_X + 0.012, SIDE_CENTER[1] + 0.034)
+# Below the shoulder callout's underline, so its leader crosses nothing.
+THREAD_NOTE_XY = (TIP_X + 0.012, SIDE_CENTER[1] + 0.020)
 # Below the journal: the fit callout fills the space above it.
 FINISH_PICK = (SHOULDER_END_X - 0.030, _sheet_y(-SHOULDER_DIA / 2.0))
 FINISH_SYMBOL = (SHOULDER_END_X - 0.045, _sheet_y(-SHOULDER_DIA / 2.0) - 0.014)

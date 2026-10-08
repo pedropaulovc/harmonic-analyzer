@@ -227,7 +227,9 @@ HEAD_FIT_CALLOUT = "\n".join(
 HEAD_COAXIAL_NOTE = "HEAD COAXIAL WITH SHOULDER"
 # The two .XXX stack lengths say why on the dimension: they set how deep the
 # shoulder and thread sit in the profile plate.
-STACK_CALLOUT = f"SETS DEPTH IN PLATE {PROFILE_PLATE_NUMBER}"
+# Short enough to sit between the 16.000 span's extension lines; the plate
+# is named on the shoulder's fit callout.
+STACK_CALLOUT = "SETS PLATE DEPTH"
 # The head-top-to-tip overall prints as a stock cut-off reference.
 OVERALL_REFERENCE_PLACES = 1
 DRAWING_NOTES = "\n".join(
@@ -236,7 +238,7 @@ DRAWING_NOTES = "\n".join(
         f"{HEAD_COAXIAL_NOTE}.",
         # One axial baseline: the underhead clamps the washer and sets the
         # depth in the plate; the slot depth is the slot's own size.
-        "AXIAL LENGTHS RUN FROM THE UNDERSIDE OF THE HEAD; THE SLOT DEPTH FROM THE HEAD TOP.",
+        "AXIAL LENGTHS FROM THE HEAD UNDERSIDE; SLOT DEPTH FROM THE HEAD TOP.",
     )
 )
 # The head left behind the slot at worst case.
