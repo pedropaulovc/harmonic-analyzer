@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "verify:identity-evidence": "uv run --isolated --no-project python scripts/canonical-native-evidence.py check",
     "verify:sync": "npm run verify:identity-evidence && node scripts/verify-sync.mjs",
-    "test:source": "node --test scripts/fresh-source-observations.test.mjs && uv run --isolated --no-project --python 3.13 --with-requirements scripts/source-fit-requirements.txt python -m unittest discover -s scripts -p \"test_source_*.py\"",
+    "test:source": "node --test scripts/fresh-source-observations.test.mjs scripts/executed-point-motion.test.mjs && uv run --isolated --no-project --python 3.13 --with-requirements scripts/source-fit-requirements.txt python -m unittest discover -s scripts -p \"test_source_*.py\"",
     "test:playback": "node --test scripts/source-track.test.mjs",
     "test:source-assembly": "node --test scripts/source-assembly.test.mjs",
     "test:model": "node --test scripts/native-identity-map.test.mjs scripts/optimize-model.test.mjs scripts/model-representation.test.mjs scripts/fetch-model.test.mjs scripts/model-loader.test.mjs && uv run --isolated --no-project python -m unittest discover -s scripts -p test_native_identity_source.py && npm run test:inventory",

@@ -5,11 +5,69 @@ import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
 import * as THREE from 'three'
 import { createServer, createLogger } from 'vite'
+import { completeInput } from './verify-reference.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const finitePoint = value => Array.isArray(value) && value.length === 3 && value.every(Number.isFinite)
 const supportedMotion = motion => motion === 'crank' || motion === 'wheel'
 const EMPTY_OVERRIDES = Object.freeze([])
+
+/** The real source compiler/solver owns feasibility; reject raw invalid values
+ * BEFORE JSON cache keys can turn NaN/Infinity into the valid automatic null.
+ */
+export function createPointMotionPairCompiler({ compileInput, solveSourceInput, createMechanismPose }) {
+  const cache = new Map(), solvePose = createMechanismPose()
+  return function pairFor(raw, motion) {
+    if (!supportedMotion(motion) || !completeInput(raw)) return null
+    const key = JSON.stringify([motion, raw])
+    if (cache.has(key)) return cache.get(key)
+    let pair = null
+    try {
+      const first = structuredClone(raw)
+      const initialPose = solveSourceInput(compileInput(first, 'Executed point-motion baseline'), [], solvePose)
+      // Hold the actual auto-calibrated physical counter identical in A/B.
+      if (first.setup.counterHeightM === null) first.setup.counterHeightM = initialPose.counter.gooseneckHeightM
+      const second = structuredClone(first)
+      second.crankTurns += 0.125
+      const inputs = [compileInput(first, 'Executed point-motion baseline'), compileInput(second, 'Executed point-motion changed driver')]
+      const angles = [], equilibriumResidualNm = []
+      for (const input of inputs) {
+        const pose = solveSourceInput(input, [], solvePose)
+        angles.push(motion === 'crank' ? pose.crankAngleRad : pose.magnifier.wheelAngleRad)
+        equilibriumResidualNm.push(pose.equilibriumResidualNm)
+      }
+      const angleDelta = angles[1] - angles[0]
+      if (Number.isFinite(angleDelta) && angleDelta !== 0 && Math.abs(angleDelta) < Math.PI) {
+        pair = { serialized: [first, second], inputs, driver: 'crankTurns', angles, equilibriumResidualNm }
+      }
+    } catch { /* Invalid or unclosed capability inputs are unknown, not fixed. */ }
+    cache.set(key, pair)
+    return pair
+  }
+}
+
+const distance3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+/** This is geometric displacement only; the caller supplies actual leased
+ * A→A→B→A points after its identity, rigid-binding and association checks.
+ */
+export function classifyPointMotion(world) {
+  if (!Array.isArray(world) || world.length !== 4 || !world.every(finitePoint)) {
+    return { motion: null, reason: 'actual normal-solved matrix unavailable or nonfinite' }
+  }
+  const [first, repeated, second, returned] = world
+  const displacementMetres = distance3(second, first)
+  const sameInputNoiseMetres = distance3(repeated, first), returnInputNoiseMetres = distance3(returned, first)
+  // Two endpoint coordinates give sqrt(3) decoded Float32 ulps in XYZ.
+  // Add measured repeat/return noise, never count a centre's datum offset.
+  const scale = Math.max(1, Math.abs(first[0]), Math.abs(first[1]), Math.abs(first[2]),
+    Math.abs(second[0]), Math.abs(second[1]), Math.abs(second[2]))
+  const roundoffMetres = Math.sqrt(3) * 2 ** -23 * scale + Math.max(sameInputNoiseMetres, returnInputNoiseMetres)
+  const moving = Number.isFinite(displacementMetres) && displacementMetres > roundoffMetres
+  return { motion: moving ? 'moving' : null, reason: moving ? null : 'zero or roundoff-ambiguous point displacement',
+    pointPair: [first, second], sameInputPoint: repeated, returnedInputPoint: returned,
+    displacementMetres, sameInputNoiseMetres, returnInputNoiseMetres, roundoffMetres }
+}
 
 /** CPU-only capability classification, not source pose, visibility, or raster proof.
  * Load the approved real GLB once and read only this update's NORMAL matrix lease.
@@ -73,36 +131,9 @@ export async function createPointMotionClassifier({ webRoot = WEB_ROOT, modelPat
     }
     for (const root of scene.children) for (const child of root.children) visit(child, '')
     const matrix = new Float64Array(16), transform = new THREE.Matrix4(), point = new THREE.Vector3()
-    const pairCache = new Map()
     let disposed = false
-    const matrixCache = new Map(), solvePose = createMechanismPose()
-
-    function pairFor(raw, motion) {
-      const key = JSON.stringify([motion, raw])
-      if (pairCache.has(key)) return pairCache.get(key)
-      let pair = null
-      try {
-        const first = structuredClone(raw)
-        const initialPose = solveSourceInput(compileInput(first, 'Executed point-motion baseline'), [], solvePose)
-        // Hold the actual auto-calibrated physical counter identical in A/B.
-        if (first.setup.counterHeightM === null) first.setup.counterHeightM = initialPose.counter.gooseneckHeightM
-        const second = structuredClone(first)
-        second.crankTurns += 0.125
-        const inputs = [compileInput(first, 'Executed point-motion baseline'), compileInput(second, 'Executed point-motion changed driver')]
-        const angles = [], equilibriumResidualNm = []
-        for (const input of inputs) {
-          const pose = solveSourceInput(input, [], solvePose)
-          angles.push(motion === 'crank' ? pose.crankAngleRad : pose.magnifier.wheelAngleRad)
-          equilibriumResidualNm.push(pose.equilibriumResidualNm)
-        }
-        const angleDelta = angles[1] - angles[0]
-        if (Number.isFinite(angleDelta) && angleDelta !== 0 && Math.abs(angleDelta) < Math.PI) {
-          pair = { serialized: [first, second], inputs, driver: 'crankTurns', angles, equilibriumResidualNm }
-        }
-      } catch { /* Invalid or unclosed capability inputs are unknown, not fixed. */ }
-      pairCache.set(key, pair)
-      return pair
-    }
+    const matrixCache = new Map()
+    const pairFor = createPointMotionPairCompiler({ compileInput, solveSourceInput, createMechanismPose })
 
     function matricesFor(pair) {
       const key = JSON.stringify(pair.serialized)
@@ -165,22 +196,7 @@ export async function createPointMotionClassifier({ webRoot = WEB_ROOT, modelPat
           entry.world.push(Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z) ? point.toArray() : null)
         }
         for (const entry of group.points) {
-          const [first, repeated, second, returned] = entry.world
-          if (!first || !repeated || !second || !returned) { results[entry.index].reason = 'actual normal-solved matrix unavailable or nonfinite'; continue }
-          const distance = other => Math.hypot(other[0] - first[0], other[1] - first[1], other[2] - first[2])
-          const displacementMetres = distance(second), sameInputNoiseMetres = distance(repeated), returnInputNoiseMetres = distance(returned)
-          // Each native endpoint coordinate carries at most half a decoded
-          // Float32 ulp of datum roundoff: two endpoints give sqrt(3) ulps in
-          // Euclidean XYZ. Add the measured identical/return-input scene noise.
-          // This prevents nominal centres' decoded-datum offsets counting as motion.
-          const scale = Math.max(1, Math.abs(first[0]), Math.abs(first[1]), Math.abs(first[2]),
-            Math.abs(second[0]), Math.abs(second[1]), Math.abs(second[2]))
-          const roundoffMetres = Math.sqrt(3) * 2 ** -23 * scale + Math.max(sameInputNoiseMetres, returnInputNoiseMetres)
-          const moving = Number.isFinite(displacementMetres) && displacementMetres > roundoffMetres
-          results[entry.index] = { id: results[entry.index].id, motion: moving ? 'moving' : null,
-            reason: moving ? null : 'zero or roundoff-ambiguous point displacement',
-            pointPair: [first, second], sameInputPoint: repeated, returnedInputPoint: returned,
-            displacementMetres, sameInputNoiseMetres, returnInputNoiseMetres, roundoffMetres, inputPairIndex: group.index }
+          results[entry.index] = { id: results[entry.index].id, ...classifyPointMotion(entry.world), inputPairIndex: group.index }
         }
       }
       return { results, inputPairs, provenance: machine.provenance }
