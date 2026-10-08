@@ -177,6 +177,39 @@ def needs_machine(frame, data):
     return shot.get("hasCorrespondingMachine") is not False
 
 
+def policy_excluded_view(frame, view):
+    """Same closed actual-exposure qualification as source-visibility.mjs."""
+    if "sourceVisibility" not in view:
+        return False
+    value = view["sourceVisibility"]
+    image = frame.get("sourceImage", {})
+    audit = value.get("manualSourceAudit") if isinstance(value, dict) else None
+    key = {"gray8": "sha256Gray8", "bgr8": "sha256Bgr8"}.get(image.get("pixelFormat"))
+    rect = view.get("rectSourcePixels")
+    valid = (isinstance(value, dict)
+             and set(value) == {"kind", "reasonCode", "sourceImage", "rectSourcePixels", "manualSourceAudit"}
+             and value["kind"] == "policy-excluded"
+             and value["reasonCode"] in ("blurred-navigation-background", "text-covered-navigation-background")
+             and isinstance(audit, dict) and set(audit) == {"method", "evidence"}
+             and audit["method"] == "manual-source-pixel-inspection"
+             and isinstance(audit["evidence"], str) and bool(audit["evidence"].strip())
+             and key is not None and set(image) == {"frameIndex", "pixelFormat", "width", "height", "sourceSha256", key}
+             and type(image["frameIndex"]) is int and image["frameIndex"] >= 0
+             and image["width"] == 1920 and image["height"] == 1080
+             and all(isinstance(image[field], str) and re.fullmatch(r"[0-9a-f]{64}", image[field])
+                     for field in ("sourceSha256", key))
+             and value["sourceImage"] == image and value["rectSourcePixels"] == rect
+             and isinstance(rect, list) and len(rect) == 4
+             and all(type(number) in (int, float) and math.isfinite(number) for number in rect)
+             and rect[0] >= 0 and rect[1] >= 0 and rect[2] > 0 and rect[3] > 0
+             and rect[0] + rect[2] <= image["width"] and rect[1] + rect[3] <= image["height"]
+             and not view.get("nativeLineChecks")
+             and not any(point.get("viewId", "main") == view["id"] for point in frame.get("landmarks", [])))
+    if not valid:
+        raise ValueError("Invalid actual source image/complete ROI/manual navigation-background visibility qualification")
+    return True
+
+
 def canonicalize_cut_clock(data):
     """Preserve cuts on their recorded native clock, not rounded decimal text."""
     if data.get("kind") == "current-source-observations":
@@ -203,6 +236,12 @@ def compact_change_times(data):
     """Snap rounded event labels within their cut uncertainty to the real cut."""
     if data.get("kind") == "current-source-observations":
         authored = set(data.get("coverage", {}).get("changeTimesSeconds", []))
+        previous = None
+        for frame in data["frames"]:
+            visibility = [(view["id"], view.get("sourceVisibility", {}).get("reasonCode")) for view in frame["views"]]
+            if visibility != previous:
+                authored.add(frame["timeSeconds"])
+            previous = visibility
         if any("sourceAssembly" in view for frame in data["frames"] for view in frame["views"]):
             authored.update(fresh.assembly_change_times(data, web_root=WEB))
         return authored
@@ -282,6 +321,8 @@ def retain_exact_exposure_landmarks(selected, data):
             result[view_id] = {"rectSourcePixels":rect,
                                "presentation":view.get("presentation", "native"),
                                "imagePlaneWarp":warp, "composite":composite}
+            if "sourceVisibility" in view:
+                result[view_id]["sourceVisibility"] = copy.deepcopy(view["sourceVisibility"])
         layout_cache[cache_key] = result or None
         return layout_cache[cache_key]
 
@@ -670,7 +711,8 @@ def build_track(data, frame_views_callback, evidence_notes=None):
         row["views"] = views
         if row["decodedTimeSeconds"] is None or abs(row["decodedTimeSeconds"] - row["timeSeconds"]) > 0.5:
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: no retained observation within 0.5s.')
-        if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in views)):
+        required = [view for view in views if not policy_excluded_view(row, view)]
+        if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in required)):
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: source-required camera/input remains unavailable.')
         frames.append(row)
     source_keys = ("videoId", "sha256", "width", "height", "durationSeconds", "videoDurationSeconds", "fps", "decodedFrameCount", "firstDecodedTimeSeconds", "lastDecodedTimeSeconds", "rights")
@@ -686,12 +728,14 @@ def build_track(data, frame_views_callback, evidence_notes=None):
               "stages": {str(stage): {"status": "unmeasured"} for stage in (50, 20, 10, 5)},
               "evidence": {"interpretation": "Chosen source-informed physically feasible playback candidates. Hidden inputs are not recovered. Camera FIT/CHECK residuals are CPU diagnostics, not current GPU measurements or stage passes.",
                            "notes": list(evidence_notes or [])}}
-    required_views = [(frame, view) for frame in frames if needs_machine(frame, data) for view in frame["views"]]
+    excluded_views = [(frame, view) for frame in frames for view in frame["views"] if policy_excluded_view(frame, view)]
+    required_views = [(frame, view) for frame in frames if needs_machine(frame, data) for view in frame["views"] if not policy_excluded_view(frame, view)]
     checked_views = sum(any(point.get("role") == "check" and point.get("viewId", "main") == view["id"] for point in frame["landmarks"]) for frame, view in required_views)
     assumed_cameras = sum(view["cameraProvenance"]["kind"] == "source-informed-framing" for _, view in required_views)
     result["sourceMeasurements"] = {
         "status": "partial" if checked_views else "incomplete",
         "requiredViewSamples": len(required_views), "viewSamplesWithSourceChecks": checked_views,
+        "qualifiedExcludedViewSamples": len(excluded_views),
         "assumedCameraViewSamples": assumed_cameras,
         "blockers": [
             f"Independent source CHECK pixels are missing in {len(required_views) - checked_views} required view samples.",

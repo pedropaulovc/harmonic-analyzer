@@ -318,6 +318,24 @@
         "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}
       }
     },
+    "sourceVisibility": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "reasonCode", "sourceImage", "rectSourcePixels", "manualSourceAudit"],
+      "properties": {
+        "kind": {"const": "policy-excluded"},
+        "reasonCode": {"enum": ["blurred-navigation-background", "text-covered-navigation-background"]},
+        "sourceImage": {"$ref": "source-observations.schema.json#/$defs/sourceImage"},
+        "rectSourcePixels": {"$ref": "source-observations.schema.json#/$defs/xyzw"},
+        "manualSourceAudit": {
+          "type": "object", "additionalProperties": false, "required": ["method", "evidence"],
+          "properties": {
+            "method": {"const": "manual-source-pixel-inspection"},
+            "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}
+          }
+        }
+      },
+      "description": "Omitted means required/readable. Only the exact complete physical ROI in this actual exposure may be manually qualified as deliberately blurred or text-covered navigation background. Readable insets/outgoing views remain separately required; this is not native pose or fidelity evidence."
+    },
     "view": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "rectSourcePixels", "presentation", "camera", "input", "provenance", "cameraProvenance", "cameraContinuityFamily"],
@@ -327,6 +345,7 @@
         "sourceViewIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}},
         "sourceViewMappingEvidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
         "rectSourcePixels": {"$ref": "source-observations.schema.json#/$defs/xyzw"},
+        "sourceVisibility": {"$ref": "#/$defs/sourceVisibility"},
         "presentation": {"enum": ["native", "horizontal-mirror"]},
         "camera": {"$ref": "#/$defs/camera"},
         "input": {"oneOf": [{"type": "null"}, {"$ref": "source-observations.schema.json#/$defs/mechanismInput"}]},

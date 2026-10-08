@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { validateModelRepresentation, assertNativeSourceAssociation } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
 import { loadNativeIdentityMap } from './native-identity-map.mjs'
+import { sourceVisibilityError, policyExcludedSourceView } from '../source-visibility.mjs'
 import { VIDEO_IDS, INPUT_FIELDS, completeInput, canonicalJson, sourceImageError, sourceNeedsMachine, recomputeImagePlaneWarp, sameResolvedImagePlaneWarp, nativeLineAxisGeometryBound, nativeGeometryAssumptionErrors, runTool } from './verify-reference.mjs'
 
 export const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -419,6 +420,8 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
         && rect[2] > 0 && rect[3] > 0 && rect[0] + rect[2] <= source.width && rect[1] + rect[3] <= source.height
         && ['native', 'horizontal-mirror'].includes(view.presentation), `${viewLabel}: invalid source layout`)
       viewIds.add(view.id)
+      const visibilityError = sourceVisibilityError(frame, view)
+      assert(!visibilityError, `${viewLabel}: ${visibilityError}`)
       if (view.sourceViewIds !== undefined || view.sourceViewMappingEvidence !== undefined) {
         assert(Array.isArray(view.sourceViewIds) && view.sourceViewIds.length > 0
           && view.sourceViewIds.every(text) && new Set(view.sourceViewIds).size === view.sourceViewIds.length
@@ -454,7 +457,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
       }
       if (view.input === null || view.camera === null) {
         assert(unavailable(view.unavailable) || unavailable(frame.unavailable), `${viewLabel}: unresolved camera/input cannot be silently available`)
-        unresolved.push(`${viewLabel}: current camera/input unresolved`)
+        if (!policyExcludedSourceView(frame, view)) unresolved.push(`${viewLabel}: current camera/input unresolved`)
       }
       if (view.imagePlaneWarp !== undefined) {
         validateWarp(view.imagePlaneWarpMeasurement, frame, view, data.frames, viewLabel)
@@ -481,10 +484,11 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
     const image = frame.sourceImage, exposureKey = `${image.sourceSha256}/${image.frameIndex}`
     const layout = canonicalJson(currentSourceLayoutForViews(frame.views))
     const assembly = canonicalJson(frame.views.map(view => ({ viewId: view.id, sourceAssembly: view.sourceAssembly })))
+    const visibility = canonicalJson(frame.views.map(view => ({ viewId: view.id, sourceVisibility: view.sourceVisibility })))
     const pixelHash = image.sha256Bgr8 ?? image.sha256Gray8, prior = exposures.get(exposureKey)
     if (prior) {
       assert(prior.pts === frame.decodedTimeSeconds && prior.shotId === frame.shotId && prior.layout === layout
-        && prior.assembly === assembly
+        && prior.assembly === assembly && prior.visibility === visibility
         && prior.sourceMachineRequirement === frame.sourceMachineRequirement
         && (!prior.hashes.has(image.pixelFormat) || prior.hashes.get(image.pixelFormat) === pixelHash),
         `${label}: identical source exposure has conflicting clock/shot/layout/assembly/pixel associations`)
@@ -494,7 +498,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
         assert(!old || equal(old.pixel, point.pixel) && old.role === point.role, `${label}: identical source exposure has conflicting independent measurements`)
         prior.points.set(key, point)
       }
-    } else exposures.set(exposureKey, { pts: frame.decodedTimeSeconds, shotId: frame.shotId, layout, assembly,
+    } else exposures.set(exposureKey, { pts: frame.decodedTimeSeconds, shotId: frame.shotId, layout, assembly, visibility,
       sourceMachineRequirement: frame.sourceMachineRequirement, hashes: new Map([[image.pixelFormat, pixelHash]]),
       points: new Map(frame.landmarks.map(point => [`${point.viewId ?? 'main'}/${point.anchorId}`, point])) })
   }

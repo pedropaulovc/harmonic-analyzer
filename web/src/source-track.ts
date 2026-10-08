@@ -6,6 +6,7 @@ import type { SourceAssemblyState } from './source-assembly'
 import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
 import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIdentity, NativeModelIdentity, SourceShot, ReferenceState, SourceSample } from './timeline'
 import type { Video } from './video-catalog'
+import { requiredSourceViews, sourceVisibilityError, type SourceVisibilityQualification } from '../source-visibility.mjs'
 
 export const SOURCE_WIDTH = 1920
 export const SOURCE_HEIGHT = 1080
@@ -33,6 +34,7 @@ export interface CompactSourceView {
   /** Source/layout evidence for the declared mapping, including authored decomposition. */
   sourceViewMappingEvidence?: string
   rectSourcePixels: [number, number, number, number]
+  sourceVisibility?: SourceVisibilityQualification
   presentation: 'native' | 'horizontal-mirror'
   camera: CameraRecord | null
   input: SerializedInput | null
@@ -165,6 +167,8 @@ interface PublicationBanks {
 export interface SourcePublicationReference {
   readonly approximationMessage: string
   prepareAt(timeSeconds: number): SourceSample
+  /** Cold-start fallback only; never replace an already displayed held pose. */
+  prepareLastReadableAt(timeSeconds: number): SourceSample | null
   commitPrepared(): SourceSample
 }
 
@@ -252,9 +256,16 @@ export class CompactVideoReference {
       if (!['machine', 'non-machine', 'transition', 'unobservable'].includes(frame.classification)) throw new Error(`Unknown source classification at ${t}s.`)
       if (frame.sourceMachineRequirement !== undefined && frame.sourceMachineRequirement !== 'required') throw new Error('Compact tracks cannot weaken required source-machine coverage.')
       if (!Array.isArray(frame.views) || !Array.isArray(frame.landmarks)) throw new Error(`Missing source layout or landmarks at ${t}s.`)
-      const required = frame.sourceMachineRequirement === 'required' || frame.classification === 'machine' || (frame.classification === 'non-machine' ? shot.hasCorrespondingMachine === true : shot.hasCorrespondingMachine !== false)
+      const sourceRequired = frame.sourceMachineRequirement === 'required' || frame.classification === 'machine' || (frame.classification === 'non-machine' ? shot.hasCorrespondingMachine === true : shot.hasCorrespondingMachine !== false)
       if (new Set(frame.views.map((view) => view.id)).size !== frame.views.length) throw new Error(`Duplicate source view at ${t}s.`)
-      const layout: SourceLayoutEntry[] = frame.views.map((view) => {
+      for (const view of frame.views) {
+        const error = sourceVisibilityError(frame, view)
+        if (error) throw new Error(`${video.id}@${t}s/${view.id}: ${error}`)
+        if (view.sourceVisibility && frame.sourceImage?.sourceSha256 !== data.source.sha256) throw new Error('Source visibility audit belongs to different footage.')
+      }
+      const requiredViews = requiredSourceViews(frame)
+      const required = sourceRequired && (frame.views.length === 0 || requiredViews.length > 0)
+      const layout: SourceLayoutEntry[] = requiredViews.map((view) => {
         if (view.rectSourcePixels?.length !== 4) throw new Error(`Invalid source viewport at ${t}s.`)
         view.rectSourcePixels.forEach((value) => finite(value, 'Source viewport'))
         const [x, y, w, h] = view.rectSourcePixels
@@ -271,7 +282,7 @@ export class CompactVideoReference {
         landmark.pixel.forEach((value) => finite(value, 'Source landmark pixel'))
         if (finite(landmark.uncertaintyPx, 'Source landmark uncertainty') < 0) throw new Error('Source landmark uncertainty cannot be negative.')
       }
-      const views = frame.views.map((view) => {
+      const views = requiredViews.map((view) => {
         const label = `${video.id}@${t}s/${view.id}`
         let sourceAssembly: SourceAssemblyState
         try {
@@ -347,11 +358,25 @@ export class CompactVideoReference {
 
   private stateFor(t: number, frame: CompiledTrackFrame): ReferenceState {
     if (frame.observation.timeSeconds > t || t < frame.shotStartSeconds || t > frame.shotEndSeconds || t === frame.shotEndSeconds && t < this.data.source.durationSeconds || !frame.available) return 'unavailable'
-    return frame.required ? 'approximate' : 'no-machine'
+    return frame.required ? 'approximate' : 'hold-last-readable'
   }
 
   prepareAt(timeSeconds: number): SourceSample {
     return this.prepareAtIn(timeSeconds, this.publication)
+  }
+
+  prepareLastReadableAt(timeSeconds: number): SourceSample | null {
+    return this.prepareLastReadableAtIn(timeSeconds, this.publication)
+  }
+
+  private prepareLastReadableAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample | null {
+    for (let index = this.indexAt(timeSeconds); index >= 0; index--) {
+      const frame = this.frames[index]!
+      if (frame.observation.timeSeconds <= timeSeconds && frame.required && frame.available) {
+        return this.prepareAtIn(frame.observation.timeSeconds, publication)
+      }
+    }
+    return null
   }
 
   private prepareAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample {
@@ -371,7 +396,7 @@ export class CompactVideoReference {
     sample.unobservedInputFields.length = 0
     sample.nativeGeometryAssumptions = this.data.nativeGeometryAssumptions ?? EMPTY_GEOMETRY_ASSUMPTIONS
     sample.reason = sample.state === 'approximate' ? this.approximationMessage
-      : sample.state === 'no-machine' ? 'No corresponding machine in this source interval.' : from.observation.unavailableReason ?? 'This required source interval has no available camera and complete feasible input.'
+      : sample.state === 'hold-last-readable' ? 'Source physical ROIs are policy-excluded or no corresponding machine is shown; retain the preceding displayed pose, not a current source match.' : from.observation.unavailableReason ?? 'This required source interval has no available camera and complete feasible input.'
     if (sample.state === 'approximate') {
       const continuous = from.continuousToNext
       const mix = continuous ? (t - from.observation.timeSeconds) / (next!.observation.timeSeconds - from.observation.timeSeconds) : 0
@@ -496,6 +521,7 @@ export class CompactVideoReference {
     const scopedReference: SourcePublicationReference = Object.freeze({
       approximationMessage: this.approximationMessage,
       prepareAt: (timeSeconds: number) => { requirePublication(); return this.prepareAtIn(timeSeconds, publication) },
+      prepareLastReadableAt: (timeSeconds: number) => { requirePublication(); return this.prepareLastReadableAtIn(timeSeconds, publication) },
       commitPrepared: () => { requirePublication(); return this.commitPreparedIn(publication) },
     })
     const state: DiagnosticSourcePublicationState = Object.freeze({
