@@ -184,6 +184,12 @@ The manifest explicitly declares `canonicalConsumerHashNormalization` as
 the normalized text, not checkout byte identity. Original evidence, historical
 snapshots, mapping bytes and derivative dependency pins are never normalized.
 
+Direct Node track-association readbacks invoke the same standard-library
+publication-seal checker through `uv run --isolated --no-project python`, not an
+ambient `python3` executable or a separate interpreter configuration. Exact
+record bytes, current native/assembly authority and live generation seals
+remain required.
+
 Ordinary producers for all six videos read only strict
 `content/v39-source/<ID>.observations.json.gz` records. They validate the current
 tracked representation authority, original MP4 identity, native inventory/map

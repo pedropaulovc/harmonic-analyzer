@@ -562,7 +562,7 @@ common.WEB=Path(sys.argv[2])
 record=json.loads(sys.argv[3])
 common.validate_current_generation_seals(record["producerPath"],executed_inputs=record["executedInputs"])
 `
-  await runTool('python3', ['-c', sealCode, resolve(webRoot, 'scripts/compact-source-common.py'), webRoot, JSON.stringify(record)])
+  await runTool('uv', ['run', '--isolated', '--no-project', 'python', '-c', sealCode, resolve(webRoot, 'scripts/compact-source-common.py'), webRoot, JSON.stringify(record)])
   assert(Array.isArray(track.anchors) && track.anchors.length === observations.anchors.length
     && track.anchors.every((anchor, i) => ['id', 'kind', 'partPath', 'runtimeTemplatePartPath', 'partLocalMetres', 'worldMetres', 'description', 'correspondenceEvidence']
       .every(key => equal(anchor[key], observations.anchors[i][key]))), 'Compact track borrowed or altered current native feature associations')

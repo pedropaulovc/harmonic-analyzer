@@ -683,7 +683,7 @@
     },
     {
       "path": "web/scripts/fresh-source-observations.mjs",
-      "sha256": "bec02f17f6176bfa38cb4fa887d8c30d4957babbf40ed731312e1fd925865fe1",
+      "sha256": "aa57e67e608a874d43a1571bce318747f016e71c45b00399363827f971705ae1",
       "scope": "Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; detects live consumer drift, not captured producer lineage, byte identity, geometric or GPU/source verification."
     },
     {
