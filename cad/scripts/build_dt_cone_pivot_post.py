@@ -1,11 +1,10 @@
 r"""Reproduce the v2 cone pivot post and integrated crank pedestal.
 
-``cone-pivot-post-v2.SLDPRT`` is a new casting, not a refinement of the old
-O24 x 100.5 cylinder.  The exact feature dimensions were harvested from that
-model.  Its 86 mm height was manually rederived from the second ch30 eight-view
-(``references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png``);
-the body/head/boss proportions were manually rederived from the two ch11 detail
-photos (``ch11_images/page002_img05.jpeg`` and ``page002_img06.jpeg``).
+The v2 casting supplies the retained diameters, cone-axis, foot and mounting
+datums.  Its original 86 mm height came from the ch30 eight-view; this
+normal-24DP crank variant grows the actual body to 90 mm and keeps the 26.6 mm
+head so the raised crank boss remains inside the host outline.  The body,
+head and boss proportions otherwise retain the harvested feature geometry.
 
 The v2 coordinate frame is also authoritative: the body stands on Top at y=0,
 the crank bore runs straight along +Z, and the cone journal itself is yawed
@@ -174,8 +173,7 @@ def _disc_column_integral(radius: float, column: Any) -> float:
 
 
 def _head_surface_z(x: float) -> float:
-    """|z| of the head cylinder at station ``x`` (the boss lies wholly
-    within the head's 59.4..86 band, so only the head clips it)."""
+    """|z| of the head cylinder; the spec guards nominal boss containment."""
     return math.sqrt(HEAD_RADIUS**2 - x * x)
 
 
@@ -183,6 +181,8 @@ def _head_surface_z(x: float) -> float:
 # a time, so a cut that ran the wrong way is caught at THAT feature instead of
 # as an unexplained final gap.  Their sum is HARVESTED_VOLUME_MM3 (asserted at
 # import below).
+MAIN_BODY_MM3 = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
+HEAD_SHELL_MM3 = math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
 #
 # Crank boss: a Ø21.93 cylinder from the head's tangent plane
 # (z = -CRANK_BOSS_NORTH_FACE) to +50.6591 minus the part of it already inside
@@ -218,8 +218,8 @@ ATTACHMENT_HOLES_MM3 = 2.0 * (
     + math.pi * (ATTACHMENT_CBORE_DIA / 2.0) ** 2 * ATTACHMENT_CBORE_DEPTH
 )
 _ANALYTIC_FINAL_MM3 = (
-    math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
-    + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
+    MAIN_BODY_MM3
+    + HEAD_SHELL_MM3
     + CRANK_BOSS_OUTSIDE_HEAD_MM3
     - CRANK_BORE_MM3
     + CONE_PADS_OUTSIDE_BODY_MM3
@@ -369,7 +369,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # 1. Main O42.011 body, y=0..86.
+    # 1. Main O42.011 body, from the unchanged foot to BLOCK_HEIGHT.
     main = SketchDims()
     check("create sketch MainBodyProfile", await adapter.create_sketch("Top"))
     await define_circle(
@@ -393,7 +393,7 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "MainBody")
     main_depth = name_dimensions(adapter, "MainBody", ["MainBodyHt"])
     drive_jobs.append((main_depth[0], '"MainBodyHeight"'))
-    body_volume = math.pi * BLOCK_RADIUS**2 * BLOCK_HEIGHT
+    body_volume = MAIN_BODY_MM3
     await volume_check(adapter, "v2 main body", body_volume, 0.001 * body_volume)
 
     # 2. HEAD_DIA head (dt_cone_pivot_post_spec) over HEAD_BASE_Y..BLOCK_HEIGHT.
@@ -406,6 +406,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
     )
     name_last_feature(adapter, "HeadBasePlane")
+    drive_jobs.append(("D1@HeadBasePlane", '"MainBodyHeight" - "HeadHeight"'))
     head = SketchDims()
     check(
         "create sketch HeadProfile", await adapter.create_sketch("HeadBasePlane")
@@ -431,9 +432,7 @@ async def build(adapter: Any) -> dict[str, str]:
     name_last_feature(adapter, "Head")
     head_depth = name_dimensions(adapter, "Head", ["HeadHt"])
     drive_jobs.append((head_depth[0], '"HeadHeight"'))
-    head_volume = (
-        body_volume + math.pi * (HEAD_RADIUS**2 - BLOCK_RADIUS**2) * HEAD_HEIGHT
-    )
+    head_volume = body_volume + HEAD_SHELL_MM3
     await volume_check(adapter, "v2 head", head_volume, 0.001 * head_volume)
 
     # 3. Straight crank boss along +Z from the head's tangent plane (the
@@ -588,9 +587,9 @@ async def build(adapter: Any) -> dict[str, str]:
     # points.  Drilled LAST, as the real casting is: the crank boss is cast
     # integral and its Ø21.93 cylinder overlaps both Ø7.14 thru holes; a boss
     # extruded after the holes would re-fill a crescent of each and no 1/4
-    # screw would pass.  The top face is still one +Y planar face after the
-    # transverse booleans (they stop 2.3 mm below it), which is all the
-    # normal-based placement-face walk needs.
+    # screw would pass.  All transverse booleans stop below the top face (the
+    # spec guards boss containment), so it remains one +Y planar face for the
+    # normal-based placement-face walk.
     attachment_cut = wizard_holes(
         adapter,
         ATTACHMENT_HOLE_SPEC,

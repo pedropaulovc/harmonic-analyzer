@@ -18,8 +18,9 @@ from _gtol_spec import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
+import cone_line
 import dt_cone_pivot_post_spec
-from dt_crank_drive_gear_spec import OUTSIDE_DIA as CRANK_GEAR_OUTSIDE_DIA
+import dt_crank_drive_gear_spec as gear64
 
 POST_ATTACHMENT_SPACING = dt_cone_pivot_post_spec.ATTACHMENT_SPACING
 POST_BLOCK_DIA = dt_cone_pivot_post_spec.BLOCK_DIA
@@ -59,12 +60,42 @@ PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
 PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
 
-# The recentered DP25.731 gear is smaller than the intermediate DP24.74 gear;
-# its complete swept OD now clears the platform top, so the obsolete scallop is
-# removed and the plate remains full thickness beneath the mesh.
-CRANK_GEAR_PLATFORM_CLEARANCE = POST_CONE_BORE_HEIGHT - CRANK_GEAR_OUTSIDE_DIA / 2.0
+# The standard normal24DP 64T needs a real top-face pocket beneath its
+# unchanged axial row. An 18-mm width cannot clear its swept tips outside
+# the pocket: the width must clear the unrelieved side/top corners too.
+CRANK_GEAR_RELIEF_WIDTH = 29.0
+CRANK_GEAR_RELIEF_LENGTH = 12.0
+CRANK_GEAR_RELIEF_DEPTH = 3.0
+CRANK_GEAR_RELIEF_LOCAL_X = 0.0
+CRANK_GEAR_RELIEF_LOCAL_Z = (
+    gear64.LAYOUT_CENTRE_STATION
+    + cone_line.GEAR_AXIS_SHIFT
+    + gear64.CENTRE_SHIFT_NORTH
+    - cone_line.PIVOT_STATION
+)
+CRANK_GEAR_RELIEF_REMAINING_STOCK = PLATE_THICKNESS - CRANK_GEAR_RELIEF_DEPTH
+CRANK_GEAR_RELIEF_REMAINING_STOCK_WORST = (
+    CRANK_GEAR_RELIEF_REMAINING_STOCK - PLATE_STOCK_BAND
+)
+# In the plate frame the cone journal is parallel to local Z. Bound its
+# complete rotating tip cylinder against the pocket floor, side/top
+# corners and axial ends; a depth-only check would miss the 18-mm collision.
+CRANK_GEAR_PLATFORM_AIR = {
+    "pocket bottom": POST_CONE_BORE_HEIGHT - gear64.OUTSIDE_DIA / 2.0
+    + CRANK_GEAR_RELIEF_DEPTH,
+    "unrelieved side/top": math.hypot(
+        CRANK_GEAR_RELIEF_WIDTH / 2.0 - abs(CRANK_GEAR_RELIEF_LOCAL_X),
+        POST_CONE_BORE_HEIGHT,
+    ) - gear64.OUTSIDE_DIA / 2.0,
+    "axial ends": (CRANK_GEAR_RELIEF_LENGTH - gear64.FACE_WIDTH) / 2.0,
+}
+CRANK_GEAR_PLATFORM_CLEARANCE = min(CRANK_GEAR_PLATFORM_AIR.values())
+if CRANK_GEAR_RELIEF_REMAINING_STOCK_WORST < 1.5:
+    raise AssertionError("crank gear relief leaves under 1.5 mm plate stock")
 if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
-    raise AssertionError("recentered crank gear has under 0.5 mm platform air")
+    raise AssertionError(
+        f"crank gear has under 0.5 mm actual pocket air: {CRANK_GEAR_PLATFORM_AIR}"
+    )
 
 
 # The post's 1/4-in fillister clearance bores mate to these platform threads.

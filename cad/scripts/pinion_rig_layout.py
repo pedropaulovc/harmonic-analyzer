@@ -35,7 +35,10 @@ import math
 
 from _printed_tolerance import printed_band_mm, printed_deviations
 from dt_cone_pivot_post_installation import MECHANISM_Z_SHIFT
-from cylinder_bank_layout import G0_FRONT_SOUTH_STACK as _BANK_G0_FRONT_SOUTH_STACK
+from cylinder_bank_layout import (
+    G0_FRONT_SOUTH_STACK as _BANK_G0_FRONT_SOUTH_STACK,
+    G19_BACK_FACE_Z,
+)
 from dt_pinion_bracket_geometry import THICKNESS as STRAP_T
 from dt_pinion_bracket_geometry import THICKNESS_PLACES as STRAP_T_PLACES
 from dt_pinion_cam_geometry import CAM_LEN
@@ -145,9 +148,8 @@ DRUM_OD_PLACES = 2  # OutsideDia prints .XX (dt_alignment_pinion_spec)
 # the back strap) beyond the leaf's set error, which DRUM_FRONT_RETREAT_STACK
 # books; its float south is DRUM_BACK_ADVANCE_STACK at j = 19 and
 # grows the drum's overhang at j = 0.
-G19_BACK_FACE_Z = (
-    71.56188830854866  # Z_DRUM0 + 19 Z_PITCH + 1.5 (the drive train pins it)
-)
+# G19_BACK_FACE_Z is the bank's configured-grid datum, not a frozen world
+# coordinate. Every rig station and transferred base seat below follows it.
 DRUM_BACK_ADVANCE_STACK = {
     "MHA-DT-000 feeler, widest (the pinned cluster's end play)": FRONT_BLOCK_FEELER
     + FRONT_BLOCK_FEELER_BAND,

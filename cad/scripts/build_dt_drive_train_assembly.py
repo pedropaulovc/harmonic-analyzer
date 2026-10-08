@@ -259,9 +259,12 @@ if abs(Y_DRIVE - CAM_SHAFT_XY[1]) > 1e-9 or abs(DRUM_X - CAM_SHAFT_XY[0]) > 1e-9
 # journal is 33.368 above that seat. The resulting drive line cascades into
 # the arbor pedestals, channel cams and connecting rods below.
 
-DP_CRANK = _config.machine("gear_train", "crank_drive_diametral_pitch")
-# The pair's one cutter (#906): the 16T's DP and both gears' addendum.
-from dt_crank_drive_gear_spec import CUTTER_DIAMETRAL_PITCH as DP_CRANK_CUTTER  # noqa: E402
+# Normal pitch and the actual cone incline determine the helical transverse
+# pitch; the straight 16T and both gears' addenda use the normal cutter.
+from dt_crank_drive_gear_spec import (  # noqa: E402
+    CUTTER_DIAMETRAL_PITCH as DP_CRANK_CUTTER,
+    DIAMETRAL_PITCH as DP_CRANK,
+)
 
 # The four smallest cone gears read "more yellow ... a harder metal" (ch.12 p.21):
 # a high-zinc yellow metal (Muntz/manganese bronze). Tinted per-INSTANCE here (see
@@ -358,7 +361,7 @@ SHAFT_FRONT_STATION = -SHAFT_FRONT_STUB
 # POST_STATION (cone_line): the corrected 2.8360-in v2 crank boss spans local z
 # -21.3753..+50.6591. The 16T follows the shifted 64T row while the T12 chain
 # plane remains photo-anchored, so the resulting axial gaps are intentionally
-# unequal; the post station still fixes crank X and the pair DP.
+# unequal; the post station fixes crank X and its configured bore height sets Y.
 
 
 # Exact-tracking self-check: the 20 mesh-derived seats lie on the shaft.
@@ -392,46 +395,18 @@ GEAR64_SEAT = cone_station(GEAR64_CENTRE_STATION)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
 R16 = (16.0 / DP_CRANK_CUTTER) * 25.4 / 2.0
 
-# Crank: ABOVE the 64T (ch30 GT photogrammetry -- the crank axle triangulates
-# to world (-122.84, 144.78, -189.1) +- 1.4: the pedestal axis of the +122
-# photo layout, ~39 ABOVE the drive plane, a near-VERTICAL 16T:64T mesh).
-# X_CRANK is the photo-pinned pedestal axis; Y_CRANK closes the mesh at a REAL
-# engaged centre distance (2026-07-14 rederive, "crank-pinion and crank-drive
-# gear are not meshing"): the crossed pair (crank machine-z, 64T plane on the
-# 12.52-deg inclined shaft) engages at depth because the 64T's teeth are a
-# TRUE 12.0-degree helix (boss-swept with twist, _gear.py) with a
-# 0.15 backlash allowance (build_dt_crank_drive_gear.py) -- matching the engaged
-# pair in the ch12 closeups (page002_img02/img06). C2C = R64 + R16 + slack;
-# slack 0.25 keeps a 1.0-deg zero-collision seed window over a full
-# crank-pitch phase sweep of the exact tooth solids
-# (diagnostics/crossed_mesh_study.py; tips reach 1.66 into the gaps, 87% of
-# working depth). Re-arbitrated 2026-07-14 from the K=12-slice era's
-# 0.40/0.60 -- the smooth swept flanks return the clearance the slice facets
-# consumed, after the user flagged the visible slop. This RETIRES the PEN16
-# radial-backoff block (C2C 40.446 left the tip circles 0.29 APART -- a
-# literal air gap; its (FACE/2)*SIN_I "dive" term modeled the
-# horizontal-mesh depth gradient, but on the near-vertical line of centres
-# the radial interleave is ~constant across the face and the real constraint
-# is LATERAL flank misregistration, which no radial backoff fixes and the
-# helix + backlash do).
-ADD16 = 25.4 / DP_CRANK_CUTTER  # both gears' addendum: one cutter
-# FRAME-FIXED (#906, Main 2026-09-26): nothing in the frame moves for the
-# single-cutter pair. The v2 casting's crank axis and the 64T station keep the
-# centre distance the fixed-post DP was solved for -- both radii at the
-# transverse DP plus tolerances.yaml's 0.25 slack -- and the smaller 16T
-# inherits the difference as slack: 0.423, still engaged 1.5 deep.
-MESH16_C2C = (
-    R64
-    + (16.0 / DP_CRANK) * 25.4 / 2.0
-    + _config.fit("crank_mesh", "c2c_slack_mm")
-)  # 39.735
-MESH16_C2C_SLACK = MESH16_C2C - R64 - R16  # 0.423
+# The true RH helical 64T follows the cone incline and meshes the straight
+# 16T at their shared standard normal pitch. Only the crank bore height
+# moves; the cone journal, solid stack and both axial seats retain their datums.
+ADD16 = 25.4 / DP_CRANK_CUTTER
+MESH16_C2C = R64 + R16 + _config.fit("crank_mesh", "c2c_slack_mm")
+MESH16_C2C_SLACK = MESH16_C2C - R64 - R16
 from dt_crank_drive_gear_spec import LONG_ADDENDUM_MM as _GEAR64_LONG_ADDENDUM  # noqa: E402
 
 TIP16_C2C = R64 + R16 + 2.0 * ADD16 + _GEAR64_LONG_ADDENDUM
 CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C
 # Depth band: above ~1.2*ADD (really engaged), below 2*ADD minus the root
-# clearance floor (slack + 0.157*ADD16 of tip-to-root air stays positive).
+# clearance floor (slack plus the cutter's dedendum excess stays positive).
 if not 1.2 * ADD16 < CRANK_MESH_DEPTH < 2.0 * ADD16 - 0.1:
     raise AssertionError("crank pair mesh depth left its derived band")
 # The restored post carries the fixed crank axis (user ruling 2026-09-28).
@@ -446,6 +421,13 @@ _DY16 = Y_CRANK - Y_DRIVE  # vertical leg in both gear planes
 if _DX16 <= 0.0:
     raise AssertionError("the 64T no longer lies +x of the crank (crank_mesh_stack premise)")
 CRANK_ACTUAL_C2C = math.hypot(_DX16, _DY16)
+from crank_mesh_stack import FRAME_C2C as CRANK_MESH_FRAME_C2C  # noqa: E402
+
+if not (
+    math.isclose(CRANK_ACTUAL_C2C, MESH16_C2C, rel_tol=0.0, abs_tol=1e-9)
+    and math.isclose(CRANK_ACTUAL_C2C, CRANK_MESH_FRAME_C2C, rel_tol=0.0, abs_tol=1e-9)
+):
+    raise AssertionError("crank physical centre must equal the normal-pitch mesh and stack reference")
 # The pair's contact ratio (user ruling 2026-09-30: under rule 12's 1.1 and
 # printed on both gear sheets as a plain fact). Nominal at the modelled centre
 # and tips; worst at crank_mesh_stack's open corner with both tips at their
@@ -471,13 +453,29 @@ CRANK_MESH_CONTACT_RATIO_WORST = crank_mesh_contact_ratio(
     tip_dia_16=_PINION_TIP_DIA_LOW,
     tip_dia_64=_GEAR64_TIP_DIA_LOW,
 )
-# crank_mesh_stack books the cone stack's north float linearly on its frame
-# reference (0.02405); at these physical centres the 64T sliding
-# CONE_FLOAT_NORTH up the cone axis opens them by the exact 0.02538, 0.0013
-# more. The printed figure must hold with the exact opening in its place.
+# Retain the accepted physical floor, not the unchanged historic drawing
+# equality. It must also hold with the north float opened exactly.
+CRANK_MESH_CONTACT_RATIO_FLOOR = 0.62
+if not CRANK_MESH_CONTACT_RATIO_WORST >= CRANK_MESH_CONTACT_RATIO_FLOOR:
+    raise AssertionError(
+        f"standard crank worst contact ratio {CRANK_MESH_CONTACT_RATIO_WORST:.4f} "
+        f"falls below {CRANK_MESH_CONTACT_RATIO_FLOOR:.2f}"
+    )
 CRANK_MESH_FLOAT_OPENING_EXACT = (
     math.hypot(_DX16 + CONE_FLOAT_NORTH * SIN_I * COS_I, _DY16) - CRANK_ACTUAL_C2C
 )
+if not (
+    crank_mesh_contact_ratio(
+        centre_distance=CRANK_ACTUAL_C2C
+        + CRANK_MESH_OPEN_CENTRE_DISTANCE
+        - CRANK_MESH_OPEN_TERMS["cone stack north float"]
+        + CRANK_MESH_FLOAT_OPENING_EXACT,
+        tip_dia_16=_PINION_TIP_DIA_LOW,
+        tip_dia_64=_GEAR64_TIP_DIA_LOW,
+    )
+    >= CRANK_MESH_CONTACT_RATIO_FLOOR
+):
+    raise AssertionError("crank contact-ratio floor fails with exact cone-stack north-float opening")
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
 # the inclined cone shaft; the 16T plane is a plain machine-Z section.
@@ -510,21 +508,11 @@ if not math.isclose(
 # nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
 # sit that same contact arc (64/16 pinion degrees per 64T degree -- the tooth
 # ratio, whatever the two pitch radii) past the contact on ITS side.
-# At ALPHA = 0 this is exactly 11.25. The formula is then CENTRED in the
-# zero-collision window: at the full-row band the helical twist biases the
-# window negative of the formula (crossed_mesh_study seed sweep 2026-07-14 at
-# the tight 0.15/0.25 fit: zero over [-1.90, -1.10] deg around it), so the
-# shipped seed sits at the window centre, buying +-0.40 deg of margin against
-# authoring-time phase wander -- 4x the 0.10-deg bound the authoring-time
-# measure-and-correct block enforces below. Re-arbitrate BOTH terms with the
-# study if the slack, band or backlash ever changes.
+# The calibrated offset is shared with the part's pure clocking contract.
+# Integration re-arbitrates it for this complete face/phase/fit-band envelope.
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
-# Exact-solid nine-phase sweep of the restored fixed axis at the grown 7.2113
-# 64T face and the 9.5 pinion face (2026-09-28,
-# dt-logs/crank-mesh-backlash-72113-95-20260928.jsonl): common free
-# seed-offset interval [-2.789, -0.215]; -1.49 keeps over 1.27 deg each side.
-MESH_WINDOW_CENTRE_DEG = -1.49
+from dt_crank_pinion_spec import MESH_WINDOW_CENTRE_DEG  # noqa: E402
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
 ) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
@@ -965,8 +953,8 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) 
 # on the pinion's local -X at the boss's mid-length; the crankshaft's hole is
 # turned PIN_CLOCKING_DEG so that, with the pinion seated rot_z(-seed), the two
 # holes are one. The pin lies along machine X through the shaft axis, flush
-# with the boss on both sides. dt_crank_pinion_spec carries the seed as a literal
-# (the part build must not import this module), so it is proven equal HERE.
+# with the boss on both sides. The pure pinion spec derives the clock
+# without importing this assembly; its independent derivation is checked HERE.
 from dt_crank_pinion_spec import (  # noqa: E402
     BOSS_DIA as PINION_BOSS_DIA,
     FACE_WIDTH as PINION_SPEC_FACE,
@@ -1971,9 +1959,9 @@ _CONE_FLOATS = (0.0, CONE_FLOAT_NORTH / 2.0, CONE_FLOAT_NORTH)
 
 _TIP120 = _cone_tip_radius_max(120)
 # T120 as a solid: its tip cylinder from its south face to its north face,
-# the teeth and web inside it counted as metal.  The 16T (tip radius 8.74)
-# reaches no further than _T120_REACH from its axis.
-_T120_REACH = 10.0
+# the teeth and web inside it counted as metal. Bound the complete displaced
+# envelope rather than clipping the raised crank's search to the old 10 mm.
+_T120_REACH = _TIP120 + CRANK_ACTUAL_C2C + 2.0 * CONE_FACE
 # T120's own face band past its south face; _cone_corners already moves the
 # south face by the 64T's band, so the stack's face_band would count it twice.
 _T120_NORTH_BAND = CONE_GEAR_FACE_WIDTH_BAND  # (upper, lower)
@@ -3202,8 +3190,8 @@ if J19_FULL_FACE_MARGIN < -1e-9:
     )
 if J19_FULL_FACE_MARGIN - RIG.FEELER_LEAF_STEP >= RIG.RIG_MARGIN_SPARE - 1e-9:
     raise AssertionError("RIG_SET_LEAF_D is more than the thinnest setting for j = 19")
-# The rig layout carries g19's back face as a number (it reads no config);
-# the pose must put the drum's back end exactly D off it.
+# The rig reads the bank's configured-grid datum; the independently placed
+# gear and drum must still put the drum's back end exactly D off that face.
 if abs(_G19_FACE_Z[1] - RIG.G19_BACK_FACE_Z) > 1e-9:
     raise AssertionError("pinion_rig_layout.G19_BACK_FACE_Z drifted from the gear grid")
 if abs(APINION_Z_BACK - _G19_FACE_Z[1] - RIG.RIG_SET_LEAF_D) > 1e-9:
@@ -4681,7 +4669,7 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(crank_mesh_stack_text())
     _telemetry.info(
         f"crank mesh actual centre distance {CRANK_ACTUAL_C2C:.6f} mm; "
-        f"conservative backlash reference {MESH16_C2C:.6f} mm"
+        f"physical backlash reference {MESH16_C2C:.6f} mm"
     )
     _telemetry.info(
         f"16T/boss north-face feeler {_BOSS_NORTH_GAP:.4f} mm; "

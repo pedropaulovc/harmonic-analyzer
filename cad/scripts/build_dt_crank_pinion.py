@@ -2,17 +2,15 @@ r"""Reproduction script: crank pinion (book ch. 11/12, pp. 16, 19, 20).
 
 The pinion on the crankshaft that meshes the dark steel crank-drive gear
 at the cone set's large end (`build_dt_crank_drive_gear.py`), implementing
-the book-stated 4:1 crank-to-cone reduction (p. 16). Tooth count/DP per
-the Appendix C #9 split, with DP 25.7311 fixed by the manually
-rederived v2 post's cast-in crank axis. A plain straight spur
-with a root-relieved floor; the crossed-mesh accommodation lives on the
-64T (see its docstring for the full rederivation). On its outboard face
-a plain hub boss at the tooth root (ch12 p.19 page002_img02 / img06)
+the book-stated 4:1 crank-to-cone reduction (p. 16). The straight 16T uses
+the pair's standard normal 24DP PA20 cutter system with a root-relieved
+full-depth floor; the crossed-axis accommodation lives on the 64T.
+A plain hub boss at the tooth root (ch12 p.19 page002_img02 / img06)
 carries the 1/8 in retention pin that keys the pinion to the crankshaft
 through a match-drilled radial cross-hole (dt_crank_pinion_spec).
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
-Appendix C #9. The 11.4 tooth length runs past the drive gear's 7.2113
+Appendix C #9. The 11.6 tooth length runs past the drive gear's 7.2244
 face; the south face stays against its restored MHA-DT-005 boss-side datum.
 The teeth run at full OD for the shoulder length and are turned down north of
 it, so the grown end passes under the inclined T120 (dt_crank_pinion_spec).
@@ -76,6 +74,7 @@ from dt_crank_pinion_spec import (
     BORE_DIA_BAND,
     BOSS_DIA,
     BOSS_LENGTH,
+    DEDENDUM_FACTOR,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -181,16 +180,15 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Root-relieved floor (real dedendum): the mating 64T's tips reach
-    # 0.71 mm BELOW this 16T's base circle at working depth -- the stock
-    # base-chord gap floor (fine for the big-count train pairs) starves a
-    # 16-tooth pinion, and was half of why the old mesh could not close
-    # (2026-07-14 rederive; see build_dt_crank_drive_gear.py's docstring).
+    # Root-relieved standard dedendum keeps the mating tips off an artificial
+    # base-chord floor. The profile and volume oracle use the same 1.25-module
+    # depth as the physical root-circle boss.
     # The pinion stays a plain straight spur otherwise -- the book's
     # removable "gear on the crankshaft can be changed" stock member; the
     # crossing accommodation (helix + backlash) lives on the 64T.
     disc = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG, root_relief=True,
+        dedendum=DEDENDUM_FACTOR,
     )
     volume = disc.volume
 

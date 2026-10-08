@@ -102,10 +102,13 @@ from fr_harmonic_base_spec import (
 import fr_nameplate_spec
 from dt_cone_pivot_post_installation import (
     FRAME_FRONT_COLUMN_Z,
-    MECHANISM_X_SHIFT,
-    MECHANISM_Z_SHIFT,
 )
 from cone_line import PIVOT_XZ as PIVOT_SCREW_XZ
+from cone_line import X_DRUM
+from cylinder_bank_layout import (
+    BACK_STRAP_INNER_Z as BANK_BACK_STRAP_INNER_Z,
+    FRONT_STRAP_INNER_Z as BANK_FRONT_STRAP_INNER_Z,
+)
 from vn_cone_pivot_screw_spec import (
     THREAD as PIVOT_THREAD,
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
@@ -128,6 +131,7 @@ from vn_fillister_screw_spec import SHANK_LEN as NAMEPLATE_SCREW_LEN
 from vn_swing_stop_screw_spec import EMBED_LEN as STOP_ENGAGEMENT
 from dt_pinion_pivot_block_geometry import BLOCK_HEIGHT, SCREW_HALF_SPACING
 from pinion_rig_layout import BLOCK_SEAT_Z, SPRING_PAD_Z
+from pinion_rig_park_geometry import PIVOT_X as PINION_PIVOT_X
 from dt_pinion_spring_section import (
     SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST,
     THICK as SPRING_THICKNESS,
@@ -337,18 +341,13 @@ STOP_SCREW_DRILL_DEPTH = seat_drill_depth(STOP_SCREW_HOLE_DEPTH, STOP_THREAD, "t
 # machine-handed convention: four #8-32 seats under the two pivot blocks
 # and one #4-40 seat under the spring foot (the arbor pedestals moved to their
 # own #8-32 group, PEDESTAL_SCREW_XZ, with U34c).
-# The block and spring seats follow the user-authoritative 32T rig's parked
-# tip gap (U28, 2026-09-23: 2.2425, the park-out that seats the 120T tips at
-# the drum's base-circle root) and the U28 block re-layout -- screws +-8.5
-# about the pivot bore, block mid-depth 5.125 in from each outer face; the
-# drum-axis pedestal seats remain unchanged.  Ruling (c) (user, 2026-09-24):
-# the block and spring-foot z stations are pinion_rig_layout's -- the front
-# block stands one feeler off the front strap, the spring foot's pad one
-# leaf off the back block, and the whole rig where the rig-set leaf D off gear
-# j = 19 puts it (RIG_AFT_SHIFT, user ruling P1-2).
-_FORMER_BLOCK_SCREW_X = (-17.226441649810653, -0.22644164981065273)  # east, west
+# The parked rig's live pivot supplies the machine-X datum; the shared rig
+# stack supplies both block mid-depth stations. The base's native seats
+# follow pitch/gap changes without a second former-world-coordinate model.
 BLOCK_SCREW_XZ = tuple(
-    (x + MECHANISM_X_SHIFT, z) for z in BLOCK_SEAT_Z for x in _FORMER_BLOCK_SCREW_X
+    (PINION_PIVOT_X + dx, z)
+    for z in BLOCK_SEAT_Z
+    for dx in (-SCREW_HALF_SPACING, SCREW_HALF_SPACING)
 )
 # Rule 12 (audit E10): stock 31.75-mm (#8-32 x 1-1/4) slotted screws penetrate
 # 11.25 mm below each 20.5-mm block -- 10.74 = 2.58D at the BlockHeight .XX
@@ -360,19 +359,9 @@ BLOCK_SCREW_HOLE_DEPTH = 12.75
 BLOCK_SCREW_DRILL_DEPTH = seat_drill_depth(
     BLOCK_SCREW_HOLE_DEPTH, "#8-32", "tapped_bottoming"
 )
-_FORMER_FOOT_SCREW_XZ = (
-    # spring foot: SPRING_SCREW_EAST of the swing pivot bore, which stands
-    # SCREW_HALF_SPACING west of the east block screw -- outboard of the back
-    # strap (re-derived 2026-09-24; the drive train asserts it; z:
-    # pinion_rig_layout)
-    (
-        _FORMER_BLOCK_SCREW_X[0] + SCREW_HALF_SPACING - SPRING_SCREW_EAST,
-        SPRING_PAD_Z - MECHANISM_Z_SHIFT,
-    ),
-)
-FOOT_SCREW_XZ = tuple(
-    (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
-)
+# The spring screw is SCREW_EAST_OF_PIVOT east of the same parked pivot,
+# with its pad's transferred machine-Z station supplied by the rig stack.
+FOOT_SCREW_XZ = ((PINION_PIVOT_X - SPRING_SCREW_EAST, SPRING_PAD_Z),)
 # The stock 9.525-mm foot screw penetrates deepest below the THINNEST spring
 # strip the stock band allows (#859 ruling 4: 17-7 PH 0.015 in, 2325K19); the
 # seat is sized at its printed worst case for a #4-40 bottoming tap.
@@ -382,25 +371,14 @@ FOOT_SCREW_DRILL_DEPTH = seat_drill_depth(
     FOOT_SCREW_HOLE_DEPTH, "#4-40", "tapped_bottoming"
 )
 
-# U34c (dt-bank-pedestal-layout-20260923 rev 3, H1): one MHA-VN-032 #8-32 x 3/4
-# fillister holds each arbor pedestal through its ledge hole. Machine frame,
-# like NAMEPLATE_SCREW_XZ (no _FORMER_ twin; the mechanism shift is already in
-# the drive train's stations): the drum axis x, and z = each strap inner face
-# -+ the 19.0 from that face to the ledge hole. The strap faces are the
-# cylinder bank's own stack (#743, cylinder_bank_layout FRONT/BACK
-# _STRAP_INNER_Z). The seats are TRANSFERRED from the fitted pedestals at
-# assembly, so the print gives no position. These are literals because the
-# base cannot import the drive train (it imports the base), and importing the
-# bank layout would make the frame read machine/channels.yaml (its station
-# ladder; test_config_deps_recipe_digest_skips_unread_yaml); the drive train
-# asserts them against its own derivation within 0.05 and
-# test_dt_drive_train_support_layout pins them within 0.005.
-_DRUM_AXIS_X = -54.7 + MECHANISM_X_SHIFT
-_PEDESTAL_STRAP_FACE_Z = (-71.519, 73.062)
+# Each transferred arbor-pedestal seat follows the live cylinder bank's
+# strap inner face and the pedestal's own ledge offset. Use exact geometry,
+# not rounded study coordinates: the assembly still checks the independent
+# pedestal placement against these native base cuts.
 _PEDESTAL_LEDGE_OFFSET = PEDESTAL_STRAP_INNER_Z - PEDESTAL_LEDGE_SCREW_Z  # 19.0
 PEDESTAL_SCREW_XZ = (
-    (_DRUM_AXIS_X, _PEDESTAL_STRAP_FACE_Z[0] - _PEDESTAL_LEDGE_OFFSET),
-    (_DRUM_AXIS_X, _PEDESTAL_STRAP_FACE_Z[1] + _PEDESTAL_LEDGE_OFFSET),
+    (X_DRUM, BANK_FRONT_STRAP_INNER_Z - _PEDESTAL_LEDGE_OFFSET),
+    (X_DRUM, BANK_BACK_STRAP_INNER_Z + _PEDESTAL_LEDGE_OFFSET),
 )
 # Rule 12 (audit E15), judged at the printed worst case: flange 5.0 +-0.8,
 # screw 19.05 +0/-0.76 (B18.6.3), these depths +-0.8 (.X). The longest screw

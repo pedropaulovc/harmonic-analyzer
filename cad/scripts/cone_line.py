@@ -109,10 +109,10 @@ def cone_station(s: float) -> list[float]:
 # The corrected 2.8360-in v2 crank boss spans local z
 # -21.3753..+50.6591. The 16T follows the shifted 64T row while the T12 chain
 # plane remains photo-anchored, so the resulting axial gaps are intentionally
-# unequal; the post station still fixes crank X and the pair DP.
+# unequal; the post station fixes crank X and the configured bore sets Y.
 POST_STATION = -39.90136099792956
 X_CRANK = cone_station(POST_STATION)[0]  # -129.336: Ry180 v2 installation
-Y_CRANK = Y_BASE_TOP + 6.35 + 72.7  # 129.850: v2 cast-in crank-axis height
+Y_CRANK = Y_BASE_TOP + 6.35 + _config.machine("gear_train", "crank_axis_height_mm")
 
 # T006 is the reference gear for the tip-end stack: its north face is the
 # fixed layout reference the MHA-VN-016 stack collar is feeler-set off.

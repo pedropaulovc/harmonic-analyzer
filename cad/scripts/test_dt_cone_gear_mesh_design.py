@@ -175,12 +175,11 @@ def test_inputs_match_experimental_standard() -> None:
     assert drum.PRESSURE_ANGLE_DEG == spec.PRESSURE_ANGLE_DEG == 20.0
     assert spec.BLANK_DIA_BAND == (0.10, -0.10)
     assert set(spec.DEEPENED_MESH_MM) == set(spec.CONFIGURATION_TEETH)
-    # The pose puts every gear at the same deep-edge interleave, 0.470 mm.
-    # (The U38 study read 0.459 off a 0.05 mm axial sampling grid; the depth
-    # changes by tan(12.52 deg) per mm along the face, so the grid missed the
-    # face edge by 0.011.)
+    # Every station retains the configured common deep-edge interleave.
     assert max(INTERLEAVE.values()) - min(INTERLEAVE.values()) < 0.001
-    assert INTERLEAVE[60] == pytest.approx(2 * M - assembly.PEN_EDGE_SLACK, abs=0.001)
+    edge_slack = _config.fit("cone_drum_oblique_mesh", "edge_slack_mm")
+    assert edge_slack == 0.25
+    assert INTERLEAVE[60] == pytest.approx(2 * M - edge_slack, abs=0.001)
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)

@@ -1,4 +1,4 @@
-"""Build production stock fasteners from verified McMaster geometry recipes."""
+"""Build production stock fasteners from vendor replays and catalog-only recipes."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from _visibility import FeatureWalk
 type RecipeAuthor = Callable[..., Awaitable[None]]
 type Vector3 = tuple[float, float, float]
 
-# The helical groove every threaded McMaster replay cuts
+# The helical groove every threaded stock recipe cuts
 # (diag_mcmaster_lib.thread_sweep_cut*): the only feature the drawing-view
 # configuration suppresses on a fastener.
 THREAD_FEATURE = "ThreadGroove"
@@ -36,7 +36,7 @@ THREAD_FEATURE = "ThreadGroove"
 
 @dataclass(frozen=True, slots=True)
 class RecipeMetadata:
-    """Static import metadata for one verified diagnostic recipe.
+    """Static import metadata for one native stock recipe.
 
     ``threaded`` declares that the recipe cuts a modeled helical thread named
     ``THREAD_FEATURE``; the stock build requires the feature to match, so a
@@ -62,8 +62,8 @@ STOCK_RECIPES: Mapping[str, RecipeMetadata] = MappingProxyType(
         "90280A837": RecipeMetadata(
             "diagnostics.diag_build_90280A837", "build_90280A837", threaded=True
         ),
-        "40923898": RecipeMetadata(
-            "diagnostics.diag_build_40923898", "build_40923898", threaded=True
+        "40923906": RecipeMetadata(
+            "diagnostics.diag_build_40923906", "build_40923906", threaded=True
         ),
         "90280A201": RecipeMetadata(
             "diagnostics.diag_build_90280A201", "build_90280A201", threaded=True

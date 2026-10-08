@@ -24,12 +24,19 @@ def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
         drive.TIP_DRUM120 + drive.TIP_APINION + drive.APINION_GAP,
         abs_tol=1e-9,
     )
-    # U28 (user, 2026-09-23; 997f3534): the drum parks 2.0 outside the tip
-    # circles PLUS the base-chord seat offset, so the engage swing ends where
-    # the 120T tips seat on the gap floor (engaged C2C), not at the pitch sum.
+    # U28's parked tip-circle air remains 2.2425 mm.  The standard-depth
+    # roots no longer define the engaged stop: that independently follows
+    # the pitch-circle sum plus the configured positive running extension.
+    import _config
+
     pitch_sum = (120 + drive.APINION_TEETH) / drive.DP_TRAIN * 25.4 / 2.0
+    extension = float(
+        _config.machine("alignment_pinion", "engaged_center_extension_mm")
+    )
+    assert math.isclose(drive.APINION_GAP, 2.2425, rel_tol=0.0, abs_tol=1e-9)
+    assert extension > 0.0
     assert math.isclose(
-        drive.APINION_GAP, 2.0 + (drive.ENGAGED_C2C - pitch_sum), abs_tol=1e-4
+        drive.ENGAGED_C2C, pitch_sum + extension, rel_tol=0.0, abs_tol=1e-9
     )
 
 
@@ -140,8 +147,29 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     assert stations0 == pytest.approx(
         (drive._spr_station[0], drive._spr_station[-1]), abs=1e-12
     )
-    assert drive.SPRING_PRELOAD_RATIO == pytest.approx((1.575, 2.118), abs=5e-4)
-    assert drive.SPRING_STRESS_SF == pytest.approx(1.525, abs=5e-4)
+    soft_ratios = []
+    stiff_factors = []
+    for corner in leaf.FORMED_CORNERS:
+        deflections, arm, stations = drive._spring_corner(corner, t_lo)
+        soft_ratios.append(
+            tuple(
+                leaf.contact_force(deflection, t_lo, w_lo, arm) * station / moment
+                for deflection, station, moment in zip(
+                    deflections, stations, gravity, strict=True
+                )
+            )
+        )
+        stiff_deflections, stiff_arm, _ = drive._spring_corner(corner, t_hi)
+        stiff_factors.append(
+            leaf.YIELD_MPA / leaf.root_stress(stiff_deflections[1], t_hi, stiff_arm)
+        )
+    assert drive.SPRING_PRELOAD_RATIO == pytest.approx(
+        tuple(min(ratios[pose] for ratios in soft_ratios) for pose in range(2)),
+        rel=0.0, abs=1e-12,
+    )
+    assert drive.SPRING_STRESS_SF == pytest.approx(
+        min(stiff_factors), rel=0.0, abs=1e-12
+    )
     assert min(drive.SPRING_PRELOAD_RATIO) >= 1.5
     assert drive.SPRING_STRESS_SF >= 1.5
     # Positive control: the one-band gate this replaced read higher on both.
@@ -242,12 +270,45 @@ def test_base_holes_follow_the_rederived_support() -> None:
         assert math.dist(derived, base) < 1e-9
     for derived, base in zip(drive._FOOT_SCREW_XZ, drive.BASE_FOOT_XZ, strict=True):
         assert math.dist(derived, base) < 1e-9
-    # U34c: the base carries the transferred pedestal seats at the study's
-    # rounded stations; the drive train derives them from the disc stack.
+    # Transferred pedestal seats now use the exact configured bank faces.
     for derived, base in zip(
         drive._PEDESTAL_SCREW_XZ, drive.BASE_PEDESTAL_XZ, strict=True
     ):
-        assert math.dist(derived, base) < 0.005
+        assert math.dist(derived, base) < 1e-9
+
+
+def test_native_base_seats_read_live_park_and_bank_datums(monkeypatch) -> None:
+    import importlib
+    import build_fr_harmonic_base as base
+    import cylinder_bank_layout as bank
+    import pinion_rig_park_geometry as park
+
+    original = base.__dict__.copy()
+    block_seats = base.BLOCK_SCREW_XZ
+    foot_seats = base.FOOT_SCREW_XZ
+    pedestal_seats = base.PEDESTAL_SCREW_XZ
+    shift_x, shift_z = 0.5, 0.25
+    # The actual builder's native Hole Wizard tuples must follow a changed
+    # source datum, not merely agree with the current snapshot by coincidence.
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(park, "PIVOT_X", park.PIVOT_X + shift_x)
+            patch.setattr(RIG, "BLOCK_SEAT_Z", tuple(z + shift_z for z in RIG.BLOCK_SEAT_Z))
+            patch.setattr(RIG, "SPRING_PAD_Z", RIG.SPRING_PAD_Z + shift_z)
+            patch.setattr(bank, "FRONT_STRAP_INNER_Z", bank.FRONT_STRAP_INNER_Z + shift_z)
+            patch.setattr(bank, "BACK_STRAP_INNER_Z", bank.BACK_STRAP_INNER_Z + shift_z)
+            importlib.reload(base)
+            for before, after in zip(
+                (*block_seats, *foot_seats),
+                (*base.BLOCK_SCREW_XZ, *base.FOOT_SCREW_XZ),
+                strict=True,
+            ):
+                assert math.dist(after, (before[0] + shift_x, before[1] + shift_z)) < 1e-9
+            for before, after in zip(pedestal_seats, base.PEDESTAL_SCREW_XZ, strict=True):
+                assert math.dist(after, (before[0], before[1] + shift_z)) < 1e-9
+    finally:
+        base.__dict__.clear()
+        base.__dict__.update(original)
 
 
 def _world(origin, rows, local):
@@ -481,8 +542,11 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
         abs_tol=1e-12,
     )
     assert not hasattr(RIG, "RIG_AFT_SHIFT_STEP")
-    # The layout's g19 literal is the gear grid's.
+    # Both consumers use the bank's live configured-grid datum.
+    import cylinder_bank_layout as bank
+
     g19_back = drive.Z_DRUM0 + 19 * drive.Z_PITCH + drive.DRUM_FACE / 2.0
+    assert math.isclose(RIG.G19_BACK_FACE_Z, bank.G19_BACK_FACE_Z, abs_tol=1e-12)
     assert math.isclose(RIG.G19_BACK_FACE_Z, g19_back, abs_tol=1e-9)
     # User ruling (E_b): the bank's own terms come from the #743 retention
     # design, booked by name in their own stack.
@@ -504,6 +568,45 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
         "j = 19 past its full face (bank pushed north)",
         "j = 0 drum overhang slack (rig and bank terms)",
     ]
+
+
+def test_rig_stations_follow_a_changed_bank_datum(monkeypatch) -> None:
+    import importlib
+    import cylinder_bank_layout as bank
+
+    original = RIG.__dict__.copy()
+    shift = 0.5
+    stations = {
+        name: getattr(RIG, name)
+        for name in (
+            "G19_BACK_FACE_Z", "BACK_STOP_Z", "DRUM_FRONT_Z", "DRUM_BACK_Z",
+            "FRONT_BLOCK_Z0", "BACK_BLOCK_Z0", "TORQUE_SHAFT_Z0",
+            "LIFT_ROD_Z0", "SPRING_PAD_Z", "RIG_AFT_SHIFT",
+        )
+    }
+    seats = RIG.BLOCK_SEAT_Z
+    lengths = (RIG.INNER_SPAN, RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN)
+    # Reload only the pure geometry consumer; no assembly or COM operation.
+    # Restore the original bindings too: assembly/spec aliases may retain
+    # tuples imported before this test reloads the shared geometry module.
+    try:
+        with monkeypatch.context() as patch:
+            patch.setattr(bank, "G19_BACK_FACE_Z", bank.G19_BACK_FACE_Z + shift)
+            importlib.reload(RIG)
+            for name, before in stations.items():
+                assert math.isclose(
+                    getattr(RIG, name), before + shift, rel_tol=0.0, abs_tol=1e-9
+                ), name
+            for before, after in zip(seats, RIG.BLOCK_SEAT_Z, strict=True):
+                assert math.isclose(after, before + shift, rel_tol=0.0, abs_tol=1e-9)
+            for before, after in zip(
+                lengths, (RIG.INNER_SPAN, RIG.TORQUE_SHAFT_LEN, RIG.LIFT_ROD_LEN),
+                strict=True,
+            ):
+                assert math.isclose(after, before, rel_tol=0.0, abs_tol=1e-9)
+    finally:
+        RIG.__dict__.clear()
+        RIG.__dict__.update(original)
 
 
 def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
@@ -1012,10 +1115,9 @@ def test_cam_set_screw_hole_stays_clear_of_the_follower() -> None:
         for j in range(21)
     ]
     assert min(gaps) - half >= _HOLE_CONTACT_MARGIN_DEG, min(gaps)
-    # At the photographed engage, with the strap fully swung: 83.5 deg.
+    # The exact engage pose must keep the same physical angular air floor.
     engaged = _hole_to_contact_deg(drive.CAM_ENGAGE_ROTATION_DEG, drive._PHI_ENG)
-    assert math.isclose(engaged, 83.52, abs_tol=0.05)
-    assert math.isclose(engaged - half, 75.45, abs_tol=0.05)
+    assert engaged - half >= _HOLE_CONTACT_MARGIN_DEG
 
 
 def test_set_pin_holes_sit_at_the_physical_back_stop_straps() -> None:
@@ -1223,7 +1325,7 @@ def test_drive_train_reads_no_shaft_or_pin_drawing_contract() -> None:
 
     deps = {Path(p).stem for p in module_deps_of(Path(drive.__file__))}
     assert not deps & {"dt_pinion_pivot_shaft_spec", "vn_pinion_strap_pin_spec"}, deps
-    assert PIN_HOLE_Z is RIG.TORQUE_SHAFT_PIN_HOLE_Z
+    assert PIN_HOLE_Z == RIG.TORQUE_SHAFT_PIN_HOLE_Z
 
 
 def test_mha145_pins_carry_no_interference_exemption() -> None:

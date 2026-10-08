@@ -78,8 +78,12 @@ async def equation_curve(adapter: Any, label: str, x_expr: str, y_expr: str) -> 
 
 
 def _root_start_parameter(base_r_in: float, root_r_in: float | None) -> float:
-    """Start on the root circle when it lies outside the involute base."""
-    if root_r_in is None or root_r_in <= base_r_in:
+    """Start on the physical root circle only when it lies above the base."""
+    if root_r_in is None:
+        return 0.0
+    if not math.isfinite(root_r_in) or root_r_in <= 0.0:
+        raise ValueError("gear root radius must be positive and finite")
+    if root_r_in <= base_r_in:
         return 0.0
     return math.sqrt((root_r_in / base_r_in) ** 2 - 1.0)
 
@@ -115,6 +119,8 @@ async def cut_tooth_gap(
     th_l, th_u = fmt(theta_l), fmt(theta_u)
     rc = fmt(R_CLEAR_IN)
     tmin = _root_start_parameter(facts["Rb"], root_r_in)
+    if tmin >= facts["Tmax"]:
+        raise ValueError("gear root must leave a nonzero involute below the tip")
     foot_inv = tmin - math.atan(tmin)
     u = f"({fmt(tmin)} + {fmt(facts['Tmax'] - tmin)} * t)"
     # NB the lower flank is the MIRRORED involute (its y is negated relative
@@ -255,6 +261,8 @@ def gap_area_in_disc_ext(
     never changes the area, so the sliced-helix twist reuses this expectation
     per slice. ``addendum_extra_in`` moves the rim arc exactly as it moves
     ``gear_facts``' tip radius.
+    Above-base roots close directly on their physical root arc, using the
+    same clipped involute and root-foot phases as the native cut and sweep.
     """
     f = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     rb, ra = f["Rb"], f["Ra"]
@@ -262,6 +270,8 @@ def gap_area_in_disc_ext(
     eps = widen_rad
     th_l, th_u = f["ThetaL"] - eps, f["ThetaU"] + eps
     tmin = _root_start_parameter(rb, root_r_in)
+    if tmin >= tmax:
+        raise ValueError("gear root must leave a nonzero involute below the tip")
     foot_inv = tmin - math.atan(tmin)
     a1, a2 = delta - foot_inv - eps, gamma - delta + foot_inv + eps
     pts: list[tuple[float, float]] = []
@@ -289,13 +299,15 @@ def gap_area_in_disc_ext(
                 rb * ((1 - s) * math.cos(a2) + s * math.cos(a1)),
                 rb * ((1 - s) * math.sin(a2) + s * math.sin(a1)),
             ))
-    else:  # radial in at a2, root arc, radial out at a1
+    else:  # root arc, with radial extensions only below the base circle
         rr = root_r_in
-        pts.append((rr * math.cos(a2), rr * math.sin(a2)))
+        if root_r_in < rb:
+            pts.append((rr * math.cos(a2), rr * math.sin(a2)))
         for i in range(1, samples):
             th = a2 + (a1 - a2) * i / samples
             pts.append((rr * math.cos(th), rr * math.sin(th)))
-        pts.append((rr * math.cos(a1), rr * math.sin(a1)))
+        if root_r_in < rb:
+            pts.append((rr * math.cos(a1), rr * math.sin(a1)))
     area = 0.0
     for (x1, y1), (x2, y2) in zip(pts, pts[1:] + pts[:1], strict=False):
         area += x1 * y2 - x2 * y1
@@ -354,13 +366,17 @@ async def boss_tooth_swept(
 
     rho, eps = rotate_rad, widen_rad
     rb, ra = fmt(facts["Rb"]), fmt(facts["Ra"])
+    tmin = _root_start_parameter(facts["Rb"], root_r_in)
+    if tmin >= facts["Tmax"]:
+        raise ValueError("gear root must leave a nonzero involute below the tip")
+    if root_r_in <= _TOOTH_EMBED_MM / IN:
+        raise ValueError("embedded tooth root radius must be positive")
     rr_embed = fmt(root_r_in - _TOOTH_EMBED_MM / IN)
     gamma = facts["Gamma"]
     theta_lo = facts["ThetaU"] + eps + rho          # tip arc start (flank A @ Ra)
     theta_hi = gamma + facts["ThetaL"] - eps + rho  # tip arc end (flank B @ Ra)
     a_lo = facts["Gamma"] - facts["Delta"] + eps + rho  # flank A base azimuth
     a_hi = gamma + facts["Delta"] - eps + rho           # flank B base azimuth
-    tmin = _root_start_parameter(facts["Rb"], root_r_in)
     foot_inv = tmin - math.atan(tmin)
     foot_r = fmt(max(facts["Rb"], root_r_in))
     foot_lo, foot_hi = a_lo + foot_inv, a_hi - foot_inv

@@ -12,7 +12,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "diagnostics"))
 
 import crank_mesh_backlash_study as backlash  # noqa: E402
 import crossed_mesh_study as cms  # noqa: E402
-from dt_crank_pinion_spec import FACE_WIDTH, SHOULDER_LENGTH, TURNED_DIA  # noqa: E402
+from dt_crank_pinion_spec import (  # noqa: E402
+    FACE_WIDTH,
+    MESH_WINDOW_CENTRE_DEG,
+    SHOULDER_LENGTH,
+    TURNED_DIA,
+)
 
 
 @pytest.fixture(scope="module")
@@ -74,7 +79,7 @@ def test_pinion_boundary_stops_at_the_turned_diameter_in_the_band(
 
 
 def test_yawed_backlash_window_honors_the_band(yawed_pose: backlash.Pose) -> None:
-    # Full-OD teeth over the whole face close the window at -2.991 deg
-    # (2.468 wide); the shipped band clears that north-end tip contact.
-    res = backlash.window(yawed_pose, backlash.dta.MESH_WINDOW_CENTRE_DEG)
-    assert res["width_deg"] == pytest.approx(2.4873, abs=0.002)
+    # Re-measured normal-24DP PA20 pair at the 48DP cone incline, phase zero:
+    # +1-degree yaw retains this window with the actual north-end tip band.
+    res = backlash.window(yawed_pose, MESH_WINDOW_CENTRE_DEG)
+    assert res["width_deg"] == pytest.approx(1.59961, abs=0.002)

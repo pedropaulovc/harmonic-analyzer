@@ -1,20 +1,25 @@
-r"""MSC 40923898 -- 1/4-20 x 3-1/2 zinc-plated steel slotted fillister screw.
+r"""MSC 40923906 -- 1/4-20 x 4 in zinc-plated steel slotted fillister screw.
 
-MSC Industrial Supply, manufacturer part 1456MSL (SAE J82 steel, zinc,
-ASME B18.6.3, fully threaded).  MSC publishes no head sizes and no CAD
-model, so the head takes ASME B18.6.3's 1/4 maximum and the length the
-supplied 3-1/2 in (MHA-VN-031's builder cuts it to fit).  Reuses the 90280A* fillister family laws
-unchanged, like 90280A837.
+Value Collection, MSC Industrial Supply: SAE J82 steel, zinc, ASME B18.6.3.
+The selected catalog identity and 4 in under-head length come from MSC's
+primary search result for https://www.mscdirect.com/product/details/40923906.
+The direct product-page read returned HTTP 403; no manufacturer part
+number, threaded length, stock price or live inventory is asserted.
 
-With no vendor model there is no replica gate: the standalone run is
-catalog-only -- it builds the recipe, checks its mass properties are sane
-and saves it under cad/out/reference for inspection.  (The McMaster
-``replica_main`` path would demand a vendor SLDPRT and its harvest, which
-MSC cannot supply.)
+This is a catalog-only ideal native model, not vendor CAD or a measured
+replica.  The head retains the existing ASME B18.6.3 1/4 maxima (height
+0.237 in, diameter 0.414 in).  The supplied under-head length is 101.6 mm;
+MHA-VN-031's builder alone cuts it to fit.  The 90280A* family laws for the
+head shape, slot, tip, runout and full-shank helical thread are retained as
+modeling conventions, not verified dimensions of the supplied screw.
+
+There is no vendor-model replica gate: the standalone run is catalog-only
+-- it builds the recipe, checks its mass properties are sane and saves it
+under cad/out/reference for inspection.
 
 Run standalone (SolidWorks open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_40923898.py
+    uv run python cad\scripts\diagnostics\diag_build_40923906.py
 """
 
 from __future__ import annotations
@@ -26,10 +31,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from diagnostics.diag_mcmaster_fillister import build_fillister  # noqa: E402
 
-PART_NO = "40923898"
+PART_NO = "40923906"
 
 
-async def build_40923898(adapter, truth=None):
+async def build_40923906(adapter, truth=None):
     await build_fillister(adapter, PART_NO)
 
 
@@ -48,7 +53,7 @@ async def build_catalog(adapter) -> dict[str, str]:
     with _telemetry.span("catalog.build", label=PART_NO):
         check(f"create_part {PART_NO}", await adapter.create_part())
         assert_seat_sketch_baseline(adapter, PART_NO)
-        await build_40923898(adapter)
+        await build_40923906(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{PART_NO} catalog build has no solid volume")

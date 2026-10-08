@@ -33,7 +33,7 @@ _EXPECTED = {
     "vn-pedestal-hold-down-screw": (("90280A197",), "MHA-VN-032", 6),
     "vn-pen-set-screw": (("99607A213",), "MHA-VN-010", 1),
     "vn-pinion-strap-pin": (("98296A027",), "MHA-VN-033", 3),
-    "vn-post-mount-screw": (("40923898",), "MHA-VN-031", 2),
+    "vn-post-mount-screw": (("40923906",), "MHA-VN-031", 2),
     "vn-slotted-screw": (("90280A201",), "MHA-VN-019", 4),
     "vn-swing-stop-screw": (("90280A108",), "MHA-VN-015", 1),
     "vn-thumb-screw": (("91882A221",), "MHA-VN-011", 2),
@@ -50,7 +50,7 @@ _EXPECTED = {
     "vn-spring-hook": (("9489T111",), "MHA-VN-012", 20),
     "vn-tube-frame-cap": (("9275K141",), "MHA-VN-028", 4),
 }
-# U37c: McMaster carries no 1/4-20 x 3-1/2 steel slotted fillister.
+# The post-mount screw's 1/4-20 x 4 in stock is sourced from MSC.
 _SUPPLIERS = {"vn-post-mount-screw": "MSC Industrial Supply"}
 
 

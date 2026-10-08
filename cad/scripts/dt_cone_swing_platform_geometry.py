@@ -17,6 +17,10 @@ from dataclasses import dataclass
 import _config
 from cone_line import COS_I as _COS_I, INCLINE_DEG, PIVOT_STATION, POST_STATION, SIN_I as _SIN_I
 from dt_cone_swing_platform_spec import (
+    CRANK_GEAR_RELIEF_LENGTH,
+    CRANK_GEAR_RELIEF_LOCAL_X,
+    CRANK_GEAR_RELIEF_LOCAL_Z,
+    CRANK_GEAR_RELIEF_WIDTH,
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
     HOLDDOWN_LOCAL_X,
@@ -117,6 +121,42 @@ def _edge_normal_distance(
     return abs((bx - ax) * (az - pz) - (ax - px) * (bz - az)) / math.hypot(
         bx - ax, bz - az
     )
+
+
+# The rectangular pocket's volume oracle is valid only when all its
+# corners lie inside the uncut tapered plate and it misses the post foot.
+_GEAR_RELIEF_CORNERS = tuple(
+    (
+        CRANK_GEAR_RELIEF_LOCAL_X + sx * CRANK_GEAR_RELIEF_WIDTH / 2.0,
+        CRANK_GEAR_RELIEF_LOCAL_Z + sz * CRANK_GEAR_RELIEF_LENGTH / 2.0,
+    )
+    for sx in (-1.0, 1.0)
+    for sz in (-1.0, 1.0)
+)
+CRANK_GEAR_RELIEF_EDGE_AIR = math.inf
+for _rx, _rz in _GEAR_RELIEF_CORNERS:
+    _fraction = (NORTH_OVERHANG - _rz) / PLATE_LEN
+    _east = HALF_WIDTH_N + (EAST_HALF_S - HALF_WIDTH_N) * _fraction
+    _west = WEST_HALF_N + (WEST_HALF_S - WEST_HALF_N) * _fraction
+    if not PLATE_SOUTH_Z < _rz < NORTH_OVERHANG or not -_east < _rx < _west:
+        raise AssertionError("crank gear relief leaves the platform outline")
+    CRANK_GEAR_RELIEF_EDGE_AIR = min(
+        CRANK_GEAR_RELIEF_EDGE_AIR,
+        _rz - PLATE_SOUTH_Z,
+        NORTH_OVERHANG - _rz,
+        _edge_normal_distance(
+            (_rx, _rz), (-HALF_WIDTH_N, NORTH_OVERHANG), (-EAST_HALF_S, PLATE_SOUTH_Z)
+        ),
+        _edge_normal_distance(
+            (_rx, _rz), (WEST_HALF_N, NORTH_OVERHANG), (WEST_HALF_S, PLATE_SOUTH_Z)
+        ),
+    )
+CRANK_GEAR_RELIEF_POST_AIR = math.hypot(
+    max(0.0, abs(CRANK_GEAR_RELIEF_LOCAL_X) - CRANK_GEAR_RELIEF_WIDTH / 2.0),
+    max(0.0, abs(CRANK_GEAR_RELIEF_LOCAL_Z - POST_LOCAL_Z) - CRANK_GEAR_RELIEF_LENGTH / 2.0),
+) - POST_MAIN_DIA / 2.0
+if min(CRANK_GEAR_RELIEF_EDGE_AIR, CRANK_GEAR_RELIEF_POST_AIR) < 0.25:
+    raise AssertionError("crank gear relief reaches the platform edge or post foot")
 
 
 _HOLDDOWN_XZ = (HOLDDOWN_LOCAL_X, HOLDDOWN_LOCAL_Z)

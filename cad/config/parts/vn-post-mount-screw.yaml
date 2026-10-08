@@ -3,9 +3,9 @@ vn-post-mount-screw:
   number: MHA-VN-031
   stock_name: Zinc-Plated Steel Slotted Fillister Head Machine Screw
   supplier: MSC Industrial Supply
-  supplier_skus: ["40923898"]
+  supplier_skus: ["40923906"]
   material: Plain Carbon Steel
-  material_specification: Steel, SAE J82, MSC 40923898 (mfr 1456MSL)
+  material_specification: Steel, SAE J82, MSC 40923906
   finish: SUPPLIED ZINC PLATING; OIL BARE CUT END
   quantity: 2
   tolerance_class: machined_block

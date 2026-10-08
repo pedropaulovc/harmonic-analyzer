@@ -1,6 +1,6 @@
 r"""Pure-data contract shared by the MHA-VN-031 post mount screw part and drawing.
 
-MHA-VN-031 is MSC 40923898 (1/4-20 x 3-1/2 slotted fillister, U37c) cut to
+MHA-VN-031 is MSC 40923906 (1/4-20 x 4 in slotted fillister) cut to
 length: a MODIFIED purchased part.  Its head seats on the MHA-DT-005
 counterbore floor and the shank threads through the MHA-DT-020 plate, which
 swings over the base, so the cut end must never stand proud of the plate's
@@ -29,7 +29,7 @@ import dt_cone_swing_platform_spec as platform
 from _fit_limits import deviations
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 
-SKU = "40923898"
+SKU = "40923906"
 THREAD = "1/4-20"
 THREAD_DIA_MM, STOCK_LENGTH_MM, HEAD_H_MM, _HEAD_DIA, _PITCH = FILLISTER_SIZES[SKU]
 
@@ -153,8 +153,8 @@ FIXED_LENGTH_FLUSH_MAX_MM = FLOOR_LOW_MM + PLATE_THIN_MM
 FIXED_LENGTH_ENGAGEMENT_MIN_MM = FLOOR_HIGH_MM + MIN_ENGAGEMENT_MM + ENGAGEMENT_BREAKS_MM
 if FIXED_LENGTH_ENGAGEMENT_MIN_MM > FLOOR_HIGH_MM + PLATE_THICK_MM:
     raise ValueError("the thick plate cannot hold 0.90D even when cut flush")
-# No single length satisfies both corners (84.89 vs 87.21 at the current
-# bands), so the shop cannot cut to a print band: each screw is cut to its
+# No single length satisfies both corners at the current bands, so the shop
+# cannot cut to a print band: each screw is cut to its
 # own hole at assembly (MHA-DT-000), and the sheet prints the modelled length as
 # a REFERENCE dimension with no band.  If the bands ever tighten enough for a
 # fixed length to exist, this raises and the sheet should carry that band.
@@ -252,14 +252,14 @@ if ENGAGEMENT_NOMINAL_MM < MIN_ENGAGEMENT_MM:
     )
 
 # --- The modification the shop makes (Main's ruling on the cut end) ---
-# The supplied screw is 3-1/2 in, factory-chamfered at its tip.  Cutting it to
-# fit removes that tip, so the 0.1 break at the new end is MHA-VN-031's own
+# The supplied screw is 4 in, modelled with the family's factory tip chamfer.
+# Cutting to fit removes that tip, so the 0.1 break at the new end is MHA-VN-031's own
 # modification, not a property of the fillister family: the builder builds
 # the stock screw at its supplied length (STOCK_LENGTH_MM, the shared
 # recipe's row), then trims it at CutLength and breaks the new end with
 # CutEndBreak.
-if abs(STOCK_LENGTH_MM - 3.5 * 25.4) > 1e-9:
-    raise ValueError("the MSC 40923898 row is not the supplied 3-1/2 in screw")
+if abs(STOCK_LENGTH_MM - 4.0 * 25.4) > 1e-9:
+    raise ValueError("the MSC 40923906 row is not the supplied 4 in screw")
 # The family's factory tip: 45 deg x 0.7P (diag_mcmaster_fillister's law).
 FACTORY_TIP_CHAMFER_MM = 0.7 * _PITCH
 MAJOR_RADIUS_MM = THREAD_DIA_MM / 2.0

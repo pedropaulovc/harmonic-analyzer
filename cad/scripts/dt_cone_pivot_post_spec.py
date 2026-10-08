@@ -1,12 +1,12 @@
 r"""Pure-data dimensional contract shared by the cone pivot post and drawing.
 
-The hand-modelled ``cone-pivot-post-v2.SLDPRT`` is the dimensional authority.
-Its 86 mm height was manually rederived from the second ch30 eight-view
-(``references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png``).
-The casting proportions were manually rederived from the two sharp ch11 details
-(``ch11_images/page002_img05.jpeg`` and ``page002_img06.jpeg``).  Those photos
-support proportions, not manufacturing tolerances; the decimal values below are
-the exact dimensions harvested from v2's feature tree.
+The hand-modelled ``cone-pivot-post-v2.SLDPRT`` supplies the cone, foot and
+mounting datums.  Its original 86 mm height was manually rederived from the
+second ch30 eight-view; the normal-24DP crossed crank requires a real 90 mm
+body with the same 26.6 mm head, not a raised bore outside that casting.
+The casting proportions came from the two sharp ch11 details
+(``ch11_images/page002_img05.jpeg`` and ``page002_img06.jpeg``); the retained
+diameters and journal stations are the exact harvested feature dimensions.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ MM_PER_IN = 25.4
 # head is a one-place reference size -- nothing mates on it; the body below it
 # is the locating/bore cylinder and keeps its turned size.
 BLOCK_DIA = 42.011
-BLOCK_HEIGHT = 86.0
+BLOCK_HEIGHT = 90.0
 HEAD_DIA = 42.7506
 HEAD_HEIGHT = 26.6
 HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
@@ -39,22 +39,32 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # initial derivation.
 #
 # v36 geometry (user ruling 2026-09-28): the crankshaft MHA-DT-011 runs directly
-# in the Ø11.438 crank bore, whose axis is the frame's crank axis 72.7 above
-# the foot -- no eccentric bushing, no drop, fixed centres.  The boss starts at
-# the head's tangent plane, so its north face stands HEAD_DIA / 2 from the post
+# in the Ø11.438 crank bore, whose height follows the crossed-crank config
+# above the unchanged foot -- no eccentric bushing, no drop, fixed centres.
+# The boss starts at the head's tangent plane, so its north face stands
+# HEAD_DIA / 2 from the post
 # axis, and runs the harvested 2.8360 in from there; nothing stands proud of
 # that face inside the boss disc, so there is no spot face, retreat or run-out.
 # The north face is the boss's machined end, stationed from the post axis on
 # the print.
 CRANK_BOSS_DIA = 21.93
 CRANK_BORE_DIA = 11.438
-CRANK_BORE_HEIGHT = 72.7
+CRANK_BORE_HEIGHT = _config.machine("gear_train", "crank_axis_height_mm")
 CRANK_BORE_OFFSET = 0.0
 CRANK_BOSS_NORTH_FACE = HEAD_DIA / 2.0
 CRANK_BOSS_START_Z = -CRANK_BOSS_NORTH_FACE
 CRANK_BOSS_LENGTH_IN = 2.8360
 CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
+
+# The boss must lie wholly in the head's nominal height band: the independent
+# boss-overlap volume oracle clips it against HEAD_DIA, never the lower body.
+CRANK_BOSS_HEAD_MARGIN_MM = min(
+    CRANK_BORE_HEIGHT - CRANK_BOSS_DIA / 2.0 - HEAD_BASE_Y,
+    BLOCK_HEIGHT - CRANK_BORE_HEIGHT - CRANK_BOSS_DIA / 2.0,
+)
+if CRANK_BOSS_HEAD_MARGIN_MM <= 0.0:
+    raise AssertionError("crank boss lies outside the post head's height band")
 
 # Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
 # into the part; downstream placement composes it with the exact Ry(180)
@@ -70,12 +80,12 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # Ry(180) maps part-local +X to machine -X, so the assembly intentionally mates
 # local east/west axes to the opposite platform names.
 #
-# The screw is MHA-VN-031, a 1/4-20 x 3-1/2 slotted fillister (MSC 40923898, user
-# ruling U37c) cut to 86.0 at assembly.  Its ASME B18.6.3 head (dia 9.1-9.5 x
-# 5.5 overall) sits about 0.5 below the top face in the dia 11.509 x 6.02
-# counterbore.  Deepening the counterbore for a shorter screw is not an
-# option: at 16.15 its wall to the crank bore would fall under the 1.5 web
-# floor at print-worst.
+# MHA-VN-031 must provide a shank long enough to reach the platform from the
+# counterbore floor, BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH.  The unchanged
+# dia 11.509 x 6.02 counterbore takes its ASME B18.6.3 fillister head; the
+# purchased-stock spec owns the actual head envelope, stock-length,
+# cut-to-fit and engagement guards.  Raising the casting also raises that
+# floor, so the former 3-1/2-inch stock is no longer long enough.
 ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
 ATTACHMENT_CBORE_DEPTH = 6.0198
@@ -109,14 +119,14 @@ if MOUNT_HEAD_WEB_WORST - 0.01 >= WEB_FLOOR_MM:
 # checks natively one feature at a time (build_dt_cone_pivot_post.py asserts
 # the sum at import):
 #
-#   body      pi*21.0055^2*86                       = +119 210.4620
-#   head      pi*(21.3753^2 - 21.0055^2)*26.6       = +  1 309.6872
+#   body      pi*(BLOCK_DIA/2)^2*BLOCK_HEIGHT
+#   head      pi*((HEAD_DIA/2)^2 - (BLOCK_DIA/2)^2)*HEAD_HEIGHT
 #   crank boss outside the head cylinder            = + 11 611.2487
-#   crank bore pi*5.719^2*72.0344                   = -  7 401.6750
+#   crank bore pi*5.719^2*72.0344                    = -  7 401.6750
 #   cone pads outside the body cylinder             = +    209.0550
-#   cone bore pi*6.1404^2*42.011                    = -  4 976.2961
-#   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5915
-#                                                   = 112 300.8902
+#   cone bore pi*6.1404^2*42.011                     = -  4 976.2961
+#   2x (thru pi*(ATTACHMENT_THRU_DIA/2)^2*(BLOCK_HEIGHT-cbore_depth)
+#       + cbore pi*(ATTACHMENT_CBORE_DIA/2)^2*cbore_depth)
 #
 # The old v36 constant, harvested from v2's B-rep rather
 # than summed, read 112 302.9406: 2.05 mm^3 (0.002%) apart.  The feature sum
@@ -126,8 +136,13 @@ if MOUNT_HEAD_WEB_WORST - 0.01 >= WEB_FLOOR_MM:
 # (opposite the sketch normal) found the collar to bite instead of flipping
 # into the boss.  The build still reverses that cut explicitly.  Mass at gray
 # iron 7.20 g/cc.
-HARVESTED_VOLUME_MM3 = 112_300.8902
-HARVESTED_MASS_KG = 0.808566
+# Growing the 86 mm feature-sum reference adds only the body column less the
+# two through drills.  The head shell's height and the contained boss/pad/bore
+# intersections are unchanged; the builder independently recomputes them.
+HARVESTED_VOLUME_MM3 = 112_300.8902 + math.pi * (
+    (BLOCK_DIA / 2.0) ** 2 - 2.0 * (ATTACHMENT_THRU_DIA / 2.0) ** 2
+) * (BLOCK_HEIGHT - 86.0)
+HARVESTED_MASS_KG = HARVESTED_VOLUME_MM3 * 7.20e-6
 
 # Both bores are running journals, so both carry the SAME size band -- the one
 # the `shaft_in_bushing` fit class needs and no tighter (tolerance-policy.md,
@@ -153,7 +168,8 @@ RUNNING_BORE_BAND = (0.005, -0.025)
 # end of this unchanged U31 band and the retained angularity frame. The
 # upper +0.37 bound predates that no-bind-only requirement; keep it as ruled,
 # without treating its former backlash-window derivation as a current gate.
-# Printed 39.33 +0.37/0; how the shop holds it is theirs (policy rule 6).
+# The current spacing follows the physical fixed-centre pair; its band stays
+# +0.37/0.  How the shop holds it is theirs (policy rule 6).
 CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 
@@ -196,6 +212,15 @@ CRANK_BORE_WEBS_WORST = {
     "top face": BLOCK_HEIGHT - _row(1) - _CRANK_AXIS_Y_MAX - _CRANK_BORE_R_MAX,
     "crank boss OD": (CRANK_BOSS_DIA - _row(1)) / 2.0 - _CRANK_BORE_R_MAX,
 }
+# The cast boss itself, not just its bore, must also remain below the top at
+# the closing printed corner.  Its lower edge may blend into the lower body;
+# the nominal boss/head containment above is what the volume oracle requires.
+CRANK_BOSS_TOP_MARGIN_WORST_MM = (
+    BLOCK_HEIGHT - _row(1) - _CRANK_AXIS_Y_MAX
+    - (CRANK_BOSS_DIA + _row(1)) / 2.0
+)
+if CRANK_BOSS_TOP_MARGIN_WORST_MM <= 0.0:
+    raise AssertionError("crank boss breaches the post's print-worst top outline")
 if _CBORE_CORNER[1] <= 0.0:
     raise AssertionError("mounting counterbore reaches below the crank axis")
 for _name, _web in CRANK_BORE_WEBS_WORST.items():

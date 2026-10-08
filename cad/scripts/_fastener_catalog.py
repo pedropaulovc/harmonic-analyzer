@@ -173,7 +173,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "vn-post-mount-screw": _stock(
         "vn-post-mount-screw",
         "Zinc-Plated Steel Slotted Fillister Head Machine Screw",
-        "40923898",
+        "40923906",
         supplier="MSC Industrial Supply",
     ),
     "vn-slotted-screw": _stock(

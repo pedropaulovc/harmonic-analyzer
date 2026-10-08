@@ -1,9 +1,10 @@
 r"""Shared recipe for the McMaster 90280A* narrow fillister head screws, and
-the 91794A112 stainless fillister screw on the same #4-40 head.
+the 91794A112 stainless fillister screw on the same #4-40 head, plus the
+catalog-only MSC 40923906 model.
 
-The vendor drives every derived number off 5 named dims via equations,
-reproduced here. The 90280A837 and 91794A112 extensions await their native
-comparison:
+The McMaster vendor drives every derived number off 5 named dims via
+equations, reproduced here and reused as modeling conventions for the MSC
+row. The 90280A837 and 91794A112 extensions await their native comparison:
 
 - slot width = HeadDia*0.135, slot depth = width*1.5 (from the dome apex)
 - head cylinder band = HeadHeight*0.8; dome = spherical cap (centre on
@@ -21,7 +22,7 @@ comparison:
 Frame: head UP, under-head junction at y = 0 (the stock Top Plane plays
 the vendor Plane1's three roles: split plane, helix seed, runout).
 
-Per-part entry points: ``diag_build_90280A*.py``.
+Per-part entry points: ``diag_build_90280A*.py``, ``diag_build_40923906.py``.
 """
 
 from __future__ import annotations
@@ -66,11 +67,13 @@ FILLISTER_SIZES = {
     # tip-seeded thread), so diag_build_91794A055 builds it, not
     # build_fillister.
     "91794A055": (1.524, 6.35, 1.397, 2.4384, 25.4 / 80.0),
-    # MSC 40923898 (mfr 1456MSL), 1/4-20 x 3-1/2 slotted fillister, fully
-    # threaded; MSC lists no head sizes, so the head is ASME B18.6.3's 1/4
-    # maximum (A 0.414, O 0.237).  The supplied 3-1/2 in length: MHA-VN-031
-    # (build_vn_post_mount_screw) cuts it to fit, never this row.
-    "40923898": (6.35, 3.5 * 25.4, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0),
+    # Value Collection MSC 40923906, 1/4-20 x 4 in slotted fillister,
+    # SAE J82 steel, zinc.  Catalog-only ideal model: the existing ASME
+    # B18.6.3 1/4 maxima (A 0.414, O 0.237) and family geometry laws, not
+    # vendor CAD or a measured replica.  The full-shank modeled thread does
+    # not verify the supplier's threaded length.  MHA-VN-031 cuts the
+    # supplied 4 in stock to fit; never change this row to its cut length.
+    "40923906": (6.35, 4.0 * 25.4, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0),
 }
 
 
