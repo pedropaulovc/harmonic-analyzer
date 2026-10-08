@@ -4,9 +4,9 @@ The dark steel gear at the cone set's large end, annotated "This gear
 engages the crank" (p. 20): together with a pinion on the crankshaft
 (`build_dt_crank_pinion.py`) it implements the book-stated 4:1 crank-to-cone
 reduction (p. 16). The 64T:16T count split preserves that stated ratio;
-DP 25.731104 is fixed by the recentered 64T station against the unchanged
-cone-pivot-post-v2 crank axis at the checked 0.25-mm mesh slack. This
-supersedes the intermediate DP24.74 rear-shifted layout.
+the experiment now uses standard normal m1 PA20 teeth. The transverse DP
+is 25.4*cos(helix), and the post's crank axis is lifted to the re-arbitrated
+41.079-mm fixed centre while the cone train and the 64T axial seat stay put.
 
 CROSSED-MESH CUT (2026-07-14 rederive, "crank-pinion and crank-drive gear
 are not meshing"): the 64T rides the cone shaft, inclined 12.52 deg IN
@@ -22,10 +22,10 @@ real pair deeply engaged, so the real 64T must carry the accommodation
 the crossing demands; this script cuts it as a true swept helix -- the
 tooth gaps advance (z - face/2)*tan(incline)/R_pitch across the face
 (equivalently: gear helix angle = shaft angle, pinion straight = a
-textbook crossed-helical pair) -- plus transverse tooth thinning (config)
-that also absorbs the cos(incline) normal-pitch shrink, and a deepened root floor (the mating
-16T's tips need real dedendum). Study: crossed_mesh_study (analytic,
-2026-07-14); arbitrated against the live interference gate.
+textbook crossed-helical pair) -- plus transverse tooth thinning (config).
+The normal pitch matches the straight 16T; standard 1.25-module dedendum
+gives its tips real root clearance. The SolidWorks-free crossed-mesh study
+is re-arbitrated here and complemented by the native interference gate.
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
@@ -96,6 +96,7 @@ from dt_crank_drive_gear_spec import (
     BORE_SOUTH_CHAMFER,
     BORE_SOUTH_CHAMFER_BAND,
     CUTTER_DIAMETRAL_PITCH,
+    DEDENDUM_FACTOR,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
@@ -212,13 +213,14 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Normal-defined (#906): the transverse DP/PA place the involute, the
-    # cutter's DP sets the depth; the blank is turned long (R9-56).
+    # Normal-defined: transverse DP/PA place the involute; the normal cutter's
+    # DP and standard full-depth dedendum set the depth, with no long addendum.
     disc = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
         helix_deg=HELIX_DEG,
         backlash_mm=BACKLASH_MM, root_relief=True,
         depth_dp=CUTTER_DIAMETRAL_PITCH,
+        dedendum=DEDENDUM_FACTOR,
         long_addendum_mm=LONG_ADDENDUM_MM,
     )
     volume = disc.volume

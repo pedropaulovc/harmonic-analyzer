@@ -9,9 +9,10 @@ gear_train:
   drive_axis_y_mm: 90.518          # cylinder-gear shaft (drum) axis height: base top 50.8 + swing plate 6.35 + v2 journal
                                    # 33.368 (build_drive_train_assembly derives it and asserts against this; channels read it)
   crank_drive_ratio: [16, 64]      # 16T pinion on crankshaft : 64T on cone shaft
-  crank_drive_diametral_pitch: 25.73110354953376 # Fixed-post recenter: the 64T moves toward the post along its unchanged bore; c2c 39.735 with 0.25 slack.
-  crank_drive_helix_deg: 12.0        # Exact-solid rederive at the recentered 64T station; replaces the intermediate 12.5182-degree helix.
-  crank_drive_backlash_mm: 0.15    # 64T tooth thinning (circumferential, at pitch r): the crossed 16T:64T mesh (crankshaft machine-z vs cone shaft inclined 12.52° in plan) needs side clearance to engage at depth — re-arbitrated 2026-07-14 for the TRUE-helix swept teeth (crossed_mesh_study at slices=0: the smooth flanks free the ~0.2 mm the K=12 slice facets consumed; user-flagged visible slop at the old 0.40); absorbs the cos(12.52°) normal-pitch shrink (~0.03)
+  crank_drive_diametral_pitch: 24.79616889676745 # m1 normal: transverse DP = 25.4*cos(helix).
+  crank_drive_helix_deg: 12.518222183287952 # RH helix matches the unchanged cone incline.
+  crank_drive_backlash_mm: 0.15    # 64T transverse tooth thinning; exact-solid study sets the seed.
+  crank_axis_height_mm: 74.02413948499517 # Above platform: normal pitch radii + 0.30 gives actual c2c 41.079257.
   source: "DIMENSIONS.md ch13 (cylinder gear OD scaling), ch29/ch8 (gear law)"
   confidence: low
   notes: >-

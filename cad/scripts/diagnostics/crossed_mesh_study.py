@@ -47,17 +47,19 @@ import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
 # real _common (every diag_*/probe_* script here relies on it)
 import build_dt_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
-from involute_gear import PA_DEG, gear_facts
+from involute_gear import gear_facts
 from build_dt_crank_drive_gear import BACKLASH_MM, HELIX_DEG
+from dt_crank_drive_gear_spec import DEDENDUM_FACTOR, NORMAL_MODULE_MM
 from dt_crank_drive_gear_spec import LONG_ADDENDUM_MM as LONG_ADDENDUM64_MM
 from dt_crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
+from dt_crank_pinion_spec import PRESSURE_ANGLE_DEG as PA_DEG  # normal, straight 16T
 from dt_crank_pinion_spec import SHOULDER_LENGTH as PINION_SHOULDER
 from dt_crank_pinion_spec import TURNED_DIA as PINION_TURNED_DIA
 
 IN = 25.4
 DP_CRANK = dta.DP_CRANK
-# #906: one cutter for the pair -- the 16T's DP, and the 64T's normal DP;
-# the 64T blank turned long (R9-56).
+# One standard full-depth normal-plane cutter for the pair: the 16T's DP
+# and the 64T's normal DP, with no additional long addendum.
 DP_CRANK_CUTTER = dta.DP_CRANK_CUTTER
 ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK + LONG_ADDENDUM64_MM / IN
 GEAR64_SEAT = dta.GEAR64_SEAT
@@ -172,8 +174,8 @@ def pinion_material(
     return (z >= 0) & (z <= PINION_FACE) & ~turned & g16.material(theta, r)
 
 
-ROOT16 = R16 - 1.157 * ADD16
-ROOT64 = R64 - 1.157 * ADD16
+ROOT16 = R16 - DEDENDUM_FACTOR * NORMAL_MODULE_MM
+ROOT64 = R64 - DEDENDUM_FACTOR * NORMAL_MODULE_MM
 
 
 def pose(axis: tuple[float, float], seed_off: float = 0.0) -> dict[str, float]:
@@ -227,7 +229,7 @@ def study(axis: tuple[float, float], skew_deg: float = 0.0, widen16: float = 0.0
     k16 = (16, widen16, root16)
     k64 = (64, widen64, root64)
     if k16 not in lut:
-        lut[k16] = GapLookup(16, DP_CRANK_CUTTER, widen16, root16)
+        lut[k16] = GapLookup(16, DP_CRANK_CUTTER, widen16, root16, pa_deg=PA_DEG)
     if k64 not in lut:
         lut[k64] = GapLookup(64, DP_CRANK, widen64, root64, pa_deg=PA64_T,
                              addendum_extra_in=ADDENDUM64_EXTRA_IN)

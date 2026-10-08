@@ -18,8 +18,9 @@ from _gtol_spec import PlanarFace
 from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
+import cone_line as c
 import dt_cone_pivot_post_spec
-from dt_crank_drive_gear_spec import OUTSIDE_DIA as CRANK_GEAR_OUTSIDE_DIA
+import dt_crank_drive_gear_spec as gear64
 
 POST_ATTACHMENT_SPACING = dt_cone_pivot_post_spec.ATTACHMENT_SPACING
 POST_BLOCK_DIA = dt_cone_pivot_post_spec.BLOCK_DIA
@@ -59,12 +60,28 @@ PIVOT_HOLE_SPEC = HoleSpec("clearance", "1/4", fit="close")
 PIVOT_HOLE_DIA = blind_cut_dia_mm(PIVOT_HOLE_SPEC)
 
 
-# The recentered DP25.731 gear is smaller than the intermediate DP24.74 gear;
-# its complete swept OD now clears the platform top, so the obsolete scallop is
-# removed and the plate remains full thickness beneath the mesh.
-CRANK_GEAR_PLATFORM_CLEARANCE = POST_CONE_BORE_HEIGHT - CRANK_GEAR_OUTSIDE_DIA / 2.0
+# The normal-module standard 64T needs a local top-face groove beneath its
+# axial row; the cone axis, stack and post seating height remain unchanged.
+CRANK_GEAR_RELIEF_WIDTH = 18.0
+CRANK_GEAR_RELIEF_LENGTH = 12.0
+CRANK_GEAR_RELIEF_DEPTH = 1.3
+CRANK_GEAR_RELIEF_LOCAL_X = 0.0
+CRANK_GEAR_RELIEF_LOCAL_Z = (
+    c.SHAFT_T120_STATION
+    - (c.CONE_FACE_STATION_REFERENCE + 10.0) / 2.0
+    - 0.1
+    + c.GEAR_AXIS_SHIFT
+    + gear64.CENTRE_SHIFT_NORTH
+    - c.PIVOT_STATION
+)
+CRANK_GEAR_RELIEF_REMAINING_STOCK = PLATE_THICKNESS - CRANK_GEAR_RELIEF_DEPTH
+CRANK_GEAR_PLATFORM_CLEARANCE = (
+    POST_CONE_BORE_HEIGHT - gear64.OUTSIDE_DIA / 2.0 + CRANK_GEAR_RELIEF_DEPTH
+)
+if CRANK_GEAR_RELIEF_REMAINING_STOCK < 1.5:
+    raise AssertionError("crank gear relief leaves under 1.5 mm plate stock")
 if CRANK_GEAR_PLATFORM_CLEARANCE < 0.5:
-    raise AssertionError("recentered crank gear has under 0.5 mm platform air")
+    raise AssertionError("crank gear has under 0.5 mm relief-bottom air")
 
 
 # The post's 1/4-in fillister clearance bores mate to these platform threads.

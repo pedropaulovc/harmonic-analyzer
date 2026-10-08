@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 
 from dt_cone_swing_platform_geometry import INCLINE_DEG
+from dt_cone_pivot_post_spec import CRANK_BORE_HEIGHT
 
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
@@ -28,7 +29,7 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 #
 # Restored frame line: pivot.x - X_CRANK east, Y_CRANK - Y_BASE_TOP up.
 CRANK_AXIS_OFF = 41.6536661190548
-CRANK_AXIS_Y = 79.05
+CRANK_AXIS_Y = 6.35 + CRANK_BORE_HEIGHT
 if CRANK_AXIS_OFF <= 0 or CRANK_AXIS_Y <= 0:
     raise AssertionError("swing platform crank axis must lie east and above the pivot")
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan

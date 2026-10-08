@@ -39,25 +39,22 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 MM_PER_IN = 25.4
 
 TEETH = 16
-# Cut straight by the 64T's own cutter (#906): a straight gear's transverse
-# section IS its normal section, so the cutter's DP and pressure angle are this
-# gear's, and the pair's normal pitches match.
-DIAMETRAL_PITCH = dt_crank_drive_gear_spec.CUTTER_DIAMETRAL_PITCH  # 26.306
+# Cut straight with the pair's standard normal-pitch cutter system. Its
+# 14--16T form cutter is distinct from the 64T helix's virtual-tooth cutter;
+# the straight pinion's transverse section IS its normal section.
+DIAMETRAL_PITCH = dt_crank_drive_gear_spec.CUTTER_DIAMETRAL_PITCH
 PRESSURE_ANGLE_DEG = dt_crank_drive_gear_spec.CUTTER_PRESSURE_ANGLE_DEG
+DEDENDUM_FACTOR = dt_crank_drive_gear_spec.DEDENDUM_FACTOR
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
+WHOLE_DEPTH = (1.0 + DEDENDUM_FACTOR) * MODULE_MM
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
-# The crank-specific discrete voxel/phase study checks the shipped 0.150 mm
-# tooth thinning at nominal geometry but does not sweep centre distance, helix,
-# shaft-angle, face-offset or bore-clearance tolerances; its 0.100 mm sample is
-# not a proven threshold.
-# Do not let this member consume that unverified margin. Its maximum thickness
-# therefore stays nominal, and its -0.020 mm side reuses MHA-DT-007's established
-# tooth-control capability. At the nominal geometry the pair's tooth-thinning
-# contribution remains 0.150..0.191 mm after converting the mate's normal-span
-# band to transverse thickness.
+# The m1 PA20 phase and centre-distance sweep re-arbitrates the pair's
+# nominal thinning. Preserve this member's zero upper deviation: the
+# fixed-centre tight stack books the mate's thickest accepted tooth and
+# every axis/fit allowance rather than spending an unverified fit-up margin.
+# Its -0.020 mm side retains the established tooth-control capability.
 TOOTH_THICKNESS_UPPER_DEVIATION = 0.000
 TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 
@@ -65,7 +62,7 @@ TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 # mesh's nonbinding stack, rather than an eccentric fit-up, owns tip/root air.
 OUTSIDE_DIA_TOLERANCE_MM = 0.10
 MESH_C2C_SLACK_MM = _config.fit("crank_mesh")["c2c_slack_mm"]
-TIP_CLEARANCE_MM = 0.157 / DIAMETRAL_PITCH * MM_PER_IN
+TIP_CLEARANCE_MM = (DEDENDUM_FACTOR - 1.0) * MODULE_MM
 
 # RULING (b), Main 2026-09-26 (#906): the crankshaft steps down to SEAT_DIA
 # under this pinion, and the pinion is bored to match. A smaller 16T cut by
@@ -127,7 +124,7 @@ SHOULDER_LENGTH_LIMITS = deviations(SHOULDER_LENGTH_BAND)  # (lower, upper)
 # inside the .XX row: build_dt_drive_train_assembly proves the T120 tip circle
 # 0.25 radially clear of the turned band at its upper limit, T120 on its
 # nominal axis; at the row's +0.51 that air falls to about 0.05.
-TURNED_DIA = 16.21
+TURNED_DIA = 17.50
 TURNED_DIA_TOLERANCE_MM = 0.10
 TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 # Fit-up of the 16T under T120 (user, 2026-09-30, #1154).  With every fit
@@ -148,7 +145,7 @@ T120_TURNED_BAND_RADIAL_WORST = -0.12
 # stops it is faced back, never under its printed short limit, where the air
 # again clears the feeler by geometry.
 T120_FITUP_FEELER_MM = 0.10
-TURNED_DIA_FITUP_MIN = 15.78
+TURNED_DIA_FITUP_MIN = 17.20
 SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
@@ -164,7 +161,7 @@ SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 # extruded from the SAME faced end as the teeth, so the print carries one
 # overall length from that end (rule 7: lengths from one faced end, the overall
 # length real and conspicuous), and the toothed length is FaceWidth.
-ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 13.21
+ROOT_DIA = PITCH_DIA - 2.0 * DEDENDUM_FACTOR * MODULE_MM
 BOSS_DIA = ROOT_DIA
 # The boss's outer end edge takes the title block's edge break: the sized
 # chamfer that once imitated the photo's rounding had no function, and at its
@@ -342,7 +339,7 @@ if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
 # The fixed-axis tooth-in-gap seed follows the installed 64T centre; the
 # assembly asserts this cross-hole clock against its independently derived
 # seed so the shaft's radial pin hole tracks a centre-station change.
-PIN_CLOCKING_DEG = 12.037647012980765
+PIN_CLOCKING_DEG = 13.219513716201227
 if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / 16.0:
     raise AssertionError("pinion retention-hole clocking must lie within one 16T pitch")
 # The matched-hole callout on both part records identifies both seated parts,

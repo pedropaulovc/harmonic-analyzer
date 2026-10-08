@@ -30,7 +30,7 @@ fits:
     note: "oblique partial engagement; checker-arbitrated edge slacks 0.00..1.14"
 
   crank_mesh:              # 16T:64T crossed mesh (crank machine-z over the inclined 64T)
-    c2c_slack_mm: 0.25               # Historical transverse-DP reference, not a backlash target.
+    c2c_slack_mm: 0.30               # m1 PA20 experiment: re-arbitrated positive closing-corner backlash.
     note: "Fixed-centre crossed-helical pair: one normal-DP cutter, 64T true 12.00° helix and 0.15 tooth thinning. User ruling 2026-09-28 requires positive worst-case tight backlash with no backlash window. The 2026-09-28 stack ruling grew the 64T to 7.2113 (north, toward T120) and cut the 16T face to 9.5; diagnostics/crank_mesh_backlash_study.py re-measured that pair over 9 phases and 13 centre-distance/thinning cases: no jam, nominal common seed-offset interval approximately -2.789..-0.215 deg, tightest case (cd -0.15, 64T thinning 0.05) -2.087..-0.884 deg. Every case brackets the assembly seed offset -1.49. crank_mesh_stack takes the conservative historical reference centre distance, while the assembly and exact-solid diagnostic use the physical grown-gear centre."
 
   cam_follower_contact:

@@ -90,7 +90,6 @@ def test_open_corner_carries_the_cone_stack_north_float() -> None:
     # inclined cone axis and the centres open further; the printed worst-case
     # contact ratio must count it.
     import build_dt_drive_train_assembly as bdt
-    import dt_crank_drive_gear_notes
     from cone_line import COS_I, SIN_I
     from cone_stack_end_play import CONE_FLOAT_NORTH, SHAFT_END_PLAY, STACK_FLOAT
 
@@ -116,14 +115,13 @@ def test_open_corner_carries_the_cone_stack_north_float() -> None:
         )
 
     unfloated = worst(stack.OPEN_CENTRE_DISTANCE_MM - float_term)
-    printed = dt_crank_drive_gear_notes.WORST_CONTACT_RATIO
+    baseline_floor = bdt.CRANK_MESH_PRINTED_CONTACT_RATIO
     assert worst(stack.OPEN_CENTRE_DISTANCE_MM) == pytest.approx(
         bdt.CRANK_MESH_CONTACT_RATIO_WORST
     )
-    # Without the float the sheets would print a figure the floated mesh
-    # does not reach; with it (booked or exact) the print holds.
-    assert math.floor(unfloated * 100.0) / 100.0 > worst(
-        stack.OPEN_CENTRE_DISTANCE_MM - float_term + exact
-    )
-    assert printed == math.floor(bdt.CRANK_MESH_CONTACT_RATIO_WORST * 100.0) / 100.0
-    assert worst(stack.OPEN_CENTRE_DISTANCE_MM - float_term + exact) >= printed
+    # This experiment deliberately leaves drawings untouched. The relocated
+    # normal-pitch pair must retain the accepted baseline worst-CR floor,
+    # including exact north-float opening, rather than pin stale print text.
+    assert unfloated > worst(stack.OPEN_CENTRE_DISTANCE_MM)
+    assert bdt.CRANK_MESH_CONTACT_RATIO_WORST >= baseline_floor
+    assert worst(stack.OPEN_CENTRE_DISTANCE_MM - float_term + exact) >= baseline_floor

@@ -2,9 +2,9 @@
 
 No backlash window or adjustable axis: the printed post-bore angularity and
 spacing must leave positive backlash at the worst closing corner. Slopes and
-pose readings come from the #1126 exact-solid B-star and crank-mesh-angle
-studies at the old 6.5 face; the grown 7.2113 face is rechecked by the
-assembly's exact-solid interference gate, not by assuming a new fitted slope.
+pose readings are remeasured for the standard-normal m1 PA20 pair. The
+assembly's native interference gate still checks the real grown 7.2113 face;
+the SolidWorks-free raster study does not replace that gate.
 """
 
 from __future__ import annotations
@@ -23,10 +23,10 @@ from cone_stack_end_play import CONE_FLOAT_NORTH
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 R64 = gear64.PITCH_DIA / 2.0
-R16 = (16.0 / gear64.DIAMETRAL_PITCH) * gear64.MM_PER_IN / 2.0
+R16 = pinion.PITCH_DIA / 2.0
 FRAME_C2C = R64 + R16 + _config.fit("crank_mesh", "c2c_slack_mm")
-# This is the conservative historical reference plane, not the physical
-# narrowed-gear centre; the assembly asserts the latter is farther apart.
+# Standard-normal-pitch experiment: the relocated post is solved at the
+# physical 64T centre, not the retired all-transverse-pitch reference.
 FRAME_DY = post.CRANK_BORE_HEIGHT - post.BORE_HEIGHT
 FRAME_DX = math.sqrt(FRAME_C2C**2 - FRAME_DY**2)
 DC_PER_DY = FRAME_DY / FRAME_C2C
@@ -36,18 +36,19 @@ if not R64 > R16 > 0 or not FRAME_C2C > FRAME_DY > 0:
 if not math.isclose(DC_PER_DX**2 + DC_PER_DY**2, 1.0):
     raise AssertionError("mesh centre-distance projections must be orthonormal")
 
-NOMINAL_TIGHT_BACKLASH_MM = 0.32269
-KC = (0.41222 - 0.23685) / 0.300
-K64 = (0.41722 - 0.22079) / 0.20
-K16 = (0.36930 - 0.31888) / 0.05
+NOMINAL_TIGHT_BACKLASH_MM = 0.30584168064244377
+KC = (0.3809726507868872 - 0.15503432496230882) / 0.300
+K64 = (0.36461018904944037 - 0.169896894373823) / 0.20
+K16 = (0.3164772807717842 - 0.2668444801681955) / 0.05
 if not (KC > 0 and K64 > 0 and K16 > 0):
     raise AssertionError("measured mesh sensitivities must preserve the tight-corner sign")
-LINEAR_RESIDUAL_MM = 0.006
+LINEAR_RESIDUAL_MM = 0.0065
 STUDY_CASES = {
-    -0.35: 0.11570,
-    -0.25: 0.17760,
-    -0.15: 0.23685,
-    +0.15: 0.41222,
+    -0.20: 0.15503432496230882,
+    -0.125: 0.21093940256525218,
+    +0.025: 0.3245221577926956,
+    +0.10: 0.3809726507868872,
+    +0.25: 0.49905508299212853,
 }
 for _dc, _measured in STUDY_CASES.items():
     if abs(_measured - (NOMINAL_TIGHT_BACKLASH_MM + KC * _dc)) > LINEAR_RESIDUAL_MM:
@@ -87,10 +88,11 @@ TOOTH_RUNOUT_TIR_MM = 0.05
 TIP_ROOT_BAND_RADIAL = max(pinion.OUTSIDE_DIA_TOLERANCE_MM, gear64.OUTSIDE_DIA_TOLERANCE_MM) / 2.0
 if TIP_ROOT_BAND_RADIAL <= 0:
     raise AssertionError("gear tip-root tolerance must have a positive closing allowance")
-# Exact-solid tip-diameter cases lost at most 0.00435; round outward.
+# The final-axis standard-normal tip cases lost at most 0.00205 mm; retain
+# 0.005 mm to cover simultaneous tip growth and raster quantisation.
 TIP_BAND_CLOSE = -0.005
-_YAW = {+1.0: 0.29715, -1.0: 0.22040}
-_TILT = {+1.0: 0.34323, -1.0: 0.28188}
+_YAW = {+1.0: 0.23466497208455006, -1.0: 0.2890701573615608}
+_TILT = {+1.0: 0.34565700420356443, -1.0: 0.26016314162540466}
 
 
 def _pose_loss(cases: dict[float, float], limit_deg: float) -> float:
@@ -160,11 +162,10 @@ def open_terms(*, spacing_printed: float, plan_limit_deg: float, crank_bearing_l
         "64T axial station": STATION_64T_DC,
         # The stack's north float slides the 64T up the inclined cone axis,
         # lengthening the in-plane horizontal leg by F*sin(i)*cos(i). Booked
-        # linearly on the frame reference's DC_PER_DX, as the plan-angle term
-        # is: 0.02405, 0.0013 under the 0.02538 exact at the assembly's
-        # physical centres (leg 5.881, not 5.647). Chosen, not missed:
-        # build_dt_drive_train_assembly asserts the printed contact ratio holds
-        # with the exact opening in its place.
+        # linearly on DC_PER_DX, as the plan-angle term is. The convex
+        # physical-centre calculation opens slightly farther, so
+        # build_dt_drive_train_assembly also checks the retained physical
+        # contact-ratio floor with that exact opening in its place.
         "cone stack north float": CONE_FLOAT_NORTH * SIN_I * COS_I * DC_PER_DX,
         "crank float at rest": _float_at_rest(_RUNNING[1], crank_bearing_length, CRANK_OVERHANG) * DC_PER_DY,
         "cone float at rest": _float_at_rest(_RUNNING[1], post.CONE_BOSS_LENGTH, CONE_OVERHANG) * DC_PER_DY,
@@ -181,9 +182,9 @@ if min(OPEN_TERMS.values()) < 0.0:
 
 # The 16T is spur, cut square by the 64T's normal-plane cutter; the 64T is a
 # helix crossed on the inclined cone axis. The ratio is screened in the 64T's
-# normal section (the 16T's transverse section to within the crossing's
-# 0.52 deg): the 64T takes its equivalent radius R/cos^2(helix), keeping its
-# addendum and the centre opening, and both share the cutter's base pitch.
+# normal section (the 16T's transverse section, since helix equals crossing):
+# the 64T takes its equivalent radius R/cos^2(helix), keeping its addendum
+# and the centre opening, and both share the normal cutter's base pitch.
 _CUTTER_PA = math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
 EQUIVALENT_RADIUS_GROWTH_64 = R64 / math.cos(math.radians(gear64.HELIX_ANGLE_DEG)) ** 2 - R64
 BASE_PITCH_MM = math.pi * gear64.NORMAL_MODULE_MM * math.cos(_CUTTER_PA)

@@ -41,6 +41,10 @@ from pathlib import Path
 
 import numpy as np
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import cone_line  # noqa: E402  -- cad/scripts on sys.path: the machine-frame crank axis
+
 REPO = Path(__file__).resolve().parents[3]
 GT_DIR = (
     REPO
@@ -150,7 +154,7 @@ TUBE_OBS = [
 # (2026-07-24 v2 post rederive: the manual casting fixes the drive and crank
 # axes; the GT observations remain evidence but the physical bores are harder.)
 MODEL_NOW = {
-    "crank_sprocket": (-131.09338, 129.85, -155.0),  # v2 boss / T12 axis
+    "crank_sprocket": (-131.09338, cone_line.Y_CRANK, -155.0),  # v2 boss / T12 axis (y rides the gear train)
     "cone_front": (-116.05, 90.518, -60.47),  # T120 big-end centre
     "cone_back": (-80.99, 90.518, 97.44),  # shaft tip (station 190; GT wants
     # z ~101.8 -- deferred to the portal/back-frame re-layout)

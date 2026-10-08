@@ -13,6 +13,7 @@ from prechips.model import Features
 
 import export_features as exporter
 from _export_feature_faces import FeatureFaceError, face_name
+from _feature_requirements import limits
 from _part_pmi import _FaceGeometry, _face_matches
 
 
@@ -121,7 +122,19 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     assert crank["dia"] == [11.413, 11.443]
     assert features["journal_bore"]["dia"] == [12.2558, 12.2858]
     assert features["journal_bore"]["height"] == [33.118, 33.618]
-    assert crank["separation"] == [39.332, 39.702]
+    # The bore-to-bore spacing is the crank axis height over the foot -- the
+    # authoritative machine gear_train.crank_axis_height_mm, which the final
+    # slack refit still moves -- less the journal bore height, on the printed
+    # mesh band.  Derived from config: a literal here goes stale with the axis.
+    spacing = (
+        exporter._config.machine("gear_train", "crank_axis_height_mm")
+        - exporter.cone.BORE_HEIGHT
+    )
+    assert crank["separation"] == limits(
+        spacing,
+        exporter.cone.DRAWING_PRECISION_BY_NAME["CrankAboveCone"],
+        exporter.cone.CRANK_ABOVE_CONE_BAND,
+    )
     assert crank["angularity_dia"] == 0.10
     assert crank["angularity_datums"] == ["A", "B"]
     assert "angularity_dia" in crank["requirements"]

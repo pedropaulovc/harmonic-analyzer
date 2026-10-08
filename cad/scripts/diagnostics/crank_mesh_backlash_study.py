@@ -55,7 +55,7 @@ EY = np.array([0.0, 1.0, 0.0])
 SLICE_MM = 0.1
 PITCH16 = 22.5
 IN = cms.IN
-DEDENDUM_FACTOR = 1.157  # root depth below pitch, in cutter addenda (ROOT16/ROOT64)
+DEDENDUM_FACTOR = cms.DEDENDUM_FACTOR
 
 
 @dataclass(frozen=True)
@@ -63,10 +63,10 @@ class GearDef:
     """One gear's tooth definition.
 
     ``definition`` says which plane carries the cutter's DP and PA:
-    ``"transverse"`` is the shipped CAD convention (the 64T's transverse
-    section is the pinion's profile, twisted); ``"normal"`` is what a form
-    or fly cutter set over at the helix angle cuts (the normal section is
-    the cutter's profile, the transverse DP is ``dp_n * cos(beta)`` and the
+    ``"transverse"`` carries DP and PA directly in the transverse section;
+    ``"normal"`` is the shipped 64T convention, as a form or fly cutter set
+    over at the helix angle cuts (the normal section is the cutter's profile,
+    the transverse DP is ``dp_n * cos(beta)`` and the
     transverse PA ``atan(tan(pa_n) / cos(beta))``). The tooth depth is the
     cutter's either way. ``tip_mm`` moves the tip circle alone, radially (a
     blank turned off its nominal outside diameter).
@@ -118,13 +118,14 @@ class GearDef:
         return lut[key]
 
 
-# #906: one cutter, the 64T normal-defined, at the frame's centre distance,
-# its blank turned long (R9-56).
-SHIPPED16 = GearDef(16, dp_n=cms.DP_CRANK_CUTTER)
+# One standard full-depth normal-plane cutter; the 64T is normal-defined
+# and neither blank has an additional long addendum.
+SHIPPED16 = GearDef(16, dp_n=cms.DP_CRANK_CUTTER, pa_n=cms.PA_DEG)
 SHIPPED64 = GearDef(
     64,
     cms.HELIX_DEG,
     dp_n=cms.DP_CRANK_CUTTER,
+    pa_n=cms.PA_DEG,
     definition="normal",
     tip_mm=cms.LONG_ADDENDUM64_MM,
 )
@@ -365,7 +366,7 @@ class Case:
     name: str
     extra: float = SHIPPED_EXTRA
     widen16: float = 0.0
-    widen64: float = 0.15
+    widen64: float = cms.BACKLASH_MM
     gear16: GearDef = SHIPPED16
     gear64: GearDef = SHIPPED64
     hand16: float = 1.0

@@ -61,36 +61,33 @@ if not LAYOUT_FACE_WIDTH - SOUTH_FACE_SHIFT_NORTH < FACE_WIDTH < LAYOUT_FACE_WID
         f"and stay inside the {LAYOUT_FACE_WIDTH} layout face"
     )
 
-# ONE cutter cuts both gears of the pair (#906, Main 2026-09-26). A crossed
-# helical pair meshes in the NORMAL plane, so this gear is cut normal-defined:
-# the cutter, set over at the helix angle, cuts its own DP, pressure angle and
-# depth in the normal section, and the straight 16T takes the same cutter
-# square. The TRANSVERSE DP stays the frame's (gear_train.yaml): it places the
-# pitch circle the fixed post was laid out for, and the transverse pressure
-# angle follows from the normal one.
+# Both gears use the same STANDARD normal-pitch/pressure-angle cutter system.
+# Form milling needs different tooth-range cutters: 14--16T for the straight
+# pinion, and 55--134 virtual teeth for this helix (z/cos(beta)^3 = 68.79).
+# A crossed-helical pair meshes in the NORMAL plane; the normal m1 PA20
+# cutter is set over at the helix angle for this gear and square for the 16T.
+# gear_train.yaml carries the derived transverse DP, while the transverse
+# pressure angle follows from the standard normal pressure angle.
 DIAMETRAL_PITCH = _config.machine("gear_train", "crank_drive_diametral_pitch")  # transverse
 _COS_HELIX = math.cos(math.radians(HELIX_ANGLE_DEG))
-CUTTER_DIAMETRAL_PITCH = DIAMETRAL_PITCH / _COS_HELIX  # normal: 26.306
-CUTTER_PRESSURE_ANGLE_DEG = 14.5  # normal
-PRESSURE_ANGLE_DEG = math.degrees(  # transverse: 14.81
+CUTTER_DIAMETRAL_PITCH = DIAMETRAL_PITCH / _COS_HELIX  # normal
+CUTTER_PRESSURE_ANGLE_DEG = 20.0  # normal
+PRESSURE_ANGLE_DEG = math.degrees(  # transverse
     math.atan(math.tan(math.radians(CUTTER_PRESSURE_ANGLE_DEG)) / _COS_HELIX)
 )
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH  # transverse
 NORMAL_MODULE_MM = MM_PER_IN / CUTTER_DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-# The cutter's depth below the pitch circle: a standard dedendum of the NORMAL
-# module, whatever plane the profile is read in.  The blank is turned
-# LONG_ADDENDUM_MM over the cutter's standard addendum (R9-56, 2026-09-30) so
-# the 16T's turned band keeps contact over the 64T row at every printed
-# corner (build_dt_drive_train_assembly.crank_row_engagement); the cutter, sunk
-# to its own depth below the pitch circle, leaves the root where it was.
-LONG_ADDENDUM_MM = 0.05
+# Standard normal full-depth cutter: one module of addendum and 1.25 modules
+# of dedendum. The blank has no additional long addendum.
+DEDENDUM_FACTOR = 1.25
+LONG_ADDENDUM_MM = 0.0
 OUTSIDE_DIA = PITCH_DIA + 2.0 * (NORMAL_MODULE_MM + LONG_ADDENDUM_MM)
-WHOLE_DEPTH = 2.157 * NORMAL_MODULE_MM + LONG_ADDENDUM_MM
+WHOLE_DEPTH = (1.0 + DEDENDUM_FACTOR) * NORMAL_MODULE_MM
 # The gap floor is a root arc one standard dedendum below the pitch circle
 # (``_gear.build_fixed_gear(root_relief=True)``, required by the helix path):
 # the cutter's depth of cut produces it, so it is REF on the print.
-ROOT_DIA = PITCH_DIA - 2.0 * 1.157 * NORMAL_MODULE_MM
+ROOT_DIA = PITCH_DIA - 2.0 * DEDENDUM_FACTOR * NORMAL_MODULE_MM
 
 # Hand: the tooth azimuth advances counter-clockwise about +z as z increases
 # (``_gear._TWIST_CCW``), which is a RIGHT-hand helix. It is the one tooth-system

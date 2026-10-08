@@ -161,7 +161,13 @@ def _loop_length(sag: float) -> float:
 LINK_PITCH = _removable.CHAIN_PITCH  # ANSI #25 pitch (1/4 in), EXACT: the link
 # parts and the chain-pattern spacing carry this standard pitch; closure comes
 # from the sag.
-LINK_COUNT = 2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH))
+# The nearest even count can be shorter than the taut loop after an axle
+# relocation. Keep the nearest *feasible* even count; droop cannot absorb
+# negative slack. The standard link pitch remains unchanged.
+LINK_COUNT = max(
+    2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH)),
+    2 * math.ceil(_loop_length(0.5) / (2.0 * LINK_PITCH)),
+)
 CENTRELINE_LEN = LINK_COUNT * LINK_PITCH
 
 # The EVEN count moves the target length by up to one LINK_PITCH (6.35 mm)
