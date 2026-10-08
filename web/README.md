@@ -399,7 +399,6 @@ npm --prefix web run build
 npm --prefix web run preview
 
 # Current all-six coarse collection; no video/time scope or optional eligibility:
-export HARMONIC_REFERENCE_ROOT="/home/pedro/src/wt-website-scaffolding/web/.vite/reference-root"
 HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --player local
 
 # After the all-six coarse pass, demonstrate the unchanged private original footage:
