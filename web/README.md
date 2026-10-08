@@ -699,10 +699,192 @@ is available for automation. External-media restrictions are failures, not skips
 
 ## Deployment
 
-`npm --prefix web run build` produces static files under `web/dist/`. The default
-base path is `/harmonic-analyzer/`; set `SIMULATOR_BASE` consistently for both the
-build and verifier when deploying elsewhere. Deployment publishes the optimized
-representation, not the 222,903,724-byte raw export or its private cache.
+Cloudflare Workers Builds uses native Git integration (not a GitHub deployment
+token or OIDC). Both Workers use repository root **`web`**, install with
+`npm ci`, and build with **`npm run build:deploy`**. Wrangler is pinned to
+**4.148.0** in the lockfile. The build produces **`web/dist/`** at base path `/`,
+including `/deployment.json` with the exact `WORKERS_CI_COMMIT_SHA` and
+`WORKERS_CI_BRANCH`. Local builds fall back to the current Git commit/branch;
+detached checkouts must supply both native-build variables.
+The npm `prebuild:deploy` lifecycle runs `npm run test:deployments` first, so the
+deployment identity, reporting and cleanup regression tests gate native builds.
+
+| Deployment | Account ID | Worker | Native deploy command |
+|---|---|---|---|
+| Production (`main` only) | `6b2522c874d4613dc2bf47bd2ce521a2` | `harmonic-analyzer-com-prod` | `npm run deploy` |
+| PPE (branch previews, all PR base branches) | `c8769c20b85cd2857afe22ef2f9a0a21` | `ppe-harmonic-analyzer-com` | `npm run deploy:preview` |
+
+PPE uses `wrangler preview --config wrangler.ppe.jsonc --name "$WORKERS_CI_BRANCH"`
+for both its default branch and non-production branch build command. It never
+publishes the PPE production Worker with `wrangler deploy`. Production
+non-production branch builds must be **disabled in the dashboard**. The native
+Git build watch paths should include `web/**`; GitHub environment reporting and
+PPE preview cleanup do not perform deployments. The sole GitHub cleanup token
+belongs to the PPE environment/account, never the production account.
+
+Native previews cover **same-repository PR branches**, including drafts and PRs
+targeting any base branch, when `web/**` changes. Valid unsupported fork PRs are
+**explicitly skipped**, not failed or represented as deployed; the job skips
+before credentials, checkout or API calls. Malformed event payloads still fail.
+Untrusted fork code never enters a credentialed native build. GitHub's PPE
+environment records the actual Cloudflare Preview API URL, not a guessed branch
+slug, and normally reports success only after `/deployment.json` matches the
+exact PR head SHA and raw branch name. If native watch paths skipped a
+non-`web/**` push, an older manifest commit is accepted only when the raw branch
+matches and GitHub's root `web` subtree object SHA is identical for that commit
+and the requested head. The successful deployment records the **actual manifest
+SHA**, with `requestedSha` and `identityProof: "matching-web-tree"` in its
+payload; it never mislabels old bytes as the new head. Changed-web mismatches
+still fail within the bounded wait. An arbitrary HTTP 200 is not deployment
+proof. Production
+reporting uses the same exact-commit or proven web-tree-equivalence rule;
+the standalone `wait` helper remains exact-SHA-only.
+Native deployment is **push-only**: opening or reopening a PR does not trigger
+a new Cloudflare build. After a closed PR's Preview has been deleted, reopening
+that PR requires a **new push touching `web/`** to recreate it. A reopened PR
+with no Preview fails reporting immediately with that instruction. A newly
+opened PR still allows the normal bounded 20-minute native startup wait before
+reporting a native-build-log/new-web-push diagnostic. Neither path attempts a
+build through an additional PPE build-control token.
+
+The PPE cleanup credential is used only to read Preview metadata and delete PPE
+Previews. The accepted cleanup contract is **branch-only**: PR closure deletes
+the closed branch's Preview resource and branch URL, releases its Preview quota,
+and inactivates the GitHub deployment record, unless another open PR shares
+that branch. **Immutable deployment URLs deliberately remain public** under the
+accepted contract because of Cloudflare's beta behavior documented in
+[issue 15945](https://github.com/cloudflare/workers-sdk/issues/15945). A live
+cleanup probe confirmed that the Preview resource disappeared and the branch
+URL returned 404 while an older immutable deployment URL still served its
+deployed bytes. Branch cleanup does not promise full public-URL revocation.
+Closed-PR cleanup issues the delete immediately, without the orphan grace
+period; branch-URL removal then propagates asynchronously through Cloudflare.
+A successful delete is not an instant data-plane 404: a second disposable probe
+initially returned 200 after deletion and subsequently returned 404 within the
+bounded propagation observation.
+An hourly reconciler catches late builds and orphaned Preview resources. It
+preserves new Previews without a PR for their first **30 minutes**, allowing a
+branch push to precede PR creation; otherwise orphan **Preview-resource**
+cleanup occurs within **90 minutes of Preview creation**, excluding scheduler
+delays. This bound does not imply immutable deployment URL revocation. Missing or
+malformed API `created_on` timestamps stop reconciliation instead of risking
+premature deletion. Open PR branches are preserved. The deployment lifecycle
+helper can also be used manually:
+
+```sh
+node web/scripts/cloudflare-deployments.mjs preview
+node web/scripts/cloudflare-deployments.mjs production
+node web/scripts/cloudflare-deployments.mjs list
+node web/scripts/cloudflare-deployments.mjs reconcile
+node web/scripts/cloudflare-deployments.mjs cleanup 'raw/branch-name'
+node web/scripts/cloudflare-deployments.mjs wait URL FULL_COMMIT_SHA [BRANCH [TIMEOUT_SECONDS]]
+```
+
+`wait` accepts an application base URL with or without a trailing slash and
+preserves any non-root base path when resolving `deployment.json`.
+
+`list`, `reconcile`, and cleanup require `CLOUDFLARE_CLEANUP_API_TOKEN` plus
+the fixed PPE `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_WORKER_NAME`, and
+`CLOUDFLARE_WORKERS_SUBDOMAIN` environment values. `cleanup` and `reconcile`
+also require `GH_TOKEN` and `GITHUB_REPOSITORY` to protect open PR branches.
+The low-level `delete RAW_BRANCH` command deliberately bypasses that open-PR
+protection; reserve it for intentional preview-deletion smoke checks.
+
+The Wrangler files explicitly pin account and Worker identity. They contain
+only the static asset binding and a lossless asset streaming Worker: no storage,
+secrets, unrelated bindings, routes, custom domains or scheduled triggers.
+`keep_vars` preserves dashboard variables; routing remains dashboard-managed.
+PPE explicitly has a `previews` block to enable noninteractive deployments
+without copying production resource settings. It enables Preview console logs
+for structured `deployment-asset-stream-abort` diagnostics only; automatic
+invocation logs are disabled. Wrangler 4.148.0 retains `assets` (including
+`ASSETS` and `run_worker_first`) at the top level, not under `previews`.
+
+The approved v39 optimized model is **41,072,516 bytes**, exceeding the
+[25 MiB per-file Workers Assets limit](https://developers.cloudflare.com/workers/platform/limits/#static-assets)
+on both Free and Paid plans. `build:deploy` therefore downloads the immutable
+[SHA-named v39 optimized release asset](https://github.com/pedropaulovc/harmonic-analyzer/releases/download/v39/ha-harmonic-analyzer-941b6193698091781f133642bdc2a7411a18c2cfcb5252646a79b9bd57c6a805.glb),
+checks its SHA-256 and exact length against `content/model-representation.json`,
+and caches it under ignored `.vite/deployment-model/`. GitHub is a **build-time
+input only**: the deployed application makes no model requests to GitHub.
+Missing or wrong bytes fail the build. It neither imports a different CAD model
+nor regenerates tracked provenance/native metadata.
+
+After Vite builds, every runtime file larger than 25 MiB (including the model
+and large source-track JavaScript modules) is split into ordered **24 MiB**
+pieces under `dist/deployment-assets/<original-sha256>/`. The generated, ignored
+`.vite/deployment-assets.json` is bundled into `worker.mjs`; it records each
+original URL, content type, length and SHA-256 plus ordered chunk paths, lengths
+and digests. The build checks every piece and the exact reconstructed original
+SHA-256 before permitting deployment. There is no compression, reduced dataset,
+regenerated model, dropped runtime asset, or source-loader change.
+
+For original chunked-asset URLs, the Worker supports GET/HEAD and sequentially
+streams pieces from its own `ASSETS` binding through a fixed-length stream.
+It never buffers the full model or large playback module. Initial missing chunks
+return 502; later missing/short chunks error the response stream rather than
+silently completing a truncated 200. The model loader still verifies the
+original compiled SHA-256 and length before parsing. Ordinary files pass through
+to `ASSETS` unchanged, including their native conditional-request behavior.
+Each immutable `ASSETS` piece is requested with `Accept-Encoding: identity` and
+must return 200 with a body. If a Content-Length header is visible it must match
+the manifest, but the native binding can omit that header even though its public
+HTTP endpoint supplies it. Piece length and SHA-256 checks, plus exact ordered
+whole-file SHA reconstruction, are mandatory **producer/predeploy** checks.
+Runtime bodies pipe directly into one native `FixedLengthStream`, which enforces
+the **actual total byte length** without per-packet JavaScript processing or
+materialized arrays. This relies on Cloudflare's immutable `ASSETS` producer for
+individual pieces; there is no separate per-piece runtime byte/SHA scan.
+The browser still verifies the complete model SHA before parsing.
+Abort diagnostics identify the original URL, active piece path, and error
+without body bytes. Header/status refusals include actual response status,
+visible length, encoding and expected length.
+Chunked routes also honor strong/weak `If-None-Match` and `*` with a 304 before
+fetching any pieces, so cache revalidation does not redownload the full asset.
+Reconstructed routes send `Cache-Control: no-transform` to prevent Cloudflare
+from recompressing the assembled response. A native headed-browser control found
+that default `Content-Encoding: zstd` failed partway through the 45,568,082-byte
+playback module, while an identity-encoding override completed the exact full
+module with HTTP/3 unchanged. The response's Content-Length had been removed
+under zstd, so this was not evidence of an explicit length-header mismatch.
+The transport uses Cloudflare's
+[documented no-transform directive](https://developers.cloudflare.com/speed/optimization/content/compression/#content-length-header-handling),
+not an HTTP/3-disabled client fallback. The no-transform-only native deployment
+still failed concurrent model/module loads, with Cloudflare invocation analytics
+reporting `exceededResources`; this outcome does not identify CPU versus memory.
+The transport therefore avoids per-buffer JavaScript processing through native
+stream piping. Public native-browser verification is required before claiming
+the deployed resource fix verified.
+Both configurations explicitly use `run_worker_first: false`, Cloudflare's
+asset-first default. Ordinary uploaded files (including the transport pieces)
+bypass the Worker; these static requests are
+[free and unlimited](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/).
+The producer deletes oversized originals only after writing all their pieces,
+so requests to those original missing URLs fall through to the Worker and use
+the manifest transport, regardless of their directory. Keep
+`not_found_handling` at its default `none`: no SPA or custom 404 asset fallback
+is configured to swallow these missing-original requests.
+Reconstructed original requests still invoke the Worker and retain its
+[plan limits](https://developers.cloudflare.com/workers/platform/limits/#daily-requests),
+including **100,000 requests/day on Workers Free**; they are not unlimited
+static delivery. No visitor/cost estimate is implied by the routing change.
+No R2 storage or runtime external origin is required.
+Original reference footage is local opt-in verification data, not published:
+deployment builds reject a `public/reference-media/` directory.
+
+From a clean clone, the equivalent commands are:
+
+```sh
+npm --prefix web ci
+npm --prefix web run build:deploy
+# Authenticated local use only; native Builds supplies Cloudflare credentials.
+npm --prefix web run deploy          # main -> production
+npm --prefix web run deploy:preview  # actual branch -> PPE preview
+```
+
+Plain `npm --prefix web run build` remains the local static Vite build with
+default base `/harmonic-analyzer/`; it is not the native deployment build.
+Deployment never publishes the raw CAD export or private source cache.
 Exact geometry sharing reduces duplicate buffers; Meshopt reduces transfer
 bytes, not the instance-expanded triangle count. No frame-rate improvement is
 established. Fidelity verification still uses all twenty channels and the full

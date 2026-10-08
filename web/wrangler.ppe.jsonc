@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ppe-harmonic-analyzer-com",
+  "account_id": "c8769c20b85cd2857afe22ef2f9a0a21",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-08",
+  "keep_vars": true,
+  "previews": {
+    "observability": {
+      "enabled": true,
+      "logs": {
+        "enabled": true,
+        "invocation_logs": false
+      }
+    }
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": false
+  }
+}

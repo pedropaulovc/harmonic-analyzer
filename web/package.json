@@ -9,6 +9,11 @@
     "fetch-model": "node scripts/fetch-model.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:deployments": "node --test scripts/cloudflare-deployments.test.mjs",
+    "prebuild:deploy": "npm run test:deployments",
+    "build:deploy": "node scripts/deployment.mjs build",
+    "deploy": "node scripts/deployment.mjs deploy",
+    "deploy:preview": "node scripts/deployment.mjs preview",
     "verify:identity-evidence": "uv run --isolated --no-project python scripts/canonical-native-evidence.py check",
     "verify:sync": "npm run verify:identity-evidence && node scripts/verify-sync.mjs",
     "test:source": "node --test scripts/fresh-source-observations.test.mjs scripts/executed-point-motion.test.mjs && uv run --isolated --no-project --python 3.13 --with-requirements scripts/source-fit-requirements.txt python -m unittest discover -s scripts -p \"test_source_*.py\"",
@@ -31,6 +36,7 @@
     "@types/three": "^0.180.0",
     "playwright": "1.63.0",
     "typescript": "^5.6.0",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "wrangler": "4.148.0"
   }
 }
