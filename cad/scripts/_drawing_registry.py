@@ -642,6 +642,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="dt_cone_pivot_post_tl_bond_cradle",
+        part="dt_cone_pivot_post_tl_bond_cradle",
+        artifact_stem="dt-cone-pivot-post-tl-bond-cradle",
+        script_name="draw_dt_cone_pivot_post_tl_bond_cradle.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_pivot_bracket_tl_ledge",
         part="ch_pivot_bracket_tl_ledge",
         artifact_stem="ch-pivot-bracket-tl-ledge",
