@@ -47,9 +47,15 @@ def test_bonded_nose_pin_ends_at_the_stop_face() -> None:
 
 
 def test_exported_hole_bands_are_the_printed_drilled_band() -> None:
+    """The explicit drilled band applies to the model nominal, so the model
+    must equal what the sheet prints or the exported limits drift."""
     features = _features()
     for name, dia in (("nose_hole", spec.NOSE_HOLE_DIA), ("screw_hole", spec.SCREW_HOLE_DIA)):
-        assert features[name]["dia"] == [dia, round(dia + spec.DRILLED_BAND[0], 12)]
+        printed = round(dia, features[name]["precision"]["dia"])
+        assert features[name]["dia"] == [
+            round(printed + spec.DRILLED_BAND[1], 12),
+            round(printed + spec.DRILLED_BAND[0], 12),
+        ]
 
 
 def test_bond_gap_holds_on_every_pin_and_hole_the_bands_allow() -> None:
