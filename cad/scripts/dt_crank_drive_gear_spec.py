@@ -50,9 +50,20 @@ BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 # grown south face, so its face is the gap between the collar and T120,
 # floored to the four places it prints.  dt_cone_gear_stack pins the two faces
 # together.  The band is the cone gears' +/-0.025.
+LAYOUT_REFERENCE_FACE_WIDTH = 10.0
+LAYOUT_CENTRE_STATION = (
+    cone_line.SHAFT_T120_STATION
+    - (cone_line.CONE_FACE_STATION_REFERENCE + LAYOUT_REFERENCE_FACE_WIDTH) / 2.0
+    - 0.1
+)
 LAYOUT_FACE_WIDTH = 8.0
 SOUTH_FACE_SHIFT_NORTH = 1.5
-FACE_WIDTH = round(14.1 - math.floor(cone_line.SEAT_PITCH * 1e4) / 1e4, 4)
+FACE_WIDTH = round(
+    cone_line.SHAFT_T120_STATION + cone_line.CONE_FACE_STATION_REFERENCE / 2.0
+    - math.floor(cone_line.SEAT_PITCH * 1e4) / 1e4
+    - (LAYOUT_CENTRE_STATION - LAYOUT_FACE_WIDTH / 2.0 + SOUTH_FACE_SHIFT_NORTH),
+    4,
+)
 FACE_WIDTH_BAND = (0.025, -0.025)
 # The centre sits CENTRE_SHIFT_NORTH north of the 19.9 layout station.
 CENTRE_SHIFT_NORTH = SOUTH_FACE_SHIFT_NORTH + (FACE_WIDTH - LAYOUT_FACE_WIDTH) / 2.0

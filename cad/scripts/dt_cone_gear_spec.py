@@ -18,6 +18,7 @@ from __future__ import annotations
 import math
 
 import _config
+from cone_line import SEAT_PITCH
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from cone_shaft_land_bands import (
@@ -139,7 +140,6 @@ BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # datum the MHA-VN-016 stack collar is feelered off -- does not move.  The band
 # is the cylinder bank's L20 d' rule (+/-0.025 per gear, the 20-gear stack
 # accepted at +/-0.20), so it is faced to a micrometer on both sides.
-SEAT_PITCH = 6.875611681879656  # cone_line.SEAT_PITCH, fixed 7.0565 channel grid
 FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4
 FACE_WIDTH_BAND = (0.025, -0.025)
 # Flat clock (user ruling 2026-09-28): the bore's D-flat is the gear's

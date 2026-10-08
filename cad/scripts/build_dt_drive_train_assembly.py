@@ -323,11 +323,9 @@ from dt_crank_drive_gear_spec import (  # noqa: E402
     FACE_WIDTH as GEAR64_FACE,
     CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH,
     LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE,
+    LAYOUT_CENTRE_STATION as GEAR64_LAYOUT_CENTRE_STATION,
     SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH,
 )
-# The 19.9 layout station was first drawn for a 10 mm 64T face 0.1 south of
-# a 6.5 T120; the number is kept so every station derived from it stands.
-GEAR64_CENTRE_REFERENCE_FACE = 10.0
 from dt_crank_pinion_spec import FACE_WIDTH as PINION_FACE  # noqa: E402
 
 # Mesh anchor: X_PITCH is every cone gear's pitch-section x at the
@@ -350,7 +348,9 @@ from dt_crank_pinion_spec import FACE_WIDTH as PINION_FACE  # noqa: E402
 # -- authored from its front stub end -- is PLACED at SHAFT_FRONT_STATION
 # instead.  The post/carrier axis remains at its ch30-fitted world placement;
 # the gear family is translated GEAR_AXIS_SHIFT along that same infinite line.
-SHAFT_FRONT_STATION = -61.90686099792956
+from dt_cone_gear_shaft_spec import FRONT_STUB as SHAFT_FRONT_STUB  # noqa: E402
+
+SHAFT_FRONT_STATION = -SHAFT_FRONT_STUB
 # = -build_dt_cone_gear_shaft FRONT_STUB (asserted below). The enlarged integral
 # journal runs through the v2 post's 42.011-mm-long inclined bore and stands
 # 1.0 mm proud of its south face.
@@ -372,9 +372,7 @@ for _j in range(20):
 # face's (#1126), and the gear grew NORTH until it bears on T120's grown south
 # face (dt_crank_drive_gear_spec, user ruling 2026-09-28): the solid stack's
 # first joint.  GEAR64_STATION is the 19.9 layout station.
-GEAR64_STATION = (
-    SHAFT_T120_STATION - (CONE_FACE_STATION_REFERENCE + GEAR64_CENTRE_REFERENCE_FACE) / 2.0 - 0.1
-)  # 19.9
+GEAR64_STATION = GEAR64_LAYOUT_CENTRE_STATION
 GEAR64_CENTRE_STATION = GEAR64_STATION + GEAR_AXIS_SHIFT + GEAR64_CENTRE_SHIFT_NORTH
 _T120_SOUTH_FACE_STATION = (
     SHAFT_T120_STATION + GEAR_AXIS_SHIFT + CONE_FACE_STATION_REFERENCE / 2.0 - CONE_FACE
@@ -1366,7 +1364,6 @@ from dt_cone_gear_shaft_spec import (  # noqa: E402
     ADJUSTER_EMBED as ADJ_EMBED,
     COLLAR_END_STATION as SHAFT_COLLAR_END,
     COLLAR_START_STATION as SHAFT_COLLAR_START,
-    FRONT_STUB as SHAFT_FRONT_STUB,
     PIVOT_FROM_T006_NORTH_FACE as SHAFT_PIVOT_FROM_T006,
     SECTIONS as SHAFT_SECTIONS,
     TIP_BLOCK_LENGTH as SHAFT_TIP_BLOCK_LENGTH,
