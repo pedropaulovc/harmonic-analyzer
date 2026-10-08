@@ -99,7 +99,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Rocker Inspection C Stop Bar Drawing",
             1: "Harmonic Analyzer shop fixture drawing",
             2: "Harmonic Analyzer Project",
-            3: "rocker inspection box C stop bar; hardened lapped O1; MHA-CH-006-TL-09",
+            3: "rocker inspection box C stop bar; hardened O1; MHA-CH-006-TL-09",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )

@@ -3,8 +3,8 @@ ch-rocker-arm-tl-inspection-box:
   # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
   number: MHA-CH-006-TL-08
   material: Suburban Tool BXP-050505-G box parallel
-  material_specification: Suburban Tool BXP-050505-G ground cast-iron box parallel, 5 x 5 x 5 in, 11/16 in walls, one vertical through core, reworked
-  finish: bought ground faces kept; windows and taps as machined
+  material_specification: Suburban Tool BXP-050505-G cast-iron box parallel, 5 x 5 x 5 in, 11/16 in walls, one vertical through core, reworked
+  finish: bought faces kept as supplied; windows and taps as machined
   quantity: 1
   tolerance_class: machined_block
   process: "buy the box parallel; mill the clamp and back windows with light cuts and soft clamping; drill and tap the stop-bar holes; re-check base-to-right squareness by reversal"

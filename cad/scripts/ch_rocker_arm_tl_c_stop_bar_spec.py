@@ -21,6 +21,8 @@ fixtures.rocker-inspection-box) maps as inventory (x, y, z) = model (x, -z, y).
 
 from __future__ import annotations
 
+import math
+
 import _config
 import ch_rocker_arm_spec as rocker
 from _feature_requirements import ExportFeature, limits
@@ -31,10 +33,20 @@ from _printed_tolerance import printed_band_mm
 INCH = 25.4
 # Abrams 102060: O1 precision-ground flat stock 1/2 x 1/2 in.
 BAR_LENGTH = 40.0
-BAR_HEIGHT = 12.7  # lapped; the datum-C simulator height above the base
-BAR_WIDTH = 12.7  # as-ground stock, projection in front of the box
-# Lapped to 12.700 +-0.002 (shop-additions section 4).
-BAR_HEIGHT_BAND = (0.002, -0.002)  # (upper, lower) deviations
+BAR_HEIGHT = 12.7  # the datum-C simulator height above the base
+BAR_WIDTH = 12.7  # as-bought stock, projection in front of the box
+# Op 50 reads pin-height differences in one set-up (X = H1 - R1, Y = H3 - R3;
+# rocker-plan op 50), so the bar's absolute height cancels; the tilt of its
+# top does not. A tilt t over the bar length turns the op-50 hub-to-rod vector
+# and moves the position reading by 2 * |v| * t / BAR_LENGTH on diameter. The
+# chain budget is a quarter of the parent's position diameter. With no GD&T
+# the size envelope carries parallelism: t is at most the total height band.
+OP50_HUB_TO_ROD = math.hypot(132.391, 15.843)  # rocker-plan op-50 CAD nominals
+PARENT_POSITION_DIA = float(rocker.GEOMETRIC_TOLERANCES_MM["rod-pin hole position"])
+BAR_HEIGHT_BAND = (0.003, -0.003)  # (upper, lower) deviations
+_TILT = BAR_HEIGHT_BAND[0] - BAR_HEIGHT_BAND[1]
+if 2.0 * OP50_HUB_TO_ROD * _TILT / BAR_LENGTH > 0.25 * PARENT_POSITION_DIA:
+    raise AssertionError("C stop bar height band spends over a quarter of the rod-hole position")
 _X = printed_band_mm(1)
 
 # The rocker's datum-C tip land rests wholly on the bar top: its strap
@@ -55,7 +67,7 @@ SCREW_LENGTH = 0.625 * INCH  # #8-32 x 5/8 SHCS
 SCREW_X = (10.0, 30.0)  # from the bar's left end (= the box left face)
 SCREW_Y = BAR_HEIGHT / 2.0
 CLEARANCE_DIA = CLEARANCE_MM[("#8", "normal")]
-CBORE_DIA = 8.0
+CBORE_DIA = 5.0 / 16.0 * INCH  # standard #8 SHCS counterbore
 CBORE_DEPTH = 4.8
 _DRILLED = _config.title_block("drilled_hole")
 DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))
@@ -65,8 +77,6 @@ if CBORE_DIA - _XX <= SCREW_HEAD_DIA:
     raise AssertionError("C stop bar counterbore does not clear the #8 head")
 if CBORE_DEPTH - _XX < SCREW_HEAD_H:
     raise AssertionError("#8 head stands proud of the C stop bar counterbore")
-if (BAR_HEIGHT - (CBORE_DIA + _XX)) / 2.0 < 2.0:
-    raise AssertionError("counterbore wall under rule 12")
 # Screw stations: the bar's clearance holes and the box's taps are drilled to
 # the same numbers on two parts. Each part holds half the radial clearance on
 # each axis, so the worst diagonal pair still passes the screw.
@@ -74,6 +84,13 @@ SCREW_RADIAL_CLEARANCE = (CLEARANCE_DIA - THREAD_MAJOR_MM[SCREW_THREAD]) / 2.0
 SCREW_POSITION_BAND = (0.10, -0.10)  # (upper, lower), each part, each axis
 if 2.0 * (2.0 * SCREW_POSITION_BAND[0] ** 2) ** 0.5 >= SCREW_RADIAL_CLEARANCE:
     raise AssertionError("C stop bar screw stations can bind the screws")
+# Rule 12 walls at worst case: shortest bar, hole high or low in its band,
+# largest counterbore.
+_CBORE_R_MAX = (CBORE_DIA + _XX) / 2.0
+if (BAR_HEIGHT + BAR_HEIGHT_BAND[1]) - (SCREW_Y + SCREW_POSITION_BAND[0]) - _CBORE_R_MAX < 2.0:
+    raise AssertionError("counterbore wall to the bar top under rule 12")
+if (SCREW_Y + SCREW_POSITION_BAND[1]) - _CBORE_R_MAX < 2.0:
+    raise AssertionError("counterbore wall to the bar bottom under rule 12")
 SCREW_HOLE_SPEC = HoleSpec(
     "counterbore_socket",
     "#8",
@@ -112,11 +129,7 @@ DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
 }
 
 SURFACE_FINISHES = ()
-DRAWING_NOTES = (
-    "TOP AND BOTTOM LAPPED FLAT AND PARALLEL AFTER HARDENING.\n"
-    "HEIGHT IS THE ROCKER DATUM C GAUGE HEIGHT.\n"
-    "TOP FACE IS THE DATUM C STOP: NO NICKS, BURRS OR STAMPING ON IT."
-)
+DRAWING_NOTES = "NO NICKS, BURRS OR STAMPING ON THE TOP FACE."
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 _Z = [0.0, 0.0, 1.0]
@@ -124,7 +137,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "c_stop_top": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 1.0, 0.0), BAR_HEIGHT),),
-        requirements=("height", "process"),
+        requirements=("height", "length", "width"),
         fields={
             "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "y", "value": BAR_HEIGHT}, ("BAR_HEIGHT",)),
@@ -133,6 +146,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("BAR_HEIGHT", "BAR_HEIGHT_BAND"),
             ),
             "height_nominal": (BAR_HEIGHT, ("BAR_HEIGHT",)),
+            "length_nominal": (BAR_LENGTH, ("BAR_LENGTH",)),
+            "width_nominal": (BAR_WIDTH, ("BAR_WIDTH",)),
             "length": (
                 limits(BAR_LENGTH, 1),
                 ("BAR_LENGTH", "C_LAND_X0", ("ch_rocker_arm_spec", "TIP_FACE")),
@@ -141,14 +156,13 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 limits(BAR_WIDTH, 1),
                 ("BAR_WIDTH", ("ch_rocker_arm_spec", "ARM_THICKNESS")),
             ),
-            "process": ("lap", ("DRAWING_NOTES",)),
         },
         precision={"height": 3, "length": 1, "width": 1},
     ),
     "base_seat": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
-        requirements=("height", "process"),
+        requirements=("height",),
         fields={
             "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
@@ -156,7 +170,6 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 limits(BAR_HEIGHT, 3, BAR_HEIGHT_BAND),
                 ("BAR_HEIGHT", "BAR_HEIGHT_BAND"),
             ),
-            "process": ("lap", ("DRAWING_NOTES",)),
         },
         precision={"height": 3},
     ),
@@ -173,26 +186,43 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     ),
     **{
         f"screw_hole_{side}": ExportFeature(
-            kind="counterbore",
+            kind="hole",
             faces=(CylinderFace(CLEARANCE_DIA, contains_x_mm=x),),
-            requirements=("at", "dia", "thru"),
+            requirements=("station", "height", "dia", "thru"),
             fields={
                 "at": ([x, SCREW_Y, BAR_WIDTH], ("SCREW_X", "SCREW_Y", "BAR_WIDTH")),
                 "axis": (_Z, ("__frame__",)),
                 "station": (limits(x, 2, SCREW_POSITION_BAND), ("SCREW_X", "SCREW_POSITION_BAND")),
+                "station_nominal": (x, ("SCREW_X",)),
                 "height": (limits(SCREW_Y, 2, SCREW_POSITION_BAND), ("SCREW_Y", "SCREW_POSITION_BAND")),
+                "height_nominal": (SCREW_Y, ("SCREW_Y",)),
                 "dia_nominal": (CLEARANCE_DIA, ("CLEARANCE_DIA",)),
                 "dia": (
                     limits(CLEARANCE_DIA, 2, DRILLED_BAND),
                     ("CLEARANCE_DIA", "DRILLED_BAND", "SCREW_HOLE_SPEC"),
                 ),
-                "hole_spec": (
-                    f"#8 SOCKET HEAD COUNTERBORE {CBORE_DIA:.2f} X {CBORE_DEPTH:.2f} DEEP",
-                    ("SCREW_HOLE_SPEC", "CBORE_DIA", "CBORE_DEPTH"),
-                ),
                 "thru": (True, ("SCREW_HOLE_SPEC",)),
             },
             precision={"station": 2, "height": 2, "dia": 2},
+        )
+        for side, x in zip(("left", "right"), SCREW_X, strict=True)
+    },
+    **{
+        f"screw_hole_{side}_counterbore": ExportFeature(
+            kind="counterbore",
+            faces=(
+                CylinderFace(CBORE_DIA, contains_x_mm=x),
+                PlanarFace((0.0, 0.0, 1.0), BAR_WIDTH - CBORE_DEPTH, contains_x_mm=x),
+            ),
+            requirements=("dia", "depth"),
+            fields={
+                "parent": (f"screw_hole_{side}", ("SCREW_HOLE_SPEC",)),
+                "dia": (limits(CBORE_DIA, 2), ("CBORE_DIA", "SCREW_HOLE_SPEC")),
+                "dia_nominal": (CBORE_DIA, ("CBORE_DIA",)),
+                "depth": (limits(CBORE_DEPTH, 2), ("CBORE_DEPTH", "SCREW_HOLE_SPEC")),
+                "depth_ref": (CBORE_DEPTH, ("CBORE_DEPTH",)),
+            },
+            precision={"dia": 2, "depth": 2},
         )
         for side, x in zip(("left", "right"), SCREW_X, strict=True)
     },

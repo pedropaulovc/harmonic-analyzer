@@ -48,7 +48,7 @@ def test_clamp_windows_open_past_the_front_wall_inner_face() -> None:
 
 
 def test_screw_never_bottoms_in_the_tap() -> None:
-    assert bar.SCREW_ENGAGEMENT <= _features()["bar_tap_left"]["depth"]
+    assert bar.SCREW_ENGAGEMENT <= _features()["bar_tap_left"]["depth"][0]
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:

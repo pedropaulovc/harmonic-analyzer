@@ -30,6 +30,7 @@ model (x, -z, y).
 
 from __future__ import annotations
 
+import _config
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_c_stop_bar_spec as bar
 from _feature_requirements import ExportFeature, limits
@@ -118,44 +119,97 @@ DRAWING_NOTES = (
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 
+_DRILLED = _config.title_block("drilled_hole")
+DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))
+
+
+def _window(
+    floor_y: float, height: float, faces: tuple, sources: tuple[str, ...],
+    width: float, station: float, normal: list[float], note: str,
+) -> ExportFeature:
+    """A printed .X through window: size, station along its wall, floor above
+    the base (lower_z is model Y here: the box frame is Y up)."""
+    return ExportFeature(
+        kind="window",
+        faces=faces,
+        requirements=("width", "height", "station", "lower_z"),
+        fields={
+            "normal": (normal, ("__frame__",)),
+            "width": (limits(width, 1), (sources[0],)),
+            "width_nominal": (width, (sources[0],)),
+            "height": (limits(height, 1), (sources[1],)),
+            "height_nominal": (height, (sources[1],)),
+            "station": (limits(station, 1), (sources[2],)),
+            "station_nominal": (station, (sources[2],)),
+            "lower_z": (limits(floor_y, 1), (sources[3],)),
+            "height_from": ("base", ("__frame__",)),
+            "note": (note, ("__frame__",)),
+            "thru": (True, ("__frame__",)),
+        },
+        precision={"width": 1, "height": 1, "station": 1, "lower_z": 1},
+    )
+
+
 EXPORT_FEATURES: dict[str, ExportFeature] = {
+    # Bought reference faces: located, not reworked, so no printed band.
     "datum_b_face": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 0.0, 1.0), 0.0),),
-        requirements=("width", "height"),
+        requirements=(),
         fields={
             "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-            "width": (BOX, ("BOX",)),
-            "height": (BOX, ("BOX",)),
         },
     ),
     "base": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
-        requirements=("width",),
+        requirements=(),
         fields={
             "normal": ([0.0, -1.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
-            "width": (BOX, ("BOX",)),
-            "thickness": (WALL, ("WALL",)),
         },
     ),
     "right_side": ExportFeature(
         kind="face",
         faces=(PlanarFace((1.0, 0.0, 0.0), BOX),),
-        requirements=("width",),
+        requirements=(),
         fields={
             "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "x", "value": BOX}, ("BOX",)),
-            "width": (BOX, ("BOX",)),
         },
+    ),
+    **{
+        f"clamp_window_{level}": _window(
+            floor_y, WINDOW_H,
+            (
+                PlanarFace((0.0, 1.0, 0.0), floor_y),
+                PlanarFace((0.0, -1.0, 0.0), -(floor_y + WINDOW_H)),
+            ),
+            ("WINDOW_W", "WINDOW_H", "WINDOW_FRONT", source),
+            WINDOW_W, WINDOW_FRONT, [-1.0, 0.0, 0.0],
+            "through the left wall; station from the front face",
+        )
+        for level, floor_y, source in (
+            ("lower", WINDOW_LOW_BASE, "WINDOW_LOW_BASE"),
+            ("upper", WINDOW_UP_BASE, "WINDOW_UP_BASE"),
+        )
+    },
+    "back_window": _window(
+        BACK_WINDOW_Y0, BACK_WINDOW,
+        (
+            PlanarFace((0.0, 1.0, 0.0), BACK_WINDOW_Y0),
+            PlanarFace((1.0, 0.0, 0.0), BACK_WINDOW_X0),
+        ),
+        ("BACK_WINDOW", "BACK_WINDOW", "BACK_WINDOW_X0", "BACK_WINDOW_Y0"),
+        BACK_WINDOW, BACK_WINDOW_X0, [0.0, 0.0, -1.0],
+        "through the back wall; station from the left face",
     ),
     **{
         f"bar_tap_{side}": ExportFeature(
             kind="hole",
             faces=(CylinderFace(TAP_DRILL_DIA, contains_x_mm=x),),
-            requirements=("at", "thread", "depth"),
+            requirements=("station", "height", "thread", "depth"),
             fields={
                 "at": ([x, TAP_Y, 0.0], ("TAP_X", "TAP_Y", ("ch_rocker_arm_tl_c_stop_bar_spec", "SCREW_X"))),
                 "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
@@ -163,16 +217,36 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                     limits(x, 2, bar.SCREW_POSITION_BAND),
                     ("TAP_X", ("ch_rocker_arm_tl_c_stop_bar_spec", "SCREW_POSITION_BAND")),
                 ),
+                "station_nominal": (x, ("TAP_X",)),
                 "height": (
                     limits(TAP_Y, 2, bar.SCREW_POSITION_BAND),
                     ("TAP_Y", ("ch_rocker_arm_tl_c_stop_bar_spec", "SCREW_POSITION_BAND")),
                 ),
+                "height_nominal": (TAP_Y, ("TAP_Y",)),
                 "thread": (f"{bar.SCREW_THREAD} UNC-2B", ("TAP_SPEC",)),
-                "depth": (TAP_SPEC.overrides_mm["ThreadDepth"], ("TAP_SPEC",)),
+                "depth": (limits(TAP_SPEC.overrides_mm["ThreadDepth"], 2), ("TAP_SPEC",)),
+                "depth_ref": (TAP_SPEC.overrides_mm["ThreadDepth"], ("TAP_SPEC",)),
                 "tap_drill_mm": (TAP_DRILL_DIA, ("TAP_DRILL_DIA", "TAP_SPEC")),
                 "thru": (False, ("TAP_SPEC",)),
             },
-            precision={"station": 2, "height": 2},
+            precision={"station": 2, "height": 2, "depth": 2},
+        )
+        for side, x in zip(("left", "right"), TAP_X, strict=True)
+    },
+    **{
+        f"bar_tap_{side}_drill": ExportFeature(
+            kind="hole",
+            faces=(CylinderFace(TAP_DRILL_DIA, contains_x_mm=x),),
+            requirements=("dia", "depth"),
+            fields={
+                "parent": (f"bar_tap_{side}", ("TAP_SPEC",)),
+                "dia": (limits(TAP_DRILL_DIA, 2, DRILLED_BAND), ("TAP_DRILL_DIA", "DRILLED_BAND", "TAP_SPEC")),
+                "dia_nominal": (TAP_DRILL_DIA, ("TAP_DRILL_DIA",)),
+                "depth": (limits(TAP_SPEC.depth_mm, 2), ("TAP_SPEC",)),
+                "depth_ref": (TAP_SPEC.depth_mm, ("TAP_SPEC",)),
+                "thru": (False, ("TAP_SPEC",)),
+            },
+            precision={"dia": 2, "depth": 2},
         )
         for side, x in zip(("left", "right"), TAP_X, strict=True)
     },

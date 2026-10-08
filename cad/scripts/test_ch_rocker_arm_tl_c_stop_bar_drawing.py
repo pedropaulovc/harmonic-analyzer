@@ -26,11 +26,13 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert {name for _feature, name in spec.DRAWING_BANDS} <= marked
 
 
-def test_exported_datum_c_height_is_the_lapped_band() -> None:
+def test_datum_c_height_band_holds_the_rod_hole_position_chain() -> None:
+    """The size envelope is the only parallelism control: its total band,
+    as a tilt over the bar, may spend at most a quarter of the Ø0.20."""
     top = _features()["c_stop_top"]
-    assert top["height"] == [12.698, 12.702]
-    assert top["process"] == "lap"
-    assert "LAPPED" in spec.DRAWING_NOTES
+    assert top["height"] == [12.697, 12.703]
+    tilt = top["height"][1] - top["height"][0]
+    assert 2.0 * spec.OP50_HUB_TO_ROD * tilt / spec.BAR_LENGTH <= 0.25 * 0.20
 
 
 def test_rocker_c_land_rests_wholly_on_the_bar_top() -> None:
@@ -59,4 +61,4 @@ def test_notes_follow_the_simplicity_policy() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert 1 <= len(lines) <= 4
     assert not re.search(r"\d", spec.DRAWING_NOTES)
-    assert "GROUND" not in spec.DRAWING_NOTES.upper()
+    assert not re.search(r"GROUND|LAPP|GRIND", spec.DRAWING_NOTES.upper())
