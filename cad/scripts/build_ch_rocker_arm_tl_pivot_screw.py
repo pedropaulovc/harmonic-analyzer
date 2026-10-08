@@ -162,30 +162,22 @@ async def build(adapter) -> dict[str, str]:
         )
     head_outline, shoulder_outline, thread_outline = lines[1], lines[3], lines[5]
     tip_chamfer, tip_face = lines[6], lines[7]
-    # The head-top centre sits at the frame's Z5.5.
+    # The head-top centre sits at the frame's HEAD_TOP_Z.
     await anchor_point_to_origin(
         adapter, f"{lines[0]}.start", u_top, 0.0, "screw head-top centre"
     )
     profile.record("HeadTop", '"HeadTop"')
-    # Axial sizes from the one faced end, the head top.
-    for name, end, value, drive in (
-        ("HeadLength", f"{head_outline}.end", HEAD_LENGTH, '"HeadLength"'),
-        (
-            "ShoulderEnd",
-            f"{shoulder_outline}.end",
-                    '"HeadLength" + "ShoulderLength"',
-        ),
-        (
-            "OverallLength",
-            f"{tip_face}.end",
-            OVERALL_LENGTH,
-            '"HeadLength" + "ShoulderLength" + "ThreadLength"',
-        ),
+    # The head length from the faced head top; the stack lengths from the
+    # underhead, the face that clamps the washer.
+    for name, start, end, value in (
+        ("HeadLength", f"{head_outline}.start", f"{head_outline}.end", HEAD_LENGTH),
+        ("ShoulderLength", f"{head_outline}.end", f"{shoulder_outline}.end", SHOULDER_LENGTH),
+        ("UnderHeadLength", f"{head_outline}.end", f"{tip_face}.end", UNDER_HEAD_LENGTH),
     ):
         await dimension_between(
-            adapter, f"{head_outline}.start", end, "horizontal_distance", value, f"screw {name}"
+            adapter, start, end, "horizontal_distance", value, f"screw {name}"
         )
-        profile.record(name, drive)
+        profile.record(name, f'"{name}"')
     await dimension_between(
         adapter,
         f"{tip_chamfer}.start",
