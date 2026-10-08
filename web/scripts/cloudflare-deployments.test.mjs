@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { PPE, PROD, guardIdentity, listPreviews, deletePreview, cleanup, reconcile, waitForManifest, webTreeSha, resolvePreviewUrl, reportPreviewEvent } from './cloudflare-deployments.mjs';
 
 const sha = 'a'.repeat(40);
-const preview = { id: 'preview-1', name: 'feature/a', slug: 'server-owned-slug', created_on: new Date(Date.now() - 60 * 60 * 1000).toISOString(), urls: ['https://server-owned-slug-ppe-harmonic-analyzer-com.ppe-harmonic-analyzer-com.workers.dev'] };
+const preview = { id: 'preview-1', name: 'feature/a', slug: 'server-owned-slug', created_on: new Date(Date.now() - 60 * 60 * 1000).toISOString(), urls: ['https://server-owned-slug-ppe-harmonic-analyzer-com.harmonicanalyzer-com-ppe.workers.dev'] };
 function envelope(rows, page = 1, perPage = 100, total = rows.length) {
   return { success: true, result: rows, result_info: { page, per_page: perPage, count: rows.length, total_count: total } };
 }
