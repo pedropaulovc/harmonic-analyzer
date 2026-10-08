@@ -709,10 +709,16 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="ch_rocker_arm_tl_vise_stop",
         artifact_stem="ch-rocker-arm-tl-vise-stop",
         script_name="draw_ch_rocker_arm_tl_vise_stop.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_filing_button",
         part="ch_rocker_arm_tl_filing_button",
         artifact_stem="ch-rocker-arm-tl-filing-button",
         script_name="draw_ch_rocker_arm_tl_filing_button.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="ch_rocker_arm_tl_filing_stud",
         part="ch_rocker_arm_tl_filing_stud",
         artifact_stem="ch-rocker-arm-tl-filing-stud",
