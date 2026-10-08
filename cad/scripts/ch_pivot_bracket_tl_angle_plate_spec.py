@@ -83,9 +83,11 @@ STUD_NUT_DIA = 16.5  # 3/8-16 hex nut envelope (inventory bridge row)
 # Every station rides the title block's one-place band: the taps are spotted
 # from the ledge and the studs float in both the upright and the bridge.
 STATION_PLACES = 1
-# The letter-X drill prints its native size to three places (10.084), so the
-# printed band under the DRILLED HOLES row is the exported one.
-STUD_DIA_PLACES = 3
+# The letter-X drill prints at two places (10.08) under the DRILLED HOLES row
+# (a machinist review called three places over-specified), so the exported
+# band is taken off that printed value: [10.08, 10.18], exactly the sheet's.
+STUD_DIA_PLACES = 2
+STUD_DIA_PRINTED = round(blind_cut_dia_mm(STUD_SPEC), STUD_DIA_PLACES)
 # Every hole lies in the upright, clear of the base and of the top edge.
 for _y, _spec in ((SCREW_Y, TAP_SPEC), (STUD_Y, STUD_SPEC)):
     _r = (blind_cut_dia_mm(_spec) + drilled_oversize_mm()) / 2.0
@@ -207,7 +209,10 @@ for _side, _x in (("left", STUD_X[0]), ("right", STUD_X[1])):
             "at": ([_x, STUD_Y, 0.0], ("STUD_X", "STUD_Y")),
             "axis": _INTO_PLATE,
             "drill": (STUD_SPEC.size, ("STUD_SPEC",)),
-            "dia": (limits(_STUD_DRILL, STUD_DIA_PLACES, _DRILLED), ("STUD_SPEC", "STUD_DIA_PLACES")),
+            "dia": (
+                limits(STUD_DIA_PRINTED, STUD_DIA_PLACES, _DRILLED),
+                ("STUD_SPEC", "STUD_DIA_PRINTED", "STUD_DIA_PLACES"),
+            ),
             "nominal_dia": (_STUD_DRILL, ("STUD_SPEC",)),
             "thru": (True, ("STUD_SPEC",)),
             "station": (_station(_x), ("STUD_X", "STATION_PLACES")),

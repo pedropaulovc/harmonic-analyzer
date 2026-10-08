@@ -248,8 +248,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="bridge stud holes",
         process=STUD_CALLOUT_PROCESS,
     )
-    # The letter-X size prints whole (10.084), so the drilled-hole band read
-    # off the sheet is the one the part exports.
+    # The letter-X size prints at the spec's places, the same value the
+    # part's exported drilled-hole band is taken from.
     set_hole_callout_precision(
         stud_callout, {"hw-diam": STUD_DIA_PLACES}, label="bridge stud holes"
     )
