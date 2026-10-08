@@ -27,7 +27,7 @@ Twenty spur gears from six to a hundred and twenty teeth on one shaft, turning o
 
 ## What will fight you
 
-The T006 gear is about 4 mm (0.16 in) outside diameter on a Ø0.794 mm (1/32 in) bore. That leaves at least 0.7485 mm (0.0295 in) of web between the gap floor and the bore: the single hardest feature in the machine. The terminal journal was cut to 1/32 in to keep that web above 0.62 mm with 48DP 20° teeth (`cad/docs/gear-standard.md`). T012 shares the same 1/32 in terminal; T018 and T024 have 2.76 mm (0.109 in) nominal. The original used a harder yellow metal for the tip gears. Enlarging them is not a free change: at a fixed tooth count it changes the diametral pitch and breaks the shared 48DP mesh with the cylinder gears.
+The T006 gear is under 4 mm (0.16 in) outside diameter on a Ø0.794 mm (1/32 in) bore. That leaves at least 0.7485 mm (0.0295 in) of web between the gap floor and the bore: the single hardest feature in the machine. The terminal journal was cut to 1/32 in to keep that web above 0.62 mm with 48DP 20° teeth (`cad/docs/gear-standard.md`). T012 shares the same 1/32 in terminal; T018 and T024 have 2.76 mm (0.109 in) nominal. The original used a harder yellow metal for the tip gears. Enlarging them is not a free change: at a fixed tooth count it changes the diametral pitch and breaks the shared 48DP mesh with the cylinder gears.
 
 ## Making each part
 
