@@ -509,9 +509,15 @@ Use original hashed footage and timestamped source observations. Evaluate every
 integer second and visible camera/mechanism change. Additional intermediate probes
 use real independently observed source exposures, never interpolated oracle pixels.
 Their unavailable measurements are diagnostic; an admitted over-limit error still
-fails the stage. Reference landmarks must include spatially distributed fixed
-features and visible moving features; a favorable camera fit alone cannot prove
-the mechanism state.
+fails the stage. Use spatially distributed independent source CHECK landmarks
+with current native geometry associations. A favorable camera fit alone cannot
+prove visual correspondence. Motion and phase classifications remain honest
+diagnostics, not a required fixed/moving composition, counterfactual point-motion
+certificate or static-rig certificate at each image. This visual-and-timing scope
+keeps source pixels, physical feasibility, native association, rendered visibility
+and every required clock; absent independent pixels or geometry stay unavailable.
+Optional finite native LINE checks retain fixed-body eligibility and cannot admit
+an articulated or source-posed ruler as a fixed BODY LINE.
 
 Compare the actual rendered native model with source landmarks and inspect
 source/render overlays and silhouettes. Report source-localization uncertainty

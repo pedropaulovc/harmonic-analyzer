@@ -390,20 +390,28 @@ are no longer prerequisites for approximate playback.
 
 Structural fixed parts that the source cannot identify may remain rendered in
 a complete feasible reconstruction, with the user's approval. They are listed
-as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
-identifiable-feature and timing checks retain their requirements.
+as source-non-identifiable, not geometric-fidelity passed. Identifiable-feature,
+rendered-pixel and actual-clock checks retain their requirements; motion and phase
+classifications remain explicit diagnostics, not per-image certificates.
 
 The current plan is **50% of source frame width across all six videos**, followed
 by a working browser demo. This is a maximum scored landmark error, not a fraction
 of coverage. At 1920 pixels wide the limit is 960 pixels; timing remains within
 0.5 seconds. The 20%, 10% and 5% refinement stages are outside the current request.
 
-Complete coarse camera/mechanism matching across the collection, then demonstrate
-the implementation. Verify every integer second and visible change using
-distributed fixed and moving landmarks, actual rendered pixels and visual
-overlays. Close-ups, insets and montages remain required. Report uncertainty,
-exceptions and unavailable measurements explicitly. A passing subset or missing
-source CHECK pixels is not an all-six stage-50 pass.
+Complete coarse visual matching across the collection, then demonstrate the
+implementation. Verify every required integer second and visible change using
+spatially distributed, independently measured source CHECKs associated with the
+current native geometry, actual rendered pixels and visual overlays. Close-ups,
+insets and montages remain required. Fixed/moving composition, a counterfactual
+point-motion witness and a static-rig certificate are not prerequisites for this
+visual-and-timing scope. Unknown motion or phase stays unknown in diagnostics;
+it does not waive source pixels, current geometry association, physical
+feasibility, raster visibility, the 960-pixel limit or the 0.5-second clock bound.
+Optional finite native LINE checks retain their fixed-body eligibility; a posed
+ruler cannot supply a fixed BODY LINE check. Report uncertainty, exceptions and
+unavailable measurements explicitly. A passing subset or missing source CHECK
+pixels is not an all-six stage-50 pass.
 
 ```sh
 npm --prefix web run build

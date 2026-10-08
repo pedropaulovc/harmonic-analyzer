@@ -265,6 +265,7 @@ test('covered lower source records remain preserved while every partially visibl
   delete frame.views[0].sourceVisibility
   const top = structuredClone(original.frames.find(row => row.views?.length).views[0])
   top.id = 'top-bank'
+  delete top.sourceVisibility
   top.composite = { mode: 'opaque' }
   top.cameraMeasurement.sourceImage = structuredClone(frame.sourceImage)
   top.cameraMeasurement.evidence = 'Synthetic native candidate with exact record bindings for coverage admission only, not an actual source camera measurement.'

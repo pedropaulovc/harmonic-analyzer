@@ -557,6 +557,7 @@ if (incomingId) {
                 track = ordinary_build(module, video_id, entrypoint, record)
                 shot = next(shot for shot in record['shots'] if shot['id'] == shot_id)
                 incoming_id, two_before, precut = None, None, None
+                expected_shot_id = shot_id
                 if video_id == '6dW6VYXp9HM':
                     time = math.nextafter(shot['endSeconds'], -math.inf)
                     frame = next(frame for frame in record['frames']
@@ -573,13 +574,30 @@ if (incomingId) {
                     precut = max((frame for frame in record['frames']
                                   if frame['decodedTimeSeconds'] < shot['startSeconds']),
                                  key=lambda frame: frame['decodedTimeSeconds'])
-                result = subprocess.run(
-                    ['node', '--input-type=module', '--eval', program],
-                    input=json.dumps({'root': str(root / 'web'), 'track': track,
-                                      'time': time, 'shotId': shot_id, 'incomingId': incoming_id,
-                                      'twoBefore': two_before, 'precut': precut}),
-                    capture_output=True, text=True, cwd=root, check=False)
-                self.assertEqual(result.returncode, 0, result.stderr)
+                    authored = next((frame for frame in record['frames']
+                                     if frame['timeSeconds'] == time), None)
+                    if authored is not None:
+                        # A genuine authored outgoing clock outranks derived cut routing.
+                        self.assertLess(authored['decodedTimeSeconds'], shot['startSeconds'])
+                        endpoint = next(row for row in track['frames'] if row['timeSeconds'] == time)
+                        self.assertEqual(endpoint['sourceImage'], authored['sourceImage'])
+                        self.assertEqual(endpoint['decodedTimeSeconds'], authored['decodedTimeSeconds'])
+                        expected_shot_id = authored['shotId']
+                        incoming_id = shot_id
+                controls = [{'time': time, 'shotId': expected_shot_id, 'incomingId': incoming_id,
+                             'twoBefore': two_before, 'precut': precut}]
+                if video_id == '4mBuyixt22U' and incoming_id is not None:
+                    # The separate incoming packet still refuses a two-ULP key or outgoing PTS.
+                    start = shot['startSeconds']
+                    controls.append({'time': start, 'shotId': shot_id, 'incomingId': None,
+                                     'twoBefore': math.nextafter(math.nextafter(start, -math.inf), -math.inf),
+                                     'precut': precut})
+                for control in controls:
+                    result = subprocess.run(
+                        ['node', '--input-type=module', '--eval', program],
+                        input=json.dumps({'root': str(root / 'web'), 'track': track, **control}),
+                        capture_output=True, text=True, cwd=root, check=False)
+                    self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_fresh_record_and_old_headers_never_read_old_calibration(self):
         for filename, video_id, entrypoint in CURRENT_PRODUCERS:
