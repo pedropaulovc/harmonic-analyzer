@@ -15,12 +15,14 @@ independent exact compressed-byte and original decoded-JSON-byte SHA-256 seals.
 from __future__ import annotations
 
 import copy
+import atexit
 import gzip
 import json
 import importlib.util
 import math
 import re
 import subprocess
+import sys
 from functools import lru_cache
 import hashlib
 from pathlib import Path
@@ -168,6 +170,8 @@ def historical_code_bytes(path, expected_sha256):
 
 def needs_machine(frame, data):
     shot = next(s for s in data["shots"] if s["id"] == frame["shotId"])
+    if data.get("kind") == "current-source-observations" and frame.get("views"):
+        return True
     if frame.get("sourceMachineRequirement") == "required":
         return True
     if frame["classification"] == "machine":
@@ -175,6 +179,104 @@ def needs_machine(frame, data):
     if frame["classification"] == "non-machine":
         return shot.get("hasCorrespondingMachine") is True
     return shot.get("hasCorrespondingMachine") is not False
+
+
+def policy_excluded_view(frame, view):
+    """Same closed actual-exposure qualification as source-visibility.mjs."""
+    if "sourceVisibility" not in view:
+        return False
+    value = view["sourceVisibility"]
+    image = frame.get("sourceImage", {})
+    audit = value.get("manualSourceAudit") if isinstance(value, dict) else None
+    key = {"gray8": "sha256Gray8", "bgr8": "sha256Bgr8"}.get(image.get("pixelFormat"))
+    rect = view.get("rectSourcePixels")
+    valid = (isinstance(value, dict)
+             and set(value) == {"kind", "reasonCode", "sourceImage", "rectSourcePixels", "manualSourceAudit"}
+             and value["kind"] == "policy-excluded"
+             and value["reasonCode"] in ("blurred-navigation-background", "text-covered-navigation-background", "unreadable-near-black-fade")
+             and isinstance(audit, dict) and set(audit) == {"method", "evidence"}
+             and audit["method"] == "manual-source-pixel-inspection"
+             and isinstance(audit["evidence"], str) and bool(audit["evidence"].strip())
+             and key is not None and set(image) == {"frameIndex", "pixelFormat", "width", "height", "sourceSha256", key}
+             and type(image["frameIndex"]) is int and image["frameIndex"] >= 0
+             and image["width"] == 1920 and image["height"] == 1080
+             and all(isinstance(image[field], str) and re.fullmatch(r"[0-9a-f]{64}", image[field])
+                     for field in ("sourceSha256", key))
+             and value["sourceImage"] == image and value["rectSourcePixels"] == rect
+             and isinstance(rect, list) and len(rect) == 4
+             and all(type(number) in (int, float) and math.isfinite(number) for number in rect)
+             and rect[0] >= 0 and rect[1] >= 0 and rect[2] > 0 and rect[3] > 0
+             and rect[0] + rect[2] <= image["width"] and rect[1] + rect[3] <= image["height"]
+             and not view.get("nativeLineChecks")
+             and not any(point.get("viewId", "main") == view["id"] and not (
+                 point.get("method") == "template-match" and "trackingEvidence" not in point
+                 and isinstance(point.get("anchorId"), str) and bool(point["anchorId"].strip())
+                 and point.get("status") == "observed" and point.get("role") in ("fit", "check")
+                 and isinstance(point.get("pixel"), list) and len(point["pixel"]) == 2
+                 and all(type(number) in (int, float) and math.isfinite(number) for number in point["pixel"])
+                 and rect[0] <= point["pixel"][0] < rect[0] + rect[2]
+                 and rect[1] <= point["pixel"][1] < rect[1] + rect[3]
+                 and type(point.get("uncertaintyPx")) in (int, float) and math.isfinite(point["uncertaintyPx"])
+                 and point["uncertaintyPx"] >= 0
+                 and (not isinstance(point.get("measurementEvidence"), dict) or (
+                     ("sourceImage" not in point["measurementEvidence"] or point["measurementEvidence"]["sourceImage"] == image)
+                     and ("sourceSha256Bgr8" not in point["measurementEvidence"] or point["measurementEvidence"]["sourceSha256Bgr8"] == image.get("sha256Bgr8"))
+                     and ("sourceSha256Gray8" not in point["measurementEvidence"] or point["measurementEvidence"]["sourceSha256Gray8"] == image.get("sha256Gray8")))))
+                 for point in frame.get("landmarks", [])))
+    if not valid:
+        raise ValueError("Invalid actual source image/complete ROI/manual approved unreadable-ROI qualification")
+    return True
+
+def valid_source_rect(rect):
+    return (isinstance(rect, list) and len(rect) == 4
+            and all(type(number) in (int, float) and math.isfinite(number) for number in rect)
+            and rect[0] >= 0 and rect[1] >= 0 and rect[2] > 0 and rect[3] > 0
+            and rect[0] + rect[2] <= 1920 and rect[1] + rect[3] <= 1080)
+
+
+def valid_source_composite(composite):
+    return (composite is None or isinstance(composite, dict) and (
+        set(composite) == {"mode"} and composite["mode"] == "opaque"
+        or set(composite) == {"mode", "groupId", "imageLayerId", "opacity"}
+        and composite["mode"] == "crossfade"
+        and all(isinstance(composite[key], str) and bool(composite[key].strip())
+                for key in ("groupId", "imageLayerId"))
+        and type(composite["opacity"]) in (int, float) and math.isfinite(composite["opacity"])
+        and 0 <= composite["opacity"] <= 1))
+
+
+def zero_opacity_source_view(view):
+    composite = view.get("composite")
+    return (valid_source_rect(view.get("rectSourcePixels"))
+            and valid_source_composite(composite) and composite is not None
+            and composite["mode"] == "crossfade" and composite["opacity"] == 0)
+
+
+def fully_covering_source_view(frame, view):
+    """Exact existing ordered opaque unwarped rectangle support, without a visibility waiver."""
+    def has_warp(candidate):
+        return any(candidate.get(key) is not None for key in (
+            "imagePlaneWarp", "resolvedImagePlaneWarp", "imagePlaneWarpMeasurement"))
+
+    views = frame.get("views", [])
+    index = next((index for index, candidate in enumerate(views) if candidate is view), -1)
+    a, own = view.get("composite"), view.get("rectSourcePixels")
+    if index < 0 or not valid_source_rect(own) or not valid_source_composite(a) or has_warp(view):
+        return None
+    for later in views[index + 1:]:
+        b, rect = later.get("composite"), later.get("rectSourcePixels")
+        if not valid_source_rect(rect) or not valid_source_composite(b) or has_warp(later):
+            continue
+        if b and b["mode"] == "crossfade" and (b["opacity"] != 1 or a
+                and a["mode"] == "crossfade" and a["groupId"] == b["groupId"]
+                and a["imageLayerId"] != b["imageLayerId"]):
+            continue
+        if (rect[0] <= own[0] and rect[1] <= own[1]
+                and rect[0] + rect[2] >= own[0] + own[2]
+                and rect[1] + rect[3] >= own[1] + own[3]):
+            return later
+    return None
+
 
 
 def canonicalize_cut_clock(data):
@@ -203,6 +305,12 @@ def compact_change_times(data):
     """Snap rounded event labels within their cut uncertainty to the real cut."""
     if data.get("kind") == "current-source-observations":
         authored = set(data.get("coverage", {}).get("changeTimesSeconds", []))
+        previous = None
+        for frame in data["frames"]:
+            visibility = [(view["id"], view.get("sourceVisibility", {}).get("reasonCode")) for view in frame["views"]]
+            if visibility != previous:
+                authored.add(frame["timeSeconds"])
+            previous = visibility
         if any("sourceAssembly" in view for frame in data["frames"] for view in frame["views"]):
             authored.update(fresh.assembly_change_times(data, web_root=WEB))
         return authored
@@ -282,6 +390,8 @@ def retain_exact_exposure_landmarks(selected, data):
             result[view_id] = {"rectSourcePixels":rect,
                                "presentation":view.get("presentation", "native"),
                                "imagePlaneWarp":warp, "composite":composite}
+            if "sourceVisibility" in view:
+                result[view_id]["sourceVisibility"] = copy.deepcopy(view["sourceVisibility"])
         layout_cache[cache_key] = result or None
         return layout_cache[cache_key]
 
@@ -641,6 +751,108 @@ def anchor_motion(anchor):
         return "fixed"
     return "moving"
 
+class _PointMotionBridge:
+    """One actual model/Node process per producer; no per-frame proof collection."""
+    def __init__(self, web_root):
+        self.process = subprocess.Popen(
+            ["node", str(Path(web_root) / "scripts/executed-point-motion.mjs")],
+            cwd=web_root, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            text=True, encoding="utf-8", bufsize=1)
+        self.cache = {}
+        self.unavailable = False
+        atexit.register(self.close)
+
+    def classify(self, request):
+        key = json.dumps(request, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        if key in self.cache:
+            return self.cache[key]
+        if self.unavailable:
+            return {}
+        try:
+            self.process.stdin.write(key + "\n")
+            self.process.stdin.flush()
+            response = json.loads(self.process.stdout.readline())
+            if response.get("error"):
+                raise ValueError(response["error"])
+            rows = response["results"]
+            if len(rows) != len(request["cases"]):
+                raise ValueError("Point-motion response omitted an occurrence.")
+            compatible = {}
+            for case, row in zip(request["cases"], rows):
+                anchor_id = case["anchor"]["id"]
+                if row["id"] != anchor_id:
+                    raise ValueError("Point-motion response changed occurrence identity.")
+                compatible[anchor_id] = compatible.get(anchor_id, True) and row["motion"] == "moving"
+            result = {anchor_id: "moving" for anchor_id, valid in compatible.items() if valid}
+        except (OSError, ValueError, KeyError) as error:
+            self.unavailable = True
+            print(f"Actual point-motion classification unavailable; anchors remain unknown: {error}", file=sys.stderr)
+            return {}
+        self.cache[key] = result
+        return result
+
+    def close(self):
+        if self.process.poll() is not None:
+            return
+        self.process.stdin.close()
+        try:
+            self.process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            self.process.terminate()
+            self.process.wait()
+
+
+@lru_cache(maxsize=1)
+def _point_motion_bridge(web_root):
+    return _PointMotionBridge(web_root)
+
+
+def executed_anchor_motion(data, anchors, frames):
+    """Promote only actual supported rigid point capability, never historical data.
+
+    Source coordinates, roles, associations and chosen inputs remain untouched.
+    Zero displacement remains unknown. A supported source provider may vary only
+    an independent local body quaternion, never camera/display/root placement.
+    Every original and published occurrence must support the same capability;
+    native/template bindings alone cannot promote an arbitrary source copy.
+    """
+    if data.get("kind") != "current-source-observations":
+        return {}
+    bindings = native_motion_bindings()
+    candidates = {
+        anchor["id"]: anchor for anchor in anchors if anchor["motion"] is None
+        and anchor.get("correspondenceEvidence")
+        and any((motion in ("crank", "wheel") and pattern.fullmatch(anchor.get("partPath", "")))
+                or (motion == "paper-sprocket" and "partLocalMetres" in anchor
+                    and pattern.fullmatch(anchor.get("runtimeTemplatePartPath") or anchor.get("partPath", "")))
+                for pattern, motion in bindings)
+    }
+    if not candidates:
+        return {}
+    cases, unavailable = [], set()
+    for frame in [*data.get("frames", []), *frames]:
+        views = {view["id"]: view for view in frame.get("views", [])}
+        for landmark in frame.get("landmarks", []):
+            anchor_id = landmark["anchorId"]
+            if anchor_id not in candidates:
+                continue
+            view = views.get(landmark.get("viewId", "main"))
+            if not view or not view.get("input"):
+                unavailable.add(anchor_id)
+                continue
+            cases.append({"anchor": candidates[anchor_id], "input": view["input"],
+                          "sourceAssembly": view.get("sourceAssembly", {"kind": "operating"})})
+    cases = [case for case in cases if case["anchor"]["id"] not in unavailable]
+    if not cases:
+        return {}
+    request = {"model": data.get("model"), "nativeIdentity": data.get("nativeIdentity"), "cases": cases}
+    try:
+        return _point_motion_bridge(str(WEB)).classify(request)
+    except (OSError, ValueError, TypeError) as error:
+        print(f"Actual point-motion bridge unavailable; anchors remain unknown: {error}", file=sys.stderr)
+        return {}
+
+
 
 def build_track(data, frame_views_callback, evidence_notes=None):
     canonicalize_cut_clock(data)
@@ -670,9 +882,16 @@ def build_track(data, frame_views_callback, evidence_notes=None):
         row["views"] = views
         if row["decodedTimeSeconds"] is None or abs(row["decodedTimeSeconds"] - row["timeSeconds"]) > 0.5:
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: no retained observation within 0.5s.')
-        if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in views)):
+        required = [view for view in views if not policy_excluded_view(row, view)
+                    and (data.get("kind") != "current-source-observations"
+                         or not zero_opacity_source_view(view) and fully_covering_source_view(row, view) is None)]
+        if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in required)):
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: source-required camera/input remains unavailable.')
         frames.append(row)
+    executed_motion = executed_anchor_motion(data, anchors, frames)
+    for anchor in anchors:
+        if anchor["motion"] is None:
+            anchor["motion"] = executed_motion.get(anchor["id"])
     source_keys = ("videoId", "sha256", "width", "height", "durationSeconds", "videoDurationSeconds", "fps", "decodedFrameCount", "firstDecodedTimeSeconds", "lastDecodedTimeSeconds", "rights")
     result = {"schemaVersion": 1, "kind": "compact-source-track",
               "source": {key: copy.deepcopy(data["source"][key]) for key in source_keys if key in data["source"]},
@@ -686,12 +905,29 @@ def build_track(data, frame_views_callback, evidence_notes=None):
               "stages": {str(stage): {"status": "unmeasured"} for stage in (50, 20, 10, 5)},
               "evidence": {"interpretation": "Chosen source-informed physically feasible playback candidates. Hidden inputs are not recovered. Camera FIT/CHECK residuals are CPU diagnostics, not current GPU measurements or stage passes.",
                            "notes": list(evidence_notes or [])}}
-    required_views = [(frame, view) for frame in frames if needs_machine(frame, data) for view in frame["views"]]
+    zero_views = [(frame, view) for frame in frames for view in frame["views"]
+                  if data.get("kind") == "current-source-observations" and zero_opacity_source_view(view)]
+    covered_views = [(frame, view) for frame in frames for view in frame["views"]
+                     if data.get("kind") == "current-source-observations" and not zero_opacity_source_view(view)
+                     and fully_covering_source_view(frame, view) is not None]
+    excluded_views = [(frame, view) for frame in frames for view in frame["views"]
+                      if policy_excluded_view(frame, view) and (data.get("kind") != "current-source-observations"
+                          or not zero_opacity_source_view(view) and fully_covering_source_view(frame, view) is None)]
+    required_views = [(frame, view) for frame in frames if needs_machine(frame, data)
+                      for view in frame["views"] if not policy_excluded_view(frame, view)
+                      and (data.get("kind") != "current-source-observations"
+                           or not zero_opacity_source_view(view) and fully_covering_source_view(frame, view) is None)]
     checked_views = sum(any(point.get("role") == "check" and point.get("viewId", "main") == view["id"] for point in frame["landmarks"]) for frame, view in required_views)
     assumed_cameras = sum(view["cameraProvenance"]["kind"] == "source-informed-framing" for _, view in required_views)
     result["sourceMeasurements"] = {
         "status": "partial" if checked_views else "incomplete",
         "requiredViewSamples": len(required_views), "viewSamplesWithSourceChecks": checked_views,
+        "qualifiedExcludedViewSamples": len(excluded_views),
+        "noncontributingCoveredViewSamples": len(covered_views),
+        "noncontributingZeroOpacityViewSamples": len(zero_views),
+        "preservedInadmissibleLandmarkSamples": sum(
+            sum(point.get("viewId", "main") == view["id"] for point in frame.get("landmarks", []))
+            for frame, view in excluded_views),
         "assumedCameraViewSamples": assumed_cameras,
         "blockers": [
             f"Independent source CHECK pixels are missing in {len(required_views) - checked_views} required view samples.",

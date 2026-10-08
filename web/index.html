@@ -32,6 +32,22 @@
               <button id="minimize-player" type="button" aria-controls="video-player" aria-expanded="true">Compact player</button>
             </div>
             <div id="video-player"></div>
+            <div id="source-controls" hidden>
+              <div class="source-audio">
+                <button id="source-play" type="button">Play video</button>
+                <button id="source-mute" type="button" aria-pressed="false">Mute</button>
+                <label for="source-volume">Volume</label>
+                <input id="source-volume" type="range" min="0" max="100" step="1" value="100" />
+              </div>
+              <label for="source-scrub">Original video time <output id="source-scrub-time">0.000 s</output></label>
+              <input id="source-scrub" type="range" min="0" max="1" step="any" value="0" disabled aria-describedby="source-seek-status" />
+              <div class="source-audio">
+                <label for="source-seek-time">Exact time (s)</label>
+                <input id="source-seek-time" type="number" min="0" max="1" step="any" value="0" disabled />
+                <button id="source-seek" type="button" disabled>Seek</button>
+              </div>
+              <p id="source-seek-status" role="status">Pause to choose an original exposure.</p>
+            </div>
             <p id="video-error" class="notice" role="alert" hidden></p>
             <a id="watch-on-youtube" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
           </section>

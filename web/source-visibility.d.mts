@@ -1,0 +1,32 @@
+import type { SourceImageIdentity } from './src/source-witness'
+import type { SourceComposite, ImagePlaneWarp } from './src/scene'
+
+export interface SourceVisibilityQualification {
+  kind: 'policy-excluded'
+  reasonCode: 'blurred-navigation-background' | 'text-covered-navigation-background' | 'unreadable-near-black-fade'
+  sourceImage: SourceImageIdentity
+  rectSourcePixels: [number, number, number, number]
+  manualSourceAudit: { method: 'manual-source-pixel-inspection'; evidence: string }
+}
+interface VisibilityView {
+  id: string
+  rectSourcePixels: [number, number, number, number]
+  sourceVisibility?: SourceVisibilityQualification
+  nativeLineChecks?: readonly unknown[]
+  composite?: SourceComposite | null
+  imagePlaneWarp?: ImagePlaneWarp | null
+  resolvedImagePlaneWarp?: ImagePlaneWarp | null
+  imagePlaneWarpMeasurement?: unknown
+}
+interface VisibilityFrame<T extends VisibilityView> {
+  sourceImage?: SourceImageIdentity
+  views?: T[]
+  landmarks?: readonly { viewId?: string }[]
+}
+export function sourceIntrinsicTemplateIssue(point: { method?: unknown; trackingEvidence?: unknown }): { code: 'template-provenance'; reason: string } | null
+export function sourceVisibilityError<T extends VisibilityView>(frame: VisibilityFrame<T>, view: T): string | null
+export function policyExcludedSourceView<T extends VisibilityView>(frame: VisibilityFrame<T>, view: T): boolean
+export function physicalSourceFrameRequired(frame: { views?: readonly unknown[] }, otherwiseRequired?: boolean): boolean
+export function zeroOpacitySourceView(view: VisibilityView): boolean
+export function fullyCoveringSourceView<T extends VisibilityView>(frame: VisibilityFrame<T>, view: T): T | null
+export function requiredSourceViews<T extends VisibilityView>(frame: VisibilityFrame<T>): T[]

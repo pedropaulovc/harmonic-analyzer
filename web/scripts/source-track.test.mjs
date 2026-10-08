@@ -405,3 +405,199 @@ test('live consumers and overlapping detached publications never consume or inva
     closeNumber(first.snapshot().publishedSample.views[0].input.crankTurns, 0.09)
   })
 })
+
+function excludeBackground(frame, view = frame.views[0]) {
+  frame.sourceImage = {
+    frameIndex: Math.round(frame.decodedTimeSeconds * 30), width: 1920, height: 1080,
+    sourceSha256: video.sourceSha256, pixelFormat: 'gray8', sha256Gray8: 'b'.repeat(64),
+  }
+  view.sourceVisibility = {
+    kind: 'policy-excluded', reasonCode: 'blurred-navigation-background',
+    sourceImage: structuredClone(frame.sourceImage), rectSourcePixels: [...view.rectSourcePixels],
+    manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: 'Synthetic whole physical ROI audit solely for hold-contract decisions.' },
+  }
+}
+
+test('wholly qualified source backgrounds request hold without publishing their native candidate pose', () => {
+  const track = assemblyFixture()
+  viewAt(track, 0).cameraInterpolation = 'held'
+  viewAt(track, 0).sourceAssembly = assemblyState({ retainingNut: { attachment: 'threaded', releaseTurns: 1 } })
+  for (const frame of track.frames.slice(1)) excludeBackground(frame)
+  const reference = new CompactVideoReference(track, operationVideo)
+  assert.equal(reference.getState(1.2), 'hold-last-readable')
+  const held = reference.at(1.2)
+  assert.equal(held.timeSeconds, 1.2)
+  assert.deepEqual(held.views, [])
+  assert.equal(held.mechanicalProvenance, null)
+  assert.match(held.reason, /preceding displayed pose, not a current source match/)
+  const fallback = reference.prepareLastReadableAt(1.2)
+  assert.equal(fallback.state, 'approximate')
+  assert.equal(fallback.timeSeconds, 0)
+  assertCamera(fallback.views[0].camera, cameraAt(0))
+  assert.equal(fallback.views[0].input.crankTurns, 0)
+  assert.deepEqual(fallback.views[0].sourceAssembly, viewAt(track, 0).sourceAssembly)
+  assert.deepEqual(fallback.views[0].sourceLayout.map(view => view.viewId), ['main'])
+  reference.commitPrepared()
+  assert.equal(reference.at(1.9).state, 'hold-last-readable')
+  assert.equal(track.frames[1].views.length, 1, 'Excluded source inventory is never removed')
+})
+
+test('mixed readable inset remains live while excluded native background candidate is not drawn or measured', () => {
+  const track = fixture()
+  for (const frame of track.frames) {
+    const foreground = structuredClone(frame.views[0])
+    foreground.id = 'readable-inset'
+    foreground.rectSourcePixels = [100, 100, 400, 300]
+    excludeBackground(frame)
+    frame.views.push(foreground)
+  }
+  const sample = new CompactVideoReference(track, video).at(0.5)
+  assert.equal(sample.state, 'approximate')
+  assert.deepEqual(sample.views.map(view => view.id), ['readable-inset'])
+  assert.deepEqual(sample.views[0].sourceLayout.map(view => view.viewId), ['readable-inset'])
+})
+
+test('missing decoder PTS and missing readable source input remain unavailable, not qualified holds', () => {
+  for (const mutation of ['decoder', 'readable-input']) {
+    const track = fixture()
+    excludeBackground(track.frames[1])
+    if (mutation === 'decoder') {
+      track.frames[1].decodedTimeSeconds = null
+      track.frames[1].sourceSampleUnavailable = true
+      track.frames[1].views = []
+      delete track.frames[1].sourceImage
+    } else {
+      const foreground = structuredClone(track.frames[0].views[0])
+      foreground.id = 'readable-inset'
+      foreground.input = null
+      track.frames[1].views.push(foreground)
+    }
+    assert.equal(new CompactVideoReference(track, video).at(1.1).state, 'unavailable')
+  }
+})
+
+test('qualified backgrounds have no cold-start source fallback before the first readable exposure', () => {
+  const track = fixture()
+  track.frames.forEach(frame => excludeBackground(frame))
+  const reference = new CompactVideoReference(track, video)
+  assert.equal(reference.prepareLastReadableAt(1), null)
+  assert.equal(reference.prepareInitialReadable(), null)
+  assert.equal(reference.at(1).state, 'hold-last-readable')
+})
+
+test('runtime qualification refuses foreign image, partial ROI, blank audit, unknown reason and measured readable views', () => {
+  for (const mutate of [
+    view => { view.sourceVisibility.sourceImage.frameIndex++ },
+    view => { view.sourceVisibility.rectSourcePixels[2]-- },
+    view => { view.sourceVisibility.manualSourceAudit.evidence = '' },
+    view => { view.sourceVisibility.reasonCode = 'unknown-motion' },
+    (view, frame) => { frame.landmarks.push({ viewId: view.id }) },
+    view => { view.nativeLineChecks = [{}] },
+  ]) {
+    const track = fixture()
+    excludeBackground(track.frames[1])
+    mutate(track.frames[1].views[0], track.frames[1])
+    assert.throws(() => new CompactVideoReference(track, video), /Source visibility|source-readable/)
+  }
+  const clock = fixture()
+  excludeBackground(clock.frames[1])
+  clock.frames[1].decodedTimeSeconds = 1.501
+  assert.throws(() => new CompactVideoReference(clock, video), /0.5s timing tolerance/)
+})
+
+test('finite native-line probes contain only bounded exact local-segment diagnostics, never extra observed source points', () => {
+  const track = fixture()
+  const local = [[0.06985, -0.06477, 0], [0.06985, 0.06477, 0]]
+  for (const frame of track.frames) frame.views[0].nativeLineChecks = [{
+    id: 'fixed-stock', partPath: 'ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1',
+    partLocalLineMetres: structuredClone(local),
+  }]
+  const reference = new CompactVideoReference(track, video)
+  assert.equal(reference.landmarkProbeAnchors.length, 5, 'One shared finite segment never expands to an all-vertex certificate')
+  assert.deepEqual(reference.landmarkProbeAnchors.map(anchor => anchor.partLocalMetres), [0, 0.25, 0.5, 0.75, 1].map(fraction => [
+    local[0][0], local[0][1] + fraction * (local[1][1] - local[0][1]), 0,
+  ]))
+  assert.equal(track.anchors.length, 0)
+  assert.ok(track.frames.every(frame => frame.landmarks.length === 0))
+  assert.equal(reference.at(0.5).state, 'approximate', 'Native line probes do not claim source fidelity')
+})
+
+test('an individually audited initial near-black fade prepares only the first authored readable camera input layout and assembly', () => {
+  const track = assemblyFixture()
+  excludeBackground(track.frames[0])
+  track.frames[0].views[0].sourceVisibility.reasonCode = 'unreadable-near-black-fade'
+  viewAt(track, 1).sourceAssembly = assemblyState({ retainingNut: { attachment: 'threaded', releaseTurns: 1 } })
+  const reference = new CompactVideoReference(track, operationVideo)
+  assert.equal(reference.at(0).state, 'hold-last-readable')
+  assert.equal(reference.prepareLastReadableAt(0), null)
+  const first = reference.prepareInitialReadable()
+  assert.equal(first.timeSeconds, 1)
+  assert.equal(first.state, 'approximate')
+  assertCamera(first.views[0].camera, viewAt(track, 1).camera)
+  assert.deepEqual(first.views[0].sourceAssembly, viewAt(track, 1).sourceAssembly)
+  assert.deepEqual(first.views[0].sourceLayout.map(view => view.viewId), ['main'])
+  reference.commitPrepared()
+  const hold = reference.at(0)
+  assert.equal(hold.timeSeconds, 0, 'Future readable candidate never replaces the current source clock')
+  assert.equal(hold.mechanicalProvenance, null)
+  assert.deepEqual(hold.views, [])
+})
+
+test('physical views remain required despite non-machine navigation labels, while a real no-view shot holds', () => {
+  for (const missingInput of [false, true]) {
+    const track = fixture()
+    track.shots[0].classification = 'non-machine'
+    track.shots[0].hasCorrespondingMachine = false
+    for (const frame of track.frames) {
+      frame.classification = 'non-machine'
+      if (missingInput) frame.views[0].input = null
+    }
+    const reference = new CompactVideoReference(track, video)
+    assert.equal(reference.at(1).state, missingInput ? 'unavailable' : 'approximate')
+    if (!missingInput) assert.deepEqual(reference.at(1).views.map(view => view.id), ['main'])
+    for (const frame of track.frames) frame.views = []
+    assert.equal(new CompactVideoReference(track, video).at(1).state, 'hold-last-readable')
+  }
+})
+
+test('only an exact ordinary opaque full cover removes the preserved lower view from active native layout', () => {
+  for (const mutation of ['none', 'strip', 'transparent', 'independent-fade', 'warp', 'reverse']) {
+    const track = fixture()
+    for (const frame of track.frames) {
+      const top = structuredClone(frame.views[0])
+      top.id = 'top-bank'
+      frame.views.push(top)
+      if (mutation === 'strip') top.rectSourcePixels = [Number.MIN_VALUE, 0, 1919, 1080]
+      if (mutation === 'transparent') top.composite = { mode: 'crossfade', groupId: 'fade', imageLayerId: 'top', opacity: 0.9999999999999999 }
+      if (mutation === 'independent-fade') {
+        frame.views[0].composite = { mode: 'crossfade', groupId: 'fade', imageLayerId: 'lower', opacity: 0.5 }
+        top.composite = { mode: 'crossfade', groupId: 'fade', imageLayerId: 'top', opacity: 1 }
+      }
+      if (mutation === 'warp') top.imagePlaneWarp = { method: 'unknown-warp' }
+      if (mutation === 'reverse') frame.views.reverse()
+    }
+    if (mutation === 'warp' || mutation === 'independent-fade') {
+      assert.throws(() => new CompactVideoReference(track, video), /warp|weights exceed|schema|supported/i)
+      continue
+    }
+    const sample = new CompactVideoReference(track, video).at(1)
+    assert.equal(sample.state, 'approximate')
+    assert.deepEqual(sample.views.map(view => view.id), mutation === 'none' ? ['top-bank'] : mutation === 'reverse' ? ['main'] : ['main', 'top-bank'])
+    assert.equal(track.frames[1].views.length, 2, 'Covered source inventory remains lossless')
+  }
+})
+
+test('exact zero native images request a truthful hold while every positive source opacity remains required', () => {
+  for (const opacity of [0, Number.MIN_VALUE, 0.5]) {
+    const track = fixture()
+    for (const frame of track.frames) frame.views[0].composite = { mode: 'crossfade', groupId: 'fade', imageLayerId: 'image', opacity }
+    const reference = new CompactVideoReference(track, video), sample = reference.at(1)
+    assert.equal(sample.state, opacity === 0 ? 'hold-last-readable' : 'approximate')
+    assert.deepEqual(sample.views.map(view => view.id), opacity === 0 ? [] : ['main'])
+    assert.equal(track.frames[1].views.length, 1)
+    assert.equal(sample.timeSeconds, 1)
+  }
+  const malformed = fixture()
+  malformed.frames[1].views[0].composite = { mode: 'crossfade', opacity: 0 }
+  assert.throws(() => new CompactVideoReference(malformed, video), /group|Crossfade/)
+})

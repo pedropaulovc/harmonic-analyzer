@@ -53,8 +53,9 @@ requirement is unchanged. Nine actual independently decoded frames supply
 missing Operation fade exposures; existing samples and landmarks are preserved.
 Their measured source facts do not make inherited pose guesses observed.
 Complete approximate playback remains separate from source-fidelity acceptance.
-Each 50/20/10/5 stage requires complete fresh source measurements; a partial run
-cannot qualify the current release. There is no acceptance-attempt quota.
+The current stage-50 target requires complete fresh source measurements; a partial
+run cannot qualify the current release. Historical finer-stage arrays remain
+stored evidence, not queued work. There is no acceptance-attempt quota.
 
 The [manifest](content/canonical-native/manifest.json) seals stored-byte and
 original SHA-256 values, mapping revision/digest, numeric-token preservation and
@@ -508,9 +509,15 @@ Use original hashed footage and timestamped source observations. Evaluate every
 integer second and visible camera/mechanism change. Additional intermediate probes
 use real independently observed source exposures, never interpolated oracle pixels.
 Their unavailable measurements are diagnostic; an admitted over-limit error still
-fails the stage. Reference landmarks must include spatially distributed fixed
-features and visible moving features; a favorable camera fit alone cannot prove
-the mechanism state.
+fails the stage. Use spatially distributed independent source CHECK landmarks
+with current native geometry associations. A favorable camera fit alone cannot
+prove visual correspondence. Motion and phase classifications remain honest
+diagnostics, not a required fixed/moving composition, counterfactual point-motion
+certificate or static-rig certificate at each image. This visual-and-timing scope
+keeps source pixels, physical feasibility, native association, rendered visibility
+and every required clock; absent independent pixels or geometry stay unavailable.
+Optional finite native LINE checks retain fixed-body eligibility and cannot admit
+an articulated or source-posed ruler as a fixed BODY LINE.
 
 Compare the actual rendered native model with source landmarks and inspect
 source/render overlays and silhouettes. Report source-localization uncertainty
@@ -570,6 +577,39 @@ failure. A separate fresh six-page runtime smoke reached maximum observed skew
 0.012847 seconds. Those controls are not a rerun of the frozen collection.
 Native `currentTime` is timing evidence, not by itself exact presented-frame
 identity; independent raster/index/PTS authority remains separate.
+
+The local-original adapter owns presentation independently of its timing clock.
+It indexes unchanged compressed H264 access units, seeks only to verified NAL5
+IDRs, and prerolls through actual native presentations to the requested original
+integer PTS/time base. Source-frame index and authored selection key are bound
+to that owned rVFC receipt; the model and draw still use real native `currentTime`.
+The verifier checks the same connected original URL, exact indexed exposure,
+owned presentation counter, settled media and the unchanged 0.5-second clock
+limit. Native seek events describe IDR access, not target-exposure identity.
+Official YouTube retains its separate existing event/clock path.
+
+Local original controls are visible app-owned play/pause, mute, volume, scrub and
+numeric seek controls. A real pointer click and at least 0.3 seconds of actual
+native progress within the existing timeout, unmuted positive volume, current
+draw and clock checks are required. `video.controls === false` is intentional;
+neither hidden UA controls nor a direct `currentTime` setter can exercise the
+safe local seek path. Paused manual controls and Restore preserve the same
+camera/input/assembly and clock requirements; presentation metadata is not
+source-pixel approval.
+
+The frozen `53863496a52d87a02a10a2beb8006cd039a97954` first normal
+Operation-204 collector retained zero measured selected samples and old
+seek/control-discovery failures. One separate actual visible seek then full
+unchanged `measureView` admitted six main-view CHECKs (81.56609 px maximum,
+zero native/model skew) but still lacked classified fixed/moving coverage.
+Its native clock was 203.985846 while owned frame6114 presented at
+6120114/30000 = 204.0038 seconds; its unchanged half-frame assertion passed.
+A single offline invocation of that assertion on an older genuine raw packet
+failed at 0.031493 seconds, but missing original URL/epoch and DOM-canvas fields
+leave that older packet outside full ordinary-consumer qualification. These
+bounded controls neither repair the frozen collection report nor qualify all
+source exposures.
+
 
 ### Browser verification
 

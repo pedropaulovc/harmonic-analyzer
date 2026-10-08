@@ -1,12 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { runInNewContext } from 'node:vm'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } from './verify-sync.mjs'
+const { parseOptions, sourceCensus, finishVideo, seekSettlement, originalSeekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } = await import(process.env.VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
 import { jsonDigest, loadCanonicalObservations } from './verify-reference.mjs'
+import { sourceVisibilityError } from '../source-visibility.mjs'
+import { nativeLineEndpointId, fixedNativeLinePart } from '../native-line-checks.mjs'
 import { NATIVE_IDENTITY_MAP_SHA256 } from '../model-representation.mjs'
 import { LIVE_MODEL_SOURCE } from './approved-model.mjs'
 import { loadCurrentObservations, currentSourceAssemblyChangeTimes } from './fresh-source-observations.mjs'
@@ -245,30 +247,127 @@ test('a new seek cannot pass merely because a later media clock equals the targe
   assert.equal(seekSettlement(observed, 1, 0.02).done, true)
 })
 
+const fixtureSourceUrl = 'https://fixture.invalid/reference-media/original.mp4'
+// Pure contract controls, not browser playback, GPU readbacks or source evidence.
+function originalSeekFixture() {
+  const expected = { frameIndex: 6114, pts: 6120114, timeBase: [1, 30000], sourceUrl: fixtureSourceUrl }
+  const receipt = presentedFrames => ({ frameIndex: expected.frameIndex, pts: expected.pts, timeBase: [...expected.timeBase],
+    mediaTime: 204.0038, currentTime: 203.972307, presentedFrames, presentationTime: 12 })
+  const read = presentedFrames => ({ mediaTime: 203.972307, paused: true, seeking: false, readyState: 4, error: null,
+    currentSrc: fixtureSourceUrl, src: fixtureSourceUrl, seekState: 'idle', presentation: receipt(presentedFrames) })
+  const pre = read(1)
+  Object.assign(pre.presentation, { frameIndex: 6000, pts: 6000000, mediaTime: 200 })
+  return { expected, observed: { sameElement: true, pre, now: read(105),
+    events: [{ type: 'seeking', mediaTime: 200.5003 }, { type: 'seeked', mediaTime: 200.5003 }] } }
+}
+
+test('native original settlement uses a fresh exact receipt rather than the IDR event clock', () => {
+  const { expected, observed } = originalSeekFixture()
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+  observed.pre.presentation = null
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+  observed.now.mediaTime = 204.0038 - 0.5
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+  observed.now.presentation.presentationTime = 0
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+})
+
+test('native original settlement refuses unowned clocks, invalid receipts and unsettled media', () => {
+  const mutations = [
+    value => { value.now.mediaTime = 204.0038; value.now.presentation = null },
+    value => { value.now.presentation.presentedFrames = 1 },
+    value => { value.now.presentation.frameIndex++ },
+    value => { value.now.presentation.pts++ },
+    value => { value.now.presentation.frameIndex = 6114.5 },
+    value => { value.now.presentation.pts = 6120114.5 },
+    value => { value.now.presentation.timeBase = [2, 60000] },
+    value => { value.now.presentation.mediaTime += 0.00001 },
+    value => { value.now.currentSrc = 'https://fixture.invalid/other.mp4' },
+    value => { value.now.src = 'https://fixture.invalid/other.mp4' },
+    value => { value.now.seekState = 'seeking' },
+    value => { value.now.seeking = true },
+    value => { value.now.paused = false },
+    value => { value.now.readyState = 1 },
+    value => { value.events.reverse() },
+    value => { value.events = [] },
+    value => { value.now.mediaTime = 204.0038 - 0.50001 },
+  ]
+  for (const invalid of [null, undefined, NaN, Infinity, -1, 0]) {
+    mutations.push(value => { value.now.presentation.presentedFrames = invalid })
+    if (invalid !== 0) mutations.push(value => { value.now.presentation.presentationTime = invalid })
+  }
+  mutations.push(value => { value.now.presentation.presentedFrames = 1.5 })
+  for (const mutate of mutations) {
+    const { expected, observed } = originalSeekFixture()
+    mutate(observed)
+    assert.notEqual(originalSeekSettlement(observed, expected).done, true)
+  }
+  for (const key of ['frameIndex', 'pts', 'timeBase', 'sourceUrl']) {
+    const { expected, observed } = originalSeekFixture()
+    expected[key] = key === 'timeBase' ? [1, 3000] : key === 'sourceUrl' ? `${fixtureSourceUrl}?wrong` : expected[key] + 1
+    assert.notEqual(originalSeekSettlement(observed, expected).done, true)
+  }
+})
+
+test('native no-op requires already settled exact preownership and preserves fatal media failures', () => {
+  const { expected, observed } = originalSeekFixture()
+  observed.pre = structuredClone(observed.now)
+  observed.events = []
+  assert.equal(originalSeekSettlement(observed, expected).done, true)
+  observed.pre.presentation.frameIndex++
+  assert.notEqual(originalSeekSettlement(observed, expected).done, true)
+  observed.sameElement = false
+  assert.ok(originalSeekSettlement(observed, expected).fatal)
+  observed.sameElement = true
+  observed.now.error = 'decode failed'
+  assert.ok(originalSeekSettlement(observed, expected).fatal)
+  observed.now.error = null
+  observed.events = [{ type: 'error' }]
+  assert.ok(originalSeekSettlement(observed, expected).fatal)
+})
+
 // Stateful native-media boundary control: seeking changes the actual fixture
 // clock and emits observed seeking/seeked events; no browser/GPU claim.
+const pausedSourceFrame = time => ({ ...frame(time), sourceImage: { frameIndex: native.pts.indexOf(time), sourceSha256: '1'.repeat(64) } })
 function pausedSourceFixture({ ended = true, reportedState, seekMode = 'settled' } = {}) {
   class NativeVideo extends EventTarget {
     constructor() {
       super()
       Object.assign(this, { duration: 2.1, paused: true, ended, seeking: false, readyState: 4,
-        videoWidth: 1920, videoHeight: 1080, volume: 1, muted: false, error: null, isConnected: true })
+        videoWidth: 1920, videoHeight: 1080, volume: 1, muted: false, error: null, isConnected: true,
+        currentSrc: fixtureSourceUrl, src: fixtureSourceUrl })
       this.time = ended ? this.duration : 1
       this.seekRequests = []
     }
     get currentTime() { return this.time }
-    set currentTime(time) {
+    set currentTime(_time) { throw new Error('Local setup must use the app-owned seekVideo command') }
+    seekFromApp(time) {
       this.seekRequests.push(time)
-      if (seekMode !== 'stale-clock') this.time = time
-      this.ended = this.time >= this.duration
       this.seeking = true
       this.dispatchEvent(new Event('seeking'))
+      if (seekMode !== 'stale-clock') this.time = time
+      this.ended = this.time >= this.duration
       this.seeking = false
       this.dispatchEvent(new Event('seeked'))
     }
   }
   const video = new NativeVideo(), selector = '#original'
-  const window = { harmonicAnalyzer: { snapshot: () => ({ playerState: reportedState ?? (video.ended ? 'ended' : video.paused ? 'paused' : 'playing') }) } }
+  let presentation = null, seekState = 'idle', presentedFrames = 1
+  const snapshot = () => ({ playerState: reportedState ?? (video.ended ? 'ended' : video.paused ? 'paused' : 'playing'),
+    sourcePresentation: presentation, sourceSeek: { state: seekState } })
+  const window = { harmonicAnalyzer: {
+    snapshot,
+    seekVideo: async timeSeconds => {
+      const frameIndex = native.pts.indexOf(timeSeconds)
+      assert.notEqual(frameIndex, -1, 'Fixture seek must select an indexed original exposure')
+      seekState = 'seeking'
+      video.seekFromApp(timeSeconds)
+      presentation = { frameIndex, pts: frameIndex * 30, timeBase: [1, 30], mediaTime: timeSeconds,
+        currentTime: video.currentTime, presentedFrames: ++presentedFrames, presentationTime: 12 }
+      seekState = 'idle'
+      return { presentation, snapshot: snapshot() }
+    },
+  } }
   const globals = { window, document: { querySelector: query => query === selector ? video : null }, HTMLVideoElement: NativeVideo }
   const evaluate = async (fn, arg) => runInNewContext(`(${fn.toString()})(arg)`, { ...globals, arg })
   const page = {
@@ -276,16 +375,18 @@ function pausedSourceFixture({ ended = true, reportedState, seekMode = 'settled'
     waitForFunction: async fn => { if (!await evaluate(fn)) throw new Error('Pause barrier requires an actually paused player') },
     locator: () => ({ click: async () => { video.paused = true } }),
   }
-  const record = { native, track: { shots: observations.shots } }
-  return { video, page, embed: { frame: page, selector }, record }
+  const record = { id: 'fixture-original', native: { ...native, observedSha256: '1'.repeat(64) }, track: { shots: observations.shots } }
+  const originalAccess = { schemaVersion: 1, kind: 'original-h264-idr-access-index',
+    source: { videoId: record.id, sha256: '1'.repeat(64), bytes: 100 }, timeBase: [1, 30], pts: [0, 30, 60], idrPts: [0] }
+  return { video, page, embed: { frame: page, selector, player: 'local', originalAccess, sourceUrl: fixtureSourceUrl }, record }
 }
 
 test('ended setup seeks the first selected nonterminal exposure before satisfying the strict pause barrier', async () => {
   const fixture = pausedSourceFixture()
-  const rows = [{ frame: null }, { frame: frame(2.1) }, { frame: frame(0.5) }, { frame: frame(1) }, { frame: frame(0) }]
+  const rows = [{ frame: null }, { frame: pausedSourceFrame(2.1) }, { frame: pausedSourceFrame(0.5) }, { frame: pausedSourceFrame(1) }, { frame: pausedSourceFrame(0) }]
   const recovery = await preparePausedSource(fixture.page, fixture.embed, fixture.record, rows)
   assert.equal(recovery.kind, 'ended-original-native-source-setup-seek')
-  assert.equal(recovery.proof, 'native-seeking-then-seeked-after-command')
+  assert.ok(recovery.proof, 'The app-owned native seek must return settlement evidence')
   assert.deepEqual(Array.from(recovery.events), ['seeking', 'seeked'])
   assert.equal(recovery.targetSourcePtsSeconds, 1)
   assert.equal(recovery.preMediaTime, 2.1)
@@ -297,7 +398,7 @@ test('ended setup seeks the first selected nonterminal exposure before satisfyin
 
 test('already paused source setup preserves its actual clock without introducing a seek', async () => {
   const fixture = pausedSourceFixture({ ended: false })
-  assert.equal(await preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(0) }]), null)
+  assert.equal(await preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(0) }]), null)
   assert.equal(fixture.video.currentTime, 1)
   assert.deepEqual(fixture.video.seekRequests, [])
 })
@@ -306,27 +407,27 @@ test('ended setup cannot invent zero, use a terminal exposure or cross the sourc
   for (const rows of [
     [],
     [{ frame: null }],
-    [{ frame: frame(2.1) }],
-    [{ frame: { ...frame(1), decodedTimeSeconds: 2.1 } }],
-    [{ frame: { ...frame(1), shotId: 'another-shot' } }],
+    [{ frame: pausedSourceFrame(2.1) }],
+    [{ frame: { ...pausedSourceFrame(1), decodedTimeSeconds: 2.1 } }],
+    [{ frame: { ...pausedSourceFrame(1), shotId: 'another-shot' } }],
   ]) {
     const fixture = pausedSourceFixture()
     await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, rows), /no selected nonterminal/)
     assert.deepEqual(fixture.video.seekRequests, [])
   }
   const fixture = pausedSourceFixture()
-  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(0.5) }]))
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(0.5) }]))
   assert.deepEqual(fixture.video.seekRequests, [])
 })
 
 test('ended source recovery refuses unavailable media and does not alias unknown or ended state to paused', async () => {
   for (const reportedState of ['unknown', 'unavailable', 'ended']) {
     const fixture = pausedSourceFixture({ ended: false, reportedState })
-    await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /actually paused|actually stopped/)
+    await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(1) }]), /actually paused|actually stopped/)
   }
   const fixture = pausedSourceFixture()
   fixture.video.error = { message: 'source decode failed' }
-  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /no decoded source content/)
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(1) }]), /no decoded source content/)
   assert.deepEqual(fixture.video.seekRequests, [])
 })
 
@@ -334,35 +435,9 @@ test('native seek events with a stale actual clock cannot recover an ended sourc
   const fixture = pausedSourceFixture({ seekMode: 'stale-clock' })
   let reads = 0
   t.mock.method(Date, 'now', () => reads++ === 0 ? 0 : 20_000)
-  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: frame(1) }]), /never decoded\/settled/)
+  await assert.rejects(preparePausedSource(fixture.page, fixture.embed, fixture.record, [{ frame: pausedSourceFrame(1) }]), /never decoded\/settled/)
   assert.equal(fixture.video.currentTime, 2.1)
   assert.equal(fixture.video.ended, true)
-})
-
-test('moving CHECKs from one shot cannot certify another internally moving shot', () => {
-  const video = videoFixture()
-  video.samples[0].sourceShotId = 'moving-a'
-  video.samples.push({ ...video.samples[0], timeSeconds: 1, sampleTimeSeconds: 1, sourceShotId: 'moving-b', measurements: [measurement('fixed-b', 'fixed')] })
-  const census = { rows: [...censusFixture.rows, { timeSeconds: 1, required: true, reasons: ['every-second'] }] }
-  finishVideo(video, census, parseOptions(['--stage', '50']))
-  assert.notEqual(video.status, 'passed')
-  assert.ok(video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage' && failure.shotId === 'moving-b'))
-})
-
-test('source-backed static rigs retain distributed fixed checks instead of invented moving hubs', () => {
-  const video = videoFixture()
-  video.samples[0].sourceShotId = 'static-rig'
-  video.samples[0].measurements = [measurement('fixed-left', 'fixed'), measurement('fixed-right', 'fixed')]
-  video.shots = [{ id: 'static-rig', internalMechanismMotion: 'static', internalMotionEvidence: 'Source-only retained static mechanism observation; camera/turntable changes, internal bodies do not.', sourceStaticControls: { status: 'source-controls-verified' } }]
-  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
-  assert.equal(video.status, 'passed')
-  assert.equal(video.landmarks.movingChecks, 0)
-  assert.equal(video.motionCoverage[0].internalMechanismMotion, 'source-backed-static-rig')
-  video.shots[0].sourceStaticControls = null
-  video.failures = []
-  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
-  assert.notEqual(video.status, 'passed')
-  assert.ok(video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
 })
 
 test('compact-required endcards retain all source views despite a legacy non-machine label', () => {
@@ -442,14 +517,25 @@ test('diagnostic success cannot replace a missing integer second or required mea
   assert.notEqual(missing.stageMeasurement.status, 'passed')
 })
 
-test('diagnostic moving CHECKs cannot certify mandatory static-only measurements', () => {
+test('diagnostic moving CHECKs do not alter mandatory motion counts or repair missing visual coverage', () => {
   const video = videoFixture(), extra = { timeSeconds: 0.5, required: true, diagnosticOnly: true, reasons: ['mid-interval'] }
-  video.samples[0].measurements = [measurement('fixed', 'fixed')]
+  video.samples[0].measurements = [measurement('unclassified', 'unknown')]
   video.samples.push({ ...video.samples[0], ...extra, sampleTimeSeconds: 0.5, measurements: [measurement('moving-extra', 'moving')] })
-  finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
-  assert.notEqual(video.status, 'passed')
+  const census = { rows: [...censusFixture.rows, extra] }
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.status, 'passed')
   assert.equal(video.landmarks.movingChecks, 0)
-  assert.ok(video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
+  assert.equal(video.landmarks.unknownChecks, 1)
+  assert.equal(video.diagnosticLandmarks.measured, 1)
+  assert.equal(video.motionCoverage[0].status, 'unavailable')
+  video.samples[0].measurements = []
+  video.samples[0].status = 'unavailable'
+  video.samples[0].unavailable = [{ reason: 'Missing required independent source pixels' }]
+  video.failures = []
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, false)
+  assert.equal(video.status, 'unavailable')
+  assert.equal(video.stageMeasurement.status, 'unmeasured')
 })
 
 const sourceView = (id, rectSourcePixels = [0, 0, 1920, 1080]) => ({
@@ -515,18 +601,244 @@ const manualSeedFrame = (fixture, timeSeconds = 0, decodedTimeSeconds = 0, viewI
   landmarks: [{ ...fixture.observations[3], method: 'manual', viewId, originalViewId: viewId }],
 })
 
-function measuredViewFixture() {
-  const view = { ...sourceView('main'), sourceAssembly: { kind: 'operating' } }, frame = { timeSeconds: 1, decodedTimeSeconds: 1, views: [view], sourceImage: sourceImage(30, 'actual-target') }
+function measuredViewFixture(timeSeconds = 1) {
+  const frameIndex = timeSeconds * 30
+  const view = { ...sourceView('main'), sourceAssembly: { kind: 'operating' } }, frame = { timeSeconds, decodedTimeSeconds: timeSeconds, views: [view], sourceImage: sourceImage(frameIndex, 'actual-target') }
   const positions = [[100, 100], [900, 100], [100, 800], [900, 800]]
   const observations = positions.map((pixel, index) => ({ anchorId: `anchor-${index}`, role: index < 2 ? 'fit' : 'check', pixel, status: 'observed', method: 'manual', uncertaintyPx: 1 }))
   const anchors = new Map(observations.map((observed, index) => [observed.anchorId, { kind: 'physical-feature', partPath: `native/part-${index}`, partLocalMetres: [0, 0, 0], correspondenceEvidence: 'Independently identified physical feature', motion: index === 2 ? 'moving' : 'fixed' }]))
   const layout = [{ viewId: 'main', rectSourcePixels: view.rectSourcePixels, presentation: 'native', composite: { mode: 'opaque' }, resolvedImagePlaneWarp: null, sourceAssembly: { kind: 'operating' } }]
-  const capture = { method: 'gpu-readback', status: 'captured', visibilityMode: 'depth-off-landmark-projection', viewId: 'main', timeSeconds: 1, sourceLayout: layout, resolvedImagePlaneWarp: null, landmarks: observations.map(observed => ({ id: observed.anchorId, state: 'rendered', sourcePixels: observed.pixel, canvasPixels: observed.pixel, uncertaintySourcePixels: 0.5 })) }
-  const mechanism = { method: 'actual-native-mechanism-solve', status: 'rendered', viewId: 'main', timeSeconds: 1, sourceDrawRevision: 1, channelAnglesRad: Array(20).fill(0), input: view.input, sourceLayout: layout, resolvedImagePlaneWarp: null }
-  const response = { captures: [{ viewId: 'main', capture, mechanism }], actual: { views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: 1 }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
+  const capture = { method: 'gpu-readback', status: 'captured', visibilityMode: 'depth-off-landmark-projection', viewId: 'main', timeSeconds, sourceLayout: layout, resolvedImagePlaneWarp: null, landmarks: observations.map(observed => ({ id: observed.anchorId, state: 'rendered', sourcePixels: observed.pixel, canvasPixels: observed.pixel, uncertaintySourcePixels: 0.5 })) }
+  const mechanism = { method: 'actual-native-mechanism-solve', status: 'rendered', viewId: 'main', timeSeconds, sourceDrawRevision: 1, channelAnglesRad: Array(20).fill(0), input: view.input, sourceLayout: layout, resolvedImagePlaneWarp: null }
+  const originalExposure = { frameIndex, pts: frameIndex, timeBase: [1, 30], sourceUrl: fixtureSourceUrl }
+  const response = { player: 'local', originalExposure, captures: [{ viewId: 'main', capture, mechanism }], actual: { modelTime: timeSeconds, sourceSampleTimeSeconds: timeSeconds, sourceDrawRevision: 1, sourcePresentation: { frameIndex, pts: frameIndex, timeBase: [1, 30], mediaTime: timeSeconds, currentTime: timeSeconds, presentedFrames: 1, presentationTime: 12 }, views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: timeSeconds, currentSrc: fixtureSourceUrl, src: fixtureSourceUrl, paused: true, seeking: false, readyState: 4, error: null }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
   return { view, frame, observations, anchors, response, capture, seeds: new Map() }
 }
+
+test('explicit YouTube review and rendered capture use real clocks without a native frame receipt', () => {
+  const fixture = measuredViewFixture(), actual = fixture.response.actual
+  Object.assign(fixture.response, { player: 'youtube', originalExposure: null })
+  Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'approximate', sourcePresentation: null })
+  requirePausedReview(actual, fixture.response.native, fixture.frame, true, 'youtube', null)
+  assert.ok(measureFixture(fixture).measured.every(point => point.status === 'passed'))
+  fixture.response.native.mediaTime += 0.50001
+  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, 'youtube', null), /clock exceeds/)
+  assert.throws(() => measureFixture(fixture), /clock|timing/)
+})
+
+test('missing or unknown player transport and missing local ownership never fall back to YouTube', () => {
+  for (const player of [undefined, null, 'unknown']) {
+    const fixture = measuredViewFixture(), actual = fixture.response.actual
+    Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'approximate' })
+    fixture.response.player = player
+    assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, player, fixture.response.originalExposure))
+    assert.throws(() => measureFixture(fixture))
+  }
+  for (const mutation of ['expectation', 'receipt', 'image', 'url']) {
+    const fixture = measuredViewFixture(), actual = fixture.response.actual
+    Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'approximate' })
+    if (mutation === 'expectation') fixture.response.originalExposure = null
+    if (mutation === 'receipt') actual.sourcePresentation = null
+    if (mutation === 'image') fixture.frame.sourceImage.frameIndex++
+    if (mutation === 'url') fixture.response.native.currentSrc = `${fixtureSourceUrl}?wrong`
+    assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, 'local', fixture.response.originalExposure))
+    assert.throws(() => measureFixture(fixture))
+  }
+})
 const measureFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 96, fixture.anchors, fixture.seeds)
+
+function unknownMotionFixture(timeSeconds = 1) {
+  const fixture = measuredViewFixture(timeSeconds)
+  for (const anchor of fixture.anchors.values()) delete anchor.motion
+  return fixture
+}
+
+function measuredVideoFixture(fixture, tolerancePx = 96) {
+  const result = measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, tolerancePx, fixture.anchors, fixture.seeds, fixture.lineAuthority)
+  const video = videoFixture(), timeSeconds = fixture.frame.timeSeconds
+  const checks = [...result.measured, ...result.nativeLines]
+  const status = checks.some(item => item.status === 'failed') || result.clockSkewSeconds > 0.5 ? 'failed'
+    : result.unavailable.length || !result.measured.length || !Number.isFinite(result.clockSkewSeconds) ? 'unavailable' : 'passed'
+  video.samples = [{ timeSeconds, sampleTimeSeconds: timeSeconds, sourceShotId: fixture.frame.shotId ?? 'shot',
+    reasons: ['every-second'], required: true, status, measurements: result.measured, unavailable: result.unavailable,
+    excluded: result.excluded, nativeLines: result.nativeLines, nativeLineUnavailable: result.nativeLineUnavailable,
+    maxClockSkewSeconds: result.clockSkewSeconds }]
+  return { video, result, census: { rows: [{ timeSeconds, required: true, reasons: ['every-second'] }] } }
+}
+
+test('valid independent visual pixels pass with missing, null, fixed-only or moving-only motion metadata', () => {
+  for (const motion of [undefined, null, 'fixed', 'moving']) {
+    const fixture = unknownMotionFixture()
+    if (motion !== undefined) for (const anchor of fixture.anchors.values()) anchor.motion = motion
+    const { video, result, census } = measuredVideoFixture(fixture)
+    assert.equal(result.measured.length, 4)
+    assert.deepEqual(result.unavailable, [])
+    assert.deepEqual(result.excluded, [])
+    assert.ok(result.measured.every(item => item.motion === (motion ?? 'unknown') && item.errorPx === 1.5 && item.status === 'passed'))
+    finishVideo(video, census, parseOptions(['--stage', '50']))
+    assert.equal(video.status, 'passed')
+    assert.equal(video.coverage.complete, true)
+    assert.equal(video.stageMeasurement.status, 'passed')
+    assert.equal(video.landmarks.fixedChecks, motion === 'fixed' ? 2 : 0)
+    assert.equal(video.landmarks.movingChecks, motion === 'moving' ? 2 : 0)
+    assert.equal(video.landmarks.unknownChecks, motion == null ? 2 : 0)
+    assert.equal(video.motionCoverage[0].internalMechanismMotion, 'unknown')
+    assert.equal(video.motionCoverage[0].status, motion === 'moving' ? 'measured' : 'unavailable')
+    const scoped = measuredVideoFixture(fixture)
+    finishVideo(scoped.video, scoped.census, parseOptions(['--stage', '50', '--times', '1']))
+    assert.equal(scoped.video.stageMeasurement.scopedSamples.status, 'passed')
+    assert.equal(scoped.video.stageMeasurement.status, 'unmeasured')
+  }
+})
+
+test('motion classification remains diagnostic and cannot change admitted pixel measurements', () => {
+  const known = measuredVideoFixture(measuredViewFixture()), unknown = measuredVideoFixture(unknownMotionFixture())
+  const withoutMotion = rows => rows.map(({ motion, ...measurement }) => measurement)
+  assert.deepEqual(withoutMotion(unknown.result.measured), withoutMotion(known.result.measured))
+  assert.deepEqual(unknown.result.unavailable, known.result.unavailable)
+  assert.deepEqual(unknown.result.excluded, known.result.excluded)
+  finishVideo(known.video, known.census, parseOptions(['--stage', '50']))
+  finishVideo(unknown.video, unknown.census, parseOptions(['--stage', '50']))
+  assert.equal(known.video.landmarks.fixedChecks, 1)
+  assert.equal(known.video.landmarks.movingChecks, 1)
+  assert.equal(known.video.landmarks.unknownChecks, 0)
+  assert.equal(unknown.video.landmarks.fixedChecks, 0)
+  assert.equal(unknown.video.landmarks.movingChecks, 0)
+  assert.equal(unknown.video.landmarks.unknownChecks, 2)
+  assert.equal(known.video.status, unknown.video.status)
+  assert.equal(unknown.video.motionCoverage[0].unknownCheckSamples, 1)
+})
+
+test('each shot passes on its own independent visual measurements without borrowing motion composition', () => {
+  const moving = measuredVideoFixture(measuredViewFixture()), unknown = measuredVideoFixture(unknownMotionFixture(2))
+  moving.video.samples[0].sourceShotId = 'moving-a'
+  unknown.video.samples[0].sourceShotId = 'unknown-b'
+  moving.video.samples.push(unknown.video.samples[0])
+  moving.census.rows.push(...unknown.census.rows)
+  finishVideo(moving.video, moving.census, parseOptions(['--stage', '50']))
+  assert.equal(moving.video.coverage.passedRequiredSamples, 2)
+  assert.equal(moving.video.status, 'passed')
+  assert.equal(moving.video.motionCoverage.find(shot => shot.shotId === 'unknown-b').movingCheckSamples, 0)
+  assert.equal(moving.video.motionCoverage.find(shot => shot.shotId === 'unknown-b').status, 'unavailable')
+})
+
+test('source static motion and phase evidence remain diagnostics without a static-rig certificate', () => {
+  const fixture = unknownMotionFixture(), { video, census } = measuredVideoFixture(fixture)
+  const evidence = 'Retained source-only observation; hidden mechanical phase is not recovered.'
+  const sourceEvidence = { kind: 'retained-source-photographic-rig', phaseImageFrameIndices: [30] }
+  video.shots = [{ id: 'shot', internalMechanismMotion: 'static', internalMotionEvidence: evidence, internalMotionSourceEvidence: sourceEvidence }]
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.status, 'passed')
+  assert.equal(video.landmarks.fixedChecks, 0)
+  assert.equal(video.landmarks.movingChecks, 0)
+  assert.equal(video.motionCoverage[0].internalMechanismMotion, 'static')
+  assert.equal(video.motionCoverage[0].evidence, evidence)
+  assert.deepEqual(video.motionCoverage[0].sourceEvidence, sourceEvidence)
+  assert.equal(video.motionCoverage[0].status, 'unavailable')
+})
+
+test('unknown motion cannot waive missing source pixels, native association, CHECK or refused GPU geometry', () => {
+  for (const mutate of [
+    fixture => { fixture.observations[3].pixel = null },
+    fixture => { fixture.anchors.delete('anchor-3') },
+    fixture => { fixture.anchors.get('anchor-3').partPath = null },
+    fixture => { fixture.anchors.get('anchor-3').partLocalMetres = null },
+    fixture => { fixture.capture.landmarks[3].state = 'unavailable'; fixture.capture.landmarks[3].reason = 'Actual native geometry refused the point association' },
+    fixture => { for (const observed of fixture.observations) observed.role = 'fit' },
+    fixture => { fixture.capture.landmarks[3].canvasPixels = [910, 800] },
+    fixture => { fixture.capture.landmarks[3].sourcePixels = [1921, 800] },
+    fixture => {
+      const inset = { ...sourceView('inset'), rectSourcePixels: [850, 750, 200, 200], sourceAssembly: { kind: 'operating' } }
+      fixture.frame.views.push(inset)
+      fixture.capture.sourceLayout.push({ viewId: inset.id, rectSourcePixels: inset.rectSourcePixels, presentation: inset.presentation, composite: { mode: 'opaque' }, resolvedImagePlaneWarp: null, sourceAssembly: inset.sourceAssembly })
+    },
+  ]) {
+    const fixture = unknownMotionFixture()
+    mutate(fixture)
+    const { video, result, census } = measuredVideoFixture(fixture)
+    assert.ok(result.unavailable.length > 0)
+    assert.deepEqual(result.excluded, [])
+    finishVideo(video, census, parseOptions(['--stage', '50']))
+    assert.equal(video.coverage.complete, false)
+    assert.equal(video.status, 'unavailable')
+    assert.equal(video.stageMeasurement.status, 'unmeasured')
+  }
+  const noPixels = unknownMotionFixture()
+  assert.throws(() => measureView(noPixels.view, noPixels.response, noPixels.frame, [], 96, noPixels.anchors))
+})
+
+test('unknown motion cannot admit a stale or unsupported physical draw or a mismatched authored pose', () => {
+  for (const mutate of [
+    fixture => { fixture.response.captures[0].mechanism.status = 'unavailable' },
+    fixture => { fixture.response.captures[0].mechanism.channelAnglesRad[0] = NaN },
+    fixture => { fixture.response.captures[0].mechanism.sourceDrawRevision++ },
+    fixture => { fixture.capture.timeSeconds-- },
+    fixture => { fixture.response.actual.views[0].input = { crankTurns: 1 } },
+    fixture => { fixture.response.actual.views[0].camera = { ...fixture.view.camera, positionMetres: [2, 2, 2] } },
+  ]) {
+    const fixture = unknownMotionFixture()
+    mutate(fixture)
+    assert.throws(() => measuredVideoFixture(fixture))
+  }
+})
+
+test('unknown motion accepts a real clock at the existing half-second boundary', () => {
+  const fixture = unknownMotionFixture()
+  fixture.response.native.mediaTime += 0.5
+  const { video, result, census } = measuredVideoFixture(fixture)
+  assert.equal(result.clockSkewSeconds, 0.5)
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, true)
+  assert.equal(video.status, 'passed')
+  assert.equal(video.stageMeasurement.status, 'passed')
+})
+
+test('unknown motion retains the distributed independent source-method exclusion floor', () => {
+  const fixture = unknownMotionFixture()
+  fixture.observations[3].method = 'unsupported-source-technique'
+  const admitted = measuredVideoFixture(fixture)
+  assert.equal(admitted.result.measured.length, 3)
+  assert.equal(admitted.result.excluded.length, 1)
+  finishVideo(admitted.video, admitted.census, parseOptions(['--stage', '50']))
+  assert.equal(admitted.video.status, 'passed')
+  fixture.observations[2].method = 'unsupported-source-technique'
+  const insufficient = measuredVideoFixture(fixture)
+  assert.equal(insufficient.result.measured.length, 2)
+  assert.ok(insufficient.result.unavailable.length > 0)
+  finishVideo(insufficient.video, insufficient.census, parseOptions(['--stage', '50']))
+  assert.equal(insufficient.video.status, 'unavailable')
+})
+
+test('unknown motion cannot hide actual mandatory or diagnostic pixel and clock counterexamples', () => {
+  for (const counterexample of ['pixel', 'clock']) for (const diagnosticOnly of [false, true]) {
+    const fixture = unknownMotionFixture(diagnosticOnly ? 1.5 : 1)
+    if (counterexample === 'pixel') {
+      fixture.capture.landmarks[2].sourcePixels = [1200, 800]
+      fixture.capture.landmarks[2].canvasPixels = [1200, 800]
+    } else fixture.response.native.mediaTime += 0.5001
+    const observed = measuredVideoFixture(fixture, 960)
+    if (counterexample === 'pixel') {
+      assert.equal(observed.result.measured[2].rawErrorPx, 1100)
+      assert.equal(observed.result.measured[2].errorPx, 1101.5)
+      assert.equal(observed.result.measured[2].status, 'failed')
+    } else assert.ok(observed.result.clockSkewSeconds > 0.5)
+    let { video, census } = observed
+    if (diagnosticOnly) {
+      const mandatory = measuredVideoFixture(unknownMotionFixture())
+      Object.assign(observed.video.samples[0], { diagnosticOnly: true, reasons: ['mid-interval'] })
+      mandatory.video.samples.push(observed.video.samples[0])
+      mandatory.census.rows.push({ timeSeconds: fixture.frame.timeSeconds, required: true, diagnosticOnly: true, reasons: ['mid-interval'] })
+      video = mandatory.video
+      census = mandatory.census
+    }
+    finishVideo(video, census, parseOptions(['--stage', '50']))
+    assert.equal(video.status, 'failed')
+    assert.equal(video.stageMeasurement.status, 'failed')
+    assert.equal(video.coverage.complete, diagnosticOnly)
+    if (counterexample === 'pixel') assert.equal(video.maxErrorPx, 1101.5)
+    else assert.ok(video.failures.some(failure => failure.code === `${diagnosticOnly ? 'diagnostic' : 'mandatory'}-clock-counterexample`))
+  }
+})
 
 // One synthetic triangle and independently PROVIDED bounds, not real GPU/source evidence.
 async function controlledEligibilityResponse(deriveNativeStagePixelRay) {
@@ -959,7 +1271,7 @@ test('stale paused model clocks are retained before reference-state and nominal-
     const actual = { mode: 'reference-review', playerState: 'paused', modelTime: 1, referenceState: 'unavailable' }
     const native = { paused: true, seeking: false, mediaTime: 2 }
     let failure
-    try { requirePausedReview(actual, native, { timeSeconds: 2 }, required) }
+    try { requirePausedReview(actual, native, { timeSeconds: 2 }, required, 'youtube', null) }
     catch (error) { failure = error }
     assert.match(failure.message, /clock exceeds/)
     assert.equal(failure.clockSkewSeconds, 1)
@@ -1003,7 +1315,7 @@ test('unknown and within-bound mandatory clocks do not fabricate timing countere
 test('paused review retains within-bound skew on stale-state errors without inventing unknown clocks', () => {
   for (const modelTime of [1.5, 2, undefined, NaN, Infinity]) {
     const actual = { mode: 'reference-review', playerState: 'paused', modelTime, referenceState: 'unavailable' }
-    assert.throws(() => requirePausedReview(actual, { paused: true, seeking: false, mediaTime: 2 }, { timeSeconds: 2 }), error => {
+    assert.throws(() => requirePausedReview(actual, { paused: true, seeking: false, mediaTime: 2 }, { timeSeconds: 2 }, true, 'youtube', null), error => {
       assert.match(error.message, /no current native draw/)
       assert.equal(Object.hasOwn(error, 'clockSkewSeconds'), Number.isFinite(modelTime))
       if (Number.isFinite(modelTime)) assert.equal(error.clockSkewSeconds, Math.abs(modelTime - 2))
@@ -1208,4 +1520,479 @@ test('render verification separates the real representation digest from pinned r
     unapprovedIdentity.identity[field] = 'e'.repeat(64)
     assert.throws(() => requireModel(actual, 'fixture', unapprovedIdentity, nativeIdentity), /identity|canonical|mapping|association|different native/i)
   }
+})
+
+function visibilityCensusFixture() {
+  const sourceImage = { frameIndex: 30, pixelFormat: 'gray8', sha256Gray8: 'b'.repeat(64), sourceSha256: 'a'.repeat(64), width: 1920, height: 1080 }
+  const background = { id: 'background', rectSourcePixels: [0, 0, 1920, 1080], presentation: 'native', camera: null, input: null }
+  const inset = { id: 'readable-inset', rectSourcePixels: [100, 100, 400, 300], presentation: 'native', camera: {}, input: {} }
+  const old = { ...frame(1), sourceImage, views: [background, inset], landmarks: [] }
+  const current = structuredClone(old)
+  current.views[0].sourceVisibility = {
+    kind: 'policy-excluded', reasonCode: 'text-covered-navigation-background',
+    sourceImage: structuredClone(sourceImage), rectSourcePixels: [...background.rectSourcePixels],
+    manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: 'Synthetic actual-ROI audit decision control; not source truth.' },
+  }
+  return { original: { ...observations, frames: [old] }, track: { shots: observations.shots, frames: [current], coverage: {} } }
+}
+
+test('qualified backgrounds leave only readable foreground required while preserving the original ROI census', () => {
+  const { original, track } = visibilityCensusFixture()
+  const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+  assert.equal(row.required, true)
+  assert.deepEqual(row.expectedViewIds, ['readable-inset'])
+  assert.equal(row.sourceViewMappings.length, 2)
+  assert.equal(row.sourceViewMappings[0].qualifiedExcluded, true)
+  assert.deepEqual(row.qualifiedExcludedViews.map(view => view.viewId), ['background'])
+  requireSourceViews(row)
+  assert.throws(() => measureView(track.frames[0].views[0], { player: 'local', originalExposure: null }, track.frames[0], [], 960, new Map()), /not a source-pose measurement/)
+})
+
+test('original/current union refuses missing readable views, misbound qualification, partial ROI and admitted readable support', () => {
+  for (const mutation of ['missing-inset', 'image', 'roi', 'reason', 'readable']) {
+    const { original, track } = visibilityCensusFixture()
+    if (mutation === 'missing-inset') track.frames[0].views.pop()
+    if (mutation === 'image') track.frames[0].views[0].sourceVisibility.sourceImage.frameIndex++
+    if (mutation === 'roi') track.frames[0].views[0].sourceVisibility.rectSourcePixels[2]--
+    if (mutation === 'reason') track.frames[0].views[0].sourceVisibility.reasonCode = 'unknown-motion'
+    if (mutation === 'readable') original.frames[0].landmarks.push({ anchorId: 'support', viewId: 'background', status: 'observed', method: 'manual', role: 'check', pixel: [10, 20], uncertaintyPx: 1 })
+    const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+    assert.equal(row.required, true)
+    assert.throws(() => requireSourceViews(row), /Required source view|Source visibility/)
+  }
+})
+
+test('inadmissible historical donor pixels stay retained but cannot re-require a properly qualified unreadable background', () => {
+  const { original, track } = visibilityCensusFixture()
+  original.frames[0].landmarks.push({ anchorId: 'donor', viewId: 'background', status: 'observed', method: 'template-match', role: 'check', pixel: [10, 20], uncertaintyPx: 1, trackingEvidence: { evidence: 'unqualified old donor prose' } })
+  const before = structuredClone(original)
+  const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+  assert.deepEqual(row.expectedViewIds, ['readable-inset'])
+  assert.deepEqual(original, before, 'Historical pixels/provenance must never be erased')
+})
+
+test('whole qualified exposures retain mandatory census and unavailable clock/decoder failures', () => {
+  const { original, track } = visibilityCensusFixture()
+  original.frames[0].views.pop()
+  track.frames[0].views.pop()
+  const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+  assert.equal(row.required, false)
+  assert.deepEqual(row.expectedViewIds, [])
+  assert.equal(row.qualifiedExcludedViews.length, 1)
+  assert.ok(row.reasons.includes('every-second'))
+  for (const state of ['qualified-excluded', 'unavailable', 'failed']) {
+    const video = videoFixture()
+    video.samples.push({ timeSeconds: 1, sampleTimeSeconds: 1, reasons: ['every-second'], required: false, status: state, measurements: [],
+      unavailable: state === 'unavailable' ? [{ reason: 'Source decoder unavailable' }] : [], qualifiedExcludedViews: row.qualifiedExcludedViews, requiredViewIds: [],
+      maxClockSkewSeconds: state === 'failed' ? 0.501 : state === 'unavailable' ? null : 0.1 })
+    const census = { rows: [...censusFixture.rows, row] }
+    finishVideo(video, census, parseOptions(['--stage', '50']))
+    assert.equal(video.sourceVisibility.qualifiedExcludedViewSamples, 1)
+    assert.equal(video.coverage.allMandatoryCensusSamples, 2)
+    if (state === 'unavailable') assert.equal(video.coverage.unavailableCensusSamples, 1)
+    if (state === 'failed') assert.ok(video.failures.some(failure => failure.code === 'mandatory-clock-counterexample'))
+    if (state === 'qualified-excluded') assert.equal(video.coverage.passedRequiredSamples, 1, 'Held background never becomes a measured required-source pass')
+  }
+})
+
+test('actual retained Rocker24353 permits only exact audited physical ROI exclusions, never preceding sharp24352', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const track = JSON.parse(await readFile(new URL('../content/4mBuyixt22U.source-track.json', import.meta.url), 'utf8'))
+  const sharp = track.frames.find(frame => frame.sourceImage?.frameIndex === 24352)
+  const blurred = structuredClone(track.frames.find(frame => frame.sourceImage?.frameIndex === 24353))
+  assert.equal(blurred.sourceImage.sha256Gray8, '2a3aeb84159b14c6cda4a45407965602d1612787e0f148eef2f3b1ad80e7fd4a')
+  assert.equal(sharp.views.length, 8)
+  assert.equal(blurred.views.length, 7)
+  for (const view of blurred.views) {
+    view.sourceVisibility = {
+      kind: 'policy-excluded', reasonCode: 'blurred-navigation-background',
+      sourceImage: structuredClone(blurred.sourceImage), rectSourcePixels: [...view.rectSourcePixels],
+      manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: `AuditCoarseObservability actual source-24353.png inspected full physical ROI ${view.id} ${JSON.stringify(view.rectSourcePixels)}: blurred/text-overprinted, no readable physical support; only this exposure, not sharp24352.` },
+    }
+    assert.equal(sourceVisibilityError(blurred, view), null)
+    assert.match(sourceVisibilityError(sharp, view), /exact actual frame source image/)
+  }
+  const fixtureTrack = { ...track, frames: [sharp, blurred] }
+  const original = { ...track, frames: [sharp, track.frames.find(frame => frame.sourceImage?.frameIndex === 24353)] }
+  const options = parseOptions(['--stage', '50', '--times', `${sharp.timeSeconds},${blurred.timeSeconds}`])
+  const census = sourceCensus(original, fixtureTrack, { ...native, durationSeconds: track.source.durationSeconds, fps: 24000 / 1001 }, options)
+  assert.equal(census.selected[0].required, true)
+  assert.ok(census.selected[0].expectedViewIds.includes('main'), 'Sharp outgoing machine remains fully required despite navigation labels')
+  assert.equal(census.selected[1].required, false)
+  assert.equal(census.selected[1].qualifiedExcludedViews.length, 7)
+})
+
+function nativeLineFixture() {
+  const fixture = measuredViewFixture(), path = 'ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1'
+  const source = [[1200, 200], [1200, 900]]
+  const focal = 1080 / (2 * Math.tan(fixture.view.camera.verticalFovDegrees * Math.PI / 360))
+  const projectedNative = [[1200, 100], [1200, 1000]]
+  const world = projectedNative.map(([x, y]) => [1 + (x - 960) / focal, 1 - (y - 540) / focal, 0])
+  const line = {
+    id: 'held-out-fixed-stock', partPath: path, partLocalLineMetres: [[0, 0, 0], [0, 1, 0]],
+    sourceLinePixels: source, uncertaintyPx: 2,
+    measurementEvidence: {
+      sourceImage: fixture.frame.sourceImage, detector: 'Synthetic paired-edge decision control.',
+      edgeRows: [200, 550, 900].map(y => ({ y, left: 1199, right: 1201, contrast: 10 })),
+      axisPerspectiveBiasBoundPx: 5, axisPerspectiveEvidence: 'Synthetic independently bounded physical stock.',
+      axisPerspectiveBiasComponents: { kind: 'includes-source-localization', geometryBoundPx: 3, sourceLocalizationBoundPx: 2, evidence: 'Synthetic inclusive budget control.' },
+      axisPerspectiveBiasSpace: 'source-global',
+    },
+  }
+  fixture.view.nativeLineChecks = [line]
+  fixture.response.captures[0].mechanism.effectiveSourceOverridePartPaths = []
+  for (const station of [0, 0.25, 0.5, 0.75, 1]) {
+    const sourcePixels = projectedNative[0].map((value, axis) => value + station * (projectedNative[1][axis] - value))
+    fixture.capture.landmarks.push({
+      id: nativeLineEndpointId(fixture.view.id, line.id, station), partPath: path,
+      state: 'rendered', sourcePixels, canvasPixels: sourcePixels, uncertaintySourcePixels: 0.5,
+      worldMetres: world[0].map((value, axis) => value + station * (world[1][axis] - value)),
+    })
+  }
+  fixture.lineAuthority = { paths: new Set([path]), bindings: [] }
+  return fixture
+}
+const measureNativeLineFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 960, fixture.anchors, fixture.seeds, fixture.lineAuthority)
+
+test('independent native fixed-body LINE uses actual GPU readbacks without becoming a fixed source POINT or camera FIT', () => {
+  const fixture = nativeLineFixture(), camera = structuredClone(fixture.view.camera), input = structuredClone(fixture.view.input)
+  const result = measureNativeLineFixture(fixture)
+  assert.equal(result.nativeLines.length, 1)
+  assert.equal(result.nativeLines[0].motion, 'fixed')
+  assert.equal(result.nativeLines[0].status, 'passed')
+  assert.equal(result.nativeLines[0].sourceUncertaintyPx, 2)
+  assert.equal(result.nativeLines[0].geometryBiasSourcePixels, 3)
+  assert.equal(result.nativeLines[0].rasterUncertaintyPx, 0.5)
+  assert.equal(result.nativeLines[0].errorPx, 5.5, 'Inclusive source localization must be added exactly once')
+  assert.equal(result.measured.length, fixture.observations.length, 'Endpoint diagnostics are never observed source landmarks')
+  assert.deepEqual(fixture.view.camera, camera, 'Line CHECK cannot adjust camera fit')
+  assert.deepEqual(fixture.view.input, input, 'Line CHECK cannot adjust chosen input')
+})
+
+test('native line wrong source image/body, missing readback and stale physical draw fail closed', () => {
+  for (const mutation of ['source-image', 'native-body', 'readback', 'layout', 'fit-role']) {
+    const fixture = nativeLineFixture()
+    if (mutation === 'source-image') fixture.view.nativeLineChecks[0].measurementEvidence.sourceImage = sourceImage(31, 'wrong-source')
+    if (mutation === 'native-body') fixture.capture.landmarks.at(-1).partPath = 'ha-harmonic-analyzer/fr-frame/wrong-part'
+    if (mutation === 'readback') for (const marker of fixture.capture.landmarks.slice(-5)) marker.state = 'not-visible'
+    if (mutation === 'layout') fixture.response.captures[0].mechanism.sourceLayout = []
+    if (mutation === 'fit-role') fixture.view.nativeLineChecks[0].role = 'fit'
+    if (mutation === 'layout') assert.throws(() => measureNativeLineFixture(fixture), /same rendered source view/)
+    else {
+      const result = measureNativeLineFixture(fixture)
+      assert.equal(result.nativeLines.length, 0)
+      assert.ok(result.nativeLineUnavailable.some(item => item.kind === 'native-body-line'))
+    }
+  }
+})
+
+test('offscreen finite endpoints retain exact segment geometry with at least two corroborating visible GPU stations', () => {
+  const fixture = nativeLineFixture()
+  const markers = fixture.capture.landmarks.slice(-5)
+  const focal = 1080 / (2 * Math.tan(fixture.view.camera.verticalFovDegrees * Math.PI / 360))
+  for (let index = 0; index < markers.length; index++) {
+    const y = -100 + index / 4 * 1500
+    markers[index].worldMetres = [1 + 240 / focal, 1 - (y - 540) / focal, 0]
+    markers[index].state = index === 0 || index === 4 ? 'not-visible' : 'rendered'
+    markers[index].sourcePixels = markers[index].canvasPixels = index === 0 || index === 4 ? null : [1200, y]
+  }
+  const result = measureNativeLineFixture(fixture)
+  assert.equal(result.nativeLines[0].status, 'passed')
+  assert.equal(result.nativeLines[0].gpuStationReadbacks.length, 3)
+  assert.equal(result.nativeLines[0].nativeSegmentCoversObservation, true)
+  assert.equal(result.nativeLines[0].endpointProbeIds.length, 2)
+  markers[2].sourcePixels[0] += 5
+  assert.equal(measureNativeLineFixture(fixture).nativeLines.length, 0, 'CPU projection cannot override inconsistent actual GPU geometry')
+})
+
+test('fixed body classification needs current native membership and no actual animated ancestor', () => {
+  const fixture = nativeLineFixture(), path = fixture.view.nativeLineChecks[0].partPath
+  assert.equal(fixedNativeLinePart(path, fixture.lineAuthority, []), true)
+  assert.equal(fixedNativeLinePart(path, { paths: new Set(), bindings: [] }, []), false)
+  fixture.lineAuthority.bindings = [{ pattern: /^ha-harmonic-analyzer\/fr-frame$/, motion: 'rod' }]
+  const result = measureNativeLineFixture(fixture)
+  assert.equal(result.nativeLines.length, 0)
+  assert.ok(result.nativeLineUnavailable.some(item => /animated ancestor/.test(item.reason)))
+  assert.equal(fixedNativeLinePart(path, null, []), false)
+})
+
+test('fixed BODY line classification rejects only actual effective source overrides, never unrelated assembly context', () => {
+  for (const overrides of [undefined, null, [''], ['duplicate', 'duplicate'],
+    ['ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1'], ['ha-harmonic-analyzer/fr-frame']]) {
+    const fixture = nativeLineFixture()
+    fixture.response.captures[0].mechanism.effectiveSourceOverridePartPaths = overrides
+    const result = measureNativeLineFixture(fixture)
+    assert.equal(result.nativeLines.length, 0)
+    assert.ok(result.nativeLineUnavailable.some(item => /source-overridden part\/ancestor/.test(item.reason)))
+  }
+  const unrelated = nativeLineFixture()
+  unrelated.response.captures[0].mechanism.effectiveSourceOverridePartPaths = ['ha-harmonic-analyzer/ha-measuring-stick-1']
+  assert.equal(measureNativeLineFixture(unrelated).nativeLines[0].status, 'passed')
+  assert.equal(fixedNativeLinePart('ha-harmonic-analyzer/ha-measuring-stick-1',
+    { paths: new Set(['ha-harmonic-analyzer/ha-measuring-stick-1']), bindings: [] },
+    ['ha-harmonic-analyzer/ha-measuring-stick-1']), false, 'A genuinely source-posed ruler is not an independent fixed BODY oracle')
+})
+
+test('optional fixed LINE measurements cannot replace required POINT CHECK pixels and actual line failures still gate', () => {
+  const fixture = nativeLineFixture()
+  for (const anchor of fixture.anchors.values()) delete anchor.motion
+  const measured = measuredVideoFixture(fixture, 960)
+  finishVideo(measured.video, measured.census, parseOptions(['--stage', '50']))
+  assert.equal(measured.video.status, 'passed')
+  assert.equal(measured.video.landmarks.fixedChecks, 0)
+  assert.equal(measured.video.landmarks.movingChecks, 0)
+  assert.equal(measured.video.landmarks.unknownChecks, 2)
+  assert.equal(measured.video.nativeLineChecks.fixedBodyChecks, 1)
+  const noCheck = nativeLineFixture()
+  for (const observed of noCheck.observations) observed.role = 'fit'
+  const missing = measuredVideoFixture(noCheck, 960)
+  assert.equal(missing.result.nativeLines.length, 1)
+  assert.ok(missing.result.unavailable.length > 0)
+  finishVideo(missing.video, missing.census, parseOptions(['--stage', '50']))
+  assert.equal(missing.video.status, 'unavailable')
+  const noPoints = nativeLineFixture()
+  noPoints.observations = []
+  assert.throws(() => measuredVideoFixture(noPoints, 960), /no independently observed landmarks/)
+  const failed = nativeLineFixture()
+  for (const marker of failed.capture.landmarks.slice(-5)) {
+    marker.sourcePixels[0] = marker.canvasPixels[0] = 20
+  }
+  const counterexample = measuredVideoFixture(failed, 960)
+  assert.equal(counterexample.result.nativeLines.length, 1)
+  assert.equal(counterexample.result.nativeLines[0].rawErrorPx, 1180)
+  assert.equal(counterexample.result.nativeLines[0].errorPx, 1185.5)
+  assert.equal(counterexample.result.nativeLines[0].status, 'failed')
+  finishVideo(counterexample.video, counterexample.census, parseOptions(['--stage', '50']))
+  assert.equal(counterexample.video.stageMeasurement.status, 'failed')
+  assert.equal(counterexample.video.maxErrorPx, 1185.5)
+})
+
+test('refused optional LINE geometry remains unavailable diagnostics without admitting a source-posed ruler', () => {
+  const fixture = nativeLineFixture()
+  for (const anchor of fixture.anchors.values()) delete anchor.motion
+  fixture.response.captures[0].mechanism.effectiveSourceOverridePartPaths = ['ha-harmonic-analyzer/fr-frame']
+  const refused = measuredVideoFixture(fixture, 960)
+  assert.equal(refused.result.nativeLines.length, 0)
+  assert.equal(refused.result.nativeLineUnavailable.length, 1)
+  assert.deepEqual(refused.result.unavailable, [])
+  finishVideo(refused.video, refused.census, parseOptions(['--stage', '50']))
+  assert.equal(refused.video.status, 'passed')
+  assert.equal(refused.video.nativeLineChecks.measured, 0)
+  assert.equal(refused.video.nativeLineChecks.unavailable, 1)
+  const ruler = 'ha-harmonic-analyzer/ha-measuring-stick-1'
+  assert.equal(fixedNativeLinePart(ruler, { paths: new Set([ruler]), bindings: [] }, [ruler]), false)
+})
+
+test('owned source exposure selects the authored pose while retaining the distinct real native draw clock', () => {
+  const fixture = measuredViewFixture(), actual = fixture.response.actual
+  Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'approximate', modelTime: 0.995 })
+  actual.sourcePresentation.currentTime = 0.995
+  Object.assign(fixture.response.native, { paused: true, seeking: false, mediaTime: 0.995 })
+  fixture.capture.timeSeconds = fixture.response.captures[0].mechanism.timeSeconds = 0.995
+  requirePausedReview(actual, fixture.response.native, fixture.frame, true, fixture.response.player, fixture.response.originalExposure)
+  const result = measureFixture(fixture)
+  assert.ok(result.measured.every(item => item.status === 'passed' && item.captureTimeSeconds === 0.995))
+  assert.equal(result.clockSkewSeconds, 0)
+  assert.equal(actual.sourceSampleTimeSeconds, 1)
+  assert.equal(actual.sourcePresentation.mediaTime, 1)
+})
+
+test('wrong original exposure, missing decoder receipt, invented clock or authored selection cannot admit a source draw', () => {
+  for (const mutation of ['image', 'pts', 'decoder', 'clock', 'selection', 'revision']) {
+    const fixture = measuredViewFixture(), actual = fixture.response.actual
+    if (mutation === 'image') actual.sourcePresentation.frameIndex++
+    if (mutation === 'pts') actual.sourcePresentation.pts++
+    if (mutation === 'decoder') actual.sourcePresentation = null
+    if (mutation === 'clock') actual.sourcePresentation.currentTime -= 0.01
+    if (mutation === 'selection') actual.sourceSampleTimeSeconds += 0.01
+    if (mutation === 'revision') fixture.response.captures[0].mechanism.sourceDrawRevision++
+    assert.throws(() => measureFixture(fixture), /owned|PTS|selection|physical solve/)
+  }
+})
+
+test('all-qualified hold admits only a real decoded clock receipt, never a required source-pose match', () => {
+  const fixture = measuredViewFixture(), actual = fixture.response.actual
+  Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'hold-last-readable' })
+  Object.assign(fixture.response.native, { paused: true, seeking: false })
+  requirePausedReview(actual, fixture.response.native, fixture.frame, false, fixture.response.player, fixture.response.originalExposure)
+  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true, fixture.response.player, fixture.response.originalExposure), /no current native draw/)
+  fixture.response.native.mediaTime += 0.50001
+  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, false, fixture.response.player, fixture.response.originalExposure), /clock exceeds/)
+})
+
+test('a supported source line outside the actual finite native segment remains a measured failure', () => {
+  const fixture = nativeLineFixture(), markers = fixture.capture.landmarks.slice(-5)
+  for (const marker of markers) {
+    marker.sourcePixels[1] = 300 + (marker.sourcePixels[1] - 100) / 900 * 500
+    marker.canvasPixels = [...marker.sourcePixels]
+  }
+  const result = measureNativeLineFixture(fixture)
+  assert.equal(result.nativeLines.length, 1)
+  assert.equal(result.nativeLines[0].nativeSegmentCoversObservation, false)
+  assert.equal(result.nativeLines[0].status, 'failed')
+})
+
+test('qualified donor templates remain lossless inadmissible provenance, not foreground measurements or sample passes', () => {
+  const { original, track } = visibilityCensusFixture()
+  const donor = { anchorId: 'old-template', viewId: 'background', role: 'fit', method: 'template-match', status: 'observed', pixel: [1200, 500], uncertaintyPx: 3 }
+  original.anchors = [{ id: donor.anchorId, kind: 'physical-feature', partPath: 'native-fixed', partLocalMetres: [0, 0, 0], correspondenceEvidence: 'Synthetic native association control.' }]
+  original.frames[0].landmarks = [structuredClone(donor)]
+  track.frames[0].landmarks = [structuredClone(donor)]
+  const before = structuredClone(track.frames[0].landmarks)
+  const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+  assert.deepEqual(row.expectedViewIds, ['readable-inset'])
+  assert.deepEqual(row.qualifiedExcludedViews[0].preservedInadmissibleLandmarks, [donor])
+  assert.deepEqual(track.frames[0].landmarks, before)
+  const video = videoFixture()
+  video.samples[0].qualifiedExcludedViews = row.qualifiedExcludedViews
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.sourceVisibility.preservedInadmissibleLandmarkSamples, 1)
+  assert.equal(video.landmarks.measured, 2, 'Preserved donor never adds a measured FIT/CHECK')
+})
+
+test('a genuinely admitted independently tracked template still blocks audited ROI exclusion', () => {
+  const fixture = measuredViewFixture(), observed = fixture.observations[0]
+  observed.method = 'template-match'
+  fixture.frame.sourceImage = sourceImage(30, 'd'.repeat(64))
+  const seedImage = sourceImage(0, 'e'.repeat(64))
+  observed.trackingEvidence = { seedTimeSeconds: 0, seedDecodedFrameIndex: 0, seedSourceImage: seedImage, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 0.999, sourcePatchCorrelation: 0.99 }
+  fixture.seeds.set('0/main/anchor-0', { role: observed.role, sourceImage: seedImage })
+  assert.ok(measureFixture(fixture).measured.some(point => point.anchorId === observed.anchorId && point.status === 'passed'), 'Existing source-method predicate actually admits the independent template control')
+  fixture.frame.landmarks = [observed]
+  fixture.view.sourceVisibility = {
+    kind: 'policy-excluded', reasonCode: 'unreadable-near-black-fade',
+    sourceImage: structuredClone(fixture.frame.sourceImage), rectSourcePixels: [...fixture.view.rectSourcePixels],
+    manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: 'Synthetic contradictory policy annotation refusal, not an actual source audit.' },
+  }
+  assert.match(sourceVisibilityError(fixture.frame, fixture.view), /source-readable/)
+  assert.throws(() => measureFixture(fixture), /source-readable/)
+})
+
+test('current physical source views cannot be waived by a readable navigation label', () => {
+  const shot = { id: 'labelled-navigation', startSeconds: 0, endSeconds: 3, classification: 'non-machine', hasCorrespondingMachine: false }
+  const source = { kind: 'current-source-observations', coverage: { changeTimesSeconds: [] }, shots: [shot], frames: [{ ...frame(1), shotId: shot.id, classification: 'non-machine', views: [sourceView('readable-bank')] }] }
+  const row = sourceCensus(source, { shots: [shot], frames: structuredClone(source.frames) }, native, parseOptions(['--times', '1'])).selected[0]
+  assert.equal(row.required, true)
+  assert.deepEqual(row.expectedViewIds, ['readable-bank'])
+  requireSourceViews(row)
+  source.frames[0].views = []
+  assert.equal(sourceCensus(source, { shots: [shot], frames: source.frames }, native, parseOptions(['--times', '1'])).selected[0].required, false)
+})
+
+// Exact metadata from the independently inspected original Analysis contact
+// sheet. Cameras/inputs here are synthetic census controls, not source fits.
+const analysisCoverExposures = [
+  [2608, 87.02026666666667, '63fd5eaae3c131ebb9a547730d7cea910514d6ff2a2a5bafffd3bfeb6dc95371', [797.2101902408472, 0, 789.5030875537748, 350.33846528816133]],
+  [2612, 87.15373333333334, '06815ae2ea0b2ad5001280d9528eaf23bfb7e35476377ab1f8c26ef0570d676b', [408.43834416899017, 0, 1340.846356663269, 706.0875769288202]],
+  [2616, 87.2872, 'fc0b86ddb08e68bf0ca493f70eac2a192f317207a2acf2f3f95b2c5649e81fb5', [58.87818800935385, 0, 1836.4626381724147, 1026.1114425892256]],
+  [2620, 87.42066666666666, 'dd0965d9be738472a14287d52caa93136bdf9c48b8682b37cc7e23bbe2f510d6', [0.0012211742535110114, 0.00044720401288042083, 1919.9959881610268, 1079.9993538624958]],
+  [2623, 87.52076666666666, '9dbada5df9c334fcfa30ef08f7bd293cd1ea0d14aa1c47b1681533fd94fd37b2', [0, 0, 1920, 1080]],
+]
+function analysisCoverFixture(exposure) {
+  const [frameIndex, timeSeconds, sha256Bgr8, rect] = exposure
+  const shot = { id: 'source-overlay', startSeconds: 0, endSeconds: 100, classification: 'machine', hasCorrespondingMachine: true }
+  const source = { shots: [shot], frames: [{
+    ...frame(timeSeconds), shotId: shot.id,
+    sourceImage: { frameIndex, pixelFormat: 'bgr8', width: 1920, height: 1080, sourceSha256: '5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52', sha256Bgr8 },
+    views: [sourceView('main'), sourceView('bar-bank', [...rect])],
+  }] }
+  return { source, track: { shots: [shot], frames: structuredClone(source.frames) },
+    row: track => sourceCensus(source, track, { ...native, durationSeconds: 100 }, parseOptions(['--times', String(timeSeconds)])).selected[0] }
+}
+
+test('actual Analysis2623 exact opaque bank is required and lower main preserved noncontributing; 2608/2612/2616 and float2620 retain both', () => {
+  for (const exposure of analysisCoverExposures) {
+    const { source, track, row } = analysisCoverFixture(exposure), before = structuredClone(source)
+    const sample = row(track), fullyCovered = exposure[0] === 2623
+    assert.equal(sample.required, true)
+    assert.deepEqual(sample.expectedViewIds, fullyCovered ? ['bar-bank'] : ['main', 'bar-bank'])
+    assert.deepEqual(sample.noncontributingCoveredViews.map(view => [view.viewId, view.coveredByViewId]), fullyCovered ? [['main', 'bar-bank']] : [])
+    assert.deepEqual(sample.qualifiedExcludedViews, [], 'Ordinary layer coverage never becomes a blur/fade qualification')
+    requireSourceViews(sample)
+    assert.deepEqual(source, before, 'Original ROI inventory, exact source image and clocks remain immutable')
+  }
+})
+
+test('exact opaque cover refuses transparency, any uncovered strip, warps and current-only loss of original source inventory', () => {
+  for (const mutation of ['transparent', 'strip', 'warp', 'missing-lower']) {
+    const { track, row } = analysisCoverFixture(analysisCoverExposures[4]), top = track.frames[0].views[1]
+    if (mutation === 'transparent') top.composite = { mode: 'crossfade', groupId: 'overlay', imageLayerId: 'bank', opacity: 0.9999999999999999 }
+    if (mutation === 'strip') top.rectSourcePixels[2] -= Number.EPSILON * 1920
+    if (mutation === 'warp') top.imagePlaneWarp = { kind: 'homography', unwarpedViewportPixels: [1920, 1080], renderToSourcePixels: [1, 0, 0, 0, 1, 0, 0, 0, 1] }
+    if (mutation === 'missing-lower') track.frames[0].views.shift()
+    const sample = row(track)
+    assert.ok(sample.expectedViewIds.includes('main'))
+    if (mutation === 'missing-lower') assert.throws(() => requireSourceViews(sample), /main/)
+    else assert.equal(sample.noncontributingCoveredViews.length, 0)
+  }
+})
+
+test('current measured full footprint can resolve only its exact original image, order and opacity, never borrowed coverage', () => {
+  for (const mutation of ['none', 'image', 'order', 'opacity']) {
+    const { source, track, row } = analysisCoverFixture(analysisCoverExposures[3]), before = structuredClone(source)
+    track.frames[0].views[1].rectSourcePixels = [0, 0, 1920, 1080]
+    if (mutation === 'image') track.frames[0].sourceImage.sha256Bgr8 = 'f'.repeat(64)
+    if (mutation === 'order') track.frames[0].views.reverse()
+    if (mutation === 'opacity') track.frames[0].views[1].composite = { mode: 'crossfade', groupId: 'overlay', imageLayerId: 'bank', opacity: 1 }
+    const sample = row(track)
+    if (mutation === 'none') {
+      assert.deepEqual(sample.expectedViewIds, ['bar-bank'])
+      requireSourceViews(sample)
+    } else {
+      assert.equal(sample.expectedViewIds.length, 2)
+      assert.throws(() => requireSourceViews(sample), /main|bar-bank/)
+    }
+    assert.deepEqual(source, before)
+  }
+})
+
+test('actual Rocker24318 to24323 retain sharp outgoing main while only exactly zero incoming images are noncontributing', async () => {
+  const track = JSON.parse(await readFile(new URL('../content/4mBuyixt22U.source-track.json', import.meta.url), 'utf8'))
+  const exposures = track.frames.filter(frame => frame.sourceImage?.frameIndex >= 24318 && frame.sourceImage?.frameIndex <= 24323)
+  assert.equal(exposures.length, 6)
+  const original = { ...track, frames: exposures }, authored = { ...track, frames: structuredClone(exposures) }
+  const options = parseOptions(['--times', exposures.map(frame => frame.timeSeconds).join(',')])
+  const census = sourceCensus(original, authored, { ...native, durationSeconds: track.source.durationSeconds, fps: 24000 / 1001 }, options)
+  for (const row of census.selected) {
+    assert.equal(row.required, true)
+    assert.deepEqual(row.expectedViewIds, ['main'])
+    assert.equal(row.noncontributingZeroOpacityViews.length, 7)
+    assert.deepEqual(row.qualifiedExcludedViews, [])
+    requireSourceViews(row)
+    assert.throws(() => measureView(row.frame.views[1], { player: 'local', originalExposure: null }, row.frame, [], 960, new Map()), /Noncontributing physical ROI/)
+  }
+  const tiny = structuredClone(authored)
+  tiny.frames[0].views[1].composite.opacity = Number.MIN_VALUE
+  const tinyRow = sourceCensus(original, tiny, { ...native, durationSeconds: track.source.durationSeconds, fps: 24000 / 1001 }, options).selected[0]
+  assert.ok(tinyRow.expectedViewIds.includes('navigation-synthesis'))
+  assert.equal(tinyRow.noncontributingZeroOpacityViews.length, 6)
+  for (const mutation of ['image', 'missing-view', 'malformed', 'opaque-zero']) {
+    const changed = structuredClone(authored)
+    if (mutation === 'image') changed.frames[0].sourceImage.sha256Gray8 = 'f'.repeat(64)
+    if (mutation === 'missing-view') changed.frames[0].views.splice(1, 1)
+    if (mutation === 'malformed') changed.frames[0].views[1].composite.groupId = ''
+    if (mutation === 'opaque-zero') changed.frames[0].views[1].composite = { mode: 'opaque', opacity: 0 }
+    const row = sourceCensus(original, changed, { ...native, durationSeconds: track.source.durationSeconds, fps: 24000 / 1001 }, options).selected[0]
+    assert.ok(row.expectedViewIds.includes('navigation-synthesis'))
+    if (mutation === 'image' || mutation === 'missing-view') assert.throws(() => requireSourceViews(row), /navigation-synthesis/)
+  }
+})
+
+test('admitted mid-interval errors use the owned integer-PTS selection without aliasing the actual native clock', () => {
+  const fixture = measuredViewFixture(), actual = fixture.response.actual
+  Object.assign(fixture.frame, { decodedTimeSeconds: 1.01, measuredInterpolation: true, interpolationInterval: [0, 2] })
+  Object.assign(actual, { modelTime: 1.009, sourceSampleTimeSeconds: 1.01, mode: 'reference-review', playerState: 'paused', referenceState: 'approximate' })
+  Object.assign(actual.sourcePresentation, { pts: 3030, timeBase: [1, 3000], mediaTime: 1.01, currentTime: 1.009 })
+  Object.assign(fixture.response.originalExposure, { pts: 3030, timeBase: [1, 3000] })
+  actual.views[0].sourceSampling = { selection: 'continuous', fromTimeSeconds: 0, toTimeSeconds: 2, mix: 1.01 / 2 }
+  Object.assign(fixture.response.native, { mediaTime: 1.009, paused: true, seeking: false })
+  fixture.capture.timeSeconds = fixture.response.captures[0].mechanism.timeSeconds = 1.009
+  fixture.capture.landmarks[0].sourcePixels = [fixture.capture.landmarks[0].sourcePixels[0] + 1000, fixture.capture.landmarks[0].sourcePixels[1]]
+  fixture.capture.landmarks[0].canvasPixels = [...fixture.capture.landmarks[0].sourcePixels]
+  requirePausedReview(actual, fixture.response.native, fixture.frame, true, fixture.response.player, fixture.response.originalExposure)
+  const measured = measureFixture(fixture).measured.find(point => point.anchorId === 'anchor-0')
+  assert.equal(measured.status, 'failed', 'A genuine admitted counterexample is not discarded for nominal-versus-PTS offset')
+  assert.equal(measured.captureTimeSeconds, 1.009)
+  actual.views[0].sourceSampling.mix = 0.5
+  assert.throws(() => measureFixture(fixture), /interpolation/)
 })

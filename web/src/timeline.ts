@@ -7,7 +7,7 @@ import type { Video } from './video-catalog'
 export { SOURCE_WIDTH, SOURCE_HEIGHT, LANDMARK_LIMIT_PX, SOURCE_STAGE_PERCENTAGES } from './source-track'
 
 /** Approximation never asserts recovered history or a passed rendered tolerance stage. */
-export type ReferenceState = 'approximate' | 'no-machine' | 'unavailable'
+export type ReferenceState = 'approximate' | 'hold-last-readable' | 'unavailable'
 export type Classification = 'machine' | 'non-machine' | 'transition' | 'unobservable'
 export interface SourceIdentity {
   videoId: string

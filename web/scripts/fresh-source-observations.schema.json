@@ -318,6 +318,24 @@
         "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}
       }
     },
+    "sourceVisibility": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "reasonCode", "sourceImage", "rectSourcePixels", "manualSourceAudit"],
+      "properties": {
+        "kind": {"const": "policy-excluded"},
+        "reasonCode": {"enum": ["blurred-navigation-background", "text-covered-navigation-background", "unreadable-near-black-fade"]},
+        "sourceImage": {"$ref": "source-observations.schema.json#/$defs/sourceImage"},
+        "rectSourcePixels": {"$ref": "source-observations.schema.json#/$defs/xyzw"},
+        "manualSourceAudit": {
+          "type": "object", "additionalProperties": false, "required": ["method", "evidence"],
+          "properties": {
+            "method": {"const": "manual-source-pixel-inspection"},
+            "evidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}
+          }
+        }
+      },
+      "description": "Omitted means required/readable. Only the exact complete physical ROI in this actual exposure may be individually manually qualified as deliberately blurred/text-covered navigation background or a genuinely unreadable near-black fade. Readable insets/outgoing views remain required. Original template donors with entirely absent independent tracking remain lossless inadmissible provenance, never measured support; genuinely admitted source measurements block exclusion. Timestamps, decoder/image replay, clocks and whole-video guards remain required. This is not native pose or fidelity evidence."
+    },
     "view": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "rectSourcePixels", "presentation", "camera", "input", "provenance", "cameraProvenance", "cameraContinuityFamily"],
@@ -327,6 +345,7 @@
         "sourceViewIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"}},
         "sourceViewMappingEvidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
         "rectSourcePixels": {"$ref": "source-observations.schema.json#/$defs/xyzw"},
+        "sourceVisibility": {"$ref": "#/$defs/sourceVisibility"},
         "presentation": {"enum": ["native", "horizontal-mirror"]},
         "camera": {"$ref": "#/$defs/camera"},
         "input": {"oneOf": [{"type": "null"}, {"$ref": "source-observations.schema.json#/$defs/mechanismInput"}]},
@@ -355,7 +374,7 @@
         "compositeEvidence": {"$ref": "source-observations.schema.json#/$defs/sourceEvidence"},
         "imagePlaneWarp": {"$ref": "source-observations.schema.json#/$defs/resolvedImagePlaneWarp"},
         "imagePlaneWarpMeasurement": {"$ref": "#/$defs/warpMeasurement"},
-        "nativeLineChecks": {"type": "array", "items": {"$ref": "source-observations.schema.json#/$defs/nativeLineCheck"}},
+        "nativeLineChecks": {"type": "array", "items": {"allOf": [{"$ref": "source-observations.schema.json#/$defs/nativeLineCheck"}, {"not": {"required": ["role"]}}]}},
         "unavailable": {"$ref": "#/$defs/unavailable"}
       },
       "allOf": [{"if": {"properties": {"camera": {"type": "object"}}}, "then": {"required": ["cameraMeasurement"]}}, {"if": {"properties": {"cameraInterpolation": {"const": "continuous-shot"}}, "required": ["cameraInterpolation"]}, "then": {"required": ["cameraInterpolationEvidence"]}}, {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}]

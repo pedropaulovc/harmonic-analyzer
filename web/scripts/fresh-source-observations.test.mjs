@@ -156,3 +156,147 @@ test('actual current tracks associate through uv without an ambient python3 alia
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+function visibilityFixture() {
+  const record = recordFixture(), frame = record.frames[0]
+  frame.sourceMachineRequirement = 'required'
+  frame.views = [{
+    id: 'main', rectSourcePixels: [0, 0, 1920, 1080], presentation: 'native',
+    camera: null, input: null,
+    provenance: { kind: 'chosen-feasible', evidence: 'Synthetic unavailable native candidate; no source pose claim.', unobservedInputFields: [] },
+    cameraProvenance: { kind: 'source-informed-framing', family: 'synthetic-visibility', evidence: 'Synthetic unavailable framing.' },
+    cameraContinuityFamily: 'synthetic-visibility',
+    unavailable: [{ reason: 'Synthetic policy-excluded background has no corresponding readable native pose.' }],
+  }]
+  const view = frame.views[0]
+  view.sourceVisibility = {
+    kind: 'policy-excluded', reasonCode: 'blurred-navigation-background',
+    sourceImage: structuredClone(frame.sourceImage), rectSourcePixels: [...view.rectSourcePixels],
+    manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: 'Synthetic full-ROI annotation control, not a claim that this readable source exposure is blurred.' },
+  }
+  return record
+}
+
+test('current visibility qualification retains the original exact source ROI and chosen candidate without a fidelity claim', async () => {
+  const record = visibilityFixture(), before = structuredClone(record)
+  await validateCurrentObservations(record, { webRoot })
+  assert.deepEqual(record, before)
+})
+
+test('current visibility refuses misbound images, partial ROIs, unknown reasons, blank audits and readable physical support', async () => {
+  for (const mutate of [
+    view => { view.sourceVisibility.sourceImage.frameIndex++ },
+    view => { view.sourceVisibility.rectSourcePixels[2]-- },
+    view => { view.sourceVisibility.reasonCode = 'unobservable' },
+    view => { view.sourceVisibility.manualSourceAudit.evidence = ' \n ' },
+    view => { view.sourceVisibility.manualSourceAudit.method = 'candidate-status' },
+    view => { view.sourceVisibility.approved = true },
+    (view, frame) => { frame.landmarks.push({ viewId: view.id }) },
+    view => { view.nativeLineChecks = [{}] },
+  ]) {
+    const record = visibilityFixture()
+    mutate(record.frames[0].views[0], record.frames[0])
+    await assert.rejects(validateCurrentObservations(record, { webRoot }), /Source visibility|source-readable/)
+  }
+})
+
+test('visibility qualification cannot waive actual requested/decoded clock ownership', async () => {
+  const record = visibilityFixture()
+  record.frames[0].decodedTimeSeconds = 0.501
+  await assert.rejects(validateCurrentObservations(record, { webRoot }), /requested\/decoded clock/)
+})
+
+test('current native line observations are held-out checks and reject explicit camera fitter roles', async () => {
+  const record = visibilityFixture(), frame = record.frames[0], view = frame.views[0]
+  delete view.sourceVisibility
+  record.coverage.status = 'blocked'
+  record.coverage.blockers = ['Synthetic source candidate intentionally has no camera/input; structural line-check control only.']
+  view.nativeLineChecks = [{
+    id: 'synthetic-held-out-line', partPath: 'ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1',
+    partLocalLineMetres: [[0, 0, 0], [0, 1, 0]], sourceLinePixels: [[1200, 200], [1200, 900]], uncertaintyPx: 2,
+    measurementEvidence: {
+      sourceImage: structuredClone(frame.sourceImage), detector: 'Synthetic paired-edge semantic decision control, not fidelity evidence.',
+      edgeRows: [200, 550, 900].map(y => ({ y, left: 1199, right: 1201, contrast: 10 })),
+      axisPerspectiveBiasBoundPx: 4, axisPerspectiveEvidence: 'Synthetic independent stock-width budget control.',
+      axisPerspectiveBiasSpace: 'source-global',
+      axisPerspectiveBiasComponents: { kind: 'includes-source-localization', geometryBoundPx: 2, sourceLocalizationBoundPx: 2, evidence: 'Synthetic inclusive localization budget.' },
+    },
+  }]
+  await validateCurrentObservations(record, { webRoot })
+  view.nativeLineChecks[0].role = 'fit'
+  await assert.rejects(validateCurrentObservations(record, { webRoot }), /schema|held out|FIT/)
+})
+
+test('qualified ROIs retain only structurally valid original template donors without independent tracking', async () => {
+  const record = visibilityFixture(), frame = record.frames[0]
+  record.anchors = [{
+    id: 'synthetic-donor', kind: 'physical-feature',
+    partPath: 'ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1', partLocalMetres: [0, 0, 0],
+    description: 'Synthetic native feature declaration for a provenance refusal control.',
+    correspondenceEvidence: 'Synthetic current released-body association, not measured source support.',
+  }]
+  frame.views[0].sourceVisibility.reasonCode = 'unreadable-near-black-fade'
+  frame.landmarks = [{ anchorId: 'synthetic-donor', viewId: 'main', role: 'fit', method: 'template-match', status: 'observed', pixel: [1200, 500], uncertaintyPx: 2 }]
+  const before = structuredClone(record)
+  await validateCurrentObservations(record, { webRoot })
+  assert.deepEqual(record, before, 'Qualification never rewrites original donor pixels, methods or roles')
+  for (const mutation of ['independent-method', 'present-tracking', 'status', 'coordinates', 'image', 'native-binding']) {
+    const changed = structuredClone(record), point = changed.frames[0].landmarks[0]
+    if (mutation === 'independent-method') point.method = 'manual'
+    if (mutation === 'present-tracking') point.trackingEvidence = {}
+    if (mutation === 'status') point.status = 'unavailable'
+    if (mutation === 'coordinates') point.pixel[0] = -1
+    if (mutation === 'image') point.measurementEvidence = { sourceImage: { ...frame.sourceImage, frameIndex: frame.sourceImage.frameIndex + 1 } }
+    if (mutation === 'native-binding') changed.anchors[0].partPath += '-unknown'
+    await assert.rejects(validateCurrentObservations(changed, { webRoot }), /source-readable|schema|unknown runtime|source association/)
+  }
+})
+
+test('a readable physical view cannot inherit a non-machine or no-correspondence label exemption', async () => {
+  const record = visibilityFixture(), frame = record.frames[0]
+  delete frame.sourceMachineRequirement
+  delete frame.views[0].sourceVisibility
+  record.shots[0].hasCorrespondingMachine = false
+  await assert.rejects(validateCurrentObservations(record, { webRoot }), /unresolved.*camera\/input/)
+})
+
+test('covered lower source records remain preserved while every partially visible lower candidate stays required', async () => {
+  const record = visibilityFixture(), frame = record.frames[0]
+  delete frame.views[0].sourceVisibility
+  const top = structuredClone(original.frames.find(row => row.views?.length).views[0])
+  top.id = 'top-bank'
+  delete top.sourceVisibility
+  top.composite = { mode: 'opaque' }
+  top.cameraMeasurement.sourceImage = structuredClone(frame.sourceImage)
+  top.cameraMeasurement.evidence = 'Synthetic native candidate with exact record bindings for coverage admission only, not an actual source camera measurement.'
+  frame.views.push(top)
+  const before = structuredClone(record)
+  await validateCurrentObservations(record, { webRoot })
+  assert.deepEqual(record, before, 'Opaque cover never erases lower source pixels or inventories')
+  for (const mutation of ['strip', 'transparent', 'reverse']) {
+    const changed = structuredClone(record), views = changed.frames[0].views
+    if (mutation === 'strip') views[1].rectSourcePixels[2] -= Number.EPSILON * 1920
+    if (mutation === 'transparent') views[1].composite = { mode: 'crossfade', groupId: 'overlay', imageLayerId: 'bank', opacity: 0.9999999999999999 }
+    if (mutation === 'reverse') views.reverse()
+    await assert.rejects(validateCurrentObservations(changed, { webRoot }), /unresolved.*camera\/input/)
+  }
+})
+
+test('exact valid zero contribution does not waive malformed records or any positive unresolved source view', async () => {
+  const record = visibilityFixture(), frame = record.frames[0], view = frame.views[0]
+  delete view.sourceVisibility
+  view.composite = { mode: 'crossfade', groupId: 'zero-image', imageLayerId: 'whole', opacity: 0 }
+  view.compositeEvidence = 'Synthetic exact zero image contribution decision control, not a measured source attenuation.'
+  const before = structuredClone(record)
+  await validateCurrentObservations(record, { webRoot })
+  assert.deepEqual(record, before)
+  for (const mutation of ['positive', 'malformed', 'unknown', 'identity', 'clock']) {
+    const changed = structuredClone(record), candidate = changed.frames[0].views[0]
+    if (mutation === 'positive') candidate.composite.opacity = Number.MIN_VALUE
+    if (mutation === 'malformed') delete candidate.composite.imageLayerId
+    if (mutation === 'unknown') candidate.composite.mode = 'dark'
+    if (mutation === 'identity') changed.frames[0].sourceImage.sourceSha256 = 'f'.repeat(64)
+    if (mutation === 'clock') changed.frames[0].decodedTimeSeconds = 0.501
+    await assert.rejects(validateCurrentObservations(changed, { webRoot }), /unresolved.*camera\/input|schema|source image|source\/native|clock|source identity|malformed source composite/i)
+  }
+})

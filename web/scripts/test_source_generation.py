@@ -557,6 +557,7 @@ if (incomingId) {
                 track = ordinary_build(module, video_id, entrypoint, record)
                 shot = next(shot for shot in record['shots'] if shot['id'] == shot_id)
                 incoming_id, two_before, precut = None, None, None
+                expected_shot_id = shot_id
                 if video_id == '6dW6VYXp9HM':
                     time = math.nextafter(shot['endSeconds'], -math.inf)
                     frame = next(frame for frame in record['frames']
@@ -573,13 +574,30 @@ if (incomingId) {
                     precut = max((frame for frame in record['frames']
                                   if frame['decodedTimeSeconds'] < shot['startSeconds']),
                                  key=lambda frame: frame['decodedTimeSeconds'])
-                result = subprocess.run(
-                    ['node', '--input-type=module', '--eval', program],
-                    input=json.dumps({'root': str(root / 'web'), 'track': track,
-                                      'time': time, 'shotId': shot_id, 'incomingId': incoming_id,
-                                      'twoBefore': two_before, 'precut': precut}),
-                    capture_output=True, text=True, cwd=root, check=False)
-                self.assertEqual(result.returncode, 0, result.stderr)
+                    authored = next((frame for frame in record['frames']
+                                     if frame['timeSeconds'] == time), None)
+                    if authored is not None:
+                        # A genuine authored outgoing clock outranks derived cut routing.
+                        self.assertLess(authored['decodedTimeSeconds'], shot['startSeconds'])
+                        endpoint = next(row for row in track['frames'] if row['timeSeconds'] == time)
+                        self.assertEqual(endpoint['sourceImage'], authored['sourceImage'])
+                        self.assertEqual(endpoint['decodedTimeSeconds'], authored['decodedTimeSeconds'])
+                        expected_shot_id = authored['shotId']
+                        incoming_id = shot_id
+                controls = [{'time': time, 'shotId': expected_shot_id, 'incomingId': incoming_id,
+                             'twoBefore': two_before, 'precut': precut}]
+                if video_id == '4mBuyixt22U' and incoming_id is not None:
+                    # The separate incoming packet still refuses a two-ULP key or outgoing PTS.
+                    start = shot['startSeconds']
+                    controls.append({'time': start, 'shotId': shot_id, 'incomingId': None,
+                                     'twoBefore': math.nextafter(math.nextafter(start, -math.inf), -math.inf),
+                                     'precut': precut})
+                for control in controls:
+                    result = subprocess.run(
+                        ['node', '--input-type=module', '--eval', program],
+                        input=json.dumps({'root': str(root / 'web'), 'track': track, **control}),
+                        capture_output=True, text=True, cwd=root, check=False)
+                    self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_fresh_record_and_old_headers_never_read_old_calibration(self):
         for filename, video_id, entrypoint in CURRENT_PRODUCERS:
@@ -2408,6 +2426,74 @@ class SynthesisAutomaticSourceDriveTests(unittest.TestCase):
         self.assertEqual(self.main_input(next_shot)['crankTurns'], self.baseline['crankTurns'])
 
 
+class ExecutedPointMotionTests(unittest.TestCase):
+    def test_rotary_points_need_executed_baseline_not_only_a_body_binding(self):
+        for path, coordinate in (
+            ('dt-drive-train/dt-crank-handle-1', [0.057999998331069946, 0, 0]),
+            ('dt-drive-train/dt-crank-handle-butt-cup-1', [-0.008100000210106373, 0, 0]),
+            ('mg-magnifier/mg-magnifying-wheel-1', [-0.0014816663460806012, 0.04997804015874863, 0]),
+            ('dt-drive-train/dt-crankshaft-1', [0, 0, 0]),
+        ):
+            with self.subTest(path=path):
+                self.assertIsNone(common.anchor_motion({
+                    'id': 'unproved-feature', 'kind': 'physical-feature',
+                    'partPath': 'ha-harmonic-analyzer/' + path, 'partLocalMetres': coordinate,
+                    'correspondenceEvidence': 'Native correspondence is not executed motion.'}))
+
+    def test_historical_anchor_authority_does_not_open_live_point_motion_route(self):
+        self.assertEqual(common.executed_anchor_motion(
+            {'kind': 'historical-source-observations'}, [{'id': 'old', 'motion': None}], []), {})
+        self.assertEqual(common.anchor_motion({'id': 'old', 'motion': 'moving'}), 'moving')
+
+    def bridge(self, responses):
+        # Protocol aggregation controls only: no substitute native model or
+        # fabricated source/geometry proof is installed in the classifier.
+        bridge = object.__new__(common._PointMotionBridge)
+        bridge.cache = {}
+        bridge.unavailable = False
+        bridge.process = type("ResponseStream", (), {})()
+        bridge.process.stdin = io.StringIO()
+        bridge.process.stdout = io.StringIO("".join(json.dumps(row) + "\n" for row in responses))
+        return bridge
+
+    def test_global_motion_requires_every_occurrence_not_any_matching_id(self):
+        request = {"cases": [{"anchor": {"id": "reused"}} for _ in range(3)]}
+        for motions, expected in (
+                (["moving", "moving", "moving"], {"reused": "moving"}),
+                (["moving", None, "moving"], {}),
+                ([None, "moving", "moving"], {}),
+                (["moving", "moving", None], {})):
+            bridge = self.bridge([{"results": [{"id": "reused", "motion": motion} for motion in motions]}])
+            self.assertEqual(bridge.classify(request), expected)
+
+    def test_missing_or_misidentified_occurrence_cannot_promote(self):
+        request = {"cases": [{"anchor": {"id": "reused"}}, {"anchor": {"id": "reused"}}]}
+        for rows in (
+                [{"id": "reused", "motion": "moving"}],
+                [{"id": "reused", "motion": "moving"}, {"id": "other", "motion": "moving"}]):
+            bridge = self.bridge([{"results": rows}])
+            with patch("sys.stderr", io.StringIO()):
+                self.assertEqual(bridge.classify(request), {})
+            self.assertTrue(bridge.unavailable)
+
+    def test_bridge_cache_separates_source_assembly_and_never_serializes_nan_as_null(self):
+        request = {"cases": [{"anchor": {"id": "point"}, "input": {"crankTurns": 0},
+                              "sourceAssembly": {"photograph": {"pair": "four-gears", "angle": 0}}}]}
+        bridge = self.bridge([{"results": [{"id": "point", "motion": "moving"}]},
+                              {"results": [{"id": "point", "motion": None}]}])
+        self.assertEqual(bridge.classify(request), {"point": "moving"})
+        written = bridge.process.stdin.getvalue()
+        self.assertEqual(bridge.classify(copy.deepcopy(request)), {"point": "moving"})
+        self.assertEqual(bridge.process.stdin.getvalue(), written)
+        changed = copy.deepcopy(request)
+        changed["cases"][0]["sourceAssembly"]["photograph"]["angle"] = .125
+        self.assertEqual(bridge.classify(changed), {})
+        invalid = copy.deepcopy(request)
+        invalid["cases"][0]["sourceAssembly"]["photograph"]["angle"] = float("nan")
+        with self.assertRaises(ValueError):
+            bridge.classify(invalid)
+
+
 class HistoricalSynthesisSourceDriveBoundaryTests(unittest.TestCase):
     def fixture(self, load_motion=True):
         generator = historical_synthesis_generator()
@@ -2587,6 +2673,196 @@ class HistoricalSceneArchiveBoundaryTests(unittest.TestCase):
                     camera_tracks.HistoricalReceiptRevalidator('8KmVDxkia_w')
                 with self.assertRaises(ValueError):
                     generator.revalidate_receipt()
+
+
+class QualifiedSourceVisibilityTests(unittest.TestCase):
+    @staticmethod
+    def qualify(frame, view):
+        view['sourceVisibility'] = {
+            'kind': 'policy-excluded', 'reasonCode': 'blurred-navigation-background',
+            'sourceImage': copy.deepcopy(frame['sourceImage']),
+            'rectSourcePixels': copy.deepcopy(view['rectSourcePixels']),
+            'manualSourceAudit': {'method': 'manual-source-pixel-inspection',
+                                  'evidence': 'Synthetic full physical ROI audit for ordinary producer contract only.'},
+        }
+
+    def test_normal_current_producer_retains_inventory_and_only_omits_qualified_background_denominators(self):
+        video_id = 'XPQwKRt4Y2k'
+        with current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            for frame in record['frames']:
+                background = copy.deepcopy(frame['views'][0])
+                frame['views'][0]['rectSourcePixels'] = [0, 0, 400, 600]
+                background['id'] = 'background'
+                background['camera'] = None
+                background['input'] = None
+                background.pop('cameraMeasurement', None)
+                background['unavailable'] = [{'reason': 'Source-qualified blurred background has no current native pose claim.'}]
+                self.qualify(frame, background)
+                frame['views'].insert(0, background)
+            write_current_record(root / 'web', video_id, record)
+            track = ordinary_build(module, video_id, 'generate', record)
+            self.assertEqual(track['coverage']['status'], 'complete')
+            self.assertEqual(track['sourceMeasurements']['requiredViewSamples'],
+                             sum(len(frame['views']) - 1 for frame in track['frames']))
+            self.assertEqual(track['sourceMeasurements']['qualifiedExcludedViewSamples'], len(track['frames']))
+            for frame in track['frames']:
+                self.assertEqual(frame['views'][0]['id'], 'background')
+                self.assertEqual(frame['views'][0]['sourceVisibility']['sourceImage'], frame['sourceImage'])
+            self.assertTrue(all(stage['status'] == 'unmeasured' for stage in track['stages'].values()))
+            module.common.write_track(track)
+
+    def test_normal_producer_refuses_incomplete_roi_wrong_image_unknown_reason_and_readable_current_pixels(self):
+        video_id = 'XPQwKRt4Y2k'
+        for mutation in ('image', 'roi', 'reason', 'blank-audit', 'readable'):
+            with self.subTest(mutation=mutation), current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+                record = data[video_id]
+                frame = record['frames'][0]
+                background = copy.deepcopy(frame['views'][0])
+                background['id'] = 'background'
+                self.qualify(frame, background)
+                frame['views'].append(background)
+                value = background['sourceVisibility']
+                if mutation == 'image':
+                    value['sourceImage']['frameIndex'] += 1
+                elif mutation == 'roi':
+                    value['rectSourcePixels'][2] -= 1
+                elif mutation == 'reason':
+                    value['reasonCode'] = 'unobservable'
+                elif mutation == 'blank-audit':
+                    value['manualSourceAudit']['evidence'] = ' '
+                else:
+                    frame['landmarks'].append({**frame['landmarks'][0], 'viewId': 'background'})
+                write_current_record(root / 'web', video_id, record)
+                with self.assertRaises(ValueError):
+                    ordinary_build(module, video_id, 'generate', record)
+
+    def test_normal_producer_preserves_inadmissible_template_donors_without_using_them_as_checks(self):
+        video_id = 'XPQwKRt4Y2k'
+        with current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            frame = record['frames'][0]
+            for point in frame['landmarks']:
+                point['method'] = 'template-match'
+                point.pop('trackingEvidence', None)
+            self.qualify(frame, frame['views'][0])
+            frame['views'][0]['sourceVisibility']['reasonCode'] = 'unreadable-near-black-fade'
+            donors = copy.deepcopy(frame['landmarks'])
+            write_current_record(root / 'web', video_id, record)
+            track = ordinary_build(module, video_id, 'generate', record)
+            retained = next(row for row in track['frames'] if row['timeSeconds'] == frame['timeSeconds'])
+            self.assertEqual(retained['landmarks'], donors)
+            self.assertEqual(track['sourceMeasurements']['preservedInadmissibleLandmarkSamples'], len(donors))
+            self.assertTrue(all(stage['status'] == 'unmeasured' for stage in track['stages'].values()))
+            module.common.write_track(track)
+
+    def test_qualification_transition_is_a_retained_observed_change_even_without_authored_keys(self):
+        data = {
+            'kind': 'current-source-observations', 'coverage': {'changeTimesSeconds': []},
+            'frames': [
+                {'timeSeconds': 0, 'views': [{'id': 'main'}]},
+                {'timeSeconds': 0.25, 'views': [{'id': 'main', 'sourceVisibility': {'reasonCode': 'blurred-navigation-background'}}]},
+                {'timeSeconds': 0.5, 'views': [{'id': 'main'}]},
+            ],
+        }
+        self.assertEqual(common.compact_change_times(data), {0, 0.25, 0.5})
+
+    def test_current_physical_views_do_not_inherit_non_machine_labels(self):
+        current = {'kind': 'current-source-observations',
+                   'shots': [{'id': 'navigation', 'classification': 'non-machine',
+                              'hasCorrespondingMachine': False}]}
+        frame = {'shotId': 'navigation', 'classification': 'non-machine',
+                 'views': [{'id': 'readable-bank'}]}
+        self.assertTrue(common.needs_machine(frame, current))
+        frame['views'] = []
+        self.assertFalse(common.needs_machine(frame, current))
+        frame['views'] = [{'id': 'historical-view'}]
+        self.assertFalse(common.needs_machine(frame, {**current, 'kind': 'source-observations'}))
+
+    def test_normal_producer_preserves_covered_lower_inventory_and_distinguishes_ordinary_coverage(self):
+        video_id = 'XPQwKRt4Y2k'
+        with current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            frame = record['frames'][0]
+            lower = frame['views'][0]
+            top = copy.deepcopy(lower)
+            top['id'] = 'top-bank'
+            top['composite'] = {'mode': 'opaque'}
+            lower['camera'] = None
+            lower['input'] = None
+            lower.pop('cameraMeasurement', None)
+            lower['unavailable'] = [{'reason': 'Preserved lower source candidate fully covered by the ordinary exact opaque bank.'}]
+            frame['views'].append(top)
+            original_points = copy.deepcopy(frame['landmarks'])
+            write_current_record(root / 'web', video_id, record)
+            track = ordinary_build(module, video_id, 'generate', record)
+            self.assertEqual(track['coverage']['status'], 'complete')
+            self.assertEqual(track['sourceMeasurements']['noncontributingCoveredViewSamples'], 1)
+            self.assertEqual(track['sourceMeasurements']['qualifiedExcludedViewSamples'], 0)
+            self.assertEqual(track['sourceMeasurements']['requiredViewSamples'],
+                             sum(len(row['views']) for row in track['frames']) - 1)
+            self.assertEqual(track['frames'][0]['landmarks'], original_points)
+            self.assertEqual([view['id'] for view in track['frames'][0]['views']], ['main', 'top-bank'])
+            self.assertTrue(all(stage['status'] == 'unmeasured' for stage in track['stages'].values()))
+            module.common.write_track(track)
+
+    def test_exact_opaque_coverage_never_rounds_away_source_strips_or_transparency(self):
+        for mutation in ('none', 'strip', 'transparent', 'warp', 'independent-fade'):
+            lower = {'id': 'main', 'rectSourcePixels': [0, 0, 1920, 1080]}
+            top = {'id': 'bank', 'rectSourcePixels': [0, 0, 1920, 1080]}
+            if mutation == 'strip':
+                top['rectSourcePixels'] = [0.0012211742535110114, 0.00044720401288042083,
+                                          1919.9959881610268, 1079.9993538624958]
+            if mutation == 'transparent':
+                top['composite'] = {'mode': 'crossfade', 'groupId': 'overlay',
+                                    'imageLayerId': 'bank', 'opacity': 0.9999999999999999}
+            if mutation == 'warp':
+                top['imagePlaneWarp'] = {'kind': 'homography'}
+            if mutation == 'independent-fade':
+                lower['composite'] = {'mode': 'crossfade', 'groupId': 'fade',
+                                      'imageLayerId': 'main', 'opacity': 0.5}
+                top['composite'] = {'mode': 'crossfade', 'groupId': 'fade',
+                                    'imageLayerId': 'bank', 'opacity': 1}
+            frame = {'views': [lower, top]}
+            self.assertIs(common.fully_covering_source_view(frame, lower),
+                          top if mutation == 'none' else None)
+
+    def test_normal_producer_retains_exact_zero_images_without_creating_source_checks(self):
+        video_id = 'XPQwKRt4Y2k'
+        with current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            frame = record['frames'][0]
+            zero = copy.deepcopy(frame['views'][0])
+            zero['id'] = 'zero-incoming'
+            zero['composite'] = {'mode': 'crossfade', 'groupId': 'incoming',
+                                 'imageLayerId': 'incoming', 'opacity': 0}
+            zero['compositeEvidence'] = 'Synthetic exact zero contribution producer control, not an actual source attenuation measurement.'
+            zero['camera'] = None
+            zero['input'] = None
+            zero.pop('cameraMeasurement', None)
+            zero['unavailable'] = [{'reason': 'Exact zero incoming image has no current source/native pose claim.'}]
+            frame['views'].append(zero)
+            write_current_record(root / 'web', video_id, record)
+            track = ordinary_build(module, video_id, 'generate', record)
+            self.assertEqual(track['coverage']['status'], 'complete')
+            self.assertEqual(track['sourceMeasurements']['noncontributingZeroOpacityViewSamples'], 1)
+            self.assertEqual(track['sourceMeasurements']['qualifiedExcludedViewSamples'], 0)
+            self.assertEqual(track['sourceMeasurements']['noncontributingCoveredViewSamples'], 0)
+            self.assertEqual(track['frames'][0]['views'][1]['composite'], zero['composite'])
+            self.assertEqual(track['sourceMeasurements']['requiredViewSamples'],
+                             sum(len(row['views']) for row in track['frames']) - 1)
+            self.assertTrue(all(stage['status'] == 'unmeasured' for stage in track['stages'].values()))
+            module.common.write_track(track)
+            for composite in (
+                {**zero['composite'], 'opacity': math.nextafter(0, 1)},
+                {'mode': 'opaque', 'opacity': 0},
+                {'mode': 'crossfade', 'opacity': 0},
+            ):
+                self.assertFalse(common.zero_opacity_source_view({**zero, 'composite': composite}))
+            zero['composite']['opacity'] = math.nextafter(0, 1)
+            write_current_record(root / 'web', video_id, record)
+            with self.assertRaisesRegex(ValueError, 'unresolved.*camera/input'):
+                ordinary_build(module, video_id, 'generate', record)
 
 
 if __name__ == '__main__':

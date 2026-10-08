@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { validateModelRepresentation, assertNativeSourceAssociation } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
 import { loadNativeIdentityMap } from './native-identity-map.mjs'
+import { sourceVisibilityError, requiredSourceViews, physicalSourceFrameRequired } from '../source-visibility.mjs'
 import { VIDEO_IDS, INPUT_FIELDS, completeInput, canonicalJson, sourceImageError, sourceNeedsMachine, recomputeImagePlaneWarp, sameResolvedImagePlaneWarp, nativeLineAxisGeometryBound, nativeGeometryAssumptionErrors, runTool } from './verify-reference.mjs'
 
 export const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -72,7 +73,7 @@ export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
   }
   // These are renderer-created bodies sharing one decoded native template, not
   // invented released inventory/REST rows. Execute the sole creation ledger.
-  const { runtimeInstances, videos } = await withCurrentRuntime(webRoot, async server => {
+  const { runtimeInstances, videos, motionBindings } = await withCurrentRuntime(webRoot, async server => {
     const { NATIVE_RUNTIME_INSTANCES } = await server.ssrLoadModule('/src/source-assembly.ts')
     assert(NATIVE_RUNTIME_INSTANCES && equal(Object.keys(NATIVE_RUNTIME_INSTANCES).sort(), ['crankMedium', 'upperMedium']),
       'Current runtime instance creation ledger must declare exactly its two genuine roles')
@@ -98,9 +99,11 @@ export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
       videos.set(video.id, { durationSeconds: video.durationSeconds, sha256: video.sourceSha256 })
     }
     assert(videos.size === VIDEO_IDS.length && VIDEO_IDS.every(id => videos.has(id)), 'Original-source catalog census differs')
-    return { runtimeInstances: instances, videos }
+    const { BINDINGS } = await server.ssrLoadModule('/src/bindings.ts')
+    assert(Array.isArray(BINDINGS) && BINDINGS.every(binding => text(binding.motion) && typeof binding.pattern?.test === 'function'), 'Actual native articulation registry is missing')
+    return { runtimeInstances: instances, videos, motionBindings: BINDINGS }
   })
-  return { approved, inventory, inventorySha256: seal.sha256, paths, runtimeInstances, videos }
+  return { approved, inventory, inventorySha256: seal.sha256, paths, runtimeInstances, videos, motionBindings }
 }
 
 function validateCurrentAnchors(data, authority, fields = CURRENT_ANCHOR_FIELDS) {
@@ -223,6 +226,7 @@ function validateLines(lines, frame, view, paths, label) {
   const inside = point => vector(point, 2) && point[0] >= rect[0] && point[0] < rect[0] + rect[2]
     && point[1] >= rect[1] && point[1] < rect[1] + rect[3]
   for (const line of lines) {
+    assert(!Object.hasOwn(line, 'role'), `${label}: native line checks are held out, not camera FIT or promoted source points`)
     const evidence = line.measurementEvidence, source = line.sourceLinePixels, local = line.partLocalLineMetres
     assert(text(line.id) && !ids.has(line.id) && paths.has(line.partPath)
       && Array.isArray(local) && local.length === 2 && local.every(point => vector(point, 3))
@@ -410,6 +414,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
     requireOptionalViewIds(frame.landmarks, `${label}/landmarks`)
     requireOptionalViewIds(frame.unavailable, `${label}/unavailable`)
     const viewIds = new Set()
+    const requiredViews = requiredSourceViews(frame)
     for (const view of frame.views) {
       const viewLabel = `${label}/${view.id}`, rect = view.rectSourcePixels
       assert(view && typeof view === 'object' && !Array.isArray(view)
@@ -419,6 +424,8 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
         && rect[2] > 0 && rect[3] > 0 && rect[0] + rect[2] <= source.width && rect[1] + rect[3] <= source.height
         && ['native', 'horizontal-mirror'].includes(view.presentation), `${viewLabel}: invalid source layout`)
       viewIds.add(view.id)
+      const visibilityError = sourceVisibilityError(frame, view)
+      assert(!visibilityError, `${viewLabel}: ${visibilityError}`)
       if (view.sourceViewIds !== undefined || view.sourceViewMappingEvidence !== undefined) {
         assert(Array.isArray(view.sourceViewIds) && view.sourceViewIds.length > 0
           && view.sourceViewIds.every(text) && new Set(view.sourceViewIds).size === view.sourceViewIds.length
@@ -454,7 +461,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
       }
       if (view.input === null || view.camera === null) {
         assert(unavailable(view.unavailable) || unavailable(frame.unavailable), `${viewLabel}: unresolved camera/input cannot be silently available`)
-        unresolved.push(`${viewLabel}: current camera/input unresolved`)
+        if (requiredViews.includes(view)) unresolved.push(`${viewLabel}: current camera/input unresolved`)
       }
       if (view.imagePlaneWarp !== undefined) {
         validateWarp(view.imagePlaneWarpMeasurement, frame, view, data.frames, viewLabel)
@@ -474,17 +481,18 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
       ;(point.role === 'fit' ? fits : checks).add(`${viewId}/${canonicalJson(point.pixel)}`)
     }
     assert(![...fits].some(pixel => checks.has(pixel)), `${label}: source FIT/CHECK pixels must be independently disjoint`)
-    if (sourceNeedsMachine(frame, shot) && !frame.views.length) {
+    if (physicalSourceFrameRequired(frame, sourceNeedsMachine(frame, shot)) && !frame.views.length) {
       assert(unavailable(frame.unavailable), `${label}: required source layout is unmapped without an explicit reason`)
       unresolved.push(`${label}: required current source layout unresolved`)
     }
     const image = frame.sourceImage, exposureKey = `${image.sourceSha256}/${image.frameIndex}`
     const layout = canonicalJson(currentSourceLayoutForViews(frame.views))
     const assembly = canonicalJson(frame.views.map(view => ({ viewId: view.id, sourceAssembly: view.sourceAssembly })))
+    const visibility = canonicalJson(frame.views.map(view => ({ viewId: view.id, sourceVisibility: view.sourceVisibility })))
     const pixelHash = image.sha256Bgr8 ?? image.sha256Gray8, prior = exposures.get(exposureKey)
     if (prior) {
       assert(prior.pts === frame.decodedTimeSeconds && prior.shotId === frame.shotId && prior.layout === layout
-        && prior.assembly === assembly
+        && prior.assembly === assembly && prior.visibility === visibility
         && prior.sourceMachineRequirement === frame.sourceMachineRequirement
         && (!prior.hashes.has(image.pixelFormat) || prior.hashes.get(image.pixelFormat) === pixelHash),
         `${label}: identical source exposure has conflicting clock/shot/layout/assembly/pixel associations`)
@@ -494,7 +502,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
         assert(!old || equal(old.pixel, point.pixel) && old.role === point.role, `${label}: identical source exposure has conflicting independent measurements`)
         prior.points.set(key, point)
       }
-    } else exposures.set(exposureKey, { pts: frame.decodedTimeSeconds, shotId: frame.shotId, layout, assembly,
+    } else exposures.set(exposureKey, { pts: frame.decodedTimeSeconds, shotId: frame.shotId, layout, assembly, visibility,
       sourceMachineRequirement: frame.sourceMachineRequirement, hashes: new Map([[image.pixelFormat, pixelHash]]),
       points: new Map(frame.landmarks.map(point => [`${point.viewId ?? 'main'}/${point.anchorId}`, point])) })
   }

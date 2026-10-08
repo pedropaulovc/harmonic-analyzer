@@ -1,11 +1,13 @@
 import { Quaternion } from 'three'
 import { createMechanismInput, createMechanismPose, MECHANISM_DATA, type MechanismInput } from './mechanics'
-import { assertSourceCompositeWeights, type CameraRecord, type ImagePlaneWarp, type SourceComposite, type SourceLayoutEntry } from './scene'
+import { assertSourceCompositeWeights, type CameraRecord, type ImagePlaneWarp, type SourceComposite, type SourceLayoutEntry, type LandmarkAnchor } from './scene'
 import { compileSourceAssemblyState } from './source-assembly'
 import type { SourceAssemblyState } from './source-assembly'
-import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
+import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type NativeLineCheck, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
 import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIdentity, NativeModelIdentity, SourceShot, ReferenceState, SourceSample } from './timeline'
 import type { Video } from './video-catalog'
+import { requiredSourceViews, sourceVisibilityError, physicalSourceFrameRequired, type SourceVisibilityQualification } from '../source-visibility.mjs'
+import { NATIVE_LINE_STATIONS, nativeLineEndpointId } from '../native-line-checks.mjs'
 
 export const SOURCE_WIDTH = 1920
 export const SOURCE_HEIGHT = 1080
@@ -33,6 +35,7 @@ export interface CompactSourceView {
   /** Source/layout evidence for the declared mapping, including authored decomposition. */
   sourceViewMappingEvidence?: string
   rectSourcePixels: [number, number, number, number]
+  sourceVisibility?: SourceVisibilityQualification
   presentation: 'native' | 'horizontal-mirror'
   camera: CameraRecord | null
   input: SerializedInput | null
@@ -47,6 +50,7 @@ export interface CompactSourceView {
   cameraInterpolationEvidence?: string
   composite?: SourceComposite
   imagePlaneWarp?: ImagePlaneWarp
+  nativeLineChecks?: NativeLineCheck[]
 }
 export interface CompactSourceFrame {
   timeSeconds: number
@@ -143,6 +147,7 @@ interface CompiledTrackFrame {
   observation: CompactSourceFrame
   required: boolean
   available: boolean
+  lastReadableIndex: number
   shotStartSeconds: number
   shotEndSeconds: number
   continuousToNext: boolean
@@ -165,6 +170,10 @@ interface PublicationBanks {
 export interface SourcePublicationReference {
   readonly approximationMessage: string
   prepareAt(timeSeconds: number): SourceSample
+  /** Cold-start fallback only; never replace an already displayed held pose. */
+  prepareLastReadableAt(timeSeconds: number): SourceSample | null
+  /** Initial unreadable exposure only: draw the first authored readable pose, never claim its source time. */
+  prepareInitialReadable(): SourceSample | null
   commitPrepared(): SourceSample
 }
 
@@ -207,7 +216,10 @@ export class CompactVideoReference {
   readonly coverageMessage: string
   readonly approximationMessage: string
   readonly stageStatus = UNMEASURED_STAGES
+  /** Probe-only exact native line endpoints never enter the source point/role census. */
+  readonly landmarkProbeAnchors: readonly LandmarkAnchor[]
   private readonly frames: CompiledTrackFrame[]
+  private readonly firstReadableIndex: number
   private readonly publication: PublicationBanks = { buffers: [buffer(), buffer()], publishedIndex: 0, preparedIndex: null, inputValidated: new WeakSet(), diagnostic: null }
   private readonly qa = new Quaternion()
   private readonly qb = new Quaternion()
@@ -228,7 +240,7 @@ export class CompactVideoReference {
     const measurementBlockers = data.sourceMeasurements?.blockers ?? []
     const measurementPreview = measurementBlockers.slice(0, 2).map((reason) => reason.length > 220 ? `${reason.slice(0, 217)}...` : reason).join(' ')
     const measurementStatus = data.sourceMeasurements?.status ?? 'unmeasured'
-    this.approximationMessage = `Approximate source-following; chosen feasible inputs, not recovered history. Rendered stages 50% / 20% / 10% / 5%: unmeasured; measurement report required.${data.coverage.status === 'blocked' ? ` Runtime coverage incomplete: ${this.coverageMessage}` : ''} Source measurements ${measurementStatus}${measurementBlockers.length ? `: ${measurementBlockers.length} issues. ${measurementPreview} Full details remain in the source track/report.` : '.'}`
+    this.approximationMessage = `Approximate source-following; chosen feasible inputs, not recovered history. Rendered stage 50%: unmeasured; measurement report required.${data.coverage.status === 'blocked' ? ` Runtime coverage incomplete: ${this.coverageMessage}` : ''} Source measurements ${measurementStatus}${measurementBlockers.length ? `: ${measurementBlockers.length} issues. ${measurementPreview} Full details remain in the source track/report.` : '.'}`
     const shotMap = new Map(data.shots.map((shot) => [shot.id, shot]))
     if (shotMap.size !== data.shots.length) throw new Error('Compact source shot IDs must be unique.')
     for (let i = 0; i < data.shots.length; i++) {
@@ -238,8 +250,8 @@ export class CompactVideoReference {
     }
     const anchorIds = new Set(data.anchors.map((anchor) => anchor.id))
     if (anchorIds.size !== data.anchors.length) throw new Error('Compact anchor IDs must be unique.')
-    let previous = -Infinity
-    this.frames = data.frames.map((frame) => {
+    let previous = -Infinity, lastReadableIndex = -1, firstReadableIndex = -1
+    this.frames = data.frames.map((frame, frameIndex) => {
       const t = finite(frame.timeSeconds, 'Compact sample time')
       const pts = frame.decodedTimeSeconds === null ? null : finite(frame.decodedTimeSeconds, 'Decoded source PTS')
       const shot = shotMap.get(frame.shotId)
@@ -252,9 +264,16 @@ export class CompactVideoReference {
       if (!['machine', 'non-machine', 'transition', 'unobservable'].includes(frame.classification)) throw new Error(`Unknown source classification at ${t}s.`)
       if (frame.sourceMachineRequirement !== undefined && frame.sourceMachineRequirement !== 'required') throw new Error('Compact tracks cannot weaken required source-machine coverage.')
       if (!Array.isArray(frame.views) || !Array.isArray(frame.landmarks)) throw new Error(`Missing source layout or landmarks at ${t}s.`)
-      const required = frame.sourceMachineRequirement === 'required' || frame.classification === 'machine' || (frame.classification === 'non-machine' ? shot.hasCorrespondingMachine === true : shot.hasCorrespondingMachine !== false)
+      const sourceRequired = physicalSourceFrameRequired(frame, frame.sourceMachineRequirement === 'required' || frame.classification === 'machine' || (frame.classification === 'non-machine' ? shot.hasCorrespondingMachine === true : shot.hasCorrespondingMachine !== false))
       if (new Set(frame.views.map((view) => view.id)).size !== frame.views.length) throw new Error(`Duplicate source view at ${t}s.`)
-      const layout: SourceLayoutEntry[] = frame.views.map((view) => {
+      for (const view of frame.views) {
+        const error = sourceVisibilityError(frame, view)
+        if (error) throw new Error(`${video.id}@${t}s/${view.id}: ${error}`)
+        if (view.sourceVisibility && frame.sourceImage?.sourceSha256 !== data.source.sha256) throw new Error('Source visibility audit belongs to different footage.')
+      }
+      const requiredViews = requiredSourceViews(frame)
+      const required = sourceRequired && (frame.views.length === 0 || requiredViews.length > 0)
+      const layout: SourceLayoutEntry[] = requiredViews.map((view) => {
         if (view.rectSourcePixels?.length !== 4) throw new Error(`Invalid source viewport at ${t}s.`)
         view.rectSourcePixels.forEach((value) => finite(value, 'Source viewport'))
         const [x, y, w, h] = view.rectSourcePixels
@@ -271,7 +290,7 @@ export class CompactVideoReference {
         landmark.pixel.forEach((value) => finite(value, 'Source landmark pixel'))
         if (finite(landmark.uncertaintyPx, 'Source landmark uncertainty') < 0) throw new Error('Source landmark uncertainty cannot be negative.')
       }
-      const views = frame.views.map((view) => {
+      const views = requiredViews.map((view) => {
         const label = `${video.id}@${t}s/${view.id}`
         let sourceAssembly: SourceAssemblyState
         try {
@@ -298,8 +317,14 @@ export class CompactVideoReference {
         if (view.cameraInterpolation === 'continuous-shot' && (typeof view.cameraInterpolationEvidence !== 'string' || !view.cameraInterpolationEvidence.trim())) throw new Error(`${label}: continuous-shot camera interpolation needs explicit evidence.`)
         return { observation: view, input, sourceAssembly, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false }
       })
-      return { observation: frame, required, layout, views, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available: pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null)) }
+      const available = pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null))
+      if (required && available) {
+        lastReadableIndex = frameIndex
+        if (firstReadableIndex < 0) firstReadableIndex = frameIndex
+      }
+      return { observation: frame, required, layout, views, lastReadableIndex, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available }
     })
+    this.firstReadableIndex = firstReadableIndex
     for (let i = 0; i < this.frames.length - 1; i++) {
       const from = this.frames[i]!
       const next = this.frames[i + 1]!
@@ -325,6 +350,20 @@ export class CompactVideoReference {
         }
       }
     }
+    const lineAnchors = new Map<string, LandmarkAnchor>()
+    for (const frame of this.frames) for (const view of frame.views) for (const line of view.observation.nativeLineChecks ?? []) {
+      for (const station of NATIVE_LINE_STATIONS) {
+        const id = nativeLineEndpointId(view.observation.id, line.id, station)
+        const [a, b] = line.partLocalLineMetres
+        const anchor: LandmarkAnchor = { id, partPath: line.partPath, partLocalMetres: [
+          a[0] + station * (b[0] - a[0]), a[1] + station * (b[1] - a[1]), a[2] + station * (b[2] - a[2]),
+        ] }
+        const prior = lineAnchors.get(id)
+        if (anchorIds.has(id) || prior && !equalRecord(prior, anchor)) throw new Error('Native line diagnostic endpoint identity conflicts with another geometry/source point.')
+        lineAnchors.set(id, anchor)
+      }
+    }
+    this.landmarkProbeAnchors = lineAnchors.size ? [...data.anchors, ...lineAnchors.values()] : data.anchors
   }
 
   private indexAt(timeSeconds: number): number {
@@ -347,11 +386,31 @@ export class CompactVideoReference {
 
   private stateFor(t: number, frame: CompiledTrackFrame): ReferenceState {
     if (frame.observation.timeSeconds > t || t < frame.shotStartSeconds || t > frame.shotEndSeconds || t === frame.shotEndSeconds && t < this.data.source.durationSeconds || !frame.available) return 'unavailable'
-    return frame.required ? 'approximate' : 'no-machine'
+    return frame.required ? 'approximate' : 'hold-last-readable'
   }
 
   prepareAt(timeSeconds: number): SourceSample {
     return this.prepareAtIn(timeSeconds, this.publication)
+  }
+
+  prepareLastReadableAt(timeSeconds: number): SourceSample | null {
+    return this.prepareLastReadableAtIn(timeSeconds, this.publication)
+  }
+
+  prepareInitialReadable(): SourceSample | null {
+    return this.prepareInitialReadableIn(this.publication)
+  }
+
+  private prepareInitialReadableIn(publication: PublicationBanks): SourceSample | null {
+    return this.firstReadableIndex < 0 ? null
+      : this.prepareAtIn(this.frames[this.firstReadableIndex]!.observation.timeSeconds, publication)
+  }
+
+  private prepareLastReadableAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample | null {
+    const index = this.frames[this.indexAt(timeSeconds)]!.lastReadableIndex
+    if (index < 0) return null
+    const frame = this.frames[index]!
+    return frame.observation.timeSeconds <= timeSeconds ? this.prepareAtIn(frame.observation.timeSeconds, publication) : null
   }
 
   private prepareAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample {
@@ -371,7 +430,7 @@ export class CompactVideoReference {
     sample.unobservedInputFields.length = 0
     sample.nativeGeometryAssumptions = this.data.nativeGeometryAssumptions ?? EMPTY_GEOMETRY_ASSUMPTIONS
     sample.reason = sample.state === 'approximate' ? this.approximationMessage
-      : sample.state === 'no-machine' ? 'No corresponding machine in this source interval.' : from.observation.unavailableReason ?? 'This required source interval has no available camera and complete feasible input.'
+      : sample.state === 'hold-last-readable' ? 'Source physical ROIs are individually policy-excluded, noncontributing, or no physical view is shown; retain the preceding displayed pose, not a current source match.' : from.observation.unavailableReason ?? 'This required source interval has no available camera and complete feasible input.'
     if (sample.state === 'approximate') {
       const continuous = from.continuousToNext
       const mix = continuous ? (t - from.observation.timeSeconds) / (next!.observation.timeSeconds - from.observation.timeSeconds) : 0
@@ -496,6 +555,8 @@ export class CompactVideoReference {
     const scopedReference: SourcePublicationReference = Object.freeze({
       approximationMessage: this.approximationMessage,
       prepareAt: (timeSeconds: number) => { requirePublication(); return this.prepareAtIn(timeSeconds, publication) },
+      prepareLastReadableAt: (timeSeconds: number) => { requirePublication(); return this.prepareLastReadableAtIn(timeSeconds, publication) },
+      prepareInitialReadable: () => { requirePublication(); return this.prepareInitialReadableIn(publication) },
       commitPrepared: () => { requirePublication(); return this.commitPreparedIn(publication) },
     })
     const state: DiagnosticSourcePublicationState = Object.freeze({

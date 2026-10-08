@@ -98,6 +98,9 @@ export interface LandmarkProbe {
   readonly visibilityMode: 'depth-off-landmark-projection'
   readonly anchors: readonly LandmarkProbeAnchor[]
   readonly status: 'active' | 'disposed'
+  /** Current completed-update rigid marker vertex, not raster/source acceptance.
+   * Writes NaN and refuses unresolved, stale, deformed or disposed associations. */
+  readWorldPoint(id: string, outWorldPoint: Float64Array): boolean
   dispose(): void
 }
 export type RenderedLandmarkState = 'rendered' | 'unresolved' | 'not-visible'
@@ -2326,6 +2329,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   const overridesSeen = new Set<string>()
   const currentOverrideMisses: string[] = []
   const revision = { value: 0 }
+  let completedPointRevision = -1
   const inventoryRevision = { value: 0 }
   let baselinePathRevision = -1
   let baselinePaths: readonly string[] = []
@@ -2769,6 +2773,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       snapshotSolvedInputKey = JSON.stringify(nativeInputSnapshot(input))
       snapshotUpdateVerified = true
     }
+    completedPointRevision = revision.value
   }
 
   function finalWorld(part: RestPart): THREE.Matrix4 {
@@ -3051,10 +3056,37 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     }
 
     let status: LandmarkProbe['status'] = 'active'
+    const readableMarkers = new Map<string, ProbeMarker | null>()
+    for (const marker of markers) readableMarkers.set(marker.id, readableMarkers.has(marker.id) ? null : marker)
     const probe: LandmarkProbe = {
       visibilityMode: 'depth-off-landmark-projection',
       anchors: markers.map(item => ({ id: item.id, partPath: item.partPath, runtimeTemplatePartPath: item.runtimeTemplatePartPath, state: item.slot >= 0 ? 'measurable' : 'unresolved', reason: item.reason })),
       get status() { return status },
+      readWorldPoint(id, out) {
+        out.fill(NaN)
+        if (out.length !== 3 || status !== 'active' || !root || root.parent !== scene
+          || availability !== 'available' || provenance.identity !== 'matched'
+          || completedPointRevision !== revision.value) return false
+        const marker = readableMarkers.get(id), object = marker?.object
+        if (!marker || marker.reason !== null || !object || !marker.partPath
+          || object.geometry.hasAttribute('springCoordinate')) return false
+        const part = parts.get(marker.partPath)
+        if (!part || object.parent !== part.node || unsupportedDeformation(part.node)) return false
+        if (marker.runtimeTemplatePartPath !== null
+          && !runtimeTemplateGeometryMatches(part, marker.runtimeTemplatePartPath)) return false
+        for (let node: THREE.Object3D | null = object; node; node = node.parent) {
+          if (node.matrixWorldNeedsUpdate) return false
+        }
+        const position = object.geometry.getAttribute('position'), e = object.matrixWorld.elements
+        const x = position.getX(0), y = position.getY(0), z = position.getZ(0)
+        const w = e[3]! * x + e[7]! * y + e[11]! * z + e[15]!
+        const a = (e[0]! * x + e[4]! * y + e[8]! * z + e[12]!) / w
+        const b = (e[1]! * x + e[5]! * y + e[9]! * z + e[13]!) / w
+        const c = (e[2]! * x + e[6]! * y + e[10]! * z + e[14]!) / w
+        if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return false
+        out[0] = a; out[1] = b; out[2] = c
+        return true
+      },
       dispose() {
         if (status === 'disposed') return
         status = 'disposed'
@@ -3067,6 +3099,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
         materials.length = 0
         markers.length = 0
         springMaterials.clear()
+        readableMarkers.clear()
         probes.delete(probe)
         probeInternals.delete(probe)
       },
