@@ -23,12 +23,11 @@ from __future__ import annotations
 
 import math
 
-import _config
 import ch_rocker_arm_spec as rocker
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
 from _hole_spec import CLEARANCE_MM, THREAD_MAJOR_MM, HoleSpec
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 INCH = 25.4
 # Abrams 102060: O1 precision-ground flat stock 1/2 x 1/2 in.
@@ -66,11 +65,12 @@ SCREW_HEAD_H = 0.164 * INCH
 SCREW_LENGTH = 0.625 * INCH  # #8-32 x 5/8 SHCS
 SCREW_X = (10.0, 30.0)  # from the bar's left end (= the box left face)
 SCREW_Y = BAR_HEIGHT / 2.0
-CLEARANCE_DIA = CLEARANCE_MM[("#8", "normal")]
-CBORE_DIA = 5.0 / 16.0 * INCH  # standard #8 SHCS counterbore
+# Model and export both use the printed two-place sizes (one fact).
+CLEARANCE_DIA = round(CLEARANCE_MM[("#8", "normal")], 2)
+CBORE_DIA = round(5.0 / 16.0 * INCH, 2)  # standard #8 SHCS counterbore
 CBORE_DEPTH = 4.8
-_DRILLED = _config.title_block("drilled_hole")
-DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))
+# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
+DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 # The native counterbore callout prints two places: the .XX general band.
 _XX = printed_band_mm(2)
 if CBORE_DIA - _XX <= SCREW_HEAD_DIA:
@@ -198,8 +198,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 "height_nominal": (SCREW_Y, ("SCREW_Y",)),
                 "dia_nominal": (CLEARANCE_DIA, ("CLEARANCE_DIA",)),
                 "dia": (
-                    # The title-block drilled band qualifies the printed Ø4.98.
-                    limits(round(CLEARANCE_DIA, 2), 2, DRILLED_BAND),
+                    limits(CLEARANCE_DIA, 2, DRILLED_BAND),
                     ("CLEARANCE_DIA", "DRILLED_BAND", "SCREW_HOLE_SPEC"),
                 ),
                 "thru": (True, ("SCREW_HOLE_SPEC",)),
