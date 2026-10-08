@@ -279,19 +279,35 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "shank": ExportFeature(
         kind="boss",
         faces=(CylinderFace(SHANK_DIA, tolerance_mm=0.003),),
-        requirements=("dia", "length"),
+        requirements=("dia",),
         fields={
             "at": ([0.0, 0.0, COLLAR_END], ("COLLAR_END",)),
             "axis": _AXIS,
             "dia": (limits(SHANK_DIA, 2, SHANK_BAND), ("SHANK_DIA", "SHANK_BAND")),
             "dia_nominal": (SHANK_DIA, ("SHANK_DIA",)),
-            # Derived OverallLength - CollarEnd: stacked endpoint limits.
-            "length": (
-                SHANK_LENGTH_LIMITS,
-                ("OVERALL_LENGTH", "COLLAR_END", "COLLAR_END_BAND"),
+            # Reference only: the inspected lengths are OverallLength (shank_end)
+            # and CollarEnd (neck_face); SHANK_LENGTH_LIMITS keeps the derived max.
+            "length_nominal": (
+                round(OVERALL_LENGTH - COLLAR_END, 6),
+                ("OVERALL_LENGTH", "COLLAR_END"),
             ),
         },
-        precision={"dia": 2, "length": 1},
+        precision={"dia": 2},
+    ),
+    # The printed 15.0 body length: the shank end face from the neck face.
+    "shank_end": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, 1.0), OVERALL_LENGTH),),
+        requirements=("height",),
+        fields={
+            "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+            "plane": (
+                {"frame": "model", "axis": "z", "value": OVERALL_LENGTH},
+                ("OVERALL_LENGTH",),
+            ),
+            "height": (limits(OVERALL_LENGTH, 1), ("OVERALL_LENGTH",)),
+        },
+        precision={"height": 1},
     ),
     # The neck whose wall is the named exception, and the ream's open length
     # below the bonded pin (the pin fills the bore through the neck).
