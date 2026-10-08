@@ -139,6 +139,18 @@ def test_every_printed_band_has_a_requirement_owner() -> None:
             assert features[name][key] == limits(nominal, places, band), (stem, printed)
 
 
+def test_every_exported_nominal_lies_inside_its_band() -> None:
+    """prechips rejects a *_nominal outside its requirement band."""
+    for stem in (SCREW, WASHER):
+        for name, feature in _features(stem).items():
+            for key, value in feature.items():
+                if not key.endswith("_nominal"):
+                    continue
+                band = feature.get(key.removesuffix("_nominal"))
+                if isinstance(band, list) and len(band) == 2:
+                    assert band[0] <= value <= band[1], (stem, name, key)
+
+
 def test_every_exported_band_is_a_requirement() -> None:
     """One-fact rule: prechips inspects only the bands a feature lists."""
     for stem in (SCREW, WASHER):
