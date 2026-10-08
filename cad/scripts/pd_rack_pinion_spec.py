@@ -50,7 +50,7 @@ MM_PER_IN = 25.4
 
 # --- gear ----------------------------------------------------------------------
 TEETH = 120
-MODULE_MM = 0.75
+MODULE_MM = 0.7
 DIAMETRAL_PITCH = MM_PER_IN / MODULE_MM
 PRESSURE_ANGLE_DEG = 20.0
 PROFILE_SHIFT = 0.0

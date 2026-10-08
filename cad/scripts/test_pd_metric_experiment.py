@@ -11,7 +11,7 @@ import paper_drive_geom as law
 
 
 def test_matched_modules_and_shift():
-    assert 25.4 / disc.DIAMETRAL_PITCH == pytest.approx(0.75)
+    assert 25.4 / disc.DIAMETRAL_PITCH == pytest.approx(0.7)
     assert knob.DIAMETRAL_PITCH == disc.DIAMETRAL_PITCH
     assert feed.MODULE_MM == pytest.approx(0.8)
     assert disc.PRESSURE_ANGLE_DEG == knob.PRESSURE_ANGLE_DEG == feed.PRESSURE_ANGLE_DEG == 20.0

@@ -65,7 +65,7 @@ MM_PER_IN = 25.4
 WALL_FLOOR = 2.0
 ENGAGEMENT_FLOOR_D = 1.5
 
-# --- Integral shifted m0.75 PA20 pinion (120T disc MHA-PD-006) ----------------
+# --- Integral shifted m0.7 PA20 pinion (120T disc MHA-PD-006) -----------------
 TEETH = 12
 DIAMETRAL_PITCH = MM_PER_IN / MODULE_MM
 PROFILE_SHIFT = MESH_PINION_SHIFT
