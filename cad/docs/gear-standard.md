@@ -162,8 +162,10 @@ x = 0.838 to keep the 120T drum tips off its base circle, against 0.649 at 20°.
 
 The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
 
-- Cylinder gears (120T, #2 form): OD 62.20 → 64.54 mm. Alignment drum (32T, #4
-  form): OD 17.33 → 17.97 mm.
+- Cylinder gears (120T, #2 form): OD 62.20 mm → about 64.5 mm. The alignment
+  drum (32T, #4 form) grows from 17.33 mm. Both blanks sit under the ideal 48DP
+  tips, set by the stock-form tolerance-corner check; the printed values are in
+  the part specs.
 - Cone incline: 12.518° → 13.001°. Cone face width: 6.8887 → 6.8756 mm. The
   7.0565 mm channel pitch is unchanged.
 - Cone outside diameters are solved per cone against the stock-form drum. The
