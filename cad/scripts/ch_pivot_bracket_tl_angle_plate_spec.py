@@ -42,13 +42,15 @@ CENTRE_X = PLATE_LENGTH / 2.0
 # The S4 stack, from the table up. The bracket's faced outer face stands
 # PART_PROUD above the plate top, so its foot free end (FOOT_LEN below that
 # face) lands at LEDGE_TOP_Y; the ledge stands on a 1-2-3 block's 2 in side
-# while its screws are tightened.
-PART_PROUD = 2.0
+# while its screws are tightened. 4 mm, not 2: the prechips bracket plan's
+# S4 op 10 facing cutter overhangs the plate side at the faced outer face
+# and passed only 2.0 over the upright at 2 mm (review blocker BR-B1).
+PART_PROUD = 4.0
 BLOCK_HEIGHT = 50.8
-LEDGE_TOP_Y = PLATE_HEIGHT + PART_PROUD - bracket.FOOT_LEN  # 66.7
+LEDGE_TOP_Y = PLATE_HEIGHT + PART_PROUD - bracket.FOOT_LEN  # 68.7
 
 # Ledge screws: two #10-24 x 5/8 SHCS (shop-to-shop UNC, fastener policy) at
-# 8.0 under the ledge top, 10.0 apart about the plate centre: wide enough that
+# 9.0 under the ledge top, 10.0 apart about the plate centre: wide enough that
 # the two heads stay clear with the ledge's holes at their worst one-place
 # stations (asserted in the ledge spec). The taps are
 # spotted through the ledge's own holes with the ledge standing on its block,
@@ -67,16 +69,19 @@ SCREW_HEAD_ECCENTRICITY_MAX = 0.006 * 25.4 / 2.0  # 0.0762
 # authored daylight margin over contact at the worst printed pitch.
 SCREW_HEAD_GAP_MIN = 0.3
 SCREW_HALF_PITCH = 5.0
-SCREW_BELOW_LEDGE_TOP = 8.0
-SCREW_Y = LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP  # 58.7
+SCREW_BELOW_LEDGE_TOP = 9.0
+SCREW_Y = LEDGE_TOP_Y - SCREW_BELOW_LEDGE_TOP  # 59.7
 TAP_X = (CENTRE_X - SCREW_HALF_PITCH, CENTRE_X + SCREW_HALF_PITCH)
 
 # Bridge studs: 3/8-16 studs through letter-X clearance holes, 40.0 apart
-# about the centre, 14.0 under the plate top (the bridge bar clears the foot).
+# about the centre. The bridge bar lies on the foot top at the prechips S4
+# hold's Setup Z -17.5 (17.5 under the bracket's faced outer face, its
+# lower edge just above the foot end), so the studs are 13.5 under the plate top.
 STUD_DIA = 9.525
 STUD_SPEC = HoleSpec("drilled_letter", "X")
 STUD_HALF_PITCH = 20.0
-STUD_Y = PLATE_HEIGHT - 14.0  # 74.9
+STUD_BELOW_PART_TOP = 17.5
+STUD_Y = PLATE_HEIGHT + PART_PROUD - STUD_BELOW_PART_TOP  # 75.4
 STUD_X = (CENTRE_X - STUD_HALF_PITCH, CENTRE_X + STUD_HALF_PITCH)
 STUD_NUT_DIA = 16.5  # 3/8-16 hex nut envelope (inventory bridge row)
 
