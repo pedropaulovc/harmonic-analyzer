@@ -142,8 +142,8 @@ facts.
 A per-part manufacturability pass ([`cad/docs/machining-dfm.md`](cad/docs/machining-dfm.md))
 found three parts carrying essentially all of the risk:
 
-- A six-tooth gear about 4 mm across with a 0.49 mm wall at the tooth root over
-  a 0.79 mm bore. The hardest part in the machine, and not by a small margin.
+- A six-tooth gear about 4 mm across with about 0.35 mm of metal between the
+  tooth root and its 1/16 in bore. The hardest part in the machine, and not by a small margin.
 - The knife edge, which is the precision interface of the whole instrument and
   sits on a hex trunnion cantilevered 21.7 mm off an organic cast lever.
 - A Ø0.79 × 34 mm journal in steel, 43:1 slenderness. Whip city.

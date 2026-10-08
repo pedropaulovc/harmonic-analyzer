@@ -44,9 +44,9 @@ lathe track is longer; start it first and slot mill modules in around it.
 
 **M09 → M10.** This remains the gear-work learning sequence. The dividing head
 is delivered, installed and usable, so equipment availability no longer blocks
-it. M09 follows M07. M10 still requires M09 and M05, plus self-made Eureka
-cutters because commercial cutters for DP 49.82 do not exist
-(`cad/docs/machining-dfm.md`).
+it. M09 follows M07. M10 still requires M09 and M05. Stock 20° inch cutters cover
+every gear except the T006 cone, which needs one self-made Eureka cutter
+(`cad/docs/machining-dfm.md`, cutter plan).
 
 ## How this feeds the book
 

@@ -60,7 +60,7 @@
   verified assemblies, and a photo-comparison gallery scoring
   it against the surviving machine. Backers can look at it before they pledge.
 - **It is a genuine skills ladder.** Facing a bar → turning bushings to a length
-  tolerance → boring → indexed gear cutting with self-made form cutters. A
+  tolerance → boring → indexed gear cutting with stock form cutters and one you make. A
   reader finishes it a better machinist, not just an owner of a thing.
 - **The failure mode is honest.** If the pen never draws a clean square wave,
   that is still a book — the machining chapters stand alone and the debugging
@@ -86,7 +86,7 @@
 
 **The gap this fills:** the visual tour exists, the primary source exists, the
 machining tradition exists. The bridge — *here is how you actually cut a
-0.49 mm-wall six-tooth gear* — does not.
+six-tooth gear with 0.35 mm of metal under its teeth* — does not.
 
 ## Proof points to lead with (all verifiable today)
 
@@ -103,6 +103,6 @@ machining tradition exists. The bridge — *here is how you actually cut a
 
 ## Tone
 
-Machinist-to-machinist. Specific numbers over adjectives. Show the 0.49 mm wall
+Machinist-to-machinist. Specific numbers over adjectives. Show the 0.35 mm web
 and say "this is the part that will beat you", not "an exciting challenge
 awaits". Admit what isn't solved.

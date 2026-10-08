@@ -17,7 +17,8 @@ things without which there is no book.
 | Stock: brass bar (gears, bushings, platen) | 40 gears + 38 bushings | TBD | — |
 | Stock: steel bar and plate (shafts, rocker arms, frame) | 20 rocker arms, long slender shafts | TBD | — |
 | Cast iron / castings or fabrication for the 3 cast parts | summing lever, rocker-arm support, connecting rods | TBD | `cad/docs/machining-dfm.md` |
-| Gear-cutter blanks + tool steel for self-made Eureka form cutters | off-the-shelf DP-49.82 cutters **do not exist** | TBD | `cad/docs/machining-dfm.md` |
+| Gear cutters: stock 48DP, 40DP, 32DP and 24DP 20° involute cutters, plus blank and tool steel for one self-made six-tooth cutter | stock cutters cover every gear except the six-tooth cone | TBD | `cad/docs/machining-dfm.md` |
+| Spiral-capable universal dividing head, or outsourcing the 64T helical gear | the installed head is semi-universal; the 64T crank gear is helical | TBD | `cad/docs/machining-dfm.md` |
 | Dividing head | required for the 40 indexed gears; delivered, installed and usable | acquired; cost TBD | [#465](https://github.com/pedropaulovc/harmonic-analyzer/issues/465) |
 | Dividing-head tailstock | supports long indexed work; acquisition state unverified | TBD | — |
 | Measuring: micrometers, bore gauges, indicators, gauge blocks | the book's tolerances are meaningless without inspection | TBD | `cad/docs/tolerance-gdt-assessment.md` |

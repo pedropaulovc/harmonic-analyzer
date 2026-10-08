@@ -27,7 +27,7 @@ Twenty spur gears from six to a hundred and twenty teeth on one shaft, turning o
 
 ## What will fight you
 
-The T006 gear is ~4.08 mm outside diameter on a Ø0.79 mm bore — a **0.49 mm wall** at the tooth root, the single hardest feature in the machine. T012/T018/T024 are 0.83/0.78/0.71 mm. The original used a harder yellow metal for the tip gears. Enlarging them is **not** a free change: at fixed tooth count it changes the diametral pitch and breaks the shared DP-49.82 mesh with the cylinder gears.
+The T006 gear is about 4.16 mm (0.164 in) outside diameter on a Ø1.5875 mm (1/16 in) bore. That leaves 0.379 mm (0.0149 in) of web between the gap floor and the bore, and 0.354 mm (0.0139 in) at the largest allowed bore: the single hardest feature in the machine. The earlier 0.621 mm web was an accepted exception; the thinner web of the 48DP 20° teeth still needs that ruling (`cad/docs/gear-standard.md`). T012, T018 and T024 have 1.97, 2.76 and 2.76 mm (0.078, 0.109 and 0.109 in) nominal. The original used a harder yellow metal for the tip gears. Enlarging them is not a free change: at a fixed tooth count it changes the diametral pitch and breaks the shared 48DP mesh with the cylinder gears.
 
 ## Making each part
 
@@ -45,6 +45,7 @@ TODO
 - `cad/scripts/build_*.py` (geometry — the source of truth)
 - `cad/scripts/vn_cone_tip_collar_spec.py`, `cad/scripts/vn_cone_tip_block_screw_spec.py` (stock collar and hold-down screw sizes)
 - `cad/config/parts/*.yaml` (material, appearance, registry)
-- `cad/docs/machining-dfm.md` (setups, hazards, routing)
+- `cad/docs/machining-dfm.md` (setups, hazards, routing, cutter plan)
+- `cad/docs/gear-standard.md` (tooth standard, and the dimensions it changed)
 - `logbook/entries/` (what actually happened)
 

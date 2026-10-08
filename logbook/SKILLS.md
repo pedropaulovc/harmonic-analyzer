@@ -20,7 +20,7 @@ failure mode that would make the book worthless.
 | Profile milling, slots, batch fixturing | M07 | `ch-rocker-arm` ×20, `ch-connecting-rod` ×20, `ch-channel-lever` ×20, `pd-platen-guide`, `mg-wheel-bar` | ch. 13 Milling |
 | Hole patterns, reaming, tapping | M08 | `fr-rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_fr_rocker_arm_support.py`), `sm-summing-lever` 20× Ø2.0 pattern, `fr-harmonic-base` | ch. 14 Hole patterns and tapping |
 | Dividing head, indexing, co-phasing | M09 | `dt-cylinder-gear` notches ×20, every gear blank | ch. 15 Indexing |
-| Form-cutter generation (Eureka) | M10 | the cutters themselves — **nothing in the gear train without them** | ch. 16 Making your own gear cutters |
+| Form-cutter generation (Eureka) | M10 | the T006 cone gear's cutter, the one gear no stock cutter range covers | ch. 16 Making your own gear cutters |
 | Gear cutting and inspection | M10 | `dt-cone-gear` ×20, `dt-cylinder-gear` ×20, `dt-crank-pinion`, `dt-alignment-pinion`, `pd-rack-pinion`, `pd-transgear-*`, `vn-transgear-*`, `pd-chain-sprocket`, `pd-platen-rack` | ch. 17 Cutting the gears |
 | D-bore fitting, gear-stack assembly | M11 | 64T + cone gear set → D-flat shaft | ch. 18 Fitting D-bores and the cone gear stack |
 | Silver soldering | M11 | `dt-crank-pin-ring` ends | — |

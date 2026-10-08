@@ -15,12 +15,14 @@ geometry is casting-shaped, not milling-shaped.
 ## The headlines (read these first)
 
 - **Three parts carry the whole risk. Everything else is generous.**
-  1. **`dt-cone-gear` T006** — nominal root-to-bore wall **0.646 mm** on a **~4.28 mm OD / Ø1.588 mm bore** gear
-     (**0.621 mm** at the maximum allowed bore, the one named web exception, U40).
+  1. **`dt-cone-gear` T006** — nominal root-to-bore wall **0.379 mm** on a **~4.16 mm OD / Ø1.588 mm bore** gear
+     (**0.354 mm** at the maximum allowed bore). The earlier 0.621 mm web was the user-ruled named
+     exception (U40); the thinner 48DP PA20 web is still awaiting that ruling ([`gear-standard.md`](./gear-standard.md#what-it-costs)).
      The single hardest part in the machine. These teeth are cut as involute flanks closed by a gap
-     floor printed as a MIN diameter; T006's floor is Ø2.880 MIN / Ø2.929 MAX. After a forced T006
+     floor printed as a MIN diameter; T006's floor is Ø2.346 MIN / Ø2.406 MAX. After a forced T006
      rebuild, `build_dt_cone_gear.py` measures the native floor edges and requires them at the printed
-     MIN radius within 0.002 mm. The other tip-gear webs meet the 2.0 target on the S1 bores.
+     MIN radius within 0.002 mm. T012's web is 1.94 mm at its maximum bore, under the 2.0 target
+     and over the 1.5 floor; the T018 and T024 webs meet the target on the S1 bores.
      Period mitigation: the tip gears were a harder yellow metal.
   2. **`sm-summing-lever` knife edge** — the sharp top-vertex ridge of a hex trunnion that protrudes
      **21.717 mm unsupported** past each end of a casting-shaped organic lever. Delicate (nicks/rounds)
@@ -35,7 +37,7 @@ geometry is casting-shaped, not milling-shaped.
   | family | qty | why CNC |
   |---|---|---|
   | `dt-cylinder-gear` (+ integral cam) | 20 | 120 teeth + eccentric cam + 0.4 mm index notch, all co-phased +Y — hand-repeating 20× scatters the phase |
-  | `dt-cone-gear` | 20 | involute teeth cut with a **self-made Eureka-generated form cutter** (cutters for these DP/tooth-counts don't exist — see "How to get this reviewed"), indexed on a dividing head; wire-EDM = outsource alt |
+  | `dt-cone-gear` | 20 | involute teeth cut with stock 48DP PA20 range cutters indexed on a dividing head; T006 alone needs a special cutter (see [Cutter plan](#cutter-plan)); wire-EDM = outsource alt |
   | `pivot-bushing` / `lever-bushing` | 19 each | turned spacers whose **length** sets channel pitch — length consistency across the set is the point |
   | `ch-rocker-arm` | 20 | flat R800 profile, one setup — ideal CNC profile part |
   | `ch-connecting-rod` | 20 | flat 2D outline → DXF/2.5D |
@@ -105,14 +107,14 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cylinder-gear`** ×20 | round brass bar ~63; toothed disc OD62.2×3 + integral eccentric cam OD30.6×3.5 (offset +Y 8.64); total H 6.5 | Ø9.525 (3/8") through bore — **rides free on arbor, no keyway**; 120T involute DP49.82 PA14.5° (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a self-made form cutter indexed (wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
+| **`dt-cylinder-gear`** ×20 | round brass bar ~65; toothed disc OD64.56×3 + integral eccentric cam OD30.6×3.5 (offset +Y 8.64); total H 6.5 | Ø9.525 (3/8") through bore — **rides free on arbor, no keyway**; 120T involute 48DP PA20 (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a stock 48DP PA20 #2 cutter indexed (see [Cutter plan](#cutter-plan); wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
 | **`ch-connecting-rod`** ×20 | flat plate ~3 mm; 2D outline ~170×40.8; book: "rough-finished" (cosmetically forgiving) | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); Ø2.0 pin hole in head | **~1.4 mm** material over the Ø2 pin (fragile crown); reentrant fillets at shoulder roots (fine — it's an outline); 2.5 mm shank | **1** (profile + 2 drills) | **DXF/2.5D profile** the outline + drill 2 bores; leave body rough |
 
-### Cone gears + shaft (T1 — the DP-49.82 train, tip gears fragile)
+### Cone gears + shaft (T1 — the 48DP PA20 train, tip gears fragile)
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face **6.8887 ±0.025** each, long-addendum OD printed per gear at DP 49.82 → **4.28 (T006) → 62.93 (T120)**; tip gears T006–T024 harder yellow metal | D-bore matching the land's single +X flat, clocked to the phase-0 tooth: round seat Ø by config (T006/T012 1.5875, T018 3.175, T024 6.350, T030+ 9.525); bore AF +0.010/+0.020 over shaft nominal AF (0.01–0.03 clearance), diametral slip clearance 0.025–0.105; 6–120 involute teeth PA14.5°, 2.5D through-cut | **T006 wall 0.646 mm nominal / 0.621 mm at maximum round bore** (the flat cuts inward from that circle); whole gear tiny → difficult workholding, especially forming and gauging the D without damaging the teeth | ≥2 (turn/bore, indexed teeth, plus D-bore finishing) | **single-point fly cutter ground to the gap form, indexed** for teeth; form the bore flat to the AF gauge (filing or broaching is a hobby-shop possibility, not a selected route; EDM or a D-shaped punch needs process/fixture approval). Measure all 20 touching faces as a stack: **137.774 ±0.20** |
+| **`dt-cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, long-addendum OD printed per gear at 48DP → **4.16 (T006) → 64.85 (T120)**; tip gears T006–T024 harder yellow metal | D-bore matching the land's single +X flat, clocked to the phase-0 tooth: round seat Ø by config (T006/T012 1.5875, T018 3.175, T024 6.350, T030+ 9.525); bore AF +0.010/+0.020 over shaft nominal AF (0.01–0.03 clearance), diametral slip clearance 0.025–0.105; 6–120 involute teeth PA20, 2.5D through-cut | **T006 wall 0.379 mm nominal / 0.354 mm at maximum round bore** (the flat cuts inward from that circle; web ruling open, see [`gear-standard.md`](./gear-standard.md#what-it-costs)); whole gear tiny → difficult workholding, especially forming and gauging the D without damaging the teeth | ≥2 (turn/bore, indexed teeth, plus D-bore finishing) | stock 48DP PA20 range cutter per gear, **indexed** (see [Cutter plan](#cutter-plan)); T006 needs a special cutter ground to its gap form; form the bore flat to the AF gauge (filing or broaching is a hobby-shop possibility, not a selected route; EDM or a D-shaped punch needs process/fixture approval). Measure all 20 touching faces as a stack: **137.512 ±0.20** |
 | **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2308 post journal, thrust collar then Ø9.525→6.35→3.175→1.5875 gear lands | turned steps plus **one milled +X D-flat on each gear land**, nominal AF **8.763/5.842/2.921/1.460** respectively, each +0/−0.010; the Ø1.5875 flat continues through the tip end and the MHA-VN-016 stack collar's set screw locks on it. Finish the post journal for 0.05 diametral clearance | slender terminal land needs tailstock support; flat machining adds an indexed milling setup and inspection against the mating D-bores | lathe + at least 1 indexed milling setup | manual lathe **+ steady/follower**, then mill/gauge the co-clocked flats; do not leave a round section under the MHA-VN-016 collar |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
@@ -139,7 +141,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
    rebuild, `build_dt_cone_gear.py` measures the native floor edges directly, requires the printed MIN
    floor radius (`dt_cone_gear_spec.floor_radius_mm`) within 0.002 mm and at least one floor edge per
    tooth, and rejects a non-positive web at the maximum allowed bore; `test_dt_cone_gear_drawing` pins
-   the T006 web at ≥ 0.621. Keep both when changing the tooth profile or bore bands.
+   the T006 web exception (`WEB_EXCEPTIONS_MM`). Keep both when changing the tooth profile or bore bands.
 2. **Decide the `sm-summing-lever` fabrication method** (cast / fabricate / hog) and the **knife-edge
    insert** now — it drives whether this is a 5-setup nightmare or two simple operations, and it is the
    critical interface.
@@ -150,7 +152,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
    drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
 5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a
    period build used harder metal. **DP caveat:** enlarging OD at a *fixed tooth count* changes the
-   DP/module and **breaks the shared DP-49.82 mesh** — tooth *counts* preserve the ratio, but DP/pitch
+   DP/module and **breaks the shared 48DP mesh** — tooth *counts* preserve the ratio, but DP/pitch
    diameter preserves the *mesh* (`build_dt_cylinder_gear.py` imports `DP` from `build_dt_cone_gear.py`; §4
    treats the shared DP/PA as the meshing-domain constraint). So a real enlargement must either re-cut
    the mating **cylinder gear + centre distance** to the same new DP for that pair, or keep DP and accept
@@ -180,7 +182,7 @@ steps instead of one big engagement.
 
 - **DFMPro (SW add-in) and Xometry auto-DFM — false-green here (observed).** Both passed *every* SLDPRT
   — yet the model is full of sharp internal corners (every gear-tooth root, the cam notch) a round tool
-  cannot cut, plus the T006 **0.621 mm minimum root-to-bore web**. Their rule sets are tuned for
+  cannot cut, plus the thin T006 **root-to-bore web** (0.621 mm in the model they checked). Their rule sets are tuned for
   moulding / sheet / generic 3-axis and don't flag manual-machining hazards. **A green from these
   means little — trust it for nothing on the corners or walls.**
 - **Fusion 360 CAM verify/simulate — the one worth banking on, with a known edge.** Because it
@@ -190,7 +192,7 @@ steps instead of one big engagement.
   the **majority of tool-access & gouge issues is reasonable** — it's a real simulation, not a
   rule-of-thumb checker.
   - **But its blind spot is exactly where the worst risk lives.** Fusion treats geometry as **rigid**
-  and stock as **held**, so it will *not* warn that the **T006 0.621 mm minimum web** breaks in
+  and stock as **held**, so it will *not* warn that the **T006 web (0.354 mm minimum)** breaks in
   workholding, the **Ø1.5875 mm slender shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
   a ~4 mm gear can't be gripped. Thin-wall / fragile-feature / fixturing failures are not modelled
   by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**
@@ -213,8 +215,103 @@ CMM against the basic-dimension grid / nominal curve, since a hand gauge can't h
 **angularity** → sine bar. The profile and position checks on the fragile T1 parts are where a CMM
 (or an outsourced inspection) earns its keep — budget for it rather than assuming calipers suffice.
 
-**Go/no-go — gear cutters: RESOLVED (they don't exist).** Off-the-shelf involute cutters for the
-cone/cylinder train's **DP 49.82** at these tooth counts do not exist (searched exhaustively). **Plan:
-generate self-made form cutters via the Eureka method** ([`references/gears-and-gear-cutting.pdf`](../../references/gears-and-gear-cutting.pdf)
-ch. 12), then cut the teeth indexed on a dividing head — the in-house gear path referenced in the
-routing tables above; wire-EDM / hobbing stay outsource alternates.
+**Go/no-go — gear cutters: RESOLVED (stock cutters, one special).** The train moved from the
+measured-photo pitch DP 49.82 to standard 48DP PA20 so that stock involute cutters cover every gear
+except the T006 cone ([`gear-standard.md`](./gear-standard.md)). The per-part plan is below;
+wire-EDM and hobbing stay outsource alternates.
+
+## Cutter plan
+
+Every gear is cut with a stock involute form cutter from the eight-cutter set for its pitch,
+indexed on the dividing head, except the T006 cone. The cutter numbers follow the Brown & Sharpe
+ranges (#1 135 teeth to a rack, #2 55–134, #3 35–54, #4 26–34, #5 21–25, #6 17–20, #7 14–16,
+#8 12–13), which date to the period catalogues
+([Brown & Sharpe 1904](https://archive.org/details/BrownAndSharpeMachineryAndTools1904Catalogue))
+and are still sold today ([C.R.Tools](https://crtoolsuk.com/product/diametrical-pitch-involute-gear-cutters/),
+[Newman Tools chart](https://www.newmantools.com/cutters/gear.htm)). Module cutters number the
+same ranges in reverse, so order by DP.
+
+Indexing assumes a 40:1 head, the ratio of the shop's Precision Matthews BS-0, so one tooth is
+40/N crank turns. The hole circles are the standard Brown & Sharpe plates (15, 16, 17, 18, 19,
+20, 21, 23, 27, 29, 31, 33, 37, 39, 41, 43, 47, 49), from
+`references/machinerys-handbook/` (printed p. 2008, which also covers differential indexing). The BS-0's own
+plates have not been checked against this list; check yours before cutting.
+
+### Cone and cylinder train, 48DP PA20
+
+| part | teeth | cutter | index per tooth (40:1) |
+|---|--:|:--:|---|
+| `dt-cone-gear` T006 | 6 | special, see below | 6 turns + 10 holes on 15 |
+| `dt-cone-gear` T012 | 12 | #8 | 3 turns + 5 on 15 |
+| `dt-cone-gear` T018 | 18 | #6 | 2 turns + 4 on 18 |
+| `dt-cone-gear` T024 | 24 | #5 | 1 turn + 10 on 15 |
+| `dt-cone-gear` T030 | 30 | #4 | 1 turn + 5 on 15 |
+| `dt-cone-gear` T036 | 36 | #3 | 1 turn + 2 on 18 |
+| `dt-cone-gear` T042 | 42 | #3 | 20 on 21 |
+| `dt-cone-gear` T048 | 48 | #3 | 15 on 18 |
+| `dt-cone-gear` T054 | 54 | #3 | 20 on 27 |
+| `dt-cone-gear` T060 | 60 | #2 | 10 on 15 |
+| `dt-cone-gear` T066 | 66 | #2 | 20 on 33 |
+| `dt-cone-gear` T072 | 72 | #2 | 10 on 18 |
+| `dt-cone-gear` T078 | 78 | #2 | 20 on 39 |
+| `dt-cone-gear` T084 | 84 | #2 | 10 on 21 |
+| `dt-cone-gear` T090 | 90 | #2 | 8 on 18 |
+| `dt-cone-gear` T096 | 96 | #2 | 5/12 turn: no standard circle |
+| `dt-cone-gear` T102 | 102 | #2 | 20/51 turn: no standard circle |
+| `dt-cone-gear` T108 | 108 | #2 | 10 on 27 |
+| `dt-cone-gear` T114 | 114 | #2 | 20/57 turn: no standard circle |
+| `dt-cone-gear` T120 | 120 | #2 | 5 on 15 |
+| `dt-cylinder-gear` ×20 | 120 | #2 | 5 on 15 |
+| `dt-alignment-pinion` | 32 | #4 | 1 turn + 4 on 16 |
+
+T096, T102 and T114 need differential indexing, which takes a universal head with change
+gears, or a plate drilled with 12, 51 or 57 holes. Those tooth counts did not change with the
+pitch, so this was already true of the old train.
+
+The cone teeth are long-addendum profiles on a backed-off oblique mesh, and a range cutter is shaped
+for the lowest count in its range. An analytic fit of the ideal cutter template to each cone flank
+passes within 0.06 mm except T042, T048 and T054 on #3 (0.068–0.092 mm); a stricter two-flank
+screen also flags T024, T030, T108, T114 and T120. Nobody has measured a real cutter against these
+profiles yet, so cut and roll one gear per cutter before committing a set.
+
+Boston Y48120 is a catalogue brass 48DP PA20 120T spur. Using it as a donor for the cylinder-gear
+teeth is possible in principle, but the part is not designed around it.
+
+### T006 special cutter
+
+No range cutter reaches 6 teeth, so T006 still needs a cutter made in the shop, ground to its gap
+form. The Eureka (button-tool) method in `references/gears-and-gear-cutting/` ch. 12 is the
+documented way to make one. Its root-to-bore web of 0.354 mm at the maximum bore is still waiting
+on the web ruling; see [`gear-standard.md`](./gear-standard.md#what-it-costs).
+
+### Crossed crank pair, normal 24DP PA20
+
+| part | teeth | form | cutter | index per tooth (40:1) |
+|---|--:|---|:--:|---|
+| `dt-crank-pinion` | 16 | straight spur | #7 | 2 turns + 10 on 20 |
+| `dt-crank-drive-gear` | 64 | right-hand helix 13.0011°, lead 945.862 mm | #2 (virtual 69 teeth) | 10 on 16 |
+
+The 64T is cut with the cutter chosen for its virtual tooth count, N / cos³ of the helix angle,
+which lands in the #2 range ([John F's workshop, helical gears](https://johnfsworkshop.org/home/making-other/gears-links/helical-gears-links/making-helical-gears-on-a-vertical-milling-machine/)).
+The table is swivelled to the helix angle and the head is geared to the table leadscrew so the
+blank turns once per 945.862 mm of travel. That needs a spiral-capable universal dividing head;
+indexing alone, even with a DRO, cannot generate the lead. The installed Precision Matthews BS-0
+is sold as semi-universal
+([BS-0](https://www.precisionmatthews.com/products/dividinghead-bs-0)); the BS-2 is sold as able to
+cut spirals ([BS-2](https://www.precisionmatthews.com/products/dividinghead-bs-2)). Change gears
+for the lead depend on the head and the table screw: `TODO(cut it first)`.
+
+### Paper drive
+
+| part | teeth | pitch | cutter | index per tooth (40:1) |
+|---|--:|---|:--:|---|
+| `pd-rack-pinion` (reducer disc) | 120 | 40DP PA20 | #2 | 5 on 15 |
+| `pd-transgear-knob-shaft` integral pinion | 12, x = +0.298 | 40DP PA20 | #8 | 3 turns + 5 on 15 |
+| `pd-transgear-feed-pinion` | 12, x = +0.298 | 32DP PA20 | #8 | 3 turns + 5 on 15 |
+| `pd-platen-rack` | rack, pitch 2.4936 mm, 108 gaps | 32DP PA20 | #1 or a straight-sided 20° rack tool | step 2.4936 mm on the table |
+
+Both 12T pinions are profile-shifted. A standard #8 cutter set to a different depth only
+approximates a shifted tooth, so check each against its mate on a trial cut. The modelled rack is a
+4.7625 mm square toothed strip on a backer. SDP/SI lists stock 32DP 20° racks (A1B12-322 family,
+[D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)) with the same tooth form, but the part is
+not designed around one. The sprockets and the 68-link chain are stock ANSI #25.

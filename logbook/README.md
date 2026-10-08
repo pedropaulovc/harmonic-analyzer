@@ -45,8 +45,8 @@ like "hold ±0.02 mm across five consecutive parts", instead of "feel confident
 turning".
 
 The gear modules are the long pole and there is no point pretending otherwise.
-Off-the-shelf cutters for this machine's diametral pitch do not exist, so M10
-includes making the cutters, and it is scheduled with the most slack.
+Stock cutters cover every gear except the six-tooth cone, so M10 includes
+making that one cutter, and it is scheduled with the most slack.
 
 ## References on hand
 

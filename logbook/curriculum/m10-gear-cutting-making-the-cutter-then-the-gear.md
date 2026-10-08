@@ -23,18 +23,20 @@ hours_actual: 0
 ## References
 
 - `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` **ch. 12 (Eureka method)**
-- `cad/docs/machining-dfm.md` (gear routing; cutters confirmed non-existent)
+- `cad/docs/machining-dfm.md` (gear routing; cutter plan with the stock cutter number and indexing for each gear)
+- `cad/docs/gear-standard.md` (why the replica uses 20° inch-standard teeth)
 - `cad/scripts/build_dt_cone_gear.py`, `cad/scripts/build_dt_cylinder_gear.py`
 
 ## Practice
 
-- Why no cutter exists: DP 49.82 at these tooth counts, searched exhaustively
-- Making the button tool
+- Choosing the stock cutter number for each gear from its tooth count, and why T006 falls outside every range
+- Making the button tool for the T006 cutter
 - Generating the form; relieving; hardening and tempering
 - Testing a cutter on scrap before trusting it
 - Blank prep: the bore is the datum
 - Mandrels, depth of cut, full tooth depth
 - Inspection: over-pins, runout on a mandrel, meshing a pair
+- The helical 64T crank gear: why it needs a spiral-capable universal head geared to the table (`cad/docs/machining-dfm.md`, cutter plan)
 
 ## Now make — the real part this unlocks
 
@@ -46,7 +48,7 @@ A cut gear that meshes with its mate through a full rotation with no tight spot,
 
 ## Notes
 
-**The long pole of the entire project.** 60 h is a guess and probably low. The T006 gear (~4.08 mm OD, Ø0.79 mm bore, **0.49 mm wall**) is the single hardest part in the machine — treat reaching it as a separate milestone, and cut a first article long before committing the set.
+**The long pole of the entire project.** 60 h is a guess and probably low. The T006 gear (~4.16 mm OD, Ø1.5875 mm bore, **0.354 mm root-to-bore web** at the largest allowed bore) is the single hardest part in the machine — treat reaching it as a separate milestone, and cut a first article long before committing the set.
 
 ## Sessions
 
