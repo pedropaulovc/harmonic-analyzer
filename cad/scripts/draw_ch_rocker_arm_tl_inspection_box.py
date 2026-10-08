@@ -78,7 +78,8 @@ DIMENSION_CALLOUTS = {
     "WinLowH": "2X",
     "WinLowFront": "2X WINDOWS THRU LEFT WALL",
     "BackW": "WINDOW THRU BACK WALL",
-    "TapRightX": "TAPS IN FRONT FACE",
+    # The bought wall behind the taps, so the drill depth can be checked.
+    "TapRightX": "TAPS IN 11/16 IN FRONT WALL",
 }
 TAP_CALLOUT_XY = (0.148, 0.215)
 _THREAD_LABEL_LAYER = "INSPECTION-BOX-THREAD-LABEL-HIDDEN"
