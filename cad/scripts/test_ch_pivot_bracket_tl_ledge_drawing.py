@@ -24,6 +24,27 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
 
 
+def test_every_exported_nominal_is_its_printed_value() -> None:
+    """Each nominal is the value the sheet prints, at its printed places: the
+    #5 callout's Ø5.22 and each station at its dimension's places. Lying inside
+    the band is not enough (5.25 sits in [5.22, 5.32])."""
+    places = spec.DRAWING_PRECISION_BY_NAME
+    expected = {("foot_rest", "height_nominal"): round(spec.LEDGE_HEIGHT, places["Height"])}
+    for side, x, dim in zip(("left", "right"), spec.HOLE_X, ("Hole1X", "Hole2X"), strict=True):
+        expected |= {
+            (f"screw_hole_{side}", "nominal_dia"): 5.22,
+            (f"screw_hole_{side}", "station_nominal"): round(x, places[dim]),
+            (f"screw_hole_{side}", "height_nominal"): round(spec.HOLE_Y, places["Hole1Y"]),
+        }
+    exported = {
+        (name, key): value
+        for name, feature in _features().items()
+        for key, value in feature.items()
+        if key.endswith("_nominal") or key.startswith("nominal_")
+    }
+    assert exported == expected
+
+
 def test_ledge_top_meets_the_bracket_foot_free_end() -> None:
     """On its 1-2-3 block the ledge top stands where the foot's free end
     lands with the bracket's outer face proud of the plate top."""

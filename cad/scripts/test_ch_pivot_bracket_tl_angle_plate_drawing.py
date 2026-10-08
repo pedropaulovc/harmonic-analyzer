@@ -73,6 +73,32 @@ def test_every_exported_nominal_lies_in_its_band(stem: str) -> None:
     assert checked
 
 
+def test_every_exported_nominal_is_its_printed_value() -> None:
+    """Each nominal is the value the sheet prints, at its printed places: the
+    callout drill sizes (Ø3.80, Ø10.08) and each station at its dimension's
+    places. Lying inside the band is not enough (10.10 sits in [10.08, 10.18])."""
+    places = spec.DRAWING_PRECISION_BY_NAME
+    expected = {}
+    for side, tap_x, stud_x, tap_dim, stud_dim in zip(
+        ("left", "right"), spec.TAP_X, spec.STUD_X, ("Tap1X", "Tap2X"), ("Stud1X", "Stud2X"), strict=True
+    ):
+        expected |= {
+            (f"ledge_tap_{side}", "nominal_dia"): 3.80,
+            (f"ledge_tap_{side}", "station_nominal"): round(tap_x, places[tap_dim]),
+            (f"ledge_tap_{side}", "height_nominal"): round(spec.SCREW_Y, places["Tap1Y"]),
+            (f"stud_hole_{side}", "nominal_dia"): 10.08,
+            (f"stud_hole_{side}", "station_nominal"): round(stud_x, places[stud_dim]),
+            (f"stud_hole_{side}", "height_nominal"): round(spec.STUD_Y, places["Stud1Y"]),
+        }
+    exported = {
+        (name, key): value
+        for name, feature in _features().items()
+        for key, value in feature.items()
+        if key.endswith("_nominal") or key.startswith("nominal_")
+    }
+    assert exported == expected
+
+
 def test_bracket_seat_lies_on_the_upright_face_above_the_ledge() -> None:
     seat = _features()["seat_face"]
     low, high = seat["bounds"]["y"]
