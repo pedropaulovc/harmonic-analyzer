@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
@@ -1512,6 +1512,116 @@ test('a genuinely admitted independently tracked template still blocks audited R
   }
   assert.match(sourceVisibilityError(fixture.frame, fixture.view), /source-readable/)
   assert.throws(() => measureFixture(fixture), /source-readable/)
+})
+
+test('current physical source views cannot be waived by a readable navigation label', () => {
+  const shot = { id: 'labelled-navigation', startSeconds: 0, endSeconds: 3, classification: 'non-machine', hasCorrespondingMachine: false }
+  const source = { kind: 'current-source-observations', coverage: { changeTimesSeconds: [] }, shots: [shot], frames: [{ ...frame(1), shotId: shot.id, classification: 'non-machine', views: [sourceView('readable-bank')] }] }
+  const row = sourceCensus(source, { shots: [shot], frames: structuredClone(source.frames) }, native, parseOptions(['--times', '1'])).selected[0]
+  assert.equal(row.required, true)
+  assert.deepEqual(row.expectedViewIds, ['readable-bank'])
+  requireSourceViews(row)
+  source.frames[0].views = []
+  assert.equal(sourceCensus(source, { shots: [shot], frames: source.frames }, native, parseOptions(['--times', '1'])).selected[0].required, false)
+})
+
+// Exact metadata from the independently inspected original Analysis contact
+// sheet. Cameras/inputs here are synthetic census controls, not source fits.
+const analysisCoverExposures = [
+  [2608, 87.02026666666667, '63fd5eaae3c131ebb9a547730d7cea910514d6ff2a2a5bafffd3bfeb6dc95371', [797.2101902408472, 0, 789.5030875537748, 350.33846528816133]],
+  [2612, 87.15373333333334, '06815ae2ea0b2ad5001280d9528eaf23bfb7e35476377ab1f8c26ef0570d676b', [408.43834416899017, 0, 1340.846356663269, 706.0875769288202]],
+  [2616, 87.2872, 'fc0b86ddb08e68bf0ca493f70eac2a192f317207a2acf2f3f95b2c5649e81fb5', [58.87818800935385, 0, 1836.4626381724147, 1026.1114425892256]],
+  [2620, 87.42066666666666, 'dd0965d9be738472a14287d52caa93136bdf9c48b8682b37cc7e23bbe2f510d6', [0.0012211742535110114, 0.00044720401288042083, 1919.9959881610268, 1079.9993538624958]],
+  [2623, 87.52076666666666, '9dbada5df9c334fcfa30ef08f7bd293cd1ea0d14aa1c47b1681533fd94fd37b2', [0, 0, 1920, 1080]],
+]
+function analysisCoverFixture(exposure) {
+  const [frameIndex, timeSeconds, sha256Bgr8, rect] = exposure
+  const shot = { id: 'source-overlay', startSeconds: 0, endSeconds: 100, classification: 'machine', hasCorrespondingMachine: true }
+  const source = { shots: [shot], frames: [{
+    ...frame(timeSeconds), shotId: shot.id,
+    sourceImage: { frameIndex, pixelFormat: 'bgr8', width: 1920, height: 1080, sourceSha256: '5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52', sha256Bgr8 },
+    views: [sourceView('main'), sourceView('bar-bank', [...rect])],
+  }] }
+  return { source, track: { shots: [shot], frames: structuredClone(source.frames) },
+    row: track => sourceCensus(source, track, { ...native, durationSeconds: 100 }, parseOptions(['--times', String(timeSeconds)])).selected[0] }
+}
+
+test('actual Analysis2623 exact opaque bank is required and lower main preserved noncontributing; 2608/2612/2616 and float2620 retain both', () => {
+  for (const exposure of analysisCoverExposures) {
+    const { source, track, row } = analysisCoverFixture(exposure), before = structuredClone(source)
+    const sample = row(track), fullyCovered = exposure[0] === 2623
+    assert.equal(sample.required, true)
+    assert.deepEqual(sample.expectedViewIds, fullyCovered ? ['bar-bank'] : ['main', 'bar-bank'])
+    assert.deepEqual(sample.noncontributingCoveredViews.map(view => [view.viewId, view.coveredByViewId]), fullyCovered ? [['main', 'bar-bank']] : [])
+    assert.deepEqual(sample.qualifiedExcludedViews, [], 'Ordinary layer coverage never becomes a blur/fade qualification')
+    requireSourceViews(sample)
+    assert.deepEqual(source, before, 'Original ROI inventory, exact source image and clocks remain immutable')
+  }
+})
+
+test('exact opaque cover refuses transparency, any uncovered strip, warps and current-only loss of original source inventory', () => {
+  for (const mutation of ['transparent', 'strip', 'warp', 'missing-lower']) {
+    const { track, row } = analysisCoverFixture(analysisCoverExposures[4]), top = track.frames[0].views[1]
+    if (mutation === 'transparent') top.composite = { mode: 'crossfade', groupId: 'overlay', imageLayerId: 'bank', opacity: 0.9999999999999999 }
+    if (mutation === 'strip') top.rectSourcePixels[2] -= Number.EPSILON * 1920
+    if (mutation === 'warp') top.imagePlaneWarp = { kind: 'homography', unwarpedViewportPixels: [1920, 1080], renderToSourcePixels: [1, 0, 0, 0, 1, 0, 0, 0, 1] }
+    if (mutation === 'missing-lower') track.frames[0].views.shift()
+    const sample = row(track)
+    assert.ok(sample.expectedViewIds.includes('main'))
+    if (mutation === 'missing-lower') assert.throws(() => requireSourceViews(sample), /main/)
+    else assert.equal(sample.noncontributingCoveredViews.length, 0)
+  }
+})
+
+test('current measured full footprint can resolve only its exact original image, order and opacity, never borrowed coverage', () => {
+  for (const mutation of ['none', 'image', 'order', 'opacity']) {
+    const { source, track, row } = analysisCoverFixture(analysisCoverExposures[3]), before = structuredClone(source)
+    track.frames[0].views[1].rectSourcePixels = [0, 0, 1920, 1080]
+    if (mutation === 'image') track.frames[0].sourceImage.sha256Bgr8 = 'f'.repeat(64)
+    if (mutation === 'order') track.frames[0].views.reverse()
+    if (mutation === 'opacity') track.frames[0].views[1].composite = { mode: 'crossfade', groupId: 'overlay', imageLayerId: 'bank', opacity: 1 }
+    const sample = row(track)
+    if (mutation === 'none') {
+      assert.deepEqual(sample.expectedViewIds, ['bar-bank'])
+      requireSourceViews(sample)
+    } else {
+      assert.equal(sample.expectedViewIds.length, 2)
+      assert.throws(() => requireSourceViews(sample), /main|bar-bank/)
+    }
+    assert.deepEqual(source, before)
+  }
+})
+
+test('actual Rocker24318 to24323 retain sharp outgoing main while only exactly zero incoming images are noncontributing', async () => {
+  const track = JSON.parse(await readFile(new URL('../content/4mBuyixt22U.source-track.json', import.meta.url), 'utf8'))
+  const exposures = track.frames.filter(frame => frame.sourceImage?.frameIndex >= 24318 && frame.sourceImage?.frameIndex <= 24323)
+  assert.equal(exposures.length, 6)
+  const original = { ...track, frames: exposures }, authored = { ...track, frames: structuredClone(exposures) }
+  const options = parseOptions(['--times', exposures.map(frame => frame.timeSeconds).join(',')])
+  const census = sourceCensus(original, authored, { ...native, durationSeconds: track.source.durationSeconds, fps: 24000 / 1001 }, options)
+  for (const row of census.selected) {
+    assert.equal(row.required, true)
+    assert.deepEqual(row.expectedViewIds, ['main'])
+    assert.equal(row.noncontributingZeroOpacityViews.length, 7)
+    assert.deepEqual(row.qualifiedExcludedViews, [])
+    requireSourceViews(row)
+    assert.throws(() => measureView(row.frame.views[1], {}, row.frame, [], 960, new Map()), /Noncontributing physical ROI/)
+  }
+  const tiny = structuredClone(authored)
+  tiny.frames[0].views[1].composite.opacity = Number.MIN_VALUE
+  const tinyRow = sourceCensus(original, tiny, { ...native, durationSeconds: track.source.durationSeconds, fps: 24000 / 1001 }, options).selected[0]
+  assert.ok(tinyRow.expectedViewIds.includes('navigation-synthesis'))
+  assert.equal(tinyRow.noncontributingZeroOpacityViews.length, 6)
+  for (const mutation of ['image', 'missing-view', 'malformed', 'opaque-zero']) {
+    const changed = structuredClone(authored)
+    if (mutation === 'image') changed.frames[0].sourceImage.sha256Gray8 = 'f'.repeat(64)
+    if (mutation === 'missing-view') changed.frames[0].views.splice(1, 1)
+    if (mutation === 'malformed') changed.frames[0].views[1].composite.groupId = ''
+    if (mutation === 'opaque-zero') changed.frames[0].views[1].composite = { mode: 'opaque', opacity: 0 }
+    const row = sourceCensus(original, changed, { ...native, durationSeconds: track.source.durationSeconds, fps: 24000 / 1001 }, options).selected[0]
+    assert.ok(row.expectedViewIds.includes('navigation-synthesis'))
+    if (mutation === 'image' || mutation === 'missing-view') assert.throws(() => requireSourceViews(row), /navigation-synthesis/)
+  }
 })
 
 test('admitted mid-interval errors use the owned integer-PTS selection without aliasing the actual native clock', () => {

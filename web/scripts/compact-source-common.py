@@ -168,6 +168,8 @@ def historical_code_bytes(path, expected_sha256):
 
 def needs_machine(frame, data):
     shot = next(s for s in data["shots"] if s["id"] == frame["shotId"])
+    if data.get("kind") == "current-source-observations" and frame.get("views"):
+        return True
     if frame.get("sourceMachineRequirement") == "required":
         return True
     if frame["classification"] == "machine":
@@ -222,6 +224,57 @@ def policy_excluded_view(frame, view):
     if not valid:
         raise ValueError("Invalid actual source image/complete ROI/manual approved unreadable-ROI qualification")
     return True
+
+def valid_source_rect(rect):
+    return (isinstance(rect, list) and len(rect) == 4
+            and all(type(number) in (int, float) and math.isfinite(number) for number in rect)
+            and rect[0] >= 0 and rect[1] >= 0 and rect[2] > 0 and rect[3] > 0
+            and rect[0] + rect[2] <= 1920 and rect[1] + rect[3] <= 1080)
+
+
+def valid_source_composite(composite):
+    return (composite is None or isinstance(composite, dict) and (
+        set(composite) == {"mode"} and composite["mode"] == "opaque"
+        or set(composite) == {"mode", "groupId", "imageLayerId", "opacity"}
+        and composite["mode"] == "crossfade"
+        and all(isinstance(composite[key], str) and bool(composite[key].strip())
+                for key in ("groupId", "imageLayerId"))
+        and type(composite["opacity"]) in (int, float) and math.isfinite(composite["opacity"])
+        and 0 <= composite["opacity"] <= 1))
+
+
+def zero_opacity_source_view(view):
+    composite = view.get("composite")
+    return (valid_source_rect(view.get("rectSourcePixels"))
+            and valid_source_composite(composite) and composite is not None
+            and composite["mode"] == "crossfade" and composite["opacity"] == 0)
+
+
+def fully_covering_source_view(frame, view):
+    """Exact existing ordered opaque unwarped rectangle support, without a visibility waiver."""
+    def has_warp(candidate):
+        return any(candidate.get(key) is not None for key in (
+            "imagePlaneWarp", "resolvedImagePlaneWarp", "imagePlaneWarpMeasurement"))
+
+    views = frame.get("views", [])
+    index = next((index for index, candidate in enumerate(views) if candidate is view), -1)
+    a, own = view.get("composite"), view.get("rectSourcePixels")
+    if index < 0 or not valid_source_rect(own) or not valid_source_composite(a) or has_warp(view):
+        return None
+    for later in views[index + 1:]:
+        b, rect = later.get("composite"), later.get("rectSourcePixels")
+        if not valid_source_rect(rect) or not valid_source_composite(b) or has_warp(later):
+            continue
+        if b and b["mode"] == "crossfade" and (b["opacity"] != 1 or a
+                and a["mode"] == "crossfade" and a["groupId"] == b["groupId"]
+                and a["imageLayerId"] != b["imageLayerId"]):
+            continue
+        if (rect[0] <= own[0] and rect[1] <= own[1]
+                and rect[0] + rect[2] >= own[0] + own[2]
+                and rect[1] + rect[3] >= own[1] + own[3]):
+            return later
+    return None
+
 
 
 def canonicalize_cut_clock(data):
@@ -725,7 +778,9 @@ def build_track(data, frame_views_callback, evidence_notes=None):
         row["views"] = views
         if row["decodedTimeSeconds"] is None or abs(row["decodedTimeSeconds"] - row["timeSeconds"]) > 0.5:
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: no retained observation within 0.5s.')
-        required = [view for view in views if not policy_excluded_view(row, view)]
+        required = [view for view in views if not policy_excluded_view(row, view)
+                    and (data.get("kind") != "current-source-observations"
+                         or not zero_opacity_source_view(view) and fully_covering_source_view(row, view) is None)]
         if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in required)):
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: source-required camera/input remains unavailable.')
         frames.append(row)
@@ -742,14 +797,26 @@ def build_track(data, frame_views_callback, evidence_notes=None):
               "stages": {str(stage): {"status": "unmeasured"} for stage in (50, 20, 10, 5)},
               "evidence": {"interpretation": "Chosen source-informed physically feasible playback candidates. Hidden inputs are not recovered. Camera FIT/CHECK residuals are CPU diagnostics, not current GPU measurements or stage passes.",
                            "notes": list(evidence_notes or [])}}
-    excluded_views = [(frame, view) for frame in frames for view in frame["views"] if policy_excluded_view(frame, view)]
-    required_views = [(frame, view) for frame in frames if needs_machine(frame, data) for view in frame["views"] if not policy_excluded_view(frame, view)]
+    zero_views = [(frame, view) for frame in frames for view in frame["views"]
+                  if data.get("kind") == "current-source-observations" and zero_opacity_source_view(view)]
+    covered_views = [(frame, view) for frame in frames for view in frame["views"]
+                     if data.get("kind") == "current-source-observations" and not zero_opacity_source_view(view)
+                     and fully_covering_source_view(frame, view) is not None]
+    excluded_views = [(frame, view) for frame in frames for view in frame["views"]
+                      if policy_excluded_view(frame, view) and (data.get("kind") != "current-source-observations"
+                          or not zero_opacity_source_view(view) and fully_covering_source_view(frame, view) is None)]
+    required_views = [(frame, view) for frame in frames if needs_machine(frame, data)
+                      for view in frame["views"] if not policy_excluded_view(frame, view)
+                      and (data.get("kind") != "current-source-observations"
+                           or not zero_opacity_source_view(view) and fully_covering_source_view(frame, view) is None)]
     checked_views = sum(any(point.get("role") == "check" and point.get("viewId", "main") == view["id"] for point in frame["landmarks"]) for frame, view in required_views)
     assumed_cameras = sum(view["cameraProvenance"]["kind"] == "source-informed-framing" for _, view in required_views)
     result["sourceMeasurements"] = {
         "status": "partial" if checked_views else "incomplete",
         "requiredViewSamples": len(required_views), "viewSamplesWithSourceChecks": checked_views,
         "qualifiedExcludedViewSamples": len(excluded_views),
+        "noncontributingCoveredViewSamples": len(covered_views),
+        "noncontributingZeroOpacityViewSamples": len(zero_views),
         "preservedInadmissibleLandmarkSamples": sum(
             sum(point.get("viewId", "main") == view["id"] for point in frame.get("landmarks", []))
             for frame, view in excluded_views),

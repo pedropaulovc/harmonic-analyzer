@@ -6,7 +6,7 @@ import type { SourceAssemblyState } from './source-assembly'
 import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type NativeLineCheck, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
 import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIdentity, NativeModelIdentity, SourceShot, ReferenceState, SourceSample } from './timeline'
 import type { Video } from './video-catalog'
-import { requiredSourceViews, sourceVisibilityError, type SourceVisibilityQualification } from '../source-visibility.mjs'
+import { requiredSourceViews, sourceVisibilityError, physicalSourceFrameRequired, type SourceVisibilityQualification } from '../source-visibility.mjs'
 import { NATIVE_LINE_STATIONS, nativeLineEndpointId } from '../native-line-checks.mjs'
 
 export const SOURCE_WIDTH = 1920
@@ -264,7 +264,7 @@ export class CompactVideoReference {
       if (!['machine', 'non-machine', 'transition', 'unobservable'].includes(frame.classification)) throw new Error(`Unknown source classification at ${t}s.`)
       if (frame.sourceMachineRequirement !== undefined && frame.sourceMachineRequirement !== 'required') throw new Error('Compact tracks cannot weaken required source-machine coverage.')
       if (!Array.isArray(frame.views) || !Array.isArray(frame.landmarks)) throw new Error(`Missing source layout or landmarks at ${t}s.`)
-      const sourceRequired = frame.sourceMachineRequirement === 'required' || frame.classification === 'machine' || (frame.classification === 'non-machine' ? shot.hasCorrespondingMachine === true : shot.hasCorrespondingMachine !== false)
+      const sourceRequired = physicalSourceFrameRequired(frame, frame.sourceMachineRequirement === 'required' || frame.classification === 'machine' || (frame.classification === 'non-machine' ? shot.hasCorrespondingMachine === true : shot.hasCorrespondingMachine !== false))
       if (new Set(frame.views.map((view) => view.id)).size !== frame.views.length) throw new Error(`Duplicate source view at ${t}s.`)
       for (const view of frame.views) {
         const error = sourceVisibilityError(frame, view)
@@ -430,7 +430,7 @@ export class CompactVideoReference {
     sample.unobservedInputFields.length = 0
     sample.nativeGeometryAssumptions = this.data.nativeGeometryAssumptions ?? EMPTY_GEOMETRY_ASSUMPTIONS
     sample.reason = sample.state === 'approximate' ? this.approximationMessage
-      : sample.state === 'hold-last-readable' ? 'Source physical ROIs are policy-excluded or no corresponding machine is shown; retain the preceding displayed pose, not a current source match.' : from.observation.unavailableReason ?? 'This required source interval has no available camera and complete feasible input.'
+      : sample.state === 'hold-last-readable' ? 'Source physical ROIs are individually policy-excluded, noncontributing, or no physical view is shown; retain the preceding displayed pose, not a current source match.' : from.observation.unavailableReason ?? 'This required source interval has no available camera and complete feasible input.'
     if (sample.state === 'approximate') {
       const continuous = from.continuousToNext
       const mix = continuous ? (t - from.observation.timeSeconds) / (next!.observation.timeSeconds - from.observation.timeSeconds) : 0

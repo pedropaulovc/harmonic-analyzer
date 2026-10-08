@@ -2606,6 +2606,7 @@ class QualifiedSourceVisibilityTests(unittest.TestCase):
             record = data[video_id]
             for frame in record['frames']:
                 background = copy.deepcopy(frame['views'][0])
+                frame['views'][0]['rectSourcePixels'] = [0, 0, 400, 600]
                 background['id'] = 'background'
                 background['camera'] = None
                 background['input'] = None
@@ -2679,6 +2680,103 @@ class QualifiedSourceVisibilityTests(unittest.TestCase):
             ],
         }
         self.assertEqual(common.compact_change_times(data), {0, 0.25, 0.5})
+
+    def test_current_physical_views_do_not_inherit_non_machine_labels(self):
+        current = {'kind': 'current-source-observations',
+                   'shots': [{'id': 'navigation', 'classification': 'non-machine',
+                              'hasCorrespondingMachine': False}]}
+        frame = {'shotId': 'navigation', 'classification': 'non-machine',
+                 'views': [{'id': 'readable-bank'}]}
+        self.assertTrue(common.needs_machine(frame, current))
+        frame['views'] = []
+        self.assertFalse(common.needs_machine(frame, current))
+        frame['views'] = [{'id': 'historical-view'}]
+        self.assertFalse(common.needs_machine(frame, {**current, 'kind': 'source-observations'}))
+
+    def test_normal_producer_preserves_covered_lower_inventory_and_distinguishes_ordinary_coverage(self):
+        video_id = 'XPQwKRt4Y2k'
+        with current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            frame = record['frames'][0]
+            lower = frame['views'][0]
+            top = copy.deepcopy(lower)
+            top['id'] = 'top-bank'
+            top['composite'] = {'mode': 'opaque'}
+            lower['camera'] = None
+            lower['input'] = None
+            lower.pop('cameraMeasurement', None)
+            lower['unavailable'] = [{'reason': 'Preserved lower source candidate fully covered by the ordinary exact opaque bank.'}]
+            frame['views'].append(top)
+            original_points = copy.deepcopy(frame['landmarks'])
+            write_current_record(root / 'web', video_id, record)
+            track = ordinary_build(module, video_id, 'generate', record)
+            self.assertEqual(track['coverage']['status'], 'complete')
+            self.assertEqual(track['sourceMeasurements']['noncontributingCoveredViewSamples'], 1)
+            self.assertEqual(track['sourceMeasurements']['qualifiedExcludedViewSamples'], 0)
+            self.assertEqual(track['sourceMeasurements']['requiredViewSamples'],
+                             sum(len(row['views']) for row in track['frames']) - 1)
+            self.assertEqual(track['frames'][0]['landmarks'], original_points)
+            self.assertEqual([view['id'] for view in track['frames'][0]['views']], ['main', 'top-bank'])
+            self.assertTrue(all(stage['status'] == 'unmeasured' for stage in track['stages'].values()))
+            module.common.write_track(track)
+
+    def test_exact_opaque_coverage_never_rounds_away_source_strips_or_transparency(self):
+        for mutation in ('none', 'strip', 'transparent', 'warp', 'independent-fade'):
+            lower = {'id': 'main', 'rectSourcePixels': [0, 0, 1920, 1080]}
+            top = {'id': 'bank', 'rectSourcePixels': [0, 0, 1920, 1080]}
+            if mutation == 'strip':
+                top['rectSourcePixels'] = [0.0012211742535110114, 0.00044720401288042083,
+                                          1919.9959881610268, 1079.9993538624958]
+            if mutation == 'transparent':
+                top['composite'] = {'mode': 'crossfade', 'groupId': 'overlay',
+                                    'imageLayerId': 'bank', 'opacity': 0.9999999999999999}
+            if mutation == 'warp':
+                top['imagePlaneWarp'] = {'kind': 'homography'}
+            if mutation == 'independent-fade':
+                lower['composite'] = {'mode': 'crossfade', 'groupId': 'fade',
+                                      'imageLayerId': 'main', 'opacity': 0.5}
+                top['composite'] = {'mode': 'crossfade', 'groupId': 'fade',
+                                    'imageLayerId': 'bank', 'opacity': 1}
+            frame = {'views': [lower, top]}
+            self.assertIs(common.fully_covering_source_view(frame, lower),
+                          top if mutation == 'none' else None)
+
+    def test_normal_producer_retains_exact_zero_images_without_creating_source_checks(self):
+        video_id = 'XPQwKRt4Y2k'
+        with current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            frame = record['frames'][0]
+            zero = copy.deepcopy(frame['views'][0])
+            zero['id'] = 'zero-incoming'
+            zero['composite'] = {'mode': 'crossfade', 'groupId': 'incoming',
+                                 'imageLayerId': 'incoming', 'opacity': 0}
+            zero['compositeEvidence'] = 'Synthetic exact zero contribution producer control, not an actual source attenuation measurement.'
+            zero['camera'] = None
+            zero['input'] = None
+            zero.pop('cameraMeasurement', None)
+            zero['unavailable'] = [{'reason': 'Exact zero incoming image has no current source/native pose claim.'}]
+            frame['views'].append(zero)
+            write_current_record(root / 'web', video_id, record)
+            track = ordinary_build(module, video_id, 'generate', record)
+            self.assertEqual(track['coverage']['status'], 'complete')
+            self.assertEqual(track['sourceMeasurements']['noncontributingZeroOpacityViewSamples'], 1)
+            self.assertEqual(track['sourceMeasurements']['qualifiedExcludedViewSamples'], 0)
+            self.assertEqual(track['sourceMeasurements']['noncontributingCoveredViewSamples'], 0)
+            self.assertEqual(track['frames'][0]['views'][1]['composite'], zero['composite'])
+            self.assertEqual(track['sourceMeasurements']['requiredViewSamples'],
+                             sum(len(row['views']) for row in track['frames']) - 1)
+            self.assertTrue(all(stage['status'] == 'unmeasured' for stage in track['stages'].values()))
+            module.common.write_track(track)
+            for composite in (
+                {**zero['composite'], 'opacity': math.nextafter(0, 1)},
+                {'mode': 'opaque', 'opacity': 0},
+                {'mode': 'crossfade', 'opacity': 0},
+            ):
+                self.assertFalse(common.zero_opacity_source_view({**zero, 'composite': composite}))
+            zero['composite']['opacity'] = math.nextafter(0, 1)
+            write_current_record(root / 'web', video_id, record)
+            with self.assertRaisesRegex(ValueError, 'unresolved.*camera/input'):
+                ordinary_build(module, video_id, 'generate', record)
 
 
 if __name__ == '__main__':

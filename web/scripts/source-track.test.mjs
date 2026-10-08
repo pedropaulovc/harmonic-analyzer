@@ -542,3 +542,62 @@ test('an individually audited initial near-black fade prepares only the first au
   assert.equal(hold.mechanicalProvenance, null)
   assert.deepEqual(hold.views, [])
 })
+
+test('physical views remain required despite non-machine navigation labels, while a real no-view shot holds', () => {
+  for (const missingInput of [false, true]) {
+    const track = fixture()
+    track.shots[0].classification = 'non-machine'
+    track.shots[0].hasCorrespondingMachine = false
+    for (const frame of track.frames) {
+      frame.classification = 'non-machine'
+      if (missingInput) frame.views[0].input = null
+    }
+    const reference = new CompactVideoReference(track, video)
+    assert.equal(reference.at(1).state, missingInput ? 'unavailable' : 'approximate')
+    if (!missingInput) assert.deepEqual(reference.at(1).views.map(view => view.id), ['main'])
+    for (const frame of track.frames) frame.views = []
+    assert.equal(new CompactVideoReference(track, video).at(1).state, 'hold-last-readable')
+  }
+})
+
+test('only an exact ordinary opaque full cover removes the preserved lower view from active native layout', () => {
+  for (const mutation of ['none', 'strip', 'transparent', 'independent-fade', 'warp', 'reverse']) {
+    const track = fixture()
+    for (const frame of track.frames) {
+      const top = structuredClone(frame.views[0])
+      top.id = 'top-bank'
+      frame.views.push(top)
+      if (mutation === 'strip') top.rectSourcePixels = [Number.MIN_VALUE, 0, 1919, 1080]
+      if (mutation === 'transparent') top.composite = { mode: 'crossfade', groupId: 'fade', imageLayerId: 'top', opacity: 0.9999999999999999 }
+      if (mutation === 'independent-fade') {
+        frame.views[0].composite = { mode: 'crossfade', groupId: 'fade', imageLayerId: 'lower', opacity: 0.5 }
+        top.composite = { mode: 'crossfade', groupId: 'fade', imageLayerId: 'top', opacity: 1 }
+      }
+      if (mutation === 'warp') top.imagePlaneWarp = { method: 'unknown-warp' }
+      if (mutation === 'reverse') frame.views.reverse()
+    }
+    if (mutation === 'warp' || mutation === 'independent-fade') {
+      assert.throws(() => new CompactVideoReference(track, video), /warp|weights exceed|schema|supported/i)
+      continue
+    }
+    const sample = new CompactVideoReference(track, video).at(1)
+    assert.equal(sample.state, 'approximate')
+    assert.deepEqual(sample.views.map(view => view.id), mutation === 'none' ? ['top-bank'] : mutation === 'reverse' ? ['main'] : ['main', 'top-bank'])
+    assert.equal(track.frames[1].views.length, 2, 'Covered source inventory remains lossless')
+  }
+})
+
+test('exact zero native images request a truthful hold while every positive source opacity remains required', () => {
+  for (const opacity of [0, Number.MIN_VALUE, 0.5]) {
+    const track = fixture()
+    for (const frame of track.frames) frame.views[0].composite = { mode: 'crossfade', groupId: 'fade', imageLayerId: 'image', opacity }
+    const reference = new CompactVideoReference(track, video), sample = reference.at(1)
+    assert.equal(sample.state, opacity === 0 ? 'hold-last-readable' : 'approximate')
+    assert.deepEqual(sample.views.map(view => view.id), opacity === 0 ? [] : ['main'])
+    assert.equal(track.frames[1].views.length, 1)
+    assert.equal(sample.timeSeconds, 1)
+  }
+  const malformed = fixture()
+  malformed.frames[1].views[0].composite = { mode: 'crossfade', opacity: 0 }
+  assert.throws(() => new CompactVideoReference(malformed, video), /group|Crossfade/)
+})

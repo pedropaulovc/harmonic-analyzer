@@ -7,7 +7,7 @@ import { promisify } from 'node:util'
 import { validateModelRepresentation, assertNativeSourceAssociation } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
 import { loadNativeIdentityMap } from './native-identity-map.mjs'
-import { sourceVisibilityError, policyExcludedSourceView } from '../source-visibility.mjs'
+import { sourceVisibilityError, requiredSourceViews, physicalSourceFrameRequired } from '../source-visibility.mjs'
 import { VIDEO_IDS, INPUT_FIELDS, completeInput, canonicalJson, sourceImageError, sourceNeedsMachine, recomputeImagePlaneWarp, sameResolvedImagePlaneWarp, nativeLineAxisGeometryBound, nativeGeometryAssumptionErrors, runTool } from './verify-reference.mjs'
 
 export const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -414,6 +414,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
     requireOptionalViewIds(frame.landmarks, `${label}/landmarks`)
     requireOptionalViewIds(frame.unavailable, `${label}/unavailable`)
     const viewIds = new Set()
+    const requiredViews = requiredSourceViews(frame)
     for (const view of frame.views) {
       const viewLabel = `${label}/${view.id}`, rect = view.rectSourcePixels
       assert(view && typeof view === 'object' && !Array.isArray(view)
@@ -460,7 +461,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
       }
       if (view.input === null || view.camera === null) {
         assert(unavailable(view.unavailable) || unavailable(frame.unavailable), `${viewLabel}: unresolved camera/input cannot be silently available`)
-        if (!policyExcludedSourceView(frame, view)) unresolved.push(`${viewLabel}: current camera/input unresolved`)
+        if (requiredViews.includes(view)) unresolved.push(`${viewLabel}: current camera/input unresolved`)
       }
       if (view.imagePlaneWarp !== undefined) {
         validateWarp(view.imagePlaneWarpMeasurement, frame, view, data.frames, viewLabel)
@@ -480,7 +481,7 @@ export async function validateCurrentObservations(data, { webRoot = WEB_ROOT, vi
       ;(point.role === 'fit' ? fits : checks).add(`${viewId}/${canonicalJson(point.pixel)}`)
     }
     assert(![...fits].some(pixel => checks.has(pixel)), `${label}: source FIT/CHECK pixels must be independently disjoint`)
-    if (sourceNeedsMachine(frame, shot) && !frame.views.length) {
+    if (physicalSourceFrameRequired(frame, sourceNeedsMachine(frame, shot)) && !frame.views.length) {
       assert(unavailable(frame.unavailable), `${label}: required source layout is unmapped without an explicit reason`)
       unresolved.push(`${label}: required current source layout unresolved`)
     }

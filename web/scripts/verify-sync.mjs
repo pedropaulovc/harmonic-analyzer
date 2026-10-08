@@ -7,7 +7,7 @@ import { VIDEO_IDS, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceIm
 import { distManifest, serveDist } from './verify-server.mjs'
 import { assertNativeSourceAssociation, assertModelRepresentationBytes, REPRESENTATION_KIND } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
-import { sourceVisibilityError, policyExcludedSourceView, requiredSourceViews, sourceIntrinsicTemplateIssue } from '../source-visibility.mjs'
+import { sourceVisibilityError, policyExcludedSourceView, requiredSourceViews, sourceIntrinsicTemplateIssue, physicalSourceFrameRequired, fullyCoveringSourceView, zeroOpacitySourceView } from '../source-visibility.mjs'
 import { NATIVE_LINE_STATIONS, nativeLineEndpointId, fixedNativeLinePart, nativeLineReadbackResidual, projectNativeLineWorld } from '../native-line-checks.mjs'
 import { APPROVED_MODEL_REPRESENTATION, LIVE_MODEL_SOURCE } from './approved-model.mjs'
 import { loadCurrentObservations, loadCurrentAuthority, validateCurrentTrackAssociation, currentSourceAssemblyChangeTimes, normalizeCurrentTrackAssemblies, currentSourceLayoutForViews as sourceLayoutForViews } from './fresh-source-observations.mjs'
@@ -219,10 +219,12 @@ export function sourceCensus(observations, track, native, options, assemblyChang
     while (left + 1 < right) { const middle = (left + right) >>> 1; if (track.frames[middle].timeSeconds <= row.timeSeconds) left = middle; else right = middle }
     const from = track.frames[left], to = track.frames[left + 1]
     const governing = from?.shotId === shot?.id ? from : authored?.shotId === shot?.id ? authored : null
-    const originalRequired = original ? sourceNeedsMachine(original, originalShots.get(original.shotId)) : !shot || shot.hasCorrespondingMachine !== false && shot.classification !== 'non-machine'
-    const compactRequired = governing ? sourceNeedsMachine(governing, shot) : originalRequired
-    // Preserve the original/current union. Only an exact current qualification
-    // can remove that ROI's obligation; a missing/misbound view remains required.
+    const originalRequired = original ? observations.kind === 'current-source-observations'
+      ? physicalSourceFrameRequired(original, sourceNeedsMachine(original, originalShots.get(original.shotId)))
+      : sourceNeedsMachine(original, originalShots.get(original.shotId)) : !shot || shot.hasCorrespondingMachine !== false && shot.classification !== 'non-machine'
+    const compactRequired = governing ? physicalSourceFrameRequired(governing, sourceNeedsMachine(governing, shot)) : originalRequired
+    // Preserve the original/current union. Only exact qualified ROI exclusions,
+    // supported zero contributions or same-image/order/opacity ordinary opaque cover can remove an obligation.
     const sourceViewMappings = originalRequired && original?.views ? original.views.map(view => {
       const mapping = compactSourceViewRequirement(original, view.id, governing?.views ?? [])
       const counterparts = mapping.viewIds.map(id => governing?.views?.find(view => view.id === id))
@@ -231,16 +233,40 @@ export function sourceCensus(observations, track, native, options, assemblyChang
         && jsonDigest(candidate.rectSourcePixels) === jsonDigest(view.rectSourcePixels)
         && jsonDigest(governing.sourceImage) === jsonDigest(original.sourceImage))
         && !originalViewHasAdmittedSourceSupport(original, view, sourceAnchors, sourceSeeds)
-      return { originalViewId: view.id, ...mapping, qualifiedExcluded }
+      const sameOrderAndOpacity = original.views.length === governing?.views?.length
+        && original.views.every((layer, index) => layer.id === governing.views[index].id
+          && jsonDigest(layer.composite ?? { mode: 'opaque' }) === jsonDigest(governing.views[index].composite ?? { mode: 'opaque' }))
+      const coveredNoncontributing = Boolean(counterparts.length > 0 && counterparts.every(Boolean)
+        && fullyCoveringSourceView(original, view)
+        || sameOrderAndOpacity && counterparts.length > 0 && counterparts.every(candidate => candidate
+          && fullyCoveringSourceView(governing, candidate)
+          && jsonDigest(candidate.rectSourcePixels) === jsonDigest(view.rectSourcePixels)
+          && jsonDigest(governing.sourceImage) === jsonDigest(original.sourceImage)))
+      const zeroOpacityNoncontributing = zeroOpacitySourceView(view) && counterparts.length > 0
+        && counterparts.every(candidate => candidate && zeroOpacitySourceView(candidate)
+          && jsonDigest(candidate.rectSourcePixels) === jsonDigest(view.rectSourcePixels)
+          && jsonDigest(candidate.composite) === jsonDigest(view.composite)
+          && jsonDigest(governing.sourceImage) === jsonDigest(original.sourceImage))
+      return { originalViewId: view.id, ...mapping, qualifiedExcluded, coveredNoncontributing, zeroOpacityNoncontributing }
     }) : []
-    const expectedViewIds = [...new Set([...sourceViewMappings.filter(mapping => !mapping.qualifiedExcluded).flatMap(mapping => mapping.viewIds),
+    const expectedViewIds = [...new Set([...sourceViewMappings.filter(mapping => !mapping.qualifiedExcluded && !mapping.coveredNoncontributing && !mapping.zeroOpacityNoncontributing).flatMap(mapping => mapping.viewIds),
       ...(compactRequired ? requiredSourceViews(governing).map(view => view.id) : [])])]
     const required = (originalRequired || compactRequired) && (expectedViewIds.length > 0
       || originalRequired && !original?.views?.length || compactRequired && !governing?.views?.length)
     const qualifiedExcludedViews = (governing?.views ?? []).filter(view => policyExcludedSourceView(governing, view)
-      && !sourceViewMappings.some(mapping => !mapping.qualifiedExcluded && mapping.viewIds.includes(view.id)))
+      && !zeroOpacitySourceView(view) && !fullyCoveringSourceView(governing, view)
+      && !sourceViewMappings.some(mapping => !mapping.qualifiedExcluded && !mapping.coveredNoncontributing && !mapping.zeroOpacityNoncontributing && mapping.viewIds.includes(view.id)))
       .map(view => ({ viewId: view.id, ...view.sourceVisibility,
         preservedInadmissibleLandmarks: (governing.landmarks ?? []).filter(point => (point.viewId ?? 'main') === view.id) }))
+    const noncontributingCoveredViews = (governing?.views ?? []).flatMap(view => {
+      const cover = !zeroOpacitySourceView(view) && fullyCoveringSourceView(governing, view)
+      return cover ? [{ viewId: view.id, coveredByViewId: cover.id, sourceImage: governing.sourceImage,
+        rectSourcePixels: view.rectSourcePixels, coveringRectSourcePixels: cover.rectSourcePixels,
+        composite: cover.composite ?? { mode: 'opaque' } }] : []
+    })
+    const noncontributingZeroOpacityViews = (governing?.views ?? []).filter(zeroOpacitySourceView)
+      .map(view => ({ viewId: view.id, reasonCode: 'supported-exact-zero-opacity', sourceImage: governing.sourceImage,
+        rectSourcePixels: view.rectSourcePixels, composite: view.composite }))
     const tolerance = row.reasons.includes('every-second') ? 1e-5 : 1 / native.fps + 0.001
     let frame = authored && Math.abs(authored.timeSeconds - row.timeSeconds) <= tolerance && authored.shotId === shot?.id ? authored : null
     let unavailableReason = frame ? null : 'Missing authored sample at retained every-second/change-point source time'
@@ -263,7 +289,7 @@ export function sourceCensus(observations, track, native, options, assemblyChang
         frame = { ...frame, viewMappingUnavailable: [{ reason: 'Original landmark view identity has no same-exposure source layout for compact-view mapping' }] }
       }
     }
-    return { ...row, diagnosticOnly, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, sourceViewMappings, qualifiedExcludedViews, frame, unavailableReason }
+    return { ...row, diagnosticOnly, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, sourceViewMappings, qualifiedExcludedViews, noncontributingCoveredViews, noncontributingZeroOpacityViews, frame, unavailableReason }
   })
   const selected = rows.filter(row => options.times ? options.times.some(time => Math.abs(time - row.timeSeconds) < 1e-5) : (options.from === null || row.timeSeconds >= options.from) && (options.to === null || row.timeSeconds <= options.to))
   for (const time of options.times ?? []) if (time >= native.durationSeconds) selected.push({ timeSeconds: time, reasons: ['requested-sample'], diagnosticOnly: false, required: true, expectedViewIds: [], frame: null, unavailableReason: 'Requested time is outside the original source duration' })
@@ -633,6 +659,7 @@ function distributedLandmarkFloor(measured) {
 export function measureView(view, response, frame, observations, tolerancePx, anchors, seeds = new Map(), lineAuthority = null) {
   const visibilityError = sourceVisibilityError(frame, view)
   assert(!visibilityError && !policyExcludedSourceView(frame, view), visibilityError ?? 'Policy-excluded physical ROI is not a source-pose measurement')
+  assert(!zeroOpacitySourceView(view) && !fullyCoveringSourceView(frame, view), 'Noncontributing physical ROI is not a source-pose measurement')
   const entry = response.captures.find(item => item.viewId === view.id), capture = entry?.capture, mechanism = entry?.mechanism
   const rendered = response.actual.views?.find(item => item.id === view.id)
   requireOwnedSourceExposure(response.actual, frame)
@@ -1167,7 +1194,8 @@ export function requireSourceViews(row) {
   assert(row.expectedViewIds.every(id => ids.has(id)), `Required source view(s) omitted or improperly excluded: ${row.expectedViewIds.filter(id => !ids.has(id)).join(',')}`)
   assert(requiredViews.every(view => view.camera && view.input), 'Required source sample has a missing camera or complete physical input')
   assert(!frame.viewMappingUnavailable?.length, frame.viewMappingUnavailable?.map(item => `${item.anchorId}: ${item.reason}`).join('; '))
-  const orphanViews = [...new Set((frame.landmarks ?? []).filter(item => !ids.has(item.viewId ?? 'main')).map(item => item.viewId ?? 'main'))]
+  const inventoryIds = new Set(frame.views.map(view => view.id))
+  const orphanViews = [...new Set((frame.landmarks ?? []).filter(item => !inventoryIds.has(item.viewId ?? 'main')).map(item => item.viewId ?? 'main'))]
   assert(!orphanViews.length, `Original source landmark view(s) lack an evidenced compact-view mapping: ${orphanViews.join(',')}`)
 }
 
@@ -1183,6 +1211,8 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
   for (const row of census.selected) {
     const sample = { timeSeconds: row.timeSeconds, reasons: row.reasons, diagnosticOnly: row.diagnosticOnly === true, required: row.required, sourceShotId: row.sourceShotId, sampleTimeSeconds: row.frame?.timeSeconds ?? null, sourceImageReplay: row.sourceImageReplay ?? null, status: 'unavailable', measurements: [], unavailable: [], excluded: [] }
     sample.qualifiedExcludedViews = row.qualifiedExcludedViews ?? []
+    sample.noncontributingCoveredViews = row.noncontributingCoveredViews ?? []
+    sample.noncontributingZeroOpacityViews = row.noncontributingZeroOpacityViews ?? []
     sample.requiredViewIds = row.expectedViewIds ?? []
     video.samples.push(sample)
     if (row.required) sample.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(row.frame,
@@ -1256,6 +1286,8 @@ export function finishVideo(video, census, options) {
   video.sourceVisibility = {
     requiredViewSamples: mandatory.reduce((sum, sample) => sum + (sample.requiredViewIds?.length ?? 0), 0),
     qualifiedExcludedViewSamples: mandatory.reduce((sum, sample) => sum + (sample.qualifiedExcludedViews?.length ?? 0), 0),
+    noncontributingCoveredViewSamples: mandatory.reduce((sum, sample) => sum + (sample.noncontributingCoveredViews?.length ?? 0), 0),
+    noncontributingZeroOpacityViewSamples: mandatory.reduce((sum, sample) => sum + (sample.noncontributingZeroOpacityViews?.length ?? 0), 0),
     preservedInadmissibleLandmarkSamples: mandatory.reduce((sum, sample) => sum + (sample.qualifiedExcludedViews ?? []).reduce((count, view) => count + (view.preservedInadmissibleLandmarks?.length ?? 0), 0), 0),
     whollyQualifiedExcludedSamples: mandatory.filter(sample => sample.status === 'qualified-excluded').length,
     unavailableViewSamples: mandatory.reduce((sum, sample) => sum + new Set([
@@ -1263,7 +1295,7 @@ export function finishVideo(video, census, options) {
       ...(sample.status === 'unavailable' ? sample.requiredViewIds ?? [] : []),
     ]).size, 0),
     unavailableQualifiedExposureSamples: mandatory.filter(sample => sample.status === 'unavailable' && sample.qualifiedExcludedViews?.length).length,
-    interpretation: 'Only exact-image/full-ROI individually manually audited approved unreadable navigation backgrounds or near-black fades leave pixel/motion obligations. Original intrinsically inadmissible template donors remain preserved provenance, never measured support. Their timestamps, decoder/image replay, source clocks and mandatory census remain required; held display is not current source fidelity.',
+    interpretation: 'Only exact-image/full-ROI individually manually audited approved unreadable navigation backgrounds or near-black fades leave pixel/motion obligations by policy. Ordinary exact ordered opaque full coverage and supported exactly zero-opacity images are separately noncontributing, never source measurements. Original intrinsically inadmissible template donors remain preserved provenance, never measured support. Every timestamp, decoder/image replay, source clock and mandatory census remains required; held display is not current source fidelity.',
   }
   video.landmarks = { measured: measurements.length, checks: checks.length, fitting: measurements.length - checks.length, fixedChecks: checks.filter(item => item.motion === 'fixed').length, movingChecks: checks.filter(item => item.motion === 'moving').length, maxErrorPx: maximumField(measurements, 'errorPx'), maxRawErrorPx: maximumField(measurements, 'rawErrorPx'), maxErrorFrameWidthPercent: maximumField(measurements, 'errorFrameWidthPercent') }
   const mandatoryLines = mandatory.flatMap(sample => sample.nativeLines ?? [])

@@ -251,3 +251,51 @@ test('qualified ROIs retain only structurally valid original template donors wit
     await assert.rejects(validateCurrentObservations(changed, { webRoot }), /source-readable|schema|unknown runtime|source association/)
   }
 })
+
+test('a readable physical view cannot inherit a non-machine or no-correspondence label exemption', async () => {
+  const record = visibilityFixture(), frame = record.frames[0]
+  delete frame.sourceMachineRequirement
+  delete frame.views[0].sourceVisibility
+  record.shots[0].hasCorrespondingMachine = false
+  await assert.rejects(validateCurrentObservations(record, { webRoot }), /unresolved.*camera\/input/)
+})
+
+test('covered lower source records remain preserved while every partially visible lower candidate stays required', async () => {
+  const record = visibilityFixture(), frame = record.frames[0]
+  delete frame.views[0].sourceVisibility
+  const top = structuredClone(original.frames.find(row => row.views?.length).views[0])
+  top.id = 'top-bank'
+  top.composite = { mode: 'opaque' }
+  top.cameraMeasurement.sourceImage = structuredClone(frame.sourceImage)
+  top.cameraMeasurement.evidence = 'Synthetic native candidate with exact record bindings for coverage admission only, not an actual source camera measurement.'
+  frame.views.push(top)
+  const before = structuredClone(record)
+  await validateCurrentObservations(record, { webRoot })
+  assert.deepEqual(record, before, 'Opaque cover never erases lower source pixels or inventories')
+  for (const mutation of ['strip', 'transparent', 'reverse']) {
+    const changed = structuredClone(record), views = changed.frames[0].views
+    if (mutation === 'strip') views[1].rectSourcePixels[2] -= Number.EPSILON * 1920
+    if (mutation === 'transparent') views[1].composite = { mode: 'crossfade', groupId: 'overlay', imageLayerId: 'bank', opacity: 0.9999999999999999 }
+    if (mutation === 'reverse') views.reverse()
+    await assert.rejects(validateCurrentObservations(changed, { webRoot }), /unresolved.*camera\/input/)
+  }
+})
+
+test('exact valid zero contribution does not waive malformed records or any positive unresolved source view', async () => {
+  const record = visibilityFixture(), frame = record.frames[0], view = frame.views[0]
+  delete view.sourceVisibility
+  view.composite = { mode: 'crossfade', groupId: 'zero-image', imageLayerId: 'whole', opacity: 0 }
+  view.compositeEvidence = 'Synthetic exact zero image contribution decision control, not a measured source attenuation.'
+  const before = structuredClone(record)
+  await validateCurrentObservations(record, { webRoot })
+  assert.deepEqual(record, before)
+  for (const mutation of ['positive', 'malformed', 'unknown', 'identity', 'clock']) {
+    const changed = structuredClone(record), candidate = changed.frames[0].views[0]
+    if (mutation === 'positive') candidate.composite.opacity = Number.MIN_VALUE
+    if (mutation === 'malformed') delete candidate.composite.imageLayerId
+    if (mutation === 'unknown') candidate.composite.mode = 'dark'
+    if (mutation === 'identity') changed.frames[0].sourceImage.sourceSha256 = 'f'.repeat(64)
+    if (mutation === 'clock') changed.frames[0].decodedTimeSeconds = 0.501
+    await assert.rejects(validateCurrentObservations(changed, { webRoot }), /unresolved.*camera\/input|schema|source image|source\/native|clock|source identity|malformed source composite/i)
+  }
+})
