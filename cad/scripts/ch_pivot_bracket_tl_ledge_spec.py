@@ -146,11 +146,13 @@ for _side, _x in (("left", HOLE_X[0]), ("right", HOLE_X[1])):
             "at": ([_x, HOLE_Y, LEDGE_THICK], ("HOLE_X", "HOLE_Y", "LEDGE_THICK")),
             "axis": ([0.0, 0.0, -1.0], ("__frame__",)),
             "drill": (CLEARANCE_SPEC.size, ("CLEARANCE_SPEC",)),
+            # The callout prints the #5 size to two places (5.22); the band
+            # and nominal are that printed value.
             "dia": (
-                limits(HOLE_DIA, 2, (drilled_oversize_mm(), 0.0)),
+                limits(round(HOLE_DIA, 2), 2, (drilled_oversize_mm(), 0.0)),
                 ("HOLE_DIA", ("ch_pivot_bracket_tl_angle_plate_spec", "SCREW_CLEARANCE")),
             ),
-            "nominal_dia": (HOLE_DIA, ("HOLE_DIA",)),
+            "nominal_dia": (round(HOLE_DIA, 2), ("HOLE_DIA",)),
             "thru": (True, ("CLEARANCE_SPEC",)),
             # model X from the left end; model Y from the block face
             "station": (limits(_x, HOLE_X_PLACES), ("HOLE_X", "HOLE_X_PLACES")),
