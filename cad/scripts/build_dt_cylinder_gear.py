@@ -112,7 +112,7 @@ from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
-from involute_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
+from involute_gear import gear_facts
 from dt_cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
@@ -120,6 +120,8 @@ from dt_cylinder_gear_spec import (
     CAM_DIA_BAND,
     CAM_PHASE_TOLERANCE_DEG,
     CAM_THICKNESS,
+    DEDENDUM_FACTOR,
+    DIAMETRAL_PITCH as DP,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ECCENTRICITY,
@@ -137,6 +139,8 @@ from dt_cylinder_gear_spec import (
     OUTSIDE_DIA,
     OVERALL_THICKNESS,
     OVERALL_THICKNESS_BAND,
+    PRESSURE_ANGLE_DEG,
+    ROOT_DIA,
     SURFACE_FINISHES,
     TEETH,
 )
@@ -151,9 +155,10 @@ NOTCH_CLEARANCE = 1.5  # kerf overshoot past the OD so the cut always opens (geo
 
 BORE_RADIUS = BORE_DIAMETER / 2.0
 
-FACTS = gear_facts(TEETH, DP)  # inches; same DP/PA as the cone set by construction
+FACTS = gear_facts(TEETH, DP, PRESSURE_ANGLE_DEG)
 RA_MM = OUTSIDE_DIA / 2.0
 RB_MM = FACTS["Rb"] * IN
+RF_MM = ROOT_DIA / 2.0
 NOTCH_FLOOR = NOTCH_FLOOR_RADIUS
 NOTCH_OUTER = RA_MM + NOTCH_CLEARANCE  # clearance past the OD so the cut always opens
 # +Y is a tooth crest.  The spec owns the first-root-CCW kerf centre so the
@@ -164,27 +169,19 @@ THROUGH_ALL = OVERALL_THICKNESS + 2.0  # bore cut depth
 
 
 def is_solid(x: float, y: float) -> bool:
-    """Exact solid test for the toothed disc cross-section at (x, y) in mm.
-
-    Mirrors the modeled cut: gap floor is the base-circle CHORD (between the
-    two flank starts), flanks are the involute from ``Delta``/``Gamma-Delta``
-    (see build_dt_cone_gear's profile derivation).
-    """
+    """Exact solid test for the standard-root tooth cross-section, in mm."""
     r = math.hypot(x, y)
     if r > RA_MM:
         return False
+    if r <= RF_MM:
+        return True
     gamma, delta = FACTS["Gamma"], FACTS["Delta"]
     psi = math.atan2(y, x) % gamma
     if r >= RB_MM:
         t = math.sqrt((r / RB_MM) ** 2 - 1.0)
         inv = t - math.atan(t)
         return not (delta - inv < psi < gamma - delta + inv)
-    if not (delta < psi < gamma - delta):
-        return True
-    r_chord = (
-        RB_MM * math.cos((gamma - 2.0 * delta) / 2.0) / math.cos(psi - gamma / 2.0)
-    )
-    return r <= r_chord
+    return not (delta < psi < gamma - delta)
 
 
 def notch_solid_area(step: float = 0.004) -> float:
@@ -291,7 +288,10 @@ async def build(adapter) -> dict[str, str]:
     # print needs the original ±0.05 blank width.  Give the first extrusion and
     # its depth stable semantic names, then drive and tolerance that real model
     # dimension.
-    disc = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    disc = await build_fixed_gear(
+        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PRESSURE_ANGLE_DEG,
+        root_relief=True, dedendum=DEDENDUM_FACTOR,
+    )
     v_teeth = disc.volume
     _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
     _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")

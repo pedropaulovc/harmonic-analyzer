@@ -27,6 +27,10 @@ from __future__ import annotations
 import math
 
 import _config
+import cone_line
+import dt_cone_gear_spec
+import dt_cone_pivot_post_installation
+import dt_cone_pivot_post_spec
 import dt_crank_drive_gear_notes
 import dt_crank_drive_gear_spec
 import dt_crank_hub_geometry
@@ -34,6 +38,7 @@ from _fit_limits import deviations
 from _gtol_spec import CylinderFace
 from _hole_spec import FRACTIONAL_DRILL_MM, HoleSpec
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from cone_stack_end_play import CONE_FLOAT_NORTH
 
 
 MM_PER_IN = 25.4
@@ -119,7 +124,107 @@ FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 # inclined T120 (build_dt_drive_train_assembly proves the 0.25 axial air at the
 # band's long limit with T120 on its nominal axis; the fit offsets and axis
 # poses are the fit-up check below).
-SHOULDER_LENGTH = 8.5
+# The toothed south face is set directly off the restored MHA-DT-005 north
+# boss face with the assembly step-4 feeler. There is no spot-face retreat
+# or eccentric sleeve in this stack.
+SEAT_FEELER_MM = 0.25
+SEAT_GAP_MAX_MM = 1.0
+PINION_BOSS_NORTH_GAP_RANGE = (SEAT_FEELER_MM, SEAT_GAP_MAX_MM)
+
+
+def _minimum_1d(function, low: float, high: float) -> tuple[float, float]:
+    """Minimise a convex section of the tilted T120 tip envelope."""
+    ends = (low, high)
+    for _ in range(80):
+        left = low + (high - low) * (3.0 - math.sqrt(5.0)) / 2.0
+        right = high - (high - low) * (3.0 - math.sqrt(5.0)) / 2.0
+        if function(left) <= function(right):
+            high = right
+        else:
+            low = left
+    point = (low + high) / 2.0
+    return min(((p, function(p)) for p in (*ends, point)), key=lambda item: item[1])
+
+
+_SIN_I, _COS_I = cone_line.SIN_I, cone_line.COS_I
+_T120_TIP_MAX = (
+    dt_cone_gear_spec.outside_dia_mm(120) + dt_cone_gear_spec.BLANK_DIA_BAND[0]
+) / 2.0
+_T120_SOUTH_FROM_POST = (
+    cone_line.SHAFT_T120_STATION
+    + dt_cone_pivot_post_installation.GEAR_AXIS_SHIFT
+    + cone_line.CONE_FACE_STATION_REFERENCE / 2.0
+    - dt_cone_gear_spec.FACE_WIDTH
+    - cone_line.POST_STATION
+)
+_GEAR64_SOUTH_FROM_POST = _T120_SOUTH_FROM_POST - dt_crank_drive_gear_spec.FACE_WIDTH
+_COLLAR_WIDTH = _GEAR64_SOUTH_FROM_POST - dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0
+_ROW_2 = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_ROW_3 = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
+_T120_SOUTH_CLOSE = (
+    _T120_SOUTH_FROM_POST
+    + (round(dt_cone_pivot_post_spec.CONE_BOSS_LENGTH, 2) - _ROW_2
+       - dt_cone_pivot_post_spec.CONE_BOSS_LENGTH) / 2.0
+    + round(_COLLAR_WIDTH, 3) - _ROW_3 - _COLLAR_WIDTH
+    + dt_crank_drive_gear_spec.FACE_WIDTH_BAND[1]
+)
+_T120_NORTH_FAR = (
+    _T120_SOUTH_FROM_POST + dt_cone_gear_spec.FACE_WIDTH
+    + dt_cone_gear_spec.FACE_WIDTH_BAND[0]
+    + (round(dt_cone_pivot_post_spec.CONE_BOSS_LENGTH, 2) + _ROW_2
+       - dt_cone_pivot_post_spec.CONE_BOSS_LENGTH) / 2.0
+    + round(_COLLAR_WIDTH, 3) + _ROW_3 - _COLLAR_WIDTH
+    + dt_crank_drive_gear_spec.FACE_WIDTH_BAND[0] + CONE_FLOAT_NORTH
+)
+_CRANK_HEIGHT_CLOSE = (
+    round(dt_cone_pivot_post_spec.CRANK_ABOVE_CONE, 2)
+    + dt_cone_pivot_post_spec.CRANK_ABOVE_CONE_BAND[1]
+)
+_BOSS_NORTH = dt_cone_pivot_post_spec.CRANK_BOSS_NORTH_FACE
+_PINION_SOUTH_HIGH = round(_BOSS_NORTH, 2) + _ROW_2 + SEAT_FEELER_MM
+_PINION_SOUTH_LOW = round(_BOSS_NORTH, 2) - _ROW_2
+
+
+def _t120_nearest_at_z(z_from_post: float) -> float:
+    """Crank radial distance to T120 at a machine-z section, axes concentric.
+
+    The cone's local station is x*sin(i)+z*cos(i), and its transverse
+    coordinate is x*cos(i)-z*sin(i). Both face and tip-circle constraints
+    therefore give exact bounds on x, with no rim sampling or penalty.
+    """
+    low = max(
+        (_T120_SOUTH_CLOSE - z_from_post * _COS_I) / _SIN_I,
+        (z_from_post * _SIN_I - _T120_TIP_MAX) / _COS_I,
+    )
+    high = min(
+        (_T120_NORTH_FAR - z_from_post * _COS_I) / _SIN_I,
+        (z_from_post * _SIN_I + _T120_TIP_MAX) / _COS_I,
+    )
+    if low > high:
+        return math.inf
+
+    def distance(x: float) -> float:
+        across = math.sqrt(max(
+            0.0, _T120_TIP_MAX**2 - (x * _COS_I - z_from_post * _SIN_I)**2
+        ))
+        return math.hypot(x, max(0.0, _CRANK_HEIGHT_CLOSE - across))
+
+    return _minimum_1d(distance, low, high)[1]
+
+
+_SHOULDER_REACH_MAX = (OUTSIDE_DIA + OUTSIDE_DIA_TOLERANCE_MM) / 2.0
+_SHOULDER_Z_LOW = _PINION_SOUTH_LOW
+_SHOULDER_Z_HIGH = _PINION_SOUTH_HIGH + FACE_WIDTH
+for _ in range(80):
+    _SHOULDER_Z_MID = (_SHOULDER_Z_LOW + _SHOULDER_Z_HIGH) / 2.0
+    if _t120_nearest_at_z(_SHOULDER_Z_MID) <= _SHOULDER_REACH_MAX:
+        _SHOULDER_Z_HIGH = _SHOULDER_Z_MID
+    else:
+        _SHOULDER_Z_LOW = _SHOULDER_Z_MID
+T120_CLEAR_SHOULDER_MAX = _SHOULDER_Z_LOW - _PINION_SOUTH_HIGH - 0.25
+SHOULDER_LENGTH = math.floor(min(
+    T120_CLEAR_SHOULDER_MAX, FACE_WIDTH + FACE_WIDTH_LIMITS[0] - 0.1
+) * 10.0) / 10.0
 SHOULDER_LENGTH_BAND = (0.0, -0.30)  # (upper, lower) deviations
 SHOULDER_LENGTH_LIMITS = deviations(SHOULDER_LENGTH_BAND)  # (lower, upper)
 # North of the shoulder the teeth are turned to TURNED_DIA, stated like the
@@ -127,7 +232,22 @@ SHOULDER_LENGTH_LIMITS = deviations(SHOULDER_LENGTH_BAND)  # (lower, upper)
 # inside the .XX row: build_dt_drive_train_assembly proves the T120 tip circle
 # 0.25 radially clear of the turned band at its upper limit, T120 on its
 # nominal axis; at the row's +0.51 that air falls to about 0.05.
-TURNED_DIA = 16.21
+_T120_BAND_NEAREST = _minimum_1d(
+    _t120_nearest_at_z,
+    _PINION_SOUTH_LOW + SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0],
+    _PINION_SOUTH_HIGH + FACE_WIDTH + FACE_WIDTH_LIMITS[1],
+)[1]
+T120_CLEAR_TURNED_DIA_MAX = 2.0 * (_T120_BAND_NEAREST - 0.25) - 0.10
+# A clearance envelope below the pitch circle cannot be made into an accepted
+# crank stub tooth. Keep a genuinely meshable part, not an impossible turn-down;
+# the unchanged assembly clearance/fit-up/row guards reject that cone family.
+_MESHABLE_FITUP_DIA = math.ceil(round((PITCH_DIA + 0.01) * 100.0, 6)) / 100.0
+_MESHABLE_BAND_DIA = math.ceil(
+    round((_MESHABLE_FITUP_DIA + 0.10 + 0.01) * 100.0, 6)
+) / 100.0
+TURNED_DIA = max(
+    math.floor(T120_CLEAR_TURNED_DIA_MAX * 100.0) / 100.0, _MESHABLE_BAND_DIA
+)
 TURNED_DIA_TOLERANCE_MM = 0.10
 TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 # Fit-up of the 16T under T120 (user, 2026-09-30, #1154).  With every fit
@@ -148,7 +268,7 @@ T120_TURNED_BAND_RADIAL_WORST = -0.12
 # stops it is faced back, never under its printed short limit, where the air
 # again clears the feeler by geometry.
 T120_FITUP_FEELER_MM = 0.10
-TURNED_DIA_FITUP_MIN = 15.78
+TURNED_DIA_FITUP_MIN = _MESHABLE_FITUP_DIA
 SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
@@ -246,12 +366,6 @@ PIN_LENGTH = BOSS_DIA  # flush both sides
 # mid-length, with the existing layout allowance.
 PIN_EDGE_MIN_WORST = 2.0
 PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
-# The toothed south face is set directly off the restored MHA-DT-005 north
-# boss face with the assembly step-4 feeler. There is no spot-face retreat
-# or eccentric sleeve in this stack.
-SEAT_FEELER_MM = 0.25
-SEAT_GAP_MAX_MM = 1.0
-PINION_BOSS_NORTH_GAP_RANGE = (SEAT_FEELER_MM, SEAT_GAP_MAX_MM)
 # The shaft end stays recessed inside the boss in the worst case too.  The
 # overall length prints at OVERALL_LENGTH_PLACES, so an accepted pinion is as
 # short as the printed row allows (.X +/-0.8).  Nothing else can shallow the
@@ -342,7 +456,7 @@ if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
 # The fixed-axis tooth-in-gap seed follows the installed 64T centre; the
 # assembly asserts this cross-hole clock against its independently derived
 # seed so the shaft's radial pin hole tracks a centre-station change.
-PIN_CLOCKING_DEG = 12.037647012980765
+PIN_CLOCKING_DEG = 10.4987256057238
 if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / 16.0:
     raise AssertionError("pinion retention-hole clocking must lie within one 16T pitch")
 # The matched-hole callout on both part records identifies both seated parts,

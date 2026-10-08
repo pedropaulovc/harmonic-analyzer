@@ -7,12 +7,8 @@ train mates the crank to it.
 
 from __future__ import annotations
 
-import math
-
+from cone_line import COS_I as _COS_I, PIVOT_XZ, SIN_I as _SIN_I, X_CRANK, Y_BASE_TOP, Y_CRANK
 from dt_cone_swing_platform_geometry import INCLINE_DEG
-
-_SIN_I = math.sin(math.radians(INCLINE_DEG))
-_COS_I = math.cos(math.radians(INCLINE_DEG))
 
 # --- crank axis (the machine-z crank line, carried BY the plate) -------------
 # The merged column's crank bore is oblique geometry only; the KINEMATIC
@@ -27,8 +23,8 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 # in the assembly.
 #
 # Restored frame line: pivot.x - X_CRANK east, Y_CRANK - Y_BASE_TOP up.
-CRANK_AXIS_OFF = 41.6536661190548
-CRANK_AXIS_Y = 79.05
+CRANK_AXIS_OFF = PIVOT_XZ[0] - X_CRANK
+CRANK_AXIS_Y = Y_CRANK - Y_BASE_TOP
 if CRANK_AXIS_OFF <= 0 or CRANK_AXIS_Y <= 0:
     raise AssertionError("swing platform crank axis must lie east and above the pivot")
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan

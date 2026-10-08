@@ -2,7 +2,8 @@
 alignment_pinion:                  # ch25 — engages the cylinder-gear set for zeroing
   teeth: 32
   disengaged_tip_gap_mm: 2.2425    # PINION_GAP; U28 park-out (was 2.0)
-  engaged_center_distance_mm: 38.990010  # 120T tip r31.099960 + drum gap-floor chord r7.890050 (tips seat)
+  engaged_center_extension_mm: 0.35  # positive backlash after the 0.20 radial closing stack
+  engaged_center_distance_mm: 40.566667  # (120 + 32) * (25.4 / 48) / 2 + 0.35; roots 1.25m
   source: "user correction 2026-09-22 (32 teeth); U28 2026-09-23 (park-out); DIMENSIONS.md ch25 (mechanism)"
   confidence: "high tooth count; low placement"
   notes: >-

@@ -131,7 +131,7 @@ POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
 # 2026-09-28): each is dt_cone_gear_spec.FACE_WIDTH thick, grown SOUTH from the
 # reference north face (centre + 3.25), so every north face -- T006's
 # included -- stays where it was, and each gear bears on the one before it.
-T006_CENTER_STATION = 126.02232594770454
+T006_CENTER_STATION = 28.25 + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
 CONE_FACE_STATION_REFERENCE = 6.5
 T006_NORTH_FACE_STATION = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
 

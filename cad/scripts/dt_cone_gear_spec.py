@@ -40,8 +40,8 @@ TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
 TEETH = 120  # default/fundamental configuration
 CONFIGURATION_TEETH = tuple(range(6, 121, 6))
-DIAMETRAL_PITCH = 49.82  # cad/config/machine/gear_train.yaml
-PRESSURE_ANGLE_DEG = 14.5
+DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
+PRESSURE_ANGLE_DEG = _config.machine("gear_train", "pressure_angle_deg")
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH * MODULE_MM
 TOOTH_FORM = "INVOLUTE FLANKS; FLOOR ANY SHAPE, NOT BELOW FLOOR DIA"
@@ -81,31 +81,31 @@ TOOTH_THICKNESS_BAND = (0.075, -0.075)
 # and both journal floats opening (rocking takes up the cone-shaft journal and
 # drum-arbor clearances).  The upper, 0.374 on T006, is rounded up to two
 # places.
-BACKLASH_ACCEPTANCE_MM = (0.06, 0.38)
-CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36, 42)
+BACKLASH_ACCEPTANCE_MM = (0.06, 0.41)
+CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36)
 # teeth: (tip diameter, thickest circular tooth thickness at the standard
 # pitch circle), mm.
 DEEPENED_MESH_MM: dict[int, tuple[float, float]] = {
-    6: (4.28, 1.006),
-    12: (7.55, 1.005),
-    18: (10.74, 1.004),
-    24: (13.90, 1.003),
-    30: (17.04, 1.002),
-    36: (20.17, 1.001),
-    42: (23.29, 1.001),
-    48: (26.39, 1.000),
-    54: (29.49, 0.999),
-    60: (32.52, 0.999),
-    66: (35.55, 0.998),
-    72: (38.58, 0.998),
-    78: (41.62, 0.997),
-    84: (44.66, 0.997),
-    90: (47.70, 0.996),
-    96: (50.74, 0.996),
-    102: (53.79, 0.995),
-    108: (56.84, 0.995),
-    114: (59.88, 0.995),
-    120: (62.93, 0.994),
+    6: (4.16, 0.893),
+    12: (7.47, 0.893),
+    18: (10.73, 0.893),
+    24: (13.97, 0.893),
+    30: (17.18, 0.893),
+    36: (20.39, 0.893),
+    42: (23.57, 0.893),
+    48: (26.75, 0.893),
+    54: (29.92, 0.893),
+    60: (33.10, 0.893),
+    66: (36.27, 0.893),
+    72: (39.45, 0.892),
+    78: (42.62, 0.892),
+    84: (45.80, 0.892),
+    90: (48.97, 0.892),
+    96: (52.15, 0.892),
+    102: (55.32, 0.892),
+    108: (58.50, 0.892),
+    114: (61.67, 0.892),
+    120: (64.85, 0.892),
 }
 
 
@@ -139,8 +139,8 @@ BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # datum the MHA-VN-016 stack collar is feelered off -- does not move.  The band
 # is the cylinder bank's L20 d' rule (+/-0.025 per gear, the 20-gear stack
 # accepted at +/-0.20), so it is faced to a micrometer on both sides.
-SEAT_PITCH = 6.888787817263312  # cone_line.SEAT_PITCH, pinned by test
-FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4  # 6.8887
+SEAT_PITCH = 6.875611681879656  # cone_line.SEAT_PITCH, fixed 7.0565 channel grid
+FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4
 FACE_WIDTH_BAND = (0.025, -0.025)
 # Flat clock (user ruling 2026-09-28): the bore's D-flat is the gear's
 # angular datum on MHA-DT-004, and its outward normal passes through the centre
@@ -199,43 +199,44 @@ def chord_floor_radius_mm(
 # with every runout closing, floored to the printed three places.  A floor
 # above it would rub the drum tip; test_dt_cone_gear_mesh_design re-derives each
 # value from the assembly pose.
-DIPPED_FLOOR_MIN_MM: dict[int, float] = {6: 2.880, 12: 5.738}
+DIPPED_FLOOR_MIN_MM: dict[int, float] = {6: 2.346, 12: 5.521, 18: 8.696, 24: 11.871}
 FLOOR_MAX_DIA_MM: dict[int, float] = {
-    6: 2.929,
-    12: 5.988,
-    18: 9.047,
-    24: 12.106,
-    30: 15.165,
-    36: 18.224,
-    42: 21.283,
-    48: 24.342,
-    54: 27.401,
-    60: 30.460,
-    66: 33.519,
-    72: 36.578,
-    78: 39.637,
-    84: 42.696,
-    90: 45.755,
-    96: 48.814,
-    102: 51.873,
-    108: 54.932,
-    114: 57.991,
-    120: 61.050,
+    6: 2.406,
+    12: 5.581,
+    18: 8.756,
+    24: 11.931,
+    30: 15.106,
+    36: 18.281,
+    42: 21.456,
+    48: 24.631,
+    54: 27.806,
+    60: 30.981,
+    66: 34.156,
+    72: 37.331,
+    78: 40.506,
+    84: 43.681,
+    90: 46.856,
+    96: 50.031,
+    102: 53.206,
+    108: 56.381,
+    114: 59.556,
+    120: 62.731,
 }
 GAP_FLOOR_TMIN: dict[int, float] = {
-    48: 0.0900,
-    54: 0.1200,
-    60: 0.1400,
-    66: 0.1540,
-    72: 0.1650,
-    78: 0.1740,
-    84: 0.1815,
-    90: 0.1875,
-    96: 0.1925,
-    102: 0.1970,
-    108: 0.2010,
-    114: 0.2040,
-    120: 0.2070,
+    42: 0.0410,
+    48: 0.1320,
+    54: 0.1725,
+    60: 0.1995,
+    66: 0.2190,
+    72: 0.2345,
+    78: 0.2465,
+    84: 0.2565,
+    90: 0.2650,
+    96: 0.2720,
+    102: 0.2780,
+    108: 0.2835,
+    114: 0.2880,
+    120: 0.2925,
 }
 
 
@@ -306,7 +307,7 @@ FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 # is the one named exception (book fidelity).
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
-WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
+WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.354}  # experimental special; not production-approved
 
 # Printed places of the bore band (model-owned, DRAWING_PRECISION).
 BORE_BAND_PLACES = 3

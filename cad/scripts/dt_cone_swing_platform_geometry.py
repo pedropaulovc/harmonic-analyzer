@@ -15,6 +15,7 @@ import math
 from dataclasses import dataclass
 
 import _config
+from cone_line import COS_I as _COS_I, INCLINE_DEG, PIVOT_STATION, POST_STATION, SIN_I as _SIN_I
 from dt_cone_swing_platform_spec import (
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
@@ -49,17 +50,13 @@ if abs(PLATE_T - PIVOT_BEARING_RELIEF_DEPTH - PIVOT_BEARING_THICKNESS) > 1e-9:
         "pivot bearing relief no longer leaves its specified thickness"
     )
 
-INCLINE_DEG = 12.5182  # cone-axis plan incline (the assembly's ROT_Y_INCLINE)
-_SIN_I = math.sin(math.radians(INCLINE_DEG))
-_COS_I = math.cos(math.radians(INCLINE_DEG))
+# The engaged plate follows the configured cone journal line.
 
 # --- cone-pivot-post-v2 attachment footprint -------------------------------
 # The casting is centred at cone station -39.90136099793 while the plate
 # origin/pivot remains station 196.  Its inward-shifted vertical attachment
 # holes are a world-X pair at +/-POST_MOUNT_HALF_PITCH.  Undoing the engaged
 # Ry(+INCLINE) placement gives the skewed pair in the platform's local (x, z).
-POST_STATION = -39.90136099793
-PIVOT_STATION = 152.27232594770453
 POST_MAIN_DIA = POST_BLOCK_DIA
 POST_LOCAL_Z = POST_STATION - PIVOT_STATION
 POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim
@@ -176,8 +173,11 @@ SLOT_W = 8.0  # Ø6.35 stud clearance plus chord-vs-arc slack
 # same seat (plate and base unchanged) with a wider post gap; the drive train
 # re-checks the head against the post, gears and stop at import.
 SLOT_E_X = 33.0
-SLOT_E_Z = -205.8075686471163
 LOCK_HEAD_POST_CLEARANCE = 2.0
+SLOT_E_Z = POST_LOCAL_Z - math.sqrt(
+    (POST_MAIN_DIA / 2.0 + 25.4 / 2.0 + LOCK_HEAD_POST_CLEARANCE) ** 2
+    - SLOT_E_X**2
+)
 SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)
 # The plate swings toward disengage (big end away from the drum), so in PLATE
 # coords the fixed stud sweeps the INVERSE rotation: unit direction (-z, x)/R
