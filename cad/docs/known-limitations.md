@@ -29,7 +29,7 @@ These are tracked against the book photos and are fidelity-only, not mechanism-b
 The cone-pivot-post is no longer a cosmetic deferral: its height was manually rederived at
 86 mm from ch30 Eight Views station 2 (`ch30_images/page003_img01.png`), and its
 bossed-casting proportions from ch11 `page002_img05.jpeg` and `page002_img06.jpeg`. The
-inch gear standard raised it to 90 mm to clear the larger 24DP crank pair
+inch gear standard raised it to 94.732 mm to clear the larger 24DP crank pair
 ([`gear-standard.md`](./gear-standard.md#what-changes-visibly)).
 
 ## Omitted hardware (documented)

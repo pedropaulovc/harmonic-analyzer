@@ -28,10 +28,10 @@ has not yet been recorded in `logbook/entries/`; no cutter, feed or setup is pre
 
 The 64T is 7.2244 ±0.025 mm thick. The twenty cone gears are each
 6.8756 ±0.025 mm thick; check the twenty-gear stack at **137.512 ±0.20 mm**
-(`cad/scripts/dt_cone_gear_stack.py`). A stock set-screw collar (MHA-VN-016,
-McMaster 9414T1) holds the stack on the shaft: push it onto a 0.45 mm feeler
-on T006 and lock its set screw on the D-flat, so the stack floats
-0.35–0.55 mm (`cad/scripts/cone_stack_end_play.py`). The collar never touches
+(`cad/scripts/dt_cone_gear_stack.py`). A custom collar (MHA-VN-016, Ø18 × 8 mm
+turned from 3/4 in bar) holds the stack on the shaft: push it onto a 0.45 mm
+feeler on T006 and lock its #2-56 × 5/16 in set screw (McMaster 94355A213) on
+the D-flat, so the stack floats 0.35–0.55 mm (`cad/scripts/cone_stack_end_play.py`). The collar never touches
 the tip block; the cup screw alone sets the shaft's end play. The 16T pinion
 face is 9.5 mm (`cad/scripts/dt_crank_pinion_spec.py`).
 

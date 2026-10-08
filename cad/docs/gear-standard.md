@@ -11,8 +11,8 @@ involute cutter instead of making cutters for an odd pitch.
 |---|---|---|
 | Cone and cylinder train | `dt-cone-gear` T006–T120, `dt-cylinder-gear` ×20 (120T), `dt-alignment-pinion` (32T) | 48DP, PA20, spur |
 | Crossed crank pair | `dt-crank-pinion` (16T, straight), `dt-crank-drive-gear` (64T, right-hand helix 13.0011°) | normal 24DP, normal PA20 |
-| Paper-drive reducer | `pd-rack-pinion` (120T disc), `pd-transgear-knob-shaft` (integral 12T, profile shift x = +0.298) | 40DP, PA20 |
-| Paper feed | `pd-transgear-feed-pinion` (12T, x = +0.298), `pd-platen-rack` | 32DP, PA20 |
+| Paper-drive reducer | `pd-rack-pinion` (120T disc), `pd-transgear-knob-shaft` (integral 12T) | 40DP, PA20 |
+| Paper feed | `pd-transgear-feed-pinion` (12T), `pd-platen-rack` | 32DP, PA20 |
 | Chain | crank and knob sprockets, 68 links | ANSI #25 |
 
 The configured values live in [`../config/machine/gear_train.yaml`](../config/machine/gear_train.yaml)
@@ -72,6 +72,25 @@ make every form cutter by the Eureka method. At 48DP PA20 the ordinary eight-cut
 ranges cover every cone from 12T to 120T, the 120T cylinder gears and the 32T
 alignment drum. The 6T cone is the one gear left needing a special cutter.
 
+### Cutter-native teeth
+
+A range cutter is ground to the tooth of the lowest count in its range: #8 for
+12–13 teeth, #7 14–16, #6 17–20, #5 21–25, #4 26–34, #3 35–54, #2 55–134. The
+model draws every form-cut gear as exactly the gap its stock cutter makes, not
+as an ideal involute for its own tooth count. The 120T cylinder gears carry the
+#2 form (55T reference), the 32T alignment drum the #4 form (26T), the 16T
+crank pinion the #7 form (14T), and the 64T crank gear the #2 form in its normal
+section. Each cone carries the form of its own range, with its blank diameter
+and plunge solved against the stock-form drum it meshes. The 6T cone uses a
+named special single-point cutter. The two 12T paper pinions carry the #8 form,
+and their hubs are shaped so the cutter runs out clear.
+
+Gears cut this way do not mesh conjugately, so a classical contact ratio no
+longer describes them. The model checks each mesh for continuous stock-form
+contact, positive backlash and root clearance at every tolerance corner, and a
+bounded transmission error carried through to channel phase. The final values
+are in the part specs.
+
 ### Undercut
 
 A full-depth standard rack undercuts a gear with fewer than
@@ -79,12 +98,13 @@ A full-depth standard rack undercuts a gear with fewer than
 ([KHK involute profile reference](https://khkgears.net/new/gear_knowledge/gear_technical_reference/involute_gear_profile.html)).
 Five cones (6T to 30T) sit below the 14.5° limit; at 20° only the 6T and 12T do.
 
-### Contact ratio on the small cones
+### Contact ratio on the small cones (study)
 
-The oblique cone mesh is backed off from
-standard centre distance, so the small cones have always run below a contact
-ratio of 1 at the worst printed tolerance corner. The 20° train improves every
-one of them. Values are the deep-edge planar screen, nominal / worst:
+The study that chose the standard compared ideal involute teeth, before the
+cutter-native ruling. The oblique cone mesh is backed off from standard centre
+distance, so the small cones ran below a contact ratio of 1 at the worst
+printed tolerance corner, and the 20° train improved every one of them. Values
+are the deep-edge planar screen, nominal / worst:
 
 | Cone | DP 49.82 PA14.5 | 48DP PA20 |
 |--:|--:|--:|
@@ -96,14 +116,17 @@ one of them. Values are the deep-edge planar screen, nominal / worst:
 | 36T | 1.482 / 0.966 | 1.517 / 1.082 |
 | 42T | 1.577 / 1.056 | 1.542 / 1.104 |
 
-From 48T up the worst-case ratio stays between about 1.12 and 1.21 in both trains. The
-42T no longer needs a short-contact exception.
+From 48T up the worst-case ratio stays between about 1.12 and 1.21 in both trains.
+These are comparison values only; the built teeth are checked by stock-form
+coverage, as above.
 
-### Paper-drive 12T pinions
+### Paper-drive 12T pinions (study)
 
-Both 12T paper pinions need positive profile shift
-to avoid undercut. At 20° the shift is x = +0.298 with a 0.437-module tip land;
-at 14.5° it would be x = +0.624 with only 0.272 module of land.
+As ideal teeth, both 12T paper pinions needed positive profile shift to avoid
+undercut: x = +0.298 with a 0.437-module tip land at 20°, against x = +0.624
+with only 0.272 module of land at 14.5°. The built pinions are cutter-native
+instead: the standard #8 gap moved along its centreline, with blank diameter
+and plunge solved from that geometry.
 
 ## Why not 14.5° at 48DP
 
@@ -141,14 +164,14 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   17.99 mm.
 - Cone incline: 12.518° → 13.001°. Cone face width: 6.8887 → 6.8756 mm. The
   7.0565 mm channel pitch is unchanged.
-- Cone ODs stay within about ±3% of the old long-addendum tips: the 6T shrinks
-  2.8% (4.28 → 4.16 mm), the cones near 18T barely move, and the 120T grows 3.05%
-  (62.93 → 64.85 mm).
+- Cone outside diameters are solved per cone against the stock-form drum. The
+  study's long-addendum tips (6T 4.16 mm, 120T 64.85 mm) are superseded by the
+  values in `dt_cone_gear_spec.py`.
 - Crank pair: centre distance 39.77 → 43.52 mm (+9.44%); 16T OD 17.38 → 19.05 mm;
-  64T OD 65.21 → 71.63 mm. To make room the cone pivot post grows from 86 to
-  90 mm, the swing platform gets a 29 × 12 × 3 mm relief pocket under the 64T,
-  and the post mounting screw becomes a 4 in 1/4-20 (MSC 40923906) cut to
-  90.2 mm.
+  64T OD 65.21 → 71.63 mm. To make room the crank and the cone journals rise
+  4.732 mm together, the cone pivot post grows from 86 to 94.732 mm (head 26.6 mm),
+  the swing platform grows 4 mm longer with no relief pocket under the 64T, and
+  the post mounting screw becomes a 4 in 1/4-20 (MSC 40923906) cut to 94.9 mm.
 - Paper drive: the reducer disc shrinks 5% (OD 77.47 mm) and the reducer centre
   moves from 44.77 to 42.22 mm. The 32DP feed pinion and rack shorten the paper
   advance from 1.596 to 1.496 mm per crank turn (−6.25%). The chain is 68 links
@@ -161,10 +184,9 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
 ## What it costs
 
 - The 6T cone still needs a cutter you make. No ordinary cutter range reaches
-  6 teeth. Its root-to-bore web also falls from 0.621 mm to 0.354 mm at the
-  maximum bore (0.379 mm nominal), because the PA20 gap floor sits lower
-  (Ø2.346 MIN). The 0.621 mm web was a user-ruled exception; the 0.354 mm web
-  is still awaiting that decision.
+  6 teeth. In the first 48DP study its root-to-bore web fell from 0.621 mm to
+  0.354 mm, because the PA20 gap floor sits lower. The terminal journal was
+  then redesigned so the web is at least 0.62 mm again.
 - The 64T crank gear is a true helix. Cutting it needs a spiral-capable
   universal dividing head geared to the table leadscrew (lead 945.86 mm per
   turn). A plain or semi-universal indexing head cannot do it; the shop's
@@ -174,14 +196,10 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   [BS-2](https://www.precisionmatthews.com/products/dividinghead-bs-2)).
   The previous crank pair was also a crossed helical pair, so this cost is not
   new, but it is now explicit.
-- Range cutters only approximate the cone profiles. The analytic fit puts
-  42T, 48T and 54T outside the 0.06 mm single-flank screen with the #3 cutter
-  (0.068–0.092 mm), and a two-flank screen also questions 24T, 30T, 108T, 114T
-  and 120T. These are fits to an idealised cutter template, not measured
-  cutters. Cut and roll a first article of each range before committing the set.
-- The shifted 12T paper pinions use the #8 range for 12–13 teeth, but
-  plunging a standard cutter to a different depth does not reproduce a
-  profile-shifted tooth exactly. Check them against their mates on a trial cut.
+- The meshes are not conjugate. Drawing each gear as its cutter's form removes
+  the earlier mismatch between range cutters and ideal profiles, at the price
+  of a small transmission error in each mesh, which the model bounds and
+  propagates to the drum and channel phase.
 - The paper scale changes by −6.25%, as above.
 
 ## Sources

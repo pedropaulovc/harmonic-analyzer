@@ -268,11 +268,12 @@ T096, T102 and T114 need differential indexing, which takes a universal head wit
 gears, or a plate drilled with 12, 51 or 57 holes. Those tooth counts did not change with the
 pitch, so this was already true of the old train.
 
-The cone teeth are long-addendum profiles on a backed-off oblique mesh, and a range cutter is shaped
-for the lowest count in its range. An analytic fit of the ideal cutter template to each cone flank
-passes within 0.06 mm except T042, T048 and T054 on #3 (0.068–0.092 mm); a stricter two-flank
-screen also flags T024, T030, T108, T114 and T120. Nobody has measured a real cutter against these
-profiles yet, so cut and roll one gear per cutter before committing a set.
+Each gear is modelled as exactly the gap its stock cutter makes: the tooth of the lowest count in
+the cutter's range, with each cone's blank diameter and plunge solved against the stock-form
+120T drum ([`gear-standard.md`](./gear-standard.md#cutter-native-teeth)). The drawn tooth is
+therefore the tooth the cutter produces, and there is no cutter-to-profile error to screen. The
+meshes are not conjugate; their coverage, backlash and transmission error are checked in the
+model. Cut and roll one gear per cutter before committing a set all the same.
 
 Boston Y48120 is a catalogue brass 48DP PA20 120T spur. Using it as a donor for the cylinder-gear
 teeth is possible in principle, but the part is not designed around it.
@@ -281,8 +282,8 @@ teeth is possible in principle, but the part is not designed around it.
 
 No range cutter reaches 6 teeth, so T006 still needs a cutter made in the shop, ground to its gap
 form. The Eureka (button-tool) method in `references/gears-and-gear-cutting/` ch. 12 is the
-documented way to make one. Its root-to-bore web of 0.354 mm at the maximum bore is still waiting
-on the web ruling; see [`gear-standard.md`](./gear-standard.md#what-it-costs).
+documented way to make one. The terminal journal was redesigned so the root-to-bore web is at least
+0.62 mm; see [`gear-standard.md`](./gear-standard.md#what-it-costs).
 
 ### Crossed crank pair, normal 24DP PA20
 
@@ -306,12 +307,12 @@ for the lead depend on the head and the table screw: `TODO(cut it first)`.
 | part | teeth | pitch | cutter | index per tooth (40:1) |
 |---|--:|---|:--:|---|
 | `pd-rack-pinion` (reducer disc) | 120 | 40DP PA20 | #2 | 5 on 15 |
-| `pd-transgear-knob-shaft` integral pinion | 12, x = +0.298 | 40DP PA20 | #8 | 3 turns + 5 on 15 |
-| `pd-transgear-feed-pinion` | 12, x = +0.298 | 32DP PA20 | #8 | 3 turns + 5 on 15 |
+| `pd-transgear-knob-shaft` integral pinion | 12 | 40DP PA20 | #8 | 3 turns + 5 on 15 |
+| `pd-transgear-feed-pinion` | 12 | 32DP PA20 | #8 | 3 turns + 5 on 15 |
 | `pd-platen-rack` | rack, pitch 2.4936 mm, 108 gaps | 32DP PA20 | #1 or a straight-sided 20° rack tool | step 2.4936 mm on the table |
 
-Both 12T pinions are profile-shifted. A standard #8 cutter set to a different depth only
-approximates a shifted tooth, so check each against its mate on a trial cut. The modelled rack is a
+Both 12T pinions are cutter-native: the standard #8 gap moved along its centreline, with the blank
+diameter and plunge solved from that geometry, and each hub is shaped so the cutter runs out clear. The modelled rack is a
 4.7625 mm square toothed strip on a backer. SDP/SI lists stock 32DP 20° racks (A1B12-322 family,
 [D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)) with the same tooth form, but the part is
 not designed around one. The sprockets and the 68-link chain are stock ANSI #25.
