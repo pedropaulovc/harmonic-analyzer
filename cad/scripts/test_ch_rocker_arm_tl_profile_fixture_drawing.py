@@ -12,7 +12,9 @@ import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_tl_profile_fixture_spec as spec
 import draw_ch_rocker_arm_tl_profile_fixture as drawing
 import export_features
+from _feature_requirements import limits
 from _printed_tolerance import printed_band_mm
+from prechips.model import TOLERANCE_REQUIREMENTS
 
 STEM = "ch_rocker_arm_tl_profile_fixture"
 # Agreed with the MHA-CH-006-TL pivot screw and diamond pin (their specs live
@@ -36,12 +38,15 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     )
     assert sum(len(view) for view in views) == len(marked)
     assert set().union(*views) == marked
-    # a banded schedule cell is a model dimension with authored places too,
+    # every schedule number is a model dimension with authored places too,
     # but it prints once, in its schedule, never as a marked dimension
     scheduled = {name for cells in spec.SCHEDULE_CELL_DIMENSIONS.values() for _f, name in cells}
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked | scheduled
     assert not marked & scheduled
-    assert {name for _f, name in spec.EXPLICIT_SYMMETRIC_TOLERANCES_MM} == scheduled
+    assert {name for _f, name in spec.EXPLICIT_SYMMETRIC_TOLERANCES_MM} == {
+        "RodPinHoleX",
+        "RodPinHoleY",
+    }
     assert set(spec.DIMENSION_CALLOUTS) <= marked
 
 
@@ -55,6 +60,167 @@ def test_locating_bore_takes_every_pivot_screw_shoulder() -> None:
 def test_rod_pin_hole_takes_every_diamond_pin_shank() -> None:
     hole = _features()["rod_pin_hole"]["dia"]
     assert hole[0] > DIAMOND_PIN_SHANK[1]
+
+
+def _schedule_cells() -> dict[tuple[str, str, str], str]:
+    return {
+        (schedule, row[0], column): text
+        for schedule, header, rows in (
+            ("FEATURE", spec.FEATURE_SCHEDULE_HEADER, spec.FEATURE_SCHEDULE),
+            ("PART", spec.PART_SCHEDULE_HEADER, spec.PART_SCHEDULE),
+        )
+        for row in rows
+        for column, text in zip(header, row, strict=True)
+    }
+
+
+def test_every_schedule_number_is_a_model_dimension_at_its_places() -> None:
+    """Policy rule 2: a schedule cell prints its owners' value at their
+    authored places; nothing in a dimension column is unowned."""
+    cells = _schedule_cells()
+    owned = set(spec.SCHEDULE_CELL_DIMENSIONS)
+    for key, text in cells.items():
+        if key[2] in {"CENTRE X", "CENTRE Y", "LENGTH X", "WIDTH Y", "DEPTH", "HEIGHT"}:
+            assert any(c.isdigit() for c in text) == (key in owned), key
+    for key, owners in spec.SCHEDULE_CELL_DIMENSIONS.items():
+        number = re.search(r"-?\d+\.(\d+)", cells[key])
+        for _feature, name in owners:
+            assert len(number.group(1)) == spec.DRAWING_PRECISION_BY_NAME[name], (key, name)
+
+
+def test_every_exported_band_is_a_requirement() -> None:
+    """One-fact rule: prechips inspects only the bands a feature lists."""
+    for name, feature in _features().items():
+        for key, value in feature.items():
+            if key in TOLERANCE_REQUIREMENTS and isinstance(value, list) and len(value) == 2:
+                assert key in feature["requirements"], (name, key)
+
+
+def _pocket_owners(tag: str, feature: str) -> dict[str, tuple[tuple[str, str], ...]]:
+    names = spec.pocket_dimension_names(tag)
+    keys = ("station", "height", "length", "width")
+    return {name: ((feature, key),) for name, key in zip(names, keys, strict=True)}
+
+
+def _part_owners(tag: str, part: str, feature: str) -> dict[str, tuple[tuple[str, str], ...]]:
+    names = spec.part_dimension_names(tag, part)
+    return {name: ((feature, key),) for name, key in zip(names, ("length", "width"), strict=True)}
+
+
+_PAD_TAGS = [row[0] for row in spec.PADS]
+_REST_TAGS = [row[0] for row in spec.RESTS]
+# Each printed dimension -> every exported (feature, requirement) owning its
+# band: a shared depth or height owns one band on each pocket or part.
+PRINTED_OWNERS: dict[str, tuple[tuple[str, str], ...]] = {
+    "PlateLength": (("plate_outline", "length"),),
+    "PlateWidth": (("plate_outline", "width"),),
+    "PlateWestX": (("plate_west_end", "station"),),
+    "PlateSouthY": (("plate_south_side", "height"),),
+    "PlateThick": (("plate_top", "thickness"),),
+    "PlateDrop": (("pad_tops", "height"),),
+    "StandOD": (("stand_top", "dia"),),
+    "StandBore": (("stand_bore", "dia"),),
+    "StandHeight": (("stand_foot", "height"),),
+    "StandDrop": (("stand_top", "height"),),
+    "RestHeight": tuple((f"rest_{tag.lower()}", "height") for tag in _REST_TAGS),
+    "RestTopHeight": (("rail_rest_tops", "height"),),
+    "StandPocketDia": (("stand_pocket", "dia"),),
+    "StandPocketDepth": (("stand_pocket", "depth"),),
+    "LocatingBoreDia": (("locating_bore", "dia"),),
+    "LocatingBoreDepth": (("locating_bore", "depth"),),
+    "RodPinHoleDia": (("rod_pin_hole", "dia"),),
+    "RodPinHoleX": (("rod_pin_hole", "station"),),
+    "RodPinHoleY": (("rod_pin_hole", "height"),),
+    "RodPinHoleDepth": (("rod_pin_hole", "depth"),),
+    "PadPocketDepth": tuple((f"pad_pocket_{tag.lower()}", "depth") for tag in _PAD_TAGS),
+    "RestPocketDepth": tuple((f"rest_pocket_{tag.lower()}", "depth") for tag in _REST_TAGS),
+    "PadHeight": tuple((f"pad_{tag.lower()}", "height") for tag in _PAD_TAGS),
+    **{
+        name: owners
+        for tag in _PAD_TAGS
+        for name, owners in _pocket_owners(tag, f"pad_pocket_{tag.lower()}").items()
+    },
+    **{
+        name: owners
+        for tag in _REST_TAGS
+        for name, owners in _pocket_owners(tag, f"rest_pocket_{tag.lower()}").items()
+    },
+    **{
+        name: owners
+        for tag in _PAD_TAGS
+        for name, owners in _part_owners(tag, "Pad", f"pad_{tag.lower()}").items()
+    },
+    **{
+        name: owners
+        for tag in _REST_TAGS
+        for name, owners in _part_owners(tag, "Rest", f"rest_{tag.lower()}").items()
+    },
+    **{
+        f"{prefix}{index}{axis}": ((f"{feature}{index}", key),)
+        for prefix, feature, count in (
+            ("HoldDown", "hold_down_h", len(spec.HOLD_DOWN_POINTS)),
+            ("ClampStud", "stud_tap_s", len(spec.CLAMP_STUD_POINTS)),
+        )
+        for index in range(1, count + 1)
+        for axis, key in (("X", "station"), ("Y", "height"))
+    },
+}
+# The printed bands that are not the general grade at their places.
+EXPLICIT_BANDS = {
+    "LocatingBoreDia": spec.LOCATING_BORE_BAND,
+    "RodPinHoleDia": spec.ROD_PIN_HOLE_BAND,
+    "RodPinHoleX": spec.ROD_PIN_XY_BAND,
+    "RodPinHoleY": spec.ROD_PIN_XY_BAND,
+    "StandBore": spec.DRILLED_BAND,
+}
+
+
+def _nominal(feature: dict, key: str) -> float:
+    for field in (f"{key}_nominal", f"nominal_{key}", f"{key}_ref"):
+        if field in feature:
+            return feature[field]
+    raise AssertionError(f"no nominal for {key}")
+
+
+def test_every_printed_band_has_a_requirement_owner() -> None:
+    """One-fact coverage: every printed dimension reaches prechips as a
+    listed requirement band, and that band is the printed one: the model
+    nominal is the printed value, so the band about it is the printed band."""
+    assert set(PRINTED_OWNERS) == set(spec.DRAWING_PRECISION_BY_NAME)
+    features = _features()
+    claimed = [owner for owners in PRINTED_OWNERS.values() for owner in owners]
+    assert len(claimed) == len(set(claimed))
+    for printed, owners in PRINTED_OWNERS.items():
+        places = spec.DRAWING_PRECISION_BY_NAME[printed]
+        for name, key in owners:
+            feature = features[name]
+            assert key in feature["requirements"], (printed, name, key)
+            nominal = _nominal(feature, key)
+            assert nominal == round(nominal, places), (printed, name, nominal)
+            assert feature[key] == limits(nominal, places, EXPLICIT_BANDS.get(printed)), (
+                printed,
+                name,
+            )
+
+
+def test_hole_callout_bands_are_the_printed_bands() -> None:
+    """The hole callouts print at two places; their exported bands are about
+    those printed values."""
+    features = _features()
+    for name, key in (
+        *((f"hold_down_h{i}", "dia") for i in range(1, 5)),
+        *((f"hold_down_h{i}_counterbore", key) for i in range(1, 5) for key in ("dia", "depth")),
+        *((f"stud_tap_s{i}", "depth") for i in range(1, 5)),
+        ("stud_tap_drills", "depth"),
+        ("pivot_tap", "depth"),
+        ("pivot_tap_drill", "depth"),
+    ):
+        feature = features[name]
+        nominal = _nominal(feature, key)
+        assert nominal == round(nominal, 2), (name, key)
+        band = spec.DRILLED_BAND if (name.startswith("hold_down") and key == "dia" and "counterbore" not in name) else None
+        assert feature[key] == limits(nominal, 2, band), (name, key)
+        assert key in feature["requirements"], (name, key)
 
 
 def test_exported_bands_are_the_printed_bands() -> None:
