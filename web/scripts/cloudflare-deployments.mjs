@@ -209,11 +209,20 @@ async function deactivate(branches, open) {
   const liveSHAs = new Set(open.map(pr => pr.head.sha));
   let eligible = 0;
   let inactivated = 0;
+  const unreadable = [];
   for await (const deployment of previewDeployments()) {
-    const decodedPayload = typeof deployment.payload === 'string' ? JSON.parse(deployment.payload || '{}') : deployment.payload;
-    // GraphQL's JSON scalar wraps the REST object payload in a JSON string.
-    // Decode that string before matching its branch when the Git ref is gone.
-    const payload = typeof decodedPayload === 'string' ? JSON.parse(decodedPayload) : decodedPayload;
+    let payload;
+    try {
+      const decodedPayload = typeof deployment.payload === 'string' ? JSON.parse(deployment.payload || '{}') : deployment.payload;
+      // GraphQL's JSON scalar wraps the REST object payload in a JSON string.
+      // Decode that string before matching its branch when the Git ref is gone.
+      payload = typeof decodedPayload === 'string' ? JSON.parse(decodedPayload) : decodedPayload;
+    } catch (error) {
+      // An unreadable record does not establish ownership, even if its Git ref
+      // matches. Preserve it but continue cleaning independently valid records.
+      unreadable.push(new Error(`Deployment ${deployment.databaseId}: unreadable payload`, { cause: error }));
+      continue;
+    }
     const branch = payload?.manager === 'cloudflare-native' ? payload.branch : deployment.ref?.name;
     if (liveBranches.has(branch) || liveSHAs.has(deployment.commitOid)) continue;
     if (branches && !branches.has(branch)) continue;
@@ -224,6 +233,7 @@ async function deactivate(branches, open) {
     }
   }
   console.log(`GitHub web-preview cleanup: ${eligible} eligible deployment(s), ${inactivated} marked inactive`);
+  if (unreadable.length) throw new AggregateError(unreadable, `Cleanup left unreadable deployments unchanged: ${unreadable.map(error => error.message).join('; ')}`);
 }
 export async function cleanup(branch) {
   guardIdentity(PPE);

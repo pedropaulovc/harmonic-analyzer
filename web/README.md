@@ -770,6 +770,11 @@ Preview resource and Git branch are already gone. The helper decodes GitHub's
 string-wrapped GraphQL deployment payload to recover the recorded branch, and
 uses paginated bulk `latestStatus` data to skip already-inactive records without
 a separate status-history request for every deployment.
+Unreadable payloads are left unchanged without inferring ownership from their
+Git refs. Valid later records are still cleaned up; afterward the run fails
+with an aggregate error naming the unreadable deployment IDs. GitHub API and
+status-write failures propagate immediately rather than being treated as
+unreadable payloads.
 
 An hourly reconciler catches late builds and orphaned Preview resources. It
 preserves new Previews without a PR for their first **30 minutes**, allowing a

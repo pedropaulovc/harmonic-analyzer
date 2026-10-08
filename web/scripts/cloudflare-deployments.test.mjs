@@ -356,3 +356,33 @@ test('cleanup inactivates the real GraphQL string-wrapped payload after its Prev
     assert.equal(writes.length, 1);
   });
 });
+
+test('unreadable outer and inner payloads leave unknown records untouched but valid later records become inactive', async () => {
+  const branch = 'web/deployment-smoke-20261008';
+  const rows = [
+    { databaseId: 21, commitOid: sha, payload: 'not-json', ref: { name: branch }, latestStatus: { state: 'SUCCESS' } },
+    { databaseId: 22, commitOid: sha, payload: JSON.stringify('{bad-inner-json'), ref: { name: branch }, latestStatus: { state: 'SUCCESS' } },
+    { databaseId: 6946755870, commitOid: '4f2f0336c72672ed2295314c8e8dcdf118da578c', payload: '"{\\"manager\\":\\"cloudflare-native\\",\\"branch\\":\\"web/deployment-smoke-20261008\\",\\"pr\\":1275}"', ref: null, latestStatus: { state: 'SUCCESS' } },
+  ];
+  const writes = [];
+  await withAPI(async (url, options) => {
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection(rows));
+    if (url.includes('/pulls?')) return json([]);
+    if (url.includes('/previews?')) return json(envelope([]));
+    if (options.method === 'POST' && url.includes('/statuses')) {
+      writes.push({ url, body: JSON.parse(options.body) });
+      return json({ state: 'inactive' });
+    }
+    throw new Error(`Unexpected request: ${options.method} ${url}`);
+  }, async () => {
+    await assert.rejects(cleanup(branch), error => {
+      assert.ok(error instanceof AggregateError);
+      assert.match(error.message, /21/);
+      assert.match(error.message, /22/);
+      return true;
+    });
+    assert.equal(writes.length, 1);
+    assert.match(writes[0].url, /\/deployments\/6946755870\/statuses$/);
+    assert.equal(writes[0].body.state, 'inactive');
+  });
+});
