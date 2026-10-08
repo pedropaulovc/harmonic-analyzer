@@ -317,7 +317,9 @@ for the lead depend on the head and the table screw: `TODO(cut it first)`.
 
 Both 12T pinions are cutter-native: the standard #8 gap moved along its centreline, with the blank
 diameter and plunge solved from that geometry, and each hub is shaped so the cutter runs out clear.
-The rack is bought, not cut: a stock 32DP 20° rack (SDP/SI and Boston list them; SDP/SI's A1B12-322
-family is in the [D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)) cut to 269.64 mm and
-fixed to the existing backer. The exact SKU is TBD. The sprockets and the 68-link chain are stock
+The rack is bought, not cut: SDP/SI A1B12-Y324, a 48 in brass 32DP 20° rack, 3/16 × 3/16 in
+(4.7625 mm) square ([product page](https://shop.sdp-si.com/a-1b12-y324.html),
+[D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)), cut to 269.64 mm and fixed to the existing
+backer. SDP/SI publishes no accuracy grade for it, so check it against the feed pinion before
+fitting. The sprockets and the 68-link chain are stock
 ANSI #25.
