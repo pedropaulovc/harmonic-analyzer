@@ -726,6 +726,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_inspection_box",
+        part="ch_rocker_arm_tl_inspection_box",
+        artifact_stem="ch-rocker-arm-tl-inspection-box",
+        script_name="draw_ch_rocker_arm_tl_inspection_box.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_rocker_arm_tl_c_stop_bar",
+        part="ch_rocker_arm_tl_c_stop_bar",
+        artifact_stem="ch-rocker-arm-tl-c-stop-bar",
+        script_name="draw_ch_rocker_arm_tl_c_stop_bar.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_arbor_pedestal",
         part="dt_arbor_pedestal",
         artifact_stem="dt-arbor-pedestal",
