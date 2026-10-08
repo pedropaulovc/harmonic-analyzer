@@ -26,8 +26,8 @@ has not yet been recorded in `logbook/entries/`; no cutter, feed or setup is pre
 
 ## Fit the solid stack
 
-The 64T is 7.2113 ±0.025 mm thick. The twenty cone gears are each
-6.8887 ±0.025 mm thick; check the twenty-gear stack at **137.774 ±0.20 mm**
+The 64T is 7.2244 ±0.025 mm thick. The twenty cone gears are each
+6.8756 ±0.025 mm thick; check the twenty-gear stack at **137.512 ±0.20 mm**
 (`cad/scripts/dt_cone_gear_stack.py`). A stock set-screw collar (MHA-VN-016,
 McMaster 9414T1) holds the stack on the shaft: push it onto a 0.45 mm feeler
 on T006 and lock its set screw on the D-flat, so the stack floats
