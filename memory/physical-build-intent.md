@@ -43,7 +43,7 @@ period brackets/screws).
   tool vs the real solid, so it DOES surface sharp internal corners (as un-cut stock) + reach/gouge/
   collision — the class DFMPro misses. Blind spot: rigid geometry + held stock, so it will NOT catch
   thin-wall breakage / slender-shaft whip / tiny-part workholding (T006 root-to-bore web,
-  Ø0.79×34mm shaft, thin cam wall) → those need a first-article cut, not a clean sim.
+  Ø0.79×29.2mm shaft tip, thin cam wall) → those need a first-article cut, not a clean sim.
 - **Gear cutters: stock, except one.** The replica uses inch-standard 20° teeth (48DP cone/
   cylinder/alignment train, normal 24DP crank pair, 40DP/32DP paper drive) so stock eight-cutter
   sets cover every gear except the 6T cone, which gets one named special cutter (Eureka method,

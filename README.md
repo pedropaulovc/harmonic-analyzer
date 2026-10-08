@@ -146,7 +146,7 @@ found three parts carrying essentially all of the risk:
   tooth root and its 1/32 in bore. The hardest part in the machine, and not by a small margin.
 - The knife edge, which is the precision interface of the whole instrument and
   sits on a hex trunnion cantilevered 21.7 mm off an organic cast lever.
-- A Ø0.79 × 34 mm journal in steel, 43:1 slenderness. Whip city.
+- A Ø0.79 × 29.2 mm terminal land in steel, 37:1 slenderness. Whip city.
 
 There is also one settled finding that shapes the entire build: the replica cuts
 standard 48DP 20° inch teeth, so stock involute cutters make every gear except
