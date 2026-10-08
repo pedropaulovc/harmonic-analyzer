@@ -25,7 +25,7 @@ import _config
 import dt_cone_pivot_post_spec as post
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import angular_band_deg, printed_band_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
 
 # Base plate, foot stop and the two saddles (inventory cone-bond-cradle rows).
@@ -363,7 +363,7 @@ _HEIGHT_FROM = "body_seat"
 # bands on their east faces, from the same block's west face.
 _FROM_BASE_TOP = ("base_top", ("BASE_TOP_Z",))
 # The printed cone pin tilt under the title block's general angular band.
-CONE_PIN_TILT_TOL = float(_config.title_block("angular")["value_deg"])
+CONE_PIN_TILT_TOL = angular_band_deg()
 CONE_PIN_TILT = round(post.INCLINE_DEG, DRAWING_PRECISION_BY_NAME["ConePinTilt"])
 # Saddle-top faces are picked off the seats' chords and the stop's top.
 SADDLE_TOP_PICK_X = SADDLE_WIDTH / 2.0 - 5.0
