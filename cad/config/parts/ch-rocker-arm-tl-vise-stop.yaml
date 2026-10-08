@@ -1,0 +1,10 @@
+ch-rocker-arm-tl-vise-stop:
+  title: Rocker Vise Blank-End Stop
+  # Shop fixture: the parent MHA-CH-006 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-CH-006-TL-01
+  material: 6061-T6 aluminium
+  material_specification: 6061-T6 aluminium flat bar, 1-1/2 x 3 in, ASTM B221
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "mill block from flat bar, mill arm and step, drill holes, bond nose pin"

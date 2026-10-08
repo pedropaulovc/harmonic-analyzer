@@ -1,0 +1,10 @@
+dt-cone-pivot-post-tl-bond-cradle:
+  title: Cone Post Bond Cradle
+  # Shop fixture: the parent MHA-DT-005 Number plus -TL-nn (subsystem-identities.md).
+  number: MHA-DT-005-TL-01
+  material: Plain Carbon Steel
+  material_specification: "AISI 1018 cold-finished steel flat bar; pins: hardened Ø4 m6 dowel pins (bought)"
+  finish: as machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "machined (steel), built up and doweled"
