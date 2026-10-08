@@ -38,17 +38,17 @@ HEAD_BASE_Y = BLOCK_HEIGHT - HEAD_HEIGHT
 # corrected source dimension in inches: 2.8360 in replaces the 2.85086614 in
 # initial derivation.
 #
-# v36 geometry (user ruling 2026-09-28): the crankshaft MHA-DT-011 runs directly
-# in the Ø11.438 crank bore, whose axis is the frame's crank axis 72.7 above
-# the foot -- no eccentric bushing, no drop, fixed centres.  The boss starts at
-# the head's tangent plane, so its north face stands HEAD_DIA / 2 from the post
-# axis, and runs the harvested 2.8360 in from there; nothing stands proud of
-# that face inside the boss disc, so there is no spot face, retreat or run-out.
+# The crankshaft MHA-DT-011 runs directly in the Ø11.438 crank bore. The
+# standard-normal crank pair relocates that fixed bore vertically through
+# gear_train.crank_axis_height_mm; the cone journal and boss length stay put.
+# The boss starts at the head's tangent plane, so its north face stands
+# HEAD_DIA / 2 from the post axis and runs the harvested 2.8360 in from there;
+# nothing stands proud of that face inside the boss disc.
 # The north face is the boss's machined end, stationed from the post axis on
 # the print.
 CRANK_BOSS_DIA = 21.93
 CRANK_BORE_DIA = 11.438
-CRANK_BORE_HEIGHT = 72.7
+CRANK_BORE_HEIGHT = _config.machine("gear_train", "crank_axis_height_mm")
 CRANK_BORE_OFFSET = 0.0
 CRANK_BOSS_NORTH_FACE = HEAD_DIA / 2.0
 CRANK_BOSS_START_Z = -CRANK_BOSS_NORTH_FACE
@@ -56,9 +56,9 @@ CRANK_BOSS_LENGTH_IN = 2.8360
 CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
 
-# Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
-# into the part; downstream placement composes it with the exact Ry(180)
-# installation instead of re-authoring the harvested feature frame.
+# The green metric cone journal keeps its incline baked into the part.
+# Downstream placement composes it with the exact Ry(180) installation
+# instead of re-authoring the harvested feature frame.
 INCLINE_DEG = 12.2729  # exp m0.5: cone_line.INCLINE_DEG 12.272927 to 4 places
 CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = 33.368

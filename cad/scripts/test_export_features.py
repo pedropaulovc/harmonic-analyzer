@@ -13,6 +13,7 @@ from prechips.model import Features
 
 import export_features as exporter
 from _export_feature_faces import FeatureFaceError, face_name
+from _feature_requirements import limits
 from _part_pmi import _FaceGeometry, _face_matches
 
 
@@ -121,7 +122,14 @@ def test_cone_native_tolerances_angularity_and_exact_datums() -> None:
     assert crank["dia"] == [11.413, 11.443]
     assert features["journal_bore"]["dia"] == [12.2558, 12.2858]
     assert features["journal_bore"]["height"] == [33.118, 33.618]
-    assert crank["separation"] == [39.332, 39.702]
+    # Bore-to-bore spacing follows the configured crank axis height while
+    # retaining the post's journal height and printed mesh band.
+    spacing = exporter.cone.CRANK_BORE_HEIGHT - exporter.cone.BORE_HEIGHT
+    assert crank["separation"] == limits(
+        spacing,
+        exporter.cone.DRAWING_PRECISION_BY_NAME["CrankAboveCone"],
+        exporter.cone.CRANK_ABOVE_CONE_BAND,
+    )
     assert crank["angularity_dia"] == 0.10
     assert crank["angularity_datums"] == ["A", "B"]
     assert "angularity_dia" in crank["requirements"]

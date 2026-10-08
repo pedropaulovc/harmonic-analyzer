@@ -122,6 +122,11 @@ from dt_cone_swing_platform_geometry import (
     WEST_HALF_S,
 )
 from dt_cone_swing_platform_spec import (
+    CRANK_GEAR_RELIEF_DEPTH,
+    CRANK_GEAR_RELIEF_LENGTH,
+    CRANK_GEAR_RELIEF_LOCAL_X,
+    CRANK_GEAR_RELIEF_LOCAL_Z,
+    CRANK_GEAR_RELIEF_WIDTH,
     HOLDDOWN_CBORE_DEPTH,
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
@@ -554,6 +559,45 @@ async def build(adapter) -> dict[str, str]:
     )
     volume = await volume_check(
         adapter, "pivot bearing relief", volume - v_relief, 0.01 * v_relief
+    )
+
+    # Top sketch (x, y) maps to part (X, -Z). This axis-aligned groove follows
+    # the physical 64T row without moving its axis or mounted solid stack.
+    relief_x = CRANK_GEAR_RELIEF_LOCAL_X
+    relief_y = -CRANK_GEAR_RELIEF_LOCAL_Z
+    relief_half_width = CRANK_GEAR_RELIEF_WIDTH / 2.0
+    relief_half_length = CRANK_GEAR_RELIEF_LENGTH / 2.0
+    gear_relief_pts = [
+        (relief_x - relief_half_width, relief_y - relief_half_length),
+        (relief_x + relief_half_width, relief_y - relief_half_length),
+        (relief_x + relief_half_width, relief_y + relief_half_length),
+        (relief_x - relief_half_width, relief_y + relief_half_length),
+    ]
+    check(
+        "create_sketch crank gear relief",
+        await adapter.create_sketch("PivotBearingTop"),
+    )
+    set_sketch_direct_db(adapter, True)
+    gear_relief_lines = await add_line_chain(adapter, gear_relief_pts)
+    set_sketch_direct_db(adapter, False)
+    await define_polygon_chain(
+        adapter, gear_relief_lines, gear_relief_pts, label="crank gear relief"
+    )
+    await ensure_fully_defined(adapter, "crank gear relief sketch")
+    check("exit_sketch crank gear relief", await adapter.exit_sketch())
+    name_last_feature(adapter, "CrankGearReliefProfile")
+    check(
+        "cut crank gear relief",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=CRANK_GEAR_RELIEF_DEPTH)
+        ),
+    )
+    name_last_feature(adapter, "CrankGearRelief")
+    v_gear_relief = (
+        CRANK_GEAR_RELIEF_WIDTH * CRANK_GEAR_RELIEF_LENGTH * CRANK_GEAR_RELIEF_DEPTH
+    )
+    volume = await volume_check(
+        adapter, "crank gear relief", volume - v_gear_relief, 0.01 * v_gear_relief
     )
 
     # The v2 casting's two Fillister-head attachment bores land on matching

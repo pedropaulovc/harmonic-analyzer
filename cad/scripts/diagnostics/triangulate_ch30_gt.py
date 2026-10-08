@@ -38,6 +38,9 @@ import json
 import math
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import cone_line
+
 
 import numpy as np
 
@@ -150,7 +153,7 @@ TUBE_OBS = [
 # (2026-07-24 v2 post rederive: the manual casting fixes the drive and crank
 # axes; the GT observations remain evidence but the physical bores are harder.)
 MODEL_NOW = {
-    "crank_sprocket": (-131.09338, 129.85, -155.0),  # v2 boss / T12 axis
+    "crank_sprocket": (cone_line.X_CRANK, cone_line.Y_CRANK, -155.0),  # live crank axis / photo-anchored T12 plane
     "cone_front": (-116.05, 90.518, -60.47),  # T120 big-end centre
     "cone_back": (-80.99, 90.518, 97.44),  # shaft tip (station 190; GT wants
     # z ~101.8 -- deferred to the portal/back-frame re-layout)

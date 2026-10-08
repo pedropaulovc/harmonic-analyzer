@@ -8,27 +8,17 @@ constants. It builds the exact modeled tooth solids -- the involute gap
 profile of ``involute_gear.gear_facts`` with the ``_gear.py`` widen /
 root-relief extensions, the 64T's teeth twisted as the TRUE helix
 ``build_crank_drive_gear`` sweeps (``slices`` optionally quantizes to the
-retired K-slice cut stack) -- places them on the live drive-train geometry
-(constants imported from ``build_drive_train_assembly``, never mirrored) at
-the shipped axial placement (``PINION_TOOTH_Z`` -- the pinion proud of the
-pivot-post casting face, spanning the 64T row; ch12 page002_img06), with the
-pinion's turned band (``crank_pinion_spec`` SHOULDER_LENGTH / TURNED_DIA, the
+retired K-slice cut stack) -- places them on live pure-data cone/spec geometry
+without importing a build script, COM helpers, or measured crank-stack guards.
+The pinion's turned band is preserved (SHOULDER_LENGTH / TURNED_DIA, the
 cut ``build_crank_pinion`` revolves), and voxel-computes the pair's
 intersection volume.
 
-Findings it reproduces (run it after changing any crank-mesh input):
-
-* the retired PEN16 radial backoff left the tip circles 0.29 mm APART -- the
-  user-flagged air gap -- and no straight-tooth pose can engage (the crossing
-  manifests as lateral flank misregistration, +-1.08 mm across the face);
-* helix hand: +INCLINE on the 64T zeroes the collision; the mirrored hand and
-  straight teeth both collide hard at the engaged depth;
-* the restored fixed-axis pose (user ruling 2026-09-28), with 0.15 tooth
-  thinning and the 6.5-wide 64T, has a nine-phase common seed-offset interval
-  approximately [-2.776, -0.206] deg in ``crank_mesh_backlash_study``.
-  The shipped -1.49 offset retains over 0.4-degree margin each way; minimum
-  measured nominal backlash is 0.3476 mm. The print-worst closing stack is
-  separate (``crank_mesh_stack``) and requires only positive backlash.
+The CLI reports nominal, seed-pose-margin, or helix-hand studies at the current
+configured crank height and cone incline. Supply the newly measured
+``--seed-off`` explicitly; the default is the raw tooth-in-gap formula, not a
+historical zero-window centre. Collision reports are measurements, not a
+replacement for the assembly's safety gates.
 
 Run (no SolidWorks)::
 
@@ -36,48 +26,75 @@ Run (no SolidWorks)::
 """
 from __future__ import annotations
 
+import argparse
 import math
 import sys
+from pathlib import Path as FilePath
 
 import numpy as np
 from matplotlib.path import Path
 
-import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
-# shim that inserts the parent cad/scripts onto sys.path and re-exports the
-# real _common (every diag_*/probe_* script here relies on it)
-import build_dt_drive_train_assembly as dta
-from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
-from involute_gear import gear_facts
-from dt_crank_pinion_spec import PRESSURE_ANGLE_DEG as PA_DEG  # crank pair, not train
-from build_dt_crank_drive_gear import BACKLASH_MM, HELIX_DEG
-from dt_crank_drive_gear_spec import LONG_ADDENDUM_MM as LONG_ADDENDUM64_MM
-from dt_crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
-from dt_crank_pinion_spec import SHOULDER_LENGTH as PINION_SHOULDER
-from dt_crank_pinion_spec import TURNED_DIA as PINION_TURNED_DIA
+# Import only pure geometry/spec contracts: assembly/build modules also load
+# COM helpers and measured crank-stack assertions, unsuitable for remeasurement.
+sys.path.insert(0, str(FilePath(__file__).resolve().parents[1]))
+import cone_line
+import dt_crank_drive_gear_spec as gear64_spec
+import dt_crank_pinion_spec as pinion_spec
+from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from dt_cone_pivot_post_spec import CRANK_BOSS_START_Z
 
 IN = 25.4
-DP_CRANK = dta.DP_CRANK
-# #906: one cutter for the pair -- the 16T's DP, and the 64T's normal DP;
-# the 64T blank turned long (R9-56).
-DP_CRANK_CUTTER = dta.DP_CRANK_CUTTER
+DEDENDUM_FACTOR = gear64_spec.DEDENDUM_FACTOR
+NORMAL_MODULE_MM = gear64_spec.NORMAL_MODULE_MM
+PA_DEG = pinion_spec.PRESSURE_ANGLE_DEG
+PA64_T = gear64_spec.PRESSURE_ANGLE_DEG
+BACKLASH_MM = gear64_spec.BACKLASH_MM
+HELIX_DEG = cone_line.INCLINE_DEG
+DP_CRANK = gear64_spec.DIAMETRAL_PITCH
+DP_CRANK_CUTTER = gear64_spec.CUTTER_DIAMETRAL_PITCH
+LONG_ADDENDUM64_MM = gear64_spec.LONG_ADDENDUM_MM
 ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK + LONG_ADDENDUM64_MM / IN
-GEAR64_SEAT = dta.GEAR64_SEAT
-GEAR64_FACE = dta.GEAR64_FACE
-PINION_FACE = dta.PINION_FACE
-# The restored post carries the fixed crank axis; both studies and the
-# assembly use this same placement.
-X_CRANK = dta.X_CRANK
-SHIPPED_AXIS = (dta.X_CRANK, dta.Y_CRANK)
-Y_DRIVE = dta.Y_DRIVE
-SIN_I, COS_I = dta.SIN_I, dta.COS_I
-INCLINE_DEG = dta.INCLINE_DEG
-R64, R16, ADD16 = dta.R64, dta.R16, dta.ADD16
-SLACK = math.hypot((GEAR64_SEAT[0] - dta.X_CRANK) * COS_I, dta.Y_CRANK - Y_DRIVE) - R64 - R16
-PINION_TOOTH_Z = dta.PINION_TOOTH_Z
-# The turned band build_dt_crank_pinion revolve-cuts: north of the full-OD
-# shoulder (pinion z > PINION_SHOULDER from the toothed south face) the teeth
-# stop at PINION_TURNED_DIA.
-PINION_TURNED_R = PINION_TURNED_DIA / 2.0
+# Same face/station construction as the assembly, without its measured guards.
+GEAR64_STATION = (
+    cone_line.SHAFT_T120_STATION
+    - (cone_line.CONE_FACE_STATION_REFERENCE + 10.0) / 2.0 - 0.1
+)
+GEAR64_SEAT = cone_line.cone_station(
+    GEAR64_STATION + GEAR_AXIS_SHIFT + gear64_spec.CENTRE_SHIFT_NORTH
+)
+GEAR64_FACE = gear64_spec.FACE_WIDTH
+PINION_FACE = pinion_spec.FACE_WIDTH
+X_CRANK, Y_CRANK = cone_line.X_CRANK, cone_line.Y_CRANK
+SHIPPED_AXIS = (X_CRANK, Y_CRANK)
+Y_DRIVE = cone_line.Y_DRIVE
+SIN_I, COS_I = cone_line.SIN_I, cone_line.COS_I
+INCLINE_DEG = cone_line.INCLINE_DEG
+R64, R16 = gear64_spec.PITCH_DIA / 2.0, pinion_spec.PITCH_DIA / 2.0
+ADD16 = NORMAL_MODULE_MM
+SLACK = math.hypot((GEAR64_SEAT[0] - X_CRANK) * COS_I, Y_CRANK - Y_DRIVE) - R64 - R16
+PINION_TOOTH_Z = (
+    cone_line.cone_station(cone_line.POST_STATION)[2] - CRANK_BOSS_START_Z
+    + pinion_spec.SEAT_FEELER_MM + PINION_FACE / 2.0
+)
+PINION_SHOULDER = pinion_spec.SHOULDER_LENGTH
+PINION_TURNED_R = pinion_spec.TURNED_DIA / 2.0
+
+
+def gear_facts(teeth: int, dp: float, pa_deg: float, *,
+               addendum_extra_in: float = 0.0) -> dict[str, float]:
+    """Pure transverse facts, matching involute_gear's inch-based equations.
+
+    Keep both polygon and lookup on the same facts without importing the
+    authoring module's _common/COM/watchdog dependencies.
+    """
+    pa = math.radians(pa_deg)
+    rb = teeth / dp * math.cos(pa) / 2.0
+    ra = (teeth + 2.0) / dp / 2.0 + addendum_extra_in
+    tmax = math.sqrt((ra / rb) ** 2 - 1.0)
+    thickness = math.pi / (2.0 * dp)
+    delta = thickness * dp / teeth + math.tan(pa) - pa
+    gamma = 2.0 * math.pi / teeth
+    return {"Rb": rb, "Ra": ra, "Tmax": tmax, "Delta": delta, "Gamma": gamma}
 
 
 def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
@@ -92,14 +109,21 @@ def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
     ``gear_facts`` (a normal-defined helical gear's transverse profile).
     """
     f = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
+    rp = teeth / dp / 2.0 * IN
     rb, ra = f["Rb"] * IN, f["Ra"] * IN
     tmax, delta, gamma = f["Tmax"], f["Delta"], f["Gamma"]
-    rp = teeth / dp / 2.0 * IN
     eps = (widen_mm / 2.0) / rp
-    th_l, th_u = f["ThetaL"] - eps, f["ThetaU"] + eps
+    if root_r_mm is not None and (not math.isfinite(root_r_mm) or root_r_mm <= 0):
+        raise ValueError("gear root radius must be positive and finite")
+    u0 = (math.sqrt((root_r_mm / rb) ** 2 - 1.0)
+          if root_r_mm is not None and root_r_mm > rb else 0.0)
+    if u0 >= tmax:
+        raise ValueError("gear root must leave a nonzero involute below the tip")
+    th_l = math.atan(tmax) - tmax + delta - eps
+    th_u = tmax - math.atan(tmax) - delta + gamma + eps
     pts: list[tuple[float, float]] = []
     for i in range(samples + 1):  # lower flank A1->B1, rotated -eps
-        t = tmax * i / samples
+        t = u0 + (tmax - u0) * i / samples
         ph = t - delta + eps
         pts.append((rb * (math.cos(ph) + t * math.sin(ph)),
                     rb * (t * math.cos(ph) - math.sin(ph))))
@@ -107,11 +131,12 @@ def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
         th = th_l + (th_u - th_l) * i / samples
         pts.append((ra * math.cos(th), ra * math.sin(th)))
     for i in range(1, samples + 1):  # upper flank reversed B2->A2, rotated +eps
-        t = tmax * (samples - i) / samples
+        t = u0 + (tmax - u0) * (samples - i) / samples
         ph = t - delta + gamma + eps
         pts.append((rb * (math.cos(ph) + t * math.sin(ph)),
                     rb * (math.sin(ph) - t * math.cos(ph))))
-    a1, a2 = delta - eps, gamma - delta + eps
+    foot_inv = u0 - math.atan(u0)
+    a1, a2 = delta - foot_inv - eps, gamma - delta + foot_inv + eps
     if root_r_mm is None:  # base chord A2->A1 (the stock floor)
         for i in range(1, samples):
             s = i / samples
@@ -119,11 +144,13 @@ def gap_polygon(teeth: int, dp: float, root_r_mm: float | None = None,
                         rb * ((1 - s) * math.sin(a2) + s * math.sin(a1))))
     else:  # radial in, root arc, radial out (the root-relieved floor)
         rr = root_r_mm
-        pts.append((rr * math.cos(a2), rr * math.sin(a2)))
+        if rr < rb:
+            pts.append((rr * math.cos(a2), rr * math.sin(a2)))
         for i in range(1, samples):
             th = a2 + (a1 - a2) * i / samples
             pts.append((rr * math.cos(th), rr * math.sin(th)))
-        pts.append((rr * math.cos(a1), rr * math.sin(a1)))
+        if rr < rb:
+            pts.append((rr * math.cos(a1), rr * math.sin(a1)))
     return np.array(pts)
 
 
@@ -173,8 +200,8 @@ def pinion_material(
     return (z >= 0) & (z <= PINION_FACE) & ~turned & g16.material(theta, r)
 
 
-ROOT16 = R16 - 1.157 * ADD16
-ROOT64 = R64 - 1.157 * ADD16
+ROOT16 = R16 - DEDENDUM_FACTOR * NORMAL_MODULE_MM
+ROOT64 = R64 - DEDENDUM_FACTOR * NORMAL_MODULE_MM
 
 
 def pose(axis: tuple[float, float], seed_off: float = 0.0) -> dict[str, float]:
@@ -197,9 +224,9 @@ def frame_axis(extra: float) -> tuple[float, float]:
     return X_CRANK, y_for_extra(extra)
 
 
-def study(axis: tuple[float, float], skew_deg: float = 0.0, widen16: float = 0.0,
-          widen64: float = 0.0, root16: float | None = None,
-          root64: float | None = None, crank_deg: float = 0.0,
+def study(axis: tuple[float, float], skew_deg: float = HELIX_DEG, widen16: float = 0.0,
+          widen64: float = BACKLASH_MM, root16: float | None = ROOT16,
+          root64: float | None = ROOT64, crank_deg: float = 0.0,
           slices: int = 0, vox: float = 0.06, seed_off: float = 0.0,
           lut: dict | None = None) -> dict[str, float]:
     """Voxel intersection of the pair with the 16T on crank ``axis``.
@@ -228,7 +255,7 @@ def study(axis: tuple[float, float], skew_deg: float = 0.0, widen16: float = 0.0
     k16 = (16, widen16, root16)
     k64 = (64, widen64, root64)
     if k16 not in lut:
-        lut[k16] = GapLookup(16, DP_CRANK_CUTTER, widen16, root16)
+        lut[k16] = GapLookup(16, DP_CRANK_CUTTER, widen16, root16, pa_deg=PA_DEG)
     if k64 not in lut:
         lut[k64] = GapLookup(64, DP_CRANK, widen64, root64, pa_deg=PA64_T,
                              addendum_extra_in=ADDENDUM64_EXTRA_IN)
@@ -289,64 +316,40 @@ def worst_over_phase(widen: float, axis: tuple[float, float], k: int, lut: dict,
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--suite", choices=("nominal", "pose", "hand"), default="nominal")
+    ap.add_argument("--phases", type=int, default=9)
+    ap.add_argument("--seed-off", type=float, default=0.0,
+                    help="measured seed offset in degrees; default is uncentred tooth-in-gap")
+    ap.add_argument("--dx", type=float, default=0.0)
+    ap.add_argument("--dy", type=float, default=0.0)
+    ap.add_argument("--vox", type=float, default=0.06)
+    args = ap.parse_args()
+    if args.phases < 1 or args.vox <= 0:
+        ap.error("phases and voxel size must be positive")
+    axis = (X_CRANK + args.dx, Y_CRANK + args.dy)
+    variants = [(HELIX_DEG, args.seed_off, BACKLASH_MM, "nominal")]
+    if args.suite == "hand":
+        variants += [(-HELIX_DEG, args.seed_off, BACKLASH_MM, "mirrored"),
+                     (0.0, args.seed_off, BACKLASH_MM, "straight")]
+    elif args.suite == "pose":
+        variants += [(HELIX_DEG, args.seed_off + delta, BACKLASH_MM, f"seed{delta:+g}")
+                     for delta in (-0.4, 0.4)]
+        variants += [(HELIX_DEG, args.seed_off, BACKLASH_MM - 0.05, "thin64-0.05")]
     lut: dict = {}
-    print(f"i={INCLINE_DEG:.4f}  R64={R64:.3f} R16={R16:.3f}  std c2c={R64 + R16:.3f}  "
-          f"live: slack {SLACK} backlash {BACKLASH_MM} smooth helix {HELIX_DEG:.4f}")
-
-    print("\n== the retired straight-tooth backoff (air gap) ==", flush=True)
-    r = study((X_CRANK, 144.96))  # the pre-rederive frame Y_CRANK
-    print(f"old pose: c2c {r['c2c']:.3f}, tip interleave {r['interleave']:+.3f} "
-          f"(NEGATIVE = the tips never touch), vol {r['vol_mm3']:.3f}")
-
-    # The frame-axis rederivation: lifting the frame axis to the frame slack
-    # lands on the casting's Y_CRANK (the assembly asserts the same c2c).  No
-    # seed is shipped there, so only the centre distance is checked.
-    assert abs(y_for_extra(SLACK) - dta.Y_CRANK) < 0.05, (
-        f"y_for_extra({SLACK}) = {y_for_extra(SLACK)} drifted from Y_CRANK "
-        f"{dta.Y_CRANK}")
-
-    # The assembly ships the seed at the zero-window CENTRE, not the raw
-    # formula (dta.MESH_WINDOW_CENTRE_DEG); model the same offset everywhere.
-    off = dta.MESH_WINDOW_CENTRE_DEG
-    shipped_slack = pose(SHIPPED_AXIS)["c2c"] - R64 - R16
-
-    print("\n== helix hand at the shipped depth ==", flush=True)
-    for skew, label in ((HELIX_DEG, "+helix (shipped)"),
-                        (-HELIX_DEG, "mirrored hand"), (0.0, "straight teeth")):
-        r = study(SHIPPED_AXIS, skew_deg=skew, widen64=BACKLASH_MM,
-                  root16=ROOT16, root64=ROOT64, seed_off=off, lut=lut)
-        print(f"{label:20s}: vol {r['vol_mm3']:8.3f} mm^3")
-
-    print("\n== the shipped pose over a crank-pitch phase sweep ==", flush=True)
-    # Pin the study's derived pose to the assembly's shipped constants -- a
-    # drift here means the study is validating a pose the build doesn't ship.
-    live = study(SHIPPED_AXIS, skew_deg=HELIX_DEG, widen64=BACKLASH_MM,
-                 root16=ROOT16, root64=ROOT64, seed_off=off, lut=lut)
-    assert abs(live["ptz"] - dta.PINION_TOOTH_Z) < 1e-9, (
-        f"study placement {live['ptz']} != assembly PINION_TOOTH_Z "
-        f"{dta.PINION_TOOTH_Z}")
-    assert abs(live["seed"] - dta.PINION_SEED_DEG) < 1e-9, (
-        f"study seed {live['seed']} != assembly PINION_SEED_DEG "
-        f"{dta.PINION_SEED_DEG}")
-    assert abs(live["c2c"] - dta.CRANK_ACTUAL_C2C) < 1e-9, (
-        f"study c2c {live['c2c']} != assembly CRANK_ACTUAL_C2C {dta.CRANK_ACTUAL_C2C}")
-    w = worst_over_phase(BACKLASH_MM, SHIPPED_AXIS, 0, lut, seed_off=off)
-    print(f"backlash {BACKLASH_MM} c2c +{shipped_slack:.3f} smooth: worst {w:.4f} mm^3")
-    wm = worst_over_phase(BACKLASH_MM - 0.05, SHIPPED_AXIS, 0, lut, seed_off=off)
-    print(f"margin (backlash -0.05):                worst {wm:.4f} mm^3")
-    # Seed-window margin: the shipped centre must clear +-0.4 deg of authoring
-    # wander in BOTH directions -- 4x the 0.10-deg bound the assembly's
-    # authoring-time measure-and-correct block enforces (the interference gate
-    # guards the real pose; this guards the margin).
-    for so in (off - 0.4, off + 0.4):
-        wm2 = worst_over_phase(BACKLASH_MM, SHIPPED_AXIS, 0, lut,
-                               phases=5, seed_off=so)
-        print(f"margin (seed {so - off:+.1f} deg):                 "
-              f"worst {wm2:.4f} mm^3")
-        assert wm2 < 0.02, (
-            f"seed window margin lost at {so - off:+.1f} deg: {wm2:.4f} mm^3")
-    ok = w < 0.0005
-    print("\nPASS" if ok else "\nFAIL: shipped pose no longer zero-collision")
+    ok = True
+    for helix, seed, thinning, label in variants:
+        worst = 0.0
+        for phase in np.linspace(0.0, 22.5, args.phases, endpoint=False):
+            result = study(axis, skew_deg=helix, crank_deg=float(phase),
+                           widen64=thinning, seed_off=seed, vox=args.vox, lut=lut)
+            worst = max(worst, result["vol_mm3"])
+            print({"case": label, "crank_deg": float(phase), **result}, flush=True)
+        threshold = 0.02 if label.startswith("seed") else 0.0005
+        passed = worst >= 0.02 if label in ("mirrored", "straight") else worst < threshold
+        ok &= passed
+        print({"case": label, "worst_mm3": worst, "passed": passed}, flush=True)
+    print("PASS" if ok else "FAIL: crank mesh study criteria not met", flush=True)
     return 0 if ok else 1
 
 

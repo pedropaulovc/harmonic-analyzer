@@ -2,9 +2,9 @@
 
 No backlash window or adjustable axis: the printed post-bore angularity and
 spacing must leave positive backlash at the worst closing corner. Slopes and
-pose readings come from the #1126 exact-solid B-star and crank-mesh-angle
-studies at the old 6.5 face; the grown 7.2113 face is rechecked by the
-assembly's exact-solid interference gate, not by assuming a new fitted slope.
+pose readings are remeasured for the standard-normal m1 PA20 pair. The
+assembly's native interference gate checks the real metric-lineage 64T face;
+the SolidWorks-free raster study does not replace that gate.
 """
 
 from __future__ import annotations
@@ -23,10 +23,10 @@ from cone_stack_end_play import CONE_FLOAT_NORTH
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 R64 = gear64.PITCH_DIA / 2.0
-R16 = (16.0 / gear64.DIAMETRAL_PITCH) * gear64.MM_PER_IN / 2.0
+R16 = pinion.PITCH_DIA / 2.0
 FRAME_C2C = R64 + R16 + _config.fit("crank_mesh", "c2c_slack_mm")
-# This is the conservative historical reference plane, not the physical
-# narrowed-gear centre; the assembly asserts the latter is farther apart.
+# Standard-normal-pitch experiment: the relocated post is solved at the
+# physical 64T centre, not the retired all-transverse-pitch reference.
 FRAME_DY = post.CRANK_BORE_HEIGHT - post.BORE_HEIGHT
 FRAME_DX = math.sqrt(FRAME_C2C**2 - FRAME_DY**2)
 DC_PER_DY = FRAME_DY / FRAME_C2C
@@ -36,18 +36,19 @@ if not R64 > R16 > 0 or not FRAME_C2C > FRAME_DY > 0:
 if not math.isclose(DC_PER_DX**2 + DC_PER_DY**2, 1.0):
     raise AssertionError("mesh centre-distance projections must be orthonormal")
 
-NOMINAL_TIGHT_BACKLASH_MM = 0.32269
-KC = (0.41222 - 0.23685) / 0.300
-K64 = (0.41722 - 0.22079) / 0.20
-K16 = (0.36930 - 0.31888) / 0.05
+NOMINAL_TIGHT_BACKLASH_MM = 0.3065234498815041
+KC = (0.4221515128261284 - 0.193895171588745) / 0.300
+K64 = (0.404425512610561 - 0.21025763332619185) / 0.20
+K16 = (0.3561562504850928 - 0.3065234498815041) / 0.05
 if not (KC > 0 and K64 > 0 and K16 > 0):
     raise AssertionError("measured mesh sensitivities must preserve the tight-corner sign")
-LINEAR_RESIDUAL_MM = 0.006
+LINEAR_RESIDUAL_MM = 0.0065
 STUDY_CASES = {
-    -0.35: 0.11570,
-    -0.25: 0.17760,
-    -0.15: 0.23685,
-    +0.15: 0.41222,
+    -0.15: 0.193895171588745,
+    -0.075: 0.24816400301794367,
+    +0.075: 0.3643374813538162,
+    +0.15: 0.4221515128261284,
+    +0.30: 0.540779360422618,
 }
 for _dc, _measured in STUDY_CASES.items():
     if abs(_measured - (NOMINAL_TIGHT_BACKLASH_MM + KC * _dc)) > LINEAR_RESIDUAL_MM:
@@ -87,10 +88,11 @@ TOOTH_RUNOUT_TIR_MM = 0.05
 TIP_ROOT_BAND_RADIAL = max(pinion.OUTSIDE_DIA_TOLERANCE_MM, gear64.OUTSIDE_DIA_TOLERANCE_MM) / 2.0
 if TIP_ROOT_BAND_RADIAL <= 0:
     raise AssertionError("gear tip-root tolerance must have a positive closing allowance")
-# Exact-solid tip-diameter cases lost at most 0.00435; round outward.
+# Simultaneous +0.05 mm radial tip growth lost 0.000955 mm in the new-lineage
+# study; retain 0.005 mm for tip growth and raster quantisation.
 TIP_BAND_CLOSE = -0.005
-_YAW = {+1.0: 0.29715, -1.0: 0.22040}
-_TILT = {+1.0: 0.34323, -1.0: 0.28188}
+_YAW = {+1.0: 0.2354830951714224, -1.0: 0.28975192660062105}
+_TILT = {+1.0: 0.3481113734641815, -1.0: 0.2616630339513373}
 
 
 def _pose_loss(cases: dict[float, float], limit_deg: float) -> float:
@@ -181,8 +183,8 @@ if min(OPEN_TERMS.values()) < 0.0:
 
 # The 16T is spur, cut square by the 64T's normal-plane cutter; the 64T is a
 # helix crossed on the inclined cone axis. The ratio is screened in the 64T's
-# normal section (the 16T's transverse section to within the crossing's
-# 0.52 deg): the 64T takes its equivalent radius R/cos^2(helix), keeping its
+# normal section (the 16T's transverse section): the 64T takes its equivalent
+# radius R/cos^2(helix), keeping its
 # addendum and the centre opening, and both share the cutter's base pitch.
 _CUTTER_PA = math.radians(gear64.CUTTER_PRESSURE_ANGLE_DEG)
 EQUIVALENT_RADIUS_GROWTH_64 = R64 / math.cos(math.radians(gear64.HELIX_ANGLE_DEG)) ** 2 - R64
@@ -211,7 +213,7 @@ TIP_DIA_LOW_64 = printed_tip_low(gear64.OUTSIDE_DIA, gear64.DRAWING_PRECISION_BY
 
 def stack_text() -> str:
     return "\n".join([
-        f"fixed-centre crank mesh: conservative reference C {FRAME_C2C:.3f}; post angularity {POST_ANGLE_DEG:.4f} deg",
+        f"fixed-centre crank mesh: physical reference C {FRAME_C2C:.3f}; post angularity {POST_ANGLE_DEG:.4f} deg",
         f"  worst supported span {CRANK_BEARING_LENGTH:.4f}, north support {CRANK_SUPPORT_NORTH_MIN:.4f}, overhang {CRANK_OVERHANG:.4f} mm",
         *[f"  {t.name:38s} {t.tight:+.5f} mm backlash" for t in TERMS],
         f"  worst-case tight backlash {TIGHT_BACKLASH_MM:.5f} mm > 0 (no backlash window)",

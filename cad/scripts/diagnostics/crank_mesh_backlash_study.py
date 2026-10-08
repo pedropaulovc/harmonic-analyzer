@@ -1,11 +1,10 @@
 """Measured free play of the crossed 16T:64T crank mesh (SolidWorks-free).
 
-U31 (cone_pivot_post_spec) models the crank-mesh backlash with the
-parallel-axis formula B = 0.28 + 2*tan(14.5 deg)*dC = 0.28 + 0.517*dC.  The
-pair is crossed (crank machine-z over the 12.52-deg inclined 64T, a true 12.0
-deg helix on the 64T), so that coefficient and the 0.28 nominal are
-hypotheses.  This script measures them on the exact tooth solids that
-``crossed_mesh_study`` builds:
+The crossed pair uses the current cone incline as the 64T helix, the crank's
+normal-plane pressure angle/module, standard cutter dedendum, actual tooth
+thinning, and configured crank height. No build/COM module or measured
+crank-stack assertion is imported. This script measures free windows on the
+tooth solids that ``crossed_mesh_study`` builds:
 
 * each gear's material boundary is read from its ``GapLookup`` table (the same
   2048 x 512 (theta, r) grid the voxel study tests against, ~0.0015 mm
@@ -47,7 +46,7 @@ import numpy as np
 
 import crossed_mesh_study as cms
 
-dta = cms.dta
+Y_CRANK = cms.Y_CRANK
 GEAR64_SEAT = np.array(cms.GEAR64_SEAT)
 U = np.array([cms.SIN_I, 0.0, cms.COS_I])  # 64T axis
 EX = np.array([cms.COS_I, 0.0, -cms.SIN_I])
@@ -55,7 +54,7 @@ EY = np.array([0.0, 1.0, 0.0])
 SLICE_MM = 0.1
 PITCH16 = 22.5
 IN = cms.IN
-DEDENDUM_FACTOR = 1.157  # root depth below pitch, in cutter addenda (ROOT16/ROOT64)
+DEDENDUM_FACTOR = cms.DEDENDUM_FACTOR
 
 
 @dataclass(frozen=True)
@@ -63,11 +62,11 @@ class GearDef:
     """One gear's tooth definition.
 
     ``definition`` says which plane carries the cutter's DP and PA:
-    ``"transverse"`` is the shipped CAD convention (the 64T's transverse
-    section is the pinion's profile, twisted); ``"normal"`` is what a form
-    or fly cutter set over at the helix angle cuts (the normal section is
-    the cutter's profile, the transverse DP is ``dp_n * cos(beta)`` and the
-    transverse PA ``atan(tan(pa_n) / cos(beta))``). The tooth depth is the
+    ``"transverse"`` carries DP and PA directly in the transverse section;
+    ``"normal"`` is the shipped 64T convention: a cutter set over at the
+    helix angle cuts its normal profile, with transverse DP
+    ``dp_n * cos(beta)`` and transverse PA
+    ``atan(tan(pa_n) / cos(beta))``. The tooth depth is the
     cutter's either way. ``tip_mm`` moves the tip circle alone, radially (a
     blank turned off its nominal outside diameter).
     """
@@ -118,13 +117,13 @@ class GearDef:
         return lut[key]
 
 
-# #906: one cutter, the 64T normal-defined, at the frame's centre distance,
-# its blank turned long (R9-56).
-SHIPPED16 = GearDef(16, dp_n=cms.DP_CRANK_CUTTER)
+# Standard full-depth normal-plane cutter shared by both gears.
+SHIPPED16 = GearDef(16, dp_n=cms.DP_CRANK_CUTTER, pa_n=cms.PA_DEG)
 SHIPPED64 = GearDef(
     64,
     cms.HELIX_DEG,
     dp_n=cms.DP_CRANK_CUTTER,
+    pa_n=cms.PA_DEG,
     definition="normal",
     tip_mm=cms.LONG_ADDENDUM64_MM,
 )
@@ -365,7 +364,7 @@ class Case:
     name: str
     extra: float = SHIPPED_EXTRA
     widen16: float = 0.0
-    widen64: float = 0.15
+    widen64: float = cms.BACKLASH_MM
     gear16: GearDef = SHIPPED16
     gear64: GearDef = SHIPPED64
     hand16: float = 1.0
@@ -380,7 +379,7 @@ class Case:
     def crank_xy(self) -> tuple[float, float] | None:
         if self.dx == 0.0 and self.dy == 0.0:
             return None
-        return cms.X_CRANK + self.dx, dta.Y_CRANK + self.dy
+        return cms.X_CRANK + self.dx, Y_CRANK + self.dy
 
     def record(self) -> dict:
         return {
@@ -442,6 +441,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--phases", type=int, default=9)
+    ap.add_argument("--seed-off", type=float, default=0.0,
+                    help="initial free-window search guess, degrees from tooth-in-gap")
     ap.add_argument("--case", action="append", help="run only these case names")
     ap.add_argument(
         "--custom", action="append", default=[],
@@ -456,7 +457,7 @@ def main() -> int:
             done.add((rec["case"], rec["crank_deg"]))
     lut: dict = {}
     phases = np.linspace(0.0, PITCH16, args.phases, endpoint=False)
-    centre = dta.MESH_WINDOW_CENTRE_DEG
+    centre = args.seed_off
     for case in cases:
         if args.case and case.name not in args.case:
             continue

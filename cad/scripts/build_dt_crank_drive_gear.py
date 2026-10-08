@@ -4,13 +4,13 @@ The dark steel gear at the cone set's large end, annotated "This gear
 engages the crank" (p. 20): together with a pinion on the crankshaft
 (`build_dt_crank_pinion.py`) it implements the book-stated 4:1 crank-to-cone
 reduction (p. 16). The 64T:16T count split preserves that stated ratio;
-DP 25.731104 is fixed by the recentered 64T station against the unchanged
-cone-pivot-post-v2 crank axis at the checked 0.25-mm mesh slack. This
-supersedes the intermediate DP24.74 rear-shifted layout.
+the experiment uses standard normal-module PA20 teeth. The transverse DP
+is normal DP*cos(helix), and only the post's crank bore moves vertically
+while the green metric cone train and the 64T axial seat stay put.
 
 CROSSED-MESH CUT (2026-07-14 rederive, "crank-pinion and crank-drive gear
-are not meshing"): the 64T rides the cone shaft, inclined 12.52 deg IN
-PLAN, while its 16T pinion spins about machine z (ch30 GT pins the crank
+are not meshing"): the 64T rides the cone shaft, inclined at the cone-line
+shaft angle IN PLAN, while its 16T pinion spins about machine z (ch30 GT pins the crank
 axle at the pedestal's x at BOTH ends -- a cone-parallel crankshaft would
 land 22 mm east at the arm, 20+ sigma off; the planar crank->paper chain
 corroborates). The pair is therefore a CROSSED-axis mesh, and straight
@@ -22,10 +22,10 @@ real pair deeply engaged, so the real 64T must carry the accommodation
 the crossing demands; this script cuts it as a true swept helix -- the
 tooth gaps advance (z - face/2)*tan(incline)/R_pitch across the face
 (equivalently: gear helix angle = shaft angle, pinion straight = a
-textbook crossed-helical pair) -- plus transverse tooth thinning (config)
-that also absorbs the cos(incline) normal-pitch shrink, and a deepened root floor (the mating
-16T's tips need real dedendum). Study: crossed_mesh_study (analytic,
-2026-07-14); arbitrated against the live interference gate.
+textbook crossed-helical pair) -- plus transverse tooth thinning (config).
+The normal pitch matches the straight 16T; standard 1.25-module dedendum
+gives its tips real root clearance. The crossed-mesh study and native
+interference gate arbitrate the resulting physical pair.
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
@@ -91,15 +91,19 @@ from _part_pmi import author_part_pmi
 from dt_crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
 from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
 from dt_crank_drive_gear_spec import (
+    BACKLASH_MM,
     BORE_AF,
     BORE_AF_BAND,
     BORE_SOUTH_CHAMFER,
     BORE_SOUTH_CHAMFER_BAND,
     CUTTER_DIAMETRAL_PITCH,
+    DEDENDUM_FACTOR,
+    DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
     FACE_WIDTH_BAND,
+    HELIX_ANGLE_DEG as HELIX_DEG,
     LONG_ADDENDUM_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
@@ -168,19 +172,14 @@ PART_NAME = "dt-crank-drive-gear"
 MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass train
 
 TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
-DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
+DP = DIAMETRAL_PITCH  # transverse, from the authoritative crank spec
 PA_DEG = PRESSURE_ANGLE_DEG  # transverse, from the normal-plane cutter (spec)
 # The 64T seats on MHA-DT-004's flatted Sec1 gear land.
 BORE_DIAMETER = 0.375 * IN
 
-# Crossed-mesh accommodation (module docstring): the tooth inclination is the
-# exact-solid result for the recentered 64T station and is shared through the
-# gear-train config. Positive
-# sign: the gap azimuth advances CCW (about local +z) toward the gear's
-# +z face, which the assembly places toward machine +z (the analytic
-# study's zero-collision hand; the mirrored hand collides 28 mm^3).
-HELIX_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
-BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
+# Crossed-mesh accommodation (module docstring): the spec follows the cone
+# shaft's incline. Positive sign advances the gap azimuth CCW about local +z
+# toward the gear's +z face, which the assembly places toward machine +z.
 
 # A printable slide fit on the Sec1 gear-seat land. The round and flat
 # clearances are independent: BoreDia sets radial runout; BoreAF limits
@@ -212,13 +211,14 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Normal-defined (#906): the transverse DP/PA place the involute, the
-    # cutter's DP sets the depth; the blank is turned long (R9-56).
+    # Transverse DP/PA place the involute; the normal cutter's DP and standard
+    # full-depth dedendum set the depth, with no additional long addendum.
     disc = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
         helix_deg=HELIX_DEG,
         backlash_mm=BACKLASH_MM, root_relief=True,
         depth_dp=CUTTER_DIAMETRAL_PITCH,
+        dedendum=DEDENDUM_FACTOR,
         long_addendum_mm=LONG_ADDENDUM_MM,
     )
     volume = disc.volume
