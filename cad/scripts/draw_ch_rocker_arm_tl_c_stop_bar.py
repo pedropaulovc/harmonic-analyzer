@@ -54,7 +54,8 @@ FRONT_KEEP = {
     # The height alone left of the view; the hole height to its right, so
     # the height's two callout lanes have the whole left margin.
     "BarHeight": (0.051, 0.170),
-    "HoleY": (0.184, 0.163),
+    # Text above the bar's top extension line, clear of both extensions.
+    "HoleY": (0.184, 0.182),
     "HoleLeftX": (0.115, 0.135),
     "HoleRightX": (0.120, 0.120),
 }
@@ -64,7 +65,11 @@ CALLOUT_XY = (0.183, 0.138)
 # Functional acceptance sits on the dimension it governs, not in the notes.
 # The size band is the stop's only tilt control (no GD&T on fixture prints).
 CALLOUTS_ABOVE = {"BarHeight": "DATUM C STOP: BAND IS TILT", "HoleY": "2X"}
-CALLOUTS_BELOW = {"BarHeight": "LIMIT FOR MHA-CH-006 CHECK"}
+CALLOUTS_BELOW = {
+    "BarHeight": "LIMIT FOR MHA-CH-006 CHECK",
+    # Inside the 30.00 extension lines: the stations' matching requirement.
+    "HoleRightX": "SCREWS ENTER TL-08 TAPS",
+}
 
 
 def _counterbore_edge(adapter: Any, view: Any) -> Any:
