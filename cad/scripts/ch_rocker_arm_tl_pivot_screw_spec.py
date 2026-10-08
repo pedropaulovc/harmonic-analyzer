@@ -14,8 +14,8 @@ shop); no heat treatment.
 
 Frame (the inventory's fixture frame, rocker-inv:1735-1748): origin on the
 pivot axis at the upper hub face, +Z up; S4 poses it at the rocker frame-A
-origin. The washer sits Z0..2, the head Z2..6, the shoulder Z-14..2 and the
-thread Z-26.3..-14. The head length prints from the faced head top; the
+origin. The washer sits Z0..2, the head Z2..6, the shoulder Z-18..2 and the
+thread Z-30.3..-18. The head length prints from the faced head top; the
 shoulder length and the length under the head print from the underhead, the
 face that clamps the washer, because they set the axial stack into the plate.
 """
@@ -52,10 +52,11 @@ THREAD_ROOT_DEPTH = round((1.22687 * THREAD_PITCH) / 2.0, 6)
 # root depth, so the first full thread sits a fixed distance from the tip.
 TIP_CHAMFER = round(THREAD_ROOT_DEPTH, 2)
 CHAMFER_CALLOUT = "X 45 DEG TO THREAD ROOT"
+TIP_CHAMFER_NOTE = f"TIP CHAMFER ({TIP_CHAMFER}) {CHAMFER_CALLOUT}"
 # The two direct axial sizes the stack rides on, both from the underhead
 # (the face that clamps the washer), both at .XXX.
-SHOULDER_LENGTH = 16.0  # underhead to shoulder end
-UNDER_HEAD_LENGTH = 28.3  # underhead to tip
+SHOULDER_LENGTH = 20.0  # underhead to shoulder end
+UNDER_HEAD_LENGTH = 32.3  # underhead to tip
 AXIAL_PLACES = 3
 THREAD_LENGTH = round(UNDER_HEAD_LENGTH - SHOULDER_LENGTH, 6)
 SLOT_WIDTH = 1.0
@@ -87,9 +88,17 @@ FLOOR_DEPTH = (
           + profile.LOCATING_BORE_DEPTH + profile.LOCATING_BORE_DEPTH_BAND, 6),
 )
 _PLATE_TOP_DEPTH_MAX = _HUB_FACE_OVER_PADS[1] + profile.PLATE_DROP + _XXX
+# The underhead stands ON the washer, WASHER_THICK above the hub face, so a
+# length hung from the underhead reaches (length - washer) below the hub face:
+# the thickest washer and the shortest length give the shallowest depth.
 _W = (WASHER_THICK - _XXX, WASHER_THICK + _XXX)
-_SHOULDER_END = (_W[0] + SHOULDER_LENGTH - _XXX, _W[1] + SHOULDER_LENGTH + _XXX)
-_TIP = (_W[0] + UNDER_HEAD_LENGTH - _XXX, _W[1] + UNDER_HEAD_LENGTH + _XXX)
+_SHOULDER_END = (SHOULDER_LENGTH - _XXX - _W[1], SHOULDER_LENGTH + _XXX - _W[0])
+_TIP = (UNDER_HEAD_LENGTH - _XXX - _W[1], UNDER_HEAD_LENGTH + _XXX - _W[0])
+if (round(UNDERHEAD_Z - SHOULDER_LENGTH, 6), round(UNDERHEAD_Z - UNDER_HEAD_LENGTH, 6)) != (
+    SHOULDER_END_Z,
+    TIP_Z,
+):
+    raise AssertionError("pivot-screw stack depths disagree with the model stations")
 # A die leaves up to two pitches of incomplete thread against the shoulder;
 # that run-out stays in the plain bore, clear of the floor, so the shoulder
 # never bottoms and every thread entering the tap is full.
@@ -231,7 +240,7 @@ HEAD_COAXIAL_NOTE = "HEAD COAXIAL WITH SHOULDER"
 # is named on the shoulder's fit callout.
 STACK_CALLOUT = "SETS PLATE DEPTH"
 # The head-top-to-tip overall prints as a stock cut-off reference.
-OVERALL_REFERENCE_PLACES = 1
+DRAWING_REFERENCE_PRECISION = 1
 DRAWING_NOTES = "\n".join(
     (
         "BRACKETED DIAMETERS ARE THE STARTING SIZE FOR THE MATCH-FIT.",
@@ -301,10 +310,13 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "tip": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 0.0, -1.0), -TIP_Z),),
-        requirements=("station",),
+        requirements=("station", "note"),
         fields={
             "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "z", "value": TIP_Z}, ("TIP_Z",)),
+            # The printed chamfer callout is the acceptance: 45 degrees, down
+            # to the thread root; its (0.65) size is reference.
+            "note": (TIP_CHAMFER_NOTE, ("CHAMFER_CALLOUT", "TIP_CHAMFER")),
             "height_from": ("underhead", ("UNDER_HEAD_LENGTH",)),
             "station_nominal": (UNDER_HEAD_LENGTH, ("UNDER_HEAD_LENGTH",)),
             "station": (

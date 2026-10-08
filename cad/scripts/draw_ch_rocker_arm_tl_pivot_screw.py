@@ -51,7 +51,7 @@ from ch_rocker_arm_tl_pivot_screw_spec import (
     HEAD_DIA,
     HEAD_TOP_Z,
     OVERALL_LENGTH,
-    OVERALL_REFERENCE_PLACES,
+    DRAWING_REFERENCE_PRECISION,
     SHOULDER_DIA,
     SHOULDER_END_Z,
     STACK_CALLOUT,
@@ -150,8 +150,8 @@ def _overall_reference(adapter: Any, side: Any) -> None:
     if abs(measured_mm - OVERALL_LENGTH) > 1e-4:
         raise RuntimeError(f"{label} measured {measured_mm:g}, expected {OVERALL_LENGTH:g}")
     set_reference_dimension(adapter, display.GetAnnotation(), label=label)
-    display.SetPrecision3(OVERALL_REFERENCE_PLACES, -1, -1, -1)
-    if int(display.GetPrimaryPrecision2()) != OVERALL_REFERENCE_PLACES:
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
         raise RuntimeError(f"{label} precision did not persist")
 
 

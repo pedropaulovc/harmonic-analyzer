@@ -71,9 +71,15 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked pivot-washer dimension needs authored places")
 
+# Named exception: MHA-CH-006-TL-07 wall 1.64 MIN (drawing-simplicity-policy.md)
+WALL_STATED_MIN = 1.64
+if round(WALL_MIN, 2) != WALL_STATED_MIN:
+    raise AssertionError("pivot-washer stated wall drifted from its geometry")
+WALL_NOTE = f"WALL {WALL_STATED_MIN:.2f} MIN."
 DRAWING_NOTES = "\n".join(
     (
         "CLAMP WASHER: IT LOCATES NOTHING, BUT ITS THICKNESS SETS THE PIVOT SCREW DEPTH.",
+        WALL_NOTE,
     )
 )
 BORE_CALLOUT = "DRILL"
