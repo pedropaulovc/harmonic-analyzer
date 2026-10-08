@@ -717,8 +717,10 @@ deployment identity, reporting and cleanup regression tests gate native builds.
 PPE uses `wrangler preview --config wrangler.ppe.jsonc --name "$WORKERS_CI_BRANCH"`
 for both its default branch and non-production branch build command. It never
 publishes the PPE production Worker with `wrangler deploy`. Production
-non-production branch builds must be **disabled in the dashboard**. The native
-Git build watch paths should include `web/**`; GitHub environment reporting and
+non-production branch builds must be **disabled in the dashboard**.
+Native Git build watch paths use Cloudflare's `web/*` wildcard on both PPE
+triggers (main and non-main) and production. GitHub workflow path filters use
+`web/**`; these are separate matching systems. GitHub environment reporting and
 PPE preview cleanup do not perform deployments. The sole GitHub cleanup token
 belongs to the PPE environment/account, never the production account.
 
@@ -762,6 +764,18 @@ period; branch-URL removal then propagates asynchronously through Cloudflare.
 A successful delete is not an instant data-plane 404: a second disposable probe
 initially returned 200 after deletion and subsequently returned 404 within the
 bounded propagation observation.
+
+Cleanup retries still inactivate matching GitHub deployment records when the
+Preview resource and Git branch are already gone. The helper decodes GitHub's
+string-wrapped GraphQL deployment payload to recover the recorded branch, and
+uses paginated bulk `latestStatus` data to skip already-inactive records without
+a separate status-history request for every deployment.
+Unreadable payloads are left unchanged without inferring ownership from their
+Git refs. Valid later records are still cleaned up; afterward the run fails
+with an aggregate error naming the unreadable deployment IDs. GitHub API and
+status-write failures propagate immediately rather than being treated as
+unreadable payloads.
+
 An hourly reconciler catches late builds and orphaned Preview resources. It
 preserves new Previews without a PR for their first **30 minutes**, allowing a
 branch push to precede PR creation; otherwise orphan **Preview-resource**

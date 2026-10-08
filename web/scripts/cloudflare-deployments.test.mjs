@@ -85,7 +85,7 @@ test('closed PR cleanup preserves a branch shared by any open PR, including a fo
 test('reconciliation deletes late native-build orphans, preserving live and main Previews', async () => {
   const writes = [];
   await withAPI(async (url, options) => {
-    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([{ databaseId: 7, commitOid: 'b'.repeat(40), ref: { name: 'old' }, payload: JSON.stringify({ manager: 'cloudflare-native', branch: preview.name }), latestStatus: { state: 'INACTIVE' } }, { databaseId: 8, commitOid: sha, ref: { name: 'live' }, payload: JSON.stringify({ manager: 'cloudflare-native', branch: 'live' }), latestStatus: { state: 'SUCCESS' } }]));
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([{ databaseId: 7, commitOid: 'b'.repeat(40), ref: { name: 'old' }, payload: JSON.stringify(JSON.stringify({ manager: 'cloudflare-native', branch: preview.name })), latestStatus: { state: 'INACTIVE' } }, { databaseId: 8, commitOid: sha, ref: { name: 'live' }, payload: JSON.stringify(JSON.stringify({ manager: 'cloudflare-native', branch: 'live' })), latestStatus: { state: 'SUCCESS' } }]));
     if (options.method !== 'GET') {
       writes.push([url, options.method, options.body && JSON.parse(options.body)]);
       return json({ success: true, result: null });
@@ -105,7 +105,7 @@ test('reconciliation deletes late native-build orphans, preserving live and main
 test('cleanup writes inactive status after deleting the closed branch Preview', async () => {
   const writes = [];
   await withAPI(async (url, options) => {
-    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([{ databaseId: 7, commitOid: sha, ref: null, payload: JSON.stringify({ manager: 'cloudflare-native', branch: preview.name }), latestStatus: { state: 'SUCCESS' } }]));
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([{ databaseId: 7, commitOid: sha, ref: null, payload: JSON.stringify(JSON.stringify({ manager: 'cloudflare-native', branch: preview.name })), latestStatus: { state: 'SUCCESS' } }]));
     if (options.method !== 'GET') {
       writes.push([url, options.method, options.body && JSON.parse(options.body)]);
       return json({ success: true, result: null });
@@ -130,8 +130,8 @@ test('cleanup paginates bulk latestStatus and does not abandon older active depl
       cursors.push(body.variables.after);
       assert.match(body.query, /latestStatus\{state\}/);
       return json(body.variables.after === null
-        ? deploymentConnection([{ databaseId: 1, commitOid: sha, ref: null, payload: JSON.stringify({ manager: 'cloudflare-native', branch: preview.name }), latestStatus: { state: 'INACTIVE' } }], true, 'older-page')
-        : deploymentConnection([{ databaseId: 2, commitOid: sha, ref: null, payload: JSON.stringify({ manager: 'cloudflare-native', branch: preview.name }), latestStatus: { state: 'SUCCESS' } }]));
+        ? deploymentConnection([{ databaseId: 1, commitOid: sha, ref: null, payload: JSON.stringify(JSON.stringify({ manager: 'cloudflare-native', branch: preview.name })), latestStatus: { state: 'INACTIVE' } }], true, 'older-page')
+        : deploymentConnection([{ databaseId: 2, commitOid: sha, ref: null, payload: JSON.stringify(JSON.stringify({ manager: 'cloudflare-native', branch: preview.name })), latestStatus: { state: 'SUCCESS' } }]));
     }
     if (options.method !== 'GET') {
       writes.push([url, JSON.parse(options.body)]);
@@ -321,4 +321,68 @@ test('standalone manifest wait joins real HTTP base URLs with and without traili
   await assert.rejects(waitForManifest(`${origin}/`, 'b'.repeat(40), rootManifest.branch, 1), /Timed out/);
   await assert.rejects(waitForManifest(`${origin}/`, rootManifest.commitSha, 'wrong-branch', 1), /Timed out/);
   await assert.rejects(waitForManifest(`${origin}/application/`, rootManifest.commitSha, rootManifest.branch, 1), /Timed out/);
+});
+
+test('cleanup inactivates the real GraphQL string-wrapped payload after its Preview is already absent', async () => {
+  // Captured from the live PR1275 deployment query: GraphQL payload is a JSON
+  // string containing JSON, ref is null after branch deletion, and SUCCESS is uppercase.
+  const row = {
+    databaseId: 6946755870,
+    commitOid: '4f2f0336c72672ed2295314c8e8dcdf118da578c',
+    payload: '"{\\"manager\\":\\"cloudflare-native\\",\\"branch\\":\\"web/deployment-smoke-20261008\\",\\"pr\\":1275}"',
+    ref: null,
+    latestStatus: { state: 'SUCCESS' },
+  };
+  const writes = [];
+  await withAPI(async (url, options) => {
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([row]));
+    if (url.includes('/pulls?')) return json([]);
+    if (url.includes('/previews?')) return json(envelope([]));
+    if (options.method === 'POST' && url.endsWith('/deployments/6946755870/statuses')) {
+      writes.push(JSON.parse(options.body));
+      row.latestStatus = { state: 'INACTIVE' };
+      return json({ state: 'inactive' });
+    }
+    throw new Error(`Unexpected request: ${options.method} ${url}`);
+  }, async () => {
+    process.env.GITHUB_REPOSITORY = 'pedropaulovc/harmonic-analyzer';
+    await cleanup('web/deployment-smoke-20261008');
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].state, 'inactive');
+    assert.equal(writes[0].auto_inactive, false);
+    // A second reconciliation sees bulk latestStatus INACTIVE and writes nothing:
+    // no individual history/status GET request, and no unnecessary CF deletion.
+    await cleanup('web/deployment-smoke-20261008');
+    assert.equal(writes.length, 1);
+  });
+});
+
+test('unreadable outer and inner payloads leave unknown records untouched but valid later records become inactive', async () => {
+  const branch = 'web/deployment-smoke-20261008';
+  const rows = [
+    { databaseId: 21, commitOid: sha, payload: 'not-json', ref: { name: branch }, latestStatus: { state: 'SUCCESS' } },
+    { databaseId: 22, commitOid: sha, payload: JSON.stringify('{bad-inner-json'), ref: { name: branch }, latestStatus: { state: 'SUCCESS' } },
+    { databaseId: 6946755870, commitOid: '4f2f0336c72672ed2295314c8e8dcdf118da578c', payload: '"{\\"manager\\":\\"cloudflare-native\\",\\"branch\\":\\"web/deployment-smoke-20261008\\",\\"pr\\":1275}"', ref: null, latestStatus: { state: 'SUCCESS' } },
+  ];
+  const writes = [];
+  await withAPI(async (url, options) => {
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection(rows));
+    if (url.includes('/pulls?')) return json([]);
+    if (url.includes('/previews?')) return json(envelope([]));
+    if (options.method === 'POST' && url.includes('/statuses')) {
+      writes.push({ url, body: JSON.parse(options.body) });
+      return json({ state: 'inactive' });
+    }
+    throw new Error(`Unexpected request: ${options.method} ${url}`);
+  }, async () => {
+    await assert.rejects(cleanup(branch), error => {
+      assert.ok(error instanceof AggregateError);
+      assert.match(error.message, /21/);
+      assert.match(error.message, /22/);
+      return true;
+    });
+    assert.equal(writes.length, 1);
+    assert.match(writes[0].url, /\/deployments\/6946755870\/statuses$/);
+    assert.equal(writes[0].body.state, 'inactive');
+  });
 });
