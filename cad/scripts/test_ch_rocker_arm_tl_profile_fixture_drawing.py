@@ -253,15 +253,16 @@ def test_hole_callout_bands_are_the_printed_bands() -> None:
     title block's DRILLED HOLES band; the tap drills print 7.94 and 3.80 while
     the taps keep their true drill size as tap_drill_mm."""
     features = _features()
+    studs = range(1, len(spec.CLAMP_STUD_POINTS) + 1)
     drilled = (
         *((f"hold_down_h{i}", "dia") for i in range(1, 5)),
-        *((f"stud_tap_s{i}", "dia") for i in range(1, 5)),
+        *((f"stud_tap_s{i}", "dia") for i in studs),
         ("pivot_tap", "dia"),
     )
     for name, key in (
         *drilled,
         *((f"hold_down_h{i}_counterbore", key) for i in range(1, 5) for key in ("dia", "depth")),
-        *((f"stud_tap_s{i}", "depth") for i in range(1, 5)),
+        *((f"stud_tap_s{i}", "depth") for i in studs),
         ("stud_tap_drills", "depth"),
         ("pivot_tap", "depth"),
         ("pivot_tap_drill", "depth"),

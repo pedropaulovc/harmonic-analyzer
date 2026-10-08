@@ -215,11 +215,17 @@ if PAD_TILT_SWING_MAX > PARENT_BAND_SHARE * (
 
 # Rail rests: inventory pockets (tag, west X, south Y, length X, width Y). Each
 # rest seats on its pocket floor; the per-blank shim stacks on top are loose.
+# The prechips freeze rows (review/compose-r5 examples/inventory/pedro-shop.toml
+# rail-rest-{ru,lu,rl,ll}-slot; its fixture frame is frame A, so X and Y read
+# across unchanged): C1/C2 the upper pair (ru/lu) under the narrow rail at
+# X +-(20..40), C3/C4 the lower pair (rl/ll) under the wide rail at X
+# +-(120..140), standing where the S4 op 25/27 collet nose clears the rail
+# clamps by 3 mm (prechips afe9a14).
 _REST_POCKETS = (
-    ("C1", 60.0, 32.2, 20.0, 4.3),
-    ("C2", -80.0, 32.2, 20.0, 4.3),
-    ("C3", 60.0, -27.5, 20.0, 5.0),
-    ("C4", -80.0, -27.5, 20.0, 5.0),
+    ("C1", 20.0, 32.2, 20.0, 4.3),
+    ("C2", -40.0, 32.2, 20.0, 4.3),
+    ("C3", 120.0, -27.5, 20.0, 5.0),
+    ("C4", -140.0, -27.5, 20.0, 5.0),
 )
 REST_HEIGHT = 4.0
 REST_POCKET_DEPTH = 1.0
@@ -465,7 +471,10 @@ if HOLD_DOWN_CBORE_DEPTH - _XX - HOLD_DOWN_SCREW_HEAD_H < 0.1:
 if HOLD_DOWN_CBORE_DIA - _XX - HOLD_DOWN_SCREW_HEAD_DIA < 0.5:
     raise AssertionError("hold-down counterbore does not clear the screw head")
 
-# Strap-clamp studs either side of the S3 clamp toes (inventory: 3/8-16 studs).
+# Clamp-stud taps (inventory: 3/8-16 studs), the prechips freeze rows
+# (review/compose-r5 pedro-shop.toml stud-tap-*, frame A): S1/S2 the lower S4
+# rail clamps (rl/ll), S3/S4 the S3 hub straps (ru/lu), S5/S6 the upper S4 rail
+# clamps (ru4/lu4, prechips 2a77dd9).
 CLAMP_STUD_SPEC = HoleSpec(
     "tapped",
     "3/8-16",
@@ -473,7 +482,14 @@ CLAMP_STUD_SPEC = HoleSpec(
     depth_mm=19.5,
     overrides_mm={"ThreadDepth": 16.5},
 )
-CLAMP_STUD_POINTS = ((-70.0, -36.0), (70.0, -36.0), (-70.0, 45.0), (70.0, 45.0))
+CLAMP_STUD_POINTS = (
+    (-130.0, -36.0),
+    (130.0, -36.0),
+    (-70.0, 45.0),
+    (70.0, 45.0),
+    (-30.0, 45.0),
+    (30.0, 45.0),
+)
 CLAMP_STUD_DRILL_DIA = TAP_DRILL_MM[CLAMP_STUD_SPEC.size]
 _CLAMP_STUD_PITCH = 25.4 / 16.0
 # Full thread at least 1.5 diameters deep at the .XX band even if the shop
@@ -1287,7 +1303,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         )
         for row in PAD_POCKETS
     },
-    # C1 and C3 share their X, so each rest pocket claims its two long walls.
+    # Each rest pocket claims its two long walls, which carry its centre Y and
+    # width Y (C1/C2 span the X of pad pockets A1/A2 and B1/B2).
     **{
         f"rest_pocket_{row[0].lower()}": _pocket(
             row, "REST_POCKETS",
@@ -1316,8 +1333,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         )
         for index, (x, y) in enumerate(CLAMP_STUD_POINTS, start=1)
     },
-    # S1/S3 and S2/S4 share a station, and a cone selector takes no Y, so one
-    # feature carries the four drill-point cones and the printed drill depth.
+    # A cone selector takes no Y, so one feature carries the drill-point cones
+    # (one per stud station X) and the printed drill depth.
     "stud_tap_drills": _tap_drill(
         CLAMP_STUD_SPEC, "CLAMP_STUD_SPEC", tuple(sorted({x for x, _y in CLAMP_STUD_POINTS})),
         parent=None,

@@ -663,6 +663,8 @@ def _tags(adapter: Any, view: Any) -> None:
                 (x - math.copysign(15.0, x), -50.0 if y < 0 else 55.0),
             )
         )
+    # Upper tags stand outboard of their stud; the lower studs at X +-130 sit
+    # under the H tags at X +-150, so theirs stand inboard.
     for index, (x, y) in enumerate(CLAMP_STUD_POINTS, start=1):
         edge = edges.circle_at(
             (x, y, z), CLAMP_STUD_DRILL_DIA / 2.0, axis=(0, 0, 1), label=f"S{index}"
@@ -671,7 +673,7 @@ def _tags(adapter: Any, view: Any) -> None:
             (
                 f"S{index}",
                 edge.edge,
-                (x + math.copysign(12.0, x), -46.0 if y < 0 else 55.0),
+                (x + math.copysign(12.0, x * y), -46.0 if y < 0 else 55.0),
             )
         )
     bore = edges.circle_at(
