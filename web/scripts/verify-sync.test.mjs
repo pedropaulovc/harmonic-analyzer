@@ -1316,7 +1316,8 @@ function nativeLineFixture() {
   const fixture = measuredViewFixture(), path = 'ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1'
   const source = [[1200, 200], [1200, 900]]
   const focal = 1080 / (2 * Math.tan(fixture.view.camera.verticalFovDegrees * Math.PI / 360))
-  const world = source.map(([x, y]) => [1 + (x - 960) / focal, 1 - (y - 540) / focal, 0])
+  const projectedNative = [[1200, 100], [1200, 1000]]
+  const world = projectedNative.map(([x, y]) => [1 + (x - 960) / focal, 1 - (y - 540) / focal, 0])
   const line = {
     id: 'held-out-fixed-stock', partPath: path, partLocalLineMetres: [[0, 0, 0], [0, 1, 0]],
     sourceLinePixels: source, uncertaintyPx: 2,
@@ -1330,7 +1331,7 @@ function nativeLineFixture() {
   }
   fixture.view.nativeLineChecks = [line]
   for (const station of [0, 0.25, 0.5, 0.75, 1]) {
-    const sourcePixels = source[0].map((value, axis) => value + station * (source[1][axis] - value))
+    const sourcePixels = projectedNative[0].map((value, axis) => value + station * (projectedNative[1][axis] - value))
     fixture.capture.landmarks.push({
       id: nativeLineEndpointId(fixture.view.id, line.id, station), partPath: path,
       state: 'rendered', sourcePixels, canvasPixels: sourcePixels, uncertaintySourcePixels: 0.5,
@@ -1376,11 +1377,16 @@ test('native line wrong source image/body, missing readback and stale physical d
 test('offscreen finite endpoints retain exact segment geometry with at least two corroborating visible GPU stations', () => {
   const fixture = nativeLineFixture()
   const markers = fixture.capture.landmarks.slice(-5)
-  markers[0].state = 'not-visible'
-  markers[0].sourcePixels = markers[0].canvasPixels = null
+  const focal = 1080 / (2 * Math.tan(fixture.view.camera.verticalFovDegrees * Math.PI / 360))
+  for (let index = 0; index < markers.length; index++) {
+    const y = -100 + index / 4 * 1500
+    markers[index].worldMetres = [1 + 240 / focal, 1 - (y - 540) / focal, 0]
+    markers[index].state = index === 0 || index === 4 ? 'not-visible' : 'rendered'
+    markers[index].sourcePixels = markers[index].canvasPixels = index === 0 || index === 4 ? null : [1200, y]
+  }
   const result = measureNativeLineFixture(fixture)
   assert.equal(result.nativeLines[0].status, 'passed')
-  assert.equal(result.nativeLines[0].gpuStationReadbacks.length, 4)
+  assert.equal(result.nativeLines[0].gpuStationReadbacks.length, 3)
   assert.equal(result.nativeLines[0].nativeSegmentCoversObservation, true)
   assert.equal(result.nativeLines[0].endpointProbeIds.length, 2)
   markers[2].sourcePixels[0] += 5

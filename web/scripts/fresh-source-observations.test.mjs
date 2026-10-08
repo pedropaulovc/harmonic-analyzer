@@ -160,7 +160,14 @@ test('actual current tracks associate through uv without an ambient python3 alia
 function visibilityFixture() {
   const record = recordFixture(), frame = record.frames[0]
   frame.sourceMachineRequirement = 'required'
-  frame.views = [structuredClone(original.frames[0].views[0])]
+  frame.views = [{
+    id: 'main', rectSourcePixels: [0, 0, 1920, 1080], presentation: 'native',
+    camera: null, input: null,
+    provenance: { kind: 'chosen-feasible', evidence: 'Synthetic unavailable native candidate; no source pose claim.', unobservedInputFields: [] },
+    cameraProvenance: { kind: 'source-informed-framing', family: 'synthetic-visibility', evidence: 'Synthetic unavailable framing.' },
+    cameraContinuityFamily: 'synthetic-visibility',
+    unavailable: [{ reason: 'Synthetic policy-excluded background has no corresponding readable native pose.' }],
+  }]
   const view = frame.views[0]
   view.sourceVisibility = {
     kind: 'policy-excluded', reasonCode: 'blurred-navigation-background',
