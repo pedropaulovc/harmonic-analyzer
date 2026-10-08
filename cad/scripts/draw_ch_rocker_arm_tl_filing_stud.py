@@ -55,7 +55,7 @@ OUTPUTS = DrawingOutputs(
 )
 SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
-# A 69 mm stud: 2:1 keeps the four steps legible on one turned profile.
+# A seventy-millimetre stud: 2:1 keeps the four steps legible on one turned profile.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = VIEW_SCALE[0] / VIEW_SCALE[1] / 1000.0
@@ -99,7 +99,7 @@ PROFILE_DIAMETER_XY = {
     "HeadDia": (SEAT_X - 0.020, PROFILE_CENTER[1] + 0.024),
     # Each diameter's dimension line stands inside its own step (codex round
     # 15): the fit callout on the journal (seat to 12.5), the thread on the
-    # threaded tip (12.5 to 24.0), both below so no leader crosses a row.
+    # threaded tip (thread start to the tip), both below so no leader crosses a row.
     "BodyDia": (SEAT_X + BODY_LENGTH / 2.0 * _S, PROFILE_CENTER[1] - 0.065),
     "ThreadDia": (
         SEAT_X + (BODY_LENGTH + THREAD_END) / 2.0 * _S,

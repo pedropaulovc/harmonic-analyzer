@@ -38,7 +38,7 @@ if button.BORE_DIA + button.BORE_BAND[1] - _BODY_MAX < BODY_CLEARANCE_MIN:
 # The head seat carries the lower button; the head stays inside the button
 # face and outside the button bore.
 HEAD_DIA = 9.0
-HEAD_LENGTH = 3.0
+HEAD_LENGTH = 3.5  # collar: two millimetres left at the worst-case stations
 if not (
     button.BORE_DIA + button.BORE_BAND[0]
     < HEAD_DIA
@@ -57,7 +57,7 @@ if not (
 STATION_PLACES = 2  # thread start and head seat: the stack reads from them
 STOCK_PLACES = 1  # head back face and vise end: stock only
 BODY_LENGTH = 12.8  # model: seat face to the thread start (derived on print)
-THREAD_END = 24.0  # seat face to the faced tip; printed tip to seat
+THREAD_END = 25.3  # seat face to the faced tip; printed tip to seat
 THREAD_START = THREAD_END - BODY_LENGTH  # printed: tip to the thread start
 TAIL_END = 45.0  # seat face to the vise end: head plus a forty-two vise tail
 HEAD_BACK = THREAD_END + HEAD_LENGTH  # printed: tip to the head's back face
@@ -82,6 +82,19 @@ if _BODY_LEN_MIN <= _HUB_TOP_MAX:
 NUT_THICKNESS = 5.56  # bought 1/4-20 hex nut, 7/32 in
 if _SEAT_MIN - _STACK_MAX < NUT_THICKNESS:
     raise AssertionError("filing-stud thread is too short for the nut")
+# Full thread of one and a half diameters past the die's lead (one and a
+# half pitches) at the shortest printed thread, and a worst-case collar of
+# two millimetres between the seat and back-face stations.
+_THREAD_PITCH = 25.4 / 20.0
+_THREAD_MAJOR = 6.35
+if _START_MIN - 1.5 * _THREAD_PITCH < 1.5 * THREAD_MODEL_DIA:
+    raise AssertionError(
+        "filing-stud thread lacks one and a half diameters of full thread"
+    )
+if limits(HEAD_BACK, STOCK_PLACES)[0] - _SEAT_MAX < 2.0:
+    raise AssertionError(
+        "filing-stud collar is thinner than two millimetres at worst case"
+    )
 
 _STATIONS = {
     "ThreadStartStation": STATION_PLACES,
