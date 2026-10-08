@@ -154,13 +154,14 @@ TOP_KEEP = {
         )
     )
 }
-# A diameter leader runs radially from its text: below-right of the seat
-# axis, steeper than the saddle-top chord, it lands on the visible seat arc
-# and leaves the view through the underside under the saddle, so its text
-# stands beneath the right view, left of the seat-bottom height and above
-# the title block, clear of the pad's fit callout in the gap between views.
+# A diameter leader runs radially from its text. Its text stands beneath the
+# right view, a little left of the seat axis and between the pad's fit
+# callout and the title block, so the leader lands on the seat arc left of
+# its bottom and drops out through the underside. The seat-bottom height's
+# extension lines run right of the axis (to the 28.0), so the leader never
+# crosses them (the run-10 review flagged the below-right leader for that).
 _SEAT_AXIS = (_right_x(SEAT_Z), _y(SEAT_CENTRE_Y))
-SEAT_DIA_XY = (_SEAT_AXIS[0] + 0.018, _SEAT_AXIS[1] - 0.036)
+SEAT_DIA_XY = (_SEAT_AXIS[0] - 0.014, _SEAT_AXIS[1] - 0.042)
 # The seat axis stands above the saddle tops, so the side-face stations stack
 # above it; the seat-bottom height stands right of the side face.
 _SEAT_AXIS_TOP = _y(SEAT_CENTRE_Y)
