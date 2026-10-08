@@ -182,7 +182,7 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
 - Crank pair: centre distance 39.77 → 43.52 mm (+9.44%); 16T OD 17.38 → 19.05 mm;
   64T OD 65.21 → 71.63 mm. To make room the crank and the cone journals rise
   4.732 mm together, the cone pivot post grows from 86 to 94.732 mm (head 26.6 mm),
-  the swing platform grows 4 mm longer with no relief pocket under the 64T, and
+  the swing platform grows 7.5 mm longer with no relief pocket under the 64T, and
   the post mounting screw becomes a 4 in 1/4-20 (MSC 40923906) cut to 94.9 mm.
 - Paper drive: the reducer keeps its 12:120 counts, which fit the photographed
   1898 disc best, but is cut at 48DP with the cone cutters. The disc shrinks from
