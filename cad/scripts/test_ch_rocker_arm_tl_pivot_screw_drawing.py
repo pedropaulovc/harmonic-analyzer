@@ -69,9 +69,22 @@ def test_fit_callout_names_the_rocker_by_its_registered_number() -> None:
     assert _config.parts("ch-rocker-arm")["number"] == screw.ROCKER_NUMBER
 
 
-def test_thread_engages_one_and_a_half_diameters_in_the_plate() -> None:
-    engaged = screw.THREAD_LENGTH - screw.PLATE_FLOOR_GAP
-    assert engaged >= 1.5 * screw.THREAD_MODEL_DIA
+def test_exported_stack_clears_the_bore_floor_and_engages_one_and_a_half_diameters() -> None:
+    # Replay the axial stack from the exported (printed) bands, worst case.
+    features = _features(SCREW)
+    thick = _features(WASHER)["hub_face"]["thickness"]
+    shoulder = features["shoulder"]["length"]
+    thread = features["thread"]["length"]
+    floor_min, floor_max = screw.FLOOR_DEPTH
+    shoulder_end_max = thick[1] + shoulder[1]
+    assert floor_min - shoulder_end_max >= screw.THREAD_RUNOUT + 0.1
+    # Tip depth from the two printed lengths under the head.
+    tip_min = thick[0] + screw.UNDER_HEAD_LENGTH - 0.13
+    full_end_min = tip_min - floor_max - screw.TIP_CHAMFER - screw.THREAD_PITCH / 2.0
+    assert full_end_min >= 1.5 * screw.THREAD_MODEL_DIA
+    tip_max = thick[1] + screw.UNDER_HEAD_LENGTH + 0.13
+    assert tip_max - floor_min - screw.TIP_CHAMFER <= screw.profile.PIVOT_TAP_THREAD_DEPTH - 0.51
+    assert thread[0] <= screw.UNDER_HEAD_LENGTH - screw.SHOULDER_LENGTH <= thread[1]
 
 
 def test_washer_passes_the_shoulder_and_carries_the_head() -> None:
@@ -79,6 +92,7 @@ def test_washer_passes_the_shoulder_and_carries_the_head() -> None:
     assert bore[0] > SHOULDER[1]
     assert bore[1] < HEAD[0]
     assert washer.THICK == screw.UNDERHEAD_Z
+    assert washer.WALL_MIN >= 1.5
 
 
 def test_numbers_are_the_parent_number_plus_a_tool_suffix() -> None:

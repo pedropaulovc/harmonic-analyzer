@@ -48,6 +48,7 @@ from ch_rocker_arm_tl_pivot_washer_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    OUTER_BAND,
     OUTER_DIA,
     THICK,
 )
@@ -116,6 +117,10 @@ async def build(adapter) -> dict[str, str]:
 
     set_dimension_bilateral_tolerance(
         adapter, "WasherProfile", "BoreDia", *deviations(BORE_BAND)
+    )
+    # The OD is the drill rod as supplied, at the stock's own tolerance.
+    set_dimension_bilateral_tolerance(
+        adapter, "WasherProfile", "OuterDia", *deviations(OUTER_BAND)
     )
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

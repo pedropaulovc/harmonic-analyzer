@@ -91,12 +91,13 @@ HEAD_TOP_X = _sheet_x(HEAD_TOP_Z)
 UNDERHEAD_X = _sheet_x(UNDERHEAD_Z)
 SHOULDER_END_X = _sheet_x(SHOULDER_END_Z)
 TIP_X = _sheet_x(TIP_Z)
-# Rows below the profile, 15 mm apart, every one from the head top.
+# Rows below the profile, 15 mm apart: the head length from the head top,
+# the stack lengths from the underhead.
 _ROW_Y = (SIDE_CENTER[1] - 0.032, SIDE_CENTER[1] - 0.047, SIDE_CENTER[1] - 0.062)
 SIDE_KEEP = {
     "HeadLength": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _ROW_Y[0]),
-    "ShoulderEnd": ((HEAD_TOP_X + SHOULDER_END_X) / 2.0, _ROW_Y[1]),
-    "OverallLength": ((HEAD_TOP_X + TIP_X) / 2.0, _ROW_Y[2]),
+    "ShoulderLength": ((UNDERHEAD_X + SHOULDER_END_X) / 2.0, _ROW_Y[1]),
+    "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[2]),
     # Diameters on the profile beside their steps.
     "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(HEAD_DIA / 2.0) + 0.042),
     # Its six-line fit callout reads below its text, right of the head's.
@@ -172,7 +173,9 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    set_reference_dimensions(adapter, annotations, ("ShoulderDia", "HeadDia"))
+    # The tip chamfer is defined by its callout (to the thread root): its size
+    # is reference.
+    set_reference_dimensions(adapter, annotations, ("ShoulderDia", "HeadDia", "TipChamfer"))
     set_dimension_callouts(
         adapter,
         annotations,
