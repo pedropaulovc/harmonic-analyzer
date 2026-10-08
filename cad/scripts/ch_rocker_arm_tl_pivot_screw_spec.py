@@ -234,6 +234,9 @@ DRAWING_NOTES = "\n".join(
     (
         "BRACKETED DIAMETERS ARE THE STARTING SIZE FOR THE MATCH-FIT.",
         f"{HEAD_COAXIAL_NOTE}.",
+        # One axial baseline: the underhead clamps the washer and sets the
+        # depth in the plate; the slot depth is the slot's own size.
+        "AXIAL LENGTHS RUN FROM THE UNDERSIDE OF THE HEAD; THE SLOT DEPTH FROM THE HEAD TOP.",
     )
 )
 # The head left behind the slot at worst case.
