@@ -146,6 +146,10 @@ _INTO_PLATE = ([0.0, 0.0, -1.0], ("__frame__",))
 _TAP_DRILL = blind_cut_dia_mm(TAP_SPEC)
 _STUD_DRILL = blind_cut_dia_mm(STUD_SPEC)
 _DRILLED = (drilled_oversize_mm(), 0.0)
+# The Hole Wizard tap callout prints its #25 drill to two places (3.80); that
+# printed size, under the DRILLED HOLES row, is the drill's inspected band.
+TAP_DRILL_PLACES = 2
+TAP_DRILL_PRINTED = round(_TAP_DRILL, TAP_DRILL_PLACES)
 EXPORT_FEATURES: dict[str, ExportFeature] = {
     "seat_face": ExportFeature(
         kind="face",
@@ -181,24 +185,31 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         },
     ),
 }
-# The taps carry only their thread and the governing spot note: their printed
-# stations are reference, so they export as nominals with no band.
+# Each tap's printed stations are reference (the spot note governs), so they
+# export as nominals with no band. The tap is THRU: its one drilled cylinder
+# carries the thread, the spot note and the printed drill band together.
 for _side, _x in (("left", TAP_X[0]), ("right", TAP_X[1])):
     EXPORT_FEATURES[f"ledge_tap_{_side}"] = ExportFeature(
         kind="hole",
         faces=(CylinderFace(_TAP_DRILL, contains_x_mm=_x),),
-        requirements=("thread", "note"),
+        requirements=("thread", "note", "dia"),
         fields={
             "at": ([_x, SCREW_Y, 0.0], ("TAP_X", "SCREW_Y")),
             "axis": _INTO_PLATE,
             "thread": (f"{SCREW_THREAD} UNC-{TAP_SPEC.thread_class}", ("TAP_SPEC", "SCREW_THREAD")),
             "tap_drill_mm": (_TAP_DRILL, ("TAP_SPEC",)),
+            "dia": (
+                limits(TAP_DRILL_PRINTED, TAP_DRILL_PLACES, _DRILLED),
+                ("TAP_SPEC", "TAP_DRILL_PRINTED", "TAP_DRILL_PLACES"),
+            ),
+            "nominal_dia": (TAP_DRILL_PRINTED, ("TAP_DRILL_PRINTED",)),
             "thru": (True, ("TAP_SPEC",)),
             "station_nominal": (_x, ("TAP_X",)),
             "height_nominal": (SCREW_Y, ("SCREW_Y",)),
             "height_from": ("table_face", ("__frame__",)),
             "note": (TAP_SPOT_NOTE, ("TAP_SPOT_NOTE", "LEDGE_CLEARANCE_SPEC")),
         },
+        precision={"dia": TAP_DRILL_PLACES},
     )
 for _side, _x in (("left", STUD_X[0]), ("right", STUD_X[1])):
     EXPORT_FEATURES[f"stud_hole_{_side}"] = ExportFeature(
@@ -213,7 +224,7 @@ for _side, _x in (("left", STUD_X[0]), ("right", STUD_X[1])):
                 limits(STUD_DIA_PRINTED, STUD_DIA_PLACES, _DRILLED),
                 ("STUD_SPEC", "STUD_DIA_PRINTED", "STUD_DIA_PLACES"),
             ),
-            "nominal_dia": (_STUD_DRILL, ("STUD_SPEC",)),
+            "nominal_dia": (STUD_DIA_PRINTED, ("STUD_DIA_PRINTED",)),
             "thru": (True, ("STUD_SPEC",)),
             "station": (_station(_x), ("STUD_X", "STATION_PLACES")),
             "station_nominal": (_x, ("STUD_X",)),
