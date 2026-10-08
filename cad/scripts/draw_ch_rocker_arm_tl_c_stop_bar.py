@@ -51,20 +51,19 @@ ISO_CENTER = (0.330, 0.175)
 ISO_NOTE_XY = (0.295, 0.230)
 FRONT_KEEP = {
     "BarLength": (0.130, 0.215),
-    # Two vertical columns well apart, so each callout lane is clear.
-    "BarHeight": (0.040, 0.170),
-    "HoleY": (0.078, 0.163),
+    # The height alone left of the view; the hole height to its right, so
+    # the height's two callout lanes have the whole left margin.
+    "BarHeight": (0.051, 0.170),
+    "HoleY": (0.184, 0.163),
     "HoleLeftX": (0.115, 0.135),
-    # Lowest dimension: its callout lane below is open sheet.
     "HoleRightX": (0.120, 0.120),
 }
 RIGHT_KEEP = {"BarWidth": (0.230, 0.135)}
-CALLOUT_XY = (0.200, 0.150)
+# Below the hole-height arrows and left of the side view's 12.7 extensions.
+CALLOUT_XY = (0.183, 0.138)
 # Functional acceptance sits on the dimension it governs, not in the notes.
-DIMENSION_CALLOUTS = {
-    "BarHeight": "DATUM C STOP HEIGHT",
-    "HoleRightX": "2X; SCREWS ENTER MHA-CH-006-TL-08 TAPS FREELY",
-}
+CALLOUTS_ABOVE = {"BarHeight": "DATUM C STOP HEIGHT FOR"}
+CALLOUTS_BELOW = {"BarHeight": "MHA-CH-006 POSITION CHECK", "HoleY": "2X"}
 
 
 def _counterbore_edge(adapter: Any, view: Any) -> Any:
@@ -132,7 +131,8 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
