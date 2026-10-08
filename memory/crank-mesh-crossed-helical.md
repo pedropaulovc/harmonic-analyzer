@@ -7,7 +7,7 @@ metadata:
 
 > Identity migration: narrative references may use current filenames and paths; this does not date those names to the original finding. Dated observations and metrics, historical release paths, and identifiers in quoted or captured records retain their snapshot values. See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for current identities and the old-to-current map.
 
-> Gear standard update (2026-10): the pair is now normal 24DP PA20 cut with stock 24DP cutters, and the 64T helix equals the 13.0011° cone incline ([gear-standard.md](../cad/docs/gear-standard.md)). The 12.5182° angle, SIN_I and centre figures below are the 2026-07 values; the crossed-helical reasoning still holds.
+> Gear standard update (2026-10): the pair is now normal 24DP PA20 cut with stock 24DP cutters, and the 64T helix equals the 13.0011° cone incline ([gear-standard.md](../cad/docs/gear-standard.md)). The 12.5182° angle, SIN_I, centre and seed-window figures below are the 2026-07 old-profile values and certify nothing about the stock-form pair; the crossed-helical reasoning still holds.
 
 
 The crank-pinion (16T) : crank-drive-gear (64T) mesh crosses axes: the 64T
