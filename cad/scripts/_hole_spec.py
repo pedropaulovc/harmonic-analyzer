@@ -26,6 +26,7 @@ TAP_DRILL_MM = {  # taps cut the tap-drill diameter (TAP_DRILL column)
     "#10-32": 4.0386,
     "1/4-20": 5.105,
     "5/16-18": 6.528,
+    "3/8-16": 7.938,  # 5/16 drill
     "1/2-13": 10.716,
     "9/16-12": 12.304,
 }
@@ -40,6 +41,7 @@ THREAD_MAJOR_MM = {  # basic external-thread major diameters (ASME B1.1)
     "#10-32": 4.826,
     "1/4-20": 6.350,
     "5/16-18": 7.938,
+    "3/8-16": 9.525,
     "1/2-13": 12.700,
     "9/16-12": 14.288,
 }
@@ -83,6 +85,7 @@ NUMBER_DRILL_MM = {  # number drills cut diameter exactly
     "#43": 2.261,
     "#47": 1.994,
     "#54": 1.397,
+    "#5": 5.220,  # 0.2055in: #10 screw clearance (pivot-bracket ledge)
 }
 FRACTIONAL_DRILL_MM = {
     "1/8": 3.175,
@@ -90,7 +93,11 @@ FRACTIONAL_DRILL_MM = {
     "15/64": 5.953,
     "5/16": 7.938,
 }
-LETTER_DRILL_MM = {"F": 6.528, "V": 9.576}  # V = 0.377in (transgear stud seat)
+LETTER_DRILL_MM = {  # letter drills cut diameter exactly
+    "F": 6.528,
+    "V": 9.576,  # 0.377in (transgear stud seat)
+    "X": 10.084,  # 0.397in: 3/8 free clearance
+}
 
 # 118-degree drill point: tip height = r * cot(59 deg). A blind wizard hole's
 # depth runs to the flat shoulder; the point extends beyond it.

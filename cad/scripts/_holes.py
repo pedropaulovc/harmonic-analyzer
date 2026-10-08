@@ -44,7 +44,19 @@ from _hole_spec import (
 )
 from _visibility import blank_sketch_feature
 
-PlacementDimension = tuple[str | None, str | None]
+@dataclass(frozen=True)
+class SharedCoordinate:
+    """A placement coordinate tied to an earlier point's by a sketch relation.
+
+    The two instances then share ONE dimension (the earlier point's), so the
+    print states the station once for both holes instead of carrying an
+    independent, unprinted dimension for the later one.
+    """
+
+    point: int
+
+
+PlacementDimension = tuple[str | None, str | None] | SharedCoordinate
 PlacementDimensions = tuple[PlacementDimension, PlacementDimension]
 
 # swFeatureNameID_e / swWzdGeneralHoleTypes_e / swWzdHoleStandards_e /
@@ -340,7 +352,10 @@ def wizard_holes(
     ``((x_name, x_drive), (y_name, y_drive))`` in placement-sketch coordinates.
     Every non-zero coordinate receives a driving dimension; a zero coordinate
     receives the matching origin-axis relation because zero-valued dimensions
-    are invalid. Named dimensions with equations are returned as deferred
+    are invalid. A ``SharedCoordinate(i)`` instead ties the coordinate to point
+    ``i``'s (an earlier point with the same value) by a vertical/horizontal
+    points relation, with no dimension of its own.
+    Named dimensions with equations are returned as deferred
     ``placement_drive_jobs`` so callers can apply them with the same end-of-build
     ``drive_dimension`` pass used by the rest of the part.
 
@@ -536,6 +551,7 @@ def wizard_holes(
         )
 
         dims = SketchDims()
+        point_ids: list[str] = []
         # Direct EditSketch bypasses the adapter's create_sketch registry reset;
         # force the reserved "origin" reference to resolve in THIS placement
         # sketch rather than reusing a prior sketch's cached dispatch.
@@ -547,6 +563,7 @@ def wizard_holes(
                 zip(placed_points, placement_dims, strict=True)
             ):
                 point_id = adapter._register_sketch_entity("Point", point)
+                point_ids.append(point_id)
                 zero_x = abs(sx) < 1e-12
                 zero_y = abs(sy) < 1e-12
                 if zero_x and zero_y:
@@ -564,10 +581,26 @@ def wizard_holes(
                             adapter, point_id, "origin", relation
                         ),
                     )
-                for axis, coord, dim_type, (dim_name, drive) in (
-                    ("x", sx, "horizontal_distance", point_dims[0]),
-                    ("y", sy, "vertical_distance", point_dims[1]),
+                for axis, coord, dim_type, share_relation, point_dim in (
+                    ("x", sx, "horizontal_distance", "vertical_points", point_dims[0]),
+                    ("y", sy, "vertical_distance", "horizontal_points", point_dims[1]),
                 ):
+                    if isinstance(point_dim, SharedCoordinate):
+                        other = point_dim.point
+                        other_coord = placed_points[other][1 if axis == "x" else 2] if 0 <= other < index else None
+                        if other_coord is None or abs(coord) < 1e-12 or abs(other_coord - coord) > 1e-9:
+                            raise ValueError(
+                                f"hole wizard {label}: point {index} {axis} cannot share "
+                                f"point {other}'s coordinate"
+                            )
+                        check(
+                            f"share hole placement {label} point {index} {axis} with point {other}",
+                            _add_sketch_constraint_impl(
+                                adapter, point_id, point_ids[other], share_relation
+                            ),
+                        )
+                        continue
+                    dim_name, drive = point_dim
                     if abs(coord) < 1e-12:
                         if dim_name is not None or drive is not None:
                             raise ValueError(

@@ -5,6 +5,8 @@ Run: python3 web/scripts/generate-intro-source-track.py
 The embedded numeric snapshots deliberately make regeneration independent of the
 ignored checkpoint tree. Their paths/hashes identify original private evidence.
 Residuals describe those original branches, not the reframed playback baseline.
+Generation requires observations of the independently approved live source model
+and current sealed producer/renderer inputs; historical snapshots cannot qualify it.
 """
 import copy
 import importlib.util
@@ -48,6 +50,7 @@ def resize_camera(camera, donor_rect, rect):
 
 def main():
     data = common.load_observations("NAsM30MAHLg")
+    common.validate_current_generation_inputs(data, Path(__file__))
     diagnostics = {}
     for key, candidate in CANDIDATES.items():
         diagnostics[key] = {"evidencePath": candidate["evidencePath"], "sha256": candidate["sha256"],

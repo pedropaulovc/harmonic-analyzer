@@ -40,6 +40,16 @@ from _printed_tolerance import printed_band_mm
 SPEC_DRIVEN_PARTS: tuple[str, ...] = (
     "dt_cone_pivot_post_tl_cap_jaw_button",
     "dt_cone_pivot_post_tl_bond_cradle",
+    "ch_pivot_bracket_tl_ledge",
+    "ch_pivot_bracket_tl_angle_plate",
+    "dt_cone_pivot_post_tl_saw_cradle",
+    "ch_rocker_arm_tl_vise_stop",
+    "ch_rocker_arm_tl_filing_button",
+    "ch_rocker_arm_tl_filing_stud",
+    "ch_rocker_arm_tl_inspection_box",
+    "ch_rocker_arm_tl_c_stop_bar",
+    "dt_cone_pivot_post_tl_soft_jaw",
+    "ch_rocker_arm_tl_diamond_pin",
 )
 SUPPORTED_PARTS = ("ch_rocker_arm", "ch_pivot_shaft", "dt_cone_pivot_post", *SPEC_DRIVEN_PARTS)
 REPO = Path(__file__).resolve().parents[2]

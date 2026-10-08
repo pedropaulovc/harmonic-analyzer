@@ -479,7 +479,11 @@ function serializeGlb(json, binary) {
   return bytes
 }
 
-/** Exact deduplication followed by filter-free meshopt, with no geometry edits. */
+/**
+ * Internal exact same-name storage optimizer: no native identity projection.
+ * The importer supplies independently verified canonical bytes; its public v2
+ * descriptor proves decoded equivalence after that authorized projection.
+ */
 export async function optimizeModel(inputBytes) {
   await Promise.all([MeshoptEncoder.ready, MeshoptDecoder.ready])
   const source = parseGlb(inputBytes), sourceViews = await decodeViews(source)
@@ -564,10 +568,10 @@ export async function optimizeModel(inputBytes) {
   optimizedCounts.nodes = json.nodes?.length ?? 0
   optimizedCounts.drawableInstances = drawableInstances(json)
   return { optimizedBytes, report: {
-    schemaVersion: 1, sourceSha256: equivalence.sourceSha256, optimizedSha256: equivalence.optimizedSha256,
+    schemaVersion: 2, sourceSha256: equivalence.sourceSha256, optimizedSha256: equivalence.optimizedSha256,
     sourceBytes: source.bytes.length, deduplicatedBytes, optimizedBytes: optimizedBytes.length,
     semanticDigest: equivalence.semanticDigest,
-    pipeline: { version: 1, steps: ['exact-dedup', 'meshopt'] },
+    stages: ['exact-dedup', 'meshopt'],
     codec: { name: 'meshoptimizer', version: CODEC_VERSION, extension: MESHOPT, attributeMode: 'ATTRIBUTES', indexMode: 'INDICES', filter: 'NONE' },
     statistics: {
       source: sourceCounts, optimized: optimizedCounts,
