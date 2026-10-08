@@ -65,28 +65,29 @@ def test_every_exported_band_is_a_requirement() -> None:
 
 
 # Each printed dimension -> the exported feature and requirement that owns its
-# band. PadHt is the matched fit's reference size and owns no band.
+# band, and the spec constant the print draws it from. PadHt is the matched
+# fit's reference size and owns no band.
 PRINTED_OWNERS = {
-    "BaseLength": ("base_far_end", "station"),
-    "BaseWidth": ("base_far_side", "height"),
-    "BaseHt": ("base_top", "height"),
-    "OverallHt": ("underside", "height"),
-    "HeadSaddleX0": ("head_saddle_x0", "station"),
-    "HeadSaddleX1": ("head_saddle_x1", "station"),
-    "FootSaddleX0": ("foot_saddle_x0", "station"),
-    "FootSaddleX1": ("foot_saddle_x1", "station"),
-    "PadX0": ("pad_x0", "station"),
-    "PadX1": ("pad_x1", "station"),
-    "PadZ0": ("pad_z0", "height"),
-    "PadZ1": ("pad_z1", "height"),
-    "SaddleZ0": ("saddle_z0", "height"),
-    "SaddleZ1": ("saddle_z1", "height"),
-    "SeatZ": ("head_seat", "station"),
-    "SeatBottomHt": ("head_seat", "height"),
-    "SeatDia": ("head_seat", "dia"),
-    "StudX": ("stud_tap_near", "station"),
-    "StudNearZ": ("stud_tap_near", "height"),
-    "StudFarZ": ("stud_tap_far", "height"),
+    "BaseLength": ("base_far_end", "station", spec.BASE_LENGTH),
+    "BaseWidth": ("base_far_side", "height", spec.BASE_WIDTH),
+    "BaseHt": ("base_top", "height", spec.BASE_HT),
+    "OverallHt": ("underside", "height", spec.OVERALL_HT),
+    "HeadSaddleX0": ("head_saddle_x0", "station", spec.HEAD_SADDLE_X[0]),
+    "HeadSaddleX1": ("head_saddle_x1", "station", spec.HEAD_SADDLE_X[1]),
+    "FootSaddleX0": ("foot_saddle_x0", "station", spec.FOOT_SADDLE_X[0]),
+    "FootSaddleX1": ("foot_saddle_x1", "station", spec.FOOT_SADDLE_X[1]),
+    "PadX0": ("pad_x0", "station", spec.PAD_X0),
+    "PadX1": ("pad_x1", "station", spec.PAD_X1),
+    "PadZ0": ("pad_z0", "height", spec.PAD_Z0),
+    "PadZ1": ("pad_z1", "height", spec.PAD_Z1),
+    "SaddleZ0": ("saddle_z0", "height", spec.SADDLE_Z[0]),
+    "SaddleZ1": ("saddle_z1", "height", spec.SADDLE_Z[1]),
+    "SeatZ": ("head_seat", "station", spec.SEAT_Z),
+    "SeatBottomHt": ("head_seat", "height", spec.SEAT_BOTTOM_Y),
+    "SeatDia": ("head_seat", "dia", spec.SEAT_DIA),
+    "StudX": ("stud_tap_near", "station", spec.STUD_X),
+    "StudNearZ": ("stud_tap_near", "height", spec.STUD_Z[0]),
+    "StudFarZ": ("stud_tap_far", "height", spec.STUD_Z[1]),
 }
 
 
@@ -95,16 +96,17 @@ def test_every_printed_band_has_a_requirement_owner() -> None:
     as a listed requirement band at its printed places."""
     assert set(PRINTED_OWNERS) | {"PadHt"} == set(spec.DRAWING_PRECISION_BY_NAME)
     features = _features()
-    for printed, (name, key) in PRINTED_OWNERS.items():
+    for printed, (name, key, source) in PRINTED_OWNERS.items():
         feature = features[name]
         assert key in feature["requirements"], printed
         nominal = feature.get(f"{key}_nominal", feature.get(f"nominal_{key}"))
         places = spec.DRAWING_PRECISION_BY_NAME[printed]
         # The part has no explicit bands: each band is the .X general grade
-        # (±0.8) about the printed value, and the exported nominal IS the
-        # printed value even where the model is derived (46.632 -> 46.6).
+        # (±0.8) about the printed value, and the exported nominal IS that
+        # printed value of its spec source even where the model is derived
+        # (PAD_X0 46.632 prints and exports 46.6).
         assert places == 1, printed
-        assert nominal == round(nominal, places), printed
+        assert nominal == round(source, places), printed
         assert feature[key] == [round(nominal - 0.8, 12), round(nominal + 0.8, 12)], printed
 
 
