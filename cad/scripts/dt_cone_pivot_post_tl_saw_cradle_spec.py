@@ -123,6 +123,12 @@ if abs(post.CONE_BOSS_LENGTH - post.BLOCK_DIA) > 1e-9:
 STUD_THREAD = "3/8-16"
 STUD_TAP_SPEC = HoleSpec("tapped", STUD_THREAD)
 STUD_TAP_DRILL = TAP_DRILL_MM[STUD_THREAD]
+# The callout prints the THRU drill at two places (Ø7.94); the title-block
+# drilled-hole band qualifies that printed value.
+STUD_DRILL_PLACES = 2
+STUD_DRILL_PRINTED = round(STUD_TAP_DRILL, STUD_DRILL_PLACES)
+_DRILLED = _config.title_block("drilled_hole")
+DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))
 STUD_X = CONE_AXIS_X
 STUD_Z = (POST_AXIS_Z - 30.0, POST_AXIS_Z + 30.0)
 STUD_MIN_ENGAGEMENT_D = 1.5
@@ -288,7 +294,7 @@ def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
                 limits(SEAT_BOTTOM_Y, 1),
                 ("SEAT_BOTTOM_Y", (_POST, "BLOCK_DIA")),
             ),
-            "height_nominal": (SEAT_BOTTOM_Y, ("SEAT_BOTTOM_Y",)),
+            "height_nominal": (round(SEAT_BOTTOM_Y, 1), ("SEAT_BOTTOM_Y",)),
             # The one printed SeatZ: the common seat axis across the base,
             # from the base side face (model Z0).
             "station": (limits(SEAT_Z, 1), ("SEAT_Z",)),
@@ -304,20 +310,27 @@ def _stud(z: float) -> ExportFeature:
     return ExportFeature(
         kind="hole",
         faces=(CylinderFace(STUD_TAP_DRILL, contains_z_mm=z),),
-        requirements=("thread", "station", "height"),
+        requirements=("thread", "dia", "station", "height"),
         fields={
             "at": ([STUD_X, BASE_HT, z], ("STUD_X", "BASE_HT", "STUD_Z")),
             "axis": ([0.0, -1.0, 0.0], ("__frame__",)),
             "thread": (f"{STUD_THREAD} UNC-{STUD_TAP_SPEC.thread_class}", ("STUD_TAP_SPEC",)),
             "tap_drill_mm": (STUD_TAP_DRILL, ("STUD_TAP_DRILL",)),
+            # THRU: no drill-point face of its own, so the tap carries the
+            # printed drill band.
+            "dia": (
+                limits(STUD_DRILL_PRINTED, STUD_DRILL_PLACES, DRILLED_BAND),
+                ("STUD_DRILL_PRINTED", "DRILLED_BAND", "STUD_TAP_SPEC"),
+            ),
+            "dia_nominal": (STUD_DRILL_PRINTED, ("STUD_DRILL_PRINTED",)),
             "thru": (True, ("STUD_TAP_SPEC",)),
             "station": (limits(STUD_X, 1), ("STUD_X",)),
-            "station_nominal": (STUD_X, ("STUD_X",)),
+            "station_nominal": (round(STUD_X, 1), ("STUD_X",)),
             "height": (limits(z, 1), ("STUD_Z",)),
-            "height_nominal": (z, ("STUD_Z",)),
+            "height_nominal": (round(z, 1), ("STUD_Z",)),
             "height_from": _FROM_SIDE,
         },
-        precision={"station": 1, "height": 1},
+        precision={"dia": STUD_DRILL_PLACES, "station": 1, "height": 1},
     )
 
 
@@ -332,7 +345,7 @@ def _x_face(x: float, outward: float, name: str, places: int) -> ExportFeature:
             "normal": ([outward, 0.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "x", "value": x}, (name,)),
             "station": (limits(x, places), (name,)),
-            "station_nominal": (x, (name,)),
+            "station_nominal": (round(x, places), (name,)),
         },
         precision={"station": places},
     )
@@ -348,7 +361,7 @@ def _z_face(z: float, outward: float, name: str) -> ExportFeature:
             "normal": ([0.0, 0.0, outward], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "z", "value": z}, (name,)),
             "height": (limits(z, 1), (name,)),
-            "height_nominal": (z, (name,)),
+            "height_nominal": (round(z, 1), (name,)),
             "height_from": _FROM_SIDE,
         },
         precision={"height": 1},
