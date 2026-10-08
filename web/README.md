@@ -723,8 +723,10 @@ PPE preview cleanup do not perform deployments. The sole GitHub cleanup token
 belongs to the PPE environment/account, never the production account.
 
 Native previews cover **same-repository PR branches**, including drafts and PRs
-targeting any base branch, when `web/**` changes. Fork PRs are rejected rather
-than passing their untrusted code to a credentialed native build. GitHub's PPE
+targeting any base branch, when `web/**` changes. Valid unsupported fork PRs are
+**explicitly skipped**, not failed or represented as deployed; the job skips
+before credentials, checkout or API calls. Malformed event payloads still fail.
+Untrusted fork code never enters a credentialed native build. GitHub's PPE
 environment records the actual Cloudflare Preview API URL, not a guessed branch
 slug, and normally reports success only after `/deployment.json` matches the
 exact PR head SHA and raw branch name. If native watch paths skipped a
@@ -745,12 +747,25 @@ reporting a native-build-log/new-web-push diagnostic. Neither path attempts a
 build through an additional PPE build-control token.
 
 The PPE cleanup credential is used only to read Preview metadata and delete PPE
-Previews. PR closure cleanup immediately removes the closed branch's Preview,
-including **all** its deployment URLs, unless another open PR shares that
-branch. An hourly reconciler catches late builds and orphaned Previews. It
+Previews. The accepted cleanup contract is **branch-only**: PR closure deletes
+the closed branch's Preview resource and branch URL, releases its Preview quota,
+and inactivates the GitHub deployment record, unless another open PR shares
+that branch. **Immutable deployment URLs deliberately remain public** under the
+accepted contract because of Cloudflare's beta behavior documented in
+[issue 15945](https://github.com/cloudflare/workers-sdk/issues/15945). A live
+cleanup probe confirmed that the Preview resource disappeared and the branch
+URL returned 404 while an older immutable deployment URL still served its
+deployed bytes. Branch cleanup does not promise full public-URL revocation.
+Closed-PR cleanup issues the delete immediately, without the orphan grace
+period; branch-URL removal then propagates asynchronously through Cloudflare.
+A successful delete is not an instant data-plane 404: a second disposable probe
+initially returned 200 after deletion and subsequently returned 404 within the
+bounded propagation observation.
+An hourly reconciler catches late builds and orphaned Preview resources. It
 preserves new Previews without a PR for their first **30 minutes**, allowing a
-branch push to precede PR creation; otherwise orphan cleanup occurs within
-**90 minutes of Preview creation**, excluding scheduler delays. Missing or
+branch push to precede PR creation; otherwise orphan **Preview-resource**
+cleanup occurs within **90 minutes of Preview creation**, excluding scheduler
+delays. This bound does not imply immutable deployment URL revocation. Missing or
 malformed API `created_on` timestamps stop reconciliation instead of risking
 premature deletion. Open PR branches are preserved. The deployment lifecycle
 helper can also be used manually:
@@ -808,6 +823,16 @@ original compiled SHA-256 and length before parsing. Ordinary files pass through
 to `ASSETS` unchanged, including their native conditional-request behavior.
 Chunked routes also honor strong/weak `If-None-Match` and `*` with a 304 before
 fetching any pieces, so cache revalidation does not redownload the full asset.
+Reconstructed routes send `Cache-Control: no-transform` to prevent Cloudflare
+from recompressing the assembled response. A native headed-browser control found
+that default `Content-Encoding: zstd` failed partway through the 45,568,082-byte
+playback module, while an identity-encoding override completed the exact full
+module with HTTP/3 unchanged. The response's Content-Length had been removed
+under zstd, so this was not evidence of an explicit length-header mismatch.
+The transport uses Cloudflare's
+[documented no-transform directive](https://developers.cloudflare.com/speed/optimization/content/compression/#content-length-header-handling),
+not an HTTP/3-disabled client fallback. Public native-browser verification of
+the deployed directive is required before claiming this delivery fix verified.
 `run_worker_first: true` allows any future oversized asset path to use the same
 manifest transport; static fallback requests consequently pass through the
 Worker as well. No R2 storage or runtime external origin is required.

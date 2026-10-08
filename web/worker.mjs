@@ -25,7 +25,10 @@ export default {
       'Content-Type': asset.contentType,
       'Content-Length': String(asset.byteLength),
       'ETag': `"${asset.sha256}"`,
-      'Cache-Control': 'public, max-age=0, must-revalidate',
+      // Native browser control: zstd-transformed reconstructed JS failed mid-
+      // stream; identity completed with HTTP/3 unchanged. Prevent edge transforms
+      // per https://developers.cloudflare.com/speed/optimization/content/compression/.
+      'Cache-Control': 'public, max-age=0, must-revalidate, no-transform',
       'X-Content-Type-Options': 'nosniff',
     }
     const candidates = (request.headers.get('if-none-match') ?? '').split(',').map(value => value.trim())

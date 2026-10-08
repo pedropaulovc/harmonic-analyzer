@@ -17,6 +17,9 @@ concurrency:
 
 jobs:
   report:
+    # Native Git integration cannot build fork branches. Skip, never report them
+    # as deployed or grant this job's environment credential to a fork event.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:

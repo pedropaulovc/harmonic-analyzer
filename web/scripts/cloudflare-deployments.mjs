@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Worker Preview API contract: workers-sdk packages/deploy-helpers/src/preview/api.ts.
-// DELETE a Preview removes every deployment URL, not just the latest version.
+// Accepted cleanup scope: retire the Preview resource and its branch alias only.
+// Immutable deployment URLs are retained; Preview DELETE does not revoke them.
 import { readFile, appendFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -101,7 +102,7 @@ export async function deletePreview(name) {
   } catch (error) {
     if (error.status !== 404 || (await listPreviews()).some(row => row.id === preview.id)) throw error;
   }
-  console.log(`Deleted Preview ${JSON.stringify(name)} and all its deployment URLs`);
+  console.log(`Deleted Preview resource ${JSON.stringify(name)} (branch-only cleanup; immutable deployment URLs are retained)`);
   return true;
 }
 function previewUrl(preview) {
@@ -243,6 +244,19 @@ export async function reconcile() {
   // scan per orphan branch or one latest-status HTTP request per historical record.
   await deactivate(undefined, await openPRs());
 }
+export async function reportPreviewEvent(event) {
+  const pr = event?.pull_request;
+  if (!Number.isInteger(pr?.number) || pr.number < 1 || typeof pr.head?.ref !== 'string' || !pr.head.ref || !/^[a-f0-9]{40}$/.test(pr.head.sha) || typeof pr.head.repo?.full_name !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(pr.head.repo.full_name)) throw new Error('Malformed pull_request payload: expected PR number, branch, full SHA, and head repository');
+  if (pr.head.repo.full_name !== repository()) {
+    console.log('::notice::Skipping native Preview reporting: Cloudflare Git integration supports same-repository branches only; no fork deployment was created.');
+    if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, 'outcome=skipped\n');
+    return { outcome: 'skipped' };
+  }
+  guardIdentity(PPE);
+  if (pr.head.ref === 'main') throw new Error('main is reserved for production');
+  await publish(pr.head.sha, pr.head.ref, 'web-preview', () => resolvePreviewUrl(pr.head.ref, event.action), pr.number);
+  return { outcome: 'processed' };
+}
 async function main() {
   const [command, ...args] = process.argv.slice(2);
   if (command === 'list') console.log(JSON.stringify(await listPreviews(), null, 2));
@@ -251,12 +265,8 @@ async function main() {
   else if (command === 'reconcile' && !args.length) await reconcile();
   else if (command === 'wait' && args.length >= 2 && args.length <= 4) console.log(await waitForManifest(args[0], args[1], args[2], args[3] === undefined ? 1200 : Number(args[3])));
   else if (command === 'preview' && !args.length) {
-    guardIdentity(PPE);
     const event = JSON.parse(await readFile(required('GITHUB_EVENT_PATH'), 'utf8'));
-    const pr = event.pull_request;
-    if (!pr || pr.head.repo?.full_name !== repository()) throw new Error('Native Cloudflare Git previews support same-repository branches only; fork PRs cannot be reported as deployed');
-    if (pr.head.ref === 'main') throw new Error('main is reserved for production');
-    await publish(pr.head.sha, pr.head.ref, 'web-preview', () => resolvePreviewUrl(pr.head.ref, event.action), pr.number);
+    await reportPreviewEvent(event);
   } else if (command === 'production' && !args.length) {
     guardIdentity(PROD);
     if (required('GITHUB_REF') !== 'refs/heads/main') throw new Error('Production reporting requires main');

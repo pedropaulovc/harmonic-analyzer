@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PPE, PROD, guardIdentity, listPreviews, deletePreview, cleanup, reconcile, waitForManifest, webTreeSha, resolvePreviewUrl } from './cloudflare-deployments.mjs';
+import { PPE, PROD, guardIdentity, listPreviews, deletePreview, cleanup, reconcile, waitForManifest, webTreeSha, resolvePreviewUrl, reportPreviewEvent } from './cloudflare-deployments.mjs';
 
 const sha = 'a'.repeat(40);
 const preview = { id: 'preview-1', name: 'feature/a', slug: 'server-owned-slug', created_on: new Date(Date.now() - 60 * 60 * 1000).toISOString(), urls: ['https://server-owned-slug-ppe-harmonic-analyzer-com.ppe-harmonic-analyzer-com.workers.dev'] };
@@ -258,4 +258,34 @@ test('scheduled deletion fails closed when an orphan creation timestamp is missi
       assert.equal(deletions, 0);
     });
   }
+});
+
+test('consumer skips valid fork event before any API, credential check, or GitHub deployment', async () => {
+  let requests = 0;
+  await withAPI(async () => { requests++; throw new Error('Unsupported fork must not call an API'); }, async () => {
+    delete process.env.GITHUB_OUTPUT;
+    delete process.env.GH_TOKEN;
+    delete process.env.CLOUDFLARE_CLEANUP_API_TOKEN;
+    process.env.CLOUDFLARE_ACCOUNT_ID = PROD.account;
+    const event = { action: 'opened', pull_request: { number: 13, head: { ref: 'feature/fork', sha, repo: { full_name: 'fork/repo' } } } };
+    assert.deepEqual(await reportPreviewEvent(event), { outcome: 'skipped' });
+    assert.equal(requests, 0);
+  });
+});
+
+test('consumer does not turn malformed payloads into successful fork skips', async () => {
+  let requests = 0;
+  const valid = { number: 13, head: { ref: 'feature/a', sha, repo: { full_name: 'fork/repo' } } };
+  await withAPI(async () => { requests++; throw new Error('Malformed event must not call an API'); }, async () => {
+    for (const event of [null, {}, { pull_request: { ...valid, number: '13' } }, { pull_request: { ...valid, head: { ...valid.head, sha: 'bad-sha' } } }, { pull_request: { ...valid, head: { ...valid.head, ref: '' } } }, { pull_request: { ...valid, head: { ...valid.head, repo: null } } }]) await assert.rejects(reportPreviewEvent(event), /Malformed pull_request payload/);
+    assert.equal(requests, 0);
+  });
+});
+
+test('same-repository main is rejected before Preview API or deployment writes', async () => {
+  let requests = 0;
+  await withAPI(async () => { requests++; throw new Error('main must not call Preview API'); }, async () => {
+    await assert.rejects(reportPreviewEvent({ pull_request: { number: 13, head: { ref: 'main', sha, repo: { full_name: 'owner/repo' } } } }), /reserved for production/);
+    assert.equal(requests, 0);
+  });
 });
