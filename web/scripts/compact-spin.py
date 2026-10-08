@@ -9,6 +9,8 @@ Declared seed presentation overrides affect chosen native rendering only; origin
 source pixels, source-view layouts and exact-exposure seed identities are retained.
 The immutable numeric phase/source-image map is committed in web/content; private
 capture paths retained in declarations are provenance only, never runtime inputs.
+Generation requires observations of the independently approved live source model
+and current sealed producer/renderer inputs; historical snapshots cannot qualify it.
 """
 import copy
 import hashlib
@@ -103,6 +105,7 @@ def main():
     seeds = json.loads((common.WEB / "content" / "canonical-native" / "XPQwKRt4Y2k.source-seeds.json").read_text())
     validate_seed_presentations(seeds)
     data = common.load_observations("XPQwKRt4Y2k")
+    common.validate_current_generation_inputs(data, Path(__file__))
     controls = seeds["montageSourceControls"]
     data["anchors"].extend(copy.deepcopy(controls["anchors"]))
     source_controls = {(entry["sourceImage"]["frameIndex"], entry["sourceImage"]["sha256Bgr8"]): entry for entry in controls["frames"]}
