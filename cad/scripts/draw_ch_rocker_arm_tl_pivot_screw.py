@@ -27,10 +27,12 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
+    set_reference_dimension,
     set_reference_dimensions,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -99,10 +101,10 @@ SIDE_KEEP = {
     "ShoulderLength": ((UNDERHEAD_X + SHOULDER_END_X) / 2.0, _ROW_Y[1]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[2]),
     # Diameters on the profile beside their steps.
-    "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(HEAD_DIA / 2.0) + 0.042),
+    "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0 - 0.008, _sheet_y(HEAD_DIA / 2.0) + 0.042),
     # Its six-line fit callout reads below its text, over the shoulder, between
     # the head's callout and the thread note's leader.
-    "ShoulderDia": (UNDERHEAD_X + 0.040, _sheet_y(SHOULDER_DIA / 2.0) + 0.037),
+    "ShoulderDia": (UNDERHEAD_X + 0.060, _sheet_y(SHOULDER_DIA / 2.0) + 0.037),
     "TipChamfer": (TIP_X + 0.010, SIDE_CENTER[1] - 0.018),
     # The slot shows as a notch in the head top; its depth reads beside it.
     "SlotDepth": (HEAD_TOP_X - 0.012, SIDE_CENTER[1] + 0.024),
@@ -174,9 +176,13 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
+    set_reference_dimensions(adapter, annotations, ("ShoulderDia", "HeadDia"))
     # The tip chamfer is defined by its callout (to the thread root): its size
-    # is reference.
-    set_reference_dimensions(adapter, annotations, ("ShoulderDia", "HeadDia", "TipChamfer"))
+    # is reference, and it is not a diameter.
+    chamfers = [a for a in annotations if dimension_name(adapter, a) == "TipChamfer"]
+    if len(chamfers) != 1:
+        raise RuntimeError(f"expected one TipChamfer dimension, found {len(chamfers)}")
+    set_reference_dimension(adapter, chamfers[0], label="pivot-screw TipChamfer")
     set_dimension_callouts(
         adapter,
         annotations,
