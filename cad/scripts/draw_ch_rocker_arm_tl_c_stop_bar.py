@@ -62,8 +62,8 @@ RIGHT_KEEP = {"BarWidth": (0.230, 0.135)}
 # Below the hole-height arrows and left of the side view's 12.7 extensions.
 CALLOUT_XY = (0.183, 0.138)
 # Functional acceptance sits on the dimension it governs, not in the notes.
-CALLOUTS_ABOVE = {"BarHeight": "DATUM C STOP HEIGHT FOR"}
-CALLOUTS_BELOW = {"BarHeight": "MHA-CH-006 POSITION CHECK", "HoleY": "2X"}
+CALLOUTS_ABOVE = {"BarHeight": "DATUM C STOP HEIGHT FOR", "HoleY": "2X"}
+CALLOUTS_BELOW = {"BarHeight": "MHA-CH-006 POSITION CHECK"}
 
 
 def _counterbore_edge(adapter: Any, view: Any) -> Any:
