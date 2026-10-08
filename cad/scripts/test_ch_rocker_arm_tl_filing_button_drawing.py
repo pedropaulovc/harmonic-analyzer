@@ -73,6 +73,22 @@ def test_every_exported_band_is_a_requirement(stem: str) -> None:
                 assert key in feature["requirements"], (name, key)
 
 
+@pytest.mark.parametrize("stem", [BUTTON, STUD])
+def test_every_exported_nominal_lies_inside_its_band(stem: str) -> None:
+    """prechips rejects a nominal outside its requirement band; references
+    under a fit callout export a nominal with no band."""
+    for name, feature in _features(stem).items():
+        for key, nominal in feature.items():
+            if not key.endswith("_nominal"):
+                continue
+            band = feature.get(key.removesuffix("_nominal"))
+            if band is None:
+                assert "note" in feature["requirements"], (name, key)
+                continue
+            low, high = band
+            assert low <= nominal <= high, (name, key)
+
+
 # Each printed toleranced dimension -> the exported feature and requirement
 # that owns its band. Reference sizes governed by a matched-fit callout and
 # the thread designation own no band.
@@ -116,6 +132,13 @@ def test_every_printed_band_has_a_requirement_owner(stem: str) -> None:
         # the printed ones.
         assert round(nominal, places) == nominal, printed
         assert feature[key] == limits(nominal, places), printed
+    # Each printed roughness symbol is a listed finish requirement on the
+    # exported feature of the same name.
+    assert spec.SURFACE_FINISHES
+    for control in spec.SURFACE_FINISHES:
+        owner = features[control.key]
+        assert "finish_ra" in owner["requirements"], control.key
+        assert owner["finish_ra"] == control.roughness_um, control.key
 
 
 def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
@@ -152,5 +175,6 @@ def test_number_is_the_parent_number_plus_a_tool_suffix(dashed: str) -> None:
 @pytest.mark.parametrize("notes", [button.DRAWING_NOTES, stud.DRAWING_NOTES])
 def test_notes_follow_the_simplicity_policy(notes: str) -> None:
     assert 1 <= len(notes.splitlines()) <= 4
-    assert not re.search(r"\d", notes)
+    # The only figure a note may carry is a named exception's stated shortfall.
+    assert not re.search(r"\d", notes.replace(button.RIM_WALL_NOTE, ""))
     assert "GROUND" not in notes and "GRIND" not in notes

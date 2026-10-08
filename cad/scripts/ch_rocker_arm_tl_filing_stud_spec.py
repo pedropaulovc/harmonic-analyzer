@@ -5,7 +5,7 @@ rocker arm's hub filing hold (prechips S3F) the bench vise grips the stud's
 tail; the lapped body locates in the arm's reamed pivot bore (datum A) and
 carries the two filing buttons (MHA-CH-006-TL-04). The lower button seats on
 the integral head, the arm's hub sits between the buttons, and a bought
-1/4-20 nut on the thread clamps the stack. Turned in one chucking from 4140 at
+1/4-20 coupling nut (McMaster 90264A435) on the thread clamps the stack. Turned in one chucking from 4140 at
 HRC 32 and left unhardened (shop-additions section 1): nothing files on it.
 
 Frame: the stud axis is model +X with the head's seat face at X0, the body
@@ -57,7 +57,7 @@ if not (
 STATION_PLACES = 2  # thread start and head seat: the stack reads from them
 STOCK_PLACES = 1  # head back face and vise end: stock only
 BODY_LENGTH = 12.8  # model: seat face to the thread start (derived on print)
-THREAD_END = 25.3  # seat face to the faced tip; printed tip to seat
+THREAD_END = 29.0  # seat face to the faced tip; printed tip to seat
 THREAD_START = THREAD_END - BODY_LENGTH  # printed: tip to the thread start
 TAIL_END = 45.0  # seat face to the vise end: head plus a forty-two vise tail
 HEAD_BACK = THREAD_END + HEAD_LENGTH  # printed: tip to the head's back face
@@ -79,17 +79,39 @@ if _BODY_LEN_MAX >= _STACK_MIN:
     raise AssertionError("filing-stud body can stand proud of the button stack")
 if _BODY_LEN_MIN <= _HUB_TOP_MAX:
     raise AssertionError("filing-stud body does not reach through the hub")
-NUT_THICKNESS = 5.56  # bought 1/4-20 hex nut, 7/32 in
-if _SEAT_MIN - _STACK_MAX < NUT_THICKNESS:
-    raise AssertionError("filing-stud thread is too short for the nut")
-# Full thread of one and a half diameters past the die's lead (one and a
-# half pitches) at the shortest printed thread, and a worst-case collar of
-# two millimetres between the seat and back-face stations.
+# Bought clamping nut: McMaster 90264A435, zinc-plated steel hex coupling
+# nut, 1/4"-20, 7/8 in long, 3/8 in across flats, fully threaded (verified
+# live 2026-10-08). Its chamfers are not stated; each end is taken as one
+# pitch of incomplete thread. Rule 12: at the worst case of the printed
+# stack and stations the INSTALLED full-thread engagement in the nut is at
+# least one and a half diameters. Engagement starts above the stack top
+# past the nut's entry chamfer, or past the die's runout (one and a half
+# pitches beyond the thread start), whichever is higher; it ends one pitch
+# short of the faced tip (the tip chamfer) or at the nut's far chamfer.
+NUT_SKU = "90264A435"
+NUT_LENGTH = 7.0 / 8.0 * 25.4
 _THREAD_PITCH = 25.4 / 20.0
-if _START_MIN - 1.5 * _THREAD_PITCH < 1.5 * THREAD_MODEL_DIA:
-    raise AssertionError(
-        "filing-stud thread lacks one and a half diameters of full thread"
-    )
+_NUT_CHAMFER = _THREAD_PITCH
+_DIE_RUNOUT = 1.5 * _THREAD_PITCH
+_TIP_CHAMFER = _THREAD_PITCH
+
+
+def installed_engagement(stack: float, seat_to_tip: float, body: float) -> float:
+    """Full-thread engagement in the coupling nut seated on the stack top."""
+    start = max(stack + _NUT_CHAMFER, body + _DIE_RUNOUT)
+    end = min(seat_to_tip - _TIP_CHAMFER, stack + NUT_LENGTH - _NUT_CHAMFER)
+    return end - start
+
+
+ENGAGEMENT_MIN = min(
+    installed_engagement(stack, seat_to_tip, body)
+    for stack in (_STACK_MIN, _STACK_MAX)
+    for seat_to_tip in (_SEAT_MIN, _SEAT_MAX)
+    for body in (_BODY_LEN_MIN, _BODY_LEN_MAX)
+)
+if ENGAGEMENT_MIN < 1.5 * THREAD_MODEL_DIA:
+    raise AssertionError("filing-stud nut engagement is under one and a half diameters")
+# A worst-case collar of two millimetres between the seat and back face.
 if limits(HEAD_BACK, STOCK_PLACES)[0] - _SEAT_MAX < 2.0:
     raise AssertionError(
         "filing-stud collar is thinner than two millimetres at worst case"
@@ -169,7 +191,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "locating_body": ExportFeature(
         kind="boss",
         faces=(CylinderFace(BODY_DIA),),
-        requirements=("note",),
+        requirements=("note", "finish_ra"),
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
@@ -182,7 +204,9 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"),
                 ),
             ),
+            "finish_ra": (MACHINED_UM, ("SURFACE_FINISHES",)),
         },
+        precision={"finish_ra": 1},
     ),
     "button_seat": ExportFeature(
         kind="face",
