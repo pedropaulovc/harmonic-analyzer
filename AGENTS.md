@@ -276,8 +276,9 @@ such build:
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
-`package:features` builds only `ch_rocker_arm`, `ch_pivot_shaft` and
-`dt_cone_pivot_post` and writes
+`package:features` builds only `ch_rocker_arm`, `ch_pivot_shaft`,
+`dt_cone_pivot_post` and the shop fixtures in `export_features.SPEC_DRIVEN_PARTS`
+(`SUPPORTED_PARTS` is the whole list) and writes
 `cad/out/features/<stem>/{<dashed-stem>.STEP,features.toml}`. The manifest's
 `step_sha256` binds the raw adjacent STEP; this self-contained bundle is the
 consumer artefact. Full `export` is independent; neither producer overwrites

@@ -2,7 +2,7 @@
 """Fit genuinely observed source pixels to CAD landmarks; never use check pixels to fit.
 
 Requires numpy, scipy, opencv-python-headless (source-fit-requirements.txt).
-Example: python web/scripts/fit-source.py web/content/canonical-native/XPQwKRt4Y2k.observations.json
+Example: python web/scripts/fit-source.py web/content/canonical-native/XPQwKRt4Y2k.observations.json.gz
   --inventory /tmp/harmonic-web-model/model-inventory.json --output /tmp/spin-fitted.json
 The inventory supplies named part-local-to-world matrices. Output is numeric data only.
 Exit 0 means measured CPU candidates pass, NOT GPU/source acceptance or video coverage.
@@ -14,6 +14,7 @@ Image-plane homographies are unsupported here and fail closed without adapting o
 
 import argparse
 import copy
+import importlib.util
 import json
 import math
 from pathlib import Path
@@ -22,6 +23,10 @@ import cv2
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
+
+SPEC = importlib.util.spec_from_file_location("compact_source_common", Path(__file__).with_name("compact-source-common.py"))
+common = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(common)
 
 
 def finite_vector(value, size, label):
@@ -1651,7 +1656,7 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
-    observations = json.loads(args.observations.read_text())
+    observations = common.read_observations(args.observations)
     if observations.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
         parser.error("--observations must select a materialized canonical-native derivative, not archived original evidence")
     fitted, report = run(
@@ -1659,7 +1664,7 @@ def main():
         json.loads(args.inventory.read_text()),
     )
     if args.output:
-        args.output.write_text(json.dumps(fitted, indent=2) + "\n")
+        common.write_observations(args.output, fitted)
     summary = {
         key: value
         for key, value in report.items()

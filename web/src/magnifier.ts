@@ -55,11 +55,11 @@ const REST_AZIMUTH = Math.atan2(REST_HOOK_Y - CY, REST_HOOK_X - CX)
 const REST_LENGTH = Math.sqrt(REST_D2 - HUB_RADIUS ** 2 + (REST_HOOK_Z - CONTACT_Z) ** 2)
 const REST_PEN_WIRE_Y = M.penWireBottomMm[1] / 1000
 
-// build_pen_assembly.MARKER_POS: the nib is the marker part's local origin.
-// Checked against released GLB world translation, maximum delta 0.000013 mm.
-const PEN_X = -0.01035
-const PEN_Y = 0.36325
-const PEN_Z = -0.14365
+// The marker's local origin is the nib, not the rod's wire anchor. The exporter
+// checks this raw world datum against the exact released pen-assembly recipe.
+const PEN_X = M.penRestMm[0] / 1000
+const PEN_Y = M.penRestMm[1] / 1000
+const PEN_Z = M.penRestMm[2] / 1000
 
 export interface MagnifierInput {
   /** Actual moving hook, not the clamp centre or a normalized Fourier sum. */

@@ -135,7 +135,7 @@ def fit_candidate(frame, points, initial, fit_source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--observations", default="web/content/canonical-native/NAsM30MAHLg.observations.json"
+        "--observations", default="web/content/canonical-native/NAsM30MAHLg.observations.json.gz"
     )
     parser.add_argument(
         "--evidence", default="/tmp/harmonic-web-reference/evidence/NAsM30MAHLg"
@@ -151,7 +151,7 @@ def main():
     spec = importlib.util.spec_from_file_location("intro_fit_source", fit_path)
     fit_source = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fit_source)
-    obs = json.loads(Path(args.observations).read_text())
+    obs = fit_source.common.read_observations(args.observations)
     if obs.get("identityDerivative", {}).get("kind") != "materialized-canonical-native-identity-derivative":
         parser.error("--observations must select a materialized canonical-native derivative, not archived original evidence")
     candidate = json.loads((evidence / "codex-fixed-fit-result.json").read_text())
@@ -268,17 +268,14 @@ def main():
         "gpuAcceptedViewSamples": 0,
         "fullMechanismInputsAssigned": 0,
     }
-    Path(args.output).write_text(
-        json.dumps(
-            {
-                "anchors": anchors,
-                "frames": output,
-                "missing": missing,
-                "summary": summary,
-            },
-            indent=2,
-        )
-        + "\n"
+    fit_source.common.write_observations(
+        Path(args.output),
+        {
+            "anchors": anchors,
+            "frames": output,
+            "missing": missing,
+            "summary": summary,
+        },
     )
     print(json.dumps(summary))
 
