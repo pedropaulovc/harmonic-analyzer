@@ -186,7 +186,7 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
   the post mounting screw becomes a 4 in 1/4-20 (MSC 40923906) cut to 94.9 mm.
 - Paper drive: the reducer keeps its 12:120 counts, which fit the photographed
   1898 disc best, but is cut at 48DP with the cone cutters. The disc shrinks from
-  OD 81.55 mm to about 64.6 mm, about 21% smaller. The change is deliberate: one
+  OD 81.55 mm to just under 64.6 mm, about 21% smaller. The change is deliberate: one
   48DP cutter set then serves the cones, the cylinder gears and the reducer. The
   32DP feed pinion and the purchased 32DP rack shorten the paper advance from
   1.596 to 1.496 mm per crank turn (−6.25%). The chain is 68 links

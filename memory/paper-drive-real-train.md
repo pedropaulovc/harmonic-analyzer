@@ -14,7 +14,7 @@ The paper-drive was rebuilt against the primary references
 ([[paper-drive-rework]] is the evidence dossier). Durable facts:
 
 - **Topology (final; inch standard since 2026-10):** crank T12 —chain→ knob T24
-  —lock→ 12T 48DP third gear —gear 12:120→ 120T 48DP reducer disc (OD ~64.6, cut with the cone cutter set) —lock→ 12T
+  —lock→ 12T 48DP third gear —gear 12:120→ 120T 48DP reducer disc (OD just under 64.6, cut with the cone cutter set) —lock→ 12T
   32DP feed pinion —rack-pinion π·9.525/rev→ teeth-down purchased 32DP rack (SDP/SI A1B12-Y324) —lock→ platen,
   all PA20. Net 1.496 mm/crank-rev (T12/T24 mounted); the 2026-07 DP38/DP30
   PA14.5 train gave 1.596. The disc NEVER meshes the rack (the old
