@@ -272,7 +272,7 @@ def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
     return ExportFeature(
         kind="hole",
         faces=(CylinderFace(SEAT_DIA, contains_x_mm=sum(x_span) / 2.0),),
-        requirements=("dia", "height", "process"),
+        requirements=("dia", "height", "station", "process"),
         fields={
             "at": ([x_span[0], SEAT_CENTRE_Y, SEAT_Z], (name, "SEAT_CENTRE_Y", "SEAT_Z")),
             "axis": _X_AXIS,
@@ -289,10 +289,14 @@ def _seat(x_span: tuple[float, float], name: str) -> ExportFeature:
                 ("SEAT_BOTTOM_Y", (_POST, "BLOCK_DIA")),
             ),
             "height_nominal": (SEAT_BOTTOM_Y, ("SEAT_BOTTOM_Y",)),
+            # The one printed SeatZ: the common seat axis across the base,
+            # from the base side face (model Z0).
+            "station": (limits(SEAT_Z, 1), ("SEAT_Z",)),
+            "station_nominal": (SEAT_Z, ("SEAT_Z",)),
             "thru": (True, (name,)),
             "process": ("bore", ("DRAWING_NOTES",)),
         },
-        precision={"dia": SEAT_PLACES, "height": 1},
+        precision={"dia": SEAT_PLACES, "height": 1, "station": 1},
     )
 
 
@@ -384,6 +388,25 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "pad_x1": _x_face(PAD_X1, 1.0, "PAD_X1", 1),
     "pad_z0": _z_face(PAD_Z0, -1.0, "PAD_Z0"),
     "pad_z1": _z_face(PAD_Z1, 1.0, "PAD_Z1"),
+    # The saddles' relief sides (both saddles share each plane).
+    "saddle_z0": _z_face(SADDLE_Z[0], -1.0, "SADDLE_Z"),
+    "saddle_z1": _z_face(SADDLE_Z[1], 1.0, "SADDLE_Z"),
+    # The base's far end and far side carry the printed overall sizes.
+    "base_far_end": _x_face(BASE_LENGTH, 1.0, "BASE_LENGTH", 1),
+    "base_far_side": _z_face(BASE_WIDTH, 1.0, "BASE_WIDTH"),
+    "base_top": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 1.0, 0.0), BASE_HT),),
+        requirements=("height",),
+        fields={
+            "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
+            "plane": ({"frame": "model", "axis": "y", "value": BASE_HT}, ("BASE_HT",)),
+            "height": (limits(BASE_HT, 1), ("BASE_HT",)),
+            "height_nominal": (BASE_HT, ("BASE_HT",)),
+            "height_from": ("underside", ("__frame__",)),
+        },
+        precision={"height": 1},
+    ),
     "underside": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, -1.0, 0.0), 0.0),),
