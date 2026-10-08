@@ -270,7 +270,10 @@ pitch, so this was already true of the old train.
 
 Each gear is modelled as exactly the gap its stock cutter makes: the tooth of the lowest count in
 the cutter's range, with each cone's blank diameter and plunge solved against the stock-form
-120T drum ([`gear-standard.md`](./gear-standard.md#cutter-native-teeth)). The drawn tooth is
+120T drum ([`gear-standard.md`](./gear-standard.md#cutter-native-teeth)). The solver,
+`cad/scripts/diagnostics/solve_stock_form_cones.py`, searches the printable OD and thickness
+steps using the actual stock-form geometry and the retained tolerance grades; only a family it
+qualifies is released for manufacture. The drawn tooth is
 therefore the tooth the cutter produces, and there is no cutter-to-profile error to screen. The
 meshes are not conjugate; the model reports their stock-form coverage (not a contact ratio) and
 checks backlash and transmission error separately. Cut and roll one gear per cutter before
