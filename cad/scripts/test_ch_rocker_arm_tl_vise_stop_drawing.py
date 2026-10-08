@@ -94,6 +94,13 @@ def test_screw_hole_exports_as_drilled_clearance_with_the_grip_band() -> None:
     assert abs(spec.SEAT_X - grip["plane"]["value"] - grip["length_nominal"]) < 1e-9
 
 
+def test_installed_nose_pin_keeps_the_block_one_piece() -> None:
+    """The bought nose pin is stated as installed, but the arm and finger
+    are one block: the export must not permit a built-up part."""
+    assert spec.NOSE_INSTALLED_NOTE in spec.DRAWING_NOTES
+    assert export_features.requirement_manifest("ch_rocker_arm_tl_vise_stop")["construction"] == "one_piece"
+
+
 def test_magnetic_base_sits_behind_the_rear_jaw_below_its_top() -> None:
     """The base's envelope clears the rear jaw's gripping plane (the blank,
     risers and parallels lie in front of it), stays under the jaw top and
