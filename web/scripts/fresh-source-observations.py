@@ -29,6 +29,7 @@ EXECUTED_INPUTS = (
     "web/scripts/fresh-source-observations.schema.json", "web/scripts/source-observations.schema.json",
     "web/source-visibility.mjs",
     "web/native-line-checks.mjs",
+    "web/scripts/executed-point-motion.mjs",
     "web/scripts/verify-reference.mjs", "web/scripts/fetch-model.mjs",
     "web/scripts/native-identity-map.mjs", "web/scripts/released-models.json",
     "web/scripts/canonical-native-evidence.py",

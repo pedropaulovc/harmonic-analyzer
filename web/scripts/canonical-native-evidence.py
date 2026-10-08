@@ -44,6 +44,7 @@ FRESH_CONSUMER_INPUTS = (
     'web/scripts/source-observations.schema.json',
     'web/source-visibility.mjs',
     'web/native-line-checks.mjs',
+    'web/scripts/executed-point-motion.mjs',
     'web/scripts/native-identity-map.mjs',
     'web/src/native-primitive-snapshot.ts',
     'web/src/source-assembly.ts',
