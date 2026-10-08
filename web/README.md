@@ -699,10 +699,64 @@ is available for automation. External-media restrictions are failures, not skips
 
 ## Deployment
 
-`npm --prefix web run build` produces static files under `web/dist/`. The default
-base path is `/harmonic-analyzer/`; set `SIMULATOR_BASE` consistently for both the
-build and verifier when deploying elsewhere. Deployment publishes the optimized
-representation, not the 222,903,724-byte raw export or its private cache.
+Cloudflare Workers Builds uses native Git integration (not a GitHub deployment
+token or OIDC). Both Workers use repository root **`web`**, install with
+`npm ci`, and build with **`npm run build:deploy`**. Wrangler is pinned to
+**4.148.0** in the lockfile. The build produces **`web/dist/`** at base path `/`,
+including `/deployment.json` with the exact `WORKERS_CI_COMMIT_SHA` and
+`WORKERS_CI_BRANCH`. Local builds fall back to the current Git commit/branch;
+detached checkouts must supply both native-build variables.
+
+| Deployment | Account ID | Worker | Native deploy command |
+|---|---|---|---|
+| Production (`main` only) | `6b2522c874d4613dc2bf47bd2ce521a2` | `harmonic-analyzer-com-prod` | `npm run deploy` |
+| PPE (branch previews, all PR base branches) | `c8769c20b85cd2857afe22ef2f9a0a21` | `ppe-harmonic-analyzer-com` | `npm run deploy:preview` |
+
+PPE uses `wrangler preview --config wrangler.ppe.jsonc --name "$WORKERS_CI_BRANCH"`
+for both its default branch and non-production branch build command. It never
+publishes the PPE production Worker with `wrangler deploy`. Production
+non-production branch builds must be **disabled in the dashboard**. The native
+Git build watch paths should include `web/**`; GitHub environment reporting and
+PPE preview cleanup do not perform deployments. The sole GitHub cleanup token
+belongs to the PPE environment/account, never the production account.
+
+The Wrangler files explicitly pin account and Worker identity. They contain
+only the static asset binding and a tiny model streaming Worker: no storage,
+secrets, unrelated bindings, routes, custom domains or scheduled triggers.
+`keep_vars` preserves dashboard variables; routing remains dashboard-managed.
+
+The approved v39 optimized model is **41,072,516 bytes**, exceeding the
+[25 MiB per-file Workers Assets limit](https://developers.cloudflare.com/workers/platform/limits/#static-assets)
+on both Free and Paid plans. `build:deploy` therefore downloads the immutable
+[SHA-named v39 optimized release asset](https://github.com/pedropaulovc/harmonic-analyzer/releases/download/v39/ha-harmonic-analyzer-941b6193698091781f133642bdc2a7411a18c2cfcb5252646a79b9bd57c6a805.glb),
+checks its SHA-256 and exact length against `content/model-representation.json`,
+and retains it only under ignored `.vite/deployment-model/`. Missing or wrong
+bytes fail the build. It neither imports a different CAD model nor regenerates
+tracked provenance/native metadata.
+
+The exact same-origin `/models/ha-harmonic-analyzer.glb` GET/HEAD route streams
+that approved public release asset through `worker.mjs`; other paths use Workers
+Assets. Upstream non-200 or wrong-length responses return 502, not an HTML
+fallback. The Worker does not buffer the GLB; the browser still checks its
+compiled SHA-256 and length before parsing. No R2 storage or loader changes are
+required. A locally imported GLB is removed only from `dist/` because this exact
+route supplies it; every other asset is checked against the 25 MiB limit.
+Original reference footage is local opt-in verification data, not published:
+deployment builds reject a `public/reference-media/` directory.
+
+From a clean clone, the equivalent commands are:
+
+```sh
+npm --prefix web ci
+npm --prefix web run build:deploy
+# Authenticated local use only; native Builds supplies Cloudflare credentials.
+npm --prefix web run deploy          # main -> production
+npm --prefix web run deploy:preview  # actual branch -> PPE preview
+```
+
+Plain `npm --prefix web run build` remains the local static Vite build with
+default base `/harmonic-analyzer/`; it is not the native deployment build.
+Deployment never publishes the raw CAD export or private source cache.
 Exact geometry sharing reduces duplicate buffers; Meshopt reduces transfer
 bytes, not the instance-expanded triangle count. No frame-rate improvement is
 established. Fidelity verification still uses all twenty channels and the full

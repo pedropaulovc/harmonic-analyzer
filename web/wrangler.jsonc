@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "harmonic-analyzer-com-prod",
+  "account_id": "6b2522c874d4613dc2bf47bd2ce521a2",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-08",
+  "keep_vars": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/models/ha-harmonic-analyzer.glb"]
+  }
+}
