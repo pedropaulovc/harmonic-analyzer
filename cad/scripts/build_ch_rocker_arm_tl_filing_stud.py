@@ -166,6 +166,12 @@ async def build(adapter) -> dict[str, str]:
     rows = (
         ("head seat", 0.0, "SeatStation", '"ThreadEnd"'),
         (
+            "thread start",
+            BODY_LENGTH,
+            "ThreadStartStation",
+            '"ThreadEnd" - "BodyLength"',
+        ),
+        (
             "head back face",
             -HEAD_LENGTH,
             "HeadBackStation",

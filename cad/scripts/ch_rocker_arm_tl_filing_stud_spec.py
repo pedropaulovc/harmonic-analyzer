@@ -10,8 +10,7 @@ HRC 32 and left unhardened (shop-additions section 1): nothing files on it.
 
 Frame: the stud axis is model +X with the head's seat face at X0, the body
 and thread toward +X and the head and vise tail toward -X. Every axial size
-station prints as one baseline from the faced tip (model X = THREAD_END);
-the body length prints direct from the seat (the stack window). In the inventory fixture frame (stud axis Z, upper
+prints as one baseline from the faced tip (model X = THREAD_END). In the inventory fixture frame (stud axis Z, upper
 hub face Z0) the seat sits at Z = -(HUB_LENGTH + button thickness), so
 inventory Z = model X - (HUB_LENGTH + button thickness).
 """
@@ -47,18 +46,19 @@ if not (
 ):
     raise AssertionError("filing-stud head does not land on the button face")
 
-# Axial stations print as one baseline from the faced tip (the thread end):
-# the head seat, the head's back face and the vise end. The model keeps the
-# seat at X0 (the stack datum). The body carries the lower button and the
-# whole hub at every printed button thickness and hub length, and stops short
-# of the stack top so the nut bears on the upper button (which then centres
-# on the thread crests: its float is far inside the hub's printed O.D. band).
-# That window is narrower than a length derived from two tip stations at the
-# general grade, so the body length prints as its one direct dimension from
-# the seat.
-AXIAL_PLACES = 1
-BODY_LENGTH = 12.8  # printed: seat face to the thread start
+# Axial sizes print as one baseline from the faced tip (the thread end): the
+# thread start, the head seat, the head's back face and the vise end. The
+# model keeps the seat at X0 (the stack datum). The body carries the lower
+# button and the whole hub at every printed button thickness and hub length,
+# and stops short of the stack top so the nut bears on the upper button
+# (which then centres on the thread crests: its float is far inside the
+# hub's printed O.D. band). The stack-bearing stations print to two places;
+# the body length is their difference, checked at worst case below.
+STATION_PLACES = 2  # thread start and head seat: the stack reads from them
+STOCK_PLACES = 1  # head back face and vise end: stock only
+BODY_LENGTH = 12.8  # model: seat face to the thread start (derived on print)
 THREAD_END = 24.0  # seat face to the faced tip; printed tip to seat
+THREAD_START = THREAD_END - BODY_LENGTH  # printed: tip to the thread start
 TAIL_END = 45.0  # seat face to the vise end: head plus a forty-two vise tail
 HEAD_BACK = THREAD_END + HEAD_LENGTH  # printed: tip to the head's back face
 OVERALL_LENGTH = TAIL_END + THREAD_END  # printed: tip to the vise end
@@ -72,8 +72,9 @@ _BUTTON_MIN, _BUTTON_MAX = limits(button.THICKNESS, button.THICKNESS_PLACES)
 _STACK_MIN = 2.0 * _BUTTON_MIN + rocker.HUB_LENGTH
 _STACK_MAX = 2.0 * _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
 _HUB_TOP_MAX = _BUTTON_MAX + rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
-_SEAT_MIN = limits(THREAD_END, AXIAL_PLACES)[0]
-_BODY_LEN_MIN, _BODY_LEN_MAX = limits(BODY_LENGTH, AXIAL_PLACES)
+_SEAT_MIN, _SEAT_MAX = limits(THREAD_END, STATION_PLACES)
+_START_MIN, _START_MAX = limits(THREAD_START, STATION_PLACES)
+_BODY_LEN_MIN, _BODY_LEN_MAX = _SEAT_MIN - _START_MAX, _SEAT_MAX - _START_MIN
 if _BODY_LEN_MAX >= _STACK_MIN:
     raise AssertionError("filing-stud body can stand proud of the button stack")
 if _BODY_LEN_MIN <= _HUB_TOP_MAX:
@@ -83,15 +84,15 @@ if _SEAT_MIN - _STACK_MAX < NUT_THICKNESS:
     raise AssertionError("filing-stud thread is too short for the nut")
 
 _STATIONS = {
-    "SeatStation": AXIAL_PLACES,
-    "HeadBackStation": AXIAL_PLACES,
-    "TailEndStation": AXIAL_PLACES,
+    "ThreadStartStation": STATION_PLACES,
+    "SeatStation": STATION_PLACES,
+    "HeadBackStation": STOCK_PLACES,
+    "TailEndStation": STOCK_PLACES,
 }
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia"},
     "TailProfile": {"TailDia"},
     "BodyProfile": {"BodyDia"},
-    "Body": {"BodyLength"},
     "ThreadProfile": {"ThreadDia"},
     "StationReference": set(_STATIONS),
 }
@@ -99,7 +100,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {"HeadDia": 1},
     "TailProfile": {"TailDia": 1},
     "BodyProfile": {"BodyDia": BODY_PLACES},
-    "Body": {"BodyLength": AXIAL_PLACES},
     "ThreadProfile": {"ThreadDia": 2},
     "StationReference": dict(_STATIONS),
 }
@@ -130,7 +130,12 @@ DIMENSION_TEXT = {"ThreadDia": THREAD}
 SURFACE_FINISHES = (
     SurfaceFinishControl("locating_body", MACHINED_UM, CylinderFace(BODY_DIA)),
 )
-DRAWING_NOTES = "VISE TAIL IS HELD ONLY. DO NOT HARDEN."
+# The two-place tip stations are functional: the journal between them must
+# carry the whole hub yet stop below the stack top so the nut clamps.
+DRAWING_NOTES = (
+    "SEAT AND THREAD START HOLD THE BUTTON STACK: NUT MUST CLAMP THE UPPER BUTTON.\n"
+    "VISE TAIL IS HELD ONLY. DO NOT HARDEN."
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 
 _AXIS = ([1.0, 0.0, 0.0], ("__frame__",))
@@ -152,7 +157,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "locating_body": ExportFeature(
         kind="boss",
         faces=(CylinderFace(BODY_DIA),),
-        requirements=("note", "length"),
+        requirements=("note", "station"),
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
@@ -165,12 +170,14 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"),
                 ),
             ),
-            "length": (
-                limits(BODY_LENGTH, AXIAL_PLACES),
-                ("BODY_LENGTH", ("ch_rocker_arm_spec", "HUB_LENGTH")),
+            # The journal runs from the printed thread start to the seat.
+            "station": (
+                limits(THREAD_START, STATION_PLACES),
+                ("THREAD_START", ("ch_rocker_arm_spec", "HUB_LENGTH")),
             ),
+            "height_from": _FROM_TIP,
         },
-        precision={"length": AXIAL_PLACES},
+        precision={"station": STATION_PLACES},
     ),
     "button_seat": ExportFeature(
         kind="face",
@@ -180,10 +187,10 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
             "dia": (limits(HEAD_DIA, 1), ("HEAD_DIA",)),
-            "station": (limits(THREAD_END, AXIAL_PLACES), ("THREAD_END",)),
+            "station": (limits(THREAD_END, STATION_PLACES), ("THREAD_END",)),
             "height_from": _FROM_TIP,
         },
-        precision={"dia": 1, "station": AXIAL_PLACES},
+        precision={"dia": 1, "station": STATION_PLACES},
     ),
     "thread": ExportFeature(
         kind="boss",
@@ -192,7 +199,9 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         fields={
             "axis": _AXIS,
             "thread": (THREAD, ("THREAD",)),
+            "length": (limits(THREAD_START, STATION_PLACES), ("THREAD_START",)),
         },
+        precision={"length": STATION_PLACES},
     ),
     "vise_tail": ExportFeature(
         kind="boss",
@@ -201,9 +210,9 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         fields={
             "axis": _AXIS,
             "dia": (limits(TAIL_DIA, 1), ("TAIL_DIA",)),
-            "station": (limits(OVERALL_LENGTH, AXIAL_PLACES), ("OVERALL_LENGTH",)),
+            "station": (limits(OVERALL_LENGTH, STOCK_PLACES), ("OVERALL_LENGTH",)),
             "height_from": _FROM_TIP,
         },
-        precision={"dia": 1, "station": AXIAL_PLACES},
+        precision={"dia": 1, "station": STOCK_PLACES},
     ),
 }
