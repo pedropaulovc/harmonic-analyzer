@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Import an immutable raw CAD GLB, prove exact decoded equivalence, and publish
- * only its deduplicated Meshopt representation. Native evidence identifies the
- * raw source, not these transport bytes.
+ * Import immutable raw CAD bytes, project authoritative native identities, prove
+ * exact canonical decoded equivalence, and publish a deduplicated Meshopt GLB.
+ * Native source provenance always identifies the original raw release bytes.
  *
  * npm run fetch-model -- /path/to/raw.glb
  * npm run fetch-model -- /path/to/new.glb --source-commit <40hex> --source-sha256 <approved64hex>
@@ -13,14 +13,20 @@ import { execFileSync } from 'node:child_process'
 import { copyFile, link, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { assertNativeSourceAssociation, validateModelRepresentation, REPRESENTATION_KIND, REPRESENTATION_PATH } from '../model-representation.mjs'
+import { assertNativeSourceAssociation, validateModelRepresentation, REPRESENTATION_KIND, REPRESENTATION_PATH, PIPELINE_VERSION, PIPELINE_STEPS } from '../model-representation.mjs'
+import { projectNativeIdentity, validateNativeIdentityProjection } from './native-identity-map.mjs'
 
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SHA256 = /^[0-9a-f]{64}$/
 const COMMIT = /^[0-9a-f]{40}$/
-const PINNED_RELEASE = {
-  sourceCommit: '1268c23d4a8fc741147c5e09d8d1e45247a71945',
-  modelSha256: '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d',
+const RELEASE_PAIRS = JSON.parse(await readFile(new URL('./released-models.json', import.meta.url), 'utf8'))
+if (!Array.isArray(RELEASE_PAIRS) || RELEASE_PAIRS.length === 0 ||
+    RELEASE_PAIRS.some(release => !release || Object.keys(release).sort().join(',') !== 'modelSha256,sourceCommit' ||
+      typeof release.sourceCommit !== 'string' || !COMMIT.test(release.sourceCommit) ||
+      typeof release.modelSha256 !== 'string' || !SHA256.test(release.modelSha256)) ||
+    new Set(RELEASE_PAIRS.map(release => release.sourceCommit)).size !== RELEASE_PAIRS.length ||
+    new Set(RELEASE_PAIRS.map(release => release.modelSha256)).size !== RELEASE_PAIRS.length) {
+  throw new Error('Invalid released-models.json; expected unique exact commit/raw SHA256 pairs')
 }
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const HELP = `Usage: npm run fetch-model -- [raw.glb] [--source-commit <40hex> --source-sha256 <approved64hex>]
@@ -68,8 +74,13 @@ export function authorizeSourceImport(native, actualSha256, { sourceCommit = nul
   if (sourceCommit !== null && !COMMIT.test(sourceCommit)) throw new Error('Invalid --source-commit; expected 40 lowercase hexadecimal characters')
   if (sourceSha256 !== null && !SHA256.test(sourceSha256)) throw new Error('Invalid --source-sha256; expected 64 lowercase hexadecimal characters')
   const commit = sourceCommit ?? native.sourceCommit
-  if (commit === PINNED_RELEASE.sourceCommit && (actualSha256 !== PINNED_RELEASE.modelSha256 || sourceSha256 !== null && sourceSha256 !== PINNED_RELEASE.modelSha256)) {
-    throw new Error(`Released native commit ${commit} remains pinned to raw SHA256 ${PINNED_RELEASE.modelSha256}; --source-commit cannot authorize different bytes for that release`)
+  const pinned = RELEASE_PAIRS.find(release => release.sourceCommit === commit)
+  if (pinned && (actualSha256 !== pinned.modelSha256 || sourceSha256 !== null && sourceSha256 !== pinned.modelSha256)) {
+    throw new Error(`Released native commit ${commit} remains pinned to raw SHA256 ${pinned.modelSha256}; --source-commit cannot authorize different bytes for that release`)
+  }
+  const releasedRaw = RELEASE_PAIRS.find(release => release.modelSha256 === actualSha256)
+  if (releasedRaw && releasedRaw.sourceCommit !== commit) {
+    throw new Error(`Raw model SHA256 ${actualSha256} requires its exact source commit ${releasedRaw.sourceCommit}; --source-commit cannot relabel released bytes`)
   }
   if (commit === native.sourceCommit) {
     if (actualSha256 !== native.modelSha256 || sourceSha256 !== null && sourceSha256 !== native.modelSha256) {
@@ -171,22 +182,33 @@ export async function importModel({ webRoot = WEB, sourcePath = null, sourceComm
   let retainRecovery = false
   try {
     const { optimizeModel, validateDecodedEquivalence } = await import('./optimize-model.mjs')
-    const { optimizedBytes, report } = await optimizeModel(sourceBytes)
+    const projection = await projectNativeIdentity(sourceBytes)
+    const projectionProof = await validateNativeIdentityProjection(sourceBytes, projection.canonicalBytes)
+    if (!projectionProof.passed || JSON.stringify(projectionProof.identity) !== JSON.stringify(projection.identity)) {
+      throw new Error('Native identity projection does not agree with independently checked raw/canonical bytes')
+    }
+    const { optimizedBytes, report } = await optimizeModel(projection.canonicalBytes)
     const optimizedDigest = digest(optimizedBytes)
-    const equivalence = await validateDecodedEquivalence(sourceBytes, optimizedBytes)
-    if (report.sourceSha256 !== sourceDigest || report.optimizedSha256 !== optimizedDigest
-      || report.sourceBytes !== sourceBytes.byteLength || report.optimizedBytes !== optimizedBytes.byteLength
-      || equivalence.passed !== true || equivalence.sourceSha256 !== sourceDigest || equivalence.optimizedSha256 !== optimizedDigest
+    const equivalence = await validateDecodedEquivalence(projection.canonicalBytes, optimizedBytes)
+    if (report.sourceSha256 !== projection.identity.canonicalSha256 || report.optimizedSha256 !== optimizedDigest
+      || report.sourceBytes !== projection.canonicalBytes.byteLength || report.optimizedBytes !== optimizedBytes.byteLength
+      || equivalence.passed !== true || equivalence.sourceSha256 !== projection.identity.canonicalSha256 || equivalence.optimizedSha256 !== optimizedDigest
       || equivalence.semanticDigest !== report.semanticDigest || equivalence.drawableInstances !== report.equivalence.drawableInstances
       || report.codec.name !== 'meshoptimizer' || report.codec.extension !== 'EXT_meshopt_compression') {
-      throw new Error('Optimizer report does not agree with independently checked source/output bytes and decoded equivalence')
+      throw new Error('Optimizer report does not agree with independently checked canonical/output bytes and decoded equivalence')
     }
+    const canonicalPaths = new Set(projectionProof.paths.map(path => path.canonical))
+    const regenerateMetadata = identity.regenerateMetadata
+      || native.nativeIdentityMapSha256 !== projection.identity.mapSha256
+      || native.canonicalModelSha256 !== projection.identity.canonicalSha256
+      || Object.keys(currentNative.renderFrames?.worldMatrices ?? {}).some(path => !canonicalPaths.has(path))
     const representation = validateModelRepresentation({
-      schemaVersion: 1, kind: REPRESENTATION_KIND,
+      schemaVersion: 2, kind: REPRESENTATION_KIND,
       source: { sha256: sourceDigest, sourceCommit: identity.sourceCommit },
+      identity: projectionProof.identity,
       representation: { path: REPRESENTATION_PATH, sha256: optimizedDigest, byteLength: optimizedBytes.byteLength, codec: report.codec.extension },
-      pipeline: { version: report.pipeline.version, steps: report.pipeline.steps, codecVersion: `${report.codec.name}@${report.codec.version}` },
-      equivalence: { method: 'decoded-per-drawable-exact-v1', semanticSha256: equivalence.semanticDigest, drawableCount: equivalence.drawableInstances },
+      pipeline: { version: PIPELINE_VERSION, steps: [...PIPELINE_STEPS], codecVersion: `${report.codec.name}@${report.codec.version}` },
+      equivalence: { method: 'decoded-per-drawable-exact-after-native-identity-v2', semanticSha256: equivalence.semanticDigest, drawableCount: equivalence.drawableInstances },
     })
     const stagedModel = join(stagingDirectory, 'model.glb')
     const stagedDescriptor = join(stagingDirectory, 'model-representation.json')
@@ -199,7 +221,7 @@ export async function importModel({ webRoot = WEB, sourcePath = null, sourceComm
       { staged: stagedModel, destination: resolve(webRoot, 'public', REPRESENTATION_PATH) },
       { staged: stagedDescriptor, destination: resolve(webRoot, 'content/model-representation.json') },
     ]
-    if (identity.regenerateMetadata) {
+    if (regenerateMetadata) {
       const stagedNative = join(stagingDirectory, 'mechanics-data.ts')
       try {
         execFileSync('uv', ['run', '--isolated', '--no-project', '--python', '3.13', '--with-requirements', resolve(webRoot, 'scripts/requirements-model-export.txt'), 'python', resolve(webRoot, 'scripts/export-mechanics.py'), '--model', rawCachePath, '--source-commit', identity.sourceCommit, '--expected-model-sha256', sourceDigest, '--output', stagedNative], { cwd: resolve(webRoot, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
@@ -217,7 +239,7 @@ export async function importModel({ webRoot = WEB, sourcePath = null, sourceComm
       retainRecovery = error.message.includes('rollback failed')
       throw error
     }
-    return { sourcePath: source, rawCachePath, nativeMetadataRegenerated: identity.regenerateMetadata, representation, report }
+    return { sourcePath: source, rawCachePath, rawByteLength: sourceBytes.byteLength, nativeMetadataRegenerated: regenerateMetadata, representation, report, projectionProof }
   } finally {
     if (!retainRecovery) await rm(stagingDirectory, { recursive: true, force: true })
   }
@@ -229,10 +251,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (options.help) console.log(HELP)
     else {
       const result = await importModel(options)
-      console.log(`   OK  ${result.sourcePath} -> public/${REPRESENTATION_PATH} (${(result.report.optimizedBytes / 1024 / 1024).toFixed(1)} MB; raw ${(result.report.sourceBytes / 1024 / 1024).toFixed(1)} MB)`)
+      console.log(`   OK  ${result.sourcePath} -> public/${REPRESENTATION_PATH} (${(result.report.optimizedBytes / 1024 / 1024).toFixed(1)} MB; raw ${(result.rawByteLength / 1024 / 1024).toFixed(1)} MB)`)
       console.log(`   Raw source: ${result.representation.source.sha256} @ ${result.representation.source.sourceCommit}`)
+      console.log(`   Native identity: ${result.representation.identity.renamedNodes}/${result.representation.identity.nodeCount} nodes projected with ${result.representation.identity.mapSha256}; canonical ${result.representation.identity.canonicalSha256}`)
       console.log(`   Representation: ${result.representation.representation.sha256}; exact ${result.representation.equivalence.drawableCount}-drawable equivalence ${result.representation.equivalence.semanticSha256}`)
-      console.log(`   Raw cache: ${result.rawCachePath}; native metadata ${result.nativeMetadataRegenerated ? 'regenerated; existing source tracks remain unqualified for this new release' : 'unchanged (same native release)'}`)
+      console.log(`   Raw cache: ${result.rawCachePath}; native metadata ${result.nativeMetadataRegenerated ? 'regenerated with canonical provenance; existing source tracks remain unqualified for this release' : 'unchanged (same native release and canonical projection)'}`)
     }
   } catch (error) {
     console.error(`xx ${error.message}`)

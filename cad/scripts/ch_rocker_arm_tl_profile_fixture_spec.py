@@ -1016,23 +1016,22 @@ def _drill_dia(drill_dia: float, spec_name: str) -> dict:
 
 
 def _tap(spec: HoleSpec, spec_name: str, drill_dia: float, at: list[float], places: tuple[int, int] | None,
-         sources: tuple[str, ...], *, drill_band: bool) -> ExportFeature:
-    """A blind tapped hole: its thread and full-thread depth (two places, as
-    the callout prints), on the drilled cylinder (matched at the true drill
-    size, kept as ``tap_drill_mm``). ``drill_band`` adds the printed drill Ø
-    here when its own drill-point cone cannot carry it."""
+         sources: tuple[str, ...]) -> ExportFeature:
+    """A blind tapped hole on its drilled cylinder (matched at the true drill
+    size, kept as ``tap_drill_mm``): the printed drill Ø (the bore that
+    cylinder is), its thread and full-thread depth, all at two places as the
+    callout prints."""
     thread_depth = spec.overrides_mm["ThreadDepth"]
     location = {} if places is None else _plan_location(at[0], at[1], *places, sources)
-    dia = _drill_dia(drill_dia, spec_name) if drill_band else {}
     return ExportFeature(
         kind="hole",
         faces=(CylinderFace(drill_dia, contains_x_mm=at[0], contains_y_mm=at[1]),),
-        requirements=(*(("station", "height") if location else ()), *dia, "thread", "depth"),
+        requirements=(*(("station", "height") if location else ()), "dia", "thread", "depth"),
         fields={
             "at": (at, (*sources, "PLATE_TOP_Z")),
             "axis": _DOWN,
             **location,
-            **dia,
+            **_drill_dia(drill_dia, spec_name),
             "thread": (f"{spec.size} UNC-{spec.thread_class}", (spec_name,)),
             "depth": (limits(thread_depth, 2), (spec_name,)),
             "depth_ref": (thread_depth, (spec_name,)),
@@ -1041,31 +1040,28 @@ def _tap(spec: HoleSpec, spec_name: str, drill_dia: float, at: list[float], plac
         },
         precision={
             **({"station": places[0], "height": places[1]} if location else {}),
-            **({"dia": 2} if dia else {}),
+            "dia": 2,
             "depth": 2,
         },
     )
 
 
 def _tap_drill(
-    spec: HoleSpec, spec_name: str, stations: tuple[float, ...], *, parent: str | None,
-    drill_dia: float | None,
+    spec: HoleSpec, spec_name: str, stations: tuple[float, ...], *, parent: str | None
 ) -> ExportFeature:
-    """The drill a tap callout prints, on its drill-point cones: its depth and,
-    for one tap (``parent``), its printed Ø (two places)."""
-    dia = {} if drill_dia is None else _drill_dia(drill_dia, spec_name)
+    """The drill depth a tap callout prints (two places), on its drill-point
+    cones; the drill Ø belongs to the tap's own cylinder."""
     return ExportFeature(
         kind="hole",
         faces=tuple(ConeFace(_DRILL_POINT_HALF_ANGLE_DEG, contains_x_mm=x) for x in stations),
-        requirements=(*dia, "depth"),
+        requirements=("depth",),
         fields={
             **({} if parent is None else {"parent": (parent, (spec_name,))}),
-            **dia,
             "depth": (limits(spec.depth_mm, 2), (spec_name,)),
             "depth_ref": (spec.depth_mm, (spec_name,)),
             "thru": (False, (spec_name,)),
         },
-        precision={**({"dia": 2} if dia else {}), "depth": 2},
+        precision={"depth": 2},
     )
 
 
@@ -1317,24 +1313,19 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         f"stud_tap_s{index}": _tap(
             CLAMP_STUD_SPEC, "CLAMP_STUD_SPEC", CLAMP_STUD_DRILL_DIA, [x, y, PLATE_TOP_Z],
             (CLAMP_STUD_PLACES, CLAMP_STUD_PLACES), ("CLAMP_STUD_POINTS", "CLAMP_STUD_PLACES"),
-            drill_band=True,
         )
         for index, (x, y) in enumerate(CLAMP_STUD_POINTS, start=1)
     },
     # S1/S3 and S2/S4 share a station, and a cone selector takes no Y, so one
-    # feature carries the four drill-point cones and the printed drill depth;
-    # each tap carries its own printed drill Ø on its drilled cylinder.
+    # feature carries the four drill-point cones and the printed drill depth.
     "stud_tap_drills": _tap_drill(
         CLAMP_STUD_SPEC, "CLAMP_STUD_SPEC", tuple(sorted({x for x, _y in CLAMP_STUD_POINTS})),
-        parent=None, drill_dia=None,
+        parent=None,
     ),
     # The pivot tap's depths run from the locating-bore floor, as printed.
     "pivot_tap": _tap(
         PIVOT_TAP_SPEC, "PIVOT_TAP_SPEC", PIVOT_TAP_DRILL_DIA, [0.0, 0.0, LOCATING_BORE_FLOOR_Z],
-        None, ("LOCATING_BORE_FLOOR_Z",), drill_band=False,
+        None, ("LOCATING_BORE_FLOOR_Z",),
     ),
-    "pivot_tap_drill": _tap_drill(
-        PIVOT_TAP_SPEC, "PIVOT_TAP_SPEC", (0.0,), parent="pivot_tap",
-        drill_dia=PIVOT_TAP_DRILL_DIA,
-    ),
+    "pivot_tap_drill": _tap_drill(PIVOT_TAP_SPEC, "PIVOT_TAP_SPEC", (0.0,), parent="pivot_tap"),
 }

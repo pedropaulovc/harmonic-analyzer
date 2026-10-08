@@ -24,6 +24,11 @@ def drilled_oversize_mm() -> float:
     return float(_config.title_block("drilled_hole")["plus_mm"])
 
 
+def angular_band_deg() -> float:
+    """The title block's general angular +/- in degrees."""
+    return float(_config.title_block("angular")["value_deg"])
+
+
 def printed_deviations(
     model: float, places: int, limits: tuple[float, float] | None = None
 ) -> tuple[float, float]:

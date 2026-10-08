@@ -12,9 +12,11 @@ conflicting corresponding source points fail closed rather than choosing a donor
 from __future__ import annotations
 
 import copy
+import gzip
 import json
 import math
 import re
+import subprocess
 from functools import lru_cache
 import hashlib
 from pathlib import Path
@@ -29,9 +31,99 @@ INPUT_FIELDS = ["crankTurns", "gearing", "magnification"] + [
 ] + [f"setup.{name}" for name in SETUP_FIELDS]
 
 
+def read_observations(path):
+    """Read observation JSON; gzip corruption and JSON errors propagate."""
+    path = Path(path)
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt", encoding="utf-8") as stream:
+            return json.load(stream)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_observations(path, data):
+    """Keep canonical observations compressed; plain temporary JSON is supported."""
+    path = Path(path)
+    canonical = (WEB / "content" / "canonical-native").resolve()
+    if path.resolve().is_relative_to(canonical) and path.name.endswith(".observations.json"):
+        raise ValueError("Canonical observation output must end in .observations.json.gz")
+    contents = json.dumps(data, indent=2) + "\n"
+    if path.suffix == ".gz":
+        with path.open("wb") as stored:
+            with gzip.GzipFile(filename="", mode="wb", fileobj=stored, compresslevel=9, mtime=0) as compressed:
+                compressed.write(contents.encode("utf-8"))
+    else:
+        path.write_text(contents, encoding="utf-8")
+
+
 def load_observations(video_id, prefer_track=False):
-    suffix = "track" if prefer_track and (WEB / "content" / "canonical-native" / f"{video_id}.track.json").exists() else "observations"
-    return json.loads((WEB / "content" / "canonical-native" / f"{video_id}.{suffix}.json").read_text())
+    content = WEB / "content" / "canonical-native"
+    track = content / f"{video_id}.track.json"
+    if prefer_track and track.exists():
+        return json.loads(track.read_text())
+    return read_observations(content / f"{video_id}.observations.json.gz")
+
+
+def load_approved_model_source():
+    """Use the same strict v2 authority loader as the importer and browser."""
+    loader = (WEB / "scripts/approved-model.mjs").resolve().as_uri()
+    try:
+        result = subprocess.run(
+            ["node", "--input-type=module", "--eval",
+             "const { LIVE_MODEL_SOURCE } = await import(process.argv[1]); "
+             "console.log(JSON.stringify(LIVE_MODEL_SOURCE));", loader],
+            capture_output=True, text=True, encoding="utf-8", check=False)
+    except OSError as error:
+        raise ValueError("Approved model authority unavailable; install Node and restore "
+                         "web/scripts/approved-model.mjs and web/content/model-representation.json") from error
+    if result.returncode:
+        raise ValueError("Approved model authority missing or malformed; restore the reviewed strict v2 "
+                         "web/content/model-representation.json and its validator: " + result.stderr.strip())
+    return json.loads(result.stdout)
+
+
+def validate_current_generation_inputs(observations, producer_path, *, additional_observations=(),
+                                       executed_inputs=()):
+    """Require independently approved live source/code, never archive fallback.
+
+    This gate is for ordinary generation. Historical receipt validation remains
+    a separate operation and cannot make old hardware eligible for current code.
+    Producers declare every extra executed module; this shared gate owns only
+    the mandatory live loader, approval record and renderer/math dependencies.
+    """
+    def relative_path(path):
+        path = Path(path)
+        return (path.resolve().relative_to(WEB.parent.resolve()).as_posix()
+                if path.is_absolute() else path.as_posix())
+    paths = {
+        relative_path(producer_path), "web/scripts/compact-source-common.py", "web/src/bindings.ts", "web/src/scene.ts",
+        "web/src/mechanics.ts", "web/src/mechanics-data.ts", "web/src/magnifier.ts", "web/src/kinematics.ts",
+        "web/scripts/approved-model.mjs", "web/model-representation.mjs",
+        "web/content/model-representation.json",
+    }
+    paths.update(relative_path(path) for path in executed_inputs)
+    manifest = json.loads((WEB / "content/canonical-native/manifest.json").read_bytes())
+    if manifest.get("canonicalConsumerHashNormalization") != "CRLF-to-LF":
+        raise ValueError("Current live consumer hash normalization differs")
+    seals = [row for row in manifest["canonicalConsumerInputs"] if row["path"] in paths]
+    if len(seals) != len(paths) or {row["path"] for row in seals} != paths:
+        raise ValueError("Current live producer input seal census differs")
+    for seal in seals:
+        path, sha = seal["path"], seal.get("sha256")
+        if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{64}", sha) is None:
+            raise ValueError(f"Current live producer input lacks SHA: {path}")
+        try:
+            raw = (WEB.parent / path).read_bytes()
+        except OSError as error:
+            raise ValueError(f"Current live producer input unavailable: {path}") from error
+        actual = hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+        if actual != sha:
+            raise ValueError(f"Current live producer input differs: {path}")
+    source = load_approved_model_source()
+    for data in (observations, *additional_observations):
+        model = data.get("model") if isinstance(data, dict) else None
+        if (not isinstance(model, dict)
+                or any(model.get(field) != source[field] for field in ("sha256", "sourceCommit"))):
+            raise ValueError("Current source model differs from independently approved live model")
 
 
 def historical_code_bytes(path, expected_sha256):
@@ -483,9 +575,12 @@ def anchor_motion(anchor):
     # A spin/swing binding alone does not prove that this point is off its axis.
     # Crank/cone also have compound platform motion: their unidentified centres
     # remain unknown, rather than being certified fixed or moving by prose.
-    if motion in (None, "crank", "cone-spin", "cylinder", "wheel", "paper-gear",
+    if motion in (None, "crank", "cone-spin", "cylinder", "wheel",
+                  "paper-knob", "paper-feed", "paper-sprocket",
                   "pinion-swing", "pinion-cam", "pinion-lever"):
         return None
+    if motion == "paper-fixed":
+        return "fixed"
     return "moving"
 
 
@@ -552,6 +647,8 @@ def build_track(data, frame_views_callback, evidence_notes=None):
 
 def prepare_track(track):
     """Serialize without publishing, so paired outputs can be prepared together."""
+    if track.get("kind") == "historical-source-track-receipt":
+        raise ValueError("Historical receipt revalidation cannot publish a source track")
     path = WEB / "content" / f'{track["source"]["videoId"]}.source-track.json'
     return path, json.dumps(track, separators=(",", ":"), allow_nan=False) + "\n"
 

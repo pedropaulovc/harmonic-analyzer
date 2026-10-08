@@ -182,25 +182,69 @@ def _nominal(feature: dict, key: str) -> float:
     raise AssertionError(f"no nominal for {key}")
 
 
+# The value each marked dimension prints (the sheet imports the model
+# dimension, which the build drives with these spec values).
+MARKED_SOURCES = {
+    "PlateLength": spec.PLATE_LENGTH,
+    "PlateWidth": spec.PLATE_WIDTH,
+    "PlateWestX": spec.PLATE_WEST_X,
+    "PlateSouthY": spec.PLATE_SOUTH_Y,
+    "PlateThick": spec.PLATE_THICK,
+    "PlateDrop": spec.PLATE_DROP,
+    "StandDrop": spec.STAND_DROP,
+    "RestTopHeight": spec.REST_TOP_HEIGHT,
+    "StandPocketDia": spec.STAND_POCKET_DIA,
+    "StandPocketDepth": spec.STAND_POCKET_DEPTH,
+    "LocatingBoreDia": spec.LOCATING_BORE_DIA,
+    "LocatingBoreDepth": spec.LOCATING_BORE_DEPTH,
+    "RodPinHoleDia": spec.ROD_PIN_HOLE_DIA,
+}
+
+
+def _printed_values() -> dict[str, float]:
+    """Every printed dimension's value as the sheet states it: a schedule
+    cell's own number (signed, as the TAGS plan reads), or a marked
+    dimension's spec source at its printed places."""
+    cells = _schedule_cells()
+    printed = {}
+    for key, owners in spec.SCHEDULE_CELL_DIMENSIONS.items():
+        value = float(re.search(r"-?\d+\.\d+", cells[key]).group())
+        for _feature, name in owners:
+            printed[name] = value
+    for name, source in MARKED_SOURCES.items():
+        places = spec.DRAWING_PRECISION_BY_NAME[name]
+        # the model carries the printed value, not a longer derived one
+        assert source == round(source, places), name
+        printed[name] = round(source, places)
+    return printed
+
+
+def one_fact_violations(features: dict) -> list[tuple]:
+    """Each printed dimension whose owners are missing, unlisted, or carry a
+    nominal or band other than the printed value and its printed band."""
+    printed = _printed_values()
+    violations = []
+    for name, owners in PRINTED_OWNERS.items():
+        places = spec.DRAWING_PRECISION_BY_NAME[name]
+        want = limits(printed[name], places, EXPLICIT_BANDS.get(name))
+        for feature_name, key in owners:
+            feature = features.get(feature_name, {})
+            if key not in feature.get("requirements", ()):
+                violations.append((name, feature_name, key, "not a requirement"))
+            elif _nominal(feature, key) != printed[name] or feature[key] != want:
+                violations.append((name, feature_name, key, _nominal(feature, key), feature[key]))
+    return violations
+
+
 def test_every_printed_band_has_a_requirement_owner() -> None:
     """One-fact coverage: every printed dimension reaches prechips as a
-    listed requirement band, and that band is the printed one: the model
-    nominal is the printed value, so the band about it is the printed band."""
+    listed requirement band whose nominal is the value the sheet prints and
+    whose band is that value's printed band."""
     assert set(PRINTED_OWNERS) == set(spec.DRAWING_PRECISION_BY_NAME)
-    features = _features()
+    assert set(_printed_values()) == set(spec.DRAWING_PRECISION_BY_NAME)
     claimed = [owner for owners in PRINTED_OWNERS.values() for owner in owners]
     assert len(claimed) == len(set(claimed))
-    for printed, owners in PRINTED_OWNERS.items():
-        places = spec.DRAWING_PRECISION_BY_NAME[printed]
-        for name, key in owners:
-            feature = features[name]
-            assert key in feature["requirements"], (printed, name, key)
-            nominal = _nominal(feature, key)
-            assert nominal == round(nominal, places), (printed, name, nominal)
-            assert feature[key] == limits(nominal, places, EXPLICIT_BANDS.get(printed)), (
-                printed,
-                name,
-            )
+    assert one_fact_violations(_features()) == []
 
 
 def test_hole_callout_bands_are_the_printed_bands() -> None:
@@ -212,7 +256,7 @@ def test_hole_callout_bands_are_the_printed_bands() -> None:
     drilled = (
         *((f"hold_down_h{i}", "dia") for i in range(1, 5)),
         *((f"stud_tap_s{i}", "dia") for i in range(1, 5)),
-        ("pivot_tap_drill", "dia"),
+        ("pivot_tap", "dia"),
     )
     for name, key in (
         *drilled,
@@ -230,7 +274,8 @@ def test_hole_callout_bands_are_the_printed_bands() -> None:
         assert key in feature["requirements"], (name, key)
     assert features["stud_tap_s1"]["dia_nominal"] == 7.94
     assert features["stud_tap_s1"]["tap_drill_mm"] == spec.CLAMP_STUD_DRILL_DIA
-    assert features["pivot_tap_drill"]["dia_nominal"] == 3.80
+    assert features["pivot_tap"]["dia_nominal"] == 3.80
+    assert "dia" not in features["pivot_tap_drill"]
     assert features["pivot_tap"]["tap_drill_mm"] == spec.PIVOT_TAP_DRILL_DIA
 
 

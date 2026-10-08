@@ -175,12 +175,15 @@ ELEVATION_KEEP_Z = {
     "RestTopHeight": (REST_TOP_Z + 10.0, -0.003),
     "PlateDrop": ((PAD_TOP_Z + PLATE_TOP_Z) / 2.0, 0.012),
 }
-# Detail E, model (x, y) mm about the bore axis.
+# Detail E, model (x, y) mm about the bore axis. Each text block centres on
+# its anchor; at x 10 both blocks ran inside the R9 (R27 at 3:1) circle
+# (codex review of run 20261008T020623281Z), so they sit at x 16, above and
+# below the circle, clear of SHEET 1 OF 3, the DETAIL E label and section D-D.
 DETAIL_KEEP_AT = {
     "StandPocketDia": ((-8.0, 10.0), (0.0, 0.0)),
-    "LocatingBoreDia": ((10.0, 5.0), (0.0, 0.0)),
+    "LocatingBoreDia": ((16.0, 11.0), (0.0, 0.0)),
 }
-PIVOT_CALLOUT_AT = (10.0, -7.0)
+PIVOT_CALLOUT_AT = (16.0, -11.0)
 
 # --- Sheet TAGS ---------------------------------------------------------------------
 TAG_CENTER = (0.200, 0.183)

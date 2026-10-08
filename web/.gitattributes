@@ -1,0 +1,10 @@
+# Current-only producer and consumer seals hash these live source bytes exactly.
+# LF checkout prevents core.autocrlf from creating a different authority tuple.
+src/mechanics.ts text eol=lf
+src/mechanics-data.ts text eol=lf
+src/kinematics.ts text eol=lf
+src/scene.ts text eol=lf
+scripts/generate-8KmVDxkia_w-automatic-motion.py text eol=lf
+scripts/compact-operation-rocker.py text eol=lf
+scripts/compact-source-common.py text eol=lf
+src/bindings.ts text eol=lf

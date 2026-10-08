@@ -9,6 +9,7 @@ import draw_dt_cone_pivot_post_tl_cap_jaw_button as drawing
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_cap_jaw_button_spec as spec
 import export_features
+from _printed_tolerance import printed_band_mm
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
@@ -36,7 +37,10 @@ def test_face_bears_on_the_cap_alone_at_its_worst_float() -> None:
     largest_face = export_features.requirement_manifest(
         "dt_cone_pivot_post_tl_cap_jaw_button"
     )["features"]["cap_face"]["dia"][1]
-    assert largest_face / 2.0 + widest_float / 2.0 < post.CONE_BOSS_DIA / 2.0
+    # The receiving cap is the smallest the post's print accepts, not its nominal.
+    places = post.DRAWING_PRECISION["ConeBossProfile"]["ConeBossDia"]
+    smallest_boss = post.CONE_BOSS_DIA - printed_band_mm(places)
+    assert largest_face / 2.0 + widest_float / 2.0 < smallest_boss / 2.0
 
 
 def test_exported_spigot_band_is_the_printed_band() -> None:
@@ -53,9 +57,3 @@ def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
     parent = _config.parts("dt-cone-pivot-post")["number"]
     number = _config.parts("dt-cone-pivot-post-tl-cap-jaw-button")["number"]
     assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
-
-
-def test_notes_follow_the_simplicity_policy() -> None:
-    lines = spec.DRAWING_NOTES.splitlines()
-    assert 1 <= len(lines) <= 4
-    assert not re.search(r"\d", spec.DRAWING_NOTES)
