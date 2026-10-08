@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "harmonic-analyzer-com-prod",
+  "name": "harmonicanalyzer-com-prod",
   "account_id": "6b2522c874d4613dc2bf47bd2ce521a2",
   "main": "worker.mjs",
   "compatibility_date": "2026-10-08",

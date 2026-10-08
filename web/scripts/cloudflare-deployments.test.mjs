@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { PPE, PROD, guardIdentity, listPreviews, deletePreview, cleanup, reconcile, waitForManifest, webTreeSha, resolvePreviewUrl, reportPreviewEvent } from './cloudflare-deployments.mjs';
 
 const sha = 'a'.repeat(40);
-const preview = { id: 'preview-1', name: 'feature/a', slug: 'server-owned-slug', created_on: new Date(Date.now() - 60 * 60 * 1000).toISOString(), urls: ['https://server-owned-slug-ppe-harmonic-analyzer-com.harmonicanalyzer-com-ppe.workers.dev'] };
+const preview = { id: 'preview-1', name: 'feature/a', slug: 'server-owned-slug', created_on: new Date(Date.now() - 60 * 60 * 1000).toISOString(), urls: ['https://server-owned-slug-harmonicanalyzer-com-ppe.harmonicanalyzer-com-ppe.workers.dev'] };
 function envelope(rows, page = 1, perPage = 100, total = rows.length) {
   return { success: true, result: rows, result_info: { page, per_page: perPage, count: rows.length, total_count: total } };
 }
@@ -50,7 +50,7 @@ test('delete targets one exact Preview ID, never a Worker or branch-normalized c
   }, async () => {
     assert.equal(await deletePreview('feature/a'), true);
     assert.equal(requests.length, 2);
-    assert.match(requests[1][0], /\/workers\/workers\/ppe-harmonic-analyzer-com\/previews\/preview-1$/);
+    assert.match(requests[1][0], /\/workers\/workers\/harmonicanalyzer-com-ppe\/previews\/preview-1$/);
     assert.equal(requests[1][1], 'DELETE');
     await assert.rejects(deletePreview('main'), /Refusing/);
   });
