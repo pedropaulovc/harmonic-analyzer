@@ -34,7 +34,7 @@ import _config
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_c_stop_bar_spec as bar
 from _feature_requirements import ExportFeature, limits
-from _gtol_spec import CylinderFace, PlanarFace
+from _gtol_spec import ConeFace, CylinderFace, PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
 
@@ -121,6 +121,7 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 
 _DRILLED = _config.title_block("drilled_hole")
 DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))
+DRILL_POINT_HALF_ANGLE = 59.0  # Hole Wizard blind drill point, 118 degrees
 
 
 def _window(
@@ -234,9 +235,11 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         for side, x in zip(("left", "right"), TAP_X, strict=True)
     },
     **{
+        # The tap claims the drilled cylinder; the drill claims its own
+        # 118-degree point cone at the drill depth.
         f"bar_tap_{side}_drill": ExportFeature(
             kind="hole",
-            faces=(CylinderFace(TAP_DRILL_DIA, contains_x_mm=x),),
+            faces=(ConeFace(DRILL_POINT_HALF_ANGLE, contains_x_mm=x),),
             requirements=("dia", "depth"),
             fields={
                 "parent": (f"bar_tap_{side}", ("TAP_SPEC",)),
