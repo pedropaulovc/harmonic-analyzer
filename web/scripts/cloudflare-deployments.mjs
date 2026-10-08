@@ -127,12 +127,16 @@ export async function resolvePreviewUrl(branch, action, timeoutSeconds = 1200) {
 export async function waitForManifest(url, sha, branch, timeoutSeconds = 1200, equivalentCommit) {
   if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Expected full commit SHA');
   if (!Number.isFinite(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 1800) throw new Error('Timeout must be 1..1800 seconds');
+  const manifestUrl = new URL(url);
+  manifestUrl.pathname = `${manifestUrl.pathname.replace(/\/+$/, '')}/deployment.json`;
+  manifestUrl.searchParams.set('commit', sha);
   const deadline = Date.now() + timeoutSeconds * 1000;
   let last = 'not available';
   do {
     let manifest;
+    manifestUrl.searchParams.set('time', String(Date.now()));
     try {
-      const response = await fetch(`${url}/deployment.json?commit=${sha}&time=${Date.now()}`, { redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(Math.min(15000, Math.max(1, deadline - Date.now()))) });
+      const response = await fetch(manifestUrl.href, { redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(Math.min(15000, Math.max(1, deadline - Date.now()))) });
       if (response.ok) {
         manifest = await response.json();
         if (manifest.commitSha === sha && (branch === undefined || manifest.branch === branch)) return equivalentCommit ? { url, commitSha: sha } : url;
@@ -161,7 +165,7 @@ async function status(id, state, url, description) {
   await gh(`/deployments/${id}/statuses`, 'POST', { state, environment_url: url, description, auto_inactive: false });
 }
 async function publish(sha, branch, environment, resolveUrl, pr) {
-  const deploymentBody = (ref, equivalentWebTree = false) => ({ ref, environment, auto_merge: false, required_contexts: [], transient_environment: environment === 'web-preview', production_environment: environment === 'web-production', payload: { manager: 'cloudflare-native', branch, ...(pr ? { pr } : {}), ...(equivalentWebTree ? { requestedSha: sha, equivalentWebTree: true } : {}) } });
+  const deploymentBody = (ref, equivalentWebTree = false) => ({ ref, environment, auto_merge: false, required_contexts: [], transient_environment: environment === 'web-preview', production_environment: environment === 'web-production', payload: { manager: 'cloudflare-native', branch, ...(pr ? { pr } : {}), ...(equivalentWebTree ? { requestedSha: sha, identityProof: 'matching-web-tree' } : {}) } });
   let deployment = await gh('/deployments', 'POST', deploymentBody(sha));
   if (!deployment.id) throw new Error('GitHub did not create a deployment');
   await status(deployment.id, 'in_progress', undefined, 'Waiting for native Cloudflare build');

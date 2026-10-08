@@ -733,9 +733,10 @@ exact PR head SHA and raw branch name. If native watch paths skipped a
 non-`web/**` push, an older manifest commit is accepted only when the raw branch
 matches and GitHub's root `web` subtree object SHA is identical for that commit
 and the requested head. The successful deployment records the **actual manifest
-SHA**, with `requestedSha` and `equivalentWebTree` in its payload; it never
-mislabels old bytes as the new head. Changed-web mismatches still fail within
-the bounded wait. An arbitrary HTTP 200 is not deployment proof. Production
+SHA**, with `requestedSha` and `identityProof: "matching-web-tree"` in its
+payload; it never mislabels old bytes as the new head. Changed-web mismatches
+still fail within the bounded wait. An arbitrary HTTP 200 is not deployment
+proof. Production
 reporting uses the same exact-commit or proven web-tree-equivalence rule;
 the standalone `wait` helper remains exact-SHA-only.
 Native deployment is **push-only**: opening or reopening a PR does not trigger
@@ -779,6 +780,9 @@ node web/scripts/cloudflare-deployments.mjs cleanup 'raw/branch-name'
 node web/scripts/cloudflare-deployments.mjs wait URL FULL_COMMIT_SHA [BRANCH [TIMEOUT_SECONDS]]
 ```
 
+`wait` accepts an application base URL with or without a trailing slash and
+preserves any non-root base path when resolving `deployment.json`.
+
 `list`, `reconcile`, and cleanup require `CLOUDFLARE_CLEANUP_API_TOKEN` plus
 the fixed PPE `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_WORKER_NAME`, and
 `CLOUDFLARE_WORKERS_SUBDOMAIN` environment values. `cleanup` and `reconcile`
@@ -790,10 +794,11 @@ The Wrangler files explicitly pin account and Worker identity. They contain
 only the static asset binding and a lossless asset streaming Worker: no storage,
 secrets, unrelated bindings, routes, custom domains or scheduled triggers.
 `keep_vars` preserves dashboard variables; routing remains dashboard-managed.
-PPE explicitly has an empty `previews` block to enable noninteractive Preview
-deployments without copying production resource settings. Wrangler 4.148.0
-retains `assets` (including `ASSETS` and `run_worker_first`) at the top level;
-they are not duplicated under `previews`.
+PPE explicitly has a `previews` block to enable noninteractive deployments
+without copying production resource settings. It enables Preview console logs
+for structured `deployment-asset-stream-abort` diagnostics only; automatic
+invocation logs are disabled. Wrangler 4.148.0 retains `assets` (including
+`ASSETS` and `run_worker_first`) at the top level, not under `previews`.
 
 The approved v39 optimized model is **41,072,516 bytes**, exceeding the
 [25 MiB per-file Workers Assets limit](https://developers.cloudflare.com/workers/platform/limits/#static-assets)
@@ -821,6 +826,19 @@ return 502; later missing/short chunks error the response stream rather than
 silently completing a truncated 200. The model loader still verifies the
 original compiled SHA-256 and length before parsing. Ordinary files pass through
 to `ASSETS` unchanged, including their native conditional-request behavior.
+Each immutable `ASSETS` piece is requested with `Accept-Encoding: identity` and
+must return 200 with a body. If a Content-Length header is visible it must match
+the manifest, but the native binding can omit that header even though its public
+HTTP endpoint supplies it. Piece length and SHA-256 checks, plus exact ordered
+whole-file SHA reconstruction, are mandatory **producer/predeploy** checks.
+Runtime bodies pipe directly into one native `FixedLengthStream`, which enforces
+the **actual total byte length** without per-packet JavaScript processing or
+materialized arrays. This relies on Cloudflare's immutable `ASSETS` producer for
+individual pieces; there is no separate per-piece runtime byte/SHA scan.
+The browser still verifies the complete model SHA before parsing.
+Abort diagnostics identify the original URL, active piece path, and error
+without body bytes. Header/status refusals include actual response status,
+visible length, encoding and expected length.
 Chunked routes also honor strong/weak `If-None-Match` and `*` with a 304 before
 fetching any pieces, so cache revalidation does not redownload the full asset.
 Reconstructed routes send `Cache-Control: no-transform` to prevent Cloudflare
@@ -831,8 +849,12 @@ module with HTTP/3 unchanged. The response's Content-Length had been removed
 under zstd, so this was not evidence of an explicit length-header mismatch.
 The transport uses Cloudflare's
 [documented no-transform directive](https://developers.cloudflare.com/speed/optimization/content/compression/#content-length-header-handling),
-not an HTTP/3-disabled client fallback. Public native-browser verification of
-the deployed directive is required before claiming this delivery fix verified.
+not an HTTP/3-disabled client fallback. The no-transform-only native deployment
+still failed concurrent model/module loads, with Cloudflare invocation analytics
+reporting `exceededResources`; this outcome does not identify CPU versus memory.
+The transport therefore avoids per-buffer JavaScript processing through native
+stream piping. Public native-browser verification is required before claiming
+the deployed resource fix verified.
 `run_worker_first: true` allows any future oversized asset path to use the same
 manifest transport; static fallback requests consequently pass through the
 Worker as well. No R2 storage or runtime external origin is required.

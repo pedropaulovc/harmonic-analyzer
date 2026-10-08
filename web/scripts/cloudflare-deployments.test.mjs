@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { PPE, PROD, guardIdentity, listPreviews, deletePreview, cleanup, reconcile, waitForManifest, webTreeSha, resolvePreviewUrl, reportPreviewEvent } from './cloudflare-deployments.mjs';
 
 const sha = 'a'.repeat(40);
@@ -288,4 +289,33 @@ test('same-repository main is rejected before Preview API or deployment writes',
     await assert.rejects(reportPreviewEvent({ pull_request: { number: 13, head: { ref: 'main', sha, repo: { full_name: 'owner/repo' } } } }), /reserved for production/);
     assert.equal(requests, 0);
   });
+});
+
+test('standalone manifest wait joins real HTTP base URLs with and without trailing slashes', async t => {
+  const server = createServer((request, response) => {
+    const pathname = new URL(request.url, 'http://localhost').pathname;
+    if (pathname !== '/deployment.json' && pathname !== '/application/deployment.json') {
+      response.writeHead(404, { 'Content-Type': 'text/plain' });
+      response.end('Only canonical manifest paths are served');
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    response.end(JSON.stringify({ commitSha: sha, branch: 'feature/a' }));
+  });
+  t.after(async () => {
+    server.closeAllConnections();
+    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  });
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  for (const base of [origin, `${origin}/`, `${origin}/application`, `${origin}/application/`]) {
+    assert.equal(await waitForManifest(base, sha, 'feature/a', 1), base);
+  }
+  // These are real 200 JSON responses, not echo/mocked fetch assertions: the
+  // oracle still rejects content from the wrong deployed commit or branch.
+  await assert.rejects(waitForManifest(`${origin}/`, 'b'.repeat(40), 'feature/a', 1), /Timed out/);
+  await assert.rejects(waitForManifest(`${origin}/`, sha, 'wrong-branch', 1), /Timed out/);
 });
