@@ -100,7 +100,15 @@ def test_every_printed_band_has_a_requirement_owner() -> None:
         assert key in feature["requirements"], printed
         nominal = feature.get(f"{key}_nominal", feature.get(f"nominal_{key}"))
         places = spec.DRAWING_PRECISION_BY_NAME[printed]
-        assert feature[key] == limits(nominal, places), printed
+        # The part has no explicit bands. Each band is the general grade
+        # about the value as printed (rounded to its places), so the
+        # exported endpoints are the printed ones even where the model
+        # nominal is derived (e.g. 46.632 printed 46.6).
+        # Every band on this print is .X, whose title-block grade is ±0.8.
+        assert places == 1, printed
+        printed_value = round(nominal, places)
+        expected = [round(printed_value - 0.8, 12), round(printed_value + 0.8, 12)]
+        assert feature[key] == expected, printed
 
 
 def test_head_saddle_fits_between_the_head_shoulder_and_the_cone_boss() -> None:
