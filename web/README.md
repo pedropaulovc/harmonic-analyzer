@@ -1,5 +1,7 @@
 # Harmonic analyzer video companion
 
+<!-- Temporary PR #1271 deployment lifecycle proof; this branch is not merged. -->
+
 Six engineerguy videos share an interactive view of the CAD-exported analyzer.
 The original YouTube player sits in the model area's lower-right corner. Pause
 for manual exploration, then orbit, pan, zoom, turn the crank or adjust the twenty
