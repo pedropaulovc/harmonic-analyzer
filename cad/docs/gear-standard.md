@@ -91,12 +91,15 @@ union of the angular spans over which a supported contact exists, including
 tip-corner and face-edge contact, divided by the tooth pitch. Coverage is
 neither a contact ratio nor a loaded-contact check. Each drive mesh must also
 keep contact with no gap between teeth, hand over within 0.005 mm, and hold
-positive backlash at every tolerance corner, and its transmission error is
-charged to the existing nominal-residual budget. The required coverage is at
-least 1.1 for every cone and 0.62 for the crank pair. The alignment pinion only
-sets the zero at fit-up and does not drive continuously, so it is checked for
-continuity, backlash and root clearance instead. The final values are in the
-part specs.
+positive backlash at every tolerance corner (0.06–0.41 mm for the cones), and
+its transmission error is charged to the existing nominal-residual budget. The
+required coverage is at least 1.1 for every cone and 0.62 for the crank pair.
+The alignment pinion is only meshed while the readout is zeroed, with the
+notches set up by eye, so it is checked for continuity, backlash and root
+clearance instead. The cone and crank meshes are crossed or oblique, so these
+checks run on the 3D solids (`cad/scripts/diagnostics/oblique_cone_mesh_study.py`
+and `stock_form_contact_3d.py`); a planar screen is reported alongside but does
+not count. The final values are in the part specs.
 
 ### Undercut
 
