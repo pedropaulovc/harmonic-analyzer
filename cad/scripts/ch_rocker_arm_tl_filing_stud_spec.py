@@ -169,7 +169,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "locating_body": ExportFeature(
         kind="boss",
         faces=(CylinderFace(BODY_DIA),),
-        requirements=("note", "station"),
+        requirements=("note",),
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
@@ -182,14 +182,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                     ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"),
                 ),
             ),
-            # The journal runs from the printed thread start to the seat.
-            "station": (
-                limits(THREAD_START, STATION_PLACES),
-                ("THREAD_START", ("ch_rocker_arm_spec", "HUB_LENGTH")),
-            ),
-            "height_from": _FROM_TIP,
         },
-        precision={"station": STATION_PLACES},
     ),
     "button_seat": ExportFeature(
         kind="face",
@@ -199,30 +192,57 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "normal": ([1.0, 0.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "x", "value": 0.0}, ("__frame__",)),
             "dia": (limits(HEAD_DIA, 1), ("HEAD_DIA",)),
+            "dia_nominal": (HEAD_DIA, ("HEAD_DIA",)),
             "station": (limits(THREAD_END, STATION_PLACES), ("THREAD_END",)),
+            "station_nominal": (THREAD_END, ("THREAD_END",)),
             "height_from": _FROM_TIP,
         },
         precision={"dia": 1, "station": STATION_PLACES},
     ),
+    "head_back_face": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((-1.0, 0.0, 0.0), HEAD_LENGTH),),
+        requirements=("station",),
+        fields={
+            "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+            "plane": (
+                {"frame": "model", "axis": "x", "value": -HEAD_LENGTH},
+                ("HEAD_LENGTH",),
+            ),
+            "station": (limits(HEAD_BACK, STOCK_PLACES), ("HEAD_BACK",)),
+            "station_nominal": (HEAD_BACK, ("HEAD_BACK",)),
+            "height_from": _FROM_TIP,
+        },
+        precision={"station": STOCK_PLACES},
+    ),
+    # The thread runs from the faced tip to the printed thread start, where
+    # the locating journal begins.
     "thread": ExportFeature(
         kind="boss",
         faces=(CylinderFace(THREAD_MODEL_DIA),),
-        requirements=("thread",),
+        requirements=("thread", "length"),
         fields={
             "axis": _AXIS,
             "thread": (THREAD, ("THREAD",)),
-            "length": (limits(THREAD_START, STATION_PLACES), ("THREAD_START",)),
+            "length": (
+                limits(THREAD_START, STATION_PLACES),
+                ("THREAD_START", ("ch_rocker_arm_spec", "HUB_LENGTH")),
+            ),
+            "length_nominal": (THREAD_START, ("THREAD_START",)),
+            "height_from": _FROM_TIP,
         },
         precision={"length": STATION_PLACES},
     ),
     "vise_tail": ExportFeature(
         kind="boss",
         faces=(CylinderFace(TAIL_DIA),),
-        requirements=("dia",),
+        requirements=("dia", "station"),
         fields={
             "axis": _AXIS,
             "dia": (limits(TAIL_DIA, 1), ("TAIL_DIA",)),
+            "dia_nominal": (TAIL_DIA, ("TAIL_DIA",)),
             "station": (limits(OVERALL_LENGTH, STOCK_PLACES), ("OVERALL_LENGTH",)),
+            "station_nominal": (OVERALL_LENGTH, ("OVERALL_LENGTH",)),
             "height_from": _FROM_TIP,
         },
         precision={"dia": 1, "station": STOCK_PLACES},
