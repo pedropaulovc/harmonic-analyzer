@@ -73,6 +73,22 @@ def test_every_exported_band_is_a_requirement(stem: str) -> None:
                 assert key in feature["requirements"], (name, key)
 
 
+@pytest.mark.parametrize("stem", [BUTTON, STUD])
+def test_every_exported_nominal_lies_inside_its_band(stem: str) -> None:
+    """prechips rejects a nominal outside its requirement band; references
+    under a fit callout export a nominal with no band."""
+    for name, feature in _features(stem).items():
+        for key, nominal in feature.items():
+            if not key.endswith("_nominal"):
+                continue
+            band = feature.get(key.removesuffix("_nominal"))
+            if band is None:
+                assert "note" in feature["requirements"], (name, key)
+                continue
+            low, high = band
+            assert low <= nominal <= high, (name, key)
+
+
 # Each printed toleranced dimension -> the exported feature and requirement
 # that owns its band. Reference sizes governed by a matched-fit callout and
 # the thread designation own no band.
