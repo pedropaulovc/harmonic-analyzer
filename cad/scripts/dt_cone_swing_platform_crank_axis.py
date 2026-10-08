@@ -8,6 +8,7 @@ train mates the crank to it.
 from __future__ import annotations
 
 import math
+import cone_line
 
 from dt_cone_swing_platform_geometry import INCLINE_DEG
 
@@ -27,8 +28,8 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 # in the assembly.
 #
 # Restored frame line: pivot.x - X_CRANK east, Y_CRANK - Y_BASE_TOP up.
-CRANK_AXIS_OFF = 41.6536661190548
-CRANK_AXIS_Y = 79.05
+CRANK_AXIS_OFF = (cone_line.PIVOT_STATION - cone_line.POST_STATION) * cone_line.SIN_I
+CRANK_AXIS_Y = cone_line.Y_CRANK - cone_line.Y_BASE_TOP
 if CRANK_AXIS_OFF <= 0 or CRANK_AXIS_Y <= 0:
     raise AssertionError("swing platform crank axis must lie east and above the pivot")
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan

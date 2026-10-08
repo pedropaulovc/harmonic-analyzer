@@ -15,6 +15,7 @@ import math
 from dataclasses import dataclass
 
 import _config
+import cone_line
 from dt_cone_swing_platform_spec import (
     HOLDDOWN_CBORE_DIA,
     HOLDDOWN_CLEARANCE_DIA,
@@ -49,17 +50,17 @@ if abs(PLATE_T - PIVOT_BEARING_RELIEF_DEPTH - PIVOT_BEARING_THICKNESS) > 1e-9:
         "pivot bearing relief no longer leaves its specified thickness"
     )
 
-INCLINE_DEG = 12.5182  # cone-axis plan incline (the assembly's ROT_Y_INCLINE)
-_SIN_I = math.sin(math.radians(INCLINE_DEG))
-_COS_I = math.cos(math.radians(INCLINE_DEG))
+INCLINE_DEG = cone_line.INCLINE_DEG
+_SIN_I = cone_line.SIN_I
+_COS_I = cone_line.COS_I
 
 # --- cone-pivot-post-v2 attachment footprint -------------------------------
 # The casting is centred at cone station -39.90136099793 while the plate
 # origin/pivot remains station 196.  Its inward-shifted vertical attachment
 # holes are a world-X pair at +/-POST_MOUNT_HALF_PITCH.  Undoing the engaged
 # Ry(+INCLINE) placement gives the skewed pair in the platform's local (x, z).
-POST_STATION = -39.90136099793
-PIVOT_STATION = 152.27232594770453
+POST_STATION = cone_line.POST_STATION
+PIVOT_STATION = cone_line.PIVOT_STATION
 POST_MAIN_DIA = POST_BLOCK_DIA
 POST_LOCAL_Z = POST_STATION - PIVOT_STATION
 POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim

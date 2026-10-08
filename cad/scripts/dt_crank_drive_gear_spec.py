@@ -24,6 +24,9 @@ import math
 import _config
 import cone_shaft_land_bands
 import gear_seat_fit
+from cone_line import CONE_FACE_STATION_REFERENCE, SHAFT_T120_STATION
+from dt_cone_pivot_post_installation import GEAR_AXIS_SHIFT
+from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -51,10 +54,29 @@ BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 # together.  The band is the cone gears' +/-0.025.
 LAYOUT_FACE_WIDTH = 8.0
 SOUTH_FACE_SHIFT_NORTH = 1.5
-FACE_WIDTH = 7.2113
+CENTRE_REFERENCE_FACE_WIDTH = 10.0
+FACE_WIDTH = math.floor(
+    (
+        CONE_FACE_STATION_REFERENCE
+        + CENTRE_REFERENCE_FACE_WIDTH / 2.0
+        + 0.1
+        + LAYOUT_FACE_WIDTH / 2.0
+        - SOUTH_FACE_SHIFT_NORTH
+        - CONE_GEAR_FACE_WIDTH
+    )
+    * 1e4
+    + 1e-9
+) / 1e4
 FACE_WIDTH_BAND = (0.025, -0.025)
 # The centre sits CENTRE_SHIFT_NORTH north of the 19.9 layout station.
 CENTRE_SHIFT_NORTH = SOUTH_FACE_SHIFT_NORTH + (FACE_WIDTH - LAYOUT_FACE_WIDTH) / 2.0
+LAYOUT_STATION = (
+    SHAFT_T120_STATION
+    - (CONE_FACE_STATION_REFERENCE + CENTRE_REFERENCE_FACE_WIDTH) / 2.0
+    - 0.1
+)
+CENTRE_STATION = LAYOUT_STATION + GEAR_AXIS_SHIFT + CENTRE_SHIFT_NORTH
+MESH_WINDOW_CENTRE_DEG = -1.49  # retained exact-solid phase-window centre
 if not LAYOUT_FACE_WIDTH - SOUTH_FACE_SHIFT_NORTH < FACE_WIDTH < LAYOUT_FACE_WIDTH:
     raise AssertionError(
         f"64T face {FACE_WIDTH} must grow past the #1126 6.5 face "

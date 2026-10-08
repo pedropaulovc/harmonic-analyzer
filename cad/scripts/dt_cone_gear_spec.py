@@ -40,7 +40,7 @@ TIP_MATERIAL_SPEC = str(_MFG["material_tip_specification"])
 
 TEETH = 120  # default/fundamental configuration
 CONFIGURATION_TEETH = tuple(range(6, 121, 6))
-DIAMETRAL_PITCH = 49.82  # cad/config/machine/gear_train.yaml
+DIAMETRAL_PITCH = 48.0  # cad/config/machine/gear_train.yaml
 PRESSURE_ANGLE_DEG = 14.5
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH * MODULE_MM
@@ -55,20 +55,20 @@ STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 # ``MESH_BACKLASH_MIN_MM``.  Tightest case: thickest tooth with the cone
 # bore-on-land and drum bore-on-arbor runouts closing the deep-edge centre
 # distance at the as-posed interleave.  The cone runout is sized for the
-# 0/-0.05 shaft seat lands under this +0.05/0 bore: 0.05 radial.
+# 0/-0.05 shaft seat lands under this +0.055/+0.025 bore: 0.0525 radial.
 # Least engagement adds the journal and arbor float opening.  Each OD is the
-# smallest that reaches worst-case CR 1.20 (T060+), else the largest
+# smallest that reaches worst-case CR 1.20, else the largest
 # that keeps the tip land >= 0.10 at the thinnest tooth and largest OD and the
-# cone tip >= 0.10 off the drum's chord floor (T006-T054).  ODs print two
+# cone tip >= 0.10 off the drum's chord floor. ODs print two
 # places and are floored to them; thicknesses print three places, floored
 # toward more backlash.  ``test_dt_cone_gear_mesh_design`` re-derives every
 # constraint from these printed values.
 #
-# Contact ratio stays below 1.1 at the worst case of the printed bands on
-# T006-T042: the tooth comes to a point before it reaches deeper.  The user
-# accepted that as a named book-fidelity exception (U42): it costs wear on the
-# tooth-tip corners, not position error (rigid transmission error at most
-# 0.023 mm at the drum pitch line, on T006; <= 0.004 on the rest).
+# Contact ratio stays below 1.1 at the worst case of the bands on
+# T006-T036 at 48 DP: the tooth comes to a point before it reaches deeper.
+# The baseline accepted these shortfalls as a book-fidelity exception (U42).
+# The experiment retains the same lower bounds and reports the re-derived
+# values externally rather than changing production notes.
 MESH_BACKLASH_MIN_MM = 0.06
 # (upper, lower) about the modelled mid thickness.  The 0.15 window is the
 # configured cone<->cylinder backlash window (tolerances.yaml gear_mesh
@@ -82,30 +82,30 @@ TOOTH_THICKNESS_BAND = (0.075, -0.075)
 # drum-arbor clearances).  The upper, 0.374 on T006, is rounded up to two
 # places.
 BACKLASH_ACCEPTANCE_MM = (0.06, 0.38)
-CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36, 42)
+CONTACT_RATIO_EXCEPTION_TEETH = (6, 12, 18, 24, 30, 36)
 # teeth: (tip diameter, thickest circular tooth thickness at the standard
 # pitch circle), mm.
 DEEPENED_MESH_MM: dict[int, tuple[float, float]] = {
-    6: (4.28, 1.006),
-    12: (7.55, 1.005),
-    18: (10.74, 1.004),
-    24: (13.90, 1.003),
-    30: (17.04, 1.002),
-    36: (20.17, 1.001),
-    42: (23.29, 1.001),
-    48: (26.39, 1.000),
-    54: (29.49, 0.999),
-    60: (32.52, 0.999),
-    66: (35.55, 0.998),
-    72: (38.58, 0.998),
-    78: (41.62, 0.997),
-    84: (44.66, 0.997),
-    90: (47.70, 0.996),
-    96: (50.74, 0.996),
-    102: (53.79, 0.995),
-    108: (56.84, 0.995),
-    114: (59.88, 0.995),
-    120: (62.93, 0.994),
+    6: (4.44, 1.034),
+    12: (7.83, 1.033),
+    18: (11.15, 1.032),
+    24: (14.43, 1.031),
+    30: (17.69, 1.030),
+    36: (20.94, 1.029),
+    42: (24.17, 1.029),
+    48: (27.40, 1.028),
+    54: (30.55, 1.028),
+    60: (33.68, 1.027),
+    66: (36.82, 1.026),
+    72: (39.97, 1.026),
+    78: (43.12, 1.025),
+    84: (46.28, 1.025),
+    90: (49.44, 1.025),
+    96: (52.60, 1.024),
+    102: (55.76, 1.024),
+    108: (58.93, 1.024),
+    114: (62.09, 1.023),
+    120: (65.26, 1.023),
 }
 
 
@@ -139,8 +139,8 @@ BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # datum the MHA-VN-016 stack collar is feelered off -- does not move.  The band
 # is the cylinder bank's L20 d' rule (+/-0.025 per gear, the 20-gear stack
 # accepted at +/-0.20), so it is faced to a micrometer on both sides.
-SEAT_PITCH = 6.888787817263312  # cone_line.SEAT_PITCH, pinned by test
-FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4  # 6.8887
+SEAT_PITCH = 6.875611681879656  # cone_line.SEAT_PITCH, fixed 7.0565 station grid
+FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4  # 6.8756
 FACE_WIDTH_BAND = (0.025, -0.025)
 # Flat clock (user ruling 2026-09-28): the bore's D-flat is the gear's
 # angular datum on MHA-DT-004, and its outward normal passes through the centre
@@ -182,12 +182,11 @@ def chord_floor_radius_mm(
 # the cutter, so the floor does not move with the tooth band.  Three
 # constructions, all one six-entity gap sketch:
 #
-# * T006, T012: the thicker tooth's chord would sit in the drum tip's path
-#   (+0.030 at T006), so the floor bows below the feet chord to the printed
-#   MIN.  MIN is the web limit: T006 keeps the 0.621 web the user ruled on as
-#   its named exception (U40); T012 trades its web from 2.12 down to 2.05,
-#   still over the 2.0 target, for a 0.25 window instead of 0.11.
-# * T018-T042: the chord between the flank feet on the base circle.
+# * T006/T012/T018: dipped floors. T006 keeps a >=0.04 diameter
+#   machining window and improves the original named web exception; T012
+#   scales its old floor with the module; T018 dips just below its chord
+#   to retain 0.10 drum-tip clearance with the new fit's runout.
+# * T024-T042: the chord between the flank feet on the base circle.
 # * T048-T120: the flanks start at ``GAP_FLOOR_TMIN`` above the base circle,
 #   which raises the floor until the drum tip clears it by 0.30 at the worst
 #   case.  The gap is then shallower and wider at the floor, so one fly
@@ -199,43 +198,43 @@ def chord_floor_radius_mm(
 # with every runout closing, floored to the printed three places.  A floor
 # above it would rub the drum tip; test_dt_cone_gear_mesh_design re-derives each
 # value from the assembly pose.
-DIPPED_FLOOR_MIN_MM: dict[int, float] = {6: 2.880, 12: 5.738}
+DIPPED_FLOOR_MIN_MM: dict[int, float] = {6: 2.960, 12: 5.955, 18: 9.191}
 FLOOR_MAX_DIA_MM: dict[int, float] = {
-    6: 2.929,
-    12: 5.988,
-    18: 9.047,
-    24: 12.106,
-    30: 15.165,
-    36: 18.224,
-    42: 21.283,
-    48: 24.342,
-    54: 27.401,
-    60: 30.460,
-    66: 33.519,
-    72: 36.578,
-    78: 39.637,
-    84: 42.696,
-    90: 45.755,
-    96: 48.814,
-    102: 51.873,
-    108: 54.932,
-    114: 57.991,
-    120: 61.050,
+    6: 3.001,
+    12: 6.176,
+    18: 9.351,
+    24: 12.526,
+    30: 15.701,
+    36: 18.876,
+    42: 22.051,
+    48: 25.226,
+    54: 28.401,
+    60: 31.576,
+    66: 34.751,
+    72: 37.926,
+    78: 41.101,
+    84: 44.276,
+    90: 47.451,
+    96: 50.626,
+    102: 53.801,
+    108: 56.976,
+    114: 60.151,
+    120: 63.326,
 }
 GAP_FLOOR_TMIN: dict[int, float] = {
-    48: 0.0900,
-    54: 0.1200,
-    60: 0.1400,
-    66: 0.1540,
-    72: 0.1650,
-    78: 0.1740,
-    84: 0.1815,
-    90: 0.1875,
-    96: 0.1925,
-    102: 0.1970,
-    108: 0.2010,
-    114: 0.2040,
-    120: 0.2070,
+    48: 0.0815,
+    54: 0.1145,
+    60: 0.1355,
+    66: 0.1510,
+    72: 0.1625,
+    78: 0.1715,
+    84: 0.1790,
+    90: 0.1855,
+    96: 0.1905,
+    102: 0.1950,
+    108: 0.1990,
+    114: 0.2025,
+    120: 0.2060,
 }
 
 

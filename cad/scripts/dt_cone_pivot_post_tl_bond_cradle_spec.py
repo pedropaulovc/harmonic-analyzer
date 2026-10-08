@@ -147,15 +147,14 @@ class ConePin:
 CONE_PIN_EAST = ConePin(side=1, length=16.0)
 CONE_PIN_WEST = ConePin(side=-1, length=20.0)
 CONE_PINS = {"east": CONE_PIN_EAST, "west": CONE_PIN_WEST}
-# prechips CN-B5's stations for the tops, to the half printed unit the
-# rounded top plane may move them along the pin axis.
-if (
-    abs(CONE_PIN_EAST.top_x - 2.671145) > PIN_TOP_ROUNDING
-    or abs(CONE_PIN_EAST.top_z + 22.110089) > PIN_TOP_ROUNDING
-    or abs(CONE_PIN_WEST.top_x + 11.777018) > PIN_TOP_ROUNDING
-    or abs(CONE_PIN_WEST.top_z + 18.902193) > PIN_TOP_ROUNDING
-):
-    raise AssertionError("cone pin tops left prechips CN-B5's stations")
+# The top stations follow the current journal angle, not CN-B5's historical
+# world coordinates.  Their across-axis positions must still straddle the
+# journal by the specified spread; the cap-plane and base-end gates below
+# independently retain the physical locating constraints.
+for _pin in CONE_PINS.values():
+    _across = _pin.top_x * CONE_PIN_ACROSS[0] + _pin.top_z * CONE_PIN_ACROSS[2]
+    if abs(_across - _pin.side * CONE_PIN_SPREAD) > 1e-9:
+        raise AssertionError("cone pin tops left their journal-axis spread")
 # Each pin's bottom end stays inside the base plate.
 _BOTTOM_HALF_DROP = PIN_RADIUS * math.sin(_INCLINE)
 for _pin in CONE_PINS.values():

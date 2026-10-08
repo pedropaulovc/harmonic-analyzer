@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 
 import _config
+import cone_line
 import dt_crank_drive_gear_notes
 import dt_crank_drive_gear_spec
 import dt_crank_hub_geometry
@@ -339,10 +340,21 @@ if PIN_AXIAL_LIGAMENT_WORST < PIN_AXIAL_LIGAMENT_FLOOR_MM:
     raise AssertionError("match-drilled pin breaks through the boss end at print-worst")
 if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
     raise AssertionError("the pinion boss needs a positive printed shaft-recess range")
-# The fixed-axis tooth-in-gap seed follows the installed 64T centre; the
-# assembly asserts this cross-hole clock against its independently derived
-# seed so the shaft's radial pin hole tracks a centre-station change.
-PIN_CLOCKING_DEG = 12.037647012980765
+# Match-drilled crankshaft clocking follows the physical 64T centre without
+# importing the assembly builder.  Its native equality check remains there.
+_GEAR64_FROM_POST = dt_crank_drive_gear_spec.CENTRE_STATION - cone_line.POST_STATION
+_CRANK_DY = cone_line.Y_CRANK - cone_line.Y_DRIVE
+_ALPHA64 = math.degrees(
+    math.atan2(_CRANK_DY, _GEAR64_FROM_POST * cone_line.SIN_I * cone_line.COS_I)
+)
+_ALPHA16 = math.degrees(math.atan2(_CRANK_DY, _GEAR64_FROM_POST * cone_line.SIN_I))
+_GEAR64_TOOTH_PITCH = 360.0 / dt_crank_drive_gear_spec.TEETH
+_DELTA64 = round(_ALPHA64 / _GEAR64_TOOTH_PITCH) * _GEAR64_TOOTH_PITCH - _ALPHA64
+PIN_CLOCKING_DEG = (
+    (_ALPHA16 + 180.0)
+    - _DELTA64 * dt_crank_drive_gear_spec.TEETH / TEETH
+    - 360.0 / TEETH / 2.0
+) % (360.0 / TEETH) + dt_crank_drive_gear_spec.MESH_WINDOW_CENTRE_DEG
 if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / 16.0:
     raise AssertionError("pinion retention-hole clocking must lie within one 16T pitch")
 # The matched-hole callout on both part records identifies both seated parts,

@@ -15,13 +15,15 @@ import _config
 from _hole_spec import HoleSpec, drill_process
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from cone_line import POST_STATION, cone_station
+from dt_cone_pivot_post_spec import CRANK_BOSS_LENGTH as POST_CRANK_BOSS_LENGTH
+from dt_cone_pivot_post_spec import CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z
 from dt_cone_pivot_post_spec import CRANK_BORE_DIA as JOURNAL_BORE_DIA
 from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as JOURNAL_BORE_BAND
 import dt_crank_pinion_spec
 import vn_crank_seat_drive_pin_spec
 import pd_transgear_removable_spec
 from dt_crank_hub_geometry import (
-    CRANK_FACE_SHIFT,
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
     FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the drawing contract
     HUB_LENGTH,
@@ -34,9 +36,10 @@ from dt_crank_hub_geometry import (
 )
 
 
-# The restored v36 post's north boss face, measured from the shifted dome root.
-# Keep this independent of the post's rebuild closure; assembly checks the mate.
-POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT
+# The crank face and chain plane stay fixed while the inclined post follows
+# the cone line.  Axial journal and pinion stations follow the installed boss.
+CRANK_FACE_Z = -183.0
+POST_BORE_END = cone_station(POST_STATION)[2] - POST_CRANK_BOSS_START_Z - CRANK_FACE_Z
 SEAT_PINION = POST_BORE_END + dt_crank_pinion_spec.SEAT_FEELER_MM
 if SEAT_PINION <= POST_BORE_END:
     raise AssertionError("the 16T seat must clear the restored post boss north face")
@@ -77,7 +80,7 @@ JOURNAL_DIA_BAND = (
     round(JOURNAL_BORE_DIA + JOURNAL_BORE_BAND[0] - _RUNNING_CLEARANCE[1] - JOURNAL_DIA, 3),
 )
 JOURNAL_CLEARANCE = JOURNAL_BORE_DIA - JOURNAL_DIA
-JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
+JOURNAL_START = POST_BORE_END - POST_CRANK_BOSS_LENGTH
 _JOURNAL_CLEARANCE_LOW = JOURNAL_BORE_BAND[1] - JOURNAL_DIA_BAND[0] + JOURNAL_CLEARANCE
 _JOURNAL_CLEARANCE_HIGH = JOURNAL_BORE_BAND[0] - JOURNAL_DIA_BAND[1] + JOURNAL_CLEARANCE
 if not (

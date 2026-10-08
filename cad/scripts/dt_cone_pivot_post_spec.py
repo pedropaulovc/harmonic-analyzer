@@ -14,6 +14,7 @@ from __future__ import annotations
 import math
 
 import _config
+import cone_line
 from _gtol_spec import CylinderFace, GeometricControl, PartDatum, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
@@ -56,10 +57,9 @@ CRANK_BOSS_LENGTH_IN = 2.8360
 CRANK_BOSS_LENGTH = CRANK_BOSS_LENGTH_IN * MM_PER_IN
 CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
 
-# Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
-# into the part; downstream placement composes it with the exact Ry(180)
-# installation instead of re-authoring the harvested feature frame.
-INCLINE_DEG = 12.5182
+# The cone-shaft journal follows the module-dependent machine incline.  Its
+# feature frame is composed with the exact Ry(180) installation downstream.
+INCLINE_DEG = cone_line.INCLINE_DEG
 CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = 33.368
 CONE_BOSS_DIA = 17.2

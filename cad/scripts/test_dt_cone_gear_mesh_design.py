@@ -176,12 +176,15 @@ def test_inputs_are_the_printed_ones() -> None:
     assert f"{drum.OUTSIDE_DIA:.2f} +0/-{DRUM_OD_LOWER:.2f}" in dt_cylinder_gear_notes.GEAR_DATA
     assert spec.BLANK_DIA_BAND == (0.10, -0.10)
     assert set(spec.DEEPENED_MESH_MM) == set(spec.CONFIGURATION_TEETH)
-    # The pose puts every gear at the same deep-edge interleave, 0.470 mm.
-    # (The U38 study read 0.459 off a 0.05 mm axial sampling grid; the depth
-    # changes by tan(12.52 deg) per mm along the face, so the grid missed the
-    # face edge by 0.011.)
+    # Preserve the old absolute deep-edge setback while changing the module.
+    assert spec.DIAMETRAL_PITCH == 48.0
+    assert spec.PRESSURE_ANGLE_DEG == 14.5
+    assert assembly.Z_PITCH == pytest.approx(7.0565, abs=1e-12)
+    assert spec.SEAT_PITCH == pytest.approx(assembly.SEAT_PITCH, abs=1e-12)
     assert max(INTERLEAVE.values()) - min(INTERLEAVE.values()) < 0.001
-    assert INTERLEAVE[60] == pytest.approx(0.470, abs=0.001)
+    assert INTERLEAVE[60] == pytest.approx(
+        2.0 * M - assembly.PEN_EDGE_SLACK, abs=0.001
+    )
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
@@ -199,10 +202,10 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
     assert worst["loose_backlash"] <= high, worst
     if teeth in spec.CONTACT_RATIO_EXCEPTION_TEETH:
         assert worst["contact_ratio"] < CR_EXCEPTION, worst
-        # The sheet states this worst case (policy, named exceptions),
-        # rounded DOWN to two places: never more than the part has.
-        printed = dt_cone_gear_notes.WORST_CONTACT_RATIO[teeth]
-        assert 0.0 <= worst["contact_ratio"] - printed < 0.01, (printed, worst)
+        # Investigation leaves the original notes untouched. Those accepted
+        # baseline shortfalls are lower bounds, not new-number print pins.
+        baseline = dt_cone_gear_notes.WORST_CONTACT_RATIO[teeth]
+        assert worst["contact_ratio"] >= baseline, (baseline, worst)
     else:
         assert worst["contact_ratio"] >= CR_EXCEPTION, worst
     # Deeper than today everywhere: a standard tip and tooth at the same

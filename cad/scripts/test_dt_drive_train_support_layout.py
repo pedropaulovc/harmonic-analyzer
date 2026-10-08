@@ -24,12 +24,14 @@ def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
         drive.TIP_DRUM120 + drive.TIP_APINION + drive.APINION_GAP,
         abs_tol=1e-9,
     )
-    # U28 (user, 2026-09-23; 997f3534): the drum parks 2.0 outside the tip
-    # circles PLUS the base-chord seat offset, so the engage swing ends where
-    # the 120T tips seat on the gap floor (engaged C2C), not at the pitch sum.
-    pitch_sum = (120 + drive.APINION_TEETH) / drive.DP_TRAIN * 25.4 / 2.0
-    assert math.isclose(
-        drive.APINION_GAP, 2.0 + (drive.ENGAGED_C2C - pitch_sum), abs_tol=1e-4
+    # The parked gap remains configured while the module-dependent engagement
+    # stop seats the cylinder tips on the alignment pinion's chord floor.
+    from dt_alignment_pinion_spec import MIN_CHORD_FLOOR_DIA
+
+    assert drive.APINION_GAP == _config.machine("alignment_pinion", "disengaged_tip_gap_mm")
+    assert drive.ENGAGED_C2C == drive.TIP_DRUM120 + MIN_CHORD_FLOOR_DIA / 2.0
+    assert drive.ENGAGED_C2C == pytest.approx(
+        _config.machine("alignment_pinion", "engaged_center_distance_mm"), abs=1e-6
     )
 
 

@@ -106,7 +106,7 @@ THICKNESS = GAP_NOMINAL
 # facing.  Its MIN keeps FACING_ALLOWANCE -- one finishing cut -- over the
 # thickest fit, so the fitted face is always freshly cut.
 FACING_ALLOWANCE = 0.10
-BLANK_THICKNESS_MIN = 4.30
+BLANK_THICKNESS_MIN = dt_crank_pinion_spec.ceil_to_places(GAP_MAX + FACING_ALLOWANCE, 2)
 
 
 def check_fit_up(gap_min: float, gap_max: float, blank_min: float) -> None:
