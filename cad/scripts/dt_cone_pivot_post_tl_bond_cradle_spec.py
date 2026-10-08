@@ -71,11 +71,20 @@ if abs(BED_HEIGHT - 18.9945) > 1e-9:
 PIN_DIA = 4.0
 PIN_RADIUS = PIN_DIA / 2.0
 
+# Every pin top prints from the post axis at PIN_TOP_PLACES under an explicit
+# band (CRANK/CONE_PIN_FROM_AXIS_TOL below). The model is driven at the
+# PRINTED nominal, the parent's value rounded to those places, so the
+# exported band and the printed limits are the same numbers (FixtureCAD
+# ruling: an explicit band applies to the printed nominal). The rounding
+# moves a top at most half a printed unit off the parent's face.
+PIN_TOP_PLACES = 2
+PIN_TOP_ROUNDING = 0.5 * 10.0**-PIN_TOP_PLACES
+
 # Crank pins: vertical, under the crank sleeve's north face, at the crank
 # socket's station from foot B.
 CRANK_PIN_X = 6.0
 CRANK_PIN_Y = post.CRANK_BORE_HEIGHT
-CRANK_PIN_TOP_Z = -post.CRANK_BOSS_NORTH_FACE
+CRANK_PIN_TOP_Z = -round(post.CRANK_BOSS_NORTH_FACE, PIN_TOP_PLACES)
 CRANK_PIN_HEIGHT = CRANK_PIN_TOP_Z - BASE_TOP_Z
 if abs(round(CRANK_PIN_HEIGHT, 2) - 8.62) > 1e-9:
     raise AssertionError("crank pin height left the plan's 8.62")
@@ -100,8 +109,8 @@ CONE_PIN_ACROSS = (math.cos(_INCLINE), 0.0, -math.sin(_INCLINE))
 _NORTH_CAP = post.SURFACE_FINISHES[3].face
 if any(abs(a + c) > 1e-12 for a, c in zip(CONE_PIN_AXIS, _NORTH_CAP.normal, strict=True)):
     raise AssertionError("cone pin axis is not square to the post's north cap")
-CONE_PIN_TOP_S = -post.CONE_BOSS_LENGTH / 2.0
-if abs(-CONE_PIN_TOP_S - _NORTH_CAP.offset_mm) > 1e-9:
+CONE_PIN_TOP_S = -round(post.CONE_BOSS_LENGTH / 2.0, PIN_TOP_PLACES)
+if abs(-CONE_PIN_TOP_S - _NORTH_CAP.offset_mm) > PIN_TOP_ROUNDING:
     raise AssertionError("cone pin tops left the post's north-cap plane")
 
 
@@ -138,11 +147,13 @@ class ConePin:
 CONE_PIN_EAST = ConePin(side=1, length=16.0)
 CONE_PIN_WEST = ConePin(side=-1, length=20.0)
 CONE_PINS = {"east": CONE_PIN_EAST, "west": CONE_PIN_WEST}
+# prechips CN-B5's stations for the tops, to the half printed unit the
+# rounded top plane may move them along the pin axis.
 if (
-    abs(CONE_PIN_EAST.top_x - 2.671145) > 1e-5
-    or abs(CONE_PIN_EAST.top_z + 22.110089) > 1e-5
-    or abs(CONE_PIN_WEST.top_x + 11.777018) > 1e-5
-    or abs(CONE_PIN_WEST.top_z + 18.902193) > 1e-5
+    abs(CONE_PIN_EAST.top_x - 2.671145) > PIN_TOP_ROUNDING
+    or abs(CONE_PIN_EAST.top_z + 22.110089) > PIN_TOP_ROUNDING
+    or abs(CONE_PIN_WEST.top_x + 11.777018) > PIN_TOP_ROUNDING
+    or abs(CONE_PIN_WEST.top_z + 18.902193) > PIN_TOP_ROUNDING
 ):
     raise AssertionError("cone pin tops left prechips CN-B5's stations")
 # Each pin's bottom end stays inside the base plate.
@@ -281,7 +292,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "CrankPinY": 1,
         "CrankPinDia": 1,
     },
-    "CrankPinReference": {"CrankPinFromAxis": 2},
+    "CrankPinReference": {"CrankPinFromAxis": PIN_TOP_PLACES},
     "PlanReference": {
         "ConePinY": 2,
         "StopSideX": 1,
@@ -295,7 +306,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ConePinEntryEastX": 2,
         "ConePinEntryWestX": 2,
         "ConePinTilt": 1,
-        "ConePinFromAxis": 2,
+        "ConePinFromAxis": PIN_TOP_PLACES,
     },
     "TailSeatReference": {"TailSeatAxisX": 1, "TailSeatAxisHeight": 1},
 }
@@ -346,6 +357,68 @@ _POST_AXIS = ([0.0, 1.0, 0.0], ("__frame__",))
 # Pin tops print from the post axis: the body seat's axis (the tail seat's
 # is the same line).
 _HEIGHT_FROM = "body_seat"
+# Every transverse (X) location prints from the base's west side face; it
+# exports as a ``width`` band, the distance from that face (base_west_side).
+# The sizes across the base, the stop and the saddles export as ``width``
+# bands on their east faces, from the same block's west face.
+_FROM_BASE_TOP = ("base_top", ("BASE_TOP_Z",))
+# The printed cone pin tilt under the title block's general angular band.
+CONE_PIN_TILT_TOL = float(_config.title_block("angular")["value_deg"])
+CONE_PIN_TILT = round(post.INCLINE_DEG, DRAWING_PRECISION_BY_NAME["ConePinTilt"])
+# Saddle-top faces are picked off the seats' chords and the stop's top.
+SADDLE_TOP_PICK_X = SADDLE_WIDTH / 2.0 - 5.0
+if not (
+    STOP_WIDTH / 2.0 < SADDLE_TOP_PICK_X
+    and math.sqrt((TAIL_SEAT_DIA / 2.0) ** 2 - BLOCK_TOP_Z**2) < SADDLE_TOP_PICK_X
+):
+    raise AssertionError("saddle-top pick strays off the saddle tops")
+
+
+def _width(nominal: float, printed: str, sources: tuple[str, ...]) -> dict:
+    """A transverse location or size: its band and nominal at printed places."""
+    return {
+        "width": (limits(nominal, DRAWING_PRECISION_BY_NAME[printed]), sources),
+        "width_nominal": (nominal, sources),
+    }
+
+
+def _block_face(
+    axis: str,
+    outward: float,
+    at: float,
+    key: str,
+    printed: str,
+    nominal: float,
+    sources: tuple[str, ...],
+    *,
+    picks: tuple[float | None, ...] = (None,),
+) -> ExportFeature:
+    """One printed block dimension, owned by the face(s) it ends on: the plane
+    at model ``axis`` = ``at`` facing ``outward``. Heights read from the base
+    top, stations from foot B, widths from the side named above."""
+    normal = [0.0, 0.0, 0.0]
+    normal["xyz".index(axis)] = outward
+    places = DRAWING_PRECISION_BY_NAME[printed]
+    fields = {
+        "normal": (normal, ("__frame__",)),
+        "plane": ({"frame": "model", "axis": axis, "value": at}, sources),
+        key: (limits(nominal, places), sources),
+        f"{key}_nominal": (nominal, sources),
+    }
+    if key == "height":
+        fields["height_from"] = _FROM_BASE_TOP
+    return ExportFeature(
+        kind="face",
+        faces=tuple(PlanarFace(tuple(normal), outward * at, contains_x_mm=x) for x in picks),
+        requirements=(key,),
+        fields=fields,
+        precision={key: places},
+    )
+
+
+def _seat_finish(key: str) -> dict:
+    control = next(item for item in SURFACE_FINISHES if item.key == key)
+    return {"finish_ra": (control.roughness_um, ("SURFACE_FINISHES",))}
 
 
 def _crank_pin(x: float) -> ExportFeature:
@@ -355,7 +428,7 @@ def _crank_pin(x: float) -> ExportFeature:
             CylinderFace(PIN_DIA, contains_x_mm=x, contains_y_mm=CRANK_PIN_Y),
             PlanarFace((0.0, 0.0, 1.0), CRANK_PIN_TOP_Z, contains_x_mm=x),
         ),
-        requirements=("height", "station"),
+        requirements=("height", "station", "width"),
         fields={
             "at": ([x, CRANK_PIN_Y, CRANK_PIN_TOP_Z], ("CRANK_PIN_X", "CRANK_PIN_Y", "CRANK_PIN_TOP_Z")),
             "axis": _UP,
@@ -378,11 +451,18 @@ def _crank_pin(x: float) -> ExportFeature:
                 limits(CRANK_PIN_Y, DRAWING_PRECISION_BY_NAME["CrankPinY"]),
                 ("CRANK_PIN_Y", (_POST, "CRANK_BORE_HEIGHT")),
             ),
+            "station_nominal": (CRANK_PIN_Y, ("CRANK_PIN_Y",)),
             "dia_nominal": (PIN_DIA, ("PIN_DIA",)),
+            **_width(
+                x - SIDE_W_X,
+                "CrankPinWestX" if x < 0.0 else "CrankPinEastX",
+                ("CRANK_PIN_WEST_FROM_SIDE" if x < 0.0 else "CRANK_PIN_EAST_FROM_SIDE",),
+            ),
         },
         precision={
             "height": DRAWING_PRECISION_BY_NAME["CrankPinFromAxis"],
             "station": DRAWING_PRECISION_BY_NAME["CrankPinY"],
+            "width": DRAWING_PRECISION_BY_NAME["CrankPinWestX" if x < 0.0 else "CrankPinEastX"],
         },
     )
 
@@ -390,10 +470,11 @@ def _crank_pin(x: float) -> ExportFeature:
 def _cone_pin(name: str) -> ExportFeature:
     pin = CONE_PINS[name]
     pin_name = f"CONE_PIN_{name.upper()}"
+    entry = f"ConePinEntry{name.title()}X"
     return ExportFeature(
         kind="pin",
         faces=(CylinderFace(PIN_DIA, contains_x_mm=pin.top_x, contains_y_mm=CONE_PIN_Y),),
-        requirements=("height", "station", "angle_deg", "note"),
+        requirements=("height", "station", "width", "land_angle_deg", "note"),
         fields={
             "at": (
                 [pin.top_x, CONE_PIN_Y, pin.top_z],
@@ -420,13 +501,24 @@ def _cone_pin(name: str) -> ExportFeature:
                 limits(CONE_PIN_Y, DRAWING_PRECISION_BY_NAME["ConePinY"]),
                 ("CONE_PIN_Y", (_POST, "BORE_HEIGHT")),
             ),
+            "station_nominal": (CONE_PIN_Y, ("CONE_PIN_Y",)),
             "angle_deg": (post.INCLINE_DEG, ((_POST, "INCLINE_DEG"),)),
+            # The printed 12.5 deg tilt, +/- the general angular band.
+            "land_angle_deg": (
+                [CONE_PIN_TILT - CONE_PIN_TILT_TOL, CONE_PIN_TILT + CONE_PIN_TILT_TOL],
+                ("CONE_PIN_TILT", "CONE_PIN_TILT_TOL", (_POST, "INCLINE_DEG")),
+            ),
+            "land_angle_nominal_deg": (post.INCLINE_DEG, ((_POST, "INCLINE_DEG"),)),
+            # The hole's entry into the base top, from the west side.
+            **_width(CONE_PIN_ENTRY_FROM_SIDE[name], entry, ("CONE_PIN_ENTRY_FROM_SIDE",)),
             "dia_nominal": (PIN_DIA, ("PIN_DIA",)),
             "note": (CONE_PIN_TOPS_NOTE, ("CONE_PIN_TOPS_NOTE", "CONE_PIN_TOPS_MATCH")),
         },
         precision={
             "height": DRAWING_PRECISION_BY_NAME["ConePinFromAxis"],
             "station": DRAWING_PRECISION_BY_NAME["ConePinY"],
+            "width": DRAWING_PRECISION_BY_NAME[entry],
+            "land_angle_deg": DRAWING_PRECISION_BY_NAME["ConePinTilt"],
         },
     )
 
@@ -435,7 +527,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "body_seat": ExportFeature(
         kind="seat",
         faces=(CylinderFace(BODY_SEAT_DIA),),
-        requirements=("note", "height"),
+        requirements=("note", "height", "width", "finish_ra"),
         fields={
             "at": ([0.0, BODY_SADDLE_Y, 0.0], ("BODY_SADDLE_Y", "__frame__")),
             "axis": _POST_AXIS,
@@ -446,15 +538,19 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("SEAT_AXIS_HEIGHT", "BASE_TOP_Z"),
             ),
             "height_nominal": (SEAT_AXIS_HEIGHT, ("SEAT_AXIS_HEIGHT",)),
+            **_width(SEAT_AXIS_FROM_SIDE, "BodySeatAxisX", ("SEAT_AXIS_FROM_SIDE",)),
+            **_seat_finish("body_seat"),
         },
         precision={
             "height": DRAWING_PRECISION_BY_NAME["BodySeatAxisHeight"],
+            "width": DRAWING_PRECISION_BY_NAME["BodySeatAxisX"],
+            "finish_ra": 1,
         },
     ),
     "tail_seat": ExportFeature(
         kind="seat",
         faces=(CylinderFace(TAIL_SEAT_DIA),),
-        requirements=("note", "height"),
+        requirements=("note", "height", "width", "finish_ra"),
         fields={
             "at": ([0.0, TAIL_SADDLE_Y, 0.0], ("TAIL_SADDLE_Y", "__frame__")),
             "axis": _POST_AXIS,
@@ -465,15 +561,19 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ("SEAT_AXIS_HEIGHT", "BASE_TOP_Z"),
             ),
             "height_nominal": (SEAT_AXIS_HEIGHT, ("SEAT_AXIS_HEIGHT",)),
+            **_width(SEAT_AXIS_FROM_SIDE, "TailSeatAxisX", ("SEAT_AXIS_FROM_SIDE",)),
+            **_seat_finish("tail_seat"),
         },
         precision={
             "height": DRAWING_PRECISION_BY_NAME["TailSeatAxisHeight"],
+            "width": DRAWING_PRECISION_BY_NAME["TailSeatAxisX"],
+            "finish_ra": 1,
         },
     ),
     "foot_stop": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 1.0, 0.0), 0.0),),
-        requirements=("plane",),
+        requirements=("plane", "thickness"),
         fields={
             "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "y", "value": 0.0}, ("__frame__",)),
@@ -499,6 +599,98 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "thickness_nominal": (BASE_THICK, ("BASE_THICK",)),
         },
         precision={"thickness": DRAWING_PRECISION_BY_NAME["BaseThick"]},
+    ),
+    # The face every transverse location prints from.
+    "base_west_side": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((-1.0, 0.0, 0.0), -SIDE_W_X),),
+        requirements=("plane",),
+        fields={
+            "normal": ([-1.0, 0.0, 0.0], ("__frame__",)),
+            "plane": ({"frame": "model", "axis": "x", "value": SIDE_W_X}, ("SIDE_W_X",)),
+        },
+    ),
+    "base_east_side": _block_face(
+        "x", 1.0, -SIDE_W_X, "width", "BaseWidth", BASE_WIDTH, ("BASE_WIDTH", "SIDE_W_X")
+    ),
+    "base_far_end": _block_face(
+        "y",
+        1.0,
+        BASE_END_Y + BASE_LENGTH,
+        "length",
+        "BaseLength",
+        BASE_LENGTH,
+        ("BASE_LENGTH", "BASE_END_Y"),
+    ),
+    "stop_top": _block_face(
+        "z",
+        1.0,
+        BLOCK_TOP_Z,
+        "height",
+        "StopHeight",
+        BLOCK_HEIGHT,
+        ("BLOCK_HEIGHT", "BLOCK_TOP_Z"),
+        picks=(0.0,),
+    ),
+    "stop_west_side": _block_face(
+        "x",
+        -1.0,
+        -STOP_WIDTH / 2.0,
+        "width",
+        "StopSideX",
+        STOP_SIDE_OFFSET,
+        ("STOP_SIDE_OFFSET", "STOP_WIDTH", "SIDE_W_X"),
+    ),
+    "stop_east_side": _block_face(
+        "x", 1.0, STOP_WIDTH / 2.0, "width", "StopWidth", STOP_WIDTH, ("STOP_WIDTH",)
+    ),
+    # Both saddles' tops, either side of each seat: one plane, one height.
+    "saddle_tops": _block_face(
+        "z",
+        1.0,
+        BLOCK_TOP_Z,
+        "height",
+        "BodySaddleHeight",
+        BLOCK_HEIGHT,
+        ("BLOCK_HEIGHT", "BLOCK_TOP_Z", "SADDLE_TOP_PICK_X"),
+        picks=(-SADDLE_TOP_PICK_X, SADDLE_TOP_PICK_X),
+    ),
+    "body_saddle_south": _block_face(
+        "y", -1.0, BODY_SADDLE_Y, "station", "BodySaddleY", BODY_SADDLE_Y, ("BODY_SADDLE_Y",)
+    ),
+    "body_saddle_north": _block_face(
+        "y",
+        1.0,
+        BODY_SADDLE_Y + BODY_SADDLE_THICK,
+        "thickness",
+        "BodySaddleThick",
+        BODY_SADDLE_THICK,
+        ("BODY_SADDLE_THICK", "BODY_SADDLE_Y"),
+    ),
+    "tail_saddle_south": _block_face(
+        "y", -1.0, TAIL_SADDLE_Y, "station", "TailSaddleY", TAIL_SADDLE_Y, ("TAIL_SADDLE_Y",)
+    ),
+    "tail_saddle_north": _block_face(
+        "y",
+        1.0,
+        TAIL_SADDLE_Y + TAIL_SADDLE_THICK,
+        "thickness",
+        "TailSaddleThick",
+        TAIL_SADDLE_THICK,
+        ("TAIL_SADDLE_THICK", "TAIL_SADDLE_Y"),
+    ),
+    # Both saddles' side faces share each plane.
+    "saddle_west_sides": _block_face(
+        "x",
+        -1.0,
+        -SADDLE_WIDTH / 2.0,
+        "width",
+        "SaddleSideX",
+        SADDLE_SIDE_OFFSET,
+        ("SADDLE_SIDE_OFFSET", "SADDLE_WIDTH", "SIDE_W_X"),
+    ),
+    "saddle_east_sides": _block_face(
+        "x", 1.0, SADDLE_WIDTH / 2.0, "width", "SaddleWidth", SADDLE_WIDTH, ("SADDLE_WIDTH",)
     ),
     "crank_pin_west": _crank_pin(-CRANK_PIN_X),
     "crank_pin_east": _crank_pin(CRANK_PIN_X),
