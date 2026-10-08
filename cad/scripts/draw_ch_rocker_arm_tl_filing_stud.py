@@ -81,9 +81,10 @@ def _row(station_x_mm: float, row: int) -> tuple[float, float]:
     )
 
 
-# Shortest span lowest so no extension line crosses another row's text.
+# Shortest tip span lowest so no extension line crosses another row's text.
 PROFILE_KEEP = {
-    "ThreadStartStation": _row(BODY_LENGTH, 0),
+    # The body length, direct from the seat, under the tip stations.
+    "BodyLength": ((2.0 * SEAT_X + BODY_LENGTH * _S) / 2.0, PROFILE_CENTER[1] + 0.022),
     "SeatStation": _row(0.0, 1),
     "HeadBackStation": _row(-HEAD_LENGTH, 2),
     "TailEndStation": _row(-TAIL_END, 3),

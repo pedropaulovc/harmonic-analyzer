@@ -65,13 +65,9 @@ def test_matched_fits_export_the_printed_reference_and_fit_note() -> None:
 
 def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
     """At every printed button thickness and hub length the whole hub sits on
-    the lapped body (its length the worst case of the two printed tip
-    stations), and the nut lands on the upper button (body short of the
+    the lapped body, and the nut lands on the upper button (body short of the
     stack top)."""
-    stud = _features(STUD)
-    seat_low, seat_high = stud["button_seat"]["station"]
-    start_low, start_high = stud["locating_body"]["station"]
-    body_low, body_high = seat_low - start_high, seat_high - start_low
+    body_low, body_high = _features(STUD)["locating_body"]["length"]
     thick_low, thick_high = _features(BUTTON)["hub_seat_face"]["thickness"]
     hub_high = rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0]
     assert body_high < 2 * thick_low + rocker.HUB_LENGTH
