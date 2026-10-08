@@ -2408,6 +2408,67 @@ class SynthesisAutomaticSourceDriveTests(unittest.TestCase):
         self.assertEqual(self.main_input(next_shot)['crankTurns'], self.baseline['crankTurns'])
 
 
+class ExecutedPointMotionTests(unittest.TestCase):
+    def test_rotary_points_need_executed_baseline_not_only_a_body_binding(self):
+        for path, coordinate in (
+            ('dt-drive-train/dt-crank-handle-1', [0.057999998331069946, 0, 0]),
+            ('dt-drive-train/dt-crank-handle-butt-cup-1', [-0.008100000210106373, 0, 0]),
+            ('mg-magnifier/mg-magnifying-wheel-1', [-0.0014816663460806012, 0.04997804015874863, 0]),
+            ('dt-drive-train/dt-crankshaft-1', [0, 0, 0]),
+        ):
+            with self.subTest(path=path):
+                self.assertIsNone(common.anchor_motion({
+                    'id': 'unproved-feature', 'kind': 'physical-feature',
+                    'partPath': 'ha-harmonic-analyzer/' + path, 'partLocalMetres': coordinate,
+                    'correspondenceEvidence': 'Native correspondence is not executed motion.'}))
+
+    def test_historical_anchor_authority_does_not_open_live_point_motion_route(self):
+        self.assertEqual(common.executed_anchor_motion(
+            {'kind': 'historical-source-observations'}, [{'id': 'old', 'motion': None}], []), {})
+        self.assertEqual(common.anchor_motion({'id': 'old', 'motion': 'moving'}), 'moving')
+
+    def test_real_model_build_track_promotes_only_supported_off_axis_capability(self):
+        approval = json.loads((common.WEB / 'content/model-representation.json').read_bytes())
+        manifest = json.loads((common.WEB / 'content/canonical-native/manifest.json').read_bytes())
+        data = current_record('NAsM30MAHLg', approval, manifest['currentSourceInventory']['sha256'])
+        data['source']['durationSeconds'] = 1
+        data['frames'] = data['frames'][:1]
+        data['shots'][0]['endSeconds'] = 1
+        data['shots'] = data['shots'][:1]
+        data['coverage']['changeTimesSeconds'] = []
+        features = (
+            ('intro-front', 'dt-drive-train/dt-crank-handle-1', [0.057999998331069946, 0, 0]),
+            ('synth-butt', 'dt-drive-train/dt-crank-handle-butt-cup-1', [-0.008100000210106373, 0, 0]),
+            ('spin-rim', 'mg-magnifier/mg-magnifying-wheel-1', [-0.0014816663460806012, 0.04997804015874863, 0]),
+            ('unknown-centre', 'dt-drive-train/dt-crankshaft-1', [0, 0, 0]),
+        )
+        for anchor_id, path, coordinate in features:
+            data['anchors'].append({
+                'id': anchor_id, 'kind': 'physical-feature', 'partPath': 'ha-harmonic-analyzer/' + path,
+                'partLocalMetres': coordinate, 'description': 'Actual native feature in synthetic assembly test.',
+                'correspondenceEvidence': 'Exact released native coordinate; source pixels are synthetic test-only.'})
+            data['frames'][0]['landmarks'].append({
+                'anchorId': anchor_id, 'viewId': 'main', 'role': 'check', 'status': 'observed',
+                'method': 'manual', 'pixel': [120.5, 340.25], 'uncertaintyPx': 0.5})
+        original = copy.deepcopy(data)
+        track = common.build_track(data, lambda frame: copy.deepcopy(frame['views']))
+        motions = {anchor['id']: anchor['motion'] for anchor in track['anchors']}
+        self.assertEqual([motions[key] for key in ('intro-front', 'synth-butt', 'spin-rim')], ['moving'] * 3)
+        self.assertIsNone(motions['unknown-centre'])
+        # The pre-existing selector adds samplingDiagnostics, but cannot mutate
+        # the captured source coordinates, roles, associations or chosen inputs.
+        for key in ('source', 'model', 'nativeIdentity', 'anchors', 'frames'):
+            self.assertEqual(data[key], original[key])
+        self.assertEqual(track['frames'][0]['landmarks'], data['frames'][0]['landmarks'])
+        self.assertEqual(track['frames'][0]['views'], data['frames'][0]['views'])
+        for compiled, captured in zip(track['anchors'], data['anchors']):
+            self.assertEqual({key: value for key, value in compiled.items() if key != 'motion'}, captured)
+        bridge = common._point_motion_bridge(str(common.WEB))
+        pid = bridge.process.pid
+        self.assertEqual(common.build_track(data, lambda frame: copy.deepcopy(frame['views'])), track)
+        self.assertEqual(common._point_motion_bridge(str(common.WEB)).process.pid, pid)
+
+
 class HistoricalSynthesisSourceDriveBoundaryTests(unittest.TestCase):
     def fixture(self, load_motion=True):
         generator = historical_synthesis_generator()

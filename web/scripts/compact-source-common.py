@@ -15,12 +15,14 @@ independent exact compressed-byte and original decoded-JSON-byte SHA-256 seals.
 from __future__ import annotations
 
 import copy
+import atexit
 import gzip
 import json
 import importlib.util
 import math
 import re
 import subprocess
+import sys
 from functools import lru_cache
 import hashlib
 from pathlib import Path
@@ -749,6 +751,91 @@ def anchor_motion(anchor):
         return "fixed"
     return "moving"
 
+class _PointMotionBridge:
+    """One actual model/Node process per producer; no per-frame proof collection."""
+    def __init__(self, web_root):
+        self.process = subprocess.Popen(
+            ["node", str(Path(web_root) / "scripts/executed-point-motion.mjs")],
+            cwd=web_root, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            text=True, encoding="utf-8", bufsize=1)
+        self.cache = {}
+        self.unavailable = False
+        atexit.register(self.close)
+
+    def classify(self, request):
+        key = json.dumps(request, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        if key in self.cache:
+            return self.cache[key]
+        if self.unavailable:
+            return {}
+        try:
+            self.process.stdin.write(key + "\n")
+            self.process.stdin.flush()
+            response = json.loads(self.process.stdout.readline())
+            if response.get("error"):
+                raise ValueError(response["error"])
+            result = {row["id"]: "moving" for row in response["results"] if row["motion"] == "moving"}
+        except (OSError, ValueError, KeyError) as error:
+            self.unavailable = True
+            print(f"Actual point-motion classification unavailable; anchors remain unknown: {error}", file=sys.stderr)
+            return {}
+        self.cache[key] = result
+        return result
+
+    def close(self):
+        if self.process.poll() is not None:
+            return
+        self.process.stdin.close()
+        try:
+            self.process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            self.process.terminate()
+            self.process.wait()
+
+
+@lru_cache(maxsize=1)
+def _point_motion_bridge(web_root):
+    return _PointMotionBridge(web_root)
+
+
+def executed_anchor_motion(data, anchors, frames):
+    """Promote only actual supported rigid point capability, never historical data.
+
+    Source coordinates, roles, associations and chosen inputs remain untouched.
+    Zero displacement is unknown, not evidence of a fixed part. No source pose,
+    camera, root override, or optional native draw certificate enters this route.
+    """
+    if data.get("kind") != "current-source-observations":
+        return {}
+    candidates = {
+        anchor["id"]: anchor for anchor in anchors if anchor["motion"] is None
+        and any(motion in ("crank", "wheel") and pattern.fullmatch(anchor.get("partPath", ""))
+                for pattern, motion in native_motion_bindings())
+    }
+    if not candidates:
+        return {}
+    inputs = {}
+    for frame in frames:
+        views = {view["id"]: view for view in frame["views"]}
+        for landmark in frame["landmarks"]:
+            anchor_id = landmark["anchorId"]
+            view = views.get(landmark.get("viewId", "main"))
+            if anchor_id in candidates and anchor_id not in inputs and view and view.get("input"):
+                inputs[anchor_id] = view["input"]
+        if len(inputs) == len(candidates):
+            break
+    if not inputs:
+        return {}
+    request = {"model": data.get("model"), "nativeIdentity": data.get("nativeIdentity"),
+               "cases": [{"anchor": candidates[anchor_id], "input": value}
+                         for anchor_id, value in inputs.items()]}
+    try:
+        return _point_motion_bridge(str(WEB)).classify(request)
+    except OSError as error:
+        print(f"Actual point-motion bridge unavailable; anchors remain unknown: {error}", file=sys.stderr)
+        return {}
+
+
 
 def build_track(data, frame_views_callback, evidence_notes=None):
     canonicalize_cut_clock(data)
@@ -784,6 +871,10 @@ def build_track(data, frame_views_callback, evidence_notes=None):
         if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in required)):
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: source-required camera/input remains unavailable.')
         frames.append(row)
+    executed_motion = executed_anchor_motion(data, anchors, frames)
+    for anchor in anchors:
+        if anchor["motion"] is None:
+            anchor["motion"] = executed_motion.get(anchor["id"])
     source_keys = ("videoId", "sha256", "width", "height", "durationSeconds", "videoDurationSeconds", "fps", "decodedFrameCount", "firstDecodedTimeSeconds", "lastDecodedTimeSeconds", "rights")
     result = {"schemaVersion": 1, "kind": "compact-source-track",
               "source": {key: copy.deepcopy(data["source"][key]) for key in source_keys if key in data["source"]},
