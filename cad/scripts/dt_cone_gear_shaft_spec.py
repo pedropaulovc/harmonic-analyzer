@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import math
 
+import cone_line
+import dt_cone_pivot_post_spec
+import dt_cone_tip_block_spec
+
 from _gtol_spec import CylinderFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -25,6 +29,7 @@ from dt_crank_drive_gear_spec import CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_N
 from dt_crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 from dt_crank_drive_gear_spec import LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE_WIDTH
 from dt_crank_drive_gear_spec import SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH
+from dt_crank_drive_gear_spec import LAYOUT_CENTRE_STATION as GEAR64_LAYOUT_CENTRE_STATION
 from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
 
@@ -34,16 +39,19 @@ MM_PER_IN = 25.4
 # 42.011 mm along the cone axis.  The shaft begins 1.0 mm proud of the post's
 # front face, so the integral journal is one millimetre longer than the post
 # body and runs with 0.05 mm diametral clearance.
-JOURNAL_BORE_DIA = 12.2808
+JOURNAL_BORE_DIA = dt_cone_pivot_post_spec.BORE_DIA
 JOURNAL_CLEARANCE = 0.05
 JOURNAL_DIA = JOURNAL_BORE_DIA - JOURNAL_CLEARANCE
-JOURNAL_END = 43.011
+JOURNAL_PROUD = 1.0
+JOURNAL_END = dt_cone_pivot_post_spec.CONE_BOSS_LENGTH + JOURNAL_PROUD
 
 # The final coupled-layout post centre is cone station -39.90136099793.  Its
 # 42.011 mm axial body therefore has its front face at -60.9068609979; another
 # 1.0 mm makes the shaft end proud at -61.9068609979.  The part origin is that front end and all
 # stations below are measured from it.
-FRONT_STUB = 61.9068609979
+FRONT_STUB = (
+    -cone_line.POST_STATION + dt_cone_pivot_post_spec.CONE_BOSS_LENGTH / 2.0 + JOURNAL_PROUD
+)
 
 # Axial capture (#914, user ruling 2026-09-25).  The tip adjuster pushes the
 # shaft south, toward the post; nothing reacted it until the 64T met the post
@@ -61,9 +69,10 @@ FRONT_STUB = 61.9068609979
 # centre is the drive-train's physical 64T station (the shaft tests pin the
 # two equal).
 GEAR64_SOUTH_FACE_STATION = (
-    19.9 + GEAR_AXIS_SHIFT - GEAR64_LAYOUT_FACE_WIDTH / 2.0 + GEAR64_SOUTH_FACE_SHIFT_NORTH
+    GEAR64_LAYOUT_CENTRE_STATION + GEAR_AXIS_SHIFT
+    - GEAR64_LAYOUT_FACE_WIDTH / 2.0 + GEAR64_SOUTH_FACE_SHIFT_NORTH
 )
-GEAR64_CENTER_STATION = 19.9 + GEAR_AXIS_SHIFT + GEAR64_CENTRE_SHIFT_NORTH
+GEAR64_CENTER_STATION = GEAR64_LAYOUT_CENTRE_STATION + GEAR_AXIS_SHIFT + GEAR64_CENTRE_SHIFT_NORTH
 GEAR64_NORTH_FACE_STATION = GEAR64_SOUTH_FACE_STATION + GEAR64_FACE_WIDTH
 COLLAR_START_STATION = JOURNAL_END
 COLLAR_END_STATION = FRONT_STUB + GEAR64_SOUTH_FACE_STATION
@@ -131,9 +140,9 @@ POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
 # 2026-09-28): each is dt_cone_gear_spec.FACE_WIDTH thick, grown SOUTH from the
 # reference north face (centre + 3.25), so every north face -- T006's
 # included -- stays where it was, and each gear bears on the one before it.
-T006_CENTER_STATION = 28.25 + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
-CONE_FACE_STATION_REFERENCE = 6.5
-T006_NORTH_FACE_STATION = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
+T006_CENTER_STATION = cone_line.T006_CENTER_STATION
+CONE_FACE_STATION_REFERENCE = cone_line.CONE_FACE_STATION_REFERENCE
+T006_NORTH_FACE_STATION = cone_line.T006_NORTH_FACE
 
 
 def gear_faces(j: int) -> tuple[float, float]:
@@ -165,20 +174,16 @@ if not (
 # apex on the tip.  The vendor Sketch2 profile (Line7, harvested 2026-09-24)
 # puts the 45 deg conical cup apex 1.2065 mm beyond the cup rim
 # (4.7625 - 3.556), so this spec ends the shaft there; the assembly backs the
-# adjuster out by the stub's seat depth on the cup wall.  The block, pivot
-# and embed constants duplicate cone_line, the block spec and the replica so
-# this spec imports no layout or build module; test_dt_cone_gear_shaft_drawing
-# pins them and the drive-train assembly asserts the seat.
+# adjuster out by the stub's seat depth on the cup wall. The block, pivot
+# and embed stations follow their pure geometry owners.
 TIP_COLLAR_START_STATION = T006_NORTH_FACE_STATION + COLLAR_FEELER
 TIP_COLLAR_END_STATION = TIP_COLLAR_START_STATION + TIP_COLLAR_WIDTH
-TIP_BLOCK_LENGTH = 9.75
-PIVOT_FROM_T006_NORTH_FACE = 23.0
-TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.575
-TIP_BLOCK_NORTH_FACE_STATION = (
-    T006_NORTH_FACE_STATION + PIVOT_FROM_T006_NORTH_FACE - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
-)
+TIP_BLOCK_LENGTH = dt_cone_tip_block_spec.BLOCK_Z
+PIVOT_FROM_T006_NORTH_FACE = cone_line.PIVOT_STATION - cone_line.T006_NORTH_FACE
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
+TIP_BLOCK_NORTH_FACE_STATION = cone_line.TIP_BLOCK_NORTH_FACE
 TIP_BLOCK_SOUTH_FACE_STATION = TIP_BLOCK_NORTH_FACE_STATION - TIP_BLOCK_LENGTH
-ADJUSTER_EMBED = 8.17
+ADJUSTER_EMBED = dt_cone_tip_block_spec.ADJUSTER_EMBED
 ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED
 MCM_94025A164_CUP_DEPTH = 1.2065
 T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + MCM_94025A164_CUP_DEPTH
