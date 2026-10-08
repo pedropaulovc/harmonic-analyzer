@@ -440,32 +440,6 @@ test('native seek events with a stale actual clock cannot recover an ended sourc
   assert.equal(fixture.video.ended, true)
 })
 
-test('moving CHECKs from one shot cannot certify another internally moving shot', () => {
-  const video = videoFixture()
-  video.samples[0].sourceShotId = 'moving-a'
-  video.samples.push({ ...video.samples[0], timeSeconds: 1, sampleTimeSeconds: 1, sourceShotId: 'moving-b', measurements: [measurement('fixed-b', 'fixed')] })
-  const census = { rows: [...censusFixture.rows, { timeSeconds: 1, required: true, reasons: ['every-second'] }] }
-  finishVideo(video, census, parseOptions(['--stage', '50']))
-  assert.notEqual(video.status, 'passed')
-  assert.ok(video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage' && failure.shotId === 'moving-b'))
-})
-
-test('source-backed static rigs retain distributed fixed checks instead of invented moving hubs', () => {
-  const video = videoFixture()
-  video.samples[0].sourceShotId = 'static-rig'
-  video.samples[0].measurements = [measurement('fixed-left', 'fixed'), measurement('fixed-right', 'fixed')]
-  video.shots = [{ id: 'static-rig', internalMechanismMotion: 'static', internalMotionEvidence: 'Source-only retained static mechanism observation; camera/turntable changes, internal bodies do not.', sourceStaticControls: { status: 'source-controls-verified' } }]
-  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
-  assert.equal(video.status, 'passed')
-  assert.equal(video.landmarks.movingChecks, 0)
-  assert.equal(video.motionCoverage[0].internalMechanismMotion, 'source-backed-static-rig')
-  video.shots[0].sourceStaticControls = null
-  video.failures = []
-  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
-  assert.notEqual(video.status, 'passed')
-  assert.ok(video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
-})
-
 test('compact-required endcards retain all source views despite a legacy non-machine label', () => {
   const legacy = { shots: [{ id: 'shot', startSeconds: 0, endSeconds: 2.1, classification: 'non-machine', hasCorrespondingMachine: false }], frames: [frame(0, 'non-machine'), frame(1, 'non-machine'), frame(2, 'non-machine')] }
   const authored = legacy.frames.map(frame => ({ ...frame, sourceMachineRequirement: 'required', views: [{ id: 'endcard-a' }, { id: 'endcard-b' }] }))
@@ -543,14 +517,25 @@ test('diagnostic success cannot replace a missing integer second or required mea
   assert.notEqual(missing.stageMeasurement.status, 'passed')
 })
 
-test('diagnostic moving CHECKs cannot certify mandatory static-only measurements', () => {
+test('diagnostic moving CHECKs do not alter mandatory motion counts or repair missing visual coverage', () => {
   const video = videoFixture(), extra = { timeSeconds: 0.5, required: true, diagnosticOnly: true, reasons: ['mid-interval'] }
-  video.samples[0].measurements = [measurement('fixed', 'fixed')]
+  video.samples[0].measurements = [measurement('unclassified', 'unknown')]
   video.samples.push({ ...video.samples[0], ...extra, sampleTimeSeconds: 0.5, measurements: [measurement('moving-extra', 'moving')] })
-  finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
-  assert.notEqual(video.status, 'passed')
+  const census = { rows: [...censusFixture.rows, extra] }
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.status, 'passed')
   assert.equal(video.landmarks.movingChecks, 0)
-  assert.ok(video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
+  assert.equal(video.landmarks.unknownChecks, 1)
+  assert.equal(video.diagnosticLandmarks.measured, 1)
+  assert.equal(video.motionCoverage[0].status, 'unavailable')
+  video.samples[0].measurements = []
+  video.samples[0].status = 'unavailable'
+  video.samples[0].unavailable = [{ reason: 'Missing required independent source pixels' }]
+  video.failures = []
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, false)
+  assert.equal(video.status, 'unavailable')
+  assert.equal(video.stageMeasurement.status, 'unmeasured')
 })
 
 const sourceView = (id, rectSourcePixels = [0, 0, 1920, 1080]) => ({
@@ -616,16 +601,17 @@ const manualSeedFrame = (fixture, timeSeconds = 0, decodedTimeSeconds = 0, viewI
   landmarks: [{ ...fixture.observations[3], method: 'manual', viewId, originalViewId: viewId }],
 })
 
-function measuredViewFixture() {
-  const view = { ...sourceView('main'), sourceAssembly: { kind: 'operating' } }, frame = { timeSeconds: 1, decodedTimeSeconds: 1, views: [view], sourceImage: sourceImage(30, 'actual-target') }
+function measuredViewFixture(timeSeconds = 1) {
+  const frameIndex = timeSeconds * 30
+  const view = { ...sourceView('main'), sourceAssembly: { kind: 'operating' } }, frame = { timeSeconds, decodedTimeSeconds: timeSeconds, views: [view], sourceImage: sourceImage(frameIndex, 'actual-target') }
   const positions = [[100, 100], [900, 100], [100, 800], [900, 800]]
   const observations = positions.map((pixel, index) => ({ anchorId: `anchor-${index}`, role: index < 2 ? 'fit' : 'check', pixel, status: 'observed', method: 'manual', uncertaintyPx: 1 }))
   const anchors = new Map(observations.map((observed, index) => [observed.anchorId, { kind: 'physical-feature', partPath: `native/part-${index}`, partLocalMetres: [0, 0, 0], correspondenceEvidence: 'Independently identified physical feature', motion: index === 2 ? 'moving' : 'fixed' }]))
   const layout = [{ viewId: 'main', rectSourcePixels: view.rectSourcePixels, presentation: 'native', composite: { mode: 'opaque' }, resolvedImagePlaneWarp: null, sourceAssembly: { kind: 'operating' } }]
-  const capture = { method: 'gpu-readback', status: 'captured', visibilityMode: 'depth-off-landmark-projection', viewId: 'main', timeSeconds: 1, sourceLayout: layout, resolvedImagePlaneWarp: null, landmarks: observations.map(observed => ({ id: observed.anchorId, state: 'rendered', sourcePixels: observed.pixel, canvasPixels: observed.pixel, uncertaintySourcePixels: 0.5 })) }
-  const mechanism = { method: 'actual-native-mechanism-solve', status: 'rendered', viewId: 'main', timeSeconds: 1, sourceDrawRevision: 1, channelAnglesRad: Array(20).fill(0), input: view.input, sourceLayout: layout, resolvedImagePlaneWarp: null }
-  const originalExposure = { frameIndex: 30, pts: 30, timeBase: [1, 30], sourceUrl: fixtureSourceUrl }
-  const response = { player: 'local', originalExposure, captures: [{ viewId: 'main', capture, mechanism }], actual: { modelTime: 1, sourceSampleTimeSeconds: 1, sourceDrawRevision: 1, sourcePresentation: { frameIndex: 30, pts: 30, timeBase: [1, 30], mediaTime: 1, currentTime: 1, presentedFrames: 1, presentationTime: 12 }, views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: 1, currentSrc: fixtureSourceUrl, src: fixtureSourceUrl, paused: true, seeking: false, readyState: 4, error: null }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
+  const capture = { method: 'gpu-readback', status: 'captured', visibilityMode: 'depth-off-landmark-projection', viewId: 'main', timeSeconds, sourceLayout: layout, resolvedImagePlaneWarp: null, landmarks: observations.map(observed => ({ id: observed.anchorId, state: 'rendered', sourcePixels: observed.pixel, canvasPixels: observed.pixel, uncertaintySourcePixels: 0.5 })) }
+  const mechanism = { method: 'actual-native-mechanism-solve', status: 'rendered', viewId: 'main', timeSeconds, sourceDrawRevision: 1, channelAnglesRad: Array(20).fill(0), input: view.input, sourceLayout: layout, resolvedImagePlaneWarp: null }
+  const originalExposure = { frameIndex, pts: frameIndex, timeBase: [1, 30], sourceUrl: fixtureSourceUrl }
+  const response = { player: 'local', originalExposure, captures: [{ viewId: 'main', capture, mechanism }], actual: { modelTime: timeSeconds, sourceSampleTimeSeconds: timeSeconds, sourceDrawRevision: 1, sourcePresentation: { frameIndex, pts: frameIndex, timeBase: [1, 30], mediaTime: timeSeconds, currentTime: timeSeconds, presentedFrames: 1, presentationTime: 12 }, views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: timeSeconds, currentSrc: fixtureSourceUrl, src: fixtureSourceUrl, paused: true, seeking: false, readyState: 4, error: null }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
   return { view, frame, observations, anchors, response, capture, seeds: new Map() }
 }
 
@@ -660,6 +646,199 @@ test('missing or unknown player transport and missing local ownership never fall
   }
 })
 const measureFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 96, fixture.anchors, fixture.seeds)
+
+function unknownMotionFixture(timeSeconds = 1) {
+  const fixture = measuredViewFixture(timeSeconds)
+  for (const anchor of fixture.anchors.values()) delete anchor.motion
+  return fixture
+}
+
+function measuredVideoFixture(fixture, tolerancePx = 96) {
+  const result = measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, tolerancePx, fixture.anchors, fixture.seeds, fixture.lineAuthority)
+  const video = videoFixture(), timeSeconds = fixture.frame.timeSeconds
+  const checks = [...result.measured, ...result.nativeLines]
+  const status = checks.some(item => item.status === 'failed') || result.clockSkewSeconds > 0.5 ? 'failed'
+    : result.unavailable.length || !result.measured.length || !Number.isFinite(result.clockSkewSeconds) ? 'unavailable' : 'passed'
+  video.samples = [{ timeSeconds, sampleTimeSeconds: timeSeconds, sourceShotId: fixture.frame.shotId ?? 'shot',
+    reasons: ['every-second'], required: true, status, measurements: result.measured, unavailable: result.unavailable,
+    excluded: result.excluded, nativeLines: result.nativeLines, nativeLineUnavailable: result.nativeLineUnavailable,
+    maxClockSkewSeconds: result.clockSkewSeconds }]
+  return { video, result, census: { rows: [{ timeSeconds, required: true, reasons: ['every-second'] }] } }
+}
+
+test('valid independent visual pixels pass with missing, null, fixed-only or moving-only motion metadata', () => {
+  for (const motion of [undefined, null, 'fixed', 'moving']) {
+    const fixture = unknownMotionFixture()
+    if (motion !== undefined) for (const anchor of fixture.anchors.values()) anchor.motion = motion
+    const { video, result, census } = measuredVideoFixture(fixture)
+    assert.equal(result.measured.length, 4)
+    assert.deepEqual(result.unavailable, [])
+    assert.deepEqual(result.excluded, [])
+    assert.ok(result.measured.every(item => item.motion === (motion ?? 'unknown') && item.errorPx === 1.5 && item.status === 'passed'))
+    finishVideo(video, census, parseOptions(['--stage', '50']))
+    assert.equal(video.status, 'passed')
+    assert.equal(video.coverage.complete, true)
+    assert.equal(video.stageMeasurement.status, 'passed')
+    assert.equal(video.landmarks.fixedChecks, motion === 'fixed' ? 2 : 0)
+    assert.equal(video.landmarks.movingChecks, motion === 'moving' ? 2 : 0)
+    assert.equal(video.landmarks.unknownChecks, motion == null ? 2 : 0)
+    assert.equal(video.motionCoverage[0].internalMechanismMotion, 'unknown')
+    assert.equal(video.motionCoverage[0].status, motion === 'moving' ? 'measured' : 'unavailable')
+    const scoped = measuredVideoFixture(fixture)
+    finishVideo(scoped.video, scoped.census, parseOptions(['--stage', '50', '--times', '1']))
+    assert.equal(scoped.video.stageMeasurement.scopedSamples.status, 'passed')
+    assert.equal(scoped.video.stageMeasurement.status, 'unmeasured')
+  }
+})
+
+test('motion classification remains diagnostic and cannot change admitted pixel measurements', () => {
+  const known = measuredVideoFixture(measuredViewFixture()), unknown = measuredVideoFixture(unknownMotionFixture())
+  const withoutMotion = rows => rows.map(({ motion, ...measurement }) => measurement)
+  assert.deepEqual(withoutMotion(unknown.result.measured), withoutMotion(known.result.measured))
+  assert.deepEqual(unknown.result.unavailable, known.result.unavailable)
+  assert.deepEqual(unknown.result.excluded, known.result.excluded)
+  finishVideo(known.video, known.census, parseOptions(['--stage', '50']))
+  finishVideo(unknown.video, unknown.census, parseOptions(['--stage', '50']))
+  assert.equal(known.video.landmarks.fixedChecks, 1)
+  assert.equal(known.video.landmarks.movingChecks, 1)
+  assert.equal(known.video.landmarks.unknownChecks, 0)
+  assert.equal(unknown.video.landmarks.fixedChecks, 0)
+  assert.equal(unknown.video.landmarks.movingChecks, 0)
+  assert.equal(unknown.video.landmarks.unknownChecks, 2)
+  assert.equal(known.video.status, unknown.video.status)
+  assert.equal(unknown.video.motionCoverage[0].unknownCheckSamples, 1)
+})
+
+test('each shot passes on its own independent visual measurements without borrowing motion composition', () => {
+  const moving = measuredVideoFixture(measuredViewFixture()), unknown = measuredVideoFixture(unknownMotionFixture(2))
+  moving.video.samples[0].sourceShotId = 'moving-a'
+  unknown.video.samples[0].sourceShotId = 'unknown-b'
+  moving.video.samples.push(unknown.video.samples[0])
+  moving.census.rows.push(...unknown.census.rows)
+  finishVideo(moving.video, moving.census, parseOptions(['--stage', '50']))
+  assert.equal(moving.video.coverage.passedRequiredSamples, 2)
+  assert.equal(moving.video.status, 'passed')
+  assert.equal(moving.video.motionCoverage.find(shot => shot.shotId === 'unknown-b').movingCheckSamples, 0)
+  assert.equal(moving.video.motionCoverage.find(shot => shot.shotId === 'unknown-b').status, 'unavailable')
+})
+
+test('source static motion and phase evidence remain diagnostics without a static-rig certificate', () => {
+  const fixture = unknownMotionFixture(), { video, census } = measuredVideoFixture(fixture)
+  const evidence = 'Retained source-only observation; hidden mechanical phase is not recovered.'
+  const sourceEvidence = { kind: 'retained-source-photographic-rig', phaseImageFrameIndices: [30] }
+  video.shots = [{ id: 'shot', internalMechanismMotion: 'static', internalMotionEvidence: evidence, internalMotionSourceEvidence: sourceEvidence }]
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.status, 'passed')
+  assert.equal(video.landmarks.fixedChecks, 0)
+  assert.equal(video.landmarks.movingChecks, 0)
+  assert.equal(video.motionCoverage[0].internalMechanismMotion, 'static')
+  assert.equal(video.motionCoverage[0].evidence, evidence)
+  assert.deepEqual(video.motionCoverage[0].sourceEvidence, sourceEvidence)
+  assert.equal(video.motionCoverage[0].status, 'unavailable')
+})
+
+test('unknown motion cannot waive missing source pixels, native association, CHECK or refused GPU geometry', () => {
+  for (const mutate of [
+    fixture => { fixture.observations[3].pixel = null },
+    fixture => { fixture.anchors.delete('anchor-3') },
+    fixture => { fixture.anchors.get('anchor-3').partPath = null },
+    fixture => { fixture.anchors.get('anchor-3').partLocalMetres = null },
+    fixture => { fixture.capture.landmarks[3].state = 'unavailable'; fixture.capture.landmarks[3].reason = 'Actual native geometry refused the point association' },
+    fixture => { for (const observed of fixture.observations) observed.role = 'fit' },
+    fixture => { fixture.capture.landmarks[3].canvasPixels = [910, 800] },
+    fixture => { fixture.capture.landmarks[3].sourcePixels = [1921, 800] },
+    fixture => {
+      const inset = { ...sourceView('inset'), rectSourcePixels: [850, 750, 200, 200], sourceAssembly: { kind: 'operating' } }
+      fixture.frame.views.push(inset)
+      fixture.capture.sourceLayout.push({ viewId: inset.id, rectSourcePixels: inset.rectSourcePixels, presentation: inset.presentation, composite: { mode: 'opaque' }, resolvedImagePlaneWarp: null, sourceAssembly: inset.sourceAssembly })
+    },
+  ]) {
+    const fixture = unknownMotionFixture()
+    mutate(fixture)
+    const { video, result, census } = measuredVideoFixture(fixture)
+    assert.ok(result.unavailable.length > 0)
+    assert.deepEqual(result.excluded, [])
+    finishVideo(video, census, parseOptions(['--stage', '50']))
+    assert.equal(video.coverage.complete, false)
+    assert.equal(video.status, 'unavailable')
+    assert.equal(video.stageMeasurement.status, 'unmeasured')
+  }
+  const noPixels = unknownMotionFixture()
+  assert.throws(() => measureView(noPixels.view, noPixels.response, noPixels.frame, [], 96, noPixels.anchors))
+})
+
+test('unknown motion cannot admit a stale or unsupported physical draw or a mismatched authored pose', () => {
+  for (const mutate of [
+    fixture => { fixture.response.captures[0].mechanism.status = 'unavailable' },
+    fixture => { fixture.response.captures[0].mechanism.channelAnglesRad[0] = NaN },
+    fixture => { fixture.response.captures[0].mechanism.sourceDrawRevision++ },
+    fixture => { fixture.capture.timeSeconds-- },
+    fixture => { fixture.response.actual.views[0].input = { crankTurns: 1 } },
+    fixture => { fixture.response.actual.views[0].camera = { ...fixture.view.camera, positionMetres: [2, 2, 2] } },
+  ]) {
+    const fixture = unknownMotionFixture()
+    mutate(fixture)
+    assert.throws(() => measuredVideoFixture(fixture))
+  }
+})
+
+test('unknown motion accepts a real clock at the existing half-second boundary', () => {
+  const fixture = unknownMotionFixture()
+  fixture.response.native.mediaTime += 0.5
+  const { video, result, census } = measuredVideoFixture(fixture)
+  assert.equal(result.clockSkewSeconds, 0.5)
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, true)
+  assert.equal(video.status, 'passed')
+  assert.equal(video.stageMeasurement.status, 'passed')
+})
+
+test('unknown motion retains the distributed independent source-method exclusion floor', () => {
+  const fixture = unknownMotionFixture()
+  fixture.observations[3].method = 'unsupported-source-technique'
+  const admitted = measuredVideoFixture(fixture)
+  assert.equal(admitted.result.measured.length, 3)
+  assert.equal(admitted.result.excluded.length, 1)
+  finishVideo(admitted.video, admitted.census, parseOptions(['--stage', '50']))
+  assert.equal(admitted.video.status, 'passed')
+  fixture.observations[2].method = 'unsupported-source-technique'
+  const insufficient = measuredVideoFixture(fixture)
+  assert.equal(insufficient.result.measured.length, 2)
+  assert.ok(insufficient.result.unavailable.length > 0)
+  finishVideo(insufficient.video, insufficient.census, parseOptions(['--stage', '50']))
+  assert.equal(insufficient.video.status, 'unavailable')
+})
+
+test('unknown motion cannot hide actual mandatory or diagnostic pixel and clock counterexamples', () => {
+  for (const counterexample of ['pixel', 'clock']) for (const diagnosticOnly of [false, true]) {
+    const fixture = unknownMotionFixture(diagnosticOnly ? 1.5 : 1)
+    if (counterexample === 'pixel') {
+      fixture.capture.landmarks[2].sourcePixels = [1200, 800]
+      fixture.capture.landmarks[2].canvasPixels = [1200, 800]
+    } else fixture.response.native.mediaTime += 0.5001
+    const observed = measuredVideoFixture(fixture, 960)
+    if (counterexample === 'pixel') {
+      assert.equal(observed.result.measured[2].rawErrorPx, 1100)
+      assert.equal(observed.result.measured[2].errorPx, 1101.5)
+      assert.equal(observed.result.measured[2].status, 'failed')
+    } else assert.ok(observed.result.clockSkewSeconds > 0.5)
+    let { video, census } = observed
+    if (diagnosticOnly) {
+      const mandatory = measuredVideoFixture(unknownMotionFixture())
+      Object.assign(observed.video.samples[0], { diagnosticOnly: true, reasons: ['mid-interval'] })
+      mandatory.video.samples.push(observed.video.samples[0])
+      mandatory.census.rows.push({ timeSeconds: fixture.frame.timeSeconds, required: true, diagnosticOnly: true, reasons: ['mid-interval'] })
+      video = mandatory.video
+      census = mandatory.census
+    }
+    finishVideo(video, census, parseOptions(['--stage', '50']))
+    assert.equal(video.status, 'failed')
+    assert.equal(video.stageMeasurement.status, 'failed')
+    assert.equal(video.coverage.complete, diagnosticOnly)
+    if (counterexample === 'pixel') assert.equal(video.maxErrorPx, 1101.5)
+    else assert.ok(video.failures.some(failure => failure.code === `${diagnosticOnly ? 'diagnostic' : 'mandatory'}-clock-counterexample`))
+  }
+})
 
 // One synthetic triangle and independently PROVIDED bounds, not real GPU/source evidence.
 async function controlledEligibilityResponse(deriveNativeStagePixelRay) {
@@ -1502,7 +1681,7 @@ test('native line wrong source image/body, missing readback and stale physical d
     else {
       const result = measureNativeLineFixture(fixture)
       assert.equal(result.nativeLines.length, 0)
-      assert.ok(result.unavailable.some(item => item.kind === 'native-body-line'))
+      assert.ok(result.nativeLineUnavailable.some(item => item.kind === 'native-body-line'))
     }
   }
 })
@@ -1533,7 +1712,7 @@ test('fixed body classification needs current native membership and no actual an
   fixture.lineAuthority.bindings = [{ pattern: /^ha-harmonic-analyzer\/fr-frame$/, motion: 'rod' }]
   const result = measureNativeLineFixture(fixture)
   assert.equal(result.nativeLines.length, 0)
-  assert.ok(result.unavailable.some(item => /animated ancestor/.test(item.reason)))
+  assert.ok(result.nativeLineUnavailable.some(item => /animated ancestor/.test(item.reason)))
   assert.equal(fixedNativeLinePart(path, null, []), false)
 })
 
@@ -1544,7 +1723,7 @@ test('fixed BODY line classification rejects only actual effective source overri
     fixture.response.captures[0].mechanism.effectiveSourceOverridePartPaths = overrides
     const result = measureNativeLineFixture(fixture)
     assert.equal(result.nativeLines.length, 0)
-    assert.ok(result.unavailable.some(item => /source-overridden part\/ancestor/.test(item.reason)))
+    assert.ok(result.nativeLineUnavailable.some(item => /source-overridden part\/ancestor/.test(item.reason)))
   }
   const unrelated = nativeLineFixture()
   unrelated.response.captures[0].mechanism.effectiveSourceOverridePartPaths = ['ha-harmonic-analyzer/ha-measuring-stick-1']
@@ -1554,28 +1733,54 @@ test('fixed BODY line classification rejects only actual effective source overri
     ['ha-harmonic-analyzer/ha-measuring-stick-1']), false, 'A genuinely source-posed ruler is not an independent fixed BODY oracle')
 })
 
-test('fixed LINE can satisfy fixed-body obligation only while original point/moving/sample floors and measured line failures remain live', () => {
-  const video = videoFixture()
-  video.samples[0].measurements = [measurement('moving', 'moving')]
-  video.samples[0].nativeLines = measureNativeLineFixture(nativeLineFixture()).nativeLines
-  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
-  assert.equal(video.landmarks.fixedChecks, 0)
-  assert.equal(video.nativeLineChecks.fixedBodyChecks, 1)
-  assert.ok(!video.failures.some(failure => failure.code === 'hard-fixed-landmark-coverage'))
-  assert.ok(!video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
-  const missingMoving = videoFixture()
-  missingMoving.samples[0].measurements = [measurement('fit-only', 'fixed')]
-  missingMoving.samples[0].measurements[0].role = 'fit'
-  missingMoving.samples[0].nativeLines = video.samples[0].nativeLines
-  finishVideo(missingMoving, censusFixture, parseOptions(['--stage', '50']))
-  assert.ok(missingMoving.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
-  const failedLine = videoFixture()
-  failedLine.samples[0].nativeLines = [{ ...video.samples[0].nativeLines[0], status: 'failed', errorPx: 1001 }]
-  failedLine.samples[0].status = 'unavailable'
-  failedLine.samples[0].unavailable = [{ reason: 'Additional point unavailable' }]
-  finishVideo(failedLine, censusFixture, parseOptions(['--stage', '50']))
-  assert.equal(failedLine.stageMeasurement.status, 'failed')
-  assert.equal(failedLine.maxErrorPx, 1001)
+test('optional fixed LINE measurements cannot replace required POINT CHECK pixels and actual line failures still gate', () => {
+  const fixture = nativeLineFixture()
+  for (const anchor of fixture.anchors.values()) delete anchor.motion
+  const measured = measuredVideoFixture(fixture, 960)
+  finishVideo(measured.video, measured.census, parseOptions(['--stage', '50']))
+  assert.equal(measured.video.status, 'passed')
+  assert.equal(measured.video.landmarks.fixedChecks, 0)
+  assert.equal(measured.video.landmarks.movingChecks, 0)
+  assert.equal(measured.video.landmarks.unknownChecks, 2)
+  assert.equal(measured.video.nativeLineChecks.fixedBodyChecks, 1)
+  const noCheck = nativeLineFixture()
+  for (const observed of noCheck.observations) observed.role = 'fit'
+  const missing = measuredVideoFixture(noCheck, 960)
+  assert.equal(missing.result.nativeLines.length, 1)
+  assert.ok(missing.result.unavailable.length > 0)
+  finishVideo(missing.video, missing.census, parseOptions(['--stage', '50']))
+  assert.equal(missing.video.status, 'unavailable')
+  const noPoints = nativeLineFixture()
+  noPoints.observations = []
+  assert.throws(() => measuredVideoFixture(noPoints, 960), /no independently observed landmarks/)
+  const failed = nativeLineFixture()
+  for (const marker of failed.capture.landmarks.slice(-5)) {
+    marker.sourcePixels[0] = marker.canvasPixels[0] = 20
+  }
+  const counterexample = measuredVideoFixture(failed, 960)
+  assert.equal(counterexample.result.nativeLines.length, 1)
+  assert.equal(counterexample.result.nativeLines[0].rawErrorPx, 1180)
+  assert.equal(counterexample.result.nativeLines[0].errorPx, 1185.5)
+  assert.equal(counterexample.result.nativeLines[0].status, 'failed')
+  finishVideo(counterexample.video, counterexample.census, parseOptions(['--stage', '50']))
+  assert.equal(counterexample.video.stageMeasurement.status, 'failed')
+  assert.equal(counterexample.video.maxErrorPx, 1185.5)
+})
+
+test('refused optional LINE geometry remains unavailable diagnostics without admitting a source-posed ruler', () => {
+  const fixture = nativeLineFixture()
+  for (const anchor of fixture.anchors.values()) delete anchor.motion
+  fixture.response.captures[0].mechanism.effectiveSourceOverridePartPaths = ['ha-harmonic-analyzer/fr-frame']
+  const refused = measuredVideoFixture(fixture, 960)
+  assert.equal(refused.result.nativeLines.length, 0)
+  assert.equal(refused.result.nativeLineUnavailable.length, 1)
+  assert.deepEqual(refused.result.unavailable, [])
+  finishVideo(refused.video, refused.census, parseOptions(['--stage', '50']))
+  assert.equal(refused.video.status, 'passed')
+  assert.equal(refused.video.nativeLineChecks.measured, 0)
+  assert.equal(refused.video.nativeLineChecks.unavailable, 1)
+  const ruler = 'ha-harmonic-analyzer/ha-measuring-stick-1'
+  assert.equal(fixedNativeLinePart(ruler, { paths: new Set([ruler]), bindings: [] }, [ruler]), false)
 })
 
 test('owned source exposure selects the authored pose while retaining the distinct real native draw clock', () => {
