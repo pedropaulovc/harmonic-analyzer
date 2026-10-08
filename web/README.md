@@ -855,9 +855,20 @@ reporting `exceededResources`; this outcome does not identify CPU versus memory.
 The transport therefore avoids per-buffer JavaScript processing through native
 stream piping. Public native-browser verification is required before claiming
 the deployed resource fix verified.
-`run_worker_first: true` allows any future oversized asset path to use the same
-manifest transport; static fallback requests consequently pass through the
-Worker as well. No R2 storage or runtime external origin is required.
+Both configurations explicitly use `run_worker_first: false`, Cloudflare's
+asset-first default. Ordinary uploaded files (including the transport pieces)
+bypass the Worker; these static requests are
+[free and unlimited](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/).
+The producer deletes oversized originals only after writing all their pieces,
+so requests to those original missing URLs fall through to the Worker and use
+the manifest transport, regardless of their directory. Keep
+`not_found_handling` at its default `none`: no SPA or custom 404 asset fallback
+is configured to swallow these missing-original requests.
+Reconstructed original requests still invoke the Worker and retain its
+[plan limits](https://developers.cloudflare.com/workers/platform/limits/#daily-requests),
+including **100,000 requests/day on Workers Free**; they are not unlimited
+static delivery. No visitor/cost estimate is implied by the routing change.
+No R2 storage or runtime external origin is required.
 Original reference footage is local opt-in verification data, not published:
 deployment builds reject a `public/reference-media/` directory.
 
