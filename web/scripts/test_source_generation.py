@@ -2427,6 +2427,54 @@ class ExecutedPointMotionTests(unittest.TestCase):
             {'kind': 'historical-source-observations'}, [{'id': 'old', 'motion': None}], []), {})
         self.assertEqual(common.anchor_motion({'id': 'old', 'motion': 'moving'}), 'moving')
 
+    def bridge(self, responses):
+        # Protocol aggregation controls only: no substitute native model or
+        # fabricated source/geometry proof is installed in the classifier.
+        bridge = object.__new__(common._PointMotionBridge)
+        bridge.cache = {}
+        bridge.unavailable = False
+        bridge.process = type("ResponseStream", (), {})()
+        bridge.process.stdin = io.StringIO()
+        bridge.process.stdout = io.StringIO("".join(json.dumps(row) + "\n" for row in responses))
+        return bridge
+
+    def test_global_motion_requires_every_occurrence_not_any_matching_id(self):
+        request = {"cases": [{"anchor": {"id": "reused"}} for _ in range(3)]}
+        for motions, expected in (
+                (["moving", "moving", "moving"], {"reused": "moving"}),
+                (["moving", None, "moving"], {}),
+                ([None, "moving", "moving"], {}),
+                (["moving", "moving", None], {})):
+            bridge = self.bridge([{"results": [{"id": "reused", "motion": motion} for motion in motions]}])
+            self.assertEqual(bridge.classify(request), expected)
+
+    def test_missing_or_misidentified_occurrence_cannot_promote(self):
+        request = {"cases": [{"anchor": {"id": "reused"}}, {"anchor": {"id": "reused"}}]}
+        for rows in (
+                [{"id": "reused", "motion": "moving"}],
+                [{"id": "reused", "motion": "moving"}, {"id": "other", "motion": "moving"}]):
+            bridge = self.bridge([{"results": rows}])
+            with patch("sys.stderr", io.StringIO()):
+                self.assertEqual(bridge.classify(request), {})
+            self.assertTrue(bridge.unavailable)
+
+    def test_bridge_cache_separates_source_assembly_and_never_serializes_nan_as_null(self):
+        request = {"cases": [{"anchor": {"id": "point"}, "input": {"crankTurns": 0},
+                              "sourceAssembly": {"photograph": {"pair": "four-gears", "angle": 0}}}]}
+        bridge = self.bridge([{"results": [{"id": "point", "motion": "moving"}]},
+                              {"results": [{"id": "point", "motion": None}]}])
+        self.assertEqual(bridge.classify(request), {"point": "moving"})
+        written = bridge.process.stdin.getvalue()
+        self.assertEqual(bridge.classify(copy.deepcopy(request)), {"point": "moving"})
+        self.assertEqual(bridge.process.stdin.getvalue(), written)
+        changed = copy.deepcopy(request)
+        changed["cases"][0]["sourceAssembly"]["photograph"]["angle"] = .125
+        self.assertEqual(bridge.classify(changed), {})
+        invalid = copy.deepcopy(request)
+        invalid["cases"][0]["sourceAssembly"]["photograph"]["angle"] = float("nan")
+        with self.assertRaises(ValueError):
+            bridge.classify(invalid)
+
 
 class HistoricalSynthesisSourceDriveBoundaryTests(unittest.TestCase):
     def fixture(self, load_motion=True):

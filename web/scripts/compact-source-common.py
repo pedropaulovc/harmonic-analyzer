@@ -774,7 +774,16 @@ class _PointMotionBridge:
             response = json.loads(self.process.stdout.readline())
             if response.get("error"):
                 raise ValueError(response["error"])
-            result = {row["id"]: "moving" for row in response["results"] if row["motion"] == "moving"}
+            rows = response["results"]
+            if len(rows) != len(request["cases"]):
+                raise ValueError("Point-motion response omitted an occurrence.")
+            compatible = {}
+            for case, row in zip(request["cases"], rows):
+                anchor_id = case["anchor"]["id"]
+                if row["id"] != anchor_id:
+                    raise ValueError("Point-motion response changed occurrence identity.")
+                compatible[anchor_id] = compatible.get(anchor_id, True) and row["motion"] == "moving"
+            result = {anchor_id: "moving" for anchor_id, valid in compatible.items() if valid}
         except (OSError, ValueError, KeyError) as error:
             self.unavailable = True
             print(f"Actual point-motion classification unavailable; anchors remain unknown: {error}", file=sys.stderr)
@@ -802,36 +811,44 @@ def executed_anchor_motion(data, anchors, frames):
     """Promote only actual supported rigid point capability, never historical data.
 
     Source coordinates, roles, associations and chosen inputs remain untouched.
-    Zero displacement is unknown, not evidence of a fixed part. No source pose,
-    camera, root override, or optional native draw certificate enters this route.
+    Zero displacement remains unknown. A supported source provider may vary only
+    an independent local body quaternion, never camera/display/root placement.
+    Every original and published occurrence must support the same capability;
+    native/template bindings alone cannot promote an arbitrary source copy.
     """
     if data.get("kind") != "current-source-observations":
         return {}
+    bindings = native_motion_bindings()
     candidates = {
         anchor["id"]: anchor for anchor in anchors if anchor["motion"] is None
-        and any(motion in ("crank", "wheel") and pattern.fullmatch(anchor.get("partPath", ""))
-                for pattern, motion in native_motion_bindings())
+        and anchor.get("correspondenceEvidence")
+        and any((motion in ("crank", "wheel") and pattern.fullmatch(anchor.get("partPath", "")))
+                or (motion == "paper-sprocket" and "partLocalMetres" in anchor
+                    and pattern.fullmatch(anchor.get("runtimeTemplatePartPath") or anchor.get("partPath", "")))
+                for pattern, motion in bindings)
     }
     if not candidates:
         return {}
-    inputs = {}
-    for frame in frames:
-        views = {view["id"]: view for view in frame["views"]}
-        for landmark in frame["landmarks"]:
+    cases, unavailable = [], set()
+    for frame in [*data.get("frames", []), *frames]:
+        views = {view["id"]: view for view in frame.get("views", [])}
+        for landmark in frame.get("landmarks", []):
             anchor_id = landmark["anchorId"]
+            if anchor_id not in candidates:
+                continue
             view = views.get(landmark.get("viewId", "main"))
-            if anchor_id in candidates and anchor_id not in inputs and view and view.get("input"):
-                inputs[anchor_id] = view["input"]
-        if len(inputs) == len(candidates):
-            break
-    if not inputs:
+            if not view or not view.get("input"):
+                unavailable.add(anchor_id)
+                continue
+            cases.append({"anchor": candidates[anchor_id], "input": view["input"],
+                          "sourceAssembly": view.get("sourceAssembly", {"kind": "operating"})})
+    cases = [case for case in cases if case["anchor"]["id"] not in unavailable]
+    if not cases:
         return {}
-    request = {"model": data.get("model"), "nativeIdentity": data.get("nativeIdentity"),
-               "cases": [{"anchor": candidates[anchor_id], "input": value}
-                         for anchor_id, value in inputs.items()]}
+    request = {"model": data.get("model"), "nativeIdentity": data.get("nativeIdentity"), "cases": cases}
     try:
         return _point_motion_bridge(str(WEB)).classify(request)
-    except OSError as error:
+    except (OSError, ValueError, TypeError) as error:
         print(f"Actual point-motion bridge unavailable; anchors remain unknown: {error}", file=sys.stderr)
         return {}
 
