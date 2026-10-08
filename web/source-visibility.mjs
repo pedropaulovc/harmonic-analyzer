@@ -22,10 +22,12 @@ export function sourceVisibilityError(frame, view) {
   const hashField = image?.pixelFormat === 'gray8' ? 'sha256Gray8' : image?.pixelFormat === 'bgr8' ? 'sha256Bgr8' : null
   if (!hashField || !closed(image, ['frameIndex', 'pixelFormat', 'width', 'height', 'sourceSha256', hashField])
     || !Number.isSafeInteger(image.frameIndex) || image.frameIndex < 0 || image.width !== 1920 || image.height !== 1080
+    || typeof image.sourceSha256 !== 'string' || typeof image[hashField] !== 'string'
     || !/^[0-9a-f]{64}$/.test(image.sourceSha256) || !/^[0-9a-f]{64}$/.test(image[hashField])
     || !same(qualification.sourceImage, image)) return 'Source visibility audit must bind the exact actual frame source image'
   const rect = view.rectSourcePixels
-  if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(Number.isFinite)
+  if (!Array.isArray(rect) || rect.length !== 4
+    || !Number.isFinite(rect[0]) || !Number.isFinite(rect[1]) || !Number.isFinite(rect[2]) || !Number.isFinite(rect[3])
     || rect[0] < 0 || rect[1] < 0 || rect[2] <= 0 || rect[3] <= 0
     || rect[0] + rect[2] > image.width || rect[1] + rect[3] > image.height
     || !same(qualification.rectSourcePixels, rect)) return 'Source visibility audit must cover the exact complete physical source ROI'
@@ -40,5 +42,5 @@ export function policyExcludedSourceView(frame, view) {
 
 /** Invalid qualifications remain required; record/runtime validators reject them separately. */
 export function requiredSourceViews(frame) {
-  return (frame.views ?? []).filter(view => !policyExcludedSourceView(frame, view))
+  return (frame?.views ?? []).filter(view => !policyExcludedSourceView(frame, view))
 }

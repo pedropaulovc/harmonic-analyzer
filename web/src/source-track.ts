@@ -1,12 +1,13 @@
 import { Quaternion } from 'three'
 import { createMechanismInput, createMechanismPose, MECHANISM_DATA, type MechanismInput } from './mechanics'
-import { assertSourceCompositeWeights, type CameraRecord, type ImagePlaneWarp, type SourceComposite, type SourceLayoutEntry } from './scene'
+import { assertSourceCompositeWeights, type CameraRecord, type ImagePlaneWarp, type SourceComposite, type SourceLayoutEntry, type LandmarkAnchor } from './scene'
 import { compileSourceAssemblyState } from './source-assembly'
 import type { SourceAssemblyState } from './source-assembly'
-import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
+import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type NativeLineCheck, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
 import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIdentity, NativeModelIdentity, SourceShot, ReferenceState, SourceSample } from './timeline'
 import type { Video } from './video-catalog'
 import { requiredSourceViews, sourceVisibilityError, type SourceVisibilityQualification } from '../source-visibility.mjs'
+import { NATIVE_LINE_STATIONS, nativeLineEndpointId } from '../native-line-checks.mjs'
 
 export const SOURCE_WIDTH = 1920
 export const SOURCE_HEIGHT = 1080
@@ -49,6 +50,7 @@ export interface CompactSourceView {
   cameraInterpolationEvidence?: string
   composite?: SourceComposite
   imagePlaneWarp?: ImagePlaneWarp
+  nativeLineChecks?: NativeLineCheck[]
 }
 export interface CompactSourceFrame {
   timeSeconds: number
@@ -145,6 +147,7 @@ interface CompiledTrackFrame {
   observation: CompactSourceFrame
   required: boolean
   available: boolean
+  lastReadableIndex: number
   shotStartSeconds: number
   shotEndSeconds: number
   continuousToNext: boolean
@@ -211,6 +214,8 @@ export class CompactVideoReference {
   readonly coverageMessage: string
   readonly approximationMessage: string
   readonly stageStatus = UNMEASURED_STAGES
+  /** Probe-only exact native line endpoints never enter the source point/role census. */
+  readonly landmarkProbeAnchors: readonly LandmarkAnchor[]
   private readonly frames: CompiledTrackFrame[]
   private readonly publication: PublicationBanks = { buffers: [buffer(), buffer()], publishedIndex: 0, preparedIndex: null, inputValidated: new WeakSet(), diagnostic: null }
   private readonly qa = new Quaternion()
@@ -242,8 +247,8 @@ export class CompactVideoReference {
     }
     const anchorIds = new Set(data.anchors.map((anchor) => anchor.id))
     if (anchorIds.size !== data.anchors.length) throw new Error('Compact anchor IDs must be unique.')
-    let previous = -Infinity
-    this.frames = data.frames.map((frame) => {
+    let previous = -Infinity, lastReadableIndex = -1
+    this.frames = data.frames.map((frame, frameIndex) => {
       const t = finite(frame.timeSeconds, 'Compact sample time')
       const pts = frame.decodedTimeSeconds === null ? null : finite(frame.decodedTimeSeconds, 'Decoded source PTS')
       const shot = shotMap.get(frame.shotId)
@@ -309,7 +314,9 @@ export class CompactVideoReference {
         if (view.cameraInterpolation === 'continuous-shot' && (typeof view.cameraInterpolationEvidence !== 'string' || !view.cameraInterpolationEvidence.trim())) throw new Error(`${label}: continuous-shot camera interpolation needs explicit evidence.`)
         return { observation: view, input, sourceAssembly, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false }
       })
-      return { observation: frame, required, layout, views, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available: pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null)) }
+      const available = pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null))
+      if (required && available) lastReadableIndex = frameIndex
+      return { observation: frame, required, layout, views, lastReadableIndex, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available }
     })
     for (let i = 0; i < this.frames.length - 1; i++) {
       const from = this.frames[i]!
@@ -336,6 +343,20 @@ export class CompactVideoReference {
         }
       }
     }
+    const lineAnchors = new Map<string, LandmarkAnchor>()
+    for (const frame of this.frames) for (const view of frame.views) for (const line of view.observation.nativeLineChecks ?? []) {
+      for (const station of NATIVE_LINE_STATIONS) {
+        const id = nativeLineEndpointId(view.observation.id, line.id, station)
+        const [a, b] = line.partLocalLineMetres
+        const anchor: LandmarkAnchor = { id, partPath: line.partPath, partLocalMetres: [
+          a[0] + station * (b[0] - a[0]), a[1] + station * (b[1] - a[1]), a[2] + station * (b[2] - a[2]),
+        ] }
+        const prior = lineAnchors.get(id)
+        if (anchorIds.has(id) || prior && !equalRecord(prior, anchor)) throw new Error('Native line diagnostic endpoint identity conflicts with another geometry/source point.')
+        lineAnchors.set(id, anchor)
+      }
+    }
+    this.landmarkProbeAnchors = lineAnchors.size ? [...data.anchors, ...lineAnchors.values()] : data.anchors
   }
 
   private indexAt(timeSeconds: number): number {
@@ -370,13 +391,10 @@ export class CompactVideoReference {
   }
 
   private prepareLastReadableAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample | null {
-    for (let index = this.indexAt(timeSeconds); index >= 0; index--) {
-      const frame = this.frames[index]!
-      if (frame.observation.timeSeconds <= timeSeconds && frame.required && frame.available) {
-        return this.prepareAtIn(frame.observation.timeSeconds, publication)
-      }
-    }
-    return null
+    const index = this.frames[this.indexAt(timeSeconds)]!.lastReadableIndex
+    if (index < 0) return null
+    const frame = this.frames[index]!
+    return frame.observation.timeSeconds <= timeSeconds ? this.prepareAtIn(frame.observation.timeSeconds, publication) : null
   }
 
   private prepareAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample {

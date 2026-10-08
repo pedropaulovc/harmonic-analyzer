@@ -3,12 +3,14 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourcePointUnmasked, jsonDigest, nativeLineErrors, nativeLineAxisGeometryBound, cameraParameters } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 import { assertNativeSourceAssociation, assertModelRepresentationBytes, REPRESENTATION_KIND } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
+import { sourceVisibilityError, policyExcludedSourceView, requiredSourceViews } from '../source-visibility.mjs'
+import { NATIVE_LINE_STATIONS, nativeLineEndpointId, fixedNativeLinePart, nativeLineReadbackResidual, projectNativeLineWorld } from '../native-line-checks.mjs'
 import { APPROVED_MODEL_REPRESENTATION, LIVE_MODEL_SOURCE } from './approved-model.mjs'
-import { loadCurrentObservations, validateCurrentTrackAssociation, currentSourceAssemblyChangeTimes, normalizeCurrentTrackAssemblies, currentSourceLayoutForViews as sourceLayoutForViews } from './fresh-source-observations.mjs'
+import { loadCurrentObservations, loadCurrentAuthority, validateCurrentTrackAssociation, currentSourceAssemblyChangeTimes, normalizeCurrentTrackAssemblies, currentSourceLayoutForViews as sourceLayoutForViews } from './fresh-source-observations.mjs'
 import { loadCurrentNativeEligibilityModule, collectCurrentNativeEligibilityEvidence, joinCurrentNativeEligibilityReport, unavailableCurrentNativeEligibilityReport } from './current-native-eligibility-report.mjs'
 import { writeJsonReport } from './json-report-writer.mjs'
 
@@ -136,6 +138,14 @@ function compactSourceViewRequirement(original, sourceViewId, views) {
   return { ...mapping, viewIds: [mapping.viewId ?? sourceViewId] }
 }
 
+function originalViewHasAdmittedSourceSupport(frame, view, anchors, seeds) {
+  return Boolean(view.nativeLineChecks?.length || (frame.landmarks ?? []).some(observed =>
+    (observed.viewId ?? 'main') === view.id && observed.status === 'observed'
+    && ['fit', 'check'].includes(observed.role) && point(observed.pixel)
+    && finite(observed.uncertaintyPx) && observed.uncertaintyPx >= 0
+    && !sourceMethodIssue(observed, anchors.get(observed.anchorId), frame, seeds, view.id)))
+}
+
 function compactSourceLandmarks(original, views, observations = original.landmarks ?? []) {
   const landmarks = [], unavailable = []
   for (const observed of observations) {
@@ -158,6 +168,8 @@ export function sourceCensus(observations, track, native, options, assemblyChang
   const times = new Map(), sourceShots = track.shots ?? observations.shots
   const originalShots = new Map(observations.shots.map(shot => [shot.id, shot]))
   const compactShots = new Map(sourceShots.map(shot => [shot.id, shot]))
+  const sourceAnchors = new Map([...(observations.anchors ?? []), ...(track.anchors ?? [])].map(anchor => [anchor.id, anchor]))
+  const sourceSeeds = sourceSeedIndex([...observations.frames, ...track.frames])
   const add = (time, reason) => {
     if (!finite(time) || time < 0 || time >= native.durationSeconds) return
     const key = time.toFixed(6), row = times.get(key) ?? { timeSeconds: time, reasons: [] }
@@ -178,7 +190,7 @@ export function sourceCensus(observations, track, native, options, assemblyChang
   let precedingLayout = null
   const framesByShot = new Map()
   for (const frame of observations.frames) {
-    const layout = JSON.stringify([frame.shotId, frame.classification, frame.sourceMachineRequirement, frame.views?.map(view => [view.id, view.presentation])])
+    const layout = JSON.stringify([frame.shotId, frame.classification, frame.sourceMachineRequirement, frame.views?.map(view => [view.id, view.presentation, view.sourceVisibility?.reasonCode ?? null])])
     if (precedingLayout !== layout) add(frame.timeSeconds, 'retained-layout-change')
     precedingLayout = layout
     const shot = compactShots.get(frame.shotId) ?? originalShots.get(frame.shotId)
@@ -209,11 +221,25 @@ export function sourceCensus(observations, track, native, options, assemblyChang
     const governing = from?.shotId === shot?.id ? from : authored?.shotId === shot?.id ? authored : null
     const originalRequired = original ? sourceNeedsMachine(original, originalShots.get(original.shotId)) : !shot || shot.hasCorrespondingMachine !== false && shot.classification !== 'non-machine'
     const compactRequired = governing ? sourceNeedsMachine(governing, shot) : originalRequired
-    const required = originalRequired || compactRequired
-    // frameViews' implicit main is a legacy convenience, not an independently
-    // declared source perspective. All explicit source views remain required.
-    const sourceViewMappings = originalRequired && original?.views ? original.views.map(view => ({ originalViewId: view.id, ...compactSourceViewRequirement(original, view.id, governing?.views ?? []) })) : []
-    const expectedViewIds = [...new Set([...sourceViewMappings.flatMap(mapping => mapping.viewIds), ...(compactRequired ? governing?.views?.map(view => view.id) ?? [] : [])])]
+    // Preserve the original/current union. Only an exact current qualification
+    // can remove that ROI's obligation; a missing/misbound view remains required.
+    const sourceViewMappings = originalRequired && original?.views ? original.views.map(view => {
+      const mapping = compactSourceViewRequirement(original, view.id, governing?.views ?? [])
+      const counterparts = mapping.viewIds.map(id => governing?.views?.find(view => view.id === id))
+      const qualifiedExcluded = counterparts.length > 0 && counterparts.every(candidate => candidate
+        && policyExcludedSourceView(governing, candidate)
+        && jsonDigest(candidate.rectSourcePixels) === jsonDigest(view.rectSourcePixels)
+        && jsonDigest(governing.sourceImage) === jsonDigest(original.sourceImage))
+        && !originalViewHasAdmittedSourceSupport(original, view, sourceAnchors, sourceSeeds)
+      return { originalViewId: view.id, ...mapping, qualifiedExcluded }
+    }) : []
+    const expectedViewIds = [...new Set([...sourceViewMappings.filter(mapping => !mapping.qualifiedExcluded).flatMap(mapping => mapping.viewIds),
+      ...(compactRequired ? requiredSourceViews(governing).map(view => view.id) : [])])]
+    const required = (originalRequired || compactRequired) && (expectedViewIds.length > 0
+      || originalRequired && !original?.views?.length || compactRequired && !governing?.views?.length)
+    const qualifiedExcludedViews = (governing?.views ?? []).filter(view => policyExcludedSourceView(governing, view)
+      && !sourceViewMappings.some(mapping => !mapping.qualifiedExcluded && mapping.viewIds.includes(view.id)))
+      .map(view => ({ viewId: view.id, ...view.sourceVisibility }))
     const tolerance = row.reasons.includes('every-second') ? 1e-5 : 1 / native.fps + 0.001
     let frame = authored && Math.abs(authored.timeSeconds - row.timeSeconds) <= tolerance && authored.shotId === shot?.id ? authored : null
     let unavailableReason = frame ? null : 'Missing authored sample at retained every-second/change-point source time'
@@ -236,7 +262,7 @@ export function sourceCensus(observations, track, native, options, assemblyChang
         frame = { ...frame, viewMappingUnavailable: [{ reason: 'Original landmark view identity has no same-exposure source layout for compact-view mapping' }] }
       }
     }
-    return { ...row, diagnosticOnly, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, sourceViewMappings, frame, unavailableReason }
+    return { ...row, diagnosticOnly, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, sourceViewMappings, qualifiedExcludedViews, frame, unavailableReason }
   })
   const selected = rows.filter(row => options.times ? options.times.some(time => Math.abs(time - row.timeSeconds) < 1e-5) : (options.from === null || row.timeSeconds >= options.from) && (options.to === null || row.timeSeconds <= options.to))
   for (const time of options.times ?? []) if (time >= native.durationSeconds) selected.push({ timeSeconds: time, reasons: ['requested-sample'], diagnosticOnly: false, required: true, expectedViewIds: [], frame: null, unavailableReason: 'Requested time is outside the original source duration' })
@@ -256,9 +282,14 @@ export async function loadRecord(id, referenceRoot, signal, { webRoot = WEB_ROOT
   assert(Array.isArray(track.frames) && track.frames.length && track.frames.every((frame, index) => finite(frame.timeSeconds) && (finite(frame.decodedTimeSeconds) || (frame.decodedTimeSeconds === null && frame.sourceSampleUnavailable === true && !frame.views?.length && !frame.landmarks?.length && !frame.sourceImage)) && (!index || frame.timeSeconds > track.frames[index - 1].timeSeconds)), 'Compact samples must have finite increasing source times and native PTS, or explicit unavailable source-clock rows')
   assert(Array.isArray(track.anchors) && new Set(track.anchors.map(anchor => anchor.id)).size === track.anchors.length, 'Compact native anchors must have unique identities')
   const assemblyChangeTimes = await currentSourceAssemblyChangeTimes(observations, { webRoot })
+  let lineAuthority = null
+  if (track.frames.some(frame => frame.views.some(view => view.nativeLineChecks?.length))) {
+    const authority = await loadCurrentAuthority(webRoot)
+    lineAuthority = { paths: authority.paths, bindings: authority.motionBindings }
+  }
   const sourcePath = resolve(referenceRoot, 'videos', `${id}.mp4`)
   const native = await probeSource(sourcePath, track.source, { signal })
-  return { id, track, observations, sourcePath, native, assemblyChangeTimes, digest }
+  return { id, track, observations, sourcePath, native, assemblyChangeTimes, lineAuthority, digest }
 }
 
 /** A bad diagnostic identity cannot erase independent successful exposures in the same decode batch. */
@@ -573,14 +604,16 @@ function distributedLandmarkFloor(measured) {
   return false
 }
 
-export function measureView(view, response, frame, observations, tolerancePx, anchors, seeds = new Map()) {
+export function measureView(view, response, frame, observations, tolerancePx, anchors, seeds = new Map(), lineAuthority = null) {
+  const visibilityError = sourceVisibilityError(frame, view)
+  assert(!visibilityError && !policyExcludedSourceView(frame, view), visibilityError ?? 'Policy-excluded physical ROI is not a source-pose measurement')
   const entry = response.captures.find(item => item.viewId === view.id), capture = entry?.capture, mechanism = entry?.mechanism
   const rendered = response.actual.views?.find(item => item.id === view.id)
   assert(capture?.method === 'gpu-readback' && capture.status === 'captured' && capture.visibilityMode === 'depth-off-landmark-projection' && capture.viewId === view.id && finite(capture.timeSeconds) && Math.abs(capture.timeSeconds - frame.timeSeconds) <= 1e-6, 'Missing/stale actual GPU landmark readback')
   assert(mechanism?.method === 'actual-native-mechanism-solve' && mechanism.status === 'rendered' && mechanism.viewId === view.id && mechanism.timeSeconds === capture.timeSeconds && Number.isInteger(mechanism.sourceDrawRevision) && mechanism.sourceDrawRevision > 0 && mechanism.channelAnglesRad?.length === 20 && mechanism.channelAnglesRad.every(finite), 'Missing/stale native full physical solve')
   assert(rendered && jsonDigest(mechanism.input) === jsonDigest(rendered.input) && jsonDigest(mechanism.sourceLayout) === jsonDigest(capture.sourceLayout) && jsonDigest(mechanism.resolvedImagePlaneWarp) === jsonDigest(capture.resolvedImagePlaneWarp), 'Readback and native input/layout/warp do not belong to the same rendered source view')
   assert(jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation, 'Rendered source view ROI/orientation differs from sample')
-  assert(jsonDigest(capture.sourceLayout) === jsonDigest(capturedSourceLayoutForViews(frame.views)),
+  assert(jsonDigest(capture.sourceLayout) === jsonDigest(capturedSourceLayoutForViews(requiredSourceViews(frame))),
     'GPU/native source layout did not draw the authored held physical assembly state')
   assert(jsonDigest(rendered.sourceAssembly) === jsonDigest(view.sourceAssembly ?? { kind: 'operating' }),
     'Rendered physical assembly descriptor differs from the source exposure')
@@ -618,7 +651,63 @@ export function measureView(view, response, frame, observations, tolerancePx, an
     measured.push({ ...context, method: capture.method, nativePixels: marker.sourcePixels, canvasPixels: marker.canvasPixels, rawErrorPx, sourceUncertaintyPx: observed.uncertaintyPx, rasterUncertaintyPx: marker.uncertaintySourcePixels, errorPx, errorFrameWidthPercent: errorPx / 1920 * 100, status: errorPx <= tolerancePx ? 'passed' : 'failed', captureTimeSeconds: capture.timeSeconds, nativeMediaTime: response.native.mediaTime, sourceDrawRevision: mechanism.sourceDrawRevision, sourceSampling: rendered.sourceSampling, independentMidIntervalObservation: frame.measuredInterpolation === true })
   }
   if (excluded.length && !distributedLandmarkFloor(measured)) unavailable.push({ viewId: view.id, status: 'source-unavailable', reason: 'Source-inadmissible exclusions require at least three distributed admitted actual landmarks including an independent CHECK' })
-  return { measured, unavailable, excluded, clockSkewSeconds: Math.abs(capture.timeSeconds - response.native.mediaTime) }
+  const nativeLines = [], nativeLineUnavailable = []
+  for (const line of view.nativeLineChecks ?? []) {
+    const context = { viewId: view.id, lineId: line.id, partPath: line.partPath, role: 'check', kind: 'native-body-line' }
+    try {
+      const issues = nativeLineErrors([line], frame.sourceImage, view)
+      assert(!issues.length, issues.join('; '))
+      assert(lineAuthority?.paths?.has(line.partPath), 'Native line has no current released-body inventory association')
+      assert(fixedNativeLinePart(line.partPath, lineAuthority), 'Native fixed-body LINE CHECK has an actual animated ancestor or unqualified motion authority')
+      const stations = NATIVE_LINE_STATIONS
+      const markers = stations.map(station => capture.landmarks?.find(marker => marker.id === nativeLineEndpointId(view.id, line.id, station)))
+      assert(markers.every(marker => marker?.partPath === line.partPath
+        && Array.isArray(marker.worldMetres) && marker.worldMetres.length === 3 && marker.worldMetres.every(finite)),
+      'Qualified native finite-line endpoints/stations lack exact same-draw native world coordinates or belong to the wrong body')
+      const visibleMarkers = markers.filter(marker => marker.state === 'rendered' && point(marker.sourcePixels)
+        && point(marker.canvasPixels) && finite(marker.uncertaintySourcePixels) && marker.uncertaintySourcePixels >= 0)
+      assert(visibleMarkers.length >= 2, 'Native finite line needs at least two actual visible GPU station readbacks; missing/offscreen support is unavailable, not proof of line impossibility')
+      let projectedLinePixels
+      if (markers[0].state === 'rendered' && markers[4].state === 'rendered') {
+        projectedLinePixels = [markers[0].sourcePixels, markers[4].sourcePixels]
+      } else {
+        assert(!view.imagePlaneWarp, 'Offscreen finite-line projection through an image-plane warp lacks current visible endpoint readback')
+        const parameters = cameraParameters(rendered.camera, view.rectSourcePixels)
+        const projectedStations = projectNativeLineWorld(parameters, markers.map(marker => marker.worldMetres), view.rectSourcePixels, view.presentation)
+        for (const marker of visibleMarkers) {
+          const expected = projectedStations[markers.indexOf(marker)]
+          assert(Math.hypot(marker.sourcePixels[0] - expected[0], marker.sourcePixels[1] - expected[1]) <= marker.uncertaintySourcePixels + 1e-6,
+            'Exact same-draw native world/camera projection disagrees with actual visible finite-line GPU readback')
+        }
+        projectedLinePixels = [projectedStations[0], projectedStations[4]]
+      }
+      const [worldStart, worldEnd] = [markers[0].worldMetres, markers[4].worldMetres]
+      assert(markers.every((marker, index) => marker.worldMetres.every((value, axis) =>
+        Math.abs(value - worldStart[axis] - stations[index] * (worldEnd[axis] - worldStart[axis])) <= 1e-8)),
+      'Current native diagnostic stations do not lie on the qualified finite physical segment')
+      const observed = [...line.sourceLinePixels, ...line.measurementEvidence.edgeRows.map(row => [(row.left + row.right) / 2, row.y])]
+      assert([...observed, ...visibleMarkers.map(marker => marker.sourcePixels)].every(pixel => sourcePointUnmasked(capture.sourceLayout, layoutIndex, pixel)), 'Native line/source paired edges lie outside the actual unmasked source support')
+      for (const marker of visibleMarkers) {
+        const mapped = [gate.x + marker.sourcePixels[0] / 1920 * gate.width, gate.y + marker.sourcePixels[1] / 1080 * gate.height]
+        assert(Math.hypot(marker.canvasPixels[0] - mapped[0], marker.canvasPixels[1] - mapped[1]) <= 0.75, 'Native line GPU source-to-canvas mapping is stale')
+      }
+      const residual = nativeLineReadbackResidual(projectedLinePixels, observed)
+      const geometry = nativeLineAxisGeometryBound(view, line, observed)
+      const rawErrorPx = Math.max(...residual.perpendicularErrorsPx)
+      const rasterUncertaintyPx = Math.max(...visibleMarkers.map(marker => marker.uncertaintySourcePixels))
+      const errorPx = rawErrorPx + line.uncertaintyPx + geometry.geometryBiasSourcePixels + rasterUncertaintyPx
+      nativeLines.push({ ...context, motion: 'fixed', method: capture.method,
+        sourceImage: frame.sourceImage, nativePartLocalLineMetres: line.partLocalLineMetres,
+        observedLinePixels: line.sourceLinePixels, observedEdgeMidpointPixels: observed.slice(2),
+        projectedLinePixels, endpointProbeIds: [markers[0].id, markers[4].id], gpuStationReadbacks: visibleMarkers.map(marker => ({ id: marker.id, sourcePixels: marker.sourcePixels, worldMetres: marker.worldMetres, uncertaintySourcePixels: marker.uncertaintySourcePixels })),
+        perpendicularErrorsPx: residual.perpendicularErrorsPx, nativeSegmentCoversObservation: residual.nativeSegmentCoversObservation,
+        rawErrorPx, sourceUncertaintyPx: line.uncertaintyPx, geometryBiasSourcePixels: geometry.geometryBiasSourcePixels,
+        axisPerspectiveBiasComponents: geometry.components, rasterUncertaintyPx, errorPx, errorFrameWidthPercent: errorPx / 1920 * 100,
+        captureTimeSeconds: capture.timeSeconds, sourceDrawRevision: mechanism.sourceDrawRevision,
+        nativeMediaTime: response.native.mediaTime, status: residual.nativeSegmentCoversObservation && errorPx <= tolerancePx ? 'passed' : 'failed' })
+    } catch (error) { nativeLineUnavailable.push({ ...context, status: 'unmeasured-native-line', reason: error.message }) }
+  }
+  return { measured, unavailable: [...unavailable, ...nativeLineUnavailable], excluded, nativeLines, clockSkewSeconds: Math.abs(capture.timeSeconds - response.native.mediaTime) }
 }
 
 function playbackSourceObservations(record) {
@@ -1042,9 +1131,11 @@ async function interactionChecks(page, embed, record, outputDirectory) {
 export function requireSourceViews(row) {
   const frame = row.frame
   assert(frame?.views?.length > 0, 'Required source interval has no authored native views (closeups/insets/montages remain required)')
-  const ids = new Set(frame.views.map(view => view.id))
-  assert(row.expectedViewIds.every(id => ids.has(id)), `Required source view(s) omitted: ${row.expectedViewIds.filter(id => !ids.has(id)).join(',')}`)
-  assert(frame.views.every(view => view.camera && view.input), 'Required source sample has a missing camera or complete physical input')
+  const requiredViews = requiredSourceViews(frame)
+  const ids = new Set(requiredViews.map(view => view.id))
+  for (const view of frame.views) assert(!sourceVisibilityError(frame, view), sourceVisibilityError(frame, view))
+  assert(row.expectedViewIds.every(id => ids.has(id)), `Required source view(s) omitted or improperly excluded: ${row.expectedViewIds.filter(id => !ids.has(id)).join(',')}`)
+  assert(requiredViews.every(view => view.camera && view.input), 'Required source sample has a missing camera or complete physical input')
   assert(!frame.viewMappingUnavailable?.length, frame.viewMappingUnavailable?.map(item => `${item.anchorId}: ${item.reason}`).join('; '))
   const orphanViews = [...new Set((frame.landmarks ?? []).filter(item => !ids.has(item.viewId ?? 'main')).map(item => item.viewId ?? 'main'))]
   assert(!orphanViews.length, `Original source landmark view(s) lack an evidenced compact-view mapping: ${orphanViews.join(',')}`)
@@ -1061,6 +1152,8 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
   }
   for (const row of census.selected) {
     const sample = { timeSeconds: row.timeSeconds, reasons: row.reasons, diagnosticOnly: row.diagnosticOnly === true, required: row.required, sourceShotId: row.sourceShotId, sampleTimeSeconds: row.frame?.timeSeconds ?? null, sourceImageReplay: row.sourceImageReplay ?? null, status: 'unavailable', measurements: [], unavailable: [], excluded: [] }
+    sample.qualifiedExcludedViews = row.qualifiedExcludedViews ?? []
+    sample.requiredViewIds = row.expectedViewIds ?? []
     video.samples.push(sample)
     if (row.required) sample.nativeLandmarkEligibility = unavailableCurrentNativeEligibilityReport(row.frame,
       options.nativeEligibility ? eligibilityModuleError ?? 'The required current frame has not been reviewed' : 'Optional current native eligibility collection was not requested',
@@ -1074,20 +1167,20 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
         sample.nativeMediaTime = response.native.mediaTime
         sample.maxClockSkewSeconds = Math.abs(response.actual.modelTime - response.native.mediaTime)
         assert(sample.maxClockSkewSeconds <= CLOCK_LIMIT, 'No-machine/held sample timing exceeds0.5s')
-        sample.status = 'not-required'
+        sample.status = sample.qualifiedExcludedViews.length ? 'qualified-excluded' : 'not-required'
         continue
       }
       requireSourceViews(row)
       let result = measuredFrames.get(frame.timeSeconds)
       if (!result) {
         const response = await review(page, embed, record, frame)
-        const measurements = [], unavailable = [], excluded = [], clocks = []
-        for (const view of frame.views) {
-          try { const measured = measureView(view, response, frame, frame.landmarks ?? [], tolerancePx, anchors, seeds); measurements.push(...measured.measured); unavailable.push(...measured.unavailable); excluded.push(...measured.excluded); clocks.push(measured.clockSkewSeconds) }
+        const measurements = [], unavailable = [], excluded = [], nativeLines = [], clocks = []
+        for (const view of requiredSourceViews(frame)) {
+          try { const measured = measureView(view, response, frame, frame.landmarks ?? [], tolerancePx, anchors, seeds, record.lineAuthority); measurements.push(...measured.measured); unavailable.push(...measured.unavailable); excluded.push(...measured.excluded); nativeLines.push(...measured.nativeLines); clocks.push(measured.clockSkewSeconds) }
           catch (error) { unavailable.push({ viewId: view.id, status: 'unmeasured-native', reason: error.message }) }
         }
         const maxClockSkewSeconds = clocks.length ? Math.max(...clocks) : null
-        result = { measurements, unavailable, excluded, maxClockSkewSeconds, status: measurements.some(item => item.status === 'failed') || maxClockSkewSeconds !== null && maxClockSkewSeconds > CLOCK_LIMIT ? 'failed' : unavailable.length || !measurements.length || maxClockSkewSeconds === null ? 'unavailable' : 'passed' }
+        result = { measurements, unavailable, excluded, nativeLines, maxClockSkewSeconds, status: [...measurements, ...nativeLines].some(item => item.status === 'failed') || maxClockSkewSeconds !== null && maxClockSkewSeconds > CLOCK_LIMIT ? 'failed' : unavailable.length || !measurements.length || maxClockSkewSeconds === null ? 'unavailable' : 'passed' }
         // Qualification is an optional report, never a measurement or playback gate.
         if (options.nativeEligibility) {
           try {
@@ -1116,7 +1209,7 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
 }
 export function finishVideo(video, census, options) {
   const mandatoryRows = census.rows.filter(row => !row.diagnosticOnly), mandatory = video.samples.filter(sample => !sample.diagnosticOnly), diagnostic = video.samples.filter(sample => sample.diagnosticOnly)
-  const required = mandatory.filter(sample => sample.required), measured = required.filter(sample => sample.measurements.length), passed = required.filter(sample => sample.status === 'passed' && !sample.unavailable.length && sample.measurements.length && sample.measurements.every(item => item.status === 'passed') && finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds <= CLOCK_LIMIT)
+  const required = mandatory.filter(sample => sample.required), measured = required.filter(sample => sample.measurements.length), passed = required.filter(sample => sample.status === 'passed' && !sample.unavailable.length && sample.measurements.length && [...sample.measurements, ...(sample.nativeLines ?? [])].every(item => item.status === 'passed') && finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds <= CLOCK_LIMIT)
   const selectedTimes = new Map(mandatory.map(sample => [sample.timeSeconds.toFixed(6), sample]))
   const selectedRows = (census.selected ?? census.rows).filter(row => !row.diagnosticOnly)
   const missingCensusSamples = selectedRows.filter(row => {
@@ -1130,13 +1223,32 @@ export function finishVideo(video, census, options) {
   video.coverage = { allSourceCensusSamples: census.rows.length, allMandatoryCensusSamples: mandatoryRows.length, allRequiredSourceSamples: mandatoryRows.filter(row => row.required).length, selectedCensusSamples: video.samples.length, selectedMandatoryCensusSamples: mandatory.length, selectedRequiredSamples: required.length, measuredRequiredSamples: measured.length, passedRequiredSamples: passed.length, failedRequiredSamples: required.filter(sample => sample.status === 'failed').length, unavailableRequiredSamples: required.filter(sample => sample.status === 'unavailable').length, missingCensusSamples, diagnosticSamples: { selected: diagnostic.length, measured: diagnostic.filter(sample => sample.measurements.length).length, passed: diagnostic.filter(sample => sample.status === 'passed').length, failed: diagnostic.filter(sample => sample.status === 'failed').length, unavailable: diagnostic.filter(sample => sample.status === 'unavailable').length }, everySecond: { required: mandatoryRows.filter(row => row.reasons.includes('every-second')).length, selected: mandatory.filter(row => row.reasons.includes('every-second')).length }, changePoints: { required: mandatoryRows.filter(isChange).length, selected: mandatory.filter(isChange).length }, complete: !options.scoped && missingCensusSamples === 0 && mandatory.length === mandatoryRows.length && required.length > 0 && passed.length === required.length && mandatory.every(sample => sample.required || sample.status === 'not-required') }
   video.coverage.unavailableCensusSamples = mandatory.filter(sample => sample.status === 'unavailable').length + missingCensusSamples
   video.coverage.complete &&= video.coverage.unavailableCensusSamples === 0
+  video.sourceVisibility = {
+    requiredViewSamples: mandatory.reduce((sum, sample) => sum + (sample.requiredViewIds?.length ?? 0), 0),
+    qualifiedExcludedViewSamples: mandatory.reduce((sum, sample) => sum + (sample.qualifiedExcludedViews?.length ?? 0), 0),
+    whollyQualifiedExcludedSamples: mandatory.filter(sample => sample.status === 'qualified-excluded').length,
+    unavailableViewSamples: mandatory.reduce((sum, sample) => sum + new Set([
+      ...sample.unavailable.map(item => item.viewId).filter(Boolean),
+      ...(sample.status === 'unavailable' ? sample.requiredViewIds ?? [] : []),
+    ]).size, 0),
+    unavailableQualifiedExposureSamples: mandatory.filter(sample => sample.status === 'unavailable' && sample.qualifiedExcludedViews?.length).length,
+    interpretation: 'Only exact-image/full-ROI manually audited blurred or text-covered navigation physical backgrounds leave pixel/motion obligations. Their timestamps, decoder/image replay, source clocks and mandatory census remain required; held display is not current source fidelity.',
+  }
   video.landmarks = { measured: measurements.length, checks: checks.length, fitting: measurements.length - checks.length, fixedChecks: checks.filter(item => item.motion === 'fixed').length, movingChecks: checks.filter(item => item.motion === 'moving').length, maxErrorPx: maximumField(measurements, 'errorPx'), maxRawErrorPx: maximumField(measurements, 'rawErrorPx'), maxErrorFrameWidthPercent: maximumField(measurements, 'errorFrameWidthPercent') }
+  const mandatoryLines = mandatory.flatMap(sample => sample.nativeLines ?? [])
+  const diagnosticLines = diagnostic.flatMap(sample => sample.nativeLines ?? [])
+  video.nativeLineChecks = {
+    measured: mandatoryLines.length, passed: mandatoryLines.filter(line => line.status === 'passed').length,
+    fixedBodyChecks: mandatoryLines.filter(line => line.motion === 'fixed' && line.status === 'passed').length,
+    maxErrorPx: maximumField(mandatoryLines, 'errorPx'),
+    interpretation: 'Independent finite native BODY LINE checks from actual same-draw native world segment and at least two visible GPU stations, plus source paired edges; never fixed POINT landmarks, exact-world certificates or camera FITs. Source localization is counted once, plus independent geometry bias and GPU raster uncertainty.',
+  }
   const diagnosticMeasurements = diagnostic.flatMap(sample => sample.measurements)
-  const diagnosticFailures = diagnosticMeasurements.filter(item => item.status === 'failed')
+  const diagnosticFailures = [...diagnosticMeasurements, ...diagnosticLines].filter(item => item.status === 'failed')
   const diagnosticClockFailures = diagnostic.filter(sample => finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds > CLOCK_LIMIT)
   const mandatoryClockFailures = mandatory.filter(sample => finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds > CLOCK_LIMIT)
   video.diagnosticLandmarks = { measured: diagnosticMeasurements.length, failed: diagnosticFailures.length, maxErrorPx: maximumField(diagnosticMeasurements, 'errorPx'), maxClockSkewSeconds: maximumField(diagnostic, 'maxClockSkewSeconds') }
-  video.maxErrorPx = maximumField([...measurements, ...diagnosticMeasurements], 'errorPx')
+  video.maxErrorPx = maximumField([...measurements, ...mandatoryLines, ...diagnosticMeasurements, ...diagnosticLines], 'errorPx')
   video.maxClockSkewSeconds = maximumField(video.samples, 'maxClockSkewSeconds')
   if (diagnosticFailures.length) video.failures.push({ code: 'diagnostic-pixel-counterexample', measuredLandmarks: diagnosticFailures.length, maxErrorPx: video.diagnosticLandmarks.maxErrorPx, reason: 'An independently admitted diagnostic source observation exceeds the stage pixel limit; optional missing or inadmissible oracles do not gate completeness, but actual measured counterexamples cannot be ignored.' })
   if (diagnosticClockFailures.length) video.failures.push({ code: 'diagnostic-clock-counterexample', measuredSamples: diagnosticClockFailures.length, maxClockSkewSeconds: maximumField(diagnosticClockFailures, 'maxClockSkewSeconds'), timeSeconds: diagnosticClockFailures.map(sample => sample.timeSeconds), reason: 'An independently observed diagnostic media/model clock exceeds0.5s; unknown timing remains unavailable, but a finite measured timing counterexample cannot be ignored.' })
@@ -1150,7 +1262,7 @@ export function finishVideo(video, census, options) {
     exclusionReasons[item.reasonCode] = (exclusionReasons[item.reasonCode] ?? 0) + 1
   }
   video.sourceLandmarkExclusions = { mandatory: excludedMandatory, diagnostic: excludedDiagnostic, byReasonCode: exclusionReasons, interpretation: 'Source-method/provenance exclusions are reported separately, never measurements. Every affected view must retain three distributed admitted actual landmarks including CHECK; missing source pixels/views/native bodies and masked/unrendered GPU points remain blocking.' }
-  if (!video.landmarks.fixedChecks) video.failures.push({ code: 'hard-fixed-landmark-coverage', reason: 'Hard fixed independent CHECK landmarks are required; easy camera-only FIT points cannot pass a video' })
+  if (!video.landmarks.fixedChecks && !video.nativeLineChecks.fixedBodyChecks) video.failures.push({ code: 'hard-fixed-landmark-coverage', reason: 'Hard fixed independent source/native CHECK geometry is required: fixed POINT landmarks or separately measured finite fixed-BODY LINE checks; easy camera-only FIT points cannot pass a video' })
   const shotMap = new Map((video.shots ?? []).map(shot => [shot.id, shot]))
   video.motionCoverage = []
   for (const shotId of new Set(required.map(sample => sample.sourceShotId ?? 'undeclared-shot'))) {
@@ -1166,7 +1278,7 @@ export function finishVideo(video, census, options) {
   if (!video.interaction || !Object.values(video.playback).some(result => result.status === 'passed')) video.failures.push({ code: 'interaction-unmeasured', reason: 'Actual original playback/audio/compact and paused manual native operation/orbit checks are required' })
   if (options.scoped) video.status = 'partial'
   else video.status = video.coverage.complete && !video.failures.length ? 'passed' : video.coverage.unavailableCensusSamples || !measurements.length ? 'unavailable' : 'failed'
-  const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed')) || mandatoryClockFailures.length > 0 || diagnosticFailures.length > 0 || diagnosticClockFailures.length > 0
+  const measuredFailure = required.some(sample => sample.status === 'failed' || [...sample.measurements, ...(sample.nativeLines ?? [])].some(item => item.status === 'failed')) || mandatoryClockFailures.length > 0 || diagnosticFailures.length > 0 || diagnosticClockFailures.length > 0
   video.stageMeasurement = { stage: options.stage, tolerancePx: 1920 * options.stage / 100, status: options.scoped ? 'unmeasured' : video.status === 'passed' ? 'passed' : measuredFailure || video.status === 'failed' ? 'failed' : 'unmeasured', scopedSamples: options.scoped ? { status: required.length && passed.length === required.length && missingCensusSamples === 0 && mandatory.length === selectedRows.length && !video.failures.length ? 'passed' : measuredFailure ? 'failed' : 'unavailable' } : null }
 }
 

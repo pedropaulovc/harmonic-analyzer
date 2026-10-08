@@ -2589,5 +2589,78 @@ class HistoricalSceneArchiveBoundaryTests(unittest.TestCase):
                     generator.revalidate_receipt()
 
 
+class QualifiedSourceVisibilityTests(unittest.TestCase):
+    @staticmethod
+    def qualify(frame, view):
+        view['sourceVisibility'] = {
+            'kind': 'policy-excluded', 'reasonCode': 'blurred-navigation-background',
+            'sourceImage': copy.deepcopy(frame['sourceImage']),
+            'rectSourcePixels': copy.deepcopy(view['rectSourcePixels']),
+            'manualSourceAudit': {'method': 'manual-source-pixel-inspection',
+                                  'evidence': 'Synthetic full physical ROI audit for ordinary producer contract only.'},
+        }
+
+    def test_normal_current_producer_retains_inventory_and_only_omits_qualified_background_denominators(self):
+        video_id = 'XPQwKRt4Y2k'
+        with current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            for frame in record['frames']:
+                background = copy.deepcopy(frame['views'][0])
+                background['id'] = 'background'
+                background['camera'] = None
+                background['input'] = None
+                background.pop('cameraMeasurement', None)
+                background['unavailable'] = [{'reason': 'Source-qualified blurred background has no current native pose claim.'}]
+                self.qualify(frame, background)
+                frame['views'].insert(0, background)
+            write_current_record(root / 'web', video_id, record)
+            track = ordinary_build(module, video_id, 'generate', record)
+            self.assertEqual(track['coverage']['status'], 'complete')
+            self.assertEqual(track['sourceMeasurements']['requiredViewSamples'],
+                             sum(len(frame['views']) - 1 for frame in track['frames']))
+            self.assertEqual(track['sourceMeasurements']['qualifiedExcludedViewSamples'], len(track['frames']))
+            for frame in track['frames']:
+                self.assertEqual(frame['views'][0]['id'], 'background')
+                self.assertEqual(frame['views'][0]['sourceVisibility']['sourceImage'], frame['sourceImage'])
+            self.assertTrue(all(stage['status'] == 'unmeasured' for stage in track['stages'].values()))
+            module.common.write_track(track)
+
+    def test_normal_producer_refuses_incomplete_roi_wrong_image_unknown_reason_and_readable_current_pixels(self):
+        video_id = 'XPQwKRt4Y2k'
+        for mutation in ('image', 'roi', 'reason', 'blank-audit', 'readable'):
+            with self.subTest(mutation=mutation), current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+                record = data[video_id]
+                frame = record['frames'][0]
+                background = copy.deepcopy(frame['views'][0])
+                background['id'] = 'background'
+                self.qualify(frame, background)
+                frame['views'].append(background)
+                value = background['sourceVisibility']
+                if mutation == 'image':
+                    value['sourceImage']['frameIndex'] += 1
+                elif mutation == 'roi':
+                    value['rectSourcePixels'][2] -= 1
+                elif mutation == 'reason':
+                    value['reasonCode'] = 'unobservable'
+                elif mutation == 'blank-audit':
+                    value['manualSourceAudit']['evidence'] = ' '
+                else:
+                    frame['landmarks'].append({**frame['landmarks'][0], 'viewId': 'background'})
+                write_current_record(root / 'web', video_id, record)
+                with self.assertRaises(ValueError):
+                    ordinary_build(module, video_id, 'generate', record)
+
+    def test_qualification_transition_is_a_retained_observed_change_even_without_authored_keys(self):
+        data = {
+            'kind': 'current-source-observations', 'coverage': {'changeTimesSeconds': []},
+            'frames': [
+                {'timeSeconds': 0, 'views': [{'id': 'main'}]},
+                {'timeSeconds': 0.25, 'views': [{'id': 'main', 'sourceVisibility': {'reasonCode': 'blurred-navigation-background'}}]},
+                {'timeSeconds': 0.5, 'views': [{'id': 'main'}]},
+            ],
+        }
+        self.assertEqual(common.compact_change_times(data), {0, 0.25, 0.5})
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { runInNewContext } from 'node:vm'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } from './verify-sync.mjs'
+const { parseOptions, sourceCensus, finishVideo, seekSettlement, preparePausedSource, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, manualInteractionFrame, requirePlaybackDraw, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel, loadRecord } = await import(process.env.VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
 import { jsonDigest, loadCanonicalObservations } from './verify-reference.mjs'
+import { sourceVisibilityError } from '../source-visibility.mjs'
+import { nativeLineEndpointId, fixedNativeLinePart } from '../native-line-checks.mjs'
 import { NATIVE_IDENTITY_MAP_SHA256 } from '../model-representation.mjs'
 import { LIVE_MODEL_SOURCE } from './approved-model.mjs'
 import { loadCurrentObservations, currentSourceAssemblyChangeTimes } from './fresh-source-observations.mjs'
@@ -1208,4 +1210,214 @@ test('render verification separates the real representation digest from pinned r
     unapprovedIdentity.identity[field] = 'e'.repeat(64)
     assert.throws(() => requireModel(actual, 'fixture', unapprovedIdentity, nativeIdentity), /identity|canonical|mapping|association|different native/i)
   }
+})
+
+function visibilityCensusFixture() {
+  const sourceImage = { frameIndex: 30, pixelFormat: 'gray8', sha256Gray8: 'b'.repeat(64), sourceSha256: 'a'.repeat(64), width: 1920, height: 1080 }
+  const background = { id: 'background', rectSourcePixels: [0, 0, 1920, 1080], presentation: 'native', camera: null, input: null }
+  const inset = { id: 'readable-inset', rectSourcePixels: [100, 100, 400, 300], presentation: 'native', camera: {}, input: {} }
+  const old = { ...frame(1), sourceImage, views: [background, inset], landmarks: [] }
+  const current = structuredClone(old)
+  current.views[0].sourceVisibility = {
+    kind: 'policy-excluded', reasonCode: 'text-covered-navigation-background',
+    sourceImage: structuredClone(sourceImage), rectSourcePixels: [...background.rectSourcePixels],
+    manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: 'Synthetic actual-ROI audit decision control; not source truth.' },
+  }
+  return { original: { ...observations, frames: [old] }, track: { shots: observations.shots, frames: [current], coverage: {} } }
+}
+
+test('qualified backgrounds leave only readable foreground required while preserving the original ROI census', () => {
+  const { original, track } = visibilityCensusFixture()
+  const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+  assert.equal(row.required, true)
+  assert.deepEqual(row.expectedViewIds, ['readable-inset'])
+  assert.equal(row.sourceViewMappings.length, 2)
+  assert.equal(row.sourceViewMappings[0].qualifiedExcluded, true)
+  assert.deepEqual(row.qualifiedExcludedViews.map(view => view.viewId), ['background'])
+  requireSourceViews(row)
+  assert.throws(() => measureView(track.frames[0].views[0], {}, track.frames[0], [], 960, new Map()), /not a source-pose measurement/)
+})
+
+test('original/current union refuses missing readable views, misbound qualification, partial ROI and admitted readable support', () => {
+  for (const mutation of ['missing-inset', 'image', 'roi', 'reason', 'readable']) {
+    const { original, track } = visibilityCensusFixture()
+    if (mutation === 'missing-inset') track.frames[0].views.pop()
+    if (mutation === 'image') track.frames[0].views[0].sourceVisibility.sourceImage.frameIndex++
+    if (mutation === 'roi') track.frames[0].views[0].sourceVisibility.rectSourcePixels[2]--
+    if (mutation === 'reason') track.frames[0].views[0].sourceVisibility.reasonCode = 'unknown-motion'
+    if (mutation === 'readable') original.frames[0].landmarks.push({ anchorId: 'support', viewId: 'background', status: 'observed', method: 'manual', role: 'check', pixel: [10, 20], uncertaintyPx: 1 })
+    const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+    assert.equal(row.required, true)
+    assert.throws(() => requireSourceViews(row), /Required source view|Source visibility/)
+  }
+})
+
+test('inadmissible historical donor pixels stay retained but cannot re-require a properly qualified unreadable background', () => {
+  const { original, track } = visibilityCensusFixture()
+  original.frames[0].landmarks.push({ anchorId: 'donor', viewId: 'background', status: 'observed', method: 'template-match', role: 'check', pixel: [10, 20], uncertaintyPx: 1, trackingEvidence: { evidence: 'unqualified old donor prose' } })
+  const before = structuredClone(original)
+  const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+  assert.deepEqual(row.expectedViewIds, ['readable-inset'])
+  assert.deepEqual(original, before, 'Historical pixels/provenance must never be erased')
+})
+
+test('whole qualified exposures retain mandatory census and unavailable clock/decoder failures', () => {
+  const { original, track } = visibilityCensusFixture()
+  original.frames[0].views.pop()
+  track.frames[0].views.pop()
+  const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+  assert.equal(row.required, false)
+  assert.deepEqual(row.expectedViewIds, [])
+  assert.equal(row.qualifiedExcludedViews.length, 1)
+  assert.ok(row.reasons.includes('every-second'))
+  for (const state of ['qualified-excluded', 'unavailable', 'failed']) {
+    const video = videoFixture()
+    video.samples.push({ timeSeconds: 1, sampleTimeSeconds: 1, reasons: ['every-second'], required: false, status: state, measurements: [],
+      unavailable: state === 'unavailable' ? [{ reason: 'Source decoder unavailable' }] : [], qualifiedExcludedViews: row.qualifiedExcludedViews, requiredViewIds: [],
+      maxClockSkewSeconds: state === 'failed' ? 0.501 : state === 'unavailable' ? null : 0.1 })
+    const census = { rows: [...censusFixture.rows, row] }
+    finishVideo(video, census, parseOptions(['--stage', '50']))
+    assert.equal(video.sourceVisibility.qualifiedExcludedViewSamples, 1)
+    assert.equal(video.coverage.allMandatoryCensusSamples, 2)
+    if (state === 'unavailable') assert.equal(video.coverage.unavailableCensusSamples, 1)
+    if (state === 'failed') assert.ok(video.failures.some(failure => failure.code === 'mandatory-clock-counterexample'))
+    if (state === 'qualified-excluded') assert.equal(video.coverage.passedRequiredSamples, 1, 'Held background never becomes a measured required-source pass')
+  }
+})
+
+test('actual retained Rocker24353 permits only exact audited physical ROI exclusions, never preceding sharp24352', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const track = JSON.parse(await readFile(new URL('../content/4mBuyixt22U.source-track.json', import.meta.url), 'utf8'))
+  const sharp = track.frames.find(frame => frame.sourceImage?.frameIndex === 24352)
+  const blurred = structuredClone(track.frames.find(frame => frame.sourceImage?.frameIndex === 24353))
+  assert.equal(blurred.sourceImage.sha256Gray8, '2a3aeb84159b14c6cda4a45407965602d1612787e0f148eef2f3b1ad80e7fd4a')
+  assert.equal(sharp.views.length, 8)
+  assert.equal(blurred.views.length, 7)
+  for (const view of blurred.views) {
+    view.sourceVisibility = {
+      kind: 'policy-excluded', reasonCode: 'blurred-navigation-background',
+      sourceImage: structuredClone(blurred.sourceImage), rectSourcePixels: [...view.rectSourcePixels],
+      manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: `AuditCoarseObservability actual source-24353.png inspected full physical ROI ${view.id} ${JSON.stringify(view.rectSourcePixels)}: blurred/text-overprinted, no readable physical support; only this exposure, not sharp24352.` },
+    }
+    assert.equal(sourceVisibilityError(blurred, view), null)
+    assert.match(sourceVisibilityError(sharp, view), /exact actual frame source image/)
+  }
+  const fixtureTrack = { ...track, frames: [sharp, blurred] }
+  const original = { ...track, frames: [sharp, track.frames.find(frame => frame.sourceImage?.frameIndex === 24353)] }
+  const options = parseOptions(['--stage', '50', '--times', `${sharp.timeSeconds},${blurred.timeSeconds}`])
+  const census = sourceCensus(original, fixtureTrack, { ...native, durationSeconds: track.source.durationSeconds, fps: 24000 / 1001 }, options)
+  assert.equal(census.selected[0].required, true)
+  assert.ok(census.selected[0].expectedViewIds.includes('main'), 'Sharp outgoing machine remains fully required despite navigation labels')
+  assert.equal(census.selected[1].required, false)
+  assert.equal(census.selected[1].qualifiedExcludedViews.length, 7)
+})
+
+function nativeLineFixture() {
+  const fixture = measuredViewFixture(), path = 'ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1'
+  const source = [[1200, 200], [1200, 900]]
+  const focal = 1080 / (2 * Math.tan(fixture.view.camera.verticalFovDegrees * Math.PI / 360))
+  const world = source.map(([x, y]) => [1 + (x - 960) / focal, 1 - (y - 540) / focal, 0])
+  const line = {
+    id: 'held-out-fixed-stock', partPath: path, partLocalLineMetres: [[0, 0, 0], [0, 1, 0]],
+    sourceLinePixels: source, uncertaintyPx: 2,
+    measurementEvidence: {
+      sourceImage: fixture.frame.sourceImage, detector: 'Synthetic paired-edge decision control.',
+      edgeRows: [200, 550, 900].map(y => ({ y, left: 1199, right: 1201, contrast: 10 })),
+      axisPerspectiveBiasBoundPx: 5, axisPerspectiveEvidence: 'Synthetic independently bounded physical stock.',
+      axisPerspectiveBiasComponents: { kind: 'includes-source-localization', geometryBoundPx: 3, sourceLocalizationBoundPx: 2, evidence: 'Synthetic inclusive budget control.' },
+      axisPerspectiveBiasSpace: 'source-global',
+    },
+  }
+  fixture.view.nativeLineChecks = [line]
+  for (const station of [0, 0.25, 0.5, 0.75, 1]) {
+    const sourcePixels = source[0].map((value, axis) => value + station * (source[1][axis] - value))
+    fixture.capture.landmarks.push({
+      id: nativeLineEndpointId(fixture.view.id, line.id, station), partPath: path,
+      state: 'rendered', sourcePixels, canvasPixels: sourcePixels, uncertaintySourcePixels: 0.5,
+      worldMetres: world[0].map((value, axis) => value + station * (world[1][axis] - value)),
+    })
+  }
+  fixture.lineAuthority = { paths: new Set([path]), bindings: [] }
+  return fixture
+}
+const measureNativeLineFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 960, fixture.anchors, fixture.seeds, fixture.lineAuthority)
+
+test('independent native fixed-body LINE uses actual GPU readbacks without becoming a fixed source POINT or camera FIT', () => {
+  const fixture = nativeLineFixture(), camera = structuredClone(fixture.view.camera), input = structuredClone(fixture.view.input)
+  const result = measureNativeLineFixture(fixture)
+  assert.equal(result.nativeLines.length, 1)
+  assert.equal(result.nativeLines[0].motion, 'fixed')
+  assert.equal(result.nativeLines[0].status, 'passed')
+  assert.equal(result.nativeLines[0].sourceUncertaintyPx, 2)
+  assert.equal(result.nativeLines[0].geometryBiasSourcePixels, 3)
+  assert.equal(result.nativeLines[0].rasterUncertaintyPx, 0.5)
+  assert.equal(result.nativeLines[0].errorPx, 5.5, 'Inclusive source localization must be added exactly once')
+  assert.equal(result.measured.length, fixture.observations.length, 'Endpoint diagnostics are never observed source landmarks')
+  assert.deepEqual(fixture.view.camera, camera, 'Line CHECK cannot adjust camera fit')
+  assert.deepEqual(fixture.view.input, input, 'Line CHECK cannot adjust chosen input')
+})
+
+test('native line wrong source image/body, missing readback and stale physical draw fail closed', () => {
+  for (const mutation of ['source-image', 'native-body', 'readback', 'layout']) {
+    const fixture = nativeLineFixture()
+    if (mutation === 'source-image') fixture.view.nativeLineChecks[0].measurementEvidence.sourceImage = sourceImage(31, 'wrong-source')
+    if (mutation === 'native-body') fixture.capture.landmarks.at(-1).partPath = 'ha-harmonic-analyzer/fr-frame/wrong-part'
+    if (mutation === 'readback') for (const marker of fixture.capture.landmarks.slice(-5)) marker.state = 'not-visible'
+    if (mutation === 'layout') fixture.response.captures[0].mechanism.sourceLayout = []
+    if (mutation === 'layout') assert.throws(() => measureNativeLineFixture(fixture), /same rendered source view/)
+    else {
+      const result = measureNativeLineFixture(fixture)
+      assert.equal(result.nativeLines.length, 0)
+      assert.ok(result.unavailable.some(item => item.kind === 'native-body-line'))
+    }
+  }
+})
+
+test('offscreen finite endpoints retain exact segment geometry with at least two corroborating visible GPU stations', () => {
+  const fixture = nativeLineFixture()
+  const markers = fixture.capture.landmarks.slice(-5)
+  markers[0].state = 'not-visible'
+  markers[0].sourcePixels = markers[0].canvasPixels = null
+  const result = measureNativeLineFixture(fixture)
+  assert.equal(result.nativeLines[0].status, 'passed')
+  assert.equal(result.nativeLines[0].gpuStationReadbacks.length, 4)
+  assert.equal(result.nativeLines[0].nativeSegmentCoversObservation, true)
+  assert.equal(result.nativeLines[0].endpointProbeIds.length, 2)
+  markers[2].sourcePixels[0] += 5
+  assert.equal(measureNativeLineFixture(fixture).nativeLines.length, 0, 'CPU projection cannot override inconsistent actual GPU geometry')
+})
+
+test('fixed body classification needs current native membership and no actual animated ancestor', () => {
+  const fixture = nativeLineFixture(), path = fixture.view.nativeLineChecks[0].partPath
+  assert.equal(fixedNativeLinePart(path, fixture.lineAuthority), true)
+  assert.equal(fixedNativeLinePart(path, { paths: new Set(), bindings: [] }), false)
+  fixture.lineAuthority.bindings = [{ pattern: /^ha-harmonic-analyzer\/fr-frame$/, motion: 'rod' }]
+  const result = measureNativeLineFixture(fixture)
+  assert.equal(result.nativeLines.length, 0)
+  assert.ok(result.unavailable.some(item => /animated ancestor/.test(item.reason)))
+  assert.equal(fixedNativeLinePart(path, null), false)
+})
+
+test('fixed LINE can satisfy fixed-body obligation only while original point/moving/sample floors and measured line failures remain live', () => {
+  const video = videoFixture()
+  video.samples[0].measurements = [measurement('moving', 'moving')]
+  video.samples[0].nativeLines = measureNativeLineFixture(nativeLineFixture()).nativeLines
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.landmarks.fixedChecks, 0)
+  assert.equal(video.nativeLineChecks.fixedBodyChecks, 1)
+  assert.ok(!video.failures.some(failure => failure.code === 'hard-fixed-landmark-coverage'))
+  assert.ok(!video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
+  const missingMoving = videoFixture()
+  missingMoving.samples[0].measurements = [measurement('fit-only', 'fixed')]
+  missingMoving.samples[0].measurements[0].role = 'fit'
+  missingMoving.samples[0].nativeLines = video.samples[0].nativeLines
+  finishVideo(missingMoving, censusFixture, parseOptions(['--stage', '50']))
+  assert.ok(missingMoving.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
+  const failedLine = videoFixture()
+  failedLine.samples[0].nativeLines = [{ ...video.samples[0].nativeLines[0], status: 'failed', errorPx: 1001 }]
+  failedLine.samples[0].status = 'unavailable'
+  failedLine.samples[0].unavailable = [{ reason: 'Additional point unavailable' }]
+  finishVideo(failedLine, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(failedLine.stageMeasurement.status, 'failed')
+  assert.equal(failedLine.maxErrorPx, 1001)
 })

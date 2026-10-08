@@ -156,3 +156,45 @@ test('actual current tracks associate through uv without an ambient python3 alia
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+function visibilityFixture() {
+  const record = recordFixture(), frame = record.frames[0]
+  frame.sourceMachineRequirement = 'required'
+  frame.views = [structuredClone(original.frames[0].views[0])]
+  const view = frame.views[0]
+  view.sourceVisibility = {
+    kind: 'policy-excluded', reasonCode: 'blurred-navigation-background',
+    sourceImage: structuredClone(frame.sourceImage), rectSourcePixels: [...view.rectSourcePixels],
+    manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: 'Synthetic full-ROI annotation control, not a claim that this readable source exposure is blurred.' },
+  }
+  return record
+}
+
+test('current visibility qualification retains the original exact source ROI and chosen candidate without a fidelity claim', async () => {
+  const record = visibilityFixture(), before = structuredClone(record)
+  await validateCurrentObservations(record, { webRoot })
+  assert.deepEqual(record, before)
+})
+
+test('current visibility refuses misbound images, partial ROIs, unknown reasons, blank audits and readable physical support', async () => {
+  for (const mutate of [
+    view => { view.sourceVisibility.sourceImage.frameIndex++ },
+    view => { view.sourceVisibility.rectSourcePixels[2]-- },
+    view => { view.sourceVisibility.reasonCode = 'unobservable' },
+    view => { view.sourceVisibility.manualSourceAudit.evidence = ' \n ' },
+    view => { view.sourceVisibility.manualSourceAudit.method = 'candidate-status' },
+    view => { view.sourceVisibility.approved = true },
+    (view, frame) => { frame.landmarks.push({ viewId: view.id }) },
+    view => { view.nativeLineChecks = [{}] },
+  ]) {
+    const record = visibilityFixture()
+    mutate(record.frames[0].views[0], record.frames[0])
+    await assert.rejects(validateCurrentObservations(record, { webRoot }), /Source visibility|source-readable/)
+  }
+})
+
+test('visibility qualification cannot waive actual requested/decoded clock ownership', async () => {
+  const record = visibilityFixture()
+  record.frames[0].decodedTimeSeconds = 0.501
+  await assert.rejects(validateCurrentObservations(record, { webRoot }), /requested\/decoded clock/)
+})

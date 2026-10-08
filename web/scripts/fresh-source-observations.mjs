@@ -73,7 +73,7 @@ export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
   }
   // These are renderer-created bodies sharing one decoded native template, not
   // invented released inventory/REST rows. Execute the sole creation ledger.
-  const { runtimeInstances, videos } = await withCurrentRuntime(webRoot, async server => {
+  const { runtimeInstances, videos, motionBindings } = await withCurrentRuntime(webRoot, async server => {
     const { NATIVE_RUNTIME_INSTANCES } = await server.ssrLoadModule('/src/source-assembly.ts')
     assert(NATIVE_RUNTIME_INSTANCES && equal(Object.keys(NATIVE_RUNTIME_INSTANCES).sort(), ['crankMedium', 'upperMedium']),
       'Current runtime instance creation ledger must declare exactly its two genuine roles')
@@ -99,9 +99,11 @@ export async function loadCurrentAuthority(webRoot = WEB_ROOT) {
       videos.set(video.id, { durationSeconds: video.durationSeconds, sha256: video.sourceSha256 })
     }
     assert(videos.size === VIDEO_IDS.length && VIDEO_IDS.every(id => videos.has(id)), 'Original-source catalog census differs')
-    return { runtimeInstances: instances, videos }
+    const { BINDINGS } = await server.ssrLoadModule('/src/bindings.ts')
+    assert(Array.isArray(BINDINGS) && BINDINGS.every(binding => text(binding.motion) && typeof binding.pattern?.test === 'function'), 'Actual native articulation registry is missing')
+    return { runtimeInstances: instances, videos, motionBindings: BINDINGS }
   })
-  return { approved, inventory, inventorySha256: seal.sha256, paths, runtimeInstances, videos }
+  return { approved, inventory, inventorySha256: seal.sha256, paths, runtimeInstances, videos, motionBindings }
 }
 
 function validateCurrentAnchors(data, authority, fields = CURRENT_ANCHOR_FIELDS) {
