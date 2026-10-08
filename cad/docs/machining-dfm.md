@@ -28,7 +28,7 @@ geometry is casting-shaped, not milling-shaped.
      **21.717 mm unsupported** past each end of a casting-shaped organic lever. Delicate (nicks/rounds)
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
-  3. **`dt-cone-gear-shaft` tip** — a **Ø0.79375 mm (1/32 in) terminal land, about 29.2 mm long in steel (L/D 36.8)**,
+  3. **`dt-cone-gear-shaft` tip** — a **Ø0.79375 mm (1/32 in) terminal land, about 32.7 mm long in steel (L/D 41.2)**,
      carrying the T012/T006 seats and the MHA-VN-016 stack collar, its cup tip seated in the MHA-VN-017 adjuster.
      Support the slender work with a follower/steady and take a light finishing cut;
      the terminal D-flat continues from the T018 step through the shaft tip.
