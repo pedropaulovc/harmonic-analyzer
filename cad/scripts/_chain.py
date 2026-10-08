@@ -33,13 +33,12 @@ import math
 
 import pd_transgear_removable_spec as _removable
 from cone_line import X_CRANK, Y_CRANK
+from paper_drive_geom import KNOB_SHAFT_XY
 
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (43.7878, 256.8933)  # build_pd_paper_drive_assembly KNOB_SHAFT_XY
-# mirrored: the knob axis K = stud S (0, 266.2007) + the permanent 12T:120T
-# DP38 mesh centre distance 44.766 at machine -168 deg (CONTRACT-paper-drive
-# axis points; the arm plate's bore datum puts it there).
+
+KNOB_CENTRE = (-KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1])
 # The crank chain-wheel rides the fixed post's crank axis. Import its
 # SolidWorks-free frame geometry, never the drive-train assembly: _chain also
 # feeds leaf chain-link parts, which must not depend on _assembly.

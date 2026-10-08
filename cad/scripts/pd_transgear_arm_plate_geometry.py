@@ -30,15 +30,14 @@ import math
 import pd_transgear_arm_geometry as ARM
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
-# K = the knob shaft axis, 44.766 from the stud on the permanent latch C2C;
-# expressed in the arm frame it is the plate's own datum.  The integrator
-# asserts it against the machine layout.
-BORE_STATION = 36.917  # arm x of K
-BORE_OFFSET = -31.409  # arm y of K (below the arm)
+# K follows the shifted reducer's centre distance, transformed into the arm
+# frame by its pure geometry. The screw midpoint follows that same bore.
+BORE_STATION = ARM.KNOB_BORE_STATION
+BORE_OFFSET = ARM.KNOB_BORE_OFFSET
 
 # --- Section ----------------------------------------------------------------
-WIDTH = 31.75  # 1-1/4 in bar
 END_R = 12.5  # full round about K; the +X edge is tangent to it
+WIDTH = 2.0 * (END_R - ARM.PLATE_CENTRELINE_OFFSET)  # 31.75, 1-1/4 in bar
 THICKNESS_OVER_ARM = 5.0  # ruling 3; prints .XX (plate-screw engagement)
 NOTCH_DEPTH = ARM.THICKNESS  # the section below the arm reaches its front face
 THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.9375

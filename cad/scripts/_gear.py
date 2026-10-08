@@ -91,32 +91,37 @@ async def cut_tooth_gap(
     ``rotate_rad`` spins the whole gap profile CCW about the gear axis;
     ``widen_rad`` is a symmetric backlash: each flank backs off the gap
     centre by that angle (circumferential widening = 2*widen_rad*R_pitch).
-    ``root_r_in`` (inches) replaces the base-chord floor with radial flank
-    extensions down to a root arc at that radius -- the deepened-dedendum
-    relief a small-pinion mate needs (the stock floor sits AT the base
-    circle, so a 16T's mate bottoms out 0.7 mm early). All offsets fold
-    into the curve literals; the expression SHAPE is the cone gear's
-    live-validated recipe, unchanged. (NB a blind cut from a sketch on an
+    ``root_r_in`` (inches) replaces the base-chord floor with a root arc.
+    Below the base circle, radial extensions provide root relief. Above it,
+    the involutes start exactly on the root circle, avoiding a self-crossing
+    contour through the base-circle feet. All offsets fold into the curve
+    literals. (NB a blind cut from a sketch on an
     OFFSET plane defaults back toward the base plane -- the retired K-slice
     helix stack tripped it; see memory/solidworks-modeling-pitfalls.md.)
     """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     rho, eps = rotate_rad, widen_rad
-    rb, ra = fmt(facts["Rb"]), fmt(facts["Ra"])
+    rb_value = facts["Rb"]
+    tmin = (
+        math.sqrt(max((root_r_in / rb_value) ** 2 - 1.0, 0.0))
+        if root_r_in is not None else 0.0
+    )
+    rb, ra = fmt(rb_value), fmt(facts["Ra"])
     theta_l = facts["ThetaL"] - eps + rho
     theta_u = facts["ThetaU"] + eps + rho
     th_l, th_u = fmt(theta_l), fmt(theta_u)
     rc = fmt(R_CLEAR_IN)
-    u = f"({fmt(facts['Tmax'])} * t)"
+    u = f"({fmt(tmin)} + {fmt(facts['Tmax'] - tmin)} * t)"
     # NB the lower flank is the MIRRORED involute (its y is negated relative
     # to the upper's form), so an azimuth offset enters its phase with the
     # OPPOSITE sign: azimuth(t=0) = -(phase(0)). Lower lands at Delta-eps+rho,
     # upper at Gamma-Delta+eps+rho.
     ph_low = f"({u} - {fmt(facts['Delta'] - eps + rho)})"
     ph_up = f"({u} + {fmt(facts['Gamma'] - facts['Delta'] + eps + rho)})"
-    a1 = facts["Delta"] - eps + rho
-    a2 = facts["Gamma"] - facts["Delta"] + eps + rho
+    inv_start = tmin - math.atan(tmin)
+    a1 = facts["Delta"] - inv_start - eps + rho
+    a2 = facts["Gamma"] - facts["Delta"] + inv_start + eps + rho
     check("create_sketch gap", await adapter.create_sketch("Front"))
     gap_curves = [
         await equation_curve(
@@ -159,26 +164,26 @@ async def cut_tooth_gap(
         ))
     else:
         rr = fmt(root_r_in)
-        gap_curves += [
-            await equation_curve(
+        if root_r_in < rb_value:
+            gap_curves.append(await equation_curve(
                 adapter,
                 "upper root extension A2->A2r",
                 f"({rb} + t * ({rr} - {rb})) * {fmt(math.cos(a2))}",
                 f"({rb} + t * ({rr} - {rb})) * {fmt(math.sin(a2))}",
-            ),
-            await equation_curve(
-                adapter,
-                "root arc A2r->A1r",
-                f"{rr} * cos({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
-                f"{rr} * sin({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
-            ),
-            await equation_curve(
+            ))
+        gap_curves.append(await equation_curve(
+            adapter,
+            "root arc A2r->A1r",
+            f"{rr} * cos({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
+            f"{rr} * sin({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
+        ))
+        if root_r_in < rb_value:
+            gap_curves.append(await equation_curve(
                 adapter,
                 "lower root extension A1r->A1",
                 f"({rr} + t * ({rb} - {rr})) * {fmt(math.cos(a1))}",
                 f"({rr} + t * ({rb} - {rr})) * {fmt(math.sin(a1))}",
-            ),
-        ]
+            ))
     # Equation-driven curves are the whitelist class for fix (no free
     # endpoints to dimension); B3 attempts a semantic scheme before keeping
     # this escalation (cad/FIX_MIGRATION.md).
@@ -242,8 +247,8 @@ def gap_area_in_disc_ext(
     ``involute_gear.gap_area_in_disc`` (asserted by ``check:math``'s import
     of both). Same Green's-theorem boundary walk as the live curves in
     ``cut_tooth_gap``: lower flank (rotated -widen), rim arc at Ra, upper
-    flank reversed (rotated +widen), then the floor -- base chord, or radial
-    extensions + root arc when ``root_r_in`` is set. A whole-gap rotation
+    flank reversed (rotated +widen), then the floor -- base chord or root arc
+    with radial extensions only below the base circle. A whole-gap rotation
     never changes the area, so the sliced-helix twist reuses this expectation
     per slice. ``addendum_extra_in`` moves the rim arc exactly as it moves
     ``gear_facts``' tip radius.
@@ -251,12 +256,17 @@ def gap_area_in_disc_ext(
     f = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     rb, ra = f["Rb"], f["Ra"]
     tmax, delta, gamma = f["Tmax"], f["Delta"], f["Gamma"]
+    tmin = (
+        math.sqrt(max((root_r_in / rb) ** 2 - 1.0, 0.0))
+        if root_r_in is not None else 0.0
+    )
     eps = widen_rad
     th_l, th_u = f["ThetaL"] - eps, f["ThetaU"] + eps
-    a1, a2 = delta - eps, gamma - delta + eps
+    inv_start = tmin - math.atan(tmin)
+    a1, a2 = delta - inv_start - eps, gamma - delta + inv_start + eps
     pts: list[tuple[float, float]] = []
     for i in range(samples + 1):  # lower flank (mirrored involute, -eps)
-        t = tmax * i / samples
+        t = tmin + (tmax - tmin) * i / samples
         ph = t - delta + eps  # mirror flips the offset sign; azimuth(0) = a1
         pts.append((
             rb * (math.cos(ph) + t * math.sin(ph)),
@@ -266,7 +276,7 @@ def gap_area_in_disc_ext(
         th = th_l + (th_u - th_l) * i / samples
         pts.append((ra * math.cos(th), ra * math.sin(th)))
     for i in range(1, samples + 1):  # upper flank, reversed (+eps)
-        t = tmax * (samples - i) / samples
+        t = tmin + (tmax - tmin) * (samples - i) / samples
         ph = t - delta + gamma + eps
         pts.append((
             rb * (math.cos(ph) + t * math.sin(ph)),
@@ -458,6 +468,7 @@ async def build_fixed_gear(
     depth_dp: float | None = None,
     long_addendum_mm: float = 0.0,
     dedendum: float = 1.157,
+    profile_shift: float = 0.0,
 ) -> ToothedDisc:
     """Build a toothed disc on the active new part.
 
@@ -490,14 +501,23 @@ async def build_fixed_gear(
     ``dedendum`` is the root-relief depth below the pitch circle in units of
     1/depth_dp: the standard 1.157, or 1.25 for a pinion whose drawing
     floors its root at the 1.25/P full-depth form (the feed-pinion sleeve).
+    ``profile_shift`` is the generating-rack coefficient x: it thickens the
+    reference-circle tooth by 2*x*m*tan(PA) and raises both tip and root by
+    x*m, with m = 1/depth_dp. It is not a centre-distance-only correction.
     """
     depth_dp = dp if depth_dp is None else depth_dp
-    addendum_extra_in = 1.0 / depth_dp - 1.0 / dp + long_addendum_mm / IN
+    shift_in = profile_shift / depth_dp
+    addendum_extra_in = (
+        1.0 / depth_dp - 1.0 / dp + long_addendum_mm / IN + shift_in
+    )
     facts = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     ra_mm = facts["Ra"] * IN
     pitch_r_in = teeth / dp / 2.0
-    widen_rad = (backlash_mm / 2.0) / (pitch_r_in * IN)
-    root_r_in = (pitch_r_in - dedendum / depth_dp) if root_relief else None
+    shift_thickness_in = 2.0 * shift_in * math.tan(math.radians(pa_deg))
+    widen_rad = (backlash_mm / IN - shift_thickness_in) / (2.0 * pitch_r_in)
+    root_r_in = (
+        pitch_r_in - dedendum / depth_dp + shift_in
+    ) if root_relief else None
     if helix_deg and root_r_in is None:
         raise ValueError("helix_deg requires root_relief=True (additive tooth "
                          "area algebra assumes the root-arc floor)")

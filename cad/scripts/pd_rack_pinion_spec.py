@@ -1,7 +1,7 @@
 r"""MHA-PD-006 rack-pinion: the 120T brass reducer disc of the translational gearing.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The disc is
-driven 12:120 by the knob shaft's 12T DP38 and screwed to the brass hub's
+driven 12:120 by the knob shaft's shifted 12T PA20 40DP and screwed to the brass hub's
 flange (MHA-PD-017, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
 screws (MHA-VN-039, McMaster 91794A055; the joint is
 ``pd_transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
@@ -26,6 +26,8 @@ bolt-circle position.
 
 from __future__ import annotations
 
+import math
+
 from _fit_limits import deviations
 from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
@@ -48,22 +50,49 @@ MM_PER_IN = 25.4
 
 # --- gear ----------------------------------------------------------------------
 TEETH = 120
-DIAMETRAL_PITCH = 38.0  # disc OD ~82 at 120T (build_pd_rack_pinion.py)
-PRESSURE_ANGLE_DEG = 14.5
+DIAMETRAL_PITCH = 40.0
+PRESSURE_ANGLE_DEG = 20.0
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
+PITCH_DIA = TEETH * MODULE_MM
+OUTSIDE_DIA = (TEETH + 2) * MODULE_MM
+DEDENDUM_FACTOR = 1.25
+ROOT_DIA = (TEETH - 2.0 * DEDENDUM_FACTOR) * MODULE_MM
+WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
 
-# The permanent mesh with the knob shaft's 12T DP38: the standard centre
-# distance plus the contract's 0.65 extension (backlash), unchanged.
+# The integral 12T has the minimum positive generating-rack shift that avoids
+# undercut at PA20. The disc remains unshifted; both use full-depth teeth.
 MESH_PINION_TEETH = 12
-CENTRE_DISTANCE = 44.766
-CENTRE_EXTENSION = CENTRE_DISTANCE - (
-    (TEETH + MESH_PINION_TEETH) / (2.0 * DIAMETRAL_PITCH) * MM_PER_IN
+MESH_PINION_PROFILE_SHIFT = 1.0 - MESH_PINION_TEETH * math.sin(
+    math.radians(PRESSURE_ANGLE_DEG)
+) ** 2 / 2.0
+MESH_ANGLE_DEG = -168.0
+CENTRE_DISTANCE = 42.22
+STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
+CENTRE_EXTENSION = CENTRE_DISTANCE - STANDARD_CENTRE_DISTANCE
+_PA = math.radians(PRESSURE_ANGLE_DEG)
+WORKING_PRESSURE_ANGLE = math.acos(
+    STANDARD_CENTRE_DISTANCE * math.cos(_PA) / CENTRE_DISTANCE
 )
-if not 0.6 < CENTRE_EXTENSION < 0.7:
-    raise AssertionError(f"12:120 centre extension moved: {CENTRE_EXTENSION:.3f}")
+MESH_BACKLASH = 2.0 * CENTRE_DISTANCE * (
+    math.tan(WORKING_PRESSURE_ANGLE) - WORKING_PRESSURE_ANGLE
+    - (math.tan(_PA) - _PA)
+    - 2.0 * MESH_PINION_PROFILE_SHIFT * math.tan(_PA)
+    / (TEETH + MESH_PINION_TEETH)
+)
+_PINION_PITCH_R = MESH_PINION_TEETH * MODULE_MM / 2.0
+_PINION_TIP_R = _PINION_PITCH_R + (1.0 + MESH_PINION_PROFILE_SHIFT) * MODULE_MM
+_PINION_BASE_R = _PINION_PITCH_R * math.cos(_PA)
+_DISC_BASE_R = PITCH_DIA / 2.0 * math.cos(_PA)
+_ACTION_LENGTH = CENTRE_DISTANCE * math.sin(WORKING_PRESSURE_ANGLE)
+_PINION_ROLLOUT = math.sqrt(_PINION_TIP_R**2 - _PINION_BASE_R**2)
+_DISC_ROLLOUT = math.sqrt((OUTSIDE_DIA / 2.0)**2 - _DISC_BASE_R**2)
+MESH_CONTACT_RATIO = (
+    _PINION_ROLLOUT + _DISC_ROLLOUT - _ACTION_LENGTH
+) / (math.pi * MODULE_MM * math.cos(_PA))
+if MESH_BACKLASH <= 0.0 or MESH_CONTACT_RATIO < 1.2:
+    raise AssertionError("the shifted 12:120 reducer has no usable running mesh")
+if max(_PINION_ROLLOUT, _DISC_ROLLOUT) >= _ACTION_LENGTH:
+    raise AssertionError("the reducer reaches past a mating base circle")
 
 # --- disc body -----------------------------------------------------------------
 FACE_WIDTH = 3.0

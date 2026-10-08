@@ -27,6 +27,9 @@ from __future__ import annotations
 import math
 from fractions import Fraction
 
+import pd_rack_pinion_spec as DISC
+import pd_support_bar_spec as BAR
+
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 
 MM_PER_IN = 25.4
@@ -94,13 +97,30 @@ SPOT_FACE_DEPTH = THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT
 # asserted in pd_transgear_arm_spec, which imports both: the pin spec imports
 # this module.
 PIN_STATION = 68.815  # |S - P|, printed .XXX (hole position)
+# Preserve the pivot, latch and pressed stud: the rack's mounting height,
+# not the hanger pose, takes up the shifted feed mesh's axis distance.
+STUD_MACHINE_X = 0.0
+ARM_U = (
+    (STUD_MACHINE_X - BAR.PIVOT_TAP_X) / PIN_STATION,
+    -math.sqrt(1.0 - ((STUD_MACHINE_X - BAR.PIVOT_TAP_X) / PIN_STATION) ** 2),
+)
+ARM_N = (-ARM_U[1], ARM_U[0])
+ARM_ANGLE_DEG = math.degrees(math.atan2(ARM_U[1], ARM_U[0]))
+_MESH_ANGLE = math.radians(DISC.MESH_ANGLE_DEG)
+KNOB_BORE_STATION = PIN_STATION + DISC.CENTRE_DISTANCE * (
+    math.cos(_MESH_ANGLE) * ARM_U[0] + math.sin(_MESH_ANGLE) * ARM_U[1]
+)
+KNOB_BORE_OFFSET = DISC.CENTRE_DISTANCE * (
+    math.cos(_MESH_ANGLE) * ARM_N[0] + math.sin(_MESH_ANGLE) * ARM_N[1]
+)
 PIN_BORE_DIA = 3.874
 PIN_BORE_DIA_BAND = (0.008, 0.0)  # (upper, lower) deviations, reamed
 PIN_BORE_DIA_MAX = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[0], 6)
 PIN_BORE_DIA_MIN = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[1], 6)
 # --- Plate taps: 2 x #8-32 THROUGH on the centreline, countersunk both ends -
 PLATE_SCREW_PITCH = 15.0
-PLATE_SCREW_MID_STATION = 33.542  # the plate's centreline (MHA-PD-019)
+PLATE_CENTRELINE_OFFSET = -3.375  # 1-1/4 in plate's centreline from its bore
+PLATE_SCREW_MID_STATION = KNOB_BORE_STATION + PLATE_CENTRELINE_OFFSET
 PLATE_TAP_STATIONS = (
     PLATE_SCREW_MID_STATION - PLATE_SCREW_PITCH / 2.0,
     PLATE_SCREW_MID_STATION + PLATE_SCREW_PITCH / 2.0,
