@@ -29,7 +29,6 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from ch_rocker_arm_tl_pivot_washer_spec import (
     BORE_CALLOUT,
     OUTER_CALLOUT,
-    THICK_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
 )
@@ -61,8 +60,7 @@ FACE_KEEP = {
     "BoreDia": (0.075, 0.145),
 }
 EDGE_KEEP = {
-    # Right of its dimension line: its two-line callout reads clear of it.
-    "Thick": (0.215, 0.105),
+    "Thick": (0.175, 0.105),
 }
 
 
@@ -119,7 +117,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if len(matches) != 1:
             raise RuntimeError(f"expected one {name} dimension, found {len(matches)}")
         set_near_side_diameter(matches[0], f"pivot-washer {name}")
-    set_dimension_callouts(adapter, annotations, {"BoreDia": BORE_CALLOUT, "OuterDia": OUTER_CALLOUT, "Thick": THICK_CALLOUT}, location="below")
+    set_dimension_callouts(adapter, annotations, {"BoreDia": BORE_CALLOUT, "OuterDia": OUTER_CALLOUT}, location="below")
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the washer face view")

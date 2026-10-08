@@ -77,8 +77,6 @@ DRAWING_NOTES = "\n".join(
     )
 )
 BORE_CALLOUT = "DRILL"
-# The thickness is a link in the pivot screw's axial stack: say so on it.
-THICK_CALLOUT = "SETS PIVOT SCREW\nMHA-CH-006-TL-06 DEPTH"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 5:1"
 
 EXPORT_FEATURES: dict[str, ExportFeature] = {
