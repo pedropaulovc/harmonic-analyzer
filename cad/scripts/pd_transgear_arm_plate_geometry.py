@@ -28,17 +28,20 @@ from __future__ import annotations
 import math
 
 import pd_transgear_arm_geometry as ARM
+from pd_transgear_hanger_layout import (
+    BORE_OFFSET,
+    BORE_STATION,
+    PLATE_END_R,
+    PLATE_WIDTH,
+)
 
 # --- Where the bore sits on the arm (arm frame, mm) -------------------------
-# K = the knob shaft axis, 44.766 from the stud on the permanent latch C2C;
-# expressed in the arm frame it is the plate's own datum.  The integrator
-# asserts it against the machine layout.
-BORE_STATION = 36.917  # arm x of K
-BORE_OFFSET = -31.409  # arm y of K (below the arm)
+# The bore is projected from the disc's authoritative centre distance at
+# machine -168 degrees onto the preserved arm frame.
 
 # --- Section ----------------------------------------------------------------
-WIDTH = 31.75  # 1-1/4 in bar
-END_R = 12.5  # full round about K; the +X edge is tangent to it
+WIDTH = PLATE_WIDTH  # 1-1/4 in bar
+END_R = PLATE_END_R  # full round about K; the +X edge is tangent to it
 THICKNESS_OVER_ARM = 5.0  # ruling 3; prints .XX (plate-screw engagement)
 NOTCH_DEPTH = ARM.THICKNESS  # the section below the arm reaches its front face
 THICKNESS_BELOW_ARM = THICKNESS_OVER_ARM + NOTCH_DEPTH  # 12.9375

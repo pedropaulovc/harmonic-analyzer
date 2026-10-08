@@ -10,12 +10,12 @@ swinging transgear hanger behind the bar, and the REAL power train:
 
     crank T12 --(belt/chain feature, 12:24 teeth)--> knob T24
       --(drive collar: two pressed drive pins + cross pin, LOCK)--> knob shaft
-      with its integral 12T DP38 --(GEAR mate 12:120)--> 120T DP38 reducer disc
-      --(LOCK: brass hub + feed sleeve)--> 12T DP30 feed pinion
-      --(RACK-PINION mate, pi*10.16/rev)--> rack --(LOCK)--> platen
+      with its shifted integral 12T m0.75 PA20 --(GEAR mate 12:120)--> 120T disc
+      --(LOCK: brass hub + feed sleeve)--> shifted 12T m0.8 PA20 feed pinion
+      --(RACK-PINION mate, pi*9.6/rev)--> rack --(LOCK)--> platen
 
 Operational kinematics: the crank-end T12 sprocket spin is the ONE free
-operational DOF -- drag it and the whole feed train follows at 1.596 mm of
+operational DOF -- drag it and the whole feed train follows at 1.508 mm of
 paper per crank revolution (T12/T24 mounted). Every stage is a real SolidWorks
 mate on real, geometrically meshed gears. The hanger arm pivots on the bar and
 carries the stud, so the 12T:120T mesh is permanent. The crank-spin drive spec
@@ -28,13 +28,13 @@ never authored.
   (ch30 p002).
 * Platen group (HANGS on the bar): platen + two full-width back guide rails
   (above/below the bar band) + 4 lock plates bridging behind the bar (held by
-  low button-head guide-lock screws) + the teeth-down rack at the bottom edge
-  (crests 2 below the platen edge) + two bright-brass edge clips + the paper
+  low button-head guide-lock screws) + the teeth-down rack positioned beneath
+  the preserved stud's mesh line + two bright-brass edge clips + the paper
   sheet + ALL its screws -- everything lock-mated to the platen so the whole
   group feeds together.
 * Transgear hanger (behind the bar): the arm stands on the pivot spacer and
   swings on the shoulder pivot screw in the bar's tap; the stepped stud in the
-  arm carries the feed sleeve (12T DP30), the 120T disc and its brass hub,
+  arm carries the feed sleeve (12T m0.8 PA20), the 120T disc and its brass hub,
   closed by the hub cap. The arm plate, screwed to the arm, bores the knob
   shaft, whose integral 12T meshes the disc; the thrust ring and the knob cup
   (set on a feeler, cross-pinned to the journal) set its end float. On the
@@ -156,9 +156,9 @@ import pd_latch_hook_geometry as HOOK  # noqa: E402
 import pd_support_bar_spec as BAR  # noqa: E402
 import pd_transgear_arm_geometry as ARM  # noqa: E402
 import pd_transgear_arm_spec as ARM_SPEC  # noqa: E402
+import pd_transgear_hanger_layout as HANGER_LAYOUT  # noqa: E402
 from build_pd_support_bar import (  # noqa: E402
     BAR_DEPTH,
-    BAR_HEIGHT,
     BAR_LENGTH,
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
@@ -272,6 +272,7 @@ from build_pd_platen_rack import (  # noqa: E402
     BAR_THICKNESS as RACK_BAR_THICKNESS,
     FIRST_GAP_X as RACK_FIRST_GAP_X,
     PITCH as RACK_PITCH,
+    PITCH_LINE_Y as RACK_PITCH_HEIGHT,
 )
 from build_pd_platen_paper import (  # noqa: E402
     PAPER_HEIGHT,
@@ -289,19 +290,13 @@ PLATE_Y0 = 273.234
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
-GUIDE_Y = (283.734, 317.734)  # bottom / top rail seats (machine y)
+GUIDE_Y = HANGER_LAYOUT.GUIDE_Y  # bottom / top rail seats (machine y)
 BAR_TOP_Y = GUIDE_Y[1]
-BAR_CY = BAR_TOP_Y - BAR_HEIGHT / 2.0
+BAR_CY = HANGER_LAYOUT.BAR_CY
 LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 # 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
 
-# Rack: teeth-down at the platen's bottom edge, crests protruding 2.25 below it
-# (R9-62: 0.25 deeper than the first 2.00, which set the feed mesh at e 0.80).
-RACK_TIP_Y = PLATE_Y0 - 2.25  # 270.984
-RACK_PITCH_Y = RACK_TIP_Y + RACK_ADDENDUM  # 271.8307
-RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # 282.984 (Rx180: local y 0..12 maps down)
-RACK_BACK_Z = BAR_FRONT_Z + RACK_BAR_THICKNESS  # -132.9 (on the platen back)
 
 # --- transgear (the real six-gear train) -------------------------------------
 from build_pd_rack_pinion import (  # noqa: E402
@@ -310,7 +305,6 @@ from build_pd_rack_pinion import (  # noqa: E402
     TEETH as DISC_TEETH,
 )
 from build_pd_transgear_feed_pinion import (  # noqa: E402
-    DP as FEED_DP,
     FACE_WIDTH as FEED_FACE,
     TEETH as FEED_TEETH,
 )
@@ -343,19 +337,22 @@ import pd_latch_hook_bracket_spec as HOOK_BRACKET_SPEC  # noqa: E402
 import vn_latch_hook_rivet_spec as HOOK_RIVET  # noqa: E402
 import pd_latch_hook_spec as HOOK_SPEC  # noqa: E402
 
-FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
-# Centre extension of the feed-pinion/rack mesh (R9-62): 0.55, contact ratio
-# 1.25, the hook's +/-0.25 set reach centred on it. The sleeve's teeth are cut
-# to the 1.25/P root (root relief), so the rack crests clear the gap floors;
-# the bound is the rack's tip corners on the form-cut flank, clear from e 0.52
-# (pd_paper_drive_assembly_steps.feed_mesh_penetration, R9-62a).
-RACK_MESH_EXT = 0.55
-# The stud S sits on machine x 0; its y is the feed pinion's mesh line under
-# the rack. The arm's printed stud station is |S - P| from the MHA-VN-041 pivot
-# tap P in the bar.
-STUD_X = 0.0
-STUD_XY = (STUD_X, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)
-PIVOT_XY = (BAR.PIVOT_TAP_X, BAR_CY + BAR.HANGER_TAP_Y)  # (-58, 303.234)
+FEED_PD = FEED.PITCH_DIA
+# Preserve the hanger and latch pose. Move the teeth-down rack's mounting
+# height instead: the shift takes x*m and .12 tangential backlash takes
+# .12/(2*tan(PA)) beyond the unshifted rack pitch line.
+RACK_MESH_EXT = FEED.PROFILE_SHIFT * FEED.MODULE_MM + 0.12 / (
+    2.0 * math.tan(math.radians(FEED.PRESSURE_ANGLE_DEG))
+)
+STUD_XY = HANGER_LAYOUT.STUD_XY
+STUD_X = STUD_XY[0]
+PIVOT_XY = HANGER_LAYOUT.PIVOT_XY
+RACK_PITCH_Y = STUD_XY[1] + FEED_PD / 2.0 + RACK_MESH_EXT
+# Rx180 maps local y down; the stock section's pitch height is from its back.
+RACK_Y0 = RACK_PITCH_Y + RACK_PITCH_HEIGHT
+RACK_TIP_Y = RACK_Y0 - RACK_BAR_HEIGHT
+RACK_FRONT_Z = BAR_FRONT_Z  # on the platen's back face
+RACK_BACK_Z = RACK_FRONT_Z + RACK_BAR_THICKNESS
 if (
     abs(math.dist(STUD_XY, PIVOT_XY) - ARM.PIN_STATION)
     > 0.5 * 10.0**-ARM_SPEC.STATION_PLACES
@@ -364,13 +361,9 @@ if (
 # The hanger's frame: U runs from the pivot P through the stud S, N is U
 # turned +90 deg in the machine XY plane. The arm, its plate and the latch pin
 # are printed in (station along U, offset along N) from P.
-_ARM_REACH = math.dist(STUD_XY, PIVOT_XY)
-ARM_U = (
-    (STUD_XY[0] - PIVOT_XY[0]) / _ARM_REACH,
-    (STUD_XY[1] - PIVOT_XY[1]) / _ARM_REACH,
-)
-ARM_N = (-ARM_U[1], ARM_U[0])
-ARM_ANGLE_DEG = math.degrees(math.atan2(ARM_U[1], ARM_U[0]))  # -32.56
+ARM_U = HANGER_LAYOUT.ARM_U
+ARM_N = HANGER_LAYOUT.ARM_N
+ARM_ANGLE_DEG = HANGER_LAYOUT.ARM_ANGLE_DEG
 
 
 def _on_arm(station: float, offset: float = 0.0) -> tuple[float, float]:
@@ -381,15 +374,9 @@ def _on_arm(station: float, offset: float = 0.0) -> tuple[float, float]:
     )
 
 
-# The knob axis K: the permanent 12T:120T DP38 mesh puts it the disc's
-# CENTRE_DISTANCE from the stud, at MESH_ANGLE (a multiple of the disc's 3-deg
-# tooth pitch, knob swung low toward the crank at machine -X). The arm plate's
-# printed bore datum must land on it.
-MESH_ANGLE_DEG = -168.0
-KNOB_SHAFT_XY = (
-    STUD_XY[0] + DISC_SPEC.CENTRE_DISTANCE * math.cos(math.radians(MESH_ANGLE_DEG)),
-    STUD_XY[1] + DISC_SPEC.CENTRE_DISTANCE * math.sin(math.radians(MESH_ANGLE_DEG)),
-)  # machine (-43.788, 256.893)
+# All consumers share the same unrounded -168-degree shifted reducer axis.
+MESH_ANGLE_DEG = HANGER_LAYOUT.MESH_ANGLE_DEG
+KNOB_SHAFT_XY = HANGER_LAYOUT.KNOB_SHAFT_XY
 _PLATE_BORE_XY = _on_arm(ARM_PLATE.BORE_STATION, ARM_PLATE.BORE_OFFSET)
 if math.dist(KNOB_SHAFT_XY, _PLATE_BORE_XY) > 1e-3:
     raise AssertionError(
@@ -575,7 +562,7 @@ if abs(DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) 
 # 6c385465d) at the rim's farthest point from P, and the disc's wobble on its
 # mount (DISC_MOUNT_WOBBLE).
 PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
-# The platen (4.0) and rack bar (6.0) carry no drawing band: .XXX assumed.
+# The platen (4.0) and catalog rack bar (6.3) carry no drawing band: .XXX assumed.
 _PLATEN_THICKNESS_BAND = printed_band_mm(3)
 _RACK_THICKNESS_BAND = printed_band_mm(3)
 DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - KNOB_SHAFT_Z0 - DISC_SPEC.FACE_WIDTH  # 2.35
@@ -687,7 +674,7 @@ if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
 # shortest spacer, the bar thinnest, the rack thickest, the bushing
 # following the sleeve forward to its fitted max, and the hanger's tilt at
 # the bushing's far rim.
-BUSHING_RACK_AIR_NOMINAL = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH - RACK_BACK_Z  # 2.5
+BUSHING_RACK_AIR_NOMINAL = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH - RACK_BACK_Z
 BUSHING_RACK_AIR_WORST = (
     BUSHING_RACK_AIR_NOMINAL
     - SPACER.LENGTH_BAND
@@ -830,7 +817,7 @@ if THIRD_PHASE_DEG > THIRD_GAMMA / 2.0:
 # (Rx180), its tooth pattern marching +X from RACK_X0.
 PLATE_X0_PHASING = math.remainder(
     STUD_XY[0] - RACK_FIRST_GAP_X - PLATE_X0_PHOTO, RACK_PITCH
-)  # -0.0355
+)
 if abs(PLATE_X0_PHASING) > RACK_PITCH / 2.0:
     raise AssertionError(
         f"platen phasing {PLATE_X0_PHASING:.4f} exceeds half the rack pitch"
@@ -841,7 +828,7 @@ if abs(RACK_BAR_LENGTH - PLATE_WIDTH) > 1e-9:
     raise AssertionError("the rack's ends cannot both be flush with the platen's")
 
 # Net platen feed per CRANK revolution through the real train (T12/T24
-# mounted): 0.5 chain * (12/120) gear * pi*PD rack = 1.596 mm. Every stage is
+# mounted): 0.5 chain * (12/120) gear * pi*PD rack. Every stage is
 # a real mate; the law lives in paper_drive_geom (shared with the kinematics
 # probe and the offline error budget) and is only cross-checked here.
 from paper_drive_geom import NET_RACK_TRAVEL_PER_CRANK_REV  # noqa: E402
@@ -1575,7 +1562,7 @@ def _assert_lock_station_sweep() -> None:
     # Pushed away from the bar (R9-49), a lock plate's guide-side edge moves
     # over the platen's own back. Behind the platen back only the rails and
     # the rack stand; paper and clips are on its front face.
-    rack = (RACK_TIP_Y, RACK_Y0, BAR_FRONT_Z, RACK_BACK_Z)
+    rack = (RACK_TIP_Y, RACK_Y0, RACK_FRONT_Z, RACK_BACK_Z)
     rack_gap = min(
         _section_gap(section, rack)
         for label, section in moving
@@ -1608,7 +1595,7 @@ def _assert_rack_mesh() -> None:
         raise RuntimeError("feed-pinion top-tooth alignment needs teeth % 4 == 0")
     # The sleeve's teeth (Ry180: FEED_Z0 forward FEED_FACE) into the rack band
     # (the rack's thickness on the platen back).
-    z_overlap = min(FEED_Z0, RACK_BACK_Z) - max(FEED_Z0 - FEED_FACE, BAR_FRONT_Z)
+    z_overlap = min(FEED_Z0, RACK_BACK_Z) - max(FEED_Z0 - FEED_FACE, RACK_FRONT_Z)
     if z_overlap < 2.5:
         raise RuntimeError(
             f"feed pinion reaches only {z_overlap:.2f} into the rack band"
@@ -1642,16 +1629,24 @@ def _assert_rack_mesh() -> None:
 
 
 def _assert_gear_mesh() -> None:
-    """Third-gear/disc mesh: same DP, the disc's centre distance, phased
-    tooth-on-gap."""
+    """Shifted PA20 third-gear/disc mesh, phased tooth-on-gap."""
     if THIRD_DP != DISC_DP:
         raise RuntimeError(f"third gear DP {THIRD_DP} != disc DP {DISC_DP}")
-    centre_distance = DISC_SPEC.CENTRE_DISTANCE
-    c2c_nominal = (THIRD_TEETH + DISC_TEETH) / (2.0 * DISC_DP) * IN  # 44.116
-    ext = centre_distance - c2c_nominal  # 0.650
-    if not (0.5 <= ext <= 0.8):
+    if (
+        KNOB_SPEC.PRESSURE_ANGLE_DEG != DISC_SPEC.PRESSURE_ANGLE_DEG
+        or KNOB_SPEC.PROFILE_SHIFT != DISC_SPEC.MESH_PINION_SHIFT
+    ):
+        raise RuntimeError("third-gear tooth system differs from the disc mesh controls")
+    centre_distance = math.dist(KNOB_SHAFT_XY, STUD_XY)
+    c2c_nominal = (KNOB_SPEC.PITCH_DIA + DISC_SPEC.PITCH_DIA) / 2.0
+    ext = centre_distance - c2c_nominal
+    expected_ext = (
+        DISC_SPEC.ZERO_BACKLASH_CENTRE_DISTANCE - c2c_nominal
+        + DISC_SPEC.MESH_BACKLASH
+    )
+    if abs(ext - expected_ext) > 1e-9:
         raise RuntimeError(
-            f"gear mesh extension {ext:.3f} outside the 0.5..0.8 gap-floor window"
+            f"gear mesh extension {ext:.6f} != shifted PA20 extension {expected_ext:.6f}"
         )
     # The disc's teeth repeat every 3 deg, so a tooth must point along the S ->
     # K line at the mesh angle for the 12T's phased gap to receive it.
@@ -1664,23 +1659,43 @@ def _assert_gear_mesh() -> None:
     gap_az = THIRD_PHASE_DEG + KNOB_SPEC.GAP_AZIMUTH_DEG - _MESH_AZ
     if abs(math.remainder(gap_az, THIRD_GAMMA)) > 1e-9:
         raise RuntimeError("the knob 12T's phased gap does not face the disc")
-    # Radial: the disc tooth tips must clear the 12T's base-circle gap floor
-    # (the law the centre extension exists for).
-    rb3 = THIRD_TEETH / THIRD_DP * IN / 2.0 * math.cos(math.radians(14.5))
-    disc_ra = (DISC_TEETH + 2.0) / DISC_DP * IN / 2.0
-    tip_reach = centre_distance - disc_ra
-    if tip_reach <= rb3 + 0.05:
-        raise RuntimeError(
-            f"disc tips reach {tip_reach:.3f}, third-gear gap floor {rb3:.3f}"
-        )
+    # Both builders cut real root arcs, including the pinion's profile shift.
+    # A tip can lie radially below the mating base circle without bottoming;
+    # the active involute contact still must stay above that base circle.
+    pinion_ra = KNOB_SPEC.OUTSIDE_DIA / 2.0
+    disc_ra = DISC_SPEC.OUTSIDE_DIA / 2.0
+    pinion_floor = KNOB_SPEC.ROOT_DIA / 2.0
+    disc_floor = DISC_SPEC.ROOT_DIA / 2.0
+    floor_margin = min(
+        centre_distance - disc_ra - pinion_floor,
+        centre_distance - pinion_ra - disc_floor,
+    )
+    if floor_margin <= 0.05:
+        raise RuntimeError(f"shifted gear tip/root-floor margin {floor_margin:.3f}")
+    pa = math.radians(DISC_SPEC.PRESSURE_ANGLE_DEG)
+    pinion_rb = KNOB_SPEC.PITCH_DIA / 2.0 * math.cos(pa)
+    disc_rb = DISC_SPEC.PITCH_DIA / 2.0 * math.cos(pa)
+    working_pa = math.acos((pinion_rb + disc_rb) / centre_distance)
+    base_tangent = centre_distance * math.sin(working_pa)
+    pinion_tip_path = math.sqrt(pinion_ra**2 - pinion_rb**2)
+    disc_tip_path = math.sqrt(disc_ra**2 - disc_rb**2)
+    pinion_floor_path = math.sqrt(max(0.0, pinion_floor**2 - pinion_rb**2))
+    disc_floor_path = math.sqrt(max(0.0, disc_floor**2 - disc_rb**2))
+    if (
+        disc_tip_path + pinion_floor_path > base_tangent + 1e-9
+        or pinion_tip_path + disc_floor_path > base_tangent + 1e-9
+    ):
+        raise RuntimeError("gear tip contact reaches below the mating involute/root floor")
     z_overlap = min(KNOB_SHAFT_Z0 + THIRD_FACE, DISC_Z0 + DISC_FACE) - max(
         KNOB_SHAFT_Z0, DISC_Z0
     )
     if z_overlap < 2.5:
         raise RuntimeError(f"third gear/disc z overlap {z_overlap:.2f} < 2.5")
     log(
-        f"gear mesh 12:120 DP38: c2c {centre_distance} (ext {ext:.2f}), 12T"
-        f" phased {THIRD_PHASE_DEG:+.1f} deg, tip/floor margin {tip_reach - rb3:.3f}"
+        f"gear mesh 12:120 m{DISC_SPEC.MODULE_MM:g} PA{DISC_SPEC.PRESSURE_ANGLE_DEG:g}:"
+        f" c2c {centre_distance:.6f} (ext {ext:.6f}), 12T"
+        f" phased {THIRD_PHASE_DEG:+.1f} deg, tip/floor margin {floor_margin:.3f},"
+        f" working PA {math.degrees(working_pa):.3f}"
     )
 
 

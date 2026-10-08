@@ -174,6 +174,14 @@ async def cut_tooth_gap(
             f"{rb} * ((1 - t) * {fmt(math.cos(a2))} + t * {fmt(math.cos(a1))})",
             f"{rb} * ((1 - t) * {fmt(math.sin(a2))} + t * {fmt(math.sin(a1))})",
         ))
+    elif tmin:
+        rr = fmt(root_r_in)
+        gap_curves.append(await equation_curve(
+            adapter,
+            "root arc A2->A1",
+            f"{rr} * cos({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
+            f"{rr} * sin({fmt(a2)} + t * ({fmt(a1)} - {fmt(a2)}))",
+        ))
     else:
         rr = fmt(root_r_in)
         if root_r_in < facts["Rb"]:
@@ -494,6 +502,7 @@ async def build_fixed_gear(
     depth_dp: float | None = None,
     long_addendum_mm: float = 0.0,
     dedendum: float = 1.157,
+    profile_shift: float = 0.0,
 ) -> ToothedDisc:
     """Build a toothed disc on the active new part.
 
@@ -526,14 +535,24 @@ async def build_fixed_gear(
     ``dedendum`` is the root-relief depth below the pitch circle in units of
     1/depth_dp: the standard 1.157, or 1.25 for a pinion whose drawing
     floors its root at the 1.25/P full-depth form (the feed-pinion sleeve).
+    ``profile_shift`` displaces the basic rack cutter by x/depth_dp: it raises
+    tip and root radii by that amount and thickens each tooth at the pitch
+    circle by 2*x*tan(pa_deg)/depth_dp. This is a shifted involute, not merely
+    a larger blank. Callers use root_relief=True for the shifted root arc.
     """
     depth_dp = dp if depth_dp is None else depth_dp
-    addendum_extra_in = 1.0 / depth_dp - 1.0 / dp + long_addendum_mm / IN
+    shift_in = profile_shift / depth_dp
+    addendum_extra_in = (
+        1.0 / depth_dp - 1.0 / dp + long_addendum_mm / IN + shift_in
+    )
     facts = gear_facts(teeth, dp, pa_deg, addendum_extra_in=addendum_extra_in)
     ra_mm = facts["Ra"] * IN
     pitch_r_in = teeth / dp / 2.0
-    widen_rad = (backlash_mm / 2.0) / (pitch_r_in * IN)
-    root_r_in = (pitch_r_in - dedendum / depth_dp) if root_relief else None
+    thickness_extra_in = 2.0 * shift_in * math.tan(math.radians(pa_deg))
+    widen_rad = (backlash_mm / IN - thickness_extra_in) / (2.0 * pitch_r_in)
+    root_r_in = (
+        pitch_r_in - dedendum / depth_dp + shift_in
+    ) if root_relief else None
     if helix_deg and root_r_in is None:
         raise ValueError("helix_deg requires root_relief=True (additive tooth "
                          "area algebra assumes the root-arc floor)")

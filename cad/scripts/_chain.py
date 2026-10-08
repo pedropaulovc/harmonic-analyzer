@@ -33,13 +33,12 @@ import math
 
 import pd_transgear_removable_spec as _removable
 from cone_line import X_CRANK, Y_CRANK
+from pd_transgear_hanger_layout import KNOB_SHAFT_XY
 
 
 # Chain-wheel centres, machine xy pre-mirror.
-KNOB_CENTRE = (43.7878, 256.8933)  # build_pd_paper_drive_assembly KNOB_SHAFT_XY
-# mirrored: the knob axis K = stud S (0, 266.2007) + the permanent 12T:120T
-# DP38 mesh centre distance 44.766 at machine -168 deg (CONTRACT-paper-drive
-# axis points; the arm plate's bore datum puts it there).
+# Chain coordinates are pre-mirror; the shared hanger layout is machine XY.
+KNOB_CENTRE = (-KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1])
 # The crank chain-wheel rides the fixed post's crank axis. Import its
 # SolidWorks-free frame geometry, never the drive-train assembly: _chain also
 # feeds leaf chain-link parts, which must not depend on _assembly.
@@ -173,8 +172,8 @@ CENTRELINE_LEN = LINK_COUNT * LINK_PITCH
 # The EVEN count moves the target length by up to one LINK_PITCH (6.35 mm)
 # from the seed loop, and the slack run's length-vs-droop sensitivity falls
 # toward small droops (~0.3..0.9 mm/mm), so the solved sag can land ~10+ mm
-# from the seed (the -168 deg knob axis: 67.03 pitches at the seed -> 68 links,
-# sag 23.6). The bracket spans every droop the internal-tangency construction
+# from the seed after a centre relocation. The bracket spans every droop the
+# internal-tangency construction
 # admits here (feasible past 40; very large droops make the slack arc
 # infeasible: _slack_centre's q2 < 0) while staying above zero droop.
 _LO_SAG, _HI_SAG = 0.5, SAG_NOMINAL + 16.0
