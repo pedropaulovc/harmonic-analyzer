@@ -3,10 +3,13 @@
 
 Run: python3 web/scripts/compact-operation-rocker.py
 This reads authored numeric seeds/source metadata only: no model, solver,
-optimizer, browser, private evidence directory, or acceptance run. Historical
-report paths/digests remain provenance; source camera failures remain diagnostics.
-Only exact decoded exposures supply source images; nearest states supply chosen
-inputs, not source pixels. None of these choices claim a measured error stage.
+optimizer, browser, private evidence directory, or acceptance run. Ordinary
+regeneration requires the independently approved live model identity and live
+code sealed by the current consumer manifest. Historical snapshots are never
+loaded to satisfy that gate or to reclassify retained old-hardware motion.
+Historical report paths/digests remain provenance and source camera failures
+remain diagnostics. Only exact decoded exposures supply source images; nearest
+states supply chosen inputs, not pixels. No choice claims a measured error stage.
 """
 from __future__ import annotations
 
@@ -25,9 +28,9 @@ WEB = common.WEB
 
 def input_record(path, role, raw=None):
     path = path.resolve()
-    return {"path": str(path.relative_to(WEB.parent)), "role": role,
+    return {"path": path.relative_to(WEB.parent).as_posix(), "role": role,
             "sha256": hashlib.sha256(path.read_bytes() if raw is None else raw).hexdigest(),
-            "requiredForRegeneration": True}
+            "requiredForRegeneration": True, "usage": "current-regeneration-input"}
 
 
 def load_seeds(video_id):
@@ -38,7 +41,7 @@ def load_seeds(video_id):
 
 def retain_generator_inputs(track, seeds, seed_input):
     track["evidence"]["generatorInputs"] = [
-        input_record(WEB / "content" / "canonical-native" / f'{track["source"]["videoId"]}.observations.json',
+        input_record(WEB / "content" / "canonical-native" / f'{track["source"]["videoId"]}.observations.json.gz',
                      "original-source-observations"),
         seed_input,
         input_record(Path(__file__), "generator"),
@@ -67,6 +70,7 @@ def view_record(original, camera, state, evidence):
 
 def operation():
     data = common.load_observations("jfH-NbsmvD4")
+    common.validate_current_generation_inputs(data, Path(__file__))
     seeds, seed_input = load_seeds("jfH-NbsmvD4")
     index = seeds["sourceInputIndex"]
     states = seeds["chosenStates"]
@@ -294,6 +298,7 @@ def operation():
 
 def rocker():
     data = common.load_observations("4mBuyixt22U")
+    common.validate_current_generation_inputs(data, Path(__file__))
     seeds, seed_input = load_seeds("4mBuyixt22U")
     states = seeds["states"]
     fps = data["source"]["fps"]["numerator"] / data["source"]["fps"]["denominator"]

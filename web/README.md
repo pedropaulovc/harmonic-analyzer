@@ -19,8 +19,9 @@ npm --prefix web run dev
 
 The model is a generated artifact, absent from a fresh checkout. Use the exact
 raw CAD export identified by `src/mechanics-data.ts`; incompatible bytes are
-rejected. `fetch-model` validates the current raw pin, performs lossless exact
-deduplication and Meshopt compression, then publishes only the optimized GLB.
+rejected. `fetch-model` projects native identities through the authoritative CAD
+map, performs lossless exact deduplication and Meshopt compression, then publishes
+only the optimized GLB. The approved raw export remains unchanged.
 It also accepts `cad/out/gltf/ha-harmonic-analyzer.glb` when no path is supplied.
 The raw cache stays outside public assets under `web/.vite/model-source/`.
 Missing models and failed YouTube playback produce visible errors.
@@ -36,12 +37,22 @@ The release command reads that exact CAD revision, checks native rest geometry
 and compatibility with the website's fixed kinematics, magnifier and spring
 deformer mathematics, and stages new native metadata and the optimized asset.
 Compatible geometry, rest, spring and setup changes are supported; unsupported
-ratio, feed, pen-datum or spring-profile changes are refused with a named
-parameter, preserving the last working assets. Missing revisions are also refused.
+ratio, feed, native-rest association or spring-profile changes are refused with
+a named parameter, preserving the last working assets. Missing revisions are
+also refused.
 A current source commit does not approve arbitrary bytes.
+Native identity projection preserves parsed JSON numeric semantics, including
+signed zero, and leaves binary geometry untouched. It does not preserve the
+original JSON number spelling or integers beyond JavaScript's exact range.
 Existing source tracks are stale for a new raw model and reject source-following;
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
 representation and provenance contract.
+
+The current imported model is the approved **v39** release. All six retained
+source tracks still identify the earlier raw model and are rejected for
+source-following against v39. Original-video playback and manual exploration
+remain separate from that guard. Fresh v39 source captures and qualification are
+required; no v39 source-following or footage-fidelity pass is claimed.
 
 Playback can start while the model or source track loads. Source-following starts
 automatically when both are ready; pausing retains manual exploration. Status
@@ -92,8 +103,24 @@ replay. `generate` rewrites only declared derivatives, current SHA pins and
 the manifest's existing seals. JSON numbers are never parsed as floating-point
 values; all original numeric lexemes remain byte-identical. The six observation
 derivatives additionally remove only JSON whitespace outside quoted strings and
-have exactly one EOF newline. Evidence paths are translated only for declared
+have exactly one decoded EOF newline. They are stored as deterministic
+`*.observations.json.gz` files; current generators and verifiers decode gzip.
+The manifest seals both stored bytes (`sha256`) and decoded bytes
+(`decodedSha256`). Gzip uses compression level 9, zero timestamp and no embedded
+filename. Historical capture commands keep their recorded plaintext paths;
+they are provenance, not current loader aliases. Evidence paths are translated
+only for declared
 manifest members; authored source tracks remain directly under `content/`.
+Path/hash projection updates explicitly current regeneration inputs and the three
+current `sourceObservations` metadata fields. Required producer-code records must
+declare their usage. `historical-producer-lineage` retains its recorded SHA and
+an exact commit/source-path/hash-addressed snapshot origin; it is never re-sealed
+against a changed live classifier. The nine original-capture snapshots and three
+prior identity-migrated input snapshots have distinct provenance. Duplicate
+projection containers or authority members are ambiguous and refused; unrelated
+capture duplicates remain byte-exact.
+Inactive inputs do not authorize path/hash projection; their captured duplicates
+remain uninterpreted even when a neighboring current input is updated.
 Sealed canonical files are exempt from Git newline conversion. Replay preserves
 the original non-observation whitespace bytes; observation packets use the
 compact LF form above. Do not convert sealed derivatives to checkout-native
@@ -102,6 +129,29 @@ The manifest explicitly declares `canonicalConsumerHashNormalization` as
 `CRLF-to-LF` for editable current code/data inputs only. Their hashes certify
 the normalized text, not checkout byte identity. Original evidence, historical
 snapshots, mapping bytes and derivative dependency pins are never normalized.
+
+Ordinary producers for all six videos validate the trusted tracked representation
+through the same strict v2 `approved-model.mjs` loader used by offline verifiers.
+They compare observations with its approved raw tuple before derivation or
+publication, and check normalized live approval, producer, classifier, scene and
+native-math inputs against current-consumer seals. Producers declare the additional
+modules they execute; Analysis seals the bank-controls module's actual loaded
+path. Synthesis checks both primary and secondary observations. Construction and
+build recheck native model associations and retained calibration. Analysis also
+rechecks consumed numerical inputs, motion indexes and held-camera/bank data.
+Synthesis rechecks automatic-motion candidates and times; its additional framing
+cameras and lineage hashes are construction-time data. Its old-model framing
+pins still refuse v39 generation. A new model label
+cannot approve old native readbacks. The pair is constructed and built before
+either output is prepared or published. Changed or missing live inputs refuse
+even when a matching historical snapshot exists.
+Analysis/Synthesis historical replay uses
+`HistoricalReceiptRevalidator.revalidate_receipt()`. Its receipt cannot be built
+or published as a current source track. Historical lineage never supplies
+current eligibility.
+
+Compression reduces current storage, not Git ancestry. Oversized historical
+blobs remain unless history is explicitly rewritten.
 
 Native bindings use explicit root/component or root/assembly/component forms,
 with optional structural `/mesh` or indexed `/mesh_N` leaves. Identity and
@@ -117,6 +167,7 @@ Qualification-case `negative-native-` names embed the corresponding native
 locator after that schema-specific prefix and translate it as a concrete
 binding. Historical localhost web-route commands are not native CAD locators
 and retain their original route spelling.
+Inventory includes those schema-specific labels, not lookalike prose elsewhere.
 Before replay returns any output (and before `generate` writes), all 29 original
 members are inventoried. One failure packet lists every undeclared occurrence
 in source-path/traversal order with its exact JSONPath, binding and reason;
@@ -128,9 +179,11 @@ Byte-replay failures list every mismatching derivative path, rather than
 stopping at the first packet.
 
 These certificates establish identity/provenance preservation, **not** fresh
-geometry, source-camera or browser qualification. A real canonical CAD export,
-model re-pin, mechanics/magnifier regeneration and native/browser qualification
-are still required. There is no runtime old-to-new GLB alias.
+geometry, source-camera or browser qualification. The approved v39 raw export
+can supply canonical identities through the importer; a newer CAD export is not
+required for renaming. Mechanics/magnifier regeneration and native/browser
+qualification remain separate gates. There is no runtime old-to-new GLB alias,
+and projecting identities does not make historical observations current.
 
 ## Fidelity and verification
 
@@ -140,6 +193,9 @@ spring, wire and magnifier. It solves quasistatic torque balance. It does not
 simulate tooth collisions, friction or inertia. The amplitude controls show CAD
 station millimetres; calibration to the video's engraved measuring sticks is
 not established.
+
+The source evidence described below belongs to the earlier model. Its measured
+results and chosen settings do not qualify the current v39 scene.
 
 Source-following tracks combine source cameras with complete feasible physical
 inputs. Hidden settings may be chosen and are labelled unobserved, not recovered
@@ -337,6 +393,13 @@ files and the motion producer script. Its cam-rod `sceneCurrentSourceSha256` als
 checks that root's actual `web/src/scene.ts`: even cosmetic byte changes require
 new bound GPU evidence. These gates do not use historical snapshots or the
 manifest's normalized consumer seals as substitutes for current source.
+`web/.gitattributes` fixes those five live source inputs and the three current
+raw-hashed regeneration inputs (the Operation producer, shared source reader and
+native bindings) to LF on checkout, including with `core.autocrlf=true`.
+Producer and consumer hashes still use exact bytes. This source-authority
+contract is separate from the normalized identity-audit inputs listed in the
+manifest. Historical code, original packets and geometry remain
+exact-byte evidence.
 Historical behavioral fixtures scope the exact archived scene and all four
 producer/math sources to those intended source paths, for both byte and text
 reads. They leave original packets and receipt seals untouched and replay only
