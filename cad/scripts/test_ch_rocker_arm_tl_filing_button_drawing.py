@@ -111,7 +111,11 @@ def test_every_printed_band_has_a_requirement_owner(stem: str) -> None:
         feature = features[name]
         assert key in feature["requirements"], printed
         places = spec.DRAWING_PRECISION_BY_NAME[printed]
-        assert feature[key] == limits(feature[f"{key}_nominal"], places), printed
+        nominal = feature[f"{key}_nominal"]
+        # The model nominal is the printed value, so the band's endpoints are
+        # the printed ones.
+        assert round(nominal, places) == nominal, printed
+        assert feature[key] == limits(nominal, places), printed
 
 
 def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
