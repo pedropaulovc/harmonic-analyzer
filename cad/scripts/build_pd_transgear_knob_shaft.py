@@ -11,7 +11,7 @@ Layout: axis local +Z (machine +Z, rearward), origin on the 12T's front face
 F (the Front Plane).
 
 * ``GearBlank`` + the seed gap and its pattern: the 12T, z 0..FACE_WIDTH,
-  root-relieved to the 1.157/P gap floor (``_gear.build_fixed_gear``).
+  root-relieved to the shifted full-depth gap floor (``_gear.build_fixed_gear``).
 * ``StudProfile``: the revolve in front of F -- the Ø6.35 core, the thread
   relief, the Ø6.22 thread blank and the 45-degree tip chamfer; a
   construction witness carries the tooth-tip blank (OutsideDia).
@@ -88,6 +88,7 @@ from pd_transgear_knob_shaft_spec import (
     CUTTER_RUNOUT_PLACES,
     CUTTER_RUNOUT_PREFIX,
     CUTTER_RUNOUT_TOL_TYPE,
+    DEDENDUM_FACTOR,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -105,6 +106,7 @@ from pd_transgear_knob_shaft_spec import (
     PINION_REAR_Z,
     PLAIN_CORE,
     PRESSURE_ANGLE_DEG,
+    PROFILE_SHIFT,
     REAR_END_Z,
     RELIEF_DIA,
     ROOT_DIA,
@@ -644,10 +646,8 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # --- The 12T, z 0..FACE_WIDTH off the Front plane (F) ---------------------
-    # Root relief cuts the gap floor at the 1.157/P root the cutter cuts
-    # (ROOT_DIA); the seed gap is centred on GAP_AZIMUTH_DEG.  The model cuts
-    # full depth over the whole face: behind FULL_DEPTH the cutter's arc
-    # leaves the gaps at most 0.05 shallow at the rear tooth ends.
+    # Shift thickens the involutes and raises tip/root together. The gap's
+    # root relief and the journal run-out both read ROOT_DIA from the spec.
     disc = await build_fixed_gear(
         adapter,
         TEETH,
@@ -655,6 +655,8 @@ async def build(adapter) -> dict[str, str]:
         dp=DIAMETRAL_PITCH,
         pa_deg=PRESSURE_ANGLE_DEG,
         root_relief=True,
+        dedendum=DEDENDUM_FACTOR,
+        profile_shift=PROFILE_SHIFT,
     )
     volume = disc.volume
     # The tooth pattern's Top x Right axis is the part's first reference axis:

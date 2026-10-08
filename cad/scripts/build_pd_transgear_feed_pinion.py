@@ -95,6 +95,7 @@ from pd_transgear_feed_pinion_spec import (
     OUTSIDE_DIA_DEVIATIONS,
     OVERALL_LENGTH,
     PRESSURE_ANGLE_DEG,
+    PROFILE_SHIFT,
     ROOT_DIA,
     ROOT_DIA_DEVIATIONS,
     ROOT_DIA_MIN,
@@ -109,7 +110,7 @@ PART_NAME = "pd-transgear-feed-pinion"
 MATERIAL = "Plain Carbon Steel"  # contract §2.3: steel, made
 
 # TEETH (12, the 4/4 video narration: "this gear has twelve teeth") comes from
-# the spec; DP meshes the DP30 rack (the ch23 scale anchor).
+# the spec; DP and PA match the catalog-sized rack.
 DP = DIAMETRAL_PITCH
 
 # Solid volumes the gates expect (mm^3).
@@ -313,12 +314,9 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Teeth z 0..FACE_WIDTH off the Front plane (the rear face). Root relief
-    # cuts the gap floor at the 1.25/P root the sheet floors (8.04 MIN): the
-    # base-chord floor would leave the rack's tips no working depth.  The
-    # model cuts full depth over the whole tooth length: behind FULL_DEPTH the
-    # cutter's arc leaves the gaps up to 0.51 shallow at the step, clear of
-    # the rack's worst reach (build_pd_paper_drive_assembly).
+    # Teeth z 0..FACE_WIDTH off the rear face. The generating-rack shift
+    # thickens the involutes and raises both tip and root; the actual gap
+    # floor is ROOT_DIA. Full-depth teeth cover the stock rack's inset band.
     disc = await build_fixed_gear(
         adapter,
         TEETH,
@@ -327,6 +325,7 @@ async def build(adapter) -> dict[str, str]:
         pa_deg=PRESSURE_ANGLE_DEG,
         root_relief=True,
         dedendum=DEDENDUM_FACTOR,
+        profile_shift=PROFILE_SHIFT,
     )
     volume = disc.volume
     # The tooth pattern's Top x Right axis is the part's first reference axis:

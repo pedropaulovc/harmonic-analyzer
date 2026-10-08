@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the feed-pinion sleeve and its draw
 
 The transgear pinion sleeve (MHA-PD-010, R9-68): one turned steel sleeve that
 runs on the MHA-PD-023 pin's Ø3.9 shank and carries, rear to front, the 12T
-DP30 feed pinion that meshes the platen rack and, past one step, the Ø9 h6
+shifted PA20 32DP feed pinion that meshes the platen rack and, past one step, the Ø9 h6
 boss.  The brass hub (MHA-PD-017) slides on the boss: its rear spigot passes
 the 120T disc's (MHA-PD-006) bore, which pilots on it, and seats its end on the
 step face, so the step is the rear stop of hub and disc; the hub drives
@@ -55,29 +55,38 @@ RACK_NUMBER = "MHA-PD-005"
 if pd_rack_pinion_spec.HUB_NUMBER != HUB_NUMBER:
     raise AssertionError("the disc's fit note names another hub than this sheet")
 
-# --- 12T DP30 feed pinion ------------------------------------------------------
+# --- Shifted 12T 32DP PA20 feed pinion -----------------------------------------
 TEETH = 12
-DIAMETRAL_PITCH = 30.0  # meshes the DP30 platen rack (the ch. 23 scale anchor)
-PRESSURE_ANGLE_DEG = 14.5
+DIAMETRAL_PITCH = 32.0
+PRESSURE_ANGLE_DEG = 20.0
+PROFILE_SHIFT = 1.0 - TEETH * math.sin(
+    math.radians(PRESSURE_ANGLE_DEG)
+) ** 2 / 2.0
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN  # 10.160
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN  # 11.853
-# Printed .XXX with its own +0/-0.10.  Functional reason for the band inside
-# the .XXX row: the row's +0.13 on the diameter would take half the 0.133
-# standard tip clearance (0.157/P) to the rack's roots, so the tip may only
-# shrink.
+PITCH_DIA = TEETH * MODULE_MM
+TOOTH_THICKNESS = MODULE_MM * (
+    math.pi / 2.0 + 2.0 * PROFILE_SHIFT * math.tan(math.radians(PRESSURE_ANGLE_DEG))
+)
+OUTSIDE_DIA = (TEETH + 2.0 * (1.0 + PROFILE_SHIFT)) * MODULE_MM
+RACK_BACKLASH = 0.14
+RACK_BACKLASH_RANGE = (0.12, 0.16)
+RACK_MESH_EXTENSION = PROFILE_SHIFT * MODULE_MM + RACK_BACKLASH / (
+    2.0 * math.tan(math.radians(PRESSURE_ANGLE_DEG))
+)
+RACK_AXIS_DISTANCE = PITCH_DIA / 2.0 + RACK_MESH_EXTENSION
+# The retained +0/-0.10 tip band only shrinks the tooth; the feed mesh's
+# contact-ratio window below is evaluated at that smallest diameter.
 OUTSIDE_DIA_BAND = (0.0, -0.10)  # (upper, lower)
-# Root at the 1.25/P full-depth dedendum (contract §2.3, root 8.043); the
-# model cuts exactly this floor (``_gear.build_fixed_gear`` dedendum 1.25).
+# Positive shift raises the root and the tip by x*m; whole depth stays 2.25*m.
 DEDENDUM_FACTOR = 1.25
-ROOT_DIA = (TEETH - 2.0 * DEDENDUM_FACTOR) / DIAMETRAL_PITCH * MM_PER_IN  # 8.0433
+ROOT_DIA = (TEETH - 2.0 * (DEDENDUM_FACTOR - PROFILE_SHIFT)) * MODULE_MM
 WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
 # The root prints as a single MIN limit, the floor of the cutter's depth, so
 # the wall under it holds whatever deeper-rooted cutter the shop uses above
 # it.  swTolMIN prints the dimension's NOMINAL followed by "MIN", so the
 # nominal rounds to the floor at the places it prints.
 ROOT_DIA_PLACES = 2
-ROOT_DIA_MIN = math.floor(ROOT_DIA * 10**ROOT_DIA_PLACES) / 10**ROOT_DIA_PLACES  # 8.04
+ROOT_DIA_MIN = math.floor(ROOT_DIA * 10**ROOT_DIA_PLACES) / 10**ROOT_DIA_PLACES
 ROOT_DIA_TOL_TYPE = 5  # swTolType_e.swTolMIN (offline API docs, enums/swTolType_e)
 if round(ROOT_DIA, ROOT_DIA_PLACES) != ROOT_DIA_MIN:
     raise AssertionError(
@@ -190,17 +199,18 @@ if pd_rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
 # run-out's end (where the cutter rises clear of the Ø9 boss) as a native MAX
 # limit (construction witnesses in ``SleeveProfile``, each named by its model
 # prefix); the note gives the largest cutter that keeps that window.  The
-# model cuts full depth over the whole tooth length and leaves the slots out
-# (0.05 long at the nominal cutter).
-FULL_DEPTH = 10.20
+# model cuts full depth over the whole tooth length and leaves the short
+# cutter run-out slots out. Start the run-out 0.05 earlier for the shifted
+# root: the existing one-inch cutter still ends inside the 13.80 limit.
+FULL_DEPTH = 10.15
 FULL_DEPTH_PLACES = 3
 CUTTER_RUNOUT_MAX = 13.80  # from the rear face, a limit
 CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA_MAX_IN = 1.00
 CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN  # 25.4
 FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 10.07
-FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 10.33
+FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND
+FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND
 # swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
 # sits at the limit; its deviations record "anywhere behind the shortest full
 # depth, up to the limit".
@@ -226,9 +236,9 @@ def cutter_runout(cutter_dia: float, rise: float) -> float:
 # The rack's worst reach from the rear face is the assembly's stack
 # (build_pd_paper_drive_assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST), which
 # asserts FULL_DEPTH_MIN covers it.  The boss at its largest radius over the
-# shallowest-printed gap floor (the root's MIN), 4.500 − 4.020 = 0.48, runs
-# out 3.46 behind the deepest full-depth station, 13.79, inside the 13.80
-# limit.  The slots end under the hub's spigot (the hub's spec takes them off
+# shallowest-printed gap floor, bounds the run-out at the deepest full-depth
+# station inside the existing 13.80 limit.
+# The slots end under the hub's spigot (the hub's spec takes them off
 # its round engagement, ROUND_ENGAGEMENT_MIN) and stand behind the disc's
 # nearest rear face (13.86) by RUNOUT_DISC_CLEARANCE: the disc sits on the
 # spigot, radially outside the boss, so the margin only keeps the slots'

@@ -23,6 +23,7 @@ import transgear_cluster_fit as cluster_fit
 import pd_transgear_feed_pinion_spec as feed_pinion
 import transgear_hanger_joints as joints
 import pd_transgear_removable_spec as removable
+import paper_drive_geom as paper_geometry
 
 DRAWING_NUMBER = "MHA-PD-000"
 
@@ -126,18 +127,17 @@ BAR_TOP_ABOVE_DECK = 266.934
 # The rack's crests below the platen's bottom edge (the builder's PLATE_Y0
 # less RACK_TIP_Y). The latched hanger cannot take up a rack set off this: the
 # hook's set range (0.51 at the hook) spans only ±0.25 of rack height, so the
-# band is held at the solder joint (Main, 2026-10-01). R9-62: 2.25, which puts
-# the feed mesh at its 0.55 centre extension (contact ratio 1.25).
-RACK_CREST_DROP = 2.25
+# band is held at the solder joint. The shifted pitch-line distance
+# determines the new crest drop without moving the latch.
+RACK_CREST_DROP = paper_geometry.RACK_CREST_DROP
 RACK_CREST_TOL = 0.05
 # R9-62a: the feed pinion's mesh in the rack, set before the hook is
 # match-drilled: the platen's shake along the rack with the knob held, i.e. the
-# backlash at the pitch line, 2 * e * tan(pressure angle) for a centre
-# extension e over the standard centres. The band's ends are checked below
-# against the form-cut 12T's interference (feed_mesh_penetration) and the 1.1
-# contact-ratio rule at the printed smallest tip (feed_mesh_contact_ratio).
-MESH_BACKLASH_RANGE = (0.28, 0.32)
-MESH_CONTACT_RATIO_FLOOR = 1.1
+# backlash at the pitch line, 2*(e - x*m)*tan(PA), with e measured over the
+# reference pitch radius. The band's ends are checked against the shifted
+# form-cut flank and the contact-ratio floor at the smallest printed tip.
+MESH_BACKLASH_RANGE = feed_pinion.RACK_BACKLASH_RANGE
+MESH_CONTACT_RATIO_FLOOR = 1.2
 # The rack's addendum and the pinion's flank, in the pinion's frame.
 _PHI = math.radians(feed_pinion.PRESSURE_ANGLE_DEG)
 _RACK_ADDENDUM = feed_pinion.MODULE_MM
@@ -150,7 +150,9 @@ _INTERFERENCE_TOL = 1e-5  # mm: the sweep's sampling floor
 
 def mesh_extension(backlash: float) -> float:
     """The feed pinion's centre extension that gives ``backlash``."""
-    return backlash / (2.0 * math.tan(_PHI))
+    return feed_pinion.PROFILE_SHIFT * feed_pinion.MODULE_MM + backlash / (
+        2.0 * math.tan(_PHI)
+    )
 
 
 def feed_mesh_contact_ratio(
@@ -180,15 +182,18 @@ def feed_mesh_penetration(extension: float, samples: int = 20001) -> float:
     worst = -math.inf
     for tooth in (-1, 0, 1):
         for side in (-1.0, 1.0):
-            # Half the backlash, extension * tan(PA), takes the rack to contact.
-            x = -_PITCH_R * roll + extension * math.tan(_PHI)
+            # Shift thickens the tooth; only the running extension beyond x*m
+            # supplies half the backlash that takes the rack to flank contact.
+            x = -_PITCH_R * roll + (
+                extension - feed_pinion.PROFILE_SHIFT * feed_pinion.MODULE_MM
+            ) * math.tan(_PHI)
             x = x + tooth * pitch + side * corner_half
             y = _PITCH_R + extension - _RACK_ADDENDUM
             px, py = cos * x + sin * y, -sin * x + cos * y
             radius = np.hypot(px, py)
             pressure = np.arccos(_BASE_R / np.maximum(radius, _BASE_R))
             half = (
-                _TOOTH_ANGLE / 4.0
+                feed_pinion.TOOTH_THICKNESS / (2.0 * _PITCH_R)
                 + math.tan(_PHI)
                 - _PHI
                 - (np.tan(pressure) - pressure)
@@ -218,9 +223,8 @@ def _least_clear_extension() -> float:
     return high
 
 
-# The mesh's working window in centre extension: the rack clear of the form
-# cut flank from MESH_EXTENSION_MIN (0.521), the contact ratio at the printed
-# smallest tip down to the 1.1 rule at MESH_EXTENSION_MAX (0.624).
+# The working extension window: no rack-corner penetration at its tight end
+# and the contact-ratio floor at the smallest printed tip at its loose end.
 MESH_EXTENSION_MIN = _least_clear_extension()
 TIP_DIA_MIN = feed_pinion.OUTSIDE_DIA + feed_pinion.OUTSIDE_DIA_BAND[1]
 MESH_EXTENSION_MAX = _RACK_ADDENDUM - (
@@ -244,7 +248,7 @@ def check_mesh_band(
 ) -> None:
     """Raise unless both ends of a platen-shake ``band`` mesh: the rack clear
     of the 12T's flank at the tight end, the contact ratio at the printed
-    smallest tip within the 1.1 rule at the loose end once the arm has
+    smallest tip within the contact-ratio floor at the loose end once the arm has
     fallen through ``latch_slack_along`` of latch-pin travel on the hook."""
     low, high = (mesh_extension(b) for b in band)
     high += joints.latch_pinion_drop(latch_slack_along)
@@ -256,7 +260,7 @@ def check_mesh_band(
     if feed_mesh_penetration(low) > _INTERFERENCE_TOL:
         raise ValueError(f"the rack reaches into the 12T at e {low:.3f}")
     if feed_mesh_contact_ratio(high, TIP_DIA_MIN) < MESH_CONTACT_RATIO_FLOOR:
-        raise ValueError(f"contact ratio under the 1.1 rule at e {high:.3f}")
+        raise ValueError(f"contact ratio under the 1.2 rule at e {high:.3f}")
 
 
 check_mesh_band(MESH_BACKLASH_RANGE)

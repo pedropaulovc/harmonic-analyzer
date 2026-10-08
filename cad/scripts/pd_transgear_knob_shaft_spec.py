@@ -19,7 +19,7 @@ Contract §1.1 (round 10): one turned steel shaft, front to rear --
   brass drive collar (MHA-PD-022), which is set on it at assembly; the Ø1.6
   hole for the MHA-VN-037 spring pin is drilled through the core AT ASSEMBLY
   along the collar's rear slot and is not on this sheet (R9-6);
-* the integral 12T DP38 pinion, meshing the 120T disc (MHA-PD-006).  Its front
+* the integral shifted 12T PA20 40DP pinion, meshing the 120T disc (MHA-PD-006). Its front
   face F is the datum of the tip, plain-core and cutter stations and the
   collar's rearward stop.  The form cutter cuts full depth from F to
   ``FULL_DEPTH`` and its arc then runs out (R9-21): partial-depth gaps over
@@ -51,6 +51,8 @@ from __future__ import annotations
 
 import math
 
+import pd_rack_pinion_spec as DISC
+
 from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
@@ -64,22 +66,25 @@ MM_PER_IN = 25.4
 WALL_FLOOR = 2.0
 ENGAGEMENT_FLOOR_D = 1.5
 
-# --- The integral 12T DP38 pinion (meshes the 120T disc MHA-PD-006) -------------
-TEETH = 12
-DIAMETRAL_PITCH = 38.0  # the 120T disc's pitch
-PRESSURE_ANGLE_DEG = 14.5
+# --- The integral shifted 12T PA20 pinion (120T disc MHA-PD-006) --------------
+TEETH = DISC.MESH_PINION_TEETH
+DIAMETRAL_PITCH = DISC.DIAMETRAL_PITCH
+PRESSURE_ANGLE_DEG = DISC.PRESSURE_ANGLE_DEG
+PROFILE_SHIFT = DISC.MESH_PINION_PROFILE_SHIFT
+DEDENDUM_FACTOR = DISC.DEDENDUM_FACTOR
 # R9-17: F moved 0.1 rearward to -148.1; the rear tooth ends (-142.2, the
 # thrust ring's seat) stay put.
 FACE_WIDTH = 5.9
 FACE_WIDTH_PLACES = 3  # 12T rear face -> F: the chain-plane stack (contract §13)
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN  # 8.021
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN  # 9.358
+PITCH_DIA = TEETH * MODULE_MM
+TOOTH_THICKNESS = MODULE_MM * (
+    math.pi / 2.0 + 2.0 * PROFILE_SHIFT * math.tan(math.radians(PRESSURE_ANGLE_DEG))
+)
+OUTSIDE_DIA = (TEETH + 2.0 * (1.0 + PROFILE_SHIFT)) * MODULE_MM
 OUTSIDE_DIA_PLACES = 2
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
-# The root-relieved gap floor _gear.build_fixed_gear cuts: the standard
-# 1.157/P dedendum below the pitch circle.
-ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 6.474
+ROOT_DIA = (TEETH - 2.0 * (DEDENDUM_FACTOR - PROFILE_SHIFT)) * MODULE_MM
+WHOLE_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
 # The seed gap _gear.cut_tooth_gap cuts is centred half a pitch CCW of local
 # +X (tooth 0 is centred on +X); the pattern repeats it every 30 degrees.
 GAP_AZIMUTH_DEG = 180.0 / TEETH
@@ -320,16 +325,21 @@ if not PINION_REAR_Z < RUNOUT_SLOT_END_Z < HUB_BORE_FROM_F_WORST:
 
 
 def gap_chord(radius: float) -> float:
-    """Chordal width of a standard 12T tooth gap at ``radius`` (mm): the gap
-    angle is π/N − 2 inv φ at the pitch circle plus 2 inv φ at ``radius``
-    (radial flanks below the base circle)."""
+    """Chordal width of the shifted 12T gap at ``radius`` (mm).
+
+    Below the base circle the model retains radial root relief; above it the
+    flanks are the same shifted involutes as the tooth builder.
+    """
     phi = math.radians(PRESSURE_ANGLE_DEG)
     base_r = PITCH_DIA / 2.0 * math.cos(phi)
     inv_r = 0.0
     if radius > base_r:
         phi_r = math.acos(base_r / radius)
         inv_r = math.tan(phi_r) - phi_r
-    angle = math.pi / TEETH - 2.0 * (math.tan(phi) - phi) + 2.0 * inv_r
+    angle = (
+        2.0 * math.pi / TEETH - 2.0 * TOOTH_THICKNESS / PITCH_DIA
+        - 2.0 * (math.tan(phi) - phi) + 2.0 * inv_r
+    )
     return 2.0 * radius * math.sin(angle / 2.0)
 
 

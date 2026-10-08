@@ -39,7 +39,10 @@ def test_the_rack_is_flush_with_the_platen_and_a_gap_sits_over_the_stud() -> Non
     assert gaps == pytest.approx(round(gaps), abs=1e-9)
     shift = assembly.PLATE_X0 - assembly.PLATE_X0_PHOTO
     assert abs(shift) <= rack.PITCH / 2.0
-    assert shift == pytest.approx(-0.0355, abs=5e-5)
+    photo_gap = (
+        assembly.STUD_XY[0] - assembly.PLATE_X0_PHOTO - rack.FIRST_GAP_X
+    ) / rack.PITCH
+    assert shift == pytest.approx((photo_gap - round(photo_gap)) * rack.PITCH)
     assembly._assert_rack_mesh()
 
 
