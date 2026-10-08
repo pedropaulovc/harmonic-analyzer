@@ -17,14 +17,24 @@ from __future__ import annotations
 import ch_rocker_arm_tl_pivot_screw_spec as screw
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
+from _printed_tolerance import printed_band_mm
 
 # AUTHOR'S CHOICE: Ø10 stock O1 drill rod with its OD left as supplied (the
 # inventory's 9.0 would leave a 1.2 wall); the head still bears inside it and
-# its rim may overhang the Ø10.2 hub edge, which carries nothing. The wall stays under the rule-12 floor at
-# the title-block band: accepted on the print for a clamp-only washer.
+# its rim may overhang the Ø10.2 hub edge, which carries nothing. The OD
+# prints as the stock with the stock's own diameter tolerance, +/-0.013 for
+# 4-12 mm metric O1 drill rod
+# (https://store.diesupplies.com/o1-drill-rod-oil-hardening-tool-steel-oilcrat-pm-metric-p114.aspx),
+# not the title block's .X band.
 OUTER_DIA = 10.0
+OUTER_BAND = (0.013, -0.013)
+OUTER_PLACES = 3
+OUTER_CALLOUT = "DRILL ROD AS SUPPLIED"
 BORE_DIA = 6.6
+# The thickness is a link in the pivot screw's axial stack (shoulder clear
+# of the plate bore floor, full thread engagement): it prints at .XXX.
 THICK = screw.WASHER_THICK
+THICK_PLACES = screw.WASHER_THICK_PLACES
 PLACES = 1
 # A drilled bore: the title block's DRILLED HOLES row, +0.10/0, held natively.
 BORE_BAND = (0.10, 0.0)
@@ -41,14 +51,19 @@ if _BORE_MAX >= screw.HEAD_DIA + screw.HEAD_BAND[1]:
 # a washer rim past the hub edge only overhangs air.
 if screw.HEAD_DIA + screw.HEAD_BAND[0] >= screw.rocker.HUB_DIA:
     raise AssertionError("pivot-screw head clamps outside the rocker hub face")
+# Rule 12: radial wall and axial thickness at their worst printed limits.
+WALL_MIN = round(((OUTER_DIA + OUTER_BAND[1]) - _BORE_MAX) / 2.0, 6)
+THICK_MIN = round(THICK - printed_band_mm(THICK_PLACES), 6)
+if min(WALL_MIN, THICK_MIN) < 1.5 - 1e-9:
+    raise AssertionError("pivot washer falls under the rule-12 floor")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "WasherProfile": {"OuterDia", "BoreDia"},
     "Washer": {"Thick"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "WasherProfile": {"OuterDia": PLACES, "BoreDia": PLACES},
-    "Washer": {"Thick": PLACES},
+    "WasherProfile": {"OuterDia": OUTER_PLACES, "BoreDia": PLACES},
+    "Washer": {"Thick": THICK_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places for dimensions in DRAWING_PRECISION.values() for name, places in dimensions.items()
@@ -58,7 +73,7 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 DRAWING_NOTES = "\n".join(
     (
-        "THIN WALL ACCEPTED: CLAMP WASHER ONLY, IT LOCATES NOTHING.",
+        "CLAMP WASHER: IT LOCATES NOTHING, BUT ITS THICKNESS SETS THE PIVOT SCREW DEPTH.",
     )
 )
 BORE_CALLOUT = "DRILL"
@@ -83,15 +98,18 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "hub_face": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-        requirements=("thickness",),
+        requirements=("thickness", "dia"),
         fields={
             "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
-            "thickness": (limits(THICK, PLACES), ("THICK",)),
-            "dia": (limits(OUTER_DIA, PLACES), ("OUTER_DIA", ("ch_rocker_arm_spec", "HUB_DIA"))),
+            "thickness": (limits(THICK, THICK_PLACES), ("THICK", "THICK_PLACES")),
+            "dia": (
+                limits(OUTER_DIA, OUTER_PLACES, OUTER_BAND),
+                ("OUTER_DIA", "OUTER_BAND", ("ch_rocker_arm_spec", "HUB_DIA")),
+            ),
             "process": ("face", ("DRAWING_NOTES",)),
         },
-        precision={"thickness": PLACES, "dia": PLACES},
+        precision={"thickness": THICK_PLACES, "dia": OUTER_PLACES},
     ),
     "head_face": ExportFeature(
         kind="face",
@@ -100,9 +118,9 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         fields={
             "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "z", "value": THICK}, ("THICK",)),
-            "thickness": (limits(THICK, PLACES), ("THICK",)),
+            "thickness": (limits(THICK, THICK_PLACES), ("THICK", "THICK_PLACES")),
             "process": ("face", ("DRAWING_NOTES",)),
         },
-        precision={"thickness": PLACES},
+        precision={"thickness": THICK_PLACES},
     ),
 }

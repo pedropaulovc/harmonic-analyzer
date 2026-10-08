@@ -58,7 +58,6 @@ from ch_rocker_arm_tl_pivot_screw_spec import (
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     SHOULDER_DIA,
-    SHOULDER_END_STATION,
     SHOULDER_LENGTH,
     SLOT_DEPTH,
     SLOT_WIDTH,
@@ -66,6 +65,7 @@ from ch_rocker_arm_tl_pivot_screw_spec import (
     THREAD_LENGTH,
     THREAD_MODEL_DIA,
     TIP_CHAMFER,
+    UNDER_HEAD_LENGTH,
 )
 
 PART_NAME = "ch-rocker-arm-tl-pivot-screw"
@@ -119,7 +119,7 @@ async def build(adapter) -> dict[str, str]:
         ("ShoulderDia", SHOULDER_DIA),
         ("ShoulderLength", SHOULDER_LENGTH),
         ("ThreadDia", THREAD_MODEL_DIA),
-        ("ThreadLength", THREAD_LENGTH),
+        ("UnderHeadLength", UNDER_HEAD_LENGTH),
         ("TipChamfer", TIP_CHAMFER),
         ("SlotWidth", SLOT_WIDTH),
         ("SlotDepth", SLOT_DEPTH),
@@ -143,8 +143,8 @@ async def build(adapter) -> dict[str, str]:
         (u_top, HEAD_R),
         (u_top + HEAD_LENGTH, HEAD_R),
         (u_top + HEAD_LENGTH, SHOULDER_R),
-        (u_top + SHOULDER_END_STATION, SHOULDER_R),
-        (u_top + SHOULDER_END_STATION, THREAD_R),
+        (u_top + HEAD_LENGTH + SHOULDER_LENGTH, SHOULDER_R),
+        (u_top + HEAD_LENGTH + SHOULDER_LENGTH, THREAD_R),
         (u_tip - TIP_CHAMFER, THREAD_R),
         (u_tip, THREAD_R - TIP_CHAMFER),
         (u_tip, 0.0),
@@ -162,31 +162,22 @@ async def build(adapter) -> dict[str, str]:
         )
     head_outline, shoulder_outline, thread_outline = lines[1], lines[3], lines[5]
     tip_chamfer, tip_face = lines[6], lines[7]
-    # The head-top centre sits at the frame's Z5.5.
+    # The head-top centre sits at the frame's HEAD_TOP_Z.
     await anchor_point_to_origin(
         adapter, f"{lines[0]}.start", u_top, 0.0, "screw head-top centre"
     )
     profile.record("HeadTop", '"HeadTop"')
-    # Axial sizes from the one faced end, the head top.
-    for name, end, value, drive in (
-        ("HeadLength", f"{head_outline}.end", HEAD_LENGTH, '"HeadLength"'),
-        (
-            "ShoulderEnd",
-            f"{shoulder_outline}.end",
-            SHOULDER_END_STATION,
-            '"HeadLength" + "ShoulderLength"',
-        ),
-        (
-            "OverallLength",
-            f"{tip_face}.end",
-            OVERALL_LENGTH,
-            '"HeadLength" + "ShoulderLength" + "ThreadLength"',
-        ),
+    # The head length from the faced head top; the stack lengths from the
+    # underhead, the face that clamps the washer.
+    for name, start, end, value in (
+        ("HeadLength", f"{head_outline}.start", f"{head_outline}.end", HEAD_LENGTH),
+        ("ShoulderLength", f"{head_outline}.end", f"{shoulder_outline}.end", SHOULDER_LENGTH),
+        ("UnderHeadLength", f"{head_outline}.end", f"{tip_face}.end", UNDER_HEAD_LENGTH),
     ):
         await dimension_between(
-            adapter, f"{head_outline}.start", end, "horizontal_distance", value, f"screw {name}"
+            adapter, start, end, "horizontal_distance", value, f"screw {name}"
         )
-        profile.record(name, drive)
+        profile.record(name, f'"{name}"')
     await dimension_between(
         adapter,
         f"{tip_chamfer}.start",
@@ -208,7 +199,7 @@ async def build(adapter) -> dict[str, str]:
     for name, line, u_mid, radius in (
         ("HeadDia", head_outline, u_top + HEAD_LENGTH / 2.0, HEAD_R),
         ("ShoulderDia", shoulder_outline, u_top + HEAD_LENGTH + SHOULDER_LENGTH / 2.0, SHOULDER_R),
-        ("ThreadDia", thread_outline, u_top + SHOULDER_END_STATION + THREAD_LENGTH / 2.0, THREAD_R),
+        ("ThreadDia", thread_outline, u_top + HEAD_LENGTH + SHOULDER_LENGTH + THREAD_LENGTH / 2.0, THREAD_R),
     ):
         await add_diametric_linear_dimension(adapter, axis, line, (u_mid, radius + 4.0), name)
         profile.record(name, f'"{name}"')
