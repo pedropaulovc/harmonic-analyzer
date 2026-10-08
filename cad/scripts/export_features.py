@@ -39,6 +39,8 @@ from _printed_tolerance import printed_band_mm
 # Parts whose ``<stem>_spec.EXPORT_FEATURES`` declares every requirement feature.
 SPEC_DRIVEN_PARTS: tuple[str, ...] = (
     "dt_cone_pivot_post_tl_cap_jaw_button",
+    "ch_rocker_arm_tl_pivot_screw",
+    "ch_rocker_arm_tl_pivot_washer",
     "ch_rocker_arm_tl_profile_fixture",
     "dt_cone_pivot_post_tl_bond_cradle",
     "ch_pivot_bracket_tl_ledge",
