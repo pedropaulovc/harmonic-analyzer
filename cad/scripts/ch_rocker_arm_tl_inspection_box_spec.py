@@ -248,7 +248,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                     limits(round(TAP_DRILL_DIA, 2), 2, DRILLED_BAND),
                     ("TAP_DRILL_DIA", "DRILLED_BAND", "TAP_SPEC"),
                 ),
-                "dia_nominal": (TAP_DRILL_DIA, ("TAP_DRILL_DIA",)),
+                "dia_nominal": (round(TAP_DRILL_DIA, 2), ("TAP_DRILL_DIA",)),
                 "depth": (limits(TAP_SPEC.depth_mm, 2), ("TAP_SPEC",)),
                 "depth_ref": (TAP_SPEC.depth_mm, ("TAP_SPEC",)),
                 "thru": (False, ("TAP_SPEC",)),

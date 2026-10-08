@@ -66,8 +66,9 @@ SCREW_HEAD_H = 0.164 * INCH
 SCREW_LENGTH = 0.625 * INCH  # #8-32 x 5/8 SHCS
 SCREW_X = (10.0, 30.0)  # from the bar's left end (= the box left face)
 SCREW_Y = BAR_HEIGHT / 2.0
-CLEARANCE_DIA = CLEARANCE_MM[("#8", "normal")]
-CBORE_DIA = 5.0 / 16.0 * INCH  # standard #8 SHCS counterbore
+# Model and export both use the printed two-place sizes (one fact).
+CLEARANCE_DIA = round(CLEARANCE_MM[("#8", "normal")], 2)
+CBORE_DIA = round(5.0 / 16.0 * INCH, 2)  # standard #8 SHCS counterbore
 CBORE_DEPTH = 4.8
 _DRILLED = _config.title_block("drilled_hole")
 DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))
@@ -198,8 +199,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 "height_nominal": (SCREW_Y, ("SCREW_Y",)),
                 "dia_nominal": (CLEARANCE_DIA, ("CLEARANCE_DIA",)),
                 "dia": (
-                    # The title-block drilled band qualifies the printed Ø4.98.
-                    limits(round(CLEARANCE_DIA, 2), 2, DRILLED_BAND),
+                    limits(CLEARANCE_DIA, 2, DRILLED_BAND),
                     ("CLEARANCE_DIA", "DRILLED_BAND", "SCREW_HOLE_SPEC"),
                 ),
                 "thru": (True, ("SCREW_HOLE_SPEC",)),

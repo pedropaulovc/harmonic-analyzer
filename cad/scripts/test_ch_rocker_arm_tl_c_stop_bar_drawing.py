@@ -76,5 +76,9 @@ def test_every_exported_band_endpoint_is_a_printed_value() -> None:
             places = feature["precision"][requirement]
             for end in band:
                 assert abs(end - round(end, places)) < 1e-9, (name, requirement, band, places)
+            nominal = feature.get(f"{requirement}_nominal")
+            if nominal is not None:
+                assert band[0] <= nominal <= band[1], (name, requirement, nominal, band)
+                assert abs(nominal - round(nominal, places)) < 1e-9, (name, requirement, nominal)
             checked += 1
     assert checked
