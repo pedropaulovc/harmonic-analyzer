@@ -243,7 +243,11 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             requirements=("dia", "depth"),
             fields={
                 "parent": (f"bar_tap_{side}", ("TAP_SPEC",)),
-                "dia": (limits(TAP_DRILL_DIA, 2, DRILLED_BAND), ("TAP_DRILL_DIA", "DRILLED_BAND", "TAP_SPEC")),
+                # The title-block drilled band qualifies the printed Ø3.45.
+                "dia": (
+                    limits(round(TAP_DRILL_DIA, 2), 2, DRILLED_BAND),
+                    ("TAP_DRILL_DIA", "DRILLED_BAND", "TAP_SPEC"),
+                ),
                 "dia_nominal": (TAP_DRILL_DIA, ("TAP_DRILL_DIA",)),
                 "depth": (limits(TAP_SPEC.depth_mm, 2), ("TAP_SPEC",)),
                 "depth_ref": (TAP_SPEC.depth_mm, ("TAP_SPEC",)),

@@ -198,7 +198,8 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 "height_nominal": (SCREW_Y, ("SCREW_Y",)),
                 "dia_nominal": (CLEARANCE_DIA, ("CLEARANCE_DIA",)),
                 "dia": (
-                    limits(CLEARANCE_DIA, 2, DRILLED_BAND),
+                    # The title-block drilled band qualifies the printed Ø4.98.
+                    limits(round(CLEARANCE_DIA, 2), 2, DRILLED_BAND),
                     ("CLEARANCE_DIA", "DRILLED_BAND", "SCREW_HOLE_SPEC"),
                 ),
                 "thru": (True, ("SCREW_HOLE_SPEC",)),

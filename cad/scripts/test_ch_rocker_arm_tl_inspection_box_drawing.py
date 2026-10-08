@@ -62,3 +62,19 @@ def test_notes_follow_the_simplicity_policy() -> None:
     assert 1 <= len(lines) <= 4
     assert not re.search(r"\d", spec.DRAWING_NOTES)
     assert "GROUND" not in spec.DRAWING_NOTES.replace("BOUGHT GROUND", "")
+
+
+def test_every_exported_band_endpoint_is_a_printed_value() -> None:
+    """One fact: a band applied to an unrounded model nominal exports limits
+    the sheet never prints (4.978 + 0.1 where the print reads 4.98)."""
+    checked = 0
+    for name, feature in _features().items():
+        for requirement in feature["requirements"]:
+            band = feature.get(requirement)
+            if not (isinstance(band, list) and len(band) == 2):
+                continue
+            places = feature["precision"][requirement]
+            for end in band:
+                assert abs(end - round(end, places)) < 1e-9, (name, requirement, band, places)
+            checked += 1
+    assert checked
