@@ -86,12 +86,17 @@ named special single-point cutter. The two 12T paper pinions carry the #8 form,
 and their hubs are shaped so the cutter runs out clear.
 
 Gears cut this way do not mesh conjugately, so a classical contact ratio no
-longer describes them. The model reports stock-form coverage instead: the
-angular span over which a supported flank contact exists, divided by the tooth
-pitch. Coverage is neither a contact ratio nor a loaded-contact check. First
-contact, backlash and root clearance at the tolerance corners, and the
-transmission error carried through to channel phase, are checked separately.
-The final values are in the part specs.
+longer describes them. The model reports stock-form coverage instead: the 3D
+union of the angular spans over which a supported contact exists, including
+tip-corner and face-edge contact, divided by the tooth pitch. Coverage is
+neither a contact ratio nor a loaded-contact check. Each drive mesh must also
+keep contact with no gap between teeth, hand over within 0.005 mm, and hold
+positive backlash at every tolerance corner, and its transmission error is
+charged to the existing nominal-residual budget. The required coverage is at
+least 1.1 for every cone and 0.62 for the crank pair. The alignment pinion only
+sets the zero at fit-up and does not drive continuously, so it is checked for
+continuity, backlash and root clearance instead. The final values are in the
+part specs.
 
 ### Undercut
 
