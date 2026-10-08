@@ -259,7 +259,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "shoulder": ExportFeature(
         kind="boss",
         faces=(SURFACE_FINISHES[0].face,),
-        requirements=("note", "finish_ra"),
+        requirements=("note", "length", "finish_ra"),
         fields={
             "at": ([0.0, 0.0, SHOULDER_END_Z], ("SHOULDER_END_Z",)),
             "axis": _AXIS,
@@ -274,7 +274,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "head": ExportFeature(
         kind="boss",
         faces=(CylinderFace(HEAD_DIA),),
-        requirements=("note", "finish_ra"),
+        requirements=("note", "length", "finish_ra"),
         fields={
             "at": ([0.0, 0.0, UNDERHEAD_Z], ("UNDERHEAD_Z",)),
             "axis": _AXIS,
@@ -296,24 +296,48 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             "plane": ({"frame": "model", "axis": "z", "value": UNDERHEAD_Z}, ("UNDERHEAD_Z", "WASHER_THICK")),
         },
     ),
+    # The tip face owns the printed UnderHeadLength, located from the
+    # underhead.
+    "tip": ExportFeature(
+        kind="face",
+        faces=(PlanarFace((0.0, 0.0, -1.0), -TIP_Z),),
+        requirements=("station",),
+        fields={
+            "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
+            "plane": ({"frame": "model", "axis": "z", "value": TIP_Z}, ("TIP_Z",)),
+            "height_from": ("underhead", ("UNDER_HEAD_LENGTH",)),
+            "station_nominal": (UNDER_HEAD_LENGTH, ("UNDER_HEAD_LENGTH",)),
+            "station": (
+                limits(UNDER_HEAD_LENGTH, AXIAL_PLACES),
+                ("UNDER_HEAD_LENGTH", "AXIAL_PLACES"),
+            ),
+        },
+        precision={"station": AXIAL_PLACES},
+    ),
+    # The thread runs the whole projection, shoulder end to tip: its ends are
+    # the shoulder's printed length and the tip's printed station, so its own
+    # length is a reference, not a second band.
     "thread": ExportFeature(
         kind="thread",
         faces=(CylinderFace(THREAD_MODEL_DIA),),
-        requirements=("thread", "length"),
+        requirements=("thread",),
         fields={
             "at": ([0.0, 0.0, TIP_Z], ("TIP_Z",)),
             "axis": _AXIS,
             "thread": (THREAD_CALLOUT, ("THREAD_CALLOUT",)),
-            # Shoulder end to tip: the printed UnderHeadLength less the
-            # printed ShoulderLength, both at .XXX.
-            "length": (
-                [
-                    round(UNDER_HEAD_LENGTH - SHOULDER_LENGTH - 2.0 * _XXX, 6),
-                    round(UNDER_HEAD_LENGTH - SHOULDER_LENGTH + 2.0 * _XXX, 6),
-                ],
-                ("UNDER_HEAD_LENGTH", "SHOULDER_LENGTH", "AXIAL_PLACES"),
-            ),
+            "length_reference": (THREAD_LENGTH, ("UNDER_HEAD_LENGTH", "SHOULDER_LENGTH")),
         },
-        precision={"length": AXIAL_PLACES},
+    ),
+    "driver_slot": ExportFeature(
+        kind="slot",
+        faces=(PlanarFace((0.0, 0.0, 1.0), round(HEAD_TOP_Z - SLOT_DEPTH, 6)),),
+        requirements=("width", "depth"),
+        fields={
+            "at": ([0.0, 0.0, HEAD_TOP_Z], ("HEAD_TOP_Z",)),
+            "normal": ([0.0, 0.0, 1.0], ("__frame__",)),
+            "width": (limits(SLOT_WIDTH, 1), ("SLOT_WIDTH",)),
+            "depth": (limits(SLOT_DEPTH, 1), ("SLOT_DEPTH",)),
+        },
+        precision={"width": 1, "depth": 1},
     ),
 }

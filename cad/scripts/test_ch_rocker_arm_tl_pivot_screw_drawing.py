@@ -11,6 +11,9 @@ import ch_rocker_arm_tl_pivot_washer_spec as washer
 import draw_ch_rocker_arm_tl_pivot_screw as screw_drawing
 import draw_ch_rocker_arm_tl_pivot_washer as washer_drawing
 import export_features
+from _feature_requirements import limits
+from _printed_tolerance import printed_band_mm
+from prechips.model import TOLERANCE_REQUIREMENTS
 
 SCREW = "ch_rocker_arm_tl_pivot_screw"
 WASHER = "ch_rocker_arm_tl_pivot_washer"
@@ -74,17 +77,69 @@ def test_exported_stack_clears_the_bore_floor_and_engages_one_and_a_half_diamete
     features = _features(SCREW)
     thick = _features(WASHER)["hub_face"]["thickness"]
     shoulder = features["shoulder"]["length"]
-    thread = features["thread"]["length"]
+    under_head = features["tip"]["station"]
     floor_min, floor_max = screw.FLOOR_DEPTH
-    shoulder_end_max = thick[1] + shoulder[1]
-    assert floor_min - shoulder_end_max >= screw.THREAD_RUNOUT + 0.1
-    # Tip depth from the two printed lengths under the head.
-    tip_min = thick[0] + screw.UNDER_HEAD_LENGTH - 0.13
-    full_end_min = tip_min - floor_max - screw.TIP_CHAMFER - screw.THREAD_PITCH / 2.0
+    assert floor_min - (thick[1] + shoulder[1]) >= screw.THREAD_RUNOUT + 0.1
+    chamfer_loss_max = screw.TIP_CHAMFER + screw.THREAD_PITCH / 2.0
+    full_end_min = thick[0] + under_head[0] - floor_max - chamfer_loss_max
     assert full_end_min >= 1.5 * screw.THREAD_MODEL_DIA
-    tip_max = thick[1] + screw.UNDER_HEAD_LENGTH + 0.13
-    assert tip_max - floor_min - screw.TIP_CHAMFER <= screw.profile.PIVOT_TAP_THREAD_DEPTH - 0.51
-    assert thread[0] <= screw.UNDER_HEAD_LENGTH - screw.SHOULDER_LENGTH <= thread[1]
+    tap_full_min = screw.profile.PIVOT_TAP_THREAD_DEPTH - printed_band_mm(2)
+    assert thick[1] + under_head[1] - floor_min - screw.TIP_CHAMFER <= tap_full_min
+
+
+# Each printed toleranced dimension -> (stem, feature, requirement) owning its
+# band at its printed places. The bracketed match-fit diameters and the tip
+# chamfer (defined to the thread root) are references and own no band.
+PRINTED_OWNERS = {
+    SCREW: {
+        "HeadLength": ("head", "length"),
+        "ShoulderLength": ("shoulder", "length"),
+        "UnderHeadLength": ("tip", "station"),
+        "SlotWidth": ("driver_slot", "width"),
+        "SlotDepth": ("driver_slot", "depth"),
+    },
+    WASHER: {
+        "OuterDia": ("hub_face", "dia"),
+        "BoreDia": ("bore", "dia"),
+        "Thick": ("hub_face", "thickness"),
+    },
+}
+REFERENCE_DIMENSIONS = {SCREW: {"HeadDia", "ShoulderDia", "TipChamfer"}, WASHER: set()}
+PRINTED_BANDS = {
+    SCREW: {
+        "HeadLength": limits(screw.HEAD_LENGTH, 1),
+        "ShoulderLength": limits(screw.SHOULDER_LENGTH, 3),
+        "UnderHeadLength": limits(screw.UNDER_HEAD_LENGTH, 3),
+        "SlotWidth": limits(screw.SLOT_WIDTH, 1),
+        "SlotDepth": limits(screw.SLOT_DEPTH, 1),
+    },
+    WASHER: {
+        "OuterDia": limits(washer.OUTER_DIA, 3, washer.OUTER_BAND),
+        "BoreDia": limits(washer.BORE_DIA, 1, washer.BORE_BAND),
+        "Thick": limits(washer.THICK, 3),
+    },
+}
+
+
+def test_every_printed_band_has_a_requirement_owner() -> None:
+    """One-fact coverage: every printed toleranced dimension reaches prechips
+    as a listed requirement band at its printed places."""
+    for stem, spec in ((SCREW, screw), (WASHER, washer)):
+        owners = PRINTED_OWNERS[stem]
+        assert set(owners) | REFERENCE_DIMENSIONS[stem] == set(spec.DRAWING_PRECISION_BY_NAME)
+        features = _features(stem)
+        for printed, (name, key) in owners.items():
+            assert key in features[name]["requirements"], (stem, printed)
+            assert features[name][key] == PRINTED_BANDS[stem][printed], (stem, printed)
+
+
+def test_every_exported_band_is_a_requirement() -> None:
+    """One-fact rule: prechips inspects only the bands a feature lists."""
+    for stem in (SCREW, WASHER):
+        for name, feature in _features(stem).items():
+            for key, value in feature.items():
+                if key in TOLERANCE_REQUIREMENTS and isinstance(value, list) and len(value) == 2:
+                    assert key in feature["requirements"], (stem, name, key)
 
 
 def test_washer_passes_the_shoulder_and_carries_the_head() -> None:

@@ -98,7 +98,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "hub_face": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 0.0, -1.0), 0.0),),
-        requirements=("thickness",),
+        requirements=("thickness", "dia"),
         fields={
             "normal": ([0.0, 0.0, -1.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "z", "value": 0.0}, ("__frame__",)),
