@@ -64,8 +64,10 @@ LEFT_KEEP = {
 }
 FRONT_KEEP = {
     "TapY": (0.207, 0.132),
-    "TapLeftX": (0.150, 0.118),
-    "TapRightX": (0.165, 0.106),
+    # 10.00 text outside the box's left edge; 30.00 text (and its wall
+    # callout) right of the 30 station, so neither crosses an extension line.
+    "TapLeftX": (0.125, 0.118),
+    "TapRightX": (0.190, 0.106),
 }
 BACK_KEEP = {
     "BackW": (0.265, 0.212),
