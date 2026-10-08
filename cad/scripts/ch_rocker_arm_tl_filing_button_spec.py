@@ -68,10 +68,17 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 # The blind reviewer sees only the sheet: each note states a function.
 # Hardness lives in the Finish field.
+# Rule 12 wall: the rim between the printed O.D. lower limit and the bore.
+RIM_WALL_MIN = 1.78
+if round((_OD_MIN - BORE_DIA) / 2.0, 2) != RIM_WALL_MIN:
+    raise AssertionError("filing-button stated rim wall drifted from its geometry")
+# Named exception: MHA-CH-006-TL-04 rim wall 1.78 MIN
+RIM_WALL_NOTE = f"RIM WALL {RIM_WALL_MIN:.2f} MIN."
 DRAWING_NOTES = (
     "RIM SETS THE FILED DIAMETER OF THE ROCKER ARM HUB; O.D. ROUND AND TRUE TO BORE.\n"
     "THICKNESS LOCATES THE STACK.\n"
-    "KEEP RIM CORNERS SHARP; STONE BURRS ONLY."
+    "KEEP RIM CORNERS SHARP; STONE BURRS ONLY.\n"
+    f"{RIM_WALL_NOTE}"
 )
 REFERENCE_DIMENSIONS = frozenset({"BoreDia"})
 REFERENCE_CALLOUTS = {"BoreDia": BORE_FIT_CALLOUT}
@@ -97,14 +104,16 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "bore": ExportFeature(
         kind="hole",
         faces=(CylinderFace(BORE_DIA),),
-        requirements=("note", "thru"),
+        requirements=("note", "thru", "finish_ra"),
         fields={
             "at": ([0.0, 0.0, 0.0], ("__frame__",)),
             "axis": _AXIS,
             "dia_nominal": (BORE_DIA, ("BORE_DIA",)),
             "thru": (True, ("BORE_DIA",)),
             "note": (BORE_FIT_NOTE, ("BORE_FIT_NOTE",)),
+            "finish_ra": (MACHINED_UM, ("SURFACE_FINISHES",)),
         },
+        precision={"finish_ra": 1},
     ),
     "hub_seat_face": ExportFeature(
         kind="face",

@@ -116,6 +116,13 @@ def test_every_printed_band_has_a_requirement_owner(stem: str) -> None:
         # the printed ones.
         assert round(nominal, places) == nominal, printed
         assert feature[key] == limits(nominal, places), printed
+    # Each printed roughness symbol is a listed finish requirement on the
+    # exported feature of the same name.
+    assert spec.SURFACE_FINISHES
+    for control in spec.SURFACE_FINISHES:
+        owner = features[control.key]
+        assert "finish_ra" in owner["requirements"], control.key
+        assert owner["finish_ra"] == control.roughness_um, control.key
 
 
 def test_body_carries_the_hub_and_stays_inside_the_stack() -> None:
@@ -152,5 +159,6 @@ def test_number_is_the_parent_number_plus_a_tool_suffix(dashed: str) -> None:
 @pytest.mark.parametrize("notes", [button.DRAWING_NOTES, stud.DRAWING_NOTES])
 def test_notes_follow_the_simplicity_policy(notes: str) -> None:
     assert 1 <= len(notes.splitlines()) <= 4
-    assert not re.search(r"\d", notes)
+    # The only figure a note may carry is a named exception's stated shortfall.
+    assert not re.search(r"\d", notes.replace(button.RIM_WALL_NOTE, ""))
     assert "GROUND" not in notes and "GRIND" not in notes
