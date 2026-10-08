@@ -98,3 +98,17 @@ def test_tip_window_uses_the_parents_printed_strap_band() -> None:
     # The mirrored places must track the parent print, or the tip guard
     # judges a strap band the sheet never states.
     assert spec.STRAP_PLACES == ch_rocker_arm_notes.DEFAULT_DRAWING_PRECISION
+
+
+def test_banded_nominals_are_their_printed_values() -> None:
+    # An explicit band is applied to the model nominal, so the nominal must be
+    # exactly what the sheet prints or the export disagrees with the print.
+    for name, nominal, places in (
+        ("LandDia", spec.LAND_DIA, spec.DRAWING_PRECISION_BY_NAME["LandDia"]),
+        ("LandHeight", spec.LAND_HEIGHT, spec.DRAWING_PRECISION_BY_NAME["LandHeight"]),
+        ("CollarEnd", spec.COLLAR_END, spec.DRAWING_PRECISION_BY_NAME["CollarEnd"]),
+        ("ShankDia", spec.SHANK_DIA, spec.DRAWING_PRECISION_BY_NAME["ShankDia"]),
+        ("NeckDia", spec.NECK_DIA, spec.DRAWING_PRECISION_BY_NAME["NeckDia"]),
+        ("ReamDia", spec.REAM_DIA, spec.DRAWING_PRECISION_BY_NAME["ReamDia"]),
+    ):
+        assert nominal == round(nominal, places), name
