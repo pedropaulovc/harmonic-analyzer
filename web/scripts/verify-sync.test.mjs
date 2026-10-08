@@ -1330,6 +1330,7 @@ function nativeLineFixture() {
     },
   }
   fixture.view.nativeLineChecks = [line]
+  fixture.response.captures[0].mechanism.effectiveSourceOverridePartPaths = []
   for (const station of [0, 0.25, 0.5, 0.75, 1]) {
     const sourcePixels = projectedNative[0].map((value, axis) => value + station * (projectedNative[1][axis] - value))
     fixture.capture.landmarks.push({
@@ -1396,13 +1397,30 @@ test('offscreen finite endpoints retain exact segment geometry with at least two
 
 test('fixed body classification needs current native membership and no actual animated ancestor', () => {
   const fixture = nativeLineFixture(), path = fixture.view.nativeLineChecks[0].partPath
-  assert.equal(fixedNativeLinePart(path, fixture.lineAuthority), true)
-  assert.equal(fixedNativeLinePart(path, { paths: new Set(), bindings: [] }), false)
+  assert.equal(fixedNativeLinePart(path, fixture.lineAuthority, []), true)
+  assert.equal(fixedNativeLinePart(path, { paths: new Set(), bindings: [] }, []), false)
   fixture.lineAuthority.bindings = [{ pattern: /^ha-harmonic-analyzer\/fr-frame$/, motion: 'rod' }]
   const result = measureNativeLineFixture(fixture)
   assert.equal(result.nativeLines.length, 0)
   assert.ok(result.unavailable.some(item => /animated ancestor/.test(item.reason)))
-  assert.equal(fixedNativeLinePart(path, null), false)
+  assert.equal(fixedNativeLinePart(path, null, []), false)
+})
+
+test('fixed BODY line classification rejects only actual effective source overrides, never unrelated assembly context', () => {
+  for (const overrides of [undefined, null, [''], ['duplicate', 'duplicate'],
+    ['ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1'], ['ha-harmonic-analyzer/fr-frame']]) {
+    const fixture = nativeLineFixture()
+    fixture.response.captures[0].mechanism.effectiveSourceOverridePartPaths = overrides
+    const result = measureNativeLineFixture(fixture)
+    assert.equal(result.nativeLines.length, 0)
+    assert.ok(result.unavailable.some(item => /source-overridden part\/ancestor/.test(item.reason)))
+  }
+  const unrelated = nativeLineFixture()
+  unrelated.response.captures[0].mechanism.effectiveSourceOverridePartPaths = ['ha-harmonic-analyzer/ha-measuring-stick-1']
+  assert.equal(measureNativeLineFixture(unrelated).nativeLines[0].status, 'passed')
+  assert.equal(fixedNativeLinePart('ha-harmonic-analyzer/ha-measuring-stick-1',
+    { paths: new Set(['ha-harmonic-analyzer/ha-measuring-stick-1']), bindings: [] },
+    ['ha-harmonic-analyzer/ha-measuring-stick-1']), false, 'A genuinely source-posed ruler is not an independent fixed BODY oracle')
 })
 
 test('fixed LINE can satisfy fixed-body obligation only while original point/moving/sample floors and measured line failures remain live', () => {

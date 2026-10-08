@@ -713,7 +713,8 @@ export function measureView(view, response, frame, observations, tolerancePx, an
       const issues = nativeLineErrors([line], frame.sourceImage, view)
       assert(!issues.length, issues.join('; '))
       assert(lineAuthority?.paths?.has(line.partPath), 'Native line has no current released-body inventory association')
-      assert(fixedNativeLinePart(line.partPath, lineAuthority), 'Native fixed-body LINE CHECK has an actual animated ancestor or unqualified motion authority')
+      assert(fixedNativeLinePart(line.partPath, lineAuthority, mechanism.effectiveSourceOverridePartPaths),
+        'Native fixed-body LINE CHECK is unsupported for an actually source-overridden part/ancestor or actual animated ancestor; same-draw effective override and motion authority must be available')
       const stations = NATIVE_LINE_STATIONS
       const markers = stations.map(station => capture.landmarks?.find(marker => marker.id === nativeLineEndpointId(view.id, line.id, station)))
       assert(markers.every(marker => marker?.partPath === line.partPath
@@ -752,6 +753,7 @@ export function measureView(view, response, frame, observations, tolerancePx, an
       const rasterUncertaintyPx = Math.max(...visibleMarkers.map(marker => marker.uncertaintySourcePixels))
       const errorPx = rawErrorPx + line.uncertaintyPx + geometry.geometryBiasSourcePixels + rasterUncertaintyPx
       nativeLines.push({ ...context, motion: 'fixed', method: capture.method,
+        effectiveSourceOverridePartPaths: mechanism.effectiveSourceOverridePartPaths,
         sourceImage: frame.sourceImage, nativePartLocalLineMetres: line.partLocalLineMetres,
         segmentProjection: markers[0].state === 'rendered' && markers[4].state === 'rendered' ? 'actual-visible-gpu-endpoints' : 'same-draw-native-world-camera-projection',
         worldEvidenceInterpretation: 'World endpoints/stations are same-draw CPU native geometry, not exact-world certificates; actual visible diagnostic GPU raster stations corroborate rendered line support.',

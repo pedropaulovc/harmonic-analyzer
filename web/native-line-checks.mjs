@@ -5,12 +5,16 @@ export function nativeLineEndpointId(viewId, lineId, endpoint) {
   return JSON.stringify(['native-line-endpoint', viewId, lineId, endpoint])
 }
 
-/** Current released membership plus the actual articulation registry, never name-prefix motion. */
-export function fixedNativeLinePart(partPath, authority) {
-  if (!authority?.paths?.has(partPath) || !Array.isArray(authority.bindings)) return false
+/** Released membership, real articulation and effective draw overrides, never name-prefix motion. */
+export function fixedNativeLinePart(partPath, authority, effectiveSourceOverridePartPaths) {
+  if (!authority?.paths?.has(partPath) || !Array.isArray(authority.bindings)
+    || !Array.isArray(effectiveSourceOverridePartPaths)
+    || effectiveSourceOverridePartPaths.some(path => typeof path !== 'string' || !path.trim())
+    || new Set(effectiveSourceOverridePartPaths).size !== effectiveSourceOverridePartPaths.length) return false
   const ancestors = partPath.split('/').map((_, index, segments) => segments.slice(0, index + 1).join('/'))
-  return !authority.bindings.some(binding => binding.motion !== 'paper-fixed'
-    && ancestors.some(path => binding.pattern.test(path)))
+  return !ancestors.some(path => effectiveSourceOverridePartPaths.includes(path))
+    && !authority.bindings.some(binding => binding.motion !== 'paper-fixed'
+      && ancestors.some(path => binding.pattern.test(path)))
 }
 
 /** Same held-out finite-segment geometry as fit-source.native_line_candidate_residual. */
