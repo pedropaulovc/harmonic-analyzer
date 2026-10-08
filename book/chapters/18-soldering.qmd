@@ -17,8 +17,7 @@ this is a fit specification, not a proved machining sequence.
 
 ## Check the flats and bores
 
-The shaft AF values are 8.763, 5.842, 2.921 and 0.430 mm, +0/−0.010 mm
-(+0/−0.02 mm on the 1/32 in terminal).
+The shaft AF values are 8.763, 5.842, 2.921 and 0.430 mm, each +0/−0.010 mm.
 Each matching D-bore AF is +0.010/+0.020 mm over its shaft nominal (0.01–0.03 mm
 flat clearance); the round portions have 0.025–0.105 mm diametral slip clearance.
 These values come from `cad/scripts/cone_shaft_land_bands.py` and
