@@ -105,18 +105,19 @@ PRINTED_OWNERS = {
     },
 }
 REFERENCE_DIMENSIONS = {SCREW: {"HeadDia", "ShoulderDia", "TipChamfer"}, WASHER: set()}
-PRINTED_BANDS = {
+# (model nominal, printed places, explicit band or None) per printed dimension.
+PRINTED_SIZES = {
     SCREW: {
-        "HeadLength": limits(screw.HEAD_LENGTH, 1),
-        "ShoulderLength": limits(screw.SHOULDER_LENGTH, 3),
-        "UnderHeadLength": limits(screw.UNDER_HEAD_LENGTH, 3),
-        "SlotWidth": limits(screw.SLOT_WIDTH, 1),
-        "SlotDepth": limits(screw.SLOT_DEPTH, 1),
+        "HeadLength": (screw.HEAD_LENGTH, 1, None),
+        "ShoulderLength": (screw.SHOULDER_LENGTH, 3, None),
+        "UnderHeadLength": (screw.UNDER_HEAD_LENGTH, 3, None),
+        "SlotWidth": (screw.SLOT_WIDTH, 1, None),
+        "SlotDepth": (screw.SLOT_DEPTH, 1, None),
     },
     WASHER: {
-        "OuterDia": limits(washer.OUTER_DIA, 3, washer.OUTER_BAND),
-        "BoreDia": limits(washer.BORE_DIA, 1, washer.BORE_BAND),
-        "Thick": limits(washer.THICK, 3),
+        "OuterDia": (washer.OUTER_DIA, 3, washer.OUTER_BAND),
+        "BoreDia": (washer.BORE_DIA, 1, washer.BORE_BAND),
+        "Thick": (washer.THICK, 3, None),
     },
 }
 
@@ -129,8 +130,13 @@ def test_every_printed_band_has_a_requirement_owner() -> None:
         assert set(owners) | REFERENCE_DIMENSIONS[stem] == set(spec.DRAWING_PRECISION_BY_NAME)
         features = _features(stem)
         for printed, (name, key) in owners.items():
+            nominal, places, band = PRINTED_SIZES[stem][printed]
+            # The model nominal is exactly the printed value, so the exported
+            # endpoints are the printed ones.
+            assert round(nominal, places) == nominal, (stem, printed)
+            assert spec.DRAWING_PRECISION_BY_NAME[printed] == places, (stem, printed)
             assert key in features[name]["requirements"], (stem, printed)
-            assert features[name][key] == PRINTED_BANDS[stem][printed], (stem, printed)
+            assert features[name][key] == limits(nominal, places, band), (stem, printed)
 
 
 def test_every_exported_band_is_a_requirement() -> None:
