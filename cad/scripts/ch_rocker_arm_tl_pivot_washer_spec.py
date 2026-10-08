@@ -73,10 +73,12 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 
 DRAWING_NOTES = "\n".join(
     (
-        "CLAMP WASHER ONLY: IT LOCATES NOTHING.",
+        "CLAMP WASHER: IT LOCATES NOTHING, BUT ITS THICKNESS SETS THE PIVOT SCREW DEPTH.",
     )
 )
 BORE_CALLOUT = "DRILL"
+# The thickness is a link in the pivot screw's axial stack: say so on it.
+THICK_CALLOUT = "SETS PIVOT SCREW\nMHA-CH-006-TL-06 DEPTH"
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 5:1"
 
 EXPORT_FEATURES: dict[str, ExportFeature] = {
