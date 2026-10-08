@@ -100,15 +100,33 @@ def test_every_printed_band_has_a_requirement_owner() -> None:
         assert key in feature["requirements"], printed
         nominal = feature.get(f"{key}_nominal", feature.get(f"nominal_{key}"))
         places = spec.DRAWING_PRECISION_BY_NAME[printed]
-        # The part has no explicit bands. Each band is the general grade
-        # about the value as printed (rounded to its places), so the
-        # exported endpoints are the printed ones even where the model
-        # nominal is derived (e.g. 46.632 printed 46.6).
-        # Every band on this print is .X, whose title-block grade is ±0.8.
+        # The part has no explicit bands: each band is the .X general grade
+        # (±0.8) about the printed value, and the exported nominal IS the
+        # printed value even where the model is derived (46.632 -> 46.6).
         assert places == 1, printed
-        printed_value = round(nominal, places)
-        expected = [round(printed_value - 0.8, 12), round(printed_value + 0.8, 12)]
-        assert feature[key] == expected, printed
+        assert nominal == round(nominal, places), printed
+        assert feature[key] == [round(nominal - 0.8, 12), round(nominal + 0.8, 12)], printed
+
+
+def test_thru_stud_taps_carry_the_printed_drill_band() -> None:
+    """The callout prints the THRU tap drill as Ø7.94: with no drill-point
+    face of its own, each tap carries the drilled-hole band on that printed
+    value, while the face match keeps the true drill size."""
+    for name in ("stud_tap_near", "stud_tap_far"):
+        feature = _features()[name]
+        assert "dia" in feature["requirements"]
+        assert feature["dia_nominal"] == 7.94
+        assert feature["dia"] == [7.94, 8.04]
+        assert feature["tap_drill_mm"] == spec.STUD_TAP_DRILL != 7.94
+
+
+def test_every_exported_nominal_lies_inside_its_band() -> None:
+    for name, feature in _features().items():
+        for key in feature["requirements"]:
+            nominal = feature.get(f"{key}_nominal", feature.get(f"nominal_{key}"))
+            band = feature[key]
+            if isinstance(nominal, float) and isinstance(band, list):
+                assert band[0] <= nominal <= band[1], (name, key)
 
 
 def test_head_saddle_fits_between_the_head_shoulder_and_the_cone_boss() -> None:
