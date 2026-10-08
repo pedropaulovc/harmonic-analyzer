@@ -5,7 +5,7 @@ import { VIDEOS, resolveVideo, type Video } from './video-catalog'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
 import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT_PX, type PlaybackView, type ReferenceState, type SourceSample } from './timeline'
 import type { CompactVideoReference, DiagnosticSourcePublicationState, SourcePublicationReference } from './source-track'
-import { buildOriginalPresentationSamples, createSourceVideoPlayer, isSourceVideoPlayer } from './source-player'
+import { buildOriginalPresentationSamples, createSourceVideoPlayer, isSourceVideoPlayer, type SourcePresentation } from './source-player'
 import { INPUT_FIELDS, equalRecord, type InputField } from './source-witness'
 import { unavailableNativePrimitiveSnapshot, type NativeInputSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmissionMetadata, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
 import { compileSourceAssemblyState, createSourceAssemblyBuffer, OPERATING_SOURCE_ASSEMBLY, solveSourceAssembly, type CompiledSourceAssembly, type SourceAssemblyBuffer, type SourceAssemblyState } from './source-assembly'
@@ -143,6 +143,7 @@ let modelTime = 0
 let sourceSampleTimeSeconds = 0
 let manualMotion: 'idle' | 'turning' = 'idle'
 let manualSceneOwnership: 'initial' | 'owned' = 'initial'
+let coldSourceInitialization: 'waiting' | 'settled' = 'waiting'
 let manualRevision: 'pending' | 'clean' = 'pending'
 let paintRevision: 'pending' | 'clean' = 'pending'
 let physicsState: 'available' | 'unavailable' = 'unavailable'
@@ -260,7 +261,7 @@ function configureLandmarkProbe(): void {
 function renderPending(): void {
   if (paintRevision === 'clean') return
   paintRevision = 'clean'
-  if (mode !== 'exploring' && referenceState === 'hold-last-readable' && activeViews.length) drawSourceViews(activeViews, modelTime)
+  if (referenceState === 'hold-last-readable' && activeViews.length && (mode !== 'exploring' || manualSceneOwnership === 'initial')) drawSourceViews(activeViews, modelTime)
   else viewer.render(currentAssembly.state)
 }
 
@@ -420,6 +421,28 @@ function retryFollowing(): void {
   } catch (error) { notice(physicsError, error instanceof Error ? error.message : String(error)) }
 }
 
+function originalPresentedSampleTime(presented: SourcePresentation): number {
+  return presentedSampleTimes.get(presented.frameIndex) ?? presented.pts * presented.timeBase[0] / presented.timeBase[1]
+}
+
+function initializeColdHeldOriginalSource(): void {
+  if (coldSourceInitialization === 'settled') return
+  if (manualSceneOwnership === 'owned') { coldSourceInitialization = 'settled'; return }
+  if (nativeDiagnosticLeaseActive || selectionAbort?.signal.aborted || !video || !player || !isSourceVideoPlayer(player)
+    || player.getVideoId() !== video.id || player.getState() !== 'paused' || player.getSeekState() !== 'idle'
+    || !reference || machine?.availability !== 'available' || modelState !== 'ready'
+    || mode !== 'exploring' || manualSceneOwnership !== 'initial' || manualMotion !== 'idle' || activeViews.length) return
+  const presented = player.getPresentation()
+  if (!presented) return
+  const clock = player.getTime(), exposure = originalPresentedSampleTime(presented)
+  coldSourceInitialization = 'settled'
+  if (reference.prepareAt(exposure).state !== 'hold-last-readable') return
+  try {
+    renderSource(clock, reference, exposure)
+    manualRevision = 'clean'
+  } catch (error) { notice(physicsError, error instanceof Error ? error.message : String(error)) }
+}
+
 function applyView(view: PlaybackView): void {
   if (!machine || machine.availability !== 'available') return
   updateMachine(view.input, compileSourceAssemblyState(view.sourceAssembly))
@@ -510,8 +533,7 @@ function renderSource(timeSeconds: number, sourceReference: SourcePublicationRef
       referenceState = 'unavailable'
       throw new Error('The original video has no current owned presented exposure. Complete a safe seek or real playback before restoring its pose.')
     }
-    sourceExposureTimeSeconds = presentedSampleTimes.get(presented.frameIndex)
-      ?? presented.pts * presented.timeBase[0] / presented.timeBase[1]
+    sourceExposureTimeSeconds = originalPresentedSampleTime(presented)
   }
   let prepared = sourceReference.prepareAt(sourceExposureTimeSeconds)
   if (prepared.state === 'hold-last-readable') {
@@ -664,6 +686,7 @@ function updateHud(inputMode: 'sync' | 'preserve' = 'sync'): void {
 function editMechanism(action: () => void): void {
   invalidateNativeDiagnosticLease('Manual mechanism input changed')
   if (mode !== 'exploring' || modelState !== 'ready') return
+  if (activeViews.length) explore()
   action()
   manualSceneOwnership = 'owned'
   manualRevision = 'pending'
@@ -752,6 +775,7 @@ async function selectVideo(next: Video): Promise<void> {
   copyInput(createMechanismInput())
   manualRevision = 'pending'
   manualSceneOwnership = 'initial'
+  coldSourceInitialization = 'waiting'
   mode = 'exploring'
   viewer.setInteraction('exploring')
   if (initialCamera) viewer.applyCamera(initialCamera)
@@ -809,7 +833,7 @@ async function selectVideo(next: Video): Promise<void> {
     if (!selection.signal.aborted) notice(videoError, error instanceof Error ? error.message : String(error))
   }
   await sourcePromise
-  if (!selection.signal.aborted) { retryFollowing(); updateControlState(); updateHud() }
+  if (!selection.signal.aborted) { initializeColdHeldOriginalSource(); retryFollowing(); updateControlState(); updateHud() }
 }
 
 function selectRoute(): void {
@@ -850,6 +874,7 @@ async function fetchMachine(): Promise<void> {
     notice(modelError, machine.missing.length ? `Unresolved native joints: ${machine.missing.join(', ')}. This model cannot establish complete footage fidelity.` : '')
     configureLandmarkProbe()
     manualRevision = 'clean'
+    initializeColdHeldOriginalSource()
     retryFollowing()
   } catch (error) {
     modelState = 'unavailable'
@@ -867,6 +892,7 @@ function tick(now: number): void {
   lastTick = now
   if (nativeDiagnosticLeaseActive && nativeDiagnosticRefusal === null) return
   try {
+    initializeColdHeldOriginalSource()
     if (mode === 'exploring' && manualSourceSeek === 'idle' && player && isSourceVideoPlayer(player)
       && player.getSeekState() === 'idle' && player.getState() === 'playing') retryFollowing()
     if (mode === 'following-video' && player) {
@@ -908,7 +934,6 @@ function tick(now: number): void {
 
 const viewer = createViewer(canvas, () => { paintRevision = 'pending' }, verificationEnabled)
 new ResizeObserver(() => { paintRevision = 'pending' }).observe(canvas.parentElement!)
-canvas.addEventListener('pointerdown', () => { if (mode === 'exploring') manualSceneOwnership = 'owned' })
 buildVideoNavigation()
 buildChannelControls()
 magnification.min = String(MAGNIFIER_RATIO_MIN)
@@ -938,6 +963,7 @@ platen.addEventListener('input', () => editMechanism(() => { input.setup.platenO
 manualRunButton.addEventListener('click', () => {
   invalidateNativeDiagnosticLease('Manual crank motion changed')
   if (mode !== 'exploring') return
+  if (activeViews.length) explore()
   manualSceneOwnership = 'owned'
   manualMotion = manualMotion === 'idle' ? 'turning' : 'idle'
   manualRunButton.textContent = manualMotion === 'turning' ? 'Stop crank' : 'Turn crank'
@@ -974,6 +1000,7 @@ followButton.addEventListener('click', () => {
 fitButton.addEventListener('click', () => {
   invalidateNativeDiagnosticLease('Manual camera fitting was requested')
   if (mode !== 'exploring') return
+  if (activeViews.length) explore()
   manualSceneOwnership = 'owned'
   viewer.fitView()
 })
@@ -990,7 +1017,13 @@ compactButton.addEventListener('click', () => {
 retryModel.addEventListener('click', () => { void fetchMachine() })
 window.addEventListener('popstate', selectRoute)
 for (const type of ['pointerdown', 'wheel'] as const) canvas.addEventListener(type, (event) => {
-  if (event.isTrusted) invalidateNativeDiagnosticLease('Manual camera interaction began')
+  if (event.isTrusted) {
+    if (mode === 'exploring') {
+      if (activeViews.length) explore()
+      else manualSceneOwnership = 'owned'
+    }
+    invalidateNativeDiagnosticLease('Manual camera interaction began')
+  }
 }, { capture: true })
 
 if (verificationEnabled) {
