@@ -64,6 +64,53 @@ def test_every_exported_band_is_a_requirement() -> None:
                 assert key in feature["requirements"], (name, key)
 
 
+# Each printed dimension -> the exported feature and requirement that owns its
+# band. PadHt is the matched fit's reference size and owns no band.
+PRINTED_OWNERS = {
+    "BaseLength": ("base_far_end", "station"),
+    "BaseWidth": ("base_far_side", "height"),
+    "BaseHt": ("base_top", "height"),
+    "OverallHt": ("underside", "height"),
+    "HeadSaddleX0": ("head_saddle_x0", "station"),
+    "HeadSaddleX1": ("head_saddle_x1", "station"),
+    "FootSaddleX0": ("foot_saddle_x0", "station"),
+    "FootSaddleX1": ("foot_saddle_x1", "station"),
+    "PadX0": ("pad_x0", "station"),
+    "PadX1": ("pad_x1", "station"),
+    "PadZ0": ("pad_z0", "height"),
+    "PadZ1": ("pad_z1", "height"),
+    "SaddleZ0": ("saddle_z0", "height"),
+    "SaddleZ1": ("saddle_z1", "height"),
+    "SeatZ": ("head_seat", "station"),
+    "SeatBottomHt": ("head_seat", "height"),
+    "SeatDia": ("head_seat", "dia"),
+    "StudX": ("stud_tap_near", "station"),
+    "StudNearZ": ("stud_tap_near", "height"),
+    "StudFarZ": ("stud_tap_far", "height"),
+}
+
+
+def test_every_printed_band_has_a_requirement_owner() -> None:
+    """One-fact coverage: every printed toleranced dimension reaches prechips
+    as a listed requirement band at its printed places."""
+    assert set(PRINTED_OWNERS) | {"PadHt"} == set(spec.DRAWING_PRECISION_BY_NAME)
+    features = _features()
+    for printed, (name, key) in PRINTED_OWNERS.items():
+        feature = features[name]
+        assert key in feature["requirements"], printed
+        nominal = feature.get(f"{key}_nominal", feature.get(f"nominal_{key}"))
+        places = spec.DRAWING_PRECISION_BY_NAME[printed]
+        # The part has no explicit bands. Each band is the general grade
+        # about the value as printed (rounded to its places), so the
+        # exported endpoints are the printed ones even where the model
+        # nominal is derived (e.g. 46.632 printed 46.6).
+        # Every band on this print is .X, whose title-block grade is ±0.8.
+        assert places == 1, printed
+        printed_value = round(nominal, places)
+        expected = [round(printed_value - 0.8, 12), round(printed_value + 0.8, 12)]
+        assert feature[key] == expected, printed
+
+
 def test_head_saddle_fits_between_the_head_shoulder_and_the_cone_boss() -> None:
     features = _features()
     widest = features["head_saddle_x1"]["station"][1] - features["head_saddle_x0"]["station"][0]
