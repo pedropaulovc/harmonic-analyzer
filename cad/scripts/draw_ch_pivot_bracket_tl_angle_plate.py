@@ -35,6 +35,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
+    set_hole_callout_precision,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -49,6 +50,7 @@ from ch_pivot_bracket_tl_angle_plate_spec import (
     REFERENCE_DIMENSIONS,
     UPRIGHT_THICK,
     SCREW_Y,
+    STUD_DIA_PLACES,
     STUD_SPEC,
     STUD_X,
     STUD_Y,
@@ -235,7 +237,7 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=TAP_CALLOUT_XY,
         label="ledge screw taps",
     )
-    add_native_hole_callout(
+    stud_callout = add_native_hole_callout(
         adapter,
         front,
         edge_xy=(
@@ -245,6 +247,11 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=STUD_CALLOUT_XY,
         label="bridge stud holes",
         process=STUD_CALLOUT_PROCESS,
+    )
+    # The letter-X size prints at the spec's places, the same value the
+    # part's exported drilled-hole band is taken from.
+    set_hole_callout_precision(
+        stud_callout, {"hw-diam": STUD_DIA_PLACES}, label="bridge stud holes"
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
