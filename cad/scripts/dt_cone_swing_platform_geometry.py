@@ -59,7 +59,7 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 # holes are a world-X pair at +/-POST_MOUNT_HALF_PITCH.  Undoing the engaged
 # Ry(+INCLINE) placement gives the skewed pair in the platform's local (x, z).
 POST_STATION = -39.90136099793
-PIVOT_STATION = 152.27232594770453
+PIVOT_STATION = 152.39554046707093  # exp m0.5: cone_line.PIVOT_STATION (19 seat pitches moved)
 POST_MAIN_DIA = POST_BLOCK_DIA
 POST_LOCAL_Z = POST_STATION - PIVOT_STATION
 POST_SOUTH_MARGIN = 3.175  # 1/8 in clearance beyond the post's south rim
