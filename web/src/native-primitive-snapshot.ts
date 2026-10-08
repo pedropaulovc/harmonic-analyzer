@@ -587,6 +587,11 @@ export function sealNativeDrawState(model: NativeCaptureModel): NativeDrawStateT
         number(node.scale.x); number(node.scale.y); number(node.scale.z)
         number(Number(node.visible)); number(node.layers.mask); number(Number(node.matrixAutoUpdate)); number(Number(node.matrixWorldAutoUpdate))
         number(node.renderOrder); number(Number(node.frustumCulled))
+        // Deformed springs have renderer-recognized object-local spheres;
+        // changing one after a draw changes its culling eligibility.
+        const sphere = (node as THREE.Object3D & { boundingSphere?: THREE.Sphere | null }).boundingSphere
+        number(Number(sphere !== undefined))
+        number(sphere?.center.x ?? NaN); number(sphere?.center.y ?? NaN); number(sphere?.center.z ?? NaN); number(sphere?.radius ?? NaN)
       }
       for (const entry of geometries) {
         const geometry = entry.object.geometry

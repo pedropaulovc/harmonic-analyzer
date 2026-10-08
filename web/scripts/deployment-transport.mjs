@@ -12,6 +12,8 @@ const contentTypes = {
   '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.json': 'application/json', '.glb': 'model/gltf-binary', '.wasm': 'application/wasm',
   '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.woff2': 'font/woff2',
 }
 export async function hashFile(path) {
   const hash = createHash('sha256')

@@ -32,9 +32,22 @@ let root, assets, worker, originals
 before(async () => {
   root = await mkdtemp(join(tmpdir(), 'deployment-transport-'))
   await mkdir(join(root, 'assets'))
+  // Deterministic high-entropy 25 MiB plus a compressible tail: gzip remains
+  // smaller than identity but exceeds the real 24 MiB transport chunk size.
+  // This exercises actual multi-piece gzip producer artifacts, not synthetic
+  // chunk descriptors or a test-only chunk-size override.
+  const model = Buffer.alloc(26 * 1024 * 1024)
+  let seed = 0x12345678
+  for (let index = 0; index < 25 * 1024 * 1024; index++) {
+    seed ^= seed << 13
+    seed ^= seed >>> 17
+    seed ^= seed << 5
+    model[index] = seed & 255
+  }
+  model.write('glTF')
   originals = {
     '/assets/source-track.js': Buffer.from(`export default ${JSON.stringify('source diagnostic '.repeat(1_600_000))};\n`),
-    '/model.glb': Buffer.concat([Buffer.from('glTF'), Buffer.alloc(26 * 1024 * 1024, 7)]),
+    '/model.glb': model,
   }
   for (const [route, bytes] of Object.entries(originals)) await writeFile(join(root, route.slice(1)), bytes)
   await writeFile(join(root, 'assets/small.js'), 'export default 1;')
@@ -67,6 +80,34 @@ test('negotiates explicit refusal, wildcard precedence, qualities and identity d
     ['*;q=0, identity;q=1', 'identity'], ['gzip;q=invalid', 'identity'],
     ['gzip;q=1, gzip;q=0', 'identity'],
   ]) assert.equal(negotiateCoding(header, variants), expected, header)
+})
+
+test('original Cloudflare client preferences override normalized edge headers', async () => {
+  const route = '/model.glb'
+  const env = binding()
+  const edgeRequest = (preferences, method = 'HEAD', extra = {}) => {
+    const input = request(route, 'br, gzip', extra, method)
+    Object.defineProperty(input, 'cf', { value: { clientAcceptEncoding: preferences } })
+    return input
+  }
+  for (const preferences of ['identity', 'gzip;q=0, *;q=1', '', 'gzip;q=0.5, identity;q=1']) {
+    const response = await worker.fetch(edgeRequest(preferences), env)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-encoding'), null)
+    assert.equal(response.headers.get('content-length'), String(assets[route].variants.identity.byteLength))
+    assert.equal(response.headers.get('etag'), `"${assets[route].variants.identity.sha256}"`)
+  }
+  for (const preferences of ['gzip;q=0,identity;q=0', '*;q=0']) {
+    const response = await worker.fetch(edgeRequest(preferences), env)
+    assert.equal(response.status, 406)
+    assert.equal(response.headers.get('cache-control'), 'no-store')
+  }
+  const gzip = await worker.fetch(edgeRequest('gzip'), env)
+  assert.equal(gzip.headers.get('content-encoding'), 'gzip')
+  const identityTag = `"${assets[route].variants.identity.sha256}"`
+  assert.equal((await worker.fetch(edgeRequest('identity', 'HEAD', { 'If-None-Match': identityTag }), env)).status, 304)
+  assert.equal((await worker.fetch(edgeRequest('gzip', 'HEAD', { 'If-None-Match': identityTag }), env)).status, 200)
+  assert.equal(env.calls.length, 0)
 })
 
 test('actual producer artifacts preserve decoded GLB and module bytes and sealed digests', async () => {
@@ -139,13 +180,16 @@ test('missing first chunk, incorrect length, or unexpected binding encoding fail
   }
 })
 
-test('later chunk failures and unannounced truncated bodies abort response consumption', async () => {
-  for (const alter of [
-    (_request, _bytes, index) => index === 2 ? new Response('missing', { status: 404 }) : undefined,
-    (_request, bytes) => new Response(bytes.subarray(0, bytes.length - 1)),
-  ]) {
-    const response = await worker.fetch(request('/model.glb', 'identity'), binding(alter))
-    await assert.rejects(response.arrayBuffer())
+test('later chunk failures and unannounced truncated bodies abort both representations', async () => {
+  for (const coding of ['identity', 'gzip']) {
+    assert.ok(assets['/model.glb'].variants[coding].chunks.length > 1)
+    for (const alter of [
+      (_request, _bytes, index) => index === 2 ? new Response('missing', { status: 404 }) : undefined,
+      (_request, bytes) => new Response(bytes.subarray(0, bytes.length - 1)),
+    ]) {
+      const response = await worker.fetch(request('/model.glb', coding), binding(alter))
+      await assert.rejects(response.arrayBuffer())
+    }
   }
 })
 

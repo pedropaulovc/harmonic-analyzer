@@ -844,8 +844,10 @@ pieces. The build verifies the pieces, reconstructed representations and exact
 decoded original bytes before deployment. Geometry and source datasets stay
 unchanged.
 
-For original chunked-asset URLs, the Worker negotiates gzip from
-`Accept-Encoding` and otherwise serves identity. GET/HEAD responses include the
+For original chunked-asset URLs, the Worker negotiates from the client's original
+`Accept-Encoding` (`request.cf.clientAcceptEncoding` on Cloudflare, not the
+normalized edge header). It selects gzip or identity by quality and returns 406
+when both are refused. GET/HEAD responses include the
 selected representation's length and ETag, `Vary: Accept-Encoding`, and
 `Content-Encoding: gzip` when selected. It sequentially streams immutable pieces
 through a fixed-length stream, without runtime compression or a full-file buffer.
@@ -925,25 +927,40 @@ Pending paint, seeks and explicit diagnostic publications still draw. HUD fields
 are written only when their displayed values change. The manual crank retains
 elapsed-time motion; idle exploration already renders on demand.
 
+Spring meshes use independent live bounding spheres that enclose their current
+shader-deformed vertices, including translated hooks and transition curves.
+Only springs outside the camera frustum skip submission. Geometry, materials,
+names and native diagnostic ownership are unchanged; full-machine views may
+save no draws.
+
 `scripts/measure-performance.js` records three cold-cache navigations, resource
-bytes, and five-second idle/manual-crank CPU and WebGL draw-call windows. Use
-native Windows Chrome to avoid WSL rendering overhead:
+bytes and five-second idle/manual-crank WebGL draw windows. Its draw wrappers add
+CPU overhead. `scripts/measure-cpu.js` measures idle, manual and actual
+source-following CPU windows without those wrappers. Run each in a fresh native
+Windows Chrome session, from the repository root in Windows PowerShell:
 
 ```powershell
 playwright-cli -s=performance open http://localhost:4178/harmonic-analyzer/ --browser=chrome --headed
 playwright-cli -s=performance run-code --filename=web/scripts/measure-performance.js
 playwright-cli -s=performance close
+playwright-cli -s=cpu open http://localhost:4178/harmonic-analyzer/ --browser=chrome --headed
+playwright-cli -s=cpu run-code --filename=web/scripts/measure-cpu.js
+playwright-cli -s=cpu close
 ```
 
 Run `npm --prefix web run build` and `npm --prefix web run preview -- --host
 0.0.0.0 --port 4178` first. A plain build needs the approved model staged through
 the normal model workflow; `build:deploy` acquires it automatically. Compare the
 same browser, viewport, pixel ratio and throttling conditions. Draw calls measure
-submission work, not GPU elapsed time. Localhost timings do not establish hosted
-load time or real-user Core Web Vitals.
+submission work, not GPU elapsed time. Vite's local compression is not evidence
+of Worker encoding negotiation: check actual hosted response headers and
+transferred bytes separately. Localhost timings establish neither hosted load
+time nor real-user Core Web Vitals.
 
-CPU polling/HUD regressions: `node --test web/scripts/main-scheduling.test.mjs`.
-Encoded delivery regressions: `node --test web/scripts/deployment-transport.test.mjs`.
+Run `npm --prefix web run test:performance` after `build:deploy` has acquired the
+pinned model, or set `SPRING_MODEL_PATH` to its exact approved bytes. Tests cover
+polling/HUD transitions, encoded delivery and every actual native spring vertex
+at catalog limits and source override spans.
 
 The source-v37 measurements and verification results below are preserved from
 that snapshot. Use the [subsystem identity guide](../cad/docs/subsystem-identities.md)

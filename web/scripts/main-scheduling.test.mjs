@@ -158,6 +158,7 @@ function hudFixture() {
   }
   const names = ['sourceScrub', 'sourceScrubTime', 'crank', 'crankValue', 'gearing', 'magnification', 'fixture', 'cone', 'pinion', 'platen', 'magnificationValue', 'fixtureValue', 'coneValue', 'pinionValue', 'platenValue', 'forceReadout', 'playbackStatus', 'playbackClock']
   const c = vm.createContext({
+    controlValueCache: new WeakMap(),
     ...Object.fromEntries(names.map(name => [name, control()])),
     player: { getTime: () => 4 }, isSourceVideoPlayer: () => true, manualSourceSeek: 'idle', document: { activeElement: null },
     mode: 'exploring', explorationOrigin: 'interactive-default', referenceSeek: 'idle', referenceState: 'approximate',
@@ -201,4 +202,36 @@ test('HUD preserves superseding controls and focused scrub, while provenance tra
   c.updateHud()
   assert.equal(c.sourceScrub.value, '4')
   assert.match(c.crankValue.value, /chosen, not measured/)
+})
+
+test('sanitized range values do not repeat writes, but external edits are restored', () => {
+  const c = vm.createContext({ controlValueCache: new WeakMap() })
+  vm.runInContext(productionFunctions(['setControlValue']), c)
+  let writes = 0
+  let observed = '0'
+  const range = {
+    get value() { return observed },
+    set value(raw) {
+      writes++
+      // The range value sanitization algorithm clamps to bounds, then rounds to
+      // the nearest permitted step (here min=0, max=90, step=0.1).
+      const numeric = Math.max(0, Math.min(90, Number(raw)))
+      observed = String(Math.round(numeric * 10) / 10)
+    },
+  }
+  c.setControlValue(range, '30.000000000004')
+  assert.equal(range.value, '30')
+  assert.equal(writes, 1)
+  c.setControlValue(range, '30.000000000004')
+  assert.equal(writes, 1, 'same raw model value and sanitized DOM result require no assignment')
+  range.value = '40'
+  c.setControlValue(range, '30.000000000004')
+  assert.equal(range.value, '30')
+  assert.equal(writes, 3, 'superseding user/diagnostic edits are not mistaken for the cached DOM result')
+  c.setControlValue(range, '30.000000000005')
+  assert.equal(writes, 4, 'changed raw model input is submitted even when it has the same stepped result')
+  c.setControlValue(range, '120')
+  assert.equal(range.value, '90')
+  c.setControlValue(range, '120')
+  assert.equal(writes, 5, 'clamped values are also stable')
 })

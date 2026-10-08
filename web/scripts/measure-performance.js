@@ -27,9 +27,9 @@ async page => {
         state.paintedFrames++;
         state.frameCalls.push(calls);
         if (previousTime) state.frameIntervalsMs.push(time - previousTime);
+        previousTime = time;
       }
       previousCalls = state.calls;
-      previousTime = time;
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
@@ -58,7 +58,7 @@ async page => {
       calls: after.calls - before.calls, triangles: after.triangles - before.triangles,
       frames: after.frames - before.frames, paintedFrames: after.paintedFrames - before.paintedFrames,
       callsPerPaintedFrame: percentile(after.frameCalls, 0.5), frameIntervalMedianMs: percentile(after.frameIntervalsMs, 0.5), frameIntervalP95Ms: percentile(after.frameIntervalsMs, 0.95),
-      cpuSeconds: Object.fromEntries(['TaskDuration', 'ScriptDuration', 'LayoutDuration', 'RecalcStyleDuration'].map(name => [name, end.metrics.find(row => row.name === name).value - start.metrics.find(row => row.name === name).value])),
+      instrumentedCpuSeconds: Object.fromEntries(['TaskDuration', 'ScriptDuration', 'LayoutDuration', 'RecalcStyleDuration'].map(name => [name, end.metrics.find(row => row.name === name).value - start.metrics.find(row => row.name === name).value])),
       heapBytes: end.metrics.find(row => row.name === 'JSHeapUsedSize').value,
     };
   };
@@ -79,7 +79,7 @@ async page => {
     }
     return {
       url: page.url(), browser: await page.evaluate(() => navigator.userAgent), viewport: await page.evaluate(() => ({ width: innerWidth, height: innerHeight, pixelRatio: devicePixelRatio })),
-      conditions: 'native browser; cold HTTP cache each navigation; no network/CPU throttling; five-second idle and active windows; three runs',
+      conditions: 'native browser; cold HTTP cache each navigation; no network/CPU throttling; five-second idle and active windows; three runs; ordinary WebGL2 draw instrumentation adds CPU overhead; use measure-cpu.js in a fresh session for CPU comparison',
       gpu: await page.evaluate(() => {
         const gl = document.querySelector('#stage').getContext('webgl2');
         const extension = gl.getExtension('WEBGL_debug_renderer_info');

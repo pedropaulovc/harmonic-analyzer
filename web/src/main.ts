@@ -241,8 +241,19 @@ function notice(target: HTMLElement, message: string): void {
   target.hidden = message.length === 0
 }
 
+const controlValueCache = new WeakMap<HTMLInputElement | HTMLSelectElement | HTMLOutputElement, { submitted: string; observed: string }>()
+
 function setControlValue(control: HTMLInputElement | HTMLSelectElement | HTMLOutputElement, value: string): void {
-  if (control.value !== value) control.value = value
+  const cached = controlValueCache.get(control)
+  const current = control.value
+  // Range/select controls can normalize an assigned value. Remember both the
+  // submitted model value and its DOM result without masking subsequent edits.
+  if (cached?.submitted === value && cached.observed === current) return
+  if (current !== value) control.value = value
+  if (cached) {
+    cached.submitted = value
+    cached.observed = control.value
+  } else controlValueCache.set(control, { submitted: value, observed: control.value })
 }
 
 function copyInput(source: MechanismInput, target = input): void {

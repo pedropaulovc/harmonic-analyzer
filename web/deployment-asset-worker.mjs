@@ -64,8 +64,10 @@ export function createAssetWorker(manifest) {
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } })
       }
-      const coding = negotiateCoding(request.headers.get('accept-encoding'), asset.variants)
-      if (!coding) return new Response(null, { status: 406, headers: { Vary: 'Accept-Encoding' } })
+      // The edge normalizes Accept-Encoding; cf retains the client's original
+      // preferences. Header fallback supports local/non-Cloudflare runtimes.
+      const coding = negotiateCoding(request.cf?.clientAcceptEncoding ?? request.headers.get('accept-encoding'), asset.variants)
+      if (!coding) return new Response(null, { status: 406, headers: { Vary: 'Accept-Encoding', 'Cache-Control': 'no-store' } })
       const variant = asset.variants[coding]
       const headers = {
         'Content-Type': asset.contentType, 'Content-Length': String(variant.byteLength),
