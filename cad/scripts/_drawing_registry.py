@@ -642,6 +642,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_rocker_arm_tl_profile_fixture",
+        part="ch_rocker_arm_tl_profile_fixture",
+        artifact_stem="ch-rocker-arm-tl-profile-fixture",
+        script_name="draw_ch_rocker_arm_tl_profile_fixture.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_cone_pivot_post_tl_bond_cradle",
         part="dt_cone_pivot_post_tl_bond_cradle",
         artifact_stem="dt-cone-pivot-post-tl-bond-cradle",
