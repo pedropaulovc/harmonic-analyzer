@@ -59,7 +59,7 @@ CRANK_BOSS_END_Z = CRANK_BOSS_START_Z + CRANK_BOSS_LENGTH
 # Inclined cone-shaft journal.  Unlike v1, the 12.5182-degree incline is baked
 # into the part; downstream placement composes it with the exact Ry(180)
 # installation instead of re-authoring the harvested feature frame.
-INCLINE_DEG = 12.5182
+INCLINE_DEG = _config.machine("cone_incline", "derived_incline_deg")
 CONE_AXIS_VIEW = "CONE JOURNAL"
 BORE_HEIGHT = 33.368
 CONE_BOSS_DIA = 17.2

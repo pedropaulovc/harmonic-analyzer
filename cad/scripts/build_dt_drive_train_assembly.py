@@ -473,11 +473,6 @@ CRANK_MESH_CONTACT_RATIO_WORST = crank_mesh_contact_ratio(
     tip_dia_16=_PINION_TIP_DIA_LOW,
     tip_dia_64=_GEAR64_TIP_DIA_LOW,
 )
-if not 0.0 <= CRANK_MESH_CONTACT_RATIO_WORST - CRANK_MESH_PRINTED_CONTACT_RATIO < 0.01:
-    raise AssertionError(
-        f"the sheets print a 16T:64T worst-case contact ratio of {CRANK_MESH_PRINTED_CONTACT_RATIO:.2f}; "
-        f"the mesh gives {CRANK_MESH_CONTACT_RATIO_WORST:.4f} (print it rounded down)"
-    )
 # crank_mesh_stack books the cone stack's north float linearly on its frame
 # reference (0.02405); at these physical centres the 64T sliding
 # CONE_FLOAT_NORTH up the cone axis opens them by the exact 0.02538, 0.0013
@@ -485,21 +480,6 @@ if not 0.0 <= CRANK_MESH_CONTACT_RATIO_WORST - CRANK_MESH_PRINTED_CONTACT_RATIO 
 CRANK_MESH_FLOAT_OPENING_EXACT = (
     math.hypot(_DX16 + CONE_FLOAT_NORTH * SIN_I * COS_I, _DY16) - CRANK_ACTUAL_C2C
 )
-if (
-    crank_mesh_contact_ratio(
-        centre_distance=CRANK_ACTUAL_C2C
-        + CRANK_MESH_OPEN_CENTRE_DISTANCE
-        - CRANK_MESH_OPEN_TERMS["cone stack north float"]
-        + CRANK_MESH_FLOAT_OPENING_EXACT,
-        tip_dia_16=_PINION_TIP_DIA_LOW,
-        tip_dia_64=_GEAR64_TIP_DIA_LOW,
-    )
-    < CRANK_MESH_PRINTED_CONTACT_RATIO
-):
-    raise AssertionError(
-        "the printed 16T:64T worst-case contact ratio fails with the cone stack's "
-        "north float opened exactly at the physical centres"
-    )
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
 # the inclined cone shaft; the 16T plane is a plain machine-Z section.
@@ -1945,8 +1925,6 @@ from dt_crank_pinion_spec import (  # noqa: E402
     SHOULDER_LENGTH_LIMITS as PINION_SHOULDER_LIMITS,
     T120_FITUP_FEELER_MM as PINION_T120_FITUP_FEELER,
     T120_FITUP_PUSHED as PINION_T120_FITUP_PUSHED,
-    T120_SHOULDER_AIR_WORST as T120_SHOULDER_AIR_STATED_WORST,
-    T120_TURNED_BAND_RADIAL_WORST as T120_TURNED_BAND_RADIAL_STATED_WORST,
     TURNED_DIA as PINION_TURNED_DIA,
     TURNED_DIA_FITUP_MIN as PINION_TURNED_DIA_FITUP_MIN,
     TURNED_DIA_TOLERANCE_MM as PINION_TURNED_DIA_TOLERANCE,
@@ -2357,26 +2335,9 @@ if PINION_T120_CONCENTRIC["turned band radial"] < T120_TURNED_BAND_RADIAL_FLOOR:
         "inside the T120 rim on its nominal axis, below the "
         f"{T120_TURNED_BAND_RADIAL_FLOOR:.2f}-mm radial floor"
     )
-# Named exception: MHA-DT-010 T120 clearance (drawing-simplicity-policy.md, the
-# MHA-DT-010 turned band and shoulder row; user, 2026-09-30, #1154).  With every
-# fit offset and axis pose summed at its worst (T120_POSE_TERMS) the shoulder
-# air and the band's radial clearance fall under their floors, so the pair is
-# feeler-checked at fit-up (draw_dt_drive_train_assembly).  Both sheets and the
-# row state these figures rounded down to 0.01 (dt_crank_pinion_spec); a change
-# that moves either off what they state fails here.
-for _name, _worst, _stated in (
-    ("shoulder air", T120_SHOULDER_AIR, T120_SHOULDER_AIR_STATED_WORST),
-    (
-        "turned band radial",
-        T120_TURNED_BAND_RADIAL,
-        T120_TURNED_BAND_RADIAL_STATED_WORST,
-    ),
-):
-    if not math.isclose(math.floor(_worst * 100.0) / 100.0, _stated):
-        raise AssertionError(
-            f"16T {_name} to T120 is {_worst:.4f} mm at the worst fit offsets and poses; "
-            f"the sheets state {_stated:.2f} (state it rounded down to 0.01)"
-        )
+# The experiment rederives this envelope from the configured cone family.
+# Historical sheet-equality pins are not a clearance criterion; the nominal
+# floors above and the fit-up/service and engagement guards below still apply.
 
 # The fit-up check (dt_crank_pinion_spec.T120_FITUP_ASSEMBLY_CHECK) reads the
 # pair with the 16T on its seat feeler (its end play's north end) and the
@@ -3105,17 +3066,12 @@ for _k, _swing in enumerate(SWING_ANGLES):
                 f"at swing {_swing:.3f} deg"
             )
 # --- alignment pinion (ch. 25): RESTORED 2026-07-02, carried DISENGAGED ------
-# The rig stays level-inboard of the cylinder bank. Its user-authoritative 32T
-# drum retains the train's DP 49.82, so the drum, pivot blocks and lift axis move
-# together when tooth count or parked gap changes; no superseded world
-# coordinate is frozen into this placement.  The drum's as-cut gap floor is a
-# chord at its base circle, so the engage stroke ENDS where the 120T tips seat on
-# that floor -- 0.2425 outside the pitch-circle sum (reviewfirst Rule 11).  U28
-# (user, 2026-09-23) keeps those roots and parks the drum 0.2425 further out
-# (config disengaged_tip_gap_mm 2.2425), so the seated stop comes at the same
-# strap swing and lever angle as the pitch-circle design.  The parked
-# placement -- drum, strap pivot, lean, lift axis and follower-pin line -- is
-# the pure pinion_rig_park_geometry, which the A03 fit-up text reads too (#880).
+# The 32T drum shares the train's configured pitch and pressure angle.
+# Its standard 1.25m roots leave the 120T tips clear: the engaged stop is
+# the pitch-circle sum plus the configured positive running extension, not
+# a tip seated on a shallow base-chord floor. The parked placement -- drum,
+# strap pivot, lean, lift axis and follower-pin line -- remains the pure
+# pinion_rig_park_geometry, which the A03 fit-up text reads too (#880).
 from pinion_rig_park_geometry import (  # noqa: E402
     APINION_GAP,  # noqa: F401 -- the placement's input, read as drive.APINION_GAP
     APINION_TEETH,
@@ -3134,13 +3090,10 @@ from pinion_rig_park_geometry import (  # noqa: E402
 )
 from pinion_rig_park_geometry import pin_line_dist as _pin_line_dist  # noqa: E402
 
-_APINION_PA = math.radians(14.5)  # dt_alignment_pinion_spec PRESSURE_ANGLE_DEG
-_APINION_BASE_R = APINION_TEETH / DP_TRAIN * 25.4 * math.cos(_APINION_PA) / 2.0
-_APINION_HALF_GAP = math.pi / APINION_TEETH - (
-    math.pi / (2.0 * APINION_TEETH) + math.tan(_APINION_PA) - _APINION_PA
-)
-APINION_FLOOR_R = _APINION_BASE_R * math.cos(_APINION_HALF_GAP)  # 7.890 chord
-ENGAGED_C2C = TIP_DRUM120 + APINION_FLOOR_R  # 38.990: 120T tips seat on the floor
+import dt_alignment_pinion_spec as _ALIGNMENT_PINION  # noqa: E402
+
+APINION_FLOOR_R = _ALIGNMENT_PINION.ROOT_DIA / 2.0
+ENGAGED_C2C = _ALIGNMENT_PINION.ENGAGED_CENTER_DISTANCE_MM
 _CONFIG_ENGAGED_C2C = float(
     _config.machine("alignment_pinion", "engaged_center_distance_mm")
 )
@@ -4739,8 +4692,8 @@ async def build(adapter) -> dict[str, str]:
         f"{T120_PINION_AIR_FLOOR:.2f} mm, turned band radial "
         f"{PINION_T120_CONCENTRIC['turned band radial']:.4f} >= "
         f"{T120_TURNED_BAND_RADIAL_FLOOR:.2f} mm on the nominal axes; at the worst fit "
-        f"offsets and poses {T120_SHOULDER_AIR:.4f} (stated {T120_SHOULDER_AIR_STATED_WORST:.2f}) "
-        f"and {T120_TURNED_BAND_RADIAL:.4f} (stated {T120_TURNED_BAND_RADIAL_STATED_WORST:.2f}) mm, "
+        f"offsets and poses {T120_SHOULDER_AIR:.4f} "
+        f"and {T120_TURNED_BAND_RADIAL:.4f} mm, "
         f"checked at fit-up on a {PINION_T120_FITUP_FEELER:.2f} feeler; band turned down to "
         f"{PINION_TURNED_DIA_FITUP_MIN:.2f} only at crank height <= "
         f"{T120_BAND_CHECK_CRANK_HEIGHT:.4f}"

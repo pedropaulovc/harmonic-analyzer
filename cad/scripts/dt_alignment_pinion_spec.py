@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 
 import _config
+import dt_cylinder_gear_spec as drum
 
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -19,10 +20,19 @@ MM_PER_IN = 25.4
 
 TEETH = int(_config.machine("alignment_pinion", "teeth"))
 DIAMETRAL_PITCH = float(_config.machine("gear_train", "diametral_pitch"))
-PRESSURE_ANGLE_DEG = 14.5
+PRESSURE_ANGLE_DEG = float(_config.machine("gear_train", "pressure_angle_deg"))
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
+DEDENDUM_FACTOR = 1.25
+ROOT_DIA = PITCH_DIA - 2.0 * DEDENDUM_FACTOR * MODULE_MM
+WHOLE_DEPTH = (1.0 + DEDENDUM_FACTOR) * MODULE_MM
+ENGAGED_CENTER_EXTENSION_MM = float(
+    _config.machine("alignment_pinion", "engaged_center_extension_mm")
+)
+ENGAGED_CENTER_DISTANCE_MM = (
+    (PITCH_DIA + drum.PITCH_DIA) / 2.0 + ENGAGED_CENTER_EXTENSION_MM
+)
 _PRESSURE_ANGLE_RAD = math.radians(PRESSURE_ANGLE_DEG)
 _BASE_RADIUS = (
     TEETH * MODULE_MM * math.cos(_PRESSURE_ANGLE_RAD) / 2.0
@@ -34,7 +44,7 @@ _BASE_TOOTH_HALF_ANGLE = (
 )
 _HALF_GAP_ANGLE = math.pi / TEETH - _BASE_TOOTH_HALF_ANGLE
 MIN_CHORD_FLOOR_DIA = 2.0 * _BASE_RADIUS * math.cos(_HALF_GAP_ANGLE)
-AS_CUT_RADIAL_TOOTH_DEPTH = OUTSIDE_DIA / 2.0 - MIN_CHORD_FLOOR_DIA / 2.0
+AS_CUT_RADIAL_TOOTH_DEPTH = (OUTSIDE_DIA - ROOT_DIA) / 2.0
 # Tooth thickness is inspected as a base-tangent span.  Three teeth put the
 # caliper contacts at r8.14, on the flanks at the pitch circle (r8.16).  The
 # model is cut to the standard thickness, which is the upper limit.  The drum

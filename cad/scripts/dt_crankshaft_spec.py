@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 
 import _config
+import cone_line
 from _hole_spec import HoleSpec, drill_process
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
@@ -36,7 +37,7 @@ from dt_crank_hub_geometry import (
 
 # The restored v36 post's north boss face, measured from the shifted dome root.
 # Keep this independent of the post's rebuild closure; assembly checks the mate.
-POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT
+POST_BORE_END = cone_line.cone_station(cone_line.POST_STATION)[2] + 183.0 + 21.3753
 SEAT_PINION = POST_BORE_END + dt_crank_pinion_spec.SEAT_FEELER_MM
 if SEAT_PINION <= POST_BORE_END:
     raise AssertionError("the 16T seat must clear the restored post boss north face")

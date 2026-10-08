@@ -1,6 +1,7 @@
 
 gear_train:
-  diametral_pitch: 49.82           # DP_TRAIN — cone/cylinder train (= 122*25.4/62.2)
+  diametral_pitch: 48.0            # standard inch cone/cylinder train
+  pressure_angle_deg: 20.0
   fundamental_cone_teeth: 120      # largest cone gear; per-channel = 120 - 6*index
   cylinder_teeth: 120              # equal-size cylinder gears
   cylinder_lock_phase_deg: 1.5     # drive-train locks every cylinder gear at Rz(+1.5), half its 3-deg pitch, to mesh

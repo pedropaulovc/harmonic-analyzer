@@ -21,6 +21,7 @@ Part frame: axis local +Y through the origin (``Axis1``); faces at y = 0
 """
 
 from __future__ import annotations
+import math
 
 import dt_cone_pivot_post_spec
 import dt_crank_pinion_spec
@@ -106,7 +107,7 @@ THICKNESS = GAP_NOMINAL
 # facing.  Its MIN keeps FACING_ALLOWANCE -- one finishing cut -- over the
 # thickest fit, so the fitted face is always freshly cut.
 FACING_ALLOWANCE = 0.10
-BLANK_THICKNESS_MIN = 4.30
+BLANK_THICKNESS_MIN = math.ceil((GAP_MAX + FACING_ALLOWANCE - 1e-9) * 100) / 100
 
 
 def check_fit_up(gap_min: float, gap_max: float, blank_min: float) -> None:

@@ -72,6 +72,7 @@ from pd_rack_pinion_spec import (
     DRAWING_PRECISION,
     FACE_WIDTH,
     GEAR_DATA,
+    PRESSURE_ANGLE_DEG,
     SURFACE_FINISHES,
     TAP_CENTRES,
     TAP_DRILL_DIA,
@@ -157,7 +158,9 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    disc = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    disc = await build_fixed_gear(
+        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PRESSURE_ANGLE_DEG
+    )
     _rename_gear_blank(adapter)
     drive_jobs += [
         (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
