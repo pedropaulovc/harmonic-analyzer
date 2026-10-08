@@ -161,7 +161,9 @@ def _loop_length(sag: float) -> float:
 LINK_PITCH = _removable.CHAIN_PITCH  # ANSI #25 pitch (1/4 in), EXACT: the link
 # parts and the chain-pattern spacing carry this standard pitch; closure comes
 # from the sag.
-LINK_COUNT = 2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH))
+# exp m0.5: the next EVEN count up (the moved crank axis put the seed at 66.76
+# pitches; 66 links cannot close above zero droop).
+LINK_COUNT = 2 * math.ceil(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH))
 CENTRELINE_LEN = LINK_COUNT * LINK_PITCH
 
 # The EVEN count moves the target length by up to one LINK_PITCH (6.35 mm)

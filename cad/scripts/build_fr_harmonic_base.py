@@ -346,7 +346,11 @@ STOP_SCREW_DRILL_DEPTH = seat_drill_depth(STOP_SCREW_HOLE_DEPTH, STOP_THREAD, "t
 # block stands one feeler off the front strap, the spring foot's pad one
 # leaf off the back block, and the whole rig where the rig-set leaf D off gear
 # j = 19 puts it (RIG_AFT_SHIFT, user ruling P1-2).
-_FORMER_BLOCK_SCREW_X = (-17.226441649810653, -0.22644164981065273)  # east, west
+# exp m0.5: the rig moved -0.9965127824167013 in x (smaller 120T/32T tips).
+_FORMER_BLOCK_SCREW_X = (
+    -17.226441649810653 - 0.9965127824167013,
+    -0.22644164981065273 - 0.9965127824167013,
+)  # east, west
 BLOCK_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z) for z in BLOCK_SEAT_Z for x in _FORMER_BLOCK_SCREW_X
 )

@@ -6,9 +6,9 @@ cone_incline:
   # NOTE drum_seat_nominal is RE-TUNED (7.5 -> 7.2204) so z_pitch stays 7.0565 =
   # the channels.station_pitch grid: holding the channel spine fixed keeps the
   # rocker/lever/spring/output machinery in place when the gear module shrinks.
-  radius_step_mm: 1.5295
-  drum_seat_nominal_mm: 7.2204
-  derived_incline_deg: 12.5188     # documentation only; code recomputes from the two inputs
+  radius_step_mm: 1.5
+  drum_seat_nominal_mm: 7.214207293642019  # sqrt(Z_PITCH^2 + 1.5^2): z_pitch kept at baseline 7.05654213 at m0.5
+  derived_incline_deg: 12.2730     # documentation only; code recomputes from the two inputs
   source: "M6.7 true-cone derivation, re-tuned for DP 49.82 (ch13 OD 62.2)"
   confidence: low
   notes: >-

@@ -19,7 +19,7 @@ MM_PER_IN = 25.4
 
 TEETH = int(_config.machine("alignment_pinion", "teeth"))
 DIAMETRAL_PITCH = float(_config.machine("gear_train", "diametral_pitch"))
-PRESSURE_ANGLE_DEG = 14.5
+PRESSURE_ANGLE_DEG = float(_config.machine("gear_train", "pressure_angle_deg"))
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN

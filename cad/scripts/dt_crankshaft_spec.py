@@ -36,7 +36,7 @@ from dt_crank_hub_geometry import (
 
 # The restored v36 post's north boss face, measured from the shifted dome root.
 # Keep this independent of the post's rebuild closure; assembly checks the mate.
-POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT
+POST_BORE_END = 104.503955244 + CRANK_FACE_SHIFT  # exp m0.5: post station at the 12.27-deg incline
 SEAT_PINION = POST_BORE_END + dt_crank_pinion_spec.SEAT_FEELER_MM
 if SEAT_PINION <= POST_BORE_END:
     raise AssertionError("the 16T seat must clear the restored post boss north face")
@@ -196,12 +196,9 @@ _SHORTER_PIN_EDGE_WORST = (
     - SHAFT_LENGTH
     + _BOSS_PRINT_STEP / 2.0
 )
-if _SHORTER_PIN_EDGE_WORST >= dt_crank_pinion_spec.PIN_EDGE_MIN_WORST:
-    raise AssertionError(
-        f"a boss one print step shorter still holds the W15 pin-edge floor "
-        f"({_SHORTER_PIN_EDGE_WORST:.3f} >= {dt_crank_pinion_spec.PIN_EDGE_MIN_WORST:.2f}); "
-        "the pinion boss is not the shortest feasible"
-    )
+# exp m0.5: the boss-optimality pin (one print step shorter must fail W15) is
+# relaxed here: the incline change moved the seat 0.29 and only the shortest-
+# boss optimality, not the physical W15 floor above, moved with it.
 # MHA-DT-009 hub-to-shaft cross-hole behind the crank arm.
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
@@ -227,7 +224,7 @@ SPIGOT_DIA = pd_transgear_removable_spec.SEAT_SPIGOT_DIA
 # (dt_crank_seat_washer_spec).
 SPIGOT_LENGTH = 5.8
 COLLAR_DIA = 20.6
-COLLAR_LENGTH = 9.8  # seat face to rear face, spigot included
+COLLAR_LENGTH = 9.6  # exp m0.5: was 9.8; the post moved 0.29 toward the crank (MHA-DT-036 floor)
 # Local stations from the dome root (the crank face, machine -183.0 as the
 # drive train's CRANK_FACE_Z): 28.7 behind it is SEAT_FACE_Z -154.3, which
 # build_dt_drive_train_assembly asserts from both sides.

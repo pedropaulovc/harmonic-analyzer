@@ -51,7 +51,7 @@ BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 # together.  The band is the cone gears' +/-0.025.
 LAYOUT_FACE_WIDTH = 8.0
 SOUTH_FACE_SHIFT_NORTH = 1.5
-FACE_WIDTH = 7.2113
+FACE_WIDTH = 7.2048  # exp m0.5: 14.1 - cone FACE_WIDTH 6.8952 (stack joint kept)
 FACE_WIDTH_BAND = (0.025, -0.025)
 # The centre sits CENTRE_SHIFT_NORTH north of the 19.9 layout station.
 CENTRE_SHIFT_NORTH = SOUTH_FACE_SHIFT_NORTH + (FACE_WIDTH - LAYOUT_FACE_WIDTH) / 2.0

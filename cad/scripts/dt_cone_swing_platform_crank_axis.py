@@ -27,7 +27,7 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 # in the assembly.
 #
 # Restored frame line: pivot.x - X_CRANK east, Y_CRANK - Y_BASE_TOP up.
-CRANK_AXIS_OFF = 41.6536661190548
+CRANK_AXIS_OFF = 40.87630269309503  # exp m0.5: the 12.27-deg incline moves the post
 CRANK_AXIS_Y = 79.05
 if CRANK_AXIS_OFF <= 0 or CRANK_AXIS_Y <= 0:
     raise AssertionError("swing platform crank axis must lie east and above the pivot")

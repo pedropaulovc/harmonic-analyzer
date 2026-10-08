@@ -298,7 +298,7 @@ def gap_area_in_disc_ext(
 from involute_gear import gap_area_in_disc as _gap_area_plain  # noqa: E402
 
 for _t, _dp in ((16, 24.74), (64, 24.74), (12, 12.7)):
-    _a, _b = gap_area_in_disc_ext(_t, dp=_dp), _gap_area_plain(_t, dp=_dp)
+    _a, _b = gap_area_in_disc_ext(_t, dp=_dp), _gap_area_plain(_t, dp=_dp, pa_deg=14.5)
     if abs(_a - _b) > 1e-9:
         raise AssertionError(f"gap_area_in_disc_ext drifted at T{_t}: {_a} vs {_b}")
 

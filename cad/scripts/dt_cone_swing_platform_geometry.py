@@ -49,7 +49,7 @@ if abs(PLATE_T - PIVOT_BEARING_RELIEF_DEPTH - PIVOT_BEARING_THICKNESS) > 1e-9:
         "pivot bearing relief no longer leaves its specified thickness"
     )
 
-INCLINE_DEG = 12.5182  # cone-axis plan incline (the assembly's ROT_Y_INCLINE)
+INCLINE_DEG = 12.2729  # cone-axis plan incline (the assembly's ROT_Y_INCLINE); exp m0.5
 _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
 

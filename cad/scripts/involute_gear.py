@@ -34,7 +34,7 @@ import _telemetry
 from _common import _early_bound, _read_member, check
 
 DP = _config.machine("gear_train", "diametral_pitch")  # cad/config/machine.yaml (DIMENSIONS.md ch12)
-PA_DEG = 14.5  # pressure angle, period-typical assumption (low)
+PA_DEG = float(_config.machine("gear_train", "pressure_angle_deg"))  # train pressure angle
 
 PI_LIT = "3.14159265358979"  # literal pi for equation-manager expressions
 

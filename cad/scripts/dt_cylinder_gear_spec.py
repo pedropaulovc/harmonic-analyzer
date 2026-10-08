@@ -21,11 +21,11 @@ MM_PER_IN = 25.4
 # --- gear tooth system (build_dt_cylinder_gear.py / gear_train.yaml) ------------
 TEETH = 120
 DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
-PRESSURE_ANGLE_DEG = 14.5
+PRESSURE_ANGLE_DEG = float(_config.machine("gear_train", "pressure_angle_deg"))
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH  # 0.510
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN  # 61.18
 OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN  # 62.20
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN  # 1.10
+WHOLE_DEPTH = 2.25 * MODULE_MM  # exp m0.5: standard metric full depth (1.125)
 
 # --- machinable blank (build_dt_cylinder_gear.py) ------------------------------
 BORE_DIAMETRAL_CLEARANCE_MM = (0.030, 0.070)  # (minimum, maximum), matched fit

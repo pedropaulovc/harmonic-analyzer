@@ -2372,6 +2372,10 @@ for _name, _worst, _stated in (
         T120_TURNED_BAND_RADIAL_STATED_WORST,
     ),
 ):
+    # exp m0.5: the smaller T120 (OD 61.37) clears the 16T outright, so the
+    # named exception's stated figures no longer apply.
+    if math.isinf(_worst) or _worst >= T120_TURNED_BAND_RADIAL_FLOOR:
+        continue
     if not math.isclose(math.floor(_worst * 100.0) / 100.0, _stated):
         raise AssertionError(
             f"16T {_name} to T120 is {_worst:.4f} mm at the worst fit offsets and poses; "
@@ -3134,7 +3138,7 @@ from pinion_rig_park_geometry import (  # noqa: E402
 )
 from pinion_rig_park_geometry import pin_line_dist as _pin_line_dist  # noqa: E402
 
-_APINION_PA = math.radians(14.5)  # dt_alignment_pinion_spec PRESSURE_ANGLE_DEG
+_APINION_PA = math.radians(float(_config.machine("gear_train", "pressure_angle_deg")))
 _APINION_BASE_R = APINION_TEETH / DP_TRAIN * 25.4 * math.cos(_APINION_PA) / 2.0
 _APINION_HALF_GAP = math.pi / APINION_TEETH - (
     math.pi / (2.0 * APINION_TEETH) + math.tan(_APINION_PA) - _APINION_PA

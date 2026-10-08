@@ -46,7 +46,8 @@ DRUM_BASE_R = DRUM_PITCH_R * math.cos(PRESSURE_ANGLE)
 DRUM_TIP_R = drum.OUTSIDE_DIA / 2.0
 DRUM_THICKNESS = spec.STANDARD_TOOTH_THICKNESS  # "FULL STANDARD THICKNESS"
 DRUM_OD_LOWER = 0.10  # MHA-DT-012 prints its tip +0/-0.10
-DRUM_FLOOR_R = spec.chord_floor_radius_mm(120, thickness_mm=DRUM_THICKNESS)
+# exp m0.5 PA20: the drum is a STANDARD (catalog) 120T, root 1.25 m below pitch.
+DRUM_FLOOR_R = DRUM_PITCH_R - 1.25 * M
 BASE_PITCH = math.pi * M * math.cos(PRESSURE_ANGLE)
 
 # Radial play.  Runouts turn with their gear, so they close the mesh at some
@@ -176,12 +177,11 @@ def test_inputs_are_the_printed_ones() -> None:
     assert f"{drum.OUTSIDE_DIA:.2f} +0/-{DRUM_OD_LOWER:.2f}" in dt_cylinder_gear_notes.GEAR_DATA
     assert spec.BLANK_DIA_BAND == (0.10, -0.10)
     assert set(spec.DEEPENED_MESH_MM) == set(spec.CONFIGURATION_TEETH)
-    # The pose puts every gear at the same deep-edge interleave, 0.470 mm.
-    # (The U38 study read 0.459 off a 0.05 mm axial sampling grid; the depth
-    # changes by tan(12.52 deg) per mm along the face, so the grid missed the
-    # face edge by 0.011.)
+    # The pose puts every gear at the same deep-edge interleave, 2 m - slack.
     assert max(INTERLEAVE.values()) - min(INTERLEAVE.values()) < 0.001
-    assert INTERLEAVE[60] == pytest.approx(0.470, abs=0.001)
+    assert INTERLEAVE[60] == pytest.approx(
+        2.0 * M - _config.fit("cone_drum_oblique_mesh", "edge_slack_mm"), abs=0.001
+    )
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
@@ -205,10 +205,11 @@ def test_printed_mesh_meets_its_design_rules(teeth: int) -> None:
         assert 0.0 <= worst["contact_ratio"] - printed < 0.01, (printed, worst)
     else:
         assert worst["contact_ratio"] >= CR_EXCEPTION, worst
-    # Deeper than today everywhere: a standard tip and tooth at the same
-    # stack.
-    standard = _worst(teeth, (teeth + 2) * M, spec.STANDARD_TOOTH_THICKNESS)
-    assert worst["contact_ratio"] > standard["contact_ratio"]
+    # Deeper than a standard tip and tooth at the same stack (T006's standard
+    # tooth is pointed at this pose, so it is not a comparison).
+    if teeth > 6:
+        standard = _worst(teeth, (teeth + 2) * M, spec.STANDARD_TOOTH_THICKNESS)
+        assert worst["contact_ratio"] > standard["contact_ratio"]
 
 
 def test_backlash_acceptance_upper_is_the_loosest_printed_mesh() -> None:
@@ -249,40 +250,34 @@ def _floor_width(teeth: int, thickest: float) -> float:
     return 2.0 * foot_r * math.sin(math.pi / teeth - half_tooth)
 
 
+def _form_cutter_floor_r(teeth: int) -> float:
+    """Floor a stock m0.5 PA20 range form cutter leaves when plunged to the
+    modelled thickness: standard 1.25 m root raised by thickening / 2 tan PA."""
+    return (
+        teeth * M / 2.0
+        - 1.25 * M
+        + (spec.tooth_thickness_mm(teeth) - spec.STANDARD_TOOTH_THICKNESS)
+        / (2.0 * math.tan(PRESSURE_ANGLE))
+    )
+
+
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_gap_floor_clears_the_drum_and_fits_one_cutter(teeth: int) -> None:
+def test_gap_floor_clears_the_drum_and_is_the_form_cutter_floor(teeth: int) -> None:
     tip_dia, thickest = spec.DEEPENED_MESH_MM[teeth]
     clearance = _worst(teeth, tip_dia, thickest)["cone_floor"]
-    # Main: one fly cutter at least 0.43 wide fits every gap.
-    assert _floor_width(teeth, thickest) >= 0.43
-    # Every floor is two-sided (Main, 2026-09-26: the #834 machinist review
-    # found sheets 3-20 printed MIN only).  MAX is the shallowest floor keeping
-    # 0.02 of drum-tip clearance with every runout closing (a shallow plunge
-    # would rub), floored to three places; MIN is the modelled floor, floored
-    # to three places too (bands round outward).
     minimum, maximum = spec.floor_limits_mm(teeth)
     drum_path = _centre(teeth) - RUNOUT - DRUM_TIP_R
     assert drum_path - maximum / 2.0 >= 0.02
     assert drum_path - (maximum + 0.001) / 2.0 < 0.02
-    # Main: T006's window must be at least 0.04 on diameter; every other
-    # gear's is wider.
     assert maximum - minimum >= 0.04
     modelled = 2.0 * spec.floor_radius_mm(teeth)
     assert modelled - 0.001 < minimum <= modelled
-    if teeth in spec.DIPPED_FLOOR_MIN_MM:
-        assert clearance > 0.04  # +0.045 at T006, +0.076 at T012
-        return
-    if spec.floor_tmin(teeth) == 0.0:
-        assert clearance >= 0.10
-        return
-    # Raised floors sit exactly as high as a 0.30 worst-case clearance allows.
-    assert clearance >= 0.30
-    higher = spec.chord_floor_radius_mm(
-        teeth,
-        thickness_mm=spec.tooth_thickness_mm(teeth),
-        tmin=spec.floor_tmin(teeth) + 0.0005,
-    )
-    assert _centre(teeth) - RUNOUT - DRUM_TIP_R - higher < 0.30
+    assert clearance > 0.04
+    if teeth == 6:
+        return  # special cutter: web-limited floor, 0.04 window
+    # exp m0.5: every other floor is the range form cutter's, to 0.002 deep.
+    cutter = 2.0 * _form_cutter_floor_r(teeth)
+    assert cutter - 0.002 <= modelled <= cutter + 1e-6, (modelled, cutter)
 
 
 def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:

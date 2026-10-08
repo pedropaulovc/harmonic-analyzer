@@ -342,7 +342,7 @@ if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
 # The fixed-axis tooth-in-gap seed follows the installed 64T centre; the
 # assembly asserts this cross-hole clock against its independently derived
 # seed so the shaft's radial pin hole tracks a centre-station change.
-PIN_CLOCKING_DEG = 12.037647012980765
+PIN_CLOCKING_DEG = 12.823859239401495  # exp m0.5 (moved crank axis)
 if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / 16.0:
     raise AssertionError("pinion retention-hole clocking must lie within one 16T pitch")
 # The matched-hole callout on both part records identifies both seated parts,

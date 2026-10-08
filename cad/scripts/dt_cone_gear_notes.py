@@ -21,13 +21,17 @@ CYLINDER_MATE_NUMBER = "MHA-DT-012"
 # test_cone_gear_mesh_design re-derives every value from the drive-train pose
 # and the printed bands, over exactly spec.CONTACT_RATIO_EXCEPTION_TEETH.
 WORST_CONTACT_RATIO: dict[int, float] = {
-    6: 0.17,
-    12: 0.42,
-    18: 0.60,
-    24: 0.74,
-    30: 0.86,
-    36: 0.96,
-    42: 1.05,
+    6: 0.52,
+    12: 0.68,
+    18: 0.79,
+    24: 0.86,
+    30: 0.92,
+    36: 0.97,
+    42: 1.01,
+    48: 1.05,
+    54: 1.07,
+    60: 1.08,
+    66: 1.09,
 }
 
 

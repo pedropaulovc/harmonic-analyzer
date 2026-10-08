@@ -112,7 +112,7 @@ from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
-from involute_gear import DP, gear_facts  # DP = train diametral_pitch (machine.yaml)
+from involute_gear import DP, PA_DEG, gear_facts  # DP/PA = train (gear_train.yaml)
 from dt_cylinder_gear_notes import DRAWING_NOTES, GEAR_DATA
 from dt_cylinder_gear_spec import (
     BORE_DIA as BORE_DIAMETER,
@@ -291,7 +291,7 @@ async def build(adapter) -> dict[str, str]:
     # print needs the original ±0.05 blank width.  Give the first extrusion and
     # its depth stable semantic names, then drive and tolerance that real model
     # dimension.
-    disc = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    disc = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG)
     v_teeth = disc.volume
     _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
     _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")

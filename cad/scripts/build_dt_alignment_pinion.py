@@ -65,6 +65,7 @@ from dt_alignment_pinion_spec import (
     ARBOR_BORE_BAND,
     BORE_DIA,
     DIAMETRAL_PITCH,
+    PRESSURE_ANGLE_DEG,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -101,7 +102,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     disc = await build_fixed_gear(
-        adapter, TEETH, FACE_WIDTH, dp=DIAMETRAL_PITCH
+        adapter, TEETH, FACE_WIDTH, dp=DIAMETRAL_PITCH, pa_deg=PRESSURE_ANGLE_DEG
     )
     v_gear = disc.volume
     blank_name = feature_name_by_type(adapter, "Extrusion")

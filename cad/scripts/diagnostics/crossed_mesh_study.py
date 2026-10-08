@@ -47,7 +47,8 @@ import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
 # real _common (every diag_*/probe_* script here relies on it)
 import build_dt_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
-from involute_gear import PA_DEG, gear_facts
+from involute_gear import gear_facts
+from dt_crank_pinion_spec import PRESSURE_ANGLE_DEG as PA_DEG  # crank pair, not train
 from build_dt_crank_drive_gear import BACKLASH_MM, HELIX_DEG
 from dt_crank_drive_gear_spec import LONG_ADDENDUM_MM as LONG_ADDENDUM64_MM
 from dt_crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
