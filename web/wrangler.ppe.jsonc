@@ -17,6 +17,6 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": false
+    "run_worker_first": ["/models/ha-harmonic-analyzer.glb"]
   }
 }
