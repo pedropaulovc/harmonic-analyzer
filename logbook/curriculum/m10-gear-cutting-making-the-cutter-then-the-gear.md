@@ -48,7 +48,7 @@ A cut gear that meshes with its mate through a full rotation with no tight spot,
 
 ## Notes
 
-**The long pole of the entire project.** 60 h is a guess and probably low. The T006 gear (~4.16 mm OD, Ø1.5875 mm bore, **0.354 mm root-to-bore web** at the largest allowed bore) is the single hardest part in the machine — treat reaching it as a separate milestone, and cut a first article long before committing the set.
+**The long pole of the entire project.** 60 h is a guess and probably low. The T006 gear (about 4 mm OD, 1/32 in (Ø0.794 mm) bore, **0.7485 mm minimum root-to-bore web**) is the single hardest part in the machine — treat reaching it as a separate milestone, and cut a first article long before committing the set.
 
 ## Sessions
 

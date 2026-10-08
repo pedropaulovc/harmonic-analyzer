@@ -5,9 +5,9 @@ carefully are the ones who back at the top tiers.
 
 ## Technical
 
-**The six-tooth cone gear may not be machinable in my shop.** It is a ~4.16 mm
-outside diameter gear on a 1/16 in (1.59 mm) bore, leaving about 0.35 mm of metal
-between tooth root and bore. `cad/docs/machining-dfm.md` calls it the single hardest part in the machine.
+**The six-tooth cone gear may not be machinable in my shop.** It is a gear about 4 mm
+across on a 1/32 in (0.79 mm) bore, leaving about 0.75 mm of metal between
+tooth root and bore. `cad/docs/machining-dfm.md` calls it the single hardest part in the machine.
 *Mitigation:* the original used a harder yellow metal for the tip gears; if my
 first articles fail, the book documents the failure and the fallback (outsourced
 wire-EDM), which is itself useful to a reader. **The book ships either way.**

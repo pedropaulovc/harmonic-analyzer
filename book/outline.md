@@ -76,7 +76,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 |---|---|---|
 | 20 | Frame and base | `fr-harmonic-base`, `fr-tube-frame`, `fr-top-frame`, `pd-support-bar`, `fr-rocker-arm-support`, feet |
 | 21 | The crank and drive train | `dt-crank-arm`, `dt-crank-handle`, `dt-crank-pin`, `dt-crankshaft`, `dt-crank-drive-gear`, `dt-crank-pinion` |
-| 22 | **The cone gear set** | `dt-cone-gear` ×20 (T006–T120), `dt-cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.354 mm minimum root-to-bore wall on its Ø1.5875 mm round bore. |
+| 22 | **The cone gear set** | `dt-cone-gear` ×20 (T006–T120), `dt-cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.7485 mm minimum root-to-bore web on its 1/32 in (Ø0.794 mm) bore. |
 | 23 | The cylinder gear set | `dt-cylinder-gear` ×20 with integral eccentric cam and 0.4 mm index notch; `dt-cylinder-gear-shaft`, `dt-arbor-pedestal` |
 | 24 | The alignment pinion | `dt-alignment-pinion`, `dt-pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
 | 25 | A channel, twenty times | `ch-connecting-rod`, `ch-rocker-arm`, `ch-amplitude-bar`, `ch-channel-lever`, `pivot-bushing`, `lever-bushing`, springs. Batch strategy: how to make twenty identical things by hand without drift. |

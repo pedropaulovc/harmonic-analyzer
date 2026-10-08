@@ -86,7 +86,7 @@
 
 **The gap this fills:** the visual tour exists, the primary source exists, the
 machining tradition exists. The bridge — *here is how you actually cut a
-six-tooth gear with 0.35 mm of metal under its teeth* — does not.
+six-tooth gear with 0.75 mm of metal under its teeth* — does not.
 
 ## Proof points to lead with (all verifiable today)
 
@@ -103,6 +103,6 @@ six-tooth gear with 0.35 mm of metal under its teeth* — does not.
 
 ## Tone
 
-Machinist-to-machinist. Specific numbers over adjectives. Show the 0.35 mm web
+Machinist-to-machinist. Specific numbers over adjectives. Show the 0.75 mm web
 and say "this is the part that will beat you", not "an exciting challenge
 awaits". Admit what isn't solved.

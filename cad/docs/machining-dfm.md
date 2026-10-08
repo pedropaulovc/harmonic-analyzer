@@ -15,9 +15,9 @@ geometry is casting-shaped, not milling-shaped.
 ## The headlines (read these first)
 
 - **Three parts carry the whole risk. Everything else is generous.**
-  1. **`dt-cone-gear` T006** — nominal root-to-bore wall **0.379 mm** on a **~4.16 mm OD / Ø1.588 mm bore** gear
-     (**0.354 mm** at the maximum allowed bore). The earlier 0.621 mm web was the user-ruled named
-     exception (U40); the thinner 48DP PA20 web is still awaiting that ruling ([`gear-standard.md`](./gear-standard.md#what-it-costs)).
+  1. **`dt-cone-gear` T006** — minimum root-to-bore web **0.7485 mm** on a **~4 mm OD gear with a 1/32 in (Ø0.794 mm) bore**.
+     The terminal journal was cut to 1/32 in so the 48DP PA20 gap floor keeps at least the 0.62 mm
+     web floor ([`gear-standard.md`](./gear-standard.md#what-it-costs)).
      The single hardest part in the machine. These teeth are cut as involute flanks closed by a gap
      floor printed as a MIN diameter; T006's floor is Ø2.346 MIN / Ø2.406 MAX. After a forced T006
      rebuild, `build_dt_cone_gear.py` measures the native floor edges and requires them at the printed
@@ -114,7 +114,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`dt-cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, long-addendum OD printed per gear at 48DP → **4.16 (T006) → 64.85 (T120)**; tip gears T006–T024 harder yellow metal | D-bore matching the land's single +X flat, clocked to the phase-0 tooth: round seat Ø by config (T006/T012 1.5875, T018 3.175, T024 6.350, T030+ 9.525); bore AF +0.010/+0.020 over shaft nominal AF (0.01–0.03 clearance), diametral slip clearance 0.025–0.105; 6–120 involute teeth PA20, 2.5D through-cut | **T006 wall 0.379 mm nominal / 0.354 mm at maximum round bore** (the flat cuts inward from that circle; web ruling open, see [`gear-standard.md`](./gear-standard.md#what-it-costs)); whole gear tiny → difficult workholding, especially forming and gauging the D without damaging the teeth | ≥2 (turn/bore, indexed teeth, plus D-bore finishing) | stock 48DP PA20 range cutter per gear, **indexed** (see [Cutter plan](#cutter-plan)); T006 needs a special cutter ground to its gap form; form the bore flat to the AF gauge (filing or broaching is a hobby-shop possibility, not a selected route; EDM or a D-shaped punch needs process/fixture approval). Measure all 20 touching faces as a stack: **137.512 ±0.20** |
+| **`dt-cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face **6.8756 ±0.025** each, OD printed per gear at 48DP, solved against the stock-form drum (`dt_cone_gear_spec.py`); tip gears T006–T024 harder yellow metal | D-bore matching the land's single +X flat, clocked to the phase-0 tooth: round seat Ø by config (T006/T012 1.5875, T018 3.175, T024 6.350, T030+ 9.525); bore AF +0.010/+0.020 over shaft nominal AF (0.01–0.03 clearance), diametral slip clearance 0.025–0.105; 6–120 involute teeth PA20, 2.5D through-cut | **T006 web 0.7485 mm minimum** on the 1/32 in bore (the flat cuts inward from that circle; see [`gear-standard.md`](./gear-standard.md#what-it-costs)); whole gear tiny → difficult workholding, especially forming and gauging the D without damaging the teeth | ≥2 (turn/bore, indexed teeth, plus D-bore finishing) | stock 48DP PA20 range cutter per gear, **indexed** (see [Cutter plan](#cutter-plan)); T006 needs its named special cutter (DT6-FORM1, a fly cutter ground to its gap form); form the bore flat to the AF gauge (filing or broaching is a hobby-shop possibility, not a selected route; EDM or a D-shaped punch needs process/fixture approval). Measure all 20 touching faces as a stack: **137.512 ±0.20** |
 | **`dt-cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2308 post journal, thrust collar then Ø9.525→6.35→3.175→1.5875 gear lands | turned steps plus **one milled +X D-flat on each gear land**, nominal AF **8.763/5.842/2.921/1.460** respectively, each +0/−0.010; the Ø1.5875 flat continues through the tip end and the MHA-VN-016 stack collar's set screw locks on it. Finish the post journal for 0.05 diametral clearance | slender terminal land needs tailstock support; flat machining adds an indexed milling setup and inspection against the mating D-bores | lathe + at least 1 indexed milling setup | manual lathe **+ steady/follower**, then mill/gauge the co-clocked flats; do not leave a round section under the MHA-VN-016 collar |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
@@ -192,7 +192,7 @@ steps instead of one big engagement.
   the **majority of tool-access & gouge issues is reasonable** — it's a real simulation, not a
   rule-of-thumb checker.
   - **But its blind spot is exactly where the worst risk lives.** Fusion treats geometry as **rigid**
-  and stock as **held**, so it will *not* warn that the **T006 web (0.354 mm minimum)** breaks in
+  and stock as **held**, so it will *not* warn that the **T006 web (0.7485 mm minimum)** breaks in
   workholding, the **Ø1.5875 mm slender shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
   a ~4 mm gear can't be gripped. Thin-wall / fragile-feature / fixturing failures are not modelled
   by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**
@@ -281,8 +281,8 @@ teeth is possible in principle, but the part is not designed around it.
 
 ### T006 special cutter
 
-No range cutter reaches 6 teeth, so T006 still needs a cutter made in the shop, ground to its gap
-form. The Eureka (button-tool) method in `references/gears-and-gear-cutting/` ch. 12 is the
+No range cutter reaches 6 teeth, so T006 needs a cutter made in the shop: DT6-FORM1, a single-point
+fly cutter ground to its gap form. The Eureka (button-tool) method in `references/gears-and-gear-cutting/` ch. 12 is the
 documented way to make one. The terminal journal was redesigned so the root-to-bore web is at least
 0.62 mm; see [`gear-standard.md`](./gear-standard.md#what-it-costs).
 

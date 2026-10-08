@@ -188,7 +188,8 @@ The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
 - The 6T cone still needs a cutter you make. No ordinary cutter range reaches
   6 teeth. In the first 48DP study its root-to-bore web fell from 0.621 mm to
   0.354 mm, because the PA20 gap floor sits lower. The terminal journal was
-  then redesigned so the web is at least 0.62 mm again.
+  then cut to 1/32 in, which restores a 0.7485 mm minimum web. Its cutter is a
+  named single-point fly cutter, DT6-FORM1.
 - The 64T crank gear is a true helix. Cutting it needs a spiral-capable
   universal dividing head geared to the table leadscrew (lead 945.86 mm per
   turn). A plain or semi-universal indexing head cannot do it; the shop's
