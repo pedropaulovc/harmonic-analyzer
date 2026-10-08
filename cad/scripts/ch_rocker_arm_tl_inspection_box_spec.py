@@ -30,13 +30,12 @@ model (x, -z, y).
 
 from __future__ import annotations
 
-import _config
 import ch_rocker_arm_spec as rocker
 import ch_rocker_arm_tl_c_stop_bar_spec as bar
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import ConeFace, CylinderFace, PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 
 INCH = 25.4
 # Bought Suburban Tool BXP-050505-G (A = B = C = 5 in, D = 11/16 in).
@@ -119,8 +118,8 @@ DRAWING_NOTES = (
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:3"
 
-_DRILLED = _config.title_block("drilled_hole")
-DRILLED_BAND = (float(_DRILLED["plus_mm"]), -float(_DRILLED["minus_mm"]))
+# Title-block DRILLED HOLES: plus allowance, zero minus (_printed_tolerance).
+DRILLED_BAND = (drilled_oversize_mm(), 0.0)
 DRILL_POINT_HALF_ANGLE = 59.0  # Hole Wizard blind drill point, 118 degrees
 
 
