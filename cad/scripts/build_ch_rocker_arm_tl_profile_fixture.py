@@ -8,8 +8,9 @@ Layout (rocker frame A, the spec's frame): the pads, the stand and the plate
 are sketched on the hidden ``PadTop`` plane -- the pad reference -- and built
 down from it, so the plate's and the stand's start offsets ARE the printed
 drops below the pad tops. The rail rests, which seat on their pocket floors,
-are sketched on the hidden ``PlateTop`` plane and built both ways from it, so
-their height above it is the printed rest-top height. Every cut is sketched on
+are sketched on the hidden ``PlateTop`` plane and built down from a start
+offset above it, so that offset is the printed rest-top height and the depth
+the rest's scheduled height. Every cut is sketched on
 ``PlateTop`` and cut into the plate. The bonded parts are separate bodies,
 built after every cut and hole so no cut ever reaches them.
 
@@ -21,6 +22,7 @@ Run (SolidWorks already open)::
 from __future__ import annotations
 
 import math
+import re
 import sys
 
 from _common import (
@@ -28,10 +30,12 @@ from _common import (
     _early_bound,
     _read_member,
     add_line_chain,
+    anchor_point_to_origin,
     apply_material,
     check,
     define_circle,
     define_rectilinear_chain,
+    dimension_between,
     ensure_fully_defined,
     extrude_at_offset,
     feature_name_by_type,
@@ -64,6 +68,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     DRAWING_PRECISION,
     EXPLICIT_SYMMETRIC_TOLERANCES_MM,
     FEATURE_SCHEDULE,
+    FEATURE_SCHEDULE_HEADER,
     HOLD_DOWN_CBORE_DEPTH,
     HOLD_DOWN_CBORE_DIA,
     HOLD_DOWN_CLEARANCE_DIA,
@@ -80,6 +85,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     PAD_TOP_Z,
     PADS,
     PART_SCHEDULE,
+    PART_SCHEDULE_HEADER,
     PIVOT_TAP_DRILL_DIA,
     PIVOT_TAP_SPEC,
     PLATE_DROP,
@@ -107,6 +113,8 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     STAND_POCKET_DEPTH,
     STAND_POCKET_DIA,
     STAND_TOP_Z,
+    part_dimension_names,
+    pocket_dimension_names,
 )
 
 PART_NAME = "ch-rocker-arm-tl-profile-fixture"
@@ -143,17 +151,89 @@ def _rect_points(cx: float, cy: float, length: float, width: float) -> list[tupl
     return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
 
 
-async def _rect_sketch(adapter, plane: str, rects, *, label: str, profile: str) -> None:
-    """One sketch of axis-parallel rectangles, each anchored at its south-west
-    corner (unprinted: the schedules carry the locations)."""
-    check(f"create_sketch {label}", await adapter.create_sketch(plane))
+async def _construction_line(adapter, start: tuple[float, float], end: tuple[float, float], label: str) -> str:
+    """A construction line placed without inference: an end on an existing
+    vertex merges with it, as ``add_line_chain`` closes its loop."""
+    sketch_mgr = adapter.currentSketchManager
+    previous_add_to_db = bool(sketch_mgr.AddToDB)
+    sketch_mgr.AddToDB = True
+    try:
+        line_id = check(f"add construction line {label}", await adapter.add_line(*start, *end))
+        # ConstructionGeometry is declared on ISketchSegment, not ISketchLine.
+        _early_bound(adapter._sketch_entities[line_id], "ISketchSegment").ConstructionGeometry = True
+    finally:
+        sketch_mgr.AddToDB = previous_add_to_db
+    return line_id
+
+
+async def _centred_rect(
+    adapter, cx: float, cy: float, length: float, width: float, *, label: str, dims: SketchDims,
+    names: tuple[str, str, str, str],
+) -> None:
+    """An axis-parallel rectangle driven by exactly what its schedule row
+    prints: length, width and centre (``names`` in that order: centre X,
+    centre Y, length, width). A construction diagonal carries the centre as
+    the midpoint of a construction half-diagonal's start, and the centre is
+    dimensioned from the origin (the locating-bore axis)."""
+    if abs(cx) < 1e-9 or abs(cy) < 1e-9:
+        raise ValueError(f"{label}: a scheduled centre on an axis has one anchor dimension")
+    x_name, y_name, length_name, width_name = names
+    points = _rect_points(cx, cy, length, width)
+    lines = await add_line_chain(adapter, points)
+    for line, direction in zip(lines, ("horizontal", "vertical") * 2, strict=True):
+        check(
+            f"{label} {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    await dimension_between(
+        adapter, f"{lines[0]}.start", f"{lines[0]}.end", "horizontal_distance", length, f"{label} length"
+    )
+    await dimension_between(
+        adapter, f"{lines[1]}.start", f"{lines[1]}.end", "vertical_distance", width, f"{label} width"
+    )
+    diagonal = await _construction_line(adapter, points[0], points[2], f"{label} diagonal")
+    centre = await _construction_line(adapter, (cx, cy), points[1], f"{label} centre")
+    check(
+        f"{label} centre at the diagonal's midpoint",
+        await adapter.add_sketch_constraint(f"{centre}.start", diagonal, "midpoint"),
+    )
+    await anchor_point_to_origin(adapter, f"{centre}.start", cx, cy, f"{label} centre")
+    for name in (length_name, width_name, x_name, y_name):
+        dims.record(name)
+
+
+async def _pocket_sketch(adapter, rects, *, label: str, profile: str) -> None:
+    """One sketch of scheduled pockets, each driven by its schedule row."""
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch(PLATE_PLANE))
     for tag, cx, cy, length, width in rects:
-        points = _rect_points(cx, cy, length, width)
-        lines = await add_line_chain(adapter, points)
-        await define_rectilinear_chain(adapter, lines, points, label=f"{label} {tag}")
+        await _centred_rect(
+            adapter, cx, cy, length, width, label=f"{label} {tag}", dims=dims,
+            names=pocket_dimension_names(tag),
+        )
     await ensure_fully_defined(adapter, f"{label} sketch")
     check(f"exit_sketch {label}", await adapter.exit_sketch())
     name_last_feature(adapter, profile)
+    dims.apply(adapter, profile)
+
+
+async def _part_sketch(adapter, plane: str, parts, *, label: str, profile: str, part: str) -> None:
+    """One sketch of bonded parts, each anchored at its south-west corner (an
+    unprinted location: each part is centred in its pocket) and driven by the
+    length and width the part schedule prints."""
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch(plane))
+    for tag, cx, cy, length, width in parts:
+        points = _rect_points(cx, cy, length, width)
+        lines = await add_line_chain(adapter, points)
+        await define_rectilinear_chain(
+            adapter, lines, points, label=f"{label} {tag}", dims=dims,
+            names=list(part_dimension_names(tag, part)),
+        )
+    await ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    name_last_feature(adapter, profile)
+    dims.apply(adapter, profile)
 
 
 async def _circle_sketch(adapter, plane: str, x: float, y: float, dia: float, *, profile: str, names) -> None:
@@ -166,31 +246,32 @@ async def _circle_sketch(adapter, plane: str, x: float, y: float, dia: float, *,
     dims.apply(adapter, profile)
 
 
-def _extrude_both_ways(adapter, up: float, down: float) -> str:
-    """Boss-extrude the last exited sketch ``up`` along its plane's normal and
-    ``down`` against it (mm), as new bodies: a part seated in a pocket of the
-    sketch plane's face, its own dimensions the height above that face and the
-    depth into it. Raw ``FeatureExtrusion3`` (``Sd=False``), as
-    ``_common.extrude_at_offset`` for the start-offset case."""
+def _extrude_down_from_offset(adapter, height: float, top: float) -> str:
+    """Boss-extrude the last exited sketch as new bodies that start ``top``
+    above its plane (a start offset along the normal) and run ``height`` back
+    down through it: a part seated in a pocket of the sketch plane's face, its
+    own dimensions its height and its top above that face. Raw
+    ``FeatureExtrusion3``, as ``_common.extrude_at_offset``, whose single flip
+    turns the offset and the direction together."""
     from solidworks_mcp.adapters.pywin32_adapter import null_callout
 
     sketch_name = feature_name_by_type(adapter, "ProfileFeature")
     if not sketch_name:
-        raise RuntimeError("_extrude_both_ways: no sketch found to consume")
+        raise RuntimeError("_extrude_down_from_offset: no sketch found to consume")
     model = adapter.currentModel
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
         sketch_name, "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
     ):
-        raise RuntimeError(f"_extrude_both_ways: cannot select sketch {sketch_name!r}")
+        raise RuntimeError(f"_extrude_down_from_offset: cannot select sketch {sketch_name!r}")
     feature = model.FeatureManager.FeatureExtrusion3(
-        False,  # Sd: both directions
+        True,  # Sd: single direction
         False,  # Flip side to cut
-        False,  # Dir: direction 1 along the plane normal
+        True,  # Dir: against the plane normal (down)
         0,  # T1: swEndCondBlind
-        0,  # T2: swEndCondBlind
-        up / 1000.0,  # D1
-        down / 1000.0,  # D2
+        0,  # T2
+        height / 1000.0,  # D1
+        0.0,  # D2
         False,
         False,  # Dchk1/2
         False,
@@ -204,13 +285,13 @@ def _extrude_both_ways(adapter, up: float, down: float) -> str:
         False,  # Merge: separate bonded bodies
         False,  # UseFeatScope
         True,  # UseAutoSelect
-        0,  # T0: swStartSketchPlane
-        0.0,  # StartOffset
-        False,  # FlipStartOffset
+        3,  # T0: swStartOffset
+        top / 1000.0,  # StartOffset
+        False,  # FlipStartOffset: along the plane normal (up)
     )
     model.ClearSelection2(True)
     if feature is None:
-        raise RuntimeError("_extrude_both_ways: FeatureExtrusion3 returned None")
+        raise RuntimeError("_extrude_down_from_offset: FeatureExtrusion3 returned None")
     return str(_read_member(feature, "Name"))
 
 
@@ -225,10 +306,10 @@ def _require_dimension(adapter, full_name: str, mm: float) -> None:
 
 
 def _require_rest_tops(adapter) -> None:
-    """Each rail rest spans its pocket floor to REST_TOP_Z: the two-way
-    extrude's direction 1 must be the plate top's outward normal. The body
-    box is approximate (IBody2.GetBodyBox), so 0.25 mm; reversed, the rest
-    would end 2 mm off at both faces."""
+    """Each rail rest spans its pocket floor to REST_TOP_Z: the start offset
+    must run along the plate top's outward normal and the depth back down. The
+    body box is approximate (IBody2.GetBodyBox), so 0.25 mm; flipped, the rest
+    would end well off at both faces."""
     boxes = [
         tuple(float(value) * 1000.0 for value in _early_bound(body, "IBody2").GetBodyBox())
         for body in _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ()
@@ -329,11 +410,17 @@ def _require_hole(cylinders, label: str, cx: float, cy: float, dia: float) -> No
         raise RuntimeError(f"{label}: no vertical bore {want} in the model, as the schedule prints")
 
 
-def _model_banded_cell(adapter, feature_name: str, dimension_name: str) -> str:
-    """A symmetric-banded dimension as the model owns it: its value at its
-    authored places and its native tolerance at the tolerance places."""
+def _model_cell(adapter, feature_name: str, dimension_name: str) -> str:
+    """A scheduled dimension as the model owns it: its value at its authored
+    places and, for a natively banded one, its symmetric tolerance at the
+    tolerance places. A sketch distance holds no sign; the cell's sign is the
+    side the face readback proves."""
     display, dimension = _named_dimension(adapter, feature_name, dimension_name)
     display = _early_bound(display, "IDisplayDimension")
+    value = abs(float(_read_member(dimension, "SystemValue")) * 1000.0)
+    text = f"{value:.{int(display.GetPrimaryPrecision2())}f}"
+    if (feature_name, dimension_name) not in EXPLICIT_SYMMETRIC_TOLERANCES_MM:
+        return text
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     label = f"{dimension_name}@{feature_name}"
     if int(tolerance.Type) != 4:  # swTolType_e.swTolSYMMETRIC
@@ -341,30 +428,43 @@ def _model_banded_cell(adapter, feature_name: str, dimension_name: str) -> str:
     plus = float(tolerance.GetMaxValue()) * 1000.0
     if abs(float(tolerance.GetMinValue()) * 1000.0 + plus) > 1e-9:
         raise RuntimeError(f"{label}: model tolerance is not symmetric")
-    value = float(_read_member(dimension, "SystemValue")) * 1000.0
-    places = int(display.GetPrimaryPrecision2())
-    plus_places = int(display.GetPrimaryTolPrecision2())
-    return f"{value:.{places}f} \u00b1{plus:.{plus_places}f}"
+    return f"{text} \u00b1{plus:.{int(display.GetPrimaryTolPrecision2())}f}"
+
+
+def _cell_number(cell: str) -> str:
+    """A cell's number as the model states it: no sign, no "OD "/"DRILL Ø"."""
+    return re.sub(r"^\D+", "", cell)
 
 
 def _require_schedules(adapter, hole_dias: dict[str, float]) -> None:
-    """Every row of the printed schedules is geometry of the built model:
-    pocket floors (centre, length, width, depth), hole axes (centre, at the
-    cut diameter ``hole_dias`` gives per feature), bonded-part tops and
-    undersides (length, width, height, centred in their pockets) and the hub
-    stand's drilled bore. A banded cell is the model dimension's own value,
-    places and native band (policy rule 2)."""
+    """Every number in the printed schedules is a model dimension's own value,
+    places and native band (policy rule 2), and every row is geometry of the
+    built model: pocket floors (centre, length, width, depth), hole axes
+    (centre, at the cut diameter ``hole_dias`` gives per feature), bonded-part
+    tops and undersides (length, width, height, centred in their pockets) and
+    the hub stand's drilled bore."""
+    cells = {
+        (schedule, row[0], column): text
+        for schedule, header, rows in (
+            ("FEATURE", FEATURE_SCHEDULE_HEADER, FEATURE_SCHEDULE),
+            ("PART", PART_SCHEDULE_HEADER, PART_SCHEDULE),
+        )
+        for row in rows
+        for column, text in zip(header, row, strict=True)
+    }
+    for key, owners in SCHEDULE_CELL_DIMENSIONS.items():
+        for feature_name, dimension_name in owners:
+            model = _model_cell(adapter, feature_name, dimension_name)
+            if model != _cell_number(cells[key]):
+                raise RuntimeError(
+                    f"{' '.join(key)} prints {cells[key]!r}; "
+                    f"{dimension_name}@{feature_name} owns {model!r}"
+                )
     extents, cylinders = _schedule_faces(adapter)
     pockets = {}
     for tag, feature, x, y, length, width, depth in FEATURE_SCHEDULE:
-        for cell, (feature_name, dimension_name) in zip(
-            (x, y), SCHEDULE_CELL_DIMENSIONS.get(tag, ()), strict=False
-        ):
-            model = _model_banded_cell(adapter, feature_name, dimension_name)
-            if model != cell:
-                raise RuntimeError(f"{tag} prints {cell!r}; the model owns {model!r}")
-        # A banded coordinate ("133.067 ±0.015") locates at its nominal.
-        cx, cy = (float(value.split()[0]) for value in (x, y))
+        # Bore L is the origin; a banded coordinate locates at its nominal.
+        cx, cy = (0.0 if value == "-" else float(value.split()[0]) for value in (x, y))
         if not feature.endswith("POCKET"):
             _require_hole(cylinders, f"{tag} {feature.lower()}", cx, cy, hole_dias[feature])
             continue
@@ -373,12 +473,10 @@ def _require_schedules(adapter, hole_dias: dict[str, float]) -> None:
         _require_face(extents, f"{tag} pocket floor", floor, cx, cy, float(length), float(width))
     for tags, part, _stock, length, width, height in PART_SCHEDULE:
         if part == "HUB STAND":
-            od = float(length.removeprefix("OD "))
+            od = float(_cell_number(length))
             for z, end in ((STAND_TOP_Z, "top"), (STAND_TOP_Z - float(height), "foot")):
                 _require_face(extents, f"hub stand {end}", z, 0.0, 0.0, od, od)
-            _require_hole(
-                cylinders, "hub stand bore", 0.0, 0.0, float(width.removeprefix("DRILL \u00d8"))
-            )
+            _require_hole(cylinders, "hub stand bore", 0.0, 0.0, float(_cell_number(width)))
             continue
         top = PAD_TOP_Z if part == "PAD" else REST_TOP_Z
         for tag in tags.split(", "):
@@ -437,12 +535,13 @@ async def build(adapter) -> dict[str, str]:
         (PAD_POCKETS, PAD_POCKET_DEPTH, "pad pockets", "PadPocketProfile", "PadPockets"),
         (REST_POCKETS, REST_POCKET_DEPTH, "rest pockets", "RestPocketProfile", "RestPockets"),
     ):
-        await _rect_sketch(adapter, PLATE_PLANE, rects, label=label, profile=profile)
+        await _pocket_sketch(adapter, rects, label=label, profile=profile)
         check(
             f"cut {label}",
             await adapter.create_cut_extrude(ExtrusionParameters(depth=depth)),
         )
         name_last_feature(adapter, feature)
+        name_dimensions(adapter, feature, [f"{feature.removesuffix('s')}Depth"])
         removed = sum(length * width * depth for _t, _x, _y, length, width in rects)
         volume = await volume_check(adapter, label, volume - removed, 0.01 * removed)
 
@@ -555,14 +654,7 @@ async def build(adapter) -> dict[str, str]:
     _require_bodies(adapter, 1, label="machined plate")
 
     # Bonded parts: separate bodies, each top on its reference.
-    check("create_sketch pads", await adapter.create_sketch(PAD_PLANE))
-    for tag, cx, cy, length, width in PADS:
-        points = _rect_points(cx, cy, length, width)
-        lines = await add_line_chain(adapter, points)
-        await define_rectilinear_chain(adapter, lines, points, label=f"pad {tag}")
-    await ensure_fully_defined(adapter, "pads sketch")
-    check("exit_sketch pads", await adapter.exit_sketch())
-    name_last_feature(adapter, "PadProfile")
+    await _part_sketch(adapter, PAD_PLANE, PADS, label="pads", profile="PadProfile", part="Pad")
     check(
         "extrude pads",
         await adapter.create_extrusion(
@@ -600,19 +692,13 @@ async def build(adapter) -> dict[str, str]:
 
     # Rail rests seat on their pocket floors: sketched on the plate top, each
     # stands RestTopHeight above it and runs its pocket depth down to the floor.
-    check("create_sketch rests", await adapter.create_sketch(PLATE_PLANE))
-    for tag, cx, cy, length, width in RESTS:
-        points = _rect_points(cx, cy, length, width)
-        lines = await add_line_chain(adapter, points)
-        await define_rectilinear_chain(adapter, lines, points, label=f"rest {tag}")
-    await ensure_fully_defined(adapter, "rests sketch")
-    check("exit_sketch rests", await adapter.exit_sketch())
-    name_last_feature(adapter, "RestProfile")
-    _extrude_both_ways(adapter, REST_TOP_HEIGHT, REST_POCKET_DEPTH)
+    await _part_sketch(adapter, PLATE_PLANE, RESTS, label="rests", profile="RestProfile", part="Rest")
+    _extrude_down_from_offset(adapter, REST_HEIGHT, REST_TOP_HEIGHT)
     name_last_feature(adapter, "Rests")
-    name_dimensions(adapter, "Rests", ["RestTopHeight", "RestSeatDepth"])
+    # Offset bosses expose depth first and start offset second.
+    name_dimensions(adapter, "Rests", ["RestHeight", "RestTopHeight"])
+    _require_dimension(adapter, "RestHeight@Rests", REST_HEIGHT)
     _require_dimension(adapter, "RestTopHeight@Rests", REST_TOP_HEIGHT)
-    _require_dimension(adapter, "RestSeatDepth@Rests", REST_POCKET_DEPTH)
     added = sum(length * width * REST_HEIGHT for _t, _x, _y, length, width in RESTS)
     volume = await volume_check(adapter, "rail rests", volume + added, 0.005 * added)
     _require_bodies(adapter, BODY_COUNT, label="built-up fixture")
