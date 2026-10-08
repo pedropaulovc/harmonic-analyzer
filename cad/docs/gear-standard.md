@@ -86,10 +86,12 @@ named special single-point cutter. The two 12T paper pinions carry the #8 form,
 and their hubs are shaped so the cutter runs out clear.
 
 Gears cut this way do not mesh conjugately, so a classical contact ratio no
-longer describes them. The model checks each mesh for continuous stock-form
-contact, positive backlash and root clearance at every tolerance corner, and a
-bounded transmission error carried through to channel phase. The final values
-are in the part specs.
+longer describes them. The model reports stock-form coverage instead: the
+angular span over which a supported flank contact exists, divided by the tooth
+pitch. Coverage is neither a contact ratio nor a loaded-contact check. First
+contact, backlash and root clearance at the tolerance corners, and the
+transmission error carried through to channel phase, are checked separately.
+The final values are in the part specs.
 
 ### Undercut
 
@@ -160,8 +162,8 @@ x = 0.838 to keep the 120T drum tips off its base circle, against 0.649 at 20°.
 
 The pitch change from 49.82 to 48 scales every standard diameter by +3.79%.
 
-- Cylinder gears (120T): OD 62.20 → 64.56 mm. Alignment drum (32T): OD 17.33 →
-  17.99 mm.
+- Cylinder gears (120T, #2 form): OD 62.20 → 64.54 mm. Alignment drum (32T, #4
+  form): OD 17.33 → 17.97 mm.
 - Cone incline: 12.518° → 13.001°. Cone face width: 6.8887 → 6.8756 mm. The
   7.0565 mm channel pitch is unchanged.
 - Cone outside diameters are solved per cone against the stock-form drum. The
