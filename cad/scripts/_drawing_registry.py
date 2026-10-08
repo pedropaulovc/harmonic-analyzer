@@ -642,6 +642,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="ch_pivot_bracket_tl_ledge",
+        part="ch_pivot_bracket_tl_ledge",
+        artifact_stem="ch-pivot-bracket-tl-ledge",
+        script_name="draw_ch_pivot_bracket_tl_ledge.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="ch_pivot_bracket_tl_angle_plate",
+        part="ch_pivot_bracket_tl_angle_plate",
+        artifact_stem="ch-pivot-bracket-tl-angle-plate",
+        script_name="draw_ch_pivot_bracket_tl_angle_plate.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="dt_cone_pivot_post_tl_saw_cradle",
         part="dt_cone_pivot_post_tl_saw_cradle",
         artifact_stem="dt-cone-pivot-post-tl-saw-cradle",
