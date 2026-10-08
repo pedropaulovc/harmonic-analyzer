@@ -112,6 +112,17 @@ function previewUrl(preview) {
   }
   throw new Error(`Preview ${preview.name} has no PPE workers.dev URL`);
 }
+export async function resolvePreviewUrl(branch, action, timeoutSeconds = 1200) {
+  if (!Number.isFinite(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 1200) throw new Error('Preview startup timeout must be 1..1200 seconds');
+  const deadline = Date.now() + timeoutSeconds * 1000;
+  do {
+    const preview = (await listPreviews()).find(row => row.name === branch);
+    if (preview) return previewUrl(preview);
+    if (action === 'reopened') throw new Error('Reopened PR has no Preview after cleanup. Push a commit touching web/ to trigger native Cloudflare Builds; reopening alone does not build.');
+    if (Date.now() < deadline) await sleep(Math.min(10000, deadline - Date.now()));
+  } while (Date.now() < deadline);
+  throw new Error('Native Cloudflare build did not create a Preview. Check native build logs. If pre-PR orphan cleanup removed it, push a commit touching web/; PR opening alone does not build.');
+}
 export async function waitForManifest(url, sha, branch, timeoutSeconds = 1200, equivalentCommit) {
   if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Expected full commit SHA');
   if (!Number.isFinite(timeoutSeconds) || timeoutSeconds < 1 || timeoutSeconds > 1800) throw new Error('Timeout must be 1..1800 seconds');
@@ -180,7 +191,7 @@ async function publish(sha, branch, environment, resolveUrl, pr) {
     console.log(url);
     if (process.env.GITHUB_OUTPUT) await appendFile(process.env.GITHUB_OUTPUT, `url=${url}\ncommit_sha=${verified.commitSha}\n`);
   } catch (error) {
-    await status(deployment.id, 'failure', undefined, 'Native build did not serve the expected commit');
+    await status(deployment.id, 'failure', undefined, error.message.includes('Reopened PR has no Preview') ? 'Preview was cleaned up; push a commit touching web/ to trigger native Builds' : 'Native build unavailable or mismatched; check workflow error and native build logs');
     throw error;
   }
 }
@@ -219,9 +230,17 @@ export async function reconcile() {
   const live = new Set(open.map(pr => pr.head.ref));
   for (const preview of await listPreviews()) {
     if (preview.name === 'main' || live.has(preview.name)) continue;
+    const created = typeof preview.created_on === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(preview.created_on) ? Date.parse(preview.created_on) : NaN;
+    if (!Number.isFinite(created)) throw new Error(`Cannot safely reconcile Preview ${JSON.stringify(preview.name)}: invalid created_on`);
+    // A branch push can finish before its PR opens. Give fresh orphan Previews a
+    // 30-minute opening window; explicit closed-PR cleanup is still immediate.
+    if (Date.now() - created < 30 * 60 * 1000) continue;
     // Re-read open PRs immediately before deletion: a reopened PR must survive.
-    await cleanup(preview.name);
+    if ((await openPRs()).some(pr => pr.head.ref === preview.name)) continue;
+    await deletePreview(preview.name);
   }
+  // One paginated history scan for the entire scheduled reconciliation, not one
+  // scan per orphan branch or one latest-status HTTP request per historical record.
   await deactivate(undefined, await openPRs());
 }
 async function main() {
@@ -237,15 +256,7 @@ async function main() {
     const pr = event.pull_request;
     if (!pr || pr.head.repo?.full_name !== repository()) throw new Error('Native Cloudflare Git previews support same-repository branches only; fork PRs cannot be reported as deployed');
     if (pr.head.ref === 'main') throw new Error('main is reserved for production');
-    await publish(pr.head.sha, pr.head.ref, 'web-preview', async () => {
-      const deadline = Date.now() + 1200000;
-      do {
-        const preview = (await listPreviews()).find(row => row.name === pr.head.ref);
-        if (preview) return previewUrl(preview);
-        await sleep(10000);
-      } while (Date.now() < deadline);
-      throw new Error('Native build did not create a branch Preview');
-    }, pr.number);
+    await publish(pr.head.sha, pr.head.ref, 'web-preview', () => resolvePreviewUrl(pr.head.ref, event.action), pr.number);
   } else if (command === 'production' && !args.length) {
     guardIdentity(PROD);
     if (required('GITHUB_REF') !== 'refs/heads/main') throw new Error('Production reporting requires main');

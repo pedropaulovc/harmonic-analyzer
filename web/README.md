@@ -736,11 +736,24 @@ mislabels old bytes as the new head. Changed-web mismatches still fail within
 the bounded wait. An arbitrary HTTP 200 is not deployment proof. Production
 reporting uses the same exact-commit or proven web-tree-equivalence rule;
 the standalone `wait` helper remains exact-SHA-only.
+Native deployment is **push-only**: opening or reopening a PR does not trigger
+a new Cloudflare build. After a closed PR's Preview has been deleted, reopening
+that PR requires a **new push touching `web/`** to recreate it. A reopened PR
+with no Preview fails reporting immediately with that instruction. A newly
+opened PR still allows the normal bounded 20-minute native startup wait before
+reporting a native-build-log/new-web-push diagnostic. Neither path attempts a
+build through an additional PPE build-control token.
 
 The PPE cleanup credential is used only to read Preview metadata and delete PPE
-Previews. PR closure cleanup and an hourly reconciliation remove stale Previews,
-including **all** their deployment URLs, while preserving any branch shared by
-another open PR. The deployment lifecycle helper can also be used manually:
+Previews. PR closure cleanup immediately removes the closed branch's Preview,
+including **all** its deployment URLs, unless another open PR shares that
+branch. An hourly reconciler catches late builds and orphaned Previews. It
+preserves new Previews without a PR for their first **30 minutes**, allowing a
+branch push to precede PR creation; otherwise orphan cleanup occurs within
+**90 minutes of Preview creation**, excluding scheduler delays. Missing or
+malformed API `created_on` timestamps stop reconciliation instead of risking
+premature deletion. Open PR branches are preserved. The deployment lifecycle
+helper can also be used manually:
 
 ```sh
 node web/scripts/cloudflare-deployments.mjs preview

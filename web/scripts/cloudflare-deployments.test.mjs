@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PPE, PROD, guardIdentity, listPreviews, deletePreview, cleanup, reconcile, waitForManifest, webTreeSha } from './cloudflare-deployments.mjs';
+import { PPE, PROD, guardIdentity, listPreviews, deletePreview, cleanup, reconcile, waitForManifest, webTreeSha, resolvePreviewUrl } from './cloudflare-deployments.mjs';
 
 const sha = 'a'.repeat(40);
-const preview = { id: 'preview-1', name: 'feature/a', slug: 'server-owned-slug', urls: ['https://server-owned-slug-ppe-harmonic-analyzer-com.ppe-harmonic-analyzer-com.workers.dev'] };
+const preview = { id: 'preview-1', name: 'feature/a', slug: 'server-owned-slug', created_on: new Date(Date.now() - 60 * 60 * 1000).toISOString(), urls: ['https://server-owned-slug-ppe-harmonic-analyzer-com.ppe-harmonic-analyzer-com.workers.dev'] };
 function envelope(rows, page = 1, perPage = 100, total = rows.length) {
   return { success: true, result: rows, result_info: { page, per_page: perPage, count: rows.length, total_count: total } };
+}
+function deploymentConnection(nodes, hasNextPage = false, endCursor = null) {
+  return { data: { repository: { deployments: { nodes, pageInfo: { hasNextPage, endCursor } } } } };
 }
 function json(data, status = 200) { return new Response(JSON.stringify(data), { status }); }
 async function withAPI(fn, body) {
@@ -81,14 +84,13 @@ test('closed PR cleanup preserves a branch shared by any open PR, including a fo
 test('reconciliation deletes late native-build orphans, preserving live and main Previews', async () => {
   const writes = [];
   await withAPI(async (url, options) => {
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([{ databaseId: 7, commitOid: 'b'.repeat(40), ref: { name: 'old' }, payload: JSON.stringify({ manager: 'cloudflare-native', branch: preview.name }), latestStatus: { state: 'INACTIVE' } }, { databaseId: 8, commitOid: sha, ref: { name: 'live' }, payload: JSON.stringify({ manager: 'cloudflare-native', branch: 'live' }), latestStatus: { state: 'SUCCESS' } }]));
     if (options.method !== 'GET') {
       writes.push([url, options.method, options.body && JSON.parse(options.body)]);
       return json({ success: true, result: null });
     }
     if (url.includes('/pulls?')) return json([{ head: { ref: 'live', sha } }]);
     if (url.includes('/previews?')) return json(envelope([preview, { ...preview, id: 'live-preview', name: 'live' }, { ...preview, id: 'reserved', name: 'main' }]));
-    if (url.includes('/deployments?')) return json([{ id: 7, sha: 'b'.repeat(40), ref: 'old', payload: { manager: 'cloudflare-native', branch: preview.name } }, { id: 8, sha, ref: 'live', payload: { manager: 'cloudflare-native', branch: 'live' } }]);
-    if (url.includes('/deployments/7/statuses')) return json([{ state: 'inactive' }]);
     throw new Error(`Unexpected API request ${url}`);
   }, async () => {
     await reconcile();
@@ -102,20 +104,47 @@ test('reconciliation deletes late native-build orphans, preserving live and main
 test('cleanup writes inactive status after deleting the closed branch Preview', async () => {
   const writes = [];
   await withAPI(async (url, options) => {
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([{ databaseId: 7, commitOid: sha, ref: null, payload: JSON.stringify({ manager: 'cloudflare-native', branch: preview.name }), latestStatus: { state: 'SUCCESS' } }]));
     if (options.method !== 'GET') {
       writes.push([url, options.method, options.body && JSON.parse(options.body)]);
       return json({ success: true, result: null });
     }
     if (url.includes('/pulls?')) return json([]);
     if (url.includes('/previews?')) return json(envelope([preview]));
-    if (url.includes('/deployments?')) return json([{ id: 7, sha, ref: sha, payload: { manager: 'cloudflare-native', branch: preview.name } }]);
-    if (url.includes('/statuses')) return json([{ state: 'success' }]);
     throw new Error(`Unexpected API request ${url}`);
   }, async () => {
     await cleanup(preview.name);
     assert.equal(writes[0][1], 'DELETE');
     assert.equal(writes[1][2].state, 'inactive');
     assert.equal(writes[1][2].auto_inactive, false);
+  });
+});
+
+test('cleanup paginates bulk latestStatus and does not abandon older active deployments', async () => {
+  const writes = [];
+  const cursors = [];
+  await withAPI(async (url, options) => {
+    if (url === 'https://api.github.com/graphql') {
+      const body = JSON.parse(options.body);
+      cursors.push(body.variables.after);
+      assert.match(body.query, /latestStatus\{state\}/);
+      return json(body.variables.after === null
+        ? deploymentConnection([{ databaseId: 1, commitOid: sha, ref: null, payload: JSON.stringify({ manager: 'cloudflare-native', branch: preview.name }), latestStatus: { state: 'INACTIVE' } }], true, 'older-page')
+        : deploymentConnection([{ databaseId: 2, commitOid: sha, ref: null, payload: JSON.stringify({ manager: 'cloudflare-native', branch: preview.name }), latestStatus: { state: 'SUCCESS' } }]));
+    }
+    if (options.method !== 'GET') {
+      writes.push([url, JSON.parse(options.body)]);
+      return json({ success: true });
+    }
+    if (url.includes('/pulls?')) return json([]);
+    if (url.includes('/previews?')) return json(envelope([]));
+    throw new Error(`Unexpected per-deployment/status request ${url}`);
+  }, async () => {
+    await cleanup(preview.name);
+    assert.deepEqual(cursors, [null, 'older-page']);
+    assert.equal(writes.length, 1);
+    assert.match(writes[0][0], /\/deployments\/2\/statuses$/);
+    assert.equal(writes[0][1].state, 'inactive');
   });
 });
 
@@ -170,4 +199,63 @@ test('exact SHA remains primary without GitHub web tree API calls', async () => 
     assert.deepEqual(await waitForManifest('https://example.workers.dev', sha, 'feature/a', 1, async () => { called = true; throw new Error('Should not compare exact SHA'); }), { url: 'https://example.workers.dev', commitSha: sha });
     assert.equal(called, false);
   });
+});
+
+test('reopened missing Preview fails immediately with a required new web push instruction', async () => {
+  let requests = 0;
+  await withAPI(async () => { requests++; return json(envelope([])); }, async () => {
+    await assert.rejects(resolvePreviewUrl(preview.name, 'reopened'), /Push a commit touching web\/.*reopening alone does not build/);
+    assert.equal(requests, 1);
+  });
+});
+
+test('reopened existing Preview is returned without asking for a new push', async () => {
+  await withAPI(async () => json(envelope([preview])), async () => assert.equal(await resolvePreviewUrl(preview.name, 'reopened'), preview.urls[0]));
+});
+
+test('opened missing Preview keeps bounded startup wait and actionable native-build diagnostics', async () => {
+  await withAPI(async () => json(envelope([])), async () => assert.rejects(resolvePreviewUrl(preview.name, 'opened', 1), /Check native build logs.*pre-PR orphan cleanup.*push a commit touching web\//));
+});
+
+test('hourly reconciliation grants fresh orphan Previews a 30-minute PR-opening window', async () => {
+  let deletions = 0;
+  await withAPI(async (url, options) => {
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([]));
+    if (url.includes('/pulls?')) return json([]);
+    if (url.includes('/previews?')) return json(envelope([{ ...preview, created_on: new Date(Date.now() - 10 * 60 * 1000).toISOString() }]));
+    if (options.method === 'DELETE') { deletions++; return json({ success: true }); }
+    throw new Error(`Unexpected request ${url}`);
+  }, async () => {
+    await reconcile();
+    assert.equal(deletions, 0);
+  });
+});
+
+test('explicit closed-PR cleanup deletes even a newly created Preview immediately', async () => {
+  let deletions = 0;
+  await withAPI(async (url, options) => {
+    if (url === 'https://api.github.com/graphql') return json(deploymentConnection([]));
+    if (url.includes('/pulls?')) return json([]);
+    if (url.includes('/previews?')) return json(envelope([{ ...preview, created_on: new Date().toISOString() }]));
+    if (options.method === 'DELETE') { deletions++; return json({ success: true }); }
+    throw new Error(`Unexpected request ${url}`);
+  }, async () => {
+    await cleanup(preview.name);
+    assert.equal(deletions, 1);
+  });
+});
+
+test('scheduled deletion fails closed when an orphan creation timestamp is missing or malformed', async () => {
+  for (const created_on of [undefined, 'invalid-date']) {
+    let deletions = 0;
+    await withAPI(async (url, options) => {
+      if (url.includes('/pulls?')) return json([]);
+      if (url.includes('/previews?')) return json(envelope([{ ...preview, created_on }]));
+      if (options.method === 'DELETE') deletions++;
+      throw new Error(`Unexpected request ${url}`);
+    }, async () => {
+      await assert.rejects(reconcile(), /invalid created_on/);
+      assert.equal(deletions, 0);
+    });
+  }
 });
