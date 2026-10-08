@@ -9,16 +9,20 @@ from __future__ import annotations
 
 import argparse
 import ast
+import gzip
 import hashlib
+import io
 import json
 from pathlib import Path
 import re
 import sys
+import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = 'web/content/canonical-native/manifest.json'
 MAP = 'cad/config/identity-migration-map.json'
 STRING = re.compile(rb'"(?:[^"\\]|\\.)*"')
+STRUCTURE = re.compile(rb'"(?:[^"\\]|\\.)*"|[{}]')
 TOKEN = re.compile(rb'"(?:[^"\\]|\\.)*"|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?')
 NATIVE = re.compile(r'(?<![/\w:-])harmonic-analyzer/[^\s"\'<>`,;:()\[\]{}]+')
 MESH = re.compile(r'mesh(?:_[0-9]+(?:_[0-9]+)*)?')
@@ -26,8 +30,12 @@ PRESERVATION = ('All original numeric JSON tokens retained byte-for-byte. Only '
                 'identity/dependency strings translated; no geometric re-export '
                 'or renderer/camera requalification.')
 SCOPE = ('Current consumer code/data input SHA-256 after CRLF-to-LF normalization only; '
-         'not a claim of byte identity, geometric or GPU/source verification.')
+         'detects live consumer drift, not captured producer lineage, byte identity, '
+         'geometric or GPU/source verification.')
 CONSUMER_NORMALIZATION = 'CRLF-to-LF'
+CURRENT_OBSERVATION_LABELS = ('analysisStationaryFrontCamera', 'synthesisCoarseFraming', 'synthesisWheelFraming')
+HISTORICAL_PRODUCER_USAGE = 'historical-producer-lineage'
+HISTORICAL_PRODUCER_ROLES = ('generator', 'shared-source-selector', 'native-anchor-motion-lineage')
 
 
 def digest(data: bytes) -> str:
@@ -47,9 +55,9 @@ def file_path(name: str) -> Path:
     return path
 
 
-def numbers(data: bytes) -> str:
+def numbers(data: bytes, start: int = 0) -> str:
     result = hashlib.sha256()
-    for match in TOKEN.finditer(data):
+    for match in TOKEN.finditer(data, start):
         if not match[0].startswith(b'"'):
             result.update(match[0])
             result.update(b'\n')
@@ -98,7 +106,7 @@ class NativeBindingInventoryError(ValueError):
 
 
 class ObjectPairs(list):
-    """Diagnostic-only object representation retaining duplicate members."""
+    """JSON object representation retaining duplicates for context and authority checks."""
 
 
 def native_mapper(mapping, archived):
@@ -175,6 +183,12 @@ def native_string_contexts(raw):
                                parse_float=NumberLexeme, parse_int=NumberLexeme), '$')
 
 
+def negative_native_case_label(value, path, location):
+    return (location == 'value' and value.startswith('negative-native-') and re.fullmatch(
+        r'\$\["independentSourceCalibration"\]\["sourceNonIdentifiableFixedPartQualification"\]'
+        r'\["cases"\]\[[0-9]+\]\["name"\]', path) is not None)
+
+
 def contextual_native_mapper(raw, source, mapping, archived):
     translate = native_mapper(mapping, archived)
     contexts = {}
@@ -191,10 +205,7 @@ def contextual_native_mapper(raw, source, mapping, archived):
         selector = location == 'value' and re.fullmatch(
             r'\$\["independentSourceCalibration"\]\["sourceNonIdentifiableFixedPartQualification"\]'
             r'\["cases"\]\[[0-9]+\](?:\["nativePartPaths"\]\[[0-9]+\]|\["error"\])', path) is not None
-        case_name = location == 'value' and re.fullmatch(
-            r'\$\["independentSourceCalibration"\]\["sourceNonIdentifiableFixedPartQualification"\]'
-            r'\["cases"\]\[[0-9]+\]\["name"\]', path) is not None
-        if case_name and value.startswith('negative-native-'):
+        if negative_native_case_label(value, path, location):
             # The immutable case label embeds its nativePartPaths locator after
             # this schema-specific prefix; it is not a general prose alias.
             return 'negative-native-' + translate(value[len('negative-native-'):])
@@ -223,7 +234,10 @@ def native_binding_occurrences(raw, source, mapping, archived):
     occurrences = []
     for token in STRING.finditer(raw):
         path, member, location, _ = contexts[token.start()]
-        for match in NATIVE.finditer(json.loads(token[0])):
+        value = json.loads(token[0])
+        if negative_native_case_label(value, path, location):
+            value = value[len('negative-native-'):]
+        for match in NATIVE.finditer(value):
             try:
                 translate(match[0], token.start())
             except UndeclaredNativeBinding as error:
@@ -241,12 +255,76 @@ def require(actual, expected, label):
         raise ValueError(f'{label}: expected {expected}, got {actual}')
 
 
+def compressed_observations(row) -> bool:
+    name = row['path']
+    if row['originalPath'].endswith('.observations.json'):
+        if not name.endswith('.observations.json.gz'):
+            raise ValueError(f'Canonical observations must be gzip: {name}')
+        require(row['contentEncoding'], 'gzip', name + ' content encoding')
+        return True
+    if name.endswith('.gz') or 'contentEncoding' in row or 'decodedSha256' in row:
+        raise ValueError(f'Non-observation derivative must remain plain JSON: {name}')
+    return False
+
+
+def encode_observations(data: bytes) -> bytes:
+    stored = io.BytesIO()
+    with gzip.GzipFile(filename='', mode='wb', fileobj=stored, compresslevel=9, mtime=0) as compressed:
+        compressed.write(data)
+    return stored.getvalue()
+
+
+def validate_json(data: bytes, name: str):
+    def reject_constant(value):
+        raise ValueError(f'{name}: invalid JSON numeric constant {value}')
+    # Validation only: never turn lexical numbers into floats or serialize them.
+    document = json.loads(data, parse_int=str, parse_float=str, parse_constant=reject_constant)
+    if not isinstance(document, dict):
+        raise ValueError(f'{name}: derivative JSON must be an object')
+    return document
+
+
+def decoded_derivative(row, data: bytes) -> bytes:
+    if compressed_observations(row):
+        try:
+            data = gzip.decompress(data)
+        except (OSError, EOFError, zlib.error) as error:
+            raise ValueError(f"{row['path']}: invalid gzip: {error}") from error
+    document = validate_json(data, row['path'])
+    header = document.get('identityDerivative')
+    if not isinstance(header, dict):
+        raise ValueError(f"{row['path']}: missing identity derivative provenance")
+    for key in ('originalPath', 'originalSha256', 'originalNumericLexemeSha256', 'archivedNativeBindings'):
+        require(header.get(key), row[key], row['path'] + ' provenance ' + key)
+    opening = data.index(b'{')
+    prefix = b'"identityDerivative":'
+    start = opening + 1
+    require(data[start:start + len(prefix)], prefix, row['path'] + ' provenance prefix')
+    depth = 0
+    for token in STRUCTURE.finditer(data, start + len(prefix)):
+        if token[0] == b'{':
+            depth += 1
+        elif token[0] == b'}':
+            depth -= 1
+            if depth == 0:
+                end = token.end()
+                require(data[end:end + 1], b',', row['path'] + ' provenance separator')
+                require(numbers(data, end + 1), row['originalNumericLexemeSha256'],
+                        row['path'] + ' decoded numeric seal')
+                break
+    else:
+        raise ValueError(f"{row['path']}: incomplete identity derivative provenance")
+    return data
+
+
 def replay(manifest, mapping_bytes):
     mapping = json.loads(mapping_bytes)
     require(mapping['schema_version'], manifest['mappingSchemaVersion'], 'mapping schema')
     rows = manifest['derivatives']
     by_sha = {row['originalSha256']: row for row in rows}
-    paths = {row['originalPath']: row['path'] for row in rows}
+    # Captured evidence retains the baseline plaintext path/payload projection.
+    paths = {row['originalPath']: row['path'][:-3] if compressed_observations(row) else row['path']
+             for row in rows}
     originals = {}
     dependencies = {}
     for row in rows:
@@ -255,6 +333,7 @@ def replay(manifest, mapping_bytes):
             raise ValueError(f'Not a derivative destination: {name}')
         if name == row['originalPath']:
             raise ValueError(f'Original is an output: {name}')
+        compressed_observations(row)
         raw = file_path(row['originalPath']).read_bytes()
         require(digest(raw), row['originalSha256'], row['originalPath'] + ' original SHA')
         require(numbers(raw), row['originalNumericLexemeSha256'], row['originalPath'] + ' numeric seal')
@@ -271,6 +350,7 @@ def replay(manifest, mapping_bytes):
     if occurrences:
         raise NativeBindingInventoryError(occurrences)
     outputs = {}
+    payload_shas = {}
     pending = list(rows)
     while pending:
         ready = [row for row in pending if all(p in outputs for p in dependencies[row['path']])]
@@ -285,7 +365,7 @@ def replay(manifest, mapping_bytes):
             historical = {}
             for dependency in dependencies[name]:
                 parent = next(r for r in rows if r['path'] == dependency)
-                replacements[parent['originalSha256']] = digest(outputs[dependency])
+                replacements[parent['originalSha256']] = payload_shas[dependency]
                 historical[parent['originalPath']] = parent['originalSha256']
             translate, _ = contextual_native_mapper(raw, row['originalPath'], mapping, set(row['archivedNativeBindings']))
             body = strings(raw, replacements, translate)
@@ -303,9 +383,11 @@ def replay(manifest, mapping_bytes):
             opening = body.index(b'{')
             output = body[:opening + 1] + b'"identityDerivative":' + json.dumps(
                 header, ensure_ascii=False, separators=(',', ':')).encode('utf8') + b',' + body[opening + 1:]
-            if name.endswith('.observations.json'):
+            if compressed_observations(row):
                 output = compact(output)
-            outputs[name] = output
+            validate_json(output, name)
+            payload_shas[name] = digest(output)
+            outputs[name] = encode_observations(output) if compressed_observations(row) else output
             pending.remove(row)
     return outputs
 
@@ -326,21 +408,150 @@ def pin_code(data: bytes, replacements: dict[str, str]) -> bytes:
             raw = data[start:end]
             quote = raw[:1]
             if quote not in (b'"', b"'") or raw[-1:] != quote:
-                raise ValueError('SHA pin must be a plain quoted Python string')
+                raise ValueError('Dependency pin must be a plain quoted Python string')
             edits.append((start, end, quote + replacements[node.value].encode('ascii') + quote))
     for start, end, value in sorted(edits, reverse=True):
         data = data[:start] + value + data[end:]
     return data
 
 
+def current_projection_fields(data: bytes, name: str):
+    """Refuse duplicate authority members before selecting current projections."""
+    document = json.loads(data, object_pairs_hook=ObjectPairs, parse_int=str, parse_float=str)
+    def select(value, fields, path):
+        if not isinstance(value, ObjectPairs):
+            raise ValueError(name + ': current projection object expected at ' + path)
+        selected = {}
+        for key, child in value:
+            if key not in fields:
+                continue
+            child_path = path + '[' + json.dumps(key) + ']'
+            if key in selected:
+                raise ValueError(name + ': duplicate current projection member at ' + child_path)
+            selected[key] = child
+        return selected
+    root = select(document, ('evidence',), '$')
+    if 'evidence' not in root:
+        return {}
+    current = select(root['evidence'], ('generatorInputs', *CURRENT_OBSERVATION_LABELS), '$["evidence"]')
+    for label in CURRENT_OBSERVATION_LABELS:
+        record = current.get(label)
+        if isinstance(record, ObjectPairs):
+            current[label] = select(record, ('sourceObservations',), '$["evidence"][' + json.dumps(label) + ']')
+    if 'generatorInputs' in current:
+        records = current['generatorInputs']
+        if not isinstance(records, list) or isinstance(records, ObjectPairs):
+            raise ValueError(name + ': current generatorInputs must be an array')
+        current['generatorInputs'] = []
+        for index, record in enumerate(records):
+            path = f'$["evidence"]["generatorInputs"][{index}]'
+            projected = select(record, ('requiredForRegeneration', 'usage'), path)
+            if (projected.get('requiredForRegeneration') is True
+                    or projected.get('usage') == HISTORICAL_PRODUCER_USAGE):
+                projected.update(select(record, ('path', 'sha256', 'role', 'origin'), path))
+                if 'origin' in projected:
+                    projected['origin'] = select(
+                        projected['origin'], ('sourceCommit', 'sourcePath', 'snapshotPath'), path + '["origin"]')
+            current['generatorInputs'].append(projected)
+    return current
+
+
+def validate_historical_track_input(record, name, manifest):
+    """Prior identity-migrated lineage is not original capture or a live pin."""
+    require(record.get('requiredForRegeneration'), True, name + ' historical regeneration requirement')
+    if record.get('role') not in HISTORICAL_PRODUCER_ROLES:
+        raise ValueError(name + ': historical producer lineage requires a declared code role')
+    path, sha = record.get('path'), record.get('sha256')
+    origin = record.get('origin')
+    if (not isinstance(path, str) or not path.endswith(('.py', '.ts'))
+            or not isinstance(sha, str) or re.fullmatch(r'[0-9a-f]{64}', sha) is None
+            or not isinstance(origin, dict)
+            or not isinstance(origin.get('sourceCommit'), str)
+            or re.fullmatch(r'[0-9a-f]{40}', origin['sourceCommit']) is None):
+        raise ValueError(name + ': historical producer lineage requires exact SHA and Git origin')
+    require(origin.get('sourcePath'), path, name + ' historical source path')
+    snapshot = ('web/content/canonical-native/historical-code/' + sha + '/' + Path(path).name)
+    require(origin.get('snapshotPath'), snapshot, name + ' historical snapshot path')
+    certificates = [row for row in manifest['historicalCodeSnapshots'] if row['path'] == snapshot]
+    require(len(certificates), 1, name + ' historical snapshot certificate count')
+    certificate = certificates[0]
+    require(certificate['sha256'], sha, name + ' historical snapshot certificate SHA')
+    require(certificate.get('origin'), {
+        'sourceCommit': origin['sourceCommit'], 'sourcePath': path,
+    }, name + ' historical snapshot certificate origin')
+    require(digest(file_path(snapshot).read_bytes()), sha, name + ' historical producer SHA')
+    if not any(row['path'] == path for row in manifest['canonicalConsumerInputs']):
+        raise ValueError(name + ': historical producer requires a separate current consumer seal: ' + path)
+
+
+def current_track_inputs(data: bytes, name: str, manifest, outputs, code_updates) -> bytes:
+    """Project live storage reads, preserving explicitly certified prior lineage."""
+    current = current_projection_fields(data, name)
+    artifacts = {row['originalPath']: row['path'] for row in manifest['derivatives']}
+    observations = {row['path'][:-3]: row['path'] for row in manifest['derivatives']
+                    if compressed_observations(row)}
+    observations.update({row['originalPath']: row['path'] for row in manifest['derivatives']
+                         if compressed_observations(row)})
+    artifacts.update(observations)
+    changes = {}
+    # These labels come from actual current observation reads, not captured lineage.
+    for label in CURRENT_OBSERVATION_LABELS:
+        record = current.get(label, {})
+        if isinstance(record, dict):
+            old = record.get('sourceObservations')
+            if isinstance(old, str) and old in observations:
+                changes[f'$["evidence"]["{label}"]["sourceObservations"]'] = observations[old]
+    for index, record in enumerate(current.get('generatorInputs', [])):
+        usage = record.get('usage')
+        if usage == HISTORICAL_PRODUCER_USAGE:
+            validate_historical_track_input(record, name, manifest)
+            continue
+        if record.get('requiredForRegeneration') is True and usage not in (None, 'current-regeneration-input'):
+            raise ValueError(name + ': unsupported required generator input usage: ' + str(usage))
+        if record.get('requiredForRegeneration') is not True:
+            continue
+        if record.get('role') in HISTORICAL_PRODUCER_ROLES and usage is None:
+            raise ValueError(name + ': required producer code must declare current or historical usage')
+        old = record['path']
+        if not isinstance(old, str) or not isinstance(record['sha256'], str):
+            raise ValueError(name + ': current generator input requires path and SHA strings')
+        path = artifacts.get(old, old)
+        if path.endswith('.source-track.json'):
+            raise ValueError(name + ': generated source track cannot be a regeneration input')
+        if path in outputs:
+            raw = outputs[path]
+        elif path in code_updates:
+            raw = code_updates[path]
+        else:
+            raw = file_path(path).read_bytes()
+        prefix = f'$["evidence"]["generatorInputs"][{index}]'
+        if path != old:
+            changes[prefix + '["path"]'] = path
+        sha = digest(raw)
+        if sha != record['sha256']:
+            changes[prefix + '["sha256"]'] = sha
+    if not changes:
+        return data
+    contexts = {token.start(): path for token, (_, path, _, location, _) in zip(
+        STRING.finditer(data), native_string_contexts(data)) if location == 'value' and path in changes}
+    return strings(data, {}, lambda value, offset: changes.get(contexts.get(offset), value))
+
+
 def consumer_updates(manifest, outputs):
     replacements = {row['sha256']: digest(outputs[row['path']]) for row in manifest['derivatives']}
+    replacements.update({row['path'][:-3]: row['path'] for row in manifest['derivatives']
+                         if compressed_observations(row)})
     paths = {row['path'] for row in manifest['canonicalConsumerInputs'] if row['path'].endswith('.py')}
-    paths.update(p.relative_to(ROOT).as_posix() for p in (ROOT / 'web/content').glob('*.source-track.json'))
+    tracks = sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / 'web/content').glob('*.source-track.json'))
     updates = {}
     for name in sorted(paths):
         data = file_path(name).read_bytes()
-        changed = pin_code(data, replacements) if name.endswith('.py') else strings(data, replacements)
+        changed = pin_code(data, replacements)
+        if changed != data:
+            updates[name] = changed
+    for name in tracks:
+        data = file_path(name).read_bytes()
+        changed = current_track_inputs(data, name, manifest, outputs, updates)
         if changed != data:
             updates[name] = changed
     return updates
@@ -362,6 +573,8 @@ def main():
         manifest['mappingSha256'] = digest(mapping_bytes)
         for row in manifest['derivatives']:
             row['sha256'] = digest(outputs[row['path']])
+            if compressed_observations(row):
+                row['decodedSha256'] = digest(decoded_derivative(row, outputs[row['path']]))
         manifest['canonicalConsumerHashNormalization'] = CONSUMER_NORMALIZATION
         for row in manifest['canonicalConsumerInputs']:
             row['sha256'] = consumer_digest(file_path(row['path']).read_bytes())
@@ -374,6 +587,12 @@ def main():
         mismatches = []
         for row in manifest['derivatives']:
             data = file_path(row['path']).read_bytes()
+            try:
+                decoded = decoded_derivative(row, data)
+                if compressed_observations(row) and digest(decoded) != row['decodedSha256']:
+                    mismatches.append(row['path'] + ': decoded SHA differs')
+            except ValueError as error:
+                mismatches.append(str(error))
             if digest(data) != row['sha256']:
                 mismatches.append(row['path'] + ': derivative SHA differs')
             if data != outputs[row['path']]:

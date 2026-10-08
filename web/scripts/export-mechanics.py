@@ -5,8 +5,8 @@ Run from the repository root (use the approved release commit and raw digest):
   uv run --isolated --no-project --python 3.13 \\
     --with-requirements web/scripts/requirements-model-export.txt \\
     python web/scripts/export-mechanics.py --model /path/to/raw-native.glb \\
-    --source-commit 1268c23d4a8fc741147c5e09d8d1e45247a71945 \\
-    --expected-model-sha256 2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d
+    --source-commit 81539e53f5146c06a77541415bd79da673806d96 \\
+    --expected-model-sha256 60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c
 Only web output is written. CAD sources and the raw model are read-only. The GLB
 is not redistributed. CAD is archived from the exact supplied commit, never from
 the working tree. Analytic force seats and calibrated native render seats are
@@ -18,11 +18,9 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
-import importlib
 import io
 import json
 import math
-import re
 import struct
 import subprocess
 import sys
@@ -32,88 +30,13 @@ import types
 from dataclasses import asdict
 from pathlib import Path
 
-RELEASE_COMMIT = "1268c23d4a8fc741147c5e09d8d1e45247a71945"
-RELEASE_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
-
-
-def glb_nodes(path: Path) -> tuple[dict[str, list[float]], str]:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-        stream.seek(0)
-        magic, version, size = struct.unpack("<III", stream.read(12))
-        if magic != 0x46546C67 or version != 2 or size != path.stat().st_size:
-            raise ValueError("Not a complete GLB 2 file")
-        length, kind = struct.unpack("<II", stream.read(8))
-        if kind != 0x4E4F534A:
-            raise ValueError("The first GLB chunk must be JSON")
-        gltf = json.loads(stream.read(length))
-    identity = [
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-    ]
-    result: dict[str, list[float]] = {}
-
-    def multiply(a: list[float], b: list[float]) -> list[float]:
-        return [
-            sum(a[k * 4 + row] * b[col * 4 + k] for k in range(4))
-            for col in range(4)
-            for row in range(4)
-        ]
-
-    def visit(index: int, parent: list[float], prefix: str) -> None:
-        node = gltf["nodes"][index]
-        name = node.get("name", f"unnamed-{index}")
-        fullpath = f"{prefix}/{name}" if prefix else name
-        if "matrix" in node:
-            local = node["matrix"]
-        else:
-            x, y, z, w = node.get("rotation", [0.0, 0.0, 0.0, 1.0])
-            sx, sy, sz = node.get("scale", [1.0, 1.0, 1.0])
-            tx, ty, tz = node.get("translation", [0.0, 0.0, 0.0])
-            local = [
-                (1 - 2 * (y * y + z * z)) * sx,
-                2 * (x * y + z * w) * sx,
-                2 * (x * z - y * w) * sx,
-                0.0,
-                2 * (x * y - z * w) * sy,
-                (1 - 2 * (x * x + z * z)) * sy,
-                2 * (y * z + x * w) * sy,
-                0.0,
-                2 * (x * z + y * w) * sz,
-                2 * (y * z - x * w) * sz,
-                (1 - 2 * (x * x + y * y)) * sz,
-                0.0,
-                tx,
-                ty,
-                tz,
-                1.0,
-            ]
-        world = multiply(parent, local)
-        if fullpath in result:
-            raise ValueError(f"Duplicate qualified model path: {fullpath}")
-        result[fullpath] = world
-        for child in node.get("children", []):
-            visit(child, world, fullpath)
-
-    for root in gltf["scenes"][gltf.get("scene", 0)]["nodes"]:
-        visit(root, identity, "")
-    return result, digest.hexdigest()
+from native_identity_source import (
+    CadIdentityMap,
+    glb_nodes,
+    magnifier_installation,
+    project_model_paths,
+    validate_release_pair,
+)
 
 
 def recipe_literal_constants(path: Path, names: tuple[str, ...]) -> dict:
@@ -127,6 +50,43 @@ def recipe_literal_constants(path: Path, names: tuple[str, ...]) -> dict:
     if set(values) != set(names):
         raise ValueError(f"Missing native mathematical contract {names} in {path}")
     return values
+
+
+def pen_rest_datum(path: Path, block, marker) -> list[float]:
+    """Evaluate the archived nib-placement data and its pure transform only."""
+    constants = recipe_literal_constants(
+        path,
+        ("PAPER_FRONT_Z", "CLEARANCE", "PEN_ROD_X", "PEN_Z_MID",
+         "BLOCK_BOTTOM_Y", "BLOCK_YAW_DEG"),
+    )
+    namespace = {
+        **constants,
+        "math": math,
+        "BLOCK_DEPTH": block.BLOCK_DEPTH,
+        "BORE_X": block.BORE_X,
+        "GROOVE_DEPTH": block.GROOVE_DEPTH,
+        "BARREL_DIA": marker.BARREL_DIA,
+    }
+    names = {
+        "_C", "_S", "BLOCK_ROWS", "ROD_BORE_LOCAL", "VBLOCK_POS",
+        "MARKER_AXIS_LOCAL_Y", "MARKER_TIP_LOCAL_X", "MARKER_POS",
+    }
+    statements = []
+    found = set()
+    for node in ast.parse(path.read_text(), filename=str(path)).body:
+        if isinstance(node, ast.FunctionDef) and node.name == "_block_to_machine":
+            statements.append(node)
+            found.add(node.name)
+        elif isinstance(node, ast.Assign):
+            targets = {target.id for target in node.targets if isinstance(target, ast.Name)}
+            if targets & names:
+                statements.append(node)
+                found.update(targets)
+    if found != names | {"_block_to_machine"}:
+        raise ValueError(f"Missing released pen-placement contract in {path}")
+    exec(compile(ast.Module(body=statements, type_ignores=[]),
+                 str(path), "exec"), namespace)  # noqa: S102
+    return namespace["MARKER_POS"]
 
 
 def spring_deformation_contract(cad: Path, stock, counter) -> tuple[dict, dict]:
@@ -204,15 +164,10 @@ def main() -> None:
         default=Path(__file__).resolve().parents[1] / "src/mechanics-data.ts",
     )
     args = parser.parse_args()
-    if not re.fullmatch(r"[0-9a-f]{40}", args.source_commit):
-        parser.error("--source-commit must be exactly 40 lowercase hexadecimal characters")
-    if not re.fullmatch(r"[0-9a-f]{64}", args.expected_model_sha256):
-        parser.error("--expected-model-sha256 must be exactly 64 lowercase hexadecimal characters")
-    if args.source_commit == RELEASE_COMMIT and args.expected_model_sha256 != RELEASE_SHA256:
-        parser.error(
-            f"--source-commit {RELEASE_COMMIT} requires the existing raw model SHA256 "
-            f"{RELEASE_SHA256}; its native release pin cannot be replaced"
-        )
+    try:
+        validate_release_pair(args.source_commit, args.expected_model_sha256)
+    except ValueError as error:
+        parser.error(str(error))
     try:
         nodes, model_hash = glb_nodes(args.model)
     except (OSError, ValueError, struct.error) as error:
@@ -227,7 +182,7 @@ def main() -> None:
     # Only pure scripts/configuration enter the temporary snapshot.
     try:
         archive = subprocess.check_output(
-            ["git", "archive", args.source_commit, "cad/scripts", "cad/config"],
+            ["git", "-c", "core.autocrlf=false", "archive", args.source_commit, "cad/scripts", "cad/config"],
             cwd=repo,
             stderr=subprocess.PIPE,
         )
@@ -240,7 +195,7 @@ def main() -> None:
     except OSError as error:
         parser.error(f"Cannot archive CAD source commit {args.source_commit} from {repo}: {error}")
     snapshot = tempfile.TemporaryDirectory(prefix="harmonic-mechanics-source-")
-    snapshot_root = Path(snapshot.name)
+    snapshot_root = Path(snapshot.name).resolve()
     try:
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             tar.extractall(snapshot_root, filter="data")
@@ -251,11 +206,36 @@ def main() -> None:
     if not (cad / "scripts").is_dir() or not (cad / "config").is_dir():
         snapshot.cleanup()
         parser.error(f"CAD source archive for {args.source_commit} lacks cad/scripts or cad/config")
+    try:
+        identity_map = CadIdentityMap(repo)
+        nodes, identity = project_model_paths(args.model, nodes, model_hash, identity_map)
+    except (OSError, ValueError) as error:
+        snapshot.cleanup()
+        parser.error(f"Cannot use the approved native identity projection: {error}")
+    try:
+        export_snapshot(args, repo, cad, identity_map, nodes, identity, model_hash)
+    finally:
+        try:
+            # Imports may configure telemetry with files inside this archive.
+            # Only its owner may close them, before the snapshot is removed.
+            telemetry = sys.modules.get("_telemetry")
+            telemetry_path = getattr(telemetry, "__file__", None)
+            if telemetry_path and Path(telemetry_path).resolve().is_relative_to(snapshot_root):
+                telemetry.shutdown()
+        finally:
+            snapshot.cleanup()
+
+
+def export_snapshot(
+    args: argparse.Namespace, repo: Path, cad: Path, identity_map: CadIdentityMap,
+    nodes: dict, identity: dict, model_hash: str,
+) -> None:
+    snapshot_root = cad.parent
     sys.path.insert(0, str(cad / "scripts"))
     # This released data table sits in a COM recipe whose unrelated imports
     # pull telemetry/Windows machinery. Evaluate its exact assignment AST only:
     # genuine supplier data, no substitute geometry and no COM function stubs.
-    thumb_path = cad / "scripts/diagnostics/diag_mcmaster_thumb.py"
+    thumb_path = identity_map.source_file(cad, "scripts/diagnostics/diag_mcmaster_thumb.py")
     thumb_tree = ast.parse(thumb_path.read_text(), filename=str(thumb_path))
     thumb_assignment = next(
         node
@@ -274,7 +254,7 @@ def main() -> None:
     )
     exec(thumb_code, thumb_module.__dict__)  # noqa: S102
     sys.modules[thumb_module.__name__] = thumb_module
-    fillister_path = cad / "scripts/diagnostics/diag_mcmaster_fillister.py"
+    fillister_path = identity_map.source_file(cad, "scripts/diagnostics/diag_mcmaster_fillister.py")
     fillister_tree = ast.parse(fillister_path.read_text(), filename=str(fillister_path))
     fillister_assignment = next(
         node
@@ -287,7 +267,7 @@ def main() -> None:
     )
     fillister_module = types.ModuleType("diagnostics.diag_mcmaster_fillister")
     fillister_module.__file__ = str(fillister_path)
-    cross_spec = importlib.import_module("vn_frame_cross_screw_spec")
+    cross_spec = identity_map.import_module(cad, "vn_frame_cross_screw_spec")
     for name in ("SHANK_DIA", "SHANK_LEN", "HEAD_H", "HEAD_DIA", "PITCH"):
         fillister_module.__dict__[name] = getattr(cross_spec, name)
     # Pinned-commit assignment AST; references the injected cross-screw constants.
@@ -299,7 +279,7 @@ def main() -> None:
     exec(fillister_code, fillister_module.__dict__)  # noqa: S102
     sys.modules[fillister_module.__name__] = fillister_module
     modules = {
-        name: importlib.import_module(name)
+        name: identity_map.import_module(cad, name)
         for name in (
             "_config",
             "channel_kinematics",
@@ -321,7 +301,10 @@ def main() -> None:
             "mg_magnifying_clamp_geom",
             "mg_lever_wire_geom",
             "pn_pen_wire_geom",
+            "pn_pen_v_block_spec",
+            "pn_pen_marker_spec",
             "paper_drive_geom",
+            "pd_transgear_removable_spec",
             "spring_force_model",
             "pinion_rig_park_geometry",
             "dt_pinion_cam_geometry",
@@ -354,14 +337,22 @@ def main() -> None:
     lw = modules["mg_lever_wire_geom"]
     pw = modules["pn_pen_wire_geom"]
     paper = modules["paper_drive_geom"]
+    removable = modules["pd_transgear_removable_spec"]
     chain = modules["_chain"]
     installation = modules["dt_cone_pivot_post_installation"]
+    magnifier_layout = magnifier_installation(
+        identity_map.source_file(cad, "scripts/build_mg_magnifier_assembly.py")
+    )
     feed_senses = recipe_literal_constants(
-        cad / "scripts/build_kinematic_probe.py", ("GEAR_SENSE", "FEED_SIGN")
+        identity_map.source_file(cad, "scripts/build_kinematic_probe.py"), ("GEAR_SENSE", "FEED_SIGN")
     )
     crank_teeth = [
-        recipe_literal_constants(cad / "scripts/build_dt_crank_pinion.py", ("TEETH",))["TEETH"],
-        recipe_literal_constants(cad / "scripts/dt_crank_drive_gear_spec.py", ("TEETH",))["TEETH"],
+        recipe_literal_constants(
+            identity_map.source_file(cad, "scripts/build_dt_crank_pinion.py"), ("TEETH",)
+        )["TEETH"],
+        recipe_literal_constants(
+            identity_map.source_file(cad, "scripts/dt_crank_drive_gear_spec.py"), ("TEETH",)
+        )["TEETH"],
     ]
     count = config.machine("channels", "count")
     if count != 20:
@@ -477,12 +468,20 @@ def main() -> None:
     check(
         "ha-harmonic-analyzer/mg-magnifier/mg-magnifying-lever-1",
         [mag.KNIFE_LOCAL_X, mag.KNIFE_LOCAL_Y, 0.0],
-        [*mount.KNIFE[:1], mount.KNIFE_CONTACT_Y, -128.3],
+        [*mount.KNIFE[:1], mount.KNIFE_CONTACT_Y, magnifier_layout["LEVER_ROD_Z"]],
     )
     check(
         "ha-harmonic-analyzer/mg-magnifier/mg-magnifying-wheel-1",
         [0.0, 0.0, 0.0],
         [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
+    )
+    check(
+        "ha-harmonic-analyzer/pn-pen/pn-pen-marker-1",
+        [0.0, 0.0, 0.0],
+        pen_rest_datum(
+            identity_map.source_file(cad, "scripts/build_pn_pen_assembly.py"),
+            modules["pn_pen_v_block_spec"], modules["pn_pen_marker_spec"],
+        ),
     )
     park = modules["pinion_rig_park_geometry"]
     cam = modules["dt_pinion_cam_geometry"]
@@ -492,8 +491,8 @@ def main() -> None:
     cone_pivot[1] = cone_line.Y_BASE_TOP
     hardware = platform.swing_hardware_geometry(
         (cone_pivot[0], cone_pivot[2]),
-        lock_collar_dia=modules["vn_cone_lock_knob_spec"].COLLAR_DIA,
-        stop_shank_dia=modules["vn_swing_stop_screw_spec"].SHANK_DIA,
+        lock_head_dia=modules["vn_cone_lock_knob_spec"].HEAD_DIA,
+        stop_contact_dia=modules["vn_swing_stop_screw_spec"].CONTACT_DIA,
     )
     pinion_z = nodes["ha-harmonic-analyzer/dt-drive-train/dt-pinion-pivot-shaft-1"][14] * 1000
     lift_z = nodes["ha-harmonic-analyzer/dt-drive-train/dt-pinion-lift-rod-1"][14] * 1000
@@ -553,15 +552,18 @@ def main() -> None:
     engage_cam = (lo + hi) / 2
 
     # Preserve the released chain equation for each actual removable-gear pair.
-    # Only its explicit wrap-radius input assignments differ; the 66 existing
-    # native links and 6.35 mm pitch stay fixed, with sag absorbing the change.
+    # Derive each source pitch circle while retaining the actual native chain.
+    # Swapping mounted wheels cannot replace its existing links; the unchanged
+    # archived closure bracket/assertions must solve that fixed standard length.
     chain_tree = ast.parse(Path(chain.__file__).read_text(), filename=chain.__file__)
     chain_paths = {}
-    for gearing, knob_radius, crank_radius in (
-        ("small-large", 24.0, 12.0),
-        ("medium-medium", 18.0, 18.0),
-        ("large-small", 12.0, 24.0),
+    for gearing, knob_config, crank_config in (
+        ("small-large", "T24", "T12"),
+        ("medium-medium", "T18", "T18"),
+        ("large-small", "T12", "T24"),
     ):
+        knob_radius = removable.pitch_dia(removable.TEETH[knob_config]) / 2.0
+        crank_radius = removable.pitch_dia(removable.TEETH[crank_config]) / 2.0
         tree = ast.parse(ast.unparse(chain_tree), filename=chain.__file__)
         for node in tree.body:
             if (
@@ -573,13 +575,59 @@ def main() -> None:
                     node.value = ast.Constant(knob_radius)
                 elif node.targets[0].id == "WRAP_R_B":
                     node.value = ast.Constant(crank_radius)
+                elif node.targets[0].id == "LINK_COUNT":
+                    node.value = ast.Constant(chain.LINK_COUNT)
         values = {"__name__": f"exported_chain_{gearing}"}
-        # Whole pinned-commit chain module with only WRAP_R_A/B constants replaced.
+        # Whole archived source with mounted pitch radii and actual native link count.
         exec(compile(ast.fix_missing_locations(tree), chain.__file__, "exec"), values)  # noqa: S102
-        if values["LINK_COUNT"] != chain.LINK_COUNT:
-            raise ValueError(
-                f"{gearing} does not close on the existing native link count"
+        # Assertions in the archived helper remain active in normal execution,
+        # but Python -O must not publish a loop which misses its native length.
+        # Re-evaluate its original sag bracket, before bisection overwrote it.
+        bracket_assignment = next(
+            node for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Tuple)
+                and [item.id for item in target.elts] == ["_LO_SAG", "_HI_SAG"]
+                for target in node.targets
             )
+        )
+        bracket = dict(values)
+        exec(compile(ast.Module(body=[bracket_assignment], type_ignores=[]),
+                     chain.__file__, "exec"), bracket)  # noqa: S102
+        loop_length = values["_loop_length"]
+        target_length = values["CENTRELINE_LEN"]
+        for sag in (bracket["_LO_SAG"], bracket["_HI_SAG"], values["SAG"]):
+            # Mirror the archived slack-radius bracket (including its lower
+            # bound search), without relying on its optimizable assert.
+            lower_radius = max(knob_radius, crank_radius) + values["D"] / 2.0
+            droop = values["_droop"]
+            while droop(lower_radius) < sag:
+                lower_radius *= 0.9
+            if not droop(lower_radius) > sag > droop(10000.0):
+                raise ValueError(f"Mounted chain {gearing} has no slack-radius bracket")
+        # Check the actual solved radius as well as the archived search bounds:
+        # future helper brackets must not silently clamp the published droop.
+        if not abs(values["_droop"](values["SLACK_R"]) - values["SAG"]) < 1e-6:
+            raise ValueError(f"Mounted chain {gearing} slack radius does not match its sag")
+        if not (
+            loop_length(bracket["_LO_SAG"]) < target_length
+            < loop_length(bracket["_HI_SAG"])
+        ):
+            raise ValueError(f"Mounted chain {gearing} cannot bracket the native chain length")
+        if not abs(loop_length(values["SAG"]) - target_length) < 1e-6:
+            raise ValueError(f"Mounted chain {gearing} does not close on the native chain length")
+        if not abs(
+            values["SPAN_A"] + values["SPAN_SLACK"] + values["SPAN_B"]
+            - 2.0 * math.pi
+        ) < 1e-9:
+            raise ValueError(f"Mounted chain {gearing} arc spans do not close a full turn")
+        if not abs(
+            knob_radius * values["SPAN_A"] + crank_radius * values["SPAN_B"]
+            + values["SLACK_R"] * values["SPAN_SLACK"] + values["TAUT_LEN"]
+            - target_length
+        ) < 1e-6:
+            raise ValueError(f"Mounted chain {gearing} arc length does not close on the native chain")
         chain_paths[gearing] = {
             "arcsMm": [
                 [0.0, 0.0, knob_radius, values["_ANG_N"], values["SPAN_A"]],
@@ -663,11 +711,12 @@ def main() -> None:
     )
     source_paths.extend(sorted((cad / "config").rglob("*.yaml")))
     source_paths.extend(
-        cad / "scripts" / name
+        identity_map.source_file(cad, "scripts/" + name)
         for name in (
             "build_dt_drive_train_assembly.py",
             "build_pd_paper_drive_assembly.py",
             "build_mg_magnifier_assembly.py",
+            "build_pn_pen_assembly.py",
             "build_kinematic_probe.py",
             "build_dt_crank_pinion.py",
             "dt_crank_drive_gear_spec.py",
@@ -676,7 +725,7 @@ def main() -> None:
     )
     sources = []
     for path in sorted(set(source_paths)):
-        relative = str(path.relative_to(snapshot_root))
+        relative = path.relative_to(snapshot_root).as_posix()
         release = path.read_bytes()
         working_path = repo / relative
         working_matches = working_path.exists() and working_path.read_bytes() == release
@@ -705,6 +754,8 @@ def main() -> None:
         "provenance": {
             "sourceCommit": args.source_commit,
             "modelSha256": model_hash,
+            "nativeIdentityMapSha256": identity["mapSha256"],
+            "canonicalModelSha256": identity["canonicalSha256"],
             "units": "CAD mm; exported pose uses metres/radians/newtons",
             "sourceFiles": sources,
             "restChecks": checks,
@@ -755,7 +806,7 @@ def main() -> None:
             "rateNPerMm": mount.CHANNEL_RATE_N_PER_MM,
             "initialTensionN": mount.CHANNEL_INITIAL_TENSION_N,
             "maximumForceN": float(
-                config.parts("vn-channel-spring-installed")["maximum_load_n"]
+                config.parts(identity_map.registry_name(cad, "vn-channel-spring-installed"))["maximum_load_n"]
             ),
         },
         "counter": {
@@ -792,31 +843,32 @@ def main() -> None:
             "clampRadiusBandMm": mag.clamp_radius_band(
                 modules["mg_magnifying_clamp_geom"].BLOCK_DEPTH
             ),
-            "clampRestMm": [lw.CLAMP_X, mount.KNIFE[1], -128.3],
+            "clampRestMm": [
+                lw.CLAMP_X, magnifier_layout["LEVER_ROD_Y"], magnifier_layout["LEVER_ROD_Z"]
+            ],
             "fixtureRestMm": [
                 lw.CLAMP_X,
-                lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE,
+                magnifier_layout["FIXTURE_Y0"],
                 lw.HOOK_Z
                 + modules["mg_magnifying_vertical_rod_spec"].ROD_DIA / 2
                 + lw.WIRE_DIA / 2
                 + lw.CLEARANCE,
             ],
-            # build_mg_magnifier_assembly:209 sets rod top at lever Y+5.
+            # Read the exact archived assembly's rod top and collar datums.
             # Full collar must remain on the straight rod, below the clamp.
             "fixtureOffsetRangeM": [
                 (
-                    mount.KNIFE[1]
-                    + 5.0
+                    magnifier_layout["VROD_TOP_Y"]
                     - modules["mg_magnifying_vertical_rod_spec"].ROD_LENGTH
                     + modules["mg_magnifying_vertical_rod_spec"].ROD_DIA / 2
-                    - (lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE)
+                    - magnifier_layout["FIXTURE_Y0"]
                 )
                 / 1000,
                 (
-                    mount.KNIFE[1]
+                    magnifier_layout["LEVER_ROD_Y"]
                     - modules["mg_magnifying_clamp_geom"].LEVER_BORE_Y
                     - modules["mg_output_fixture_spec"].COLLAR_HEIGHT
-                    - (lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE)
+                    - magnifier_layout["FIXTURE_Y0"]
                 )
                 / 1000,
             ],
@@ -828,9 +880,8 @@ def main() -> None:
             "hubTangentMm": lw.WIRE_END,
             "wheelCentreMm": [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
             "penWireBottomMm": pw.WIRE_BOTTOM,
-            # magnifier.ts still fixes the nib datum. Expose the actual raw
-            # marker origin so the importer can reject a moved datum before
-            # publishing, without freezing other output geometry.
+            # The nib is the marker's native local origin. Its raw world datum
+            # passed the independent archived MARKER_POS rest check above.
             "penRestMm": [
                 value * 1000
                 for value in nodes["ha-harmonic-analyzer/pn-pen/pn-pen-marker-1"][12:15]
@@ -933,10 +984,11 @@ def main() -> None:
                 "restChecks": len(checks),
                 "maximumRestErrorMm": data["provenance"]["maximumRestErrorMm"],
                 "modelSha256": model_hash,
+                "nativeIdentityMapSha256": identity["mapSha256"],
+                "canonicalModelSha256": identity["canonicalSha256"],
             }
         )
     )
-    snapshot.cleanup()
 
 
 if __name__ == "__main__":
