@@ -10,11 +10,47 @@ import ch_pivot_bracket_tl_angle_plate_spec as plate
 import ch_pivot_bracket_tl_ledge_spec as spec
 import draw_ch_pivot_bracket_tl_ledge as drawing
 import export_features
+from _feature_requirements import limits
 from _hole_spec import THREAD_MAJOR_MM
+
+# The prechips S4 hold the ledge and plate were built for (review/compose-r5
+# follow-on 67237b9, examples/inventory/pedro-shop.toml [fixtures.angle-plate]
+# and examples/pivot-bracket/plan.toml [setups.hold]), in Setup frame TC: Z0 is
+# the bracket's faced outer face, 4 mm proud of the plate top.
+PRECHIPS_PART_PROUD = 4.0
+PRECHIPS_TABLE_Z = -92.9  # base box bottom
+PRECHIPS_LEDGE_Z = (-42.1, -24.2)  # bolted foot-end ledge box, 17.9 high
+PRECHIPS_SCREW_Z = -33.2  # ledge screws, clearance and tapped holes
+PRECHIPS_STUD_Z = -17.5  # bridge stud holes (the bridge's Setup Z)
 
 
 def _features() -> dict:
     return export_features.requirement_manifest("ch_pivot_bracket_tl_ledge")["features"]
+
+
+def test_ledge_and_plate_stations_are_the_prechips_s4_stack() -> None:
+    """BR-B1 (#1262): the part stands 4 mm proud, so the ledge is 17.9 high
+    with its holes 8.9 off its bottom, and the plate's taps and studs sit at
+    the prechips hold's Z rows. Each printed value is held here, independently
+    of the specs, and checked with its one-place band."""
+    assert plate.PART_PROUD == PRECHIPS_PART_PROUD
+    ledge = _features()
+    taps_and_studs = export_features.requirement_manifest("ch_pivot_bracket_tl_angle_plate")["features"]
+    ledge_bottom = PRECHIPS_LEDGE_Z[0] - PRECHIPS_TABLE_Z  # on its 2 in block
+    assert abs(ledge_bottom - plate.BLOCK_HEIGHT) < 1e-9
+    height = round(PRECHIPS_LEDGE_Z[1] - PRECHIPS_LEDGE_Z[0], 1)
+    hole_y = round(PRECHIPS_SCREW_Z - PRECHIPS_LEDGE_Z[0], 1)
+    tap_y = round(PRECHIPS_SCREW_Z - PRECHIPS_TABLE_Z, 1)
+    stud_y = round(PRECHIPS_STUD_Z - PRECHIPS_TABLE_Z, 1)
+    assert (height, hole_y, tap_y, stud_y) == (17.9, 8.9, 59.7, 75.4)
+    rest = ledge["foot_rest"]
+    assert (rest["height_nominal"], rest["height"]) == (height, limits(height, 1))
+    for side in ("left", "right"):
+        hole = ledge[f"screw_hole_{side}"]
+        assert (hole["height_nominal"], hole["height"]) == (hole_y, limits(hole_y, 1))
+        assert taps_and_studs[f"ledge_tap_{side}"]["height_nominal"] == tap_y
+        stud = taps_and_studs[f"stud_hole_{side}"]
+        assert (stud["height_nominal"], stud["height"]) == (stud_y, limits(stud_y, 1))
 
 
 def test_every_marked_dimension_prints_once_at_its_model_places() -> None:

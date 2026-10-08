@@ -1,7 +1,7 @@
 r"""Create the drawing for the pivot bracket's angle-plate ledge (MHA-CH-008-TL-01).
 
-A 20 x 15.9 x 6 block: the face view (front) carries the width, the lapped
-height and both screw-hole stations, each from the left end or the bottom
+A 22.6 x 17.9 x 6 block: the face view (front) carries the width, the
+milled height and both screw-hole stations, each from the left end or the bottom
 face (no chains); the edge view (right) carries the thickness; the iso
 rides top-right at 2:1. No datums (policy rule 3).
 
@@ -56,8 +56,8 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 ISO_SCALE = (2, 1)
-# Front: the 22.6 x 15.9 face at 4:1 is 90.4 x 63.6 mm, x 0.090..0.180 and
-# y 0.118..0.182. Third angle: the edge view stands right of it, past the
+# Front: the 22.6 x 17.9 face at 4:1 is 90.4 x 71.6 mm, x 0.090..0.180 and
+# y 0.114..0.186. Third angle: the edge view stands right of it, past the
 # hole callout; the iso rides top-right.
 FRONT_CENTER = (0.135, 0.150)
 RIGHT_CENTER = (0.290, 0.150)
