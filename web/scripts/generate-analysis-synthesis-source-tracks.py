@@ -75,7 +75,7 @@ SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never
 
 
 def load(path):
-    return json.loads((ROOT / path).read_text())
+    return common.read_observations(ROOT / path)
 
 
 def load_pinned(path, expected_sha256, description):
@@ -739,7 +739,7 @@ class Generator:
 
     def analysis_held_camera_packet(self):
         """Pin original own-shot evidence before any generated controls mutate it."""
-        path = "web/content/canonical-native/6dW6VYXp9HM.observations.json"
+        path = "web/content/canonical-native/6dW6VYXp9HM.observations.json.gz"
         shot = self.shots["analysis-06"]
         reason = "Whole machine front held steady; presenter gestures and two explanatory text panels appear."
         if (shot["startSeconds"] != 14.2142 or shot["endSeconds"] != 33.26656666666667
@@ -931,7 +931,7 @@ class Generator:
 
     def synthesis_coarse_framing_packet(self):
         """Bound own-shot approximate cameras to retained exact native evidence."""
-        observations_path = "web/content/canonical-native/8KmVDxkia_w.observations.json"
+        observations_path = "web/content/canonical-native/8KmVDxkia_w.observations.json.gz"
         observations = load(observations_path)
         report_path = FRAMING_GPU
         width, height = 1920, 1080
@@ -1186,7 +1186,7 @@ class Generator:
 
     def synthesis_wheel_framing_packet(self):
         """Choose wheel-macro translation from its single original FIT only."""
-        path = "web/content/canonical-native/8KmVDxkia_w.observations.json"
+        path = "web/content/canonical-native/8KmVDxkia_w.observations.json.gz"
         observations = load(path)
         original = next(frame for frame in observations["frames"]
                         if frame["shotId"] == "wheel-macro" and frame["timeSeconds"] == 252.00175)

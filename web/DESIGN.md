@@ -19,9 +19,21 @@ Active observation, calibration and motion inputs live under
 original numeric observations; originals under `content/` remain byte-exact
 archival evidence from `bfde892a5`. Fitting, observation and static-calibration
 commands refuse original observation files as current inputs.
-The [manifest](content/canonical-native/manifest.json) seals derivative and
+The six `*.observations.json.gz` files are standard gzip (level 9, `mtime=0`,
+no embedded filename). Their decoded JSON bytes are preserved exactly during the
+storage migration; all metadata, numeric spelling and FIT/CHECK evidence remain.
+Consumers select gzip without a deprecated plain canonical fallback and fail on
+corrupt gzip or invalid decoded JSON. Other canonical records, including preferred
+`*.track.json` inputs, stay plain JSON. Writers refuse plaintext canonical
+`*.observations.json` output; other numeric diagnostics and temporary JSON may
+remain plain.
+
+The [manifest](content/canonical-native/manifest.json) seals stored-byte and
 original SHA-256 values, mapping revision/digest, numeric-token preservation and
-historical-code snapshots. Historical-code seals prove original lineage only.
+historical-code snapshots. Compressed observation records also seal the decoded
+payload separately from the stored gzip bytes. Old capture paths/plaintext hashes
+remain immutable historical provenance, not current lookups. Historical-code
+seals prove original lineage only.
 Translation does not qualify current CAD, renderer or source-camera correspondence;
 canonical farm export, metadata re-export and renderer requalification remain
 required.

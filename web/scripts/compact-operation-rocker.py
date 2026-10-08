@@ -38,7 +38,7 @@ def load_seeds(video_id):
 
 def retain_generator_inputs(track, seeds, seed_input):
     track["evidence"]["generatorInputs"] = [
-        input_record(WEB / "content" / "canonical-native" / f'{track["source"]["videoId"]}.observations.json',
+        input_record(WEB / "content" / "canonical-native" / f'{track["source"]["videoId"]}.observations.json.gz',
                      "original-source-observations"),
         seed_input,
         input_record(Path(__file__), "generator"),

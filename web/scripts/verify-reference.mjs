@@ -4,6 +4,8 @@ import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { resolve, join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { gunzip } from 'node:zlib'
+import { promisify } from 'node:util'
 
 export const VIDEO_IDS = Object.freeze(['NAsM30MAHLg', '8KmVDxkia_w', '6dW6VYXp9HM', 'jfH-NbsmvD4', 'XPQwKRt4Y2k', '4mBuyixt22U'])
 export const MODEL_SHA256 = '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d'
@@ -11,6 +13,7 @@ export const MODEL_COMMIT = '1268c23d4a8fc741147c5e09d8d1e45247a71945'
 export const PIXEL_LIMIT = 1920 * 0.02
 export const CLOCK_LIMIT = 0.5
 const EPSILON = 1e-6
+const gunzipAsync = promisify(gunzip)
 const finite = value => typeof value === 'number' && Number.isFinite(value)
 const vector = (value, size) => Array.isArray(value) && value.length === size && value.every(finite)
 const text = value => typeof value === 'string' && value.trim().length > 0
@@ -827,12 +830,17 @@ export async function probeSource(path, expected, { signal } = {}) {
   return { observedSha256, width: stream.width, height: stream.height, fps, durationSeconds, nativeFrameCount: pts.length, pts }
 }
 
+export async function loadCanonicalObservations(webRoot, id) {
+  const stored = await readFile(resolve(webRoot, `content/canonical-native/${id}.observations.json.gz`))
+  return JSON.parse((await gunzipAsync(stored)).toString('utf8'))
+}
+
 export async function loadReferences(webRoot, referenceRoot, { signal } = {}) {
   const metadata = JSON.parse(await readFile(resolve(referenceRoot, 'evidence/footage-metadata.json'), 'utf8'))
   const records = [], failures = []
   for (const id of VIDEO_IDS) {
     try {
-      const data = JSON.parse(await readFile(resolve(webRoot, `content/canonical-native/${id}.observations.json`), 'utf8'))
+      const data = await loadCanonicalObservations(webRoot, id)
       const entry = metadata.find(item => item.id === id)
       if (!entry || entry.sha256 !== data.source?.sha256) throw new Error('Measured source identity differs from independent acquisition metadata')
       // Keep paths relocatable without requiring original /tmp directories.
