@@ -10,7 +10,7 @@ import draw_dt_cone_pivot_post_tl_bond_cradle as drawing
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_bond_cradle_spec as spec
 import export_features
-from _printed_tolerance import printed_band_mm
+from _printed_tolerance import angular_band_deg, printed_band_mm
 from prechips.model import TOLERANCE_REQUIREMENTS
 
 STEM = "dt_cone_pivot_post_tl_bond_cradle"
@@ -204,7 +204,7 @@ def test_every_printed_dimension_has_a_band_owner_at_its_printed_limits() -> Non
 
 def test_cone_pin_tilt_and_seat_finishes_are_requirements() -> None:
     features = _features()
-    tol = float(_config.title_block("angular")["value_deg"])
+    tol = angular_band_deg()
     for name in ("cone_pin_east", "cone_pin_west"):
         pin = features[name]
         assert "land_angle_deg" in pin["requirements"]
