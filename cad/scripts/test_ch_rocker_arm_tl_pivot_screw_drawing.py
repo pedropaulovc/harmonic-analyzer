@@ -72,19 +72,74 @@ def test_fit_callout_names_the_rocker_by_its_registered_number() -> None:
     assert _config.parts("ch-rocker-arm")["number"] == screw.ROCKER_NUMBER
 
 
-def test_exported_stack_clears_the_bore_floor_and_engages_one_and_a_half_diameters() -> None:
-    # Replay the axial stack from the exported (printed) bands, worst case.
+def _plate_z() -> tuple[tuple[float, float], tuple[float, float]]:
+    """(plate top Z, bore floor Z) worst-case ranges in the fixture frame (Z0 =
+    upper hub face, +Z up), rebuilt from the rocker and plate prints."""
+    xxx, xx = printed_band_mm(3), printed_band_mm(2)
+    hub = (rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[1], rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0])
+    strap = (rocker.ARM_THICKNESS - xx, rocker.ARM_THICKNESS + xx)
+    # The strap sits centred on the pads, so the pad tops are half the hub
+    # plus strap below the hub face.
+    pad_top = (-(hub[1] + strap[1]) / 2.0, -(hub[0] + strap[0]) / 2.0)
+    drop = (screw.profile.PLATE_DROP - xxx, screw.profile.PLATE_DROP + xxx)
+    depth_band = screw.profile.LOCATING_BORE_DEPTH_BAND
+    depth = (screw.profile.LOCATING_BORE_DEPTH - depth_band, screw.profile.LOCATING_BORE_DEPTH + depth_band)
+    top = (pad_top[0] - drop[1], pad_top[1] - drop[0])
+    floor = (top[0] - depth[1], top[1] - depth[0])
+    return top, floor
+
+
+def test_plate_frame_matches_the_profile_fixture() -> None:
+    top, floor = _plate_z()
+    # The profile's nominal plate lies inside the rebuilt worst-case ranges
+    # (the hub's unilateral band puts it off their centre).
+    assert top[0] <= screw.profile.PLATE_TOP_Z <= top[1]
+    assert floor[0] <= screw.profile.LOCATING_BORE_FLOOR_Z <= floor[1]
+
+
+def test_nominal_screw_sits_in_the_plate_in_physical_z() -> None:
+    # Exported model stations, no stack arithmetic: the shoulder ends inside
+    # the plate's locating bore and the tip lies below its floor.
+    features = _features(SCREW)
+    underhead_z = features["underhead"]["plane"]["value"]
+    shoulder_end_z = features["shoulder"]["at"][2]
+    tip_z = features["tip"]["plane"]["value"]
+    assert underhead_z == _features(WASHER)["head_face"]["plane"]["value"] > 0.0
+    assert screw.profile.LOCATING_BORE_FLOOR_Z < shoulder_end_z < screw.profile.PLATE_TOP_Z - 2.0
+    assert tip_z < screw.profile.LOCATING_BORE_FLOOR_Z - 1.5 * screw.THREAD_MODEL_DIA
+    assert tip_z > screw.profile.LOCATING_BORE_FLOOR_Z - screw.profile.PIVOT_TAP_DRILL_DEPTH
+
+
+def test_printed_bands_seat_the_screw_in_the_plate_in_physical_z() -> None:
+    """Worst case from the exported bands, in signed Z: the washer stands on
+    the hub face, the underhead on the washer, the lengths hang below it."""
     features = _features(SCREW)
     thick = _features(WASHER)["hub_face"]["thickness"]
     shoulder = features["shoulder"]["length"]
     under_head = features["tip"]["station"]
-    floor_min, floor_max = screw.FLOOR_DEPTH
-    assert floor_min - (thick[1] + shoulder[1]) >= screw.THREAD_RUNOUT + 0.1
-    chamfer_loss_max = screw.TIP_CHAMFER + screw.THREAD_PITCH / 2.0
-    full_end_min = thick[0] + under_head[0] - floor_max - chamfer_loss_max
-    assert full_end_min >= 1.5 * screw.THREAD_MODEL_DIA
-    tap_full_min = screw.profile.PIVOT_TAP_THREAD_DEPTH - printed_band_mm(2)
-    assert thick[1] + under_head[1] - floor_min - screw.TIP_CHAMFER <= tap_full_min
+    underhead_z = (thick[0], thick[1])
+    shoulder_end_z = (underhead_z[0] - shoulder[1], underhead_z[1] - shoulder[0])
+    tip_z = (underhead_z[0] - under_head[1], underhead_z[1] - under_head[0])
+    top_z, floor_z = _plate_z()
+    # The shoulder enters the plate bore at least 2.0 ...
+    assert top_z[0] - shoulder_end_z[1] >= 2.0
+    # ... and it and the die run-out stay clear of the bore floor.
+    assert shoulder_end_z[0] - floor_z[1] >= screw.THREAD_RUNOUT + 0.1
+    # Full thread below the floor, less the chamfer and half a pitch.
+    chamfer_loss = screw.TIP_CHAMFER + screw.THREAD_PITCH / 2.0
+    assert floor_z[0] - tip_z[1] - chamfer_loss >= 1.5 * screw.THREAD_MODEL_DIA
+    # The screw's full thread stays inside the tap's full thread, and the tip
+    # inside the tap drill.
+    tap_full = screw.profile.PIVOT_TAP_THREAD_DEPTH - printed_band_mm(2)
+    assert floor_z[1] - tip_z[0] - screw.TIP_CHAMFER <= tap_full
+    drill = screw.profile.PIVOT_TAP_DRILL_DEPTH - printed_band_mm(2)
+    assert floor_z[1] - tip_z[0] <= drill - 0.5
+
+
+def test_tip_chamfer_acceptance_exports_with_the_tip() -> None:
+    tip = _features(SCREW)["tip"]
+    assert "note" in tip["requirements"]
+    assert screw.CHAMFER_CALLOUT in tip["note"]
 
 
 # Each printed toleranced dimension -> (stem, feature, requirement) owning its
