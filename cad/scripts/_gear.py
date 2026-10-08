@@ -108,7 +108,17 @@ async def cut_tooth_gap(
     theta_u = facts["ThetaU"] + eps + rho
     th_l, th_u = fmt(theta_l), fmt(theta_u)
     rc = fmt(R_CLEAR_IN)
-    u = f"({fmt(facts['Tmax'])} * t)"
+    # A root circle ABOVE the base circle (PA20 at high tooth counts: the two
+    # flanks would cross below it) starts both flanks there, at involute
+    # parameter u0, and floors the gap with one root arc.
+    root_above_base = root_r_in is not None and root_r_in > facts["Rb"]
+    u0 = math.sqrt((root_r_in / facts["Rb"]) ** 2 - 1.0) if root_above_base else 0.0
+    roll0 = u0 - math.atan(u0)
+    u = (
+        f"({fmt(u0)} + ({fmt(facts['Tmax'] - u0)}) * t)"
+        if root_above_base
+        else f"({fmt(facts['Tmax'])} * t)"
+    )
     # NB the lower flank is the MIRRORED involute (its y is negated relative
     # to the upper's form), so an azimuth offset enters its phase with the
     # OPPOSITE sign: azimuth(t=0) = -(phase(0)). Lower lands at Delta-eps+rho,
@@ -150,7 +160,16 @@ async def cut_tooth_gap(
             f"({rc} + t * ({ra} - {rc})) * {fmt(math.sin(theta_u))}",
         ),
     ]
-    if root_r_in is None:
+    if root_above_base:
+        rr = fmt(root_r_in)
+        b2, b1 = a2 + roll0, a1 - roll0
+        gap_curves.append(await equation_curve(
+            adapter,
+            "root arc A2r->A1r (root above base)",
+            f"{rr} * cos({fmt(b2)} + t * ({fmt(b1)} - {fmt(b2)}))",
+            f"{rr} * sin({fmt(b2)} + t * ({fmt(b1)} - {fmt(b2)}))",
+        ))
+    elif root_r_in is None:
         gap_curves.append(await equation_curve(
             adapter,
             "base chord A2->A1",
@@ -254,9 +273,12 @@ def gap_area_in_disc_ext(
     eps = widen_rad
     th_l, th_u = f["ThetaL"] - eps, f["ThetaU"] + eps
     a1, a2 = delta - eps, gamma - delta + eps
+    root_above_base = root_r_in is not None and root_r_in > rb
+    t0 = math.sqrt((root_r_in / rb) ** 2 - 1.0) if root_above_base else 0.0
+    roll0 = t0 - math.atan(t0)
     pts: list[tuple[float, float]] = []
     for i in range(samples + 1):  # lower flank (mirrored involute, -eps)
-        t = tmax * i / samples
+        t = t0 + (tmax - t0) * i / samples
         ph = t - delta + eps  # mirror flips the offset sign; azimuth(0) = a1
         pts.append((
             rb * (math.cos(ph) + t * math.sin(ph)),
@@ -266,13 +288,19 @@ def gap_area_in_disc_ext(
         th = th_l + (th_u - th_l) * i / samples
         pts.append((ra * math.cos(th), ra * math.sin(th)))
     for i in range(1, samples + 1):  # upper flank, reversed (+eps)
-        t = tmax * (samples - i) / samples
+        t = t0 + (tmax - t0) * (samples - i) / samples
         ph = t - delta + gamma + eps
         pts.append((
             rb * (math.cos(ph) + t * math.sin(ph)),
             rb * (math.sin(ph) - t * math.cos(ph)),
         ))
-    if root_r_in is None:  # base chord A2 -> A1
+    if root_above_base:  # root arc between the flank starts
+        rr = root_r_in
+        b2, b1 = a2 + roll0, a1 - roll0
+        for i in range(1, samples):
+            th = b2 + (b1 - b2) * i / samples
+            pts.append((rr * math.cos(th), rr * math.sin(th)))
+    elif root_r_in is None:  # base chord A2 -> A1
         for i in range(1, samples):
             s = i / samples
             pts.append((

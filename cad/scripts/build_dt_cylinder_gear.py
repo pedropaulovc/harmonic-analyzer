@@ -154,6 +154,8 @@ BORE_RADIUS = BORE_DIAMETER / 2.0
 FACTS = gear_facts(TEETH, DP)  # inches; same DP/PA as the cone set by construction
 RA_MM = OUTSIDE_DIA / 2.0
 RB_MM = FACTS["Rb"] * IN
+# Standard 1.25m root (above the PA20 base circle): the gap floor arc.
+ROOT_MM = (TEETH / DP / 2.0 - 1.25 / DP) * IN
 NOTCH_FLOOR = NOTCH_FLOOR_RADIUS
 NOTCH_OUTER = RA_MM + NOTCH_CLEARANCE  # clearance past the OD so the cut always opens
 # +Y is a tooth crest.  The spec owns the first-root-CCW kerf centre so the
@@ -173,6 +175,8 @@ def is_solid(x: float, y: float) -> bool:
     r = math.hypot(x, y)
     if r > RA_MM:
         return False
+    if r <= ROOT_MM:
+        return True
     gamma, delta = FACTS["Gamma"], FACTS["Delta"]
     psi = math.atan2(y, x) % gamma
     if r >= RB_MM:
@@ -291,7 +295,9 @@ async def build(adapter) -> dict[str, str]:
     # print needs the original ±0.05 blank width.  Give the first extrusion and
     # its depth stable semantic names, then drive and tolerance that real model
     # dimension.
-    disc = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG)
+    disc = await build_fixed_gear(
+        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG, root_relief=True, dedendum=1.25
+    )
     v_teeth = disc.volume
     _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
     _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")
