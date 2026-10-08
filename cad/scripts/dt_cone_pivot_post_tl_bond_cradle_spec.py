@@ -375,10 +375,15 @@ if not (
 
 
 def _width(nominal: float, printed: str, sources: tuple[str, ...]) -> dict:
-    """A transverse location or size: its band and nominal at printed places."""
+    """A transverse location or size: its band and nominal at printed places.
+
+    Every exported ``*_nominal`` is the PRINTED value (FixtureCAD ruling:
+    prechips refuses a nominal outside its band), never the raw model one.
+    """
+    places = DRAWING_PRECISION_BY_NAME[printed]
     return {
-        "width": (limits(nominal, DRAWING_PRECISION_BY_NAME[printed]), sources),
-        "width_nominal": (nominal, sources),
+        "width": (limits(nominal, places), sources),
+        "width_nominal": (round(nominal, places), sources),
     }
 
 
@@ -403,7 +408,7 @@ def _block_face(
         "normal": (normal, ("__frame__",)),
         "plane": ({"frame": "model", "axis": axis, "value": at}, sources),
         key: (limits(nominal, places), sources),
-        f"{key}_nominal": (nominal, sources),
+        f"{key}_nominal": (round(nominal, places), sources),
     }
     if key == "height":
         fields["height_from"] = _FROM_BASE_TOP
@@ -501,14 +506,17 @@ def _cone_pin(name: str) -> ExportFeature:
                 limits(CONE_PIN_Y, DRAWING_PRECISION_BY_NAME["ConePinY"]),
                 ("CONE_PIN_Y", (_POST, "BORE_HEIGHT")),
             ),
-            "station_nominal": (CONE_PIN_Y, ("CONE_PIN_Y",)),
+            "station_nominal": (
+                round(CONE_PIN_Y, DRAWING_PRECISION_BY_NAME["ConePinY"]),
+                ("CONE_PIN_Y",),
+            ),
             "angle_deg": (post.INCLINE_DEG, ((_POST, "INCLINE_DEG"),)),
             # The printed 12.5 deg tilt, +/- the general angular band.
             "land_angle_deg": (
                 [CONE_PIN_TILT - CONE_PIN_TILT_TOL, CONE_PIN_TILT + CONE_PIN_TILT_TOL],
                 ("CONE_PIN_TILT", "CONE_PIN_TILT_TOL", (_POST, "INCLINE_DEG")),
             ),
-            "land_angle_nominal_deg": (post.INCLINE_DEG, ((_POST, "INCLINE_DEG"),)),
+            "land_angle_nominal_deg": (CONE_PIN_TILT, ("CONE_PIN_TILT", (_POST, "INCLINE_DEG"))),
             # The hole's entry into the base top, from the west side.
             **_width(CONE_PIN_ENTRY_FROM_SIDE[name], entry, ("CONE_PIN_ENTRY_FROM_SIDE",)),
             "dia_nominal": (PIN_DIA, ("PIN_DIA",)),

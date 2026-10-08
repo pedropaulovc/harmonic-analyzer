@@ -214,3 +214,19 @@ def test_cone_pin_tilt_and_seat_finishes_are_requirements() -> None:
         seat = features[control.key]
         assert "finish_ra" in seat["requirements"]
         assert seat["finish_ra"] == control.roughness_um
+
+
+def test_every_band_carries_a_printed_nominal_inside_it() -> None:
+    """prechips refuses a nominal outside its band: every listed band carries
+    a nominal that is the printed value, at the band's places, within it."""
+    for name, feature in _features().items():
+        for key in feature["requirements"]:
+            band = feature[key]
+            if not (isinstance(band, list) and len(band) == 2):
+                continue
+            nominal_key = "land_angle_nominal_deg" if key == "land_angle_deg" else f"{key}_nominal"
+            assert nominal_key in feature, (name, key)
+            value = feature[nominal_key]
+            low, high = band
+            assert low <= value <= high, (name, nominal_key, value, band)
+            assert value == round(value, feature["precision"][key]), (name, nominal_key)
