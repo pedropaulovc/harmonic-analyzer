@@ -100,8 +100,9 @@ SIDE_KEEP = {
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[2]),
     # Diameters on the profile beside their steps.
     "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(HEAD_DIA / 2.0) + 0.042),
-    # Its six-line fit callout reads below its text, right of the head's.
-    "ShoulderDia": (UNDERHEAD_X + 0.077, _sheet_y(SHOULDER_DIA / 2.0) + 0.037),
+    # Its six-line fit callout reads below its text, over the shoulder, between
+    # the head's callout and the thread note's leader.
+    "ShoulderDia": (UNDERHEAD_X + 0.040, _sheet_y(SHOULDER_DIA / 2.0) + 0.037),
     "TipChamfer": (TIP_X + 0.010, SIDE_CENTER[1] - 0.018),
     # The slot shows as a notch in the head top; its depth reads beside it.
     "SlotDepth": (HEAD_TOP_X - 0.012, SIDE_CENTER[1] + 0.024),
