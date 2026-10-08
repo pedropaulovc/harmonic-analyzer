@@ -8,6 +8,8 @@ Use `<prefix>-<descriptive-name>` for native model and exported asset basenames,
 
 Drawing Numbers use `MHA-<CATEGORY>-<NNN>`. `000` is the category's assembly drawing; parts start at `001`. HA, CH, DT, FR, MG, PD, PN and SM have assemblies. VN and SH contain parts only. The cutover assigned part sequences by the old numeric identifier within each evidence-derived category. The numbers are stored in the registries, not recalculated when the graph changes. Configuration variants retain their existing qualifiers on the new family Number, such as `MHA-DT-003-T006` for a cone-gear configuration; installed channel spring stretch variants retain the unqualified base Number.
 
+Shop fixtures, the shop-made tooling that holds or gauges one part while it is machined, carry their parent part's Number plus `-TL-<nn>`, sequenced per parent from `01`: `MHA-DT-005-TL-01` is the cone pivot post's bond cradle. The stem is the parent stem plus `-tl-<name>`, such as `dt-cone-pivot-post-tl-bond-cradle`. Fixtures are parts only. They never enter a machine assembly or BOM, and the table's part counts exclude them. Bought finished fixture hardware, such as dowels, screws and magnetic bases, is not modelled.
+
 | Prefix | Category | Parts |
 |---|---|---:|
 | `ha` / `HA` | Harmonic analyzer | 2 |
