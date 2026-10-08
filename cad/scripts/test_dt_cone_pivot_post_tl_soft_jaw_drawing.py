@@ -11,6 +11,9 @@ import draw_dt_cone_pivot_post_tl_soft_jaw as drawing
 import dt_cone_pivot_post_spec as post
 import dt_cone_pivot_post_tl_soft_jaw_spec as spec
 import export_features
+from _feature_requirements import limits
+from _printed_tolerance import drilled_oversize_mm
+from prechips.model import TOLERANCE_REQUIREMENTS
 
 STEM = "dt_cone_pivot_post_tl_soft_jaw"
 
@@ -49,19 +52,58 @@ def test_screw_heads_sink_below_the_gripping_face() -> None:
         assert cbore["dia"][0] > spec.JAW_SCREW_HEAD_DIA
 
 
-def test_exported_bolt_stations_are_the_printed_stations_from_one_end() -> None:
+# Each printed size -> every exported feature.requirement that owns its band,
+# and the printed value it prints. The model dimensions print at their
+# DRAWING_PRECISION places; the hole callout prints the drilled hole at two
+# places (+drilled oversize/0) and the counterbore at two places.
+PRINTED_OWNERS = {
+    "PlateLength": ((("jaw_top", "length"),), spec.PLATE_LENGTH),
+    "PlateHeight": ((("jaw_top", "height"), ("bed_face", "height")), spec.PLATE_HEIGHT),
+    "PlateThick": (
+        (("grip_face", "thickness"), ("jaw_seat", "thickness")),
+        spec.PLATE_THICK,
+    ),
+    "BoltLeftX": ((("bolt_left", "station"),), spec.BOLT_LEFT_X),
+    "BoltRightX": ((("bolt_right", "station"),), spec.BOLT_RIGHT_X),
+    "BoltY": ((("bolt_left", "height"), ("bolt_right", "height")), spec.BOLT_HEIGHT),
+}
+CALLOUT_OWNERS = {
+    "hole dia": (
+        (("bolt_left", "dia"), ("bolt_right", "dia")),
+        [round(spec.BOLT_HOLE_DIA, 2), round(spec.BOLT_HOLE_DIA, 2) + drilled_oversize_mm()],
+    ),
+    "counterbore dia": (
+        (("bolt_left_counterbore", "dia"), ("bolt_right_counterbore", "dia")),
+        limits(round(spec.CBORE_DIA, 2), 2),
+    ),
+    "counterbore depth": (
+        (("bolt_left_counterbore", "depth"), ("bolt_right_counterbore", "depth")),
+        limits(round(spec.CBORE_DEPTH, 2), 2),
+    ),
+}
+
+
+def test_every_printed_band_has_a_requirement_owner() -> None:
+    """One-fact coverage: every printed toleranced size reaches prechips as a
+    listed requirement whose band is exactly the band the sheet states."""
+    assert set(PRINTED_OWNERS) == set(spec.DRAWING_PRECISION_BY_NAME)
     features = _features()
-    assert features["bolt_left"]["station"] == [
-        round(spec.BOLT_LEFT_X - 0.51, 2),
-        round(spec.BOLT_LEFT_X + 0.51, 2),
-    ]
-    # Symmetric pattern about the plate centre, as the vise's plate is drilled.
-    assert spec.BOLT_LEFT_X + spec.BOLT_RIGHT_X == pytest.approx(spec.PLATE_LENGTH)
-    for side in ("left", "right"):
-        assert features[f"bolt_{side}"]["height"] == [
-            round(spec.BOLT_HEIGHT - 0.51, 2),
-            round(spec.BOLT_HEIGHT + 0.51, 2),
-        ]
+    expected = {
+        printed: (owners, limits(value, spec.DRAWING_PRECISION_BY_NAME[printed]))
+        for printed, (owners, value) in PRINTED_OWNERS.items()
+    } | CALLOUT_OWNERS
+    for printed, (owners, band) in expected.items():
+        for name, key in owners:
+            assert key in features[name]["requirements"], (printed, name)
+            assert features[name][key] == pytest.approx(band, abs=1e-9), (printed, name)
+
+
+def test_every_exported_band_is_a_requirement() -> None:
+    """prechips inspects only the bands a feature lists."""
+    for name, feature in _features().items():
+        for key, value in feature.items():
+            if key in TOLERANCE_REQUIREMENTS and isinstance(value, list) and len(value) == 2:
+                assert key in feature["requirements"], (name, key)
 
 
 def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
