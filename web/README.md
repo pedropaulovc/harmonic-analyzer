@@ -467,6 +467,21 @@ skew passed their existing predicates. That time-scoped diagnostic is not an
 acceptance run; its short-window failure and the original collection failures
 remain failures despite the longer bounded runtime positives.
 
+The bounded native-progress correction replaces the fixed 600 ms observation
+with a wait for the same 0.3 seconds of actual source progress, using the existing
+20-second timeout. Unmuted positive-volume media, the actual native button,
+source following, at most 0.5 seconds of clock skew and a new current native draw
+remain required; timeout/error receipts retain their real predicate values.
+The changed Synthesis 284-second arm passed with 0.312458 seconds of source
+progress and 0.010537 seconds of clock skew. A real original-media pause before
+the boundary advanced only 0.000037 seconds and was refused by the 20-second
+guard. A fresh six-page compact/manual/Restore smoke passed with maximum observed
+skew 0.012847 seconds. These separate receipts are under
+`web/.vite/complete1227-stage50-20261007/native-progress/`; they do not rewrite
+the frozen scientific report or clear unexercised collection failures.
+Restore equality binds camera, input and assembly to the measured native clock;
+`currentTime` alone does not identify the exact presented decoded frame.
+
 Original-source authority is validated before lazy shared browser startup. Shared
 startup becomes ready only after server, browser, context and page acquisition;
 failure is one terminal verification prerequisite with acquired-resource cleanup,
@@ -517,6 +532,24 @@ Gray references use explicit round-to-nearest limited-to-full 8-bit luma,
 not FFmpeg's version-dependent implicit gray conversion. The schema defines the
 byte profile; unsupported source formats are refused and existing hashes stay
 unchanged.
+
+The pixel observer uses that same native Y raster for both gray identity and
+NCC/LK measurements, selected by the declared pixel format rather than video ID.
+Source clocks use native integer PTS with the rational stream time base, not
+microsecond-rounded display timestamps at half-open cuts. Install its locked
+web tooling group from the repository root. With `HARMONIC_REFERENCE_ROOT`
+pointing to the unchanged original reference root, a private observation run is:
+
+```sh
+uv sync --group web
+uv run --group web python web/scripts/observe-source.py \
+  --source "$HARMONIC_REFERENCE_ROOT/videos/4mBuyixt22U.mp4" \
+  --observations web/content/v39-source/4mBuyixt22U.observations.json.gz \
+  --output web/.vite/verification-output/rocker-observed.observations.json.gz
+```
+
+Successful decoding/emission does not certify missing independent measurements
+or promote unavailable source coverage to passed.
 
 Compact selection preserves original landmark observations across nominal and
 decoded-time aliases only when source frame, hashes, PTS and view layout match.

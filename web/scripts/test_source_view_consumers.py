@@ -2,8 +2,11 @@
 import copy
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
+from types import SimpleNamespace
+from unittest.mock import patch
 import unittest
 
 import numpy as np
@@ -160,6 +163,72 @@ for (const kind of ['landmark', 'frame-unavailable', 'view-unavailable']) {
                 self.assertEqual(missing, {(other, str(index)) for index in range(8)})
                 self.assertEqual(result['frames'][0]['landmarks'], original['frames'][0]['landmarks'])
                 self.assertEqual(data, original)
+
+    def test_native_clock_retains_rational_cut_boundary(self):
+        cut = 25045 * 1001 / 24000
+        probe = {'streams': [{'time_base': '1/24000'}],
+                 'frames': [{'best_effort_timestamp': index * 1001} for index in (25044, 25045)]}
+        result = SimpleNamespace(returncode=0, stdout=json.dumps(probe))
+        with patch.object(observer.subprocess, 'run', return_value=result) as run:
+            pts = observer.source_clock(Path('/private/original.mp4'))
+        self.assertEqual(pts[-1], cut)
+        self.assertEqual(observer.bisect_left(pts, cut), 1)
+        self.assertIn('stream=time_base:frame=best_effort_timestamp', run.call_args.args[0])
+        self.assertNotEqual(float(f'{cut:.6f}'), cut)
+
+    def test_current_gray_identity_and_measurements_use_native_raster(self):
+        data, inventory, bgr = fixture('main')
+        gray = np.full(bgr.shape[:2], 73, dtype=np.uint8)
+        cap = PixelCapture(bgr)
+        cap.gray = lambda index: gray.copy()
+        image = data['frames'][0]['sourceImage']
+        image['pixelFormat'] = 'gray8'
+        del image['sha256Bgr8']
+        image['sha256Gray8'] = hashlib.sha256(gray.tobytes()).hexdigest()
+        original = copy.deepcopy(data)
+        result = observer._observe_current(data, cap, [0], inventory, ConsumerOnlyContract(), False)
+        self.assertEqual(result['frames'][0]['sourceImage'], image)
+        self.assertEqual(data, original)
+        np.testing.assert_array_equal(observer.tracking_gray(cap, bgr, 0, data['frames'][0]), gray)
+        for mutation in ('hash', 'pts', 'index', 'format'):
+            broken = copy.deepcopy(data)
+            frame = broken['frames'][0]
+            if mutation == 'hash':
+                frame['sourceImage']['sha256Gray8'] = '0' * 64
+            elif mutation == 'pts':
+                frame['decodedTimeSeconds'] = .01
+            elif mutation == 'index':
+                frame['decodedFrameIndex'] = 1
+            else:
+                frame['sourceImage']['pixelFormat'] = 'rgb8'
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                observer._observe_current(broken, cap, [0], inventory, ConsumerOnlyContract(), False)
+
+    def test_native_gray_protocol_checks_pts_range_and_removes_stride(self):
+        # Native limited-range Y plus decoder row padding. This is a deterministic
+        # consumer regression, not a claim of source/native geometry certification.
+        def capture(*, time=0, pixel_format='yuv420p', color_range=1):
+            plane = np.array([16, 17, 235, 255, 99, 99, 99, 99], dtype=np.uint8)
+            plane = memoryview(plane)
+            class Plane(bytearray):
+                line_size = 8
+            frame = SimpleNamespace(
+                pts=time, time_base=1, width=4, height=1,
+                format=SimpleNamespace(name=pixel_format), color_range=color_range,
+                planes=[Plane(plane)],
+            )
+            cap = observer.CheckedCapture.__new__(observer.CheckedCapture)
+            cap.pts = [0]
+            cap.dimensions = (4, 1)
+            cap.gray_container = object()
+            cap.gray_frames = iter([frame])
+            cap.gray_next_index = 0
+            return cap
+        np.testing.assert_array_equal(capture().gray(0), [[0, 1, 255, 255]])
+        for kwargs in ({'time': .01}, {'pixel_format': 'rgb24'}, {'pixel_format': 'yuv422p'},
+                       {'pixel_format': 'yuv444p'}, {'color_range': 2}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                capture(**kwargs).gray(0)
 
     def test_historical_unscoped_pixels_still_fit_the_implicit_none_view(self):
         data, inventory, _ = fixture('missing')

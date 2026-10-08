@@ -78,6 +78,11 @@ dev = [
     # duplicated here.
     "solidworks-mcp-python[ui]",
 ]
+# Exact original-source native Y/PTS decoding for the web pixel observer.
+web = [
+    "av>=16.0",
+    "opencv-python-headless>=4.12",
+]
 
 [tool.pytest.ini_options]
 # A bare `pytest` runs these; `pytest .` is kept out of the vendored submodule

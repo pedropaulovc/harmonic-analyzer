@@ -786,6 +786,16 @@ export async function playOfficialNativeControl(embed) {
   throw new Error('Official original player has no visible usable native Play/Play video control')
 }
 
+export async function waitCompactNativeProgress(embed, startedMedia) {
+  await embed.frame.waitForFunction(({ selector, startedTime, minimumAdvanceSeconds }) => {
+    const video = document.querySelector(selector)
+    if (!(video instanceof HTMLVideoElement)) throw new Error('Actual compact original media element is unavailable')
+    const error = video.error ? video.error.message || `MediaError code ${video.error.code}` : document.querySelector('.ytp-error-content-wrap')?.textContent?.trim()
+    if (error) throw new Error(`Actual compact original media failed: ${error}`)
+    return video.currentTime - startedTime >= minimumAdvanceSeconds
+  }, { selector: embed.selector, startedTime: startedMedia.mediaTime, minimumAdvanceSeconds: 0.3 }, { timeout: 20_000 })
+}
+
 async function playbackChecks(page, embed, record, report, outputDirectory) {
   const playback = { status: 'unavailable', selectedInterval: null, clocks: [] }
   report.playback[embed.player] = playback
@@ -877,12 +887,14 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
   }
   await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().playerState === 'playing', undefined, { timeout: 20_000 })
   const compactStarted = await media(embed); requireMedia(compactStarted, record)
-  await delay(600)
+  let compactProgressError = null
+  try { await waitCompactNativeProgress(embed, compactStarted) } catch (error) { compactProgressError = error }
   const compactPlayed = await media(embed)
   const compactRender = await readRenderState()
   const compactState = compactRender.actual
   playback.compactAttempt = {
     rect, activeControls, startedMedia: compactStarted, playedMedia: compactPlayed, rendered: compactRender,
+    progressWait: { status: compactProgressError ? 'failed' : 'passed', timeoutMs: 20_000, error: compactProgressError?.message ?? null },
     predicates: {
       mediaUnpaused: !compactPlayed.paused, mediaUnmuted: !compactPlayed.muted,
       positiveVolume: compactPlayed.volume > 0, advancedSeconds: compactPlayed.mediaTime - compactStarted.mediaTime,
@@ -890,6 +902,7 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
       clockSkewSeconds: Math.abs(compactState.modelTime - compactPlayed.mediaTime), maximumClockSkewSeconds: CLOCK_LIMIT,
     },
   }
+  if (compactProgressError) throw compactProgressError
   assert(!compactPlayed.paused && !compactPlayed.muted && compactPlayed.volume > 0 && compactPlayed.mediaTime - compactStarted.mediaTime >= 0.3 && compactState.mode === 'following-video' && Math.abs(compactState.modelTime - compactPlayed.mediaTime) <= CLOCK_LIMIT, 'Compact native controls did not actually play original audio/video with synchronized model')
   assert(requirePlaybackDraw(compactRender) > clocks.at(-1).sourceDrawRevision, 'Compact playback has no new completed native geometry render receipt')
   await pause(page, embed)

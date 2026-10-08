@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Decode current actual-source frames and conservatively track identified physical features.
 
-python web/scripts/observe-source.py --source /private/source.mp4
+uv run --group web python web/scripts/observe-source.py --source /private/source.mp4
   --observations web/content/v39-source/XPQwKRt4Y2k.observations.json.gz
   --output /tmp/observed.observations.json.gz --inventory /tmp/current-model-inventory.json
 Ordinary inputs/outputs require explicit gzip paths and the shared strict current authority.
 Inventory remains ordinary JSON. New output JSON bytes use the shared deterministic codec.
 Omitting --inventory loads the independently sealed current inventory.
+The locked web dependency group supplies PyAV for native limited-range Y gray8;
+BGR-derived luma is not that approved original raster identity.
 --historical-diagnostic selects only the old materialized-derivative diagnostic.
 It allows private .json output only under web/.vite/verification-output or at
 resolved paths under /tmp or /var/tmp outside the whole checkout. Symlink
@@ -28,6 +30,7 @@ Tracking never supplies a camera or mechanical input for a newly decoded exposur
 import argparse
 from bisect import bisect_left
 import copy
+from fractions import Fraction
 import hashlib
 import importlib.util
 import json
@@ -103,13 +106,20 @@ def correlation(first, second):
     return float((first * second).sum() / norm) if norm > 1e-6 else -1.0
 
 
+def tracking_gray(cap, image, index, seed):
+    """Current gray8 measurements use exactly the raster named by their identity."""
+    if hasattr(cap, "gray") and seed.get("sourceImage", {}).get("pixelFormat") == "gray8":
+        return cap.gray(index)
+    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+
 def track_direction(cap, seed_index, boundary_index, seed, kinds, fps, pts=None):
     direction = 1 if boundary_index > seed_index else -1
     cap.set(cv2.CAP_PROP_POS_FRAMES, seed_index)
     ok, image = cap.read()
     if not ok:
         raise ValueError("Cannot decode manually observed seed frame")
-    previous = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    previous = tracking_gray(cap, image, seed_index, seed)
     active = {
         (item.get("viewId"), item["anchorId"]): copy.deepcopy(item)
         for item in seed["landmarks"]
@@ -141,7 +151,7 @@ def track_direction(cap, seed_index, boundary_index, seed, kinds, fps, pts=None)
                     }
                 )
             break
-        current = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        current = tracking_gray(cap, image, index, seed)
         keys = list(active)
         old = np.array(
             [active[key]["pixel"] for key in keys], dtype=np.float32
@@ -233,7 +243,7 @@ def repeated_source_views(cap, seed, shot, shots, fps, frame_count, pts=None):
     ok, image = cap.read()
     if not ok:
         raise ValueError("Cannot decode repeated-view manual seed")
-    grey_seed = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    grey_seed = tracking_gray(cap, image, seed_index, seed)
     ys, xs = np.where(grey_seed > 20)
     if not len(xs):
         return {}, []
@@ -271,7 +281,7 @@ def repeated_source_views(cap, seed, shot, shots, fps, frame_count, pts=None):
             != shot.get("continuityGroup", shot["id"])
         ):
             continue
-        grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        grey = tracking_gray(cap, image, index, seed)
         small = cv2.resize(grey[top:bottom, left:right], (160, 240)).astype(float)
         small -= small.mean()
         whole_correlation = correlation(reference, small)
@@ -594,18 +604,30 @@ def source_clock(source_path):
     result = subprocess.run(
         [
             "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_frames",
-            "-show_entries", "frame=best_effort_timestamp_time", "-of", "json", str(source_path),
+            "-show_entries", "stream=time_base:frame=best_effort_timestamp", "-of", "json", str(source_path),
         ],
         capture_output=True, text=True, check=False,
     )
     if result.returncode:
         raise ValueError("Cannot establish actual decoded source PTS: " + result.stderr.strip())
-    frames = json.loads(result.stdout).get("frames", [])
+    decoded = json.loads(result.stdout)
+    try:
+        time_base = Fraction(decoded["streams"][0]["time_base"])
+        if time_base <= 0:
+            raise ValueError("Nonpositive native time base")
+    except (KeyError, IndexError, TypeError, ValueError, ZeroDivisionError) as error:
+        raise ValueError("Actual source lacks a supported native time base") from error
+    frames = decoded.get("frames", [])
     pts = []
     for frame in frames:
         try:
-            time = float(frame["best_effort_timestamp_time"])
-        except (KeyError, TypeError, ValueError) as error:
+            # Decimal *_timestamp_time is rounded to microseconds by ffprobe;
+            # retain native rational PTS so a cut cannot acquire its next frame.
+            timestamp = frame["best_effort_timestamp"]
+            if type(timestamp) is not int:
+                raise ValueError("Native PTS must be an integer")
+            time = float(timestamp * time_base)
+        except (KeyError, TypeError, ValueError, OverflowError) as error:
             raise ValueError("Actual source exposure lacks a supported decoded PTS") from error
         if not math.isfinite(time) or time < 0 or (pts and time <= pts[-1]):
             raise ValueError("Actual source PTS must be finite, nonnegative and strictly increasing")
@@ -620,9 +642,13 @@ class CheckedCapture:
 
     def __init__(self, path, pts, width, height):
         self.cap = cv2.VideoCapture(str(path))
+        self.path = path
         self.pts = pts
         self.dimensions = (width, height)
         self.next_index = 0
+        self.gray_container = None
+        self.gray_frames = None
+        self.gray_next_index = 0
         if not self.cap.isOpened():
             self.cap.release()
             raise ValueError("Cannot open actual source")
@@ -658,8 +684,61 @@ class CheckedCapture:
         self.next_index += 1
         return True, image
 
+    def gray(self, index):
+        """Decode approved gray8 raster bytes from native limited-range 8-bit Y.
+
+        Bind decoded frames by their own PTS to the probed clock, not average FPS.
+        Backwards keyframe seeks still require an exact supported PTS/index.
+        """
+        if type(index) is not int or not 0 <= index < len(self.pts):
+            raise ValueError("Requested native exposure is unsupported by the actual source")
+        if self.gray_container is None:
+            import av
+
+            self.gray_container = av.open(str(self.path))
+            self.gray_stream = self.gray_container.streams.video[0]
+            self.gray_stream.thread_type = "AUTO"
+            self.gray_frames = iter(self.gray_container.decode(self.gray_stream))
+        if index < self.gray_next_index:
+            self.gray_container.seek(
+                int(self.pts[index] / self.gray_stream.time_base),
+                stream=self.gray_stream, backward=True, any_frame=False,
+            )
+            self.gray_frames = iter(self.gray_container.decode(self.gray_stream))
+            self.gray_next_index = None
+        while True:
+            frame = next(self.gray_frames, None)
+            if frame is None:
+                raise ValueError(f"Cannot decode actual native exposure {index}")
+            if frame.pts is None or frame.time_base is None:
+                raise ValueError("Actual source exposure lacks a supported decoded PTS")
+            time = float(frame.pts * frame.time_base)
+            position = bisect_left(self.pts, time - 1e-6)
+            if (
+                not math.isfinite(time) or position >= len(self.pts)
+                or abs(self.pts[position] - time) > 1e-6
+                or (self.gray_next_index is not None and position != self.gray_next_index)
+                or position > index
+            ):
+                raise ValueError(f"Decoder cannot establish exact native index/PTS for frame {index}")
+            if (frame.width, frame.height) != self.dimensions:
+                raise ValueError("Decoded source dimensions differ from current observations")
+            self.gray_next_index = position + 1
+            if position == index:
+                break
+        if frame.format.name != "yuv420p" or frame.color_range != 1:
+            raise ValueError("gray8 identity requires native limited-range 8-bit yuv420p Y")
+        plane = np.frombuffer(frame.planes[0], dtype=np.uint8).reshape(
+            frame.height, frame.planes[0].line_size
+        )[:, :frame.width]
+        # Approved original-source recipe (fresh-rocker/audit-exposures.py);
+        # strip stride padding before hashing the full source raster.
+        return np.clip(np.floor((plane.astype(np.float32) - 16) * 255 / 219 + 0.5), 0, 255).astype(np.uint8)
+
     def release(self):
         self.cap.release()
+        if self.gray_container is not None:
+            self.gray_container.close()
 
 
 def observe(data, source_path, match_repeated_view=False, *, inventory=None, historical_diagnostic=False):
@@ -694,13 +773,14 @@ def _observe_current(data, cap, pts, inventory, contract, match_repeated_view):
     def source_image(index, pixel_format="bgr8"):
         key = (index, pixel_format)
         if key not in source_images:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, index)
-            ok, image = cap.read()
-            if not ok:
-                raise ValueError(f"Cannot decode actual native exposure {index}")
             if pixel_format == "gray8":
-                image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            elif pixel_format != "bgr8":
+                image = cap.gray(index)
+            elif pixel_format == "bgr8":
+                cap.set(cv2.CAP_PROP_POS_FRAMES, index)
+                ok, image = cap.read()
+                if not ok:
+                    raise ValueError(f"Cannot decode actual native exposure {index}")
+            else:
                 raise ValueError("Unsupported actual source pixel format")
             hash_key = "sha256Bgr8" if pixel_format == "bgr8" else "sha256Gray8"
             source_images[key] = {
@@ -842,7 +922,8 @@ def _observe_current(data, cap, pts, inventory, contract, match_repeated_view):
                     view["unavailable"] = [{"reason": "No current camera or complete mechanism input for this decoded exposure"}]
                     frame["views"].append(view)
         index = frame["sourceImage"]["frameIndex"] if "sourceImage" in frame else index
-        image = source_image(index, frame.get("sourceImage", {}).get("pixelFormat", "bgr8"))
+        exemplar_format = exemplars[shot["id"]]["sourceImage"]["pixelFormat"] if shot["id"] in exemplars else "bgr8"
+        image = source_image(index, frame.get("sourceImage", {}).get("pixelFormat", exemplar_format))
         frame["sourceImage"] = copy.deepcopy(image)
         frame["decodedFrameIndex"] = index
         frame.setdefault("unavailable", [])

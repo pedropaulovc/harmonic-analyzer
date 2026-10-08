@@ -560,6 +560,16 @@ short-window advancement predicate (0.227414 seconds versus 0.3 after 600 ms),
 while actual media/audio/source-following and 0.009989-second clock skew were
 valid. A later positive with a longer observation window does not clear that
 measured failed predicate.
+The subsequent compact wait observes at least the same 0.3 seconds of actual
+native progress within the existing 20-second timeout; it does not impose 1x
+wall-clock playback. Real unmuted/positive-volume media, native controls,
+source following, clock skew at most 0.5 seconds and a newer native draw remain
+load-bearing. The changed Synthesis arm passed with 0.312458 seconds of progress
+and 0.010537 seconds of skew; genuine paused original media remained a timeout
+failure. A separate fresh six-page runtime smoke reached maximum observed skew
+0.012847 seconds. Those controls are not a rerun of the frozen collection.
+Native `currentTime` is timing evidence, not by itself exact presented-frame
+identity; independent raster/index/PTS authority remains separate.
 
 ### Browser verification
 
