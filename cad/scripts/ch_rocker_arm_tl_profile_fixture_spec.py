@@ -473,8 +473,8 @@ if HOLD_DOWN_CBORE_DIA - _XX - HOLD_DOWN_SCREW_HEAD_DIA < 0.5:
 
 # Clamp-stud taps (inventory: 3/8-16 studs), the prechips freeze rows
 # (review/compose-r5 pedro-shop.toml stud-tap-*, frame A): S1/S2 the lower S4
-# rail clamps (rl/ll), S3/S4 the S3 hub straps (ru/lu), S5/S6 the upper S4 rail
-# clamps (ru4/lu4, prechips 2a77dd9).
+# rail clamps (ll/rl), S3/S4 the S3 hub straps (lu/ru), S5/S6 the upper S4 rail
+# clamps (lu4/ru4, prechips 2a77dd9).
 CLAMP_STUD_SPEC = HoleSpec(
     "tapped",
     "3/8-16",
