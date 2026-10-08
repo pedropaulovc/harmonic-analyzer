@@ -225,6 +225,11 @@ HEAD_FIT_CALLOUT = "\n".join(
     )
 )
 HEAD_COAXIAL_NOTE = "HEAD COAXIAL WITH SHOULDER"
+# The two .XXX stack lengths say why on the dimension: they set how deep the
+# shoulder and thread sit in the profile plate.
+STACK_CALLOUT = f"SETS DEPTH IN PLATE {PROFILE_PLATE_NUMBER}"
+# The head-top-to-tip overall prints as a stock cut-off reference.
+OVERALL_REFERENCE_PLACES = 1
 DRAWING_NOTES = "\n".join(
     (
         "BRACKETED DIAMETERS ARE THE STARTING SIZE FOR THE MATCH-FIT.",

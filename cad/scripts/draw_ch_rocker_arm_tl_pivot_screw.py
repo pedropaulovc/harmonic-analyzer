@@ -4,7 +4,8 @@ No datum and no geometric-control frame (fixture policy): the two lapped
 locating diameters keep their native bands, the shoulder its Ra 0.8 finish,
 and the coaxiality requirement is a no-digit note. The ``*Right`` view lays
 the axis horizontal with model +Z (the head) to paper-left; every axial size
-reads from the faced head top. The head-end view (``*Front``, third-angle
+reads from the underhead except the head length, with a reference overall
+from the faced head top for cut-off. The head-end view (``*Front``, third-angle
 left view) sits on the profile's axis to its left and shows the slot.
 
 Run with SolidWorks open::
@@ -19,10 +20,11 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
+    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
@@ -48,8 +50,11 @@ from ch_rocker_arm_tl_pivot_screw_spec import (
     DRAWING_PRECISION_BY_NAME,
     HEAD_DIA,
     HEAD_TOP_Z,
+    OVERALL_LENGTH,
+    OVERALL_REFERENCE_PLACES,
     SHOULDER_DIA,
     SHOULDER_END_Z,
+    STACK_CALLOUT,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
     THREAD_MODEL_DIA,
@@ -101,10 +106,10 @@ SIDE_KEEP = {
     "ShoulderLength": ((UNDERHEAD_X + SHOULDER_END_X) / 2.0, _ROW_Y[1]),
     "UnderHeadLength": ((UNDERHEAD_X + TIP_X) / 2.0, _ROW_Y[2]),
     # Diameters on the profile beside their steps.
-    "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0 - 0.008, _sheet_y(HEAD_DIA / 2.0) + 0.042),
+    "HeadDia": ((HEAD_TOP_X + UNDERHEAD_X) / 2.0 + 0.004, _sheet_y(HEAD_DIA / 2.0) + 0.042),
     # Its six-line fit callout reads below its text, over the shoulder, between
     # the head's callout and the thread note's leader.
-    "ShoulderDia": (UNDERHEAD_X + 0.060, _sheet_y(SHOULDER_DIA / 2.0) + 0.037),
+    "ShoulderDia": (UNDERHEAD_X + 0.066, _sheet_y(SHOULDER_DIA / 2.0) + 0.037),
     "TipChamfer": (TIP_X + 0.010, SIDE_CENTER[1] - 0.018),
     # The slot shows as a notch in the head top; its depth reads beside it.
     "SlotDepth": (HEAD_TOP_X - 0.012, SIDE_CENTER[1] + 0.024),
@@ -112,6 +117,10 @@ SIDE_KEEP = {
 END_KEEP = {
     "SlotWidth": (END_CENTER[0] + 0.026, END_CENTER[1] + 0.024),
 }
+# The reference overall, head top (outside the slot) to tip face, on a
+# fourth row below the stack lengths' callouts.
+OVERALL_PICKS = ((HEAD_TOP_X, _sheet_y(3.0)), (TIP_X, _sheet_y(1.0)))
+OVERALL_TEXT_XY = ((HEAD_TOP_X + TIP_X) / 2.0, SIDE_CENTER[1] - 0.079)
 THREAD_PICK = ((SHOULDER_END_X + TIP_X) / 2.0, _sheet_y(THREAD_MODEL_DIA / 2.0))
 THREAD_NOTE_XY = (TIP_X + 0.012, SIDE_CENTER[1] + 0.034)
 # Below the journal: the fit callout fills the space above it.
@@ -120,6 +129,29 @@ FINISH_SYMBOL = (SHOULDER_END_X - 0.045, _sheet_y(-SHOULDER_DIA / 2.0) - 0.014)
 HEAD_FINISH_PICK = ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(-HEAD_DIA / 2.0))
 HEAD_FINISH_SYMBOL = ((HEAD_TOP_X + UNDERHEAD_X) / 2.0, _sheet_y(-HEAD_DIA / 2.0) - 0.014)
 CENTERLINE_PICK = (SHOULDER_END_X - 0.050, SIDE_CENTER[1] + 0.003)
+
+
+def _overall_reference(adapter: Any, side: Any) -> None:
+    """The head-top-to-tip overall as a reference, for stock cut-off."""
+    label = "pivot-screw overall length reference"
+    display = add_edge_dimension(
+        adapter,
+        side,
+        p0=OVERALL_PICKS[0],
+        p1=OVERALL_PICKS[1],
+        text_xy=OVERALL_TEXT_XY,
+        label=label,
+        orientation="horizontal",
+    )
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL_LENGTH) > 1e-4:
+        raise RuntimeError(f"{label} measured {measured_mm:g}, expected {OVERALL_LENGTH:g}")
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+    display.SetPrecision3(OVERALL_REFERENCE_PLACES, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != OVERALL_REFERENCE_PLACES:
+        raise RuntimeError(f"{label} precision did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -192,10 +224,13 @@ async def build(adapter: Any) -> dict[str, str]:
             "ShoulderDia": SHOULDER_FIT_CALLOUT,
             "HeadDia": HEAD_FIT_CALLOUT,
             "TipChamfer": CHAMFER_CALLOUT,
+            "ShoulderLength": STACK_CALLOUT,
+            "UnderHeadLength": STACK_CALLOUT,
         },
         location="below",
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    _overall_reference(adapter, side)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add the center mark to the pivot-screw head-end view")
     add_view_centerline(adapter, side, face_xy=CENTERLINE_PICK, label="pivot-screw turning axis")
