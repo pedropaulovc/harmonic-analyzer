@@ -706,6 +706,8 @@ token or OIDC). Both Workers use repository root **`web`**, install with
 including `/deployment.json` with the exact `WORKERS_CI_COMMIT_SHA` and
 `WORKERS_CI_BRANCH`. Local builds fall back to the current Git commit/branch;
 detached checkouts must supply both native-build variables.
+The npm `prebuild:deploy` lifecycle runs `npm run test:deployments` first, so the
+deployment identity, reporting and cleanup regression tests gate native builds.
 
 | Deployment | Account ID | Worker | Native deploy command |
 |---|---|---|---|
@@ -720,27 +722,82 @@ Git build watch paths should include `web/**`; GitHub environment reporting and
 PPE preview cleanup do not perform deployments. The sole GitHub cleanup token
 belongs to the PPE environment/account, never the production account.
 
+Native previews cover **same-repository PR branches**, including drafts and PRs
+targeting any base branch, when `web/**` changes. Fork PRs are rejected rather
+than passing their untrusted code to a credentialed native build. GitHub's PPE
+environment records the actual Cloudflare Preview API URL, not a guessed branch
+slug, and normally reports success only after `/deployment.json` matches the
+exact PR head SHA and raw branch name. If native watch paths skipped a
+non-`web/**` push, an older manifest commit is accepted only when the raw branch
+matches and GitHub's root `web` subtree object SHA is identical for that commit
+and the requested head. The successful deployment records the **actual manifest
+SHA**, with `requestedSha` and `equivalentWebTree` in its payload; it never
+mislabels old bytes as the new head. Changed-web mismatches still fail within
+the bounded wait. An arbitrary HTTP 200 is not deployment proof. Production
+reporting uses the same exact-commit or proven web-tree-equivalence rule;
+the standalone `wait` helper remains exact-SHA-only.
+
+The PPE cleanup credential is used only to read Preview metadata and delete PPE
+Previews. PR closure cleanup and an hourly reconciliation remove stale Previews,
+including **all** their deployment URLs, while preserving any branch shared by
+another open PR. The deployment lifecycle helper can also be used manually:
+
+```sh
+node web/scripts/cloudflare-deployments.mjs preview
+node web/scripts/cloudflare-deployments.mjs production
+node web/scripts/cloudflare-deployments.mjs list
+node web/scripts/cloudflare-deployments.mjs reconcile
+node web/scripts/cloudflare-deployments.mjs cleanup 'raw/branch-name'
+node web/scripts/cloudflare-deployments.mjs wait URL FULL_COMMIT_SHA [BRANCH [TIMEOUT_SECONDS]]
+```
+
+`list`, `reconcile`, and cleanup require `CLOUDFLARE_CLEANUP_API_TOKEN` plus
+the fixed PPE `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_WORKER_NAME`, and
+`CLOUDFLARE_WORKERS_SUBDOMAIN` environment values. `cleanup` and `reconcile`
+also require `GH_TOKEN` and `GITHUB_REPOSITORY` to protect open PR branches.
+The low-level `delete RAW_BRANCH` command deliberately bypasses that open-PR
+protection; reserve it for intentional preview-deletion smoke checks.
+
 The Wrangler files explicitly pin account and Worker identity. They contain
-only the static asset binding and a tiny model streaming Worker: no storage,
+only the static asset binding and a lossless asset streaming Worker: no storage,
 secrets, unrelated bindings, routes, custom domains or scheduled triggers.
 `keep_vars` preserves dashboard variables; routing remains dashboard-managed.
+PPE explicitly has an empty `previews` block to enable noninteractive Preview
+deployments without copying production resource settings. Wrangler 4.148.0
+retains `assets` (including `ASSETS` and `run_worker_first`) at the top level;
+they are not duplicated under `previews`.
 
 The approved v39 optimized model is **41,072,516 bytes**, exceeding the
 [25 MiB per-file Workers Assets limit](https://developers.cloudflare.com/workers/platform/limits/#static-assets)
 on both Free and Paid plans. `build:deploy` therefore downloads the immutable
 [SHA-named v39 optimized release asset](https://github.com/pedropaulovc/harmonic-analyzer/releases/download/v39/ha-harmonic-analyzer-941b6193698091781f133642bdc2a7411a18c2cfcb5252646a79b9bd57c6a805.glb),
 checks its SHA-256 and exact length against `content/model-representation.json`,
-and retains it only under ignored `.vite/deployment-model/`. Missing or wrong
-bytes fail the build. It neither imports a different CAD model nor regenerates
-tracked provenance/native metadata.
+and caches it under ignored `.vite/deployment-model/`. GitHub is a **build-time
+input only**: the deployed application makes no model requests to GitHub.
+Missing or wrong bytes fail the build. It neither imports a different CAD model
+nor regenerates tracked provenance/native metadata.
 
-The exact same-origin `/models/ha-harmonic-analyzer.glb` GET/HEAD route streams
-that approved public release asset through `worker.mjs`; other paths use Workers
-Assets. Upstream non-200 or wrong-length responses return 502, not an HTML
-fallback. The Worker does not buffer the GLB; the browser still checks its
-compiled SHA-256 and length before parsing. No R2 storage or loader changes are
-required. A locally imported GLB is removed only from `dist/` because this exact
-route supplies it; every other asset is checked against the 25 MiB limit.
+After Vite builds, every runtime file larger than 25 MiB (including the model
+and large source-track JavaScript modules) is split into ordered **24 MiB**
+pieces under `dist/deployment-assets/<original-sha256>/`. The generated, ignored
+`.vite/deployment-assets.json` is bundled into `worker.mjs`; it records each
+original URL, content type, length and SHA-256 plus ordered chunk paths, lengths
+and digests. The build checks every piece and the exact reconstructed original
+SHA-256 before permitting deployment. There is no compression, reduced dataset,
+regenerated model, dropped runtime asset, or source-loader change.
+
+For original chunked-asset URLs, the Worker supports GET/HEAD and sequentially
+streams pieces from its own `ASSETS` binding through a fixed-length stream.
+It never buffers the full model or large playback module. Initial missing chunks
+return 502; later missing/short chunks error the response stream rather than
+silently completing a truncated 200. The model loader still verifies the
+original compiled SHA-256 and length before parsing. Ordinary files pass through
+to `ASSETS` unchanged, including their native conditional-request behavior.
+Chunked routes also honor strong/weak `If-None-Match` and `*` with a 304 before
+fetching any pieces, so cache revalidation does not redownload the full asset.
+`run_worker_first: true` allows any future oversized asset path to use the same
+manifest transport; static fallback requests consequently pass through the
+Worker as well. No R2 storage or runtime external origin is required.
 Original reference footage is local opt-in verification data, not published:
 deployment builds reject a `public/reference-media/` directory.
 

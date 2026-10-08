@@ -1,0 +1,45 @@
+name: Web Preview
+
+on:
+  # No branches filter: PRs targeting every base branch, including drafts.
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+    paths: ['web/**']
+
+permissions:
+  contents: read
+  pull-requests: read
+  deployments: write
+
+concurrency:
+  group: web-preview-report-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: web-preview
+      # Create our own deployment with the HEAD SHA, not pull_request_target's base SHA.
+      deployment: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CLOUDFLARE_CLEANUP_API_TOKEN: ${{ secrets.CLOUDFLARE_CLEANUP_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
+      CLOUDFLARE_WORKERS_SUBDOMAIN: ${{ vars.CLOUDFLARE_WORKERS_SUBDOMAIN }}
+    steps:
+      # Never execute a PR checkout with these credentials (including same-repo PRs).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: web/scripts/cloudflare-deployments.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact native deployment and report URL
+        id: deployment
+        run: node web/scripts/cloudflare-deployments.mjs preview

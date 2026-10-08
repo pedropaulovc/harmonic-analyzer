@@ -1,0 +1,40 @@
+name: Web Production
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**']
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: web-production-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: web-production
+      deployment: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
+      CLOUDFLARE_WORKERS_SUBDOMAIN: ${{ vars.CLOUDFLARE_WORKERS_SUBDOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: web/scripts/cloudflare-deployments.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify exact native deployment and report URL
+        id: deployment
+        run: node web/scripts/cloudflare-deployments.mjs production

@@ -9,6 +9,8 @@
     "fetch-model": "node scripts/fetch-model.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:deployments": "node --test scripts/cloudflare-deployments.test.mjs",
+    "prebuild:deploy": "npm run test:deployments",
     "build:deploy": "node scripts/deployment.mjs build",
     "deploy": "node scripts/deployment.mjs deploy",
     "deploy:preview": "node scripts/deployment.mjs preview",
