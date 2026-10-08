@@ -8,6 +8,7 @@ from pathlib import Path
 import _config
 import _drawing_contract
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_notes as rocker_notes
 import ch_rocker_arm_tl_profile_fixture_spec as spec
 import draw_ch_rocker_arm_tl_profile_fixture as drawing
 import export_features
@@ -35,7 +36,12 @@ def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
     )
     assert sum(len(view) for view in views) == len(marked)
     assert set().union(*views) == marked
-    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    # a banded schedule cell is a model dimension with authored places too,
+    # but it prints once, in its schedule, never as a marked dimension
+    scheduled = {name for cells in spec.SCHEDULE_CELL_DIMENSIONS.values() for _f, name in cells}
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked | scheduled
+    assert not marked & scheduled
+    assert {name for _f, name in spec.EXPLICIT_SYMMETRIC_TOLERANCES_MM} == scheduled
     assert set(spec.DIMENSION_CALLOUTS) <= marked
 
 
@@ -87,8 +93,11 @@ def test_exported_bands_are_the_printed_bands() -> None:
 
 
 def test_hub_stand_carries_the_hub_and_clears_the_strap() -> None:
-    # the highest printed stand stays under the longest hub's lower face ...
-    longest_step = (rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0] - rocker.ARM_THICKNESS) / 2.0
+    # the highest printed stand stays under the lowest accepted hub face: the
+    # longest hub on the thinnest strap the rocker print accepts ...
+    strap_band = printed_band_mm(rocker_notes.DEFAULT_DRAWING_PRECISION)
+    thinnest_strap = rocker.ARM_THICKNESS - strap_band
+    longest_step = (rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0] - thinnest_strap) / 2.0
     band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["StandDrop"])
     lowest_drop = spec.STAND_DROP - band
     assert lowest_drop >= longest_step

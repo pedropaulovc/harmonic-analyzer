@@ -44,11 +44,13 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    _named_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _holes import blind_hole_volume_mm3, wizard_holes
@@ -60,6 +62,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    EXPLICIT_SYMMETRIC_TOLERANCES_MM,
     FEATURE_SCHEDULE,
     HOLD_DOWN_CBORE_DEPTH,
     HOLD_DOWN_CBORE_DIA,
@@ -96,6 +99,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     ROD_PIN_HOLE_DEPTH,
     ROD_PIN_HOLE_DIA,
     ROD_PIN_HOLE_XY,
+    SCHEDULE_CELL_DIMENSIONS,
     STAND_BORE,
     STAND_DROP,
     STAND_HEIGHT,
@@ -246,16 +250,52 @@ def _require_rest_tops(adapter) -> None:
 # The schedules print sizes the model has to carry: every printed value is
 # read back from the built faces, so neither table can publish a number the
 # CAD does not hold (codex review of PR 1252: schedule cells were only
-# formatted spec values). Faces are flat and sharp-cornered, so IFace2.GetBox
-# is the face itself; hole axes come from the exact ISurface.CylinderParams.
-# 0.0005 mm is half the finest printed place.
+# formatted spec values). Every value comes from exact B-rep geometry: plane
+# heights from ISurface.PlaneParams, flat-face extents from their straight
+# edges' vertices and whole circles' CircleParams, hole axes from
+# ISurface.CylinderParams (cross-vendor review of PR 1252: IFace2.GetBox is an
+# approximate, possibly loose box). The schedules round to three places, so
+# the model may differ from a cell by half the finest printed place.
 _SCHEDULE_READBACK_TOL_MM = 0.0005
 
 
+def _flat_face_extent(face) -> tuple[float, ...] | None:
+    """A horizontal planar face's exact (x min, y min, z, x max, y max, z) in
+    mm, or None for any other face. Its edges must be straight lines (their
+    end vertices bound it) or circles (each bounds it by centre +/- radius:
+    exact for the whole circles of these bores, stands and counterbores; an arc
+    would overstate the face, so it then matches no schedule row and fails)."""
+    surface = _early_bound(face.GetSurface(), "ISurface")
+    if not surface.IsPlane():
+        return None
+    *normal, _root_x, _root_y, root_z = (float(value) for value in surface.PlaneParams)
+    if abs(abs(normal[2]) - 1.0) > 1e-9:
+        return None
+    xs, ys = [], []
+    for raw_edge in face.GetEdges() or ():
+        edge = _early_bound(raw_edge, "IEdge")
+        curve = _early_bound(edge.GetCurve(), "ICurve")
+        if curve.IsLine():
+            for vertex in (edge.GetStartVertex(), edge.GetEndVertex()):
+                x, y, _z = (float(value) for value in _early_bound(vertex, "IVertex").GetPoint())
+                xs.append(x)
+                ys.append(y)
+        elif curve.IsCircle():
+            cx, cy, _cz, *_axis, radius = (float(value) for value in curve.CircleParams)
+            xs += [cx - radius, cx + radius]
+            ys += [cy - radius, cy + radius]
+        else:
+            return None
+    if not xs:
+        return None
+    z = root_z * 1000.0
+    return (min(xs) * 1000.0, min(ys) * 1000.0, z, max(xs) * 1000.0, max(ys) * 1000.0, z)
+
+
 def _schedule_faces(adapter) -> tuple[list[tuple[float, ...]], list[tuple[float, float, float]]]:
-    """The model's horizontal flat-face boxes and its vertical cylinders
+    """The model's horizontal flat-face extents and its vertical cylinders
     (axis x, axis y, radius), all in mm."""
-    boxes, cylinders = [], []
+    extents, cylinders = [], []
     for body in _early_bound(adapter.currentModel, "IPartDoc").GetBodies2(0, False) or ():
         for raw_face in _early_bound(body, "IBody2").GetFaces() or ():
             face = _early_bound(raw_face, "IFace2")
@@ -265,17 +305,17 @@ def _schedule_faces(adapter) -> tuple[list[tuple[float, ...]], list[tuple[float,
                 if abs(abs(params[5]) - 1.0) < 1e-9:
                     cylinders.append((params[0] * 1000.0, params[1] * 1000.0, params[6] * 1000.0))
                 continue
-            box = tuple(float(value) * 1000.0 for value in face.GetBox())
-            if abs(box[5] - box[2]) < 1e-6:
-                boxes.append(box)
-    return boxes, cylinders
+            extent = _flat_face_extent(face)
+            if extent is not None:
+                extents.append(extent)
+    return extents, cylinders
 
 
-def _require_face(boxes, label: str, z: float, cx: float, cy: float, length: float, width: float) -> None:
+def _require_face(extents, label: str, z: float, cx: float, cy: float, length: float, width: float) -> None:
     want = (cx - length / 2.0, cy - width / 2.0, z, cx + length / 2.0, cy + width / 2.0, z)
     if not any(
-        all(abs(a - b) <= _SCHEDULE_READBACK_TOL_MM for a, b in zip(box, want, strict=True))
-        for box in boxes
+        all(abs(a - b) <= _SCHEDULE_READBACK_TOL_MM for a, b in zip(extent, want, strict=True))
+        for extent in extents
     ):
         raise RuntimeError(f"{label}: no flat face {want} in the model, as the schedule prints")
 
@@ -289,33 +329,62 @@ def _require_hole(cylinders, label: str, cx: float, cy: float, dia: float) -> No
         raise RuntimeError(f"{label}: no vertical bore {want} in the model, as the schedule prints")
 
 
+def _model_banded_cell(adapter, feature_name: str, dimension_name: str) -> str:
+    """A symmetric-banded dimension as the model owns it: its value at its
+    authored places and its native tolerance at the tolerance places."""
+    display, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display = _early_bound(display, "IDisplayDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    label = f"{dimension_name}@{feature_name}"
+    if int(tolerance.Type) != 4:  # swTolType_e.swTolSYMMETRIC
+        raise RuntimeError(f"{label}: carries no symmetric model tolerance")
+    plus = float(tolerance.GetMaxValue()) * 1000.0
+    if abs(float(tolerance.GetMinValue()) * 1000.0 + plus) > 1e-9:
+        raise RuntimeError(f"{label}: model tolerance is not symmetric")
+    value = float(_read_member(dimension, "SystemValue")) * 1000.0
+    places = int(display.GetPrimaryPrecision2())
+    plus_places = int(display.GetPrimaryTolPrecision2())
+    return f"{value:.{places}f} \u00b1{plus:.{plus_places}f}"
+
+
 def _require_schedules(adapter, hole_dias: dict[str, float]) -> None:
     """Every row of the printed schedules is geometry of the built model:
     pocket floors (centre, length, width, depth), hole axes (centre, at the
-    cut diameter ``hole_dias`` gives per feature), and bonded-part tops and
-    undersides (length, width, height, centred in their pockets)."""
-    boxes, cylinders = _schedule_faces(adapter)
+    cut diameter ``hole_dias`` gives per feature), bonded-part tops and
+    undersides (length, width, height, centred in their pockets) and the hub
+    stand's drilled bore. A banded cell is the model dimension's own value,
+    places and native band (policy rule 2)."""
+    extents, cylinders = _schedule_faces(adapter)
     pockets = {}
     for tag, feature, x, y, length, width, depth in FEATURE_SCHEDULE:
-        # A coordinate may carry its band ("133.067 ±0.015"): read the nominal.
+        for cell, (feature_name, dimension_name) in zip(
+            (x, y), SCHEDULE_CELL_DIMENSIONS.get(tag, ()), strict=False
+        ):
+            model = _model_banded_cell(adapter, feature_name, dimension_name)
+            if model != cell:
+                raise RuntimeError(f"{tag} prints {cell!r}; the model owns {model!r}")
+        # A banded coordinate ("133.067 ±0.015") locates at its nominal.
         cx, cy = (float(value.split()[0]) for value in (x, y))
         if not feature.endswith("POCKET"):
             _require_hole(cylinders, f"{tag} {feature.lower()}", cx, cy, hole_dias[feature])
             continue
         pockets[tag] = (cx, cy)
         floor = PLATE_TOP_Z - float(depth)
-        _require_face(boxes, f"{tag} pocket floor", floor, cx, cy, float(length), float(width))
+        _require_face(extents, f"{tag} pocket floor", floor, cx, cy, float(length), float(width))
     for tags, part, _stock, length, width, height in PART_SCHEDULE:
         if part == "HUB STAND":
             od = float(length.removeprefix("OD "))
             for z, end in ((STAND_TOP_Z, "top"), (STAND_TOP_Z - float(height), "foot")):
-                _require_face(boxes, f"hub stand {end}", z, 0.0, 0.0, od, od)
+                _require_face(extents, f"hub stand {end}", z, 0.0, 0.0, od, od)
+            _require_hole(
+                cylinders, "hub stand bore", 0.0, 0.0, float(width.removeprefix("DRILL \u00d8"))
+            )
             continue
         top = PAD_TOP_Z if part == "PAD" else REST_TOP_Z
         for tag in tags.split(", "):
             for z, end in ((top, "top"), (top - float(height), "underside")):
                 _require_face(
-                    boxes, f"{part.lower()} {tag} {end}", z, *pockets[tag], float(length), float(width)
+                    extents, f"{part.lower()} {tag} {end}", z, *pockets[tag], float(length), float(width)
                 )
 
 
@@ -553,6 +622,18 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await volume_check(adapter, "rebuilt fixture", volume, 0.001 * plate_volume)
     _require_bodies(adapter, BODY_COUNT, label="rebuilt fixture")
+    await apply_material(adapter, MATERIAL)
+    await report_mass_properties(adapter)
+    set_dimension_bilateral_tolerance(
+        adapter, "LocatingBoreProfile", "LocatingBoreDia", *deviations(LOCATING_BORE_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "RodPinHoleProfile", "RodPinHoleDia", *deviations(ROD_PIN_HOLE_BAND)
+    )
+    # The schedule's banded cells are model tolerances (policy rule 2).
+    for (feature_name, dimension_name), plus in EXPLICIT_SYMMETRIC_TOLERANCES_MM.items():
+        set_dimension_symmetric_tolerance(adapter, feature_name, dimension_name, plus)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     _require_schedules(
         adapter,
         {
@@ -562,16 +643,6 @@ async def build(adapter) -> dict[str, str]:
             "STUD TAP": studs.hole_dia_mm,
         },
     )
-
-    await apply_material(adapter, MATERIAL)
-    await report_mass_properties(adapter)
-    set_dimension_bilateral_tolerance(
-        adapter, "LocatingBoreProfile", "LocatingBoreDia", *deviations(LOCATING_BORE_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "RodPinHoleProfile", "RodPinHoleDia", *deviations(ROD_PIN_HOLE_BAND)
-    )
-    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

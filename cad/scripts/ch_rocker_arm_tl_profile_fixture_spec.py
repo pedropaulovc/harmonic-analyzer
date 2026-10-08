@@ -27,6 +27,7 @@ import math
 
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 import ch_rocker_arm_spec as rocker
+import ch_rocker_arm_notes as rocker_notes
 from _feature_requirements import ExportFeature, limits
 from _gtol_spec import CylinderFace, PlanarFace
 from _hole_spec import CLEARANCE_MM, TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
@@ -58,15 +59,20 @@ PLATE_WIDTH = PLATE_NORTH_Y - PLATE_SOUTH_Y
 # --- Bonded-part fits -----------------------------------------------------------
 # Every pocket size and every bonded part's width and height print at three
 # places, so each moves by the title block's .XXX band (part lengths print at
-# one place, below). A pocket clears its part by more than both bands together,
-# so the largest part always enters the smallest pocket with a bond line left
-# (the inventory's 0.05 a side cannot survive two .XXX bands).
-POCKET_SIDE_CLEARANCE = 0.14
+# one place, below). Each part is centred in its pocket, so its bond line is
+# half the pocket-less-part width: the largest part in the smallest pocket
+# keeps BOND_LINE_MIN a side (the inventory's 0.05 a side cannot survive two
+# .XXX bands; cross-vendor review of PR 1252: 0.14 left 0.010 a side).
+POCKET_SIDE_CLEARANCE = 0.15
 REST_CLEARANCE = 0.15
 BOND_LINE_MIN = 0.02
-for _gap in (POCKET_SIDE_CLEARANCE, REST_CLEARANCE):
-    if 2.0 * _gap - 2.0 * _XXX < BOND_LINE_MIN:
-        raise AssertionError("a bonded part can bind in its pocket at the .XXX bands")
+
+
+def _side_bond_line_min(pocket: float, part: float) -> float:
+    """Bond line a side for a part centred in its pocket, both at .XXX."""
+    return round(((pocket - _XXX) - (part + _XXX)) / 2.0, 9)
+
+
 # Pocket corners are left to the cutter (any radius up to a full-round end),
 # so every bonded part ends short of its pocket's end radius. A part's length
 # locates nothing (each part is centred in its pocket), so it prints at one
@@ -78,13 +84,19 @@ POCKET_END_GAP = 0.55
 PART_LENGTH_PLACES = 1
 
 
-def _part_length(pocket_length: float, pocket_width: float) -> float:
-    room = pocket_length - pocket_width - 2.0 * POCKET_END_GAP
+def _part_length(pocket_length: float, pocket_width: float, length_band: float = _XXX) -> float:
+    """``length_band``: the pocket length's printed band; a looser one than
+    the .XXX the end gap was sized for shortens the part by the difference."""
+    room = pocket_length - pocket_width - 2.0 * POCKET_END_GAP - (length_band - _XXX)
     return math.floor(room * 10.0 + 1e-9) / 10.0
 
 
-def _end_gap_min(pocket_length: float, pocket_width: float, part_length: float) -> float:
-    return ((pocket_length - _XXX) - (pocket_width + _XXX) - (part_length + _X)) / 2.0
+def _end_gap_min(
+    pocket_length: float, pocket_width: float, part_length: float, length_band: float = _XXX
+) -> float:
+    return round(
+        ((pocket_length - length_band) - (pocket_width + _XXX) - (part_length + _X)) / 2.0, 9
+    )
 
 
 # Pads: inventory stations, +X side (tag, station west X, station length, pad
@@ -211,17 +223,39 @@ REST_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     (tag, x0 + length / 2.0, y0 + width / 2.0, length, width)
     for tag, x0, y0, length, width in _REST_POCKETS
 )
+# A rest pocket's length neither locates its centred rest nor neighbours a
+# web, so it prints at one place (codex review of run
+# 20261007T232215823Z: 20.000 was over-specified); its rest is shortened by
+# the wider band so it still ends clear. The pad pockets keep .XXX lengths:
+# their 2 mm webs need them.
+REST_POCKET_LENGTH_PLACES = 1
+_REST_POCKET_LENGTH_BAND = printed_band_mm(REST_POCKET_LENGTH_PLACES)
 RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
-    (tag, cx, cy, _part_length(length, width), width - 2.0 * REST_CLEARANCE)
+    (
+        tag,
+        cx,
+        cy,
+        _part_length(length, width, _REST_POCKET_LENGTH_BAND),
+        width - 2.0 * REST_CLEARANCE,
+    )
     for tag, cx, cy, length, width in REST_POCKETS
 )
 PART_END_GAP_MIN = min(
-    _end_gap_min(pocket[3], pocket[4], part[3])
-    for pockets, parts in ((PAD_POCKETS, PADS), (REST_POCKETS, RESTS))
-    for pocket, part in zip(pockets, parts, strict=True)
+    *(_end_gap_min(pocket[3], pocket[4], part[3]) for pocket, part in zip(PAD_POCKETS, PADS, strict=True)),
+    *(
+        _end_gap_min(pocket[3], pocket[4], part[3], _REST_POCKET_LENGTH_BAND)
+        for pocket, part in zip(REST_POCKETS, RESTS, strict=True)
+    ),
 )
 if PART_END_GAP_MIN < BOND_LINE_MIN:
     raise AssertionError("a bonded part can reach its pocket's end radius")
+PART_BOND_LINE_MIN = min(
+    _side_bond_line_min(pocket[4], part[4])
+    for pockets, parts in ((PAD_POCKETS, PADS), (REST_POCKETS, RESTS))
+    for pocket, part in zip(pockets, parts, strict=True)
+)
+if PART_BOND_LINE_MIN < BOND_LINE_MIN:
+    raise AssertionError("a bonded part can bind in its pocket at the .XXX bands")
 
 # --- Hub stand (FixtureCAD ruling B, revised) --------------------------------------
 # A relieved tube: its annulus carries the lower hub face through the hub shim
@@ -229,30 +263,37 @@ if PART_END_GAP_MIN < BOND_LINE_MIN:
 # gauge stack STAND_DROP below the pad reference, in a counterbore round the
 # locating bore. StandDrop prints directly from the pad tops (no chain through
 # the plate) at the general .XXX band: the hub shim stack is cut to the
-# measured stand, so the stand's band reaches the hub only through that fit-up
-# (the user's own justification for ruling B's +/-0.02, which was a relaxation
-# ceiling, not a functional need; FixtureCAD ruling after the codex review of
-# run 20261007T205522920Z flagged the 0.04 band as over-specified). The drop
-# is set so the shim stack stays non-negative over the whole band and the
-# hub-length band; the shop's shim assortment covers HUB_SHIM_GAP_MAX.
-STAND_DROP = 2.450
+# measured stand and arm, so the stand's band reaches the hub only through that
+# fit-up and takes no share of a rocker band (ruling B's +/-0.02 was a
+# relaxation ceiling, not a functional need; FixtureCAD ruling after the codex
+# review of run 20261007T205522920Z flagged the 0.04 band as over-specified).
+# The strap rests on the pads, so the hub's lower face hangs below the pad
+# plane by half the hub less half the strap. Both are the parent's printed
+# bands: the hub length's own (upper, lower) and the strap's two-place general
+# band (ch_rocker_arm_notes "STRAP 2.50 THICK"), the hub centred on the strap.
+# The drop is set so the shim stack stays non-negative for every accepted arm
+# (cross-vendor review of PR 1252: nominal-strap limits let a 1.99 strap on a
+# long hub lift the arm off its pads); the shop's shim assortment covers
+# HUB_SHIM_GAP_MAX.
+_STRAP_BAND = printed_band_mm(rocker_notes.DEFAULT_DRAWING_PRECISION)
+_HUB_STEP_MAX = (
+    rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0] - (rocker.ARM_THICKNESS - _STRAP_BAND)
+) / 2.0
+_HUB_STEP_MIN = (
+    rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[1] - (rocker.ARM_THICKNESS + _STRAP_BAND)
+) / 2.0
+STAND_DROP = 2.700
 STAND_DROP_BAND = (_XXX, -_XXX)  # the title block's .XXX, not printed explicitly
 STAND_TOP_Z = PAD_TOP_Z - STAND_DROP
 STAND_OD = 12.5
 STAND_BORE = 8.0  # drilled: the title block's DRILLED HOLES band
-# The wider StandDrop band needs a 0.2 deeper counterbore and a 0.05 taller
-# stand to keep both the floor gap and the bond engagement below.
-STAND_HEIGHT = 9.25
+# StandHeight loses what StandDrop gains, so the floor gap and the bond
+# engagement below hold in the same counterbore.
+STAND_HEIGHT = 9.0
 STAND_POCKET_DIA = 12.8
 STAND_POCKET_DEPTH = 2.2
-_HUB_STEP_MAX = (
-    rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[0] - rocker.ARM_THICKNESS
-) / 2.0
-_HUB_STEP_MIN = (
-    rocker.HUB_LENGTH + rocker.HUB_LENGTH_BAND[1] - rocker.ARM_THICKNESS
-) / 2.0
 # The hub shim stack never goes negative: the highest stand still sits below
-# the longest hub's lower face when the strap rests on the pads.
+# the lowest accepted hub face when the strap rests on the pads.
 HUB_SHIM_GAP_MIN = STAND_DROP + STAND_DROP_BAND[1] - _HUB_STEP_MAX
 HUB_SHIM_GAP_MAX = STAND_DROP + STAND_DROP_BAND[0] - _HUB_STEP_MIN
 if HUB_SHIM_GAP_MIN < 0.0:
@@ -262,7 +303,7 @@ if HUB_SHIM_GAP_MIN < 0.0:
 STRAP_AIR_MIN = STAND_DROP + STAND_DROP_BAND[1]
 if STRAP_AIR_MIN < 2.0:
     raise AssertionError("the hub stand comes within 2 mm of the strap")
-if (STAND_POCKET_DIA - _XXX) - (STAND_OD + _XXX) < BOND_LINE_MIN:
+if _side_bond_line_min(STAND_POCKET_DIA, STAND_OD) < BOND_LINE_MIN:
     raise AssertionError("the hub stand can bind in its counterbore")
 STAND_WALL_MIN = ((STAND_OD - _XXX) - (STAND_BORE + _DRILLED_PLUS)) / 2.0
 if STAND_WALL_MIN < 2.0:
@@ -289,6 +330,12 @@ if STAND_ENGAGEMENT_MIN < 1.0:
 LOCATING_BORE_DIA = rocker.PIVOT_HOLE_DIA
 LOCATING_BORE_BAND = (0.012, 0.0)
 LOCATING_BORE_DEPTH = 6.0  # from the plate top; floor at Z-21
+# The bore depth sets where the pivot screw's thread starts in the tap, so it
+# prints at .XXX (FixtureCAD ruling B): at the .XX band the TL-06 pivot screw
+# could not reach 1.5D full thread at worst case. The pivot screw's spec
+# imports both names.
+LOCATING_BORE_DEPTH_PLACES = 3
+LOCATING_BORE_DEPTH_BAND = printed_band_mm(LOCATING_BORE_DEPTH_PLACES)
 LOCATING_BORE_FLOOR_Z = PLATE_TOP_Z - LOCATING_BORE_DEPTH
 PIVOT_TAP_THREAD_DEPTH = 10.0  # full thread from the bore floor, to Z-31
 PIVOT_TAP_DRILL_DEPTH = 13.0
@@ -314,7 +361,8 @@ def _blind_drill_floor_wall(depth_max: float, drill_dia: float) -> float:
 
 if (
     _blind_drill_floor_wall(
-        LOCATING_BORE_DEPTH + _XX + PIVOT_TAP_DRILL_DEPTH + _XX, PIVOT_TAP_DRILL_DIA
+        LOCATING_BORE_DEPTH + LOCATING_BORE_DEPTH_BAND + PIVOT_TAP_DRILL_DEPTH + _XX,
+        PIVOT_TAP_DRILL_DIA,
     )
     < 2.0
 ):
@@ -452,8 +500,11 @@ def _circle_rect_gap(
 
 
 _RECTS = [
-    (cx, cy, length + _XXX, width + _XXX)
-    for _tag, cx, cy, length, width in (*PAD_POCKETS, *REST_POCKETS)
+    *((cx, cy, length + _XXX, width + _XXX) for _tag, cx, cy, length, width in PAD_POCKETS),
+    *(
+        (cx, cy, length + _REST_POCKET_LENGTH_BAND, width + _XXX)
+        for _tag, cx, cy, length, width in REST_POCKETS
+    ),
 ]
 _ROUNDS = [
     (0.0, 0.0, (STAND_POCKET_DIA + _XXX) / 2.0),
@@ -520,16 +571,38 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StandPocketProfile": {"StandPocketDia": 3},
     "StandPocket": {"StandPocketDepth": 3},
     "LocatingBoreProfile": {"LocatingBoreDia": 3},
-    "LocatingBore": {"LocatingBoreDepth": 2},
-    "RodPinHoleProfile": {"RodPinHoleDia": 3},
+    "LocatingBore": {"LocatingBoreDepth": LOCATING_BORE_DEPTH_PLACES},
+    "RodPinHoleProfile": {"RodPinHoleDia": 3, "RodPinHoleX": 3, "RodPinHoleY": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
-if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
-    raise AssertionError("every marked profile-fixture dimension needs authored places")
+_MARKED = set().union(*DRAWING_DIMENSIONS.values())
+# What the sheet imports, and must read back at the authored places.
+MARKED_PRECISION_BY_NAME: dict[str, int] = {
+    name: places for name, places in DRAWING_PRECISION_BY_NAME.items() if name in _MARKED
+}
+# A schedule cell that carries its own band is a model dimension too (policy
+# rule 2: the model owns the band and its places; cross-vendor review of PR
+# 1252). The build tolerances it natively and proves the printed cell is the
+# model's value, places and band; the sheet prints it in the schedule, not as
+# a marked dimension. Row tag -> (X cell, Y cell) as (feature, dimension).
+SCHEDULE_CELL_DIMENSIONS: dict[str, tuple[tuple[str, str], tuple[str, str]]] = {
+    "P": (("RodPinHoleProfile", "RodPinHoleX"), ("RodPinHoleProfile", "RodPinHoleY")),
+}
+if ROD_PIN_XY_BAND[1] != -ROD_PIN_XY_BAND[0]:
+    raise AssertionError("the rod-pin coordinates print a symmetric band")
+EXPLICIT_SYMMETRIC_TOLERANCES_MM: dict[tuple[str, str], float] = {
+    cell: ROD_PIN_XY_BAND[0] for cell in SCHEDULE_CELL_DIMENSIONS["P"]
+}
+if set(DRAWING_PRECISION_BY_NAME) != _MARKED | {
+    name for cells in SCHEDULE_CELL_DIMENSIONS.values() for _feature, name in cells
+}:
+    raise AssertionError(
+        "every marked or scheduled profile-fixture dimension needs authored places"
+    )
 DIMENSION_CALLOUTS = {"LocatingBoreDia": "REAM", "RodPinHoleDia": "REAM"}
 
 # Schedules (sheets two and three): every pocket and hole is tagged on the
@@ -590,7 +663,7 @@ FEATURE_SCHEDULE: tuple[tuple[str, ...], ...] = (
             "REST POCKET",
             _mm(cx),
             _mm(cy),
-            _mm(length),
+            _mm(length, REST_POCKET_LENGTH_PLACES),
             _mm(width),
             _mm(REST_POCKET_DEPTH),
         )
@@ -698,10 +771,13 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
                 ),
             ),
             "dia_nominal": (LOCATING_BORE_DIA, ("LOCATING_BORE_DIA",)),
-            "depth": (limits(LOCATING_BORE_DEPTH, 2), ("LOCATING_BORE_DEPTH",)),
+            "depth": (
+                limits(LOCATING_BORE_DEPTH, LOCATING_BORE_DEPTH_PLACES),
+                ("LOCATING_BORE_DEPTH", "LOCATING_BORE_DEPTH_PLACES"),
+            ),
             "process": ("REAM", ("DIMENSION_CALLOUTS",)),
         },
-        precision={"dia": 3, "depth": 2},
+        precision={"dia": 3, "depth": LOCATING_BORE_DEPTH_PLACES},
     ),
     "rod_pin_hole": ExportFeature(
         kind="hole",
@@ -777,7 +853,12 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
             ),
             "height": (
                 limits(STAND_DROP, 3),
-                ("STAND_DROP", ("ch_rocker_arm_spec", "HUB_LENGTH_BAND")),
+                (
+                    "STAND_DROP",
+                    ("ch_rocker_arm_spec", "HUB_LENGTH_BAND"),
+                    ("ch_rocker_arm_spec", "ARM_THICKNESS"),
+                    ("ch_rocker_arm_notes", "DEFAULT_DRAWING_PRECISION"),
+                ),
             ),
             "height_from": ("pad_tops", ("STAND_DROP",)),
             "dia": (limits(STAND_OD, 3), ("STAND_OD",)),

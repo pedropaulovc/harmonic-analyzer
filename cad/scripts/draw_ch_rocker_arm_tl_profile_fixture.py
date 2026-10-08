@@ -52,7 +52,6 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     DETAIL_LABEL,
     DIMENSION_CALLOUTS,
     DRAWING_DIMENSIONS,
-    DRAWING_PRECISION_BY_NAME,
     FEATURE_SCHEDULE,
     FEATURE_SCHEDULE_HEADER,
     FEATURE_SCHEDULE_TITLE,
@@ -60,6 +59,7 @@ from ch_rocker_arm_tl_profile_fixture_spec import (
     HOLD_DOWN_POINTS,
     LOCATING_BORE_DIA,
     LOCATING_BORE_FLOOR_Z,
+    MARKED_PRECISION_BY_NAME,
     PAD_POCKETS,
     PAD_TOP_Z,
     PART_SCHEDULE,
@@ -560,10 +560,14 @@ def _detail(adapter: Any, plan: Any) -> Any:
     if detail is None:
         raise RuntimeError("CreateDetailViewAt4 returned no view for detail E")
     rebuild_drawing(adapter, label="create detail E")
-    _center_on_outline(adapter, detail, DETAIL_CENTER, label="detail E")
-    # A fresh detail view's projection lags its ink; settle it before anything
-    # is placed through it (draw_dt_cone_swing_platform._create_detail_view).
-    for attempt in range(3):
+    # Centre the view on the bore axis it is cut about (its circle's centre),
+    # not on its outline: on swmaker000004 the outline-centred view put the
+    # bore 5 mm low on the sheet and three rebuilds never moved it (run
+    # 20261007T233527878Z). A fresh detail view's projection also lags its
+    # ink, so each move is re-projected after a rebuild
+    # (draw_dt_cone_swing_platform._create_detail_view).
+    view = _early_bound(detail, "IView")
+    for attempt in range(4):
         projected = model_point_in_view(
             adapter,
             detail,
@@ -572,6 +576,10 @@ def _detail(adapter: Any, plan: Any) -> Any:
         )
         if math.dist(projected, DETAIL_CENTER) < 0.0005:
             break
+        position = tuple(float(value) for value in view.Position)
+        moved = [position[axis] + DETAIL_CENTER[axis] - projected[axis] for axis in range(2)]
+        if not view.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to position detail E")
         rebuild_drawing(adapter, label="settle detail E")
     else:
         raise RuntimeError(
@@ -791,7 +799,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     # Places (and so each dimension's tolerance) are authored on the part; the
     # sheet only proves the import kept them.
-    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    assert_imported_precision(adapter, annotations, MARKED_PRECISION_BY_NAME)
 
     plan_edges = scan_view_edges(plan, label="plan")
     hold_down = HOLD_DOWN_POINTS[1]
