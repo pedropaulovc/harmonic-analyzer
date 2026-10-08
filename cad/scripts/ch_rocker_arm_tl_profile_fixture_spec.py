@@ -104,8 +104,12 @@ def _end_gap_min(
 
 # Pads: inventory stations, +X side (tag, station west X, station length, pad
 # south Y, pad width). B pads mirror them about the pivot axis. Each pocket is
-# its station less an end wall at each end, so neighbouring pockets keep a 2 mm
-# web at the worst case of their .XXX sizes and locations (rule 12 target).
+# its station less an end wall at each end. A pocket's length locates nothing
+# (each pad is centred in it), so it prints at one place (codex review of run
+# 20261008T010334394Z: 17.500 was over-specified); the end walls are sized so
+# neighbouring pockets keep a 2 mm web at the worst case of those .X lengths
+# and their .XXX locations (rule 12 target), and each pad is shortened by the
+# wider band so it still ends clear.
 # Each pad stands at least PAD_OUTLINE_MARGIN inside the arm's finished outline
 # (the inventory's "~6 mm inside, outside the end mills' swept bands") and is
 # at least 2 mm wide at the .XXX band. The inventory's 20 mm pads lost width to
@@ -119,7 +123,9 @@ _RIGHT_STATIONS = (
     ("5", 90.0, 20.0, 5.17, 2.15),
     ("6", 110.0, 12.0, 7.25, 2.3),
 )
-POCKET_END_WALL = 1.25
+PAD_POCKET_LENGTH_PLACES = 1
+_PAD_POCKET_LENGTH_BAND = printed_band_mm(PAD_POCKET_LENGTH_PLACES)
+POCKET_END_WALL = 1.55
 PAD_HEIGHT = 11.6
 PAD_POCKET_DEPTH = 2.0
 PAD_OUTLINE_MARGIN = 6.0
@@ -142,15 +148,16 @@ PADS: tuple[tuple[str, float, float, float, float], ...] = tuple(
         tag,
         cx,
         cy,
-        _part_length(length, width),
+        _part_length(length, width, _PAD_POCKET_LENGTH_BAND),
         round(width - 2.0 * POCKET_SIDE_CLEARANCE, 3),
     )
     for tag, cx, cy, length, width in PAD_POCKETS
 )
 if min(width for *_head, width in PADS) - _XXX < 2.0:
     raise AssertionError("a pad is under 2 mm wide at the .XXX band (rule 12 target)")
-# Web between neighbouring pockets: both length bands and both location bands.
-if 2.0 * POCKET_END_WALL - 3.0 * _XXX < 2.0:
+# Web between neighbouring pockets: half of each pocket's length band at the
+# shared end, and both location bands.
+if 2.0 * POCKET_END_WALL - _PAD_POCKET_LENGTH_BAND - 2.0 * _XXX < 2.0:
     raise AssertionError("a web between pad pockets is under 2 mm at the worst case")
 
 
@@ -229,10 +236,9 @@ REST_POCKETS: tuple[tuple[str, float, float, float, float], ...] = tuple(
 )
 # A rest pocket's length neither locates its centred rest nor neighbours a
 # web, so it prints at one place (codex review of run
-# 20261007T232215823Z: 20.000 was over-specified); its rest is shortened by
-# the wider band so it still ends clear. The pad pockets keep .XXX lengths:
-# their 2 mm webs need them.
-REST_POCKET_LENGTH_PLACES = 1
+# 20261007T232215823Z: 20.000 was over-specified), as the pad pockets' do;
+# its rest is shortened by the wider band so it still ends clear.
+REST_POCKET_LENGTH_PLACES = PAD_POCKET_LENGTH_PLACES
 _REST_POCKET_LENGTH_BAND = printed_band_mm(REST_POCKET_LENGTH_PLACES)
 RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     (
@@ -245,7 +251,10 @@ RESTS: tuple[tuple[str, float, float, float, float], ...] = tuple(
     for tag, cx, cy, length, width in REST_POCKETS
 )
 PART_END_GAP_MIN = min(
-    *(_end_gap_min(pocket[3], pocket[4], part[3]) for pocket, part in zip(PAD_POCKETS, PADS, strict=True)),
+    *(
+        _end_gap_min(pocket[3], pocket[4], part[3], _PAD_POCKET_LENGTH_BAND)
+        for pocket, part in zip(PAD_POCKETS, PADS, strict=True)
+    ),
     *(
         _end_gap_min(pocket[3], pocket[4], part[3], _REST_POCKET_LENGTH_BAND)
         for pocket, part in zip(REST_POCKETS, RESTS, strict=True)
@@ -591,7 +600,7 @@ HOLD_DOWN_NAMES = tuple(
 CLAMP_STUD_NAMES = tuple(
     (f"ClampStud{index}X", f"ClampStud{index}Y") for index in range(1, len(CLAMP_STUD_POINTS) + 1)
 )
-_POCKET_PLACES = (SCHEDULE_PLACES,) * 4
+_POCKET_PLACES = (SCHEDULE_PLACES, SCHEDULE_PLACES, PAD_POCKET_LENGTH_PLACES, SCHEDULE_PLACES)
 _REST_POCKET_PLACES = (SCHEDULE_PLACES, SCHEDULE_PLACES, REST_POCKET_LENGTH_PLACES, SCHEDULE_PLACES)
 _PART_PLACES = (PART_LENGTH_PLACES, SCHEDULE_PLACES)
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
@@ -1278,7 +1287,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
         f"pad_pocket_{row[0].lower()}": _pocket(
             row, "PAD_POCKETS",
             (PlanarFace((0.0, 0.0, 1.0), PLATE_TOP_Z - PAD_POCKET_DEPTH, contains_x_mm=row[1]),),
-            PAD_POCKET_DEPTH, "PAD_POCKET_DEPTH", SCHEDULE_PLACES,
+            PAD_POCKET_DEPTH, "PAD_POCKET_DEPTH", PAD_POCKET_LENGTH_PLACES,
         )
         for row in PAD_POCKETS
     },
