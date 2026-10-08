@@ -313,10 +313,11 @@ for the lead depend on the head and the table screw: `TODO(cut it first)`.
 | `pd-rack-pinion` (reducer disc) | 120 | 40DP PA20 | #2 | 5 on 15 |
 | `pd-transgear-knob-shaft` integral pinion | 12 | 40DP PA20 | #8 | 3 turns + 5 on 15 |
 | `pd-transgear-feed-pinion` | 12 | 32DP PA20 | #8 | 3 turns + 5 on 15 |
-| `pd-platen-rack` | rack, pitch 2.4936 mm, 108 gaps | 32DP PA20 | #1 or a straight-sided 20° rack tool | step 2.4936 mm on the table |
+| `pd-platen-rack` | rack, pitch 2.4936 mm | 32DP PA20 | none: bought as stock rack | none |
 
 Both 12T pinions are cutter-native: the standard #8 gap moved along its centreline, with the blank
-diameter and plunge solved from that geometry, and each hub is shaped so the cutter runs out clear. The modelled rack is a
-4.7625 mm square toothed strip on a backer. SDP/SI lists stock 32DP 20° racks (A1B12-322 family,
-[D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)) with the same tooth form, but the part is
-not designed around one. The sprockets and the 68-link chain are stock ANSI #25.
+diameter and plunge solved from that geometry, and each hub is shaped so the cutter runs out clear.
+The rack is bought, not cut: a stock 32DP 20° rack (SDP/SI and Boston list them; SDP/SI's A1B12-322
+family is in the [D820 catalogue](https://sdp-si.com/D820/PDFS/Gears.pdf)) cut to 269.64 mm and
+fixed to the existing backer. The exact SKU is TBD. The sprockets and the 68-link chain are stock
+ANSI #25.
