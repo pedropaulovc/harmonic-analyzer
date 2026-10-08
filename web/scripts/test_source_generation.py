@@ -2650,6 +2650,25 @@ class QualifiedSourceVisibilityTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     ordinary_build(module, video_id, 'generate', record)
 
+    def test_normal_producer_preserves_inadmissible_template_donors_without_using_them_as_checks(self):
+        video_id = 'XPQwKRt4Y2k'
+        with current_source_fixture('compact-spin.py', [video_id]) as (root, module, data, _):
+            record = data[video_id]
+            frame = record['frames'][0]
+            for point in frame['landmarks']:
+                point['method'] = 'template-match'
+                point.pop('trackingEvidence', None)
+            self.qualify(frame, frame['views'][0])
+            frame['views'][0]['sourceVisibility']['reasonCode'] = 'unreadable-near-black-fade'
+            donors = copy.deepcopy(frame['landmarks'])
+            write_current_record(root / 'web', video_id, record)
+            track = ordinary_build(module, video_id, 'generate', record)
+            retained = next(row for row in track['frames'] if row['timeSeconds'] == frame['timeSeconds'])
+            self.assertEqual(retained['landmarks'], donors)
+            self.assertEqual(track['sourceMeasurements']['preservedInadmissibleLandmarkSamples'], len(donors))
+            self.assertTrue(all(stage['status'] == 'unmeasured' for stage in track['stages'].values()))
+            module.common.write_track(track)
+
     def test_qualification_transition_is_a_retained_observed_change_even_without_authored_keys(self):
         data = {
             'kind': 'current-source-observations', 'coverage': {'changeTimesSeconds': []},

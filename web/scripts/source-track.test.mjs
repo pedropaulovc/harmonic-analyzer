@@ -481,6 +481,7 @@ test('qualified backgrounds have no cold-start source fallback before the first 
   track.frames.forEach(frame => excludeBackground(frame))
   const reference = new CompactVideoReference(track, video)
   assert.equal(reference.prepareLastReadableAt(1), null)
+  assert.equal(reference.prepareInitialReadable(), null)
   assert.equal(reference.at(1).state, 'hold-last-readable')
 })
 
@@ -519,4 +520,25 @@ test('finite native-line probes contain only bounded exact local-segment diagnos
   assert.equal(track.anchors.length, 0)
   assert.ok(track.frames.every(frame => frame.landmarks.length === 0))
   assert.equal(reference.at(0.5).state, 'approximate', 'Native line probes do not claim source fidelity')
+})
+
+test('an individually audited initial near-black fade prepares only the first authored readable camera input layout and assembly', () => {
+  const track = assemblyFixture()
+  excludeBackground(track.frames[0])
+  track.frames[0].views[0].sourceVisibility.reasonCode = 'unreadable-near-black-fade'
+  viewAt(track, 1).sourceAssembly = assemblyState({ retainingNut: { attachment: 'threaded', releaseTurns: 1 } })
+  const reference = new CompactVideoReference(track, operationVideo)
+  assert.equal(reference.at(0).state, 'hold-last-readable')
+  assert.equal(reference.prepareLastReadableAt(0), null)
+  const first = reference.prepareInitialReadable()
+  assert.equal(first.timeSeconds, 1)
+  assert.equal(first.state, 'approximate')
+  assertCamera(first.views[0].camera, viewAt(track, 1).camera)
+  assert.deepEqual(first.views[0].sourceAssembly, viewAt(track, 1).sourceAssembly)
+  assert.deepEqual(first.views[0].sourceLayout.map(view => view.viewId), ['main'])
+  reference.commitPrepared()
+  const hold = reference.at(0)
+  assert.equal(hold.timeSeconds, 0, 'Future readable candidate never replaces the current source clock')
+  assert.equal(hold.mechanicalProvenance, null)
+  assert.deepEqual(hold.views, [])
 })

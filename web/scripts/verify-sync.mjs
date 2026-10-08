@@ -7,7 +7,7 @@ import { VIDEO_IDS, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceIm
 import { distManifest, serveDist } from './verify-server.mjs'
 import { assertNativeSourceAssociation, assertModelRepresentationBytes, REPRESENTATION_KIND } from '../model-representation.mjs'
 import { nativeProvenanceFromModule } from './fetch-model.mjs'
-import { sourceVisibilityError, policyExcludedSourceView, requiredSourceViews } from '../source-visibility.mjs'
+import { sourceVisibilityError, policyExcludedSourceView, requiredSourceViews, sourceIntrinsicTemplateIssue } from '../source-visibility.mjs'
 import { NATIVE_LINE_STATIONS, nativeLineEndpointId, fixedNativeLinePart, nativeLineReadbackResidual, projectNativeLineWorld } from '../native-line-checks.mjs'
 import { APPROVED_MODEL_REPRESENTATION, LIVE_MODEL_SOURCE } from './approved-model.mjs'
 import { loadCurrentObservations, loadCurrentAuthority, validateCurrentTrackAssociation, currentSourceAssemblyChangeTimes, normalizeCurrentTrackAssemblies, currentSourceLayoutForViews as sourceLayoutForViews } from './fresh-source-observations.mjs'
@@ -239,7 +239,8 @@ export function sourceCensus(observations, track, native, options, assemblyChang
       || originalRequired && !original?.views?.length || compactRequired && !governing?.views?.length)
     const qualifiedExcludedViews = (governing?.views ?? []).filter(view => policyExcludedSourceView(governing, view)
       && !sourceViewMappings.some(mapping => !mapping.qualifiedExcluded && mapping.viewIds.includes(view.id)))
-      .map(view => ({ viewId: view.id, ...view.sourceVisibility }))
+      .map(view => ({ viewId: view.id, ...view.sourceVisibility,
+        preservedInadmissibleLandmarks: (governing.landmarks ?? []).filter(point => (point.viewId ?? 'main') === view.id) }))
     const tolerance = row.reasons.includes('every-second') ? 1e-5 : 1 / native.fps + 0.001
     let frame = authored && Math.abs(authored.timeSeconds - row.timeSeconds) <= tolerance && authored.shotId === shot?.id ? authored : null
     let unavailableReason = frame ? null : 'Missing authored sample at retained every-second/change-point source time'
@@ -506,13 +507,36 @@ export async function preparePausedSource(page, embed, record, rows) {
 
 
 
+/** The pose-selection key is not a substitute for the owned original exposure or native clock. */
+function requireOwnedSourceExposure(actual, frame) {
+  const presentation = actual.sourcePresentation, timeBase = presentation?.timeBase
+  assert(presentation && Number.isSafeInteger(presentation.frameIndex)
+    && presentation.frameIndex === frame.sourceImage?.frameIndex
+    && Number.isSafeInteger(presentation.pts) && Array.isArray(timeBase) && timeBase.length === 2
+    && timeBase.every(value => Number.isSafeInteger(value) && value > 0)
+    && Number.isSafeInteger(presentation.presentedFrames) && presentation.presentedFrames > 0,
+  'Source sample lacks its exact owned presented original frame identity')
+  const sourcePts = presentation.pts * timeBase[0] / timeBase[1]
+  assert(finite(frame.decodedTimeSeconds) && Math.abs(sourcePts - frame.decodedTimeSeconds) <= 0.001
+    && finite(presentation.mediaTime) && Math.abs(presentation.mediaTime - sourcePts) <= 1e-6,
+  'Owned original presentation PTS differs from the measured source exposure')
+  assert(finite(actual.modelTime) && finite(presentation.currentTime)
+    && Math.abs(actual.modelTime - presentation.currentTime) <= 1e-6
+    && finite(actual.sourceSampleTimeSeconds) && (Math.abs(actual.sourceSampleTimeSeconds - frame.timeSeconds) <= 1e-6
+      || frame.measuredInterpolation === true && Math.abs(actual.sourceSampleTimeSeconds - frame.decodedTimeSeconds) <= 1e-6),
+  'Native draw clock or retained authored selection key differs from the owned source exposure')
+}
+
 /** Preserve observed timing counterexamples even when the native model state is stale. */
 export function requirePausedReview(actual, native, frame, required = true) {
   assert(actual.mode === 'reference-review' && actual.playerState === 'paused' && native.paused && !native.seeking, 'Source review did not hold a decoded paused original frame')
   const clockSkewSeconds = Math.abs(actual.modelTime - native.mediaTime)
   try {
     assert(!finite(clockSkewSeconds) || clockSkewSeconds <= CLOCK_LIMIT, 'Actual original media/model clock exceeds the0.5s timing bound')
-    assert((required ? ['approximate'] : ['no-machine', 'approximate']).includes(actual.referenceState) && Math.abs(actual.modelTime - frame.timeSeconds) <= 1e-6, 'Source sample has no current native draw or legitimate no-machine hold')
+    assert((required ? ['approximate'] : ['hold-last-readable', 'approximate']).includes(actual.referenceState)
+      && finite(actual.modelTime) && finite(actual.sourceSampleTimeSeconds),
+    'Source sample has no current native draw or legitimate held-readable state')
+    requireOwnedSourceExposure(actual, frame)
   } catch (error) {
     if (finite(clockSkewSeconds)) Object.assign(error, { clockSkewSeconds, nativeMediaTime: native.mediaTime })
     throw error
@@ -561,6 +585,8 @@ export function sourceSeedIndex(frames) {
 
 /** Only method/provenance rejection is excludable; missing pixels/native bodies are not. */
 function sourceMethodIssue(observed, anchor, frame, seeds, viewId) {
+  const intrinsic = sourceIntrinsicTemplateIssue(observed)
+  if (intrinsic) return intrinsic
   if (!['manual', 'optical-flow', 'image-edge', 'template-match'].includes(observed.method)) return { code: 'source-method', reason: 'Source measurement method is not an admitted independent pixel technique' }
   const evidence = observed.trackingEvidence, seed = seeds.get(`${evidence?.seedTimeSeconds}/${observed.originalViewId ?? viewId}/${observed.anchorId}`)
   const seedBound = seed && seed.sourceImage?.sourceSha256 && seed.sourceImage.sourceSha256 === frame.sourceImage?.sourceSha256
@@ -609,8 +635,9 @@ export function measureView(view, response, frame, observations, tolerancePx, an
   assert(!visibilityError && !policyExcludedSourceView(frame, view), visibilityError ?? 'Policy-excluded physical ROI is not a source-pose measurement')
   const entry = response.captures.find(item => item.viewId === view.id), capture = entry?.capture, mechanism = entry?.mechanism
   const rendered = response.actual.views?.find(item => item.id === view.id)
-  assert(capture?.method === 'gpu-readback' && capture.status === 'captured' && capture.visibilityMode === 'depth-off-landmark-projection' && capture.viewId === view.id && finite(capture.timeSeconds) && Math.abs(capture.timeSeconds - frame.timeSeconds) <= 1e-6, 'Missing/stale actual GPU landmark readback')
-  assert(mechanism?.method === 'actual-native-mechanism-solve' && mechanism.status === 'rendered' && mechanism.viewId === view.id && mechanism.timeSeconds === capture.timeSeconds && Number.isInteger(mechanism.sourceDrawRevision) && mechanism.sourceDrawRevision > 0 && mechanism.channelAnglesRad?.length === 20 && mechanism.channelAnglesRad.every(finite), 'Missing/stale native full physical solve')
+  requireOwnedSourceExposure(response.actual, frame)
+  assert(capture?.method === 'gpu-readback' && capture.status === 'captured' && capture.visibilityMode === 'depth-off-landmark-projection' && capture.viewId === view.id && finite(capture.timeSeconds) && capture.timeSeconds === response.actual.modelTime, 'Missing/stale actual GPU landmark readback')
+  assert(mechanism?.method === 'actual-native-mechanism-solve' && mechanism.status === 'rendered' && mechanism.viewId === view.id && mechanism.timeSeconds === capture.timeSeconds && Number.isInteger(mechanism.sourceDrawRevision) && mechanism.sourceDrawRevision > 0 && mechanism.sourceDrawRevision === response.actual.sourceDrawRevision && mechanism.channelAnglesRad?.length === 20 && mechanism.channelAnglesRad.every(finite), 'Missing/stale native full physical solve')
   assert(rendered && jsonDigest(mechanism.input) === jsonDigest(rendered.input) && jsonDigest(mechanism.sourceLayout) === jsonDigest(capture.sourceLayout) && jsonDigest(mechanism.resolvedImagePlaneWarp) === jsonDigest(capture.resolvedImagePlaneWarp), 'Readback and native input/layout/warp do not belong to the same rendered source view')
   assert(jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation, 'Rendered source view ROI/orientation differs from sample')
   assert(jsonDigest(capture.sourceLayout) === jsonDigest(capturedSourceLayoutForViews(requiredSourceViews(frame))),
@@ -620,7 +647,7 @@ export function measureView(view, response, frame, observations, tolerancePx, an
   const near = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, index) => finite(value) && Math.abs(value - b[index]) <= 1e-7)
   if (frame.measuredInterpolation) {
     const sampling = rendered.sourceSampling, [fromTime, toTime] = frame.interpolationInterval
-    assert(sampling && sampling.fromTimeSeconds === fromTime && (sampling.selection === 'continuous' ? sampling.toTimeSeconds === toTime && Math.abs(sampling.mix - (frame.timeSeconds - fromTime) / (toTime - fromTime)) <= 1e-7 : sampling.selection === 'decoded-exposure' && sampling.toTimeSeconds === fromTime && sampling.mix === 0), 'Intermediate source sample has no correctly bound actual interpolation/explicit held-pose receipt')
+    assert(sampling && sampling.fromTimeSeconds === fromTime && (sampling.selection === 'continuous' ? sampling.toTimeSeconds === toTime && response.actual.sourceSampleTimeSeconds >= fromTime && response.actual.sourceSampleTimeSeconds < toTime && Math.abs(sampling.mix - (response.actual.sourceSampleTimeSeconds - fromTime) / (toTime - fromTime)) <= 1e-7 : sampling.selection === 'decoded-exposure' && sampling.toTimeSeconds === fromTime && sampling.mix === 0), 'Intermediate source sample has no correctly bound actual interpolation/explicit held-pose receipt')
   } else {
     assert(near(rendered.camera?.positionMetres, view.camera.positionMetres) && (near(rendered.camera?.quaternion, view.camera.quaternion) || near(rendered.camera?.quaternion, view.camera.quaternion.map(value => -value))) && Math.abs(rendered.camera.verticalFovDegrees - view.camera.verticalFovDegrees) <= 1e-7 && jsonDigest(rendered.input) === jsonDigest(view.input), 'GPU sample did not draw the authored camera and complete chosen physical input')
   }
@@ -655,6 +682,7 @@ export function measureView(view, response, frame, observations, tolerancePx, an
   for (const line of view.nativeLineChecks ?? []) {
     const context = { viewId: view.id, lineId: line.id, partPath: line.partPath, role: 'check', kind: 'native-body-line' }
     try {
+      assert(!Object.hasOwn(line, 'role'), 'Native body line checks are held out; explicit fitter roles cannot be promoted to CHECK')
       const issues = nativeLineErrors([line], frame.sourceImage, view)
       assert(!issues.length, issues.join('; '))
       assert(lineAuthority?.paths?.has(line.partPath), 'Native line has no current released-body inventory association')
@@ -663,7 +691,7 @@ export function measureView(view, response, frame, observations, tolerancePx, an
       const markers = stations.map(station => capture.landmarks?.find(marker => marker.id === nativeLineEndpointId(view.id, line.id, station)))
       assert(markers.every(marker => marker?.partPath === line.partPath
         && Array.isArray(marker.worldMetres) && marker.worldMetres.length === 3 && marker.worldMetres.every(finite)),
-      'Qualified native finite-line endpoints/stations lack exact same-draw native world coordinates or belong to the wrong body')
+      'Qualified native finite-line endpoints/stations lack same-draw native world coordinates or belong to the wrong body')
       const visibleMarkers = markers.filter(marker => marker.state === 'rendered' && point(marker.sourcePixels)
         && point(marker.canvasPixels) && finite(marker.uncertaintySourcePixels) && marker.uncertaintySourcePixels >= 0)
       assert(visibleMarkers.length >= 2, 'Native finite line needs at least two actual visible GPU station readbacks; missing/offscreen support is unavailable, not proof of line impossibility')
@@ -698,6 +726,8 @@ export function measureView(view, response, frame, observations, tolerancePx, an
       const errorPx = rawErrorPx + line.uncertaintyPx + geometry.geometryBiasSourcePixels + rasterUncertaintyPx
       nativeLines.push({ ...context, motion: 'fixed', method: capture.method,
         sourceImage: frame.sourceImage, nativePartLocalLineMetres: line.partLocalLineMetres,
+        segmentProjection: markers[0].state === 'rendered' && markers[4].state === 'rendered' ? 'actual-visible-gpu-endpoints' : 'same-draw-native-world-camera-projection',
+        worldEvidenceInterpretation: 'World endpoints/stations are same-draw CPU native geometry, not exact-world certificates; actual visible diagnostic GPU raster stations corroborate rendered line support.',
         observedLinePixels: line.sourceLinePixels, observedEdgeMidpointPixels: observed.slice(2),
         projectedLinePixels, endpointProbeIds: [markers[0].id, markers[4].id], gpuStationReadbacks: visibleMarkers.map(marker => ({ id: marker.id, sourcePixels: marker.sourcePixels, worldMetres: marker.worldMetres, uncertaintySourcePixels: marker.uncertaintySourcePixels })),
         perpendicularErrorsPx: residual.perpendicularErrorsPx, nativeSegmentCoversObservation: residual.nativeSegmentCoversObservation,
@@ -1226,13 +1256,14 @@ export function finishVideo(video, census, options) {
   video.sourceVisibility = {
     requiredViewSamples: mandatory.reduce((sum, sample) => sum + (sample.requiredViewIds?.length ?? 0), 0),
     qualifiedExcludedViewSamples: mandatory.reduce((sum, sample) => sum + (sample.qualifiedExcludedViews?.length ?? 0), 0),
+    preservedInadmissibleLandmarkSamples: mandatory.reduce((sum, sample) => sum + (sample.qualifiedExcludedViews ?? []).reduce((count, view) => count + (view.preservedInadmissibleLandmarks?.length ?? 0), 0), 0),
     whollyQualifiedExcludedSamples: mandatory.filter(sample => sample.status === 'qualified-excluded').length,
     unavailableViewSamples: mandatory.reduce((sum, sample) => sum + new Set([
       ...sample.unavailable.map(item => item.viewId).filter(Boolean),
       ...(sample.status === 'unavailable' ? sample.requiredViewIds ?? [] : []),
     ]).size, 0),
     unavailableQualifiedExposureSamples: mandatory.filter(sample => sample.status === 'unavailable' && sample.qualifiedExcludedViews?.length).length,
-    interpretation: 'Only exact-image/full-ROI manually audited blurred or text-covered navigation physical backgrounds leave pixel/motion obligations. Their timestamps, decoder/image replay, source clocks and mandatory census remain required; held display is not current source fidelity.',
+    interpretation: 'Only exact-image/full-ROI individually manually audited approved unreadable navigation backgrounds or near-black fades leave pixel/motion obligations. Original intrinsically inadmissible template donors remain preserved provenance, never measured support. Their timestamps, decoder/image replay, source clocks and mandatory census remain required; held display is not current source fidelity.',
   }
   video.landmarks = { measured: measurements.length, checks: checks.length, fitting: measurements.length - checks.length, fixedChecks: checks.filter(item => item.motion === 'fixed').length, movingChecks: checks.filter(item => item.motion === 'moving').length, maxErrorPx: maximumField(measurements, 'errorPx'), maxRawErrorPx: maximumField(measurements, 'rawErrorPx'), maxErrorFrameWidthPercent: maximumField(measurements, 'errorFrameWidthPercent') }
   const mandatoryLines = mandatory.flatMap(sample => sample.nativeLines ?? [])

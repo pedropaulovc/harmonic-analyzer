@@ -189,7 +189,7 @@ def policy_excluded_view(frame, view):
     valid = (isinstance(value, dict)
              and set(value) == {"kind", "reasonCode", "sourceImage", "rectSourcePixels", "manualSourceAudit"}
              and value["kind"] == "policy-excluded"
-             and value["reasonCode"] in ("blurred-navigation-background", "text-covered-navigation-background")
+             and value["reasonCode"] in ("blurred-navigation-background", "text-covered-navigation-background", "unreadable-near-black-fade")
              and isinstance(audit, dict) and set(audit) == {"method", "evidence"}
              and audit["method"] == "manual-source-pixel-inspection"
              and isinstance(audit["evidence"], str) and bool(audit["evidence"].strip())
@@ -204,9 +204,23 @@ def policy_excluded_view(frame, view):
              and rect[0] >= 0 and rect[1] >= 0 and rect[2] > 0 and rect[3] > 0
              and rect[0] + rect[2] <= image["width"] and rect[1] + rect[3] <= image["height"]
              and not view.get("nativeLineChecks")
-             and not any(point.get("viewId", "main") == view["id"] for point in frame.get("landmarks", [])))
+             and not any(point.get("viewId", "main") == view["id"] and not (
+                 point.get("method") == "template-match" and "trackingEvidence" not in point
+                 and isinstance(point.get("anchorId"), str) and bool(point["anchorId"].strip())
+                 and point.get("status") == "observed" and point.get("role") in ("fit", "check")
+                 and isinstance(point.get("pixel"), list) and len(point["pixel"]) == 2
+                 and all(type(number) in (int, float) and math.isfinite(number) for number in point["pixel"])
+                 and rect[0] <= point["pixel"][0] < rect[0] + rect[2]
+                 and rect[1] <= point["pixel"][1] < rect[1] + rect[3]
+                 and type(point.get("uncertaintyPx")) in (int, float) and math.isfinite(point["uncertaintyPx"])
+                 and point["uncertaintyPx"] >= 0
+                 and (not isinstance(point.get("measurementEvidence"), dict) or (
+                     ("sourceImage" not in point["measurementEvidence"] or point["measurementEvidence"]["sourceImage"] == image)
+                     and ("sourceSha256Bgr8" not in point["measurementEvidence"] or point["measurementEvidence"]["sourceSha256Bgr8"] == image.get("sha256Bgr8"))
+                     and ("sourceSha256Gray8" not in point["measurementEvidence"] or point["measurementEvidence"]["sourceSha256Gray8"] == image.get("sha256Gray8")))))
+                 for point in frame.get("landmarks", [])))
     if not valid:
-        raise ValueError("Invalid actual source image/complete ROI/manual navigation-background visibility qualification")
+        raise ValueError("Invalid actual source image/complete ROI/manual approved unreadable-ROI qualification")
     return True
 
 
@@ -736,6 +750,9 @@ def build_track(data, frame_views_callback, evidence_notes=None):
         "status": "partial" if checked_views else "incomplete",
         "requiredViewSamples": len(required_views), "viewSamplesWithSourceChecks": checked_views,
         "qualifiedExcludedViewSamples": len(excluded_views),
+        "preservedInadmissibleLandmarkSamples": sum(
+            sum(point.get("viewId", "main") == view["id"] for point in frame.get("landmarks", []))
+            for frame, view in excluded_views),
         "assumedCameraViewSamples": assumed_cameras,
         "blockers": [
             f"Independent source CHECK pixels are missing in {len(required_views) - checked_views} required view samples.",

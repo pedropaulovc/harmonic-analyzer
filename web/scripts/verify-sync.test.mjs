@@ -525,7 +525,7 @@ function measuredViewFixture() {
   const layout = [{ viewId: 'main', rectSourcePixels: view.rectSourcePixels, presentation: 'native', composite: { mode: 'opaque' }, resolvedImagePlaneWarp: null, sourceAssembly: { kind: 'operating' } }]
   const capture = { method: 'gpu-readback', status: 'captured', visibilityMode: 'depth-off-landmark-projection', viewId: 'main', timeSeconds: 1, sourceLayout: layout, resolvedImagePlaneWarp: null, landmarks: observations.map(observed => ({ id: observed.anchorId, state: 'rendered', sourcePixels: observed.pixel, canvasPixels: observed.pixel, uncertaintySourcePixels: 0.5 })) }
   const mechanism = { method: 'actual-native-mechanism-solve', status: 'rendered', viewId: 'main', timeSeconds: 1, sourceDrawRevision: 1, channelAnglesRad: Array(20).fill(0), input: view.input, sourceLayout: layout, resolvedImagePlaneWarp: null }
-  const response = { captures: [{ viewId: 'main', capture, mechanism }], actual: { views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: 1 }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
+  const response = { captures: [{ viewId: 'main', capture, mechanism }], actual: { modelTime: 1, sourceSampleTimeSeconds: 1, sourceDrawRevision: 1, sourcePresentation: { frameIndex: 30, pts: 30, timeBase: [1, 30], mediaTime: 1, currentTime: 1, presentedFrames: 1 }, views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: 1 }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
   return { view, frame, observations, anchors, response, capture, seeds: new Map() }
 }
 const measureFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 96, fixture.anchors, fixture.seeds)
@@ -1359,12 +1359,13 @@ test('independent native fixed-body LINE uses actual GPU readbacks without becom
 })
 
 test('native line wrong source image/body, missing readback and stale physical draw fail closed', () => {
-  for (const mutation of ['source-image', 'native-body', 'readback', 'layout']) {
+  for (const mutation of ['source-image', 'native-body', 'readback', 'layout', 'fit-role']) {
     const fixture = nativeLineFixture()
     if (mutation === 'source-image') fixture.view.nativeLineChecks[0].measurementEvidence.sourceImage = sourceImage(31, 'wrong-source')
     if (mutation === 'native-body') fixture.capture.landmarks.at(-1).partPath = 'ha-harmonic-analyzer/fr-frame/wrong-part'
     if (mutation === 'readback') for (const marker of fixture.capture.landmarks.slice(-5)) marker.state = 'not-visible'
     if (mutation === 'layout') fixture.response.captures[0].mechanism.sourceLayout = []
+    if (mutation === 'fit-role') fixture.view.nativeLineChecks[0].role = 'fit'
     if (mutation === 'layout') assert.throws(() => measureNativeLineFixture(fixture), /same rendered source view/)
     else {
       const result = measureNativeLineFixture(fixture)
@@ -1426,4 +1427,107 @@ test('fixed LINE can satisfy fixed-body obligation only while original point/mov
   finishVideo(failedLine, censusFixture, parseOptions(['--stage', '50']))
   assert.equal(failedLine.stageMeasurement.status, 'failed')
   assert.equal(failedLine.maxErrorPx, 1001)
+})
+
+test('owned source exposure selects the authored pose while retaining the distinct real native draw clock', () => {
+  const fixture = measuredViewFixture(), actual = fixture.response.actual
+  Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'approximate', modelTime: 0.995 })
+  actual.sourcePresentation.currentTime = 0.995
+  Object.assign(fixture.response.native, { paused: true, seeking: false, mediaTime: 0.995 })
+  fixture.capture.timeSeconds = fixture.response.captures[0].mechanism.timeSeconds = 0.995
+  requirePausedReview(actual, fixture.response.native, fixture.frame)
+  const result = measureFixture(fixture)
+  assert.ok(result.measured.every(item => item.status === 'passed' && item.captureTimeSeconds === 0.995))
+  assert.equal(result.clockSkewSeconds, 0)
+  assert.equal(actual.sourceSampleTimeSeconds, 1)
+  assert.equal(actual.sourcePresentation.mediaTime, 1)
+})
+
+test('wrong original exposure, missing decoder receipt, invented clock or authored selection cannot admit a source draw', () => {
+  for (const mutation of ['image', 'pts', 'decoder', 'clock', 'selection', 'revision']) {
+    const fixture = measuredViewFixture(), actual = fixture.response.actual
+    if (mutation === 'image') actual.sourcePresentation.frameIndex++
+    if (mutation === 'pts') actual.sourcePresentation.pts++
+    if (mutation === 'decoder') actual.sourcePresentation = null
+    if (mutation === 'clock') actual.sourcePresentation.currentTime -= 0.01
+    if (mutation === 'selection') actual.sourceSampleTimeSeconds += 0.01
+    if (mutation === 'revision') fixture.response.captures[0].mechanism.sourceDrawRevision++
+    assert.throws(() => measureFixture(fixture), /owned|PTS|selection|physical solve/)
+  }
+})
+
+test('all-qualified hold admits only a real decoded clock receipt, never a required source-pose match', () => {
+  const fixture = measuredViewFixture(), actual = fixture.response.actual
+  Object.assign(actual, { mode: 'reference-review', playerState: 'paused', referenceState: 'hold-last-readable' })
+  Object.assign(fixture.response.native, { paused: true, seeking: false })
+  requirePausedReview(actual, fixture.response.native, fixture.frame, false)
+  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, true), /no current native draw/)
+  fixture.response.native.mediaTime += 0.50001
+  assert.throws(() => requirePausedReview(actual, fixture.response.native, fixture.frame, false), /clock exceeds/)
+})
+
+test('a supported source line outside the actual finite native segment remains a measured failure', () => {
+  const fixture = nativeLineFixture(), markers = fixture.capture.landmarks.slice(-5)
+  for (const marker of markers) {
+    marker.sourcePixels[1] = 300 + (marker.sourcePixels[1] - 100) / 900 * 500
+    marker.canvasPixels = [...marker.sourcePixels]
+  }
+  const result = measureNativeLineFixture(fixture)
+  assert.equal(result.nativeLines.length, 1)
+  assert.equal(result.nativeLines[0].nativeSegmentCoversObservation, false)
+  assert.equal(result.nativeLines[0].status, 'failed')
+})
+
+test('qualified donor templates remain lossless inadmissible provenance, not foreground measurements or sample passes', () => {
+  const { original, track } = visibilityCensusFixture()
+  const donor = { anchorId: 'old-template', viewId: 'background', role: 'fit', method: 'template-match', status: 'observed', pixel: [1200, 500], uncertaintyPx: 3 }
+  original.anchors = [{ id: donor.anchorId, kind: 'physical-feature', partPath: 'native-fixed', partLocalMetres: [0, 0, 0], correspondenceEvidence: 'Synthetic native association control.' }]
+  original.frames[0].landmarks = [structuredClone(donor)]
+  track.frames[0].landmarks = [structuredClone(donor)]
+  const before = structuredClone(track.frames[0].landmarks)
+  const row = sourceCensus(original, track, native, parseOptions(['--stage', '50', '--times', '1'])).selected[0]
+  assert.deepEqual(row.expectedViewIds, ['readable-inset'])
+  assert.deepEqual(row.qualifiedExcludedViews[0].preservedInadmissibleLandmarks, [donor])
+  assert.deepEqual(track.frames[0].landmarks, before)
+  const video = videoFixture()
+  video.samples[0].qualifiedExcludedViews = row.qualifiedExcludedViews
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.sourceVisibility.preservedInadmissibleLandmarkSamples, 1)
+  assert.equal(video.landmarks.measured, 2, 'Preserved donor never adds a measured FIT/CHECK')
+})
+
+test('a genuinely admitted independently tracked template still blocks audited ROI exclusion', () => {
+  const fixture = measuredViewFixture(), observed = fixture.observations[0]
+  observed.method = 'template-match'
+  fixture.frame.sourceImage = sourceImage(30, 'd'.repeat(64))
+  const seedImage = sourceImage(0, 'e'.repeat(64))
+  observed.trackingEvidence = { seedTimeSeconds: 0, seedDecodedFrameIndex: 0, seedSourceImage: seedImage, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 0.999, sourcePatchCorrelation: 0.99 }
+  fixture.seeds.set('0/main/anchor-0', { role: observed.role, sourceImage: seedImage })
+  assert.ok(measureFixture(fixture).measured.some(point => point.anchorId === observed.anchorId && point.status === 'passed'), 'Existing source-method predicate actually admits the independent template control')
+  fixture.frame.landmarks = [observed]
+  fixture.view.sourceVisibility = {
+    kind: 'policy-excluded', reasonCode: 'unreadable-near-black-fade',
+    sourceImage: structuredClone(fixture.frame.sourceImage), rectSourcePixels: [...fixture.view.rectSourcePixels],
+    manualSourceAudit: { method: 'manual-source-pixel-inspection', evidence: 'Synthetic contradictory policy annotation refusal, not an actual source audit.' },
+  }
+  assert.match(sourceVisibilityError(fixture.frame, fixture.view), /source-readable/)
+  assert.throws(() => measureFixture(fixture), /source-readable/)
+})
+
+test('admitted mid-interval errors use the owned integer-PTS selection without aliasing the actual native clock', () => {
+  const fixture = measuredViewFixture(), actual = fixture.response.actual
+  Object.assign(fixture.frame, { decodedTimeSeconds: 1.01, measuredInterpolation: true, interpolationInterval: [0, 2] })
+  Object.assign(actual, { modelTime: 1.009, sourceSampleTimeSeconds: 1.01, mode: 'reference-review', playerState: 'paused', referenceState: 'approximate' })
+  Object.assign(actual.sourcePresentation, { pts: 3030, timeBase: [1, 3000], mediaTime: 1.01, currentTime: 1.009 })
+  actual.views[0].sourceSampling = { selection: 'continuous', fromTimeSeconds: 0, toTimeSeconds: 2, mix: 1.01 / 2 }
+  Object.assign(fixture.response.native, { mediaTime: 1.009, paused: true, seeking: false })
+  fixture.capture.timeSeconds = fixture.response.captures[0].mechanism.timeSeconds = 1.009
+  fixture.capture.landmarks[0].sourcePixels = [fixture.capture.landmarks[0].sourcePixels[0] + 1000, fixture.capture.landmarks[0].sourcePixels[1]]
+  fixture.capture.landmarks[0].canvasPixels = [...fixture.capture.landmarks[0].sourcePixels]
+  requirePausedReview(actual, fixture.response.native, fixture.frame)
+  const measured = measureFixture(fixture).measured.find(point => point.anchorId === 'anchor-0')
+  assert.equal(measured.status, 'failed', 'A genuine admitted counterexample is not discarded for nominal-versus-PTS offset')
+  assert.equal(measured.captureTimeSeconds, 1.009)
+  actual.views[0].sourceSampling.mix = 0.5
+  assert.throws(() => measureFixture(fixture), /interpolation/)
 })

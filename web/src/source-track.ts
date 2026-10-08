@@ -172,6 +172,8 @@ export interface SourcePublicationReference {
   prepareAt(timeSeconds: number): SourceSample
   /** Cold-start fallback only; never replace an already displayed held pose. */
   prepareLastReadableAt(timeSeconds: number): SourceSample | null
+  /** Initial unreadable exposure only: draw the first authored readable pose, never claim its source time. */
+  prepareInitialReadable(): SourceSample | null
   commitPrepared(): SourceSample
 }
 
@@ -217,6 +219,7 @@ export class CompactVideoReference {
   /** Probe-only exact native line endpoints never enter the source point/role census. */
   readonly landmarkProbeAnchors: readonly LandmarkAnchor[]
   private readonly frames: CompiledTrackFrame[]
+  private readonly firstReadableIndex: number
   private readonly publication: PublicationBanks = { buffers: [buffer(), buffer()], publishedIndex: 0, preparedIndex: null, inputValidated: new WeakSet(), diagnostic: null }
   private readonly qa = new Quaternion()
   private readonly qb = new Quaternion()
@@ -247,7 +250,7 @@ export class CompactVideoReference {
     }
     const anchorIds = new Set(data.anchors.map((anchor) => anchor.id))
     if (anchorIds.size !== data.anchors.length) throw new Error('Compact anchor IDs must be unique.')
-    let previous = -Infinity, lastReadableIndex = -1
+    let previous = -Infinity, lastReadableIndex = -1, firstReadableIndex = -1
     this.frames = data.frames.map((frame, frameIndex) => {
       const t = finite(frame.timeSeconds, 'Compact sample time')
       const pts = frame.decodedTimeSeconds === null ? null : finite(frame.decodedTimeSeconds, 'Decoded source PTS')
@@ -315,9 +318,13 @@ export class CompactVideoReference {
         return { observation: view, input, sourceAssembly, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false }
       })
       const available = pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null))
-      if (required && available) lastReadableIndex = frameIndex
+      if (required && available) {
+        lastReadableIndex = frameIndex
+        if (firstReadableIndex < 0) firstReadableIndex = frameIndex
+      }
       return { observation: frame, required, layout, views, lastReadableIndex, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available }
     })
+    this.firstReadableIndex = firstReadableIndex
     for (let i = 0; i < this.frames.length - 1; i++) {
       const from = this.frames[i]!
       const next = this.frames[i + 1]!
@@ -388,6 +395,15 @@ export class CompactVideoReference {
 
   prepareLastReadableAt(timeSeconds: number): SourceSample | null {
     return this.prepareLastReadableAtIn(timeSeconds, this.publication)
+  }
+
+  prepareInitialReadable(): SourceSample | null {
+    return this.prepareInitialReadableIn(this.publication)
+  }
+
+  private prepareInitialReadableIn(publication: PublicationBanks): SourceSample | null {
+    return this.firstReadableIndex < 0 ? null
+      : this.prepareAtIn(this.frames[this.firstReadableIndex]!.observation.timeSeconds, publication)
   }
 
   private prepareLastReadableAtIn(timeSeconds: number, publication: PublicationBanks): SourceSample | null {
@@ -540,6 +556,7 @@ export class CompactVideoReference {
       approximationMessage: this.approximationMessage,
       prepareAt: (timeSeconds: number) => { requirePublication(); return this.prepareAtIn(timeSeconds, publication) },
       prepareLastReadableAt: (timeSeconds: number) => { requirePublication(); return this.prepareLastReadableAtIn(timeSeconds, publication) },
+      prepareInitialReadable: () => { requirePublication(); return this.prepareInitialReadableIn(publication) },
       commitPrepared: () => { requirePublication(); return this.commitPreparedIn(publication) },
     })
     const state: DiagnosticSourcePublicationState = Object.freeze({

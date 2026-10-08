@@ -205,3 +205,49 @@ test('visibility qualification cannot waive actual requested/decoded clock owner
   record.frames[0].decodedTimeSeconds = 0.501
   await assert.rejects(validateCurrentObservations(record, { webRoot }), /requested\/decoded clock/)
 })
+
+test('current native line observations are held-out checks and reject explicit camera fitter roles', async () => {
+  const record = visibilityFixture(), frame = record.frames[0], view = frame.views[0]
+  delete view.sourceVisibility
+  record.coverage.status = 'blocked'
+  record.coverage.blockers = ['Synthetic source candidate intentionally has no camera/input; structural line-check control only.']
+  view.nativeLineChecks = [{
+    id: 'synthetic-held-out-line', partPath: 'ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1',
+    partLocalLineMetres: [[0, 0, 0], [0, 1, 0]], sourceLinePixels: [[1200, 200], [1200, 900]], uncertaintyPx: 2,
+    measurementEvidence: {
+      sourceImage: structuredClone(frame.sourceImage), detector: 'Synthetic paired-edge semantic decision control, not fidelity evidence.',
+      edgeRows: [200, 550, 900].map(y => ({ y, left: 1199, right: 1201, contrast: 10 })),
+      axisPerspectiveBiasBoundPx: 4, axisPerspectiveEvidence: 'Synthetic independent stock-width budget control.',
+      axisPerspectiveBiasSpace: 'source-global',
+      axisPerspectiveBiasComponents: { kind: 'includes-source-localization', geometryBoundPx: 2, sourceLocalizationBoundPx: 2, evidence: 'Synthetic inclusive localization budget.' },
+    },
+  }]
+  await validateCurrentObservations(record, { webRoot })
+  view.nativeLineChecks[0].role = 'fit'
+  await assert.rejects(validateCurrentObservations(record, { webRoot }), /schema|held out|FIT/)
+})
+
+test('qualified ROIs retain only structurally valid original template donors without independent tracking', async () => {
+  const record = visibilityFixture(), frame = record.frames[0]
+  record.anchors = [{
+    id: 'synthetic-donor', kind: 'physical-feature',
+    partPath: 'ha-harmonic-analyzer/fr-frame/fr-rocker-arm-support-1', partLocalMetres: [0, 0, 0],
+    description: 'Synthetic native feature declaration for a provenance refusal control.',
+    correspondenceEvidence: 'Synthetic current released-body association, not measured source support.',
+  }]
+  frame.views[0].sourceVisibility.reasonCode = 'unreadable-near-black-fade'
+  frame.landmarks = [{ anchorId: 'synthetic-donor', viewId: 'main', role: 'fit', method: 'template-match', status: 'observed', pixel: [1200, 500], uncertaintyPx: 2 }]
+  const before = structuredClone(record)
+  await validateCurrentObservations(record, { webRoot })
+  assert.deepEqual(record, before, 'Qualification never rewrites original donor pixels, methods or roles')
+  for (const mutation of ['independent-method', 'present-tracking', 'status', 'coordinates', 'image', 'native-binding']) {
+    const changed = structuredClone(record), point = changed.frames[0].landmarks[0]
+    if (mutation === 'independent-method') point.method = 'manual'
+    if (mutation === 'present-tracking') point.trackingEvidence = {}
+    if (mutation === 'status') point.status = 'unavailable'
+    if (mutation === 'coordinates') point.pixel[0] = -1
+    if (mutation === 'image') point.measurementEvidence = { sourceImage: { ...frame.sourceImage, frameIndex: frame.sourceImage.frameIndex + 1 } }
+    if (mutation === 'native-binding') changed.anchors[0].partPath += '-unknown'
+    await assert.rejects(validateCurrentObservations(changed, { webRoot }), /source-readable|schema|unknown runtime|source association/)
+  }
+})

@@ -226,6 +226,7 @@ function validateLines(lines, frame, view, paths, label) {
   const inside = point => vector(point, 2) && point[0] >= rect[0] && point[0] < rect[0] + rect[2]
     && point[1] >= rect[1] && point[1] < rect[1] + rect[3]
   for (const line of lines) {
+    assert(!Object.hasOwn(line, 'role'), `${label}: native line checks are held out, not camera FIT or promoted source points`)
     const evidence = line.measurementEvidence, source = line.sourceLinePixels, local = line.partLocalLineMetres
     assert(text(line.id) && !ids.has(line.id) && paths.has(line.partPath)
       && Array.isArray(local) && local.length === 2 && local.every(point => vector(point, 3))
