@@ -292,6 +292,8 @@ test('same-repository main is rejected before Preview API or deployment writes',
 });
 
 test('standalone manifest wait joins real HTTP base URLs with and without trailing slashes', async t => {
+  const rootManifest = { commitSha: sha, branch: 'feature/root' };
+  const nestedManifest = { commitSha: 'c'.repeat(40), branch: 'feature/nested' };
   const server = createServer((request, response) => {
     const pathname = new URL(request.url, 'http://localhost').pathname;
     if (pathname !== '/deployment.json' && pathname !== '/application/deployment.json') {
@@ -300,7 +302,7 @@ test('standalone manifest wait joins real HTTP base URLs with and without traili
       return;
     }
     response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    response.end(JSON.stringify({ commitSha: sha, branch: 'feature/a' }));
+    response.end(JSON.stringify(pathname === '/application/deployment.json' ? nestedManifest : rootManifest));
   });
   t.after(async () => {
     server.closeAllConnections();
@@ -311,11 +313,12 @@ test('standalone manifest wait joins real HTTP base URLs with and without traili
     server.listen(0, '127.0.0.1', resolve);
   });
   const origin = `http://127.0.0.1:${server.address().port}`;
-  for (const base of [origin, `${origin}/`, `${origin}/application`, `${origin}/application/`]) {
-    assert.equal(await waitForManifest(base, sha, 'feature/a', 1), base);
+  for (const { base, manifest } of [{ base: origin, manifest: rootManifest }, { base: `${origin}/application`, manifest: nestedManifest }]) {
+    for (const url of [base, `${base}/`]) assert.equal(await waitForManifest(url, manifest.commitSha, manifest.branch, 1), url);
   }
   // These are real 200 JSON responses, not echo/mocked fetch assertions: the
   // oracle still rejects content from the wrong deployed commit or branch.
-  await assert.rejects(waitForManifest(`${origin}/`, 'b'.repeat(40), 'feature/a', 1), /Timed out/);
-  await assert.rejects(waitForManifest(`${origin}/`, sha, 'wrong-branch', 1), /Timed out/);
+  await assert.rejects(waitForManifest(`${origin}/`, 'b'.repeat(40), rootManifest.branch, 1), /Timed out/);
+  await assert.rejects(waitForManifest(`${origin}/`, rootManifest.commitSha, 'wrong-branch', 1), /Timed out/);
+  await assert.rejects(waitForManifest(`${origin}/application/`, rootManifest.commitSha, rootManifest.branch, 1), /Timed out/);
 });
