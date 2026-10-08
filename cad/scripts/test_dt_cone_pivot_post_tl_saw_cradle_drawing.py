@@ -1,0 +1,179 @@
+"""Offline contracts for the cone post saw cradle (MHA-DT-005-TL-02)."""
+
+from __future__ import annotations
+
+import re
+
+import _config
+import draw_dt_cone_pivot_post_tl_saw_cradle as drawing
+import dt_cone_pivot_post_spec as post
+import dt_cone_pivot_post_tl_saw_cradle_spec as spec
+import export_features
+from _feature_requirements import limits
+from prechips.model import TOLERANCE_REQUIREMENTS
+
+STEM = "dt_cone_pivot_post_tl_saw_cradle"
+
+
+def _features() -> dict:
+    return export_features.requirement_manifest(STEM)["features"]
+
+
+def test_every_marked_dimension_prints_once_at_its_model_places() -> None:
+    views = (drawing.FRONT_KEEP, drawing.TOP_KEEP, drawing.RIGHT_KEEP)
+    printed = [name for keep in views for name in keep]
+    assert len(printed) == len(set(printed))
+    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
+    assert set(printed) == marked
+    assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+
+
+def test_every_body_the_post_print_allows_bottoms_on_the_seat_line() -> None:
+    """The smallest printed seat is no smaller than the largest printed body,
+    so every body lies on the seat bottoms; a post change that grows the body
+    past the seat fails here, not at the saw."""
+    body_max = limits(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])[1]
+    for seat in ("head_seat", "foot_seat"):
+        assert _features()[seat]["dia"][0] >= body_max - 1e-9
+
+
+def test_unfitted_pad_stands_above_every_compliant_cap() -> None:
+    """The pad is fitted down to the cap, never built up: its unfitted top
+    clears the highest cap any compliant post presents to a seat bored at
+    the top of its printed band."""
+    body = limits(post.BLOCK_DIA, post.DRAWING_PRECISION_BY_NAME["MainBodyDia"])
+    boss = limits(post.CONE_BOSS_LENGTH, post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
+    seat_bottom_max = _features()["head_seat"]["height"][1]
+    highest_cap = seat_bottom_max + (body[1] - boss[0]) / 2.0
+    assert _features()["cap_pad"]["height_nominal"] - highest_cap >= spec.PAD_FIT_STOCK_MIN
+
+
+def test_pad_height_is_a_matched_fit_not_a_band() -> None:
+    pad = _features()["cap_pad"]
+    assert "height" not in pad
+    assert "note" in pad["requirements"]
+    assert pad["note"] == spec.PAD_FIT_CALLOUT
+    assert spec.POST_NUMBER in pad["note"]
+
+
+def test_every_exported_band_is_a_requirement() -> None:
+    """One-fact rule: prechips inspects only the bands a feature lists."""
+    for name, feature in _features().items():
+        for key, value in feature.items():
+            if key in TOLERANCE_REQUIREMENTS and isinstance(value, list) and len(value) == 2:
+                assert key in feature["requirements"], (name, key)
+
+
+# Each printed dimension -> the exported feature and requirement that owns its
+# band, and the spec constant the print draws it from. PadHt is the matched
+# fit's reference size and owns no band.
+PRINTED_OWNERS = {
+    "BaseLength": ("base_far_end", "station", spec.BASE_LENGTH),
+    "BaseWidth": ("base_far_side", "height", spec.BASE_WIDTH),
+    "BaseHt": ("base_top", "height", spec.BASE_HT),
+    "OverallHt": ("underside", "height", spec.OVERALL_HT),
+    "HeadSaddleX0": ("head_saddle_x0", "station", spec.HEAD_SADDLE_X[0]),
+    "HeadSaddleX1": ("head_saddle_x1", "station", spec.HEAD_SADDLE_X[1]),
+    "FootSaddleX0": ("foot_saddle_x0", "station", spec.FOOT_SADDLE_X[0]),
+    "FootSaddleX1": ("foot_saddle_x1", "station", spec.FOOT_SADDLE_X[1]),
+    "PadX0": ("pad_x0", "station", spec.PAD_X0),
+    "PadX1": ("pad_x1", "station", spec.PAD_X1),
+    "PadZ0": ("pad_z0", "height", spec.PAD_Z0),
+    "PadZ1": ("pad_z1", "height", spec.PAD_Z1),
+    "SaddleZ0": ("saddle_z0", "height", spec.SADDLE_Z[0]),
+    "SaddleZ1": ("saddle_z1", "height", spec.SADDLE_Z[1]),
+    "SeatZ": ("head_seat", "station", spec.SEAT_Z),
+    "SeatBottomHt": ("head_seat", "height", spec.SEAT_BOTTOM_Y),
+    "SeatDia": ("head_seat", "dia", spec.SEAT_DIA),
+    "StudX": ("stud_tap_near", "station", spec.STUD_X),
+    "StudNearZ": ("stud_tap_near", "height", spec.STUD_Z[0]),
+    "StudFarZ": ("stud_tap_far", "height", spec.STUD_Z[1]),
+}
+
+
+def test_every_printed_band_has_a_requirement_owner() -> None:
+    """One-fact coverage: every printed toleranced dimension reaches prechips
+    as a listed requirement band at its printed places."""
+    assert set(PRINTED_OWNERS) | {"PadHt"} == set(spec.DRAWING_PRECISION_BY_NAME)
+    features = _features()
+    for printed, (name, key, source) in PRINTED_OWNERS.items():
+        feature = features[name]
+        assert key in feature["requirements"], printed
+        nominal = feature.get(f"{key}_nominal", feature.get(f"nominal_{key}"))
+        places = spec.DRAWING_PRECISION_BY_NAME[printed]
+        # The part has no explicit bands: each band is the .X general grade
+        # (±0.8) about the printed value, and the exported nominal IS that
+        # printed value of its spec source even where the model is derived
+        # (PAD_X0 46.632 prints and exports 46.6).
+        assert places == 1, printed
+        assert nominal == round(source, places), printed
+        assert feature[key] == [round(nominal - 0.8, 12), round(nominal + 0.8, 12)], printed
+
+
+def test_thru_stud_taps_carry_the_printed_drill_band() -> None:
+    """The callout prints the THRU tap drill as Ø7.94: with no drill-point
+    face of its own, each tap carries the drilled-hole band on that printed
+    value, while the face match keeps the true drill size."""
+    for name in ("stud_tap_near", "stud_tap_far"):
+        feature = _features()[name]
+        assert "dia" in feature["requirements"]
+        assert feature["dia_nominal"] == 7.94
+        assert feature["dia"] == [7.94, 8.04]
+        assert feature["tap_drill_mm"] == spec.STUD_TAP_DRILL != 7.94
+
+
+def test_every_exported_nominal_lies_inside_its_band() -> None:
+    for name, feature in _features().items():
+        for key in feature["requirements"]:
+            nominal = feature.get(f"{key}_nominal", feature.get(f"nominal_{key}"))
+            band = feature[key]
+            if isinstance(nominal, float) and isinstance(band, list):
+                assert band[0] <= nominal <= band[1], (name, key)
+
+
+def test_head_saddle_fits_between_the_head_shoulder_and_the_cone_boss() -> None:
+    features = _features()
+    widest = features["head_saddle_x1"]["station"][1] - features["head_saddle_x0"]["station"][0]
+    assert widest <= spec.HEAD_GAP_MIN
+
+
+def test_printed_edge_stations_export_as_their_own_bands() -> None:
+    """One fact per printed dimension: each printed face station is its own
+    band; the pad and seat spans are reference nominals, never derived bands."""
+    features = _features()
+    for name in ("pad_x0", "pad_x1", "head_saddle_x0", "foot_saddle_x1"):
+        feature = features[name]
+        assert feature["station"] == limits(feature["station_nominal"], 1)
+    for name in ("cap_pad", "head_seat", "foot_seat"):
+        assert "length" not in features[name] and "width" not in features[name]
+
+
+def test_bridge_studs_clear_the_pad_at_print_worst() -> None:
+    """A drawing-compliant pad never fouls a bridge stud's thread: each pad
+    side face at its printed extreme against each stud's printed band."""
+    features = _features()
+    stud_r = spec.THREAD_MAJOR_MM[spec.STUD_THREAD] / 2.0
+    near = features["stud_tap_near"]["height"][1] + stud_r
+    far = features["stud_tap_far"]["height"][0] - stud_r
+    assert features["pad_z0"]["height"][0] - near >= spec.WALL_FLOOR_MM
+    assert far - features["pad_z1"]["height"][1] >= spec.WALL_FLOOR_MM
+
+
+def test_cradle_is_one_piece() -> None:
+    """No component definition exists for a built-up cradle, so the export
+    must not let prechips plan one."""
+    assert export_features.requirement_manifest(STEM)["construction"] == "one_piece"
+
+
+def test_number_is_the_parent_number_plus_a_tool_suffix() -> None:
+    parent = _config.parts("dt-cone-pivot-post")["number"]
+    number = _config.parts("dt-cone-pivot-post-tl-saw-cradle")["number"]
+    assert re.fullmatch(re.escape(parent) + r"-TL-\d{2}", number)
+
+
+def test_notes_follow_the_simplicity_policy() -> None:
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert 1 <= len(lines) <= 4
+    assert not re.search(r"\d", spec.DRAWING_NOTES)
+    # the shop has no grinder
+    assert not re.search(r"\bGROUND\b|\bGRIND", spec.DRAWING_NOTES)

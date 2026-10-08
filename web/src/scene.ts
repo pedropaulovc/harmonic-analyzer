@@ -1875,7 +1875,9 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
           part.binding = binding
           part.station = binding.kind === 'indexed' ? instanceIndex(part.path, binding.pattern) - 1 : -1
           resolved.push(part)
-          driven.push(part)
+          // Fixed paper structure keeps its authored latched pose; removable
+          // sprockets have their own ratio/swap placement in driveSprockets.
+          if (binding.motion !== 'paper-fixed' && binding.motion !== 'paper-sprocket') driven.push(part)
           if (binding.motion === 'lever-wire' || binding.motion === 'pen-wire') part.wireLengthM = nativeWireLength(part)
           if (binding.motion === 'channel-spring' || binding.motion === 'counter-spring') {
             const counter = binding.motion === 'counter-spring'
@@ -1925,7 +1927,6 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   const knife = new THREE.Vector3().fromArray(MECHANISM_DATA.summing.knifeMm).multiplyScalar(0.001)
   const crankPart = parts.get('ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1')
   const conePart = parts.get('ha-harmonic-analyzer/dt-drive-train/dt-cone-gear-shaft-1')
-  const reducerDisc = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-rack-pinion-1')
   const crankPivot = crankPart ? new THREE.Vector3().setFromMatrixPosition(crankPart.world) : new THREE.Vector3()
   const conePivot = conePart ? new THREE.Vector3().setFromMatrixPosition(conePart.world) : new THREE.Vector3()
   const coneAxis = conePart ? new THREE.Vector3().setFromMatrixColumn(conePart.world, 2).normalize() : new THREE.Vector3(0, 0, 1)
@@ -1945,6 +1946,10 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   const upperSprocket = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-1')
   const crankSprocket = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-2')
   const spareSprocket = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3')
+  const paperKnobPart = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-transgear-knob-shaft-1')
+  const paperFeedPart = parts.get('ha-harmonic-analyzer/pd-paper-drive/pd-rack-pinion-1')
+  const paperKnobRotation = new THREE.Matrix4()
+  const paperFeedRotation = new THREE.Matrix4()
   const upperMediumPath = 'ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3@upper'
   const crankMediumPath = 'ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3@crank'
   if (spareSprocket) {
@@ -2014,6 +2019,21 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     }
     pivot.fromArray(pose.setup.coneSwingPivotM)
     around(swing, pivot, Y, pose.setup.coneSwingRad)
+    const knobAngle = pose.crankAngleRad * MECHANISM_DATA.paperDrive.chainRatioFine * PAPER_FEED_MULTIPLIER[input.gearing]
+    const feedAngle = knobAngle * MECHANISM_DATA.paperDrive.externalMeshSense * MECHANISM_DATA.paperDrive.reducerRatio
+    // v39 build_paper_drive_assembly._sprocket_revolute fixes world +Z.
+    // :2699-2844 / :2598-2662 ties each rigid group to the shared K / S axis,
+    // not to each off-axis pin/screw origin. The Ry180 feed sleeve is LOCKED
+    // to the identity-placed disc: its reversed local +Z must not flip spin.
+    // A platen datum reset translates the carriage without winding the gears.
+    if (paperKnobPart) {
+      pivot.setFromMatrixPosition(paperKnobPart.world)
+      around(paperKnobRotation, pivot, Z, knobAngle)
+    }
+    if (paperFeedPart) {
+      pivot.setFromMatrixPosition(paperFeedPart.world)
+      around(paperFeedRotation, pivot, Z, feedAngle)
+    }
     for (const part of driven) {
       const j = part.station
       const p = j * 3
@@ -2074,11 +2094,16 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
         case 'pinion-cam': case 'pinion-lever':
           pivot.fromArray(pose.setup.pinionLiftAxisM)
           rotate(part, pivot, Z, pose.setup.pinionCamRad); break
-        case 'paper-gear': drivePaperPart(part); break
+        case 'paper-knob':
+          if (paperKnobPart) { desired.multiplyMatrices(paperKnobRotation, part.world); setWorld(part, desired) }
+          break
+        case 'paper-feed':
+          if (paperFeedPart) { desired.multiplyMatrices(paperFeedRotation, part.world); setWorld(part, desired) }
+          break
         case 'chain-link': driveChainPart(part); break
       }
     }
-    driveSprockets()
+    driveSprockets(knobAngle)
     root!.updateMatrixWorld(true)
     overrideEpoch++
     if (overrides) for (const override of overrides) {
@@ -2145,18 +2170,6 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     setWorld(part, desired)
   }
 
-  function drivePaperPart(part: RestPart) {
-    if (part === upperSprocket || part === crankSprocket || part === spareSprocket) return
-    const name = part.shortName
-    const knobAngle = pose.crankAngleRad * MECHANISM_DATA.paperDrive.chainRatioFine * PAPER_FEED_MULTIPLIER[input.gearing]
-    const feedAngle = knobAngle * MECHANISM_DATA.paperDrive.externalMeshSense * MECHANISM_DATA.paperDrive.reducerRatio
-    const feedRotor = name === 'pd-rack-pinion-1' || name === 'pd-transgear-feed-pinion-1' || name === 'pd-transgear-disc-hub-1' || name.startsWith('vn-transgear-disc-screw-')
-    const angle = feedRotor ? feedAngle : knobAngle
-    // Resetting a platen datum does not wind the feed gears; only crank turns do.
-    pivot.setFromMatrixPosition(feedRotor && reducerDisc ? reducerDisc.world : part.world)
-    rotate(part, pivot, Z, angle)
-  }
-
   function chainPoint(stationMm: number, out: THREE.Vector3) {
     const path = chain.paths[input.gearing]
     let distance = ((stationMm % chain.centrelineLengthMm) + chain.centrelineLengthMm) % chain.centrelineLengthMm
@@ -2186,10 +2199,10 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       return
     }
     // Native CONNECTED_LINKAGE placement resolves unequal arc stations to
-    // fixed 6.35-mm chords. Preserve its actual rest TRS/offsets, rather than
-    // replacing it with uniform arc spacing. Runtime motion follows the source
-    // planar centreline display law; tooth contact and 3D chain flexibility are
-    // not solved. The released closing seam has a measured 0.55228-mm gap.
+    // fixed 6.35-mm chords. Preserve all 68 native rest TRS/offsets rather
+    // than replacing them with uniform arc spacing. Runtime motion follows
+    // the source planar centreline display law; tooth contact, 3D chain
+    // flexibility and a displaced crank-axis loop are not solved.
     const advance = -chain.paths[input.gearing].crankPitchRadiusMm * pose.crankAngleRad
     chainPoint(part.chainStationMm + advance, origin)
     chainPoint(part.chainNextStationMm! + advance, b)
@@ -2209,9 +2222,8 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     part.node.visible = true
   }
 
-  function driveSprockets() {
+  function driveSprockets(knobAngle: number) {
     if (!upperSprocket || !crankSprocket || !spareSprocket || !upperMedium || !crankMedium) return
-    const knobAngle = pose.crankAngleRad * MECHANISM_DATA.paperDrive.chainRatioFine * PAPER_FEED_MULTIPLIER[input.gearing]
     if (input.gearing === 'medium-medium') {
       upperSprocket.node.visible = false
       crankSprocket.node.visible = false
