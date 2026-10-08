@@ -61,7 +61,8 @@ FACE_KEEP = {
     "BoreDia": (0.075, 0.145),
 }
 EDGE_KEEP = {
-    "Thick": (0.175, 0.105),
+    # Right of its dimension line: its two-line callout reads clear of it.
+    "Thick": (0.215, 0.105),
 }
 
 
