@@ -554,6 +554,12 @@ eligibility, finer stage or per-drawable certification was run for this checkpoi
 After a source correction, preserve the frozen measured head and compare exact
 track/observation/dist bytes separately; new-head runtime proof is a new receipt,
 not a renamed old measurement.
+Corrected-head `3cfa8f6dd7848020d85079124eb6517d5a1da74e` has separate six-page
+runtime positives. Its retained Synthesis compact attempt still failed the
+short-window advancement predicate (0.227414 seconds versus 0.3 after 600 ms),
+while actual media/audio/source-following and 0.009989-second clock skew were
+valid. A later positive with a longer observation window does not clear that
+measured failed predicate.
 
 ### Browser verification
 

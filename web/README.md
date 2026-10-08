@@ -455,6 +455,18 @@ Private source/data/dist seals, complete reports and screenshots are retained in
 `web/.vite/complete1227-stage50-20261007/`; they are not publication assets.
 Later code/seal changes do not relabel this frozen report as newer-head scoring.
 
+After the repeatability correction and consumer-seal refresh,
+`3cfa8f6dd7848020d85079124eb6517d5a1da74e` passed a separately bound fresh
+six-page runtime smoke, with maximum observed playback skew 0.015018 seconds.
+All observation, track and compiled-dist bytes exactly matched the frozen
+checkpoint. A single changed-diagnostic Synthesis arm at 284 seconds retained
+the actual compact failure: 0.227414 seconds of native progress after 600 ms,
+below the unchanged 0.3-second minimum. Media was unpaused, unmuted at volume 1,
+readyState 4 without an error; source following and the 0.009989-second model
+skew passed their existing predicates. That time-scoped diagnostic is not an
+acceptance run; its short-window failure and the original collection failures
+remain failures despite the longer bounded runtime positives.
+
 Original-source authority is validated before lazy shared browser startup. Shared
 startup becomes ready only after server, browser, context and page acquisition;
 failure is one terminal verification prerequisite with acquired-resource cleanup,
