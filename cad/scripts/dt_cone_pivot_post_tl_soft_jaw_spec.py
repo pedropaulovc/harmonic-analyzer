@@ -50,7 +50,10 @@ BOLT_HEIGHT = 22.5
 BOLT_LEFT_X = round(PLATE_LENGTH / 2.0 - BOLT_HALF_SPACING, 2)
 BOLT_RIGHT_X = round(PLATE_LENGTH / 2.0 + BOLT_HALF_SPACING, 2)
 BOLT_XS = (BOLT_LEFT_X, BOLT_RIGHT_X)
-BOLT_HOLE_DIA = 7.0 / 16.0 * MM_PER_IN
+# The hole prints at two places; its model nominal is that printed value, so the
+# drilled band the sheet states is the band exported (a 7/16 drill, 11.1125,
+# cuts inside it).
+BOLT_HOLE_DIA = 11.11
 CBORE_DIA = 11.0 / 16.0 * MM_PER_IN
 CBORE_DEPTH = 11.75
 BOLT_HOLE_SPEC = HoleSpec(
@@ -258,7 +261,7 @@ EXPORT_FEATURES: dict[str, ExportFeature] = {
     "jaw_top": ExportFeature(
         kind="face",
         faces=(PlanarFace((0.0, 1.0, 0.0), PLATE_HEIGHT),),
-        requirements=("height",),
+        requirements=("height", "length"),
         fields={
             "normal": ([0.0, 1.0, 0.0], ("__frame__",)),
             "plane": ({"frame": "model", "axis": "y", "value": PLATE_HEIGHT}, ("PLATE_HEIGHT",)),
