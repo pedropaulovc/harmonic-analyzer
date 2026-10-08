@@ -65,19 +65,31 @@ def test_every_exported_band_is_a_requirement() -> None:
 
 
 def test_head_saddle_fits_between_the_head_shoulder_and_the_cone_boss() -> None:
-    head = _features()["head_seat"]["length"]
-    assert head[1] <= spec.HEAD_GAP_MIN
+    features = _features()
+    widest = features["head_saddle_x1"]["station"][1] - features["head_saddle_x0"]["station"][0]
+    assert widest <= spec.HEAD_GAP_MIN
+
+
+def test_printed_edge_stations_export_as_their_own_bands() -> None:
+    """One fact per printed dimension: each printed face station is its own
+    band; the pad and seat spans are reference nominals, never derived bands."""
+    features = _features()
+    for name in ("pad_x0", "pad_x1", "head_saddle_x0", "foot_saddle_x1"):
+        feature = features[name]
+        assert feature["station"] == limits(feature["station_nominal"], 1)
+    for name in ("cap_pad", "head_seat", "foot_seat"):
+        assert "length" not in features[name] and "width" not in features[name]
 
 
 def test_bridge_studs_clear_the_pad_at_print_worst() -> None:
-    """A drawing-compliant pad never fouls a bridge stud's thread: the pad's
-    longest print against each stud's one-place station band."""
+    """A drawing-compliant pad never fouls a bridge stud's thread: each pad
+    side face at its printed extreme against each stud's printed band."""
     features = _features()
-    pad_half = features["cap_pad"]["length"][1] / 2.0
     stud_r = spec.THREAD_MAJOR_MM[spec.STUD_THREAD] / 2.0
-    for name in ("stud_tap_near", "stud_tap_far"):
-        offset = abs(features[name]["at"][2] - features["cap_pad"]["at"][2]) - 0.8
-        assert offset - pad_half - stud_r >= spec.WALL_FLOOR_MM
+    near = features["stud_tap_near"]["height"][1] + stud_r
+    far = features["stud_tap_far"]["height"][0] - stud_r
+    assert features["pad_z0"]["height"][0] - near >= spec.WALL_FLOOR_MM
+    assert far - features["pad_z1"]["height"][1] >= spec.WALL_FLOOR_MM
 
 
 def test_cradle_is_one_piece() -> None:
