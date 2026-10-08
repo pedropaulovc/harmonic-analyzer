@@ -17,11 +17,54 @@ from _printed_tolerance import printed_band_mm
 from prechips.model import TOLERANCE_REQUIREMENTS
 
 STEM = "ch_rocker_arm_tl_profile_fixture"
-# Agreed with the MHA-CH-006-TL pivot screw and diamond pin (their specs live
-# on sibling branches): the screw's ground shoulder and the pin's shank, a
-# bonded slip fit (Ø2.97 ±0.02, MHA-CH-006-TL-03).
+# Agreed with the MHA-CH-006-TL pivot screw and diamond pin: the screw's ground
+# shoulder and the pin's shank, a bonded slip fit (Ø2.97 ±0.02,
+# MHA-CH-006-TL-03).
 PIVOT_SCREW_SHOULDER = (6.485, 6.490)
 DIAMOND_PIN_SHANK = (2.950, 2.990)
+# The prechips freeze stations (review/compose-r5 c25b48fc,
+# examples/inventory/pedro-shop.toml:2131-2147, frame A = model frame): rest
+# pocket centre and length x width from each rail-rest-*-slot's corner and
+# size, and each stud-tap-* station, by print tag.
+FROZEN_REST_POCKETS = {
+    "c1": (30.0, 34.35, 20.0, 4.3),  # rail-rest-ru-slot
+    "c2": (-30.0, 34.35, 20.0, 4.3),  # rail-rest-lu-slot
+    "c3": (130.0, -25.0, 20.0, 5.0),  # rail-rest-rl-slot
+    "c4": (-130.0, -25.0, 20.0, 5.0),  # rail-rest-ll-slot
+}
+FROZEN_STUD_TAPS = {
+    "s1": (-130.0, -36.0),  # stud-tap-ll
+    "s2": (130.0, -36.0),  # stud-tap-rl
+    "s3": (-70.0, 45.0),  # stud-tap-lu
+    "s4": (70.0, 45.0),  # stud-tap-ru
+    "s5": (-30.0, 45.0),  # stud-tap-lu4
+    "s6": (30.0, 45.0),  # stud-tap-ru4
+}
+
+
+def test_rests_and_stud_taps_stand_at_the_prechips_freeze_stations() -> None:
+    """The rail-rest pockets, rests and stud taps that prechips' S3/S4 clamp
+    and clearance rows were frozen on: every station, no more, no fewer."""
+    features = _features()
+    assert {name for name in features if name.startswith("stud_tap_s")} == {
+        f"stud_tap_{tag}" for tag in FROZEN_STUD_TAPS
+    }
+    for tag, (x, y) in FROZEN_STUD_TAPS.items():
+        tap = features[f"stud_tap_{tag}"]
+        assert (tap["station_nominal"], tap["height_nominal"]) == (x, y), tag
+    assert {name for name in features if name.startswith("rest_pocket_c")} == {
+        f"rest_pocket_{tag}" for tag in FROZEN_REST_POCKETS
+    }
+    for tag, (x, y, length, width) in FROZEN_REST_POCKETS.items():
+        pocket = features[f"rest_pocket_{tag}"]
+        assert (
+            pocket["station_nominal"],
+            pocket["height_nominal"],
+            pocket["length_nominal"],
+            pocket["width_nominal"],
+        ) == (x, y, length, width), tag
+        rest = next(row for row in spec.RESTS if row[0] == tag.upper())
+        assert rest[1:3] == (x, y), tag
 
 
 def _features() -> dict:
@@ -253,15 +296,16 @@ def test_hole_callout_bands_are_the_printed_bands() -> None:
     title block's DRILLED HOLES band; the tap drills print 7.94 and 3.80 while
     the taps keep their true drill size as tap_drill_mm."""
     features = _features()
+    studs = range(1, len(spec.CLAMP_STUD_POINTS) + 1)
     drilled = (
         *((f"hold_down_h{i}", "dia") for i in range(1, 5)),
-        *((f"stud_tap_s{i}", "dia") for i in range(1, 5)),
+        *((f"stud_tap_s{i}", "dia") for i in studs),
         ("pivot_tap", "dia"),
     )
     for name, key in (
         *drilled,
         *((f"hold_down_h{i}_counterbore", key) for i in range(1, 5) for key in ("dia", "depth")),
-        *((f"stud_tap_s{i}", "depth") for i in range(1, 5)),
+        *((f"stud_tap_s{i}", "depth") for i in studs),
         ("stud_tap_drills", "depth"),
         ("pivot_tap", "depth"),
         ("pivot_tap_drill", "depth"),
