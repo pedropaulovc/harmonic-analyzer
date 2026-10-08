@@ -233,5 +233,7 @@ def test_notes_follow_the_simplicity_policy() -> None:
     for spec in (screw, washer):
         lines = spec.DRAWING_NOTES.splitlines()
         assert 1 <= len(lines) <= 4
-        assert not re.search(r"\d", spec.DRAWING_NOTES)
+        # The washer's named rule-12 exception (WALL 1.64 MIN) is the only digit.
+        general = spec.DRAWING_NOTES.replace(getattr(spec, "WALL_NOTE", "\0"), "")
+        assert not re.search(r"\d", general)
         assert "GROUND" not in spec.DRAWING_NOTES
