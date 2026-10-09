@@ -8,7 +8,6 @@ from types import SimpleNamespace
 import pytest
 
 import _common
-import _gear
 
 from _gear import pattern_about_z
 
@@ -102,17 +101,12 @@ class _SketchRelation:
 
 
 class _RelationManager:
-    __slots__ = ("relations", "calls", "refuse_all", "deleted")
+    __slots__ = ("relations", "calls", "refuse_all")
 
     def __init__(self, relations: dict[int, tuple]) -> None:
         self.relations = relations
         self.calls: list[int] = []
         self.refuse_all = False
-        self.deleted: list[object] = []
-
-    def DeleteRelation(self, relation: object) -> bool:
-        self.deleted.append(relation)
-        return True
 
     def GetRelations(self, filter_value: int) -> tuple:
         self.calls.append(filter_value)
@@ -122,33 +116,11 @@ class _RelationManager:
 
 
 class _SketchManager:
-    __slots__ = ("_value", "writes", "refuse_enable", "refuse_restore", "initial")
+    """Read-only sketch-manager properties the relation snapshot logs."""
 
-    def __init__(self, initial: object = False) -> None:
-        self.initial = self._value = initial
-        self.writes: list[bool] = []
-        self.refuse_enable = self.refuse_restore = False
-
-    @property
-    def AutoInference(self) -> bool:
-        return True
-
-    @property
-    def AutoSolve(self) -> bool:
-        return True
-
-    @property
-    def AddToDB(self) -> object:
-        return self._value
-
-    @AddToDB.setter
-    def AddToDB(self, value: bool) -> None:
-        self.writes.append(value)
-        if self.refuse_enable and value is True:
-            return
-        if self.refuse_restore and value is self.initial:
-            return
-        self._value = value
+    AutoInference = True
+    AutoSolve = True
+    AddToDB = False
 
 
 class _NativeSketch:
@@ -197,7 +169,6 @@ class _SketchAdapter:
         self.currentModel = _SketchModel(self.sketch)
         self.currentSketchManager = _SketchManager()
         self.fixed: list[str] = []
-        self.filtered_probe_refused = False
 
     async def check_sketch_fully_defined(self) -> _Result:
         state = next(self._states)
@@ -205,8 +176,6 @@ class _SketchAdapter:
         return _Result({"definition_state": state, "raw_status": self.sketch._status})
 
     async def get_over_defining_relations(self) -> _Result:
-        if self.filtered_probe_refused:
-            raise RuntimeError("filtered adapter probe refused")
         return _Result({"relations": [{"relation_type": 9}]})
 
     async def add_sketch_constraint(self, entity: str, other: None, kind: str) -> _Result:
@@ -229,16 +198,20 @@ def sketch_logs(monkeypatch):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("after_fix", [False, True])
 async def test_over_defined_logs_every_relation_before_raising(after_fix, sketch_logs) -> None:
+    # Main's loop: an over-definition after a FIX ends escalation as "not
+    # fully defined"; either way the native inventories are logged first.
     states = ["under_defined", "over_defined"] if after_fix else ["over_defined"]
     adapter = _SketchAdapter(states)
+    message = "not fully defined .state='over_defined'" if after_fix else "sketch OVER-defined"
+    phase = "(not_fully_defined)" if after_fix else "(over_defined)"
 
-    with pytest.raises(RuntimeError, match="sketch OVER-defined; over-defining relations"):
+    with pytest.raises(RuntimeError, match=message):
         await _common.ensure_fully_defined(
             adapter, "stock gap sketch",
             fix_entities=["EquationCurve_1"], allow_fix_escalation=True,
         )
 
-    error = next(line for line in sketch_logs["error"] if "(over_defined)" in line)
+    error = next(line for line in sketch_logs["error"] if phase in line)
     snapshot = json.loads(error.split(": ", 2)[2])
     assert snapshot["sketch_status"] == 4
     assert snapshot["path"] == ""
@@ -267,7 +240,6 @@ async def test_over_defined_logs_every_relation_before_raising(after_fix, sketch
 async def test_over_defined_keeps_failure_when_diagnostics_refuse(sketch_logs) -> None:
     adapter = _SketchAdapter(["over_defined"])
     adapter.relations.refuse_all = True
-    adapter.filtered_probe_refused = True
 
     with pytest.raises(RuntimeError, match="stock gap sketch: sketch OVER-defined"):
         await _common.ensure_fully_defined(adapter, "stock gap sketch")
@@ -287,42 +259,6 @@ async def test_over_defined_keeps_failure_when_logger_refuses(monkeypatch) -> No
 
 
 @pytest.mark.asyncio
-async def test_fix_skips_already_constrained_equation_curve(sketch_logs) -> None:
-    adapter = _SketchAdapter(["under_defined", "fully_defined"], statuses=(3, 2))
-    await _common.ensure_fully_defined(
-        adapter, "gap", fix_entities=["EquationCurve_1", "EquationCurve_2"],
-        allow_fix_escalation=True,
-    )
-    assert adapter.fixed == ["EquationCurve_2"]
-    assert any("(before_fix)" in line for line in sketch_logs["debug"])
-    assert any("(after_fix)" in line for line in sketch_logs["debug"])
-    assert not any("native sketch relations" in line for line in sketch_logs["warn"])
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("status", [1, 4, 5, 6, 7, None, True, "2", lambda: 2])
-async def test_fix_refuses_non_underconstrained_entity(status, sketch_logs) -> None:
-    adapter = _SketchAdapter(["under_defined"], statuses=(status,))
-    with pytest.raises(RuntimeError, match="cannot fix EquationCurve_1 with native Status"):
-        await _common.ensure_fully_defined(
-            adapter, "gap", fix_entities=["EquationCurve_1"], allow_fix_escalation=True,
-        )
-    assert adapter.fixed == []
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("entity_id", ["Line_1", "EquationCurve_999"])
-async def test_fix_refuses_non_owned_equation_entity(entity_id, sketch_logs) -> None:
-    adapter = _SketchAdapter(["under_defined"])
-    adapter._sketch_entities["Line_1"] = _SketchEntity(2, (0, 2))
-    with pytest.raises(RuntimeError, match="not an owned equation curve"):
-        await _common.ensure_fully_defined(
-            adapter, "gap", fix_entities=[entity_id], allow_fix_escalation=True,
-        )
-    assert adapter.fixed == []
-
-
-@pytest.mark.asyncio
 async def test_nonwhitelisted_sketch_stays_strict(sketch_logs) -> None:
     adapter = _SketchAdapter(["under_defined"])
     with pytest.raises(RuntimeError, match="legacy fix escalation disabled"):
@@ -331,248 +267,39 @@ async def test_nonwhitelisted_sketch_stays_strict(sketch_logs) -> None:
     assert adapter.relations.calls == []
 
 
-class _CurveAdapter:
-    def __init__(self, manager: _SketchManager) -> None:
-        self.currentSketchManager = manager
-        self.calls: list[object] = []
-        self.fail_creation = False
-        self.fail_result = False
+@pytest.mark.parametrize("teeth", [None, *range(6, 121, 6)])
+def test_stock_gaps_are_authored_in_mains_cut_tooth_gap_order(teeth) -> None:
+    """Every stock gap (drum, alignment pinion, each cone row) follows main's
+    _gear.cut_tooth_gap: flanks base->tip first, lower ray, clearance arc,
+    upper ray, then the floor from the upper foot to the lower foot."""
+    import dt_alignment_pinion_spec
+    import dt_cone_gear_spec
+    import dt_cylinder_gear_spec
 
-    async def create_equation_driven_curve(self, parameters: object) -> _Result:
-        assert self.currentSketchManager.AddToDB is True
-        self.calls.append(parameters)
-        if self.fail_creation:
-            raise RuntimeError("equation parser refused")
-        if self.fail_result:
-            failed = _Result(None)
-            failed.is_success = False
-            failed.error = "equation parser refused"
-            return failed
-        return _Result("EquationCurve_1")
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("initial", [False, True])
-async def test_shared_equation_curve_uses_direct_db_and_restores(initial, sketch_logs) -> None:
-    manager = _SketchManager(initial)
-    adapter = _CurveAdapter(manager)
-    assert _gear.equation_curve is _common.equation_curve
-    assert await _common.equation_curve(adapter, "floor", "t", "1-t") == "EquationCurve_1"
-    parameters = adapter.calls[0]
-    assert (parameters.x_expression, parameters.y_expression) == ("t", "1-t")
-    assert (parameters.range_start, parameters.range_end) == ("0", "1")
-    assert parameters.lock_start is True and parameters.lock_end is True
-    assert manager.AddToDB is initial
-    assert manager.writes == [True, initial]
-    assert any("AddToDB before=" in line for line in sketch_logs["debug"])
-    assert any("AddToDB enabled=True" in line for line in sketch_logs["debug"])
-    assert any(f"AddToDB restored={initial!r}" in line for line in sketch_logs["debug"])
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("failed_result", [False, True])
-async def test_equation_curve_restores_direct_db_on_creator_failure(
-    failed_result, sketch_logs
-) -> None:
-    manager = _SketchManager()
-    adapter = _CurveAdapter(manager)
-    adapter.fail_creation = not failed_result
-    adapter.fail_result = failed_result
-    with pytest.raises(RuntimeError, match="equation parser refused"):
-        await _common.equation_curve(adapter, "floor", "t", "1-t")
-    assert manager.AddToDB is False
-    assert manager.writes == [True, False]
-
-
-@pytest.mark.asyncio
-async def test_equation_curve_refuses_failed_direct_db_write(sketch_logs) -> None:
-    manager = _SketchManager()
-    manager.refuse_enable = True
-    adapter = _CurveAdapter(manager)
-    with pytest.raises(RuntimeError, match="AddToDB write refused"):
-        await _common.equation_curve(adapter, "floor", "t", "1-t")
-    assert adapter.calls == []
-    assert manager.AddToDB is False
-
-
-@pytest.mark.asyncio
-async def test_equation_curve_refuses_failed_direct_db_restore(sketch_logs) -> None:
-    manager = _SketchManager()
-    manager.refuse_restore = True
-    with pytest.raises(RuntimeError, match="AddToDB restore refused"):
-        await _common.equation_curve(_CurveAdapter(manager), "floor", "t", "1-t")
-    assert manager.AddToDB is True
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("initial", [None, 0, "False", lambda: False])
-async def test_equation_curve_requires_native_bool_direct_db(initial, sketch_logs) -> None:
-    manager = _SketchManager(initial)
-    adapter = _CurveAdapter(manager)
-    with pytest.raises(RuntimeError, match="AddToDB is not a native bool"):
-        await _common.equation_curve(adapter, "floor", "t", "1-t")
-    assert adapter.calls == []
-    assert manager.writes == []
-
-
-class _UnreadableRelation(_SketchRelation):
-    __slots__ = ()
-
-    def GetRelationType(self) -> int:
-        raise RuntimeError("native relation type refused")
-
-
-def test_relation_inventory_continues_after_one_getter_refuses(sketch_logs) -> None:
-    adapter = _SketchAdapter(["over_defined"])
-    good = adapter.relations.relations[0][0]
-    bad = _UnreadableRelation(9, (), ())
-    adapter.relations.relations[0] = (bad, good)
-
-    snapshot = _common._sketch_relation_snapshot(adapter, "gap")
-
-    rows = snapshot["relations"]["swAll"]
-    assert len(rows) == 2
-    assert rows[0]["relation_type"] == {"unavailable": "native relation type refused"}
-    assert rows[1]["relation_type"] == 9
-    assert rows[1]["entities"][0]["status"] == 2
-    assert set(adapter.relations.calls) == {0, 1, 2, 6}
-
-
-def test_relation_inventory_does_not_join_fresh_wrappers_by_python_identity() -> None:
-    adapter = _SketchAdapter(["over_defined"])
-    all_relation = adapter.relations.relations[0][0]
-    filtered_relation = adapter.relations.relations[2][0]
-    assert all_relation is not filtered_relation
-
-    snapshot = _common._sketch_relation_snapshot(adapter, "gap")
-
-    assert snapshot["relations"]["swAll"][0]["relation_solve_status"].startswith("UNKNOWN")
-    filtered = snapshot["relations"]["swOverDefining"][0]
-    assert filtered["returned_by_filter"] == "swOverDefining"
-    assert filtered["entities"][0]["native_id"] == (0, 1)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("phase", ["before", "enabled", "restored"])
-@pytest.mark.parametrize("failed_result", [False, True])
-async def test_creator_failure_survives_selective_direct_db_debug_refusal(
-    phase, failed_result, monkeypatch, sketch_logs
-) -> None:
-    selector = f"AddToDB {phase}="
-    attempted: list[str] = []
-
-    def debug(message, **_fields):
-        attempted.append(message)
-        if selector in message:
-            raise RuntimeError("selected DEBUG refused")
-
-    monkeypatch.setattr(_common._telemetry, "debug", debug)
-    manager = _SketchManager()
-    adapter = _CurveAdapter(manager)
-    adapter.fail_creation = not failed_result
-    adapter.fail_result = failed_result
-
-    with pytest.raises(RuntimeError, match="equation parser refused"):
-        await _common.equation_curve(adapter, "floor", "t", "1-t")
-
-    assert len(adapter.calls) == 1
-    assert manager.AddToDB is False
-    assert manager.writes == [True, False]
-    assert any(selector in message for message in attempted)
-
-
-@pytest.mark.asyncio
-async def test_restore_refusal_precedes_restored_debug_logging(
-    monkeypatch, sketch_logs
-) -> None:
-    attempted: list[str] = []
-
-    def debug(message, **_fields):
-        attempted.append(message)
-        if "AddToDB restored=" in message:
-            raise RuntimeError("restored DEBUG refused")
-
-    monkeypatch.setattr(_common._telemetry, "debug", debug)
-    manager = _SketchManager()
-    manager.refuse_restore = True
-
-    with pytest.raises(RuntimeError, match="AddToDB restore refused"):
-        await _common.equation_curve(_CurveAdapter(manager), "floor", "t", "1-t")
-
-    assert manager.AddToDB is True
-    assert not any("AddToDB restored=" in message for message in attempted)
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "selector", ["EquationCurve_1.Status=", "fixed EquationCurve_1 -> over_defined"]
-)
-async def test_post_fix_overdefined_inventory_precedes_refusable_debug(
-    selector, monkeypatch, sketch_logs
-) -> None:
-    attempted: list[str] = []
-
-    def debug(message, **_fields):
-        attempted.append(message)
-        if selector in message:
-            raise RuntimeError("selected FIX DEBUG refused")
-
-    monkeypatch.setattr(_common._telemetry, "debug", debug)
-    adapter = _SketchAdapter(["under_defined", "over_defined"])
-
-    with pytest.raises(RuntimeError, match="gap: sketch OVER-defined"):
-        await _common.ensure_fully_defined(
-            adapter, "gap", fix_entities=["EquationCurve_1"],
-            allow_fix_escalation=True,
-        )
-
-    error = next(line for line in sketch_logs["error"] if "(over_defined)" in line)
-    snapshot = json.loads(error.split(": ", 2)[2])
-    assert snapshot["sketch_status"] == 4
-    assert len(snapshot["relations"]["swAll"]) == 2
-    assert set(adapter.relations.calls) == {0, 1, 2, 6}
-    assert adapter.fixed == ["EquationCurve_1"]
-    assert adapter.relations.deleted == []  # no relation is ever deleted
-    assert not any("fixed EquationCurve_1 -> over_defined" in line for line in attempted)
-
-
-@pytest.mark.parametrize("module", ["dt_cylinder_gear_spec", "dt_alignment_pinion_spec"])
-def test_stock_gap_fix_order_leaves_the_perpendicular_closing_pair_last(module) -> None:
-    # Farm 20261009T214825987Z: the drum's native-order closure (closing ray
-    # + nearly radial flank) was singular; the closing pair is not.
-    import importlib
-    import math
-
-    segments = importlib.import_module(module).STOCK_FORM.native_segments()
-    order = _gear.stock_gap_fix_order([s.name for s in segments])
-    assert sorted(order) == list(range(len(segments)))
-    # One chain: each FIX after the first touches the previous one.
-    assert all((b - a) % len(segments) == 1 for a, b in zip(order, order[1:]))
-    ray, arc = segments[order[-2]], segments[order[-1]]
-    assert (ray.name, arc.name) == ("LowerClosingRay", "ClearanceArc")
-    u = (ray.start_mm[0] - ray.end_mm[0], ray.start_mm[1] - ray.end_mm[1])
-    v = (arc.end_mm[0] - arc.start_mm[0], arc.end_mm[1] - arc.start_mm[1])
-    sine = abs(u[0] * v[1] - u[1] * v[0]) / (math.hypot(*u) * math.hypot(*v))
-    assert sine > 0.9
-    with pytest.raises(ValueError):
-        _gear.stock_gap_fix_order([s.name for s in reversed(segments)])
-
-
-@pytest.mark.asyncio
-async def test_entity_status_refusal_survives_eligibility_debug_refusal(
-    monkeypatch, sketch_logs
-) -> None:
-    def debug(message, **_fields):
-        if "EquationCurve_1.Status=" in message:
-            raise RuntimeError("eligibility DEBUG refused")
-
-    monkeypatch.setattr(_common._telemetry, "debug", debug)
-    adapter = _SketchAdapter(["under_defined"], statuses=(4,))
-
-    with pytest.raises(RuntimeError, match="cannot fix EquationCurve_1 with native Status=4"):
-        await _common.ensure_fully_defined(
-            adapter, "gap", fix_entities=["EquationCurve_1"],
-            allow_fix_escalation=True,
-        )
-
-    assert adapter.fixed == []
+    profiles = (
+        [dt_cylinder_gear_spec.STOCK_FORM, dt_alignment_pinion_spec.STOCK_FORM]
+        if teeth is None else [dt_cone_gear_spec.stock_form_profile(teeth)]
+    )
+    for profile in profiles:
+        loop = profile.native_segments()
+        ordered = profile.cut_order_native_segments()
+        names = [s.name for s in ordered]
+        roles = ["LowerFiniteFlank", "UpperFiniteFlank", "LowerClosingRay", "ClearanceArc",
+                 "UpperClosingRay", "UpperBelowBase", "RootArc", "LowerBelowBase"]
+        assert names == [r for r in roles if r in {s.name for s in loop}]
+        by = {s.name: s for s in ordered}
+        lower_foot = by.get("LowerBelowBase", by["RootArc"]).end_mm
+        upper_foot = by.get("UpperBelowBase", by["RootArc"]).start_mm
+        joints = [
+            (lower_foot, by["LowerFiniteFlank"].start_mm),
+            (by["LowerFiniteFlank"].end_mm, by["LowerClosingRay"].start_mm),
+            (by["LowerClosingRay"].end_mm, by["ClearanceArc"].start_mm),
+            (by["ClearanceArc"].end_mm, by["UpperClosingRay"].start_mm),
+            (by["UpperClosingRay"].end_mm, by["UpperFiniteFlank"].end_mm),
+            (by["UpperFiniteFlank"].start_mm, upper_foot),
+        ]
+        if "UpperBelowBase" in by:
+            joints += [(by["UpperBelowBase"].end_mm, by["RootArc"].start_mm),
+                       (by["RootArc"].end_mm, by["LowerBelowBase"].start_mm)]
+        for a, b in joints:
+            assert a == pytest.approx(b, abs=1e-9)

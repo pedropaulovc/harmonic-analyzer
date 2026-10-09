@@ -186,7 +186,7 @@ def test_native_gap_features_are_distinct_and_preserve_real_template_topology() 
     }
     for teeth in spec.CONFIGURATION_TEETH:
         profile = spec.stock_form_profile(teeth)
-        core = profile.native_segments(
+        core = profile.cut_order_native_segments(
             unit_scale=1.0 / spec.MM_PER_IN, clearance_radius_mm=part.R_CLEAR_MM
         )
         expected_entities = 8 if profile.template.root_radius_mm < profile.template.base_radius_mm else 6

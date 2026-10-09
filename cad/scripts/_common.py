@@ -38,10 +38,10 @@ driving dims, SolidworksMCP-python PRs #55/#56):
 * **Over-defined triage**: ``adapter.get_over_defining_relations()`` names
   the conflicting relations; drop the redundant anchor dim, keep the
   semantic relation.
-* **fix is a last resort** for explicitly whitelisted equation-driven gear
-  gaps, and only when the registered curve's native Status is under-constrained.
-  Locked equation curves that are already fully constrained must not receive
-  a redundant FIX. Everything else uses semantic relations/dimensions.
+* **fix is a last resort** for reference geometry that genuinely cannot be
+  dimensioned (currently only the equation-driven spring-hook curves, which
+  have no free endpoints). Every surviving ``fix`` needs an inline comment
+  justifying it.
 """
 
 from __future__ import annotations
@@ -264,53 +264,6 @@ def _log_sketch_relations(adapter: Any, label: str, phase: str, severity: str) -
             )
 
 
-async def equation_curve(
-    adapter: Any, label: str, x_expr: str, y_expr: str
-) -> str:
-    """Author exact equation coordinates without creation-time snapping.
-
-    Range locks define the equation's endpoints. Normal sketch inference can
-    add redundant relations between adjacent locked curves; AddToDB avoids
-    that creation mechanism, not a solver failure. Native farm proof remains
-    required.
-    """
-    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
-
-    manager = _early_bound(adapter.currentSketchManager, "ISketchManager")
-    if manager is None:
-        raise RuntimeError(f"curve {label}: no active sketch manager")
-    before = manager.AddToDB
-    if type(before) is not bool:
-        raise RuntimeError(f"curve {label}: AddToDB is not a native bool: {before!r}")
-    with contextlib.suppress(Exception):
-        _telemetry.debug(f"curve {label}: AddToDB before={before!r}")
-    try:
-        manager.AddToDB = True
-        enabled = manager.AddToDB
-        if enabled is not True:
-            raise RuntimeError(f"curve {label}: AddToDB write refused")
-        with contextlib.suppress(Exception):
-            _telemetry.debug(f"curve {label}: AddToDB enabled={enabled!r}")
-        result = await adapter.create_equation_driven_curve(
-            CreateEquationCurveParameters(
-                x_expression=x_expr,
-                y_expression=y_expr,
-                range_start="0",
-                range_end="1",
-                lock_start=True,
-                lock_end=True,
-            )
-        )
-        return check(f"curve {label}", result)
-    finally:
-        manager.AddToDB = before
-        restored = manager.AddToDB
-        if restored is not before:
-            raise RuntimeError(f"curve {label}: AddToDB restore refused")
-        with contextlib.suppress(Exception):
-            _telemetry.debug(f"curve {label}: AddToDB restored={restored!r}")
-
-
 @_telemetry.traced("sketch.ensure_defined", label_param="label")
 async def ensure_fully_defined(
     adapter: Any,
@@ -320,32 +273,19 @@ async def ensure_fully_defined(
 ) -> None:
     """Assert the active sketch is fully defined.
 
-    Raises when the sketch is under- or over-defined. On over-defined, ERROR
-    logs include EVERY native relation and actual status-filter inventories
-    before raising, both at entry and after an attempted whitelisted fix.
+    Raises when the sketch is under- or over-defined. On over-defined, the
+    error includes ``get_over_defining_relations()`` so the redundant anchor
+    is identifiable without opening SolidWorks; every failure also logs the
+    native relation inventories at ERROR.
 
     ``fix_entities`` + ``allow_fix_escalation=True`` enable the fix-escalation
     loop with a loud WARN. The only legitimate users are the whitelisted
-    equation-driven gear-gap sketches, including finite stock gaps and cone/
-    removable variants. Their equations and locked parameter bounds carry the
-    analytic shape; configured curves re-solve from globals. Only an owned,
-    natively under-constrained equation curve may receive FIX; an already
-    constrained curve is skipped. The caller owns the FIX ORDER: on the farm
-    a closed stock-gap loop of n locked curves is defined by n - 2 FIXes, and
-    the last two must be well conditioned (``_gear.stock_gap_fix_order``).
-    Any over-definition raises, and success requires a fully defined sketch.
-    Everything else uses semantic relations/dims.
+    equation-driven gear-gap sketches (_gear.cut_tooth_gap and its cone/
+    removable/stock-form variants): those curves re-solve from equation
+    globals on configuration changes, so no static relation/dimension scheme
+    can define them without breaking regeneration. Everything else anchors
+    points to the origin with semantic relations/dims.
     """
-    async def _over_defined() -> None:
-        _log_sketch_relations(adapter, label, "over_defined", "error")
-        try:
-            over = await adapter.get_over_defining_relations()
-            detail = over.data if over.is_success else over.error
-        except Exception as exc:
-            detail = {"unavailable": str(exc)}
-        raise RuntimeError(
-            f"{label}: sketch OVER-defined; over-defining relations: {detail!r}"
-        )
 
     async def _state() -> str | None:
         res = await adapter.check_sketch_fully_defined()
@@ -362,7 +302,12 @@ async def ensure_fully_defined(
         return
 
     if state == "over_defined":
-        await _over_defined()
+        _log_sketch_relations(adapter, label, "over_defined", "error")
+        over = await adapter.get_over_defining_relations()
+        detail = over.data if over.is_success else over.error
+        raise RuntimeError(
+            f"{label}: sketch OVER-defined; over-defining relations: {detail!r}"
+        )
 
     fix_entities = list(fix_entities)
     if not (allow_fix_escalation and fix_entities):
@@ -383,41 +328,19 @@ async def ensure_fully_defined(
         f"{label}: fix escalation (equation-curve whitelist only"
         " — anything else must use semantic anchors)"
     )
-    _log_sketch_relations(adapter, label, "before_fix", "debug")
     for entity_id in fix_entities:
         if state not in ("under_defined", "unknown"):
             break
-        # A sketch-level under-defined status does not mean every equation
-        # curve is free. Never FIX an already constrained locked curve.
-        entity = adapter._sketch_entities.get(entity_id)
-        if entity is None or not entity_id.startswith("EquationCurve_"):
-            raise RuntimeError(
-                f"{label}: fix entity is not an owned equation curve: {entity_id}"
-            )
-        segment = _early_bound(entity, "ISketchSegment")
-        status = segment.Status
-        with contextlib.suppress(Exception):
-            _telemetry.debug(f"{label}: {entity_id}.Status={status!r}")
-        if type(status) is not int or status not in (2, 3):
-            raise RuntimeError(
-                f"{label}: cannot fix {entity_id} with native Status={status!r}"
-            )
-        if status == 3:  # swFullyConstrained; its equation already anchors it.
-            continue
         fixed = await adapter.add_sketch_constraint(entity_id, None, "fix")
         if not fixed.is_success:
             raise RuntimeError(f"{label}: fix {entity_id} failed: {fixed.error}")
         state = await _state()
-        if state == "over_defined":
-            await _over_defined()
-        with contextlib.suppress(Exception):
-            _telemetry.debug(f"fixed {entity_id} -> {state}")
+        _telemetry.debug(f"fixed {entity_id} -> {state}")
         if state == "fully_defined":
             _telemetry.success(f"fully defined after fixing {entity_id}: {label}")
-            _log_sketch_relations(adapter, label, "after_fix", "debug")
             return
 
-    _log_sketch_relations(adapter, label, "final_not_fully_defined", "error")
+    _log_sketch_relations(adapter, label, "not_fully_defined", "error")
     raise RuntimeError(f"{label}: sketch not fully defined (state={state!r})")
 
 

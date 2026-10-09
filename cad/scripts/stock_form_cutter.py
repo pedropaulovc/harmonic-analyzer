@@ -766,6 +766,22 @@ class StockFormProfile:
             *self._branch_segments(1, False, scale=unit_scale),
         ])
 
+    def cut_order_native_segments(self, unit_scale: float = 1 / 25.4, clearance_radius_mm: float | None = None) -> tuple[NativeSegment, ...]:
+        """``native_segments`` in main's ``_gear.cut_tooth_gap`` creation order.
+
+        Main authors the two flanks first (each base -> tip), then the lower
+        closing ray, the clearance arc and the upper closing ray, then the floor
+        from the upper flank's foot round to the lower's. The stock loop maps
+        onto that role for role; only the upper flank runs the other way.
+        """
+        loop = {s.name: s for s in self.native_segments(unit_scale, clearance_radius_mm)}
+        if "UpperFiniteFlank" not in loop:
+            raise ValueError("stock gap has no finite involute flank to author first")
+        upper_flank = next(s for s in self._branch_segments(1, True, scale=unit_scale) if s.name == "UpperFiniteFlank")
+        order = ("LowerFiniteFlank", "UpperFiniteFlank", "LowerClosingRay", "ClearanceArc",
+                 "UpperClosingRay", "UpperBelowBase", "RootArc", "LowerBelowBase")
+        return tuple(upper_flank if name == "UpperFiniteFlank" else loop[name] for name in order if name in loop)
+
     def gap_polygon(self, samples_per_segment: int = 128) -> tuple[tuple[float, float], ...]:
         if type(samples_per_segment) is not int or samples_per_segment < 1:
             raise ValueError("samples per segment must be a positive integer")

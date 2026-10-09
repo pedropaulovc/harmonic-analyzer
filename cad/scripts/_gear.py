@@ -30,7 +30,6 @@ from _common import (
     check,
     define_circle,
     dimension_between,
-    equation_curve,
     ensure_fully_defined,
     name_last_feature,
     volume_check,
@@ -70,6 +69,21 @@ class ToothedDisc(NamedTuple):
 def fmt(value: float) -> str:
     """Literal for a curve expression (document units = inches, radians)."""
     return f"{value:.12g}"
+
+
+async def equation_curve(adapter: Any, label: str, x_expr: str, y_expr: str) -> str:
+    """Add a parametric equation curve over t in [0, 1]; return its entity ID."""
+    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
+
+    res = await adapter.create_equation_driven_curve(
+        CreateEquationCurveParameters(
+            x_expression=x_expr,
+            y_expression=y_expr,
+            range_start="0",
+            range_end="1",
+        )
+    )
+    return check(f"curve {label}", res)
 
 
 def _root_start_parameter(base_r_in: float, root_r_in: float | None) -> float:
@@ -602,31 +616,6 @@ async def build_fixed_gear(
     return ToothedDisc(volume, (*seeds, str(pattern.name)))
 
 
-def stock_gap_fix_order(names: list[str] | tuple[str, ...]) -> list[int]:
-    """FIX order for a ``StockFormProfile.native_segments`` loop (indices).
-
-    SolidWorks solves each locked equation curve as a rigid body pinned to
-    its neighbours at the shared loop vertices, so a loop of n curves is
-    fully defined after n - 2 FIXes, and the last two curves are placed by
-    the closure. Farm runs 20261009T195743546Z and 20261009T214825987Z show
-    that closure is singular when those two curves are nearly collinear:
-    in native order the 120T drum's last pair is the UpperClosingRay and the
-    almost radial UpperFiniteFlank, and its 4th FIX over-defined (then gave
-    no_solution). Every passing 8-curve gap and material sector fixed 6
-    curves. So FIX the loop as one chain starting at UpperClosingRay and
-    leave LowerClosingRay + ClearanceArc last: a radial ray and a
-    tangential arc, near-perpendicular at their shared vertex for any N.
-    """
-    names = list(names)
-    if names.count("UpperClosingRay") != 1:
-        raise ValueError("stock gap loop needs exactly one UpperClosingRay")
-    start = names.index("UpperClosingRay")
-    order = [(start + k) % len(names) for k in range(len(names))]
-    if [names[i] for i in order[-2:]] != ["LowerClosingRay", "ClearanceArc"]:
-        raise ValueError("stock gap loop must end LowerClosingRay, ClearanceArc, UpperClosingRay")
-    return order
-
-
 async def build_stock_form_gear(
     adapter: Any,
     profile: StockFormProfile,
@@ -662,7 +651,8 @@ async def build_stock_form_gear(
     cosine, sine = fmt(math.cos(rotation)), fmt(math.sin(rotation))
     radius = profile.blank_radius_mm
     clearance = max(R_CLEAR_IN * IN, radius + 1.0)
-    segments = profile.native_segments(
+    # Main's cut_tooth_gap creation order and fix escalation, role for role.
+    segments = profile.cut_order_native_segments(
         unit_scale=1.0 / IN, clearance_radius_mm=clearance
     )
     gap_area = profile.gap_area_mm2
@@ -692,10 +682,8 @@ async def build_stock_form_gear(
                 f"({segment.x}) * {sine} + ({segment.y}) * {cosine}",
             )
         )
-    order = stock_gap_fix_order([segment.name for segment in segments])
     await ensure_fully_defined(
-        adapter, "stock gap sketch", fix_entities=[gap_curves[i] for i in order],
-        allow_fix_escalation=True,
+        adapter, "stock gap sketch", fix_entities=gap_curves, allow_fix_escalation=True
     )
     check("exit_sketch stock gap", await adapter.exit_sketch())
     seed = check(
@@ -777,8 +765,6 @@ async def _build_helical_stock_form_gear(
         await equation_curve(adapter, segment.name, segment.x, segment.y)
         for segment in segments
     ]
-    # Native order ends RightFoot (radial) + EmbedArc (tangential): the
-    # well-conditioned closing pair (see stock_gap_fix_order).
     await ensure_fully_defined(
         adapter, "stock tooth", fix_entities=curves, allow_fix_escalation=True
     )

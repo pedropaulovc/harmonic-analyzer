@@ -86,7 +86,6 @@ from _common import (
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
-    equation_curve,
     force_rebuild,
     name_dimensions,
     name_last_feature,
@@ -96,7 +95,7 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
-from _gear import stock_gap_fix_order
+from _gear import equation_curve
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 # Equation-parser/unit guards are reused, not their historical ideal profiles.
@@ -766,7 +765,7 @@ def _apply_configuration_properties(
 
 
 def native_gap_segments(teeth: int) -> tuple[tuple[str, str, str], ...]:
-    """Rotate the canonical core gap by pi/N, retaining its exact finite curves."""
+    """Rotate the canonical core gap by pi/N, in main's cut_tooth_gap order."""
     phase = math.pi / teeth
     cosine, sine = f"{math.cos(phase):.17g}", f"{math.sin(phase):.17g}"
     return tuple(
@@ -775,7 +774,7 @@ def native_gap_segments(teeth: int) -> tuple[tuple[str, str, str], ...]:
             f"({cosine})*({segment.x})-({sine})*({segment.y})",
             f"({sine})*({segment.x})+({cosine})*({segment.y})",
         )
-        for segment in stock_form_profile(teeth).native_segments(
+        for segment in stock_form_profile(teeth).cut_order_native_segments(
             unit_scale=1.0 / MM_PER_IN, clearance_radius_mm=R_CLEAR_MM
         )
     )
@@ -1167,14 +1166,12 @@ async def build(adapter) -> dict[str, str]:
         bored = (math.pi * profile.blank_radius_mm**2 - bore_area_mm2(teeth)) * FACE_WIDTH
         await volume_check(adapter, f"{configuration} bored blank", bored, 0.01 * bored)
         check(f"create {configuration} gap sketch", await adapter.create_sketch("Front"))
-        segments = native_gap_segments(teeth)
         curves = [
             await equation_curve(adapter, f"{configuration} {label}", x, y)
-            for label, x, y in segments
+            for label, x, y in native_gap_segments(teeth)
         ]
-        order = stock_gap_fix_order([label for label, _, _ in segments])
         await ensure_fully_defined(
-            adapter, f"{configuration} finite gap", fix_entities=[curves[i] for i in order],
+            adapter, f"{configuration} finite gap", fix_entities=curves,
             allow_fix_escalation=True,
         )
         check(f"exit {configuration} gap sketch", await adapter.exit_sketch())
