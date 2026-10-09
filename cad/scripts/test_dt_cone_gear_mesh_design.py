@@ -40,8 +40,8 @@ def test_inputs_match_the_configured_train(inputs: solve.DesignInputs) -> None:
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
 def test_every_count_has_complete_actual_qualified_authority(teeth: int) -> None:
-    spec.require_qualified_stock_family()
-    data = spec.stock_form_mesh_data(teeth)
+    domain_supplier.require_qualified_stock_family()
+    data = domain_supplier.stock_form_mesh_data(teeth)
     assert data["qualification"] == "qualified"
     assert data["refusal"] is None
     assert spec.stock_form_profile(teeth).teeth == teeth
@@ -71,7 +71,7 @@ def test_printed_setting_is_actual_and_quantized(teeth: int) -> None:
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
 def test_actual_packet_meets_all_retained_rules(teeth: int) -> None:
-    packet = spec.require_qualified_stock_family()
+    packet = domain_supplier.require_qualified_stock_family()
     row = next(row for row in packet["rows"] if row["teeth"] == teeth)
     selected = next(candidate for candidate in row["candidates"]
                     if candidate["setting"] == row["selected"])
@@ -111,7 +111,7 @@ def test_actual_packet_meets_all_retained_rules(teeth: int) -> None:
             assert reverse["root_owner"] == "driven"
             assert reverse["root_air_lower_mm"] == proof["driven_root_air_lower_mm"]
             assert reverse["material_sweep"]["status"] == "PROVED"
-    frozen = spec.stock_form_mesh_data(teeth)
+    frozen = domain_supplier.stock_form_mesh_data(teeth)
     assert frozen["coverage_min"] >= solve.UNION_COVERAGE_MIN
     assert frozen["oblique_phase_bound_rad"] == pytest.approx(row["oblique_phase_bound_rad"])
     assert frozen["oblique_phase_bound_excluded_terms"] == spec.OBLIQUE_PHASE_EXCLUDED_TERMS
@@ -157,7 +157,7 @@ def test_fixed_drum_uses_real_finite_process_corners() -> None:
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
 def test_operating_notch_up_is_a_physical_setup_not_a_planar_tare(teeth: int, inputs: solve.DesignInputs) -> None:
-    data = spec.stock_form_mesh_data(teeth)
+    data = domain_supplier.stock_form_mesh_data(teeth)
     placement = domain_supplier.nominal_placement_record(teeth)
     assert data["centre_mm"] == pytest.approx(inputs.centre_mm(teeth))
     assert "home_gap_clocking_rad" not in data

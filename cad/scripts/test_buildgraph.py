@@ -1710,6 +1710,8 @@ def test_data_deps_of_follows_a_same_tick_rewrite():
         ("draw_dt_crank_pinion.py", "dt-crank-stock-form.json"),
         ("build_dt_drive_train_assembly.py", "dt-crank-stock-form.json"),
         ("error_budget.py", "dt-crank-stock-form.json"),
+        ("error_budget.py", "dt-cone-stock-form.json"),
+        ("dt_cone_mesh_domain.py", "dt-cone-stock-form.json"),
     ],
 )
 def test_data_deps_of_calibration_reaches_real_stock_consumers(script_name, packet_name):
@@ -1953,6 +1955,32 @@ def test_config_files_track_real_reads():
     assert "cone_line.py" not in cone_modules, (
         "part-local data must not import world datums"
     )
+
+
+def test_cone_native_qualification_stays_below_current_world_source():
+    entry = SCRIPTS_DIR / "build_dt_cone_gear.py"
+    tokens = config_files_of(entry)
+    assert "**" not in tokens
+    assert "machine/*" not in tokens
+    assert "channels.yaml" not in tokens
+    modules = {Path(path).name for path in module_deps_of(entry)}
+    assert "dt_cone_mesh_domain.py" not in modules
+    assert "dt_cone_support_pose.py" not in modules
+
+    assembly = ast.parse((SCRIPTS_DIR / "build_dt_drive_train_assembly.py").read_text())
+    assert any(isinstance(node, ast.ImportFrom)
+               and node.module == "dt_cone_mesh_domain"
+               and any(alias.name == "require_qualified_stock_family" for alias in node.names)
+               for node in assembly.body)
+    build = next(node for node in assembly.body
+                 if isinstance(node, ast.AsyncFunctionDef) and node.name == "build")
+    assert ast.unparse(build.body[0]) == "require_qualified_stock_family()"
+    budget = ast.parse((SCRIPTS_DIR / "error_budget.py").read_text())
+    row = next(node for node in budget.body
+               if isinstance(node, ast.FunctionDef) and node.name == "_qualified_cone_row")
+    assert any(isinstance(node, ast.Call)
+               and ast.unparse(node.func) == "dt_cone_mesh_domain.stock_form_mesh_data"
+               for node in ast.walk(row))
 
 
 def test_config_files_subset_of_known_tokens():

@@ -1,60 +1,18 @@
-"""Pure retained cone/drum placement and complete-source transport.
+"""Current retained cone/drum placement and complete-source qualification.
 
-No diagnostic engine, selected factory output or native certificate is read.
-Raise owns shaft support; this adapter only projects that authority into the
-shared body's named coordinates. Missing tooth-to-bore runout authority is
-UNKNOWN, never a zero tolerance or the unrelated crank mesh's grade.
+No diagnostic engine, selected factory output or native certificate supplies a
+source grade. Raise owns shaft support. Installed mesh APIs independently
+rebind the full calibration receipt here, above the part-local geometry tier.
+Missing tooth-to-bore runout authority is UNKNOWN, never a zero tolerance.
 """
 from __future__ import annotations
 
 from dataclasses import asdict
 import math
 
-
-class SourceDomainUnknown(ValueError):
-    """A real physical source authority needed by the full mesh is absent."""
+import _fit_limits
 
 
-BUDGET_CLOCK_EXCLUDED_TERMS = (
-    "cone_flat_free_clock","BoreFlatClock","drum_tooth_to_cam_notch_clock",
-)
-
-
-def tooth_cutting_runout_tir_mm(body: str) -> float:
-    """Read the shared part's required process/inspection TIR, not measured stock.
-
-    These source keys receive grades only after actual all-profile margins
-    establish an achievable observable requirement. Their absence is refusal.
-    The drum grade is also the same 120T part's alignment-mesh input.
-    """
-    import _config
-    if body not in ("cone", "drum"):
-        raise ValueError("tooth runout body must be cone or drum")
-    key = f"{body}_tooth_cutting_runout_tir_mm"
-    try:
-        value = _config.fit("cone_drum_oblique_mesh", key)
-    except KeyError as error:
-        raise SourceDomainUnknown(f"missing actual {body} tooth-to-bore TIR authority: {key}") from error
-    if type(value) not in (int, float) or not math.isfinite(value) or value <= 0.0:
-        raise SourceDomainUnknown(f"{body} tooth-to-bore TIR must be a finite positive source requirement")
-    return float(value)
-
-
-def drum_tooth_to_cam_notch_clock_deg() -> float:
-    """Require the actual gear-pattern/CAM-NOTCH grade, not the lobe grade.
-
-    Whole-body NOTCH-up setup is not this manufactured angular error.
-    A proposed or full-pitch engineering band is not a production requirement.
-    """
-    import _config
-    key = "drum_tooth_to_cam_notch_clock_deg"
-    try:
-        value = _config.fit("cone_drum_oblique_mesh", key)
-    except KeyError as error:
-        raise SourceDomainUnknown(f"missing actual drum tooth-to-CAM-NOTCH clock authority: {key}") from error
-    if type(value) not in (int,float) or not math.isfinite(value) or value<=0.0:
-        raise SourceDomainUnknown("drum tooth-to-CAM-NOTCH clock must be a finite positive source requirement")
-    return float(value)
 
 
 def installed_axis_acceptance_from_record(record):
@@ -167,7 +125,7 @@ def nominal_placement_record(teeth: int) -> dict:
 
 def _outward_radius(terms: dict[str, float]) -> float:
     if not terms or any(not math.isfinite(value) or value < 0 for value in terms.values()):
-        raise SourceDomainUnknown("source eccentricity needs finite named radial allowances")
+        raise _fit_limits.SourceDomainUnknown("source eccentricity needs finite named radial allowances")
     return math.nextafter(math.fsum(terms.values()), math.inf)
 
 
@@ -177,8 +135,8 @@ def source_eccentricity_disks(teeth: int) -> dict:
     import dt_cone_gear_spec as cone
     import dt_cylinder_gear_spec as drum
     _member(teeth)
-    cone_tir = tooth_cutting_runout_tir_mm("cone")
-    drum_tir = tooth_cutting_runout_tir_mm("drum")
+    cone_tir = _fit_limits.tooth_cutting_runout_tir_mm("cone")
+    drum_tir = _fit_limits.tooth_cutting_runout_tir_mm("drum")
     section = cone.land_section(teeth)
     diameter = cone.bore_dia_mm(teeth)
     shaft_low, _ = lands.land_finished_dia_limits_mm(diameter, section)
@@ -226,14 +184,14 @@ def _centre_source_ledger(teeth, pose, disks, axial, drum_axial, pivot_radial, p
     import dt_cone_gear_spec as cone
     import dt_cylinder_gear_spec as drum
     if not math.isfinite(booked) or booked<0:
-        raise SourceDomainUnknown("booked total opening is not finite/nonnegative")
+        raise _fit_limits.SourceDomainUnknown("booked total opening is not finite/nonnegative")
     nominal = nominal_placement_record(teeth)
     c,s = cone_line.COS_I,cone_line.SIN_I
     incline = math.atan2(s,c)
     rotations = pose["shortest_transport_euler_intervals_rad"]
     angle = math.fsum(max(abs(lo),abs(hi)) for lo,hi in rotations)
     if abs(incline)+angle>=math.pi/2:
-        raise SourceDomainUnknown("operating shaft source permits a horizontal-section axis singularity")
+        raise _fit_limits.SourceDomainUnknown("operating shaft source permits a horizontal-section axis singularity")
     guard = 128*math.ulp(1.0)*(1+abs(incline)+angle)
     slope = (math.nextafter(math.tan(incline-angle)-guard,-math.inf),
              math.nextafter(math.tan(incline+angle)+guard,math.inf))
@@ -352,7 +310,7 @@ def continuous_source_domain(teeth: int, *, installed_axis_acceptance=None) -> d
     clock = math.nextafter(free_clock + math.radians(cone.FLAT_CLOCK_TOLERANCE_DEG), math.inf)
 
     booked = float(_config.fit("cone_drum_oblique_mesh", "centre_opening_mm"))
-    pattern_clock_deg = drum_tooth_to_cam_notch_clock_deg()
+    pattern_clock_deg = _fit_limits.drum_tooth_to_cam_notch_clock_deg()
     pattern_clock_rad = math.nextafter(math.radians(pattern_clock_deg),math.inf)
     centre_ledger = _centre_source_ledger(teeth,pose,disks,axial,drum_axial,
         pivot_radial,pivot_axial,booked)
@@ -408,35 +366,114 @@ def continuous_source_domain(teeth: int, *, installed_axis_acceptance=None) -> d
     }
 
 
-def nominal_source_subdomain(placement: dict, physical_domain: dict) -> dict:
-    """An explicit mathematical q=0 comparison, NEVER a production fit grade."""
-    from copy import deepcopy
-    domain = deepcopy(physical_domain)
-    domain["physical_parent_domain"] = physical_domain
-    domain["scope"] = "DESIGN_NOMINAL_SUBDOMAIN"
-    domain["production_source_domain"] = False
-    domain["correlated_pose_parameters"] = [
-        [name,[0.0,0.0]] for name,_ in physical_domain["correlated_pose_parameters"]]
-    domain["source_eccentricity_disks"] = {
-        body:{"shape":"closed_disk","centre_mm":[0.0,0.0],"radius_mm":0.0,
-              "source_terms_mm":{"nominal_subdomain_radius_upper_mm":0.0}}
-        for body in ("driver","driven")}
-    domain["finite_face_width_limits_mm"] = {
-        body:[width,width] for body,width in (
-            ("driver",placement["driver_face_mm"][1]-placement["driver_face_mm"][0]),
-            ("driven",placement["driven_face_mm"][1]-placement["driven_face_mm"][0]))}
-    return domain
+def _current_config_reads(records: dict) -> dict:
+    """Replay the full finite public-getter ledger with explicit file families."""
+    import _config
+    if not isinstance(records, dict) or not records:
+        raise ValueError("factory source has no actual geometric config reads")
+    values = {}
+    for identity in records:
+        accessor, separator, path = identity.partition(":")
+        if not separator:
+            raise ValueError("factory config read lacks its public getter identity")
+        keys = path.split("/") if path else []
+        if accessor == "machine" and keys:
+            subsystem, *fields = keys
+            if subsystem == "gear_train":
+                value = _config.machine("gear_train", *fields)
+            elif subsystem == "cone_incline":
+                value = _config.machine("cone_incline", *fields)
+            elif subsystem == "channels":
+                value = _config.machine("channels", *fields)
+            elif subsystem == "alignment_pinion":
+                value = _config.machine("alignment_pinion", *fields)
+            elif subsystem == "output":
+                value = _config.machine("output", *fields)
+            elif subsystem == "amplitude":
+                value = _config.machine("amplitude", *fields)
+            elif subsystem == "springs":
+                value = _config.machine("springs", *fields)
+            else:
+                raise ValueError(f"unqualified geometric machine subsystem {subsystem}")
+        elif accessor == "parts" and len(keys) == 2:
+            value = _config.parts(keys[0])[keys[1]]
+        elif accessor == "cone_teeth" and len(keys) == 1:
+            value = _config.cone_teeth(int(keys[0]))
+        elif accessor == "fit" and keys:
+            value = _config.fit(*keys)
+        elif accessor == "title_block" and len(keys) == 1:
+            value = _config.title_block(keys[0])
+        elif accessor == "palette" and len(keys) == 1:
+            value = _config.palette(keys[0])
+        elif accessor == "channels" and not keys:
+            value = _config.channels()
+        elif accessor == "amplitudes" and not keys:
+            value = _config.amplitudes()
+        elif accessor == "poses" and not keys:
+            value = _config.poses()
+        elif accessor == "active_count" and not keys:
+            value = _config.active_count()
+        elif accessor == "active_channels" and not keys:
+            value = _config.active_channels()
+        elif accessor == "materials" and not keys:
+            value = _config.materials()
+        else:
+            raise ValueError(f"unqualified geometric config getter {identity}")
+        values[identity] = value
+    return values
 
 
-def budget_clock_subdomain(physical_domain: dict) -> dict:
-    """Hold the three independently booked driver/drum pattern-clock terms."""
-    from copy import deepcopy
-    domain = deepcopy(physical_domain)
-    domain["physical_parent_domain"] = physical_domain
-    domain["scope"] = "BUDGET_CLOCK_NOMINAL_SUBDOMAIN"
-    domain["production_source_domain"] = False
-    domain["correlated_pose_parameters"] = [
-        [name,[0.0,0.0] if name in ("driver_clock_rad","driven_clock_rad") else list(limits)]
-        for name,limits in physical_domain["correlated_pose_parameters"]]
-    domain["oblique_phase_bound_excluded_terms"] = list(BUDGET_CLOCK_EXCLUDED_TERMS)
-    return domain
+def _qualified_family(payload: dict | None = None):
+    """Fresh ALL20 SOURCE binding; never cache a world/calibration rebind."""
+    import dt_cone_gear_spec as cone
+    try:
+        payload, members = cone._qualified_family(payload)
+        source = payload["source_identity"]
+        compiled = cone._relative_sources(source["actual_preimport_project_sha256"], "COMPILED")
+        required = {
+            "cad/scripts/dt_cone_support_pose.py",
+            "cad/scripts/dt_cone_mesh_domain.py",
+            "cad/scripts/cone_line.py",
+        }
+        if not required <= compiled.keys():
+            raise ValueError("cone qualification lacks its consumed physical-source authority")
+        pure = {path: sha for path, sha in compiled.items()
+                if not path.startswith("cad/scripts/diagnostics/")}
+        if pure != cone._current_geometry_source_sha256(pure):
+            raise ValueError("cone full physical source identity is stale")
+        reads = source["actual_config_value_reads"]
+        cone._same_record(reads, _current_config_reads(reads), "actual geometric config reads")
+        for row in payload["rows"]:
+            teeth = row["teeth"]
+            domain = continuous_source_domain(teeth)
+            if (domain["scope"] != "FULL_PRODUCTION_SOURCE_DOMAIN"
+                    or domain["production_source_domain"] is not True):
+                raise ValueError("installed cone requires the complete unconditional production SOURCE domain")
+            cone._same_record(row["continuous_source_domain"], domain,
+                              "independent whole physical SOURCE domain")
+            selected = next(candidate for candidate in row["candidates"]
+                            if candidate.get("qualification") == "qualified"
+                            and candidate.get("setting") == row["selected"])
+            cone._same_record(selected["all_corner_actual3d"]["placement"],
+                              nominal_placement_record(teeth), "actual SOURCE placement")
+        return payload, members
+    except (KeyError, TypeError, IndexError, AttributeError, OverflowError, OSError, StopIteration) as exc:
+        raise ValueError(f"incomplete cone stock-form qualification: {exc}") from exc
+
+
+def require_qualified_stock_family(payload: dict | None = None) -> dict:
+    """Require current full SOURCE/phase qualification before publication/use.
+
+    Recorded numerical qualification and current native geometry alone are
+    insufficient. This gate also rebinds every actual config read, pure-source
+    byte identity, physical domain and world-positive placement on every call.
+    """
+    return _qualified_family(payload)[0]
+
+
+def stock_form_mesh_data(teeth: int) -> dict:
+    """Current installed 3D inspection/budget authority, with no stale fallback."""
+    import dt_cone_gear_spec as cone
+    cone._require_member(teeth)
+    _payload, members = _qualified_family()
+    return dict(members[cone.CONFIGURATION_TEETH.index(teeth)].mesh_items)

@@ -503,7 +503,7 @@ def test_pattern_notch_native_locator_is_a_separate_basic_reference() -> None:
 
 
 def test_pattern_notch_grade_has_no_missing_source_fallback(monkeypatch) -> None:
-    import dt_cone_mesh_domain as supplier
+    import _fit_limits as supplier
 
     def missing():
         raise supplier.SourceDomainUnknown("actual published pattern clock is UNKNOWN")
@@ -517,14 +517,14 @@ def test_pattern_notch_grade_has_no_missing_source_fallback(monkeypatch) -> None
 
 @pytest.mark.parametrize("grade", (0.02, 0.031))
 def test_pattern_notch_grade_reads_only_the_published_supplier(monkeypatch, grade) -> None:
-    import dt_cone_mesh_domain as supplier
+    import _fit_limits as supplier
 
     monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: grade)
     assert spec.pattern_notch_clock_grade_deg() == grade
 
 
 def test_pattern_notch_grade_reports_a_tighter_admission_without_drawing(monkeypatch) -> None:
-    import dt_cone_mesh_domain as supplier
+    import _fit_limits as supplier
 
     monkeypatch.setattr(supplier, "drum_tooth_to_cam_notch_clock_deg", lambda: 0.019)
     with pytest.raises(

@@ -25,6 +25,9 @@ the frozen, source-identified qualified calibration through
 `crank_mesh_stack.require_qualified()`; an incomplete or geometrically
 refused study must remain an explicit publication refusal, never old fitted
 constants or a zero-error fallback.
+Collectors compile their captured entry bytes using explicit runtime bindings.
+The continuation module is imported explicitly, so the undefined-name gate
+also covers the entry shims and continuation type annotations.
 The physical geometry identity includes the actual profiles, source pose
 domains and pure geometry/core bytes. A separate measurement-engine manifest
 pins the collector, 3D engine, adapter, both root helpers and continuous
@@ -123,6 +126,20 @@ cam-notch/cone-lock zeros must be supplied from their independent manufactured
 datums; neither a loaded home value nor an arbitrary tooth clock is a TE tare.
 Nonrigid face-width families must be covered as material-cap motion, not silently
 relabelled as a rigid translation.
+
+Cone native geometry remains below world placement: `cone_pitch.py` supplies
+the part-local seat pitch, while `dt_cone_gear_spec.py` binds current geometry
+sources/config, reconstructs every actual manufactured profile and replays the
+authentic recorded ALL20/ALL17 certificates. Its drawing references are labelled
+as recorded SOURCE receipts, not current installed-mesh authority. The explicit
+`dt_cone_mesh_domain.require_qualified_stock_family` publication/assembly gate
+and `stock_form_mesh_data` budget API additionally rebind every actual producer
+config read, full pure-source byte identity, current continuous physical SOURCE
+domain and world-positive placement on every call. A stale placement receipt
+cannot qualify an installed mesh even when its native part geometry is unchanged.
+Shared finite process-grade getters and their UNKNOWN exception live in the
+existing narrow `_fit_limits.py` tier, so the drum's grade API does not pull
+world placement into either native part recipe.
 
 The retained physical crank phase has one configuration cell,
 `gear_train.crank_mesh_phase_offset_deg`. Until qualified it is null.

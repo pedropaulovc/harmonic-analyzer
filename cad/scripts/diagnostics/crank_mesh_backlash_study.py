@@ -20,7 +20,7 @@ import time
 # As in the cone collector, even the entry module executes captured bytes.
 if __name__ == "__main__" and "_ENTRY_PAYLOAD" not in globals():
     _entry_path = Path(__file__).resolve()
-    globals()["_ENTRY_PAYLOAD"] = _entry_path.read_bytes()
+    _ENTRY_PAYLOAD: bytes = _entry_path.read_bytes()
     exec(compile(_ENTRY_PAYLOAD,str(_entry_path),"exec",dont_inherit=True),globals())
     raise RuntimeError("captured crank collector returned without completing main")
 

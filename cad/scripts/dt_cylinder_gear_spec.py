@@ -122,7 +122,7 @@ PATTERN_NOTCH_SHOP_CANDIDATE_DEG = 0.02
 
 def pattern_notch_clock_grade_deg() -> float:
     """Read the post-F4 published drum pattern-to-CAM-NOTCH half-width lazily."""
-    from dt_cone_mesh_domain import SourceDomainUnknown, drum_tooth_to_cam_notch_clock_deg
+    from _fit_limits import SourceDomainUnknown, drum_tooth_to_cam_notch_clock_deg
 
     grade = drum_tooth_to_cam_notch_clock_deg()
     if grade < PATTERN_NOTCH_SHOP_CANDIDATE_DEG:

@@ -45,6 +45,7 @@ import numpy as np
 import yaml
 
 import _config
+import _fit_limits
 import ch_amplitude_bar_spec
 import ch_channel_lever_spec
 import vn_channel_spring_installed_spec
@@ -1064,7 +1065,7 @@ def _qualified_cone_row(teeth: int) -> dict[str, np.ndarray]:
     driver phase (the source frame: TE = (beta_abs - pi) + r phi), and each
     TE interval is a finite (lo <= hi)."""
     try:
-        mesh = dt_cone_gear_spec.stock_form_mesh_data(teeth)
+        mesh = dt_cone_mesh_domain.stock_form_mesh_data(teeth)
     except ValueError as exc:
         raise StockPhaseUnavailable(f"cone T{teeth:03d} stock-form family refused: {exc}") from exc
     if mesh.get("qualification") != "qualified":
@@ -1165,8 +1166,8 @@ def drum_pattern_clock_rad() -> float:
     paid once, as +/- this grade, in the nominal residual. Absent or invalid
     grade: ``StockPhaseUnavailable``, never 0."""
     try:
-        grade_deg = dt_cone_mesh_domain.drum_tooth_to_cam_notch_clock_deg()
-    except dt_cone_mesh_domain.SourceDomainUnknown as exc:
+        grade_deg = _fit_limits.drum_tooth_to_cam_notch_clock_deg()
+    except _fit_limits.SourceDomainUnknown as exc:
         raise StockPhaseUnavailable(f"drum tooth-to-CAM-NOTCH clock: {exc}") from exc
     return math.nextafter(math.radians(grade_deg), math.inf)
 

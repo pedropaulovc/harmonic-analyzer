@@ -1,8 +1,8 @@
 """Model-stamped cutting and inspection data from the finite cutter authority.
 
 Nonconjugate meshes print STOCK-FORM COVERAGE, never an ideal contact ratio.
-The pure specification owns qualification and numerical bounds; this text layer
-neither recomputes the mesh nor approves a refused configured member.
+The part-local specification replays the original numerical receipt and current
+native geometry. Drawing references are not current installed-mesh authority.
 """
 
 from __future__ import annotations
@@ -39,11 +39,11 @@ def cutter_description(teeth: int) -> str:
 
 
 def gear_data(teeth: int) -> str:
-    """One compact physical recipe, including actual carrying-contact bounds."""
+    """One physical recipe with explicitly recorded, not installed, references."""
     profile = spec.stock_form_profile(teeth)
-    mesh = spec.stock_form_mesh_data(teeth)
-    if mesh["qualification"] != "qualified":
-        raise ValueError(f"T{teeth:03d}: cutter mesh is not qualified: {mesh['refusal']}")
+    mesh = spec.stock_form_reference_data(teeth)
+    if mesh["qualification"] != "geometry-qualified-reference":
+        raise ValueError(f"T{teeth:03d}: cutter geometry reference is not qualified")
     minimum, maximum = spec.BACKLASH_ACCEPTANCE_MM
     # Conservative reference reporting: round coverage/reserve/web down and
     # error/gap bounds up. These rows do not replace native toleranced sizes.
@@ -64,6 +64,7 @@ def gear_data(teeth: int) -> str:
         ("WHOLE DEPTH MAX / ROOT ARC R (mm, REF)", f"{whole_depth_max:.4f} / {profile.template.root_radius_mm:.4f}"),
         ("TOOTH FORM", "FINITE INVOLUTE; RADIAL BELOW BASE" if profile.template.root_radius_mm < profile.template.base_radius_mm else "FINITE INVOLUTE; ABOVE-BASE ROOT ARC"),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
+        ("MESH REFERENCE SCOPE", "RECORDED SOURCE RECEIPT; CURRENT INSTALLED SOURCE REBIND REQUIRED"),
         ("BACKLASH AT ASSEMBLY (mm)", f"{minimum:.2f} TO {maximum:.2f}"),
         ("ACTUAL 3D STOCK-FORM COVERAGE MIN (REF)", f"{coverage:.2f}"),
         ("PHASE RESERVE (rad, REF)", f"{reserve:.6f}"),

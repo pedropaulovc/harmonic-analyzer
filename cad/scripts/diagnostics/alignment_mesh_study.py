@@ -27,7 +27,7 @@ import sys
 if __name__ == "__main__" and "_ENTRY_SOURCE_SHA256" not in globals():
     _entry_path = Path(__file__).resolve()
     _entry_payload = _entry_path.read_bytes()
-    globals()["_ENTRY_SOURCE_SHA256"] = hashlib.sha256(_entry_payload).hexdigest()
+    _ENTRY_SOURCE_SHA256: str = hashlib.sha256(_entry_payload).hexdigest()
     exec(compile(_entry_payload, str(_entry_path), "exec", dont_inherit=True), globals())
     raise RuntimeError("captured alignment entry returned without completing main")
 

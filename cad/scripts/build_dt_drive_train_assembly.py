@@ -288,6 +288,7 @@ from dt_cone_gear_spec import BLANK_DIA_BAND as CONE_GEAR_BLANK_DIA_BAND  # noqa
 from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH  # noqa: E402
 from dt_cone_gear_spec import FACE_WIDTH_BAND as CONE_GEAR_FACE_WIDTH_BAND  # noqa: E402
 from dt_cone_gear_spec import outside_dia_mm as cone_gear_outside_dia_mm  # noqa: E402
+from dt_cone_mesh_domain import require_qualified_stock_family  # noqa: E402
 
 
 def _cone_tip_radius_max(teeth: int) -> float:
@@ -4491,6 +4492,7 @@ def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
+    require_qualified_stock_family()
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)

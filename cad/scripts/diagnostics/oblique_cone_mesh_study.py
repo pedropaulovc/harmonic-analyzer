@@ -299,7 +299,6 @@ from diagnostics.stock_form_contact_3d import (
 from stock_form_cutter import StockFormProfile
 from diagnostics.stock_form_root_angles import RootAngularDomain
 from diagnostics.stock_form_root_sweep import root_free_intervals
-from dt_cone_mesh_domain import nominal_source_subdomain, budget_clock_subdomain
 
 
 @dataclass(frozen=True)
@@ -1059,6 +1058,7 @@ def qualify_actual_pair(pair: ContactPair, *, continuous_source_domain: dict,
                         selected_nominal_te_rad: tuple[float,float],
                         nominal_pose_report: dict) -> dict:
     """Consume genuine whole-q continuation/endpoints; never a scalar pose ball."""
+    from dt_cone_gear_spec import budget_clock_subdomain
     result = {"qualification":"refused","oblique_phase_bound_rad":None,
         "nominal_oblique_phase_bound_rad":None,"continuous_source_domain":continuous_source_domain,
         "smooth_3d_ff_screen":exact_smooth_ff_exclusion(pair),
@@ -1312,7 +1312,8 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
             teeth,inputs,cone_radius_upper_mm=radius_upper,installed=installed) if source_inputs_only else None
         source_domain = None
         if not (nominal_engineering_only or source_inputs_only):
-            from dt_cone_mesh_domain import continuous_source_domain, SourceDomainUnknown
+            from dt_cone_mesh_domain import continuous_source_domain
+            from _fit_limits import SourceDomainUnknown
             try:
                 source_domain = continuous_source_domain(teeth,installed_axis_acceptance=installed)
             except SourceDomainUnknown as error:
@@ -1435,6 +1436,7 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
                 calculation = {"qualification":"refused","oblique_phase_bound_rad":None,
                     "nominal_oblique_phase_bound_rad":None}
                 try:
+                    from dt_cone_gear_spec import nominal_source_subdomain
                     nominal_comparison = _continuous_analysis(pair,nominal_source_subdomain(pair.placement.record(),source_domain),
                         phases=contact_phases,maximum_error_mm=maximum_error_mm,read_phases_rad=phases_rad)
                     reference_te = actual3d_nominal_te_enclosure(nominal_comparison)
@@ -1757,7 +1759,7 @@ def main() -> int:
         factory_inputs = None
         stationary_runout_authority = None
         if args.nominal_engineering_only:
-            from dt_cone_mesh_domain import SourceDomainUnknown,tooth_cutting_runout_tir_mm
+            from _fit_limits import SourceDomainUnknown,tooth_cutting_runout_tir_mm
             stationary_runout_authority = {
                 "scope":"mathematical held q0 for margin selection only; no manufacturing TIR band is assumed or qualified",
                 "assumed_tir_band_mm":None,

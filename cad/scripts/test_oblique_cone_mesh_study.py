@@ -483,6 +483,55 @@ def test_cli_import_capture_does_not_replace_external_package_loader(tmp_path,mo
     assert cone_study._captured_project_code(loader,"external") is expected
 
 
+def test_cli_capture_stays_cold_before_deferred_part_helpers():
+    """Exercise the actual capture class without importing numeric engines."""
+    import ast
+    import builtins
+    from pathlib import Path
+
+    path = Path(cone_study.__file__)
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    eager = [
+        node for node in tree.body
+        if (isinstance(node, ast.ImportFrom) and node.module == "dt_cone_gear_spec")
+        or (isinstance(node, ast.Import)
+            and any(alias.name == "dt_cone_gear_spec" for alias in node.names))
+    ]
+    capture = next(node for node in tree.body
+                   if isinstance(node, ast.ClassDef) and node.name == "InputReadIdentity")
+    cache = SimpleNamespace(currsize=0)
+    config = SimpleNamespace(
+        __name__="cold_capture_config_fixture",
+        _doc=SimpleNamespace(cache_info=lambda: cache),
+        _parts_registry=SimpleNamespace(cache_info=lambda: cache),
+        _load=lambda path: {},
+    )
+    early_reads = []
+    original_import = builtins.__import__
+
+    def cold_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "_config":
+            return config
+        if name == "dt_cone_gear_spec":
+            early_reads.append(name)
+            cache.currsize = 1
+            return SimpleNamespace(nominal_source_subdomain=lambda *args: None,
+                                   budget_clock_subdomain=lambda *args: None)
+        return original_import(name, globals, locals, fromlist, level)
+
+    namespace = dict(vars(cone_study))
+    namespace["__builtins__"] = {**vars(builtins), "__import__": cold_import}
+    isolated = ast.Module(body=[*eager, capture], type_ignores=[])
+    exec(compile(isolated, str(path), "exec"), namespace)
+    with namespace["InputReadIdentity"]() as reads:
+        assert reads.config is config and reads.values == {}
+    assert early_reads == []
+    cache.currsize = 1
+    with pytest.raises(ValueError, match="requires a fresh CLI process"):
+        with namespace["InputReadIdentity"]():
+            pass
+
+
 def test_registry_capture_records_only_fields_consumed_by_geometry_or_wording():
     fetched = []
     row = cone_study.RegistryFieldReads(
@@ -771,7 +820,7 @@ def test_manufactured_gap_and_notch_mapping_matches_native_reflection():
 @pytest.mark.parametrize("body", ("cone", "drum"))
 def test_missing_own_tooth_runout_is_unknown_not_unrelated_crank_grade(monkeypatch, body):
     import _config
-    import dt_cone_mesh_domain as source
+    import _fit_limits as source
     calls = []
     def missing(section, key):
         calls.append((section, key))
@@ -785,7 +834,7 @@ def test_missing_own_tooth_runout_is_unknown_not_unrelated_crank_grade(monkeypat
 @pytest.mark.parametrize("value", (0.0, -.01, math.nan, math.inf, True, ".02"))
 def test_own_tooth_runout_needs_actual_positive_source_authority(monkeypatch, value):
     import _config
-    import dt_cone_mesh_domain as source
+    import _fit_limits as source
     monkeypatch.setattr(_config, "fit", lambda *args: value)
     with pytest.raises(source.SourceDomainUnknown, match="finite positive"):
         source.tooth_cutting_runout_tir_mm("drum")
@@ -793,10 +842,11 @@ def test_own_tooth_runout_needs_actual_positive_source_authority(monkeypatch, va
 
 def test_body_disks_pay_printed_running_clearance_and_own_tir_once(monkeypatch):
     import dt_cone_mesh_domain as source
+    import _fit_limits
     import dt_cone_gear_spec as cone
     import dt_cylinder_gear_spec as drum
     import cone_shaft_land_bands as lands
-    monkeypatch.setattr(source, "tooth_cutting_runout_tir_mm",
+    monkeypatch.setattr(_fit_limits, "tooth_cutting_runout_tir_mm",
                         lambda body: {"cone": .024, "drum": .028}[body])
     for teeth in range(6, 121, 6):
         disks = source.source_eccentricity_disks(teeth)
@@ -814,7 +864,7 @@ def test_body_disks_pay_printed_running_clearance_and_own_tir_once(monkeypatch):
 
 
 def test_nominal_subdomain_is_explicit_mathematics_not_a_production_grade():
-    import dt_cone_mesh_domain as source
+    import dt_cone_gear_spec as source
     pair = _pair()
     parent = {
         "scope":"FULL_PRODUCTION_SOURCE_DOMAIN","production_source_domain":True,
@@ -1093,7 +1143,7 @@ def test_consumed_config_capture_keeps_metadata_but_excludes_unread_cache_rows()
 
 def test_missing_drum_tooth_to_cam_notch_clock_is_unknown_not_lobe_grade(monkeypatch):
     import _config
-    import dt_cone_mesh_domain as source
+    import _fit_limits as source
     calls = []
     def missing(group,key):
         calls.append((group,key))
@@ -1107,7 +1157,7 @@ def test_missing_drum_tooth_to_cam_notch_clock_is_unknown_not_lobe_grade(monkeyp
 @pytest.mark.parametrize("value",(0.0,-.05,math.nan,math.inf,True,".05"))
 def test_drum_pattern_clock_requires_actual_positive_source_grade(monkeypatch,value):
     import _config
-    import dt_cone_mesh_domain as source
+    import _fit_limits as source
     monkeypatch.setattr(_config,"fit",lambda *args:value)
     with pytest.raises(source.SourceDomainUnknown,match="finite positive"):
         source.drum_tooth_to_cam_notch_clock_deg()
@@ -1115,7 +1165,7 @@ def test_drum_pattern_clock_requires_actual_positive_source_grade(monkeypatch,va
 
 def test_drum_pattern_clock_positive_reader_does_not_invent_a_band(monkeypatch):
     import _config
-    import dt_cone_mesh_domain as source
+    import _fit_limits as source
     monkeypatch.setattr(_config,"fit",lambda *args:.037)
     assert source.drum_tooth_to_cam_notch_clock_deg() == .037
 

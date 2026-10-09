@@ -412,8 +412,8 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
 
 def test_stock_coverage_metadata_and_retained_web_guards_are_not_ideal_cr() -> None:
     for teeth in spec.CONFIGURATION_TEETH:
-        metadata = spec.stock_form_mesh_data(teeth)
-        assert metadata["qualification"] == "qualified"
+        metadata = spec.stock_form_reference_data(teeth)
+        assert metadata["qualification"] == "geometry-qualified-reference"
         assert metadata["phase_reserve_rad"] >= 0.0
         assert metadata["noncarrying_gap_mm"] >= 0.0
         assert metadata["te_bound_rad"] >= 0.0
@@ -429,6 +429,7 @@ def test_actual_web_and_coverage_print_as_facts(teeth: int) -> None:
     assert web >= required - 1e-9
     assert f"WEB MIN (mm, REF):  {math.floor(web * 100.0) / 100.0:.2f}" in data
     assert "STOCK-FORM COVERAGE" in data
+    assert "RECORDED SOURCE RECEIPT; CURRENT INSTALLED SOURCE REBIND REQUIRED" in data
     assert "CONTACT RATIO" not in data
 
 

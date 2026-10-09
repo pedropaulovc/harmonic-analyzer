@@ -1,13 +1,14 @@
 r"""Finite cutter-native authority shared by the cone family and its drawing.
 
 Only a complete, source-qualified T006..T120 numerical packet supplies blank
-and tool settings. Missing or stale evidence refuses construction; there is no
-ideal-count profile or historical deepened-mesh fallback. Native inspection
-sizes come from the same supported core profiles as the actual through cuts.
+and tool settings. Missing or geometrically stale evidence refuses construction;
+there is no ideal-count profile or historical deepened-mesh fallback. Native
+inspection sizes come from the same supported core profiles as the through cuts.
 
-The retained seat-fit and manufacturing bands are inputs to qualification,
-not outputs back-fed into the solver. Numerical qualification may precede the
-first farm build: ``native_certificate=False`` is not a construction refusal.
+This part-local receiver replays the recorded certificates and binds current
+geometry, not world placement. ``dt_cone_mesh_domain`` independently rebinds
+the complete current SOURCE before installed mesh, assembly and budget use.
+Numerical qualification may precede native proof (``native_certificate=False``).
 """
 
 from __future__ import annotations
@@ -75,6 +76,21 @@ MEASUREMENT_SOURCE_PATHS = frozenset((
     "cad/scripts/diagnostics/stock_form_root_sweep.py",
     "cad/scripts/diagnostics/stock_form_contact_3d.py",
     "cad/scripts/diagnostics/stock_form_contact_continuation.py",
+))
+PART_GEOMETRY_SOURCE_PATHS = frozenset((
+    "cad/scripts/_config.py",
+    "cad/scripts/_fit_limits.py",
+    "cad/scripts/_printed_tolerance.py",
+    "cad/scripts/_gtol_spec.py",
+    "cad/scripts/_surface_finish.py",
+    "cad/scripts/cone_pitch.py",
+    "cad/scripts/dt_cone_gear_spec.py",
+    "cad/scripts/dt_cylinder_gear_spec.py",
+    "cad/scripts/dt_cylinder_gear_shaft_spec.py",
+    "cad/scripts/cone_shaft_land_bands.py",
+    "cad/scripts/gear_seat_fit.py",
+    "cad/scripts/stock_form_cutter.py",
+    "cad/scripts/stock_form_contact_certificate.py",
 ))
 OBLIQUE_PHASE_EXCLUDED_TERMS = (
     "cone_flat_free_clock", "BoreFlatClock", "drum_tooth_to_cam_notch_clock",
@@ -237,31 +253,34 @@ def _current_geometry_source_sha256(paths: Any) -> dict[str, str]:
 
 
 def _current_config_reads(records: Any) -> dict[str, Any]:
-    """Re-read the producer's finite public getter ledger, not raw metadata."""
+    """Replay only the finite part-local slice of the authentic producer ledger.
+
+    Other producer reads remain in the receipt and its semantic digest; their
+    current SOURCE rebind belongs to ``dt_cone_mesh_domain``, not a gear recipe.
+    Every getter here has a literal file-family argument for the build graph.
+    """
     if not isinstance(records, dict) or not records:
         raise ValueError("factory source has no actual geometric config reads")
-    allowed = {
-        "machine", "fit", "channels", "cone_teeth", "amplitudes", "poses",
-        "active_count", "active_channels", "title_block", "materials", "palette",
-    }
     values = {}
     for identity in records:
         accessor, separator, path = identity.partition(":")
         if not separator:
             raise ValueError("factory config read lacks its public getter identity")
         keys = path.split("/") if path else []
-        if accessor == "parts":
+        if accessor == "machine" and keys and keys[0] == "gear_train":
+            values[identity] = _config.machine("gear_train", *keys[1:])
+        elif accessor == "machine" and keys and keys[0] == "cone_incline":
+            values[identity] = _config.machine("cone_incline", *keys[1:])
+        elif accessor == "parts" and keys and keys[0] == "dt-cone-gear":
             if len(keys) != 2:
                 raise ValueError("factory registry read lacks its exact field")
-            values[identity] = _config.parts(keys[0])[keys[1]]
-        elif accessor == "cone_teeth":
-            if len(keys) != 1:
-                raise ValueError("cone-teeth read lacks its exact channel index")
-            values[identity] = _config.cone_teeth(int(keys[0]))
-        elif accessor in allowed:
-            values[identity] = getattr(_config, accessor)(*keys)
-        else:
-            raise ValueError(f"unqualified geometric config getter {accessor}")
+            values[identity] = _config.parts("dt-cone-gear")[keys[1]]
+        elif accessor == "fit":
+            values[identity] = _config.fit(*keys)
+        elif accessor == "title_block":
+            values[identity] = _config.title_block(*keys)
+    if not values:
+        raise ValueError("factory source has no actual part-local config reads")
     return values
 
 
@@ -303,21 +322,15 @@ def _require_packet_identity(payload: dict) -> None:
     for path, sha in loaded.items():
         if compiled.get(path) != sha or before.get(path) != sha:
             raise ValueError(f"cone loaded measurement source identity is inconsistent: {path}")
-    pure_required = {
-        "cad/scripts/dt_cone_gear_spec.py", "cad/scripts/stock_form_cutter.py",
-        "cad/scripts/dt_cylinder_gear_spec.py", "cad/scripts/cone_shaft_land_bands.py",
-        "cad/scripts/gear_seat_fit.py", "cad/scripts/dt_cone_support_pose.py",
-        "cad/scripts/dt_cone_mesh_domain.py",
-        "cad/scripts/stock_form_contact_certificate.py",
-    }
-    if not pure_required <= compiled.keys():
-        raise ValueError("cone qualification lacks its consumed physical-source authority")
-    pure = {path: sha for path, sha in compiled.items()
-            if not path.startswith("cad/scripts/diagnostics/")}
+    if not PART_GEOMETRY_SOURCE_PATHS <= compiled.keys():
+        raise ValueError("cone qualification lacks its consumed part-geometry authority")
+    pure = {path: compiled[path] for path in PART_GEOMETRY_SOURCE_PATHS}
     if pure != _current_geometry_source_sha256(pure):
         raise ValueError("cone pure geometry source identity is stale")
     reads = source["actual_config_value_reads"]
-    _same_record(reads, _current_config_reads(reads), "actual geometric config reads")
+    current = _current_config_reads(reads)
+    _same_record({identity: reads[identity] for identity in current}, current,
+                 "actual part-local config reads")
     if _digest(source["geometric_config_value_sha256"], "config SHA") != geometry_sha256(reads):
         raise ValueError("cone config semantic identity is inconsistent")
     if _digest(source["domain_pack_sha256"], "domain BEFORE") != _digest(source["domain_pack_after_sha256"], "domain AFTER"):
@@ -435,11 +448,44 @@ def _profiles_from_row(row: dict) -> tuple[StockFormProfile, tuple[StockFormProf
     return profile, corners, (minimum, maximum)
 
 
+def nominal_source_subdomain(placement: dict, physical_domain: dict) -> dict:
+    """An explicit mathematical q=0 comparison, NEVER a production fit grade."""
+    from copy import deepcopy
+    domain = deepcopy(physical_domain)
+    domain["physical_parent_domain"] = physical_domain
+    domain["scope"] = "DESIGN_NOMINAL_SUBDOMAIN"
+    domain["production_source_domain"] = False
+    domain["correlated_pose_parameters"] = [
+        [name,[0.0,0.0]] for name,_ in physical_domain["correlated_pose_parameters"]]
+    domain["source_eccentricity_disks"] = {
+        body:{"shape":"closed_disk","centre_mm":[0.0,0.0],"radius_mm":0.0,
+              "source_terms_mm":{"nominal_subdomain_radius_upper_mm":0.0}}
+        for body in ("driver","driven")}
+    domain["finite_face_width_limits_mm"] = {
+        body:[width,width] for body,width in (
+            ("driver",placement["driver_face_mm"][1]-placement["driver_face_mm"][0]),
+            ("driven",placement["driven_face_mm"][1]-placement["driven_face_mm"][0]))}
+    return domain
+
+
+def budget_clock_subdomain(physical_domain: dict) -> dict:
+    """Hold the three independently booked driver/drum pattern-clock terms."""
+    from copy import deepcopy
+    domain = deepcopy(physical_domain)
+    domain["physical_parent_domain"] = physical_domain
+    domain["scope"] = "BUDGET_CLOCK_NOMINAL_SUBDOMAIN"
+    domain["production_source_domain"] = False
+    domain["correlated_pose_parameters"] = [
+        [name,[0.0,0.0] if name in ("driver_clock_rad","driven_clock_rad") else list(limits)]
+        for name,limits in physical_domain["correlated_pose_parameters"]]
+    domain["oblique_phase_bound_excluded_terms"] = list(OBLIQUE_PHASE_EXCLUDED_TERMS)
+    return domain
+
+
 def _require_stock_phase_evidence(
     arrays: dict, cases: list, source_domain: dict, source_placement: dict,
 ) -> None:
     """Replay the real aggregate against independently bound ALL17 receipts."""
-    from dt_cone_mesh_domain import nominal_source_subdomain, budget_clock_subdomain
     from stock_form_contact_certificate import (
         require_actual_read_phase, require_continuous_certificate,
         require_whole_period_envelope,
@@ -751,22 +797,19 @@ def _qualified_members(encoded: str) -> tuple[_QualifiedMember, ...]:
     if set(poses) != {str(teeth) for teeth in CONFIGURATION_TEETH}:
         raise ValueError("source pose receipt lacks the exact ALL20 family")
     import dt_cylinder_gear_spec as drum
-    from dt_cone_mesh_domain import continuous_source_domain, nominal_placement_record
 
     drum_corners = drum.manufacturing_corner_profiles()
     members = []
     for row in sorted(rows, key=lambda value: value["teeth"]):
         teeth = row["teeth"]
         profile, corners, floors = _profiles_from_row(row)
-        source_domain = continuous_source_domain(teeth)
+        source_domain = row["continuous_source_domain"]
         if (source_domain["scope"] != "FULL_PRODUCTION_SOURCE_DOMAIN"
                 or source_domain["production_source_domain"] is not True):
-            raise ValueError("native cone requires the complete unconditional production SOURCE domain")
-        source_placement = nominal_placement_record(teeth)
+            raise ValueError("native cone requires the complete unconditional production SOURCE receipt")
         source_pose = poses[str(teeth)]
         _same_record(row["geometry"], source_pose["geometry"], "actual cone placement")
         _same_record(row["continuous_source_domain"], source_pose["domain"], "actual BEFORE physical source domain")
-        _same_record(row["continuous_source_domain"], source_domain, "independent whole physical SOURCE domain")
         if row["oblique_phase_bound_excluded_terms"] != list(OBLIQUE_PHASE_EXCLUDED_TERMS):
             raise ValueError("cone budget bound double-books or drops the physical clock scope")
         selected_reports = [candidate for candidate in row["candidates"]
@@ -775,6 +818,7 @@ def _qualified_members(encoded: str) -> tuple[_QualifiedMember, ...]:
         if len(selected_reports) != 1:
             raise ValueError(f"T{teeth:03d}: selected setting has no unique actual report")
         selected = selected_reports[0]
+        source_placement = selected["all_corner_actual3d"]["placement"]
         if selected["actual3d_mesh_evaluated"] is not True:
             raise ValueError("selected cone geometry has no actual3D calculation")
         cam = selected["integral_cam_body_exclusion"]
@@ -850,8 +894,13 @@ def _qualified_family(payload: dict | None = None) -> tuple[dict, tuple[_Qualifi
         raise ValueError(f"incomplete cone stock-form qualification: {exc}") from exc
 
 
-def require_qualified_stock_family(payload: dict | None = None) -> dict:
-    """Validate complete ALL20 numerical authority, independently of native proof."""
+def require_stock_geometry_family(payload: dict | None = None) -> dict:
+    """Bind ALL20 native geometry and recorded proof, not current world SOURCE.
+
+    The returned authentic packet retains its original qualification receipt.
+    It is not current installed-mesh authority; that API lives in the placement
+    tier and replays the complete current source/config/placement freshness.
+    """
     return _qualified_family(payload)[0]
 
 
@@ -870,9 +919,15 @@ def manufacturing_corner_profiles(teeth: int) -> tuple[StockFormProfile, ...]:
     return _family_member(teeth).corners
 
 
-def stock_form_mesh_data(teeth: int) -> dict:
-    """Actual qualified 3D inspection/budget bounds; never a planar fallback."""
-    return dict(_family_member(teeth).mesh_items)
+def stock_form_reference_data(teeth: int) -> dict:
+    """Recorded mesh references for the part drawing, NOT installed budget data."""
+    member = dict(_family_member(teeth).mesh_items)
+    return {
+        "qualification": "geometry-qualified-reference",
+        **{key: member[key] for key in (
+            "coverage_min", "phase_reserve_rad", "noncarrying_gap_mm", "te_bound_rad",
+        )},
+    }
 
 
 def _require_member(teeth: int) -> None:

@@ -1396,7 +1396,7 @@ def test_cone_advance_is_the_3d_reference_plus_the_ideal_shaft_term(monkeypatch)
     signed TE interval's span once. A row read at the other sense is refused."""
     teeth, sense = 30, -1
     row = _cone_row(teeth, sense)
-    monkeypatch.setattr(eb.dt_cone_gear_spec, "stock_form_mesh_data", lambda t: row)
+    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: row)
     ratio = teeth / eb.CYLINDER_TEETH
     shaft_advance = np.linspace(0.0, 1e-3, eb.K_MAX + 1)
     shaft_bound = np.full(eb.K_MAX + 1, 2e-4)
@@ -1520,7 +1520,7 @@ def test_refused_cone_row_names_itself(monkeypatch, row, match):
     TE outside its own source frame (driven advance + T/120 x driver phase)
     is refused by name -- never evaluated at a planar TE, never paid twice,
     never read in another datum."""
-    monkeypatch.setattr(eb.dt_cone_gear_spec, "stock_form_mesh_data", lambda t: row)
+    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: row)
     with pytest.raises(eb.StockPhaseUnavailable, match=match):
         eb._qualified_cone_row(30)
 
@@ -1529,7 +1529,7 @@ def test_qualified_cone_row_reads_every_stock_phase_field(monkeypatch):
     """The accepted row yields exactly its frozen reads, as float arrays, and
     an unqualifiable stock-form family (the spec's ValueError) is a named
     refusal, never a crash of the budget."""
-    monkeypatch.setattr(eb.dt_cone_gear_spec, "stock_form_mesh_data", lambda t: _ROW)
+    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: _ROW)
     row = eb._qualified_cone_row(30)
     assert set(row) == {*eb.CONE_ROW_STALL_READS, *eb.CONE_ROW_TE_INTERVALS}
     for key, values in row.items():
@@ -1538,7 +1538,7 @@ def test_qualified_cone_row_reads_every_stock_phase_field(monkeypatch):
     def unqualified(teeth):
         raise ValueError("incomplete cone stock-form qualification: packet")
 
-    monkeypatch.setattr(eb.dt_cone_gear_spec, "stock_form_mesh_data", unqualified)
+    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", unqualified)
     with pytest.raises(eb.StockPhaseUnavailable, match="T030 stock-form family refused: incomplete"):
         eb._qualified_cone_row(30)
 
@@ -1559,7 +1559,7 @@ def test_drum_pattern_clock_is_paid_once_on_every_cam_read(monkeypatch):
         lambda: (sense, np.zeros_like(stalls), np.zeros_like(stalls), "digest"),
     )
     monkeypatch.setattr(
-        eb.dt_cone_gear_spec, "stock_form_mesh_data", lambda t: _cone_row(t, sense)
+        eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: _cone_row(t, sense)
     )
     calls = []
 
@@ -1567,7 +1567,7 @@ def test_drum_pattern_clock_is_paid_once_on_every_cam_read(monkeypatch):
         calls.append(True)
         return grade_deg
 
-    monkeypatch.setattr(eb.dt_cone_mesh_domain, "drum_tooth_to_cam_notch_clock_deg", grade)
+    monkeypatch.setattr(eb._fit_limits, "drum_tooth_to_cam_notch_clock_deg", grade)
     phase, missing = eb._stock_phase_result.__wrapped__()
     assert missing == () and calls == [True]
     paid = math.nextafter(math.radians(grade_deg), math.inf)
@@ -1586,11 +1586,11 @@ def test_unknown_drum_pattern_clock_refuses_closed(monkeypatch):
     """A missing or invalid grade is a named refusal of the whole stock phase,
     beside every other refused input -- never a 0 fallback."""
     def unknown():
-        raise eb.dt_cone_mesh_domain.SourceDomainUnknown(
+        raise eb._fit_limits.SourceDomainUnknown(
             "missing actual drum tooth-to-CAM-NOTCH clock authority"
         )
 
-    monkeypatch.setattr(eb.dt_cone_mesh_domain, "drum_tooth_to_cam_notch_clock_deg", unknown)
+    monkeypatch.setattr(eb._fit_limits, "drum_tooth_to_cam_notch_clock_deg", unknown)
     with pytest.raises(eb.StockPhaseUnavailable, match="drum tooth-to-CAM-NOTCH clock: missing"):
         eb.drum_pattern_clock_rad()
     stalls = eb.CRANK_STALL_RAD
@@ -1599,7 +1599,7 @@ def test_unknown_drum_pattern_clock_refuses_closed(monkeypatch):
         "crank_shaft_lag",
         lambda: (-1, np.zeros_like(stalls), np.zeros_like(stalls), "digest"),
     )
-    monkeypatch.setattr(eb.dt_cone_gear_spec, "stock_form_mesh_data", lambda t: _cone_row(t))
+    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: _cone_row(t))
     phase, missing = eb._stock_phase_result.__wrapped__()
     assert phase is None
     assert missing == (

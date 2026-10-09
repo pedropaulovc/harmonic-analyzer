@@ -18,6 +18,7 @@ import numpy as np
 from scipy.optimize import brentq, linprog, minimize, root
 
 from stock_form_cutter import StockFormProfile
+from diagnostics import stock_form_contact_continuation as continuation
 from diagnostics.stock_form_root_angles import intersect_intervals
 from diagnostics.stock_form_root_sweep import root_free_intervals
 

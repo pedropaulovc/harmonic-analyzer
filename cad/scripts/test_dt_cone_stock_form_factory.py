@@ -16,6 +16,8 @@ from pathlib import Path
 
 import pytest
 
+import _fit_limits
+
 import dt_cone_gear_notes as notes
 import dt_cone_gear_spec as spec
 import dt_cylinder_gear_spec as drum
@@ -182,10 +184,10 @@ def _row(teeth: int) -> dict:
         ci, di = case["cone_corner_index"], case["drum_corner_index"]
         cone, mate = (profile, drum.STOCK_FORM) if ci is None else (corners[ci], mate_corners[di])
         case["calculation"]["nominal_actual3d"] = _stock_phase_report(
-            cone, mate, domain_supplier.nominal_source_subdomain(placement, source),
+            cone, mate, spec.nominal_source_subdomain(placement, source),
         )
         case["calculation"]["budget_actual3d"] = _stock_phase_report(
-            cone, mate, domain_supplier.budget_clock_subdomain(source),
+            cone, mate, spec.budget_clock_subdomain(source),
         )
     phases = [-index * math.pi for index in range(21)]
     references = cases[0]["calculation"]["nominal_actual3d"]["actual_read_phases"]
@@ -245,11 +247,9 @@ def _row(teeth: int) -> dict:
 
 @pytest.fixture(scope="module")
 def packet_template() -> dict:
-    pure = {
-        "cad/scripts/dt_cone_gear_spec.py", "cad/scripts/dt_cylinder_gear_spec.py",
-        "cad/scripts/cone_shaft_land_bands.py", "cad/scripts/gear_seat_fit.py",
+    pure = spec.PART_GEOMETRY_SOURCE_PATHS | {
         "cad/scripts/dt_cone_support_pose.py", "cad/scripts/dt_cone_mesh_domain.py",
-        "cad/scripts/stock_form_contact_certificate.py",
+        "cad/scripts/cone_line.py",
     }
     paths = pure | spec.MEASUREMENT_SOURCE_PATHS
     hashes = {path: hashlib.sha256(f"synthetic captured bytes:{path}".encode()).hexdigest().upper() for path in paths}
@@ -291,9 +291,8 @@ def packet(packet_template: dict, monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     payload = deepcopy(packet_template)
     sources = spec._relative_sources(payload["source_identity"]["actual_preimport_project_sha256"], "synthetic fixture")
     pure = {path: sha for path, sha in sources.items() if not path.startswith("cad/scripts/diagnostics/")}
-    reads = deepcopy(payload["source_identity"]["actual_config_value_reads"])
-    monkeypatch.setattr(spec, "_current_geometry_source_sha256", lambda _paths: deepcopy(pure))
-    monkeypatch.setattr(spec, "_current_config_reads", lambda _reads: deepcopy(reads))
+    monkeypatch.setattr(spec, "_current_geometry_source_sha256",
+                        lambda paths: {path: pure[path] for path in paths})
     monkeypatch.setattr(domain_supplier, "continuous_source_domain", _source_domain)
     monkeypatch.setattr(domain_supplier, "nominal_placement_record", _placement)
     path = tmp_path / "dt-cone-stock-form.json"
@@ -305,7 +304,7 @@ def packet(packet_template: dict, monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 
 
 def test_real_native_profile_can_precede_native_observation(packet: dict) -> None:
-    assert spec.require_qualified_stock_family(packet)["native_certificate"] is False
+    assert domain_supplier.require_qualified_stock_family(packet)["native_certificate"] is False
     for teeth in spec.CONFIGURATION_TEETH:
         row = packet["rows"][spec.CONFIGURATION_TEETH.index(teeth)]
         selected = row["selected"]
@@ -328,7 +327,7 @@ def test_actual_inspection_and_notes_have_no_planar_or_ideal_fallback(packet: di
         low, high = spec.floor_limits_mm(teeth)
         assert low <= 2 * min(p.root_radius_min_mm for p in corners)
         assert high >= 2 * max(p.root_radius_max_mm for p in corners)
-        data = spec.stock_form_mesh_data(teeth)
+        data = domain_supplier.stock_form_mesh_data(teeth)
         assert data["coverage_min"] == pytest.approx(1.15)
         cases = packet["rows"][spec.CONFIGURATION_TEETH.index(teeth)]["candidates"][0]["actual_profile_cases"]
         expected_te = max(
@@ -359,9 +358,10 @@ def test_missing_packet_refuses_every_native_reader_without_blocking_inputs(monk
     monkeypatch.setattr(spec, "STOCK_FORM_PACKET_PATH", tmp_path / "absent.json")
     assert len(spec.geometry_inputs()["members"]) == 20
     for reader in (
-        spec.stock_form_profile, spec.manufacturing_corner_profiles, spec.stock_form_mesh_data,
+        spec.stock_form_profile, spec.manufacturing_corner_profiles, domain_supplier.stock_form_mesh_data,
         spec.outside_dia_mm, spec.tooth_thickness_mm, spec.floor_radius_min_mm,
         spec.floor_radius_max_mm, spec.floor_limits_mm, notes.gear_data,
+        spec.stock_form_reference_data,
     ):
         with pytest.raises(ValueError, match="qualification is missing"):
             reader(6)
@@ -379,15 +379,15 @@ def test_source_only_stationary_or_unstable_records_never_build(packet: dict) ->
         changed = deepcopy(packet)
         changed[key] = True
         with pytest.raises(ValueError):
-            spec.require_qualified_stock_family(changed)
+            domain_supplier.require_qualified_stock_family(changed)
     changed = deepcopy(packet)
     changed["source_identity"]["source_bytes_stable"] = False
     with pytest.raises(ValueError, match="changed"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
     changed = deepcopy(packet)
     changed["qualified"] = False
     with pytest.raises(ValueError, match="unqualified"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
 
 
 def test_incomplete_wrong_count_and_selected_geometry_are_refused(packet: dict) -> None:
@@ -395,40 +395,40 @@ def test_incomplete_wrong_count_and_selected_geometry_are_refused(packet: dict) 
         changed = deepcopy(packet)
         changed["rows"] = changed_rows
         with pytest.raises(ValueError, match="ALL20|count"):
-            spec.require_qualified_stock_family(changed)
+            domain_supplier.require_qualified_stock_family(changed)
     changed = deepcopy(packet)
     changed["rows"][0]["selected"]["tool_translation_mm"] += 0.001
     changed["selected_geometry_sha256"] = spec.geometry_sha256(spec.selected_geometry_record(changed["rows"]))
     with pytest.raises(ValueError, match="translation"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
     changed = deepcopy(packet)
     changed["rows"][0]["printed_profile_root_envelope_mm"][0] += 0.001
     changed["selected_geometry_sha256"] = spec.geometry_sha256(spec.selected_geometry_record(changed["rows"]))
     with pytest.raises(ValueError, match="root MIN"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
     changed = deepcopy(packet)
     changed["rows"][0]["selected"]["outside_dia_mm"] = 1000.0
     changed["selected_geometry_sha256"] = spec.geometry_sha256(spec.selected_geometry_record(changed["rows"]))
     with pytest.raises(ValueError, match="FINITE cutter support"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
 
 
 def test_source_manifest_cannot_be_missing_changed_or_ambiguously_relocated(packet: dict) -> None:
     changed = deepcopy(packet)
     changed["measurement_engine_sources_sha256"].pop("stock_form_contact_continuation.py")
     with pytest.raises(ValueError, match="SIX"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
     changed = deepcopy(packet)
     path = next(iter(changed["source_identity"]["actual_preimport_project_sha256"]))
     changed["source_identity"]["actual_preimport_project_sha256"][path] = "B" * 64
     with pytest.raises(ValueError, match="compiled|measurement"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
     changed = deepcopy(packet)
     before = changed["source_identity"]["before_design_sha256"]
     path, sha = next(iter(before.items()))
     before[f"Q:/another-root/{path.split('/isolated-factory-fixture/')[1]}"] = sha
     with pytest.raises(ValueError, match="ambiguous"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
 
 
 def test_input_and_output_hashes_are_separate_and_stale_inputs_refuse(packet: dict) -> None:
@@ -436,11 +436,11 @@ def test_input_and_output_hashes_are_separate_and_stale_inputs_refuse(packet: di
     changed["geometry_inputs"]["face_width_mm"] += 0.001
     changed["geometry_inputs_sha256"] = spec.geometry_sha256(changed["geometry_inputs"])
     with pytest.raises(ValueError, match="inputs"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
     changed = deepcopy(packet)
     changed["selected_geometry_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="OUTPUT"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
     assert spec.geometry_sha256(spec.geometry_inputs()) == packet["geometry_inputs_sha256"]
     assert "selected" not in json.dumps(spec.geometry_inputs())
     changed = deepcopy(packet)
@@ -483,7 +483,7 @@ def test_full_actual_evidence_refuses_discriminating_defects(packet: dict, defec
     else:
         report["all_corner_actual3d"].pop("continuous_contact_certificate")
     with pytest.raises(ValueError):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
 
 
 def test_duplicate_json_keys_and_nonfinite_fields_refuse(packet: dict) -> None:
@@ -493,7 +493,7 @@ def test_duplicate_json_keys_and_nonfinite_fields_refuse(packet: dict) -> None:
     changed = deepcopy(packet)
     changed["rows"][0]["selected"]["outside_dia_mm"] = math.nan
     with pytest.raises(ValueError):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
 
 
 @pytest.mark.parametrize("field", ["continuous_source_domain", "placement"])
@@ -505,18 +505,97 @@ def test_contact_report_is_bound_to_independent_source_supplier(packet: dict, fi
     else:
         robust[field]["correlated_pose_parameters"][0][1][1] *= .5
     with pytest.raises(ValueError, match="SOURCE"):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
 
 
 def test_unknown_receiving_grade_is_not_replaced_with_zero(
     packet: dict, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def unknown(_teeth: int) -> dict:
-        raise domain_supplier.SourceDomainUnknown("synthetic receiving grade is UNKNOWN")
+        raise _fit_limits.SourceDomainUnknown("synthetic receiving grade is UNKNOWN")
 
     monkeypatch.setattr(domain_supplier, "continuous_source_domain", unknown)
     with pytest.raises(ValueError, match="UNKNOWN"):
-        spec.require_qualified_stock_family(packet)
+        domain_supplier.require_qualified_stock_family(packet)
+
+
+@pytest.mark.parametrize("subsystem, field, part_local", [
+    ("gear_train", "diametral_pitch", True),
+    ("channels", "station_z0_mm", False),
+])
+def test_actual_config_changes_refuse_current_source_without_rekeying_world_parts(
+    packet: dict, monkeypatch: pytest.MonkeyPatch, subsystem: str, field: str,
+    part_local: bool,
+) -> None:
+    changed = deepcopy(packet)
+    original = spec._config.machine
+    reads = changed["source_identity"]["actual_config_value_reads"]
+    reads[f"machine:{subsystem}/{field}"] = original(subsystem, field)
+    changed["source_identity"]["geometric_config_value_sha256"] = spec.geometry_sha256(reads)
+    spec.STOCK_FORM_PACKET_PATH.write_text(json.dumps(changed), encoding="utf-8")
+    domain_supplier.require_qualified_stock_family(changed)
+
+    def current(*keys):
+        value = original(*keys)
+        return value + .001 if keys == (subsystem, field) else value
+
+    monkeypatch.setattr(spec._config, "machine", current)
+    if part_local:
+        with pytest.raises(ValueError, match="part-local config"):
+            spec.require_stock_geometry_family(changed)
+    else:
+        spec.require_stock_geometry_family(changed)
+        reference = spec.stock_form_reference_data(6)
+        assert reference["qualification"] == "geometry-qualified-reference"
+        assert "robust_half_width_rad" not in reference
+    with pytest.raises(ValueError, match="config reads"):
+        domain_supplier.require_qualified_stock_family(changed)
+    with pytest.raises(ValueError, match="config reads"):
+        domain_supplier.stock_form_mesh_data(6)
+
+
+@pytest.mark.parametrize("path", [
+    "cad/scripts/dt_cone_support_pose.py",
+    "cad/scripts/dt_cone_mesh_domain.py",
+    "cad/scripts/cone_line.py",
+])
+def test_world_source_bytes_refuse_full_api_even_after_geometry_cache(
+    packet: dict, monkeypatch: pytest.MonkeyPatch, path: str,
+) -> None:
+    domain_supplier.require_qualified_stock_family(packet)
+    original = spec._current_geometry_source_sha256
+
+    def current(paths):
+        values = original(paths)
+        if path in values:
+            values[path] = "0" * 64
+        return values
+
+    monkeypatch.setattr(spec, "_current_geometry_source_sha256", current)
+    spec.require_stock_geometry_family(packet)
+    with pytest.raises(ValueError, match="full physical source identity is stale"):
+        domain_supplier.require_qualified_stock_family(packet)
+    with pytest.raises(ValueError, match="full physical source identity is stale"):
+        domain_supplier.stock_form_mesh_data(6)
+
+
+def test_current_world_placement_refuses_full_api_not_recorded_part_reference(
+    packet: dict, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    domain_supplier.require_qualified_stock_family(packet)
+
+    def moved(teeth):
+        placement = _placement(teeth)
+        placement["driver_origin_mm"][2] += .001
+        return placement
+
+    monkeypatch.setattr(domain_supplier, "nominal_placement_record", moved)
+    spec.require_stock_geometry_family(packet)
+    with pytest.raises(ValueError, match="actual SOURCE placement"):
+        domain_supplier.require_qualified_stock_family(packet)
+    with pytest.raises(ValueError, match="actual SOURCE placement"):
+        domain_supplier.stock_form_mesh_data(6)
+
 
 
 @pytest.mark.parametrize("scope, required", [
@@ -537,7 +616,7 @@ def test_mathematical_or_conditional_domain_cannot_be_promoted_to_native_source(
 
     monkeypatch.setattr(domain_supplier, "continuous_source_domain", conditional)
     with pytest.raises(ValueError, match="unconditional production SOURCE"):
-        spec.require_qualified_stock_family(packet)
+        domain_supplier.require_qualified_stock_family(packet)
 
 
 @pytest.mark.parametrize("defect", [
@@ -601,7 +680,7 @@ def test_actual_continuity_receipts_cannot_be_status_or_surface_summaries(
     elif defect == "wrong_boundary_stratum":
         lower["boundary_continuations"][0]["right_branch_proof"]["physical_strata"]["driver"]["tooth"] = 1
     with pytest.raises(ValueError):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
 
 
 @pytest.mark.parametrize("defect", [
@@ -680,11 +759,11 @@ def test_operating_3d_stock_reference_refuses_missing_or_unpaid_data(packet: dic
         # the named SOURCE/geometry/payment defect, not an unrelated alias.
         changed["rows"][0]["stock_phase_3d"] = deepcopy(record)
     with pytest.raises(ValueError):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
 
 
 def test_operating_3d_stock_reference_is_immutable_and_exposes_no_planar_clock(packet: dict) -> None:
-    data = spec.stock_form_mesh_data(6)
+    data = domain_supplier.stock_form_mesh_data(6)
     record = packet["rows"][0]["candidates"][0]["stock_phase_3d"]
     for name in (
         "driver_read_phases_rad", "nominal_driven_advance_rad",
@@ -749,4 +828,4 @@ def test_canonical_point_and_period_receipts_refuse_actual_geometry_payment_defe
     else:
         actual["continuous_contact_certificate"]["whole_period_signed_running_te_scope"] = {"status": "PROVED"}
     with pytest.raises(ValueError):
-        spec.require_qualified_stock_family(changed)
+        domain_supplier.require_qualified_stock_family(changed)
