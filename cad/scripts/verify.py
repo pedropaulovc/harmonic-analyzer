@@ -198,11 +198,12 @@ _COMPONENT_BAND = {
     "fr-frame": (16, 21),  # measured 18 (9 structure + 4 lag-screw hold-downs
     # + 4 #10-24 frame-side screws + 1 gooseneck set screw — 2026-08-02 top-frame
     # rederive; plain capped column stubs, NO column nuts)
-    "dt-drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
+    # #948 ruling R (PR #1292): + the MHA-VN-050 bank spring.
+    "dt-drive-train": (62 + _N_CH - 4, 62 + _N_CH + 4),  # N=20 -> (78,86), expected 82
     "ch-channel": (
-        8 * _N_CH + 13 - 6,
-        8 * _N_CH + 13 + 6,
-    ),  # N=20 -> (167,179), expected 173
+        8 * _N_CH + 14 - 6,
+        8 * _N_CH + 14 + 6,
+    ),  # N=20 -> (168,180), expected 174 (#948 ruling R: + MHA-VN-051)
     # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
     # keepers +2 keeper foot screws nets +2)
     # The former monolithic output split by function (no per-channel parts here);

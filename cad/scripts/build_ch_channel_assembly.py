@@ -5,7 +5,7 @@ output: connecting rods riding the integral cams, the rocker-arm seesaw
 bank on its pivot shaft, the amplitude bars running UP the spine, and the
 top-lever bank on its fulcrum shaft with the channel springs hanging from
 the lever tips, each retained by a stock eyebolt threaded into the plate.
-173 components (8 * CHANNELS + 13):
+174 components (8 * CHANNELS + 14):
 
 Coordinates are machine frame (#151: crank at machine -X, output side -Z;
 the M6.8 mirror layer is gone).
@@ -14,7 +14,8 @@ the M6.8 mirror layer is gone).
   integral shoulder on the north ear's inner face, the cylinder spanning
   both ears, each end domed -- rocker_bank_layout)
 * rocker-thrust-washer x1 (MHA-CH-009, between rocker 0's hub and the south
-  ear; the end-play leaf is set between it and the ear)
+  ear) + vn-rocker-bank-spring x1 (MHA-VN-051, the wave disc spring between
+  the washer and the south ear that preloads the bank north; #948 ruling R)
   + fulcrum-shaft x1 (lever bank at (199.9, 1061.4), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
 * pivot-bracket x2 (2026-09 photo re-derive, ch14 page002_img01/img07: the
@@ -349,14 +350,16 @@ LEVER_THICKNESS = 3.0
 # --- supports / mounts ------------------------------------------------------
 SUPPORT_APEX_Y = 228.6
 CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
-# Rocker pivot brackets, shaft and south washer (#743 PR2, Reading 1): the
-# rocker bank's retention stack, from rocker_bank_layout. The north ear's
-# inner face is the datum the shaft's shoulder bears on; the south ear is
-# feeler-set off the MHA-CH-009 washer on hub 0. Feet inside the rocker-arm-
+# Rocker pivot brackets, shaft, south washer and spring (#948 ruling R, PR
+# #1292): the rocker bank's retention stack, from rocker_bank_layout. The
+# north ear's inner face is the datum the shaft's shoulder bears on; the
+# MHA-VN-051 spring between the south ear and the MHA-CH-009 washer on hub 0
+# preloads the bank and shaft north onto it. Feet inside the rocker-arm-
 # support's +-88.9 top (it is the only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
     PIVOT_BRACKET_Z,
     PIVOT_SHAFT_NORTH_Z,
+    ROCKER_SPRING_Z,
     SHOULDER_Z,
     SOUTH_WASHER_Z,
     STACK_MID_Z as _STACK_MID_Z,
@@ -391,6 +394,14 @@ if abs(SOUTH_WASHER_Z[1] - (hub_mid_z(0) - _ROCKER_HUB_LENGTH / 2.0)) > 1e-9:
     raise AssertionError(
         "south thrust washer's north face is not on hub 0's south face"
     )
+# The spring's part runs z 0..MODEL_HEIGHT from its origin (axis +Z), so
+# IDENTITY at ROCKER_SPRING_Z[0] fills the south ear to washer envelope.
+import vn_rocker_bank_spring_spec as _rocker_spring  # noqa: E402
+
+if abs(ROCKER_SPRING_Z[1] - ROCKER_SPRING_Z[0] - _rocker_spring.MODEL_HEIGHT) > 1e-9:
+    raise AssertionError("rocker bank spring is not its installed envelope")
+if abs(ROCKER_SPRING_Z[1] - SOUTH_WASHER_Z[0]) > 1e-9:
+    raise AssertionError("rocker bank spring's north face is not on the washer")
 # Bracket hold-downs (#743 PR2): two MHA-VN-032 (#8-32 x 3/4 fillister) per
 # bracket, through its #8 close-clearance foot holes into the support rail's
 # transferred seats. rocker_bracket_seat_layout owns the seats and their
@@ -993,9 +1004,8 @@ async def build(adapter) -> dict[str, str]:
             label=f"pivot-bracket rocker z{mount_z:+.0f}",
         )
         await _locate_to_datum(adapter, mount)
-    # South thrust washer (MHA-CH-009): on the shaft against rocker 0's hub, the
-    # end-play leaf between it and the south ear. Free-space structure here,
-    # datum-located like the brackets.
+    # South thrust washer (MHA-CH-009): on the shaft against rocker 0's hub.
+    # Free-space structure here, datum-located like the brackets.
     washer = await place_component(
         adapter,
         "ch-rocker-thrust-washer",
@@ -1006,6 +1016,18 @@ async def build(adapter) -> dict[str, str]:
         label="rocker-thrust-washer south",
     )
     await _locate_to_datum(adapter, washer)
+    # Rocker bank spring (MHA-VN-051, #948 ruling R): coaxial on the shaft,
+    # south face on the south ear's inner face, north face on the washer.
+    rocker_spring = await place_component(
+        adapter,
+        "vn-rocker-bank-spring",
+        [PIVOT[0], PIVOT[1], ROCKER_SPRING_Z[0]],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="rocker-bank-spring south",
+    )
+    await _locate_to_datum(adapter, rocker_spring)
     # Bracket hold-downs (MHA-VN-032): head down on each bracket foot's top,
     # over the rail seat rocker_bracket_seat_layout derived from its hole.
     # Free-space here (the support is the frame's), datum-located likewise.

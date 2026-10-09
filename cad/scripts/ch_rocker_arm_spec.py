@@ -124,6 +124,10 @@ HUB_LENGTH = 7.0565  # == machine channels.station_pitch_mm (asserted by the bui
 # long, and the 20-arm stack's acceptance (rocker_bank_layout.STACK_L20_ACCEPT)
 # caps the sum, as the cylinder gears' overall thickness does.
 HUB_LENGTH_BAND = (0.05, 0.0)
+# The strap symmetric to the hub within this (total; #948 ruling R, PR #1292):
+# the hub stack places the arm, the strap carries the rod's fork, so a flat
+# rod's float on the arm is measured from the hub's mid-plane.
+STRAP_HUB_SYMMETRY = 0.10
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {

@@ -310,7 +310,7 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     """User ruling 2026-09-27 (#1038): a notch is never narrower than the
     plate it straddles. Its minimum -- the modelled nominal -- is the plate at
-    max material plus MIN_END_PLAY; the band is +0.30/0, native on the width."""
+    max material plus RUNNING_FLOOR; the band is +0.30/0, native on the width."""
     import ch_channel_lever_spec as lever
     import ch_rocker_arm_spec as rocker
     import rocker_bank_layout as bank
@@ -329,7 +329,7 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     # so the foot notch stays conservative and the bar does not re-key.
     assert spec.STRAP_THICKNESS_TOLERANCE == rocker.LINEAR_2PL
     assert spec.STRAP_THICKNESS_TOLERANCE >= max(map(abs, rocker.ARM_THICKNESS_BAND))
-    assert spec.STRADDLE_RUNNING_FLOOR == bank.MIN_END_PLAY
+    assert spec.STRADDLE_RUNNING_FLOOR == bank.RUNNING_FLOOR
 
     upper, lower = spec.NOTCH_WIDTH_BAND
     assert (upper, lower) == (0.30, 0.0)
@@ -338,8 +338,8 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
         (spec.BOTTOM_NOTCH_WIDTH, spec.STRAP_THICKNESS, spec.STRAP_THICKNESS_TOLERANCE),
     ):
         least = width + lower
-        assert least >= plate + tolerance + bank.MIN_END_PLAY - 1e-9
-        assert least - (plate + tolerance + bank.MIN_END_PLAY) < 0.01  # the minimum
+        assert least >= plate + tolerance + bank.RUNNING_FLOOR - 1e-9
+        assert least - (plate + tolerance + bank.RUNNING_FLOOR) < 0.01  # the minimum
     assert spec.TOP_NOTCH_WIDTH == 3.20
     assert spec.BOTTOM_NOTCH_WIDTH == 3.11
     assert bar.TOP_NOTCH_WIDTH is spec.TOP_NOTCH_WIDTH
@@ -371,7 +371,7 @@ def test_neighbouring_bars_keep_a_running_gap_at_the_printed_worst_case() -> Non
         (spec.BOTTOM_NOTCH_WIDTH, spec.STRAP_THICKNESS, spec.STRAP_THICKNESS_TOLERANCE),
     ):
         float_max = (width + upper) - (plate - tolerance)
-        assert gap - float_max >= bank.MIN_END_PLAY
+        assert gap - float_max >= bank.RUNNING_FLOOR
 
 
 def test_details_are_cropped_model_views_dimensioned_before_the_crop() -> None:

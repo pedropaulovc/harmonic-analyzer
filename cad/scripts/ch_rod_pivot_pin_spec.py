@@ -51,7 +51,7 @@ PIN_CSK_ANGLE_DEG = 90.0
 
 # --- The joint's limits (the clearance budget test_ch_rod_pivot_fit holds). ---
 RULE12_WALL_FLOOR = 1.5  # drawing-simplicity policy rule 12
-RUNNING_FLOOR = 0.10  # rocker_bank_layout.MIN_END_PLAY: oiled steel faces
+RUNNING_FLOOR = 0.10  # rocker_bank_layout.RUNNING_FLOOR: oiled steel faces
 MARGIN_SPARE = 0.25  # rocker_bank_layout.MARGIN_SPARE: novice spare
 NEIGHBOUR_CLEARANCE_MIN = RUNNING_FLOOR + MARGIN_SPARE  # 0.35
 RETENTION_OVERLAP_MIN = 0.35  # radial: countersink rim over the drilled hole

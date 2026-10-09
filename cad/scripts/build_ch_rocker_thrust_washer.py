@@ -2,8 +2,8 @@ r"""Reproduction script: rocker-bank south thrust washer (MHA-CH-009; #743 PR2; 
 
 The steel washer on the pivot shaft between rocker 0's hub and the south
 pivot-bracket ear: cut from 1/16 in stock at the rocker hub's O.D., it stands
-the ear off the ch0 amplitude bar (``ch_rocker_thrust_washer_spec``). The end-play leaf is set between it and the
-south ear (``rocker_bank_layout``).
+the ear off the ch0 amplitude bar (``ch_rocker_thrust_washer_spec``). The MHA-VN-051 preload
+spring sits between it and the south ear (#948 ruling R; ``rocker_bank_layout``).
 
 Layout: Front-plane annulus at the origin (OD, bore) extruded +Z by the
 thickness. The channel assembly slips it on the shaft against hub 0.

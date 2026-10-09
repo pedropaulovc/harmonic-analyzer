@@ -43,6 +43,11 @@ flip_invert:
   - ch rocker thrust washer datum x
   - ch rocker thrust washer datum y
   - ch rocker thrust washer datum z
+  # #948 ruling R: the MHA-VN-051 rocker bank spring, datum-located IDENTITY
+  # beside the washer [INFERENCE: same learned side; confirm on the farm build].
+  - vn rocker bank spring datum x
+  - vn rocker bank spring datum y
+  - vn rocker bank spring datum z
 allowed_free_stems:
   - ch-rocker-arm
   - ch-connecting-rod

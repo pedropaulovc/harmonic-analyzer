@@ -474,13 +474,19 @@ sections:
       - - Cylinder bank thrust washers ×2 (#743, 2026-09-25)
         - Ø25 × Ø9.6 × 1.50 ±0.05 turned steel washer, one between each end gear and its arbor-pedestal strap (MHA-DT-026)
         - '0.98'
-        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap, the front one is feeler-set 0.45 off the front strap (`cylinder_bank_layout.py`, `build_dt_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
+        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap (target offset by the measured washer''s W − 1.500, #948 ruling R), the front one sits 0.95 off the front strap on the MHA-VN-050 preload spring (`cylinder_bank_layout.py`, `build_dt_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
         - derived
         - med
       - - Arbor ends and set screws (#743, 2026-09-25)
         - arbor ends domed, 1.5 proud of each strap; one #4-40 × 1/4 cup-point set screw in each pedestal crown apex (MHA-VN-034)
         - '0.06'
         - 'p.23/25 + ch25 p.67: the bright dome on each pedestal is the arbor end; ch12 p.18 and the user ruling on #743 (Q3) put a set screw at each strap apex. Supersedes the Ø10 dome cap screw MHA-125 (`build_dome_cap_screw.py`, deleted)'
+        - derived
+        - med
+      - - Cylinder bank preload spring (#948 ruling R, PR #1292)
+        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on a 0.95 blade between the front washer and the front strap, 2.2–4.2 N over the ±0.10 set band (MHA-VN-050)
+        - —
+        - 'design: replaces the 0.45 end-play leaf and reverses #743 Q1 ("bank is not preloaded"): the stack is held north on its datum, so a flat rod held at cam and arm needs no end-play allowance (`cylinder_bank_layout.BANK_PRELOAD`, `test_channel_axial_budget.py`)'
         - derived
         - med
   - prose: |2
@@ -688,9 +694,9 @@ sections:
         - scaled
         - low
       - - Ring / shank / fork thickness
-        - 3 / 2.5 / 6.075 ±0.05 mm, one mid-plane (the cam plane = the arm plane)
+        - 2.200 ±0.127 / 2.200 ±0.127 / 6.075 ±0.05 mm, one mid-plane (the cam plane = the arm plane)
         - —
-        - 'flat rod: ring, shank and fork share the cam plane, and the rocker bank sits on it (`rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ`), so the arm runs centred in the fork slot. Fork over the tines 6.075 ±0.05 and slot 2.625 +0.127/0 (Main ruling 2026-10, option b): each inter-arm gap (pitch 7.0565 − arm 2.500) holds one tine of each neighbouring rod, tine 1.59 MIN, 0.35 MIN to the neighbouring fork (`ch_rod_pivot_pin_spec.BUDGET`)'
+        - 'flat rod: ring, shank and fork share the cam plane, and the rocker bank sits on it (`rocker_bank_layout.ARM_MID_DZ = CAM_MID_DZ`), so the arm runs centred in the fork slot. Ring and shank 2.200 at three places, symmetric to the slot within 0.10 (#948 ruling R, PR #1292; was 3 / 2.5 at two places): the thinnest cam slot then floats the ring ±0.83, which with the fork''s side clearance holds every station''s cam-vs-arm offset (`test_channel_axial_budget.py`). Fork over the tines 6.075 ±0.05 and slot 2.625 +0.127/0 (Main ruling 2026-10, option b): each inter-arm gap (pitch 7.0565 − arm 2.500) holds one tine of each neighbouring rod, tine 1.59 MIN, 0.35 MIN to the neighbouring fork (`ch_rod_pivot_pin_spec.BUDGET`)'
         - derived
         - med
       - - Shank width
@@ -782,9 +788,13 @@ sections:
       - confidence
       rows:
       - - Pivot shaft
-        - 'Ø6.35 along Z at (x, y) = (+72.9, 253.8); #743 PR2 (Reading 1): turned from Ø10 bar with an integral Ø10 × 1.5 shoulder on the north ear''s inner face, the cylinder spanning both ears (cut to fit, nominal 156.6) and each end domed 1.5 proud; the rocker stack closes south on the Ø10 × 1.5 MHA-CH-009 washer, feeler-set 0.45 to the south ear (`rocker_bank_layout.py`). Was 170, centred on the stack mid-plane'
+        - 'Ø6.35 along Z at (x, y) = (+72.9, 253.8); #743 PR2 (Reading 1): turned from Ø10 bar with an integral Ø10 × 1.5 shoulder on the north ear''s inner face (the ear''s DRO target offset by the measured shoulder''s S − 1.500, #948 ruling R), the cylinder spanning both ears (cut to fit, nominal 156.82) and each end domed 1.5 proud; the rocker stack closes south on the Ø10.2 × 1.59 MHA-CH-009 washer, held north by the MHA-VN-051 preload spring set 0.60 to the south ear (`rocker_bank_layout.py`). Was 170, centred on the stack mid-plane'
         - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The fixed support remains at its old world location while the channel bank recenters to z +3.088 and the longer rocker lever reaches drum x −60.394.'
         - med (x, y photo + frame; dia low)
+      - - Rocker bank preload spring (#948 ruling R, PR #1292)
+        - McMaster 9714K24 wave disc spring Ø6.73 × Ø9.32 × 0.152, free 0.762; set on a 0.60 blade between the MHA-CH-009 washer and the south ear, 2.2–9.2 N over the ±0.10 set band (MHA-VN-051); OD under the Ø10.2 hub, so the ch0 bar foot passes over it
+        - 'design: replaces the 0.45 end-play leaf and reverses #743 Q4 ("no keeper"): the stack and shaft are held north on the datum ear, so a flat rod held at cam and arm needs no end-play allowance; each spring is checked free on the shaft at fit-up, the catalogue ID tolerance reaching under Ø6.35 (`rocker_bank_layout.ROCKER_PRELOAD`)'
+        - med (catalogue)
       - - Support casting ×1 (windowed rocker-arm support)
         - 'green 177.8 × 177.8 windowed casting, 63.5 thick tapering to 16.94 at the apex, authored window-normal local Z and installed Ry+90 at its original machine location (+72.9, 0). Three measured p2 reliefs follow the recentered pivot rig while retaining the guarded ligaments to the four 5/16 hold-down clearance drills (`cad/scripts/build_fr_rocker_arm_support.py`).'
         - 'front view: triangle base spans x −130…−44 (≈86), apex at −81 ± 6. M6.9 REINSTATED the windowed-frame reading M6.3/M6.5 refuted: ch30 p008 (+x side, brightened) plainly shows the windowed portal frame (~184 wide, ~127 window). The p008 uprights read ~28–40 deep and near-uniform → side depth 40 → 20 (supersedes the legacy 63.5 → 16.9 strong taper). M6.5''s refutation of a second free-standing SOUTH frustum stands (the calibrated v3 side view shows ONE frustum at the back, z +69..+134 footprint; the south ball is gripped by the clevis). M6.12: photo Z-scale is perspective-compressed, so the casting''s Z geometry stays anchored on the mechanically-locked neighbours (both pivot balls, the channel grid, the parked stick z ≤ −118; the "ch25 handle z ≥ −98" pin is OBSOLETE — the restored ch30-GT alignment pinion carries its tee handle at z −144, well south of the plate — the band now rests on the stick + photo read alone).'
@@ -800,7 +810,7 @@ sections:
         - high (catalog + native vendor model + assembly contract)
       - - Pivot brackets ×2 (replaced the chrome ball mounts 2026-09)
         - 'black L-bracket (2026-09-02, was a T): foot 16 wide (fits the support''s 16.93 apex) × 6 × 24 running INBOARD from the ear with two Ø4.2 holes on its centreline, ear 14 × 6 arched R7 about the Ø6.5 shaft bore at 25.2 above the seat (#743 PR2: the bright dome on the ear is the shaft''s own domed end, so the brazed Ø16 ball is gone); north bracket turned Ry180 in ch-channel.SLDASM'
-        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at the rocker_bank_layout ear stations (north ear inner face on the shaft shoulder, south feeler-set) so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_ch_pivot_bracket.py`)'
+        - 'ch14 p.27 (2026-09 re-derive): the shaft rides in two black cast brackets bolted to the support rail, not chrome ball pillars; seated on the support at the rocker_bank_layout ear stations (north ear inner face on the shaft shoulder, south set 0.60 off the thrust washer on the preload spring) so the pivot axis stays 228.6 + 25.2 = 253.8 (`build_ch_pivot_bracket.py`)'
         - scaled
         - med
       - - Rocker-arm pivot hubs (integral; the ×19 spacer bushings are retired 2026-09-02)

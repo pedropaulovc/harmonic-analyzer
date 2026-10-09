@@ -33,7 +33,7 @@ import rocker_bank_layout as bank
 def test_restated_floors_are_their_sources() -> None:
     drilled = _config.title_block("drilled_hole")
     assert (drilled["minus_mm"], drilled["plus_mm"]) == (0.0, pin.DRILLED_PLUS)
-    assert pin.RUNNING_FLOOR == bank.MIN_END_PLAY
+    assert pin.RUNNING_FLOOR == bank.RUNNING_FLOOR
     assert pin.MARGIN_SPARE == bank.MARGIN_SPARE
     assert arm.LINEAR_2PL == pytest.approx(
         _config.title_block("linear_2pl")["value_in"] * 25.4

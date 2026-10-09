@@ -696,6 +696,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_transgear_latch_pin",  # MHA-VN-042 1/8 dowel pressed into the arm's reamed end-face hole
         "pd_transgear_pivot_spacer",  # MHA-PD-020 brass spacer, reamed bore pressed on the pivot shoulder (locating, R9-71); no thread
         "vn_transgear_pivot_spring",  # MHA-VN-049 disc spring on the pivot shoulder; no thread
+        "vn_cylinder_bank_spring",  # MHA-VN-050 wave spring loose on the MHA-DT-013 arbor; no thread
+        "vn_rocker_bank_spring",  # MHA-VN-051 wave spring loose on the MHA-CH-005 shaft; no thread
         "pd_transgear_pin",  # MHA-PD-023 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
         "pd_transgear_rear_bushing",  # MHA-PD-024 brass bushing faced to fit, reamed bore on the pin; no thread
         "pd_transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_pd_transgear_removable)
@@ -722,6 +724,8 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "vn_transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
     "vn_transgear_pivot_spring": "disc spring on the pivot shoulder; no thread",
+    "vn_cylinder_bank_spring": "wave disc spring loose on the arbor; no thread",
+    "vn_rocker_bank_spring": "wave disc spring loose on the pivot shaft; no thread",
     "vn_tube_frame_cap": "push-on round cap over the column end",
 }
 
@@ -1243,7 +1247,7 @@ JOINTS: tuple[Joint, ...] = (
             "vn_pedestal_hold_down_screw_spec.THREAD; rocker_bracket_seat_layout.SEAT_SPEC (tapped_bottoming #8-32 2B); "
             "draw_dt_drive_train_assembly.py BANK_STEPS step north-pivot-bracket-set (MHA-DT-000 STEP 10: 'DRILL AND TAP THE RAIL "
             "THROUGH ITS FEET ... UNSCREW IT AND LIFT IT OFF'); draw_ch_channel_assembly.py step north-ear-datum (MHA-CH-000 "
-            "STEP 3: 'SLIDE THE ... EAR SOUTH OVER THE NORTH JOURNAL, SCREW IT DOWN AND RECHECK ITS Y'); "
+            "STEP 3: 'SLIDE THE ... EAR SOUTH OVER THE NORTH JOURNAL, SCREW IT DOWN AND RECHECK ITS S-OFFSET Y'); "
             "ch_channel_assembly_steps.NORTH_BRACKET_SET_REF; "
             "config parts/vn-pedestal-hold-down-screw.yaml (90280A197)"
         ),
@@ -1255,7 +1259,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_rocker_arm_support",
         thread="#8-32",
         quantity=2,
-        installed_at=ch_channel_assembly_steps.step_ref("south-bracket-feeler-set"),
+        installed_at=ch_channel_assembly_steps.step_ref("south-bracket-spring-set"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the south pivot_bracket foot to the stationary rocker_arm_support "
@@ -1264,17 +1268,17 @@ JOINTS: tuple[Joint, ...] = (
             "oscillating drag and end thrust act about/along the pivot-shaft axis (Z), "
             "perpendicular to the vertical screw axes"
         ),
-        axial_capture="fillister head on the bracket foot top face; thread in a bottoming-tapped #8-32 2B blind seat transferred through the feeler-set foot",
+        axial_capture="fillister head on the bracket foot top face; thread in a bottoming-tapped #8-32 2B blind seat transferred through the blade-set foot",
         lock=Lock.NONE,
         lock_part="",
         lock_binds=(),
         lock_step="",
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
-            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-feeler-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEATS ... "
-            "SCREW IT DOWN AT THE FEELER'), left screwed down through 'shaft-cut-to-fit' (STEP 6: 'UNSCREW THE NORTH ... "
-            "AND SLIDE IT OFF NORTH; DRAW THE SHAFT NORTH ... REFIT AS STEP 3, THE WASHER HELD BETWEEN HUB 0 AND THE "
-            "SOUTH EAR, LEFT AT ITS STEP 5 FEELER')"
+            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-spring-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEATS ... "
+            "SCREW DOWN, PULL THE BLADE'), left screwed down through 'shaft-cut-to-fit' (STEP 6: 'UNSCREW THE NORTH ... "
+            "AND SLIDE IT OFF NORTH; DRAW THE SHAFT NORTH ... REFIT AS STEP 3; "
+            "SOUTH EAR LEFT AT ITS STEP 5 SETTING')"
         ),
     ),
     Joint(
@@ -1998,7 +2002,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-pivot-bracket-set"
     ),
     "ha-harmonic-analyzer/south-pivot-bracket-hold-down": Occurrence(
-        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-feeler-set"
+        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-spring-set"
     ),
     "ha-harmonic-analyzer/fulcrum-keeper-screw-in-top-frame": Occurrence(
         "ha_harmonic_analyzer", "build_ch_channel_assembly.py", '"vn-frame-side-screw"'

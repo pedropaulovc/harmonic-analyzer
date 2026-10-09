@@ -34,8 +34,9 @@ def test_gear_and_stack_bands_are_centred() -> None:
     upper, lower = gear.OVERALL_THICKNESS_BAND
     assert upper - lower == pytest.approx(0.05)
     assert upper == pytest.approx(-lower)
+    # #948 ruling R tightened the acceptance to +/-0.10 (a fit-up re-face).
     assert bank.STACK_L20_ACCEPT == pytest.approx(
-        (bank.STACK_L20 - 0.20, bank.STACK_L20 + 0.20)
+        (bank.STACK_L20 - 0.10, bank.STACK_L20 + 0.10)
     )
 
 
@@ -62,51 +63,76 @@ def test_partial_stack_band_is_the_worst_accepted_split(n: int) -> None:
     assert min(sums) == pytest.approx(lower)
 
 
-def test_end_play_uses_the_rig_feeler_rule() -> None:
-    assert bank.BANK_END_FEELER == pytest.approx(0.45)
-    assert bank.BANK_END_PLAY == pytest.approx((0.35, 0.55))
-    # The tightest setting keeps the floor plus the novice spare ...
-    assert bank.BANK_END_PLAY[0] >= bank.MIN_END_PLAY + bank.MARGIN_SPARE - 1e-9
-    # ... and one blade thinner would not.
-    thinner = bank.BANK_END_FEELER - bank.FEELER_STEP - bank.BANK_END_FEELER_BAND
-    assert thinner < bank.MIN_END_PLAY + bank.MARGIN_SPARE
-    assert bank.THERMAL_END_PLAY_DRIFT < bank.MARGIN_SPARE
+def test_the_bank_is_preloaded_by_its_spring() -> None:
+    # #948 ruling R: the 0.45 leaf became a 9714K392 wave spring set on a
+    # 0.95 blade; its whole set band stays in the spring's working range at a
+    # light, single-digit-newton preload, and the bank has no end play.
+    assert bank.BANK_SPRING_SET == pytest.approx(0.95)
+    assert bank.BANK_SPRING_HEIGHT == pytest.approx((0.85, 1.05))
+    assert bank.BANK_PRELOAD == pytest.approx((2.22, 4.24), abs=0.01)
+    assert bank.BANK_SPRING_Z == (bank.FRONT_STRAP_INNER_Z, bank.FRONT_WASHER_Z[0])
+    assert not hasattr(bank, "BANK_END_PLAY")
+    assert not hasattr(bank, "RING_OVERHANG_MAX")
+    # The spring takes up the brass stack's thermal growth inside its set band.
+    assert bank.THERMAL_STACK_DRIFT < bank.BANK_SPRING_SET_BAND
+
+
+def test_the_bank_spring_fits_its_arbor_and_faces() -> None:
+    import dt_arbor_pedestal_spec as ped
+    import dt_cylinder_end_disc_spec as washer
+    import dt_cylinder_gear_shaft_spec as arbor
+    import vn_cylinder_bank_spring_spec as spring
+
+    # Catalogue worst case: the tightest spring still passes the largest arbor
+    # (with no clearance to spare: the DT-000 step checks it slides free).
+    id_min = spring.ID + spring.ID_BAND[1]
+    assert id_min >= arbor.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0] - 1e-9
+    # Its whole width lands on the washer's face and on the strap's.
+    od_min = spring.OD + spring.OD_BAND[1]
+    od_max = spring.OD + spring.OD_BAND[0]
+    assert od_min > washer.WASHER_BORE + washer.WASHER_BORE_BAND[0]
+    assert od_min > ped.BORE_DIA + ped.BORE_DIA_BAND[0]
+    assert od_max < washer.WASHER_OD
 
 
 def test_g0_to_g19_band_is_capped_by_the_stack_acceptance() -> None:
     assert bank.G0_FRONT_FROM_G19_BACK == pytest.approx(
         -(19 * bank.BANK_PITCH + gear.FACE_WIDTH)
     )
-    # Gears 1-19 against L20 +/-0.20: 19 x 0.025 is capped at 0.20 + 0.025.
-    assert bank.G0_G19_BAND == pytest.approx((-0.275, 0.275))
-    assert sum(bank.G0_FRONT_SOUTH_STACK.values()) == pytest.approx(0.825)
-    assert sum(bank.G0_FRONT_NORTH_STACK.values()) == pytest.approx(0.275)
+    # Gears 1-19 against L20 +/-0.10: 19 x 0.025 is capped at 0.10 + 0.025.
+    assert bank.G0_G19_BAND == pytest.approx((-0.175, 0.175))
+    # Preloaded: no end-play term south.
+    assert sum(bank.G0_FRONT_SOUTH_STACK.values()) == pytest.approx(0.175)
+    assert sum(bank.G0_FRONT_NORTH_STACK.values()) == pytest.approx(0.175)
 
 
-def test_the_worst_station_is_gear_5_not_gear_0() -> None:
-    # 14 gears north of gear 5 may all lean one way (0.35) while the other 6
-    # lean back (0.15), and the stack still passes L20 +/-0.20.
-    assert bank.partial_stack_band(14) == pytest.approx((0.35, -0.35))
-    assert bank.STATION_STACK_BAND == pytest.approx((-0.375, 0.375))
+def test_the_worst_station_is_gear_7_not_gear_0() -> None:
+    # 12 gears north of gear 7 may all lean one way (0.30) while the other 8
+    # lean back (0.20), and the stack still passes L20 +/-0.10.
+    assert bank.partial_stack_band(12) == pytest.approx((0.30, -0.30))
+    assert bank.STATION_STACK_BAND == pytest.approx((-0.325, 0.325))
 
 
-def test_g19_never_moves_north_of_the_datum() -> None:
-    assert sum(bank.G19_BACK_NORTH_STACK.values()) == 0.0
-    assert sum(bank.G19_BACK_SOUTH_STACK.values()) == pytest.approx(bank.BANK_END_PLAY[1])
+def test_the_datum_chain_is_mic_compensated() -> None:
+    # #948 ruling R: the back strap's DRO target is offset by the measured
+    # back washer's (W - 1.500), so only the micrometer's residual stays.
+    assert bank.DATUM_CHAIN_STACK == pytest.approx(
+        {"back strap DRO locate": 0.10, "back washer, mic-compensated": 0.013}
+    )
 
 
 def test_a_closed_slot_always_holds_the_whole_ring() -> None:
-    # The rod print does not dimension the ring thickness; the spec's band is
-    # the title block's 2-place class, the loosest a shop would read into it.
-    two_place = _config.title_block("linear_2pl")["value_in"] * MM_PER_IN
-    assert rod.RING_THICKNESS_BAND == pytest.approx((two_place, -two_place))
-    ring_max = rod.RING_THICKNESS + two_place
+    # #948 ruling R: ring and shank 2.200 at three places, the title block's
+    # 3-place class.
+    three_place = _config.title_block("linear_3pl")["value_in"] * MM_PER_IN
+    assert rod.RING_THICKNESS_BAND == pytest.approx((three_place, -three_place))
+    ring_max = rod.RING_THICKNESS + three_place
     assert bank.RING_MAX == pytest.approx(ring_max)
+    assert bank.SHANK_MAX == pytest.approx(ring_max)
     # d': the thinnest in-band gear, 7.0565 - 0.025, less FW + 0.05.
     assert bank.SLOT_MIN == pytest.approx(3.9815)
     assert bank.RING_SLOT_MARGIN == pytest.approx(bank.SLOT_MIN - ring_max)
     assert bank.RING_SLOT_MARGIN >= bank.MARGIN_SPARE
-    assert bank.RING_OVERHANG_MAX == bank.BANK_END_PLAY[1]
 
 
 def test_each_gear_is_accepted_on_its_print_band() -> None:
@@ -132,7 +158,7 @@ def test_stations_close_up_against_the_datum() -> None:
         bank.station_z(0) - gear.FACE_WIDTH / 2.0 - gear.CAM_THICKNESS
     )
     assert bank.FRONT_WASHER_Z[0] - bank.FRONT_STRAP_INNER_Z == pytest.approx(
-        bank.BANK_END_FEELER
+        bank.BANK_SPRING_SET
     )
     assert bank.CAM_MID_DZ == pytest.approx(-gear.OVERALL_THICKNESS / 2.0)
 
@@ -179,7 +205,7 @@ def test_pedestals_anchor_on_the_bank_strap_faces() -> None:
     assert bank.BACK_PEDESTAL_ORIGIN_Z == pytest.approx(
         bank.BACK_STRAP_INNER_Z + ped.STRAP_INNER_Z
     )
-    assert bank.FRONT_STRAP_INNER_Z == pytest.approx(-71.519, abs=5e-4)
+    assert bank.FRONT_STRAP_INNER_Z == pytest.approx(-72.019, abs=5e-4)
     assert bank.BACK_STRAP_INNER_Z == pytest.approx(73.062, abs=5e-4)
     # The apex set screws sit at each strap's mid-depth.
     assert bank.FRONT_SET_SCREW_Z == pytest.approx(

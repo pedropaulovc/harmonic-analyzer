@@ -1,9 +1,10 @@
 r"""Create the one-sheet Front/Right/Isometric channel assembly drawing (MHA-CH-000).
 
-The sheet carries the rocker bank's fit-up steps (#743): the bank's end play is
-set by a feeler at assembly, so the setting and its acceptance are shop
-instructions this sheet must print (drawing-simplicity rule 6), generated from
-``rocker_bank_layout`` and numbered by ``channel_assembly_steps``.
+The sheet carries the rocker bank's fit-up steps (#948 ruling R, PR #1292): the
+south bracket is set off a wave disc spring that preloads the bank north, so the
+setting and its acceptance are shop instructions this sheet must print
+(drawing-simplicity rule 6), generated from ``rocker_bank_layout`` and numbered
+by ``channel_assembly_steps``.
 """
 
 from __future__ import annotations
@@ -32,8 +33,7 @@ from ch_rod_pivot_pin_spec import PIN_END_PROUD_MAX
 from rocker_bank_layout import (
     COUNT,
     PLAIN_END_CUT_BAND,
-    ROCKER_END_FEELER,
-    ROCKER_END_PLAY,
+    ROCKER_SPRING_SET,
     STACK_L20_ACCEPT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
@@ -72,11 +72,11 @@ def _fitup_steps() -> str:
     shaft = _config.parts("ch-pivot-shaft")["number"]
     bracket = _config.parts("ch-pivot-bracket")["number"]
     washer = _config.parts("ch-rocker-thrust-washer")["number"]
+    spring = _config.parts("vn-rocker-bank-spring")["number"]
     support = _config.parts("fr-rocker-arm-support")["number"]
     last = COUNT - 1
-    play_low, play_high = ROCKER_END_PLAY
     stack_low, stack_high = STACK_L20_ACCEPT
-    feeler_step = steps.step_number("south-bracket-feeler-set")
+    set_step = steps.step_number("south-bracket-spring-set")
     north_step = steps.step_number("north-ear-datum")
     # The pivot shaft is supplied long, its plain end uncut (pivot_shaft_spec):
     # the cylinder ends PLAIN_END_CUT_BAND past the south ear's outer face and
@@ -104,34 +104,33 @@ def _fitup_steps() -> str:
             "ACCEPT IF THE ARM SWINGS FREE UNDER ITS OWN WEIGHT."
         ),
         "north-ear-datum": (
-            f"BASE STILL ON THE MILL, DRO ZEROED, THE NORTH {bracket} LIFTED "
+            f"BASE ON THE MILL, DRO ZEROED, NORTH {bracket} LIFTED "
             f"OFF AT {steps.NORTH_BRACKET_SET_REF}: SWING EACH ARM UP "
             f"ON ITS ROD AND THREAD THE {shaft} SHAFT, BODY FIRST FROM THE "
             f"NORTH, THROUGH HUBS {last} TO 0 IN ORDER. SLIDE THE {bracket} "
             "EAR SOUTH OVER THE NORTH JOURNAL, SCREW IT DOWN AND RECHECK ITS "
-            f"Y AS {steps.NORTH_BRACKET_SET_REF}. ITS EAR IS THE BANK'S AXIAL "
-            "DATUM: PUSH THE SHAFT SHOULDER AGAINST IT."
+            f"S-OFFSET Y AS {steps.NORTH_BRACKET_SET_REF}."
         ),
         "south-washer-fitted": f"SLIP THE {washer} WASHER ON AGAINST HUB 0.",
-        "south-bracket-feeler-set": (
-            f"SET THE SOUTH {bracket} WITH A {ROCKER_END_FEELER:.2f} FEELER "
-            "BETWEEN THE WASHER AND ITS EAR, BANK PUSHED NORTH. CLAMP IT, "
-            f"TRANSFER ITS SEATS INTO THE {support} RAIL, SCREW IT DOWN AT THE "
-            "FEELER, THEN PULL THE FEELER."
+        "south-bracket-spring-set": (
+            f"RUN A {spring} SPRING ALONG THE {shaft}; REJECT ONE THAT BINDS. "
+            f"FIT IT ON. SET THE SOUTH {bracket} OFF THE WASHER ON A "
+            f"{ROCKER_SPRING_SET:.2f} BLADE BESIDE THE SPRING, BANK PUSHED NORTH. "
+            f"CLAMP, TRANSFER ITS SEATS INTO THE {support} RAIL, SCREW DOWN, "
+            "PULL THE BLADE."
         ),
         "shaft-cut-to-fit": (
             f"SHOULDER PUSHED NORTH, SCRIBE THE {shaft} SHAFT AT THE SOUTH "
             f"EAR'S OUTER FACE. UNSCREW THE NORTH {bracket} AND SLIDE IT OFF "
             "NORTH; DRAW THE SHAFT NORTH OUT OF THE HUBS, EACH ARM LEFT "
-            "HANGING ON ITS ROD, AND CATCH THE WASHER. CUT THE PLAIN END "
+            "HANGING ON ITS ROD; CATCH WASHER AND SPRING. CUT THE PLAIN END "
             f"{cut_low:.1f} TO {cut_high:.1f} PAST THE SCRIBE AND DOME IT "
-            f"{DOME_HEIGHT:.1f} (SEE {shaft}). REFIT AS STEP {north_step}, THE "
-            "WASHER HELD BETWEEN HUB 0 AND THE SOUTH EAR, LEFT AT ITS STEP "
-            f"{feeler_step} FEELER."
+            f"{DOME_HEIGHT:.1f}. REFIT AS STEP {north_step}; "
+            f"SOUTH EAR LEFT AT ITS STEP {set_step} SETTING."
         ),
-        "end-play-accepted": (
-            f"ACCEPT: BANK END PLAY {play_low:.2f} TO {play_high:.2f} BY "
-            f"FEELER. OUTSIDE IT, REPEAT STEP {feeler_step}."
+        "preload-accepted": (
+            "ACCEPT: PUSHED SOUTH, BANK AND SHAFT SPRING BACK ONTO THE NORTH "
+            f"EAR. ELSE REPEAT STEP {set_step}."
         ),
     }
     lines = ["ROCKER BANK FIT-UP"]

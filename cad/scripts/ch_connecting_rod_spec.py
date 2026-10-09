@@ -19,14 +19,24 @@ CENTER_DISTANCE = 163.1010299795349  # fixed-post recenter; level arm, plumb rod
 RING_BORE_DIA = 30.8  # strap bore riding the eccentric cam
 RING_BORE_DIA_BAND = (0.10, 0.00)  # running bore; (upper, lower) deviations
 RING_WALL = 5.0  # radial strap wall
-RING_THICKNESS = 3.0
-# The rod print leaves the ring thickness to the title block's 2-place class,
-# +/-.02 in (title_block.yaml linear_2pl, pinned by test_cylinder_bank_layout):
-# the loosest routine class a shop would read into it. The cylinder bank's
-# closed cam slot must hold the thickest such ring (cylinder_bank_layout).
-RING_THICKNESS_BAND = (0.508, -0.508)  # (upper, lower) deviations
+# Ring and shank 2.200 at three places, the title block's +/-.005 in class
+# (title_block.yaml linear_3pl; #948 ruling R, PR #1292). Both pass between
+# the same two tooth discs of the closed cam slot (cylinder_bank_layout), and
+# a flat rod held by its fork on the arm needs the cam-vs-arm offset inside
+# its float there: 2.200 at three places widens that float over the old
+# 3.00 / 2.50 at two places by geometry, and still leaves a 2.073 section at
+# its thinnest (drawing-simplicity rule 12).
+RING_THICKNESS = 2.2
+RING_THICKNESS_BAND = (0.127, -0.127)  # (upper, lower) deviations
 SHANK_WIDTH = 8.0
-SHANK_THICKNESS = 2.5
+SHANK_THICKNESS = RING_THICKNESS  # one plate thickness, ring to shank
+SHANK_THICKNESS_BAND = RING_THICKNESS_BAND
+# Ring and shank symmetric to the fork slot within this (total), so the
+# ring's float in the cam slot and the fork's on the arm share a mid-plane.
+RING_SLOT_SYMMETRY = 0.10
+RULE12_SECTION_MIN = 2.0  # drawing-simplicity policy rule 12
+if RING_THICKNESS + RING_THICKNESS_BAND[1] < RULE12_SECTION_MIN:
+    raise AssertionError("the rod's thinnest ring/shank section is under rule 12's 2.0")
 # --- Fork (the U-shaped clevis straddling the 2.500 +/-0.025 rocker strap). ---
 # The rod is flat: ring, shank and fork share one mid-plane (z = 0), the cam
 # plane, which is also the arm plane (rocker_bank_layout.ARM_MID_DZ). Two tines

@@ -437,11 +437,12 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     assert (RIG.RIG_SET_LEAF_D, RIG.RIG_SET_LEAVES) == (1.25, (1.00, 0.25))
     # j = 0 at the front: the drum's front end never uncovers gear 0, even
     # with the thickest leaf D and the shortest drum (the drum hard aft, the
-    # pose), while g0 walks south by the bank's widest end play and a long
-    # g0 -> g19 pitch stack (Codex #858, PRRT_kwDOPHDy386mUjhU).
+    # pose), while g0 sits south by a long g0 -> g19 pitch stack (Codex #858,
+    # PRRT_kwDOPHDy386mUjhU). The bank is preloaded, so no end play adds to
+    # it (#948 ruling R, PR #1292).
     g0_front = drive.Z_DRUM0 - drive.DRUM_FACE / 2.0
     g0_south = sum(RIG.G0_FRONT_SOUTH_STACK.values())
-    assert math.isclose(g0_south, 0.825, abs_tol=1e-9)
+    assert math.isclose(g0_south, 0.175, abs_tol=1e-9)
     face_min = drive.APINION_DRUM_LEN - RIG.DRUM_LEN_BAND
     slack = min(
         (g0_front - g0_south - 1.0) - (g19_back + RIG.RIG_SET_LEAF_D + d - face_min)
@@ -449,7 +450,7 @@ def test_j19_keeps_its_full_face_at_the_worst_stack() -> None:
     )
     assert slack >= RIG.RIG_MARGIN_SPARE, slack
     assert math.isclose(slack, drive.J0_SLACK_WORST, abs_tol=1e-9)
-    assert math.isclose(slack, 2.151, abs_tol=5e-4)
+    assert math.isclose(slack, 2.801, abs_tol=5e-4)
     # Positive control: without the bank terms the row read 2.976 (163435c4f).
     assert math.isclose(slack + g0_south, 2.976, abs_tol=5e-4)
 
@@ -486,17 +487,20 @@ def test_rig_set_leaf_d_derives_the_shift_and_books_the_743_terms() -> None:
     assert math.isclose(RIG.G19_BACK_FACE_Z, g19_back, abs_tol=1e-9)
     # User ruling (E_b): the bank's own terms come from the #743 retention
     # design, booked by name in their own stack.
-    # D is set with the bank pushed north (#743 rider): g19 then never sits
-    # north of the datum, so the bank adds nothing to the advance -- and the
-    # print must say so, or the stack would have to carry E_b max.
+    # D is set with the bank held north on its datum (#743 rider; preloaded
+    # since #948 ruling R, PR #1292): g19 never sits north of the datum, so
+    # the bank adds nothing to the advance.
     assert RIG.DRUM_BACK_ADVANCE_OPEN_TERMS == ()
     assert FITUP.RIG_SET_BANK_PRECONDITION == "BANK PUSHED NORTH"
     assert "NORTH MHA-DT-012 BACK FACE, BANK PUSHED NORTH;" in FITUP.RIG_SET_STEP
     # The bank's terms at the front are booked by name in their own stack,
-    # never mixed into the rig's (Codex #858, PRRT_kwDOPHDy386mUjhU).
+    # never mixed into the rig's (Codex #858, PRRT_kwDOPHDy386mUjhU), and the
+    # preloaded bank carries no end play among them.
     assert RIG.DRUM_FRONT_RETREAT_OPEN_TERMS == ()
     assert all(name.startswith("MHA-DT-012 ") for name in RIG.G0_FRONT_SOUTH_STACK)
-    assert any("E_b" in name for name in RIG.G0_FRONT_SOUTH_STACK)
+    assert not any(
+        "E_b" in name or "end play" in name for name in RIG.G0_FRONT_SOUTH_STACK
+    )
     for stack in (RIG.DRUM_BACK_ADVANCE_STACK, RIG.DRUM_FRONT_RETREAT_STACK):
         assert not any("E_b" in name or "#743" in name for name in stack)
     rows = [name for name in drive.RIG_MARGINS if name.startswith(("j = 19", "j = 0"))]

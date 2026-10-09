@@ -24,7 +24,7 @@ from _hole_spec import NUMBER_DRILL_MM
 def test_restated_floors_are_their_sources() -> None:
     drilled = _config.title_block("drilled_hole")
     assert (drilled["minus_mm"], drilled["plus_mm"]) == (0.0, pin.DRILLED_PLUS)
-    assert pin.RUNNING_FLOOR == bank.MIN_END_PLAY
+    assert pin.RUNNING_FLOOR == bank.RUNNING_FLOOR
     # The levers' hubs set the pitch the neighbour stack is judged at.
     assert lever.HUB_LENGTH == bank.PITCH
     assert pin.BAR_HOLE_DIA is bar.TOP_PIN_HOLE_DIA

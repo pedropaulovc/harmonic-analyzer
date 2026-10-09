@@ -32,9 +32,9 @@ SEQUENCE: tuple[str, ...] = (
     RODS_PINNED_KEY,
     "north-ear-datum",
     "south-washer-fitted",
-    "south-bracket-feeler-set",
+    "south-bracket-spring-set",
     "shaft-cut-to-fit",
-    "end-play-accepted",
+    "preload-accepted",
 )
 
 _NUMBER = {key: index for index, key in enumerate(SEQUENCE, start=1)}
