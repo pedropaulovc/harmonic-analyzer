@@ -33,7 +33,7 @@ geometry is casting-shaped, not milling-shaped.
      Support the slender work with a follower/steady and take a light finishing cut;
      the terminal D-flat continues from the T018 step through the shaft tip.
      Break the two long torque corners of the terminal flat no more than 0.020 mm; the 0.420 AF
-     already pays for that break. The stepped collar (nose Ø6.40 × 3.0, body 11.0 wide, all ±0.51) has a
+     already pays for that break. The stepped collar (body Ø17.05 × 11.0, nose Ø6.40 × 3.0, all ±0.51) has a
      finished bore of Ø0.849 ±0.030. To fit it, hold the gear stack south on the shaft's thrust collar,
      set the original 0.45 ±0.10 feeler off the T006 thrust face, seat both collar bore ends on the
      round back of the terminal, snug the ground dog wholly on the unbroken flat, then remove the feeler.
