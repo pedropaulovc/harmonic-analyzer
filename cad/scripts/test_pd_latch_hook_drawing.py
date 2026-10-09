@@ -6,6 +6,7 @@ import ast
 import itertools
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -83,6 +84,21 @@ def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
     for name, (nominal, worst) in spec.WALLS.items():
         assert nominal >= worst >= spec.WALL_TARGET - 1e-9, name
     assert spec.WALL_TARGET > spec.WALL_FLOOR
+
+
+def test_the_screw_position_band_is_the_widest_xx_the_screw_stack_closes() -> None:
+    """Review 964b60a3: ±0.065 at .XXX read as over-specified.  The band is
+    the fixed-fastener stack's: the bar taps' radial reach plus the hole's
+    printed reach stays inside the Ø3.2 hole's float over the basic major,
+    and one more .XX step would not."""
+    assert spec.POSITION_PLACES == 2
+    assert spec.CLEARANCE_RADIAL_MIN == pytest.approx(
+        (geom.SCREW_HOLE_DIA - spec.MAJOR_DIA) / 2.0
+    )
+    assert spec.SCREW_POSITION_RADIAL == spec._position_radial(spec.POSITION_TOL)
+    assert spec.SCREW_POSITION_RADIAL <= spec.CLEARANCE_RADIAL_MIN
+    assert spec._position_radial(spec.POSITION_TOL + 0.01) > spec.CLEARANCE_RADIAL_MIN
+    assert spec.POSITION_TOL == pytest.approx(0.05)
 
 
 def test_the_screw_head_clears_the_inside_bend_at_the_worst_case() -> None:
@@ -181,9 +197,12 @@ def test_the_notes_fit_the_note_field_and_leave_the_title_block_its_own() -> Non
     assert not any(
         ch.isdigit() for line in lines for ch in line[2:].replace("MHA-PD-007", "")
     )
-    # The pin hole's callout points at the match-drill note.
-    assert "MATCH-DRILL" in spec.DRAWING_NOTES
-    assert "NOTE 3" in spec.PIN_HOLE_CALLOUT and lines[2].startswith("3.")
+    # The pin hole's callout names the process; note 3 says where and when.
+    assert spec.PIN_HOLE_CALLOUT == "MATCH-DRILL"
+    assert lines[2].startswith("3.") and "MATCH-DRILL PIN HOLE" in lines[2]
+    # The flat pattern is identified; no step order is prescribed.
+    assert lines[0].startswith("1. FLAT PATTERN")
+    assert not any(word in spec.DRAWING_NOTES for word in ("THEN", "AFTER", "BEFORE"))
 
 
 # --- Sheet layout ----------------------------------------------------------------
@@ -249,10 +268,10 @@ def _texts() -> dict[str, tuple[float, ...]]:
     below = {
         name: len(text.split("\n")) for name, text in drawing.CALLOUTS_BELOW.items()
     }
-    # Printed widths in characters: value and band ("12.631 ±0.065",
+    # Printed widths in characters: value and band ("12.63 ±0.05",
     # "Ø3.20 +0.10" over "0.00", "R1.2 +0.3" over "-0.2", "16.0").
     widths = {
-        "ScrewX1": 13, "ScrewX2": 12, "ScrewY": 12, "ScrewDia": 11,
+        "ScrewX1": 11, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
         "RollStart": 9, "FaceY": 10, "FaceX": 10, "TabEndX": 9,
         "StraightLen": 9, "PinHoleDia": 11, "RollR": 10, "TabR": 9,
         "Width": 10, "ArmFrontZ": 3, "ArmLowZ": 3, "RootR": 4, "RoundR": 5,
@@ -269,6 +288,9 @@ def _texts() -> dict[str, tuple[float, ...]]:
         ]
         chars = max(widths[name], *map(len, callouts))
         boxes[name] = _box(chars, xy, above.get(name, 0), below.get(name, 0))
+    boxes["Overall"] = _box(
+        len(f"({spec.OVERALL_HEIGHT:.1f})"), drawing.OVERALL_TEXT_XY
+    )
     return boxes
 
 
@@ -476,6 +498,162 @@ def test_no_dimension_line_runs_through_another_text() -> None:
             assert not (_inside(p, box) or _inside(q, box)), (line_name, name)
             for r, s in _box_edges(box):
                 assert not _crosses(p, q, r, s), (line_name, name)
+
+
+def test_the_pin_hole_dimension_line_meets_its_value_not_its_callout() -> None:
+    """Review 964b60a3: the leader climbed through MATCH-DRILL / NOTE 3 hung
+    under the value.  The callout now prints above (one line: above-callouts
+    never print a second), and the text stands on the +N side wholly past
+    the upper extension line, so the dimension line rises from the hole into
+    the value's underside.  It crosses only the straight's roll-end extension
+    line (an extension line may cross a dimension line), runs through no
+    other text, and the hole's own extension lines cross nothing."""
+    assert all("\n" not in text for text in drawing.CALLOUTS_ABOVE.values())
+    assert drawing.CALLOUTS_ABOVE["PinHoleDia"] == spec.PIN_HOLE_CALLOUT
+    assert "PinHoleDia" not in drawing.CALLOUTS_BELOW
+    texts = {**_texts(), **_notes()}
+    box = texts.pop("PinHoleDia")
+    centre = drawing.FRONT_KEEP["PinHoleDia"]
+    hole = drawing._front(*geom.PIN_HOLE_L)
+    rel = [(centre[i] - hole[i]) / drawing._S for i in range(2)]
+    u = rel[0] * geom.ARM_U[0] + rel[1] * geom.ARM_U[1]
+    n = rel[0] * geom.ARM_N[0] + rel[1] * geom.ARM_N[1]
+    radius = geom.PIN_HOLE_DIA / 2.0
+    assert u < 0.0 and n > radius
+    # The value's underside is the box's lower line; the callout sits above.
+    value_top = box[1] + _LINE_PITCH
+    extension = {
+        side: (
+            drawing._front(*drawing._on(geom.PIN_HOLE_L, -0.5, side * radius)),
+            drawing._front(*drawing._on(geom.PIN_HOLE_L, u - 1.0, side * radius)),
+        )
+        for side in (-1, 1)
+    }
+    for p, q in extension.values():
+        assert not (_inside(p, box) or _inside(q, box))
+        assert not any(_crosses(p, q, r, s) for r, s in _box_edges(box))
+    dimension_line = (extension[-1][1], centre)
+    entered = [
+        i for i, (r, s) in enumerate(_box_edges(box)) if _crosses(*dimension_line, r, s)
+    ]
+    assert entered == [0]  # the bottom edge, the value's underside
+    bottom_edge_x = dimension_line[0][0] + (box[1] - dimension_line[0][1]) * (
+        centre[0] - dimension_line[0][0]
+    ) / (centre[1] - dimension_line[0][1])
+    assert box[0] < bottom_edge_x < box[2] and centre[1] < value_top
+    crossed = []
+    for line_name, (r, s) in _front_lines().items():
+        for p, q in extension.values():
+            assert not _crosses(p, q, r, s), line_name
+        if _crosses(*dimension_line, r, s):
+            crossed.append(line_name)
+    assert crossed == ["StraightLen ext roll end"]
+    for name, other in texts.items():
+        for p, q in (*extension.values(), dimension_line):
+            assert not (_inside(p, other) or _inside(q, other)), name
+            assert not any(_crosses(p, q, r, s) for r, s in _box_edges(other)), name
+
+
+def _overall_lines() -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """The side view's overall height: an extension line left from each pick
+    (the tip's from the round's extreme), the vertical dimension line."""
+    x = drawing.OVERALL_TEXT_XY[0]
+    top = drawing.OVERALL_PICKS[0]
+    tip = drawing._right(geom.ROUND_C_L[1], geom.ROUND_C_L[0] - geom.ROUND_R)
+    return {
+        "Overall ext top": (top, (x, top[1])),
+        "Overall ext tip": (tip, (x, tip[1])),
+        "Overall": ((x, top[1]), (x, tip[1])),
+    }
+
+
+def test_the_overall_height_is_a_conspicuous_reference_clear_of_every_text() -> None:
+    """Rule 7: the formed overall, ear top to round tip, printed in its own
+    right and distinct from the 70.4 to the pin, its lines through no text."""
+    lines = _overall_lines()
+    top, tip = lines["Overall ext top"][0], lines["Overall ext tip"][0]
+    assert (top[1] - tip[1]) / drawing._S == pytest.approx(spec.OVERALL_HEIGHT)
+    assert spec.OVERALL_HEIGHT == pytest.approx(
+        geom.WIDTH - (geom.TIP_Y - geom.BASE_Y[0])
+    )
+    assert abs(spec.OVERALL_HEIGHT + part.FAR_FACE_POINT[1]) > 10.0
+    # The round pick lies on the round, off its tip (the arc-max re-anchors).
+    pick = drawing.OVERALL_PICKS[1]
+    centre = drawing._right(geom.ROUND_C_L[1], geom.ROUND_C_L[0])
+    assert math.dist(pick, centre) / drawing._S == pytest.approx(geom.ROUND_R)
+    assert pick[1] > tip[1] + 0.5 * drawing._S
+    texts = {**_texts(), **_notes()}
+    for line_name, (p, q) in lines.items():
+        for name, box in texts.items():
+            if name == "Overall":
+                continue
+            assert not (_inside(p, box) or _inside(q, box)), (line_name, name)
+            assert not any(_crosses(p, q, r, s) for r, s in _box_edges(box)), (
+                line_name,
+                name,
+            )
+        for other, (r, s) in _front_lines().items():
+            assert not _crosses(p, q, r, s), (line_name, other)
+        # Through no view: the extension lines leave the side view outward.
+        for region in (*_part_regions(), _iso_box()):
+            assert not any(_crosses(p, q, r, s) for r, s in _box_edges(region)), (
+                line_name
+            )
+
+
+class _Display:
+    """A drawing dimension stub: its value, the precision put on it."""
+
+    def __init__(self, value_mm: float) -> None:
+        self.value_mm = value_mm
+        self.precision = -1
+
+    def GetDimension2(self, _index: int) -> SimpleNamespace:
+        return SimpleNamespace(SystemValue=self.value_mm / 1000.0)
+
+    def GetAnnotation(self) -> object:
+        return self
+
+    def SetPrecision3(self, primary: int, *_rest: int) -> bool:
+        self.precision = primary
+        return True
+
+    def GetPrimaryPrecision2(self) -> int:
+        return self.precision
+
+
+def test_the_overall_reference_takes_its_places_from_the_spec(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+    display = _Display(spec.OVERALL_HEIGHT)
+
+    def add_edge_dimension(_adapter, _view, **kwargs):
+        calls["edge"] = kwargs
+        return display
+
+    monkeypatch.setattr(drawing, "add_edge_dimension", add_edge_dimension)
+    monkeypatch.setattr(
+        drawing,
+        "set_arc_endpoints_to_max",
+        lambda _a, dimension, *, label: calls.setdefault("arc", dimension),
+    )
+    monkeypatch.setattr(
+        drawing,
+        "set_reference_dimension",
+        lambda _a, annotation, *, label: calls.setdefault("reference", annotation),
+    )
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _name: value)
+    drawing._overall_reference(object(), object())
+    edge = calls["edge"]
+    assert edge["orientation"] == "vertical"
+    assert (edge["p0"], edge["p1"]) == drawing.OVERALL_PICKS
+    assert edge["text_xy"] == drawing.OVERALL_TEXT_XY
+    assert calls["arc"] is display and calls["reference"] is display
+    assert display.precision == spec.DRAWING_REFERENCE_PRECISION
+
+    # Negative control: a pick that resolved to the round's centre reads short.
+    display = _Display(spec.OVERALL_HEIGHT - geom.ROUND_R)
+    with pytest.raises(RuntimeError, match="overall height reference measured"):
+        drawing._overall_reference(object(), object())
 
 
 def test_the_roll_radius_is_shortened_because_its_centre_leaves_the_sheet() -> None:

@@ -29,8 +29,8 @@ the part by translation to ``PART_ORIGIN_MACHINE``):
   bending, located from the ear's outer face;
 * ``PinHolePlane`` / ``PinHoleProfile`` / ``PinHole``: the pin hole, a
   revolve cut about its axis along U at the pin's height;
-* ``FlatBlank``: the flat pattern, a hidden construction-only reference
-  sketch on the Right Plane beside the part (the drawing's phantom).
+* ``FlatBlank``: the flat pattern, a hidden reference sketch on the Right
+  Plane beside the part (the drawing's thin outline beside the side view).
 
 Run (SolidWorks already open)::
 
@@ -45,7 +45,6 @@ import sys
 from _common import (
     POLISHED_STEEL,
     SketchDims,
-    _early_bound,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
@@ -241,14 +240,6 @@ _FLAT = {
 }
 if abs(_FLAT_LOW - _FLAT_FRONT - LIP_W) > 1e-9:
     raise AssertionError("the flat's taper does not step the front edge by LIP_W")
-
-
-def _as_construction(adapter, entity_id: str) -> None:
-    """Flag a registered sketch segment as construction geometry."""
-    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
-    segment.ConstructionGeometry = True
-    if not bool(segment.ConstructionGeometry):
-        raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
 async def _relate(adapter, rows) -> None:
@@ -453,7 +444,9 @@ async def _arm_profile(adapter) -> SketchDims:
 
 
 async def _flat_blank(adapter) -> SketchDims:
-    """The flat pattern in the open Right-plane sketch, construction only.
+    """The flat pattern in the open Right-plane sketch: ordinary sketch
+    geometry, so the drawing draws it as a continuous thin outline (the
+    chain font of construction geometry broke its short edges apart).
 
     38 DOF: 9 joins (18); six horizontals/verticals (6); four tangencies (4);
     the blank's top corner anchored (2); its length and width, the root
@@ -492,8 +485,6 @@ async def _flat_blank(adapter) -> SketchDims:
         "flat rear edge", await adapter.add_line(*p["round_rear"], *p["top_rear"])
     )
     set_sketch_direct_db(adapter, False)
-    for entity in (top, base_end, low, root, front, taper, low_front, tip, rear):
-        _as_construction(adapter, entity)
     await _relate(
         adapter,
         (

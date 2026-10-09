@@ -101,9 +101,11 @@ def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, f
 
 
 # The worst far-face margin this test's restatement finds at the printed
-# rows, and the retired 3/4 pin in the 6.05 hole's (short of the face).
-_PINNED_FAR_FACE_MARGIN = 0.695
-_PINNED_OLD_PIN_MARGIN = -0.030
+# rows, and the retired 3/4 pin's: in the 6.05 hole it barely clears with the
+# hook's screw holes at ±0.05; 0.05 deeper it stops short of the face.
+_PINNED_FAR_FACE_MARGIN = 0.741
+_PINNED_OLD_PIN_MARGIN = 0.016
+_PINNED_DEEPER_OLD_PIN_MARGIN = -0.034
 
 
 def _worst_far_face_margin(
@@ -206,11 +208,17 @@ def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -
     # The screws' float turns the hook about the pin as well as sliding it,
     # so the drift along U at the hole exceeds the pure slide.
     assert joints.HOOK_DRIFT_ALONG_U > joints.HOOK_SCREW_SHIFT
-    # Negative control: the 3/4 pin in the 6.05 hole stops short of the far
-    # face with the bends and the grade; without them it cleared.
+    # Negative control: the 3/4 pin barely clears in the 6.05 hole and stops
+    # short 0.05 deeper with the bends and the grade; without them it cleared.
     old = _printed_proud_range(0.75 * 25.4, 6.05)
-    assert _worst_far_face_margin(printed, old) < _PINNED_OLD_PIN_MARGIN + 1e-3
-    depth_only = (old[0] + _PIN_LENGTH_GRADE, old[1] - _PIN_LENGTH_GRADE)
+    assert _worst_far_face_margin(printed, old) == pytest.approx(
+        _PINNED_OLD_PIN_MARGIN, abs=1e-3
+    )
+    deeper = _printed_proud_range(0.75 * 25.4, 6.10)
+    assert _worst_far_face_margin(printed, deeper) == pytest.approx(
+        _PINNED_DEEPER_OLD_PIN_MARGIN, abs=1e-3
+    )
+    depth_only = (deeper[0] + _PIN_LENGTH_GRADE, deeper[1] - _PIN_LENGTH_GRADE)
     assert _worst_far_face_margin(printed, depth_only, bend_deg=0.0) > 0.0
 
 

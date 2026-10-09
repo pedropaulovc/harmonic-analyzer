@@ -25,12 +25,13 @@ import vn_transgear_pivot_spring_spec as spring
 from _hole_spec import TAP_DRILL_MM
 
 
-def _reload_joints() -> None:
+def _reload_joints():
     spec = importlib.util.spec_from_file_location(
         "_hanger_joints_perturbed", joints.__file__
     )
     fresh = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fresh)
+    return fresh
 
 
 def test_pivot_screw_refuses_a_tap_drill_it_can_bottom_in(monkeypatch) -> None:
@@ -279,16 +280,22 @@ def test_the_proud_range_counts_the_depth_row_and_the_pin_length_grade() -> None
 
 
 def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
-    """R9-50: the 3/4 dowel in the 6.05 hole stops short of the one-piece
-    hook's far face with the ear's 1 deg bend, the screws' drift, the formed
-    band and the length grade; the gate refuses it and accepts the 7/8 pin in
-    the 8.50 hole."""
+    """R9-50: the 3/4 dowel stops short of the one-piece hook's far face with
+    the ear's 1 deg bend, the screws' drift, the formed band and the length
+    grade; the gate refuses it and accepts the 7/8 pin in the 8.50 hole.
+    With the hook's screw holes at ±0.05 the 3/4 dowel in its 6.05 hole
+    keeps only 0.010, so the refusal is shown 0.05 deeper."""
     assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.6
     monkeypatch.setattr(latch_pin, "LENGTH", 0.75 * 25.4)
     monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.05)
     monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.05)
+    clearing = _reload_joints()
+    assert 0.0 < clearing.LATCH_PIN_FAR_FACE_MARGIN_WORST < 0.02
+    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.10)
+    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.10)
     with pytest.raises(
-        AssertionError, match=r"MHA-VN-042 pin / MHA-PD-014 strip far face.* 0\.036 short"
+        AssertionError,
+        match=r"MHA-VN-042 pin / MHA-PD-014 strip far face.* 0\.040 short",
     ):
         _reload_joints()
 

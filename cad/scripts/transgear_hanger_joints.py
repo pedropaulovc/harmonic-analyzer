@@ -373,7 +373,7 @@ if LATCH_PIN_ENGAGEMENT_WORST_D < LATCH_PIN.PRESS_ENGAGEMENT_MIN_D:
 # thickness band, the formed arm's band and the ear's 90 deg bend at the
 # hook sheet's angular row.
 LATCH_ARM_ANGLE_PLAY = 0.00305  # rad
-# The screw holes are drilled from the formed ear's outer face at the base,
+# The screw holes are located from the formed ear's outer face at the base,
 # so a bend off 90 deg leans the ear and the arm it carries about the base:
 # the strip's far face at the pin moves by the pin axis's height above the
 # base's underside times tan(bend error), and its normal tilts out of the
@@ -384,7 +384,7 @@ _LATCH_PIVOT = HOOK.PIVOT_XY
 _LATCH_THETA = math.radians(HOOK.ARM_ANGLE_DEG)  # -32.56 deg
 # Each screw's centre in its hole off the model, any direction: the bar's tap
 # and the hook's printed hole position (each a per-axis band, so their
-# diagonal), and the head's float in the Ø3.2 hole.
+# diagonal), and the head's float in the drilled #4 clearance hole.
 HOOK_SCREW_SHIFT = (BAR.HOLE_POSITION_BAND + HOOK_SPEC.POSITION_TOL) * math.sqrt(
     2.0
 ) + HOOK_SPEC.HEAD_FLOAT_MAX

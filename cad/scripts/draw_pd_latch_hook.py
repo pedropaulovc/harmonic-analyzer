@@ -13,9 +13,11 @@ edge -- lands where the layout puts it):
   origin; the pin hole's size, match-drilled at assembly;
 * ``*Right`` (looking -X, Z running left): the width, the arm's front-edge
   heights above and below the taper, the root relief and the full round;
-  beside it the flat pattern, the part's hidden ``FlatBlank`` reference
-  sketch shown in this view only: the blank across the bend and the arm's
-  developed stations of the taper and the round's centre;
+  left of it the formed overall height, a reference from the ear's top edge
+  to the full round's tip; beside it the flat pattern, the part's hidden
+  ``FlatBlank`` reference sketch shown in this view only (a thin outline):
+  the blank across the bend and the arm's developed stations of the taper
+  and the round's centre;
 * ``*Bottom`` (looking +Y, X right, Z up), out of projection beside the side
   view and so labelled: the base length, the ear height and the inside bend.
 
@@ -34,6 +36,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_property_linked_note,
     assert_imported_precision,
     dimension_name,
@@ -41,9 +44,11 @@ from _drawing_common import (
     model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
@@ -64,14 +69,19 @@ from pd_latch_hook_geometry import (
     OUTER_TAB_END,
     PART_ORIGIN_MACHINE,
     PIN_HOLE_L,
+    ROUND_C_L,
+    ROUND_R,
     SCREW_HOLE_X,
     SCREW_HOLE_Y,
     TAB_C_L,
+    WIDTH,
 )
 from pd_latch_hook_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     FLAT_ROUND_CALLOUT,
+    OVERALL_HEIGHT,
     PAIR_CALLOUT,
     PIN_HOLE_CALLOUT,
     ROUND_CALLOUT,
@@ -160,9 +170,11 @@ def _on(point: tuple[float, float], u: float, n: float = 0.0) -> tuple[float, fl
 # Per-view survivors of the marked-dimension import: name -> sheet position.
 # Front: the screw X pair stacked above the base, their Y and size left of
 # it; the roll start and the far face's Y right of the arm; the far face's X
-# and the tab end's X stacked below it; the straight's length and the pin
-# hole's size on the arm's -U side (both extension sets clear of the far
-# face's X, which drops from the far face); the inside roll radius in the
+# and the tab end's X stacked below it; the straight's length on the arm's
+# -U side (its extension set clear of the far face's X, which drops from the
+# far face); the pin hole's size up its +N side past the straight's roll-end
+# extension line, under the roll radius, its callout above so the dimension
+# line meets the value and never the callout; the inside roll radius in the
 # roll's concave side, the tab radius outside the tab.
 FRONT_KEEP = {
     "ScrewX2": _front(SCREW_HOLE_X[1] / 2.0, 12.5),
@@ -174,7 +186,7 @@ FRONT_KEEP = {
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),
     "TabEndX": _front(OUTER_TAB_END[0] / 2.0, -103.0),
     "StraightLen": _front(*_on(OUTER_ROLL_END, -28.0, -4.0)),
-    "PinHoleDia": _front(*_on(PIN_HOLE_L, -14.0, 3.0)),
+    "PinHoleDia": _front(*_on(PIN_HOLE_L, -12.3, 21.2)),
     "RollR": _front(-20.0, -35.0),
     "TabR": _front(
         TAB_C_L[0] + 21.0 * math.cos(math.radians(175.0)),
@@ -202,14 +214,27 @@ BOTTOM_KEEP = {
     "EarHeight": _bottom(6.0, EAR_HEIGHT / 2.0),
     "InsideBendR": _bottom(11.0, -12.0),
 }
-CALLOUTS_ABOVE = {"ScrewDia": PAIR_CALLOUT, "DevRoundC": FLAT_ROUND_CALLOUT}
-CALLOUTS_BELOW = {
-    "ScrewDia": SCREW_HOLE_CALLOUT,
+CALLOUTS_ABOVE = {
+    "ScrewDia": PAIR_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
-    "RoundR": ROUND_CALLOUT,
+    "DevRoundC": FLAT_ROUND_CALLOUT,
 }
+CALLOUTS_BELOW = {"ScrewDia": SCREW_HOLE_CALLOUT, "RoundR": ROUND_CALLOUT}
 # The roll's centre sits 80 left of the vertical: off the sheet at 3:2.
 SHORTENED_RADII = ("RollR",)
+# The formed overall height (rule 7), a reference left of the side view: its
+# dimension line passes left of the width's text, its text below the front
+# view's 70.4 level and clear right of it; picked on the ear's top edge and
+# on the full round, re-anchored to the round's far extreme (its tip).
+_ROUND_PICK_DEG = -120.0  # on the round, clear of its tip and the RoundR leader
+OVERALL_PICKS = (
+    _right(12.0, WIDTH),
+    _right(
+        ROUND_C_L[1] + ROUND_R * math.cos(math.radians(_ROUND_PICK_DEG)),
+        ROUND_C_L[0] + ROUND_R * math.sin(math.radians(_ROUND_PICK_DEG)),
+    ),
+)
+OVERALL_TEXT_XY = _right(38.0, -55.0)
 
 
 def _pin_origin(
@@ -254,6 +279,32 @@ def _shorten_radii(
         remaining.discard(name)
     if remaining:
         raise RuntimeError(f"radii not shortened: {sorted(remaining)}")
+
+
+def _overall_reference(adapter: Any, right: Any) -> None:
+    """The (96.5) formed overall height, ear top edge to the round's tip."""
+    label = "latch-hook overall height reference"
+    display = add_edge_dimension(
+        adapter,
+        right,
+        p0=OVERALL_PICKS[0],
+        p1=OVERALL_PICKS[1],
+        text_xy=OVERALL_TEXT_XY,
+        label=label,
+        orientation="vertical",
+    )
+    set_arc_endpoints_to_max(adapter, display, label=label)
+    display = _early_bound(display, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL_HEIGHT) > 1e-4:
+        raise RuntimeError(
+            f"{label} measured {measured_mm:g}, expected {OVERALL_HEIGHT:g}"
+        )
+    set_reference_dimension(adapter, display.GetAnnotation(), label=label)
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError(f"{label} precision did not persist")
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -346,6 +397,7 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _shorten_radii(adapter, annotations, SHORTENED_RADII)
+    _overall_reference(adapter, right)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the screw holes")
     # Re-asserted after annotating: the toggle regenerates the dashed edges.
