@@ -9,7 +9,7 @@ from pathlib import PureWindowsPath
 import pytest
 
 # A test process never starts (or kills) SolidWorks. On amet a start takes the
-# licence farm worker w6 shares; on a worker it takes the seat from the build.
+# licence farm worker w15 shares; on a worker it takes the seat from the build.
 # NOSW_GUARD=0 turns this off for deliberate operator work, matching the shared
 # sitecustomize guard agents load with PYTHONPATH.
 _LAUNCH_MARKERS = (

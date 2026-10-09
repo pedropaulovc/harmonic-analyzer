@@ -2,7 +2,7 @@
 
 That suite can launch SolidWorks (its docs-discovery smoke test falls through
 to the 3DEXPERIENCE Start-menu shortcut when nothing is running). On amet a
-launch takes the licence farm worker w6 shares, so it must never run from here.
+launch takes the licence farm worker w15 shares, so it must never run from here.
 A bare ``pytest`` uses ``testpaths``; ``pytest .`` names the root explicitly
 and is kept out only by ``norecursedirs``. Both are checked, as pytest itself
 read them.
