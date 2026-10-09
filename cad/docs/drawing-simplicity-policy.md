@@ -87,7 +87,12 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      zone holds tilt as well as yaw, with the plan angle basic. The fixed-centre
      16T:64T crossed mesh loses running clearance to yaw and tilt of the crank
      axis (#906 pose study, `dt-logs/crankhub/crank-mesh-angle-20260926.jsonl`;
-     user ruling 2026-09-28 requires only that the mesh never bind).
+     user ruling 2026-09-28 requires only that the mesh never bind). Assembly
+     fit notes, procedures and checks traverse one full MHA-DT-007 revolution,
+     not just one crank turn. Before pinning the pinion, turn MHA-DT-007 directly
+     by hand; the loose pinion does not couple the crank to the gear. In the
+     completed assembly's fit/check instructions, the crank-turn count comes
+     from `gear_train.crank_drive_ratio`, checked against the pair's tooth counts.
    - **disc cluster** — the MHA-PD-006 120T disc's rear face parallel to its
      clamp face (datum B); the MHA-PD-017 hub's flange rear face and spigot end
      square to its bore (datum A); the MHA-PD-010 sleeve's step face square to

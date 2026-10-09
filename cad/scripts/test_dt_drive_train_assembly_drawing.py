@@ -143,6 +143,69 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
     assert cited <= bom | EXTERNAL_NUMBERS
 
 
+def test_crank_mesh_traversal_matches_configured_and_manufactured_ratio() -> None:
+    """A single crank turn covers only part of the drive gear's circumference."""
+    import _config
+    import dt_crank_drive_gear_spec as gear
+    import dt_crank_pinion_spec as pinion
+
+    configured = _config.machine("gear_train", "crank_drive_ratio")
+    assert tuple(configured) == (pinion.TEETH, gear.TEETH)
+    assert drawing.CRANK_TURNS_PER_GEAR_TURN * pinion.TEETH == gear.TEETH
+    assert drawing.CRANK_TURNS_PER_GEAR_TURN == configured[1] / configured[0]
+
+
+def test_printed_crank_mesh_instructions_require_full_drive_gear_traversal() -> None:
+    """Check the emitted procedure, FIT note and checks, not their line wrapping."""
+    import dt_crank_drive_gear_spec as gear
+    import dt_crank_pinion_spec as pinion
+    import dt_drive_train_steps as steps
+
+    blocks = {
+        label: text
+        for field in drawing.package_note_fields(_drawing_facts())
+        for label, text in field.blocks
+    }
+
+    def numbered(text: str, number: int) -> str:
+        paragraph = re.search(
+            rf"^{number}\. .*?(?=^\d+[A-Z]?\.\s|\Z)", text, re.MULTILINE | re.DOTALL
+        )
+        assert paragraph is not None, (number, text)
+        return " ".join(paragraph.group().split())
+
+    pre_pin_procedure = numbered(
+        blocks["cone and crank sequence"], steps.step_number("crank-mesh-checked")
+    )
+    assembled_instructions = (
+        " ".join(blocks["fit placeholder"].split()),
+        numbered(blocks["functional checks"], 2),
+    )
+    full_gear_revolution = re.compile(
+        r"(?:ONE|1)\s+FULL\s+(?:MHA-DT-007\s+)?(?:TURN|REVOLUTION)\b"
+        r"|\bMHA-DT-007\s+(?:BY HAND THROUGH\s+)?(?:ONE|1)\s+FULL\s+(?:TURN|REVOLUTION)\b"
+    )
+    for text in (pre_pin_procedure, *assembled_instructions):
+        assert "MHA-DT-007" in text
+        assert full_gear_revolution.search(text), text
+        assert re.search(r"\bBIND(?:ING)?\b", text), text
+
+    # The pinion is still loose on the shaft here: drive the gear directly,
+    # never imply that turning the unconnected crank proves its mesh.
+    assert re.search(r"\bTURN\s+MHA-DT-007\s+BY HAND\b", pre_pin_procedure)
+    assert not re.search(r"\bCRANK\s+TURNS?\b", pre_pin_procedure)
+    for text in assembled_instructions:
+        turns = re.search(r"\b(\d+(?:\.\d+)?)\s+CRANK\s+TURNS?\b", text)
+        assert turns is not None, text
+        assert float(turns[1]) * pinion.TEETH == gear.TEETH, text
+
+    motion_check = numbered(blocks["functional checks"], 1)
+    turns = re.search(r"\b(\d+(?:\.\d+)?)\s+CRANK\s+TURNS?\b", motion_check)
+    assert turns is not None, motion_check
+    assert float(turns[1]) * pinion.TEETH == gear.TEETH
+    assert re.search(r"\b(?:ONE|1)\s+FULL\s+(?:TURN|REVOLUTION)\b", motion_check)
+
+
 def test_note_lines_fit_a_half_sheet_field() -> None:
     """The actual note producer stays inside the unchanged 70-character budget."""
     for field in drawing.package_note_fields(_drawing_facts()):

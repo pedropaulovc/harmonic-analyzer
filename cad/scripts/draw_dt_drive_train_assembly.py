@@ -1,4 +1,4 @@
-r"""Create the native ten-sheet drive-train assembly drawing package (MHA-DT-000).
+r"""Create the native eleven-sheet drive-train assembly drawing package (MHA-DT-000).
 
 The released ``dt-drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -28,6 +28,8 @@ import _config
 import _seat_forensics
 import _telemetry
 import ch_connecting_rod_spec as rod
+import dt_crank_drive_gear_spec as crank_gear
+import dt_crank_pinion_spec as crank_pinion
 import cylinder_bank_layout as bank
 import dt_drive_train_steps as steps
 import pinion_rig_fitup as FITUP
@@ -487,6 +489,19 @@ BOM_NORMALIZED_ALIASES = {
 # package is not released while any remains.
 _STEP_LINE_WIDTH = 70
 
+# The assembly's configured gear mate owns the reduction; the manufactured
+# tooth counts must agree before its fit instructions can describe a full mesh.
+CRANK_MESH_TEETH = tuple(_config.machine("gear_train", "crank_drive_ratio"))
+if CRANK_MESH_TEETH != (crank_pinion.TEETH, crank_gear.TEETH):
+    raise AssertionError("configured crank ratio disagrees with the gear tooth counts")
+if crank_gear.TEETH % crank_pinion.TEETH:
+    raise AssertionError("one MHA-DT-007 revolution is not a whole number of crank turns")
+CRANK_TURNS_PER_GEAR_TURN = crank_gear.TEETH // crank_pinion.TEETH
+CRANK_MESH_REVOLUTION = (
+    "ONE FULL MHA-DT-007 REVOLUTION"
+    f" ({CRANK_TURNS_PER_GEAR_TURN} CRANK TURNS)"
+)
+
 
 def _note_text(rows: Sequence[str], *, heading: bool = True) -> str:
     """Reflow whole steps; retain headings, lettered heads and deeper sublists."""
@@ -624,7 +639,7 @@ CONE_CRANK_STEPS = _note_text(
         f"   WITH MHA-DT-007. FIT MHA-DT-036 PER SHEET {CONTINUATION_SHEET}. WITH MHA-DT-036 SEATED,",
         f"   SET MHA-DT-010 {PINION_SEAT_FEELER:.2f} OFF THE MHA-DT-005 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
-        "   TURN MHA-DT-007 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
+        "   TURN MHA-DT-007 BY HAND THROUGH ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
         "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL/REAM MHA-DT-029 AT BOSS",
         "   MID-LENGTH WITH MHA-DT-011, FLUSH BOTH SIDES; RE-CHECK NO BINDING.",
         "5. PAPER-DRIVE T12 ON MHA-DT-011 BEFORE THE ARM, HOLES OVER 2X MHA-VN-044.",
@@ -862,12 +877,13 @@ RING_ON_CAM_PERCENT = math.floor(
 CHECKS = _note_text(
     (
         "ASSEMBLY-ONLY FUNCTIONAL CHECKS",
-        "1. CRANK TURNS FREELY THROUGH FULL TURNS; ONE CRANK TURN TURNS THE",
-        "   CONE SET 1/4 TURN (16T:64T).",
+        f"1. {CRANK_TURNS_PER_GEAR_TURN} CRANK TURNS TURN THE CONE SET ONE FULL TURN",
+        f"   ({crank_pinion.TEETH}T:{crank_gear.TEETH}T); CRANK TURNS FREELY THROUGHOUT.",
         # User ruling 2026-09-28: the fixed-centre crank mesh must never bind;
         # no backlash acceptance interval or fit-up target remains.
-        "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-007",
-        "   TURN; EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE MHA-DT-003 PRINT.",
+        "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH",
+        f"   {CRANK_MESH_REVOLUTION}; EACH CONE GEAR MESHES ITS MHA-DT-012",
+        "   PER THE MHA-DT-003 PRINT.",
         "3. EACH MHA-DT-012 TURNS FREELY ON MHA-DT-013 WITHOUT AXIAL BINDING.",
         # The same bound the MHA-DT-012 print states (cylinder_gear_notes).
         f"   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO {RING_OVERHANG_TEXT} (AT LEAST",
@@ -926,8 +942,8 @@ FIT_PLACEHOLDER = _note_text(
         # The rest of the old placeholder is owned elsewhere now: each cone
         # gear's mesh by the MHA-DT-003 print (check 2), the pinion engagement
         # by the rig-located step and check 7, the taper pin by step 6.
-        "16T:64T CENTRE DISTANCE FIXED BY MHA-DT-005 BORE SPACING; VERIFY NO",
-        "BINDING THROUGH ONE CRANK TURN (CHECK 2).",
+        f"{crank_pinion.TEETH}T:{crank_gear.TEETH}T CENTRE DISTANCE FIXED BY MHA-DT-005 BORE SPACING; VERIFY NO",
+        f"BINDING THROUGH {CRANK_MESH_REVOLUTION} (CHECK 2).",
     ),
     heading=False,
 )
