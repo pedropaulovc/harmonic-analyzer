@@ -161,7 +161,7 @@ tolerance.**
    independent gear systems at different pitches**, each internally consistent — they do not mesh
    across domains, so they must *not* be collapsed to one DP:
    - **cone↔cylinder train — 48DP / 20° PA** (`machine/gear_train.yaml diametral_pitch: 48`;
-     `build_dt_cylinder_gear.py` imports the train `DP` from `build_dt_cone_gear`, so the whole
+     the cone and cylinder gear specs both read it through `read_config`, so the whole
      20-pair train and the 32T alignment pinion share it by construction);
    - **crossed crank pair — normal 24DP / 20° PA** (`gear_train.yaml crank_drive_normal_module_mm`),
      a straight 16T pinion driving a right-hand 13.0011° helical 64T;
