@@ -2379,11 +2379,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # also carries the drop and the ramp angle; repeating it here would be
     # the same length stated twice on two sheets.
     _position_view_caption(adapter, geometry_bottom, HUB_DETAIL_CAPTION_XY)
-    for sheet_index, sheet_name in enumerate(SHEET_NAMES, start=1):
-        if not ddoc.ActivateSheet(sheet_name):
-            raise RuntimeError(f"failed to label drawing sheet {sheet_name}")
-        if add_note(adapter, f"SHEET {sheet_index} OF {len(SHEET_NAMES)}", 0.350, 0.263) is None:
-            raise RuntimeError(f"failed to stamp sheet count on {sheet_name}")
 
     auto_tapped_notes = _auto_tapped_hole_notes(adapter)
     _telemetry.info(f"automatic tapped-hole notes per view: {auto_tapped_notes}")

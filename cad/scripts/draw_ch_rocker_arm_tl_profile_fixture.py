@@ -96,8 +96,6 @@ SLDDRW, PDF, PNG = OUTPUTS.slddrw, OUTPUTS.pdf, OUTPUTS.png
 
 SHEET_NAMES = ("PLAN", "TAGS", "SCHEDULE")
 SHEET_SCALES = {"PLAN": (1.0, 2.0), "TAGS": (1.0, 1.0), "SCHEDULE": (1.0, 4.0)}
-# Right of the 1:1 TAGS plan's box (it reaches x 385.6 mm, run 20261007T182242302Z).
-SHEET_COUNT_XY = (0.388, 0.262)
 
 # --- Sheet PLAN -------------------------------------------------------------------
 PLAN_CENTER = (0.120, 0.212)
@@ -178,7 +176,7 @@ ELEVATION_KEEP_Z = {
 # Detail E, model (x, y) mm about the bore axis. Each text block centres on
 # its anchor; at x 10 both blocks ran inside the R9 (R27 at 3:1) circle
 # (codex review of run 20261008T020623281Z), so they sit at x 16, above and
-# below the circle, clear of SHEET 1 OF 3, the DETAIL E label and section D-D.
+# below the circle, clear of the DETAIL E label and section D-D.
 DETAIL_KEEP_AT = {
     "StandPocketDia": ((-8.0, 10.0), (0.0, 0.0)),
     "LocatingBoreDia": ((16.0, 11.0), (0.0, 0.0)),
@@ -918,14 +916,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    for index, sheet_name in enumerate(SHEET_NAMES, start=1):
+    for sheet_name in SHEET_NAMES:
         if not ddoc.ActivateSheet(sheet_name):
             raise RuntimeError(f"failed to activate sheet {sheet_name!r} for audit")
-        if (
-            add_note(adapter, f"SHEET {index} OF {len(SHEET_NAMES)}", *SHEET_COUNT_XY)
-            is None
-        ):
-            raise RuntimeError(f"failed to stamp sheet count on {sheet_name!r}")
         rebuild_drawing(adapter, label=f"profile fixture {sheet_name} layout")
         check_drawing_layout(adapter, layout=SPEC.layout, stem=sheet_name)
 

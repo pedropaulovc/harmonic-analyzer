@@ -1417,7 +1417,7 @@ def _place_package(adapter: Any) -> Callable[[], None]:
     """Place every sheet; return the check that proves every balloon again
     after the last rebuild (:func:`_assert_frame_balloons_settled`)."""
     _create_mixed_package_sheets(adapter)
-    for sheet_number, sheet_name in enumerate(SHEET_NAMES, start=1):
+    for sheet_name in SHEET_NAMES:
         _activate_sheet(adapter, sheet_name)
         sheet = _early_bound(
             _early_bound(adapter.currentModel, "IDrawingDoc").GetCurrentSheet(), "ISheet"
@@ -1425,12 +1425,6 @@ def _place_package(adapter: Any) -> Callable[[], None]:
         sheet_scale = SHEET_SCALES[sheet_name]
         if not sheet.SetScale(float(sheet_scale[0]), float(sheet_scale[1]), False, False):
             raise RuntimeError(f"failed to set native frame sheet scale: {sheet_name}")
-        _add_note_block(
-            adapter,
-            f"SHEET {sheet_number} OF {len(SHEET_NAMES)}",
-            (0.018, 0.025),
-            label="package sheet number",
-        )
 
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(
