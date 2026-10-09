@@ -26,7 +26,7 @@ may import it; no part build does.
   hole (R9-12): the hole's reamed band keeps the press, its depth band and
   the dowel's length grade set the proud range, the shallowest hole still
   grips the pin 1.5 D, and the pin's full diameter passes the MHA-PD-014
-  strip's far face at every corner of the latch stack (R9-23, R9-50).
+  hook strip's far face at every corner of the latch stack (R9-23, R9-50).
 """
 
 from __future__ import annotations
@@ -34,9 +34,8 @@ from __future__ import annotations
 import itertools
 import math
 
-import pd_latch_hook_bracket_geometry as BRACKET
-import pd_latch_hook_bracket_spec as BRACKET_SPEC
 import pd_latch_hook_geometry as HOOK
+import pd_latch_hook_spec as HOOK_SPEC
 import pd_support_bar_spec as BAR
 import pd_transgear_arm_geometry as ARM
 import pd_transgear_arm_plate_geometry as PLATE
@@ -362,33 +361,33 @@ if LATCH_PIN_ENGAGEMENT_WORST_D < LATCH_PIN.PRESS_ENGAGEMENT_MIN_D:
     )
 
 # --- MHA-VN-042 pin through the MHA-PD-014 strip's far face (R9-23, R9-50) ----------
-# The hook is set at fit-up in y and z only (R9-15), so nothing absorbs the
-# pin's reach along its own axis: its crowned end's full-diameter circle must
-# pass the strip's far (+X) face at every corner of the latch stack.  The
+# The hook's pin hole is match-drilled from the pin at fit-up, which takes up
+# where the strip lies across the pin; nothing takes up the pin's reach along
+# its own axis, so its crowned end's full-diameter circle must pass the
+# strip's far (+U) face, square to the pin, at every corner of the latch
 # stack: the arm's tip station (.XX) and pin position (.XXX), the proud range
 # above, the dowel's diameter band, the arm's angular play about the pivot
 # (IntegratorE's coupled stack), the pivot tap's position and the shoulder's
-# float in the arm bore, the bracket's screw holes in the bar and in the
-# sheet with the screw head's float, the sheet's thickness band, and the
-# flap's 90 deg bend at the title block's angular row.
+# float in the arm bore, the hook's two screw holes (the bar's taps, the
+# hook's printed hole positions and the screw heads' float), the sheet's
+# thickness band, the formed arm's band and the ear's 90 deg bend at the
+# hook sheet's angular row.
 LATCH_ARM_ANGLE_PLAY = 0.00305  # rad
-# The title block's ANGULAR row (+/-1 deg), which the MHA-PD-021 sheet's BEND 90
-# DEG note takes.
-FLAP_BEND_TOL_DEG = 1.0
-# The flap's screw-hole X is taken from its outer face at the base, so a bent
-# flap leans its inside face, where the strip lies, by the pin axis's height
-# above the base's underside times tan(bend error).  The bend centre sits
-# 2.25..2.6 above the underside, so the underside is the longer, conservative
-# lever.
-FLAP_BEND_LEVER = ARM.PIN_MACHINE_Z - BRACKET.BAR_BACK_FACE_Z  # 9.469
-_LATCH_PIVOT = (BAR.PIVOT_TAP_X, BRACKET.BAR_CENTRE_Y + BAR.HANGER_TAP_Y)
-_LATCH_PIN_AT_STRIP = (sum(HOOK.PLANE_X) / 2.0, HOOK.PIN_AXIS_YZ[0])
-_LATCH_THETA = math.atan2(
-    _LATCH_PIN_AT_STRIP[1] - _LATCH_PIVOT[1], _LATCH_PIN_AT_STRIP[0] - _LATCH_PIVOT[0]
-)  # -32.56 deg
-_FLAP_SHIFT = (
-    BAR.HOLE_POSITION_BAND + BRACKET_SPEC.POSITION_TOL + BRACKET_SPEC.HEAD_FLOAT_MAX
-)
+# The screw holes are drilled from the formed ear's outer face at the base,
+# so a bend off 90 deg leans the ear and the arm it carries about the base:
+# the strip's far face at the pin moves by the pin axis's height above the
+# base's underside times tan(bend error), and its normal tilts out of the
+# machine XY plane by the bend error.  The bend centre sits 2.0..2.3 above
+# the underside, so the underside is the longer, conservative lever.
+EAR_BEND_LEVER = HOOK.PIN_HOLE_Z - HOOK.BAR_BACK_FACE_Z  # 9.469
+_LATCH_PIVOT = HOOK.PIVOT_XY
+_LATCH_THETA = math.radians(HOOK.ARM_ANGLE_DEG)  # -32.56 deg
+# Each screw's centre in its hole off the model, any direction: the bar's tap
+# and the hook's printed hole position (each a per-axis band, so their
+# diagonal), and the head's float in the Ø3.2 hole.
+HOOK_SCREW_SHIFT = (BAR.HOLE_POSITION_BAND + HOOK_SPEC.POSITION_TOL) * math.sqrt(
+    2.0
+) + HOOK_SPEC.HEAD_FLOAT_MAX
 _BORE_FLOAT = (
     ARM.PIVOT_BORE_DIA
     + ARM.PIVOT_BORE_DIA_BAND
@@ -397,36 +396,103 @@ _BORE_FLOAT = (
 ) / 2.0
 
 
+def hook_screw_drift(
+    point: tuple[float, float],
+    direction: tuple[float, float],
+    shift: float = HOOK_SCREW_SHIFT,
+    samples: int = 4001,
+) -> float:
+    """Largest move along unit ``direction`` (machine xy) of the hook's
+    ``point`` when each screw's centre stands up to ``shift`` off its model
+    (any direction) and the latched pin holds the pin hole across the strip
+    (along N): the hook's refit puts the hole's lower edge on the pin.  The
+    hook is rigid in its plane, a translation plus a turn about the screws'
+    midpoint, so the screws' float turns the hook about the pin as well as
+    sliding it; the turn more than doubles a pure translation's reach along
+    U at the hole."""
+    mid = (sum(HOOK.SCREW_X) / 2.0, HOOK.SCREW_Y)
+
+    def turned(at: tuple[float, float]) -> tuple[float, float]:
+        # d(at)/d(turn) for a turn about the midpoint: z x (at - mid).
+        return (-(at[1] - mid[1]), at[0] - mid[0])
+
+    def dot(a: tuple[float, float], b: tuple[float, float]) -> float:
+        return a[0] * b[0] + a[1] * b[1]
+
+    hole = turned(HOOK.PIN_HOLE_XY)
+    target = turned(point)
+    screws = [turned((x, HOOK.SCREW_Y)) for x in HOOK.SCREW_X]
+    turn_max = 2.0 * shift / (HOOK.SCREW_X[1] - HOOK.SCREW_X[0])
+    du, dn = dot(HOOK.ARM_U, direction), dot(HOOK.ARM_N, direction)
+    worst = 0.0
+    for k in range(samples):
+        turn = turn_max * (2.0 * k / (samples - 1) - 1.0)
+        # The pin holds the hole along N: the translation's N part cancels
+        # the turn's.  Its U part ``a`` keeps each screw inside its float.
+        across = -turn * dot(hole, HOOK.ARM_N)
+        low, high = -math.inf, math.inf
+        for screw in screws:
+            off_n = across + turn * dot(screw, HOOK.ARM_N)
+            if abs(off_n) > shift:
+                low, high = math.inf, -math.inf
+                break
+            room = math.sqrt(shift**2 - off_n**2)
+            off_u = turn * dot(screw, HOOK.ARM_U)
+            low, high = max(low, -off_u - room), min(high, -off_u + room)
+        if low > high:
+            continue
+        rest = across * dn + turn * dot(target, direction)
+        worst = max(worst, *(abs(a * du + rest) for a in (low, high)))
+    return worst
+
+
+HOOK_DRIFT_ALONG_U = hook_screw_drift(HOOK.PIN_HOLE_XY, HOOK.ARM_U)
+
+
 def latch_pin_far_face_margin(
     tip_band: float = ARM.TIP_STATION_BAND,
     proud_range: tuple[float, float] = LATCH_PIN_PROUD_RANGE,
-    bend_deg: float = FLAP_BEND_TOL_DEG,
+    bend_deg: float = HOOK_SPEC.BEND_TOL_DEG,
 ) -> float:
     """Least distance, along the pin, by which the crowned end's full
     diameter passes the strip's far face over every corner of the stack."""
     signs = (-1.0, 1.0)
     radii = [(LATCH_PIN.DIA + band) / 2.0 for band in LATCH_PIN.DIA_BAND]
-    sheet = (-BRACKET.SHEET_T_MINUS, BRACKET.SHEET_T_PLUS)
+    sheet = (-HOOK.SHEET_T_MINUS, HOOK.SHEET_T_PLUS)
     bends = [math.radians(s * bend_deg) for s in signs]
+    u0x, u0y = HOOK.ARM_U
+    face0 = HOOK.on_arm(HOOK.FAR_FACE_STATION)
     worst = math.inf
-    for tip, proud, r, flap, dt, tap, float_, side, play, bend in itertools.product(
+    for tip, proud, r, hook, dt, tap, float_, side, play, bend in itertools.product(
         signs, proud_range, radii, signs, sheet, signs, signs, signs, signs, bends
     ):
         theta = _LATCH_THETA + play * LATCH_ARM_ANGLE_PLAY
         ux, uy = math.cos(theta), math.sin(theta)
-        px = _LATCH_PIVOT[0] + tap * BAR.HOLE_POSITION_BAND + float_ * _BORE_FLOAT
+        # The pivot tap (a per-axis band) and the shoulder's float in the
+        # bore, both along the far face's normal.
+        pivot_shift = tap * BAR.HOLE_POSITION_BAND * (abs(u0x) + abs(u0y))
+        pivot_shift += float_ * _BORE_FLOAT
+        px = _LATCH_PIVOT[0] + pivot_shift * u0x
+        py = _LATCH_PIVOT[1] + pivot_shift * u0y
         full = ARM.TIP_STATION + tip * tip_band + proud - LATCH_PIN.CROWN_R
-        centre_x = px + full * ux - uy * side * ARM.HOLE_POSITION_BAND
-        far_face = (
-            HOOK.PLANE_X[1] + flap * _FLAP_SHIFT + dt + FLAP_BEND_LEVER * math.tan(bend)
+        lateral = side * ARM.HOLE_POSITION_BAND
+        centre = (px + full * ux - uy * lateral, py + full * uy + ux * lateral, 0.0)
+        # The far face: screwed, formed and sheet bands along U, then the
+        # ear's lean about the base (along machine X at the pin's height).
+        move = hook * (HOOK_DRIFT_ALONG_U + HOOK_SPEC.FORMED_BAND) + dt
+        face = (
+            face0[0] + move * u0x + EAR_BEND_LEVER * math.tan(bend),
+            face0[1] + move * u0y,
+            0.0,
         )
-        # The leaning face's normal is (cos, 0, sin) of the bend error; the
-        # end circle spans the pin's horizontal normal and machine Z.
-        reach = r * math.hypot(uy * math.cos(bend), math.sin(bend))
-        margin = ((centre_x - far_face) * math.cos(bend) - reach) / (
-            ux * math.cos(bend)
-        )
-        worst = min(worst, margin)
+        normal = (u0x * math.cos(bend), u0y, -u0x * math.sin(bend))
+        axis = (ux, uy, 0.0)
+        along = sum(n * a for n, a in zip(normal, axis, strict=True))
+        # The end circle lies square to the pin; its nearest point to the
+        # face is r times the normal's part across the pin back.
+        across = math.sqrt(max(0.0, 1.0 - along**2))
+        gap = sum((c - f) * n for c, f, n in zip(centre, face, normal, strict=True))
+        worst = min(worst, (gap - r * across) / along)
     return worst
 
 
@@ -441,13 +507,12 @@ if LATCH_PIN_FAR_FACE_MARGIN_WORST <= 0.0:
 # --- The feed mesh on the latch (Codex P1 on b2eb9a0e1) -----------------------
 def latch_pinion_drop(slack_along: float) -> float:
     """How far the feed pinion's centre falls, opening its mesh in the rack,
-    when the free arm swings down till its latch pin's trace on the hook
-    strip has moved ``slack_along`` (machine y).  The pin's axis turns with
-    the arm about P; its trace on the strip's plane (x constant) moves
-    run / cos^2 per radian, and the stud, on the same line PIN_STATION from P,
-    falls PIN_STATION * cos per radian."""
-    run = _LATCH_PIN_AT_STRIP[0] - _LATCH_PIVOT[0]
-    turn = slack_along * math.cos(_LATCH_THETA) ** 2 / run
+    when the free arm swings down till its latch pin has moved ``slack_along``
+    across the hook strip.  The strip lies square to the pin (its face normal
+    U), so the pin's travel across it is along N at HOLE_STATION from P: the
+    arm turns slack / HOLE_STATION, and the stud, PIN_STATION from P on the
+    same line, falls PIN_STATION * cos per radian."""
+    turn = slack_along / HOOK.HOLE_STATION
     return turn * ARM.PIN_STATION * math.cos(_LATCH_THETA)
 
 

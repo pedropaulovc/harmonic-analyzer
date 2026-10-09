@@ -34,11 +34,11 @@ def test_catalogue_row_is_the_foot_screw_sku() -> None:
 def test_engagement_in_the_bar_tap_passes_at_the_worst_case() -> None:
     """Each Ø3.1 MAX countersink takes thread to where its 45° leg meets the
     #43 tap drill (R9-63): 0.4195 a mouth, not the 0.1276 counted to the
-    major, and the bar still holds 2.27 D."""
+    major; under the hook's 0.8 base the bar still holds 2.54 D."""
     worst_d = spec.checked_engagement(
         bar.BRACKET_TAP_CSK_DIA, _DRILL, bar.BAR_DEPTH, bar.BAR_DEPTH_BAND
     )
-    assert worst_d == pytest.approx(6.4508 / spec.MAJOR_DIA, abs=1e-4)
+    assert worst_d == pytest.approx(7.2208 / spec.MAJOR_DIA, abs=1e-4)
     assert worst_d >= spec.ENGAGEMENT_FLOOR_D
 
 

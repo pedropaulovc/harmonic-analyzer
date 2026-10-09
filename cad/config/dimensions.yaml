@@ -1666,9 +1666,9 @@ sections:
         - derived
         - low
       - - Transgear latch (round 10, rulings 2 / 7 / R9-10 / R9-15)
-        - 'a 1/8 × 7/8 dowel `vn-transgear-latch-pin` (MHA-VN-042) pressed 8.50 into the arm''s square end face at T (50.642, 233.865) along the arm (z −120.43) stands 13.725 proud and engages the Ø5.4 hole of the latch hook MHA-PD-014; the hook is riveted by two 1/16 × 3/16 aluminium rivets `vn-latch-hook-rivet` (MHA-VN-045, flap holes match-drilled through the hook at assembly) to the flap (x 58.5..60) of the 1.5 steel sheet bracket `pd-latch-hook-bracket` (MHA-PD-021), whose base (x 43..60, on the bar''s back face) is screwed by two #4-40 × 3/8 fillisters `vn-latch-hook-bracket-screw` (MHA-VN-043) into through taps at x 47.5 / 54.5, y 303.234. Flexing the strip +X releases the pin'
+        - 'a 1/8 × 7/8 dowel `vn-transgear-latch-pin` (MHA-VN-042) pressed 8.50 into the arm''s square end face at T (50.642, 233.865) along the arm (z −120.43) stands 13.725 proud and engages the Ø3.3 hole of the one-piece latch hook MHA-PD-014, match-drilled through the hook from the pin at assembly; the hook''s base (x 61.0..77.63, on the bar''s back face) is screwed by two #4-40 × 3/8 fillisters `vn-latch-hook-bracket-screw` (MHA-VN-043) into through taps at x 65.0 / 72.0, y 303.234. Pulling the finger tab flexes the arm flatwise off the pin'
         - —
-        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released); CONTRACT-paper-drive §4 (round 10); `pd_latch_hook_bracket_geometry`, `pd_latch_hook_geometry`'
+        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released); CONTRACT-paper-drive §4 (round 10); `pd_latch_hook_geometry`'
         - scaled + derived
         - med
       - - Knob shaft (MHA-PD-008, round 10)
@@ -1678,9 +1678,9 @@ sections:
         - scaled + derived
         - low/med
       - - Latch hook (MHA-PD-014, round 10, R9-10)
-        - '10 × 0.6 dead-soft bright low-carbon strip, flat in the machine plane x 57.9..58.5 (face toward +X, riveted to the bracket flap''s −X face), curved EDGEWISE to a template: two tangent arcs R850 / R490 from the square top cut at y 306.2, z −116.64 (the part origin) down to a R5 free end 99.9 below the cut (y 206.3); Ø5.4 hole over the latch pin at (y, z) (229.04, −120.4); two Ø1.65 rivet holes at y 303, 3.9 apart'
+        - 'one piece of 0.8 (0.032 in) 1095 spring steel, cut and formed annealed, then hardened and tempered blue: an 8-wide base flat on the bar''s back face (x 61.0..77.63, y 299.2..307.2) with two Ø3.2 screw holes; a 90° bend (inside R1.2) up to an ear in the plane x 76.83..77.63 (z −129.9..−113.9); from the ear''s lower edge an arm, 0.8 thick in XY, in the z band −113.9..−123.9 tapering to −125.4 by y 270, hanging plumb to y 282.2, then rolled flatwise R80 through 32.56° toward −X so its straight run lies square to the latch pin; Ø3.3 pin hole match-drilled at assembly at (58.23, 229.09, −120.43); below it a finger tab turned R10 through 35° with a full-round end'
         - —
-        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released): a small curved leaf hanging from the bar at x ~ +52 in the video; CONTRACT-paper-drive §4.4 (`pd_latch_hook_geometry`, PART_ORIGIN_MACHINE on the x 57.9 plane)'
+        - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released): a small curved leaf hanging from the bar at x ~ +52 in the video; CONTRACT-paper-drive §4.4 (`pd_latch_hook_geometry`, PART_ORIGIN_MACHINE at the ear''s outer face, x 77.63)'
         - scaled
         - low
       - - Transgear thumbnut (MHA-PD-013, round 10)

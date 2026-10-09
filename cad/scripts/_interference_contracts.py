@@ -378,9 +378,11 @@ _RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
 # D-flat, the MHA-VN-042 dowel in the arm's Ø3.175 ream, the sleeve and both
 # bushings on the MHA-PD-023 pin (Ø3.9), the disc bore on the boss (Ø9), the
 # knob journal in the plate bore (Ø8.5), the collar bore on the core
-# (Ø6.35), the MHA-VN-045 rivets (Ø1.5875) in the Ø1.65 hook and flap holes,
-# the MHA-VN-037 pin in the collar's 1.8 slot, the MHA-VN-038 dowels in the T24's
-# Ø2.5 holes, and every screw in its clearance hole.
+# (Ø6.35), the MHA-VN-037 pin in the collar's 1.8 slot, the MHA-VN-038 dowels
+# in the T24's Ø2.5 holes, every screw in its clearance hole, and the
+# MHA-PD-014 latch hook: its base on the bar's back face under the MHA-VN-043
+# heads, their shanks through its Ø3.2 holes, and the MHA-VN-042 pin through
+# its Ø3.3 pin hole.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "vn-clamp-screw",
@@ -451,13 +453,13 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         4.1656, 3.454, 4.7625 - 1.1938
     ),
     # MHA-VN-043 #4-40 x 3/8 (vn_latch_hook_bracket_screw_spec) through the
-    # bracket's 1.5 sheet (Ø3.2 clearance): 9.525 - 1.5 = 8.025 in the
+    # MHA-PD-014 hook's 0.8 base (Ø3.2 clearance): 9.525 - 0.8 = 8.725 in the
     # support bar's #43 taps.
     **_numbered_pairs(
         "vn-latch-hook-bracket-screw",
         range(1, 3),
         "pd-support-bar",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 1.5),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 0.8),
     ),
     # MHA-PD-023 (pd_transgear_pin_spec, Ø3.900) pressed through the arm's Ø3.874
     # ream (pd_transgear_arm_geometry) over the whole 7.9375 stock: the press.

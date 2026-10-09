@@ -528,7 +528,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "pd-support-bar",
                 2.8448,
                 2.261,
-                8.025,
+                8.725,
             ),
             frozenset(("pd-transgear-pin-1", "pd-transgear-arm-1")): _annulus_limit(
                 3.9, 3.874, 7.9375

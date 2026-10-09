@@ -4,7 +4,7 @@ THE bar the platen rides on (book p.62 caption, singular): one rectangular
 steel bar clamped across the two front columns by the two-piece column
 clamps (build_sh_column_clamp_front.py and build_sh_column_clamp_back.py), carrying the hanging platen
 (guides + locks on the platen back) and, on its own back face, the ch. 23
-transgear hanger (pivot screw MHA-VN-041) and the latch-hook bracket.
+transgear hanger (pivot screw MHA-VN-041) and the latch hook (MHA-PD-014).
 Cross-section 22 tall x 9 deep (ch22 back-side wear band + ch30 front
 view); 452 long so the ends run ~29 past each column (ch30 p002).
 
@@ -12,7 +12,7 @@ Holes (all along local Z, the machine front-back axis):
 * 4x clamp-screw counterbores flanking each column (x +-197 -+ 17.5):
   the screw heads sit sub-flush in the BAR's front face so the refitted platen
   can slide across the east clamp, and thread into the back clamp arc.
-* the hanger's #8-32 blind pivot tap and the latch-hook bracket's two #4-40
+* the hanger's #8-32 blind pivot tap and the latch hook's two #4-40 base-screw
   through taps, all entering the back face (``pd_support_bar_spec``).
 
 The hanger holes make the bar x-ASYMMETRIC, so it is authored MACHINE-
@@ -157,7 +157,7 @@ async def build(adapter) -> dict[str, str]:
     expected -= v_holes
     await volume_check(adapter, "bar with clamp holes", expected, 0.02 * v_holes)
 
-    # Latch-hook bracket: two #4-40 taps THROUGH from the back face (their
+    # Latch hook's base screws: two #4-40 taps THROUGH from the back face (their
     # exits on the front face lie under the platen footprint), then a
     # 90-degree countersink on both mouths of each.
     bracket_dia = blind_cut_dia_mm(BRACKET_TAP_SPEC)
@@ -165,7 +165,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, BRACKET_TAP_SPEC,
         [[x, HANGER_TAP_Y, BACK_FACE_Z] for x in BRACKET_TAP_X],
         (0.0, 0.0, 1.0),
-        f"latch-hook bracket taps ({BRACKET_TAP_SPEC.size} through)",
+        f"latch-hook base-screw taps ({BRACKET_TAP_SPEC.size} through)",
         name="BracketTaps",
     )
     r_bracket = bracket_dia / 2.0

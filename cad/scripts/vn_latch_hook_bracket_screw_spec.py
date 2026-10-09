@@ -2,8 +2,8 @@ r"""Pure-data contract of the latch-hook bracket screws (MHA-VN-043).
 
 PURE DATA, no SolidWorks/COM imports.  Two McMaster 90280A108 #4-40 x 3/8
 slotted narrow-fillister screws (the foot-screw SKU, contract ruling 2) pass
-the latch-hook bracket's 1.5 sheet base into the support bar's #4-40 THROUGH
-taps (contract §4.3, §7).
+the latch hook's (MHA-PD-014) 0.8 spring-steel base into the support bar's
+#4-40 THROUGH taps (contract §4.3, §7).
 
 Frame (the fillister family's): screw axis +Y, head UP, the under-head
 junction at y = 0, the thread running to y = -LENGTH.  The axis is published
@@ -11,14 +11,14 @@ as ``ScrewAxis`` (Front ∩ Right).
 
 The bar's thickness, tap drill and tap countersinks belong to the support
 bar's slice; ``engagement_worst`` and ``tip_short_worst`` take them as
-arguments, so this module never retypes them.  The bracket sheet under the
-head and its stock band are the bracket's (``pd_latch_hook_bracket_geometry``).
+arguments, so this module never retypes them.  The base sheet under the
+head and its stock band are the hook's (``pd_latch_hook_geometry``).
 """
 
 from __future__ import annotations
 
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
-from pd_latch_hook_bracket_geometry import SHEET_T, SHEET_T_MINUS, SHEET_T_PLUS
+from pd_latch_hook_geometry import SHEET_T, SHEET_T_MINUS, SHEET_T_PLUS
 
 SKU = "90280A108"
 MAJOR_DIA, LENGTH, HEAD_H, HEAD_DIA, _SLOT_W = FILLISTER_SIZES[SKU]

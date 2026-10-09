@@ -279,15 +279,16 @@ def test_the_proud_range_counts_the_depth_row_and_the_pin_length_grade() -> None
 
 
 def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
-    """R9-50: the 3/4 dowel in the 6.05 hole stopped 0.42 short of the strip's
-    far face with the flap's 1 deg bend and the length grade; the gate refuses
-    it and accepts the 7/8 pin in the 8.50 hole."""
-    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.3
+    """R9-50: the 3/4 dowel in the 6.05 hole stops short of the one-piece
+    hook's far face with the ear's 1 deg bend, the screws' drift, the formed
+    band and the length grade; the gate refuses it and accepts the 7/8 pin in
+    the 8.50 hole."""
+    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.6
     monkeypatch.setattr(latch_pin, "LENGTH", 0.75 * 25.4)
     monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.05)
     monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.05)
     with pytest.raises(
-        AssertionError, match=r"MHA-VN-042 pin / MHA-PD-014 strip far face.* 0\.419 short"
+        AssertionError, match=r"MHA-VN-042 pin / MHA-PD-014 strip far face.* 0\.036 short"
     ):
         _reload_joints()
 

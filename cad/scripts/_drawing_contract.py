@@ -115,7 +115,6 @@ PRECISION_MIGRATED_DRAWINGS = frozenset(
         "draw_pd_transgear_drive_collar.py",
         "draw_pd_transgear_knob_shaft.py",
         "draw_pd_latch_hook.py",
-        "draw_pd_latch_hook_bracket.py",
         "draw_fr_tube_frame.py",
     }
 )

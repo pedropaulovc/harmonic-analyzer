@@ -873,24 +873,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="pd_latch_hook_bracket",
-        part="pd_latch_hook_bracket",
-        artifact_stem="pd-latch-hook-bracket",
-        script_name="draw_pd_latch_hook_bracket.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="pd_latch_hook",
         part="pd_latch_hook",
         artifact_stem="pd-latch-hook",
         script_name="draw_pd_latch_hook.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="vn_latch_hook_rivet",
-        part="vn_latch_hook_rivet",
-        artifact_stem="vn-latch-hook-rivet",
-        script_name="draw_vn_latch_hook_rivet.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

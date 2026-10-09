@@ -600,7 +600,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_slotted_screw",  # #8-32 x 1-1/4 fillister (90280A201, MHA-VN-019), member into harmonic_base tapped seat
         "vn_spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-VN-012); member, x20 into summing_lever tapped plate (top-level row); no channel-internal joint
         "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
-        "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through bracket taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
+        "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through latch-hook taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "vn_swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
         "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
         "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #8-32 fulcrum-keeper taps (top-level row)
@@ -653,9 +653,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_keeper_chain",  # bead chain
         "vn_keeper_chain_link",  # snap loop link
         "vn_knife_hanger_washer",  # 90126A211 SAE washer, clearance ID
-        "pd_latch_hook",  # MHA-PD-014 spring-steel strip: drilled latch-pin and rivet holes, riveted to the bracket flap; no thread
-        "pd_latch_hook_bracket",  # MHA-PD-021 bent sheet: screw holes DRILL THRU, rivet holes drilled at assembly; no thread
-        "vn_latch_hook_rivet",  # MHA-VN-045 1/16 aluminium solid rivet
+        "pd_latch_hook",  # MHA-PD-014 formed spring-steel hook: screw holes drilled thru, latch-pin hole match-drilled at assembly; no thread
         "mg_lever_wire",  # wire, tied through the fixture cross hole; no thread
         "mg_magnifying_bracket",  # two counterbored normal #2 clearance holes in its front mounting flange; no thread
         "mg_magnifying_lever",  # plain Ø6 domed rod
@@ -717,7 +715,6 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_keeper_chain_link": "plain chain link",
     "vn_knife_hanger_washer": "plain flat washer",
     "vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
-    "vn_latch_hook_rivet": "solid rivet set through drilled holes",
     "vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "vn_transgear_collar_cross_pin": "slotted spring pin in a drilled hole",
     "vn_transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",
@@ -1863,21 +1860,21 @@ JOINTS: tuple[Joint, ...] = (
         receiver="pd_support_bar",
         thread="#4-40 UNC",
         quantity=2,
-        installed_at="latch-bracket-fitted",
+        installed_at="latch-hook-fitted",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "clamp the latch-hook bracket to the fixed support bar; the hook is riveted to the "
-            "bracket's flap, so neither part moves in operation. The latch load on the hook reaches "
+            "clamp the one-piece latch hook's base to the fixed support bar, so the hook's base "
+            "does not move in operation; only its arm flexes. The latch load on the hook reaches "
             "the screw pair, 7 mm apart, as in-plane shear plus a couple the pair reacts in shear, not "
             "as torque about either screw axis (judgement call)"
         ),
         axial_capture=(
-            "narrow fillister head on the bracket's 1.5 sheet; shank through the bracket's drilled "
-            "hole into the bar's #4-40 through tap, 8.0 mm nominal engagement"
+            "narrow fillister head on the hook base's 0.8 sheet; shank through the base's drilled "
+            "hole into the bar's #4-40 through tap, 8.725 mm nominal engagement"
         ),
         lock=Lock.NONE,
         evidence=(
-            "draw_pd_paper_drive_assembly._step_text 'latch-bracket-fitted' and 'hook-set-and-riveted'; "
+            "draw_pd_paper_drive_assembly._step_text 'latch-hook-fitted' and 'hook-pin-hole-match-drilled'; "
             "build_pd_paper_drive_assembly.py 'latch-hook-bracket-screw (x' placements; "
             "pd_support_bar_spec.BRACKET_TAP_X/BRACKET_TAP_SPEC; vn_latch_hook_bracket_screw_spec."
             "ENGAGEMENT_NOMINAL"

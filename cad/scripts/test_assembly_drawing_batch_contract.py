@@ -116,7 +116,7 @@ def test_registry_task_names_outputs_and_assembly_dependencies_are_preserved() -
                     "vn_transgear_pivot_screw_spec.py",
                     "pd_transgear_knob_shaft_spec.py",
                     "transgear_hanger_joints.py",
-                    "pd_latch_hook_bracket_geometry.py",
+                    "pd_latch_hook_geometry.py",
                 )
             } <= set(deps)
             assert str(Path(_assembly_drawing.__file__).resolve()) not in deps

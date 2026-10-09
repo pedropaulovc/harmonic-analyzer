@@ -9,7 +9,7 @@ length passes through the latch hook's (MHA-PD-014) Ø5.4 hole, which holds the
 swung arm until the strip is flexed off it.
 
 R9-50: the 3/4 length (98381A473) left the pin's full diameter short of the
-hook's far face at the worst case once the MHA-PD-021 flap's 1 deg bend and the
+hook's far face at the worst case once the MHA-PD-014 ear's 1 deg bend and the
 dowel's length grade are counted; the 7/8 length of the same series, in a
 deeper hole, passes it (``transgear_hanger_joints``).
 

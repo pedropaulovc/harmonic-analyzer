@@ -16,9 +16,10 @@ Ch. 23 hanger holes (contract §5), all entering the BACK face:
   (-58, 303.234): a flat-bottomed tap drill (drill + end mill; no drill-point
   cone) 6.8 +0/-0.4 deep, full thread 5.2 minimum (bottoming tap), entry
   countersink Ø4.3 max so the shoulder's end ring still bears;
-* the latch-hook bracket's two #4-40 THROUGH taps at machine x 47.5 and 54.5
-  on the same line, countersunk Ø3.1 max both faces (their exits on the
-  front face lie under the platen footprint).
+* the latch hook's (MHA-PD-014) two #4-40 THROUGH taps for its base screws
+  (MHA-VN-043) at machine x 65.0 and 72.0 on the same line, countersunk Ø3.1
+  max both faces (their exits on the front face lie under the platen
+  footprint, machine x -33.25..236.39).
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
 
 BAR_HEIGHT = 22.0  # tall (Y) -- ch22 back-side wear band (low)
 BAR_DEPTH = 9.0  # deep (Z) -- front face rubs the platen back (low)
-# The pivot floor and the latch-hook-bracket-screw tips need the bar's
+# The pivot floor and the latch-hook-bracket-screw (MHA-VN-043) tips need the bar's
 # thickness at 9.000 ±0.13 (.XXX); at .XX the floor would be 1.69 worst.
 BAR_DEPTH_BAND = 0.13
 BACK_FACE_Z = BAR_DEPTH / 2.0
@@ -46,8 +47,8 @@ PIVOT_TAP_CSK_DIA = 4.3  # MAX
 # blind cylinder; its thread is this spec's, not a wizard feature's.
 PIVOT_TAP_DRILL_DIA = TAP_DRILL_MM[PIVOT_TAP_THREAD]
 
-# --- Latch-hook bracket taps ------------------------------------------------
-BRACKET_TAP_X = (47.5, 54.5)
+# --- Latch-hook base taps (MHA-PD-014's base, MHA-VN-043 screws) -----------------
+BRACKET_TAP_X = (65.0, 72.0)
 BRACKET_TAP_SPEC = HoleSpec("tapped", "#4-40")
 BRACKET_TAP_CSK_DIA = 3.1  # MAX, both faces
 
@@ -73,7 +74,7 @@ WALLS: dict[str, tuple[float, float]] = {
         - HOLE_POSITION_BAND
         - _TAP_OVERSIZE_R,
     ),
-    "bracket taps to the lower edge": (
+    "latch-hook taps to the lower edge": (
         BAR_HEIGHT / 2.0 + HANGER_TAP_Y - THREAD_MAJOR_MM[BRACKET_TAP_SPEC.size] / 2.0,
         BAR_HEIGHT / 2.0
         + HANGER_TAP_Y

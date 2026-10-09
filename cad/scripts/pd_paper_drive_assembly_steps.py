@@ -17,7 +17,6 @@ import math
 import numpy as np
 
 import dt_drive_train_steps
-import pd_latch_hook_bracket_spec as hook_bracket
 import pd_transgear_drive_collar_spec as collar
 import transgear_cluster_fit as cluster_fit
 import pd_transgear_feed_pinion_spec as feed_pinion
@@ -82,10 +81,11 @@ SEQUENCE: tuple[str, ...] = (
     "pilot-faced-to-fit",
     "knob-stack-fitted",
     # Latch (R9-15, R9-24). The hanger is meshed in the rack and run over the
-    # platen's travel first; the hook is then set to hold that mesh.
-    "latch-bracket-fitted",
+    # platen's travel first; the hook's pin hole is then match-drilled from
+    # the pin to hold that mesh, and the hook hardened and refitted.
+    "latch-hook-fitted",
     "hanger-meshed",
-    "hook-set-and-riveted",
+    "hook-pin-hole-match-drilled",
     # Chain fit-up (contract §13.2 procedure (2)-(8)).
     "fitup-pose-set",
     # R9-68: in that pose, the MHA-PD-025 front bushing faced to m (the F-to-disc
@@ -124,13 +124,14 @@ def step_ref(key: str) -> str:
 # block's .X band holds it (Main, 2026-10-01).
 BAR_TOP_ABOVE_DECK = 266.934
 # The rack's crests below the platen's bottom edge (the builder's PLATE_Y0
-# less RACK_TIP_Y). The latched hanger cannot take up a rack set off this: the
-# hook's set range (0.51 at the hook) spans only ±0.25 of rack height, so the
-# band is held at the solder joint (Main, 2026-10-01). R9-62: 2.25, which puts
-# the feed mesh at its 0.55 centre extension (contact ratio 1.25).
+# less RACK_TIP_Y). The hook's pin hole is match-drilled wherever the meshed
+# hanger puts the pin, but a rack set off this band swings the latched hanger
+# and moves the pin along the hook's straight run, so the band is held at the
+# solder joint (Main, 2026-10-01). R9-62: 2.25, which puts the feed mesh at
+# its 0.55 centre extension (contact ratio 1.25).
 RACK_CREST_DROP = 2.25
 RACK_CREST_TOL = 0.05
-# R9-62a: the feed pinion's mesh in the rack, set before the hook is
+# R9-62a: the feed pinion's mesh in the rack, set before the hook's pin hole is
 # match-drilled: the platen's shake along the rack with the knob held, i.e. the
 # backlash at the pitch line, 2 * e * tan(pressure angle) for a centre
 # extension e over the standard centres. The band's ends are checked below
@@ -230,12 +231,14 @@ MESH_EXTENSION_MAX = _RACK_ADDENDUM - (
 ) * math.sin(_PHI)
 
 
-# R9-62a's band is read with the arm resting on the hook, its MHA-VN-042 pin on
-# the Ø5.4's lower edge ("hook-set-and-riveted"), so in service the pin has
-# no travel left along the strip to let the arm fall: LATCH_SLACK_ALONG.  Read
-# with the arm clamped and the pin clear in the hole (the step before Codex P1
-# on b2eb9a0e1), the unclamped arm fell through the hole's 0.620 along the
-# strip, the pinion 0.220, and the band's loose end ran at e 0.839.
+# R9-62a's band is read with the hanger clamped at its mesh while the hook's
+# Ø3.3 pin hole is match-drilled from the MHA-VN-042 pin, drawn PIN_BEARING_LIFT
+# up N so the largest pin rests on its lower edge ("hook-pin-hole-match-drilled"),
+# so in service the pin has no travel left across the strip to let the arm
+# fall: LATCH_SLACK_ALONG.  Read with the arm clamped and the pin clear in the
+# retired strip's Ø5.4 (the step before Codex P1 on b2eb9a0e1), the unclamped
+# arm fell through the hole's 0.620 along the strip, the pinion 0.220, and the
+# band's loose end ran at e 0.839.
 LATCH_SLACK_ALONG = 0.0
 
 
@@ -318,12 +321,6 @@ T24_HELD_BACK_TEXT = "T24 HELD BACK ON ITS SEAT"
 COLLAR_DISC_AIR_TEXT = f"{COLLAR_DISC_AIR_MIN:.2f} MIN"
 RACK_CREST_TEXT = f"{RACK_CREST_DROP:.2f} \u00b1{RACK_CREST_TOL:.2f}"
 MESH_BACKLASH_TEXT = f"{MESH_BACKLASH_RANGE[0]:.2f} TO {MESH_BACKLASH_RANGE[1]:.2f}"
-# The set hook's rivet holes from the MHA-PD-021 datums (pd_latch_hook_bracket_spec
-# HOOK_SET_YZ): above the flap's lower edge, and the front one rear of the bar.
-HOOK_SET_Y_TEXT, HOOK_SET_Z_TEXT = (
-    f"{value:.{hook_bracket.HOOK_SET_PLACES}f}" for value in hook_bracket.HOOK_SET_YZ
-)
-HOOK_SET_TEXT = f"\u00b1{hook_bracket.HOOK_SET_RANGE:.2f}"
 # The collar's seat limit (pd_transgear_drive_collar_spec.SEAT_MAX_FROM_F).
 T24_SEAT_MAX_TEXT = f"{collar.SEAT_MAX_FROM_F:.2f} MAX"
 # The collar's rear face never passes the 12T's front face (the MHA-PD-022

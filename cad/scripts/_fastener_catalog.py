@@ -113,12 +113,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91794A077",
         material="AISI 304",
     ),
-    "vn-latch-hook-rivet": _stock(
-        "vn-latch-hook-rivet",
-        "Aluminum Domed Head Solid Rivet",
-        "97482A015",
-        material="1100-O Rod (SS)",
-    ),
     "vn-frame-side-screw": _stock(
         "vn-frame-side-screw",
         "Steel Narrow Fillister Head Slotted Screw",

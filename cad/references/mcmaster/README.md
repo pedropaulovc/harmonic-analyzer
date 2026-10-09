@@ -53,7 +53,6 @@ recipes:
 | 94025A164 | `vn-cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 9715K43 | `vn-transgear-pivot-spring` (catalogue-only; no vendor model) | Curved Disc Spring |
 | 97431A260 | `vn-transgear-retaining-ring` | Side-Mount External Retaining Ring |
-| 97482A015 | `vn-latch-hook-rivet` (catalogue-only; no vendor model) | Aluminum Domed Head Solid Rivet |
 | 98296A026 | `vn-transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `vn-pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A031 | `vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -476,30 +475,6 @@ Catalog specifications checked on September 10, 2026:
   place of the factory tip. It is catalogue-only: no vendor model is
   downloaded or kept here, so it has no replica gate, and its standalone
   diagnostic is a catalog-only run.
-- [97482A015](https://www.mcmaster.com/97482A015/) (`vn-latch-hook-rivet`,
-  MHA-VN-045, two) joins the latch hook's strip to the latch-hook bracket's
-  flap; the flap's holes are drilled at assembly through the hook's. The
-  family page was read live on September 30, 2026 (dt-logs
-  `transgear-evidence/mcmaster-skus.md`, "Round 10 — hook rivets"): 1100
-  aluminum domed head solid rivets, 1/16 in diameter; 97482A015 is the
-  0.188 in (3/16) length, for material up to 0.157 in thick. The 97482A010
-  row (1/8 long) read live gives the round domed head Ø0.13 in x 0.051 in
-  high and a 0.067 in (#51 drill) hole; 97482A015 is taken to share them
-  [INFERENCE]. The contract row asked for steel, but McMaster lists no steel
-  1/16 in solid rivet (all 16 in the family filter are aluminum), so the part
-  is aluminum; SolidWorks has no plain 1100 wire, and the page states no
-  temper, so the part carries the library's `1100-O Rod (SS)`. The page gives
-  no head radius, so `diag_build_97482A015.py` models the dome as the
-  spherical cap through the head rim and apex (R = 1.6998 mm) [INFERENCE].
-  R9-51 moved the joint from the 1/8 length in Ø1.6 holes: the ASME B18.1.1
-  shank (Ø0.064 in max) enters the least printed Ø1.65 +0.10/0 hole with
-  0.024 mm to spare, and the shortest rivet (-0.016 in) on the thickest
-  2.2 mm grip in the largest hole leaves 2.39 mm³ for the shop head against
-  MIL-R-47196A's 2.11 mm³ (Ø0.081 x 0.025 in). The vendor's #51 hole
-  (Ø1.7018) lies inside the band. It is catalogue-only: no vendor model was
-  supplied or kept here, so it has no replica gate, and its standalone
-  diagnostic is a catalog-only run.
-
 - [97431A260](https://www.mcmaster.com/97431A260/) (`vn-transgear-retaining-ring`,
   MHA-VN-047, R9-68) is pushed sideways into the MHA-PD-023 pin's groove in front
   of the MHA-PD-025 front bushing and closes the disc cluster's float. Its page
