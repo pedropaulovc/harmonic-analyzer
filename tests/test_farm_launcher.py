@@ -799,12 +799,13 @@ def test_launch_defaults_to_omp_local_working_directory(tmp_path: Path) -> None:
             "-NonInteractive",
             "-File",
             str(LAUNCHER),
+            "-LogDirectory",
+            str(expected_directory),
             "-Status",
             "-RunId",
             finished["run_id"],
         ],
         environment,
-        cwd=scratchpad,
     )
     assert status_result.returncode == 0, (
         status_result.stdout,
@@ -858,21 +859,30 @@ def test_agent_scratchpad_snapshot_supports_windows_long_paths(
     ) == "built\n"
 
 
+@pytest.mark.parametrize(
+    ("working_directory", "omp_code"),
+    [("local", None), ("Local", "1")],
+    ids=["local-without-omp", "omp-case-mismatch"],
+)
 def test_launch_defaults_to_local_appdata_when_no_agent_scratchpad_is_set(
-    tmp_path: Path,
+    tmp_path: Path, working_directory: str, omp_code: str | None
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
-    local_app_data = tmp_path / "Local"
-    local_app_data.mkdir()
+    caller_directory = tmp_path / working_directory
+    caller_directory.mkdir()
+    local_app_data = tmp_path / "local app data"
     environment = dict(fixture["environment"])
     environment.pop("HARMONIC_AGENT_SCRATCHPAD", None)
-    environment["OMPCODE"] = "1"
+    if omp_code is None:
+        environment.pop("OMPCODE", None)
+    else:
+        environment["OMPCODE"] = omp_code
     environment["LOCALAPPDATA"] = str(local_app_data)
 
     command = _command(fixture, "part:pen_rod")
     log_directory = command.index("-LogDirectory")
     del command[log_directory : log_directory + 2]
-    result = _run_launcher(fixture, command, environment, cwd=local_app_data)
+    result = _run_launcher(fixture, command, environment, cwd=caller_directory)
 
     assert result.returncode == 0, (result.stdout, result.stderr)
     finished = json.loads(result.stdout.splitlines()[-1])

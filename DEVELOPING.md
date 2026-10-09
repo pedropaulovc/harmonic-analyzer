@@ -267,14 +267,16 @@ or not the hub is still around.
 
 Every operation selects one run by `-RunId <run-id>` or `-Tag <tag>` (the newest
 run with that tag). The default `-LogDirectory` is recomputed from the current
-process environment and working directory. For an OMP launch, omitting it works
-only when the tracking process uses the same resolved `local` `cwd` as the
-launch. From a later session or a different working directory, pass the launch's
-effective `-LogDirectory`: it is the parent directory of the `.run.json` path
-printed on the `farm-launch started` readiness line. This also applies to the
-`hub` process used for `-Watch`. Otherwise tracking falls back to
-`%LOCALAPPDATA%\ha-farm\runs` and cannot find the OMP-local run. A selection
-that matches nothing, or both selectors at once, exits 2.
+process environment and working directory. Omit it only when that computed
+default resolves to the launch's effective `-LogDirectory`. Without a matching
+`HARMONIC_AGENT_SCRATCHPAD` or an explicit `-LogDirectory`, an OMP launch
+requires the tracking process to use the same resolved `local` `cwd`. If the
+launch used an explicit override, or the computed defaults differ, pass the
+launch's effective `-LogDirectory`: it is the parent directory of the
+`.run.json` path printed on the `farm-launch started` readiness line. This also
+applies to the `hub` process used for `-Watch`. If the computed default does
+not match, tracking searches that other directory instead of the launch
+directory. A selection that matches nothing, or both selectors at once, exits 2.
 
 ```powershell
 $launcher = 'C:/src/harmonic-analyzer/scripts/farm-run.ps1'
