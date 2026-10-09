@@ -95,31 +95,33 @@ class CameraFitter:
     def __init__(self, client: Any, ready: dict):
         self.client, self.ready = client, ready
 
-    def loss_function(self, sample: dict):
+    def loss_function(self, sample: dict, *, full_pose: bool = False):
         mask = sample['mask']
         source_edges = sample['edges'].astype(np.uint8)
         dt = cv2.distanceTransform(1-source_edges, cv2.DIST_L2, 3)
         scale = sample['sourceWidth'] / mask.shape[1]
         cap = 96 / scale
         source_area = max(1, np.count_nonzero(mask))
+        kernel = np.ones((3, 3), np.uint8)
         def score(ids: np.ndarray) -> float:
             rendered = ids > 0
             area = int(np.count_nonzero(rendered))
             if area < 8 or area >= .98*rendered.size or np.count_nonzero(source_edges) < 8:
                 return 1e4
-            edges = cv2.morphologyEx(rendered.astype(np.uint8), cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0
+            edges = cv2.morphologyEx(ids.astype(np.uint16), cv2.MORPH_GRADIENT, kernel) > 0
             if not edges.any():
                 return 1e4
-            edge = float(np.minimum(dt[edges], cap).mean()) * scale
+            reverse_dt = cv2.distanceTransform((~edges).astype(np.uint8), cv2.DIST_L2, 3)
+            render_to_source = float(np.minimum(dt[edges], cap).mean())*scale
+            source_to_render = float(np.minimum(reverse_dt[source_edges > 0], cap).mean())*scale
             intersection = np.count_nonzero(mask & rendered)
             union = source_area + area - intersection
-            outside = 1-intersection/area
-            # Static frame cannot fill the source moving-parts mask. A low-weight
-            # IoU plus robust directed edges avoids making that impossible target.
-            # Suppress the tiny-geometry-on-one-source-edge degeneracy without
-            # pretending the source's moving mask is a static-only annotation.
-            area_penalty = 12*abs(math.log(max(1., area)/(.5*source_area)))
-            return edge + 65*outside + 15*(1-intersection/max(1, union)) + area_penalty
+            iou = intersection/max(1, union)
+            expected_area = source_area if full_pose else .5*source_area
+            area_penalty = 12*abs(math.log(max(1., area)/expected_area))
+            # Both directions and substantial silhouette weight prevent a tiny
+            # render on dense source edges from becoming a good camera minimum.
+            return .5*(render_to_source+source_to_render) + 192*(1-iou) + area_penalty
         return score
 
     def fit(self, sample: dict, *, target_group: str = 'static', seed: dict | None = None, coarse: bool = True, evaluations: int = 80, full_pose: bool = False) -> tuple[dict, float]:
@@ -135,24 +137,33 @@ class CameraFitter:
         principal = [float(np.median(xs)), float(np.median(ys))]
         if sample['presentation'] == 'horizontal-mirror':
             principal[0] = width-1-principal[0]
-        fill = max(.08, min(.98, (ys.max()-ys.min()+1)/height))
+        fill_y = max(.08, min(.98, (ys.max()-ys.min()+1)/height))
+        fill_x = max(.08, min(.98, (xs.max()-xs.min()+1)/width))
         groups = None if full_pose else ['static']
         def request(camera: dict) -> dict:
             return {'camera': camera, 'input': sample['input'], 'width': width, 'height': height,
                     'presentation': sample['presentation'], **({'groups': groups} if groups else {})}
-        score = self.loss_function(sample)
+        score = self.loss_function(sample, full_pose=full_pose)
         candidates = []
         if seed:
             candidates.append(seed)
         if coarse or not seed:
-            for azimuth in np.linspace(-math.pi, math.pi, 12, endpoint=False):
-                for elevation in (math.radians(-15), math.radians(20), math.radians(55)):
+            extents = hi-lo
+            for azimuth in np.linspace(-math.pi, math.pi, 8, endpoint=False):
+                for degrees in (-10., 15., 50., 80.):
+                    elevation = math.radians(degrees)
                     direction = np.array([math.cos(elevation)*math.sin(azimuth), math.sin(elevation), math.cos(elevation)*math.cos(azimuth)])
-                    for fov in (22., 40., 65.):
-                        distance = diameter/(2*math.tan(math.radians(fov)/2)*fill)
-                        eye = centre+direction*distance
-                        candidates.append({'positionMetres': eye.tolist(), 'quaternion': look_at(eye, centre).tolist(),
-                                           'verticalFovDegrees': fov, 'principalPointViewportPixels': principal})
+                    quaternion = look_at(centre+direction, centre)
+                    basis = Rotation.from_quat(quaternion).as_matrix()
+                    span_x, span_y = abs(basis[:, 0]) @ extents, abs(basis[:, 1]) @ extents
+                    for fov in (30., 65.):
+                        tangent = math.tan(math.radians(fov)/2)
+                        fitted_distance = max(span_y/(2*tangent*fill_y),
+                                              span_x/(2*tangent*(width/height)*fill_x), .04)
+                        for crop_scale in (.35, .7, 1.2):
+                            eye = centre+direction*fitted_distance*crop_scale
+                            candidates.append({'positionMetres': eye.tolist(), 'quaternion': quaternion.tolist(),
+                                               'verticalFovDegrees': fov, 'principalPointViewportPixels': principal})
         scored = []
         for offset in range(0, len(candidates), 32):
             batch = candidates[offset:offset+32]

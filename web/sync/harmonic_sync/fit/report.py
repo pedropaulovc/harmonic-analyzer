@@ -22,11 +22,12 @@ from PIL import Image, ImageDraw
 
 THRESHOLD_PX = 960.0
 TARGET_FRACTION = 0.9
+REQUIRED_IOU = 0.5
 LIMITS = {
     "sourceGroups": "Per-group source support is projection-conditioned: source mask/edges are clipped near the rendered group. No independent source part labels exist; per-group IoU is not independently observed source-group IoU, even with tracked crank.",
     "crank": "Only independently tracked crank samples enter harmonic regressions. Inferred crank is fitted from the same moving parts being compared; held and inferred samples cannot validate kinematics.",
     "triage": "Kinematics-suspect requires harmonic correlation persistent in independent segments with different explicit fitted/manual setups. Local supported failures are setup-suspect, not proof of a setup defect. Insufficient phase/support or unresolved independent evidence is unvalidated.",
-    "pixels": "Chamfer is symmetric and untruncated, in original source-video pixels: rectSourcePixels width / render width. Robust truncated camera loss is never an acceptance error.",
+    "pixels": "Chamfer is symmetric and untruncated, in original source-video pixels: rectSourcePixels width / render width. Distributions retain all finite raw errors, including low-IoU samples. Acceptance requires mask IoU >= 0.5 and each supplied render-to-source/source-to-render chamfer <= 960 px; their mean cannot conceal a one-sided failure. Robust truncated camera loss is never an acceptance error.",
     "independentTakes": "Only the shot's driverViewId (largest machine view by median source mask area normalized to original source pixels) drives setup/crank. Other views may be independent takes: their numeric residuals remain pixel-alignment diagnostics, not independent mechanism/kinematics validation, even when they inherit a tracked crank.",
     "heldOut": "Setup parameters are fitted once at their first observable segment frame and then frozen. Fitting observations are excluded only from independent evidence for their fitted groups; dense raw pixel-alignment metrics still include every fitting frame/group.",
 }
@@ -77,21 +78,25 @@ def _atomic_json(path: Path, value: Any) -> None:
     _atomic_text(path, json.dumps(_safe(value), indent=2, allow_nan=False) + "\n")
 
 
-def _distribution(values: Sequence[float], total: int) -> dict[str, Any]:
+def _distribution(values: Sequence[float], total: int, acceptance_values: Sequence[float] | None = None) -> dict[str, Any]:
     numbers = np.asarray(values, dtype=float)
-    validated = len(numbers)
-    passing = int(np.count_nonzero(numbers <= THRESHOLD_PX))
+    observed = len(numbers)
+    qualified = np.asarray(values if acceptance_values is None else acceptance_values, dtype=float)
+    validated = len(qualified)
+    passing = int(np.count_nonzero(qualified <= THRESHOLD_PX))
     fraction = passing / total if total else None
     return {
         "sampledFrames": total, "validatedFrames": validated,
+        "finiteMetricFrames": observed,
         "unvalidatedFrames": total - validated, "framesAtOrBelow960Px": passing,
-        "medianPx": float(np.median(numbers)) if validated else None,
-        "p90Px": float(np.percentile(numbers, 90)) if validated else None,
-        "maxPx": float(numbers.max()) if validated else None,
+        "medianPx": float(np.median(numbers)) if observed else None,
+        "p90Px": float(np.percentile(numbers, 90)) if observed else None,
+        "maxPx": float(numbers.max()) if observed else None,
         "fractionAtOrBelow960Px": fraction,
         "percentAtOrBelow960Px": 100 * fraction if fraction is not None else None,
         "thresholdPx": THRESHOLD_PX, "requiredFraction": TARGET_FRACTION,
-        "distributionPopulation": "finite supported samples only; all unsupported/missing samples remain in the acceptance denominator",
+        "requiredIoU": REQUIRED_IOU,
+        "distributionPopulation": "all finite nonnegative raw chamfer samples, including low-IoU and unsupported observations; acceptance separately requires supported mask IoU >= 0.5 and each supplied directed chamfer <= 960 px; every sample remains in the denominator",
         "status": "unvalidated" if not total else "pass" if fraction >= TARGET_FRACTION else "fail",
     }
 
@@ -104,6 +109,23 @@ def _supported_error(frame: Mapping[str, Any]) -> float | None:
         if key in frame and (_finite(frame[key]) is None or float(frame[key]) <= 0):
             return None
     return error
+
+
+def _acceptance_error(frame: Mapping[str, Any]) -> float | None:
+    error = _supported_error(frame)
+    if error is None or float(frame["iou"]) < REQUIRED_IOU:
+        return None
+    keys = ("renderToSourceChamferPx", "sourceToRenderChamferPx")
+    directions = [_finite(frame.get(key)) for key in keys]
+    if any(value is None or value < 0 for value in directions):
+        return None
+    return max(directions)
+
+
+def _frame_distribution(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    values = [value for frame in frames if (value := _finite(frame.get("chamferPx"))) is not None and value >= 0]
+    qualified = [value for frame in frames if (value := _acceptance_error(frame)) is not None]
+    return _distribution(values, len(frames), qualified)
 
 
 def _key(frame: Mapping[str, Any]) -> tuple[str, str, Any]:
@@ -128,7 +150,7 @@ def _coverage_frames(video_id: str, root: Path, residuals: Mapping[str, Any]) ->
         key = str(shot["id"])
         by_shot[key] = {**by_shot.get(key, {}), **shot}
     shots = list(by_shot.values())
-    machine = {str(shot["id"]): shot for shot in shots if shot.get("classification") == "machine"}
+    machine = {str(shot["id"]): shot for shot in shots if shot.get("classification") in ("machine", "transition")}
     frames: dict[tuple[str, str, Any], dict[str, Any]] = {}
     for row in residuals.get("frames", []):
         if str(row.get("shotId")) not in machine:
@@ -158,8 +180,8 @@ def _coverage_frames(video_id: str, root: Path, residuals: Mapping[str, Any]) ->
                 if key not in frames:
                     frames[key] = {**identity, "index": row["index"], "t": row.get("t"), "iou": None, "chamferPx": None, "crankSource": None, "reason": "missing sampled-frame residual", "groups": {}}
             actual = [row for key, row in frames.items() if key[:2] == (shot_id, view_id)]
-            if not actual or any(_supported_error(row) is None for row in actual):
-                missing_views.append({**identity, "sampledFrames": len(actual), "unvalidatedFrames": sum(_supported_error(row) is None for row in actual)})
+            if not actual or any(_acceptance_error(row) is None for row in actual):
+                missing_views.append({**identity, "sampledFrames": len(actual), "unvalidatedFrames": sum(_acceptance_error(row) is None for row in actual)})
     upstream = residuals.get("sourceCoverage", {})
     coverage = {"expectedViews": expected_views, "processedViews": len(expected_views) - len(missing_views), "missingViews": missing_views, "unknownSampleCountViews": unknown_counts, "reportedByFitter": upstream}
     return list(frames.values()), coverage, shots
@@ -206,9 +228,19 @@ def _driver_evidence(frame: Mapping[str, Any], drivers: Mapping[str, Any]) -> bo
 def _fit_observation(frame: Mapping[str, Any], detail: Mapping[str, Any]) -> bool:
     return (
         detail.get("heldOut") is False
-        or detail.get("validationScope") == "fit-frame"
-        or frame.get("validationScope") == "fit-frame"
+        or str(detail.get("validationScope", "")).startswith("fit-frame")
+        or str(frame.get("validationScope", "")).startswith("fit-frame")
     )
+
+
+def _crank_support(observations: Sequence[Mapping[str, Any]], driver: Any) -> tuple[str, bool, bool]:
+    frame = next((row for row in observations if driver is not None and str(row.get("viewId")) == str(driver)), None)
+    source = frame.get("crankSource") if frame is not None else None
+    if frame is None or str(frame.get("validationScope", "")).startswith("independent-take") or _finite(frame.get("turns")) is None or source not in ("tracked", "inferred", "held"):
+        source = "unvalidated"
+    support = frame.get("crankSupport", {}) if frame is not None else {}
+    eligible = support.get("eligible")
+    return source, eligible is True, not isinstance(eligible, bool)
 
 
 def _harmonics(frames: Sequence[Mapping[str, Any]], residuals: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -286,13 +318,30 @@ def _harmonics(frames: Sequence[Mapping[str, Any]], residuals: Mapping[str, Any]
 def save_contact_sheet(output_path: str | Path, panels: Sequence[Mapping[str, Any]], group_ids: Mapping[str, int]) -> Path:
     """Save worst-first source | deterministic ID render | foreground blend.
 
-    Null/invalid errors sort before finite errors: failures never disappear.
+    When IoU is supplied, unsupported IoU sorts first, then lowest IoU,
+    with worst directed chamfer breaking ties. Legacy panels sort by raw
+    chamfer. These are pixel diagnostics, not visual acceptance certification.
     Each source must already be cropped/presentation-aligned to its ID image.
     """
     if not panels:
         raise ValueError("A contact sheet needs at least one panel")
     output = Path(output_path).expanduser()
-    ordered = sorted(panels, key=lambda panel: (0, 0) if _finite(panel.get("errorPx")) is None else (1, -float(panel["errorPx"])))
+    has_iou = any("iou" in panel for panel in panels)
+    def worst_first(panel: Mapping[str, Any]) -> tuple[float, ...]:
+        error = _finite(panel.get("errorPx"))
+        if not has_iou:
+            return (0, 0) if error is None else (1, -error)
+        iou = _finite(panel.get("iou"))
+        if iou is not None and not 0 <= iou <= 1:
+            iou = None
+        keys = ("renderToSourceChamferPx", "sourceToRenderChamferPx")
+        if any(key in panel for key in keys):
+            directions = [_finite(panel.get(key)) for key in keys]
+            worst = math.inf if any(value is None or value < 0 for value in directions) else max(directions)
+        else:
+            worst = math.inf if error is None else error
+        return (0 if iou is None else 1, iou if iou is not None else 0, -worst)
+    ordered = sorted(panels, key=worst_first)
     max_id = max(int(np.max(np.asarray(panel["ids"]))) for panel in ordered)
     palette = np.zeros((max_id + 1, 3), dtype=np.uint8)
     names = {int(index): name for name, index in group_ids.items()}
@@ -324,6 +373,15 @@ def save_contact_sheet(output_path: str | Path, panels: Sequence[Mapping[str, An
         draw = ImageDraw.Draw(row)
         error = _finite(panel.get("errorPx"))
         title = f"{panel.get('title', '')} | {'unvalidated' if error is None else f'{error:.2f} source px'}"
+        if has_iou:
+            def metric_label(value: Any) -> str:
+                number = _finite(value)
+                return "unvalidated" if number is None else f"{number:.3f}"
+            title += (
+                f" | IoU {metric_label(panel.get('iou'))}"
+                f" | R2S {metric_label(panel.get('renderToSourceChamferPx'))} px"
+                f" | S2R {metric_label(panel.get('sourceToRenderChamferPx'))} px"
+            )
         # The default Pillow font is portable; unsupported glyphs are replaced.
         draw.text((8, 5), title.encode("latin-1", "replace").decode("latin-1"), fill="white")
         for column, (name, image) in enumerate(zip(("Source", "Render IDs", "Blend"), images, strict=True)):
@@ -383,14 +441,14 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
     drivers = {str(shot["id"]): shot.get("driverViewId") for shot in shots}
     independent_views = [
         {"shotId": shot["id"], "viewId": view["viewId"], "driverViewId": shot.get("driverViewId"), "validationScope": "independent-take, not validated"}
-        for shot in shots if shot.get("classification") == "machine" and shot.get("driverViewId") is not None
+        for shot in shots if shot.get("classification") in ("machine", "transition") and shot.get("driverViewId") is not None
         for view in shot.get("views", []) if str(view["viewId"]) != str(shot["driverViewId"])
     ]
     fit_frame_views = 0
     fit_group_observations = 0
     held_out_group_observations = 0
     for frame in frames:
-        fitting = frame.get("validationScope") == "fit-frame"
+        fitting = str(frame.get("validationScope", "")).startswith("fit-frame")
         for detail in frame.get("groups", {}).values():
             if _fit_observation(frame, detail):
                 fit_group_observations += 1
@@ -410,29 +468,40 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
             frame for frame in frames
             if str(frame.get("shotId")) == str(identity["shotId"])
             and str(frame.get("viewId")) == str(identity["viewId"])
-            and _supported_error(frame) is None
+            and _acceptance_error(frame) is None
         ]
-        reasons = sorted({str(frame.get("reason") or "unsupported pixel-alignment sample") for frame in unsupported})
+        reasons = set()
+        for frame in unsupported:
+            iou = _finite(frame.get("iou"))
+            if iou is not None and iou < REQUIRED_IOU:
+                reasons.add(f"mask IoU below required {REQUIRED_IOU}")
+            if frame.get("reason"):
+                reasons.add(str(frame["reason"]))
+            elif iou is None or iou >= REQUIRED_IOU:
+                reasons.add("unsupported pixel-alignment sample")
         manual_needed_reasons.append({
-            **identity, "reasons": reasons, "source": "sampled-frame support",
+            **identity, "reasons": sorted(reasons), "source": "sampled-frame support",
         })
     manual_needed_reasons.extend({**note, "source": "explicit private alignment review"} for note in review_notes)
     for frame in frames:
         driver = drivers.get(str(frame.get("shotId")))
         if driver is not None and str(frame.get("viewId")) != str(driver):
             frame["validationScope"] = "independent-take, not validated"
-    values = [error for frame in frames if (error := _supported_error(frame)) is not None]
-    frame_view_acceptance = _distribution(values, len(frames))
+    frame_view_acceptance = _frame_distribution(frames)
     unique: dict[tuple[str, Any], list[dict[str, Any]]] = defaultdict(list)
     for frame in frames:
         unique[(str(frame.get("shotId")), frame.get("index", frame.get("t")))].append(frame)
     # A machine frame is accepted only when every expected view is supported.
     frame_errors = []
+    qualified_frame_errors = []
     for observations in unique.values():
-        errors = [_supported_error(frame) for frame in observations]
-        if errors and all(error is not None for error in errors):
+        errors = [_finite(frame.get("chamferPx")) for frame in observations]
+        if errors and all(error is not None and error >= 0 for error in errors):
             frame_errors.append(max(errors))
-    acceptance = _distribution(frame_errors, len(unique))
+        qualified = [_acceptance_error(frame) for frame in observations]
+        if qualified and all(error is not None for error in qualified):
+            qualified_frame_errors.append(max(qualified))
+    acceptance = _distribution(frame_errors, len(unique), qualified_frame_errors)
     if coverage["unknownSampleCountViews"]:
         acceptance["status"] = frame_view_acceptance["status"] = "unvalidated"
     acceptance["unit"] = "unique sampled machine frame; worst view; any invalid view makes frame unvalidated"
@@ -440,23 +509,28 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
     acceptance["validationScope"] = frame_view_acceptance["validationScope"] = "pixel alignment only; not independent mechanism validation"
     shot_reports = []
     for shot in shots:
-        if shot.get("classification") != "machine":
+        if shot.get("classification") not in ("machine", "transition"):
             continue
         shot_frames = [frame for frame in frames if frame.get("shotId") == shot["id"]]
-        errors = [error for frame in shot_frames if (error := _supported_error(frame)) is not None]
-        quality = _distribution(errors, len(shot_frames))
+        quality = _frame_distribution(shot_frames)
         statuses = [view.get("quality", {}).get("status", "unfitted") for view in shot.get("views", [])]
         manual = any(frame.get("cameraSource") == "manual" for frame in shot_frames) or "manual" in statuses
         usable = bool(statuses) and all(status in ("manual", "fitted") for status in statuses)
         status = "manual" if manual and usable and quality["status"] == "pass" else "fitted" if usable and quality["status"] == "pass" else "manual-needed"
-        shot_reports.append({"id": shot["id"], "driverViewId": shot.get("driverViewId"), "status": status, "quality": quality, "validationScope": "pixel alignment", "views": shot.get("views", [])})
+        operational_review = [note for note in review_notes if str(note.get("shotId", "")) == str(shot["id"])]
+        shot_reports.append({
+            "id": shot["id"], "driverViewId": shot.get("driverViewId"),
+            "numericStatus": status, "status": "manual-needed" if operational_review else status,
+            "operationalReviewReasons": operational_review, "quality": quality,
+            "validationScope": "pixel alignment", "views": shot.get("views", []),
+        })
     crank_counts = {source: 0 for source in ("tracked", "inferred", "held", "unvalidated")}
+    eligible_samples = 0
+    unknown_support_samples = 0
     for (shot_id, _), observations in unique.items():
-        driver = drivers.get(shot_id)
-        driver_frame = next((frame for frame in observations if driver is not None and str(frame.get("viewId")) == str(driver)), None)
-        source = driver_frame.get("crankSource") if driver_frame is not None else None
-        if driver_frame is None or not _driver_evidence(driver_frame, drivers) or _finite(driver_frame.get("turns")) is None or source not in ("tracked", "inferred", "held"):
-            source = "unvalidated"
+        source, eligible, unknown = _crank_support(observations, drivers.get(shot_id))
+        eligible_samples += int(eligible)
+        unknown_support_samples += int(unknown)
         crank_counts[source] += 1
     crank = {
         "counts": crank_counts,
@@ -466,7 +540,62 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
         "kinematicsEvidence": "tracked-driver-view-only",
         "independentTrackedDriverSamples": crank_counts["tracked"],
         "unknownSampleCountViews": coverage["unknownSampleCountViews"],
+        "supportEligibility": {
+            "eligibleSamples": eligible_samples,
+            "eligibleFraction": eligible_samples / len(unique) if unique else None,
+            "sampledMachineExposures": len(unique),
+            "unvalidatedSamples": unknown_support_samples,
+            "method": ">=150 pixels at 480 width (squared scale), >=50% source-mask overlap; native projection-conditioned",
+            "denominator": "all unique sampled machine exposures, driver-only support; unknown support remains unvalidated and never eligible",
+        },
     }
+    segment_metrics = []
+    frames_by_segment: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    shot_segments = {str(shot["id"]): shot.get("segmentId") for shot in shots}
+    for frame in frames:
+        segment_id = frame.get("segmentId") or shot_segments.get(str(frame.get("shotId")))
+        frames_by_segment[str(segment_id) if segment_id is not None else "unassigned"].append(frame)
+    segment_ids = {str(segment["id"]) for segment in residuals.get("segments", [])} | frames_by_segment.keys()
+    group_names = {str(group) for frame in frames for group in frame.get("groups", {})}
+    group_names.update(f"channel-{channel['harmonic']}" for channel in residuals.get("channelMapping", []) if "harmonic" in channel)
+    for segment_id in sorted(segment_ids):
+        segment_frames = frames_by_segment.get(segment_id, [])
+        groups = []
+        for group in sorted(group_names):
+            supported = [
+                detail for frame in segment_frames
+                if _supported_error(detail := frame.get("groups", {}).get(group, {})) is not None
+            ]
+            ious = np.asarray([float(detail["iou"]) for detail in supported], dtype=float)
+            groups.append({
+                "group": group,
+                "chamfer": _frame_distribution([frame.get("groups", {}).get(group, {}) for frame in segment_frames]),
+                "iou": {
+                    "sampledObservations": len(segment_frames), "supportedObservations": len(supported),
+                    "unsupportedObservations": len(segment_frames) - len(supported),
+                    "median": float(np.median(ious)) if len(ious) else None,
+                    "p90": float(np.percentile(ious, 90)) if len(ious) else None,
+                    "min": float(ious.min()) if len(ious) else None,
+                    "max": float(ious.max()) if len(ious) else None,
+                },
+            })
+        segment_exposures: dict[tuple[str, Any], list[dict[str, Any]]] = defaultdict(list)
+        for frame in segment_frames:
+            segment_exposures[(str(frame.get("shotId")), frame.get("index", frame.get("t")))].append(frame)
+        counts = {source: 0 for source in crank_counts}
+        for (shot_id, _), observations in segment_exposures.items():
+            source, _, _ = _crank_support(observations, drivers.get(shot_id))
+            counts[source] += 1
+        segment_metrics.append({
+            "segmentId": segment_id,
+            "validationScope": "raw pixel alignment; group source support projection-conditioned; not independent mechanics evidence; fitting observations included",
+            "frameViewAcceptance": _frame_distribution(segment_frames),
+            "groups": groups,
+            "crank": {
+                "counts": counts, "sampledMachineExposures": len(segment_exposures),
+                "denominator": "unique shot/index exposures; driver-only crank observations; unknown driver/support unvalidated",
+            },
+        })
     contacts = []
     missing_contacts = []
     for item in residuals.get("contactSheets", []):
@@ -513,11 +642,12 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
         "manualShots": [shot["id"] for shot in shot_reports if shot["status"] == "manual"],
         "manualNeededShots": [shot["id"] for shot in shot_reports if shot["status"] == "manual-needed"],
         "crank": crank, "segments": residuals.get("segments", []), "channelMapping": residuals.get("channelMapping", []),
+        "segmentMetrics": segment_metrics,
         "harmonicRegressions": _harmonics(frames, residuals), "sourceCoverage": coverage, "limitations": LIMITS,
         "heldOutEvidence": held_out_evidence,
         "manualNeededReasons": manual_needed_reasons,
         "independentTakeViews": independent_views,
-        "shotsWithoutDriverView": [shot["id"] for shot in shots if shot.get("classification") == "machine" and shot.get("driverViewId") is None],
+        "shotsWithoutDriverView": [shot["id"] for shot in shots if shot.get("classification") in ("machine", "transition") and shot.get("driverViewId") is None],
         "independentTakeFrameViews": sum(str(frame.get("validationScope", "")).startswith("independent-take") for frame in frames),
         "fitRuntimeSeconds": seconds, "timing": timing, "timingAcceptance": timing_acceptance,
         "shotTiming": residuals.get("shotTiming", []),
@@ -540,9 +670,9 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
         f"Model SHA-256: `{summary['modelSha256']}`", "",
         "## Acceptance (all sampled machine frames)", "",
         f"Status: **{acceptance['status']}**; sampled {acceptance['sampledFrames']}; validated {acceptance['validatedFrames']}; unvalidated {acceptance['unvalidatedFrames']}.",
-        f"Untruncated source-pixel chamfer median / p90 / max: {number(acceptance['medianPx'])} / {number(acceptance['p90Px'])} / {number(acceptance['maxPx'])}.",
-        f"At most 960 px: {number(acceptance['percentAtOrBelow960Px'])}% of all sampled frames (target 90%).",
-        f"Frame-view support: {frame_view_acceptance['validatedFrames']} / {frame_view_acceptance['sampledFrames']}; missing support is never a success.",
+        f"All-finite raw untruncated source-pixel chamfer median / p90 / max (including low-IoU observations): {number(acceptance['medianPx'])} / {number(acceptance['p90Px'])} / {number(acceptance['maxPx'])}.",
+        f"Each supplied render→source AND source→render chamfer at most 960 px AND mask IoU at least {REQUIRED_IOU}: {number(acceptance['percentAtOrBelow960Px'])}% of all sampled frames (target 90%); the symmetric mean alone cannot pass a one-sided failure.",
+        f"Frame-view support: {frame_view_acceptance['validatedFrames']} / {frame_view_acceptance['sampledFrames']}; low-IoU or missing support is never a success.",
         f"Fit computation runtime: {number(summary['fitRuntimeSeconds'])} s (not a temporal alignment acceptance metric).", "",
         "## Temporal alignment", "",
         f"Maximum source/model clock error: {number(clock_error)} s; bound 0.5 s; **{timing_acceptance['status']}**.",
@@ -550,7 +680,7 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
         "Sample/key gaps are diagnostics, not clock skew. Unmeasured clock error is unvalidated; computation runtime is never compared with the 0.5 s alignment bound.", "",
         "## Shot status", "",
     ]
-    lines.extend(f"- {shot['id']}: {shot['status']}; median {number(shot['quality']['medianPx'])} px, p90 {number(shot['quality']['p90Px'])} px, max {number(shot['quality']['maxPx'])} px; unvalidated {shot['quality']['unvalidatedFrames']}." for shot in shot_reports)
+    lines.extend(f"- {shot['id']}: {shot['status']} (numeric status: {shot['numericStatus']}); median {number(shot['quality']['medianPx'])} px, p90 {number(shot['quality']['p90Px'])} px, max {number(shot['quality']['maxPx'])} px; unvalidated {shot['quality']['unvalidatedFrames']}." for shot in shot_reports)
     lines.extend([
         "", "## Frozen whole-segment validation and runtime", "",
         f"Final frozen-setup re-pose/render validation runtime: {number(summary['frozenValidationSeconds'])} s; missing timing is not evidence that the final pass ran.",
@@ -572,6 +702,25 @@ def write_report(video_id: str, data_root: str | Path, residuals: Mapping[str, A
         f"Actual native renderer: `{json.dumps(_safe(summary['renderer']), ensure_ascii=True, allow_nan=False)}`.",
     ])
     lines.extend(["", f"Crank-count denominator: {crank['sampledMachineExposures']} unique sampled machine exposures; only driver views contribute tracked/inferred/held counts. Missing driver support is unvalidated. Non-driver copies are not independently tracked."])
+    support = crank["supportEligibility"]
+    lines.extend([
+        "", f"Driver crank-support eligibility: {support['eligibleSamples']} / {support['sampledMachineExposures']} exposures; fraction {number(support['eligibleFraction'])}; unknown/unvalidated support {support['unvalidatedSamples']}.",
+        f"Support method: {support['method']}. Eligibility is projection-conditioned, not proof of independent tracking.",
+        "", "## Per-segment raw pixel metrics", "",
+        "All frame-views, including fitting observations and unsupported samples, remain in denominators. Group IoU/chamfer support is projection-conditioned; these aggregates do not establish held-out mechanics evidence. Unassigned samples are retained explicitly.", "",
+        "| Segment | Supported / sampled frame-views | Median / p90 / max px | Tracked / inferred / held / unvalidated crank |",
+        "| --- | --- | --- | --- |",
+    ])
+    for metric in segment_metrics:
+        quality = metric["frameViewAcceptance"]
+        counts = metric["crank"]["counts"]
+        label = str(metric["segmentId"]).replace("|", "\\|").replace("\n", " ")
+        lines.append(
+            f"| {label} | {quality['validatedFrames']} / {quality['sampledFrames']} | "
+            f"{number(quality['medianPx'])} / {number(quality['p90Px'])} / {number(quality['maxPx'])} | "
+            + " / ".join(str(counts[source]) for source in ("tracked", "inferred", "held", "unvalidated")) + " |"
+        )
+    lines.extend(["", "Full per-group distributions and support counts:", "", "```json", json.dumps(_safe(segment_metrics), indent=2, allow_nan=False), "```"])
     lines.extend(["", "## Crank evidence", "", *(f"- {source}: {count}; fraction {number(crank['fractions'][source])}." for source, count in crank_counts.items()), "", "## Segment setups and flattened provenance", "", "```json", json.dumps(_safe(summary["segments"]), indent=2, allow_nan=False), "```", "", "## Harmonic residual triage (tracked only)", "", "Thresholds: at least 12 samples, one channel cycle, six of eight phase bins; sine/cosine improvement R² ≥ 0.5 over offset + linear drift; amplitude ≥ max(1 px, 10% median residual). Different segments require distinct fitted/manual setup inputs. Suspicion is not proof.", "", "```json", json.dumps(_safe(summary["harmonicRegressions"]), indent=2, allow_nan=False), "```", "", "## Source coverage", "", "```json", json.dumps(_safe(coverage), indent=2, allow_nan=False), "```", "", "## Evidence limitations", ""])
     lines.extend(f"- {value}" for value in LIMITS.values())
     lines.extend(["", "## Native candidate feasibility", "", "Classification: optimizer-domain-rejection. These counts record physical-domain exclusions during numerical candidate search, not automatically a model defect or an accepted final-state failure. Initial/manual/final-state validation remains strict.", ""])

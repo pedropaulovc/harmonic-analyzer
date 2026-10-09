@@ -35,8 +35,8 @@ reference gooseneck shifted by the catalog free/maximum spring-length margins,
 not a measured screw stop; native spring/equilibrium checks remain authoritative.
 Phase/held-bank bounds span one exact kinematic period rather than an invented
 mechanical stop. Malformed input, objective failure, an infeasible initial setup,
-and unexpected native solver/browser failures propagate loudly. Explicit native
-spring/closure/wire constraint failures of SEARCH CANDIDATES are rejected with
+and unexpected native solver/browser failures propagate loudly. Only the two
+known magnifier hook/wire RangeErrors of SEARCH CANDIDATES are rejected with
 infinite cost and counted in evidence; they cannot become fitted runtime poses.
 """
 from __future__ import annotations
@@ -199,7 +199,22 @@ def affected_groups(path: str, group_ids: Mapping[str, int]) -> list[str]:
 
 
 def _affected(path: str, group_ids: Mapping[str, int]) -> list[int]:
-    return [group_ids[name] for name in affected_groups(path, group_ids)]
+    """Use local measurement support, not downstream hold-out causality."""
+    if path.startswith("phases."):
+        names = [f"channel-{20 - int(path.split('.')[1])}"]
+    elif path.startswith("amplitudes."):
+        names = ["amplitude-bars", "summing", "springs"]
+    elif path == "gearing" or path == "setup.platenOffsetM":
+        names = ["platen-paper"]
+    elif path == "magnification" or path == "setup.wireFixtureOffsetM":
+        names = ["magnifier", "wheel-wire", "pen"]
+    elif path == "setup.counterHeightM":
+        names = ["springs", "summing", "magnifier"]
+    elif path in ("setup.coneSwingRad", "setup.pinionCamRad"):
+        names = ["cones", "platen-paper"]
+    else:
+        names = [f"channel-{k}" for k in range(1, 21)]
+    return [group_ids[name] for name in names if name in group_ids]
 
 
 def fit_setup(
@@ -390,10 +405,15 @@ def fit_setup(
         candidate = deepcopy(best_state)
         x0 = np.array([(_get(candidate, path) - lo) / (hi - lo) for path, (lo, hi) in zip(continuous, bounds, strict=True)])
 
+        def decode(path: str, value: float, lo: float, hi: float) -> float:
+            decoded = float(lo + value * (hi - lo))
+            prior = _get(candidate, path)
+            return prior if math.isclose(decoded, prior, rel_tol=1e-10, abs_tol=1e-12) else decoded
+
         def objective(x: np.ndarray) -> float:
             trial = deepcopy(candidate)
             for path, value, (lo, hi) in zip(continuous, x, bounds, strict=True):
-                _set(trial, path, float(lo + value * (hi - lo)))
+                _set(trial, path, decode(path, value, lo, hi))
             return loss(render(trial, search=True))
 
         result = minimize(objective, x0, method="Nelder-Mead", bounds=[(0.0, 1.0)] * len(continuous), options={"maxfev": 400, "xatol": 0.002, "fatol": 0.0001})
@@ -403,7 +423,7 @@ def fit_setup(
         if result.fun < best_loss:
             best_loss = float(result.fun)
             for path, value, (lo, hi) in zip(continuous, result.x, bounds, strict=True):
-                _set(candidate, path, float(lo + value * (hi - lo)))
+                _set(candidate, path, decode(path, value, lo, hi))
             best_state = candidate
     if best_loss < initial_loss - 1e-8:
         state = best_state

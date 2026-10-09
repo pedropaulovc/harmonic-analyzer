@@ -11,11 +11,12 @@ import time
 import numpy as np
 
 from .camera import interpolate_camera, scale_camera
-from .crank import interpolate_turns
+from .crank import crank_support, interpolate_turns
 
 
 def finalize_video(client, ready, census, root, runtime_shots, runtime_segments,
-                   segment_evidence, manual, width, crank_keys) -> dict:
+                   segment_evidence, manual, width, crank_keys, *, render_code_hash: str,
+                   force: bool = False) -> dict:
     # Import lazily: pipeline owns source transforms and report conventions.
     from . import pipeline as p
 
@@ -28,7 +29,6 @@ def finalize_video(client, ready, census, root, runtime_shots, runtime_segments,
     segments.sort(key=lambda segment: segment['start'])
     census_shots = {shot['id']: shot for shot in census['shots']}
     group_ids = ready['groupIds']
-    render_seal = p.source_seal(p.PROJECT.parent)
     code = hashlib.sha256()
     for module in sorted(Path(__file__).parent.glob('*.py')):
         code.update(module.read_bytes())
@@ -42,7 +42,12 @@ def finalize_video(client, ready, census, root, runtime_shots, runtime_segments,
         raise ValueError(f'No frozen setup segment contains source frame {index}')
 
     def fits_for(segment_id):
-        return segment_evidence.get(segment_id, {}).get('parameterFits', [])
+        entries = segment_evidence.get('parameterFits', [])
+        if isinstance(entries, list):
+            shared = [entry for entry in entries if entry.get('segmentId', segment_id) == segment_id]
+        else:
+            shared = entries.get(segment_id, [])
+        return [*shared, *segment_evidence.get(segment_id, {}).get('parameterFits', [])]
 
     for runtime_shot in sorted(runtime_shots, key=lambda shot: shot['startFrame']):
         shot_started = time.perf_counter()
@@ -68,7 +73,7 @@ def finalize_video(client, ready, census, root, runtime_shots, runtime_segments,
                    'parameterFits': {segment['id']: [entry for entry in fits_for(segment['id'])
                                       if entry.get('shotId') == shot_id] for segment in relevant},
                    'crank': local_keys, 'manualCameras': manual_cameras, 'width': width,
-                   'render': render_seal, 'ready': ready, 'fitCode': code.hexdigest(),
+                   'render': render_code_hash, 'ready': ready, 'fitCode': code.hexdigest(),
                    'sources': [{'viewId': source['view']['viewId'],
                                 'inputHash': source['index']['inputHash'],
                                 'motionInputHash': source['motion'].get('motionInputHash'),
@@ -76,7 +81,7 @@ def finalize_video(client, ready, census, root, runtime_shots, runtime_segments,
         stamp = hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()
         checkpoint = video_root/'fit-checkpoints'/f'final-{shot_id}.json'
         saved = None
-        if checkpoint.is_file():
+        if not force and checkpoint.is_file():
             cached = json.loads(checkpoint.read_text())
             if cached.get('fingerprint') == stamp and all(Path(path).is_file() for path in cached['contactSheets']):
                 saved = cached
@@ -109,8 +114,16 @@ def finalize_video(client, ready, census, root, runtime_shots, runtime_segments,
                         arrays = client.render_batch([p.request(sample) for sample in batch],
                                                      shot_id=shot_id, view_id=view_id)
                     except Exception as exc:
-                        p.write_json(video_root/'fit-checkpoints'/f'setup-suspect-final-{shot_id}.json', {
-                            'shotId': shot_id, 'viewId': view_id,
+                        message = str(exc)
+                        physical_errors = (
+                            'Magnifier hook has left the installed upper hub-tangent branch',
+                            'Pen wire has exhausted its hanging run; reset the physical output fixture before using this clamp setting',
+                        )
+                        classification = 'setup-suspect' if any(
+                            f'RangeError: {reason}' in message for reason in physical_errors
+                        ) else 'execution-error'
+                        p.write_json(video_root/'fit-checkpoints'/f'{classification}-final-{shot_id}.json', {
+                            'classification': classification, 'shotId': shot_id, 'viewId': view_id,
                             'samples': [{'index': sample['index'], 'segmentId': segment_at(sample['index'])['id'],
                                          'input': sample['input']} for sample in batch],
                             'exceptionType': type(exc).__name__, 'exception': str(exc)})
@@ -123,9 +136,15 @@ def finalize_video(client, ready, census, root, runtime_shots, runtime_segments,
                         exact = next((key for key in local_keys if key['t'] == sample['t']), None)
                         independent = view_id != runtime_shot['driverViewId']
                         scope = 'independent-take, not validated' if independent else 'driver'
+                        support = crank_support(ids, sample, group_ids)
+                        origin = (exact or previous or local_keys[0]).get('source', 'inferred')
+                        if origin == 'manual':
+                            origin = 'held'
+                        elif origin == 'tracked' and not support['eligible']:
+                            origin = 'inferred'
                         row = {'shotId': shot_id, 'viewId': view_id, 'index': sample['index'], 't': sample['t'],
                                'segmentId': segment['id'], 'turns': sample['input']['crankTurns'],
-                               'crankSource': (exact or previous or local_keys[0]).get('source', 'inferred'),
+                               'crankSource': origin, 'crankSupport': support,
                                'cameraSource': 'manual' if fixed else 'fitted', 'validationScope': scope,
                                **p.validate_frame(ids, sample, group_ids)}
                         for name, metrics in row['groups'].items():
@@ -136,20 +155,32 @@ def finalize_video(client, ready, census, root, runtime_shots, runtime_segments,
                             metrics['validationScope'] = 'fit-frame, not held-out' if fitted_here else scope
                         frames.append(row)
                         view_frames.append(row)
-                        worst.append((row['chamferPx'] if row['chamferPx'] is not None else 1e9,
-                                      sample['index'], sample, ids.copy()))
-                        worst.sort(key=lambda item: item[0], reverse=True)
+                        directions = [row.get('sourceToRenderChamferPx'), row.get('renderToSourceChamferPx')]
+                        max_directed = max(directions) if all(
+                            value is not None and np.isfinite(value) for value in directions
+                        ) else float('inf')
+                        iou_rank = row['iou'] if row['iou'] is not None and np.isfinite(row['iou']) else -1.
+                        worst.append(((iou_rank, -max_directed), row, sample, ids.copy()))
+                        worst.sort(key=lambda item: item[0])
                         del worst[4:]
-                errors = [row['chamferPx'] for row in view_frames if row['chamferPx'] is not None]
+                errors = [row['chamferPx'] for row in view_frames
+                          if row['chamferPx'] is not None and np.isfinite(row['chamferPx'])]
+                supported = bool(view_frames) and len(view_frames) == len(samples) and all(
+                    row['iou'] is not None and np.isfinite(row['iou']) and row['iou'] >= .5
+                    and all(row.get(field) is not None and np.isfinite(row[field]) and row[field] <= 960
+                            for field in ('sourceToRenderChamferPx', 'renderToSourceChamferPx'))
+                    for row in view_frames)
                 exported['quality'] = {'medianPx': float(np.median(errors)) if errors else None,
                     'p90Px': float(np.percentile(errors, 90)) if errors else None,
                     'maxPx': float(max(errors)) if errors else None,
-                    'status': 'manual' if fixed else ('fitted' if errors and len(errors) == len(samples)
-                                                    and max(errors) <= 960 else 'unfitted')}
+                    'status': 'manual' if fixed else ('fitted' if supported else 'unfitted')}
                 final_shot['views'].append(exported)
-                panels = [{'source': p.source_frame(source, index, fps), 'ids': ids,
+                panels = [{'source': p.source_frame(source, row['index'], fps), 'ids': ids,
                            'title': f'{shot_id}/{view_id} t={sample["t"]:.3f}s T={sample["input"]["crankTurns"]:.3f}',
-                           'errorPx': None if error == 1e9 else error} for error, index, sample, ids in worst]
+                           'errorPx': row['chamferPx'], 'iou': row['iou'],
+                           'sourceToRenderChamferPx': row.get('sourceToRenderChamferPx'),
+                           'renderToSourceChamferPx': row.get('renderToSourceChamferPx')}
+                          for _, row, sample, ids in worst]
                 path = video_root/'report'/'contact-sheets'/f'{shot_id}--{view_id}.png'
                 if panels:
                     p.save_contact_sheet(path, panels, group_ids)

@@ -13,7 +13,10 @@ def _edge_score(ids: np.ndarray, sample: dict, selected_ids: list[int]) -> float
     mask = np.isin(ids, selected_ids)
     if np.count_nonzero(mask) < 8 or not sample['edges'].any():
         return 1e4
-    edges = cv2.morphologyEx(mask.astype(np.uint8), cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0
+    # A union silhouette hides a pen moving over paper and adjacent rockers.
+    # Retain the actual native group boundaries as well as the outer contour.
+    selected = np.where(mask, ids, 0).astype(np.uint16)
+    edges = cv2.morphologyEx(selected, cv2.MORPH_GRADIENT, np.ones((3, 3), np.uint8)) > 0
     if not edges.any():
         return 1e4
     dt = sample.get('edgeDistance')
@@ -50,13 +53,13 @@ def fit_bank_offset(client: Any, sample: dict, group_ids: dict, turns: float) ->
     scored = []
     rejected = {}
     for offset in range(0, 80, 32):
-        requests = _requests(sample, [turns]*len(values[offset:offset+32]), groups)
+        requests = _requests(sample, [turns]*len(values[offset:offset+32]))
         for request, value in zip(requests, values[offset:offset+32]):
             request['input']['setup']['driveCrankOffsetTurns'] = value
         renders = client.render_candidate_batch(requests)
         for reason, count in client.last_candidate_failures.items():
             rejected[reason] = rejected.get(reason, 0)+count
-        scored.extend((_edge_score(ids, sample, selected), value, int(np.count_nonzero(ids)))
+        scored.extend((_edge_score(ids, sample, selected), value, int(np.count_nonzero(np.isin(ids, selected))))
                       for ids, value in zip(renders, values[offset:offset+32]) if ids is not None)
     if not scored:
         # The original/final state remains strict. Do not fabricate a feasible
@@ -74,45 +77,65 @@ def fit_bank_offset(client: Any, sample: dict, group_ids: dict, turns: float) ->
                    'alternatives': [{'driveCrankOffsetTurns': value, 'loss': loss} for loss, value, _ in sorted(scored)[:5]]}
 
 
+def crank_support(ids: np.ndarray, sample: dict, group_ids: dict) -> dict:
+    """Automatic, projection-conditioned crank support; not a source annotation."""
+    mask = ids == group_ids['crank']
+    visible = int(np.count_nonzero(mask))
+    minimum = max(1, math.ceil(150*(sample['width']/480)**2))
+    fraction = float(np.count_nonzero(mask & sample['mask'])/visible) if visible else 0.
+    return {'visiblePixels': visible, 'minVisiblePixels': minimum,
+            'sourceMaskFraction': fraction, 'eligible': visible >= minimum and fraction >= .5}
+
+
 def fit_crank(client: Any, sample: dict, group_ids: dict, previous: float | None,
-              *, explicit_handle_view: bool = False, grid_count: int = 9) -> tuple[float, str, dict]:
+              *, grid_count: int = 9) -> tuple[float, str, dict]:
     centre = 0. if previous is None else previous
     values = np.linspace(centre-.5, centre+.5, grid_count).tolist()
-    # Full posed renders let hidden/occluded crank handles remain hidden. Rendering
-    # crank alone would falsely count geometry behind the bank as observable.
+    # Full poses retain real occlusion. Captions/reason text never qualify a
+    # handle: each candidate needs sufficient projected physical-mask support.
     arrays = client.render_candidate_batch(_requests(sample, values))
-    feasible = [ids for ids in arrays if ids is not None]
-    if not feasible:
+    if not any(ids is not None for ids in arrays):
         client.render(_requests(sample, [centre])[0])
         raise ValueError('No feasible crank candidates')
-    crank_id = group_ids['crank']
-    best_area = max(np.count_nonzero(ids == crank_id) for ids in feasible)
-    handle = explicit_handle_view and best_area >= 16
-    selected = [crank_id] if handle else [value for name, value in group_ids.items() if name != 'static']
-    losses = np.array([_edge_score(ids, sample, selected) if ids is not None else math.inf for ids in arrays])
+    supports = [crank_support(ids, sample, group_ids) if ids is not None else None for ids in arrays]
+    handle = any(support and support['eligible'] for support in supports)
+    selected = [group_ids['crank']] if handle else [
+        value for name, value in group_ids.items() if name != 'static']
+
+    def score(ids, support):
+        if ids is None:
+            return math.inf
+        if handle and not support['eligible']:
+            return 1e4
+        return _edge_score(ids, sample, selected)
+
+    losses = np.array([score(ids, support) for ids, support in zip(arrays, supports)])
     j = int(np.argmin(losses))
     finite_losses = losses[np.isfinite(losses)]
     if losses[j] >= 1e4 or float(np.ptp(finite_losses)) < .1:
-        if arrays[len(values)//2] is None:
-            client.render(_requests(sample, [centre])[0])
+        middle = len(values)//2
+        if arrays[middle] is None:
+            arrays[middle] = client.render(_requests(sample, [centre])[0])
+            supports[middle] = crank_support(arrays[middle], sample, group_ids)
         return float(centre), 'held', {'loss': float(losses[j]), 'phaseContrast': 0.,
-                                     'crankVisiblePixels': int(best_area), 'reason': 'Insufficient independent phase response'}
-    # One quadratic sub-grid proposal improves smooth phase without tripling the
-    # sequential native solve count. Never leave the +/-half-turn continuity band.
-    value = values[j]
+                                     'crankSupport': supports[middle], 'phaseGroups': selected,
+                                     'reason': 'Insufficient phase response'}
+    # One quadratic sub-grid proposal stays within the +/-half-turn search band.
+    value, support = values[j], supports[j]
     if 0 < j < len(values)-1 and np.isfinite(losses[j-1:j+2]).all():
         curvature = losses[j-1]-2*losses[j]+losses[j+1]
         if curvature > 1e-8:
             delta = .5*(losses[j-1]-losses[j+1])/curvature
             proposal = value+float(np.clip(delta, -.5, .5))*(values[1]-values[0])
             ids = client.render_candidate_batch(_requests(sample, [proposal]))[0]
-            proposal_loss = _edge_score(ids, sample, selected) if ids is not None else math.inf
+            proposed_support = crank_support(ids, sample, group_ids) if ids is not None else None
+            proposal_loss = score(ids, proposed_support)
             if proposal_loss < losses[j]:
-                value, losses[j] = proposal, proposal_loss
+                value, losses[j], support = proposal, proposal_loss, proposed_support
     contrast = float(np.median(finite_losses)-losses[j])
-    source = 'tracked' if handle and losses[j] < 32 and contrast > .75 else 'inferred'
+    source = 'tracked' if handle and support['eligible'] else 'inferred'
     return float(value), source, {'loss': float(losses[j]), 'phaseContrast': contrast,
-                                'crankVisiblePixels': int(best_area), 'handleView': bool(explicit_handle_view)}
+                                'crankSupport': support, 'phaseGroups': selected}
 
 
 def _isotonic(values: np.ndarray, weights: np.ndarray) -> np.ndarray:

@@ -86,9 +86,10 @@ Full fits build a private immutable native Vite snapshot under
 preview. The report records the Git revision/dirty state, source and bundle
 hashes, model hash, actual renderer and elapsed runtime. Partial development
 fits disable Vite HMR; neither mode opens a browser window.
-Per-shot checkpoints resume only when source-stage fingerprints, authored
-segments, manual entries, model and fitter/native render code agree. Later mask
-corrections re-fit only their shot; frozen segment setups have their own checkpoint.
+Camera/crank checkpoints resume per ready shot when source-stage fingerprints,
+authored segments, manual entries, model and fitter/native render code agree.
+Later mask corrections re-fit that shot and revalidate affected frozen segments;
+first-observable setup and final validation have separate private checkpoints.
 `--force` discards checkpoint reuse, not the source artifacts. Shot timing goes
 to stderr and private `fit.jsonl`; render timings remain in private `render.jsonl`
 without flooding stderr. Documented native physical-infeasible optimizer
@@ -97,21 +98,42 @@ manual and final chosen states remain strict: no guard is suppressed to obtain
 a usable runtime pose.
 
 `segments.json` supplies timestamp-cited, hand-editable setup priors and visible
-fit parameters. Camera fits use static native geometry before one full-pose
-alternation; moving shots receive half-second camera keys. The largest
-source-machine view, recorded as `driverViewId`, alone drives each shot's setup
-and crank. Other views may be independently filmed takes: their cameras and
-pixel residuals are reported, but they cannot validate that mechanism state.
+fit parameters. Ready shots fit cameras and crank immediately from those priors:
+static native geometry for whole-machine views, full native posed geometry for
+closeups, one full-pose alternation, and half-second camera keys for moving
+shots. Closeup seeds use the physical subject's projected bounds with explicit
+crop-scale candidates, not the whole machine's diameter. The largest
+source-machine view, recorded as
+`driverViewId`, alone drives the mechanism. Other views may be independently
+filmed takes: their cameras and pixel residuals cannot validate that mechanism.
 Manual cameras, setup initializations and crank keys are authoritative.
+Once all shots are ready, a chronological pass fits each requested setup
+parameter at its first native/source-visible driver frame in the segment, then
+freezes it. Thus a platen closeup need not falsely freeze an invisible bank
+origin: the first bank-visible frame supplies that separate integer fit.
+The complete segment is re-posed and densely validated with the final frozen
+values; the fitting frame's affected groups are excluded from independent
+mechanics evidence, while raw pixel-alignment metrics retain every sample.
 
 The crank handle identifies turns only modulo one; the actual channel bank has
 an 80-crank-turn cycle (`channelAngle(T,k) = T*k*pi/40`). Its integer ambiguity
-is fitted once per segment, not silently wrapped every frame. Tracked handle,
-inferred same-parts crank and unobserved held priors remain distinct.
+is fitted once per segment, not silently wrapped every frame. Handle support is
+automatic in the driver view: at least 150 projected crank pixels at a render
+width of 480 (scaled quadratically with width), with at least 50% falling inside
+the physical source mask. Caption/reason text never establishes tracking.
+Tracked handle, inferred same-parts crank and unobserved held priors remain
+distinct; final-pose support can demote a track but does not promote a
+same-parts inference to independent evidence.
 Private reports contain `summary.md`, `summary.json`, dense `residuals.json`
-and worst-first source/render/blend contact sheets. Acceptance uses symmetric,
-untruncated chamfer in original source pixels; missing/empty supports remain
-unvalidated in the denominator. Per-group source support is explicitly
+and lowest-IoU-first source/render/blend contact sheets. Fitted qualification
+requires mask IoU at least 0.5 and **both** untruncated directed chamfers at or
+below 960 original source pixels; their symmetric mean alone cannot hide a
+one-sided failure. Error distributions retain all finite observations,
+including low-IoU failures; missing/empty supports remain in the denominator.
+The camera objective also scores both directions with substantial silhouette
+weight, but its truncated optimization loss is never a validation metric.
+Human-inspected wrong camera/part correspondence remains manual-needed even
+when numerical qualification passes. Per-group source support is explicitly
 projection-conditioned, not an independently labelled part mask. Inferred
 crank and independent takes cannot establish a kinematic defect; harmonic
 attribution requires tracked driver observations across different fitted/manual
@@ -174,8 +196,10 @@ following playback. Shot ownership uses `round(t * fps)` in half-open
 Cameras and crank turns still interpolate in time within the selected shot.
 Non-machine intervals hold the preceding machine's last included frame and its
 setup. Other videos still use the existing path.
-The small Synthesis track is a rough, unfitted development fixture until replaced
-by the fitter; it is not a source-match result.
+Synthesis and Analysis tracks are produced by the checkpointed native-render
+fitter. Their private source/render/blend reports distinguish coarse pixel
+alignment from independent mechanism validation; low pixel error alone does not
+establish measured setup or correct crank phase.
 
 Open `align.html?video=synthesis` (or `video=analysis`) on the Vite dev server.
 Keep the original MP4s in `~/data/harmonic-analyzer-videos/<videoId>.mp4` and the

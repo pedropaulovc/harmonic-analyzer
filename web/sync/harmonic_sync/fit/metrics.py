@@ -50,51 +50,22 @@ def _distances(source: np.ndarray, render: np.ndarray) -> tuple[np.ndarray, np.n
     return distance_transform_edt(~render)[source], distance_transform_edt(~source)[render]
 
 
-def symmetric_chamfer(
+def chamfer_metrics(
     source_edges: np.ndarray,
     render_edges: np.ndarray,
     *,
     source_width: float = 1920,
-) -> float | None:
-    """Mean of both directed edge distances, untruncated, in source pixels.
-
-    For a full-video render use source_width=1920. For a cropped/inset view use
-    its rectSourcePixels width, so the answer still uses original-video pixels.
-    Either empty edge set returns None, including when both sets are empty.
-    """
+) -> dict[str, float | None]:
+    """Both directed distances and their mean, untruncated source-video pixels."""
     source, render = _pair(source_edges, render_edges)
     scale = _scale(source.shape[1], source_width)
+    keys = ("sourceToRenderChamferPx", "renderToSourceChamferPx", "chamferPx")
     if not source.any() or not render.any():
-        return None
+        return dict.fromkeys(keys)
     forward, backward = _distances(source, render)
-    return float((forward.mean() + backward.mean()) * (0.5 * scale))
+    source_to_render = float(forward.mean()*scale)
+    render_to_source = float(backward.mean()*scale)
+    return dict(zip(keys, (source_to_render, render_to_source,
+                           .5*(source_to_render+render_to_source))))
 
 
-def robust_camera_score(
-    source_mask: np.ndarray,
-    source_edges: np.ndarray,
-    render_mask: np.ndarray,
-    render_edges: np.ndarray | None = None,
-    *,
-    source_width: float = 1920,
-    truncation_px: float = 96.0,
-) -> float:
-    """Finite camera minimization loss: clipped chamfer + silhouette penalty.
-
-    This robust loss is not an acceptance metric. Missing support gets a loss
-    larger than any supported score, avoiding empty-render optimizer minima.
-    """
-    source, render = _pair(source_mask, render_mask)
-    edges, projected = _pair(source_edges, mask_edges(render) if render_edges is None else render_edges)
-    if edges.shape != source.shape:
-        raise ValueError("Masks and edges must have the same shape")
-    scale = _scale(source.shape[1], source_width)
-    if not math.isfinite(truncation_px) or truncation_px <= 0:
-        raise ValueError("truncation_px must be positive and finite")
-    iou = mask_iou(source, render)
-    if iou is None or not edges.any() or not projected.any():
-        return float(2 * truncation_px + source_width)
-    forward, backward = _distances(edges, projected)
-    clip_pixels = truncation_px / scale
-    chamfer = (np.minimum(forward, clip_pixels).mean() + np.minimum(backward, clip_pixels).mean()) * (0.5 * scale)
-    return float(chamfer + truncation_px * (1 - iou))
