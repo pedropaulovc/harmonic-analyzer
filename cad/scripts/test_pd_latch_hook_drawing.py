@@ -618,6 +618,122 @@ def test_the_overall_height_is_a_conspicuous_reference_clear_of_every_text() -> 
             )
 
 
+# --- Bottom view: the inside bend's leader (review 4) ---------------------------
+# SolidWorks draws a radius leader radially from the bend's centre to a
+# shoulder under the text, then an underline to the text's far end.  Read
+# off run 4's render (R1.2 placed at (11, -12)): the shoulder at (2.54,
+# -15.0), the underline 15.9 long (local mm); the extension lines start 1.0
+# (sheet mm) off the part and overrun their dimension line 1.1; the arrows
+# of a span too short for its text stand outside, their tails 6.4 past the
+# extension lines.  The gap is taken shorter and the runs longer, so the
+# lines are drawn longer than SolidWorks prints them.
+_BEND_LANDING = (-8.46, -3.0)
+_BEND_UNDERLINE = 15.9
+_EXT_GAP = 0.0008
+_EXT_OVERRUN = 0.002
+_ARROW_RUN = 0.0066
+
+
+def _bottom_lines(
+    keep: dict[str, tuple[float, float]],
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """The bottom view's dimension and extension lines: the base length's
+    under the base (arrows outside), the ear height's right of the ear."""
+    low, ear = drawing._bottom(-geom.BASE_LENGTH, 0.0), drawing._bottom(0.0, 0.0)
+    top = drawing._bottom(0.0, geom.EAR_HEIGHT)
+    y = keep["BaseLength"][1]
+    x = keep["EarHeight"][0]
+    return {
+        "BaseLength": ((low[0] - _ARROW_RUN, y), (ear[0] + _ARROW_RUN, y)),
+        "BaseLength ext low": (
+            (low[0], low[1] - _EXT_GAP),
+            (low[0], y - _EXT_OVERRUN),
+        ),
+        "BaseLength ext ear": (
+            (ear[0], ear[1] - _EXT_GAP),
+            (ear[0], y - _EXT_OVERRUN),
+        ),
+        "EarHeight": ((x, ear[1]), (x, top[1])),
+        "EarHeight ext base": ((ear[0] + _EXT_GAP, ear[1]), (x + _EXT_OVERRUN, ear[1])),
+        "EarHeight ext top": ((top[0] + _EXT_GAP, top[1]), (x + _EXT_OVERRUN, top[1])),
+    }
+
+
+def _bend_leader(
+    xy: tuple[float, float],
+) -> dict[str, tuple[tuple[float, float], tuple[float, float]]]:
+    """The inside bend's leader for its text at ``xy``: the radial run from
+    the bend's centre to the shoulder, and the underline."""
+    corner = geom.SHEET_T + geom.INSIDE_BEND_R
+    centre = drawing._bottom(-corner, corner)
+    shoulder = (
+        xy[0] + _BEND_LANDING[0] * drawing._S,
+        xy[1] + _BEND_LANDING[1] * drawing._S,
+    )
+    return {
+        "InsideBendR leader": (centre, shoulder),
+        "InsideBendR underline": (
+            shoulder,
+            (shoulder[0] + _BEND_UNDERLINE * drawing._S, shoulder[1]),
+        ),
+    }
+
+
+def _crossed(leader, lines) -> list[str]:
+    return sorted(
+        name
+        for p, q in leader.values()
+        for name, (r, s) in lines.items()
+        if _crosses(p, q, r, s)
+    )
+
+
+def test_the_inside_bend_leader_clears_every_dimension_line() -> None:
+    """Review 4: from below-right the radius leader cut the base length's
+    dimension line.  Its text now stands right of the ear between the two
+    dimensions, the base length's moved down under it, so the radial run
+    leaves the bend through the corner gap between the extension lines and
+    the leader and underline cross no dimension or extension line."""
+    # The model reproduces the review's crossing at run 4's placements.
+    run4 = {
+        **drawing.BOTTOM_KEEP,
+        "BaseLength": drawing._bottom(-geom.BASE_LENGTH / 2.0, -6.0),
+    }
+    assert "BaseLength" in _crossed(
+        _bend_leader(drawing._bottom(11.0, -12.0)), _bottom_lines(run4)
+    )
+    keep = drawing.BOTTOM_KEEP
+    leader = _bend_leader(keep["InsideBendR"])
+    assert _crossed(leader, _bottom_lines(keep)) == []
+    # The radial run lands on the bend: between the base and the ear.
+    (cx, cy), (sx, sy) = leader["InsideBendR leader"]
+    angle = math.degrees(math.atan2(sy - cy, sx - cx))
+    assert -60.0 < angle < -30.0
+    # Nor through any other text.
+    texts = {**_texts(), **_notes()}
+    texts.pop("InsideBendR")
+    for line_name, (p, q) in leader.items():
+        for name, box in texts.items():
+            assert not (_inside(p, box) or _inside(q, box)), (line_name, name)
+            assert not any(_crosses(p, q, r, s) for r, s in _box_edges(box)), (
+                line_name,
+                name,
+            )
+
+
+def test_the_screw_hole_callout_names_the_taps_its_bands_serve() -> None:
+    """Review 4: the ±0.05 positions read as unexplained.  The 2X Ø3.20
+    callout names the mate (MHA-PD-007's fixed taps); the holes are drilled
+    to the print, not match-drilled."""
+    assert spec.SCREW_HOLE_MATE == "LOCATE TO MHA-PD-007 TAPS"
+    assert drawing.CALLOUTS_BELOW["ScrewDia"].split("\n") == [
+        spec.SCREW_HOLE_CALLOUT,
+        spec.SCREW_HOLE_MATE,
+    ]
+    assert "MATCH" not in drawing.CALLOUTS_BELOW["ScrewDia"]
+    assert spec.POSITION_TOL == pytest.approx(0.05)
+
+
 class _Display:
     """A drawing dimension stub: its value, the precision put on it."""
 

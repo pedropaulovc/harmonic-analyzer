@@ -25,7 +25,8 @@ How the sheet locates things:
   edge (y = 0), both ±POSITION_TOL at .XX: the Ø3.2 drilled hole's float
   over the basic #4-40 major, less the MHA-PD-007 bar taps' own ±0.065, is
   what each printed position may spend (the fixed-fastener stack, as the
-  guide lock's on its screws);
+  guide lock's on its screws); the hole callout names that mate
+  (SCREW_HOLE_MATE), so the band reads as the taps' and not as arbitrary;
 * the base length ±BASE_LENGTH_TOL at .XX: the .XX row's ±0.51 would thin
   the far screw hole's -X edge wall to 1.79;
 * the width ±WIDTH_TOL: the ear's +Y edge in the guide-lock sweep (the
@@ -272,6 +273,9 @@ ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:2"
 BOTTOM_VIEW_NOTE = "BOTTOM VIEW"
 PAIR_CALLOUT = "2X"
 SCREW_HOLE_CALLOUT = "DRILL THRU"
+# Under the drill line: the mate the ±POSITION_TOL bands serve (review 4).
+# Plain drilled to the print, not match-drilled: the taps are fixed.
+SCREW_HOLE_MATE = "LOCATE TO MHA-PD-007 TAPS"
 # One line: an above-callout (note 3 says where and when it is drilled).
 PIN_HOLE_CALLOUT = "MATCH-DRILL"
 ROUND_CALLOUT = "FULL ROUND"

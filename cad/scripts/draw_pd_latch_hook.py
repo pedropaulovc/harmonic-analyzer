@@ -88,6 +88,7 @@ from pd_latch_hook_spec import (
     REFERENCE_DIMENSIONS,
     ROUND_CALLOUT,
     SCREW_HOLE_CALLOUT,
+    SCREW_HOLE_MATE,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -128,7 +129,7 @@ _MID_Z = sum(_LOCAL_Z) / 2.0
 # view and the isometric at the right above the title block (top 0.066).
 FRONT_CENTER = (0.072, 0.170)
 RIGHT_CENTER = (0.205, FRONT_CENTER[1])
-BOTTOM_CENTER = (0.365, 0.230)
+BOTTOM_CENTER = (0.359, 0.230)
 ISO_CENTER = (0.372, 0.135)
 NOTES_XY = (0.020, 0.062)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.035)
@@ -182,7 +183,7 @@ FRONT_KEEP = {
     "ScrewX2": _front(SCREW_HOLE_X[1] / 2.0, 12.5),
     "ScrewX1": _front(SCREW_HOLE_X[0] / 2.0, 17.5),
     "ScrewY": _front(-32.0, SCREW_HOLE_Y / 2.0),
-    "ScrewDia": _front(-24.0, -8.0),
+    "ScrewDia": _front(-25.0, -8.0),  # its mate line clear of the arm
     "RollStart": _front(20.0, OUTER_ROLL_START[1] / 2.0),
     "FaceY": _front(30.0, FAR_FACE_POINT[1] / 2.0),
     "FaceX": _front(FAR_FACE_POINT[0] / 2.0, -96.0),
@@ -209,19 +210,26 @@ RIGHT_KEEP = {
     "DevTaper2": _flat(66.0, -DEV_TAPER[1] / 2.0),
     "DevRoundC": _flat(74.0, -45.0),
 }
-# Bottom view: the base length under the base, the ear height right of the
-# ear, the inside bend's leader from below-right through the corner.
+# Bottom view: the base length well under the base, the ear height right of
+# the ear, and the inside bend's text between the two, right of the ear: its
+# radial leader leaves the bend at 45 deg, through the corner gap between
+# the two dimensions' extension lines, and crosses no dimension line (review
+# 4: from below, it cut the base length's).  SolidWorks lands that leader on
+# an underline under the text.
 BOTTOM_KEEP = {
-    "BaseLength": _bottom(-BASE_LENGTH / 2.0, -6.0),
+    "BaseLength": _bottom(-BASE_LENGTH / 2.0, -11.0),
     "EarHeight": _bottom(6.0, EAR_HEIGHT / 2.0),
-    "InsideBendR": _bottom(11.0, -12.0),
+    "InsideBendR": _bottom(15.5, -4.0),
 }
 CALLOUTS_ABOVE = {
     "ScrewDia": PAIR_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
     "DevRoundC": FLAT_ROUND_CALLOUT,
 }
-CALLOUTS_BELOW = {"ScrewDia": SCREW_HOLE_CALLOUT, "RoundR": ROUND_CALLOUT}
+CALLOUTS_BELOW = {
+    "ScrewDia": f"{SCREW_HOLE_CALLOUT}\n{SCREW_HOLE_MATE}",
+    "RoundR": ROUND_CALLOUT,
+}
 # The roll's centre sits 80 left of the vertical: off the sheet at 3:2.
 SHORTENED_RADII = ("RollR",)
 # The formed overall height (rule 7), a reference left of the side view: its
