@@ -1,0 +1,13 @@
+vn-magnifying-bracket-screw:
+  title: 18-8 Stainless Steel Fillister Head Slotted Screw
+  number: MHA-VN-050
+  stock_name: 18-8 Stainless Steel Fillister Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [91794A077]
+  material: AISI 304
+  material_specification: 18-8 stainless steel, McMaster-Carr 91794A077
+  finish: passivated
+  quantity: 2
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

@@ -107,6 +107,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A108",
     ),
+    "vn-magnifying-bracket-screw": _stock(
+        "vn-magnifying-bracket-screw",
+        "18-8 Stainless Steel Fillister Head Slotted Screw",
+        "91794A077",
+        material="AISI 304",
+    ),
     "vn-latch-hook-rivet": _stock(
         "vn-latch-hook-rivet",
         "Aluminum Domed Head Solid Rivet",
