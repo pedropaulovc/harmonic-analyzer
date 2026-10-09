@@ -47,6 +47,7 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from sm_knife_mount_spec import (
@@ -64,7 +65,7 @@ from sm_knife_mount_spec import (
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
+    dimension_name,
     place_view,
     remove_notes_matching,
 )
@@ -83,6 +84,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 # SolidWorks' own descriptive thread note; the manufacturing notes state the tap.
 TAPPED_HOLE_NOTE = "Tapped Hole"
+_CENTER_MARK_ANNOTATION = 13  # swAnnotationType_e.swCenterMarkSym
 
 SHEET_SCALE = (2.0, 1.0)
 _BLOCK_CY = (BLK_TOP + BLK_BOT) / 2.0  # block centre height (model mm)
@@ -118,10 +120,16 @@ def _sheet_x(model_x_mm: float) -> float:
     return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
 
 
+# The 29.62 height's dimension line stands at sheet x 0.055, 36 mm off the
+# block's -X face, and the bore's Ø and THRU sit in the band between them,
+# 10.6 mm right of that line and 8.6 mm off the face: the 5ff8fba5d render
+# ran the height line (then x 0.063) 3.62 mm through the Ø (text 58.5..75.3
+# mm).  BORE_DIA_TEXT_HALF_WIDTH is half that render's block.
+BORE_DIA_TEXT_HALF_WIDTH = 0.0084
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
-    "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
-    "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
+    "BlockHeight": (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1]),
+    "BoreDia": (FRONT_CENTER[0] - 0.041, _front_y(BORE_CY) + 0.026),
 }
 # The dowel hole's floor depth stands right of the section, level with the
 # middle of the hole, its witness lines off the cut top seat and hole floor.
@@ -319,8 +327,22 @@ async def build(adapter: Any) -> dict[str, str]:
     # count is logged, not gated; finalize_drawing then proves none is left.
     removed_tap_notes = remove_notes_matching(adapter, TAPPED_HOLE_NOTE)
     _telemetry.info(f"removed {removed_tap_notes} automatic tapped-hole note(s)")
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to knife bore")
+    # One arrow on the bore's near (upper-left) rim, its leader short from
+    # the text on the left; native, the Ø line ran rim to rim through the
+    # centre and across the view to a shoulder left of it.
+    bore_dia = [a for a in annotations if dimension_name(adapter, a) == "BoreDia"]
+    if len(bore_dia) != 1:
+        raise RuntimeError(f"expected one BoreDia dimension, found {len(bore_dia)}")
+    set_near_side_diameter(bore_dia[0], "knife-bore diameter")
+    # The template centre-marks every hole as each view is placed (the top
+    # view's two holes and section A-A carry marks no call asked for), so an
+    # explicit AutoInsertCenterMarks2 on the front view printed the bore's
+    # mark twice (DetailItem346/352 at one point; #913).  Prove the one mark.
+    marks = (
+        _early_bound(front, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+    if len(marks) != 1:
+        raise RuntimeError(f"expected one knife-bore centre mark, found {len(marks)}")
 
     # Block depth (14): dimension the right view's flat front/back faces.
     add_edge_dimension(

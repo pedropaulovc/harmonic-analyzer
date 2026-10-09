@@ -117,6 +117,30 @@ def test_the_tap_is_stated_once_in_the_notes_not_by_solidworks_note() -> None:
     )
 
 
+def test_bore_callout_stands_between_the_height_line_and_the_block() -> None:
+    # 5ff8fba5d render: the 29.62 dimension line ran 3.62 mm through the
+    # Ø12.00 THRU text, and the Ø line crossed the bore and the view to a
+    # shoulder left of it.  The text now sits in the band between the height
+    # line and the block's -X face, at least 5 mm clear of each, and the Ø
+    # is drawn as one arrow on the near rim.
+    height_x, _ = drawing.FRONT_KEEP["BlockHeight"]
+    x, y = drawing.FRONT_KEEP["BoreDia"]
+    face_x = drawing._sheet_x(-sm_knife_mount_spec.BLK_HALF_X)
+    assert x - drawing.BORE_DIA_TEXT_HALF_WIDTH > height_x + 0.005
+    assert x + drawing.BORE_DIA_TEXT_HALF_WIDTH < face_x - 0.005
+    # Above the bore centre, so the leader descends to the upper-left rim.
+    assert y > drawing._front_y(sm_knife_mount_spec.BORE_CY)
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert 'set_near_side_diameter(bore_dia[0], "knife-bore diameter")' in source
+
+
+def test_the_template_alone_centre_marks_the_bore() -> None:
+    # #913 on this sheet: the template marks the bore as the front view is
+    # placed, and an explicit auto-insert printed a second mark over it.
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "auto_center_marks" not in source
+    assert "expected one knife-bore centre mark" in source
+
 
 def test_spec_geometry_mirrors_the_build_source() -> None:
     # The drawing's view math reads the spec's mirrored nominals for placement
