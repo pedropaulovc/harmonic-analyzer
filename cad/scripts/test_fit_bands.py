@@ -194,6 +194,27 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
         "indexed by _feature_requirements.limits for the stud-drill inspection limits"
     ),
+    ("ch_rocker_arm_tl_c_stop_bar_spec", "DRILLED_BAND"): (
+        "indexed by _feature_requirements.limits for screw-hole inspection limits"
+    ),
+    ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"): (
+        "indexed by _feature_requirements.limits for tap-drill inspection limits"
+    ),
+    ("ch_rocker_arm_tl_filing_button_spec", "BORE_BAND"): (
+        "matched-fit design intent, indexed by filing_stud_spec for bore clearance"
+    ),
+    ("ch_rocker_arm_tl_filing_stud_spec", "BODY_BAND"): (
+        "matched-fit design intent, indexed for the rocker and filing-button clearances"
+    ),
+    ("ch_rocker_arm_tl_pivot_screw_spec", "SHOULDER_BAND"): (
+        "matched-fit design intent, indexed for the rocker and fixture-bore clearances"
+    ),
+    ("ch_rocker_arm_tl_pivot_screw_spec", "HEAD_BAND"): (
+        "matched-fit design intent, indexed for the outline-template bush clearance"
+    ),
+    ("ch_rocker_arm_tl_profile_fixture_spec", "STAND_DROP_BAND"): (
+        "indexed for the hub-shim gap, strap air and stand-pocket engagement"
+    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}
