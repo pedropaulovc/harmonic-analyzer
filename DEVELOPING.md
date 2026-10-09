@@ -54,8 +54,10 @@ explicit way to stop a run, `-Cancel` (see
   Set `HARMONIC_AGENT_SCRATCHPAD` to the host-visible root of the agent's
   scratchpad, or pass `-LogDirectory` to override it. The directory holds the
   run records, logs, build snapshots, shared environments and each run's
-  outputs. A `local://` tool URI is not a Windows filesystem path and cannot be
-  passed directly to this PowerShell launcher.
+  outputs. In OMP, resolve its `local://` URI before launching with
+  `HARMONIC_AGENT_SCRATCHPAD="$(realpath local://)"`. The launcher enables
+  `core.longpaths=true` only for itself and its child processes, allowing deep
+  snapshots without changing the user's Git configuration.
 
 ### Parameters
 

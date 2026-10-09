@@ -259,11 +259,13 @@ such build:
   final output under the agent-local scratchpad:
   `$env:HARMONIC_AGENT_SCRATCHPAD\harmonic-analyzer\farm-runs`, falling back to
   `%LOCALAPPDATA%\ha-farm\runs`.
-  Explicit `-LogDirectory` overrides the default. The OMP `local://` namespace
-  is not a Windows filesystem path; use a host-visible scratchpad path through
-  `HARMONIC_AGENT_SCRATCHPAD` when one is available. Outputs land in the run
-  record's `outputs` (`<LogDirectory>\<run-id>.out`), not the worktree's
-  `cad/out`, and recovery works from the recorded commit, not the worktree. A
+  Explicit `-LogDirectory` overrides the default. The OMP `local://` URI is not a
+  Windows filesystem path; convert it with `realpath local://` and pass the
+  result through `HARMONIC_AGENT_SCRATCHPAD`. The launcher scopes Git long-path
+  support to its process tree; global Git configuration stays unchanged.
+  Outputs land in the run record's `outputs` (`<LogDirectory>\<run-id>.out`),
+  not the worktree's `cad/out`, and recovery works from the recorded commit,
+  not the worktree. A
   direct `build.py --executor farm` has no snapshot: it refuses to dispatch a
   leaf whose key a checkout change since launch can move, naming the files, so
   never commit or edit in that worktree mid-run.

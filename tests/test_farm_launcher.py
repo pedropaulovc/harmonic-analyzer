@@ -669,6 +669,48 @@ def test_launch_defaults_to_the_agent_scratchpad(tmp_path: Path) -> None:
     assert json.loads(status_result.stdout.splitlines()[-1])["state"] == "succeeded"
 
 
+def test_agent_scratchpad_snapshot_supports_windows_long_paths(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path, submodules=True)
+    worktree = Path(fixture["worktree"])
+    relative = (
+        Path("deep-" + "a" * 33)
+        / ("nested-" + "b" * 33)
+        / ("leaf-" + "c" * 26)
+        / "payload.txt"
+    )
+    tracked_file = worktree / relative
+    tracked_file.parent.mkdir(parents=True)
+    tracked_file.write_text("long tracked path\n", encoding="utf-8")
+    _git(worktree, "add", "--", relative.as_posix())
+    _git(worktree, "commit", "-q", "-m", "add long tracked path")
+    _git(worktree, "update-ref", "refs/remotes/origin/main", "HEAD")
+
+    scratchpad = tmp_path / "agent scratchpad"
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_AGENT_SCRATCHPAD"] = str(scratchpad)
+    command = _command(fixture, "part:pen_rod")
+    log_directory_argument = command.index("-LogDirectory")
+    del command[log_directory_argument : log_directory_argument + 2]
+
+    default_directory = scratchpad / "harmonic-analyzer" / "farm-runs"
+    snapshot_file = default_directory / "snapshots" / ("0" * 12) / relative
+    assert len(str(tracked_file)) < 260
+    assert len(str(snapshot_file)) > 260
+
+    result = _run_launcher(fixture, command, environment)
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    finished = json.loads(result.stdout.splitlines()[-1])
+    assert Path(finished["log"]).parent == default_directory
+    assert finished["snapshot_removed"] is True
+    assert finished["cleanup_errors"] == []
+    assert (Path(finished["outputs"]) / "reports" / "stub-output.txt").read_text(
+        encoding="utf-8"
+    ) == "built\n"
+
+
 def test_launch_defaults_to_local_appdata_when_no_agent_scratchpad_is_set(
     tmp_path: Path,
 ) -> None:
