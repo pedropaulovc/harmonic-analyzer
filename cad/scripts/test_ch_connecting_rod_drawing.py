@@ -133,8 +133,10 @@ def test_linked_notes_are_functional_and_not_title_block_duplicates() -> None:
     # imports from the model, the bore its imported model tolerance and the
     # fork its 3-place model bands; notes never repeat a sheet dimension.
     assert "#47" not in notes
-    assert "RING 3.00, SHANK 2.50 THICK" in notes
-    assert "SHANK AND FORK ON ONE MIDPLANE" in notes
+    # #948 ruling R: one 2.200 plate at three places (title block linear_3pl).
+    assert "2. RING AND SHANK 2.200 THICK;" in notes
+    assert "SYMMETRIC TO SLOT WITHIN 0.10." in notes
+    assert "3.00" not in notes and "2.50" not in notes
     assert "0.10 MIN CLR/SIDE" in notes
     assert "RING WALL 4.50 MIN AFTER BORING" in notes
     assert "SLOT CENTRED; TINES EQUAL WITHIN 0.10" in notes

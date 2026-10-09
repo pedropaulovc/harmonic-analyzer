@@ -187,9 +187,10 @@ async def build(adapter: Any) -> dict[str, str]:
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     # The 1:1 left view (third angle: placed LEFT of the front) shows the
-    # stepped thickness -- ring 3.0, shank 2.5, and the 6.075 fork split by its
-    # slot into two tines -- and carries the fork's thickness, slot width, slot
-    # depth and boss length.  The right-hand column belongs to the title block,
+    # stepped thickness -- one 2.200 plate for ring and shank (note 2), and the
+    # 6.075 fork split by its slot into two tines -- and carries the fork's
+    # thickness, slot width, slot depth and boss length.  The right-hand
+    # column belongs to the title block,
     # so the side view lives on the left.
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))

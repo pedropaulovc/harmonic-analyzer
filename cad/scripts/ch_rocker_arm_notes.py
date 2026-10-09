@@ -17,6 +17,7 @@ from ch_rocker_arm_spec import (
     PIVOT_MID_Y,
     R_BOTTOM,
     R_TOP,
+    STRAP_HUB_SYMMETRY,
     TIP_FACE,
     TOP_ARC_LEN,
     HUB_DIA,
@@ -88,8 +89,11 @@ DRAWING_NOTES = "\n".join(
         # REAM is the fit bore's process requirement (policy rule 6); its
         # +0.03/0 band rides the O6.50 natively and its Ra the bore's symbol.
         "6. PIVOT HOLE: REAM.",
-        f"7. INTEGRAL HUB DIA {HUB_DIA:.{DEFAULT_DRAWING_PRECISION}f}, CENTRED ON THE",
-        "   STRAP: THE HUBS SET THE STATION PITCH",
+        # #948 ruling R: the rod's float on the arm is taken from the hub's
+        # mid-plane, so the strap's offset from it is held.
+        "7. STRAP SYMMETRIC TO HUB WITHIN "
+        f"{STRAP_HUB_SYMMETRY:.{DEFAULT_DRAWING_PRECISION}f};",
+        f"   INTEGRAL HUB DIA {HUB_DIA:.{DEFAULT_DRAWING_PRECISION}f} SETS THE PITCH",
         "   (NO SPACERS). HUB OD COAXIAL WITH PIVOT",
         f"   BORE WITHIN Ø{HUB_COAXIALITY_DIA:.{DEFAULT_DRAWING_PRECISION}f} (TURN HUB AND REAM",
         "   BORE IN ONE SETUP).",
