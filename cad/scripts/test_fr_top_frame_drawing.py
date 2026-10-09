@@ -858,6 +858,47 @@ def test_hanger_datums_are_picked_on_their_rims_toward_their_tags() -> None:
         assert to_pick[0] * to_tag[0] + to_pick[1] * to_tag[1] > 0.0, datum
 
 
+def test_hanger_datum_leaders_run_clear_of_the_slot_frames() -> None:
+    # Farm run 20261009T171439353Z: datum B's leader, rim (107.5, 172.4) to
+    # its tag at (122.0, 185.0) mm, ran 7.88 mm through the front slot
+    # frame's text [78.9, 179.1]..[128.6, 184.2] mm (leader-through-text).
+    from _layout_geometry import Box, Segment, segment_box_overlap_length
+
+    x0, y0, x1, y1 = drawing.HANGER_SLOT_FRAME_TEXT_BOX
+    frames = {
+        station: Box(fx + x0, fy + y0, fx + x1, fy + y1)
+        for station, (fx, fy) in drawing.HANGER_SLOT_FRAME_XY.items()
+    }
+    front = frames["front"]
+    assert (front.xmin, front.ymin, front.xmax, front.ymax) == pytest.approx(
+        (0.0789, 0.1791, 0.1286, 0.1842)
+    )
+    centre = drawing.HUB_BOTTOM_CENTER
+    m_per_mm = drawing._HUB_BOTTOM_M_PER_MM
+    for datum, station_z in (("B", part.STUD_Z_FRONT), ("C", part.STUD_Z_REAR)):
+        hole = (
+            centre[0] + part.PIN_HOLE_X * m_per_mm,
+            centre[1] + station_z * m_per_mm,
+        )
+        tag = drawing.HANGER_DATUM_SYMBOL_XY[datum]
+        leader = Segment(*drawing.hanger_datum_pick(hole, tag), *tag)
+        for station, box in frames.items():
+            assert segment_box_overlap_length(leader, box) == 0.0, (datum, station)
+            # The 7 mm letter box above the tag point keeps 3 mm off the frame.
+            letter = Box(tag[0] - 0.0035, tag[1], tag[0] + 0.0035, tag[1] + 0.007)
+            assert (
+                letter.xmin - box.xmax >= 0.003
+                or box.xmin - letter.xmax >= 0.003
+                or letter.ymin - box.ymax >= 0.003
+                or box.ymin - letter.ymax >= 0.003
+            ), (datum, station)
+    # The tag stays in the window right of the crossbar, above the front
+    # rail's inner face.
+    bx, by = drawing.HANGER_DATUM_SYMBOL_XY["B"]
+    assert bx > centre[0] + part.BAR_X1 * m_per_mm
+    assert by > centre[1] - part.INNER_Z * m_per_mm
+
+
 def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
     text = spec.HANGER_PIN_HOLE_CALLOUT
     assert text.startswith("2X ") and "REAM" in text and "MHA-VN-051" in text

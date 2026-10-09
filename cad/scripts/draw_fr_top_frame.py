@@ -402,9 +402,12 @@ HANGER_SECTION_CALLOUTS = {
 }
 HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
 # Sheet 6, UNDERSIDE locator (1:3, model x right and z up from the view
-# centre): datum B is the front round dowel hole, its tag in the window
-# right of the crossbar; datum C the rear one, its tag above the rear rail
-# so its leader climbs away from F-F's right arrow.  Each slot's position
+# centre): datum B is the front round dowel hole, its tag low in the window
+# right of the crossbar, past the front slot frame's right end and under its
+# bottom, so its leader runs clear of that frame's text (at (122, 185) mm it
+# ran 7.9 mm through it, farm run 20261009T171439353Z); datum C the rear
+# one, its tag above the rear rail so its leader climbs away from F-F's
+# right arrow.  Each slot's position
 # frame, B|C> in front and C|B> at the rear (the translation modifier frees
 # the slot along the line to the other station's round hole), stands in the
 # window left of the crossbar, between its junction gussets and right of
@@ -413,7 +416,7 @@ HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
 # the band under the front rail, between the locator's label and the
 # land's dimension line.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
-HANGER_DATUM_SYMBOL_XY = {"B": (0.122, 0.185), "C": (0.130, 0.257)}
+HANGER_DATUM_SYMBOL_XY = {"B": (0.136, 0.176), "C": (0.130, 0.257)}
 # Each round hole is 1.06 mm across at 1:3, its rim 1.0 mm (sheet) inside
 # the crossbar's +X edge, so the rim is hit-tested zoomed onto a 5 mm square
 # (draw_ch_rocker_arm's pivot-bore datum precedent), where the pick aperture
@@ -434,6 +437,10 @@ def hanger_datum_pick(
     radius = HANGER_PIN_HOLE_DIA / 2.0 * _HUB_BOTTOM_M_PER_MM
     return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
 HANGER_SLOT_FRAME_XY = {"front": (0.078, 0.185), "rear": (0.078, 0.218)}
+# Each slot frame's printed text box from its frame_xy (sheet m), as farm
+# run 20261009T171439353Z measured the front one: [78.9, 179.1]..[128.6,
+# 184.2] mm from (78, 185).
+HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0059, 0.0506, -0.0008)
 HANGER_SLOT_WIDTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] + (BAR_X0 - 24.0) * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
