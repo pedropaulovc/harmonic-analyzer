@@ -33,6 +33,7 @@ fits:
   cone_drum_oblique_mesh:  # the inclined cone partial engagement
     edge_slack_mm: 0.25              # selected 48DP PA20 oblique partial engagement
     centre_opening_mm: 0.20           # total booked opening, including runout/bearing allowance
+    drum_tooth_to_cam_notch_clock_deg: 0.02  # drum tooth pattern to CAM-NOTCH half-width (Main ruling 2026-10-09)
     note: "oblique partial engagement; checker-arbitrated edge slacks 0.00..1.14"
 
   crank_mesh:              # 16T:64T crossed mesh (crank machine-z over the inclined 64T)
