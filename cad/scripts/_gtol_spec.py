@@ -54,8 +54,17 @@ def gtol_frame_xml(
     *,
     datums: Sequence[str] = (),
     diameter: bool = False,
+    translated: Sequence[str] = (),
 ) -> str:
-    """Build the SOLIDWORKS-2022+ feature-control-frame XML payload."""
+    """Build the SOLIDWORKS-2022+ feature-control-frame XML payload.
+
+    ``translated`` names the datum references that carry the ASME Y14.5-2018
+    translation modifier (the open triangle after the letter): the frame
+    XML's per-compartment ``<Translation>`` flag (SOLIDWORKS API help, "Gtol
+    Frame XML Schema", the Datum dialog's triangle control).  A clocking
+    datum feature of size at a basic distance from the primary takes it, so
+    its simulator may slide along that distance and only orients.
+    """
     symbol = GTOL_SYMBOLS.get(characteristic)
     if symbol is None:
         raise ValueError(f"unsupported geometric characteristic: {characteristic!r}")
@@ -63,6 +72,11 @@ def gtol_frame_xml(
         raise ValueError("feature-control-frame tolerance cannot be blank")
     if len(datums) > 3 or any(not d or len(d) > 2 for d in datums):
         raise ValueError(f"invalid datum reference sequence: {tuple(datums)!r}")
+    if not set(translated) <= set(datums) or (datums and datums[0] in translated):
+        raise ValueError(
+            f"translation modifier on {tuple(translated)!r} must name a "
+            f"non-primary datum of {tuple(datums)!r}"
+        )
     root = ElementTree.Element("GtolFrame")
     ElementTree.SubElement(root, "ToleranceSymbol").text = symbol
     range_info = ElementTree.SubElement(root, "ToleranceRangeInfo")
@@ -71,6 +85,8 @@ def gtol_frame_xml(
         ElementTree.SubElement(range_info, "PrimaryRangeSymbol").text = "phi"
     for datum in datums:
         compartment = ElementTree.SubElement(root, "DatumCompartment")
+        if datum in translated:
+            ElementTree.SubElement(compartment, "Translation").text = "true"
         detail = ElementTree.SubElement(compartment, "DatumDetail")
         ElementTree.SubElement(detail, "DatumLetter").text = datum
     return ElementTree.tostring(root, encoding="unicode", short_empty_elements=True)
@@ -84,6 +100,7 @@ class GtolFrameSignature:
     tolerance: str
     datums: tuple[str, ...]
     tolerance_zone: ToleranceZone
+    translated: tuple[str, ...] = ()
 
 
 def gtol_frame_signature(xml: str) -> GtolFrameSignature:
@@ -117,11 +134,24 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
     if any(value != "phi" for value in range_symbols) or len(range_symbols) > 1:
         raise ValueError(f"unsupported primary range symbols: {range_symbols!r}")
     tolerance_zone: ToleranceZone = "diametral" if range_symbols else "linear"
+    translated = tuple(
+        letter.text or ""
+        for compartment in root.iter()
+        if compartment.tag.rsplit("}", 1)[-1] == "DatumCompartment"
+        and any(
+            child.tag.rsplit("}", 1)[-1] == "Translation"
+            and (child.text or "").strip().lower() == "true"
+            for child in compartment
+        )
+        for letter in compartment.iter()
+        if letter.tag.rsplit("}", 1)[-1] == "DatumLetter"
+    )
     return GtolFrameSignature(
         characteristic_symbol=symbols[0],
         tolerance=tolerances[0],
         datums=tuple(texts("DatumLetter")),
         tolerance_zone=tolerance_zone,
+        translated=translated,
     )
 
 

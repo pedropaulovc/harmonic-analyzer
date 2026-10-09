@@ -14,6 +14,7 @@ from _gtol_spec import (
     SphereFace,
     TorusFace,
     gtol_frame_signature,
+    gtol_frame_xml,
     validate_part_pmi,
 )
 from _part_pmi import _FaceGeometry, _face_matches
@@ -221,3 +222,20 @@ def test_imported_pmi_placement_requires_one_attachment() -> None:
             attachment_xy=(0.1, 0.1),
             entity=SimpleNamespace(),
         )
+
+
+def test_frame_xml_carries_the_translation_modifier_on_its_datum_only() -> None:
+    xml = gtol_frame_xml(
+        "position", "0.05", datums=("B", "C"), translated=("C",)
+    )
+
+    signature = gtol_frame_signature(xml)
+
+    assert signature.datums == ("B", "C")
+    assert signature.translated == ("C",)
+    plain = gtol_frame_xml("position", "0.05", datums=("B",))
+    assert gtol_frame_signature(plain).translated == ()
+    with pytest.raises(ValueError, match="non-primary datum"):
+        gtol_frame_xml("position", "0.05", datums=("B", "C"), translated=("B",))
+    with pytest.raises(ValueError, match="non-primary datum"):
+        gtol_frame_xml("position", "0.05", datums=("B",), translated=("D",))

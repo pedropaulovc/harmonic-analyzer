@@ -905,6 +905,75 @@ def add_datum_feature(
     return tag
 
 
+def add_dimension_datum_feature(
+    adapter: Any,
+    view: Any,
+    *,
+    dimension: Any,
+    datum: str,
+    label: str,
+) -> Any:
+    """Attach a native datum-feature symbol to a size dimension.
+
+    A pattern of holes is one datum feature when the symbol rides the
+    pattern's ``nX`` size dimension (ASME Y14.5-2018 §7.4), not one hole's
+    rim.  The display dimension is selected by its own selection name (the
+    ``draw_dt_cone_gear`` flat-clock idiom) before ``InsertDatumTag2``;
+    SOLIDWORKS seats the symbol on the dimension itself (between its value
+    and the below-callout lane -- see :func:`set_dimension_callouts`), so
+    the tag is not repositioned.  It must read back its label and exactly
+    one ``swSelDIMENSIONS`` attachment, not dangling.
+    """
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"failed to activate the view for datum {datum} ({label})")
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "GetNameForSelection"
+    )
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        str(display.GetNameForSelection()),
+        "DIMENSION",
+        0.0,
+        0.0,
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError(f"failed to select the dimension for datum {datum} ({label})")
+    tag = draw.InsertDatumTag2()
+    if tag is None:
+        raise RuntimeError(f"failed to insert datum {datum} ({label})")
+    tag = _sw_type_info.early_bound_or_flag(
+        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel"
+    )
+    if not tag.SetLabel(datum):
+        raise RuntimeError(f"failed to label datum feature {datum} ({label})")
+    tag_annotation = _sw_type_info.early_bound_or_flag(
+        tag.GetAnnotation(),
+        "IAnnotation",
+        "GetAttachedEntityCount3",
+        "GetAttachedEntityTypes",
+        "IsDangling",
+    )
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="add_dimension_datum_feature")
+    if str(tag.GetLabel()) != datum:
+        raise RuntimeError(f"datum feature label did not persist ({label})")
+    count = int(tag_annotation.GetAttachedEntityCount3())
+    types = tuple(int(t) for t in (tag_annotation.GetAttachedEntityTypes() or ()))
+    dangling = bool(tag_annotation.IsDangling())
+    if count != 1 or types != (_SEL_DIMENSION,) or dangling:
+        raise RuntimeError(
+            f"datum {datum} is not attached to its dimension ({label}): "
+            f"count={count}, types={types}, dangling={dangling}"
+        )
+    return tag
+
+
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
 def add_feature_control_frame(
     adapter: Any,
@@ -923,8 +992,17 @@ def add_feature_control_frame(
     entity_type: str = "EDGE",
     entity: Any | None = None,
     leader_attach_xy: tuple[float, float] | None = None,
+    translated: Sequence[str] = (),
+    composite_lower: tuple[str, Sequence[str]] | None = None,
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
+
+    ``translated`` names datum references printed with the translation
+    modifier (``_gtol_spec.gtol_frame_xml``).  ``composite_lower`` is the
+    lower tier ``(tolerance, datums)`` of a composite frame: a second frame of
+    the same characteristic (``IGtol.AddFrame``) joined to the first by
+    ``IGtol.SetCompositeFrame2(True, 1)`` (both frames must share the symbol),
+    proved by ``GetCompositeFrame2(1)`` and each frame's XML read back.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.  Only the kinds
@@ -976,6 +1054,8 @@ def add_feature_control_frame(
         "SetLeader",
         "IsAttached",
         "GetLeaderCount",
+        "SetCompositeFrame2",
+        "GetCompositeFrame2",
     )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
@@ -1026,14 +1106,46 @@ def add_feature_control_frame(
     frame = _sw_type_info.early_bound_or_flag(
         frame, "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
     )
-    xml = _gtol_frame_xml(characteristic, tolerance, datums=datums, diameter=diameter)
-    if not migrated and not frame.SetSymbolXml(xml):
+    xml = _gtol_frame_xml(
+        characteristic, tolerance, datums=datums, diameter=diameter,
+        translated=translated,
+    )
+    # A migrated frame was seeded through the old setters, which carry no
+    # translation modifier; the current-format XML then states it.
+    if (not migrated or translated) and not frame.SetSymbolXml(xml):
         raise RuntimeError(f"SOLIDWORKS rejected feature-control frame XML ({label})")
     applied = str(frame.GetSymbolXml() or "")
     if _GTOL_SYMBOLS[characteristic] not in applied or tolerance not in applied:
         raise RuntimeError(f"feature-control frame did not persist ({label})")
+    if translated:
+        from _gtol_spec import gtol_frame_signature
+
+        if gtol_frame_signature(applied).translated != tuple(translated):
+            raise RuntimeError(
+                f"feature-control frame lost its translation modifier ({label})"
+            )
     if int(gtol.GetFormat()) != 2:  # swGtolFormatType_e.GTOL_SW2022 (current)
         raise RuntimeError(f"feature-control frame remained in old format ({label})")
+    if composite_lower is not None:
+        lower_tolerance, lower_datums = composite_lower
+        if not gtol.AddFrame() or int(gtol.GetFrameCount() or 0) != 2:
+            raise RuntimeError(f"failed to add the composite lower tier ({label})")
+        lower = _sw_type_info.early_bound_or_flag(
+            gtol.GetFrame(2), "IGtolFrame", "SetSymbolXml", "GetSymbolXml"
+        )
+        lower_xml = _gtol_frame_xml(
+            characteristic, lower_tolerance, datums=lower_datums, diameter=diameter
+        )
+        if not lower.SetSymbolXml(lower_xml):
+            raise RuntimeError(
+                f"SOLIDWORKS rejected the composite lower-tier XML ({label})"
+            )
+        gtol.SetCompositeFrame2(True, 1)
+        if not gtol.GetCompositeFrame2(1):
+            raise RuntimeError(f"feature-control frame is not composite ({label})")
+        lower_applied = str(lower.GetSymbolXml() or "")
+        if lower_tolerance not in lower_applied:
+            raise RuntimeError(f"composite lower tier did not persist ({label})")
     if quantity:
         if not gtol.InsertBelowFrameTextAt(1, quantity):
             raise RuntimeError(f"failed to add feature quantity {quantity!r} ({label})")
