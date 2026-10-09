@@ -41,11 +41,18 @@ _BAND_HELPERS = {"deviations": 0, "band_text": 0, "fit_limits": 1}
 _SETTER = "set_dimension_bilateral_tolerance"
 
 # A consumer whose argument is a name local to build() (so it cannot be read off
-# the imported module) must say here which module-level value build() derives it
-# from. "each" means build() loops over the tuple of bands.
+# the imported module) must say here which module-level expression build()
+# derives it from. "each" checks a tuple of bands; "values" checks a band mapping.
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
     ("build_dt_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
+    # Fixture builders apply the same bands their specs publish on the sheet.
+    ("build_ch_rocker_arm_tl_c_stop_bar", "band"): ("DRAWING_BANDS", "values"),
+    ("build_ch_rocker_arm_tl_inspection_box", "band"): ("DRAWING_BANDS", "values"),
+    ("build_ch_rocker_arm_tl_diamond_pin", "band"): (
+        "(LAND_BAND, LAND_HEIGHT_BAND, SHANK_BAND, NECK_BAND, REAM_BAND, COLLAR_END_BAND)",
+        "each",
+    ),
     # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
     ("dt_cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
         "GENERAL_BAND_BY_PLACES",
@@ -175,6 +182,39 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
     ),
+    ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"): (
+        "indexed for the symmetric rod-pin coordinate tolerance and position budget"
+    ),
+    ("ch_rocker_arm_tl_profile_fixture_spec", "DRILLED_BAND"): (
+        "indexed by _feature_requirements.limits for drilled-hole inspection limits"
+    ),
+    ("ch_rocker_arm_tl_vise_stop_spec", "SCREW_LENGTH_BAND"): (
+        "indexed for the ISO 4762 screw's minimum engagement and maximum protrusion"
+    ),
+    ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
+        "indexed by _feature_requirements.limits for the stud-drill inspection limits"
+    ),
+    ("ch_rocker_arm_tl_c_stop_bar_spec", "DRILLED_BAND"): (
+        "indexed by _feature_requirements.limits for screw-hole inspection limits"
+    ),
+    ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"): (
+        "indexed by _feature_requirements.limits for tap-drill inspection limits"
+    ),
+    ("ch_rocker_arm_tl_filing_button_spec", "BORE_BAND"): (
+        "matched-fit design intent, indexed by filing_stud_spec for bore clearance"
+    ),
+    ("ch_rocker_arm_tl_filing_stud_spec", "BODY_BAND"): (
+        "matched-fit design intent, indexed for the rocker and filing-button clearances"
+    ),
+    ("ch_rocker_arm_tl_pivot_screw_spec", "SHOULDER_BAND"): (
+        "matched-fit design intent, indexed for the rocker and fixture-bore clearances"
+    ),
+    ("ch_rocker_arm_tl_pivot_screw_spec", "HEAD_BAND"): (
+        "matched-fit design intent, indexed for the outline-template bush clearance"
+    ),
+    ("ch_rocker_arm_tl_profile_fixture_spec", "STAND_DROP_BAND"): (
+        "indexed for the hub-shim gap, strap air and stand-pocket engagement"
+    ),
 }
 
 KNOWN_BAD: dict[str, pytest.MarkDecorator] = {}
@@ -246,7 +286,7 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
     key = (use.module, use.expression)
     if key in LOCAL_BAND_SOURCES:
         source, how = LOCAL_BAND_SOURCES[key]
-        value = getattr(module, source)
+        value = eval(source, vars(module))  # noqa: S307 -- repo source
         if how == "values":
             return [(f"{source}[{places!r}]", band) for places, band in value.items()]
         assert how == "each", f"unknown local-source mode {how!r}"
@@ -260,6 +300,26 @@ def _resolve(use: BandUse) -> list[tuple[str, Any]]:
             "it to LOCAL_BAND_SOURCES with the module-level value it derives from."
         ) from error
     return [(use.expression, value)]
+
+
+@pytest.mark.parametrize(
+    ("module_name", "expected"),
+    [
+        ("build_ch_rocker_arm_tl_c_stop_bar", "DRAWING_BANDS"),
+        ("build_ch_rocker_arm_tl_inspection_box", "DRAWING_BANDS"),
+        (
+            "build_ch_rocker_arm_tl_diamond_pin",
+            "(LAND_BAND, LAND_HEIGHT_BAND, SHANK_BAND, NECK_BAND, REAM_BAND, COLLAR_END_BAND)",
+        ),
+    ],
+)
+def test_fixture_local_sources_cover_every_band(module_name: str, expected: str) -> None:
+    module = _import(module_name)
+    source = eval(expected, vars(module))  # noqa: S307 -- repo source
+    bands = list(source.values()) if isinstance(source, dict) else list(source)
+    resolved = _resolve(BandUse(module_name, 0, "band", "upper_lower"))
+    assert [band for _, band in resolved] == bands
+    assert all(any(band is actual for _, actual in resolved) for band in bands)
 
 
 def _check_band(label: str, band: Any, order: str) -> None:
@@ -344,9 +404,9 @@ def test_every_band_tuple_is_checked_or_classified() -> None:
         module = importlib.import_module(use.module)
         key = (use.module, use.expression)
         if key in LOCAL_BAND_SOURCES:
-            source = getattr(module, LOCAL_BAND_SOURCES[key][0])
+            source = eval(LOCAL_BAND_SOURCES[key][0], vars(module))  # noqa: S307
             checked.add(id(source))
-            checked.update(id(band) for band in source)
+            checked.update(id(band) for _, band in _resolve(use))
             continue
         try:
             checked.add(id(eval(use.expression, vars(module))))  # noqa: S307
