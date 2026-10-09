@@ -11,6 +11,7 @@ import { PAPER_FEED_MULTIPLIER } from './kinematics'
 import { captureNativePrimitives, diagnosticNativePrimitiveMetadata, inspectNativeTargetSurfaceTarget, nativeCaptureModels, nativeInputSnapshot, prepareNativeTargetSurfaceAssociation, sealNativeDrawState, nativeRenderSubmissions, trackNativePrimitiveSubmissions, unavailableNativePrimitiveSnapshot, type NativeCaptureModel, type NativeDrawStateToken, type NativeInputSnapshot, type NativeObject, type NativePrimitiveDraw, type NativePrimitiveModelSnapshot, type NativePrimitiveSnapshot, type NativePrimitiveSubmission, type NativePrimitiveSubmissionMetadata, type NativeSpringEvaluator, type NativeTargetSurfaceAssociation, type NativeTargetSurfaceInspection, type NativeTargetSurfacePass, type NativeTargetSurfaceRequest } from './native-primitive-snapshot'
 import { NATIVE_RUNTIME_INSTANCES, OPERATING_SOURCE_ASSEMBLY, type SourceAssemblyState } from './source-assembly'
 import { captureNativeDiagnosticRendererState, restoreNativeDiagnosticRendererState, measureNativeTargetShaderFeedback, type NativeDiagnosticRendererState, type NativeTargetShaderFeedbackResult } from './native-target-shader-feedback'
+import { createSpringCullingBounds, type SpringCullingBounds } from './spring-culling-bounds'
 
 export type Point3 = readonly [number, number, number]
 export type Quaternion4 = readonly [number, number, number, number]
@@ -3377,7 +3378,16 @@ const preparedSprings = new WeakMap<THREE.BufferGeometry, Map<string, THREE.Buff
  * only here. The frame loop changes one length uniform and one rigid matrix.
  */
 function createSpringDeformer(node: THREE.Object3D, restLengthM: number, stock: SpringStock): SpringDeformer {
-  const length = { value: restLengthM }
+  const bounds: SpringCullingBounds[] = []
+  let span = restLengthM
+  const length = {
+    get value() { return span },
+    set value(value: number) {
+      if (Object.is(span, value)) return
+      span = value
+      for (const bound of bounds) bound.update(span, rest.value)
+    },
+  }
   const rest = { value: restLengthM }
   const counter = stock === 'counter'
   const source = counter ? MECHANISM_DATA.counter : MECHANISM_DATA.spring
@@ -3595,8 +3605,9 @@ ${positionExpression}
       geometry = prepared
     }
     object.geometry = geometry
-    // Source bounding spheres describe the saved length, not the extended coil.
-    object.frustumCulled = false
+    const bound = createSpringCullingBounds(object, { radius, inset, endCorrection, turns })
+    bound.update(length.value, rest.value)
+    bounds.push(bound)
     meshes.push(object)
     object.material = Array.isArray(object.material) ? object.material.map(deformedClone) : deformedClone(object.material)
   })

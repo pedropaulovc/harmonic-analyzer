@@ -54,6 +54,12 @@ const fixture = element<HTMLInputElement>('#fixture-offset')
 const cone = element<HTMLInputElement>('#cone-swing')
 const pinion = element<HTMLInputElement>('#pinion-cam')
 const platen = element<HTMLInputElement>('#platen-offset')
+const crankValue = element<HTMLOutputElement>('#crank-value')
+const magnificationValue = element<HTMLOutputElement>('#magnification-value')
+const fixtureValue = element<HTMLOutputElement>('#fixture-value')
+const coneValue = element<HTMLOutputElement>('#cone-value')
+const pinionValue = element<HTMLOutputElement>('#pinion-value')
+const platenValue = element<HTMLOutputElement>('#platen-value')
 const manualRunButton = element<HTMLButtonElement>('#manual-run')
 const speed = element<HTMLInputElement>('#crank-speed')
 const forceReadout = element<HTMLOutputElement>('#force-readout')
@@ -220,10 +226,34 @@ let diagnosticMachine: Machine | null = null
 let lastTick = performance.now()
 let lastHud = 0
 const channelInputs: { amplitude: HTMLInputElement; phase: HTMLInputElement; value: HTMLOutputElement }[] = []
+// Only the normal following poll is cached. Explicit seeks and diagnostic
+// publications still execute renderSource and retain their transaction semantics.
+let followingPollReference: SourcePublicationReference | null = null
+let followingPollMachine: Machine | null = null
+let followingPollTime = NaN
+let followingPollExposureTime = NaN
+let followingPollPresentedFrame = -1
+let followingPollSeekState = ''
+let followingPollDrawRevision = -1
 
 function notice(target: HTMLElement, message: string): void {
   if (target.textContent !== message) target.textContent = message
   target.hidden = message.length === 0
+}
+
+const controlValueCache = new WeakMap<HTMLInputElement | HTMLSelectElement | HTMLOutputElement, { submitted: string; observed: string }>()
+
+function setControlValue(control: HTMLInputElement | HTMLSelectElement | HTMLOutputElement, value: string): void {
+  const cached = controlValueCache.get(control)
+  const current = control.value
+  // Range/select controls can normalize an assigned value. Remember both the
+  // submitted model value and its DOM result without masking subsequent edits.
+  if (cached?.submitted === value && cached.observed === current) return
+  if (current !== value) control.value = value
+  if (cached) {
+    cached.submitted = value
+    cached.observed = control.value
+  } else controlValueCache.set(control, { submitted: value, observed: control.value })
 }
 
 function copyInput(source: MechanismInput, target = input): void {
@@ -615,6 +645,26 @@ function renderSource(timeSeconds: number, sourceReference: SourcePublicationRef
   notice(sourceError, sourceReference.approximationMessage)
 }
 
+function renderFollowingSource(timeSeconds: number): void {
+  const seekState = player && isSourceVideoPlayer(player) ? player.getSeekState() : ''
+  const presented = player && isSourceVideoPlayer(player) && seekState === 'idle' ? player.getPresentation() : null
+  const exposureTime = presented ? originalPresentedSampleTime(presented) : timeSeconds
+  const presentedFrame = presented?.frameIndex ?? -1
+  if (paintRevision === 'clean' && physicsState === 'available' && referenceState !== 'unavailable'
+    && reference === followingPollReference && machine === followingPollMachine
+    && timeSeconds === followingPollTime && exposureTime === followingPollExposureTime
+    && presentedFrame === followingPollPresentedFrame && seekState === followingPollSeekState
+    && sourceDrawRevision === followingPollDrawRevision) return
+  renderSource(timeSeconds)
+  followingPollReference = reference
+  followingPollMachine = machine
+  followingPollTime = timeSeconds
+  followingPollExposureTime = exposureTime
+  followingPollDrawRevision = sourceDrawRevision
+  followingPollPresentedFrame = presentedFrame
+  followingPollSeekState = seekState
+}
+
 function beforeView(_view: SourceView, index: number): void {
   const sample = activeViews[index]
   if (sample) applyView(sample)
@@ -623,8 +673,8 @@ function beforeView(_view: SourceView, index: number): void {
 function updateHud(inputMode: 'sync' | 'preserve' = 'sync'): void {
   const time = player?.getTime() ?? 0
   if (player && isSourceVideoPlayer(player) && manualSourceSeek === 'idle' && document.activeElement !== sourceScrub) {
-    sourceScrub.value = String(time)
-    sourceScrubTime.value = `${time.toFixed(3)} s`
+    setControlValue(sourceScrub, String(time))
+    setControlValue(sourceScrubTime, `${time.toFixed(3)} s`)
   }
   const chosen = mode === 'exploring' ? undefined : primaryView()
   const context = mode === 'exploring'
@@ -636,8 +686,9 @@ function updateHud(inputMode: 'sync' | 'preserve' = 'sync'): void {
   const valueLabel = (field: InputField, value: string): string => `${value}${hidden.includes(field) ? ' · chosen, not measured' : mode !== 'exploring' && !chosen ? ' · not source-measured' : ''}`
   const markControl = (control: HTMLInputElement | HTMLSelectElement, field: InputField): void => {
     const provenance = mode === 'exploring' ? 'manual' : !chosen ? 'unobserved' : hidden.includes(field) ? 'chosen' : 'measured'
-    control.dataset.provenance = provenance
-    control.title = provenance === 'chosen' ? 'Chosen physically feasible input; source setting unobserved, not measured.' : provenance === 'manual' ? 'Manual physical input; not a source measurement.' : provenance === 'unobserved' ? 'Source setting unobserved; retained physical input is not measured.' : 'Source-measured input.'
+    if (control.dataset.provenance !== provenance) control.dataset.provenance = provenance
+    const title = provenance === 'chosen' ? 'Chosen physically feasible input; source setting unobserved, not measured.' : provenance === 'manual' ? 'Manual physical input; not a source measurement.' : provenance === 'unobserved' ? 'Source setting unobserved; retained physical input is not measured.' : 'Source-measured input.'
+    if (control.title !== title) control.title = title
   }
   markControl(crank, 'crankTurns')
   markControl(gearing, 'gearing')
@@ -657,30 +708,30 @@ function updateHud(inputMode: 'sync' | 'preserve' = 'sync'): void {
   const clock = ` · ${time.toFixed(1)} s`
   if (playbackClock.textContent !== clock) playbackClock.textContent = clock
   if (inputMode === 'sync') {
-    crank.value = String(input.crankTurns)
-    element<HTMLOutputElement>('#crank-value').value = valueLabel('crankTurns', `${input.crankTurns.toFixed(3)} turns`)
-    gearing.value = input.gearing
-    magnification.value = String(input.magnification)
-    fixture.value = String(input.setup.wireFixtureOffsetM)
-    cone.value = String(input.setup.coneSwingRad)
-    pinion.value = String(input.setup.pinionCamRad)
-    platen.value = String(input.setup.platenOffsetM)
-    element<HTMLOutputElement>('#magnification-value').value = valueLabel('magnification', `${input.magnification.toFixed(3)}×`)
-    element<HTMLOutputElement>('#fixture-value').value = valueLabel('setup.wireFixtureOffsetM', `${(input.setup.wireFixtureOffsetM * 1000).toFixed(1)} mm`)
-    element<HTMLOutputElement>('#cone-value').value = valueLabel('setup.coneSwingRad', `${(input.setup.coneSwingRad * 180 / Math.PI).toFixed(2)}°`)
-    element<HTMLOutputElement>('#pinion-value').value = valueLabel('setup.pinionCamRad', `${(input.setup.pinionCamRad * 180 / Math.PI).toFixed(1)}°`)
-    element<HTMLOutputElement>('#platen-value').value = valueLabel('setup.platenOffsetM', `${(input.setup.platenOffsetM * 1000).toFixed(1)} mm`)
+    setControlValue(crank, String(input.crankTurns))
+    setControlValue(crankValue, valueLabel('crankTurns', `${input.crankTurns.toFixed(3)} turns`))
+    setControlValue(gearing, input.gearing)
+    setControlValue(magnification, String(input.magnification))
+    setControlValue(fixture, String(input.setup.wireFixtureOffsetM))
+    setControlValue(cone, String(input.setup.coneSwingRad))
+    setControlValue(pinion, String(input.setup.pinionCamRad))
+    setControlValue(platen, String(input.setup.platenOffsetM))
+    setControlValue(magnificationValue, valueLabel('magnification', `${input.magnification.toFixed(3)}×`))
+    setControlValue(fixtureValue, valueLabel('setup.wireFixtureOffsetM', `${(input.setup.wireFixtureOffsetM * 1000).toFixed(1)} mm`))
+    setControlValue(coneValue, valueLabel('setup.coneSwingRad', `${(input.setup.coneSwingRad * 180 / Math.PI).toFixed(2)}°`))
+    setControlValue(pinionValue, valueLabel('setup.pinionCamRad', `${(input.setup.pinionCamRad * 180 / Math.PI).toFixed(1)}°`))
+    setControlValue(platenValue, valueLabel('setup.platenOffsetM', `${(input.setup.platenOffsetM * 1000).toFixed(1)} mm`))
     for (let i = 0; i < channelInputs.length; i++) {
       const controls = channelInputs[i]!
-      controls.amplitude.value = String(input.amplitudes[i]!)
-      controls.phase.value = String(input.phases[i]! * 180 / Math.PI)
+      setControlValue(controls.amplitude, String(input.amplitudes[i]!))
+      setControlValue(controls.phase, String(input.phases[i]! * 180 / Math.PI))
       markControl(controls.amplitude, `amplitudes[${i}]`)
       markControl(controls.phase, `phases[${i}]`)
-      controls.value.value = `${valueLabel(`amplitudes[${i}]`, `${(input.amplitudes[i]! * MECHANISM_DATA.channel.maximumStationMm).toFixed(1)} mm`)} · ${valueLabel(`phases[${i}]`, `${(input.phases[i]! * 180 / Math.PI).toFixed(0)}°`)}`
+      setControlValue(controls.value, `${valueLabel(`amplitudes[${i}]`, `${(input.amplitudes[i]! * MECHANISM_DATA.channel.maximumStationMm).toFixed(1)} mm`)} · ${valueLabel(`phases[${i}]`, `${(input.phases[i]! * 180 / Math.PI).toFixed(0)}°`)}`)
     }
   }
   if (!machine || machine.availability !== 'available' || physicsState !== 'available') {
-    forceReadout.value = modelState === 'ready' ? 'Mechanical state rejected; last rendered geometry retained.' : 'No compatible CAD mechanical state available.'
+    setControlValue(forceReadout, modelState === 'ready' ? 'Mechanical state rejected; last rendered geometry retained.' : 'No compatible CAD mechanical state available.')
     return
   }
   let minimum = Infinity
@@ -692,7 +743,7 @@ function updateHud(inputMode: 'sync' | 'preserve' = 'sync'): void {
   const forceView = mode === 'exploring' ? undefined : lastContributingView()
   const forceProvenance = mode === 'exploring' ? 'Manual physical calculation — not source measurements' : forceView ? 'Chosen-input physical calculation — not source measurements' : 'Last physical calculation — source reconstruction unavailable, not source-measured'
   const counterChoice = forceView?.unobservedInputFields.includes('setup.counterHeightM') ? `\nCounter ${forceView.input.setup.counterHeightM === null ? 'auto-level algorithm' : 'height'} chosen, not measured` : ''
-  forceReadout.value = `${forceProvenance}${forceView ? ` · view ${forceView.id}` : ''}\n20 springs · ${minimum.toFixed(2)}–${maximum.toFixed(2)} N\nTorque residual ${machine.pose.equilibriumResidualNm.toExponential(1)} N·m\nPaper feed ${(machine.pose.platenTravelM * 1000).toFixed(2)} mm${counterChoice}`
+  setControlValue(forceReadout, `${forceProvenance}${forceView ? ` · view ${forceView.id}` : ''}\n20 springs · ${minimum.toFixed(2)}–${maximum.toFixed(2)} N\nTorque residual ${machine.pose.equilibriumResidualNm.toExponential(1)} N·m\nPaper feed ${(machine.pose.platenTravelM * 1000).toFixed(2)} mm${counterChoice}`)
 }
 
 function editMechanism(action: () => void): void {
@@ -908,7 +959,7 @@ function tick(now: number): void {
     if (mode === 'exploring' && manualSourceSeek === 'idle' && player && isSourceVideoPlayer(player)
       && player.getSeekState() === 'idle' && player.getState() === 'playing') retryFollowing()
     if (mode === 'following-video' && player) {
-      renderSource(player.getTime())
+      renderFollowingSource(player.getTime())
     } else if (mode === 'exploring') {
       if (manualMotion === 'turning') {
         input.crankTurns += elapsed * Number(speed.value)
@@ -1100,6 +1151,7 @@ if (verificationEnabled) {
         throw aggregate
       }
       const restoreFrame = (frame: NativeDiagnosticFrame) => {
+        followingPollReference = null
         try {
           mode = frame.mode
           referenceState = frame.referenceState
