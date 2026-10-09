@@ -212,6 +212,140 @@ def test_refresh_dof_gate_can_reuse_an_already_resolved_model(
     assert rebuilds == []
 
 
+@pytest.mark.parametrize(
+    "asm_name", ["ch-channel", "ch_channel", "ch_channel.SLDASM"]
+)
+@pytest.mark.parametrize("resolve", [True, False])
+@pytest.mark.parametrize("state", ["free", "insufficient", "pinned", "stray"])
+def test_refresh_dof_gate_matches_canonical_artifact_identity(
+    tmp_path, monkeypatch, asm_name, resolve, state
+) -> None:
+    import _assembly
+
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    (tmp_path / ".ch-channel.dof.json").write_text(
+        json.dumps(
+            {
+                "stem": "ch-channel",
+                "specs": [
+                    {"verify": ["ch-rocker-arm-1", []]},
+                    {"verify": ["ch-rocker-arm-1", []]},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def component(name, status=2):
+        return SimpleNamespace(
+            Name2=name,
+            IsFixed=False,
+            IsPatternInstance=lambda: False,
+            GetConstrainedStatus=lambda: status,
+        )
+
+    components = [component("ch-rocker-arm-1"), component("ch-rocker-arm-2")]
+    if state == "insufficient":
+        components[1] = component("ch-rocker-arm-2", status=3)
+    elif state == "pinned":
+        components[0] = component("ch-rocker-arm-1", status=3)
+        components.append(component("ch-rocker-arm-3"))
+    elif state == "stray":
+        components[1] = component("structural-bracket-1")
+    rebuilds = []
+    adapter = _Adapter()
+    adapter.currentModel.GetComponents = lambda _top_only: components
+    adapter.currentModel.ForceRebuild3 = lambda _top_only: rebuilds.append(True) or True
+
+    if state == "free":
+        assert_manifest_dof_state(adapter, asm_name, resolve=resolve)
+    else:
+        errors = {
+            "insufficient": "expected >= 2 free operational DOF",
+            "pinned": r"required instance.*ch-rocker-arm-1",
+            "stray": "structural-bracket-1",
+        }
+        with pytest.raises(RuntimeError, match=errors[state]):
+            assert_manifest_dof_state(adapter, asm_name, resolve=resolve)
+
+    assert rebuilds == ([True] if resolve else [])
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        {"stem": "dt-drive-train"},
+        {"stem": "channel"},
+        {"stem": "ch_channel"},
+        {"stem": ""},
+        {"stem": None},
+        {"stem": 42},
+        {},
+    ],
+)
+def test_refresh_dof_gate_refuses_wrong_or_missing_manifest_identity(
+    tmp_path, monkeypatch, identity
+) -> None:
+    import _assembly
+
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    path = tmp_path / ".ch-channel.dof.json"
+    # A valid channel witness cannot authorize a manifest naming another assembly.
+    contents = json.dumps(
+        {**identity, "specs": [{"verify": ["ch-rocker-arm-1", []]}]}
+    )
+    path.write_text(contents, encoding="utf-8")
+    monkeypatch.setattr(
+        _assembly,
+        "assert_free_dof_necessity",
+        lambda *_args, **_kwargs: pytest.fail("untrusted manifest reached DOF gate"),
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "allowed_free_stems",
+        lambda *_args: pytest.fail("untrusted manifest reached family contract"),
+    )
+    monkeypatch.setattr(
+        _assembly,
+        "assert_components_fully_defined",
+        lambda *_args, **_kwargs: pytest.fail("invalid manifest used missing fallback"),
+    )
+
+    with pytest.raises(RuntimeError, match="expected 'ch-channel'"):
+        assert_manifest_dof_state(object(), "ch_channel.SLDASM", resolve=False)
+
+    assert path.read_text(encoding="utf-8") == contents
+
+
+@pytest.mark.parametrize("resolve", [True, False])
+@pytest.mark.parametrize("status", [3, 2])
+def test_refresh_dof_gate_without_manifest_keeps_strict_gate(
+    tmp_path, monkeypatch, resolve, status
+) -> None:
+    import _assembly
+
+    monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
+    component = SimpleNamespace(
+        Name2="ch-rocker-arm-1",
+        IsFixed=False,
+        IsPatternInstance=lambda: False,
+        GetConstrainedStatus=lambda: status,
+    )
+    rebuilds = []
+    adapter = _Adapter()
+    adapter.currentModel.GetComponents = lambda _top_only: [component]
+    adapter.currentModel.ForceRebuild3 = lambda _top_only: rebuilds.append(True) or True
+
+    if status == 3:
+        assert_manifest_dof_state(adapter, "ch-channel", resolve=resolve)
+    else:
+        with pytest.raises(RuntimeError, match="components not fully defined"):
+            assert_manifest_dof_state(adapter, "ch-channel", resolve=resolve)
+
+    assert rebuilds == ([True] if resolve else [])
+    assert not (tmp_path / ".ch-channel.dof.json").exists()
+
+
 def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) -> None:
     import _assembly
 
