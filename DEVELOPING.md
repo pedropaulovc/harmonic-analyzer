@@ -48,11 +48,16 @@ explicit way to stop a run, `-Cancel` (see
   silently leave it out of the build.
 - **A protocol-compatible pool checkout** at `-PoolHome`, holding `farm.py`, and
   Azure credentials for the cache (`az login`; `off` is refused).
-- **A log directory outside every Git worktree.** It holds the run records, the
-  logs, the build snapshots, the shared environments and each run's outputs. A
-  snapshot inside some worktree would show up there as an untracked nested
-  checkout, so a `-LogDirectory` inside any Git work tree is refused before
-  anything is created.
+- **A log directory outside every Git worktree.** By default the launcher uses
+  `$env:HARMONIC_AGENT_SCRATCHPAD\harmonic-analyzer\farm-runs`; if unset, it
+  uses `%LOCALAPPDATA%\ha-farm\runs`.
+  Set `HARMONIC_AGENT_SCRATCHPAD` to the host-visible root of the agent's
+  scratchpad, or pass `-LogDirectory` to override it. The directory holds the
+  run records, logs, build snapshots, shared environments and each run's
+  outputs. In OMP, resolve its `local://` URI before launching with
+  `HARMONIC_AGENT_SCRATCHPAD="$(realpath local://)"`. The launcher enables
+  `core.longpaths=true` only for itself and its child processes, allowing deep
+  snapshots without changing the user's Git configuration.
 
 ### Parameters
 
@@ -60,10 +65,16 @@ explicit way to stop a run, `-Cancel` (see
 |---|:---:|---|
 | `-Worktree` | yes | absolute path to the checkout whose pushed HEAD is built; the build runs from a private snapshot of that commit, never from here |
 | `-PoolHome` | yes | absolute path to the `solidworks-pool` checkout; exported as `SOLIDWORKS_POOL_HOME` |
-| `-LogDirectory` | yes | absolute path for the logs, run records, snapshots, shared environments and outputs; created if missing, and rejected if it resolves inside any Git worktree |
+| `-LogDirectory` | no | optional absolute path for run files and outputs; defaults under the agent scratchpad and must resolve outside every Git worktree |
 | `-Targets` | yes | doit task names as ONE comma-separated string (`part:pn_pen_rod,part:dt_cone_gear`) |
 | `-LeafTimeout` | yes | per-attempt remote leaf budget in minutes, 1–180 |
 | `-Tag` | no | label recorded with the run (letters, digits, `_`, `-`); defaults to `run` |
+
+When `HARMONIC_AGENT_SCRATCHPAD` is set, it names the scratchpad root and the
+launcher creates an application subdirectory beneath it. Otherwise, the
+default root is `%LOCALAPPDATA%\ha-farm`, which
+survives automatic temporary-file cleanup. Pass its resulting absolute path
+when handing a run to an agent on another host.
 
 Targets are *selections*, not variables, and they arrive as one string. `pwsh
 -File` binds a single token per parameter, so a repeated `-Targets` or a
@@ -196,7 +207,6 @@ would lose live monitoring, so it is not used.
     "-File", "C:/src/harmonic-analyzer/scripts/farm-run.ps1",
     "-Worktree", "C:/src/harmonic-smoke",
     "-PoolHome", "C:/src/solidworks-pool",
-    "-LogDirectory", "C:/src/dt-logs/farm-runs",
     "-Targets", "part:pn_pen_rod",
     "-LeafTimeout", "90",
     "-Tag", "smoke"
@@ -212,23 +222,24 @@ The full closure is the same call with `"-Targets", "build"` and
 `"-Tag", "full-build"`. Do not `hub stop` a live launcher to quiet the console —
 retune it with `op: "monitor"`, `progress: "ambient"` or `"off"`. The watcher is
 [`-Watch`](#tracking-a-run-status-watch-list-cancel), not the hub's console and
-not a loop waiting for `.done`. To hand off, pass on the run id from the
-readiness line and the `-LogDirectory`; a successor tracks the run with the same
-command, whether or not the hub is still around.
+not a loop waiting for `.done`. To hand off, pass the run id from the readiness
+line and the effective `-LogDirectory` (the default when omitted, or the
+explicit override); a successor tracks the run with the same command, whether
+or not the hub is still around.
 
 ### Tracking a run: status, watch, list, cancel
 
-Every operation takes `-LogDirectory` and selects one run by `-RunId <run-id>`
-or `-Tag <tag>` (the newest run with that tag). A selection that matches nothing,
-or both selectors at once, exits 2.
+Every operation selects one run by `-RunId <run-id>` or `-Tag <tag>` (the newest
+run with that tag). Omitting `-LogDirectory` uses the same scratchpad default as
+launch; supply the original explicit directory when the launch overrode it. A
+selection that matches nothing, or both selectors at once, exits 2.
 
 ```powershell
 $launcher = 'C:/src/harmonic-analyzer/scripts/farm-run.ps1'
-$runs = 'C:/src/dt-logs/farm-runs'
-pwsh -NoProfile -File $launcher -Status -LogDirectory $runs -RunId <run-id>
-pwsh -NoProfile -File $launcher -Watch  -LogDirectory $runs -Tag full-build
-pwsh -NoProfile -File $launcher -List   -LogDirectory $runs -State running -MaxAgeHours 24
-pwsh -NoProfile -File $launcher -Cancel -LogDirectory $runs -RunId <run-id> -Why 'superseded by <sha>'
+pwsh -NoProfile -File $launcher -Status -RunId <run-id>
+pwsh -NoProfile -File $launcher -Watch  -Tag full-build
+pwsh -NoProfile -File $launcher -List   -State running -MaxAgeHours 24
+pwsh -NoProfile -File $launcher -Cancel -RunId <run-id> -Why 'superseded by <sha>'
 ```
 
 The run's state is derived, never trusted from one file: `.done`'s `state` when

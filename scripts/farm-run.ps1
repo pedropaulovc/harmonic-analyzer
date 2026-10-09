@@ -8,8 +8,26 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [string]$PoolHome,
 
-    [Parameter(Mandatory)]
-    [string]$LogDirectory,
+    # Use a host-visible scratchpad when supplied by the harness; callers must
+    # resolve `local://` before passing it. Deep snapshots use process-local
+    # Git long-path support, without changing the user's Git configuration.
+    [string]$LogDirectory = $(
+        $scratchpad = [System.Environment]::GetEnvironmentVariable(
+            'HARMONIC_AGENT_SCRATCHPAD'
+        )
+        if ([string]::IsNullOrWhiteSpace($scratchpad)) {
+            $localAppData = [System.Environment]::GetEnvironmentVariable(
+                'LOCALAPPDATA'
+            )
+            if ([string]::IsNullOrWhiteSpace($localAppData)) {
+                throw 'LOCALAPPDATA missing; set HARMONIC_AGENT_SCRATCHPAD'
+            }
+            Join-Path $localAppData 'ha-farm\runs'
+        }
+        else {
+            Join-Path $scratchpad 'harmonic-analyzer\farm-runs'
+        }
+    ),
 
     [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [string[]]$Targets,
@@ -67,6 +85,38 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $script:PSNativeCommandUseErrorActionPreference = $false
+
+# A snapshot rooted under an agent scratchpad can exceed Windows MAX_PATH.
+# Scope core.longpaths to this process tree and preserve any Git environment
+# configuration already supplied by the caller.
+$gitConfigCount = 0
+$gitConfigCountText = [System.Environment]::GetEnvironmentVariable(
+    'GIT_CONFIG_COUNT',
+    'Process'
+)
+if (-not [string]::IsNullOrWhiteSpace($gitConfigCountText)) {
+    if (
+        -not [int]::TryParse($gitConfigCountText, [ref]$gitConfigCount) -or
+        $gitConfigCount -lt 0
+    ) {
+        throw 'GIT_CONFIG_COUNT must be a non-negative integer'
+    }
+}
+[System.Environment]::SetEnvironmentVariable(
+    "GIT_CONFIG_KEY_$gitConfigCount",
+    'core.longpaths',
+    'Process'
+)
+[System.Environment]::SetEnvironmentVariable(
+    "GIT_CONFIG_VALUE_$gitConfigCount",
+    'true',
+    'Process'
+)
+[System.Environment]::SetEnvironmentVariable(
+    'GIT_CONFIG_COUNT',
+    [string]($gitConfigCount + 1),
+    'Process'
+)
 
 function Resolve-ExistingDirectory {
     param(
@@ -1718,8 +1768,9 @@ try {
         $outputsPath = Join-Path $resolvedLogDirectory "$runId.out"
         # _farm._dispatch names each workflow here before creating it.
         $requestsPath = Join-Path $resolvedLogDirectory "$runId.requests"
-        # A short name keeps the snapshot's deepest tracked path under MAX_PATH;
-        # the run record maps it back to the run.
+        # Keep the extra snapshot nesting short; Git long-path support is scoped
+        # to this launcher and its child processes. The run record maps this
+        # short name back to the run.
         $snapshotPath = Join-Path (Join-Path $resolvedLogDirectory 'snapshots') $runGuid.Substring(0, 12)
         $hasConflict = (
             (Test-Path -LiteralPath $recordPath) -or

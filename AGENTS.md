@@ -48,7 +48,11 @@ credibility rests on:
    the last DFM backstop: a finding that exposes a plausible model omission,
    contradiction, or unmanufacturable feature must be reconciled against the
    source CAD and primary evidence, not papered over on the sheet. Escalate a
-   materially ambiguous geometry or process choice to the user.
+   materially ambiguous geometry or process choice to the user. Before asking
+   the user to choose a geometry change, include a clear drawing sketch comparing
+   the viable options, with relevant dimensions, interfaces, clearances, and
+   manufacturing tradeoffs called out where known; never ask an unillustrated
+   geometry question.
 3. **The logbook is the source of truth for process.** No machining operation is
    written up in the book that hasn't been performed and logged. An agent may
    never author a logbook entry.
@@ -250,12 +254,20 @@ such build:
   querying the fleet, so an undefined CAD/build-script name cannot dispatch a
   COM leaf even when the stamped checks would run later in the doit graph.
 - The build runs from a private snapshot of the pushed HEAD under
-  `-LogDirectory` (which must sit outside every Git worktree), so the caller's
-  worktree may change mid-run; outputs land in the run record's `outputs`
-  (`<LogDirectory>\<run-id>.out`), not the worktree's `cad/out`, and recovery
-  works from the recorded commit, not the worktree. A direct
-  `build.py --executor farm` has no snapshot: it refuses to dispatch a leaf
-  whose key a checkout change since launch can move, naming the files, so
+  `-LogDirectory` (which must sit outside every Git worktree). By default the
+  launcher stores its logs, run records, snapshots, shared environments and
+  final output under the agent-local scratchpad:
+  `$env:HARMONIC_AGENT_SCRATCHPAD\harmonic-analyzer\farm-runs`, falling back to
+  `%LOCALAPPDATA%\ha-farm\runs`.
+  Explicit `-LogDirectory` overrides the default. The OMP `local://` URI is not a
+  Windows filesystem path; convert it with `realpath local://` and pass the
+  result through `HARMONIC_AGENT_SCRATCHPAD`. The launcher scopes Git long-path
+  support to its process tree; global Git configuration stays unchanged.
+  Outputs land in the run record's `outputs` (`<LogDirectory>\<run-id>.out`),
+  not the worktree's `cad/out`, and recovery works from the recorded commit,
+  not the worktree. A
+  direct `build.py --executor farm` has no snapshot: it refuses to dispatch a
+  leaf whose key a checkout change since launch can move, naming the files, so
   never commit or edit in that worktree mid-run.
 - Prove one real remote leaf on the launcher, protocol and pool configuration
   you are about to use before fanning parallel agents out over the farm. A green
