@@ -9,7 +9,6 @@ states the worst case it computes.
 from __future__ import annotations
 
 import importlib.util
-import itertools
 import math
 
 import pytest
@@ -23,7 +22,6 @@ import vn_transgear_latch_pin_spec as latch_pin
 import vn_transgear_pivot_screw_spec as pivot
 import pd_transgear_pivot_spacer_spec as spacer
 import vn_transgear_pivot_spring_spec as spring
-from _hole_spec import TAP_DRILL_MM
 
 
 def _reload_joints():

@@ -77,6 +77,11 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         " blank_dia_band(12), tooth_thickness_band(12))",
         "each",
     ),
+    # _apply_neck_and_flat_limits passes each native LIMIT band in turn.
+    ("build_pd_transgear_knob_shaft", "band"): (
+        "(FRONT_CORNER_RADIUS_BAND, CORE_FLAT_CUT_END_BAND, CORE_FLAT_TOOL_END_RADIUS_BAND)",
+        "each",
+    ),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.
@@ -141,6 +146,29 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("vn_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
         "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the stock's reach past the disc's rear face before its cut"
+    ),
+    ("pd_rack_pinion_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_rack_pinion_spec", "RADIAL_SETTING_BAND"): (
+        "the cutter radial setting implied by the printed span limits (a machine setting)"
+    ),
+    ("pd_transgear_feed_pinion_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_transgear_knob_shaft_spec", "_SPAN_DESIGN_SETTING_BAND"): (
+        "the cutter radial-setting design band the printed span limits are solved from"
+    ),
+    ("pd_transgear_knob_shaft_spec", "RADIAL_SETTING_BAND"): (
+        "the cutter radial setting implied by the printed span limits (a machine setting)"
+    ),
+    ("pd_transgear_drive_collar_spec", "FLAT_BAND"): (
+        "the D-flat's FLAT_LIMITS as deviations for the flat-to-core clearance "
+        "corners; the sheet prints the native LIMIT"
+    ),
+    ("pd_transgear_thumbnut_spec", "CSK_HALF_ANGLE_BAND"): (
+        "half the title block's angular band on the 90 deg countersink, for the "
+        "seat-cone corners; not a size fit"
     ),
     ("vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
         "the button-head screw's B18.6.3 length tolerance (plus, minus): "

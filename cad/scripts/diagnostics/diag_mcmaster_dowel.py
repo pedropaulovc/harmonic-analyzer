@@ -40,7 +40,6 @@ are owned by ``vn_transgear_latch_pin_spec``; this native recipe consumes them.
 
 from __future__ import annotations
 
-import math
 import sys
 from pathlib import Path
 

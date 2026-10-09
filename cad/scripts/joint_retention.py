@@ -692,6 +692,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_transgear_knob_cup",  # MHA-PD-016: reamed through bore, cross-pinned to the journal at assembly; no thread
         "pd_transgear_knob_thrust_ring",  # MHA-PD-015 loose brass ring, drilled bore; no thread
         "vn_transgear_latch_pin",  # MHA-VN-042 1/8 dowel pressed into the arm's reamed end-face hole
+        "vn_transgear_arm_plate_locating_pin",  # MHA-VN-051 2 mm dowels pressed into the arm's blind sockets
         "pd_transgear_pivot_spacer",  # MHA-PD-020 brass spacer, reamed bore pressed on the pivot shoulder (locating, R9-71); no thread
         "vn_transgear_pivot_spring",  # MHA-VN-049 disc spring on the pivot shoulder; no thread
         "pd_transgear_pin",  # MHA-PD-023 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
@@ -717,6 +718,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "vn_transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",
     "vn_transgear_latch_pin": "dowel pin pressed into a reamed hole",
+    "vn_transgear_arm_plate_locating_pin": "dowel pin pressed into the arm's blind socket",
     "vn_transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
     "vn_transgear_pivot_spring": "disc spring on the pivot shoulder; no thread",
     "vn_tube_frame_cap": "push-on round cap over the column end",
@@ -1914,7 +1916,7 @@ JOINTS: tuple[Joint, ...] = (
             "'collar-rear-faced-to-fit', 'collar-shoulder-seated' and 'fitup-accepted' "
             "(T24 free under the nut); "
             "build_pd_paper_drive_assembly.py THUMBNUT_Z0 on the pilot and 'transgear-thumbnut "
-            "(seated on the collar pilot' placement; transgear_drive_collar_spec PILOT_PROUD_RANGE, "
+            "(seated on collar pilot' placement; transgear_drive_collar_spec PILOT_PROUD_RANGE, "
             "NUT_PILOT_BEARING_WORST and CHAIN_OFFSET_MARGIN"
         ),
     ),
@@ -2077,7 +2079,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "pd-paper-drive/thumbnut-on-knob-shaft": Occurrence(
         "pd_paper_drive",
         "build_pd_paper_drive_assembly.py",
-        "transgear-thumbnut (seated on the collar pilot",
+        "transgear-thumbnut (seated on collar pilot",
     ),
 }
 
