@@ -240,12 +240,19 @@ so the offline stale-feature check can see that the builder creates them.
 harness deadline.** `scripts/farm-run.ps1` started with `hub` (`persist: true`)
 is the only sanctioned way for an agent to submit `--executor farm` work; the
 full contract, parameters, run records and recovery procedure live in
-[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Five rules bind every
+[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Six rules bind every
 such build:
 
 - No finite local timer. A cold leaf has measured 61.5 min and a full closure
   runs for hours, so a Bash job or a 300 s tool deadline kills a still-valid
   build and leaves the remote workflow running.
+- Every launch requires `-DisplayName`: a short owner/session plus the reason,
+  for example `'InchPD - Add new drawing detail view to pd_transgear_stub v3'`.
+  Use a nonblank single-line label of at most 160 characters, and include it in
+  the handoff. Temporal memo `display_name` identifies the workflow's creator;
+  attaching with `USE_EXISTING` retains that creator's label and `farm_run`,
+  rather than transferring ownership to the attaching session. The label does
+  not change the leaf request, workflow ID or cache key.
 - Task names use prefixed underscores (`part:pn_pen_rod`). An unknown or dashed target is
   refused with doit's invalid-command exit 3, naming the target, before any
   fleet query or workflow submission; a failed farm preflight exits 2. Neither

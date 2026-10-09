@@ -36,6 +36,16 @@ param(
     [ValidateRange(1, 180)]
     [int]$LeafTimeout,
 
+    [Parameter(Mandatory, ParameterSetName = 'Launch')]
+    [ValidateScript({
+        if ([string]::IsNullOrWhiteSpace($_) -or $_.Length -gt 160 -or
+            $_ -match '[\r\n\u0085\u2028\u2029]') {
+            throw 'DisplayName must be nonblank, single-line, and at most 160 characters'
+        }
+        $true
+    })]
+    [string]$DisplayName,
+
     # Launch: the label recorded with the run. Status/Watch/Cancel: select the
     # newest run carrying it. List: filter by it.
     [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
@@ -1748,6 +1758,7 @@ try {
     $buildArgs = @(
         'run', '--frozen', '--no-sync', '--active', 'python', 'build.py',
         '--executor', 'farm',
+        '--display-name', $DisplayName,
         '--leaf-timeout', [string]$LeafTimeout,
         '--verbosity', 'info',
         '--continue'
@@ -1794,6 +1805,7 @@ try {
         commit = $commit
         targets = @($normalizedTargets)
         leaf_timeout_minutes = $LeafTimeout
+        display_name = $DisplayName
         started_at = $startedAt.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
         pid = $PID
         log = [System.IO.Path]::GetFullPath($logPath)
@@ -1844,6 +1856,7 @@ try {
     # _farm._dispatch stamps this on every leaf it creates, so -Cancel can tell
     # a leaf this run created from one it attached to.
     $env:HARMONIC_FARM_RUN = $runId
+    $env:HARMONIC_FARM_DISPLAY_NAME = $DisplayName
     # _farm._dispatch names each workflow here before it can exist: -Cancel
     # stops this process, whose copy of the build's output can then miss the
     # last `Farm workflow requested` lines.

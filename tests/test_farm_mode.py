@@ -28,6 +28,7 @@ import build  # noqa: E402
 _RealFarmDoitMain = build._FarmDoitMain
 
 SHA = "c" * 40
+DISPLAY_NAME = "Test farm build"
 FARM_ENV = (
     "HARMONIC_FARM_COMMIT",
     "HARMONIC_EXECUTOR",
@@ -101,6 +102,7 @@ def _undrifted_checkout(monkeypatch):
     dispatch around it (tests/test_farm_checkout_drift.py covers git itself).
     """
     monkeypatch.setattr(_farm, "checkout_drift", lambda task_inputs=None: None)
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", DISPLAY_NAME)
 
 
 def _restore_sequence(dodo, monkeypatch, calls, outcomes, on_hit=None):
@@ -608,6 +610,37 @@ def _install_real_doit(monkeypatch, namespace=None):
     return seen, executed
 
 
+@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b"])
+@pytest.mark.parametrize("command", [["part:x"], ["run", "part:x"], ["strace", "part:x"]])
+def test_farm_execution_requires_a_valid_display_name(label, command, monkeypatch, capsys):
+    if label is None:
+        monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
+    else:
+        monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
+    monkeypatch.setattr(build, "_farm_preflight", lambda: pytest.fail("preflight before valid label"))
+    _seen, executed = _install_real_doit(monkeypatch)
+    assert build.main(["--executor", "farm", *command]) == 2
+    assert executed == []
+    captured = capsys.readouterr()
+    assert "--display-name" in captured.out + captured.err
+
+
+@pytest.mark.parametrize("flag", [None, "--display-name", "-DisplayName"])
+@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  "])
+def test_display_name_reaches_the_task_boundary(flag, label, monkeypatch):
+    _preflight_fakes(monkeypatch)
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label if flag is None else "Inherited label")
+    observed = []
+    namespace = {"task_part": lambda: {
+        "actions": [lambda: observed.append(os.environ.get("HARMONIC_FARM_DISPLAY_NAME"))]
+    }}
+    seen, _executed = _install_real_doit(monkeypatch, namespace)
+    options = [] if flag is None else [flag, label]
+    assert build.main(["--executor", "farm", *options, "part"]) == 0
+    assert seen == [["-n", "8", "part"]]
+    assert observed == [label]
+
+
 def test_farm_build_refuses_a_dirty_tree_before_contacting_the_fleet(
     tmp_path, monkeypatch, capsys
 ):
@@ -864,8 +897,13 @@ def test_a_repo_declaring_no_exclusions_keeps_refusing_every_submodule(
     assert executed == []
 
 
-def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeypatch):
+@pytest.mark.parametrize("label", [None, "", "invalid\nlabel"])
+def test_explicit_local_executor_overrides_an_inherited_farm_environment(monkeypatch, label):
     monkeypatch.setenv("HARMONIC_EXECUTOR", "farm")
+    if label is None:
+        monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
+    else:
+        monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
     monkeypatch.setattr(
         build, "_farm_preflight", lambda: pytest.fail("preflight ran in local mode")
     )
@@ -1173,6 +1211,7 @@ def test_invalid_farm_selection_stops_before_preflight_or_actions(
 ):
     from doit.dependency import Dependency
 
+    monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
     preflights = []
     closes = []
     close = Dependency.close
@@ -1386,6 +1425,7 @@ def test_every_task_executing_command_gets_the_preflight_and_only_run_fans_out(
 
 
 def test_help_and_non_run_commands_skip_the_preflight(monkeypatch, capsys):
+    monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
     def no_git(argv, **kwargs):
         pytest.fail(f"preflight launched {argv}")
 
@@ -1506,6 +1546,7 @@ def temporal_boundary(tmp_path, monkeypatch):
     monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
     monkeypatch.delenv("HARMONIC_FARM_REQUESTS", raising=False)
     calls: dict = {"connect": [], "start": []}
+    calls["creator_memos"] = {}
     outcome: dict = {}
 
     class Handle:
@@ -1517,6 +1558,7 @@ def temporal_boundary(tmp_path, monkeypatch):
     class FakeClient:
         async def start_workflow(self, workflow, arg, **options):
             calls["start"].append((workflow, arg, options))
+            calls["creator_memos"].setdefault(options["id"], dict(options["memo"]))
             return Handle()
 
     async def connect(target_host, **options):
@@ -1647,7 +1689,7 @@ def test_run_leaf_starts_the_shared_workflow_with_the_contract(temporal_boundary
     assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
     assert options["execution_timeout"] == timedelta(hours=8)
     assert options["result_type"] is _farm.LeafResult
-    assert options["memo"] is None, "no launcher run to name"
+    assert options["memo"] == {"display_name": DISPLAY_NAME}
 
 
 def test_a_launcher_run_is_stamped_as_the_creator_memo(temporal_boundary, monkeypatch):
@@ -1660,7 +1702,67 @@ def test_a_launcher_run_is_stamped_as_the_creator_memo(temporal_boundary, monkey
     _farm.run_leaf("part:pen_rod", "k" * 64)
 
     [(_, _, options)] = calls["start"]
-    assert options["memo"] == {"farm_run": "20260929T000000000Z-abc"}
+    assert options["memo"] == {
+        "display_name": DISPLAY_NAME,
+        "farm_run": "20260929T000000000Z-abc",
+    }
+
+
+@pytest.mark.parametrize("label", [None, "", " \t", "x" * 161, "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b"])
+def test_invalid_dispatch_display_name_has_no_side_effects(
+    temporal_boundary, tmp_path, monkeypatch, label
+):
+    calls, _resolve = temporal_boundary
+    if label is None:
+        monkeypatch.delenv("HARMONIC_FARM_DISPLAY_NAME", raising=False)
+    else:
+        monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
+    requests = tmp_path / "requests"
+    requests.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    monkeypatch.setattr(_farm, "load_config", lambda *args, **kwargs: pytest.fail("config before valid label"))
+    with pytest.raises(RuntimeError, match="HARMONIC_FARM_DISPLAY_NAME"):
+        _farm.run_leaf("part:pen_rod", "k" * 64)
+    assert calls["connect"] == []
+    assert calls["start"] == []
+    assert list(requests.iterdir()) == []
+
+
+@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  "])
+def test_dispatch_preserves_valid_display_name(temporal_boundary, monkeypatch, label):
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", label)
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+    [(_, request, options)] = calls["start"]
+    assert options["memo"] == {"display_name": label}
+    assert request.task == "part:pen_rod"
+    assert request.cache_key == "k" * 64
+    assert options["id"] == "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+
+
+def test_shared_workflow_keeps_creator_label_and_run(temporal_boundary, monkeypatch):
+    from temporalio.common import WorkflowIDConflictPolicy
+
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", "Creator's build")
+    monkeypatch.setenv("HARMONIC_FARM_RUN", "creator-run")
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+    monkeypatch.setenv("HARMONIC_FARM_DISPLAY_NAME", "Attaching build")
+    monkeypatch.setenv("HARMONIC_FARM_RUN", "attaching-run")
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+    [(_, first_request, first), (_, second_request, second)] = calls["start"]
+    assert first["id"] == second["id"]
+    assert first_request.task == second_request.task
+    assert first_request.cache_key == second_request.cache_key
+    assert first_request.commit == second_request.commit
+    assert first["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
+    assert second["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
+    assert second["memo"] == {"display_name": "Attaching build", "farm_run": "attaching-run"}
+    assert calls["creator_memos"] == {
+        first["id"]: {"display_name": "Creator's build", "farm_run": "creator-run"}
+    }
 
 
 def test_a_launcher_run_names_each_workflow_before_creating_it(

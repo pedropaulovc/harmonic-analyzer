@@ -19,6 +19,7 @@ pytestmark = pytest.mark.skipif(
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = REPO_ROOT / "scripts" / "farm-run.ps1"
+DISPLAY_NAME = "Fixture build: pen and drawing"
 
 # A hang guard, never a correctness budget. Every wait below ends on the event
 # it is waiting for (the launcher exits, a record appears, a line reaches the
@@ -208,6 +209,7 @@ def record(**late):
                     "SOLIDWORKS_POOL_HOME": os.environ.get("SOLIDWORKS_POOL_HOME"),
                     "HARMONIC_REMOTE_CACHE_MODE": os.environ.get("HARMONIC_REMOTE_CACHE_MODE"),
                     "PYTHONUNBUFFERED": os.environ.get("PYTHONUNBUFFERED"),
+                    "HARMONIC_FARM_DISPLAY_NAME": os.environ.get("HARMONIC_FARM_DISPLAY_NAME"),
                     "VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
                 },
                 "submodule_files": {
@@ -251,6 +253,7 @@ if lines:
         # ...then start_workflow(USE_EXISTING, memo=...): only a creation writes it.
         if workflow in workflows and not workflows[workflow].get("_old"):
             workflows[workflow].setdefault("farm_run", os.environ.get("HARMONIC_FARM_RUN"))
+            workflows[workflow].setdefault("display_name", os.environ.get("HARMONIC_FARM_DISPLAY_NAME"))
     farm_state.write_text(json.dumps(workflows), encoding="utf-8")
     print(printed, end="", flush=True)
 print("uv-stderr", file=sys.stderr, flush=True)
@@ -307,7 +310,8 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
 
 
 def _command(
-    fixture: dict[str, object], targets: str, *, tag: str = "test"
+    fixture: dict[str, object], targets: str, *, tag: str = "test",
+    display_name: str = DISPLAY_NAME,
 ) -> list[str]:
     return [
         str(fixture["pwsh"]),
@@ -327,7 +331,48 @@ def _command(
         "90",
         "-Tag",
         tag,
+        "-DisplayName",
+        display_name,
     ]
+
+
+@pytest.mark.parametrize(
+    "label",
+    [None, "", " \t", "x" * 161, "a\rb", "a\nb", "a\u0085b", "a\u2028b", "a\u2029b"],
+)
+def test_launch_requires_valid_display_name_before_creating_records(tmp_path, label):
+    fixture = _launcher_fixture(tmp_path)
+    command = _command(fixture, "part:pen_rod")
+    if label is None:
+        command = command[:-2]
+    else:
+        command[-1] = label
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_FARM_DISPLAY_NAME"] = "Inherited label is not a launcher argument"
+    result = _run_launcher(fixture, command, environment)
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert "DisplayName" in result.stdout + result.stderr
+    assert not Path(fixture["invocation"]).exists()
+    log_directory = Path(fixture["log_directory"])
+    assert not log_directory.exists() or list(log_directory.iterdir()) == []
+
+
+@pytest.mark.parametrize("label", ["x", "x" * 160, "  Review Ω: gear train  "])
+def test_launch_preserves_boundary_display_names_and_overrides_environment(tmp_path, label):
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["HARMONIC_FARM_DISPLAY_NAME"] = "Inherited label"
+    result = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", display_name=label), environment
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    record = _record(_only(Path(fixture["log_directory"]), "*.run.json"))
+    finished = _record(Path(record["done"]))
+    invocation = json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
+    assert record["display_name"] == finished["display_name"] == label
+    assert invocation["environment"]["HARMONIC_FARM_DISPLAY_NAME"] == label
+    index = invocation["argv"].index("--display-name")
+    assert invocation["argv"][index + 1] == label
 
 
 def _only(path: Path, pattern: str) -> Path:
@@ -503,6 +548,8 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     assert finished["exit_code"] == 0
     assert finished["targets"] == ["part:pen_rod", "drawing:pen"]
     assert finished["tag"] == "spaces-ok"
+    assert running["display_name"] == DISPLAY_NAME
+    assert finished["display_name"] == DISPLAY_NAME
     assert finished["leaf_timeout_minutes"] == 90
     assert Path(finished["worktree"]) == Path(fixture["worktree"]).resolve()
     assert Path(finished["pool_home"]) == Path(fixture["pool"]).resolve()
@@ -524,6 +571,8 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "build.py",
         "--executor",
         "farm",
+        "--display-name",
+        DISPLAY_NAME,
         "--leaf-timeout",
         "90",
         "--verbosity",
@@ -538,6 +587,7 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
     assert invocation["environment"] == {
         "SOLIDWORKS_POOL_HOME": str(Path(fixture["pool"]).resolve()),
         "HARMONIC_REMOTE_CACHE_MODE": "rw",
+        "HARMONIC_FARM_DISPLAY_NAME": DISPLAY_NAME,
         "PYTHONUNBUFFERED": "1",
         "VIRTUAL_ENV": running["environment"],
     }
@@ -1290,11 +1340,15 @@ def test_status_and_watch_follow_a_live_run_to_its_outcome(tmp_path: Path) -> No
         # Before .done the outputs are still in the snapshot.
         assert Path(report["outputs"]) == Path(running["snapshot"]) / "cad" / "out"
 
+        # Tracking is not a launch: neither an argument nor a valid inherited
+        # label is needed to watch the already-recorded run.
+        watch_environment = dict(fixture["environment"])
+        watch_environment["HARMONIC_FARM_DISPLAY_NAME"] = "invalid\ninherited label"
         watch = subprocess.Popen(
             _tracking(
                 fixture, "-Watch", "-RunId", running["run_id"], "-PollSeconds", "1"
             ),
-            env=fixture["environment"],
+            env=watch_environment,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
