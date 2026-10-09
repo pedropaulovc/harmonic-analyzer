@@ -92,6 +92,7 @@ from sm_knife_mount_spec import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
+    PIN_HOLE_DIA_PLACES,
     PIN_HOLE_X,
     PIN_HOLE_XS,
     STUD_TAP_DIA,
@@ -474,10 +475,16 @@ async def build(adapter) -> dict[str, str]:
     await report_mass_properties(adapter)
 
     # Explicit band on both dowel reams (the station and depth are governed by
-    # their places); then the places the sheet prints (DRAWING_PRECISION).
+    # their places), printed at the nominal's three places: 0.000/-0.010, not
+    # the band's fewest, "0.00 / -0.01" under Ø3.175; then the places the
+    # sheet prints (DRAWING_PRECISION).
     for pin_dia_name in ("PinHoleDia", "PinHole2Dia"):
         set_dimension_bilateral_tolerance(
-            adapter, "PinHoleProfile", pin_dia_name, *deviations(PIN_HOLE_DIA_BAND)
+            adapter,
+            "PinHoleProfile",
+            pin_dia_name,
+            *deviations(PIN_HOLE_DIA_BAND),
+            places=PIN_HOLE_DIA_PLACES,
         )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     # Manufacturing drawing support: mark exactly the print's dimensions and

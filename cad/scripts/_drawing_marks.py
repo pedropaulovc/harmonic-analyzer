@@ -130,11 +130,27 @@ def _tolerance_places(*deviations: float) -> int:
 
 @_telemetry.traced("dim.tolerance_precision", label_param="label")
 def _set_tolerance_precision(
-    display: Any, deviations: tuple[float, ...], *, label: str
+    display: Any,
+    deviations: tuple[float, ...],
+    *,
+    label: str,
+    places: int | None = None,
 ) -> int:
-    """Set and verify a model display dimension's primary tolerance precision."""
+    """Set and verify a model display dimension's primary tolerance precision.
+
+    ``places`` widens the tolerance to the nominal's places where a band's
+    fewest places would print short of it (a 3-place ream's 0/-0.010 read
+    "0.00 / -0.01"); it may never drop a digit a deviation needs.
+    """
     display = _early_bound(display, "IDisplayDimension")
     digits = _tolerance_places(*deviations)
+    if places is not None:
+        if places < digits:
+            raise ValueError(
+                f"{label}: {places} tolerance places would round {deviations!r}, "
+                f"which needs {digits}"
+            )
+        digits = places
     do_not_change = -1  # swDimensionPrecisionSettings_e
     display.SetPrecision3(do_not_change, do_not_change, digits, do_not_change)
     applied = int(display.GetPrimaryTolPrecision2())
@@ -288,8 +304,14 @@ def set_dimension_bilateral_tolerance(
     dimension_name: str,
     lower_deviation_mm: float,
     upper_deviation_mm: float,
+    *,
+    places: int | None = None,
 ) -> None:
-    """Apply signed lower/upper deviations to one named source dimension."""
+    """Apply signed lower/upper deviations to one named source dimension.
+
+    ``places`` prints the tolerance at the nominal's places
+    (``_set_tolerance_precision``); by default, the fewest that keep it.
+    """
     if lower_deviation_mm > upper_deviation_mm:
         raise ValueError("lower dimension deviation must not exceed upper deviation")
     if lower_deviation_mm == upper_deviation_mm:
@@ -319,6 +341,7 @@ def set_dimension_bilateral_tolerance(
         display,
         (lower_deviation_mm, upper_deviation_mm),
         label=f"{dimension_name}@{feature_name}",
+        places=places,
     )
     _telemetry.success(
         f"toleranced {dimension_name}@{feature_name}: "

@@ -302,6 +302,52 @@ def test_tolerance_precision_rejects_silent_com_failure(
         )
 
 
+class _PrecisionDisplay:
+    tolerance_precision = 2
+
+    def SetPrecision3(
+        self, _primary: int, _dual: int, primary_tol: int, _dual_tol: int
+    ) -> int:
+        self.tolerance_precision = primary_tol
+        return 0
+
+    def GetPrimaryTolPrecision2(self) -> int:
+        return self.tolerance_precision
+
+
+def test_tolerance_prints_at_the_nominals_places_when_asked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Farm run 20261009T171439353Z: the knife mount's Ø3.175 ream band
+    # 0/-0.010 printed "0.00 / -0.01" at the band's fewest places.
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    display = _PrecisionDisplay()
+    assert (
+        _drawing_marks._set_tolerance_precision(
+            display, (-0.010, 0.0), label="PinHoleDia@PinHoleProfile", places=3
+        )
+        == display.tolerance_precision
+        == 3
+    )
+    # By default the band keeps its fewest places (U27's hundredth bands).
+    assert (
+        _drawing_marks._set_tolerance_precision(
+            display, (-0.010, 0.0), label="PinHoleDia@PinHoleProfile"
+        )
+        == 2
+    )
+
+
+def test_tolerance_places_never_round_a_band(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+    with pytest.raises(ValueError, match="2 tolerance places would round"):
+        _drawing_marks._set_tolerance_precision(
+            _PrecisionDisplay(), (-0.004, 0.004), label="PinDia@PinProfile", places=2
+        )
+
+
 def test_tolerance_precision_has_dimension_labeled_operation_span(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

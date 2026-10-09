@@ -10,7 +10,14 @@ import pytest
 
 import _drawing_common
 import _part_pmi
-from _gtol_spec import ConeFace, CylinderFace, PlanarFace, SphereFace, TorusFace
+from _gtol_spec import (
+    ConeFace,
+    CylinderFace,
+    PlanarFace,
+    SphereFace,
+    TorusFace,
+    gtol_frame_xml,
+)
 from _part_pmi import _FaceGeometry
 from _surface_finish import SurfaceFinishControl
 
@@ -301,103 +308,206 @@ def test_feature_control_frame_refuses_a_dimension_attachment() -> None:
         )
 
 
-class _Frame:
-    def __init__(self) -> None:
-        self.xml = ""
-
-    def SetSymbolXml(self, xml: str) -> bool:
-        self.xml = xml
-        return True
+class _FrameXml:
+    def __init__(self, datums: tuple[str, ...]) -> None:
+        self.xml = gtol_frame_xml("position", "0.10", datums=datums, diameter=True)
 
     def GetSymbolXml(self) -> str:
         return self.xml
 
 
-class _FrameAnnotation:
-    def GetAttachedEntityCount3(self) -> int:
-        return 1
+class _NamedAnnotation:
+    """A frame's or tag's annotation: its name, selection and attachment."""
 
-    def SetLeader3(self, *_args: Any) -> int:
-        return 0
+    def __init__(self, name: str, *, selects: bool = True) -> None:
+        self.name = name
+        self.selects = selects
+        self.position = (0.0, 0.0)
+        self.attached: tuple[Any, ...] = ()
+        self.types: tuple[int, ...] = ()
 
-    def SetPosition2(self, *_args: Any) -> bool:
+    def GetName(self) -> str:
+        return self.name
+
+    def Select3(self, _append: bool, _data: Any) -> bool:
+        return self.selects
+
+    def SetPosition2(self, x: float, y: float, _z: float) -> bool:
+        self.position = (x, y)
         return True
 
+    def GetPosition(self) -> tuple[float, float, float]:
+        return (*self.position, 0.0)
 
-class _Gtol:
-    """A current-format frame whose datum identifier ``keeps`` decides."""
+    def GetAttachedEntities3(self) -> tuple[Any, ...]:
+        return self.attached
 
-    def __init__(self, keeps: str) -> None:
-        self.keeps = keeps
-        self.frames = [_Frame()]
-        self.identifier = ""
+    def GetAttachedEntityCount3(self) -> int:
+        return len(self.attached)
+
+    def GetAttachedEntityTypes(self) -> tuple[int, ...]:
+        return self.types
+
+
+class _FrameGtol:
+    def __init__(self, name: str, datums: tuple[str, ...] = ("A",)) -> None:
+        self.annotation = _NamedAnnotation(name)
+        self.frames = [_FrameXml(datums)]
+
+    def GetAnnotation(self) -> _NamedAnnotation:
+        return self.annotation
 
     def GetFrameCount(self) -> int:
         return len(self.frames)
 
-    def GetFrame(self, index: int) -> _Frame:
+    def GetFrame(self, index: int) -> _FrameXml:
         return self.frames[index - 1]
 
-    def GetFormat(self) -> int:
-        return 2
 
-    def GetAnnotation(self) -> _FrameAnnotation:
-        return _FrameAnnotation()
+class _DatumTag:
+    def __init__(self, label: str = "") -> None:
+        self.label = label
+        self.annotation = _NamedAnnotation("DetailItem900")
 
-    def SetDatumIdentifier(self, identifier: str) -> None:
-        if self.keeps != "ignored":
-            self.identifier = identifier
+    def SetLabel(self, label: str) -> bool:
+        self.label = label
+        return True
 
-    def GetDatumIdentifier(self) -> str:
-        return self.identifier
+    def GetLabel(self) -> str:
+        return self.label
+
+    def GetAnnotation(self) -> _NamedAnnotation:
+        return self.annotation
 
 
-def _frame_with_identifier(monkeypatch: pytest.MonkeyPatch, gtol: _Gtol) -> Any:
+def _frame_datum(
+    monkeypatch: pytest.MonkeyPatch,
+    frame: _FrameGtol,
+    *,
+    selected: tuple[int, Any] | None = None,
+    attaches_to: Any | None = None,
+) -> _DatumTag:
+    """Run add_frame_datum_feature on a fake seat.
+
+    ``selected`` is what the selection manager reports after Select3 (type,
+    object; default the frame); the inserted tag attaches, after the rebuild,
+    to ``attaches_to`` (default the frame) -- None leaves it attached to nothing.
+    """
+    tag = _DatumTag()
+    kind, picked = selected if selected is not None else (13, frame)
+
+    class _SelectionManager:
+        def CreateSelectData(self) -> Any:
+            return type("_Data", (), {"View": None})()
+
+        def GetSelectedObjectCount2(self, _mark: int) -> int:
+            return 1 if frame.annotation.selects else 0
+
+        def GetSelectedObjectType3(self, _index: int, _mark: int) -> int:
+            return kind
+
+        def GetSelectedObject6(self, _index: int, _mark: int) -> Any:
+            return picked
+
     class _Draw:
-        def InsertGtol(self) -> _Gtol:
-            return gtol
+        SelectionManager = _SelectionManager()
+
+        def ActivateView(self, _name: str) -> bool:
+            return True
 
         def ClearSelection2(self, _all: bool) -> None:
             pass
+
+        def InsertDatumTag2(self) -> _DatumTag:
+            return tag
 
     class _Adapter:
         currentModel = _Draw()
 
     def rebuild(_adapter: Any, *, label: str) -> None:
-        if gtol.keeps == "dropped":
-            gtol.identifier = ""
+        target = frame if attaches_to is None else attaches_to
+        if target is not False:
+            tag.annotation.attached = (target,)
+            tag.annotation.types = (13,)
 
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(
         _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
     )
-    monkeypatch.setattr(_drawing_common, "_select_annotation_entity", lambda *_, **__: "rim")
+    monkeypatch.setattr(_drawing_common, "view_name", lambda *_: "Drawing View3")
     monkeypatch.setattr(_drawing_common, "rebuild_drawing", rebuild)
-    monkeypatch.setattr(_drawing_common, "_assert_attached_to", lambda *_, **__: None)
-    return _drawing_common.add_feature_control_frame(
-        _Adapter(), None, edge_xy=(0.1, 0.2), frame_xy=(0.12, 0.22),
-        characteristic="position", tolerance="0.13", datums=("A",),
-        diameter=True, label="dowel hole pattern", datum_identifier="B",
+    return _drawing_common.add_frame_datum_feature(
+        _Adapter(), object(), frame, datum="B", symbol_xy=(0.161, 0.206),
+        label="dowel hole pattern datum B",
     )
 
 
-def test_feature_control_frame_names_its_feature_a_datum(monkeypatch) -> None:
-    gtol = _Gtol("kept")
-    assert _frame_with_identifier(monkeypatch, gtol) is gtol
-    assert gtol.identifier == "B"
+def test_frame_datum_symbol_goes_on_the_frame_it_names(monkeypatch) -> None:
+    frame = _FrameGtol("DetailItem356")
+    tag = _frame_datum(monkeypatch, frame)
+    assert tag.label == "B"
+    assert tag.annotation.attached == (frame,)
 
 
 @pytest.mark.parametrize(
-    ("keeps", "stage"),
-    (("ignored", "after SetDatumIdentifier"), ("dropped", "after the rebuild")),
+    ("case", "match"),
+    (
+        ("not selectable", r"failed to select the frame DetailItem356"),
+        ("other frame", r"selected 1 object\(s\), type 13, name 'DetailItem355'"),
+        ("a dimension", r"selected 1 object\(s\), type 14, name ''"),
+        ("attached to nothing", r"not attached to its frame DetailItem356 .*count=0"),
+        ("attached elsewhere", r"not attached to its frame .*attached='DetailItem355'"),
+    ),
 )
-def test_feature_control_frame_fails_closed_without_its_datum_identifier(
-    monkeypatch, keeps: str, stage: str
+def test_frame_datum_symbol_fails_closed_off_its_frame(
+    monkeypatch, case: str, match: str
 ) -> None:
+    frame = _FrameGtol("DetailItem356")
+    other = _FrameGtol("DetailItem355")
+    kwargs: dict[str, Any] = {}
+    if case == "not selectable":
+        frame.annotation.selects = False
+    elif case == "other frame":
+        kwargs["selected"] = (13, other)
+    elif case == "a dimension":
+        kwargs["selected"] = (14, object())
+    elif case == "attached to nothing":
+        kwargs["attaches_to"] = False
+    else:
+        kwargs["attaches_to"] = other
+    with pytest.raises(RuntimeError, match=match):
+        _frame_datum(monkeypatch, frame, **kwargs)
+
+
+class _View:
+    def __init__(self, tags: tuple[str, ...], frames: tuple[_FrameGtol, ...]) -> None:
+        self.tags = tuple(_DatumTag(label) for label in tags)
+        self.frames = frames
+
+    def GetDatumTags(self) -> tuple[_DatumTag, ...]:
+        return self.tags
+
+    def GetGTols(self) -> tuple[_FrameGtol, ...]:
+        return self.frames
+
+
+def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
+    # Farm run 20261009T171439353Z: the knife mount printed the tap and bore
+    # frames to A|B with no B on the sheet (only the frame's unprinted datum
+    # identifier named it).
+    monkeypatch.setattr(_drawing_common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    front = _View(("A",), (_FrameGtol("DetailItem355", ("A", "B")),))
+    top = _View((), (_FrameGtol("DetailItem356", ("A",)), _FrameGtol("DetailItem358", ("A", "B"))))
     with pytest.raises(
         RuntimeError,
-        match=rf"datum identifier reads '' {stage}, expected 'B' \(dowel hole pattern\)",
+        match=r"reference datum\(s\) no tag prints: B by \['DetailItem355', 'DetailItem358'\]; tags print \['A'\]",
     ):
-        _frame_with_identifier(monkeypatch, _Gtol(keeps))
+        _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
+    top.tags = (_DatumTag("B"),)
+    _drawing_common.assert_frame_datums_defined((front, top), label="knife mount")
 
 
 @pytest.mark.parametrize(

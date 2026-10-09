@@ -8,7 +8,7 @@ and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
 depth added across the right-view section.  The two MHA-VN-051 dowel holes
 print their 2X reamed Ø (with its band and press callout) and a position
-frame under it, Ø0.13 to A, whose datum identifier makes the pair datum B,
+frame under it, Ø0.13 to A, carrying the datum feature symbol B for the pair,
 at their BASIC span in the top view, and their flat-floor depth in section
 A-A, cut from the top view through the tap and dowel axes (policy rule 7: the
 floor is hidden in the front view, so it is dimensioned where the cut shows
@@ -37,9 +37,11 @@ from _drawing_common import (
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
+    add_frame_datum_feature,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    assert_frame_datums_defined,
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
@@ -184,12 +186,24 @@ DIMENSION_CALLOUTS = {
 # The pair's count rides ABOVE its Ø (the pd-latch-hook-bracket PAIR_CALLOUT
 # precedent), the process lines below it.
 CALLOUTS_ABOVE = {"PinHoleDia": PIN_HOLE_PAIR_CALLOUT}
-# The pair's position frame (datum identifier B) hangs under that callout's
-# shoulder, its left edge on the shoulder's near end, on its own leader to
-# the same hole; the bore's frame stands ~30 mm lower.
+# The pair's position frame hangs under that callout's shoulder, its left
+# edge on the shoulder's near end, on its own leader to the same hole; the
+# bore's frame stands ~30 mm lower.  Printed: 29.4 x 7.0 mm, sheet x
+# 146.6..176.0, y 212.0..219.0 (farm run 20261009T171439353Z).
 PIN_FRAME_XY = (
     PIN_CALLOUT_SHOULDER_START[0] + PIN_CALLOUT_SHOULDER_OVERHANG,
     PIN_CALLOUT_SHOULDER_START[1] - 0.006,
+)
+PIN_FRAME_SIZE = (0.0294, 0.0070)
+# Datum B's symbol hangs under that frame, at the middle of its width (Y14.5
+# attaches a pattern's datum feature symbol to the frame under its nX
+# callout), in the open band above the bore's two-tier frame (top 188.6 mm).
+# The position is the letter box's bottom middle (datum A printed its 7 mm
+# box upward from it); 5 mm of stem stand between the box and the frame.
+DATUM_TAG_BOX = 0.007
+PIN_DATUM_B_XY = (
+    PIN_FRAME_XY[0] + PIN_FRAME_SIZE[0] / 2.0,
+    PIN_FRAME_XY[1] - PIN_FRAME_SIZE[1] - 0.005 - DATUM_TAG_BOX,
 )
 # The #6-32 bottoming tap is stated once, on its Hole Wizard callout in the
 # top view (fr-top-frame's KEEPER TAP precedent), not in a note.  The
@@ -498,9 +512,9 @@ async def build(adapter: Any) -> dict[str, str]:
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
     # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel
-    # holes); datum B = the dowel pair, named by the position frame under
-    # their 2X Ø (its datum identifier; a tag on the dimension attaches to
-    # nothing, farm run 20261009T155421516Z).  Ra 1.6
+    # holes); datum B = the dowel pair, its symbol on the position frame
+    # under their 2X Ø (a tag on the dimension attaches to nothing, farm run
+    # 20261009T155421516Z).  Ra 1.6
     # (MACHINED_UM) on the bore's working upper wall, tagged on the bore rim
     # (a real circular edge).
     add_datum_feature(
@@ -512,7 +526,9 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block top seat",
     )
     # The pair: ⌖Ø0.13 to A at their BASIC span, the frame on the +X hole's
-    # lower outer rim, where the 2X Ø callout's own leader lands.
+    # lower outer rim, where the 2X Ø callout's own leader lands; datum B is
+    # the symbol on that frame (add_frame_datum_feature: the frame's datum
+    # identifier read "B" back and printed nothing, run 20261009T171439353Z).
     pin_frame_rim = min(
         (
             model_point_in_view(
@@ -529,7 +545,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         key=lambda point: point[1],
     )
-    add_feature_control_frame(
+    pin_frame = add_feature_control_frame(
         adapter,
         top,
         edge_xy=pin_frame_rim,
@@ -538,8 +554,15 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"],
         datums=("A",),
         diameter=True,
-        datum_identifier="B",
         label="dowel hole pattern position",
+    )
+    add_frame_datum_feature(
+        adapter,
+        top,
+        pin_frame,
+        datum="B",
+        symbol_xy=PIN_DATUM_B_XY,
+        label="dowel hole pattern datum B",
     )
     # The bore: Ø0.20 located to A|B, its orientation refined to Ø0.05 to
     # the same A|B (composite; tolerance-gdt-assessment §5.4).  Its centre
@@ -598,6 +621,14 @@ async def build(adapter: Any) -> dict[str, str]:
         symbol_xy=(FRONT_CENTER[0] + 0.052, _front_y(BORE_CY) - 0.020),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_bore"),
         label="knife bore finish",
+        # The fleet's finish height (62 of 75 finishes): the document default
+        # is the dimension height, and Ra 1.6 printed twice the sheet's notes.
+        char_height=0.0025,
+    )
+    # Every datum a frame names is printed (A on the front view, B on the
+    # pattern frame), so no frame references a datum the sheet never names.
+    assert_frame_datums_defined(
+        (front, right, top, section), label="sm-knife-mount frame datums"
     )
 
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.175)

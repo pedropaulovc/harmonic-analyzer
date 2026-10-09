@@ -25,6 +25,20 @@ def test_knife_seat_bore_finish_is_part_owned_and_consumed_by_key() -> None:
     assert "surface_finishes=SURFACE_FINISHES" in part_source
     assert 'surface_finish_by_key(SURFACE_FINISHES, "knife_bore")' in drawing_source
     assert "roughness_ra=" not in drawing_source
+    # The fleet's finish height (62 of 75 finish symbols print at 2.5 mm):
+    # at the document default the Ra 1.6 printed 6.35 mm, twice the sheet's
+    # 3.5 mm notes (farm run 20261009T171439353Z).
+    import ast
+
+    (finish,) = (
+        call
+        for call in ast.walk(ast.parse(drawing_source))
+        if isinstance(call, ast.Call)
+        and getattr(call.func, "id", "") == "add_surface_finish"
+    )
+    keywords = {keyword.arg: ast.literal_eval(keyword.value) for keyword in finish.keywords
+                if keyword.arg in {"label", "char_height"}}
+    assert keywords == {"label": "knife bore finish", "char_height": 0.0025}
 
 
 def test_required_drawing_paths() -> None:
@@ -233,7 +247,19 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH)" in source
     assert 'for pin_dia_name in ("PinHoleDia", "PinHole2Dia"):' in source
-    assert '"PinHoleProfile", pin_dia_name, *deviations(PIN_HOLE_DIA_BAND)' in source
+    # The band prints at the nominal's places, +0.000/-0.010 under Ø3.175,
+    # not "0.00 / -0.01" (farm run 20261009T171439353Z).
+    assert (
+        '            "PinHoleProfile",\n'
+        "            pin_dia_name,\n"
+        "            *deviations(PIN_HOLE_DIA_BAND),\n"
+        "            places=PIN_HOLE_DIA_PLACES,\n"
+    ) in source
+    assert (
+        sm_knife_mount_spec.PIN_HOLE_DIA_PLACES
+        == sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME["PinHoleDia"]
+        == 3
+    )
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
@@ -260,15 +286,41 @@ def test_the_sheet_carries_no_notes_block() -> None:
     ]
 
 
+def test_datum_b_hangs_under_its_frame_clear_of_the_bore_frame() -> None:
+    # The B symbol's box (its bottom middle at PIN_DATUM_B_XY) sits under the
+    # dowel-pattern frame's printed box, within its width, with stem room to
+    # it and clear of the bore frame's top (DetailItem355, 188.62 mm) below.
+    frame_left, frame_top = drawing.PIN_FRAME_XY
+    frame_w, frame_h = drawing.PIN_FRAME_SIZE
+    box = drawing.DATUM_TAG_BOX
+    x, y = drawing.PIN_DATUM_B_XY
+    assert frame_left + box / 2 <= x <= frame_left + frame_w - box / 2
+    assert (frame_top - frame_h) - (y + box) >= 0.004
+    assert y - drawing.BORE_FRAME_XY[1] >= 0.004
+
+
 def test_native_gdt_and_bore_geometry() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Datum A the top seat (a tag); datum B the dowel pair, named by its
-    # position frame's datum identifier: a tag on the 2X Ø attaches to
-    # nothing (farm run 20261009T155421516Z, count=0).
+    # Datum A the top seat (a tag on its edge); datum B the dowel pair, its
+    # symbol on the pair's position frame: a tag on the 2X Ø attaches to
+    # nothing (farm run 20261009T155421516Z, count=0), and the frame's datum
+    # identifier read "B" back but printed nothing (20261009T171439353Z).
     assert source.count("add_datum_feature(") == 1
     assert "add_dimension_datum_feature" not in source
-    assert 'datum="A"' in source and 'datum="B"' not in source
-    assert source.count('datum_identifier="B"') == 1
+    assert "datum_identifier" not in source
+    assert source.count("add_frame_datum_feature(") == 1
+    frame_datum = source[source.index("pin_frame = add_feature_control_frame(") :]
+    frame_datum = frame_datum[: frame_datum.index("# The bore:")]
+    assert "        pin_frame,\n        datum=\"B\",\n" in frame_datum
+    assert 'datum="A"' in source
+    # The sheet fails unless every frame's datum is printed, over every view
+    # a frame or tag stands in.
+    assert (
+        "assert_frame_datums_defined(\n        (front, right, top, section),"
+    ) in source
+    assert source.index("assert_frame_datums_defined(") > source.index(
+        "add_frame_datum_feature("
+    )
     # The pair's frame to A, the bore's composite frame and the tap's frame
     # to A|B.
     assert source.count("add_feature_control_frame(") == 3

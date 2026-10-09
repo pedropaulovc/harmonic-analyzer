@@ -925,7 +925,6 @@ def add_feature_control_frame(
     leader_attach_xy: tuple[float, float] | None = None,
     translated: Sequence[str] = (),
     composite_lower: tuple[str, Sequence[str]] | None = None,
-    datum_identifier: str = "",
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
@@ -935,15 +934,6 @@ def add_feature_control_frame(
     the same characteristic (``IGtol.AddFrame``) joined to the first by
     ``IGtol.SetCompositeFrame2(True, 1)`` (both frames must share the symbol),
     proved by ``GetCompositeFrame2(1)`` and each frame's XML read back.
-
-    ``datum_identifier`` names the controlled feature a datum feature
-    (``IGtol.SetDatumIdentifier``): the frame under a pattern's ``nX`` size
-    callout then defines that pattern as one datum (ASME Y14.5-2018 §7.4).
-    A datum tag cannot attach to a dimension (farm run
-    20261009T155421516Z: ``InsertDatumTag2`` on a selected dimension read
-    zero attached entities, as the vm2 datum-placement probe found), so the
-    identifier rides the frame.  ``GetDatumIdentifier`` must read it back
-    before and after the rebuild.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.  Only the kinds
@@ -997,8 +987,6 @@ def add_feature_control_frame(
         "GetLeaderCount",
         "SetCompositeFrame2",
         "GetCompositeFrame2",
-        "SetDatumIdentifier",
-        "GetDatumIdentifier",
     )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
@@ -1095,17 +1083,6 @@ def add_feature_control_frame(
         if str(gtol.GetBelowFrameTextAt(1) or "") != quantity:
             raise RuntimeError(f"feature quantity did not persist ({label})")
 
-    def _assert_datum_identifier(stage: str) -> None:
-        applied_identifier = str(gtol.GetDatumIdentifier() or "")
-        if applied_identifier != datum_identifier:
-            raise RuntimeError(
-                f"feature-control frame datum identifier reads "
-                f"{applied_identifier!r} {stage}, expected {datum_identifier!r} ({label})"
-            )
-
-    if datum_identifier:
-        gtol.SetDatumIdentifier(datum_identifier)
-        _assert_datum_identifier("after SetDatumIdentifier")
     annotation = _sw_type_info.early_bound_or_flag(
         gtol.GetAnnotation(),
         "IAnnotation",
@@ -1151,14 +1128,191 @@ def add_feature_control_frame(
         what="feature-control frame",
         label=label,
     )
-    if datum_identifier:
-        _assert_datum_identifier("after the rebuild")
     if leader_attach_xy is not None:
         _assert_leader_lands(
             annotation, leader_attach_xy, what="feature-control frame", label=label
         )
     draw.ClearSelection2(True)
     return gtol
+
+
+_SEL_GTOL = 13  # swSelectType_e.swSelGTOLS
+
+
+def _frame_name(gtol: Any) -> str:
+    """The sheet-unique annotation name (``DetailItemNNN``) of one frame.
+
+    A selection or attachment readback may hand back the frame as its
+    ``IGtol`` or as its ``IAnnotation``; either names it, anything else
+    names nothing (and so matches no frame).
+    """
+    try:
+        annotation = _early_bound(gtol, "IGtol").GetAnnotation()
+    except Exception:  # noqa: BLE001 - not an IGtol: try it as the annotation
+        annotation = gtol
+    try:
+        annotation = _sw_type_info.early_bound_or_flag(
+            annotation, "IAnnotation", "GetName"
+        )
+        return str(annotation.GetName() or "")
+    except Exception:  # noqa: BLE001 - neither names a frame
+        return ""
+
+
+@_telemetry.traced("drawing.frame_datum_feature", label_param="label")
+def add_frame_datum_feature(
+    adapter: Any,
+    view: Any,
+    gtol: Any,
+    *,
+    datum: str,
+    symbol_xy: tuple[float, float],
+    label: str,
+    position_tolerance_m: float = 0.02,
+) -> Any:
+    """Attach a native datum-feature symbol to a feature-control frame.
+
+    ASME Y14.5-2018 names a pattern of features of size one datum by the
+    datum feature symbol on the frame under the pattern's ``nX`` callout.
+    ``IGtol.SetDatumIdentifier`` cannot: on farm run 20261009T171439353Z it
+    read "B" back before and after the rebuild and printed nothing.  A tag
+    on the dimension attaches to nothing (run 20261009T155421516Z, and the
+    vm2 datum-placement probe).  So the frame is selected -- as its own
+    annotation (``IAnnotation.Select3`` in its view) -- and the tag is
+    inserted on that selection, the way a tag goes on a selected edge.
+
+    The selection must be ONE GTOL whose annotation name is the frame's, and
+    after the rebuild the tag must be attached to exactly that frame (one
+    entity, type GTOL, same name), else the sheet fails: an unattached tag
+    would print a letter that defines nothing.
+    ``position_tolerance_m`` bounds the symbol's readback as in
+    :func:`add_datum_feature`.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not ddoc.ActivateView(name):
+        raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
+    frame_name = _frame_name(gtol)
+    frame_annotation = _sw_type_info.early_bound_or_flag(
+        _early_bound(gtol, "IGtol").GetAnnotation(), "IAnnotation", "Select3"
+    )
+    draw.ClearSelection2(True)
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection_manager.CreateSelectData()
+    selection_data.View = view
+    if not frame_annotation.Select3(False, selection_data):
+        raise RuntimeError(f"failed to select the frame {frame_name} for datum {datum} ({label})")
+    count = int(selection_manager.GetSelectedObjectCount2(-1))
+    kind = int(selection_manager.GetSelectedObjectType3(count, -1)) if count else 0
+    picked = selection_manager.GetSelectedObject6(count, -1) if count else None
+    picked_name = _frame_name(picked) if kind == _SEL_GTOL and picked is not None else ""
+    if count != 1 or kind != _SEL_GTOL or picked_name != frame_name:
+        raise RuntimeError(
+            f"selecting the frame for datum {datum} ({label}) selected {count} "
+            f"object(s), type {kind}, name {picked_name!r}; expected one GTOL {frame_name!r}"
+        )
+    tag = draw.InsertDatumTag2()
+    if tag is None:
+        raise RuntimeError(f"failed to insert datum {datum} on frame {frame_name} ({label})")
+    tag = _sw_type_info.early_bound_or_flag(tag, "IDatumTag", "SetLabel", "GetLabel", "GetAnnotation")
+    if not tag.SetLabel(datum):
+        raise RuntimeError(f"failed to label datum feature {datum} ({label})")
+    tag_annotation = _sw_type_info.early_bound_or_flag(
+        tag.GetAnnotation(),
+        "IAnnotation",
+        "GetPosition",
+        "SetPosition2",
+        "GetAttachedEntities3",
+        "GetAttachedEntityCount3",
+        "GetAttachedEntityTypes",
+    )
+    if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
+        raise RuntimeError(f"failed to position datum {datum} ({label})")
+    actual = tag_annotation.GetPosition()
+    if not actual:
+        raise RuntimeError(f"datum {datum} reports no position ({label})")
+    actual_xy = (float(actual[0]), float(actual[1]))
+    offset = math.hypot(actual_xy[0] - symbol_xy[0], actual_xy[1] - symbol_xy[1])
+    _telemetry.event(
+        "datum.frame_placement",
+        datum=datum,
+        frame=frame_name,
+        requested_x=symbol_xy[0],
+        requested_y=symbol_xy[1],
+        reported_x=actual_xy[0],
+        reported_y=actual_xy[1],
+        offset_m=offset,
+    )
+    if offset > position_tolerance_m:
+        raise RuntimeError(
+            f"datum {datum} position did not persist ({label}): {actual_xy}; "
+            f"requested={symbol_xy}, offset={offset:.6g} m, "
+            f"limit={position_tolerance_m:.6g} m"
+        )
+    draw.ClearSelection2(True)
+    rebuild_drawing(adapter, label="add_frame_datum_feature")
+    attached = tuple(tag_annotation.GetAttachedEntities3() or ())
+    attached_count = int(tag_annotation.GetAttachedEntityCount3())
+    types = tuple(int(t) for t in (tag_annotation.GetAttachedEntityTypes() or ()))
+    # The readback type of an annotation-on-annotation attachment is not
+    # documented, so the type is logged and the NAME decides.
+    attached_name = (
+        _frame_name(attached[0])
+        if len(attached) == 1 and attached[0] is not None
+        else ""
+    )
+    _telemetry.event(
+        "datum.frame_attachment",
+        datum=datum,
+        frame=frame_name,
+        count=attached_count,
+        types=str(types),
+        attached=attached_name,
+    )
+    if attached_count != 1 or attached_name != frame_name:
+        raise RuntimeError(
+            f"datum {datum} is not attached to its frame {frame_name} ({label}): "
+            f"count={attached_count}, types={types}, attached={attached_name!r}"
+        )
+    if str(tag.GetLabel()) != datum:
+        raise RuntimeError(f"datum feature label did not persist ({label})")
+    return tag
+
+
+def assert_frame_datums_defined(views: Sequence[Any], *, label: str) -> None:
+    """Fail unless every datum letter a frame in ``views`` references is
+    printed by a datum tag in ``views``.
+
+    A frame naming a datum the sheet never identifies is not a requirement a
+    machinist can hold; farm run 20261009T171439353Z printed ⌖Ø0.10|A|B and
+    ⌖Ø0.20|A|B on the knife mount with no B on the sheet, because the
+    identifier its readback proved does not print.
+    """
+    from _gtol_spec import gtol_frame_signature
+
+    defined: set[str] = set()
+    referenced: dict[str, list[str]] = {}
+    for view in views:
+        native = _early_bound(view, "IView")
+        for tag in native.GetDatumTags() or ():
+            defined.add(str(_early_bound(tag, "IDatumTag").GetLabel() or ""))
+        for gtol in native.GetGTols() or ():
+            gtol = _early_bound(gtol, "IGtol")
+            name = _frame_name(gtol)
+            for index in range(1, int(gtol.GetFrameCount() or 0) + 1):
+                frame = _sw_type_info.early_bound_or_flag(
+                    gtol.GetFrame(index), "IGtolFrame", "GetSymbolXml"
+                )
+                for letter in gtol_frame_signature(str(frame.GetSymbolXml() or "")).datums:
+                    referenced.setdefault(letter, []).append(name)
+    missing = {letter: frames for letter, frames in referenced.items() if letter not in defined}
+    if missing:
+        raise RuntimeError(
+            f"{label}: frames reference datum(s) no tag prints: "
+            + ", ".join(f"{letter} by {sorted(set(frames))}" for letter, frames in sorted(missing.items()))
+            + f"; tags print {sorted(defined)}"
+        )
 
 
 @_telemetry.traced("drawing.project_part_pmi", label_param="label")

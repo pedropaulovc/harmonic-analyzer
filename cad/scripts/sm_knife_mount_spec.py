@@ -186,7 +186,7 @@ PIN_HOLE_COUNT = len(PIN_HOLE_XS)
 if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
     raise AssertionError("the knife mount reams one hole per MHA-VN-051 dowel")
 # The pair's 2X ream carries ⌖Ø0.13 to the top seat (datum A) and names the
-# pattern datum B (the frame's datum identifier; policy rule 3); the sheet
+# pattern datum B (the datum feature symbol on that frame; policy rule 3); the sheet
 # prints its span BASIC between the two hole axes, centred on the block, and
 # positions the tap and the bore to A|B.  Each hole's station from the
 # pattern centre varies by the zone's radius, and from the tap axis by that

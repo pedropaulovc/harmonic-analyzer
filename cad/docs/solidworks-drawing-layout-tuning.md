@@ -382,6 +382,20 @@ acceptable where no second line runs inside the hit radius of the pick, and
 `draw_ch_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
 `IsSame` readback against the named bore.
 
+**l. A datum named by a frame's datum identifier.**
+Don't: name a pattern datum with `IGtol::SetDatumIdentifier` and take
+`GetDatumIdentifier` as proof. On the knife mount (farm run
+20261009T171439353Z) it read "B" back before and after the rebuild and the
+sheet printed no B, while the tap and bore frames referenced A|B. The API
+help (`types/IGtol/SetDatumIdentifier.md`) says only that it "sets the name
+of the datum being defined"; the frame XML schema has no node for it.
+Do: insert a real datum tag on the selected frame
+(`_drawing_common.add_frame_datum_feature`) and require the tag's attachment
+to be that frame by annotation name. This path is not yet proven on a farm
+leaf, and its guards fail closed. Also end the sheet with
+`assert_frame_datums_defined`, which fails when any frame names a datum that
+no `IView::GetDatumTags` label prints.
+
 ## The sheet-split rule
 
 When two views' callouts are squeezed together, the fix is a NEW SHEET, not a
