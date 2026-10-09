@@ -27,7 +27,7 @@ promise. (Widely repeated as campaign advice. Find a citable source before this
 line goes anywhere public.) What this project has going for it is that a large,
 verifiable chunk of the work is already done and already public:
 
-- 151 registered CAD part families, generated from Python scripts, with a build
+- 149 registered CAD part families, generated from Python scripts, with a build
   pipeline that gates every assembly on DOF, interference and mass properties.
   See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for the
   inventory and the root [README](../README.md) for the CAD model.

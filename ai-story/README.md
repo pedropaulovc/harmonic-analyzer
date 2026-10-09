@@ -13,7 +13,7 @@ The publication format remains an editorial decision owned by
 
 This repo is an unusually complete artefact of AI-assisted engineering:
 
-- [151 registered CAD part families](../cad/docs/subsystem-identities.md), generated
+- [149 registered CAD part families](../cad/docs/subsystem-identities.md), generated
   by Python scripts written almost entirely with agents, driving a COM API that
   is famously badly covered by training data.
 - A build pipeline, a verification suite, a remote cache, a watchdog and full
