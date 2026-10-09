@@ -32,7 +32,12 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is sm_knife_mount_spec.DRAWING_DIMENSIONS
     marked = set().union(*sm_knife_mount_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
+    kept = (
+        set(drawing.FRONT_KEEP)
+        | set(drawing.SECTION_KEEP)
+        | set(drawing.RIGHT_KEEP)
+        | set(drawing.TOP_KEEP)
+    )
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
     # Every marked dowel-hole dimension carries part-authored places.
@@ -43,6 +48,35 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     }
     for feature, names in sm_knife_mount_spec.DRAWING_PRECISION.items():
         assert set(names) <= sm_knife_mount_spec.DRAWING_DIMENSIONS[feature]
+
+
+def test_dowel_hole_depth_is_dimensioned_on_the_section_not_a_hidden_edge() -> None:
+    # Policy rule 7: the blind dowel hole's floor is a hidden edge in the
+    # front view, so its depth rides section A-A, cut on z = 0 through the
+    # tap axis (the origin) and the dowel axis, and only there.
+    assert set(drawing.SECTION_KEEP) == {"PinHoleDepth"}
+    assert "PinHoleDepth" not in drawing.FRONT_KEEP
+    assert "PinHoleDepth" not in drawing.TOP_KEEP
+    (start, end) = drawing.SECTION_LINE_MODEL_MM
+    assert start[2] == end[2] == 0.0
+    assert start[0] < -sm_knife_mount_spec.BLK_HALF_X
+    assert end[0] > sm_knife_mount_spec.BLK_HALF_X
+    assert start[0] < 0.0 < sm_knife_mount_spec.PIN_HOLE_X < end[0]
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert source.count("create_section_view(") == 1
+    assert "_look_section_along_minus_z(adapter, section)" in source
+    assert "set_hidden_lines_removed(adapter, section)" in source
+    # Section before top: the MHA-PD-018 import order.
+    assert source.index("keep=SECTION_KEEP") < source.index("keep=TOP_KEEP")
+    # The depth text stands right of the cut block, level with the hole.
+    x, y = drawing.SECTION_KEEP["PinHoleDepth"]
+    scale = drawing.SHEET_SCALE[0] / 1000.0
+    assert x > drawing.SECTION_CENTER[0] + sm_knife_mount_spec.BLK_HALF_X * scale
+    top_y = drawing._section_y(sm_knife_mount_spec.BLK_TOP)
+    floor_y = drawing._section_y(
+        sm_knife_mount_spec.BLK_TOP - sm_knife_mount_spec.PIN_HOLE_DEPTH
+    )
+    assert floor_y < y < top_y
 
 
 def test_spec_geometry_mirrors_the_build_source() -> None:

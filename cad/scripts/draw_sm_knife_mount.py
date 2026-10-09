@@ -8,7 +8,9 @@ and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
 depth added across the right-view section.  The MHA-VN-051 dowel hole prints
 its reamed Ø (with its band and press callout) and its station from the tap
-axis in the top view, and its flat-floor depth in the front view.
+axis in the top view, and its flat-floor depth in section A-A, cut from the
+top view through the tap and dowel axes (policy rule 7: the floor is hidden in
+the front view, so it is dimensioned where the cut shows it).
 
 Run with SolidWorks open::
 
@@ -24,7 +26,7 @@ from typing import Any
 from sm_knife_mount_spec import GEOMETRIC_TOLERANCES_MM
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
@@ -33,10 +35,13 @@ from _drawing_common import (
     add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
@@ -46,6 +51,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from sm_knife_mount_spec import (
     BLK_BOT,
+    BLK_HALF_X,
     BLK_TOP,
     BORE_CY,
     DRAWING_DIMENSIONS,
@@ -82,10 +88,26 @@ FRONT_CENTER = (0.115, 0.140)
 RIGHT_CENTER = (0.220, 0.140)
 TOP_CENTER = (0.115, 0.235)
 ISO_CENTER = (0.345, 0.210)
+# Section A-A stands right of the right view and under the isometric, clear
+# of the title block (x > 0.216 below y 0.066): the block spans sheet y
+# 0.0955..0.1545 at 2:1 and its label hangs under it.
+SECTION_CENTER = (0.300, 0.125)
+# The cutting line (model z = 0, through the tap and dowel axes) runs this
+# far past each block face in the top view.
+SECTION_LINE_OVERRUN_MM = 2.5
+SECTION_LINE_MODEL_MM = (
+    (-(BLK_HALF_X + SECTION_LINE_OVERRUN_MM), BLK_TOP, 0.0),
+    (BLK_HALF_X + SECTION_LINE_OVERRUN_MM, BLK_TOP, 0.0),
+)
 
 
 def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - _BLOCK_CY) * SHEET_SCALE[0] / 1000.0
+
+
+def _section_y(model_y_mm: float) -> float:
+    """Sheet y of a model y in section A-A (it looks along -Z, as the front)."""
+    return SECTION_CENTER[1] + (model_y_mm - _BLOCK_CY) * SHEET_SCALE[0] / 1000.0
 
 
 def _sheet_x(model_x_mm: float) -> float:
@@ -97,9 +119,14 @@ FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
     "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
-    # Right of the block, between the bore's position frame and its finish
-    # symbol, level with the dowel-hole floor.
-    "PinHoleDepth": (FRONT_CENTER[0] + 0.036, _front_y(BLK_TOP - PIN_HOLE_DEPTH)),
+}
+# The dowel hole's floor depth stands right of the section, level with the
+# middle of the hole, its witness lines off the cut top seat and hole floor.
+SECTION_KEEP = {
+    "PinHoleDepth": (
+        SECTION_CENTER[0] + (BLK_HALF_X + 8.0) * SHEET_SCALE[0] / 1000.0,
+        _section_y(BLK_TOP - PIN_HOLE_DEPTH / 2.0),
+    ),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
 TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -116,6 +143,38 @@ DIMENSION_CALLOUTS = {
 
 RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
 RIGHT_HALF_Y = (BLK_TOP - BLK_BOT) / 2.0 * SHEET_SCALE[0] / 1000.0
+
+
+def _look_section_along_minus_z(adapter: Any, section: Any) -> None:
+    """Point section A-A's sight line along -Z, so it reads as the front view.
+
+    The direction is read from the section's own projection (the
+    draw_dt_cone_swing_platform section C-C idiom): with screen-right r and
+    screen-up u the sight line is u x r, which runs along -z exactly when
+    model +x's sheet-x sign times model +y's sheet-y sign is positive.  Then
+    the dowel hole stands right of the tap axis, beside SECTION_KEEP's depth.
+    """
+    cut = _early_bound(section.GetSection(), "IDrSection")
+
+    def x_direction() -> float:
+        base = model_point_in_view(
+            adapter, section, (0.0, 0.0, 0.0), label="A-A origin"
+        )
+        east = model_point_in_view(adapter, section, (0.001, 0.0, 0.0), label="A-A +x")
+        up = model_point_in_view(adapter, section, (0.0, 0.001, 0.0), label="A-A +y")
+        return (east[0] - base[0]) * (up[1] - base[1])
+
+    if x_direction() < 0.0:
+        reversed_cut = not bool(cut.GetReversedCutDirection())
+        cut.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="section A-A looks along -Z")
+        if bool(cut.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("section A-A cut direction did not persist")
+    direction = x_direction()
+    if not direction > 0.0:
+        raise RuntimeError(
+            f"section A-A still looks along +Z (sign product {direction})"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -163,6 +222,30 @@ async def build(adapter: Any) -> dict[str, str]:
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(2, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
+    # Section A-A cuts the top view on z = 0 through the tap and dowel axes:
+    # the blind dowel hole's floor is hidden in the front view (policy rule 7),
+    # so its depth is dimensioned on the cut.
+    section_ends = [
+        model_point_in_view(
+            adapter,
+            top,
+            tuple(value / 1000.0 for value in point),
+            label=f"section A-A line end {index}",
+        )
+        for index, point in enumerate(SECTION_LINE_MODEL_MM)
+    ]
+    section = create_section_view(
+        adapter,
+        top,
+        line_start=section_ends[0],
+        line_end=section_ends[1],
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=(2, 1),
+        label="dowel and tap axis section",
+    )
+    _look_section_along_minus_z(adapter, section)
+    set_hidden_lines_removed(adapter, section)
     # The bore only reads in the front view; show it dashed in the projected
     # right/top views so the orthographic set carries the thru-hole the
     # isometric implies (blind-review finding: HLR left them empty rectangles).
@@ -170,14 +253,21 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, top):
         set_hidden_lines_visible(adapter, view)
 
-    # The dowel hole's floor depth (front) is imported before its profile's
-    # Ø and station (top), the MHA-PD-018 section-before-end order.
+    # The dowel hole's floor depth (section A-A) is imported before its
+    # profile's Ø and station (top), the MHA-PD-018 section-before-end order.
     annotations = [
         *curate_view_dimensions(
             adapter,
             front,
             keep=FRONT_KEEP,
             view_label="front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            section,
+            keep=SECTION_KEEP,
+            view_label="section A-A",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
         *curate_view_dimensions(
