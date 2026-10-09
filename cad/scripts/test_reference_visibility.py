@@ -772,11 +772,91 @@ _REFERENCE_KINDS = frozenset({"PLANE", "AXIS", "POINT", "DATUMPOINT", "SKETCH"})
 _AUTO_NAME = re.compile(r"^(?:Plane|Axis|Point)\d+$")
 
 
+def _loop_authored_names(tree: ast.AST, in_blank: set[int]) -> set[str]:
+    """Resolve simple f-strings only within literal tuple/list loops."""
+    names: set[str] = set()
+    for loop in ast.walk(tree):
+        if not isinstance(loop, ast.For):
+            continue
+        if not isinstance(loop.iter, (ast.Tuple, ast.List)):
+            continue
+        targets = (
+            [loop.target]
+            if isinstance(loop.target, ast.Name)
+            else list(loop.target.elts)
+            if isinstance(loop.target, (ast.Tuple, ast.List))
+            else []
+        )
+        if not targets or not all(isinstance(target, ast.Name) for target in targets):
+            continue
+        for row in loop.iter.elts:
+            values = (
+                [row]
+                if isinstance(loop.target, ast.Name)
+                else row.elts
+                if isinstance(row, (ast.Tuple, ast.List))
+                else []
+            )
+            if len(values) != len(targets):
+                continue
+            bindings = {
+                target.id: value.value
+                for target, value in zip(targets, values, strict=True)
+                if isinstance(value, ast.Constant) and isinstance(value.value, str)
+            }
+            # A reassigned placeholder cannot be resolved from the loop literal.
+            rebound = {
+                node.id
+                for statement in loop.body
+                for node in ast.walk(statement)
+                if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+            }
+            for name in rebound:
+                bindings.pop(name, None)
+            # Do not descend into another scope, where a loop variable may be rebound.
+            pending = list(loop.body)
+            while pending:
+                node = pending.pop()
+                if id(node) in in_blank or isinstance(
+                    node,
+                    (
+                        ast.For,
+                        ast.AsyncFor,
+                        ast.FunctionDef,
+                        ast.AsyncFunctionDef,
+                        ast.ClassDef,
+                        ast.Lambda,
+                    ),
+                ):
+                    continue
+                if isinstance(node, ast.JoinedStr):
+                    parts: list[str] = []
+                    for part in node.values:
+                        if (
+                            isinstance(part, ast.Constant)
+                            and isinstance(part.value, str)
+                        ):
+                            parts.append(part.value)
+                        elif (
+                            isinstance(part, ast.FormattedValue)
+                            and isinstance(part.value, ast.Name)
+                            and isinstance(bindings.get(part.value.id), str)
+                            and part.conversion == -1
+                            and part.format_spec is None
+                        ):
+                            parts.append(bindings[part.value.id])
+                        else:
+                            break
+                    else:
+                        names.add("".join(parts))
+                pending.extend(ast.iter_child_nodes(node))
+    return names
+
+
 def _blanked_names_never_authored(text: str) -> list[str]:
     """Names passed to blank_reference_geometry that nothing else in the source
-    authors.  A name is authored if it is a string literal outside the blank
-    call, or, for ``<X>StartPlane``, if ``<X>`` is (the crankshaft's
-    ``f"{name}StartPlane"`` helper)."""
+    authors. Literal strings, simple f-strings in literal loops, and the
+    crankshaft's ``f"{name}StartPlane"`` helper are recognized."""
     tree = ast.parse(text)
     in_blank: set[int] = set()
     blanked: list[str] = []
@@ -795,6 +875,7 @@ def _blanked_names_never_authored(text: str) -> list[str]:
         and isinstance(node.value, str)
         and id(node) not in in_blank
     }
+    authored.update(_loop_authored_names(tree, in_blank))
     return [
         name
         for name in blanked
@@ -816,6 +897,37 @@ def test_the_blank_sweep_flags_a_name_nothing_authors() -> None:
     assert _blanked_names_never_authored(
         'blank_reference_geometry(adapter, (("Plane7", "PLANE"),))\n'
     ) == []
+
+
+@pytest.mark.parametrize("container", ["tuple", "list"])
+def test_the_blank_sweep_resolves_literal_loop_names(container: str) -> None:
+    rows = (
+        '(("Body", BODY_Y), ("Tail", TAIL_Y))'
+        if container == "tuple"
+        else '[("Body", BODY_Y), ("Tail", TAIL_Y)]'
+    )
+    source = (
+        f"for which, offset in {rows}:\n"
+        '    plane = f"{which}SeatPlane"\n'
+        '    create_plane(plane, offset)\n'
+        'blank_reference_geometry(adapter, (("BodySeatPlane", "PLANE"),'
+        ' ("TailSeatPlane", "PLANE"), ("JournalSeatPlane", "PLANE")))\n'
+    )
+    assert _blanked_names_never_authored(source) == ["JournalSeatPlane"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'for which in names:\n    create_plane(f"{which}SeatPlane")\n',
+        'for which in ("Body",):\n    which = other\n'
+        '    create_plane(f"{which}SeatPlane")\n',
+        'for which in ("Body",):\n    create_plane(f"{unknown}SeatPlane")\n',
+    ],
+)
+def test_the_blank_sweep_does_not_guess_unresolved_loop_names(source: str) -> None:
+    source += 'blank_reference_geometry(adapter, (("BodySeatPlane", "PLANE"),))\n'
+    assert _blanked_names_never_authored(source) == ["BodySeatPlane"]
 
 
 def test_every_blanked_name_is_one_its_builder_authors() -> None:

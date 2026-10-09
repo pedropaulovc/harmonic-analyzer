@@ -62,6 +62,13 @@ glance:
 | **`build`** | yes | either executor | **every** part + assembly + **every** gate — the one fully-safe entry |
 | `build_bare` | yes | either executor | parts + assemblies only — a quick rebuild |
 
+`check:recipe` includes the offline fit-band and reference-visibility inventories.
+Loop-local native bands must register their module-level source in
+`test_fit_bands.LOCAL_BAND_SOURCES`; indexed or export-only fit bands belong in
+`INDEXED_FIT_BANDS` with their consumer explained, and still receive the same
+inverted/zero-width checks. Reference names may be authored as literals or simple
+f-strings over literal tuple/list loops; unresolved or missing names remain errors.
+
 These examples run on a **local seat**. For the farm, replace
 `uv run python -m doit` with `build.py --executor farm` and follow
 [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches) —

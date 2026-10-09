@@ -55,25 +55,20 @@ from _saved_part_guard import require_saved_drawing_properties
 from ch_rocker_arm_tl_diamond_pin_spec import (
     COLLAR_DIA,
     COLLAR_END,
-    COLLAR_END_BAND,
+    DRAWING_BANDS,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FLATS_AF,
     ISOMETRIC_VIEW_NOTE,
-    LAND_BAND,
     LAND_DIA,
     LAND_HEIGHT,
-    LAND_HEIGHT_BAND,
     NECK_DIA,
     NECK_LENGTH,
     OVERALL_LENGTH,
     PIN_LENGTH,
-    REAM_BAND,
     REAM_DEPTH,
     REAM_DIA,
-    NECK_BAND,
-    SHANK_BAND,
     SHANK_DIA,
 )
 
@@ -395,14 +390,7 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    for feature, dimension, band in (
-        ("LandProfile", "LandDia", LAND_BAND),
-        ("Flats", "LandHeight", LAND_HEIGHT_BAND),
-        ("ShankProfile", "ShankDia", SHANK_BAND),
-        ("NeckProfile", "NeckDia", NECK_BAND),
-        ("ReamProfile", "ReamDia", REAM_BAND),
-        ("Collar", "CollarEnd", COLLAR_END_BAND),
-    ):
+    for (feature, dimension), band in DRAWING_BANDS.items():
         set_dimension_bilateral_tolerance(
             adapter, feature, dimension, *deviations(band)
         )

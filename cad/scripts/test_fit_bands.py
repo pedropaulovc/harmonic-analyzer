@@ -51,6 +51,9 @@ LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
         "GENERAL_BAND_BY_PLACES",
         "values",
     ),
+    ("build_ch_rocker_arm_tl_c_stop_bar", "band"): ("DRAWING_BANDS", "values"),
+    ("build_ch_rocker_arm_tl_inspection_box", "band"): ("DRAWING_BANDS", "values"),
+    ("build_ch_rocker_arm_tl_diamond_pin", "band"): ("DRAWING_BANDS", "values"),
 }
 
 # Consumer modules that cannot be imported without SolidWorks, with the reason.
@@ -174,6 +177,39 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
+    ),
+    ("ch_rocker_arm_tl_c_stop_bar_spec", "DRILLED_BAND"): (
+        "drilled screw-hole limits exported through _feature_requirements.limits"
+    ),
+    ("ch_rocker_arm_tl_inspection_box_spec", "DRILLED_BAND"): (
+        "tap-drill limits exported through _feature_requirements.limits"
+    ),
+    ("ch_rocker_arm_tl_filing_button_spec", "BORE_BAND"): (
+        "matched-fit design intent indexed by the filing stud's clearance stack"
+    ),
+    ("ch_rocker_arm_tl_filing_stud_spec", "BODY_BAND"): (
+        "matched-fit design intent indexed for the largest locating body"
+    ),
+    ("ch_rocker_arm_tl_pivot_screw_spec", "SHOULDER_BAND"): (
+        "indexed for the rocker and profile-plate locating clearances"
+    ),
+    ("ch_rocker_arm_tl_pivot_screw_spec", "HEAD_BAND"): (
+        "indexed for the outline-template bush fit and washer bearing"
+    ),
+    ("ch_rocker_arm_tl_profile_fixture_spec", "STAND_DROP_BAND"): (
+        "indexed for hub-shim air, stand engagement and floor-clearance stacks"
+    ),
+    ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"): (
+        "indexed for the native symmetric coordinate tolerance and position stack"
+    ),
+    ("ch_rocker_arm_tl_profile_fixture_spec", "DRILLED_BAND"): (
+        "clearance and tap-drill limits exported through _feature_requirements.limits"
+    ),
+    ("ch_rocker_arm_tl_vise_stop_spec", "SCREW_LENGTH_BAND"): (
+        "stock screw length indexed for the worst-case protrusion and engagement"
+    ),
+    ("dt_cone_pivot_post_tl_saw_cradle_spec", "DRILLED_BAND"): (
+        "stud tap-drill limits exported through _feature_requirements.limits"
     ),
 }
 
@@ -346,7 +382,8 @@ def test_every_band_tuple_is_checked_or_classified() -> None:
         if key in LOCAL_BAND_SOURCES:
             source = getattr(module, LOCAL_BAND_SOURCES[key][0])
             checked.add(id(source))
-            checked.update(id(band) for band in source)
+            bands = source.values() if LOCAL_BAND_SOURCES[key][1] == "values" else source
+            checked.update(id(band) for band in bands)
             continue
         try:
             checked.add(id(eval(use.expression, vars(module))))  # noqa: S307

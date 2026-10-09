@@ -181,6 +181,16 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked diamond-pin dimension needs authored places")
 
+# Native dimension bands shared by the builder and the offline fit inventory.
+DRAWING_BANDS: dict[tuple[str, str], tuple[float, float]] = {
+    ("LandProfile", "LandDia"): LAND_BAND,
+    ("Flats", "LandHeight"): LAND_HEIGHT_BAND,
+    ("ShankProfile", "ShankDia"): SHANK_BAND,
+    ("NeckProfile", "NeckDia"): NECK_BAND,
+    ("ReamProfile", "ReamDia"): REAM_BAND,
+    ("Collar", "CollarEnd"): COLLAR_END_BAND,
+}
+
 DRAWING_REFERENCE_PRECISION = 1  # the (overall) reference prints .X
 SURFACE_FINISHES = ()
 # Lines 3-4 stay short: the template's isometric caption sits beside them.
