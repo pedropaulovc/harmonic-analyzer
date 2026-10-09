@@ -62,7 +62,7 @@ geometry is casting-shaped, not milling-shaped.
   engagement (1.956D). The seat is sized at its printed .XX worst case:
   13.20 mm full thread (0.25 mm tip reserve at the low limit) and 20.60 mm
   cylindrical tap-drill depth (five 1.27 mm pitches past the thread).
-  Other receivers are threaded too; the `sm-knife-mount` hanger-stud seat is one
+  Other receivers are threaded too; the `sm-knife-mount` #6-32 bottoming hanger-screw tap is one
   example. The 20 `dt-cone-gear`s and the 64T `dt-crank-drive-gear` transmit torque
   through matching D-bores on the shaft's D-flat lands; the cylinder gears
   ride free on their stationary arbor. The gears seat against each other,
@@ -99,7 +99,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`sm-summing-lever`** | modeled **Gray Cast Iron casting**; organic first-class lever ~120×28×196 | solid pivot cylinder Ø25.4×152.4 (**no bore**); 2× hex knife trunnions (edges = top-vertex ridges) protruding 21.717 each end; 20× #6-32 tapped anchor seats through the 5.08 plate @ 7.0565 pitch (web ~5.06, Ø2.705 tap drill); one #10-24 tap through the Ø19.05×19.05 summation-anchor boss — both purchased spring anchors thread straight in, no nuts | knife-edge ridge **delicate** (the precision line); trunnion slender cantilever → **chatter**; organic 3-pt-arc leaf/rib profiles hard to mill; turning Ø25.4 with cantilevered plates; 20 small through-taps in a 5.08 web → **tap breakage**, use a tapping head | **4–5 from bar** (2 sketch planes + turn) | **CAST or fabricate**, don't hog; knife edge → hardened insert (§6) |
-| **`sm-knife-mount`** | rectangular block 34×43.77×14 (bar/plate); **2 identical** | Ø25.4 through bore (bearing bore for the trunnion), centre ~27.1 below the top face (`BORE_CY` −12.45 from the knife-edge origin, block top +14.62); tapped 1/2-13 blind hole ×12 in the block top (hanger-stud seat); walls 4.0 under bore, ~4.3 flanks | watch **bore breakout on the 4 mm floor**; otherwise trivial | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or trivial manual. Hangs from the top-frame casting's integral crossbar (the former separate top-crossbar part is merged into the top-frame) via a 1/2-13 knife-hanger stud |
+| **`sm-knife-mount`** | rectangular block 24×29.62×14 (bar/plate); **2 identical** | Ø12 through bore (bearing bore for the trunnion), centre 20.62 below the top face (`BORE_CY` −5.75 from the knife-edge origin, block top +14.87, clamped to the casting underside); #6-32 UNC-2B bottoming tap in the block top on the bore axis (hanger-screw seat: drill #36 Ø2.705 ×10.9, full thread 9.7; worst-case 2.04 web over the bore crown, no break-in); Ø3.175 reamed dowel press hole ×9.5 in the block top at 6.350 from the tap axis; walls 3.0 under bore, 6.0 flanks | watch **bore breakout on the 3 mm floor**; hold the #36 drill to 10.9 (the 2.04 worst-case web over the bore crown); otherwise trivial | 1–2 (square block, bore one axis) | **CNC-REPEAT** (×2) or trivial manual. Clamped to the underside of the top-frame casting's integral crossbar (the former separate top-crossbar part is merged into the top-frame) by a #6-32 × 1-1/2 socket head cap screw (MHA-VN-024, McMaster 91251A157) dropped through a Ø7.0 ×6.5 counterbore + Ø4.318 #6 clearance (floor 30.0 above the crossbar underside), 8.10 nominal engagement (6.28..8.90), set with removable medium-strength threadlocker; the pressed MHA-VN-051 dowel (98381A473, 1/8 × 3/4) slips into a Ø3.24 ±0.03 ×12.0 blind hole in the crossbar underside and keys the block against turning |
 
 ### Cylinder gear + cam, connecting rod (T1 — the 20 function generators)
 
@@ -143,9 +143,9 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 2. **Decide the `sm-summing-lever` fabrication method** (cast / fabricate / hog) and the **knife-edge
    insert** now — it drives whether this is a 5-setup nightmare or two simple operations, and it is the
    critical interface.
-3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02): the
-   block hangs from the top-frame casting's integral crossbar via a 1/2-13 hanger stud threaded
-   into a tapped hole in the block top; both the stud and the tapped hole are modeled.
+3. ~~**Model the `sm-knife-mount` mounting holes**~~ — RESOLVED (top-frame rederive, 2026-08-02; #6-32 redesign, 2026-10): the
+   block is clamped to the top-frame casting's integral crossbar by a #6-32 socket head cap screw threaded
+   into a bottoming tap in the block top and keyed by a pressed dowel; the screw, dowel and all their holes are modeled.
 4. **Reconcile the `ch-rocker-arm` R800 vs book 812.8 mm** (already a §4 Finding) before it becomes a
    drawing callout — but note the good news from this pass: it's a *profile* dimension, cheap to change.
 5. **Consider enlarging the tip cone gears** (T006–T012) — the model already flags them marginal and a
