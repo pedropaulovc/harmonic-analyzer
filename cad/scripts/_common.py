@@ -282,13 +282,15 @@ async def equation_curve(
     before = manager.AddToDB
     if type(before) is not bool:
         raise RuntimeError(f"curve {label}: AddToDB is not a native bool: {before!r}")
-    _telemetry.debug(f"curve {label}: AddToDB before={before!r}")
+    with contextlib.suppress(Exception):
+        _telemetry.debug(f"curve {label}: AddToDB before={before!r}")
     try:
         manager.AddToDB = True
         enabled = manager.AddToDB
-        _telemetry.debug(f"curve {label}: AddToDB enabled={enabled!r}")
         if enabled is not True:
             raise RuntimeError(f"curve {label}: AddToDB write refused")
+        with contextlib.suppress(Exception):
+            _telemetry.debug(f"curve {label}: AddToDB enabled={enabled!r}")
         result = await adapter.create_equation_driven_curve(
             CreateEquationCurveParameters(
                 x_expression=x_expr,
@@ -303,9 +305,10 @@ async def equation_curve(
     finally:
         manager.AddToDB = before
         restored = manager.AddToDB
-        _telemetry.debug(f"curve {label}: AddToDB restored={restored!r}")
         if restored is not before:
             raise RuntimeError(f"curve {label}: AddToDB restore refused")
+        with contextlib.suppress(Exception):
+            _telemetry.debug(f"curve {label}: AddToDB restored={restored!r}")
 
 
 @_telemetry.traced("sketch.ensure_defined", label_param="label")
@@ -389,7 +392,8 @@ async def ensure_fully_defined(
             )
         segment = _early_bound(entity, "ISketchSegment")
         status = segment.Status
-        _telemetry.debug(f"{label}: {entity_id}.Status={status!r}")
+        with contextlib.suppress(Exception):
+            _telemetry.debug(f"{label}: {entity_id}.Status={status!r}")
         if type(status) is not int or status not in (2, 3):
             raise RuntimeError(
                 f"{label}: cannot fix {entity_id} with native Status={status!r}"
@@ -400,9 +404,10 @@ async def ensure_fully_defined(
         if not fixed.is_success:
             raise RuntimeError(f"{label}: fix {entity_id} failed: {fixed.error}")
         state = await _state()
-        _telemetry.debug(f"fixed {entity_id} -> {state}")
         if state == "over_defined":
             await _over_defined()
+        with contextlib.suppress(Exception):
+            _telemetry.debug(f"fixed {entity_id} -> {state}")
         if state == "fully_defined":
             _telemetry.success(f"fully defined after fixing {entity_id}: {label}")
             _log_sketch_relations(adapter, label, "after_fix", "debug")

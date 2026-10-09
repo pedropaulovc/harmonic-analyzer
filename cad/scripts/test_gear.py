@@ -445,3 +445,106 @@ def test_relation_inventory_does_not_join_fresh_wrappers_by_python_identity() ->
     filtered = snapshot["relations"]["swOverDefining"][0]
     assert filtered["returned_by_filter"] == "swOverDefining"
     assert filtered["entities"][0]["native_id"] == (0, 1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["before", "enabled", "restored"])
+@pytest.mark.parametrize("failed_result", [False, True])
+async def test_creator_failure_survives_selective_direct_db_debug_refusal(
+    phase, failed_result, monkeypatch, sketch_logs
+) -> None:
+    selector = f"AddToDB {phase}="
+    attempted: list[str] = []
+
+    def debug(message, **_fields):
+        attempted.append(message)
+        if selector in message:
+            raise RuntimeError("selected DEBUG refused")
+
+    monkeypatch.setattr(_common._telemetry, "debug", debug)
+    manager = _SketchManager()
+    adapter = _CurveAdapter(manager)
+    adapter.fail_creation = not failed_result
+    adapter.fail_result = failed_result
+
+    with pytest.raises(RuntimeError, match="equation parser refused"):
+        await _common.equation_curve(adapter, "floor", "t", "1-t")
+
+    assert len(adapter.calls) == 1
+    assert manager.AddToDB is False
+    assert manager.writes == [True, False]
+    assert any(selector in message for message in attempted)
+
+
+@pytest.mark.asyncio
+async def test_restore_refusal_precedes_restored_debug_logging(
+    monkeypatch, sketch_logs
+) -> None:
+    attempted: list[str] = []
+
+    def debug(message, **_fields):
+        attempted.append(message)
+        if "AddToDB restored=" in message:
+            raise RuntimeError("restored DEBUG refused")
+
+    monkeypatch.setattr(_common._telemetry, "debug", debug)
+    manager = _SketchManager()
+    manager.refuse_restore = True
+
+    with pytest.raises(RuntimeError, match="AddToDB restore refused"):
+        await _common.equation_curve(_CurveAdapter(manager), "floor", "t", "1-t")
+
+    assert manager.AddToDB is True
+    assert not any("AddToDB restored=" in message for message in attempted)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "selector", ["EquationCurve_1.Status=", "fixed EquationCurve_1 -> over_defined"]
+)
+async def test_post_fix_overdefined_inventory_precedes_refusable_debug(
+    selector, monkeypatch, sketch_logs
+) -> None:
+    attempted: list[str] = []
+
+    def debug(message, **_fields):
+        attempted.append(message)
+        if selector in message:
+            raise RuntimeError("selected FIX DEBUG refused")
+
+    monkeypatch.setattr(_common._telemetry, "debug", debug)
+    adapter = _SketchAdapter(["under_defined", "over_defined"])
+
+    with pytest.raises(RuntimeError, match="gap: sketch OVER-defined"):
+        await _common.ensure_fully_defined(
+            adapter, "gap", fix_entities=["EquationCurve_1"],
+            allow_fix_escalation=True,
+        )
+
+    error = next(line for line in sketch_logs["error"] if "(over_defined)" in line)
+    snapshot = json.loads(error.split(": ", 2)[2])
+    assert snapshot["sketch_status"] == 4
+    assert len(snapshot["relations"]["swAll"]) == 2
+    assert set(adapter.relations.calls) == {0, 1, 2, 6}
+    assert adapter.fixed == ["EquationCurve_1"]
+    assert not any("fixed EquationCurve_1 -> over_defined" in line for line in attempted)
+
+
+@pytest.mark.asyncio
+async def test_entity_status_refusal_survives_eligibility_debug_refusal(
+    monkeypatch, sketch_logs
+) -> None:
+    def debug(message, **_fields):
+        if "EquationCurve_1.Status=" in message:
+            raise RuntimeError("eligibility DEBUG refused")
+
+    monkeypatch.setattr(_common._telemetry, "debug", debug)
+    adapter = _SketchAdapter(["under_defined"], statuses=(4,))
+
+    with pytest.raises(RuntimeError, match="cannot fix EquationCurve_1 with native Status=4"):
+        await _common.ensure_fully_defined(
+            adapter, "gap", fix_entities=["EquationCurve_1"],
+            allow_fix_escalation=True,
+        )
+
+    assert adapter.fixed == []
