@@ -60,9 +60,9 @@ _XXX = float(str(_config.title_block("linear_3pl")["display"]).lstrip("\u00b1"))
 # Two pins per knife mount, their axes HANGER_OFFSET either side of the
 # knife-hanger screw axis along machine X in BOTH parts (block local X is
 # machine X: the mounts are placed unrotated).  The crossbar prints each
-# station .XXX from its screw axis (HANGER_OFFSET_TOL); the knife mount prints
-# the pair's SPAN .XXX (SPAN_TOL) as its datum pattern and positions its tap
-# to it.  The crossbar's slot takes up the spacing, its #6 clearance hole the
+# station .XXX from its screw axis (HANGER_OFFSET_TOL); the knife mount holds
+# the pair as its datum pattern B -- the 2X ream carries a position frame to
+# the top seat, its SPAN BASIC -- and positions its tap to it.  The crossbar's slot takes up the spacing, its #6 clearance hole the
 # rest (``fr_top_frame_spec``, ``build_sm_summing_assembly``).
 PER_MOUNT = 2
 MOUNTS = 2
@@ -70,10 +70,15 @@ QUANTITY = PER_MOUNT * MOUNTS
 HANGER_OFFSET = 0.25 * MM_PER_IN  # 6.350
 HANGER_OFFSET_PLACES = 3
 HANGER_OFFSET_TOL = _XXX  # 0.13
-# The pair's centre-to-centre span along the dowel line.
+# The pair's centre-to-centre span along the dowel line, BASIC.  Each hole's
+# axis stands within half the frame's zone of its true position, so the span
+# varies by the full zone: the knife mount's Ø0.13
+# (``sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM``, which asserts it equals
+# SPAN_TOL) keeps the 0.13 the .XXX span gave, and with it every stack the
+# pair feeds (the 2026-10-09 ruling).
 SPAN = 2.0 * HANGER_OFFSET  # 12.700
 SPAN_PLACES = 3
-SPAN_TOL = _XXX  # 0.13
+SPAN_TOL = 0.13
 # Pressed to the flat floor of the knife mount's blind hole, printed .X.
 PRESS_DEPTH = 9.5
 PRESS_DEPTH_PLACES = 1

@@ -134,11 +134,16 @@ KNIFE_Y = 979.7  # machine y of the pivot centreline (build_sm_summing_assembly 
 CASTING_UNDERSIDE_Y = 999.7  # top-frame casting underside (integral crossbar)
 MOUNT_GAP = 0.0  # seat clamped to the casting underside by the #6-32 screw
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
-BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.87)
+BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.866)
 if abs(BLK_TOP - sm_knife_mount_spec.BLK_TOP) > 0.005:
     raise AssertionError(
         f"knife-mount BLK_TOP {BLK_TOP:.4f} != spec {sm_knife_mount_spec.BLK_TOP}"
     )
+# The bore centre's BASIC height under the datum-A top seat, exactly as
+# modelled: 14.866 + 5.75 = 20.616.  The sheet prints it (draw_sm_knife_mount)
+# at the places that carry it unrounded; the spec's 14.87 mirror would print a
+# BASIC 0.004 off the part (farm run 20261009T155421516Z measured 20.616).
+BORE_CENTRE_DEPTH = BLK_TOP - BORE_CY
 # The spec judges the tap's web at its rounded mirror; the derived top is
 # 0.004 lower, so re-judge it here (2.038).
 _TAP_WEB_WORST = sm_knife_mount_spec.tap_web_worst(

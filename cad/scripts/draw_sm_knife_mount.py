@@ -7,8 +7,9 @@ unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
 and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
 depth added across the right-view section.  The two MHA-VN-051 dowel holes
-print their 2X reamed Ø (with its band and press callout; the pair is datum
-B) and their .XXX span in the top view, and their flat-floor depth in section
+print their 2X reamed Ø (with its band and press callout) and a position
+frame under it, Ø0.13 to A, whose datum identifier makes the pair datum B,
+at their BASIC span in the top view, and their flat-floor depth in section
 A-A, cut from the top view through the tap and dowel axes (policy rule 7: the
 floor is hidden in the front view, so it is dimensioned where the cut shows
 it).  The bore carries a composite position frame to the top seat (datum A)
@@ -34,7 +35,6 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_datum_feature,
-    add_dimension_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
@@ -58,11 +58,11 @@ from _drawing_common import (
 from _drawing_leaders import set_near_side_diameter
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from build_sm_knife_mount import BORE_CENTRE_DEPTH
 from sm_knife_mount_spec import (
     BLK_BOT,
     BLK_HALF_X,
     BLK_TOP,
-    BORE_CENTRE_DEPTH,
     BORE_CY,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -167,7 +167,7 @@ PIN_CALLOUT_HALF_WIDTH = 0.04225
 PIN_CALLOUT_SHOULDER_OVERHANG = 0.0016
 PIN_CALLOUT_SHOULDER_DROP = 0.01286
 PIN_CALLOUT_SHOULDER_START = (_sheet_x(BLK_HALF_X) + 0.006, TOP_CENTER[1] - 0.010)
-# The pair's 12.700 span runs above the top view, between the hole axes.
+# The pair's BASIC 12.700 span runs above the top view, between the hole axes.
 PIN_SPAN_TEXT_XY = (TOP_CENTER[0], TOP_CENTER[1] + TOP_HALF_Z + 0.010)
 TOP_KEEP = {
     "PinHoleDia": (
@@ -181,10 +181,16 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
-# The pair's count rides ABOVE its Ø: datum B is attached to the same
-# dimension, and SOLIDWORKS seats that symbol between the value and the
-# below lane (the pd-latch-hook-bracket PAIR_CALLOUT precedent).
+# The pair's count rides ABOVE its Ø (the pd-latch-hook-bracket PAIR_CALLOUT
+# precedent), the process lines below it.
 CALLOUTS_ABOVE = {"PinHoleDia": PIN_HOLE_PAIR_CALLOUT}
+# The pair's position frame (datum identifier B) hangs under that callout's
+# shoulder, its left edge on the shoulder's near end, on its own leader to
+# the same hole; the bore's frame stands ~30 mm lower.
+PIN_FRAME_XY = (
+    PIN_CALLOUT_SHOULDER_START[0] + PIN_CALLOUT_SHOULDER_OVERHANG,
+    PIN_CALLOUT_SHOULDER_START[1] - 0.006,
+)
 # The #6-32 bottoming tap is stated once, on its Hole Wizard callout in the
 # top view (fr-top-frame's KEEPER TAP precedent), not in a note.  The
 # process rides its own row over the native drill and thread rows: three
@@ -476,10 +482,13 @@ async def build(adapter: Any) -> dict[str, str]:
             f"expected {PIN_HOLE_SPAN:g} mm"
         )
     _set_sheet_precision(span, label="dowel hole span")
+    set_basic_dimension(adapter, span, label="dowel hole span")
 
     # Datum A = the block top seat (clamped to the top-frame casting underside;
     # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel
-    # holes); datum B = the dowel pair, its symbol on their 2X Ø.  Ra 1.6
+    # holes); datum B = the dowel pair, named by the position frame under
+    # their 2X Ø (its datum identifier; a tag on the dimension attaches to
+    # nothing, farm run 20261009T155421516Z).  Ra 1.6
     # (MACHINED_UM) on the bore's working upper wall, tagged on the bore rim
     # (a real circular edge).
     add_datum_feature(
@@ -490,15 +499,35 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="block top seat",
     )
-    pin_dia = [a for a in annotations if dimension_name(adapter, a) == "PinHoleDia"]
-    if len(pin_dia) != 1:
-        raise RuntimeError(f"expected one PinHoleDia dimension, found {len(pin_dia)}")
-    add_dimension_datum_feature(
+    # The pair: ⌖Ø0.13 to A at their BASIC span, the frame on the +X hole's
+    # lower outer rim, where the 2X Ø callout's own leader lands.
+    pin_frame_rim = min(
+        (
+            model_point_in_view(
+                adapter,
+                top,
+                (
+                    (PIN_HOLE_X + pin_rim_mm) / 1000.0,
+                    BLK_TOP / 1000.0,
+                    z_side * pin_rim_mm / 1000.0,
+                ),
+                label=f"dowel hole frame rim z{z_side:+.0f}",
+            )
+            for z_side in (1.0, -1.0)
+        ),
+        key=lambda point: point[1],
+    )
+    add_feature_control_frame(
         adapter,
         top,
-        dimension=_early_bound(pin_dia[0], "IAnnotation").GetSpecificAnnotation(),
-        datum="B",
-        label="dowel hole pattern",
+        edge_xy=pin_frame_rim,
+        frame_xy=PIN_FRAME_XY,
+        characteristic="position",
+        tolerance=GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"],
+        datums=("A",),
+        diameter=True,
+        datum_identifier="B",
+        label="dowel hole pattern position",
     )
     # The bore: Ø0.20 located to A|B, its orientation refined to Ø0.05 to
     # the same A|B (composite; tolerance-gdt-assessment §5.4).  Its centre

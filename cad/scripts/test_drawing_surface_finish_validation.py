@@ -301,6 +301,105 @@ def test_feature_control_frame_refuses_a_dimension_attachment() -> None:
         )
 
 
+class _Frame:
+    def __init__(self) -> None:
+        self.xml = ""
+
+    def SetSymbolXml(self, xml: str) -> bool:
+        self.xml = xml
+        return True
+
+    def GetSymbolXml(self) -> str:
+        return self.xml
+
+
+class _FrameAnnotation:
+    def GetAttachedEntityCount3(self) -> int:
+        return 1
+
+    def SetLeader3(self, *_args: Any) -> int:
+        return 0
+
+    def SetPosition2(self, *_args: Any) -> bool:
+        return True
+
+
+class _Gtol:
+    """A current-format frame whose datum identifier ``keeps`` decides."""
+
+    def __init__(self, keeps: str) -> None:
+        self.keeps = keeps
+        self.frames = [_Frame()]
+        self.identifier = ""
+
+    def GetFrameCount(self) -> int:
+        return len(self.frames)
+
+    def GetFrame(self, index: int) -> _Frame:
+        return self.frames[index - 1]
+
+    def GetFormat(self) -> int:
+        return 2
+
+    def GetAnnotation(self) -> _FrameAnnotation:
+        return _FrameAnnotation()
+
+    def SetDatumIdentifier(self, identifier: str) -> None:
+        if self.keeps != "ignored":
+            self.identifier = identifier
+
+    def GetDatumIdentifier(self) -> str:
+        return self.identifier
+
+
+def _frame_with_identifier(monkeypatch: pytest.MonkeyPatch, gtol: _Gtol) -> Any:
+    class _Draw:
+        def InsertGtol(self) -> _Gtol:
+            return gtol
+
+        def ClearSelection2(self, _all: bool) -> None:
+            pass
+
+    class _Adapter:
+        currentModel = _Draw()
+
+    def rebuild(_adapter: Any, *, label: str) -> None:
+        if gtol.keeps == "dropped":
+            gtol.identifier = ""
+
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    monkeypatch.setattr(_drawing_common, "_select_annotation_entity", lambda *_, **__: "rim")
+    monkeypatch.setattr(_drawing_common, "rebuild_drawing", rebuild)
+    monkeypatch.setattr(_drawing_common, "_assert_attached_to", lambda *_, **__: None)
+    return _drawing_common.add_feature_control_frame(
+        _Adapter(), None, edge_xy=(0.1, 0.2), frame_xy=(0.12, 0.22),
+        characteristic="position", tolerance="0.13", datums=("A",),
+        diameter=True, label="dowel hole pattern", datum_identifier="B",
+    )
+
+
+def test_feature_control_frame_names_its_feature_a_datum(monkeypatch) -> None:
+    gtol = _Gtol("kept")
+    assert _frame_with_identifier(monkeypatch, gtol) is gtol
+    assert gtol.identifier == "B"
+
+
+@pytest.mark.parametrize(
+    ("keeps", "stage"),
+    (("ignored", "after SetDatumIdentifier"), ("dropped", "after the rebuild")),
+)
+def test_feature_control_frame_fails_closed_without_its_datum_identifier(
+    monkeypatch, keeps: str, stage: str
+) -> None:
+    with pytest.raises(
+        RuntimeError,
+        match=rf"datum identifier reads '' {stage}, expected 'B' \(dowel hole pattern\)",
+    ):
+        _frame_with_identifier(monkeypatch, _Gtol(keeps))
+
+
 @pytest.mark.parametrize(
     ("offset_m", "accepted"),
     (

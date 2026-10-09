@@ -52,7 +52,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     }
     assert sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION == {
         "dowel hole span": 3,
-        "knife-bore centre from top seat": 2,
+        "knife-bore centre from top seat": 3,
     }
     for feature, names in sm_knife_mount_spec.DRAWING_PRECISION.items():
         assert set(names) <= sm_knife_mount_spec.DRAWING_DIMENSIONS[feature]
@@ -221,8 +221,8 @@ def test_the_sheet_carries_no_notes_block() -> None:
     assert "Manufacturing Notes" not in drawing_source
     assert drawing_source.count("add_property_linked_note(") == 1
     assert 'add_property_linked_note(adapter, "Isometric View Note"' in drawing_source
-    # The dowel holes' count rides above their Ø (datum B shares the
-    # dimension) and the press below it (MHA-PD-018 precedent).
+    # The dowel holes' count rides above their Ø and the press below it
+    # (MHA-PD-018 precedent); their position frame hangs under the callout.
     assert drawing.CALLOUTS_ABOVE == {"PinHoleDia": "2X"}
     assert sm_knife_mount_spec.PIN_HOLE_CALLOUT.splitlines() == [
         "BLIND FLAT-BOTTOM REAM",
@@ -233,26 +233,61 @@ def test_the_sheet_carries_no_notes_block() -> None:
 
 def test_native_gdt_and_bore_geometry() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    # Datum A the top seat; datum B the dowel pair, on its 2X Ø.
+    # Datum A the top seat (a tag); datum B the dowel pair, named by its
+    # position frame's datum identifier: a tag on the 2X Ø attaches to
+    # nothing (farm run 20261009T155421516Z, count=0).
     assert source.count("add_datum_feature(") == 1
-    assert source.count("add_dimension_datum_feature(") == 1
-    assert 'datum="A"' in source and 'datum="B"' in source
-    # The bore's composite frame and the tap's frame, both to A|B.
-    assert source.count("add_feature_control_frame(") == 2
-    assert source.count('characteristic="position"') == 2
+    assert "add_dimension_datum_feature" not in source
+    assert 'datum="A"' in source and 'datum="B"' not in source
+    assert source.count('datum_identifier="B"') == 1
+    # The pair's frame to A, the bore's composite frame and the tap's frame
+    # to A|B.
+    assert source.count("add_feature_control_frame(") == 3
+    assert source.count('characteristic="position"') == 3
+    assert source.count('datums=("A",)') == 1
     assert source.count('datums=("A", "B")') == 2
     assert source.count("composite_lower=(") == 1
+    assert 'GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"]' in source
     assert sm_knife_mount_spec.GEOMETRIC_TOLERANCES_MM == {
         "knife-bore position": "0.20",
         "knife-bore orientation refinement": "0.05",
         "knife-hanger tap position": "0.10",
+        "dowel hole pattern position": "0.13",
     }
     # Sheet-added: the block depth, the dowel span and the bore centre's
-    # BASIC height under A (14.87 + 5.75); the dowel holes' Ø and depth are
-    # marked model dimensions (DRAWING_DIMENSIONS).
+    # height under A, both BASIC; the dowel holes' Ø and depth are marked
+    # model dimensions (DRAWING_DIMENSIONS).
     assert source.count("add_edge_dimension(") == 3
-    assert source.count("set_basic_dimension(") == 1
-    assert abs(sm_knife_mount_spec.BORE_CENTRE_DEPTH - 20.62) < 1e-9
+    assert source.count("set_basic_dimension(") == 2
+    assert 'set_basic_dimension(adapter, span, label="dowel hole span")' in source
+
+
+@pytest.mark.parametrize(
+    ("label", "basic"),
+    (
+        ("knife-bore centre from top seat", part.BORE_CENTRE_DEPTH),
+        ("dowel hole span", sm_knife_mount_spec.PIN_HOLE_SPAN),
+    ),
+)
+def test_each_basic_prints_the_modelled_value_unrounded(label: str, basic: float) -> None:
+    # A BASIC is exact: the sheet measures it off the model (1e-5 gate) and
+    # its places must print that value, not a rounding of it.  48ad988c6
+    # checked the bore height against the spec's 14.87 mirror (20.62) at
+    # .XX; the model measures 14.866 + 5.75 = 20.616, and the leaf failed.
+    places = sm_knife_mount_spec.DRAWING_REFERENCE_PRECISION[label]
+    assert abs(round(basic, places) - basic) < 1e-9
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "from build_sm_knife_mount import BORE_CENTRE_DEPTH" in source
+    assert not hasattr(sm_knife_mount_spec, "BORE_CENTRE_DEPTH")
+
+
+def test_bore_basic_is_the_built_geometry() -> None:
+    assert part.BORE_CENTRE_DEPTH == part.BLK_TOP - part.BORE_CY
+    assert part.BORE_CENTRE_DEPTH == pytest.approx(20.616, abs=1e-9)
+    assert f"{part.BORE_CENTRE_DEPTH:.3f}" == "20.616"
+    # The spec's mirror would print a BASIC 0.004 off the part.
+    mirror = sm_knife_mount_spec.BLK_TOP - sm_knife_mount_spec.BORE_CY
+    assert abs(mirror - part.BORE_CENTRE_DEPTH) > 1e-5
 
 
 def test_part_stamps_make_critical_properties() -> None:

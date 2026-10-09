@@ -76,8 +76,11 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    the requirement AND the machine's error model rewards it
    (assessment §2: the summing knife edge, the cams, channel-to-channel
    consistency). The allowlist:
-   - **knife-edge system** — knife-mount bore (one composite position frame to
-     the top seat, datum A, and the 2X dowel-hole pattern, datum B: Ø0.20
+   - **knife-edge system** — knife-mount 2X dowel-hole pattern (one position
+     frame under its 2X Ø, Ø0.13 to the top seat, datum A, at the BASIC
+     12.700 span, its datum identifier naming the pattern datum B — the zone
+     the .XXX span gave, so the screw-float and slot stacks are unchanged),
+     bore (one composite position frame to A|B: Ø0.20
      located, Ø0.05 orientation refinement) and its #6-32 hanger tap (Ø0.10 to
      A|B, so the crossbar's Ø4.318 clearance hole still floats round the screw
      — `build_sm_summing_assembly._assert_knife_hanger_stack`); the top

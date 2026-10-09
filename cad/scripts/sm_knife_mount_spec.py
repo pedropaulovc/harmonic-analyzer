@@ -54,6 +54,7 @@ GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "knife-bore position": "0.20",
     "knife-bore orientation refinement": "0.05",
     "knife-hanger tap position": "0.10",
+    "dowel hole pattern position": "0.13",
 }
 # The bore's composite position (policy rule 3, knife-edge system): the upper
 # tier locates it Ø0.20 to the top seat (datum A) and the dowel pattern
@@ -184,13 +185,16 @@ PIN_HOLE_XS = (-PIN_HOLE_X, PIN_HOLE_X)
 PIN_HOLE_COUNT = len(PIN_HOLE_XS)
 if PIN_HOLE_COUNT != DOWEL.PER_MOUNT:
     raise AssertionError("the knife mount reams one hole per MHA-VN-051 dowel")
-# The sheet prints the pair's span .XXX between the two hole axes, centred on
-# the block (its centreline), and positions the tap and the bore to the pair
-# (datum B), so each hole's station from the pattern centre varies by half
-# the span band, and from the tap axis by that plus the tap's zone radius.
-PIN_HOLE_SPAN = DOWEL.SPAN  # 12.700
+# The pair's 2X ream carries ⌖Ø0.13 to the top seat (datum A) and names the
+# pattern datum B (the frame's datum identifier; policy rule 3); the sheet
+# prints its span BASIC between the two hole axes, centred on the block, and
+# positions the tap and the bore to A|B.  Each hole's station from the
+# pattern centre varies by the zone's radius, and from the tap axis by that
+# plus the tap's zone radius.
+PIN_HOLE_POSITION_TOL = float(GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"])
+PIN_HOLE_SPAN = DOWEL.SPAN  # 12.700 BASIC
 PIN_HOLE_SPAN_PLACES = DOWEL.SPAN_PLACES
-PIN_HOLE_SPAN_TOL = DOWEL.SPAN_TOL  # 0.13
+PIN_HOLE_SPAN_TOL = PIN_HOLE_POSITION_TOL  # 0.13: the span's worst variation
 PIN_HOLE_HALF_SPAN_TOL = PIN_HOLE_SPAN_TOL / 2.0  # 0.065
 PIN_HOLE_X_TOL = PIN_HOLE_HALF_SPAN_TOL + STUD_TAP_POSITION_TOL / 2.0  # 0.115
 PIN_HOLE_DIA = DOWEL.DIA  # 3.175
@@ -199,8 +203,10 @@ PIN_HOLE_DIA_PLACES = 3
 PIN_HOLE_DEPTH = DOWEL.PRESS_DEPTH  # 9.5
 PIN_HOLE_DEPTH_PLACES = DOWEL.PRESS_DEPTH_PLACES
 DOWEL_NUMBER = "MHA-VN-051"
-if abs(PIN_HOLE_SPAN_TOL - _XXX) > 1e-9 or PIN_HOLE_SPAN_PLACES != 3:
-    raise AssertionError("the dowel span must print .XXX at the title-block band")
+if PIN_HOLE_SPAN_TOL != DOWEL.SPAN_TOL or PIN_HOLE_SPAN_PLACES != 3:
+    raise AssertionError(
+        "the dowel pattern's zone must be the span variation the stacks take"
+    )
 # (loosest, tightest) press from the ream band and the catalogue band:
 # 0.00254..0.01762, printed rounded outward to four places.
 PIN_PRESS_INTERFERENCE = (
@@ -275,14 +281,15 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 # Places of the dimensions the sheet adds between two model features (no
 # model dimension carries them; the fr_top_frame_spec precedent): the dowel
-# pair's span, toleranced by the title block's .XXX band, and the bore
-# centre's BASIC height under the datum-A top seat.
+# pair's BASIC span and the bore centre's BASIC height under the datum-A top
+# seat.  A BASIC states the model's exact value, so its places must print it
+# unrounded: the height is the build's 14.866 + 5.75 = 20.616
+# (``build_sm_knife_mount.BORE_CENTRE_DEPTH``), not this module's 14.87
+# mirror.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
     "dowel hole span": PIN_HOLE_SPAN_PLACES,
-    "knife-bore centre from top seat": 2,
+    "knife-bore centre from top seat": 3,
 }
-# The bore's BASIC location under datum A: 14.87 + 5.75.
-BORE_CENTRE_DEPTH = BLK_TOP - BORE_CY
 # The pair's count above the dowel holes' Ø and three short lines under it
 # (the MHA-PD-018 PIN_HOLE_CALLOUT precedent): the operation, the mating
 # dowel, the press.  The pair is datum B.

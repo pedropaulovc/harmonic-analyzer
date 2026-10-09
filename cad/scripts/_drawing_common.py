@@ -905,75 +905,6 @@ def add_datum_feature(
     return tag
 
 
-def add_dimension_datum_feature(
-    adapter: Any,
-    view: Any,
-    *,
-    dimension: Any,
-    datum: str,
-    label: str,
-) -> Any:
-    """Attach a native datum-feature symbol to a size dimension.
-
-    A pattern of holes is one datum feature when the symbol rides the
-    pattern's ``nX`` size dimension (ASME Y14.5-2018 §7.4), not one hole's
-    rim.  The display dimension is selected by its own selection name (the
-    ``draw_dt_cone_gear`` flat-clock idiom) before ``InsertDatumTag2``;
-    SOLIDWORKS seats the symbol on the dimension itself (between its value
-    and the below-callout lane -- see :func:`set_dimension_callouts`), so
-    the tag is not repositioned.  It must read back its label and exactly
-    one ``swSelDIMENSIONS`` attachment, not dangling.
-    """
-    draw = adapter.currentModel
-    drawing = _early_bound(draw, "IDrawingDoc")
-    if not drawing.ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"failed to activate the view for datum {datum} ({label})")
-    display = _sw_type_info.early_bound_or_flag(
-        dimension, "IDisplayDimension", "GetNameForSelection"
-    )
-    draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        str(display.GetNameForSelection()),
-        "DIMENSION",
-        0.0,
-        0.0,
-        0.0,
-        False,
-        0,
-        null_callout(),
-        0,
-    ):
-        raise RuntimeError(f"failed to select the dimension for datum {datum} ({label})")
-    tag = draw.InsertDatumTag2()
-    if tag is None:
-        raise RuntimeError(f"failed to insert datum {datum} ({label})")
-    tag = _sw_type_info.early_bound_or_flag(
-        tag, "IDatumTag", "SetLabel", "GetAnnotation", "GetLabel"
-    )
-    if not tag.SetLabel(datum):
-        raise RuntimeError(f"failed to label datum feature {datum} ({label})")
-    tag_annotation = _sw_type_info.early_bound_or_flag(
-        tag.GetAnnotation(),
-        "IAnnotation",
-        "GetAttachedEntityCount3",
-        "GetAttachedEntityTypes",
-        "IsDangling",
-    )
-    draw.ClearSelection2(True)
-    rebuild_drawing(adapter, label="add_dimension_datum_feature")
-    if str(tag.GetLabel()) != datum:
-        raise RuntimeError(f"datum feature label did not persist ({label})")
-    count = int(tag_annotation.GetAttachedEntityCount3())
-    types = tuple(int(t) for t in (tag_annotation.GetAttachedEntityTypes() or ()))
-    dangling = bool(tag_annotation.IsDangling())
-    if count != 1 or types != (_SEL_DIMENSION,) or dangling:
-        raise RuntimeError(
-            f"datum {datum} is not attached to its dimension ({label}): "
-            f"count={count}, types={types}, dangling={dangling}"
-        )
-    return tag
-
-
 @_telemetry.traced("drawing.feature_control_frame", label_param="label")
 def add_feature_control_frame(
     adapter: Any,
@@ -994,6 +925,7 @@ def add_feature_control_frame(
     leader_attach_xy: tuple[float, float] | None = None,
     translated: Sequence[str] = (),
     composite_lower: tuple[str, Sequence[str]] | None = None,
+    datum_identifier: str = "",
 ) -> Any:
     """Attach a native feature-control frame to a drawing-view edge.
 
@@ -1003,6 +935,15 @@ def add_feature_control_frame(
     the same characteristic (``IGtol.AddFrame``) joined to the first by
     ``IGtol.SetCompositeFrame2(True, 1)`` (both frames must share the symbol),
     proved by ``GetCompositeFrame2(1)`` and each frame's XML read back.
+
+    ``datum_identifier`` names the controlled feature a datum feature
+    (``IGtol.SetDatumIdentifier``): the frame under a pattern's ``nX`` size
+    callout then defines that pattern as one datum (ASME Y14.5-2018 §7.4).
+    A datum tag cannot attach to a dimension (farm run
+    20261009T155421516Z: ``InsertDatumTag2`` on a selected dimension read
+    zero attached entities, as the vm2 datum-placement probe found), so the
+    identifier rides the frame.  ``GetDatumIdentifier`` must read it back
+    before and after the rebuild.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.  Only the kinds
@@ -1056,6 +997,8 @@ def add_feature_control_frame(
         "GetLeaderCount",
         "SetCompositeFrame2",
         "GetCompositeFrame2",
+        "SetDatumIdentifier",
+        "GetDatumIdentifier",
     )
     frame_count = int(gtol.GetFrameCount() or 0)
     if frame_count == 0:
@@ -1151,6 +1094,18 @@ def add_feature_control_frame(
             raise RuntimeError(f"failed to add feature quantity {quantity!r} ({label})")
         if str(gtol.GetBelowFrameTextAt(1) or "") != quantity:
             raise RuntimeError(f"feature quantity did not persist ({label})")
+
+    def _assert_datum_identifier(stage: str) -> None:
+        applied_identifier = str(gtol.GetDatumIdentifier() or "")
+        if applied_identifier != datum_identifier:
+            raise RuntimeError(
+                f"feature-control frame datum identifier reads "
+                f"{applied_identifier!r} {stage}, expected {datum_identifier!r} ({label})"
+            )
+
+    if datum_identifier:
+        gtol.SetDatumIdentifier(datum_identifier)
+        _assert_datum_identifier("after SetDatumIdentifier")
     annotation = _sw_type_info.early_bound_or_flag(
         gtol.GetAnnotation(),
         "IAnnotation",
@@ -1196,6 +1151,8 @@ def add_feature_control_frame(
         what="feature-control frame",
         label=label,
     )
+    if datum_identifier:
+        _assert_datum_identifier("after the rebuild")
     if leader_attach_xy is not None:
         _assert_leader_lands(
             annotation, leader_attach_xy, what="feature-control frame", label=label

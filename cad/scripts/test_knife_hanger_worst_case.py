@@ -135,6 +135,31 @@ def test_the_crossbar_webs_hold_round_the_hole_and_the_slot() -> None:
     assert build_fr_top_frame.SLOT_FLOOR_MARGIN == pytest.approx(18.0)
 
 
+def test_the_dowel_pattern_frame_is_the_zone_the_stacks_were_derived_on() -> None:
+    # The 2026-10-09 ruling: the pair's 2X ream carries ⌖Ø0.13 to A, its span
+    # BASIC; each hole within 0.065 of true position, so the span varies by
+    # the zone's Ø -- the 0.13 the .XXX span gave -- and every stack holds.
+    zone = knife_mount.GEOMETRIC_TOLERANCES_MM["dowel hole pattern position"]
+    assert zone == "0.13"
+    assert knife_mount.PIN_HOLE_POSITION_TOL == 0.13
+    assert knife_mount.PIN_HOLE_SPAN_TOL == dowel.SPAN_TOL == float(zone)
+    assert knife_mount.PIN_HOLE_HALF_SPAN_TOL == pytest.approx(0.065)
+    assert asm.HANGER_SCREW_MISMATCH == pytest.approx(0.3766, abs=5e-5)
+    assert asm.KNIFE_FREE_ROCK_WORST_DEG == pytest.approx(5.038, abs=5e-4)
+    assert top_frame.HANGER_SLOT_LENGTH_REQUIRED == pytest.approx(4.055, abs=5e-4)
+    # The conversion the ruling corrected: Ø0.23 (half-span 0.115) would
+    # stack 0.416 against the 0.4065 float.
+    x_at_023 = (
+        asm.HANGER_SCREW_MISMATCH_X - knife_mount.PIN_HOLE_HALF_SPAN_TOL + 0.23 / 2.0
+    )
+    assert math.hypot(x_at_023, asm.HANGER_SCREW_MISMATCH_Z) == pytest.approx(
+        0.4164, abs=5e-4
+    )
+    assert (
+        math.hypot(x_at_023, asm.HANGER_SCREW_MISMATCH_Z) > top_frame.HANGER_SCREW_FLOAT
+    )
+
+
 def test_the_knife_mount_webs_hold_round_both_dowel_holes() -> None:
     assert knife_mount.PIN_HOLE_SPAN == pytest.approx(12.7)
     assert knife_mount.PIN_HOLE_SPAN_TOL == 0.13
