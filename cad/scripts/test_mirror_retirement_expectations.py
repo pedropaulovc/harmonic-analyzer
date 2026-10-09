@@ -242,3 +242,66 @@ def test_on_shaft_expectation_matches_assembly_station_and_face(stem: str) -> No
             f"differs by {diagnostic_value - assembly_value:.6f} mm "
             f"from assembly _place_on_shaft {ast.unparse(placed)}"
         )
+
+
+def test_magnifying_bracket_screw_expectations_follow_live_placement() -> None:
+    import build_mg_magnifier_assembly as magnifier
+    import magnifying_bracket_joint_layout as joint
+
+    assert magnifier.BRACKET_SCREW_POSITIONS is joint.SCREW_POSITIONS
+    assert magnifier.BRACKET_SCREW_ROWS == _transforms.ROT_X_NEG90
+    # The stock shank runs -Y, so the installed shank must run machine +Z.
+    assert [-value for value in magnifier.BRACKET_SCREW_ROWS[1]] == [0.0, 0.0, 1.0]
+    tree = ast.parse(DIAGNOSTIC.read_text(encoding="utf-8"))
+    loops = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.For)
+        and isinstance(node.iter, ast.Call)
+        and ast.unparse(node.iter) == "enumerate(m.BRACKET_SCREW_POSITIONS, start=1)"
+    ]
+    assert len(loops) == 1
+    calls = [
+        node for node in ast.walk(loops[0])
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "expect"
+    ]
+    assert len(calls) == 1
+    call = calls[0]
+    assert ast.literal_eval(call.args[0]) == "mg-magnifier"
+    assert ast.literal_eval(call.args[4]) == "vn-magnifying-bracket-screw"
+    for index, position in enumerate(magnifier.BRACKET_SCREW_POSITIONS, start=1):
+        namespace = {"m": magnifier, "index": index, "position": position}
+        values = [
+            eval(compile(ast.Expression(expr), str(DIAGNOSTIC), "eval"), namespace)
+            for expr in call.args[1:4]
+        ]
+        assert values == [
+            f"vn-magnifying-bracket-screw-{index}",
+            list(position),
+            magnifier.BRACKET_SCREW_ROWS,
+        ]
+
+
+def test_magnifying_bracket_screws_are_free_and_locked_to_the_bracket() -> None:
+    assembly = SCRIPTS / "build_mg_magnifier_assembly.py"
+    tree = ast.parse(assembly.read_text(encoding="utf-8"))
+    loops = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.For)
+        and isinstance(node.iter, ast.Call)
+        and ast.unparse(node.iter) == "enumerate(BRACKET_SCREW_POSITIONS, start=1)"
+    ]
+    assert len(loops) == 1
+    calls = [node for node in ast.walk(loops[0]) if isinstance(node, ast.Call)]
+    placement = next(
+        node for node in calls
+        if getattr(node.func, "id", None) == "place_component"
+    )
+    assert ast.literal_eval(placement.args[1]) == "vn-magnifying-bracket-screw"
+    assert ast.unparse(placement.args[2]) == "list(position)"
+    assert ast.unparse(placement.args[4]) == "BRACKET_SCREW_ROWS"
+    assert next(kw.value.value for kw in placement.keywords if kw.arg == "ground") is False
+    mate = next(
+        node for node in calls if getattr(node.func, "id", None) == "lock_mate"
+    )
+    assert ast.unparse(mate.args[1]) == "named_ref(f'Front Plane@{screw}', 'PLANE')"
+    assert ast.unparse(mate.args[2]) == "named_ref(f'Front Plane@{bracket}', 'PLANE')"

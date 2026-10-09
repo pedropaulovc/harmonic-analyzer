@@ -1327,17 +1327,17 @@ sections:
         - scaled
         - low
       - - Mounting bracket
-        - 'collar Ø12 × 10 (bore Ø6.2) at machine (+40, 985, −85) (post-mirror, M6.8), axis along X; arm 10 wide reaching +Z to −70; 16 × 4 flange (machine x +29..+45, M6.5 — trimmed from 40 long: the end stops 0.65 off the j = 0 channel-spring helix at x +28.35) under the plate''s front edge (top touches the plate bottom 992.9)'
+        - 'Angle bracket: existing Ø12 × 10 collar (Ø6.2 bore) and 10-wide forward arm unchanged at machine (+40, 979.7, −128.3); vertical side plate 48 wide × 12.7 tall × 3.175 thick, machine x −3..+45, y 973.35..986.05, z −76.2874..−73.1124. Back face seats flush against the summing-lever front face (SUMMING_Z − 152.4/2), not below it.'
         - —
-        - p.47 close-up
-        - scaled
-        - low
-      - - Bracket flange screws ×2 (M6.10)
-        - 'fillister Ø5.5 × 2.2 head + Ø2.9 × 4 shank, UP (Rx −90) through Ø3.2 flange holes on the z −67 line (machine x +33/+41, inset 4 from the flange ends): shanks fill the flange band 988.9..992.9, tips flush with the plate bottom (engagement into the summing-lever plate not modeled); heads in free air below, 0.25 off the arm face (z −70), 1.9 off spring j = 0'
-        - —
-        - p.47 close-up (screw heads visible under the flange)
+        - 'ch30_images/page002_img01.png, eight views front; ch20_images/page001_img01.jpeg, top-right close-up: vertical black angle side plate against the lever front face, two side-by-side slotted heads at the lever mid-plane'
         - scaled + derived
-        - low
+        - high (joint orientation); med (photo-scaled stations)
+      - - Bracket flange screws ×2
+        - 'MHA-VN-050, McMaster 91794A077 #2-56 UNC × 1/4 passivated 18-8 stainless steel fillister slotted screws: head Ø3.556 × 2.1082, shank Ø2.1844 × 6.35. Axes +Z into the lever, machine x +1.0/+14.7, y 979.7 (13.7 centres). Heads seat at z −74.7374 in 2X native counterbores Ø3.8 +0.10/0 × 1.55 ±0.05 deep over normal #2 Ø2.591 thru clearance; heads protrude 0.5582 nominal, 0.6082 at the shallowest counterbore for the catalog head height. Side-plate thickness 3.175 ±0.05 gives grip 1.625 ±0.10 and engagement 4.725 nominal, 3.2975 minimum full profile (≥1.5D = 3.2766), including 0.76 conservative stock length allowance, 0.7P tip and 0.25 entry edge break. Lever #2-56 UNC-2B blind full thread 4.95 ±0.05 stays inside the -Z receiver rib, EdgeRibBack, 5.08 ±0.05 deep (0.03 minimum containment margin); 6.05 ±0.10 tap-drill plus 118° point continues into the plate at mid-height. Receiver-row 2.54 ±0.05 from lower face and lever plate 5.08 ±0.05 retain 1.501 minimum drill lateral wall. Screw-tip gap 0.075 minimum; bottoming tap has 2P lead plus 0.0429 margin. Counterbore floor 1.525 minimum, east-end wall 2.000 from the real end-face station datum and height wall 3.840 minimum at the printed .XX ±0.51 height band. Minimum head radial float 0.122 exceeds maximum station-pitch offset 0.100. Head clears the knife mount in X by 2.222 nominal, 1.152 conservative worst case including translation with the lever free-edge datum. Sloped rib thread wall 3.413 minimum; nearest spring-tap web 6.927 minimum under the native Ø0.30 RFS position frame.'
+        - —
+        - 'ch30_images/page002_img01.png, front; ch20_images/page001_img01.jpeg, top-right close-up. McMaster 91794A077 product table and technical drawing verified live 2026-10-08; option-B user ruling permits specific depth/position bands and the smaller drill continuation inside the plate (not full-thread continuation). Joint layout in cad/scripts/magnifying_bracket_joint_layout.py.'
+        - stock + scaled + derived
+        - high (stock dimensions and installed stack); med (photo-scaled stations)
   - prose: |2
 
       Notes: round brass rod lever; magnification set by a reeded (knurled) screw
@@ -1369,8 +1369,10 @@ sections:
       z −128.3. Vertical rod z −134.8 (skew bore 6.5, top y 984.7), wire hook
       at (−150, 915.05, −137.95) tied under the fixture collar beside the
       rod; hub end z −142.77, yoke WIRE_END (63.324, 573.083, −142.77),
-      YOKE_PLANE_OFFSET −0.0564; bracket arm machine −124.3..−70 (flange
-      band on the plate front unchanged at −81..−76.45). Lever-wire straight
+      YOKE_PLANE_OFFSET −0.0564; bracket arm machine −124.3..−70. The side plate
+      now seats at the shifted lever front, z −76.2874..−73.1124; its former
+      −81..−76.45 band was a stale pre-MECHANISM_Z_SHIFT front-face reference.
+      Lever-wire straight
       rest run 362.731 → 352.813 (−9.918: the hook DROPS toward the fixed
       wheel, so the wire SHRINKS — the contract's "+10.3" was a sign slip).
       Derived from the plumb-line photo + wire clearance solve (≥0.25

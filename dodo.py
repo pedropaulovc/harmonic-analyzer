@@ -3111,6 +3111,7 @@ def task_check():
         SCRIPTS_DIR / "test_define_circle.py",
         SCRIPTS_DIR / "test_rocker_bank_layout.py",
         SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
+        SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

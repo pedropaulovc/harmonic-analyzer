@@ -107,3 +107,147 @@ def test_pitch_proof_rejects_an_equal_pitch_between_other_holes(identity) -> Non
             identity, _dimension(pitch, (seed, second)), expected_mm=8.43,
             label="spring-hole start Z", entities=(seed, second),
         )
+
+
+def test_bracket_receiver_is_blind_and_authored_after_ribs() -> None:
+    from pathlib import Path
+    import build_sm_summing_lever as part
+    import magnifying_bracket_joint_layout as joint
+    assert part.LEVER_HOLE_POINTS is joint.LEVER_HOLE_POINTS
+    assert part.TAP_SPEC is joint.TAP_SPEC
+    assert (part.TAP_SPEC.kind, part.TAP_SPEC.end) == ("tapped_bottoming", "blind")
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert source.index("await _middle_rib(adapter, drive_jobs)") < source.index(
+        "await _bracket_mounting_taps(adapter)"
+    )
+    assert "DRILL_DEPTH + DRILL_POINT_DEPTH / 3.0" in source
+    assert 'name="BracketMountingTaps"' in source
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "mounting_rims[0].edge" in drawing_source
+    assert "FULL THREAD DEPTH / TAP DRILL DEPTH" in drawing_source
+    assert "BOTTOMING TAP -" in drawing_source
+    assert '"hw-threaddepth": THREAD_DEPTH' in drawing_source
+    assert '"hw-tapdrldepth": DRILL_DEPTH' in drawing_source
+    assert "bracket tap callout omits native depths" in drawing_source
+    assert part.TAP_SPEC.size == "#2-56"
+    assert part.TAP_SPEC.depth_mm == 6.05
+    assert part.TAP_SPEC.overrides_mm["ThreadDepth"] == 4.95
+    assert joint.THREAD_DEPTH_BAND == 0.05
+    assert joint.DRILL_DEPTH_BAND == 0.10
+    assert joint.RECEIVER_DIMENSION_BANDS == {
+        "CoefficientsPlate": {"D1": 0.05},
+        "EdgeRibBack": {"D1": 0.05},
+    }
+    assert "variable.ToleranceMin" in drawing_source
+    assert "variable.ToleranceMax" in drawing_source
+    assert "variable = dynamic_dispatch(raw._oleobj_)" in drawing_source
+    assert '_early_bound(raw, "ICalloutVariable")' not in drawing_source
+    assert "ReceiverY0" in drawing_source
+    assert "PlateThickness" in drawing.FRONT_KEEP
+    assert "RibDepth" in drawing.TOP_KEEP
+    assert "Bracket Receiver Note" in drawing_source
+    assert "BRACKET TAP DRILL LATERAL WALL {DRILL_LATERAL_WALL_MIN:.3f} MIN." in source
+
+
+def test_receiver_rim_scan_uses_back_entry_face(monkeypatch) -> None:
+    import magnifying_bracket_joint_layout as joint
+    back = object()
+    calls = []
+
+    def circle_at(center, radius, *, axis, label):
+        calls.append((center, radius, axis))
+        return SimpleNamespace(edge=object())
+
+    def scan(view, *, label):
+        assert view is back
+        return SimpleNamespace(circle_at=circle_at)
+
+    monkeypatch.setattr(drawing, "scan_view_edges", scan)
+    assert len(drawing._mounting_rims(back)) == len(joint.LEVER_HOLE_POINTS)
+    assert [call[0] for call in calls] == list(joint.LEVER_HOLE_POINTS)
+    assert all(call[1] == joint.TAP_DRILL_DIA / 2.0 for call in calls)
+    assert drawing._back_xy(joint.LEVER_HOLE_POINTS[0][0], 0.0)[0] > (
+        drawing._back_xy(joint.LEVER_HOLE_POINTS[1][0], 0.0)[0]
+    )
+
+
+def test_receiver_view_is_on_a_back_view_sheet_with_real_binding() -> None:
+    import ast
+    from pathlib import Path
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    assert "from _sw_type_info import" not in source
+    assert '"*Back", *BACK_CENTER' in source
+    assert "expected_sheet_names=SHEET_NAMES" in source
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id == "scan_view_edges":
+                assert len(node.args) == 1
+    assert 'length = _early_bound(raw, "ICalloutLengthVariable")' in source
+
+
+def test_receiver_depth_bands_select_native_depths_not_diameter(monkeypatch) -> None:
+    import _common
+    import build_sm_summing_lever as part
+
+    def dimension(name, nominal):
+        return SimpleNamespace(FullName=name, Name=name, SystemValue=nominal / 1000.0)
+
+    native = [
+        dimension("Tap Drill Dia.@BracketMountingTaps", 1.778),
+        dimension("Tap Drill Depth@BracketMountingTaps", 6.05),
+        dimension("Thread Depth@BracketMountingTaps", 4.95),
+    ]
+    displays = [SimpleNamespace(GetDimension=lambda dim=dim: dim) for dim in native]
+    taps = SimpleNamespace(
+        GetFirstDisplayDimension=lambda: displays[0],
+        GetNextDisplayDimension=lambda current: (
+            displays[displays.index(current) + 1]
+            if displays.index(current) + 1 < len(displays) else None
+        ),
+    )
+    features = {
+        name: SimpleNamespace(Parameter=lambda key: dimension(key, 5.08))
+        for name in part.RECEIVER_DIMENSION_BANDS
+    }
+    features["BracketMountingTaps"] = taps
+    adapter = SimpleNamespace(
+        currentModel=SimpleNamespace(FeatureByName=features.get),
+    )
+    monkeypatch.setattr(_common, "_early_bound", lambda value, interface: value)
+    bands = []
+    monkeypatch.setattr(
+        part, "set_dimension_symmetric_tolerance",
+        lambda adapter, feature, name, band: bands.append((feature, name, band)),
+    )
+    monkeypatch.setattr(part, "set_dimension_display_precision", lambda *args: None)
+    monkeypatch.setattr(part, "mark_dimensions_for_drawing", lambda *args: None)
+    part._receiver_model_bands(adapter)
+    assert bands == [
+        ("CoefficientsPlate", "PlateThickness", 0.05),
+        ("EdgeRibBack", "RibDepth", 0.05),
+        ("BracketMountingTaps", "FullThreadDepth", 0.05),
+        ("BracketMountingTaps", "TapDrillDepth", 0.10),
+    ]
+    assert native[0].Name == "Tap Drill Dia.@BracketMountingTaps"
+    assert native[1].Name == "TapDrillDepth"
+    assert native[2].Name == "FullThreadDepth"
+    import pytest
+    duplicate = dimension("Second Thread Depth@BracketMountingTaps", 4.95)
+    displays.append(SimpleNamespace(GetDimension=lambda: duplicate))
+    with pytest.raises(RuntimeError, match="expected one native FullThreadDepth"):
+        part._receiver_model_bands(adapter)
+
+
+def test_receiver_lateral_wall_includes_lower_face_coordinate_band() -> None:
+    import magnifying_bracket_joint_layout as joint
+
+    drill_radius_max = (joint.TAP_DRILL_DIA + 0.10) / 2.0
+    row = sm_summing_lever_spec.PLATE_T / 2.0
+    lower_wall = row - joint.POSITION_BAND - drill_radius_max
+    upper_wall = (
+        sm_summing_lever_spec.PLATE_T - joint.LEVER_PLATE_THICKNESS_BAND
+        - row - joint.POSITION_BAND - drill_radius_max
+    )
+    assert lower_wall >= 1.5
+    assert upper_wall >= 1.5

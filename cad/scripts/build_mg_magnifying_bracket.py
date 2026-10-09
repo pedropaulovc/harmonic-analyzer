@@ -4,20 +4,10 @@ The black fitting that affixes the magnifying lever rod to the summing
 lever: a flange butted against the coefficients plate's front edge FACE
 and a forward arm ending in a collar (O12, bore 6.2) the O6 rod clamps
 into. The collar/rod sit at the plate centreline (machine y 979.7, after the
-2026-08-02 Cascade-A drop) so the rod is coplanar with the plate; the flange
-spans the plate's full height
-(977.16..982.24). The current source model is an UNDRILLED blank. The older
-mounting-screw description predates the butt-flange orientation and conflicts
-on the screw axis/stations, so no hole geometry is asserted here.
-
-Layout: origin at the collar centre (machine (+40, 979.7, -128.3) after the
-2026-07-04 depth re-anchor); collar axis along X (the rod direction), arm
-runs +Z from the collar back beside the plate's east edge (machine
--124.3 -> -70), flange at local z 47.3..51.85 (machine -81..-76.45,
-unchanged) butting the plate's real front face at -76.2 with a 0.25 gap. The
-part is authored MACHINE-handed and placed IDENTITY, so local axes are
-machine axes (the flange, its only x-asymmetric feature, sits at the
-machine-east local -x). Dimensions: cad/DIMENSIONS.md ch. 20 (M6.4, low).
+2026-08-02 Cascade-A drop). The flange seats flush on the summing lever's
+installed front face and carries two native #2 counterbores entering -Z.
+The arm and collar remain unchanged. Joint geometry and hole specifications
+are owned by magnifying_bracket_joint_layout, independently of assemblies.
 
 Run (SolidWorks already open)::
 
@@ -55,13 +45,33 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    apply_drawing_precision,
+    set_dimension_symmetric_tolerance,
+    set_dimension_bilateral_tolerance,
+    set_dimension_display_precision,
 )
 from mg_magnifying_bracket_spec import (
     DRAWING_DIMENSIONS,
+    DRAWING_PRECISION,
     DRAWING_NOTES,
     ISOMETRIC_VIEW_NOTE,
 )
 from mg_magnifying_lever_geom import COLLAR_HALF_LEN as LEVER_COLLAR_HALF_LEN
+from magnifying_bracket_joint_layout import (
+    BRACKET_HOLE_POINTS,
+    CLEARANCE_DIA,
+    CLEARANCE_SPEC,
+    COUNTERBORE_DIA,
+    COUNTERBORE_DEPTH,
+    COUNTERBORE_DEPTH_BAND,
+    PLATE_THICKNESS_BAND,
+    POSITION_BAND,
+    SIDE_PLATE_X as FLANGE_X,
+    SIDE_PLATE_Y as FLANGE_Y,
+    SIDE_PLATE_Z as FLANGE_Z,
+    SIDE_PLATE_THICKNESS,
+)
+from _holes import wizard_holes
 
 PART_NAME = "mg-magnifying-bracket"
 MATERIAL = "Plain Carbon Steel"  # black hardware
@@ -74,35 +84,85 @@ COLLAR_BORE = 6.2  # the O6 magnifying rod clamps in (derived)
 COLLAR_HALF_LEN = LEVER_COLLAR_HALF_LEN
 ARM_HALF_X = 5.0  # arm 10 wide (x), y -3..+4.5 (low)
 ARM_Y = (-3.0, 4.5)
-# DEPTH RE-ANCHOR (2026-07-04): the collar (part origin) moved forward with
-# the lever rod (machine z -85 -> -128.3, ch30 p.4 plumb-wire re-anchor in
-# build_mg_magnifier_assembly), while the flange stays butted on the summing
-# plate's UNCHANGED front face (machine -81..-76.45, north face 0.25 off the
-# plate's -76.2). The arm therefore lengthens: local z 4 .. 58.3 = machine
-# -124.3..-70 (same -70 end as before). The real black bracket cantilevers
-# the rod well forward of the plate -- video 4/4 shows the rod extending from
-# the pivoted summing bar over the wheel line.
 ARM_Z = (4.0, 58.3)
-FLANGE_X = (-20.0, 5.0)  # mounting flange, machine x +20..+45. The collar sits
-# at machine x +40, EAST of the plate's east edge (+29.45), so the flange reaches
-# WEST onto the plate front face: x +20..+29.45 (9.45 wide) butts it, the rest
-# wraps the collar. (At -11 the flange stopped at x +29, touching the plate only at
-# a 0.45-wide corner sliver -> it read as floating in the top view.) The west tab
-# remains on the unchanged front-column/output side. The re-anchored channel
-# spring bank now starts at z -64.012, still clear of this flange.
-FLANGE_Y = (-2.54, 2.54)  # spans the plate's FULL height: with the collar/rod now
-# at the plate centreline (machine 979.7, see build_mg_magnifier_assembly LEVER_ROD_Y),
-# the flange butts the plate FRONT FACE rather than tucking under it -- machine
-# 977.16..982.24 = the coplanar .cs plate band
-FLANGE_Z = (47.3, 51.85)  # SAME machine band as ever (-81..-76.45): north face
-# at machine -76.45 = 0.25 south of the plate's real FRONT (-Z) face at -76.2
-# (the plate is the Top-rect z +-76.2, centred on the pivot -- NOT -70, an
-# earlier mis-read); the flange butts that face. Local values shifted by the
-# 2026-07-04 depth re-anchor (collar/origin at machine -123.5, was -85); only
-# the ARM between them lengthened.
+
 async def _volume(adapter) -> float:
     res = await adapter.get_mass_properties()
     return res.data.volume if res.is_success else float("nan")
+
+
+def _name_mounting_dimensions(adapter) -> None:
+    """Resolve native Hole Wizard dimensions before assigning stable names."""
+    from _common import _early_bound
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    flange = _early_bound(model.FeatureByName("Flange"), "IFeature")
+    height = flange.Parameter("D1")
+    if height is None:
+        raise RuntimeError("Flange: missing native extrusion height")
+    height = _early_bound(height, "IDimension")
+    if abs(float(height.SystemValue) * 1000.0 - (FLANGE_Y[1] - FLANGE_Y[0])) > 1e-5:
+        raise RuntimeError("Flange: native extrusion height differs from contract")
+    height.Name = "FlangeHeight"
+    feature = _early_bound(model.FeatureByName("MountingCounterbores"), "IFeature")
+    required = {
+        "HoleDiameter": ("dia", CLEARANCE_DIA),
+        "CounterBoreDiameter": ("dia", COUNTERBORE_DIA),
+        "CounterBoreDepth": ("depth", COUNTERBORE_DEPTH),
+    }
+    matches = {name: [] for name in required}
+    display = feature.GetFirstDisplayDimension()
+    while display is not None:
+        display = _early_bound(display, "IDisplayDimension")
+        dimension = _early_bound(display.GetDimension(), "IDimension")
+        native_name = str(dimension.FullName).split("@")[0].lower()
+        for name, (kind, nominal) in required.items():
+            if kind in native_name and abs(float(dimension.SystemValue) * 1000.0 - nominal) < 1e-5:
+                matches[name].append(dimension)
+        display = feature.GetNextDisplayDimension(display)
+    for name, dimensions in matches.items():
+        if len(dimensions) != 1:
+            raise RuntimeError(f"MountingCounterbores: expected one native {name}, found {len(dimensions)}")
+        dimensions[0].Name = name
+
+
+async def _mounting_coordinate_dimensions(adapter) -> None:
+    """Own mounting coordinates from the real west edge and lower face."""
+    from _common import anchor_point_to_point
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+    check("mounting coordinate sketch", await adapter.create_sketch("Front"))
+    dimensions = SketchDims()
+    for index, point in enumerate(BRACKET_HOLE_POINTS):
+        start = (FLANGE_X[0], FLANGE_Y[0])
+        corner = (point[0], start[1])
+        lines = await add_line_chain(adapter, [start, corner, point[:2]], close=False)
+        await anchor_point_to_origin(adapter, f"{lines[0]}.start", *start, "mounting west lower corner")
+        dimensions.record(f"MountingOriginX{index}", None)
+        dimensions.record(f"MountingOriginY{index}", None)
+        await anchor_point_to_point(
+            adapter, f"{lines[0]}.start", f"{lines[0]}.end",
+            corner[0] - start[0], 0.0, "mounting X station",
+        )
+        dimensions.record(f"MountingX{index}", None)
+        await anchor_point_to_point(
+            adapter, f"{lines[1]}.start", f"{lines[1]}.end",
+            0.0, point[1] - start[1], "mounting row",
+        )
+        dimensions.record(f"MountingY{index}", None)
+    await ensure_fully_defined(adapter, "mounting coordinate sketch")
+    check("exit mounting coordinate sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "MountingCoordinates")
+    dimensions.apply(adapter, "MountingCoordinates")
+    for name in ("MountingX0", "MountingX1", "MountingY0", "MountingY1"):
+        set_dimension_symmetric_tolerance(adapter, "MountingCoordinates", name, POSITION_BAND)
+        set_dimension_display_precision(adapter, "MountingCoordinates", name, 2)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "MountingCoordinates", "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot hide mounting coordinate sketch")
+    model.BlankSketch()
+    model.ClearSelection2(True)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -257,8 +317,7 @@ async def build(adapter) -> dict[str, str]:
     flange = await add_line_chain(adapter, flange_rect)
     # Emission: seg0 width (= X1 - X0), seg1 depth (= Z1 - Z0), THEN the
     # (X0, -Z1) corner anchor (x then z). The flange is x-asymmetric: its corner
-    # sits at x = X0 = -20, so the anchor dim shows the magnitude 20 and must
-    # drive POSITIVE -- negate the signed FlangeX0 global ('-"FlangeX0"').
+    # The signed west corner drives its unsigned origin distance positively.
     await define_rectilinear_chain(
         adapter, flange, flange_rect, label="flange", dims=flange_dims,
         names=["FlangeWidth", "FlangeDepth", "FlangeCornerX", "FlangeCornerZ"],
@@ -280,7 +339,7 @@ async def build(adapter) -> dict[str, str]:
         * (FLANGE_Z[1] - FLANGE_Z[0])
         * (FLANGE_Y[1] - FLANGE_Y[0])
     )
-    # Overlap with the arm: x +-5 cap, z 9..15, y 3.9..4.5.
+    # Exact rectangular intersection with the unchanged arm.
     v_overlap = (
         (min(ARM_HALF_X, FLANGE_X[1]) - max(-ARM_HALF_X, FLANGE_X[0]))
         * (min(ARM_Z[1], FLANGE_Z[1]) - max(ARM_Z[0], FLANGE_Z[0]))
@@ -295,9 +354,25 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"flange: added {added:.1f}, expected {v_net:.1f}")
     expected = vol
 
-    # Mounting holes are intentionally absent.  The older source description
-    # conflicts with this butt-flange revision on both axis and stations; do not
-    # turn that unresolved design input into guessed geometry.
+    wizard_holes(
+        adapter,
+        CLEARANCE_SPEC,
+        BRACKET_HOLE_POINTS,
+        (0.0, 0.0, -1.0),
+        "magnifying bracket counterbores",
+        name="MountingCounterbores",
+        expect_dia_mm=CLEARANCE_DIA,
+    )
+    cut_volume = (
+        len(BRACKET_HOLE_POINTS) * math.pi / 4.0 * (
+            CLEARANCE_DIA ** 2 * SIDE_PLATE_THICKNESS
+            + (COUNTERBORE_DIA ** 2 - CLEARANCE_DIA ** 2) * COUNTERBORE_DEPTH
+        )
+    )
+    expected -= cut_volume
+    await volume_check(
+        adapter, "bracket mounting counterbores", expected, 0.02 * cut_volume
+    )
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -317,9 +392,20 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Manufacturing drawing support: mark exactly the print's plan dimensions
-    # (the two extruded rectangles -- the collar Ø/bore + Y through-thicknesses
-    # ride the notes) and stamp the make-critical title-block properties.
+    # Native model dimensions own the flange and head-seat bands; the print
+    # imports the plan dimensions and exposes the stepped holes by callout.
+    _name_mounting_dimensions(adapter)
+    await _mounting_coordinate_dimensions(adapter)
+    set_dimension_symmetric_tolerance(
+        adapter, "FlangeProfile", "FlangeDepth", PLATE_THICKNESS_BAND
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "MountingCounterbores", "CounterBoreDepth", COUNTERBORE_DEPTH_BAND
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "MountingCounterbores", "CounterBoreDiameter", 0.0, 0.10
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

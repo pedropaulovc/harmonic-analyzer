@@ -51,6 +51,11 @@ from pd_transgear_removable_spec import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from pd_transgear_removable_spec import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from vn_crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
 from vn_transgear_knob_drive_pin_spec import PRESS_DEPTH as _KNOB_SEAT_PIN_DEPTH
+from magnifying_bracket_joint_layout import (
+    ENGAGEMENT as _BRACKET_SCREW_ENGAGEMENT,
+    SCREW_MAJOR_DIA as _BRACKET_SCREW_MAJOR_DIA,
+    TAP_DRILL_DIA as _BRACKET_TAP_DRILL_DIA,
+)
 
 
 def _smooth_annulus_limit_mm3(
@@ -527,6 +532,16 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
 # envelope. Bound its exact nested tap engagement by the same conservative
 # smooth-annulus contract as every other migrated stock thread.
 _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
+    # Two #2-56 x 1/4 screws seat on the shallow counterbore floors.
+    # Only thread/lever overlap is allowed; the bracket must remain clear.
+    **_numbered_pairs(
+        "mg-magnifier-1/vn-magnifying-bracket-screw",
+        range(1, 3),
+        "sm-summing-1/sm-summing-lever",
+        _smooth_annulus_limit_mm3(
+            _BRACKET_SCREW_MAJOR_DIA, _BRACKET_TAP_DRILL_DIA, _BRACKET_SCREW_ENGAGEMENT
+        ),
+    ),
     **_numbered_pairs(
         "ch-channel-1/vn-spring-hook",
         range(1, sm_summing_lever_spec.HOLE_COUNT + 1),

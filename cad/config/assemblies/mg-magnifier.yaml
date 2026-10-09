@@ -29,6 +29,7 @@ allowed_free_stems:
   - mg-magnifying-vertical-rod
   - mg-magnifying-wheel
   - mg-output-fixture
+  - vn-magnifying-bracket-screw
   - vn-thumb-screw
 # Three freed DOF (lever knife-rock + wire swing/spin); the yoke-coupled
 # wheel must read under-constrained WITH them, else the coupling died -- and

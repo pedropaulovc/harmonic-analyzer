@@ -98,9 +98,17 @@ from _transforms import (
     euler_from_rows,
     rot_z_rows,
 )
-from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
+from dt_cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z, SUMMING_Z
+from sm_summing_lever_spec import PLATE_L
+from magnifying_bracket_joint_layout import (
+    BRACKET_ORIGIN,
+    SCREW_POSITIONS,
+    SEAT_PLANE_Z,
+)
 
 ASM_NAME = "mg-magnifier"
+BRACKET_SCREW_POSITIONS = SCREW_POSITIONS
+BRACKET_SCREW_ROWS = ROT_X_NEG90
 
 # --- machine anchors ---------------------------------------------------------
 WHEEL_BAR_Y = 575.7  # ch30 p002 front-view re-anchor (2026-07-17): the wheel
@@ -191,6 +199,15 @@ assert THUMB_SCREW_RAIL_CLEARANCE >= _MIN_THUMB_RAIL_CLEARANCE, (
 # magnification range (Ry(180): machine x = LEVER_X0 - local x).
 CLAMP_X = LEVER_X0 - CLAMP_LOCAL_X  # 150
 BRACKET_X = LEVER_X0 - COLLAR_LOCAL_X  # 40
+assert math.isclose(SEAT_PLANE_Z, SUMMING_Z - PLATE_L / 2.0, abs_tol=1e-9), (
+    "magnifying-bracket seat drifted from the summing-lever front face"
+)
+assert all(
+    math.isclose(actual, expected, abs_tol=1e-9)
+    for actual, expected in zip(
+        BRACKET_ORIGIN, (BRACKET_X, LEVER_ROD_Y, LEVER_ROD_Z), strict=True
+    )
+), "magnifying-bracket joint origin drifted from its live placement"
 # The bracket part imports COLLAR_HALF_LEN from mg_magnifying_lever_geom (which
 # reads output.magnifier_collar_half_len_mm), so the collar length has ONE read
 # point and there is no copy left here to assert equal.
@@ -452,7 +469,7 @@ async def build(adapter) -> dict[str, str]:
     bracket = await place_component(
         adapter,
         "mg-magnifying-bracket",
-        [BRACKET_X, LEVER_ROD_Y, LEVER_ROD_Z],
+        list(BRACKET_ORIGIN),
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
@@ -463,6 +480,25 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{ml}", "PLANE"),
         label="mag-bracket locked to lever",
     )
+    # Stock shank is -Y: Rx(-90) points it +Z into the lever's front taps.
+    # Heads seat on the counterbore floors; both ride the knife-edge rock.
+    for index, position in enumerate(BRACKET_SCREW_POSITIONS, start=1):
+        screw = await place_component(
+            adapter,
+            "vn-magnifying-bracket-screw",
+            list(position),
+            [-90.0, 0.0, 0.0],
+            BRACKET_SCREW_ROWS,
+            ground=False,
+            label=f"magnifying-bracket screw {index}",
+        )
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{screw}", "PLANE"),
+            named_ref(f"Front Plane@{bracket}", "PLANE"),
+            label=f"magnifying-bracket screw {index} locked to bracket",
+        )
+        assert_component_placed(adapter, screw, list(position), BRACKET_SCREW_ROWS)
     # The clamp + vertical rod + output fixture + thumb screw are clamped to the
     # lever at the set magnification radius (the thumb screw locks the clamp on
     # the rod): they ride the lever as one rigid body. The output fixture is

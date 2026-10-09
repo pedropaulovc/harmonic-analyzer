@@ -582,6 +582,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "sm_knife_mount",  # 1/2-13 UNC-2B x 12.0 blind tap in the top seat, receiver of the knife-hanger stud
         "vn_lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
         "vn_latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-VN-043), member: 2 into the support_bar's #4-40 through taps
+        "vn_magnifying_bracket_screw",  # #2-56 fillister, member: two in bracket counterbores into summing_lever (top-level row)
         "mg_magnifying_clamp",  # #4-40 UNC-2B tapped ScrewHole (Hole Wizard), receiver of thumb_screw
         "ha_measuring_stick_stop",  # knurled thumbscrew (size not stated) threading up through the block floor, modelled integral (member AND receiver, one component)
         "mg_output_fixture",  # #4-40 UNC tapped cross hole (entry wall), receiver of the 2nd thumb_screw
@@ -598,7 +599,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "fr_rocker_arm_support",  # receiver only of channel screws: 4x #8-32 BracketSeats (top-level rows); its own foot holes are 5/16 clearance
         "vn_slotted_screw",  # #8-32 x 1-1/4 fillister (90280A201, MHA-VN-019), member into harmonic_base tapped seat
         "vn_spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-VN-012); member, x20 into summing_lever tapped plate (top-level row); no channel-internal joint
-        "sm_summing_lever",  # #10-24 counter-anchor through tap (receiver of boss_hook) + 20x #6-32 plate taps (receiver of channel spring_hook, top-level row)
+        "sm_summing_lever",  # receiver: #10-24 counter-anchor, 20x #6-32 channel anchors, two blind #2-56 magnifying-bracket seats
         "pd_support_bar",  # #8-32 blind pivot tap + 2x #4-40 through bracket taps (pd_support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "vn_swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
         "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
@@ -655,7 +656,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_latch_hook_bracket",  # MHA-PD-021 bent sheet: screw holes DRILL THRU, rivet holes drilled at assembly; no thread
         "vn_latch_hook_rivet",  # MHA-VN-045 1/16 aluminium solid rivet
         "mg_lever_wire",  # wire, tied through the fixture cross hole; no thread
-        "mg_magnifying_bracket",  # UNDRILLED blank; mounting-screw description retired (build_mg_magnifying_bracket docstring)
+        "mg_magnifying_bracket",  # two counterbored normal #2 clearance holes in its front mounting flange; no thread
         "mg_magnifying_lever",  # plain Ø6 domed rod
         "mg_magnifying_vertical_rod",  # plain Ø5 domed rod
         "mg_magnifying_wheel",  # Ø5 reamed running bore; no thread
@@ -1548,6 +1549,28 @@ JOINTS: tuple[Joint, ...] = (
     ),
     # --- magnifier ---
     Joint(
+        id="ha-harmonic-analyzer/magnifying-bracket-screws",
+        assembly="ha_harmonic_analyzer",
+        member="vn_magnifying_bracket_screw",
+        receiver="sm_summing_lever",
+        thread="#2-56 UNC",
+        quantity=2,
+        installed_at="",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "clamp the bracket flange to the summing lever; both rock together "
+            "about the knife edge without relative motion at the seat. Two "
+            "screws react the bracket moment as a shear couple, not operating "
+            "spin friction about either screw axis"
+        ),
+        axial_capture="fillister heads on the bracket counterbore floors; shanks pass normal #2 clearance into the lever's blind bottoming #2-56 seats",
+        lock=Lock.NONE,
+        evidence=(
+            "build_mg_magnifier_assembly.py BRACKET_SCREW_POSITIONS loop, screws locked "
+            "to bracket; magnifying_bracket_joint_layout.CLEARANCE_SPEC/TAP_SPEC"
+        ),
+    ),
+    Joint(
         id="mg-magnifier/wheel-axle-nut",
         assembly="mg_magnifier",
         member="vn_wheel_axle_nut",
@@ -2001,6 +2024,9 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "pn-pen/v-block-set-screw-on-rod": Occurrence(
         "pn_pen", "pn_pen_v_block_spec.py", "SCREW_HOLE_DIA"
+    ),
+    "ha-harmonic-analyzer/magnifying-bracket-screws": Occurrence(
+        "ha_harmonic_analyzer", "build_mg_magnifier_assembly.py", "BRACKET_SCREW_POSITIONS"
     ),
     "mg-magnifier/wheel-axle-nut": Occurrence(
         "mg_magnifier", "build_mg_magnifier_assembly.py", "wheel-axle nut locked to the axle"

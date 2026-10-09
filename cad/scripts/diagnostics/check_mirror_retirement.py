@@ -179,10 +179,18 @@ expect(
 expect(
     "mg-magnifier",
     "mg-magnifying-bracket-1",
-    [40.0, m.LEVER_ROD_Y, m.LEVER_ROD_Z],
+    list(m.BRACKET_ORIGIN),
     IDENTITY,
     "mg-magnifying-bracket",
 )
+for index, position in enumerate(m.BRACKET_SCREW_POSITIONS, start=1):
+    expect(
+        "mg-magnifier",
+        f"vn-magnifying-bracket-screw-{index}",
+        list(position),
+        m.BRACKET_SCREW_ROWS,
+        "vn-magnifying-bracket-screw",
+    )
 expect(
     "mg-magnifier",
     "mg-magnifying-clamp-1",

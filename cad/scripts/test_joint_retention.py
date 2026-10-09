@@ -82,6 +82,28 @@ VALID = (STUD, CAP, SCREW, NUT)
 REQUIRED = {j.id: Occurrence(j.assembly, "fixture", j.id) for j in VALID}
 
 
+def test_magnifying_bracket_joint_is_a_two_screw_static_clamp() -> None:
+    row = next(
+        joint
+        for joint in jr.JOINTS
+        if joint.id == "ha-harmonic-analyzer/magnifying-bracket-screws"
+    )
+    assert row.assembly == "ha_harmonic_analyzer"
+    assert row.member == "vn_magnifying_bracket_screw"
+    assert row.receiver == "sm_summing_lever"
+    assert row.quantity == 2
+    assert row.thread == "#2-56 UNC"
+    assert "counterbore floors" in row.axial_capture
+    assert row.exposure is Exposure.STATIC_CLAMP
+    assert row.lock is Lock.NONE
+    assert not row.lock_part and not row.exception
+    assert "without relative motion" in row.exposure_reason
+    assert row.member in jr.THREADED_PARTS
+    assert "mg_magnifying_bracket" in jr.UNTHREADED_PARTS
+    assert jr.REQUIRED_JOINTS[row.id].assembly == row.assembly
+    assert row.member in jr.build_inventory().parts["mg_magnifier"]
+
+
 def _audit(joints, inventory=INVENTORY, **kwargs):
     kwargs.setdefault("threaded", THREADED)
     kwargs.setdefault("unthreaded", UNTHREADED)
