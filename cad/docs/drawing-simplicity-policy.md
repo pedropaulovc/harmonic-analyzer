@@ -392,7 +392,10 @@ observable manufacturing contracts and plausible failures, not fixed note wordin
 line counts, or mocked API-call sequences. Native drawing generation must verify
 persisted dimension values, tolerances, reference state, and required view modes.
 A finish attachment must identify the controlled model face and keep its
-physical leader landing, not merely a non-dangling transient silhouette. A
+physical leader landing, not merely a non-dangling transient silhouette.
+Project the physical model-space surface point through the current view
+transform; an unscaled paper-space radius added to the projected axis does
+not preserve the flank under scale or orientation changes. A
 sheet-derived linear reference must read back a linear native dimension type
 before its system value is read as a length.
 The exported sheet review checks clarity and unnecessary annotations. Add focused

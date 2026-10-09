@@ -1917,8 +1917,8 @@ class _Silhouette:
 
     def __init__(self, face: _ShaftFace, side: float) -> None:
         self.face = face
-        y = side * face.surface.CylinderParams[6]
-        self.ends = ((0.0, y, face.box[2]), (0.0, y, face.box[5]))
+        x = side * face.surface.CylinderParams[6]
+        self.ends = ((x, 0.0, face.box[2]), (x, 0.0, face.box[5]))
 
     def GetFace(self):  # noqa: N802
         return self.face
@@ -1931,14 +1931,17 @@ class _Silhouette:
 
 
 class _ProfileView:
-    """The 1:1 profile: model z runs leftwards along sheet x, model y up."""
+    """The turned *Top profile: model Z runs left and model X runs down."""
 
     def __init__(
-        self, silhouettes: list[_Silhouette], part: _ArborPart | None = None
+        self, silhouettes: list[_Silhouette], part: _ArborPart | None = None,
+        *, scale: float = 1.0, angle: float = 0.0,
     ) -> None:
         self.silhouettes = silhouettes
         self.ReferencedDocument = part
         self.sweeps: list[int] = []
+        self.scale = scale
+        self.angle = angle
 
     def GetVisibleComponents(self):  # noqa: N802
         return ["dt-pinion-arbor-1"]
@@ -1947,12 +1950,21 @@ class _ProfileView:
         self.sweeps.append(kind)
         return list(self.silhouettes) if kind == 4 else []
 
-    @staticmethod
-    def sheet(xyz) -> tuple[float, float]:
-        return (0.30 - xyz[2], 0.17 + xyz[1])
+    def sheet(self, xyz) -> tuple[float, float]:
+        # Project *Top, turned -90 degrees, then rotate by the additional
+        # in-plane angle. Model Y is view depth, not paper-space vertical.
+        x, y = -xyz[2], -xyz[0]
+        cosine, sine = math.cos(self.angle), math.sin(self.angle)
+        return (
+            0.30 + self.scale * (cosine * x - sine * y),
+            0.17 + self.scale * (sine * x + cosine * y),
+        )
+
+    def ModelToViewTransform(self):  # noqa: N802 - native property via _com_invoke
+        return lambda xyz: (*self.sheet(xyz), 0.0)
 
 
-def _journal_profile(monkeypatch, *, drop=()) -> tuple[_ProfileView, dict]:
+def _journal_profile(monkeypatch, *, drop=(), scale=1.0, angle=0.0) -> tuple[_ProfileView, dict]:
     """The arbor's collinear Ø8 zones and its Ø15 head as model faces of the
     part the profile references; ``drop`` leaves zones out of the model."""
     front, back = spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z
@@ -1963,17 +1975,19 @@ def _journal_profile(monkeypatch, *, drop=()) -> tuple[_ProfileView, dict]:
         "head": _ShaftFace(spec.HEAD_DIA, spec.HEAD_REAR_Z - spec.HEAD_LEN, spec.HEAD_REAR_Z),
     }
     part = _ArborPart([face for name, face in faces.items() if name not in drop])
-    view = _ProfileView([], part)
-    monkeypatch.setattr(
-        drawing,
-        "model_point_in_view",
-        lambda adapter, v, xyz, *, label: v.sheet(xyz),
-    )
+    view = _ProfileView([], part, scale=scale, angle=angle)
+    import _drawing_common
+
+    # Exercise the real model_point_in_view path with pure affine math, not
+    # an echo of the landing requested by the recipe.
+    monkeypatch.setattr(_drawing_common, "double_array", _DoubleArray)
     return view, faces
 
 
+@pytest.mark.parametrize("scale", (1.0, 2.0))
+@pytest.mark.parametrize("angle", (0.0, math.pi / 6.0))
 def test_each_journal_ra_attaches_its_own_controlled_face_at_its_flank(
-    monkeypatch,
+    monkeypatch, scale: float, angle: float,
 ) -> None:
     """drawing:dt_pinion_arbor key 870279bc: ``SelectByID2`` at the front land's
     flank point (0.25355, 0.166) missed on swmaker00000a@10 and hit on
@@ -1983,9 +1997,10 @@ def test_each_journal_ra_attaches_its_own_controlled_face_at_its_flank(
     attaches the model face its part-owned control names -- never the
     collinear plain zone next to it -- and still lands at its station on the
     flank it always did (front lower, back upper), without a silhouette sweep."""
-    view, faces = _journal_profile(monkeypatch)
+    view, faces = _journal_profile(monkeypatch, scale=scale, angle=angle)
+    adapter = SimpleNamespace(swApp=SimpleNamespace(GetMathUtility=lambda: _Utility()))
 
-    picks = drawing._journal_finish_picks(SimpleNamespace(), view)
+    picks = drawing._journal_finish_picks(adapter, view)
 
     assert view.sweeps == []
     assert set(picks) == set(drawing.JOURNAL_FINISHES)
@@ -1993,8 +2008,14 @@ def test_each_journal_ra_attaches_its_own_controlled_face_at_its_flank(
         station_z, want_symbol, flank = drawing.JOURNAL_FINISHES[key]
         assert face is faces[key]
         assert symbol_xy == want_symbol
+        radius = spec.SHAFT_DIA / 2000.0
+        station = station_z / 1000.0
+        sign = drawing.FLANK_SIGN[flank]
         assert landing == pytest.approx(
-            view.sheet((0.0, drawing.FLANK_SIGN[flank] * spec.SHAFT_DIA / 2000.0, station_z / 1000.0))
+            (
+                0.30 - scale * (math.cos(angle) * station + math.sin(angle) * sign * radius),
+                0.17 + scale * (-math.sin(angle) * station + math.cos(angle) * sign * radius),
+            )
         )
 
 
@@ -2016,7 +2037,7 @@ def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypat
     lower = _Silhouette(face, -1.0)
     # A shorter segment on the same line: not a twin, so not the same line.
     stub = _Silhouette(face, -1.0)
-    stub.ends = (stub.ends[0], (0.0, stub.ends[1][1], 0.015))
+    stub.ends = (stub.ends[0], (stub.ends[1][0], stub.ends[1][1], 0.015))
     view = _ProfileView([lower, stub])
     monkeypatch.setattr(
         _drawing_common,
@@ -2026,6 +2047,6 @@ def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypat
     spec_face = spec.SURFACE_FINISHES[0].face.__class__(spec.SHAFT_DIA, contains_z_mm=10.0)
     with pytest.raises(RuntimeError, match=r"2 silhouettes of land's face"):
         _drawing_common.face_silhouettes_through(
-            SimpleNamespace(), view, {"land": (spec_face, view.sheet((0.0, -0.004, 0.010)))},
+            SimpleNamespace(), view, {"land": (spec_face, view.sheet((-0.004, 0.0, 0.010)))},
             label="land",
         )

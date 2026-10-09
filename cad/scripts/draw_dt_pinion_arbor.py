@@ -418,6 +418,9 @@ def _journal_finish_picks(
     returned only the land's UPPER flank, y=174 mm, so the lower-flank
     landing had no silhouette to take.  The face spans both flanks; the
     leader-landing readback still pins the flank.
+    The turned *Top profile maps model +X to the lower flank. Project that
+    physical surface point through the current view transform so both the
+    radius and the station follow its scale and orientation.
     """
     document = _early_bound(
         _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
@@ -431,13 +434,12 @@ def _journal_finish_picks(
     )
     picks = {}
     for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
-        land_x, axis_y = model_point_in_view(
+        landing = model_point_in_view(
             adapter,
             view,
-            (0.0, 0.0, station_z / 1000.0),
-            label=f"arbor {key} finish station",
+            (-FLANK_SIGN[flank] * SHAFT_DIA / 2000.0, 0.0, station_z / 1000.0),
+            label=f"arbor {key} finish landing",
         )
-        landing = (land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0)
         picks[key] = (faces[key], landing, symbol_xy)
     return picks
 
