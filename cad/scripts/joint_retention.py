@@ -1999,7 +1999,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
         "ha_harmonic_analyzer", "build_dt_drive_train_assembly.py", '"vn-slotted-screw"'
     ),
     "ha-harmonic-analyzer/north-pivot-bracket-hold-down": Occurrence(
-        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-pivot-bracket-set"
+        "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "north-ear-datum"
     ),
     "ha-harmonic-analyzer/south-pivot-bracket-hold-down": Occurrence(
         "ha_harmonic_analyzer", "ch_channel_assembly_steps.py", "south-bracket-spring-set"
