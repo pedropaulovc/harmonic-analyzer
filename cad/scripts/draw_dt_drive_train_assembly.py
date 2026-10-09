@@ -32,7 +32,8 @@ import cylinder_bank_layout as bank
 import dt_drive_train_steps as steps
 import pinion_rig_fitup as FITUP
 import pinion_rig_tip_gap as TIP_GAP
-from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY
+from ch_channel_assembly_steps import NORTH_BRACKET_SET_KEY, RODS_PINNED_REF
+from ch_channel_assembly_steps import step_ref as channel_step_ref
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
@@ -683,14 +684,18 @@ BANK_STEPS = _note_text(
         "8. MIC EACH OF {cylinder_gears}X MHA-DT-012, CAM FACE TO BACK FACE:",
         f"   {bank.GEAR_THICKNESS_ACCEPT[0]:.4f}-{bank.GEAR_THICKNESS_ACCEPT[1]:.4f};"
         " RECORD. SLIDE THEM ONTO A 3/8 GROUND SETTING",
-        "   MANDREL ~190 LONG, ALL ALIKE, CAM SIDE FRONT; ADD EACH CONNECTING",
-        "   ROD (CHANNEL ASSEMBLY MHA-CH-000) ON ITS CAM AS ITS GEAR GOES ON.",
+        # Each connecting rod comes pinned to its rocker arm (MHA-CH-000's
+        # bench pinning step, cited by key): its ring is captured in the closed
+        # cam slot as the next gear goes on, so the pair travels with its gear.
+        "   MANDREL ~190 LONG, ALL ALIKE, CAM SIDE FRONT; SET EACH CONNECTING",
+        f"   ROD + ARM PAIR ({RODS_PINNED_REF}) ON ITS CAM AS ITS GEAR GOES ON.",
         "   CLAMP LIGHTLY END TO END: GEAR 0 CAM FACE TO GEAR 19 BACK FACE",
         f"   {bank.STACK_L20_ACCEPT[0]:.2f}-{bank.STACK_L20_ACCEPT[1]:.2f}."
-        " LONG: RE-FACE THE THICKEST CAM FACE, REMEASURE.",
+        " LONG: SLIDE THE GEARS OFF IN ORDER WITH THEIR PAIRS TO THE THICKEST",
+        "   CAM; RE-FACE ITS CAM FACE, RESTACK, REMEASURE.",
         f"   SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR,"
         " REMEASURE.",
-        "   SLIDE THE STACK OFF IN ORDER.",
+        "   SLIDE THE STACK OFF IN ORDER, EACH GEAR WITH ITS PAIR.",
         "9. BASE MHA-FR-001 OUT OF THE FRAME, ON THE MILL TABLE, PAD TRAMMED,",
         "   OVERHANG SUPPORTED; CONE SET (MHA-DT-020) NOT FITTED.",
         "9A. BACK MHA-DT-002 ALONE ON THE MANDREL, ON THE BASE. EDGE-FIND BOTH",
@@ -705,7 +710,8 @@ BANK_STEPS = _note_text(
         # strap alone until the front one goes on (F2), and its front end sits
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
         # So the loaded mandrel leaves the base for the drill and tap.
-        "9B. FROM THE FRONT, LOAD ONE MHA-DT-026, THE STACK IN ORDER, THEN THE",
+        "9B. FROM THE FRONT, LOAD ONE MHA-DT-026, THE STACK IN ORDER, ITS PAIRS",
+        "   HANGING FREE, THEN THE",
         "   OTHER MHA-DT-026. PUSH THE BANK BACK, CLOSED UP ON THE BACK MHA-DT-026.",
         "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
         "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-002 ON.",
@@ -713,7 +719,7 @@ BANK_STEPS = _note_text(
         "   AND THE FRONT MHA-DT-026 IS LIGHTLY PINCHED. SET X 168.11-168.31 AND",
         "   SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW THE LOADED MANDREL",
         "   OUT OF THE BACK MHA-DT-002, HOLDING BOTH MHA-DT-026, AND LAY IT IN",
-        "   V-BLOCKS ON PARALLELS OFF THE BASE, RODS HANGING FREE. DRILL AND",
+        "   V-BLOCKS ON PARALLELS OFF THE BASE, PAIRS HANGING FREE. DRILL AND",
         "   TAP AS 9A. PASS THE MANDREL BACK THROUGH THE BACK MHA-DT-002, PUSH",
         "   THE BANK BACK AND PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET",
         "   THE LEAF AND X, TIGHTEN MHA-VN-032 AND RECHECK.",
@@ -731,16 +737,23 @@ BANK_STEPS = _note_text(
         # is the rocker bank's axial datum (rocker_bank_layout), set here on
         # the 9A DRO zero so the cams and the rocker stations share one datum.
         # Y is the hole-table rear-face distance of the ear inner face,
-        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 67.711, held to the same
+        # BOTTOM_REAR_Z - NORTH_EAR_INNER_Z = 72.039, held to the same
         # BACK_STRAP_LOCATE_BAND edge-find as 9A. Channel assembly MHA-CH-000
         # cites this step by key (channel_steps.NORTH_BRACKET_SET_REF). The
         # band the rod pins need from it is open: #948.
         f"{steps.step_number(NORTH_BRACKET_SET_KEY)}. MHA-FR-005 SCREWED DOWN ON THE BASE"
         " (FRAME ASSEMBLY MHA-FR-000 STEP 8),",
         "   DRO STILL ZEROED AS 9A. STAND THE NORTH MHA-CH-008 ON THE MHA-FR-005",
-        "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 67.62-67.81;",
+        "   RAIL, EAR TO THE BACK. SET ITS EAR INNER FACE TO Y 71.94-72.13;",
         "   CLAMP. DRILL AND TAP THE RAIL THROUGH ITS FEET PER THE MHA-FR-005 SEAT",
         "   CALLOUT (VIEW B); SCREW IT DOWN AND RECHECK Y.",
+        # Main's ruling (option i): the shaft's integral shoulder cannot pass
+        # the north ear, so the bracket comes off again and MHA-CH-000 threads
+        # the shaft from the north and refits it on these seats, rechecking Y
+        # on this DRO zero -- which must survive until its cut-to-fit refit.
+        "   UNSCREW IT AND LIFT IT OFF; KEEP THE BASE ON THE MILL, DRO ZEROED,",
+        f"   THROUGH {channel_step_ref('shaft-cut-to-fit')}."
+        f" {channel_step_ref('north-ear-datum')} REFITS IT OVER THE SHAFT.",
         f"   PINION RIG: CONT. ON SHEET {FIT_SHEET}.",
     )
 )

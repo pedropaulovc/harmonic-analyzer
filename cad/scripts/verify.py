@@ -125,10 +125,10 @@ DANGLING_ENTITY_NOT_FOUND = 48  # What's Wrong: mate reference PID not found
 # when this sub is verified, not duplicated at the top.
 GEAR_OWNER = "dt-drive-train"
 # The channel assembly carries the independent moving stations (CHANNELS of them).
-# These four stems are mated instances (one per channel), NOT pattern slaves -- the
+# These stems are mated instances (one per channel), NOT pattern slaves -- the
 # isolation suite asserts CHANNELS of each, the structural precondition for the
-# channels articulating at independent harmonics (only grounded spring/bushing
-# structure is LocalLinearPattern'd; see build_channel_assembly.py).
+# channels articulating at independent harmonics (the rod-pivot and bar pivot
+# pins ride their rod / bar on a lock mate; see build_ch_channel_assembly.py).
 CHANNEL_OWNER = "ch-channel"
 # Physically-built channels. machine.yaml channels.active_count is a
 # BUILD-SPEED KNOB: it caps the per-channel mechanism to the first N during
@@ -156,6 +156,8 @@ _MOVING_CHANNEL_STEMS = (
     "ch-connecting-rod",
     "ch-amplitude-bar",
     "ch-channel-lever",
+    "ch-rod-pivot-pin",
+    "ch-bar-pivot-pin",
 )
 _INSTANCE_SUFFIX = re.compile(r"-\d+$")
 # Crank-drive gear mate: either side carries one of these in its component name.
@@ -173,9 +175,12 @@ _FEED_GEAR_RATIO = (1, 10)  # 12T third gear : 120T reducer disc
 # measuring-stick; the spare gear rides inside paper-drive) -- NOT the ~340
 # flattened parts. Bands measured live on a green build, with margin.
 # The channel + drive-train bands scale with the built channel count N (the
-# active_count build-speed knob): channel = 7N + 4 (N×{rocker,rod,bar,lever,spring} + 2
-# shafts + 2 rocker brackets + 2 fulcrum keepers + 2 keeper foot screws;
-# 2026-09-02: the 2 spacer bushings per gap are gone -- integral hubs),
+# active_count build-speed knob): channel = 8N + 13 (N×{rocker,rod,rod-pivot-pin,
+# bar,bar-pivot-pin,lever,spring,spring-hook} + pivot shaft + south thrust washer
+# + fulcrum shaft + 2 pivot brackets + 4 bracket hold-down screws + 2 fulcrum
+# keepers + 2 keeper foot screws; 2026-09-02: the 2 spacer bushings per gap are
+# gone -- integral hubs; 2026-10: + the peened rod-pivot pin and the pressed bar
+# pivot pin per channel),
 # drive-train = 61 + N
 # (full 20-gear cone stack + crank/structure ≈ 33 -- including the cone swing
 # platform + tip block that joined the pivot post in the p1 swing rework, and
@@ -195,9 +200,9 @@ _COMPONENT_BAND = {
     # rederive; plain capped column stubs, NO column nuts)
     "dt-drive-train": (61 + _N_CH - 4, 61 + _N_CH + 4),  # N=20 -> (77,85), expected 81
     "ch-channel": (
-        6 * _N_CH + 8 - 6,
-        6 * _N_CH + 8 + 6,
-    ),  # N=20 -> (122,134), expected 128
+        8 * _N_CH + 13 - 6,
+        8 * _N_CH + 13 + 6,
+    ),  # N=20 -> (167,179), expected 173
     # (measured 164 pre-remount; 2026-08-02: -2 lever ball-mounts +2 fulcrum
     # keepers +2 keeper foot screws nets +2)
     # The former monolithic output split by function (no per-channel parts here);
@@ -476,12 +481,14 @@ def assert_channel_independence(adapter: Any) -> None:
 
     The decoherence test the docs ask for (each channel runs at its own harmonic)
     is a motion-solver run -- tracked, not wired here. But its structural
-    precondition IS statically checkable: the four moving parts must be 20
-    individually-mated instances, not pattern slaves (a pattern instance is a
-    rigid, DOF-less copy and could never articulate independently). Counting 20 of
-    each stem is the tripwire that a rebuild did not collapse the channels into a
-    component pattern -- the single most important "no pattern for moving parts"
-    invariant (spec §5 / handoff §8), checked at the level that owns them.
+    precondition IS statically checkable: the four chain parts and their
+    rod-pivot and bar pivot pins must each be CHANNELS individually-mated
+    instances, not pattern slaves (a pattern instance is a rigid, DOF-less copy
+    and could never articulate independently). Counting CHANNELS of each stem is
+    the tripwire that a rebuild did not drop or duplicate a channel or collapse
+    the channels into a component pattern -- the single most important "no
+    pattern for moving parts" invariant (spec §5 / handoff §8), checked at the
+    level that owns them.
     """
     stems = [_INSTANCE_SUFFIX.sub("", n) for n in component_names(adapter)]
     counts = {stem: stems.count(stem) for stem in _MOVING_CHANNEL_STEMS}

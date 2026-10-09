@@ -84,6 +84,10 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
         f"{fitup_number} STEP "
         f"{dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY)}"
     )
+    stack_ref = (
+        f"{fitup_number} STEP "
+        f"{dt_drive_train_steps.step_number(steps.CYLINDER_STACK_KEY)}"
+    )
     sheets = {
         channel_number: _sequence_steps(drawing.FITUP_STEPS),
         fitup_number: _sequence_steps(
@@ -100,7 +104,17 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     # What each pointer's target must name, keyed by (citing sheet, pointer).
     expected = {
         (channel_number, north_ref): f"THE NORTH {bracket}",
+        # The rod rings go onto their cams in the cylinder stack, so the
+        # bench-pinned rod + arm pairs must exist by then.
+        (channel_number, stack_ref): "ON ITS CAM AS ITS GEAR GOES ON",
+        # ... and that drive-train step names the pinning step it relies on.
+        (fitup_number, steps.RODS_PINNED_REF): "ROD FORK TO ITS",
         (fitup_number, f"{frame_number} STEP 8"): f"{support} ON DECK",
+        # The north bracket comes off again at the drive-train step that sets
+        # it: the channel sheet threads the shaft and refits it, and the DRO
+        # zero must last through the cut-to-fit refit.
+        (fitup_number, steps.step_ref("north-ear-datum")): "THREAD THE",
+        (fitup_number, steps.step_ref("shaft-cut-to-fit")): "CUT THE PLAIN END",
     }
     found = set()
     for sheet, bodies in sheets.items():
@@ -113,6 +127,12 @@ def test_every_cross_sheet_step_pointer_lands_on_the_step_it_names() -> None:
     north_label = str(dt_drive_train_steps.step_number(steps.NORTH_BRACKET_SET_KEY))
     north = sheets[fitup_number][north_label]
     assert "EAR INNER FACE TO Y" in north and "DRO STILL ZEROED AS 9A" in north
+    # The shoulder cannot pass the set ear: the bracket comes off again, and
+    # the channel sheet threads the shaft from the north and rechecks its Y.
+    assert "UNSCREW IT AND LIFT IT OFF" in north
+    north_ear = _step_body("north-ear-datum")
+    assert "BODY FIRST FROM THE NORTH" in north_ear
+    assert f"RECHECK ITS Y AS {steps.NORTH_BRACKET_SET_REF}" in north_ear
     # Positive control: the step before it is the bank's end play, not the ear.
     assert f"NORTH {bracket}" not in sheets[fitup_number]["9F"]
     # It follows 9F, the bank's last sub-step, on the bank sheet: the rig's
@@ -165,6 +185,32 @@ def test_the_step_block_fits_the_field_right_of_the_isometric() -> None:
     assert left > 0.248 + 0.015
 
 
+def test_each_rod_fork_is_pinned_to_its_arm_at_the_bench_first() -> None:
+    """The rod ring is captured in its closed cam slot during the cylinder
+    stack, and a peened pin needs a bucking bar on its far end, so the
+    MHA-CH-010 pin goes in at the bench, before that drive-train step -- after
+    the hub stack is proved on the shaft and the rockers come off in order."""
+    from ch_rod_pivot_pin_spec import PIN_END_PROUD_MAX
+
+    assert steps.SEQUENCE[:2] == ("rocker-stack-accepted", steps.RODS_PINNED_KEY)
+    stack = _step_body("rocker-stack-accepted")
+    assert stack.endswith("SLIDE THE ROCKERS OFF IN ORDER AND KEEP THAT ORDER.")
+    body = _step_body(steps.RODS_PINNED_KEY)
+    rod = _config.parts("ch-connecting-rod")["number"]
+    arm = _config.parts("ch-rocker-arm")["number"]
+    pin = _config.parts("ch-rod-pivot-pin")["number"]
+    assert f"BEFORE {steps.CYLINDER_STACK_REF}, AT THE BENCH:" in body
+    assert f"EACH {rod} ROD FORK TO ITS {arm} ARM WITH ONE {pin}." in body
+    assert "PEEN BOTH ENDS INTO THE COUNTERSINKS" in body
+    assert f"{PIN_END_PROUD_MAX:.2f} PROUD MAX" in body
+    assert "SWINGS FREE UNDER ITS OWN WEIGHT" in body
+    # Positive control: no other step pins or peens.
+    for key in steps.SEQUENCE:
+        if key != steps.RODS_PINNED_KEY:
+            assert pin not in _step_body(key) and "PEEN" not in _step_body(key)
+
+
+
 def test_the_shaft_supplied_long_is_cut_to_fit_before_the_end_play_is_accepted() -> None:
     """Codex #936 (PRRT_kwDOPHDy386mSteE): MHA-CH-005 is supplied long with its
     plain end uncut, and its print defers the length to the assembly, but no
@@ -188,8 +234,14 @@ def test_the_shaft_supplied_long_is_cut_to_fit_before_the_end_play_is_accepted()
     assert f"CUT THE PLAIN END {cut} PAST THE SCRIBE" in body
     assert f"DOME IT {shaft.DOME_HEIGHT:.1f}" in body
     assert "SCRIBE" in body.split("CUT")[0] and "SOUTH EAR'S OUTER FACE" in body
-    # It comes out only with the south bracket off, and goes back at the feeler.
-    assert "UNSCREW THE SOUTH" in body
-    assert f"AT THE FEELER AS STEP {steps.step_number('south-bracket-feeler-set')}" in body
+    # The integral shoulder passes neither ear nor a hub, and the pinned rods
+    # hold the arms at their stations: the shaft comes out only northward with
+    # the north bracket off, and goes back by the threading of the north-ear
+    # step, the south bracket staying down at its feeler.
+    assert "UNSCREW THE NORTH" in body and "DRAW THE SHAFT NORTH" in body
+    assert "EACH ARM LEFT HANGING ON ITS ROD" in body
+    assert f"REFIT AS STEP {steps.step_number('north-ear-datum')}," in body
+    assert f"SOUTH EAR, LEFT AT ITS STEP {steps.step_number('south-bracket-feeler-set')} FEELER" in body
+    assert "UNSCREW THE SOUTH" not in body
     # Positive control: no other step mentions the cut.
     assert "SCRIBE" not in _step_body("south-bracket-feeler-set")

@@ -682,6 +682,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pd_platen_paper",  # paper sheet, no thread
         "pd_platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
+        "ch_rod_pivot_pin",  # MHA-CH-010 5/64 drill-rod pin, peened into the fork's countersinks (rod-forks-pinned); no thread
         "ch_rocker_thrust_washer",  # 1/16 sheet washer, plain bore
         "pd_transgear_arm_plate",  # MHA-PD-019: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "vn_transgear_collar_cross_pin",  # MHA-VN-037 1/16 slotted spring pin through the drive collar slot and shaft core
@@ -1223,7 +1224,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="fr_rocker_arm_support",
         thread="#8-32",
         quantity=2,
-        installed_at=dt_drive_train_steps.step_ref("north-pivot-bracket-set"),
+        installed_at=ch_channel_assembly_steps.step_ref("north-ear-datum"),
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
             "clamps the north pivot_bracket foot to the stationary rocker_arm_support "
@@ -1241,7 +1242,9 @@ JOINTS: tuple[Joint, ...] = (
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header (MHA-VN-032, #8-32 x 3/4 fillister, two per foot); "
             "vn_pedestal_hold_down_screw_spec.THREAD; rocker_bracket_seat_layout.SEAT_SPEC (tapped_bottoming #8-32 2B); "
             "draw_dt_drive_train_assembly.py BANK_STEPS step north-pivot-bracket-set (MHA-DT-000 STEP 10: 'DRILL AND TAP THE RAIL "
-            "THROUGH ITS FEET ... SCREW IT DOWN AND RECHECK Y'); ch_channel_assembly_steps.NORTH_BRACKET_SET_REF; "
+            "THROUGH ITS FEET ... UNSCREW IT AND LIFT IT OFF'); draw_ch_channel_assembly.py step north-ear-datum (MHA-CH-000 "
+            "STEP 3: 'SLIDE THE ... EAR SOUTH OVER THE NORTH JOURNAL, SCREW IT DOWN AND RECHECK ITS Y'); "
+            "ch_channel_assembly_steps.NORTH_BRACKET_SET_REF; "
             "config parts/vn-pedestal-hold-down-screw.yaml (90280A197)"
         ),
     ),
@@ -1268,9 +1271,9 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="",
         evidence=(
             "build_ch_channel_assembly.py BRACKET_SCREW_XZ loop + header; rocker_bracket_seat_layout.SEAT_SPEC; "
-            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-feeler-set' (MHA-CH-000 STEP 4: 'TRANSFER ITS SEATS ... "
-            "SCREW IT DOWN AT THE FEELER'), re-screwed at 'shaft-cut-to-fit' (STEP 5: 'SCREW THE SOUTH ... DOWN AT THE "
-            "FEELER AS STEP 4')"
+            "draw_ch_channel_assembly.py _fitup_steps 'south-bracket-feeler-set' (MHA-CH-000 STEP 5: 'TRANSFER ITS SEATS ... "
+            "SCREW IT DOWN AT THE FEELER'), re-screwed at 'shaft-cut-to-fit' (STEP 6: 'SCREW THE SOUTH ... DOWN AT THE "
+            "FEELER AS STEP 5')"
         ),
     ),
     Joint(
