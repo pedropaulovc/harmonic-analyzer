@@ -828,10 +828,11 @@ also require `GH_TOKEN` and `GITHUB_REPOSITORY` to protect open PR branches.
 The low-level `delete RAW_BRANCH` command deliberately bypasses that open-PR
 protection; reserve it for intentional preview-deletion smoke checks.
 
-The Wrangler files explicitly pin account and Worker identity. They contain
-only the static asset binding and a lossless asset streaming Worker: no storage,
-secrets, unrelated bindings, routes, custom domains or scheduled triggers.
-`keep_vars` preserves dashboard variables; routing remains dashboard-managed.
+The Wrangler files explicitly pin account and Worker identity. Both use the
+static asset binding and a lossless asset streaming Worker, with no storage,
+secrets, unrelated bindings or scheduled triggers. Production also declares its
+apex custom domain and observability settings; PPE has no custom domains.
+`keep_vars` preserves dashboard variables.
 PPE explicitly has a `previews` block to enable noninteractive deployments
 without copying production resource settings. It enables Preview console logs
 for structured `deployment-asset-stream-abort` diagnostics only; automatic
