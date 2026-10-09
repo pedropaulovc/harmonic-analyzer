@@ -8,13 +8,23 @@ param(
     [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [string]$PoolHome,
 
-    # Use a host-visible scratchpad when supplied by the harness; callers must
-    # resolve `local://` before passing it. Deep snapshots use process-local
-    # Git long-path support, without changing the user's Git configuration.
+    # An explicit host path wins. OMP resolves `local://` only in the outer
+    # shell; set the persistent launcher's working directory to that path for
+    # the automatic default. `HARMONIC_AGENT_SCRATCHPAD` remains an override.
     [string]$LogDirectory = $(
         $scratchpad = [System.Environment]::GetEnvironmentVariable(
             'HARMONIC_AGENT_SCRATCHPAD'
         )
+        if ([string]::IsNullOrWhiteSpace($scratchpad)) {
+            $currentDirectory = [System.Environment]::CurrentDirectory
+            $isOmpLocalScratchpad = (
+                [System.Environment]::GetEnvironmentVariable('OMPCODE') -eq '1' -and
+                [System.IO.Path]::GetFileName($currentDirectory) -ceq 'local'
+            )
+            if ($isOmpLocalScratchpad) {
+                $scratchpad = $currentDirectory
+            }
+        }
         if ([string]::IsNullOrWhiteSpace($scratchpad)) {
             $localAppData = [System.Environment]::GetEnvironmentVariable(
                 'LOCALAPPDATA'
