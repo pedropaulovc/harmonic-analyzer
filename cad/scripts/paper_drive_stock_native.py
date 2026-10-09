@@ -16,6 +16,7 @@ from _common import (
     _early_bound,
     add_line_chain,
     anchor_point_to_origin,
+    blank_reference_sketches,
     check,
     dimension_between,
     ensure_fully_defined,
@@ -241,6 +242,9 @@ async def author_span(
     actual_mm = _driven_carrier(display, name, expected, 2 * profile.geometry_error_bound_mm, reference=False)
     check("exit_sketch physical span", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
+    # A standalone sketch saves shown and renders in every assembly; the
+    # drawing still imports its dimension from the hidden sketch.
+    blank_reference_sketches(adapter, (feature,))
     return actual_mm
 
 
@@ -334,6 +338,7 @@ async def author_root_envelope(
     actual_mm = _driven_carrier(display, name, 2 * radius, 2 * profile.geometry_error_bound_mm, reference=True)
     check("exit_sketch axis-root inspection", await adapter.exit_sketch())
     name_last_feature(adapter, feature)
+    blank_reference_sketches(adapter, (feature,))
     return actual_mm
 
 
@@ -382,7 +387,17 @@ async def author_cutter_endcut(
     check("create_sketch finite cutter ground", await adapter.create_sketch(plane))
     suppress_dimension_input(adapter)
     curves = [await placed_ground_curve(adapter, segment, angle, translation) for segment in ground]
-    await ensure_fully_defined(adapter, "finite ground curves", fix_entities=curves, allow_fix_escalation=True)
+    # The ground chain (UpperFiniteFlank, UpperBelowBase, RootArc,
+    # LowerBelowBase, LowerFiniteFlank) is defined after all but its last two
+    # curves are FIXed; those two close it and must not be nearly collinear.
+    # In chain order they were LowerBelowBase and the almost radial
+    # LowerFiniteFlank, and the solve ended no_solution. FIX the upper
+    # branch, then the lower branch from its outer end, so the radial
+    # LowerBelowBase and the tangential RootArc close it: a near-perpendicular
+    # pair (_gear.stock_gap_fix_order's rule).
+    n_upper = len(upper_ground)
+    fix_order = curves[:n_upper] + curves[n_upper + 1 :][::-1] + [curves[n_upper]]
+    await ensure_fully_defined(adapter, "finite ground curves", fix_entities=fix_order, allow_fix_escalation=True)
     a, b = rotate_mm((axis_x, lower[1]), angle), rotate_mm((axis_x, upper[1]), angle)
     arbor = check("tangential cutter arbor", await adapter.add_centerline(*a, *b))
     await anchor_point_to_origin(adapter, f"{arbor}.start", *a, "cutter arbor lower end")

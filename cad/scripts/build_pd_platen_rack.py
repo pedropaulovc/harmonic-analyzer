@@ -49,6 +49,7 @@ from _common import (
     add_line_chain,
     apply_material,
     anchor_point_to_origin,
+    blank_reference_sketches,
     check,
     define_polygon_chain,
     define_rectilinear_chain,
@@ -177,16 +178,9 @@ async def _drawing_witnesses(adapter: Any) -> list[tuple[str, str]]:
     name_last_feature(adapter, "OverallHeightReference")
     drives += overall.apply(adapter, "OverallHeightReference")
 
-    blank_reference_geometry(
-        adapter,
-        tuple(
-            (name, "SKETCH")
-            for name in (
-                "EndStockProfile",
-                "OverallHeightReference",
-            )
-        ),
-    )
+    # BlankRefGeom left these sketches shown (farm run 20261009T214031408Z);
+    # BlankSketch, read back per sketch, hides them.
+    blank_reference_sketches(adapter, ("EndStockProfile", "OverallHeightReference"))
     return drives
 
 

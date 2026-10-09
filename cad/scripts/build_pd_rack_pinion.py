@@ -76,7 +76,7 @@ from pd_rack_pinion_spec import (
     FACE_WIDTH,
     GEAR_DATA,
     OUTSIDE_DIA_BAND,
-    PRESSURE_ANGLE_DEG,
+    PRESSURE_ANGLE_DEG,  # noqa: F401 - the drawing test reads it off the part
     SPAN_DEVIATIONS,
     SPAN_NOMINAL,
     SPAN_PLACES,
@@ -88,7 +88,7 @@ from pd_rack_pinion_spec import (
     TAP_DRILL_DIA,
     TAP_SPEC,
     TAP_TO_BORE_WALL_WORST,
-    TEETH,
+    TEETH,  # noqa: F401 - the drawing test reads it off the part
     TOOTH_SPACE_CALLOUT,
     TOOTH_SPACE_CALLOUT_PROPERTY,
 )
@@ -253,10 +253,6 @@ async def build(adapter) -> dict[str, str]:
     await author_root_envelope(adapter, STOCK_PROFILE)
     set_dimension_prefix(
         adapter, "RootInspectionProfile", "RootEnvelope", "AXIS ROOT "
-    )
-    blank_reference_geometry(
-        adapter,
-        (("SpanProfile", "SKETCH"), ("RootInspectionProfile", "SKETCH")),
     )
     await volume_check(adapter, "inspection sketches neutral", expected, 0.01 * V_BORE)
 
