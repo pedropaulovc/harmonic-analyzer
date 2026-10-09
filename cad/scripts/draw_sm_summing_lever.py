@@ -548,7 +548,7 @@ async def build(adapter: Any) -> dict[str, str]:
         )
         _telemetry.info(
             f"bracket mounting callout {variable_name} imported tolerance "
-            f"type {observed[0]} {observed[1]:+.4f}/{observed[2]:+.4f} mm"
+            f"(type, lower mm, upper mm) = {observed!r}"
         )
         # A hole callout variable carries its OWN tolerance (SW 2016+:
         # ICalloutVariable.ToleranceType; the model IDimensionTolerance does
@@ -566,7 +566,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ):
             raise RuntimeError(
                 f"bracket mounting callout tolerance for {variable_name} did not "
-                f"persist: wanted +/-{band} mm at 2 places"
+                f"persist: wanted symmetric band {band} mm at 2 places"
             )
     if required_depths:
         raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
