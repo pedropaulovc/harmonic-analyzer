@@ -87,7 +87,7 @@ web = [
 [tool.pytest.ini_options]
 # A bare `pytest` runs these; `pytest .` is kept out of the vendored submodule
 # by norecursedirs. The SolidworksMCP-python suite can launch SolidWorks, which
-# on amet steals the licence farm worker w6 shares, so it never runs from here.
+# on amet steals the licence farm worker w15 shares, so it never runs from here.
 # The first nine entries are pytest's defaults, which a custom list replaces;
 # `.*` also skips .git, .venv and the nested checkouts under .claude/worktrees.
 testpaths = ["cad/scripts", "cad/comparisons/tools", "tests"]
