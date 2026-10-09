@@ -1,7 +1,7 @@
 r"""Reproduction script: transgear disc hub (MHA-PD-017; ch. 23; 1 used).
 
 The turned brass hub and flange whose bore slides on the pinion sleeve's
-(MHA-PD-010) Ø9 boss and drives through its D-flat.  Its rear spigot passes the
+(MHA-PD-010) h6 boss and drives through its D-flat. Its rear spigot passes the
 120T disc's (MHA-PD-006) bore, which pilots on it, and seats on the sleeve's
 step; the flange's rear face clamps the disc's front face and three #0-80
 fillister screws (MHA-VN-039) hold them.  Nothing fastens the hub to the
@@ -387,8 +387,8 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "hub D-bore", v_body - V_D_BORE, 0.01 * V_D_BORE)
     v_body -= V_D_BORE
 
-    # The spigot's bore: the same Ø9 H7, round, reversed (+Z) from the Front
-    # Plane to the spigot's end, driven by the D-bore's own BoreDia.
+    # The spigot's bore: the same sleeve-matched H7 diameter, round, reversed
+    # (+Z) from the Front Plane to its end, driven by the D-bore's BoreDia.
     spigot_bore = SketchDims()
     check("create_sketch spigot bore", await adapter.create_sketch("Front"))
     await define_circle(

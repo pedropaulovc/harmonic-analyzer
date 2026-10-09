@@ -58,7 +58,7 @@ def test_engaged_pinion_centre_and_clocking_share_the_pivot_swing() -> None:
 def test_live_stock_block_screw_keeps_full_threads_at_the_longest_grip() -> None:
     import dt_pinion_pivot_block_geometry as geometry
     import vn_slotted_screw_spec as screw
-    from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+    from vn_fillister_screw_spec import FILLISTER_SIZES
 
     entry = _config.title_block("edge_break")
     entry_loss = max(float(entry["radius_mm"]), float(entry["chamfer_max_mm"]))

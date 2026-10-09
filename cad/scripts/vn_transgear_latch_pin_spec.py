@@ -13,8 +13,13 @@ hook's far face at the worst case once the MHA-PD-014 ear's 1 deg bend and the
 dowel's length grade are counted; the 7/8 length of the same series, in a
 deeper hole, passes it (``transgear_hanger_joints``).
 
-Catalogue: 1/8 x 7/8 alloy-steel dowel, Round x Chamfer ends; the size row
-and the family's diameter band are ``diagnostics.diag_mcmaster_dowel``'s.
+Catalogue: this pure module owns the shared dowel size table, the 98381A*
+diameter band and end forms; stock pin specs and native recipes consume them.
+Catalogue provenance: each size's McMaster product page, read live 2026-09-30
+(dt-logs transgear-evidence/mcmaster-skus.md R6): alloy steel, unplated,
+diameter +0.0001 to +0.0003 in over nominal, "Round x Chamfer" ends.
+The 98381A433/434 pages state neither end radius nor chamfer and have no
+vendor model, so their reference geometry remains a plain nominal cylinder.
 [INFERENCE] The SKU is the 7/8 length of the 1/8 series, not yet read live,
 and its end forms are the 98381A473 vendor model's (harvested 2026-09-30):
 the chamfered end a flat Ø2.921 face and a cone 16 deg to the axis, 0.443
@@ -30,12 +35,87 @@ at PRESS_DEPTH inside the arm's end face.
 
 from __future__ import annotations
 
-from diagnostics.diag_mcmaster_dowel import (
-    DIA_BAND_IN,
-    DOWEL_ENDS,
-    DOWEL_SIZES,
-    MM_PER_IN,
+import math
+from dataclasses import dataclass
+
+
+MM_PER_IN = 25.4
+
+DOWEL_SIZES = {
+    # part:        (nominal dia, length), mm
+    "98381A433": (3.0 / 32.0 * MM_PER_IN, 3.0 / 16.0 * MM_PER_IN),  # 3/32 x 3/16
+    "98381A434": (3.0 / 32.0 * MM_PER_IN, 0.25 * MM_PER_IN),  # 3/32 x 1/4
+    "98381A473": (0.125 * MM_PER_IN, 0.75 * MM_PER_IN),  # 1/8 x 3/4
+    "98381A474": (0.125 * MM_PER_IN, 0.875 * MM_PER_IN),  # 1/8 x 7/8 [INFERENCE]
+    # 316 stainless nominal reference only; its m6/incoming limits live in its spec.
+    "93600A189": (2.0, 6.0),
+}
+# Catalogue diameter tolerance for the 98381A* alloy series only, in inches.
+DIA_BAND_IN = (0.0001, 0.0003)
+
+
+@dataclass(frozen=True)
+class DowelEnds:
+    """A vendor-modelled Round x Chamfer pair of end forms, mm and degrees."""
+
+    point_dia: float  # the chamfered end's flat face
+    chamfer_deg: float  # the chamfer cone's angle to the pin axis
+    crown_r: float  # the round end's radius, tangent to the diameter
+
+    def chamfer_len(self, dia: float) -> float:
+        """Axial length of the chamfer cone on a pin of ``dia``."""
+        return (dia - self.point_dia) / 2.0 / math.tan(math.radians(self.chamfer_deg))
+
+
+# Read off the 98381A473 harvest (Sketch2 "Point Diameter" 2.921, D3 16 deg,
+# "Crown Radius" 0.4064; Revolve1 faces: cone x -9.525..-9.0821, torus
+# x 9.1186..9.525, end faces Ø2.921 and Ø2.3622).
+_ROUND_X_CHAMFER_1_8 = DowelEnds(
+    point_dia=0.115 * MM_PER_IN, chamfer_deg=16.0, crown_r=0.016 * MM_PER_IN
 )
+DOWEL_ENDS = {
+    "98381A473": _ROUND_X_CHAMFER_1_8,
+    # [INFERENCE] the 1/8 series' end forms, read off the 98381A473 harvest.
+    "98381A474": _ROUND_X_CHAMFER_1_8,
+}
+
+
+def dowel_volume(part_no: str) -> float:
+    """The recipe's solid volume, mm^3: the nominal cylinder less the chamfer
+    ring and the round end's corner ring (Pappus, each about the pin axis)."""
+    dia, length = DOWEL_SIZES[part_no]
+    radius = dia / 2.0
+    volume = math.pi * radius**2 * length
+    ends = DOWEL_ENDS.get(part_no)
+    if ends is None:
+        return volume
+    step = radius - ends.point_dia / 2.0
+    chamfer_area = 0.5 * step * ends.chamfer_len(dia)
+    volume -= 2.0 * math.pi * (radius - step / 3.0) * chamfer_area
+    r = ends.crown_r
+    corner_area = (1.0 - math.pi / 4.0) * r**2
+    corner_centroid = radius - r + (r / 6.0) / (1.0 - math.pi / 4.0)
+    volume -= 2.0 * math.pi * corner_centroid * corner_area
+    return volume
+
+
+def dowel_section(part_no: str) -> list[tuple[float, float]]:
+    """The half-section's corners (radius, y), mm: from the round end's flat
+    face rim round the axis and the chamfered end to the round end's tangent
+    point.  The round end's arc closes it from the last point to the first."""
+    dia, length = DOWEL_SIZES[part_no]
+    radius = dia / 2.0
+    ends = DOWEL_ENDS[part_no]
+    r = ends.crown_r
+    return [
+        (radius - r, length),
+        (0.0, length),
+        (0.0, 0.0),
+        (ends.point_dia / 2.0, 0.0),
+        (radius, ends.chamfer_len(dia)),
+        (radius, length - r),
+    ]
+
 
 SKU = "98381A474"
 DIA, LENGTH = DOWEL_SIZES[SKU]  # 3.175 x 22.225

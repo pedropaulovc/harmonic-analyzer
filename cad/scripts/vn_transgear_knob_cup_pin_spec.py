@@ -12,19 +12,18 @@ modelled between them.
 Catalogue: McMaster 98296A031, read live on October 2, 2026 (dt-logs
 transgear-evidence mcmaster-skus.md): 1050-1095 spring steel, unplated,
 1/16 in diameter, 5/8 in long, 0.012 in wall, chamfered ends, for a
-0.062-0.065 in hole; no diameter tolerance stated.  It is MHA-VN-037's
-98296A026 in its 5/8 length; both are rows of
-``diagnostics/diag_mcmaster_spring_pin.py``, whose table this module reads.
+0.062-0.065 in hole; no diameter tolerance stated.  The retained catalogue
+row in ``diagnostics/diag_mcmaster_spring_pin.py`` supplies size and wall;
+this spec owns the actual cup joint's B18.8.2 hole and length limits.
 
 Part frame: axis along local X through the origin, centred on it, so the
 ends sit at x = -PIN_LEN / 2 and +PIN_LEN / 2.  The Right Plane is the
 mid-length plane; the Front and Top Planes contain the axis, which the part
-publishes as ``ScrewAxis`` (Front Plane x Top Plane).  MHA-VN-037's layout.
+publishes as ``ScrewAxis`` (Front Plane x Top Plane).
 """
 
 from __future__ import annotations
 
-import vn_transgear_collar_cross_pin_spec as _cross_pin
 from diagnostics.diag_mcmaster_spring_pin import SPRING_PIN_SIZES
 from diagnostics.diag_mcmaster_spring_pin import WALL_T as _CATALOGUE_WALL
 
@@ -33,21 +32,20 @@ SKU = "98296A031"
 PIN_STANDARD = "ASME B18.8.2"
 PIN_DIA, PIN_LEN = SPRING_PIN_SIZES[SKU]  # 1/16 x 5/8 in
 WALL_T = _CATALOGUE_WALL  # 0.012 in
-# MHA-VN-037's length band (contract §1.3): +/-0.015 in.
-PIN_LEN_BAND = _cross_pin.PIN_LEN_BAND
+# Commercial B18.8.2 slotted spring pin length tolerance: +/-0.015 in.
+PIN_LEN_BAND = 0.015 * INCH
 PIN_LEN_MIN = PIN_LEN - PIN_LEN_BAND
 PIN_LEN_MAX = PIN_LEN + PIN_LEN_BAND
 
-# The hole match-drilled through cup and journal at assembly: MHA-VN-037's
-# functional band (R9-11), inside the window B18.8.2 sells the 1/16 pin to
-# grip, and under its free diameter so the pin is sprung in it.
-HOLE_WINDOW = _cross_pin.HOLE_WINDOW
-HOLE_DIA = _cross_pin.HOLE_DIA  # 1.6
-HOLE_BAND = _cross_pin.HOLE_BAND  # (+0.05, 0)
+# Actual cup/journal match-drilled hole, inside the catalogue 1/16 pin's
+# recommended window and smaller than its minimum free diameter.
+HOLE_WINDOW = (0.062 * INCH, 0.065 * INCH)
+HOLE_DIA = 1.6
+HOLE_BAND = (0.05, 0.0)
 HOLE_MAX = HOLE_DIA + HOLE_BAND[0]
 # The match-drilled hole as the A06 knob-stack step prints it.
 HOLE_TEXT = f"\u00d8{HOLE_DIA:.1f} +{HOLE_BAND[0]:.2f}/0"
-FREE_DIA_MIN = _cross_pin.FREE_DIA_MIN
+FREE_DIA_MIN = 0.066 * INCH
 if not (HOLE_WINDOW[0] <= HOLE_DIA and HOLE_MAX <= HOLE_WINDOW[1]):
     raise AssertionError("the cup pin hole's band leaves B18.8.2's recommended hole")
 if not HOLE_WINDOW[0] <= PIN_DIA <= HOLE_WINDOW[1]:

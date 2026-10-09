@@ -169,20 +169,22 @@ from _drawing_common import add_feature_control_frame as fcf
 import _drawing_common as drawing
 
 LOCAL_TOLERANCE = "0.10"
+LOCAL_ROWS = ("0.20",)
 fcf(adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
     tolerance="0.05", label="literal")
 drawing.add_feature_control_frame(
     adapter, view, frame_xy=(0.1, 0.2), characteristic="perpendicularity",
     tolerance=LOCAL_TOLERANCE, label="local alias")
+for row in LOCAL_ROWS:
+    fcf(adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
+        tolerance=row, label="local loop")
 """
     violations = drawing_specification_violations(source)
-    assert [item.rule for item in violations] == [
-        "drawing-gdt-provenance",
-        "drawing-gdt-provenance",
-    ]
+    assert [item.rule for item in violations] == ["drawing-gdt-provenance"] * 3
     assert [item.evidence for item in violations] == [
         "tolerance='0.05' is not part-spec-sourced",
         "tolerance=LOCAL_TOLERANCE is not part-spec-sourced",
+        "tolerance=row is not part-spec-sourced",
     ]
 
 
@@ -242,6 +244,10 @@ add_feature_control_frame(
     tolerance=SELECTED_CONTROL.tolerance,
     projected_zone_height_mm=SELECTED_CONTROL.projected_zone_height_mm,
     label="selected control")
+for control in GEOMETRIC_CONTROLS:
+    add_feature_control_frame(
+        adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
+        tolerance=control.tolerance, label="looped control")
 """
     assert drawing_specification_violations(source) == ()
 

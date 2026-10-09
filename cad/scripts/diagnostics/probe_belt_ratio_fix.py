@@ -38,30 +38,30 @@ PITCH_DIAMS_M = [0.024, 0.048]  # T12 / T24 pitch diameters
 DRIVE_DEG = 30.0
 
 
-async def _measure_ratio(adapter: Any, t12: str, t24: str, tag: str) -> float:
+async def _measure_ratio(adapter: Any, crank_wheel: str, knob_wheel: str, tag: str) -> float:
     from solidworks_mcp.adapters.base import MateRefParameters
 
-    base12 = component_transform(adapter, t12)[:9]
-    base24 = component_transform(adapter, t24)[:9]
-    a = component_transform(adapter, t12)
+    base_crank = component_transform(adapter, crank_wheel)[:9]
+    base_knob = component_transform(adapter, knob_wheel)[:9]
+    a = component_transform(adapter, crank_wheel)
     rest = math.degrees(math.acos(max(-1.0, min(1.0, a[0]))))
-    res = await angle_driver(adapter, named_ref(f"Right Plane@{t12}", "PLANE"),
+    res = await angle_driver(adapter, named_ref(f"Right Plane@{crank_wheel}", "PLANE"),
                              named_ref("Right Plane", "PLANE"), rest + DRIVE_DEG,
                              label=f"[{tag}] drive crank +{DRIVE_DEG:.0f}", verify=None)
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-    d12 = _rel_z_angle_deg(component_transform(adapter, t12)[:9], base12)
-    d24 = _rel_z_angle_deg(component_transform(adapter, t24)[:9], base24)
+    d_crank = _rel_z_angle_deg(component_transform(adapter, crank_wheel)[:9], base_crank)
+    d_knob = _rel_z_angle_deg(component_transform(adapter, knob_wheel)[:9], base_knob)
     check(f"[{tag}] delete temp driver",
           await adapter.delete_mate(MateRefParameters(name=res.get("name", ""))))
     # Drive back to the rest pose so the next experiment starts clean.
-    res2 = await angle_driver(adapter, named_ref(f"Right Plane@{t12}", "PLANE"),
+    res2 = await angle_driver(adapter, named_ref(f"Right Plane@{crank_wheel}", "PLANE"),
                               named_ref("Right Plane", "PLANE"), rest,
                               label=f"[{tag}] restore rest", verify=None)
     adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
     check(f"[{tag}] delete restore driver",
           await adapter.delete_mate(MateRefParameters(name=res2.get("name", ""))))
-    ratio = (d24 / d12) if d12 else 0.0
-    info(f"[{tag}] T12 {d12:+.2f} -> T24 {d24:+.2f}  ratio {ratio:+.4f}")
+    ratio = (d_knob / d_crank) if d_crank else 0.0
+    info(f"[{tag}] crank {d_crank:+.2f} -> knob {d_knob:+.2f}  ratio {ratio:+.4f}")
     return ratio
 
 
@@ -150,10 +150,10 @@ async def build(adapter: Any) -> dict[str, str]:
     check("open paper-drive", await adapter.open_model(str(asm)))
     try:
         roles = _removables_by_role(adapter)
-        t12, t24 = roles["T12"], roles["T24"]
-        log(f"sprockets: T12={t12} T24={t24}")
+        crank_wheel, knob_wheel = roles["crank"], roles["knob"]
+        log(f"sprockets: crank={crank_wheel} knob={knob_wheel}")
 
-        r0 = await _measure_ratio(adapter, t12, t24, "baseline")
+        r0 = await _measure_ratio(adapter, crank_wheel, knob_wheel, "baseline")
 
         # C: the DOCUMENTED per-pulley setter (ModifyMemberParameters). The
         # array-property routes were measured dead: a forced ModifyDefinition
@@ -162,7 +162,7 @@ async def build(adapter: Any) -> dict[str, str]:
         _belt_commit(adapter, diameters=PITCH_DIAMS_M, engage=None,
                      tag="C-members", member_params=True)
         adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-        r1 = await _measure_ratio(adapter, t12, t24, "C-member-params")
+        r1 = await _measure_ratio(adapter, crank_wheel, knob_wheel, "C-member-params")
 
         r2 = None
         if abs(r1 - 0.5) > 0.01:
@@ -171,7 +171,7 @@ async def build(adapter: Any) -> dict[str, str]:
             _belt_commit(adapter, diameters=PITCH_DIAMS_M, engage=True,
                          tag="C2-reengage", member_params=True)
             adapter._attempt(lambda: adapter.currentModel.ForceRebuild3(False), default=None)
-            r2 = await _measure_ratio(adapter, t12, t24, "C2-reengaged")
+            r2 = await _measure_ratio(adapter, crank_wheel, knob_wheel, "C2-reengaged")
 
         verdict = (f"baseline {r0:+.4f}; member-params {r1:+.4f}"
                    + (f"; member+reengage {r2:+.4f}" if r2 is not None else ""))

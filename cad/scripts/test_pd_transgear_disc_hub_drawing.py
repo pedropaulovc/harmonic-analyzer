@@ -86,8 +86,9 @@ def test_the_sheet_prints_the_faced_overall_and_the_flange_never_the_hub_body() 
     assert spec.HUB_LENGTH == cluster_fit.HUB_LENGTH_MODEL == pytest.approx(13.70)
     assert spec.FLANGE_THICK == pytest.approx(2.4) and _places("FlangeThick") == 3
     assert spec.SPIGOT_LENGTH == pytest.approx(3.65) and _places("SpigotLength") == 3
-    assert spec.BORE_DIA == pytest.approx(9.0) and _places("BoreDia") == 3
-    assert spec.FLAT_TO_AXIS == pytest.approx(3.5) and _places("FlatToAxis") == 3
+    assert spec.BORE_DIA == spec.SLEEVE.BOSS_DIA and _places("BoreDia") == 3
+    assert spec.FLAT_TO_AXIS == spec.SLEEVE.FLAT_TO_AXIS
+    assert _places("FlatToAxis") == 3
     assert spec.HUB_DIA == pytest.approx(13.2) and _places("HubDia") == 3
     assert spec.SPIGOT_DIA == pytest.approx(13.1) and _places("SpigotDia") == 3
     assert spec.FLANGE_DIA == pytest.approx(25.1) and _places("FlangeDia") == 3
@@ -173,6 +174,14 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     import build_pd_transgear_feed_pinion as sleeve_part
     import pd_transgear_feed_pinion_spec as sleeve
 
+    assert spec.BORE_DIA == sleeve.BOSS_DIA
+    assert spec.BORE_BAND == (0.015, 0.0)  # H7 in the mating boss's 6-10 mm group
+    assert spec.FLAT_TO_AXIS == sleeve.FLAT_TO_AXIS
+    assert part.BORE_DIA == drawing.BORE_DIA == spec.BORE_DIA
+    assert part.BORE_R == pytest.approx(sleeve.BOSS_DIA / 2.0)
+    assert part.FLAT_TO_AXIS == spec.FLAT_TO_AXIS
+    assert part.BORE_DEVIATIONS == spec.BORE_DEVIATIONS
+
     bore = _printed_limits(part, spec, "BoreProfile", "BoreDia", spec.BORE_DIA)
     boss = _printed_limits(
         sleeve_part, sleeve, "SleeveProfile", "BossDia", sleeve.BOSS_DIA
@@ -195,6 +204,50 @@ def test_the_d_bore_slides_on_the_sleeve_boss_and_flat_at_every_printed_limit() 
     assert f"(CLR {flat_fit[0]:.3f}-{flat_fit[1]:.3f} ON" in flat_callout
 
 
+def test_boss_round_engagement_and_available_flat_face_follow_the_live_sleeve() -> None:
+    """The retained axial stack keeps the finite cutter end behind the
+    locating round and the sleeve flat's end behind the hub flat. The
+    available D-flat face is geometry, not a certified torque capacity."""
+    sleeve = spec.SLEEVE
+    engagement = (
+        sleeve.OVERALL_LENGTH
+        - sleeve.STATION_TOL
+        - cluster_fit.HUB_NOSE_WINDOW[1]
+        - max(
+            sleeve.FACE_WIDTH + sleeve.FACE_WIDTH_BAND,
+            sleeve.CUTTER_RUNOUT_END_WORST,
+        )
+    )
+    assert spec.ROUND_ENGAGEMENT_MIN == pytest.approx(engagement)
+    assert engagement > 0.0
+    assert spec.FLAT_END_CLEARANCE_WORST > 0.0
+    width = 2.0 * math.sqrt(
+        (sleeve.BOSS_DIA / 2.0) ** 2 - sleeve.FLAT_TO_AXIS**2
+    )
+    width_min = 2.0 * math.sqrt(
+        ((sleeve.BOSS_DIA + sleeve.BOSS_DIA_BAND[1]) / 2.0) ** 2
+        - (sleeve.FLAT_TO_AXIS + sleeve.FLAT_TO_AXIS_BAND[0]) ** 2
+    )
+    length_min = (
+        sleeve.OVERALL_LENGTH
+        - sleeve.STATION_TOL
+        - cluster_fit.HUB_NOSE_WINDOW[1]
+        - (sleeve.FACE_WIDTH + sleeve.FACE_WIDTH_BAND + spec.SPIGOT_LENGTH_MAX)
+    )
+    assert spec.FLAT_DRIVE_WIDTH == pytest.approx(width)
+    assert spec.FLAT_DRIVE_WIDTH_MIN == pytest.approx(width_min)
+    assert spec.FLAT_DRIVE_LENGTH_MIN == pytest.approx(length_min)
+    assert spec.FLAT_DRIVE_FACE_AREA_MIN == pytest.approx(width_min * length_min)
+    # The existing named flat-wall floor is unchanged, with the new G7 bore.
+    flat_wall = (
+        sleeve.FLAT_TO_AXIS
+        + sleeve.FLAT_TO_AXIS_BAND[1]
+        - (sleeve.BORE_DIA + sleeve.BORE_DIA_BAND[0]) / 2.0
+    )
+    assert sleeve.FLAT_WALL_WORST == pytest.approx(flat_wall)
+    assert flat_wall >= sleeve.WALL_FLOOR
+
+
 def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     """R9-68: the spigot pilots the disc's bore and seats on the 12T's step.
     Its end and the flange's rear face are square to the bore (datum A) on
@@ -214,16 +267,22 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     assert fit[0] >= 0.0
     callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["SpigotDia"].split())
     assert f"(DIA CLR {fit[0]:.3f}-{fit[1]:.3f} IN" in callout
-    # The seat: the 12T's tooth ends from the bore's edge break to the
-    # smallest tip circle.
+    # The common seat annulus at the actual partial-depth cutter end, with
+    # every printed radial/tip/step/full-depth corner bounded by its owner.
     assert spec.SEAT_CONTACT_R == pytest.approx(
         (sleeve.OUTSIDE_DIA + sleeve.OUTSIDE_DIA_BAND[1]) / 2.0
     )
     assert spec.SEAT_INNER_R == pytest.approx(
         (spec.BORE_DIA + spec.BORE_BAND[0]) / 2.0 + spec.EDGE_BREAK_MAX
     )
-    assert 0.0 < spec.SEAT_CONTACT_AREA < spec.SEAT_ANNULUS_AREA
-    assert spec.SEAT_CONTACT_AREA == pytest.approx(15.545, abs=0.01)
+    lower, upper = spec.SEAT_CONTACT_AREA_BOUNDS
+    assert 0.0 < lower <= upper < spec.SEAT_ANNULUS_AREA
+    assert spec.SEAT_CONTACT_AREA == lower
+    assert len(spec._SEAT_AREA_BOUNDS) == 4 * len(sleeve.manufactured_profiles())
+    assert (lower, upper) == (
+        min(bounds[0] for bounds in spec._SEAT_AREA_BOUNDS),
+        min(bounds[1] for bounds in spec._SEAT_AREA_BOUNDS),
+    )
     # Geometric control: the frames print the spec's values against A.
     assert spec.BORE_DATUM == sleeve.BORE_DATUM == "A"
     assert spec.GEOMETRIC_TOLERANCES_MM == {
@@ -538,9 +597,7 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         spec.FLAT_TO_AXIS + spec.FLAT_TO_AXIS_BAND[0]
     )
 
-    assert hub_wall == pytest.approx(2.0275, abs=0.005)
     assert oil_ligament == pytest.approx(2.68, abs=0.005)
-    assert spigot_wall == pytest.approx(2.037, abs=0.005)
     assert hole_to_rim == pytest.approx(2.02, abs=0.005)
     assert not any("RIM" in line for line in spec.DRAWING_NOTES.splitlines())
     for wall in (
@@ -567,17 +624,18 @@ def test_screw_heads_keep_a_millimetre_of_air_to_the_hub_body() -> None:
     assert spec.HEAD_TO_HUB_WORST == pytest.approx(clearance, abs=1e-9)
 
 
-def test_each_turned_size_is_the_smallest_on_its_step_that_holds_rule_12() -> None:
-    """R9-68: the body, the bolt circle and the flange are each the smallest
-    that holds its wall: 0.1 smaller on any of the three fails (the circle
-    on the disc's tap-to-bore wall around the Ø13.1 spigot), and so does
-    the photograph's own Ø12.4 body, Ø16.4 circle and Ø21 flange."""
+def test_retained_outer_envelope_keeps_wall_driver_air_and_screw_margins() -> None:
+    """The smaller sleeve-matched bore does not resize the R9-68 envelope:
+    the hub body and spigot retain their diameters, while the screw joint's
+    circle and flange retain the original printed worst-case margins."""
     import pd_rack_pinion_spec as disc
 
-    walls, flat = spec.body_walls_worst(spec.HUB_DIA)
-    assert min(walls, flat) >= spec.WALL_FLOOR
-    assert min(spec.body_walls_worst(spec.HUB_DIA - 0.1)) < spec.WALL_FLOOR
-    assert min(spec.body_walls_worst(12.4)) < spec.WALL_FLOOR
+    assert spec.HUB_DIA == pytest.approx(13.2)
+    assert spec.SPIGOT_DIA == pytest.approx(13.1)
+    assert spec.FLANGE_DIA == pytest.approx(25.1)
+    assert joint.BOLT_CIRCLE_DIA == pytest.approx(19.0)
+    round_wall, flat_wall = spec.body_walls_worst(spec.HUB_DIA)
+    assert min(round_wall, flat_wall, spec.SPIGOT_WALL_WORST) >= spec.WALL_FLOOR
     bc = joint.BOLT_CIRCLE_DIA
     assert spec.head_air_worst(bc, spec.HUB_DIA) >= spec.HEAD_AIR_MIN
     assert disc.TAP_TO_BORE_WALL_WORST >= disc.WALL_FLOOR
@@ -593,6 +651,22 @@ def _spec_fresh():
     fresh = importlib.util.module_from_spec(fresh_spec)
     fresh_spec.loader.exec_module(fresh)
     return fresh
+
+
+def test_the_native_bore_follows_the_feed_boss_instead_of_an_old_literal(
+    monkeypatch,
+) -> None:
+    old_boss = spec.SLEEVE.BOSS_DIA
+    monkeypatch.setattr(spec.SLEEVE, "BOSS_DIA", old_boss - 0.1)
+    fresh = _spec_fresh()
+    assert fresh.BORE_DIA == pytest.approx(old_boss - 0.1)
+    assert fresh.BORE_BAND == spec.BORE_BAND
+    assert fresh.FLAT_TO_AXIS == spec.SLEEVE.FLAT_TO_AXIS
+    assert fresh.HUB_DIA == spec.HUB_DIA
+    assert fresh.SPIGOT_DIA == spec.SPIGOT_DIA
+    assert fresh.FLANGE_DIA == spec.FLANGE_DIA
+    assert fresh.HUB_WALL_WORST > spec.HUB_WALL_WORST
+
 
 
 def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:

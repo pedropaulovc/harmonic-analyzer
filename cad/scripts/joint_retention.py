@@ -605,11 +605,11 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "vn_thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
         "fr_top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #8-32 fulcrum-keeper taps (top-level row)
         "pd_transgear_arm",  # MHA-PD-018: 2x #8-32 plate taps through (pd_transgear_arm_spec), receiver; the pin MHA-PD-023 is pressed in a reamed hole
-        "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A196, MHA-VN-040), cut to fit; member: 2 into transgear_arm
+        "vn_transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster91790A199, MHA-VN-040), 1-in stock cut to fit; member:2 into transgear_arm
         "vn_transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-VN-039), cut to fit; member: 3 through the hub flange into rack_pinion
-        "pd_transgear_knob_shaft",  # MHA-PD-008: 1/4-20 UNC die-cut front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-VN-048)
+        "pd_transgear_knob_shaft",  # MHA-PD-008: #8-32 UNC die-cut front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-VN-048)
         "vn_transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 91829A205, MHA-VN-041), member into the support_bar's blind pivot tap
-        "pd_transgear_thumbnut",  # MHA-PD-013 knurled nut, 1/4-20 UNC-2B through; member on the knob shaft's front thread
+        "pd_transgear_thumbnut",  # MHA-PD-013 knurled nut, #8-32 UNC-2B through; member on the knob shaft's front thread
         "mg_wheel_axle",  # stud tip carries the hex nut (thread not modelled / not specified on the axle drawing), receiver of wheel_axle_nut
         "vn_wheel_axle_nut",  # hex nut AF8 x 3 on the O5 stud ("commercial hex nut (thread not modelled)"), member
     }
@@ -684,11 +684,10 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "ch_rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
         "ch_rocker_thrust_washer",  # 1/16 sheet washer, plain bore
         "pd_transgear_arm_plate",  # MHA-PD-019: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
-        "vn_transgear_collar_cross_pin",  # MHA-VN-037 1/16 slotted spring pin through the drive collar slot and shaft core
         "vn_transgear_knob_cup_pin",  # MHA-VN-048 1/16 slotted spring pin through the knob cup and the shaft's journal
         "pd_transgear_disc_hub",  # MHA-PD-017 brass hub: D-bore on the sleeve's D-flat, plain flange clearance holes for the disc screws; trapped between the seat shoulder and the front bushing, no thread
-        "pd_transgear_drive_collar",  # MHA-PD-022: reamed bore, reamed drive-pin holes, rear slot; no thread
-        "pd_transgear_feed_pinion",  # MHA-PD-010 12T DP30 feed sleeve: plain bore on the pin, D-flat keying the hub's D-bore; no thread
+        "pd_transgear_drive_collar",  # MHA-PD-022: matching D-bore on the knob shaft, reamed drive-pin holes; no thread
+        "pd_transgear_feed_pinion",  # MHA-PD-010 shifted 12T 32DP PA20 sleeve: plain bore on the pin, D-flat keying the hub's D-bore; no thread
         "pd_transgear_front_bushing",  # MHA-PD-025 brass bushing faced to fit, reamed bore on the pin; no thread
         "pd_transgear_knob_cup",  # MHA-PD-016: reamed through bore, cross-pinned to the journal at assembly; no thread
         "pd_transgear_knob_thrust_ring",  # MHA-PD-015 loose brass ring, drilled bore; no thread
@@ -716,7 +715,6 @@ UNTHREADED_STOCK: dict[str, str] = {
     "vn_knife_hanger_washer": "plain flat washer",
     "vn_pinion_strap_pin": "slotted spring pin pressed into a plain hole",
     "vn_transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
-    "vn_transgear_collar_cross_pin": "slotted spring pin in a drilled hole",
     "vn_transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",
     "vn_transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "vn_transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
@@ -1795,7 +1793,8 @@ JOINTS: tuple[Joint, ...] = (
             "BLIND TAP WITH LOW-STRENGTH THREADLOCKER; THE ARM FALLS FREELY'); "
             "build_pd_paper_drive_assembly.py 'vn-transgear-pivot-screw' placement; "
             "pd_support_bar_spec.PIVOT_TAP_THREAD; transgear_hanger_joints.SPRING_ROOM_MIN/MAX, "
-            "HANGER_SWING_MARGIN, LATCH_ARM_ANGLE_PLAY and PIVOT_ENGAGEMENT_WORST_D"
+            "LATCH_ARM_ANGLE_PLAY and PIVOT_ENGAGEMENT_WORST_D; free-fall fit is not a "
+            "loaded-engagement proof, which requires the complete source-derived physical qualifier"
         ),
     ),
     Joint(
@@ -1831,7 +1830,7 @@ JOINTS: tuple[Joint, ...] = (
         assembly="pd_paper_drive",
         member="pd_transgear_knob_cup",
         receiver="pd_transgear_knob_shaft",
-        thread="none: Ø8.5 reamed slip fit, cross-pinned (R9-70 replaced the #8-32 screw)",
+        thread="none: Ø6 reamed slip fit, cross-pinned (R9-70 replaced the rear screw)",
         installed_at="knob-stack-fitted",
         exposure=Exposure.ROTATING_DRAG,
         exposure_reason=(
@@ -1890,27 +1889,30 @@ JOINTS: tuple[Joint, ...] = (
         assembly="pd_paper_drive",
         member="pd_transgear_thumbnut",
         receiver="pd_transgear_knob_shaft",
-        thread="1/4-20 UNC",
-        installed_at="fitup-pose-set",
+        thread="#8-32 UNC",
+        installed_at="collar-shoulder-seated",
         exposure=Exposure.OSCILLATING,
         exposure_reason=(
             "the nut seats on the drive collar's pilot, faced 0.05-0.15 proud of the T24's front "
-            "face, so it clamps only the collar to itself and the T24 floats free under its flange "
-            "(R9-70). The drive goes T24 -> the two pressed drive pins -> collar -> the MHA-VN-037 "
-            "cross pin -> shaft, but the free T24 rocks through its pin backlash at each "
-            "reversal and, pushed forward, can rub the flange (machinist review of 6c385465d)"
+            "face, so its axial clamp passes through the collar's rear face onto the shaft's "
+            "actual pinion front face F while the T24 floats free under its flange. The drive "
+            "goes T24 -> the two pressed drive pins -> collar -> D-flat -> shaft; the free T24 "
+            "rocks through its pin backlash at each reversal and, pushed forward, can rub the "
+            "flange (machinist review of 6c385465d)"
         ),
         axial_capture=(
-            "the nut's flange seat face bears on the collar pilot's faced front; 1/4-20 UNC-2B "
-            "through on the shaft's die-cut front thread, finger-tight at fitup-pose-set and "
-            "tightened on the pilot at collar-pinned; the flange spans the T24 bore and retains "
-            "the wheel on the drive pins; removed by hand for gear swaps"
+            "the nut's flange seat face bears on the collar pilot's faced front; #8-32 UNC-2B "
+            "through on the shaft's die-cut front thread. At collar-shoulder-seated the collar's "
+            "fitted rear face bears on actual F and reacts the nut's axial clamp, independently "
+            "of its D-flat torque key; the flange retains the wheel on the drive pins and is "
+            "removed by hand for gear swaps"
         ),
         lock=Lock.NONE,
         exception="U-MHA-PD-013-no-lock",
         evidence=(
-            "draw_pd_paper_drive_assembly._step_text 'pilot-faced-to-fit', 'collar-pinned' ('THUMBNUT "
-            "TIGHT ON THE PILOT') and 'fitup-accepted' (T24 free under the nut); "
+            "draw_pd_paper_drive_assembly._step_text 'pilot-faced-to-fit', "
+            "'collar-rear-faced-to-fit', 'collar-shoulder-seated' and 'fitup-accepted' "
+            "(T24 free under the nut); "
             "build_pd_paper_drive_assembly.py THUMBNUT_Z0 on the pilot and 'transgear-thumbnut "
             "(seated on the collar pilot' placement; transgear_drive_collar_spec PILOT_PROUD_RANGE, "
             "NUT_PILOT_BEARING_WORST and CHAIN_OFFSET_MARGIN"

@@ -17,6 +17,11 @@ cut edges, and the hub and boss thrust faces carry their finish.
 Every kept dimension's text point is a model point (mm) projected through
 its view, so the placement holds whichever way SolidWorks orients the
 section.
+
+The knob bore is the plate origin; screw stations, top corners and notch
+corners come from ``pd_transgear_arm_plate_geometry`` at the current reducer
+centre. The print imports those model dimensions rather than restating a
+historical bore offset.
 """
 
 from __future__ import annotations
@@ -30,12 +35,15 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    PmiDrawingPlacement,
     add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
     create_section_view,
     finalize_drawing,
     model_point_in_view,
+    project_part_pmi,
+    scan_view_edges,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
@@ -43,11 +51,15 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _native_projected_zone import require_saved_projected_gtols
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
 from pd_transgear_arm_plate_geometry import (
+    LOCATOR_SITES_MM,
+    LOCATOR_HOLE_DIA_MM,
     BORE_DIA,
     BOSS_FACE_Z,
+    CSK_DIA,
     EDGE_MINUS_X,
     EDGE_PLUS_X,
     END_R,
@@ -57,12 +69,16 @@ from pd_transgear_arm_plate_geometry import (
     NOTCH_LEFT,
     NOTCH_RIGHT,
     REAR_FACE_Z,
+    SCREW_HOLE_DIA,
     SCREW_HOLES,
     TOP_LEFT,
     TOP_RIGHT,
     arm_upper_edge_y,
 )
 from pd_transgear_arm_plate_spec import (
+    LOCATOR_CALLOUT,
+    GEOMETRIC_CONTROLS,
+    PART_DATUMS,
     BORE_CALLOUT,
     CSK_CALLOUT,
     DRAWING_DIMENSIONS,
@@ -90,12 +106,11 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# The plate is 56 x 32 in plan and 29 deep: at 2:1 the plan, the back view
-# and section A-A stand side by side above the title block (x > 0.216 below
-# y 0.066), the isometric in the upper right.  The section stands far enough
-# right that its hub Ø clears the back view's notch height, and the
-# isometric's caption starts right of the section's over-arm wall and ends
-# inside the border (x 0.419).
+# At 2:1 the geometry-derived plan, back view and section A-A stand side by
+# side above the title block (x > 0.216 below y 0.066), the isometric in the
+# upper right. The section stands far enough right that its hub diameter
+# clears the back view's notch height, and the isometric's caption starts
+# right of the section's over-arm wall and ends inside the border (x 0.419).
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 PLAN_CENTER = (0.080, 0.165)
@@ -103,6 +118,9 @@ BACK_CENTER = (0.206, PLAN_CENTER[1])
 SECTION_CENTER = (0.326, PLAN_CENTER[1])
 ISO_CENTER = (0.390, 0.225)
 ISO_NOTE_XY = (0.353, 0.180)
+REDUCER_POSITION_NOTE_XY = (0.014, 0.048)
+NORMAL_INSPECTION_NOTE_XY = (0.155, 0.112)
+CLAMP_AXIS_INSPECTION_NOTE_XY = (0.155, 0.137)
 
 _TOP = TOP_LEFT[1]  # the plate's highest point (the top edge's -X corner)
 _SECTION_TOP = arm_upper_edge_y(0.0)
@@ -135,11 +153,15 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "BoreDia": (EDGE_MINUS_X - 4.0, _BOTTOM - 6.0, _Z_PLAN),
     "ScrewHoleDia": (EDGE_MINUS_X - 8.0, _TOP + 8.0, _Z_PLAN),
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
+    "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2] + 5.0, _Z_PLAN),
+    "LocatorDia1": (EDGE_MINUS_X - 8.0, _TOP + 15.0, _Z_PLAN),
 }
 # Back view (the mounting face): the notch face's corner heights, outboard.
 BACK_KEEP: dict[str, tuple[float, float, float]] = {
     "NotchLeftY": (EDGE_MINUS_X - 4.0, NOTCH_LEFT[1] / 2.0, FRONT_FACE_Z),
     "NotchRightY": (EDGE_PLUS_X + 4.0, NOTCH_RIGHT[1] / 2.0, FRONT_FACE_Z),
+    "LocatorY1": (EDGE_MINUS_X - 8.0, LOCATOR_SITES_MM[0][1] / 2.0, 0.0),
+    "LocatorY2": (EDGE_PLUS_X + 8.0, LOCATOR_SITES_MM[1][1] / 2.0, 0.0),
 }
 # Section A-A (x = 0): the stations along Z are a baseline from the mounting
 # face (the face that seats on the arm), stacked above the plate nearest
@@ -159,6 +181,7 @@ DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "ScrewHoleDia": SCREW_HOLE_CALLOUT,
     "CskDia": CSK_CALLOUT,
+    "LocatorDia1": LOCATOR_CALLOUT,
 }
 CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
@@ -224,6 +247,9 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Isometric View Note",
+            "Reducer Position Inspection",
+            "Arm Plate Normal Inspection",
+            "Clamp Axis Inspection",
         ),
         required=(
             "Number",
@@ -231,6 +257,9 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Isometric View Note",
+            "Reducer Position Inspection",
+            "Arm Plate Normal Inspection",
+            "Clamp Axis Inspection",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -297,6 +326,78 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
+    # These are the same native feature datums and circular zones authored
+    # on the part, not +/- positions retyped on a drawing. *Front sees +Z:
+    # countersink mouths and locator rims are on RearFace. The drill mouth
+    # on the Front sketch (z = 0) is visible in *Back, not through the cone
+    # in *Front, whose same-radius throat is at RearFace - CSK_DEPTH.
+    plan_edges = scan_view_edges(plan, label="plate rear-face locating PMI")
+    back_edges = scan_view_edges(back, label="plate mounting-face drill PMI")
+    placements = {
+        "datum:A": PmiDrawingPlacement(
+            section, (0.300, 0.246),
+            attachment_xy=_sheet_xy(
+                adapter, section, (0.0, SCREW_HOLES[0][1], 0.0),
+                "plate mounting datum",
+            ),
+        ),
+        "datum:B": PmiDrawingPlacement(
+            plan, (0.037, 0.120),
+            edge_entity=visible_circle_edge(adapter, plan, BORE_DIA),
+        ),
+        "datum:C": PmiDrawingPlacement(
+            plan, (0.128, 0.213),
+            edge_entity=plan_edges.exact_line_through(
+                (EDGE_PLUS_X, (TOP_RIGHT[1] + NOTCH_RIGHT[1]) / 2.0, REAR_FACE_Z),
+                label="plate +X clock edge",
+            ).edge,
+        ),
+        **{
+            f"plate_hole_{index}_position": PmiDrawingPlacement(
+                back, (0.154 + 0.075 * (index - 1), 0.274),
+                edge_entity=back_edges.circle_at(
+                    (x, y, 0.0), SCREW_HOLE_DIA / 2.0,
+                    axis=(0.0, 0.0, 1.0), label=f"plate hole {index} position",
+                ).edge,
+            )
+            for index, (x, y) in enumerate(SCREW_HOLES, 1)
+        },
+        **{
+            f"plate_countersink_{index}_position": PmiDrawingPlacement(
+                plan, (0.015 + 0.076 * (index - 1), 0.274),
+                edge_entity=plan_edges.circle_at(
+                    (x, y, REAR_FACE_Z), CSK_DIA / 2.0,
+                    axis=(0.0, 0.0, 1.0), label=f"plate countersink {index} projected position",
+                ).edge,
+            ) for index, (x, y) in enumerate(SCREW_HOLES, 1)
+        },
+        "knob_projected_axis": PmiDrawingPlacement(
+            plan, (0.080, 0.112),
+            edge_entity=visible_circle_edge(adapter, plan, BORE_DIA),
+        ),
+        **{
+            f"plate_locator_{index}_position": PmiDrawingPlacement(
+                plan, (0.025 + 0.073 * (index - 1), 0.262),
+                edge_entity=plan_edges.circle_at(
+                    (x, y, REAR_FACE_Z), LOCATOR_HOLE_DIA_MM / 2.0,
+                    axis=(0.0, 0.0, 1.0), label=f"plate locator {index} position",
+                ).edge,
+            ) for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1)
+        },
+    }
+    project_part_pmi(
+        adapter, placements=placements, datums=PART_DATUMS,
+        controls=GEOMETRIC_CONTROLS, label="plate actual-bore locating frame",
+    )
+    add_property_linked_note(
+        adapter, "Reducer Position Inspection", *REDUCER_POSITION_NOTE_XY,
+    )
+    add_property_linked_note(
+        adapter, "Arm Plate Normal Inspection", *NORMAL_INSPECTION_NOTE_XY,
+    )
+    add_property_linked_note(
+        adapter, "Clamp Axis Inspection", *CLAMP_AXIS_INSPECTION_NOTE_XY,
+    )
     for view, label in ((plan, "plan"), (back, "back")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME centre marks to the {label} view")
@@ -331,13 +432,18 @@ async def build(adapter: Any) -> dict[str, str]:
         )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
-    return await finalize_drawing(
+    artefacts = await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Arm Plate Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )
+    require_saved_projected_gtols(
+        adapter, artefacts["drawing"], GEOMETRIC_CONTROLS,
+        label="saved transgear arm plate drawing projected axes",
+    )
+    return artefacts
 
 
 def _parse_args() -> argparse.Namespace:

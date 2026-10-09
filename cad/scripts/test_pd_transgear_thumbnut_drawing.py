@@ -52,9 +52,17 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.DIMENSION_CALLOUTS_ABOVE) <= set(drawing.SECTION_KEEP)
 
 
-def test_no_printed_dimension_carries_a_model_band() -> None:
-    """Every size is governed by its places; the thread is the native callout."""
-    assert model_toleranced_dimensions(part) == {}
+def test_actual_entry_cones_carry_model_owned_controls() -> None:
+    assert model_toleranced_dimensions(part) == {
+        ("CountersinkProfile", "CountersinkHalfAngle"): "max(CSK_HALF_ANGLE_BAND)",
+        ("CountersinkProfile", "FrontCountersinkHalfAngle"): "max(CSK_HALF_ANGLE_BAND)",
+    }
+    assert spec.CSK_DIA_TOL_TYPE == 6
+    assert spec.CSK_DIA_PLACES == 3
+    assert spec.DRAWING_DIMENSIONS["CountersinkProfile"] == {
+        "CountersinkDia", "CountersinkHalfAngle",
+    }
+    assert not any(character.isdigit() for character in spec.CSK_QUALIFIER[3:])
 
 
 def _thumbnut_spec_with(monkeypatch, module, name: str, value):
@@ -70,15 +78,14 @@ def _thumbnut_spec_with(monkeypatch, module, name: str, value):
 
 
 def test_walls_over_the_thread_refuse_a_larger_thread(monkeypatch) -> None:
-    # Positive control: the real 1/4-20 major re-executes clean.
+    # Positive control: the actual #8-32 major re-executes clean.
     clean = _thumbnut_spec_with(
         monkeypatch, _hole_spec, "THREAD_MAJOR_MM", dict(_hole_spec.THREAD_MAJOR_MM)
     )
     assert min(worst for _nominal, worst in clean.WALLS.values()) >= clean.WALL_FLOOR
-    # Negative control: a thread 0.2 over the waist's allowance thins the
-    # waist under the 2.0 floor at the printed worst case.
+    # A deliberately oversized thread crosses the waist's legal wall floor.
     majors = dict(_hole_spec.THREAD_MAJOR_MM)
-    majors[spec.THREAD] = spec.THREAD_MAJOR + 0.2
+    majors[spec.THREAD] = 7.0
     with pytest.raises(AssertionError, match="waist"):
         _thumbnut_spec_with(monkeypatch, _hole_spec, "THREAD_MAJOR_MM", majors)
 
@@ -106,19 +113,15 @@ def test_the_seat_face_bears_on_the_collar_pilot(monkeypatch) -> None:
 
 
 def test_countersinks_take_no_more_thread_than_the_engagement_deducts() -> None:
-    """Full thread starts where each countersink's 45° leg meets the tap
-    drill (R9-63), not the major: the printed MAX takes 0.82 at the seat
-    face, not the 0.2 counted to the major, and the front one, cut in the
-    dish floor at its deepest printed depth, 2.62 from the rim.  The
-    engagement stack deducts both."""
-    printed = float(spec.CSK_QUALIFIER.split("\u00d8")[1].split()[0])
-    assert "MAX" in spec.CSK_QUALIFIER.split()
-    rear = (printed - spec.TAP_DRILL_DIA) / 2.0
-    assert rear == pytest.approx(0.8225, abs=1e-3)
-    assert rear <= spec.REAR_THREAD_LOSS + 1e-9
+    """Actual MAX cone and the smallest printed half-angle charge both ends."""
+    assert spec.CSK_DIA == pytest.approx(4.566)
+    rear = (spec.CSK_DIA - spec.TAP_DRILL_DIA) / (
+        2.0 * math.tan(math.radians(spec.CSK_HALF_ANGLE_MIN))
+    )
+    assert rear == pytest.approx(spec.REAR_THREAD_LOSS)
     deepest_floor = spec.DISH_DEPTH + printed_band_mm(spec.DISH_DEPTH_PLACES)
     front = deepest_floor + rear
-    assert front == pytest.approx(2.6225, abs=1e-3)
+    assert front > rear
     assert front <= spec.FRONT_THREAD_LOSS + 1e-9
 
 
@@ -147,7 +150,7 @@ def test_the_dish_ends_on_its_floor_at_every_printed_size() -> None:
         spec.DISH_DIA, spec.DISH_FLOOR_DIA, spec.DISH_DEPTH, spec.CSK_DIA
     ) == pytest.approx(
         {
-            "floor land outside the countersink": 0.725,
+            "floor land outside the countersink": (9.0 - 0.8 - 4.566) / 2.0,
             "cone from the rim to the floor": 2.2,
             "floor below the rim": 0.2,
         }
@@ -188,18 +191,23 @@ def test_the_dish_dimensions_stack_clear_of_each_other_and_the_rim() -> None:
     assert bottom((keep["DishDepth"][0], rim_y)) < rim_y
 
 
-def test_countersink_line_joins_the_native_thread_line() -> None:
-    native = {
-        5: "<MOD-DIAM> <hw-thrutapdrldia> <hw-thru>",
-        6: "",
-        7: "<hw-threaddesc> <hw-threadclass> <hw-thru>",
-        8: "",
-    }
-    rewritten = drawing._thread_callout_definitions(native)
-    assert rewritten[5] == native[5]
-    assert rewritten[7] == f"{native[7]}\n{spec.CSK_QUALIFIER}"
-    with pytest.raises(RuntimeError):
-        drawing._thread_callout_definitions({**native, 5: native[7]})
+def test_thread_callout_is_native_and_is_not_rewritten_for_countersinks(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+
+    class Callout:
+        def __init__(self, text):
+            self.text = text
+
+        def GetText(self, part):
+            assert part in (1, 2, 3, 4)
+            return self.text if part == 3 else ""
+
+    drawing._assert_native_thread(Callout(f"{spec.THREAD} UNC - 2B THRU ALL"))
+    for wrong in ("1/4-20 UNC - 2B THRU ALL", "#8-32 UNC - 2A", "#8-32 THRU"):
+        with pytest.raises(RuntimeError, match="source thread"):
+            drawing._assert_native_thread(Callout(wrong))
+    with pytest.raises(RuntimeError, match="invalid readback"):
+        drawing._assert_native_thread(Callout(None))
 
 
 def test_the_knurl_puts_crests_on_the_section_plane() -> None:
@@ -302,7 +310,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
 
 # Face view, run 20261001T151531763Z, as its layout audit measured them: the
 # thread callout's leader, from its arrow on the tap drill to its knee, and
-# the shoulder of SolidWorks' own "1/4-20 Tapped Hole" note.  The note's drop
+# the shoulder of SolidWorks' own tapped-hole note.  The note's drop
 # to its arrow on the countersink is the 19e33c6c2 audit's (the same note,
 # DetailItem348; the run's audit reported only the shoulder it crossed).
 _THREAD_CALLOUT_LEADER = LeaderSegment(
@@ -338,9 +346,9 @@ def test_the_tapped_hole_note_whose_leader_the_callout_crossed_is_removed() -> N
         "expected_redundant_notes": 1,
     }
     # The removal reaches the note, and the callout itself is no note to lose.
-    note_text = "1/4-20 Tapped Hole".lower()
+    note_text = f"{spec.THREAD} Tapped Hole".lower()
     assert all(s.lower() in note_text for s in removal["redundant_note_substrings"])
-    callout_text = f"1/4-20 UNC - 2B THRU ALL\n{spec.CSK_QUALIFIER}".lower()
+    callout_text = f"{spec.THREAD} UNC - 2B THRU ALL".lower()
     assert not any(
         s.lower() in callout_text for s in removal["redundant_note_substrings"]
     )
@@ -411,15 +419,124 @@ def test_the_stem_diameters_print_across_their_own_cut() -> None:
         assert x > head_right, name
     # The text clears the overall length's dimension line beyond it.
     assert drawing.SECTION_KEEP["OverallLength"][0] - drawing._STEM_TEXT_X > 0.004
-    # Nothing prints below the seat face, where the caption hangs.
+    # All nine turned/dished sizes remain above the seat. The cone diameter
+    # has a left caption lane; the native angle's arc stays at its real cone.
     seat_y = drawing._section_y(0.0)
-    assert all(y >= seat_y for _x, y in drawing.SECTION_KEEP.values())
+    turned = set().union(
+        *(spec.DRAWING_DIMENSIONS[feature] for feature in ("HeadProfile", "StemProfile", "DishProfile"))
+    )
+    assert len(turned) == 9
+    assert all(drawing.SECTION_KEEP[name][1] >= seat_y for name in turned)
+    dia = drawing.SECTION_KEEP["CountersinkDia"]
+    angle_arc = drawing.SECTION_KEEP["CountersinkHalfAngle"]
+    angle_text = drawing.COUNTERSINK_ANGLE_TEXT_XY
+    assert dia[0] < drawing.SECTION_CENTER[0] - drawing.HALF_HEAD - 0.020
+    assert angle_text[0] > head_right + 0.010
+    assert dia[1] == angle_text[1] < seat_y
+    assert dia[1] > SHEET_INNER_LEFT + 0.020
+    # Compact arc anchor just outside the rear cone, not outside the head.
+    cone_right = drawing._section_x(spec.CSK_DIA / 2.0)
+    assert 0.0 < angle_arc[0] - cone_right < 0.003
+    assert 0.0 < seat_y - angle_arc[1] < 0.003
+    apex = (drawing.SECTION_CENTER[0], drawing._section_y(spec.REAR_CSK_APEX_Y))
+    assert math.dist(angle_arc, apex) < 0.015
+    # Negative control: 4e9a4df's sheet-outboard anchor grew a >50 mm arc.
+    old_arc = (head_right + 0.025, seat_y - 0.008)
+    assert math.dist(old_arc, apex) > 0.050
     # The rim's diameters print above the rim, the knurl outermost.
     rim_y = drawing._section_y(spec.OVERALL_LENGTH)
     assert drawing.SECTION_KEEP["HeadDia"][1] > drawing.SECTION_KEEP["DishDia"][1]
     assert drawing.SECTION_KEEP["DishDia"][1] > rim_y
     # Negative control: the 19e33c6c2 stack sat under the seat face.
     assert _section_station(seat_y - 0.014) < 0.0
+
+
+@pytest.mark.parametrize(
+    "offset_persists,arc_moves,text_moves",
+    ((True, True, True), (False, True, True), (True, False, True), (True, True, False)),
+)
+def test_native_cone_angle_offsets_only_text_and_refuses_noops(
+    monkeypatch, offset_persists, arc_moves, text_moves,
+) -> None:
+    """Bounded annotation fake follows the SDK OffsetText movement semantics."""
+    model_dimension = object()
+
+    class Display:
+        def __init__(self):
+            self.offset = True  # A previous offset must not preserve a long arc.
+
+        @property
+        def OffsetText(self):
+            return self.offset
+
+        @OffsetText.setter
+        def OffsetText(self, value):
+            self.offset = bool(value) and offset_persists
+
+    class Annotation:
+        def __init__(self):
+            self.name = "CountersinkHalfAngle"
+            self.dimension = model_dimension
+            self.display = Display()
+            self.arc = (0.271, 0.133)
+            self.text = self.arc
+
+        def GetSpecificAnnotation(self):
+            return self.display
+
+        def SetPosition2(self, x, y, z):
+            assert z == 0.0
+            can_move = text_moves if self.display.OffsetText else arc_moves
+            if can_move:
+                self.text = (x, y)
+                if not self.display.OffsetText:
+                    self.arc = self.text
+            return True  # A successful status alone does not prove a move.
+
+        def GetPosition(self):
+            return (*self.text, 0.0)
+
+    annotation = Annotation()
+    adapter = object()
+    calls = []
+
+    def offset(actual_adapter, annotations, positions):
+        assert actual_adapter is adapter and annotations == [annotation]
+        calls.append(positions)
+        annotation.display.OffsetText = True
+        assert annotation.SetPosition2(*positions[annotation.name], 0.0)
+
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    monkeypatch.setattr(drawing, "offset_dimension_text", offset)
+    if not offset_persists:
+        with pytest.raises(RuntimeError, match="did not stay offset"):
+            drawing._place_countersink_angle(adapter, [annotation])
+    elif not arc_moves:
+        with pytest.raises(RuntimeError, match="angle arc did not persist"):
+            drawing._place_countersink_angle(adapter, [annotation])
+    elif not text_moves:
+        with pytest.raises(RuntimeError, match="angle text did not persist"):
+            drawing._place_countersink_angle(adapter, [annotation])
+    else:
+        drawing._place_countersink_angle(adapter, [annotation])
+        assert annotation.arc == drawing.SECTION_KEEP[annotation.name]
+        assert annotation.text == drawing.COUNTERSINK_ANGLE_TEXT_XY
+        assert annotation.display.OffsetText
+    assert annotation.dimension is model_dimension
+    assert calls == (
+        [{annotation.name: drawing.COUNTERSINK_ANGLE_TEXT_XY}] if arc_moves else []
+    )
+    call = _calls(drawing.__file__)["_place_countersink_angle"]
+    assert [ast.unparse(arg) for arg in call.args] == ["adapter", "section_annotations"]
+
+
+def test_native_cone_angle_requires_exactly_one_model_annotation(monkeypatch) -> None:
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, item: item.name)
+    angle = SimpleNamespace(name="CountersinkHalfAngle")
+    for annotations in ([], [angle, angle]):
+        with pytest.raises(RuntimeError, match="needs one native"):
+            drawing._place_countersink_angle(object(), annotations)
 
 
 def test_the_section_stands_rim_up_or_is_refused() -> None:
@@ -532,11 +649,10 @@ def test_the_outline_must_be_the_nut_on_its_axis() -> None:
 
 
 def test_the_thread_callout_stays_inside_the_left_border() -> None:
-    """Codex on 19e33c6c2: centred 0.050 left of the face view, the
-    countersink line ran off the sheet's left edge."""
+    """The source #8 thread fits; a deliberate border-crossing anchor fails."""
     from _layout_geometry import estimate_text_box
 
-    text = f"1/4-20 UNC - 2B THRU ALL\n{spec.CSK_QUALIFIER}"
+    text = f"{spec.THREAD} UNC - 2B THRU ALL"
 
     def left_edge(anchor: tuple[float, float]) -> float:
         box = estimate_text_box(text, anchor=anchor, height=0.0035, reference=5)
@@ -544,6 +660,60 @@ def test_the_thread_callout_stays_inside_the_left_border() -> None:
         return box.xmin
 
     assert left_edge(drawing.THREAD_CALLOUT_XY) > SHEET_INNER_LEFT + 0.003
-    # Negative control: the 19e33c6c2 anchor.
-    old = (drawing.FACE_CENTER[0] - 0.050, drawing.THREAD_CALLOUT_XY[1])
+    # Negative control: place the centre directly on the border.
+    old = (SHEET_INNER_LEFT, drawing.THREAD_CALLOUT_XY[1])
     assert left_edge(old) < SHEET_INNER_LEFT
+
+
+class _CountersinkTolerance:
+    def __init__(self, *, accepts=True, persists=True):
+        self.Type = 0
+        self.low = self.high = 0.0
+        self.accepts, self.persists = accepts, persists
+
+    def SetValues(self, low: float, high: float) -> bool:
+        if self.persists:
+            self.low, self.high = low, high
+        return self.accepts
+
+    def GetMinValue(self) -> float:
+        return self.low
+
+    def GetMaxValue(self) -> float:
+        return self.high
+
+
+def _apply_countersink_max(monkeypatch, tolerance, *, diameter=None):
+    monkeypatch.setattr(part, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        part, "_named_dimension",
+        lambda *_args: (object(), SimpleNamespace(
+            SystemValue=(spec.CSK_DIA if diameter is None else diameter) / 1000.0,
+            Tolerance=tolerance,
+        )),
+    )
+    part._countersink_max_limit(object(), "CountersinkDia")
+
+
+def test_native_countersink_max_owns_real_diameter_envelope(monkeypatch) -> None:
+    tolerance = _CountersinkTolerance()
+    _apply_countersink_max(monkeypatch, tolerance)
+    assert tolerance.Type == spec.CSK_DIA_TOL_TYPE
+    assert (
+        spec.CSK_DIA + tolerance.low * 1000.0,
+        spec.CSK_DIA + tolerance.high * 1000.0,
+    ) == pytest.approx((spec.THREAD_MAJOR, spec.CSK_DIA))
+
+
+@pytest.mark.parametrize(
+    "tolerance, diameter, message",
+    [(None, None, "missing"),
+     (_CountersinkTolerance(accepts=False), None, "rejected"),
+     (_CountersinkTolerance(persists=False), None, "persist"),
+     (_CountersinkTolerance(), 6.75, "diameter")],
+)
+def test_native_countersink_control_refuses_unwritten_or_obsolete_geometry(
+    monkeypatch, tolerance, diameter, message
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        _apply_countersink_max(monkeypatch, tolerance, diameter=diameter)

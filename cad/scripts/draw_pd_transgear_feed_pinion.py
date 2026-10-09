@@ -1,8 +1,8 @@
 r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-PD-010).
 
 An end view, a longitudinal section B-B and an isometric at 3:1 (the section
-takes B: A names the bore datum).  The end view carries the bore's fit note,
-its finish and datum A; the section carries every turned diameter beside its
+takes B: A names the bore datum). The end view carries the genuine native
+two-tooth span, bore fit note, finish and datum A; the section carries diameters beside their
 axial extent, the D-flat from the axis, the lengths baselined from the rear
 face (rule 7) and the step face (the disc hub's seat) square to the bore, all
 imported natively from the part with the places and bands the part authored
@@ -43,12 +43,14 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
+from paper_drive_stock_drawing import add_toothspace_callout
 from pd_transgear_feed_pinion_spec import (
     BORE_DATUM,
     BORE_DIA,
     BORE_FIT_CALLOUT,
     BORE_PROCESS_CALLOUT,
     BOSS_DIA,
+    DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
@@ -58,7 +60,16 @@ from pd_transgear_feed_pinion_spec import (
     HUB_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
+    PRESSURE_ANGLE_DEG,
+    RADIAL_SETTING,
     SURFACE_FINISHES,
+    TEETH,
+    STOCK_PROFILE,
+    TOOTHSPACE_GAUGE_DIA_MM,
+    TOOTH_SPACE_CALLOUT,
+    TOOTH_SPACE_INSPECTION_ENDS_MM,
+    TOOTH_SPACE_INSPECTION_PHASE_RAD,
+    TOOTH_SPACE_CALLOUT_PROPERTY,
 )
 from pd_transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -117,7 +128,7 @@ def _side_x(z_mm: float) -> float:
 # their spans, so their text stands left of the rear face, clear of every
 # station's extension line; the rows' 8 mm pitch keeps the section caption
 # over the title block.
-FRONT_KEEP: dict[str, tuple[float, float]] = {}
+FRONT_KEEP: dict[str, tuple[float, float]] = {"ToothSpan": (FRONT_CENTER[0], 0.117)}
 _SIDE_TOP = RIGHT_CENTER[1] + HALF_OD
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 _REAR_X = _side_x(0.0)
@@ -136,7 +147,7 @@ def _row(index: int) -> float:
 
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "RootDia": (_REAR_X - 0.030, RIGHT_CENTER[1]),
-    "OutsideDia": (_REAR_X - 0.066, RIGHT_CENTER[1]),
+    "OutsideDia": (_REAR_X - 0.0675, RIGHT_CENTER[1]),
     "BossDia": (_NOSE_X + 0.064, RIGHT_CENTER[1]),
     "FlatToAxis": (_NOSE_X + 0.024, RIGHT_CENTER[1] - _FLAT_SHEET_DROP / 2.0),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
@@ -165,7 +176,17 @@ OIL_HOLE_CALLOUT = (_REAR_X + 0.035, _SIDE_TOP + 0.077)
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
-BORE_FIT_NOTE = (0.016, 0.215)
+# The finite-form data block uses the upper-left lane; the bore-fit note
+# remains within the air above the end view, preserving its leader.
+GEAR_DATA_XY = (0.016, 0.262)
+GEAR_DATA_CHAR_HEIGHT = 0.0025
+BORE_FIT_NOTE = (0.016, 0.193)
+BORE_FIT_CHAR_HEIGHT = 0.0022
+# Separate radial-runout and relative-index controls share one source-linked
+# callout on the real finite tooth flank, not the OD. Its four short rows use
+# the standard 3.5 mm font in the lane above the manufacturing notes.
+TOOTH_SPACE_CALLOUT_XY = (0.016, 0.102)
+TOOTH_SPACE_CALLOUT_CHAR_HEIGHT = 0.0035
 BORE_FIT_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(135.0)),
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(135.0)),
@@ -277,7 +298,7 @@ async def build(adapter: Any) -> dict[str, str]:
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
 
     check("open transgear-feed-pinion source", await adapter.open_model(str(SOURCE)))
-    read_required_properties(
+    source_properties = read_required_properties(
         adapter.currentModel,
         (
             "Number",
@@ -288,6 +309,8 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
+            TOOTH_SPACE_CALLOUT_PROPERTY,
+            "Tooth Cut Features",
         ),
         required=(
             "Number",
@@ -296,8 +319,13 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Gear Data",
             "Manufacturing Notes",
+            TOOTH_SPACE_CALLOUT_PROPERTY,
+            "Tooth Cut Features",
         ),
     )
+    if source_properties[TOOTH_SPACE_CALLOUT_PROPERTY] != TOOTH_SPACE_CALLOUT:
+        raise RuntimeError("source toothspace/index inspection control is stale for configured limits")
+    tooth_features = tuple(source_properties["Tooth Cut Features"].splitlines())
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
     )
@@ -308,7 +336,10 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Transgear Pinion Sleeve Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "transgear pinion sleeve; steel; 12T DP30 pinion, D-flat boss",
+            3: (
+                f"transgear pinion sleeve; steel; {TEETH}T {DIAMETRAL_PITCH:g}DP "
+                f"PA{PRESSURE_ANGLE_DEG:g} finite stock form s={RADIAL_SETTING:.3f} mm; D-flat boss"
+            ),
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -369,7 +400,7 @@ async def build(adapter: Any) -> dict[str, str]:
         attach_xy=BORE_FIT_ATTACH,
         label="sleeve bore fit",
         view=front,
-        height=0.0022,
+        height=BORE_FIT_CHAR_HEIGHT,
     )
     adapter.currentModel.GraphicsRedraw2()
     _assert_note_inside_border(oil_note, "oil hole note")
@@ -410,10 +441,21 @@ async def build(adapter: Any) -> dict[str, str]:
         label="step face perpendicularity",
     )
 
-    add_property_linked_note(adapter, "Gear Data", 0.016, 0.262, char_height=0.0025)
+    add_property_linked_note(
+        adapter, "Gear Data", *GEAR_DATA_XY, char_height=GEAR_DATA_CHAR_HEIGHT
+    )
     add_property_linked_note(
         adapter, "Manufacturing Notes", 0.016, 0.070, char_height=0.0025
     )
+    toothspace_callout = add_toothspace_callout(
+        adapter, front, profile=STOCK_PROFILE,
+        actual_pin_diameter_mm=TOOTHSPACE_GAUGE_DIA_MM,
+        rotate_rad=TOOTH_SPACE_INSPECTION_PHASE_RAD,
+        axial_stations_mm=TOOTH_SPACE_INSPECTION_ENDS_MM,
+        tooth_features=tooth_features,
+        property_name=TOOTH_SPACE_CALLOUT_PROPERTY, note_xy=TOOTH_SPACE_CALLOUT_XY,
+    )
+    _assert_note_inside_border(toothspace_callout, "toothspace inspection callout")
     rebuild_drawing(adapter, label="pinion sleeve layout audit")
     check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(

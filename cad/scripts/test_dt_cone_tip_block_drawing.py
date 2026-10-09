@@ -838,7 +838,7 @@ def test_pinch_screw_is_the_5_8_stainless_fillister() -> None:
     of MHA-VN-018 and Main's ruling (a)."""
     import _config
     from _fastener_catalog import fastener
-    from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+    from vn_fillister_screw_spec import FILLISTER_SIZES
 
     config = _config.parts("vn-cone-tip-pinch-screw")
     assert config["supplier_skus"] == ["91794A112"]

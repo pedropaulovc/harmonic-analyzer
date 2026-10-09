@@ -1,8 +1,8 @@
 r"""Reproduction script: transgear knob thrust ring (MHA-PD-015; ch. 23; 1 used).
 
-The loose brass ring on the knob shaft's journal between the 12T's rear face
-and the arm plate's front hub (``pd_transgear_knob_thrust_ring_spec``): the
-forward stop of the knob's end float.
+The loose brass ring clears the new six-millimetre rear journal between the
+12T's rear face and the arm-plate front hub. Its source-owned length and
+both actual running faces retain the existing opposing axial stack.
 
 Layout: Top-plane annulus at the origin (O.D., bore) extruded +Y by the
 length, so the front face (on the 12T) is the Top Plane (y = 0) and the rear

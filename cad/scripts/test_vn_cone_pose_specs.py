@@ -19,6 +19,8 @@ PURE_SPECS = (
     "vn_swing_stop_screw_spec",
     "vn_cone_tip_adjuster_spec",
     "vn_foot_screw_spec",
+    "vn_fillister_screw_spec",
+    "vn_transgear_latch_pin_spec",
 )
 
 
@@ -44,6 +46,9 @@ def _pure_local_closure(module_name: str) -> set[str]:
     forbidden_roots = {
         "diagnostics",
         "_common",
+        "_visibility",
+        "_telemetry",
+        "_watchdog",
         "_holes",
         "_assembly",
         "_drawing_common",
@@ -63,7 +68,7 @@ def _pure_local_closure(module_name: str) -> set[str]:
         for imported in _imports(_source_tree(current)):
             root = imported.split(".", 1)[0]
             assert root not in forbidden_roots and not root.startswith(
-                ("build_", "diag_")
+                ("build_", "draw_", "diag_")
             ), f"native import in pure closure: {current} -> {imported}"
             local = SCRIPTS / f"{imported.replace('.', '/')}.py"
             if local.is_file():
@@ -99,9 +104,163 @@ def test_pose_vendor_specs_have_no_native_import_closure(module_name: str) -> No
     assert _pure_spec(module_name).__name__ == module_name
 
 
-def test_pure_closure_guard_has_a_real_native_positive_control() -> None:
+@pytest.mark.parametrize(
+    "module_name",
+    (
+        "diagnostics.diag_build_94025A164",
+        "diagnostics.diag_build_90114A511",
+        "diagnostics.diag_mcmaster_fillister",
+        "diagnostics.diag_mcmaster_dowel",
+    ),
+)
+def test_pure_closure_guard_has_a_real_native_positive_control(
+    module_name: str,
+) -> None:
     with pytest.raises(AssertionError, match="native import in pure closure"):
-        _pure_local_closure("diagnostics.diag_build_94025A164")
+        _pure_local_closure(module_name)
+
+
+@pytest.mark.parametrize(
+    ("recipe_name", "authority", "moved", "consumed"),
+    (
+        (
+            "diagnostics.diag_build_90114A511",
+            "vn_fillister_screw_spec",
+            {
+                "BF_MAJOR_R", "BF_LEN", "BF_HH", "BF_HEAD_R",
+                "BF_PITCH", "BF_SLOT_W", "BF_SLOT_D",
+            },
+            {
+                "BF_MAJOR_R", "BF_LEN", "BF_HH", "BF_HEAD_R",
+                "BF_PITCH", "BF_SLOT_W", "BF_SLOT_D",
+            },
+        ),
+        (
+            "diagnostics.diag_mcmaster_fillister",
+            "vn_fillister_screw_spec",
+            {"FILLISTER_SIZES"},
+            {"FILLISTER_SIZES"},
+        ),
+        (
+            "diagnostics.diag_mcmaster_dowel",
+            "vn_transgear_latch_pin_spec",
+            {
+                "MM_PER_IN", "DOWEL_SIZES", "DIA_BAND_IN", "DowelEnds",
+                "_ROUND_X_CHAMFER_1_8", "DOWEL_ENDS", "dowel_volume",
+                "dowel_section",
+            },
+            {"DOWEL_SIZES", "DOWEL_ENDS", "dowel_volume", "dowel_section"},
+        ),
+    ),
+)
+def test_native_catalogue_recipes_are_consumers_not_data_reexports(
+    recipe_name: str, authority: str, moved: set[str], consumed: set[str]
+) -> None:
+    recipe = _source_tree(recipe_name)
+    pure = _source_tree(authority)
+    pure_declarations = set(_top_level_assignments(pure)) | {
+        node.name
+        for node in pure.body
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef))
+    }
+    assert moved <= pure_declarations
+    native_declarations = set(_top_level_assignments(recipe)) | {
+        node.name
+        for node in recipe.body
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef))
+    }
+    assert not moved & native_declarations
+    module_imports = [
+        alias
+        for node in recipe.body
+        if isinstance(node, ast.Import)
+        for alias in node.names
+        if alias.name == authority
+    ]
+    assert len(module_imports) == 1
+    assert module_imports[0].asname is None
+    assert not any(
+        isinstance(node, ast.ImportFrom) and node.module == authority
+        for node in ast.walk(recipe)
+    )
+    qualified_reads = {
+        node.attr
+        for node in ast.walk(recipe)
+        if isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == authority
+    }
+    assert consumed <= qualified_reads
+    assert not any(
+        isinstance(node, ast.Name) and node.id in moved
+        for node in ast.walk(recipe)
+    )
+
+
+def test_fillister_catalogue_move_preserves_every_supplier_row_and_brass_scalar() -> None:
+    spec = _pure_spec("vn_fillister_screw_spec")
+    expected = {
+        "90280A108": (2.8448, 9.525, 2.7178, 4.6482, 0.635),
+        "90280A194": (4.1656, 12.7, 3.9624, 6.858, 0.79375),
+        "90280A197": (4.1656, 19.05, 3.9624, 6.858, 0.79375),
+        "90280A199": (4.1656, 25.4, 3.9624, 6.858, 0.79375),
+        "90280A201": (4.1656, 31.75, 3.9624, 6.858, 0.79375),
+        "90280A203": (4.1656, 38.1, 3.9624, 6.858, 0.79375),
+        "90280A837": (4.826, 44.45, 4.572, 7.9502, 0.79375),
+        "91794A112": (2.8448, 15.875, 2.7178, 4.6482, 0.635),
+        "91794A077": (2.1844, 6.35, 2.1082, 3.556, 25.4 / 56.0),
+        "91794A055": (1.524, 6.35, 1.397, 2.4384, 25.4 / 80.0),
+        "40923906": (
+            6.35, 4.0 * 25.4, 0.237 * 25.4, 0.414 * 25.4, 25.4 / 20.0
+        ),
+    }
+    assert type(spec.FILLISTER_SIZES) is dict
+    assert spec.FILLISTER_SIZES == expected
+    assert all(
+        type(row) is tuple and all(type(value) is float for value in row)
+        for row in spec.FILLISTER_SIZES.values()
+    )
+    for name, value in {
+        "BF_MAJOR_R": 2.8448 / 2.0,
+        "BF_LEN": 6.35,
+        "BF_HH": 2.7178,
+        "BF_HEAD_R": 4.6482 / 2.0,
+        "BF_PITCH": 0.635,
+        "BF_SLOT_W": 0.9906,
+        "BF_SLOT_D": 1.2192,
+    }.items():
+        assert type(getattr(spec, name)) is float
+        assert getattr(spec, name) == value
+
+
+def test_dowel_catalogue_move_preserves_nominals_band_and_harvested_end_forms() -> None:
+    spec = _pure_spec("vn_transgear_latch_pin_spec")
+    assert type(spec.DOWEL_SIZES) is dict
+    assert spec.DOWEL_SIZES == {
+        "98381A433": (3.0 / 32.0 * 25.4, 3.0 / 16.0 * 25.4),
+        "98381A434": (3.0 / 32.0 * 25.4, 0.25 * 25.4),
+        "98381A473": (0.125 * 25.4, 0.75 * 25.4),
+        "98381A474": (0.125 * 25.4, 0.875 * 25.4),
+        "93600A189": (2.0, 6.0),
+    }
+    assert all(
+        type(row) is tuple and all(type(value) is float for value in row)
+        for row in spec.DOWEL_SIZES.values()
+    )
+    assert type(spec.DIA_BAND_IN) is tuple
+    assert spec.DIA_BAND_IN == (0.0001, 0.0003)
+    assert type(spec.MM_PER_IN) is float
+    assert spec.MM_PER_IN == 25.4
+    assert type(spec.DOWEL_ENDS) is dict
+    assert set(spec.DOWEL_ENDS) == {"98381A473", "98381A474"}
+    ends = spec.DOWEL_ENDS["98381A473"]
+    assert type(ends) is spec.DowelEnds
+    assert spec.DowelEnds.__dataclass_params__.frozen
+    assert ends is spec.DOWEL_ENDS["98381A474"]
+    assert ends.point_dia == 0.115 * 25.4
+    assert ends.chamfer_deg == 16.0
+    assert ends.crown_r == 0.016 * 25.4
+
 
 
 @pytest.mark.parametrize(
@@ -203,10 +362,11 @@ def test_same_sku_fillister_row_has_one_pure_authority() -> None:
     }.items():
         assert getattr(stop, name) == pytest.approx(expected, rel=0.0, abs=1e-12)
     assert len(stop.FILLISTER_SIZE) == 5
+    catalogue = _source_tree("vn_fillister_screw_spec")
     recipe = _source_tree("diagnostics.diag_mcmaster_fillister")
     row_imports = [
         alias
-        for node in recipe.body
+        for node in catalogue.body
         if isinstance(node, ast.ImportFrom)
         and node.module == "vn_swing_stop_screw_spec"
         for alias in node.names
@@ -214,7 +374,7 @@ def test_same_sku_fillister_row_has_one_pure_authority() -> None:
     ]
     assert len(row_imports) == 1
     row_name = row_imports[0].asname or row_imports[0].name
-    table = _top_level_assignments(recipe)["FILLISTER_SIZES"]
+    table = _top_level_assignments(catalogue)["FILLISTER_SIZES"]
     assert isinstance(table, ast.Dict)
     matching_rows = [
         value
@@ -224,6 +384,17 @@ def test_same_sku_fillister_row_has_one_pure_authority() -> None:
     assert len(matching_rows) == 1
     assert isinstance(matching_rows[0], ast.Name)
     assert matching_rows[0].id == row_name
+    fillister = _pure_spec("vn_fillister_screw_spec")
+    assert fillister.FILLISTER_SIZES["90280A108"] is stop.FILLISTER_SIZE
+    assert "vn_fillister_screw_spec" in _imports(recipe)
+    assert "FILLISTER_SIZES" not in _top_level_assignments(recipe)
+    assert any(
+        isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "vn_fillister_screw_spec"
+        and node.attr == "FILLISTER_SIZES"
+        for node in ast.walk(recipe)
+    )
     # Both same-SKU consumers read the row, not the native table or a copy.
     for consumer in ("vn_foot_screw_spec", "vn_latch_hook_bracket_screw_spec"):
         tree = _source_tree(consumer)

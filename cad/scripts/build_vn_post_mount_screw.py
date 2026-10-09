@@ -60,7 +60,7 @@ from _fastener_catalog import fastener
 from _fit_limits import deviations
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
 from diagnostics.diag_build_40923906 import build_40923906
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from vn_fillister_screw_spec import FILLISTER_SIZES
 from diagnostics.diag_mcmaster_lib import no_sketch_inference
 from vn_post_mount_screw_spec import (
     CUT_END_BREAK_BAND,

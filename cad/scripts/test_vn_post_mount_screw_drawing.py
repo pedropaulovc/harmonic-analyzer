@@ -20,7 +20,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
 from _stock_fastener import STOCK_RECIPES
 from diagnostics import diag_build_40923906 as recipe
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from vn_fillister_screw_spec import FILLISTER_SIZES
 
 IN = 25.4
 # Screw head seated on the counterbore floor: its under-head face is this far

@@ -149,9 +149,13 @@ def test_fit_up_adjustments_are_complete_and_ordered_before_installation() -> No
         < seq.index("disc-screws-cut")
         < seq.index("disc-cluster-hung")
     )
-    printed = "\n".join(
-        (drawing.PLATEN_STEPS, *drawing.FITUP_NOTES, *drawing.CHAIN_NOTES)
+    # Only ordering/facing prose is under test; this is not a release window.
+    from types import SimpleNamespace
+
+    text = drawing._step_text(
+        operating_domain=SimpleNamespace(operating_window_text="UNIT NOTE WINDOW ONLY")
     )
+    printed = drawing._step_column("", steps.SEQUENCE, text)
 
     def printed_step(key: str) -> str:
         match = re.search(

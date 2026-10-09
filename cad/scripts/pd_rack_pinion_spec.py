@@ -1,8 +1,8 @@
 r"""MHA-PD-006 rack-pinion: the 120T brass reducer disc of the translational gearing.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The disc is
-driven 12:120 by the knob shaft's 12T DP38 and screwed to the brass hub's
-flange (MHA-PD-017, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
+driven 12:120 by the knob shaft's finite #8/reference-12 PA20 48DP form and
+screwed to the brass hub's flange (MHA-PD-017, ``pd_transgear_disc_hub_spec``) by three #0-80 fillister
 screws (MHA-VN-039, McMaster 91794A055; the joint is
 ``pd_transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
 Ø13.1 h6 spigot, which passes it and seats on the pinion sleeve's (MHA-PD-010)
@@ -26,12 +26,21 @@ bolt-circle position.
 
 from __future__ import annotations
 
+import math
+
 from _fit_limits import deviations
+from _gear_quality import (
+    pinion_pitch_index_deviation_mm,
+    pitch_index_measurement_uncertainty_mm,
+    require_pitch_index_measurements_mm,
+    toothspace_runout_tir_mm,
+)
 from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
+from vn_fillister_screw_spec import FILLISTER_SIZES
+from paper_drive_stock_inspection import GaugeContact, toothspace_gauge_contact_mm
 from pd_transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
     BOLT_CIRCLE_POSITION_TOL,
@@ -43,27 +52,214 @@ from pd_transgear_disc_hub_geometry import (
     SPIGOT_DIA_BAND,
     screw_centres,
 )
+from stock_form_cutter import (
+    CutterTemplate,
+    StockFormProfile,
+    translation_for_tangent_span,
+)
 
 MM_PER_IN = 25.4
 
 # --- gear ----------------------------------------------------------------------
 TEETH = 120
-DIAMETRAL_PITCH = 38.0  # disc OD ~82 at 120T (build_pd_rack_pinion.py)
-PRESSURE_ANGLE_DEG = 14.5
-MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
-PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-OUTSIDE_DIA = (TEETH + 2) / DIAMETRAL_PITCH * MM_PER_IN
-WHOLE_DEPTH = 2.157 / DIAMETRAL_PITCH * MM_PER_IN
-
-# The permanent mesh with the knob shaft's 12T DP38: the standard centre
-# distance plus the contract's 0.65 extension (backlash), unchanged.
-MESH_PINION_TEETH = 12
-CENTRE_DISTANCE = 44.766
-CENTRE_EXTENSION = CENTRE_DISTANCE - (
-    (TEETH + MESH_PINION_TEETH) / (2.0 * DIAMETRAL_PITCH) * MM_PER_IN
+DIAMETRAL_PITCH = 48.0
+PRESSURE_ANGLE_DEG = 20.0
+CUTTER_REFERENCE_TEETH = 55
+CUTTER_TEMPLATE = CutterTemplate(
+    CUTTER_REFERENCE_TEETH, DIAMETRAL_PITCH, PRESSURE_ANGLE_DEG
 )
-if not 0.6 < CENTRE_EXTENSION < 0.7:
-    raise AssertionError(f"12:120 centre extension moved: {CENTRE_EXTENSION:.3f}")
+CUTTER_NUMBER = CUTTER_TEMPLATE.cutter_number
+CUTTER_TOOTH_RANGE = CUTTER_TEMPLATE.teeth_range
+MODULE_MM = CUTTER_TEMPLATE.module_mm
+PITCH_DIA = TEETH * MODULE_MM
+# These are the declared finite master's ground-root/tip premises, not a
+# vendor certification of a 2.25m ground whole depth or generated actual-N form.
+ADDENDUM_FACTOR = 1.0
+DEDENDUM_FACTOR = 1.25
+GROUND_WHOLE_DEPTH_PREMISE_MM = 2.25 * MODULE_MM
+RADIAL_SETTING = 17.210  # axis-total rigid tool translation, NOT profile shift x
+_SPAN_DESIGN_SETTING_BAND = (0.010, -0.010)
+SPAN_TEETH = 13  # physical indexed teeth, never the cutter's reference count
+SPAN_PLACES = 4
+OUTSIDE_DIA_BAND = (0.0, -0.10)  # (upper, lower), finite-supported blank
+_SUPPORT_PROFILE = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, RADIAL_SETTING
+)
+SPAN_NOMINAL = _SUPPORT_PROFILE.tangent_span_mm(SPAN_TEETH)
+_SPAN_DESIGN_PROFILES = tuple(
+    StockFormProfile(
+        TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, RADIAL_SETTING + setting
+    )
+    for setting in _SPAN_DESIGN_SETTING_BAND
+)
+_SPAN_GEOMETRY_ERROR = max(
+    StockFormProfile(
+        TEETH, CUTTER_TEMPLATE, profile.support_radius_max_mm,
+        profile.radial_translation_mm,
+    ).geometry_error_bound_mm
+    for profile in _SPAN_DESIGN_PROFILES
+)
+_SPAN_CORNERS = tuple(
+    (
+        profile.tangent_span_mm(SPAN_TEETH) - 2.0 * _SPAN_GEOMETRY_ERROR,
+        profile.tangent_span_mm(SPAN_TEETH) + 2.0 * _SPAN_GEOMETRY_ERROR,
+    )
+    for profile in _SPAN_DESIGN_PROFILES
+)
+SPAN_LIMITS = (
+    math.floor(min(row[0] for row in _SPAN_CORNERS) * 10**SPAN_PLACES)
+    / 10**SPAN_PLACES,
+    math.ceil(max(row[1] for row in _SPAN_CORNERS) * 10**SPAN_PLACES)
+    / 10**SPAN_PLACES,
+)
+SPAN_BAND = (SPAN_LIMITS[1] - SPAN_NOMINAL, SPAN_LIMITS[0] - SPAN_NOMINAL)
+SPAN_DEVIATIONS = deviations(SPAN_BAND)
+SPAN_TOL_TYPE = 3  # swTolType_e.swTolLIMIT
+SPAN_PREFIX = f"SPAN {SPAN_TEETH} TEETH "
+SPAN_ORIENTATION = "NORMAL TO SPANNED-TOOTH BISECTOR; MAXIMUM READING."
+_SPAN_SENSITIVITY = 2.0 * math.sin(math.pi * SPAN_TEETH / TEETH)
+_SPAN_ROUNDING_ALLOWANCE = (
+    10**-SPAN_PLACES + 4.0 * _SPAN_GEOMETRY_ERROR
+) / _SPAN_SENSITIVITY
+_SPAN_INVERSE_BOUNDS = (
+    RADIAL_SETTING + _SPAN_DESIGN_SETTING_BAND[1] - _SPAN_ROUNDING_ALLOWANCE,
+    RADIAL_SETTING + _SPAN_DESIGN_SETTING_BAND[0] + _SPAN_ROUNDING_ALLOWANCE,
+)
+# Every consumer spends these ACTUAL printed-span-inverted limits. The
+# nominal +/- .010 tool setup is only the design input, not the accepted band.
+RADIAL_SETTING_LIMITS = tuple(
+    translation_for_tangent_span(
+        TEETH,
+        CUTTER_TEMPLATE,
+        limit + sign * 2.0 * _SPAN_GEOMETRY_ERROR,
+        SPAN_TEETH,
+        translation_bounds_mm=_SPAN_INVERSE_BOUNDS,
+    )
+    for limit, sign in zip(SPAN_LIMITS, (-1.0, 1.0), strict=True)
+)
+RADIAL_SETTING_BAND = (
+    RADIAL_SETTING_LIMITS[1] - RADIAL_SETTING,
+    RADIAL_SETTING_LIMITS[0] - RADIAL_SETTING,
+)
+_MIN_SETTING_SUPPORT = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, PITCH_DIA / 2.0, RADIAL_SETTING_LIMITS[0]
+)
+SUPPORT_OUTSIDE_DIA_MM = 2.0 * _MIN_SETTING_SUPPORT.support_radius_max_mm
+# The finite translated tip VECTOR, not T + the reference tip radius, caps
+# the blank. Floor after paying numerical error at the lowest accepted T.
+OUTSIDE_DIA = math.floor(
+    (
+        SUPPORT_OUTSIDE_DIA_MM
+        - 2.0 * _MIN_SETTING_SUPPORT.geometry_error_bound_mm
+        - OUTSIDE_DIA_BAND[0]
+    )
+    * 100.0
+) / 100.0
+STOCK_PROFILE = StockFormProfile(
+    TEETH, CUTTER_TEMPLATE, OUTSIDE_DIA / 2.0, RADIAL_SETTING
+)
+
+
+def manufactured_profiles() -> tuple[StockFormProfile, ...]:
+    """The printed span family crossed with the supported blank limits."""
+    return tuple(
+        StockFormProfile(TEETH, CUTTER_TEMPLATE, (OUTSIDE_DIA + tip) / 2.0, setting)
+        for setting in RADIAL_SETTING_LIMITS
+        for tip in OUTSIDE_DIA_BAND
+    )
+
+
+_PROFILE_CORNERS = manufactured_profiles()
+TOOTH_THICKNESS = STOCK_PROFILE.pitch_tooth_thickness_mm
+ROOT_DIA = 2.0 * STOCK_PROFILE.root_radius_min_mm
+ROOT_ENVELOPE_DIA_MM = (
+    2.0 * STOCK_PROFILE.root_radius_min_mm,
+    2.0 * STOCK_PROFILE.root_radius_max_mm,
+)
+ROOT_DIA_PLACES = 3
+ROOT_DIA_MIN = min(2.0 * profile.root_radius_min_mm for profile in _PROFILE_CORNERS)
+ROOT_DEPTH_X_MIN = min(
+    profile.root_point(profile.root_half_angle_rad)[0]
+    for profile in _PROFILE_CORNERS
+)
+WHOLE_DEPTH = STOCK_PROFILE.plunge_mm
+TIP_LAND_MIN = min(profile.tip_land_mm for profile in _PROFILE_CORNERS)
+FINITE_GROUND_TIP_AIR_MIN = min(
+    profile.support_radius_max_mm - profile.blank_radius_mm
+    for profile in _PROFILE_CORNERS
+)
+for _profile in _PROFILE_CORNERS:
+    _profile.require_tip_land(0.25 * MODULE_MM)
+    _profile.tangent_span_mm(SPAN_TEETH)  # actual blank-clipped finite contacts
+    if (
+        _profile.support_radius_max_mm - _profile.blank_radius_mm
+        <= _profile.geometry_error_bound_mm
+    ):
+        raise AssertionError("finite #2 ground tip/closure reaches the accepted blank")
+
+
+# One certified pin, re-seated in every physical space, measures pattern
+# eccentricity on a radial indicator. A freely translated span cannot do so.
+TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.0  # nominal; use the actual certified diameter
+TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()  # assembled cluster, inclusive of pilot float
+# Relative index is separate from span thickness and radial TIR. Convert the
+# actual-pin/contact-corrected angular observations at this pitch-reference
+# radius, not the measuring pin's centre radius.
+PITCH_INDEX_REFERENCE_RADIUS_MM = PITCH_DIA / 2.0
+PITCH_INDEX_DEVIATION_MM = pinion_pitch_index_deviation_mm()
+PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM = pitch_index_measurement_uncertainty_mm()
+PITCH_INDEX_STATIONS = tuple(range(TEETH + 1))  # station TEETH is the full wrap
+
+
+def tooth_space_gauge_contacts(actual_pin_dia_mm: float) -> tuple[GaugeContact, ...]:
+    """Qualify actual certified pin contact over every accepted finite corner."""
+    return tuple(
+        toothspace_gauge_contact_mm(profile, actual_pin_dia_mm)
+        for profile in manufactured_profiles()
+    )
+
+
+def require_pitch_index_errors_mm(measured_index_errors_mm: dict[int, float]) -> float:
+    """Receive every calibrated assembled running-bore index, including wrap.
+
+    At station i the error is R_ref * (observed_angle_i - datum_angle -
+    2*pi*i/TEETH). Angles are unwrapped and actual-pin/contact corrected about
+    the assembled feed running bore A against one physical index datum; a
+    floating best-fit tooth axis must not remove eccentricity. Relative
+    index does not replace radial TIR, span thickness or absolute drive clock.
+    The returned range pays both stations' calibration uncertainty.
+    """
+    return require_pitch_index_measurements_mm(
+        measured_index_errors_mm=measured_index_errors_mm,
+        required_stations=PITCH_INDEX_STATIONS,
+        relative_deviation_limit_mm=PITCH_INDEX_DEVIATION_MM,
+        absolute_measurement_uncertainty_mm=PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM,
+    )
+
+
+_GAUGE_CORNERS = tooth_space_gauge_contacts(TOOTH_SPACE_GAUGE_PIN_DIA_MM)
+TOOTH_SPACE_GAUGE_ROOT_AIR_MIN_MM = min(contact.root_air_mm for contact in _GAUGE_CORNERS)
+TOOTH_SPACE_GAUGE_TIP_AIR_MIN_MM = min(contact.tip_air_mm for contact in _GAUGE_CORNERS)
+
+
+# The physical reducer's assembled axis datum, set from the closed-form
+# checks in paper_drive_mesh_check.reducer_mesh over the printed bands:
+# knob-pinion and disc tooth thickness at the pitch circle (the
+# manufactured_profiles corners) and both tooth-space runouts of 0.005 TIR,
+# which together move the working centre by (0.005 + 0.005)/2 = 0.005.
+# The usable window is 35.052..35.105 mm:
+#   - below 35.052 the largest disc tip reaches past the knob pinion's
+#     interference point (its base-circle tangency) at the tight extreme;
+#   - above 35.105 the contact ratio at the minimum tips (7.38 and 64.44 OD)
+#     falls below 1.2.
+# Backlash stays positive from 34.964 up. 35.080 sits mid-window and gives
+# CR 1.245, backlash 0.087..0.120, root clearance 0.264 (AGMA fine-pitch
+# floor 0.157) and an interference margin of 0.080 mm.
+MESH_PINION_TEETH = 12
+MESH_ANGLE_DEG = -168.0
+CENTRE_DISTANCE = 35.080
+STANDARD_CENTRE_DISTANCE = (TEETH + MESH_PINION_TEETH) * MODULE_MM / 2.0
+CENTRE_EXTENSION = CENTRE_DISTANCE - STANDARD_CENTRE_DISTANCE
 
 # --- disc body -----------------------------------------------------------------
 FACE_WIDTH = 3.0
@@ -189,15 +385,22 @@ BORE_FIT_CALLOUT = "\n".join(
 
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 
-# Marked model dimensions and the places the model authors on them (policy
-# rule 2): the disc thickness (the gear blank's extrude depth) and the bore.
+# Marked native model dimensions: the disc thickness, finite blank, bore
+# and controlling actual-flank span. Root-envelope data are axis references;
+# neither OD touch-off nor free span variation certifies tooth-space runout.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
+    "GearBlankProfile": {"OutsideDia"},
     "BoreProfile": {"BoreDia"},
+    "SpanProfile": {"ToothSpan"},
+    "RootInspectionProfile": {"RootEnvelope"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
+    "GearBlankProfile": {"OutsideDia": 2},
     "BoreProfile": {"BoreDia": BORE_PLACES},
+    "SpanProfile": {"ToothSpan": SPAN_PLACES},
+    "RootInspectionProfile": {"RootEnvelope": ROOT_DIA_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -217,12 +420,26 @@ GEAR_DATA = gear_data_note(
     [
         ("NUMBER OF TEETH", f"{TEETH}"),
         ("DIAMETRAL PITCH", f"{DIAMETRAL_PITCH:.2f}"),
-        ("MODULE (mm, REF)", f"{MODULE_MM:.3f}"),
         ("PRESSURE ANGLE", f"{PRESSURE_ANGLE_DEG:.1f} DEG"),
+        (
+            "CUTTER TEMPLATE",
+            f"#{CUTTER_NUMBER}, {CUTTER_TOOTH_RANGE[0]}-{CUTTER_TOOTH_RANGE[1]}T; "
+            f"{CUTTER_REFERENCE_TEETH}T MASTER",
+        ),
         ("PITCH DIAMETER (mm, REF)", f"{PITCH_DIA:.2f}"),
-        ("OUTSIDE DIAMETER (mm)", f"{OUTSIDE_DIA:.2f} +0/-0.10"),
-        ("WHOLE DEPTH (mm)", f"{WHOLE_DEPTH:.2f} REF"),
-        ("TOOTH FORM", "INVOLUTE, FULL DEPTH"),
+        ("TOTAL TOOL TRANSLATION T (mm, REF)", f"{RADIAL_SETTING:.3f}"),
+        ("THICKNESS INSPECTION", f"NATIVE SPAN OVER {SPAN_TEETH} TEETH"),
+        ("CIRCULAR THICKNESS AT PD (mm, REF)", f"{TOOTH_THICKNESS:.3f}"),
+        (
+            "AXIS ROOT ENVELOPE DIA (mm, REF)",
+            f"{ROOT_ENVELOPE_DIA_MM[0]:.3f}-{ROOT_ENVELOPE_DIA_MM[1]:.3f}",
+        ),
+        ("TOOTH FORM", "FINITE TRANSLATED STOCK FORM, NOT x"),
+        ("GROUND ROOT PREMISE", f"{DEDENDUM_FACTOR:g}m; RADIAL BELOW BASE"),
+        ("GROUND DEPTH PREMISE (mm, REF)", f"{GROUND_WHOLE_DEPTH_PREMISE_MM:.3f} (2.25m)"),
+        ("TOOTH-SPACE QUALITY CLASS", "CRITICAL; ASSEMBLED RUNNING-BORE DATUM"),
+        ("INSPECTION PIN (mm)", f"{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f}; ACTUAL CERTIFIED DIA"),
+        ("TOOTH-SPACE INDICATION", f"EACH OF ALL {TEETH} SPACES; FIXED RADIAL STATION"),
     ]
 )
 
@@ -230,8 +447,20 @@ GEAR_DATA = gear_data_note(
 # screw's engagement line (vn_transgear_disc_screw_spec imports this module).
 DRAWING_NOTES = "\n".join(
     (
-        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX TO DATUM A AT THE TOOTH TIPS.",
+        SPAN_ORIENTATION,
+        "SPAN/ROOT: AXIS, NOT OD. GROUND DEPTH NOT VENDOR-CERTIFIED.",
         BORE_FRONT_CHAMFER_NOTE,
+    )
+)
+
+TOOTH_SPACE_CALLOUT_PROPERTY = "Tooth Space Inspection"
+TOOTH_SPACE_CALLOUT = "\n".join(
+    (
+        f"TOOTH SPACE RADIAL INDICATOR TIR {TOOTH_SPACE_RUNOUT_TIR_MM:.3f} "
+        "MAX TO FEED BORE A (ASSY)",
+        f"PITCH INDEX RANGE+2U {PITCH_INDEX_DEVIATION_MM} mm MAX AT REF Ø{PITCH_DIA:.3f}",
+        f"ALL SPACES + WRAP; ABS POSITION U {PITCH_INDEX_MEASUREMENT_UNCERTAINTY_MM} mm MAX",
+        f"CERTIFIED PIN Ø{TOOTH_SPACE_GAUGE_PIN_DIA_MM:.3f} mm; ALL {TEETH} SPACES",
     )
 )
 
@@ -239,7 +468,8 @@ DRAWING_NOTES = "\n".join(
 # Manufacturing GD&T limits consumed by the part's drawing projection.  The
 # hub's flange clamps the front face (datum B), so the rear face, toward the
 # platen, is held parallel to it (the paper-drive assembly's platen air reads
-# it); the bore (datum A) carries the tooth-tip runout note.
+# it). Tooth-space runout is controlled on the assembled cluster's actual
+# running bore, NOT on this disc's separate 13.1 pilot datum A.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
     "disc rear face parallelism to front": "0.05",
 }

@@ -1537,11 +1537,11 @@ sections:
         - 'p.55 top edge-on photo read ~4; thinned to 3.85 (R9-68) with the back face held on the bar front, opening the disc-to-platen air 0.15; four Ø7 × 0.65 clip-screw bosses on the back face'
         - scaled
         - low
-      - - Rack bar (rework E3)
-        - '269.64 × 12 × 6, brass, teeth-down at the platen''s bottom edge, crests protruding 2 below it (band y 271.234..283.234, z −138.9..−132.9)'
+      - - Rack and backer (current model)
+        - 'Purchased SDP/SI A1B12-Y324 brass rack stock, 32DP PA20, 48 in long, 3/16 in square (4.7625 × 4.7625), cut to 269.64 and centred across the existing 269.64 × 7.2375 × 6 brass backer; fabricated MHA-PD-005 compound envelope 269.64 × 12 × 6 retained. Teeth-down crests at nominal y 270.6996859 and backer top at 282.6996859; backer band z −138.9..−132.9, tooth strip z −138.28125..−133.51875. Rack is soft-soldered to the backer, which is soldered to the platen. Stock end-tooth phase is uncontrolled; set mesh at assembly, not by cutting or indexing teeth.'
         - —
-        - 'ch22 back-side photo (the exposed rack band below the bottom guide rail is ~10-12 tall, not 30); teeth cut at DP 30 / PA 14.5° (ch. 23 measurement), 101 gaps at p = 2.660 mm — `build_pd_platen_rack.py`'
-        - scaled
+        - 'Purchased stock: [SDP/SI A1B12-Y324](https://shop.sdp-si.com/a-1b12-y324.html) and [D820 Gears catalog](https://sdp-si.com/D820/PDFS/Gears.pdf), p. 1-193 (Y = PA20; face width and thickness = 3/16 in; 4 ft brass stock). Commercial rack with no published pitch-accuracy grade; no inventory or quality-certification claim. Nominal CAD tooth representation: 108 gaps at p = 2.493639169 mm; FIRST_GAP_X = 1.246819584 is a nominal CAD phase only, not a stock end-tooth or manufacturing control. Historical ch22 back-side photo: exposed band ~10–12 tall, not 30; preceding DP30 / PA14.5 model used 101 gaps at p ≈ 2.660 mm and is not the current tooth specification.'
+        - catalog + modeled + historical scaling
         - low
       - - Support bar + two-piece clamps (rework E1/E2)
         - 'ONE bar 452 × 22 tall × 9 deep (ends x ±226, ~29 past each column), front face −138.9 on the platen back, centre y 306.734; clamped to each Ø25.4 column by a FRONT semi-arc (17.9 deep, bar back → column axis) + BACK semi-arc (14 deep), both 48 wide × 16 tall, black, closed by 2 × Ø3.9 × 28 slotted screws whose heads sit on the bar''s front face flanking the column (x ±197 ∓ 17.5)'
@@ -1550,7 +1550,7 @@ sections:
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.9178 counterbores (stock 2.7178 heads 0.2 sub-flush so the paper lies flat) with the 6.35 shanks passing the 0.9322 web left in the 3.85 plate and threading 5.4178 into #4-40 through taps on the rail fronts (R9-64; tips 3.5022 inside the shallowest seat); 4 black lock plates 22 × 15.65 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 #4-40 × 3/8 button-head socket cap screws `vn-guide-lock-screw` each — MHA-VN-046, McMaster 91255A108 into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), lapping 1.0 past each rail''s outer edge (R9-59), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 2.65 (R9-61), the top pair hangs 9.65 over it — so the platen cannot fall off without colliding with the east column clamp'
+        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.7001..+209.0119 step 53.928), seated in Ø6.5 × 2.9178 counterbores (stock 2.7178 heads 0.2 sub-flush so the paper lies flat) with the 6.35 shanks passing the 0.9322 web left in the 3.85 plate and threading 5.4178 into #4-40 through taps on the rail fronts (R9-64; tips 3.5022 inside the shallowest seat); 4 black lock plates 22 × 15.65 × 2 (2 per rail, inboard 30/70% stations x 47.2279/155.0839, 2 #4-40 × 3/8 button-head socket cap screws `vn-guide-lock-screw` each — MHA-VN-046, McMaster 91255A108 into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), lapping 1.0 past each rail''s outer edge (R9-59), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 2.65 (R9-61), the top pair hangs 9.65 over it — so the platen cannot fall off without colliding with the east column clamp'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
@@ -1574,19 +1574,19 @@ sections:
         - stated
         - high
       - - Platen position (rework)
-        - plate x −33.2485..+236.3915, y 273.234..408.054, front face z −142.75 (back face on the bar front at −138.9; 3.85 thick, R9-68); top-left fixed by the ch30-p002 delta fit at x −33.213, then moved −0.0355 (the least shift, under half the 2.660 rack pitch) so the flush-soldered rack has a gap centre over the feed stud; hangs on the single y-306.734 support bar
+        - 'Nominal CAD plate x −33.6641288..+235.9758712, y 273.234..408.054, front face z −142.75 (back face on the bar front at −138.9; 3.85 thick, R9-68). Historical ch30-p002 fitted top-left x −33.213 is retained as the photo anchor; the CAD tooth phase shifts it −0.4511288 within half the 2.493639169 rack pitch. This is not a purchased rack end-tooth control: physical phase is uncontrolled and mesh is set at assembly. Rack ends remain flush with the platen; the single y-306.734 support bar and platen height are unchanged.'
         - —
         - 'ch30-p002 Pose Studio delta fit: current-model origin translated (+116.787,+20.122), width scaled 0.8988, then height corrected to H:W = 1:2 while preserving the fitted top-left corner; z delta rejected as front-view depth leakage'
         - derived
         - med
       - - Paper holder positions (rework E4)
-        - 'two handed vertical holders from y 324.554..408.054: left origin (−29.8557, 408.054), Rz −90°, envelope x −29.8557..−20.8677; right origin (+232.9987, 324.554), Rz +90°, envelope x +224.0107..+232.9987. The flat rails seat at z −143.55..−142.75 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.05 at peak'
+        - 'two handed vertical holders from y 324.554..408.054: left origin (−30.2713288, 408.054), Rz −90°, envelope x −30.2713288..−21.2833288; right origin (+232.5830712, 324.554), Rz +90°, envelope x +223.5950712..+232.5830712. The flat rails seat at z −143.55..−142.75 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.05 at peak'
         - —
         - 'ch22 front photo: bright holders hug opposite platen edges with their spring lanes inward; #4 holes remain on the platen socket rows, while opposite handed rotations preserve the asymmetric one-sheet topology'
         - scaled + derived
         - med
       - - Clip screws ×4 + platen sockets
-        - stock 90114A511 brass fillister (Ø4.6482 × 2.7178 head, 6.35 shank) through each clip's #4 clearance end holes (machine x −27.856/+230.999, y 331.744/400.864) into #4-40 taps through the 3.85 platen and its Ø7 × 0.65 rear bosses (4.5 engaged, 1.58D; tips flush with the boss rear faces); under-head faces on the clip seats (z −144.6); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - stock 90114A511 brass fillister (Ø4.6482 × 2.7178 head, 6.35 shank) through each clip's #4 clearance end holes (machine x −28.2713288/+230.5830712, y 331.7444/400.8636) into #4-40 taps through the 3.85 platen and its Ø7 × 0.65 rear bosses (4.5 engaged, 1.58D; tips flush with the boss rear faces); under-head faces on the clip seats (z −144.6); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
         - p.55 front photo (clip end screws)
         - scaled + derived
@@ -1597,12 +1597,18 @@ sections:
       horizontal travel); two brass clips (left/right) retain the recording paper;
       gearing can be unlatched from the rack for free repositioning/reset (the
       whole transgear cluster tilts away — see ch. 23 rework notes).
-      Rework rack mesh: rack teeth-down with crests at y 271.234, pitch line 272.081;
-      the 12T DP30 feed pinion's axis sits PD/2 + 0.8 below it (stud (0, 266.201)
-      post-mirror) — the 0.8 centre extension clears the _gear-recipe gap floor at
-      the pinion base circle (drive-train-style checker-arbitrated slack). Rack
-      x0 = −31.949, putting a rack GAP centre
-      exactly over the stud where the pinion's +90° tooth rises (12T: 90 = 3γ).
+      Current rack mesh (`paper_drive_geom`, `pd_transgear_feed_pinion_spec`):
+      purchased 32DP PA20 teeth-down rack, nominal CAD crests y 270.6996859
+      and pitch line y 271.4934359. Fixed feed stud S is (0, 266.2001746);
+      axis-to-pitch-line distance is 5.293261347 = PD/2 + 0.530761347.
+      The finite #8/12T feed master is rigidly translated s = 0.210 mm.
+      Its source contact law sets the tooth-centred rack-normal datum
+      backlash to 0.13 mm (0.12–0.14); this is not an all-phase running band.
+      Native span limits govern the accepted feed template translations.
+      CAD rack x0 = −33.6641288 and first gap = 1.246819584 are nominal
+      illustration phases only, not purchased-stock end-tooth controls.
+      Set mesh at assembly; physical rack phase is uncontrolled. Historical
+      DP30/PA14.5 measurements remain provenance, not current geometry.
 - heading: Chapter 23 — Translational Gearing (pp. 56–59)
   elements:
   - prose: ''
@@ -1645,18 +1651,54 @@ sections:
         - text
         - stated
         - high
-      - - Rack & rack pinion pitch
-        - DP 30 (machine system)
+      - - Rack and feed pinion pitch (current model)
+        - 32DP PA20; m = 0.79375 mm; rack pitch = 2.493639169 mm
         - —
-        - 'M4c keyframe measurement: rack pitch 2.66 mm; the DP 30 conclusion stands, but the M4c 120T/OD-105 read of the keyframes is superseded — see the rack-pinion row'
-        - scaled + counted
+        - 'Current selection: `pd_transgear_feed_pinion_spec` and `pd_platen_rack_spec`; the rack is purchased SDP/SI A1B12-Y324 stock, not teeth cut with a rack cutter. Historical M4c rack pitch measurement 2.66 mm suggested DP30; retained as photo provenance, not a specification of the present rack. The M4c 120T/OD-105 read was superseded by the separate reducer-disc topology.'
+        - modeled + historical scaling
         - med
       - - Reducer disc ("fourth gear"; part `pd-rack-pinion`)
-        - '120T DP 38: PD 80.21, OD 81.55, 3 mm face, Ø10 bore on the feed-pinion sleeve''s spigot, screwed to the brass hub''s flange (MHA-PD-017) by 3 × #0-80 fillisters (MHA-VN-039), brass — the 4/4 video''s narrated 120T count, FFT-ring-confirmed on ch30 p002 (~115–119 peak); it does NOT touch the rack (paper-drive rework E7/E8 REFUTES the M6.4 96T-DP30-meshes-rack read: the measured rack/disc pitch ratio ≈ 1.27 matches DP 38, and the disc rides in FRONT of the platen face)'
-        - 3.211 OD
-        - '4/4 video narration + FFT ring count + pitch-ratio cross-check (2.660/2.101 = 1.266); OD ≈ 82 ± 2.5 measured on ch30 p002; memory/paper-drive-rework.md E7'
-        - counted + scaled
+        - 'Current 120T 48DP PA20 brass reducer cut with stock #2/55T finite master: reference PD 63.5, finite-supported blank OD 64.54 (+0/−0.10), 3 mm face. Nominal total rigid cutter translation T = 17.210 mm; native 13-tooth span limits 20.4174–20.4308 control actual accepted T = 17.199973570587375–17.220045057491475, not a generated profile shift or nominal ±0.010 setting alone. Nominal axis-relative root envelope is 62.1993995–62.20125 (REF), with accepted-family minimum 62.1793471 (`ROOT_ENVELOPE_DIA_MM` / `ROOT_DIA_MIN`), not a single analytic root circle. Actual blank-bisector plunge is 1.169375; the declared ground-master depth is separately 1.190625 (2.25m), not a vendor certificate. Ø13.1 H7 bore pilots on the brass hub''s Ø13.1 h6 spigot (MHA-PD-017); spigot end seats on the feed sleeve step. Three #0-80 fillisters (MHA-VN-039) attach disc to hub. The disc rides in front of the platen and never meshes the rack. Standard pitch-radius sum 34.925 is reference geometry, not the approved operating centre.'
+        - 2.5409 OD
+        - 'Current cutter selection: [Precise/Penn 10-289-482](https://www.penntoolco.com/precise-20-involute-h-s-s-gear-cutter-2-diametrical-pitch-48-cutter-diameter-1-3-4-hole-size-7-8/), 48DP PA20 #2 (55–134T), using the finite lower-count 55T stock-form master; cutter body OD 44.45 and arbor bore 22.225 are vendor-verified, but ground depth/form accuracy are unpublished, and 2.25-module master depth is Main''s design premise. Dimensions belong to `pd_rack_pinion_spec` and `pd_transgear_disc_hub_geometry`. Historical 4/4 video narration gives 120T, FFT ring on ch30 p002 peaks ~115–119; photo OD ≈ 82 ± 2.5 and rack/disc pitch ratio 2.660/2.101 ≈ 1.266 motivated the preceding DP38 interpretation (`memory/paper-drive-rework.md` E7), not the selected 48DP cutter. The old 96T-DP30 disc-meshes-rack reading remains refuted.'
+        - modeled + counted + historical scaling
         - med
+      - - Reducer disc assembled tooth-space inspection
+        - '0.005 mm TIR MAX about the feed sleeve MHA-PD-010 actual running-bore axis, including disc-pilot float. Seat the same certified nominal Ø1.000 pin in all 120 tooth spaces at mid-face; use its actual certified diameter and the same radial-indicator station. Centre the disc before transfer-spotting the #0-80 taps, lock screws, recheck every space and match-mark disc/hub. OD runout or free span variation does not certify this running datum. This is the required control, not a completed qualification result.'
+        - —
+        - '`pd_rack_pinion_spec.TOOTH_SPACE_RUNOUT_TIR_MM`, `TOOTH_SPACE_GAUGE_PIN_DIA_MM`, `tooth_space_gauge_contacts`, and `TOOTH_SPACE_INSPECTION`'
+        - specified inspection control
+        - high
+      - - Rack/feed incoming pitch and complete-face receiving
+        - 'Incoming DESIGN requirements, not SDP/SI accuracy claims: rack relative local/cumulative X-index range 0.010 MAX, feed-pinion relative tooth-space index range 0.010 MAX, and assembled rigid face/axis lead over the complete rack face 0.010 MAX. Incoming intrinsic rack lead belongs to whole material form, not this separate mounted rigid-alignment term. The sole canonical receiving status remains PROVISIONAL / NOT SHOP-RELEASED; shop-resolution grades are not completed physical function proof. Measured complete rack-face width plus calibrated width uncertainty must be ≤4.800; nominal 4.7625 remains the body/reference size, not a vendor width-tolerance certificate. Inspect every station in an actual physical usable-gap manifest against one datum; do not substitute nominal CAD first-gap phase or 108-gap count. Include pinion wrap station. Source indicator uncertainty is 0.002 at each calibrated XY/index reading: max(measured errors) − min(measured errors) + 2u ≤0.010. Source micrometer uncertainty on measured wire/pin diameter is 0.005; actual calibration, wire geometry, orientation, thermal and datum contributions must also be paid. Check applicable 1- and 20-pitch spans using actual certified diameters of nominal Ø1 pins; outside-pin span parallel to machine X is N × 2.493639168786898 + (D1+D2)/2, not Euclidean distance between unequal-height seats. Nominal 1/20-pitch values are 3.493639168786898 / 50.87278337573797 REF. Reject excess, missing stations, incomplete seats or root/obstruction contact. X spans/index and finite point clouds do not establish complete material, actual local normals or physical function; independent whole-feature/whole-face manufacturing or functional-inspection evidence remains required. Independent full-journal service cocking remains separately paid. Static loaded rack/support asset pitch-height range is 0.010 MAX over the whole located recording stroke, referred to one captured loaded-axis datum: use one positive-loaded tooth-centred setup, hold the knob and take the forward platen endpoint under positive paper resistance; retain the same paper zero for every station/load. Include rack/solder, guide/support straightness and platen rocking. Later journal/pivot motion, true tilted section and service cock are paid separately, not erased by static inspection. The finite engaged-feed window is an assembly/traveler requirement, not a hardware stop. Scope is rigid quasi-static kinematics, excluding elastic compliance.'
+        - —
+        - '`fits.stock_form_quality` through the sole `_gear_quality` rack/feed index, face-lead, measured-face-width, loaded-height and measurement-uncertainty readers, `stock_form_receiving_status_text`, and `require_pitch_index_measurements_mm`; `pd_platen_rack_spec.rack_gauge_pin_contact_mm`, `rack_over_pins_span_mm`; `paper_drive_geom.feed_loaded_geometry_inspection_text`; `paper_drive_rack_travel`'
+        - provisional receiving allocations; not shop-released
+        - high
+      - - Purchased rack full-material shop-resolution controls
+        - 'One independently captured material/end XY datum covers both flanks, every physical usable gap, the entire face and finite crest features. The whole-stock relative error range of both signed X-intercepts x ±tan(20°)y is 0.025 MAX, including uniform gap-width error; it is not unit-normal distance or an index-only pin span. Complete active flank/crest material-boundary error is independently 0.025 MAX. Source wire/pin-diameter micrometer uncertainty is 0.005 and calibrated XY/index indicator uncertainty is 0.002; actual calibration, datum, wire geometry, orientation and thermal contributions also need payment. Complete active XY material and root enclosures require a justified whole-feature/whole-face manufacturing or functional-inspection model, not finite pin contacts, sampled point clouds or filtered certificates. The standard-manufactured purchased 32DP PA20 rack has straight, smooth working flanks as an explicit NAMED conditional model premise at the same level as the native gear forms, not supplier accuracy or a received normal certificate. Its DRAWN incoming same-side wire secant spans 0.8 in Y, with X/Y measurement uncertainties 0.005/0.002; the complete paid angle enclosure must lie within 20° ±2° or the rack is rejected. Count supported working-side normals under that premise; material distance readings alone do not establish local normals, and crest/birth, first-carrier and finite whole-material guards remain active. Root-material intrusion toward the pinion is 0.020 MAX inclusive of paid inspection uncertainty (a 0.018 MAX reading when combined uncertainty is 0.002); arbitrary root normals are inactive only after the whole root-material envelope is strictly separated throughout the physical box with root air at least 0.25. Running lateral inputs substitute both-side full-material constraints for rack X-index, then add pinion index, mounted rigid lead and independent service cock without paying rack index or intrinsic lead twice. These source-defined shop controls remain PROVISIONAL / NOT SHOP-RELEASED until the physical function family is qualified; they are not vendor accuracy or completed hardware receiving.'
+        - —
+        - '`fits.stock_form_quality` through sole `_gear_quality.rack_form_admission_controls()` (no reference-pitch argument): `constraint_relative_mm`, `active_boundary_mm`, `root_intrusion_mm`, `wire_measurement_uncertainty_mm`, `indicator_measurement_uncertainty_mm`, `working_side_angle_deviation_deg`, `working_side_secant_minimum_height_mm`, `working_side_form_model_premise`, `status_text`; canonical readers `rack_working_side_angle_deviation_deg`, `rack_flank_secant_minimum_height_mm`, `purchased_rack_working_side_form_model_premise`; selected `paper_drive_geom.feed_rack_form_admission_controls`, `feed_rack_working_side_angle_band_rad`; `_gear_quality.stock_form_receiving_status_text`'
+        - canonical shop-resolution allocation; PROVISIONAL / NOT SHOP-RELEASED
+        - high
+      - - Whole-material rack receiving provenance
+        - 'require_rack_form_admission_mm takes an immutable actual RackFormInspectionReceipt and the full traveler physical usable-gap manifest. Every gap includes both signed flank intercepts and whole root material, with all N+1 adjacent crests and one connected, complete native u/v partition over the whole actual face. inspection_basis is qualified-extrusion-process or actual-functional-roll; method, calibration, trace, whole_point_enclosure_ref, native mapping and partition evidence must genuinely establish the complete point/material enclosures. A scalar roll result alone, finite pin contacts, a point cloud or a filtered/C1 boolean is insufficient. One independently captured material/fixture/end XY datum applies to every station and side; a flank/pin-seat Y fit that erases uniform thickness is forbidden. Each compound U pays calibration, datum, angle/projection, actual gauge diameter/certification and thermal effects above the sole source instrument floors: signed-intercept U ≥ nextafter(0.005 +tan(20°)×0.002 +0.005/(2cos(20°)), +∞), XY-boundary U ≥ nextafter(hypot(0.005,0.002), +∞), root U ≥0.002. The calibrated usable carrying-face lower bound after all actual edge zones must remain positive without cropping full-face receiving. The whole-point-envelope report retains the immutable receipt by reference and supplies conditional drawn conformance only, not received-stock or hardware qualification; UNKNOWN-normal/root-air/coverage/physical-force/pose proof remains independent.'
+        - —
+        - '`pd_platen_rack_spec.RackFormInspectionReceipt`, `RackFeatureMapping`, `RackFormAdmissionReport`, `require_rack_form_admission_mm`; `paper_drive_geom.feed_rack_receiving_constraint_uncertainty_mm`, `feed_rack_receiving_boundary_uncertainty_mm`, `feed_rack_receiving_root_uncertainty_mm`; canonical `feed_rack_form_admission_controls`'
+        - implemented conditional whole-point receiving; PROVISIONAL / NOT SHOP-RELEASED
+        - high
+      - - Finite rack operating datum and mesh gates
+        - 'Closed-form AGMA-style gates at the 0.12–0.14 tooth-centred datum over every printed feed-pinion corner (tip band × translation limits): contact ratio ≥1.2 at the minimum OD and loose datum, positive backlash, rack-crest root clearance ≥0.25, tip clearance and the interference point. The translated #8 form is treated as the untranslated involute with rack and tip moved in by s·cos(π/N); a numeric step of the generated flank agrees within 0.004. The engaged-feed window clips the projected contact path (±max(approach, recess)·cos 20°) plus one pitch and the lateral deviation at each cut end, and the profile-centre band once; limits round inward. The actual −X cut face is the operator datum; positive machine-X feed decreases cut-face-to-running-axis distance.'
+        - —
+        - '`paper_drive_mesh_check.feed_rack_mesh`, `feed_rack_contact_half_width_mm`; `pd_paper_drive_assembly_steps.require_feed_rack_mesh`, `feed_rack_operating_domain`; `paper_drive_rack_travel.rack_operating_domain_mm`, `RackOperatingDomain.cut_end_reserve_mm`; canonical `paper_drive_geom.feed_rack_cut_end_section_maxima_mm`'
+        - closed-form standard checks + native assembly interference
+        - high
+      - - Purchased rack section and finished cut-end envelope
+        - 'Measure extrema over the complete received stock, not three sample points. Stock HEIGHT and face WIDTH are separate dimensions, each with measured maximum + its own actual calibrated uncertainty ≤4.800; neither is an alias for the other or a supplier tolerance on nominal 3/16 in square stock. The receiving helper requires all four finite positive values and rejects zero uncertainty or excess. Use the sole source finished cut-section maxima, not nominal 12 × 6: native seam 7.2375 prints 7.24 ±0.51, so upper seam 7.75 + received height 4.800 gives Ymax 12.55; the source backer-depth/inset bands and received face width give Zmax 6.51, with outward rounding. Pass those maxima to the required cut-end section argument of the rack operating-domain factory, which pays the source 1° cut finish and 0.25 edge break within its cut-end reserve. This is a cut-envelope/traveler input, not certification of a complete tooth at an uncontrolled cut end or a completed operating-window qualification.'
+        - —
+        - '`_gear_quality.rack_stock_height_max_mm`, `rack_face_width_max_mm`; `pd_platen_rack_spec.require_rack_stock_section_measurements_mm`; sole composition `paper_drive_geom.feed_rack_cut_end_section_maxima_mm`; required `paper_drive_rack_travel.rack_operating_domain_mm(..., cut_end_section_maxima_mm=...)` and `RackOperatingDomain.cut_end_reserve_mm`'
+        - specified incoming section and cut-end controls
+        - high
       - - Removable gear tooth form
         - 'Bought steel ANSI #25 roller-chain sprockets, McMaster 6793K4 / 6793K11 / 6793K17 (T12 / T18 / T24), teeth and OD as supplied (6.35 pitch, Ø3.30 roller). The finished model uses the ANSI B29.1 (ACA) standard tooth form: seating curve R = 0.5025·Dr + 0.0015 in = 1.696 on the pitch circle, working curve E = 1.3025·Dr + 0.0015 in = 4.336, straight yz and topping curve F (2.757 / 2.708 / 2.682); PD 24.53 / 36.57 / 48.65, nominal OD 27.5 / 39.8 / 52.0, bottom Ø (PD − Dr) 21.23 / 33.27 / 45.35 (`pd_transgear_removable_spec`). Supplied STEP mid-plate profiles match the ACA form within 0.007 mm Hausdorff; measured ODs 27.5082 / 39.8272 / 52.0446.'
         - —
@@ -1675,30 +1717,54 @@ sections:
         - 'M6.8 supersedes the M4c "17T sprockets both ends": ch. 23 text + `v4_transgear_002/008/012` (chain visibly wraps the removable''s coarse teeth); ch30 p002 full-res: upper wrap tips Ø ≈ 53.6 ≈ T24 OD 52 at post-mirror (−65, ~248); crank wheel small ≈ Ø30 (`v2_gears_010`) ≈ T12 OD 28. `pd-chain-sprocket.SLDPRT` retired from the assemblies'
         - counted + scaled
         - med
-      - - Drive chain (roller chain; paper-drive rework 2026-07-07)
-        - 'real ANSI #25 roller chain (alternating `vn-chain-inner-link`/`vn-chain-outer-link` through the native connected-linkage pattern), unchanged with the bought sprockets: McMaster 6793K17 knob T24 K (−43.788, 256.893) and 6793K4 crank T12 on the restored fixed axis (−129.336, 129.850); _chain.py solves the exact ANSI #25 link count and sag on the sprockets'' pitch circles. Link pin plane z −155.7 (`pd_transgear_removable_spec.CHAIN_MID_Z`), the same on both shafts.'
+      - - Drive chain (current roller-chain model)
+        - 'Selected physical chain is 68 links of ANSI #25 (`pd_transgear_removable_spec.CHAIN_LINK_COUNT`) at exact 6.35 pitch, centreline length 431.8, on unchanged crank T12 (McMaster 6793K4 blank) and knob T24 (McMaster 6793K17 blank). Alternating `vn-chain-inner-link`/`vn-chain-outer-link` form the native connected-linkage pattern. Physical qualification must close the discrete pinned-link cycle at the final centres; neither a different nearest-even count nor stretched pitch satisfies the selection. Knob centre follows `paper_drive_geom.KNOB_SHAFT_XY`; crank centre follows `cone_line.X_CRANK/Y_CRANK`. The inherited `_chain.py` smooth three-arc visual guide and its continuous sag closure are not proof of a physical standard-pitch cycle. Link pin plane z −155.7 (`pd_transgear_removable_spec.CHAIN_MID_Z`) is shared by both shafts. The selected quantity is not a completed physical/native qualification result.'
         - —
-        - 'ch30 p002/p005/p006 (taut run + visibly drooping slack run) + ch. 23 p.58-59 (chain wider than the wheel); crank centre from ch30 GT; knob centre K = stud S (0, 266.201) + the permanent 12T:120T mesh c-c 44.766 at −168° (CONTRACT-paper-drive axis points, round 10)'
+        - 'Physical chain selection and pitch: `pd_transgear_removable_spec`; centres: `paper_drive_geom` and `cone_line`; inherited visual guide only: `_chain.py`. Historical ch30 p002/p005/p006 show a taut run and visibly drooping slack run; ch23 p.58–59 show chain wider than the sprocket. The preceding DP38 reducer placement K (−43.788, 256.893), c-c 44.766 at −168°, is photograph-derived provenance, not the selected 48DP reducer placement.'
         - scaled + derived
         - med
-      - - Third gear (12T DP38, integral to the knob shaft `pd-transgear-knob-shaft`, MHA-PD-008)
-        - '12T DP 38 cut on the knob shaft itself (no separate gear part since the round-10 re-derivation): PD 8.021, OD 9.358, root 6.474, PA 14.5°, face 5.9 (z −148.1..−142.2) — meshes the 120T disc permanently at c-c 44.766 (44.116 + 0.65 gap-floor extension, backlash 0.181); knob axis K (−43.788, 256.893), −168° from the stud S (0, 266.201)'
+      - - Third gear (12T 48DP, integral to the knob shaft `pd-transgear-knob-shaft`, MHA-PD-008)
+        - 'Current custom integral 12T 48DP PA20 pinion cut with the finite #8/12T stock master: reference PD 6.35, finite-supported OD 7.40 (+0/−0.020), face 5.9 (z −148.1..−142.2). Nominal total rigid translation T = 0.005 mm; native two-tooth span limits 2.4321–2.4422 control actual T = −0.00008950187527867472..+0.010010498125563318, not merely the design 0..+0.010 family. True nominal root minimum is 5.0370163 (REF); accepted-family exact minimum 5.0269043 produces native ROOT MIN 5.02. These derive from finite translated-root norms, not a generated shifted-root formula. The permanent 12:120 reducer operating centre and knob axis come from `pd_rack_pinion_spec` and the mounted geometry, not reference pitch-radius sum 34.925. Stock cutter body is Ø44.45 with Ø22.225 arbor bore; full-depth station is F + 4.65, with actual finite endcuts limited to F + 10.50. This is one integral shaft, not a drop-in catalogue pinion.'
         - —
-        - '4/4 video narration ("the third gear... has 12 teeth"); CONTRACT-paper-drive §1.1 (round 10, R9-17); `pd_transgear_knob_shaft_spec`. Supersedes the M6.4 24T-DP30 estimate, which belonged to the refuted disc-meshes-rack topology (rework E7/E8)'
+        - '4/4 video narration ("the third gear... has 12 teeth"); selected [TTC 10-289-488](https://www.travers.com/product/ttc-10-289-488-involute-style-gear-cutter-10-289-488), 48DP PA20 #8 (12–13T), finite lower-count 12T stock-form master. Actual Travers primary identifies TTC, HSS ground solid, cutter body OD 44.45 and arbor bore 22.225; no fine-pitch whole-depth/root-coordinate or form-accuracy certificate is published. The 2.25-module master depth remains Main''s model premise, PROVISIONAL for physical admission, not vendor ground-shape evidence. Current dimensional authority is `pd_transgear_knob_shaft_spec` and `pd_rack_pinion_spec`; rigid master translation is not a generated profile shift. The prior DP38 PA14.5 and refuted 24T-DP30 estimates remain historical provenance.'
         - counted + derived
         - med
       - - Feed pinion ("fifth gear"; part `pd-transgear-feed-pinion`, MHA-PD-010)
-        - '12T DP 30: PD 10.16, OD 11.853, face 13.75 (z −144.15..−130.4), cut on the rear end of one turned steel sleeve (OAL 27.35, R9-68) that runs on the MHA-PD-023 pin''s Ø3.9; in front of the teeth the Ø10 seat shoulder locates the 120T disc on the Ø9 h6 boss, whose D-flat keys the brass hub MHA-PD-017 (screwed to the disc by three #0-80 MHA-VN-039), so sleeve, hub and disc turn as one; meshes the teeth-down rack with its axis 0.8 below the nominal pitch-line offset (gap-floor extension)'
+        - 'Current custom integral 12T 32DP PA20 pinion cut with the finite #8/12T stock master, nominal rigid translation s = 0.210 mm: reference PD 9.525, OD 11.50 (+0/−0.020), face 13.60 (z −144.0..−130.4), sleeve OAL 27.35. Native two-tooth span limits 3.8482–3.8683 control actual s = 0.19991574718705965..0.22001574718836728. True nominal root minimum is 7.9579511 (REF); accepted-family exact minimum 7.9379045 produces native ROOT MIN 7.93, not an analytic shifted-root circle. Bore Ø3.9 G7 runs on MHA-PD-023 Ø3.9 h6 with 0.004–0.024 diametral clearance. Ø8.2 h6 boss and D-flat locate and drive brass hub MHA-PD-017; its Ø13.1 spigot carries the 120T disc and seats on the sleeve step. Sleeve, hub and disc turn as one. Full-depth station is 10.15; finite stock-cutter run-out is limited to 13.80 from the sleeve rear. Axis is 5.293261347 below the nominal 32DP rack pitch line; datum backlash is 0.13 (0.12–0.14), not an all-phase guarantee. This is a fabricated sleeve, not a drop-in catalogue pinion.'
         - —
-        - '4/4 video narration ("Behind and attached to the fourth gear is the fifth gear. This gear has twelve teeth and engages the rack."); DP must match the rack (the ch23 scale anchor); user field report said 10T — the narrated 12T kept, discrepancy flagged in PR #196; sleeve construction CONTRACT-paper-drive §2.3 (R9-5 / R9-8)'
+        - '4/4 video narration ("Behind and attached to the fourth gear is the fifth gear. This gear has twelve teeth and engages the rack."); current `pd_transgear_feed_pinion_spec` retains independent 12T 32DP PA20 teeth cut by a finite rigidly translated #8/12T stock master, not a generated shift. Precise/Penn cutter [10-289-328](https://www.penntoolco.com/precise-20-involute-h-s-s-gear-cutter-8-diametral-pitch-32-cutter-diameter-2-1-4-hole-size-1/) has vendor-verified body OD 57.15 and arbor bore 25.4; ground depth/form accuracy are unpublished, with 2.25-module master depth Main''s design premise. Historical rack scaling suggested DP30; user field report said 10T, but the narrated 12T was kept (PR #196).'
         - counted + derived
         - med
+      - - 12T pinion angular-index inspection
+        - 'Both integral pinions require all 12 spaces plus the full-circle wrap station (13 measured stations) against one actual running-axis index datum. Correct contact angles using the certified actual gauge diameter, then convert angular errors to millimetres at the pitch-reference radius, not the measuring-pin centre radius: knob Ø6.350/R3.175 with nominal Ø1.000 gauge; feed Ø9.525/R4.7625 with nominal 1/16 in (1.5875) gauge. Maximum measured index range +2u is 0.010; source absolute XY/index indicator uncertainty is 0.002 per station and actual wire/pin-diameter micrometer uncertainty is 0.005, with all method/geometry/calibration contributions paid. No floating best-fit tooth axis or omission of the wrap. Relative index is independent of 0.005 radial tooth-space TIR, tangent-span thickness and the absolute matched reducer clock. The sole receiving status is PROVISIONAL / NOT SHOP-RELEASED; these shop-resolution requirements do not establish complete material envelopes or a passed physical function family.'
+        - —
+        - '`pd_transgear_knob_shaft_spec` and `pd_transgear_feed_pinion_spec`: `PITCH_INDEX_REFERENCE_RADIUS_MM`, `PITCH_INDEX_STATIONS`, `require_pitch_index_errors_mm`, certified gauge-contact helpers and Tooth Space Inspection properties; sole `_gear_quality` index/uncertainty readers'
+        - provisional index allocation; not shop-released
+        - high
+      - - Matched reducer absolute setup clock
+        - 'With the disc cluster locked to its matched feed running-bore datum and actual S-K gear-plane axes held in the matched setup, use actual formed flanks to align the integral 12T gap bisector toward S and a 120T tooth bisector toward K. Absolute one-time setup-clock error INCLUDING actual calibration uncertainty is 0.010 mm MAX at each gear own reference radius; reject excess. Retain this single joint clock datum through every running phase and positive load; do not re-clock/re-zero per load. This canonical shop-resolution allocation remains PROVISIONAL / NOT SHOP-RELEASED. It is separate from all-space relative index, radial TIR and tooth thickness, not a passed physical phase-closure or complete function qualification.'
+        - —
+        - '`fits.stock_form_quality.reducer_setup_clock_deviation_mm` through `_gear_quality.reducer_setup_clock_deviation_mm`; `paper_drive_geom.reducer_setup_clock_inspection_text`'
+        - provisional matched-clock allocation; not shop-released
+        - high
       - - Transgear hanger (round-10 re-derivation; supersedes the 2026-07-07 bar-back bracket and the pinion bar before it)
-        - 'the transgear cluster hangs from the steel arm `pd-transgear-arm` (MHA-PD-018, 7.9375 thick, 5/16 precision-ground flat stock, z −124.4..−116.46), which swings on the shoulder screw `vn-transgear-pivot-screw` (MHA-VN-041: #8-32 into the support bar''s blind tap at P (−58, 303.234), over the brass `pd-transgear-pivot-spacer` MHA-PD-020, 5.5 long, against the bar''s back face z −129.9). The plain pin `pd-transgear-pin` (MHA-PD-023) is pressed into the arm''s reamed hole at S (0, 266.201); the arm plate MHA-PD-019 (two #8-32 oval-head screws MHA-VN-040 into the arm''s through taps) carries the knob shaft''s Ø8.5 running bore at K (−43.788, 256.893). Pin and knob shaft ride the one arm, so the 12T:120T c-c 44.766 never changes; unlatching swings the WHOLE cluster away from the rack (v4_transgear 001 vs 011-013)'
+        - 'the transgear cluster hangs from steel arm `pd-transgear-arm` (MHA-PD-018), 7.9375 thick, 5/16 precision-ground flat stock, z −124.4..−116.4625. It swings on shoulder screw MHA-VN-041 (#8-32 into the support bar blind tap), over brass spacer MHA-PD-020, 5.5 long against the bar back face z −129.9. Pivot and pressed-stud positions come from `pd_transgear_arm_geometry` and `paper_drive_geom`; knob bore and plate-screw stations derive from the selected physical reducer centre. Arm plate MHA-PD-019 carries the Ø6 H7 running bore for the Ø6 g6 knob journal. Two MHA-VN-051 stock locating dowels define the arm/plate location: set the explicitly specified critical S-K pose before match-reaming the paired holes, not an arbitrary as-made pose. Two #8-32 oval-head screws MHA-VN-040 clamp only; countersink centering and clearance-hole float are not locating controls. Pin and knob shaft ride one arm, so the reducer centre remains constant during unlatching. Source geometry and critical pose/bore-squareness controls own the mounted arrangement.'
         - —
         - 'CONTRACT-paper-drive §3 + §5 (round 10, rulings R9-5..R9-25); book p.62 top-down + p.63 back view; `pd_transgear_arm_geometry`, `pd_support_bar_spec`'
         - scaled + derived
         - med
+      - - Arm/plate locating dowels (selected source, MHA-VN-051)
+        - '2 × purchased McMaster-Carr 93600A189, 316 stainless steel, passivated, ISO 2338-m6, nominal Ø2 ×6 mm with published diameter +0.008/+0.002 (2.002–2.008); both ends chamfered. Published ISO 2338 length limits are 5.75–6.25; c≈0.35 is an approximate end-form reference, not a guaranteed maximum or full-cylinder certificate. Arm press holes 1.990–2.000 and plate slip holes 2.010–2.020 give 0.002–0.018 interference/diametral clearance. Press each pin 1.70 ±0.03 proud, not to the blind floor; custom arm blind depth 4.80 ±0.05 gives insertion 4.02–4.58 and bottom air 0.17 MIN for the complete standard length family. Retain matched marks, actual drawn S-K gear-plane setting, free-hand assembly and signed loaded seat/gear-centre checks. No commodity incoming inspection or pin-end-derived body-yaw certification. Catalogue-only nominal cylinder is not an actual hardware measurement. Retained MHA-VN-038 wheel-drive dowels are distinct and not substitutes.'
+        - —
+        - '[McMaster-Carr 93600A189](https://www.mcmaster.com/93600A189/) verified 2026-10-09T00:41:03Z; [ISO 2338:1997 Table1](https://cdn.standards.iteh.ai/samples/20001/5b26cece48c448b782c0de1eccb5b16c/ISO-2338-1997.pdf); [ISO end-form reference](https://fullerfasteners.com/tech/iso-2338-specifications-parallel-pins/); `vn_transgear_arm_plate_locating_pin_spec`, `paper_drive_arm_registration`; canonical registry `vn-transgear-arm-plate-locating-pin.yaml`'
+        - verified supplier data + selected design
+        - high
+      - - Matched arm-plate critical controls and published standard clamp stock
+        - 'Source-drawn over-arm plate thickness is 5.00 ±0.51. Model countersink Ø7.9248 prints ordinary 7.9 ±1.5 with the actual 82° ±1° custom cone; clearance drill Ø5.8 +0.10/0 accommodates the published maximum under-head fillet and retains the true 2 mm cone floor. Each arm tap has its own Ø0.050 POSITION projected 14.7; each plate clearance-hole axis and own countersink axis independently have Ø0.050 POSITION projected 7.0, sourced in mm. Two MHA-VN-051 dowels locate; screws clamp only. Positively verified McMaster-Carr 91790A199 is oval/slotted 18-8 #8-32 UNC-2A, nominal 1 in (25.40 mm) from bevel top, quantity2, cut to the unchanged installed fit. ASME B18.6.3-2013 Table7 gives maximum head Ø0.312 in, maximum protrusion F0.091 in above gaging diameter G0.267 in, and bearing angle80–82°; H0.100/C0.052/O0.152 are REF, not maxima. Whole-metal crown/cone/fillet bounds derive from F/G, minimum permitted non-thread body diameter and maximum fillet15%basicD. The distinct first-full-thread bearing datum derives from F/G and the maximum Class2A major diameter, then pays two pitches without double-paying fillet. Head-axis true-position diameter is6%maximumD; stock straightness is0.006 in/in. Oval overall Lo carries -.03 in; conservative Lo MIN24.638 gives no positive crown REF credit. A199 length removes the factory-tip two-pitch region after cutting; no new commodity inspection is required. Ordinary arm entry and exit edge breaks are0.10 MAX, and the cut-end break is0.10 MAX. Bench-fit the matched joint, remove/pre-cut OFF MECHANISM BEFORE GUIDE-LOCK SWEEP, trim flush to0.20 proud MAX, then refit the same matched hardware. Source bounds pay eccentric head support, pitch-cylinder float, every allowed seat sign and distinct entry/exit losses. Projected heights cover seated bearing contact, not every crown point. Native/reference pose checks are not a manufactured pin-full-span or physical loaded-joint certificate. Critical gear-plane S-K and signed loaded three-site seat observations remain separate, with actual applied force/moment vectors recorded for every required load case.'
+        - —
+        - '`pd_transgear_arm_geometry`, `pd_transgear_arm_plate_geometry`, `pd_transgear_arm_spec`, `pd_transgear_arm_plate_spec`, `paper_drive_arm_registration`, `transgear_hanger_joints`, `vn_transgear_arm_plate_screw_spec`; [McMaster-Carr 91790A199](https://www.mcmaster.com/91790A199/) observed 2026-10-09T07:17:13.553Z; [ASME B18.6.3-2013 Table7, §§2.1.1,2.1.5,2.1.6,3.2–3.7](https://www.finesz.com/pic/ASMEB18.6.3-2013.pdf); [ASME B1.1 UNC-2A/2B thread dimensions](https://www.machiningdoctor.com/threadinfo/?tid=15); MHA-VN-040 ordinary installation notes'
+        - source-drawn critical controls + published standard bounds
+        - high
       - - A-frame → folded into `fr-rocker-arm-support` (M6.5/M6.9, UNIFIED M6.12)
         - 'M6.12: no longer a separate part — these are the SOUTH-upright + rail features of the single `fr-rocker-arm-support` casting (build_fr_rocker_arm_support.py), re-centred on machine x +72.9 and authored machine-handed in the frame assembly''s frame. The two south-flank hold-down hex bolts move to fr-frame.SLDASM with the foot rail. Geometry below unchanged. The FRONT rocker support — the SOUTH upright of the portal frame (ch30 p008): tapered plate 18.5 thick (machine z −117.5..−99.0 — photo reads ~28-30 but the band is pinned by the parked measuring stick at z ≤ −118; the former ch25-handle z ≥ −98 pin is obsolete, the restored GT alignment-pinion handle sits at z −144 well clear of the plate), foot x −115..−45 on the base top (y 50.8), apex x −87..−59 at the ball-seat saddle y 228.6 (machine); full-width saddle z ±11.1 over the last 19.8 of rise; clevis ears (z ±(8.1..11.1), 20 tall, tops machine 248.6) flank the south pivot-ball mount''s Ø16 base (gap 16.2; ball r 9.5 centre 253.8 clears the ear inner faces; pivot shaft bottom 250.65 clears ear tops by 2.05); carries the portal-frame rails to the north frustum (faces −0.25): TOP RAIL 20 (machine x +62.9..+82.9) × 16 (y machine 212.6..228.6 = photo window top) to machine z +90.45, FOOT RAIL 30 (machine x +59.75..+89.75 — west face 0.25 east of the arbor-pedestal block) × 20 on the base top to machine z +81.35, bolted down by two hex bolts (M6.10): AF 12.7 × 5.5 heads + Ø7.8 × 32 shanks at machine (74.75, z −54/+36) through the rail''s Ø8.2 holes, 12 into the base''s through-holes (head corner 2.64 clear of the cylinder train''s 120T tips); M6.12: the part is authored MACHINE-handed with NO MIRROR_PLANE entry (it lives in the non-mirroring fr-frame.SLDASM) — the real machine casts both uprights + rails in one piece, now modeled that way'
         - —
@@ -1706,7 +1772,7 @@ sections:
         - scaled
         - med
       - - Transgear pin, bushings and ring (MHA-PD-023..025 and MHA-VN-047, R9-68; supersede the MHA-082 stud, MHA-160 cap nut and MHA-178 shim)
-        - 'plain steel pin `pd-transgear-pin` (MHA-PD-023, Ø3.900 ground) pressed from the rear through the arm''s reamed hole at S, its domed head seated on the arm''s rear face −116.46; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `pd-transgear-rear-bushing` (MHA-PD-024, faced to fit, to −130.4); the steel feed sleeve MHA-PD-010 (−130.4..−157.75), carrying the 120T disc on its Ø10 seat shoulder (−144.65..−147.65) and the brass hub MHA-PD-017 on its Ø9 boss and D-flat; brass `pd-transgear-front-bushing` (MHA-PD-025, faced to fit, nose −157.75 to −162.78); the side-mount ring `vn-transgear-retaining-ring` (MHA-VN-047, McMaster 97431A260) in the pin''s groove, −163.08..−163.71. The front bushing sets the disc-to-12T air m 0.10-0.20, the rear bushing the cluster float 0.2-0.4 (model: cluster rearward)'
+        - 'plain steel pin `pd-transgear-pin` (MHA-PD-023, Ø3.900 h6) pressed from the rear through the arm''s reamed hole at S, its domed head seated on the arm''s rear face −116.4625; nothing on it is threaded. Forward of the arm front face −124.4, rear to front: brass `pd-transgear-rear-bushing` (MHA-PD-024, faced to fit, to −130.4); steel feed sleeve MHA-PD-010 (−130.4..−157.75), with G7 bore and step at −144.0 seating the hub''s Ø13.1 spigot; the 120T disc pilots on that spigot in band z −147.65..−144.65, clamped by the hub flange, while the hub''s Ø8.2 H7 bore and D-flat mate with the sleeve boss; brass `pd-transgear-front-bushing` (MHA-PD-025, faced to fit, nose −157.75 to −162.78); side-mount ring `vn-transgear-retaining-ring` (MHA-VN-047, McMaster 97431A260) in the pin''s groove, −163.08..−163.71. The front bushing sets disc-to-knob-pinion axial air m 0.10–0.20; the rear bushing sets cluster float 0.2–0.4 (model: cluster rearward).'
         - —
         - 'ruling R9-68 (rev 5, candidate B); `pd_transgear_pin_spec`, `transgear_cluster_fit`, `pd_transgear_rear_bushing_spec`, `pd_transgear_front_bushing_spec`, `vn_transgear_retaining_ring_spec`; ch23 p.59 page002_img04'
         - derived
@@ -1718,9 +1784,9 @@ sections:
         - scaled + derived
         - med
       - - Knob shaft (MHA-PD-008, round 10)
-        - 'steel, on axis K (−43.788, 256.893), z −172..−101.26 (70.74): 1/4-20 stud end from the tip −172 to −154.6 (thumbnut MHA-PD-013, seated on the collar''s pilot, faced 0.05–0.15 proud of the T24 front face, the T24 free under it); Ø6.35 plain core to the 12T front face −148.1 carrying the sliding brass drive collar `pd-transgear-drive-collar` (MHA-PD-022: Ø17.5 × 4 body −154.3..−150.3 = the T24 seat, Ø10 pilot inside the T24''s Ø10.3 bore, two 3/32 × 3/16 dowels MHA-VN-038 pressed in its through holes 2.4 proud of its front face, pinned at assembly by the 1/16 spring pin MHA-VN-037 through the core, lying in the collar''s rear slot); integral 12T DP38 −148.1..−142.2; Ø8.5 journal −142.2..−101.26 running in the arm plate''s bore behind the loose brass thrust ring MHA-PD-015; the brass cup MHA-PD-016 (Ø19 × 8.0 ring, −107.76..−99.76) on the journal''s rear end, pinned by the 1/16 × 5/8 spring pin MHA-VN-048 match-drilled through cup and journal 3.0 behind its front face; no retaining screw or tap. T24 sprocket plate −157.1..−154.3, #25 chain plane −155.7'
+        - 'steel integral 12T 48DP PA20 knob shaft, on axis `paper_drive_geom.KNOB_SHAFT_XY`, z −172..−101.2625 (OAL 70.7375). #8-32 UNC-2A stud ends at −155.6, followed by Ø2.8 thread relief to −153.35. Ø4.900 h6 solid D-core has flat 2.150 from axis (+0/−0.015); its front station is 5.25 ±0.13 from gear front F, not its active length. The front neck is Ø4.000 ±0.13 × 0.400 ±0.13, with actual nominal corner R0.050 and LIMIT 0–0.100. The physical rounded flat-tool end, including rounding, is 0.050–0.170 short of F (nominal 0.110). Core and neck have 0.050 total runout; gear tooth-space TIR is separately 0.005. Brass drive collar MHA-PD-022 has true Ø4.910 H7 D-bore and modeled flat midpoint 2.1775, LIMIT 2.170–2.185. Its Ø17.5 body is supplied 7.400 MIN and rear-faced to fit directly on F; final rear D-bore entry is 45° with both equal legs 0.150–0.250. Fitted body length is 3.870–6.900, nominal 6.2 REF, not an independent ± title-block length. No front cross-pin or rear slot remains. Ø10 pilot carries T24 and is faced 0.05–0.15 proud of its front face; the custom #8-32 nut seats on the pilot, leaving the sprocket free. Two retained MHA-VN-038 drive dowels stand 2.4 proud. Gear band is −148.1..−142.2; Ø6 g6 rear journal runs to −101.2625 in the Ø6 H7 arm-plate bore, behind loose ring MHA-PD-015 (Ø6.1 bore, 5.2 length). Brass cup MHA-PD-016 (Ø19 × 8.0, −107.7625..−99.7625, Ø6 H7 bore) is retained by assembly-match-drilled MHA-VN-048; no retaining thread. Nominal T24 seat −154.3, sprocket plate −157.1..−154.3 and chain plane −155.7 are unchanged.'
         - —
-        - '`v4_transgear_008/020` + ch. 23 topology; CONTRACT-paper-drive §1 (round 10, R9-6 / R9-17); the −155.7 chain plane both shafts share (`pd_transgear_removable_spec`); purchased-blank ruling 2026-10-08 replaces only the removable T24 stock with McMaster 6793K17, hub turned off flush, Ø10.3 through bore and two Ø2.5 pin holes on Ø14; shaft, collar and chain interfaces unchanged'
+        - '`v4_transgear_008/020` + ch. 23 topology; current mechanical authority `pd_transgear_knob_shaft_spec`, `pd_transgear_drive_collar_spec`, `pd_transgear_thumbnut_spec`, cup/ring specs and the shared `_gear_quality` readers; retained −155.7 chain plane from `pd_transgear_removable_spec`; purchased-blank ruling 2026-10-08 replaces only the removable T24 stock with McMaster 6793K17, hub turned off flush, Ø10.3 through bore and two Ø2.5 pin holes on Ø14'
         - scaled + derived
         - low/med
       - - Latch hook (MHA-PD-014, round 10, R9-10)
@@ -1730,9 +1796,9 @@ sections:
         - scaled
         - low
       - - Transgear thumbnut (MHA-PD-013, round 10)
-        - 'knurled brass nut, outermost on the knob shaft''s 1/4-20 stud in FRONT of the removable sprocket (z −173.2..−157.1): Ø20.5 × 8.7 straight-knurled head with a dished front face, Ø11 × 2.4 waist, Ø12.4 flange bearing on the T24''s front face only'
+        - 'custom knurled brass #8-32 UNC-2B nut, outermost on the knob stud in front of the removable sprocket (nominal z −173.2..−157.1): Ø20.5 × 8.7 straight-knurled head with dished front face, Ø11 × 2.4 waist, Ø12.4 flange. The flange bears on the drive collar''s faced pilot, not on T24; pilot proudness leaves T24 free. Countersink both thread entries to the source Ø4.566 MAX. Outer head/waist/flange remain unchanged; this is MHA-PD-013 fabricated from brass, not a new purchased nut.'
         - —
-        - 'ch23 p.58/59 (page002_img03/04) + video 4/4 "unscrew the nut that holds the other gear in place"; CONTRACT-paper-drive §1.6 (`build_pd_transgear_thumbnut.py`)'
+        - 'ch23 p.58/59 (page002_img03/04) + video 4/4 "unscrew the nut that holds the other gear in place"; current thread and seating authority: `pd_transgear_thumbnut_spec` and `pd_transgear_drive_collar_spec`'
         - scaled
         - med
   - prose: |2
@@ -1740,29 +1806,34 @@ sections:
       Notes: speed combos — small driving + large driven = slowest platen (smallest
       horizontal scale), large+small = fastest, medium+medium = 1:1. Latch disengages
       gearing from the platen rack (quick reset; also slackens chain for swapping the
-      removable gears). Brass gears, central bores.
+      removable gears). Pinions and sprockets are steel; disc and rack are brass.
 
-      Paper-drive rework notes (2026-07-07, FINAL topology — supersedes the M4c
-      and M6.8 readings and CLOSES Appendix C #8): the six gears, per the 4/4
-      video narration, are (1) the crank removable chain wheel (T12 mounted)
-      and (2) the knob removable chain wheel (T24 mounted) — the roller chain
-      rides their #25 sprocket teeth; (3) the 12T DP38 THIRD gear, cut integral
-      on the knob shaft behind the removable (round 10); (4) the 120T DP38
-      reducer disc on the stud, in PERMANENT mesh with (3) at c2c 44.766 — the
-      stud and the knob shaft ride one hanger arm that swings on the pivot
-      screw at P (−58, 303.234) (round 10), so this centre distance never
-      changes and the old two-distance riddle (66.05 rest vs 51.0 engaged)
-      dissolves: the measured 66.05 was a fit against the wrong
-      disc-meshes-rack topology, and unlatching swings the WHOLE cluster away
-      from the rack (v4_transgear 001 vs 011-013); (5) the 12T DP30 FEED
-      pinion cut on the steel sleeve that carries the disc ("behind and
-      attached to the fourth gear"), passing under the platen's bottom
-      edge to mesh (6) the teeth-down rack. Net feed with T12/T24 mounted:
-      0.5 × (12/120) × π × 10.16 = 1.596 mm per crank revolution. The spare
-      removable (T18) lies loose on the base (machine (−160, 53.2, −15)). The
-      mixed-pitch jam note (#25 sprocket vs DP 30/38) still bars any literal
-      removable-on-gear mesh; it never happens in this topology. The measuring
-      stick (ch. 16, hand tool) lies flat on the base at (−158, 53.8, −133),
+      Current paper-drive topology retains the six gears established by the
+      2026-07-07 video re-derivation: (1) crank T12 and (2) knob T24 removable
+      ANSI #25 sprockets, connected by the selected fixed 68-link chain;
+      (3) custom integral 12T 48DP PA20 knob-shaft pinion cut with the finite
+      stock #8/12T master; (4) 120T 48DP PA20 brass reducer disc cut with the
+      finite stock #2/55T master, permanently meshing (3) at the physical
+      centre specified by `pd_rack_pinion_spec` and the mounted arm geometry;
+      (5) independent 12T 32DP PA20 feed sleeve cut with the stock #8/12T
+      master; and (6) purchased SDP/SI A1B12-Y324 32DP PA20 rack, cut to the
+      platen length and soft-soldered to its brass backer.
+      Knob-bearing and plate-screw stations follow the physical reducer
+      centre; rack mounting height follows the finite feed contact law.
+      Printed tangent spans control actual rigid master translations, not a
+      generated profile-shift law. Unlatching swings the cluster away from
+      the rack without changing the reducer centre distance.
+      The historical 66.05 rest / 51.0 engaged riddle came from the refuted
+      disc-meshes-rack interpretation; neither dimension defines this model.
+      Net feed with T12/T24 mounted is 0.5 × (12/120) × π × 9.525 =
+      1.496183501 mm per crank revolution (`paper_drive_geom`), −6.25% from
+      the preceding DP30 feed law, 1.595929068 mm/rev; this paper-scale change
+      is intentional, not compensated. The spare T18 lies loose on the base
+      at machine (+160, 53.2, −75). No chain sprocket meshes a spur gear.
+      The historical pitch measurements are retained in the source rows;
+      the selected 48DP reducer and 32DP feed use actual stock-form cutters,
+      not catalogue drop-in gears or a generated-profile-shift substitute.
+      The measuring stick (ch. 16, hand tool) lies flat on the base at (−158, 53.8, −133),
       graduations up (M6.5).
 - heading: Chapter 24 — Pen Mechanism (pp. 60–61)
   elements:
@@ -2071,9 +2142,9 @@ sections:
          every key PD a round inch value — largest cone / cylinder gear 4.000",
          pinion 1.400". The photogrammetry cross-check (`195445871`) was abandoned:
          through-glass color cast + parallax made the nameplate unusable.
-         NOTE: ch. 23 translational gearing looks coarser than DP 30 in the video
-         frames (`v4_transgear_*`) — its module is a separate question, measure when
-         authoring those parts.
+         Historical ch. 23 caveat: the video frames (`v4_transgear_*`) looked
+         coarser than the then-assumed DP30 train. Paper-drive pitch is now
+         specified separately: 48DP reducer, 32DP feed/rack, PA20 (chapter 23).
       2. **Pinion tooth count** (ch. 25) — **32 teeth, user-authoritative
          correction 2026-09-22.** This supersedes the prior video-frame count;
          no historical photo justification overrides the corrected count.
@@ -2140,7 +2211,8 @@ sections:
          small gears; D-flats are an intentional fidelity departure for
          alignment without adhesive. The configured bore drove the gear blank
          from a revolve to an extruded disc in the original parametric build.
-      8. **Translational gearing fixed-reduction topology** (ch. 23) — found in
+      8. **Translational gearing fixed-reduction topology** (ch. 23):
+         **Historical derivations below, superseded for current dimensions.**
          M4c keyframe measurement: a small fine-tooth steel pinion (≈ Ø21 mm,
          est. 24T DP 30) rides coaxially with the 120T rack pinion
          (`v4_transgear_002/003/008`), but the frames do not show what it meshes,
@@ -2167,6 +2239,25 @@ sections:
          12T:120T mesh never does), and the arm swing about the stud provides
          chain slack for gear swaps. Modeled: the engaged state exactly; the
          tilt path is not modeled.
+         **Current model (2026-10-08):** the same six-gear topology uses
+         120T 48DP PA20 disc (#2/55T finite stock master), integral 12T
+         48DP PA20 knob pinion (#8/12T master), independent integral 12T
+         32DP PA20 feed sleeve (#8/12T master), and purchased SDP/SI
+         A1B12-Y324 32DP PA20 rack on its fabricated backer.
+         The selected physical ANSI #25 chain remains 68 links, pitch 6.35,
+         centreline length 431.8, on crank T12 / knob T24; closure must
+         preserve that selection. Feed remains 1.496183501 mm/crank rev
+         (−6.25% versus the historical DP30 feed law).
+         Current physical mounting centre and knob position come from
+         `pd_rack_pinion_spec`, `pd_transgear_arm_geometry` and
+         `paper_drive_geom`; printed spans govern the actual stock-master
+         translations in the disc, knob and feed specs. Reference pitch
+         radii, prior measured centres and generated profile shift do not
+         replace that contract. The #8-32 stud, solid D-core, true D-bore
+         collar rear-faced to gear front F, Ø6 g6 journal/H7 bore and
+         retained rear cup pin replace the preceding front-cross-pin slot
+         construction. The photographs and interpretations above remain
+         provenance, not current dimensions or qualification evidence.
       9. **Crank-drive gear pair** (ch. 11/12) — found in M4c: the dark steel
          gear at the cone set's large end ("This gear engages the crank",
          p.20) implements the stated 4:1 crank→cone reduction together with a

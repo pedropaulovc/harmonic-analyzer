@@ -62,7 +62,7 @@ from __future__ import annotations
 import math
 
 from pd_support_bar_spec import BRACKET_TAP_X, HANGER_TAP_Y, PIVOT_TAP_X
-from pd_transgear_arm_geometry import PIN_MACHINE_Z
+from pd_transgear_arm_geometry import ARM_ANGLE_DEG, PIN_MACHINE_Z
 from vn_transgear_latch_pin_spec import DIA_MAX as PIN_DIA_MAX
 
 # --- Stock ---------------------------------------------------------------------
@@ -77,10 +77,9 @@ HALF_T = SHEET_T / 2.0
 # machine X and a bar-frame Y is BAR_CENTRE_Y above.
 BAR_CENTRE_Y = 306.734
 BAR_BACK_FACE_Z = -129.9
-# The hanger's pivot P and its latched direction U (the paper-drive
-# assembly's ARM_ANGLE_DEG, which it asserts equal); N = U turned +90 deg.
+# The hanger's pivot P and its latched direction U (the arm geometry's
+# ARM_ANGLE_DEG, set by the pressed stud's station); N = U turned +90 deg.
 PIVOT_XY = (PIVOT_TAP_X, BAR_CENTRE_Y + HANGER_TAP_Y)  # (-58, 303.234)
-ARM_ANGLE_DEG = -32.55846520920007
 ARM_U = (math.cos(math.radians(ARM_ANGLE_DEG)), math.sin(math.radians(ARM_ANGLE_DEG)))
 ARM_N = (-ARM_U[1], ARM_U[0])
 
