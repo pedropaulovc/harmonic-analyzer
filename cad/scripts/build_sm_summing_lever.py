@@ -165,10 +165,10 @@ PLATE_TOP_Y = 982.24
 # the lever's pivot overhangs the body so the knife edges rest on bearing
 # supports standing on the top plate (ch30-p003). Each stub's top vertex line
 # is the knife edge the lever is suspended/rocks on.
-# Knife-edge trunnion cross-section: vertex-up hex, 8.653 wide (X) x 10.268 tall
+# Knife-edge trunnion cross-section: vertex-up hex, 8.080 wide (X) x 10.268 tall
 # (Y, vertex to vertex) x 21.717 deep (Z protrusion). The top vertex ridge is
 # the knife edge (= the rock axis, above the cylinder centreline).
-HEX_W = 8.653  # across-flats width (X)
+HEX_W = 8.080  # across-flats width (X); = sm_summing_lever_spec.HEX_W
 HEX_H = 10.268  # vertex-to-vertex height (Y) -- vertex-up
 HEX_DEPTH = 21.717  # axial length each stub protrudes past the body end
 HEX_Z_INNER = PLATE_L / 2.0  # inboard face flush with the body end (76.20)
