@@ -1,10 +1,12 @@
-"""Offline contract: every channel's cam sits axially where its rod can clear
-both neighbouring rocker plates (#743 L20 d', #948).
+"""Offline contract: every channel's cam sits axially where its flat rod can
+join cam and rocker without binding (#743 L20 d', #948).
 
-The two banks are laid out by separate modules on purpose: the rocker bank
-reads no gear-train config (test_rocker_bank_layout forbids it importing
-cylinder_bank_layout). Only a test sees both, so the cross-bank budget lives
-here.
+The rod is flat: its ring rides the cam and its fork straddles the arm in one
+plane (rocker_bank_layout.ARM_MID_DZ is cylinder_bank_layout.CAM_MID_DZ), so a
+rigid rod held at both ends tolerates only the ring's float in the cam slot
+plus the fork's side clearance on the arm. The banks' build-up deviations
+are laid out by separate modules; only a test sees both, so the cross-bank
+budget lives here.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ import pytest
 
 import _config
 import ch_connecting_rod_spec as rod
+import ch_rod_pivot_pin_spec as pin
 import cylinder_bank_layout as bank
 import dt_cylinder_gear_spec as gear
 import ch_rocker_arm_spec as arm
@@ -32,16 +35,13 @@ def _rocker_partial_band(n: int) -> tuple[float, float]:
 
 
 def _clear_window() -> tuple[float, float]:
-    """Delta range (cam slot centre less rocker gap, deviations) over which a
-    rigid rod can sit clear of both plates: its ring floats in the thinnest
-    slot, its head is coplanar with the ring."""
-    head_mid = bank.CAM_MID_DZ
-    plate_below = rocker.ARM_MID_DZ - rocker.PITCH + arm.ARM_THICKNESS / 2.0
-    plate_own = rocker.ARM_MID_DZ - arm.ARM_THICKNESS / 2.0
-    south_gap = head_mid - rod.HEAD_THICKNESS / 2.0 - plate_below
-    north_gap = plate_own - (head_mid + rod.HEAD_THICKNESS / 2.0)
+    """Delta range (cam slot centre less rocker plate centre, deviations) a
+    rigid flat rod spans without binding: its ring floats in the thinnest
+    slot, its fork in the least side clearance on the thickest arm."""
+    assert rocker.ARM_MID_DZ == bank.CAM_MID_DZ  # one nominal plane
     ring_float = bank.RING_SLOT_MARGIN / 2.0
-    return -(south_gap + ring_float), north_gap + ring_float
+    fork_float = pin.BUDGET["side_clearance_min"] / 2.0
+    return -(ring_float + fork_float), ring_float + fork_float
 
 
 def _station_delta(j: int) -> tuple[float, float]:
@@ -64,9 +64,9 @@ def _station_delta(j: int) -> tuple[float, float]:
     return cam[0] - gap[1], cam[1] - gap[0]
 
 
-def test_the_clear_window_is_the_one_filed_on_948() -> None:
+def test_the_clear_window_is_the_flat_rods() -> None:
     low, high = _clear_window()
-    assert (low, high) == pytest.approx((-0.465, 2.065), abs=0.001)
+    assert (low, high) == pytest.approx((-0.28675, 0.28675), abs=0.001)
     # The ring band the window rests on is the title block's 2-place class.
     two_place = _config.title_block("linear_2pl")["value_in"] * 25.4
     assert rod.RING_THICKNESS_BAND[0] == pytest.approx(two_place)
@@ -76,13 +76,13 @@ def test_the_clear_window_is_the_one_filed_on_948() -> None:
     strict=True,
     raises=AssertionError,
     reason=(
-        "#948: neither bank is preloaded, so E_b 0.55 alone exceeds the ~0.47 "
-        "of south room; the rod-pin retention must bring every station's Delta "
-        "inside the window"
+        "#948: neither bank is preloaded, so the stations' Delta spans about "
+        "-1.19..+1.41 against the flat rod's +/-0.29; bank retention (or a "
+        "modelled rod lean) must bring every station's Delta inside the window"
     ),
 )
 @pytest.mark.parametrize("j", range(bank.COUNT))
-def test_every_rod_can_sit_clear_of_both_rocker_plates(j: int) -> None:
+def test_every_flat_rod_spans_its_cam_and_arm(j: int) -> None:
     low, high = _clear_window()
     delta_min, delta_max = _station_delta(j)
     assert low <= delta_min and delta_max <= high
