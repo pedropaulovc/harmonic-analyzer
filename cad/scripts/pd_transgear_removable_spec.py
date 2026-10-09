@@ -5,8 +5,8 @@ closure.  One authority for the numbers the removable sprocket, the two
 shafts it seats on (crankshaft MHA-DT-011, knob shaft MHA-PD-008), the drive-train
 and paper-drive assemblies and the chain solver ``_chain`` all share.
 
-Evidence: ch23 p.56 (catalog photo: #25 chain, plate, bore and the two
-drive-pin holes nearly touching the bore), p.61 and video frame f_0215/f_0210.
+Evidence: ch23 p.56 (historic #25 chain and bore/drive-pin interface), p.61
+and video frame f_0215/f_0210; purchased blanks verified 2026-10-08 below.
 
 Machine frame: +Y up, -Z = machine FRONT, +X = operator's left.  Both mounted
 wheels (crank T12, knob T24) occupy the SAME z band: rear face on the shaft's
@@ -15,24 +15,24 @@ runs in one plane, ``CHAIN_MID_Z``, on both shafts.  Each shaft's seat is a
 flat ``SEAT_SPIGOT_DIA`` face carrying two pressed 3/32 dowels: small enough
 that the #25 chain's plates wrap the T12 clear of it.
 
-Tooth form: the ANSI B29.1 standard (American Chain Association) #25
-roller-chain sprocket form, the one a #25 sprocket cutter reproduces, in
-every configuration.  Seating curve ``SEAT_CURVE_R`` = 0.5025 Dr + 0.0015 in
+Tooth form: the supplied McMaster ANSI #25 sprockets agree with the ANSI
+B29.1 standard (American Chain Association) form within 0.007 mm Hausdorff
+at mid-plate in all three vendor STEPs.  Seating curve ``SEAT_CURVE_R`` = 0.5025 Dr + 0.0015 in
 centred on the pitch circle (point a); working curve ``WORKING_CURVE_R``
 (E = 1.3025 Dr + 0.0015 in) about c, ``WORKING_CENTRE_OFFSET`` (ac = 0.8 Dr)
 from a at A = 35 + 60/N deg, spanning B = 18 - 56/N deg; the straight yz
 tangent to it; the topping curve F about b, ``TOPPING_CENTRE_OFFSET``
-(ab = 1.4 Dr) from a along the pitch chord, out to the turned outside
+(ab = 1.4 Dr) from a along the pitch chord, out to the supplied outside
 diameter p (0.6 + cot(180/N)).  The bottom diameter is PD - Dr (for even N
 also the caliper diameter); its minus-only commercial tolerance
-0.002 P sqrt(N) + 0.006 in holds the as-cut seat bottom PD - 2 R.  Sources:
+0.002 P sqrt(N) + 0.006 in holds the supplied seat bottom PD - 2 R.  Sources:
 the ACA formulas as reproduced in GEARS-IDS "Designing and Drawing a
 Sprocket", p. 2 Table 1 (http://www.gearseds.com/files/design_draw_sprocket_5.pdf);
 diameters, caliper diameter and tolerances, Machinery's Handbook 31st ed.
 pp. 2621-2623 (https://online.flippingbook.com/view/954046886/1316/ to
-/1318/).  :func:`gap_area` is the exact in-plate area one tooth gap removes,
-so the part's volume check tests the tooth SHAPE, not merely that some cut
-happened.
+/1318/).  :func:`gap_area` is the exact in-plate area one tooth gap removes.
+The volume gate also intersects the supplied two-face conical tooth chamfer
+with this profile, not with a full circular disc.
 
 Part frame (``build_pd_transgear_removable``): axis Z through the origin, plate
 z = 0..PLATE, drive-pin holes on local +/-Y, a TOOTH (not a gap) centred on
@@ -104,10 +104,17 @@ def caliper_minus_tol(teeth: int) -> float:
 
 
 # --- plate and mounting interface (all three configurations) -----------------
-PLATE = 2.8  # 0.110 in, the #25 tooth width; flat both faces, no hub
-# Faced to thickness, never over nominal: the hub's rear face stands 0.7 in
-# front of the wheel, and the chain's inner plates straddle it.
+PLATE = 2.8  # supplied 0.110 in plate (2.794 mm), hub removed flush
+# Incoming inspection of the supplied plate: never over nominal.  Facing the
+# hub flush must not cut below the plate face or change the existing z stack.
 PLATE_BAND = (0.0, -0.10)  # (upper, lower) deviations
+# Vendor tooth side relief on BOTH plate faces: 0.075 in radial, 16.172 deg
+# to the face (73.828 deg cone semi-angle), measured from the STEPs below.
+CHAMFER_RADIAL = 0.075 * MM_PER_IN  # 1.905
+CHAMFER_FACE_ANGLE_DEG = 16.172
+CHAMFER_AXIAL = CHAMFER_RADIAL * math.tan(math.radians(CHAMFER_FACE_ANGLE_DEG))
+if 2.0 * CHAMFER_AXIAL >= PLATE + min(PLATE_BAND):
+    raise AssertionError("the supplied tooth chamfers must leave a mid-plate land")
 # Float model: the chain rides the 2.8 wheel and floats axially until an
 # inner plate's inner face meets a wheel face.  Measured from the SEAT face
 # (the wheel's rear face): frontmost, the rear inner plate lies on the seat
@@ -148,15 +155,29 @@ BORE_PIN_WEB = PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0 - BORE_DIA / 2.0  # 0.60
 CONFIGS: tuple[tuple[str, int], ...] = (("T12", 12), ("T18", 18), ("T24", 24))
 TEETH = dict(CONFIGS)
 DEFAULT_CONFIG = "T24"  # the part saves on T24
+# Live McMaster pages and local-only vendor CAD measured 2026-10-08;
+# full provenance: cad/references/mcmaster/README.md, 6793K sprocket entry.
+# https://www.mcmaster.com/6793K4/ (T12), STEP SHA-256:
+# f220620116bb06a842faba75d61c33d807c639239e81f23ba5e4360af239f470
+# https://www.mcmaster.com/6793K11/ (T18), STEP SHA-256:
+# daa0cdef6391e60ffeeba99f35a9436edcf90b3098384b043b5754693caed894
+# https://www.mcmaster.com/6793K17/ (T24), STEP SHA-256:
+# 6d88447ab5e301a19f42d172e319aedea319892d7790cbe6a7ecbc0c5dd98253
+# All pages state only Steel, not a grade; tooth mid-profiles are within
+# 0.007 mm Hausdorff of the ACA model.  These are blanks, not VN items:
+# hub facing, boring and pin drilling leave the fabricated PD identity.
+BLANK_SKUS = {"T12": "6793K4", "T18": "6793K11", "T24": "6793K17"}
+if tuple(BLANK_SKUS) != tuple(name for name, _teeth in CONFIGS):
+    raise AssertionError("every configuration needs its purchased blank")
 
 # --- manufacturing drawing (one sheet: the T24 views plus one edge view each
 # of T12 and T18; SPROCKET DATA lists all three configurations) --------------
 # The plate thickness carries PLATE_BAND; the bore and the pin holes are
 # drilled (the title block's DRILLED HOLES row governs them); each pin centre
 # carries +/-DRIVE_PIN_OFFSET_TOL at .XXX.  PinNegDia is the same global as
-# PinPosDia and prints once as its "2X".  BlankDia, the turned outside
-# diameter, is configuration-driven ("2 * Ra") and prints once per
-# configuration at .X, the title block's one-place row.
+# PinPosDia and prints once as its "2X".  BlankDia is the supplied outside
+# diameter, configuration-driven ("2 * Ra"), printed once per configuration
+# at .X as a REFERENCE only: it is not a turning operation.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia", "BlankWidth"},
     "BorePinsProfile": {"BoreDiaDim", "PinPosDia", "PinPosY", "PinNegY"},
@@ -179,6 +200,7 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for names in DRAWING_PRECISION.values()
     for name, places in names.items()
 }
+DRAWING_REFERENCE_DIMENSIONS = frozenset({"BlankDia"})
 
 # --- shared machine z band (both shafts) -------------------------------------
 # User ruling 2026-09-30: 1.8 forward of the first seat (-152.5); the chain
@@ -243,7 +265,7 @@ def bottom_dia(teeth: int) -> float:
 
 
 def seat_bottom_dia(teeth: int) -> float:
-    """Diameter through the seating-curve bottoms, PD - 2 R (the as-cut root)."""
+    """Diameter through the supplied seating-curve bottoms, PD - 2 R."""
     return pitch_dia(teeth) - 2.0 * SEAT_CURVE_R
 
 
@@ -284,7 +306,7 @@ def gap_geometry(teeth: int) -> dict[str, float]:
     ty = TOPPING_CENTRE_OFFSET * math.cos(half)
     topping_start = a_ang - b_ang - math.pi / 2.0
     zx, zy = tx + f * math.cos(topping_start), ty + f * math.sin(topping_start)
-    # The turned OD meets the topping circle ``gamma`` short of b's bearing.
+    # The supplied OD meets the topping circle ``gamma`` short of b's bearing.
     dist = math.hypot(tx, ty)
     cos_gamma = (dist * dist + ra * ra - f * f) / (2.0 * dist * ra)
     if not -1.0 < cos_gamma < 1.0:
@@ -298,7 +320,7 @@ def gap_geometry(teeth: int) -> dict[str, float]:
     if not topping_start < topping_end:
         raise AssertionError(f"T{teeth}: the OD cuts the topping curve before z")
     if not 0.0 < corner_ang < half:
-        raise AssertionError(f"T{teeth}: the turned OD leaves no tip land")
+        raise AssertionError(f"T{teeth}: the supplied OD leaves no tip land")
     return {
         "half_pitch_angle": half,
         "ra": ra,
@@ -364,9 +386,76 @@ def blank_volume(teeth: int) -> float:
     return math.pi * (outside_dia(teeth) / 2.0) ** 2 * PLATE
 
 
+def chamfer_volume(teeth: int) -> float:
+    """Both conical face cuts intersected with the ACA teeth (mm^3).
+
+    At radius r in [a, R], a = R - radial relief, each face loses
+    (r - a) tan(face angle) axially.  The material occupies 2 N (pi/N - theta)
+    radians, where theta is the upper tooth-gap boundary's polar angle.
+    Thus the removed volume is 4 N tan(angle) integral r (r-a) (pi/N-theta) dr.
+    Circle/ray and line/ray intersections give theta analytically; composite
+    Simpson integration over each smooth flank segment converges within
+    1e-7 mm^3 at 128 panels for the three supplied blanks.  In particular this
+    does NOT subtract the full triangular ring, which cuts mostly tooth gaps.
+    """
+    g = gap_geometry(teeth)
+    lower = g["ra"] - CHAMFER_RADIAL
+    seat_end = math.hypot(
+        g["rp"] + g["seat_r"] * math.cos(g["seat_start"]),
+        g["seat_r"] * math.sin(g["seat_start"]),
+    )
+    work_end = math.hypot(g["flank_start_x"], g["flank_start_y"])
+    flank_end = math.hypot(g["flank_end_x"], g["flank_end_y"])
+    if not seat_end < lower < work_end < flank_end < g["ra"]:
+        raise AssertionError(
+            f"T{teeth}: supplied chamfer no longer starts on working arc"
+        )
+
+    def circle_angle(r: float, cx: float, cy: float, radius: float, sign: int) -> float:
+        distance = math.hypot(cx, cy)
+        cosine = (r * r + distance * distance - radius * radius) / (2.0 * r * distance)
+        return math.atan2(cy, cx) + sign * math.acos(max(-1.0, min(1.0, cosine)))
+
+    def integrand(r: float) -> float:
+        if r <= work_end:
+            theta = circle_angle(r, g["working_cx"], g["working_cy"], g["working_r"], 1)
+        elif r >= flank_end:
+            theta = circle_angle(
+                r, g["topping_cx"], g["topping_cy"], g["topping_r"], -1
+            )
+        else:
+            x, y = g["flank_start_x"], g["flank_start_y"]
+            dx, dy = g["flank_end_x"] - x, g["flank_end_y"] - y
+            dot, length_sq = x * dx + y * dy, dx * dx + dy * dy
+            t = (
+                -dot + math.sqrt(dot * dot + length_sq * (r * r - x * x - y * y))
+            ) / length_sq
+            theta = math.atan2(y + t * dy, x + t * dx)
+        return r * (r - lower) * (g["half_pitch_angle"] - theta)
+
+    panels = 128  # even, with every curve join at a panel boundary
+    integral = 0.0
+    edges = (lower, work_end, flank_end, g["ra"])
+    for lo, hi in zip(edges, edges[1:], strict=False):
+        step = (hi - lo) / panels
+        integral += (
+            step
+            / 3.0
+            * (
+                integrand(lo)
+                + integrand(hi)
+                + sum(
+                    (4.0 if k % 2 else 2.0) * integrand(lo + k * step)
+                    for k in range(1, panels)
+                )
+            )
+        )
+    return 4.0 * teeth * math.tan(math.radians(CHAMFER_FACE_ANGLE_DEG)) * integral
+
+
 def toothed_volume(teeth: int) -> float:
-    """Volume (mm^3) after the tooth gaps, before the bore and pin holes."""
-    return blank_volume(teeth) - teeth * gap_area(teeth) * PLATE
+    """Supplied tooth profile and both face chamfers, before the shop holes."""
+    return blank_volume(teeth) - teeth * gap_area(teeth) * PLATE - chamfer_volume(teeth)
 
 
 def part_volume(teeth: int) -> float:

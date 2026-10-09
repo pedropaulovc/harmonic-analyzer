@@ -3022,6 +3022,9 @@ def task_check():
         # The removable sprocket's seat interface: its recorded web/rim
         # shortfalls and the #25 plates' clearance over the shared seat.
         SCRIPTS_DIR / "test_pd_transgear_removable_seat.py",
+        # The supplied tooth-side cones must match their native sections and
+        # the finished-part volume gate in every bought-blank configuration.
+        SCRIPTS_DIR / "test_pd_transgear_removable_chamfer.py",
         # The transgear hanger's screwed joints, pivot head play and the latch
         # pin's press, judged at the printed bands (transgear_hanger_joints).
         SCRIPTS_DIR / "test_transgear_hanger_joints.py",

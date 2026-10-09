@@ -1,10 +1,10 @@
 pd-transgear-removable:
   title: Removable Chain Sprocket
   number: MHA-PD-009
-  description: "ANSI #25 CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+  description: "ANSI #25 CHAIN SPROCKET, T12/T18/T24; 1 EACH; McMASTER BLANKS REWORKED"
   material: Plain Carbon Steel
-  material_specification: Bright plain-carbon steel plate; no plating
-  finish: bright, unplated
+  material_specification: "bought steel ANSI #25 sprocket: McMaster 6793K4 (T12), 6793K11 (T18), 6793K17 (T24); supplier states no steel grade"
+  finish: "as supplied, unplated; supplier states no coating"
   quantity: 1
   tolerance_class: machined_block
-  process: "machined (steel plate)"
+  process: "modify McMaster 6793K4 (T12) / 6793K11 (T18) / 6793K17 (T24) steel plain-bore ANSI #25 sprockets, teeth, OD and plate faces as supplied: turn the hub off flush with the supplied plate; bore Ø10.3 through; drill two Ø2.5 through drive-pin holes on Ø14 pitch circle"

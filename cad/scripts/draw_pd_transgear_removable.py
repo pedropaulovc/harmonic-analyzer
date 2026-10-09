@@ -6,8 +6,8 @@ T18 and T24 (the tooth count and the diameters it sets).  The face view
 (``*Front``) carries the bore, the two drive-pin holes and their locations;
 the edge view (``*Top``, third-angle above it) carries the plate thickness
 and the outside diameter, whose dimensions lie in the revolve sketch's Top
-plane.  The outside diameter is the one dimension the tooth count changes, so
-T12 and T18 each get a small labelled edge view of their own configuration
+plane.  The supplied outside diameter is reference-only, not a turning
+operation.  T12 and T18 each get a labelled edge view of their configuration
 carrying the same model dimension, read back at that configuration's value.
 """
 
@@ -35,6 +35,7 @@ from _drawing_common import (
     rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
 )
@@ -48,6 +49,7 @@ from pd_transgear_removable_spec import (
     DEFAULT_CONFIG,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_DIMENSIONS,
     PLATE,
     TEETH,
     outside_dia,
@@ -221,7 +223,7 @@ def _assert_outside_diameter(
     """Prove a view prints THIS configuration's outside diameter natively.
 
     One model dimension carries all three diameters; each view reads the one
-    of its referenced configuration, at the places the part authored.
+    of its referenced configuration, at the part's places and reference-only.
     """
     found = [a for a in annotations if dimension_name(adapter, a) == "BlankDia"]
     if len(found) != 1:
@@ -234,6 +236,13 @@ def _assert_outside_diameter(
     )
     places = int(display.GetPrimaryPrecision2())
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    prefix, suffix = str(display.GetText(1) or ""), str(display.GetText(2) or "")
+    tolerance_type = int(_early_bound(dimension.Tolerance, "IDimensionTolerance").Type)
+    if (prefix, suffix) != ("(<MOD-DIAM>", ")") or tolerance_type != 0:
+        raise RuntimeError(
+            f"{configuration}: BlankDia must be reference-only and unbanded; "
+            f"prefix={prefix!r}, suffix={suffix!r}, tolerance type={tolerance_type}"
+        )
     values = dimension.GetSystemValue3(_SPECIFY_CONFIGURATION, configuration)
     if not isinstance(values, (list, tuple)) or len(values) != 1:
         raise RuntimeError(
@@ -316,7 +325,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Removable Chain Sprocket Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "removable ANSI #25 sprocket; T12 / T18 / T24; steel plate",
+            3: "removable ANSI #25 sprocket; T12 / T18 / T24; McMaster blank reworked",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -350,6 +359,7 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="edge",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    set_reference_dimensions(adapter, edge, DRAWING_REFERENCE_DIMENSIONS)
     _assert_outside_diameter(adapter, edge, DEFAULT_CONFIG)
     annotations = [*face, *edge]
     # The T24 edge view imports first, so its import keeps eliminating
@@ -361,14 +371,14 @@ async def build(adapter: Any) -> dict[str, str]:
             keep=configuration_keep(configuration),
             view_label=f"{configuration} edge",
         )
+        set_reference_dimensions(adapter, curated, DRAWING_REFERENCE_DIMENSIONS)
         _assert_outside_diameter(adapter, curated, configuration)
         annotations += curated
         _label_configuration_view(adapter, view, configuration)
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
-    # Decimal places (and so the general-tolerance row each dimension claims)
-    # and the two bands are authored on the part; the sheet only proves the
-    # import kept the places.
+    # Decimal places and bands are part-authored; the sheet proves they
+    # survived import.  Parenthesized supplied ODs claim no general tolerance.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the sprocket face view")

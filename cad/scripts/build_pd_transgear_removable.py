@@ -1,15 +1,16 @@
 r"""Reproduction script: MHA-PD-009 removable ANSI #25 sprocket (book ch. 23, p. 56-61).
 
-Three bright-steel sprockets -- 12 / 18 / 24 teeth -- of which two are mounted
-at a time to set the platen speed: one on the crank's seat collar, one on the
-knob shaft's, both in the ONE chain plane (the third is the loose spare). One
-part, three configurations (T12/T18/T24). Every number is
+Three purchased steel sprockets -- McMaster 6793K4 / 6793K11 / 6793K17,
+12 / 18 / 24 teeth -- with the supplied hub turned off flush with the plate.
+Two are mounted at a time to set the platen speed: one on the crank's seat
+collar, one on the knob shaft's, both in the ONE chain plane (the third is the
+loose spare). One part, three configurations (T12/T18/T24). Every number is
 ``pd_transgear_removable_spec``'s; this script only turns them into features.
 
 Tooth form (spec docstring): the ANSI B29.1 (ACA) #25 standard form -- the
 ``SEAT_CURVE_R`` seating arc centred on the pitch circle, the
 ``WORKING_CURVE_R`` working arc, the straight yz and the topping arc out to
-the turned outside diameter. One tooth gap is one sketch of native arcs and
+the supplied outside diameter. One tooth gap is one sketch of native arcs and
 lines (the in-disc profile, its six joins tangent, closed outside the blank
 by two lines to an apex), every dimension driven by an equation-manager
 global, cut, then circularly patterned.
@@ -18,6 +19,13 @@ radius, the ACA angles A and B and the topping radius F are all equations of
 it (each round-tripped against ``spec.gap_geometry`` at T24), so every
 configuration re-solves its own gap and each configuration's volume is
 checked against ``spec.part_volume``.
+
+The vendor-supplied teeth, OD and plate are built natively, not imported from
+vendor CAD. One revolved cut of two closed Top-plane triangles reproduces
+the supplied tooth-side chamfers on BOTH faces. Its radial position follows
+``Ra`` and its axial position follows ``Plate``; the radial width and face
+angle are configuration-independent spec values. The hub is absent by
+construction; only the through bore and drive-pin holes are shop operations.
 
 Config-independent mounting interface, cut after the tooth pattern: bore
 ``BORE_DIA`` and two ``PIN_HOLE_DIA`` drive-pin holes on ``PIN_CIRCLE_RADIUS``
@@ -102,7 +110,7 @@ from involute_gear import (
 )
 
 PART_NAME = "pd-transgear-removable"
-MATERIAL = "Plain Carbon Steel"  # contract: bright plain-carbon steel plate
+MATERIAL = "Plain Carbon Steel"  # SW physical material; vendor states steel, no grade
 
 DEFAULT_TEETH = spec.TEETH[spec.DEFAULT_CONFIG]
 DRAWING_DIMENSIONS = spec.DRAWING_DIMENSIONS
@@ -481,6 +489,173 @@ async def draw_gap_sketch(adapter, teeth: int, dims: SketchDims) -> None:
         dims.record(name, drive)
 
 
+def chamfer_globals() -> list[tuple[str, str, float]]:
+    """Supplied-face chamfer globals: IPS lengths and degree-based trig."""
+    return [
+        (
+            "ToothChamferRadial",
+            repr(spec.CHAMFER_RADIAL / IN),
+            spec.CHAMFER_RADIAL / IN,
+        ),
+        (
+            "ToothChamferFaceDeg",
+            repr(spec.CHAMFER_FACE_ANGLE_DEG),
+            spec.CHAMFER_FACE_ANGLE_DEG,
+        ),
+        (
+            "ToothChamferAxial",
+            '"ToothChamferRadial" * tan("ToothChamferFaceDeg")',
+            spec.CHAMFER_AXIAL / IN,
+        ),
+    ]
+
+
+def chamfer_points(teeth: int) -> dict[str, Point]:
+    """Radial/axial Top-plane section (mm): sketch Y is part -Z.
+
+    Each closed triangle extends one radial width beyond Ra into air, avoiding
+    a cut edge coincident with the tooth-tip cylinder. Its diagonal intersects
+    Ra at CHAMFER_AXIAL inside its face and starts at Ra - CHAMFER_RADIAL
+    on that face. Both cones therefore leave the mounting plate untouched.
+    """
+    inner = spec.outside_dia(teeth) / 2.0 - spec.CHAMFER_RADIAL
+    outer = spec.outside_dia(teeth) / 2.0 + spec.CHAMFER_RADIAL
+    return {
+        "origin": (0.0, 0.0),
+        "axis_rear": (0.0, -spec.PLATE),
+        "front_inner": (inner, 0.0),
+        "front_outer": (outer, 0.0),
+        "front_tip": (outer, -2.0 * spec.CHAMFER_AXIAL),
+        "rear_inner": (inner, -spec.PLATE),
+        "rear_outer": (outer, -spec.PLATE),
+        "rear_tip": (outer, -spec.PLATE + 2.0 * spec.CHAMFER_AXIAL),
+    }
+
+
+CHAMFER_ENTITIES: dict[str, tuple[str, str]] = {
+    "ChamferAxis": ("origin", "axis_rear"),
+    "FrontFace": ("front_inner", "front_outer"),
+    "FrontOuter": ("front_outer", "front_tip"),
+    "FrontCone": ("front_tip", "front_inner"),
+    "RearFace": ("rear_inner", "rear_outer"),
+    "RearOuter": ("rear_outer", "rear_tip"),
+    "RearCone": ("rear_tip", "rear_inner"),
+}
+
+# Same dimension/drive recording convention as GAP_DIMENSIONS; distances are
+# unsigned, with the two triangles created on their intended sides of the faces.
+CHAMFER_DIMENSIONS: tuple[tuple[str, str, str, str, str], ...] = (
+    ("ChamferAxisLength", "vertical_distance", "ChamferAxis.end", "origin", '"Plate"'),
+    (
+        "FrontChamferRadius",
+        "horizontal_distance",
+        "FrontFace.start",
+        "origin",
+        '"Ra" - "ToothChamferRadial"',
+    ),
+    (
+        "FrontChamferWidth",
+        "horizontal_distance",
+        "FrontFace.start",
+        "FrontFace.end",
+        '2 * "ToothChamferRadial"',
+    ),
+    (
+        "FrontChamferDepth",
+        "vertical_distance",
+        "FrontOuter.start",
+        "FrontOuter.end",
+        '2 * "ToothChamferAxial"',
+    ),
+    (
+        "RearChamferRadius",
+        "horizontal_distance",
+        "RearFace.start",
+        "origin",
+        '"Ra" - "ToothChamferRadial"',
+    ),
+    ("RearChamferOffset", "vertical_distance", "RearFace.start", "origin", '"Plate"'),
+    (
+        "RearChamferWidth",
+        "horizontal_distance",
+        "RearFace.start",
+        "RearFace.end",
+        '2 * "ToothChamferRadial"',
+    ),
+    (
+        "RearChamferDepth",
+        "vertical_distance",
+        "RearOuter.start",
+        "RearOuter.end",
+        '2 * "ToothChamferAxial"',
+    ),
+)
+
+
+def chamfer_point(points: dict[str, Point], ref: str) -> Point:
+    """Resolve a chamfer sketch entity endpoint or the origin."""
+    if ref == "origin":
+        return points["origin"]
+    entity, _, suffix = ref.partition(".")
+    return points[CHAMFER_ENTITIES[entity][{"start": 0, "end": 1}[suffix]]]
+
+
+async def draw_chamfer_sketch(adapter, teeth: int, dims: SketchDims) -> None:
+    """Two closed, fully dimensioned triangles and one Z rotation axis."""
+    points = chamfer_points(teeth)
+    ids: dict[str, str] = {}
+    set_sketch_direct_db(adapter, True)
+    for name, (start, end) in CHAMFER_ENTITIES.items():
+        if name == "ChamferAxis":
+            result = await adapter.add_centerline(*points[start], *points[end])
+        else:
+            result = await adapter.add_line(*points[start], *points[end])
+        ids[name] = check(f"tooth chamfer {name}", result)
+    set_sketch_direct_db(adapter, False)
+
+    def entity_ref(ref: str) -> str:
+        entity, dot, suffix = ref.partition(".")
+        return ref if ref == "origin" else ids[entity] + dot + suffix
+
+    for name, relation in (
+        ("ChamferAxis", "vertical"),
+        ("FrontFace", "horizontal"),
+        ("FrontOuter", "vertical"),
+        ("RearFace", "horizontal"),
+        ("RearOuter", "vertical"),
+    ):
+        check(
+            f"tooth chamfer {name} {relation}",
+            await adapter.add_sketch_constraint(ids[name], None, relation),
+        )
+    for ref, relation in (
+        ("ChamferAxis.start", "coincident"),
+        ("FrontFace.start", "horizontal_points"),
+    ):
+        check(
+            f"tooth chamfer {ref} -> origin",
+            await adapter.add_sketch_constraint(entity_ref(ref), "origin", relation),
+        )
+    # Identical endpoints merge at creation with inference off, as in the gap
+    # sketch; no fixed entities or configuration-specific coordinates survive.
+    for name, kind, ref, other, drive in CHAMFER_DIMENSIONS:
+        first, second = chamfer_point(points, ref), chamfer_point(points, other)
+        coordinate = 0 if kind == "horizontal_distance" else 1
+        value = abs(first[coordinate] - second[coordinate])
+        check(
+            f"tooth chamfer {name} = {value:.4f}",
+            await adapter.add_sketch_dimension(
+                entity_ref(ref), entity_ref(other), kind, value
+            ),
+        )
+        dims.record(name, drive)
+
+
+def chamfer_volume_tolerance(teeth: int, expected: float) -> float:
+    """Keep either missing supplied face outside the native volume gate."""
+    return min(0.01 * expected, spec.chamfer_volume(teeth) / 4.0)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
@@ -500,6 +675,8 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     await set_global(adapter, "TrigProbe", "cos(60)", 0.5)
     for name, expression, expected in gap_globals(DEFAULT_TEETH):
+        await set_global(adapter, name, expression, expected)
+    for name, expression, expected in chamfer_globals():
         await set_global(adapter, name, expression, expected)
 
     # Plain length knobs for the config-independent geometry (plate + the
@@ -550,8 +727,8 @@ async def build(adapter) -> dict[str, str]:
         (axis_edge, "vertical"),
     ):
         check(f"blank {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    # The turned outside diameter, doubled off the axis so the model owns the
-    # diameter a drawing prints (not a radius a sheet would have to double).
+    # The supplied outside diameter, doubled off the axis so the model owns
+    # the diameter a drawing prints (not a radius a sheet would have to double).
     await add_diametric_linear_dimension(
         adapter, axis, side_line, (ra_default_mm / 2.0, 4.0), "BlankDia"
     )
@@ -682,17 +859,37 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
 
-    # Fail fast: validate the toothed disc at the default tooth count before
-    # any configuration work (localises pattern failures to this feature).
+    # ------------------------------------------------------------------
+    # Supplied tooth-side chamfers: both faces in one native revolve cut.
+    # Cut AFTER the pattern, so the toothed-volume gate includes both cones
+    # intersected with the actual teeth, not a full-disc ring subtraction.
+    # ------------------------------------------------------------------
+    chamfer_dims = SketchDims()
+    check("create_sketch tooth chamfers", await adapter.create_sketch("Top"))
+    await draw_chamfer_sketch(adapter, DEFAULT_TEETH, chamfer_dims)
+    await ensure_fully_defined(adapter, "tooth chamfer sketch")
+    check("exit_sketch tooth chamfers", await adapter.exit_sketch())
+    chamfer_profile = name_last_feature(adapter, "ToothChamferProfile")
+    drive_jobs += chamfer_dims.apply(adapter, chamfer_profile)
+    check(
+        "revolve both tooth chamfers",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    tooth_chamfers = name_last_feature(adapter, "ToothSideChamfers")
+
+    # Fail fast: validate supplied teeth AND both chamfers at the default
+    # count before configuration work (localises tooth-feature failures).
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
-        raise RuntimeError(f"post-pattern mass properties failed: {mass.error}")
+        raise RuntimeError(f"post-chamfer mass properties failed: {mass.error}")
     toothed = float(mass.data.volume)
     expected_toothed = spec.toothed_volume(DEFAULT_TEETH)
-    if abs(toothed - expected_toothed) > 0.01 * expected_toothed:
+    if abs(toothed - expected_toothed) > chamfer_volume_tolerance(
+        DEFAULT_TEETH, expected_toothed
+    ):
         raise RuntimeError(
             f"toothed disc volume {toothed:.1f} mm^3, analytic "
-            f"{expected_toothed:.1f} -- pattern produced wrong geometry"
+            f"{expected_toothed:.1f} -- teeth/chamfers produced wrong geometry"
         )
     _telemetry.success(f"toothed disc volume {toothed:.1f} (analytic {expected_toothed:.1f})")
 
@@ -789,7 +986,9 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"post-drive mass properties failed: {mass.error}")
     driven = float(mass.data.volume)
     expected_driven = spec.part_volume(DEFAULT_TEETH)
-    if abs(driven - expected_driven) > 0.01 * expected_driven:
+    if abs(driven - expected_driven) > chamfer_volume_tolerance(
+        DEFAULT_TEETH, expected_driven
+    ):
         raise RuntimeError(
             f"driven part volume {driven:.1f} mm^3, analytic {expected_driven:.1f} "
             "-- drive equations are not geometry-neutral"
@@ -826,7 +1025,9 @@ async def build(adapter) -> dict[str, str]:
     volumes: dict[str, float] = {}
     for name, teeth in spec.CONFIGS:
         check(f"activate {name}", await adapter.set_active_configuration(name))
-        log_gap_state(adapter, name, gap_profile, (gap_cut, gap_pattern))
+        log_gap_state(
+            adapter, name, gap_profile, (gap_cut, gap_pattern, tooth_chamfers)
+        )
 
         count = read_dimension(adapter, count_dim)
         if abs(count - teeth) > 1e-9:
@@ -838,7 +1039,7 @@ async def build(adapter) -> dict[str, str]:
             raise RuntimeError(f"{name}: get_mass_properties failed: {mass.error}")
         volume = float(mass.data.volume)
         expected = spec.part_volume(teeth)
-        if abs(volume - expected) > 0.01 * expected:
+        if abs(volume - expected) > chamfer_volume_tolerance(teeth, expected):
             raise RuntimeError(
                 f"{name}: volume {volume:.1f} mm^3, analytic {expected:.1f} -- "
                 "regeneration produced wrong geometry"
@@ -896,10 +1097,10 @@ async def build(adapter) -> dict[str, str]:
         await adapter.set_active_configuration(spec.DEFAULT_CONFIG),
     )
     await report_mass_properties(adapter)
-    # Manufacturing drawing support: the plate is faced never over nominal and
-    # each pin centre holds its location band; the bore and pin-hole sizes are
-    # drilled (the title block's DRILLED HOLES row governs them).  The places
-    # are the part's (policy rule 2).
+    # Manufacturing drawing support: supplied plate thickness stays within
+    # its nominal band and each machined pin centre holds its location band.
+    # Bore and pin-hole sizes are drilled (the title block's DRILLED HOLES
+    # row governs them). The places are the part's (policy rule 2).
     set_dimension_bilateral_tolerance(
         adapter, "BlankProfile", "BlankWidth", *deviations(spec.PLATE_BAND)
     )
