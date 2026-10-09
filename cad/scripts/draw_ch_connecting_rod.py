@@ -5,7 +5,7 @@ views, dimension layout, hole callouts, and manufacturing notes; every shared
 sheet/template, import, curation, and export behavior lives in
 ``_drawing_common``.
 
-The rod is a tall thin lollipop (~170 mm ring-bottom to head-crown), so the
+The rod is a tall thin lollipop (~190 mm ring-bottom to fork crown), so the
 sheet runs at 1:1 with a 1:2 isometric.
 
 Run with SolidWorks open::
@@ -21,6 +21,7 @@ from typing import Any
 
 from ch_connecting_rod_spec import GEOMETRIC_TOLERANCES_MM
 
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
@@ -41,12 +42,16 @@ from _drawing_common import (
     set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _gear_drawing_entities import visible_circle_edge
 from _hole_spec import blind_cut_dia_mm
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from ch_connecting_rod_notes import DRAWING_DIMENSIONS, PIN_CSK_QUALIFIER
 from ch_connecting_rod_spec import (
     CENTER_DISTANCE,
-    HEAD_TOP_Y,
+    FORK_BASE_Y,
+    FORK_CROTCH_Y,
+    FORK_TOP_Y,
     PIN_HOLE_SPEC,
     RING_BORE_DIA,
     RING_BOTTOM_Y,
@@ -74,12 +79,17 @@ _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 SHEET_SCALE = (1.0, 1.0)  # 1:1
 
 # Front-view model bbox: X symmetric about 0, Y from the ring bottom up to the
-# head crown.
-_BBOX_CY = (RING_BOTTOM_Y + HEAD_TOP_Y) / 2.0
+# fork crown.  The left view shares it (Z symmetric about the mid-plane).
+_BBOX_CY = (RING_BOTTOM_Y + FORK_TOP_Y) / 2.0
 
 FRONT_CENTER = (0.180, 0.135)
-LEFT_CENTER = (0.080, 0.171)  # stepped-thickness profile, inside the top zone
-ISO_CENTER = (0.360, 0.140)
+# Third-angle left view, aligned with the front view so the fork's thickness
+# and slot dimensions stand in the clear band above its crown.
+LEFT_CENTER = (0.080, FRONT_CENTER[1])
+ISO_CENTER = (0.385, 0.140)
+# The notes column sits between the front view's pin annotations and the
+# isometric view (the left view now runs down the old bottom-left column).
+NOTES_XY = (0.258, 0.185)
 
 
 def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
@@ -90,16 +100,57 @@ def _sheet_xy(mx: float, my: float) -> tuple[float, float]:
     )
 
 
+def _left_xy(offset: float, my: float) -> tuple[float, float]:
+    """Sheet (x, y) ``offset`` mm right of the left view's mid-plane at model
+    height ``my`` (1:1)."""
+    return (
+        LEFT_CENTER[0] + offset / 1000.0,
+        LEFT_CENTER[1] + (my - _BBOX_CY) / 1000.0,
+    )
+
+
 FRONT_KEEP = {
     "RingOuterDia": (0.185, 0.070),
     "StrapBoreDia": (0.190, 0.052),
     "ShankWidthDim": (0.180, 0.150),
+    "ForkWidthDim": _sheet_xy(0.0, FORK_TOP_Y + 8.0),
 }
-RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+# The fork's 3-place thickness and slot stack above the crown; the slot depth
+# and the boss length run from the tine tops down the right-hand side.
+LEFT_KEEP = {
+    "SlotWidth": _left_xy(0.0, FORK_TOP_Y + 6.0),
+    "ForkThick": _left_xy(0.0, FORK_TOP_Y + 13.0),
+    "SlotDepth": _left_xy(12.0, (FORK_TOP_Y + FORK_CROTCH_Y) / 2.0),
+    "ForkBossLength": _left_xy(24.0, (FORK_TOP_Y + FORK_BASE_Y) / 2.0),
+}
 TOP_KEEP: dict[str, tuple[float, float]] = {}
 
 BORE_FINISH_EDGE = _sheet_xy(RING_BORE_DIA / 2.0, 0.0)
 BORE_FINISH_SYMBOL = (BORE_FINISH_EDGE[0] + 0.025, BORE_FINISH_EDGE[1] + 0.015)
+
+
+def _add_countersink_line(display: Any) -> None:
+    """Add the countersink row under the pin hole's native drill callout.
+
+    swDimensionTextCalloutBelowDefinition (8) pairs with the writable
+    swDimensionTextCalloutBelow (4); the native size and depth rows stay
+    untouched, so their Hole Wizard variables stay associative
+    (draw_ch_rocker_arm_tl_profile_fixture._locate_pivot_tap_depths)."""
+    display = _sw_type_info.early_bound_or_flag(
+        display, "IDisplayDimension", "SetText", "GetText"
+    )
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    _telemetry.info(f"pin hole callout definitions before: {definitions!r}")
+    below = definitions[8].rstrip()
+    updated = f"{below}\n{PIN_CSK_QUALIFIER}" if below else PIN_CSK_QUALIFIER
+    display.SetText(4, updated)
+    if str(display.GetText(8) or "") != updated or any(
+        str(display.GetText(part) or "") != definitions[part] for part in (5, 6, 7)
+    ):
+        raise RuntimeError(
+            "pin hole countersink line or untouched native definitions did not "
+            f"persist: {[str(display.GetText(part) or '') for part in (5, 6, 7, 8)]!r}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -138,17 +189,17 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Connecting Rod Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "connecting rod; cast iron; cam strap",
+            3: "connecting rod; 1018 steel; fork and cam strap",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 1))
     # The 1:1 left view (third angle: placed LEFT of the front) shows the
-    # stepped thickness (ring 3.0 / shank+head 2.5) the notes describe -- a
-    # single orthographic view left the step geometry to prose (machinist
-    # round 2).  The right-hand column belongs to the title block, so the
-    # section lives on the left.
+    # stepped thickness -- ring 3.0, shank 2.5, and the 6.075 fork split by its
+    # slot into two tines -- and carries the fork's thickness, slot width, slot
+    # depth and boss length.  The right-hand column belongs to the title block,
+    # so the side view lives on the left.
     left = place_view(adapter, str(SOURCE), "*Left", *LEFT_CENTER, scale=(1, 1))
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 2))
     for view in (left, iso):
@@ -156,20 +207,35 @@ async def build(adapter: Any) -> dict[str, str]:
     set_hidden_lines_visible(adapter, front)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    curate_view_dimensions(
+        adapter,
+        left,
+        keep=LEFT_KEEP,
+        view_label="left",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     # The strap-bore tolerance imports with the named model dimension.  The
-    # drawing owns only this descriptive text beneath the native value/band.
-    set_dimension_callouts(adapter, front_annotations, {"StrapBoreDia": "BORE"})
+    # drawing owns only this descriptive text beneath the native value/band;
+    # the fork's crown is a full round on the pin, tangent to its sides.
+    set_dimension_callouts(
+        adapter, front_annotations, {"StrapBoreDia": "BORE", "ForkWidthDim": "FULL R"}
+    )
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")
 
     # Centre distance: ring bore edge to the rocker-pin bore edge (SolidWorks
     # dimensions circle edges centre-to-centre); box it BASIC.  Pick each bore's
-    # LEFT rim -- the pin bore is tiny and sits inside the head crown, so a TOP
-    # pick snapped to the crown arc (read 145.07); the left rim is unambiguously
-    # on the pin circle, clear of the wider crown.
+    # LEFT rim -- the pin bore is tiny and sits inside the fork crown, so a TOP
+    # pick snapped to the crown arc (read 145.07); the left rim is on the pin
+    # circle, clear of the wider crown.  The countersink rims beside it are
+    # concentric, so either pick dimensions centre to centre.
     ring_rim = _sheet_xy(-RING_BORE_DIA / 2.0, 0.0)
     pin_rim = _sheet_xy(-_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     centre_distance = add_edge_dimension(
@@ -182,14 +248,17 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, centre_distance, label="rod centre distance")
 
-    # Rocker pin hole native callout.
-    add_native_hole_callout(
+    # Pivot pin hole native callout, on the drill's own circle: a rim pick now
+    # lands 0.6 mm from the countersink rim, which is a chamfer edge the Hole
+    # Wizard callout cannot carry.  The countersink line rides beneath it.
+    pin_callout = add_native_hole_callout(
         adapter,
         front,
-        edge_xy=pin_rim,
-        callout_xy=(0.235, 0.208),
+        edge=visible_circle_edge(adapter, front, _PIN_HOLE_DIA),
+        callout_xy=(0.240, 0.243),
         label="rocker pin hole",
     )
+    _add_countersink_line(pin_callout)
 
     # Datum A on the strap bore axis (picked at 9 o'clock so the tag stands off
     # to the LEFT), Ra on the bore at 6 o'clock, and a position FCF tying the
@@ -234,10 +303,9 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "strap_bore"),
         label="strap bore finish",
     )
-    # The hole callout owns the 9-o'clock rim and routes down-right to its
-    # text; anchoring the FCF at the same point crossed the two leaders (layout
-    # audit).  Attach the frame at 3 o'clock and keep it in a higher lane so
-    # its whole leader stays clear of the callout path.
+    # The hole callout leaves the drill circle for the lane above the crown;
+    # the FCF attaches at the 3-o'clock rim with a level leader below that
+    # lane, so the two leaders cannot cross.
     pin_fcf_rim = _sheet_xy(_PIN_HOLE_DIA / 2.0, CENTER_DISTANCE)
     add_feature_control_frame(
         adapter,
@@ -251,8 +319,8 @@ async def build(adapter: Any) -> dict[str, str]:
         label="rocker pin hole position",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.070)
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.205)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    add_property_linked_note(adapter, "Isometric View Note", 0.350, 0.205)
 
     return await finalize_drawing(
         adapter,

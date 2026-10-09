@@ -83,6 +83,7 @@ def test_linked_notes_are_functional_metric_and_not_title_block_duplicates() -> 
     assert "#47" not in notes
     assert "6. PIVOT HOLE: REAM." in notes
     assert "16.00 REF" in notes
+    assert "2. ALL HOLES THRU." in notes
     # User ruling 2026-09-26: the edge height over the pivot is the control
     # (a model dimension, test_top_edge_height_is_a_banded_model_dimension);
     # the arc centre distance is reference.
@@ -203,6 +204,49 @@ def test_hub_length_prints_its_one_sided_band() -> None:
     )
     assert ch_rocker_arm_spec.HUB_LENGTH_BAND == (0.05, 0.0)
     assert f"{ch_rocker_arm_spec.HUB_LENGTH:.2f}" not in ch_rocker_arm_notes.DRAWING_NOTES
+
+
+def test_strap_thickness_prints_its_band_natively() -> None:
+    """Main ruling 2026-10, option b: each inter-arm gap holds one tine of
+    each neighbouring rod fork, so the strap prints 2.500 +/-0.025 at three
+    places on the Strap extrude's own depth (policy rule 2), selected by
+    feature and dimension name in the end view, and no note repeats it."""
+    from _drawing_contract import model_toleranced_dimensions
+
+    assert ch_rocker_arm_spec.ARM_THICKNESS_BAND == (0.025, -0.025)
+    assert ch_rocker_arm_notes.DRAWING_DIMENSIONS["Strap"] == {"StrapThickness"}
+    assert ch_rocker_arm_notes.DRAWING_PRECISION["Strap"]["StrapThickness"] == 3
+    assert "StrapThickness" in drawing.RIGHT_KEEP
+    assert "StrapThickness" not in drawing.FRONT_KEEP
+    assert model_toleranced_dimensions(arm)[("Strap", "StrapThickness")] == "strap_upper"
+    build = "".join(Path(arm.__file__).read_text(encoding="utf-8").split())
+    assert 'name_dimensions(adapter,"Strap",["StrapThickness"])' in build
+    assert "strap_lower,strap_upper=deviations(ARM_THICKNESS_BAND)" in build
+    assert "(strap_thickness_dim[0],'\"ArmThickness\"')" in build
+    joined = " ".join(
+        line.strip() for line in ch_rocker_arm_notes.DRAWING_NOTES.splitlines()
+    )
+    assert "2. ALL HOLES THRU." in joined
+    assert "STRAP 2.50" not in joined
+    assert "THICK" not in joined
+    assert "GROUND" not in joined  # the strap faces are milled (plan op 20)
+
+
+def test_strap_thickness_text_clears_datum_b_the_frame_and_the_iso_caption() -> None:
+    x, y = drawing.STRAP_THICKNESS_TEXT_XY
+    # Right of the end view's strap and its hub (1:1).
+    assert x - drawing.RIGHT_CENTER[0] > ch_rocker_arm_spec.HUB_LENGTH / 2000.0 + 0.010
+    # Its line runs above datum B's attachment on the broad face ...
+    datum_b_y = drawing.RIGHT_CENTER[1] + (
+        ch_rocker_arm_spec.ARM_DEPTH - 1.0 - drawing._PIVOT_MID_Y
+    ) / 1000.0
+    assert y >= datum_b_y + 0.003
+    # ... and inside the strap's height above the hub, so it crosses no hub line.
+    view_top = drawing.RIGHT_CENTER[1] + ch_rocker_arm_spec.TOP_END_Y / 2000.0
+    assert y < view_top
+    # Under the iso caption and the rod-pin frame.
+    assert y < drawing.ISO_CAPTION_XY[1] - 0.006
+    assert y < drawing.FCF_XY[1] - 0.007 - 0.010
 
 
 def test_top_edge_height_is_a_banded_model_dimension() -> None:

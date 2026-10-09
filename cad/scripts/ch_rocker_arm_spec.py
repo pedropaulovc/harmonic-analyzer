@@ -26,6 +26,11 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 CURVE_RADIUS = 800.0  # top-edge arc radius = amplitude-bar length (stated)
 ARM_DEPTH = 16.0  # perpendicular top-to-bottom depth (p.29 callout)
 ARM_THICKNESS = 2.5  # plate thickness, Z (p.27 callout)
+# Milled strap faces either side of the integral hub, micrometer-checked
+# (process plan op 20), printed 3-place natively on the strap's thickness
+# (Main ruling 2026-10, option b): each inter-arm gap holds one tine of each
+# neighbouring rod fork (ch_rod_pivot_pin_spec.joint_budget).
+ARM_THICKNESS_BAND = (0.025, -0.025)  # (upper, lower) deviations
 TOP_ARC_LEN = 292.1  # top edge arc length = 11.5" (ch.30 back view)
 BOT_ARC_LEN = 266.7  # bottom edge arc length = 10.5" (ch.30 back-view sketch)
 TIP_FACE = 5.588  # 0.22" tip face, perpendicular to the top edge

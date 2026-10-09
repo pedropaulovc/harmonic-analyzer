@@ -312,7 +312,6 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     plate it straddles. Its minimum -- the modelled nominal -- is the plate at
     max material plus MIN_END_PLAY; the band is +0.30/0, native on the width."""
     import ch_channel_lever_spec as lever
-    import ch_rocker_arm_notes
     import ch_rocker_arm_spec as rocker
     import rocker_bank_layout as bank
     from _drawing_contract import model_toleranced_dimensions
@@ -325,8 +324,11 @@ def test_each_notch_minimum_clears_its_plate_at_max_material() -> None:
     )
     assert lever_print in lever.DRAWING_NOTES
     assert spec.STRAP_THICKNESS == rocker.ARM_THICKNESS
-    assert spec.STRAP_THICKNESS_TOLERANCE == rocker.LINEAR_2PL  # printed at .XX
-    assert f"STRAP {rocker.ARM_THICKNESS:.2f} THICK" in ch_rocker_arm_notes.DRAWING_NOTES
+    # The rocker strap now prints 2.500 +/-0.025 natively (Main ruling
+    # 2026-10, option b); the bar keeps the former .XX band, which covers it,
+    # so the foot notch stays conservative and the bar does not re-key.
+    assert spec.STRAP_THICKNESS_TOLERANCE == rocker.LINEAR_2PL
+    assert spec.STRAP_THICKNESS_TOLERANCE >= max(map(abs, rocker.ARM_THICKNESS_BAND))
     assert spec.STRADDLE_RUNNING_FLOOR == bank.MIN_END_PLAY
 
     upper, lower = spec.NOTCH_WIDTH_BAND

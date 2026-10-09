@@ -38,16 +38,16 @@ geometry is casting-shaped, not milling-shaped.
   | `dt-cone-gear` | 20 | involute teeth cut with a **self-made Eureka-generated form cutter** (cutters for these DP/tooth-counts don't exist — see "How to get this reviewed"), indexed on a dividing head; wire-EDM = outsource alt |
   | `pivot-bushing` / `lever-bushing` | 19 each | turned spacers whose **length** sets channel pitch — length consistency across the set is the point |
   | `ch-rocker-arm` | 20 | flat R800 profile, one setup — ideal CNC profile part |
-  | `ch-connecting-rod` | 20 | flat 2D outline → DXF/2.5D |
+  | `ch-connecting-rod` | 20 | flat 2D outline from 1018 plate, stepped both faces, slotted fork → 2.5D |
   | `sm-knife-mount` | 2 | trivial prismatic block, 2 identical |
 
-- **Casting-vs-bar substitution (3 T1 parts are castings in the registry):** `sm-summing-lever`,
-  `fr-rocker-arm-support`, and `ch-connecting-rod` carry `material: Gray Cast Iron` in
-  `cad/config/parts/*.yaml`. Two are **benign** substitutions — the support cuts fine from bar, and the
-  rod is a flat 2D profile that cuts trivially from plate (book: "rough-finished"). The **lever does
+- **Casting-vs-bar substitution (2 T1 parts are castings in the registry):** `sm-summing-lever` and
+  `fr-rocker-arm-support` carry `material: Gray Cast Iron` in `cad/config/parts/*.yaml`
+  (`ch-connecting-rod` is now 1018 plate, Main ruling 2026-10). The support is a **benign**
+  substitution — it cuts fine from bar. The **lever is
   not** — its ribbed/leaf organic form is casting-native and hogging it from solid means 4–5 setups
   around cantilevered plates. Decide **cast, fabricate (weld/silver-solder up from simple stock), or
-  accept the multi-setup hog** before you start; the support/rod are just a stock choice, the lever is a
+  accept the multi-setup hog** before you start; the support is just a stock choice, the lever is a
   real decision.
   - **`sm-knife-mount` is a material *conflict*, not a settled casting:** its registry
     (`parts/sm-knife-mount.yaml`) and assessment §6 say **Brass**, but `build_sm_knife_mount.py` hardcodes
@@ -106,7 +106,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`dt-cylinder-gear`** ×20 | round brass bar ~63; toothed disc OD62.2×3 + integral eccentric cam OD30.6×3.5 (offset +Y 8.64); total H 6.5 | Ø9.525 (3/8") through bore — **rides free on arbor, no keyway**; 120T involute DP49.82 PA14.5° (2.5D through-cut, patterned → **DXF/2.5D-machinable**); cam = plain eccentric circle (2.5D); **0.4 mm alignment notch** = the +Y co-phased timing datum | cam thin-side wall **1.90 mm**; notch kerf **0.4 mm** (slitting-saw, fragile crests); 3 mm slender disc; **double-sided** (teeth+notch front / cam boss far face) | **≥2** (flip for cam boss) | **CNC-REPEAT** — lathe bore+OD, teeth with a self-made form cutter indexed (wire-EDM = outsource), cam offset, notch by slitting saw; **hold the +Y phasing identical on all 20** |
-| **`ch-connecting-rod`** ×20 | flat plate ~3 mm; 2D outline ~170×40.8; book: "rough-finished" (cosmetically forgiving) | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); Ø2.0 pin hole in head | **~1.4 mm** material over the Ø2 pin (fragile crown); reentrant fillets at shoulder roots (fine — it's an outline); 2.5 mm shank | **1** (profile + 2 drills) | **DXF/2.5D profile** the outline + drill 2 bores; leave body rough |
+| **`ch-connecting-rod`** ×20 | AISI 1018 plate, 1/4" (6.35) faced to 6.075; 2D outline ~188×40.8; ring 3, shank 2.5 and fork 6.075 ±0.05 all on one mid-plane; black finish | Ø30.8 strap bore (rides Ø30.6 cam, 0.1/side); fork 10 wide, full R5 crown on the pin; slot 2.625 +0.127/0, 13 deep from the crown, centred (tines equal within 0.10); #47 pin hole through both tines, 90° CSK Ø3.2 both faces (pin MHA-CH-010 peened in at assembly) | tines **1.725** (1.59 MIN) beside a 2.625 slot — slitting saw or a 3/32 end mill in two passes, hold the 3-place band; both faces stepped (thin 2.5 shank ~150 long faced from 6.35 — chatter/curl); CSK diameter is the peen's fill volume | **2** (flip to face the second side; slot, drill and both CSKs in the second) | **DXF/2.5D profile** the outline, face both sides to the three levels, slit the fork, drill + countersink |
 
 ### Cone gears + shaft (T1 — the DP-49.82 train, tip gears fragile)
 
