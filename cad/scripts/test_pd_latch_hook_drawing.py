@@ -52,31 +52,48 @@ def test_every_marked_dimension_has_one_placement_and_model_places() -> None:
 def test_the_model_owns_every_band_the_sheet_prints() -> None:
     """Drilled holes never under size; the inside bend up to the largest the
     screw head clears; the screw positions, the width and the base length
-    their own ± bands; every formed arm feature the formed band (the far
-    face its per-axis share).  Everything else takes its title-block row."""
+    their own ± bands; every formed arm feature the formed band.  The far
+    face at the pin carries none (a reference).  Everything else takes its
+    title-block row."""
     assert model_toleranced_dimensions(part) == {
         ("ScrewHoleProfile", "ScrewDia"): "*deviations(HOLE_BAND)",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(HOLE_BAND)",
         ("InsideBend", "InsideBendR"): "*deviations(BEND_R_BAND)",
         ("BaseEar", "Width"): "WIDTH_TOL",
         ("BaseEarProfile", "BaseLength"): "BASE_LENGTH_TOL",
-        # The position, formed and face loops (read below).
-        ("feature_name", "dimension_name"): "band",
+        # The position and formed loops share one key (both read below);
+        # the formed loop, the last, takes FORMED_BAND.
+        ("feature_name", "dimension_name"): "FORMED_BAND",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "for feature_name, dimension_names in POSITION_DIMENSIONS.items()" in source
-    assert "((FORMED_DIMENSIONS, FORMED_BAND), (FACE_DIMENSIONS, FACE_BAND))" in source
+    assert "for feature_name, dimension_names in FORMED_DIMENSIONS.items()" in source
     assert min(spec.HOLE_BAND) == 0.0 < max(spec.HOLE_BAND)
     assert spec.BEND_R_BAND[0] == pytest.approx(
         geom.INSIDE_BEND_R_MAX - geom.INSIDE_BEND_R
     )
-    for groups in (spec.FORMED_DIMENSIONS, spec.FACE_DIMENSIONS):
-        for feature, names in groups.items():
-            assert names <= spec.DRAWING_DIMENSIONS[feature]
+    for feature, names in spec.FORMED_DIMENSIONS.items():
+        assert names <= spec.DRAWING_DIMENSIONS[feature]
     for feature, names in spec.POSITION_DIMENSIONS.items():
         assert set(names) <= spec.DRAWING_DIMENSIONS[feature]
-    # The far face's X and Y bands move it at most the formed band along U.
-    assert spec.FAR_FACE_U_BAND <= spec.FORMED_BAND
+
+
+def test_the_far_face_at_the_pin_prints_as_a_reference() -> None:
+    """Review-3 #3: the match-drilled hole's far face is set at fit-up (note
+    3), so its X and Y print in parentheses with no band; the straight's
+    length still controls the formed straight and keeps the formed band."""
+    assert spec.REFERENCE_DIMENSIONS == {"FaceX", "FaceY"}
+    assert spec.REFERENCE_DIMENSIONS <= spec.DRAWING_DIMENSIONS["ArmProfile"]
+    assert not spec.REFERENCE_DIMENSIONS & spec.FORMED_DIMENSIONS["ArmProfile"]
+    assert "StraightLen" in spec.FORMED_DIMENSIONS["ArmProfile"]
+    assert not any(
+        "FaceX" in names or "FaceY" in names
+        for names in spec.POSITION_DIMENSIONS.values()
+    )
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for name in sorted(REFERENCE_DIMENSIONS):" in source
+    assert "set_reference_dimension(" in source
+    assert "STATION" in spec.DRAWING_NOTES.split("\n")[2]
 
 
 def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
@@ -272,7 +289,7 @@ def _texts() -> dict[str, tuple[float, ...]]:
     # "Ø3.20 +0.10" over "0.00", "R1.2 +0.3" over "-0.2", "16.0").
     widths = {
         "ScrewX1": 11, "ScrewX2": 10, "ScrewY": 10, "ScrewDia": 11,
-        "RollStart": 9, "FaceY": 10, "FaceX": 10, "TabEndX": 9,
+        "RollStart": 9, "FaceY": 6, "FaceX": 6, "TabEndX": 9,
         "StraightLen": 9, "PinHoleDia": 11, "RollR": 10, "TabR": 9,
         "Width": 10, "ArmFrontZ": 3, "ArmLowZ": 3, "RootR": 4, "RoundR": 5,
         "FlatLength": 4, "DevTaper1": 4, "DevTaper2": 4, "DevRoundC": 4,

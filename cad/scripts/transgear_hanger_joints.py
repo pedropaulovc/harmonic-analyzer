@@ -27,6 +27,10 @@ may import it; no part build does.
   the dowel's length grade set the proud range, the shallowest hole still
   grips the pin 1.5 D, and the pin's full diameter passes the MHA-PD-014
   hook strip's far face at every corner of the latch stack (R9-23, R9-50).
+  The hook sheet prints that face's X and Y only as references, so this
+  margin rests on the fit-up step (its note 3): the annealed arm is set
+  square on the pin with the face at its drawn station, within the formed
+  band, before the pin hole is match-drilled.
 """
 
 from __future__ import annotations
@@ -371,7 +375,9 @@ if LATCH_PIN_ENGAGEMENT_WORST_D < LATCH_PIN.PRESS_ENGAGEMENT_MIN_D:
 # float in the arm bore, the hook's two screw holes (the bar's taps, the
 # hook's printed hole positions and the screw heads' float), the sheet's
 # thickness band, the formed arm's band and the ear's 90 deg bend at the
-# hook sheet's angular row.
+# hook sheet's angular row.  The face's printed X and Y are references; the
+# fit-up (the hook sheet's note 3) sets it at its drawn station within the
+# formed band, and that step is what this margin rests on.
 LATCH_ARM_ANGLE_PLAY = 0.00305  # rad
 # The screw holes are located from the formed ear's outer face at the base,
 # so a bend off 90 deg leans the ear and the arm it carries about the base:

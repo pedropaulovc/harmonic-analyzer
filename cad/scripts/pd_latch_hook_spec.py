@@ -13,9 +13,11 @@ off the pin; lift the hanger and the pin's crowned end rides up the tab and
 the strip until it snaps into the hole.
 
 Process (the sheet's notes): the blank is the flat pattern; every form is
-made annealed; fit to the bar, clamp the hanger at full feed mesh and
-match-drill the pin hole from the pin; remove, harden and temper blue,
-reinstall.  The order of cutting, bending and drilling is the shop's.
+made annealed; fit to the bar, clamp the hanger at full feed mesh, set the
+annealed arm square on the pin with the strip's far face at its drawn
+station, and match-drill the pin hole from the pin; remove, harden and
+temper blue, reinstall.  The order of cutting, bending and drilling is the
+shop's.
 
 How the sheet locates things:
 
@@ -34,7 +36,9 @@ How the sheet locates things:
   clears); the 90 deg bend at the title block's angular row;
 * every formed arm feature (roll, straight, tab) ±FORMED_BAND at .X, the
   radii to the inside surface; the far face at the pin, located in X and Y
-  from the origin, ±FACE_BAND each, so it moves at most FORMED_BAND along U;
+  from the origin, only as a reference (REFERENCE_DIMENSIONS): a hand-rolled
+  R80 holds no tighter band there, and the fit-up sets the strip on the pin
+  (square, its face at that station) before the hole is match-drilled;
 * the pin hole: size only, drilled +0.10/0, match-drilled at assembly from
   the pin (the model keeps it at the geometry's nominal);
 * the flat pattern (a hidden reference sketch shown beside the side view):
@@ -55,7 +59,6 @@ import math
 
 from _printed_tolerance import angular_band_deg, drilled_oversize_mm, printed_deviations
 from pd_latch_hook_geometry import (
-    ARM_U,
     ARM_Z0,
     ARM_Z1,
     BASE_LENGTH,
@@ -96,14 +99,10 @@ EAR_HEIGHT_PLACES = 1
 ARM_BAND_PLACES = 1  # the arm's z-band edges, from the base's underside
 FORMED_BAND = 0.5  # ± on every formed arm feature (roll, straight, tab)
 FORMED_PLACES = 1
-# The far face at the pin prints X and Y from the origin; a FACE_BAND on
-# each moves it at most FORMED_BAND along U (the latch's own direction).
-FACE_BAND = 0.35
-FAR_FACE_U_BAND = FACE_BAND * (abs(ARM_U[0]) + abs(ARM_U[1]))
-if FAR_FACE_U_BAND > FORMED_BAND + 1e-9:
-    raise AssertionError(
-        f"far face moves {FAR_FACE_U_BAND:.3f} along U, over FORMED_BAND {FORMED_BAND}"
-    )
+# The far face at the pin prints X and Y from the origin as references: the
+# fit-up sets the annealed arm square on the pin with the face at the drawn
+# station, so the formed band, not a printed coordinate band, is what the
+# hanger joints' far-face margin spends along U.
 BEND_TOL_DEG = angular_band_deg()  # the ear's 90 deg bend, title-block row
 BEND_R_PLACES = 1
 BEND_R_BAND = (INSIDE_BEND_R_MAX - INSIDE_BEND_R, -0.2)  # (upper, lower)
@@ -261,9 +260,9 @@ if HEAD_CLEARANCE_WORST < HEAD_CLEARANCE_FLOOR - 1e-9:
 MATERIAL_TITLE = f"{SHEET_T:.1f} (0.032) 1095 spring steel"
 DRAWING_NOTES = "\n".join(
     (
-        "1. FLAT PATTERN: THIN OUTLINE RIGHT OF SIDE VIEW.",
-        "2. FORM ANNEALED.",
-        "3. FIT ON MHA-PD-007; CLAMP HANGER AT FULL MESH; MATCH-DRILL PIN HOLE.",
+        "1. FLAT PATTERN: THIN OUTLINE RIGHT OF SIDE VIEW. FORM ANNEALED.",
+        "2. FIT ANNEALED ON MHA-PD-007; CLAMP HANGER AT FULL MESH.",
+        "3. SET ARM SQUARE ON PIN, FACE AT DRAWN STATION; MATCH-DRILL PIN HOLE.",
         "4. REMOVE FOR HEAT TREATMENT, REINSTALL. RADII TO INSIDE SURFACE.",
     )
 )
@@ -294,7 +293,8 @@ REFERENCE_SKETCHES = (FLAT_SKETCH,)
 FORMED_DIMENSIONS: dict[str, set[str]] = {
     "ArmProfile": {"RollStart", "RollR", "StraightLen", "TabR", "TabEndX"},
 }
-FACE_DIMENSIONS: dict[str, set[str]] = {"ArmProfile": {"FaceX", "FaceY"}}
+# The far face at the pin: printed in parentheses (see the band comment).
+REFERENCE_DIMENSIONS = frozenset({"FaceX", "FaceY"})
 POSITION_DIMENSIONS: dict[str, tuple[str, ...]] = {
     "ScrewHoleProfile": ("ScrewX1", "ScrewX2", "ScrewY"),
 }
@@ -303,7 +303,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BaseEar": {"Width"},
     "InsideBend": {"InsideBendR"},
     "ScrewHoleProfile": {"ScrewX1", "ScrewX2", "ScrewY", "ScrewDia"},
-    "ArmProfile": FORMED_DIMENSIONS["ArmProfile"] | FACE_DIMENSIONS["ArmProfile"],
+    "ArmProfile": FORMED_DIMENSIONS["ArmProfile"] | REFERENCE_DIMENSIONS,
     "Arm": {"ArmLowZ"},
     "TaperProfile": {"ArmFrontZ"},
     "RootRelief": {"RootR"},

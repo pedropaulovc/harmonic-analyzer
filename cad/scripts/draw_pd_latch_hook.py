@@ -10,7 +10,8 @@ edge -- lands where the layout puts it):
   the roll's start below the ear, its inside radius (shortened leader: the
   centre is 80 off), the straight's length, the inside tab radius, the tab
   end's X -- and the far face where the pin crosses it, in X and Y from the
-  origin; the pin hole's size, match-drilled at assembly;
+  origin as references (the fit-up sets it, note 3); the pin hole's size,
+  match-drilled at assembly;
 * ``*Right`` (looking -X, Z running left): the width, the arm's front-edge
   heights above and below the taper, the root relief and the full round;
   left of it the formed overall height, a reference from the ear's top edge
@@ -84,6 +85,7 @@ from pd_latch_hook_spec import (
     OVERALL_HEIGHT,
     PAIR_CALLOUT,
     PIN_HOLE_CALLOUT,
+    REFERENCE_DIMENSIONS,
     ROUND_CALLOUT,
     SCREW_HOLE_CALLOUT,
 )
@@ -397,6 +399,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     _shorten_radii(adapter, annotations, SHORTENED_RADII)
+    # The far face at the pin: located at fit-up (note 3), so its X and Y
+    # print as references.
+    by_name = {dimension_name(adapter, a): a for a in annotations}
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter, by_name[name], label=f"MHA-PD-014 far face {name}"
+        )
     _overall_reference(adapter, right)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the screw holes")

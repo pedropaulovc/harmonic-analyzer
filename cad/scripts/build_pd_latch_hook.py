@@ -144,8 +144,6 @@ from pd_latch_hook_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    FACE_BAND,
-    FACE_DIMENSIONS,
     FLAT_SKETCH,
     FORMED_BAND,
     FORMED_DIMENSIONS,
@@ -977,13 +975,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, "BaseEarProfile", "BaseLength", BASE_LENGTH_TOL
     )
     # Every hand-formed arm feature carries the one formed band; the far face
-    # at the pin its per-axis share of it.
-    for bands, band in ((FORMED_DIMENSIONS, FORMED_BAND), (FACE_DIMENSIONS, FACE_BAND)):
-        for feature_name, dimension_names in bands.items():
-            for dimension_name in sorted(dimension_names):
-                set_dimension_symmetric_tolerance(
-                    adapter, feature_name, dimension_name, band
-                )
+    # at the pin carries none (the sheet prints it as a reference).
+    for feature_name, dimension_names in FORMED_DIMENSIONS.items():
+        for dimension_name in sorted(dimension_names):
+            set_dimension_symmetric_tolerance(
+                adapter, feature_name, dimension_name, FORMED_BAND
+            )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
