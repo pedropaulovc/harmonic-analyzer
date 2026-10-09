@@ -2,7 +2,7 @@ r"""Pure-data dimensional contract shared by the rocker pivot shaft (MHA-CH-005)
 and its drawing.
 
 #948 ruling R (PR #1292): the shaft is held by the brackets and preloaded north
-by the MHA-VN-051 spring. It is turned from O10 bar and leaves an integral O10 x 1.5 SHOULDER
+by the MHA-VN-053 spring. It is turned from O10 bar and leaves an integral O10 x 1.5 SHOULDER
 one ear thickness from its north end. The shoulder's north face bears on the
 north ear's inner face, so the shaft cannot move north, and rocker 19's hub
 bears on its south face. At the south ear the spring pushes the stack north

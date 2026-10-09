@@ -1,4 +1,4 @@
-r"""MHA-VN-050 cylinder-bank-spring: McMaster 9714K392 stock wave disc spring.
+r"""MHA-VN-052 cylinder-bank-spring: McMaster 9714K392 stock wave disc spring.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  One wave disc spring sits on the MHA-DT-013 arbor between the front

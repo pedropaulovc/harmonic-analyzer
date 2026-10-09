@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the cylinder bank spring (MHA-VN-050, McMaster 9714K392)."""
+"""Create the purchased reference drawing for the cylinder bank spring (MHA-VN-052, McMaster 9714K392)."""
 
 from __future__ import annotations
 

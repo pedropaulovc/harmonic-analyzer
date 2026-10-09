@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-VN-050 cylinder bank spring (McMaster 9714K392)."""
+"""Offline contracts for the MHA-VN-052 cylinder bank spring (McMaster 9714K392)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from diagnostics import diag_build_9714K392 as recipe
 
 STEM = "vn-cylinder-bank-spring"
 SHEET = "vn_cylinder_bank_spring"
-NUMBER = "MHA-VN-050"
+NUMBER = "MHA-VN-052"
 STOCK_NAME = "Wave Disc Spring"
 BUILD = "build_9714K392"
 IN = 25.4

@@ -696,8 +696,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "vn_transgear_latch_pin",  # MHA-VN-042 1/8 dowel pressed into the arm's reamed end-face hole
         "pd_transgear_pivot_spacer",  # MHA-PD-020 brass spacer, reamed bore pressed on the pivot shoulder (locating, R9-71); no thread
         "vn_transgear_pivot_spring",  # MHA-VN-049 disc spring on the pivot shoulder; no thread
-        "vn_cylinder_bank_spring",  # MHA-VN-050 wave spring loose on the MHA-DT-013 arbor; no thread
-        "vn_rocker_bank_spring",  # MHA-VN-051 wave spring loose on the MHA-CH-005 shaft; no thread
+        "vn_cylinder_bank_spring",  # MHA-VN-052 wave spring loose on the MHA-DT-013 arbor; no thread
+        "vn_rocker_bank_spring",  # MHA-VN-053 wave spring loose on the MHA-CH-005 shaft; no thread
         "pd_transgear_pin",  # MHA-PD-023 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
         "pd_transgear_rear_bushing",  # MHA-PD-024 brass bushing faced to fit, reamed bore on the pin; no thread
         "pd_transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_pd_transgear_removable)

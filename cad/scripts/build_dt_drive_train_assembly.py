@@ -774,7 +774,7 @@ from build_dt_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E40
 # MHA-DT-012 is one station pitch thick, cam face to back face, and a turned
 # MHA-DT-026 thrust washer closes each end. The back (north) strap is the bank's
 # axial datum and the bank is modelled held back against it; the front strap
-# stands one BANK_SPRING_SET blade off the front washer, and the MHA-VN-050
+# stands one BANK_SPRING_SET blade off the front washer, and the MHA-VN-052
 # wave spring in that gap preloads the stack north (#948 ruling R, PR #1292).
 # Every station below is the layout module's, so the ladder, the washers, the
 # spring, the straps, the arbor and the apex set screws cannot drift apart.
@@ -4848,7 +4848,7 @@ async def build(adapter) -> dict[str, str]:
             label=f"cylinder thrust washer {_end} z0={_disc_z0:.3f}",
         )
         await _lock_static(adapter, end_disc, arbor)
-    # Bank spring (MHA-VN-050, #948 ruling R, PR #1292): its installed envelope
+    # Bank spring (MHA-VN-052, #948 ruling R, PR #1292): its installed envelope
     # fills the front-strap gap, south face on the strap, north face on the
     # front washer, coaxial with the arbor; static like the washers.
     bank_spring = await place_component(

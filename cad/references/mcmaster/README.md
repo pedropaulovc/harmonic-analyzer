@@ -520,7 +520,7 @@ Catalog specifications checked on September 10, 2026:
   a catalog-only run.
 
 - [9714K392](https://www.mcmaster.com/9714K392/) (`vn-cylinder-bank-spring`,
-  MHA-VN-050, one) sits on the MHA-DT-013 arbor between the front MHA-DT-026
+  MHA-VN-052, one) sits on the MHA-DT-013 arbor between the front MHA-DT-026
   washer and the front MHA-DT-002 strap, set by a 0.95 blade, and holds the
   20-gear stack north on its datum (#948 ruling R). Its page was read live on
   October 9, 2026: Wave Disc Spring, steel, stackable; ID 0.385 in -0.01/+0.01,
@@ -530,7 +530,7 @@ Catalog specifications checked on September 10, 2026:
   the working point taken as linear [INFERENCE]); the part carries the
   library's `Plain Carbon Steel`.
 - [9714K24](https://www.mcmaster.com/9714K24/) (`vn-rocker-bank-spring`,
-  MHA-VN-051, one) sits on the MHA-CH-005 pivot shaft between the MHA-CH-009
+  MHA-VN-053, one) sits on the MHA-CH-005 pivot shaft between the MHA-CH-009
   washer and the south MHA-CH-008 ear, set by a 0.60 blade, and holds the
   20-hub stack north on its datum. Its page was read live on October 9, 2026:
   Wave Disc Spring, high-carbon steel, stackable; ID 0.265 in -0.02/+0.01, OD

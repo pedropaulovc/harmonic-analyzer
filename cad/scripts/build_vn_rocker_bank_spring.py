@@ -1,4 +1,4 @@
-r"""Purchased MHA-VN-051 rocker bank spring: McMaster 9714K24.
+r"""Purchased MHA-VN-053 rocker bank spring: McMaster 9714K24.
 
 A wave disc spring (``vn_rocker_bank_spring_spec``); on the MHA-CH-005
 pivot shaft between the MHA-CH-009 washer and the south MHA-CH-008 ear, it

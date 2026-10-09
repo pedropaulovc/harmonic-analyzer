@@ -139,7 +139,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         ("north",),
     ),
     ExplodeStep("south thrust washer", ("dt-cylinder-end-disc",), "z", -15.0, ("south",)),
-    # MHA-VN-050 (#948 ruling R) sits between the front strap and the front
+    # MHA-VN-052 (#948 ruling R) sits between the front strap and the front
     # washer: it stops between their exploded stations.
     ExplodeStep("bank spring", ("vn-cylinder-bank-spring",), "z", -25.0),
     ExplodeStep("north thrust washer", ("dt-cylinder-end-disc",), "z", 15.0, ("north",)),

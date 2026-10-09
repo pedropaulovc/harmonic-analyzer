@@ -1,4 +1,4 @@
-r"""MHA-VN-051 rocker-bank-spring: McMaster 9714K24 stock wave disc spring.
+r"""MHA-VN-053 rocker-bank-spring: McMaster 9714K24 stock wave disc spring.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  One wave disc spring sits on the MHA-CH-005 pivot shaft between the

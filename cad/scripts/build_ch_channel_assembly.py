@@ -14,7 +14,7 @@ the M6.8 mirror layer is gone).
   integral shoulder on the north ear's inner face, the cylinder spanning
   both ears, each end domed -- rocker_bank_layout)
 * rocker-thrust-washer x1 (MHA-CH-009, between rocker 0's hub and the south
-  ear) + vn-rocker-bank-spring x1 (MHA-VN-051, the wave disc spring between
+  ear) + vn-rocker-bank-spring x1 (MHA-VN-053, the wave disc spring between
   the washer and the south ear that preloads the bank north; #948 ruling R)
   + fulcrum-shaft x1 (lever bank at (199.9, 1061.4), 182 long - the
   228.6 shaft clipped the west columns at top level, M6.5)
@@ -353,7 +353,7 @@ CHANNEL_BANK_REAR_SHIFT = MECHANISM_Z_SHIFT
 # Rocker pivot brackets, shaft, south washer and spring (#948 ruling R, PR
 # #1292): the rocker bank's retention stack, from rocker_bank_layout. The
 # north ear's inner face is the datum the shaft's shoulder bears on; the
-# MHA-VN-051 spring between the south ear and the MHA-CH-009 washer on hub 0
+# MHA-VN-053 spring between the south ear and the MHA-CH-009 washer on hub 0
 # preloads the bank and shaft north onto it. Feet inside the rocker-arm-
 # support's +-88.9 top (it is the only stand; the old south "A-frame" is gone).
 from rocker_bank_layout import (  # noqa: E402
@@ -1016,7 +1016,7 @@ async def build(adapter) -> dict[str, str]:
         label="rocker-thrust-washer south",
     )
     await _locate_to_datum(adapter, washer)
-    # Rocker bank spring (MHA-VN-051, #948 ruling R): coaxial on the shaft,
+    # Rocker bank spring (MHA-VN-053, #948 ruling R): coaxial on the shaft,
     # south face on the south ear's inner face, north face on the washer.
     rocker_spring = await place_component(
         adapter,

@@ -474,7 +474,7 @@ sections:
       - - Cylinder bank thrust washers ×2 (#743, 2026-09-25)
         - Ø25 × Ø9.6 × 1.50 ±0.05 turned steel washer, one between each end gear and its arbor-pedestal strap (MHA-DT-026)
         - '0.98'
-        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap (target offset by the measured washer''s W − 1.500, #948 ruling R), the front one sits 0.95 off the front strap on the MHA-VN-050 preload spring (`cylinder_bank_layout.py`, `build_dt_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
+        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap (target offset by the measured washer''s W − 1.500, #948 ruling R), the front one sits 0.95 off the front strap on the MHA-VN-052 preload spring (`cylinder_bank_layout.py`, `build_dt_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
         - derived
         - med
       - - Arbor ends and set screws (#743, 2026-09-25)
@@ -484,7 +484,7 @@ sections:
         - derived
         - med
       - - Cylinder bank preload spring (#948 ruling R, PR #1292)
-        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on a 0.95 blade between the front washer and the front strap, 2.2–4.2 N over the ±0.10 set band (MHA-VN-050)
+        - McMaster 9714K392 wave disc spring Ø9.78 × Ø12.7 × 0.127, free 1.27; set on a 0.95 blade between the front washer and the front strap, 2.2–4.2 N over the ±0.10 set band (MHA-VN-052)
         - —
         - 'design: replaces the 0.45 end-play leaf and reverses #743 Q1 ("bank is not preloaded"): the stack is held north on its datum, so a flat rod held at cam and arm needs no end-play allowance (`cylinder_bank_layout.BANK_PRELOAD`, `test_channel_axial_budget.py`)'
         - derived
@@ -788,11 +788,11 @@ sections:
       - confidence
       rows:
       - - Pivot shaft
-        - 'Ø6.35 along Z at (x, y) = (+72.9, 253.8); #743 PR2 (Reading 1): turned from Ø10 bar with an integral Ø10 × 1.5 shoulder on the north ear''s inner face (the ear''s DRO target offset by the measured shoulder''s S − 1.500, #948 ruling R), the cylinder spanning both ears (cut to fit, nominal 156.82) and each end domed 1.5 proud; the rocker stack closes south on the Ø10.2 × 1.59 MHA-CH-009 washer, held north by the MHA-VN-051 preload spring set 0.60 to the south ear (`rocker_bank_layout.py`). Was 170, centred on the stack mid-plane'
+        - 'Ø6.35 along Z at (x, y) = (+72.9, 253.8); #743 PR2 (Reading 1): turned from Ø10 bar with an integral Ø10 × 1.5 shoulder on the north ear''s inner face (the ear''s DRO target offset by the measured shoulder''s S − 1.500, #948 ruling R), the cylinder spanning both ears (cut to fit, nominal 156.82) and each end domed 1.5 proud; the rocker stack closes south on the Ø10.2 × 1.59 MHA-CH-009 washer, held north by the MHA-VN-053 preload spring set 0.60 to the south ear (`rocker_bank_layout.py`). Was 170, centred on the stack mid-plane'
         - 'ball x photo-measured 66…81, ball y 252–255 in both 0°/180° views; y = support apex 228.6 + ball rise 25.2. The fixed support remains at its old world location while the channel bank recenters to z +3.088 and the longer rocker lever reaches drum x −60.394.'
         - med (x, y photo + frame; dia low)
       - - Rocker bank preload spring (#948 ruling R, PR #1292)
-        - McMaster 9714K24 wave disc spring Ø6.73 × Ø9.32 × 0.152, free 0.762; set on a 0.60 blade between the MHA-CH-009 washer and the south ear, 2.2–9.2 N over the ±0.10 set band (MHA-VN-051); OD under the Ø10.2 hub, so the ch0 bar foot passes over it
+        - McMaster 9714K24 wave disc spring Ø6.73 × Ø9.32 × 0.152, free 0.762; set on a 0.60 blade between the MHA-CH-009 washer and the south ear, 2.2–9.2 N over the ±0.10 set band (MHA-VN-053); OD under the Ø10.2 hub, so the ch0 bar foot passes over it
         - 'design: replaces the 0.45 end-play leaf and reverses #743 Q4 ("no keeper"): the stack and shaft are held north on the datum ear, so a flat rod held at cam and arm needs no end-play allowance; each spring is checked free on the shaft at fit-up, the catalogue ID tolerance reaching under Ø6.35 (`rocker_bank_layout.ROCKER_PRELOAD`)'
         - med (catalogue)
       - - Support casting ×1 (windowed rocker-arm support)

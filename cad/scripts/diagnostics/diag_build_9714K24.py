@@ -1,6 +1,6 @@
 r"""McMaster 9714K24 -- high-carbon steel wave disc spring, ID 0.265 x OD 0.367 in.
 
-Used as vn-rocker-bank-spring (MHA-VN-051).  The catalogue facts and the
+Used as vn-rocker-bank-spring (MHA-VN-053).  The catalogue facts and the
 part frame are ``vn_rocker_bank_spring_spec``'s.  The model is the
 spring's installed envelope: one Top-plane ID x OD annulus extruded blind
 MODEL_HEIGHT along +Y from the south bearing face (y = 0).  [INFERENCE: the

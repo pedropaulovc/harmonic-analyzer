@@ -21,7 +21,7 @@ strap.
   screw in each pedestal's crown apex bears on it (MHA-VN-034): the back one
   fixes the arbor, the front one is tightened once the front strap is set.
 * The FRONT (south) strap is set off the front washer by one BANK_SPRING_SET
-  blade, and the MHA-VN-050 wave spring (``vn_cylinder_bank_spring_spec``)
+  blade, and the MHA-VN-052 wave spring (``vn_cylinder_bank_spring_spec``)
   squeezed in that gap preloads the whole stack north onto the datum.
 * Every gear's overall thickness is +/-0.025 on its print (user ruling L20
   d'). A fit-up acceptance on the measured 20-gear stack (STACK_L20_ACCEPT,
@@ -89,7 +89,7 @@ def station_z(j: int) -> float:
 
 # --- preload (#948 ruling R) ----------------------------------------------------
 # The front strap is set off the front washer by one blade of the metric gauge
-# set; the MHA-VN-050 wave spring in that gap holds the stack north, so the
+# set; the MHA-VN-052 wave spring in that gap holds the stack north, so the
 # bank has no end play. The blade is the spring's installed height; the strap's
 # set error (re-set on its hold-downs) moves only the spring's height, and with
 # it the preload, never a gear.

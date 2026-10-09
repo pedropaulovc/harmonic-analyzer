@@ -1091,10 +1091,10 @@ def test_bank_fitup_limits_are_the_layout_bands() -> None:
     )
     assert steps.index("MIC THE MHA-CH-005 SHOULDER, S") < steps.index("EAR INNER FACE")
     # The front strap is set one spring-set blade off the front washer, the
-    # MHA-VN-050 beside it; the bank then has no end play to read.
+    # MHA-VN-052 beside it; the bank then has no end play to read.
     assert f"A {bank.BANK_SPRING_SET:.2f} BLADE BETWEEN ITS STRAP" in steps
-    assert "BESIDE MHA-VN-050" in steps
-    assert "MHA-VN-050 THAT SLIDES FREE ON THE MHA-DT-013 BAR" in steps
+    assert "BESIDE MHA-VN-052" in steps
+    assert "MHA-VN-052 THAT SLIDES FREE ON THE MHA-DT-013 BAR" in steps
     assert "REMOVE THE BLADE" in steps
     for gone in ("MHA-125", "0.025", "-6.0", "END PLAY", "LEAF", "0.45"):
         assert gone not in steps, gone
@@ -1121,7 +1121,7 @@ def test_bank_drills_the_front_foot_with_the_loaded_mandrel_off_the_base() -> No
 
 
 def test_bank_preload_check_replaces_the_ring_overhang_bound() -> None:
-    """#948 ruling R (PR #1292): MHA-VN-050 preloads the bank back, so no ring
+    """#948 ruling R (PR #1292): MHA-VN-052 preloads the bank back, so no ring
     overhangs its cam; check 3 proves the spring holds instead, and neither
     check 3 nor the MHA-DT-012 callout states an overhang bound."""
     import dt_cylinder_gear_notes

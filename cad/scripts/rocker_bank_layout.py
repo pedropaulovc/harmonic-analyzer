@@ -19,7 +19,7 @@ preloads it with a keeper spring, reversing #743 Q4 (Reading 1, "no keeper"):
   axial datum: fit-up offsets its DRO target by the measured shoulder's
   deviation from nominal (MIC_RESIDUAL is what is left of that band).
 * The SOUTH bracket is set off the MHA-CH-009 thrust washer on hub 0 by one
-  ROCKER_SPRING_SET blade, and the MHA-VN-051 wave spring
+  ROCKER_SPRING_SET blade, and the MHA-VN-053 wave spring
   (``vn_rocker_bank_spring_spec``) squeezed in that gap holds the stack and
   the shaft's shoulder north on the datum ear: the bank has no end play and
   the shaft no float.

@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the rocker bank spring (MHA-VN-051, McMaster 9714K24)."""
+"""Create the purchased reference drawing for the rocker bank spring (MHA-VN-053, McMaster 9714K24)."""
 
 from __future__ import annotations
 

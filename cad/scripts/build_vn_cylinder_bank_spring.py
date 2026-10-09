@@ -1,4 +1,4 @@
-r"""Purchased MHA-VN-050 cylinder bank spring: McMaster 9714K392.
+r"""Purchased MHA-VN-052 cylinder bank spring: McMaster 9714K392.
 
 A wave disc spring (``vn_cylinder_bank_spring_spec``); on the MHA-DT-013
 arbor between the front MHA-DT-026 washer and the front MHA-DT-002 strap, it

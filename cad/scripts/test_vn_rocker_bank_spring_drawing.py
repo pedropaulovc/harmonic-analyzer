@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-VN-051 rocker bank spring (McMaster 9714K24)."""
+"""Offline contracts for the MHA-VN-053 rocker bank spring (McMaster 9714K24)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from diagnostics import diag_build_9714K24 as recipe
 
 STEM = "vn-rocker-bank-spring"
 SHEET = "vn_rocker_bank_spring"
-NUMBER = "MHA-VN-051"
+NUMBER = "MHA-VN-053"
 STOCK_NAME = "Wave Disc Spring"
 BUILD = "build_9714K24"
 IN = 25.4

@@ -158,7 +158,7 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
 
 def test_the_spring_set_and_its_preload_check_are_printed_from_the_layout() -> None:
     """#948 ruling R (PR #1292): the south bracket is set off the MHA-CH-009
-    washer by the spring's set blade, beside the MHA-VN-051 spring, which is
+    washer by the spring's set blade, beside the MHA-VN-053 spring, which is
     first run along the shaft (its catalogue ID can bind). Rule 6: the blade
     comes from rocker_bank_layout, never typed; the acceptance is the preload."""
     spring = _config.parts("vn-rocker-bank-spring")["number"]

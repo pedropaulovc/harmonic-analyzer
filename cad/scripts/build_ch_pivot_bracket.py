@@ -8,7 +8,7 @@ at one END of the foot, and the foot is only as wide as the support's apex.
 shaft's own domed end, not a brazed-on ball, so the ear is a plain plate
 arched EAR_W/2 about the O6.5 cross-bore. The north ear's inner face is the
 rocker bank's axial datum (the shaft's shoulder bears on it); the south one
-is set off the MHA-VN-051 preload spring (#948 ruling R; ``rocker_bank_layout``).
+is set off the MHA-VN-053 preload spring (#948 ruling R; ``rocker_bank_layout``).
 
 The channel assembly inserts the SOUTH bracket (inboard = +Z) as IDENTITY
 and the NORTH one turned Ry(180) about its bore axis, so both feet run

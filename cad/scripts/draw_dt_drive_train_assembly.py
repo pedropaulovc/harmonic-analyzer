@@ -364,7 +364,7 @@ BOM_PART_NUMBERS = {
     "dt-cylinder-gear-shaft": "MHA-DT-013",
     "dt-arbor-pedestal": "MHA-DT-002",
     "dt-cylinder-end-disc": "MHA-DT-026",
-    "vn-cylinder-bank-spring": "MHA-VN-050",
+    "vn-cylinder-bank-spring": "MHA-VN-052",
     "dt-cylinder-gear": "MHA-DT-012",
     "vn-pedestal-hold-down-screw": "MHA-VN-032",
     "vn-arbor-set-screw": "MHA-VN-034",
@@ -677,7 +677,7 @@ BANK_STEPS = _note_text(
         # strap as the Z datum and swaps a setting mandrel for the finished
         # arbor, which the MHA-VN-034 apex set screws hold. #948 ruling R
         # (PR #1292): the front strap is set one BANK_SPRING_SET blade off the
-        # front washer and the MHA-VN-050 wave spring in that gap holds the
+        # front washer and the MHA-VN-052 wave spring in that gap holds the
         # bank back (no end play); the back strap's DRO target moves north by
         # the miced back washer's excess, W - 1.500. Supersedes U34's
         # disc/feeler end play and its "span -6.0" arbor. Every limit is
@@ -719,17 +719,17 @@ BANK_STEPS = _note_text(
         # over the front foot hole, where no chuck or tap wrench reaches (F1).
         # So the loaded mandrel leaves the base for the drill and tap.
         "9B. FROM THE FRONT, LOAD THE MICED MHA-DT-026, THE STACK IN ORDER, ITS",
-        "   PAIRS HANGING FREE, THEN THE OTHER MHA-DT-026, THEN ONE MHA-VN-050",
+        "   PAIRS HANGING FREE, THEN THE OTHER MHA-DT-026, THEN ONE MHA-VN-052",
         "   THAT SLIDES FREE ON THE MHA-DT-013 BAR (ELSE TAKE ANOTHER). PUSH THE",
         "   BANK BACK, CLOSED UP ON THE BACK MHA-DT-026.",
         "   PROP THE MANDREL FRONT END AT BORE HEIGHT (V-BLOCK ON PARALLELS);",
         "   TAKE THE PROP AWAY ONLY TO SLIDE THE FRONT MHA-DT-002 ON.",
         "9C. SLIDE THE FRONT MHA-DT-002 ON UNTIL A "
         f"{bank.BANK_SPRING_SET:.2f} BLADE BETWEEN ITS STRAP",
-        "   AND THE FRONT MHA-DT-026, BESIDE MHA-VN-050, IS LIGHTLY PINCHED. SET",
+        "   AND THE FRONT MHA-DT-026, BESIDE MHA-VN-052, IS LIGHTLY PINCHED. SET",
         "   X 168.11-168.31 AND SPOT AS 9A. SLIDE THE FRONT MHA-DT-002 OFF; DRAW",
         "   THE LOADED MANDREL OUT OF THE BACK MHA-DT-002, HOLDING BOTH",
-        "   MHA-DT-026 AND MHA-VN-050, AND LAY IT IN V-BLOCKS ON PARALLELS OFF",
+        "   MHA-DT-026 AND MHA-VN-052, AND LAY IT IN V-BLOCKS ON PARALLELS OFF",
         "   THE BASE, PAIRS HANGING FREE. DRILL AND TAP AS 9A. PASS THE MANDREL",
         "   BACK THROUGH THE BACK MHA-DT-002, PUSH THE BANK BACK AND",
         "   PROP IT AS 9B. REFIT THE FRONT MHA-DT-002; RE-SET THE BLADE AND X, TIGHTEN",
@@ -740,9 +740,9 @@ BANK_STEPS = _note_text(
         "   THE MANDREL IS OUT AND EACH DOME STANDS 1.5 PROUD (DEPTH GAUGE).",
         "   SPOT MHA-DT-013 THROUGH EACH CROWN TAP WITH A #43 DRILL, 0.5 DEEP;",
         "   BLOW OUT CHIPS. RUN THE BACK MHA-VN-034 IN TIGHT, THEN THE FRONT ONE.",
-        # #948 ruling R (PR #1292): MHA-VN-050 holds the bank back on its
+        # #948 ruling R (PR #1292): MHA-VN-052 holds the bank back on its
         # datum, so there is no end play to read; check 3 proves the preload.
-        "9F. THE BANK TURNS FREE BY HAND, HELD BACK BY MHA-VN-050.",
+        "9F. THE BANK TURNS FREE BY HAND, HELD BACK BY MHA-VN-052.",
         # #936 P1 b, option A (user ruling 2026-09-26): the north MHA-CH-008 ear
         # is the rocker bank's axial datum (rocker_bank_layout), set here on
         # the 9A DRO zero so the cams and the rocker stations share one datum.
@@ -890,7 +890,7 @@ CHECKS = _note_text(
         "2. MHA-DT-010/MHA-DT-007 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-DT-007",
         "   TURN; EACH CONE GEAR MESHES ITS MHA-DT-012 PER THE MHA-DT-003 PRINT.",
         "3. EACH MHA-DT-012 TURNS FREELY ON MHA-DT-013 WITHOUT AXIAL BINDING.",
-        # #948 ruling R (PR #1292): MHA-VN-050 preloads the bank back, so no
+        # #948 ruling R (PR #1292): MHA-VN-052 preloads the bank back, so no
         # ring overhangs its cam; the fitter proves the spring holds.
         "   PUSH GEAR 0 TOWARD THE FRONT BY HAND AND RELEASE; THE BANK SPRINGS",
         "   BACK ONTO THE BACK MHA-DT-026.",
@@ -1228,7 +1228,7 @@ def bom_row_fit(requested: float, actual: float) -> Literal["short", "exact", "g
 def bom_split_row(data_rows: int) -> int:
     """Data rows in the FIRST column: the smaller half, so the first piece never
     grows into the reference view below it; the second has open paper below.
-    (#948 ruling R's MHA-VN-050 made the count odd: 28 rows met the view.)"""
+    (#948 ruling R's MHA-VN-052 made the count odd: 28 rows met the view.)"""
     if data_rows < 2:
         raise ValueError("a split BOM needs at least two data rows")
     return data_rows // 2
