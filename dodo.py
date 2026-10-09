@@ -3112,6 +3112,9 @@ def task_check():
         SCRIPTS_DIR / "test_rocker_bank_layout.py",
         SCRIPTS_DIR / "test_rocker_bracket_seat_layout.py",
         SCRIPTS_DIR / "test_magnifying_bracket_joint_layout.py",
+        # The amplitude bar's pressed MHA-CH-011 pin: its worst-case press,
+        # running fit and flush-end gap budget, pinned to their sources.
+        SCRIPTS_DIR / "test_ch_bar_pivot_fit.py",
         # The blind machinist-review runner (cad/docs/drawing-simplicity-policy.md):
         # prompt calibration, strict output schema, neutral-workdir command, pass
         # logic and the blind-review tool-event detector are pinned offline.

@@ -114,7 +114,7 @@ _INSERTED_SOURCES = {
     "dt_pinion_cam_pin dt_pinion_handle dt_pinion_lever dt_pinion_lever_pin dt_pinion_lift_rod "
     "dt_pinion_pivot_block dt_pinion_pivot_shaft dt_pinion_spring vn_pinion_strap_pin vn_post_mount_screw vn_slotted_screw "
     "vn_swing_stop_screw",
-    "ch_channel": "ch_amplitude_bar ch_channel_lever vn_channel_spring_installed ch_connecting_rod "
+    "ch_channel": "ch_amplitude_bar ch_bar_pivot_pin ch_channel_lever vn_channel_spring_installed ch_connecting_rod "
     "vn_frame_side_screw ch_fulcrum_keeper ch_fulcrum_shaft vn_pedestal_hold_down_screw ch_pivot_bracket "
     "ch_pivot_shaft ch_rocker_arm ch_rocker_thrust_washer vn_spring_hook",
     "sm_summing": "vn_boss_hook vn_counter_spring sm_gooseneck vn_knife_hanger_stud vn_knife_hanger_washer sm_knife_mount sm_summing_lever",

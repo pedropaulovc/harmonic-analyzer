@@ -13,7 +13,7 @@ Shop fixtures, the shop-made tooling that holds or gauges one part while it is m
 | Prefix | Category | Parts |
 |---|---|---:|
 | `ha` / `HA` | Harmonic analyzer | 2 |
-| `ch` / `CH` | Channel | 9 |
+| `ch` / `CH` | Channel | 10 |
 | `dt` / `DT` | Drive train | 36 |
 | `fr` / `FR` | Frame | 5 |
 | `mg` / `MG` | Magnifier | 9 |
@@ -98,7 +98,7 @@ Dated reports, released packages, raw logs, source quotations and user-authored 
 
 ## Identity migration table
 
-The table covers 146 part families and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files.
+The table covers 147 part families and eight assemblies. Old names and Numbers are lookup keys for historical evidence, not supported aliases for current commands or files. Families created after the cutover have no old name or Number (—).
 
 | Kind | Old stem | Canonical stem | Old Number | Current Number |
 |---|---|---|---|---|
@@ -113,6 +113,7 @@ The table covers 146 part families and eight assemblies. Old names and Numbers a
 | part | `fulcrum-keeper` | `ch-fulcrum-keeper` | MHA-120 | MHA-CH-007 |
 | part | `pivot-bracket` | `ch-pivot-bracket` | MHA-123 | MHA-CH-008 |
 | part | `rocker-thrust-washer` | `ch-rocker-thrust-washer` | MHA-148 | MHA-CH-009 |
+| part | — | `ch-bar-pivot-pin` | — | MHA-CH-011 |
 | part | `alignment-pinion` | `dt-alignment-pinion` | MHA-002 | MHA-DT-001 |
 | part | `arbor-pedestal` | `dt-arbor-pedestal` | MHA-004 | MHA-DT-002 |
 | part | `cone-gear` | `dt-cone-gear` | MHA-013 | MHA-DT-003 |

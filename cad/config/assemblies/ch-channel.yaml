@@ -48,6 +48,10 @@ allowed_free_stems:
   - ch-connecting-rod
   - ch-amplitude-bar
   - ch-channel-lever
+  # The MHA-CH-011 bar pivot pin is lock-mated to its bar, so it rides the
+  # bar's freed amplitude DOF and reads under-constrained with it (it adds no
+  # DOF of its own; not a required family).
+  - ch-bar-pivot-pin
 # Rocker swing + rod follow + bar amplitude, plus the channel lever which
 # must read under-constrained WITH the chain (closed by the J5 foot-on-arc
 # coupling off the rocker -- a frozen lever means the coupling died).
