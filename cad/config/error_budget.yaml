@@ -57,25 +57,6 @@ reference_inputs: [all_ones, rect_half, gaussian_a0p1, alternating, pair_1_20]
 reserved:
   nominal_residual_mae:            # what survives the null-station zero + 2nd-harmonic correction
     allowance_pct: 0.05
-    # The residual carries the stock-form drive-flank phase: every shop-cut
-    # running mesh read at each read stall -- cone/cylinder 6i/120 as the cone
-    # row's actual 3D q0 signed running TE at psi_k = k pi from the operating
-    # notch-up setup (untared), crossed crank 16/64 at 4 pi k from its 3D
-    # study -- the shaft term reaching each cylinder at the ideal T_i/120 and
-    # the crank index absorbing only the 64T's home lag (reported). Paid on
-    # top: each read's half-width over the budget clock-nominal subdomain
-    # (carrying its numerical bound), the crank study's bound at T_i/120, and
-    # the whole-period signed TE interval's span wherever the shaft shifts the
-    # cone off a read; and each drum's tooth pattern clocked against its
-    # CAM-NOTCH -- +/- fits.cone_drum_oblique_mesh.drum_tooth_to_cam_notch_
-    # clock_deg in cam radians directly (not T_i/120, not x i), nominal 0, on
-    # every read k=0 included, never tared or indexed out; the cone rows
-    # exclude it by name and a missing grade refuses, never 0. The alignment
-    # drum is not a datum (notches up by eye, drum parked), so its contact is
-    # not in it.
-    # Deterministic and the same on every machine, so it is spent HERE, not
-    # root-sum-squared as scatter. Any missing, refused or stale input fails
-    # the closure (error_budget.stock_phase); nothing is credited without it.
     # The as-built CAD locks every cylinder gear at Rz(+1.5) -- half its tooth
     # pitch, tooth-in-gap against the phase-0 cones (gear_train.cylinder_lock_
     # phase_deg) -- and the cam lobe is a tooth crest, so at crank home every
@@ -140,7 +121,7 @@ reserved:
 monte_carlo:
   draws: 4000
   seed: 20260912
-  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play's unit draw spans [0, free-clock OUTER]
+  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play is drawn about the fit's 0.02 mm mean
 
 # Channel-specific features. `tolerance` is the +/- half-width of the drawing
 # (or matching/setup) limit; `unit` is mm unless stated. `class`:
@@ -214,19 +195,19 @@ critical_features:
     class: channel
     holds: "index each cone gear's teeth off its D-bore flat on one setup (BoreFlatClock +/-0.25 deg); the shaft flats' own clock is cone_land_clock"
   cone_flat_play:
-    tolerance: 1.0
-    unit: span
+    tolerance: 0.010
+    unit: mm
     nominal: null
     quantity: phase
     class: channel
-    holds: "D-bore across-flat fit (gear_seat_fit.FLAT_AF_CLEARANCE via BORE_AF_BAND): each gear's loaded turn from its flats-parallel connected home lies in [0, OUTER], OUTER = gear_seat_fit.connected_home_clock_angle_bound_rad over the land's diameter/AF and the bore's AF limits, paying the torque corner's edge break (title block; terminal land TERMINAL_FLAT_EDGE_BREAK_MAX) (error_budget.cone_flat_free_clock_rad). Unit draw v in [-1, +1] -> T/120 * OUTER * (1 + v) / 2: uniform is the budget's distribution hypothesis, its centre is not a nominal. Downstream of the shaft, so the crank index removes none of it"
+    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on the shortest flat half-chord MHA-DT-004 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on its torque corner (error_budget.phase_profiles); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
   cone_land_clock:
     tolerance: 1.0
     unit: deg
     nominal: null
     quantity: phase
     class: channel
-    holds: "MHA-DT-004 note ALL FLATS PARALLEL. at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø0.794 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
+    holds: "MHA-DT-004 note ALL FLATS PARALLEL. at the title-block +/-1 deg angle: the Ø6.350, Ø3.175 and Ø1.588 land flats each within 1 deg of the Ø9.525 land's, which carries T030-T120 and the 64T (its own clock is a crank-index shift); one draw per land, shared by its gears (error_budget.draw_groups)"
   station_setting:
     tolerance: 0.25
     nominal: null

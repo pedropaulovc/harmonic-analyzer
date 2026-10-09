@@ -41,18 +41,12 @@ ASSEMBLY_CONTRACT_PY = (SCRIPTS_DIR / "_assembly_contract.py").resolve()
 ASSEMBLY_CONTRACTS_TOKEN = "assemblies/*"
 REFERENCES_DIR = SCRIPTS_DIR.parent / "references"
 
-# Explicit runtime data inputs must rebuild their consumers and bust their
-# remote-cache keys -- see data_deps_of, honored at each native recipe boundary.
-# DXF/DWG basenames keep the existing cad/references convention; registered
-# calibration JSON literals name their complete CAD-relative path.
+# Vendored input artefacts (DXF/DWG) a build imports at run time. A build that
+# imports one (e.g. build_nameplate -> nameplate-engraving.dxf) must depend on the
+# FILE so an edit rebuilds the part and busts its remote-cache key -- see
+# data_deps_of, honored by dodo._part_file_deps.
 _DATA_EXTENSIONS = (".dxf", ".dwg")
 _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECASE)
-_CALIBRATION_LITERAL_RE = re.compile(
-    r"""["'](calibration/[^"'{}\r\n]+\.json)["']"""
-)
-# Register a calibration input only in the commit publishing its genuine JSON.
-# Keep registered inputs declared after deletion; never filter by disk existence.
-REGISTERED_CALIBRATION_INPUTS: frozenset[str] = frozenset()
 
 # Sub-assemblies in build order; the top-level harmonic-analyzer references the
 # six subs, so it is last. doit derives ordering from file_dep, but this tuple
@@ -1780,34 +1774,26 @@ def fastener_rows_selected(
     return frozenset(selected)
 
 
-def data_deps_of(script: Path, *, include_entry: bool = True) -> list[str]:
-    """Resolved runtime data inputs named by ``script`` or its local helpers.
+def data_deps_of(script: Path) -> list[str]:
+    """Resolved paths of every vendored DXF/DWG artefact ``script`` (or a helper
+    it imports) references by filename -- the run-time-imported input edges doit
+    must treat as ``file_dep`` (and fold into the remote-cache key).
 
     ``module_deps_of`` only follows Python imports; a build that imports a data
-    file has no import edge to it, so an edit would otherwise not rebuild the
-    part, drawing or assembly or move its cache key. This scans the transitive
-    source closure for quoted ``*.dxf``/``*.dwg`` literals, resolving each
-    basename under ``cad/references`` as before. Explicit ``calibration/*.json``
-    literals are included only when in ``REGISTERED_CALIBRATION_INPUTS`` and
-    retain their complete CAD-relative path (including subdirectories). Publish
-    the genuine JSON and its registration in the same commit. Other JSON names
-    and output/report paths are ignored.
+    file (``build_nameplate`` -> ``cad/references/fr-nameplate-engraving.dxf`` via
+    ``adapter.import_dxf_dwg``) has no import edge to it, so an edit to the DXF
+    would otherwise not rebuild the part. This scans the script's transitive
+    module closure source for quoted ``*.dxf``/``*.dwg`` literals and resolves
+    each basename under ``cad/references``.
 
-    ``include_entry=False`` omits the entry's own text, not its imported local
-    source closure. Check tasks use it for ``test_*`` entries: literals inside
-    temporary test fixtures are not required runtime inputs of the check.
-
-    A named DXF/DWG or registered calibration input is listed **whether or not it
-    currently exists on disk**: an input accidentally deleted or renamed after a
-    build remains a MISSING runtime dependency, making doit/the build fail loud
-    rather than silently report the stale ``.SLDPRT`` up to date. Unpublished
-    calibration literals do not declare phantom inputs; their readers still
-    refuse absent packets at run time.
+    A named artefact is listed **whether or not it currently exists on disk**: a
+    referenced input that is accidentally deleted or renamed after a build is a
+    MISSING runtime dependency, and keeping it in ``file_dep`` makes doit/the
+    build fail loud on it rather than silently report the stale ``.SLDPRT`` up to
+    date. It is CONSERVATIVE (can over- but never under-invalidate): only files
+    named by a literal in the script's own import closure are ever listed.
     """
-    entry = _resolved(script)
-    sources = [Path(p) for p in module_deps_of(script) if p != str(entry)]
-    if include_entry:
-        sources.append(entry)
+    sources = [_resolved(script), *(Path(p) for p in module_deps_of(script))]
     found: set[str] = set()
     for src in sources:
         try:
@@ -1817,10 +1803,6 @@ def data_deps_of(script: Path, *, include_entry: bool = True) -> list[str]:
         for literal in _data_literals(text):
             candidate = REFERENCES_DIR / Path(literal).name
             found.add(str(_resolved(candidate)))
-        for literal in _calibration_literals(text):
-            if literal in REGISTERED_CALIBRATION_INPUTS:
-                candidate = SCRIPTS_DIR.parent / literal
-                found.add(str(_resolved(candidate)))
     return sorted(found)
 
 
@@ -1829,12 +1811,6 @@ def _data_literals(text: str) -> tuple[str, ...]:
     """The quoted DXF/DWG names in one source CONTENT (every task re-scans its
     whole closure, so the ~600 shared helpers are scanned once, not ~1600 times)."""
     return tuple(_DATA_LITERAL_RE.findall(text))
-
-
-@functools.lru_cache(maxsize=1024)
-def _calibration_literals(text: str) -> tuple[str, ...]:
-    """Explicit CAD-relative calibration JSON paths in one source CONTENT."""
-    return tuple(_CALIBRATION_LITERAL_RE.findall(text))
 
 
 # --- Per-script CONFIG read-set: which cad/config FILES a build script actually

@@ -282,8 +282,6 @@ def test_budget_closes(report):
         "knife",
         "total_mae",
         "nominal_residual_mae_as_built",
-        "nominal_residual_mae_kinematic",
-        "nominal_residual_mae_nominal_pose",
         "total_mae_as_built",
         "pair_worst",
         "pair_terms",
@@ -634,12 +632,11 @@ def test_cam_home_phase_is_scored_as_built_and_fails_unless_waived(budget, repor
 
     assert phase_deg(as_built) == pytest.approx(1.5, abs=0.02)
     assert abs(phase_deg(nom)) < 0.02
-    # the analytic size of the leak: h * sum x sin(i theta_k) on all-ones, on
-    # the ideal-mesh machine (the stock-form phase rides on top in residual_*)
+    # the analytic size of the leak: h * sum x sin(i theta_k) on all-ones
     x = eb.reference_inputs()["all_ones"]
     leak = math.radians(1.5) * (np.sin(np.outer(eb.THETA_K, eb.HARMONICS)) @ x)
     home = report["cam_home_phase"]
-    assert home["kinematic_as_built"]["all_ones"]["max"] == pytest.approx(
+    assert home["residual_as_built"]["all_ones"]["max"] == pytest.approx(
         100.0 * np.max(np.abs(leak)) / eb.N_ELEMENTS, rel=0.1
     )
     cl = report["closure"]
@@ -1095,75 +1092,79 @@ def test_reference_inputs_stay_on_the_lifting_side():
         assert np.all(x >= 0.0), name
 
 
-def test_cone_flat_play_books_the_exact_free_clock_outer(budget, monkeypatch):
-    """Each gear's loaded D-flat turn lies in [0, OUTER] of gear_seat_fit's
-    exact connected-home width barrier, over the print's absolute land
-    diameter/AF and bore AF limits, paying the torque corner's edge break --
-    the title block's on every land, the drawing's smaller one on the
-    terminal land. The unit draw spans exactly that range at T/120; the
-    crank index removes none of it, so no residual is subtracted and no bore
-    chord clamps it."""
+def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
+    """The index removes only the Ø9.525-land lag, not differences between
+    flats or the clearance variation between individual gears. The lever is
+    the shortest flat the print accepts: the land at its least diameter and
+    greatest AF, less the title block's edge break on the torque corner
+    (Codex, #1128), unless the least bore flat is shorter still. The residual
+    is booked against the longest unbroken Ø9.525 flat."""
     import dt_cone_gear_spec
     import cone_shaft_land_bands
     import gear_seat_fit
 
-    feature = budget["critical_features"]["cone_flat_play"]
-    assert feature["tolerance"] == 1.0
-    assert feature["unit"] == "span"
-    clock = budget["critical_features"]["cone_flat_clock"]["tolerance"]
-    assert clock == dt_cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
-    edge_break = _config.title_block("edge_break")
-    general_break = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
-    terminal_section = len(cone_shaft_land_bands.SECTION_DIA_BANDS) - 1
-    assert cone_shaft_land_bands.TERMINAL_FLAT_EDGE_BREAK_MAX < general_break
+    def chord(diameter, af):
+        radius = diameter / 2.0
+        return math.sqrt(radius**2 - (af - radius) ** 2)
 
-    calls = []
-    reader = gear_seat_fit.connected_home_clock_angle_bound_rad
-
-    def spy(*limits, edge_break_mm):
-        calls.append((limits, edge_break_mm))
-        return 1e-3 * len(calls)
-
-    monkeypatch.setattr(gear_seat_fit, "connected_home_clock_angle_bound_rad", spy)
-    np.testing.assert_array_equal(
-        eb.cone_flat_free_clock_rad(), 1e-3 * np.arange(1, eb.N_ELEMENTS + 1)
-    )
-    assert len(calls) == eb.N_ELEMENTS
-    bore_af_upper, bore_af_lower = dt_cone_gear_spec.BORE_AF_BAND
-    for index, (limits, edge) in enumerate(calls):
-        teeth = 6 * (index + 1)
-        section = dt_cone_gear_spec.land_section(teeth)
-        bore_af = round(
-            dt_cone_gear_spec.bore_flat_af_mm(teeth), dt_cone_gear_spec.BORE_AF_PLACES
-        )
-        np.testing.assert_array_equal(
-            np.asarray(limits),
-            [
-                cone_shaft_land_bands.land_finished_dia_limits_mm(
-                    dt_cone_gear_spec.bore_dia_mm(teeth), section
-                ),
-                cone_shaft_land_bands.land_finished_af_limits_mm(section),
-                (bore_af + bore_af_lower, bore_af + bore_af_upper),
-            ],
-        )
-        assert edge == (
-            cone_shaft_land_bands.TERMINAL_FLAT_EDGE_BREAK_MAX
-            if section == terminal_section
-            else general_break
-        )
-    monkeypatch.setattr(gear_seat_fit, "connected_home_clock_angle_bound_rad", reader)
-
-    outer = eb.cone_flat_free_clock_rad()
-    assert np.all(np.isfinite(outer)) and np.all(outer > 0.0)
     profiles = eb.phase_profiles()
-    per_unit, fixed = profiles["cone_flat_play"]
-    ratio = 6.0 * np.arange(1, eb.N_ELEMENTS + 1) / 120.0
-    np.testing.assert_allclose(profiles["cone_flat_clock"][0], np.radians(1.0) * ratio)
-    np.testing.assert_allclose(-1.0 * per_unit + fixed, 0.0, atol=1e-15)
-    np.testing.assert_allclose(1.0 * per_unit + fixed, ratio * outer, rtol=1e-12)
-    for index, (limits, edge) in enumerate(calls):
-        sharp = reader(*limits, edge_break_mm=0.0)
-        assert outer[index] >= sharp, index  # the break only frees the clock
+    clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
+    mean = (clearance_lo + clearance_hi) / 2.0
+    clock = budget["critical_features"]["cone_flat_clock"]["tolerance"]
+    play = budget["critical_features"]["cone_flat_play"]["tolerance"]
+    assert clock == dt_cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
+    assert play == pytest.approx((clearance_hi - clearance_lo) / 2.0)
+    assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.010, 0.030)
+    edge_break = _config.title_block("edge_break")
+    lever_loss = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
+    af_upper, af_lower = cone_shaft_land_bands.FLAT_AF_BAND
+    bore_af_upper, _ = gear_seat_fit.flat_bore_af_band(
+        cone_shaft_land_bands.FLAT_AF_BAND
+    )
+
+    reference_upper, _ = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
+    reference_chord = chord(
+        dt_cone_gear_spec.bore_dia_mm(120) + reference_upper,
+        cone_shaft_land_bands.SECTION_FLAT_AF[1] + af_lower,
+    )
+    for section, (band, af, carried) in enumerate(
+        zip(
+            cone_shaft_land_bands.SECTION_DIA_BANDS,
+            cone_shaft_land_bands.SECTION_FLAT_AF,
+            cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH,
+            strict=True,
+        )
+    ):
+        if not carried:
+            assert section == 0 and af is None
+            continue
+        assert af is not None
+        diameter = dt_cone_gear_spec.bore_dia_mm(carried[0])
+        _, lower = band
+        _, bore_lower = gear_seat_fit.seat_bore_band(band)
+        lever = min(
+            chord(diameter + lower, af + af_upper) - lever_loss,
+            chord(diameter + bore_lower, af + bore_af_upper),
+        )
+        for teeth in carried:
+            index = teeth // 6 - 1
+            ratio = teeth / 120.0
+            assert dt_cone_gear_spec.bore_dia_mm(teeth) == pytest.approx(diameter)
+            assert profiles["cone_flat_clock"][0][index] * clock == pytest.approx(
+                math.radians(clock) * ratio
+            )
+            per_unit, residual = profiles["cone_flat_play"]
+            for clearance in (clearance_lo, mean, clearance_hi):
+                phase = (clearance - mean) * per_unit[index] + residual[index]
+                if section == 1:
+                    expected = (clearance - mean) / lever * ratio
+                else:
+                    expected = (clearance / lever - mean / reference_chord) * ratio
+                assert phase == pytest.approx(expected, abs=1e-12)
+            if section == 1:
+                assert residual[index] == pytest.approx(0.0, abs=1e-12)
+            else:
+                assert residual[index] > 0.0
 
 
 def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
@@ -1197,14 +1198,18 @@ def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
 
 
 def test_flat_phase_propagates_through_physical_readout(nom):
-    """A mixed-land pair retains both its clock error and every gear's own
-    D-flat turn: no crank-index shift removes any of it."""
+    """A mixed-land pair retains both its clock error and smaller-land
+    systematic play after the common crank-index shift."""
+    import gear_seat_fit
+
     x = np.zeros(eb.N_ELEMENTS)
     x[[0, 19]] = 1.0  # T006 and T120, the two extremes of the flat size
     clock = np.zeros((1, eb.N_ELEMENTS))
     clock[0, 0] = 0.25
-    play = np.zeros((1, eb.N_ELEMENTS))  # every gear at half its OUTER ...
-    play[0, 0] = 1.0  # ... but T006 at its full OUTER
+    play = np.zeros((1, eb.N_ELEMENTS))
+    play[0, 0] = gear_seat_fit.FLAT_AF_CLEARANCE[1] - sum(
+        gear_seat_fit.FLAT_AF_CLEARANCE
+    ) / 2.0
     dev = {"cone_flat_clock": clock, "cone_flat_play": play}
     actual = eb._channel_model(x, nom, dev, eb.gain_sensitivities(nom))
     t = eb.cycle_table(nom)
@@ -1331,427 +1336,3 @@ def test_setup_class_deviations_are_redrawn_per_trial(budget, nom, monkeypatch):
     }
     with pytest.raises(ValueError, match="class"):
         eb.monte_carlo(bad, nom, setups)
-
-
-def _phase(advance: float | np.ndarray, bound: float | np.ndarray) -> eb.StockPhase:
-    shape = (eb.N_ELEMENTS, eb.K_MAX + 1)
-    return eb.StockPhase(
-        advance_rad=np.broadcast_to(np.asarray(advance, dtype=float), shape).copy(),
-        bound_rad=np.broadcast_to(np.asarray(bound, dtype=float), shape).copy(),
-        nominal_pose_bound_rad=np.broadcast_to(np.asarray(bound, dtype=float), shape).copy(),
-        shaft_home_lag_rad=2e-3,
-        cone_shaft_sense=1,
-        crank_geometry_sha256="0" * 64,
-    )
-
-
-def test_stock_phase_read_stalls_follow_the_configured_train():
-    """Coefficient k is read with the crank on its index after 2k turns: the
-    cone shaft (16:64) has then turned k/2 rev, psi_k = k pi, and channel i's
-    cone carries T_i = 6 i teeth onto the 120T cylinder -- the stalls every
-    mesh is evaluated at, derived from the configured train, not assumed."""
-    k = np.arange(eb.K_MAX + 1)
-    assert eb.CONE_STALL_RAD == pytest.approx(k * math.pi)
-    assert eb.CRANK_STALL_RAD == pytest.approx(4.0 * k * math.pi)
-    assert eb.CRANK_STALL_RAD == pytest.approx(
-        eb.CONE_STALL_RAD * eb._CRANK_DRIVE_TEETH / eb._CRANK_PINION_TEETH
-    )
-    assert list(eb.CHANNEL_CONE_TEETH) == [6 * i for i in range(1, 21)]
-    assert eb.CYLINDER_TEETH == 120
-    # what only the crank index removes: T_i/120 of the 64T's home lag
-    phase = _phase(0.0, 0.0)
-    assert phase.index_removed_cam_rad == pytest.approx(
-        eb.CHANNEL_CONE_TEETH / 120.0 * phase.shaft_home_lag_rad
-    )
-
-
-def _cone_row(teeth: int, sense: int = -1) -> dict:
-    """A qualified cone row exporting its ``stock_phase_3d`` reads as the
-    factory flattens them (immutable tuples, JSON-list scope)."""
-    reads = sense * eb.CONE_STALL_RAD
-    te = np.linspace(-1e-3, 1e-3, eb.K_MAX + 1)
-    stall = lambda values: tuple(float(v) for v in values)  # noqa: E731
-    return {
-        "qualification": "qualified",
-        "refusal": None,
-        "oblique_phase_bound_excluded_terms": list(eb.CONE_ROW_EXCLUDED_TERMS),
-        "driver_read_phases_rad": stall(reads),
-        "nominal_driven_advance_rad": stall(te - teeth / eb.CYLINDER_TEETH * reads),
-        "nominal_signed_running_te_rad": stall(te),
-        "nominal_reference_numerical_bound_rad": stall(np.full(eb.K_MAX + 1, 1e-6)),
-        "robust_half_width_rad": stall(np.full(eb.K_MAX + 1, 3e-5)),
-        "nominal_pose_half_width_rad": stall(np.full(eb.K_MAX + 1, 2e-5)),
-        "robust_signed_te_interval_rad": (-2e-3, 3e-3),
-        "nominal_pose_signed_te_interval_rad": (-1.5e-3, 2.5e-3),
-    }
-
-
-def test_cone_advance_is_the_3d_reference_plus_the_ideal_shaft_term(monkeypatch):
-    """The cylinder's advance at each read is the row's actual 3D q0 signed
-    running TE (+ = ahead in its running direction, no tare) plus the shaft's
-    advance at the ideal T/120, which the reference excludes. The bound pays
-    the shaft bound at T/120, the read's half-width (robust credited, nominal
-    pose reported; each already carrying the numerical bound, never paid
-    twice) and, only where the shaft is shifted or uncertain, the whole-period
-    signed TE interval's span once. A row read at the other sense is refused."""
-    teeth, sense = 30, -1
-    row = _cone_row(teeth, sense)
-    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: row)
-    ratio = teeth / eb.CYLINDER_TEETH
-    shaft_advance = np.linspace(0.0, 1e-3, eb.K_MAX + 1)
-    shaft_bound = np.full(eb.K_MAX + 1, 2e-4)
-    shaft_bound[0] = 0.0  # home: no shift, no uncertainty -> no TE change paid
-    advance, bound, pose = eb.cone_stall_advance(teeth, sense, shaft_advance, shaft_bound)
-    te = np.asarray(row["nominal_signed_running_te_rad"])
-    shifted = np.arange(eb.K_MAX + 1) > 0
-    assert advance == pytest.approx(te + ratio * shaft_advance, abs=1e-15)
-    assert bound == pytest.approx(
-        ratio * shaft_bound + 3e-5 + np.where(shifted, 5e-3, 0.0), abs=1e-15
-    )
-    assert pose == pytest.approx(
-        ratio * shaft_bound + 2e-5 + np.where(shifted, 4e-3, 0.0), abs=1e-15
-    )
-    with pytest.raises(eb.StockPhaseUnavailable, match=r"T030 reads are not at the shaft's stalls \+1"):
-        eb.cone_stall_advance(teeth, 1, shaft_advance, shaft_bound)
-
-
-def test_stock_phase_bound_is_conservative(nom):
-    """The paid bound encloses every machine whose cams lie anywhere inside
-    advance +/- bound, normaliser included."""
-    trial = eb.NominalTrial(nom)
-    rng = np.random.default_rng(7)
-    shape = (eb.N_ELEMENTS, eb.K_MAX + 1)
-    advance = rng.uniform(-2e-3, 2e-3, shape)
-    bound = np.full(shape, 1e-3)
-    for name, x in eb.reference_inputs().items():
-        centre = trial.readout(x, phase=advance)
-        paid = trial.phase_uncertainty(x, advance, bound)
-        for _ in range(8):
-            moved = trial.readout(x, phase=advance + rng.uniform(-1.0, 1.0, shape) * bound)
-            assert np.all(np.abs(moved - centre) <= paid + 1e-12), name
-
-
-def test_stock_phase_residual_runs_through_the_shipped_procedure(nom):
-    """With no phase the stock-form residual is the kinematic one; a phase
-    moves the exact value, the bound is paid on top, and the L1-weighted
-    2 sin(|delta|/2) screen is reported beside it."""
-    still = eb.stock_phase_residual(nom, _phase(0.0, 0.0))
-    kinematic = eb.nominal_design_errors(
-        nom, correct_second_harmonic=True, calibrated_stick=True
-    )
-    for name in still:
-        assert still[name]["mae_value"] == pytest.approx(kinematic[name]["mae"])
-        assert still[name]["bound_mae"] == 0.0
-        assert still[name]["screen_max"] == 0.0
-    advance = np.outer(np.ones(eb.N_ELEMENTS), np.linspace(0.0, 2e-3, eb.K_MAX + 1))
-    moved = eb.stock_phase_residual(nom, _phase(advance, 1e-4))
-    for name, row in moved.items():
-        assert row["mae"] == pytest.approx(row["mae_value"] + row["bound_mae"])
-        assert row["bound_mae"] > 0.0
-        x = eb.reference_inputs()[name]
-        w = np.abs(x) / np.sum(np.abs(x))
-        expected = (
-            100.0
-            * np.sum(np.abs(x))
-            / np.max(np.abs(eb.ideal_coefficients(x)))
-            * (w @ (2.0 * np.sin((advance + 1e-4) / 2.0)))
-        )
-        assert row["screen_max"] == pytest.approx(float(np.max(expected)))
-    assert moved["all_ones"]["mae_value"] != pytest.approx(still["all_ones"]["mae_value"])
-
-
-_DROP = object()
-
-
-def _with(row: dict, key: str, value) -> dict:
-    out = dict(row)
-    if value is _DROP:
-        del out[key]
-    else:
-        out[key] = value
-    return out
-
-
-def _stall_with(row: dict, key: str, index: int, value) -> tuple:
-    values = list(row[key])
-    values[index] = value
-    return tuple(values)
-
-
-_ROW = _cone_row(30)
-_SCOPE = list(eb.CONE_ROW_EXCLUDED_TERMS)
-
-
-@pytest.mark.parametrize(
-    ("row", "match"),
-    [
-        (_with(_ROW, "qualification", "refused") | {"refusal": "root air"}, "root air"),
-        (_with(_ROW, "oblique_phase_bound_excluded_terms", _DROP), "T030 widths exclude None"),
-        (_with(_ROW, "oblique_phase_bound_excluded_terms", _SCOPE[:1]), "T030 widths exclude"),
-        (_with(_ROW, "oblique_phase_bound_excluded_terms", [*_SCOPE, "cam_phase"]), "T030 widths exclude"),
-        *[
-            (_with(_ROW, key, _DROP), f"T030 {key} None")
-            for key in (*eb.CONE_ROW_STALL_READS, *eb.CONE_ROW_TE_INTERVALS)
-        ],
-        (_with(_ROW, "robust_half_width_rad", _ROW["robust_half_width_rad"][:-1]), "robust_half_width_rad"),
-        (_with(_ROW, "nominal_signed_running_te_rad",
-               _stall_with(_ROW, "nominal_signed_running_te_rad", 3, math.nan)), "nominal_signed_running_te_rad"),
-        (_with(_ROW, "driver_read_phases_rad",
-               _stall_with(_ROW, "driver_read_phases_rad", 0, True)), "driver_read_phases_rad"),
-        (_with(_ROW, "nominal_pose_half_width_rad",
-               _stall_with(_ROW, "nominal_pose_half_width_rad", 5, -1e-6)), "nominal_pose_half_width_rad"),
-        (_with(_ROW, "robust_signed_te_interval_rad", (3e-3, -2e-3)), "robust_signed_te_interval_rad has lo > hi"),
-        (_with(_ROW, "nominal_pose_signed_te_interval_rad", (0.0,)), "nominal_pose_signed_te_interval_rad"),
-        (_with(_ROW, "robust_half_width_rad",
-               _stall_with(_ROW, "robust_half_width_rad", 7, 5e-7)),
-         "robust_half_width_rad does not carry its reference's numerical bound"),
-        (_with(_ROW, "nominal_signed_running_te_rad",
-               _stall_with(_ROW, "nominal_signed_running_te_rad", 9,
-                           _ROW["nominal_signed_running_te_rad"][9] + 1e-6)),
-         "signed TE is not driven advance"),
-    ],
-)
-def test_refused_cone_row_names_itself(monkeypatch, row, match):
-    """A cone row that is not qualified, whose widths do not exclude exactly
-    the terms the budget books itself (the D-flat free clock and
-    BoreFlatClock), that lacks any ``stock_phase_3d`` read or interval or
-    carries a non-finite, bool, short or negative-width one, an inverted TE
-    interval, a width short of its reference's numerical bound, or a signed
-    TE outside its own source frame (driven advance + T/120 x driver phase)
-    is refused by name -- never evaluated at a planar TE, never paid twice,
-    never read in another datum."""
-    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: row)
-    with pytest.raises(eb.StockPhaseUnavailable, match=match):
-        eb._qualified_cone_row(30)
-
-
-def test_qualified_cone_row_reads_every_stock_phase_field(monkeypatch):
-    """The accepted row yields exactly its frozen reads, as float arrays, and
-    an unqualifiable stock-form family (the spec's ValueError) is a named
-    refusal, never a crash of the budget."""
-    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: _ROW)
-    row = eb._qualified_cone_row(30)
-    assert set(row) == {*eb.CONE_ROW_STALL_READS, *eb.CONE_ROW_TE_INTERVALS}
-    for key, values in row.items():
-        assert values.tolist() == list(_ROW[key]), key
-
-    def unqualified(teeth):
-        raise ValueError("incomplete cone stock-form qualification: packet")
-
-    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", unqualified)
-    with pytest.raises(eb.StockPhaseUnavailable, match="T030 stock-form family refused: incomplete"):
-        eb._qualified_cone_row(30)
-
-
-def test_drum_pattern_clock_is_paid_once_on_every_cam_read(monkeypatch):
-    """The drum tooth pattern clocked q off its CAM-NOTCH moves the cam by -q
-    in cylinder radians DIRECTLY (not T_i/120, not times i): a signed unknown
-    with nominal 0, so every one of the 20 x 21 cam reads -- k=0 included,
-    no index or tare removing it -- pays +/- the outward-rounded grade once,
-    credited and reported alike; the advance is untouched. The cone rows
-    must exclude it by name, so it is never paid twice."""
-    assert eb.CONE_ROW_EXCLUDED_TERMS[-1] == "drum_tooth_to_cam_notch_clock"
-    sense, grade_deg = -1, 0.02
-    stalls = eb.CRANK_STALL_RAD
-    monkeypatch.setattr(
-        eb,
-        "crank_shaft_lag",
-        lambda: (sense, np.zeros_like(stalls), np.zeros_like(stalls), "digest"),
-    )
-    monkeypatch.setattr(
-        eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: _cone_row(t, sense)
-    )
-    calls = []
-
-    def grade():
-        calls.append(True)
-        return grade_deg
-
-    monkeypatch.setattr(eb._fit_limits, "drum_tooth_to_cam_notch_clock_deg", grade)
-    phase, missing = eb._stock_phase_result.__wrapped__()
-    assert missing == () and calls == [True]
-    paid = math.nextafter(math.radians(grade_deg), math.inf)
-    assert eb.drum_pattern_clock_rad() == paid
-    te = np.asarray(_cone_row(6, sense)["nominal_signed_running_te_rad"])
-    # crank at rest (s = b = 0): no TE interval span, so only width + pattern
-    assert phase.advance_rad == pytest.approx(np.broadcast_to(te, phase.advance_rad.shape), abs=0.0)
-    assert phase.bound_rad == pytest.approx(np.full_like(phase.bound_rad, 3e-5 + paid), abs=1e-18)
-    assert phase.nominal_pose_bound_rad == pytest.approx(
-        np.full_like(phase.bound_rad, 2e-5 + paid), abs=1e-18
-    )
-    assert phase.index_removed_cam_rad == pytest.approx(np.zeros(eb.N_ELEMENTS))
-
-
-def test_unknown_drum_pattern_clock_refuses_closed(monkeypatch):
-    """A missing or invalid grade is a named refusal of the whole stock phase,
-    beside every other refused input -- never a 0 fallback."""
-    def unknown():
-        raise eb._fit_limits.SourceDomainUnknown(
-            "missing actual drum tooth-to-CAM-NOTCH clock authority"
-        )
-
-    monkeypatch.setattr(eb._fit_limits, "drum_tooth_to_cam_notch_clock_deg", unknown)
-    with pytest.raises(eb.StockPhaseUnavailable, match="drum tooth-to-CAM-NOTCH clock: missing"):
-        eb.drum_pattern_clock_rad()
-    stalls = eb.CRANK_STALL_RAD
-    monkeypatch.setattr(
-        eb,
-        "crank_shaft_lag",
-        lambda: (-1, np.zeros_like(stalls), np.zeros_like(stalls), "digest"),
-    )
-    monkeypatch.setattr(eb.dt_cone_mesh_domain, "stock_form_mesh_data", lambda t: _cone_row(t))
-    phase, missing = eb._stock_phase_result.__wrapped__()
-    assert phase is None
-    assert missing == (
-        "drum tooth-to-CAM-NOTCH clock: missing actual drum tooth-to-CAM-NOTCH clock authority",
-    )
-
-
-_SEED_AS_CERTIFIED = object()
-
-
-def _crank_packet(
-    monkeypatch, *, certified=12.5, seed=_SEED_AS_CERTIFIED, frozen="digest", refusal=None
-):
-    """Stand-in crank modules: the packet admission (``require_qualified``,
-    returning the admitted payload with its ``phase_seed_deg`` -- the
-    certified phase unless ``seed`` is given -- or raising ``refusal``; it
-    records the order it was called in), the frozen fields, and the pure
-    input digest ``crank_mesh_geometry``. Returns the access log, so a test
-    can assert the admission ran first."""
-    import sys
-    import types
-
-    stalls = eb.CRANK_STALL_RAD
-    log: list[str] = []
-
-    def require_qualified():
-        log.append("require_qualified")
-        if refusal is not None:
-            raise refusal
-        return {"phase_seed_deg": certified if seed is _SEED_AS_CERTIFIED else seed}
-
-    fields = {
-        "GEOMETRY_SHA256": frozen,
-        "CERTIFIED_PHASE_OFFSET_DEG": certified,
-        "CONE_SHAFT_SENSE": -1,
-        "STALL_DRIVER_RAD": tuple(stalls),
-        "CONE_SHAFT_LAG_RAD": tuple(np.zeros_like(stalls)),
-        "BOUND_RAD": tuple(np.full_like(stalls, 1e-5)),
-    }
-
-    class Crank(types.ModuleType):
-        def __getattr__(self, name):
-            if name in fields:
-                log.append(name)
-                return fields[name]
-            raise AttributeError(name)
-
-    crank = Crank("crank_drive_phase")
-    crank.require_qualified = require_qualified
-    monkeypatch.setitem(sys.modules, "crank_drive_phase", crank)
-    monkeypatch.setitem(
-        sys.modules,
-        "crank_mesh_geometry",
-        types.SimpleNamespace(geometry_sha256=lambda: "digest"),
-    )
-    return log
-
-
-def _configured_crank_phase(monkeypatch, configured):
-    gear_train = dict(_config.machine("gear_train"))
-    gear_train["crank_mesh_phase_offset_deg"] = configured
-    real_machine = _config.machine
-    monkeypatch.setattr(
-        eb._config,
-        "machine",
-        lambda *keys: gear_train if keys == ("gear_train",) else real_machine(*keys),
-    )
-
-
-@pytest.mark.parametrize(
-    ("configured", "certified", "seed", "admitted"),
-    [
-        (12.5, 12.5, _SEED_AS_CERTIFIED, True),
-        (12, 12.0, _SEED_AS_CERTIFIED, True),
-        (12.5, 12.5, 12.0, False),  # packet seeded elsewhere than it certified
-        (12.5, 12.5, None, False),
-        (12.5, 12.5, True, False),
-        (12.5, 12.5, 12.5 + 1e-12, False),
-        (None, 12.5, _SEED_AS_CERTIFIED, False),
-        (12.5, None, _SEED_AS_CERTIFIED, False),
-        (12.5, 12.5 + 1e-12, _SEED_AS_CERTIFIED, False),  # exact, never isclose
-        (True, 1.0, _SEED_AS_CERTIFIED, False),
-        (1.0, True, _SEED_AS_CERTIFIED, False),
-        (math.nan, math.nan, _SEED_AS_CERTIFIED, False),
-        (math.inf, math.inf, _SEED_AS_CERTIFIED, False),
-        ("12.5", 12.5, _SEED_AS_CERTIFIED, False),
-    ],
-)
-def test_crank_study_admitted_only_at_its_certified_phase(
-    monkeypatch, configured, certified, seed, admitted
-):
-    """The crank study's digest does not carry the phase it selected, so it is
-    admitted only when the configured crank mesh phase, the admitted packet's
-    ``phase_seed_deg`` and the certified phase are equal exactly: finite
-    non-bool degrees, no tolerance, default or tare."""
-    log = _crank_packet(monkeypatch, certified=certified, seed=seed)
-    _configured_crank_phase(monkeypatch, configured)
-    if admitted:
-        sense, lag, bound, digest = eb.crank_shaft_lag()
-        assert (sense, digest) == (-1, "digest")
-        assert lag.shape == bound.shape == eb.CRANK_STALL_RAD.shape
-        assert log[0] == "require_qualified"
-    else:
-        with pytest.raises(eb.StockPhaseUnavailable, match="configured crank phase"):
-            eb.crank_shaft_lag()
-
-
-@pytest.mark.parametrize("error", [ValueError, RuntimeError])
-def test_crank_packet_refusal_comes_before_any_numeric_field(monkeypatch, error):
-    """The crank packet's own admission runs first: its ValueError or
-    RuntimeError is the budget's named refusal, and no frozen numeric field
-    (digest, phase, sense, stalls, lag, bound) is read -- no fallback."""
-    log = _crank_packet(monkeypatch, refusal=error("calibration packet stale"))
-    _configured_crank_phase(monkeypatch, 12.5)
-    with pytest.raises(
-        eb.StockPhaseUnavailable, match="crank 16/64 phase study refused: calibration packet stale"
-    ):
-        eb.crank_shaft_lag()
-    assert log == ["require_qualified"]
-
-
-def test_crank_packet_is_stale_against_the_pure_input_digest(monkeypatch):
-    """Staleness compares the packet's frozen digest with the PURE input
-    digest ``crank_mesh_geometry.geometry_sha256()`` (no phase output)."""
-    _crank_packet(monkeypatch, frozen="old")
-    _configured_crank_phase(monkeypatch, 12.5)
-    with pytest.raises(eb.StockPhaseUnavailable, match="stale: frozen old, current geometry digest"):
-        eb.crank_shaft_lag()
-
-
-
-def test_missing_stock_phase_fails_the_closure(budget, monkeypatch):
-    """Without the stock-form phase nothing carrying the nominal residual is
-    credited: the residual, totals and pair worst are None, the gate names
-    every missing input, and no readout procedure is issued."""
-    monkeypatch.setattr(
-        eb, "_stock_phase_result", lambda: (None, ("crank 16/64 phase study refused: test",))
-    )
-    r = eb.build_report(negative(budget))
-    assert r["stock_phase"] == {
-        "available": False,
-        "missing": ["crank 16/64 phase study refused: test"],
-    }
-    cl = r["closure"]
-    for key in ("nominal_residual_mae", "total_mae", "nominal_residual_mae_as_built",
-                "nominal_residual_mae_nominal_pose", "total_mae_as_built", "pair_worst"):
-        assert cl[key] is None, key
-    assert cl["nominal_residual_mae_kinematic"] > 0.0
-    assert r["pair_joint"]["stock_phase_included"] is False
-    bad = eb.budget_closes(r)
-    assert bad[0] == (
-        "stock-form transmission error unavailable: crank 16/64 phase study refused: test"
-    )
-    with pytest.raises(eb.StockPhaseUnavailable, match="crank 16/64"):
-        eb.readout_procedure(r)
