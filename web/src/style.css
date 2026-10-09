@@ -42,6 +42,21 @@ body {
   gap: 0.5rem;
 }
 
+#loading progress {
+  appearance: none;
+  justify-self: center;
+  width: min(22rem, 80vw);
+  height: 0.65rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--panel);
+  accent-color: var(--accent);
+}
+#loading progress::-webkit-progress-bar { background: var(--panel); border-radius: 6px; }
+#loading progress::-webkit-progress-value { background: var(--accent); border-radius: 6px; }
+#loading progress::-moz-progress-bar { background: var(--accent); border-radius: 6px; }
+#loading progress[hidden] { display: none; }
+
 .hint { color: var(--dim); font-size: 0.9rem; }
 
 code {

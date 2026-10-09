@@ -82,6 +82,11 @@ names; missing joints have a separate persistent warning and prevent complete
 synchronization acceptance. Original geometry is not decimated, resized or
 replaced with proxy parts.
 
+The loading progress meter counts decoded response-body bytes against the
+compiled representation size, never a compressed length or guessed total.
+Identity checking and decoder preparation run as an indeterminate phase, and
+the overlay never reports a ready model before the accepted digest.
+
 The viewer generates a PMREM room environment once for image-based lighting.
 The native steel and brass materials are fully metallic, so diffuse hemisphere
 lighting alone leaves their surfaces dark. The environment contributes reflected

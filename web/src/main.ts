@@ -20,6 +20,7 @@ const verificationEnabled = new URLSearchParams(location.search).get('verify') =
 const canvas = element<HTMLCanvasElement>('#stage')
 const loading = element('#loading')
 const modelStatus = element('#model-status')
+const modelProgress = element<HTMLProgressElement>('#model-progress')
 const retryModel = element<HTMLButtonElement>('#retry-model')
 const title = element('#video-title')
 const playbackStatus = element('#playback-status')
@@ -923,10 +924,26 @@ async function fetchMachine(): Promise<void> {
   modelState = 'loading'
   physicsState = 'unavailable'
   loading.hidden = false
+  modelStatus.textContent = 'Loading the released CAD model…'
+  modelProgress.hidden = false
+  modelProgress.removeAttribute('value')
   retryModel.hidden = true
   updateControlState()
   try {
-    machine = await loadMachine(viewer.scene, { nativePrimitiveSnapshots: verificationEnabled })
+    machine = await loadMachine(viewer.scene, {
+      nativePrimitiveSnapshots: verificationEnabled,
+      onProgress: (progress) => {
+        if (progress.phase === 'downloading') {
+          const loadedBytes = Math.min(progress.loadedBytes, progress.totalBytes)
+          modelProgress.max = progress.totalBytes
+          modelProgress.value = loadedBytes
+          modelStatus.textContent = `Downloading the released CAD model… ${Math.round((loadedBytes / progress.totalBytes) * 100)}%`
+        } else {
+          modelProgress.removeAttribute('value')
+          modelStatus.textContent = 'Download complete; verifying and preparing the model…'
+        }
+      },
+    })
     if (machine.availability !== 'available') throw new Error(machine.loadError ?? 'The CAD model is unavailable.')
     modelState = 'ready'
     updateMachine(input)
@@ -941,6 +958,7 @@ async function fetchMachine(): Promise<void> {
     retryFollowing()
   } catch (error) {
     modelState = 'unavailable'
+    modelProgress.hidden = true
     modelStatus.textContent = `No compatible model loaded. Run npm run fetch-model -- path/to/released.glb. ${error instanceof Error ? error.message : String(error)}`
     notice(modelError, error instanceof Error ? error.message : String(error))
     retryModel.hidden = false
