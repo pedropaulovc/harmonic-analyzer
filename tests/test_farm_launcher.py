@@ -674,30 +674,33 @@ def test_agent_scratchpad_snapshot_supports_windows_long_paths(
 ) -> None:
     fixture = _launcher_fixture(tmp_path, submodules=True)
     worktree = Path(fixture["worktree"])
-    relative = (
-        Path("deep-" + "a" * 33)
-        / ("nested-" + "b" * 33)
-        / ("leaf-" + "c" * 26)
-        / "payload.txt"
-    )
+    scratchpad = tmp_path / "agent scratchpad"
+    default_directory = scratchpad / "harmonic-analyzer" / "farm-runs"
+    snapshot_root = default_directory / "snapshots" / ("0" * 12)
+    # Target a 261-character snapshot path while keeping the fixture source short.
+    relative_length = max(15, 261 - len(str(snapshot_root)) - 1)
+    payload_length = relative_length - 15
+    relative = Path("nested") / ("payload-" + "x" * payload_length)
     tracked_file = worktree / relative
+    snapshot_file = snapshot_root / relative
+    if len(str(tracked_file)) >= 260:
+        pytest.skip(
+            "pytest temporary root leaves no short source path for the long-path probe"
+        )
+    assert len(str(tracked_file)) < 260
+    assert len(str(snapshot_file)) > 260
+
     tracked_file.parent.mkdir(parents=True)
     tracked_file.write_text("long tracked path\n", encoding="utf-8")
     _git(worktree, "add", "--", relative.as_posix())
     _git(worktree, "commit", "-q", "-m", "add long tracked path")
     _git(worktree, "update-ref", "refs/remotes/origin/main", "HEAD")
 
-    scratchpad = tmp_path / "agent scratchpad"
     environment = dict(fixture["environment"])
     environment["HARMONIC_AGENT_SCRATCHPAD"] = str(scratchpad)
     command = _command(fixture, "part:pen_rod")
     log_directory_argument = command.index("-LogDirectory")
     del command[log_directory_argument : log_directory_argument + 2]
-
-    default_directory = scratchpad / "harmonic-analyzer" / "farm-runs"
-    snapshot_file = default_directory / "snapshots" / ("0" * 12) / relative
-    assert len(str(tracked_file)) < 260
-    assert len(str(snapshot_file)) > 260
 
     result = _run_launcher(fixture, command, environment)
 
