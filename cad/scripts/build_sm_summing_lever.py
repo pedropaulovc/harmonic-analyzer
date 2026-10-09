@@ -762,7 +762,7 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
 
 def _receiver_model_bands(adapter) -> None:
     """Author receiver limits on owned source dimensions, including subfeatures."""
-    from _common import _com_invoke, _display_dimensions, _early_bound
+    from _common import _com_invoke, _early_bound, _feature_display_dimensions
     from _drawing_marks import _feature_tree
     from magnifying_bracket_joint_layout import THREAD_DEPTH
 
@@ -799,7 +799,8 @@ def _receiver_model_bands(adapter) -> None:
     # native names are not a semantic API ("depth" is not guaranteed in them).
     for current in _feature_tree(feature):
         owner = str(_com_invoke(current, "IFeature", "Name"))
-        for dimension in _display_dimensions(current):
+        for display in _feature_display_dimensions(current):
+            dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
             full_name = str(_com_invoke(dimension, "IDimension", "FullName"))
             system_value = float(_com_invoke(dimension, "IDimension", "SystemValue"))
             dimension_type = int(_com_invoke(dimension, "IDimension", "GetType"))
@@ -817,22 +818,58 @@ def _receiver_model_bands(adapter) -> None:
                 continue
             for name, (nominal, _band) in required.items():
                 if abs(value_mm - nominal) < 1e-5:
-                    matches[name].append((owner, parts[0]))
+                    matches[name].append((owner, parts[0], display, dimension))
     # Native shape (farm, 2026-10-09): Hole Wizard owns the tap drill depth on
     # one sketch subfeature, but adds one cosmetic-thread subfeature PER HOLE,
     # each owning its own full-thread depth.
     expected = {"FullThreadDepth": len(LEVER_HOLE_POINTS), "TapDrillDepth": 1}
     for name, (_nominal, band) in required.items():
-        owners = {owner for owner, _native_name in matches[name]}
+        owners = {match[0] for match in matches[name]}
         if len(matches[name]) != expected[name] or len(owners) != expected[name]:
             raise RuntimeError(
                 f"BracketMountingTaps: expected {expected[name]} native {name} "
-                f"(one per owner), found {len(matches[name])}: {matches[name]}"
+                f"(one per owner), found {len(matches[name])}: "
+                f"{[match[:2] for match in matches[name]]}"
             )
-        for owner, native_name in matches[name]:
-            # Wizard-owned names are its native parameter contract; never rewrite them.
-            set_dimension_symmetric_tolerance(adapter, owner, native_name, band)
-            set_dimension_display_precision(adapter, owner, native_name, 2)
+        for owner, native_name, display, dimension in matches[name]:
+            # Wizard-owned names are its native parameter contract; never
+            # rewrite them. Subfeatures (Sketch14, Hole Thread22...) are not
+            # reachable by FeatureByName, and the per-hole threads share the
+            # name D1, so band the dimensions already held, not by name.
+            _band_held_dimension(display, dimension, band, f"{native_name}@{owner}")
+
+
+def _band_held_dimension(display, dimension, band: float, label: str) -> None:
+    """Symmetric tolerance + 2-place display on an already-resolved dimension
+    (the by-name ``set_dimension_symmetric_tolerance`` contract, minus lookup)."""
+    from _common import _bind, _early_bound
+    from _drawing_marks import _set_tolerance_precision
+
+    display = _bind(display, "IDisplayDimension")
+    dimension = _bind(dimension, "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
+    band_m = band / 1000.0
+    if not tolerance.SetValues(-band_m, band_m):
+        raise RuntimeError(f"{label}: SetValues rejected +/-{band} mm")
+    minimum = float(tolerance.GetMinValue())
+    maximum = float(tolerance.GetMaxValue())
+    if (
+        int(tolerance.Type) != 4
+        or abs(minimum + band_m) > 1e-9
+        or abs(maximum - band_m) > 1e-9
+    ):
+        raise RuntimeError(
+            f"{label}: tolerance readback type {int(tolerance.Type)} "
+            f"{minimum:g}/{maximum:g} m != symmetric +/-{band_m:g} m"
+        )
+    _set_tolerance_precision(display, (-band, band), label=label)
+    display = _early_bound(display, "IDisplayDimension")
+    do_not_change = -1  # swDimensionPrecisionSettings_e
+    display.SetPrecision3(2, do_not_change, do_not_change, do_not_change)
+    if int(display.GetPrimaryPrecision2()) != 2:
+        raise RuntimeError(f"{label}: display precision did not persist")
+    _telemetry.success(f"toleranced {label}: +/-{band:g} mm (2 decimals)")
 
 
 async def _receiver_coordinate_dimensions(adapter) -> None:

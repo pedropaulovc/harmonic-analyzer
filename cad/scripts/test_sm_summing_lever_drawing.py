@@ -210,7 +210,7 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
 
         @Name.setter
         def Name(self, value):
-            if self.owner in {"BracketMountingTaps", "CosmeticThread1", "ReferencePlane"}:
+            if self.owner in {"BracketMountingTaps", "Sketch14", "Hole Thread22", "Hole Thread23", "ReferencePlane"}:
                 raise AssertionError("native Wizard dimension names must not be rewritten")
             self._name = value
 
@@ -297,6 +297,13 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
         lambda adapter, feature, name, band: bands.append((feature, name, band)),
     )
     monkeypatch.setattr(part, "set_dimension_display_precision", lambda *args: None)
+    held = []
+    monkeypatch.setattr(
+        part, "_band_held_dimension",
+        lambda display, dimension, band, label: held.append(
+            (display.GetDimension2(0) is dimension, dimension, band, label)
+        ),
+    )
     monkeypatch.setattr(part, "mark_dimensions_for_drawing", lambda *args: None)
     inventory = []
     monkeypatch.setattr(part._telemetry, "info", inventory.append)
@@ -304,9 +311,13 @@ def test_receiver_depth_bands_follow_owned_dimensions_without_native_name_guesse
     assert bands == [
         ("CoefficientsPlate", "PlateThickness", 0.05),
         ("EdgeRibBack", "RibDepth", 0.05),
-        ("Hole Thread22", "D1", 0.05),
-        ("Hole Thread23", "D1", 0.05),
-        ("Sketch14", "Tap Drill Depth", 0.10),
+    ]
+    # Subfeatures are not FeatureByName-reachable and both threads are "D1":
+    # band the exact native objects found in the walk, never a by-name lookup.
+    assert held == [
+        (True, thread, 0.05, "D1@Hole Thread22"),
+        (True, thread_b, 0.05, "D1@Hole Thread23"),
+        (True, drill, 0.10, "Tap Drill Depth@Sketch14"),
     ]
     assert (drill.Name, thread.Name, thread_b.Name, unrelated.Name) == (
         "Tap Drill Depth", "D1", "D1", "Depth"
