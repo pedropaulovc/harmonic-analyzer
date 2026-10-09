@@ -1596,6 +1596,32 @@ def test_com_seat_hands_back_its_wait_and_logs_total_elapsed(tmp_path, monkeypat
     }
 
 
+@pytest.fixture
+def vendor_warning_capture(monkeypatch):
+    """Capture the real severity/resource-routed OTel logs without disk or OTLP."""
+    from opentelemetry._logs import get_logger_provider
+    from opentelemetry.sdk._logs.export import (
+        InMemoryLogRecordExporter,
+        SimpleLogRecordProcessor,
+    )
+    import _telemetry
+
+    monkeypatch.setattr(_telemetry, "_resolve_otlp_endpoint", lambda _signal, **_kw: None)
+    monkeypatch.setattr(_telemetry, "_telemetry_dir", lambda: None)
+    monkeypatch.setenv("HARMONIC_VERBOSITY", "warn")
+    _telemetry.configure(force=True)
+    logs = InMemoryLogRecordExporter()
+    processor = SimpleLogRecordProcessor(logs)
+    get_logger_provider().add_log_record_processor(processor)
+    # Task-stage logger providers share these processors, as in test_telemetry.
+    _telemetry._log_processors.append(processor)
+    _telemetry._aux_logger_providers.clear()
+    try:
+        yield logs
+    finally:
+        _telemetry.configure(force=True)
+
+
 @pytest.mark.parametrize(
     "stem,executor,restores,worker,expected",
     [
@@ -1609,7 +1635,8 @@ def test_com_seat_hands_back_its_wait_and_logs_total_elapsed(tmp_path, monkeypat
     ],
 )
 def test_vendor_part_warning_only_at_actual_build(
-    tmp_path, monkeypatch, stem, executor, restores, worker, expected
+    tmp_path, monkeypatch, capsys, vendor_warning_capture,
+    stem, executor, restores, worker, expected
 ):
     """Warn at the work boundary, not a miss that later restores or dispatches.
 
@@ -1629,6 +1656,20 @@ def test_vendor_part_warning_only_at_actual_build(
     output = tmp_path / f"{stem}.SLDPRT"
     outcomes = iter(restores)
     events = []
+    logs = vendor_warning_capture
+    label = f"part:{stem}"
+
+    def vendor_warnings():
+        return [
+            record.log_record
+            for record in logs.get_finished_logs()
+            if (record.log_record.attributes or {}).get("label") == label
+        ]
+
+    def execute(*_args, **_kwargs):
+        # Inspect the consumer-visible record at the execution boundary.
+        assert len(vendor_warnings()) == int(expected)
+        events.append("execute")
 
     monkeypatch.setattr(dodo, "_part_file_deps", lambda *_a: [])
     monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [output])
@@ -1638,17 +1679,8 @@ def test_vendor_part_warning_only_at_actual_build(
     monkeypatch.setattr(dodo, "_stamp_part_execution", lambda _stem: None)
     monkeypatch.setattr(dodo, "_sw_ensure_once", lambda: None)
     monkeypatch.setattr(dodo, "_com_seat", lambda _label: contextlib.nullcontext(0.0))
-    monkeypatch.setattr(
-        dodo, "_farm_build", lambda *_a: events.append(("dispatch", {}))
-    )
-    monkeypatch.setattr(
-        dodo, "_exec_com", lambda *_a, **_kw: events.append(("execute", {}))
-    )
-    monkeypatch.setattr(
-        dodo._telemetry,
-        "warn",
-        lambda message, **fields: events.append((message, fields)),
-    )
+    monkeypatch.setattr(dodo, "_farm_build", lambda *_a: events.append("dispatch"))
+    monkeypatch.setattr(dodo, "_exec_com", execute)
 
     if executor == "drawing":
         dodo._cached_com_action(
@@ -1657,22 +1689,27 @@ def test_vendor_part_warning_only_at_actual_build(
     else:
         dodo._cached_part_action(stem, script)
 
-    warnings = [(message, fields) for message, fields in events if fields]
+    warnings = vendor_warnings()
+    console = capsys.readouterr().err
     if expected:
+        from opentelemetry._logs import SeverityNumber
+
         assert len(warnings) == 1
-        message, fields = warnings[0]
-        assert fields == {"label": f"part:{stem}", "cache.key": key[:12]}
-        assert f"part:{stem}" in message and key[:12] in message
-        assert "investigate" in message and "refactor" in message
-        assert events == [warnings[0], ("execute", {})]
+        record = warnings[0]
+        assert record.severity_number == SeverityNumber.WARN
+        assert record.attributes["cache.key"] == key
+        assert record.trace_id and record.span_id
+        assert "!!" in console and label in console and key[:12] in console
+        assert events == ["execute"]
     else:
         assert warnings == []
+        assert "!!" not in console
         if executor == "farm":
-            assert events == [("dispatch", {})]
+            assert events == ["dispatch"]
         elif not all(outcome is False for outcome in restores):
             assert events == []
         else:
-            assert events == [("execute", {})]
+            assert events == ["execute"]
 
 
 def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):

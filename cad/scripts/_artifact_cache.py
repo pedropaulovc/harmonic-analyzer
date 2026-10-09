@@ -162,37 +162,98 @@ _KEYDIR = _REPORTS / "cache-keys"
 # computes its key immediately before those calls, so this stays bounded to the
 # current doit process and avoids threading a second return value through dodo.
 _KEY_INPUTS: dict[tuple[str, str], list[tuple[str, str]]] = {}
+_KEY_CONTEXT: dict[tuple[str, str], tuple[str, str]] = {}
+
+# Azure customDimensions values allow 8192 characters. ASCII JSON fragments keep
+# both the character and UTF-8 byte size below that limit, including escaped paths.
+# Chunks are structured DEBUG logs, not span events: SDK spans retain only 128
+# events by default (and may be configured lower). Logs have no per-span count
+# limit, so every input is emitted without adding spans or evicting decisions.
+_MANIFEST_CHUNK_SIZE = 6000
+
+
+def _provenance(label: str, key: str) -> dict:
+    """The one recipe representation used by cache.jsonl and remote manifests."""
+    pairs = _KEY_INPUTS.get((label, key))
+    context = _KEY_CONTEXT.get((label, key))
+    return {
+        "schema": 1,
+        "key": key,
+        "epoch": context[0] if context else _CACHE_EPOCH,
+        "salt": context[1] if context else _salt(),
+        "recipe_known": pairs is not None and context is not None,
+        "input_count": len(pairs) if pairs is not None else -1,
+        "inputs": [{"path": path, "digest": digest} for path, digest in pairs or []],
+    }
+
+
+def _manifest(provenance: dict) -> tuple[str, dict]:
+    """Canonical ASCII payload plus queryable integrity/completeness metadata."""
+    payload = json.dumps(provenance, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    count = (len(payload) + _MANIFEST_CHUNK_SIZE - 1) // _MANIFEST_CHUNK_SIZE
+    identity = hashlib.sha256(payload.encode("ascii")).hexdigest()
+    return payload, {
+        "manifest_id": identity,
+        "manifest_schema": provenance["schema"],
+        "manifest_chars": len(payload),
+        "manifest_chunk_count": count,
+        "manifest_emitted_chunks": count,
+        "manifest_input_count": provenance["input_count"],
+        "manifest_complete": provenance["recipe_known"],
+        "manifest_transport": "logs",
+    }
 
 
 def _log(msg: str) -> None:
-    import _telemetry  # local import: keeps the cache usable even if telemetry is absent
+    with contextlib.suppress(Exception):
+        import _telemetry  # cache remains usable even if telemetry is absent
 
-    _telemetry.info(f"[cache] {msg}")
+        _telemetry.info(f"[cache] {msg}")
 
 
 def _debug_log(msg: str) -> None:
-    import _telemetry
+    with contextlib.suppress(Exception):
+        import _telemetry
 
-    _telemetry.debug(f"[cache] {msg}")
+        _telemetry.debug(f"[cache] {msg}")
 
 
 def _warn(msg: str) -> None:
     """Cache drift and soft errors remain warnings; routine misses do not."""
-    import _telemetry
+    with contextlib.suppress(Exception):
+        import _telemetry
 
-    _telemetry.warn(f"[cache] {msg}")
+        _telemetry.warn(f"[cache] {msg}")
 
 
 def _event(name: str, label: str, key: str, **extra) -> None:
-    """Record the cache outcome as a span EVENT on the active task span (best-effort).
+    """Keep outcome fields stable; emit bounded recipe fragments as DEBUG logs.
 
-    The restore/store run INSIDE the ``task part:``/``assembly:`` span dodo opens, so
-    a hit/miss/store shows up ON the trace timeline (with the key + label) -- making a
-    cache miss backtraceable from the trace, not only from cache.jsonl / the console.
-    No-op when no span is recording (e.g. cache_status), so callers never guard."""
-    import _telemetry
+    No telemetry failure (including an unavailable module or a replaced sink)
+    may turn a successful restore/store into a cache error. A manifest is emitted
+    for misses AND successful hits/stores, so disposable seats need no sidecar
+    to find a previous successful baseline. No dependency gets its own span."""
+    try:
+        import _telemetry
 
-    _telemetry.event(name, label=label, key=key[:12], **extra)
+        if name not in ("cache.miss", "cache.hit", "cache.store"):
+            _telemetry.event(name, label=label, key=key[:12], **extra)
+            return
+        provenance = _provenance(label, key)
+        payload, metadata = _manifest(provenance)
+        _telemetry.event(
+            name, label=label, key=key[:12], key_full=key,
+            epoch=provenance["epoch"], salt=provenance["salt"], **metadata, **extra,
+        )
+        for index in range(metadata["manifest_chunk_count"]):
+            _telemetry.debug(
+                "cache.provenance", service=_telemetry.BUILD_INFRA_SERVICE,
+                label=label, key=key[:12], key_full=key,
+                outcome=name, **metadata, chunk_index=index,
+                chunk=payload[index * _MANIFEST_CHUNK_SIZE:(index + 1) * _MANIFEST_CHUNK_SIZE],
+            )
+    except Exception:  # noqa: BLE001 -- observability must never change cache decisions
+        pass
 
 
 def _debug() -> bool:
@@ -225,7 +286,9 @@ def _rel(path: Path) -> str:
         return path.name
 
 
-def key_inputs(file_deps: list[str], digest_one) -> tuple[str, list[tuple[str, str]]]:
+def key_inputs(
+    file_deps: list[str], digest_one, *, salt: str | None = None
+) -> tuple[str, list[tuple[str, str]]]:
     """``(key, [(relpath, digest), ...])`` -- the cache key AND the per-file
     provenance that produced it, sorted by repo-relative path.
 
@@ -238,7 +301,7 @@ def key_inputs(file_deps: list[str], digest_one) -> tuple[str, list[tuple[str, s
     worktrees. The input list is what ``HARMONIC_CACHE_DEBUG`` / ``cache_status``
     print so a key shift is a readable per-file diff (issue #73)."""
     h = hashlib.sha256()
-    h.update(f"epoch={_CACHE_EPOCH}\0salt={_salt()}\0".encode())
+    h.update(f"epoch={_CACHE_EPOCH}\0salt={_salt() if salt is None else salt}\0".encode())
     pairs: list[tuple[str, str]] = []
     for path in sorted(file_deps, key=lambda p: _rel(Path(p))):
         rel = _rel(Path(path))
@@ -257,9 +320,11 @@ def cache_key(file_deps: list[str], digest_one, label: str | None = None) -> str
     With ``HARMONIC_CACHE_DEBUG`` set, logs each ``(digest, relpath)`` feeding the
     key and the resulting key, tagged by ``label`` -- so a debugger can see exactly
     which dep digest moved when a key shifts (issue #73)."""
-    key, pairs = key_inputs(file_deps, digest_one)
+    salt = _salt()
+    key, pairs = key_inputs(file_deps, digest_one, salt=salt)
     if label:
         _KEY_INPUTS[(label, key)] = pairs
+        _KEY_CONTEXT[(label, key)] = (_CACHE_EPOCH, salt)
     if _debug():
         head = label or "?"
         _log(f"key provenance {head} (epoch={_CACHE_EPOCH} salt={_salt()}):")
@@ -481,21 +546,20 @@ def config_summary() -> dict:
 # so each swallows OSError and returns a benign default.
 # --------------------------------------------------------------------------- #
 def _record(event: str, label: str, key: str, **extra) -> None:
-    """Append one cache event to cache.jsonl, including readable provenance for
-    miss/drift outcomes so a historical key shift remains explainable even after
-    the last-published sidecar advances to the newly built key (issue #255).
+    """Append one cache event to cache.jsonl with the same recipe as telemetry.
+    Miss/drift additionally retain the seat's previous published provenance
+    (issue #255); successful hits/stores provide portable historical baselines.
 
     ``extra`` fields are written verbatim alongside the base record: cache.jsonl is
     the post-hoc record, so an outcome whose CONSOLE severity was demoted still
     lands here in full, carrying why it was demoted."""
     try:
         _REPORTS.mkdir(parents=True, exist_ok=True)
+        provenance = _provenance(label, key)
+        _, metadata = _manifest(provenance)
         rec = {"ts": round(time.time(), 3), "event": event, "label": label,
-               "key": key, "epoch": _CACHE_EPOCH, "salt": _salt()}
+               **provenance, **metadata}
         if event in ("restore_miss", "restore_hit_drift"):
-            pairs = _KEY_INPUTS.get((label, key))
-            if pairs is not None:
-                rec["inputs"] = [{"path": path, "digest": digest} for path, digest in pairs]
             previous = _stored_provenance(label)
             if previous and previous["key"] != key:
                 rec["previous_key"] = previous["key"]
