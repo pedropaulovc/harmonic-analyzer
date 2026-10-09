@@ -2458,3 +2458,17 @@ def test_tracking_refuses_an_unselected_or_unknown_run(
 
     assert result.returncode == 2
     assert diagnostic in result.stderr
+
+
+def test_tracking_resolves_a_drive_root_log_directory(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    fixture["log_directory"] = Path(tmp_path.anchor)
+
+    result = _run_launcher(
+        fixture, _tracking(fixture, "-Status"), fixture["environment"]
+    )
+
+    # Resolution must succeed before the read-only selector validation, without
+    # creating files at the drive root or starting a farm build.
+    assert result.returncode == 2
+    assert "-Status needs -RunId or -Tag" in result.stderr
