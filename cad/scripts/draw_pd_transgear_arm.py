@@ -209,9 +209,10 @@ SECTION_KEEP = {
 LOCATOR_SECTION_KEEP = {
     "LocatorDepth": (0.375, 0.128),
 }
-# Rear-only blind sockets must be shown from the rear, never attached to
-# invisible circles in the front HLR view. These are model XYZ millimetres,
-# not curate's sheet XY metres; project through the actual *Back view first.
+# The blind sockets open in the rear face (z = THICKNESS), which *Front looks
+# at; *Back looks at z = 0 and hides them (farm run 20261009T214031408Z: no
+# locator rim in the view). These are model XYZ millimetres, not curate's
+# sheet XY metres; project through the actual locating view first.
 REAR_TEXT_MODEL_MM = {
     "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, -22.0, THICKNESS),
     "LocatorY1": (LOCATOR_SITES_MM[0][0] - 15.0, LOCATOR_SITES_MM[0][1] / 2.0, THICKNESS),
@@ -495,7 +496,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="matched locating sockets transverse section",
     )
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
-    rear = place_view(adapter, str(SOURCE), "*Back", *REAR_CENTER, scale=REAR_VIEW_SCALE)
+    rear = place_view(adapter, str(SOURCE), "*Front", *REAR_CENTER, scale=REAR_VIEW_SCALE)
     if add_note(
         adapter, f"REAR LOCATING VIEW ({REAR_VIEW_SCALE[0]}:{REAR_VIEW_SCALE[1]})",
         0.215, 0.279,

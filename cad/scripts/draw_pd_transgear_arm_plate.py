@@ -154,7 +154,9 @@ PLAN_KEEP: dict[str, tuple[float, float, float]] = {
     "ScrewHoleDia": (EDGE_MINUS_X - 8.0, _TOP + 8.0, _Z_PLAN),
     "CskDia": (EDGE_PLUS_X + 8.0, _TOP + 8.0, _Z_PLAN),
     "LocatorX1": (LOCATOR_SITES_MM[0][0] / 2.0, PLAN_ROWS[2] + 5.0, _Z_PLAN),
-    "LocatorDia1": (EDGE_MINUS_X - 8.0, _TOP + 15.0, _Z_PLAN),
+    # High enough that its two callout lines clear the screw-hole callout,
+    # and its right end clears countersink 1's frame leader.
+    "LocatorDia1": (EDGE_MINUS_X - 7.0, _TOP + 21.0, _Z_PLAN),
 }
 # Back view (the mounting face): the notch face's corner heights, outboard.
 BACK_KEEP: dict[str, tuple[float, float, float]] = {
@@ -187,10 +189,29 @@ CALLOUTS_ABOVE = {
     "ScrewHoleDia": HOLE_COUNT_CALLOUT,
     "CskDia": HOLE_COUNT_CALLOUT,
 }
-# The bore finish symbol stands below the end round, clear of the bore
-# callout (lower left) and the end radius (lower right).
-BORE_FINISH_MODEL = (0.0, _BOTTOM - 9.0, _Z_PLAN)
+# The bore finish symbol stands below the end round, left of the bore axis:
+# clear of the bore callout (lower left), the end radius (lower right) and
+# the bore's projected-axis frame, whose leader rises right of this one.
+BORE_FINISH_MODEL = (-9.0, _BOTTOM - 9.0, _Z_PLAN)
 FINISH_CHAR_HEIGHT = 0.0025
+# Position frames, sheet metres. A frame's xy is its top-left corner; it is
+# about 59 mm wide with a projected zone (44 mm without), and its leader
+# leaves the end nearer the feature through a 6.3 mm shoulder (measured on
+# run 20261009T214031408Z). The frames stand in three rows above the views
+# and each leader drops beside, never through, the plan's stacked
+# X-dimension text (sheet x 0.069..0.097): countersink 1's left of it,
+# countersink 2's right of it. The back view mirrors X, so its hole frames
+# sit outboard of their own holes (no crossing) and the two through-bore
+# locator leaders drop between the hole leaders.
+FRAME_ROWS = (0.274, 0.262, 0.250)
+FRAME_XY = {
+    "plate_countersink_1_position": (0.071, FRAME_ROWS[0]),
+    "plate_countersink_2_position": (0.1143, FRAME_ROWS[1]),
+    "plate_hole_1_position": (0.228, FRAME_ROWS[2]),
+    "plate_hole_2_position": (0.1174, FRAME_ROWS[2]),
+    "plate_locator_1_position": (0.2098, FRAME_ROWS[0]),
+    "plate_locator_2_position": (0.2183, FRAME_ROWS[1]),
+}
 # The thrust faces' finish symbols, on section A-A where each face is
 # edge-on: the pick lands on the face's line inside the bore (the bore's
 # far-half end edge, which bounds the face) and the symbol stands beyond the
@@ -328,14 +349,18 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     # These are the same native feature datums and circular zones authored
     # on the part, not +/- positions retyped on a drawing. *Front sees +Z:
-    # countersink mouths and locator rims are on RearFace. The drill mouth
-    # on the Front sketch (z = 0) is visible in *Back, not through the cone
-    # in *Front, whose same-radius throat is at RearFace - CSK_DEPTH.
+    # countersink mouths are on RearFace. The drill mouths and the through
+    # locator bores' rims on the Front sketch (z = 0) are visible in *Back;
+    # the plan's drill mouth hides behind the cone, whose same-radius throat
+    # is at RearFace - CSK_DEPTH.
     plan_edges = scan_view_edges(plan, label="plate rear-face locating PMI")
     back_edges = scan_view_edges(back, label="plate mounting-face drill PMI")
     placements = {
+        # Above section A-A's station stack (its top text reaches y 0.2485),
+        # so the tag's horizontal leader to the mounting face's extension
+        # runs clear of the HubFaceToMounting text.
         "datum:A": PmiDrawingPlacement(
-            section, (0.300, 0.246),
+            section, (0.300, 0.256),
             attachment_xy=_sheet_xy(
                 adapter, section, (0.0, SCREW_HOLES[0][1], 0.0),
                 "plate mounting datum",
@@ -354,7 +379,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         **{
             f"plate_hole_{index}_position": PmiDrawingPlacement(
-                back, (0.154 + 0.075 * (index - 1), 0.274),
+                back, FRAME_XY[f"plate_hole_{index}_position"],
                 edge_entity=back_edges.circle_at(
                     (x, y, 0.0), SCREW_HOLE_DIA / 2.0,
                     axis=(0.0, 0.0, 1.0), label=f"plate hole {index} position",
@@ -364,22 +389,23 @@ async def build(adapter: Any) -> dict[str, str]:
         },
         **{
             f"plate_countersink_{index}_position": PmiDrawingPlacement(
-                plan, (0.015 + 0.076 * (index - 1), 0.274),
+                plan, FRAME_XY[f"plate_countersink_{index}_position"],
                 edge_entity=plan_edges.circle_at(
                     (x, y, REAR_FACE_Z), CSK_DIA / 2.0,
                     axis=(0.0, 0.0, 1.0), label=f"plate countersink {index} projected position",
                 ).edge,
             ) for index, (x, y) in enumerate(SCREW_HOLES, 1)
         },
+        # Below the end radius's text and right of the bore finish symbol.
         "knob_projected_axis": PmiDrawingPlacement(
-            plan, (0.080, 0.112),
+            plan, (0.092, 0.100),
             edge_entity=visible_circle_edge(adapter, plan, BORE_DIA),
         ),
         **{
             f"plate_locator_{index}_position": PmiDrawingPlacement(
-                plan, (0.025 + 0.073 * (index - 1), 0.262),
-                edge_entity=plan_edges.circle_at(
-                    (x, y, REAR_FACE_Z), LOCATOR_HOLE_DIA_MM / 2.0,
+                back, FRAME_XY[f"plate_locator_{index}_position"],
+                edge_entity=back_edges.circle_at(
+                    (x, y, 0.0), LOCATOR_HOLE_DIA_MM / 2.0,
                     axis=(0.0, 0.0, 1.0), label=f"plate locator {index} position",
                 ).edge,
             ) for index, (x, y) in enumerate(LOCATOR_SITES_MM, 1)
