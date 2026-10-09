@@ -1,12 +1,14 @@
 r"""Create the curated machinist drawing for the knife-mount bearing block.
 
-A machined, heat-treated steel block (24 wide x ~29.4 tall x 14 deep) with a
+A machined, heat-treated steel block (24 wide x ~29.6 tall x 14 deep) with a
 single Ø12 bore.  The bore is the knife-edge bearing: the summing-lever
 trunnion's top vertex rides its upper inner wall in line contact (ch18 p.42:
 unpainted hardened steel, close bore -- 2026-09-02 user re-read).  Every face
 and the bore are real edges, so
 the block dimensions ride the auto-imported profile marks (block + bore) with the
-depth added across the right-view section.
+depth added across the right-view section.  The MHA-VN-051 dowel hole prints
+its reamed Ø (with its band and press callout) and its station from the tap
+axis in the top view, and its flat-floor depth in the front view.
 
 Run with SolidWorks open::
 
@@ -30,6 +32,7 @@ from _drawing_common import (
     add_feature_control_frame,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -45,6 +48,11 @@ from sm_knife_mount_spec import (
     BLK_BOT,
     BLK_TOP,
     BORE_CY,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    PIN_HOLE_CALLOUT,
+    PIN_HOLE_DEPTH,
+    PIN_HOLE_X,
     R_BORE,
     SUPPORT_Z_THICK,
     SURFACE_FINISHES,
@@ -80,14 +88,30 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + (model_y_mm - _BLOCK_CY) * SHEET_SCALE[0] / 1000.0
 
 
+def _sheet_x(model_x_mm: float) -> float:
+    """Sheet x of a model x in the front and top views (shared column)."""
+    return FRONT_CENTER[0] + model_x_mm * SHEET_SCALE[0] / 1000.0
+
+
 FRONT_KEEP = {
     "BlockWidth": (FRONT_CENTER[0], _front_y(BLK_BOT) - 0.016),
     "BlockHeight": (FRONT_CENTER[0] - 0.052, FRONT_CENTER[1]),
     "BoreDia": (FRONT_CENTER[0] - 0.048, _front_y(BORE_CY) + 0.026),
+    # Right of the block, between the bore's position frame and its finish
+    # symbol, level with the dowel-hole floor.
+    "PinHoleDepth": (FRONT_CENTER[0] + 0.036, _front_y(BLK_TOP - PIN_HOLE_DEPTH)),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
+TOP_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
+TOP_KEEP = {
+    # The 6.350 station from the tap axis (the origin's projection) runs
+    # above the top view; the Ø and its three-line callout sit to its right.
+    "PinHoleX": (_sheet_x(PIN_HOLE_X / 2.0), TOP_CENTER[1] + TOP_HALF_Z + 0.010),
+    "PinHoleDia": (_sheet_x(PIN_HOLE_X) + 0.030, TOP_CENTER[1] + 0.004),
+}
 DIMENSION_CALLOUTS = {
     "BoreDia": "THRU",
+    "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 
 RIGHT_HALF_Z = SUPPORT_Z_THICK / 2.0 * SHEET_SCALE[0] / 1000.0
@@ -146,11 +170,35 @@ async def build(adapter: Any) -> dict[str, str]:
     for view in (front, right, top):
         set_hidden_lines_visible(adapter, view)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+    # The dowel hole's floor depth (front) is imported before its profile's
+    # Ø and station (top), the MHA-PD-018 section-before-end order.
+    annotations = [
+        *curate_view_dimensions(
+            adapter,
+            front,
+            keep=FRONT_KEEP,
+            view_label="front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+        *curate_view_dimensions(
+            adapter,
+            top,
+            keep=TOP_KEEP,
+            view_label="top",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        ),
+    ]
+    curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    # Places and the ream band are authored on the part; the sheet only proves
+    # the import kept them.
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to knife bore")
 
@@ -164,9 +212,10 @@ async def build(adapter: Any) -> dict[str, str]:
         label="block-depth overall",
     )
 
-    # Datum A = the block top seat (hangs 0.25 under the top-frame casting
-    # underside; carries the 1/2-13 knife-hanger-stud tap); Ra 0.8 on the
-    # bore's working upper wall, tagged on the bore rim (a real circular edge).
+    # Datum A = the block top seat (clamped to the top-frame casting underside;
+    # carries the #6-32 knife-hanger-screw tap and the MHA-VN-051 dowel hole);
+    # Ra 0.8 on the bore's working upper wall, tagged on the bore rim (a real
+    # circular edge).
     add_datum_feature(
         adapter,
         front,

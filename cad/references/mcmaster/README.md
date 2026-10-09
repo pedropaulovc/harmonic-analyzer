@@ -21,15 +21,16 @@ recipes:
 | 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
 | 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
-| 90126A211 | `vn-knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
+| 90126A211 | — (diagnostic recipe; the former `vn-knife-hanger-washer`, retired) | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | `vn-frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `vn-clamp-screw`, `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 91247A720 | `vn-knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
+| 91247A720 | — (diagnostic recipe; a former `vn-knife-hanger-stud`) | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `vn-cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91251A157 | `vn-knife-hanger-stud` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91255A106 | — (diagnostic recipe; a former `vn-guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A108 | `vn-guide-lock-screw` (catalogue-only; no vendor model; SKU not yet read live) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `vn-cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
@@ -60,7 +61,7 @@ recipes:
 | 98296A031 | `vn-transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98381A433 | `vn-transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `vn-crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
-| 98381A473 | — (replica gate for the 1/8 series' end forms) | Alloy Steel Dowel Pin |
+| 98381A473 | `vn-knife-mount-dowel` | Alloy Steel Dowel Pin |
 | 98381A474 | `vn-transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
 | 99607A213 | `vn-pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
@@ -328,6 +329,21 @@ Catalog specifications checked on September 10, 2026:
   minimum key engagement, 0.055 in, and a plain cylindrical head. It is
   catalogue-only: no vendor model is downloaded or kept here, so it has no
   replica gate, and its standalone diagnostic is a catalog-only run.
+- [91251A157](https://www.mcmaster.com/91251A157/) (`vn-knife-hanger-stud`,
+  MHA-VN-024, two) hangs each MHA-SM-002 knife mount from the MHA-FR-002
+  crossbar: it drops through the crossbar's counterbore, its head on the
+  counterbore floor, into a #6-32 bottoming tap in the mount's top seat. It
+  replaced the 1/2-13 hex bolt 91247A720 and its washer 90126A211. The
+  product page was read live in October 2026: black-oxide alloy steel socket
+  head screw, 6-32 UNC class 3A, right hand, 1-1/2 in under the head,
+  partially threaded with a 3/4 in minimum thread length, flat tip, head
+  Ø0.226 in x 0.138 in, 7/64 in hex drive, 170 ksi, Rockwell C37, ASTM A574.
+  The page gives no socket depth; `diag_build_91251A157.py` takes ASME
+  B18.3's #6 minimum key engagement, 0.064 in, and a plain cylindrical head,
+  on the socket-head recipe it shares with 91251A108
+  (`diag_mcmaster_socket_head.py`). It is catalogue-only: no vendor model is
+  downloaded or kept here, so it has no replica gate, and its standalone
+  diagnostic is a catalog-only run.
 - [91255A106](https://www.mcmaster.com/91255A106/) (`vn-guide-lock-screw`,
   MHA-VN-046, eight) holds the four guide locks to the platen guides per ruling
   R9-31 (September 30, 2026): these screws ride the platen, and the MHA-VN-006
@@ -387,9 +403,9 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
-- [98381A473](https://www.mcmaster.com/98381A473/) (formerly
-  `vn-transgear-latch-pin`; since R9-50 the 1/8 series' end-form gate) was read
-  live on September 30, 2026:
+- [98381A473](https://www.mcmaster.com/98381A473/) (`vn-knife-mount-dowel`,
+  MHA-VN-051, two; formerly `vn-transgear-latch-pin`) was read live on
+  September 30, 2026:
   alloy steel dowel pin, 1/8 in diameter, 3/4 in long, end shape "Round x
   Chamfer". The page states no end radius or chamfer; the vendor model does.
   The user supplied it (as `98381A473_Dowel Pin.SLDPRT`, kept here as
@@ -400,8 +416,8 @@ Catalog specifications checked on September 10, 2026:
   a flat Ø0.115 in end face and a cone 16° to the axis at the chamfered end,
   the Ø0.125 in cylinder, and a 0.016 in radius tangent to it down to a flat
   Ø0.093 in face at the round end (150.2183 mm³). `diag_build_98381A473.py`
-  models those end forms, chamfered end at y = 0 (the end pressed into the
-  arm), and its standalone run is the replica gate against that harvest. The
+  models those end forms, chamfered end at y = 0 (the pressed end), and its
+  standalone run is the replica gate against that harvest. The
   diameter band is the family's, read on the 98381A433/434/489 pages.
 - 98381A474 (`vn-transgear-latch-pin`, MHA-VN-042, since R9-50) is the 7/8 in
   length of the same 1/8 series (98381A467 1/8 in through 98381A479 1-3/4 in,
@@ -573,8 +589,8 @@ top, right and isometric views, with the stock description and ordering SKU.
 They are purchased-part identification sheets; their general tolerance and
 edge-break notes do not apply.
 
-For example, `uv run python build.py drawing:vn_knife_hanger_washer` writes
-`cad/out/slddrw/vn-knife-hanger-washer.SLDDRW`,
-`cad/out/pdf/vn-knife-hanger-washer.pdf` and
-`cad/out/png/vn-knife-hanger-washer_drawing.png`. Run these tasks through the
+For example, `uv run python build.py drawing:vn_knife_mount_dowel` writes
+`cad/out/slddrw/vn-knife-mount-dowel.SLDDRW`,
+`cad/out/pdf/vn-knife-mount-dowel.pdf` and
+`cad/out/png/vn-knife-mount-dowel_drawing.png`. Run these tasks through the
 pipeline so they acquire the shared SolidWorks seat lock.

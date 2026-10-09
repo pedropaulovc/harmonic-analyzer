@@ -263,3 +263,13 @@ Retired identities keep their rows here for historical lookup but have no regist
 | assembly | `pen` | `pn-pen` | MHA-A01 | MHA-PN-000 |
 | assembly | `paper-drive` | `pd-paper-drive` | MHA-A06 | MHA-PD-000 |
 | assembly | `harmonic-analyzer` | `ha-harmonic-analyzer` | MHA-A08 | MHA-HA-000 |
+
+## Changes after the cutover
+
+A retired Number is never reused. A family added after the cutover takes the
+next free Number in its category and has no old stem or old Number.
+
+| Change | Canonical stem | Number | Note |
+|---|---|---|---|
+| retired | `vn-knife-hanger-washer` | MHA-VN-026 | no replacement: the MHA-VN-024 socket head screw seats on the MHA-FR-002 counterbore floor |
+| added | `vn-knife-mount-dowel` | MHA-VN-051 | keys each MHA-SM-002 knife mount to the MHA-FR-002 crossbar |

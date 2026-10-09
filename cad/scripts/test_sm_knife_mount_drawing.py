@@ -32,9 +32,17 @@ def test_required_drawing_paths() -> None:
 def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     assert part.DRAWING_DIMENSIONS is sm_knife_mount_spec.DRAWING_DIMENSIONS
     marked = set().union(*sm_knife_mount_spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP) | set(drawing.TOP_KEEP)
     assert kept == marked
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
+    # Every marked dowel-hole dimension carries part-authored places.
+    assert set(sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME) == {
+        "PinHoleDia",
+        "PinHoleX",
+        "PinHoleDepth",
+    }
+    for feature, names in sm_knife_mount_spec.DRAWING_PRECISION.items():
+        assert set(names) <= sm_knife_mount_spec.DRAWING_DIMENSIONS[feature]
 
 
 def test_spec_geometry_mirrors_the_build_source() -> None:
@@ -43,18 +51,57 @@ def test_spec_geometry_mirrors_the_build_source() -> None:
     # actual (assembly-derived) geometry to <0.05 mm so they cannot drift.
     assert sm_knife_mount_spec.R_BORE == part.R_BORE
     assert sm_knife_mount_spec.SUPPORT_Z_THICK == part.SUPPORT_Z_THICK
-    assert abs(sm_knife_mount_spec.BLK_TOP - part.BLK_TOP) < 0.05
+    assert abs(sm_knife_mount_spec.BLK_TOP - part.BLK_TOP) < 0.005
     assert abs(sm_knife_mount_spec.BLK_BOT - part.BLK_BOT) < 0.05
     assert abs(sm_knife_mount_spec.BORE_CY - part.BORE_CY) < 0.05
+    # The seat is clamped to the casting underside by the #6-32 screw.
+    assert part.MOUNT_GAP == 0.0
+    assert abs(part.BLK_TOP - 14.866) < 1e-3
+    assert sm_knife_mount_spec.BLK_TOP == 14.87
+    # The build owns no tap constants: they are the spec's (consumers import
+    # them there).
+    assert not hasattr(part, "STUD_TAP_DEPTH")
+    assert part.STUD_TAP_SPEC is sm_knife_mount_spec.STUD_TAP_SPEC
+    assert part.STUD_TAP_DIA == sm_knife_mount_spec.STUD_TAP_DIA
+    # Dowel hole: printed places and the volume the build's gate expects.
+    assert sm_knife_mount_spec.PIN_HOLE_X == 6.350
+    assert sm_knife_mount_spec.DRAWING_PRECISION_BY_NAME == {
+        "PinHoleDia": 3,
+        "PinHoleX": 3,
+        "PinHoleDepth": 1,
+    }
+    import math
+
+    assert abs(part.V_PIN - math.pi * (3.175 / 2.0) ** 2 * 9.5) < 1e-9
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH)" in source
+    assert '"PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)' in source
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
 def test_linked_notes_expose_the_stud_tap_and_hardened_knife_seat() -> None:
     notes = sm_knife_mount_spec.DRAWING_NOTES
     assert f"BORE Ø{2.0 * sm_knife_mount_spec.R_BORE:.1f} THRU, CENTRED IN THE {2.0 * sm_knife_mount_spec.BLK_HALF_X:.2f} WIDTH" in notes
     assert "BORE Ø12.0 THRU" in notes
-    assert "TAP 1/2-13 UNC-2B X 12.0 DEEP" in notes
-    assert "KNIFE-HANGER STUD" in notes
-    assert "TAP-DRILL POINT BREAKS INTO THE BORE CROWN" in notes
+    notes_and_callouts = notes + "\n" + sm_knife_mount_spec.PIN_HOLE_CALLOUT
+    # Redesign: a #6-32 bottoming tap (no 1/2-13 stud, no bore-crown break-in).
+    assert "1/2-13" not in notes_and_callouts
+    assert "BREAKS INTO" not in notes_and_callouts
+    assert "TAP #6-32 UNC-2B BOTTOMING X 9.70 FULL THREAD" in notes
+    assert "Ø2.71 X 10.90" in notes
+    assert "MHA-VN-024 SCREW CLAMPS THE SEAT" in notes
+    assert "CENTRE 20.62 BELOW THE TOP SEAT" in notes
+    # Rule 6: the hanger text is at most four short lines.
+    lines = notes.splitlines()
+    first = next(i for i, line in enumerate(lines) if line.startswith("TAP #6-32"))
+    last = next(i for i, line in enumerate(lines) if "CROSSBAR UNDERSIDE" in line)
+    assert last - first + 1 <= 4
+    # The dowel hole's press rides the Ø callout (MHA-PD-018 precedent).
+    assert sm_knife_mount_spec.PIN_HOLE_CALLOUT.splitlines() == [
+        "BLIND FLAT-BOTTOM REAM",
+        "PRESS MHA-VN-051 DOWEL TO FLOOR",
+        "0.0025/0.0177 INTERFERENCE",
+    ]
     # ch18 p.42 (2026-09-02): the block IS the hardened knife seat -- the old
     # "no hardened seat / do not release" hold is gone.
     assert "HARDEN AND TEMPER TO 58-60 HRC AFTER MACHINING" in notes
@@ -77,6 +124,8 @@ def test_native_gdt_and_bore_geometry() -> None:
     assert source.count("add_datum_feature(") == 1
     assert source.count("add_feature_control_frame(") == 1
     assert 'characteristic="position"' in source
+    # The block depth is the one sheet-added dimension; the dowel hole's Ø,
+    # station and depth are marked model dimensions (DRAWING_DIMENSIONS).
     assert source.count("add_edge_dimension(") == 1
 
 

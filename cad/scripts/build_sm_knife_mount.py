@@ -1,8 +1,10 @@
 r"""Reproduction script: knife bearing support (book ch. 18, pp. 42-43).
 
 The hardened-steel bearing block that suspends the summing lever's knife edge from the
-top-frame casting's integral crossbar (hung by a 1/2-13 knife-hanger stud
-threaded into the block top). The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
+top-frame casting's integral crossbar (clamped to its underside by the MHA-VN-024
+#6-32 socket head cap screw threaded into a bottoming tap in the block top, and
+keyed against turning by the MHA-VN-051 dowel pressed into the top seat).
+The lever rocks as a FIRST-CLASS LEVER on the **top vertex line
 of its hexagonal pivot trunnions** (build_sm_summing_lever ``_hex_collar``); each
 trunnion overhangs the lever body into one of these supports.
 
@@ -24,9 +26,11 @@ Layout (part-local): origin = the **knife-edge contact line** = the hex top
 vertex ridge (placed at machine (15, 984.83, +-87)); local Z = the bore/trunnion
 axis, +Y up, +X across. The bore centre sits ``R_BORE`` below the origin so the
 bore's upper inner wall lands on the ridge (with a TOP_CLEAR sliver margin). The
-block rises from below the bore up to just under the top-frame casting underside
-(999.7); the hanger stud threads 12 into the block-top tap and carries the hang.
-The tap-drill point breaks into the bore crown (accepted; see the notes).
+block rises from below the bore up to the top-frame casting underside (999.7),
+its top seat clamped flush to it: the #6-32 screw threads into a 9.7 full-thread
+bottoming tap (drill 10.9) on the bore's vertical centreline, which leaves 2.0
+of metal over the bore crown at worst case; the dowel's blind flat-bottom reamed
+hole sits 6.350 along +X from the tap axis.
 
 The named "knife axis" is the contact ridge line itself (part origin); the
 assembly mates the lever's knife ridge (``Axis3@sm-summing-lever``) coincident to
@@ -47,6 +51,7 @@ import sys
 
 from _common import (
     SketchDims,
+    _early_bound,
     add_line_chain,
     apply_color,
     apply_material,
@@ -57,6 +62,7 @@ from _common import (
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -65,24 +71,35 @@ from _common import (
     volume_check,
 )
 from sm_summing_lever_spec import HEX_H, HEX_W
+from _fit_limits import deviations
 from _holes import (
-    HoleSpec,
-    blind_cut_dia_mm,
     blind_hole_volume_mm3,
+    find_planar_face,
     wizard_holes,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
 from _part_pmi import author_part_pmi
 from sm_knife_mount_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
+    PIN_HOLE_DEPTH,
+    PIN_HOLE_DIA,
+    PIN_HOLE_DIA_BAND,
+    PIN_HOLE_X,
+    STUD_TAP_DIA,
+    STUD_TAP_DRILL_DEPTH,
+    STUD_TAP_SPEC,
     SURFACE_FINISHES,
 )
+import sm_knife_mount_spec
 
 import _telemetry
 
@@ -110,28 +127,98 @@ BLK_HALF_X = 12.0  # bore wall + flank (24 across, photo-scaled)
 WALL = 3.0  # material below the bore
 BLK_BOT = BORE_CY - R_BORE - WALL  # -14.75
 
-# Mount: the block top seat hangs MOUNT_GAP below the top-frame casting
-# underside (the integral crossbar's flush lower face); the knife-hanger stud
-# threaded into the block top carries the hang (build_sm_summing_assembly).
+# Mount: the block top seat is clamped to the top-frame casting underside (the
+# integral crossbar's flush lower face) by the #6-32 knife-hanger screw threaded
+# into the block top (build_sm_summing_assembly).
 KNIFE_Y = 979.7  # machine y of the pivot centreline (build_sm_summing_assembly KNIFE)
 CASTING_UNDERSIDE_Y = 999.7  # top-frame casting underside (integral crossbar)
-MOUNT_GAP = 0.25  # design clearance to the casting (sliver-flag margin)
+MOUNT_GAP = 0.0  # seat clamped to the casting underside by the #6-32 screw
 CONTACT_Y = KNIFE_Y + RIDGE_Y  # machine y of the knife-edge contact line (984.834)
-BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.62)
+BLK_TOP = CASTING_UNDERSIDE_Y - CONTACT_Y - MOUNT_GAP  # local top (14.87)
+if abs(BLK_TOP - sm_knife_mount_spec.BLK_TOP) > 0.005:
+    raise AssertionError(
+        f"knife-mount BLK_TOP {BLK_TOP:.4f} != spec {sm_knife_mount_spec.BLK_TOP}"
+    )
+# The spec judges the tap's web at its rounded mirror; the derived top is
+# 0.004 lower, so re-judge it here (2.038).
+_TAP_WEB_WORST = sm_knife_mount_spec.tap_web_worst(
+    BLK_TOP,
+    sm_knife_mount_spec.STUD_TAP_DRILL_DEPTH,
+    sm_knife_mount_spec.STUD_TAP_DIA,
+)
+if _TAP_WEB_WORST < sm_knife_mount_spec.STUD_TAP_WEB_MIN:
+    raise AssertionError(
+        f"knife-mount tap point leaves {_TAP_WEB_WORST:.3f} over the bore crown"
+    )
 
 THROUGH_CUT_DEPTH = SUPPORT_Z_THICK + 4.0  # > the block thickness, both directions
 
-# --- hanger-stud tap: 1/2-13 UNC-2B blind x12.0 in the block top -------------
-# On the trunnion-axis centreline (local x 0, z 0): the knife-hanger stud
-# threads STUD_TAP_DEPTH in and hangs the mount from the casting's integral
-# crossbar. Material above the bore crown is only BLK_TOP - TOP_CLEAR = 14.37,
-# so the 118-deg tap-drill point (r * 0.60086 = 3.22 tall) breaks 0.85 into the
-# bore crown -- accepted: the bearing contact line is interrupted only over
-# ~3 mm (the cone's width at the crown) at mid-length (called out in the
-# drawing notes).
-STUD_TAP_DEPTH = 12.0
-STUD_TAP_SPEC = HoleSpec("tapped", "1/2-13", end="blind", depth_mm=STUD_TAP_DEPTH)
-STUD_TAP_DIA = blind_cut_dia_mm(STUD_TAP_SPEC)  # 10.716 tap drill (27/64)
+# --- the MHA-VN-051 dowel hole: blind, flat-floored, reamed in the top seat --
+_R_PIN = PIN_HOLE_DIA / 2.0
+V_PIN = math.pi * _R_PIN**2 * PIN_HOLE_DEPTH
+
+
+async def _volume(adapter) -> float:
+    res = await adapter.get_mass_properties()
+    return res.data.volume if res.is_success else float("nan")
+
+
+async def _mass(adapter) -> tuple[float, list[float]]:
+    res = await adapter.get_mass_properties()
+    if not res.is_success:
+        raise RuntimeError(f"knife-mount mass properties failed: {res.error}")
+    return float(res.data.volume), [float(c) for c in res.data.center_of_mass]
+
+
+def _open_top_seat_sketch(adapter) -> tuple[float, float, bool]:
+    """Open a sketch ON the top seat; map the dowel-hole centre into it.
+
+    The MHA-PD-018 latch-pin precedent (``build_pd_transgear_arm``
+    ``_open_end_face_sketch``): a face sketch anchors the blind depth on the
+    real seat edge.  The face's sketch axes are SolidWorks' choice, so the
+    centre maps through ``ModelToSketchTransform``.  Returns the sketch
+    ``(u, v)`` and whether the sketch normal points OUT of the seat (+Y).
+    """
+    import pythoncom
+    from win32com.client import VARIANT
+
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    centre = (PIN_HOLE_X, BLK_TOP, 0.0)
+    face = find_planar_face(model, (0.0, 1.0, 0.0), [list(centre)])
+    model.ClearSelection2(True)
+    if not _early_bound(face, "IEntity").Select2(False, 0):
+        raise RuntimeError("dowel hole: top seat Select2 failed")
+    adapter.currentSketchManager = model.SketchManager
+    adapter._reset_sketch_entity_registry()
+    model.SketchManager.InsertSketch(True)
+    active = adapter.currentModel.GetActiveSketch2()
+    if active is None:
+        raise RuntimeError("dowel hole: no active sketch on the top seat")
+    adapter.currentSketch = active
+    adapter._sketch_count += 1
+    adapter._last_sketch_name = str(active.Name)
+    sketch = _early_bound(active, "ISketch")
+    math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    xform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+
+    def to_sketch(model_mm: tuple[float, float, float]) -> tuple[float, ...]:
+        point = math_util.CreatePoint(
+            VARIANT(
+                pythoncom.VT_ARRAY | pythoncom.VT_R8, [c / 1000.0 for c in model_mm]
+            )
+        )
+        mapped = _early_bound(
+            _early_bound(point, "IMathPoint").MultiplyTransform(xform), "IMathPoint"
+        )
+        return tuple(c * 1000.0 for c in mapped.ArrayData)
+
+    u, v, w = to_sketch(centre)
+    if abs(w) > 1e-4:
+        raise RuntimeError(f"dowel hole centre is {w:g} mm off the top-seat sketch")
+    w_out = to_sketch((PIN_HOLE_X, BLK_TOP + 1.0, 0.0))[2]
+    if abs(abs(w_out) - 1.0) > 1e-4:
+        raise RuntimeError(f"top-seat sketch normal is not along Y (w {w_out:g})")
+    return u, v, w_out > 0.0
 
 
 async def _volume(adapter) -> float:
@@ -156,6 +243,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "BlkHalfX", f"{BLK_HALF_X}mm")
     await set_global(adapter, "Wall", f"{WALL}mm")
     await set_global(adapter, "BlkTop", f"{BLK_TOP}mm")
+    await set_global(adapter, "PinHoleX", f"{PIN_HOLE_X}mm")
+    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
+    await set_global(adapter, "PinHoleDepth", f"{PIN_HOLE_DEPTH}mm")
     await set_global(adapter, "BoreCy", '"TopClear" - "RBore"')
     await set_global(adapter, "BlkBot", '"BoreCy" - "RBore" - "Wall"')
 
@@ -256,29 +346,90 @@ async def build(adapter) -> dict[str, str]:
                 f"hex shoulder {d:.3f} mm too close to Ø{2 * R_BORE} bore"
             )
 
-    # Hanger-stud tap: ONE native Hole Wizard 1/2-13 blind tapped hole x12.0 in
-    # the block top, on the trunnion-axis centreline (both placement coords are
-    # zero -> origin-axis relations, no placement dims). The analytic
-    # expectation subtracts the full cylinder + drill-point volume; the point's
-    # break-in to the bore crown re-removes only ~2 mm^3 of already-void space,
-    # far inside the 1% gate (~80 mm^3).
+    # Hanger-screw tap: ONE native Hole Wizard #6-32 bottoming tapped hole in
+    # the block top (drill STUD_TAP_DRILL_DEPTH, full thread to the spec's
+    # ThreadDepth override), on the trunnion-axis centreline (both placement
+    # coords are zero -> origin-axis relations, no placement dims). The
+    # analytic expectation subtracts the drill cylinder to its depth plus the
+    # drill point; the point stops STUD_TAP_WEB_WORST (2.04) above the bore
+    # crown, so none of it overlaps the bore void.
     wizard_holes(
         adapter,
         STUD_TAP_SPEC,
         [[0.0, BLK_TOP, 0.0]],
         (0.0, 1.0, 0.0),
-        "hanger-stud tapped hole (1/2-13)",
+        "knife-hanger screw tapped hole (#6-32)",
         name="StudTap",
         # no expect_dia_mm: a BLIND hole's definition reads 0.0 for both
         # diameter knobs on this seat (the tripwire is through-hole only);
         # the pinned dia is what HoleWizard5 was handed, and the volume
         # gate below proves the cut.
     )
-    expected -= blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DEPTH)
+    expected -= blind_hole_volume_mm3(STUD_TAP_DIA, STUD_TAP_DRILL_DEPTH)
     vol = await _volume(adapter)
     _telemetry.info(f"volume after stud tap: {vol:.1f} mm^3 (analytic {expected:.1f})")
     if abs(vol - expected) > 0.01 * expected:
         raise RuntimeError(f"stud tap volume {vol:.1f} != {expected:.1f}")
+
+    # MHA-VN-051 dowel hole: blind along -Y from the top seat, PIN_HOLE_X along
+    # +X from the tap axis (the MHA-PD-018 latch-pin hole precedent). A plain
+    # cut-extrude, so the floor is flat: the dowel is pressed onto it (a
+    # wizard drill point would leave a cone under the pressed end).
+    before, com_before = await _mass(adapter)
+    pin = SketchDims()
+    u, v, normal_out = _open_top_seat_sketch(adapter)
+    # The seat's sketch axes carry model x on one axis and z (= 0) on the
+    # other; the one nonzero centre offset is the station from the tap axis.
+    if abs(abs(u) - PIN_HOLE_X) < 1e-4 and abs(v) < 1e-4:
+        v = 0.0
+    elif abs(abs(v) - PIN_HOLE_X) < 1e-4 and abs(u) < 1e-4:
+        u = 0.0
+    else:
+        raise RuntimeError(
+            f"dowel-hole centre mapped to unexpected sketch ({u:g}, {v:g})"
+        )
+    await define_circle(
+        adapter,
+        u,
+        v,
+        _R_PIN,
+        "dowel hole",
+        dims=pin,
+        names=("PinHoleX", "PinHoleX", "PinHoleDia"),
+        drives=('"PinHoleX"', '"PinHoleX"', '"PinHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "dowel hole sketch")
+    check("exit_sketch dowel hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinHoleProfile")
+    drive_jobs += pin.apply(adapter, "PinHoleProfile")
+    # A cut runs opposite the sketch normal unless reversed.
+    check(
+        "cut dowel hole",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=PIN_HOLE_DEPTH, reverse_direction=not normal_out)
+        ),
+    )
+    name_last_feature(adapter, "PinHole")
+    drive_jobs += [
+        (name_dimensions(adapter, "PinHole", ["PinHoleDepth"])[0], '"PinHoleDepth"')
+    ]
+    expected -= V_PIN
+    after, com_after = await _mass(adapter)
+    if abs((before - after) - V_PIN) > 0.02 * V_PIN:
+        raise RuntimeError(
+            f"dowel hole removed {before - after:.2f} mm^3, expected "
+            f"{V_PIN:.2f}: circle misplaced or cut the wrong way"
+        )
+    # Material removed at +X moves the centre of mass toward -X.
+    if com_after[0] >= com_before[0]:
+        raise RuntimeError(
+            f"dowel hole missed the +X station (COM x {com_before[0]:.4f} -> "
+            f"{com_after[0]:.4f})"
+        )
+    _telemetry.success(
+        f"dowel hole (top-seat sketch {u:+g}, {v:+g}) removed "
+        f"{before - after:.2f} mm^3 (analytic {V_PIN:.2f})"
+    )
 
     # Named axis = the knife-edge contact ridge line (part origin, along Z). The
     # assembly mates Axis3@sm-summing-lever (the hex ridge) coincident to it.
@@ -301,6 +452,12 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, HARDENED_STEEL)
     await report_mass_properties(adapter)
 
+    # Explicit band on the dowel ream (the station and depth are governed by
+    # their places); then the places the sheet prints (DRAWING_PRECISION).
+    set_dimension_bilateral_tolerance(
+        adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     # Manufacturing drawing support: mark exactly the print's dimensions and
     # stamp the make-critical title-block properties.
     clear_dimensions_for_drawing(adapter)

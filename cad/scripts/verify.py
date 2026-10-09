@@ -212,7 +212,9 @@ _COMPONENT_BAND = {
     # bands tightened to the measured green-build counts (verify:subsystems).
     "sm-summing": (7, 9),  # ch 18-19, measured 8 (knife-stay removed: never in
     # the real device; 2026-08-02 rederive: -top-crossbar -gooseneck-clamp
-    # +2 knife-hanger-studs nets zero)
+    # +2 knife-hanger-studs nets zero). Not re-measured since the two knife-
+    # hanger washers joined (expect 10); the 2026-10 #6-32 knife hanger's
+    # -2 knife-hanger washers +2 knife-mount dowels nets zero.
     "mg-magnifier": (11, 13),  # ch 20-21, measured 12 (+lever-wire, 2026-07-04)
     "pn-pen": (7, 9),  # ch 24, measured 8 (+pen-wire, 2026-07-04)
     "pd-paper-drive": (112, 120),  # ch 22-23-25, expected 116 (54 placed + 62-link

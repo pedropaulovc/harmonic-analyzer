@@ -26,7 +26,8 @@ _EXPECTED = {
     "vn-gooseneck-set-screw": (("91410A538",), "MHA-VN-023", 1),
     "vn-hanger-screw": (("93075A194",), "MHA-VN-007", 1),
     "vn-hex-bolt": (("92865A585",), "MHA-VN-008", None),
-    "vn-knife-hanger-stud": (("91247A720",), "MHA-VN-024", 2),
+    "vn-knife-hanger-stud": (("91251A157",), "MHA-VN-024", 2),
+    "vn-knife-mount-dowel": (("98381A473",), "MHA-VN-051", 2),
     "vn-latch-hook-bracket-screw": (("90280A108",), "MHA-VN-043", 2),
     "vn-magnifying-bracket-screw": (("91794A077",), "MHA-VN-050", 2),
     "vn-lag-screw": (("92240A540",), "MHA-VN-009", 4),
@@ -48,7 +49,6 @@ _EXPECTED = {
     "vn-transgear-pivot-spring": (("9715K43",), "MHA-VN-049", 1),
     "vn-cylinder-bank-spring": (("9714K392",), "MHA-VN-052", 1),
     "vn-rocker-bank-spring": (("9714K24",), "MHA-VN-053", 1),
-    "vn-knife-hanger-washer": (("90126A211",), "MHA-VN-026", 2),
     "vn-spring-hook": (("9489T111",), "MHA-VN-012", 20),
     "vn-tube-frame-cap": (("9275K141",), "MHA-VN-028", 4),
 }
@@ -111,8 +111,8 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
 
 
 def test_special_bom_titles_remain_machine_specific() -> None:
-    assert _config.parts("vn-knife-hanger-stud")["title"] == "Knife-Hanger Bolt"
-    assert _config.parts("vn-knife-hanger-washer")["title"] == "Knife-Hanger Washer"
+    assert _config.parts("vn-knife-hanger-stud")["title"] == "Knife-Hanger Screw"
+    assert _config.parts("vn-knife-mount-dowel")["title"] == "Knife-Mount Dowel"
     assert _config.parts("vn-lag-screw")["title"] == "Rocker-Support Hold-Down Screw"
 
 

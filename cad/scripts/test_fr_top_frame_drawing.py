@@ -127,6 +127,7 @@ def test_every_imported_drawing_dimension_has_part_authored_places() -> None:
         drawing.DETAIL_SECTION_KEEP,
         drawing.HUB_TOP_KEEP,
         drawing.HUB_LEFT_KEEP,
+        drawing.HANGER_SECTION_KEEP,
     )
     assert kept, "the top-frame sheets import no model dimensions"
     assert not kept - set(spec.DRAWING_PRECISION_BY_NAME)
@@ -628,7 +629,8 @@ def test_pin_section_profile_fails_loud_when_the_move_does_not_hold(monkeypatch)
 def test_build_pins_every_removed_section_and_writes_centrelines_direct() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     for pinned in ("RAIL_SECTION_PROFILE_X, label=\"B-B\"", "SIDE_SECTION_PROFILE_X, label=\"E-E\"",
-                   "HUB_SECTION_PROFILE_X, label=\"D-D\""):
+                   "HUB_SECTION_PROFILE_X, label=\"D-D\"",
+                   "HANGER_SECTION_PROFILE_X, label=\"F-F\""):
         assert pinned in source, pinned
     body = source[source.index("def _add_view_centerlines(") :]
     body = body[: body.index("\ndef ")]
@@ -644,3 +646,114 @@ def test_build_cuts_each_section_at_its_derived_ends() -> None:
         'for x, z in section_cut_ends()["D"]',
     ):
         assert placed in source, placed
+
+
+# --- Knife hanger: #6 SHCS counterbore + MHA-VN-051 dowel slip hole --------
+
+
+def test_knife_hanger_is_a_6_shcs_counterbore_on_the_knife_line() -> None:
+    import spring_mount_geom
+
+    hole = spec.HANGER_HOLE_SPEC
+    assert (hole.kind, hole.size, hole.end) == ("counterbore_socket", "#6", "through_all")
+    assert hole.overrides_mm == {
+        "HoleDiameter": spec.HANGER_CLEARANCE_DIA,
+        "CounterBoreDiameter": spec.HANGER_CBORE_DIA,
+        "CounterBoreDepth": spec.HANGER_CBORE_DEPTH,
+    }
+    assert spec.HANGER_CLEARANCE_DIA == pytest.approx(4.318)
+    assert (spec.HANGER_CBORE_DIA, spec.HANGER_CBORE_DEPTH) == (7.0, 6.5)
+    # The 1/2 hanger-stud clearance is gone, not aliased.
+    assert not hasattr(part, "STUD_HOLE_SPEC") and not hasattr(part, "STUD_HOLE_DIA")
+    # Both stations sit on the knife line, centred on the crossbar.
+    assert part.HANGER_X == spring_mount_geom.KNIFE[0] == (part.BAR_X0 + part.BAR_X1) / 2.0
+    assert drawing.HANGER_X == part.HANGER_X
+    # The counterbore stays inside the junction material at the rear station.
+    assert part.STUD_Z_REAR + spec.HANGER_CBORE_DIA / 2.0 < part.INNER_Z + part.GUSSET
+    # Print-worst head checks (rule 12).
+    assert spec.HANGER_CBORE_HEAD_CLEARANCE == pytest.approx(0.7496)
+    assert spec.HANGER_HEAD_RECESS == pytest.approx(2.4848)
+    assert spec.HANGER_HEAD_BEARING == pytest.approx(0.6612)
+
+
+def test_counterbore_floor_is_the_screw_grip_at_one_place() -> None:
+    assert spec.HANGER_GRIP == 30.0 == part.RING_HEIGHT - spec.HANGER_CBORE_DEPTH
+    assert spec.HANGER_GRIP_PLACES == 1
+    assert spec.HANGER_GRIP_TOL == float(
+        str(_config.title_block("linear_1pl")["display"]).lstrip("\u00b1")
+    )
+    assert (
+        spec.DRAWING_REFERENCE_PRECISION["hanger counterbore floor from underside"]
+        == spec.HANGER_GRIP_PLACES
+    )
+
+
+def test_dowel_slip_hole_contract() -> None:
+    assert part.PIN_HOLE_X == pytest.approx(-8.65)
+    assert part.PIN_HOLE_X - part.HANGER_X == spec.HANGER_PIN_X == 6.35
+    assert spec.HANGER_PIN_X_PLACES == 3
+    assert spec.DRAWING_REFERENCE_PRECISION["dowel hole from hanger axis"] == 3
+    assert (spec.HANGER_PIN_HOLE_DIA, spec.HANGER_PIN_HOLE_DIA_BAND) == (3.24, (0.03, -0.03))
+    assert spec.HANGER_PIN_HOLE_DEPTH == 12.0
+    assert spec.HANGER_PIN_SLIP_CLEARANCE_MIN == pytest.approx(0.02738)
+    assert spec.HANGER_PIN_SLIP_CLEARANCE_MAX == pytest.approx(0.09246)
+    assert 0.02 <= spec.HANGER_PIN_SLIP_CLEARANCE_MIN < spec.HANGER_PIN_SLIP_CLEARANCE_MAX <= 0.10
+    # Rule 12 walls and floor, print-worst.
+    assert part.PIN_HOLE_BAR_WALL == pytest.approx(3.015)
+    assert part.PIN_HOLE_SCREW_WALL == pytest.approx(2.376)
+    assert part.PIN_HOLE_FLOOR_MARGIN == pytest.approx(18.0)
+    assert spec.HANGER_PIN_HOLE_DEPTH < spec.HANGER_GRIP
+    # The model owns the size, band and depth; the drawing imports them.
+    assert spec.DRAWING_DIMENSIONS["HangerPinProfile"] == {"HangerPinHoleDia"}
+    assert spec.DRAWING_DIMENSIONS["HangerPinHoles"] == {"HangerPinHoleDepth"}
+    assert spec.DRAWING_PRECISION_BY_NAME["HangerPinHoleDia"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["HangerPinHoleDepth"] == 1
+    assert set(drawing.HANGER_SECTION_KEEP) == {"HangerPinHoleDia", "HangerPinHoleDepth"}
+
+
+def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
+    text = spec.HANGER_PIN_HOLE_CALLOUT
+    assert text.startswith("2X ") and "REAM" in text and "MHA-VN-051" in text
+    assert "BLIND" in text and "FLAT-BOTTOM" in text
+    # Rule 6: short notes.
+    assert len(text.splitlines()) <= 2
+    assert max(len(line) for line in text.splitlines()) <= 26
+    assert drawing.HANGER_SECTION_CALLOUTS["HangerPinHoleDia"] == text
+
+
+def test_hanger_section_cuts_the_crossbar_from_window_to_window() -> None:
+    """F-F cuts the rear station across the crossbar and its gussets only:
+    both ends stand in open window, past the gussets' reach at that z and
+    short of the side rails, and the cut stays below the window rim break."""
+    x0, x1 = drawing.HANGER_SECTION_CUT_X
+    reach = drawing.HANGER_SECTION_GUSSET_REACH
+    assert drawing.HANGER_SECTION_Z == part.STUD_Z_REAR
+    assert reach == pytest.approx(part.GUSSET - (part.INNER_Z - part.STUD_Z_REAR))
+    assert -part.INNER_X < x0 < part.BAR_X0 - reach
+    assert part.BAR_X1 + reach < x1 < part.INNER_X
+    assert part.STUD_Z_REAR < part.INNER_Z - part.EDGE_CHAMFER
+
+
+def test_hanger_section_text_stays_on_the_sheet_off_the_title_block() -> None:
+    points = {
+        "floor": drawing.HANGER_FLOOR_TEXT_XY,
+        "floor offset": drawing.HANGER_FLOOR_OFFSET_XY,
+        "station": drawing.PIN_STATION_TEXT_XY,
+        "station offset": drawing.PIN_STATION_OFFSET_XY,
+        "caption": drawing.HANGER_SECTION_CAPTION_XY,
+        **drawing.HANGER_SECTION_KEEP,
+    }
+    for name, (x, y) in points.items():
+        assert 0.013 < x < TITLE_BLOCK[0] and 0.013 < y < 0.150, name
+    # The station reads above the profile, the slip-hole size below it.
+    top = drawing._hanger_section_xy(part.HANGER_X, part.HALF_H)[1]
+    bottom = drawing._hanger_section_xy(part.HANGER_X, -part.HALF_H)[1]
+    assert drawing.PIN_STATION_TEXT_XY[1] > top
+    assert drawing.HANGER_SECTION_KEEP["HangerPinHoleDia"][1] < bottom
+
+
+def test_build_places_the_hanger_section_on_the_underside_sheet() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    underside = source[source.index('ddoc.ActivateSheet("UNDERSIDE")') :]
+    assert "_hanger_section(adapter, hub_bottom_parent)" in underside
+    assert "imported_annotations += hanger_dimensions" in underside

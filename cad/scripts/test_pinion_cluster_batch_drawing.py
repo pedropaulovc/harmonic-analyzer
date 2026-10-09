@@ -308,8 +308,21 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
     summing = _interference_contracts.allowed_interference_pairs("sm-summing")
     assert summing == pytest.approx(
         {
-            frozenset(("vn-knife-hanger-stud-1", "sm-knife-mount-1")): 456.48979768633853,
-            frozenset(("vn-knife-hanger-stud-2", "sm-knife-mount-2")): 456.48979768633853,
+            # 91251A157 #6-32 in the #36 drill over its 8.10 nominal reach.
+            frozenset(("vn-knife-hanger-stud-1", "sm-knife-mount-1")): _annulus_limit(
+                3.505, 2.705, 8.10
+            ),
+            frozenset(("vn-knife-hanger-stud-2", "sm-knife-mount-2")): _annulus_limit(
+                3.505, 2.705, 8.10
+            ),
+            # 98381A473 at its largest (3.18262) in the smallest Ø3.165 ream,
+            # pressed 9.5 deep (the models are line to line).
+            frozenset(("vn-knife-mount-dowel-1", "sm-knife-mount-1")): _annulus_limit(
+                3.18262, 3.165, 9.5
+            ),
+            frozenset(("vn-knife-mount-dowel-2", "sm-knife-mount-2")): _annulus_limit(
+                3.18262, 3.165, 9.5
+            ),
             # 9490T1 #10-24 through the 0.75-in boss; #25 tap drill.
             frozenset(("vn-boss-hook-1", "sm-summing-lever-1")): _annulus_limit(
                 4.826, 3.797, 19.05
@@ -427,13 +440,24 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
         "sm-summing": {
+            # Stock 91251A157: #6-32 major, #36 drill, 8.10 nominal reach.
             **_expected_numbered_pairs(
                 "vn-knife-hanger-stud",
                 range(1, 3),
                 "sm-knife-mount",
-                12.7,
-                10.716,
-                11.3735,
+                3.505,
+                2.705,
+                8.10,
+                second_number=None,
+            ),
+            # Stock 98381A473 pressed 9.5 into the Ø3.175 +0/-0.010 ream.
+            **_expected_numbered_pairs(
+                "vn-knife-mount-dowel",
+                range(1, 3),
+                "sm-knife-mount",
+                3.18262,
+                3.165,
+                9.5,
                 second_number=None,
             ),
             # Stock 9490T1: #10-24 major, #25 drill, 0.75-in boss engagement.

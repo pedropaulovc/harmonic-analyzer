@@ -1,0 +1,16 @@
+vn-knife-mount-dowel:
+  title: Knife-Mount Dowel
+  number: MHA-VN-051
+  stock_name: Alloy Steel Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98381A473]
+  material: Alloy Steel
+  material_specification: "Alloy steel dowel pin, 1/8 x 3/4, Round x Chamfer ends; McMaster-Carr 98381A473"
+  finish: plain; no coating
+  installation_notes: |-
+    INSTALLATION - KNIFE MOUNT MHA-SM-002 TOP SEAT
+    PRESS IN, CHAMFER END FIRST, TO THE HOLE FLOOR.
+    SLIPS INTO THE MHA-FR-002 CROSSBAR HOLE AT ASSEMBLY.
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

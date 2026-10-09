@@ -207,6 +207,14 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
     ),
+    ("vn_knife_mount_dowel_spec", "DIA_BAND"): (
+        "the pressed dowel's catalogue diameter: read by min/max for the press "
+        "interference against the knife mount's reamed blind hole"
+    ),
+    ("vn_knife_hanger_stud_spec", "LENGTH_BAND"): (
+        "the socket head screw's catalogue length tolerance: indexed into "
+        "LENGTH_MIN/LENGTH_MAX for the tap reach and bottoming stack"
+    ),
     ("ch_rocker_arm_tl_profile_fixture_spec", "ROD_PIN_XY_BAND"): (
         "indexed for the symmetric rod-pin coordinate tolerance and position budget"
     ),
