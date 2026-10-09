@@ -104,6 +104,7 @@ try {
       if (error.code !== 'ENOENT') throw error
     }
     const approvedModel = await verifyReleasedModel()
+    run('npm', ['run', 'test:performance'], { ...process.env, SPRING_MODEL_PATH: approvedModel })
     run('npm', ['run', 'build'], { ...process.env, SIMULATOR_BASE: '/' })
     const modelPath = join(DIST, DEPLOYMENT_MODEL.representation.path)
     await mkdir(dirname(modelPath), { recursive: true })

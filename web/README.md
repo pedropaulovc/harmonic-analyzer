@@ -844,10 +844,18 @@ pieces. The build verifies the pieces, reconstructed representations and exact
 decoded original bytes before deployment. Geometry and source datasets stay
 unchanged.
 
-For original chunked-asset URLs, the Worker negotiates from the client's original
-`Accept-Encoding` (`request.cf.clientAcceptEncoding` on Cloudflare, not the
-normalized edge header). It selects gzip or identity by quality and returns 406
-when both are refused. GET/HEAD responses include the
+For original chunked-asset URLs, the Worker selects gzip or identity from
+`request.cf.clientAcceptEncoding`, not Cloudflare's normalized edge header.
+Missing original Cloudflare metadata selects identity; non-Cloudflare requests
+use their raw header.
+
+**Native Preview limitation:** measured Cloudflare metadata drops `q` values and
+wildcard entries before the Worker. Worker-first routing did not restore them.
+The parser respects qualities and returns 406 when both codings are refused
+only where raw/preserved metadata is available; it cannot recover preferences
+discarded by the platform. This is not a deployed quality-negotiation guarantee.
+
+GET/HEAD responses include the
 selected representation's length and ETag, `Vary: Accept-Encoding`, and
 `Content-Encoding: gzip` when selected. It sequentially streams immutable pieces
 through a fixed-length stream, without runtime compression or a full-file buffer.
@@ -956,11 +964,28 @@ submission work, not GPU elapsed time. Vite's local compression is not evidence
 of Worker encoding negotiation: check actual hosted response headers and
 transferred bytes separately. Localhost timings establish neither hosted load
 time nor real-user Core Web Vitals.
+Both probes activate the native browser tab and flag invalid window endpoints.
+Keep it unobscured: Windows Chrome can throttle an occluded window to 1 Hz.
+Discard interrupted samples; endpoint checks do not certify the whole window.
 
-Run `npm --prefix web run test:performance` after `build:deploy` has acquired the
-pinned model, or set `SPRING_MODEL_PATH` to its exact approved bytes. Tests cover
-polling/HUD transitions, encoded delivery and every actual native spring vertex
-at catalog limits and source override spans.
+The 2026-10-08 native Preview delivery check retained the approved decoded
+SHA-256 while reducing the oversized responses below. These are encoded body
+bytes, not page-load or FPS improvements:
+
+| Asset | Identity bytes | Gzip bytes | Reduction |
+|---|---:|---:|---:|
+| Approved Meshopt GLB | 41,072,516 | 31,547,135 | 23.2% |
+| Intro source track | 45,568,082 | 1,689,190 | 96.3% |
+
+The approach follows the measurement-first
+[web-quality performance skill](https://github.com/addyosmani/web-quality-skills)
+and [Three agent skills](https://github.com/emalorenzo/three-agent-skills).
+
+`build:deploy` runs `test:performance` after acquiring the pinned model, before
+Vite and publication. To run it separately, use `npm --prefix web run
+test:performance` with the cached model, or set `SPRING_MODEL_PATH` to its exact
+approved bytes. Tests cover polling/HUD transitions, encoded delivery and every
+actual native spring vertex at catalog limits and source override spans.
 
 The source-v37 measurements and verification results below are preserved from
 that snapshot. Use the [subsystem identity guide](../cad/docs/subsystem-identities.md)

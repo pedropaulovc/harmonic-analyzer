@@ -4,15 +4,21 @@ async page => {
   await cdp.send('Network.enable');
   await cdp.send('Performance.enable');
   const collect = async label => {
+    await page.bringToFront();
+    const environment = () => page.evaluate(() => ({ visibility: document.visibilityState, focus: document.hasFocus() ? 'focused' : 'blurred', manualState: document.querySelector('#manual-run').textContent }));
+    const environmentBefore = await environment();
     const stateBefore = await page.locator('#playback-status').textContent();
     const start = await cdp.send('Performance.getMetrics');
     await page.waitForTimeout(5000);
     const end = await cdp.send('Performance.getMetrics');
     const stateAfter = await page.locator('#playback-status').textContent();
+    const environmentAfter = await environment();
+    const foreground = environmentBefore.visibility === 'visible' && environmentAfter.visibility === 'visible' && environmentBefore.focus === 'focused' && environmentAfter.focus === 'focused';
+    const manualRunning = label !== 'manual-crank' || (environmentBefore.manualState === 'Stop crank' && environmentAfter.manualState === 'Stop crank');
     const followingPattern = /^Playing · Approximate source-following/;
     return {
-      label, stateBefore, stateAfter,
-      endpointStatus: label !== 'source-following' || (followingPattern.test(stateBefore ?? '') && followingPattern.test(stateAfter ?? '')) ? 'valid' : 'changed-state',
+      label, stateBefore, stateAfter, environmentBefore, environmentAfter,
+      endpointStatus: !foreground || !manualRunning ? 'interrupted' : label !== 'source-following' || (followingPattern.test(stateBefore ?? '') && followingPattern.test(stateAfter ?? '')) ? 'valid' : 'changed-state',
       cpuSeconds: Object.fromEntries(['TaskDuration', 'ScriptDuration', 'LayoutDuration', 'RecalcStyleDuration'].map(name => [name, end.metrics.find(row => row.name === name).value - start.metrics.find(row => row.name === name).value])),
       wallSeconds: end.metrics.find(row => row.name === 'Timestamp').value - start.metrics.find(row => row.name === 'Timestamp').value,
       heapBytes: end.metrics.find(row => row.name === 'JSHeapUsedSize').value,

@@ -39,22 +39,27 @@ async page => {
   await cdp.send('Performance.enable');
   const samples = [];
   const collect = async label => {
+    await page.bringToFront();
     const start = await cdp.send('Performance.getMetrics');
     const before = await page.evaluate(() => {
       const probe = window.__harmonicPerformanceProbe;
       probe.frameCalls.length = 0;
       probe.frameIntervalsMs.length = 0;
-      return { calls: probe.calls, triangles: probe.triangles, frames: probe.frames, paintedFrames: probe.paintedFrames };
+      const visibility = document.visibilityState;
+      const focus = document.hasFocus() ? 'focused' : 'blurred';
+      const manualState = document.querySelector('#manual-run').textContent;
+      return { calls: probe.calls, triangles: probe.triangles, frames: probe.frames, paintedFrames: probe.paintedFrames, visibility, focus, manualState };
     });
     await page.waitForTimeout(5000);
     const end = await cdp.send('Performance.getMetrics');
-    const after = await page.evaluate(() => ({ ...window.__harmonicPerformanceProbe }));
+    const after = await page.evaluate(() => ({ ...window.__harmonicPerformanceProbe, visibility: document.visibilityState, focus: document.hasFocus() ? 'focused' : 'blurred', manualState: document.querySelector('#manual-run').textContent }));
     const percentile = (values, fraction) => {
       const ordered = values.toSorted((a, b) => a - b);
       return ordered[Math.floor((ordered.length - 1) * fraction)] ?? null;
     };
     return {
       label, wallSeconds: end.metrics.find(row => row.name === 'Timestamp').value - start.metrics.find(row => row.name === 'Timestamp').value,
+      endpointStatus: before.visibility === 'visible' && after.visibility === 'visible' && before.focus === 'focused' && after.focus === 'focused' && (label !== 'manual-crank' || (before.manualState === 'Stop crank' && after.manualState === 'Stop crank')) ? 'valid' : 'interrupted',
       calls: after.calls - before.calls, triangles: after.triangles - before.triangles,
       frames: after.frames - before.frames, paintedFrames: after.paintedFrames - before.paintedFrames,
       callsPerPaintedFrame: percentile(after.frameCalls, 0.5), frameIntervalMedianMs: percentile(after.frameIntervalsMs, 0.5), frameIntervalP95Ms: percentile(after.frameIntervalsMs, 0.95),

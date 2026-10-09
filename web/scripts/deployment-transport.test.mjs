@@ -82,7 +82,7 @@ test('negotiates explicit refusal, wildcard precedence, qualities and identity d
   ]) assert.equal(negotiateCoding(header, variants), expected, header)
 })
 
-test('original Cloudflare client preferences override normalized edge headers', async () => {
+test('when original metadata is preserved, client preferences override normalized edge headers', async () => {
   const route = '/model.glb'
   const env = binding()
   const edgeRequest = (preferences, method = 'HEAD', extra = {}) => {
@@ -107,6 +107,21 @@ test('original Cloudflare client preferences override normalized edge headers', 
   const identityTag = `"${assets[route].variants.identity.sha256}"`
   assert.equal((await worker.fetch(edgeRequest('identity', 'HEAD', { 'If-None-Match': identityTag }), env)).status, 304)
   assert.equal((await worker.fetch(edgeRequest('gzip', 'HEAD', { 'If-None-Match': identityTag }), env)).status, 200)
+  assert.equal(env.calls.length, 0)
+})
+
+test('Cloudflare missing original metadata selects identity; non-Cloudflare uses raw header', async () => {
+  const env = binding()
+  for (const cf of [{}, { clientAcceptEncoding: undefined }, { clientAcceptEncoding: null }, null]) {
+    const input = request('/model.glb', 'br, gzip', {}, 'HEAD')
+    Object.defineProperty(input, 'cf', { value: cf })
+    const response = await worker.fetch(input, env)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-encoding'), null)
+    assert.equal(response.headers.get('etag'), `"${assets['/model.glb'].variants.identity.sha256}"`)
+  }
+  const nonCloudflare = await worker.fetch(request('/model.glb', 'gzip', {}, 'HEAD'), env)
+  assert.equal(nonCloudflare.headers.get('content-encoding'), 'gzip')
   assert.equal(env.calls.length, 0)
 })
 
