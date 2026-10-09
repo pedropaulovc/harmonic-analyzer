@@ -62,6 +62,7 @@ from pd_transgear_knob_shaft_spec import (
     PLAIN_CORE,
     PRESSURE_ANGLE_DEG,
     GEOMETRIC_CONTROLS,
+    GEOMETRIC_TOLERANCES_MM,
     PART_DATUMS,
     REAR_END_Z,
     SURFACE_FINISHES,
@@ -329,15 +330,19 @@ async def build(adapter: Any) -> dict[str, str]:
         datum=journal_datum.letter,
         label="knob running journal datum",
     )
-    for control in GEOMETRIC_CONTROLS:
-        edge_xy, frame_xy = CONTROL_ATTACHMENTS[control.key]
+    controls = {control.key: control for control in GEOMETRIC_CONTROLS}
+    if set(controls) != set(GEOMETRIC_TOLERANCES_MM):
+        raise RuntimeError("knob shaft frames do not cover the spec's geometric controls")
+    for (key,) in (("core_total_runout",), ("front_neck_total_runout",)):
+        control = controls[key]
+        edge_xy, frame_xy = CONTROL_ATTACHMENTS[key]
         add_feature_control_frame(
             adapter,
             side,
             edge_xy=edge_xy,
             frame_xy=frame_xy,
             characteristic=control.characteristic,
-            tolerance=control.tolerance,
+            tolerance=GEOMETRIC_TOLERANCES_MM[key],
             datums=control.datums,
             diameter=control.tolerance_zone == "diametral",
             entity_type="SILHOUETTE",
