@@ -224,6 +224,14 @@ The SolidWorks-free `check:*` gates and the comparison/diff tooling run from thi
 SolidWorks seat — either open on this machine (`--executor local`) or on the build
 farm (`--executor farm`, which is how a seatless machine runs them).
 
+The `check:recipe` source contracts also cover tooling fixtures. When a builder
+loops over fit bands, register its module-level source expression in
+`test_fit_bands.py::LOCAL_BAND_SOURCES` (`each` for tuples, `values` for mappings).
+Bands used only by indexed inspection/stack calculations belong in
+`INDEXED_FIT_BANDS`, which validates them too, not in the non-fit exemptions.
+Keep names passed to `blank_reference_geometry` literal at their authoring site
+so the offline stale-feature check can see that the builder creates them.
+
 **An agent-driven farm build runs under the supervised launcher, never under a
 harness deadline.** `scripts/farm-run.ps1` started with `hub` (`persist: true`)
 is the only sanctioned way for an agent to submit `--executor farm` work; the

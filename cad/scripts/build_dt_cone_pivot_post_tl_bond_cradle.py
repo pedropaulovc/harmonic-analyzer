@@ -424,11 +424,24 @@ async def build(adapter: Any) -> dict[str, str]:
     # 4. Seats: on the post axis, cut mid-plane through each saddle from a
     # plane square to the axis at the saddle's mid-thickness. Top-plane
     # sketches: x = model X, y = model -Z, so the origin is the post axis.
-    for which, y, thick, dia, removed in (
-        ("Body", BODY_SADDLE_Y, BODY_SADDLE_THICK, BODY_SEAT_DIA, V_BODY_SEAT),
-        ("Tail", TAIL_SADDLE_Y, TAIL_SADDLE_THICK, TAIL_SEAT_DIA, V_TAIL_SEAT),
+    for which, plane, y, thick, dia, removed in (
+        (
+            "Body",
+            "BodySeatPlane",
+            BODY_SADDLE_Y,
+            BODY_SADDLE_THICK,
+            BODY_SEAT_DIA,
+            V_BODY_SEAT,
+        ),
+        (
+            "Tail",
+            "TailSeatPlane",
+            TAIL_SADDLE_Y,
+            TAIL_SADDLE_THICK,
+            TAIL_SEAT_DIA,
+            V_TAIL_SEAT,
+        ),
     ):
-        plane = f"{which}SeatPlane"
         await _offset_plane(adapter, plane, "Top Plane", y + thick / 2.0)
         seat = SketchDims()
         sketch = f"{which}SeatProfile"
