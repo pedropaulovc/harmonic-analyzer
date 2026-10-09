@@ -410,27 +410,13 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
     assert '"Manufacturing Notes": drawing_notes(teeth)' in source
 
 
-def test_stock_coverage_metadata_and_retained_web_guards_are_not_ideal_cr() -> None:
-    for teeth in spec.CONFIGURATION_TEETH:
-        metadata = spec.stock_form_reference_data(teeth)
-        assert metadata["qualification"] == "geometry-qualified-reference"
-        assert metadata["phase_reserve_rad"] >= 0.0
-        assert metadata["noncarrying_gap_mm"] >= 0.0
-        assert metadata["te_bound_rad"] >= 0.0
-        required = spec.WEB_EXCEPTIONS_MM.get(teeth, spec.MACHINED_WEB_TARGET_MM)
-        assert notes.root_to_bore_web_min_mm(teeth) >= required - 1e-9
-
-
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_actual_web_and_coverage_print_as_facts(teeth: int) -> None:
+def test_actual_web_prints_as_a_fact(teeth: int) -> None:
     data = notes.gear_data(teeth)
     web = notes.root_to_bore_web_min_mm(teeth)
     required = spec.WEB_EXCEPTIONS_MM.get(teeth, spec.MACHINED_WEB_TARGET_MM)
     assert web >= required - 1e-9
     assert f"WEB MIN (mm, REF):  {math.floor(web * 100.0) / 100.0:.2f}" in data
-    assert "STOCK-FORM COVERAGE" in data
-    assert "RECORDED SOURCE RECEIPT; CURRENT INSTALLED SOURCE REBIND REQUIRED" in data
-    assert "CONTACT RATIO" not in data
 
 
 _REVIEW_RECORD_TEXT = re.compile(

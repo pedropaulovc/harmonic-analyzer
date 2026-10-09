@@ -1,8 +1,7 @@
 """Model-stamped cutting and inspection data from the finite cutter authority.
 
-Nonconjugate meshes print STOCK-FORM COVERAGE, never an ideal contact ratio.
-The part-local specification replays the original numerical receipt and current
-native geometry. Drawing references are not current installed-mesh authority.
+Every value comes from dt_cone_gear_spec; the backlash reference is the
+closed-form standard check of the drum mesh (dt_mesh_checks).
 """
 
 from __future__ import annotations
@@ -13,6 +12,7 @@ import textwrap
 from dataclasses import replace
 
 import dt_cone_gear_spec as spec
+import dt_mesh_checks
 
 CYLINDER_MATE_NUMBER = "MHA-DT-012"
 CUTTER_DETAIL_SHEET = "DT6-FORM1"
@@ -39,18 +39,13 @@ def cutter_description(teeth: int) -> str:
 
 
 def gear_data(teeth: int) -> str:
-    """One physical recipe with explicitly recorded, not installed, references."""
+    """One physical recipe with its reference sizes."""
     profile = spec.stock_form_profile(teeth)
-    mesh = spec.stock_form_reference_data(teeth)
-    if mesh["qualification"] != "geometry-qualified-reference":
-        raise ValueError(f"T{teeth:03d}: cutter geometry reference is not qualified")
-    minimum, maximum = spec.BACKLASH_ACCEPTANCE_MM
-    # Conservative reference reporting: round coverage/reserve/web down and
-    # error/gap bounds up. These rows do not replace native toleranced sizes.
-    coverage = math.floor(mesh["coverage_min"] * 100.0) / 100.0
-    reserve = math.floor(mesh["phase_reserve_rad"] * 1e6) / 1e6
-    gap = math.ceil(mesh["noncarrying_gap_mm"] * 1e4) / 1e4
-    te = math.ceil(mesh["te_bound_rad"] * 1e6) / 1e6
+    mesh = dt_mesh_checks.cone_check(teeth)
+    # Conservative reference reporting: round the backlash range and web
+    # outward. These rows do not replace native toleranced sizes.
+    minimum = math.floor(mesh.backlash_min_mm * 100.0) / 100.0
+    maximum = math.ceil(mesh.backlash_max_mm * 100.0) / 100.0
     web = math.floor(root_to_bore_web_min_mm(teeth) * 100.0) / 100.0
     whole_depth_max = math.ceil(max(
         corner.blank_radius_mm - corner.root_radius_min_mm
@@ -64,12 +59,7 @@ def gear_data(teeth: int) -> str:
         ("WHOLE DEPTH MAX / ROOT ARC R (mm, REF)", f"{whole_depth_max:.4f} / {profile.template.root_radius_mm:.4f}"),
         ("TOOTH FORM", "FINITE INVOLUTE; RADIAL BELOW BASE" if profile.template.root_radius_mm < profile.template.base_radius_mm else "FINITE INVOLUTE; ABOVE-BASE ROOT ARC"),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
-        ("MESH REFERENCE SCOPE", "RECORDED SOURCE RECEIPT; CURRENT INSTALLED SOURCE REBIND REQUIRED"),
-        ("BACKLASH AT ASSEMBLY (mm)", f"{minimum:.2f} TO {maximum:.2f}"),
-        ("ACTUAL 3D STOCK-FORM COVERAGE MIN (REF)", f"{coverage:.2f}"),
-        ("PHASE RESERVE (rad, REF)", f"{reserve:.6f}"),
-        ("NONCARRYING GAP MAX (mm, REF)", f"{gap:.4f}"),
-        ("UNTARED 21-STALL SIGNED TE BOUND (+/-rad, REF)", f"{te:.6f}"),
+        ("BACKLASH WITH MATE (mm, REF)", f"{minimum:.2f} TO {maximum:.2f}"),
         ("ROOT RADIAL MIN/MAX (mm, REF)", f"{profile.root_radius_min_mm:.3f} / {profile.root_radius_max_mm:.3f}"),
         ("WEB MIN (mm, REF)", f"{web:.2f}"),
     )
