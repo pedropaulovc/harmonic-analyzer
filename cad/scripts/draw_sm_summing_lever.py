@@ -33,6 +33,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     ViewEdge,
+    _early_bound,
     ViewEdges,
     add_datum_feature,
     add_edge_dimension,
@@ -42,6 +43,7 @@ from _drawing_common import (
     add_surface_finish,
     assert_dimension_measures,
     curate_view_dimensions,
+    create_blank_drawing_sheets,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -75,6 +77,10 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 
+from magnifying_bracket_joint_layout import (
+    LEVER_HOLE_POINTS, TAP_DRILL_DIA, THREAD_DEPTH, DRILL_DEPTH,
+    THREAD_DEPTH_BAND, DRILL_DEPTH_BAND,
+)
 
 SPEC = DRAWINGS_BY_NAME["sm_summing_lever"]
 PART_STEM = SPEC.artifact_stem
@@ -103,6 +109,28 @@ _BBOX_CX = (TIP_X - ANCHOR_R + PLATE_W) / 2.0
 FRONT_CENTER = (0.225, 0.235)
 TOP_CENTER = (0.225, 0.130)  # aligned plan below the front profile
 ISO_CENTER = (0.350, 0.225)
+BACK_CENTER = (0.225, 0.190)
+SHEET_NAMES = ("Lever Geometry", "Bracket Receiver")
+
+
+def _back_xy(mx: float, my: float) -> tuple[float, float]:
+    """Back view reverses X and looks at the blind taps' -Z entry face."""
+    return (
+        BACK_CENTER[0] - (mx - _BBOX_CX) * _S / 1000.0,
+        BACK_CENTER[1] + my * _S / 1000.0,
+    )
+
+def _mounting_rims(back: Any) -> list[Any]:
+    """Back looks from -Z directly onto the blind taps' entry circles."""
+    edges = scan_view_edges(back, label="bracket receiver face")
+    return [
+        edges.circle_at(
+            point, TAP_DRILL_DIA / 2.0, axis=(0.0, 0.0, 1.0),
+            label=f"bracket receiver {index}",
+        )
+        for index, point in enumerate(LEVER_HOLE_POINTS)
+    ]
+
 
 
 def _front_xy(mx: float, my: float) -> tuple[float, float]:
@@ -150,6 +178,7 @@ def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
 
 FRONT_KEEP = {
     "CylDia": (0.145, 0.260),
+    "PlateThickness": (0.320, 0.240),
 }
 TOP_KEEP = {
     # Below the plate end, its witness lines 14 mm long: at 0.160 they ran
@@ -160,6 +189,7 @@ TOP_KEEP = {
     # text sits right of the span, clear of B.
     "PlateWidth": (0.266, 0.0813),
     "PlateLength": (0.395, TOP_CENTER[1]),
+    "RibDepth": (0.325, 0.160),  # -Z receiver rib: Top prints model +Z down
     "AnchorOuterDia": (0.145, 0.175),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
@@ -181,6 +211,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Bracket Receiver Note",
         ),
         required=(
             "Number",
@@ -189,6 +220,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Bracket Receiver Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -205,6 +237,10 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
+    create_blank_drawing_sheets(adapter, SHEET_NAMES, label="summing lever package")
+    drawing = _early_bound(drawing_model, "IDrawingDoc")
+    if not drawing.ActivateSheet(SHEET_NAMES[0]):
+        raise RuntimeError("failed to activate lever geometry sheet")
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(1, 2))
     top = place_view(adapter, str(SOURCE), "*Top", *TOP_CENTER, scale=(1, 2))
@@ -473,14 +509,91 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.120)
     add_property_linked_note(adapter, "Isometric View Note", 0.300, 0.185)
 
+    if not drawing.ActivateSheet(SHEET_NAMES[1]):
+        raise RuntimeError("failed to activate bracket receiver sheet")
+    back = place_view(adapter, str(SOURCE), "*Back", *BACK_CENTER, scale=(1, 2))
+    receiver_iso = place_view(
+        adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 4),
+    )
+    for view in (back, receiver_iso):
+        set_hidden_lines_removed(adapter, view)
+    curate_view_dimensions(adapter, back, keep={}, view_label="bracket receiver")
+    mounting_rims = _mounting_rims(back)
+    mounting_callout = add_native_hole_callout(
+        adapter, back, edge=mounting_rims[0].edge,
+        callout_xy=(0.292, 0.155), label="two blind bracket mounting taps",
+        process="BOTTOMING TAP - FULL THREAD DEPTH / TAP DRILL DEPTH",
+    )
+    from win32com.client.dynamic import Dispatch as dynamic_dispatch
+    required_depths = {
+        "hw-threaddepth": THREAD_DEPTH,
+        "hw-tapdrldepth": DRILL_DEPTH,
+    }
+    for raw in mounting_callout.GetHoleCalloutVariables() or ():
+        # Concrete callout interfaces alias the generic metadata DISPIDs.
+        variable = dynamic_dispatch(raw._oleobj_)
+        variable_name = str(variable.VariableName)
+        if variable_name not in required_depths:
+            continue
+        length = _early_bound(raw, "ICalloutLengthVariable")
+        expected_depth = required_depths.pop(variable_name)
+        if abs(float(length.Length) * 1000.0 - expected_depth) > 1e-5:
+            raise RuntimeError(f"bracket mounting callout has wrong {variable_name}")
+        band = THREAD_DEPTH_BAND if variable_name == "hw-threaddepth" else DRILL_DEPTH_BAND
+        observed = (
+            int(variable.ToleranceType),
+            float(variable.ToleranceMin) * 1000.0,
+            float(variable.ToleranceMax) * 1000.0,
+        )
+        _telemetry.info(
+            f"bracket mounting callout {variable_name} imported tolerance "
+            f"(type, lower mm, upper mm) = {observed!r}"
+        )
+        # A hole callout variable carries its OWN tolerance (SW 2016+:
+        # ICalloutVariable.ToleranceType; the model IDimensionTolerance does
+        # not override it). Farm 2026-10-09: the cosmetic-thread depth band
+        # did not reach hw-threaddepth, so author the same source band here.
+        variable.ToleranceType = 4  # swTolType_e.swTolSYMMETRIC
+        variable.ToleranceMin = -band / 1000.0
+        variable.ToleranceMax = band / 1000.0
+        length.TolerancePrecision = 2
+        if (
+            int(variable.ToleranceType) != 4
+            or abs(float(variable.ToleranceMin) * 1000.0 + band) > 1e-5
+            or abs(float(variable.ToleranceMax) * 1000.0 - band) > 1e-5
+            or int(length.TolerancePrecision) != 2
+        ):
+            raise RuntimeError(
+                f"bracket mounting callout tolerance for {variable_name} did not "
+                f"persist: wanted symmetric band {band} mm at 2 places"
+            )
+    if required_depths:
+        raise RuntimeError(f"bracket tap callout omits native depths: {required_depths}")
+    from _drawing_hidden_sketches import curate_view_dimensions as curate_hidden_dimensions
+    curate_hidden_dimensions(
+        adapter, back,
+        keep={
+            "ReceiverX0": (0.225, 0.220),
+            "ReceiverX1": (0.225, 0.229),
+            "ReceiverY0": (0.182, 0.185),
+        },
+        view_label="bracket receiver coordinates",
+        dimensions_by_feature={
+            "ReceiverCoordinates": ("ReceiverX0", "ReceiverX1", "ReceiverY0"),
+        },
+    )
+    add_property_linked_note(adapter, "Bracket Receiver Note", 0.020, 0.120)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Summing Lever Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        expected_sheet_names=SHEET_NAMES,
         redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=3,
+        # main's 3, plus the bracket taps' per-hole cosmetic threads (2) in the
+        # receiver sheet's two views: 7 observed on the farm 2026-10-09.
+        expected_redundant_notes=7,
     )
 
 

@@ -575,6 +575,14 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
         },
         "ha-harmonic-analyzer": {
+            **_expected_numbered_pairs(
+                "mg-magnifier-1/vn-magnifying-bracket-screw",
+                range(1, 3),
+                "sm-summing-1/sm-summing-lever",
+                2.1844,
+                1.778,
+                4.725,
+            ),
             # Twenty stock 9489T111 #6-32 anchors engage only the 0.2-in
             # summing-lever plate; #36 tap drill, not the full stock shank.
             **_expected_numbered_pairs(

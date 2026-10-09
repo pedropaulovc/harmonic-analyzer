@@ -63,6 +63,7 @@ from __future__ import annotations
 import math
 import sys
 
+import _telemetry
 from _common import (
     CASTING_GREEN,
     IN,
@@ -91,10 +92,23 @@ from _common import (
 )
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
+from magnifying_bracket_joint_layout import (
+    LEVER_HOLE_POINTS,
+    TAP_SPEC,
+    TAP_DRILL_DIA,
+    DRILL_DEPTH,
+    DRILL_POINT_DEPTH,
+    DRILL_DEPTH_BAND,
+    THREAD_DEPTH_BAND,
+    RECEIVER_DIMENSION_BANDS,
+    DRILL_LATERAL_WALL_MIN,
+)
 from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_symmetric_tolerance,
+    set_dimension_display_precision,
 )
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
@@ -746,6 +760,202 @@ async def _counter_anchor_tap(adapter, drive_jobs: list[tuple[str, str]]) -> Non
     )
 
 
+def _receiver_model_bands(adapter) -> None:
+    """Author receiver limits on owned source dimensions, including subfeatures."""
+    from _common import _com_invoke, _early_bound, _feature_display_dimensions
+    from _drawing_marks import _feature_tree
+    from magnifying_bracket_joint_layout import THREAD_DEPTH
+
+    model = _early_bound(adapter.currentModel, "IPartDoc")
+    for feature_name, dimensions in RECEIVER_DIMENSION_BANDS.items():
+        feature = _early_bound(model.FeatureByName(feature_name), "IFeature")
+        for dimension_name, band in dimensions.items():
+            dimension = feature.Parameter(dimension_name)
+            if dimension is not None:
+                dimension = _early_bound(dimension, "IDimension")
+            if (
+                dimension is None
+                or abs(float(dimension.SystemValue) * 1000.0 - PLATE_T) > 1e-5
+            ):
+                raise RuntimeError(
+                    f"{feature_name}: missing native receiver thickness {dimension_name}"
+                )
+            drawing_name = (
+                "PlateThickness" if feature_name == "CoefficientsPlate" else "RibDepth"
+            )
+            dimension.Name = drawing_name
+            set_dimension_symmetric_tolerance(adapter, feature_name, drawing_name, band)
+            set_dimension_display_precision(adapter, feature_name, drawing_name, 2)
+            mark_dimensions_for_drawing(adapter, feature_name, [drawing_name])
+
+    feature = _early_bound(model.FeatureByName("BracketMountingTaps"), "IFeature")
+    required = {
+        "FullThreadDepth": (THREAD_DEPTH, THREAD_DEPTH_BAND),
+        "TapDrillDepth": (DRILL_DEPTH, DRILL_DEPTH_BAND),
+    }
+    matches = {name: [] for name in required}
+    # Hole Wizard thread lengths can belong to its cosmetic-thread subfeature.
+    # Follow the same owned-dimension tree as the tolerance/precision helpers;
+    # native names are not a semantic API ("depth" is not guaranteed in them).
+    for current in _feature_tree(feature):
+        owner = str(_com_invoke(current, "IFeature", "Name"))
+        for display in _feature_display_dimensions(current):
+            dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+            full_name = str(_com_invoke(dimension, "IDimension", "FullName"))
+            system_value = float(_com_invoke(dimension, "IDimension", "SystemValue"))
+            dimension_type = int(_com_invoke(dimension, "IDimension", "GetType"))
+            linear = dimension_type == 0  # swDimensionParamTypeDoubleLinear
+            value_mm = system_value * 1000.0
+            reported_value = value_mm if linear else system_value
+            reported_units = "mm" if linear else "SI"
+            _telemetry.info(
+                f"BracketMountingTaps native dimension {full_name} = "
+                f"{reported_value:.6g} {reported_units} (feature {owner}) "
+                f"[parameter type {dimension_type}]"
+            )
+            parts = full_name.split("@")
+            if not linear or len(parts) < 2 or parts[1] != owner:
+                continue
+            for name, (nominal, _band) in required.items():
+                if abs(value_mm - nominal) < 1e-5:
+                    matches[name].append((owner, parts[0], display, dimension))
+    # Native shape (farm, 2026-10-09): Hole Wizard owns the tap drill depth on
+    # one sketch subfeature, but adds one cosmetic-thread subfeature PER HOLE,
+    # each owning its own full-thread depth.
+    expected = {"FullThreadDepth": len(LEVER_HOLE_POINTS), "TapDrillDepth": 1}
+    for name, (_nominal, band) in required.items():
+        owners = {match[0] for match in matches[name]}
+        if len(matches[name]) != expected[name] or len(owners) != expected[name]:
+            raise RuntimeError(
+                f"BracketMountingTaps: expected {expected[name]} native {name} "
+                f"(one per owner), found {len(matches[name])}: "
+                f"{[match[:2] for match in matches[name]]}"
+            )
+        for owner, native_name, display, dimension in matches[name]:
+            # Wizard-owned names are its native parameter contract; never
+            # rewrite them. Subfeatures (Sketch14, Hole Thread22...) are not
+            # reachable by FeatureByName, and the per-hole threads share the
+            # name D1, so band the dimensions already held, not by name.
+            _band_held_dimension(display, dimension, band, f"{native_name}@{owner}")
+
+
+def _band_held_dimension(display, dimension, band: float, label: str) -> None:
+    """Symmetric tolerance + 2-place display on an already-resolved dimension
+    (the by-name ``set_dimension_symmetric_tolerance`` contract, minus lookup)."""
+    from _common import _bind, _early_bound
+    from _drawing_marks import _set_tolerance_precision
+
+    display = _bind(display, "IDisplayDimension")
+    dimension = _bind(dimension, "IDimension")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = 4  # swTolType_e.swTolSYMMETRIC
+    band_m = band / 1000.0
+    if not tolerance.SetValues(-band_m, band_m):
+        raise RuntimeError(f"{label}: SetValues rejected +/-{band} mm")
+    minimum = float(tolerance.GetMinValue())
+    maximum = float(tolerance.GetMaxValue())
+    if (
+        int(tolerance.Type) != 4
+        or abs(minimum + band_m) > 1e-9
+        or abs(maximum - band_m) > 1e-9
+    ):
+        raise RuntimeError(
+            f"{label}: tolerance readback type {int(tolerance.Type)} "
+            f"{minimum:g}/{maximum:g} m != symmetric +/-{band_m:g} m"
+        )
+    _set_tolerance_precision(display, (-band, band), label=label)
+    display = _early_bound(display, "IDisplayDimension")
+    do_not_change = -1  # swDimensionPrecisionSettings_e
+    display.SetPrecision3(2, do_not_change, do_not_change, do_not_change)
+    if int(display.GetPrimaryPrecision2()) != 2:
+        raise RuntimeError(f"{label}: display precision did not persist")
+    _telemetry.success(f"toleranced {label}: +/-{band:g} mm (2 decimals)")
+
+
+async def _receiver_coordinate_dimensions(adapter) -> None:
+    """Native coordinate dimensions from the real free edge and lower face."""
+    from _common import anchor_point_to_point
+    from magnifying_bracket_joint_layout import POSITION_BAND
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    check("receiver coordinate sketch", await adapter.create_sketch("Front"))
+    dimensions = SketchDims()
+    for index, point in enumerate(LEVER_HOLE_POINTS):
+        start = (PLATE_W, -PLATE_T / 2.0)
+        corner = (point[0], start[1])
+        lines = await add_line_chain(adapter, [start, corner, point[:2]], close=False)
+        await anchor_point_to_origin(
+            adapter, f"{lines[0]}.start", *start, "receiver free edge"
+        )
+        dimensions.record(f"ReceiverOriginX{index}", None)
+        dimensions.record(f"ReceiverOriginY{index}", None)
+        await anchor_point_to_point(
+            adapter,
+            f"{lines[0]}.start",
+            f"{lines[0]}.end",
+            corner[0] - start[0],
+            0.0,
+            "receiver X station",
+        )
+        dimensions.record(f"ReceiverX{index}", None)
+        await anchor_point_to_point(
+            adapter,
+            f"{lines[1]}.start",
+            f"{lines[1]}.end",
+            0.0,
+            point[1] - start[1],
+            "receiver row",
+        )
+        dimensions.record(f"ReceiverY{index}", None)
+    await ensure_fully_defined(adapter, "receiver coordinate sketch")
+    check("exit receiver coordinate sketch", await adapter.exit_sketch())
+    name_last_feature(adapter, "ReceiverCoordinates")
+    dimensions.apply(adapter, "ReceiverCoordinates")
+    names = ["ReceiverX0", "ReceiverX1", "ReceiverY0"]
+    for name in names + ["ReceiverY1"]:
+        set_dimension_symmetric_tolerance(
+            adapter, "ReceiverCoordinates", name, POSITION_BAND
+        )
+        set_dimension_display_precision(adapter, "ReceiverCoordinates", name, 2)
+    mark_dimensions_for_drawing(adapter, "ReceiverCoordinates", names)
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        "ReceiverCoordinates", "SKETCH", 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError("cannot hide receiver coordinate sketch")
+    model.BlankSketch()
+    model.ClearSelection2(True)
+
+
+async def _bracket_mounting_taps(adapter) -> None:
+    """Cut the two blind front-face taps after all structural additions."""
+    mass = await adapter.get_mass_properties()
+    if not mass.is_success:
+        raise RuntimeError(f"pre-bracket-tap mass props failed: {mass.error}")
+    wizard_holes(
+        adapter,
+        TAP_SPEC,
+        LEVER_HOLE_POINTS,
+        (0.0, 0.0, -1.0),
+        "magnifying bracket mounting taps",
+        name="BracketMountingTaps",
+        expect_dia_mm=TAP_DRILL_DIA,
+    )
+    cut_volume = (
+        len(LEVER_HOLE_POINTS)
+        * math.pi
+        * (TAP_DRILL_DIA / 2.0) ** 2
+        * (DRILL_DEPTH + DRILL_POINT_DEPTH / 3.0)
+    )
+    await volume_check(
+        adapter,
+        "magnifying bracket blind taps",
+        float(mass.data.volume) - cut_volume,
+        0.02 * cut_volume,
+    )
+
+
 async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
@@ -822,6 +1032,7 @@ async def build(adapter) -> dict[str, str]:
     await _summation_anchor(adapter, drive_jobs)
     await _middle_rib(adapter, drive_jobs)
     await _counter_anchor_tap(adapter, drive_jobs)
+    await _bracket_mounting_taps(adapter)
 
     # Apply the deferred drive equations now -- after the whole model + a rebuild
     # exists, so every target resolves. Each equation evaluates to the value just
@@ -865,6 +1076,8 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    _receiver_model_bands(adapter)
+    await _receiver_coordinate_dimensions(adapter)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
@@ -872,7 +1085,15 @@ async def build(adapter) -> dict[str, str]:
         {
             "Manufacturing Notes": DRAWING_NOTES,
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+            # Named exception: MHA-SM-003 bracket tap-drill wall 1.501 MIN
+            # (drawing-simplicity-policy.md, "Named exceptions").
+            "Bracket Receiver Note": f"BRACKET TAP DRILL LATERAL WALL {DRILL_LATERAL_WALL_MIN:.3f} MIN.",
         },
+    )
+    # Native dimension metadata must not erase the already-verified blind taps.
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter, "summing lever after native receiver bands", v_built, 1e-5 * v_built
     )
     artefacts = await save_part_and_images(adapter, PART_NAME)
     require_saved_drawing_properties(
@@ -884,6 +1105,7 @@ async def build(adapter) -> dict[str, str]:
             "Quantity",
             "Manufacturing Notes",
             "Isometric View Note",
+            "Bracket Receiver Note",
         ),
     )
     return artefacts

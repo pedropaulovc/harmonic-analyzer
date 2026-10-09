@@ -859,6 +859,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="vn_magnifying_bracket_screw",
+        part="vn_magnifying_bracket_screw",
+        artifact_stem="vn-magnifying-bracket-screw",
+        script_name="draw_vn_magnifying_bracket_screw.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="pd_latch_hook_bracket",
         part="pd_latch_hook_bracket",
         artifact_stem="pd-latch-hook-bracket",

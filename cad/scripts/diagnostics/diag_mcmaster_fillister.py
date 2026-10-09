@@ -57,6 +57,9 @@ FILLISTER_SIZES = {
     # 18-8 stainless fillister, the same 0.183 x 0.107 #4-40 head (McMaster
     # 91794A product table, read 2026-09-25).
     "91794A112": (2.8448, 15.875, 2.7178, 4.6482, 0.635),
+    # 18-8 stainless #2-56 x 1/4, live product page and technical drawing
+    # read 2026-10-08. Derived family details are not vendor-verified.
+    "91794A077": (2.1844, 6.35, 2.1082, 3.556, 25.4 / 56.0),
     # 18-8 stainless fillister, 0-80 x 1/4, high narrow head 0.096 x 0.055,
     # fully threaded (McMaster 91794A055 product page, read 2026-09-30).
     # Sizes only: its vendor model is a different tree (drafted head, neck,

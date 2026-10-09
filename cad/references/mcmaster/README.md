@@ -19,10 +19,10 @@ recipes:
 | 3606T811 | `vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | `vn-knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
-| 90280A108 | `vn-foot-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A194 | `vn-frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `vn-pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A199 | `vn-swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A199 | — (diagnostic recipe; a former `vn-swing-stop-screw`) | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `vn-clamp-screw`, `vn-slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `vn-frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 91247A720 | `vn-knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
@@ -35,6 +35,7 @@ recipes:
 | 91790A196 | `vn-transgear-arm-plate-screw` (catalogue-only; no vendor model; SKU not yet read live) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91794A112 | `vn-cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `vn-transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A077 | `vn-magnifying-bracket-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `vn-lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A205 | `vn-transgear-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A560 | `vn-cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
@@ -61,6 +62,58 @@ recipes:
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_vn_cone_lock_knob.py`
 and `cad/scripts/build_vn_swing_stop_screw.py`.
+
+Live catalog verification on October 8, 2026:
+
+- [91794A077](https://www.mcmaster.com/91794A077/), selected for the two
+  MHA-VN-050 magnifying-bracket screws, is titled “18-8 Stainless Steel
+  Fillister Head Slotted Screw, 2-56 Thread Size, 1/4" Long”. The live page
+  and [technical drawing](https://www.mcmaster.com/mvC/Library/CAD2/20260108/09FCA726/91794A077_18-8%20Stainless%20Steel%20Fillister%20Head%20Slotted%20ScrewS.GIF)
+  were viewed on October 8, 2026: passivated 18-8 stainless, #2-56 UNC,
+  right-hand class 2A, fully threaded, flat tip, ASME B18.6.3. Under-head
+  length is 0.250 in (6.35 mm), nominal major diameter 0.086 in (2.1844 mm),
+  head diameter 0.140 in (3.556 mm), and head height 0.083 in (2.1082 mm).
+  The drawing states no dimensional tolerances. The joint's conservative
+  0.76 mm screw-length allowance is a stack assumption, not a McMaster tolerance.
+  The provisional #4-40 x 3/8 90280A108 selection is rejected for this joint:
+  its larger thread and longer reach cannot satisfy the rib envelope and
+  no-bottoming stack. It remains selected for the other three fleet parts.
+  The #2 screw uses a Ø3.8 x 1.55 deep counterbore, leaving 1.625 mm nominal
+  grip and a deliberately protruding head (0.5582 mm nominal, not flush).
+  Its worst-case engagement is 3.2975 mm, above 1.5D (3.2766 mm); maximum
+  reach 4.825 mm stays below the 4.90 mm minimum full-thread depth.
+  The 5.00 mm maximum full-thread envelope stays within the 5.03 mm minimum
+  rib depth. The drill body and point may continue into the lever plate.
+  The native ±0.05 depth band belongs to `EdgeRibBack`, the actual -Z
+  entry rib; `EdgeRibFront` is the opposite end. The minimum 0.122 mm
+  head-to-counterbore radial float exceeds the 0.10 mm maximum station
+  pitch mismatch at the printed ±0.05 position bands. The minimum end wall
+  is 2.00 mm from the real end-face station datum, without double-counting
+  its general location band.
+  Receiver depth bands are authored on owned source-model dimensions across
+  the Hole Wizard's full subfeature tree, using the same `GetDimension2(0)`
+  traversal as the drawing-mark/tolerance helpers. The two validated model
+  values identify the depths; native display names need not contain the word
+  "depth". The build logs every native dimension name/value before its
+  uniqueness checks, including borrowed and non-linear dimensions it refuses
+  to tolerance. Linear values are logged in mm; other parameter types retain
+  their native system units instead of being mislabeled as lengths.
+  Wizard-owned dimension names are retained; bands and precision use their
+  observed native names and owners, never foreign aliases. The farm receipt
+  at `849347e57` passed the bracket's pre-annotation cut-volume check but its
+  saved STL had no mounting holes. The measured 20.1045903 mm³ per-screw
+  interference matches a solid plate's head/thread/runout overlap:
+  20.1051883 mm³ analytically (0.0005980 mm³ residual), rather than a reversed
+  counterbore or screw. Foreign Wizard-parameter renames in that loss window
+  were removed; their causal role remains a native-validation inference.
+  The same run's bracket drawing found no mounting-face circle at
+  `(-39.0, 0.0, 52.01258778042654)` with radius 1.9 mm, corroborating the
+  missing-cut diagnosis.
+  Both builders force a final rebuild and prove the post-annotation volume
+  before publication, so a later missing cut cannot inherit an earlier pass.
+  `diagnostics.diag_build_91794A077` reuses the native fillister family recipe;
+  its derived slot, dome, thread/runout and vendor-frame mapping are family
+  assumptions, not verified vendor geometry. No vendor model is harvested.
 
 Catalog specifications checked on September 10, 2026:
 

@@ -12,12 +12,16 @@ drawing keeps EXACTLY ``DRAWING_DIMENSIONS``.
 The bracket is a three-feature fitting: a revolved COLLAR tube (Ø12 OD, Ø6.2
 bore, 10 long about local X), a rectangular ARM cantilevering +Z to the summing
 plate, and a mounting FLANGE that butts the plate's front face.  The two plan
-rectangles (arm, flange) carry the auto-importable marked dimensions; the collar
-diameters + bore, the through-thicknesses and the fit ride the notes (a revolved
-tube gives no clean marked Ø, and its curved wall is not a dependable pick).
+rectangles carry the auto-importable marked dimensions, including the flange
+thickness band. Native counterbore callouts define the through bore and head
+seat; the legacy collar dimensions and fit remain in the notes.
 """
 
 from __future__ import annotations
+from magnifying_bracket_joint_layout import (
+    POSITION_BAND,
+    GRIP_MIN,
+)
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows.  Only the two extruded PLAN rectangles are marked (they auto-
@@ -28,21 +32,30 @@ from __future__ import annotations
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmProfile": {"ArmWidth", "ArmDepth"},
     "FlangeProfile": {"FlangeWidth", "FlangeDepth"},
+    "Flange": {"FlangeHeight"},
+    "MountingCoordinates": {"MountingX0", "MountingX1", "MountingY0"},
 }
 
-# True free-text instructions only.  The collar OD/bore (a revolved tube has no
-# clean marked Ø), the Y through-thicknesses (extrude depths, not sketch dims)
-# and the slip fit on the Ø6 lever rod live here.  The part build stamps these
-# strings into the SLDPRT; the drawing displays only $PRPSHEET links, so the
-# print cannot silently diverge from its source model.
+# Wizard callout precision is applied in the build through observed native
+# dimension names; those identifiers must never be renamed for this contract.
+DRAWING_PRECISION = {
+    "ArmProfile": {"ArmWidth": 2, "ArmDepth": 2},
+    "FlangeProfile": {"FlangeWidth": 2, "FlangeDepth": 3},
+    "Flange": {"FlangeHeight": 2},
+}
+DRAWING_POSITION_BAND = POSITION_BAND
+
+# True free-text instructions and the intentionally retained legacy collar
+# dimensions. Mounting sizes and bands are native model/drawing dimensions.
 DRAWING_NOTES = "\n".join(
     (
         "COLLAR Ø12 OD x 10 LONG (ALONG THE COLLAR AXIS), BORE Ø6.2 THRU -",
         "SLIP GUIDE ON THE Ø6 LEVER ROD.",
-        "ARM 10 WIDE x 7.5 THICK (VERTICAL); FLANGE 5 THICK (VERTICAL), BUTTS",
-        "THE SUMMING-PLATE FRONT FACE. CURRENT PART IS AN UNDRILLED BLANK:",
-        "MOUNTING-HOLE AXIS AND PATTERN ARE NOT DEFINED.",
-        "DO NOT RELEASE UNTIL SPECIFIED.",
+        "ARM 10 WIDE x 7.5 THICK.",
+        "SEAT ON SUMMING-LEVER FRONT.",
+        # Named exception: MHA-MG-001 counterbore floor 1.525 MIN
+        # (drawing-simplicity-policy.md, "Named exceptions").
+        f"COUNTERBORE FLOOR {GRIP_MIN:.3f} MIN.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
