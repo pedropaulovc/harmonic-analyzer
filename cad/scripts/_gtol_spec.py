@@ -35,6 +35,24 @@ GTOL_SYMBOLS = {
 }
 
 ToleranceZone = Literal["linear", "diametral"]
+# How a translated compartment is serialized.  The bare ``<Translation>``
+# flag (Gtol Frame XML Schema) printed "B ▷ [0,0,0]" on farm run
+# 20261009T174542021Z: SOLIDWORKS showed the translation vector (the Datum
+# dialog's i, j, k, ``<TranslationValueI/J/K>``) at its zero default in a
+# compartment of its own.  Which serialization prints the bare ASME Y14.5-2018
+# modifier is proven per leaf by the printed text
+# (``translation_print_problem``), in this order:
+#   "empty-vector" -- the flag with i, j, k present and empty;
+#   "vector-false" -- the flag with i, j, k "false" (the dialog help calls all
+#                     13 compartment controls true/false);
+#   "after-letter" -- the flag after the compartment's DatumDetail.
+TranslationForm = Literal["bare", "empty-vector", "vector-false", "after-letter"]
+TRANSLATION_FORMS: tuple[TranslationForm, ...] = (
+    "empty-vector",
+    "vector-false",
+    "after-letter",
+)
+_TRANSLATION_MODIFIER = "MOD-TRANS"
 _PMI_NAME_PREFIX = "HARMONIC_PMI_"
 
 
@@ -55,6 +73,7 @@ def gtol_frame_xml(
     datums: Sequence[str] = (),
     diameter: bool = False,
     translated: Sequence[str] = (),
+    translation_form: TranslationForm = "bare",
 ) -> str:
     """Build the SOLIDWORKS-2022+ feature-control-frame XML payload.
 
@@ -64,6 +83,7 @@ def gtol_frame_xml(
     Frame XML Schema", the Datum dialog's triangle control).  A clocking
     datum feature of size at a basic distance from the primary takes it, so
     its simulator may slide along that distance and only orients.
+    ``translation_form`` serializes that flag (``TRANSLATION_FORMS``).
     """
     symbol = GTOL_SYMBOLS.get(characteristic)
     if symbol is None:
@@ -85,10 +105,19 @@ def gtol_frame_xml(
         ElementTree.SubElement(range_info, "PrimaryRangeSymbol").text = "phi"
     for datum in datums:
         compartment = ElementTree.SubElement(root, "DatumCompartment")
-        if datum in translated:
+        moved = datum in translated
+        if moved and translation_form != "after-letter":
             ElementTree.SubElement(compartment, "Translation").text = "true"
+            if translation_form in ("empty-vector", "vector-false"):
+                value = "false" if translation_form == "vector-false" else ""
+                for axis in "IJK":
+                    ElementTree.SubElement(
+                        compartment, f"TranslationValue{axis}"
+                    ).text = value
         detail = ElementTree.SubElement(compartment, "DatumDetail")
         ElementTree.SubElement(detail, "DatumLetter").text = datum
+        if moved and translation_form == "after-letter":
+            ElementTree.SubElement(compartment, "Translation").text = "true"
     return ElementTree.tostring(root, encoding="unicode", short_empty_elements=True)
 
 
@@ -153,6 +182,34 @@ def gtol_frame_signature(xml: str) -> GtolFrameSignature:
         tolerance_zone=tolerance_zone,
         translated=translated,
     )
+
+
+def translation_print_problem(texts: Sequence[str], translated: Sequence[str]) -> str:
+    """Why a frame's printed text items misstate its translation modifiers,
+    or "" when they print exactly as ASME Y14.5-2018 writes them.
+
+    ``texts`` are the frame's display-data text items in print order
+    (``IDisplayData.GetTextAtIndex``).  Each translated datum's letter must be
+    followed directly by one modifier glyph (``<MOD-TRANS...>``), and nothing
+    may print a bracketed vector: farm run 20261009T174542021Z printed
+    "C", "B", "<MOD-TRANS2>", "[0,0,0]" for the frame C|B▷.
+    """
+    items = [str(text).strip() for text in texts]
+    vectors = [text for text in items if "[" in text or "]" in text]
+    if vectors:
+        return f"prints a translation vector {vectors!r} in {items!r}"
+    modifiers = [i for i, text in enumerate(items) if _TRANSLATION_MODIFIER in text]
+    if len(modifiers) != len(translated):
+        return (
+            f"prints {len(modifiers)} translation modifier(s) for "
+            f"{len(translated)} translated datum(s) in {items!r}"
+        )
+    for datum, index in zip(translated, modifiers):
+        own = items[index].split("<", 1)[0].strip()
+        before = items[index - 1] if index else ""
+        if own != datum and not (own == "" and before == datum):
+            return f"prints its translation modifier off datum {datum} in {items!r}"
+    return ""
 
 
 @dataclass(frozen=True)

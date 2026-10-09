@@ -572,6 +572,131 @@ def test_frame_datum_fails_when_a_stray_tag_survives_its_delete(monkeypatch) -> 
         _frame_datum(monkeypatch, _FrameGtol("DetailItem354"), attaches={}, deletes=False)
 
 
+class _DisplayData:
+    def __init__(self, texts: list[str]) -> None:
+        self.texts = texts
+
+    def GetTextCount(self) -> int:
+        return len(self.texts)
+
+    def GetTextAtIndex(self, index: int) -> str:
+        return self.texts[index]
+
+
+def _translated_frame(
+    monkeypatch: pytest.MonkeyPatch, prints: Any, *, accepts: Any = lambda _xml: True
+) -> tuple[Any, list[str]]:
+    """add_feature_control_frame on a fake seat for the slot frame C|B▷.
+
+    ``prints(xml)`` is the frame's printed text for its current XML;
+    ``accepts(xml)`` is SetSymbolXml's answer.  Returns the gtol and every
+    XML SOLIDWORKS was handed.
+    """
+    handed: list[str] = []
+
+    class _XmlFrame:
+        xml = ""
+
+        def SetSymbolXml(self, xml: str) -> bool:
+            handed.append(xml)
+            if accepts(xml):
+                self.xml = xml
+                return True
+            return False
+
+        def GetSymbolXml(self) -> str:
+            return self.xml
+
+    frame = _XmlFrame()
+
+    class _Annotation:
+        def GetAttachedEntityCount3(self) -> int:
+            return 1
+
+        def SetLeader3(self, *_args: Any) -> int:
+            return 0
+
+        def SetPosition2(self, *_args: Any) -> bool:
+            return True
+
+        def GetDisplayData(self) -> _DisplayData:
+            return _DisplayData(prints(frame.xml))
+
+    class _Gtol:
+        def GetFrameCount(self) -> int:
+            return 1
+
+        def GetFrame(self, _index: int) -> _XmlFrame:
+            return frame
+
+        def GetFormat(self) -> int:
+            return 2
+
+        def GetAnnotation(self) -> _Annotation:
+            return _Annotation()
+
+    gtol = _Gtol()
+
+    class _Draw:
+        def InsertGtol(self) -> _Gtol:
+            return gtol
+
+        def ClearSelection2(self, _all: bool) -> None:
+            pass
+
+    monkeypatch.setattr(
+        _drawing_common._sw_type_info, "early_bound_or_flag", lambda obj, *_: obj
+    )
+    monkeypatch.setattr(_drawing_common, "_select_annotation_entity", lambda *_, **__: "rim")
+    monkeypatch.setattr(_drawing_common, "rebuild_drawing", lambda *_, **__: None)
+    monkeypatch.setattr(_drawing_common, "_assert_attached_to", lambda *_, **__: None)
+    _drawing_common.add_feature_control_frame(
+        type("_Adapter", (), {"currentModel": _Draw()})(), None,
+        edge_xy=(0.1, 0.2), frame_xy=(0.078, 0.218), characteristic="position",
+        tolerance="0.05", datums=("C", "B"), translated=("B",),
+        label="knife-hanger rear dowel slot position",
+    )
+    return gtol, handed
+
+
+_VECTOR = ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>", "[0,0,0]"]
+_BARE = ["<GTOL-POSI>", "0.05", "C", "B", "<MOD-TRANS2>"]
+
+
+def test_translated_frame_keeps_the_first_form_that_prints_no_vector(monkeypatch) -> None:
+    # Farm run 20261009T174542021Z printed C|B▷[0,0,0]; the leaf moves on
+    # until the frame prints C|B▷ (here SOLIDWORKS refuses empty i, j, k and
+    # prints the vector for "false" ones).
+    gtol, handed = _translated_frame(
+        monkeypatch,
+        lambda xml: _BARE if "</DatumDetail><Translation>" in xml else _VECTOR,
+        accepts=lambda xml: "<TranslationValueI />" not in xml,
+    )
+    assert [_gtol_form(xml) for xml in handed] == [
+        "empty-vector", "vector-false", "after-letter"
+    ]
+    assert _gtol_form(gtol.GetFrame(1).GetSymbolXml()) == "after-letter"
+
+
+def test_translated_frame_fails_closed_when_every_form_prints_a_vector(monkeypatch) -> None:
+    with pytest.raises(
+        RuntimeError,
+        match=r"no translation-modifier form prints as ASME Y14.5 .*"
+        r"empty-vector: prints a translation vector .*after-letter: prints a translation vector",
+    ):
+        _translated_frame(monkeypatch, lambda _xml: _VECTOR)
+
+
+def _gtol_form(xml: str) -> str:
+    if "<TranslationValueI />" in xml:
+        return "empty-vector"
+    if "<TranslationValueI>false" in xml:
+        return "vector-false"
+    if "</DatumDetail><Translation>" in xml:
+        return "after-letter"
+    return "bare"
+
+
 def test_every_frame_datum_must_be_printed_on_the_sheet(monkeypatch) -> None:
     # Farm run 20261009T171439353Z: the knife mount printed the tap and bore
     # frames to A|B with no B on the sheet (only the frame's unprinted datum

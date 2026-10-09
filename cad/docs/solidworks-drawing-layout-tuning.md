@@ -400,6 +400,19 @@ leaf proves one, keep that one alone. Also end the sheet with
 `assert_frame_datums_defined`, which fails when any frame names a datum that
 no `IView::GetDatumTags` label prints.
 
+**m. A translation modifier proved by its XML alone.**
+Don't: take `<Translation>true</Translation>` read back from
+`IGtolFrame::GetSymbolXml` as proof that a frame prints "B▷". On the top
+frame's slot frames (farm run 20261009T174542021Z) that flag printed
+"B", "<MOD-TRANS2>", "[0,0,0]": SOLIDWORKS also prints the Datum dialog's
+translation vector (`<TranslationValueI/J/K>`) at its zero default, 13.6 mm
+of text that ASME Y14.5-2018 does not write.
+Do: read the frame's printed text items (`IAnnotation::GetDisplayData`) and
+reject any bracketed vector (`_gtol_spec.translation_print_problem`).
+`add_feature_control_frame` tries each of `TRANSLATION_FORMS` until one
+prints the bare modifier after its letter, logging `gtol.translation_form`.
+Once a leaf proves one, keep that one alone.
+
 ## The sheet-split rule
 
 When two views' callouts are squeezed together, the fix is a NEW SHEET, not a
