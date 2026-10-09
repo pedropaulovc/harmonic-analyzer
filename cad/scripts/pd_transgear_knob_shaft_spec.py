@@ -221,7 +221,15 @@ CORE_DIA_PLACES = 3
 CORE_FLAT_FROM_AXIS = 2.150
 CORE_FLAT_BAND = (0.0, -0.015)
 CORE_FLAT_PLACES = 3
-CORE_TOTAL_RUNOUT = shaft_turned_runout_mm()
+# The drawing's frames print these strings; the turned-shaft grade is the
+# shared shaft_turned_runout_mm() (asserted below).
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "core_total_runout": "0.050",
+    "front_neck_total_runout": "0.050",
+}
+CORE_TOTAL_RUNOUT = float(GEOMETRIC_TOLERANCES_MM["core_total_runout"])
+if CORE_TOTAL_RUNOUT != shaft_turned_runout_mm():
+    raise AssertionError("knob shaft core runout is not the turned-shaft grade")
 # Pattern runout is a toothspace inspection, not mounting plate position.
 TOOTH_SPACE_RUNOUT_TIR_MM = toothspace_runout_tir_mm()
 TOOTH_SPACE_GAUGE_PIN_DIA_MM = 1.000  # use the actual certified diameter
@@ -295,7 +303,7 @@ FRONT_CORNER_RADIUS_BAND = (
     FRONT_CORNER_RADIUS_MAX - FRONT_CORNER_RADIUS, -FRONT_CORNER_RADIUS
 )
 FRONT_CORNER_RADIUS_TOL_TYPE = 3  # native LIMIT0..0.100, actual nominal0.050
-FRONT_RELIEF_TOTAL_RUNOUT = CORE_TOTAL_RUNOUT
+FRONT_RELIEF_TOTAL_RUNOUT = float(GEOMETRIC_TOLERANCES_MM["front_neck_total_runout"])
 FRONT_RELIEF_DIA_MIN = FRONT_RELIEF_DIA - printed_band_mm(FRONT_RELIEF_DIA_PLACES)
 FRONT_RELIEF_DIA_MAX = FRONT_RELIEF_DIA + printed_band_mm(FRONT_RELIEF_DIA_PLACES)
 FRONT_RELIEF_WIDTH_MIN = FRONT_RELIEF_WIDTH - printed_band_mm(FRONT_RELIEF_WIDTH_PLACES)
@@ -750,11 +758,12 @@ PART_DATUMS = (
 )
 GEOMETRIC_CONTROLS = (
     GeometricControl(
-        "core_total_runout", "total_runout", f"{CORE_TOTAL_RUNOUT:.3f}",
+        "core_total_runout", "total_runout", GEOMETRIC_TOLERANCES_MM["core_total_runout"],
         CylinderFace(CORE_DIA, contains_z_mm=(CORE_FRONT_Z + CORE_REAR_Z) / 2.0), ("A",),
     ),
     GeometricControl(
-        "front_neck_total_runout", "total_runout", f"{FRONT_RELIEF_TOTAL_RUNOUT:.3f}",
+        "front_neck_total_runout", "total_runout",
+        GEOMETRIC_TOLERANCES_MM["front_neck_total_runout"],
         CylinderFace(FRONT_RELIEF_DIA, contains_z_mm=CORE_REAR_Z / 2.0), ("A",),
     ),
 )
