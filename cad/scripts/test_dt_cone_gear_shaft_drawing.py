@@ -1704,7 +1704,7 @@ def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
     assert "screw_sweep_bound_mm=NATIVE_SWEEP_BOUND_MM" in crank
 
 
-def test_the_64t_native_stock_sector_preserves_material_and_phase_gates(monkeypatch) -> None:
+def test_the_64t_native_stock_tooth_preserves_material_and_phase_gates(monkeypatch) -> None:
     """Record the released helper's real profile recipe, without native CAD."""
     import asyncio
     from types import SimpleNamespace
@@ -1718,16 +1718,16 @@ def test_the_64t_native_stock_sector_preserves_material_and_phase_gates(monkeypa
     assert profile.teeth == gear.TEETH
     assert profile.helix_angle_deg == cone_line.INCLINE_DEG
     assert profile.helix_angle_deg > 0.0
-    base_radius = profile.root_radius_min_mm - _gear._TOOTH_EMBED_MM
+    base_radius = profile.foot_radius_mm
     twist = face * math.tan(math.radians(profile.helix_angle_deg)) / profile.pitch_radius_mm
     material_calls = []
     emitted = []
     events = []
     volumes = {}
-    material_sector = type(profile).material_sector_segments
+    tooth_body = type(profile).tooth_body_segments
 
     def record_material_sector(self, **kwargs):
-        segments = material_sector(self, **kwargs)
+        segments = tooth_body(self, **kwargs)
         material_calls.append((kwargs, segments))
         return segments
 
@@ -1760,7 +1760,7 @@ def test_the_64t_native_stock_sector_preserves_material_and_phase_gates(monkeypa
         events.append("pattern")
         return SimpleNamespace(name="StockPattern")
 
-    monkeypatch.setattr(type(profile), "material_sector_segments", record_material_sector)
+    monkeypatch.setattr(type(profile), "tooth_body_segments", record_material_sector)
     monkeypatch.setattr(_gear, "check", lambda _label, value: value)
     for name in ("define_circle", "ensure_fully_defined"):
         monkeypatch.setattr(_gear, name, AsyncMock())
@@ -1783,7 +1783,7 @@ def test_the_64t_native_stock_sector_preserves_material_and_phase_gates(monkeypa
     assert not extrusion.reverse_direction
     assert material_calls[0][0] == {
         "unit_scale": 1.0 / _gear.IN,
-        "embed_radius_mm": base_radius,
+        "embed_radius_mm": base_radius - _gear._TOOTH_EMBED_MM,
         "rotate_rad": pytest.approx(-twist / 2.0),
     }
     assert len(material_calls) == 1

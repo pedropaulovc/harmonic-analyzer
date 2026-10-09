@@ -804,6 +804,39 @@ class StockFormProfile:
             self._segment("EmbedArc", "embed_arc", "circle", h, -h, scale=unit_scale, rotation=rotate_rad, radius=embed),
         ])
 
+    @property
+    def foot_radius_mm(self) -> float:
+        """Radius where the root arc meets each flank branch (the tooth feet)."""
+        return math.hypot(*self.root_point(self.root_half_angle_rad))
+
+    def tooth_body_segments(self, unit_scale: float, embed_radius_mm: float, rotate_rad: float = 0.0) -> tuple[NativeSegment, ...]:
+        """One tooth above its feet, closed by radial legs down to an embed arc.
+
+        Unlike the whole-pitch material sector, patterned copies never touch:
+        the gap floor between them is the caller's foot-radius cylinder, so
+        the caller must bound root_radius_max - root_radius_min. Datum is
+        tooth-centred, as for material_sector_segments.
+        """
+        _positive(embed_radius_mm, "embed radius")
+        if embed_radius_mm >= self.root_radius_min_mm - self.geometry_error_bound_mm:
+            raise ValueError("embed radius must lie below true root minimum")
+        if not math.isfinite(rotate_rad):
+            raise ValueError("tooth rotation must be finite")
+        h, alpha, tip = self.angular_pitch_rad / 2, self.root_half_angle_rad, self.tip_half_angle_rad
+        left_foot = _rotate(*self.root_point(alpha), -h)
+        right_foot = _rotate(*self.root_point(-alpha), h)
+        scale = embed_radius_mm / self.foot_radius_mm
+        left_embed = left_foot[0] * scale, left_foot[1] * scale
+        right_embed = right_foot[0] * scale, right_foot[1] * scale
+        return tuple([
+            self._segment("LeftFoot", "seam", "line", 0, 1, scale=unit_scale, rotation=rotate_rad, line=(*left_embed, *left_foot)),
+            *self._branch_segments(1, True, scale=unit_scale, rotation=rotate_rad-h),
+            self._segment("MaterialTipLand", "tip_arc", "circle", -h+tip, h-tip, scale=unit_scale, rotation=rotate_rad, radius=self.blank_radius_mm),
+            *self._branch_segments(-1, False, scale=unit_scale, rotation=rotate_rad+h),
+            self._segment("RightFoot", "seam", "line", 0, 1, scale=unit_scale, rotation=rotate_rad, line=(*right_foot, *right_embed)),
+            self._segment("EmbedArc", "embed_arc", "circle", math.atan2(right_foot[1], right_foot[0]), math.atan2(left_foot[1], left_foot[0]), scale=unit_scale, rotation=rotate_rad, radius=embed_radius_mm),
+        ])
+
     def external_boundary_segments(self, unit_scale: float = 1.0, rotate_rad: float = 0.0) -> tuple[NativeSegment, ...]:
         """One true MATERIAL tooth perimeter; no artificial embed sidewalls.
 

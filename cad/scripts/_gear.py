@@ -332,6 +332,12 @@ for _t, _dp in ((16, 24.74), (64, 24.74), (12, 12.7)):
 # a flipped sweep path fails LOUD (a disjoint tooth keeps its embedded
 # sliver: ~+0.1 mm^2 x face x teeth over the analytic expectation).
 _TOOTH_EMBED_MM = 0.3
+# The stock helical recipe floors each gap on the foot-radius cylinder, not
+# the translated root arc. 0.005 mm radial is 3 % of the 0.157/P = 0.166 mm
+# standard clearance of the coarsest stock helical cutter here (24 DP), so the
+# substitute floor cannot eat the mating tip's clearance (the 64T's arc and
+# cylinder differ by 0.0007 mm).
+_ROOT_CYLINDER_BOUND_MM = 0.005
 # Top-plane sketch -y maps to world +Z on this template (live-arbitrated:
 # the +y first try left the tooth disjoint below the disc -- the seeded-tooth
 # gate read exactly +1 embedded sliver), and a positive
@@ -716,20 +722,33 @@ async def _build_helical_stock_form_gear(
     rotate_rad: float | None,
     sweep_bound_mm: float,
 ) -> ToothedDisc:
-    """Sweep the core's complete physical-pitch material sector, never an ideal tooth."""
+    """Sweep one actual finite stock tooth onto a cylinder through its feet.
+
+    Farm run 20261009T214825987Z: the whole-pitch material sector made each
+    patterned copy share its twisted seam faces with both neighbours, and
+    the circular pattern failed. Main's helical recipe (``boss_tooth_swept``)
+    patterns a tooth that never touches its neighbours; this does the same
+    with the stock profile. The gap floor between teeth becomes the
+    foot-radius cylinder instead of the translated root arc, so refuse when
+    the two differ by more than ``_ROOT_CYLINDER_BOUND_MM``.
+    """
     from solidworks_mcp.adapters.base import ExtrusionParameters
 
     if not math.isfinite(face_width) or face_width <= 0.0:
         raise ValueError("stock-form gear face width must be positive and finite")
-    base_radius = profile.root_radius_min_mm - _TOOTH_EMBED_MM
-    if not math.isfinite(base_radius) or base_radius <= 0.0:
-        raise ValueError("stock-form embedded base radius must be positive and finite")
+    root_spread = profile.root_radius_max_mm - profile.root_radius_min_mm
+    if root_spread > _ROOT_CYLINDER_BOUND_MM:
+        raise ValueError(
+            f"stock root arc departs {root_spread:.4f} mm from a cylinder;"
+            f" the swept-tooth recipe allows {_ROOT_CYLINDER_BOUND_MM} mm"
+        )
+    base_radius = profile.foot_radius_mm
     gap_area = profile.gap_area_mm2
     blank_area = math.pi * profile.blank_radius_mm**2
     base_area = math.pi * base_radius**2
-    sector_area = (blank_area - base_area) / profile.teeth - gap_area
-    if not math.isfinite(sector_area) or sector_area <= 0.0:
-        raise ValueError("stock-form material sector must leave positive tooth material")
+    tooth_area = (blank_area - base_area) / profile.teeth - gap_area
+    if not math.isfinite(tooth_area) or tooth_area <= 0.0:
+        raise ValueError("stock-form tooth must leave positive material")
     twist_rad = (
         face_width * math.tan(math.radians(profile.helix_angle_deg))
         / profile.pitch_radius_mm
@@ -737,9 +756,9 @@ async def _build_helical_stock_form_gear(
     midface_phase = (
         0.0 if rotate_rad is None else rotate_rad - math.pi / profile.teeth
     )
-    segments = profile.material_sector_segments(
+    segments = profile.tooth_body_segments(
         unit_scale=1.0 / IN,
-        embed_radius_mm=base_radius,
+        embed_radius_mm=base_radius - _TOOTH_EMBED_MM,
         rotate_rad=midface_phase - twist_rad / 2.0,
     )
     check("create_sketch stock base", await adapter.create_sketch("Front"))
@@ -753,20 +772,24 @@ async def _build_helical_stock_form_gear(
     base_volume = base_area * face_width
     await volume_check(adapter, "blank", base_volume, 0.005 * base_volume)
 
-    check("create_sketch stock material sector", await adapter.create_sketch("Front"))
+    check("create_sketch stock tooth", await adapter.create_sketch("Front"))
     curves = [
         await equation_curve(adapter, segment.name, segment.x, segment.y)
         for segment in segments
     ]
+    # Native order ends RightFoot (radial) + EmbedArc (tangential): the
+    # well-conditioned closing pair (see stock_gap_fix_order).
     await ensure_fully_defined(
-        adapter, "stock material sector", fix_entities=curves, allow_fix_escalation=True
+        adapter, "stock tooth", fix_entities=curves, allow_fix_escalation=True
     )
-    check("exit_sketch stock material sector", await adapter.exit_sketch())
+    check("exit_sketch stock tooth", await adapter.exit_sketch())
     name_last_feature(adapter, "StockToothProfile")
     seed = await _sweep_tooth_sketch(
         adapter, face_width, twist_deg=math.degrees(twist_rad)
     )
-    seeded_volume = base_volume + sector_area * face_width
+    # gap_area below the foot circle (the root dip) is at most root_spread
+    # deep over one gap: < 0.005 mm * 2 mm * face, far inside the 1 mm^3 gate.
+    seeded_volume = base_volume + tooth_area * face_width
     await volume_check(adapter, "seeded tooth/gap", seeded_volume, 1.0)
     assert_stock_screw_sweep_phase(
         adapter, profile, face_width, midface_tooth_phase_rad=midface_phase,

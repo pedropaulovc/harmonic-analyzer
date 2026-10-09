@@ -351,6 +351,28 @@ def test_complete_material_sector_preserves_root_lobes(beta):
     p.require_tip_land(p.tip_land_mm - .001)
 
 
+def test_helical_tooth_body_is_closed_and_leaves_the_gap_open():
+    # The 64T recipe patterns this body; copies must not touch (farm run
+    # 20261009T214825987Z failed patterning whole-pitch sectors).
+    import dt_crank_drive_gear_spec as gear
+
+    p = gear.STOCK_PROFILE
+    embed = p.foot_radius_mm - .3
+    segments = p.tooth_body_segments(unit_scale=1, embed_radius_mm=embed, rotate_rad=.2)
+    for a, b in zip(segments, segments[1:] + segments[:1]):
+        assert a.end_mm == pytest.approx(b.start_mm, abs=1e-11)
+    polygon = [s.point(i/2000) for s in segments for i in range(2000)]
+    angles = [math.atan2(y, x) - .2 for x, y in polygon]
+    # Angular extent stays inside one pitch with the whole root arc between copies.
+    assert max(angles) - min(angles) < p.angular_pitch_rad - p.root_half_angle_rad
+    feet = math.atan2(*reversed(segments[0].end_mm)), math.atan2(*reversed(segments[-2].start_mm))
+    body = math.pi * (p.blank_radius_mm**2 - p.foot_radius_mm**2)/p.teeth - p.gap_area_mm2
+    legs = (p.foot_radius_mm**2 - embed**2) / 2 * (feet[1] - feet[0])
+    spread = p.root_radius_max_mm - p.root_radius_min_mm
+    assert abs(_shoelace(polygon) - body - legs) <= spread * p.angular_pitch_rad * p.foot_radius_mm
+
+
+
 def test_custom_six_is_named_finite_raised_root_not_stock():
     c = CustomSixCutter(48, 20, 1.173, 1.95, math.pi * (25.4/48)/2,
                         "DT6-FORM1", "Main-approved N6 PA20 derived finite ground form")
