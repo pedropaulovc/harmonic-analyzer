@@ -4,6 +4,12 @@ Client arrays are top-left row-major uint16; ready()['groupIds'] names the IDs.
 The wire format tags base64 IDs as uint8 or little-endian uint16.
 The browser receives CameraRecord principal points in the requested viewport's
 pixels. Callers scaling a source camera must scale its principal point too.
+The loaded page has Vite HMR disabled so code edits cannot interrupt a running fit.
+Full runs can use preview=True, preview_out_dir=<private snapshot directory>.
+The caller builds and records that snapshot; this client only serves it.
+Candidate search may reject only the two documented native magnifier RangeErrors;
+manual/final renders remain strict. last_candidate_failures holds per-call reason
+counts; candidate_failure_counts accumulates them across the client's lifetime.
 
 Run the private smoke/throughput check from the repository root:
     uv run --project web/sync python -m harmonic_sync.render_client --smoke
@@ -23,7 +29,7 @@ import socket
 import subprocess
 import sys
 import time
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -40,13 +46,20 @@ class RenderClient:
         *,
         web_root: Path | str | None = None,
         preview: bool = False,
+        preview_out_dir: Path | str | None = None,
         executable_path: str | None = None,
         chromium_args: Iterable[str] = (),
         gpu_backend: str = "auto",
         data_root: Path | str | None = None,
         timeout_seconds: float = 120,
+        quiet_batches: bool = False,  # Quiet batch stderr only; JSONL and other events are unchanged.
     ) -> None:
         self.web_root = Path(web_root) if web_root else Path(__file__).resolve().parents[2]
+        if preview_out_dir is not None and not preview:
+            raise ValueError("preview_out_dir requires preview=True")
+        self._preview_out_dir = Path(preview_out_dir).expanduser().resolve() if preview_out_dir is not None else None
+        if self._preview_out_dir is not None and self._preview_out_dir.is_relative_to(self.web_root.resolve().parent):
+            raise ValueError("preview_out_dir must be outside the repository")
         self.data_root = Path(data_root or os.environ.get("HARMONIC_SYNC_DATA", "~/data/harmonic-analyzer-sync")).expanduser()
         self.data_root.mkdir(parents=True, exist_ok=True)
         self._server: subprocess.Popen[bytes] | None = None
@@ -55,9 +68,12 @@ class RenderClient:
         self._browser: Browser | None = None
         self.page: Page | None = None
         self._log_path = self.data_root / "render.jsonl"
+        self._quiet_batches = quiet_batches
         self._ready: dict[str, Any] = {}
         self._browser_errors: list[str] = []
         self.last_batch_timing: dict[str, Any] = {}
+        self.last_candidate_failures: dict[str, int] = {}
+        self.candidate_failure_counts: dict[str, int] = {}
         started = time.perf_counter()
         try:
             self.url = url or self._start_vite(preview, timeout_seconds)
@@ -89,6 +105,11 @@ class RenderClient:
             self.page.set_default_timeout(timeout_seconds * 1000)
             self.page.on("pageerror", lambda error: self._browser_error(str(error)))
             self.page.on("console", lambda message: self._browser_error(message.text) if message.type == "error" else None)
+            # A long fit must retain its loaded module graph during shared edits.
+            # The HMR client is unnecessary for this on-demand, headless page.
+            self.page.route("**/@vite/client", lambda route: route.fulfill(
+                status=200, content_type="application/javascript", body="",
+            ))
             self.page.goto(self.url, wait_until="load", timeout=timeout_seconds * 1000)
             self.page.wait_for_function("window.harmonicFit !== undefined")
             self._ready = self.page.evaluate("() => window.harmonicFit.ready()")
@@ -105,6 +126,8 @@ class RenderClient:
         if not vite.is_file():
             raise FileNotFoundError(f"Vite missing at {vite}; run npm --prefix web ci")
         command = [str(vite), *(["preview"] if preview else []), "--host", "127.0.0.1", "--port", str(port), "--strictPort", "--base", "/"]
+        if self._preview_out_dir is not None:
+            command.extend(["--outDir", str(self._preview_out_dir)])
         self._server_log = (self.data_root / f"render-vite-{port}.log").open("wb")
         self._server = subprocess.Popen(
             command, cwd=self.web_root, env={**os.environ, "BROWSER": "none"},
@@ -128,7 +151,8 @@ class RenderClient:
         line = json.dumps(record, separators=(",", ":"))
         with self._log_path.open("a") as stream:
             stream.write(line + "\n")
-        print(f"[render] {line}", file=sys.stderr, flush=True)
+        if event != "batch" or not self._quiet_batches:
+            print(f"[render] {line}", file=sys.stderr, flush=True)
 
     def _browser_error(self, message: str) -> None:
         self._browser_errors.append(message)
@@ -152,6 +176,18 @@ class RenderClient:
     def render_batch(
         self, requests: Iterable[dict[str, Any]], *, shot_id: str | None = None, view_id: str | None = None,
     ) -> list[np.ndarray]:
+        return cast(list[np.ndarray], self._render_batch(requests, shot_id, view_id, candidates=False))
+
+    def render_candidate_batch(
+        self, requests: Iterable[dict[str, Any]], *, shot_id: str | None = None, view_id: str | None = None,
+    ) -> list[np.ndarray | None]:
+        """Return None only for documented physical infeasibility during search."""
+        self.last_candidate_failures = {}
+        return self._render_batch(requests, shot_id, view_id, candidates=True)
+
+    def _render_batch(
+        self, requests: Iterable[dict[str, Any]], shot_id: str | None, view_id: str | None, *, candidates: bool,
+    ) -> list[np.ndarray | None]:
         if self.page is None:
             raise RuntimeError("RenderClient is closed")
         batch = list(requests)
@@ -162,27 +198,59 @@ class RenderClient:
         try:
             # Compress only the CDP envelope, not the harmonicFit API. Flat ID
             # images otherwise spend more time in JSON transport than rendering.
-            envelope = self.page.evaluate("""async requests => {
-                const results = await window.harmonicFit.renderBatch(requests);
+            envelope = self.page.evaluate("""async ({requests, candidates}) => {
+                const failures = {};
+                let results;
+                const renderStarted = performance.now();
+                if (candidates) {
+                    const allowed = [
+                        'Magnifier hook has left the installed upper hub-tangent branch',
+                        'Pen wire has exhausted its hanging run; reset the physical output fixture before using this clamp setting',
+                    ];
+                    results = [];
+                    for (const request of requests) {
+                        try {
+                            results.push(await window.harmonicFit.render(request));
+                        } catch (error) {
+                            if (!(error instanceof RangeError) || !allowed.includes(error.message)) throw error;
+                            failures[error.message] = (failures[error.message] ?? 0) + 1;
+                            results.push(null);
+                        }
+                    }
+                } else {
+                    results = await window.harmonicFit.renderBatch(requests);
+                }
+                const renderMs = performance.now() - renderStarted;
                 const started = performance.now();
-                const stream = new Blob([JSON.stringify(results)]).stream()
+                const stream = new Blob([JSON.stringify({results, failures})]).stream()
                     .pipeThrough(new CompressionStream('gzip'));
                 const compressed = new Uint8Array(await new Response(stream).arrayBuffer());
-                return {gzip: compressed.toBase64(), transportMs: performance.now() - started};
-            }""", batch)
+                return {gzip: compressed.toBase64(), renderMs, transportMs: performance.now() - started};
+            }""", {"requests": batch, "candidates": candidates})
             evaluated = time.perf_counter()
             if self._browser_errors:
                 raise RuntimeError("Browser render error: " + "\n".join(self._browser_errors))
-            results = json.loads(gzip.decompress(base64.b64decode(envelope["gzip"], validate=True)))
+            payload = json.loads(gzip.decompress(base64.b64decode(envelope["gzip"], validate=True)))
             unpacked = time.perf_counter()
-            arrays = [self._decode(result) for result in results]
+            if candidates:
+                self.last_candidate_failures = payload["failures"]
+                for reason, count in self.last_candidate_failures.items():
+                    self.candidate_failure_counts[reason] = self.candidate_failure_counts.get(reason, 0) + count
+                if self.last_candidate_failures:
+                    self._log("candidate-infeasible", shotId=shot_id, viewId=view_id,
+                              count=sum(self.last_candidate_failures.values()), reasons=self.last_candidate_failures)
+            arrays = [None if candidates and result is None else self._decode(result) for result in payload["results"]]
             decoded = time.perf_counter()
         except Exception as error:
-            self._log("batch-error", shotId=shot_id, viewId=view_id, count=len(batch), seconds=time.perf_counter() - started, error=str(error))
+            self._log("batch-error", shotId=shot_id, viewId=view_id, count=len(batch), candidates=candidates,
+                      seconds=time.perf_counter() - started, error=str(error))
             raise
         seconds = decoded - started
         after = self.timing_snapshot()
         browser = {key: after[key] - value for key, value in before.items()}
+        # Candidate calls use strict render(), not renderBatch(), so measure
+        # their full search duration here, including rejected physical solves.
+        browser["batchMs"] = envelope["renderMs"]
         self.last_batch_timing = {
             "browser": browser, "evaluateMs": (evaluated - started) * 1000,
             "browserTransportMs": envelope["transportMs"],
@@ -190,7 +258,8 @@ class RenderClient:
             "decodeMs": (decoded - unpacked) * 1000,
             "cdpAndSerializationMs": (evaluated - started) * 1000 - browser["batchMs"] - envelope["transportMs"],
         }
-        self._log("batch", shotId=shot_id, viewId=view_id, count=len(batch), seconds=seconds, rendersPerSecond=len(batch) / seconds, timing=self.last_batch_timing)
+        self._log("batch", shotId=shot_id, viewId=view_id, count=len(batch), candidates=candidates,
+                  seconds=seconds, rendersPerSecond=len(batch) / seconds, timing=self.last_batch_timing)
         return arrays
 
     def timing_snapshot(self) -> dict[str, float]:

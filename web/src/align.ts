@@ -3,12 +3,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { loadMachine, type CameraRecord, type Machine, type Presentation } from './scene'
-import { applySegmentInput, intervalAt, loadSyncTrack, serializeSyncInput, type SegmentInit, type SyncCameraKey, type SyncTrack } from './sync-track'
+import { applySegmentInput, frameIntervalAt, loadSyncTrack, serializeSyncInput, type SegmentInit, type SyncCameraKey, type SyncTrack } from './sync-track'
 import './style.css'
 import './align.css'
 
 interface CensusView { viewId: string; rectSourcePixels: [number, number, number, number]; presentation: Presentation }
-interface CensusShot { id: string; start: number; end: number; classification: string; views: CensusView[] }
+interface CensusShot { id: string; start: number; end: number; startFrame: number; endFrame: number; classification: string; views: CensusView[] }
 interface Census { videoId: string; fps: [number, number]; shots: CensusShot[] }
 interface SetupSegment { id: string; start: number; end: number; init: SegmentInit }
 interface ManualData {
@@ -206,16 +206,18 @@ function selectSegment(segment: SetupSegment | undefined): void {
 function updateTime(): void {
   if (!loaded || !census) return
   const t = original.currentTime
+  const fps = census.fps[0] / census.fps[1]
+  const frame = Math.round(t * fps)
   timeControl.value = t.toFixed(6)
   scrub.value = String(t)
-  const shot = intervalAt(census.shots, t)
+  const shot = frameIntervalAt(census.shots, frame)
   if (shot !== currentShot) {
     currentShot = shot
     shotSelect.value = shot?.id ?? ''
     viewSelect.replaceChildren(...(shot?.views ?? []).map(view => new Option(view.viewId, view.viewId)))
     selectView()
   }
-  const segment = intervalAt(segments, t)
+  const segment = segments.find(item => frame >= Math.round(item.start * fps) && frame < Math.round(item.end * fps))
   if (segment !== currentSegment) selectSegment(segment)
   const keys = [...(track?.data.crank ?? [])].map(key => ({ t: key.t, turns: key.turns }))
   for (const key of manual.crank) {
@@ -232,7 +234,7 @@ function updateTime(): void {
     input.crankTurns = b ? a.turns + (b.turns - a.turns) * f : a.turns
   }
   crankControl.value = String(input.crankTurns)
-  status.textContent = `${shot?.id ?? 'No shot'} · ${t.toFixed(3)} s · frame ${Math.round(t * census.fps[0] / census.fps[1])}`
+  status.textContent = `${shot?.id ?? 'No shot'} · ${t.toFixed(3)} s · frame ${frame}`
   status.dataset.state = 'ready'
   render()
 }
@@ -241,7 +243,7 @@ async function seek(t: number): Promise<void> {
   if (!Number.isFinite(t)) throw new Error('Seek time must be finite')
   original.pause()
   t = Math.max(0, Math.min(original.duration || 0, t))
-  if (Math.abs(original.currentTime - t) > 0.000001) {
+  if (original.currentTime !== t) {
     await new Promise<void>((resolve, reject) => {
       const timer = window.setTimeout(() => { cleanup(); reject(new Error('Video seek timed out')) }, 15000)
       const done = () => { cleanup(); resolve() }
@@ -330,7 +332,8 @@ async function loadVideo(): Promise<void> {
   timeControl.max = String(original.duration)
   element<HTMLAnchorElement>('companion-link').href = `./?video=${id}`
   loaded = true
-  await seek(census.shots.find(shot => shot.classification === 'machine' && shot.views.length)?.start ?? 0)
+  const firstMachine = census.shots.find(shot => shot.classification === 'machine' && shot.views.length)
+  await seek((firstMachine?.startFrame ?? 0) * census.fps[1] / census.fps[0])
 }
 
 // Physical setup coordinates remain in SI units; phase controls are radians.
@@ -384,9 +387,9 @@ crankControl.addEventListener('input', () => { input.crankTurns = Number(crankCo
 for (const [id, control, delta] of [['pp-left', ppX, -1], ['pp-right', ppX, 1], ['pp-up', ppY, -1], ['pp-down', ppY, 1]] as const) {
   element(id).addEventListener('click', () => { control.value = String(Number(control.value) + delta); render() })
 }
-shotSelect.addEventListener('change', () => { const shot = census?.shots.find(item => item.id === shotSelect.value); if (shot) void seek(shot.start).catch(handleError) })
+shotSelect.addEventListener('change', () => { const shot = census?.shots.find(item => item.id === shotSelect.value); if (shot && census) void seek(shot.startFrame * census.fps[1] / census.fps[0]).catch(handleError) })
 viewSelect.addEventListener('change', selectView)
-segmentSelect.addEventListener('change', () => { const segment = segments.find(item => item.id === segmentSelect.value); if (segment) void seek(segment.start).catch(handleError) })
+segmentSelect.addEventListener('change', () => { const segment = segments.find(item => item.id === segmentSelect.value); if (segment && census) void seek(Math.round(segment.start * census.fps[0] / census.fps[1]) * census.fps[1] / census.fps[0]).catch(handleError) })
 videoSelect.addEventListener('change', () => { void loadVideo().catch(handleError) })
 element('reset-camera').addEventListener('click', reloadCamera)
 element('seek').addEventListener('click', () => { void seek(Number(timeControl.value)).catch(handleError) })

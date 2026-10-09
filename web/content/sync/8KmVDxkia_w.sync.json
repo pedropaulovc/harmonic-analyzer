@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "videoId": "8KmVDxkia_w",
+  "fps": [24000, 1001],
   "sourceSha256": "da74c5c395c6a797a2a8cb445bc7b58f2b4c2a4a5c91e8568cdb0fc176743cdf",
   "modelSha256": "941b6193698091781f133642bdc2a7411a18c2cfcb5252646a79b9bd57c6a805",
   "shots": [
@@ -8,6 +9,8 @@
       "id": "fixture-wide",
       "start": 0,
       "end": 10,
+      "startFrame": 0,
+      "endFrame": 240,
       "classification": "machine",
       "views": [
         {
@@ -76,6 +79,8 @@
       "id": "fixture-cut",
       "start": 10,
       "end": 20,
+      "startFrame": 240,
+      "endFrame": 480,
       "classification": "machine",
       "views": [
         {
@@ -123,6 +128,8 @@
       "id": "fixture-hold",
       "start": 20,
       "end": 1000,
+      "startFrame": 480,
+      "endFrame": 23976,
       "classification": "non-machine",
       "views": []
     }

@@ -12,7 +12,9 @@
       "end": 1.8018,
       "classification": "non-machine",
       "reason": "Black/title card only; no corresponding physical machine.",
-      "views": []
+      "views": [],
+      "startFrame": 0,
+      "endFrame": 54
     },
     {
       "id": "machine-title-fade",
@@ -31,7 +33,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 54,
+      "endFrame": 69
     },
     {
       "id": "presenter-first",
@@ -100,7 +104,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 69,
+      "endFrame": 1618
     },
     {
       "id": "synthesis-entry-crossfade",
@@ -179,7 +185,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1618,
+      "endFrame": 1638
     },
     {
       "id": "synthesis-cams",
@@ -258,7 +266,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1638,
+      "endFrame": 1654
     },
     {
       "id": "synthesis-cone-gears",
@@ -327,7 +337,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1654,
+      "endFrame": 1692
     },
     {
       "id": "synthesis-gears-bars-crossfade",
@@ -406,7 +418,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1692,
+      "endFrame": 1699
     },
     {
       "id": "synthesis-moving-bars",
@@ -475,7 +489,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1699,
+      "endFrame": 1795
     },
     {
       "id": "synthesis-bars-summing-crossfade",
@@ -554,7 +570,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1795,
+      "endFrame": 1806
     },
     {
       "id": "synthesis-summing",
@@ -623,7 +641,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1806,
+      "endFrame": 1872
     },
     {
       "id": "synthesis-summing-crank-crossfade",
@@ -702,7 +722,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1872,
+      "endFrame": 1881
     },
     {
       "id": "synthesis-cranking",
@@ -771,7 +793,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1881,
+      "endFrame": 1902
     },
     {
       "id": "synthesis-exit-fade",
@@ -840,7 +864,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1902,
+      "endFrame": 1915
     },
     {
       "id": "navigation-gap-one",
@@ -899,7 +925,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1915,
+      "endFrame": 1927
     },
     {
       "id": "analysis-hand-bars",
@@ -968,7 +996,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1927,
+      "endFrame": 1951
     },
     {
       "id": "analysis-bars-pen-crossfade",
@@ -1047,7 +1077,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1951,
+      "endFrame": 1960
     },
     {
       "id": "analysis-pen-wide",
@@ -1116,7 +1148,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1960,
+      "endFrame": 1981
     },
     {
       "id": "analysis-pen-bars-crossfade",
@@ -1195,7 +1229,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1981,
+      "endFrame": 1990
     },
     {
       "id": "analysis-coefficient-bank",
@@ -1264,7 +1300,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1990,
+      "endFrame": 2018
     },
     {
       "id": "analysis-bank-composite-crossfade",
@@ -1353,7 +1391,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2018,
+      "endFrame": 2027
     },
     {
       "id": "analysis-two-view-composite",
@@ -1432,7 +1472,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2027,
+      "endFrame": 2075
     },
     {
       "id": "analysis-composite-pen-crossfade",
@@ -1521,7 +1563,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2075,
+      "endFrame": 2084
     },
     {
       "id": "analysis-pen-macro",
@@ -1590,7 +1634,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2084,
+      "endFrame": 2176
     },
     {
       "id": "analysis-exit-fade",
@@ -1659,7 +1705,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2176,
+      "endFrame": 2189
     },
     {
       "id": "navigation-gap-two",
@@ -1718,7 +1766,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2189,
+      "endFrame": 2200
     },
     {
       "id": "operation-entry-fade",
@@ -1787,7 +1837,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2200,
+      "endFrame": 2210
     },
     {
       "id": "operation-output-fixture",
@@ -1856,7 +1908,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2210,
+      "endFrame": 2260
     },
     {
       "id": "operation-fixture-three-view-crossfade",
@@ -1955,7 +2009,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2260,
+      "endFrame": 2270
     },
     {
       "id": "operation-three-view-gearing",
@@ -2044,7 +2100,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2270,
+      "endFrame": 2320
     },
     {
       "id": "operation-gearing-counter-crossfade",
@@ -2143,7 +2201,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2320,
+      "endFrame": 2330
     },
     {
       "id": "operation-counter-setting",
@@ -2212,7 +2272,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2330,
+      "endFrame": 2380
     },
     {
       "id": "operation-counter-phase-crossfade",
@@ -2301,7 +2363,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2380,
+      "endFrame": 2390
     },
     {
       "id": "operation-phase-knob",
@@ -2380,7 +2444,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2390,
+      "endFrame": 2410
     },
     {
       "id": "operation-exit-fade",
@@ -2459,7 +2525,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2410,
+      "endFrame": 2425
     },
     {
       "id": "history-entry-fade",
@@ -2478,7 +2546,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2425,
+      "endFrame": 2443
     },
     {
       "id": "presenter-history-first",
@@ -2497,7 +2567,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2443,
+      "endFrame": 3554
     },
     {
       "id": "plaque-entry-crossfade",
@@ -2526,7 +2598,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3554,
+      "endFrame": 3575
     },
     {
       "id": "base-maker-plaque",
@@ -2545,7 +2619,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3575,
+      "endFrame": 3646
     },
     {
       "id": "plaque-exit-crossfade",
@@ -2574,7 +2650,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3646,
+      "endFrame": 3665
     },
     {
       "id": "presenter-history-second",
@@ -2593,7 +2671,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3665,
+      "endFrame": 5521
     },
     {
       "id": "endcard-entry-crossfade",
@@ -2692,7 +2772,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5521,
+      "endFrame": 5550
     },
     {
       "id": "navigation-endcards",
@@ -2781,7 +2863,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5550,
+      "endFrame": 6403
     },
     {
       "id": "credits-crossfade",
@@ -2870,7 +2954,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6403,
+      "endFrame": 6424
     },
     {
       "id": "credits-crossfade-no-machine",
@@ -2889,7 +2975,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6424,
+      "endFrame": 6435
     },
     {
       "id": "credits",
@@ -2897,7 +2985,9 @@
       "end": 218.381,
       "classification": "non-machine",
       "reason": "Credits and final fade to black; no corresponding physical machine.",
-      "views": []
+      "views": [],
+      "startFrame": 6435,
+      "endFrame": 6545
     }
   ]
 }

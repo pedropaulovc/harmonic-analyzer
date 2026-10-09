@@ -12,7 +12,9 @@
       "end": 1.8351666666666666,
       "classification": "non-machine",
       "reason": "Opening title on black; no corresponding physical mechanism.",
-      "views": []
+      "views": [],
+      "startFrame": 0,
+      "endFrame": 55
     },
     {
       "id": "analysis-01",
@@ -31,7 +33,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 55,
+      "endFrame": 69
     },
     {
       "id": "analysis-02",
@@ -50,7 +54,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 69,
+      "endFrame": 132
     },
     {
       "id": "analysis-03",
@@ -69,7 +75,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 132,
+      "endFrame": 219
     },
     {
       "id": "analysis-04",
@@ -88,7 +96,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 219,
+      "endFrame": 386
     },
     {
       "id": "analysis-05",
@@ -107,7 +117,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 386,
+      "endFrame": 426
     },
     {
       "id": "analysis-06",
@@ -126,7 +138,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 426,
+      "endFrame": 997
     },
     {
       "id": "analysis-07",
@@ -145,7 +159,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 997,
+      "endFrame": 1037
     },
     {
       "id": "analysis-08",
@@ -164,7 +180,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1037,
+      "endFrame": 1177
     },
     {
       "id": "analysis-09",
@@ -183,7 +201,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1177,
+      "endFrame": 1190
     },
     {
       "id": "analysis-10",
@@ -191,7 +211,9 @@
       "end": 64.99826666666667,
       "classification": "non-machine",
       "reason": "Square-wave graphics only: changing period, even symmetry, half period and discrete 20-point rocker-bar values; approved hold.",
-      "views": []
+      "views": [],
+      "startFrame": 1190,
+      "endFrame": 1948
     },
     {
       "id": "analysis-11",
@@ -210,7 +232,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1948,
+      "endFrame": 1962
     },
     {
       "id": "analysis-12",
@@ -229,7 +253,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1962,
+      "endFrame": 2140
     },
     {
       "id": "analysis-13",
@@ -248,7 +274,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2140,
+      "endFrame": 2149
     },
     {
       "id": "analysis-14",
@@ -267,7 +295,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2149,
+      "endFrame": 2372
     },
     {
       "id": "analysis-15",
@@ -286,7 +316,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2372,
+      "endFrame": 2381
     },
     {
       "id": "analysis-16",
@@ -305,7 +337,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2381,
+      "endFrame": 2608
     },
     {
       "id": "analysis-17",
@@ -324,7 +358,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2608,
+      "endFrame": 2624
     },
     {
       "id": "analysis-18",
@@ -343,7 +379,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2624,
+      "endFrame": 2770
     },
     {
       "id": "analysis-19",
@@ -362,7 +400,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2770,
+      "endFrame": 2787
     },
     {
       "id": "analysis-20",
@@ -381,7 +421,9 @@
           ],
           "presentation": "horizontal-mirror"
         }
-      ]
+      ],
+      "startFrame": 2787,
+      "endFrame": 2873
     },
     {
       "id": "analysis-21",
@@ -400,7 +442,9 @@
           ],
           "presentation": "horizontal-mirror"
         }
-      ]
+      ],
+      "startFrame": 2873,
+      "endFrame": 3366
     },
     {
       "id": "analysis-22",
@@ -419,7 +463,9 @@
           ],
           "presentation": "horizontal-mirror"
         }
-      ]
+      ],
+      "startFrame": 3366,
+      "endFrame": 3731
     },
     {
       "id": "analysis-23",
@@ -448,7 +494,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3731,
+      "endFrame": 4190
     },
     {
       "id": "analysis-24",
@@ -477,7 +525,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4190,
+      "endFrame": 4197
     },
     {
       "id": "analysis-25",
@@ -485,7 +535,9 @@
       "end": 152.2521,
       "classification": "non-machine",
       "reason": "Sinc machine drawing/computer comparison and 20 sample graphics only; approved hold.",
-      "views": []
+      "views": [],
+      "startFrame": 4197,
+      "endFrame": 4563
     },
     {
       "id": "analysis-26",
@@ -504,7 +556,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4563,
+      "endFrame": 4574
     },
     {
       "id": "analysis-27",
@@ -523,7 +577,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4574,
+      "endFrame": 4981
     },
     {
       "id": "analysis-28",
@@ -542,7 +598,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4981,
+      "endFrame": 4990
     },
     {
       "id": "analysis-29",
@@ -561,7 +619,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4990,
+      "endFrame": 5440
     },
     {
       "id": "analysis-30",
@@ -580,7 +640,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5440,
+      "endFrame": 5449
     },
     {
       "id": "analysis-31",
@@ -588,7 +650,9 @@
       "end": 183.75023333333334,
       "classification": "non-machine",
       "reason": "Square-wave output drawing only, no physical machine; approved hold.",
-      "views": []
+      "views": [],
+      "startFrame": 5449,
+      "endFrame": 5507
     },
     {
       "id": "analysis-32",
@@ -607,7 +671,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5507,
+      "endFrame": 5527
     },
     {
       "id": "analysis-33",
@@ -626,7 +692,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5527,
+      "endFrame": 5630
     },
     {
       "id": "analysis-34",
@@ -645,7 +713,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5630,
+      "endFrame": 5644
     },
     {
       "id": "analysis-35",
@@ -653,7 +723,9 @@
       "end": 198.0979,
       "classification": "non-machine",
       "reason": "Analysis/synthesis diagram animation on white only; approved hold.",
-      "views": []
+      "views": [],
+      "startFrame": 5644,
+      "endFrame": 5937
     },
     {
       "id": "analysis-36",
@@ -672,7 +744,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5937,
+      "endFrame": 5952
     },
     {
       "id": "analysis-37",
@@ -691,7 +765,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5952,
+      "endFrame": 6328
     },
     {
       "id": "analysis-38",
@@ -710,7 +786,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6328,
+      "endFrame": 6347
     },
     {
       "id": "analysis-39",
@@ -718,7 +796,9 @@
       "end": 239.5393,
       "classification": "non-machine",
       "reason": "Navigation endcard and moving deliberately blurred thumbnails; no corresponding identifiable physical pose, approved hold.",
-      "views": []
+      "views": [],
+      "startFrame": 6347,
+      "endFrame": 7179
     },
     {
       "id": "analysis-40",
@@ -726,7 +806,9 @@
       "end": 240.0398,
       "classification": "non-machine",
       "reason": "Navigation endcard dissolves to credits; approved hold.",
-      "views": []
+      "views": [],
+      "startFrame": 7179,
+      "endFrame": 7194
     },
     {
       "id": "analysis-41",
@@ -734,7 +816,9 @@
       "end": 244.541,
       "classification": "non-machine",
       "reason": "Credits through video/audio end; approved hold.",
-      "views": []
+      "views": [],
+      "startFrame": 7194,
+      "endFrame": 7329
     }
   ]
 }

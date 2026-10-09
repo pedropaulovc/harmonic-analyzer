@@ -1,8 +1,8 @@
 """Preserve the human shot census and representative source view layouts.
 
-Existing committed censuses are authoritative: refresh only source metadata and
-preserve hand-edited shots, layouts, and reclassification annotations. On first
-extraction, each view uses its most frequent observed rectangle/presentation pair;
+Existing committed censuses are authoritative: refresh source metadata, bootstrap
+missing frame bounds, and preserve hand-edited shots, layouts, and annotations.
+On first extraction, each view uses its most frequent observed rectangle/presentation pair;
 ties prefer the shot midpoint, then the earliest observation. Every view identity
 is retained, including transition-only views. Static layouts are starting points,
 not a reconstruction of animated crops.
@@ -88,13 +88,15 @@ def _view_layout(
 
 
 def _validate_census(census: dict, video_id: str, width: int, height: int) -> None:
-    """Validate hand edits without normalizing or discarding their fields."""
+    """Bootstrap missing frame bounds and validate hand edits without normalizing them."""
     if not isinstance(census, dict) or census.get("videoId") != video_id:
         raise ValueError(f"{video_id}: census videoId must match the requested video")
     shots = census.get("shots")
     if not isinstance(shots, list):
         raise ValueError(f"{video_id}: census shots must be an array")
     shot_ids = set()
+    fps_num, fps_den = census["fps"]
+    previous_end_frame = 0
     for shot in shots:
         if not isinstance(shot, dict):
             raise ValueError(f"{video_id}: each census shot must be an object")
@@ -111,6 +113,18 @@ def _validate_census(census: dict, video_id: str, width: int, height: int) -> No
         end = _number(shot.get("end"), f"{context} end")
         if start < 0 or end <= start:
             raise ValueError(f"{context}: invalid shot interval [{start}, {end}]")
+        for key, seconds in (("startFrame", start), ("endFrame", end)):
+            if key not in shot:
+                shot[key] = round(seconds * fps_num / fps_den)
+            value = shot[key]
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise ValueError(f"{context} {key}: expected a nonnegative integer, got {value!r}")
+        start_frame, end_frame = shot["startFrame"], shot["endFrame"]
+        if start_frame >= end_frame:
+            raise ValueError(f"{context}: invalid frame interval [{start_frame}, {end_frame})")
+        if start_frame < previous_end_frame:
+            raise ValueError(f"{context}: frame interval overlaps the preceding shot")
+        previous_end_frame = end_frame
         if not isinstance(shot.get("reason"), str):
             raise ValueError(f"{context}: reason must be a string")
         views = shot.get("views")
@@ -128,7 +142,8 @@ def extract_shots(video_id: str) -> dict:
     """Refresh an authoritative census, or bootstrap one from observations.
 
     Existing ``videos/<video_id>/shots.json`` needs no observation file and keeps
-    all hand-edited shot fields and layouts. Only sourceSha256 and fps change.
+    all hand-edited shot fields and layouts. Source metadata refreshes, and missing
+    startFrame/endFrame bounds are bootstrapped from descriptive seconds and fps.
     Source MP4s live under ``HARMONIC_SYNC_VIDEOS`` or, by default,
     ``~/data/harmonic-analyzer-videos``. Missing or malformed input fails before
     writing the census; no source frames or videos are copied into the project.
@@ -141,9 +156,9 @@ def extract_shots(video_id: str) -> dict:
     if destination.exists():
         with destination.open(encoding="utf-8") as source:
             census = json.load(source)
-        _validate_census(census, video_id, width, height)
         census["sourceSha256"] = sha256
         census["fps"] = fps
+        _validate_census(census, video_id, width, height)
         destination.write_text(
             json.dumps(census, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
             encoding="utf-8",

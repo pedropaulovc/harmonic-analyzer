@@ -28,14 +28,14 @@ try {
     const segmentInput = { amplitudes: Array(20).fill(0), phases: Array(20).fill(0), gearing: 'small-large', magnification: 4, setup }
     const quality = { medianPx: 0, p90Px: 0, maxPx: 0, status: 'unfitted' }
     const track = createSyncTrack({
-      schemaVersion: 1, videoId: 'test', sourceSha256: '', modelSha256: '',
+      schemaVersion: 1, videoId: 'test', fps: [24, 1], sourceSha256: '', modelSha256: '',
       shots: [
-        { id: 'a', start: 0, end: 1, classification: 'machine', views: [{ viewId: 'crop', rectSourcePixels: [100, 50, 800, 600], presentation: 'horizontal-mirror', quality, cameraKeys: [
+        { id: 'a', start: 0, end: 1, startFrame: 0, endFrame: 24, classification: 'machine', views: [{ viewId: 'crop', rectSourcePixels: [100, 50, 800, 600], presentation: 'horizontal-mirror', quality, cameraKeys: [
           { t: 0, camera: { positionMetres: [0, 0, 0], quaternion: [0, 0, 0, 1], verticalFovDegrees: 35 } },
           { t: 1, camera: { positionMetres: [2, 0, 0], quaternion: [0, 0, Math.SQRT1_2, Math.SQRT1_2], verticalFovDegrees: 45, principalPointViewportPixels: [420, 310] } },
         ] }] },
-        { id: 'b', start: 1, end: 2, classification: 'machine', views: [{ viewId: 'main', rectSourcePixels: [0, 0, 1920, 1080], presentation: 'native', quality, cameraKeys: [{ t: 1, camera: { positionMetres: [10, 0, 0], quaternion: [0, 0, 0, 1], verticalFovDegrees: 30 } }] }] },
-        { id: 'hold', start: 2, end: 5, classification: 'non-machine', views: [] },
+        { id: 'b', start: 1, end: 2, startFrame: 24, endFrame: 48, classification: 'machine', views: [{ viewId: 'main', rectSourcePixels: [0, 0, 1920, 1080], presentation: 'native', quality, cameraKeys: [{ t: 1, camera: { positionMetres: [10, 0, 0], quaternion: [0, 0, 0, 1], verticalFovDegrees: 30 } }] }] },
+        { id: 'hold', start: 2, end: 5, startFrame: 48, endFrame: 120, classification: 'non-machine', views: [] },
       ],
       segments: [
         { id: 'first', start: 0, end: 1, input: segmentInput, provenance: {} },
@@ -44,7 +44,7 @@ try {
       ],
       crank: [0, 1, 2, 5].map(t => ({ t, turns: t, source: 'tracked' })),
     })
-    return [-1, 0.5, 1, 2, 4].map(t => {
+    return [-1, 0.5, 1, 2, 4, 0.99, 1.99].map(t => {
       const frame = track.evaluate(t)
       return { t, views: structuredClone(frame.views), input: serializeSyncInput(frame.input) }
     })
@@ -60,8 +60,12 @@ try {
   assert.deepEqual(oracle[2].views[0].camera.positionMetres, [10, 0, 0])
   assert.equal(oracle[2].input.amplitudes[0], 0.5)
   assert.deepEqual(oracle[3], { ...oracle[4], t: 2 })
-  assert.equal(oracle[4].input.crankTurns, 2)
+  assert.equal(oracle[4].input.crankTurns, 47 / 24)
   assert.equal(oracle[4].input.amplitudes[0], 0.5)
+  // Nearest-frame selection crosses these cuts before the descriptive second.
+  assert.deepEqual(oracle[5].views[0].camera.positionMetres, [10, 0, 0])
+  assert.equal(oracle[5].input.amplitudes[0], 0.5)
+  assert.deepEqual(oracle[3], { ...oracle[6], t: 2 })
   for (const t of [5, 12, 25]) {
     const sample = await page.evaluate(t => {
       const evaluated = window.harmonicSync.evaluate(t)

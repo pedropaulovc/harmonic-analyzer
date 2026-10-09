@@ -12,7 +12,9 @@
       "end": 1.793458333,
       "classification": "non-machine",
       "reason": "Opening title only; no corresponding machine.",
-      "views": []
+      "views": [],
+      "startFrame": 0,
+      "endFrame": 43
     },
     {
       "id": "intro-fade-title-only",
@@ -20,7 +22,9 @@
       "end": 1.918583333,
       "classification": "non-machine",
       "reason": "Actual decoded source contains no physical-machine photograph at this exposure; no corresponding machine view is required.",
-      "views": []
+      "views": [],
+      "startFrame": 43,
+      "endFrame": 46
     },
     {
       "id": "intro-fade",
@@ -39,7 +43,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 46,
+      "endFrame": 67
     },
     {
       "id": "intro-machine",
@@ -58,7 +64,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 67,
+      "endFrame": 623
     },
     {
       "id": "presenter-to-spin",
@@ -77,7 +85,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 623,
+      "endFrame": 638
     },
     {
       "id": "whole-spin-a",
@@ -96,7 +106,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 638,
+      "endFrame": 651
     },
     {
       "id": "crank-inset",
@@ -125,7 +137,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 651,
+      "endFrame": 705
     },
     {
       "id": "whole-spin-b",
@@ -154,7 +168,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 705,
+      "endFrame": 760
     },
     {
       "id": "gear-inset",
@@ -183,7 +199,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 760,
+      "endFrame": 834
     },
     {
       "id": "whole-spin-c",
@@ -212,7 +230,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 834,
+      "endFrame": 872
     },
     {
       "id": "rocker-inset",
@@ -241,7 +261,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 872,
+      "endFrame": 1011
     },
     {
       "id": "whole-spin-d",
@@ -270,7 +292,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1011,
+      "endFrame": 1050
     },
     {
       "id": "spring-inset",
@@ -299,7 +323,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1050,
+      "endFrame": 1155
     },
     {
       "id": "whole-spin-e",
@@ -328,7 +354,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1155,
+      "endFrame": 1228
     },
     {
       "id": "pen-inset",
@@ -357,7 +385,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1228,
+      "endFrame": 1345
     },
     {
       "id": "whole-spin-f",
@@ -376,7 +406,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1345,
+      "endFrame": 1461
     },
     {
       "id": "cone-overview-zoom",
@@ -405,7 +437,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1461,
+      "endFrame": 1473
     },
     {
       "id": "cone-overview",
@@ -434,7 +468,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1473,
+      "endFrame": 1824
     },
     {
       "id": "gear-macro-zoom",
@@ -463,7 +499,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1824,
+      "endFrame": 1835
     },
     {
       "id": "gear-macro",
@@ -482,7 +520,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1835,
+      "endFrame": 2315
     },
     {
       "id": "gear-macro-out",
@@ -511,7 +551,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2315,
+      "endFrame": 2325
     },
     {
       "id": "whole-spin-g",
@@ -530,7 +572,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2325,
+      "endFrame": 2380
     },
     {
       "id": "cam-rod-zoom",
@@ -559,7 +603,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2380,
+      "endFrame": 2390
     },
     {
       "id": "cam-rod",
@@ -578,7 +624,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2390,
+      "endFrame": 2520
     },
     {
       "id": "cam-to-rocker-fade",
@@ -607,7 +655,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2520,
+      "endFrame": 2540
     },
     {
       "id": "rocker-bank",
@@ -626,7 +676,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2540,
+      "endFrame": 2984
     },
     {
       "id": "rocker-out",
@@ -645,7 +697,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2984,
+      "endFrame": 2997
     },
     {
       "id": "whole-spin-h",
@@ -674,7 +728,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2997,
+      "endFrame": 3053
     },
     {
       "id": "bar-inset",
@@ -703,7 +759,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3053,
+      "endFrame": 3130
     },
     {
       "id": "dual-lever-insets",
@@ -742,7 +800,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3130,
+      "endFrame": 4180
     },
     {
       "id": "dual-insets-out",
@@ -781,7 +841,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4180,
+      "endFrame": 4196
     },
     {
       "id": "whole-spin-i",
@@ -810,7 +872,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4196,
+      "endFrame": 4260
     },
     {
       "id": "summing-side-zoom",
@@ -839,7 +903,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4260,
+      "endFrame": 4272
     },
     {
       "id": "summing-side",
@@ -858,7 +924,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4272,
+      "endFrame": 4560
     },
     {
       "id": "summing-side-out",
@@ -887,7 +955,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4560,
+      "endFrame": 4575
     },
     {
       "id": "whole-spin-j",
@@ -906,7 +976,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4575,
+      "endFrame": 4640
     },
     {
       "id": "top-assembly-zoom",
@@ -935,7 +1007,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4640,
+      "endFrame": 4657
     },
     {
       "id": "top-assembly",
@@ -954,7 +1028,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4657,
+      "endFrame": 4736
     },
     {
       "id": "top-overhead-fade",
@@ -983,7 +1059,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4736,
+      "endFrame": 4760
     },
     {
       "id": "top-overhead",
@@ -1002,7 +1080,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4760,
+      "endFrame": 4945
     },
     {
       "id": "overhead-spring-fade",
@@ -1031,7 +1111,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4945,
+      "endFrame": 4967
     },
     {
       "id": "spring-bank",
@@ -1050,7 +1132,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4967,
+      "endFrame": 5124
     },
     {
       "id": "spring-bank-out",
@@ -1079,7 +1163,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5124,
+      "endFrame": 5134
     },
     {
       "id": "whole-spin-k",
@@ -1108,7 +1194,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5134,
+      "endFrame": 5223
     },
     {
       "id": "summing-side-reprise",
@@ -1137,7 +1225,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5223,
+      "endFrame": 5261
     },
     {
       "id": "knife-hardware-macro-zoom",
@@ -1166,7 +1256,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5261,
+      "endFrame": 5276
     },
     {
       "id": "knife-hardware-macro",
@@ -1185,7 +1277,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5276,
+      "endFrame": 5463
     },
     {
       "id": "knife-macro-out",
@@ -1214,7 +1308,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5463,
+      "endFrame": 5477
     },
     {
       "id": "whole-spin-l",
@@ -1233,7 +1329,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5477,
+      "endFrame": 5565
     },
     {
       "id": "magnifier-top-zoom",
@@ -1262,7 +1360,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5565,
+      "endFrame": 5580
     },
     {
       "id": "magnifier-top",
@@ -1281,7 +1381,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5580,
+      "endFrame": 5653
     },
     {
       "id": "magnifier-clamp-zoom",
@@ -1310,7 +1412,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5653,
+      "endFrame": 5674
     },
     {
       "id": "magnifier-clamp",
@@ -1329,7 +1433,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5674,
+      "endFrame": 5804
     },
     {
       "id": "magnifier-out",
@@ -1358,7 +1464,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5804,
+      "endFrame": 5819
     },
     {
       "id": "magnifier-half",
@@ -1377,7 +1485,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5819,
+      "endFrame": 6026
     },
     {
       "id": "wheel-zoom",
@@ -1406,7 +1516,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6026,
+      "endFrame": 6042
     },
     {
       "id": "wheel-macro",
@@ -1425,7 +1537,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6042,
+      "endFrame": 6307
     },
     {
       "id": "wheel-out",
@@ -1454,7 +1568,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6307,
+      "endFrame": 6323
     },
     {
       "id": "wheel-pen",
@@ -1473,7 +1589,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6323,
+      "endFrame": 6461
     },
     {
       "id": "lower-crank-zoom",
@@ -1492,7 +1610,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6461,
+      "endFrame": 6477
     },
     {
       "id": "lower-crank",
@@ -1511,7 +1631,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6477,
+      "endFrame": 6770
     },
     {
       "id": "lower-presenter-fade",
@@ -1540,7 +1662,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6770,
+      "endFrame": 6795
     },
     {
       "id": "final-presenter-machine",
@@ -1559,7 +1683,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6795,
+      "endFrame": 7391
     },
     {
       "id": "endcard-fade",
@@ -1577,78 +1703,10 @@
             1080
           ],
           "presentation": "native"
-        },
-        {
-          "viewId": "endcard-plaque",
-          "rectSourcePixels": [
-            0,
-            0,
-            640,
-            540
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "endcard-bank",
-          "rectSourcePixels": [
-            640,
-            0,
-            640,
-            540
-          ],
-          "presentation": "horizontal-mirror"
-        },
-        {
-          "viewId": "endcard-pen-inset",
-          "rectSourcePixels": [
-            878,
-            0,
-            402,
-            277
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "endcard-paper-0",
-          "rectSourcePixels": [
-            1280,
-            0,
-            640,
-            180
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "endcard-paper-1",
-          "rectSourcePixels": [
-            1280,
-            180,
-            640,
-            180
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "endcard-paper-2",
-          "rectSourcePixels": [
-            1280,
-            360,
-            640,
-            180
-          ],
-          "presentation": "native"
-        },
-        {
-          "viewId": "endcard-spin",
-          "rectSourcePixels": [
-            1280,
-            540,
-            640,
-            540
-          ],
-          "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 7391,
+      "endFrame": 7416
     },
     {
       "id": "endcards",
@@ -1657,7 +1715,9 @@
       "classification": "non-machine",
       "reason": "blurred endcard thumbnails/credits, no physical machine to match",
       "reclassifiedFrom": "machine",
-      "views": []
+      "views": [],
+      "startFrame": 7416,
+      "endFrame": 8073
     },
     {
       "id": "credits-fade",
@@ -1666,7 +1726,9 @@
       "classification": "non-machine",
       "reason": "blurred endcard thumbnails/credits, no physical machine to match",
       "reclassifiedFrom": "machine",
-      "views": []
+      "views": [],
+      "startFrame": 8073,
+      "endFrame": 8107
     },
     {
       "id": "credits",
@@ -1675,7 +1737,9 @@
       "classification": "non-machine",
       "reason": "blurred endcard thumbnails/credits, no physical machine to match",
       "reclassifiedFrom": "machine",
-      "views": []
+      "views": [],
+      "startFrame": 8107,
+      "endFrame": 8109
     },
     {
       "id": "credits-credits-only",
@@ -1683,7 +1747,9 @@
       "end": 340.8405,
       "classification": "non-machine",
       "reason": "Creator/license credits only; hold last matched physical-machine pose.",
-      "views": []
+      "views": [],
+      "startFrame": 8109,
+      "endFrame": 8172
     },
     {
       "id": "credits-to-black",
@@ -1691,7 +1757,9 @@
       "end": 341.861,
       "classification": "non-machine",
       "reason": "Final credits fade to black; hold last matched physical-machine pose.",
-      "views": []
+      "views": [],
+      "startFrame": 8172,
+      "endFrame": 8196
     }
   ]
 }

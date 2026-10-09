@@ -67,6 +67,58 @@ Readiness exposes cumulative render timing counters; each Python batch logs
 solver/matrix update, draw, readback, encoding, browser compression,
 CDP/serialization, Python unpack and decode times.
 
+### Fitting and validation reports
+
+Start fitting as soon as the source publisher exposes any final shots in its
+private `ready.json`; the fitter consumes ready shots without waiting for the
+slowest shot, checkpoints each, and writes the final report once all are ready:
+
+```sh
+uv run --project web/sync python -m harmonic_sync fit 8KmVDxkia_w
+uv run --project web/sync python -m harmonic_sync fit 6dW6VYXp9HM
+uv run --project web/sync python -m harmonic_sync report 8KmVDxkia_w
+# Development iteration only: does not replace the committed runtime track.
+uv run --project web/sync python -m harmonic_sync fit 8KmVDxkia_w --shot intro-machine
+```
+
+Full fits build a private immutable native Vite snapshot under
+`~/data/harmonic-analyzer-sync/fit-snapshots/` and render it through headless
+preview. The report records the Git revision/dirty state, source and bundle
+hashes, model hash, actual renderer and elapsed runtime. Partial development
+fits disable Vite HMR; neither mode opens a browser window.
+Per-shot checkpoints resume only when source-stage fingerprints, authored
+segments, manual entries, model and fitter/native render code agree. Later mask
+corrections re-fit only their shot; frozen segment setups have their own checkpoint.
+`--force` discards checkpoint reuse, not the source artifacts. Shot timing goes
+to stderr and private `fit.jsonl`; render timings remain in private `render.jsonl`
+without flooding stderr. Documented native physical-infeasible optimizer
+candidates receive infinite cost with retained per-shot reason counts. Initial,
+manual and final chosen states remain strict: no guard is suppressed to obtain
+a usable runtime pose.
+
+`segments.json` supplies timestamp-cited, hand-editable setup priors and visible
+fit parameters. Camera fits use static native geometry before one full-pose
+alternation; moving shots receive half-second camera keys. The largest
+source-machine view, recorded as `driverViewId`, alone drives each shot's setup
+and crank. Other views may be independently filmed takes: their cameras and
+pixel residuals are reported, but they cannot validate that mechanism state.
+Manual cameras, setup initializations and crank keys are authoritative.
+
+The crank handle identifies turns only modulo one; the actual channel bank has
+an 80-crank-turn cycle (`channelAngle(T,k) = T*k*pi/40`). Its integer ambiguity
+is fitted once per segment, not silently wrapped every frame. Tracked handle,
+inferred same-parts crank and unobserved held priors remain distinct.
+Private reports contain `summary.md`, `summary.json`, dense `residuals.json`
+and worst-first source/render/blend contact sheets. Acceptance uses symmetric,
+untruncated chamfer in original source pixels; missing/empty supports remain
+unvalidated in the denominator. Per-group source support is explicitly
+projection-conditioned, not an independently labelled part mask. Inferred
+crank and independent takes cannot establish a kinematic defect; harmonic
+attribution requires tracked driver observations across different fitted/manual
+setups. The report lists remaining shots for the alignment tool rather than
+promoting coarse pixel agreement to mechanical validation.
+
+
 ### Source masks and shot census
 
 The standalone `sync/` uv project uses Python 3.12 and CUDA 12.4 PyTorch. The
@@ -93,21 +145,35 @@ mask areas/coverage and sharpness. `maskScale` and `cropOriginSourcePixels` map
 mask pixels back to source pixels; `motion.json` maps current crop pixels to
 its reference crop (`space: "view-crop-halfres"`). Insufficient static features
 are explicitly `unobservable`, not fitted identity motion.
+Turntable views are explicitly `model: "not-planar"` with `H: null`; their 3D
+rotation cannot be summarized by a source homography.
 
-All container PTS are checked against the rational frame clock before propagation.
-Finished shot/views resume only when their source/prompt/model/code hash and
-required artifacts match. Per-shot timing/progress goes to stderr and
+Shot ownership uses half-open `startFrame`/`endFrame` integer ranges; `start`
+and `end` seconds are human-readable descriptions, not float cut boundaries.
+Mask, edge/statistic and motion stages have separate fingerprints and checkpoints.
+A motion-code change reuses matching masks and edges; prompt changes invalidate
+all dependent stages. Per-shot timing/progress goes to stderr and
 `source.jsonl`; per-video statistics and mask-overlay sheets are saved as
 `<data>/<videoId>/source-stats.json` and `source-review.png`. Mask coverage is a
 pixel-area statistic, not an accuracy claim; inspect the overlays after edits.
+
+`ready.json` is updated atomically after each completed shot. Its `shots` map
+contains only shots whose required views have current mask, edge and motion
+hashes; each view records `maskInputHash`, `edgeInputHash`, `motionInputHash`
+and the completed `inputHash`. The fitter can consume these shots immediately
+and re-fit only the affected shot after a prompt change. For an already-running
+source process, `python -m harmonic_sync.readiness <videoId> --watch` publishes
+the same snapshot without loading SAM2.
 
 
 ### Kinematic sync and manual alignment
 
 Videos with `content/sync/<videoId>.sync.json` use the kinematic track while
-following playback. Cameras interpolate only within their shot; setup inputs
-come from the current segment, crank turns interpolate linearly, and non-machine
-intervals hold the last machine pose. Other videos still use the existing path.
+following playback. Shot ownership uses `round(t * fps)` in half-open
+`startFrame`/`endFrame` ranges; segment boundaries use rounded human seconds.
+Cameras and crank turns still interpolate in time within the selected shot.
+Non-machine intervals hold the preceding machine's last included frame and its
+setup. Other videos still use the existing path.
 The small Synthesis track is a rough, unfitted development fixture until replaced
 by the fitter; it is not a source-match result.
 

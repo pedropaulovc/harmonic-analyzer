@@ -12,7 +12,9 @@
       "end": 1.4014,
       "classification": "non-machine",
       "reason": "Opening typography on black",
-      "views": []
+      "views": [],
+      "startFrame": 0,
+      "endFrame": 42
     },
     {
       "id": "operation-001",
@@ -31,7 +33,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 42,
+      "endFrame": 69
     },
     {
       "id": "operation-002",
@@ -50,7 +54,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 69,
+      "endFrame": 324
     },
     {
       "id": "operation-003",
@@ -69,7 +75,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 324,
+      "endFrame": 1043
     },
     {
       "id": "operation-004",
@@ -88,7 +96,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1043,
+      "endFrame": 1263
     },
     {
       "id": "operation-005",
@@ -107,7 +117,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1263,
+      "endFrame": 1289
     },
     {
       "id": "operation-006",
@@ -126,7 +138,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1289,
+      "endFrame": 1354
     },
     {
       "id": "operation-007",
@@ -145,7 +159,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1354,
+      "endFrame": 1423
     },
     {
       "id": "operation-008",
@@ -164,7 +180,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1423,
+      "endFrame": 1601
     },
     {
       "id": "operation-009",
@@ -183,7 +201,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1601,
+      "endFrame": 1756
     },
     {
       "id": "operation-010",
@@ -202,7 +222,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1756,
+      "endFrame": 1826
     },
     {
       "id": "operation-011",
@@ -221,7 +243,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1826,
+      "endFrame": 1989
     },
     {
       "id": "operation-012",
@@ -240,7 +264,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1989,
+      "endFrame": 2106
     },
     {
       "id": "operation-013",
@@ -259,7 +285,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2106,
+      "endFrame": 2239
     },
     {
       "id": "operation-014",
@@ -278,7 +306,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2239,
+      "endFrame": 2278
     },
     {
       "id": "operation-015",
@@ -297,7 +327,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2278,
+      "endFrame": 2493
     },
     {
       "id": "operation-016",
@@ -316,7 +348,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2493,
+      "endFrame": 2517
     },
     {
       "id": "operation-017",
@@ -335,7 +369,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2517,
+      "endFrame": 2809
     },
     {
       "id": "operation-018",
@@ -354,7 +390,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2809,
+      "endFrame": 2826
     },
     {
       "id": "operation-019",
@@ -373,7 +411,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2826,
+      "endFrame": 2990
     },
     {
       "id": "operation-020",
@@ -392,7 +432,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2990,
+      "endFrame": 3006
     },
     {
       "id": "operation-021",
@@ -400,7 +442,9 @@
       "end": 106.07263333333333,
       "classification": "non-machine",
       "reason": "Standalone drawn plots: no corresponding physical machine",
-      "views": []
+      "views": [],
+      "startFrame": 3006,
+      "endFrame": 3179
     },
     {
       "id": "operation-022",
@@ -419,7 +463,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3179,
+      "endFrame": 3201
     },
     {
       "id": "operation-023",
@@ -438,7 +484,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3201,
+      "endFrame": 3321
     },
     {
       "id": "operation-024",
@@ -457,7 +505,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3321,
+      "endFrame": 3435
     },
     {
       "id": "operation-025",
@@ -476,7 +526,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3435,
+      "endFrame": 3604
     },
     {
       "id": "operation-026",
@@ -495,7 +547,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3604,
+      "endFrame": 3783
     },
     {
       "id": "operation-027",
@@ -514,7 +568,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3783,
+      "endFrame": 4059
     },
     {
       "id": "operation-028",
@@ -533,7 +589,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4059,
+      "endFrame": 4076
     },
     {
       "id": "operation-029",
@@ -552,7 +610,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4076,
+      "endFrame": 4233
     },
     {
       "id": "operation-030",
@@ -571,7 +631,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4233,
+      "endFrame": 4256
     },
     {
       "id": "operation-031",
@@ -590,7 +652,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4256,
+      "endFrame": 4633
     },
     {
       "id": "operation-032",
@@ -609,7 +673,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4633,
+      "endFrame": 4651
     },
     {
       "id": "operation-033",
@@ -628,7 +694,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4651,
+      "endFrame": 4882
     },
     {
       "id": "operation-034",
@@ -647,7 +715,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4882,
+      "endFrame": 4915
     },
     {
       "id": "operation-035",
@@ -666,7 +736,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4915,
+      "endFrame": 5082
     },
     {
       "id": "operation-036",
@@ -685,7 +757,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5082,
+      "endFrame": 5095
     },
     {
       "id": "operation-037",
@@ -704,7 +778,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5095,
+      "endFrame": 5294
     },
     {
       "id": "operation-038",
@@ -723,7 +799,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5294,
+      "endFrame": 5335
     },
     {
       "id": "operation-039",
@@ -742,7 +820,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5335,
+      "endFrame": 5470
     },
     {
       "id": "operation-040",
@@ -761,7 +841,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5470,
+      "endFrame": 5655
     },
     {
       "id": "operation-041",
@@ -780,7 +862,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5655,
+      "endFrame": 5673
     },
     {
       "id": "operation-042",
@@ -799,7 +883,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5673,
+      "endFrame": 5864
     },
     {
       "id": "operation-043",
@@ -818,7 +904,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5864,
+      "endFrame": 6021
     },
     {
       "id": "operation-044",
@@ -837,7 +925,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6021,
+      "endFrame": 6036
     },
     {
       "id": "operation-045",
@@ -856,7 +946,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6036,
+      "endFrame": 6212
     },
     {
       "id": "operation-046",
@@ -875,7 +967,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6212,
+      "endFrame": 6234
     },
     {
       "id": "operation-047",
@@ -894,7 +988,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6234,
+      "endFrame": 6406
     },
     {
       "id": "operation-048",
@@ -913,7 +1009,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6406,
+      "endFrame": 6423
     },
     {
       "id": "operation-049",
@@ -932,7 +1030,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6423,
+      "endFrame": 6581
     },
     {
       "id": "operation-050",
@@ -951,7 +1051,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6581,
+      "endFrame": 6917
     },
     {
       "id": "operation-051",
@@ -970,7 +1072,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6917,
+      "endFrame": 6997
     },
     {
       "id": "operation-052",
@@ -989,7 +1093,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6997,
+      "endFrame": 7016
     },
     {
       "id": "operation-053",
@@ -1008,7 +1114,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 7016,
+      "endFrame": 7172
     },
     {
       "id": "operation-054",
@@ -1047,7 +1155,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 7172,
+      "endFrame": 7223
     },
     {
       "id": "operation-055",
@@ -1086,7 +1196,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 7223,
+      "endFrame": 7498
     },
     {
       "id": "operation-056",
@@ -1125,7 +1237,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 7498,
+      "endFrame": 7812
     },
     {
       "id": "operation-057",
@@ -1164,7 +1278,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 7812,
+      "endFrame": 8084
     },
     {
       "id": "operation-058",
@@ -1203,7 +1319,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 8084,
+      "endFrame": 8168
     },
     {
       "id": "operation-059",
@@ -1242,7 +1360,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 8168,
+      "endFrame": 8552
     },
     {
       "id": "operation-060",
@@ -1261,7 +1381,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 8552,
+      "endFrame": 8583
     },
     {
       "id": "operation-061",
@@ -1280,7 +1402,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 8583,
+      "endFrame": 8820
     },
     {
       "id": "operation-062",
@@ -1299,7 +1423,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 8820,
+      "endFrame": 8841
     },
     {
       "id": "operation-063",
@@ -1318,7 +1444,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 8841,
+      "endFrame": 9090
     },
     {
       "id": "operation-064",
@@ -1337,7 +1465,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 9090,
+      "endFrame": 9144
     },
     {
       "id": "operation-065",
@@ -1356,7 +1486,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 9144,
+      "endFrame": 9171
     },
     {
       "id": "operation-066",
@@ -1375,7 +1507,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 9171,
+      "endFrame": 9338
     },
     {
       "id": "operation-067",
@@ -1394,7 +1528,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 9338,
+      "endFrame": 9516
     },
     {
       "id": "operation-068",
@@ -1413,7 +1549,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 9516,
+      "endFrame": 9728
     },
     {
       "id": "operation-069",
@@ -1432,7 +1570,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 9728,
+      "endFrame": 9768
     },
     {
       "id": "operation-070",
@@ -1451,7 +1591,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 9768,
+      "endFrame": 10005
     },
     {
       "id": "operation-071",
@@ -1470,7 +1612,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10005,
+      "endFrame": 10066
     },
     {
       "id": "operation-072",
@@ -1489,7 +1633,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10066,
+      "endFrame": 10094
     },
     {
       "id": "operation-073",
@@ -1508,7 +1654,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10094,
+      "endFrame": 10364
     },
     {
       "id": "operation-074",
@@ -1527,7 +1675,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10364,
+      "endFrame": 10405
     },
     {
       "id": "operation-075",
@@ -1556,7 +1706,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10405,
+      "endFrame": 10430
     },
     {
       "id": "operation-076",
@@ -1585,7 +1737,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10430,
+      "endFrame": 10577
     },
     {
       "id": "operation-077",
@@ -1614,7 +1768,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10577,
+      "endFrame": 10679
     },
     {
       "id": "operation-078",
@@ -1643,7 +1799,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10679,
+      "endFrame": 10898
     },
     {
       "id": "operation-079",
@@ -1672,7 +1830,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10898,
+      "endFrame": 10921
     },
     {
       "id": "operation-080",
@@ -1701,7 +1861,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10921,
+      "endFrame": 11214
     },
     {
       "id": "operation-081",
@@ -1750,7 +1912,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 11214,
+      "endFrame": 11239
     },
     {
       "id": "operation-082",
@@ -1779,7 +1943,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 11239,
+      "endFrame": 11426
     },
     {
       "id": "operation-083",
@@ -1808,7 +1974,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 11426,
+      "endFrame": 11461
     },
     {
       "id": "operation-084",
@@ -1827,7 +1995,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 11461,
+      "endFrame": 11677
     },
     {
       "id": "operation-085",
@@ -1846,7 +2016,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 11677,
+      "endFrame": 11853
     },
     {
       "id": "operation-086",
@@ -1865,7 +2037,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 11853,
+      "endFrame": 12240
     },
     {
       "id": "operation-087",
@@ -1884,7 +2058,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12240,
+      "endFrame": 12258
     },
     {
       "id": "operation-088",
@@ -1903,7 +2079,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12258,
+      "endFrame": 12380
     },
     {
       "id": "operation-089",
@@ -1922,7 +2100,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12380,
+      "endFrame": 12397
     },
     {
       "id": "operation-cone-top-clear",
@@ -1941,7 +2121,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12397,
+      "endFrame": 12404
     },
     {
       "id": "operation-090",
@@ -1960,7 +2142,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12404,
+      "endFrame": 12609
     },
     {
       "id": "operation-091",
@@ -1979,7 +2163,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12609,
+      "endFrame": 12626
     },
     {
       "id": "operation-092",
@@ -1998,7 +2184,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12626,
+      "endFrame": 12911
     },
     {
       "id": "operation-093",
@@ -2017,7 +2205,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12911,
+      "endFrame": 12947
     },
     {
       "id": "operation-094",
@@ -2036,7 +2226,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12947,
+      "endFrame": 13045
     },
     {
       "id": "operation-095",
@@ -2055,7 +2247,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 13045,
+      "endFrame": 13187
     },
     {
       "id": "operation-096",
@@ -2074,7 +2268,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 13187,
+      "endFrame": 13364
     },
     {
       "id": "operation-097",
@@ -2093,7 +2289,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 13364,
+      "endFrame": 13711
     },
     {
       "id": "operation-098",
@@ -2112,7 +2310,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 13711,
+      "endFrame": 13864
     },
     {
       "id": "operation-099",
@@ -2131,7 +2331,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 13864,
+      "endFrame": 14045
     },
     {
       "id": "operation-100",
@@ -2150,7 +2352,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14045,
+      "endFrame": 14086
     },
     {
       "id": "operation-101",
@@ -2169,7 +2373,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14086,
+      "endFrame": 14346
     },
     {
       "id": "operation-102",
@@ -2188,7 +2394,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14346,
+      "endFrame": 14389
     },
     {
       "id": "operation-103",
@@ -2207,7 +2415,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14389,
+      "endFrame": 14464
     },
     {
       "id": "operation-104",
@@ -2226,7 +2436,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14464,
+      "endFrame": 14488
     },
     {
       "id": "operation-105",
@@ -2245,7 +2457,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14488,
+      "endFrame": 14618
     },
     {
       "id": "operation-106",
@@ -2264,7 +2478,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14618,
+      "endFrame": 14655
     },
     {
       "id": "operation-107",
@@ -2283,7 +2499,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14655,
+      "endFrame": 14968
     },
     {
       "id": "operation-108",
@@ -2302,7 +2520,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14968,
+      "endFrame": 14985
     },
     {
       "id": "operation-109",
@@ -2321,7 +2541,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 14985,
+      "endFrame": 15159
     },
     {
       "id": "operation-110",
@@ -2340,7 +2562,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15159,
+      "endFrame": 15351
     },
     {
       "id": "operation-111",
@@ -2359,7 +2583,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15351,
+      "endFrame": 15567
     },
     {
       "id": "operation-112",
@@ -2378,7 +2604,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15567,
+      "endFrame": 15731
     },
     {
       "id": "operation-113",
@@ -2397,7 +2625,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15731,
+      "endFrame": 15883
     },
     {
       "id": "operation-114",
@@ -2416,7 +2646,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15883,
+      "endFrame": 15914
     },
     {
       "id": "operation-115",
@@ -2435,7 +2667,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15914,
+      "endFrame": 15991
     },
     {
       "id": "operation-116",
@@ -2454,7 +2688,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15991,
+      "endFrame": 16336
     },
     {
       "id": "operation-117",
@@ -2473,7 +2709,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 16336,
+      "endFrame": 16624
     },
     {
       "id": "operation-118",
@@ -2492,7 +2730,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 16624,
+      "endFrame": 16642
     },
     {
       "id": "operation-119",
@@ -2511,7 +2751,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 16642,
+      "endFrame": 16792
     },
     {
       "id": "operation-120",
@@ -2530,7 +2772,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 16792,
+      "endFrame": 16922
     },
     {
       "id": "operation-121",
@@ -2549,7 +2793,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 16922,
+      "endFrame": 16942
     },
     {
       "id": "operation-122",
@@ -2568,7 +2814,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 16942,
+      "endFrame": 17023
     },
     {
       "id": "operation-123",
@@ -2597,7 +2845,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17023,
+      "endFrame": 17129
     },
     {
       "id": "operation-124",
@@ -2626,7 +2876,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17129,
+      "endFrame": 17149
     },
     {
       "id": "operation-125",
@@ -2645,7 +2897,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17149,
+      "endFrame": 17427
     },
     {
       "id": "operation-126",
@@ -2664,7 +2918,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17427,
+      "endFrame": 17613
     },
     {
       "id": "operation-127",
@@ -2683,7 +2939,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17613,
+      "endFrame": 17652
     },
     {
       "id": "operation-128",
@@ -2702,7 +2960,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17652,
+      "endFrame": 17762
     },
     {
       "id": "operation-129",
@@ -2721,7 +2981,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17762,
+      "endFrame": 17921
     },
     {
       "id": "operation-130",
@@ -2740,7 +3002,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17921,
+      "endFrame": 17952
     },
     {
       "id": "operation-131",
@@ -2759,7 +3023,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17952,
+      "endFrame": 18312
     },
     {
       "id": "operation-132",
@@ -2778,7 +3044,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 18312,
+      "endFrame": 18597
     },
     {
       "id": "operation-133",
@@ -2797,7 +3065,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 18597,
+      "endFrame": 18671
     },
     {
       "id": "operation-134",
@@ -2816,7 +3086,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 18671,
+      "endFrame": 19000
     },
     {
       "id": "operation-135",
@@ -2835,7 +3107,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 19000,
+      "endFrame": 19460
     },
     {
       "id": "operation-136",
@@ -2854,7 +3128,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 19460,
+      "endFrame": 19490
     },
     {
       "id": "operation-137",
@@ -2873,7 +3149,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 19490,
+      "endFrame": 19674
     },
     {
       "id": "operation-138",
@@ -2892,7 +3170,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 19674,
+      "endFrame": 20182
     },
     {
       "id": "operation-139",
@@ -2911,7 +3191,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 20182,
+      "endFrame": 20215
     },
     {
       "id": "operation-140",
@@ -2919,7 +3201,9 @@
       "end": 702.9022,
       "classification": "non-machine",
       "reason": "Navigation endcard: no corresponding physical-machine pose",
-      "views": []
+      "views": [],
+      "startFrame": 20215,
+      "endFrame": 21066
     },
     {
       "id": "operation-141",
@@ -2938,7 +3222,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 21066,
+      "endFrame": 21099
     },
     {
       "id": "operation-142",
@@ -2946,7 +3232,9 @@
       "end": 707.061,
       "classification": "non-machine",
       "reason": "Credits and final fade to black",
-      "views": []
+      "views": [],
+      "startFrame": 21099,
+      "endFrame": 21191
     }
   ]
 }

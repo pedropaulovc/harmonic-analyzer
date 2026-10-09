@@ -10,12 +10,15 @@ export interface SyncView {
   rectSourcePixels: [number, number, number, number]
   presentation: Presentation
   cameraKeys: SyncCameraKey[]
-  quality: { medianPx: number; p90Px: number; maxPx: number; status: 'fitted' | 'manual' | 'unfitted' }
+  quality: { medianPx: number | null; p90Px: number | null; maxPx: number | null; status: 'fitted' | 'manual' | 'unfitted' }
 }
 export interface SyncShot {
   id: string
+  driverViewId?: string
   start: number
   end: number
+  startFrame: number
+  endFrame: number
   classification: 'machine' | 'transition' | 'non-machine'
   views: SyncView[]
 }
@@ -29,6 +32,7 @@ export interface SyncSegment {
 export interface SyncTrackData {
   schemaVersion: 1
   videoId: string
+  fps: [number, number]
   sourceSha256: string
   modelSha256: string
   shots: SyncShot[]
@@ -60,15 +64,16 @@ export function applySegmentInput(target: MechanismInput, source: SegmentInit): 
   if (source.setup) Object.assign(target.setup, source.setup)
 }
 
-/** Half-open intervals: a cut belongs to the incoming shot/segment. */
-export function intervalAt<T extends { start: number; end: number }>(items: readonly T[], t: number): T | undefined {
-  return items.find((item, index) => t >= item.start && (t < item.end || index === items.length - 1 && t === item.end))
+/** Half-open integer-frame intervals: a cut belongs to the incoming interval. */
+export function frameIntervalAt<T extends { startFrame: number; endFrame: number }>(items: readonly T[], frame: number): T | undefined {
+  return items.find(item => frame >= item.startFrame && frame < item.endFrame)
 }
 
 export function createSyncTrack(data: SyncTrackData): SyncTrack {
-  if (data.schemaVersion !== 1 || !data.videoId || !Array.isArray(data.shots) || !Array.isArray(data.segments) || !Array.isArray(data.crank)) throw new Error('Invalid sync track')
-  const shots = [...data.shots].sort((a, b) => a.start - b.start)
-  const segments = [...data.segments].sort((a, b) => a.start - b.start)
+  if (data.schemaVersion !== 1 || !data.videoId || !Array.isArray(data.fps) || data.fps.length !== 2 || !data.fps.every(value => Number.isSafeInteger(value) && value > 0) || !Array.isArray(data.shots) || !Array.isArray(data.segments) || !Array.isArray(data.crank)) throw new Error('Invalid sync track')
+  const fps = data.fps[0] / data.fps[1]
+  const shots = [...data.shots].sort((a, b) => a.startFrame - b.startFrame)
+  const segments = data.segments.map(segment => ({ segment, startFrame: Math.round(segment.start * fps), endFrame: Math.round(segment.end * fps) })).sort((a, b) => a.startFrame - b.startFrame)
   const crank = [...data.crank].sort((a, b) => a.t - b.t)
   const input = createMechanismInput()
   const defaults = serializeSyncInput(createMechanismInput())
@@ -76,7 +81,7 @@ export function createSyncTrack(data: SyncTrackData): SyncTrack {
   const q0 = new Quaternion(), q1 = new Quaternion()
   const buffers = new Map<SyncShot, { source: SyncView; keys: SyncCameraKey[]; output: EvaluatedSyncView }[]>()
   for (const shot of shots) {
-    if (!Number.isFinite(shot.start) || !Number.isFinite(shot.end) || shot.end <= shot.start) throw new Error(`Invalid sync shot ${shot.id}`)
+    if (!Number.isSafeInteger(shot.startFrame) || !Number.isSafeInteger(shot.endFrame) || shot.endFrame <= shot.startFrame) throw new Error(`Invalid sync shot ${shot.id}`)
     buffers.set(shot, shot.views.filter(view => view.cameraKeys.length > 0).map(source => ({
       source, keys: [...source.cameraKeys].sort((a, b) => a.t - b.t),
       output: { viewId: source.viewId, rect: source.rectSourcePixels, presentation: source.presentation,
@@ -88,21 +93,22 @@ export function createSyncTrack(data: SyncTrackData): SyncTrack {
 
   function evaluate(t: number): EvaluatedSync {
     if (!Number.isFinite(t)) throw new Error('Sync time must be finite')
-    let shot = intervalAt(shots, t)
+    const frame = Math.round(t * fps)
+    let shot = frameIntervalAt(shots, frame)
     let poseTime = t
-    let held = false
+    let poseFrame = frame
     if (!shot || shot.classification !== 'machine') {
       shot = undefined
       for (const candidate of shots) {
-        if (candidate.start > t) break
+        if (candidate.startFrame > frame) break
         if (candidate.classification === 'machine') shot = candidate
       }
-      if (shot) { poseTime = Math.min(t, shot.end); held = true }
+      if (shot) {
+        poseFrame = shot.endFrame - 1
+        poseTime = poseFrame * data.fps[1] / data.fps[0]
+      }
     }
-    // Use the outgoing segment at the held machine's end, never a later setup.
-    const segment = !shot ? undefined : held
-      ? segments.find(item => poseTime > item.start && poseTime <= item.end)
-      : intervalAt(segments, poseTime)
+    const segment = shot ? frameIntervalAt(segments, poseFrame)?.segment : undefined
     if (segment !== previousSegment) {
       const source = segment?.input ?? defaults
       applySegmentInput(input, source)

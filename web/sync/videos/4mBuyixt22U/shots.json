@@ -23,7 +23,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 0,
+      "endFrame": 1158
     },
     {
       "id": "overlay-2",
@@ -42,7 +44,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1158,
+      "endFrame": 2319
     },
     {
       "id": "overlay-3",
@@ -61,7 +65,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2319,
+      "endFrame": 3480
     },
     {
       "id": "overlay-4",
@@ -80,7 +86,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3480,
+      "endFrame": 4641
     },
     {
       "id": "overlay-5",
@@ -99,7 +107,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4641,
+      "endFrame": 5802
     },
     {
       "id": "overlay-6",
@@ -118,7 +128,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 5802,
+      "endFrame": 6963
     },
     {
       "id": "overlay-7",
@@ -137,7 +149,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 6963,
+      "endFrame": 8124
     },
     {
       "id": "overlay-8",
@@ -156,7 +170,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 8124,
+      "endFrame": 9285
     },
     {
       "id": "overlay-9",
@@ -175,7 +191,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 9285,
+      "endFrame": 10446
     },
     {
       "id": "overlay-10",
@@ -194,7 +212,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 10446,
+      "endFrame": 11607
     },
     {
       "id": "overlay-11",
@@ -213,7 +233,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 11607,
+      "endFrame": 12768
     },
     {
       "id": "overlay-12",
@@ -232,7 +254,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 12768,
+      "endFrame": 13913
     },
     {
       "id": "overlay-13",
@@ -251,7 +275,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 13913,
+      "endFrame": 15072
     },
     {
       "id": "overlay-14",
@@ -270,7 +296,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15072,
+      "endFrame": 16233
     },
     {
       "id": "overlay-15",
@@ -289,7 +317,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 16233,
+      "endFrame": 17394
     },
     {
       "id": "overlay-16",
@@ -308,7 +338,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 17394,
+      "endFrame": 18555
     },
     {
       "id": "overlay-17",
@@ -327,7 +359,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 18555,
+      "endFrame": 19716
     },
     {
       "id": "overlay-18",
@@ -346,7 +380,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 19716,
+      "endFrame": 20877
     },
     {
       "id": "overlay-19",
@@ -365,7 +401,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 20877,
+      "endFrame": 22038
     },
     {
       "id": "overlay-20",
@@ -384,7 +422,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 22038,
+      "endFrame": 23199
     },
     {
       "id": "overlay-all",
@@ -403,7 +443,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 23199,
+      "endFrame": 24318
     },
     {
       "id": "machine-to-navigation",
@@ -422,7 +464,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 24318,
+      "endFrame": 24353
     },
     {
       "id": "navigation",
@@ -430,7 +474,9 @@
       "end": 1020.7280416666666,
       "classification": "non-machine",
       "reason": "Actual frame24353 is pure navigation; source-only mixture and local rod-registration negative controls reject live-machine contribution.",
-      "views": []
+      "views": [],
+      "startFrame": 24353,
+      "endFrame": 24473
     },
     {
       "id": "navigation-emphasis",
@@ -438,7 +484,9 @@
       "end": 1024.6903333333332,
       "classification": "non-machine",
       "reason": "Green emphasis on navigation panels, not a corresponding physical-mechanism view; hold pose.",
-      "views": []
+      "views": [],
+      "startFrame": 24473,
+      "endFrame": 24568
     },
     {
       "id": "navigation-restored",
@@ -446,7 +494,9 @@
       "end": 1043.3756666666666,
       "classification": "non-machine",
       "reason": "Navigation panels restored; hold pose.",
-      "views": []
+      "views": [],
+      "startFrame": 24568,
+      "endFrame": 25016
     },
     {
       "id": "navigation-to-credits",
@@ -465,7 +515,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 25016,
+      "endFrame": 25045
     },
     {
       "id": "credits",
@@ -473,7 +525,9 @@
       "end": 1048.361,
       "classification": "non-machine",
       "reason": "Credit card only; hold pose.",
-      "views": []
+      "views": [],
+      "startFrame": 25045,
+      "endFrame": 25136
     }
   ]
 }

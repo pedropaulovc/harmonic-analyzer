@@ -12,7 +12,9 @@
       "end": 0.04170833333333333,
       "classification": "non-machine",
       "reason": "Actual decoded native exposure0 is black; no visible corresponding native landmark. Later attenuated exposures remain required.",
-      "views": []
+      "views": [],
+      "startFrame": 0,
+      "endFrame": 1
     },
     {
       "id": "opening-fade",
@@ -31,7 +33,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 1,
+      "endFrame": 15
     },
     {
       "id": "whole-machine",
@@ -50,7 +54,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 15,
+      "endFrame": 2577
     },
     {
       "id": "whole-machine-credit",
@@ -69,7 +75,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2577,
+      "endFrame": 2699
     },
     {
       "id": "whole-closeup-crossfade",
@@ -98,7 +106,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2699,
+      "endFrame": 2709
     },
     {
       "id": "closeup-sweep",
@@ -117,7 +127,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 2709,
+      "endFrame": 3394
     },
     {
       "id": "machine-endcard-crossfade",
@@ -226,7 +238,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3394,
+      "endFrame": 3429
     },
     {
       "id": "endcard",
@@ -325,7 +339,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 3429,
+      "endFrame": 4043
     },
     {
       "id": "endcard-credit-crossfade",
@@ -424,7 +440,9 @@
           ],
           "presentation": "native"
         }
-      ]
+      ],
+      "startFrame": 4043,
+      "endFrame": 4062
     },
     {
       "id": "credits",
@@ -432,7 +450,9 @@
       "end": 173.741,
       "classification": "non-machine",
       "reason": "Creator/support credits on black; container audio outlasts video by0.025792s.",
-      "views": []
+      "views": [],
+      "startFrame": 4062,
+      "endFrame": 4166
     }
   ]
 }

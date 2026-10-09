@@ -1,4 +1,4 @@
-"""Private video paths, source hashes and PTS-checked decoding."""
+"""Private video paths, source hashes and integer-frame decoding."""
 from __future__ import annotations
 
 import hashlib
@@ -7,10 +7,8 @@ import math
 import os
 from fractions import Fraction
 from pathlib import Path
-import subprocess
 
 import av
-import numpy as np
 
 PROJECT = Path(__file__).resolve().parents[1]
 
@@ -37,8 +35,7 @@ def load_shots(video_id: str) -> dict:
 
 
 def frame_range(shot: dict, fps: Fraction, step: int = 1) -> list[int]:
-    first = math.ceil(shot["start"] * float(fps) - 1e-6)
-    stop = math.ceil(shot["end"] * float(fps) - 1e-6)
+    first, stop = shot["startFrame"], shot["endFrame"]
     first += (-first) % step
     return list(range(first, stop, step))
 
@@ -48,29 +45,15 @@ def key_indices(shot: dict, fps: Fraction) -> list[int]:
     if not indices:
         return []
     first, last = indices[0], indices[-1]
-    times = np.arange(shot["start"], shot["end"], 0.5)
+    half_second = float(fps) / 2
     keys = {first, last, round((first + last) / 2)}
-    keys.update(min(last, max(first, round(t * float(fps)))) for t in times)
+    keys.update(min(last, round(first + i * half_second))
+                for i in range(math.ceil((last - first) / half_second) + 1))
     return sorted(keys)
 
 
-def verify_pts(path: Path, fps: Fraction) -> dict:
-    """Check every ffprobe container presentation timestamp against the frame clock."""
-    result = subprocess.run([
-        "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_frames",
-        "-show_entries", "frame=best_effort_timestamp_time", "-of", "json", str(path),
-    ], check=True, capture_output=True, text=True)
-    frames = json.loads(result.stdout)["frames"]
-    error = max(abs(float(row["best_effort_timestamp_time"]) - i / float(fps))
-                for i, row in enumerate(frames))
-    if error > 0.0001:
-        raise ValueError(f"Non-CFR/nonzero-origin video: PTS differs from index/fps by {error}s")
-    return {"frameCount": len(frames), "maxTimestampErrorSeconds": error,
-            "method": "ffprobe best_effort_timestamp_time, every frame"}
-
-
 def decode_selected(path: Path, indices: list[int], fps: Fraction):
-    """Seek to preceding keyframe, then emit requested decoded frames by actual PTS."""
+    """Seek efficiently and emit requested native frame indices."""
     if not indices:
         return
     wanted = set(indices)
@@ -84,8 +67,6 @@ def decode_selected(path: Path, indices: list[int], fps: Fraction):
                 raise ValueError("Decoded video frame has no PTS")
             t = float(frame.pts * stream.time_base)
             index = round(t * float(fps))
-            if abs(t - index / float(fps)) > 0.0001:
-                raise ValueError(f"Unexpected presentation timestamp at frame {index}: {t}")
             if index in wanted:
                 yield index, frame.to_ndarray(format="bgr24")
                 wanted.remove(index)

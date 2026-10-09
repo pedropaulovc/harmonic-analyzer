@@ -1,4 +1,4 @@
-"""SAM 2 video masks, masked edges and source-only static motion per shot/view."""
+"""Separately checkpointed SAM 2 masks, masked edges/stats and source motion."""
 from __future__ import annotations
 
 import gc
@@ -17,11 +17,20 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from .video import (PROJECT, data_root, decode_selected, frame_range, key_indices,
-                    load_shots, sha256, verify_pts, video_path, write_json)
+                    load_shots, sha256, video_path, write_json)
 
 MODEL = "sam2.1_hiera_small"
 MODEL_URL = f"https://dl.fbaipublicfiles.com/segment_anything_2/092824/{MODEL}.pt"
 MODEL_CONFIG = "configs/sam2.1/sam2.1_hiera_s.yaml"
+FRAME_STRIDE = 2
+MASK_SCALE = 0.5
+MASK_STAGE_VERSION = "sam2-video-v1"
+EDGE_STAGE_VERSION = "canny-mask-stats-v1"
+MOTION_STAGE_VERSION = "direct-orb-nonplanar-v1"
+# Keep this implementation revision aligned with the SAM-2 pin in uv.lock.
+SAM_IMPLEMENTATION_VERSION = "sam2-2b90b9f5ceec907a1c18123530e92e794ad901a4"
+STATIC_DEVIATION_THRESHOLD = 10
+TEMPORAL_SAMPLES = 24
 
 
 def log(event: str, **fields) -> None:
@@ -52,7 +61,8 @@ def imwrite(path: Path, image: np.ndarray) -> None:
 def crop_half(image: np.ndarray, view: dict) -> np.ndarray:
     x, y, w, h = view["rectSourcePixels"]
     crop = image[y:y+h, x:x+w]
-    return cv2.resize(crop, (max(1, round(w / 2)), max(1, round(h / 2))), interpolation=cv2.INTER_AREA)
+    return cv2.resize(crop, (max(1, round(w * MASK_SCALE)), max(1, round(h * MASK_SCALE))),
+                      interpolation=cv2.INTER_AREA)
 
 
 def keyframes(video_id: str, shot_id: str | None = None) -> Path:
@@ -85,37 +95,75 @@ def model_checkpoint() -> Path:
     return path
 
 
-def input_hash(census: dict, shot: dict, view: dict, prompts: list[dict], checkpoint_hash: str) -> str:
-    code_hash = hashlib.sha256()
-    for name in ("source.py", "video.py", "motion.py"):
-        code_hash.update((Path(__file__).parent / name).read_bytes())
-    value = {"source": census["sourceSha256"], "fps": census["fps"], "shot": shot,
-             "view": view, "prompts": prompts, "checkpoint": checkpoint_hash,
-             "code": code_hash.hexdigest(), "stride": 2, "scale": 0.5}
-    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+def motion_model(shot: dict, view: dict) -> str:
+    nonplanar = (shot["id"].startswith("whole-spin-") or shot["id"] == "presenter-to-spin"
+                 or (view["viewId"] == "main" and "turntable" in shot.get("reason", "").lower()))
+    return "not-planar" if nonplanar else "homography"
 
 
-def complete(root: Path, fingerprint: str, indices: list[int], keys: list[int]) -> bool:
+def input_hash(inputs: dict) -> str:
+    return hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
+
+
+def stage_hashes(census: dict, shot: dict, view: dict, prompts: list[dict],
+                 checkpoint_hash: str) -> dict:
+    """Hash each stage's immutable inputs, never unrelated stage implementation."""
+    mask = input_hash({
+        "sourceSha256": census["sourceSha256"], "fps": census["fps"],
+        "shot": {"startFrame": shot["startFrame"], "endFrame": shot["endFrame"]},
+        "rectSourcePixels": view["rectSourcePixels"], "prompts": prompts,
+        "checkpoint": checkpoint_hash, "model": MODEL, "modelConfig": MODEL_CONFIG,
+        "applyPostprocessing": False, "samImplementation": SAM_IMPLEMENTATION_VERSION,
+        "stride": FRAME_STRIDE, "scale": MASK_SCALE, "version": MASK_STAGE_VERSION,
+    })
+    edges = input_hash({
+        "mask": mask, "canny": [60, 160], "dilation": [5, 5],
+        "sharpness": "variance-of-CV_32F-laplacian-inside-mask",
+        "version": EDGE_STAGE_VERSION,
+    })
+    motion = input_hash({
+        "mask": mask, "code": sha256(Path(__file__).with_name("motion.py")),
+        "staticDeviationThreshold": STATIC_DEVIATION_THRESHOLD,
+        "temporalSamples": TEMPORAL_SAMPLES,
+        "temporalSampling": "first-24-at-local-multiples-of-max-1-count-div-24",
+        "staticSupport": "full-image-low-variance-texture-physical-mask-centers",
+        "model": motion_model(shot, view), "space": "view-crop-halfres",
+        "nonplanarRule": "whole-spin-prefix-presenter-to-spin-or-main-turntable",
+        "version": MOTION_STAGE_VERSION,
+    })
+    return {"mask": mask, "edges": edges, "motion": motion}
+
+
+def stage_validity(root: Path, hashes: dict, indices: list[int]) -> tuple[dict, dict]:
+    """Only completed stage hashes and their required files are reusable."""
     try:
         index = json.loads((root / "index.json").read_text())
-        if index["inputHash"] != fingerprint or [f["index"] for f in index["frames"]] != indices:
-            return False
-        if not (root / "motion.json").is_file():
-            return False
-        return all((root / folder / f"{i}.png").is_file()
-                   for folder, values in (("frames", keys), ("masks", indices), ("edges", indices))
-                   for i in values)
+        same_frames = [f["index"] for f in index["frames"]] == indices
+        masks = (same_frames and index.get("maskInputHash") == hashes["mask"]
+                 and all((root / "masks" / f"{i}.png").is_file() for i in indices))
+        edges = (masks and index.get("edgeInputHash") == hashes["edges"]
+                 and all((root / "edges" / f"{i}.png").is_file() for i in indices))
+        motion = (masks and index.get("motionInputHash") == hashes["motion"]
+                  and (root / "motion.json").is_file())
+        return index, {"mask": masks, "edges": edges, "motion": motion}
     except (OSError, KeyError, ValueError):
-        return False
+        return {}, {"mask": False, "edges": False, "motion": False}
 
 
-def validate_prompts(prompts: list[dict], shot: dict, view: dict) -> None:
+def complete(root: Path, hashes: dict, indices: list[int], keys: list[int]) -> bool:
+    index, valid = stage_validity(root, hashes, indices)
+    return (index.get("inputHash") == input_hash(hashes) and all(valid.values())
+            and all((root / "frames" / f"{i}.png").is_file() for i in keys))
+
+
+def validate_prompts(prompts: list[dict], shot: dict, view: dict, fps: Fraction) -> None:
     if not prompts:
         raise ValueError(f"Missing SAM2 prompt: {shot['id']}/{view['viewId']}")
     x, y, w, h = view["rectSourcePixels"]
     for prompt in prompts:
-        if not shot["start"] <= prompt["t"] < shot["end"]:
-            raise ValueError(f"Prompt outside shot time: {prompt}")
+        prompt_frame = round(prompt["t"] * float(fps))
+        if not shot["startFrame"] <= prompt_frame < shot["endFrame"]:
+            raise ValueError(f"Prompt outside shot frame range: {prompt}")
         if not prompt.get("points") and not prompt.get("box"):
             raise ValueError(f"Empty prompt: {prompt}")
         for px, py, label in prompt.get("points", []):
@@ -137,120 +185,181 @@ def mask_stats(rows: list[dict]) -> dict:
                              "max": float(coverage.max())}}
 
 
-def run_view(video_id: str, census: dict, shot: dict, view: dict, prompts: list[dict],
-             predictor, fingerprint: str) -> dict:
+def run_masks(video_id: str, shot: dict, view: dict, prompts: list[dict], root: Path,
+              samples: Path, indices: list[int], fps: Fraction, predictor, started: float) -> list[dict]:
+    """Propagate SAM masks and checkpoint-ready mask areas, without edges or motion."""
     import torch
-    from .motion import MotionEstimator
 
+    x, y, w, h = view["rectSourcePixels"]
+    width, height = max(1, round(w * MASK_SCALE)), max(1, round(h * MASK_SCALE))
+    scale = np.array([width/w, height/h], dtype=np.float32)
+    prompt_positions = []
+    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+        state = predictor.init_state(str(samples), offload_video_to_cpu=True, offload_state_to_cpu=True)
+        for prompt in prompts:
+            local = min(range(len(indices)), key=lambda i: abs(indices[i] / float(fps) - prompt["t"]))
+            prompt_positions.append(local)
+            points = prompt.get("points", [])
+            coordinates = (np.array([p[:2] for p in points], dtype=np.float32) - [x, y]) * scale if points else None
+            labels = np.array([p[2] for p in points], dtype=np.int32) if points else None
+            box = (np.array(prompt["box"], dtype=np.float32).reshape(2, 2) - [x,y]) * scale if "box" in prompt else None
+            predictor.add_new_points_or_box(state, frame_idx=local, obj_id=1, points=coordinates,
+                                            labels=labels, box=box.reshape(4) if box is not None else None)
+        first_prompt = min(prompt_positions)
+        passes = [(first_prompt, False)]
+        if first_prompt > 0:
+            passes.append((first_prompt, True))
+        for start, reverse in passes:
+            for local, _, logits in predictor.propagate_in_video(state, start_frame_idx=start, reverse=reverse):
+                mask = (logits[0, 0] > 0).cpu().numpy().astype(np.uint8) * 255
+                imwrite(root / "masks" / f"{indices[local]}.png", mask)
+                if local % 100 == 0:
+                    log("view-progress", videoId=video_id, shotId=shot["id"], viewId=view["viewId"],
+                        sampledFrame=local, samples=len(indices), seconds=time.perf_counter()-started)
+        del state
+    gc.collect()
+    torch.cuda.empty_cache()
+    rows = []
+    for index in indices:
+        mask = cv2.imread(str(root / "masks" / f"{index}.png"), cv2.IMREAD_GRAYSCALE)
+        area = int(np.count_nonzero(mask))
+        rows.append({"index": index, "t": index / float(fps), "maskArea": area,
+                     "maskCoverage": area / mask.size})
+    return rows
+
+
+def run_edges(root: Path, samples: Path, rows: list[dict]) -> None:
+    """Add masked Canny edges and sharpness to the completed mask rows."""
+    kernel = np.ones((5, 5), np.uint8)
+    for local, row in enumerate(rows):
+        image = cv2.imread(str(samples / f"{local:06d}.jpg"))
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        mask = cv2.imread(str(root / "masks" / f"{row['index']}.png"), cv2.IMREAD_GRAYSCALE)
+        support = cv2.dilate(mask, kernel)
+        edges = cv2.bitwise_and(cv2.Canny(gray, 60, 160), support)
+        imwrite(root / "edges" / f"{row['index']}.png", edges)
+        laplacian = cv2.Laplacian(gray, cv2.CV_32F)
+        row["sharpness"] = float(np.var(laplacian[mask > 0])) if row["maskArea"] else 0.0
+
+
+def run_motion(root: Path, samples: Path, indices: list[int], fps: Fraction,
+               prompts: list[dict], temporal: list[np.ndarray], model: str) -> dict:
+    """Register directly to the first prompt, or explicitly mark non-planar views."""
+    ref_local = min(range(len(indices)), key=lambda i: abs(indices[i] / float(fps) - prompts[0]["t"]))
+    ref_index = indices[ref_local]
+    if model == "not-planar":
+        motion = [{"index": index, "t": index / float(fps), "H": None,
+                   "inlierRatio": 0, "method": "not-planar"} for index in indices]
+    else:
+        from .motion import MotionEstimator
+
+        reference = cv2.imread(str(samples / f"{ref_local:06d}.jpg"))
+        reference_mask = cv2.imread(str(root / "masks" / f"{ref_index}.png"), cv2.IMREAD_GRAYSCALE)
+        deviation = np.std(np.stack(temporal), axis=0) if len(temporal) > 1 else np.zeros(reference.shape[:2])
+        # Descriptor texture may include background; MotionEstimator constrains
+        # feature centers to physical machine support independently.
+        static_mask = (deviation < STATIC_DEVIATION_THRESHOLD).astype(np.uint8) * 255
+        estimator = MotionEstimator(ref_index, reference, reference_mask, static_mask)
+        motion = []
+        for local, index in enumerate(indices):
+            image = cv2.imread(str(samples / f"{local:06d}.jpg"))
+            mask = cv2.imread(str(root / "masks" / f"{index}.png"), cv2.IMREAD_GRAYSCALE)
+            motion.append(estimator.estimate(index, index / float(fps), image, mask))
+    return {"model": model, "refFrame": ref_index, "space": "view-crop-halfres", "frames": motion}
+
+
+def run_view(video_id: str, census: dict, shot: dict, view: dict, prompts: list[dict],
+             predictor, hashes: dict) -> dict:
+    """Run only dirty stages, retaining each completed checkpoint on interruption."""
     started = time.perf_counter()
     fps = Fraction(*census["fps"])
-    indices = frame_range(shot, fps, 2)
+    indices = frame_range(shot, fps, FRAME_STRIDE)
     keys = key_indices(shot, fps)
     if not indices:
         raise ValueError(f"Shot {shot['id']} has no every-second-frame samples")
     root = data_root() / video_id / shot["id"] / view["viewId"]
     root.mkdir(parents=True, exist_ok=True)
-    # An interrupted/re-prompted view must never look complete to a later run.
-    (root / "index.json").unlink(missing_ok=True)
+    previous, valid = stage_validity(root, hashes, indices)
+    x, y, w, h = view["rectSourcePixels"]
+    width, height = max(1, round(w * MASK_SCALE)), max(1, round(h * MASK_SCALE))
+    result = {"sourceSha256": census["sourceSha256"],
+              "videoId": video_id, "shotId": shot["id"], "viewId": view["viewId"],
+              "width": width, "height": height, "fps": census["fps"],
+              "startFrame": shot["startFrame"], "endFrame": shot["endFrame"],
+              "rectSourcePixels": view["rectSourcePixels"], "cropOriginSourcePixels": [x,y],
+              "maskScale": [width/w, height/h], "model": MODEL,
+              "frames": previous["frames"] if valid["mask"] else []}
+    if valid["mask"]:
+        result["stats"] = previous["stats"]
+    for stage, field in (("mask", "maskInputHash"), ("edges", "edgeInputHash"), ("motion", "motionInputHash")):
+        if valid[stage]:
+            result[field] = hashes[stage]
+    # Invalidate dirty stages before overwriting their files; retain earlier
+    # checkpoints, but never retain inputHash while a required output is dirty.
+    write_json(root / "index.json", result)
     log("view-start", videoId=video_id, shotId=shot["id"], viewId=view["viewId"], samples=len(indices))
-    with tempfile.TemporaryDirectory(prefix="sam2-", dir=root) as directory:
+    model = motion_model(shot, view)
+    need_temporal = not valid["motion"] and model == "homography"
+    need_samples = not valid["mask"] or not valid["edges"] or need_temporal
+    needed_keys = keys if not valid["mask"] else [i for i in keys if not (root / "frames" / f"{i}.png").is_file()]
+    with tempfile.TemporaryDirectory(prefix="source-", dir=root) as directory:
         samples = Path(directory)
-        position = {index: local for local, index in enumerate(indices)}
+        position = {index: local for local, index in enumerate(indices)} if need_samples else {}
         temporal = []
-        for index, image in decode_selected(video_path(video_id), sorted(set(indices + keys)), fps):
-            if index in keys:
+        requested = sorted(set(list(position) + needed_keys))
+        for index, image in decode_selected(video_path(video_id), requested, fps):
+            if index in needed_keys:
                 imwrite(root / "frames" / f"{index}.png", image)
             if index in position:
                 crop = crop_half(image, view)
-                imwrite(samples / f"{position[index]:06d}.jpg", crop)
-                if len(temporal) < 24 and position[index] % max(1, len(indices) // 24) == 0:
+                local = position[index]
+                imwrite(samples / f"{local:06d}.jpg", crop)
+                if (need_temporal and len(temporal) < TEMPORAL_SAMPLES
+                        and local % max(1, len(indices) // TEMPORAL_SAMPLES) == 0):
                     temporal.append(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY).astype(np.float32))
-        prompt_positions = []
-        x, y, w, h = view["rectSourcePixels"]
-        width, height = max(1, round(w/2)), max(1, round(h/2))
-        scale = np.array([width/w, height/h], dtype=np.float32)
-        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
-            state = predictor.init_state(str(samples), offload_video_to_cpu=True, offload_state_to_cpu=True)
-            for prompt in prompts:
-                local = min(range(len(indices)), key=lambda i: abs(indices[i] / float(fps) - prompt["t"]))
-                prompt_positions.append(local)
-                points = prompt.get("points", [])
-                coordinates = (np.array([p[:2] for p in points], dtype=np.float32) - [x, y]) * scale if points else None
-                labels = np.array([p[2] for p in points], dtype=np.int32) if points else None
-                box = (np.array(prompt["box"], dtype=np.float32).reshape(2, 2) - [x,y]) * scale if "box" in prompt else None
-                predictor.add_new_points_or_box(state, frame_idx=local, obj_id=1, points=coordinates,
-                                                labels=labels, box=box.reshape(4) if box is not None else None)
-            first_prompt = min(prompt_positions)
-            passes = [(first_prompt, False)]
-            if first_prompt > 0:
-                passes.append((first_prompt, True))
-            for start, reverse in passes:
-                for local, _, logits in predictor.propagate_in_video(state, start_frame_idx=start, reverse=reverse):
-                    mask = (logits[0, 0] > 0).cpu().numpy().astype(np.uint8) * 255
-                    imwrite(root / "masks" / f"{indices[local]}.png", mask)
-                    if local % 100 == 0:
-                        log("view-progress", videoId=video_id, shotId=shot["id"], viewId=view["viewId"],
-                            sampledFrame=local, samples=len(indices), seconds=time.perf_counter()-started)
-            del state
-        gc.collect()
-        torch.cuda.empty_cache()
-        ref_local = prompt_positions[0]
-        ref_index = indices[ref_local]
-        reference = cv2.imread(str(samples / f"{ref_local:06d}.jpg"))
-        reference_mask = cv2.imread(str(root / "masks" / f"{ref_index}.png"), cv2.IMREAD_GRAYSCALE)
-        # Temporal variance excludes crank/rocker motion before matching static source texture.
-        deviation = np.std(np.stack(temporal), axis=0) if len(temporal) > 1 else np.zeros((height, width))
-        static_mask = ((deviation < 10) & (reference_mask > 0)).astype(np.uint8) * 255
-        estimator = MotionEstimator(ref_index, reference, reference_mask, static_mask)
-        rows, motion = [], []
-        for local, index in enumerate(indices):
-            image = cv2.imread(str(samples / f"{local:06d}.jpg"))
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            mask = cv2.imread(str(root / "masks" / f"{index}.png"), cv2.IMREAD_GRAYSCALE)
-            support = cv2.dilate(mask, np.ones((5,5), np.uint8))
-            edges = cv2.bitwise_and(cv2.Canny(gray, 60, 160), support)
-            imwrite(root / "edges" / f"{index}.png", edges)
-            area = int(np.count_nonzero(mask))
-            laplacian = cv2.Laplacian(gray, cv2.CV_32F)
-            sharpness = float(np.var(laplacian[mask > 0])) if area else 0.0
-            t = index / float(fps)
-            rows.append({"index": index, "t": t, "maskArea": area,
-                         "maskCoverage": area / mask.size, "sharpness": sharpness})
-            motion.append(estimator.estimate(index, t, image, mask))
+        if not valid["mask"]:
+            rows = run_masks(video_id, shot, view, prompts, root, samples, indices, fps, predictor, started)
+            result.update(frames=rows, stats=mask_stats(rows), maskInputHash=hashes["mask"])
+            write_json(root / "index.json", result)
+        if not valid["edges"]:
+            run_edges(root, samples, result["frames"])
+            result["edgeInputHash"] = hashes["edges"]
+            write_json(root / "index.json", result)
+        if not valid["motion"]:
+            motion = run_motion(root, samples, indices, fps, prompts, temporal, model)
+            write_json(root / "motion.json", motion)
+            result["motionInputHash"] = hashes["motion"]
+            write_json(root / "index.json", result)
     seconds = time.perf_counter() - started
-    write_json(root / "motion.json", {"refFrame": ref_index, "space": "view-crop-halfres", "frames": motion})
-    result = {"inputHash": fingerprint, "sourceSha256": census["sourceSha256"],
-              "videoId": video_id, "shotId": shot["id"], "viewId": view["viewId"],
-              "width": width, "height": height, "fps": census["fps"],
-              "rectSourcePixels": view["rectSourcePixels"], "cropOriginSourcePixels": [x,y],
-              "maskScale": [width/w, height/h], "frames": rows, "stats": mask_stats(rows),
-              "timingSeconds": seconds, "model": MODEL}
+    result.update(inputHash=input_hash(hashes), timingSeconds=seconds)
     write_json(root / "index.json", result)
     log("view-done", videoId=video_id, shotId=shot["id"], viewId=view["viewId"], seconds=seconds, stats=result["stats"])
     return result
 
 
 def source(video_id: str, shot_id: str | None = None) -> dict:
+    from .readiness import publish_ready
+
     os.environ.setdefault("TQDM_DISABLE", "1")
-    import torch
-    from sam2.build_sam import build_sam2_video_predictor
 
     started = time.perf_counter()
     census = load_shots(video_id)
+    fps = Fraction(*census["fps"])
     path = video_path(video_id)
     if sha256(path) != census["sourceSha256"]:
         raise ValueError("Video hash changed; re-run shots and inspect prompts against the new video")
-    pts = verify_pts(path, Fraction(*census["fps"]))
     shots = selected_shots(census, shot_id)
-    all_prompts = json.loads((PROJECT / "videos" / video_id / "prompts.json").read_text())["prompts"]
+    prompt_path = PROJECT / "videos" / video_id / "prompts.json"
+    all_prompts = json.loads(prompt_path.read_text())["prompts"]
     jobs = []
     for shot in shots:
         for view in shot["views"]:
             prompts = [p for p in all_prompts if p["shotId"] == shot["id"] and p["viewId"] == view["viewId"]]
-            validate_prompts(prompts, shot, view)
+            validate_prompts(prompts, shot, view, fps)
             jobs.append((shot, view, prompts))
     checkpoint = model_checkpoint()
     checkpoint_hash = sha256(checkpoint)
+    publish_ready(census, all_prompts, checkpoint_hash)
     predictor = None
     results = []
     current_shot = None
@@ -262,18 +371,26 @@ def source(video_id: str, shot_id: str | None = None) -> dict:
                 seconds = time.perf_counter() - shot_started
                 shot_timings.append({"shotId": current_shot, "seconds": seconds})
                 log("shot-done", videoId=video_id, shotId=current_shot, seconds=seconds)
+                publish_ready(load_shots(video_id), json.loads(prompt_path.read_text())["prompts"],
+                              checkpoint_hash)
             current_shot = shot["id"]
             shot_started = time.perf_counter()
             log("shot-start", videoId=video_id, shotId=current_shot)
-        fingerprint = input_hash(census, shot, view, prompts, checkpoint_hash)
+        hashes = stage_hashes(census, shot, view, prompts, checkpoint_hash)
         root = data_root() / video_id / shot["id"] / view["viewId"]
-        if complete(root, fingerprint, frame_range(shot, Fraction(*census["fps"]), 2), key_indices(shot, Fraction(*census["fps"]))):
+        indices = frame_range(shot, fps, FRAME_STRIDE)
+        keys = key_indices(shot, fps)
+        if complete(root, hashes, indices, keys):
             result = json.loads((root / "index.json").read_text())
             results.append({"shotId": shot["id"], "viewId": view["viewId"], "cached": True,
                             "seconds": 0, "stats": result["stats"]})
             log("view-skip", videoId=video_id, shotId=shot["id"], viewId=view["viewId"])
             continue
-        if predictor is None:
+        _, valid = stage_validity(root, hashes, indices)
+        if not valid["mask"] and predictor is None:
+            import torch
+            from sam2.build_sam import build_sam2_video_predictor
+
             if not torch.cuda.is_available():
                 raise RuntimeError("CUDA is required for this source pipeline")
             torch.set_num_threads(4)
@@ -281,14 +398,16 @@ def source(video_id: str, shot_id: str | None = None) -> dict:
             torch.backends.cudnn.allow_tf32 = True
             predictor = build_sam2_video_predictor(MODEL_CONFIG, str(checkpoint), device="cuda",
                                                   apply_postprocessing=False)
-        result = run_view(video_id, census, shot, view, prompts, predictor, fingerprint)
+        result = run_view(video_id, census, shot, view, prompts, predictor, hashes)
         results.append({"shotId": shot["id"], "viewId": view["viewId"], "cached": False,
                         "seconds": result["timingSeconds"], "stats": result["stats"]})
     if current_shot is not None:
         seconds = time.perf_counter() - shot_started
         shot_timings.append({"shotId": current_shot, "seconds": seconds})
         log("shot-done", videoId=video_id, shotId=current_shot, seconds=seconds)
-    summary = {"videoId": video_id, "seconds": time.perf_counter()-started, "pts": pts,
+        publish_ready(load_shots(video_id), json.loads(prompt_path.read_text())["prompts"],
+                      checkpoint_hash)
+    summary = {"videoId": video_id, "seconds": time.perf_counter()-started,
                "shots": shot_timings, "views": results}
     destination = data_root() / video_id / ("source-stats.json" if shot_id is None else f"source-stats-{shot_id}.json")
     write_json(destination, summary)
