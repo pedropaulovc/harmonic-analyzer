@@ -20,11 +20,11 @@ from _common import (
     check,
     dimension_between,
     ensure_fully_defined,
-    equation_curve,
     name_last_feature,
     set_sketch_direct_db,
 )
 from _drawing_marks import _named_dimension, set_dimension_prefix
+from _gear import equation_curve
 from _visibility import blank_reference_geometry
 from paper_drive_stock_inspection import span_contact_points_mm
 from stock_form_cutter import StockFormProfile
@@ -386,18 +386,16 @@ async def author_cutter_endcut(
     name_last_feature(adapter, plane)
     check("create_sketch finite cutter ground", await adapter.create_sketch(plane))
     suppress_dimension_input(adapter)
-    curves = [await placed_ground_curve(adapter, segment, angle, translation) for segment in ground]
-    # The ground chain (UpperFiniteFlank, UpperBelowBase, RootArc,
-    # LowerBelowBase, LowerFiniteFlank) is defined after all but its last two
-    # curves are FIXed; those two close it and must not be nearly collinear.
-    # In chain order they were LowerBelowBase and the almost radial
-    # LowerFiniteFlank, and the solve ended no_solution. FIX the upper
-    # branch, then the lower branch from its outer end, so the radial
-    # LowerBelowBase and the tangential RootArc close it: a near-perpendicular
-    # pair (_gear.stock_gap_fix_order's rule).
-    n_upper = len(upper_ground)
-    fix_order = curves[:n_upper] + curves[n_upper + 1 :][::-1] + [curves[n_upper]]
-    await ensure_fully_defined(adapter, "finite ground curves", fix_entities=fix_order, allow_fix_escalation=True)
+    # Main's cut_tooth_gap order, less the clearance pieces the tool never
+    # carries: both finite flanks first (base to tip), then the floor from the
+    # upper flank's foot round to the lower's; FIX in creation order. The
+    # chain-order FIX ended no_solution on run 20261009T214031408Z.
+    kinds = ("radial", "flank", "root_arc")
+    created = [s for s in master_profile.cut_order_native_segments(unit_scale=1.0 / 25.4) if s.kind in kinds]
+    if sorted(s.name for s in created) != sorted(s.name for s in ground):
+        raise ValueError("finite cutter creation order lost a ground branch")
+    curves = [await placed_ground_curve(adapter, segment, angle, translation) for segment in created]
+    await ensure_fully_defined(adapter, "finite ground curves", fix_entities=curves, allow_fix_escalation=True)
     a, b = rotate_mm((axis_x, lower[1]), angle), rotate_mm((axis_x, upper[1]), angle)
     arbor = check("tangential cutter arbor", await adapter.add_centerline(*a, *b))
     await anchor_point_to_origin(adapter, f"{arbor}.start", *a, "cutter arbor lower end")

@@ -62,7 +62,7 @@ from _drawing_marks import (
     set_dimension_symmetric_tolerance,
 )
 from _drawing_simplified import save_simplified_part
-from _gear import ToothedDisc, pattern_about_z, stock_gap_fix_order
+from _gear import ToothedDisc, pattern_about_z
 from _holes import cross_hole_volume_mm3
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -181,14 +181,14 @@ async def _straight_stock_gaps(
 
     check("create_sketch finite straight gap", await adapter.create_sketch("Front"))
     suppress_dimension_input(adapter)
-    segments = STOCK_PROFILE.native_segments(clearance_radius_mm=radius + 1.0)
+    # Main's cut_tooth_gap order (flanks first), FIXed as created.
+    segments = STOCK_PROFILE.cut_order_native_segments(clearance_radius_mm=radius + 1.0)
     curves = [
         await placed_ground_curve(adapter, segment, TOOTH_SPACE_INSPECTION_PHASE_RAD)
         for segment in segments
     ]
-    order = stock_gap_fix_order([segment.name for segment in segments])
     await ensure_fully_defined(
-        adapter, "finite straight gap", fix_entities=[curves[i] for i in order], allow_fix_escalation=True
+        adapter, "finite straight gap", fix_entities=curves, allow_fix_escalation=True
     )
     check("exit_sketch finite straight gap", await adapter.exit_sketch())
     check("cut finite straight gap", await adapter.create_cut_extrude(ExtrusionParameters(depth=FULL_DEPTH)))
