@@ -886,7 +886,7 @@ def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
     assert crank_mesh_stack.SPACING_PRINTED == round(spec.CRANK_ABOVE_CONE, 2)
     assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE) < 1e-9
-    assert crank_mesh_stack.TIGHT_BACKLASH_MM > 0.0
+    assert crank_mesh_stack.standard_check().backlash_min_mm > 0.0
     # The foot-to-crank height stays on the front view only as a reference.
     assert "CrankAxisY" in drawing.FRONT_KEEP
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")

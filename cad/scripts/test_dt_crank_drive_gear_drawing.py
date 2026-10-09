@@ -601,10 +601,10 @@ def _tip_dia_text_box(centre: tuple[float, float]) -> tuple[float, ...]:
 
 
 def test_tip_diameter_text_hangs_under_every_gear_data_row_and_over_the_teeth() -> None:
-    # Actual stock inspection and coverage requirements add rows. The tip text
-    # must retain both the under-note gap and air off the real blank silhouette.
+    # The tip text must retain both the under-note gap and air off the real
+    # blank silhouette.
     block = _gear_data_box()
-    assert "STOCK-FORM COVERAGE WITH MHA-DT-010" in notes.GEAR_DATA.splitlines()[-1]
+    assert notes.GEAR_DATA.splitlines()[-1].startswith("MATES WITH")
     tip = _tip_dia_text_box(drawing.FRONT_KEEP["OutsideDia"])
     # The text sits under the block's columns, so its clearance is vertical.
     assert block[0] < tip[0] < block[2]

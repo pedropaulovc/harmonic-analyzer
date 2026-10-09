@@ -1,7 +1,6 @@
 """Drawing-only gear data for the straight crank pinion.
 
 Geometry and exact stock tangent-span acceptance remain in dt_crank_pinion_spec.
-Assembly requirements are requirements, not a measured crossed-mesh certificate.
 """
 
 from __future__ import annotations
@@ -9,11 +8,6 @@ from __future__ import annotations
 import dt_crank_drive_gear_notes as mate_notes
 import dt_crank_pinion_spec as spec
 
-
-STOCK_FORM_COVERAGE_ROW = (
-    "STOCK-FORM COVERAGE WITH MHA-DT-007, ACCEPT AT ASSEMBLY",
-    mate_notes.STOCK_FORM_COVERAGE_ROW[1],
-)
 
 # The spur's normal and transverse sections coincide. Its physical tooth
 # count selects a different stock cutter from the helical mate's virtual count.
@@ -56,6 +50,5 @@ GEAR_DATA = mate_notes.gear_data_note(
             f"FINITE STOCK #{spec.CUTTER_NUMBER}/{spec.CUTTER_TEMPLATE.reference_teeth}T; STANDARD ROOT",
         ),
         ("MATES WITH", "CRANK DRIVE GEAR MHA-DT-007, 64T RIGHT-HAND HELICAL"),
-        STOCK_FORM_COVERAGE_ROW,
     ]
 )

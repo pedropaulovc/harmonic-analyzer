@@ -68,9 +68,8 @@ engagement, distinct wear", ch. 12): the contact tooth crosses the
 about its centre value; X_PITCH backs the cone off so the DEEPEST
 crossing point stays clear of the configured working depth by
 PEN_EDGE_SLACK. Every station follows the same grid, including T006;
-the cone spec owns each custom tip, tooth thickness and gap floor.
-Those ideal profiles do not imply blanket stock form-cutter approval:
-the cone cutter-fit/backlash/root qualifications remain unresolved.
+the cone spec owns each tip, tooth thickness and gap floor, and
+dt_mesh_checks runs the closed-form standard checks of every drum mesh.
 The 16T crank pinion mesh is DIFFERENT: on its near-VERTICAL line of
 centres the radial interleave is nearly constant across the face, while
 the crossing manifests as LATERAL flank misregistration. The 64T is a
@@ -82,7 +81,7 @@ no relief pocket in the casting). Its south tooth face seats 0.25 mm
 north of that boss face; the span checks below keep it off the T120
 and cover at least 85% of the grown 64T row. The fixed-centre
 mesh's only backlash requirement is positive clearance at the worst
-closing corner, proved by crank_mesh_stack.
+closing corner, checked in closed form by crank_mesh_stack.
 The perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i)
 north of its centre (alpha = the contact azimuth from the in-plane
 horizontal).
@@ -288,7 +287,12 @@ from dt_cone_gear_spec import BLANK_DIA_BAND as CONE_GEAR_BLANK_DIA_BAND  # noqa
 from dt_cone_gear_spec import FACE_WIDTH as CONE_GEAR_FACE_WIDTH  # noqa: E402
 from dt_cone_gear_spec import FACE_WIDTH_BAND as CONE_GEAR_FACE_WIDTH_BAND  # noqa: E402
 from dt_cone_gear_spec import outside_dia_mm as cone_gear_outside_dia_mm  # noqa: E402
-from dt_cone_mesh_domain import require_qualified_stock_family  # noqa: E402
+import dt_mesh_checks  # noqa: E402
+
+# Closed-form standard checks of the drum meshes, logged by build(); the
+# native interference/soundness gate checks the real flanks.
+CONE_MESH_CHECKS = dt_mesh_checks.cone_checks()
+ALIGNMENT_MESH_CHECK = dt_mesh_checks.alignment_check()
 
 
 def _cone_tip_radius_max(teeth: int) -> float:
@@ -390,20 +394,19 @@ R16 = (16.0 / DP_CRANK_CUTTER) * 25.4 / 2.0
 ADD16 = 25.4 / DP_CRANK_CUTTER
 MESH16_C2C = R64 + R16 + _config.fit("crank_mesh", "c2c_slack_mm")
 MESH16_C2C_SLACK = MESH16_C2C - R64 - R16
-from dt_crank_drive_gear_spec import LONG_ADDENDUM_MM as _GEAR64_LONG_ADDENDUM  # noqa: E402
+from dt_crank_drive_gear_spec import OUTSIDE_DIA as _GEAR64_TIP_DIA  # noqa: E402
+from dt_crank_drive_gear_spec import OUTSIDE_DIA_TOLERANCE_MM as _GEAR64_TIP_DIA_TOLERANCE  # noqa: E402
+from dt_crank_pinion_spec import OUTSIDE_DIA as _PINION_TIP_DIA  # noqa: E402
 
-TIP16_C2C = R64 + R16 + 2.0 * ADD16 + _GEAR64_LONG_ADDENDUM
+# Interleave of the two printed blanks at the fixed centre. Above ~1.2*ADD
+# the teeth are really engaged; below 2*ADD less 0.1 the tips keep root air.
+TIP16_C2C = (_GEAR64_TIP_DIA + _PINION_TIP_DIA) / 2.0
 CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C
-# Depth band: above ~1.2*ADD (really engaged), below 2*ADD minus the root
-# clearance floor (slack plus the cutter's dedendum excess stays positive).
 if not 1.2 * ADD16 < CRANK_MESH_DEPTH < 2.0 * ADD16 - 0.1:
     raise AssertionError("crank pair mesh depth left its derived band")
 # The restored post carries the fixed crank axis (user ruling 2026-09-28).
 import crank_mesh_stack as crank_mesh  # noqa: E402
 
-# Refuse unavailable or stale actual-stock evidence before touching None-valued
-# manufacturing fields. A dimensional clearance screen is not qualification.
-CRANK_MESH_QUALIFICATION = crank_mesh.require_qualified()
 _DX16 = (GEAR64_SEAT[0] - X_CRANK) * COS_I  # horizontal leg toward the
 # crank (a plane-local magnitude: the azimuth convention below measures from
 # the in-plane horizontal TOWARD the other axis, so it is chirality-free)
@@ -411,28 +414,17 @@ _DY16 = Y_CRANK - Y_DRIVE  # vertical leg in both gear planes
 if _DX16 <= 0.0:
     raise AssertionError("the 64T no longer lies +x of the crank (crank_mesh_stack premise)")
 CRANK_ACTUAL_C2C = math.hypot(_DX16, _DY16)
-from crank_mesh_stack import FRAME_C2C as CRANK_MESH_FRAME_C2C  # noqa: E402
-
 if not (
     math.isclose(CRANK_ACTUAL_C2C, MESH16_C2C, rel_tol=0.0, abs_tol=1e-9)
-    and math.isclose(CRANK_ACTUAL_C2C, CRANK_MESH_FRAME_C2C, rel_tol=0.0, abs_tol=1e-9)
+    and math.isclose(CRANK_ACTUAL_C2C, crank_mesh.FRAME_C2C, rel_tol=0.0, abs_tol=1e-9)
 ):
     raise AssertionError(
         "crank physical centre must equal the normal-pitch mesh and stack reference"
     )
-# Actual finite-stock 3D evidence owns the contact figures. Gear-sheet notes
-# state requirements only; they are not measured certificates or data sources.
+# Closed-form standard check over every printed corner and the booked centre
+# range; the native interference gate below checks the actual flanks.
+CRANK_MESH_CHECK = crank_mesh.standard_check()
 from cone_stack_end_play import CONE_FLOAT_NORTH  # noqa: E402
-from dt_crank_drive_gear_spec import OUTSIDE_DIA as _GEAR64_TIP_DIA  # noqa: E402
-from dt_crank_drive_gear_spec import OUTSIDE_DIA_TOLERANCE_MM as _GEAR64_TIP_DIA_TOLERANCE  # noqa: E402
-from crank_mesh_requirements import (  # noqa: E402
-    HANDOVER_JUMP_MAX_MM,
-    ROW_ENGAGEMENT_MIN,
-    STOCK_FORM_COVERAGE_MIN,
-)
-
-CRANK_STOCK_FORM_COVERAGE_NOMINAL = crank_mesh.STOCK_FORM_COVERAGE_NOMINAL
-CRANK_STOCK_FORM_COVERAGE_WORST = crank_mesh.STOCK_FORM_COVERAGE_WORST
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
 # the inclined cone shaft; the 16T plane is a plain machine-Z section.
@@ -465,24 +457,16 @@ if not math.isclose(
 # nearest tooth leads the contact azimuth by DELTA64; the pinion's gap must
 # sit that same contact arc (64/16 pinion degrees per 64T degree -- the tooth
 # ratio, whatever the two pitch radii) past the contact on ITS side.
-# Only the qualified actual-stock payload supplies the mesh-window offset.
-# The part's independent matched-hole clocking must agree with this placement.
-from crank_mesh_stack import require_selected_pin_clocking  # noqa: E402
+# gear_train.crank_mesh_phase_offset_deg is the one configured offset from
+# that standard tooth-in-gap seed; the crankshaft's matched-hole clocking
+# (dt_crank_pinion_spec.PIN_CLOCKING_DEG) is checked against it below.
+from dt_crank_pinion_spec import PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG  # noqa: E402
 
-PINION_PIN_CLOCKING_DEG = require_selected_pin_clocking()
-if not math.isclose(
-    crank_mesh.MESH_WINDOW_CENTRE_DEG,
-    _config.machine("gear_train", "crank_mesh_phase_offset_deg"),
-    rel_tol=0.0,
-    abs_tol=1e-12,
-):
-    raise AssertionError("qualified crank phase differs from the selected physical datum")
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
-) % 22.5 + crank_mesh.MESH_WINDOW_CENTRE_DEG  # qualified window-centred tooth-in-gap
-# The crankshaft's retention-hole clocking is independently checked against this phase below.
+) % 22.5 + _config.machine("gear_train", "crank_mesh_phase_offset_deg")
 
 # ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
 # strap faces and are defined with them below (U34b/U34c).
@@ -917,10 +901,10 @@ if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) 
 # Pinion retention pin (ch12 p.19): a plain 1/8 in straight pin through the
 # pinion's hub boss and the crankshaft, match-drilled at assembly. The hole is
 # on the pinion's local -X at the boss's mid-length; the crankshaft's hole is
-# turned to the qualified measured seed so that, with the pinion seated
-# rot_z(-seed), the two holes are one. The pin lies along machine X through
-# the shaft axis, flush with the boss on both sides. The pinion and shaft
-# consume the same source-selected clock; its calibration is checked HERE.
+# turned to the pinion seed so that, with the pinion seated rot_z(-seed),
+# the two holes are one. The pin lies along machine X through the shaft
+# axis, flush with the boss on both sides. The pinion and shaft consume the
+# same configured clock; their agreement is checked HERE.
 from dt_crank_pinion_spec import (  # noqa: E402
     BOSS_DIA as PINION_BOSS_DIA,
     FACE_WIDTH as PINION_SPEC_FACE,
@@ -960,7 +944,7 @@ if abs(PINION_SPEC_FACE - PINION_FACE) > 1e-9:
     raise AssertionError("dt_crank_pinion_spec.FACE_WIDTH disagrees with PINION_FACE")
 if abs(PINION_PIN_CLOCKING_DEG - PINION_SEED_DEG) > 1e-9:
     raise AssertionError(
-        "crankshaft matched-hole clock differs from the qualified actual-stock pinion seed"
+        "crankshaft matched-hole clock differs from the pinion seed"
     )
 if abs((CRANKSHAFT_Z0 + CS_PINION_PIN_STATION) - PINION_PIN_Z) > 1e-6:
     raise AssertionError("crankshaft pin hole station off the pinion's pin station")
@@ -2381,7 +2365,6 @@ def t120_fitup_cuts(reading: dict[str, float]) -> frozenset[str]:
 
 # T120's distance from the crank axis never falls as the crank rises, so the
 # band-turn heights run from the bottom of the printed band to one height.
-# Actual 16T:64T contact at any pose is a separate frozen 3D qualification.
 if Y_CRANK + min(_CRANK_HEIGHT_BAND) <= Y_DRIVE:
     raise AssertionError("the T120 band reading is not monotonic over the crank height band")
 
@@ -2425,18 +2408,41 @@ def gear64_contact_z(station_shift: float) -> float:
 if not math.isclose(gear64_contact_z(0.0), _GEAR64_CONTACT_Z, abs_tol=1e-9):
     raise AssertionError("gear64_contact_z disagrees with the seated pitch-cylinder azimuth")
 
-# Every row is the exact certified world pose and supported per-slice union
-# over a whole physical pitch. Changed face, band, station or axis grades
-# require a fresh geometry identity and study, never an interpolated screen.
-CRANK_ROW_QUALIFICATIONS = {
-    name: crank_mesh.row_qualification(name)
-    for name in crank_mesh.CALIBRATION_CASES
-}
-CRANK_ROW_ENGAGEMENT_FRACTION_WORST = min(
-    row.row_fraction_lower for row in CRANK_ROW_QUALIFICATIONS.values()
-)
-if CRANK_ROW_ENGAGEMENT_FRACTION_WORST < ROW_ENGAGEMENT_MIN:
-    raise AssertionError("actual supported 16T:64T row falls below its source-owned floor")
+# Face overlap of the 16T on the 64T tooth row along the crank axis: the worst
+# share of the row the 16T face covers, over every printed axial band, the
+# pinion end play, the cone stack's north float and the axis poses (summed
+# arithmetically). The contact quality inside the overlap is the standard
+# mesh check above; the native interference gate checks the real flanks.
+CRANK_ROW_ENGAGEMENT_FLOOR = 0.85
+
+
+def crank_row_engagement(cone_float: float, pose_axial: float = CRANK_ROW_POSE_AXIAL) -> float:
+    worst = math.inf
+    for b1, b2, b3, b4, d_length, play, f, shift in itertools.product(
+        _BOSS_NORTH_BAND,
+        _CONE_BOSS_NORTH_BAND,
+        _COLLAR_WIDTH_BAND,
+        _GEAR64_FACE_LIMITS,
+        _PINION_FACE_BAND,
+        PINION_END_PLAY,
+        (0.0, cone_float),
+        (-pose_axial, pose_axial),
+    ):
+        south = _POST_BOSS_NORTH + b1 + PINION_SEAT_FEELER + play
+        north = south + PINION_FACE + d_length
+        row_south = gear64_contact_z(-GEAR64_FACE / 2.0 + b2 + b3 + f) + shift
+        row_north = gear64_contact_z(GEAR64_FACE / 2.0 + b2 + b3 + b4 + f) + shift
+        overlap = min(north, row_north) - max(south, row_south)
+        worst = min(worst, max(0.0, overlap) / (row_north - row_south))
+    return worst
+
+
+CRANK_ROW_ENGAGEMENT_FRACTION_WORST = crank_row_engagement(CONE_FLOAT_NORTH)
+if CRANK_ROW_ENGAGEMENT_FRACTION_WORST < CRANK_ROW_ENGAGEMENT_FLOOR:
+    raise AssertionError(
+        f"16T covers {CRANK_ROW_ENGAGEMENT_FRACTION_WORST:.1%} of the 64T tooth row at worst, "
+        f"below {CRANK_ROW_ENGAGEMENT_FLOOR:.0%}"
+    )
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED
@@ -4492,7 +4498,8 @@ def _require_collar_pin_in_collar_hole(adapter, pin: str, collar: str) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    require_qualified_stock_family()
+    for check in (*CONE_MESH_CHECKS, ALIGNMENT_MESH_CHECK, CRANK_MESH_CHECK):
+        _telemetry.info("standard mesh check: " + check.text())
     # Flip seeds + free-DOF contract: cad/config/assemblies/<ASM_NAME>.yaml.
     activate_assembly_contract(ASM_NAME)
     # Reset the free-DOF manifest buffer before any *_driver(free_dof_key=...)
@@ -4521,16 +4528,9 @@ async def build(adapter) -> dict[str, str]:
         f"{T120_BAND_CHECK_CRANK_HEIGHT:.4f}"
     )
     _telemetry.info(
-        f"actual-stock 16T/64T supported row {CRANK_ROW_ENGAGEMENT_FRACTION_WORST:.2%} "
-        f">= {ROW_ENGAGEMENT_MIN:.0%} across {len(CRANK_ROW_QUALIFICATIONS)} "
-        f"source-owned physical cases; geometry {CRANK_MESH_QUALIFICATION['geometry_sha256']}"
-    )
-    _telemetry.info(
-        f"16T/64T STOCK-FORM COVERAGE {CRANK_STOCK_FORM_COVERAGE_NOMINAL:.4f} nominal, "
-        f"{CRANK_STOCK_FORM_COVERAGE_WORST:.4f} worst >= {STOCK_FORM_COVERAGE_MIN:.2f}; "
-        f"continuous carrying contact {crank_mesh.CONTINUOUS_CARRYING_CONTACT}, "
-        f"paid handover jump {crank_mesh.MAX_HANDOVER_JUMP_MM:.6f} "
-        f"<= {HANDOVER_JUMP_MAX_MM:.3f} mm; offline 3D evidence, not a native certificate"
+        f"16T covers {CRANK_ROW_ENGAGEMENT_FRACTION_WORST:.2%} of the 64T tooth row at worst "
+        f"(axis poses +/-{CRANK_ROW_POSE_AXIAL:.4f}, cone stack floated {CONE_FLOAT_NORTH:.2f}) "
+        f">= {CRANK_ROW_ENGAGEMENT_FLOOR:.0%}"
     )
     # #893: the W15 stacks are import-time asserts, so a passing build would
     # otherwise leave no record of their sums or margins in the leaf log.

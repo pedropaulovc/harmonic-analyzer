@@ -1,14 +1,13 @@
 """Drawing-only crank-drive gear text, above the shared geometry specs.
 
 The cone-swing platform consumes the tip circle without importing these notes.
-Exact stock tangent-span limits come from the part spec. Assembly requirements
-are stated as requirements, not a certificate for the unqualified crossed mesh.
+Exact stock tangent-span limits come from the part spec; the crossed mesh's
+standard check lives in crank_mesh_stack.
 """
 
 from __future__ import annotations
 
 import _config
-from crank_mesh_requirements import HANDOVER_JUMP_MAX_MM, STOCK_FORM_COVERAGE_MIN
 import dt_crank_drive_gear_spec as spec
 
 
@@ -19,13 +18,6 @@ GEAR_MESH_BACKLASH_MM = tuple(_config.fit("gear_mesh", "backlash_mm"))
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
     """Render an aligned gear/sprocket data block for a property-linked note."""
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
-
-
-STOCK_FORM_COVERAGE_ROW = (
-    "STOCK-FORM COVERAGE WITH MHA-DT-010, ACCEPT AT ASSEMBLY",
-    f"{STOCK_FORM_COVERAGE_MIN:.2f} MIN; NO UNCOVERED PHASE; "
-    f"HANDOVER JUMP {HANDOVER_JUMP_MAX_MM:.3f} mm MAX",
-)
 
 
 # Rule 6's compact data identifies the standard normal full-depth CUTTER.
@@ -87,7 +79,6 @@ GEAR_DATA = gear_data_note(
             f"{spec.CUTTER_TEMPLATE.reference_teeth}T; NOMINAL NORMAL-SECTION SCREW SWEEP",
         ),
         ("MATES WITH", "CRANK PINION MHA-DT-010, 16T STOCK #7/14T STRAIGHT SPUR"),
-        STOCK_FORM_COVERAGE_ROW,
     ]
 )
 

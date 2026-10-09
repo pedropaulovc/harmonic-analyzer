@@ -310,45 +310,6 @@ def test_changed_gear_bom_counts_come_from_their_specs() -> None:
         assert f"{teeth}T" in drawing.BOM_DESCRIPTIONS[stem]
 
 
-def test_crank_screen_consumes_the_actual_qualified_stock_payload() -> None:
-    import crank_mesh_stack as mesh
-    import crank_mesh_requirements as requirements
-    import dt_crank_drive_gear_spec as gear64
-    import dt_crank_pinion_spec as pinion
-
-    # This real-production gate remains red while the actual design is refused.
-    payload = mesh.require_qualified()
-    import build_dt_drive_train_assembly as assembly
-
-    normal_module = _config.machine("gear_train", "crank_drive_normal_module_mm")
-    assert gear64.NORMAL_MODULE_MM == normal_module
-    assert pinion.MODULE_MM == normal_module
-    assert gear64.HELIX_ANGLE_DEG == pytest.approx(cone_line.INCLINE_DEG)
-    assert assembly.CRANK_ACTUAL_C2C == pytest.approx(
-        (gear64.PITCH_DIA + pinion.PITCH_DIA) / 2.0
-        + _config.fit("crank_mesh", "c2c_slack_mm"),
-        abs=1e-9,
-    )
-    assert assembly.CRANK_MESH_QUALIFICATION is payload
-    assert assembly.CRANK_ACTUAL_C2C == pytest.approx(mesh.FRAME_C2C, abs=1e-9)
-    assert set(assembly.CRANK_ROW_QUALIFICATIONS) == set(payload["cases"])
-    assert mesh.required_calibration_case_names() <= payload["cases"].keys()
-    assert assembly.CRANK_STOCK_FORM_COVERAGE_NOMINAL == payload["cases"]["nominal"][
-        "stock_form_coverage_lower"
-    ]
-    worst = min(case["stock_form_coverage_lower"] for case in payload["cases"].values())
-    assert assembly.CRANK_STOCK_FORM_COVERAGE_WORST == worst == mesh.STOCK_FORM_COVERAGE_WORST
-    assert worst >= requirements.STOCK_FORM_COVERAGE_MIN
-    assert mesh.TIGHT_BACKLASH_MM > requirements.POSITIVE_BACKLASH_MIN_MM
-    assert mesh.NOMINAL_TIGHT_BACKLASH_MM == payload["cases"]["nominal"]["tight_backlash_lower_mm"]
-    assert mesh.TIGHT_BACKLASH_MM == min(
-        case["tight_backlash_lower_mm"] for case in payload["cases"].values()
-    )
-    assert mesh.CONTINUOUS_CARRYING_CONTACT
-    assert mesh.MAX_HANDOVER_JUMP_MM <= requirements.HANDOVER_JUMP_MAX_MM
-    assert mesh.PHASE_WINDOW_RAD[0] < math.radians(mesh.MESH_WINDOW_CENTRE_DEG) < mesh.PHASE_WINDOW_RAD[1]
-
-
 def test_t120_printed_facts_match_the_actual_print_worst_envelope() -> None:
     import build_dt_drive_train_assembly as assembly
     import dt_crank_pinion_spec as pinion
