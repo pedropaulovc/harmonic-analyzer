@@ -82,6 +82,9 @@ from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
 from doit.tools import config_changed
 from filelock import FileLock, Timeout  # noqa: E402
 
+# Start before the local import graph; recording is deferred until generation ends.
+_DOIT_LOAD_STARTED_NS = time.time_ns()
+
 # Every build/verify/export task routes its subprocess through ``_run``, which
 # streams the child's stdout through this doit parent process -- and tees it to
 # cad/out/logs when a log_stem is given. Build output carries non-ASCII (e.g. the
@@ -96,6 +99,13 @@ for _stream in (sys.stdout, sys.stderr):
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
+
+import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
+import _doit_load  # noqa: E402  (one graph/import span, shared by both CLI entries)
+
+_DOIT_LOAD = _doit_load.LoadStamp(_DOIT_LOAD_STARTED_NS)
+_doit_load.watch_import(_DOIT_LOAD)
+_doit_load.install()
 
 # ``_resolved`` is the graph's per-process ``Path.resolve()`` memo (dropped by
 # ``clear_import_caches``); dodo's per-task path plumbing shares it.
@@ -135,7 +145,6 @@ from _buildgraph import (  # noqa: E402
 import _artifact_cache as _cache  # noqa: E402  (remote build-artefact cache)
 import _farm  # noqa: E402  (farm executor: cache-missing leaves run on the pool)
 import _sw_lifecycle  # noqa: E402  (SolidWorks autostart/recover; lazy-imports sw_recovery)
-import _telemetry  # noqa: E402  (observability spine: console logging + tracing)
 from _drawing_registry import (  # noqa: E402
     DRAWING_TEMPLATES,
     DRAWINGS_BY_NAME,
