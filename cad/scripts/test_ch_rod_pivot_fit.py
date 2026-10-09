@@ -15,6 +15,8 @@ import numpy as np
 import pytest
 
 import _config
+import build_ch_rod_pivot_pin as pin_build
+from _hole_spec import blind_cut_dia_mm
 import ch_amplitude_bar_spec as bar
 import channel_frame_geom as frame
 import channel_kinematics as ck
@@ -49,6 +51,70 @@ def test_the_rod_arm_and_cam_share_one_plane() -> None:
     assert pin.PIN_INSTALLED_LENGTH == rod.FORK_THICKNESS
     assert pin.PIN_CSK_DIA == rod.PIN_HOLE_CSK_DIA
     assert rod.PIN_HOLE_SPEC == arm.ROD_HOLE_SPEC
+
+
+# The #47 the Hole Wizard cuts in the rod's tines (and the arm): the ANSI-inch
+# table's 0.0785 in, which _hole_spec.NUMBER_DRILL_MM rounds to 1.994.
+_WIZARD_47_DRILL = 0.0785 * 25.4
+_TABLE_47_DRILL = blind_cut_dia_mm(rod.PIN_HOLE_SPEC)
+_TINE_DEPTHS = np.linspace(0.0, rod.FORK_TINE_THICKNESS, 20001)
+
+
+def _tine_cavity_r(drill: float, leg: float) -> np.ndarray:
+    """Radius of the tine's drill + 90-degree countersink (an equal-leg
+    chamfer on the drill mouth) at each depth below the tine's outer face."""
+    return np.maximum(drill / 2.0, drill / 2.0 + leg - _TINE_DEPTHS)
+
+
+def _installed_pin_r() -> np.ndarray:
+    """Radius of the installed pin at each depth below its dressed end: the
+    45-degree flare from the Ø CskDia rim down to the journal."""
+    return np.maximum(pin_build.PIN_R, pin_build.CSK_R - _TINE_DEPTHS)
+
+
+def _sliver_mm3(drill: float, leg: float) -> float:
+    """Volume of the installed pin proud of one tine's drill + countersink."""
+    proud = np.maximum(_installed_pin_r(), _tine_cavity_r(drill, leg))
+    ring = math.pi * (proud**2 - _tine_cavity_r(drill, leg) ** 2)
+    return float(np.trapezoid(ring, _TINE_DEPTHS))
+
+
+def test_installed_pin_sits_inside_the_tine_hole_and_countersinks() -> None:
+    """The native interference gate counts ANY positive pin-rod volume, so the
+    installed pin's flare may meet the countersink but never stand proud of it.
+    The build cuts the chamfer leg from the drill the wizard reports, which
+    puts the countersink rim on PinCskDia whatever the drill's last decimal."""
+    # The pin's dressed ends are the tine faces; its flare is the 90-degree
+    # countersink's cone from the same Ø rim.
+    assert pin_build.HALF_LEN == rod.FORK_THICKNESS / 2.0
+    assert pin_build.CSK_R == rod.PIN_HOLE_CSK_DIA / 2.0
+    assert pin_build.CSK_DEPTH == pytest.approx(pin_build.CSK_R - pin_build.PIN_R)
+    assert pin.PIN_CSK_ANGLE_DEG == 90.0
+    for drill in (
+        _TABLE_47_DRILL - 0.0005,
+        _WIZARD_47_DRILL,
+        _TABLE_47_DRILL,
+        _TABLE_47_DRILL + 0.0005,
+    ):
+        leg = (rod.PIN_HOLE_CSK_DIA - drill) / 2.0
+        proud = _installed_pin_r() - _tine_cavity_r(drill, leg)
+        assert proud.max() <= 1e-12, drill
+        assert _sliver_mm3(drill, leg) <= 1e-15, drill
+    # The journal runs free in the arm's #47 between the tines.
+    assert pin_build.PIN_R < _WIZARD_47_DRILL / 2.0
+
+
+def test_a_table_drill_leg_leaves_the_pin_flare_proud() -> None:
+    """Regression (farm build at 71a6e3107, assembly:ch_channel): the leg
+    taken from the table's 1.994 on the 0.0785 in drill the wizard cut left
+    the rim Ø3.1999 and every pin's flare 0.05 um proud of it -- the reported
+    0.000245865 mm^3 per pin end."""
+    table_leg = (rod.PIN_HOLE_CSK_DIA - _TABLE_47_DRILL) / 2.0
+    proud = _installed_pin_r() - _tine_cavity_r(_WIZARD_47_DRILL, table_leg)
+    assert proud.max() == pytest.approx((_TABLE_47_DRILL - _WIZARD_47_DRILL) / 2.0)
+    assert _sliver_mm3(_WIZARD_47_DRILL, table_leg) == pytest.approx(
+        0.000245865, rel=2e-3
+    )
 
 
 def test_worst_case_joint_budget() -> None:

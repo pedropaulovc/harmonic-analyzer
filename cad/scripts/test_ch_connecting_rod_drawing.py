@@ -199,7 +199,11 @@ def test_countersink_diameter_is_model_owned() -> None:
     build = "".join(Path(rod.__file__).read_text(encoding="utf-8").split())
     assert 'set_global(adapter,"PinCskDia",f"{PIN_HOLE_CSK_DIA}mm")' in build
     assert 'name_dimensions(adapter,"PinCountersinks",["PinCskLeg"])' in build
-    assert "(csk_leg_dim[0],f'(\"PinCskDia\"-{PIN_DRILL_DIA}mm)/2')" in build
+    # The leg runs from the drill the wizard cut, so the rim lands on PinCskDia
+    # exactly (test_ch_rod_pivot_fit: the installed pin's flare fills it).
+    assert 'drill_cut=f"{pin_cut.hole_dia_mm:.9g}"' in build
+    assert "(csk_leg_dim[0],f'(\"PinCskDia\"-{drill_cut}mm)/2')" in build
+    assert "(PIN_HOLE_CSK_DIA-float(drill_cut))/2.0," in build
     assert 'names=(None,"PinCskRefY","PinCskDia")' in build
     assert 'blank_reference_sketches(adapter,("CountersinkReference",))' in build
     # The chamfer leg's drive evaluates to the leg the build cuts.

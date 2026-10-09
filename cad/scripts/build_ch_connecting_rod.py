@@ -144,7 +144,8 @@ SLOT_DEPTH = FORK_TOP_Y - FORK_CROTCH_Y  # crown top -> slot floor (14.75)
 SLOT_CUT_HEIGHT = SLOT_DEPTH + SLOT_RUNOUT
 PIN_DRILL_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 # 90-degree countersink = an equal-distance chamfer whose leg is the radial
-# step from the drill to the countersink diameter.
+# step from the drill to the countersink diameter (the analytic volumes; the
+# build cuts the leg from the drill the wizard reports, see PinCountersinks).
 PIN_CSK_LEG = (PIN_HOLE_CSK_DIA - PIN_DRILL_DIA) / 2.0
 
 
@@ -513,12 +514,16 @@ async def build(adapter) -> dict[str, str]:
     # 90-degree countersinks on both tine outer faces: the peened pin ends
     # upset into them (ch_rod_pivot_pin_spec). Edge picks sit on the drill
     # mouths' +X rims; the chamfer's leg is unprinted, driven from the
-    # countersink Ø the reference sketch below prints.
-    pin_r = PIN_DRILL_DIA / 2.0
+    # countersink Ø the reference sketch below prints. The leg runs from the
+    # drill the wizard CUT (#47 = 0.0785 in = 1.9939), not the 3-place table's
+    # 1.994: a table leg leaves the rim Ø3.1999, 0.05 um radially inside the
+    # installed pin's Ø3.200 flare -- a sliver interference at every pin.
+    drill_cut = f"{pin_cut.hole_dia_mm:.9g}"
+    pin_r = float(drill_cut) / 2.0
     check(
         "countersink pin hole mouths",
         await adapter.add_chamfer(
-            PIN_CSK_LEG,
+            (PIN_HOLE_CSK_DIA - float(drill_cut)) / 2.0,
             [
                 [pin_r, CENTER_DISTANCE, z_face]
                 for z_face in (-FORK_THICKNESS / 2.0, FORK_THICKNESS / 2.0)
@@ -527,7 +532,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "PinCountersinks")
     csk_leg_dim = name_dimensions(adapter, "PinCountersinks", ["PinCskLeg"])
-    drive_jobs.append((csk_leg_dim[0], f'("PinCskDia" - {PIN_DRILL_DIA}mm) / 2'))
+    drive_jobs.append((csk_leg_dim[0], f'("PinCskDia" - {drill_cut}mm) / 2'))
     v_csk = pin_countersink_volume()
     v_expected -= v_csk
     v_built = await volume_check(
