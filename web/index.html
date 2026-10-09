@@ -21,9 +21,10 @@
       <main id="workspace">
         <div class="model-view">
           <canvas id="stage" aria-label="Interactive CAD model of the harmonic analyzer" tabindex="0"></canvas>
-          <div id="loading" role="status">
-            <p id="model-status">Loading the released CAD model…</p>
-            <p class="hint">The complete assembly is 223 MB; the first load can take a moment.</p>
+          <div id="loading">
+            <p id="model-status" role="status">Loading the released CAD model…</p>
+            <progress id="model-progress" aria-label="CAD model download"></progress>
+            <span id="model-progress-percentage" class="hint" aria-hidden="true">0%</span>
             <button id="retry-model" type="button" hidden>Retry model</button>
           </div>
           <section id="video-dock" data-size="expanded" aria-label="Source video">

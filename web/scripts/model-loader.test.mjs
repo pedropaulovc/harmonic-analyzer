@@ -54,10 +54,102 @@ test('tampered download is rejected before parse/scene attachment and reports it
   machine.dispose()
 })
 
+test('streamed progress counts decoded chunks against the approved size, not compressed Content-Length', async t => {
+  const chunks = [Buffer.from('Not '), Buffer.from('the approved '), Buffer.from('representation')]
+  const bytes = Buffer.concat(chunks)
+  const progress = []
+  let nextChunk = 0
+  interceptFetch(t, new Response(new ReadableStream({
+    pull(controller) {
+      if (nextChunk < chunks.length) controller.enqueue(chunks[nextChunk++])
+      else controller.close()
+    },
+  }), { headers: { 'Content-Encoding': 'gzip', 'Content-Length': '1' } }))
+  const fetch = globalThis.fetch
+  globalThis.fetch = async (...args) => {
+    assert.equal(progress.length, 1, 'initial progress must precede the request')
+    assert.equal(progress[0].phase, 'downloading')
+    assert.equal(progress[0].loadedBytes, 0)
+    return fetch(...args)
+  }
+  let parses = 0
+  const parseAsync = GLTFLoader.prototype.parseAsync
+  GLTFLoader.prototype.parseAsync = async () => { parses++; throw new Error('Unapproved bytes reached GLTFLoader') }
+  t.after(() => { GLTFLoader.prototype.parseAsync = parseAsync })
+  const scene = new THREE.Scene()
+  const machine = await loadMachine(scene, {
+    url: 'https://invalid.test/streamed.glb',
+    onProgress: event => progress.push(event),
+  })
+  const totalBytes = machine.provenance.expectedByteLength
+  assert.deepEqual(progress, [
+    { phase: 'downloading', loadedBytes: 0, totalBytes },
+    { phase: 'downloading', loadedBytes: chunks[0].length, totalBytes },
+    { phase: 'downloading', loadedBytes: chunks[0].length + chunks[1].length, totalBytes },
+    { phase: 'downloading', loadedBytes: bytes.length, totalBytes },
+    { phase: 'preparing' },
+  ])
+  assert.ok(totalBytes > bytes.length, 'a compressed header must not report an early full download')
+  assert.equal(machine.availability, 'incompatible')
+  assert.equal(machine.provenance.identity, 'mismatched')
+  assert.equal(machine.provenance.observedSha256, createHash('sha256').update(bytes).digest('hex'))
+  assert.equal(machine.provenance.observedByteLength, bytes.length)
+  assert.equal(parses, 0)
+  assert.equal(scene.children.length, 0)
+  assert.match(machine.loadError, /identity mismatch/)
+  machine.dispose()
+})
+
+test('a failed response body retains received progress without preparing or invented observations', async t => {
+  const bytes = Buffer.from('partial model')
+  const progress = []
+  let receivedChunk
+  const chunkObserved = new Promise(resolve => { receivedChunk = resolve })
+  let sent = false
+  interceptFetch(t, new Response(new ReadableStream({
+    async pull(controller) {
+      if (!sent) {
+        sent = true
+        controller.enqueue(bytes)
+      } else {
+        await chunkObserved
+        controller.error(new Error('Download interrupted'))
+      }
+    },
+  })))
+  const scene = new THREE.Scene()
+  const machine = await loadMachine(scene, {
+    url: 'https://invalid.test/interrupted.glb',
+    onProgress: event => {
+      progress.push(event)
+      if (event.phase === 'downloading' && event.loadedBytes > 0) receivedChunk()
+    },
+  })
+  const totalBytes = machine.provenance.expectedByteLength
+  assert.deepEqual(progress, [
+    { phase: 'downloading', loadedBytes: 0, totalBytes },
+    { phase: 'downloading', loadedBytes: bytes.length, totalBytes },
+  ])
+  assert.equal(machine.availability, 'unavailable')
+  assert.equal(machine.provenance.identity, 'unavailable')
+  assert.equal(machine.provenance.observedSha256, null)
+  assert.equal(machine.provenance.observedByteLength, null)
+  assert.equal(scene.children.length, 0)
+  assert.match(machine.loadError, /Download interrupted/)
+  machine.dispose()
+})
+
 test('missing public artifact remains a supported unavailable state without invented observations', async t => {
   interceptFetch(t, new Response('Not found', { status: 404 }))
   const scene = new THREE.Scene()
-  const machine = await loadMachine(scene, { url: 'https://invalid.test/missing.glb' })
+  const progress = []
+  const machine = await loadMachine(scene, {
+    url: 'https://invalid.test/missing.glb',
+    onProgress: event => progress.push(event),
+  })
+  assert.deepEqual(progress, [
+    { phase: 'downloading', loadedBytes: 0, totalBytes: machine.provenance.expectedByteLength },
+  ])
   assert.equal(machine.availability, 'unavailable')
   assert.equal(machine.provenance.identity, 'unavailable')
   assert.equal(machine.provenance.observedSha256, null)
