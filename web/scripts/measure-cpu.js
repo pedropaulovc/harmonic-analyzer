@@ -5,24 +5,50 @@ async page => {
   await cdp.send('Performance.enable');
   const collect = async label => {
     await page.bringToFront();
-    const environment = () => page.evaluate(() => ({ visibility: document.visibilityState, focus: document.hasFocus() ? 'focused' : 'blurred', manualState: document.querySelector('#manual-run').textContent }));
-    const environmentBefore = await environment();
-    const stateBefore = await page.locator('#playback-status').textContent();
-    const start = await cdp.send('Performance.getMetrics');
-    await page.waitForTimeout(5000);
-    const end = await cdp.send('Performance.getMetrics');
-    const stateAfter = await page.locator('#playback-status').textContent();
-    const environmentAfter = await environment();
-    const foreground = environmentBefore.visibility === 'visible' && environmentAfter.visibility === 'visible' && environmentBefore.focus === 'focused' && environmentAfter.focus === 'focused';
-    const manualRunning = label !== 'manual-crank' || (environmentBefore.manualState === 'Stop crank' && environmentAfter.manualState === 'Stop crank');
-    const followingPattern = /^Playing · Approximate source-following/;
-    return {
-      label, stateBefore, stateAfter, environmentBefore, environmentAfter,
-      endpointStatus: !foreground || !manualRunning ? 'interrupted' : label !== 'source-following' || (followingPattern.test(stateBefore ?? '') && followingPattern.test(stateAfter ?? '')) ? 'valid' : 'changed-state',
-      cpuSeconds: Object.fromEntries(['TaskDuration', 'ScriptDuration', 'LayoutDuration', 'RecalcStyleDuration'].map(name => [name, end.metrics.find(row => row.name === name).value - start.metrics.find(row => row.name === name).value])),
-      wallSeconds: end.metrics.find(row => row.name === 'Timestamp').value - start.metrics.find(row => row.name === 'Timestamp').value,
-      heapBytes: end.metrics.find(row => row.name === 'JSHeapUsedSize').value,
-    };
+    try {
+      await page.evaluate(label => {
+        const observer = window.__harmonicSampleObserver = { label, blurCount: 0, hiddenCount: 0 };
+        const onBlur = () => { observer.blurCount++; };
+        const onVisibilityChange = () => {
+          if (document.visibilityState !== 'visible') observer.hiddenCount++;
+        };
+        observer.stop = () => {
+          window.removeEventListener('blur', onBlur);
+          document.removeEventListener('visibilitychange', onVisibilityChange);
+          window.removeEventListener('pagehide', observer.stop);
+        };
+        window.addEventListener('blur', onBlur);
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.addEventListener('pagehide', observer.stop);
+      }, label);
+      const environment = () => page.evaluate(() => ({ visibility: document.visibilityState, focus: document.hasFocus() ? 'focused' : 'blurred', manualState: document.querySelector('#manual-run').textContent }));
+      const environmentBefore = await environment();
+      const stateBefore = await page.locator('#playback-status').textContent();
+      const start = await cdp.send('Performance.getMetrics');
+      await page.waitForTimeout(5000);
+      const end = await cdp.send('Performance.getMetrics');
+      const stateAfter = await page.locator('#playback-status').textContent();
+      const environmentAfter = await environment();
+      const interruptions = await page.evaluate(() => {
+        const { blurCount, hiddenCount } = window.__harmonicSampleObserver;
+        return { blurCount, hiddenCount };
+      });
+      const foreground = environmentBefore.visibility === 'visible' && environmentAfter.visibility === 'visible' && environmentBefore.focus === 'focused' && environmentAfter.focus === 'focused' && interruptions.blurCount === 0 && interruptions.hiddenCount === 0;
+      const manualRunning = label !== 'manual-crank' || (environmentBefore.manualState === 'Stop crank' && environmentAfter.manualState === 'Stop crank');
+      const followingPattern = /^Playing · Approximate source-following/;
+      return {
+        label, stateBefore, stateAfter, environmentBefore, environmentAfter, interruptions,
+        endpointStatus: !foreground || !manualRunning ? 'interrupted' : label !== 'source-following' || (followingPattern.test(stateBefore ?? '') && followingPattern.test(stateAfter ?? '')) ? 'valid' : 'changed-state',
+        cpuSeconds: Object.fromEntries(['TaskDuration', 'ScriptDuration', 'LayoutDuration', 'RecalcStyleDuration'].map(name => [name, end.metrics.find(row => row.name === name).value - start.metrics.find(row => row.name === name).value])),
+        wallSeconds: end.metrics.find(row => row.name === 'Timestamp').value - start.metrics.find(row => row.name === 'Timestamp').value,
+        heapBytes: end.metrics.find(row => row.name === 'JSHeapUsedSize').value,
+      };
+    } finally {
+      await page.evaluate(() => {
+        window.__harmonicSampleObserver?.stop();
+        delete window.__harmonicSampleObserver;
+      }).catch(() => {}); // Navigation/closure destroys the context; pagehide also removes listeners.
+    }
   };
   const samples = [];
   try {

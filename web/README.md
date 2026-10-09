@@ -964,9 +964,10 @@ submission work, not GPU elapsed time. Vite's local compression is not evidence
 of Worker encoding negotiation: check actual hosted response headers and
 transferred bytes separately. Localhost timings establish neither hosted load
 time nor real-user Core Web Vitals.
-Both probes activate the native browser tab and flag invalid window endpoints.
-Keep it unobscured: Windows Chrome can throttle an occluded window to 1 Hz.
-Discard interrupted samples; endpoint checks do not certify the whole window.
+Both probes activate the native browser tab, retain blur/hidden events throughout
+each sample, and validate window/mode endpoints. Keep the window unobscured:
+Windows Chrome can throttle an occluded window to 1 Hz. Discard interrupted
+samples; source playback status is checked at endpoints, not continuously.
 
 The 2026-10-08 native Preview delivery check retained the approved decoded
 SHA-256 while reducing the oversized responses below. These are encoded body
