@@ -2227,7 +2227,7 @@ sections:
          **OLD-PROFILE NONCERTIFYING:** positive worst-case tight backlash,
          not a backlash window, was this earlier profile's acceptance
          (`crank_mesh_stack`). Its former grown-gear exact-solid phase/row
-         study (`diagnostics/crank_mesh_backlash_study.py`) kept the −1.49 seed
+         study (retired from the merge path) kept the −1.49 seed
          inside its common interval, nominal −2.79..−0.22. These archived
          numbers do not certify the current finite stock-form geometry;
          latest actual 3D qualification remains pending.

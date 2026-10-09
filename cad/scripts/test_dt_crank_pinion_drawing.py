@@ -1233,15 +1233,6 @@ def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
     assert max(turned, default=low) <= bdt.T120_BAND_CHECK_CRANK_HEIGHT + 1e-12
     if not turned:
         assert all(reading["turned band radial"] >= feeler for _, reading in witnesses)
-    import crank_mesh_stack as mesh
-    import crank_mesh_requirements as requirements
-
-    payload = mesh.require_qualified()
-    fitup = mesh.row_qualification("nominal")
-    support = payload["cases"]["nominal"]["continuous_contact_certificate"][
-        "finite_face_material_enclosure"]["support_placement"]
-    assert support["driver_turned_radius_mm"] == spec.TURNED_DIA_FITUP_MIN / 2.0
-    assert fitup.row_fraction_lower >= requirements.ROW_ENGAGEMENT_MIN
     # Both sheets give each cut its own condition: the turn-down floor is
     # stated with the band and its check only, the facing floor with the
     # shoulder only.  The part sheet points at the MHA-DT-000 T120 check, which

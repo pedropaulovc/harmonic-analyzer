@@ -171,7 +171,7 @@ RUNNING_BORE_BAND = (0.005, -0.025)
 # heights would stack to +/-1.02 mm; at fixed centres that could close the
 # 16T:64T crossed mesh and make it bind. Under the user ruling 2026-09-28
 # the mesh has no backlash window or fit-up adjustment. Its closing-corner
-# budget is now crank_mesh_stack.TIGHT_BACKLASH_MM > 0, which reads the low
+# budget is now crank_mesh_stack.standard_check() backlash > 0, read at the low
 # end of this unchanged U31 band and the retained angularity frame. The
 # upper +0.37 bound predates that no-bind-only requirement; keep it as ruled,
 # without treating its former backlash-window derivation as a current gate.

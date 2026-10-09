@@ -76,6 +76,25 @@ chain; a limit that cannot cite each step is a habit, not a requirement.
 7. **Verify on the assembled machine** with the trials in the last section; the model is a
    prediction until a trial confirms it.
 
+### Drive-train gear tips and standard mesh checks
+
+Gear tips take `fits.gear_tip` in `tolerances.yaml` (read through
+`_fit_limits.gear_tip_band_mm`), not the routine title-block band: an oversize
+tip eats root air and an undersize tip shortens the path of contact.
+`contact_critical` (+0.00/−0.02 mm) is the 32T alignment and 120T cylinder
+grade; `standard` (+0.00/−0.10 mm) is for tips whose mesh budget allows it.
+
+Every drive-train mesh is accepted by one closed-form AGMA-style check
+(`standard_mesh_checks`, applied in `dt_mesh_checks` and
+`crank_mesh_stack.standard_check`) plus the native SolidWorks assembly
+interference/soundness gate. The check takes each part's printed tip and
+tooth-thickness corners (`manufacturing_corner_profiles()`) and the booked
+centre range from `tolerances.yaml`, and reports the contact ratio (nominal and
+at the open corner), the involute interference margin, exact backlash and root
+clearance. The crossed 16T:64T is checked in the 64T normal section (virtual
+radius R/cos²β, thickness × cos β). Geometry comes only from the specs and
+config; no build, drawing or import reads study output.
+
 ### The chain, and where each error enters
 
 ```mermaid
