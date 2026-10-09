@@ -90,9 +90,9 @@ def test_model_owns_precision_for_every_printed_dimension() -> None:
 
 
 def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
-    # The retained explicit blank band is an input to the actual supported
-    # UNION/root-air qualification, not an ideal contact-ratio certificate.
-    assert spec.BLANK_DIA_BAND == (0.10, -0.10)
+    # Option B (user ruling 2026-10-10): undersize-only blank band about the
+    # AGMA outside diameter, narrow enough for the open-corner contact ratio.
+    assert spec.BLANK_DIA_BAND == (0.0, -0.02)
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert (
@@ -139,10 +139,10 @@ def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
 
 
 def test_native_tooth_inspection_reads_the_actual_installed_cutter() -> None:
-    minimum, maximum = _config.fit("gear_mesh", "backlash_mm")
+    # Thin-only about the standard-depth thickness (option B), so the nominal
+    # profile is the maximum-material limit.
     upper, lower = spec.TOOTH_THICKNESS_BAND
-    assert upper == pytest.approx(-lower)
-    assert upper - lower == pytest.approx(maximum - minimum)
+    assert (upper, lower) == (0.0, -0.04)
     for teeth in spec.CONFIGURATION_TEETH:
         profile = spec.stock_form_profile(teeth)
         assert profile.pitch_tooth_thickness_mm == pytest.approx(spec.tooth_thickness_mm(teeth))

@@ -31,8 +31,13 @@ fits:
     note: "Functional fit/process tip grades, not AGMA accuracy classes or an ideal-CR allocation. Contact-critical retains the 0.02 mm diametral grade for 32T alignment and 120T cylinder tips. Finite stock support pays both printed tip and retained thickness/depth limits. Alignment is a fit-up mesh: actual supported-union continuity, positive backlash and root air must pass the whole booked centre stack; smooth-flank span is reported, not gated at >1.1. Operating meshes and absolute zero TE have separate source-owned gates. See tolerance-policy.md."
 
   cone_drum_oblique_mesh:  # the inclined cone partial engagement
-    edge_slack_mm: 0.25              # selected 48DP PA20 oblique partial engagement
-    centre_opening_mm: 0.20           # total booked opening, including runout/bearing allowance
+    # User ruling 2026-10-10, option B: worst-corner contact ratio >= 1.2 for T012..T120.
+    # edge_slack: the T012 closing corner needs >= 0.076 over standard for no involute
+    #   interference at the largest drum/cone tips; 0.08 is that, rounded up.
+    # centre_opening: largest opening that keeps the T012 open-corner contact ratio >= 1.2
+    #   with the 0/-0.04 thickness and 0/-0.02 blank bands (1.217 at 0.06).
+    edge_slack_mm: 0.08
+    centre_opening_mm: 0.06           # total booked opening, including runout/bearing allowance
     drum_tooth_to_cam_notch_clock_deg: 0.02  # drum tooth pattern to CAM-NOTCH half-width (Main ruling 2026-10-09)
     note: "oblique partial engagement; checker-arbitrated edge slacks 0.00..1.14"
 

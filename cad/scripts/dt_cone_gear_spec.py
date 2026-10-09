@@ -53,7 +53,11 @@ DIAMETRAL_PITCH = _config.machine("gear_train", "diametral_pitch")
 PRESSURE_ANGLE_DEG = _config.machine("gear_train", "pressure_angle_deg")
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH
 PITCH_DIA = TEETH * MODULE_MM
-TOOTH_THICKNESS_BAND = (0.075, -0.075)  # (upper, lower), actual pitch arc
+# (upper, lower), actual pitch arc, about the standard-depth (maximum-material)
+# thickness. Option B (user ruling 2026-10-10): thin-only so the closing corner
+# keeps backlash at 0.08 edge slack, 0.04 wide so T012's open corner holds a
+# contact ratio >= 1.2 at the 0.06 opening (tolerances.yaml cone_drum_oblique_mesh).
+TOOTH_THICKNESS_BAND = (0.0, -0.04)
 CUSTOM_SIX_TOOL_THICKNESS_MM = 1.05
 
 
@@ -358,9 +362,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     GAP_FLOOR_SKETCH: {"FloorDia"},
 }
 
-# Keep the source-owned blank band: every OD/thickness corner must retain
-# finite cutter support, tip land, root air and web before construction.
-BLANK_DIA_BAND = (0.10, -0.10)
+# Blank band about the AGMA (N + 2)/DP outside diameter, undersize only, so
+# the closing corner keeps root clearance and the 0.02 width costs T012's
+# open-corner contact ratio no more than option B allows (user ruling
+# 2026-10-10). Every corner must still keep finite cutter support, tip land,
+# root air and web before construction.
+BLANK_DIA_BAND = (0.0, -0.02)
 
 
 def configuration_number(part_number: str, teeth: int) -> str:

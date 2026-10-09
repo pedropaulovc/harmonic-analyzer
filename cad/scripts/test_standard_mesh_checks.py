@@ -1,15 +1,17 @@
 """Closed-form standard checks of every drive-train mesh, from spec values.
 
 Gates, at every printed tip/thickness corner over the booked centre range:
-no binding (positive backlash at the closing corner), positive root clearance,
-no involute interference, and a contact ratio of at least 1 at the nominal
-centre. The open-corner contact ratio is a reference figure, as main printed
-it for the crank pair (dt_crank_drive_gear_notes, user ruling 2026-09-30).
+no binding (positive backlash at the closing corner), positive root clearance
+and no involute interference. The cone family must also keep a contact ratio
+of at least 1.2 at the open corner (largest centre, smallest tips; user
+ruling 2026-10-10, option B). The crank pair's open-corner figure is a
+reference, as main printed it (dt_crank_drive_gear_notes, user ruling
+2026-09-30).
 
 Named exceptions:
-* T006 is below any full-depth count against the 120T drum; its DT6-FORM1
-  form cannot be cut deeper (adjacent gaps meet), so the native assembly
-  interference/soundness gate at the operating pose governs it alone.
+* T006 is below any full-depth count against the 120T drum; the shared 20 deg
+  drum caps its contact ratio near 1, so its DT6-FORM1 form is checked by the
+  native assembly interference/soundness gate at the operating pose.
 * The alignment pinion is a fit-up mesh: its contact ratio is reported, not
   gated (tolerances.yaml gear_tip note).
 """
@@ -23,6 +25,7 @@ import dt_mesh_checks
 
 EXEMPT_CONE_TEETH = frozenset({6})
 CONE_TEETH = tuple(t for t in cone.CONFIGURATION_TEETH if t not in EXEMPT_CONE_TEETH)
+CONE_OPEN_CORNER_CONTACT_RATIO_MIN = 1.2
 
 
 def _require_no_bind(check) -> None:
@@ -35,7 +38,7 @@ def _require_no_bind(check) -> None:
 def test_cone_drum_mesh_passes_the_standard_checks(teeth: int) -> None:
     check = dt_mesh_checks.cone_check(teeth)
     _require_no_bind(check)
-    assert check.contact_ratio_nominal >= 1.0, check.text()
+    assert check.contact_ratio_min >= CONE_OPEN_CORNER_CONTACT_RATIO_MIN, check.text()
 
 
 def test_alignment_drum_fitup_mesh_cannot_bind() -> None:
