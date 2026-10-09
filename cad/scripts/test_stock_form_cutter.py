@@ -260,7 +260,7 @@ def test_helix_independent_rotation_z_elimination_and_root(beta):
             independent = _normal_screw_hand(p, normal)
             assert p.flank_point(u, side) == pytest.approx(independent, abs=2e-12)
             assert p.transverse_to_normal(*independent) == pytest.approx(normal, abs=2e-12)
-    angles = [i * p.root_half_angle_rad / 1000 for i in range(1001)]
+    angles = [p.root_half_angle_rad * (i / 1000) for i in range(1001)]  # i/1000 == 1.0 exactly at the end
     radii = [math.hypot(*_normal_screw_hand(p, c.root_point(angle))) for angle in angles]
     assert min(radii) == pytest.approx(p.root_radius_min_mm, abs=1e-8)
     assert max(radii) == pytest.approx(p.root_radius_max_mm, abs=1e-8)

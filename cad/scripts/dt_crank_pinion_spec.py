@@ -218,7 +218,9 @@ TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 # means that no T120 section reaches the full-tip shoulder envelope.
 # Both sheets describe that absence rather than printing an infinite size.
 T120_SHOULDER_AIR_WORST = math.inf
-T120_TURNED_BAND_RADIAL_WORST = 1.81
+# 1.7689 exact under cone option B (edge slack 0.08 moves X_PITCH), floored
+# to 1.76; the ordinary floor is 0.25.
+T120_TURNED_BAND_RADIAL_WORST = 1.76
 # The independent fit-up feeler check remains: MHA-DT-010 and T120 are
 # pushed toward each other to take up every running play. A band that stops
 # the feeler is turned down, never under TURNED_DIA_FITUP_MIN; a shoulder
