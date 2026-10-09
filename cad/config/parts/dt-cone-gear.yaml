@@ -12,4 +12,12 @@ dt-cone-gear:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: "gear cutting: 48DP PA20 cutter-native cone family; actual specified finite stock/custom tool authority governs blank and plunge"
+  # The current spec owns the actual cutter support, tip and floor geometry;
+  # no ideal upper-flank continuation is a manufacturing substitute.
+  # Earlier changed-profile studies refused 42/48/54T and other root/backlash cases.
+  # Their 0.35425 mm T006 web used the old 1/16 in terminal land, not this redesign.
+  # Main authorizes finite custom DT6-FORM1 N6PA20 form/root MIN 2.346 with the
+  # 1/32 in journal as tool authority ONLY, not mesh/manufacturing-corner release.
+  # Complete family solver/3D/stock-budget disposition remains pending; old U40
+  # is not an approval for current cutter-native or root-to-bore cases.

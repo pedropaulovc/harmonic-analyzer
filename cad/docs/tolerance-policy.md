@@ -76,6 +76,188 @@ chain; a limit that cannot cite each step is a habit, not a requirement.
 7. **Verify on the assembled machine** with the trials in the last section; the model is a
    prediction until a trial confirms it.
 
+### Functional gear-tip grades
+
+Gear tips are fit/process-critical even when their size is not a channel-gain
+accuracy allocation: an oversize tip consumes root air, while an undersize tip
+shortens the working path of contact. They do not take the routine exterior
+profile/title-block band. `fits.gear_tip` in `tolerances.yaml`, read through
+`_fit_limits.gear_tip_band_mm`, owns two **functional** diametral grades, not
+AGMA tooth-accuracy classes:
+
+- `standard`: +0.00/−0.10 mm, for tips whose mesh/clearance budget supports that
+  width. A part's mesh still has to pass its own retained guards.
+- `contact_critical`: +0.00/−0.02 mm, the retained functional tip grade for
+  the 32T alignment drum and 120T cylinder gears. It is independent of an
+  ideal-involute CR allocation or an AGMA accuracy claim. Actual finite
+  stock support, full booked-stack fit-up contact/air/backlash, and the
+  cylinder's separate operating meshes must pay both printed tip limits
+  together with the retained tooth-thickness and cutter-depth grades.
+
+The alignment drum is a **fit-up/zeroing mesh**, not a continuous power
+transmission. Its final acceptance is actual supported-union carrying
+continuity, positive backlash and root air over the whole booked centre
+stack, including the +0.20 mm opening corner. The union includes finite
+flank/corner/edge branches; it is not true CR. Smooth flank-only span is
+reported separately and does **not** have a >1.1 acceptance floor for this
+fit-up family. At the selected native nominal geometry the independent
+smooth-flank interval is 1.016938748–1.016938749, while the corner-inclusive
+union is 2.958717632–2.958717634. Neither number alone is a no-gap or TE
+certificate. No cone-family 0.41 mm backlash ceiling is copied onto this
+alignment fit-up mesh, and no source grade is tightened to make it pass.
+
+The model carries the explicit band on its `OutsideDia` dimension, and each
+part spec's `outside_dia_limits_mm()` returns the accepted printed MIN/MAX.
+Clearance and contact readers use those limits, including the nominal's
+rounding offset. The finite #4/26-reference alignment and #2/55-reference
+cylinder forms are not an actual-count conjugate pair. Their named
+**STOCK-FORM COVERAGE** is not true CR, and coverage alone is not no-gap
+handover, positive backlash/root air, or bounded transmission error.
+No ideal-involute screen certifies those actual translated flank/root
+profiles. The native volume and actual-contact gates remain mandatory.
+
+The finished blank must also fit the **deepest retained stock-cutter
+placement**, not merely the nominal finite flank. For the 32T part,
+$W_3=2r_{b,\mathrm{ref}}(\beta-k)+2T\sin\beta$ with $\beta=3\pi/32$.
+Its retained printed span is 4.0411–4.1411 mm, including the unchanged
++0.000/−0.100 band. Four-place nominal precision keeps the exact standard
+span 4.141050236 mm inside its printed +0 cap; three places would reject it
+by rounding downward. The lower span gives $T=1.415341006$ mm and finite
+support OD 17.636633356 mm, so the native blank is 17.63 mm and its critical
+printed tip limits are **17.61–17.63 mm**. Native nominal placement remains
+$T=(32-26)m/2=1.5875$ mm; the actual nominal plunge is 1.009791667 mm.
+
+The 120T part retains +0.05/0 mm cutter plunge. Its native blank is
+64.44 mm, with critical printed tip limits **64.42–64.44 mm**, standard
+nominal placement $T=(120-55)m/2=17.197916667$ mm, and actual nominal
+plunge 1.131458333 mm—not the reference cutter's $2.25m$ depth. The printed
+process row accepts 1.131–1.181 mm. Every corner uses the actual law
+$T=d_\mathrm{tip}/2-r_{f,\mathrm{ref}}-h_\mathrm{printed}$; the deepest
+upper/lower-tip corners support ODs 64.444123441/64.424127570 mm.
+The conservative blank-cap calculation also pays half a three-place
+rounding step. Neither the thickness nor depth grade is tightened.
+
+Each part's `manufacturing_corner_profiles()` provides the actual finite
+profiles at the Cartesian product of its printed tip and process limits;
+the native `STOCK_FORM` separately owns the standard-depth nominal.
+For alignment, the native nominal and all 4×4 manufacturing profile pairs
+are evaluated at the nominal centre and both ±0.20 mm booked centre
+corners. The actual finite union must carry without an uncovered phase,
+keep positive supported-branch reserves and backlash, retain root air
+above 0.20 mm, and enclose handover jump plus numerical error within
+0.005 mm. Smooth-flank span remains diagnostic only. Positive normal gaps
+at **noncarrying** pairs are allowed; they neither invalidate a supported
+carrier nor establish one. Support qualification alone is not a
+continuous-contact certificate. Ordinary tests require the genuine frozen
+full-period qualification from `diagnostics/alignment_mesh_study.py`, bound
+to the exact geometry, grades, core/engine source and complete 51-case
+family; missing, stale, partial or refused evidence cannot release it.
+Full adaptive-cell reports stay out of tree, while a compact source-bound
+calibration records each case's paid gates and independent diagnostics.
+The reported `uncovered_phase_rad` is a conservative measure of uncertified
+phase cells, **not** a measured physical gap. The compact evidence separates
+`support_uncertain_phase_rad` (supported sampled carriers whose swept support
+could not be enclosed) from `unsupported_contact_samples_rad` (actual sampled
+unsupported carriers). Neither numerical uncertainty nor a supported
+midpoint substitutes for full-period support qualification.
+For these spur forms, exact reflection across the line of centres maps
+upper carrying contact to lower over an entire physical tooth period;
+thus the same enclosed full-period proof qualifies both loaded directions.
+
+The alignment drum is **not a readout datum**: it has no index feature.
+Zeroing sets notches up (or a quarter turn for sines) by eye, then parks
+the drum; cone lock and crank index establish the subsequent cam datum.
+Authored engaged drum clocking is only a fit-up diagnostic, not a phase
+observation or coefficient-budget term. The pure engaged-pose law can
+report the diagnostic engine clockings
+$(\phi+\pi/32-L,\,-\lambda-L)$, where $L$ is the engaged line heading;
+the parked level line is not substituted. Native row-vector placement
+first flips the cylinder by Ry180, then rotates by Rz($-\lambda$).
+The chosen positive-platen-X operating sense is crank world $+Z$,
+cone $-U$ and cylinder world $+Z$; finishing zeroing in that direction
+loads the lower/reverse alignment edge. No historical handle-direction
+claim is made. Actual cone/cylinder home and crossed-crank phase errors
+remain absolute in the readout budget, without a channel-zero or mean tare.
+
+### Actual oblique cone qualification and installed-axis inspection
+
+The cone study in `diagnostics/oblique_cone_mesh_study.py` first reports one
+actual nominal profile and all sixteen distinct cone/cylinder printed-profile
+corner pairs for each of T006 through T120. This engineering matrix can derive
+an installed inspection from real margins; a held nominal pose, or a successful
+profile corner, is not acceptance of the complete assembled source domain.
+The unconditional two-support OUTER enclosure is not an independently
+attainable engaged corner and its numerical refusal is not physical
+infeasibility. Refused selected settings do not exhaust the real printed
+lattice or establish an all-family no-solution certificate.
+
+`dt_cone_support_pose` is the sole retained shaft-axis authority. Optional
+installed observations have strictly positive bounds and no numeric preset.
+Indicate a removable gauge arbor in the actual POST BORE,
+referenced to the cylinder-bank arbor and actual seated thrust/washer plane,
+then retain that post setting during final installation. With POST and TIP
+retained, indicate the exposed north terminal shaft's round BACK arc through
+full rotation and opposed light radial seating loads. No accessible south
+journal proud is assumed. Both observations include uncertainty and any
+verified setup movement; post running radial clearance is paid once, while
+the terminal observation already measures the actual shaft. Whole observed
+and source support envelopes intersect, never their individual terms.
+Gear-seat/tooth runout, cylinder running cock, printed axial/profile bands
+and the whole booked mesh-centre opening remain separate source inputs.
+A required inspection is not a claim that purchased stock or an assembled
+machine has been measured and passed.
+
+When the cup permits larger running motion, use `InstalledSupportMotionAcceptance`:
+datum-fixed post/north centre boxes plus the complete north radial-motion
+disk and axial travel, not an impossible tight box around the whole moving
+shaft. Rho is distance in the fixed radial measurement plane to that plane's
+intersection with the north box, not distance from a selected measured
+baseline or a recentered mean. The closed condition is
+`rho²/Rmax² + q/e <= 1`; all datum-fixed XYZ extrema remain booked. An exported
+Cartesian OUTER does not acquire that correlation implicitly and must not be
+treated as an independently attainable corner.
+
+BASIC cone incline
+does not inherit the title-block angular tolerance or the relative crank-bore
+feature-control frame.
+
+Production qualification requires actual supported three-dimensional UNION
+at least 1.1, continuous carrying and handover displacement at the physical
+driven pitch circle no greater than 0.005 mm over every paid phase cell.
+Smooth FF is a screen, not conjugate contact ratio. Root/floor material is
+collision authority only. Independent held-cone lower and upper cylinder
+angular roots establish the retained 0.06–0.41 mm backlash at the original
+operating calibration circle; the physical pitch-circle arc is reported
+separately. No inverse-driver window multiplied by an ideal ratio substitutes
+for these roots. Forward cone-root air is at least 0.02 mm and reverse
+cylinder-root air at least 0.10 mm, with the actual loaded phase intervals
+strictly inside certified FREE INNER components. The integral eccentric cam
+body must also be excluded under the entire retained pose/profile domain.
+Additional root-air capacity is obtained only by re-solving the actual sweeps
+with increased air and retaining resolved FREE INNER over every phase cell.
+The original requested-floor lower bound minus that floor is zero, not a
+physical reserve. A refused parameter-search trial bounds the certification
+search only; it is not a physical maximum or a shop-infeasible count.
+
+The cone/cylinder booked centre opening is a TOTAL source stack: select the
+larger of the booked 0.20 mm and the derived retained runout/bearing total.
+Do not add 0.20 mm to that derived total. Closing retains the actual runout;
+the booked opening does not impose an additional symmetric closing penalty.
+Stationary nominal/profile DESIGN records this stack without claiming its
+whole installed-domain qualification, supported UNION or handover.
+
+Signed operating-stall TE loads the physical lower cylinder endpoint in cone
+direction −U and retains the CAM-NOTCH/cone-lock datum, without mean, median,
+home or channel tare. The numerical report captures exact algorithm and
+consumed configuration provenance before and after the calculation, accessor
+values/read sites and the explicit calculation arguments. Registry
+title/stock/process/installation wording is reported as metadata outside the
+geometric value identity; dimensional, fit-class and unknown fields remain
+geometric. Changed source bytes cannot be rebound to an old result. No
+nominal-only matrix releases manufacturing or native factory data.
+
+
+
 ### The chain, and where each error enters
 
 ```mermaid
@@ -233,8 +415,8 @@ flowchart LR
 
 Monte Carlo of [`error_budget.yaml`](../config/error_budget.yaml) (4000 draws,
 zero-centred features uniform within ± tolerance per channel; `cone_flat_play`
-instead draws the physical 0.01–0.03 mm across-flat clearance around its
-0.02 mm mean — `class: channel` drawn once per draw and shared by every trial,
+instead draws each gear's loaded D-flat turn uniform on [0, its free-clock
+OUTER] — the same uniform hypothesis, not a nominal — `class: channel` drawn once per draw and shared by every trial,
 `class: setup` (station setting) redrawn per trial as the operator resets the bars — applied to each bar's **physical hook waveform** at its
 station — so a gain error scales the channel's second harmonic, a phase error rotates it, and a
 kinematic deviation (eccentricity, the rod pin, the lever's bar pin and spring eye: `feature_axes`) **reshapes** it
@@ -249,8 +431,8 @@ deviations too), % of the greatest term. "broad"
 pools the all-ones, half-rectangle, Gaussian and lifted-square (odd channels on) inputs; "pair" is channels 1 and
 20 alone, the consistency stress case. `allowable` is the tolerance at which a
 *zero-centred* feature alone would consume 0.05 % MAE or 0.5 % pair-p99, the
-equal-share allocation. The D-flat play's per-land mean residual survives even
-with no clearance scatter, so no linear allowable half-width exists for it.
+equal-share allocation. The D-flat play is one-sided: a gear's loaded turn is
+never negative, so no zero-centred allowable half-width exists for it.
 
 | feature | ± limit | broad MAE | broad p99 max | pair p99 | allowable | how it is held |
 |---|---:|---:|---:|---:|---:|---|
@@ -264,11 +446,15 @@ with no clearance scatter, so no linear allowable half-width exists for it.
 | cam phase | 0.25° | 0.038 | 0.21 | 0.23 | 0.33 | native `NotchPhase` dimension; the nominal 1.50° offset remains #749 |
 | mesh lag spread | 0.14° | 0.021 | 0.12 | 0.13 | 0.33 | derived from the 0.05–0.20 backlash band |
 | cone flat clock | 0.25° cone | 0.016 | 0.12 | 0.03 | 0.76° | native `BoreFlatClock` dimension; shaft flats share one clock, teeth indexed from each gear's flat in one setup; cam phase scales by T/120 |
-| cone flat play | 0.01–0.03 mm AF clearance | 0.070 | 0.36 | 0.49 | n/a | D-bore across-flat fit; phase = (clearance / lever) × T/120, the lever being the shortest flat half-chord MHA-DT-004 accepts (land at its least diameter and greatest AF) less the title block's 0.25 edge break on the torque corner; minus the Ø9.525-land lag removed by the crank index; per-land residual and per-channel variation remain |
+| cone flat play | [0, OUTER] gear turn | — | — | — | n/a | D-bore across-flat fit; phase = T/120 × the gear's loaded turn, drawn uniform on [0, OUTER], OUTER = `gear_seat_fit.connected_home_clock_angle_bound_rad` (exact width barrier at the land's least diameter and AF and the bore's greatest AF, paying the torque corner's edge break); nothing removes it |
 | station setting (setup) | 0.25 mm | 0.051 | 0.30 | 0.53 | 0.24 | interpolate the released stick; zero/travel-stop errors are one-sided and their mean bias is recorded. Scored at each input's pen-forced scale |
-| **all combined** | | **0.158** | **0.81** | **1.54** | | targets 0.30 / 1.5 / 2.0 |
+| **all combined** | | — | — | — | | targets 0.30 / 1.5 / 2.0 |
 
-The scatter calculation is below its broad-input and two-channel targets. This
+The cone-flat-play row and the combined row are recomputed on the final
+F4 inputs; the figures they carried came from the superseded linear-lever
+model, which assumed the crank index removed the Ø9.525 land's lag.
+
+The other rows' scatter is below its broad-input and two-channel targets. This
 does not discharge the physical operating assumptions or the two waivers below.
 
 - **Spring-rate matching dominates the part budget.** Match all 20 rates within
@@ -289,15 +475,19 @@ does not discharge the physical operating assumptions or the two waivers below.
 - **Phase is cheap if clocks share their datums.** ±0.25° cam-lobe/notch phase
   is 0.13 mm at the notch. All shaft flats are milled at one clock and each
   cone gear's teeth are indexed from its D-bore flat on one setup. The D-flat
-  angular play is larger on the smaller lands (half-chords ≈2.584, 1.723,
-  0.861, 0.431 mm on Ø9.525, Ø6.35, Ø3.175, Ø1.5875). A land accepted at its
-  least diameter and greatest AF has a shorter flat still (2.498, 1.636,
-  0.772, 0.396), and the title block lets each flat's torque corner lose
-  0.25 of that to an edge break. The budget books both at their worst:
-  levers of 2.248, 1.386, 0.522 and 0.146 mm, so the tip land's play is
-  about three times the sharp nominal's. Its common large-land mean lag is a
-  crank-index time shift, but neither the smaller-land residual nor
-  independent 0.01–0.03 mm clearances are. Crank in one direction only; a
+  itself still lets each gear turn on its land: under the one-way crank's
+  load a gear turns from its flats-parallel home until the shaft's width
+  across the bore's flat reaches the bore's AF. `gear_seat_fit` bounds that
+  turn exactly (an asin width barrier, not clearance ÷ half-chord, which
+  under-reads it) at the land's least diameter and AF and the bore's
+  greatest AF, paying the edge break each flat's torque corner may lose —
+  the title block's 0.25, except the 1/32 in tip flat, whose drawing holds
+  0.020 (`cone_shaft_land_bands.TERMINAL_FLAT_EDGE_BREAK_MAX`, retained for
+  the tip-screw dog's fit, not for phase). The budget draws each gear's turn
+  uniform on [0, that OUTER]; no inner bound or nominal is certified. The
+  crank index removes none of it: the index absorbs only offsets upstream of
+  the cone gears (the crank mesh's home lag, the 64T's own flat), and each
+  cone gear's flat is downstream and its own. Crank in one direction only; a
   reversal re-seats every mesh on the other flank (0.05–0.20 mm backlash).
 - **Every clearance in the position-driven chain is benign under one-sided load** — strap on
   cam, rod pin, rocker pivot, bar foot, top pin, spring hooks — because the channel spring
@@ -310,7 +500,7 @@ does not discharge the physical operating assumptions or the two waivers below.
 
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
-| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`), **on the lobe-up machine** (`reserved.nominal_residual_mae.waive_cam_home_phase`, #749); the as-built CAD's 1.5° common cam phase leaves **0.30 % MAE** that no step removes | 0.007 % MAE (as-built 0.30) | 0.05 |
+| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`), **on the lobe-up machine** (`reserved.nominal_residual_mae.waive_cam_home_phase`, #749); the as-built CAD's 1.5° common cam phase leaves **0.30 % MAE** that no step removes. The credited residual also carries the **stock-form drive-flank phase** (`error_budget.stock_phase`): cone/cylinder contact at ψ<sub>k</sub> = kπ from the cone-lock home and the crossed 16/64 shaft lag at 4πk, each by actual first contact on the loaded flank, the crank index absorbing only the 64T's home lag (T<sub>i</sub>/120 per cam, reported); contact enclosures, the crank study's bound and the cone/drum oblique-section bound are paid on top. The alignment drum is not a datum (zeroing sets the notches up by eye and parks it), so its contact at an authored drum clocking -- a gauge offset, 0.547° plus half its backlash at the CAD pose -- is not a machine error and is not booked. Deterministic, so spent here, not root-sum-squared; any missing, refused or stale input fails `check:budget` | ideal-mesh 0.007 % MAE (as-built 0.30); with stock-form phase: pending qualified cone and crank rows | 0.05 |
 | ordinate readout | ±0.075 mm reading uncertainty assumes a 0.15 mm technical-pen line; the CAD marker does not establish that performance. Loaded spring stiffness and the CAD wheel ratio give 2.089 mm per full-scale bar at the 66 mm clamp setting, or **7.180 bars** of ordinate capacity. Broad input scales are 0.338 (all ones), 0.673 (half rectangle/lifted square), and 0.809 (Gaussian). The sparse pair uses the built 165 mm radius but reaches only 13.401 mm of the 15 mm half-stroke. Each coefficient carries its own reading error and the k=0 normalizer's; `closed_form.readout` evaluates both through the actual stroke fill | 0.257 % MAE | 0.30 |
 | timebase | stop the crank at 2k turns, repeatable to ±8° (uniform). Evaluate the shifted physical trace through the readout procedure, with the correction evaluated at the intended index; do not substitute the ideal Fourier-vector slope | 0.255 % FS | 0.30 |
 | knife-edge hysteresis | rolling-resistance length 0.005 mm at each case's **rest/preload force sum**. The worst broad cases, half rectangle and lifted square, each conservatively load the knife to 138.436 N and require 47.537 N counter force at 351.700 mm inside length. The configured neutral CAD case alone is 136.615 N / 46.912 N; it is not a universal preload. The conservative numerator sums force magnitudes and the report also gives the smaller resolved vertical load. The stall denominator remains the neutral small-signal loaded lift response, not a station-exact or cycle-peak transfer. Broad-input result is 0.187%, sparse pair 0.625%. Confirm gravity, operating loads, contact material/finish and reversal trace width before treating this allowance as demonstrated hardware performance | 0.187 % FS | 0.45 |

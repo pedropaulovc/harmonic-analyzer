@@ -547,6 +547,67 @@ identifier, a checkout at any commit other than the recorded one or a different
 cache environment, or a `status` call that failed on authentication, network or
 CLI error. An auth or network failure is never a `NOT_FOUND`.
 
+### Finite form-cut gear profiles
+
+`cad/scripts/stock_form_cutter.py` owns the finite cutter geometry, independent
+of configuration and native builders. Stock selection uses the lowest-count
+master in the declared cutter range; below-base continuation is radial, with no
+upper extrapolation. A virtual helical count selects the cutter, never the
+physical tooth count. Every printed blank/tool-translation corner must retain
+support, tip land and the actual root envelope.
+
+Native and numerical consumers share the normalized core curves. Volume gates
+use the bounded Green-area oracle; material membership retains the translated
+root's partial sectors. `DT6-FORM1` is an explicitly named custom six-tooth tool,
+not a stock-range alias. Non-conjugate pairs require the named stock-form contact
+study, continuous carrying contact and signed transmission-error allocation;
+neither an ideal-involute contact ratio nor a plausible native volume certifies
+their mesh. Keep sizing and contact-study modules out of part dependency
+closures. The qualified design record and native acceptance must refer to the
+same frozen geometry and manufactured bands.
+
+### Swing-cluster gravity calibration
+
+After the farm finishes, the maintained, SolidWorks-free collector reads seven
+native STLs (nine placed instances), never imports builders or COM, and never
+writes into the source tree:
+
+```powershell
+uv run --frozen python cad/scripts/diagnostics/collect_dt_swing_gravity.py --outroot C:/src/dt-logs/farm-runs/20261008T164225457Z-6a2365ac09404a98b9cde46767f8d792.out --source-root C:/src/ha-gstd-inch-train --report C:/src/dt-logs/inch-train-swing-gravity.json
+```
+
+For subsequent calibrations, substitute the completed run and its matching source
+tree. STL has no units or commit metadata: the collector checks the source
+exporter's enforced **mm / preserved part-local origin** settings and reports
+source/mesh SHA-256 hashes, but cannot prove those sources generated those bytes.
+The example artifacts were built at `fb97437db18ac88669256295638cc87b802f9592`;
+review any governing geometry/material differences before using a rebased source.
+
+Method provenance is #859, original `03b51bce2` (main equivalent `964b1229f`):
+the c486 STL-centroid basis with later analytic weight-volume updates. The
+collector preserves that hybrid method: current native-STL centroids on the
+assembly's actual transforms, analytic weight volumes for arbor, pivot shaft,
+collar, handle and cam pins, mesh volumes for drum and brackets, brass 8500
+kg/m³ nominal / 8800 corner, steel 7800, and gravity 9.80665 m/s². It welds only
+vertices within **1e-5 mm** using SciPy KD-tree radius pairs and union-find;
+watertightness and consistent winding remain separate strict predicates. It
+does not grid-round, fill holes, remove faces or repair winding.
+
+Install all five `recommended_calibration` entries together in
+`cad/scripts/build_dt_drive_train_assembly.py`: both moment tuples, mass, basis
+and `SWING_GRAVITY_FINGERPRINT`. Use the report's measured/analytic values, not
+the mesh-only comparison. The frozen fingerprint includes dimensions, pressure
+angle and actual tooth-floor diameter/depth; never replace it with live config
+aliases. Update the nearby calibration provenance comment with the completed run
+and the exact governing source.
+Then run the **undeselected**
+`test_dt_drive_train_support_layout.py::test_swing_gravity_basis_is_the_current_parts`
+and `test_dt_swing_gravity_collector.py`, followed by `check:recipe` and the release
+gates. After any governing geometry or material changes, preserve the previously
+measured values and let the stale-basis guard refuse until the replacement report
+has been collected from the changed native parts.
+
+
 ## Remote build-artifact cache
 
 Every task that opens SolidWorks is cached: `part:<stem>`, `assembly:<stem>`,
@@ -833,3 +894,93 @@ subscription.
   `.gitattributes` normalizing line endings, a `.py` re-materialized with
   different EOLs hashes differently → a miss (never a wrong artefact). Add
   `*.py text eol=lf` if hit rate disappoints.
+
+## Native projected geometric-control zones
+
+The canonical `_gtol_spec.GeometricControl.projected_zone_height_mm` is optional:
+`None` preserves the ordinary XML payload and migrated ordinary frames are not
+repopulated; an authored height must be finite and positive. Readback gating is
+stricter for **all** feature-control frames: complete semantic signatures pay
+projection enablement/height, tolerance-zone diameter and datum order; drawings
+also check a freshly fetched frame after rebuild. Part and drawing helpers consume
+the same spec through current `IGtolFrame.SetSymbolXml` / `GetSymbolXml`.
+Direct drawing calls must source both tolerance and projected height from a
+part-spec contract; `drawing-gdt-provenance` checks both keyword values.
+
+The populated offline API reference (bundle v3.12.1) documents
+[Gtol Frame XML Schema](https://help.solidworks.com/2026/english/api/sldworksapiprogguide/Overview/Gtol_Frame_XML_Schema.htm).
+The installed R2026x `data/xmlschema/swGtolFrameXmlSchema-public-2.xsd` confirms
+`FeatureInfo/ProjectedToleranceZone` (`xs:boolean`) followed by `Projection`
+(`xs:decimal`), before datum compartments. The repository serializes the height
+using the same mm numeric-text convention as `PrimaryToleranceValue`. No primary
+source states the native unit of `Projection`; its actual physical interpretation
+remains a farm proof requirement. No exponent-form decimal or free-text `P` suffix
+is authored. `ProjectionRange` is not supported: nonzero readback refuses a
+different ranged zone.
+
+`IGtol.SetPTZHeight2` / `GetPTZHeight2` are explicitly pre-2022-only APIs and are
+never a fallback on current frames. The existing old-format seed uses the void
+`SetFrameSymbols2`, BOOL `SetFrameValues2`, and checked `ConvertFormat` status
+before any projected XML is applied. The enrolled `test_gtol_spec.py` and
+`test_drawing_specification_purity.py` include source-only contract tests; these
+are not native execution evidence. Parent offline checks and the farm gate must
+cover **every drawing with direct or spec-projected FCFs**, including ordinary
+frames. Farm evidence must capture ordinary/projected readback, reopen saved
+SLDPRT and drawing frames, and inspect rendered tolerance value, circled-P symbol,
+height and physical units on model and drawing, specifically after migration.
+
+Projected controls additionally use the LOWER-only `_native_projected_zone` reader.
+`capture_projected_gtol(model, gtol, *, expected_xml, key, phase, migrated=None)`
+records exact expected/applied `GetSymbolXml` strings, the requested source height
+in mm and the readback **XML numeric** height, plus actual document path/title/type.
+Its native `GetUserUnit(swLengthUnit)` observation includes raw `IUserUnit.UnitType`,
+`SpecificUnitType`, `GetConversionFactor()` and `GetFullUnitName(False)`. Neither
+the conversion-factor direction nor `Projection` physical units are inferred.
+Receipts explicitly say `physical_projection_unit_qualification="UNQUALIFIED"`
+and `physical_projection_unit_verified=False`: they permit first-farm evidence
+acquisition, not production publication without separate physical/render proof.
+Ordinary `None` controls never invoke this additional reader or unit getters.
+Saved-file receipts use `migrated=None`: migration history was not observed there.
+Authoring callers pass their actually observed conversion-path Boolean.
+
+After saving a projected part, or after `finalize_drawing` has closed a projected
+drawing, callers use the same synchronous public API:
+Saved drawing lookup covers canonically named `project_part_pmi` frames only.
+An unnamed direct `add_feature_control_frame` projection has immediate semantic
+capture but fails saved typed-control lookup; it is not silently accepted.
+
+```python
+from _native_projected_zone import require_saved_projected_gtols
+
+require_saved_projected_gtols(adapter, artifacts["part"], controls, label=part_name)
+# Drawing caller instead passes artifacts["drawing"], after finalize_drawing.
+```
+
+The reader never saves the audited target; its open-part reload never discards
+dirty native part state. An open part must have
+`GetSaveFlag() is False`; the current `IModelDocExtension.ReloadOrReplace` receives
+`(False, same_saved_path, False, True)` in the documented order
+`(ReadOnly, ReplaceFileName, DiscardChanges, ForceReload)`, with integer status 0
+required. It reacquires the document and named annotation handles and rejects
+changed native unit context. Already-closed files open read-only/silent through
+connected-compatible `OpenDoc7`; the target is closed in `finally`, even after a
+failed open that loaded it, and void `CloseDoc` is verified by native lookup.
+Caller-held document, feature, face and annotation handles become stale after
+reload; reacquire them from the refreshed `adapter.currentModel`.
+The documented `CloseDoc` API also closes any non-active hidden documents and
+discards their dirty state. Target identity checks do **not** prevent that API
+side effect: perform this audit in an isolated farm context, without other dirty
+hidden documents resident. This is not a general no-discard guarantee.
+Wrong document identity, missing/duplicate/wrong-type annotation, non-string or
+malformed XML, omitted projection or wrong height all refuse. An open drawing is
+refused rather than silently discarded; its caller must finalize/close first.
+The saved reader cannot turn an arbitrary phase label or stale handle into
+saved-file proof. A broken identity/title/close lookup fails instead of closing
+an unidentifiable document. Native physical unit and migrated rendered-P checks
+remain mandatory parent farm gates; document-unit getters alone cannot waive them.
+
+The source-only `test_native_projected_zone.py` covers these native getter shapes,
+raw evidence, honest unqualified status, reload refusal/fresh-handle semantics,
+multi-sheet annotation enumeration and read-only-open cleanup. Existing
+`test_gtol_spec.py` also covers canonical writer capture and ordinary-path bypass.
+These authored tests are pending parent centralized checks and native farm proof.

@@ -1,13 +1,13 @@
 vn-cone-tip-collar:
   title: Cone Tip Stack Collar
   number: MHA-VN-016
-  stock_name: Black-Oxide Carbon Steel Set Screw Shaft Collar
-  supplier: McMaster-Carr
-  supplier_skus: [9414T1]
+  description: "CUSTOM CONE TIP COLLAR WITH GROUND SCREW"
   material: Plain Carbon Steel
-  material_specification: "1215 carbon steel, black oxide; McMaster-Carr 9414T1"
-  finish: black oxide
+  material_specification: "1018 or 1215 low-carbon steel collar; reworked 18-8 stainless stock set screw"
+  stock: "3/4 in steel round bar; McMaster-Carr 94355A213 #2-56 x 5/16 in flat-tip set screw"
+  finish: bare steel; protect collar with ISO VG 32 machine-oil film
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance
-  process: purchased
+  process: "turn unchanged south nose and wall-derived smaller body with native shoulder root and free-edge breaks; preserve the full printed 2.0 wall target, 1.5 floor, ordinary bands, original tap/flat, full thread and socket reach; finish the same retained round-bore limits (native in-band representative prints diameter 0.849 +/-0.030, not a zero-clearance shaft-sized hole); mill radial tap face; tap #2-56 2B to native BASIC position and MAX root controls; grind supplied screw dog tip to native size and total runout relative to retained thread axis, retaining stock thread and hex"
+  installation_notes: "Set unchanged 0.45 +/-0.10 feeler off T006's actual thrust face; seat both finite collar-bore ends on the terminal journal's retained round BACK arc, then snug the complete ground dog wholly inside the unbroken D-flat and its torque-corner 0.020 MAX breaks; remove the leaf. Never swing/run loose. Follow assembly actual-post mandrel and entire cup-seated centre-family inspections, datum-fixed north box plus full rho^2/Rmax^2+q/e<=1 motion including metrology and original running floats, and manufactured whole-bank working-face grade that never removes running-bore cock. No loose D-fit motion, fake zero concentricity, nominal cup-angle bound, or supplied-stock pass claim. Retain original shaft/stack/bank floats and print-worst collar-to-tip-block and full manufactured-P1 collar-to-bank air."

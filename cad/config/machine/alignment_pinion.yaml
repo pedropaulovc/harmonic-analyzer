@@ -2,16 +2,46 @@
 alignment_pinion:                  # ch25 — engages the cylinder-gear set for zeroing
   teeth: 32
   disengaged_tip_gap_mm: 2.2425    # PINION_GAP; U28 park-out (was 2.0)
-  engaged_center_extension_mm: 0.35  # positive backlash after the 0.20 radial closing stack
-  engaged_center_distance_mm: 40.566667  # (120 + 32) * (25.4 / 48) / 2 + 0.35; roots 1.25m
-  source: "user correction 2026-09-22 (32 teeth); U28 2026-09-23 (park-out); DIMENSIONS.md ch25 (mechanism)"
-  confidence: "high tooth count; low placement"
+  engaged_center_extension_mm: 0.35  # chosen extension; actual stock-form backlash qualification pending
+  engaged_center_distance_mm: 40.566667  # (120 + 32) * (25.4 / 48) / 2 + 0.35; actual roots are off-centre cutter arcs
+  engaged_center_radial_stack_mm: 0.20  # retained fit/placement closing and opening corner
+  source: "2026-10-08 selected 48DP PA20 finite stock-form design (alignment26T /cylinder55T forms); user32T correction and U28 parked gap retained; DIMENSIONS.md ch25 historical mechanism"
+  confidence: "high selected tooth system; low historical placement"
   notes: >-
-    The user-authoritative 32T drum swings into the 120T cylinder set to zero
-    all channels. Its as-cut roots are shallow (gap floor a chord at the base
-    circle, r7.890), so the engage stroke ends where the 120T tips seat on
-    that floor: engaged centre distance 38.990010 mm, 0.2425 mm outside the
-    38.747491 pitch-circle sum at DP 49.82 (reviewfirst Rule 11). U28 (user,
-    2026-09-23) keeps the roots and parks the drum 0.2425 further out instead
-    (2.2425 mm disengaged tip gap), so the seated stop is reached at the same
-    6.314-degree strap swing and photographed -71.8-degree lever as before.
+    The user-authoritative 32T alignment drum swings into the 120T cylinder
+    set to zero all channels. Both use 48DP PA20, with pitch diameters
+    16.933333 and 63.5 mm, but their actual flanks come from the finite
+    26T and 55T stock forms, not ideal 32T and 120T involutes or an
+    unsupported upper continuation. The selected whole-process native blanks
+    are 17.63 and 64.44 mm. The 32T pays the printed tangent-span low corner
+    with finite support 17.636633356 mm; the 120T pays its retained plunge
+    band plus print rounding with conservative support cap 64.442207170 mm.
+    Plunge and off-centre root envelope follow those cutter-owned profiles.
+    Both OutsideDia dimensions use the shared contact-critical +0/-0.02 mm
+    tip grade at two decimal places: 17.61..17.63 /64.42..64.44 mm; actual
+    printed limits come from each spec's outside_dia_limits_mm reader.
+    Earlier nominal-support-only 17.97/64.54 caps did not pay the retained
+    tangent-span/depth corners and are not the chosen whole-process blanks.
+    The configured centre is the 40.216667 mm pitch-circle sum plus
+    0.35 mm extension, with the retained 0.20 mm radial fit/placement
+    closing and opening stack. This is not a continuous loaded-contact
+    certificate: current contact, root-air and backlash must use the actual
+    stock-form mesh, including printed tip, process bands and opening corner.
+    Main selects FITUP/zeroing use: actual UNION continuity/no-gap,
+    positive backlash, root air at least0.20 mm and handover at most0.005 mm
+    must hold over the full retained centre range and all16 manufacturing
+    profile pairs. Flank/flank coverage is diagnostic only; no greater-than1.1
+    alignment criterion or borrowed cone backlash ceiling is asserted.
+    Named union coverage is a non-contact-ratio functional measure, not an
+    ideal involute CR claim. A pointwise corner sample is not an all-phase
+    carrier-aware first-contact/backlash/TE certificate.
+    The U28 2.2425 mm parked tip gap remains the placement input.
+    Zero is established by the actual cylinder notch UP BY EYE followed
+    by the cone lock; the alignment drum has no index. An authored home
+    clock is a geometric gauge placement, not accumulated chain/error TE.
+    The actual cone-home/crank-index signed TE remains absolute and paid.
+    Prior ideal-profile tips 17.991667/64.558333 and their nominal critical-tip
+    contact study are historical calculations, not a new-profile certificate.
+    Older 49.82DP shallow base-chord roots used 38.990010 mm seated centre,
+    0.2425 mm beyond their 38.747491 mm pitch-circle sum; that root-tip
+    seating rule and its old swing angles do not govern the selected design.

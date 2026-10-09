@@ -7,25 +7,35 @@ gear_train:
   cylinder_lock_phase_deg: 1.5     # drive-train locks every cylinder gear at Rz(+1.5), half its 3-deg pitch, to mesh
                                    # tooth-in-gap with the phase-0 cones -- so at crank home every cam LOBE (a tooth
                                    # crest) sits 1.5 deg off vertical: a common cam phase the error budget scores as-built
-  drive_axis_y_mm: 90.518          # cylinder-gear shaft (drum) axis height: base top 50.8 + swing plate 6.35 + v2 journal
-                                   # 33.368 (build_drive_train_assembly derives it and asserts against this; channels read it)
+  drive_axis_y_mm: 95.25          # base top + platform stock + common cone-axis height
   crank_drive_ratio: [16, 64]      # 16T pinion on crankshaft : 64T on cone shaft
   crank_drive_normal_module_mm: 1.0583333333333333 # standard normal 24DP; transverse pitch and helix follow the cone incline
   crank_drive_pressure_angle_deg: 20.0            # standard normal-plane cutter pressure angle
-  crank_drive_backlash_mm: 0.15                   # transverse 64T tooth thinning at pitch radius
-  crank_axis_height_mm: 76.46364350289599          # physical 24DP pair centre with 0.30 mm slack; from cone journal datum
-  source: "DIMENSIONS.md ch13 (cylinder gear OD scaling), ch29/ch8 (gear law)"
-  confidence: low
+  crank_axis_height_mm: 81.19564350289599          # common Y raise; crossed-mesh bore spacing unchanged
+  crank_mesh_phase_offset_deg: null              # publish only from current-source all-corner whole-period qualification
+  source: "48DP PA20 cone train and normal-24DP PA20 crossed-crank design; DIMENSIONS.md ch13/ch29/ch8 for historical counts and gear law"
+  confidence: high                 # selected tooth systems; historical scale measurements remain low confidence
   notes: >-
-    Tooth counts counted directly on the book plates (high). DP is now ANCHORED
-    on the measured cylinder-gear OD = 62.2 mm (DIMENSIONS.md ch13, scaled p.25
-    bottom-left vs the back-view gear brackets, LOW confidence): m = 62.2/(120+2)
-    = 0.50984 mm, DP = 25.4/m = 49.82, pitch dia = 120*m = 61.18 mm. This
-    SUPERSEDES the former DP 30 round-inch derivation (which gave OD 103.3) — see
-    the ch12/ch13 discrepancy notes. Cone T120 shares this module (it meshes the
-    cylinder set). Gear law (ch.29 p.99, annotated): cylinder gear k turns k/80
-    rev per crank turn; ch.8 p.7 (stated): gear n spins n× gear 1. Crank reduction
-    16:64 = 1:4 sets the cone-shaft input speed. The crank-pair module is now
-    subordinate to the manually rederived v2 post: its cast-in crank-axis
-    location fixes DP 24.74 at the checked 0.25 mm engaged centre-distance
-    slack; equal 64T/cone-T120 pitch radii are no longer assumed.
+    Cone, cylinder and alignment teeth use the 48DP PA20 tooth system.
+    Shop-made profiles use the actual specified finite stock/custom cutter
+    authority; blank OD and plunge are selected against its finite support,
+    with no ideal upper-flank continuation. Cylinder uses the 55T stock form
+    and alignment the 26T. The 120T pitch diameter is 63.5 mm; 64.558333 mm
+    was its earlier ideal-profile tip, not a cutter-native certificate.
+    Cone counts and the 7.0565 mm channel grid are retained.
+    The crossed crank uses normal 24DP PA20, actual 14T form for its straight
+    16T pinion and actual 55T normal form for the right-hand 64T helix.
+    Beta follows the cone incline (13.001107 degrees), so the transverse
+    pitch is 23.384777DP. Actual tip, floor and phase belong to the
+    current finite stock-form spec and mesh readers.
+    The physical pair centre is 43.524321 mm with 0.30 mm running extension;
+    the cone journal is 38.1 mm above the unrelieved swing platform and
+    the post crank axis is 81.195644 mm above it. The shared 4.732 mm raise
+    preserves the crossed-pair centre and plan; post body height is 94.732 mm.
+    Cutter #7 is the 14T stock form for the spur; cutter #2 is the actual
+    55T normal stock form for the helix. The 69.185 virtual tooth count is a
+    helix conversion reference, not permission to use an ideal virtual flank.
+    Helical lead is 945.862339 mm/revolution, not a tilted straight slot.
+    Gear law (ch.29 p.99, annotated): cylinder gear k turns k/80 rev per
+    crank turn; ch.8 p.7 (stated): gear n spins n times gear 1.
+    Crank reduction 16:64 = 1:4 sets the cone-shaft input speed.

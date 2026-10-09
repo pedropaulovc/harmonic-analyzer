@@ -5,3 +5,7 @@ dt-cone-pivot-post:
   quantity: 1
   tolerance_class: machined_block
   process: "machined from solid stock or casting"
+  # Both journal heights and the body follow the shared raised-axis law in
+  # dt_post_mount_stack; the head height and mounting pitch are unchanged.
+  # Crank axis height and cone incline read the current machine configs;
+  # the former 86 mm / 72.7 mm / 12.5182-degree v36 values are historical.
