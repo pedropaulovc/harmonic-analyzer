@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -115,7 +116,7 @@ def test_every_actual_template_uses_its_authoritative_root_endpoint(teeth: int) 
     for translation in (lower, upper):
         profile = solve._profile_probe(teeth, cutter, translation)
         assert profile.root_radius_min_mm >= inputs.root_min_mm(teeth) - 1e-9
-        assert profile.root_radius_max_mm <= inputs.root_max_mm(teeth) + 1e-9
+        assert profile.root_radius_max_mm <= teeth * inputs.module_mm / 2 + 1e-9
 
 
 def test_custom_six_has_real_below_base_support_and_full_printed_band() -> None:
@@ -152,7 +153,27 @@ def test_booked_opening_is_total_and_never_discards_larger_derived_stack(
     assert components["derived_total"] == pytest.approx(expected_derived)
     assert components["booked_total"] == booked
     assert components["selected_total"] == pytest.approx(inputs.opening_mm)
-    # Closing retains the real runout only; booked opening is not a new
-    # symmetric closing penalty or a change to the printed root floor.
-    assert inputs.root_max_mm(6) == pytest.approx(inputs.centre_mm(6)-inputs.runout_mm
-        -max(profile.blank_radius_mm for profile in inputs.drum_corners)-solve.FLOOR_AIR_MIN_MM)
+    # Closing retains the existing source class runout; total booking never
+    # becomes a new symmetric close penalty or a filled RootMAX floor.
+    assert inputs.runout_mm == pytest.approx(
+        (solve.cone_spec.BORE_DIA_BAND[0] - solve.lands.GEAR_SEAT_BAND[1]) / 2
+        + solve.drum_spec.BORE_DIAMETRAL_CLEARANCE_MM[1] / 2
+    )
+
+
+def test_dimensional_candidates_are_not_pruned_by_filled_root_collision_disks():
+    inputs = solve.configured_inputs()
+    cutter = solve.cutter_for_count(6, inputs, six_pitch_thickness_mm=1.05)
+    domain = solve._translation_domain(6, cutter, inputs)
+    impossible_scalar_air = replace(inputs, edge_slack_mm=-1000.0,
+                                   runout_mm=1000.0, opening_mm=1000.0)
+    assert solve._translation_domain(6, cutter, impossible_scalar_air) == domain
+    translations = (domain[0], domain[0])
+    od_low, od_high = solve._od_domain(6, translations, cutter)
+    outside = (od_low + od_high) / 2
+    first = solve.geometry_margins(6, outside, translations, cutter, inputs)
+    second = solve.geometry_margins(6, outside, translations, cutter, impossible_scalar_air)
+    assert first == second
+    assert not {"floor_air_mm", "floor_window_dia_mm", "drum_root_air_mm"} & first.keys()
+    assert {"finite_support_mm", "blank_above_root_mm", "web_mm", "tip_land_mm",
+            "gap_foot_width_mm", "special_root_min_mm"} <= first.keys()

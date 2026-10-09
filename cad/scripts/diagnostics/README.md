@@ -34,6 +34,22 @@ native consumers check its integrity without importing or reading diagnostics.
 Every counted branch retains a genuine finite common-normal contact proof.
 Root arcs and root junctions remain noncarrying, including when a neighbouring
 radial working segment lies between the true root minimum and maximum.
+`stock_form_root_sweep.root_free_intervals` defaults to actual driver ROOT
+material. Its explicit `root_only=False` selector reuses the same traversal
+for complete cutter-gapped driver material; receipts and witnesses name that
+different scope and retain every physical driven tooth and cap. A complete-
+material query is not a root-MAX disk or a substitute for directed root
+ownership. Accepted nearly orthogonal stored frames use precomputed true
+inverses for containment and sampled world points, with directional clearance,
+primitive-error and parameter-radius metric payments. A legacy point adapter's
+transpose-local result cannot become root evidence. These are source-only
+numerical enclosures, not evidence that manufactured stock has passed.
+Known squared norms preserve the nonnegative domain of the complete sum,
+including three uncertain components straddling zero. Eccentricity and frame
+norms are accumulated as whole vectors rather than re-summing scalar norm
+intervals. Generic square roots still reject genuinely negative domains;
+neither an absolute value nor an arbitrary square-root clamp supplies proof.
+
 The surface search separates its lower-envelope model from guaranteed
 physical witnesses. Expanded pose domains bound possible contact; eroded
 domains admit witnesses that survive every paid displacement. Their gap is
@@ -77,10 +93,79 @@ remain explicit refusal, never physical infeasibility or native success.
 The permanent sixth measurement source is authenticated when continuation
 is actually collected; stationary-only DESIGN is not a production certificate.
 
+Physical neighbourhoods retain each patch's own native coordinates: t/z on
+sides and incidents, t/rho on finite face caps. A main-chart rectangle cannot
+stand in for a differently parameterised incident or cap. Constrained minima,
+one-sided boundary derivatives and complete outside-union surface receipts bind
+these actual domains and branch root coordinates; missing or point domains refuse.
+
+Periodic closure requires actual same-source centred eccentricity disks, an
+all-stratum endpoint bijection, fresh endpoint/centre roots and an all-tooth/cap
+material-root receipt. Driver and driven root-air floors remain separate.
+Finite-pitch and rotation-product discrepancies are paid through the joint
+`lcm(Ndriver,Ndriven)` tooth period, with geometry-plus-arc padding on the actual
+minimum neighbourhoods. Rotated rectangle corners, sampled flags and proclaimed
+zero jumps are not closure certificates. Handover proofs retain and exclude
+every physical competitor, not just the two candidate roots.
+The same explicitly supplied `additional_geometry_error_mm` is required on
+first-contact covers, branch ordering/coverage and same-source handovers, not
+only on the final seam/root receipts. The converter pays profile geometry and
+joint-period displacement once; a dropped payment or a second TE payment is
+not a valid replay. Endpoint square-root certificates compare exact dyadic
+integer squares, so nonzero underflowing norm squares cannot trigger an
+astronomical outward-rounded-product correction walk. Exact-zero identities,
+finite ordered endpoints and genuinely negative-domain refusal are unchanged.
+
+`stock_form_contact_certificate.py` is the pure shared native reader, not a
+seventh measuring source. Its lower/upper labels refer to physical driven-angle
+endpoints (closing senses -1/+1), not to inverse-offset window labels. Mechanical
+cam-notch/cone-lock zeros must be supplied from their independent manufactured
+datums; neither a loaded home value nor an arbitrary tooth clock is a TE tare.
+Nonrigid face-width families must be covered as material-cap motion, not silently
+relabelled as a rigid translation.
+
 The retained physical crank phase has one configuration cell,
 `gear_train.crank_mesh_phase_offset_deg`. Until qualified it is null.
 The shaft builder requests the retention-hole angle only after the current
 calibration and that cell agree; no ideal-profile phase alias is retained.
+
+The crank collector calls `analyse_3d_mesh` with the required
+`continuous_source_domain`, covering the nominal profile and all 16 profile
+corners. There is no scalar pose-ball or sampled-window fallback. The actual
+post, each journal's own clearance/contact span, both gear TIR disks, all
+retained-band/face states and independent real tooth-clock sources belong to
+that domain. An unbound lateral-origin or clock grade is UNKNOWN. Explicit
+conditional DESIGN assumptions are captured inputs, never installed stock
+acceptance or a publishable source qualification.
+
+`crank_mesh_geometry.geometry_sha256()` is the pure physical INPUT identity.
+It excludes diagnostic bytes, calibration JSON and the selected phase OUTPUT;
+the exact six-source measuring manifest and before/compiled/after captures
+remain separate. The collector must publish a real admitted
+`calibration/dt-crank-stock-form.json` before the native build. A missing,
+replaced, malformed or mutated packet refuses; neither a synthetic test
+fixture nor a historical stationary result can fill it. Native readers bind
+current physical bytes and parameters, while central publication also binds
+the actual deployed measuring sources.
+
+Selection keeps the raw unselected certificate identity. The selected driver
+placement uses the native degree-valued datum arithmetic and has a separate
+identity/transport receipt, actual effective clock displacement, same-q
+mapping and proved disk-only joint-period relabelling. Fresh selected-placement
+21-point face/root/first-contact queries are required. Their reference is a
+separate declared nominal q0/profile/face/band query, not the midpoint of an
+asymmetric manufacturing source. The full-source envelopes compare to that
+same physical nominal scalar, and the whole-period signed cone-shaft lag
+interval retains all source cells, numerical payment and seam authority.
+`crank_drive_phase.require_qualified()` returns the actual admitted full packet;
+native and budget callers require exact finite configuration/packet/provider
+phase equality and frozen provider fields from those same packet bytes.
+
+The recorded historical crank C+0.4/phase-zero stationary refusal used
+500000 boxes and retained 0.849669 mm residual with unchanged source bytes.
+It is not a numerical candidate qualification or evidence that physical
+manufacture is impossible. Source APIs and static review readiness are
+separate from a new source-captured design run and full native qualification.
 
 They still import shared helpers with bare `from _common import ...` /
 `from _chain import ...`; the `_common.py` / `_chain.py` shims in this directory

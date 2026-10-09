@@ -51,8 +51,10 @@ from dt_cylinder_gear_spec import (
     NOTCH_CENTER_X,
     NOTCH_FLOOR_RADIUS,
     OVERALL_THICKNESS,
+    PATTERN_NOTCH_BASIC_ANGLE_DEG,
     SURFACE_FINISHES,
     TIP_RADIUS,
+    pattern_notch_clock_grade_deg,
 )
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
@@ -102,6 +104,7 @@ FRONT_KEEP = {
     "CamDia": (0.175, 0.235),
     "CamCy": (0.175, 0.279),
     "NotchPhase": (0.152, 0.334),
+    "PatternNotchPhase": (0.152, 0.360),
 }
 RIGHT_KEEP = {
     "OutsideDia": (0.248, RIGHT_CENTER[1]),
@@ -463,9 +466,46 @@ def _leader_outside_arrow(adapter: Any, annotations: list[Any], name: str) -> No
         raise RuntimeError(f"{name} did not keep its single outside arrow")
 
 
+def _pattern_notch_phase_control(adapter: Any, annotations: list[Any], grade_deg: float) -> Any:
+    """Keep the true pattern locator BASIC; print its independently paid grade."""
+    matches = [annotation for annotation in annotations
+               if dimension_name(adapter, annotation) == "PatternNotchPhase"]
+    if len(matches) != 1:
+        raise RuntimeError("expected one actual PatternNotchPhase@NotchProfile locator")
+    raw_display = matches[0].GetSpecificAnnotation()
+    if raw_display is None:
+        raise RuntimeError("pattern-to-CAM-notch locator has no display dimension")
+    display = _early_bound(raw_display, "IDisplayDimension")
+    raw_dimension = display.GetDimension2(0)
+    if raw_dimension is None:
+        raise RuntimeError("pattern-to-CAM-notch locator has no model dimension")
+    dimension = _early_bound(raw_dimension, "IDimension")
+    name = dimension.FullName
+    if (type(name) is not str or not name.startswith("PatternNotchPhase@NotchProfile@")
+            or int(display.Type2) != 3 or int(dimension.DrivenState) != 1
+            or not math.isclose(abs(float(dimension.SystemValue)),
+                                math.radians(PATTERN_NOTCH_BASIC_ANGLE_DEG), abs_tol=1e-8)):
+        raise RuntimeError("pattern-to-CAM-notch locator is not the actual driven 90-degree angle")
+    if dimension.SetToleranceType(1) is not True or int(dimension.GetToleranceType()) != 1:
+        raise RuntimeError("pattern-to-CAM-notch locator did not retain BASIC tolerance")
+    display.ShowParenthesis = False
+    if display.ShowParenthesis is not False:
+        raise RuntimeError("BASIC pattern locator incorrectly retained reference parentheses")
+    above = f"TOOTH PATTERN TO CAM NOTCH\nANGULAR ERROR +/-{grade_deg:g} DEG FROM BASIC"
+    below = "INSPECT FROM THE ACTUAL SEED TOOTH GAP,\nNOT FROM THE ECCENTRIC CAM LOBE."
+    # IDisplayDimension.SetText is VT_VOID: success is authoritative GetText,
+    # never the setter's return value. The boxed angle remains BASIC, not +/-.
+    display.SetText(3, above)  # swDimensionTextCalloutAbove
+    display.SetText(4, below)  # swDimensionTextCalloutBelow
+    if display.GetText(3) != above or display.GetText(4) != below:
+        raise RuntimeError("critical gear-pattern angular callout did not persist")
+    return display
+
+
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
+    pattern_grade = pattern_notch_clock_grade_deg()
 
     check("open cylinder-gear source", await adapter.open_model(str(SOURCE)))
     read_required_properties(
@@ -541,6 +581,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # band nobody specified.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_reference_dimensions(adapter, annotations, {"BoreDia"})
+    _pattern_notch_phase_control(adapter, annotations, pattern_grade)
     # Keep the controlled face-width value while moving only its text outside
     # the side-view extension lines; the offset leader returns to the dimension.
     offset_dimension_text(

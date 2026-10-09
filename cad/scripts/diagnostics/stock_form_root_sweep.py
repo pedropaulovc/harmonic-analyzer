@@ -8,10 +8,14 @@ Root arcs, floors, lobes and their joins supply no working coverage or TE.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 import sys
 from typing import TYPE_CHECKING
+
+from diagnostics.stock_form_contact_continuation import (
+    Interval, _squared_norm, frame_inverse_bounds, operator_norm_upper, sqrt_bounds,
+)
 
 from diagnostics.stock_form_root_angles import (
     RootAngularDomain,
@@ -99,6 +103,11 @@ class RootSweepBounds:
     reason: str = ""
     root_is_carrying: bool = False
     native_solid_certificate: bool = False
+    material_scope: str = "driver_root_material"
+    physical_driver_teeth: tuple[int, ...] = ()
+    physical_driven_teeth: tuple[int, ...] = ()
+    physical_patch_inventory: tuple[str, ...] = ()
+    parameter_radius_metric_upper: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -160,9 +169,6 @@ def _cap(segment) -> bool:
     return segment.kind == "axial_face"
 
 
-def _local(world, origin, frame) -> tuple[float, float, float]:
-    return tuple(math.fsum((world[j] - origin[j]) * frame[j][i]
-                           for j in range(3)) for i in range(3))
 
 
 def _validate(search: RootSearch, maximum_error_mm: float, max_boxes: int,
@@ -239,35 +245,43 @@ def _containment(search: RootSearch, full: Intervals, required_root_air_mm: floa
     driven boundary must intersect it and the continuous sweep detects it.
     """
     driven, p = search.case.driven, search.placement
-    # Directional errors are DRIVER-frame cylinder components. Containment
-    # queries are in the DRIVEN frame, so crossing axes mixes axial/radial pay.
-    cross = tuple(
-        p.driver_frame[(j + 1) % 3][2] * p.driven_frame[(j + 2) % 3][2]
-        - p.driver_frame[(j + 2) % 3][2] * p.driven_frame[(j + 1) % 3][2]
-        for j in range(3)
-    )
-    sine = min(1.0, math.sqrt(math.fsum(c * c for c in cross)) + 64 * sys.float_info.epsilon)
-    radial = (search.radial_error_mm + search.axial_error_mm * sine
-              + driven.geometry_error_bound_mm)
-    axial = (search.axial_error_mm + search.radial_error_mm * sine
-             + driven.geometry_error_bound_mm)
+    # Source errors and the requested mm clearance are DRIVER-local. The
+    # stored frames are merely near orthogonal: use their true inverse and
+    # pay the complete directional metric, once per invariant query pose.
+    inverse = frame_inverse_bounds(p.driven_frame)
+    relative = tuple(tuple(sum(inverse[i][k]*float(p.driver_frame[k][j]) for k in range(3))
+                           for j in range(3)) for i in range(3))
+    planar_gain = operator_norm_upper(tuple(row[:2] for row in relative[:2]))
+    axial_to_radial = sqrt_bounds(_squared_norm(tuple(relative[i][2] for i in range(2)))).upper
+    radial_to_axial = sqrt_bounds(_squared_norm(relative[2][:2])).upper
+    axial_gain = relative[2][2].magnitude
+    clearance = Interval.point(operator_norm_upper(relative))*required_root_air_mm
+    radial = (Interval.point(planar_gain)*search.radial_error_mm
+              +Interval.point(axial_to_radial)*search.axial_error_mm
+              +driven.geometry_error_bound_mm+clearance).upper
+    axial = (Interval.point(axial_gain)*search.axial_error_mm
+             +Interval.point(radial_to_axial)*search.radial_error_mm
+             +driven.geometry_error_bound_mm+clearance).upper
     candidates = []
     for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
         z = p.driver_face_mm[0] + fraction * (p.driver_face_mm[1] - p.driver_face_mm[0])
-        world = tuple(p.driver_origin_mm[j] + p.driver_frame[j][2] * z for j in range(3))
-        q = _local(world, p.driven_origin_mm, p.driven_frame)
-        arithmetic = 128 * sys.float_info.epsilon * (1 + sum(map(abs, world)) + sum(map(abs, q)))
-        r = math.hypot(q[0], q[1])
-        if (r > driven.blank_radius_mm + radial + arithmetic + required_root_air_mm
-                or q[2] < p.driven_face_mm[0] - axial - arithmetic - required_root_air_mm
-                or q[2] > p.driven_face_mm[1] + axial + arithmetic + required_root_air_mm):
+        world_bounds = tuple(Interval.point(float(p.driver_origin_mm[j]))
+                             +Interval.point(float(p.driver_frame[j][2]))*z for j in range(3))
+        local_bounds = tuple(sum(inverse[i][j]*(world_bounds[j]-float(p.driven_origin_mm[j]))
+                                 for j in range(3)) for i in range(3))
+        world = tuple(value.midpoint for value in world_bounds)
+        q = tuple(value.midpoint for value in local_bounds)
+        r = sqrt_bounds(_squared_norm(local_bounds[:2]))
+        if (r.lower > (Interval.point(driven.blank_radius_mm)+radial).upper
+                or local_bounds[2].upper < (Interval.point(p.driven_face_mm[0])-axial).lower
+                or local_bounds[2].lower > (Interval.point(p.driven_face_mm[1])+axial).upper):
             return "driver-root axis point outside paid driven finite cylinder", None
         # Inside the core's actual central material disk is an offset-invariant
         # collision. Neither an uncertain gap membership nor a fan is enough.
         if (p.driver_face_mm[0] < z < p.driver_face_mm[1]
-                and r + radial + arithmetic < driven.root_radius_min_mm
-                and p.driven_face_mm[0] + axial + arithmetic < q[2]
-                < p.driven_face_mm[1] - axial - arithmetic
+                and (Interval.point(r.upper)+radial).upper < driven.root_radius_min_mm
+                and (Interval.point(p.driven_face_mm[0])+axial).upper < local_bounds[2].lower
+                and local_bounds[2].upper < (Interval.point(p.driven_face_mm[1])-axial).lower
                 and driven.contains_material(q[0], q[1])):
             candidates.append(RootMaterialWitness(
                 None, "driver-axis containment", None, None, q[2], world,
@@ -281,7 +295,7 @@ def _containment(search: RootSearch, full: Intervals, required_root_air_mm: floa
 
 def root_free_intervals(
     search: RootSearch, *, maximum_error_mm: float = 0.001, max_boxes: int = 500000,
-    required_root_air_mm: float = 0.0,
+    required_root_air_mm: float = 0.0, root_only: bool = True,
 ) -> RootSweepBounds:
     """Enclose FREE inverse driver offsets over the complete physical pitch.
 
@@ -292,6 +306,9 @@ def root_free_intervals(
     ``required_root_air_mm`` inflates the collision query by a 3D clearance ball,
     paying radial, angular and axial distances independently. Its guarantee is
     conditional on an offset in FREE INNER, not on a root-MAX disk screen.
+    ``root_only=False`` queries the actual COMPLETE cutter-gapped driver
+    material. It does not turn a root-radius screen into a solid. Scope,
+    complete tooth/cap inventory and material witnesses remain explicit.
     """
     full: Intervals = ()
     witnesses: list[RootMaterialWitness] = []
@@ -303,12 +320,32 @@ def root_free_intervals(
     has_nominal_collision = False
     radial_air = math.inf
     geometric = math.inf
+    scope = "invalid_selector"
+    inventory = ()
+    driver_teeth = driven_teeth = ()
+    parameter_metric = 1.0
     try:
+        if type(root_only) is not bool:
+            raise ValueError("root_only must explicitly select root or complete driver material")
+        scope = "driver_root_material" if root_only else "driver_full_material"
         _validate(search, maximum_error_mm, max_boxes, required_root_air_mm)
+        driver_teeth = tuple(range(search.case.driver.teeth))
+        driven_teeth = tuple(search.driven_teeth)
+        inventory = tuple(f"{tooth}:{segment.name}" for tooth in driven_teeth for segment in search.segments)
+        inverse_driver = frame_inverse_bounds(search.placement.driver_frame)
+        inverse_metric = operator_norm_upper(inverse_driver)
+        relative_driven = tuple(tuple(sum(inverse_driver[i][k]*float(search.placement.driven_frame[k][j])
+                                         for k in range(3)) for j in range(3)) for i in range(3))
+        parameter_metric = operator_norm_upper(relative_driven)
         pitch, radius = search.pitch, search.case.driver.pitch_radius_mm
         full = ((-pitch / 2, pitch / 2),)
         domain = RootAngularDomain(search.case.driver, search.gap)
         proof, containment_witness = _containment(search, full, required_root_air_mm)
+        if not root_only:
+            proof = proof.replace("driver-root axis","driver-material axis")
+            if containment_witness is not None:
+                containment_witness = replace(containment_witness,
+                    proof=containment_witness.proof.replace("driver root-axis","driver material-axis"))
         if containment_witness is not None:
             witnesses.append(containment_witness)
             return RootSweepBounds(
@@ -319,6 +356,9 @@ def root_free_intervals(
                 root_air_lower_bound_mm=None, root_max_radial_clearance_screen_mm=None,
                 witnesses=tuple(witnesses), enclosure_uncertainty=(), uncertain_boxes=0,
                 boxes=0, status="contained_collision", containment_proof=proof,
+                material_scope=scope, physical_driver_teeth=driver_teeth,
+                physical_driven_teeth=driven_teeth, physical_patch_inventory=inventory,
+                parameter_radius_metric_upper=parameter_metric,
             )
         if proof.startswith("driver-inside-driven"):
             return RootSweepBounds(
@@ -329,18 +369,20 @@ def root_free_intervals(
                 root_air_lower_bound_mm=None, root_max_radial_clearance_screen_mm=None,
                 witnesses=(), enclosure_uncertainty=(), uncertain_boxes=0, boxes=0,
                 status="containment_refused", containment_proof=proof,
-                reason="surface noncrossing cannot prove absence of interior root overlap",
+                reason=f"surface noncrossing cannot prove absence of interior {'root' if root_only else 'material'} overlap",
+                material_scope=scope, physical_driver_teeth=driver_teeth,
+                physical_driven_teeth=driven_teeth, physical_patch_inventory=inventory,
+                parameter_radius_metric_upper=parameter_metric,
             )
         p = search.placement
-        source_error = search.case.driven.geometry_error_bound_mm
+        source_error = (Interval.point(parameter_metric)*search.case.driven.geometry_error_bound_mm).upper
 
-        def point_domain(local, rho, air=required_root_air_mm):
+        def point_domain(local, rho, point_error, air=required_root_air_mm):
             r = math.hypot(local[0], local[1])
-            arithmetic = 128 * sys.float_info.epsilon * (1 + sum(map(abs, local)))
-            radial = rho + search.radial_error_mm + source_error + arithmetic + air
-            axial = rho + search.axial_error_mm + source_error + arithmetic + air
-            rlo, rhi = max(0.0, r - radial), r + radial
-            zlo, zhi = local[2] - axial, local[2] + axial
+            radial = (Interval.point(rho)+search.radial_error_mm+source_error+point_error+air).upper
+            axial = (Interval.point(rho)+search.axial_error_mm+source_error+point_error+air).upper
+            rlo, rhi = max(0.0,(Interval.point(r)-radial).lower),(Interval.point(r)+radial).upper
+            zlo, zhi = (Interval.point(local[2])-axial).lower,(Interval.point(local[2])+axial).upper
             if zhi < p.driver_face_mm[0] or zlo > p.driver_face_mm[1]:
                 return None
             if zlo > p.driver_shoulder_z_mm:
@@ -348,24 +390,37 @@ def root_free_intervals(
                     return None
                 rhi = min(rhi, p.driver_turned_radius_mm)
             theta = math.atan2(local[1], local[0]) + search.seed - search.phase - pitch / 2
-            bound = domain.offset_bounds(rlo, rhi, theta, _angle_error(r, radial), root_only=True)
+            bound = domain.offset_bounds(rlo, rhi, theta, _angle_error(r, radial), root_only=root_only)
             guaranteed_axial = (p.driver_face_mm[0] < zlo and zhi < p.driver_face_mm[1]
                                 and (zhi <= p.driver_shoulder_z_mm
                                      or r + radial <= p.driver_turned_radius_mm))
             return bound, (zlo, zhi), guaranteed_axial, rlo - domain.root_max
 
         def actual_point(segment, tooth, t, s):
-            world, local = search.point(segment, tooth, t, s)
-            world, local = tuple(map(float, world)), tuple(map(float, local))
-            if len(world) != 3 or len(local) != 3 or not all(map(math.isfinite, (*world, *local))):
+            world, reported_local = search.point(segment, tooth, t, s)
+            world, reported_local = tuple(map(float, world)), tuple(map(float, reported_local))
+            if len(world) != 3 or len(reported_local) != 3 or not all(map(math.isfinite, (*world, *reported_local))):
                 raise ValueError("source point must return finite actual world and driver-local triples")
-            return world, local
+            # The source's legacy point adapter may use F.T. An accepted nearly
+            # orthogonal F is not an exact rotation: bind the ACTUAL world point
+            # through the query's precomputed true-inverse enclosure instead.
+            enclosed = tuple(sum(inverse_driver[i][j]*(Interval.point(world[j])-p.driver_origin_mm[j])
+                                 for j in range(3)) for i in range(3))
+            local = tuple(value.midpoint for value in enclosed)
+            inverse_rounding = sqrt_bounds(_squared_norm(tuple(
+                value-Interval.point(centre) for value,centre in zip(enclosed,local)))).upper
+            world_scale = sum((Interval.point(abs(value)) for value in (*world,*p.driver_origin_mm)),
+                              Interval.point(1))
+            local_scale = sum((Interval.point(abs(value)) for value in local),Interval.point(1))
+            arithmetic = (Interval.point(128*sys.float_info.epsilon)
+                          *(world_scale*inverse_metric+local_scale)).upper
+            return world,local,(Interval.point(inverse_rounding)+arithmetic).upper
 
-        def record_material_point(segment, tooth, t, s, world, local):
+        def record_material_point(segment, tooth, t, s, world, local, point_error):
             nonlocal guaranteed, reference, has_nominal_collision
             if not search.surface_member(segment, t, s):
                 return
-            midpoint = point_domain(local, 0.0)
+            midpoint = point_domain(local,0.0,point_error)
             if midpoint is None:
                 return
             point_bound, _, admitted, _ = midpoint
@@ -374,10 +429,16 @@ def root_free_intervals(
             added = bool(_difference(forbidden, guaranteed))
             point_radius = math.hypot(local[0], local[1])
             theta = math.atan2(local[1], local[0]) + search.seed - search.phase - pitch / 2
-            nominal = domain.offset_bounds(point_radius, point_radius, theta, 0.0, root_only=True)
+            nominal_error = (Interval.point(source_error)+point_error).upper
+            nominal = domain.offset_bounds(
+                max(0.0,(Interval.point(point_radius)-nominal_error).lower),
+                (Interval.point(point_radius)+nominal_error).upper,theta,
+                _angle_error(point_radius,nominal_error),root_only=root_only)
+            nominal_z = Interval.point(local[2])+Interval(-nominal_error,nominal_error)
             actual = (
-                p.driver_face_mm[0] < local[2] < p.driver_face_mm[1]
-                and (local[2] <= p.driver_shoulder_z_mm or point_radius <= p.driver_turned_radius_mm)
+                p.driver_face_mm[0] < nominal_z.lower <= nominal_z.upper < p.driver_face_mm[1]
+                and (nominal_z.upper <= p.driver_shoulder_z_mm
+                     or (Interval.point(point_radius)+nominal_error).upper <= p.driver_turned_radius_mm)
                 and any(a < 0.0 < b for a, b in _difference(full, nominal.outer))
                 and search.case.driver.contains_material(
                     local[0], local[1], rotate_rad=-search.seed + search.phase + pitch / 2)
@@ -391,6 +452,9 @@ def root_free_intervals(
                 if added else
                 "actual nominal root-material collision at declared phase; paid pose-domain collision not certified"
             )
+            if not root_only:
+                witness_proof = witness_proof.replace("root-only OUTER","full-material OUTER").replace(
+                    "root-material collision","full-material collision")
             witnesses.append(RootMaterialWitness(
                 tooth, segment.name, t, s, segment.station_mm if _cap(segment) else s,
                 world, local, forbidden, actual, witness_proof,
@@ -402,11 +466,11 @@ def root_free_intervals(
             segment = search.segments[index]
             t0, t1, s0, s1 = limits
             t, s = (t0 + t1) / 2, (s0 + s1) / 2
-            world, local = actual_point(segment, tooth, t, s)
+            world,local,point_error = actual_point(segment,tooth,t,s)
             rho = segment.speed_bound_mm * (t1 - t0) / 2 + search.second_speed(segment) * (s1 - s0) / 2
             if search.cap_removed(segment, t, s, rho):
                 return None
-            enclosed = point_domain(local, rho)
+            enclosed = point_domain(local,(Interval.point(rho)*parameter_metric).upper,point_error)
             if enclosed is None:
                 return None
             bound, axial, _, air = enclosed
@@ -415,15 +479,15 @@ def root_free_intervals(
             if not possible:
                 return None
             member = bool(search.surface_member(segment, t, s))
-            record_material_point(segment, tooth, t, s, world, local)
+            record_material_point(segment,tooth,t,s,world,local,point_error)
             if initial:
                 # Exact source joins/endpoints catch zero-T floor tangencies.
                 # These are point constraints only; INNER still comes entirely
                 # from continuous speed boxes, never from finite sampling.
                 for a, b in ((t0, s0), (t0, s), (t0, s1), (t, s0),
                              (t, s1), (t1, s0), (t1, s), (t1, s1)):
-                    point_world, point_local = actual_point(segment, tooth, a, b)
-                    record_material_point(segment, tooth, a, b, point_world, point_local)
+                    point_world,point_local,point_error = actual_point(segment,tooth,a,b)
+                    record_material_point(segment,tooth,a,b,point_world,point_local,point_error)
             return _Box(index, tooth, limits, possible, RootEnclosureUncertainty(
                 tooth, segment.name, limits, bound.radial_interval_mm, axial, possible, member))
 
@@ -499,6 +563,9 @@ def root_free_intervals(
         enclosure_uncertainty=tuple(box.evidence for box in uncertain[:32]),
         uncertain_boxes=len(uncertain), boxes=count, status=status,
         containment_proof=proof, reason=reason,
+        material_scope=scope, physical_driver_teeth=driver_teeth,
+        physical_driven_teeth=driven_teeth, physical_patch_inventory=inventory,
+        parameter_radius_metric_upper=parameter_metric,
     )
 
 

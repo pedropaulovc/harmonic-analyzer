@@ -58,12 +58,21 @@ reserved:
   nominal_residual_mae:            # what survives the null-station zero + 2nd-harmonic correction
     allowance_pct: 0.05
     # The residual carries the stock-form drive-flank phase: every shop-cut
-    # running mesh (cone/cylinder 6i/120 at psi_k = k pi from the cone-lock
-    # home, crossed crank 16/64 at 4 pi k) evaluated by actual first contact
-    # at each read stall, the crank index absorbing only the 64T's home lag
-    # (reported), each contact's enclosure, the crank study's bound and the
-    # cone/drum oblique-section bound paid on top. The alignment drum is not
-    # a datum (notches up by eye, drum parked), so its contact is not in it.
+    # running mesh read at each read stall -- cone/cylinder 6i/120 as the cone
+    # row's actual 3D q0 signed running TE at psi_k = k pi from the operating
+    # notch-up setup (untared), crossed crank 16/64 at 4 pi k from its 3D
+    # study -- the shaft term reaching each cylinder at the ideal T_i/120 and
+    # the crank index absorbing only the 64T's home lag (reported). Paid on
+    # top: each read's half-width over the budget clock-nominal subdomain
+    # (carrying its numerical bound), the crank study's bound at T_i/120, and
+    # the whole-period signed TE interval's span wherever the shaft shifts the
+    # cone off a read; and each drum's tooth pattern clocked against its
+    # CAM-NOTCH -- +/- fits.cone_drum_oblique_mesh.drum_tooth_to_cam_notch_
+    # clock_deg in cam radians directly (not T_i/120, not x i), nominal 0, on
+    # every read k=0 included, never tared or indexed out; the cone rows
+    # exclude it by name and a missing grade refuses, never 0. The alignment
+    # drum is not a datum (notches up by eye, drum parked), so its contact is
+    # not in it.
     # Deterministic and the same on every machine, so it is spent HERE, not
     # root-sum-squared as scatter. Any missing, refused or stale input fails
     # the closure (error_budget.stock_phase); nothing is credited without it.

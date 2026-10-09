@@ -105,12 +105,16 @@ sections:
       `cad/scripts/fr_harmonic_base_spec.py` (TOP_WIDTH derivation).
       The current inch-train cutover retains this centred footprint, not a new
       rear-only base extension. Its drive-train seats follow the live parked
-      alignment pivot and cylinder-bank faces (`build_fr_harmonic_base`):
-      block X = −21.652205567 / −4.652205567, spring-foot X = −33.152205567;
-      block Z comes from `pinion_rig_layout.BLOCK_SEAT_Z` and the spring-foot Z
-      from `SPRING_PAD_Z`. Pedestal seats are at X = −60.393602135 and
-      Z = −90.518912220 / +92.061087780. Former fixed world-hole coordinates
-      are not drilling inputs.
+      alignment pivot and cylinder-bank faces (`build_fr_harmonic_base`).
+      `BLOCK_SCREW_XZ` reads `pinion_rig_park_geometry.PIVOT_X` and
+      `pinion_rig_layout.BLOCK_SEAT_Z`; `FOOT_SCREW_XZ` reads that same pivot
+      and `SPRING_PAD_Z`. Pedestal seats remain at X = −60.393602135 and
+      Z = −90.518912220 / +92.061087780, through `PEDESTAL_SCREW_XZ`.
+      The former block X = −21.412205567 / −4.412205567 and spring-foot
+      X = −32.912205567 describe the earlier ideal-tooth parked rig; they are
+      historical reconstruction coordinates, not current drilling inputs.
+      Pivot, lock and stop seats follow `cone_line.PIVOT_XZ` and
+      `dt_cone_swing_platform_geometry.swing_hardware_geometry`.
       Frame column 107 cm is the top-down anchor for tube-frame length; 147 − 107 =
       40 cm of counter-spring rod arc above the frame.
 - heading: Chapter 26/29/8/9 — System-level facts (gear law, scale references)
@@ -186,7 +190,7 @@ sections:
       - - Crank arm length (center-to-center)
         - ~75 mm
         - ~3.0
-        - 'Historical 2026-09 re-derive from the ch30 FRONT view (p002 registered pair: 107 px hub-to-pivot vs the model''s 92 px at 66 -> 77, less ~2% perspective), cross-checked on the ch11 p.13 studio photo (~78 at the arm-width scale). The earlier 66 was perspective-inflated. The selected arm remains 75 mm and hangs straight DOWN; current crank axis Y = 138.345643503 gives handle-axis clearance 12.545643503 above the 50.8 mm base top. Earlier 133.613643503 /7.813643503 and 129.850 /4.05 values describe superseded post layouts, not changed photographic measurements.'
+        - 'Historical 2026-09 re-derive from the ch30 FRONT view (p002 registered pair: 107 px hub-to-pivot vs the model''s 92 px at 66 -> 77, less ~2% perspective), cross-checked on the ch11 p.13 studio photo (~78 at the arm-width scale). The earlier 66 was perspective-inflated. The selected arm remains 75 mm and hangs straight DOWN; the current configured crank axis is Y = 138.345643503, with handle-axis clearance 12.545643503 above the 50.8 mm base top, as recorded in dimensions.yaml. Earlier 133.613643503 / 7.813643503 and 129.850 / 4.05 values describe superseded lower-post geometry, not the photograph.'
         - scaled
         - med
       - - Taper pin + keeper ring (MHA-DT-009)
@@ -232,17 +236,17 @@ sections:
         - scaled + stated topology
         - med
       - - Crankshaft diameter
-        - '9.525 mm (3/8") on the crank-hub seat and the removable-sprocket pilot; integral seat collar z −154.3..−144.5: Ø17.5 × 5.8 seat spigot (a bought #25 chain wrapping the T12 passes over it) then Ø20.6 body, 2 × Ø2.38 reamed blind drive-pin holes on Ø14 BC in the spigot face; restored integral Ø11.388 journal runs directly in MHA-DT-005; the 16T pinion sits on a Ø9.0 seat step at current local station 112.2, derived as SHAFT_LENGTH − PINION_SEAT_STATION'
+        - '9.525 mm (3/8") on the crank-hub seat and the removable-sprocket pilot; integral seat collar z −154.3..−144.5: Ø17.5 × 5.8 seat spigot (a bought #25 chain wrapping the T12 passes over it) then Ø20.6 body, 2 × Ø2.38 reamed blind drive-pin holes on Ø14 BC in the spigot face; integral Ø11.388 journal runs directly in MHA-DT-005; the 16T pinion sits on a Ø9.0 seat step at local station `dt_crankshaft_spec.SEAT_STEP`, derived as SHAFT_LENGTH − PINION_SEAT_STATION (selected nominal 112.2 mm)'
         - '0.375'
-        - 'User ruling 2026-09-28 restores the integral running journal while retaining the single-cutter 16T seat and existing hub geometry. The smaller pinion root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst. The removable T12 seats on the collar''s front face (ch23 p.56 catalog shot: two drive pins through the sprocket); the Ø20.6 washer is faced at assembly to the current dt_crank_seat_washer_spec.GAP_MIN..GAP_MAX from BLANK_THICKNESS_MIN, not the former 0.50–4.00 fit range /4.30 MIN blank. The pin hole to spigot rim (0.56 nominal, 0.48 print-worst) is a separate named exception, User 2026-09-30; it does not approve the pending cone-root web.'
-        - legacy
+        - 'User ruling 2026-09-28 restores the integral running journal while retaining the 16T seat and existing hub geometry. The finite-tool pinion''s root-matched boss retains the 1.5 mm wall floor under dt_crank_pinion_spec. The removable T12 seats on the collar''s front face (ch23 p.56 catalog shot: two drive pins through the sprocket); the custom MHA-DT-036 washer is faced at assembly to dt_crank_seat_washer_spec.GAP_MIN..GAP_MAX from BLANK_THICKNESS_MIN, not the former 0.50–4.00 fit range / 4.30 MIN blank. The pin hole to spigot rim (0.56 nominal, 0.48 print-worst) is a separate named exception, User 2026-09-30; it does not establish current cone-family qualification.'
+        - legacy + derived current spec
         - med
       - - Crankshaft bearing
-        - 'Integral Ø11.388 journal in the restored MHA-DT-005 Ø11.438 crank bore; relieved middle Ø10.4, current journal local stations 40.755105572..108.6 and relief 55.3..93.6. The moving stations are SHAFT_LENGTH minus the preserved 29.5, 82.8 and 44.5 far-end dimensions, respectively.'
+        - 'Integral Ø11.388 journal in the MHA-DT-005 Ø11.438 crank bore; relieved middle Ø10.4. dt_crankshaft_spec owns JOURNAL_START/JOURNAL_END and RELIEF_START/RELIEF_END (selected nominal local stations 40.755105572..108.6 and 55.3..93.6). Moving stations are SHAFT_LENGTH minus the preserved 29.5, 82.8 and 44.5 far-end dimensions.'
         - —
-        - 'User ruling 2026-09-28: restore the journal and its relief. The shaft runs directly in the post, with the shaft_in_bushing clearance class; there is no separate crank bearing sleeve.'
-        - derived
-        - high
+        - 'User ruling 2026-09-28: restore the journal and relief, running directly in the post with the shaft_in_bushing clearance class; no separate bearing sleeve. Shaft floating/cock uses the actual JOURNAL_DIAMETRAL_CLEARANCE_MM and JOURNAL_SUPPORT_SPAN_MIN_MM between retained bearing contacts, not the whole 72.0344 mm boss or the relieved middle.'
+        - derived from current spec
+        - med
       - - Arm thickness
         - 8.0 mm
         - '0.315'
@@ -279,6 +283,12 @@ sections:
         - 'The outboard cylindrical face remains at world z −183. The inboard end is floor-to-one-place(SEAT_PINION + dt_crank_pinion_spec.OVERALL_LENGTH − SHAFT_END_RECESS_MIN), not a frozen 137.5 mm length. SEAT_PINION follows the current post boss and the 0.25 mm seat feeler; the shaft end remains recessed inside the pinion boss. The original pin size, +0/−0.4 length band and W15 2.0 mm print-worst pin-edge floor are retained. The earlier 137.5 mm length is a superseded reconstruction dimension.'
         - derived from current spec
         - med
+      - - Crank seat washer (MHA-DT-036)
+        - 'Custom turned washer: Ø20.6 OD, Ø11.6 drilled through bore with the title-block drilled-hole band; fitted thickness from dt_crank_seat_washer_spec.THICKNESS, never below its 0.5 mm floor'
+        - —
+        - 'dt_crank_seat_washer_spec owns the collar-rear/boss-face gap chain, GAP_MIN/GAP_MAX, and BLANK_THICKNESS_MIN including the 0.10 mm facing allowance. Install over the shaft''s rear journal, then face to the actual joint; it is not a purchased 3/8 in washer. The 16T seat feeler sets crankshaft end play. Earlier 0.50–4.00 / 4.30 MIN figures are historical, not the current fitted-thickness contract.'
+        - derived from current spec
+        - med
   - prose: |2
 
       Construction: the wooden handle rotates on the metal arm. The arm is a matched
@@ -293,7 +303,7 @@ sections:
       pivot 75 mm below the crankshaft axis with the grip axis parallel to the shaft.
 - heading: Chapter 12 — Cone Gear Set (pp. 16–21)
   elements:
-  - prose: 'Current chosen inch design (2026-10-08): 48DP PA20 cones/drum/alignment and normal-24DP PA20 crossed crank, using actual finite stock/custom cutter authority. Historical measurements and prior reconstruction choices remain labelled, not current cutting dimensions. Main authorized DT6-FORM1 finite custom N6PA20 form/root MIN2.346 with the1/32 in journal as tool authority only, not mesh/manufacturing-corner qualification or release. Current release requires actual3D union functional coverage, including supported corner/edge branches, at least1.1 for EVERY cone over the whole booked stack including opening; the prior small-cone release floors are superseded, not carried as waivers. Flank/flank coverage is a diagnostic screen, not the functional release gate. Complete family solver, actual3D and stock-budget evidence remains pending.'
+  - prose: 'Current chosen inch design (2026-10-08): 48DP PA20 cones/drum/alignment and normal-24DP PA20 crossed crank, with actual finite stock/custom cutter authority rather than ideal actual-count involutes. Historical photo measurements and prior reconstruction choices remain identified as such, not current cutting dimensions. Main authorized the custom DT6-FORM1 finite N6PA20 tool, physical root MIN Ø2.346 and 1/32 in terminal journal; that authority is not an actual3D contact, manufacturing-corner or release certificate. Current cone acceptance requires supported-contact UNION coverage at least 1.1 on every cone over the whole booked centre stack, including the 0.20 mm opening, with no phase gap, positive backlash and paid handovers no larger than 0.005 mm. Flank/flank coverage is a diagnostic screen, not contact ratio or the functional release gate.'
   - table:
       columns:
       - dim
@@ -312,7 +322,7 @@ sections:
       - - Cone set axial length
         - 150 mm
         - '5.91'
-        - photo callout p.18 — historical 150 mm; the selected model has twenty touching 6.8756 ±0.025 mm faces, accepted as a 137.512 ±0.20 mm stack (`dt_cone_gear_stack.STACK_L20`); the adjacent 64T face is 7.2244 ±0.025 mm and bears on the shaft collar. The photographed arrow is retained as historical evidence, not silently rewritten to the current stack.
+        - photo callout p.18 — historical 150 mm; the selected model has twenty touching 6.8756 ±0.025 mm faces, with stack acceptance 137.512 ±0.20 mm (`dt_cone_gear_stack.STACK_L20`); the adjacent 64T face is 7.2244 ±0.025 mm and bears on the shaft collar. The photographed arrow is retained as historical evidence, not silently rewritten to the current stack.
         - annotated
         - high
       - - Gear count
@@ -352,27 +362,27 @@ sections:
         - selected design
         - high
       - - Cone shaft length
-        - 208.890340373345 mm overall (shaft-local station of tip)
-        - '8.224'
-        - 'dt_cone_gear_shaft_spec: front end is cone station −61.906860997930, derived from POST_STATION, half the post cone-boss length and 1.0 mm journal proud. The stepped custom collar extends the tip block and pivot together by 7.5 mm relative to the original station, comprising the former 4.0 mm extension plus a further 3.5 mm for the south nose. Current block north face is cone station 153.946979375415, 5.575 mm south of the pivot. ADJUSTER_EMBED 8.17 and vn_cone_tip_adjuster_spec.CUP_DEPTH nominal1.2065 locate the model apex/tip at cone station 146.983479375415; adding FRONT_STUB gives the overall shaft length. Supplier cup depth/diameter bands are unknown, not zero; this nominal station does not qualify the supplied cup or its complete stock-corner fit. Former 205.390340373345, 201.390340373345 and 201.6406869456 mm shaft lengths are earlier design choices, not current cut lengths.'
+        - Selected nominal 209.390340373345 mm overall (shaft-local station of tip); dt_cone_gear_shaft_spec.SHAFT_LENGTH is the reader
+        - '8.244'
+        - 'Front end is cone station −61.906860997930, derived from POST_STATION, half the post cone-boss length and 1.0 mm journal proud. cone_line extends the pivot and block together by 8.0 mm: the retained 7.5 mm extension plus cone_shaft_land_bands.TIP_COLLAR_BODY_NORTH_SHIFT_MM = 0.50 mm, coupled to collar nose length, width and tap station. Current nominal block north face is cone station 154.446979375415, 5.575 mm south of the pivot; ADJUSTER_EMBED 8.17 and vn_cone_tip_adjuster_spec.CUP_DEPTH nominal 1.2065 place the model apex/tip at 147.483479375415. The flat tip seats on the cup wall, not its apex. These nominal source stations do not establish supplied-cup fit or full printed-band air. Former 208.890340373345, 205.390340373345, 201.390340373345 and 201.6406869456 mm lengths belong to earlier reconstructions.'
         - derived from current spec
         - med
       - - Cone shaft diameter
-        - 'stepped from the front end: Ø12.2308 journal shaft-local 0–43.011; Ø15.875 integral thrust collar shaft-local 43.011–46.192218417631, supporting the 64T south face and defining the drawing length origin. Gear lands Ø9.525 /6.35 /3.175 /0.79375 (terminal 1/32 in), with co-clocked +X flats, nominal AF 8.763 /5.842 /2.921 /0.420, each +0/−0.010. The terminal AF derives the complete dog/fit/position/tilt budget including two-end loaded bore-contact cock, the whole dog-to-back force lever, model-owned 0.02 total dog runout to the threaded-shank datum and terminal-flat edge break 0.020 MAX; the named edge limit replaces the former side reserve once, not an extra independent margin. Former 0.730, 0.480 and 0.430 flats preceded that complete loaded-contact bound. Final changed-source design capture and physical air remain pending, not manufacturing release. Seat steps remain 1.0 mm south of the T030/T024/T018 north faces at cone stations 100.519532647896 /107.395144329776 /114.270756011656. T012 and T006 share the 0.79375 terminal, also carrying the custom collar; terminal length 32.712723363759 mm to shaft-local 208.890340373345. There is no current Ø1.5875 intermediate land.'
+        - 'Stepped from the front end: Ø12.2308 journal shaft-local 0–43.011; Ø15.875 integral thrust collar shaft-local 43.011–46.192218417631, supporting the 64T south face and defining the drawing length origin. Gear lands Ø9.525 / 6.35 / 3.175 / 0.79375 (terminal 1/32 in), with co-clocked +X flats, nominal AF 8.763 / 5.842 / 2.921 / 0.420, each +0/−0.010. Seat steps remain 1.0 mm south of the T030/T024/T018 north faces, at cone stations 100.519532647896 / 107.395144329776 / 114.270756011656. T012, T006 and the custom collar share the terminal land; its end follows SHAFT_LENGTH.'
         - 12.2308/9.525/6.35/3.175/0.79375
-        - 'Current dt_cone_gear_shaft_spec derives axial stations from cone_line and the actual post. The Ø12.2308 journal runs in the Ø12.2808 bore with 0.05 mm diametral clearance over the 42.011 mm boss plus 1.0 mm proud. The 3.181218417631 mm integral thrust collar remains under the 64T. The separate custom MHA-VN-016 stack collar locks its ground dog on the terminal D-flat, 0.45 mm off T006. The former 1/16 in terminal land and McMaster 9414T1 collar are historical, not current procurement or geometry.'
-        - legacy diameters + derived current stations
+        - 'dt_cone_gear_shaft_spec derives axial stations from cone_line and the post; cone_shaft_land_bands owns diameters, flats and retention bands. The Ø12.2308 journal runs in the Ø12.2808 bore with 0.05 mm nominal diametral clearance over the 42.011 mm boss plus 1.0 mm proud; actual support clearance/span remain reader-owned. The 3.181218417631 mm integral thrust collar supports the stack. Terminal AF 0.420 pays the loaded back-arc/two-end bore-contact and full dog/fit/position/runout budget, with terminal-flat edge break 0.020 MAX. Former Ø1.5875 / AF 1.460 terminal geometry, later AF 0.730 / 0.480 / 0.430 selections and the McMaster 9414T1 collar are historical, not current machining or procurement inputs.'
+        - legacy diameters + derived current stations and retention
         - med
       - - Gear bores (configured `BoreDia`, with matching D-flat)
-        - 'D-bores on stepped shaft: round seat nominal Ø9.525 T030–T120 and 64T; Ø6.350 T024; Ø3.175 T018; Ø0.79375 (1/32 in) T006–T012. One +X flat per bore; shaft AF 8.763 /5.842 /2.921 /0.420, +0/−0.010; bore AF +0.010/+0.020 over matching nominal AF. Flat clearance 0.01–0.03; the gear family''s uniform round-bore band derives from the minimum admitted seat band, not the custom collar''s wider bore band.'
+        - 'D-bores on stepped shaft: round seat nominal Ø9.525 T030–T120 and 64T; Ø6.350 T024; Ø3.175 T018; Ø0.79375 (1/32 in) T006–T012. One +X flat per bore; shaft AF 8.763 / 5.842 / 2.921 / 0.420, +0/−0.010; bore AF +0.010/+0.020 over the corresponding shaft nominal. Flat clearance 0.01–0.03; round-bore bands come from gear_seat_fit and the shared land bands, not the custom collar''s wider fit.'
         - —
-        - 'The 2026-09-28 D-bore ruling replaced the photographed p.21 solder-joint interpretation with adhesive-free alignment, an explicit fidelity departure. Current floors, cutter support and root-to-bore webs belong to the cutter-native spec and1/32 in terminal seat. Main authorized the finite custom DT6-FORM1 N6PA20 tool/root MIN Ø2.346 with this journal as authority only, not mesh/tolerance-corner qualification or manufacturing release. The earlier modified ideal-profile T006 floor MIN Ø2.346 /worst web0.35425 used a1/16 in terminal; it is historical evidence, not a current result. The old U40 Ø2.880 /0.621 web acceptance and green CAD integration do not approve the complete current family: solver, actual3D and stock-budget disposition remain pending.'
-        - derived
+        - 'The 2026-09-28 D-bore ruling replaces the p.21 solder-joint interpretation with adhesive-free alignment, an explicit fidelity departure. Current cutter-owned physical floors/root domains and bore envelopes must retain the T006 web floor 0.62 mm and T012 web floor 2.0 mm with the 1/32 in terminal seat. DT6-FORM1/root MIN Ø2.346 authorization does not establish all-corner mesh or manufacturing release. Earlier modified ideal-profile Ø2.346 / worst web 0.35425 used the former 1/16 in terminal; historical U40 Ø2.880 / 0.621 web acceptance and the former 0.025–0.105 round-clearance summary are not a current family qualification.'
+        - derived from current readers
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
-        - 'Normal 24DP PA20 pair: finite #7/14T stock form for the straight16T and finite #2/55T normal stock form for the RIGHT-HAND64T helix, beta = cone incline 13.0011073536895°. Normal module 1.058333333333 mm;64T transverse DP23.384777207555 and PA20.482963738522°. Selected64T pitch Ø69.515308423585 mm; blank Ø71.39±0.10; actual nominal root envelope Ø66.868062962269 /66.869475090251; normal-tool plunge 2.260262455 mm; face 7.2244 ±0.025 and Ø9.525 D-bore. Selected16T pitch Ø16.933333333333 mm; blank Ø18.87±0.10; actual nominal root envelope Ø14.278969828022 /14.287500000000; cutter plunge 2.291250000 mm; face11.6, full-OD shoulder8.5, north band Ø18.55±0.10 with18.25 fit-up floor. Primary normal tangent span16T over2 teeth 4.9230, limits4.9071..4.9230; normal tangent span64T over7 teeth 21.3282, limits21.2896..21.4077. Standard-root translation replaces the ideal0.15 transverse-thinning knob; the64T retains tooth-thickness capability+0.100/−0.050,16T+0/−0.020. Shared tooth-cutting setup TIR0.05 mm applies to EACH16T/64T about its finished bore; E≤0.025 per gear gives the retained pair radial setup allowance0.05. This is a process-setting limit, not an AGMA/cutter-form quality class or added geometric FCF. Actual carrier-aware mesh qualification and functional centre selection remain pending; the previous43.524320878459 mm configured centre is not a certificate for these forms.'
+        - 'Normal 24DP PA20 pair: finite #7 / 14T-reference stock form for the straight 16T and finite #2 / 55T-reference normal stock form for the RIGHT-HAND 64T helix, beta = cone incline 13.0011073536895°. Normal module 1.058333333333 mm; 64T transverse DP 23.384777207555 and PA 20.482963738522°. Selected 64T pitch Ø69.515308423585, blank Ø71.39 ±0.10, nominal root-envelope MIN/MAX Ø66.868062962269 / 66.869475090251, normal-tool plunge 2.260262455 mm, face 7.2244 ±0.025 and Ø9.525 D-bore. Selected 16T pitch Ø16.933333333333, blank Ø18.87 ±0.10, nominal root-envelope MIN/MAX Ø14.278969828022 / 14.287500000000, cutter plunge 2.291250000 mm, face 11.6, full-OD shoulder 8.5 and north band Ø18.55 ±0.10 with 18.25 fit-up floor. Actual whole depths, root envelopes and normal tangent-span limits are reader-owned by dt_crank_drive_gear_spec / dt_crank_pinion_spec.'
         - —
-        - 'Selected source geometry: dt_crank_drive_gear_spec /dt_crank_pinion_spec and the actualfinite-source report inchdt-crank-span-selection.json. p.20 supplies the4:1 reduction and coarse-pair appearance, not this pitch/PA/helix. Former ideal normal24DP tips71.631975090251/19.05 and ideal circular roots were a previous design, not actual finite-tool blanks. The still older normal26.306 /transverse25.7311DP,12.00° helix and fixed39.735 mm reconstruction are historical. Current stock-form geometry is not manufacturing release: actual worst-corner mesh at the prior centre has refused, so final functional design/calibration is pending. D-bore/touching-face retention remains a chosen departure from photographed solder detail. The64T requires true lead-geared helical milling; a tilted straight slot or stock spur is not equivalent.'
+        - 'Selected finite-source dimensions.yaml rows and the pure gear specs own these nominal forms; stock_form_cutter owns finite support and off-centre roots. Each 16T/64T cutting setup has the shared 0.05 mm TIR limit to its finished bore, not a cutter-form quality class. The configured 43.524320878459 mm centre / 0.30 mm extension is a source pose, not qualified actual3D contact or phase. Former ideal normal-24DP tips Ø71.631975090251 / 19.05, ideal circular roots and 0.15 mm transverse thinning (0.146154857547 normal) are superseded. The earlier normal26.306 / transverse25.7311DP, 12.00° helix and 39.735 mm reconstruction remain historical. p.20 supplies the 4:1 reduction and coarse appearance, not pitch/PA/helix; D-bore/touching-face retention is a departure from photographed solder detail. The 64T requires a true normal-section complete-pitch-sector screw sweep and lead-geared helical cutting, not a tilted straight slot or stock spur.'
         - selected design + derived current specs
         - med
   - prose: |2
@@ -381,7 +391,8 @@ sections:
       faces touch from the collar-supported 64T to T006; accept the twenty-gear
       stack at 137.512 ±0.20. The MHA-VN-016 set-screw collar is pushed onto a
       0.45 mm feeler against T006 and locked on the D-flat, for 0.35–0.55 mm
-      stack end play; the tip block never touches it.
+      stack end play. The separate block/cup sets shaft end play; current
+      collar-to-block clearance belongs to the assembly's physical-air ledger.
       Engagement with cylinder gears is oblique (partial engagement → distinct
       wear). The four smallest gears (T006–T024) look "slightly more yellow …
       a different, perhaps harder metal" (p.21). A harder high-zinc yellow
@@ -391,19 +402,21 @@ sections:
       2026-09-28 user ruling chooses co-clocked D-flats and matching D-bores
       to align the gears without adhesive: a deliberate departure from that
       photographed detail. The cone set pivots out of engagement for sine/cosine
-      alignment (ch. 25). Current cones use the specified finite stock/custom
-      tool profiles and off-centre root arcs, not ideal-N flank continuations.
-      All 20 tooth counts are configurations T006..T120 of `dt-cone-gear.SLDPRT` with
-      configured bores. The separate dark 64T beside T120 engages the crank (p.20).
-      Tool authority alone is not manufacturing approval. Main authorized
-      DT6-FORM1 finite custom N6PA20 form/root MIN2.346 with the1/32 in journal,
-      not mesh/manufacturing-corner qualification or release. The complete
-      family remains pending solver, actual3D and stock-budget disposition.
+      alignment (ch. 25). Current tooth authority is the finite stock/custom
+      tool form and its off-centre root arcs; no ideal-N upper continuation is
+      permitted. The earlier ideal 6T involute was severely undercut at standard
+      proportions and used stub-form gap floors in the previous builder.
+      All 20 tooth counts are configurations T006..T120 of
+      `dt-cone-gear.SLDPRT` with configured bores. The separate dark 64T
+      beside T120 engages the crank (p.20). Tool authority alone is not
+      manufacturing approval: current profile settings, actual3D UNION,
+      handovers, signed TE and stock-budget disposition remain source-bound.
       Earlier modified ideal-profile studies refused 42/48/54T on their
       single-flank screen and other root/backlash cases; their T006 worst web
-      of 0.35425 mm used the former 1/16 in terminal seat. Those are historical
-      study results, not current 1/32 in cutter-native results or approvals.
-      Neither a green CAD integration nor the former U40 ruling approves them.
+      0.35425 mm used the former 1/16 in terminal seat. Those are historical
+      study observations, not current 1/32 in cutter-native results.
+      Neither earlier green CAD integration nor the former U40 ruling
+      qualifies the current family.
 - heading: Chapter 13 — Cylinder Gear Set (pp. 22–25)
   elements:
   - prose: ''
@@ -455,14 +468,14 @@ sections:
       - - Gear outer diameter
         - '64.44 mm blank; pitch diameter 63.5 mm; tooth-tip MIN/MAX 64.42..64.44 mm'
         - '2.537008'
-        - 'Current dt_cylinder_gear_spec uses the finite #2 stock form, 55T reference for the 120T 48DP PA20 gear: supported outside diameter 64.543186357 mm at nominal translation. The conservative depth-corner cap 64.442207170 mm pays the retained +0.05/0 plunge band and three-place rounding before selecting the two-place 64.44 blank. Native contact-critical tip band is +0/−0.02; actual nominal root envelope Ø62.175233433 /62.177083333 mm, cutter plunge 1.131458333 mm (printed depth MIN/MAX 1.131..1.181). This source finite-support selection is not a stock mesh/contact certificate; coverage/no-gap/backlash/air/TE disposition remains pending. The earlier nominal-support-only blank 64.54 was not the whole-process selection. The former ideal-N tip 64.558333333333 is historical. Historical p.25 photo scaling gave 62.2 mm /2.449 in (user, 2026-06-18, low confidence) and formerly anchored DP49.82; it is source evidence, not the selected inch blank. Boston Y48120 is a pitch/count tooth-rim candidate only, not an actual-flank equivalent or native custom cam composite.'
+        - 'Current dt_cylinder_gear_spec uses finite #2 stock form, 55T reference, for the 120T 48DP PA20 gear. dimensions.yaml records nominal support Ø64.543186357 and depth-corner cap Ø64.442207170, paying the retained +0.05/0 plunge band and three-place rounding before selecting the two-place 64.44 blank; the contact-critical tip band is +0/−0.02. Nominal root-envelope MIN/MAX Ø62.175233433 / 62.177083333 and cutter plunge 1.131458333 mm are finite-tool geometry, not an actual-N circular root or contact certificate. Earlier support-only blank 64.54 and ideal-N tip 64.558333333333 (2.541667 in) are historical. Historical p.25 photo scaling against the back-view brackets gave 62.2 mm / 2.449 in (user, 2026-06-18, low confidence) and formerly anchored DP49.82; that observation is preserved, not asserted equal to the inch blank. Boston Y48120 is only a pitch/count tooth-rim candidate, not an actual-flank equivalent or the native custom cam composite.'
         - derived from selected finite stock form; historical scale retained
-        - med current nominal geometry; low historical scale; contact corners pending
+        - med current nominal geometry; low historical scale
       - - Cam diameter (integral cam per gear)
         - 30.6 mm
         - '1.205'
-        - 'SCALED 0.6022 with the photographed gear OD (50.8→30.6, user-directed 2026-06-18); independently confirmed by the p.25 strap close-up: ring bore scales to Ø29.83, consistent with the Ø30.8 bore riding a Ø30.6 cam (ch14 ROM re-derive 2026-07-02). Current finite 55T-reference stock form keeps the 23.94 mm eccentric-lobe extent inside the actual uncut root web: nominal minimum cam web 7.147616716 mm from dt_cylinder_gear_spec.CAM_ROOT_WEB_MIN_MM. The former ideal 48DP root radius 31.088541667 and DP49.82 radius ≈29.95 are prior reconstruction values, not the current off-centre root envelope.'
-        - scaled
+        - 'SCALED 0.6022 with the photographed gear OD (50.8 → 30.6, user-directed 2026-06-18); independently confirmed by the p.25 strap close-up: ring bore scales to Ø29.83, consistent with the Ø30.8 bore riding a Ø30.6 cam (ch14 ROM re-derive 2026-07-02). Current finite 55T-reference stock form locates the 23.94 mm eccentric-lobe extent inside the actual uncut root web; dimensions.yaml records nominal minimum cam web 7.147616716 mm from dt_cylinder_gear_spec.CAM_ROOT_WEB_MIN_MM. Former ideal-48DP root radius 31.088541667 and DP49.82 radius ≈29.95 are earlier reconstructions, not current off-centre root boundaries.'
+        - scaled + derived current spec
         - med
       - - Cam thickness
         - 4.0565 mm
@@ -508,18 +521,21 @@ sections:
       to top = cosine mode; rotated 90° = sine mode (pp. 66–67).
 
       Current build (`build_dt_cylinder_gear.py`): single non-configured custom
-      120T 48DP PA20 full-depth gear/cam composite; its standard tooth rim is
-      not the custom-thickness/root cone T120 solid. The integral cam lobe is +Y, toward the
+      120T 48DP PA20 gear/cam composite with a finite #2 / 55T-reference stock
+      tooth rim, not the custom cone T120 solid. The integral cam lobe is +Y, toward the
       notch: the ch14 end views show the 0-crank tip row LEVEL at the TOP of the
       stroke — cos mode reads +1 at notch-up, so the lobe points up; plain bore
       through gear and cam, alignment notch near +Y. The book states only the notch
       **depth** (3 mm); the p.23 close-up labelled "notch" shows the mark as a thin
       saw **kerf cut between two teeth** — the real gears keep all 120 teeth, they are
-      NOT missing one. So it is modeled as a 0.4 mm saw kerf, 3 mm deep, seated in the
-      root **valley** nearest +Y (90° = 30·γ is a tooth crest at 120 T, so the kerf
-      rides the adjacent valley at 90° + γ/2; flanking crests stay intact, removed
-      solid ≈ 0.60 mm² → v_notch ≈ 1.8 mm³). This SUPERSEDES both the former 3 mm
-      square (width estimated = depth, low) and the interim missing-tooth slit. The
+      NOT missing one. The selected 0.4 mm-wide, 3 mm-deep saw kerf is placed by
+      `dt_cylinder_gear_spec.NOTCH_PHASE_DEG` relative to the cam, preserving the
+      physical cam/notch home lock rather than providing an arbitrary TE tare.
+      The earlier ideal-tooth construction placed it at 90° + γ/2 because +Y
+      was a crest at 120T; its ≈0.60 mm² removal / ≈1.8 mm³ notch volume is a
+      historical CAD observation, not a current finite-tool volume result. The
+      thin-valley reading superseded the earlier 3 mm square (width assumed
+      equal to depth, low confidence) and interim missing-tooth slit. The
       standalone `eccentric-cam` part (M2 legacy re-author) was removed -- the
       integral cam on the cylinder gear is the only cam geometry now built.
 
@@ -556,9 +572,11 @@ sections:
       −123.07), cone_back (−81.03, 104.60, +101.83), pinion_front (−10.16,
       104.23, −144.07), pinion_back (−11.41, 106.71, +91.25), cyl_front
       (−51.93, 100.45, −89.66), cyl_back (−52.73, 105.24, +91.49). These drive
-      the historical evidence rows. The 2026-07-24 v2 casting supplied the retained
-      drive height 90.518; current crank height is 133.613643503 after the selected
-      90 mm post / normal-24DP cutover. The old 129.850 height is provenance only.
+      the historical evidence rows. The 2026-07-24 v2 casting supplied the former
+      drive height 90.518; the lower inch-post design used crank height
+      133.613643503 and a 90 mm post. The current common 4.732 mm source raise
+      puts the drive axis at 95.25 and crank axis at 138.345643503, with post
+      body height 94.732. The former 129.850 crank height is provenance only.
   - table:
       columns:
       - item
@@ -568,8 +586,8 @@ sections:
       rows:
       - - Drive height (cylinder arbor AND cone big-end axis)
         - y = 44.45 above base top (95.25 abs) — selected raised-axis law
-        - 'Current dt_post_mount_stack sets the cone journal 1.5 in /38.1 mm above the 6.35 mm platform: 50.8 + 6.35 + 38.1 = 95.25. The common 4.732 mm raise removes the need for a crank-gear pocket while retaining the crossed-pair spacing. The former v2-derived 33.368 mm journal /90.518 mm world axis and ch30 image-fit 104.8 mm remain historical evidence, not the selected machining height.'
-        - high (selected and source-derived current geometry)
+        - 'dt_post_mount_stack sets the cone journal 1.5 in / 38.1 mm above the 6.35 mm platform, and cone_line.Y_DRIVE places the axis at 95.25. The common 4.732 mm raise replaces the crank-gear pocket while retaining crossed-pair spacing. The former v2-derived 33.368 mm journal / 39.718 mm deck-relative / 90.518 mm world axis and earlier ch30 image-fit centreline 104.8 mm remain historical evidence, not current machining heights.'
+        - med (selected and source-derived geometry; historical evidence separate)
       - - Mesh offset direction
         - horizontal (plan), cone beside drum
         - 'ch. 12 p.18 top-down: cone converges on the drum toward the small end; side view cone midline ≈ level'
@@ -579,8 +597,8 @@ sections:
         - 'Current cone_incline.yaml exact-tracking derivation: radius step = 3·25.4/48 = 1.5875 mm; channel grid remains 7.0565 mm with drum-seat input 7.232865856630. The former 49.82DP step 1.5295, seat 7.2204 and approximately 12.5188° incline are superseded reconstruction choices; the Appendix C derivation remains historical provenance.'
         - low
       - - Cone mesh grid (X_PITCH)
-        - 'every cone gear pitch section crosses x = −92.753856638 at the reference contact azimuth; X_PITCH follows drum x −60.393602135 and the retained oblique placement contract, not a finite-tool tooth-tip boundary'
-        - 'cone_line.X_PITCH = DRUM_TIP_X − ADDENDUM/cos(i) + WORKING_DEPTH − edge_slack − (DRUM_FACE/2)·tan(i). Here DRUM_TIP_X uses the retained ideal (120+2)/DP placement reference, ADDENDUM is the pitch-based module and WORKING_DEPTH is twice that module. Reference depth 1.058333333 mm, edge slack 0.25 mm, drum face 3.0 mm and incline 13.0011073536895° place the selected family; actual material tip caps and contact domains come from the 120T/32T stock-form specs and profiles. This placement identity is not a qualified tooth-contact or manufacturing claim.'
+        - 'every cone gear pitch section crosses x = −92.753856638 at the reference contact azimuth; X_PITCH follows drum x −60.393602135 and the retained placement contract, not a finite-tool tooth-tip boundary'
+        - 'cone_line.X_PITCH = DRUM_TIP_X − ADDENDUM/cos(i) + WORKING_DEPTH − edge_slack − (DRUM_FACE/2)·tan(i). DRUM_TIP_X uses the retained ideal (120+2)/DP placement reference; ADDENDUM and WORKING_DEPTH are pitch-based references. Reference depth 1.058333333 mm, edge slack 0.25 mm, drum face 3.0 mm and incline 13.0011073536895° place the family. Actual material tips, finite support and contact domains belong to the gear specs and stock_form_cutter; the placement identity is not mesh qualification.'
         - low
       - - Cone big-end (T120) gear centre
         - '(x, z) = (−123.689968152, −56.869618342) = (X_PITCH − 31.75 cos i, Z_DRUM0 + 31.75 sin i)'
@@ -588,24 +606,24 @@ sections:
         - low
       - - 64T drive gear
         - 'RIGHT-HAND helix on the 3/8 in D-land, physical centre cone station −12.102442580298; machine (x, z) = (−125.318255192, −63.921882528); 7.2244 mm face. South face bears on the integral thrust collar; north face touches T120.'
-        - 'Current dt_crank_drive_gear_spec and dt_cone_gear_shaft_spec close the solid stack from the retained collar south datum. The preceding normal 24DP PA20 pair centre 43.524320878459 mm with 0.30 extension remains the source pose while the actual finite-14T/55T-form functional centre and phase are selected; it is not a qualified mesh window. Earlier ideal-profile native integration measured a 1.6471 mm gear-to-post crank-boss gap (analytic 1.5152) and budgeted +0.015729 mm worst backlash. Those observations are historical engineering evidence, not current cutter-native contact or manufacturing qualification. The gear-to-post printed-worst clearance floor remains 0.25 mm.'
+        - 'dt_crank_drive_gear_spec and dt_cone_gear_shaft_spec close the solid stack from the retained collar south datum. The configured 43.524320878459 mm centre with 0.30 extension remains a source pose, not a qualified finite-14T/55T-form contact window or phase. Earlier ideal-profile native integration observed a 1.6471 mm gear-to-post crank-boss gap (analytic 1.5152) and budgeted +0.015729 mm worst backlash; those are historical engineering observations, not current actual3D or manufacturing qualification. The printed-worst gear-to-post clearance floor remains 0.25 mm.'
         - low
       - - Cone gear j (j = 0 big … 19 small)
-        - 'reference seat station 28.25 + GEAR_AXIS_SHIFT + 6.875611681880j; x_j = X_PITCH − (31.75 − 1.5875j)·cos i; z_j = −64.012412219573 + 7.0565j + (31.75 − 1.5875j)·sin i; y = 95.25, j = 0 big …19 small. Every gear is square to the shaft; actual solid centres follow its faced width from the reference north face.'
-        - 'Current cone_line exact tracking: sin i = 1.5875/7.0565 and tan(cone half-angle) = 1.5875/6.875611681880 = tan i, so the drum-side generator is parallel to the drum axis. GEAR_AXIS_SHIFT = −33.114642580298 mm; dt_cone_gear_shaft_spec.gear_faces owns the actual touching solid faces.'
+        - 'reference seat station 28.25 + GEAR_AXIS_SHIFT + 6.875611681880j; x_j = X_PITCH − (31.75 − 1.5875j)·cos i; z_j = −64.012412219573 + 7.0565j + (31.75 − 1.5875j)·sin i; y = 95.25, j = 0 big …19 small. Every gear is square to the shaft; actual solid centres follow faced width from the reference north face.'
+        - 'cone_line exact tracking retains sin i = 1.5875/7.0565 and tan(cone half-angle) = 1.5875/6.875611681880 = tan i, making the drum-side generator parallel to the drum axis. GEAR_AXIS_SHIFT = −33.114642580298 mm; dt_cone_gear_shaft_spec.gear_faces owns touching solid faces. Earlier y = 90.518 was the lower-axis layout.'
         - low
       - - Cylinder arbor (stationary)
-        - 'x = −60.393602135, y = 95.25; cylinder spans z −81.518912220..+83.061087780 (164.58 mm), domes stand 1.5 mm beyond each end. Its actual stationary plain-bore support stations follow cylinder_bank_layout. The earlier y90.518 belonged to the lower drive-axis design.'
-        - ch30 GT supplies historical topology; current cone_line and cylinder_bank_layout own placement and strap-to-strap cut length
+        - 'x = −60.393602135, y = 95.25; cylindrical span z −81.518912220..+83.061087780 (164.58 mm), domes 1.5 mm proud of each end. Stationary plain-bore support stations follow cylinder_bank_layout; earlier y = 90.518 belonged to the lower-axis design.'
+        - ch30 GT supplies historical topology; cone_line and cylinder_bank_layout own current placement and strap-to-strap cut length
         - med (derived current layout)
       - - Cylinder gear j
         - 'toothed slab centred at z_j = −64.012412219573 + 7.0565j; installed Ry180 about its phased local Y diameter; cam/rod-ring centre is z_j − 3.52825 from the current 4.0565 mm cam thickness'
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along machine Z on the current crank axis (x, y) = (−131.572174697361, 138.345643502896). The common 4.732 mm Y raise retains the physical crossed-pair centre 43.524320878459 mm and 0.30 mm extension; it does not certify the former ideal-profile contact study for the new cutter-native teeth. Cylindrical outboard face remains z −183; shaft length and pinion seat follow dt_crankshaft_spec. Boss spans z −141.667295603261..−69.632895603261; pinion is feeler-set 0.25 north at z −69.382895603261. Ø11.388 shaft journals run in the post and Ø9.0 seats the pinion. The MHA-DT-036 washer is faced to the actual collar-to-boss gap under dt_crank_seat_washer_spec.GAP_MIN/GAP_MAX and supplied BLANK_THICKNESS_MIN, not the obsolete 0.50–4.00 /4.30 MIN values.'
-        - 'Selected gear_train.yaml crank height, cone_line post station and dt_crankshaft_spec / dt_crank_pinion_spec / dt_crank_seat_washer_spec own the current geometry. The ch30 GT crank_sprocket (−122.84, 144.78) remains independent historical image evidence; the primary crank construction photo governs the separate through hub and flush outboard face. The former 129.850 mm crank height is not retained.'
-        - med (selected and derived geometry; GT provenance separate)
+        - 'Along machine Z on the configured axis (x, y) = (−131.572174697361, 138.345643502896). The common 4.732 mm Y raise retains source crossed-pair centre 43.524320878459 mm / 0.30 mm extension, not the former ideal-profile contact qualification. Cylindrical outboard face remains z −183; length, far-end recess and Ø9.0 pinion-seat step follow dt_crankshaft_spec. Boss spans z −141.667295603261..−69.632895603261; pinion south face is feeler-set 0.25 north at z −69.382895603261. Its 11.6 mm face comprises an 8.5 mm full-blank Ø18.87 shoulder and 3.1 mm north band Ø18.55 ±0.10. Ø11.388 journals run directly in the post. The custom MHA-DT-036 washer is faced to the actual collar-to-boss gap under dt_crank_seat_washer_spec.GAP_MIN/GAP_MAX and BLANK_THICKNESS_MIN, not obsolete 0.50–4.00 / 4.30 MIN figures.'
+        - 'gear_train.yaml crank height, cone_line post station and the pure shaft/pinion/washer specs own current geometry. ch30 GT crank_sprocket (−122.84, 144.78) remains independent historical image evidence; the primary crank photo governs the separate hub and flush outboard face. Former crank Y 133.613643503 / 129.850 and ideal pinion tip Ø19.05 are historical. Final source-bound centre/phase/contact selection is not established by these nominal stations.'
+        - med (selected/derived geometry; GT provenance separate)
       - - Chain run
         - crank T12 sprocket from McMaster 6793K4 on the current crank axis (−131.572174697361, 138.345643502896, z −155.7 chain plane) up to the transgear knob-shaft T24 from McMaster 6793K17; ANSI #25 link count and sag are solved by _chain.py from those centres; bought blanks are hub-removed, bored and pin-drilled, with teeth, OD and plate faces as supplied
         - current cone_line crank-axis cascade; both sprockets share one band −157.1..−154.3, chain plane −155.7 (`pd_transgear_removable_spec`); purchased-blank ruling 2026-10-08 and live SKU/vendor-CAD evidence in `cad/references/mcmaster/README.md`
@@ -626,60 +644,65 @@ sections:
       - confidence
       rows:
       - - '`dt-arbor-pedestal` ×2 (south + north; ch30 GT height; PR3 reshape)'
-        - 'Current dt_arbor_pedestal_spec: foot flange 24 ×28 ×5 mm (10 mm strap +18 mm ledge), tapered strap 10 mm deep, R11 crown and 55.45 mm total height. Finished clamp bore Ø9.55 +0.03/0 along Z, at 44.45 above the base deck (machine y = 95.25), following the common raised drive axis. Earlier 39.718 mm bore height and 24 ×16 foot /R10/Ø9.5 descriptions are historical reconstruction geometry.'
-        - 'at X = −60.393602135, pedestal origins Z = −79.518912220 south / +81.061087780 north; strap inner faces −71.518912220 / +73.061087780. The arbor spans both full 10 mm strap bores, with 1.5 mm proud domes; support positions derive from cylinder_bank_layout, not the former 187 mm arbor.'
-        - 'Historical ch30 GT (cyl_front) and still t00393 / v4_pinion_008 supply the tapered casting interpretation, previously scaled using the 62.2 mm OD estimate; the current 48DP bank determines support placement.'
-        - med (GT height; shape photo-scaled)
+        - 'dt_arbor_pedestal_spec: foot flange 24 ×28 ×5 mm (10 mm strap +18 mm ledge), tapered strap 10 mm deep, R11 crown and 55.45 mm total height. Finished clamp bore Ø9.55 +0.03/0 along Z, at 44.45 above the base deck (machine y = 95.25), following the common raised drive axis. Former total height 50.718 / bore height 39.718 and 24 ×16 foot / R10 / Ø9.5 descriptions are historical reconstruction geometry.'
+        - 'X = −60.393602135, pedestal origins Z = −79.518912220 south / +81.061087780 north; strap inner faces −71.518912220 / +73.061087780. Arbor spans both full 10 mm strap bores with 1.5 mm proud domes; positions derive from cylinder_bank_layout, not the former 187 mm arbor.'
+        - 'Historical ch30 GT (cyl_front) and t00393 / v4_pinion_008 supply the tapered casting interpretation, previously scaled using OD 62.2 mm; current shared raised-axis law and 48DP bank determine geometry/placement.'
+        - med (selected/derived geometry; historical shape scale separate)
       - - '`dt-cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
-        - '1/4 in steel stock, 6.35 mm as supplied; current asymmetric wedge length 230.603840373345 along the cone axis, half-widths 16 east /8 west at north and 24 east /37 west at south. Post south rim keeps 3.175 mm overhang; two 1/4-20 UNC-2B taps follow the 25.96 mm post pattern. Pivot uses Ø6.756 close clearance with the retained open Ø10.50 ×0.25 bearing-seat relief, leaving 6.10 local bearing thickness. Under the gear this is an unrelieved platform; cone journal at 38.1 mm above the plate, booked full-turn air 1.088991 mm from crank_gear_platform_clearance() for the selected 71.39±0.10 mm 64T blank and retained printed/fit/tilt/runout/local-stock budget. The minimum builder guard is 0.50 mm. Plate top remains y=57.15; the crank bore height/centre follows its current functional mesh selection. The former 29 ×12 ×3 crank pocket and its 1044 mm³ removal are superseded, not retained machining features.'
-        - 'Pivot at cone station 159.521979375415, machine (−86.707928564, +103.303070422), rotated to the configured 13.0011073536895° incline. Pivot and tip block extend 7.5 mm together along the cone axis for the stepped custom collar, 3.5 mm beyond the preceding wider-collar design. Post local Z is −199.423340373345; its world axes, crank axes and body heights are unchanged by this tip extension. Post, shaft, tip block and crank ride the platform. Lock/stop stations and disengaged swing derive from dt_cone_swing_platform_geometry.swing_hardware_geometry; the centred base footprint is unchanged.'
-        - 'p.18 pivot/platform role and v4 stills remain historical evidence; selected stock and geometry come from dt_cone_swing_platform_spec / geometry / crank_axis, with current cone_line stations'
-        - med (historical role; selected/derived geometry)
+        - '1/4 in steel stock, 6.35 mm as supplied; selected asymmetric wedge length 231.103840373345 along the cone axis, half-widths 16 east / 8 west at north and 24 east / 37 west at south. Post south rim keeps 3.175 mm overhang; two 1/4-20 UNC-2B taps follow the 25.96 mm post pattern. Pivot uses Ø6.756 close clearance with an open Ø10.50 ×0.25 bearing-seat relief, leaving 6.10 nominal local bearing thickness. The platform is unrelieved under the crank gear; cone journal is 38.1 mm above it, and crank_gear_platform_clearance() owns the full-turn printed/service air budget with a 0.50 mm guard. Plate top remains y = 57.15; crank reference axis comes from dt_cone_swing_platform_crank_axis.'
+        - 'Pivot at cone station 160.021979375415, machine (−86.595443621, +103.790253281), installed at 13.0011073536895°. Pivot and tip block extend 8.0 mm together, including the selected coupled 0.50 mm collar-body north shift; post local Z −199.923340373345 follows that pivot, without moving post/crank world axes. Lock/stop stations and swing derive from swing_hardware_geometry; the centred base footprint is unchanged.'
+        - 'p.18 role and v4 stills are historical evidence; current stock/outline/axis readers are dt_cone_swing_platform_spec / dt_cone_swing_platform_geometry / dt_cone_swing_platform_crank_axis and cone_line. The former 29 ×12 ×3 gear pocket removed 1044 mm³, with study stock 3.22 and nominal air 0.552012455 mm; that removed feature and its former 43.176971989 east / 82.813643503 high axis references are historical, not current machining instructions. Earlier outlines 223.103840373345 / 227.103840373345 preceded the stepped-collar extension.'
+        - med (historical role; selected/derived geometry, not air qualification)
       - - '`dt-cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
-        - 'Current post body Ø42.011 ×94.732 high; upper head Ø42.7506 ×26.6, height band 68.132..94.732 above platform. Straight crank boss Ø21.93, Ø11.438 running bore at 81.195643502896 above platform, retained harvested length 2.8360 in /72.0344 mm and no north spot face. Cone boss Ø17.2, Ø12.2808 journal at 38.1 above platform, yaw 13.0011073536895°. Two vertical 1/4 in fillister counterbores remain on 25.96 mm centres: Ø7.14248 through, Ø11.50874 ×6.0198 deep.'
-        - 'Installs exact Ry180 on the platform with cross-paired holes; cone_line.POST_STATION locates the post. Both journal heights and the body follow dt_post_mount_stack''s common 4.732 mm raise, retaining the crossed-pair spacing and mounting footprint. gear_train.yaml owns the raised crank-height input.'
-        - 'dt_cone_pivot_post_spec current chosen geometry; earlier inch-design body90 /crank76.4636435 /cone33.368 mm and historical v36 body86 /crank72.7 mm remain provenance. Historical proportions came from ch30 Eight Views station2 and ch11 photos, with other features harvested from cone-pivot-post-v2.SLDPRT; none of those earlier height values is the current machining dimension.'
-        - med (selected/derived current geometry; historical scale separate)
+        - 'Current body Ø42.011 ×94.732 high; head Ø42.7506 ×26.6, height band 68.132..94.732 above platform. Straight crank boss Ø21.93, Ø11.438 running bore at 81.195643502896 above platform, harvested length 2.8360 in / 72.0344 mm and no north spot face. Cone boss Ø17.2, Ø12.2808 journal at 38.1 above platform, yaw 13.0011073536895°. Two vertical 1/4 in fillister counterbores on 25.96 mm centres: Ø7.14248 through, Ø11.50874 ×6.0198 deep.'
+        - 'Exact Ry180 installation on the platform with cross-paired holes; cone_line.POST_STATION locates the post. Both journal heights and body follow dt_post_mount_stack''s common 4.732 mm raise; crossed-pair spacing and mounting footprint remain. gear_train.yaml owns the crank-height input.'
+        - 'dt_cone_pivot_post_spec current geometry; former inch body 90 / head band 63.4..90 / crank 76.463643502896 / cone 33.368 mm and historical v36 body 86 / crank 72.7 mm remain provenance. Height/proportions came from ch30 Eight Views station 2 and ch11 photos; other features were harvested from cone-pivot-post-v2.SLDPRT. Earlier heights are not current machining dimensions.'
+        - med (selected/derived geometry; historical scale separate)
+      - - '`dt-cone-pivot-post-tl-bond-cradle` (MHA-DT-005-TL-01)'
+        - 'Shop fixture, not an installed machine part: 80 ×134 ×10 mm base; 30 mm foot stop and two 60 mm-wide saddles, all 15 mm above the base top. Body seat matches the actual post body; tail seat matches its Ø44.45 stock tail. Ø4 m6 locating dowels set the crank and cone sleeve faces.'
+        - 'Post model frame R0 is the fixture frame, foot B at Y0 and post axis at X0 Z0; base top Z −30. CRANK_PIN_Y reads post.CRANK_BORE_HEIGHT and CONE_PIN_Y reads post.BORE_HEIGHT, so both pin rows follow the raised post instead of old export stations. Pin tops reference the post axis; the cone pair follows the actual incline and north-cap annulus.'
+        - 'dt_cone_pivot_post_tl_bond_cradle_spec owns geometry and matched-seat/pin-top acceptance. make-data and prechips CN-B5/S6 provenance is retained in that reader; this fixture description is not a cure, dry-fit or native-build result.'
+        - selected/derived fixture geometry
       - - '`vn-post-mount-screw` ×2 (modified purchased post hold-downs)'
-        - 'MSC 40923906 slotted fillister steel/zinc, SAE J82 /ASME B18.6.3, 1/4-20 ×4 in /101.6 mm supplied stock. Current reference cut length 94.9 mm, deburr cut end 0.1 MAX; cut each screw to its matched post/platform hole, end flush to 0.3 mm short of the platform underside, NEVER PROUD, engagement 0.90D MIN. The former 90.2 mm reference belonged to the lower post.'
-        - 'Head seated on the current post counterbore floor; the screw passes through the post and threads into the 6.35 mm platform. No single fixed cut length covers all accepted post/plate bands.'
-        - 'vn_post_mount_screw_spec and the supplier catalog identity; old 3.5 in /88.9 mm stock cannot reach the taller post. Ideal catalog-dimension CAD, not a supplied vendor solid or measured screw; exact supplier thread length remains unestablished.'
+        - 'MSC 40923906 slotted fillister steel/zinc, SAE J82 / ASME B18.6.3, 1/4-20 ×4 in / 101.6 mm supplied stock. Current reference cut length 94.9 mm; deburr cut end 0.1 MAX. Cut each screw to its own matched hole, end flush to 0.3 mm short of the platform underside, NEVER PROUD, engagement 0.90D MIN. Former 90.2 mm reference belonged to the lower post.'
+        - 'Head seated on the post counterbore floor; shank passes through the post and threads into the 6.35 mm platform. No single fixed cut length covers all accepted post/plate bands.'
+        - 'vn_post_mount_screw_spec consumes dt_post_mount_stack''s nominal/cut-to-fit law and supplier identity. Old 3.5 in / 88.9 mm stock cannot reach this post. Catalog-dimension CAD is not a supplied vendor solid or a measured screw; exact supplier thread length is not established by the reference cut.'
         - high stock identity; med derived cut-to-fit geometry
       - - '`dt-cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
-        - 'Black steel straight prism 17 × 9.750 × 52.66 tall, standing directly on the platform. Current #10-32 UNF-2B through tap is on the raised cone axis 38.1 mm above the foot (±0.10), with 90° countersinks to Ø5.0 both ends; the cup-ended adjuster enters from north and the 1/32 in terminal shaft from south. The 1.2-wide top slit ends 0.65 below the axis; #4-40 pinch joint is 46.95 above the foot, 8.85 above the axis (McMaster 91794A112, head on +X west). One #4-40 × 3/8 socket-head screw MHA-VN-030 / McMaster 91251A108 enters from under the platform into the blind foot tap, 1.00 east of the cone line (both stations ±0.10). Width/depth print .XXX for containment, embed and collar air. No shim, flange, slot or heel.'
-        - 'Current centre (−89.058863872, +93.120948680), cone station 149.071979375415; north face 153.946979375415 and south face 144.196979375415. North face remains 5.575 mm south of the extended pivot. Shaft tip/apex station 146.983479375415 follows ADJUSTER_EMBED 8.17 and the pure adjuster spec nominal cup depth1.2065, not a supplier-guaranteed cup size. Nominal engagement accounts for the flat Ø0.79375 terminal tip seating on the cup wall, not at its apex; supplied cup bands remain unestablished.'
-        - 'Historical ch30 GT (cone_back), p.18 clamp and v4_t00471 / 7:49 supply topology; 2026-09-21 DFM correction supplied the top/slit arrangement and 2026-09-29 eight-views-4 supplied the straight-prism reading. The former 47.93 mm block / 33.368 mm axis / 42.22 mm pinch height belong to that earlier geometry; current dt_cone_tip_block_spec applies the shared raise and cone_line extends the block 7.5 mm north in total for the stepped collar, without moving the post/crank world axes.'
-        - med (GT-anchored)
+        - 'Selected nominal black steel straight prism 17 ×9.750 ×52.66, standing directly on the platform. #10-32 UNF-2B through tap at raised cone axis 38.1 ±0.10 above the foot, 90° countersinks to Ø5.0 both mouths; cup adjuster enters from north, 1/32 in terminal shaft from south. Slit 1.2 wide, floor 0.65 below axis; #4-40 pinch joint 46.95 above foot / 8.85 above axis (91794A112 head on +X west). One #4-40 ×3/8 socket screw MHA-VN-030 / 91251A108 enters from under the platform into the blind foot tap, 1.00 east of the cone line (both stations ±0.10). Width/depth print .XXX. No shim, flange, slot or heel.'
+        - 'cone_line.TIP_BLOCK_STATION / TIP_BLOCK_NORTH_FACE and dt_cone_tip_block_spec.BLOCK_Z own its placement; current nominal centre (−88.946378929, +93.608131538), cone station 149.571979375415, north/south faces 154.446979375415 / 144.696979375415. North face is 5.575 mm south of the extended pivot. Shaft/cup seating comes from the block, shaft and pure adjuster readers, not a guaranteed supplier cup size or a frozen air result.'
+        - 'Historical ch30 GT (cone_back), p.18 clamp and v4_t00471 / 7:49 supply topology; 2026-09-21 corrected top/slit arrangement and 2026-09-29 eight-views-4 supplied the straight-prism reading. Former 47.93 block / 33.368 axis / 42.22 pinch height and centre (−90.746138016, +85.813205803) belonged to the lower, unextended tip layout. Current readers apply the shared raise and 8.0 mm total tip extension, including the coupled 0.50 mm collar-body north shift, without moving post/crank world axes.'
+        - med (historical topology; selected nominal geometry)
       - - '`vn-cone-lock-knob` (clamps the swing plate engaged/disengaged)'
-        - 'McMaster-Carr 93585A190 18-8 stainless steel high-profile knurled-head thumb screw: Ø15.875 × 12.7 knurled head (131 straight ridges, 0.794 × 45° rim chamfers) with no collar, over a 1/4-20 stud (Ø6.35) 19.05 long; the head underside seats on the plate top and the stud passes through the open notch into the base tap. Through the 6.35 plate, engagement is 12.70 gross and 11.7475 full-profile after the 0.9525 tip chamfer. The base has 19.30 full thread depth and 25.65 drill depth before the drill point, accepting the full stud when the head seats on the bare base.'
-        - 'Base-bolted STATIC at build_fr_harmonic_base.LOCK_KNOB_XZ, derived by dt_cone_swing_platform_geometry.swing_hardware_geometry; head seat y = 57.15 and the plate is the mover. Current slot radius, mouth travel and disengaged angle follow the current pivot/post geometry, not former world-coordinate literals. The purchased Ø15.875 head fences the open notch mouth when tightened with no plate beneath it, locking the plate disengaged (ch12: unscrewing this knob lets the cone set swing away).'
-        - 'vn_cone_lock_knob_spec owns the harvested McMaster-Carr 93585A190 nominal geometry; the native diagnostic recipe consumes that authority. Supplied SLDPRT comparison is geometric evidence, not a tolerance guarantee. Engagement and base depths follow build_fr_harmonic_base; v4_t00411 ("knob" label), v4_t00417 top view and ch12 p.16 retain the historical function.'
-        - high stock identity and nominal model provenance; function/placement derived; supplier head/stud bands unknown, not zero or a manufactured title-block grade
-      - - '`vn-cone-pivot-screw` (the physical p1 pivot pin)'
-        - 'McMaster-Carr 91829A560 slotted 18-8 stainless precision shoulder screw — head nominal Ø9.525 ×4.7625, supplier shoulder diameter6.35 +0/−0.0254 and length6.35 +0.0508/0; followed by a nominal9.525-long #10-24 UNC-2A threaded tail, nominal15.875 total under-head length. Qualified supplied external thread major MAXØ4.80060 and pitch diameter MINØ4.02844 mm follow the No10/24/2A source table. Functional installation inspection requires full-form useful engagement MIN4.83 mm with the shoulder fully seated; this is installed-joint acceptance, not a supplier tail/tip tolerance or thread-to-shoulder coaxiality grade. Tail engages a matching blind #10-24 UNC-2B bottoming-tapped base seat with9.775 full thread depth (0.25 nominal tip reserve),12.00 cylindrical drill depth and2.225 tap lead before the drill point. Supplier head diameter/height and raw tail/tip bands remain unknown.'
-        - 'Base-threaded STATIC at the current swing pivot (−86.707928564, +103.303070422). Shoulder bottoms on base top while the retained pivot-bearing relief leaves6.10 local bearing thickness and0.25 nominal running air; the supplied shoulder bands and finished matched pivot fit govern acceptance. This pivot-seat relief is not a crank-gear pocket.'
-        - 'vn_cone_pivot_screw_spec owns nominal vendor-model geometry and live 2026-10-08 McMaster91829A560 supplied shoulder bands; MODEL_SOURCE preserves the harvested geometry report. v4 top stills retain the historical slotted-head role.'
-        - high stock identity and supplier shoulder grades; nominal model provenance separate; supplied head grades unknown, finished pivot fit required
+        - 'McMaster-Carr 93585A190 18-8 stainless high-profile knurled-head thumb screw: vendor-model nominal head Ø15.875 ×12.7, 131 straight ridges and 0.794 ×45° rim chamfers, no collar; nominal 1/4-20 stud Ø6.35 ×19.05. Underhead face seats on plate top or, disengaged, bare base. Nominal plate-through insertion 12.70 gross / 11.7475 full-profile after 0.9525 tip chamfer; base full-thread/drill references 19.30 / 25.65 mm accept the head-on-bare-base pose.'
+        - 'Base-bolted STATIC at build_fr_harmonic_base.LOCK_KNOB_XZ, from swing_hardware_geometry; engaged head seat y = 57.15, plate is the mover. Current slot radius, mouth travel and swing follow current pivot/post geometry; the nominal head fences the open notch when seated without plate beneath it.'
+        - 'vn_cone_lock_knob_spec owns harvested McMaster 93585A190 nominal geometry; diagnostic/native recipes consume that reader. Supplier-model comparison is geometry provenance, not supplier head/stud grades or installed acceptance. Base seat depths remain build_fr_harmonic_base-owned; v4_t00411 ("knob"), v4_t00417 and ch12 p.16 preserve the historical function.'
+        - high stock identity; nominal model provenance and derived placement separate
+      - - '`vn-cone-pivot-screw` (physical p1 pivot pin)'
+        - 'McMaster-Carr 91829A560 slotted 18-8 stainless shoulder screw: vendor-model nominal head Ø9.525 ×4.7625; supplied shoulder diameter 6.35 +0/−0.0254 and length 6.35 +0.0508/0; nominal #10-24 UNC-2A tail 9.525 long / total under-head 15.875. Sourced thread major MAX Ø4.80060 and pitch diameter MIN Ø4.02844 mm constrain thread form. Installation requires full-form useful engagement MIN 4.83 mm, shoulder fully seated; this is an inspection requirement, not a supplied-tail or coaxiality grade. Base seat full-thread/drill references 9.775 / 12.00 mm, with nominal 0.25 tip reserve and 2.225 tap lead.'
+        - 'Base-threaded STATIC at cone_line.PIVOT_XZ, current nominal (−86.595443621, +103.790253281). Shoulder seats on base top; open pivot-bearing relief leaves 6.10 nominal plate thickness / 0.25 nominal axial air. Match relief depth to finished plate and actual shoulder: platform must swing freely with minimal axial play. This relief is not a crank-gear pocket. Former pivot (−88.395202708, +95.995327545) preceded the tip extension.'
+        - 'vn_cone_pivot_screw_spec owns harvested MODEL_SOURCE geometry, sourced shoulder bands and thread limits. v4 top stills preserve the slotted-head role; no unprovided supplier head/tail/profile grade follows from the CAD nominal.'
+        - high stock identity and sourced shoulder grades; matched installed pivot acceptance separate
       - - '`vn-swing-stop-screw` (p1 travel limit)'
-        - 'McMaster-Carr 90280A108 steel narrow fillister-head slotted screw, the foot screw''s SKU (user decision 2026-09-29), ASME B18.6.3 #4-40 UNC-2A. Vendor-model head nominal Ø4.6482 ×2.7178 and nominal shank Ø2.8448 ×9.525 remain the depiction. Qualified slotted-fillister stock head diameter MIN/MAX4.21640..4.64820 mm, total head height2.23520..2.71780 mm and under-head length9.01700..9.52500 mm come from standard supplier/table limits, not a manufactured title-block grade. Bearing circle MINØ3.79476 and unslotted head-height MIN1.01600 bound the actual contact head; qualified external thread major MAXØ2.82448 and pitch diameter MINØ2.34950 bound threaded material, not the raw depicted shank. Functional installation inspection requires full-form useful engagement MIN2.85 mm and the head fully seated; this is installed-joint acceptance, not a supplier tolerance or a nominal-model certificate. The head must bear on the base top and remain inside the6.35 platform edge; it is the stop. The base receiver has10.3 full thread depth and14.5 drill depth before the drill point.'
-        - 'Base-threaded STATIC at build_fr_harmonic_base.STOP_SCREW_XZ, derived by dt_cone_swing_platform_geometry.swing_hardware_geometry from the actual purchased head and current 230.603840373345 mm outline. The east taper reaches the head at the derived disengaged swing after the stud clears the notch; prior 223.103840373345 and 227.103840373345 mm outlines preceded the stepped terminal collar.'
-        - 'vn_swing_stop_screw_spec owns the shared90280A108 nominal fillister row and qualified ASME B18.6.3 slotted Table8 /machine-screw length limits. Live SKU supplied standard/thread class, Machinery''s Handbook26th-edition slotted-fillister table and Optimas ASME tables provide the documented stock limits; Steelmasters provides UNC2A thread limits. Native foot/latch recipes consume the same unchanged row. Embed and receiver depths follow build_vn_swing_stop_screw and build_fr_harmonic_base; v4 historical role is the small screw the platform bumps against.'
-        - high stock identity and sourced head/length/thread limits; nominal model provenance separate; raw shank-profile grade remains unknown, not zero; final assembled stop pose qualification separate
-      - - '`vn-cone-tip-collar` (MHA-VN-016 set-screw collar retaining the gear stack)'
-        - 'Custom MHA-VN-016 stepped steel stack collar turned from 3/4 in bar: body OD18.0, total width11.0, south nose Ø6.40 ×3.00, each at routine .XX±0.51; shoulder root R0.25 +0/−0.25, radial tap-face offset 7.0±0.51. Bore nominal 0.79375 mm (1/32 in), +0.085/+0.025 from the inherited seat fit. Actual purchased screw is McMaster 94355A213 #2-56 ×5/16 in UNC3A 18-8 stainless flat-tip stock; grind a positive dog Ø0.20±0.01 ×1.20±0.51, edge break 0..0.02, to seat wholly on the terminal 0.420 AF D-flat. That AF pays the loaded two-end bore-contact cock and whole dog-to-back lever, not the former shaft-radius lever. Model-owned radial-tap position is Ø0.05 referenced to A (bore), B (south face), C (mounting flat), basic tap station 7.0 from B, centred in the body beyond the nose; tap-root MAX Ø2.36 limits the physical thread envelope. The ground dog has model-owned total runout 0.02 to datum D (the stock threaded shank).'
-        - 'On the terminal D-land at cone stations 129.471979375415..140.471979375415, with the nose/body shoulder at 132.471979375415: set with 0.45 mm feeler against T006 and lock on the flat for 0.35–0.55 mm stack float. The tip-block south face is 144.196979375415; the block/pivot extension is now 7.5 mm in total, 3.5 mm beyond the prior width8 collar placement. The narrow south nose addresses the drum-side envelope while the further tip extension opens the north collar/block pair; full printed-band physical air remains to be qualified. The block/cup, not this collar, sets shaft end play.'
-        - 'Current vn_cone_tip_collar_spec and custom registry; live McMaster 94355A213 supplies only the reworked screw. Historical 9414T1 was a 1/16 in collar, not a 1/32 in substitute or runtime alias. v4_t00471 / 7:49 and the 2026-09-29 ruling remain evidence for separate gear-stack retention.'
-        - 'selected stepped source geometry and derived retention budget; full printed-band physical air and manufacturing/native realization of tap-position and dog-runout controls remain pending, not release-approved; stock length ±0.254 and socket minimum 1.524 are ASME limits, not vendor-exact harvested geometry'
+        - 'McMaster-Carr 90280A108 steel slotted narrow fillister, foot-screw SKU (user, 2026-09-29), ASME B18.6.3 #4-40 UNC-2A. Model nominal head Ø4.6482 ×2.7178 / shank Ø2.8448 ×9.525. Sourced stock limits: head diameter 4.21640..4.64820, total height 2.23520..2.71780, under-head length 9.01700..9.52500, bearing circle MIN Ø3.79476 and unslotted head height MIN 1.01600 mm; external thread major MAX Ø2.82448 / pitch diameter MIN Ø2.34950 constrain threaded material, not the raw depicted shank. Installation requires full-form useful engagement MIN 2.85 mm with head fully seated on base; head remains inside the 6.35 platform edge and is the stop. Base full-thread/drill references 10.3 / 14.5 mm.'
+        - 'Base-threaded STATIC at build_fr_harmonic_base.STOP_SCREW_XZ, from swing_hardware_geometry and the selected 231.103840373345 outline. The east taper meets the actual head after the stud clears the notch; assembled all-P1 head/platform seating and stop pose remain the installation contract. Earlier 223.103840373345 / 227.103840373345 outlines and the nominal 9.525 embed / 3.35D description were prior model references, not stock full-form engagement evidence.'
+        - 'vn_swing_stop_screw_spec owns the shared nominal 90280A108 row and ASME slotted-fillister/length/thread limits with its recorded supplier/table provenance; native foot/latch recipes consume the same row. Base receiver is build_fr_harmonic_base-owned. v4 preserves the small-screw stop role; sourced bounds are not proof of a measured installed screw or raw shank-profile grade.'
+        - high stock identity and sourced limits; nominal depiction and installed acceptance separate
+      - - '`vn-cone-tip-collar` (custom MHA-VN-016 gear-stack retainer)'
+        - 'Custom stepped steel collar turned from 3/4 in bar, with geometry and printed limits owned by vn_cone_tip_collar_spec. The reader derives OUTER_DIA from its bore/tap/flat/wall envelope; the selected source-design body OD17.05 ±0.51 mm is not a frozen purchased-collar diameter or native/full-P1 acceptance. Shared cone_shaft_land_bands owns the 1/32 in terminal, width 11.5 at the routine ±0.51 band, south nose length 3.5 and BASIC tap station 7.5; collar spec owns the Ø6.40 nose. Reworked McMaster 94355A213 #2-56 ×5/16 UNC3A 18-8 flat-tip screw has a ground positive dog governed by the shared retention reader, with model-owned tap-position and dog-runout controls.'
+        - 'Set one 0.45 ±0.10 feeler off T006 and lock on the terminal AF 0.420 D-flat for 0.35–0.55 mm stack float; start/end stations follow dt_cone_gear_shaft_spec.TIP_COLLAR_START_STATION / TIP_COLLAR_END_STATION. The block/cup sets shaft end play. Full printed-band, loaded-support collar/drum/block/platform air comes from the assembly readers, not the old nominal axis-only gap.'
+        - 'vn_cone_tip_collar_spec and cone_shaft_land_bands are current geometry/retention authority; only the reworked screw is purchased. Historical McMaster 9414T1 was a black-oxide Ø6.35 ×4.7625 collar with Ø1.5875 bore / #2-56 cup-point screw, formerly at cone stations 129.471979375415..134.234479375415 with block south face 136.696979375415. It is not current procurement or a 1/32 in substitute. v4_t00471 / 7:49 and the 2026-09-29 ruling preserve the separate stack-retention role.'
+        - selected/derived custom reader authority; no physical-air or native realization qualification asserted
       - - '`vn-cone-tip-adjuster` (axial end-play screw, partially hollow)'
-        - 'McMaster-Carr94025A164 slotted18-8 stainless #10-32 UNF-2A ×3/8 in cup-tip set screw (rule-12 E11). vn_cone_tip_adjuster_spec owns the vendor Sketch2 nominal90° included cup, Ø2.413 and depth1.2065 from rim to apex; Sketch2 Line7 is geometric provenance, not a supplied tolerance. Qualified external thread major MAX is0.1891 in /4.80314 mm and pitch diameter MIN0.1658 in /4.21132 mm from the No10/32/2A thread table. Supplier raw-body/length and cup-diameter/depth bands remain unknown.'
-        - 'Threaded through the current tip block''s #10-32 UNF-2B tap; ADJUSTER_EMBED and the smaller flat-tip cup-wall seat define nominal engagement, with the retained user-ruled1.0D full-thread floor. Nominal cup apex/tip station is146.983479375415; unknown supplier cup/body bands do not become zero-width or title-block tolerance inputs, so nominal cup geometry alone cannot approve the complete supplied-stock corner fit. Run in until shaft shuttle stops, back off1/8 turn for0.05–0.25 mm end play, then lock the slit/pinch screw. The custom stack collar independently owns0.35–0.55 mm gear-stack float.'
-        - 'v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)'
-        - med (role high, dims low)
+        - 'McMaster-Carr 94025A164 slotted 18-8 stainless #10-32 UNF-2A ×3/8 cup-tip set screw (rule-12 E11). vn_cone_tip_adjuster_spec owns Sketch2 nominal 90° included cup, Ø2.413 / depth 1.2065 from rim to apex; former “45° cup” denotes its half-angle. Sourced thread major MAX Ø4.80314 / pitch diameter MIN Ø4.21132 mm constrain threaded material, not supplied cup/body/length grades.'
+        - 'Current #10-32 UNF-2B through tap; dt_cone_tip_block_spec.ADJUSTER_EMBED and the shaft''s flat-tip cup-wall seating law define engagement with the retained 1.0D full-thread floor. Current nominal model apex/tip station is 147.483479375415; former 139.483479375415 belonged to the unextended tip. Run in until shuttle stops, back off 1/8 turn for 0.05–0.25 shaft end play and lock slit/pinch joint; custom stack collar independently owns 0.35–0.55 gear-stack float. Nominal cup dimensions alone do not approve supplied-stock corner fit.'
+        - 'vn_cone_tip_adjuster_spec preserves supplier-model Sketch2 Line7 provenance; v4_t00471 / 7:49 (t00147: hollow slotted screw the shaft rests in) preserves the historical role.'
+        - med (role high; nominal cup geometry separate from installed fit)
       - - '`vn-cone-tip-pinch-screw` (locks the adjuster)'
-        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 15.875 (rule-12 E1: 6.26 = 2.20D of far-jaw thread, from the slit''s far wall, at the printed worst case; tip 0.995 inside the -X face at the width minimum).'
-        - 'Across the tip block''s slit (head on +X west, current machine y = 104.10 = platform top 57.15 + PINCH_HEIGHT 46.95): near jaw normal-clearance, far jaw native #4-40 UNC-2B. Tightening pinches the slit around the #10-32 adjuster so its end-play setting cannot back off; the former y110.35 was a stale earlier placement.'
-        - McMaster-Carr 91794A112 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
-        - high (stock dimensions exact; function photo-derived)
+        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: model nominal head Ø4.6482 ×2.7178, #4-40 shank Ø2.8448 ×15.875. Retained rule-12 E1 printed-jaw stack: 6.26 = 2.20D far-jaw thread from slit wall, tip 0.995 inside −X face at width minimum; this is not a supplier-exact screw-size grade.'
+        - 'Across block slit, head on +X west; current nominal machine y = 104.10 from platform top 57.15 and dt_cone_tip_block_spec.PINCH_HEIGHT 46.95. Near jaw normal-clearance / far jaw native #4-40 UNC-2B; tightening locks the #10-32 adjuster. Former y = 110.35 was an earlier placement, not the raised reader.'
+        - 'McMaster 91794A112 nominal recipe, dt_cone_tip_block_spec and v4_t00471 / 7:49 perpendicular top-screw observation; printed receiver acceptance remains separate from supplied screw limits.'
+        - high stock identity; nominal model and photo-derived function separate
   - prose: |2
 
       ### Connecting rods (ch. 13 pp. 22–25 + ch. 14 p. 29; 20 used)
@@ -1855,9 +1878,9 @@ sections:
       - - Outer diameter
         - '17.63 mm blank; tooth-tip MIN/MAX 17.61..17.63 mm'
         - '0.694094'
-        - 'Current dt_alignment_pinion_spec uses finite #4 stock form, 26T reference for the 32T 48DP PA20 pinion: supported outside diameter 17.979877682 mm at nominal translation; span-corner support 17.636633356 mm pays the retained +0/−0.100 inspection band before selecting the two-place 17.63 blank, with native contact-critical band +0/−0.02. Actual nominal root envelope Ø15.607797572 /15.610416667 mm, cutter plunge 1.009791667 mm, three-tooth tangent span 4.141050236 mm (four-place printed span MIN/MAX 4.0411..4.1411). This source finite-support selection is not a loaded-contact/no-gap/backlash/air/TE certificate. Earlier nominal-support-only blank 17.97 was not the whole-process selection. Former ideal-N tip 17.991666666667 and circular root 15.610416666667 are historical reference values only.'
+        - 'dt_alignment_pinion_spec uses finite #4 stock form, 26T reference, for the 32T 48DP PA20 pinion. dimensions.yaml records nominal support Ø17.979877682; span-corner support Ø17.636633356 pays retained +0/−0.100 tangent-span inspection before selecting the two-place 17.63 blank, with contact-critical tip band +0/−0.02. Nominal root-envelope MIN/MAX Ø15.607797572 / 15.610416667, cutter plunge 1.009791667 and three-tooth tangent span 4.141050236 mm (printed span 4.0411..4.1411) are source geometry, not a loaded-contact certificate. Earlier support-only blank 17.97, ideal-N tip 17.991666666667 / 0.708333 in and circular root 15.610416666667 are historical reference values.'
         - derived from selected finite stock form
-        - med current nominal geometry; retained-band corner disposition pending
+        - med current nominal geometry; qualification separate
       - - Drum length
         - 143.2 mm
         - '5.638'
@@ -1871,16 +1894,16 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.381 × 6.35 17-7 PH stainless strip, Condition C (0.015 in, McMaster-Carr 2325K19 sheared 1/4 in wide; PR 859 ruling 4, 2026-09-25, supersedes the 0.5 × 6.0 C51000 of O1-b — stainless departs from the p.68 brass look for stress margin and corrosion resistance); foot screwed down 20.0 EAST of the pivot bore, outboard of the back strap, on a 9.5 square pad flush with the strip's aft edge (widening forward only, PR 859 option (iv)); R3.3 bend straight off the pad; current raised straight blade 34.794280431 mm, leaning 0.879274675° west of vertical (9.017849127° in to the parked flank); crest R3.3 bearing on the east flank 23.0 up the strap, 5 below the arbor; 25° flick back east, 2.0 flat. Modelled installed (0.15 parked air); formed free with the crest preset 4.577524286 mm into the flank (8.2° more bend). The prior 5.4°/approximately2.6 mm free form is superseded for the raised mechanism. Current native gravity/preload/stress qualification remains required (`dt_pinion_spring_geometry.py`, `dt_pinion_spring_section.py`)
+        - '0.381 ×6.35 17-7 PH stainless strip, Condition C (0.015 in, McMaster 2325K19 sheared 1/4 in wide; PR859 ruling 4, 2026-09-25, supersedes O1-b 0.5 ×6.0 C51000; stainless departs from p.68 brass appearance). Foot screwed 20.0 EAST of pivot, outboard of back strap, 9.5 square pad flush with strip aft edge, widened forward only; R3.3 bend, current raised straight blade 34.794280431 mm, leaning 0.879274675° west / 9.017849127° into parked flank. Crest R3.3 contacts 23.0 up strap / 5 below arbor; 25° flick east, 2.0 flat. Installed nominal parked air 0.15; free preset 4.577524286 into flank / 8.2° further bend. Former approximately 1.0° / 9.2° blade and approximately 2.6 mm / 5.4° preset described the lower rig.'
         - —
-        - 'p.68–69 + v4_pinion_013/018/019: a brass-coloured leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). img01''s far-left black screw is on the DRUM side (east): the foot is outboard, not under the strap (the pre-2026-09-24 model read it as west). img04 puts the crest 5 below the arbor. The pad''s aft edge, flush with the strip''s, is set a 0.65 gage leaf off the back block (`SPRING_PAD_LEAF`), which stations the blade in from the strap''s inner face (`SPRING_BLADE_INSET`) (build_dt_pinion_spring / build_dt_drive_train_assembly SPRING_*)'
-        - scaled
+        - 'p.68–69 + v4_pinion_013/018/019: brass-coloured leaf on BACK strap east flank, more flexed engaged, holds drum disengaged; front strap clean (t00393). img01''s far-left screw is east/drum-side, not the pre-2026-09-24 west interpretation; img04 locates crest 5 below arbor. Pad aft edge set by 0.65 gage leaf from back block (SPRING_PAD_LEAF / SPRING_BLADE_INSET). dt_pinion_spring_geometry / dt_pinion_spring_section and dimensions.yaml own current geometry/preset; source calculations are not current gravity, bend-trial, preload or stress qualification.'
+        - scaled + derived current reader
         - med
       - - Swing straps ×2 (2026-09 re-derive)
-        - 28.0 centre-to-centre ×15 wide ×9 thick, R7.5 ends, plain (no cam relief), parked near-vertical with blocks under the drum; Ø8 arbor bore, Ø6.35 pivot bore. Current centred Ø4 blind follower-stud seat leaves 2.04 mm worst side web, not the superseded 1.59 mm named-exception placement.
+        - '28.0 centre-to-centre ×15 wide ×9 thick, R7.5 ends, plain (no cam relief), near-vertical with blocks under drum; Ø8 arbor / Ø6.35 pivot bores. Centred Ø4 blind follower-stud seat retains the source 2.04 mm side-web budget, not the former 1.59 exception placement.'
         - —
-        - 'ch25 p.68: the straps read ~28 ×15 and stand near-vertical, superseding the 43 ×18 straps leaning 50° with the blocks 33 mm east. Current dt_pinion_pivot_block_geometry uses 40 ×25.232 ×11.0 blocks, bore 16.732 above the base, after the shared 4.732 mm drive-axis raise; the lift bore stays 18.5 west of and 2.16 above the pivot, with hold-downs ±8.5 about it. U28''s earlier 40 ×20.5 ×10.25 block is historical reconstruction evidence, not current stock. MHA-VN-019 is verified McMaster 90280A203 #8-32 ×1-1/2 in/38.1 mm stock (head Ø6.858 ×3.9624), not the former 31.75 mm model length. Current nominal insertion 12.868, maximum 13.378; base full-thread/drill references 14.15 /16.8 mm follow the actual screw/block stack.'
-        - scaled
+        - 'Historical ch25 p.68 reads approximately 28 ×15 straps, superseding 43 ×18 leaning 50° / blocks 33 east. Current dt_pinion_pivot_block_geometry uses 40 ×25.232 ×11.0 blocks, pivot bore 16.732 above base after common 4.732 raise; west-to-east order is lift bore → screw → pivot bore → screw, lift 18.5 west / 2.16 above pivot, hold-downs ±8.5. U28''s earlier 40 ×20.5 ×10.25 block remains historical. MHA-VN-019 current stock is McMaster 90280A203 #8-32 ×1-1/2 in / 38.1 (model head Ø6.858 ×3.9624), not old 31.75 length; dimensions.yaml records nominal/max insertion 12.868 / 13.378 and base full-thread/drill references 14.15 / 16.8 from the actual screw/block stack.'
+        - scaled + derived current reader
         - med
       - - Pinion grip head and crossrod (2026-09 re-derive)
         - Integral MHA-DT-022 turned head Ø15 × 11.5 (SR10.9 crown; rule 12 W6 was × 9 → 10.5, machinist review of 7f7fc1717 → 11.5 for a 2.30 worst-case crossrod web), neck Ø10.5 × 10.5 (shoulder 0.25 forward so every turned length prints .X), reamed Ø6.00 +0.10/0 for the separate MHA-DT-015 Ø6 crossrod, bonded with Loctite 638, 65 overall (32 down / 33 up)
@@ -1889,10 +1912,10 @@ sections:
         - scaled
         - med
       - - Engage lever rest and throw (2026-09 photo correction)
-        - 'Ø6 ×86 lever; parked +10° from vertical toward machine −X; the −76.622° eccentric-cam contact rotation carries it through vertical to −66.622° toward machine +X at engagement. Current Ø14.6 ×9 collar, ecc 2.0, 2.100 thin-side wall and sub-flush M2.5 set screw; 2.2425 mm parked tip gap and 40.566667 mm engaged centre distance use the actual finite 26T/55T stock forms at 48DP PA20, not root-tip seating.'
+        - 'Ø6 ×86 lever, parked +10° toward machine −X; source-law eccentric-cam rotation −76.622° carries it through vertical to −66.622° toward +X at engagement. Ø14.6 ×9 collar, eccentricity 2.0, source thin-side wall 2.100 and sub-flush M2.5 screw; 2.2425 parked tip gap / 40.566667 engaged centre use the finite 26T/55T stock forms at 48DP PA20, not root-tip seating.'
         - —
-        - 'Historical ch25 p.68 front-side pair: page002_img08 shows the lever about +10° parked toward machine −X and page002_img07 about −76° engaged toward machine +X. Current source-law linkage solves −76.622° cam rotation and a −66.622° engaged lever with the selected whole-process blank caps; source historical perspective is retained, not silently remeasured. Earlier ideal-48DP −80.813°/−70.813° and shallow-root DP49.82 −82.023°/−72.023° are superseded reconstruction values.'
-        - scaled + derived
+        - 'Historical ch25 p.68 pair: page002_img08 approximately +10° parked and page002_img07 approximately −76° engaged. Current nominal linkage/whole-process-blank results are recorded in dimensions.yaml and consumed by the rig readers, not a new historical photo measurement or qualification. Former ideal-48DP −80.813° / −70.813° and shallow-root DP49.82 −82.023° / −72.023° belong to earlier reconstructions.'
+        - scaled + derived current reader
         - med
       - - Cam-follower pin (per strap)
         - Ø4 × 20 steel stud, seated 4.0 in a blind edge bore 7.0 ABOVE the pivot axis (U28 2026-09-23 re-solve); 16 proud reaches the lift cam 18.5 out
@@ -1905,59 +1928,60 @@ sections:
       Notes: single pinion — a long toothed drum, engaged via a small ball-handle
       lever, meshes the cylinder gear set and turns all 20 cylinder gears as one —
       used only during setup to align the 3 mm notches (top = cosine, 90° = sine)
-      after pivoting the cone set out of engagement. Current Step5 sets the actual
-      notch UP BY EYE, then applies the cone lock: the alignment drum has no
-      index. An authored home-clock gauge offset is not accumulated readout TE;
-      actual cone-home/crank-index signed TE remains absolute and paid.
-      The "small gear" visible on the
-      lever arm in the p.68–69 photos is the drum's front end face, not a separate
-      idler (video frame `v4_pinion_018` shows the drum receding behind it).
+      after pivoting the cone set out of engagement. Set the actual notch UP BY
+      EYE, then apply the cone lock: the alignment drum has no index. Its authored
+      home-clock gauge is not a readout datum or a cone-home/crank-index TE tare.
+      The "small gear" visible on the lever arm in the p.68–69 photos is the
+      drum's front end face, not a separate idler (`v4_pinion_018` recedes behind it).
 
       ### Alignment-pinion layout — RESTORED 2026-07-02 (ch30 GT), level-inboard
 
       The mechanism (32T zeroing drum + swing straps, pivot blocks, torque
       shaft, lift rod, lever, integral grip head and separate crossrod) is BACK in
       `build_dt_drive_train_assembly.py`, re-solved against the ch30 GT
-      triangulation, then re-closed vertically around the v2 post. The 2026-06-18
+      triangulation, then re-closed around the v2 post and the later raised-axis law. The 2026-06-18
       removal used a superseded pre-correction drum model and argued it could not
       thread the 12.56 mm channel between the rocker-support frustum and the
       64T — but the GT shows the drum never lived there: pinion_front/pinion_back
       triangulate its axis near machine x −10 to −11, y ~104–107. The x evidence
       establishes the level-inboard topology; the selected finite stock forms,
-      shared 4.732 mm drive-axis raise, user-authoritative 32T count and U28
-      2.2425 mm parked tip gap now own the derived rig location.
-      Modeled layout (`APINION_*` constants): axis at machine (−17.116, 95.25) =
-      X_DRUM + (drum tip 32.220 + pinion tip 8.815 + 2.2425 disengaged gap);
-      drum z −70.389..+72.811 (face 143.2, spanning all 20
+      common 4.732 mm raise, user-authoritative 32T count and U28 2.2425 mm
+      parked tip gap now own the derived location. Current nominal layout in
+      dimensions.yaml / the pure rig readers has axis (−17.116, 95.25), from
+      X_DRUM plus drum radius 32.220, pinion radius 8.815 and parked gap 2.2425;
+      former axis (−16.876, 90.518) / radii 32.279 and 8.996 were ideal-tooth
+      lower-rig references. Drum z −70.389..+72.811 (143.2 face, all 20
       stations), integral steel arbor/head root z −130.689..+95.561,
       head/crossrod axis z −137.189, and separate MHA-DT-015 crossrod at +65°.
       Straps: 15 wide × 9 thick with R7.5 ends, plain (no cam relief), pivot
-      (−13.152, 67.532), bore-to-bore c2c 28.0, parked at an 8.139° lean; the swing
+      (−13.152, 67.532), bore-to-bore c2c 28.0, parked at an 8.139° lean; the
+      former pivot (−12.912, 62.8) belonged to the lower ideal-tooth rig. The swing
       rides the setup DOF (a freed operational DOF, its angle drive spec recorded
       in the DOF manifest; articulated by the mobility probe / motion drives).
       The selected stainless return spring (table row above) stands beside the back strap,
       foot on the base east of it, and presses the swing to the disengaged rest —
       parked-pose clearances asserted in `build_dt_drive_train_assembly`
       (`SPRING_*`). The engage path is the p.69 cam: the lift rod rides the
-      blocks' other bores at (5.348, 69.692), and each strap tail carries a Ø4
+      blocks' other bores at (5.348, 69.692); former (5.588, 64.960) belonged
+      to the lower ideal-tooth rig. Each strap tail carries a Ø4
       follower pin (table row above), bonded into its blind seat, that the
       rod's eccentric collar lifts. The collar is Ø14.6 with a 2.0 eccentricity
-      and keeps a 2.100 thin-side wall. Parked surface gap is 0.161; the solved
-      −76.622° cam rotation gives 1.928 mm engaged authority and leaves 2.731 mm
-      of follower pin beyond the contact station. Existing guards assert these
-      (`CAM_*` + the segment-distance scan). Current engaged pitch-circle sum
-      40.216667 mm plus 0.35 mm extension gives 40.566667 mm. The drum is
-      32T 48DP PA20, pitch Ø16.933333 and finite-26T-form blank Ø17.63,
-      accepted tip17.61..17.63. Historical DP49.82 /Ø17.334 /C2C38.990010 and
-      the later ideal-32T tip17.991667 describe prior reconstructions, not the
-      current finite stock form. Main chooses FITUP/zeroing duty: the whole
-      retained centre range and all16 manufacturing profile pairs must retain
-      actual UNION continuity/no-gap, positive backlash, root air at least0.20
-      and handover no larger than0.005 mm. Flank/flank coverage is diagnostic
-      only, not a greater-than1.1 alignment release criterion; the cone's old
-      backlash ceiling is not borrowed here. Named union functional coverage
-      is non-CR. Supported branch span or pointwise first-contact samples alone
-      do not establish all-phase carrier-aware backlash, air or signed TE.
+      and keeps a 2.100 thin-side wall. Current nominal parked surface gap is
+      0.161; dimensions.yaml records −76.622° cam rotation, 1.928 mm engaged
+      authority and 2.731 mm follower projection beyond contact. Former
+      −80.813° / 1.760 / 2.623 results describe the earlier ideal-tooth rig.
+      The assembly's CAM_* and segment-distance guards consume current readers;
+      their presence is not an exercised-check claim. Current pitch-circle sum
+      40.216667 plus 0.35 extension gives 40.566667. The drum is 32T 48DP PA20,
+      pitch Ø16.933333 with finite-26T-form blank Ø17.63 / tips 17.61..17.63.
+      Historical DP49.82 / Ø17.334 / C2C38.990010 and ideal-32T tip Ø17.991667
+      describe prior reconstructions. Alignment is FITUP/zeroing duty: actual
+      UNION must retain continuity/no-gap, positive backlash, root air at least
+      0.20 and handover no larger than 0.005 mm across the whole retained centre
+      range and all 16 manufacturing-profile pairs. Flank/flank coverage is
+      diagnostic only, not contact ratio or a greater-than-1.1 alignment release
+      criterion; neither pointwise contact samples nor supported branch span alone
+      establish all-phase carrier-aware backlash, air or signed TE.
 
 
       ---
@@ -2026,6 +2050,14 @@ sections:
 - heading: Appendix C — Open items (must close before the milestone that needs them)
   elements:
   - prose: |2+
+
+      The drive-train entries below preserve dated research/reconstruction history,
+      not active cutting dimensions or current qualification. In particular, the
+      DP30/PA14.5 inference in item 1, channel/incline arithmetic in item 3,
+      old stack and 1/16 in terminal in items 6–7, and fixed-axis/ideal-helix
+      studies in item 9 are superseded by the source-attributed Chapter 11–13/25
+      rows above. Item 10 preserves restoration history, not current rig sizes.
+      Historical observations and their original wording are retained below.
 
       1. **Gear module + pressure angle** (ch. 12/13/25) — **RESOLVED in M4 prep:
          DP 30 (m = 0.8467 mm), PA 14.5° (assumed, unchanged).** Two independent

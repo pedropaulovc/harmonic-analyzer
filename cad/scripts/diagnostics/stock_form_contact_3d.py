@@ -1109,208 +1109,8 @@ def merge_intervals(intervals) -> tuple[tuple[float,float], ...]:
     return tuple(merged)
 
 
-def handovers(
-    case: ContactPair, rows: list[dict], error_mm: float, *,
-    position_error_mm: float = 0.0, maximum_jump_mm: float = 0.005,
-    radial_error_mm: float = 0.0, axial_error_mm: float = 0.0,
-    required_root_air_mm: float = 0.0,
-) -> list[dict]:
-    """Compare independently rooted driven branches at one fixed driver pose."""
-    result = []
-    ratio = case.driver.teeth/case.driven.teeth
-    for side,sense,index in (("lower",1,1),("upper",-1,2)):
-        for left,right in zip(rows,rows[1:]):
-            a,b = left[f"{side}_contact"]["driven_tooth"],right[f"{side}_contact"]["driven_tooth"]
-            if a == b:
-                continue
-            low,high = left["driver_phase_rad"],right["driver_phase_rad"]
-            original = [low,high]
-            crossing = None
-            for _ in range(28):
-                phase = (low+high)/2.0
-                measured = ContactSearch(
-                    case,phase,position_error_mm=position_error_mm,
-                    radial_error_mm=radial_error_mm,axial_error_mm=axial_error_mm,
-                ).window(error_mm,required_root_air_mm=required_root_air_mm)
-                pairs = {entry[0]:entry[index] for entry in measured.branch_intervals}
-                if a not in pairs or b not in pairs:
-                    break
-                crossing = phase,(pairs[a]+pairs[b])/2.0,measured
-                if abs(pairs[a]-pairs[b])*case.driver.pitch_radius_mm < maximum_jump_mm/20.0:
-                    break
-                a_carries = pairs[a] > pairs[b] if sense == 1 else pairs[a] < pairs[b]
-                if a_carries:
-                    low = phase
-                else:
-                    high = phase
-            if crossing is None:
-                result.append({"continuous":False,"side":side,"pair":[a,b],
-                               "phase_bracket_rad":original,"reason":"supported branch overlap absent"})
-                continue
-            phase,offset,measured = crossing
-            # Same worlddriver pose for both independent actual driven roots.
-            fixed_driver = phase-offset
-            nominal_driven = case.placement.driven_clocking_rad-phase*ratio
-            bracket = (nominal_driven-case.driven.angular_pitch_rad/8,
-                       nominal_driven+case.driven.angular_pitch_rad/8)
-            try:
-                roots = [loaded_driven_contact(
-                    case,fixed_driver,driver_sense=sense,driven_bracket_rad=bracket,
-                    maximum_error_mm=min(error_mm,maximum_jump_mm/16),
-                    driven_teeth=(tooth,),position_error_mm=position_error_mm,
-                    radial_error_mm=radial_error_mm,axial_error_mm=axial_error_mm,
-                    required_root_air_mm=required_root_air_mm,
-                ) for tooth in (a,b)]
-            except ValueError as exc:
-                result.append({"continuous":False,"side":side,"pair":[a,b],
-                               "phase_bracket_rad":original,"reason":str(exc)})
-                continue
-            separation = abs(roots[0]["driven_phase_rad"]-roots[1]["driven_phase_rad"])
-            bound = roots[0]["bound_rad"]+roots[1]["bound_rad"]
-            jump = case.driven.pitch_radius_mm*(separation+bound)
-            contact = roots[0]["contact"]
-            point_delta = np.asarray(roots[1]["contact"]["world_point_mm"])-np.asarray(contact["world_point_mm"])
-            normal = np.asarray(contact["driven_normal_world"])
-            result.append({
-                "continuous":jump <= maximum_jump_mm,"side":side,"pair":[a,b],
-                "phase_rad":phase,"phase_bracket_rad":original,
-                "fixed_driver_phase_rad":fixed_driver,
-                "pitch_displacement_jump_upper_mm":jump,
-                "driven_phase_roots_rad":[root["driven_phase_rad"] for root in roots],
-                "driven_phase_error_bounds_rad":[root["bound_rad"] for root in roots],
-                "normal_projected_contact_transfer_mm":float(point_delta@normal),
-                "contact_site_distance_mm":float(np.linalg.norm(point_delta)),
-                "contact":contact,
-            })
-    return result
 
 
-def analyse_3d_mesh(
-    case: ContactPair, *, phases: int = 129, maximum_error_mm: float = 0.001,
-    coverage_min: float = 0.62, row_min: float = 0.85,
-    handover_max_mm: float = 0.005, positive_backlash_min_mm: float = 0.0,
-    position_error_mm: float = 0.0,
-    radial_error_mm: float = 0.0, axial_error_mm: float = 0.0,
-    driver_sense: int = 1,
-    required_root_air_mm: float = 0.0,
-) -> dict:
-    if phases < 3:
-        raise ValueError("a whole-pitch study requires endpoints and interior phases")
-    if driver_sense not in (-1,1):
-        raise ValueError("driver_sense must be +1 or -1 about the declared driver axis")
-    pitch = case.driver.angular_pitch_rad
-    rows = []
-    for phase in np.linspace(0.0, pitch, phases):
-        measured = ContactSearch(
-            case,float(phase),position_error_mm=position_error_mm,
-            radial_error_mm=radial_error_mm,axial_error_mm=axial_error_mm,
-        ).window(maximum_error_mm,phase_half_width_rad=pitch/(phases-1)/2,
-                 required_root_air_mm=required_root_air_mm)
-        rows.append(asdict(measured))
-        if measured.lower_contact is None or measured.upper_contact is None:
-            raise ValueError(f"{case.name}: missing supported carrying contact at phase {phase}")
-    radius = case.driver.pitch_radius_mm
-    ratio = case.driver.teeth / case.driven.teeth
-    # The radial inverse's slope and polar-angle differential bound motion
-    # of each feasible branch. Pay both endpoints of every backlash window.
-    inverse = GapAngles(case.driver)
-    phase_lipschitz = 1.0+ratio*case.driven.blank_radius_mm*math.hypot(1.0/inverse.minimum,inverse.radial_slope_bound())
-    phase_step = pitch/(phases-1)
-    phase_bound = radius*phase_lipschitz*phase_step/2.0
-    lower = max(row["lower_rad"]+row["error_rad"] for row in rows)+phase_bound/radius
-    upper = min(row["upper_rad"]-row["error_rad"] for row in rows)-phase_bound/radius
-    common = ((-pitch/2,pitch/2),)
-    for row in rows:
-        common = intersect_intervals(common,row["free_intervals_rad"])
-    selected = max(common,key=lambda interval:interval[1]-interval[0]) if common else None
-    backlash = [(row["upper_rad"]-row["lower_rad"]-2*row["error_rad"])*radius for row in rows]
-    edge = "lower_rad" if driver_sense == 1 else "upper_rad"
-    carrying = [row[edge] for row in rows]
-    # Actual input is phase-offset; output is seed-ratio*phase. The
-    # mechanical-datum world-angle TE is -ratio*offset, with NO home tare.
-    # This is not the direct held-driver stall reader.
-    te = [-value*ratio for value in carrying]
-    counts = []
-    no_gap = True
-    reserve = math.inf
-    noncarrying_gap = 0.0
-    for row in rows[:-1]:
-        reserves = dict(row["branch_phase_reserves_rad"])
-        active = []
-        for tooth,low,high in row["branch_intervals"]:
-            free_reserve = (high-low-2*row["error_rad"])/(2*phase_lipschitz)
-            branch_reserve = min(reserves.get(tooth,0.0),free_reserve)
-            if branch_reserve >= phase_step/2:
-                active.append(branch_reserve)
-            if math.isfinite(low) and math.isfinite(row["lower_rad"]):
-                angular_gap = row["lower_rad"]-low+2*row["error_rad"]+2*phase_bound/radius
-                noncarrying_gap = max(noncarrying_gap,angular_gap*case.driver.blank_radius_mm)
-        counts.append(len(active))
-        contact_kinds = (row["lower_contact"]["kind"],row["upper_contact"]["kind"])
-        no_gap &= (bool(active) and row["surface_numerical_resolved"] and not row["root_contact"]
-                   and all(not any(feature in kind for feature in ("axial_face","root_arc","root_corner")) for kind in contact_kinds)
-                   and all(row[side]["common_normal_supported"]
-                           and math.isfinite(row[side]["driven_per_driver_velocity"])
-                           and row[side]["opposed_normal_residual"] <= row[side]["common_normal_error_bound"]
-                           for side in ("lower_contact","upper_contact")))
-        reserve = min(reserve,max(active,default=0.0)-phase_step/2)
-    exchanges = handovers(
-        case,rows,maximum_error_mm,position_error_mm=position_error_mm,
-        radial_error_mm=radial_error_mm,axial_error_mm=axial_error_mm,
-        maximum_jump_mm=handover_max_mm,
-        required_root_air_mm=required_root_air_mm,
-    )
-    row_intervals = merge_intervals(interval for row in rows for interval in row["row_intervals_mm"])
-    row_fraction = sum(high-low for low,high in row_intervals)/(case.placement.driven_face_mm[1]-case.placement.driven_face_mm[0])
-    coverage = sum(counts)/(phases-1)
-    no_gap &= all(
-        row["surface_numerical_resolved"] and not row["root_contact"] and all(
-            row[side]["common_normal_supported"]
-            and not any(feature in row[side]["kind"] for feature in ("axial_face","root_arc","root_corner"))
-            and math.isfinite(row[side]["driven_per_driver_velocity"])
-            and row[side]["opposed_normal_residual"] <= row[side]["common_normal_error_bound"]
-            for side in ("lower_contact","upper_contact"))
-        for row in rows
-    )
-    qualified = (min(backlash)-2*phase_bound > positive_backlash_min_mm and bool(common) and no_gap
-                 and coverage >= coverage_min and row_fraction >= row_min
-                 and all(exchange["continuous"] and exchange["pitch_displacement_jump_upper_mm"] <= handover_max_mm for exchange in exchanges))
-    return {
-        "case": case.name, "metric": "STOCK-FORM COVERAGE", "is_conjugate": False,
-        "operating_driver_sense":driver_sense,
-        "driver_profile":profile_record(case.driver),"driven_profile":profile_record(case.driven),
-        "placement":case.placement.record(),"phase_rows":rows,
-        "phase_components_rad":common,
-        "flank_phase_window_rad":[lower,upper],
-        "phase_window_rad":list(selected) if selected is not None else None,
-        "phase_seed_rad":sum(selected)/2 if selected is not None else None,
-        "stock_form_coverage_lower":coverage,
-        "coverage_definition":"supported pair branch-existence span / one physical driver pitch, with interval-paid phase cells",
-        "continuous_carrying_contact":no_gap and all(exchange["continuous"] for exchange in exchanges),
-        "phase_reserve_rad":reserve,
-        "uncovered_phase_rad":sum(phase_step for count in counts if count == 0),
-        "noncarrying_pair_normal_gap_upper_mm":noncarrying_gap,
-        "noncarrying_gap_definition":"normal projection bounded by actual driver point rotation arc at maximum material radius, including phase and inverse errors",
-        "sampled_carrying_corner_fraction":sum(
-            any(label in row["lower_contact" if driver_sense == 1 else "upper_contact"]["kind"]
-                for label in ("corner","edge","tip_arc")) for row in rows[:-1])/(phases-1),
-        "handovers":exchanges,
-        "row_available_fraction_lower":row_fraction,
-        "row_available_intervals_mm":row_intervals,
-        "qualified":qualified,
-        "tight_backlash_lower_mm": min(backlash)-2*phase_bound,
-        "loose_backlash_upper_mm": max((row["upper_rad"]-row["lower_rad"]+2*row["error_rad"])*radius for row in rows)+2*phase_bound,
-        "no_overlap_at_samples": all(row["upper_rad"]-row["lower_rad"] > 2*row["error_rad"] and not row["root_contact"] for row in rows),
-        "parametric_driven_mechanical_datum_te_rad":te,
-        "parametric_actual_driver_phase_rad":[row["driver_phase_rad"]-row[edge] for row in rows],
-        "numerical_error_bounds": {"surface_mm":maximum_error_mm,"phase_motion_mm":phase_bound,
-                                   "geom_ball_mm":position_error_mm,
-                                   "radial_mm":position_error_mm+radial_error_mm,
-                                   "axial_mm":position_error_mm+axial_error_mm,
-                                   "root_surface_mm":max(row["root_sweep"]["geometric_uncertainty_mm"] for row in rows),
-                                   "te_rad":(2*max(row["error_rad"] for row in rows)+phase_bound/radius)*ratio},
-        "native_certificate": False,
-    }
 
 
 def loaded_driven_contact(
@@ -1415,99 +1215,173 @@ def source_pose(parameters=()) -> continuation.SourcePose:
     ))
 
 
-def pose_cell_search(pair: ContactPair, cell: continuation.PhaseCell,
-                     driven_phase_rad: continuation.Interval):
-    """Enclose one correlated rigid-pose cell in the straight driver's frame.
+def _geometry_cell_for_angle(cell, angle_coordinate):
+    from diagnostics import stock_form_contact_continuation as continuation
+    if angle_coordinate == "physical":
+        return cell
+    if angle_coordinate != "driven_material":
+        raise ValueError("driven angle coordinate must be physical or driven_material")
+    # beta*=beta+clock is the helper's actual material-coordinate gauge.
+    # Remove its clock column exactly, rather than subtracting and adding
+    # independent intervals. The caller retains the ORIGINAL source receipt.
+    return continuation.PhaseCell(cell.driver_phase_rad, continuation.SourcePose(tuple(
+        (name, value) for name, value in cell.source_pose.axes if name != "driven_clock_rad"
+    )))
 
-    The shared coordinates remain fixed while both material eccentricities
-    rotate with their own shafts. Pointwise radial/axial bounds are derived
-    from those transforms only for the complete-surface/root queries; they
-    are never subtracted to estimate a handover between two branches.
+
+def _frame_operator_norm_upper(frame):
+    """Tight outward Euclidean norm bound for a stored nominal frame."""
+    from diagnostics import stock_form_contact_continuation as continuation
+    return continuation.operator_norm_upper(frame)
+
+
+def _physical_surface_inventory(pair):
+    from diagnostics import stock_form_contact_continuation as continuation
+    return continuation.physical_patch_inventory(pair)
+
+
+def pose_cell_search(pair: ContactPair, cell: continuation.PhaseCell,
+                     driven_phase_rad: continuation.Interval, *, angle_coordinate="physical",
+                     additional_geometry_error_mm=0.0):
+    """Enclose a correlated rigid-pose cell in true driver-local coordinates.
+
+    The reference search has an identity driver frame; its old transpose-based
+    point transform is therefore exactly the inverse. Interval residuals use
+    F_driver^-1 F_driven, including stored-frame non-isometry. This does not
+    alter the stationary Window implementation or either root helper.
     """
     from diagnostics import stock_form_contact_continuation as continuation
-    interval = continuation.Interval
-    phi,beta = cell.driver_phase_rad,driven_phase_rad
-    sources = dict(cell.source_pose.axes)
-    driver_clock = sources.get("driver_clock_rad",interval.point(0))
-    driven_clock = sources.get("driven_clock_rad",interval.point(0))
+    I = continuation.Interval
+    if not math.isfinite(additional_geometry_error_mm) or additional_geometry_error_mm < 0:
+        raise ValueError("additional physical geometry enclosure must be finite and nonnegative")
+    geometry_cell = _geometry_cell_for_angle(cell, angle_coordinate)
+    phi, beta = geometry_cell.driver_phase_rad, driven_phase_rad
+    sources = dict(geometry_cell.source_pose.axes)
+    driver_clock = sources.get("driver_clock_rad", I.point(0))
+    driven_clock = sources.get("driven_clock_rad", I.point(0))
     poses = {
-        body:continuation.body_pose_bounds(pair,cell.source_pose,phi,beta,body=body)
-        for body in ("driver","driven")
+        body: continuation.body_pose_bounds(pair, geometry_cell.source_pose, phi, beta, body=body)
+        for body in ("driver", "driven")
     }
     centres = {
-        body:continuation.body_pose_bounds(
-            pair,cell.source_pose.centre(),interval.point(phi.midpoint),
-            interval.point(beta.midpoint),body=body,
-        ) for body in ("driver","driven")
+        body: continuation.body_pose_bounds(
+            pair, geometry_cell.source_pose.centre(), I.point(phi.midpoint),
+            I.point(beta.midpoint), body=body,
+        ) for body in ("driver", "driven")
     }
-    frames = {body:np.array([[value.midpoint for value in row] for row in pose.frame])
-              for body,pose in centres.items()}
-    origins = {body:np.array([value.midpoint for value in pose.origin_mm])
-               for body,pose in centres.items()}
-    driver,driven = poses["driver"],poses["driven"]
-    relative = tuple(tuple(
-        sum(driver.frame[k][i]*driven.frame[k][j] for k in range(3))
-        for j in range(3)) for i in range(3))
-    translation = tuple(sum(
-        driver.frame[k][i]*(driven.origin_mm[k]-driver.origin_mm[k])
-        for k in range(3)) for i in range(3))
-    reference = frames["driver"].T@frames["driven"]
-    reference_translation = (origins["driven"]-origins["driver"])@frames["driver"]
-    support = (pair.driven.blank_radius_mm,pair.driven.blank_radius_mm,
+    def relative_transform(driver, driven):
+        matrix = tuple(tuple(
+            sum(driver.inverse_frame[i][k]*driven.frame[k][j] for k in range(3))
+            for j in range(3)) for i in range(3))
+        shift = tuple(sum(
+            driver.inverse_frame[i][k]*(driven.origin_mm[k]-driver.origin_mm[k])
+            for k in range(3)) for i in range(3))
+        return matrix, shift
+    relative, translation = relative_transform(poses["driver"], poses["driven"])
+    centre_matrix, centre_shift = relative_transform(centres["driver"], centres["driven"])
+    reference = np.array([[value.midpoint for value in row] for row in centre_matrix])
+    reference_translation = np.array([value.midpoint for value in centre_shift])
+    support = (pair.driven.blank_radius_mm, pair.driven.blank_radius_mm,
                max(abs(value) for value in pair.placement.driven_face_mm))
     displacement = tuple((
-        interval.point((translation[i]-float(reference_translation[i])).magnitude)
-        +sum(interval.point((relative[i][j]-float(reference[i,j])).magnitude)*radius
-             for j,radius in enumerate(support))
+        I.point((translation[i]-float(reference_translation[i])).magnitude)
+        +sum(I.point((relative[i][j]-float(reference[i, j])).magnitude)*radius
+             for j, radius in enumerate(support))
     ).upper for i in range(3))
-    # R is orthogonal at every realization. The material rotation chord is
-    # at most R*|delta beta| and at most 2R; no libm error assumption is used.
-    angular = ((beta-interval.point(beta.midpoint))
-               +(driven_clock-interval.point(driven_clock.midpoint))).magnitude
-    rotation = min((interval.point(pair.driven.blank_radius_mm)*angular).upper,
-                   (interval.point(pair.driven.blank_radius_mm)*2).upper)
-    # Python hypot has <1 ulp error; round it outward before interval addition.
-    radial_norm = math.nextafter(math.nextafter(math.hypot(displacement[0],displacement[1]),math.inf),math.inf)
-    radial = (interval.point(radial_norm)+rotation).upper
-    axial = (interval.point(displacement[2])+rotation).upper
+    # Source Euler factors are exact real rotations. Only the stored nominal
+    # matrices need a metric payment, independent of those rotation angles.
+    inverse_norm = _frame_operator_norm_upper(
+        continuation.frame_inverse_bounds(pair.placement.driver_frame))
+    relative_norm = (I.point(inverse_norm)
+                     *_frame_operator_norm_upper(pair.placement.driven_frame)).upper
+    reference_beta = beta.midpoint+driven_clock.midpoint
+    angular = (beta+driven_clock-I.point(reference_beta)).magnitude
+    rotation = (I.point(min((I.point(pair.driven.blank_radius_mm)*angular).upper,
+                           (I.point(pair.driven.blank_radius_mm)*2).upper))*relative_norm).upper
+    reference_norm = _frame_operator_norm_upper(reference)
+    geometry_extra = (I.point(max(0.0,(I.point(relative_norm)-reference_norm).upper))
+                      *pair.driven.geometry_error_bound_mm).upper
+    radial_norm = math.nextafter(math.nextafter(
+        math.hypot(displacement[0], displacement[1]), math.inf), math.inf)
+    padding = (I.point(inverse_norm)*additional_geometry_error_mm).upper
+    radial = (I.point(radial_norm)+rotation+geometry_extra+padding).upper
+    axial = (I.point(displacement[2])+rotation+geometry_extra+padding).upper
     placement = replace(
-        pair.placement,
-        driver_origin_mm=tuple(map(float,origins["driver"])),
-        driven_origin_mm=tuple(map(float,origins["driven"])),
-        driver_frame=frames["driver"],driven_frame=frames["driven"],
+        pair.placement, driver_origin_mm=(0.0, 0.0, 0.0),
+        driven_origin_mm=tuple(map(float, reference_translation)),
+        driver_frame=np.eye(3), driven_frame=reference,
         driver_clocking_rad=pair.placement.driver_clocking_rad+driver_clock.midpoint,
     )
-    physical = replace(pair,placement=placement)
     search = ContactSearch(
-        physical,phi.midpoint,driven_phase_rad=beta.midpoint+driven_clock.midpoint,
-        radial_error_mm=radial,axial_error_mm=axial,
+        replace(pair, placement=placement), phi.midpoint,
+        driven_phase_rad=reference_beta,
+        radial_error_mm=radial, axial_error_mm=axial,
     )
-    driver_motion = ((phi-interval.point(phi.midpoint))
-                     +(driver_clock-interval.point(driver_clock.midpoint))).magnitude
-    return search,driver_motion
+    driver_motion = (phi+pair.placement.driver_clocking_rad+driver_clock
+                     -I.point(phi.midpoint+placement.driver_clocking_rad)).magnitude
+    return search, driver_motion
 
 
 def root_free_pose_cell(pair: ContactPair, cell: continuation.PhaseCell,
                         driven_phase_rad: continuation.Interval, *,
-                        maximum_error_mm: float, required_root_air_mm: float):
-    """Actual all-tooth/cap root proof over one physical driven-angle cell."""
-    search,driver_motion = pose_cell_search(pair,cell,driven_phase_rad)
+                        maximum_error_mm: float, required_root_air_mm: float,
+                        angle_coordinate="physical", additional_geometry_error_mm=0.0,
+                        root_only=True):
+    """Actual all-tooth/cap INNER root proof, with its declared angle gauge."""
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    if not math.isfinite(required_root_air_mm) or required_root_air_mm < 0:
+        raise ValueError("source root-air floor must be finite and nonnegative")
+    search, driver_motion = pose_cell_search(
+        pair, cell, driven_phase_rad, angle_coordinate=angle_coordinate,
+        additional_geometry_error_mm=additional_geometry_error_mm)
+    inverse_norm = max(1.0, _frame_operator_norm_upper(
+        continuation.frame_inverse_bounds(pair.placement.driver_frame)))
+    frame_norm = max(1.0, _frame_operator_norm_upper(pair.placement.driver_frame))
+    distance_scale = (I.point(1)/inverse_norm).lower
+    # Zero is a specification floor, not a positive-air certificate. Query
+    # a strictly positive amount grounded in the actual primitive arithmetic
+    # enclosure; failure still means UNKNOWN, not a new manufacturing grade.
+    rounding_air = sum(
+        I.point(_frame_operator_norm_upper(getattr(pair.placement,f"{body}_frame")))
+        *getattr(pair,body).geometry_error_bound_mm for body in ("driver","driven")
+    ).upper
+    physical_target = max(required_root_air_mm,rounding_air)
+    if physical_target <= 0:
+        raise ArithmeticError("actual primitive error gives no positive root-air query")
+    local_required = (I.point(physical_target)/distance_scale).upper
+    while (I.point(local_required)*distance_scale).lower < physical_target:
+        local_required = math.nextafter(local_required,math.inf)
     bounded = root_free_intervals(
-        search,maximum_error_mm=maximum_error_mm,
-        required_root_air_mm=required_root_air_mm,
+        search, maximum_error_mm=(I.point(maximum_error_mm)/frame_norm).lower,
+        required_root_air_mm=local_required, root_only=root_only,
     )
-    inner = erode_periodic_intervals(bounded.free_inner,driver_motion,search.pitch)
+    inner = erode_periodic_intervals(bounded.free_inner, driver_motion, search.pitch)
     resolved = bounded.status == "resolved" and any(lo <= 0.0 <= hi for lo,hi in inner)
+    physical_air = ((I.point(bounded.root_air_lower_bound_mm)*distance_scale).lower
+                    if resolved and bounded.root_air_lower_bound_mm is not None else None)
+    resolved = resolved and physical_air is not None and physical_air > 0 and physical_air >= required_root_air_mm
+    inventory, _, _ = _physical_surface_inventory(pair)
     return {
-        "status":"PROVED" if resolved else "UNKNOWN",
-        "root_free_driven_components_rad":(driven_phase_rad,) if resolved else (),
-        "inverse_offset_free_components_rad":inner,
-        "driver_phase_motion_rad":driver_motion,
-        "same_source_pose":cell.source_pose.record(),
-        "source_frame_radial_error_mm":search.radial_error_mm,
-        "source_frame_axial_error_mm":search.axial_error_mm,
-        "root_sweep":asdict(bounded),
-        "native_certificate":False,
+        "status": "PROVED" if resolved else "UNKNOWN",
+        "root_free_driven_components_rad": (driven_phase_rad.record(),) if resolved else (),
+        "inverse_offset_free_components_rad": inner,
+        "driver_phase_motion_rad": driver_motion,
+        "phase_cell_rad": cell.driver_phase_rad.record(),
+        "same_source_pose": cell.source_pose.record(),
+        "angle_coordinate": angle_coordinate,
+        "driven_angle_domain_rad": driven_phase_rad.record(),
+        "physical_driven_teeth": list(range(pair.driven.teeth)),
+        "physical_patch_inventory": inventory,
+        "source_frame_radial_error_mm": search.radial_error_mm,
+        "source_frame_axial_error_mm": search.axial_error_mm,
+        "additional_geometry_error_mm": additional_geometry_error_mm,
+        "material_scope":bounded.material_scope,
+        "driver_local_to_world_distance_lower": distance_scale,
+        "physical_root_air_lower_bound_mm": physical_air,
+        "physical_required_root_air_mm": required_root_air_mm,
+        "root_sweep": asdict(bounded),
+        "native_certificate": False,
     }
 
 
@@ -1525,12 +1399,15 @@ def _interval_square(value):
     return value*value
 
 
-def _relative_surface_derivatives(pair, cell, beta, segment, tooth, t, z):
+def _relative_surface_derivatives(pair, cell, beta, segment, tooth, t, z, *,
+                                  finite_master_extension=False, radial_fraction=None):
     """Exact screw-map point, t/z derivatives, and held-driver beta velocity."""
     from diagnostics import stock_form_contact_continuation as continuation
     I = continuation.Interval
-    point,tangent = continuation.segment_bounds(segment,t)
-    second = continuation.segment_second_derivative_bounds(segment,t)
+    point,tangent = continuation.segment_bounds(
+        segment,t,finite_master_extension=finite_master_extension)
+    second = continuation.segment_second_derivative_bounds(
+        segment,t,finite_master_extension=finite_master_extension)
     parameters = dict(cell.source_pose.axes)
     clock = parameters.get("driven_clock_rad",I.point(0.0))
     twist = 0.0 if math.isinf(pair.driven.lead_per_radian_mm) else 1.0/pair.driven.lead_per_radian_mm
@@ -1539,16 +1416,26 @@ def _relative_surface_derivatives(pair, cell, beta, segment, tooth, t, z):
     zero = I.point(0.0)
     def rotate(x,y,axial=zero):
         return c*x-s*y,s*x+c*y,axial
-    local = rotate(*point,z)
-    first = (rotate(*tangent),rotate(-twist*point[1],twist*point[0],I.point(1.0)))
-    seconds = ((rotate(*second),rotate(-twist*tangent[1],twist*tangent[0])),
-               (rotate(-twist*tangent[1],twist*tangent[0]),
-                rotate(-twist*twist*point[0],-twist*twist*point[1])))
+    if radial_fraction is None:
+        local = rotate(*point,z)
+        first = (rotate(*tangent),rotate(-twist*point[1],twist*point[0],I.point(1.0)))
+        seconds = ((rotate(*second),rotate(-twist*tangent[1],twist*tangent[0])),
+                   (rotate(-twist*tangent[1],twist*tangent[0]),
+                    rotate(-twist*twist*point[0],-twist*twist*point[1])))
+    else:
+        boundary_point,boundary_tangent = point,tangent
+        point = tuple(radial_fraction*v for v in point)
+        tangent = tuple(radial_fraction*v for v in tangent)
+        second = tuple(radial_fraction*v for v in second)
+        local = rotate(*point,z)
+        first = (rotate(*tangent),rotate(*boundary_point))
+        seconds = ((rotate(*second),rotate(*boundary_tangent)),
+                   (rotate(*boundary_tangent),(zero,zero,zero)))
     driver = continuation.body_pose_bounds(pair,cell.source_pose,cell.driver_phase_rad,beta,body="driver")
     driven = continuation.body_pose_bounds(pair,cell.source_pose,cell.driver_phase_rad,beta,body="driven")
-    matrix = tuple(tuple(sum(driver.frame[k][i]*driven.frame[k][j] for k in range(3))
+    matrix = tuple(tuple(sum(driver.inverse_frame[i][k]*driven.frame[k][j] for k in range(3))
                          for j in range(3)) for i in range(3))
-    shift = tuple(sum(driver.frame[k][i]*(driven.origin_mm[k]-driver.origin_mm[k])
+    shift = tuple(sum(driver.inverse_frame[i][k]*(driven.origin_mm[k]-driver.origin_mm[k])
                       for k in range(3)) for i in range(3))
     transform = lambda value:tuple(_interval_dot(row,value) for row in matrix)
     q = tuple(v+d for v,d in zip(transform(local),shift))
@@ -1558,7 +1445,7 @@ def _relative_surface_derivatives(pair, cell, beta, segment, tooth, t, z):
     cb,sb = continuation.cos_bounds(beta+clock),continuation.sin_bounds(beta+clock)
     eccentric_velocity = (-cb*ecc[1]-sb*ecc[0],-sb*ecc[1]+cb*ecc[0],zero)
     beta_velocity = tuple(a+b for a,b in zip(rotate(-point[1],point[0]),eccentric_velocity))
-    return q,qt,qtt,transform(beta_velocity),driver.frame,point,tangent,second
+    return q,qt,qtt,transform(beta_velocity),driver.inverse_frame,point,tangent,second
 
 
 def _working_angle_derivatives(profile, kind, radius):
@@ -1587,7 +1474,7 @@ def _working_angle_derivatives(profile, kind, radius):
         return rb+T*continuation.cos_bounds(k+u),rb*u+T*continuation.sin_bounds(k+u)
     def radial(u):
         S,Q = sq(u)
-        return continuation.sqrt_bounds(_interval_square(S)+_interval_square(Q))
+        return continuation.sqrt_bounds(continuation._squared_norm((S,Q)))
     upper = 2.0*(radius.upper+rb+abs(T))/rb+2.0
     if radial(I.point(0.0)).upper >= radius.lower or radial(I.point(upper)).lower <= radius.upper:
         raise ArithmeticError("finite flank curvature reaches its base singularity")
@@ -1616,26 +1503,53 @@ def _working_angle_derivatives(profile, kind, radius):
     return slope,derivative_u/dr
 
 
-def chart_neighbourhood_minimum(pair, chart, proof, t, z, *,
-                                direction, outside_air_mm, approach_driven_phase_rad):
-    """Sufficient constrained local minimum on an entire real patch rectangle.
+def _root_objective_multipliers(chart,proof,direction):
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    pair = chart.pair
+    cell = _geometry_cell_for_angle(proof.cell,chart.unknown_angle_coordinate)
+    root_t,root_z = proof.driven_surface_root_box
+    q,_,_,_,inverse,_,_,_ = _relative_surface_derivatives(
+        pair,cell,proof.driven_material_phase_rad,chart.driven_stratum.segment,
+        chart.driven_tooth,root_t,root_z,finite_master_extension=chart.driven_stratum.implicit_tip)
+    radius = continuation.sqrt_bounds(continuation._squared_norm(q[:2]))
+    slope,_ = _working_angle_derivatives(pair.driver,chart.driver_stratum.segment.kind,radius)
+    er = q[0]/radius,q[1]/radius
+    et = -er[1],er[0]
+    gradient = tuple(slope*er[i]-direction*et[i]/radius for i in range(2))+(I.point(0),)
+    world = tuple(sum(inverse[j][i]*gradient[j] for j in range(3)) for i in range(3))
+    return continuation.objective_kkt_multipliers(chart,proof,world)
 
-    A positive FULL 2D Lagrangian Hessian is deliberately stronger than a
-    tangent-only test at an edge. Failure is UNKNOWN, never zero curvature or a
-    fabricated support margin. Multipliers use the same implicit branch/source.
+
+def chart_neighbourhood_minimum(pair, chart, proof, t, z, *,
+                                direction, outside_air_mm, approach_driven_phase_rad,
+                                neighbourhood):
+    """A full-rectangle, whole-approach constrained local minimum.
+
+    ROOT multipliers are held fixed per source throughout the approach.
+    They multiply LOCAL-mm constraints in incident -> radial-cap -> face
+    order. A Placement shoulder/cylinder constraint is valid only on the
+    corresponding arm of the retained-material UNION over this WHOLE box.
     """
     from diagnostics import stock_form_contact_continuation as continuation
     I = continuation.Interval
     if (chart.pair is not pair or pair.driver.helix_angle_deg != 0.0
-            or chart.driver_stratum.segment.kind not in ("flank","radial")
-            or direction not in (-1,1) or direction != chart.driver_stratum.segment._side):
+            or chart.driver_stratum.segment.kind not in ("flank", "radial")
+            or direction not in (-1, 1) or direction != chart.driver_stratum.segment._side):
         raise ValueError("local minimum does not use the actual straight driver's working side")
+    coordinate = chart.unknown_angle_coordinate
+    refusal = neighbourhood.refusal(proof, approach_driven_phase_rad, coordinate)
+    if refusal or neighbourhood.driven_surface_domain != (t, z):
+        raise ValueError(refusal or "minimum rectangle differs from its bound physical neighbourhood")
     beta = approach_driven_phase_rad
-    if not beta.contains(proof.driven_phase_rad):
-        raise ValueError("local minimum approach omits its actual contact root")
-    q,qt,qtt,velocity,frame,p,dp,ddp = _relative_surface_derivatives(
-        pair,proof.cell,beta,chart.driven_stratum.segment,chart.driven_tooth,t,z)
-    radius = continuation.sqrt_bounds(_interval_square(q[0])+_interval_square(q[1]))
+    root_beta = proof.driven_material_phase_rad if coordinate == "driven_material" else proof.driven_phase_rad
+    if root_beta is None or not beta.contains(root_beta):
+        raise ValueError("local minimum approach omits its actual same-coordinate contact root")
+    geometry_cell = _geometry_cell_for_angle(proof.cell, coordinate)
+    q,qt,qtt,velocity,inverse_frame,p,dp,ddp = _relative_surface_derivatives(
+        pair,geometry_cell,beta,chart.driven_stratum.segment,chart.driven_tooth,t,z,
+        finite_master_extension=chart.driven_stratum.implicit_tip)
+    radius = continuation.sqrt_bounds(continuation._squared_norm(q[:2]))
     slope,curvature = _working_angle_derivatives(pair.driver,chart.driver_stratum.segment.kind,radius)
     er = (q[0]/radius,q[1]/radius)
     et = (-er[1],er[0])
@@ -1645,42 +1559,63 @@ def chart_neighbourhood_minimum(pair, chart, proof, t, z, *,
                      for j in range(2)) for i in range(2))
     hessian = [[sum(qt[i][a]*hxy[a][b]*qt[j][b] for a in range(2) for b in range(2))
                 +_interval_dot(gradient,qtt[i][j]) for j in range(2)] for i in range(2)]
-    gradient_world = tuple(sum(frame[i][j]*gradient[j] for j in range(3)) for i in range(3))
-    multipliers = continuation.objective_kkt_multipliers(chart,proof,gradient_world)
+
+    # Compute the actual root scale, not a newly chosen multiplier at each
+    # beta in the approach. F^-T maps LOCAL objective covectors to world.
+    multipliers = _root_objective_multipliers(chart,proof,direction)
+    inverse_norm = _frame_operator_norm_upper(
+        continuation.frame_inverse_bounds(pair.placement.driver_frame))
+    padding = (I.point(chart.geometry_error_bound_mm)
+               +continuation.periodicity_displacement_bound_mm(pair,proof.cell.source_pose)).upper
+    local_geometry_error = (I.point(padding)*inverse_norm).upper
+    expanded_radius = radius+I(-local_geometry_error,local_geometry_error)
+    expanded_slope,_ = _working_angle_derivatives(
+        pair.driver,chart.driver_stratum.segment.kind,expanded_radius)
+    gradient_norm = (I.point(inverse_norm)*continuation.sqrt_bounds(continuation._squared_norm((
+        I.point(expanded_slope.magnitude),I.point(1)/expanded_radius.lower)))).upper
     approach = _interval_dot(gradient,velocity)
     for body,stratum in (("driver",chart.driver_stratum),("driven",chart.driven_stratum)):
-        constraints = list(stratum.incident_segments)
+        constraints = []
+        for incident,_ in stratum.incident_segments:
+            if incident.kind != "tip_arc" or not stratum.implicit_tip:
+                raise ArithmeticError("noncanonical incident constraint has no actual local covector scale")
+            constraints.append(("radial",getattr(pair,body).blank_radius_mm))
+        if stratum.radial_cap_radius_mm is not None:
+            if (body != "driver" or stratum.radial_cap_radius_mm != pair.placement.driver_turned_radius_mm
+                    or (q[2]-local_geometry_error).lower <= pair.placement.driver_shoulder_z_mm):
+                raise ArithmeticError("whole neighbourhood/approach does not lie above the shoulder cut")
+            constraints.append(("radial",stratum.radial_cap_radius_mm))
         if stratum.z_fixed is not None:
-            constraints.append((None,stratum.z_fixed))
-        for multiplier,(segment,station) in zip(multipliers[body],constraints):
-            if segment is not None and segment.kind != "tip_arc":
-                raise ArithmeticError("non-tip junction Lagrangian constraint is unresolved")
+            face = getattr(pair.placement,f"{body}_face_mm")
+            if stratum.axial_cap_source == "driver_shoulder":
+                if (body != "driver" or stratum.z_fixed != pair.placement.driver_shoulder_z_mm
+                        or expanded_radius.lower <= pair.placement.driver_turned_radius_mm):
+                    raise ArithmeticError("whole neighbourhood/approach is not outside the turned cylinder")
+            elif stratum.axial_cap_source != "face" or stratum.z_fixed not in face:
+                raise ValueError("axial multiplier does not refer to an actual face or shoulder")
+            constraints.append(("axial",stratum.z_fixed))
+        # A truncated zip would silently omit a real active constraint.
+        for multiplier,(kind,station) in zip(multipliers[body],constraints,strict=True):
             if body == "driven":
-                if segment is not None:
-                    r = continuation.sqrt_bounds(_interval_square(p[0])+_interval_square(p[1]))
+                if kind == "radial":
+                    r = continuation.sqrt_bounds(continuation._squared_norm(p[:2]))
                     numerator = _interval_dot(dp,dp)+_interval_dot(p,ddp)-_interval_square(_interval_dot(p,dp)/r)
                     hessian[0][0] += multiplier*numerator/r
-                continue  # Physical driven axial constraints are linear in z.
-            # The moving active constraint contributes to the loaded envelope
-            # derivative: dV/dbeta = partial_beta(h-sum(lambda*c)), with the
-            # same per-source ROOT multiplier fixed over this entire approach.
-            if segment is None:
-                sign = -1 if station == pair.placement.driver_face_mm[0] else 1
+                continue  # Driven local face constraints are linear, beta-independent.
+            sign = -1 if kind == "axial" and station == pair.placement.driver_face_mm[0] else 1
+            if kind == "axial":
                 approach += multiplier*sign*velocity[2]
             else:
                 approach += multiplier*_interval_dot(er,velocity[:2])
             for i in range(2):
                 for j in range(2):
-                    if segment is None:
-                        sign = -1 if station == pair.placement.driver_face_mm[0] else 1
+                    if kind == "axial":
                         constraint_hessian = sign*qtt[i][j][2]
                     else:
                         constraint_hessian = ((_interval_dot(qt[i][:2],qt[j][:2])
                                                -_interval_dot(er,qt[i][:2])*_interval_dot(er,qt[j][:2]))/radius
                                               +_interval_dot(er,qtt[i][j][:2]))
                     hessian[i][j] += multiplier*constraint_hessian
-    # Positive principal minor/determinant avoids a coordinate-scale-dependent
-    # Gershgorin refusal (t is dimensionless while z is measured in mm).
     cross = max(hessian[0][1].magnitude,hessian[1][0].magnitude)
     determinant = I.point(hessian[0][0].lower)*hessian[1][1].lower-I.point(cross)*cross
     trace = hessian[0][0]+hessian[1][1]
@@ -1690,4 +1625,1476 @@ def chart_neighbourhood_minimum(pair, chart, proof, t, z, *,
     return continuation.ChartMinimumBound(
         chart.name,2,lower,outside_air_mm,transversality,
         lagrangian_beta_derivative=approach,objective_direction=direction,
+        neighbourhood=neighbourhood,objective_gradient_magnitude_upper_per_mm=gradient_norm,
+        objective_gradient_padding_mm=padding,
     )
+
+
+def _patch_rectangles_outside_union(full, excluded):
+    """Partition in THIS patch's coordinates; never use a neighbourhood hull."""
+    cuts = [set((full[0],full[1])),set((full[2],full[3]))]
+    for rectangle in excluded:
+        if len(rectangle) != 4 or any(not math.isfinite(v) for v in rectangle):
+            raise ValueError("physical patch excisions require finite two-coordinate rectangles")
+        if rectangle[0] >= rectangle[1] or rectangle[2] >= rectangle[3]:
+            raise ValueError("physical patch excision is degenerate")
+        for axis,(low,high) in enumerate(((rectangle[0],rectangle[1]),(rectangle[2],rectangle[3]))):
+            cuts[axis].update(v for v in (low,high) if full[2*axis] < v < full[2*axis+1])
+    first,second = (sorted(values) for values in cuts)
+    result = []
+    for a,b in zip(first,first[1:]):
+        for c,d in zip(second,second[1:]):
+            if not any(x <= a <= b <= y and z <= c <= d <= w for x,y,z,w in excluded):
+                result.append((a,b,c,d))
+    return result
+
+
+def finite_surface_patch_air(pair, cell, driven_phase_rad, patch_id, *,
+                             required_air_mm, maximum_error_mm,
+                             patch_parameter_domains=(), additional_geometry_error_mm=0.0,
+                             max_boxes=500000):
+    """Actual finite material exclusion outside bound physical patch domains.
+
+    The existing RootAngularDomain FULL-material inverse supplies INNER and
+    OUTER sets; no root-radius disk or selected point replaces the solid.
+    This is a boundary-patch receipt, NOT a volume-containment certificate.
+    Unresolved source/approach spread is not manufactured infeasibility.
+    """
+    from diagnostics import stock_form_contact_continuation as continuation
+    from diagnostics.stock_form_root_angles import RootAngularDomain
+    I = continuation.Interval
+    if (not math.isfinite(required_air_mm) or required_air_mm < 0
+            or not math.isfinite(maximum_error_mm) or maximum_error_mm <= 0
+            or type(max_boxes) is not int or max_boxes <= 0):
+        raise ValueError("physical exclusion requires finite air/error and a positive box limit")
+    search,motion = pose_cell_search(pair,cell,driven_phase_rad,angle_coordinate="driven_material",
+                                    additional_geometry_error_mm=additional_geometry_error_mm)
+    candidates = {f"{tooth}:{segment.name}":(tooth,segment)
+                  for tooth in search.driven_teeth for segment in search.segments}
+    if patch_id not in candidates:
+        raise ValueError("exclusion names no actual physical tooth/surface/cap")
+    tooth,segment = candidates[patch_id]
+    cap = isinstance(segment,EndFacePatch)
+    names = ("native_t","radial_fraction" if cap else "z_mm")
+    full = (0.0,1.0,0.0,1.0) if cap else (0.0,1.0,*pair.placement.driven_face_mm)
+    excluded = tuple(tuple(value for interval in rectangle for value in interval)
+                     for rectangle in patch_parameter_domains)
+    pending = _patch_rectangles_outside_union(full,excluded)
+    empty = not pending
+    angle_domain = (-search.pitch/2,search.pitch/2)
+    inner = outer = (angle_domain,)
+    domain = RootAngularDomain(pair.driver,search.gap)
+    inverse_norm = max(1.0,_frame_operator_norm_upper(
+        continuation.frame_inverse_bounds(pair.placement.driver_frame)))
+    scale = (I.point(1)/inverse_norm).lower
+    rounding = sum(I.point(_frame_operator_norm_upper(getattr(pair.placement,f"{body}_frame")))
+                   *getattr(pair,body).geometry_error_bound_mm for body in ("driver","driven")).upper
+    target = (I.point(required_air_mm)+rounding).upper
+    if target <= required_air_mm:
+        target = math.nextafter(required_air_mm,math.inf)
+    local_air = (I.point(target)/scale).upper
+    while (I.point(local_air)*scale).lower < target:
+        local_air = math.nextafter(local_air,math.inf)
+    count,terminal = 0,0
+    unresolved = None
+    parameter_metric = _frame_operator_norm_upper(search.placement.driven_frame)
+    primitive_error = (I.point(parameter_metric)*pair.driven.geometry_error_bound_mm).upper
+    largest_terminal_radius = 0.0
+    def material_bound(local,numerical_radius):
+        r = math.hypot(local[0],local[1])
+        arithmetic = 128*np.finfo(float).eps*(1+sum(abs(float(v)) for v in local))
+        radial = (I.point(numerical_radius)+search.radial_error_mm
+                  +primitive_error+arithmetic+local_air).upper
+        axial = (I.point(numerical_radius)+search.axial_error_mm
+                 +primitive_error+arithmetic+local_air).upper
+        rlo,rhi = max(0.0,(I.point(r)-radial).lower),(I.point(r)+radial).upper
+        zlo,zhi = (I.point(float(local[2]))-axial).lower,(I.point(float(local[2]))+axial).upper
+        p = search.placement
+        if (zhi < p.driver_face_mm[0] or zlo > p.driver_face_mm[1]
+                or zlo > p.driver_shoulder_z_mm and rlo > p.driver_turned_radius_mm):
+            return None
+        if zlo > p.driver_shoulder_z_mm:
+            rhi = min(rhi,p.driver_turned_radius_mm)
+        angular = math.pi if radial >= r else math.asin(radial/r)
+        theta = math.atan2(local[1],local[0])+search.seed-search.phase-search.pitch/2
+        return domain.offset_bounds(rlo,rhi,theta,angular+motion,root_only=False)
+    while pending:
+        limits = pending.pop()
+        if count >= max_boxes:
+            unresolved = {"reason":"finite patch material enclosure reached its box limit","limits":limits}
+            break
+        count += 1
+        t0,t1,s0,s1 = limits
+        t,s = t0/2+t1/2,s0/2+s1/2
+        radius = (I.point(segment.speed_bound_mm)*(I.point(t1)-t0)/2
+                  +I.point(search.second_speed(segment))*(I.point(s1)-s0)/2).upper
+        if search.cap_removed(segment,t,s,radius):
+            terminal += 1
+            continue
+        _,local = search.point(segment,tooth,t,s)
+        numerical_radius = (I.point(radius)*parameter_metric).upper
+        bound = material_bound(local,numerical_radius)
+        if bound is None:
+            terminal += 1
+            largest_terminal_radius = max(largest_terminal_radius,numerical_radius)
+            continue
+        if any(a <= 0 <= b for a,b in bound.inner):
+            inner = intersect_intervals(inner,bound.inner)
+            outer = intersect_intervals(outer,bound.outer)
+            terminal += 1
+            largest_terminal_radius = max(largest_terminal_radius,numerical_radius)
+            continue
+        point_bound = material_bound(local,0.0) if search.surface_member(segment,t,s) else None
+        if point_bound is not None and not any(a <= 0 <= b for a,b in point_bound.inner):
+            unresolved = {
+                "reason":"paid source/approach point enclosure unresolved independently of parameter refinement",
+                "limits":limits,"numerical_parameter_radius_mm":numerical_radius,
+                "paid_point_free_inner":point_bound.inner,"paid_point_free_outer":point_bound.outer,
+            }
+            break
+        first = segment.speed_bound_mm*(t1-t0)
+        second = search.second_speed(segment)*(s1-s0)
+        axis = 0 if first >= second else 1
+        low,high = limits[2*axis:2*axis+2]
+        middle = low/2+high/2
+        if middle in (low,high):
+            unresolved = {"reason":"fixed source/approach enclosure remains unresolved at finite parameter precision",
+                          "limits":limits,"free_inner":bound.inner,"free_outer":bound.outer}
+            break
+        left,right = list(limits),list(limits)
+        left[2*axis+1],right[2*axis] = middle,middle
+        pending.extend((tuple(right),tuple(left)))
+    result = {"status":"PROVED" if unresolved is None else "UNKNOWN",
+            "physical_no_solution":False,"native_certificate":False,
+            "scope":"boundary patch against complete cutter-gapped driver material",
+            "patch_id":patch_id,"patch_parameter_names":names,
+            "patch_parameter_domain":((full[0],full[1]),(full[2],full[3])),
+            "excluded_patch_parameter_domains":patch_parameter_domains,
+            "empty_remainder":empty,"phase_cell_rad":cell.driver_phase_rad.record(),
+            "same_source_pose":cell.source_pose.record(),"angle_coordinate":"driven_material",
+            "approach_driven_phase_rad":driven_phase_rad.record(),
+            "required_air_mm":required_air_mm,
+            "air_lower_mm":(I.point(local_air)*scale).lower if unresolved is None else None,
+            "additional_geometry_error_mm":additional_geometry_error_mm,
+            "inverse_offset_domain_rad":angle_domain,
+            "free_inner_inverse_offset_components_rad":inner if unresolved is None else (),
+            "free_outer_inverse_offset_components_rad":outer if unresolved is None else (angle_domain,),
+            "boxes":count,"terminal_boxes":terminal,
+            "largest_terminal_parameter_radius_mm":largest_terminal_radius,
+            "parameter_radius_metric_upper":parameter_metric}
+    if unresolved is not None:
+        result["unresolved"] = unresolved
+    return result
+
+
+def driven_root_material_clearance(pair, cell, driven_phase_rad, *,
+                                   maximum_error_mm, required_root_air_mm,
+                                   additional_geometry_error_mm=0.0):
+    """Complete directed driven-ROOT material clearance, including containment.
+
+    Straight mates use the genuine reversed root sweep. A helical mate stays
+    on the driven side: its actual cutter-gapped material is radially clipped
+    at an outward root bound and swept against COMPLETE straight-driver
+    material. Extra working material can only refuse this sufficient proof.
+    Neither route replaces the stock by a filled root-radius disk.
+    """
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    result = {"proof_schema":"finite-stock-directed-root-material/1",
+              "status":"UNKNOWN","physical_no_solution":False,"native_certificate":False,
+              "root_owner":"driven","other_material_owner":"driver",
+              "phase_cell_rad":cell.driver_phase_rad.record(),
+              "same_source_pose":cell.source_pose.record(),"angle_coordinate":"driven_material",
+              "approach_driven_phase_rad":driven_phase_rad.record(),
+              "required_root_air_mm":required_root_air_mm,
+              "source_driver_profile":profile_record(pair.driver),
+              "source_driven_profile":profile_record(pair.driven),
+              "source_placement":pair.placement.record()}
+    try:
+        if pair.driven.helix_angle_deg == 0:
+            p = pair.placement
+            geometry_cell = _geometry_cell_for_angle(cell,"driven_material")
+            swapped = tuple((("driven_"+name[7:] if name.startswith("driver_") else "driver_"+name[7:]),value)
+                            for name,value in geometry_cell.source_pose.axes)
+            reverse_source = continuation.SourcePose(swapped)
+            reverse_cell = continuation.PhaseCell(driven_phase_rad,reverse_source)
+            reverse_placement = Placement(
+                p.driven_origin_mm,p.driver_origin_mm,p.driven_frame,p.driver_frame,
+                p.driven_face_mm,p.driver_face_mm,0.0,0.0,
+            )
+            reverse = ContactPair(pair.name+":reverse-root-material",pair.driven,pair.driver,reverse_placement)
+            other_angle = cell.driver_phase_rad+p.driver_clocking_rad
+            receipt = root_free_pose_cell(
+                reverse,reverse_cell,other_angle,maximum_error_mm=maximum_error_mm,
+                required_root_air_mm=required_root_air_mm,angle_coordinate="physical",
+                additional_geometry_error_mm=additional_geometry_error_mm,
+            )
+            result.update({
+                "method":"reversed_actual_straight_root_sweep",
+                "query_driver_profile":profile_record(reverse.driver),
+                "query_driven_profile":profile_record(reverse.driven),
+                "query_placement":reverse_placement.record(),
+                "query_driver_phase_rad":driven_phase_rad.record(),
+                "query_driven_phase_rad":other_angle.record(),
+                "query_source_pose":reverse_source.record(),
+                "source_axis_relabel":{name:("driven_"+name[7:] if name.startswith("driver_") else "driver_"+name[7:])
+                                       for name,_ in geometry_cell.source_pose.axes},
+                "removed_material_clock_axis":"driven_clock_rad",
+                "other_material_enclosure":"complete untrimmed finite stock; any original driver band only removes material",
+            })
+        else:
+            profile = pair.driven
+            radius = min(profile.blank_radius_mm,
+                         (I.point(profile.root_radius_max_mm)+profile.geometry_error_bound_mm).upper)
+            clipped = StockFormProfile(profile.teeth,profile.template,radius,
+                                       profile.radial_translation_mm,profile.helix_angle_deg)
+            enclosed = ContactPair(pair.name+":driven-root-material-enclosure",pair.driver,clipped,pair.placement)
+            receipt = root_free_pose_cell(
+                enclosed,cell,driven_phase_rad,maximum_error_mm=maximum_error_mm,
+                required_root_air_mm=required_root_air_mm,angle_coordinate="driven_material",
+                additional_geometry_error_mm=additional_geometry_error_mm,root_only=False,
+            )
+            result.update({
+                "method":"actual_cutter_gapped_root_material_radial_enclosure",
+                "query_driver_profile":profile_record(enclosed.driver),
+                "query_driven_profile":profile_record(enclosed.driven),
+                "query_placement":pair.placement.record(),
+                "query_driver_phase_rad":cell.driver_phase_rad.record(),
+                "query_driven_phase_rad":driven_phase_rad.record(),
+                "query_source_pose":cell.source_pose.record(),
+                "root_subset_enclosure":{
+                    "operation":"intersect actual finite stock material with a concentric local radial cylinder",
+                    "source_root_radius_upper_mm":profile.root_radius_max_mm,
+                    "source_profile_geometry_error_mm":profile.geometry_error_bound_mm,
+                    "radial_clip_radius_mm":radius,
+                    "source_blank_radius_mm":profile.blank_radius_mm,
+                    "retained_teeth":profile.teeth,"retained_helix_angle_deg":profile.helix_angle_deg,
+                    "retained_face_interval_mm":list(pair.placement.driven_face_mm),
+                    "scope":"all physical teeth and axial stations; cutter gaps and actual cap material retained",
+                    "extra_working_material_policy":"UNKNOWN on refusal, not physical infeasibility",
+                },
+            })
+        result["material_sweep"] = receipt
+        if receipt["status"] != "PROVED":
+            result["reason"] = "complete directed material/root/containment enclosure unresolved"
+            return result
+        air = receipt["physical_root_air_lower_bound_mm"]
+        if air <= 0 or air < required_root_air_mm:
+            raise ArithmeticError("directed material distance does not pay the actual root floor")
+        result.update({"status":"PROVED","root_air_lower_mm":air,
+                       "reason":"complete cutter-gapped material sweep with actual finite caps and containment"})
+    except (ArithmeticError,ValueError) as exc:
+        result["reason"] = f"directed root-material proof unresolved: {exc}"
+    return result
+
+
+def finite_face_family(pair, source_domain):
+    """Nested actual material and common physical support for all face widths.
+
+    This is an enclosure theorem, not a manufactured minimum-width cap:
+    only side/tip surfaces inside common support, or genuinely fixed faces,
+    can carry. Complete maximum material supplies exclusion/containment.
+    """
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    limits = source_domain["finite_face_width_limits_mm"]
+    anchors = source_domain["finite_face_anchor_fraction"]
+    if set(limits) != {"driver","driven"} or set(anchors) != {"driver","driven"}:
+        raise ValueError("both physical finite-face width/anchor authorities are required")
+    support,material = {},{}
+    for body in ("driver","driven"):
+        low,high = limits[body]
+        fraction = anchors[body]
+        old = getattr(pair.placement,f"{body}_face_mm")
+        if (any(type(v) not in (float,int) or not math.isfinite(v) for v in (low,high,fraction))
+                or not 0 < low <= old[1]-old[0] <= high or not 0 <= fraction <= 1):
+            raise ValueError("actual finite-face reference/width/anchor is unbound")
+        if low == high:
+            support[f"{body}_face_mm"] = material[f"{body}_face_mm"] = old
+            continue
+        anchor = old[0]+fraction*(old[1]-old[0])
+        inner_low = I.point(anchor)-I.point(fraction)*low
+        inner_high = I.point(anchor)+I.point(1-fraction)*low
+        outer_low = I.point(anchor)-I.point(fraction)*high
+        outer_high = I.point(anchor)+I.point(1-fraction)*high
+        support[f"{body}_face_mm"] = (inner_low.upper,inner_high.lower)
+        material[f"{body}_face_mm"] = (outer_low.lower,outer_high.upper)
+    band = source_domain.get("driver_retained_band_limits_mm")
+    if math.isfinite(pair.placement.driver_shoulder_z_mm):
+        if not isinstance(band,dict) or set(band) != {"shoulder_z","turned_radius"}:
+            raise ValueError("actual driver shoulder/turned-radius family is unbound")
+        for name,field in (("shoulder_z","driver_shoulder_z_mm"),("turned_radius","driver_turned_radius_mm")):
+            lo,hi = band[name]
+            if (any(type(value) not in (int,float) or not math.isfinite(value) for value in (lo,hi))
+                    or not 0 < lo <= getattr(pair.placement,field) <= hi):
+                raise ValueError("actual retained-material band does not enclose its reference geometry")
+            support[field],material[field] = lo,hi
+    elif band is not None:
+        raise ValueError("unbanded physical driver cannot acquire a synthetic retained band")
+    support_pair = replace(pair,placement=replace(pair.placement,**support))
+    material_pair = replace(pair,placement=replace(pair.placement,**material))
+    record = {
+        "method":"nested actual finite-stock material with common physical side/tip support",
+        "reference_placement":pair.placement.record(),
+        "support_placement":support_pair.placement.record(),
+        "material_placement":material_pair.placement.record(),
+        "source_face_width_limits_mm":limits,"source_face_anchor_fraction":anchors,
+        "source_driver_retained_band_limits_mm":band,
+        "moving_band_cap_carrying":False,
+        "moving_face_cap_carrying":False,"native_certificate":False,
+    }
+    return support_pair,material_pair,record
+
+
+def _common_physical_face_chart(chart,material_pair):
+    supported_placement = chart.pair.placement
+    stratum = chart.driver_stratum
+    if (stratum.axial_cap_source == "driver_shoulder"
+            and supported_placement.driver_shoulder_z_mm != material_pair.placement.driver_shoulder_z_mm):
+        return False
+    if (stratum.radial_cap_radius_mm is not None
+            and supported_placement.driver_turned_radius_mm != material_pair.placement.driver_turned_radius_mm):
+        return False
+    for body,stratum in (("driver",chart.driver_stratum),("driven",chart.driven_stratum)):
+        if stratum.z_fixed is None or stratum.axial_cap_source != "face":
+            continue
+        supported = getattr(chart.pair.placement,f"{body}_face_mm")
+        material = getattr(material_pair.placement,f"{body}_face_mm")
+        if stratum.z_fixed not in supported:
+            return False
+        if material[supported.index(stratum.z_fixed)] != stratum.z_fixed:
+            return False
+    return True
+
+
+def patch_boundary_separation(chart,proof,neighbourhood,patch_id,patch_domain,*,outside_air_mm):
+    """One-sided derivative on THIS incident-side or radial-fan cap domain."""
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    pair = chart.pair
+    names,_ = continuation.physical_patch_root_coordinates(proof,patch_id)
+    refusal = continuation.patch_domain_refusal(proof,patch_id,names,patch_domain)
+    if refusal:
+        raise ArithmeticError(refusal)
+    stratum = chart.driven_stratum
+    suffix = next((v for v in (":end_face:-1",":end_face:+1") if patch_id.endswith(v)),"")
+    side = patch_id[:-len(suffix)] if suffix else patch_id
+    segments = {f"{stratum.tooth}:{stratum.segment.name}":(stratum.segment,None)}
+    segments.update({f"{stratum.tooth}:{segment.name}":(segment,endpoint)
+                     for segment,endpoint in stratum.incident_segments})
+    segment,endpoint = segments[side]
+    t,second = patch_domain
+    geometry_cell = _geometry_cell_for_angle(proof.cell,"driven_material")
+    if suffix:
+        sign = 0 if suffix.endswith("-1") else 1
+        z = I.point(pair.placement.driven_face_mm[sign])
+        if stratum.z_fixed != z.midpoint:
+            raise ArithmeticError("cap derivative is not at the actual supported face")
+        rho = second
+    else:
+        if endpoint is None:
+            raise ValueError("a main side neighbourhood uses its minimum, not a boundary exception")
+        z,rho = second,None
+    q,first,_,_,_,_,_,_ = _relative_surface_derivatives(
+        pair,geometry_cell,neighbourhood.approach_driven_phase_rad,segment,stratum.tooth,t,z,
+        finite_master_extension=segment == stratum.segment and stratum.implicit_tip,
+        radial_fraction=rho)
+    tangent = tuple(-value for value in first[1]) if suffix else tuple(
+        (1 if endpoint == 0 else -1)*value for value in first[0])
+    radius = continuation.sqrt_bounds(continuation._squared_norm(q[:2]))
+    direction = chart.driver_stratum.segment._side
+    slope,_ = _working_angle_derivatives(pair.driver,chart.driver_stratum.segment.kind,radius)
+    er,et = (q[0]/radius,q[1]/radius),(-q[1]/radius,q[0]/radius)
+    gradient = list(slope*er[i]-direction*et[i]/radius for i in range(2))+[I.point(0)]
+    active = []
+    for incident,_ in chart.driver_stratum.incident_segments:
+        if incident.kind != "tip_arc" or not chart.driver_stratum.implicit_tip:
+            raise ArithmeticError("incident boundary has no actual native radial constraint")
+        active.append(("radial",pair.driver.blank_radius_mm))
+    cap = chart.driver_stratum.radial_cap_radius_mm
+    padding = (I.point(chart.geometry_error_bound_mm)
+               +continuation.periodicity_displacement_bound_mm(pair,proof.cell.source_pose)).upper
+    padding = (I.point(padding)*_frame_operator_norm_upper(
+        continuation.frame_inverse_bounds(pair.placement.driver_frame))).upper
+    if cap is not None:
+        if (q[2]-padding).lower <= pair.placement.driver_shoulder_z_mm:
+            raise ArithmeticError("incident/cap neighbourhood crosses the retained-material union")
+        active.append(("radial",cap))
+    driver_face = chart.driver_stratum.z_fixed
+    if driver_face is not None:
+        if (chart.driver_stratum.axial_cap_source == "driver_shoulder"
+                and (radius-padding).lower <= pair.placement.driver_turned_radius_mm):
+            raise ArithmeticError("incident/cap neighbourhood reaches the reentrant shoulder/cylinder join")
+        active.append(("axial",driver_face))
+    multipliers = _root_objective_multipliers(chart,proof,direction)["driver"]
+    for multiplier,(kind,station) in zip(multipliers,active,strict=True):
+        if kind == "radial":
+            for index in range(2):
+                gradient[index] += multiplier*er[index]
+        else:
+            sign = -1 if station == pair.placement.driver_face_mm[0] else 1
+            gradient[2] += multiplier*sign
+    inward = _interval_dot(gradient,tangent)
+    if inward.lower <= 0:
+        raise ArithmeticError("actual whole-patch one-sided separating derivative remains unresolved")
+    return continuation.BoundarySeparation(
+        patch_id,chart.name,inward.lower,outside_air_mm,neighbourhood,names,patch_domain)
+
+
+def _source_centre_pair(pair,cell,beta):
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    centre = _geometry_cell_for_angle(cell.centre(),"driven_material")
+    values = dict(centre.source_pose.axes)
+    poses = {body:continuation.body_pose_bounds(pair,centre.source_pose,centre.driver_phase_rad,
+                                              I.point(beta),body=body) for body in ("driver","driven")}
+    fields = {}
+    for body,pose in poses.items():
+        fields[f"{body}_origin_mm"] = tuple(value.midpoint for value in pose.origin_mm)
+        fields[f"{body}_frame"] = np.array([[value.midpoint for value in row] for row in pose.frame])
+    fields["driver_clocking_rad"] = pair.placement.driver_clocking_rad+values.get("driver_clock_rad",I.point(0)).midpoint
+    return replace(pair,placement=replace(pair.placement,**fields))
+
+
+def _polish_stock_chart(chart,cell):
+    """Numerical initialization, then a REAL uniform Krawczyk root enclosure.
+
+    This is intentionally not a first-contact/root-air certificate. The
+    complete material proofs below must precede public branch admission.
+    """
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    centre = cell.centre()
+    initial = np.array([value.midpoint for value in chart.unknown_box])
+    def evaluated(values):
+        return chart.evaluate(centre,tuple(I.point(float(value)) for value in values))
+    def residual(values):
+        return np.array([value.midpoint for value in evaluated(values).residual])
+    def jacobian(values):
+        return np.array([[value.midpoint for value in row] for row in evaluated(values).jacobian])
+    solved = root(residual,initial,jac=jacobian,tol=1e-11)
+    if not solved.success or not np.all(np.isfinite(solved.x)):
+        raise ArithmeticError(f"supported common-normal numerical initialization failed: {solved.message}")
+    at_point = evaluated(solved.x)
+    jac = np.array([[value.midpoint for value in row] for row in at_point.jacobian])
+    parameters = np.array([[value.midpoint for value in row] for row in at_point.parameter_jacobian])
+    sensitivities = np.linalg.solve(jac,-parameters)
+    deviations = np.array([max(abs(value.lower-value.midpoint),abs(value.upper-value.midpoint))
+                           for value in cell.parameter_bounds])
+    motion = np.abs(sensitivities)@deviations
+    baseline = np.array([(value.upper-value.lower)/2 for value in chart.unknown_box])
+    reason = "no uniform initial box"
+    for factor in (1.0,2.0,4.0):
+        radii = factor*(baseline+motion)
+        box = tuple(I(math.nextafter(float(value-radius),-math.inf),
+                      math.nextafter(float(value+radius),math.inf))
+                    for value,radius in zip(solved.x,radii))
+        candidate = replace(chart,unknown_box=box)
+        enclosure,gradient,contraction,reason = continuation._krawczyk(candidate.evaluate,cell,box)
+        if enclosure is None:
+            continue
+        support = candidate.evaluate(cell,enclosure)
+        if any(value.lower <= 0 for _,value in support.margins):
+            reason = "whole-source finite stratum/normal-cone support is unresolved"
+            continue
+        a,b = support.driver_moment,support.driven_moment
+        if a.lower <= 0 <= a.upper or b.lower <= 0 <= b.upper or (a*b).upper >= 0:
+            reason = "whole-source opposing nonzero normal moments are unresolved"
+            continue
+        return candidate,tuple(float(v) for v in solved.x),enclosure
+    raise ArithmeticError(reason)
+
+
+def _supported_normal_candidates(pair,material_pair,cell,closing_sense,maximum_error_mm):
+    """All physical teeth supply seeds; only exhaustive exclusions can finish."""
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    phi = cell.driver_phase_rad.midpoint
+    ratio = pair.driver.teeth/pair.driven.teeth
+    seed_beta = pair.placement.driven_clocking_rad-ratio*phi
+    direction = -closing_sense
+    found,failures = {},[]
+    # Cull numerical seeds, never the exhaustive physical proof inventory.
+    half_pitch = pair.driven.angular_pitch_rad/2
+    seed_domain = I(seed_beta-half_pitch,seed_beta+half_pitch)
+    seed_search,_ = pose_cell_search(pair,cell,seed_domain,angle_coordinate="driven_material")
+    seed_metric = _frame_operator_norm_upper(seed_search.placement.driven_frame)
+    station = sum(pair.placement.driven_face_mm)/2
+    half_face = (pair.placement.driven_face_mm[1]-pair.placement.driven_face_mm[0])/2
+    geometry_centre = _geometry_cell_for_angle(cell.centre(),"driven_material")
+    for tooth in range(pair.driven.teeth):
+        for segment in pair.driven.external_boundary_segments():
+            if segment.kind not in ("flank","radial","tip_arc"):
+                continue
+            _,local = seed_search.point(segment,tooth,.5,station)
+            extent = seed_metric*(segment.speed_bound_mm/2+seed_search.second_speed(segment)*half_face)
+            radial = extent+seed_search.radial_error_mm+pair.driven.geometry_error_bound_mm
+            axial = extent+seed_search.axial_error_mm+pair.driven.geometry_error_bound_mm
+            if (math.hypot(local[0],local[1])-radial > pair.driver.blank_radius_mm
+                    or local[2]+axial < pair.placement.driver_face_mm[0]
+                    or local[2]-axial > pair.placement.driver_face_mm[1]):
+                continue
+            beta,initial = seed_beta,None
+            try:
+                contact,settled = None,False
+                for _ in range(16):
+                    centre_pair = _source_centre_pair(pair,cell,beta)
+                    search = ContactSearch(centre_pair,phi,driven_phase_rad=beta)
+                    fitted = search.optimise(segment,tooth,(0.0,1.0,*pair.placement.driven_face_mm),
+                                             direction,initial=initial)
+                    if fitted is None:
+                        break
+                    _,contact = fitted
+                    initial = [contact.parameter,contact.station_mm]
+                    q,_,_,velocity,_,_,_,_ = _relative_surface_derivatives(
+                        pair,geometry_centre,I.point(beta),segment,tooth,
+                        I.point(contact.parameter),I.point(contact.station_mm))
+                    radius = math.hypot(q[0].midpoint,q[1].midpoint)
+                    er = np.array([q[0].midpoint/radius,q[1].midpoint/radius,0.0])
+                    et = np.array([-er[1],er[0],0.0])
+                    gradient = search.gap.exact_slope(radius)*er-direction*et/radius
+                    derivative = direction*float(gradient@np.array([value.midpoint for value in velocity]))
+                    if not math.isfinite(derivative) or derivative == 0:
+                        break
+                    correction = -contact.phase_offset_rad/derivative
+                    if abs(correction)*pair.driven.pitch_radius_mm <= maximum_error_mm/32:
+                        beta += correction
+                        centre_pair = _source_centre_pair(pair,cell,beta)
+                        search = ContactSearch(centre_pair,phi,driven_phase_rad=beta)
+                        fitted = search.optimise(segment,tooth,(0.0,1.0,*pair.placement.driven_face_mm),
+                                                 direction,initial=initial)
+                        contact = fitted[1] if fitted is not None else None
+                        settled = contact is not None
+                        break
+                    beta += max(-pair.driven.angular_pitch_rad/4,min(pair.driven.angular_pitch_rad/4,correction))
+                    if not seed_domain.contains(I.point(beta)):
+                        break
+                if not settled or contact is None or not grounded_contact(contact):
+                    continue
+                for seed in continuation.chart_candidates(centre_pair,contact,phi,beta):
+                    candidate = replace(seed,pair=pair)
+                    if candidate.driver_stratum.segment._side != direction or not _common_physical_face_chart(candidate,material_pair):
+                        continue
+                    try:
+                        chart,point,enclosure = _polish_stock_chart(candidate,cell)
+                    except (ArithmeticError,ValueError,np.linalg.LinAlgError) as exc:
+                        failures.append({"chart":candidate.name,"reason":str(exc)})
+                        continue
+                    old = found.get(chart.name)
+                    if old is not None and not all(a.intersection(b) is not None for a,b in zip(old[2],enclosure)):
+                        raise ArithmeticError("distinct roots on one physical stratum require separate global exclusion domains")
+                    found[chart.name] = (chart,point,enclosure)
+            except (ArithmeticError,ValueError,np.linalg.LinAlgError) as exc:
+                failures.append({"physical_tooth":tooth,"segment":segment.name,"reason":str(exc)})
+    return tuple(found.values()),failures
+
+
+class ContinuousContactRefusal(ValueError):
+    """An unresolved numerical enclosure, never a manufacturing no-solution."""
+
+    def __init__(self,reason,evidence):
+        super().__init__(reason)
+        self.evidence = evidence
+
+
+@dataclass(frozen=True)
+class _ContactCell:
+    cell: continuation.PhaseCell
+    charts: tuple
+    proofs: tuple
+    numerical_points: tuple
+    cover: continuation.FirstContactCover
+    root_proof: dict
+    driven_root_material_proof: dict
+    surface_exclusions: tuple
+    free_reference_exclusions: tuple
+
+    def record(self):
+        return {
+            "proof_schema":"finite-stock-first-contact-cell/1","status":"PROVED","native_certificate":False,
+            "phase_cell_rad":self.cell.driver_phase_rad.record(),
+            "same_source_pose":self.cell.source_pose.record(),
+            "branch_proofs":[proof.record() for proof in self.proofs],
+            "first_contact_cover":self.cover.record(),
+            "root_proof":self.root_proof,
+            "driven_root_material_proof":self.driven_root_material_proof,
+            "surface_exclusion_receipts":list(self.surface_exclusions),
+            "free_reference_exclusion_receipts":list(self.free_reference_exclusions),
+            "numerical_initializations":{name:list(point) for name,point in self.numerical_points},
+        }
+
+
+def _branch_neighbourhood(chart,proof,material_pair,approach,*,length_mm):
+    """Bound each actual patch in its OWN native coordinates."""
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    stratum = chart.driven_stratum
+    root_t,root_z = proof.driven_surface_root_box
+    dt = max(root_t.upper-root_t.lower,length_mm/stratum.segment.speed_bound_mm)
+    dz = max(root_z.upper-root_z.lower,length_mm)
+    t = root_t+I(-dt,dt)
+    if not stratum.implicit_tip:
+        t = t.intersection(I(0,1))
+    z = (root_z+I(-dz,dz)).intersection(I(*material_pair.placement.driven_face_mm))
+    if t is None or z is None or t.lower == t.upper or z.lower == z.upper:
+        raise ArithmeticError("actual local material rectangle is degenerate")
+    neighbourhood = continuation.ProofNeighbourhood(
+        proof.cell,chart.unknown_box,approach,(t,z),"driven_material")
+    main = f"{stratum.tooth}:{stratum.segment.name}"
+    domains = {main:(("native_t","z_mm"),(t,z))}
+    for segment,endpoint in stratum.incident_segments:
+        width = min(1.0,max(length_mm,dt*stratum.segment.speed_bound_mm)/segment.speed_bound_mm)
+        incident_t = I(0,width) if endpoint == 0 else I(1-width,1)
+        domains[f"{stratum.tooth}:{segment.name}"] = (("native_t","z_mm"),(incident_t,z))
+    if stratum.z_fixed is not None:
+        face = material_pair.placement.driven_face_mm
+        if stratum.z_fixed not in face:
+            raise ArithmeticError("moving/artificial support face cannot supply a material cap")
+        suffix = ":end_face:-1" if stratum.z_fixed == face[0] else ":end_face:+1"
+        depth = min(1.0,max(length_mm,dt*stratum.segment.speed_bound_mm,dz)/chart.pair.driven.blank_radius_mm)
+        for patch,(_,rectangle) in tuple(domains.items()):
+            domains[patch+suffix] = (("native_t","radial_fraction"),(rectangle[0],I(1-depth,1)))
+    return neighbourhood,domains
+
+
+def _reference_air(material_pair,cell,reference,*,maximum_error_mm,periodic_padding_mm):
+    inventory,_,_ = _physical_surface_inventory(material_pair)
+    receipts = []
+    for patch in inventory:
+        receipt = finite_surface_patch_air(
+            material_pair,cell,reference,patch,required_air_mm=0.0,
+            maximum_error_mm=maximum_error_mm,additional_geometry_error_mm=periodic_padding_mm)
+        receipts.append(receipt)
+        if receipt["status"] != "PROVED":
+            return None,tuple(receipts)
+    # The two directed material/containment proofs are still REQUIRED before
+    # this boundary clearance becomes an actual free-volume anchor.
+    return min(receipt["air_lower_mm"] for receipt in receipts),tuple(receipts)
+
+
+def _prove_contact_side(pair,material_pair,cell,candidates,reference,reference_air,
+                        reference_receipts,source_domain,*,closing_sense,
+                        maximum_error_mm,maximum_jump_mm,periodic_padding_mm):
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    contenders = []
+    for chart,point,enclosure in candidates:
+        beta = enclosure[chart.offset_index]
+        if (closing_sense == 1 and beta.lower > reference.upper
+                or closing_sense == -1 and beta.upper < reference.lower):
+            contenders.append((chart,point,enclosure))
+    if not contenders:
+        raise ContinuousContactRefusal("no uniformly supported root beyond the actual free reference",
+                                      {"phase_cell_rad":cell.driver_phase_rad.record(),"closing_sense":closing_sense})
+    earliest_upper = min((closing_sense*entry[2][entry[0].offset_index]).upper for entry in contenders)
+    retain_band = (I.point(maximum_jump_mm+maximum_error_mm)/pair.driven.pitch_radius_mm).upper
+    contenders = [entry for entry in contenders
+                  if (closing_sense*entry[2][entry[0].offset_index]).lower <= earliest_upper+retain_band]
+    beta_hull = I(min([reference.lower]+[entry[2][entry[0].offset_index].lower for entry in contenders]),
+                  max([reference.upper]+[entry[2][entry[0].offset_index].upper for entry in contenders]))
+    pad = (I.point(maximum_error_mm)/pair.driven.pitch_radius_mm).upper
+    approach = beta_hull+I(-pad,pad)
+    floors = source_domain["root_air_requirements_mm"]
+    root = root_free_pose_cell(
+        material_pair,cell,approach,maximum_error_mm=maximum_error_mm,
+        required_root_air_mm=floors["driver"],angle_coordinate="driven_material",
+        additional_geometry_error_mm=periodic_padding_mm)
+    reverse = driven_root_material_clearance(
+        material_pair,cell,approach,maximum_error_mm=maximum_error_mm,
+        required_root_air_mm=floors["driven"],additional_geometry_error_mm=periodic_padding_mm)
+    if root["status"] != "PROVED" or reverse["status"] != "PROVED":
+        raise ContinuousContactRefusal("complete directed root MATERIAL/containment is unresolved",
+                                      {"root_proof":root,"driven_root_material_proof":reverse})
+    components = tuple(I(*value) for value in root["root_free_driven_components_rad"])
+    charts = tuple(entry[0] for entry in contenders)
+    proofs = tuple(continuation.prove_branch_cell(
+        chart,cell,root_free_driven_components_rad=components,root_free_coordinate="driven_material")
+        for chart in charts)
+    if any(proof.status != "PROVED" for proof in proofs):
+        raise ContinuousContactRefusal("uniform supported common-normal branch inclusion is unresolved",
+                                      {"branch_proofs":[proof.record() for proof in proofs]})
+    inventory,roots,noncarrying = _physical_surface_inventory(material_pair)
+    axes = dict(cell.source_pose.axes)
+    eccentricity = continuation.sqrt_bounds(continuation._squared_norm(tuple(
+        axes.get(f"driven_ecc_{axis}_mm",I.point(0)) for axis in ("x","y")))).upper
+    speed = (I.point(_frame_operator_norm_upper(material_pair.placement.driven_frame))
+             *(I.point(material_pair.driven.blank_radius_mm)+eccentricity)).upper
+    backlash = (I.point(2)*reference_air*pair.driven.pitch_radius_mm/speed).lower
+    last_failure = {}
+    # Grow the PROVED local convex regions, not the unshrinkable source balls
+    # or a box budget. Every accepted enlargement is re-proved over its full
+    # rectangle x approach and all source coordinates.
+    for scale in (1,2,4,8,16,32,64):
+        neighbourhoods,patches = {},{}
+        for chart,proof in zip(charts,proofs):
+            neighbourhood,domains = _branch_neighbourhood(
+                chart,proof,material_pair,approach,length_mm=16*maximum_error_mm*scale)
+            neighbourhoods[chart.name] = neighbourhood
+            patches[chart.name] = domains
+        owners = {patch:tuple(chart.name for chart in charts if patch in patches[chart.name])
+                  for patch in inventory}
+        receipts,air = [],{}
+        for patch in inventory:
+            domains = tuple(tuple(value.record() for value in patches[name][patch][1])
+                            for name in owners[patch])
+            receipt = finite_surface_patch_air(
+                material_pair,cell,approach,patch,
+                required_air_mm=floors["driven"] if patch in roots else 0.0,
+                maximum_error_mm=maximum_error_mm,patch_parameter_domains=domains,
+                additional_geometry_error_mm=periodic_padding_mm)
+            receipts.append(receipt)
+            if receipt["status"] != "PROVED":
+                last_failure = {"scale":scale,"surface_exclusion":receipt}
+                break
+            air[patch] = I.point(receipt["air_lower_mm"])
+        else:
+            minima,boundaries = [],[]
+            try:
+                for chart,proof in zip(charts,proofs):
+                    neighbourhood = neighbourhoods[chart.name]
+                    outside = I.point(min(air[patch].lower for patch in patches[chart.name]))
+                    minimum = chart_neighbourhood_minimum(
+                        pair,chart,proof,*neighbourhood.driven_surface_domain,
+                        direction=-closing_sense,outside_air_mm=outside,
+                        approach_driven_phase_rad=approach,neighbourhood=neighbourhood)
+                    refusal = minimum.refusal()
+                    if refusal:
+                        raise ArithmeticError(refusal)
+                    if continuation.branch_geometry_error_rad(
+                            proof,minimum,additional_geometry_error_mm=periodic_padding_mm) > pad:
+                        raise ArithmeticError("actual geometry payment exceeds the retained loaded-approach padding")
+                    minima.append(minimum)
+                    main = f"{chart.driven_tooth}:{chart.driven_stratum.segment.name}"
+                    for patch,(_,rectangle) in patches[chart.name].items():
+                        if patch != main:
+                            boundaries.append(patch_boundary_separation(
+                                chart,proof,neighbourhood,patch,rectangle,outside_air_mm=air[patch]))
+                remainders = tuple(continuation.PatchRemainderBound(
+                    patch,names,air[patch],tuple((name,neighbourhoods[name]) for name in names),
+                    patches[names[0]][patch][0],tuple((name,patches[name][patch][1]) for name in names))
+                    for patch,names in owners.items() if len(names) > 1)
+                cover = continuation.FirstContactCover(
+                    cell,components,backlash,approach,inventory,
+                    tuple((chart.name,tuple(patches[chart.name])) for chart in charts),
+                    tuple((patch,air[patch]) for patch in inventory if not owners[patch]),
+                    noncarrying,floors["driven"],tuple(minima),roots,tuple(boundaries),remainders,
+                    reference,I.point(reference_air),closing_sense,"driven_material",
+                    additional_geometry_error_mm=periodic_padding_mm)
+                refusal = cover.refusal(proofs)
+                if refusal:
+                    raise ArithmeticError(refusal)
+                return _ContactCell(
+                    cell,charts,proofs,tuple((chart.name,point) for chart,point,_ in contenders),
+                    cover,root,reverse,tuple(receipts),reference_receipts)
+            except (ArithmeticError,ValueError) as exc:
+                last_failure = {"scale":scale,"minimum_or_boundary_refusal":str(exc)}
+    raise ContinuousContactRefusal("actual finite-surface first-contact exclusion is unresolved",
+                                  {"phase_cell_rad":cell.driver_phase_rad.record(),
+                                   "closing_sense":closing_sense,**last_failure})
+
+
+def _contact_cell_pair(pair,material_pair,cell,source_domain,*,maximum_error_mm,maximum_jump_mm):
+    """Both physical closing directions share one independently proved free pose.
+
+    Choosing a clearance anchor is NOT a manufactured datum change: all beta
+    roots and TE retain the caller's original physical axes and index zeros.
+    """
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    candidates,seed_failures = {},{}
+    for name,sense in (("lower",-1),("upper",1)):
+        candidates[name],seed_failures[name] = _supported_normal_candidates(
+            pair,material_pair,cell,sense,maximum_error_mm)
+    choices = set()
+    for a in candidates["lower"]:
+        lower = a[2][a[0].offset_index]
+        for b in candidates["upper"]:
+            upper = b[2][b[0].offset_index]
+            if lower.upper < upper.lower:
+                choices.add(lower.upper/2+upper.lower/2)
+    nominal = pair.placement.driven_clocking_rad-cell.driver_phase_rad.midpoint*pair.driver.teeth/pair.driven.teeth
+    periodic_padding = continuation.periodicity_displacement_bound_mm(material_pair,cell.source_pose)
+    refusals = []
+    for beta in sorted(choices,key=lambda value:abs(value-nominal)):
+        reference = I.point(beta)
+        air,receipts = _reference_air(
+            material_pair,cell,reference,maximum_error_mm=maximum_error_mm,
+            periodic_padding_mm=periodic_padding)
+        if air is None:
+            refusals.append({"reference_driven_phase_rad":reference.record(),
+                             "surface_exclusion":receipts[-1]})
+            continue
+        try:
+            return {
+                name:_prove_contact_side(
+                    pair,material_pair,cell,candidates[name],reference,air,receipts,source_domain,
+                    closing_sense=sense,maximum_error_mm=maximum_error_mm,
+                    maximum_jump_mm=maximum_jump_mm,periodic_padding_mm=periodic_padding)
+                for name,sense in (("lower",-1),("upper",1))}
+        except ContinuousContactRefusal as exc:
+            refusals.append({"reference_driven_phase_rad":reference.record(),
+                             "reason":str(exc),"evidence":exc.evidence})
+    raise ContinuousContactRefusal(
+        "no complete common-source first-contact pair was proved",
+        {"phase_cell_rad":cell.driver_phase_rad.record(),"same_source_pose":cell.source_pose.record(),
+         "numerical_seed_refusals":seed_failures,"free_reference_attempts":refusals,
+         "supported_candidate_counts":{name:len(value) for name,value in candidates.items()}})
+
+
+def _uniform_first_charts(item):
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    minima = {value.chart_name:value for value in item.cover.chart_minimum_bounds}
+    result = set()
+    for selected in item.proofs:
+        for other in item.proofs:
+            if other.chart_name == selected.chart_name:
+                continue
+            delta = item.cover.closing_driven_sense*continuation.difference_from_branch_proofs(selected,other)
+            error = (I.point(continuation.branch_geometry_error_rad(selected,minima[selected.chart_name],
+                      additional_geometry_error_mm=item.cover.additional_geometry_error_mm))
+                     +continuation.branch_geometry_error_rad(other,minima[other.chart_name],
+                      additional_geometry_error_mm=item.cover.additional_geometry_error_mm))
+            if (delta-error).lower < 0:
+                break
+        else:
+            result.add(selected.chart_name)
+    return frozenset(result)
+
+
+def _contact_topology(item,maximum_jump_mm):
+    from diagnostics import stock_form_contact_continuation as continuation
+    first = _uniform_first_charts(item)
+    if first:
+        return (first,first),None
+    failures = []
+    for a in item.charts:
+        for b in item.charts:
+            if a.name == b.name:
+                continue
+            proof = continuation.prove_paid_handover(
+                a,b,item.cell,item.cover,driven_pitch_radius_mm=a.pair.driven.pitch_radius_mm,
+                maximum_jump_mm=maximum_jump_mm,driven_sense=item.cover.closing_driven_sense,
+                first_contact_branch_proofs=item.proofs)
+            if proof["status"] == "PROVED":
+                return (frozenset((a.name,)),frozenset((b.name,))),proof
+            failures.append(proof)
+    raise ContinuousContactRefusal("possible first-root exchange lacks a paid same-source continuous bracket",
+                                  {"phase_cell_rad":item.cell.driver_phase_rad.record(),
+                                   "closing_sense":item.cover.closing_driven_sense,"attempts":failures})
+
+
+def _endpoint_root(item,name,phase):
+    from diagnostics import stock_form_contact_continuation as continuation
+    chart = next(chart for chart in item.charts if chart.name == name)
+    cell = continuation.PhaseCell(continuation.Interval.point(phase),item.cell.source_pose)
+    proof = continuation.prove_branch_cell(
+        chart,cell,root_free_driven_components_rad=item.cover.root_free_driven_components_rad,
+        root_free_coordinate=item.cover.angle_coordinate)
+    if proof.status != "PROVED":
+        raise ContinuousContactRefusal("actual common-source endpoint root is unresolved",proof.record())
+    return proof
+
+
+def _strictly_contains_root(domain,root):
+    return len(domain) == len(root) and all(a.lower < b.lower <= b.upper < a.upper for a,b in zip(domain,root))
+
+
+def _boundary_continuation(left,right,left_first,right_first,index):
+    phase = left.cell.driver_phase_rad.upper
+    if phase != right.cell.driver_phase_rad.lower or left.cell.source_pose != right.cell.source_pose:
+        raise ValueError("continuation boundary must have one identical physical phase/source")
+    for name in sorted(left_first & right_first):
+        a,b = _endpoint_root(left,name,phase),_endpoint_root(right,name,phase)
+        if a.physical_strata != b.physical_strata:
+            continue
+        if (_strictly_contains_root(a.unknown_domain,b.root_box)
+                or _strictly_contains_root(b.unknown_domain,a.root_box)):
+            return {"left_cell_index":index,"right_cell_index":index+1,"phase_rad":phase,"chart":name,
+                    "left_branch_proof":a.record(),"right_branch_proof":b.record()}
+    raise ContinuousContactRefusal(
+        "adjacent first-contact branches have no common-boundary root uniqueness proof",
+        {"phase_rad":phase,"left_first_charts":sorted(left_first),"right_first_charts":sorted(right_first)})
+
+
+def _row_branch_spans(items,boundaries,material_pair):
+    """Continuous INNER images of one actually first physical contact branch."""
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    first_sets = tuple(_uniform_first_charts(item) for item in items)
+    spans,intervals = [],[]
+    for name in sorted(set().union(*first_sets)):
+        index = 0
+        while index < len(items):
+            if name not in first_sets[index]:
+                index += 1
+                continue
+            start = end = index
+            while (end+1 < len(items) and name in first_sets[end+1]
+                   and boundaries[end]["chart"] == name):
+                end += 1
+            lo,hi = items[start].cell.driver_phase_rad.lower,items[end].cell.driver_phase_rad.upper
+            left,right = _endpoint_root(items[start],name,lo),_endpoint_root(items[end],name,hi)
+            a,b = left.driven_surface_root_box[1],right.driven_surface_root_box[1]
+            inner = ((a.upper,b.lower) if a.upper < b.lower else
+                     (b.upper,a.lower) if b.upper < a.lower else None)
+            if inner is not None:
+                intervals.append(inner)
+                spans.append({"chart":name,"first_cell_index":start,"last_cell_index":end,
+                              "phase_endpoints_rad":[lo,hi],"left_branch_proof":left.record(),
+                              "right_branch_proof":right.record(),"inner_station_interval_mm":list(inner)})
+            index = end+1
+    merged = merge_intervals(intervals)
+    width = sum((I.point(hi)-lo for lo,hi in merged),I.point(0))
+    face = material_pair.placement.driven_face_mm
+    fraction = (width/(I.point(face[1])-face[0])).lower
+    return spans,merged,max(0.0,fraction)
+
+
+def _actual_periodic_seam(pair,material_pair,items,source_domain,*,maximum_error_mm,maximum_jump_mm):
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    start,end = items[0],items[-1]
+    bounds = []
+    for item,phase,shift in ((start,0.0,-pair.driven.angular_pitch_rad),
+                             (end,pair.driver.angular_pitch_rad,0.0)):
+        for chart in item.charts:
+            bounds.append(_endpoint_root(item,chart.name,phase).driven_material_phase_rad+shift)
+    domain = I(min(value.lower for value in bounds),max(value.upper for value in bounds))
+    # The end approach includes a genuine clear anchor as well as every mapped
+    # source-relabelled root. Retain it in both complete material sweeps.
+    domain = I(min(domain.lower,end.cover.approach_driven_phase_rad.lower),
+               max(domain.upper,end.cover.approach_driven_phase_rad.upper))
+    cell = continuation.PhaseCell(I.point(pair.driver.angular_pitch_rad),start.cell.source_pose)
+    padding = continuation.periodicity_displacement_bound_mm(material_pair,cell.source_pose)
+    floors = source_domain["root_air_requirements_mm"]
+    root = root_free_pose_cell(
+        material_pair,cell,domain,maximum_error_mm=maximum_error_mm,
+        required_root_air_mm=floors["driver"],angle_coordinate="driven_material",
+        additional_geometry_error_mm=padding)
+    reverse = driven_root_material_clearance(
+        material_pair,cell,domain,maximum_error_mm=maximum_error_mm,
+        required_root_air_mm=floors["driven"],additional_geometry_error_mm=padding)
+    proof = continuation.prove_periodic_seam(
+        start.charts,start.cell,start.cover,end.charts,end.cell,end.cover,
+        start_branch_proofs=start.proofs,end_branch_proofs=end.proofs,
+        source_eccentricity_disks=source_domain["source_eccentricity_disks"],
+        root_receipt=root,driven_root_material_receipt=reverse,
+        root_air_requirements_mm=floors,driven_pitch_radius_mm=pair.driven.pitch_radius_mm,
+        maximum_jump_mm=maximum_jump_mm)
+    if proof["status"] != "PROVED":
+        raise ContinuousContactRefusal("actual whole-period physical source-relabelled seam is unresolved",proof)
+    return proof
+
+
+def _continuous_side(pair,material_pair,items,source_domain,*,maximum_error_mm,maximum_jump_mm):
+    from diagnostics import stock_form_contact_continuation as continuation
+    topology = [_contact_topology(item,maximum_jump_mm) for item in items]
+    boundaries = [_boundary_continuation(
+        left,right,topology[index][0][1],topology[index+1][0][0],index)
+        for index,(left,right) in enumerate(zip(items,items[1:]))]
+    coverage = continuation.retained_phase_coverage(
+        tuple((item.cell,item.proofs,item.cover) for item in items),
+        driver_pitch_rad=pair.driver.angular_pitch_rad,
+        driven_pitch_radius_mm=pair.driven.pitch_radius_mm,maximum_jump_mm=maximum_jump_mm)
+    if coverage["status"] != "PROVED":
+        raise ContinuousContactRefusal("continuous same-source supported-tooth coverage is unresolved",coverage)
+    rows,intervals,fraction = _row_branch_spans(items,boundaries,material_pair)
+    seam = _actual_periodic_seam(
+        pair,material_pair,items,source_domain,maximum_error_mm=maximum_error_mm,maximum_jump_mm=maximum_jump_mm)
+    return {
+        "proof_schema":"finite-stock-continuous-envelope/1","status":"PROVED","native_certificate":False,
+        "same_source_pose":items[0].cell.source_pose.record(),
+        "phase_domain_rad":[0.0,pair.driver.angular_pitch_rad],
+        "closing_driven_sense":items[0].cover.closing_driven_sense,
+        "phase_cells":[{**item.record(),**carrier} for item,carrier in zip(items,coverage["carrier_cells"])],
+        "stock_form_coverage_lower":coverage["stock_form_coverage_lower"],
+        "uncovered_phase_rad":coverage["uncovered_phase_rad"],
+        "coverage_definition":coverage["coverage_definition"],
+        "boundary_continuations":boundaries,
+        "row_branch_spans":rows,"row_available_intervals_mm":[list(value) for value in intervals],
+        "row_available_fraction_lower":fraction,
+        "handovers":[proof for _,proof in topology if proof is not None],
+        "periodic_seam":seam,
+    }
+
+
+def _contact_partition(pair,material_pair,source_domain,pose,*,phases,maximum_error_mm,maximum_jump_mm):
+    """Refine phase error only after a fixed-phase whole-source proof succeeds.
+
+    A source-domain refusal is not repaired by indefinitely splitting phase.
+    A first-root exchange needs a bracket covering its SOURCE spread; adjacent
+    cells are merged for that proof rather than substituting two point roots.
+    """
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    pitch = pair.driver.angular_pitch_rad
+    cache = {}
+
+    def prove(lo,hi):
+        key = lo,hi
+        if key not in cache:
+            cache[key] = _contact_cell_pair(
+                pair,material_pair,continuation.PhaseCell(I(lo,hi),pose),source_domain,
+                maximum_error_mm=maximum_error_mm,maximum_jump_mm=maximum_jump_mm)
+        return cache[key]
+
+    grid = [pitch*i/(phases-1) for i in range(phases)]
+    pending = list(reversed(list(zip(grid,grid[1:]))))
+    cells = []
+    while pending:
+        lo,hi = pending.pop()
+        try:
+            proved = prove(lo,hi)
+        except ContinuousContactRefusal as whole:
+            mid = lo/2+hi/2
+            if not lo < mid < hi or len(cells)+len(pending) >= 32*(phases-1):
+                raise ContinuousContactRefusal(
+                    "phase enclosure refinement unresolved at its finite partition limit",
+                    {"phase_cell_rad":[lo,hi],"whole_cell_refusal":whole.evidence}) from whole
+            try:
+                prove(mid,mid)
+            except ContinuousContactRefusal as point:
+                raise ContinuousContactRefusal(
+                    "fixed-phase physical-source proof is unresolved; phase subdivision cannot certify this cell",
+                    {"phase_cell_rad":[lo,hi],"fixed_driver_phase_rad":mid,
+                     "whole_cell_refusal":whole.evidence,"fixed_phase_refusal":point.evidence,
+                     "physical_no_solution":False}) from point
+            pending.extend(((mid,hi),(lo,mid)))
+            continue
+        cells.append(proved)
+
+    while True:
+        problem = None
+        topology = []
+        for index,cell in enumerate(cells):
+            try:
+                topology.append({side:_contact_topology(item,maximum_jump_mm)[0] for side,item in cell.items()})
+            except ContinuousContactRefusal as exc:
+                problem = index,index,exc
+                break
+            if index:
+                try:
+                    for side in ("lower","upper"):
+                        _boundary_continuation(cells[index-1][side],cell[side],
+                                               topology[index-1][side][1],topology[index][side][0],index-1)
+                except ContinuousContactRefusal as exc:
+                    problem = index-1,index,exc
+                    break
+        if problem is None:
+            return cells
+        first,last,reason = problem
+        ranges = ([(first,last)] if first != last else
+                  [(a,b) for a,b in ((first-1,last),(first,last+1)) if 0 <= a <= b < len(cells)])
+        failures = []
+        for first,last in sorted(ranges,key=lambda indices:
+                                 cells[indices[1]]["lower"].cell.driver_phase_rad.upper
+                                 -cells[indices[0]]["lower"].cell.driver_phase_rad.lower):
+            lo = cells[first]["lower"].cell.driver_phase_rad.lower
+            hi = cells[last]["lower"].cell.driver_phase_rad.upper
+            try:
+                merged = prove(lo,hi)
+                for item in merged.values():
+                    _contact_topology(item,maximum_jump_mm)
+            except ContinuousContactRefusal as exc:
+                failures.append({"phase_cell_rad":[lo,hi],"reason":str(exc),"evidence":exc.evidence})
+                continue
+            cells[first:last+1] = [merged]
+            break
+        else:
+            raise ContinuousContactRefusal(
+                "whole-source branch exchange or boundary continuation remains unresolved",
+                {"reason":str(reason),"continuation_refusal":reason.evidence,"merged_cell_attempts":failures})
+
+
+def _branch_phase_envelope(item,proof,pair,material_pair,mechanical_zero):
+    """Same-q signed mechanical TE; cancel ideal phase before propagation."""
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    ratio = I.point(pair.driver.teeth)/pair.driven.teeth
+    centre = proof.cell.centre()
+    phi0,beta0 = mechanical_zero["driver"],mechanical_zero["driven"]
+    minimum = next(value for value in item.cover.chart_minimum_bounds if value.chart_name == proof.chart_name)
+    geometry = continuation.branch_geometry_error_rad(proof,minimum,additional_geometry_error_mm=0.0)
+    displacement = item.cover.additional_geometry_error_mm
+    required_displacement = continuation.periodicity_displacement_bound_mm(material_pair,proof.cell.source_pose)
+    if (displacement < required_displacement
+            or minimum.objective_gradient_padding_mm < (I.point(proof.geometry_error_bound_mm)+displacement).upper):
+        raise ContinuousContactRefusal("whole-period TE lacks its full geometric-plus-periodic Lipschitz region",
+                                      {"chart":proof.chart_name,"minimum":minimum.record()})
+    periodic = (I.point(displacement)*minimum.objective_gradient_magnitude_upper_per_mm
+                /minimum.approach_derivative_magnitude_lower).upper
+    payment = continuation.branch_geometry_error_rad(
+        proof,minimum,additional_geometry_error_mm=displacement)
+    te = proof.center_driven_phase_rad-beta0+ratio*(centre.driver_phase_rad-phi0)
+    for name,bounds,derivative in zip(proof.cell.parameter_names,proof.cell.parameter_bounds,proof.source_gradient_rad):
+        slope = derivative+ratio if name == "driver_phase_rad" else derivative
+        te += slope*(bounds-I.point(bounds.midpoint))
+    te += I(-payment,payment)
+    physical = proof.driven_phase_rad+I(-payment,payment)
+    material = proof.driven_material_phase_rad+I(-payment,payment)
+    return {
+        "chart":proof.chart_name,"signed_running_te_interval_rad":te.record(),
+        "physical_driven_phase_interval_rad":physical.record(),
+        "material_driven_phase_interval_rad":material.record(),
+        "physical_geometry_payment_rad":geometry,"joint_period_displacement_upper_mm":displacement,
+        "joint_period_error_payment_rad":periodic,"total_geometric_payment_rad":payment,
+        "mechanical_zero_rad":dict(mechanical_zero),
+        "definition":"physical beta-beta0 + exact tooth-count ratio*(actual phi-phi0); shared parameter derivatives",
+    }
+
+
+def _side_phase_envelopes(item,pair,material_pair,mechanical_zero):
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    first = _uniform_first_charts(item)
+    branches = [proof for proof in item.proofs if not first or proof.chart_name in first]
+    records = [_branch_phase_envelope(item,proof,pair,material_pair,mechanical_zero) for proof in branches]
+
+    def envelope(field):
+        intervals = [I(*record[field]) for record in records]
+        # Closing downwards meets the greatest root; upwards meets the least.
+        select = max if item.cover.closing_driven_sense == -1 else min
+        return I(select(value.lower for value in intervals),select(value.upper for value in intervals))
+
+    return {
+        "signed_running_te_interval_rad":envelope("signed_running_te_interval_rad"),
+        "physical_driven_phase_interval_rad":envelope("physical_driven_phase_interval_rad"),
+        "material_driven_phase_interval_rad":envelope("material_driven_phase_interval_rad"),
+        "branch_envelopes":records,
+    }
+
+
+def _correlated_backlash(lower,upper,pair,lower_envelope,upper_envelope):
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    if lower.cell != upper.cell:
+        raise ValueError("backlash requires one identical physical source/phase cell")
+    left_payments = {record["chart"]:record["total_geometric_payment_rad"] for record in lower_envelope["branch_envelopes"]}
+    right_payments = {record["chart"]:record["total_geometric_payment_rad"] for record in upper_envelope["branch_envelopes"]}
+    left = [proof for proof in lower.proofs if proof.chart_name in left_payments]
+    right = [proof for proof in upper.proofs if proof.chart_name in right_payments]
+    pairs = []
+    for a in left:
+        for b in right:
+            difference = continuation.difference_from_branch_proofs(a,b)
+            error = (I.point(left_payments[a.chart_name])+right_payments[b.chart_name]).upper
+            paid = difference+I(-error,error)
+            pairs.append({"lower_chart":a.chart_name,"upper_chart":b.chart_name,
+                          "same_pose_root_difference_rad":difference.record(),
+                          "geometry_and_period_payment_rad":error,"paid_root_difference_rad":paid.record()})
+    # min_j beta_upper_j - max_i beta_lower_i = min_(i,j)(beta_upper_j-beta_lower_i).
+    angle = I(min(value["paid_root_difference_rad"][0] for value in pairs),
+              min(value["paid_root_difference_rad"][1] for value in pairs))
+    return {
+        "same_source_pose":lower.cell.source_pose.record(),"phase_cell_rad":lower.cell.driver_phase_rad.record(),
+        "branch_pairs":pairs,"backlash_interval_rad":angle.record(),
+        "backlash_interval_mm":(angle*pair.driven.pitch_radius_mm).record(),
+        "pitch_radius_mm":pair.driven.pitch_radius_mm,
+        "definition":"min of same-q upper-minus-lower root differences; source derivatives subtracted before propagation",
+    }
+
+
+def _period_cell_record(items,pair,material_pair,source_domain,driver_sense):
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    zero = source_domain["mechanical_zero_rad"]
+    envelopes = {side:_side_phase_envelopes(item,pair,material_pair,zero) for side,item in items.items()}
+    running_side = "lower" if driver_sense == -1 else "upper"
+    running = items[running_side]
+    root,reverse = running.root_proof,running.driven_root_material_proof
+    backlash = _correlated_backlash(items["lower"],items["upper"],pair,envelopes["lower"],envelopes["upper"])
+    return {
+        "phase_cell_rad":running.cell.driver_phase_rad.record(),
+        "actual_driver_interval_rad":(running.cell.driver_phase_rad-zero["driver"]).record(),
+        "actual_driven_lower_interval_rad":(envelopes["lower"]["physical_driven_phase_interval_rad"]-zero["driven"]).record(),
+        "actual_driven_upper_interval_rad":(envelopes["upper"]["physical_driven_phase_interval_rad"]-zero["driven"]).record(),
+        "material_driven_lower_interval_rad":envelopes["lower"]["material_driven_phase_interval_rad"].record(),
+        "material_driven_upper_interval_rad":envelopes["upper"]["material_driven_phase_interval_rad"].record(),
+        "signed_running_te_interval_rad":envelopes[running_side]["signed_running_te_interval_rad"].record(),
+        "mechanical_zero_rad":dict(zero),"operating_driver_sense":driver_sense,
+        "side_branch_envelopes":{side:value["branch_envelopes"] for side,value in envelopes.items()},
+        "correlated_backlash":backlash,
+        "correlated_backlash_interval_mm":backlash["backlash_interval_mm"],
+        "root_air":{
+            "qualified":(root["status"] == reverse["status"] == "PROVED"
+                         and root["physical_root_air_lower_bound_mm"] > 0 and reverse["root_air_lower_mm"] > 0),
+            "root_is_carrying":False,"root_air_requirements_mm":dict(source_domain["root_air_requirements_mm"]),
+            "driver_root_air_lower_mm":root["physical_root_air_lower_bound_mm"],
+            "driven_root_air_lower_mm":reverse["root_air_lower_mm"],
+            "driver_root_proof":root,"driven_root_material_proof":reverse,
+        },
+        "same_source_pose":running.cell.source_pose.record(),
+        "whole_joint_period_scope":{
+            "tooth_steps":math.lcm(pair.driver.teeth,pair.driven.teeth),
+            "source_relabel":"actual rotation-invariant body eccentricity disks; all physical tooth identities",
+            "displacement_payment_mm":continuation.periodicity_displacement_bound_mm(material_pair,running.cell.source_pose),
+        },
+    }
+
+
+def _actual_read_phase(pair,material_pair,source_domain,pose,phase,*,driver_sense,maximum_error_mm,maximum_jump_mm,face_enclosure):
+    """Query the actual requested driver angle, not a periodic endpoint alias."""
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    cell = continuation.PhaseCell(I.point(phase),pose)
+    items = _contact_cell_pair(pair,material_pair,cell,source_domain,
+                               maximum_error_mm=maximum_error_mm,maximum_jump_mm=maximum_jump_mm)
+    row = _period_cell_record(items,pair,material_pair,source_domain,driver_sense)
+    side = "lower" if driver_sense == -1 else "upper"
+    running = items[side]
+    centre_clock = dict(pose.centre().axes).get("driven_clock_rad",I.point(0)).midpoint
+    proofs = {proof.chart_name:proof for proof in running.proofs}
+    charts = {chart.name:chart for chart in running.charts}
+    minima = {minimum.chart_name:minimum for minimum in running.cover.chart_minimum_bounds}
+    direct = {key:item.record() for key,item in items.items()}
+    records = {proof["chart"]:proof for proof in direct[side]["branch_proofs"]}
+    centres = {}
+    for name,proof in proofs.items():
+        # This is a bounded numerical representative of the certified centre
+        # ROOT, never the midpoint of the manufacturing source or an old seed.
+        point = tuple(value.midpoint for value in proof.center_root_box)
+        evaluation = charts[name].evaluate(cell.centre(),tuple(I.point(value) for value in point))
+        records[name]["center_point"] = list(point)
+        records[name]["center_point_residual_intervals"] = [value.record() for value in evaluation.residual]
+        root_evaluation = charts[name].evaluate(cell.centre(),proof.center_root_box)
+        records[name]["center_root_residual_intervals"] = [value.record() for value in root_evaluation.residual]
+        payment = continuation.branch_geometry_error_rad(
+            proof,minima[name],additional_geometry_error_mm=running.cover.additional_geometry_error_mm)
+        centres[name] = proof.center_driven_phase_rad+I(-payment,payment)
+    choose = max if running.cover.closing_driven_sense == -1 else min
+    first = I(choose(value.lower for value in centres.values()),
+              choose(value.upper for value in centres.values()))
+    # Overlapping/tied roots remain eligible. The extreme certified bound
+    # selects a deterministic representative, NOT a claim of unique ordering.
+    _,name = choose(((value.lower if side == "lower" else value.upper),name)
+                    for name,value in centres.items())
+    eligible = sorted(name for name,value in centres.items()
+                      if value.lower <= first.upper and value.upper >= first.lower)
+    point = records[name]["center_point"]
+    beta = point[proofs[name].driven_angle_unknown_index]-centre_clock
+    zero = source_domain["mechanical_zero_rad"]
+    reference = math.fsum((beta,-zero["driven"],pair.driver.teeth/pair.driven.teeth*(phase-zero["driver"])))
+    actual = I(*row["signed_running_te_interval_rad"])
+    error = (actual-I.point(reference)).magnitude
+    centre_error = first-I.point(beta)
+    centre_te = first-I.point(zero["driven"])+(I.point(pair.driver.teeth)/pair.driven.teeth)*(I.point(phase)-zero["driver"])
+    if not first.contains(beta) or not actual.contains(centre_te):
+        raise ContinuousContactRefusal("certified centre first-root reference is outside the paid actual envelope",
+                                      {"centre_first_root_rad":first.record(),"actual_te_rad":actual.record()})
+    return {
+        **row,"actual_driver_phase_rad":phase,"reference_signed_running_te_rad":reference,
+        "reference_driven_phase_rad":beta,"reference_source_pose":pose.centre().record(),
+        "reference_chart":name,"reference_common_normal_point":point,
+        "reference_residual_intervals":records[name]["center_point_residual_intervals"],
+        "reference_root_proof":records[name],"reference_error_bound_rad":error,
+        "reference_center_first_root_interval_rad":first.record(),
+        "reference_center_first_candidates":eligible,
+        "reference_center_first_root_error_rad":centre_error.record(),
+        "reference_center_first_root_error_bound_rad":centre_error.magnitude,
+        "actual_interval_error_from_reference_rad":(actual-I.point(reference)).record(),
+        "direct_first_contact_sides":direct,
+        "reference_definition":"canonical certified centre-root midpoint eligible for the paid first-contact envelope; residual and midpoint-to-true-root error retained, not an exact zero-residual root or a source midpoint",
+        "direct_actual_phase_query":True,"periodic_point_substitution":False,
+        "finite_face_material_enclosure":face_enclosure,
+    }
+
+
+def analyse_3d_mesh(
+    case: ContactPair, *, continuous_source_domain: dict,
+    phases: int = 129, maximum_error_mm: float = 0.001,
+    coverage_min: float = 0.62, row_min: float = 0.85,
+    handover_max_mm: float = 0.005, positive_backlash_min_mm: float = 0.0,
+    driver_sense: int = 1, read_driver_phases_rad=(),
+) -> dict:
+    """Produce actual continuous common-source material/contact evidence.
+
+    There is no point-row fallback. Unresolved first contact, source spread,
+    branch exchange, finite cap or root containment raises a receipt-bearing
+    refusal; none means that the physical mechanism is infeasible.
+    """
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    if type(phases) is not int or phases < 3:
+        raise ValueError("a whole-pitch study requires at least three phase nodes")
+    if type(driver_sense) is not int or driver_sense not in (-1,1):
+        raise ValueError("driver sense must be the actual signed physical axis direction")
+    criteria = maximum_error_mm,coverage_min,row_min,handover_max_mm,positive_backlash_min_mm
+    if (any(type(value) not in (float,int) or not math.isfinite(value) for value in criteria)
+            or maximum_error_mm <= 0 or coverage_min < 0 or not 0 <= row_min <= 1
+            or handover_max_mm <= 0 or positive_backlash_min_mm < 0):
+        raise ValueError("continuous contact criteria must be finite physical bounds")
+    domain = continuous_source_domain
+    if domain.get("unbound_sources") or domain.get("source_domain_status") == "UNKNOWN":
+        raise ContinuousContactRefusal("physical source domain contains an unbound manufacturing degree of freedom",
+                                      {"continuous_source_domain":domain,"physical_no_solution":False})
+    pose = source_pose(domain["correlated_pose_parameters"])
+    zero = domain["mechanical_zero_rad"]
+    if (set(zero) != {"driver","driven"} or any(
+            type(value) not in (float,int) or not math.isfinite(value) for value in zero.values())
+            or zero["driver"] != 0.0):
+        raise ValueError("whole-pitch coordinate zero must bind actual manufactured driver/driven datums")
+    floors = domain["root_air_requirements_mm"]
+    if (set(floors) != {"driver","driven"} or any(
+            type(value) not in (float,int) or not math.isfinite(value) or value < 0 for value in floors.values())):
+        raise ValueError("both directed root-material floors are required")
+    requested = tuple(read_driver_phases_rad)
+    if any(type(value) not in (float,int) or not math.isfinite(value) for value in requested):
+        raise ValueError("direct read phases must be actual finite signed driver angles")
+    support,material,face_receipt = finite_face_family(case,domain)
+    cells = _contact_partition(
+        support,material,domain,pose,phases=phases,
+        maximum_error_mm=maximum_error_mm,maximum_jump_mm=handover_max_mm)
+    sides = {side:_continuous_side(
+        support,material,[cell[side] for cell in cells],domain,
+        maximum_error_mm=maximum_error_mm,maximum_jump_mm=handover_max_mm) for side in ("lower","upper")}
+    running_side = "lower" if driver_sense == -1 else "upper"
+    running = sides[running_side]
+    rows = [_period_cell_record(cell,support,material,domain,driver_sense) for cell in cells]
+    reads = [_actual_read_phase(
+        support,material,domain,pose,float(phase),driver_sense=driver_sense,
+        maximum_error_mm=maximum_error_mm,maximum_jump_mm=handover_max_mm,
+        face_enclosure=face_receipt) for phase in requested]
+    tight = min(row["correlated_backlash_interval_mm"][0] for row in rows)
+    loose = max(row["correlated_backlash_interval_mm"][1] for row in rows)
+    lag = I(min(row["signed_running_te_interval_rad"][0] for row in rows),
+            max(row["signed_running_te_interval_rad"][1] for row in rows))
+    # A prospective driver material clock -delta corresponds to ideal physical
+    # beta at TE=-ratio*delta. This is a DESIGN window, not a selected datum or
+    # a transport of the certificate to an unqueried installed clock.
+    ratio = I.point(case.driver.teeth)/case.driven.teeth
+    lower,upper = -math.inf,math.inf
+    for cell in cells:
+        bounds = {side:_side_phase_envelopes(item,support,material,zero)["signed_running_te_interval_rad"]
+                  for side,item in cell.items()}
+        lower = max(lower,(-I.point(bounds["upper"].lower)/ratio).upper)
+        upper = min(upper,(-I.point(bounds["lower"].upper)/ratio).lower)
+    common = [[lower,upper]] if lower < upper else []
+    gates = (tight > positive_backlash_min_mm and running["stock_form_coverage_lower"] >= coverage_min
+             and running["row_available_fraction_lower"] >= row_min
+             and all(row["root_air"]["qualified"] for row in rows))
+    production = (domain.get("scope") == "FULL_PRODUCTION_SOURCE_DOMAIN"
+                  and domain.get("production_source_domain") is True)
+    certificate = {
+        "proof_schema":"finite-stock-continuous-envelope/1","status":"PROVED","native_certificate":False,
+        "same_source_pose":pose.record(),"phase_domain_rad":[0.0,case.driver.angular_pitch_rad],
+        "finite_face_material_enclosure":face_receipt,"sides":sides,
+        "joint_period_tooth_steps":math.lcm(case.driver.teeth,case.driven.teeth),
+        "whole_period_signed_running_te_interval_rad":lag.record(),
+        "whole_period_signed_running_te_scope":{
+            "operating_driver_sense":driver_sense,"source_domain":domain,
+            "phase_cells":len(rows),"all_physical_tooth_identities":True,
+            "periodicity_authority":"both actual source-relabelled periodic_seam receipts",
+            "bound_authority":"same-q branch derivatives plus actual geometry and full joint-period displacement",
+        },
+    }
+    return {
+        "case":case.name,"metric":"STOCK-FORM COVERAGE","is_conjugate":False,
+        "driver_profile":profile_record(case.driver),"driven_profile":profile_record(case.driven),
+        "placement":case.placement.record(),"operating_driver_sense":driver_sense,
+        "continuous_source_domain":domain,"continuous_contact_certificate":certificate,
+        "continuous_carrying_contact":True,"full_period_cells":rows,"actual_read_phases":reads,
+        "source_domain_proved":gates,"production_source_qualified":gates and production,
+        "qualified":gates and production,"native_certificate":False,"physical_no_solution":False,
+        "stock_form_coverage_lower":running["stock_form_coverage_lower"],
+        "coverage_definition":running["coverage_definition"],"uncovered_phase_rad":running["uncovered_phase_rad"],
+        "row_available_fraction_lower":running["row_available_fraction_lower"],
+        "row_available_intervals_mm":running["row_available_intervals_mm"],
+        "handovers":running["handovers"],"periodic_seam":running["periodic_seam"],
+        "tight_backlash_lower_mm":tight,"loose_backlash_upper_mm":loose,
+        "whole_period_signed_running_te_interval_rad":lag.record(),
+        "phase_components_rad":common,"phase_window_rad":common[0] if common else None,
+        "phase_window_scope":"prospective driver material clock DESIGN only; installed phase requires actual source qualification",
+        "numerical_error_bounds":{"surface_mm":maximum_error_mm},
+    }
+
+
+def read_actual_phases(case: ContactPair,*,continuous_source_domain,driver_phases_rad,
+                       driver_sense,maximum_error_mm=.001,maximum_jump_mm=.005):
+    """Fresh complete material/contact queries at explicitly requested angles.
+
+    This point packet is not a whole-period certificate. A selected-phase
+    publisher must separately bind its actual phase transport to a complete
+    continuous source certificate.
+    """
+    if (type(driver_sense) is not int or driver_sense not in (-1,1)
+            or any(type(value) not in (float,int) or not math.isfinite(value) or value <= 0
+                   for value in (maximum_error_mm,maximum_jump_mm))):
+        raise ValueError("actual read query requires a physical sense and finite positive numerical bounds")
+    domain = continuous_source_domain
+    if domain.get("unbound_sources") or domain.get("source_domain_status") == "UNKNOWN":
+        raise ContinuousContactRefusal("actual read query has an unbound physical source",
+                                      {"continuous_source_domain":domain,"physical_no_solution":False})
+    pose = source_pose(domain["correlated_pose_parameters"])
+    requested = tuple(driver_phases_rad)
+    if not requested or any(type(value) not in (float,int) or not math.isfinite(value) for value in requested):
+        raise ValueError("actual read queries require their finite physical driver angles")
+    support,material,faces = finite_face_family(case,domain)
+    rows = [_actual_read_phase(
+        support,material,domain,pose,float(phase),driver_sense=driver_sense,
+        maximum_error_mm=maximum_error_mm,maximum_jump_mm=maximum_jump_mm,face_enclosure=faces)
+        for phase in requested]
+    return {
+        "case":case.name,"proof_schema":"finite-stock-actual-read-points/1",
+        "point_source_domain_proved":True,"production_source_qualified":False,"native_certificate":False,
+        "placement":case.placement.record(),"driver_profile":profile_record(case.driver),
+        "driven_profile":profile_record(case.driven),"continuous_source_domain":domain,
+        "operating_driver_sense":driver_sense,"numerical_error_bounds":{"surface_mm":maximum_error_mm},
+        "actual_read_phases":rows,
+    }
+
+
+def selected_driver_clock_transport(case,selected_pair,result,*,selected_phase_offset_deg,
+                                    base_geometry_sha256,measurement_engine_sha256):
+    """Exact same-q material-clock change, then the already-paid physical seam.
+
+    The commanded degree setting is not pretended to be an exact radian
+    subtraction. The effective delta encloses the actual two source clocks.
+    No source translation/tilt box is rotated; only the existing seam may
+    relabel its proved eccentricity DISKS and actual physical tooth identities.
+    """
+    import hashlib
+    import json
+    from diagnostics import stock_form_contact_continuation as continuation
+    I = continuation.Interval
+    if (type(selected_phase_offset_deg) not in (float,int) or not math.isfinite(selected_phase_offset_deg)
+            or result.get("source_domain_proved") is not True
+            or result["placement"] != case.placement.record()
+            or selected_pair.driver is not case.driver or selected_pair.driven is not case.driven):
+        raise ValueError("selected material clock needs its actual whole-source physical base proof")
+    base,selected = case.placement.record(),selected_pair.placement.record()
+    if any(selected[key] != value for key,value in base.items() if key != "driver_clocking_rad"):
+        raise ValueError("phase transport may change ONLY the actual manufactured driver material clock")
+    certificate = result["continuous_contact_certificate"]
+    if any(certificate["sides"][side]["periodic_seam"]["status"] != "PROVED" for side in ("lower","upper")):
+        raise ValueError("selected clock lacks both actual paid source-relabelled seam proofs")
+    domain = result["continuous_source_domain"]
+    source = source_pose(domain["correlated_pose_parameters"])
+    delta = I.point(base["driver_clocking_rad"])-selected["driver_clocking_rad"]
+    ratio = I.point(case.driver.teeth)/case.driven.teeth
+    conversion = ratio*delta
+    base_lag = I(*result["whole_period_signed_running_te_interval_rad"])
+    def digest(value):
+        return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+    record = {
+        "proof_schema":"finite-stock-selected-driver-clock/1","native_certificate":False,
+        "base_geometry_sha256":base_geometry_sha256,"measurement_engine_sha256":measurement_engine_sha256,
+        "base_certificate_sha256":digest(certificate),"base_placement":base,"selected_placement":selected,
+        "selected_phase_offset_deg":selected_phase_offset_deg,
+        "effective_driver_material_delta_rad":delta.record(),
+        "source_map_before_period_reduction":{name:name for name,_ in source.axes},
+        "driver_parameter_relation":"psi = physical_driver_phi - effective_driver_material_delta",
+        "driven_parameter_relation":"physical_beta unchanged",
+        "unchanged_rectangular_source_axes":[name for name,_ in source.axes if "_ecc_" not in name],
+        "period_relabelling_authority":{
+            side:digest(certificate["sides"][side]["periodic_seam"]) for side in ("lower","upper")},
+        "source_eccentricity_disks":domain["source_eccentricity_disks"],
+        "joint_period_tooth_steps":math.lcm(case.driver.teeth,case.driven.teeth),
+        "signed_running_te_conversion_rad":conversion.record(),
+        "base_whole_period_signed_running_te_interval_rad":base_lag.record(),
+        "selected_whole_period_signed_running_te_interval_rad":(base_lag+conversion).record(),
+        "geometry_payment":"the SAME geometry and joint-period displacement already paid in every first-contact cell; not added again",
+        "selected_read_requirement":"fresh complete material/first-contact queries at every actual requested selected-placement angle",
+    }
+    record["selected_source_identity_sha256"] = digest(record)
+    return record

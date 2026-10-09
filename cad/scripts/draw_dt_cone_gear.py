@@ -12,9 +12,9 @@ There are no datums or feature-control frames.  Hidden lines communicate no
 additional manufacturing fact on these through-bored spur gears, so every view
 remains hidden-lines-removed.  The one finish symbol belongs to the fitted
 bore.  The side view stays in projection with the front view's bore axis; its
-face width hangs below it, clear of the Gear Data block.  The circular tooth
-thickness is dimensioned on the +X tooth's pitch chord (a tooth on every
-configuration), and root MIN/MAX on a functional radial-envelope witness.
+face width hangs below it, clear of the Gear Data block. The circular pitch
+thickness uses a construction inspection witness of the actual arc size, not
+an ideal chord oracle; root MIN/MAX use the actual radial-envelope witness.
 The D-bore prints in an enlarged bore view, a cropped *Front model view at a
 scale that renders every bore at least ``BORE_VIEW_BORE_MIN`` across (its flat
 is 0.13 deep on T006 and T012); both views centre-mark the bore.  The part

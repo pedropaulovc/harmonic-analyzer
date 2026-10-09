@@ -35,6 +35,7 @@ from cone_shaft_land_bands import (
     TERMINAL_DIA_MM,
     TERMINAL_DIA_PLACES,
     TERMINAL_FINISHED_DIA_LIMITS_MM,
+    TERMINAL_FINISHED_AF_LIMITS_MM,
     TERMINAL_FLAT_AF_MM,
     TERMINAL_HALF_CHORD_MIN_MM,
     TIP_COLLAR_MAX_RADIAL_FLOAT_MM,
@@ -191,11 +192,8 @@ GEOMETRIC_CONTROLS = COLLAR_CONTROLS + SCREW_CONTROLS
 _BORE_MAX = BORE_FINISHED_DIA_LIMITS_MM[1]
 _LAND_MIN = TERMINAL_FINISHED_DIA_LIMITS_MM[0]
 _FLOAT_MAX = (_BORE_MAX - _LAND_MIN) / 2.0
-_FLAT_MAX = TERMINAL_FLAT_AF_MM + FLAT_AF_BAND[0] - _LAND_MIN / 2.0
-_FLAT_MIN = (
-    TERMINAL_FLAT_AF_MM + FLAT_AF_BAND[1]
-    - TERMINAL_FINISHED_DIA_LIMITS_MM[1] / 2.0
-)
+_FLAT_MAX = TERMINAL_FINISHED_AF_LIMITS_MM[1] - _LAND_MIN / 2.0
+_FLAT_MIN = TERMINAL_FINISHED_AF_LIMITS_MM[0] - TERMINAL_FINISHED_DIA_LIMITS_MM[1] / 2.0
 DOG_SIDE_MARGIN_MM = (
     TERMINAL_HALF_CHORD_MIN_MM - TIP_SCREW_DOG_PROJECTED_RADIUS_MM
     - _FLOAT_MAX - TIP_SCREW_DOG_AXIS_OFFSET_MM - TERMINAL_FLAT_EDGE_BREAK_MAX
@@ -275,7 +273,7 @@ def validate_installed_clamp_pose(
                 or not BORE_FINISHED_DIA_LIMITS_MM[0]/2.0-1e-9 <= witness.bore_radius_mm <= BORE_FINISHED_DIA_LIMITS_MM[1]/2.0+1e-9):
             raise ValueError("actual shaft/bore radii leave their retained finished limits")
         actual_af = flat_offset_mm + witness.shaft_radius_mm
-        if not TERMINAL_FLAT_AF_MM+FLAT_AF_BAND[1]-1e-9 <= actual_af <= TERMINAL_FLAT_AF_MM+FLAT_AF_BAND[0]+1e-9:
+        if not TERMINAL_FINISHED_AF_LIMITS_MM[0]-1e-9 <= actual_af <= TERMINAL_FINISHED_AF_LIMITS_MM[1]+1e-9:
             raise ValueError("actual dog contact leaves the retained terminal AF band")
         if flat_half_chord_mm > math.sqrt(witness.shaft_radius_mm**2-flat_offset_mm**2)+NATIVE_CONTACT_RESOLUTION_MM:
             raise ValueError("claimed whole-dog half chord exceeds the actual retained D circle")

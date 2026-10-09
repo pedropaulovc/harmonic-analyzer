@@ -154,6 +154,12 @@ to the exact geometry, grades, core/engine source and complete 51-case
 family; missing, stale, partial or refused evidence cannot release it.
 Full adaptive-cell reports stay out of tree, while a compact source-bound
 calibration records each case's paid gates and independent diagnostics.
+The collector follows the oblique study's exact-byte entry and import
+capture: its CLI recompiles captured entry/project source instead of trusting
+timestamp-only bytecode caches, and configuration is parsed from the same bytes
+whose SHA is recorded. Before/actually-compiled/actually-parsed/after manifests
+must agree with the live source for the frozen reader to release the proof.
+Unchanged files after importing pre-existing code are not that evidence.
 The reported `uncovered_phase_rad` is a conservative measure of uncertified
 phase cells, **not** a measured physical gap. The compact evidence separates
 `support_uncertain_phase_rad` (supported sampled carriers whose swept support
@@ -181,6 +187,19 @@ remain absolute in the readout budget, without a channel-zero or mean tare.
 
 ### Actual oblique cone qualification and installed-axis inspection
 
+The operating source is explicitly **OPERATING_NOTCH_UP**. Native canonical
+GAP clocks are $\pi/T$ for the cone and $\pi-L-\pi/120$ for the saved drum
+pose. Native row-vector reflection makes the world CAM-NOTCH ray
+$\beta_{\rm ABS}-\pi/2$. The documented physical zeroing operation rotates
+the drum from that saved pose by $L+\pi/120$ to literal NOTCH-up,
+$\beta_0=\pi$; the cone-lock datum is $\phi_0=0$. The raw saved-CAD bias and
+the signed setup rotation are separately recorded assembly facts. This is
+an actual source setup operation, not a nearest-pitch re-indexing or a
+fitted contact-home correction. Signed TE remains
+$(\beta_{\rm ABS}-\pi)+(T/120)(\phi-\phi_0)$ at actual contacts. No contact,
+placement, mean or channel tare is subtracted; the historical lobe-up waiver
+does not redefine this manufactured datum.
+
 The cone study in `diagnostics/oblique_cone_mesh_study.py` first reports one
 actual nominal profile and all sixteen distinct cone/cylinder printed-profile
 corner pairs for each of T006 through T120. This engineering matrix can derive
@@ -191,31 +210,53 @@ attainable engaged corner and its numerical refusal is not physical
 infeasibility. Refused selected settings do not exhaust the real printed
 lattice or establish an all-family no-solution certificate.
 
-`dt_cone_support_pose` is the sole retained shaft-axis authority. Optional
-installed observations have strictly positive bounds and no numeric preset.
-Indicate a removable gauge arbor in the actual POST BORE,
-referenced to the cylinder-bank arbor and actual seated thrust/washer plane,
-then retain that post setting during final installation. With POST and TIP
-retained, indicate the exposed north terminal shaft's round BACK arc through
-full rotation and opposed light radial seating loads. No accessible south
-journal proud is assumed. Both observations include uncertainty and any
-verified setup movement; post running radial clearance is paid once, while
-the terminal observation already measures the actual shaft. Whole observed
-and source support envelopes intersect, never their individual terms.
-Gear-seat/tooth runout, cylinder running cock, printed axial/profile bands
-and the whole booked mesh-centre opening remain separate source inputs.
-A required inspection is not a claim that purchased stock or an assembled
-machine has been measured and passed.
+`dt_cone_support_pose` is the sole retained shaft-axis authority. Commodity
+hardware uses its vendor or standard published maximum envelope, not a newly
+invented incoming-inspection procedure. The proposed installed full-motion
+observer is held and is not a production acceptance gate. Convergence may
+instead use margin-derived, shop-achievable requirements for the critical
+custom gear teeth, bore RUNNING fits, seat faces and cam-pin interfaces.
+A required critical grade is not a claim that actual stock has passed.
 
-When the cup permits larger running motion, use `InstalledSupportMotionAcceptance`:
-datum-fixed post/north centre boxes plus the complete north radial-motion
-disk and axial travel, not an impossible tight box around the whole moving
-shaft. Rho is distance in the fixed radial measurement plane to that plane's
-intersection with the north box, not distance from a selected measured
-baseline or a recentered mean. The closed condition is
-`rho²/Rmax² + q/e <= 1`; all datum-fixed XYZ extrema remain booked. An exported
-Cartesian OUTER does not acquire that correlation implicitly and must not be
-treated as an independently attainable corner.
+`dt_cone_mesh_domain` supplies the same pure physical placement and named
+source coordinates to producer and native receiver without importing a
+diagnostic solver or reading the selected factory JSON. Actual printed
+bore/land clearance and each body's own tooth-to-bore TIR form closed
+body-fixed eccentricity disks. Missing cone or shared 120T drum tooth TIR is
+UNKNOWN and refuses qualification; the crank's unrelated .05 grade is not a
+substitute. Finite face-width limits remain material-cap bands, not rigid
+axial shifts. The retained .20 centre opening is a TOTAL booking and must not
+be added again to its constituent runout/bearing allowances. Source
+projection ledgers remain whole; separate bounds cannot be silently
+cancelled, nor can an OUTER corner establish physical infeasibility.
+
+Drum tooth-pattern clock relative to the physical CAM-NOTCH datum is a
+separate critical gear-index requirement, read only through
+`drum_tooth_to_cam_notch_clock_deg` in the shared mesh supplier. A missing
+grade is UNKNOWN, not zero, the lobe/notch grade, a BASIC ±1°, or the #749
+lobe-home waiver. The full SOURCE keeps its actual signed band once:
+material `beta_star = beta_absolute + driven_clock_rad`, while physical TE
+uses `beta_absolute = beta_star - driven_clock_rad` without datum tare.
+The grade must follow the actual remaining F4 accuracy margin; shop
+candidates or a whole-pattern-pitch mechanical bound are conditional
+engineering inputs, never published requirements or production acceptance.
+
+The budget separately pays that actual ±grade deterministically with stock
+TE on every operating read, without RSS or a new allocation. Therefore the
+`BUDGET_CLOCK_NOMINAL_SUBDOMAIN` holds only `driver_clock_rad` and
+`driven_clock_rad` at mathematical zero. Its exact ordered exclusions are
+`cone_flat_free_clock`, `BoreFlatClock`,
+`drum_tooth_to_cam_notch_clock`; full-source grades remain unchanged.
+
+The authoritative default supplier labels the whole retained domain
+`FULL_PRODUCTION_SOURCE_DOMAIN` with `production_source_domain=true`; that
+describes its source completeness, not a numerical pass or accepted stock.
+An installed-observer override is explicitly a conditional DESIGN domain.
+Mathematical q0 and budget-clock subdomains also set the production flagfalse.
+Their engine reports require `source_domain_proved=true` and the actual
+source-bound certificate, not a production verdict. Only the complete
+authoritative domain can receive `production_source_qualified=true`; a
+proved q0, clock subdomain or assumed-grade band cannot be promoted to it.
 
 BASIC cone incline
 does not inherit the title-block angular tolerance or the relative crank-bore
@@ -229,9 +270,12 @@ collision authority only. Independent held-cone lower and upper cylinder
 angular roots establish the retained 0.06–0.41 mm backlash at the original
 operating calibration circle; the physical pitch-circle arc is reported
 separately. No inverse-driver window multiplied by an ideal ratio substitutes
-for these roots. Forward cone-root air is at least 0.02 mm and reverse
-cylinder-root air at least 0.10 mm, with the actual loaded phase intervals
-strictly inside certified FREE INNER components. The integral eccentric cam
+for these roots. Forward cone-root MATERIAL air is at least 0.02 mm and
+reverse cylinder-root MATERIAL air at least 0.10 mm to complete other-body
+material, not merely excluded external patches. Both directed receipts bind
+the same retained source/phase cell and actual loaded approach; root material
+is never a carrying contact. The loaded phase intervals remain strictly
+inside certified FREE INNER components. The integral eccentric cam
 body must also be excluded under the entire retained pose/profile domain.
 Additional root-air capacity is obtained only by re-solving the actual sweeps
 with increased air and retaining resolved FREE INNER over every phase cell.
@@ -239,18 +283,31 @@ The original requested-floor lower bound minus that floor is zero, not a
 physical reserve. A refused parameter-search trial bounds the certification
 search only; it is not a physical maximum or a shop-infeasible count.
 
-The cone/cylinder booked centre opening is a TOTAL source stack: select the
-larger of the booked 0.20 mm and the derived retained runout/bearing total.
-Do not add 0.20 mm to that derived total. Closing retains the actual runout;
-the booked opening does not impose an additional symmetric closing penalty.
-Stationary nominal/profile DESIGN records this stack without claiming its
-whole installed-domain qualification, supported UNION or handover.
+The cone/cylinder centre books are TOTAL envelopes: original source-derived
+closing 0.0875 mm and opening 0.20 mm. A named per-count ledger retains whole
+operating support transport, axial stacks/full-bore pivot, actual bore/land
+clearances and own tooth TIR once. A generic bearing/post coupon is not added
+again. Required closing/opening is the larger of its book and actual derived
+directed bound; the physical source domain is never clipped to the book.
+One directed radial remainder supplements only positive shortfalls on each
+side: $[-\max(0,.0875-C_i),+\max(0,.20-O_i)]$. It shares the existing
+driven-centre radial coordinate with the retained full-bore pivot; there are
+not two independent extra coupons. The descriptor binds source, remainder
+and completed enclosures with required closing/opening. Source correlations
+remain explicit; a Cartesian or angular OUTER is not a proof of physical
+radial attainment or inclusion. The per-count bore subtotal/book remainder is
+reported, but a remainder is not a new tolerance grant. Stationary nominal/
+profile DESIGN cannot qualify that whole source, supported UNION or handover.
 
 Signed operating-stall TE loads the physical lower cylinder endpoint in cone
 direction −U and retains the CAM-NOTCH/cone-lock datum, without mean, median,
 home or channel tare. The numerical report captures exact algorithm and
-consumed configuration provenance before and after the calculation, accessor
-values/read sites and the explicit calculation arguments. Registry
+consumed configuration provenance before and after the calculation, including
+the same raw bytes actually compiled/parsed, accessor values/read sites and
+explicit arguments. Unrelated registry cache rows are not frozen inputs.
+Stationary q0 margin selection declares missing own tooth TIR as UNKNOWN;
+it assumes no manufacturing TIR band and cannot turn a held mathematical
+coordinate into a zero-runout acceptance grade. Registry
 title/stock/process/installation wording is reported as metadata outside the
 geometric value identity; dimensional, fit-class and unknown fields remain
 geometric. Changed source bytes cannot be rebound to an old result. No
@@ -500,7 +557,7 @@ does not discharge the physical operating assumptions or the two waivers below.
 
 | term | assumption (`error_budget.yaml reserved:`) | value | allowance |
 |---|---|---:|---:|
-| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`), **on the lobe-up machine** (`reserved.nominal_residual_mae.waive_cam_home_phase`, #749); the as-built CAD's 1.5° common cam phase leaves **0.30 % MAE** that no step removes. The credited residual also carries the **stock-form drive-flank phase** (`error_budget.stock_phase`): cone/cylinder contact at ψ<sub>k</sub> = kπ from the cone-lock home and the crossed 16/64 shaft lag at 4πk, each by actual first contact on the loaded flank, the crank index absorbing only the 64T's home lag (T<sub>i</sub>/120 per cam, reported); contact enclosures, the crank study's bound and the cone/drum oblique-section bound are paid on top. The alignment drum is not a datum (zeroing sets the notches up by eye and parks it), so its contact at an authored drum clocking -- a gauge offset, 0.547° plus half its backlash at the CAD pose -- is not a machine error and is not booked. Deterministic, so spent here, not root-sum-squared; any missing, refused or stale input fails `check:budget` | ideal-mesh 0.007 % MAE (as-built 0.30); with stock-form phase: pending qualified cone and crank rows | 0.05 |
+| nominal residual after correction | table-lookup setting + read-vs-set vector + 2nd-harmonic correction (all in the shipped `READOUT.md`), **on the lobe-up machine** (`reserved.nominal_residual_mae.waive_cam_home_phase`, #749); the as-built CAD's 1.5° common cam phase leaves **0.30 % MAE** that no step removes. The credited residual also carries the **stock-form drive-flank phase** (`error_budget.stock_phase`): each cone row's actual 3D q0 signed running TE at ψ<sub>k</sub> = kπ from the operating notch-up setup (untared; no planar recompute), plus the crossed 16/64 study's shaft lag at 4πk reaching each cylinder at the ideal T<sub>i</sub>/120, the crank index absorbing only the 64T's home lag (T<sub>i</sub>/120 per cam, reported). Paid on top: each read's half-width over the budget clock-nominal subdomain (robust, credited; nominal pose, reported; each carrying its reference's numerical bound), the crank study's bound at T<sub>i</sub>/120, wherever the shaft shifts the cone off a read the row's whole-period signed TE interval span once, and each drum's tooth-pattern-to-CAM-NOTCH clock: ± `fits.cone_drum_oblique_mesh.drum_tooth_to_cam_notch_clock_deg` in cam radians directly (not T<sub>i</sub>/120, not ×i), nominal 0, on all 20×21 reads including k = 0, never tared or indexed out. The cone rows exclude exactly `cone_flat_free_clock`, `BoreFlatClock` and `drum_tooth_to_cam_notch_clock`, so each is paid once; a missing grade fails closed, never 0. The alignment drum is not a datum (zeroing sets the notches up by eye and parks it), so its contact at an authored drum clocking -- a gauge offset, 0.547° plus half its backlash at the CAD pose -- is not a machine error and is not booked. Deterministic, so spent here, not root-sum-squared; any missing, refused or stale input fails `check:budget` | ideal-mesh 0.007 % MAE (as-built 0.30); with stock-form phase: pending qualified cone and crank rows | 0.05 |
 | ordinate readout | ±0.075 mm reading uncertainty assumes a 0.15 mm technical-pen line; the CAD marker does not establish that performance. Loaded spring stiffness and the CAD wheel ratio give 2.089 mm per full-scale bar at the 66 mm clamp setting, or **7.180 bars** of ordinate capacity. Broad input scales are 0.338 (all ones), 0.673 (half rectangle/lifted square), and 0.809 (Gaussian). The sparse pair uses the built 165 mm radius but reaches only 13.401 mm of the 15 mm half-stroke. Each coefficient carries its own reading error and the k=0 normalizer's; `closed_form.readout` evaluates both through the actual stroke fill | 0.257 % MAE | 0.30 |
 | timebase | stop the crank at 2k turns, repeatable to ±8° (uniform). Evaluate the shifted physical trace through the readout procedure, with the correction evaluated at the intended index; do not substitute the ideal Fourier-vector slope | 0.255 % FS | 0.30 |
 | knife-edge hysteresis | rolling-resistance length 0.005 mm at each case's **rest/preload force sum**. The worst broad cases, half rectangle and lifted square, each conservatively load the knife to 138.436 N and require 47.537 N counter force at 351.700 mm inside length. The configured neutral CAD case alone is 136.615 N / 46.912 N; it is not a universal preload. The conservative numerator sums force magnitudes and the report also gives the smaller resolved vertical load. The stall denominator remains the neutral small-signal loaded lift response, not a station-exact or cycle-peak transfer. Broad-input result is 0.187%, sparse pair 0.625%. Confirm gravity, operating loads, contact material/finish and reversal trace width before treating this allowance as demonstrated hardware performance | 0.187 % FS | 0.45 |

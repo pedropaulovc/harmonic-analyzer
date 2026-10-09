@@ -96,6 +96,7 @@ def source_sha256() -> dict[str, str]:
         scripts / "dt_cylinder_gear_spec.py",
         scripts / "stock_form_cutter.py",
         scripts / "stock_form_mesh.py",
+        scripts / "_config.py",
         scripts / "_fit_limits.py",
         scripts / "_printed_tolerance.py",
         scripts.parent / "config" / "tolerances.yaml",
@@ -106,6 +107,46 @@ def source_sha256() -> dict[str, str]:
         str(path.relative_to(repo)).replace("\\", "/"): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in paths
     }
+
+
+def require_authentic_source_capture(payload: dict) -> None:
+    """Pay actual compiled/parsed bytes, not merely unchanged files after import."""
+    capture = payload.get("source_capture")
+    if not isinstance(capture, dict) or capture.get("source_bytes_stable") is not True:
+        raise ValueError("alignment actual compiled/parsed source capture is missing or changed")
+    names = (
+        "actual_compiled_project_sha256", "actual_parsed_config_sha256",
+        "before_design_sha256", "after_design_sha256",
+    )
+    if any(not isinstance(capture.get(name), dict) or not capture[name] for name in names):
+        raise ValueError("alignment before/compiled/parsed/after manifests are incomplete")
+    compiled, parsed, before, after = (capture[name] for name in names)
+    if compiled.keys() & parsed.keys():
+        raise ValueError("alignment project and configuration capture scopes overlap")
+    actual = {**compiled, **parsed}
+    if before != actual or after != actual:
+        raise ValueError("alignment compiled/parsed/before/after source bytes differ")
+    if any(
+        not isinstance(path, str) or not path.startswith("cad/scripts/") or not path.endswith(".py")
+        for path in compiled
+    ) or any(
+        not isinstance(path, str) or not path.startswith("cad/config/") or not path.endswith(".yaml")
+        for path in parsed
+    ):
+        raise ValueError("alignment captured source scope is invalid")
+    required = source_sha256()
+    if any(actual.get(path) != digest for path, digest in required.items()):
+        raise ValueError("alignment capture omits a required live geometry/algorithm source")
+    repo = Path(__file__).resolve().parents[2]
+    for path, digest in actual.items():
+        resolved = (repo / path).resolve()
+        if not resolved.is_relative_to(repo) or resolved.relative_to(repo).as_posix() != path or (
+            not isinstance(digest, str) or len(digest) != 64
+            or any(char not in "0123456789abcdef" for char in digest)
+        ):
+            raise ValueError(f"alignment captured source path/digest is invalid: {path}")
+        if not resolved.is_file() or hashlib.sha256(resolved.read_bytes()).hexdigest() != digest:
+            raise ValueError(f"alignment actually loaded source identity is stale: {path}")
 
 
 def qualification_failures(case: dict) -> tuple[str, ...]:
@@ -193,6 +234,7 @@ def require_qualified(payload: dict | None = None) -> dict:
         raise ValueError("alignment calibration geometry identity is stale")
     if payload.get("source_sha256") != source_sha256():
         raise ValueError("alignment calibration algorithm/source identity is stale")
+    require_authentic_source_capture(payload)
     cases = payload["cases"]
     if not isinstance(cases, dict) or set(cases) != set(expected_geometry["cases"]):
         raise ValueError("alignment calibration lacks the exact whole booked corner family")

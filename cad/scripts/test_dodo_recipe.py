@@ -157,6 +157,187 @@ def test_release_revision_source_invalidates_native_and_drawing_tasks():
     assert revision_source in drawing["file_dep"]
 
 
+@pytest.fixture
+def isolated_calibration_keys(tmp_path, monkeypatch):
+    """Real task/key boundaries over a bounded, source-only CAD import closure."""
+    import _buildgraph as bg
+    import _drawing_registry as registry
+    from dataclasses import replace
+
+    dodo = _load_dodo()
+    root = tmp_path / "repo"
+    cad = root / "cad"
+    scripts = cad / "scripts"
+    scripts.mkdir(parents=True)
+    config = cad / "config"
+    config.mkdir()
+    calibration = cad / "calibration"
+    calibration.mkdir()
+    packet = calibration / "selected-form.json"
+    # These are cache-test bytes, never loaded as a geometric calibration.
+    packet.write_text('{"fixture_revision": "before"}\n', encoding="utf-8")
+    unrelated_json = calibration / "unrelated-form.json"
+    unrelated_json.write_text('{"fixture_revision": "before"}\n', encoding="utf-8")
+    report = cad / "out" / "reports" / "selected-form.json"
+    report.parent.mkdir(parents=True)
+    report.write_text('{"fixture_revision": "before"}\n', encoding="utf-8")
+    sources = {
+        "build_calibrated.py": "from fixture_spec import profile\n",
+        "build_unrelated.py": 'REPORT = "out/reports/selected-form.json"\n',
+        "draw_calibrated.py": "from fixture_spec import profile\n",
+        "draw_unrelated.py": 'BARE_JSON = "unrelated-form.json"\n',
+        "fixture_spec.py": "from fixture_reader import read_packet\n"
+        "def profile():\n    return read_packet()\n",
+        "fixture_reader.py": "from pathlib import Path\n"
+        "def read_packet():\n"
+        "    packet = Path(__file__).resolve().parents[1] / "
+        "'calibration/selected-form.json'\n"
+        "    return packet.read_text()\n",
+        "build_calibrated_parent_assembly.py": "from fixture_spec import profile\n"
+        "async def build(adapter):\n"
+        "    await place_component(adapter, 'calibrated', pos, rot, rows)\n",
+        "build_unrelated_parent_assembly.py": "async def build(adapter):\n"
+        "    await place_component(adapter, 'unrelated', pos, rot, rows)\n",
+    }
+    for name, source in sources.items():
+        (scripts / name).write_text(source, encoding="utf-8")
+    assemblies = ("calibrated_parent", "unrelated_parent")
+    for module in (dodo, bg):
+        monkeypatch.setattr(module, "SCRIPTS_DIR", scripts)
+        monkeypatch.setattr(module, "CONFIG_DIR", config)
+        monkeypatch.setattr(module, "CAD_OUT", cad / "out")
+        monkeypatch.setattr(module, "ASSEMBLY_ORDER", assemblies)
+    monkeypatch.setattr(bg, "REFERENCES_DIR", cad / "references")
+    monkeypatch.setattr(bg, "ASSEMBLY_CONTRACT_DIR", config / "assemblies")
+    monkeypatch.setattr(dodo, "REPO_ROOT", root)
+    monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
+    revision = config / "release.yaml"
+    revision.write_text("next_revision: fixture\n", encoding="utf-8")
+    monkeypatch.setattr(dodo, "RELEASE_VERSION_FILE", revision)
+    template = cad / "templates" / "fixture.PRTDOT"
+    template.parent.mkdir()
+    template.write_bytes(b"fixed part template")
+    monkeypatch.setattr(dodo, "PART_TEMPLATE", template)
+    for function in ("_submodule_part_dep", "_submodule_assembly_dep", "_submodule_dep"):
+        adapter = root / f".{function}.digest"
+        adapter.write_bytes(b"fixed adapter input\n")
+        monkeypatch.setattr(dodo, function, lambda path=str(adapter): path)
+    monkeypatch.setattr(registry, "SCRIPTS_DIR", scripts)
+    monkeypatch.setattr(registry, "CAD_ROOT", cad)
+    monkeypatch.setattr(registry, "LAYOUT_REPORT_DIR", report.parent / "layout-audit")
+    drawing_template = template.with_suffix(".DRWDOT")
+    drawing_template.write_bytes(b"fixed drawing template")
+    monkeypatch.setattr(
+        registry,
+        "DRAWING_TEMPLATES",
+        {
+            layout: replace(spec, path=drawing_template)
+            for layout, spec in registry.DRAWING_TEMPLATES.items()
+        },
+    )
+    monkeypatch.setattr(
+        dodo,
+        "DRAWINGS_BY_NAME",
+        {
+            stem: registry.DrawingSpec(
+                stem, stem, stem, f"draw_{stem}.py", registry.DrawingLayout.LANDSCAPE
+            )
+            for stem in ("calibrated", "unrelated")
+        },
+    )
+
+    def clear_closure():
+        bg.clear_import_caches()
+        bg.config_files_of.cache_clear()
+        bg._stamping_modules.cache_clear()
+        dodo._ARTEFACT_DIGEST_MEMO.clear()
+
+    def tasks():
+        return {
+            f"{family}:{task['name']}": task
+            for family, generator in (
+                ("part", dodo.task_part),
+                ("assembly", dodo.task_assembly),
+                ("drawing", dodo.task_drawing),
+            )
+            for task in generator()
+        }
+
+    clear_closure()
+    dodo._ARTEFACT_INDEX = None
+    for task in tasks().values():
+        for target in task["targets"]:
+            path = Path(target)
+            assert path.resolve().is_relative_to(root.resolve()), path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"a" * 64 + b"\n")
+
+    def snapshot():
+        clear_closure()
+        current = tasks()
+        result = {}
+        for label, task in current.items():
+            deps = task["file_dep"]
+            assert all(
+                Path(path).resolve().is_relative_to(root.resolve()) for path in deps
+            ), label
+            result[label] = (dodo._digest_files(deps), dodo._cache_key(deps, label))
+        return current, result
+
+    try:
+        yield dodo, packet, unrelated_json, report, snapshot
+    finally:
+        clear_closure()
+
+
+def test_calibration_dependency_reaches_task_recipes_and_rekeys_only_consumers(
+    isolated_calibration_keys,
+):
+    dodo, packet, unrelated_json, report, snapshot = isolated_calibration_keys
+    tasks, before = snapshot()
+    consumers = {"part:calibrated", "assembly:calibrated_parent", "drawing:calibrated"}
+    for label, task in tasks.items():
+        assert (str(packet.resolve()) in task["file_dep"]) == (label in consumers), label
+        assert str(unrelated_json.resolve()) not in task["file_dep"], label
+        assert str(report.resolve()) not in task["file_dep"], label
+    recipe = dodo._recipe_files("calibrated_parent")
+    assert str(packet.resolve()) in recipe
+    task = _FakeTask()
+    dodo._RecipeTracker("calibrated_parent", recipe)(task, {})
+    saved = task.saved()
+
+    for ignored in (unrelated_json, report):
+        ignored.write_text('{"fixture_revision": "after"}\n', encoding="utf-8")
+    assert snapshot()[1] == before
+    packet.write_text('{"fixture_revision": "after"}\n', encoding="utf-8")
+    current, after = snapshot()
+    for label in before:
+        if label in consumers:
+            assert all(a != b for a, b in zip(before[label], after[label])), label
+        else:
+            assert after[label] == before[label], label
+    assert dodo._RecipeTracker("calibrated_parent", recipe)(_FakeTask(), saved) is False
+    assert current.keys() == tasks.keys()
+
+
+def test_calibration_dependency_remains_in_task_inputs_when_deleted(
+    isolated_calibration_keys,
+):
+    dodo, packet, _unrelated_json, _report, snapshot = isolated_calibration_keys
+    _tasks, before = snapshot()
+    packet.unlink()
+    tasks, after = snapshot()
+    consumers = {"part:calibrated", "assembly:calibrated_parent", "drawing:calibrated"}
+    for label in consumers:
+        deps = tasks[label]["file_dep"]
+        assert str(packet.resolve()) in deps
+        assert all(a != b for a, b in zip(before[label], after[label])), label
+        _key, inputs = dodo._cache.key_inputs(deps, dodo.ContentChecker._digest)
+        assert ("cad/calibration/selected-form.json", "<missing>") in inputs
+    for label in tasks.keys() - consumers:
+        assert after[label] == before[label], label
+
+
 def test_drawing_tasks_depend_on_all_selected_layout_templates():
     dodo = _load_dodo()
     tasks = {task["name"]: task for task in dodo.task_drawing()}
@@ -3049,6 +3230,178 @@ def test_check_gates_depend_on_everything_they_execute():
         f"check:{name} misses {len(paths)}: {', '.join(paths)}"
         for name, paths in sorted(gaps.items())
     )
+
+
+def test_calibration_check_named_runtime_inputs_have_no_fixture_phantoms():
+    """Named check data must exist, except the two authentic unpublished packets."""
+    dodo = _load_dodo()
+    tasks = {task["name"]: task for task in dodo.task_check()}
+    assert tasks.keys() == set(dodo._CHECK_NAMES) | set(dodo._OPTIONAL_CHECK_NAMES)
+    assert {"graph", "recipe", "budget", "nameplate"} <= tasks.keys()
+    cad = dodo.SCRIPTS_DIR.parent.resolve()
+    references = cad / "references"
+    calibration = cad / "calibration"
+    packets = {
+        calibration / "dt-cone-stock-form.json",
+        calibration / "dt-crank-stock-form.json",
+    }
+    named = {}
+    for name, task in tasks.items():
+        # Deliberately not every file_dep: some gates require generated/farm data.
+        named[name] = {
+            path
+            for dependency in task["file_dep"]
+            for path in (Path(dependency).resolve(),)
+            if (
+                path.suffix.lower() in {".dxf", ".dwg"}
+                and path.parent == references
+            ) or (
+                path.suffix == ".json" and path.is_relative_to(calibration)
+            )
+        }
+        missing = {
+            path.relative_to(REPO_ROOT).as_posix()
+            for path in named[name]
+            if path not in packets and not path.is_file()
+        }
+        assert not missing, f"check:{name} requires fixture/nonexistent data: {missing}"
+    for name in ("budget", "recipe"):
+        assert packets <= named[name], f"check:{name} misses an authentic stock packet"
+    assert references / "fr-nameplate-engraving.dxf" in named["nameplate"]
+
+
+
+
+@pytest.fixture(params=("dt-cone-stock-form.json", "dt-crank-stock-form.json"))
+def isolated_calibration_check_keys(tmp_path, monkeypatch, request):
+    """Copy four real source-only check tasks' inputs; never run their actions."""
+    dodo = _load_dodo()
+    selected = {"budget", "recipe", "graph", "nameplate"}
+    original_tasks = {
+        task["name"]: task for task in dodo.task_check() if task["name"] in selected
+    }
+    assert original_tasks.keys() == selected
+    original_packets = {
+        (REPO_ROOT / "cad" / "calibration" / name).resolve()
+        for name in ("dt-cone-stock-form.json", "dt-crank-stock-form.json")
+    }
+    original_packet = (
+        REPO_ROOT / "cad" / "calibration" / request.param
+    ).resolve()
+    for name, task in original_tasks.items():
+        for packet in original_packets:
+            assert (str(packet) in task["file_dep"]) == (
+                name in {"budget", "recipe"}
+            ), (name, packet.name)
+
+    root = tmp_path / "repo"
+    paths = {
+        path
+        for task in original_tasks.values()
+        for path in (*task["file_dep"], *task["targets"])
+    }
+    mapped = {
+        path: root / Path(path).resolve().relative_to(REPO_ROOT) for path in paths
+    }
+    for task in original_tasks.values():
+        for path in task["file_dep"]:
+            original = Path(path).resolve()
+            copied = mapped[path]
+            if original == original_packet:
+                continue
+            if not original.is_file():
+                assert original in original_packets, (
+                    f"check:{task['name']} missing source: {original}"
+                )
+                continue
+            copied.parent.mkdir(parents=True, exist_ok=True)
+            copied.write_bytes(original.read_bytes())
+    tasks = {
+        name: {
+            **task,
+            "file_dep": [str(mapped[path]) for path in task["file_dep"]],
+            "targets": [str(mapped[path]) for path in task["targets"]],
+        }
+        for name, task in original_tasks.items()
+    }
+    packet = root / original_packet.relative_to(REPO_ROOT)
+    packet.parent.mkdir(parents=True, exist_ok=True)
+    # Cache/freshness test bytes only; no real calibration schema is supplied.
+    packet.write_text('{"fixture_revision": "before"}\n', encoding="utf-8")
+    unrelated = packet.with_name("unrelated-form.json")
+    report = root / "cad" / "out" / "reports" / packet.name
+    for ignored in (unrelated, report):
+        ignored.parent.mkdir(parents=True, exist_ok=True)
+        ignored.write_text('{"fixture_revision": "before"}\n', encoding="utf-8")
+    for task in tasks.values():
+        stamp = Path(task["targets"][0])
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text("previous successful check\n", encoding="utf-8")
+    monkeypatch.setattr(dodo, "REPO_ROOT", root)
+    monkeypatch.setattr(dodo._cache, "REPO_ROOT", root)
+    dodo._ARTEFACT_INDEX = {}
+
+    def snapshot():
+        return {
+            name: (
+                dodo._digest_files(task["file_dep"]),
+                dodo._cache_key(task["file_dep"], f"check:{name}"),
+            )
+            for name, task in tasks.items()
+        }
+
+    return dodo, tasks, packet, unrelated, report, snapshot
+
+
+def test_calibration_check_gates_rekey_and_stale_saved_stamps_on_packet_republish(
+    isolated_calibration_check_keys,
+):
+    dodo, tasks, packet, unrelated, report, snapshot = isolated_calibration_check_keys
+    before = snapshot()
+    checker = dodo.ContentChecker()
+    state = checker.get_state(str(packet), None)
+    stamps = {
+        name: Path(task["targets"][0]).read_bytes() for name, task in tasks.items()
+    }
+    for name, task in tasks.items():
+        assert str(unrelated) not in task["file_dep"], name
+        assert str(report) not in task["file_dep"], name
+    for ignored in (unrelated, report):
+        ignored.write_text('{"fixture_revision": "after"}\n', encoding="utf-8")
+    assert snapshot() == before
+
+    packet.write_text('{"fixture_revision": "after"}\n', encoding="utf-8")
+    os.utime(packet, (state[0] + 10, state[0] + 10))
+    after = snapshot()
+    for name in ("budget", "recipe"):
+        assert str(packet) in tasks[name]["file_dep"]
+        assert checker.check_modified(str(packet), packet.stat(), state) is True
+        assert all(a != b for a, b in zip(before[name], after[name])), name
+    assert after["nameplate"] == before["nameplate"]
+    assert after["graph"] == before["graph"]
+    # The saved .ok files still exist, but changed declared input invalidates them.
+    assert {
+        name: Path(task["targets"][0]).read_bytes() for name, task in tasks.items()
+    } == stamps
+
+
+def test_calibration_check_gates_keep_missing_packet_as_required_input(
+    isolated_calibration_check_keys,
+):
+    dodo, tasks, packet, _unrelated, _report, snapshot = isolated_calibration_check_keys
+    before = snapshot()
+    packet.unlink()
+    after = snapshot()
+    for name in ("budget", "recipe"):
+        deps = tasks[name]["file_dep"]
+        assert str(packet) in deps
+        assert all(a != b for a, b in zip(before[name], after[name])), name
+        _key, inputs = dodo._cache.key_inputs(deps, dodo.ContentChecker._digest)
+        assert (packet.relative_to(dodo.REPO_ROOT).as_posix(), "<missing>") in inputs
+        with pytest.raises(FileNotFoundError):
+            dodo.ContentChecker().get_state(str(packet), None)
+    assert after["nameplate"] == before["nameplate"]
+    assert after["graph"] == before["graph"]
 
 
 def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():

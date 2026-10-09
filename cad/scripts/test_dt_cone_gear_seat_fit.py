@@ -145,9 +145,9 @@ def test_the_flat_is_a_true_chord_clocked_to_one_place() -> None:
     ) >= lands.TERMINAL_FLAT_EDGE_BREAK_MAX
 
 
-def test_the_band_upper_is_the_lower_of_its_two_named_limits() -> None:
-    # A later land or web change re-derives the band instead of silently
-    # breaking the T006 web or the seat window.
+def test_retained_seat_band_is_input_and_qualified_web_is_acceptance() -> None:
+    # Selected cutter geometry must meet the retained fit; it must not make
+    # its own numerical producer depend on an unpublished output floor first.
     assert spec.BORE_BAND_FIT_UPPER == pytest.approx(
         min(
             seat_bore_band(band)[0]
@@ -163,11 +163,11 @@ def test_the_band_upper_is_the_lower_of_its_two_named_limits() -> None:
         - math.ceil(spec.bore_dia_mm(teeth) * scale - 1e-9) / scale
         for teeth, minimum in spec.TERMINAL_WEB_REQUIREMENTS_MM.items()
     )
-    assert spec.BORE_BAND_WEB_UPPER <= web_cap + 1e-9
-    assert web_cap - spec.BORE_BAND_WEB_UPPER < 1.0 / scale + 1e-9
-    assert spec.BORE_DIA_BAND[0] == pytest.approx(
-        min(spec.BORE_BAND_FIT_UPPER, spec.BORE_BAND_WEB_UPPER)
-    )
+    cutter_cap = spec.terminal_web_bore_upper_mm()
+    assert cutter_cap <= web_cap + 1e-9
+    assert web_cap - cutter_cap < 1.0 / scale + 1e-9
+    assert spec.BORE_DIA_BAND[0] == pytest.approx(spec.BORE_BAND_FIT_UPPER)
+    assert spec.BORE_DIA_BAND[0] <= cutter_cap + 1e-9
     assert spec.BORE_DIA_BAND[1] == pytest.approx(spec.BORE_BAND_LOWER)
 
 
@@ -184,14 +184,10 @@ def test_both_terminal_web_guards_read_the_current_cutter_and_bore() -> None:
 def _actual_clock_fit(teeth):
     section = spec.land_section(teeth)
     nominal_dia = spec.bore_dia_mm(teeth)
-    nominal_af = lands.SECTION_FLAT_AF[section]
-    dia = (
-        lands.TERMINAL_FINISHED_DIA_LIMITS_MM
-        if section == len(lands.SECTION_DIA_BANDS)-1
-        else tuple(nominal_dia+value for value in reversed(lands.SECTION_DIA_BANDS[section]))
-    )
-    shaft_af = tuple(nominal_af+value for value in reversed(lands.FLAT_AF_BAND))
-    bore_af = tuple(spec.bore_flat_af_mm(teeth)+value for value in reversed(spec.BORE_AF_BAND))
+    dia = lands.land_finished_dia_limits_mm(nominal_dia, section)
+    shaft_af = lands.land_finished_af_limits_mm(section)
+    printed_bore_af = round(spec.bore_flat_af_mm(teeth), spec.BORE_AF_PLACES)
+    bore_af = tuple(printed_bore_af + value for value in reversed(spec.BORE_AF_BAND))
     edge = _config.title_block("edge_break")
     edge_break = (
         lands.TERMINAL_FLAT_EDGE_BREAK_MAX

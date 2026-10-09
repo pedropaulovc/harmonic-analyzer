@@ -1,10 +1,9 @@
-"""Re-derive the cutter-native cone design from config, actual forms and settings.
+"""Production gates for the real source-qualified cutter-native cone packet.
 
-Supported branch-existence coverage is deliberately NOT a true contact ratio.
-Its retained named floors are separate from full-period carrying contact and
-continuous handover. Actual process/tip/thickness corners and numerical bounds
-are paid by the design solver. The three-dimensional oblique contact/TE study
-is an additional acceptance, never substituted by this deep planar screen.
+Actual 3D UNION, untared reads, full-source continuation and RootSweep proofs
+are produced once by the explicit collector, not silently recomputed during a
+native build. The reader checks that whole ALL20 packet and actual core
+manufactured profiles. Faithful synthetic reader tests live separately.
 """
 
 from __future__ import annotations
@@ -16,6 +15,7 @@ import pytest
 import _config
 import cone_line
 import dt_cone_gear_spec as spec
+import dt_cone_mesh_domain as domain_supplier
 import dt_cylinder_gear_spec as drum
 from diagnostics import solve_stock_form_cones as solve
 from stock_form_cutter import translation_for_pitch_tooth_thickness
@@ -39,16 +39,12 @@ def test_inputs_match_the_configured_train(inputs: solve.DesignInputs) -> None:
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_every_count_is_selected_or_explicitly_refused(teeth: int) -> None:
+def test_every_count_has_complete_actual_qualified_authority(teeth: int) -> None:
+    spec.require_qualified_stock_family()
     data = spec.stock_form_mesh_data(teeth)
-    assert data["qualification"] in {"qualified", "refused"}
-    if data["qualification"] == "refused":
-        assert data["refusal"]
-        with pytest.raises(ValueError, match="refused"):
-            spec.stock_form_profile(teeth)
-    else:
-        assert not data["refusal"]
-        assert spec.stock_form_profile(teeth).teeth == teeth
+    assert data["qualification"] == "qualified"
+    assert data["refusal"] is None
+    assert spec.stock_form_profile(teeth).teeth == teeth
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
@@ -57,7 +53,7 @@ def test_printed_setting_is_actual_and_quantized(teeth: int) -> None:
     outside = spec.outside_dia_mm(teeth)
     thickness = spec.tooth_thickness_mm(teeth)
     assert outside == round(outside, 2)
-    assert thickness == round(thickness, 3)
+    assert thickness == pytest.approx(round(thickness, 3), abs=1e-9)
     assert profile.blank_radius_mm == pytest.approx(outside / 2.0)
     assert profile.pitch_tooth_thickness_mm == pytest.approx(thickness, abs=1e-9)
     assert profile.radial_translation_mm == pytest.approx(
@@ -74,53 +70,51 @@ def test_printed_setting_is_actual_and_quantized(teeth: int) -> None:
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_printed_mesh_meets_its_actual_design_rules(teeth: int, inputs: solve.DesignInputs) -> None:
-    """Refused designs fail the production gate rather than gaining a fallback."""
-    from diagnostics import oblique_cone_mesh_study as study
-
-    profile = spec.stock_form_profile(teeth)
-    domain = solve._translation_domain(teeth, profile.template, inputs)
-    translations = solve._corner_translations(teeth, profile.template, spec.tooth_thickness_mm(teeth), domain)
-    geometry_margins = solve.geometry_margins(
-        teeth, spec.outside_dia_mm(teeth), translations, profile.template, inputs,
-    )
-    assert min(geometry_margins.values()) >= 0.0
-    geometry, home = solve.oblique_section_geometry(teeth), solve.home_clocking_rad(teeth)
-    pair = study.ContactPair(
-        f"cone T{teeth:03d} acceptance", profile, inputs.drum_nominal,
-        study.placement_from_geometry(geometry, home),
-    )
-    cone_corners = spec.manufacturing_corner_profiles(teeth)
-    pose_domain = study.configured_pose_domain(
-        teeth, inputs, cone_radius_upper_mm=max(corner.blank_radius_mm for corner in cone_corners),
-    )
-    ball = (
-        study.profile_motion_ball(profile, cone_corners)
-        + study.profile_motion_ball(inputs.drum_nominal, inputs.drum_corners)
-    )
-    radial, axial = study.complete_pose_errors(pair, pose_domain, profile_motion_mm=ball)
-    cam_clearance = study.configured_cam_exclusion(
-        pair, radial_error_mm=radial, profile_motion_mm=ball,
-    )
-    assert cam_clearance["qualified"], cam_clearance
-    actual = study.qualify_actual_pair(
-        pair, pose_ball_mm=ball, phases=129, maximum_error_mm=inputs.maximum_error_mm,
-        radial_error_mm=radial, axial_error_mm=axial,
-        read_phases_rad=tuple(-k * math.pi for k in range(21)),
-        planar_centre_mm=inputs.centre_mm(teeth), home=home,
-    )
-    assert actual["qualification"] == "qualified", actual
-    assert min(actual["margins"].values()) >= 0.0, actual
-    assert actual["margins"]["cone_root_air_mm"] >= 0.0, actual
-    assert actual["margins"]["drum_root_air_mm"] >= 0.0, actual
-    # Main's final gate is ALL-count actual 3D branch UNION, including real
-    # finite corners/edges. The old small-count FF/CR floors are comparisons.
-    required = solve.UNION_COVERAGE_MIN
+def test_actual_packet_meets_all_retained_rules(teeth: int) -> None:
+    packet = spec.require_qualified_stock_family()
+    row = next(row for row in packet["rows"] if row["teeth"] == teeth)
+    selected = next(candidate for candidate in row["candidates"]
+                    if candidate["setting"] == row["selected"])
+    assert len(selected["actual_profile_cases"]) == 17
+    for case in selected["actual_profile_cases"]:
+        actual = case["calculation"]
+        assert actual["qualification"] == "qualified"
+        assert min(actual["margins"].values()) >= 0.0
+        assert actual["all_corner_actual3d"]["stock_form_coverage_lower"] >= solve.UNION_COVERAGE_MIN
+        full = actual["all_corner_actual3d"]
+        assert full["production_source_qualified"] is True
+        assert full["continuous_source_domain"]["scope"] == "FULL_PRODUCTION_SOURCE_DOMAIN"
+        assert full["continuous_source_domain"]["production_source_domain"] is True
+        for role, scope in (
+            ("nominal_actual3d", "DESIGN_NOMINAL_SUBDOMAIN"),
+            ("budget_actual3d", "BUDGET_CLOCK_NOMINAL_SUBDOMAIN"),
+        ):
+            subdomain = actual[role]
+            assert subdomain["source_domain_proved"] is True
+            assert subdomain["continuous_source_domain"]["scope"] == scope
+            assert subdomain["continuous_source_domain"]["production_source_domain"] is False
+            assert [read["actual_driver_phase_rad"] for read in subdomain["actual_read_phases"]] == [
+                -index * math.pi for index in range(21)
+            ]
+            assert all(read["direct_actual_phase_query"] is True
+                       and read["periodic_point_substitution"] is False
+                       for read in subdomain["actual_read_phases"])
+        assert actual["signed_read_matrix"]["all_reads_bounded"]
+        for cell in actual["full_period_cells"]:
+            proof = cell["root_air"]
+            assert proof["qualified"] and not proof["root_is_carrying"]
+            assert proof["driver_root_air_lower_mm"] >= spec.ROOT_AIR_MIN_MM
+            assert proof["driven_root_air_lower_mm"] >= spec.DRUM_ROOT_AIR_MIN_MM
+            assert proof["driver_root_proof"]["status"] == "PROVED"
+            reverse = proof["driven_root_material_proof"]
+            assert reverse["proof_schema"] == "finite-stock-directed-root-material/1"
+            assert reverse["root_owner"] == "driven"
+            assert reverse["root_air_lower_mm"] == proof["driven_root_air_lower_mm"]
+            assert reverse["material_sweep"]["status"] == "PROVED"
     frozen = spec.stock_form_mesh_data(teeth)
-    coverage_min = actual["all_corner_actual3d"]["stock_form_coverage_lower"]
-    assert coverage_min >= required, actual
-    assert frozen["coverage_min"] == pytest.approx(coverage_min, abs=1e-9)
-    assert frozen["oblique_phase_bound_rad"] == pytest.approx(actual["oblique_phase_bound_rad"], abs=1e-9)
+    assert frozen["coverage_min"] >= solve.UNION_COVERAGE_MIN
+    assert frozen["oblique_phase_bound_rad"] == pytest.approx(row["oblique_phase_bound_rad"])
+    assert frozen["oblique_phase_bound_excluded_terms"] == spec.OBLIQUE_PHASE_EXCLUDED_TERMS
     assert frozen["phase_reserve_rad"] >= 0.0
     assert frozen["noncarrying_gap_mm"] >= 0.0
     assert frozen["te_bound_rad"] >= 0.0
@@ -131,10 +125,11 @@ def test_actual_tool_corners_pay_support_land_floor_and_web(teeth: int, inputs: 
     profiles = spec.manufacturing_corner_profiles(teeth)
     assert len(profiles) == 4
     minimum, maximum = spec.floor_limits_mm(teeth)
-    assert maximum - minimum >= 0.04 - 1e-9
-    closing = inputs.centre_mm(teeth) - inputs.runout_mm
-    assert closing - max(gear.blank_radius_mm for gear in inputs.drum_corners) - maximum / 2.0 >= 0.02 - 1e-9
-    assert closing - max(gear.blank_radius_mm for gear in inputs.drum_corners) - (maximum + 0.001) / 2.0 < 0.02 + 1e-9
+    assert 0.0 < minimum < maximum
+    # Actual RootArc extrema define the inspection witness. A RootMAX filled
+    # disk/scalar centre-air screen is not a collision or no-solution proof.
+    assert minimum <= 2.0 * min(profile.root_radius_min_mm for profile in profiles)
+    assert maximum >= 2.0 * max(profile.root_radius_max_mm for profile in profiles)
     for profile in profiles:
         assert profile.blank_radius_mm <= profile.support_radius_max_mm
         assert profile.tip_land_mm >= max(0.10, 0.25 * spec.MODULE_MM)
@@ -161,12 +156,17 @@ def test_fixed_drum_uses_real_finite_process_corners() -> None:
 
 
 @pytest.mark.parametrize("teeth", spec.CONFIGURATION_TEETH)
-def test_frozen_planar_centre_and_physical_zero_follow_source(teeth: int, inputs: solve.DesignInputs) -> None:
+def test_operating_notch_up_is_a_physical_setup_not_a_planar_tare(teeth: int, inputs: solve.DesignInputs) -> None:
     data = spec.stock_form_mesh_data(teeth)
+    placement = domain_supplier.nominal_placement_record(teeth)
     assert data["centre_mm"] == pytest.approx(inputs.centre_mm(teeth))
-    assert data["home_clocking_rad"] == pytest.approx(solve.home_clocking_rad(teeth))
-    assert solve.home_clocking_rad(teeth)[0] == pytest.approx(math.pi / teeth)
-    assert solve.home_clocking_rad(teeth)[1] == pytest.approx(-math.radians(_config.machine("gear_train", "cylinder_lock_phase_deg")))
+    assert "home_gap_clocking_rad" not in data
+    assert "home_clocking_rad" not in data
+    assert placement["driver_clocking_rad"] == pytest.approx(math.pi / teeth)
+    assert placement["driven_clocking_rad"] == pytest.approx(math.pi)
+    datum = domain_supplier.manufactured_datum_mapping(teeth)
+    assert datum["mechanical_zero_rad"] == {"driver": 0.0, "driven": math.pi}
+    assert datum["datum_tare_rad"] is None
 
 
 def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:

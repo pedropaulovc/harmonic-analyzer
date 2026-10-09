@@ -13,7 +13,7 @@ surface/root engine. Their absence is UNKNOWN, never physical infeasibility.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 from typing import Callable
 
@@ -218,7 +218,10 @@ def _squared_norm(vector):
         lo = (Interval.point(lower) * lower).lower
         hi = (Interval.point(upper) * upper).upper
         result += Interval(max(0.0, lo), hi)
-    return result
+    # Generic outward addition can take an exact zero lower sum one ULP
+    # negative. The sum of these correlated squares is KNOWN nonnegative;
+    # intersect only this proved domain, never weaken sqrt's input guard.
+    return Interval(max(0.0,result.lower),result.upper)
 
 
 def _matvec(matrix, vector):
@@ -377,6 +380,18 @@ def frame_inverse_bounds(frame):
     return tuple(tuple(value / determinant for value in row) for row in zip(*columns))
 
 
+def operator_norm_upper(matrix):
+    """Outward Euclidean operator bound from the actual interval Gram matrix."""
+    rows = tuple(tuple(_interval(value) for value in row) for row in matrix)
+    if not rows or not rows[0] or any(len(row) != len(rows[0]) for row in rows):
+        raise ValueError("operator norm requires a nonempty rectangular matrix")
+    size = len(rows[0])
+    gram = tuple(tuple(sum(row[i]*row[j] for row in rows) for j in range(size))
+                 for i in range(size))
+    squared = max(sum(Interval.point(value.magnitude) for value in row).upper for row in gram)
+    return sqrt_bounds(Interval.point(squared)).upper
+
+
 def _body_pose(pair, body, source, actual_angle):
     p = pair.placement
     n = len(actual_angle.derivative)
@@ -523,6 +538,7 @@ class ChartEvaluation:
     driven_moment: Interval
     cone_weights: tuple[tuple[Interval, ...], ...] = ()
     cone_generators_world: tuple[tuple[tuple[Interval, ...], ...], ...] = ()
+    driven_surface_coordinates: tuple[Interval, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -609,7 +625,7 @@ class StockContactChart:
         total = Interval.point(0)
         for body in ("driver", "driven"):
             frame = getattr(self.pair.placement, f"{body}_frame")
-            norm = _sqrt_bounds(sum(Interval.point(float(v)) * float(v) for row in frame for v in row))
+            norm = _sqrt_bounds(_squared_norm(tuple(Interval.point(float(v)) for row in frame for v in row)))
             total += norm * getattr(self.pair, body).geometry_error_bound_mm
         return total.upper
 
@@ -745,7 +761,8 @@ class StockContactChart:
         return ChartEvaluation(tuple(v.value for v in equations),
                                tuple(v.derivative[:count] for v in equations),
                                tuple(v.derivative[count:] for v in equations), tuple(margins), *moments,
-                               tuple(cone_weights), tuple(cone_generators))
+                               tuple(cone_weights), tuple(cone_generators),
+                               tuple(v.value for v in coordinates[1]))
 
 
 def chart_candidates(pair, contact, fixed_driver_phase_rad: float, driven_phase_rad: float, *,
@@ -886,6 +903,7 @@ class BranchProof:
     geometry_error_bound_mm: float = 0.0
     center_root_box: tuple[Interval, ...] = ()
     center_contraction_upper: float | None = None
+    driven_surface_root_box: tuple[Interval, ...] = ()
 
     def record(self):
         return {"status": self.status, "reason": self.reason, "chart": self.chart_name,
@@ -900,6 +918,7 @@ class BranchProof:
                                  else "finite-analytic-contact-continuation/1"),
                 "unknown_domain": [v.record() for v in self.unknown_domain],
                 "root_box": [v.record() for v in self.root_box],
+                "driven_surface_root_box": [v.record() for v in self.driven_surface_root_box],
                 "support_margins": {name: v.record() for name, v in self.support_margins},
                 "common_normal_moments": [v.record() for v in self.common_normal_moments],
                 "normal_cone_weights": [[v.record() for v in weights] for weights in self.normal_cone_weights],
@@ -936,11 +955,22 @@ def _sqrt_bounds(value):
         raise ArithmeticError("square-root interval is not nonnegative")
     if value.upper == 0:
         return Interval.point(0)
+    lower_numerator, lower_denominator = value.lower.as_integer_ratio()
+    upper_numerator, upper_denominator = value.upper.as_integer_ratio()
     lo = max(0.0, math.nextafter(math.sqrt(value.lower), -math.inf))
     hi = math.nextafter(math.sqrt(value.upper), math.inf)
-    while lo and (Interval.point(lo) * lo).upper > value.lower:
+    # Certify squares of the binary endpoints EXACTLY. An outward floating
+    # product loses a whole subnormal square bin and can require quadrillions
+    # of root-ULP steps despite an already valid endpoint.
+    while lo:
+        numerator, denominator = lo.as_integer_ratio()
+        if numerator*numerator*lower_denominator <= lower_numerator*denominator*denominator:
+            break
         lo = math.nextafter(lo, -math.inf)
-    while (Interval.point(hi) * hi).lower < value.upper:
+    while True:
+        numerator, denominator = hi.as_integer_ratio()
+        if numerator*numerator*upper_denominator >= upper_numerator*denominator*denominator:
+            break
         hi = math.nextafter(hi, math.inf)
     return Interval(lo, hi)
 
@@ -1115,17 +1145,23 @@ def prove_branch_cell(chart: StockContactChart, cell: PhaseCell, *, root_free_dr
                            chart.offset_index, getattr(chart, "driven_z_index", None), center_beta,
                            material if isinstance(chart, StockContactChart) else None, root_free_coordinate,
                            chart.geometry_error_bound_mm if isinstance(chart, StockContactChart) else 0.0,
-                           center_box, center_norm)
+                           center_box, center_norm, evaluated.driven_surface_coordinates)
     except (ArithmeticError, ValueError, np.linalg.LinAlgError) as exc:
         return unknown(f"interval branch proof unresolved: {exc}")
 
 
 @dataclass(frozen=True)
 class ProofNeighbourhood:
-    """Cell-bound closed geometry/approach domain for supplied numeric bounds."""
+    """Cell-bound full physical t/z rectangle and algebra/approach domains.
+
+    Native normalized t and axial z_mm remain two physical coordinates even
+    when a chart fixes either one and removes it from its algebra unknowns.
+    Bounds on a point edge are not bounds on this material neighbourhood.
+    """
     cell: PhaseCell
     unknown_domain: tuple[Interval, ...]
     approach_driven_phase_rad: Interval
+    driven_surface_domain: tuple[Interval, Interval]
     angle_coordinate: str = "physical"
 
     def refusal(self, proof, approach, coordinate):
@@ -1134,6 +1170,15 @@ class ProofNeighbourhood:
         if (len(self.unknown_domain) != len(proof.unknown_domain)
                 or not all(a.contains(b) for a, b in zip(self.unknown_domain, proof.unknown_domain))):
             return "numeric geometry neighbourhood does not contain the certified chart domain"
+        domain = self.driven_surface_domain
+        if (not isinstance(domain, tuple) or len(domain) != 2
+                or not all(isinstance(v, Interval) for v in domain)):
+            return "numeric geometry bound lacks its actual driven t/z surface rectangle"
+        if any(v.lower >= v.upper for v in domain):
+            return "numeric geometry bound requires a full two-coordinate physical surface rectangle"
+        root = proof.driven_surface_root_box
+        if len(root) != 2 or not all(a.contains(b) for a, b in zip(domain, root)):
+            return "numeric surface rectangle does not contain actual free/fixed driven root coordinates"
         if not self.approach_driven_phase_rad.contains(approach):
             return "numeric geometry bound does not contain the entire free-reference-to-root approach"
         return None
@@ -1142,6 +1187,9 @@ class ProofNeighbourhood:
         return {"phase_cell_rad": self.cell.driver_phase_rad.record(),
                 "same_source_pose": self.cell.source_pose.record(),
                 "unknown_domain": [v.record() for v in self.unknown_domain],
+                "driven_surface_domain": [v.record() for v in self.driven_surface_domain]
+                                         if isinstance(self.driven_surface_domain, tuple) else None,
+                "driven_surface_coordinate_names": ["native_t", "z_mm"],
                 "approach_driven_phase_rad": self.approach_driven_phase_rad.record(),
                 "angle_coordinate": self.angle_coordinate}
 
@@ -1167,6 +1215,7 @@ class ChartMinimumBound:
     objective_direction: int = 0
     neighbourhood: ProofNeighbourhood | None = None
     objective_gradient_magnitude_upper_per_mm: float | None = None
+    objective_gradient_padding_mm: float | None = None
 
     def refusal(self):
         if self.tangent_dimension != 2:
@@ -1188,11 +1237,58 @@ class ChartMinimumBound:
         return {"chart": self.chart_name, "tangent_dimension": self.tangent_dimension,
                 "neighbourhood": self.neighbourhood.record() if self.neighbourhood else None,
                 "objective_gradient_magnitude_upper_per_mm": self.objective_gradient_magnitude_upper_per_mm,
+                "objective_gradient_padding_mm": self.objective_gradient_padding_mm,
                 "lagrangian_hessian_lower": self.tangent_hessian_lower,
                 "outside_neighbourhood_air_mm": self.outside_neighbourhood_air_mm.record(),
                 "approach_derivative_magnitude_lower": self.approach_derivative_magnitude_lower,
                 "lagrangian_beta_derivative": self.lagrangian_beta_derivative.record() if self.lagrangian_beta_derivative else None,
                 "objective_direction": self.objective_direction}
+
+
+def physical_patch_root_coordinates(proof, patch_id):
+    """Coordinates of THIS physical patch at the supported common root."""
+    if not proof.physical_strata:
+        return ("native_t","z_mm"),proof.driven_surface_root_box
+    stratum = proof.physical_strata[1]
+    suffix = next((value for value in (":end_face:-1",":end_face:+1") if patch_id.endswith(value)), "")
+    side = patch_id[:-len(suffix)] if suffix else patch_id
+    main = f"{stratum.tooth}:{stratum.segment.name}"
+    if side == main:
+        t = proof.driven_surface_root_box[0]
+    else:
+        incident = {f"{stratum.tooth}:{segment.name}":endpoint for segment,endpoint in stratum.incident_segments}
+        if side not in incident:
+            raise ValueError("patch is not an actual incident native surface")
+        t = Interval.point(incident[side])
+    if suffix:
+        if stratum.z_fixed is None:
+            raise ValueError("cap patch has no actual fixed face contact")
+        return ("native_t","radial_fraction"),(t,Interval.point(1))
+    return ("native_t","z_mm"),(t,proof.driven_surface_root_box[1])
+
+
+def patch_domain_refusal(proof, patch_id, names, domain):
+    try:
+        expected,root = physical_patch_root_coordinates(proof,patch_id)
+    except (ValueError,IndexError) as exc:
+        return str(exc)
+    if tuple(names) != expected or len(domain) != 2 or any(
+            not isinstance(v,Interval) or v.lower >= v.upper for v in domain):
+        return "physical patch lacks its own nondegenerate native parameter domain"
+    if len(root) != 2 or any(not a.contains(b) for a,b in zip(domain,root)):
+        return "physical patch parameter domain does not contain its actual incident/cap root"
+    stratum = proof.physical_strata[1] if proof.physical_strata else None
+    main = f"{stratum.tooth}:{stratum.segment.name}" if stratum else None
+    side = patch_id.split(":end_face:")[0]
+    master_extension = stratum is not None and stratum.implicit_tip and side == main
+    # The exact blank/master intersection can straddle the rounded native
+    # endpoint. Its proved neighbourhood may extend the MASTER equation;
+    # outside-UNION excision still acts only on the finite physical [0,1].
+    if ((domain[0].intersection(Interval(0,1)) is None if master_extension
+         else not Interval(0,1).contains(domain[0]))
+            or expected[1] == "radial_fraction" and not Interval(0,1).contains(domain[1])):
+        return "physical patch neighbourhood has no bound finite native parameter range"
+    return None
 
 
 @dataclass(frozen=True)
@@ -1210,6 +1306,8 @@ class BoundarySeparation:
     inward_gap_derivative_lower: float
     outside_neighbourhood_air_mm: Interval
     neighbourhood: ProofNeighbourhood | None = None
+    patch_parameter_names: tuple[str,str] = ()
+    patch_parameter_domain: tuple[Interval,Interval] = ()
 
     def refusal(self):
         if not math.isfinite(self.inward_gap_derivative_lower) or self.inward_gap_derivative_lower <= 0:
@@ -1221,6 +1319,8 @@ class BoundarySeparation:
     def record(self):
         return {"patch_id": self.patch_id, "chart": self.chart_name,
                 "neighbourhood": self.neighbourhood.record() if self.neighbourhood else None,
+                "patch_parameter_names":list(self.patch_parameter_names),
+                "patch_parameter_domain":[v.record() for v in self.patch_parameter_domain],
                 "inward_gap_derivative_lower": self.inward_gap_derivative_lower,
                 "outside_neighbourhood_air_mm": self.outside_neighbourhood_air_mm.record()}
 
@@ -1271,10 +1371,15 @@ class PatchRemainderBound:
     chart_names: tuple[str, ...]
     outside_union_air_mm: Interval
     neighbourhoods: tuple[tuple[str, ProofNeighbourhood], ...] = ()
+    patch_parameter_names: tuple[str,str] = ()
+    patch_parameter_domains: tuple[tuple[str,tuple[Interval,Interval]], ...] = ()
 
     def record(self):
         return {"patch_id": self.patch_id, "charts": list(self.chart_names),
                 "neighbourhoods": {name: domain.record() for name, domain in self.neighbourhoods},
+                "patch_parameter_names":list(self.patch_parameter_names),
+                "patch_parameter_domains":{name:[v.record() for v in domain]
+                                           for name,domain in self.patch_parameter_domains},
                 "outside_union_air_mm": self.outside_union_air_mm.record()}
 
 
@@ -1308,6 +1413,7 @@ class FirstContactCover:
     free_reference_air_mm: Interval | None = None
     closing_driven_sense: int = 0
     angle_coordinate: str = "physical"
+    additional_geometry_error_mm: float = field(kw_only=True)
 
     def record(self):
         return {"proof_schema": "finite-stock-first-contact-cover/1",
@@ -1329,11 +1435,15 @@ class FirstContactCover:
                 "free_reference_air_mm": self.free_reference_air_mm.record() if self.free_reference_air_mm else None,
                 "closing_driven_sense": self.closing_driven_sense,
                 "angle_coordinate": self.angle_coordinate,
+                "additional_geometry_error_mm":self.additional_geometry_error_mm,
                 "native_certificate": False}
 
     def refusal(self, proofs):
         if self.angle_coordinate not in ("physical", "driven_material"):
             return "first-contact angle coordinate is undefined"
+        if (type(self.additional_geometry_error_mm) not in (float,int)
+                or not math.isfinite(self.additional_geometry_error_mm) or self.additional_geometry_error_mm < 0):
+            return "first-contact additional geometry payment is missing, negative or nonfinite"
         proof_by_chart = {p.chart_name: p for p in proofs}
         if len(proof_by_chart) != len(proofs):
             return "carrying chart proofs are duplicated"
@@ -1381,6 +1491,12 @@ class FirstContactCover:
             gradient = minimum.objective_gradient_magnitude_upper_per_mm
             if gradient is None or not math.isfinite(gradient) or gradient <= 0:
                 return "whole-neighbourhood objective Lipschitz bound for physical geometry error is absent"
+            required_padding = (0.0 if proof.geometry_error_bound_mm == self.additional_geometry_error_mm == 0
+                                else (Interval.point(proof.geometry_error_bound_mm)+self.additional_geometry_error_mm).upper)
+            if required_padding > 0 and (
+                    minimum.objective_gradient_padding_mm is None
+                    or minimum.objective_gradient_padding_mm < required_padding):
+                return "first-contact objective neighbourhood omits its additional geometry payment"
         shared = {patch: names for patch, names in patch_charts.items() if len(names) > 1}
         remainders = {v.patch_id: v for v in self.patch_remainder_bounds}
         if len(remainders) != len(self.patch_remainder_bounds) or set(remainders) != set(shared):
@@ -1396,6 +1512,23 @@ class FirstContactCover:
                 refusal = domain.refusal(proof_by_chart[name], self.approach_driven_phase_rad, self.angle_coordinate)
                 if refusal or domain != minima[name].neighbourhood:
                     return refusal or "outside-UNION bound refers to different physical neighbourhoods"
+            patch_domains = dict(remainder.patch_parameter_domains)
+            native = any(proof_by_chart[name].physical_strata for name in names)
+            if native and (len(patch_domains) != len(remainder.patch_parameter_domains) or set(patch_domains) != names):
+                return "outside-UNION bound lacks actual per-patch native parameter domains"
+            for name,patch_domain in patch_domains.items():
+                refusal = patch_domain_refusal(proof_by_chart[name],patch,remainder.patch_parameter_names,patch_domain)
+                if refusal:
+                    return refusal
+                stratum = proof_by_chart[name].physical_strata[1]
+                if patch == f"{stratum.tooth}:{stratum.segment.name}":
+                    bound_domain = minima[name].neighbourhood.driven_surface_domain
+                else:
+                    boundary = next((v for v in self.boundary_separations
+                                     if v.chart_name == name and v.patch_id == patch),None)
+                    bound_domain = boundary.patch_parameter_domain if boundary else ()
+                if patch_domain != bound_domain:
+                    return "outside-UNION exclusion uses a different incident/cap parameter domain"
             if remainder.outside_union_air_mm.lower <= 0 or any(
                     minima[name].outside_neighbourhood_air_mm.lower > remainder.outside_union_air_mm.lower
                     for name in names):
@@ -1408,6 +1541,10 @@ class FirstContactCover:
             return "root/floor/junction material cannot use an edge-neighbourhood exception"
         boundaries = {(v.patch_id, v.chart_name): v for v in self.boundary_separations}
         expected = {(patch, name) for patch in noncarrying & included for name in patch_charts[patch]}
+        expected |= {(patch,name) for name,patches in by_chart.items()
+                     if proof_by_chart[name].physical_strata
+                     for patch in patches
+                     if patch != f"{proof_by_chart[name].physical_strata[1].tooth}:{proof_by_chart[name].physical_strata[1].segment.name}"}
         if len(boundaries) != len(self.boundary_separations) or set(boundaries) != expected:
             return "selected noncarrying edge neighbourhood lacks exact one-sided separation coverage"
         for boundary in boundaries.values():
@@ -1420,6 +1557,12 @@ class FirstContactCover:
                                                       self.approach_driven_phase_rad, self.angle_coordinate)
             if refusal or boundary.neighbourhood != minima[boundary.chart_name].neighbourhood:
                 return refusal or "one-sided boundary and minimum use different physical neighbourhoods"
+            proof = proof_by_chart[boundary.chart_name]
+            if proof.physical_strata:
+                refusal = patch_domain_refusal(proof,boundary.patch_id,boundary.patch_parameter_names,
+                                               boundary.patch_parameter_domain)
+                if refusal:
+                    return refusal
         for name, air in exclusions.items():
             required = self.required_root_air_mm if name in roots else 0.0
             if air.lower <= required:
@@ -1453,13 +1596,20 @@ def difference_from_branch_proofs(proof_a, proof_b):
     return difference
 
 
-def branch_geometry_error_rad(proof, minimum):
-    """Pay finite-profile position error through actual objective transversality."""
+def branch_geometry_error_rad(proof, minimum, *, additional_geometry_error_mm):
+    """Pay profile and explicit additional geometry through ONE transversality."""
     gradient = minimum.objective_gradient_magnitude_upper_per_mm
-    if gradient is None or not math.isfinite(gradient) or gradient <= 0:
-        raise ValueError("physical position-error payment lacks objective Lipschitz bound")
-    return (Interval.point(proof.geometry_error_bound_mm) * gradient
-            / minimum.approach_derivative_magnitude_lower).upper
+    if (gradient is None or not math.isfinite(gradient) or gradient <= 0
+            or type(additional_geometry_error_mm) not in (float,int)
+            or not math.isfinite(additional_geometry_error_mm) or additional_geometry_error_mm < 0):
+        raise ValueError("physical position-error payment lacks finite geometry and objective bounds")
+    profile = (Interval.point(proof.geometry_error_bound_mm)*gradient
+               /minimum.approach_derivative_magnitude_lower).upper
+    if additional_geometry_error_mm == 0:
+        return profile
+    additional = (Interval.point(additional_geometry_error_mm)*gradient
+                  /minimum.approach_derivative_magnitude_lower).upper
+    return (Interval.point(profile)+additional).upper
 
 
 def correlated_root_difference(chart_a, chart_b, cell, *, root_free_driven_components_rad,
@@ -1496,7 +1646,7 @@ def correlated_root_difference(chart_a, chart_b, cell, *, root_free_driven_compo
 
 def prove_paid_handover(chart_a, chart_b, cell: PhaseCell, cover: FirstContactCover, *,
                         driven_pitch_radius_mm: float, maximum_jump_mm: float = 0.005,
-                        driven_sense: int = 1):
+                        driven_sense: int = 1, first_contact_branch_proofs=None):
     """Prove a supported first-contact exchange with a paid common-pose bound.
 
     Both branches exist over the common closed cell. Opposite endpoint signs
@@ -1524,13 +1674,44 @@ def prove_paid_handover(chart_a, chart_b, cell: PhaseCell, cover: FirstContactCo
     result["branch_proofs"] = [p.record() for p in proofs]
     if difference is None:
         return {**result, "reason": reason}
-    refusal = cover.refusal(proofs)
+    full = {p.chart_name:p for p in (proofs if first_contact_branch_proofs is None else first_contact_branch_proofs)}
+    if first_contact_branch_proofs is not None and len(full) != len(first_contact_branch_proofs):
+        return {**result,"reason":"first-contact handover proofs are duplicated"}
+    for chart,actual in zip((chart_a,chart_b),proofs):
+        supplied = full.get(chart.name)
+        if supplied is None or supplied.cell != cell or supplied.unknown_domain != chart.unknown_box:
+            return {**result,"reason":"handover pair is absent from its actual full-source first-contact cover"}
+        full[chart.name] = actual
+    result["first_contact_branch_proofs"] = [p.record() for p in full.values()]
+    refusal = cover.refusal(tuple(full.values()))
     if refusal:
         return {**result, "reason": refusal}
     if driven_sense != cover.closing_driven_sense:
         return {**result, "reason": "handover closing sense differs from actual first-contact approach"}
     if proofs[0].root_component_rad != proofs[1].root_component_rad:
         return {**result, "reason": "handover branches are in different actual root-free components"}
+    minima = {m.chart_name:m for m in cover.chart_minimum_bounds}
+    competitors = []
+    for competitor in full.values():
+        if competitor.chart_name in (chart_a.name,chart_b.name):
+            continue
+        comparisons = []
+        for selected in proofs:
+            difference_to_competitor = driven_sense * difference_from_branch_proofs(selected,competitor)
+            payment = (Interval.point(branch_geometry_error_rad(selected,minima[selected.chart_name],
+                        additional_geometry_error_mm=cover.additional_geometry_error_mm))
+                       + branch_geometry_error_rad(competitor,minima[competitor.chart_name],
+                        additional_geometry_error_mm=cover.additional_geometry_error_mm))
+            paid = difference_to_competitor - payment
+            comparisons.append({"chart":selected.chart_name,
+                                "closing_competitor_excess_rad":difference_to_competitor.record(),
+                                "physical_geometry_error_payment_rad":payment.record(),
+                                "paid_competitor_excess_lower_rad":paid.lower})
+        competitors.append({"competitor_chart":competitor.chart_name,"pair_comparisons":comparisons})
+        if max(v["paid_competitor_excess_lower_rad"] for v in comparisons) < 0:
+            return {**result,"reason":"another physical root may intervene in the proposed first-contact exchange",
+                    "full_cell_competitor_exclusions":competitors}
+    result["full_cell_competitor_exclusions"] = competitors
     endpoints, endpoint_evidence = [], []
     for phase in (cell.driver_phase_rad.lower, cell.driver_phase_rad.upper):
         end = PhaseCell(Interval.point(phase), cell.source_pose)
@@ -1547,7 +1728,8 @@ def prove_paid_handover(chart_a, chart_b, cell: PhaseCell, cover: FirstContactCo
     result["endpoint_difference_proofs"] = endpoint_evidence
     # sense*delta >0 means a is encountered first in the loaded approach.
     minima = {m.chart_name: m for m in cover.chart_minimum_bounds}
-    error_rad = sum(Interval.point(branch_geometry_error_rad(p, minima[p.chart_name])) for p in proofs)
+    error_rad = sum(Interval.point(branch_geometry_error_rad(p,minima[p.chart_name],
+                    additional_geometry_error_mm=cover.additional_geometry_error_mm)) for p in proofs)
     if endpoints[0].lower <= error_rad.upper or endpoints[1].upper >= -error_rad.upper:
         return {**result, "reason": "same-source supported first-contact exchange is not uniformly bracketed after geometry payment",
                 "physical_geometry_error_payment_rad": error_rad.record(),
@@ -1608,8 +1790,10 @@ def retained_phase_coverage(phase_cells, *, driver_pitch_rad: float,
                     continue
                 try:
                     difference = cover.closing_driven_sense * difference_from_branch_proofs(competitor, candidate)
-                    error = (Interval.point(branch_geometry_error_rad(candidate, minima[candidate.chart_name]))
-                             + branch_geometry_error_rad(competitor, minima[competitor.chart_name]))
+                    error = (Interval.point(branch_geometry_error_rad(candidate,minima[candidate.chart_name],
+                              additional_geometry_error_mm=cover.additional_geometry_error_mm))
+                             + branch_geometry_error_rad(competitor,minima[competitor.chart_name],
+                              additional_geometry_error_mm=cover.additional_geometry_error_mm))
                     excess_mm = (Interval.point(driven_pitch_radius_mm)
                                  * (Interval.point(difference.upper) + error)).upper
                 except (ArithmeticError, ValueError):
@@ -1658,3 +1842,348 @@ def retained_phase_coverage(phase_cells, *, driver_pitch_rad: float,
             "maximum_carrier_excess_mm": maximum_jump_mm,
             "same_source_pose": source.record(), "native_certificate": False,
             "reason": "full closed-phase supported cover" if resolved else "unsupported phase gap or periodic seam"}
+
+
+def _periodicity_displacement_evidence(pair, source_pose):
+    """Pay finite relabel defects through the complete joint tooth period."""
+    true_turn = Interval(3.141592653589793, 3.1415926535897936) * 2
+    axes = dict(source_pose.axes)
+    bodies = {}
+    total = Interval.point(0)
+    joint_steps = math.lcm(pair.driver.teeth, pair.driven.teeth)
+    for body, step in (("driver", 1), ("driven", -1)):
+        profile = getattr(pair, body)
+        pitch = profile.angular_pitch_rad
+        if not math.isfinite(pitch) or pitch <= 0 or profile.teeth <= 0:
+            raise ValueError("periodicity requires the actual positive finite tooth pitch")
+        # The actual adapter evaluates tooth*pitch as a stored float. Bound
+        # every relabel, including rounding of that product and the wrap.
+        errors = []
+        for tooth in range(profile.teeth):
+            mapped = (tooth + step) % profile.teeth
+            if step == 1:
+                delta = Interval.point(pitch) + Interval.point(tooth * pitch) - Interval.point(mapped * pitch)
+                if mapped == 0:
+                    delta -= true_turn
+            else:
+                delta = Interval.point(pitch) + Interval.point(mapped * pitch) - Interval.point(tooth * pitch)
+                if tooth == 0:
+                    delta -= true_turn
+            errors.append(delta)
+        angle = Interval.point(max(v.magnitude for v in errors))
+        c, s = cos_bounds(Interval.point(pitch)), sin_bounds(Interval.point(pitch))
+        # Exact real R(p)R(-p)=I. Retain, rather than proclaim zero for, the
+        # finite interval product enclosure used by the source relabelling.
+        rotations = (((c, -s), (s, c)), ((c, s), (-s, c)))
+        closure = _matrix_product(*rotations)
+        closure_error = tuple(closure[i][j] - int(i == j) for i in range(2) for j in range(2))
+        closure_norm = sqrt_bounds(_squared_norm(tuple(Interval.point(v.magnitude) for v in closure_error)))
+        eccentricity = sqrt_bounds(_squared_norm(tuple(
+            axes.get(f"{body}_ecc_{axis}_mm",Interval.point(0)) for axis in ("x","y"))))
+        frame = _frame_rows(getattr(pair.placement, f"{body}_frame"))
+        frame_norm = sqrt_bounds(_squared_norm(tuple(value for row in frame for value in row)))
+        radius = Interval.point(profile.blank_radius_mm) + Interval.point(profile.geometry_error_bound_mm)
+        one_step = frame_norm * (angle * (radius + eccentricity) + closure_norm * eccentricity)
+        # Each exact local rotation has norm one. Successive relabel defects
+        # therefore add, rather than disappearing at the first tooth seam.
+        # lcm(Ndriver,Ndriven) steps restore BOTH physical tooth labels.
+        displacement = Interval.point(joint_steps) * one_step
+        total += Interval.point(displacement.upper)
+        bodies[body] = {"tooth_relabel_angle_errors_rad": [v.record() for v in errors],
+                        "rotation_product_error": [v.record() for v in closure_error],
+                        "frame_operator_upper": frame_norm.upper,
+                        "rectangular_eccentricity_radius_upper_mm": eccentricity.upper,
+                        "joint_period_tooth_steps": joint_steps,
+                        "one_step_displacement_upper_mm": one_step.upper,
+                        "displacement_upper_mm": displacement.upper}
+    return total.upper, bodies
+
+
+def periodicity_displacement_bound_mm(pair, source_pose: SourcePose):
+    """World-mm arc padding required IN ADDITION to actual profile geometry E."""
+    return _periodicity_displacement_evidence(pair, source_pose)[0]
+
+
+def _periodic_source_relabel(pair, source_pose, disks):
+    """Validate real centred physical disks; never rotate a rectangle into itself."""
+    if not isinstance(disks, dict) or set(disks) != {"driver", "driven"}:
+        raise ValueError("periodic source requires both authenticated physical eccentricity disks")
+    axes = dict(source_pose.axes)
+    rotations = {}
+    for body, sign in (("driver", 1), ("driven", -1)):
+        disk = disks[body]
+        if not isinstance(disk, dict) or disk.get("shape") != "closed_disk" or disk.get("centre_mm") != [0.0, 0.0]:
+            raise ValueError("periodic eccentricity source must be a closed disk centred at zero")
+        terms = disk.get("source_terms_mm")
+        if (not isinstance(terms, dict) or not terms
+                or any(not isinstance(name, str) or not name for name in terms)):
+            raise ValueError("physical eccentricity disk lacks named source-grade radial terms")
+        values = tuple(terms.values())
+        radius = disk.get("radius_mm")
+        if (not isinstance(radius, (int, float)) or not math.isfinite(radius) or radius < 0
+                or any(not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0 for v in values)
+                or radius < sum((Interval.point(v) for v in values), Interval.point(0)).upper):
+            raise ValueError("physical eccentricity radius does not enclose its outward source-term sum")
+        for axis in ("x", "y"):
+            if axes.get(f"{body}_ecc_{axis}_mm") != Interval(-radius, radius):
+                raise ValueError("physical eccentricity disk is not authenticated by both symmetric source axes")
+        angle = Interval.point(sign * getattr(pair, body).angular_pitch_rad)
+        c, s = cos_bounds(angle), sin_bounds(angle)
+        rotations[body] = ((c, -s), (s, c))
+    return rotations
+
+
+def correlated_periodic_branch_difference(start_proof, end_proof, pair, *, source_eccentricity_disks):
+    """Same-realization endpoint difference beta_start(Tq)-p_driven-beta_end(q).
+
+    This is a supported branch-difference bound, NOT first-contact or seam
+    qualification. The certified rectangles enclose the physical disks.
+    Their rotated corners need not fit: only disk points and their convex
+    centre-to-point paths are used by the exact linear chain rule.
+    """
+    source = start_proof.cell.source_pose
+    if (start_proof.status != "PROVED" or end_proof.status != "PROVED"
+            or source != end_proof.cell.source_pose
+            or not start_proof.physical_strata or not end_proof.physical_strata
+            or start_proof.cell.driver_phase_rad != Interval.point(0)
+            or end_proof.cell.driver_phase_rad != Interval.point(pair.driver.angular_pitch_rad)
+            or start_proof.center_driven_phase_rad is None or end_proof.center_driven_phase_rad is None):
+        raise ValueError("periodic branch comparison requires actual same-source endpoint/centre proofs")
+    rotations = _periodic_source_relabel(pair, source, source_eccentricity_disks)
+    names = tuple(name for name, _ in source.axes)
+    if (len(start_proof.source_gradient_rad) != len(names) + 1
+            or len(end_proof.source_gradient_rad) != len(names) + 1):
+        raise ValueError("periodic branch sensitivities do not match the actual source coordinates")
+    start_gradient = dict(zip(names, start_proof.source_gradient_rad[1:]))
+    transformed = dict(start_gradient)
+    for body, rotation in rotations.items():
+        x, y = (f"{body}_ecc_{axis}_mm" for axis in ("x", "y"))
+        transformed[x] = start_gradient[x] * rotation[0][0] + start_gradient[y] * rotation[1][0]
+        transformed[y] = start_gradient[x] * rotation[0][1] + start_gradient[y] * rotation[1][1]
+    derivatives = tuple(transformed[name] - value for name, value in zip(names, end_proof.source_gradient_rad[1:]))
+    centre = start_proof.center_driven_phase_rad - pair.driven.angular_pitch_rad - end_proof.center_driven_phase_rad
+    difference = centre
+    for (_, parameter), derivative in zip(source.axes, derivatives):
+        difference += derivative * (parameter - Interval.point(parameter.midpoint))
+    return {"centre_difference_rad": centre.record(),
+            "difference_parameter_names": list(names),
+            "difference_parameter_derivatives": [v.record() for v in derivatives],
+            "same_pose_driven_root_difference_rad": difference.record(),
+            "source_relabel": {body: [[v.record() for v in row] for row in matrix]
+                               for body, matrix in rotations.items()},
+            "source_domain": "same physical centred disks within certified boxes; other axes unchanged",
+            "native_certificate": False}
+
+
+def physical_patch_inventory(pair):
+    """Every physical driven perimeter and both finite radial-fan end caps."""
+    perimeter = tuple(pair.driven.external_boundary_segments())
+    inventory = tuple(f"{tooth}:{segment.name}{suffix}" for tooth in range(pair.driven.teeth)
+                      for segment in perimeter for suffix in ("",":end_face:-1",":end_face:+1"))
+    roots = tuple(f"{tooth}:{segment.name}{suffix}" for tooth in range(pair.driven.teeth)
+                  for segment in perimeter if segment.kind not in ("flank","radial","tip_arc")
+                  for suffix in ("",":end_face:-1",":end_face:+1"))
+    root_set = set(roots)
+    noncarrying = tuple(name for name in inventory if name in root_set or ":end_face:" in name)
+    return inventory,roots,noncarrying
+
+
+def _seam_stratum_key(stratum, tooth):
+    return (stratum.segment, tooth, stratum.t_fixed, stratum.z_fixed,
+            stratum.incident_segments, stratum.radial_cap_radius_mm, stratum.axial_cap_source)
+
+
+def _seam_interval(value):
+    return value if isinstance(value, Interval) else Interval(*value)
+
+
+def _seam_record(value):
+    if isinstance(value, Interval):
+        return value.record()
+    if isinstance(value, dict):
+        return {key: _seam_record(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_seam_record(item) for item in value]
+    return value
+
+
+def prove_periodic_seam(start_charts, start_cell, start_cover, end_charts, end_cell, end_cover, *,
+                        start_branch_proofs, end_branch_proofs, source_eccentricity_disks,
+                        root_receipt, driven_root_material_receipt,
+                        root_air_requirements_mm, driven_pitch_radius_mm: float,
+                        maximum_jump_mm: float = 0.005):
+    """Pay an actual supported first-contact min/max envelope over one pitch.
+
+    All paired endpoint branches, not a guessed uniformly first branch, are
+    compared under the same physical source relabelling. A bijection and
+    exhaustive first-contact covers give |min a-min b| (or max) <= max|a-b|.
+    Shared-engine root/exclusion/gradient bounds remain genuine prerequisites.
+    """
+    result = {"proof_schema": "finite-stock-periodic-seam/1", "status": "UNKNOWN", "continuous": False,
+              "native_certificate": False, "physical_no_solution": False,
+              "phase_endpoints_rad": [0.0, end_cell.driver_phase_rad.upper],
+              "same_source_pose": start_cell.source_pose.record(),
+              "source_eccentricity_disks": source_eccentricity_disks,
+              "root_proof": _seam_record(root_receipt), "chart_pairs": [],
+              "driven_root_material_proof":_seam_record(driven_root_material_receipt),
+              "root_air_requirements_mm": root_air_requirements_mm,
+              "start_endpoint_branch_proofs": [], "end_endpoint_branch_proofs": [],
+              "start_full_cell_branch_proofs": [p.record() for p in start_branch_proofs],
+              "end_full_cell_branch_proofs": [p.record() for p in end_branch_proofs],
+              "start_first_contact_cover": start_cover.record(), "end_first_contact_cover": end_cover.record()}
+    try:
+        if (not math.isfinite(driven_pitch_radius_mm) or driven_pitch_radius_mm <= 0
+                or not math.isfinite(maximum_jump_mm) or not 0 < maximum_jump_mm <= 0.005):
+            raise ValueError("periodic seam uses the actual positive radius and unchanged .005 limit")
+        if not start_charts or not end_charts or any(not isinstance(c, StockContactChart) for c in (*start_charts, *end_charts)):
+            raise ValueError("periodic seam requires actual finite StockContactCharts")
+        pair = start_charts[0].pair
+        if any(c.pair is not pair for c in (*start_charts, *end_charts)) or driven_pitch_radius_mm != pair.driven.pitch_radius_mm:
+            raise ValueError("periodic seam charts/radius do not belong to one actual physical pair")
+        pitch, mate_pitch = pair.driver.angular_pitch_rad, pair.driven.angular_pitch_rad
+        if (not isinstance(root_air_requirements_mm, dict) or set(root_air_requirements_mm) != {"driver", "driven"}
+                or any(not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0
+                       for v in root_air_requirements_mm.values())):
+            raise ValueError("periodic seam requires separate authenticated driver/driven root floors")
+        if min(start_cover.required_root_air_mm, end_cover.required_root_air_mm) < root_air_requirements_mm["driven"]:
+            raise ValueError("periodic first-contact covers do not pay the actual driven-root floor")
+        result["phase_endpoints_rad"] = [0.0, pitch]
+        if (start_cell.source_pose != end_cell.source_pose or not start_cell.driver_phase_rad.contains(0)
+                or not end_cell.driver_phase_rad.contains(pitch)
+                or start_cover.cell != start_cell or end_cover.cell != end_cell
+                or start_cover.angle_coordinate != "driven_material" or end_cover.angle_coordinate != "driven_material"):
+            raise ValueError("periodic seam lacks bound same-source endpoint cells/material covers")
+        inventory,roots,noncarrying = physical_patch_inventory(pair)
+        for charts, proofs, cell, cover in ((start_charts, start_branch_proofs, start_cell, start_cover),
+                                           (end_charts, end_branch_proofs, end_cell, end_cover)):
+            if (len({c.name for c in charts}) != len(charts) or len(proofs) != len(charts)
+                    or {p.chart_name for p in proofs} != {c.name for c in charts}
+                    or any(p.cell != cell or p.unknown_domain != next(c.unknown_box for c in charts if c.name == p.chart_name)
+                           for p in proofs)):
+                raise ValueError("periodic seam lacks every actual full-cell branch/domain proof")
+            if (len(cover.physical_patch_inventory) != len(inventory)
+                    or set(cover.physical_patch_inventory) != set(inventory)
+                    or len(cover.root_patch_ids) != len(roots) or set(cover.root_patch_ids) != set(roots)
+                    or len(cover.noncarrying_patch_ids) != len(noncarrying)
+                    or set(cover.noncarrying_patch_ids) != set(noncarrying)):
+                raise ValueError("periodic first-contact cover omits actual physical teeth/root/cap material")
+            refusal = cover.refusal(proofs)
+            if refusal:
+                raise ValueError(refusal)
+        if start_cover.closing_driven_sense != end_cover.closing_driven_sense:
+            raise ValueError("periodic first-contact covers have different physical closing senses")
+        result["closing_driven_sense"] = start_cover.closing_driven_sense
+        _periodic_source_relabel(pair, start_cell.source_pose, source_eccentricity_disks)
+        start_keys = {}
+        for chart in start_charts:
+            key = (_seam_stratum_key(chart.driver_stratum, chart.driver_stratum.tooth),
+                   _seam_stratum_key(chart.driven_stratum, chart.driven_stratum.tooth))
+            if key in start_keys:
+                raise ValueError("periodic seam duplicates a physical start stratum")
+            start_keys[key] = chart
+        pairs = []
+        used = set()
+        for end in end_charts:
+            key = (_seam_stratum_key(end.driver_stratum, (end.driver_stratum.tooth + 1) % pair.driver.teeth),
+                   _seam_stratum_key(end.driven_stratum, (end.driven_stratum.tooth - 1) % pair.driven.teeth))
+            start = start_keys.get(key)
+            if start is None or start.name in used:
+                raise ValueError("periodic seam does not biject ALL actual physical strata")
+            pairs.append((start, end))
+            used.add(start.name)
+        if len(used) != len(start_charts):
+            raise ValueError("periodic seam leaves an unpaired possible first-contact stratum")
+        source = start_cell.source_pose
+        endpoints = (PhaseCell(Interval.point(0), source), PhaseCell(Interval.point(pitch), source))
+        endpoint_proofs = []
+        for charts, cell, cover in ((start_charts, endpoints[0], start_cover), (end_charts, endpoints[1], end_cover)):
+            proofs = {chart.name: prove_branch_cell(chart, cell,
+                       root_free_driven_components_rad=cover.root_free_driven_components_rad,
+                       root_free_coordinate="driven_material") for chart in charts}
+            if any(p.status != "PROVED" for p in proofs.values()):
+                raise ValueError("fresh physical periodic endpoint root/centre proof is unresolved")
+            endpoint_proofs.append(proofs)
+        result["start_endpoint_branch_proofs"] = [p.record() for p in endpoint_proofs[0].values()]
+        result["end_endpoint_branch_proofs"] = [p.record() for p in endpoint_proofs[1].values()]
+        inventory,_,_ = physical_patch_inventory(pair)
+        if (not isinstance(root_receipt, dict) or root_receipt.get("status") != "PROVED"
+                or root_receipt.get("native_certificate") is not False
+                or root_receipt.get("angle_coordinate") != "driven_material"
+                or root_receipt.get("phase_cell_rad") != endpoints[1].driver_phase_rad.record()
+                or root_receipt.get("same_source_pose") != source.record()
+                or list(root_receipt.get("physical_driven_teeth", ())) != list(range(pair.driven.teeth))
+                or set(root_receipt.get("physical_patch_inventory", ())) != set(inventory)
+                or len(root_receipt.get("physical_patch_inventory", ())) != len(inventory)
+                or not isinstance(root_receipt.get("root_sweep"), dict)
+                or root_receipt["root_sweep"].get("status") != "resolved"
+                or root_receipt.get("physical_required_root_air_mm", -1) < root_air_requirements_mm["driver"]
+                or not isinstance(root_receipt.get("physical_root_air_lower_bound_mm"), (int, float))
+                or not math.isfinite(root_receipt["physical_root_air_lower_bound_mm"])
+                or root_receipt["physical_root_air_lower_bound_mm"] <= 0
+                or root_receipt["physical_root_air_lower_bound_mm"] < root_air_requirements_mm["driver"]):
+            raise ValueError("periodic seam lacks actual all-tooth/cap same-source endpoint root receipt")
+        root_domain = _seam_interval(root_receipt["driven_angle_domain_rad"])
+        root_components = tuple(_seam_interval(v) for v in root_receipt["root_free_driven_components_rad"])
+        displacement, displacement_evidence = _periodicity_displacement_evidence(pair, source)
+        if (root_receipt.get("material_scope") != "driver_root_material"
+                or root_receipt["root_sweep"].get("material_scope") != "driver_root_material"
+                or root_receipt.get("additional_geometry_error_mm",-1) < displacement):
+            raise ValueError("periodic root proof does not pay the full joint-period displacement")
+        reverse = driven_root_material_receipt
+        if (not isinstance(reverse,dict) or reverse.get("proof_schema") != "finite-stock-directed-root-material/1"
+                or reverse.get("status") != "PROVED" or reverse.get("native_certificate") is not False
+                or reverse.get("root_owner") != "driven" or reverse.get("other_material_owner") != "driver"
+                or reverse.get("phase_cell_rad") != endpoints[1].driver_phase_rad.record()
+                or reverse.get("same_source_pose") != source.record()
+                or reverse.get("approach_driven_phase_rad") != root_domain.record()
+                or reverse.get("required_root_air_mm") != root_air_requirements_mm["driven"]
+                or not isinstance(reverse.get("root_air_lower_mm"),(float,int))
+                or not math.isfinite(reverse["root_air_lower_mm"]) or reverse["root_air_lower_mm"] <= 0
+                or reverse["root_air_lower_mm"] < root_air_requirements_mm["driven"]
+                or reverse.get("material_sweep",{}).get("status") != "PROVED"
+                or reverse.get("material_sweep",{}).get("additional_geometry_error_mm",-1) < displacement):
+            raise ValueError("periodic seam lacks the complete directed driven-root material/containment proof")
+        result["periodicity_displacement_evidence"] = displacement_evidence
+        result["joint_period_tooth_steps"] = math.lcm(pair.driver.teeth,pair.driven.teeth)
+        minima = ({m.chart_name: m for m in start_cover.chart_minimum_bounds},
+                  {m.chart_name: m for m in end_cover.chart_minimum_bounds})
+        maximum = 0.0
+        for start, end in pairs:
+            a, b = endpoint_proofs[0][start.name], endpoint_proofs[1][end.name]
+            mapped_material = a.driven_material_phase_rad - mate_pitch
+            if (not root_domain.contains(mapped_material) or not root_domain.contains(b.driven_material_phase_rad)
+                    or not any(c.contains(mapped_material) and c.contains(b.driven_material_phase_rad) for c in root_components)):
+                raise ValueError("periodic mapped material roots leave one actual finite root-free component")
+            bounds = (minima[0][start.name], minima[1][end.name])
+            geometry, arc = Interval.point(0), Interval.point(0)
+            for proof, minimum in zip((a, b), bounds):
+                padding = minimum.objective_gradient_padding_mm
+                required = (Interval.point(proof.geometry_error_bound_mm) + Interval.point(displacement)).upper
+                if padding is None or not math.isfinite(padding) or padding < required:
+                    raise ValueError("periodic Lipschitz receipt does not bind full geometry-plus-arc padding")
+                geometry += branch_geometry_error_rad(proof,minimum,additional_geometry_error_mm=0.0)
+                arc += Interval.point(displacement) * minimum.objective_gradient_magnitude_upper_per_mm / minimum.approach_derivative_magnitude_lower
+            record = correlated_periodic_branch_difference(a, b, pair, source_eccentricity_disks=source_eccentricity_disks)
+            difference = _seam_interval(record["same_pose_driven_root_difference_rad"])
+            jump = (Interval.point(driven_pitch_radius_mm) * (Interval.point(difference.magnitude) + geometry + arc)).upper
+            record.update({"start_chart": start.name, "end_chart": end.name,
+                           "physical_geometry_error_payment_rad": geometry.record(),
+                           "periodicity_displacement_upper_mm": displacement,
+                           "periodicity_error_payment_rad": arc.record(),
+                           "pitch_displacement_jump_upper_mm": jump,
+                           "mapped_start_material_root_rad": mapped_material.record(),
+                           "end_material_root_rad": b.driven_material_phase_rad.record()})
+            result["chart_pairs"].append(record)
+            result["source_relabel"] = record["source_relabel"]
+            maximum = max(maximum, jump)
+        result["pitch_displacement_jump_upper_mm"] = maximum
+        result["driven_pitch_radius_mm"] = driven_pitch_radius_mm
+        result["maximum_jump_mm"] = maximum_jump_mm
+        if maximum > maximum_jump_mm:
+            raise ValueError("same-source periodic first-contact envelope exceeds the paid .005 limit")
+        result.update({"status": "PROVED", "continuous": True,
+                       "reason": "bijective actual supported min/max envelope; same-source disk relabel and paid periodicity",
+                       "envelope_bound_definition": "max paired branch error bounds both min and max of all possible first roots"})
+    except (ArithmeticError, ValueError, KeyError, TypeError) as exc:
+        result["reason"] = f"periodic seam proof unresolved: {exc}"
+    return result

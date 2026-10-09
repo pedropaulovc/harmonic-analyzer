@@ -566,6 +566,59 @@ their mesh. Keep sizing and contact-study modules out of part dependency
 closures. The qualified design record and native acceptance must refer to the
 same frozen geometry and manufactured bands.
 
+The cone native factory reads only the source-qualified ALL20 packet
+`cad/calibration/dt-cone-stock-form.json`; absent, stale, partial, stationary
+DESIGN or numerically refused data cannot fall back to an ideal profile.
+Retained seat/AF/face/cutter/grade inputs have a separate identity from selected
+OUTPUT geometry, so publishing the authentic JSON does not circularly change
+the measurement input. The JSON is nevertheless a declared per-file
+part/drawing/budget recipe and farm-package input. Numerical qualification
+requires the actual six-source engine receipt, whole booked source domain,
+nominal plus all sixteen printed-profile pairs, continuous first-contact/
+handover and paid full-period seam proof, actual RootArc FREE INNER air and
+untared physical signed reads. Cone driver-root/full-drum material clearance
+retains .02 mm; directed drum-root/full-cone MATERIAL clearance retains .10 mm.
+Both complete finite-material receipts must cover the same source/phase and
+physical driven approach. First-contact surface exclusions or RootMAX disks
+cannot substitute for caps, volume or containment.
+The stock-phase reference is the actual selected 3D q0 root at all 21 stalls
+after physical `OPERATING_NOTCH_UP` setup, not a planar recomputation or a
+subtracted saved-CAD bias. Its paid CLOCK-subdomain/whole-phase envelopes
+retain all seventeen profile cases; crank ideal advance is added separately.
+Each `actual_read_phases` record is a direct query at the requested physical
+driver angle, with the genuine reference root, centre-point enclosure and
+numerical bound; a periodic endpoint cannot supply that point observation.
+Whole-period cells retain correlated same-source upper-minus-lower root
+differences. SOURCE inspection backlash scales that proved angular interval
+by the retained inspection radius; its separate physical pitch arc uses the
+actual driven pitch radius, never independent root-interval subtraction.
+The whole-period signed envelope is the canonical all-cell, both-sided seam
+receipt, not an independently rebuilt hull of uncertified rows. The CLOCK
+subdomain excludes exactly `cone_flat_free_clock`, `BoreFlatClock` and
+`drum_tooth_to_cam_notch_clock`; those three independently paid phase terms
+remain in the full production SOURCE domain. The drum pattern-to-CAM-notch
+term is paid at every read, including the initial zero, without datum removal.
+Its native `PatternNotchPhase@NotchProfile` is a separate driven 90-degree
+BASIC locator from the actual seed-gap ray to the existing kerf axis. It does
+not alter the lobe-to-kerf `NotchPhase` or its .25-degree cam-phase tolerance.
+The drawing reads the published pattern-clock grade lazily and prints a
+separate critical angular-error callout; no grade is inferred from a general
+angle tolerance. The .02-degree shop candidate may be drawn only after actual
+budget admission. An UNKNOWN or tighter admissible grade refuses production
+drawing issuance; report the tighter value instead of publishing the candidate.
+Only the unconditional `FULL_PRODUCTION_SOURCE_DOMAIN` with
+`production_source_domain=true` and functional `production_source_qualified`
+reports can supply the native full-source gate. A conditional installed-grade
+DESIGN cannot be promoted. Mathematical `DESIGN_NOMINAL_SUBDOMAIN` q0 and
+`BUDGET_CLOCK_NOMINAL_SUBDOMAIN` receipts deliberately retain
+`production_source_domain=false`; their independent supplier-bound
+`source_domain_proved` evidence serves only those stock-phase roles. Missing
+own cone/drum receiving grades remain UNKNOWN, not zero/default allowances.
+The parent authenticates deployed diagnostic bytes; native leaves validate
+the frozen receipt and current pure geometry without importing those engines.
+`native_certificate=false` permits the first native farm observation; it is
+not native acceptance, numerical success or a waived publication gate.
+
 ### Swing-cluster gravity calibration
 
 After the farm finishes, the maintained, SolidWorks-free collector reads seven

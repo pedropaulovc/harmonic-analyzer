@@ -866,751 +866,466 @@ def test_actual_64t_rows_are_frozen_exact_qualified_physical_cases() -> None:
 def test_actual_64t_row_corners_retain_short_faces_and_fitup_band() -> None:
     import crank_mesh_geometry as geometry
     import crank_mesh_stack as mesh
-
     payload = mesh.require_qualified()
-    assert geometry.required_calibration_case_names() <= payload["cases"].keys()
-    opened = mesh.row_qualification("booked_open")
-    fitup = mesh.row_qualification("turned_fitup_floor")
-    assert opened.driver_face_mm[1] - opened.driver_face_mm[0] == pytest.approx(
-        spec.FACE_WIDTH + min(spec.FACE_WIDTH_BAND)
-    )
-    assert opened.driver_shoulder_z_mm == pytest.approx(
-        spec.SHOULDER_LENGTH + min(spec.SHOULDER_LENGTH_BAND)
-    )
-    assert opened.driver_turned_radius_mm == pytest.approx(
-        (spec.TURNED_DIA - spec.TURNED_DIA_TOLERANCE_MM) / 2.0
-    )
-    assert fitup.driver_turned_radius_mm == spec.TURNED_DIA_FITUP_MIN / 2.0
-    assert opened.driven_face_mm[1] - opened.driven_face_mm[0] == pytest.approx(
-        mate.FACE_WIDTH + max(mate.FACE_WIDTH_BAND)
-    )
-    assert payload["geometry_sha256"] == mesh.geometry_sha256()
+    assert set(payload["cases"]) == geometry.required_calibration_case_names()
+    for case in payload["cases"].values():
+        family = case["continuous_contact_certificate"]["finite_face_material_enclosure"]
+        support,material = family["support_placement"],family["material_placement"]
+        assert support["driver_face_mm"][1]-support["driver_face_mm"][0] == pytest.approx(spec.FACE_WIDTH+min(spec.FACE_WIDTH_BAND))
+        assert support["driver_shoulder_z_mm"] == spec.SHOULDER_LENGTH_FITUP_MIN
+        assert support["driver_turned_radius_mm"] == spec.TURNED_DIA_FITUP_MIN/2
+        assert material["driven_face_mm"][1]-material["driven_face_mm"][0] == pytest.approx(mate.FACE_WIDTH+max(mate.FACE_WIDTH_BAND))
+        assert family["moving_face_cap_carrying"] is False
+        assert family["moving_band_cap_carrying"] is False
+    assert payload["geometry_sha256"] == geometry.geometry_sha256()
 
 
 @pytest.fixture(scope="module")
 def bounded_crank_contract_payload() -> dict:
-    """Synthetic receiver evidence, never an engineering/native certificate.
+    """REAL fully admitted baseline; missing qualification is an honest failure.
 
-    Exact source profiles, manufactured corners and full world placements
-    are real inputs. Positive bounded contact observations are deliberately
-    synthetic so refusal/mutation logic remains executable while the actual
-    engineering study is refused. No production module imports this fixture.
+    The former synthetic 65-point roots/windows/normals are retired. Shared
+    TESTONLY pure-reader controls below are independent and never substituted
+    for this complete manufacturing/source/phase acceptance packet.
     """
-    import hashlib
-    import json
-
-    import crank_mesh_geometry as geometry
     import crank_mesh_stack as mesh
-
-    def profile_record(profile) -> dict:
-        return {
-            "teeth": profile.teeth,
-            "reference_teeth": profile.template.reference_teeth,
-            "dp": profile.template.diametral_pitch,
-            "pa_deg": profile.template.pressure_angle_deg,
-            "blank_radius_mm": profile.blank_radius_mm,
-            "radial_translation_mm": profile.radial_translation_mm,
-            "helix_angle_deg": profile.helix_angle_deg,
-        }
-
-    drivers = {"nominal": spec.STOCK_PROFILE, **dict(spec.STOCK_PROFILE_CORNERS)}
-    driven = {"nominal": mate.STOCK_PROFILE, **dict(mate.STOCK_PROFILE_CORNERS)}
-    placements = geometry.calibration_case_placements()
-    domains = geometry.calibration_case_domains()
-    pitch = 2.0 * math.pi / spec.TEETH
-    surface_error = 0.001
-    phase_error = surface_error / (spec.PITCH_DIA / 2.0)
-    phase_motion = 0.0001
-    root_air_lower = 0.02  # Synthetic positive bound, not a production root-air floor.
-    low, high = -0.025, -0.005
-    cases = {}
-    for source in geometry.calibration_case_parameters():
-        name = source["name"]
-        pose = placements[name]
-        domain = domains[name]
-        p16 = drivers[source["driver_profile_label"]]
-        p64 = driven[source["driven_profile_label"]]
-        face_low, face_high = pose["driven_face_mm"]
-        width = face_high - face_low
-        intervals = [[face_low + 0.05 * width, face_high - 0.05 * width]]
-        station = (face_low + face_high) / 2.0
-        driver_z = sum(pose["driver_face_mm"]) / 2.0
-        driver_radius = p16.pitch_radius_mm
-        world_point = [
-            pose["driver_origin_mm"][axis]
-            + pose["driver_frame"][axis][0] * driver_radius
-            + pose["driver_frame"][axis][2] * driver_z
-            for axis in range(3)
-        ]
-        normal = [pose["driver_frame"][axis][0] for axis in range(3)]
-
-        def contact(offset: float, tooth: int) -> dict:
-            return {
-                "phase_offset_rad": offset,
-                "driven_tooth": tooth,
-                "segment": "finite_flank",
-                "kind": "flank",
-                "parameter": 0.5,
-                "station_mm": station,
-                "world_point_mm": list(world_point),
-                "driver_radius_mm": driver_radius,
-                "driver_z_mm": driver_z,
-                "driven_normal_world": [-value for value in normal],
-                "driver_normal_world": list(normal),
-                "opposed_normal_residual": 0.0,
-                "common_normal_supported": True,
-                "common_normal_error_bound": 1e-12,
-                "driven_per_driver_velocity": -spec.TEETH / mate.TEETH,
-            }
-
-        rows = []
-        for index in range(65):
-            tooth = 0 if index < 32 else 1
-            rows.append({
-                "driver_phase_rad": index * pitch / 64.0,
-                "lower_rad": low,
-                "upper_rad": high,
-                "error_rad": phase_error,
-                "phase_error_rad": phase_motion / driver_radius,
-                "surface_numerical_resolved": True,
-                "surface_extrema_enclosures_rad": [{
-                    "side": side,
-                    "lower_rad": edge - phase_error / 2,
-                    "upper_rad": edge,
-                    "branches": [[tooth, edge - phase_error / 2, edge]],
-                    "unwitnessed_branch_lower_rad": [],
-                    "numerical_tolerance_rad": phase_error,
-                    "relaxed_incumbent_rad": edge - phase_error / 2,
-                    "achieved_residual_rad": 0.0,
-                    "terminal_lower_rad": None,
-                    "terminal_boxes": 0,
-                    "branch_numerics": [{
-                        "tooth": tooth,
-                        "lower_rad": edge - phase_error / 2,
-                        "relaxed_incumbent_rad": edge - phase_error / 2,
-                        "achieved_residual_rad": 0.0,
-                        "terminal_lower_rad": None,
-                        "terminal_boxes": 0,
-                    }],
-                    "radial_pose_error_mm": domain["radial_error_mm"],
-                    "axial_pose_error_mm": domain["axial_error_mm"],
-                } for side, edge in (("lower", -low), ("upper", high))],
-                "root_free_intervals_rad": [[-pitch / 2.0, pitch / 2.0]],
-                "free_intervals_rad": [[
-                    low + phase_error + phase_motion / driver_radius,
-                    high - phase_error - phase_motion / driver_radius,
-                ]],
-                "root_sweep": {
-                    "free_inner": [[-pitch / 2.0, pitch / 2.0]],
-                    "free_outer": [[-pitch / 2.0, pitch / 2.0]],
-                    "offset_domain_rad": [-pitch / 2.0, pitch / 2.0],
-                    # Matching inner/outer sets have no angular set uncertainty.
-                    "angular_uncertainty_rad": 0.0,
-                    "driver_pitch_displacement_uncertainty_mm": 0.0,
-                    "geometric_uncertainty_mm": surface_error,
-                    "radial_error_mm": domain["radial_error_mm"],
-                    "axial_error_mm": domain["axial_error_mm"],
-                    "required_root_air_mm": domain["required_root_air_mm"],
-                    "root_air_lower_bound_mm": root_air_lower,
-                    "root_max_radial_clearance_screen_mm": None,
-                    "witnesses": [],
-                    "enclosure_uncertainty": [],
-                    "uncertain_boxes": 0,
-                    "boxes": 1,
-                    "status": "resolved",
-                    "containment_proof": "synthetic complete outer-solid enclosure",
-                    "reason": "",
-                    "root_is_carrying": False,
-                    "native_solid_certificate": False,
-                },
-                "lower_contact": contact(low, tooth),
-                "upper_contact": contact(high, tooth),
-                "branch_intervals": [[tooth, low, high]],
-                "boxes": 1,
-                "root_contact": False,
-                # Covers half the uniform phase cell, within the branch window.
-                "branch_phase_reserves_rad": [[tooth, 0.004]],
-                "supported_branch_contacts": [{
-                    "tooth": tooth,
-                    "contacts": [
-                        {"side": "lower", "contact": contact(low, tooth)},
-                        {"side": "upper", "contact": contact(high, tooth)},
-                    ],
-                }],
-                "row_intervals_mm": [list(interval) for interval in intervals],
-            })
-        cases[name] = {
-            "case": name,
-            "metric": "STOCK-FORM COVERAGE",
-            "is_conjugate": False,
-            "driver_profile": profile_record(p16),
-            "driven_profile": profile_record(p64),
-            "placement": pose,
-            "pose_domain": domain,
-            "phase_rows": rows,
-            "phase_components_rad": [[
-                low + phase_error + phase_motion / driver_radius,
-                high - phase_error - phase_motion / driver_radius,
-            ]],
-            "phase_window_rad": [low + 2.0 * phase_error, high - 2.0 * phase_error],
-            "phase_seed_rad": (low + high) / 2.0,
-            "stock_form_coverage_lower": 1.0,
-            "coverage_definition": "synthetic bounded supported branch union / physical pitch",
-            "continuous_carrying_contact": True,
-            "uncovered_phase_rad": 0.0,
-            "phase_reserve_rad": 0.001,
-            "noncarrying_pair_normal_gap_upper_mm": 0.002,
-            "handovers": [{
-                "continuous": True,
-                "side": side,
-                "phase_rad": 31.5 * pitch / 64.0,
-                "phase_bracket_rad": [31.0 * pitch / 64.0, 32.0 * pitch / 64.0],
-                "pair": [0, 1],
-                "pitch_displacement_jump_upper_mm": 0.003,
-                "contact": contact(offset, 1),
-            } for side, offset in (("lower", low), ("upper", high))],
-            "row_available_fraction_lower": 0.89,
-            "row_available_intervals_mm": intervals,
-            "qualified": True,
-            "tight_backlash_lower_mm": (high - low - 2.0 * phase_error) * driver_radius - 2.0 * phase_motion,
-            "loose_backlash_upper_mm": (high - low + 2.0 * phase_error) * driver_radius + 2.0 * phase_motion,
-            "no_overlap_at_samples": True,
-            "parametric_driven_mechanical_datum_te_rad": [
-                -spec.TEETH / mate.TEETH * row["lower_rad"] for row in rows
-            ],
-            "parametric_actual_driver_phase_rad": [row["driver_phase_rad"] - low for row in rows],
-            "numerical_error_bounds": {
-                "surface_mm": surface_error,
-                "phase_motion_mm": phase_motion,
-                "root_surface_mm": surface_error,
-                "geom_ball_mm": 0.0,
-                "radial_mm": domain["radial_error_mm"],
-                "axial_mm": domain["axial_error_mm"],
-                "te_rad": (2.0 * surface_error + phase_motion) / driver_radius * spec.TEETH / mate.TEETH,
-            },
-            "native_certificate": False,
-        }
-    # Hash synthetic labels, NOT diagnostic files. These unit identities may
-    # never be mistaken for an actual collector's deployed-source manifest.
-    engine_sources = {
-        name: hashlib.sha256(f"synthetic receiver fixture: {name}".encode()).hexdigest()
-        for name in (
-            "crank_mesh_backlash_study.py", "crossed_mesh_study.py",
-            "stock_form_contact_3d.py", "stock_form_root_angles.py", "stock_form_root_sweep.py",
-            "stock_form_contact_continuation.py",
-        )
-    }
-    return {
-        "qualified": True,
-        "geometry_sha256": mesh.geometry_sha256(),
-        "measurement_engine_sources_sha256": engine_sources,
-        "measurement_engine_sha256": hashlib.sha256(
-            json.dumps(engine_sources, sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest(),
-        "measurement_engine_provenance": "synthetic unit-fixture labels; not source bytes",
-        "refusal": None,
-        "cases": cases,
-        "phase_window_rad": [-0.020, -0.010],
-        "phase_seed_deg": math.degrees(-0.015),
-    }
+    return mesh.require_qualified()
 
 
-def _crank_case_mutation(payload: dict, case_name: str = "nominal") -> dict:
-    """Copy only the mutated case; the full source family remains present."""
-    from copy import deepcopy
+@pytest.mark.parametrize("value",[None,True,float("nan"),float("inf"),"0"])
+def test_crank_configured_phase_must_be_an_actual_finite_number(bounded_crank_contract_payload,monkeypatch,value):
+    import _config
+    import crank_mesh_stack as mesh
+    original = _config.machine
+    def configured(group,*keys):
+        if group == "gear_train" and keys == ("crank_mesh_phase_offset_deg",):
+            return value
+        return original(group,*keys)
+    monkeypatch.setattr(_config,"machine",configured)
+    with pytest.raises(ValueError,match="exactly the same finite datum"):
+        mesh.require_qualified(bounded_crank_contract_payload)
 
-    result = dict(payload, cases=dict(payload["cases"]))
-    result["cases"][case_name] = deepcopy(payload["cases"][case_name])
+
+@pytest.mark.parametrize("path",[
+    ("phase_seed_deg",),("phase_qualification","CERTIFIED_PHASE_OFFSET_DEG"),
+])
+def test_crank_packet_and_certified_phase_cannot_drift_from_configuration(bounded_crank_contract_payload,path):
+    import crank_mesh_stack as mesh
+    changed = _crank_path_change(bounded_crank_contract_payload,path,
+                                bounded_crank_contract_payload["phase_seed_deg"]+0.125)
+    with pytest.raises(ValueError,match="exactly the same finite datum"):
+        mesh.require_qualified(changed)
+
+
+def test_crank_provider_returns_the_same_fully_admitted_packet(bounded_crank_contract_payload):
+    import crank_drive_phase as phase
+    assert phase.require_qualified() is bounded_crank_contract_payload
+
+
+def test_crank_provider_refuses_equal_but_unbound_return_object(bounded_crank_contract_payload,monkeypatch):
+    import crank_drive_phase as phase
+    import crank_mesh_stack as mesh
+    monkeypatch.setattr(mesh,"require_qualified",lambda:dict(bounded_crank_contract_payload))
+    with pytest.raises(ValueError,match="frozen byte identities"):
+        phase.require_qualified()
+
+
+@pytest.mark.parametrize("field",[
+    "CERTIFIED_PHASE_OFFSET_DEG","CONE_SHAFT_LAG_RAD","BOUND_RAD",
+    "CONE_SHAFT_LAG_INTERVAL_RAD","GEOMETRY_SHA256","MEASUREMENT_ENGINE_SHA256","PACKET_SHA256",
+])
+def test_crank_provider_cannot_publish_fields_from_other_packet_bytes(
+        bounded_crank_contract_payload,monkeypatch,field):
+    import crank_drive_phase as phase
+    monkeypatch.setattr(phase,field,None)
+    with pytest.raises(ValueError,match="frozen"):
+        phase.require_qualified()
+
+
+def test_crank_provider_refuses_replaced_raw_packet_even_if_json_value_is_equal(
+        bounded_crank_contract_payload,monkeypatch):
+    from pathlib import Path
+    import crank_mesh_calibration as calibration
+    import crank_drive_phase as phase
+    original = Path.read_bytes
+    def replaced(path):
+        raw = original(path)
+        return raw+b"\n" if path == calibration._PACKET_PATH else raw
+    monkeypatch.setattr(Path,"read_bytes",replaced)
+    with pytest.raises(ValueError,match="bytes/data changed"):
+        phase.require_qualified()
+
+
+@pytest.mark.parametrize("path,value",[
+    (("phase_qualification","scope"),"nominal-only"),
+    (("cases","nominal","handovers"),[]),
+    (("cases","nominal","periodic_seam","pitch_displacement_jump_upper_mm"),0.0),
+])
+def test_crank_published_phase_and_carrying_summaries_bind_the_actual_proofs(
+        bounded_crank_contract_payload,path,value):
+    import crank_mesh_stack as mesh
+    with pytest.raises(ValueError):
+        mesh.require_qualified(_crank_path_change(bounded_crank_contract_payload,path,value))
+
+def test_actual_selected_clock_producer_replays_committed_transport_without_a_beta_tare(
+        bounded_crank_contract_payload):
+    from dataclasses import replace
+    import crank_mesh_geometry as geometry
+    from diagnostics.stock_form_contact_3d import ContactPair,Placement,selected_driver_clock_transport
+    from stock_form_contact_certificate import same_numeric_tree
+    payload = bounded_crank_contract_payload
+    source = next(row for row in geometry.calibration_case_parameters() if row["name"] == "nominal")
+    pair = ContactPair("nominal",geometry.pinion.STOCK_PROFILE,geometry.gear64.STOCK_PROFILE,
+                       Placement(**geometry.placement_record(source["pose"])))
+    selected = replace(pair,placement=Placement(**geometry.placement_record(
+        source["pose"],selected_phase_offset_deg=payload["phase_seed_deg"])))
+    keywords = dict(selected_phase_offset_deg=payload["phase_seed_deg"],
+                    base_geometry_sha256=payload["geometry_sha256"],
+                    measurement_engine_sha256=payload["measurement_engine_sha256"])
+    actual = selected_driver_clock_transport(pair,selected,payload["cases"]["nominal"],**keywords)
+    assert same_numeric_tree(actual,payload["selected_phase_transports"]["nominal"])
+    tared = replace(selected,placement=replace(
+        selected.placement,driven_clocking_rad=selected.placement.driven_clocking_rad+0.125))
+    with pytest.raises(ValueError,match="ONLY"):
+        selected_driver_clock_transport(pair,tared,payload["cases"]["nominal"],**keywords)
+
+
+
+def _crank_path_change(payload,path,value=None,*,remove=False):
+    """Copy only the changed containers; never mutate the canonical packet."""
+    result = dict(payload)
+    original,target = payload,result
+    for key in path[:-1]:
+        child = original[key]
+        copied = dict(child) if isinstance(child,dict) else list(child)
+        target[key] = copied
+        original,target = child,copied
+    assert path[-1] in original if isinstance(original,dict) else 0 <= path[-1] < len(original)
+    if remove:
+        del target[path[-1]]
+    else:
+        assert original[path[-1]] != value
+        target[path[-1]] = value
     return result
 
 
-@pytest.mark.parametrize("mutation", ["non_unit", "false_opposition"])
-def test_crank_receiver_reconstructs_claimed_common_normal(mutation, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = _crank_case_mutation(bounded_crank_contract_payload)
-    proof = payload["cases"]["nominal"]["phase_rows"][0]["lower_contact"]
-    if mutation == "non_unit":
-        proof["driven_normal_world"] = [2*value for value in proof["driven_normal_world"]]
-    else:
-        proof["driven_normal_world"] = list(proof["driver_normal_world"])
-    with pytest.raises(ValueError, match="common-normal"):
-        mesh.require_qualified(payload)
+_CRANK_CELL = ("cases","nominal","continuous_contact_certificate","sides","upper","phase_cells",0)
+_CRANK_BRANCH = (*_CRANK_CELL,"branch_proofs",0)
+_CRANK_ROOT = (*_CRANK_CELL,"root_proof","root_sweep")
 
 
-@pytest.mark.parametrize("mutation", [
-    "missing", "unpaid_width", "dropped_pose", "duplicate_branch", "outside_tooth",
-    "detached_branch_lower", "detached_side_incumbent",
-])
-def test_crank_receiver_refuses_unpaid_surface_enclosures(mutation, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = _crank_case_mutation(bounded_crank_contract_payload)
-    row = payload["cases"]["nominal"]["phase_rows"][0]
-    if mutation == "missing":
-        del row["surface_extrema_enclosures_rad"]
-    else:
-        enclosure = row["surface_extrema_enclosures_rad"][0]
-        if mutation == "unpaid_width":
-            enclosure["lower_rad"] = enclosure["upper_rad"] - 2 * row["error_rad"]
-        elif mutation == "dropped_pose":
-            enclosure["radial_pose_error_mm"] = 0.0
-        elif mutation == "duplicate_branch":
-            enclosure["branches"].append(list(enclosure["branches"][0]))
-        elif mutation == "detached_branch_lower":
-            proof = enclosure["branch_numerics"][0]
-            proof["lower_rad"] -= row["error_rad"]
-            proof["relaxed_incumbent_rad"] = proof["lower_rad"]
-        elif mutation == "detached_side_incumbent":
-            enclosure["relaxed_incumbent_rad"] -= row["error_rad"]
-        else:
-            enclosure["branches"][0][0] = mate.TEETH
-    with pytest.raises(ValueError):
-        mesh.require_qualified(payload)
-
-
-@pytest.mark.parametrize("mutation", ["reversed", "overlap", "inner_outside_outer", "partial_pitch"])
-def test_crank_receiver_checks_unselected_root_components(mutation, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = _crank_case_mutation(bounded_crank_contract_payload)
-    root = payload["cases"]["nominal"]["phase_rows"][0]["root_sweep"]
-    half = math.pi / spec.TEETH
-    if mutation == "reversed":
-        root["free_outer"].append([half / 2, half / 4])
-    elif mutation == "overlap":
-        root["free_outer"].append([half / 4, half / 2])
-    elif mutation == "inner_outside_outer":
-        root["free_outer"] = [[-half, half / 2]]
-    else:
-        root["offset_domain_rad"] = [-half, half / 2]
-    with pytest.raises(ValueError):
-        mesh.require_qualified(payload)
-
-
-def test_bounded_full_crank_payload_executes_row_factory(monkeypatch, bounded_crank_contract_payload) -> None:
+def test_bounded_full_crank_payload_executes_row_factory(bounded_crank_contract_payload) -> None:
     from dataclasses import FrozenInstanceError
-
     import crank_mesh_geometry as geometry
     import crank_mesh_stack as mesh
-
     payload = bounded_crank_contract_payload
     assert mesh.require_qualified(payload) is payload
     assert set(payload["cases"]) == geometry.required_calibration_case_names()
-    monkeypatch.setattr(mesh, "CALIBRATION", payload)
-    # The full family is validated above. Exercise the factory across each
-    # physical case category without re-validating that family quadratically.
-    names = (
-        "nominal", "booked_closed", "booked_open", "centre_minus", "centre_plus",
-        "turned_fitup_floor",
-        next(name for name in payload["cases"] if name.startswith("profile_corner_")),
-        next(name for name in payload["cases"] if name.startswith("axis_corner_")),
-    )
-    for name in names:
+    for name,case in payload["cases"].items():
         row = mesh.row_qualification(name)
-        assert isinstance(row, mesh.RowQualification)
-        assert row.case_name == name
-        assert row.row_fraction_lower == 0.89
-        assert row.coverage_lower == 1.0
+        pose = case["placement"]
+        assert isinstance(row,mesh.RowQualification) and row.case_name == name
+        assert row.driver_origin_mm == tuple(pose["driver_origin_mm"])
+        assert row.driven_origin_mm == tuple(pose["driven_origin_mm"])
+        assert row.driver_frame == tuple(map(tuple,pose["driver_frame"]))
+        assert row.driven_frame == tuple(map(tuple,pose["driven_frame"]))
+        assert row.driver_face_mm == tuple(pose["driver_face_mm"])
+        assert row.driven_face_mm == tuple(pose["driven_face_mm"])
+        assert row.driver_shoulder_z_mm == pose["driver_shoulder_z_mm"]
+        assert row.driver_turned_radius_mm == pose["driver_turned_radius_mm"]
+        assert row.supported_driven_station_intervals_mm == tuple(map(tuple,case["row_available_intervals_mm"]))
+        assert row.row_fraction_lower == case["row_available_fraction_lower"] >= .85
+        assert row.coverage_lower == case["stock_form_coverage_lower"] >= .62
         assert row.continuous_carrier
-        assert row.supported_driven_station_intervals_mm
-        assert row.driver_origin_mm == tuple(payload["cases"][name]["placement"]["driver_origin_mm"])
         with pytest.raises(FrozenInstanceError):
-            row.driver_turned_radius_mm = 0.0
-    with pytest.raises(ValueError, match="row qualification"):
+            row.driver_turned_radius_mm = 0
+    with pytest.raises(ValueError,match="row qualification"):
         mesh.row_qualification("unmeasured_hypothetical_face")
 
 
-def test_crank_requires_every_source_owned_case(bounded_crank_contract_payload) -> None:
-    import crank_mesh_geometry as geometry
+@pytest.mark.parametrize("mutation",["non_unit","false_opposition"])
+def test_crank_receiver_reconstructs_claimed_common_normal(mutation,bounded_crank_contract_payload):
     import crank_mesh_stack as mesh
+    cell = bounded_crank_contract_payload["cases"]["nominal"]["continuous_contact_certificate"]["sides"]["upper"]["phase_cells"][0]
+    generators = cell["branch_proofs"][0]["normal_cone_generators_world"]
+    if mutation == "non_unit":
+        path,value = (*_CRANK_BRANCH,"normal_cone_generators_world",0,0),[[2.,2.],[0.,0.],[0.,0.]]
+    else:
+        path,value = (*_CRANK_BRANCH,"normal_cone_generators_world",1),generators[0]
+    with pytest.raises(ValueError):
+        mesh.require_qualified(_crank_path_change(bounded_crank_contract_payload,path,value))
 
-    for name in geometry.required_calibration_case_names():
-        payload = dict(bounded_crank_contract_payload, cases=dict(bounded_crank_contract_payload["cases"]))
-        del payload["cases"][name]
+
+@pytest.mark.parametrize("mutation",["reversed","overlap","inner_outside_outer","partial_pitch"])
+def test_crank_receiver_checks_unselected_root_components(mutation,bounded_crank_contract_payload):
+    import crank_mesh_stack as mesh
+    root = bounded_crank_contract_payload["cases"]["nominal"]["continuous_contact_certificate"]["sides"]["upper"]["phase_cells"][0]["root_proof"]["root_sweep"]
+    lo,hi = root["offset_domain_rad"]
+    if mutation == "reversed":
+        field,value = "free_outer",[*root["free_outer"],[hi,lo]]
+    elif mutation == "overlap":
+        field,value = "free_outer",[*root["free_outer"],list(root["free_outer"][0])]
+    elif mutation == "inner_outside_outer":
+        field,value = "free_outer",[]
+    else:
+        field,value = "offset_domain_rad",[lo,lo/2+hi/2]
+    with pytest.raises(ValueError):
+        mesh.require_qualified(_crank_path_change(bounded_crank_contract_payload,(*_CRANK_ROOT,field),value))
+
+
+@pytest.mark.parametrize("path,value",[
+    (("cases","nominal","qualified"),False),
+    (("cases","nominal","metric"),"CONTACT RATIO"),
+    (("cases","nominal","is_conjugate"),True),
+    (("cases","nominal","native_certificate"),True),
+    (("cases","nominal","tight_backlash_lower_mm"),0.),
+    (("cases","nominal","loose_backlash_upper_mm"),math.inf),
+    (("cases","nominal","stock_form_coverage_lower"),.6199),
+    (("cases","nominal","row_available_fraction_lower"),.8499),
+    (("cases","nominal","continuous_carrying_contact"),False),
+    (("cases","nominal","uncovered_phase_rad"),1e-6),
+    (("cases","nominal","full_period_cells"),[]),
+    (("cases","nominal","phase_components_rad"),[]),
+    (("cases","nominal","numerical_error_bounds"),{}),
+    (("cases","nominal","placement","driver_frame"),[[0.]*3]*3),
+    (("cases","nominal","placement","driven_frame"),[[0.]*3]*3),
+    (("cases","nominal","driver_profile","teeth"),15),
+    (("cases","nominal","driver_profile","reference_teeth"),16),
+    (("cases","nominal","driven_profile","teeth"),69),
+    (("cases","nominal","driven_profile","helix_angle_deg"),0.),
+    (("cases","nominal","continuous_source_domain","production_source_domain"),False),
+    ((*_CRANK_BRANCH,"status"),"UNKNOWN"),
+    ((*_CRANK_BRANCH,"normal_cone_weights"),[]),
+    ((*_CRANK_BRANCH,"physical_strata","driven","kind"),"root_arc"),
+    ((*_CRANK_BRANCH,"root_free_component_rad"),[0.,0.]),
+    ((*_CRANK_CELL,"first_contact_cover","physical_patch_inventory"),[]),
+    ((*_CRANK_CELL,"first_contact_cover","additional_geometry_error_mm"),0.),
+    ((*_CRANK_CELL,"surface_exclusion_receipts"),[]),
+    ((*_CRANK_CELL,"free_reference_exclusion_receipts"),[]),
+    ((*_CRANK_ROOT,"root_is_carrying"),True),
+    ((*_CRANK_ROOT,"native_solid_certificate"),True),
+    ((*_CRANK_ROOT,"free_inner"),[]),
+    ((*_CRANK_ROOT,"physical_driver_teeth"),[]),
+    ((*_CRANK_CELL,"driven_root_material_proof","root_subset_enclosure","retained_helix_angle_deg"),0.),
+    ((*_CRANK_CELL,"driven_root_material_proof","material_sweep","material_scope"),"driver_root_material"),
+    ((*_CRANK_CELL,"driven_root_material_proof","material_sweep","root_sweep","containment_proof"),""),
+    (("nominal_reference_read_case","continuous_source_domain","scope"),"FULL_PRODUCTION_SOURCE_DOMAIN"),
+    (("nominal_reference_read_case","actual_read_phases",0,"periodic_point_substitution"),True),
+    (("nominal_reference_read_case","actual_read_phases",0,"direct_actual_phase_query"),False),
+    (("nominal_reference_read_case","actual_read_phases",0,"reference_error_bound_rad"),0.),
+    (("phase_qualification","CONE_SHAFT_LAG_INTERVAL_RAD"),[0.,0.]),
+    (("phase_qualification","alignment_zero_subtracted"),True),
+    (("source_identity","source_bytes_stable"),False),
+    (("selected_phase_transports","nominal","source_map_before_period_reduction"),{}),
+    (("selected_phase_transports","nominal","period_relabelling_authority"),{}),
+    (("selected_phase_transports","nominal","selected_source_identity_sha256"),"0"*64),
+])
+def test_full_crank_contract_mutations_refuse(path,value,bounded_crank_contract_payload):
+    import crank_mesh_stack as mesh
+    changed = _crank_path_change(bounded_crank_contract_payload,path,value)
+    with pytest.raises(ValueError):
+        mesh.require_qualified(changed)
+
+
+@pytest.mark.parametrize("path",[
+    ("geometry_sha256",),("measurement_engine_sha256",),("measurement_engine_sources_sha256",),
+    ("source_identity",),("consumed_input_sha256",),("phase_seed_deg",),("phase_qualification",),
+    ("selected_phase_transports",),("selected_read_cases",),("nominal_reference_read_case",),
+    ("cases","nominal","continuous_contact_certificate"),("cases","nominal","continuous_source_domain"),
+    ("cases","nominal","whole_period_signed_running_te_interval_rad"),
+    (*_CRANK_BRANCH,"normal_cone_generators_world"),(*_CRANK_BRANCH,"physical_strata"),
+    (*_CRANK_BRANCH,"driven_phase_parameter_derivatives"),(*_CRANK_BRANCH,"center_root_box"),
+    (*_CRANK_BRANCH,"common_normal_moments"),(*_CRANK_BRANCH,"geometry_error_bound_mm"),
+    (*_CRANK_CELL,"first_contact_cover","chart_minimum_bounds"),
+    (*_CRANK_CELL,"first_contact_cover","boundary_separations"),
+    (*_CRANK_CELL,"first_contact_cover","patch_remainder_bounds"),
+    (*_CRANK_CELL,"first_contact_cover","additional_geometry_error_mm"),
+    (*_CRANK_CELL,"root_proof"),(*_CRANK_CELL,"driven_root_material_proof"),
+    (*_CRANK_CELL,"driven_root_material_proof","root_subset_enclosure"),
+    (*_CRANK_CELL,"driven_root_material_proof","root_subset_enclosure","radial_clip_radius_mm"),
+    (*_CRANK_CELL,"surface_exclusion_receipts"),(*_CRANK_CELL,"free_reference_exclusion_receipts"),
+    ("cases","nominal","continuous_contact_certificate","finite_face_material_enclosure","source_driver_retained_band_limits_mm"),
+    ("cases","nominal","continuous_contact_certificate","finite_face_material_enclosure","moving_band_cap_carrying"),
+])
+def test_missing_crank_nested_contract_fields_refuse(path,bounded_crank_contract_payload):
+    import crank_mesh_stack as mesh
+    with pytest.raises(ValueError):
+        mesh.require_qualified(_crank_path_change(bounded_crank_contract_payload,path,remove=True))
+
+
+def test_crank_requires_every_source_owned_case(bounded_crank_contract_payload):
+    import crank_mesh_stack as mesh
+    for name in bounded_crank_contract_payload["cases"]:
         with pytest.raises(ValueError):
-            mesh.require_qualified(payload)
+            mesh.require_qualified(_crank_path_change(bounded_crank_contract_payload,("cases",name),remove=True))
 
 
-@pytest.mark.parametrize("path,value", [
-    (("qualified",), False),
-    (("metric",), "CONTACT RATIO"),
-    (("is_conjugate",), True),
-    (("native_certificate",), True),
-    (("tight_backlash_lower_mm",), 0.0),
-    (("tight_backlash_lower_mm",), math.nan),
-    (("loose_backlash_upper_mm",), math.inf),
-    (("stock_form_coverage_lower",), 0.6199),
-    (("stock_form_coverage_lower",), math.nan),
-    (("row_available_fraction_lower",), 0.8499),
-    (("row_available_fraction_lower",), math.nan),
-    (("continuous_carrying_contact",), False),
-    (("uncovered_phase_rad",), 0.000001),
-    (("uncovered_phase_rad",), math.nan),
-    (("handovers", 0, "continuous"), False),
-    (("handovers", 0, "pitch_displacement_jump_upper_mm"), 0.005001),
-    (("handovers", 0, "pitch_displacement_jump_upper_mm"), math.nan),
-    (("handovers", 0, "pitch_displacement_jump_upper_mm"), -0.001),
-    (("handovers", 0, "contact"), None),
-    (("handovers",), []),
-    (("phase_rows",), []),
-    (("phase_rows", 0, "driver_phase_rad"), 0.001),
-    (("phase_rows", 64, "driver_phase_rad"), 0.1),
-    (("phase_rows", 64, "lower_contact", "driven_tooth"), 0),
-    (("phase_rows", 64, "upper_contact", "driven_tooth"), 2),
-    (("phase_rows", 2, "driver_phase_rad"), 0.0),
-    (("phase_rows", 2, "lower_rad"), math.nan),
-    (("phase_rows", 2, "upper_rad"), -0.030),
-    (("phase_rows", 2, "error_rad"), -0.001),
-    (("phase_rows", 2, "root_contact"), True),
-    (("phase_rows", 2, "phase_error_rad"), -0.001),
-    (("phase_rows", 2, "root_free_intervals_rad"), []),
-    (("phase_rows", 2, "root_free_intervals_rad"), [[0.01, 0.02]]),
-    (("phase_rows", 2, "free_intervals_rad"), []),
-    (("phase_rows", 2, "free_intervals_rad"), [[0.01, 0.02]]),
-    (("phase_rows", 2, "driver_phase_rad"), 0.013),
-    (("phase_rows", 2, "root_sweep", "status"), "unresolved"),
-    (("phase_rows", 2, "root_sweep", "root_is_carrying"), True),
-    (("phase_rows", 2, "root_sweep", "root_air_lower_bound_mm"), -0.001),
-    (("phase_rows", 2, "root_sweep", "root_air_lower_bound_mm"), None),
-    (("phase_rows", 2, "root_sweep", "required_root_air_mm"), 0.03),
-    (("phase_rows", 2, "root_sweep", "geometric_uncertainty_mm"), 0.002),
-    (("phase_rows", 2, "root_sweep", "geometric_uncertainty_mm"), math.nan),
-    (("phase_rows", 2, "root_sweep", "native_solid_certificate"), True),
-    (("phase_components_rad",), []),
-    (("phase_components_rad",), [[0.01, 0.02]]),
-    (("phase_rows", 2, "lower_contact"), None),
-    (("phase_rows", 2, "upper_contact", "kind"), "axial_face"),
-    (("phase_rows", 2, "lower_contact", "kind"), "root_arc"),
-    (("phase_rows", 2, "lower_contact", "kind"), "root_corner"),
-    (("phase_rows", 2, "supported_branch_contacts"), []),
-    (("phase_rows", 2, "branch_phase_reserves_rad"), [[63, 0.01]]),
-    (("phase_rows", 2, "branch_phase_reserves_rad"), [[0, 0.0]]),
-    (("phase_rows", 2, "supported_branch_contacts", 0, "tooth"), 63),
-    (("phase_rows", 2, "supported_branch_contacts", 0, "contacts"), []),
-    (("phase_rows", 2, "supported_branch_contacts", 0, "contacts", 0, "contact", "driven_tooth"), 63),
-    (("phase_rows", 2, "lower_contact", "world_point_mm"), [math.inf, 0.0, 0.0]),
-    (("phase_rows", 2, "lower_contact", "common_normal_supported"), False),
-    (("phase_rows", 2, "upper_contact", "common_normal_supported"), False),
-    (("phase_rows", 2, "lower_contact", "common_normal_error_bound"), -1e-12),
-    (("phase_rows", 2, "lower_contact", "common_normal_error_bound"), math.nan),
-    (("phase_rows", 2, "lower_contact", "opposed_normal_residual"), 1e-11),
-    (("phase_rows", 2, "lower_contact", "driven_per_driver_velocity"), math.nan),
-    (("numerical_error_bounds", "surface_mm"), -0.001),
-    (("numerical_error_bounds", "phase_motion_mm"), math.nan),
-    (("numerical_error_bounds",), {}),
-    (("pose_domain", "radial_error_mm"), 0.0),
-    (("pose_domain", "axial_error_mm"), 0.0),
-    (("pose_domain", "all_runout_angles"), False),
-    (("pose_domain", "components_mm"), []),
-    (("pose_domain", "required_root_air_mm"), 0.02),
-    (("numerical_error_bounds", "radial_mm"), 0.0),
-    (("numerical_error_bounds", "axial_mm"), 0.0),
-    (("row_available_intervals_mm",), []),
-    (("row_available_intervals_mm",), [[-0.1, 0.1]]),
-    (("row_available_intervals_mm",), [[-1.0, 1.0], [0.0, 2.0]]),
-    (("row_available_intervals_mm",), [[-100.0, 100.0]]),
-    (("placement", "driver_face_mm"), [0.0, 0.0]),
-    (("placement", "driver_shoulder_z_mm"), 0.0),
-    (("placement", "driver_turned_radius_mm"), 0.0),
-    (("placement", "driver_origin_mm"), [0.0, 0.0, 0.0]),
-    (("placement", "driven_origin_mm"), [0.0, 0.0, 0.0]),
-    (("placement", "driver_frame"), [[0.0] * 3] * 3),
-    (("placement", "driven_frame"), [[0.0] * 3] * 3),
-    (("driver_profile", "teeth"), 15),
-    (("driver_profile", "reference_teeth"), 16),
-    (("driver_profile", "blank_radius_mm"), 0.0),
-    (("driven_profile", "teeth"), 69),
-    (("driven_profile", "helix_angle_deg"), 0.0),
-    (("driven_profile", "radial_translation_mm"), 0.0),
-    (("phase_window_rad",), [-0.019, -0.016]),
-    (("phase_rows", 2, "lower_contact", "kind"), "axial_interior"),
+@pytest.mark.parametrize("name",[
+    "crank_mesh_backlash_study.py","crossed_mesh_study.py","stock_form_contact_3d.py",
+    "stock_form_root_angles.py","stock_form_root_sweep.py","stock_form_contact_continuation.py",
 ])
-def test_full_crank_contract_mutations_refuse(path, value, bounded_crank_contract_payload) -> None:
+def test_missing_crank_engine_source_manifest_refuses(name,bounded_crank_contract_payload):
     import crank_mesh_stack as mesh
+    with pytest.raises(ValueError,match="manifest"):
+        mesh.require_qualified(_crank_path_change(bounded_crank_contract_payload,
+                                                ("measurement_engine_sources_sha256",name),remove=True))
 
-    payload = _crank_case_mutation(bounded_crank_contract_payload)
-    target = payload["cases"]["nominal"]
-    for field in path[:-1]:
-        target = target[field]
-    target[path[-1]] = value
+
+@pytest.mark.parametrize("digest",["","0"*63,"G"*64,"A"*64,None])
+def test_malformed_crank_engine_source_digest_refuses(digest,bounded_crank_contract_payload):
+    import crank_mesh_stack as mesh
+    with pytest.raises(ValueError,match="manifest"):
+        mesh.require_qualified(_crank_path_change(bounded_crank_contract_payload,
+            ("measurement_engine_sources_sha256","stock_form_contact_3d.py"),digest))
+
+
+def test_source_rebinding_or_an_extra_engine_cannot_pass(bounded_crank_contract_payload):
+    import crank_mesh_stack as mesh
+    from copy import deepcopy
+    changed = dict(bounded_crank_contract_payload)
+    changed["measurement_engine_sources_sha256"] = dict(changed["measurement_engine_sources_sha256"],ideal_contact_ratio_fallback="0"*64)
     with pytest.raises(ValueError):
+        mesh.require_qualified(changed)
+    for field in ("compiled_sha256","actual_compiled_sha256","before_sha256","after_sha256"):
+        changed = dict(bounded_crank_contract_payload)
+        receipt = changed["source_identity"] = deepcopy(changed["source_identity"])
+        key = next(key for key in receipt[field] if key.endswith("stock_form_contact_3d.py"))
+        receipt[field][key] = "0"*64
+        with pytest.raises(ValueError):
+            mesh.require_qualified(changed)
+
+
+def test_actual_capture_does_not_require_unconsumed_stock_form_mesh(bounded_crank_contract_payload):
+    import crank_mesh_stack as mesh
+    compiled = bounded_crank_contract_payload["source_identity"]["compiled_sha256"]
+    assert not any(path.replace("\\","/").endswith("/stock_form_mesh.py") for path in compiled)
+    assert mesh.require_qualified(bounded_crank_contract_payload) is bounded_crank_contract_payload
+
+
+@pytest.mark.parametrize("name",[
+    "stock_form_cutter.py","crank_mesh_geometry.py","crank_mesh_backlash_study.py",
+    "crossed_mesh_study.py","stock_form_contact_3d.py","stock_form_root_angles.py",
+    "stock_form_root_sweep.py","stock_form_contact_continuation.py",
+])
+def test_actual_capture_still_requires_every_consumed_core_geometry_and_measuring_source(
+        bounded_crank_contract_payload,name):
+    import crank_mesh_stack as mesh
+    payload = dict(bounded_crank_contract_payload)
+    receipt = payload["source_identity"] = dict(payload["source_identity"])
+    path = next(path for path in receipt["compiled_sha256"] if path.replace("\\","/").endswith("/"+name))
+    # Keep the remaining before/compiled/after maps coherent: the failure
+    # must be the missing actual consumed source, not a one-map stale hash.
+    for field in ("before_sha256","compiled_sha256","actual_compiled_sha256","after_sha256"):
+        receipt[field] = dict(receipt[field])
+        del receipt[field][path]
+    with pytest.raises(ValueError,match="compiled"):
         mesh.require_qualified(payload)
 
 
-@pytest.mark.parametrize("field,value", [
-    ("common_normal_supported", False),
-    ("kind", "root_corner"),
-    ("kind", "root_arc"),
-    ("kind", "axial_face"),
+@pytest.mark.parametrize("owner,field",[
+    ("pinion","FACE_WIDTH"),("pinion","SHOULDER_LENGTH"),("pinion","TURNED_DIA"),
+    ("pinion","TURNED_DIA_FITUP_MIN"),("pinion","SEAT_GAP_MAX_MM"),
+    ("pinion","BASE_TANGENT_SPAN_LIMITS_MM"),("pinion","TOOTH_RUNOUT_TIR_MM"),
+    ("gear64","FACE_WIDTH"),("gear64","BASE_TANGENT_SPAN_LIMITS_MM"),("gear64","TOOTH_RUNOUT_TIR_MM"),
+    ("geometry","POST_ANGLE_DEG"),("geometry","CONE_FLOAT_NORTH"),("geometry","FRAME_DY"),("geometry","GEAR_AXIS_SHIFT"),
 ])
-def test_crank_coverage_cannot_count_unsupported_branch_proofs(
-    field, value, bounded_crank_contract_payload
-) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = _crank_case_mutation(bounded_crank_contract_payload)
-    proof = payload["cases"]["nominal"]["phase_rows"][2]["supported_branch_contacts"][0]
-    for witness in proof["contacts"]:
-        witness["contact"][field] = value
-    with pytest.raises(ValueError):
-        mesh.require_qualified(payload)
-
-
-def test_all_crank_corners_share_one_machined_retention_clock() -> None:
+def test_hypothetical_crank_geometry_refuses_stale_rows(owner,field,monkeypatch,bounded_crank_contract_payload):
     import crank_mesh_geometry as geometry
-
-    placements = geometry.calibration_case_placements()
-    clock = placements["nominal"]["driver_clocking_rad"]
-    assert all(pose["driver_clocking_rad"] == clock for pose in placements.values())
-
-
-@pytest.mark.parametrize("field", ["driver_clocking_rad", "driven_clocking_rad"])
-def test_a_reclocked_corner_cannot_reuse_the_crank_certificate(field, bounded_crank_contract_payload) -> None:
     import crank_mesh_stack as mesh
-
-    payload = _crank_case_mutation(bounded_crank_contract_payload, "booked_open")
-    pose = payload["cases"]["booked_open"]["placement"]
-    pose[field] += 0.001
-    with pytest.raises(ValueError, match="placement"):
-        mesh.require_qualified(payload)
-
-
-@pytest.mark.parametrize("field", [
-    "qualified", "geometry_sha256", "cases", "phase_window_rad", "phase_seed_deg",
-    "measurement_engine_sources_sha256", "measurement_engine_sha256",
-])
-def test_missing_crank_payload_fields_refuse(field, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = dict(bounded_crank_contract_payload)
-    del payload[field]
-    with pytest.raises(ValueError):
-        mesh.require_qualified(payload)
-
-
-@pytest.mark.parametrize("field", [
-    "qualified", "metric", "is_conjugate", "native_certificate", "driver_profile",
-    "driven_profile", "placement", "phase_rows", "phase_window_rad",
-    "tight_backlash_lower_mm", "loose_backlash_upper_mm", "stock_form_coverage_lower",
-    "row_available_fraction_lower", "row_available_intervals_mm",
-    "continuous_carrying_contact", "uncovered_phase_rad", "handovers", "numerical_error_bounds",
-    "phase_components_rad", "pose_domain",
-])
-def test_missing_crank_case_fields_refuse(field, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = _crank_case_mutation(bounded_crank_contract_payload)
-    del payload["cases"]["nominal"][field]
-    with pytest.raises(ValueError):
-        mesh.require_qualified(payload)
-
-
-def test_crank_pose_domains_are_exact_source_owned_not_corner_only(bounded_crank_contract_payload) -> None:
-    import crank_mesh_geometry as geometry
-
-    domains = geometry.calibration_case_domains()
-    assert set(domains) == geometry.required_calibration_case_names()
-    for name, case in bounded_crank_contract_payload["cases"].items():
-        domain = domains[name]
-        assert case["pose_domain"] == domain
-        assert domain["all_runout_angles"]
-        assert domain["components_mm"]
-        assert domain["radial_error_mm"] > 0.0
-        assert domain["axial_error_mm"] > 0.0
-        assert case["numerical_error_bounds"]["radial_mm"] == domain["radial_error_mm"]
-        assert case["numerical_error_bounds"]["axial_mm"] == domain["axial_error_mm"]
-        for row in case["phase_rows"]:
-            assert row["root_sweep"]["required_root_air_mm"] == domain["required_root_air_mm"]
-
-
-@pytest.mark.parametrize("field", ["phase_window_rad", "phase_seed_deg", "geometry_sha256"])
-def test_common_crank_phase_and_identity_mutations_refuse(field, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    mutations = {"phase_window_rad": [-0.030, -0.010], "phase_seed_deg": math.nan, "geometry_sha256": "0" * 64}
-    payload = dict(bounded_crank_contract_payload)
-    payload[field] = mutations[field]
-    with pytest.raises(ValueError):
-        mesh.require_qualified(payload)
-
-
-@pytest.mark.parametrize("source_name", [
-    "crank_mesh_backlash_study.py", "crossed_mesh_study.py",
-    "stock_form_contact_3d.py", "stock_form_root_angles.py", "stock_form_root_sweep.py",
-    "stock_form_contact_continuation.py",
-])
-def test_missing_crank_engine_source_manifest_refuses(source_name, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = dict(bounded_crank_contract_payload)
-    sources = dict(payload["measurement_engine_sources_sha256"])
-    del sources[source_name]
-    payload["measurement_engine_sources_sha256"] = sources
-    with pytest.raises(ValueError, match="measurement-engine identity"):
-        mesh.require_qualified(payload)
-
-
-@pytest.mark.parametrize("digest", ["", "0" * 63, "G" * 64, "A" * 64, None])
-def test_malformed_crank_engine_source_digest_refuses(digest, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = dict(bounded_crank_contract_payload)
-    sources = dict(payload["measurement_engine_sources_sha256"])
-    sources["stock_form_contact_3d.py"] = digest
-    payload["measurement_engine_sources_sha256"] = sources
-    with pytest.raises(ValueError, match="measurement-engine identity"):
-        mesh.require_qualified(payload)
-
-
-def test_stale_crank_engine_manifest_digest_refuses(bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = dict(bounded_crank_contract_payload)
-    payload["measurement_engine_sha256"] = "0" * 64
-    with pytest.raises(ValueError, match="provenance"):
-        mesh.require_qualified(payload)
-    payload = dict(bounded_crank_contract_payload)
-    sources = dict(payload["measurement_engine_sources_sha256"])
-    sources["stock_form_contact_3d.py"] = "0" * 64
-    payload["measurement_engine_sources_sha256"] = sources
-    with pytest.raises(ValueError, match="provenance"):
-        mesh.require_qualified(payload)
-
-
-def test_unregistered_crank_engine_source_refuses(bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = dict(bounded_crank_contract_payload)
-    sources = dict(payload["measurement_engine_sources_sha256"])
-    sources["ideal_contact_ratio_fallback.py"] = "0" * 64
-    payload["measurement_engine_sources_sha256"] = sources
-    with pytest.raises(ValueError, match="measurement-engine identity"):
-        mesh.require_qualified(payload)
-
-
-@pytest.mark.parametrize("path", [
-    ("placement", "driver_face_mm"),
-    ("placement", "driven_face_mm"),
-    ("placement", "driver_shoulder_z_mm"),
-    ("placement", "driver_turned_radius_mm"),
-    ("placement", "driver_origin_mm"),
-    ("placement", "driven_origin_mm"),
-    ("placement", "driver_frame"),
-    ("placement", "driven_frame"),
-    ("placement", "driver_clocking_rad"),
-    ("placement", "driven_clocking_rad"),
-    ("driver_profile", "teeth"),
-    ("driver_profile", "reference_teeth"),
-    ("driver_profile", "blank_radius_mm"),
-    ("driver_profile", "radial_translation_mm"),
-    ("driven_profile", "helix_angle_deg"),
-    ("phase_rows", 2, "driver_phase_rad"),
-    ("phase_rows", 2, "lower_rad"),
-    ("phase_rows", 2, "upper_rad"),
-    ("phase_rows", 2, "error_rad"),
-    ("phase_rows", 2, "root_contact"),
-    ("phase_rows", 2, "lower_contact"),
-    ("phase_rows", 2, "upper_contact"),
-    ("phase_rows", 2, "lower_contact", "kind"),
-    ("phase_rows", 2, "lower_contact", "world_point_mm"),
-    ("phase_rows", 2, "lower_contact", "driven_normal_world"),
-    ("phase_rows", 2, "lower_contact", "driver_normal_world"),
-    ("phase_rows", 2, "lower_contact", "common_normal_supported"),
-    ("phase_rows", 2, "lower_contact", "common_normal_error_bound"),
-    ("phase_rows", 2, "lower_contact", "opposed_normal_residual"),
-    ("phase_rows", 2, "lower_contact", "driven_per_driver_velocity"),
-    ("phase_rows", 2, "supported_branch_contacts"),
-    ("phase_rows", 2, "branch_phase_reserves_rad"),
-    ("phase_rows", 2, "supported_branch_contacts", 0, "tooth"),
-    ("phase_rows", 2, "supported_branch_contacts", 0, "contacts"),
-    ("phase_rows", 2, "supported_branch_contacts", 0, "contacts", 0, "side"),
-    ("phase_rows", 2, "supported_branch_contacts", 0, "contacts", 0, "contact"),
-    ("phase_rows", 2, "phase_error_rad"),
-    ("phase_rows", 2, "root_free_intervals_rad"),
-    ("phase_rows", 2, "free_intervals_rad"),
-    ("phase_rows", 2, "root_sweep"),
-    ("phase_rows", 2, "root_sweep", "status"),
-    ("phase_rows", 2, "root_sweep", "root_is_carrying"),
-    ("phase_rows", 2, "root_sweep", "required_root_air_mm"),
-    ("phase_rows", 2, "root_sweep", "root_air_lower_bound_mm"),
-    ("phase_rows", 2, "root_sweep", "geometric_uncertainty_mm"),
-    ("phase_rows", 2, "root_sweep", "native_solid_certificate"),
-    ("phase_rows", 2, "root_sweep", "free_inner"),
-    ("phase_rows", 2, "root_sweep", "free_outer"),
-    ("phase_rows", 2, "root_sweep", "offset_domain_rad"),
-    ("handovers", 0, "continuous"),
-    ("handovers", 0, "pitch_displacement_jump_upper_mm"),
-    ("handovers", 0, "contact"),
-    ("handovers", 0, "side"),
-    ("handovers", 0, "pair"),
-    ("handovers", 0, "phase_bracket_rad"),
-    ("numerical_error_bounds", "surface_mm"),
-    ("numerical_error_bounds", "phase_motion_mm"),
-    ("numerical_error_bounds", "te_rad"),
-    ("pose_domain", "radial_error_mm"),
-    ("pose_domain", "axial_error_mm"),
-    ("pose_domain", "all_runout_angles"),
-    ("pose_domain", "components_mm"),
-    ("pose_domain", "angularity_full_cone"),
-    ("pose_domain", "required_root_air_mm"),
-    ("numerical_error_bounds", "radial_mm"),
-    ("numerical_error_bounds", "axial_mm"),
-])
-def test_missing_crank_nested_contract_fields_refuse(path, bounded_crank_contract_payload) -> None:
-    import crank_mesh_stack as mesh
-
-    payload = _crank_case_mutation(bounded_crank_contract_payload)
-    target = payload["cases"]["nominal"]
-    for field in path[:-1]:
-        target = target[field]
-    del target[path[-1]]
-    with pytest.raises(ValueError):
-        mesh.require_qualified(payload)
-
-
-def test_row_factory_refuses_unqualified_before_reading_placement(monkeypatch) -> None:
-    import crank_mesh_stack as mesh
-
-    monkeypatch.setattr(mesh, "CALIBRATION", {"qualified": False, "refusal": "synthetic unqualified"})
-    with pytest.raises(ValueError, match="synthetic unqualified"):
+    module = {"pinion":geometry.pinion,"gear64":geometry.gear64,"geometry":geometry}[owner]
+    old = getattr(module,field)
+    monkeypatch.setattr(module,field,tuple(value+.01 for value in old) if isinstance(old,tuple) else old+.01)
+    assert geometry.geometry_sha256() != bounded_crank_contract_payload["geometry_sha256"]
+    with pytest.raises(ValueError,match="stale"):
+        mesh.require_qualified(bounded_crank_contract_payload)
+    with pytest.raises(ValueError,match="stale"):
         mesh.row_qualification("nominal")
 
 
-@pytest.mark.parametrize("owner,field", [
-    ("pinion", "FACE_WIDTH"),
-    ("pinion", "SHOULDER_LENGTH"),
-    ("pinion", "TURNED_DIA"),
-    ("pinion", "TURNED_DIA_FITUP_MIN"),
-    ("pinion", "SEAT_GAP_MAX_MM"),
-    ("pinion", "BASE_TANGENT_SPAN_LIMITS_MM"),
-    ("pinion", "TOOTH_RUNOUT_TIR_MM"),
-    ("gear64", "FACE_WIDTH"),
-    ("gear64", "BASE_TANGENT_SPAN_LIMITS_MM"),
-    ("gear64", "TOOTH_RUNOUT_TIR_MM"),
-    ("geometry", "POST_ANGLE_DEG"),
-    ("geometry", "CONE_FLOAT_NORTH"),
-    ("geometry", "FRAME_DY"),
-    ("geometry", "GEAR_AXIS_SHIFT"),
-])
-def test_hypothetical_crank_geometry_refuses_stale_rows(
-    owner, field, monkeypatch, bounded_crank_contract_payload
-) -> None:
-    import crank_mesh_geometry as geometry
+def test_row_factory_refuses_unqualified_before_reading_placement(monkeypatch):
     import crank_mesh_stack as mesh
-
-    payload = bounded_crank_contract_payload
-    mesh.require_qualified(payload)
-    monkeypatch.setattr(mesh, "CALIBRATION", payload)
-    module = {"pinion": geometry.pinion, "gear64": geometry.gear64, "geometry": geometry}[owner]
-    previous = getattr(module, field)
-    changed = tuple(value + 0.01 for value in previous) if isinstance(previous, tuple) else previous + 0.01
-    monkeypatch.setattr(module, field, changed)
-    assert mesh.geometry_sha256() != payload["geometry_sha256"]
-    with pytest.raises(ValueError, match="stale"):
-        mesh.require_qualified(payload)
-    with pytest.raises(ValueError, match="stale"):
+    monkeypatch.setattr(mesh,"require_current_packet_bytes",lambda:{"qualified":False,"refusal":"synthetic unqualified"})
+    with pytest.raises(ValueError,match="synthetic unqualified"):
         mesh.row_qualification("nominal")
+
+
+@pytest.fixture(scope="module")
+def synthetic_crank_reader_case():
+    """Isolated schema arithmetic ONLY, never a replacement production packet."""
+    import crank_mesh_geometry as geometry
+    from _stock_contact_test_fixtures import synthetic_case
+    row = geometry.calibration_case_parameters(conditional_source={
+        "conditional_lateral_origin_half_width_mm":.01,
+        "conditional_driver_clock_half_width_rad":0.,
+        "conditional_driven_clock_half_width_rad":0.,
+    })[0]
+    domain = row["continuous_source_domain"]
+    case = synthetic_case(spec.STOCK_PROFILE,mate.STOCK_PROFILE,geometry.placement_record(row["pose"]),domain,
+                          coverage_floor=.62,row_floor=.85,operating_driver_sense=1,read_phases_rad=(0.,))
+    return case,domain
+
+
+def _admit_synthetic_crank_case(case,domain):
+    import stock_form_contact_certificate as reader
+    reader.require_continuous_certificate(case,domain,spec.STOCK_PROFILE,mate.STOCK_PROFILE,
+        case["continuous_contact_certificate"],coverage_floor=.62,row_floor=.85)
+    reader.require_whole_period_envelope(case,domain,spec.STOCK_PROFILE,mate.STOCK_PROFILE)
+    reader.require_actual_read_phase(case,domain,spec.STOCK_PROFILE,mate.STOCK_PROFILE,
+                                    case["actual_read_phases"][0],expected_phase_rad=0.)
+
+
+def test_testonly_continuous_receiver_fixture_reaches_every_pure_reader(synthetic_crank_reader_case):
+    case,domain = synthetic_crank_reader_case
+    _admit_synthetic_crank_case(case,domain)
+    assert not case["production_source_qualified"]
+
+
+@pytest.mark.parametrize("mutation",["missing_band","misbound_band","promoted_cap","dropped_period","double_period",
+                                     "cap_coordinate","missing_terminal","missing_inner","dropped_root_clip",
+                                     "dropped_root_gaps","wrong_root_scope","missing_containment"])
+def test_pure_crank_receiver_controls_are_independent_of_pending_native_data(mutation,synthetic_crank_reader_case):
+    from copy import deepcopy
+    case,domain = synthetic_crank_reader_case
+    _admit_synthetic_crank_case(case,domain)
+    changed = deepcopy(case)
+    certificate = changed["continuous_contact_certificate"]
+    cell = certificate["sides"]["upper"]["phase_cells"][0]
+    if mutation == "missing_band":
+        del certificate["finite_face_material_enclosure"]["source_driver_retained_band_limits_mm"]
+    elif mutation == "misbound_band":
+        certificate["finite_face_material_enclosure"]["source_driver_retained_band_limits_mm"]["shoulder_z"][0] += .01
+    elif mutation == "promoted_cap":
+        certificate["finite_face_material_enclosure"]["moving_band_cap_carrying"] = True
+    elif mutation == "dropped_period":
+        cell["first_contact_cover"]["additional_geometry_error_mm"] = 0.
+    elif mutation == "double_period":
+        changed["full_period_cells"][0]["side_branch_envelopes"]["upper"][0]["total_geometric_payment_rad"] *= 2
+    elif mutation == "cap_coordinate":
+        cap = next(value for value in cell["surface_exclusion_receipts"] if ":end_face:" in value["patch_id"])
+        cap["patch_parameter_names"] = ["native_t","z_mm"]
+    elif mutation == "missing_terminal":
+        receipt = next(value for value in cell["surface_exclusion_receipts"] if not value["empty_remainder"])
+        receipt["terminal_boxes"] = 0
+    elif mutation == "missing_inner":
+        cell["surface_exclusion_receipts"][0]["free_inner_inverse_offset_components_rad"] = []
+    elif mutation == "dropped_root_clip":
+        del cell["driven_root_material_proof"]["root_subset_enclosure"]["radial_clip_radius_mm"]
+    elif mutation == "dropped_root_gaps":
+        cell["driven_root_material_proof"]["material_sweep"]["root_sweep"]["physical_driver_teeth"] = []
+    elif mutation == "wrong_root_scope":
+        cell["driven_root_material_proof"]["material_sweep"]["material_scope"] = "driver_root_material"
+    else:
+        cell["driven_root_material_proof"]["material_sweep"]["root_sweep"]["containment_proof"] = ""
+    with pytest.raises(ValueError):
+        _admit_synthetic_crank_case(changed,domain)
+
+
+def test_json_key_order_does_not_change_the_actual_patch_union(synthetic_crank_reader_case):
+    import json
+    case,domain = synthetic_crank_reader_case
+    _admit_synthetic_crank_case(json.loads(json.dumps(case,sort_keys=True)),domain)
+
+
 
 
 def test_64t_pitch_cylinder_slice_law_is_only_a_physical_frame_construction() -> None:
@@ -1928,9 +1643,11 @@ def test_t120_turn_down_height_and_actual_fitup_row_are_separate_gates() -> None
     import crank_mesh_stack as mesh
     import crank_mesh_requirements as requirements
 
-    mesh.require_qualified()
-    row = mesh.row_qualification("turned_fitup_floor")
-    assert row.driver_turned_radius_mm == spec.TURNED_DIA_FITUP_MIN / 2.0
+    payload = mesh.require_qualified()
+    row = mesh.row_qualification("nominal")
+    support = payload["cases"]["nominal"]["continuous_contact_certificate"][
+        "finite_face_material_enclosure"]["support_placement"]
+    assert support["driver_turned_radius_mm"] == spec.TURNED_DIA_FITUP_MIN / 2.0
     assert row.row_fraction_lower >= requirements.ROW_ENGAGEMENT_MIN
     assert row.coverage_lower >= requirements.STOCK_FORM_COVERAGE_MIN
     assert row.continuous_carrier
@@ -2036,9 +1753,11 @@ def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
     import crank_mesh_stack as mesh
     import crank_mesh_requirements as requirements
 
-    mesh.require_qualified()
-    fitup = mesh.row_qualification("turned_fitup_floor")
-    assert fitup.driver_turned_radius_mm == spec.TURNED_DIA_FITUP_MIN / 2.0
+    payload = mesh.require_qualified()
+    fitup = mesh.row_qualification("nominal")
+    support = payload["cases"]["nominal"]["continuous_contact_certificate"][
+        "finite_face_material_enclosure"]["support_placement"]
+    assert support["driver_turned_radius_mm"] == spec.TURNED_DIA_FITUP_MIN / 2.0
     assert fitup.row_fraction_lower >= requirements.ROW_ENGAGEMENT_MIN
     # Both sheets give each cut its own condition: the turn-down floor is
     # stated with the band and its check only, the facing floor with the

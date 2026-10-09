@@ -44,6 +44,11 @@ from diagnostics.stock_form_contact_continuation import (
     constraint_covector_scales,
     contact_strata,
     correlated_root_difference,
+    correlated_periodic_branch_difference,
+    periodicity_displacement_bound_mm,
+    _periodicity_displacement_evidence,
+    prove_periodic_seam,
+    _periodic_source_relabel,
     cos_bounds,
     driven_station_bounds,
     frame_inverse_bounds,
@@ -380,7 +385,8 @@ class _FiniteParabolicSurface:
             moment = Interval.point(self.slope)
         return ChartEvaluation(tuple(v.value for v in equations),
                                tuple(v.derivative[:n] for v in equations),
-                               tuple(v.derivative[n:] for v in equations), margins, moment, Interval.point(1))
+                               tuple(v.derivative[n:] for v in equations), margins, moment, Interval.point(1),
+                               driven_surface_coordinates=((u * 0.5 + 0.5).value, v.value))
 
 
 def _source():
@@ -405,10 +411,13 @@ def _cover(cell, surfaces):
                              tuple(ChartMinimumBound(surface.name, 2, 2.0, remainder_air, 1.0,
                                                      Interval.point(-1), -1,
                                                      ProofNeighbourhood(cell, (Interval(-0.75, 0.75),) * 3,
-                                                                        Interval(-0.2, 0.2)), 3.0)
+                                                                        Interval(-0.2, 0.2),
+                                                                        (Interval(0.125, 0.5 if surface.edge else 0.875),
+                                                                         Interval(-0.75, 0.75))), 3.0)
                                    for surface in surfaces),
                              root_patch_ids=roots, free_reference_driven_phase_rad=Interval.point(-0.2),
-                             free_reference_air_mm=Interval(0.4 - payment, 2.0), closing_driven_sense=1)
+                             free_reference_air_mm=Interval(0.4 - payment, 2.0), closing_driven_sense=1,
+                             additional_geometry_error_mm=0.0)
 
 
 def test_same_source_translation_cancels_only_through_proved_difference_derivatives():
@@ -706,6 +715,57 @@ def test_actual_record_retains_reader_strata_indices_and_interval_evidence():
     assert not record["native_certificate"]
 
 
+def test_actual_axial_edge_domain_binds_physical_z_absent_from_chart_unknowns():
+    chart = _matched_stock_chart(stratum="edge")
+    cell = PhaseCell(Interval(-1e-9, 1e-9))
+    proof = prove_branch_cell(chart, cell, root_free_driven_components_rad=_FREE)
+    assert proof.status == "PROVED", proof.reason
+    assert chart.driven_z_index is None
+    t_root, z_root = proof.driven_surface_root_box
+    assert t_root == proof.root_box[chart.driver_stratum.algebra_coordinates]
+    assert z_root == Interval.point(chart.driven_stratum.z_fixed) == Interval.point(1)
+    approach = Interval(-0.05, 0.05)
+    domain = ProofNeighbourhood(cell, chart.unknown_box, approach,
+                               (Interval(0, 1), Interval(0.9, 1)))
+    assert domain.refusal(proof, approach, "physical") is None  # binding, not first-contact proof
+    assert domain.record()["driven_surface_domain"] == [[0, 1], [0.9, 1]]
+    assert proof.record()["driven_surface_root_box"] == [t_root.record(), z_root.record()]
+    # All algebra/phase/source/approach bounds are unchanged: only a fixed
+    # physical coordinate absent from those algebra unknowns is omitted.
+    outside_face = replace(domain, driven_surface_domain=(Interval(0, 1), Interval(-0.002, 0.002)))
+    assert "free/fixed" in outside_face.refusal(proof, approach, "physical")
+    ghost_face_point = replace(domain, driven_surface_domain=(Interval(0, 1), Interval.point(1)))
+    assert "two-coordinate" in ghost_face_point.refusal(proof, approach, "physical")
+    wrong_free_t = replace(domain, driven_surface_domain=(Interval(0, 0.1), Interval(0.9, 1)))
+    assert "free/fixed" in wrong_free_t.refusal(proof, approach, "physical")
+
+
+def test_real_finite_edge_domain_binds_fixed_profile_parameter_and_surface_receipts():
+    edge = _FiniteParabolicSurface("edge", 0, edge=True, offset_index=1,
+                                  unknown_box=(Interval(-0.1, 0.1), Interval(-0.3, 0.3),
+                                               Interval(0.001, 0.003)))
+    cell = PhaseCell(Interval(0.0009, 0.0011), _source())
+    proof = prove_branch_cell(edge, cell, root_free_driven_components_rad=_FREE)
+    assert proof.status == "PROVED", proof.reason
+    assert proof.driven_surface_root_box[0] == Interval.point(0.5)  # real u=0, t=(u+1)/2
+    cover = _cover(cell, (edge,))
+    domain = cover.chart_minimum_bounds[0].neighbourhood
+    assert domain.refusal(proof, cover.approach_driven_phase_rad, "physical") is None
+    wrong_fixed_t = replace(domain, driven_surface_domain=(Interval(0.1, 0.4), Interval(-0.75, 0.75)))
+    assert "free/fixed" in wrong_fixed_t.refusal(proof, cover.approach_driven_phase_rad, "physical")
+    # Bind an actual open vertical cap's derivative receipt to the same
+    # working-side neighbourhood. A different rectangle cannot be reused.
+    cap = "edge:vertical_cap"
+    valid = replace(cover, physical_patch_inventory=(*cover.physical_patch_inventory, cap),
+                    chart_patch_ids=((edge.name, ("edge:lower", cap)),),
+                    noncarrying_patch_ids=(*cover.noncarrying_patch_ids, cap),
+                    boundary_separations=(BoundarySeparation(cap, edge.name, 1, Interval(0.25, 3), domain),))
+    assert valid.refusal((proof,)) is None
+    different = replace(domain, driven_surface_domain=(Interval(0.1, 0.5), Interval(-0.75, 0.75)))
+    broken = replace(valid, boundary_separations=(replace(valid.boundary_separations[0], neighbourhood=different),))
+    assert "different physical neighbourhoods" in broken.refusal((proof,))
+
+
 def test_shared_physical_patch_requires_outside_union_exclusion_without_extra_tooth():
     a, b = _FiniteParabolicSurface("a", 0), _FiniteParabolicSurface("b", 1, slope=-1.1)
     cell = PhaseCell(Interval(-0.001, 0.001), _source())
@@ -724,6 +784,14 @@ def test_shared_physical_patch_requires_outside_union_exclusion_without_extra_to
         tuple((m.chart_name, m.neighbourhood) for m in base.chart_minimum_bounds)),))
     result = prove_paid_handover(a, b, cell, shared, driven_pitch_radius_mm=10)
     assert result["status"] == "PROVED", result["reason"]
+    proofs = tuple(prove_branch_cell(s, cell, root_free_driven_components_rad=_FREE) for s in (a, b))
+    domain = base.chart_minimum_bounds[0].neighbourhood
+    different = replace(domain, driven_surface_domain=(Interval(0.25, 0.875), Interval(-0.75, 0.75)))
+    assert different.refusal(proofs[0], shared.approach_driven_phase_rad, "physical") is None
+    remainder = shared.patch_remainder_bounds[0]
+    wrong_union = replace(shared, patch_remainder_bounds=(replace(
+        remainder, neighbourhoods=((a.name, different), remainder.neighbourhoods[1])),))
+    assert "different physical neighbourhoods" in wrong_union.refusal(proofs)
     duplicate = replace(shared, chart_patch_ids=((a.name, (patch, patch)), (b.name, (patch,))))
     assert prove_paid_handover(a, b, cell, duplicate, driven_pitch_radius_mm=10)["status"] == "UNKNOWN"
 
@@ -909,7 +977,9 @@ def test_coverage_refuses_a_relabelled_cell_and_does_not_count_a_deeper_tooth():
                                     driven_pitch_radius_mm=10)["status"] == "UNKNOWN"
 
 
-@pytest.mark.parametrize("defect", ["absent", "other_cell", "wrong_coordinate", "smaller_chart", "short_approach", "zero_dimension"])
+@pytest.mark.parametrize("defect", ["absent", "other_cell", "wrong_coordinate", "smaller_chart",
+                                  "short_approach", "zero_dimension", "surface_absent",
+                                  "surface_point", "surface_wrong_t", "surface_wrong_z"])
 def test_minimum_certificate_is_bound_to_real_chart_cell_neighbourhood_and_approach(defect):
     a, b = _FiniteParabolicSurface("a", 0), _FiniteParabolicSurface("b", 1, slope=-1.1)
     cell = PhaseCell(Interval(-0.001, 0.001), _source())
@@ -926,6 +996,17 @@ def test_minimum_certificate_is_bound_to_real_chart_cell_neighbourhood_and_appro
         minimum = replace(minimum, neighbourhood=replace(domain, unknown_domain=(Interval(-0.01, 0.01),) * 3))
     elif defect == "short_approach":
         minimum = replace(minimum, neighbourhood=replace(domain, approach_driven_phase_rad=Interval(-0.1, 0.1)))
+    elif defect == "surface_absent":
+        minimum = replace(minimum, neighbourhood=replace(domain, driven_surface_domain=None))
+    elif defect == "surface_point":
+        minimum = replace(minimum, neighbourhood=replace(
+            domain, driven_surface_domain=(Interval.point(0.5), Interval(-0.75, 0.75))))
+    elif defect == "surface_wrong_t":
+        minimum = replace(minimum, neighbourhood=replace(
+            domain, driven_surface_domain=(Interval(0.1, 0.2), Interval(-0.75, 0.75))))
+    elif defect == "surface_wrong_z":
+        minimum = replace(minimum, neighbourhood=replace(
+            domain, driven_surface_domain=(Interval(0.125, 0.875), Interval(0.2, 0.3))))
     else:
         minimum = replace(minimum, tangent_dimension=0, tangent_hessian_lower=-1)
     refused = prove_paid_handover(a, b, cell, replace(cover, chart_minimum_bounds=(minimum, cover.chart_minimum_bounds[1])),
@@ -943,7 +1024,7 @@ def test_profile_error_payment_has_real_stock_provenance_and_is_present_in_hando
     # the independently tested error converter; no continuity is asserted.
     minimum = ChartMinimumBound(chart.name, 2, 1, Interval(1, 2), 0.5,
                                 Interval(0.5, 1), 1, objective_gradient_magnitude_upper_per_mm=2)
-    assert branch_geometry_error_rad(proof, minimum) >= 4 * proof.geometry_error_bound_mm
+    assert branch_geometry_error_rad(proof, minimum, additional_geometry_error_mm=0.0) >= 4 * proof.geometry_error_bound_mm
     a, b = _FiniteParabolicSurface("a", 0), _FiniteParabolicSurface("b", 1, slope=-1.1)
     cell = PhaseCell(Interval(-0.001, 0.001), _source())
     result = prove_paid_handover(a, b, cell, _cover(cell, (a, b)), driven_pitch_radius_mm=10)
@@ -954,6 +1035,65 @@ def test_profile_error_payment_has_real_stock_provenance_and_is_present_in_hando
     generic = prove_branch_cell(a, cell, root_free_driven_components_rad=_FREE).record()
     assert generic["proof_schema"] == "finite-analytic-contact-continuation/1"
     assert generic["physical_strata"] == {} and not generic["native_certificate"]
+
+
+def _cover_with_additional_geometry(cell,surfaces,extra):
+    cover = _cover(cell,surfaces)
+    return replace(
+        cover, additional_geometry_error_mm=extra,
+        excluded_patch_air_mm=tuple((name,air-extra) for name,air in cover.excluded_patch_air_mm),
+        free_reference_air_mm=cover.free_reference_air_mm-extra,
+        chart_minimum_bounds=tuple(replace(
+            minimum, outside_neighbourhood_air_mm=minimum.outside_neighbourhood_air_mm-extra,
+            objective_gradient_padding_mm=math.nextafter(extra,math.inf))
+            for minimum in cover.chart_minimum_bounds))
+
+
+def test_joint_period_geometry_is_paid_once_in_actual_handover_and_neighbourhood():
+    a,b = _FiniteParabolicSurface("a",0),_FiniteParabolicSurface("b",1,slope=-1.1)
+    cell = PhaseCell(Interval(-0.001,0.001),_source())
+    extra = 1e-6
+    cover = _cover_with_additional_geometry(cell,(a,b),extra)
+    result = prove_paid_handover(a,b,cell,cover,driven_pitch_radius_mm=10)
+    assert result["status"] == "PROVED",result["reason"]
+    # Both actual branch converters have |gradient|<=3 and |dF/dbeta|>=1.
+    # This would fail if the extra error were omitted OR charged twice.
+    payment = Interval(*result["physical_geometry_error_payment_rad"])
+    assert 6*extra <= payment.upper < 6.01*extra
+    missing_pad = replace(cover,chart_minimum_bounds=tuple(
+        replace(minimum,objective_gradient_padding_mm=0.0) for minimum in cover.chart_minimum_bounds))
+    refused = prove_paid_handover(a,b,cell,missing_pad,driven_pitch_radius_mm=10)
+    assert refused["status"] == "UNKNOWN" and "additional geometry" in refused["reason"]
+    too_wide = prove_paid_handover(a,b,cell,_cover_with_additional_geometry(cell,(a,b),1e-4),
+                                  driven_pitch_radius_mm=10)
+    assert too_wide["status"] == "UNKNOWN" and "geometry payment" in too_wide["reason"]
+
+
+def test_joint_period_payment_changes_same_pose_first_carrier_coverage():
+    a,b = _FiniteParabolicSurface("a",0),_FiniteParabolicSurface("b",1,slope=-1.1)
+    cell = PhaseCell(Interval(0,0.002),_source())
+    _,proofs,_ = correlated_root_difference(a,b,cell,root_free_driven_components_rad=_FREE)
+    assert all(proof.status == "PROVED" for proof in proofs)
+    narrow = retained_phase_coverage(((cell,proofs,_cover_with_additional_geometry(cell,(a,b),1e-6)),),
+                                     driver_pitch_rad=0.002,driven_pitch_radius_mm=10)
+    wide = retained_phase_coverage(((cell,proofs,_cover_with_additional_geometry(cell,(a,b),1e-4)),),
+                                   driver_pitch_rad=0.002,driven_pitch_radius_mm=10)
+    assert narrow["status"] == "PROVED" and narrow["stock_form_coverage_lower"] > 1.99
+    assert wide["status"] == "UNKNOWN" and wide["stock_form_coverage_lower"] == 0
+    assert not wide["native_certificate"]
+
+
+@pytest.mark.parametrize("extra",[-1.0,math.inf,math.nan,True])
+def test_additional_geometry_is_a_required_finite_nonnegative_physical_bound(extra):
+    surface = _FiniteParabolicSurface("a",0)
+    cell = PhaseCell(Interval(-0.001,0.001),_source())
+    proof = prove_branch_cell(surface,cell,root_free_driven_components_rad=_FREE)
+    cover = _cover(cell,(surface,))
+    assert "additional geometry" in replace(cover,additional_geometry_error_mm=extra).refusal((proof,))
+    with pytest.raises(ValueError):
+        branch_geometry_error_rad(proof,cover.chart_minimum_bounds[0],additional_geometry_error_mm=extra)
+    with pytest.raises(TypeError):
+        branch_geometry_error_rad(proof,cover.chart_minimum_bounds[0])
 
 
 def test_a_supported_native_point_does_not_reserve_a_wide_phase_cell():
@@ -1081,3 +1221,315 @@ def test_actual_local_cap_face_multiplier_scales_do_not_use_world_generator_norm
     driver_factors = constraint_covector_scales(driven_tip, "driver")
     assert driver_factors == ()
     assert driven_factor.lower > driven_tip.pair.driven.blank_radius_mm
+
+
+def _actual_periodic_endpoints():
+    start = _matched_stock_chart()
+    p, m = start.pair.driver.angular_pitch_rad, start.pair.driven.angular_pitch_rad
+    box = list(start.unknown_box)
+    box[start.offset_index] -= m
+    end = replace(start, driver_stratum=replace(start.driver_stratum, tooth=start.pair.driver.teeth - 1),
+                  driven_stratum=replace(start.driven_stratum, tooth=1), unknown_box=tuple(box))
+    # Physical bore/runout grades, not manufactured branch intervals.
+    term = 1e-9
+    radius = (Interval.point(term) + Interval.point(term)).upper
+    disks = {body: {"shape": "closed_disk", "centre_mm": [0.0, 0.0], "radius_mm": radius,
+                    "source_terms_mm": {"bore_radial_upper": term, "tooth_runout_radius_upper": term}}
+             for body in ("driver", "driven")}
+    source = SourcePose(tuple((f"{body}_ecc_{axis}_mm", Interval(-radius, radius))
+                              for body in ("driver", "driven") for axis in ("x", "y")) +
+                        (("driver_clock_rad", Interval(-1e-8, 1e-8)),
+                         ("driven_clock_rad", Interval(-1e-8, 1e-8))))
+    cells = (PhaseCell(Interval.point(0), source), PhaseCell(Interval.point(p), source))
+    proofs = tuple(prove_branch_cell(c, cell, root_free_driven_components_rad=_FREE,
+                                     root_free_coordinate="driven_material")
+                   for c, cell in zip((start, end), cells))
+    assert all(proof.status == "PROVED" for proof in proofs), [proof.reason for proof in proofs]
+    return start, end, cells, proofs, disks
+
+
+def test_actual_periodic_branch_difference_uses_rotated_same_source_disk_and_paid_arc():
+    start, end, cells, proofs, disks = _actual_periodic_endpoints()
+    record = correlated_periodic_branch_difference(*proofs, start.pair, source_eccentricity_disks=disks)
+    difference = Interval(*record["same_pose_driven_root_difference_rad"])
+    assert difference.contains(0) and difference.magnitude < 1e-5
+    independent = proofs[0].driven_phase_rad - start.pair.driven.angular_pitch_rad - proofs[1].driven_phase_rad
+    assert independent.width > difference.width
+    assert record["difference_parameter_names"] == [name for name, _ in cells[0].source_pose.axes]
+    assert record["difference_parameter_derivatives"][-1] == [0.0, 0.0]  # same physical driven clock
+    # Floating tooth pitches are not the real mathematical turn. The helper
+    # pays finite relabel/product error, rather than declaring an exact zero.
+    assert 0 < periodicity_displacement_bound_mm(start.pair, cells[0].source_pose) < 1e-8
+    assert not record["native_certificate"]
+
+
+def test_actual_periodic_source_rotation_matches_material_origin_not_unrotated_pose():
+    start, end, cells, proofs, disks = _actual_periodic_endpoints()
+    rotations = _periodic_source_relabel(start.pair, cells[0].source_pose, disks)
+    q = {name: Interval.point(0) for name, _ in cells[0].source_pose.axes}
+    radius = disks["driver"]["radius_mm"]
+    for body in ("driver", "driven"):
+        q[f"{body}_ecc_x_mm"] = Interval.point(radius)
+    transformed = dict(q)
+    for body, rotation in rotations.items():
+        x, y = (f"{body}_ecc_{axis}_mm" for axis in ("x", "y"))
+        transformed[x] = rotation[0][0] * q[x] + rotation[0][1] * q[y]
+        transformed[y] = rotation[1][0] * q[x] + rotation[1][1] * q[y]
+    original = SourcePose(tuple(q.items()))
+    mapped = SourcePose(tuple(transformed.items()))
+    p, m = start.pair.driver.angular_pitch_rad, start.pair.driven.angular_pitch_rad
+    for body in ("driver", "driven"):
+        a = body_pose_bounds(start.pair, mapped, Interval.point(0), Interval.point(0), body=body)
+        b = body_pose_bounds(start.pair, original, Interval.point(p), Interval.point(-m), body=body)
+        assert all((left - right).contains(0) for left, right in zip(a.origin_mm, b.origin_mm))
+        wrong = body_pose_bounds(start.pair, original, Interval.point(0), Interval.point(0), body=body)
+        assert any((left - right).magnitude > radius * 0.01 for left, right in zip(wrong.origin_mm, b.origin_mm))
+
+
+@pytest.mark.parametrize("defect", ["rectangle", "offcentre", "negative_term", "too_small_radius", "asymmetric_axes"])
+def test_periodic_source_refuses_unproved_rotated_rectangle_or_invented_disk(defect):
+    start, end, cells, proofs, disks = _actual_periodic_endpoints()
+    altered = {body: {**disk, "source_terms_mm": dict(disk["source_terms_mm"])} for body, disk in disks.items()}
+    source = cells[0].source_pose
+    if defect == "rectangle":
+        altered["driver"]["shape"] = "rectangle"
+    elif defect == "offcentre":
+        altered["driver"]["centre_mm"] = [1e-9, 0.0]
+    elif defect == "negative_term":
+        altered["driver"]["source_terms_mm"]["bore_radial_upper"] = -1e-9
+    elif defect == "too_small_radius":
+        altered["driver"]["radius_mm"] *= 0.9
+    else:
+        source = SourcePose(tuple((name, Interval(-value.upper, value.upper * 1.1))
+                                  if name == "driver_ecc_x_mm" else (name, value)
+                                  for name, value in source.axes))
+    with pytest.raises(ValueError):
+        _periodic_source_relabel(start.pair, source, altered)
+
+
+def test_real_periodic_roots_cannot_replace_actual_first_contact_or_root_receipts():
+    start, end, cells, proofs, disks = _actual_periodic_endpoints()
+    # The two actual supported endpoint roots above say nothing about the
+    # other real teeth, caps or root air. An empty physical cover must refuse.
+    covers = tuple(FirstContactCover(cell, _FREE, 0.1, Interval(-0.3, 0.3), (),
+                                    (), (), (), 0.01, angle_coordinate="driven_material",
+                                    additional_geometry_error_mm=0.0)
+                   for cell in cells)
+    result = prove_periodic_seam((start,), cells[0], covers[0], (end,), cells[1], covers[1],
+                                start_branch_proofs=(proofs[0],), end_branch_proofs=(proofs[1],),
+                                source_eccentricity_disks=disks, root_receipt={},
+                                driven_root_material_receipt={},
+                                root_air_requirements_mm={"driver": 0.01, "driven": 0.01},
+                                driven_pitch_radius_mm=start.pair.driven.pitch_radius_mm)
+    assert result["status"] == "UNKNOWN" and not result["physical_no_solution"]
+    assert not result["native_certificate"] and "pitch_displacement_jump_upper_mm" not in result
+
+
+def test_periodic_gradient_uses_transposed_source_chain_rule_not_forward_rotation():
+    start, _, cells, proofs, disks = _actual_periodic_endpoints()
+    receipt = correlated_periodic_branch_difference(*proofs,start.pair,source_eccentricity_disks=disks)
+    rotations = _periodic_source_relabel(start.pair,cells[0].source_pose,disks)
+    names = receipt["difference_parameter_names"]
+    a = dict(zip(names,proofs[0].source_gradient_rad[1:]))
+    b = dict(zip(names,proofs[1].source_gradient_rad[1:]))
+    discriminators = 0
+    for body,matrix in rotations.items():
+        x,y = (f"{body}_ecc_{axis}_mm" for axis in ("x","y"))
+        expected = (a[x]*matrix[0][0]+a[y]*matrix[1][0]-b[x],
+                    a[x]*matrix[0][1]+a[y]*matrix[1][1]-b[y])
+        wrong = (a[x]*matrix[0][0]+a[y]*matrix[0][1]-b[x],
+                 a[x]*matrix[1][0]+a[y]*matrix[1][1]-b[y])
+        for name,correct,transposed in zip((x,y),expected,wrong):
+            actual = Interval(*receipt["difference_parameter_derivatives"][names.index(name)])
+            assert actual == correct
+            discriminators += actual.intersection(transposed) is None
+    assert discriminators, "actual anisotropic stock sensitivities must distinguish R.T from R"
+
+
+def test_periodic_rounding_payment_composes_through_both_tooth_label_cycles():
+    start, _, cells, _, _ = _actual_periodic_endpoints()
+    total,bodies = _periodicity_displacement_evidence(start.pair,cells[0].source_pose)
+    steps = math.lcm(start.pair.driver.teeth,start.pair.driven.teeth)
+    assert steps > 1
+    accumulated = Interval.point(0)
+    for receipt in bodies.values():
+        assert receipt["joint_period_tooth_steps"] == steps
+        one = receipt["one_step_displacement_upper_mm"]
+        assert one > 0
+        assert receipt["displacement_upper_mm"] >= (Interval.point(steps)*one).upper
+        assert receipt["displacement_upper_mm"] > one
+        accumulated += receipt["displacement_upper_mm"]
+    assert total >= accumulated.upper
+
+
+@pytest.mark.parametrize("competitor_offset,expected",[(0.01,"PROVED"),(-0.01,"UNKNOWN")])
+def test_paid_handover_binds_all_real_competitors_not_only_its_pair(competitor_offset,expected):
+    a,b = _FiniteParabolicSurface("a",0),_FiniteParabolicSurface("b",1,slope=-1.1)
+    competitor = _FiniteParabolicSurface("third",2,slope=-1.05,offset=competitor_offset)
+    surfaces = a,b,competitor
+    cell = PhaseCell(Interval(-0.001,0.001),_source())
+    proofs = tuple(prove_branch_cell(s,cell,root_free_driven_components_rad=_FREE) for s in surfaces)
+    assert all(p.status == "PROVED" for p in proofs)
+    result = prove_paid_handover(a,b,cell,_cover(cell,surfaces),driven_pitch_radius_mm=10,
+                                first_contact_branch_proofs=proofs)
+    assert result["status"] == expected
+    assert len(result["first_contact_branch_proofs"]) == 3
+    assert len(result["full_cell_competitor_exclusions"]) == 1
+    if expected == "UNKNOWN":
+        assert "another physical root may intervene" in result["reason"]
+    else:
+        assert result["continuous"] and result["pitch_displacement_jump_upper_mm"] <= 0.005
+
+
+@pytest.mark.parametrize("scale",[1.0,1e-12])
+def test_sum_of_nonnegative_squares_retains_its_domain_after_outward_addition(scale):
+    components = tuple(Interval(-factor*scale,factor*scale) for factor in (1,2,3))
+    squared = _squared_norm(components)
+    assert squared.lower == 0.0
+    assert squared.upper > 0.0
+    norm = sqrt_bounds(squared)
+    assert norm.lower == 0.0
+    assert norm.contains(math.hypot(scale,2*scale,3*scale))
+    assert norm.contains(0.0)
+    positive = _squared_norm((Interval.point(3),Interval.point(4)))
+    assert 0 < positive.lower <= 25 <= positive.upper
+    assert sqrt_bounds(positive).contains(5)
+    mixed = _squared_norm((Interval(-1,1),Interval(3,4),Interval(-2,2)))
+    assert mixed.lower > 0 and mixed.contains(9) and mixed.contains(21)
+    assert sqrt_bounds(mixed).contains(3) and sqrt_bounds(mixed).contains(math.sqrt(21))
+
+
+def test_generic_square_root_still_refuses_genuinely_negative_domain():
+    with pytest.raises(ArithmeticError,match="not nonnegative"):
+        sqrt_bounds(Interval(-math.ulp(0.0),1.0))
+    from stock_form_contact_certificate import _bound_sqrt
+    with pytest.raises(ValueError,match="negative"):
+        _bound_sqrt((-math.ulp(0.0),1.0))
+
+
+def test_underflowing_sum_of_squares_keeps_positive_upper_enclosure():
+    squared = _squared_norm((Interval(-1e-200,1e-200),Interval(-2e-200,2e-200)))
+    assert squared.lower == 0.0
+    assert squared.upper > 0.0
+    assert sqrt_bounds(squared).contains(math.hypot(1e-200,2e-200))
+
+
+def _assert_exact_sqrt_endpoint_squares(bounds, result):
+    low, high = result
+    low_n, low_d = low.as_integer_ratio()
+    high_n, high_d = high.as_integer_ratio()
+    input_low_n, input_low_d = bounds[0].as_integer_ratio()
+    input_high_n, input_high_d = bounds[1].as_integer_ratio()
+    assert low >= 0
+    assert low_n*low_n*input_low_d <= input_low_n*low_d*low_d
+    assert high_n*high_n*input_high_d >= input_high_n*high_d*high_d
+
+
+@pytest.mark.parametrize("bounds",[
+    (0.0,0.0), (0.0,5e-324), (5e-324,5e-324),
+    (5e-324,3e-323), (5e-324,1.0), (4.0,9.0),
+    (1.7976931348623157e308,1.7976931348623157e308),
+])
+def test_square_root_certifies_exact_dyadic_squares_without_underflow_walk(bounds,monkeypatch):
+    from stock_form_contact_certificate import _bound_sqrt
+    original_nextafter = math.nextafter
+    calls = 0
+
+    def bounded_nextafter(value,direction):
+        nonlocal calls
+        calls += 1
+        # A dropped repair fails promptly instead of hanging this regression.
+        assert calls <= 16, "sqrt endpoint correction walks a rounded subnormal square bin"
+        return original_nextafter(value,direction)
+
+    monkeypatch.setattr(math,"nextafter",bounded_nextafter)
+    measured = sqrt_bounds(Interval(*bounds))
+    _assert_exact_sqrt_endpoint_squares(bounds,measured.record())
+    calls = 0
+    replay = _bound_sqrt(bounds)
+    _assert_exact_sqrt_endpoint_squares(bounds,replay)
+    assert replay == (measured.lower,measured.upper)
+
+
+@pytest.mark.parametrize("bounds",[(0.0,math.inf),(math.nan,1.0),(2.0,1.0)])
+def test_square_root_endpoints_remain_finite_and_ordered(bounds):
+    from stock_form_contact_certificate import _bound_sqrt
+    with pytest.raises(ValueError,match="finite and ordered"):
+        Interval(*bounds)
+    with pytest.raises(ValueError,match="finite and ordered"):
+        _bound_sqrt(bounds)
+
+
+def test_real_root_sample_inverse_error_has_a_nonnegative_norm_domain(monkeypatch):
+    from diagnostics import stock_form_root_sweep as roots
+    from diagnostics.stock_form_contact_3d import ContactSearch
+    angle = .2
+    frame = np.array(((math.cos(angle),-math.sin(angle),0.0),
+                      (math.sin(angle),math.cos(angle),0.0),(0.0,0.0,1.0)))
+    pair = _pair(origin=(60.0,2.0,3.0))
+    pair = replace(pair,placement=replace(pair.placement,driver_frame=frame))
+    seen = []
+    original = roots.sqrt_bounds
+
+    def observed(value):
+        seen.append(value)
+        return original(value)
+
+    monkeypatch.setattr(roots,"sqrt_bounds",observed)
+    result = roots.root_free_intervals(ContactSearch(pair,0.0),max_boxes=1)
+    assert result.status == "budget_exhausted"
+    assert result.boxes == 1
+    assert any(value.lower == 0.0 and 0 < value.upper < 1e-12 for value in seen)
+
+
+def test_periodic_eccentricity_norm_keeps_whole_vector_nonnegative_domain():
+    from stock_form_contact_certificate import _bound_squared_norm, _periodic_source_evidence, same_numeric_tree
+    pair = _pair()
+    pose = SourcePose(tuple(
+        (f"{body}_ecc_{axis}_mm",Interval(-radius,radius))
+        for body,radius in (("driver",.03),("driven",.05)) for axis in ("x","y")))
+    total,evidence = _periodicity_displacement_evidence(pair,pose)
+    replay,replayed,_ = _periodic_source_evidence(
+        pair.driver,pair.driven,pair.placement.record(),pose.record())
+    assert total > 0 and total == replay
+    assert same_numeric_tree(evidence,replayed)
+    for body,radius in (("driver",.03),("driven",.05)):
+        assert evidence[body]["displacement_upper_mm"] > 0
+        vector = (Interval(-radius,radius),Interval(-radius,radius),Interval(-radius,radius))
+        assert _bound_squared_norm(tuple(value.record() for value in vector)) == tuple(_squared_norm(vector).record())
+
+
+@pytest.mark.parametrize("radius",[0.0,1e-200])
+def test_actual_nominal_and_tiny_eccentricity_norm_callers_replay_exact_squares(radius,monkeypatch):
+    from diagnostics import stock_form_contact_continuation as continuation
+    import stock_form_contact_certificate as reader
+    pair = _pair()
+    pose = SourcePose(tuple(
+        (f"{body}_ecc_{axis}_mm",Interval(-radius,radius))
+        for body in ("driver","driven") for axis in ("x","y")))
+    measured_inputs, replay_inputs = [], []
+    original_measure, original_replay = continuation.sqrt_bounds,reader._bound_sqrt
+
+    def measured(value):
+        result = original_measure(value)
+        measured_inputs.append(tuple(value.record()))
+        _assert_exact_sqrt_endpoint_squares(value.record(),result.record())
+        return result
+
+    def replayed(value):
+        result = original_replay(value)
+        replay_inputs.append(tuple(value))
+        _assert_exact_sqrt_endpoint_squares(value,result)
+        return result
+
+    monkeypatch.setattr(continuation,"sqrt_bounds",measured)
+    monkeypatch.setattr(reader,"_bound_sqrt",replayed)
+    total,evidence = _periodicity_displacement_evidence(pair,pose)
+    replay,replay_evidence,_ = reader._periodic_source_evidence(
+        pair.driver,pair.driven,pair.placement.record(),pose.record())
+    assert total == replay and reader.same_numeric_tree(evidence,replay_evidence)
+    assert measured_inputs == replay_inputs
+    if radius == 0:
+        assert measured_inputs.count((0.0,0.0)) == 2
+    else:
+        assert sum(0 < upper < 1e-320 for _,upper in measured_inputs) == 2

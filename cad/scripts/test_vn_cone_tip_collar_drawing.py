@@ -578,6 +578,38 @@ def test_installed_air_authority_keeps_real_fit_and_axial_material_travel():
     assert terms["correlated north motion and axial material travel"] >= 0.0
 
 
+
+def test_selected_motion_limit_and_metrology_flow_through_one_inspection_authority():
+    installed, _thrust = air.installation_acceptances()
+    assert air.NORTH_RADIAL_MOTION_MAX_MM == pytest.approx(0.480)
+    assert installed.north_radial_motion_max_mm == air.NORTH_RADIAL_MOTION_MAX_MM
+    assert air.TERMINAL_CENTRE_EXPANDED_UNCERTAINTY_MAX_MM == pytest.approx(0.005)
+    assert air.TERMINAL_INDICATOR_RESOLUTION_MAX_MM == pytest.approx(0.001)
+    notes = " ".join(air.installation_requirements())
+    assert f"rho^2/{installed.north_radial_motion_max_mm:.3f}^2+q/e<=1" in notes
+    assert "OBSERVED UPPER PLUS ITS EXPANDED UNCERTAINTY" in notes
+    assert "RESOLUTION <=0.001 IS NOT ACCURACY" in notes
+    assert "CORRELATED q/e UNCERTAINTY" in notes
+    assert "CUP-SEATED UNCERTAINTY FAMILY MUST REMAIN INSIDE THE FIXED BOX" in notes
+    assert "CRITICAL RUNNING-BORE/SHAFT-SEAT SETUP ONLY" in notes
+    assert "NO COMMODITY RECEIVING OR FULL-P1 TRACKING" in notes
+
+
+def test_selected_motion_domain_does_not_erase_actual_raw_pivot_transport():
+    from dataclasses import replace
+    installed, thrust = air.installation_acceptances()
+    former = replace(installed, north_radial_motion_max_mm=0.55)
+    arguments = (air.TIERS[1], (0.0, 0.0, 1.0), air.DRUM_TIERS[0], 9.725825)
+    current_terms = air.projection_closure_terms_mm(
+        *arguments, installed=installed, bank_thrust=thrust,
+    )
+    former_terms = air.projection_closure_terms_mm(
+        *arguments, installed=former, bank_thrust=thrust,
+    )
+    assert current_terms["actual pivot transport remainder"] > 0.0
+    assert current_terms["actual pivot transport remainder"] == former_terms["actual pivot transport remainder"]
+    assert current_terms["correlated north motion and axial material travel"] < former_terms["correlated north motion and axial material travel"]
+
 @pytest.mark.parametrize("station", [math.nan, air.TERMINAL_INSPECTION_STATION_MIN_MM-0.1,
                                      air.TERMINAL_INSPECTION_STATION_MAX_MM+0.1])
 def test_inspection_station_refuses_unobserved_or_inaccessible_back_arc(station):
@@ -671,11 +703,28 @@ def test_custom_body_is_smallest_printed_od_retaining_existing_wall_target():
     assert min(spec.WORST_WALLS_MM.values()) >= spec.WALL_TARGET_MM
 
 
+def test_coupled_body_shift_has_one_source_and_keeps_radial_and_body_process_envelopes():
+    import cone_line
+    delta = lands.TIP_COLLAR_BODY_NORTH_SHIFT_MM
+    assert delta == pytest.approx(0.50)
+    assert spec.NOSE_LENGTH == pytest.approx(3.0 + delta)
+    assert spec.WIDTH == pytest.approx(11.0 + delta)
+    assert spec.TAP_STATION == pytest.approx(7.0 + delta)
+    assert cone_line.TIP_END_EXTENSION_MM == pytest.approx(7.5 + delta)
+    assert spec.WIDTH-spec.NOSE_LENGTH == 8.0
+    assert spec.TAP_STATION-spec.NOSE_LENGTH == 4.0
+    assert spec.WIDTH-spec.TAP_STATION == 4.0
+    assert spec.NOSE_DIA == 6.40
+    assert lands.TERMINAL_FLAT_AF_MM == 0.420
+
+
 def test_correlated_full_stroke_support_pays_interior_without_independent_maxima():
     from dt_cone_support_pose import correlated_north_motion_support_mm
     assert correlated_north_motion_support_mm(0.20, 1.0, 0.25) == pytest.approx(0.29)
     assert correlated_north_motion_support_mm(0.55, 1.0, 0.25) == pytest.approx(0.55)
     assert correlated_north_motion_support_mm(0.55, -1.0, 0.25) == pytest.approx(0.55)
+    assert correlated_north_motion_support_mm(0.480, 1.0, 0.25) == pytest.approx(0.4804)
+    assert correlated_north_motion_support_mm(0.480, -1.0, 0.25) == pytest.approx(0.480)
     assert correlated_north_motion_support_mm(0.0, 1.0, 0.25) == pytest.approx(0.25)
 
 
@@ -730,3 +779,30 @@ def test_round_readbacks_outside_actual_printed_limits_are_not_masked():
     values["flat_half_chord_mm"] = math.sqrt(r*r-a*a)
     with pytest.raises(ValueError, match="finished limits"):
         spec.validate_installed_clamp_pose(**values)
+
+
+def test_original_journal_span_pays_north_withdrawal_once():
+    from cone_stack_end_play import SHAFT_END_PLAY
+    import dt_cone_gear_shaft_spec as shaft
+    import dt_cone_pivot_post_spec as post
+    expected = min(
+        post.CONE_BOSS_LENGTH-printed_band_mm(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"])-2.0*shaft.THRUST_EDGE_BREAK_MAX,
+        shaft.JOURNAL_END-shaft.printed_band("Sec0End")-shaft.JOURNAL_FREE_END_BREAK_MAX_MM-shaft.THRUST_EDGE_BREAK_MAX-SHAFT_END_PLAY[1],
+    )
+    assert shaft.JOURNAL_SUPPORT_SPAN_MIN_MM == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("section,native", [(0, 12.2308), (1, 9.525), (2, 6.35), (3, 3.175), (4, 0.79375)])
+def test_all_land_physical_limit_readers_share_native_print_precision(section, native):
+    import dt_cone_gear_shaft_spec as shaft
+    assert shaft.DRAWING_PRECISION[f"Sec{section}Profile"][f"Sec{section}Dia"] == lands.LAND_DIA_PLACES[section]
+    upper, lower = lands.SECTION_DIA_BANDS[section]
+    nominal = round(native, lands.LAND_DIA_PLACES[section])
+    assert lands.land_finished_dia_limits_mm(native, section) == pytest.approx((nominal+lower, nominal+upper))
+    if section:
+        assert shaft.DRAWING_PRECISION[f"Sec{section}FlatProfile"][f"Sec{section}AF"] == lands.LAND_AF_PLACES[section]
+        af = round(lands.SECTION_FLAT_AF[section], lands.LAND_AF_PLACES[section])
+        assert lands.land_finished_af_limits_mm(section) == pytest.approx((af+lands.FLAT_AF_BAND[1], af+lands.FLAT_AF_BAND[0]))
+    else:
+        with pytest.raises(ValueError, match="no finished across-flat"):
+            lands.land_finished_af_limits_mm(section)

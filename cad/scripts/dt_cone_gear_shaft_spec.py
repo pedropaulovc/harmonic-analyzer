@@ -19,6 +19,8 @@ from dt_cone_pivot_post_spec import RUNNING_BORE_BAND as POST_JOURNAL_BORE_BAND
 from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft build
     FLAT_AF_BAND,
     GEAR_SEAT_BAND,
+    LAND_DIA_PLACES,
+    LAND_AF_PLACES,
     RUNNING_DIA_BAND,
     SECTION_DIA_BANDS,
     SECTION_FLAT_AF,
@@ -26,7 +28,7 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
     TERMINAL_DIA_PLACES,
     TERMINAL_FLAT_EDGE_BREAK_MAX,
 )
-from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE
+from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE, SHAFT_END_PLAY
 from vn_cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
 from vn_cone_tip_adjuster_spec import CUP_DEPTH
 from dt_crank_drive_gear_spec import CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH
@@ -426,20 +428,20 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # at .XX the station term grows from 0.53 to 0.91 and the widest face holding
 # the post floor falls from 6.5 to 6.2.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "Sec0Profile": {"Sec0Dia": 3},
-    "Sec1Profile": {"Sec1Dia": 3},
-    "Sec2Profile": {"Sec2Dia": 3},
-    "Sec3Profile": {"Sec3Dia": 3},
-    "Sec4Profile": {"Sec4Dia": TERMINAL_DIA_PLACES},
+    "Sec0Profile": {"Sec0Dia": LAND_DIA_PLACES[0]},
+    "Sec1Profile": {"Sec1Dia": LAND_DIA_PLACES[1]},
+    "Sec2Profile": {"Sec2Dia": LAND_DIA_PLACES[2]},
+    "Sec3Profile": {"Sec3Dia": LAND_DIA_PLACES[3]},
+    "Sec4Profile": {"Sec4Dia": LAND_DIA_PLACES[4]},
     "Sec0": {"Sec0End": 1},
     "Sec1": {"Sec1End": 3},
     "Sec2": {"Sec2End": 3},
     "Sec3": {"Sec3End": 3},
     "Sec4": {"Sec4End": 2},
-    "Sec1FlatProfile": {"Sec1AF": 3},
-    "Sec2FlatProfile": {"Sec2AF": 3},
-    "Sec3FlatProfile": {"Sec3AF": 3},
-    "Sec4FlatProfile": {"Sec4AF": 3},
+    "Sec1FlatProfile": {"Sec1AF": LAND_AF_PLACES[1]},
+    "Sec2FlatProfile": {"Sec2AF": LAND_AF_PLACES[2]},
+    "Sec3FlatProfile": {"Sec3AF": LAND_AF_PLACES[3]},
+    "Sec4FlatProfile": {"Sec4AF": LAND_AF_PLACES[4]},
     "TerminalFlatEdgeBreak": {"TerminalTorqueEdge": 3},
     "ShoulderFillets": {"ShoulderR": 2},
     "CollarProfile": {"CollarDia": 2},
@@ -470,17 +472,17 @@ def printed_band(name: str) -> float:
     return printed_band_mm(DRAWING_PRECISION_BY_NAME[name])
 
 
-# Guaranteed cylindrical support, with the integral collar seated on the
-# actual post north face. Neither a full boss nor the shaft's proud end is a
-# bearing contact. Both bore rims and the ordinary free shaft-end break remove
-# support; the shorter of the two COMPLETE overlaps controls running cock.
+# Guaranteed cylindrical support across the ENTIRE retained shaft stroke.
+# The integral collar starts seated on the actual post north face; north q
+# withdraws the shaft's free end into the bore. Both bore rims and ordinary
+# shaft-end break remove support; the shorter COMPLETE overlap controls cock.
 JOURNAL_FREE_END_BREAK_MAX_MM = 0.25
 JOURNAL_SUPPORT_SPAN_MIN_MM = min(
     dt_cone_pivot_post_spec.CONE_BOSS_LENGTH
     - printed_band_mm(dt_cone_pivot_post_spec.DRAWING_PRECISION_BY_NAME["ConeBossLen"])
     - 2.0 * THRUST_EDGE_BREAK_MAX,
     JOURNAL_END - printed_band("Sec0End")
-    - JOURNAL_FREE_END_BREAK_MAX_MM - THRUST_EDGE_BREAK_MAX,
+    - JOURNAL_FREE_END_BREAK_MAX_MM - THRUST_EDGE_BREAK_MAX - SHAFT_END_PLAY[1],
 )
 if JOURNAL_SUPPORT_SPAN_MIN_MM <= 0.0:
     raise AssertionError("post/shaft pair has no guaranteed cylindrical bearing span")

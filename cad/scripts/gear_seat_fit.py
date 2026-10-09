@@ -56,45 +56,81 @@ def flat_bore_af_band(land_af_band: tuple[float, float]) -> tuple[float, float]:
 
 
 def connected_home_clock_angle_bound_rad(
-    shaft_diameter_limits_mm: tuple[float,float],
-    shaft_across_flat_limits_mm: tuple[float,float],
-    bore_across_flat_limits_mm: tuple[float,float],
+    shaft_diameter_limits_mm: tuple[float, float],
+    shaft_across_flat_limits_mm: tuple[float, float],
+    bore_across_flat_limits_mm: tuple[float, float],
+    *,
+    edge_break_mm: float,
 ) -> float:
-    """Translation-independent free-clock OUTER for the retained round-backed D.
+    """First connected-home free-clock OUTER including allowed C/R removal.
 
-    Inputs are absolute (MIN, MAX), not deviation (upper, lower) bands.
-    The flat retains at least half the shaft at every size corner. For
-    r=radius, a=AF-r and c=sqrt(r*r-a*a), its width normal to the bore flat
-    is r+a*cos(theta)+c*abs(sin(theta)) until the whole circle supports.
-    Translation cannot change width, so that width must be <= bore AF.
-    The FIRST width barrier bounds the component connected to actual home;
-    a later 180-degree width branch is not a route through that barrier.
+    Inputs are absolute printed (MIN,MAX). The bore must contain the retained
+    round-backed D at home. This necessary width law is independent of rigid
+    translation; it is not observed twist, torque seating or an INNER.
 
-    Bigger shaft radius or AF gives a superset (after translating the round
-    back to x=0); a bigger bore AF relaxes the inequality. Therefore the
-    maximum over all independent bands occurs at rMIN, shaft AFMIN, bore
-    AFMAX. This is not observed material twist or proof of loaded seating.
-    Full solid containment and physical loading may narrow this OUTER.
+    With r=D/2, h=A-r and c=sqrt(A*(D-A)), a MAX C=e leaves a flat witness
+    at y=c-e. A TRUE internal circular R=e tangent to the flat and round back
+    leaves y=sqrt((A-2e)*(D-A)); its setback can exceed e. Pay the smaller
+    witness and use W=r+h*cos(theta)+y*sin(theta). The untouched back-circle
+    extremum supplies the opposite support up to the explicitly bounded arc.
+    The first ascending W=B barrier disconnects home from later width fits.
+
+    On that ascending branch W increases with r and A, so the largest first
+    barrier uses DMIN, shaft AFMIN, bore AFMAX. If no retained witness/barrier
+    is certified, report the universal wrapped-angle OUTER pi, never zero.
     """
-    for limits in (shaft_diameter_limits_mm,shaft_across_flat_limits_mm,bore_across_flat_limits_mm):
-        if len(limits)!=2 or not all(math.isfinite(value) and value>0 for value in limits) or limits[0]>limits[1]:
+    for limits in (shaft_diameter_limits_mm, shaft_across_flat_limits_mm,
+                   bore_across_flat_limits_mm):
+        if (len(limits) != 2
+                or not all(math.isfinite(value) and value > 0 for value in limits)
+                or limits[0] > limits[1]):
             raise ValueError("clock bound needs finite positive absolute MIN/MAX limits")
-    dmin,dmax = shaft_diameter_limits_mm
-    amin,amax = shaft_across_flat_limits_mm
-    bmin,bmax = bore_across_flat_limits_mm
-    if amin<dmax/2 or amax>=dmin:
+    if not math.isfinite(edge_break_mm) or edge_break_mm < 0:
+        raise ValueError("clock bound needs a finite nonnegative edge break")
+    dmin, dmax = shaft_diameter_limits_mm
+    amin, amax = shaft_across_flat_limits_mm
+    bmin, bmax = bore_across_flat_limits_mm
+    if amin < dmax / 2 or amax >= dmin:
         raise ValueError("clock width law requires a proper round-backed D at every size corner")
-    if bmin<amax:
+    if bmin < amax:
         raise ValueError("AF limits do not guarantee connected-home assembly at every size corner")
-    radius = dmin/2
-    if bmax>=2*radius:
-        return math.pi  # No width barrier; the full wrapped-angle OUTER.
-    lower = (amin-radius)/radius
-    upper = (bmax-radius)/radius
-    # Pay normalization and asin endpoint arithmetic outward; unlike the
-    # clearance/chord linearization, this never knowingly rounds inward.
-    error = 32*math.ulp(1.0)*(1+abs(lower)+abs(upper))
-    lower = max(-1.0,math.nextafter(lower-error,-math.inf))
-    upper = min(1.0,math.nextafter(upper+error,math.inf))
-    angle = math.asin(upper)-math.asin(lower)+64*math.ulp(math.pi)
-    return min(math.pi,math.nextafter(angle,math.inf))
+    radius = dmin / 2
+    edge = edge_break_mm
+    if bmax >= dmin or edge >= amin / 2:
+        return math.pi
+    chord = math.sqrt(amin * (dmin - amin))
+    retained = min(chord - edge, math.sqrt((amin - 2 * edge) * (dmin - amin)))
+    if retained <= 0:
+        return math.pi
+
+    # Enclose the earliest removed round-back arc over ALL shaft-size corners.
+    # For C its cut x is >=h-e. For R the circle tangency has
+    # x=r*(h-e)/(r-e), decreasing with r and increasing with A when A>2e.
+    largest_radius = dmax / 2
+    smallest_offset = amin - largest_radius
+    arc_cut = min(smallest_offset - edge,
+                  largest_radius * (smallest_offset - edge) / (largest_radius - edge))
+    arithmetic = 128 * math.ulp(1.0) * (1 + dmax + amax + bmax + edge)
+    arc_cut = math.nextafter(arc_cut - arithmetic, -math.inf)
+    if arc_cut <= -radius:
+        return math.pi
+    safe = math.pi / 2 if arc_cut >= 0 else math.acos(min(1.0, -arc_cut / radius))
+    safe = math.nextafter(safe - 64 * math.ulp(math.pi), -math.inf)
+
+    # Lower the necessary width, moving its first barrier outward. The guard
+    # covers these elementary operations; final inverse-angle rounding is up.
+    rlow = math.nextafter(radius - arithmetic, -math.inf)
+    hlow = max(0.0, math.nextafter(amin - radius - arithmetic, -math.inf))
+    ylow = math.nextafter(retained - arithmetic, -math.inf)
+    if rlow <= 0 or ylow <= 0:
+        return math.pi
+    amplitude = math.hypot(hlow, ylow)
+    ratio = math.nextafter((bmax - rlow) / amplitude, math.inf)
+    if ratio >= 1:
+        return math.pi
+    angle = (math.asin(max(-1.0, ratio)) - math.atan2(hlow, ylow)
+             + 128 * math.ulp(math.pi))
+    angle = math.nextafter(max(0.0, angle), math.inf)
+    if angle >= safe:
+        return math.pi
+    return min(math.pi, angle)

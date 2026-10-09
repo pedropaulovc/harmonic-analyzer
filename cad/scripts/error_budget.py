@@ -52,6 +52,7 @@ import ch_connecting_rod_spec
 import vn_counter_spring_spec
 import dt_cylinder_gear_spec
 import dt_cone_gear_spec
+import dt_cone_mesh_domain
 import cone_shaft_land_bands
 import gear_seat_fit
 import mg_lever_wire_geom
@@ -64,7 +65,6 @@ import ch_rocker_arm_spec
 import sm_summing_lever_spec
 import spring_mount_geom
 import spring_force_model
-import stock_form_mesh
 from channel_frame_geom import (
     CAM_SHAFT_XY,
     CYLINDER_LOCK_PHASE_DEG,
@@ -839,16 +839,17 @@ def nominal_design_errors(
 # signed, deterministic angle off where an ideal train would put it -- the
 # same on every machine, so it is nominal residual
 # (reserved.nominal_residual_mae), never scatter. Two meshes set it, both
-# read from their owners' specs and evaluated by actual first contact
-# (stock_form_mesh.planar_contact) on the drive flank, at the stall itself:
+# read from their owners' qualified actual 3D studies on the drive flank,
+# at the stall itself:
 #
 # * cone -> cylinder -- at stall k the cone shaft has turned psi_k = k pi
 #   (3 i k teeth of channel i's T_i = 6 i), plus the crank mesh's shaft term.
-#   The cylinder's actual driven phase against the ideal-ratio phase at the
-#   NOMINAL psi_k, from the cone home lock (the solver's physical home
-#   clocking), is the cam's advance -- an absolute datum, never tared by a
-#   mean, median or k=0 value -- so the shaft term reaches channel i through
-#   the actual mesh (~T_i/120 of it), not a linearised ratio.
+#   The cone row's ``stock_phase_3d`` reference is the cylinder's signed
+#   running TE at exactly those reads, from the physical setup the
+#   operating notch-up zero leaves (no tare by a mean, median or k=0 value).
+#   The shaft term reaches channel i at the ideal T_i/120, and the TE's own
+#   change over the shaft's shift is paid by the row's whole-period signed
+#   TE interval.
 # * crank 16 -> 64 (crossed) -- the shaft's own lag at crank stall
 #   phi_k = 4 pi k, from the 3D first-contact study. Its value at home is a
 #   shaft angle every stall shares, upstream of every cone gear, which the
@@ -859,14 +860,15 @@ def nominal_design_errors(
 # The alignment drum (32T) is NOT in the chain: zeroing turns the notches up
 # (sines to 90 deg) by eye and parks the drum before the cones re-engage, so
 # no drum angle is ever a datum, and the running cams sit where the cone
-# lock and the crank index put them. Its contact at an authored drum
-# clocking is a gauge choice (a constant -ratio x drum clocking offset), not
-# a machine error.
+# lock and the crank index put them.
 #
-# Numerical enclosures are paid, never assumed away: each contact's own
-# phase enclosure, the crank study's bound (by evaluating the cone at both
-# ends of the shaft interval -- driven phase is monotone in driver phase on
-# one flank) and the cone/drum oblique-section bound.
+# Numerical enclosures are paid, never assumed away: each read's half-width
+# over the budget's clock-nominal subdomain (which carries its reference's
+# numerical bound), the crank study's bound, and the TE interval paying any
+# shaft shift. So is the one manufacturing phase grade the cone rows leave
+# out for the budget: each drum's tooth pattern clocked against its
+# CAM-NOTCH (``drum_pattern_clock_rad``), +/- its grade in cam radians
+# directly on every read.
 
 CONE_STEP_TEETH = dt_cone_gear_spec.CONFIGURATION_TEETH[0]
 CYLINDER_TEETH = int(_config.machine("gear_train", "cylinder_teeth"))
@@ -897,11 +899,13 @@ class StockPhase:
     """Each cam's signed advance (rad, + = ahead in its running direction)
     from its cone-lock home at every read stall, channels x stalls, with its
     conservative half-width ``bound_rad`` -- the one credited and gated,
-    carrying the solver's ROBUST oblique bound (every source pose,
-    manufacturing and runout corner). ``nominal_pose_bound_rad`` is the same
-    half-width with the nominal-pose oblique bound instead: reported beside
-    it, never credited, so the share of the residual that is really
-    manufacturing spread is visible, not silently booked as nominal bias."""
+    carrying the cone rows' ROBUST widths (the budget clock-nominal
+    subdomain: every source pose, manufacturing and runout corner) and the
+    drum pattern clock grade (``drum_pattern_clock_rad``, on every read).
+    ``nominal_pose_bound_rad`` is the same half-width with the rows'
+    nominal-pose widths instead: reported beside it, never credited, so the
+    share of the residual that is really manufacturing spread is visible,
+    not silently booked as nominal bias."""
 
     advance_rad: np.ndarray
     bound_rad: np.ndarray
@@ -934,59 +938,9 @@ class StockPhase:
         }
 
 
-def _driven_advance(
-    engine: Any,
-    phi: float,
-    ideal_phi: float,
-    sense: int,
-    lower: tuple[Any, float] | None = None,
-) -> tuple[float, float]:
-    """(advance, enclosure) of the driven gear at driver phase ``phi`` against
-    the ideal-ratio datum at ``ideal_phi``, + = ahead in its running
-    direction. ``sense`` +1 drives the engine's driver positively (driven
-    turns negatively, loaded on the upper backlash edge ``driven_phase_rad``);
-    -1 the reverse (lower edge ``reverse_driven_phase_rad``).
-
-    The loaded edge must be a supported contact, or the stall is refused.
-    ``PhaseContact.supported`` describes the upper (forward) carry only, so
-    for -1 ``lower`` = (the mirrored engine, the driver clocking) queries
-    the lower edge as the mirror's upper one, at -phi - 2 x driver clocking:
-    its ``supported`` is the lower edge's, and its negated driven phase must
-    agree with ``reverse_driven_phase_rad`` modulo a driven pitch within
-    both enclosures."""
-    contact = engine.contact_at(phi)
-    if sense > 0:
-        if not contact.supported:
-            raise StockPhaseUnavailable(
-                f"upper-edge contact unsupported at driver {phi:+.6f} rad "
-                f"({contact.feature_ids})"
-            )
-        return engine.datum(ideal_phi) - contact.driven_phase_rad, contact.phase_error_rad
-    if lower is None:
-        raise ValueError("the lower edge needs its mirrored engine")
-    mirror, driver_clocking = lower
-    image = mirror.contact_at(-phi - 2.0 * driver_clocking)
-    if not image.supported:
-        raise StockPhaseUnavailable(
-            f"lower-edge contact unsupported at driver {phi:+.6f} rad "
-            f"(mirrored {image.feature_ids})"
-        )
-    edge = contact.reverse_driven_phase_rad
-    pitch = 2.0 * math.pi / CYLINDER_TEETH
-    disagreement = abs(
-        math.remainder(-image.driven_phase_rad - edge, pitch)
-    )
-    if disagreement > contact.phase_error_rad + image.phase_error_rad:
-        raise StockPhaseUnavailable(
-            f"lower edge at driver {phi:+.6f} rad disagrees with its mirror by "
-            f"{disagreement:.3e} rad"
-        )
-    return -(engine.datum(ideal_phi) - edge), contact.phase_error_rad
-
-
-def _finite_phase_deg(value: Any) -> bool:
-    """A configured or certified crank phase is admissible only as a finite
-    int/float (never a bool, never None)."""
+def _finite_real(value: Any) -> bool:
+    """A source scalar (a crank phase, a cone row read) is admissible only as a
+    finite int/float -- never a bool, a string or None."""
     return (
         isinstance(value, (int, float))
         and not isinstance(value, bool)
@@ -999,31 +953,41 @@ def crank_shaft_lag() -> tuple[int, np.ndarray, np.ndarray, str]:
     the cone shaft (+1 = the cone engine's positive driver sense, cylinders
     turning world -Z) and the shaft's lag (rad, + = behind the ideal 16:64
     ratio in its running direction) at every crank read stall, from the
-    crossed-mesh 3D first-contact study, refused unless it is qualified,
-    current, certified at exactly the configured crank mesh phase
-    (``gear_train.crank_mesh_phase_offset_deg`` == the study's
-    ``CERTIFIED_PHASE_OFFSET_DEG``, both finite degrees, compared exactly --
-    the geometry digest does not carry the selected phase) and sampled at
-    exactly the read stalls."""
+    crossed-mesh 3D first-contact study. Refused unless its packet passes
+    ``crank_drive_phase.require_qualified()`` (called before any numeric
+    field is read; its ValueError/RuntimeError is the named refusal), the
+    frozen ``GEOMETRY_SHA256`` equals the pure input digest
+    ``crank_mesh_geometry.geometry_sha256()`` (which excludes the selected
+    phase output), it is certified at exactly the configured crank mesh phase
+    (``gear_train.crank_mesh_phase_offset_deg`` == the admitted packet's
+    ``phase_seed_deg`` == the study's ``CERTIFIED_PHASE_OFFSET_DEG``, all
+    finite degrees, compared exactly) and it is sampled at exactly the read
+    stalls."""
     import crank_drive_phase as crank
+    import crank_mesh_geometry
 
-    if not crank.QUALIFIED:
-        raise StockPhaseUnavailable(f"crank 16/64 phase study refused: {crank.REFUSAL}")
-    current = crank.geometry_sha256()
+    try:
+        packet = crank.require_qualified()
+    except (ValueError, RuntimeError) as exc:
+        raise StockPhaseUnavailable(f"crank 16/64 phase study refused: {exc}") from exc
+    current = crank_mesh_geometry.geometry_sha256()
     if current != crank.GEOMETRY_SHA256:
         raise StockPhaseUnavailable(
             f"crank 16/64 phase study is stale: frozen {crank.GEOMETRY_SHA256}, "
             f"current geometry {current}"
         )
     configured = _config.machine("gear_train").get("crank_mesh_phase_offset_deg")
+    seeded = packet.get("phase_seed_deg") if isinstance(packet, dict) else None
     certified = crank.CERTIFIED_PHASE_OFFSET_DEG
     if not (
-        _finite_phase_deg(configured)
-        and _finite_phase_deg(certified)
-        and configured == certified
+        _finite_real(configured)
+        and _finite_real(seeded)
+        and _finite_real(certified)
+        and configured == seeded == certified
     ):
         raise StockPhaseUnavailable(
-            f"configured crank phase {configured!r} deg != certified {certified!r} deg"
+            f"configured crank phase {configured!r} deg != packet seed {seeded!r} deg "
+            f"!= certified {certified!r} deg"
         )
     sense = int(crank.CONE_SHAFT_SENSE)
     if sense not in (1, -1):
@@ -1042,85 +1006,178 @@ def crank_shaft_lag() -> tuple[int, np.ndarray, np.ndarray, str]:
     return sense, lag, bound, current
 
 
-# The terms the solver's oblique bound leaves out because the budget books
-# them itself: the D-flat free clock (``cone_flat_play``) and the bore-flat
-# indexing grade (``cone_flat_clock``). Exactly these, so nothing is paid
-# twice and nothing is left unpaid.
-CONE_ROW_EXCLUDED_TERMS = ("cone_flat_free_clock", "BoreFlatClock")
+# The terms the cone rows' widths leave out because the budget books them
+# itself: the D-flat free clock (``cone_flat_play``), the bore-flat indexing
+# grade (``cone_flat_clock``) and the drum tooth-pattern-to-CAM-NOTCH clock
+# (``drum_pattern_clock_rad``, on every read). Exactly these, so nothing is
+# paid twice and nothing is left unpaid.
+CONE_ROW_EXCLUDED_TERMS = (
+    "cone_flat_free_clock",
+    "BoreFlatClock",
+    "drum_tooth_to_cam_notch_clock",
+)
+# The cone row's ``stock_phase_3d`` reads (dt-cone-operating-stock-phase/1),
+# one per read stall, all rad: the cone shaft's read phases, the selected
+# q0 reference's driven advance and signed running TE, that reference's
+# numerical bound (an audit: both widths already carry it), and the
+# half-widths over the budget clock-nominal subdomain (robust, credited)
+# and over the q0 nominal pose (reported).
+CONE_ROW_STALL_READS = (
+    "driver_read_phases_rad",
+    "nominal_driven_advance_rad",
+    "nominal_signed_running_te_rad",
+    "nominal_reference_numerical_bound_rad",
+    "robust_half_width_rad",
+    "nominal_pose_half_width_rad",
+)
+# ... and its whole-period signed TE intervals (lo, hi) over the same two
+# domains: what any shift of the cone off a read can change the TE by.
+CONE_ROW_TE_INTERVALS = (
+    "robust_signed_te_interval_rad",
+    "nominal_pose_signed_te_interval_rad",
+)
 
 
-def _qualified_cone_row(teeth: int) -> dict[str, Any]:
-    """The solver's row for cone T``teeth``, refused unless it is qualified,
-    carries both oblique-section bounds (robust and nominal pose), and scopes
-    them to exclude exactly ``CONE_ROW_EXCLUDED_TERMS``."""
-    mesh = dt_cone_gear_spec.stock_form_mesh_data(teeth)
-    if mesh["qualification"] != "qualified":
-        raise StockPhaseUnavailable(f"cone mesh refused: {mesh['refusal']}")
-    for key in ("oblique_phase_bound_rad", "nominal_oblique_phase_bound_rad"):
-        if mesh[key] is None:
-            raise StockPhaseUnavailable(f"cone/drum {key} unavailable")
+def _row_reals(
+    mesh: dict[str, Any], teeth: int, key: str, length: int, nonnegative: bool
+) -> np.ndarray:
+    values = mesh.get(key)
+    if (
+        not isinstance(values, (tuple, list))
+        or len(values) != length
+        or not all(_finite_real(value) for value in values)
+        or (nonnegative and any(value < 0.0 for value in values))
+    ):
+        raise StockPhaseUnavailable(
+            f"cone T{teeth:03d} {key} {values!r} is not {length} finite"
+            f"{' non-negative' if nonnegative else ''} rad"
+        )
+    return np.asarray(values, dtype=float)
+
+
+def _qualified_cone_row(teeth: int) -> dict[str, np.ndarray]:
+    """The cone T``teeth`` row's ``stock_phase_3d`` reads (``CONE_ROW_STALL_READS``
+    and ``CONE_ROW_TE_INTERVALS``), refused unless the row is qualified,
+    scoped to exclude exactly ``CONE_ROW_EXCLUDED_TERMS``, every read is a
+    finite real per stall (widths non-negative, each carrying the reference's
+    numerical bound), its signed TE is its driven advance plus T/120 of its
+    driver phase (the source frame: TE = (beta_abs - pi) + r phi), and each
+    TE interval is a finite (lo <= hi)."""
+    try:
+        mesh = dt_cone_gear_spec.stock_form_mesh_data(teeth)
+    except ValueError as exc:
+        raise StockPhaseUnavailable(f"cone T{teeth:03d} stock-form family refused: {exc}") from exc
+    if mesh.get("qualification") != "qualified":
+        raise StockPhaseUnavailable(f"cone mesh refused: {mesh.get('refusal')}")
     excluded = mesh.get("oblique_phase_bound_excluded_terms")
     if excluded is None or tuple(excluded) != CONE_ROW_EXCLUDED_TERMS:
         raise StockPhaseUnavailable(
-            f"cone T{teeth:03d} oblique bound excludes {excluded!r}, "
+            f"cone T{teeth:03d} widths exclude {excluded!r}, "
             f"not exactly {CONE_ROW_EXCLUDED_TERMS!r}"
         )
-    return mesh
+    row = {
+        key: _row_reals(
+            mesh,
+            teeth,
+            key,
+            K_MAX + 1,
+            nonnegative=key
+            in (
+                "nominal_reference_numerical_bound_rad",
+                "robust_half_width_rad",
+                "nominal_pose_half_width_rad",
+            ),
+        )
+        for key in CONE_ROW_STALL_READS
+    }
+    for key in CONE_ROW_TE_INTERVALS:
+        row[key] = _row_reals(mesh, teeth, key, 2, nonnegative=False)
+        if row[key][0] > row[key][1]:
+            raise StockPhaseUnavailable(f"cone T{teeth:03d} {key} has lo > hi")
+    numerical = row["nominal_reference_numerical_bound_rad"]
+    for key in ("robust_half_width_rad", "nominal_pose_half_width_rad"):
+        if np.any(row[key] < numerical):
+            raise StockPhaseUnavailable(
+                f"cone T{teeth:03d} {key} does not carry its reference's numerical bound"
+            )
+    ratio = teeth / CYLINDER_TEETH
+    if not np.allclose(
+        row["nominal_signed_running_te_rad"],
+        row["nominal_driven_advance_rad"] + ratio * row["driver_read_phases_rad"],
+        rtol=0.0,
+        atol=1e-9,
+    ):
+        raise StockPhaseUnavailable(
+            f"cone T{teeth:03d} signed TE is not driven advance + T/120 x driver phase"
+        )
+    return row
 
 
 def cone_stall_advance(
     teeth: int, sense: int, shaft_advance: np.ndarray, shaft_bound: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """(advance, bound, nominal-pose bound) rad of the cylinder T_i drives at
-    every read stall: the cone at sense x psi_k plus the shaft's advance (in
-    its running direction), against the ideal ratio at sense x psi_k, from
-    the solver's qualified row (actual profile, deep planar centre, physical
-    home clocking), plus its robust oblique-section bound (``bound``) or its
-    nominal-pose one (reported only)."""
-    mesh = _qualified_cone_row(teeth)
-    oblique = float(mesh["oblique_phase_bound_rad"])
-    nominal_oblique = float(mesh["nominal_oblique_phase_bound_rad"])
-    driver_clocking, driven_clocking = mesh["home_clocking_rad"]
-    profile = dt_cone_gear_spec.stock_form_profile(teeth)
-    engine = stock_form_mesh.planar_contact(
-        profile,
-        dt_cylinder_gear_spec.STOCK_FORM,
-        mesh["centre_mm"],
-        driver_clocking_rad=driver_clocking,
-        driven_clocking_rad=driven_clocking,
-    )
-    lower = None
-    if sense < 0:
-        # the planar profiles are symmetric: the lower edge is the upper edge
-        # of the mirrored mesh (driver clock unchanged)
-        mirror = stock_form_mesh.planar_contact(
-            profile,
-            dt_cylinder_gear_spec.STOCK_FORM,
-            mesh["centre_mm"],
-            driver_clocking_rad=driver_clocking,
-            driven_clocking_rad=-driven_clocking
-            - 2.0 * teeth / CYLINDER_TEETH * driver_clocking,
-        )
-        lower = (mirror, driver_clocking)
-    advance = np.empty(K_MAX + 1)
-    bound = np.empty(K_MAX + 1)
-    for k, (psi, shift, spread) in enumerate(
-        zip(sense * CONE_STALL_RAD, sense * shaft_advance, shaft_bound)
+    every read stall, + = ahead in its running direction, from the row's
+    actual 3D q0 reference (``_qualified_cone_row``): its signed running TE
+    at the read, plus the shaft's advance (in its running direction) at the
+    ideal ratio T_i/120, which the reference does not include.
+
+    The row must be read at exactly the shaft's stalls, sense x psi_k. The
+    bound pays the shaft bound at T_i/120, the read's half-width (robust,
+    credited; nominal pose, reported), and -- wherever the shaft is shifted
+    or uncertain -- once the whole-period signed TE interval's span over the
+    same domain, the most the TE can change between the read and the shifted
+    cone."""
+    row = _qualified_cone_row(teeth)
+    if not np.allclose(
+        row["driver_read_phases_rad"], sense * CONE_STALL_RAD, rtol=0.0, atol=1e-9
     ):
-        centre, enclosure = _driven_advance(engine, psi + shift, psi, sense, lower)
-        lo, hi = centre - enclosure, centre + enclosure
-        if spread > 0.0:
-            for end in (psi + shift - spread, psi + shift + spread):
-                value, error = _driven_advance(engine, end, psi, sense, lower)
-                lo, hi = min(lo, value - error), max(hi, value + error)
-        advance[k] = centre
-        bound[k] = max(hi - centre, centre - lo)
-    return advance, bound + oblique, bound + nominal_oblique
+        raise StockPhaseUnavailable(
+            f"cone T{teeth:03d} reads are not at the shaft's stalls {sense:+d} x k pi"
+        )
+    ratio = teeth / CYLINDER_TEETH
+    shifted = (shaft_advance != 0.0) | (shaft_bound > 0.0)
+    robust_lo, robust_hi = row["robust_signed_te_interval_rad"]
+    pose_lo, pose_hi = row["nominal_pose_signed_te_interval_rad"]
+    shaft = ratio * shaft_bound
+    return (
+        row["nominal_signed_running_te_rad"] + ratio * shaft_advance,
+        shaft
+        + row["robust_half_width_rad"]
+        + np.where(shifted, robust_hi - robust_lo, 0.0),
+        shaft
+        + row["nominal_pose_half_width_rad"]
+        + np.where(shifted, pose_hi - pose_lo, 0.0),
+    )
+
+
+def drum_pattern_clock_rad() -> float:
+    """The half-width (cylinder rad) of each drum's tooth pattern clocked
+    against its CAM-NOTCH, read from the shared gear-critical source grade
+    (``fits.cone_drum_oblique_mesh.drum_tooth_to_cam_notch_clock_deg``),
+    rounded outward exactly as the source domain rounds it.
+
+    The mesh sets the tooth pattern's angle beta* = beta + q; the cam sits at
+    beta = beta* - q, so the clock q moves the cam by -q in cylinder (= cam)
+    radians directly -- never T_i/120 of it, never times i. A signed unknown
+    with nominal 0, fixed per gear across all 21 reads (k=0 included): no
+    tare, no index removes it, no stochastic or root-sum-squared share. It is
+    paid once, as +/- this grade, in the nominal residual. Absent or invalid
+    grade: ``StockPhaseUnavailable``, never 0."""
+    try:
+        grade_deg = dt_cone_mesh_domain.drum_tooth_to_cam_notch_clock_deg()
+    except dt_cone_mesh_domain.SourceDomainUnknown as exc:
+        raise StockPhaseUnavailable(f"drum tooth-to-CAM-NOTCH clock: {exc}") from exc
+    return math.nextafter(math.radians(grade_deg), math.inf)
 
 
 @functools.cache
 def _stock_phase_result() -> tuple[StockPhase | None, tuple[str, ...]]:
     missing: list[str] = []
+    try:
+        pattern = drum_pattern_clock_rad()
+    except StockPhaseUnavailable as exc:
+        missing.append(str(exc))
     try:
         sense, lag, lag_bound, crank_sha = crank_shaft_lag()
     except StockPhaseUnavailable as exc:
@@ -1142,10 +1199,14 @@ def _stock_phase_result() -> tuple[StockPhase | None, tuple[str, ...]]:
             advance[n], bound[n], nominal_pose_bound[n] = cone_stall_advance(
                 int(teeth), sense, shaft_advance, shaft_bound
             )
-        except (StockPhaseUnavailable, stock_form_mesh.MeshCertificationError) as exc:
+        except StockPhaseUnavailable as exc:
             missing.append(f"T{int(teeth):03d}: {exc}")
     if missing:
         return None, tuple(missing)
+    # the drum pattern clock: the same +/- grade on every cam at every read,
+    # in both the credited and the reported half-width (the cone rows exclude it)
+    bound += pattern
+    nominal_pose_bound += pattern
     return (
         StockPhase(
             advance_rad=advance,
@@ -1285,12 +1346,12 @@ def cone_flat_free_clock_rad() -> np.ndarray:
     (rad of gear turn, one side of home), per channel.
 
     ``gear_seat_fit.connected_home_clock_angle_bound_rad`` is the exact
-    width barrier of the round-backed D, maximised over absolute limits: the
-    land's diameter (the configured bore's unrounded native nominal with its
-    section band -- the native representative, not the drawing's printed
-    limits, e.g. the terminal land prints .794 h0/-.020 against a native
-    .79375), the land's AF (``FLAT_AF_BAND``) and the bore's printed AF
-    (``BORE_AF_PLACES``) with ``dt_cone_gear_spec.BORE_AF_BAND``, paying the edge break the torque
+    width barrier of the round-backed D, maximised over the drawings'
+    absolute PRINTED limits: the land's diameter and AF
+    (``cone_shaft_land_bands.land_finished_dia_limits_mm`` from the
+    configured bore's native diameter, ``land_finished_af_limits_mm``) and
+    the bore's AF (its native AF at ``BORE_AF_PLACES`` with
+    ``dt_cone_gear_spec.BORE_AF_BAND``), paying the edge break the torque
     corner may lose -- the title block's (``flat_edge_break_mm``) on every
     land but the terminal 1/32 in one, whose drawing holds
     ``cone_shaft_land_bands.TERMINAL_FLAT_EDGE_BREAK_MAX``. It is a necessary
@@ -1298,21 +1359,19 @@ def cone_flat_free_clock_rad() -> np.ndarray:
     only narrow it, so no bore chord clamps it."""
     general_break = flat_edge_break_mm()
     terminal_section = len(cone_shaft_land_bands.SECTION_DIA_BANDS) - 1
-    land_af_upper, land_af_lower = cone_shaft_land_bands.FLAT_AF_BAND
     bore_af_upper, bore_af_lower = dt_cone_gear_spec.BORE_AF_BAND
     outer = np.empty(N_ELEMENTS)
     for index, teeth in enumerate(int(t) for t in CHANNEL_CONE_TEETH):
         section = dt_cone_gear_spec.land_section(teeth)
-        dia_upper, dia_lower = cone_shaft_land_bands.SECTION_DIA_BANDS[section]
-        diameter = dt_cone_gear_spec.bore_dia_mm(teeth)
-        land_af = cone_shaft_land_bands.SECTION_FLAT_AF[section]
         # the bore AF as printed (BORE_AF_PLACES), then its band
         bore_af = round(
             dt_cone_gear_spec.bore_flat_af_mm(teeth), dt_cone_gear_spec.BORE_AF_PLACES
         )
         outer[index] = gear_seat_fit.connected_home_clock_angle_bound_rad(
-            (diameter + dia_lower, diameter + dia_upper),
-            (land_af + land_af_lower, land_af + land_af_upper),
+            cone_shaft_land_bands.land_finished_dia_limits_mm(
+                dt_cone_gear_spec.bore_dia_mm(teeth), section
+            ),
+            cone_shaft_land_bands.land_finished_af_limits_mm(section),
             (bore_af + bore_af_lower, bore_af + bore_af_upper),
             edge_break_mm=(
                 cone_shaft_land_bands.TERMINAL_FLAT_EDGE_BREAK_MAX
@@ -2218,8 +2277,8 @@ def build_report(budget: dict[str, Any] | None = None) -> dict[str, Any]:
             "residual_lobe_up": None
             if phase is None
             else stock_phase_residual(replace(as_built, cam_home_deg=0.0), phase),
-            # reported only: the same residual paying the NOMINAL-pose oblique
-            # bound, so the robust (pose/manufacturing/runout) share is visible
+            # reported only: the same residual paying the cone rows' NOMINAL-
+            # pose widths, so the robust (pose/manufacturing/runout) share is visible
             "residual_nominal_pose": None
             if phase is None
             else stock_phase_residual(
@@ -2344,8 +2403,8 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
         index = np.degrees(np.asarray(sp["index_removed_cam_rad"]))
         p(
             f"  cam advance from the cone-lock home: max |delta| {sp['max_abs_advance_deg']:.4f} deg, "
-            f"bound <= {sp['max_bound_deg']:.4f} deg (robust oblique, credited; "
-            f"nominal-pose oblique <= {sp['max_nominal_pose_bound_deg']:.4f} deg, "
+            f"bound <= {sp['max_bound_deg']:.4f} deg (robust 3D widths, credited; "
+            f"nominal-pose widths <= {sp['max_nominal_pose_bound_deg']:.4f} deg, "
             f"MAE {r['closure']['nominal_residual_mae_nominal_pose']:.4f} %, reported only)"
         )
         p(
@@ -2416,8 +2475,8 @@ def closure(r: dict[str, Any], budget: dict[str, Any]) -> dict[str, Any]:
         if home["residual_as_built"] is None
         else max(home["residual_as_built"][n]["mae"] for n in broad),
         "nominal_residual_mae_kinematic": max(kinematic[n]["mae"] for n in broad),
-        # reported, never credited: the nominal-pose oblique bound in place of
-        # the robust one (the gap is pose/manufacturing/runout spread)
+        # reported, never credited: the cone rows' nominal-pose widths in place
+        # of the robust ones (the gap is pose/manufacturing/runout spread)
         "nominal_residual_mae_nominal_pose": None
         if home["residual_nominal_pose"] is None
         else max(home["residual_nominal_pose"][n]["mae"] for n in broad),

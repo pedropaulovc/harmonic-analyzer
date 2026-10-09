@@ -90,9 +90,8 @@ def test_model_owns_precision_for_every_printed_dimension() -> None:
 
 
 def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
-    # Main ruling (2026-09-23): the title-block .XX +/-0.51 is a whole
-    # addendum; the contact-ratio stack kept +/-0.25 below CR 1.1, so the
-    # tip prints +/-0.10, applied on the model like the other two bands.
+    # The retained explicit blank band is an input to the actual supported
+    # UNION/root-air qualification, not an ideal contact-ratio certificate.
     assert spec.BLANK_DIA_BAND == (0.10, -0.10)
     assert spec.BLANK_DIA_BAND[0] < spec.MODULE_MM / 2.0
     source = Path(part.__file__).read_text(encoding="utf-8")
@@ -127,7 +126,7 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
 def test_bore_bands_are_the_current_derived_seat_fit_bands() -> None:
     assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
     assert spec.BORE_DIA_BAND[0] <= spec.BORE_BAND_FIT_UPPER
-    assert spec.BORE_DIA_BAND[0] <= spec.BORE_BAND_WEB_UPPER
+    assert spec.BORE_DIA_BAND[0] <= spec.terminal_web_bore_upper_mm()
     assert spec.BORE_DIA_BAND[0] - spec.BORE_DIA_BAND[1] >= 0.02 - 1e-9
     assert spec.BORE_AF_BAND == pytest.approx((0.02, 0.01))
     for teeth in spec.CONFIGURATION_TEETH:
@@ -377,11 +376,9 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
 
 
 def test_notes_state_no_bore_joint_method_or_review_record() -> None:
-    # Rule 6: the D-bore and its fit print as native dimensions in the bore
-    # view; no joint, keyway or retaining method is named.  The U42/U40
-    # shortfalls print once each, as GEAR DATA rows (test_named_shortfalls_
-    # print_as_facts_on_their_sheets), so the notes never repeat them.  Every
-    # sheet prints the same two lines.
+    # Rule 6: native D-bore dimensions carry its fit, and the Gear Data block
+    # reports actual cutter/mesh facts separately. Every sheet keeps the same
+    # two short manufacturing notes, without review history or waived floors.
     expected = [
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
         "MAKE ONE GEAR FROM EACH T-CONFIGURATION SHEET.",
@@ -819,9 +816,8 @@ def test_invalid_family_member_is_rejected() -> None:
 
 
 def test_root_to_bore_webs_keep_the_floor_and_target_guards() -> None:
-    # Printed MIN floor against maximum bore, not the nominal floor.  The
-    # D-flat only adds material.  T006's experimental special remains separate
-    # from production approval, and no new target shortfall is waived.
+    # Printed root MIN against the outward-rounded maximum bore, not a nominal
+    # floor. T006's approved 0.62 web is separate from the ordinary 2.0 target.
     for teeth in spec.CONFIGURATION_TEETH:
         web = notes.root_to_bore_web_min_mm(teeth)
         if teeth in spec.WEB_EXCEPTIONS_MM:

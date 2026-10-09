@@ -368,6 +368,86 @@ def test_full_fitup_reader_refuses_stale_partial_or_wrong_corner_proof(mutation:
         mesh.require_qualified(payload)
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    ("compiled", "parsed", "before", "after", "unstable", "missing"),
+)
+def test_full_fitup_reader_refuses_unauthentic_loaded_source(mutation: str) -> None:
+    from copy import deepcopy
+    import alignment_stock_mesh as mesh
+
+    payload = deepcopy(mesh.require_qualified())
+    if mutation == "missing":
+        del payload["source_capture"]
+    elif mutation == "unstable":
+        payload["source_capture"]["source_bytes_stable"] = False
+    else:
+        manifest_name = {
+            "compiled": "actual_compiled_project_sha256",
+            "parsed": "actual_parsed_config_sha256",
+            "before": "before_design_sha256",
+            "after": "after_design_sha256",
+        }[mutation]
+        manifest = payload["source_capture"][manifest_name]
+        manifest[next(iter(manifest))] = "0" * 64
+    # The ordinary current-file hash is untouched: it alone is not proof
+    # that these were the bytes compiled or parsed for the numerical study.
+    assert payload["source_sha256"] == mesh.source_sha256()
+    with pytest.raises(ValueError):
+        mesh.require_qualified(payload)
+
+
+def test_collector_compiles_exact_captured_bytes_not_cached_code(tmp_path, monkeypatch) -> None:
+    import hashlib
+    from importlib.machinery import SourceFileLoader
+    from diagnostics import alignment_mesh_study as study
+
+    scripts = tmp_path / "cad" / "scripts"
+    scripts.mkdir(parents=True)
+    source = scripts / "capture_fixture.py"
+    payload = b"VALUE = 1\n"
+    source.write_bytes(payload)
+    monkeypatch.setattr(study, "REPO", tmp_path)
+    monkeypatch.setattr(study, "SCRIPTS", scripts)
+    monkeypatch.setattr(study, "_COMPILED_PROJECT_SHA", {})
+
+    def forbidden_cached_code(loader, fullname):
+        raise AssertionError("project compilation must not consult the cached-code loader")
+
+    monkeypatch.setattr(study, "_ORIGINAL_GET_CODE", forbidden_cached_code)
+    namespace = {}
+    exec(study._captured_project_code(SourceFileLoader("capture_fixture", str(source)),
+                                     "capture_fixture"), namespace)
+    assert namespace["VALUE"] == 1
+    assert study._COMPILED_PROJECT_SHA == {
+        "cad/scripts/capture_fixture.py": hashlib.sha256(payload).hexdigest()
+    }
+    source.write_bytes(b"VALUE = 2\n")
+    with pytest.raises(RuntimeError, match="changed across loads"):
+        study._captured_project_code(SourceFileLoader("capture_fixture", str(source)),
+                                     "capture_fixture")
+
+
+def test_collector_parses_exact_captured_config_bytes(tmp_path, monkeypatch) -> None:
+    import hashlib
+    from diagnostics import alignment_mesh_study as study
+
+    config = tmp_path / "cad" / "config"
+    config.mkdir(parents=True)
+    source = config / "capture_fixture.yaml"
+    payload = b"value: 1\n"
+    source.write_bytes(payload)
+    monkeypatch.setattr(study, "REPO", tmp_path)
+    monkeypatch.setattr(study, "_PARSED_CONFIG_SHA", {})
+    assert study._captured_config_load(source) == {"value": 1}
+    assert study._PARSED_CONFIG_SHA == {
+        "cad/config/capture_fixture.yaml": hashlib.sha256(payload).hexdigest()
+    }
+    source.write_bytes(b"value: 2\n")
+    with pytest.raises(RuntimeError, match="changed across loads"):
+        study._captured_config_load(source)
+
+
 def test_tip_limits_follow_printed_nominal_not_unrounded_od() -> None:
     places = spec.DRAWING_PRECISION_BY_NAME["OutsideDia"]
     nominal = round(spec.OUTSIDE_DIA, places)

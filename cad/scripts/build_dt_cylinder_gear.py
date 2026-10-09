@@ -100,6 +100,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_basic_tolerance,
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
@@ -129,6 +130,7 @@ from dt_cylinder_gear_spec import (
     NOTCH_PHASE_DEG,
     NOTCH_WIDTH,
     NOTCH_WIDTH_BAND,
+    PATTERN_NOTCH_BASIC_ANGLE_DEG,
     OUTSIDE_DIA,
     OUTSIDE_DIA_BAND,
     OVERALL_THICKNESS,
@@ -136,6 +138,7 @@ from dt_cylinder_gear_spec import (
     STOCK_FORM,
     SURFACE_FINISHES,
     TEETH,
+    TOOTH_PATTERN_GAP_RAD,
 )
 
 import _telemetry
@@ -449,6 +452,16 @@ async def build(adapter) -> dict[str, str]:
             NOTCH_MEAN_RADIUS * math.cos(math.radians(NOTCH_PHASE_DEG)),
         ),
     )
+    # Reference only: the seed ray is the ACTUAL finite stock pattern's pi/N
+    # gap datum. It does not rotate a tooth, cam or kerf, or drive their sketch.
+    pattern_ray = check(
+        "actual seed-tooth-gap reference ray",
+        await adapter.add_centerline(
+            0.0, 0.0,
+            NOTCH_MEAN_RADIUS * math.cos(TOOTH_PATTERN_GAP_RAD),
+            NOTCH_MEAN_RADIUS * math.sin(TOOTH_PATTERN_GAP_RAD),
+        ),
+    )
     set_sketch_direct_db(adapter, False)
     await anchor_point_to_origin(adapter, f"{lobe_axis}.start", 0.0, 0.0, "lobe axis")
     check(
@@ -474,6 +487,10 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     notch_dims.record("NotchMeanRadius", None)
+    check(
+        "fix canonical stock-pattern reference ray",
+        await adapter.add_sketch_constraint(pattern_ray, None, "fix"),
+    )
     # Text point INSIDE the 1.5 deg sector (SolidWorks picks which of the four
     # angles the text sits in; 0.4 deg off the lobe axis, well clear of the
     # radial at 1.5 deg) -- a point outside it reads the 178.5 supplement.
@@ -486,6 +503,13 @@ async def build(adapter) -> dict[str, str]:
         expected_degrees=NOTCH_PHASE_DEG,
     )
     notch_dims.record("NotchPhase")
+    await add_angular_reference_dimension(
+        adapter, pattern_ray, notch_radial,
+        (NOTCH_MEAN_RADIUS * .65, NOTCH_MEAN_RADIUS * .70),
+        "actual tooth-pattern to CAM-notch BASIC phase",
+        expected_degrees=PATTERN_NOTCH_BASIC_ANGLE_DEG,
+    )
+    notch_dims.record("PatternNotchPhase")
     await ensure_fully_defined(adapter, "notch sketch")
     check("exit_sketch notch", await adapter.exit_sketch())
     name_last_feature(adapter, "NotchProfile")
@@ -600,6 +624,7 @@ async def build(adapter) -> dict[str, str]:
         CAM_PHASE_TOLERANCE_DEG,
         require_driven=True,
     )
+    set_dimension_basic_tolerance(adapter, "NotchProfile", "PatternNotchPhase")
     volume = await volume_check(
         adapter, "driven cylinder gear (equations neutral)", volume, 0.01 * v_bore
     )

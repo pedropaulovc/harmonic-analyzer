@@ -16,6 +16,7 @@ so the values are bit-identical to what the assembly computed.
 from __future__ import annotations
 
 import _config
+from cone_shaft_land_bands import TIP_COLLAR_BODY_NORTH_SHIFT_MM
 from cone_pitch import (
     COS_I,
     DP_TRAIN,
@@ -112,12 +113,11 @@ Y_CRANK = Y_BASE_TOP + PLATFORM_THICKNESS_MM + _config.machine("gear_train", "cr
 # fixed layout reference the MHA-VN-016 stack collar is feeler-set off.
 T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
 T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
-# The stepped terminal collar requires a longer tip-end land. Extend pivot
-# and block together so their head clearance and hold-down coordinates stay
-# unchanged. The approved 7.5 comprises the former 4.0-mm wider-collar
-# extension plus 3.5 mm for the 3.0 +/-0.51 south nose; the collar's unchanged
-# 0.45 +/-0.10 feeler and full printed bands remain in the assembly ledger.
-TIP_END_EXTENSION_MM = 7.5
+# Extend the tip, block and pivot by the SAME northward delta that moves only
+# the custom collar's large body and tap. Its small south end remains feeler-
+# set off T006; collar-to-block and block-to-pivot clearances are invariant.
+# The retained 7.5-mm extension and ordinary bands are not regraded.
+TIP_END_EXTENSION_MM = 7.5 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
 PIVOT_STATION = T006_NORTH_FACE + 23.0 + TIP_END_EXTENSION_MM
 # User ruling 2026-09-29 (eight-views-4.png): the tip block is a straight
 # prism held by one screw in a fixed platform hole under its centre.  Its

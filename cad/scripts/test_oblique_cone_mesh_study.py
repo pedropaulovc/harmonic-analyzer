@@ -22,7 +22,8 @@ def _geometry():
     incline = math.radians(13.0011)
     return {"cone_axis":(math.sin(incline),0.0,math.cos(incline)),
             "cone_centre_mm":(0.0,0.0,0.0),"cone_face_width_mm":7.0,
-            "drum_axis_xy_mm":(40.0,0.0),"drum_z_limits_mm":(-1.5,1.5)}
+            "drum_axis_xy_mm":(40.0,0.0),"drum_z_limits_mm":(-1.5,1.5),
+            "native_gap_clocks_rad":(math.pi/32,math.pi-math.radians(15)-math.pi/120)}
 
 
 def _pair():
@@ -30,7 +31,7 @@ def _pair():
     a = StockFormProfile(32,tool,8.8,1.5875)
     btool = CutterTemplate(55,48.0,20.0)
     b = StockFormProfile(120,btool,32.2,17.197916666666668)
-    pose = placement_from_geometry(_geometry(),(math.pi/32,-math.radians(15.0)))
+    pose = placement_from_geometry(_geometry())
     return ContactPair("actual explicit oblique fixture",a,b,pose)
 
 
@@ -53,9 +54,9 @@ def test_native_cylinder_flip_retains_clock_and_reverses_phase():
     assert rows[0] == pytest.approx((-math.cos(lock),math.sin(lock),0.0))
     assert rows[2] == pytest.approx((0.0,0.0,-1.0))
     assert np.linalg.det(rows) == pytest.approx(1.0)
-    pose = placement_from_geometry(_geometry(),(math.pi/32,-lock))
-    assert pose.driven_clocking_rad == pytest.approx(math.pi-lock)
-    assert pose.driver_clocking_rad == pytest.approx(2*math.pi/32)
+    pose = placement_from_geometry(_geometry())
+    assert pose.driven_clocking_rad == pytest.approx(math.pi-lock-math.pi/120)
+    assert pose.driver_clocking_rad == pytest.approx(math.pi/32)
     assert pose.driver_face_mm == (-3.5,3.5)
     assert pose.driven_face_mm == (-1.5,1.5)
 
@@ -64,7 +65,7 @@ def test_pose_ball_records_do_not_masquerade_as_full_circle_certificate():
     tilt = math.radians(13.0011)
     domain = PoseDomain((0.0,0.8),(-0.55,0.2),(6.975,7.025),(2.95,3.05),
                         0.07,(tilt,tilt),("actual source-owned fixture",))
-    rows = pose_corner_records(_geometry(),(math.pi/32,0.0),domain)
+    rows = pose_corner_records(_geometry(),domain)
     assert len(rows) == 80
     assert {tuple(row["corner"]["radial_offset_mm"]) for row in rows} == {
         (0.0,0.0),(-0.07,0.0),(0.07,0.0),(0.0,-0.07),(0.0,0.07)}
@@ -420,27 +421,37 @@ def test_printed_profile_matrix_is_every_distinct_four_by_four_pair():
         tuple(cone_study.printed_profile_cases(cones,(drums[0],)*4))
 
 
-def test_robust_signed_stalls_are_computed_even_when_union_search_refuses(monkeypatch):
-    import stock_form_mesh
+def test_full_source_refusal_preserves_actual_reads_without_stationary_fallback(monkeypatch):
+    import stock_form_contact_certificate
     pair = _pair()
+    domain = {"fixture":"explicit whole source"}
     received = {}
-    def measured_reads(actual,phases,**kwargs):
+    reads = [{"actual_driver_phase_rad":0.0,
+              "signed_running_te_interval_rad":[-.004,-.003]}]
+    def unresolved(actual,**kwargs):
         received.update(kwargs)
-        return {"all_reads_bounded":True,"rows":[{"signed_running_te_rad":-.003}]}
-    def unresolved(*args,**kwargs):
-        raise ValueError("explicit unresolved union fixture")
-    monkeypatch.setattr(cone_study,"signed_read_matrix",measured_reads)
+        return {"qualified":False,"source_domain_proved":True,"actual_read_phases":reads,
+                "continuous_contact_certificate":{"status":"UNRESOLVED"}}
+    def forbidden(*args,**kwargs):
+        pytest.fail("full source must not fall back to a stationary/scalar-ball read")
     monkeypatch.setattr(cone_study,"analyse_3d_mesh",unresolved)
-    monkeypatch.setattr(stock_form_mesh,"supported_flank_coverage",unresolved)
-    result = cone_study.qualify_actual_pair(pair,pose_ball_mm=.01,phases=3,
+    monkeypatch.setattr(cone_study,"signed_read_matrix",forbidden)
+    monkeypatch.setattr(stock_form_contact_certificate,"require_continuous_certificate",
+        lambda *args,**kwargs:(_ for _ in ()).throw(ValueError("unresolved union fixture")))
+    result = cone_study.qualify_actual_pair(pair,continuous_source_domain=domain,phases=3,
         maximum_error_mm=.0002,read_phases_rad=(0.0,),planar_centre_mm=40,
-        home=(math.pi/32,0.0),radial_error_mm=.02,axial_error_mm=.03)
-    assert received == {"maximum_error_mm":.0002,"position_error_mm":.01,
-                        "radial_error_mm":.02,"axial_error_mm":.03}
+        selected_nominal_te_rad=(-.005,-.002),nominal_pose_report={})
+    assert received["continuous_source_domain"] is domain
+    assert received["read_driver_phases_rad"] == (0.0,)
+    assert received["coverage_min"] == 1.1
+    assert received["row_min"] == 0.0
+    assert received["driver_sense"] == -1
+    assert not {"position_error_mm","radial_error_mm","axial_error_mm","required_root_air_mm"} & received.keys()
     assert result["qualification"] == "refused"
     assert result["oblique_phase_bound_rad"] is None
-    assert result["signed_read_matrix"]["rows"][0]["signed_running_te_rad"] == -.003
-    assert "unresolved union fixture" in result["reason"]
+    assert result["actual_signed_read_phases"] is reads
+    assert result["all_corner_actual3d"]["certificate_replay_error"] == "unresolved union fixture"
+    assert "whole retained physical source" in result["reason"]
 
 
 def test_cli_preimport_identity_compiles_captured_bytes_not_cached_code(tmp_path,monkeypatch):
@@ -559,8 +570,7 @@ def test_stationary_design_matrix_never_calls_full_analysis_or_handover(monkeypa
     monkeypatch.setattr(cone_study,"maximum_certified_root_air_capacity",
         lambda *args,**kwargs:{"certified_extra_air_lower_mm":.004})
     measured = cone_study.measure_nominal_for_inspection(pair,phases=3,
-        maximum_error_mm=.0002,read_phases_rad=(0,),planar_centre_mm=40,
-        home=(math.pi/32,0))
+        maximum_error_mm=.0002,read_phases_rad=(0,),planar_centre_mm=40)
     assert senses == [-1,1,-1,1]
     assert measured["engineering_complete"]
     assert not measured["production_qualified"]
@@ -570,3 +580,592 @@ def test_stationary_design_matrix_never_calls_full_analysis_or_handover(monkeypa
     assert measured["source_inspection_radius_mm"] == pytest.approx(40*120/152)
     assert measured["physical_driven_pitch_radius_mm"] == pair.driven.pitch_radius_mm
     assert measured["margins"]["cone_root_air_mm"] == .004
+
+
+def _six_compiled_receipt():
+    files = {
+        "C:/actual/captured/"+path:"AB"*32
+        for path in cone_study._MEASUREMENT_ENGINE_PATHS
+    }
+    return {
+        "source_bytes_stable":True,
+        **{name:dict(files) for name in (
+            "before_design_sha256","actual_preimport_project_sha256",
+            "after_design_sha256","loaded_algorithm_sha256",
+        )},
+    }
+
+
+def test_factory_engine_identity_uses_real_receipt_not_live_file_hashes(monkeypatch):
+    monkeypatch.setattr(cone_study,"_byte_sha",
+        lambda *args:pytest.fail("factory transport must not rebind current source"))
+    identity = cone_study.compiled_measurement_identity(_six_compiled_receipt())
+    measured = identity["measurement_engine_sources_sha256"]
+    assert set(measured) == {path.rsplit("/",1)[1]
+                            for path in cone_study._MEASUREMENT_ENGINE_PATHS}
+    assert len(measured) == 6
+    assert identity["measurement_engine_sha256"] == cone_study._canonical_sha256(measured)
+
+
+@pytest.mark.parametrize("field",(
+    "before_design_sha256","actual_preimport_project_sha256",
+    "after_design_sha256","loaded_algorithm_sha256",
+))
+def test_factory_engine_identity_refuses_missing_actual_sixth_source(field):
+    source = _six_compiled_receipt()
+    missing = cone_study._MEASUREMENT_ENGINE_PATHS[-1]
+    source[field].pop("C:/actual/captured/"+missing)
+    with pytest.raises(ValueError,match="stock_form_contact_continuation"):
+        cone_study.compiled_measurement_identity(source)
+
+
+def test_changed_after_source_never_releases_factory_measurement_identity():
+    source = _six_compiled_receipt()
+    source["source_bytes_stable"] = False
+    with pytest.raises(ValueError,match="changed live source"):
+        cone_study.compiled_measurement_identity(source)
+    source["source_bytes_stable"] = True
+    changed = "C:/actual/captured/"+cone_study._MEASUREMENT_ENGINE_PATHS[0]
+    source["after_design_sha256"][changed] = "CD"*32
+    with pytest.raises(ValueError,match="compiled/before/after/loaded"):
+        cone_study.compiled_measurement_identity(source)
+
+
+def test_ambiguous_raw_source_suffix_is_not_an_authentic_factory_identity():
+    source = _six_compiled_receipt()
+    source["before_design_sha256"][
+        "C:/second/captured/"+cone_study._MEASUREMENT_ENGINE_PATHS[0]
+    ] = "AB"*32
+    with pytest.raises(ValueError,match="exactly one"):
+        cone_study.compiled_measurement_identity(source)
+
+
+def _full_transport_case(ci=None,di=None):
+    side = {
+        "same_source_pose":{"fixture":["bounded source"]},
+        "phase_domain_rad":[0.0,1.0],"phase_cells":[{"fixture":"full cell"}],
+        "row_branch_spans":[{"fixture":"supported row"}],"handovers":[],
+        "periodic_seam":{"status":"PROVED","continuous":True},
+    }
+    return {
+        "case_id":"nominal" if ci is None else f"C{ci:02d}-D{di:02d}",
+        "cone_corner_index":ci,"drum_corner_index":di,
+        "cone":{"fixture":"cone"},"drum":{"fixture":"drum"},
+        "calculation":{
+            "qualification":"qualified",
+            "all_corner_actual3d":{
+                "production_source_qualified":True,"source_domain_proved":True,
+                "continuous_contact_certificate":{
+                    "proof_schema":"finite-stock-continuous-envelope/1",
+                    "status":"PROVED","native_certificate":False,
+                    "sides":{"lower":side,"upper":side},
+                },
+            },
+        },
+    }
+
+
+def test_full_profile_transport_preserves_distinct_all_sixteen_real_case_reports():
+    corners = [_full_transport_case(ci,di) for ci in range(4) for di in range(4)]
+    nominal = _full_transport_case()
+    records = cone_study.full_profile_case_records(nominal,list(reversed(corners)))
+    assert records[0] is nominal
+    assert records[1:] == corners
+    assert records[-1]["calculation"] is corners[-1]["calculation"]
+    with pytest.raises(ValueError,match="each distinct"):
+        cone_study.full_profile_case_records(nominal,[*corners[:-1],corners[0]])
+
+
+def test_full_profile_transport_refuses_held_nominal_or_old_sample_flags():
+    nominal = _full_transport_case()
+    corners = [_full_transport_case(ci,di) for ci in range(4) for di in range(4)]
+    corners[0]["actual_source_nominal_pose"] = True
+    with pytest.raises(ValueError,match="held-nominal"):
+        cone_study.full_profile_case_records(nominal,corners)
+    corners[0].pop("actual_source_nominal_pose")
+    corners[0]["calculation"]["all_corner_actual3d"] = {
+        "qualified":True,"continuous_carrying_contact":True,
+    }
+    with pytest.raises(ValueError,match="continuous-contact proof"):
+        cone_study.full_profile_case_records(nominal,corners)
+
+
+def test_actual_four_root_envelope_is_radius_not_maximum_as_floor():
+    profiles = [
+        SimpleNamespace(blank_radius_mm=radius,radial_translation_mm=shift,
+                        root_radius_min_mm=1.0+shift,root_radius_max_mm=1.1+shift)
+        for radius,shift in itertools.product((1.8,1.79),(0.0,-.02))
+    ]
+    assert cone_study.printed_root_radius_envelope(profiles) == pytest.approx([.98,1.1])
+    with pytest.raises(ValueError,match="four distinct"):
+        cone_study.printed_root_radius_envelope([profiles[0]]*4)
+
+
+def test_factory_transport_never_turns_refused_or_engineering_data_green():
+    refused = {
+        "qualified":False,"rows":[],"source_inputs_only":False,
+        "nominal_engineering_only":False,
+    }
+    cone_study.attach_factory_transport(refused,{"fixture":"retained independent inputs"})
+    assert not refused["qualified"]
+    assert refused["selected_geometry_sha256"] is None
+    assert "measurement_engine_sources_sha256" not in refused
+    assert "factory_transport_refusal" in refused
+    with pytest.raises(ValueError,match="engineering/source-prep"):
+        cone_study.attach_factory_transport({"nominal_engineering_only":True},{})
+
+
+def test_cone_transport_does_not_invent_a_positive_axial_row_floor():
+    nominal = _full_transport_case()
+    corners = [_full_transport_case(ci, di) for ci in range(4) for di in range(4)]
+    for record in (nominal, *corners):
+        for side in record["calculation"]["all_corner_actual3d"]["continuous_contact_certificate"]["sides"].values():
+            side["row_branch_spans"] = []
+    assert len(cone_study.full_profile_case_records(nominal, corners)) == 17
+
+
+def test_pure_cone_source_placement_retains_original_physical_gauge():
+    import dt_cone_mesh_domain as source
+    from diagnostics.solve_stock_form_cones import oblique_section_geometry
+    for teeth in range(6, 121, 6):
+        expected = placement_from_geometry(oblique_section_geometry(teeth)).record()
+        actual = source.nominal_placement_record(teeth)
+        for name in ("driver_origin_mm", "driven_origin_mm", "driver_frame", "driven_frame"):
+            assert np.asarray(actual[name]) == pytest.approx(np.asarray(expected[name]))
+        for name in ("driver_face_mm", "driven_face_mm", "driver_clocking_rad", "driven_clocking_rad"):
+            assert actual[name] == pytest.approx(expected[name])
+        assert actual["driver_shoulder_z_mm"] is None
+        assert actual["driver_turned_radius_mm"] is None
+
+
+def test_manufactured_gap_and_notch_mapping_matches_native_reflection():
+    import _config
+    import dt_cone_mesh_domain as source
+    import dt_cylinder_gear_spec as drum
+    lock = math.radians(_config.machine("gear_train", "cylinder_lock_phase_deg"))
+    rows = cylinder_native_rows(lock)
+    native_gap = math.pi / drum.TEETH
+    native_notch = math.pi / 2 + math.radians(drum.NOTCH_PHASE_DEG)
+    world_gap = rows.T @ np.array((math.cos(native_gap), math.sin(native_gap), 0.0))
+    world_notch = rows.T @ np.array((math.cos(native_notch), math.sin(native_notch), 0.0))
+    for teeth in range(6, 121, 6):
+        datum = source.manufactured_datum_mapping(teeth)
+        gap = datum["saved_cad_driven_canonical_gap_clock_rad"]
+        notch = datum["saved_cad_world_cam_notch_ray_rad"]
+        assert (math.cos(gap), math.sin(gap)) == pytest.approx(world_gap[:2])
+        assert (math.cos(notch), math.sin(notch)) == pytest.approx(world_notch[:2])
+        assert datum["driver_canonical_gap_clock_rad"] == pytest.approx(math.pi / teeth)
+        assert datum["mechanical_zero_rad"]["driver"] == 0.0
+        assert datum["mechanical_zero_rad"]["driven"] == pytest.approx(math.pi)
+        assert datum["saved_cad_driven_mechanical_phase_rad"] == pytest.approx(-lock-native_gap)
+        assert datum["nominal_driven_mechanical_phase_rad"] == 0.0
+        assert datum["operating_source_state"] == "OPERATING_NOTCH_UP"
+        assert datum["physical_driven_setup_rotation_rad"] == pytest.approx(lock+native_gap)
+        assert datum["driven_canonical_gap_clock_rad"] == pytest.approx(math.pi)
+        assert datum["nominal_world_cam_notch_ray_rad"] == pytest.approx(math.pi/2)
+        assert datum["datum_tare_rad"] is None
+        assert "physical drum rotation" in datum["alignment_zero_operation"]
+        assert datum["mechanical_zero_rad"]["driven"] != pytest.approx(gap)
+
+
+@pytest.mark.parametrize("body", ("cone", "drum"))
+def test_missing_own_tooth_runout_is_unknown_not_unrelated_crank_grade(monkeypatch, body):
+    import _config
+    import dt_cone_mesh_domain as source
+    calls = []
+    def missing(section, key):
+        calls.append((section, key))
+        raise KeyError(key)
+    monkeypatch.setattr(_config, "fit", missing)
+    with pytest.raises(source.SourceDomainUnknown, match="missing actual"):
+        source.tooth_cutting_runout_tir_mm(body)
+    assert calls == [("cone_drum_oblique_mesh", f"{body}_tooth_cutting_runout_tir_mm")]
+
+
+@pytest.mark.parametrize("value", (0.0, -.01, math.nan, math.inf, True, ".02"))
+def test_own_tooth_runout_needs_actual_positive_source_authority(monkeypatch, value):
+    import _config
+    import dt_cone_mesh_domain as source
+    monkeypatch.setattr(_config, "fit", lambda *args: value)
+    with pytest.raises(source.SourceDomainUnknown, match="finite positive"):
+        source.tooth_cutting_runout_tir_mm("drum")
+
+
+def test_body_disks_pay_printed_running_clearance_and_own_tir_once(monkeypatch):
+    import dt_cone_mesh_domain as source
+    import dt_cone_gear_spec as cone
+    import dt_cylinder_gear_spec as drum
+    import cone_shaft_land_bands as lands
+    monkeypatch.setattr(source, "tooth_cutting_runout_tir_mm",
+                        lambda body: {"cone": .024, "drum": .028}[body])
+    for teeth in range(6, 121, 6):
+        disks = source.source_eccentricity_disks(teeth)
+        shaft_low, _ = lands.land_finished_dia_limits_mm(cone.bore_dia_mm(teeth), cone.land_section(teeth))
+        printed_bore_high = round(cone.bore_dia_mm(teeth), cone.DRAWING_PRECISION_BY_NAME["BoreCutDia"]) + cone.BORE_DIA_BAND[0]
+        expected = {"driver": ((printed_bore_high - shaft_low) / 2, .012),
+                    "driven": (drum.BORE_DIAMETRAL_CLEARANCE_MM[1] / 2, .014)}
+        for body, (fit, runout) in expected.items():
+            assert disks[body]["shape"] == "closed_disk"
+            assert disks[body]["centre_mm"] == [0.0, 0.0]
+            assert disks[body]["source_terms_mm"] == {
+                "gear_bore_radial_clearance_upper": fit, "tooth_runout_radius_upper": runout}
+            assert disks[body]["radius_mm"] >= fit + runout
+            assert disks[body]["radius_mm"] == pytest.approx(fit + runout, abs=1e-14)
+
+
+def test_nominal_subdomain_is_explicit_mathematics_not_a_production_grade():
+    import dt_cone_mesh_domain as source
+    pair = _pair()
+    parent = {
+        "scope":"FULL_PRODUCTION_SOURCE_DOMAIN","production_source_domain":True,
+        "correlated_pose_parameters":[["driver_clock_rad",[-.2,.2]],["driver_dx_mm",[-.01,.03]],
+                                      ["driven_clock_rad",[-.001,.001]]],
+        "source_eccentricity_disks":{"driver":{"radius_mm":.02},"driven":{"radius_mm":.03}},
+        "finite_face_width_limits_mm":{"driver":[6.9,7.1],"driven":[2.95,3.05]},
+        "finite_face_anchor_fraction":{"driver":.5,"driven":.5},
+    }
+    nominal = source.nominal_source_subdomain(pair.placement.record(),parent)
+    assert nominal["scope"] == "DESIGN_NOMINAL_SUBDOMAIN"
+    assert nominal["production_source_domain"] is False
+    assert nominal["physical_parent_domain"] is parent
+    assert all(bounds == [0.0,0.0] for _,bounds in nominal["correlated_pose_parameters"])
+    assert nominal["source_eccentricity_disks"]["driver"]["source_terms_mm"] == {
+        "nominal_subdomain_radius_upper_mm":0.0}
+    assert parent["source_eccentricity_disks"]["driver"]["radius_mm"] == .02
+    assert nominal["finite_face_anchor_fraction"] == parent["finite_face_anchor_fraction"]
+    assert nominal["finite_face_width_limits_mm"] == {
+        body:[width,width] for body,width in (
+            ("driver",pair.placement.driver_face_mm[1]-pair.placement.driver_face_mm[0]),
+            ("driven",pair.placement.driven_face_mm[1]-pair.placement.driven_face_mm[0]))}
+    budget = source.budget_clock_subdomain(parent)
+    assert budget["scope"] == "BUDGET_CLOCK_NOMINAL_SUBDOMAIN"
+    assert budget["production_source_domain"] is False
+    assert budget["physical_parent_domain"] is parent
+    assert dict(budget["correlated_pose_parameters"]) == {
+        "driver_clock_rad":[0.0,0.0],"driver_dx_mm":[-.01,.03],"driven_clock_rad":[0.0,0.0]}
+    assert budget["source_eccentricity_disks"] == parent["source_eccentricity_disks"]
+    assert budget["finite_face_width_limits_mm"] == parent["finite_face_width_limits_mm"]
+    assert budget["finite_face_anchor_fraction"] == parent["finite_face_anchor_fraction"]
+    assert budget["oblique_phase_bound_excluded_terms"] == [
+        "cone_flat_free_clock","BoreFlatClock","drum_tooth_to_cam_notch_clock"]
+
+
+def test_operating_setup_rotates_native_marker_and_keeps_saved_bias():
+    import dt_cone_mesh_domain as source
+    import dt_cylinder_gear_spec as drum
+    for teeth in range(6,121,6):
+        datum = source.manufactured_datum_mapping(teeth)
+        native = datum["native_cam_notch_ray_rad"]
+        saved_lock = math.pi-datum["saved_cad_driven_canonical_gap_clock_rad"]-math.pi/drum.TEETH
+        saved = cylinder_native_rows(saved_lock).T @ np.array((math.cos(native),math.sin(native),0.0))
+        active = cylinder_native_rows(saved_lock-datum["physical_driven_setup_rotation_rad"]).T @ np.array(
+            (math.cos(native),math.sin(native),0.0))
+        assert active == pytest.approx((0.0,1.0,0.0),abs=2e-15)
+        assert tuple(saved) != pytest.approx(tuple(active))
+        assert datum["saved_cad_driven_mechanical_phase_rad"] != 0.0
+        assert datum["datum_tare_rad"] is None
+
+
+def test_current_lattice_alternatives_are_lazy_and_never_repeat_inputs(monkeypatch):
+    from diagnostics import solve_stock_form_cones as solve
+    chosen = {"outside_dia_mm":10.0,"pitch_thickness_mm":1.0}
+    alternative = {"outside_dia_mm":10.01,"pitch_thickness_mm":1.01}
+    calls = []
+    def current(teeth,inputs,**kwargs):
+        calls.append((teeth,inputs,kwargs))
+        return {"geometry_candidates":[dict(chosen),alternative],"finite_lattice_exhausted":True}
+    monkeypatch.setattr(solve,"solve_count",current)
+    ledger = {}
+    settings = cone_study.actual_candidate_settings(32,{"geometry_candidates":[chosen,dict(chosen)]},"inputs",
+        six_pitch_thickness_mm=1.05,allow_fresh_lattice=True,lattice_record=ledger)
+    assert next(settings) is chosen
+    assert calls == []
+    assert next(settings) is alternative
+    assert calls == [(32,"inputs",{"six_pitch_thickness_mm":1.05,"analyse_mesh":False})]
+    assert list(settings) == []
+    assert "current_dimensional_lattice" in ledger
+    assert "physical all-family" in ledger["scope"]
+
+
+def _stock_phase_reports_fixture():
+    phases = tuple(-k*math.pi for k in range(21))
+    def report(delta,*,reference=False):
+        rows = []
+        for phase in phases:
+            value = -.003+phase*.0001+delta
+            row = {"actual_driver_phase_rad":phase,
+                   "signed_running_te_interval_rad":[value-.0002,value+.0003]}
+            if reference:
+                row.update(reference_signed_running_te_rad=value,
+                           reference_error_bound_rad=.0004)
+            rows.append(row)
+        return {"source_domain_proved":True,"actual_read_phases":rows,
+                "full_period_cells":[{"signed_running_te_interval_rad":[-.02+delta,.01+delta]}],
+                "whole_period_signed_running_te_interval_rad":[-.02+delta,.01+delta]}
+    reference = report(0.0,reference=True)
+    cases = [_full_transport_case(),*(_full_transport_case(ci,di) for ci in range(4) for di in range(4))]
+    for index,case in enumerate(cases):
+        case["calculation"]["budget_actual3d"] = report(index*.0001)
+        case["calculation"]["nominal_actual3d"] = reference if index==0 else report(index*.00005)
+    return phases,reference,cases
+
+
+def test_actual_stock_phase_uses_true_point_reference_not_source_range_mean():
+    phases,reference,cases = _stock_phase_reports_fixture()
+    result = cone_study.stock_phase_3d_packet(cases,reference,
+        driver_read_phases_rad=phases,ratio=32/120,datum={"fixture":"physical notch"})
+    assert result["schema"] == "dt-cone-operating-stock-phase/1"
+    assert result["nominal_signed_running_te_rad"][0] == -.003
+    assert result["nominal_signed_running_te_rad"][0] != pytest.approx((-.0032-.0027)/2)
+    assert result["nominal_driven_advance_rad"][1] == pytest.approx(
+        reference["actual_read_phases"][1]["reference_signed_running_te_rad"]-(32/120)*phases[1])
+    assert result["nominal_reference_numerical_bound_rad"] == [.0004]*21
+    assert result["robust_half_width_rad"][0] >= .0019
+    assert result["nominal_pose_half_width_rad"][0] >= .0011
+    assert result["robust_signed_te_interval_rad"] == pytest.approx([-.02,.0116])
+    assert result["nominal_pose_signed_te_interval_rad"] == pytest.approx([-.02,.0108])
+    assert result["shaft_advance_included"] is False
+    assert result["excluded_terms"] == [
+        "cone_flat_free_clock","BoreFlatClock","drum_tooth_to_cam_notch_clock"]
+    assert result["datum_tare_rad"] is None
+
+
+@pytest.mark.parametrize("change",("reference","numerical","read_order","corner","whole_period"))
+def test_actual_stock_phase_refuses_missing_real_reference_or_full_matrix(change):
+    phases,reference,cases = _stock_phase_reports_fixture()
+    if change=="reference":
+        reference["actual_read_phases"][0].pop("reference_signed_running_te_rad")
+    elif change=="numerical":
+        reference["actual_read_phases"][0]["reference_error_bound_rad"] = 0.0
+    elif change=="read_order":
+        reference["actual_read_phases"].reverse()
+    elif change=="whole_period":
+        cases[1]["calculation"]["budget_actual3d"].pop("whole_period_signed_running_te_interval_rad")
+    else:
+        cases.pop()
+    with pytest.raises((KeyError,ValueError)):
+        cone_study.stock_phase_3d_packet(cases,reference,
+            driver_read_phases_rad=phases,ratio=32/120,datum={"fixture":"physical notch"})
+
+
+def test_centre_ledger_books_whole_operating_sources_once_and_never_clips(monkeypatch):
+    import dt_cone_mesh_domain as source
+    import cone_line
+    pose = {
+        "translation_intervals_mm":[[-.12,.12],[0.0,0.0],[0.0,0.0]],
+        "shortest_transport_euler_intervals_rad":[[0.0,0.0]]*3,
+        "source_projection_ledgers_mm":[{"post running journal radial fit":.12},{},{}],
+    }
+    disks = {
+        body:{"radius_mm":radius,"source_terms_mm":{
+            "gear_bore_radial_clearance_upper":radius,
+            "tooth_runout_radius_upper":0.0}}
+        for body,radius in (("driver",.0375),("driven",.035))}
+    monkeypatch.setattr(source,"nominal_placement_record",
+        lambda teeth:{"driver_origin_mm":[0.0,0.0,0.0],"driven_origin_mm":[1.0,0.0,0.0]})
+    ledger = source._centre_source_ledger(6,pose,disks,(0.0,0.0),(0.0,0.0),0.0,0.0,.20)
+    assert ledger["booked_closing_total"] == pytest.approx(.0875)
+    assert ledger["known_bore_radial_total_before_other_sources"] == pytest.approx(.0725)
+    assert ledger["closing_book_remainder_before_other_sources"] == pytest.approx(.015)
+    assert not ledger["closing_remainder_is_tolerance_grant"]
+    assert not ledger["post_running_fit_added_again"]
+    assert "bearing" not in " ".join(ledger["directed_source_terms_mm"])
+    assert ledger["derived_closing_total"] >= .12/cone_line.COS_I
+    assert ledger["derived_opening_total"] > .20
+    assert ledger["positive_opening_axis"] == 0.0
+    assert ledger["selected_total"] == ledger["derived_opening_total"]
+    assert ledger["required_closing_total"] == ledger["derived_closing_total"]
+    pose["translation_intervals_mm"] = [[0.0,0.0]]*3
+    pose["source_projection_ledgers_mm"] = [{},{},{}]
+    zero_disks = {body:{**disk,"radius_mm":0.0} for body,disk in disks.items()}
+    small = source._centre_source_ledger(6,pose,zero_disks,(0.0,0.0),(0.0,0.0),0.0,0.0,.20)
+    assert small["positive_opening_axis"] > 0
+    assert small["derived_opening_total"]+small["positive_opening_axis"] >= .20
+    assert small["selected_total"] == .20
+
+
+@pytest.mark.parametrize("closing_factor,opening_factor",((.3,.25),(1.0,1.0),(1.5,1.25)))
+def test_radial_book_remainder_below_equal_above_each_total(monkeypatch,closing_factor,opening_factor):
+    """The tested bounds are source-ledger inputs, not measured stock/geometry."""
+    import dt_cone_mesh_domain as source
+    import dt_cone_gear_spec as cone
+    import dt_cylinder_gear_spec as drum
+    import cone_shaft_land_bands as lands
+    expected_close = math.fsum(((cone.BORE_DIA_BAND[0]-lands.GEAR_SEAT_BAND[1])/2,
+                               drum.BORE_DIAMETRAL_CLEARANCE_MM[1]/2))
+    closing,opening = closing_factor*expected_close,opening_factor*.20
+    real_sum = source._interval_sum
+    calls = []
+    def source_or_completed_sum(rows):
+        calls.append(tuple(rows))
+        return (-closing,opening) if len(calls)==1 else real_sum(calls[-1])
+    monkeypatch.setattr(source,"_interval_sum",source_or_completed_sum)
+    monkeypatch.setattr(source,"nominal_placement_record",
+        lambda teeth:{"driver_origin_mm":[0.0,0.0,0.0],"driven_origin_mm":[1.0,0.0,0.0]})
+    pose = {"translation_intervals_mm":[[0.0,0.0]]*3,
+        "shortest_transport_euler_intervals_rad":[[0.0,0.0]]*3,
+        "source_projection_ledgers_mm":[{},{},{}]}
+    disks = {body:{"radius_mm":0.0,"source_terms_mm":{
+        "gear_bore_radial_clearance_upper":0.0,"tooth_runout_radius_upper":0.0}}
+        for body in ("driver","driven")}
+    ledger = source._centre_source_ledger(6,pose,disks,(0.0,0.0),(0.0,0.0),0.0,0.0,.20)
+    booked_close = ledger["booked_closing_total"]
+    assert booked_close == expected_close
+    residual = ledger["booked_centre_radial_remainder_mm"]
+    assert residual[0] == pytest.approx(-max(0.0,booked_close-closing),abs=1e-15)
+    assert residual[1] == pytest.approx(max(0.0,.20-opening),abs=1e-15)
+    assert residual[0] <= 0.0 <= residual[1]
+    assert ledger["required_closing_total"] == max(booked_close,closing)
+    assert ledger["selected_total"] == max(.20,opening)
+    completed = ledger["actual_source_plus_remainder_enclosure_mm"]
+    assert completed[0] <= -ledger["required_closing_total"]
+    assert completed[1] >= ledger["selected_total"]
+    assert "existing driven_dx_mm" in ledger["remainder_coordinate"]
+    assert "no physical attainment" in ledger["radial_booking_scope"]
+    if closing>=booked_close:
+        assert residual[0] == 0.0
+    if opening>=.20:
+        assert residual[1] == 0.0
+
+
+def test_raw_compiled_snapshot_retains_captured_bytes_without_live_reread(tmp_path):
+    from pathlib import Path
+    original = str(cone_study.SCRIPTS/"captured-receipt-fixture.py")
+    captured = {original:b"# exact imported bytes\nvalue = 1\n"}
+    root = tmp_path/"source.capture"
+    compiled = cone_study.retain_raw_source_snapshot(root,"compiled",captured)
+    after = cone_study.retain_raw_source_snapshot(root,"after",{original:b"value = 2\n"})
+    assert Path(compiled[original]).read_bytes() == captured[original]
+    assert Path(after[original]).read_bytes() != captured[original]
+    assert Path(compiled[original]) != Path(after[original])
+    with pytest.raises(ValueError,match="outside the repository"):
+        cone_study.retain_raw_source_snapshot(cone_study.SCRIPTS/"forbidden-capture","compiled",captured)
+
+
+def test_source_identity_retains_the_same_hashed_payload_not_later_bytes(tmp_path):
+    import hashlib
+    original = tmp_path/"fit-source.yaml"
+    original.write_bytes(b"grade: old\n")
+    captured = {}
+    identity = cone_study.source_identity((original,),captured_payloads=captured)
+    before = captured[str(original)]
+    original.write_bytes(b"grade: changed\n")
+    assert before == b"grade: old\n"
+    assert identity[str(original)] == hashlib.sha256(before).hexdigest().upper()
+    assert identity[str(original)] != cone_study.source_identity((original,))[str(original)]
+
+
+def test_actual_parsed_config_bytes_are_retained_and_changed_reparse_refuses(tmp_path):
+    import json
+    reads = cone_study.InputReadIdentity()
+    empty_cache = SimpleNamespace(cache_info=lambda:SimpleNamespace(currsize=0))
+    original_load = lambda path:{"unconsumed":True}
+    reads.config = SimpleNamespace(
+        __name__="capture_fixture",_doc=empty_cache,_parts_registry=empty_cache,
+        _load=original_load,yaml=SimpleNamespace(safe_load=json.loads))
+    path = tmp_path/"actual-config.yaml"
+    payload = b'{"grade_mm":0.015}\n'
+    path.write_bytes(payload)
+    with reads:
+        assert reads.config._load(path) == {"grade_mm":.015}
+        assert reads.loaded_config_payloads[str(path.resolve())] == payload
+        path.write_bytes(b'{"grade_mm":0.020}\n')
+        with pytest.raises(RuntimeError,match="changed across actual parses"):
+            reads.config._load(path)
+        assert reads.loaded_config_payloads[str(path.resolve())] == payload
+    assert reads.config._load is original_load
+
+
+def test_consumed_config_capture_keeps_metadata_but_excludes_unread_cache_rows():
+    reads = cone_study.InputReadIdentity()
+    reads.loaded_config_payloads = {
+        "geometric.yaml":b"fit: actual\n",
+        "metadata.yaml":b"title: actual\n",
+        "unread-registry-row.yaml":b"unused: parsed-by-shared-cache\n",
+    }
+    reads.before = {"geometric.yaml":"geometric-sha"}
+    reads.non_geometry_before = {"metadata.yaml":"metadata-sha"}
+    assert reads.consumed_config_payloads() == {
+        "geometric.yaml":b"fit: actual\n",
+        "metadata.yaml":b"title: actual\n",
+    }
+
+
+def test_missing_drum_tooth_to_cam_notch_clock_is_unknown_not_lobe_grade(monkeypatch):
+    import _config
+    import dt_cone_mesh_domain as source
+    calls = []
+    def missing(group,key):
+        calls.append((group,key))
+        raise KeyError(key)
+    monkeypatch.setattr(_config,"fit",missing)
+    with pytest.raises(source.SourceDomainUnknown,match="missing actual drum tooth-to-CAM-NOTCH"):
+        source.drum_tooth_to_cam_notch_clock_deg()
+    assert calls == [("cone_drum_oblique_mesh","drum_tooth_to_cam_notch_clock_deg")]
+
+
+@pytest.mark.parametrize("value",(0.0,-.05,math.nan,math.inf,True,".05"))
+def test_drum_pattern_clock_requires_actual_positive_source_grade(monkeypatch,value):
+    import _config
+    import dt_cone_mesh_domain as source
+    monkeypatch.setattr(_config,"fit",lambda *args:value)
+    with pytest.raises(source.SourceDomainUnknown,match="finite positive"):
+        source.drum_tooth_to_cam_notch_clock_deg()
+
+
+def test_drum_pattern_clock_positive_reader_does_not_invent_a_band(monkeypatch):
+    import _config
+    import dt_cone_mesh_domain as source
+    monkeypatch.setattr(_config,"fit",lambda *args:.037)
+    assert source.drum_tooth_to_cam_notch_clock_deg() == .037
+
+
+def test_full_pair_preserves_raw_same_q_rows_and_calibrates_only_actual_difference(monkeypatch):
+    pair = _pair()
+    rop = 40*pair.driven.teeth/(pair.driver.teeth+pair.driven.teeth)
+    angle = [.10/rop,.15/rop]
+    domain = {
+        "scope":"FULL_PRODUCTION_SOURCE_DOMAIN","production_source_domain":True,
+        "correlated_pose_parameters":[["driver_clock_rad",[-.01,.01]]],
+        "root_air_requirements_mm":{"driver":.02,"driven":.10},
+        "manufactured_datum_mapping":{"fixture":"independent physical datum"},
+    }
+    root = {
+        "qualified":True,"root_is_carrying":False,
+        "root_air_requirements_mm":domain["root_air_requirements_mm"],
+        "driver_root_air_lower_mm":.03,"driven_root_air_lower_mm":.11,
+    }
+    cell = {
+        "actual_driver_interval_rad":[0.0,pair.driver.angular_pitch_rad],
+        "signed_running_te_interval_rad":[-.004,-.003],
+        # Marginal beta intervals deliberately lose the common source and
+        # would refuse if independently subtracted. They are not backlash.
+        "actual_driven_lower_interval_rad":[-100.0,100.0],
+        "actual_driven_upper_interval_rad":[-99.999,100.001],
+        "correlated_backlash":{"backlash_interval_rad":angle},
+        "correlated_backlash_interval_mm":[value*pair.driven.pitch_radius_mm for value in angle],
+        "root_air":root,
+    }
+    read = {"actual_driver_phase_rad":-math.pi,
+            "signed_running_te_interval_rad":[-.004,-.003]}
+    robust = {
+        "production_source_qualified":True,"source_domain_proved":True,
+        "full_period_cells":[cell],"actual_read_phases":[read],
+        "stock_form_coverage_lower":1.2,"handovers":[{"pitch_displacement_jump_upper_mm":.003}],
+    }
+    budget = {"source_domain_proved":True,"full_period_cells":[cell]}
+    monkeypatch.setattr(cone_study,"_continuous_analysis",
+        lambda actual,source,**kwargs:robust if source is domain else budget)
+    monkeypatch.setattr(cone_study,"exact_smooth_ff_exclusion",lambda actual:{"fixture":True})
+    monkeypatch.setattr(cone_study,"full_source_cam_exclusion",lambda *args:{"qualified":True})
+    result = cone_study.qualify_actual_pair(pair,continuous_source_domain=domain,phases=3,
+        maximum_error_mm=.0002,read_phases_rad=(-math.pi,),planar_centre_mm=40,
+        selected_nominal_te_rad=(-.004,-.003),nominal_pose_report=budget)
+    assert result["qualification"] == "qualified"
+    assert result["full_period_cells"][0] is cell
+    inspection = result["source_inspection_backlash_cells"][0]
+    assert inspection["source_calibrated_backlash_interval_mm"] == pytest.approx([.10,.15])
+    assert inspection["physical_pitch_arc_backlash_interval_mm"] == cell["correlated_backlash_interval_mm"]
+    assert result["actual_driven_backlash"]["tight_lower_mm"] == pytest.approx(.10)
+    assert result["actual_driven_backlash"]["loose_upper_mm"] == pytest.approx(.15)
+    assert result["signed_read_matrix"]["rows"][0]["read_phase_interval_rad"] == [-math.pi,-math.pi]

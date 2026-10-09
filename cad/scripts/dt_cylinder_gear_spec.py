@@ -112,6 +112,26 @@ NOTCH_MEAN_RADIUS = (NOTCH_FLOOR_RADIUS + TIP_RADIUS) / 2.0
 # NOTCH_PHASE_DEG from the lobe axis.
 NOTCH_PHASE_DEG = 180.0 / TEETH
 NOTCH_CENTER_X = -NOTCH_MEAN_RADIUS * math.sin(math.radians(NOTCH_PHASE_DEG))
+# The native stock profile is patterned with the canonical seed-gap ray at
+# pi/N. The existing kerf ray is pi/2 + pi/N, so this separate locator is 90
+# BASIC; it is not the cam-lobe-to-kerf NotchPhase/cam_phase control above.
+TOOTH_PATTERN_GAP_RAD = math.pi / TEETH
+PATTERN_NOTCH_BASIC_ANGLE_DEG = 90.0
+PATTERN_NOTCH_SHOP_CANDIDATE_DEG = 0.02
+
+
+def pattern_notch_clock_grade_deg() -> float:
+    """Read the post-F4 published drum pattern-to-CAM-NOTCH half-width lazily."""
+    from dt_cone_mesh_domain import SourceDomainUnknown, drum_tooth_to_cam_notch_clock_deg
+
+    grade = drum_tooth_to_cam_notch_clock_deg()
+    if grade < PATTERN_NOTCH_SHOP_CANDIDATE_DEG:
+        raise SourceDomainUnknown(
+            f"actual drum pattern-to-CAM-NOTCH grade +/-{grade:g} deg is tighter "
+            f"than the +/-{PATTERN_NOTCH_SHOP_CANDIDATE_DEG:g} deg shop candidate; "
+            "report the admissible grade, do not issue the production drawing"
+        )
+    return grade
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -131,7 +151,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BoreProfile": {"BoreDia"},
     "CamProfile": {"CamDia", "CamCy"},
     "CamBoss": {"OverallThickness"},
-    "NotchProfile": {"NotchDepth", "NotchWidth", "NotchPhase"},
+    "NotchProfile": {"NotchDepth", "NotchWidth", "NotchPhase", "PatternNotchPhase"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity policy rule
@@ -140,8 +160,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # three-place band rides the dimension (the matched running bore's reference
 # nominal, the cam eccentricity, the +0.05/0 stacking thickness that sets
 # the station pitch); two where the band is a two-place one (cam OD, face
-# width, kerf width); one on the kerf depth; the notch phase is an angle read
-# to the tenth of a degree.
+# width, kerf width); one on the kerf depth. The existing cam-lobe phase is an
+# angle read to the tenth of a degree; the separate pattern locator is BASIC.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": 2},
     "GearBlankProfile": {"OutsideDia": 2},
@@ -150,7 +170,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     # Four places: 7.0565 is the station pitch, exact only at four (user
     # ruling L20 d'); three would round one limit of the band inward.
     "CamBoss": {"OverallThickness": 4},
-    "NotchProfile": {"NotchDepth": 1, "NotchWidth": 2, "NotchPhase": 1},
+    "NotchProfile": {"NotchDepth": 1, "NotchWidth": 2, "NotchPhase": 1, "PatternNotchPhase": 0},
 }
 
 _PRECISION_NAMES = [

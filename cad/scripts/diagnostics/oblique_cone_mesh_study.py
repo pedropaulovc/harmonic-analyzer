@@ -9,8 +9,10 @@ there is no honest manufactured corner to analyse when that domain is empty.
 The assembly flips the straight cylinder about Y. Its symmetric gear solid
 can be reparameterised about world +Z, reversing native rotation and axial
 station. This is an exact rigid-solid identity, not an obliquity correction.
-Its tooth-zero angle is pi-lock. Planar driven phases are GAP phases, so the
-3D tooth phase is planar phase + pi/120. No median or home tare is applied.
+Native canonical GAP clocks are pi/T and pi-lock-pi/120. Documented physical
+NOTCH-up setup rotates the drum to beta=pi; saved-CAD bias is reported
+separately. Signed TE uses the independent notch/cone-lock datum, not a
+mean, nearest-tooth, loaded-home or placement-clock subtraction.
 """
 from __future__ import annotations
 
@@ -52,9 +54,20 @@ _ALGORITHM_PATHS = tuple(SCRIPTS/name for name in (
     "diagnostics/stock_form_root_sweep.py","diagnostics/oblique_cone_mesh_study.py",
     "diagnostics/stock_form_contact_continuation.py",
     "diagnostics/solve_stock_form_cones.py","dt_cone_support_pose.py"))
+_MEASUREMENT_ENGINE_PATHS = (
+    "cad/scripts/stock_form_cutter.py",
+    "cad/scripts/stock_form_mesh.py",
+    "cad/scripts/diagnostics/stock_form_root_angles.py",
+    "cad/scripts/diagnostics/stock_form_root_sweep.py",
+    "cad/scripts/diagnostics/stock_form_contact_3d.py",
+    "cad/scripts/diagnostics/stock_form_contact_continuation.py",
+)
+_BUDGET_EXCLUDED_TERMS = ("cone_flat_free_clock","BoreFlatClock","drum_tooth_to_cam_notch_clock")
 _LOADED_ALGORITHM_SHA = {str(path):_byte_sha(path) for path in _ALGORITHM_PATHS if path.is_file()}
 _LOADED_PROJECT_SHA = {str(Path(__file__).resolve()):
                       globals().get("_ENTRY_SOURCE_SHA256") or _byte_sha(Path(__file__).resolve())}
+_LOADED_PROJECT_PAYLOADS = (
+    {str(Path(__file__).resolve()):_entry_payload} if __name__=="__main__" else {})
 _ORIGINAL_GET_CODE = SourceFileLoader.get_code
 
 
@@ -68,6 +81,7 @@ def _captured_project_code(loader,fullname):
     previous = _LOADED_PROJECT_SHA.setdefault(str(path),sha)
     if previous!=sha:
         raise RuntimeError(f"project source changed across imports: {path}")
+    _LOADED_PROJECT_PAYLOADS.setdefault(str(path),payload)
     return compile(payload,str(path),"exec",dont_inherit=True)
 
 
@@ -125,7 +139,7 @@ class RegistryFieldReads(dict):
         return dict(super().items())
 
 
-def source_identity(config_paths=()) -> dict[str,str]:
+def source_identity(config_paths=(), *, captured_payloads=None) -> dict[str,str]:
     """Actual loaded project code plus configuration bytes, never a rebind."""
     paths = set()
     for module in tuple(sys.modules.values()):
@@ -135,7 +149,26 @@ def source_identity(config_paths=()) -> dict[str,str]:
             if path.is_relative_to(SCRIPTS) and path.suffix == ".py":
                 paths.add(path)
     paths.update(Path(path) for path in config_paths)
-    return {str(path):_byte_sha(path) for path in sorted(paths)}
+    identity = {}
+    for path in sorted(paths):
+        payload = path.read_bytes()
+        identity[str(path)] = hashlib.sha256(payload).hexdigest().upper()
+        if captured_payloads is not None:
+            captured_payloads[str(path)] = payload
+    return identity
+
+
+def retain_raw_source_snapshot(root: Path, scope: str, payloads: dict) -> dict:
+    """Retain the SAME captured bytes outside-tree, never reread compiled code."""
+    if root.resolve().is_relative_to(SCRIPTS.parents[1]):
+        raise ValueError("raw DESIGN source snapshots must be outside the repository")
+    paths = {}
+    for original,payload in payloads.items():
+        destination = root/scope/Path(original).resolve().relative_to(SCRIPTS.parents[1])
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        destination.write_bytes(payload)
+        paths[original] = str(destination)
+    return paths
 
 class InputReadIdentity:
     """Delegating CLI-only provenance of configuration values actually read."""
@@ -149,6 +182,7 @@ class InputReadIdentity:
         self.non_geometry_values = {}
         self.call_sites = {}
         self.loaded_config_sha = {}
+        self.loaded_config_payloads = {}
 
     def _paths(self,name,keys):
         root = self.config.CONFIG_DIR
@@ -194,7 +228,10 @@ class InputReadIdentity:
             path = Path(path).resolve()
             payload = path.read_bytes()
             sha = hashlib.sha256(payload).hexdigest().upper()
-            self.loaded_config_sha.setdefault(str(path),sha)
+            previous = self.loaded_config_sha.setdefault(str(path),sha)
+            if previous!=sha:
+                raise RuntimeError(f"configuration source changed across actual parses: {path}")
+            self.loaded_config_payloads.setdefault(str(path),payload)
             return self.config.yaml.safe_load(payload.decode("utf-8")) or {}
         self.config._load = captured_load
         for name,original in tuple(vars(self.config).items()):
@@ -248,6 +285,12 @@ class InputReadIdentity:
         for name,original in self.original.items():
             setattr(self.config,name,original)
 
+    def consumed_config_payloads(self) -> dict:
+        """Exclude unrelated registry rows parsed only by the shared cache."""
+        return {path:self.loaded_config_payloads[path]
+                for path in self.before.keys() | self.non_geometry_before.keys()
+                if path in self.loaded_config_payloads}
+
 
 from diagnostics.stock_form_contact_3d import (
     ContactPair, ContactSearch, EndFacePatch, GapAngles, Placement, analyse_3d_mesh,
@@ -256,6 +299,7 @@ from diagnostics.stock_form_contact_3d import (
 from stock_form_cutter import StockFormProfile
 from diagnostics.stock_form_root_angles import RootAngularDomain
 from diagnostics.stock_form_root_sweep import root_free_intervals
+from dt_cone_mesh_domain import nominal_source_subdomain, budget_clock_subdomain
 
 
 @dataclass(frozen=True)
@@ -313,7 +357,7 @@ def cylinder_native_rows(lock_rad: float) -> np.ndarray:
     return np.array(((-c, s, 0.0), (s, c, 0.0), (0.0, 0.0, -1.0)))
 
 
-def placement_from_geometry(geometry: dict[str, Any], home: tuple[float, float], *,
+def placement_from_geometry(geometry: dict[str, Any], *,
                             inclination_rad: float | None = None,
                             cone_shift_mm: float = 0.0, drum_shift_mm: float = 0.0,
                             cone_width_mm: float | None = None,
@@ -334,23 +378,30 @@ def placement_from_geometry(geometry: dict[str, Any], home: tuple[float, float],
     drum_width = zhi-zlo if drum_width_mm is None else drum_width_mm
     dx, dy = geometry["drum_axis_xy_mm"]
     driven_origin = (dx+radial_offset_mm[0], dy+radial_offset_mm[1], (zlo+zhi)/2+drum_shift_mm)
-    # Native cone tooth0 is keyed to the flat. Planar home uses gap pi/T;
-    # the material tooth shift is another half-pitch, hence one whole pitch.
-    tooth_clock = 2*home[0]
+    # Source supplies the ACTUAL native canonical-gap clocks. The cone
+    # builder's pi/T is applied once; the reflected drum subtracts pi/N.
+    driver_clock, driven_clock = geometry["native_gap_clocks_rad"]
+    if not all(math.isfinite(value) for value in (driver_clock, driven_clock)):
+        raise ValueError("actual native canonical-gap clocks must be finite")
     return Placement(tuple(float(v) for v in origin), driven_origin, frame, np.eye(3),
                      (-width/2, width/2), (-drum_width/2, drum_width/2),
-                     driver_clocking_rad=tooth_clock,
-                     driven_clocking_rad=math.pi+home[1])
+                     driver_clocking_rad=driver_clock,
+                     driven_clocking_rad=driven_clock)
 
 
 def pose_record(pair: ContactPair, geometry: dict, home: tuple[float, float]) -> dict:
+    datum = geometry["manufactured_datum_mapping"]
+    setup = datum["physical_driven_setup_rotation_rad"]
     return {"placement": pair.placement.record(),
             "assembly_cone_rows": pair.placement.driver_frame.T.tolist(),
-            "assembly_cylinder_rows": cylinder_native_rows(-home[1]).tolist(),
+            "saved_cad_cylinder_rows": cylinder_native_rows(-home[1]).tolist(),
+            "operating_cylinder_rows": cylinder_native_rows(-home[1]-setup).tolist(),
+            "physical_driven_setup_rotation_rad":setup,
             "native_cylinder_local_face_mm": [0.0, geometry["drum_z_limits_mm"][1]-geometry["drum_z_limits_mm"][0]],
             "native_cylinder_origin_mm": [*geometry["drum_axis_xy_mm"], geometry["drum_z_limits_mm"][1]],
-            "cylinder_reparameterisation": "native phase sign reversed, local Z reflected, symmetric straight solid unchanged",
-            "phase_datum": "planar gap phase = 3D world-positive tooth phase - pi/120; no tare"}
+            "cylinder_reparameterisation": "native phase sign reversed, local Z reflected; explicit physical NOTCH-up setup rotates integral cam and teeth together",
+            "phase_datum": datum,
+            "mechanical_zero_rad": geometry["mechanical_zero_rad"]}
 
 
 def cutter_q_domain(cutter, translations: tuple[float,float]) -> tuple[float,float] | None:
@@ -413,11 +464,11 @@ def loaded_phase_at(pair: ContactPair, driver_phase_rad: float, *,
                     maximum_error_mm: float = 0.0002, driver_sense: int = -1,
                     position_error_mm: float = 0.0,
                     radial_error_mm: float = 0.0, axial_error_mm: float = 0.0) -> dict:
-    """Signed loaded CYLINDER gap phase at an absolute physical cone read.
+    """Root the saved native index, then report absolute physical notch TE.
 
-    A datum-nearest free component is bracketed in actual driven rotation;
-    generic inverse-driver offsets are never multiplied by an ideal ratio
-    and presented as a driven phase error.
+    The connected-component seed is the actual source canonical-GAP clock,
+    not the physical zero and not a fitted loaded home. Beta is the world
+    positive canonical-GAP angle; its notch ray is beta minus pi/2.
     """
     if pair.driver.helix_angle_deg or pair.driven.helix_angle_deg:
         raise ValueError("the actual cone/drum train has two source-owned straight forms")
@@ -457,10 +508,12 @@ def loaded_phase_at(pair: ContactPair, driver_phase_rad: float, *,
         raise ValueError("actual carrying point has no bounded positive common-normal cone")
     if not math.isfinite(contact["driven_per_driver_velocity"]) or contact["driven_per_driver_velocity"] >= 0.0:
         raise ValueError("carrying normal has no certified negative driven/driver velocity")
-    result["driven_phase_rad"] -= half
-    result["driven_phase_interval_rad"] = [value-half for value in result["driven_phase_interval_rad"]]
-    datum = datum_tooth-half
+    from dt_cone_mesh_domain import manufactured_datum_mapping
+    mapping = manufactured_datum_mapping(pair.driver.teeth)
+    zero = mapping["mechanical_zero_rad"]
+    datum = zero["driven"]-ratio*(driver_phase_rad-zero["driver"])
     result.update(mechanical_datum_rad=datum,
+                  manufactured_datum_mapping=mapping,
                   signed_running_te_rad=result["driven_phase_rad"]-datum,
                   signed_running_te_interval_rad=[value-datum for value in result["driven_phase_interval_rad"]],
                   datum_tare_rad=None,
@@ -552,7 +605,7 @@ def configured_pose_domain(teeth: int, inputs, *, cone_radius_upper_mm: float,
          installed_axis_acceptance=tuple(asdict(installed).items()) if installed is not None else ())
 
 
-def pose_corner_records(geometry: dict, home: tuple[float,float], domain: PoseDomain) -> list[dict]:
+def pose_corner_records(geometry: dict, domain: PoseDomain) -> list[dict]:
     rows = []
     # Radial directions are explicit witnesses. The continuous ball is NOT
     # certified by these four directions, and is retained separately.
@@ -562,7 +615,7 @@ def pose_corner_records(geometry: dict, home: tuple[float,float], domain: PoseDo
             sorted(set(domain.cone_axial_shift_mm)),sorted(set(domain.drum_axial_shift_mm)),
             sorted(set(domain.cone_face_width_mm)),sorted(set(domain.drum_face_width_mm)),
             sorted(set(domain.inclination_rad)),offsets):
-        pose = placement_from_geometry(geometry,home,inclination_rad=tilt,
+        pose = placement_from_geometry(geometry,inclination_rad=tilt,
             cone_shift_mm=cs,drum_shift_mm=ds,cone_width_mm=cw,drum_width_mm=dw,
             radial_offset_mm=offset)
         rows.append({"corner": {"cone_axial_mm":cs,"drum_axial_mm":ds,
@@ -840,141 +893,262 @@ def maximum_certified_root_air_capacity(
         "scope":"maximum certified common extra .02/.10 air to stated search tolerance; an unresolved trial is not a physical upper or no-solution proof"}
 
 
-def qualify_actual_pair(pair: ContactPair, *, pose_ball_mm: float, phases: int,
-                        maximum_error_mm: float, read_phases_rad: tuple[float,...],
-                        planar_centre_mm: float, home: tuple[float,float],
-                        radial_error_mm: float = 0.0, axial_error_mm: float = 0.0) -> dict:
-    """Real supported-union gates, loaded reads and same-datum discrepancy.
 
-    Directional and uniform geometric errors enclose all directions of
-    runout and the complete manufacturing/axial pose domain. An unresolved cap/root, carrying edge,
-    whole-period or driven-phase enclosure remains a numerical refusal.
-    """
-    from stock_form_mesh import analyse_planar_mesh, supported_flank_coverage
+
+
+
+def actual3d_nominal_te_enclosure(report: dict) -> tuple[float,float]:
+    """Paid actual q=0 full-period range, never a fitted or mean reference."""
+    if report.get("source_domain_proved") is not True:
+        raise ValueError("nominal mathematical source subdomain is not proved")
+    if not report["full_period_cells"]:
+        raise ValueError("actual nominal full-period TE cells are missing")
+    lower,upper = report["whole_period_signed_running_te_interval_rad"]
+    if not math.isfinite(lower) or not math.isfinite(upper) or lower>upper:
+        raise ValueError("actual nominal TE range is unresolved")
+    return lower,upper
+
+
+def stock_phase_3d_packet(cases: list[dict], reference: dict, *,
+                          driver_read_phases_rad: tuple[float,...], ratio: float,
+                          datum: dict) -> dict:
+    """True point reference and paid same-stall/source profile half-widths."""
+    if (len(cases)!=17 or len(driver_read_phases_rad)!=21
+            or type(ratio) not in (int,float) or not math.isfinite(ratio) or not 0<ratio<=1
+            or not all(type(phase) in (int,float) and math.isfinite(phase) for phase in driver_read_phases_rad)):
+        raise ValueError("operating stock phase requires nominal/all16, all21 finite stalls and actual tooth ratio")
+    full_profile_case_records(cases[0],cases[1:])
+    rows = reference["actual_read_phases"]
+    if (reference.get("source_domain_proved") is not True
+            or tuple(row["actual_driver_phase_rad"] for row in rows)!=driver_read_phases_rad):
+        raise ValueError("nominal q=0 actual read references are missing/reordered")
+    reports = {"robust":[],"nominal_pose":[]}
+    for case in cases:
+        calculation = case["calculation"]
+        for label,key in (("robust","budget_actual3d"),("nominal_pose","nominal_actual3d")):
+            report = calculation[key]
+            if (report.get("source_domain_proved") is not True or not report["full_period_cells"]
+                    or tuple(row["actual_driver_phase_rad"] for row in report["actual_read_phases"])
+                    !=driver_read_phases_rad):
+                raise ValueError(f"{case['case_id']}: genuine phase/source/stall TE proof is absent")
+            reports[label].append(report)
+            for interval in itertools.chain(
+                    (row["signed_running_te_interval_rad"] for row in report["actual_read_phases"]),
+                    (cell["signed_running_te_interval_rad"] for cell in report["full_period_cells"])):
+                if (len(interval)!=2 or any(type(value) not in (int,float) or not math.isfinite(value) for value in interval)
+                        or interval[0]>interval[1]):
+                    raise ValueError(f"{case['case_id']}: invalid actual signed TE interval")
+    nominal_te,nominal_advance,numerical,robust,nominal_pose = [],[],[],[],[]
+    for index,(phase,row) in enumerate(zip(driver_read_phases_rad,rows)):
+        value = row["reference_signed_running_te_rad"]
+        bound = row["reference_error_bound_rad"]
+        lo,hi = row["signed_running_te_interval_rad"]
+        if (type(value) not in (int,float) or type(bound) not in (int,float)
+                or not math.isfinite(value) or not math.isfinite(bound) or bound<0
+                or not math.isfinite(lo) or not math.isfinite(hi) or lo>hi
+                or math.nextafter(value-bound,-math.inf)>lo or math.nextafter(value+bound,math.inf)<hi):
+            raise ValueError("nominal point root/reference numerical bound is absent or does not enclose its genuine point proof")
+        nominal_te.append(value)
+        nominal_advance.append(value-ratio*phase)
+        numerical.append(bound)
+        def half_width(label):
+            intervals = [report["actual_read_phases"][index]["signed_running_te_interval_rad"]
+                         for report in reports[label]]
+            values = [max(abs(low-value),abs(high-value)) for low,high in intervals]
+            if not all(math.isfinite(item) for item in values):
+                raise ValueError("source/profile half-width is not a finite actual TE enclosure")
+            return math.nextafter(max(bound,max(values)),math.inf)
+        robust.append(half_width("robust"))
+        nominal_pose.append(half_width("nominal_pose"))
+    def whole_period(label):
+        intervals = [report["whole_period_signed_running_te_interval_rad"]
+                     for report in reports[label]]
+        lower,upper = min(row[0] for row in intervals),max(row[1] for row in intervals)
+        if not math.isfinite(lower) or not math.isfinite(upper) or lower>upper:
+            raise ValueError("residual TE phase-change interval is unresolved")
+        return [lower,upper]
+    return {
+        "schema":"dt-cone-operating-stock-phase/1","operating_source_state":"OPERATING_NOTCH_UP",
+        "driver_read_phases_rad":list(driver_read_phases_rad),"operating_driver_sense":-1,
+        "nominal_driven_advance_rad":nominal_advance,"nominal_signed_running_te_rad":nominal_te,
+        "nominal_reference_numerical_bound_rad":numerical,
+        "robust_half_width_rad":robust,"nominal_pose_half_width_rad":nominal_pose,
+        "robust_signed_te_interval_rad":whole_period("robust"),
+        "nominal_pose_signed_te_interval_rad":whole_period("nominal_pose"),
+        "half_width_scope":"nominal/all16 SAME requested stall; numerical reference bound included once",
+        "phase_change_scope":"genuine whole-period intervals bound residual TE(psi+s)-TE(psi); pay the relevant width once when adding crank shaft advance",
+        "shaft_advance_included":False,
+        "excluded_terms":list(_BUDGET_EXCLUDED_TERMS),
+        "manufactured_datum_mapping":datum,"datum_tare_rad":None,
+    }
+
+
+
+
+def _continuous_analysis(pair: ContactPair, domain: dict, *, phases: int,
+                         maximum_error_mm: float, read_phases_rad: tuple[float,...]) -> dict:
+    from stock_form_contact_certificate import (
+        require_continuous_certificate,require_whole_period_envelope,require_actual_read_phase)
+    report = analyse_3d_mesh(pair,continuous_source_domain=domain,
+        phases=phases,maximum_error_mm=maximum_error_mm,coverage_min=1.1,row_min=0.0,
+        handover_max_mm=.005,positive_backlash_min_mm=0.0,driver_sense=-1,
+        read_driver_phases_rad=read_phases_rad)
+    try:
+        if report.get("source_domain_proved") is not True:
+            raise ValueError("actual supplied source domain has not been mathematically proved")
+        certificate = report["continuous_contact_certificate"]
+        require_continuous_certificate(report,domain,pair.driver,pair.driven,
+            certificate,coverage_floor=1.1,row_floor=0.0,handover_max_mm=.005)
+        require_whole_period_envelope(report,domain,pair.driver,pair.driven)
+        reads = report["actual_read_phases"]
+        if tuple(row["actual_driver_phase_rad"] for row in reads)!=read_phases_rad:
+            raise ValueError("actual mechanical read phases are missing or reordered")
+        for phase,row in zip(read_phases_rad,reads):
+            require_actual_read_phase(report,domain,pair.driver,pair.driven,row,
+                expected_phase_rad=phase)
+    except (KeyError,TypeError,ValueError) as error:
+        report.update(source_domain_proved=False,production_source_qualified=False,
+            qualified=False,certificate_replay_error=str(error))
+    return report
+
+
+def _te_discrepancy_upper(report: dict, reference_te: tuple[float,float]) -> float:
+    cells = report["full_period_cells"]
+    if not cells:
+        raise ValueError("same-source actual driven endpoint cells are absent")
+    bounds = [max(abs(cell["signed_running_te_interval_rad"][0]-reference_te[1]),
+                  abs(cell["signed_running_te_interval_rad"][1]-reference_te[0]))
+              for cell in cells]
+    if not all(math.isfinite(value) for value in bounds):
+        raise ValueError("nonfinite actual signed TE enclosure")
+    return math.nextafter(max(bounds),math.inf)
+
+
+def full_source_cam_exclusion(pair: ContactPair, domain: dict) -> dict:
+    """Exclude the integral cam using the actual named source coordinates."""
+    import dt_cylinder_gear_spec as drum
+    axes = dict(domain["correlated_pose_parameters"])
+    def magnitude(name):
+        lo,hi = axes.get(name,(0.0,0.0))
+        if not math.isfinite(lo) or not math.isfinite(hi) or lo>hi:
+            raise ValueError("cam exclusion requires finite actual source axes")
+        return max(abs(lo),abs(hi))
+    def motion(body, radius):
+        translation = math.sqrt(math.fsum(magnitude(f"{body}_d{axis}_mm")**2 for axis in "xyz"))
+        eccentricity = math.sqrt(math.fsum(magnitude(f"{body}_ecc_{axis}_mm")**2 for axis in "xy"))
+        angle = min(math.pi,math.fsum(magnitude(f"{body}_r{axis}_rad") for axis in "xyz"))
+        return translation+eccentricity+2*radius*math.sin(angle/2)
+    cone_width = max(domain["finite_face_width_limits_mm"]["driver"])
+    cone_radius = math.hypot(pair.driver.blank_radius_mm,cone_width/2)
+    cam_radius = ((drum.CAM_DIA+max(drum.CAM_DIA_BAND))/2+drum.ECCENTRICITY
+                  +drum.ECCENTRICITY_TOLERANCE_MM+drum.SET_ECCENTRICITY_RANGE_MM)
+    cam_reach = drum.OVERALL_THICKNESS+max(drum.OVERALL_THICKNESS_BAND)
+    motions = {"driver":motion("driver",cone_radius),
+               "driven":motion("driven",math.hypot(cam_radius,cam_reach))}
+    error = math.nextafter(math.fsum(motions.values())+
+        128*np.finfo(float).eps*(1+cone_radius+cam_radius+cam_reach),math.inf)
+    record = configured_cam_exclusion(pair,radial_error_mm=error,profile_motion_mm=0.0)
+    record.update(continuous_source_domain=domain,source_body_motion_upper_mm=motions,
+        proof="finite integral cam circular/axial superset; actual named rigid/source eccentricity motions paid once, all printed profiles are evaluated separately")
+    return record
+
+
+def qualify_actual_pair(pair: ContactPair, *, continuous_source_domain: dict,
+                        phases: int, maximum_error_mm: float,
+                        read_phases_rad: tuple[float,...], planar_centre_mm: float,
+                        selected_nominal_te_rad: tuple[float,float],
+                        nominal_pose_report: dict) -> dict:
+    """Consume genuine whole-q continuation/endpoints; never a scalar pose ball."""
     result = {"qualification":"refused","oblique_phase_bound_rad":None,
-              "nominal_oblique_phase_bound_rad":None,
-              "position_ball_mm":pose_ball_mm,
-              "radial_pose_error_mm":radial_error_mm,"axial_pose_error_mm":axial_error_mm,
-              "smooth_3d_ff_screen":exact_smooth_ff_exclusion(pair)}
+        "nominal_oblique_phase_bound_rad":None,"continuous_source_domain":continuous_source_domain,
+        "smooth_3d_ff_screen":exact_smooth_ff_exclusion(pair),
+        "nominal_actual3d_te_enclosure_rad":selected_nominal_te_rad,
+        "reference_scope":"selected NOMINAL printed profiles, actual3D mathematical q=0 notch-up/cone-lock; no planar oracle or range mean",
+        "oblique_phase_bound_excluded_terms":list(_BUDGET_EXCLUDED_TERMS)}
     try:
-        result["planar_ff_screen"] = asdict(supported_flank_coverage(
-            pair.driver,pair.driven,planar_centre_mm,maximum_error_mm=maximum_error_mm))
-    except (ValueError,RuntimeError) as error:
-        result["planar_ff_screen"] = {"qualification":"refused","reason":str(error)}
-    result["signed_read_matrix"] = signed_read_matrix(pair,read_phases_rad,
-        maximum_error_mm=maximum_error_mm,position_error_mm=pose_ball_mm,
-        radial_error_mm=radial_error_mm,axial_error_mm=axial_error_mm)
-    try:
-        nominal = analyse_3d_mesh(pair,phases=phases,maximum_error_mm=maximum_error_mm,
-            coverage_min=1.1,row_min=0.0,positive_backlash_min_mm=0.0,driver_sense=-1)
-        result["nominal_actual3d"] = nominal
-        robust = nominal if pose_ball_mm==radial_error_mm==axial_error_mm==0 else analyse_3d_mesh(
-            pair,phases=phases,maximum_error_mm=maximum_error_mm,
-            coverage_min=1.1,row_min=0.0,positive_backlash_min_mm=0.0,
-            position_error_mm=pose_ball_mm,radial_error_mm=radial_error_mm,
-            axial_error_mm=axial_error_mm,driver_sense=-1)
-        result.update(nominal_actual3d=nominal,all_corner_actual3d=robust)
-        handovers = robust["handovers"]
-        jump = max((row.get("pitch_displacement_jump_upper_mm",math.inf) for row in handovers),default=0.0)
+        robust = _continuous_analysis(pair,continuous_source_domain,phases=phases,
+            maximum_error_mm=maximum_error_mm,read_phases_rad=read_phases_rad)
+        result["all_corner_actual3d"] = robust
+        result["actual_signed_read_phases"] = robust.get("actual_read_phases",[])
+        if (continuous_source_domain.get("scope")!="FULL_PRODUCTION_SOURCE_DOMAIN"
+                or continuous_source_domain.get("production_source_domain") is not True
+                or robust.get("production_source_qualified") is not True
+                or robust.get("source_domain_proved") is not True):
+            raise ValueError("whole retained physical source domain is not production qualified")
+        budget_domain = budget_clock_subdomain(continuous_source_domain)
+        budget = _continuous_analysis(pair,budget_domain,phases=phases,
+            maximum_error_mm=maximum_error_mm,read_phases_rad=read_phases_rad)
+        result["budget_actual3d"] = budget
+        if (budget.get("source_domain_proved") is not True
+                or nominal_pose_report.get("source_domain_proved") is not True):
+            raise ValueError("actual budget-clock or nominal-pose mathematical source proof is incomplete")
+        cam = full_source_cam_exclusion(pair,continuous_source_domain)
+        result["integral_cam_body_exclusion"] = cam
+        if not cam["qualified"]:
+            raise ValueError("actual integral cam-body exclusion unresolved")
+        cells, arcs, inspection_cells, root_records = [], [], [], []
+        rop = planar_centre_mm*pair.driven.teeth/(pair.driver.teeth+pair.driven.teeth)
+        for source_cell in robust["full_period_cells"]:
+            angular = source_cell["correlated_backlash"]["backlash_interval_rad"]
+            arc = (math.nextafter(angular[0]*rop,-math.inf),math.nextafter(angular[1]*rop,math.inf))
+            root = source_cell["root_air"]
+            required = continuous_source_domain["root_air_requirements_mm"]
+            if (root["root_air_requirements_mm"] != required or root["qualified"] is not True
+                    or root["driver_root_air_lower_mm"] < required["driver"]
+                    or root["driven_root_air_lower_mm"] < required["driven"]
+                    or root["root_is_carrying"] is not False):
+                raise ValueError("directed same-q driver/driven actual ROOT MATERIAL proofs are incomplete")
+            arcs.append(arc)
+            root_records.append(root)
+            cells.append(source_cell)
+            inspection_cells.append({
+                "actual_driver_interval_rad":source_cell["actual_driver_interval_rad"],
+                "correlated_backlash_interval_rad":angular,
+                "source_calibrated_backlash_interval_mm":arc,
+                "physical_pitch_arc_backlash_interval_mm":source_cell["correlated_backlash_interval_mm"]})
+        if not cells:
+            raise ValueError("whole-phase genuine endpoint/root-air cells are absent")
+        reads = robust["actual_read_phases"]
+        if tuple(row["actual_driver_phase_rad"] for row in reads) != read_phases_rad:
+            raise ValueError("actual source-aware read stalls are missing, reordered or substituted")
+        read_rows = []
+        for row in reads:
+            te = row["signed_running_te_interval_rad"]
+            if len(te)!=2 or not all(math.isfinite(value) for value in te) or te[0]>te[1]:
+                raise ValueError("unresolved actual signed operating-stall TE")
+            phase = row["actual_driver_phase_rad"]
+            read_rows.append({**row,"driver_phase_rad":phase,
+                "read_phase_interval_rad":[phase,phase],
+                "qualification":"interval bounded","datum_tare_rad":None})
+        result["signed_read_matrix"] = {"rows":read_rows,"all_reads_bounded":True,
+            "read_phase_scope":"genuine mechanical requested stalls over WHOLE physical source domain",
+            "units":"signed cylinder radians","datum":continuous_source_domain["manufactured_datum_mapping"]}
+        tight,loose = min(arc[0] for arc in arcs),max(arc[1] for arc in arcs)
+        handover = max((row["pitch_displacement_jump_upper_mm"] for row in robust["handovers"]),default=0.0)
         margins = {"supported_union_coverage":robust["stock_form_coverage_lower"]-1.1,
-            "handover_jump_mm":0.005-jump,
-            "phase_reserve_rad":robust["phase_reserve_rad"],
-            "continuous_carrying":0.0 if robust["continuous_carrying_contact"] else -1.0}
-        result["margins"] = margins
-        rows = robust["phase_rows"]
-        kinds = [row["upper_contact"]["kind"] for row in rows if row["upper_contact"]]
-        result["corner_carried_fraction"] = (sum("corner" in kind or "edge" in kind for kind in kinds)/len(kinds)) if kinds else None
-        # Enclose EACH full phase cell by an additional spatial rotation
-        # ball. This bounds its fixed-driver loaded root directly, without
-        # assuming a velocity interval from a point normal or interpolating
-        # TE. The planar oracle supplies its independently interval-paid
-        # signed TE range; the discrepancy subtraction preserves the datum.
-        planar = analyse_planar_mesh(pair.driver,pair.driven,planar_centre_mm,
-            driver_clocking_rad=home[0],driven_clocking_rad=home[1],
-            maximum_error_mm=maximum_error_mm)
-        planar_values = tuple(planar.transmission_error_driven_rad)
-        # analyse_planar_mesh carries positive-driver upper phases. Reverse
-        # running uses the lower phase = upper phase - actual backlash/Rop.
-        # Enclose that shift by the complete paid backlash range; no median.
-        operating_radius = planar_centre_mm*pair.driven.teeth/(pair.driver.teeth+pair.driven.teeth)
-        planar_error = planar.numerical_error_bounds["transmission_error_driven_rad"]
-        backlash_error = planar.numerical_error_bounds["backlash_mm"]
-        planar_te = (min(planar_values)-planar_error-(planar.loose_backlash_mm+backlash_error)/operating_radius,
-                     max(planar_values)+planar_error-(planar.tight_backlash_mm-backlash_error)/operating_radius)
-        step = pair.driver.angular_pitch_rad/(phases-1)
-        half_step = step/2
-        phase_ball = 2*(pair.driver.blank_radius_mm+pose_ball_mm)*math.sin(half_step/2)
-        all_pose_bounds, nominal_bounds, cells = [], [], []
-        result["full_period_cells"] = cells
-        physical_backlash_bounds = []
-        root_air_records = []
-        for centre in np.linspace(half_step,pair.driver.angular_pitch_rad-half_step,phases-1):
-            nominal_cell = loaded_phase_at(pair,float(centre),maximum_error_mm=maximum_error_mm,
-                driver_sense=-1,radial_error_mm=phase_ball)
-            uniform_cell = loaded_phase_at(pair,float(centre),maximum_error_mm=maximum_error_mm,
-                driver_sense=-1,position_error_mm=pose_ball_mm,
-                radial_error_mm=radial_error_mm+phase_ball,axial_error_mm=axial_error_mm)
-            opposite = loaded_phase_at(pair,float(centre),maximum_error_mm=maximum_error_mm,
-                driver_sense=1,position_error_mm=pose_ball_mm,
-                radial_error_mm=radial_error_mm+phase_ball,axial_error_mm=axial_error_mm)
-            lower_lo,lower_hi = uniform_cell["driven_phase_interval_rad"]
-            upper_lo,upper_hi = opposite["driven_phase_interval_rad"]
-            backlash_interval = ((upper_lo-lower_hi)*operating_radius,
-                                 (upper_hi-lower_lo)*operating_radius)
-            physical_backlash_bounds.append(backlash_interval)
-            air = loaded_root_air_bounds(pair,float(centre),(lower_lo,lower_hi),
-                driver_phase_half_width_rad=half_step,position_error_mm=pose_ball_mm,
-                radial_error_mm=radial_error_mm,axial_error_mm=axial_error_mm,
-                maximum_error_mm=maximum_error_mm)
-            root_air_records.append(air)
-            result["root_air_proofs"] = root_air_records
-            if not air["qualified"]:
-                raise ValueError(f"actual finite RootArc air .02/.10 unresolved at driver phase cell {float(centre):.17g}")
-            datum_motion = pair.driver.teeth/pair.driven.teeth*half_step
-            def discrepancy(measured):
-                lo,hi = measured["signed_running_te_interval_rad"]
-                return max(abs(lo-datum_motion-planar_te[1]),abs(hi+datum_motion-planar_te[0]))
-            all_pose_bounds.append(discrepancy(uniform_cell))
-            nominal_bounds.append(discrepancy(nominal_cell))
-            cells.append({"driver_interval_rad":[float(centre)-half_step,float(centre)+half_step],
-                          "actual3d_signed_te_interval_rad":uniform_cell["signed_running_te_interval_rad"],
-                          "datum_motion_rad":datum_motion,
-                          "discrepancy_upper_rad":all_pose_bounds[-1],
-                          "actual_driven_backlash_interval_mm":backlash_interval,
-                          "actual_driven_lower_interval_rad":[lower_lo,lower_hi],
-                          "actual_driven_upper_interval_rad":[upper_lo,upper_hi],
-                          "actual_driven_pitch_arc_backlash_interval_mm":[
-                              (upper_lo-lower_hi)*pair.driven.pitch_radius_mm,
-                              (upper_hi-lower_lo)*pair.driven.pitch_radius_mm],
-                          "root_air":air,
-                          "loaded_contact":uniform_cell["contact"]})
-        tight = min(interval[0] for interval in physical_backlash_bounds)
-        loose = max(interval[1] for interval in physical_backlash_bounds)
-        cone_air = min(record["cone_root_air_lower_mm"] for record in root_air_records)
-        drum_air = min(record["drum_root_air_lower_mm"] for record in root_air_records)
-        margins.update(tight_backlash_mm=tight-.06,loose_backlash_mm=.41-loose,
-                       cone_root_air_mm=cone_air-.02,drum_root_air_mm=drum_air-.10)
-        result["actual_driven_backlash"] = {
-            "tight_lower_mm":tight,"loose_upper_mm":loose,
-            "source_inspection_radius_mm":operating_radius,
-            "physical_driven_pitch_radius_mm":pair.driven.pitch_radius_mm,
-            "definition":"independently rooted held-driver lower/upper driven phase intervals; source operating-circle calibration, not inverse-driver ideal-ratio conversion"}
-        if (not robust["qualified"] or not result["signed_read_matrix"]["all_reads_bounded"]
-                or any(not math.isfinite(value) or value<0 for value in margins.values())):
-            raise ValueError("actual supported union, handover, signed stalls, rooted driven backlash or finite RootArc air gate refused")
-        result.update(qualification="qualified",oblique_phase_bound_rad=max(all_pose_bounds),
-            nominal_oblique_phase_bound_rad=max(nominal_bounds),
-            planar_lower_edge_te_enclosure_rad=planar_te,
-            full_period_cells=cells,phase_cell_position_ball_mm=phase_ball,
+            "handover_jump_mm":.005-handover,"tight_backlash_mm":tight-.06,"loose_backlash_mm":.41-loose,
+            "cone_root_air_mm":min(row["driver_root_air_lower_mm"] for row in root_records)-required["driver"],
+            "drum_root_air_mm":min(row["driven_root_air_lower_mm"] for row in root_records)-required["driven"]}
+        result.update(margins=margins,full_period_cells=cells,
+            source_inspection_backlash_cells=inspection_cells,root_air_proofs=root_records,
+            actual_driven_backlash={"tight_lower_mm":tight,"loose_upper_mm":loose,
+                "source_inspection_radius_mm":rop,"physical_driven_pitch_radius_mm":pair.driven.pitch_radius_mm,
+                "definition":"same-q independently rooted original-index physical LOWER/UPPER differences; Rop calibration is not inverse-window conversion"},
+            nominal_actual3d=nominal_pose_report)
+        if any(not math.isfinite(value) or value<0 for value in margins.values()):
+            raise ValueError("actual union/handover/.06..41 backlash/directed root-air gate refused")
+        result.update(qualification="qualified",
+            oblique_phase_bound_rad=_te_discrepancy_upper(budget,selected_nominal_te_rad),
+            nominal_oblique_phase_bound_rad=_te_discrepancy_upper(nominal_pose_report,selected_nominal_te_rad),
             reason=None)
-    except (ValueError,RuntimeError) as error:
+    except (KeyError,TypeError,ValueError,RuntimeError) as error:
         result["reason"] = str(error)
     return result
 
 
 def measure_nominal_for_inspection(pair: ContactPair, *, phases: int,
                                    maximum_error_mm: float, read_phases_rad: tuple[float,...],
-                                   planar_centre_mm: float,home: tuple[float,float]) -> dict:
+                                   planar_centre_mm: float) -> dict:
     """Actual stationary-root DESIGN; no UNION or old handover call.
 
     Whole phase cells pay material motion. The result may derive a required
@@ -1062,6 +1236,36 @@ def printed_profile_cases(cone_corners: tuple, drum_corners: tuple):
         yield ci,di,cone,drum
 
 
+def actual_candidate_settings(teeth: int, source: dict, inputs, *,
+                              six_pitch_thickness_mm: float, allow_fresh_lattice: bool,
+                              lattice_record: dict):
+    """Try supplied settings, then the CURRENT real printed lattice if needed.
+
+    The caller stops after an accepted actual matrix. Resuming this generator
+    means the supplied settings failed; identical OD/thickness inputs are not
+    queried again. Old-domain refusal flags never certify this current lattice.
+    """
+    seen = set()
+    for setting in source.get("geometry_candidates",()):
+        key = (setting["outside_dia_mm"],setting["pitch_thickness_mm"])
+        if key not in seen:
+            seen.add(key)
+            yield setting
+    if not allow_fresh_lattice:
+        return
+    from diagnostics.solve_stock_form_cones import solve_count
+    fresh = solve_count(teeth,inputs,six_pitch_thickness_mm=six_pitch_thickness_mm,
+                        analyse_mesh=False)
+    lattice_record.update(
+        current_dimensional_lattice=fresh,
+        scope="fresh captured-source finite dimensional lattice only; no physical all-family contact refusal")
+    for setting in fresh["geometry_candidates"]:
+        key = (setting["outside_dia_mm"],setting["pitch_thickness_mm"])
+        if key not in seen:
+            seen.add(key)
+            yield setting
+
+
 def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
                  phases_rad: tuple[float,...] = tuple(-k*math.pi for k in range(21)),
                  maximum_error_mm: float = 0.0002, contact_phases: int = 129,
@@ -1090,28 +1294,46 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
         source = indexed[teeth]
         geometry,home = oblique_section_geometry(teeth),home_clocking_rad(teeth)
         source_candidates = source.get("geometry_candidates",())
+        current_lattice_loaded = False
+        if not source_candidates and not source_inputs_only:
+            from diagnostics.solve_stock_form_cones import solve_count
+            source = solve_count(teeth,inputs,six_pitch_thickness_mm=six_pitch_thickness_mm,
+                                 analyse_mesh=False)
+            current_lattice_loaded = True
+            source_candidates = source["geometry_candidates"]
         if not source_candidates:
             rows.append({"teeth":teeth,"qualification":"refused","oblique_phase_bound_rad":None,
-                "actual3d_mesh_evaluated":False,"reason":"no source-qualified finite manufactured profile",
-                "domain_refusal_certified":source.get("no_solution_certificate",False)})
+                "actual3d_mesh_evaluated":False,"reason":"current finite dimensional lattice has no manufactured profile",
+                "dimensional_lattice":source,"domain_refusal_certified":False})
             continue
         radius_upper = max(setting["outside_dia_mm"]+max(BLANK_DIA_BAND)
                            for setting in source_candidates)/2
-        domain = None if nominal_engineering_only else configured_pose_domain(
-            teeth,inputs,cone_radius_upper_mm=radius_upper,installed=installed)
+        domain = configured_pose_domain(
+            teeth,inputs,cone_radius_upper_mm=radius_upper,installed=installed) if source_inputs_only else None
+        source_domain = None
+        if not (nominal_engineering_only or source_inputs_only):
+            from dt_cone_mesh_domain import continuous_source_domain, SourceDomainUnknown
+            try:
+                source_domain = continuous_source_domain(teeth,installed_axis_acceptance=installed)
+            except SourceDomainUnknown as error:
+                rows.append({"teeth":teeth,"qualification":"source domain unknown",
+                    "oblique_phase_bound_rad":None,"actual3d_mesh_evaluated":False,
+                    "reason":str(error),"domain_refusal_certified":False})
+                continue
         row = {"teeth":teeth,"qualification":"refused", "oblique_phase_bound_rad":None,
             "nominal_oblique_phase_bound_rad":None,"actual3d_mesh_evaluated":False,
-            "geometry":geometry,"pose_domain":asdict(domain) if domain is not None else None,
-            "pose_corners":pose_corner_records(geometry,home,domain) if domain is not None else [],
-            "pose_corner_scope":"source OUTER witnesses, never independently attainable corners" if domain is not None else
-                "held source nominal engineering only; no installed acceptance supplied",
+            "geometry":geometry,"pose_domain":asdict(domain) if domain is not None else source_domain,
+            "pose_corners":pose_corner_records(geometry,domain) if domain is not None else [],
+            "continuous_source_domain":source_domain,
+            "pose_corner_scope":"whole source coordinates; Cartesian OUTERs are not independent engaged corners" if source_domain is not None else
+                ("source-only OUTER witnesses" if domain is not None else "held operating nominal engineering; no installed acceptance supplied"),
             "read_phases_rad":phases_rad,
             "coverage_required":1.1,
             "coverage_definition":"Main-final actual 3D union of supported flank/tip/axial-edge branches; smooth FF is screen only",
             "dimensional_certificate":{name:source.get(name) for name in (
                 "translation_domain_mm","pitch_thickness_domain_mm","available_thickness_span_mm",
                 "required_thickness_span_mm","thickness_domain_deficit_mm","root_min_required_mm",
-                "root_max_air_mm","finite_lattice_exhausted","no_solution_certificate","lattice_points")}}
+                "finite_lattice_exhausted","no_solution_certificate","lattice_points")}}
         cutter = cutter_for_count(teeth,inputs,six_pitch_thickness_mm=six_pitch_thickness_mm)
         cone_q = cutter_q_domain(cutter,tuple(source["translation_domain_mm"]))
         drum_q = [
@@ -1125,16 +1347,15 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
             "nominal_XZ_pose_Q_sum_lower_mm":residual,
             "smooth_ff_coverage_upper":0.0 if residual is not None and residual>0 else None,
             "scope":"nominal XZ axes and full finite cutter/translation domain; screen only, never an edge-union refusal"}
-        candidates = source.get("geometry_candidates",())
-        if not candidates:
-            row.update(reason="no source-qualified finite manufactured profile: "+", ".join(source["binding_constraints"]),
-                       binding_constraints=source["binding_constraints"],
-                       domain_refusal_certified=source.get("no_solution_certificate",False),
-                       signed_read_matrix=None)
-            rows.append(row)
-            continue
+        lattice_record = {}
+        if current_lattice_loaded:
+            lattice_record.update(current_dimensional_lattice=source,
+                scope="fresh captured-source finite dimensional lattice only; no physical all-family contact refusal")
+        row["actual_lattice_search"] = lattice_record
         candidate_reports = []
-        for setting in candidates:
+        for setting in actual_candidate_settings(teeth,source,inputs,
+                six_pitch_thickness_mm=six_pitch_thickness_mm,
+                allow_fresh_lattice=not source_inputs_only and not current_lattice_loaded,lattice_record=lattice_record):
             nominal_translation = translation_for_pitch_tooth_thickness(teeth,cutter,setting["pitch_thickness_mm"])
             actual_translations = tuple(translation_for_pitch_tooth_thickness(
                 teeth,cutter,setting["pitch_thickness_mm"]+deviation)
@@ -1157,7 +1378,7 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
                            actual_pitch_tooth_thickness_mm=profile.pitch_tooth_thickness_mm,
                            reconstructed_from_actual_loaded_core=True)
             pair = ContactPair(f"cone T{teeth:03d} nominal",profile,inputs.drum_nominal,
-                               placement_from_geometry(geometry,home))
+                               placement_from_geometry(geometry))
             cone_corners = tuple(StockFormProfile(teeth,cutter,
                 (setting["outside_dia_mm"]+od)/2,translation)
                 for od,translation in itertools.product(BLANK_DIA_BAND,actual_translations))
@@ -1179,7 +1400,7 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
                     "reason":"actual source nominal and printed-profile corners measured for inspection design; complete engaged-pose qualification not asserted",
                     "nominal_engineering":measure_nominal_for_inspection(pair,
                         phases=contact_phases,maximum_error_mm=maximum_error_mm,
-                        read_phases_rad=phases_rad,planar_centre_mm=inputs.centre_mm(teeth),home=home),
+                        read_phases_rad=phases_rad,planar_centre_mm=inputs.centre_mm(teeth)),
                     "manufactured_corner_engineering":[]}
                 for ci,di,cone_corner,drum_corner in printed_profile_cases(cone_corners,inputs.drum_corners):
                     corner_pair = ContactPair(f"{pair.name} manufactured C{ci:02d}-D{di:02d}",
@@ -1192,7 +1413,7 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
                         "actual_source_nominal_pose":True,
                         "calculation":measure_nominal_for_inspection(corner_pair,
                             phases=contact_phases,maximum_error_mm=maximum_error_mm,
-                            read_phases_rad=phases_rad,planar_centre_mm=inputs.centre_mm(teeth),home=home)})
+                            read_phases_rad=phases_rad,planar_centre_mm=inputs.centre_mm(teeth))})
                 matrix = [calculation["nominal_engineering"],*(
                     record["calculation"] for record in calculation["manufactured_corner_engineering"])]
                 calculation["inspection_design_matrix"] = {
@@ -1209,13 +1430,59 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
                     "installation_limits_derived":False,
                     "scope":"one actual nominal and sixteen distinct printed-profile corners; no installed-pose certificate or numerical zero preset"}
             else:
-                calculation = qualify_actual_pair(pair,pose_ball_mm=ball,phases=contact_phases,
-                    maximum_error_mm=maximum_error_mm,read_phases_rad=phases_rad,
-                    planar_centre_mm=inputs.centre_mm(teeth),home=home,
-                    radial_error_mm=radial,axial_error_mm=axial)
-            if not nominal_engineering_only and not cam["qualified"]:
+                actual_cases = []
+                nominal_comparison = None
+                calculation = {"qualification":"refused","oblique_phase_bound_rad":None,
+                    "nominal_oblique_phase_bound_rad":None}
+                try:
+                    nominal_comparison = _continuous_analysis(pair,nominal_source_subdomain(pair.placement.record(),source_domain),
+                        phases=contact_phases,maximum_error_mm=maximum_error_mm,read_phases_rad=phases_rad)
+                    reference_te = actual3d_nominal_te_enclosure(nominal_comparison)
+                    calculation = qualify_actual_pair(pair,continuous_source_domain=source_domain,
+                        phases=contact_phases,maximum_error_mm=maximum_error_mm,read_phases_rad=phases_rad,
+                        planar_centre_mm=inputs.centre_mm(teeth),selected_nominal_te_rad=reference_te,
+                        nominal_pose_report=nominal_comparison)
+                    actual_cases = [{"case_id":"nominal","cone_corner_index":None,"drum_corner_index":None,
+                        "cone":profile_record(profile),"drum":profile_record(inputs.drum_nominal),
+                        "calculation":calculation}]
+                    for ci,di,cone_corner,drum_corner in printed_profile_cases(cone_corners,inputs.drum_corners):
+                        corner_pair = ContactPair(f"{pair.name} C{ci:02d}-D{di:02d}",
+                            cone_corner,drum_corner,pair.placement)
+                        corner_nominal = _continuous_analysis(corner_pair,
+                            nominal_source_subdomain(corner_pair.placement.record(),source_domain),phases=contact_phases,
+                            maximum_error_mm=maximum_error_mm,read_phases_rad=phases_rad)
+                        actual_cases.append({"case_id":f"C{ci:02d}-D{di:02d}",
+                            "cone_corner_index":ci,"drum_corner_index":di,
+                            "cone":profile_record(cone_corner),"drum":profile_record(drum_corner),
+                            "calculation":qualify_actual_pair(corner_pair,continuous_source_domain=source_domain,
+                                phases=contact_phases,maximum_error_mm=maximum_error_mm,read_phases_rad=phases_rad,
+                                planar_centre_mm=inputs.centre_mm(teeth),selected_nominal_te_rad=reference_te,
+                                nominal_pose_report=corner_nominal)})
+                    calculation = dict(calculation)
+                    calculation["actual_profile_cases"] = actual_cases
+                    if all(case["calculation"]["qualification"]=="qualified" for case in actual_cases):
+                        full_profile_case_records(actual_cases[0],actual_cases[1:])
+                        calculation["oblique_phase_bound_rad"] = max(
+                            case["calculation"]["oblique_phase_bound_rad"] for case in actual_cases)
+                        calculation["stock_phase_3d"] = stock_phase_3d_packet(actual_cases,nominal_comparison,
+                            driver_read_phases_rad=phases_rad,ratio=teeth/inputs.drum_teeth,
+                            datum=source_domain["manufactured_datum_mapping"])
+                    else:
+                        calculation.update(qualification="refused",oblique_phase_bound_rad=None,
+                            reason="one or more actual nominal/all16 full-source printed-profile certificates unresolved")
+                    cam = calculation.get("integral_cam_body_exclusion")
+                except (KeyError,TypeError,ValueError,RuntimeError) as error:
+                    calculation = dict(calculation)
+                    calculation.update(qualification="refused",oblique_phase_bound_rad=None,
+                        nominal_oblique_phase_bound_rad=None,reason=str(error),
+                        actual_profile_cases=actual_cases,
+                        actual_profile_case_count=len(actual_cases),
+                        profile_matrix_complete=len(actual_cases)==17)
+                    if nominal_comparison is not None:
+                        calculation.setdefault("nominal_actual3d",nominal_comparison)
+            if source_inputs_only and not cam["qualified"]:
                 calculation.update(qualification="refused",oblique_phase_bound_rad=None,
-                    reason="integral cam-body exclusion unresolved under retained source poses; no omitted body fallback")
+                    reason="integral cam-body source OUTER exclusion unresolved; no physical no-solution inference")
             candidate_reports.append({"setting":setting,"actual_pose":pose_record(pair,geometry,home),
                 "actual3d_mesh_evaluated":not source_inputs_only,
                 "driver_profile":profile_record(profile),"driven_profile":profile_record(inputs.drum_nominal),
@@ -1223,17 +1490,36 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
                 "manufactured_drum_corners":[profile_record(p) for p in inputs.drum_corners],
                 "integral_cam_body_exclusion":cam,
                 **calculation})
+            if not (nominal_engineering_only or source_inputs_only):
+                candidate_reports[-1].update(
+                    cutter=actual_cutter_record(cutter),
+                    printed_profile_root_envelope_mm=printed_root_radius_envelope(cone_corners),
+                )
+            if not source_inputs_only:
+                engineering = calculation.get("inspection_design_matrix",{})
+                if calculation["qualification"]=="qualified" or (
+                        nominal_engineering_only and engineering.get("all_profile_cases_bounded") is True
+                        and engineering.get("all_cases_have_positive_certified_extra_air") is True
+                        and all(value>=0 for value in engineering.get("margin_lower",{}).values())):
+                    break
         qualified = [report for report in candidate_reports if report["qualification"] == "qualified"]
         selected = min(qualified,key=lambda report:report["oblique_phase_bound_rad"]) if qualified else None
         row.update(actual3d_mesh_evaluated=any(report.get("actual3d_mesh_evaluated",False) for report in candidate_reports),
                    candidates=candidate_reports,selected=selected["setting"] if selected else None,
                    qualification="qualified" if selected else "refused",
-                   reason=None if selected else "actual final-core studies refused every supplied manufactured candidate; source lattice exhaustion is not inferred",
+                   reason=None if selected else "actual supplied/current-lattice studies unresolved or refused; no physical all-family no-solution inferred",
                    domain_refusal_certified=False,
                    binding_constraints=[] if selected else ["actual_3d_contact"],
                    oblique_phase_bound_rad=selected["oblique_phase_bound_rad"] if selected else None,
                    nominal_oblique_phase_bound_rad=selected["nominal_oblique_phase_bound_rad"] if selected else None,
                    signed_read_matrix=(selected or candidate_reports[0]).get("signed_read_matrix"))
+        if not (nominal_engineering_only or source_inputs_only):
+            row["cutter"] = actual_cutter_record(cutter)
+            if selected is not None:
+                row["printed_profile_root_envelope_mm"] = selected["printed_profile_root_envelope_mm"]
+                row["oblique_phase_bound_excluded_terms"] = selected.get(
+                    "oblique_phase_bound_excluded_terms")
+                row["stock_phase_3d"] = selected["stock_phase_3d"]
         if source_inputs_only:
             row.update(qualification="source inputs prepared",reason="no contact calculation requested",
                        selected=None,binding_constraints=[],domain_refusal_certified=False)
@@ -1252,8 +1538,182 @@ def study_family(domain_report: dict, inputs, *, six_pitch_thickness_mm: float,
             "measured_in_this_scope":not nominal_engineering_only and not source_inputs_only},
         "scope":"actual finite 3D surfaces and source corner domains; explicit refusals, no planar/profile fallback",
         "read_phase_source":"explicit actual cone phases supplied by caller; default operating stalls -k*pi, k=0..20",
-        "runout_enclosure":"relative radial ball includes every rotating eccentricity direction; cardinal samples alone never qualify it",
-        "numerical_error_policy":"pointwise loaded root keeps actual bracket width; no unobserved whole-period bound is exported"}
+        "runout_enclosure":"actual body-fixed full eccentricity disks are bounded by named source coordinates; cardinal samples alone never qualify them",
+        "numerical_error_policy":"actual continuous source/cell certificates bind whole-period endpoint/root/material proofs; true q0 point-reference bounds are separate and paid once"}
+
+
+def actual_cutter_record(cutter) -> dict:
+    """Actual captured tool, including a non-default caller-supplied N6 thickness."""
+    return {
+        "reference_teeth":cutter.reference_teeth,
+        "cutter_number":cutter.cutter_number,
+        "teeth_range":list(cutter.teeth_range),
+        "diametral_pitch":cutter.diametral_pitch,
+        "pressure_angle_deg":cutter.pressure_angle_deg,
+        "root_radius_mm":cutter.root_radius_mm,
+        "base_radius_mm":cutter.base_radius_mm,
+        "tip_radius_mm":cutter.tip_radius_mm,
+        "pitch_tooth_thickness_mm":cutter.pitch_tooth_thickness_mm,
+        "name":cutter.name,
+        "source":cutter.source,
+    }
+
+
+def printed_root_radius_envelope(profiles) -> list[float]:
+    """Manufactured RootArc extrema in RADIUS mm, never a fictitious MAX floor."""
+    profiles = tuple(profiles)
+    if (len(profiles)!=4 or len({
+            (profile.blank_radius_mm,profile.radial_translation_mm)
+            for profile in profiles})!=4):
+        raise ValueError("root envelope needs four distinct actual printed profiles")
+    low = min(profile.root_radius_min_mm for profile in profiles)
+    high = max(profile.root_radius_max_mm for profile in profiles)
+    if not (math.isfinite(low) and math.isfinite(high) and 0<low<=high):
+        raise ValueError("actual printed RootArc radius envelope is invalid")
+    return [low,high]
+
+
+def _canonical_sha256(record) -> str:
+    return hashlib.sha256(json.dumps(
+        record,sort_keys=True,separators=(",",":"),allow_nan=False,
+    ).encode("utf-8")).hexdigest().upper()
+
+
+def _manifest_value(manifest: dict[str,str], relative_path: str) -> str:
+    """Match one authentic path without reading or rebinding live source."""
+    if (not isinstance(manifest,dict)
+            or any(not isinstance(path,str) for path in manifest)):
+        raise ValueError("actual source manifest needs named file paths")
+    matches = [
+        value for path,value in manifest.items()
+        if path.replace("\\","/")==relative_path
+        or path.replace("\\","/").endswith("/"+relative_path)
+    ]
+    if len(matches)!=1:
+        raise ValueError(f"actual source receipt needs exactly one {relative_path}")
+    value = matches[0]
+    if (not isinstance(value,str) or len(value)!=64
+            or any(character not in "0123456789ABCDEF" for character in value)):
+        raise ValueError(f"actual source receipt has invalid SHA256 for {relative_path}")
+    return value
+
+
+def compiled_measurement_identity(source: dict) -> dict:
+    """The genuine SIX measured files, never a current-file hash substitution."""
+    manifests = [
+        source[name] for name in (
+            "before_design_sha256","actual_preimport_project_sha256",
+            "after_design_sha256","loaded_algorithm_sha256",
+        )
+    ]
+    if source.get("source_bytes_stable") is not True:
+        raise ValueError("changed live source cannot release a measurement identity")
+    measured = {}
+    for path in _MEASUREMENT_ENGINE_PATHS:
+        values = [_manifest_value(manifest,path) for manifest in manifests]
+        if len(set(values))!=1:
+            raise ValueError(f"compiled/before/after/loaded source differs for {path}")
+        measured[path.rsplit("/",1)[1]] = values[0]
+    return {
+        "measurement_engine_sources_sha256":measured,
+        "measurement_engine_sha256":_canonical_sha256(measured),
+    }
+
+
+def full_profile_case_records(nominal: dict, manufactured: list[dict]) -> list[dict]:
+    """Preserve seventeen real full reports; an engineering summary is not one."""
+    expected = {(ci,di) for ci in range(4) for di in range(4)}
+    indices = [(case["cone_corner_index"],case["drum_corner_index"]) for case in manufactured]
+    if len(indices)!=16 or set(indices)!=expected:
+        raise ValueError("full factory evidence needs each distinct C00-D00..C03-D03 once")
+    if (nominal.get("case_id")!="nominal"
+            or nominal.get("cone_corner_index") is not None
+            or nominal.get("drum_corner_index") is not None):
+        raise ValueError("nominal profile report has the wrong physical case label")
+    cases = [nominal,*sorted(manufactured,key=lambda case:(
+        case["cone_corner_index"],case["drum_corner_index"]))]
+    for case in cases:
+        ci,di = case["cone_corner_index"],case["drum_corner_index"]
+        if ci is not None and case["case_id"]!=f"C{ci:02d}-D{di:02d}":
+            raise ValueError("full factory profile labels differ from their actual corner indices")
+        if (case.get("actual_source_nominal_pose") is True
+                or not {"cone","drum","calculation"} <= case.keys()):
+            raise ValueError("held-nominal engineering evidence is not full source qualification")
+        calculation = case["calculation"]
+        if (calculation.get("production_qualified") is False
+                or calculation.get("qualification")!="qualified"):
+            raise ValueError(f"{case['case_id']}: actual full-profile calculation is not qualified")
+        robust = calculation.get("all_corner_actual3d",{})
+        certificate = robust.get("continuous_contact_certificate",{})
+        if (certificate.get("proof_schema")!="finite-stock-continuous-envelope/1"
+                or certificate.get("status")!="PROVED"
+                or certificate.get("native_certificate") is not False
+                or set(certificate.get("sides",{}))!={"lower","upper"}):
+            raise ValueError(f"{case['case_id']}: full directional continuous-contact proof is absent")
+        if (robust.get("production_source_qualified") is not True
+                or robust.get("source_domain_proved") is not True):
+            raise ValueError(f"{case['case_id']}: actual full physical source admission is absent")
+        for side in certificate["sides"].values():
+            required = {
+                "same_source_pose","phase_domain_rad","phase_cells",
+                "row_branch_spans","handovers","periodic_seam",
+            }
+            if (not isinstance(side,dict) or not required<=side.keys()
+                    or not side["same_source_pose"] or not side["phase_cells"]
+                    or not isinstance(side["row_branch_spans"],(list,tuple))):
+                raise ValueError(f"{case['case_id']}: continuous proof omits its actual source/cell evidence")
+            domain = side["phase_domain_rad"]
+            if (len(domain)!=2 or not all(math.isfinite(value) for value in domain)
+                    or domain[0]!=0.0 or domain[1]<=0.0):
+                raise ValueError(f"{case['case_id']}: continuous proof has no closed whole-phase domain")
+            seam = side["periodic_seam"]
+            if seam.get("status")!="PROVED" or seam.get("continuous") is not True:
+                raise ValueError(f"{case['case_id']}: actual periodic seam remains unproved")
+        lower,upper = (certificate["sides"][name] for name in ("lower","upper"))
+        if (lower["same_source_pose"]!=upper["same_source_pose"]
+                or lower["phase_domain_rad"]!=upper["phase_domain_rad"]):
+            raise ValueError(f"{case['case_id']}: directional proofs do not retain the same source/phase domain")
+    return cases
+
+
+def attach_factory_transport(report: dict, geometry_inputs: dict) -> None:
+    """Add input/output identities only to genuine full-production transport.
+
+    The output JSON is not a geometry input. This serializer never solves a
+    mesh, manufactures a missing proof, changes a signed datum or sets a
+    refused numerical report green.
+    """
+    import dt_cone_gear_spec as spec
+    if report.get("source_inputs_only") or report.get("nominal_engineering_only"):
+        raise ValueError("engineering/source-prep output is not a native factory packet")
+    report.update(
+        family="dt_cone_stock_form",schema_version=1,
+        geometry_inputs=geometry_inputs,
+        geometry_inputs_sha256=spec.geometry_sha256(geometry_inputs),
+    )
+    rows = report["rows"]
+    required = tuple(range(6,121,6))
+    try:
+        if (len(rows)!=20 or tuple(sorted(row["teeth"] for row in rows))!=required
+                or report.get("qualified") is not True):
+            raise ValueError("factory family lacks twenty fully qualified actual rows")
+        for row in rows:
+            if (row.get("qualification")!="qualified" or not row.get("selected")
+                    or row.get("oblique_phase_bound_excluded_terms")!=list(_BUDGET_EXCLUDED_TERMS)):
+                raise ValueError("selected factory row or budget geometric scope is incomplete")
+            chosen = [candidate for candidate in row["candidates"]
+                      if candidate["setting"]==row["selected"]]
+            if len(chosen)!=1:
+                raise ValueError("selected factory setting does not identify one actual report")
+            cases = chosen[0]["actual_profile_cases"]
+            full_profile_case_records(cases[0],cases[1:])
+        report.update(compiled_measurement_identity(report["source_identity"]))
+        report["selected_geometry_sha256"] = spec.geometry_sha256(
+            spec.selected_geometry_record(rows))
+    except (KeyError,ValueError,TypeError) as error:
+        report["qualified"] = False
+        report["selected_geometry_sha256"] = None
+        report["factory_transport_refusal"] = str(error)
 
 
 def json_safe(value):
@@ -1294,26 +1754,56 @@ def main() -> int:
         if tuple(sorted(source_rows))!=tuple(range(6,121,6)) or len(domain_report["rows"])!=20:
             raise ValueError("exactly twenty unique actual cone rows required")
         pose_identity = {}
+        factory_inputs = None
+        stationary_runout_authority = None
+        if args.nominal_engineering_only:
+            from dt_cone_mesh_domain import SourceDomainUnknown,tooth_cutting_runout_tir_mm
+            stationary_runout_authority = {
+                "scope":"mathematical held q0 for margin selection only; no manufacturing TIR band is assumed or qualified",
+                "assumed_tir_band_mm":None,
+                "conditional_manufacturing_acceptance":False,
+                "source_requirements":{}}
+            for body in ("cone","drum"):
+                try:
+                    value = tooth_cutting_runout_tir_mm(body)
+                    state = {"state":"source requirement","tir_mm":value,
+                        "applied_to_this_held_q0_design":False}
+                except SourceDomainUnknown as error:
+                    state = {"state":"UNKNOWN","reason":str(error)}
+                stationary_runout_authority["source_requirements"][body] = state
         if not args.source_inputs_only:
             import stock_form_mesh
+            import diagnostics.stock_form_root_sweep
         if not (args.nominal_engineering_only or args.source_inputs_only):
             import diagnostics.stock_form_contact_continuation
+            import stock_form_contact_certificate
+            import dt_cone_gear_spec as spec
+            factory_inputs = spec.geometry_inputs()
         for teeth in range(6,121,6):
-            if not source_rows[teeth].get("geometry_candidates"):
-                pose_identity[teeth] = {"domain":None,"refusal":"no source-qualified finite manufactured profile",
-                    "geometry":oblique_section_geometry(teeth),"home":home_clocking_rad(teeth)}
+            if args.source_inputs_only and not source_rows[teeth].get("geometry_candidates"):
+                pose_identity[teeth] = {"domain":None,"refusal":"source-only supplied lattice has no finite manufactured profile",
+                    "geometry":oblique_section_geometry(teeth),
+                    "saved_planar_gap_clocking_rad":home_clocking_rad(teeth)}
                 continue
             if args.nominal_engineering_only:
                 pose_identity[teeth] = {"domain":None,
                     "scope":"held source nominal engineering; no installed acceptance supplied",
-                    "geometry":oblique_section_geometry(teeth),"home":home_clocking_rad(teeth)}
+                    "geometry":oblique_section_geometry(teeth),
+                    "saved_planar_gap_clocking_rad":home_clocking_rad(teeth)}
                 continue
-            pose_identity[teeth] = {
-                "domain":asdict(configured_pose_domain(teeth,inputs,cone_radius_upper_mm=max(
+            if args.source_inputs_only:
+                domain = asdict(configured_pose_domain(teeth,inputs,cone_radius_upper_mm=max(
                     setting["outside_dia_mm"]+max(BLANK_DIA_BAND)
-                    for setting in source_rows[teeth]["geometry_candidates"])/2)),
-                "geometry":oblique_section_geometry(teeth),"home":home_clocking_rad(teeth)}
-        before = source_identity(reads.before)
+                    for setting in source_rows[teeth]["geometry_candidates"])/2))
+            else:
+                from dt_cone_mesh_domain import continuous_source_domain
+                domain = continuous_source_domain(teeth)
+            pose_identity[teeth] = {
+                "domain":domain,
+                "geometry":oblique_section_geometry(teeth),
+                "saved_planar_gap_clocking_rad":home_clocking_rad(teeth)}
+        before_payloads = {}
+        before = source_identity(reads.before,captured_payloads=before_payloads)
         active_algorithms = {path:sha for path,sha in _LOADED_ALGORITHM_SHA.items() if path in before}
         loaded_algorithm_consistent = all(before[path]==sha for path,sha in active_algorithms.items())
         if not loaded_algorithm_consistent or not all(
@@ -1321,13 +1811,23 @@ def main() -> int:
             raise RuntimeError("source bytes changed before DESIGN; no calculation launched")
         basis_path = output.with_suffix(output.suffix+".basis.json")
         basis_path.parent.mkdir(parents=True,exist_ok=True)
+        raw_root = output.with_suffix(output.suffix+".capture")
+        raw_snapshots = {
+            "before":retain_raw_source_snapshot(raw_root,"before",before_payloads),
+            "compiled":retain_raw_source_snapshot(raw_root,"compiled",_LOADED_PROJECT_PAYLOADS),
+            "parsed":retain_raw_source_snapshot(raw_root,"parsed",reads.consumed_config_payloads()),
+            "domain_pack":str(raw_root/"domain-input.json")}
+        (raw_root/"domain-input.json").write_bytes(domain_bytes)
         basis = {"state":"before DESIGN only; after-design stability not yet observed",
             "actual_compiled_project_sha256":dict(_LOADED_PROJECT_SHA),
             "before_design_sha256":before,"loaded_algorithm_sha256":active_algorithms,
-            "actual_parsed_config_sha256":dict(reads.loaded_config_sha),
+            "actual_parsed_config_sha256":{path:reads.loaded_config_sha[path]
+                for path in reads.consumed_config_payloads()},
+            "raw_source_snapshots":raw_snapshots,
             "actual_geometric_config_reads":dict(reads.values),
             "non_geometric_metadata_reads":dict(reads.non_geometry_values),
             "source_pose_inputs":pose_identity,"domain_pack_sha256":domain_sha,
+            "stationary_tooth_runout_authority":stationary_runout_authority,
             "centre_stack_source_mm":{"closing_runout":inputs.runout_mm,
                 "opening_total":inputs.opening_mm,
                 "opening_components":dict(inputs.opening_components_mm)},
@@ -1336,15 +1836,33 @@ def main() -> int:
                 "nominal_engineering_only":args.nominal_engineering_only,
                 "source_inputs_only":args.source_inputs_only},
             "production_qualified":False}
+        if factory_inputs is not None:
+            basis["geometry_inputs"] = factory_inputs
+            basis["geometry_inputs_sha256"] = spec.geometry_sha256(factory_inputs)
         basis_path.write_text(json.dumps(json_safe(basis),indent=2,allow_nan=False)+"\n",encoding="utf-8")
         print(json.dumps({"before_design_basis":str(basis_path),
                           "frozen_project_paths":len(_LOADED_PROJECT_SHA),
                           "scope":"source captured before actual DESIGN; no result claimed"}),flush=True)
-        report = study_family(domain_report,inputs,
-            six_pitch_thickness_mm=args.six_pitch_thickness_mm,maximum_error_mm=args.maximum_error_mm,
-            contact_phases=args.contact_phases,
-            source_inputs_only=args.source_inputs_only,nominal_engineering_only=args.nominal_engineering_only)
-    after = source_identity(reads.before)
+        calculation_failure = None
+        try:
+            report = study_family(domain_report,inputs,
+                six_pitch_thickness_mm=args.six_pitch_thickness_mm,maximum_error_mm=args.maximum_error_mm,
+                contact_phases=args.contact_phases,
+                source_inputs_only=args.source_inputs_only,nominal_engineering_only=args.nominal_engineering_only)
+        except Exception as error:
+            calculation_failure = error
+            report = {"qualified":False,"native_certificate":False,"rows":[],
+                "calculation_status":"failed before a family result was returned",
+                "calculation_exception":{"type":type(error).__name__,"message":str(error)},
+                "unreturned_numeric_rows":"absent from this receipt; no completed-count or partial-row claim",
+                "source_inputs_only":args.source_inputs_only,
+                "nominal_engineering_only":args.nominal_engineering_only}
+    after_payloads = {}
+    after = source_identity(reads.before,captured_payloads=after_payloads)
+    raw_snapshots.update(
+        after=retain_raw_source_snapshot(raw_root,"after",after_payloads),
+        compiled=retain_raw_source_snapshot(raw_root,"compiled",_LOADED_PROJECT_PAYLOADS),
+        parsed=retain_raw_source_snapshot(raw_root,"parsed",reads.consumed_config_payloads()))
     domain_after_sha = _byte_sha(args.domain_report)
     config_consistent = all(after.get(path)==sha for path,sha in reads.before.items())
     loaded_project_consistent = all(before.get(path)==after.get(path)==sha
@@ -1355,12 +1873,14 @@ def main() -> int:
         "loaded_algorithm_sha256":active_algorithms,
         "entry_source_capture":"CLI recompiles its exact captured entry bytes before project imports",
         "before_design_basis_path":str(basis_path),
+        "raw_source_snapshots":raw_snapshots,
         "actual_preimport_project_sha256":_LOADED_PROJECT_SHA,
         "project_code_capture":"CLI compiles the exact preimport bytes, bypassing timestamp-only bytecode caches",
         "actual_parsed_config_sha256":{path:reads.loaded_config_sha[path] for path in reads.before
                                      if path in reads.loaded_config_sha},
         "before_design_sha256":before,"after_design_sha256":after,
         "source_bytes_stable":stable,"all_source_pose_inputs":pose_identity,
+        "stationary_tooth_runout_authority":stationary_runout_authority,
         "non_geometric_metadata_reads":reads.non_geometry_values,
         "non_geometric_metadata_before_sha256":reads.non_geometry_before,
         "metadata_exclusion_scope":"known registry title/stock/process/installation/material wording and provenance only; unknown fields and fit/tolerance classes stay geometric",
@@ -1383,11 +1903,15 @@ def main() -> int:
             row["qualification"] = "refused"
             row["oblique_phase_bound_rad"] = None
             row["reason"] = "source bytes changed during actual design calculation; no qualification rebind"
+    if factory_inputs is not None and calculation_failure is None:
+        attach_factory_transport(report,factory_inputs)
     output.parent.mkdir(parents=True,exist_ok=True)
     output.write_text(json.dumps(json_safe(report),indent=2,allow_nan=False)+"\n",encoding="utf-8")
     print(json.dumps({"qualified":report["qualified"],"rows":len(report["rows"]),
                       "actual3d_mesh_rows":sum(row["actual3d_mesh_evaluated"] for row in report["rows"]),
                       "output":str(output)}),flush=True)
+    if calculation_failure is not None:
+        raise calculation_failure
     return 0 if report["qualified"] or ((args.source_inputs_only or args.nominal_engineering_only) and stable) else 2
 
 

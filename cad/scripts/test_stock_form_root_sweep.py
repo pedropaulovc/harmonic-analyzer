@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from diagnostics.stock_form_contact_3d import ContactPair, ContactSearch, Placement
+from diagnostics.stock_form_contact_3d import ContactPair, ContactSearch, GapAngles, Placement
 from diagnostics.stock_form_root_angles import RootAngularDomain
 from diagnostics.stock_form_root_sweep import (
     _difference,
@@ -712,3 +712,135 @@ def test_turned_radius_straddling_root_strip_preserves_below_turned_lobe():
     assert all(math.hypot(w.driver_local_point_mm[0], w.driver_local_point_mm[1]) < turned
                for w in bounds.witnesses if w.forbidden_offsets)
     _assert_point_controls_free(search, bounds)
+
+
+def test_default_root_scope_remains_distinct_from_complete_working_material():
+    driver = _stock()
+    radial_room = driver.blank_radius_mm-driver.root_radius_max_mm
+    assert radial_room > 0
+    search = _root_disk(driver,centre_radius=(driver.blank_radius_mm+driver.root_radius_max_mm)/2,
+                        disk_radius=min(0.001,radial_room/16),theta=driver.angular_pitch_rad/2)
+    search.gap = GapAngles(driver)
+    default = root_free_intervals(search,maximum_error_mm=0.005)
+    explicit = root_free_intervals(search,maximum_error_mm=0.005,root_only=True)
+    complete = root_free_intervals(search,maximum_error_mm=0.005,root_only=False)
+    assert default == explicit
+    assert default.status == complete.status == "resolved"
+    assert default.material_scope == "driver_root_material"
+    assert complete.material_scope == "driver_full_material"
+    assert default.free_inner == ((-search.pitch/2,search.pitch/2),)
+    assert not _member(complete.free_outer,0)
+    assert any(w.collision_at_declared_phase for w in complete.witnesses)
+    assert any("full-material" in w.proof for w in complete.witnesses)
+    assert complete.physical_driver_teeth == tuple(range(driver.teeth))
+    assert complete.physical_driven_teeth == search.driven_teeth
+    assert set(complete.physical_patch_inventory) == {
+        f"{tooth}:{segment.name}" for tooth in search.driven_teeth for segment in search.segments}
+    assert len(complete.physical_patch_inventory) == len(search.driven_teeth)*len(search.segments)
+
+
+@pytest.mark.parametrize("selector",[0,1,None,"full"])
+def test_material_scope_selector_is_not_a_truthy_alias(selector):
+    result = root_free_intervals(_root_disk(_stock()),root_only=selector)
+    assert result.status == "invalid" and not result.free_inner
+    assert "root_only" in result.reason
+    assert result.material_scope == "invalid_selector"
+
+
+@pytest.mark.parametrize("stretch",[4e-13,-4e-13])
+def test_containment_uses_true_inverse_of_accepted_near_orthogonal_frame(stretch):
+    radius = 1000.0
+    search = _BoundedCylinderSearch(_stock(),_Cylinder(radius),(radius,0.0,0.0),half_face=10.0)
+    search.placement.driven_frame = ((1+stretch,0.0,0.0),(0.0,1.0,0.0),(0.0,0.0,1.0))
+    # These distinguish opposite containment classifications, not merely two
+    # numerically unequal matrices. The one-box cap avoids surface traversal.
+    assert (radius/(1+stretch) < radius) != (radius*(1+stretch) < radius)
+    result = root_free_intervals(search,max_boxes=1)
+    if stretch > 0:
+        assert result.status == "contained_collision"
+        assert result.containment_proof == "offset-invariant interior material witness"
+        assert result.witnesses[0].collision_at_declared_phase
+    else:
+        assert result.status == "budget_exhausted"
+        assert result.containment_proof == "driver-root axis point outside paid driven finite cylinder"
+
+
+@pytest.mark.parametrize("payment",["radial_pose","required_clearance"])
+def test_containment_pays_near_orthogonal_directional_metric(payment):
+    contraction,allowance = 4e-13,10.0
+    local_radius = 1+allowance+contraction*allowance/2
+    search = _BoundedCylinderSearch(_stock(),_Cylinder(1.0),
+                                   ((1-contraction)*local_radius,0.0,0.0),half_face=100.0)
+    search.placement.driven_frame = ((1-contraction,0.0,0.0),(0.0,1.0,0.0),(0.0,0.0,1.0))
+    required = allowance if payment == "required_clearance" else 0.0
+    search.radial_error_mm = allowance if payment == "radial_pose" else 0.0
+    assert 1+allowance < local_radius < 1+allowance/(1-contraction)
+    result = root_free_intervals(search,required_root_air_mm=required,max_boxes=1)
+    assert result.status == "containment_refused"
+    assert "outside" not in result.containment_proof
+
+
+def test_root_material_witness_uses_true_driver_inverse_not_source_transpose():
+    driver = _stock()
+    search = _root_disk(driver,centre_radius=driver.root_radius_min_mm-.1,disk_radius=.001)
+    stretch = 4e-13
+    search.placement.driver_frame = ((1+stretch,0.0,0.0),(0.0,1.0,0.0),(0.0,0.0,1.0))
+    result = root_free_intervals(search)
+    assert result.status == "resolved"
+    witnesses = [value for value in result.witnesses if value.driven_tooth is not None]
+    assert witnesses and any(value.collision_at_declared_phase for value in witnesses)
+    for witness in witnesses:
+        x = witness.world_point_mm[0]-search.placement.driver_origin_mm[0]
+        true_local,transposed = x/(1+stretch),x*(1+stretch)
+        assert abs(true_local-transposed) > 1e-12
+        assert witness.driver_local_point_mm[0] == pytest.approx(true_local,rel=0,abs=2e-14)
+
+
+def test_full_material_containment_refusal_has_no_root_scope_alias():
+    driver = _stock()
+    source = _Cylinder(2*driver.blank_radius_mm,1.1*driver.blank_radius_mm)
+    search = _BoundedCylinderSearch(driver,source,(0.0,0.0,0.0),half_face=2.0)
+    result = root_free_intervals(search,root_only=False)
+    assert result.status == "containment_refused"
+    assert result.material_scope == "driver_full_material"
+    assert "interior material overlap" in result.reason and "root" not in result.reason
+    assert result.free_inner == () and result.free_outer and not result.witnesses
+
+
+@pytest.mark.parametrize("payment",["parameter_radius","primitive_error"])
+def test_relative_metric_changes_actual_initial_root_box_classification(payment):
+    # Large but finite exact cylinder controls separate a ~4e-13 accepted
+    # frame defect from arithmetic rounding. The DRIVER frame is contracted:
+    # ||F_driver^-1 F_driven|| > 1 (contracting the driven frame would not do).
+    # Exactly one initial inventory is allowed. With the paid metric the
+    # closest boxes reach genuine ROOT material and need subdivision; dropping
+    # the named scaling falsely prunes every box and reports the pitch FREE.
+    driver = _stock()
+    radius,contraction,half_face = 1e5,4e-13,1e-12
+    source_error = 1e6 if payment == "primitive_error" else 0.0
+    driven = _Cylinder(radius,geometry_error_bound_mm=source_error)
+    native_rho = driven.external_boundary_segments()[0].speed_bound_mm/2+half_face
+    gain = contraction/(1-contraction)
+    base = driver.root_radius_max_mm+native_rho+source_error
+    arithmetic_reserve = 512*np.finfo(float).eps*(1+base+radius)
+    margin = (gain*(native_rho+source_error/2) if payment == "primitive_error"
+              else gain*native_rho/2)
+    local_midpoint = base+arithmetic_reserve+margin
+
+    def placed(scale):
+        search = _BoundedCylinderSearch(
+            driver,driven,(scale*local_midpoint+radius,0.0,0.0),half_face=half_face)
+        search.placement.driver_frame = ((scale,0.0,0.0),(0.0,scale,0.0),(0.0,0.0,scale))
+        search.gear_phase = math.pi
+        return search
+
+    identity = placed(1.0)
+    initial_boxes = len(identity.driven_teeth)*len(identity.segments)
+    reference = root_free_intervals(identity,max_boxes=initial_boxes)
+    contracted = root_free_intervals(placed(1-contraction),max_boxes=initial_boxes)
+    assert reference.status == "resolved"
+    assert reference.free_inner == ((-identity.pitch/2,identity.pitch/2),)
+    assert contracted.parameter_radius_metric_upper > 1+contraction/2
+    assert contracted.status == "budget_exhausted"
+    assert contracted.boxes == initial_boxes
+    assert contracted.free_inner == ()

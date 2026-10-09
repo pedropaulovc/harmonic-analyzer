@@ -22,7 +22,11 @@ CUTTER_DETAIL_LINE_CHARS = 108
 def root_to_bore_web_min_mm(teeth: int) -> float:
     """Print-worst radial ligament; the fitted D-flat only leaves more metal."""
     minimum, _maximum = spec.floor_limits_mm(teeth)
-    return (minimum - (spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0])) / 2.0
+    scale = 10**spec.BORE_BAND_PLACES
+    bore_maximum = math.ceil(
+        (spec.bore_dia_mm(teeth) + spec.BORE_DIA_BAND[0]) * scale - 1e-9
+    ) / scale
+    return (minimum - bore_maximum) / 2.0
 
 
 def cutter_description(teeth: int) -> str:
@@ -48,19 +52,23 @@ def gear_data(teeth: int) -> str:
     gap = math.ceil(mesh["noncarrying_gap_mm"] * 1e4) / 1e4
     te = math.ceil(mesh["te_bound_rad"] * 1e6) / 1e6
     web = math.floor(root_to_bore_web_min_mm(teeth) * 100.0) / 100.0
+    whole_depth_max = math.ceil(max(
+        corner.blank_radius_mm - corner.root_radius_min_mm
+        for corner in spec.manufacturing_corner_profiles(teeth)
+    ) * 1e4) / 1e4
     rows = (
         ("CONFIGURATION / TEETH", f"T{teeth:03d} / {teeth}"),
         ("DIAMETRAL PITCH / PRESSURE ANGLE", f"{spec.DIAMETRAL_PITCH:.2f} / {spec.PRESSURE_ANGLE_DEG:.1f} DEG"),
         ("CUTTER", cutter_description(teeth)),
         ("TOOL T / PLUNGE (mm, REF)", f"{profile.radial_translation_mm:.4f} / {profile.plunge_mm:.4f}"),
-        ("WHOLE DEPTH MAX / ROOT ARC R (mm, REF)", f"{profile.blank_radius_mm - profile.root_radius_min_mm:.4f} / {profile.template.root_radius_mm:.4f}"),
+        ("WHOLE DEPTH MAX / ROOT ARC R (mm, REF)", f"{whole_depth_max:.4f} / {profile.template.root_radius_mm:.4f}"),
         ("TOOTH FORM", "FINITE INVOLUTE; RADIAL BELOW BASE" if profile.template.root_radius_mm < profile.template.base_radius_mm else "FINITE INVOLUTE; ABOVE-BASE ROOT ARC"),
         ("MATE", f"{CYLINDER_MATE_NUMBER}, 120T; INCLINED AXES"),
         ("BACKLASH AT ASSEMBLY (mm)", f"{minimum:.2f} TO {maximum:.2f}"),
-        ("PLANAR STOCK-FORM COVERAGE MIN (REF)", f"{coverage:.2f}"),
+        ("ACTUAL 3D STOCK-FORM COVERAGE MIN (REF)", f"{coverage:.2f}"),
         ("PHASE RESERVE (rad, REF)", f"{reserve:.6f}"),
         ("NONCARRYING GAP MAX (mm, REF)", f"{gap:.4f}"),
-        ("SIGNED TE PLANAR @ ALIGNMENT ZERO (+/-rad, REF)", f"{te:.6f}"),
+        ("UNTARED 21-STALL SIGNED TE BOUND (+/-rad, REF)", f"{te:.6f}"),
         ("ROOT RADIAL MIN/MAX (mm, REF)", f"{profile.root_radius_min_mm:.3f} / {profile.root_radius_max_mm:.3f}"),
         ("WEB MIN (mm, REF)", f"{web:.2f}"),
     )

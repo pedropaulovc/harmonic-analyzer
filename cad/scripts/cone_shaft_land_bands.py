@@ -41,6 +41,19 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
     GEAR_SEAT_BAND,  # Sec3: T018 seat
     RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + MHA-VN-016 stack collar
 )
+# Shared displayed precision: native drawing and physical-limit consumers
+# read the same per-section table; no unrounded-nominal acceptance mapping.
+LAND_DIA_PLACES = (3, 3, 3, 3, 3)
+LAND_AF_PLACES = (None, 3, 3, 3, 3)
+
+
+def land_finished_dia_limits_mm(native_diameter_mm: float, section: int) -> tuple[float, float]:
+    """Absolute PRINTED (MIN,MAX), with the retained named land size band."""
+    nominal = round(native_diameter_mm, LAND_DIA_PLACES[section])
+    upper, lower = SECTION_DIA_BANDS[section]
+    return nominal+lower, nominal+upper
+
+
 
 # One actual terminal-size reader, independent of gear/collar/shaft specs.
 # The gear owner checks this against its current cutter-owned floor limits;
@@ -50,12 +63,9 @@ TERMINAL_DIA_IN = 1.0 / 32.0
 TERMINAL_DIA_MM = TERMINAL_DIA_IN * MM_PER_IN
 # Manufacturing limits follow the ACTUAL displayed size, not hidden model
 # digits. Exact native 1/32 representation is retained separately above.
-TERMINAL_DIA_PLACES = 3
+TERMINAL_DIA_PLACES = LAND_DIA_PLACES[4]
 TERMINAL_PRINTED_DIA_MM = round(TERMINAL_DIA_MM, TERMINAL_DIA_PLACES)
-TERMINAL_FINISHED_DIA_LIMITS_MM = (
-    TERMINAL_PRINTED_DIA_MM + RUNNING_DIA_BAND[1],
-    TERMINAL_PRINTED_DIA_MM + RUNNING_DIA_BAND[0],
-)
+TERMINAL_FINISHED_DIA_LIMITS_MM = land_finished_dia_limits_mm(TERMINAL_DIA_MM, 4)
 # Retention requirements live with the land, not in the collar consumer:
 # the terminal D-flat must accommodate the real ground dog and its complete
 # fit/position budget. Intermediate flats retain the historical ~8% depth.
@@ -80,9 +90,15 @@ TIP_SCREW_THREAD_RADIAL_PLAY_MM = (0.0772 - 0.0728) * MM_PER_IN / 2.0
 TERMINAL_FLAT_EDGE_BREAK_MAX = 0.020
 # Collar geometry governing the loaded bore/contact span; the collar spec
 # consumes these readers so the terminal retention law cannot fork its width.
-TIP_COLLAR_WIDTH_MM = 11.0
+# Single coupled owned-geometry delta: move the large collar material, tip
+# and pivot together without changing the gear stations or any retained band.
+# Selected .50-mm coupled shift: parent-authorized full-P1 engineering DESIGN
+# covered all 2400 closed material-pair cells. Not a stock/native qualification
+# or a global minimum outside the released [.50,1.00]-mm candidate domain.
+TIP_COLLAR_BODY_NORTH_SHIFT_MM = 0.50
+TIP_COLLAR_WIDTH_MM = 11.0 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
 TIP_COLLAR_WIDTH_BAND_MM = printed_band_mm(2)
-TIP_COLLAR_NOSE_LENGTH_MM = 3.0
+TIP_COLLAR_NOSE_LENGTH_MM = 3.0 + TIP_COLLAR_BODY_NORTH_SHIFT_MM
 TIP_COLLAR_TAP_STATION_MM = (TIP_COLLAR_NOSE_LENGTH_MM + TIP_COLLAR_WIDTH_MM) / 2.0
 TIP_COLLAR_FREE_EDGE_BREAK_MAX_MM = 0.25
 # Conservative AF design radius retains the original exact-native h lower
@@ -212,3 +228,16 @@ SECTION_FLAT_AF: tuple[float | None, ...] = (
     2.921,  # Sec3: Ø3.175, 0.254 deep
     TERMINAL_FLAT_AF_MM,  # Sec4: complete dog retention budget, same named AF band
 )
+
+
+def land_finished_af_limits_mm(section: int) -> tuple[float, float]:
+    """Absolute PRINTED (MIN,MAX) of a real D-flat; journal has no AF."""
+    native = SECTION_FLAT_AF[section]
+    places = LAND_AF_PLACES[section]
+    if native is None or places is None:
+        raise ValueError("round pivot journal has no finished across-flat limits")
+    nominal = round(native, places)
+    return nominal+FLAT_AF_BAND[1], nominal+FLAT_AF_BAND[0]
+
+
+TERMINAL_FINISHED_AF_LIMITS_MM = land_finished_af_limits_mm(4)

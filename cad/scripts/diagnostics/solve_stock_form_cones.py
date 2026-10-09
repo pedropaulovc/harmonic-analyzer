@@ -44,8 +44,6 @@ THICKNESS_STEP_MM = 0.001
 BLANK_DIA_BAND = (0.10, -0.10)
 TOOTH_THICKNESS_BAND = (0.075, -0.075)
 BACKLASH_ACCEPTANCE_MM = (0.06, 0.41)
-FLOOR_AIR_MIN_MM = 0.02
-DRUM_ROOT_AIR_MIN_MM = 0.10
 GAP_FOOT_WIDTH_MIN_MM = 0.32
 HANDOVER_JUMP_MAX_MM = 0.005
 # The inherited low-count floors are historical planar screen comparisons.
@@ -86,10 +84,6 @@ class DesignInputs:
         web_root = self.maximum_bore_mm(teeth) / 2.0 + self.web_min_mm(teeth)
         return max(web_root, 1.173) if teeth == 6 else web_root
 
-    def root_max_mm(self, teeth: int) -> float:
-        return self.centre_mm(teeth) - self.runout_mm - max(
-            gear.blank_radius_mm for gear in self.drum_corners
-        ) - FLOOR_AIR_MIN_MM
 
 
 def configured_inputs(*, maximum_error_mm: float = 0.0002) -> DesignInputs:
@@ -130,6 +124,8 @@ def oblique_section_geometry(teeth: int) -> dict[str, Any]:
     true 3D/affine-contact consumer; it does not invent a scalar TE bound.
     """
     import cone_line
+    from dt_cone_mesh_domain import manufactured_datum_mapping
+    datum = manufactured_datum_mapping(teeth)
 
     face = math.floor(cone_line.SEAT_PITCH * 1e4) / 1e4
     j = (120 - teeth) // 6
@@ -141,6 +137,12 @@ def oblique_section_geometry(teeth: int) -> dict[str, Any]:
     return {
         "cone_centre_mm": centre,
         "cone_axis": (cone_line.SIN_I, 0.0, cone_line.COS_I),
+        "native_gap_clocks_rad": [
+            datum["driver_canonical_gap_clock_rad"],
+            datum["driven_canonical_gap_clock_rad"],
+        ],
+        "mechanical_zero_rad": datum["mechanical_zero_rad"],
+        "manufactured_datum_mapping": datum,
         "cone_radial_x": (cone_line.COS_I, 0.0, -cone_line.SIN_I),
         "cone_radial_y": (0.0, 1.0, 0.0),
         "cone_face_width_mm": face,
@@ -199,7 +201,7 @@ def _profile_probe(teeth: int, cutter: Any, translation: float) -> StockFormProf
 
 
 def _translation_domain(teeth: int, cutter: Any, inputs: DesignInputs) -> tuple[float, float]:
-    """Bound all possible tool origins by physical root web and closing floor air.
+    """Bound tool origins by physical web, finite support and periodic land.
 
     A reference root-arc endpoint has (x,y), and positive physical tool origins
     satisfy sqrt((T+x)^2+y^2)=R.  The opposite negative-origin branch would put
@@ -209,20 +211,18 @@ def _translation_domain(teeth: int, cutter: Any, inputs: DesignInputs) -> tuple[
     root = cutter.root_radius_mm
     x, y = cutter.root_point(cutter.root_half_angle_rad)
     minimum = inputs.root_min_mm(teeth)
-    maximum = inputs.root_max_mm(teeth)
-    if maximum < minimum or maximum < abs(y):
-        return (1.0, 0.0)
-    # Bisector and arc-endpoint radii are the only spur root extrema. Both
-    # inequalities are required, including the negative-T case.
-    lower = max(minimum - root, math.sqrt(max(0.0, minimum * minimum - y * y)) - x)
-    upper = min(maximum - root, math.sqrt(maximum * maximum - y * y) - x)
-    tip_x, tip_y = cutter.flank_point(cutter.flank_parameter_max)
     pitch = teeth * cutter.module_mm / 2.0
+    if pitch < minimum or pitch < abs(y):
+        return (1.0, 0.0)
+    # Both actual root-arc extrema must clear the physical web and remain
+    # below the declared pitch inspection circle, not a filled collision disk.
+    lower = max(minimum - root, math.sqrt(max(0.0, minimum * minimum - y * y)) - x)
+    upper = min(pitch - root, math.sqrt(max(0.0, pitch * pitch - y * y)) - x)
+    tip_x, tip_y = cutter.flank_point(cutter.flank_parameter_max)
     # Pitch thickness is a declared inspection size. Its circle must lie on
     # finite working support; radial below-base continuation is not an
     # invented upper working flank.
     lower = max(lower, math.sqrt(max(0.0, pitch * pitch - tip_y * tip_y)) - tip_x)
-    upper = min(upper, pitch - root)
     # Keep the physical root lobes from touching the next periodic gap.
     half_pitch = math.pi / teeth
     lower = max(lower, y / math.tan(half_pitch) - x + 1e-10)
@@ -244,7 +244,7 @@ def thickness_translation(teeth: int, cutter: Any, thickness: float, domain: tup
     """Use the sole core authority, then apply the physical manufacturing domain."""
     translation = translation_for_pitch_tooth_thickness(teeth, cutter, thickness)
     if not domain[0] - 1e-9 <= translation <= domain[1] + 1e-9:
-        raise ValueError(f"actual thickness {thickness:g} lies outside root/web/floor domain")
+        raise ValueError(f"actual thickness {thickness:g} lies outside physical root/web/support domain")
     return translation
 
 
@@ -269,10 +269,6 @@ def geometry_margins(teeth: int, outside_dia: float, translations: tuple[float, 
         "finite_support_mm": support - maximum_tip,
         "blank_above_root_mm": minimum_tip - root_max,
         "web_mm": root_min - inputs.maximum_bore_mm(teeth) / 2.0 - inputs.web_min_mm(teeth),
-        "floor_air_mm": inputs.root_max_mm(teeth) - root_max,
-        "floor_window_dia_mm": 2.0 * (inputs.root_max_mm(teeth) - root_min) - 0.04,
-        "drum_root_air_mm": inputs.centre_mm(teeth) - inputs.runout_mm - maximum_tip
-        - max(gear.root_radius_max_mm for gear in inputs.drum_corners) - DRUM_ROOT_AIR_MIN_MM,
         "gap_foot_width_mm": 2.0 * abs(cutter.root_point(cutter.root_half_angle_rad)[1]) - GAP_FOOT_WIDTH_MIN_MM,
     }
     if teeth == 6:
@@ -293,17 +289,12 @@ def geometry_margins(teeth: int, outside_dia: float, translations: tuple[float, 
     return margins
 
 
-def _od_domain(teeth: int, translations: tuple[float, float], cutter: Any, inputs: DesignInputs,
+def _od_domain(teeth: int, translations: tuple[float, float], cutter: Any,
                *, probes: tuple[StockFormProfile, ...] | None = None) -> tuple[float, float]:
     if probes is None:
         probes = tuple(_profile_probe(teeth, cutter, translation) for translation in translations)
     lower = 2.0 * max(profile.root_radius_max_mm for profile in probes) - BLANK_DIA_BAND[1]
-    upper = min(
-        2.0 * min(profile.support_radius_max_mm for profile in probes) - BLANK_DIA_BAND[0],
-        2.0 * (inputs.centre_mm(teeth) - inputs.runout_mm
-               - max(gear.root_radius_max_mm for gear in inputs.drum_corners)
-               - DRUM_ROOT_AIR_MIN_MM) - BLANK_DIA_BAND[0],
-    )
+    upper = 2.0 * min(profile.support_radius_max_mm for profile in probes) - BLANK_DIA_BAND[0]
     return lower, upper
 
 
@@ -516,7 +507,10 @@ def evaluate_setting(teeth: int, outside_dia: float, thickness: float, cutter: A
             2.0 * min(_profile_probe(teeth, cutter, translation).root_radius_min_mm
                       for translation in translations) * 1000.0 + 1e-9
         ) / 1000.0
-        result["floor_max_dia_mm"] = math.floor(inputs.root_max_mm(teeth) * 2000.0 + 1e-9) / 1000.0
+        result["floor_max_dia_mm"] = math.ceil(
+            2.0 * max(_profile_probe(teeth, cutter, translation).root_radius_max_mm
+                      for translation in translations) * 1000.0
+        ) / 1000.0
     return result
 
 def setting_score(margins: dict[str, float], module_mm: float) -> float:
@@ -537,7 +531,7 @@ def solve_count(teeth: int, inputs: DesignInputs, *, six_pitch_thickness_mm: flo
         "qualification_scope": "transverse_planar_diagnostic_only" if analyse_mesh else "dimensional_only",
         "planar_mesh_evaluated": analyse_mesh, "geometry_candidates": [],
         "translation_domain_mm": domain, "root_min_required_mm": inputs.root_min_mm(teeth),
-        "root_max_air_mm": inputs.root_max_mm(teeth), "coverage_required": UNION_COVERAGE_MIN,
+        "coverage_required": UNION_COVERAGE_MIN,
         "historical_coverage_floor": HISTORICAL_COVERAGE_MIN.get(teeth, 1.1),
         "cutter": {"reference_teeth": cutter.reference_teeth, "root_radius_mm": cutter.root_radius_mm,
                    "tip_radius_mm": cutter.tip_radius_mm,
@@ -545,7 +539,7 @@ def solve_count(teeth: int, inputs: DesignInputs, *, six_pitch_thickness_mm: flo
                    if teeth == 6 else math.pi * inputs.module_mm / 2.0,
                    "name": cutter.name, "source": cutter.source}}
     if domain[0] > domain[1]:
-        row.update(binding_constraints=["root_web_support_vs_floor_air"], lattice_points=0,
+        row.update(binding_constraints=["physical_root_web_vs_finite_pitch_support"], lattice_points=0,
                    finite_lattice_exhausted=True, no_solution_certificate=True)
         return row
     row["certificate_scope"] = (
@@ -566,7 +560,7 @@ def solve_count(teeth: int, inputs: DesignInputs, *, six_pitch_thickness_mm: flo
     row["required_thickness_span_mm"] = TOOTH_THICKNESS_BAND[0] - TOOTH_THICKNESS_BAND[1]
     ticks = lattice_ticks(*thickness_bounds, THICKNESS_STEP_MM)
     if not ticks:
-        row.update(binding_constraints=["thickness_band_vs_root_web_floor_air"], lattice_points=0,
+        row.update(binding_constraints=["thickness_band_vs_physical_root_web"], lattice_points=0,
                    thickness_domain_deficit_mm=thickness_bounds[0] - thickness_bounds[1],
                    finite_lattice_exhausted=True, no_solution_certificate=True)
         return row
@@ -582,7 +576,7 @@ def solve_count(teeth: int, inputs: DesignInputs, *, six_pitch_thickness_mm: flo
         thickness = round(tick * THICKNESS_STEP_MM, 3)
         translations = _corner_translations(teeth, cutter, thickness, domain)
         probes = tuple(_profile_probe(teeth, cutter, translation) for translation in translations)
-        od_bounds = _od_domain(teeth, translations, cutter, inputs, probes=probes)
+        od_bounds = _od_domain(teeth, translations, cutter, probes=probes)
         thickness_sections.append({"pitch_thickness_mm": thickness,
             "translation_limits_mm": translations, "outside_dia_domain_mm": od_bounds})
         for od_tick in lattice_ticks(*od_bounds, OD_STEP_MM):

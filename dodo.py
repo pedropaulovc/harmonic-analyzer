@@ -1882,6 +1882,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
             # sheet that prints another part's registry number must re-run, and
             # miss the cache, when that row changes without any geometry change.
             *_config_deps(script, spec.part, "drawing"),
+            *data_deps_of(script),
             *(str(_resolved(path)) for path in spec.assets),
         }
     )
@@ -2428,11 +2429,11 @@ def _recipe_files(stem: str) -> list[str]:
     """Files whose change forces a FULL rebuild of <stem> (re-insert/re-mate)
     rather than a part-only refresh: the assembly script, its hooks, the helper
     modules it transitively imports (``_helper_deps`` -> ``module_deps_of``, incl.
-    _assembly/_transforms), and the config docs THIS assembly actually reads
+    _assembly/_transforms), the config docs THIS assembly actually reads
     (``_config_deps``; a placement like channels.station_pitch_mm changing must
-    re-insert components at new coordinates, which an in-place reload cannot do).
-    The fine-grained config set means an edit to a YAML this assembly never reads
-    no longer forces a spurious ~500 s FULL re-insert."""
+    re-insert components at new coordinates, which an in-place reload cannot do),
+    and explicitly named runtime data inputs. Unread config/data changes no longer
+    force a spurious ~500 s FULL re-insert."""
     asm_script = script_for(stem)
     hooks = [str((SCRIPTS_DIR / h).resolve()) for h in POST_ASSEMBLY.get(stem, ())]
     # An assembly that GENERATES parts in-script (build_channel_assembly's
@@ -2455,6 +2456,7 @@ def _recipe_files(stem: str) -> list[str]:
         *hooks,
         *_helper_deps(asm_script),
         *_config_deps(asm_script, stem, "assembly"),
+        *data_deps_of(asm_script),
         *template,
         _submodule_assembly_dep(),
     ]
@@ -3103,6 +3105,7 @@ def task_check():
         # Integ-branch tests that guard caught un-enrolled at #877 round 4.
         SCRIPTS_DIR / "test_dt_cone_gear_mesh_design.py",
         SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
+        SCRIPTS_DIR / "test_dt_cone_stock_form_factory.py",
         # Finite stock-cutter geometry, actual contact and the printed cone
         # sizing lattice are production design contracts, not native probes.
         SCRIPTS_DIR / "test_stock_form_cutter.py",
@@ -3659,14 +3662,16 @@ def task_check():
     )
     for name, spec in specs.items():
         stamp = str(REPORTS / f"check-{name}.ok")
-        # A gate's stamp must go stale whenever code or config it EXECUTES changes,
-        # so every .py entry point on its command line contributes its local import
-        # closure (lazy imports included) and the config that closure reads. Hand
-        # lists drifted: check:math never listed build_summing_assembly.py or
-        # gooseneck_geom.py, so a gooseneck edit left it green without running
-        # (2026-09-23). The hand-listed deps above stay for what an import graph
-        # cannot see: runtime-read data, scanned sources, dodo.py, and the tooling
-        # modules module_deps_of excludes. test_dodo_recipe pins the invariant.
+        # A gate's stamp must go stale whenever code, config or explicitly named
+        # runtime data it EXECUTES changes. Every .py entry point contributes its
+        # local import closure (lazy imports included), config and data read sets.
+        # A test_* entry's OWN literals can describe intentionally absent fixture
+        # inputs; only its imported modules supply required named runtime data.
+        # Hand lists drifted: check:math missed build_summing_assembly.py and
+        # gooseneck_geom.py, so a gooseneck edit left it green (2026-09-23).
+        # The hand-listed deps above stay for unrecognized runtime data, scanned
+        # sources, dodo.py, and tooling modules module_deps_of excludes.
+        # test_dodo_recipe pins the invariant.
         executed = {
             path
             for entry in (Path(arg) for arg in spec["cmd"] if arg.endswith(".py"))
@@ -3674,6 +3679,7 @@ def task_check():
                 str(entry.resolve()),
                 *module_deps_of(entry),
                 *_config_deps(entry),
+                *data_deps_of(entry, include_entry=not entry.name.startswith("test_")),
             )
         }
         yield {
