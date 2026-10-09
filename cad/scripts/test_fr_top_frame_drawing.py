@@ -899,6 +899,76 @@ def test_hanger_datum_leaders_run_clear_of_the_slot_frames() -> None:
     assert by > centre[1] - part.INNER_Z * m_per_mm
 
 
+def test_rear_slot_frame_stands_clear_of_section_f_f() -> None:
+    # Farm run 20261009T174542021Z: the rear frame at (78, 218) mm printed
+    # its text [78.9, 212.1]..[128.6, 217.2] under both F labels and F-F's
+    # left arrow (text-clearance 3.87 mm short of 1.78 mm air; text-on-line
+    # 3.05 mm), which REPORT mode on fr-top-frame does not enforce.
+    from _layout_geometry import Box, Segment, segment_box_distance
+
+    centre, m_per_mm = drawing.HUB_BOTTOM_CENTER, drawing._HUB_BOTTOM_M_PER_MM
+    cut_y = centre[1] + drawing.HANGER_SECTION_Z * m_per_mm
+    arrows = [centre[0] + x * m_per_mm for x in drawing.HANGER_SECTION_CUT_X]
+    # Each F-F arrow runs 12 mm sheet-down from the cutting line; its letter
+    # prints [-1.2, +1.8] x [-20.25, -14.15] mm about the line's end (run
+    # 20261009T174542021Z: arrows x 91.33 / 118.67 from y 230.05, letters
+    # [90.1, 209.8]..[93.1, 215.9] and [117.4, 209.8]..[120.4, 215.9]).
+    assert arrows == pytest.approx([0.09133, 0.11867], abs=5e-5)
+    assert cut_y == pytest.approx(0.23005, abs=5e-5)
+    section_ink: dict[str, Box | Segment] = {
+        "cutting line": Segment(arrows[0], cut_y, arrows[1], cut_y),
+    }
+    for side, x in zip(("left", "right"), arrows):
+        section_ink[f"{side} arrow"] = Segment(x, cut_y, x, cut_y - 0.012)
+        section_ink[f"{side} F"] = Box(
+            x - 0.0012, cut_y - 0.02025, x + 0.0018, cut_y - 0.01415
+        )
+    fx, fy = drawing.HANGER_SLOT_FRAME_XY["rear"]
+    ox0, oy0, ox1, oy1 = drawing.HANGER_SLOT_FRAME_OUTLINE
+    outline = Box(fx + ox0, fy + oy0, fx + ox1, fy + oy1)
+    # The leader: the shoulder off the outline's left end at mid height, then
+    # to the outer end of the rear slot (its arc's bottom, under the line).
+    knee = (outline.xmin - drawing.HANGER_SLOT_FRAME_SHOULDER, (outline.ymin + outline.ymax) / 2)
+    slot_end = (
+        centre[0] + (part.SLOT_X - part.SLOT_FLAT / 2) * m_per_mm,
+        centre[1] + (part.STUD_Z_REAR - drawing.HANGER_SLOT_WIDTH / 2) * m_per_mm,
+    )
+    leader = [
+        Segment(outline.xmin, knee[1], *knee),
+        Segment(*knee, *slot_end),
+    ]
+    for name, ink in section_ink.items():
+        if isinstance(ink, Box):
+            gap = max(
+                ink.ymin - outline.ymax, outline.ymin - ink.ymax,
+                ink.xmin - outline.xmax, outline.xmin - ink.xmax,
+            )
+            # The audit asked for 1.78 mm of air between the two texts.
+            assert gap >= 0.00178, name
+            for run in leader:
+                assert segment_box_distance(run, ink) >= 0.00178, name
+        else:
+            assert segment_box_distance(ink, outline) >= 0.00178, name
+            for run in leader:
+                assert _segments_apart(run, ink), name
+    # The frame stays in the window right of the crossbar, its leader's knee
+    # right of the crossbar's edge, and its widest print inside the rail.
+    bar_right = centre[0] + part.BAR_X1 * m_per_mm
+    assert knee[0] > bar_right
+    assert outline.xmax < centre[0] + part.INNER_X * m_per_mm
+    assert outline.ymin > max(drawing.HANGER_SLOT_FRAME_XY["front"][1], drawing.HANGER_DATUM_SYMBOL_XY["B"][1] + 0.007)
+
+
+def _segments_apart(a, b) -> bool:
+    """True when two segments neither cross nor touch."""
+
+    def side(p, q, r) -> float:
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    a0, a1, b0, b1 = (a.x0, a.y0), (a.x1, a.y1), (b.x0, b.y0), (b.x1, b.y1)
+    return side(a0, a1, b0) * side(a0, a1, b1) > 0 or side(b0, b1, a0) * side(b0, b1, a1) > 0
+
+
 def test_slip_hole_callout_states_process_and_purpose_briefly() -> None:
     text = spec.HANGER_PIN_HOLE_CALLOUT
     assert text.startswith("2X ") and "REAM" in text and "MHA-VN-051" in text

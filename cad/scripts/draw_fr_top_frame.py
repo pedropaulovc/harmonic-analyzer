@@ -409,10 +409,16 @@ HANGER_SECTION_CAPTION_XY = (0.070, 0.040)
 # one, its tag above the rear rail so its leader climbs away from F-F's
 # right arrow.  Each slot's position
 # frame, B|C> in front and C|B> at the rear (the translation modifier frees
-# the slot along the line to the other station's round hole), stands in the
-# window left of the crossbar, between its junction gussets and right of
-# detail C's fence.  The FRONT slot's width (the rear slot lies on F-F's
-# cutting line) runs left of the front gusset, its text on a leader into
+# the slot along the line to the other station's round hole).  The front
+# frame stands in the window left of the crossbar, between its junction
+# gussets and right of detail C's fence.  The rear one stands in the window
+# right of the crossbar, under F-F's right label: left of the crossbar its
+# text sat under both F labels and F-F's left arrow (farm run
+# 20261009T174542021Z: text-clearance 3.87 mm, text-on-line 3.05 mm), and
+# above the labels its leader would cross F-F's cutting line to the slot.
+# Its leader drops from the frame's left end, between the crossbar's right
+# edge and the right arrow, to the slot rim under the cutting line.  The
+# FRONT slot's width (the rear slot lies on F-F's cutting line) runs left of the front gusset, its text on a leader into
 # the band under the front rail, between the locator's label and the
 # land's dimension line.
 _HUB_BOTTOM_M_PER_MM = HUB_BOTTOM_SCALE[0] / HUB_BOTTOM_SCALE[1] / 1000.0
@@ -436,11 +442,16 @@ def hanger_datum_pick(
     reach = math.hypot(dx, dy)
     radius = HANGER_PIN_HOLE_DIA / 2.0 * _HUB_BOTTOM_M_PER_MM
     return (centre[0] + radius * dx / reach, centre[1] + radius * dy / reach)
-HANGER_SLOT_FRAME_XY = {"front": (0.078, 0.185), "rear": (0.078, 0.218)}
-# Each slot frame's printed text box from its frame_xy (sheet m), as farm
-# run 20261009T171439353Z measured the front one: [78.9, 179.1]..[128.6,
-# 184.2] mm from (78, 185).
+HANGER_SLOT_FRAME_XY = {"front": (0.078, 0.185), "rear": (0.116, 0.2075)}
+# Each slot frame's printed text box and outline from its frame_xy (sheet m),
+# as farm runs measured them with the translation vector printed (the widest
+# the frame has printed): text [78.9, 179.1]..[128.6, 184.2] mm from (78, 185)
+# (20261009T171439353Z), outline 52.7 x 7.0 mm (DetailItem507,
+# 20261009T174542021Z).  Its leader leaves the outline's left end at mid
+# height on a 6.35 mm shoulder.
 HANGER_SLOT_FRAME_TEXT_BOX = (0.0009, -0.0059, 0.0506, -0.0008)
+HANGER_SLOT_FRAME_OUTLINE = (0.0, -0.0070, 0.0527, 0.0)
+HANGER_SLOT_FRAME_SHOULDER = 0.00635
 HANGER_SLOT_WIDTH_TEXT_XY = (
     HUB_BOTTOM_CENTER[0] + (BAR_X0 - 24.0) * _HUB_BOTTOM_M_PER_MM,
     HUB_BOTTOM_CENTER[1] + STUD_Z_FRONT * _HUB_BOTTOM_M_PER_MM,
