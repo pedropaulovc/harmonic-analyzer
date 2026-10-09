@@ -715,7 +715,8 @@ deployment identity, reporting and cleanup regression tests gate native builds.
 | PPE (branch previews, all PR base branches) | `harmonicanalyzer-com-ppe` | `c8769c20b85cd2857afe22ef2f9a0a21` | `harmonicanalyzer-com-ppe` | `npm run deploy:preview` |
 
 Worker service names match their account names and account subdomains; account
-IDs are unchanged. Production's origin is
+IDs are unchanged. Production's primary URL is `https://harmonicanalyzer.com`.
+The companion origin remains
 `https://harmonicanalyzer-com-prod.harmonicanalyzer-com-prod.workers.dev`.
 The PPE service origin is
 `https://harmonicanalyzer-com-ppe.harmonicanalyzer-com-ppe.workers.dev`;
@@ -723,6 +724,19 @@ branch Preview API URLs use
 `https://<preview-slug>-harmonicanalyzer-com-ppe.harmonicanalyzer-com-ppe.workers.dev`.
 GitHub's `production` and `web-preview` environment variables
 `CLOUDFLARE_WORKERS_SUBDOMAIN` must match the respective account subdomains above.
+
+Production `wrangler.jsonc` declares the apex as a Workers Custom Domain so
+future deployments retain the binding. Worker logs, invocation logs and traces
+are enabled with 100% head sampling. Static assets served without invoking the
+Worker do not produce Worker invocation telemetry.
+
+Cloudflare Web Analytics is enabled for `harmonicanalyzer.com` in the production
+account, with automatic edge injection and full RUM (`lite: false`). Its beacon
+collects page visits and Web Vitals; no duplicate script is installed in the app,
+and PPE/local pages are not included. Manage this zone-owned setting in
+Cloudflare **Web Analytics**, not Wrangler. Verify the injected
+`static.cloudflareinsights.com/beacon.min.js` and successful `/cdn-cgi/rum`
+requests in a browser; dashboard aggregates can lag collection.
 
 PPE uses `wrangler preview --config wrangler.ppe.jsonc --name "$WORKERS_CI_BRANCH"`
 for both its default branch and non-production branch build command. It never
@@ -814,10 +828,11 @@ also require `GH_TOKEN` and `GITHUB_REPOSITORY` to protect open PR branches.
 The low-level `delete RAW_BRANCH` command deliberately bypasses that open-PR
 protection; reserve it for intentional preview-deletion smoke checks.
 
-The Wrangler files explicitly pin account and Worker identity. They contain
-only the static asset binding and a lossless asset streaming Worker: no storage,
-secrets, unrelated bindings, routes, custom domains or scheduled triggers.
-`keep_vars` preserves dashboard variables; routing remains dashboard-managed.
+The Wrangler files explicitly pin account and Worker identity. Both use the
+static asset binding and a lossless asset streaming Worker, with no storage,
+secrets, unrelated bindings or scheduled triggers. Production also declares its
+apex custom domain and observability settings; PPE has no custom domains.
+`keep_vars` preserves dashboard variables.
 PPE explicitly has a `previews` block to enable noninteractive deployments
 without copying production resource settings. It enables Preview console logs
 for structured `deployment-asset-stream-abort` diagnostics only; automatic

@@ -5,6 +5,23 @@
   "main": "worker.mjs",
   "compatibility_date": "2026-10-08",
   "keep_vars": true,
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "harmonicanalyzer.com", "custom_domain": true }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
