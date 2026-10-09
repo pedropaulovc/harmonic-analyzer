@@ -6,6 +6,7 @@ import ast
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -59,7 +60,7 @@ def test_the_bands_live_on_the_model_dimensions() -> None:
         ("BorePinsProfile", "PinPosY"): "spec.DRIVE_PIN_OFFSET_TOL",
         ("BorePinsProfile", "PinNegY"): "spec.DRIVE_PIN_OFFSET_TOL",
     }
-    # Faced to thickness, never over nominal.
+    # Incoming plate inspection, not a facing-to-thickness operation.
     assert max(spec.PLATE_BAND) == 0.0 > min(spec.PLATE_BAND)
 
 
@@ -96,12 +97,14 @@ def test_sprocket_data_lists_every_configuration() -> None:
     # PD - Dr, Dr = 0.130 in: T12 24.535 - 3.302 = 21.233.
     assert values("BOTTOM DIAMETER (mm, REF)") == ["21.23", "33.27", "45.35"]
     assert rows["CHAIN"] == "ANSI #25 ROLLER, PITCH 6.35, ROLLER Ø3.30"
+    assert "AS SUPPLIED" in rows["TOOTH FORM (REF)"]
 
 
 def test_the_outside_diameter_is_a_model_dimension_not_sheet_text() -> None:
-    """The turned diameter is held to the title block's .X row: the part owns
-    those places on BlankDia, so the sheet never types the value."""
+    """The supplied OD remains a part-owned model dimension, but claims no
+    turning tolerance or manufacturing operation on any configuration."""
     assert "BlankDia" in spec.DRAWING_DIMENSIONS["BlankProfile"]
+    assert spec.DRAWING_REFERENCE_DIMENSIONS == {"BlankDia"}
     assert spec.DRAWING_PRECISION_BY_NAME["BlankDia"] == 1
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
     # p (0.6 + cot(180/N)): T12 6.35 (0.6 + 3.732) = 27.51.
@@ -191,6 +194,7 @@ def test_configuration_views_do_not_meet() -> None:
 class _Dimension:
     def __init__(self, values_m: dict[str, float]) -> None:
         self._values = values_m
+        self.Tolerance = SimpleNamespace(Type=0)
 
     def GetSystemValue3(self, which: int, configuration: str):
         assert which == 3  # swSpecifyConfiguration
@@ -201,6 +205,10 @@ class _Display:
     def __init__(self, places: int, values_m: dict[str, float]) -> None:
         self._places = places
         self._dimension = _Dimension(values_m)
+        self._text = {1: "(<MOD-DIAM>", 2: ")"}
+
+    def GetText(self, part: int) -> str:
+        return self._text[part]
 
     def GetPrimaryPrecision2(self) -> int:
         return self._places
@@ -257,6 +265,32 @@ def test_a_view_without_exactly_one_diameter_is_refused(monkeypatch) -> None:
         drawing._assert_outside_diameter(None, annotations[:1], "T24")
     with pytest.raises(RuntimeError, match="expected one BlankDia"):
         drawing._assert_outside_diameter(None, annotations * 2, "T24")
+
+
+@pytest.mark.parametrize("configuration", [name for name, _teeth in spec.CONFIGS])
+def test_a_supplied_od_that_lost_its_reference_mark_is_refused(
+    monkeypatch, configuration: str
+) -> None:
+    annotations = _od_annotations(monkeypatch, 1, _OD_M)
+    annotations[1]._display._text[1] = "<MOD-DIAM>"
+    with pytest.raises(RuntimeError, match="must be reference-only and unbanded"):
+        drawing._assert_outside_diameter(None, annotations, configuration)
+
+
+def test_a_supplied_od_with_a_manufacturing_band_is_refused(monkeypatch) -> None:
+    annotations = _od_annotations(monkeypatch, 1, _OD_M)
+    annotations[1]._display._dimension.Tolerance.Type = 2
+    with pytest.raises(RuntimeError, match="must be reference-only and unbanded"):
+        drawing._assert_outside_diameter(None, annotations, "T24")
+
+
+def test_notes_specify_every_blank_and_the_operations_not_on_the_views() -> None:
+    assert tuple(spec.BLANK_SKUS) == tuple(name for name, _teeth in spec.CONFIGS)
+    for configuration, sku in spec.BLANK_SKUS.items():
+        assert f"{sku} ({configuration})" in notes.DRAWING_NOTES
+    assert "1 EACH" in notes.DRAWING_NOTES
+    assert "TEETH, O.D. AND PLATE FACES AS SUPPLIED" in notes.DRAWING_NOTES
+    assert "TURN HUB OFF FLUSH" in notes.DRAWING_NOTES
 
 
 def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> None:
@@ -629,7 +663,7 @@ def test_the_gap_draws_as_one_loop_of_minor_arcs_outside_the_disc(teeth: int) ->
 
 
 @pytest.mark.parametrize("teeth", _TEETH)
-def test_the_cut_gap_is_the_ansi_b29_1_standard_form(teeth: int) -> None:
+def test_the_supplied_gap_is_the_ansi_b29_1_standard_form(teeth: int) -> None:
     points = part.gap_points(teeth)
 
     def radius(name: str) -> float:
@@ -651,7 +685,7 @@ def test_the_cut_gap_is_the_ansi_b29_1_standard_form(teeth: int) -> None:
     yz = _DR * (1.4 * _sind(17.0 - 64.0 / teeth) - 0.8 * _sind(b_deg)) * _IN
     topping = _DR * (0.8 * _cosd(b_deg) + 1.4 * _cosd(17.0 - 64.0 / teeth) - 1.3025)
     topping_r = (topping - 0.0015) * _IN
-    # The tips are turned to the OD p (0.6 + cot(180/N)).
+    # The supplied tips follow the OD p (0.6 + cot(180/N)).
     outside = _P * (0.6 + _cosd(half) / _sind(half)) * _IN
     for side, working, topping_arc in (
         ("u", "WorkUpper", "TopUpper"),
@@ -704,6 +738,31 @@ def test_the_volume_check_reads_the_area_the_sketch_cuts(teeth: int) -> None:
     corner = math.atan2(k_u[1], k_u[0]) - math.atan2(k_l[1], k_l[0])
     outside = fan - 0.5 * ra * ra * corner
     assert area - outside == pytest.approx(spec.gap_area(teeth), rel=1e-5)
+
+
+@pytest.mark.parametrize(
+    ("teeth", "vendor_plate_mm3"),
+    [(12, 1248.331943), (18, 2834.845367), (24, 5065.837369)],
+)
+def test_chamfered_plate_matches_the_purchased_blank_volume(
+    teeth: int, vendor_plate_mm3: float
+) -> None:
+    """OCP exact slab z=-1.397..1.397 of the pinned 6793K vendor STEPs,
+    with the supplied bore/mouth breaks filled, isolates the supplied plate.
+    Hub outside-edge breaks are therefore not mistaken for tooth relief.
+    The ACA mid-profile is within 0.007 mm of these blanks, not identical;
+    its plate volume must agree within 0.2%, independently of the build gate.
+    """
+    area = math.pi * (spec.outside_dia(teeth) / 2.0) ** 2 - teeth * spec.gap_area(teeth)
+    at_vendor_thickness = spec.toothed_volume(teeth) - area * (spec.PLATE - 2.794)
+    assert at_vendor_thickness == pytest.approx(vendor_plate_mm3, rel=0.002)
+    # Losing either supplied-face chamfer is observable, even with the
+    # residual difference between the standard and vendor tooth profiles.
+    for missing_faces in (1, 2):
+        incomplete = (
+            at_vendor_thickness + missing_faces * spec.chamfer_volume(teeth) / 2.0
+        )
+        assert abs(incomplete - vendor_plate_mm3) > 0.002 * vendor_plate_mm3
 
 
 class _Result:

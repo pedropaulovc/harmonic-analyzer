@@ -589,8 +589,8 @@ sections:
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
-        - crank T12 sprocket on the restored fixed axis (−129.336, 129.850, z −155.7 chain plane) up to the transgear knob-shaft T24; ANSI #25 link count and sag are solved by _chain.py from those centres
-        - v2 cast-in crank-axis cascade; both sprockets share one band −157.1..−154.3, chain plane −155.7 (`pd_transgear_removable_spec`)
+        - crank T12 sprocket from McMaster 6793K4 on the restored fixed axis (−129.336, 129.850, z −155.7 chain plane) up to the transgear knob-shaft T24 from McMaster 6793K17; ANSI #25 link count and sag are solved by _chain.py from those centres; bought blanks are hub-removed, bored and pin-drilled, with teeth, OD and plate faces as supplied
+        - v2 cast-in crank-axis cascade; both sprockets share one band −157.1..−154.3, chain plane −155.7 (`pd_transgear_removable_spec`); purchased-blank ruling 2026-10-08 and live SKU/vendor-CAD evidence in `cad/references/mcmaster/README.md`
         - med
       - - Cone pivot
         - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post; the thin tip is end-play located by the cup-ended adjuster carried in the black block, and the MHA-VN-016 set-screw collar retains the gear stack on the shaft. The post and block both stand ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
@@ -1612,16 +1612,16 @@ sections:
         - counted + scaled
         - med
       - - Removable gear tooth form
-        - 'ANSI #25 roller-chain sprocket (6.35 pitch, Ø3.30 roller): ANSI B29.1 (ACA) standard tooth form, seating curve R = 0.5025·Dr + 0.0015 in = 1.696 on the pitch circle, working curve E = 1.3025·Dr + 0.0015 in = 4.336, straight yz and topping curve F (2.757 / 2.708 / 2.682) out to the turned OD; T12 / T18 / T24 PD 24.53 / 36.57 / 48.65, OD 27.5 / 39.8 / 52.0, bottom Ø (PD − Dr) 21.23 / 33.27 / 45.35 (`pd_transgear_removable_spec`)'
+        - 'Bought steel ANSI #25 roller-chain sprockets, McMaster 6793K4 / 6793K11 / 6793K17 (T12 / T18 / T24), teeth and OD as supplied (6.35 pitch, Ø3.30 roller). The finished model uses the ANSI B29.1 (ACA) standard tooth form: seating curve R = 0.5025·Dr + 0.0015 in = 1.696 on the pitch circle, working curve E = 1.3025·Dr + 0.0015 in = 4.336, straight yz and topping curve F (2.757 / 2.708 / 2.682); PD 24.53 / 36.57 / 48.65, nominal OD 27.5 / 39.8 / 52.0, bottom Ø (PD − Dr) 21.23 / 33.27 / 45.35 (`pd_transgear_removable_spec`). Supplied STEP mid-plate profiles match the ACA form within 0.007 mm Hausdorff; measured ODs 27.5082 / 39.8272 / 52.0446.'
         - —
-        - 'ch23 p.56 catalog shot (sprocket, not a spur gear: the chain rollers sit in the tooth pockets) + p.58-59 + video f_0215; supersedes the m2 spur-gear read (24T OD ≈ 51 in `v4_transgear_030` stays within 1 mm of the #25 T24 OD 52)'
-        - standard + scaled
+        - 'ch23 p.56 catalog shot (sprocket, not a spur gear: the chain rollers sit in the tooth pockets) + p.58-59 + video f_0215; supersedes the m2 spur-gear read (24T OD ≈ 51 in `v4_transgear_030` stays within 1 mm of the #25 T24 OD 52); purchased-blank ruling 2026-10-08, live McMaster pages and supplied STEP measurements recorded in `cad/references/mcmaster/README.md`'
+        - standard + scaled + vendor CAD
         - med
       - - Removable gear plate / bore / pins
-        - '2.8 flat plate (the #25 tooth width), no hub; common bore Ø10.3 (13/32, 0.39 radial over the Ø9.525 pilot); 2 × Ø2.5 through holes on Ø14 BC at ±Y, over two Ø3/32 drive pins standing 2.4 proud of each shaft''s seat face; bore/pin-hole web 0.60 nominal, 0.47 MIN at the printed bands (photo-faithful, below the 1.5 floor; accepted by the user 2026-09-30, drawing-simplicity-policy.md exception table)'
+        - 'Bought plate faces as supplied: vendor STEP thickness 2.794 (0.110 in), represented by the 2.8 +0/−0.10 plate band; turn the supplied hub off flush with the plate, then bore Ø10.3 through (13/32, 0.39 radial over the Ø9.525 pilot), then drill 2 × Ø2.5 through holes on Ø14 BC at ±Y, over two Ø3/32 drive pins standing 2.4 proud of each shaft''s seat face; bore/pin-hole web 0.60 nominal, 0.47 MIN at the printed bands (photo-faithful, below the 1.5 floor; accepted by the user 2026-09-30, drawing-simplicity-policy.md exception table)'
         - —
-        - 'ch23 p.56 catalog shot (the pin holes nearly touch the bore) + `v4_transgear_020/025/030`; CQ sketch CONTRACT-crank'
-        - scaled + derived
+        - 'ch23 p.56 catalog shot (the pin holes nearly touch the bore) + `v4_transgear_020/025/030`; CQ sketch CONTRACT-crank; purchased-blank ruling 2026-10-08 and supplied STEP plate/hub/bore measurements in `cad/references/mcmaster/README.md`'
+        - scaled + derived + vendor CAD
         - med
       - - Chain wheels
         - 'the two MOUNTED removable sprockets themselves (knob shaft T24, crankshaft T12): the #25 roller chain rides their teeth — that is how gear swaps change the platen ratio, and why the latch slackens the chain. Both sit in ONE band, rear face on the shaft''s seat face at z −154.3, front face −157.1, chain mid-plane −155.7'
@@ -1630,7 +1630,7 @@ sections:
         - counted + scaled
         - med
       - - Drive chain (roller chain; paper-drive rework 2026-07-07)
-        - 'real roller chain (alternating `vn-chain-inner-link`/`vn-chain-outer-link` through the native connected-linkage pattern): pitch-circle centres are knob T24 K (−43.788, 256.893) and crank T12 on the restored fixed axis (−129.336, 129.850); _chain.py solves the exact ANSI #25 link count and sag on the sprockets'' pitch circles. Link pin plane z −155.7 (`pd_transgear_removable_spec.CHAIN_MID_Z`), the same on both shafts.'
+        - 'real ANSI #25 roller chain (alternating `vn-chain-inner-link`/`vn-chain-outer-link` through the native connected-linkage pattern), unchanged with the bought sprockets: McMaster 6793K17 knob T24 K (−43.788, 256.893) and 6793K4 crank T12 on the restored fixed axis (−129.336, 129.850); _chain.py solves the exact ANSI #25 link count and sag on the sprockets'' pitch circles. Link pin plane z −155.7 (`pd_transgear_removable_spec.CHAIN_MID_Z`), the same on both shafts.'
         - —
         - 'ch30 p002/p005/p006 (taut run + visibly drooping slack run) + ch. 23 p.58-59 (chain wider than the wheel); crank centre from ch30 GT; knob centre K = stud S (0, 266.201) + the permanent 12T:120T mesh c-c 44.766 at −168° (CONTRACT-paper-drive axis points, round 10)'
         - scaled + derived
@@ -1674,7 +1674,7 @@ sections:
       - - Knob shaft (MHA-PD-008, round 10)
         - 'steel, on axis K (−43.788, 256.893), z −172..−101.26 (70.74): 1/4-20 stud end from the tip −172 to −154.6 (thumbnut MHA-PD-013, seated on the collar''s pilot, faced 0.05–0.15 proud of the T24 front face, the T24 free under it); Ø6.35 plain core to the 12T front face −148.1 carrying the sliding brass drive collar `pd-transgear-drive-collar` (MHA-PD-022: Ø17.5 × 4 body −154.3..−150.3 = the T24 seat, Ø10 pilot inside the T24''s Ø10.3 bore, two 3/32 × 3/16 dowels MHA-VN-038 pressed in its through holes 2.4 proud of its front face, pinned at assembly by the 1/16 spring pin MHA-VN-037 through the core, lying in the collar''s rear slot); integral 12T DP38 −148.1..−142.2; Ø8.5 journal −142.2..−101.26 running in the arm plate''s bore behind the loose brass thrust ring MHA-PD-015; the brass cup MHA-PD-016 (Ø19 × 8.0 ring, −107.76..−99.76) on the journal''s rear end, pinned by the 1/16 × 5/8 spring pin MHA-VN-048 match-drilled through cup and journal 3.0 behind its front face; no retaining screw or tap. T24 sprocket plate −157.1..−154.3, #25 chain plane −155.7'
         - —
-        - '`v4_transgear_008/020` + ch. 23 topology; CONTRACT-paper-drive §1 (round 10, R9-6 / R9-17); the −155.7 chain plane both shafts share (`pd_transgear_removable_spec`)'
+        - '`v4_transgear_008/020` + ch. 23 topology; CONTRACT-paper-drive §1 (round 10, R9-6 / R9-17); the −155.7 chain plane both shafts share (`pd_transgear_removable_spec`); purchased-blank ruling 2026-10-08 replaces only the removable T24 stock with McMaster 6793K17, hub turned off flush, Ø10.3 through bore and two Ø2.5 pin holes on Ø14; shaft, collar and chain interfaces unchanged'
         - scaled + derived
         - low/med
       - - Latch hook (MHA-PD-014, round 10, R9-10)

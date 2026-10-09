@@ -17,6 +17,9 @@ recipes:
 |---|---|---|
 | 3606T118 | `vn-keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
 | 3606T811 | `vn-keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
+| 6793K4 | `pd-transgear-removable` T12 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 12 Teeth |
+| 6793K11 | `pd-transgear-removable` T18 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 18 Teeth |
+| 6793K17 | `pd-transgear-removable` T24 (shop-reworked blank) | Steel ANSI #25 Plain-Bore Sprocket, 24 Teeth |
 | 90114A511 | `vn-fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | `vn-knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `vn-foot-screw`, `vn-swing-stop-screw`, `vn-latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -238,6 +241,78 @@ Catalog specifications checked on September 10, 2026:
   centre of mass (`cad/out/reference/91255A148-replica-report.json`).
   Evidence SHA-256: native SLDPRT
   `4b8dac17c6b7e77499209a399342aa51780743b657aec0df7175f227b54e59a0`.
+- [6793K4](https://www.mcmaster.com/6793K4/),
+  [6793K11](https://www.mcmaster.com/6793K11/) and
+  [6793K17](https://www.mcmaster.com/6793K17/) are the bought blanks for
+  `pd-transgear-removable`, MHA-PD-009 T12/T18/T24, per the user ruling of
+  October 8, 2026. The pages, read live October 8, 2026, specify steel,
+  ANSI #25, 1/4 in pitch and plain bores; they state no steel grade, plate
+  thickness, finish or coating. The registry retains Plain Carbon Steel and
+  an as-supplied, unplated finish; no supplier grade or coating is inferred.
+  Teeth, OD and plate faces remain as supplied. Shop operations are, in order:
+  turn the hub off flush with the supplied plate, bore Ø10.3 through, then
+  drill two Ø2.5 through drive-pin holes on Ø14. Identity, ANSI #25 chain
+  and shaft/collar interfaces are unchanged.
+  Source: `C:/src/dt-logs/sprocket-evidence/mcmaster-skus.md` (October 8, 2026),
+  recording the live pages and headless OCP measurements of user-supplied CAD:
+
+  | supplied blank measurement (mm unless noted) | 6793K4 T12 | 6793K11 T18 | 6793K17 T24 |
+  |---|---|---|---|
+  | OD | 27.5082 | 39.8272 | 52.0446 |
+  | plate thickness; faces about its mid-plane | 2.794; −1.397 / +1.397 | 2.794; −1.397 / +1.397 | 2.794; −1.397 / +1.397 |
+  | hub diameter × projection beyond plate | 15.875 × 9.906 | 28.575 × 9.906 | 38.100 × 13.081 |
+  | supplied bore | 6.35 | 6.35 | 9.525 |
+  | supplied bore chamfer, both ends, 45° | 0.3175 | 0.3175 | 0.476 |
+  | whole-blank volume (mm³), before shop rework | 2794.988 | 8765.472 | 18817.317 |
+
+  Each supplied tooth-side chamfer is a revolved cone on both faces:
+  semi-angle 73.828° (16.172° to the face), radial width 1.905 and axial
+  depth 0.552, running from the OD to Ø(OD − 3.81) at the plate face.
+  Mid-plate profiles match the spec's ACA tooth form within 0.007 mm
+  Hausdorff distance for all three blanks; symmetric-difference areas are
+  0.69 / 1.10 / 1.46 mm² respectively. The nominal 2.8 +0/−0.10 plate band
+  includes the supplied 2.794 plate. After boring T24 to Ø10.3, its supplied
+  hubless-face bore chamfer to Ø10.4775 leaves an approximately 0.09 radial
+  edge break.
+
+  An independent headless OCP volume cross-check, recorded by the local-only
+  `C:/src/dt-logs/sprocket-evidence/plate_volume_crosscheck.py`, clips each
+  vendor STEP to z = −1.397..+1.397 and fills its supplied bore and mouth
+  breaks with a radius-6 cylinder to isolate the solid toothed plate.
+  Comparing that plate with the ACA model at the same 2.794 thickness,
+  including both conical tooth-side cuts, gives:
+
+  | cross-check volume (mm³) | T12 | T18 | T24 |
+  |---|---|---|---|
+  | filled vendor plate | 1248.331943 | 2834.845367 | 5065.837369 |
+  | ACA plate with tooth-side chamfers | 1246.650982 | 2832.032137 | 5062.167973 |
+  | ACA minus vendor | −1.680961 | −2.813230 | −3.669396 |
+  | material removed by modelled tooth-side chamfers | 24.488689 | 34.334689 | 44.060412 |
+  | expected finished model, nominal 2.8 thickness, Ø10.3 bore and two Ø2.5 pin holes | 988.587671 | 2577.394510 | 4812.340357 |
+
+  The same-thickness plate differences are below 0.14% and reflect the
+  residual tooth-profile differences, not an omitted hub or tooth-side
+  chamfer. The expected finished volumes are numerical model predictions,
+  not measured shop parts or a SolidWorks-build acceptance result. The probe
+  remains local-only and is not tracked; the original vendor files are bound
+  by the hashes below.
+
+  Evidence SHA-256:
+
+  | local-only vendor file | SHA-256 |
+  |---|---|
+  | `6793K4.STEP` | `f220620116bb06a842faba75d61c33d807c639239e81f23ba5e4360af239f470` |
+  | `6793K11.STEP` | `daa0cdef6391e60ffeeba99f35a9436edcf90b3098384b043b5754693caed894` |
+  | `6793K17.STEP` | `6d88447ab5e301a19f42d172e319aedea319892d7790cbe6a7ecbc0c5dd98253` |
+  | `6793K4.SLDPRT` | `8197ff52361ab9cd9b387bdda8e1fda0fa931ecf5db9a07ed33b13a3125ac9c1` |
+  | `6793K11.SLDPRT` | `b1b131c9edb72b1dc247f337ec30bb705594aeb83715c7c834ddc0fa871cde5d` |
+  | `6793K17.SLDPRT` | `98b8bc501273cac0a82962b01ebeb4f19943f812ae23408881f60e6d90e948e0` |
+
+  These STEP and SLDPRT files are © McMaster-Carr, local-only evidence,
+  never committed or redistributed. No `diag_build_*` recipe replays these
+  whole vendor blanks: the finished part is modelled from
+  `pd_transgear_removable_spec`, not imported vendor geometry.
+
 
 - [91251A108](https://www.mcmaster.com/91251A108/) (`vn-cone-tip-block-screw`,
   MHA-VN-030) holds the cone tip block down per the user ruling of September 29,

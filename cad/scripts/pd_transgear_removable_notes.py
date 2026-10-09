@@ -50,14 +50,13 @@ def _per_configuration(render: Callable[[int], str]) -> str:
 # the three configurations, which differ only in their tooth count.  The
 # outside diameter is not here: it is the part's BlankDia, printed natively on
 # each configuration's view.  The pitch and bottom diameters follow from the
-# chain and the ANSI B29.1 tooth form a #25 cutter reproduces, so they are
-# reference values.
+# supplied ANSI B29.1 tooth form, so they are reference values.
 _GEAR_DATA_ROWS = (
     (
         "CHAIN",
         f"ANSI #25 ROLLER, PITCH {spec.CHAIN_PITCH:.2f}, ROLLER Ø{spec.ROLLER_DIA:.2f}",
     ),
-    ("TOOTH FORM (REF)", "ANSI B29.1 #25 STANDARD FORM,"),
+    ("TOOTH FORM (REF)", "AS SUPPLIED, ANSI B29.1 #25 STANDARD FORM;"),
     ("", f"ROLLER SEAT R{spec.SEAT_CURVE_R:.2f} ON THE PITCH CIRCLE"),
     ("CONFIGURATION", "  /  ".join(name for name, _teeth in spec.CONFIGS)),
     ("NUMBER OF TEETH", _per_configuration(str)),
@@ -82,9 +81,13 @@ GEAR_DATA = "\n".join(
 
 DRAWING_NOTES = "\n".join(
     (
-        "MAKE ONE SPROCKET OF EACH CONFIGURATION IN SPROCKET DATA.",
-        f"DRIVE-PIN HOLES SLIP OVER THE PRESSED PINS OF CRANKSHAFT {CRANKSHAFT_NUMBER}",
-        f"    AND KNOB DRIVE COLLAR {KNOB_COLLAR_NUMBER}.",
+        "BLANK, 1 EACH: McMASTER "
+        + " / ".join(
+            f"{spec.BLANK_SKUS[name]} ({name})" for name, _teeth in spec.CONFIGS
+        )
+        + ".",
+        "TEETH, O.D. AND PLATE FACES AS SUPPLIED; TURN HUB OFF FLUSH.",
+        f"DRIVE-PIN HOLES SLIP OVER PINS IN {CRANKSHAFT_NUMBER} AND {KNOB_COLLAR_NUMBER}.",
         BORE_PIN_WEB_NOTE,
     )
 )
