@@ -76,8 +76,16 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    the requirement AND the machine's error model rewards it
    (assessment §2: the summing knife edge, the cams, channel-to-channel
    consistency). The allowlist:
-   - **knife-edge system** — knife-mount bore; summing-lever knife seat and its
-     20-hole spring pattern (one pattern position frame);
+   - **knife-edge system** — knife-mount bore (one composite position frame to
+     the top seat, datum A, and the 2X dowel-hole pattern, datum B: Ø0.20
+     located, Ø0.05 orientation refinement) and its #6-32 hanger tap (Ø0.10 to
+     A|B, so the crossbar's Ø4.318 clearance hole still floats round the screw
+     — `build_sm_summing_assembly._assert_knife_hanger_stack`); the top
+     frame's two knife-hanger dowel slots (⌖0.05 to the round dowel hole at
+     their own station, datum B front / C rear, with the other station's
+     round hole translated, B|C▷ and C|B▷, so the two knife mounts' dowel
+     lines stay square to the knife-edge line); summing-lever knife seat and
+     its 20-hole spring pattern (one pattern position frame);
    - **cams** — pinion-cam eccentric-axis position (and any future cam);
    - **channel consistency** — at most one control per channel part
      (rocker arm, channel lever, amplitude bar, connecting rod) where a
