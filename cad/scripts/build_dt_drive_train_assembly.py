@@ -312,8 +312,7 @@ def _cone_tip_radius_max(teeth: int) -> float:
 # from its SOUTH face only (seed placed (reference - face)/2 = 0.19435 SOUTH
 # of its station), so all north faces -- and the tip end against T006 -- are
 # unchanged.  The drum's engaged zone keeps its place about the
-# reference centre (test_dt_cone_gear_mesh_design re-expresses it about the grown
-# centre and holds it inside the face under the stack's axial stations).
+# reference centre, inside the face under the stack's axial stations.
 CONE_FACE = CONE_GEAR_FACE_WIDTH
 from dt_crank_drive_gear_spec import (  # noqa: E402
     FACE_WIDTH as GEAR64_FACE,
