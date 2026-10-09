@@ -1414,6 +1414,67 @@ def test_cone_line_consumers_do_not_import_the_drive_train_script():
         assert "build_dt_drive_train_assembly" not in deps, script
 
 
+def test_pd_station_band_consumers_do_not_reach_rich_plate_or_phase_calibration():
+    """Real module closure, not an empty unregistered-packet dependency list."""
+    rich_plate = _helper_names("pd_transgear_arm_plate_spec.py")
+    assert {
+        "pd_transgear_arm_plate_geometry", "_gtol_spec", "_surface_finish"
+    } <= rich_plate
+    forbidden = {
+        "pd_transgear_arm_plate_spec",
+        "crank_mesh_stack",
+        "crank_mesh_geometry",
+        "crank_mesh_calibration",
+        "dt_cone_gear_spec",
+    }
+    for script in (
+        "transgear_cluster_fit.py",
+        "pd_transgear_disc_hub_spec.py",
+        "build_pd_transgear_feed_pinion.py",
+        "draw_pd_transgear_feed_pinion.py",
+        "build_pd_transgear_disc_hub.py",
+        "draw_pd_transgear_disc_hub.py",
+        "pd_paper_drive_assembly_steps.py",
+    ):
+        deps = _helper_names(script)
+        assert {
+            "pd_transgear_arm_plate_geometry", "_printed_tolerance", "_config"
+        } <= deps, script
+        assert forbidden.isdisjoint(deps), (script, forbidden & deps)
+
+
+def test_crank_physical_interfaces_do_not_acquire_phase_calibration():
+    """The real PD collar retains the shaft grades, not its native phase guard."""
+    forbidden = {
+        "crank_mesh_stack", "crank_mesh_geometry",
+        "crank_mesh_calibration", "dt_cone_gear_spec",
+    }
+    for script, retained in (
+        ("dt_crank_pinion_spec.py", {"dt_crank_drive_gear_spec"}),
+        ("dt_crankshaft_spec.py", {"dt_crank_pinion_spec"}),
+        (
+            "pd_transgear_drive_collar_spec.py",
+            {"dt_crankshaft_spec", "dt_crank_pinion_spec"},
+        ),
+    ):
+        deps = _helper_names(script)
+        assert retained | {"stock_form_cutter", "_config"} <= deps, script
+        assert forbidden.isdisjoint(deps), (script, forbidden & deps)
+
+
+def test_native_crank_phase_guard_consumers_retain_calibration_sources():
+    """Moving a guard out of pure interfaces must not delete genuine inputs."""
+    required = {
+        "crank_mesh_stack", "crank_mesh_geometry",
+        "crank_mesh_calibration", "dt_cone_gear_spec",
+    }
+    for script in (
+        "build_dt_crankshaft.py", "build_dt_drive_train_assembly.py"
+    ):
+        deps = _helper_names(script)
+        assert required <= deps, (script, required - deps)
+
+
 def test_swing_platform_consumers_read_geometry_not_the_builder():
     """The base and the drive train read the platform's plan geometry, not its
     builder or its print data: a sketch, precision or caption edit on MHA-DT-020

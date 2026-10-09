@@ -467,7 +467,7 @@ if not math.isclose(
 # ratio, whatever the two pitch radii) past the contact on ITS side.
 # Only the qualified actual-stock payload supplies the mesh-window offset.
 # The part's independent matched-hole clocking must agree with this placement.
-from dt_crank_pinion_spec import require_selected_pin_clocking  # noqa: E402
+from crank_mesh_stack import require_selected_pin_clocking  # noqa: E402
 
 PINION_PIN_CLOCKING_DEG = require_selected_pin_clocking()
 if not math.isclose(

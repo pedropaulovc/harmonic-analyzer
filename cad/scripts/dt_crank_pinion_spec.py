@@ -305,9 +305,8 @@ if BOSS_WALL_WORST < BOSS_WALL_FLOOR_MM:
 # actual pin is a light drive fit. The callout locates the operation at the
 # boss mid-length and requires the fitted pin flush on both sides. The hole sits
 # on the pinion's local -X; its clocking against the 64T tooth-in-gap seed is
-# carried by the crankshaft hole. Its entry angle is returned only by
-# require_selected_pin_clocking() after source-bound qualification. The
-# assembly independently checks that angle against its tooth-in-gap seed.
+# carried by the crankshaft hole. Physical datum geometry here is independent
+# of the source-qualified phase selected by the native publication callers.
 PIN_HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
 PIN_DIA = FRACTIONAL_DRILL_MM["1/8"]  # 3.175
 PIN_LENGTH = BOSS_DIA  # flush both sides
@@ -429,37 +428,11 @@ _PINION_DATUM_CLOCK_DEG = (
 ) % (360.0 / TEETH)
 
 
-def require_selected_pin_clocking() -> float:
-    """Refuse native publication until the physical measured phase is selected."""
-    phase = _config.machine("gear_train").get("crank_mesh_phase_offset_deg")
-    if phase is None:
-        raise RuntimeError(
-            "UNQUALIFIED crank phase: select the actual stock-form physical phase "
-            "before publishing the crankshaft retention hole"
-        )
-    if type(phase) not in (int, float) or not math.isfinite(phase):
-        raise ValueError("selected crank mesh phase must be finite")
-    # Lazy import keeps pure geometry construction independent of calibration.
-    # A numeric config edit alone may never publish a retention hole.
-    from crank_mesh_stack import require_qualified
-
-    measured = require_qualified()["phase_seed_deg"]
-    if not math.isclose(phase, measured, rel_tol=0.0, abs_tol=1e-12):
-        raise RuntimeError("crankshaft retention clock is stale relative to the qualified physical phase")
-    clock = _PINION_DATUM_CLOCK_DEG + phase
-    if not 0.0 <= clock < 360.0 / TEETH:
-        raise ValueError("pinion retention-hole clocking must lie within one physical tooth pitch")
-    return clock
-
-
 # The matched-hole callout on both part records identifies both seated parts,
 # the shared boss-mid-length operation and the actual fitted pin. It deliberately
 # omits the modeled hole nominal: reaming to a functional acceptance governs,
 # and the pin identity plus flush condition stay on the feature callout.
-# The part numbers are hard-coded, not read from ``_config.parts``: this module
-# reaches the crank-mesh stack, and through it the cone-swing platform and every
-# script that imports that, so a registry read here would make three part rows
-# rebuild inputs of the frame (dt_crank_drive_gear_notes' precedent).
+# The part numbers are hard-coded, not read from ``_config.parts``.
 # test_dt_crank_pinion_drawing checks them against the registry offline.
 CRANKSHAFT_NUMBER = "MHA-DT-011"
 PINION_NUMBER = "MHA-DT-010"

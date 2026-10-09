@@ -612,35 +612,73 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
 
 
 def test_native_shaft_refuses_an_unselected_or_stale_stock_form_clock(monkeypatch) -> None:
-    import dt_crank_pinion_spec as pinion
     import crank_mesh_stack as mesh
 
-    monkeypatch.setattr(pinion._config, "machine", lambda *_keys: {})
-    with pytest.raises(RuntimeError, match="UNQUALIFIED crank phase"):
-        pinion.require_selected_pin_clocking()
+    calls = []
+    measured_phase = -0.5
+    def qualified():
+        calls.append("require_qualified")
+        return {"phase_seed_deg": measured_phase}
+    monkeypatch.setattr(mesh, "require_qualified", qualified)
+
+    for configured in ({}, {"crank_mesh_phase_offset_deg": None}):
+        monkeypatch.setattr(mesh._config, "machine", lambda *_keys: configured)
+        with pytest.raises(RuntimeError, match="UNQUALIFIED crank phase"):
+            mesh.require_selected_pin_clocking()
+        assert calls == []
+    for phase in (math.inf, -math.inf, math.nan, True, "-0.5"):
+        monkeypatch.setattr(
+            mesh._config, "machine",
+            lambda *_keys: {"crank_mesh_phase_offset_deg": phase},
+        )
+        with pytest.raises(ValueError, match="must be finite"):
+            mesh.require_selected_pin_clocking()
+        assert calls == []
+
     monkeypatch.setattr(
-        pinion._config, "machine",
-        lambda *_keys: {"crank_mesh_phase_offset_deg": math.inf},
-    )
-    with pytest.raises(ValueError, match="must be finite"):
-        pinion.require_selected_pin_clocking()
-    monkeypatch.setattr(mesh, "require_qualified", lambda: {"phase_seed_deg": -0.5})
-    monkeypatch.setattr(
-        pinion._config, "machine",
+        mesh._config, "machine",
         lambda *_keys: {"crank_mesh_phase_offset_deg": 0.5},
     )
     with pytest.raises(RuntimeError, match="retention clock is stale"):
-        pinion.require_selected_pin_clocking()
+        mesh.require_selected_pin_clocking()
+    assert calls == ["require_qualified"]
+    calls.clear()
     monkeypatch.setattr(
-        pinion._config, "machine",
+        mesh._config, "machine",
         lambda *_keys: {"crank_mesh_phase_offset_deg": -0.5},
     )
-    assert pinion.require_selected_pin_clocking() == pytest.approx(pinion._PINION_DATUM_CLOCK_DEG - 0.5)
+    assert mesh.require_selected_pin_clocking() == pytest.approx(
+        mesh.geometry.pinion._PINION_DATUM_CLOCK_DEG - 0.5
+    )
+    assert calls == ["require_qualified"]
+
+    tooth_pitch = 360.0 / mesh.geometry.pinion.TEETH
+    for phase in (-tooth_pitch, tooth_pitch):
+        calls.clear()
+        measured_phase = phase
+        monkeypatch.setattr(
+            mesh._config, "machine",
+            lambda *_keys: {"crank_mesh_phase_offset_deg": phase},
+        )
+        with pytest.raises(ValueError, match="one physical tooth pitch"):
+            mesh.require_selected_pin_clocking()
+        assert calls == ["require_qualified"]
+
+    calls.clear()
+    monkeypatch.setattr(
+        mesh._config, "machine",
+        lambda *_keys: {"crank_mesh_phase_offset_deg": -0.5},
+    )
     def refused():
+        calls.append("require_qualified")
         raise ValueError("synthetic current-source calibration refusal")
     monkeypatch.setattr(mesh, "require_qualified", refused)
     with pytest.raises(ValueError, match="current-source calibration refusal"):
-        pinion.require_selected_pin_clocking()
+        mesh.require_selected_pin_clocking()
+    assert calls == ["require_qualified"]
+    assert part.require_selected_pin_clocking is mesh.require_selected_pin_clocking
+    assert not hasattr(mesh.geometry.pinion, "require_selected_pin_clocking")
     source = Path(part.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(adapter)"):]
+    assert body.splitlines()[1].strip() == "pinion_pin_clocking_deg = require_selected_pin_clocking()"
     assert body.index("require_selected_pin_clocking()") < body.index("await adapter.create_part()")

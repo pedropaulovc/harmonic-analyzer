@@ -284,6 +284,26 @@ def require_qualified(payload: dict | None = None) -> dict:
         raise ValueError(f"incomplete actual3D stock-form calibration payload: {exc}") from exc
 
 
+def require_selected_pin_clocking() -> float:
+    """Refuse native publication until the physical measured phase is selected."""
+    phase = _config.machine("gear_train").get("crank_mesh_phase_offset_deg")
+    if phase is None:
+        raise RuntimeError(
+            "UNQUALIFIED crank phase: select the actual stock-form physical phase "
+            "before publishing the crankshaft retention hole"
+        )
+    if type(phase) not in (int, float) or not math.isfinite(phase):
+        raise ValueError("selected crank mesh phase must be finite")
+    # A numeric config edit alone may never publish a retention hole.
+    measured = require_qualified()["phase_seed_deg"]
+    if not math.isclose(phase, measured, rel_tol=0.0, abs_tol=1e-12):
+        raise RuntimeError("crankshaft retention clock is stale relative to the qualified physical phase")
+    clock = geometry.pinion._PINION_DATUM_CLOCK_DEG + phase
+    if not 0.0 <= clock < 360.0 / geometry.pinion.TEETH:
+        raise ValueError("pinion retention-hole clocking must lie within one physical tooth pitch")
+    return clock
+
+
 @dataclass(frozen=True)
 class RowQualification:
     case_name: str

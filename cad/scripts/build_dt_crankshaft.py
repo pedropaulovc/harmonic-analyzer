@@ -62,11 +62,11 @@ from _hole_spec import blind_cut_dia_mm
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
+from crank_mesh_stack import require_selected_pin_clocking
 from dt_crank_pinion_spec import (
     CRANKSHAFT_PIN_HOLE_PROCESS,
     PIN_DIA as PINION_PIN_DIA,
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
-    require_selected_pin_clocking,
 )
 from dt_crankshaft_spec import (
     COLLAR_DIA,
